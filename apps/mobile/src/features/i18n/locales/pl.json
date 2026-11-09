@@ -144,6 +144,7 @@
     "refuseTitle": "Odrzuć prośbę",
     "refuseAsk": "Odrzucić prośbę?",
     "leaves": "wychodzi poza firmę",
+    "leavesPersonal": "wychodzi poza twoją przestrzeń roboczą",
     "refuseWhyF": "{{name}} uczy się z uzasadnienia. Opcjonalnie.",
     "refuseWhyM": "{{name}} uczy się z uzasadnienia. Opcjonalnie.",
     "sheet": {
@@ -179,6 +180,7 @@
       "irreversible": "Nie da się cofnąć",
       "reversible": "Można cofnąć",
       "external": "Wychodzi poza firmę",
+      "externalPersonal": "Wychodzi poza twoją przestrzeń roboczą",
       "unsent": "Nic nie zostanie wysłane",
       "deletable": "Można usunąć"
     },
@@ -253,6 +255,9 @@
     "newChannelHint": "Dla zespołu albo tematu",
     "channelPlaceholder": "Nazwa kanału, np. marketing",
     "createChannel": "Utwórz kanał",
+    "newChannelHintPersonal": "Na jeden temat, z kilkoma agentami",
+    "channelPlaceholderPersonal": "Nazwa, np. podróż",
+    "createChannelPersonal": "Utwórz rozmowę grupową",
     "waitIn": "w {{where}}",
     "workingNowLine_one": "{{count}} agent pracuje teraz",
     "workingNowLine_few": "{{count}} agenci pracują teraz",
@@ -265,6 +270,7 @@
       "unmute": "Włącz dźwięk"
     },
     "firstRunLine": "{{name}} konfiguruje zespół · {{done}} z {{total}}",
+    "firstRunLinePersonal": "{{name}} konfiguruje twoich agentów · {{done}} z {{total}}",
     "first": {
       "title": "Zacznij od pierwszego agenta",
       "subtitle": "Nadaj mu nazwę i powiedz, czym się zajmuje. Pojawi się tutaj jako czat.",
@@ -293,6 +299,8 @@
     "chat": "Czat z…",
     "name": "Nazwa",
     "channelFine": "Dla zespołu albo tematu.",
+    "channelPersonal": "Rozmowa grupowa",
+    "channelFinePersonal": "Na jeden temat, z kilkoma agentami.",
     "chatSearch": "Szukaj osoby albo agenta",
     "to": "Do:",
     "people": "Osoby",
@@ -305,6 +313,7 @@
     "routineHint": "Agent zrobi to sam, według harmonogramu",
     "wikiPage": "Strona wiki",
     "wikiHint": "Do czytania dla zespołu i agentów",
+    "wikiHintPersonal": "Do czytania dla twoich agentów",
     "inviteHint": "Przez e-mail lub link",
     "agent": {
       "question": "Czym będzie się zajmować?"
@@ -490,12 +499,14 @@
       "arrived": "{{name}} dołącza do zespołu",
       "meet": "Twoja pierwsza rozmowa z: {{name}}",
       "roleIntro": "{{role}} w twoim zespole. Pytaj zwykłymi słowami.",
+      "roleIntroPersonal": "{{role}}, do twojej dyspozycji. Pytaj zwykłymi słowami.",
       "noIntro": "Poproś o to, czego potrzebujesz, zwykłymi słowami.",
       "firstTitle": "Na początek",
       "sendHint": "Stuknij, aby wysłać",
       "hello": "Cześć, {{person}}! Jestem {{name}}.",
       "helloNoName": "Cześć! Jestem {{name}}.",
       "helloRole": "{{role}} w zespole.",
+      "helloRolePersonal": "{{role}}, do twojej dyspozycji.",
       "helloAsk": "Od czego zaczynamy?",
       "now": "teraz",
       "start": {
@@ -833,6 +844,7 @@
     "noGroupSection": "Bez działu",
     "workingSection": "Pracują",
     "teamSection": "Zespół",
+    "teamSectionPersonal": "Twoi agenci",
     "managerQuiet": "Nic w toku",
     "state": {
       "waitsYou": "czeka na twoją zgodę",
@@ -1185,7 +1197,9 @@
     "title": "Ty",
     "role": {
       "owner": "właściciel",
-      "member": "członek"
+      "member": "członek",
+      "ownerPersonal": "twój osobisty obszar roboczy",
+      "memberPersonal": "osobisty obszar roboczy udostępniony tobie"
     },
     "appearance": "Wygląd",
     "notifications": "Powiadomienia",
@@ -1985,6 +1999,7 @@
     "loadFailed": "Nie udało się wczytać konektorów.",
     "connectedCheck": "{{name}}, połączono",
     "adminsOnly": "Usługi łączy tylko administrator {{org}}. Poproś któregoś z nich.",
+    "adminsOnlyPersonal": "Aplikacje łączy tylko osoba, która prowadzi tę przestrzeń roboczą. Poproś ją.",
     "canTitle": "Agenci będą mogli",
     "asks": "{{text}} · prosi o twoje zatwierdzenie",
     "connect": "Połącz",
@@ -2135,6 +2150,7 @@
     "zoneChange": "Zmień",
     "zoneTitle": "Strefa czasowa",
     "anotherTitle": "Jak nazywa się nowa przestrzeń robocza?",
+    "anotherPurpose": "Do czego ma służyć nowa przestrzeń robocza?",
     "anotherLead": "W agentes.chat. Zostajesz w {{org}} i możesz przełączyć się w każdej chwili.",
     "suggested": "Na podstawie twojego adresu w domenie {{domain}} proponuję {{org}}.",
     "create": "Utwórz",
@@ -2557,7 +2573,11 @@
       "title": "Zbuduj zespół agentów",
       "text": "Każdy agent przyjmuje rolę i pracuje z tobą na czacie.",
       "viewerTitle": "Tutaj jest twój zespół agentów",
-      "viewerText": "Osoba tworząca agentów w tym obszarze roboczym doda pierwszego, a on pojawi się tutaj."
+      "viewerText": "Osoba tworząca agentów w tym obszarze roboczym doda pierwszego, a on pojawi się tutaj.",
+      "titlePersonal": "Korzystaj z pomocy własnych agentów",
+      "textPersonal": "Każdy agent zajmuje się jedną sprawą za ciebie, prosto na czacie.",
+      "viewerTitlePersonal": "Tutaj są twoi agenci",
+      "viewerTextPersonal": "Osoba tworząca tu agentów doda pierwszego, a on pojawi się tutaj."
     },
     "agentsForYou": {
       "title": "Twoi agenci pojawiają się tutaj",
@@ -2567,13 +2587,20 @@
       "title": "Wszystko, co tworzy zespół, w jednym miejscu",
       "text": "Raporty, tabele i pliki agentów i osób zostają tutaj, łatwe do znalezienia.",
       "viewerTitle": "Znajdź to, co tworzy zespół",
-      "viewerText": "Tutaj pojawia się to, co agenci i osoby tworzą na czatach."
+      "viewerText": "Tutaj pojawia się to, co agenci i osoby tworzą na czatach.",
+      "titlePersonal": "Wszystko, co tworzą twoi agenci, w jednym miejscu",
+      "textPersonal": "Raporty, tabele i pliki twoich agentów zostają tutaj, łatwe do znalezienia.",
+      "viewerTitlePersonal": "Znajdź to, co tworzą twoi agenci",
+      "viewerTextPersonal": "To, co agenci tworzą w twoich rozmowach, pojawia się tutaj."
     },
     "tasks": {
       "title": "Przekaż pracę zespołowi",
       "text": "Utwórz zadanie dla agenta lub osoby i śledź je do końca.",
       "viewerTitle": "Śledź pracę zespołu",
-      "viewerText": "Zadania pojawią się tutaj, gdy ktoś utworzy pierwsze."
+      "viewerText": "Zadania pojawią się tutaj, gdy ktoś utworzy pierwsze.",
+      "titlePersonal": "Przekaż swoje sprawy agentom",
+      "textPersonal": "Utwórz zadanie dla agenta i śledź je do końca.",
+      "viewerTitlePersonal": "Śledź pracę swoich agentów"
     },
     "routines": {
       "title": "Zostaw powtarzalną pracę agentom",
@@ -2585,7 +2612,10 @@
       "title": "Zachowaj to, co zespół powinien wiedzieć",
       "text": "Osoby i agenci czytają te strony, więc wszyscy pracują na tych samych informacjach.",
       "viewerTitle": "Sprawdź, co wie zespół",
-      "viewerText": "Osoba edytująca wiki napisze pierwszą stronę, a ona pojawi się tutaj."
+      "viewerText": "Osoba edytująca wiki napisze pierwszą stronę, a ona pojawi się tutaj.",
+      "titlePersonal": "Prowadź notatki, które czytają twoi agenci",
+      "textPersonal": "Twoi agenci czytają te strony i pracują na tym, co napisałeś.",
+      "viewerTitlePersonal": "Sprawdź, co tu jest napisane"
     },
     "memory": {
       "title": "Twoi agenci uczą się podczas pracy",
@@ -2608,13 +2638,21 @@
       "text": "Każdy kanał łączy tych, którzy zajmują się jednym tematem.",
       "viewerTitle": "Tutaj są kanały zespołu",
       "viewerText": "Osoba tworząca kanały otworzy pierwszy, a on pojawi się tutaj.",
-      "action": "Utwórz kanał"
+      "action": "Utwórz kanał",
+      "titlePersonal": "Rozmawiaj z kilkoma agentami naraz",
+      "textPersonal": "Każda rozmowa grupowa łączy agentów i osoby wokół jednego tematu.",
+      "viewerTitlePersonal": "Tutaj są rozmowy grupowe",
+      "viewerTextPersonal": "Osoba tworząca rozmowy grupowe otworzy pierwszą, a ona pojawi się tutaj."
     },
     "people": {
       "title": "Pracuj tutaj ze swoim zespołem",
       "text": "Zaproś osoby, aby rozmawiać z nimi i z agentami w jednym miejscu.",
       "viewerTitle": "Twój zespół pojawia się tutaj",
-      "viewerText": "Osoba zapraszająca ściągnie resztę zespołu, a oni pojawią się tutaj."
+      "viewerText": "Osoba zapraszająca ściągnie resztę zespołu, a oni pojawią się tutaj.",
+      "titlePersonal": "Zaproś rodzinę lub przyjaciół",
+      "textPersonal": "Zaproś kogoś, aby rozmawiać z tobą i z twoimi agentami w jednym miejscu.",
+      "viewerTitlePersonal": "Tutaj pojawiają się rodzina i przyjaciele",
+      "viewerTextPersonal": "Gdy ktoś dołączy, pojawi się tutaj."
     },
     "chat": {
       "title": "Wszystko zaczyna się od wiadomości",
@@ -2634,7 +2672,11 @@
       "title": "Udostępniaj loginy bez przekazywania haseł",
       "text": "Zapisz loginy i klucze, których twoi agenci używają dla zespołu.",
       "viewerTitle": "Tutaj pojawiają się loginy zespołu",
-      "viewerText": "Gdy ktoś udostępni ci login lub klucz, pojawi się tutaj."
+      "viewerText": "Gdy ktoś udostępni ci login lub klucz, pojawi się tutaj.",
+      "titlePersonal": "Trzymaj wspólne loginy w jednym miejscu",
+      "textPersonal": "Zapisz loginy i klucze, których twoi agenci używają dla wszystkich tutaj.",
+      "viewerTitlePersonal": "Tutaj pojawiają się wspólne loginy",
+      "viewerTextPersonal": "Gdy ktoś stąd udostępni ci login lub klucz, pojawi się tutaj."
     },
     "skills": {
       "title": "Naucz agentów, jak pracujecie",

@@ -293,8 +293,8 @@ function NewAgentForm({
   );
   const levels = useMemo(
     // A proposal's levels (the reviewer's, in Revisar) over the role's; the apps it doesn't name open as any role's.
-    () => (managesAgents ? { ...presetLevels(role ?? "custom", items), ...proposedLevels } : {}),
-    [proposedLevels, role, items, managesAgents],
+    () => (managesAgents ? { ...presetLevels(role ?? "custom", items, isPersonal(org)), ...proposedLevels } : {}),
+    [proposedLevels, role, items, managesAgents, org],
   );
   const granted = items.filter((i) => (levels[i.id] ?? "none") !== "none");
   const myMail = (proposed?.mail ?? []).filter((m) => m.accountId in mailLevels);

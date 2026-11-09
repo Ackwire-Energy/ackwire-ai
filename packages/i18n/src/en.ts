@@ -725,12 +725,12 @@ export const en = {
       title: "What will you use agentes.chat for?",
       lead: "You can change this later, nothing is lost.",
       personal: "For me",
-      personalText: "Agents for your calendar, bills, training and anything else you ask.",
+      personalText: "Agents that look after your day.",
       team: "For my company or team",
       teamText: "People and agents work together, with channels, roles and approvals.",
       /** A quiet line of what it does, under each answer. */
-      personalExamples: "Your day at 7 · The month's bills · This week's training",
-      teamExamples: "Customer support · Finance · The team's weekly report",
+      personalExamples: "Your day at 7 · Bills · Training",
+      teamExamples: "Customer support · Finance · Reports",
     },
     /** A personal workspace's name, given at once in the person's language (renamed in Settings like any other). */
     personal: {
@@ -4805,6 +4805,16 @@ export const en = {
       activity: "Activity",
       settings: "Settings",
       more: "More",
+      /** A personal workspace's bar (ADR 0158): the access tab is what it can use; Settings keeps name, look, budget. */
+      accessPersonal: "Can use",
+      settingsPersonal: "Settings",
+      /** A personal workspace's tab with what one person rarely needs. */
+      advanced: "Advanced",
+    },
+    /** A personal workspace's Advanced tab: the tabs its bar leaves out, then the hard settings and tools. */
+    advanced: {
+      elsewhere: "Activity, files and usage",
+      tools: "Tools and rules",
     },
     /** The overview's two lists of rows: how it works, then who it works with. */
     ficha: {
@@ -4868,7 +4878,8 @@ export const en = {
       memberKeeper: "You see how {{name}} works. Only {{keeper}} edits.",
       memberPersonal: "You see how {{name}} works. Only the people who run this space edit.",
       memberOwner: "You see how {{name}} works. Who edits: admins and {{owner}} (owner).",
-      memberOwnerPersonal: "You see how {{name}} works. Who edits: {{owner}} (owner) and the people who run this space.",
+      memberOwnerPersonal:
+        "You see how {{name}} works. Who edits: {{owner}} (owner) and the people who run this space.",
       owner:
         "You own {{name}}: you change the look, who can talk, the channels and the computer. The rest, only admins.",
       ownerKeeper:
@@ -5747,6 +5758,8 @@ export const en = {
       custom: { name: "From scratch", desc: "You write everything. No access until you grant it.", instructions: "" },
     },
     roleGroups: {
+      /** A personal workspace's one group: the right hand's personal agents (ADR 0158). */
+      personal: "For your day",
       tech: "Product and tech",
       customers: "Customers",
       operations: "Operations",
@@ -16602,7 +16615,7 @@ export const en = {
       leo: "Today, 30 minutes: 5 minutes of warm-up, 3 rounds of 12 squats, 10 push-ups and a 30-second plank, then 5 minutes of stretching. Tell me how it went and I'll adjust Wednesday's.",
       gabi: "Today's topic: photosynthesis. In short, plants turn light, water and carbon dioxide into sugar and oxygen. Three questions: where does it happen, what goes in and what comes out?",
       rosa: "This week: rice, beans, eggs, bananas, coffee and detergent. At home: change the sheets on Thursday and call someone about the kitchen tap.",
-      vic: "Lisbon in 3 days: day 1, Alfama and the castle; day 2, Belém and the river; day 3, Sintra. The cheapest flights are on Tuesday the 12th. Want me to keep an eye on the price?",
+      vic: "Lisbon in 3 days: day 1, Alfama and the castle. Day 2, Belém and the river. Day 3, Sintra. The cheapest flights are on Tuesday the 12th. Want me to keep an eye on the price?",
       rui: "Hi Marcos, here's the proposal: a new site with 5 pages, delivered in 3 weeks, paid in two parts. If it works for you, I'll send the contract today.",
     },
     channels: {

@@ -577,6 +577,22 @@
     "goneLead": "Puede que se haya cancelado. Habla con quien te invitó.",
     "entering": "Entrando a {{org}}",
     "enteringReady": "Tu cuenta está lista.",
+    "personalName": "Espacio de trabajo de {{name}}",
+    "personalNameNoName": "Un espacio de trabajo personal",
+    "helloPersonal": "Hola. {{name}} te invitó a entrar.",
+    "helloNoNamePersonal": "Hola. Te invitaron a un espacio de trabajo personal.",
+    "nameLeadPersonal": "Primero: ¿cómo deben llamarte los agentes?",
+    "newPasswordLeadPersonal": "La usarás para entrar ahora y cada vez que vuelvas.",
+    "enterPersonal": "Entrar",
+    "calledYouPersonal": "{{name}} te invitó a entrar.",
+    "calledYouNoNamePersonal": "Te invitaron a un espacio de trabajo personal.",
+    "passwordLeadPersonal": "{{name}} te invitó. Tu contraseña y listo.",
+    "passwordLeadNoNamePersonal": "Te invitaron. Tu contraseña y listo.",
+    "otherLeadPersonal": "Iniciaste sesión como {{other}}. Inicia sesión con el correo invitado para entrar.",
+    "fullTitlePersonal": "Este espacio de trabajo no tiene lugares libres ahora.",
+    "enteringPersonal": "Entrando",
+    "usedTitlePersonal": "Ya estás dentro.",
+    "openPersonal": "Abrir",
     "ask": {
       "title": "Pide unirte a {{org}}",
       "lead": "{{name}} compartió este enlace. Un admin aprueba a cada persona nueva.",
@@ -639,7 +655,16 @@
       "signInTitle": "Aprobado. Ahora solo inicia sesión.",
       "signInLead": "Usa el correo y la contraseña que elegiste.",
       "endedTitle": "Tu pedido terminó.",
-      "endedLead": "Si se aprobó, inicia sesión con tu cuenta."
+      "endedLead": "Si se aprobó, inicia sesión con tu cuenta.",
+      "titlePersonal": "Pide unirte a este espacio de trabajo",
+      "helloPersonal": "Hola. Esta es una invitación a un espacio de trabajo personal.",
+      "waitTitlePersonal": "Listo. Tu pedido fue enviado.",
+      "waitCardPersonal": "Esperando una respuesta",
+      "inTitlePersonal": "Ya estás dentro",
+      "memberTitlePersonal": "Ya estás dentro",
+      "openPersonal": "Abrir",
+      "approvedInPersonal": "Aprobado. Ya estás dentro.",
+      "deniedTextPersonal": "Si crees que es un error, pídele a quien te envió el enlace que te invite."
     }
   },
   "onboarding": {
@@ -690,6 +715,19 @@
       "invite_other": "Invitar a {{count}} personas"
     },
     "yourCompany": "tu empresa",
+    "purpose": {
+      "title": "¿Para qué vas a usar agentes.chat?",
+      "lead": "Puedes cambiarlo después, no se pierde nada.",
+      "personal": "Para mí",
+      "personalText": "Agentes para tu agenda, tus cuentas, tu entrenamiento y todo lo que les pidas.",
+      "team": "Para mi empresa o equipo",
+      "teamText": "Personas y agentes trabajan juntos, con canales, roles y aprobaciones.",
+      "personalExamples": "Tu día a las 7 · Cuentas · Entreno",
+      "teamExamples": "Atención al cliente · Finanzas · Informes"
+    },
+    "personal": {
+      "name": "Personal"
+    },
     "workspace": {
       "title": "¿Cómo se llama tu espacio de trabajo?",
       "lead": "Es donde conversan el equipo y los agentes.",
@@ -1352,6 +1390,7 @@
   },
   "shell": {
     "otherChannels": "Otros canales",
+    "otherChannelsPersonal": "Otras conversaciones en grupo",
     "titleBar": {
       "back": "Atrás",
       "forward": "Adelante"
@@ -1369,13 +1408,25 @@
       "calendar": "Reuniones y plazos",
       "team": "Quién es quién: personas, agentes y sus grupos",
       "dashboards": "Números y gráficos que los agentes mantienen al día",
-      "taskManager": "Lo que cada agente hace ahora, y detener lo que necesites"
+      "taskManager": "Lo que cada agente hace ahora, y detener lo que necesites",
+      "approvalsPersonal": "Lo que tus agentes te piden permitir",
+      "proposalsPersonal": "Lo que tus agentes proponen cambiar",
+      "threadsPersonal": "Conversaciones aparte, y misiones",
+      "issuesPersonal": "Tus tareas y las de tus agentes",
+      "wikiPersonal": "Notas que tus agentes pueden leer",
+      "calendarPersonal": "Tus citas y plazos",
+      "teamPersonal": "Tus agentes, y quién más está aquí",
+      "dashboardsPersonal": "Números y gráficos que tus agentes mantienen al día",
+      "taskManagerPersonal": "Lo que hacen tus agentes ahora, y detener lo que necesites",
+      "homePersonal": "Tu día: lo que te espera y lo que hacen tus agentes"
     },
     "customizeSidebar": "Personalizar la barra lateral",
     "sidebarMenu": {
       "title": "Barra lateral",
       "newChannel": "Nuevo canal",
+      "newChannelPersonal": "Nueva conversación en grupo",
       "addToChannels": "Nuevo canal o categoría",
+      "addToChannelsPersonal": "Nueva conversación en grupo o categoría",
       "newMessage": "Nuevo mensaje",
       "addMembers": "Agregar personas o agentes",
       "channelSettings": "Configuración del canal",
@@ -1451,6 +1502,7 @@
     "drive": "Drive",
     "members": "Miembros",
     "channels": "Canales",
+    "channelsPersonal": "Conversaciones en grupo",
     "agents": "Agentes",
     "directMessages": "Mensajes directos",
     "createAgent": "Crear agente",
@@ -1536,6 +1588,8 @@
     "more_many": "{{count}} agentes más en Equipo",
     "more_other": "{{count}} agentes más en Equipo",
     "createFirst": "Crear el primer agente",
+    "createFirstPersonal": "Crear tu primer agente",
+    "newAgent": "Nuevo agente",
     "working_one": "{{count}} trabajando",
     "working_many": "{{count}} trabajando",
     "working_other": "{{count}} trabajando",
@@ -2023,21 +2077,30 @@
     "label": "tu mano derecha",
     "newDot": "Nuevo",
     "role": "Asistente del workspace",
+    "rolePersonal": "Asistente personal",
     "actsAsYou": "actúa con tus permisos",
     "composerHint": "nada cambia sin ti",
     "intro": {
       "greeting": "Hola, soy {{name}}. Armo el equipo contigo.",
+      "greetingPersonal": "Hola, soy {{name}}. Armo tus agentes contigo.",
       "lead": "Creo los agentes, conecto las apps e invito a las personas. Nada cambia si no lo pides, y solo hago lo que tú puedes hacer.",
+      "leadPersonal": "Creo tus agentes y conecto tus apps. Nada cambia si no lo pides.",
       "heldLead": "Elige a qué se dedica tu empresa y el equipo aparece aquí. Los agentes empiezan a trabajar cuando el workspace tenga un plan de agentes.chat.",
+      "heldLeadPersonal": "Elige en qué quieres ayuda y tus agentes aparecen aquí. Empiezan a trabajar cuando tengas un plan de agentes.chat.",
       "connect": {
         "title": "Conectar una IA para el equipo",
+        "titlePersonal": "Conectar una IA para tus agentes",
         "text": "Los agentes piensan con la IA del workspace. Inicia sesión con tu plan de Claude o de ChatGPT, sin clave de API.",
+        "textPersonal": "Tus agentes piensan con esta IA. Inicia sesión con tu plan de Claude o de ChatGPT, sin clave de API.",
         "action": "Conectar"
       },
       "again": {
         "question": "¿Quieres armar el equipo conmigo?",
         "action": "Armar el equipo",
-        "message": "Ayúdame a armar el equipo."
+        "message": "Ayúdame a armar el equipo.",
+        "questionPersonal": "¿Quieres armar más agentes conmigo?",
+        "actionPersonal": "Armar agentes",
+        "messagePersonal": "Ayúdame a armar mis agentes."
       },
       "next": {
         "firstTask": "Darle una primera tarea a {{name}}"
@@ -2810,6 +2873,7 @@
     "teammate": "No lo repetí: <b>{{who}}</b> ya hizo esto con {{target}} {{when}}",
     "self": "No lo repetí: ya hice esto con {{target}} {{when}}",
     "someone": "No lo repetí: alguien del equipo ya hizo esto con {{target}} {{when}}",
+    "someonePersonal": "No lo repetí: esto ya se hizo con {{target}} {{when}}",
     "inChannel": "en #{{channel}}",
     "open": "Ver"
   },
@@ -2958,18 +3022,25 @@
   "newChannel": {
     "open": "Crear canal",
     "title": "Crear canal",
+    "titlePersonal": "Nueva conversación en grupo",
     "name": "Nombre",
     "namePlaceholder": "ej.: marketing",
+    "namePlaceholderPersonal": "ej.: viaje",
     "nameHelp": "Letras minúsculas, números y guiones. Se muestra como #{{name}}.",
     "nameInvalid": "Usa letras minúsculas, números y guiones, empezando con una letra o un número.",
     "nameTaken": "Ya existe un canal #{{name}}.",
+    "nameTakenPersonal": "Ya existe una conversación en grupo llamada #{{name}}.",
     "topic": "Descripción",
     "topicPlaceholder": "De qué se habla aquí",
     "visibility": "Quién puede unirse",
     "public": "Público",
+    "publicPersonal": "Todos aquí pueden entrar",
     "publicDesc": "Cualquiera del espacio de trabajo lo ve y puede unirse.",
+    "publicDescPersonal": "Cualquiera de aquí la ve y entra.",
     "private": "Privado",
+    "privatePersonal": "Solo quien yo añada",
     "privateDesc": "Solo quienes se añadan.",
+    "privateDescPersonal": "Solo la ven las personas que añadas.",
     "roles": "Departamentos o roles",
     "rolesDesc": "Quien tenga uno de los roles elegidos lo ve y entra, ahora o más adelante.",
     "rolesPick": "Roles que ven el canal",
@@ -2983,6 +3054,7 @@
     "publicBody": "Todos en el workspace podrán unirse y leer todos sus mensajes, incluidos los anteriores.",
     "publicConfirm": "Hacer público",
     "members": "Miembros iniciales",
+    "membersPersonal": "Quién participa",
     "membersSearch": "Buscar personas o agentes",
     "membersEmpty": "No se encontró a nadie para “{{q}}”.",
     "selected_one": "{{count}} seleccionado",
@@ -3047,6 +3119,8 @@
     "addRow": "Agregar personas o agentes",
     "invite": "Invitar a {{email}} a {{org}} y a #{{channel}}",
     "inviteOrg": "Invitar a {{email}} a {{org}}",
+    "invitePersonal": "Invitar a {{email}} a tu espacio de trabajo y a #{{channel}}",
+    "inviteOrgPersonal": "Invitar a {{email}} a tu espacio de trabajo",
     "addTitle": "Agregar a #{{channel}}",
     "addSearch": "Buscar personas o agentes",
     "addEmpty": "Nadie fuera del canal coincide con “{{q}}”.",
@@ -3312,6 +3386,7 @@
     "tab": {
       "label": "Qué mostrar",
       "team": "Equipo",
+      "teamPersonal": "Compartidos",
       "personal": "Personal",
       "connections": "Conexiones"
     },
@@ -3326,9 +3401,11 @@
       "personalEmpty": "Guarda tus inicios de sesión y claves seguros",
       "personalEmptyText": "Solo tú ves estos elementos. Tus agentes los usan solo cuando se lo pides.",
       "teamEmpty": "Comparte accesos sin pasar contraseñas",
+      "teamEmptyPersonal": "Guarda los accesos compartidos en un solo lugar",
       "teamEmptyText": "Guarda una vez un inicio de sesión, una clave o datos de contacto, y elige qué agentes pueden usarlo.",
       "sharedEmpty": "Nada compartido contigo todavía",
-      "sharedEmptyText": "Cuando alguien comparta contigo un inicio de sesión o una clave del equipo, aparecerá aquí."
+      "sharedEmptyText": "Cuando alguien comparta contigo un inicio de sesión o una clave del equipo, aparecerá aquí.",
+      "sharedEmptyTextPersonal": "Cuando alguien de aquí comparta contigo un acceso o una clave, aparecerá aquí."
     },
     "row": {
       "agents_one": "{{count}} agente",
@@ -3355,13 +3432,16 @@
     "scope": {
       "personal": "Personal",
       "team": "Equipo",
+      "teamPersonal": "Compartido",
       "personalText": "Solo tú lo ves",
-      "teamText": "Compartido con el espacio de trabajo"
+      "teamText": "Compartido con el espacio de trabajo",
+      "teamTextPersonal": "Compartido con todos aquí"
     },
     "field": {
       "title": "Nombre",
       "contactTitle": "Nombre en el Vault",
       "loginPlaceholder": "Correo de la empresa",
+      "loginPlaceholderPersonal": "Correo personal",
       "keyPlaceholder": "Clave de pagos",
       "contactPlaceholder": "Datos de facturación",
       "website": "Sitio web",
@@ -3502,6 +3582,7 @@
       "what": "¿Qué quieres guardar?",
       "who": "Quién puede usarlo",
       "teamLocked": "Solo quienes administran el Vault pueden guardar elementos del equipo. Este queda como tuyo.",
+      "teamLockedPersonal": "Solo quienes administran el Vault pueden guardar elementos compartidos. Este queda como tuyo.",
       "save": "Guardar",
       "saved": "Guardado en el Vault"
     },
@@ -3560,8 +3641,10 @@
       "required": "Completa este campo.",
       "for": "Conectar para",
       "forTeam": "Sus elementos son del equipo. Quien administra el Vault decide quién los usa.",
+      "forTeamPersonal": "Sus elementos son compartidos. Quien administra el Vault decide quién los usa.",
       "forPersonal": "Sus elementos son solo tuyos.",
       "teamLocked": "Sus elementos serán solo tuyos. Solo quien administra el Vault conecta uno para el equipo.",
+      "teamLockedPersonal": "Sus elementos serán solo tuyos. Solo quien administra el Vault conecta uno para compartir.",
       "sealed": "Lo que escribes aquí se cifra y no se vuelve a mostrar.",
       "connected_one": "{{name}} conectado. Llegó {{count}} elemento.",
       "connected_other": "{{name}} conectado. Llegaron {{count}} elementos.",
@@ -3651,7 +3734,9 @@
       "scope": "Guardar como",
       "personalText": "Solo tú lo ves",
       "teamText": "El espacio de trabajo lo ve",
+      "teamTextPersonal": "Todos aquí lo ven",
       "teamLocked": "Solo quien administra el Vault guarda para el equipo",
+      "teamLockedPersonal": "Solo quien administra el Vault guarda elementos compartidos",
       "agents": "Usado por",
       "choose": "Elegir",
       "saved": "Guardado en el Vault",
@@ -3898,7 +3983,8 @@
       "waiting_many": "{{count}} cosas te esperan",
       "waiting_other": "{{count}} cosas te esperan",
       "calm": "Nada te espera ahora.",
-      "new": "Tu espacio de trabajo está listo. Empieza aquí."
+      "new": "Tu espacio de trabajo está listo. Empieza aquí.",
+      "newPersonal": "Todo listo. Empieza aquí."
     },
     "start": {
       "label": "Al abrir la app",
@@ -4382,6 +4468,7 @@
     "nameLabel": "Nombre",
     "roleLabel": "Rol",
     "roleHelp": "Lo que hace por el equipo, por ejemplo: Asistente de correo y calendario.",
+    "roleHelpPersonal": "Lo que hace por ti, por ejemplo: Asistente de correo y calendario.",
     "editName": "Editar nombre: {{name}}",
     "editHandle": "Editar menciones: @{{handle}}",
     "editRole": "Editar rol: {{role}}",
@@ -4411,6 +4498,7 @@
     "instructions": "Instrucciones",
     "howWorks": "Cómo trabaja {{name}}",
     "instructionsHelp": "El contexto de {{org}} (a qué se dedica la empresa, las reglas de la casa) va antes de estas instrucciones en cada conversación: escribe aquí solo lo que es propio de {{name}}.",
+    "instructionsHelpPersonal": "Lo que contaste sobre ti va antes de estas instrucciones en cada conversación: escribe aquí solo lo que es propio de {{name}}.",
     "budgetUsed": "Presupuesto usado",
     "runsCount_one": "{{count}} ejecución",
     "runsCount_many": "{{count}} ejecuciones",
@@ -4729,7 +4817,14 @@
       "usage": "Uso",
       "activity": "Actividad",
       "settings": "Configuración",
-      "more": "Más"
+      "more": "Más",
+      "accessPersonal": "Puede usar",
+      "settingsPersonal": "Ajustes",
+      "advanced": "Avanzado"
+    },
+    "advanced": {
+      "elsewhere": "Actividad, archivos y uso",
+      "tools": "Herramientas y reglas"
     },
     "ficha": {
       "with": "Con quién",
@@ -4786,14 +4881,26 @@
     },
     "lock": {
       "admins": "Solo los admins cambian esto",
-      "adminsAndOwner": "Los admins y {{name}} cambian esto"
+      "adminsKeeper": "Solo {{keeper}} cambia esto",
+      "adminsPersonal": "Solo quienes administran este espacio cambian esto",
+      "adminsAndOwner": "Los admins y {{name}} cambian esto",
+      "adminsAndOwnerPersonal": "{{name}} y quienes administran este espacio cambian esto"
     },
     "readOnly": {
       "member": "Ves cómo trabaja {{name}}. Solo los admins editan.",
+      "memberKeeper": "Ves cómo trabaja {{name}}. Solo {{keeper}} edita.",
+      "memberPersonal": "Ves cómo trabaja {{name}}. Solo editan quienes administran este espacio.",
       "memberOwner": "Ves cómo trabaja {{name}}. Quién edita: los admins y {{owner}} (responsable).",
+      "memberOwnerPersonal": "Ves cómo trabaja {{name}}. Quién edita: {{owner}} (responsable) y quienes administran este espacio.",
       "owner": "{{name}} es tuyo: cambias la apariencia, quién puede hablar, los canales y la computadora. El resto, solo los admins.",
+      "ownerKeeper": "{{name}} es tuyo: cambias la apariencia, quién puede hablar, las conversaciones en grupo y la computadora. El resto, solo {{keeper}}.",
+      "ownerPersonal": "{{name}} es tuyo: cambias la apariencia, quién puede hablar, las conversaciones en grupo y la computadora. El resto, solo quienes administran este espacio.",
       "ownerInstructions": "Solo los admins editan las instrucciones. Como responsable, apruebas los cambios propuestos.",
-      "ownerAccess": "Solo los admins dan o quitan acceso y repositorios."
+      "ownerInstructionsKeeper": "Solo {{keeper}} edita las instrucciones. Como responsable, apruebas los cambios propuestos.",
+      "ownerInstructionsPersonal": "Solo quienes administran este espacio editan las instrucciones. Como responsable, apruebas los cambios propuestos.",
+      "ownerAccess": "Solo los admins dan o quitan acceso y repositorios.",
+      "ownerAccessKeeper": "Solo {{keeper}} da o quita acceso y repositorios.",
+      "ownerAccessPersonal": "Solo quienes administran este espacio dan o quitan acceso y repositorios."
     },
     "status": {
       "idle": "Disponible",
@@ -4888,6 +4995,7 @@
       "allConnectors": "Conectores:",
       "onlyRead": "Solo lectura",
       "connectors": "Conectores de {{org}}",
+      "connectorsPersonal": "Tus conectores",
       "oneLevel": "Un nivel por app",
       "builtin": "Integrado en agentes",
       "builtinHelp": "Drive, tareas, memoria y más",
@@ -5126,6 +5234,7 @@
     "back": "{{name}}",
     "title": "Lo que sabe {{name}}",
     "subtitle": "Lo que {{name}} aprendió de las conversaciones y de las correcciones del equipo.",
+    "subtitlePersonal": "Lo que {{name}} aprendió de tus conversaciones y correcciones.",
     "proposals_one": "{{count}} propuesta de mejora",
     "proposals_many": "{{count}} propuestas de mejora",
     "proposals_other": "{{count}} propuestas de mejora",
@@ -5172,6 +5281,7 @@
     "emptyTab": "Nada por aquí por ahora.",
     "emptyTitle": "La memoria de {{name}} empieza aquí",
     "emptyText": "Cada conversación enseña algo nuevo sobre cómo trabaja el equipo.",
+    "emptyTextPersonal": "Cada conversación enseña algo nuevo sobre cómo te gusta que se hagan las cosas.",
     "how": "Cómo funciona la memoria",
     "editTitle": "Editar {{kind}}",
     "text": "Texto",
@@ -5198,6 +5308,7 @@
       "noChannel": "No está en ningún canal."
     },
     "subtitle": "Cambios que proponen los agentes. Nada cambia hasta que alguien acepta.",
+    "subtitlePersonal": "Cambios que proponen tus agentes. Nada cambia hasta que aceptes.",
     "list": "Propuestas",
     "proposes": "<b>{{agent}}</b> propone · {{target}}",
     "proposesMany": "<b>{{agent}}</b> propone · instrucciones de {{count}} agentes",
@@ -5213,6 +5324,7 @@
     "targetChanges": "cambios para {{name}}",
     "targetChanges_female": "cambios para {{name}}",
     "targetContext": "contexto de {{org}}",
+    "targetContextPersonal": "lo que tus agentes saben de ti",
     "roleLine": "Rol: {{from}} → {{to}}",
     "accessOn": "Activar: {{app}}",
     "accessOff": "Desactivar: {{app}}",
@@ -5264,6 +5376,7 @@
     "titleSettings": "Cambiar la configuración de {{name}}",
     "titleSkill": "Corregir la habilidad {{skill}}",
     "titleContext": "Actualizar el contexto de {{org}}",
+    "titleContextPersonal": "Actualizar lo que tus agentes saben de ti",
     "evidence": {
       "outcome": "Resultado observado",
       "human": "Una persona",
@@ -5301,6 +5414,7 @@
       "todoDesc": "Leer nunca cambia nada.",
       "action": "Permitir",
       "todoNone": "Usar las apps de {{org}}",
+      "todoNonePersonal": "Usar tus apps",
       "todoNoneDesc": "Las que ya conectaste, como Gmail y Drive.",
       "done": "Uso {{apps}}",
       "doneNone": "Sin apps por ahora",
@@ -5312,6 +5426,7 @@
       "ok_other": "Permitir {{count}} apps",
       "okNone": "Continuar sin apps",
       "empty": "{{org}} aún no tiene apps conectadas.",
+      "emptyPersonal": "Aún no tienes apps conectadas.",
       "connectOther": "Conectar otra app"
     },
     "where": {
@@ -5332,10 +5447,12 @@
     },
     "who": {
       "todo": "Hablar con todos en {{org}}",
+      "todoPersonal": "Hablar con todos aquí",
       "todoDesc": "Cualquiera puede llamarme.",
       "todoPlan": "Hablar solo contigo",
       "todoPlanDesc": "Tu plan es personal.",
       "doneEveryone": "Hablo con todos en {{org}}",
+      "doneEveryonePersonal": "Hablo con todos aquí",
       "doneYou": "Hablo solo contigo",
       "doneOwner": "Hablo solo con {{name}}",
       "donePeople": "Hablo con las personas que elegiste",
@@ -5357,6 +5474,7 @@
       "title": "Cómo trabaja {{name}}",
       "title_female": "Cómo trabaja {{name}}",
       "desc": "Escribe como lo harías para alguien nuevo en el equipo.",
+      "descPersonal": "Escribe como lo harías para alguien que te ayuda por primera vez.",
       "instructions": "Instrucciones",
       "budget": "Límite mensual",
       "budgetHelp": "Te avisamos al llegar al 80 %. Al llegar al límite, se pausa y te avisa.",
@@ -5379,6 +5497,7 @@
     },
     "firstRun": {
       "title": "Para que el equipo de {{org}} empiece a trabajar",
+      "titlePersonal": "Para que tus agentes empiecen a trabajar",
       "complete": "Todo listo.",
       "notNow": "Ahora no",
       "afterPlan": "Se abre con el plan.",
@@ -5390,7 +5509,14 @@
         "title": "¿Qué hace {{org}}?",
         "desc": "Todos los agentes leen esto. Lo cambias cuando quieras.",
         "line": "En una frase",
-        "optional": "Opcional. Sin frase, vale el tipo que marcaste."
+        "optional": "Opcional. Sin frase, vale el tipo que marcaste.",
+        "todoPersonal": "Cuéntame un poco sobre ti.",
+        "todoDescPersonal": "Todos tus agentes leen esto.",
+        "donePersonal": "Ya sé un poco sobre ti",
+        "titlePersonal": "¿En qué quieres ayuda?",
+        "descPersonal": "Todos tus agentes leen esto. Lo cambias cuando quieras.",
+        "linePersonal": "Sobre ti, en una frase",
+        "optionalPersonal": "Opcional. Sin frase, valen las áreas que marcaste."
       },
       "team": {
         "todo": "Arma el equipo.",
@@ -5398,6 +5524,12 @@
         "action": "Ver el equipo",
         "done_one": "{{count}} agente en el equipo",
         "done_other": "{{count}} agentes en el equipo",
+        "todoPersonal": "Elige tus agentes.",
+        "todoDescPersonal": "Un comienzo listo, puedes cambiarlo todo después.",
+        "actionPersonal": "Ver agentes",
+        "donePersonal_one": "{{count}} agente",
+        "donePersonal_many": "{{count}} agentes",
+        "donePersonal_other": "{{count}} agentes",
         "card": "Sigue en la tarjeta de abajo"
       },
       "ai": {
@@ -5418,7 +5550,11 @@
         "title": "Las apps del trabajo",
         "desc": "Primero las que usaría el equipo que acabas de crear. Leer nunca cambia nada, y enviar, borrar y pagar piden tu aprobación.",
         "connect": "Conectar",
-        "all": "Ver todas las apps"
+        "all": "Ver todas las apps",
+        "todoPersonal": "Conecta tus apps.",
+        "todoDescPersonal": "Correo, calendario y archivos. Leer nunca cambia nada.",
+        "titlePersonal": "Tus apps",
+        "descPersonal": "Primero las que usarían tus agentes. Leer nunca cambia nada, y enviar, borrar y pagar piden tu aprobación."
       },
       "people": {
         "todo": "Llama a quienes trabajan contigo.",
@@ -5433,14 +5569,57 @@
         "team": "Llegó el equipo.",
         "ai": "Ahora el equipo piensa.",
         "apps": "Listo, ya leo las apps.",
-        "people": "Qué bueno tener más gente aquí."
+        "people": "Qué bueno tener más gente aquí.",
+        "aboutPersonal": "Anotado. Todos tus agentes leen esto.",
+        "teamPersonal": "Llegaron tus agentes.",
+        "aiPersonal": "Ahora tus agentes pueden pensar.",
+        "appsPersonal": "Listo, ya puedo leer tus apps.",
+        "peoplePersonal": "Qué bueno tener a tu gente aquí."
       },
       "asks": {
         "lead": "Ahora pídeme algo:",
         "fit": "Ajusta el equipo a mi negocio",
-        "who": "¿Quién del equipo se encarga de qué?"
+        "who": "¿Quién del equipo se encarga de qué?",
+        "fitPersonal": "Ajusta mis agentes a mi rutina",
+        "whoPersonal": "¿Qué agente se encarga de qué?"
       }
     }
+  },
+  "newAgentAsk": {
+    "title": "¿Qué hará tu nuevo agente?",
+    "lead": "Dilo en una frase. {{name}} lo prepara y te lo muestra antes de crearlo.",
+    "field": "Qué hace por ti",
+    "placeholder": "Ej.: Ordenar mi agenda y recordarme lo importante",
+    "ideas": "Ideas",
+    "idea": {
+      "agenda": {
+        "label": "Agenda",
+        "text": "Ordenar mi agenda y recordarme mis citas"
+      },
+      "money": {
+        "label": "Finanzas",
+        "text": "Seguir mis cuentas y avisarme antes de que venzan"
+      },
+      "training": {
+        "label": "Entrenamiento",
+        "text": "Planear mis entrenamientos de la semana y ajustarlos a cómo me siento"
+      },
+      "studies": {
+        "label": "Estudios",
+        "text": "Hacerme un plan de estudio y preguntarme lo que aprendí"
+      },
+      "home": {
+        "label": "Casa",
+        "text": "Llevar la lista de compras y las tareas de la casa"
+      },
+      "travel": {
+        "label": "Viajes",
+        "text": "Planear mis viajes: itinerario, reservas y documentos"
+      }
+    },
+    "full": "Prefiero completar todo",
+    "create": "Crear con {{name}}",
+    "message": "Quiero un agente nuevo: {{what}}"
   },
   "newAgent": {
     "title": "Crear agente",
@@ -5457,7 +5636,8 @@
       "identity": {
         "name": "Identidad",
         "title": "Quién es",
-        "lead": "Cómo lo llama y lo reconoce el equipo en el chat."
+        "lead": "Cómo lo llama y lo reconoce el equipo en el chat.",
+        "leadPersonal": "Cómo lo llamas y lo reconoces en el chat."
       },
       "instructions": {
         "name": "Instrucciones",
@@ -5473,7 +5653,8 @@
       "where": {
         "name": "Dónde y con quién",
         "title": "Dónde trabaja y con quién",
-        "lead": "{{name}} entra en los canales que marques y tiene un responsable en el equipo."
+        "lead": "{{name}} entra en los canales que marques y tiene un responsable en el equipo.",
+        "leadPersonal": "{{name}} habla contigo en su propio chat y entra en las conversaciones en grupo que marques."
       },
       "model": {
         "name": "Modelo y presupuesto",
@@ -5636,6 +5817,7 @@
       }
     },
     "roleGroups": {
+      "personal": "Para tu día",
       "tech": "Producto y tecnología",
       "customers": "Clientes",
       "operations": "Operaciones"
@@ -5706,6 +5888,8 @@
     "ownerHelp": "Recibe las alertas de presupuesto y aprueba las acciones sensibles.",
     "ownerYours": "Quien crea el agente es su responsable. Un admin puede pasárselo a otra persona después.",
     "accessAdmins": "Solo los admins dan a los agentes acceso a apps y buzones. Cuando esté creado, pídeselo a un admin.",
+    "accessAdminsKeeper": "Solo {{keeper}} da a los agentes acceso a apps y buzones. Cuando esté creado, pídeselo a {{keeper}}.",
+    "accessAdminsPersonal": "Solo quienes administran este espacio dan a los agentes acceso a apps y buzones. Cuando esté creado, basta con pedirlo.",
     "modelAndCost": "Modelo y costo",
     "model": "Modelo",
     "modelDesc": {
@@ -5783,12 +5967,17 @@
     "defaultName": "agente",
     "newOnTeam": "Nuevo en el equipo",
     "createdTitle": "{{name}} se sumó al equipo",
+    "newOnTeamPersonal": "Agente nuevo",
+    "createdTitlePersonal": "{{name}} ya está aquí",
     "createdText": "Ya está en {{channels}}. Menciona a @{{handle}} en una conversación para empezar.",
     "createdTextNoChannels": "Añade a {{name}} a un canal y menciona a @{{handle}} en una conversación para empezar.",
+    "createdTextNoChannelsPersonal": "Abre tu chat con {{name}} y pídele algo para empezar.",
     "goTo": "Ir a #{{channel}}",
     "openProfile": "Abrir perfil",
     "createAnother": "Crear otro agente",
     "adminsOnly": "Solo los admins y propietarios crean agentes. Pídeselo a un admin de {{org}}.",
+    "adminsOnlyKeeper": "Pide a {{keeper}} que te deje crear agentes.",
+    "adminsOnlyPersonal": "Pide a quien administra este espacio que te deje crear agentes.",
     "proposalClosed": "Esta propuesta ya se decidió o venció.",
     "proposalNoAccess": "Solo las personas de su conversación pueden ver esta propuesta.",
     "backToChat": "Volver a la conversación",
@@ -5810,6 +5999,7 @@
     "filters": "Filtrar personas",
     "rolesOf": "Roles de {{name}}",
     "everyoneNote": "Todos aplica a cada persona del espacio de trabajo.",
+    "everyoneNotePersonal": "Sin rol, usa los agentes. Con {{role}}, te ayuda a administrarlo.",
     "noRolesToGive": "No hay roles por debajo del tuyo para dar.",
     "roleFilter": "Rol",
     "rolesCount_one": "{{count}} rol",
@@ -5819,6 +6009,9 @@
     "subtitle_one": "Quiénes forman parte de {{org}}: {{people}} persona y {{agents}} agentes.",
     "subtitle_many": "Quiénes forman parte de {{org}}: {{people}} personas y {{agents}} agentes.",
     "subtitle_other": "Quiénes forman parte de {{org}}: {{people}} personas y {{agents}} agentes.",
+    "subtitlePersonal_one": "Quién está aquí: {{people}} persona y {{agents}} agentes.",
+    "subtitlePersonal_many": "Quién está aquí: {{people}} personas y {{agents}} agentes.",
+    "subtitlePersonal_other": "Quién está aquí: {{people}} personas y {{agents}} agentes.",
     "inviteTitle": "Invitar personas",
     "copyInviteLink": "Copiar enlace de invitación",
     "emailsPlaceholder": "nombre@empresa.com",
@@ -5877,10 +6070,12 @@
       "roleOf": "Rol de {{email}}",
       "memberHint": "Lo que todos pueden hacer",
       "member": "ya está en {{org}}",
+      "memberPersonal": "ya está aquí",
       "invited": "ya invitado"
     },
     "dialog": {
       "title": "Invitar a {{org}}",
+      "titlePersonal": "Invitar a alguien a tu espacio de trabajo",
       "stepOf": "Paso {{n}} de {{total}} · {{step}}",
       "steps": {
         "who": "Quién",
@@ -5899,6 +6094,7 @@
       "note": "Nota en el correo",
       "optional": "(opcional)",
       "notePlaceholder": "Hola. Únete a {{org}}: el equipo y los agentes están todos aquí.",
+      "notePlaceholderPersonal": "Hola. Únete aquí: mis agentes también pueden ayudarte.",
       "or": "o envía el enlace",
       "continueWith": "Continuar con {{count}}",
       "send_one": "Invitar a {{count}} persona",
@@ -5921,13 +6117,30 @@
         "titleMany": "¿Con qué rol entran estas personas?",
         "lead": "El rol dice lo que cada persona puede hacer. Puedes cambiarlo después.",
         "each": "Un rol para cada persona",
-        "same": "El mismo rol para todas las personas"
+        "same": "El mismo rol para todas las personas",
+        "titleOnePersonal": "¿Qué puede hacer {{name}} aquí?",
+        "titleManyPersonal": "¿Qué pueden hacer aquí?",
+        "leadPersonal": "Puedes cambiarlo después.",
+        "eachPersonal": "Una opción para cada persona",
+        "samePersonal": "Lo mismo para todos",
+        "uses": "Usa los agentes",
+        "usesText": "Habla con los agentes y usa lo que se comparte.",
+        "helps": "Te ayuda a administrarlo",
+        "helpsText": "Puede cambiar agentes, la configuración y quién está aquí, como tú."
+      },
+      "reach": {
+        "line_one": "<agents/> responderá a quien entre.",
+        "line_many": "<agents/> responderán a quien entre.",
+        "line_other": "<agents/> responderán a quien entre."
       },
       "where": {
         "titleOne": "¿En qué canales entra {{name}} desde ya?",
         "titleMany": "¿En qué canales entran estas personas desde ya?",
+        "titleOnePersonal": "¿A qué conversaciones en grupo se une {{name}} de inmediato?",
+        "titleManyPersonal": "¿A qué conversaciones en grupo se unen estas personas de inmediato?",
         "lead": "Todo el mundo empieza en #{{channel}}. Los demás los eliges tú.",
         "label": "Canales",
+        "labelPersonal": "Conversaciones en grupo",
         "everyone": "Todo el mundo entra",
         "private": "Privado · estás en él",
         "people_one": "{{count}} persona",
@@ -5961,6 +6174,7 @@
       "result": {
         "invited": "Enviada",
         "already_member": "ya está en {{org}}",
+        "already_memberPersonal": "ya está aquí",
         "already_invited": "ya tenía invitación",
         "invalid_email": "correo no válido"
       },
@@ -5968,6 +6182,7 @@
       "finish": "Terminar",
       "linkStep": {
         "title": "Este es el enlace de {{org}}.",
+        "titlePersonal": "Este es el enlace de tu espacio de trabajo.",
         "lead": "Quien lo abra pide entrar. Te muestro cada solicitud, y tú apruebas.",
         "how1": "La persona abre el enlace y dice quién es.",
         "how2": "La solicitud le llega a quien invita, aquí y en el celular.",
@@ -9041,13 +9256,17 @@
     "mode": {
       "everyone": "Todo el espacio de trabajo",
       "people": "Solo algunas personas o roles",
-      "owner": "Solo su responsable"
+      "owner": "Solo su responsable",
+      "everyonePersonal": "Todos aquí",
+      "peoplePersonal": "Solo algunas personas"
     },
     "modeText": {
       "everyone": "Cualquiera del espacio de trabajo puede llamar a {{name}}.",
       "people": "Elige las personas y los roles que pueden hablar con {{name}}.",
       "owner": "Solo {{owner}} habla con {{name}}.",
-      "noOwner": "Define un responsable para usar esta opción."
+      "noOwner": "Define un responsable para usar esta opción.",
+      "everyonePersonal": "Cualquiera de aquí puede llamar a {{name}}.",
+      "peoplePersonal": "Elige las personas que pueden hablar con {{name}}."
     },
     "people": "Personas",
     "roles": "Roles",
@@ -9060,14 +9279,18 @@
     "onlyYouForNow": "Solo tú, por ahora",
     "onlyOwnerForNow": "Solo {{name}}, por ahora",
     "search": "Buscar roles y personas",
+    "searchPeople": "Buscar personas",
     "noMatch": "Ningún rol ni persona con ese nombre.",
+    "noMatchPeople": "Nadie con ese nombre.",
     "pickSomeone": "Elige al menos una persona o un rol.",
     "chip": {
       "owner": "Personal",
-      "people": "Restringido"
+      "people": "Restringido",
+      "ownerPersonal": "Solo tú"
     },
     "summary": {
       "everyone": "Todo el espacio de trabajo",
+      "everyonePersonal": "Todos aquí",
       "owner": "Solo {{name}}",
       "nobody": "Nadie por ahora",
       "someone": "Algunas personas",
@@ -9304,6 +9527,7 @@
     "goTo": "Ir a",
     "ask": "Preguntar a un agente",
     "channel": "canal",
+    "channelPersonal": "conversación en grupo",
     "agent": "agente",
     "agentRole": "agente · {{role}}",
     "person": "mensaje directo",
@@ -10783,8 +11007,10 @@
     "emptyText": "Puedes conectar cualquier servicio por su dirección.",
     "none": "Los agentes empiezan a trabajar en tus herramientas, solo con el acceso que permitas.",
     "noneTitle": "Conecta las apps de tu equipo",
+    "noneTitlePersonal": "Conecta tus apps",
     "connectedFilter": "Conectados",
     "suggested": "Sugeridos para {{org}}",
+    "suggestedPersonal": "Sugeridos para ti",
     "more": "Más servicios",
     "tileConnected": "{{name}}, conectado",
     "tileSoon": "{{name}}, pronto",
@@ -12187,6 +12413,7 @@
     "clearRecentAll": "Borrar búsquedas recientes",
     "header": {
       "placeholder": "Buscar en {{org}}",
+      "placeholderPersonal": "Buscar en todo",
       "clear": "Borrar búsqueda"
     },
     "panel": {
@@ -13414,8 +13641,13 @@
       "voice": "Voz",
       "apps": "Apps de IA",
       "approvals": "Aprobaciones",
-      "about": "Acerca de agentes.chat"
+      "about": "Acerca de agentes.chat",
+      "generalPersonal": "Sobre ti",
+      "keysPersonal": "IA y apps",
+      "usagePersonal": "Plan y uso",
+      "membersPersonal": "Personas"
     },
+    "advanced": "Avanzado",
     "sectionText": {
       "account": "Tu perfil y cómo se ve la app para ti.",
       "notifications": "Lo que te llega como aviso aquí. La bandeja de entrada guarda todo.",
@@ -13437,7 +13669,13 @@
       "voice": "Mensajes de voz en las conversaciones, y quién convierte la voz en texto.",
       "apps": "Pide tareas a los agentes desde Claude, Cursor y otras apps.",
       "approvals": "Quién decide por ti cuando un agente pide tu aprobación.",
-      "about": "Quién lo hace, su licencia y dónde está su código fuente."
+      "about": "Quién lo hace, su licencia y dónde está su código fuente.",
+      "generalPersonal": "Lo que tus agentes saben de ti, y cómo funciona este espacio de trabajo.",
+      "keysPersonal": "La IA con la que piensan tus agentes, y las apps y skills que usan.",
+      "usagePersonal": "Cuánta IA usan tus agentes, y tu plan.",
+      "connectorsPersonal": "Tus apps y servidores MCP, conectados una vez para tus agentes.",
+      "membersPersonal": "Quién está aquí contigo, y las invitaciones.",
+      "rolesPersonal": "Lo que cada persona de aquí puede hacer. Quien es propietario puede hacerlo todo."
     },
     "about": {
       "basedOn": "Basado en <site>agentes.chat</site> de Codari Global, LLC",
@@ -13459,6 +13697,7 @@
         "densityHelp": "Cambia solo para ti, en todos tus dispositivos",
         "where": "Dónde se aplica",
         "channels": "Canales",
+        "channelsPersonal": "Grupos",
         "dms": "Mensajes directos",
         "comfortable": "Cómoda",
         "left": "Todo a la izquierda",
@@ -13467,6 +13706,7 @@
         "toneDms": "Mis mensajes en los mensajes directos",
         "toneDmsHelp": "Del color del agente con el que hablas",
         "toneChannels": "Mis mensajes en los canales",
+        "toneChannelsPersonal": "Mis mensajes en los grupos",
         "toneChannelsHelp": "En azul",
         "toneLight": "Clara",
         "toneStrong": "Intensa",
@@ -13500,23 +13740,43 @@
       "agentStyleTechnical": "Técnico"
     },
     "orgTitle": "Espacio de trabajo",
+    "orgTitlePersonal": "Este espacio de trabajo",
     "name": "Nombre",
+    "namePersonal": "Nombre del espacio de trabajo",
     "savedShort": "Guardado",
     "context": "Contexto del espacio de trabajo",
+    "contextPersonal": "Sobre ti",
     "contextTitle": "Lo que los agentes saben de {{name}}",
+    "contextTitlePersonal": "Lo que tus agentes saben de ti",
     "contextSubtitle": "Todos los agentes leen esto antes de cada conversación.",
     "contextPlaceholder": "Ej.: Somos una agencia de viajes para familias. Atendemos a los clientes por WhatsApp…",
+    "contextPlaceholderPersonal": "Ej.: Soy profesor y vivo con mi esposa y nuestros dos hijos. Quiero ayuda con las cuentas, la escuela de los niños y mis carreras…",
     "contextMissing": "Falta decir:",
     "contextIdeas": {
       "who": "Para quién es",
       "now": "Qué importa ahora",
-      "never": "Qué no hacer nunca"
+      "never": "Qué no hacer nunca",
+      "whoPersonal": "Quién vive contigo",
+      "nowPersonal": "Qué importa ahora",
+      "neverPersonal": "Qué no hacer nunca"
     },
     "contextHelp": "Escríbelo como si le explicaras {{name}} a alguien que empezó hoy.",
+    "contextHelpPersonal": "Escríbelo como si te presentaras a alguien que te va a ayudar todos los días.",
     "timezone": "Zona horaria",
     "timezoneHelp": "Las rutinas y los resúmenes usan esta zona horaria.",
     "actionCheck": "Los agentes revisan lo que el equipo ya hizo",
+    "actionCheckPersonal": "Los agentes revisan lo que ya se hizo",
     "actionCheckHelp": "Antes de enviar un correo, un mensaje o un pull request, el agente revisa si alguien del equipo ya lo hizo con la misma persona o en el mismo lugar en los últimos 30 días, y no lo repite.",
+    "actionCheckHelpPersonal": "Antes de un correo o un mensaje, el agente revisa si tú u otro agente ya lo hicieron con la misma persona o lugar en los últimos 30 días, y no lo repite.",
+    "mode": {
+      "label": "Modo del espacio de trabajo",
+      "team": "Equipo",
+      "personal": "Personal",
+      "teamHelp": "Canales, personas y roles para trabajar juntos. Cambiar solo cambia lo que está a la vista.",
+      "personalHelp": "Más simple, para ti y tu familia si la invitas. Cambiar solo cambia lo que está a la vista.",
+      "toTeam": "Cambiar a equipo…",
+      "toPersonal": "Cambiar a personal…"
+    },
     "telemetry": {
       "title": "Estadísticas de uso",
       "label": "Enviar estadísticas de uso anónimas a agentes.chat",
@@ -13694,6 +13954,42 @@
         "jev": "Los agentes envían stickers por su cuenta solo con Jev.",
         "jevLink": "Configurar Jev"
       }
+    }
+  },
+  "personalMode": {
+    "toTeam": {
+      "title": "Cambiar a un espacio de trabajo de equipo",
+      "lead": "Para trabajar con otras personas. Aparecen los canales y las personas.",
+      "channels": "Canales y personas en la barra lateral",
+      "roles": "Invitar personas, con roles para lo que cada una puede hacer",
+      "admin": "Aprobar por otros y el registro de auditoría, de vuelta en Configuración",
+      "stays": "Tus agentes, conversaciones, rutinas y archivos siguen como están.",
+      "name": "Nombre del espacio de trabajo",
+      "confirm": "Cambiar a equipo",
+      "done": "{{name}} ahora es un espacio de trabajo de equipo."
+    },
+    "toPersonal": {
+      "title": "Cambiar a un espacio de trabajo personal",
+      "lead": "El mismo espacio de trabajo, más simple de usar por tu cuenta.",
+      "sidebar": "La barra lateral muestra lo que más usas, el resto queda en Más",
+      "channels": "Los canales aparecen como conversaciones en grupo",
+      "settings": "La Configuración se acorta, con el resto en Avanzado",
+      "bubbles": "Las conversaciones se abren en burbujas",
+      "others_one": "La otra persona de aquí también lo ve así",
+      "others_many": "Las otras {{count}} personas de aquí también lo ven así",
+      "others_other": "Las otras {{count}} personas de aquí también lo ven así",
+      "stays": "No se pierde nada: agentes, conversaciones, rutinas, archivos y el acceso de cada uno siguen como están.",
+      "confirm": "Cambiar a personal",
+      "done": "Este espacio de trabajo ahora es personal."
+    },
+    "invite": {
+      "title": "¿A quién vas a invitar?",
+      "lead": "Tu espacio de trabajo es personal.",
+      "family": "Familia o amigos",
+      "familyText": "Se unen a ti aquí, y el espacio de trabajo sigue siendo personal.",
+      "work": "Personas con las que trabajas",
+      "workText": "Primero cámbialo a un espacio de trabajo de equipo: aparecen los canales, las personas y los roles.",
+      "workLocked": "Solo quien administra este espacio de trabajo puede cambiarlo a equipo."
     }
   },
   "peopleUsage": {
@@ -14154,6 +14450,7 @@
         "tooMany": "Demasiados para aprobar seguidos",
         "off": "Ejecutar comandos está desactivado para este agente",
         "team": "El equipo ya hizo esto",
+        "teamPersonal": "Esto ya se hizo",
         "unclear": "No se puede leer con claridad",
         "outside": "Cambia archivos fuera de la carpeta del agente",
         "upload": "Envía datos o guarda fuera de la carpeta del agente",
@@ -15447,9 +15744,13 @@
     "managedNotRemovable": "Esta es la computadora propia del espacio de trabajo: no se puede quitar.",
     "managedAccess": "Esta es la computadora propia del espacio de trabajo: sus herramientas y carpetas se quedan como están.",
     "notification": {
-      "ready": "La computadora de tu espacio de trabajo está lista"
+      "ready": "La computadora de tu espacio de trabajo está lista",
+      "readyPersonal": "La computadora de tus agentes está lista"
     },
     "title": "Computadora de {{org}}",
+    "titlePersonal": "Computadora de tus agentes",
+    "titleInSentence": "la computadora de {{org}}",
+    "titleInSentencePersonal": "la computadora de tus agentes",
     "users": "Un usuario por agente: cada uno tiene su propia carpeta.",
     "specs": "{{cpus}} CPU · {{memoryGb}} GB de memoria · {{diskGb}} GB de disco",
     "chip": {
@@ -15575,6 +15876,7 @@
     "notice": {
       "label": "La computadora del espacio de trabajo",
       "title": "Preparando la computadora de {{org}}",
+      "titlePersonal": "Preparando la computadora de tus agentes",
       "see": "Ver",
       "hide": "Ocultar"
     },
@@ -16440,7 +16742,8 @@
   },
   "teamPlan": {
     "start": {
-      "templates": "Ver plantillas de equipo"
+      "templates": "Ver plantillas de equipo",
+      "templatesPersonal": "Ver agentes listos"
     },
     "business": {
       "agency": "Agencia",
@@ -16452,6 +16755,18 @@
       "other": "Otra cosa"
     },
     "step": "Pregunta {{step}} de {{of}}",
+    "lifeArea": {
+      "routine": "Agenda y rutina",
+      "money": "Finanzas",
+      "health": "Salud y entrenamiento",
+      "studies": "Estudios",
+      "home": "Casa y compras",
+      "travel": "Viajes",
+      "work": "Trabajo y proyectos",
+      "writing": "Escritura e ideas",
+      "other": "Otra cosa"
+    },
+    "lifeAreaContext": "Quiero ayuda con: {{areas}}.",
     "send": "Enviar {{count}}",
     "card": {
       "new": "nuevo",
@@ -16459,6 +16774,7 @@
       "skills": "Skills",
       "create": "Crear el equipo",
       "adjust": "Ajustar",
+      "createPersonal": "Crear los agentes",
       "adjustName": "Ajustar a {{name}}",
       "map": "Ver como mapa",
       "agents_one": "{{count}} agente",
@@ -16468,15 +16784,20 @@
       "routineCount_one": "{{count}} rutina",
       "routineCount_other": "{{count}} rutinas",
       "weekly": "te cuento aquí cómo fue la semana del equipo",
+      "weeklyPersonal": "te cuento aquí cómo fue la semana de tus agentes",
       "failed": "El equipo no se creó: falló {{step}} ({{reason}}). No se hizo nada, así que puedes intentarlo de nuevo.",
       "retry": "Intentar de nuevo",
       "onlyCreators": "Solo quien crea agentes crea el equipo.",
       "created": "Equipo creado por {{name}}",
       "createdYou": "Equipo creado por ti",
+      "createdPersonal": "Agentes creados por {{name}}",
+      "createdYouPersonal": "Agentes creados por ti",
       "skillsWait": "Las skills esperan a un admin.",
       "weeklyWait": "Mi revisión semanal espera a quien gestiona mis rutinas.",
       "undone": "Equipo deshecho",
-      "dismissed": "Equipo descartado"
+      "dismissed": "Equipo descartado",
+      "undonePersonal": "Agentes deshechos",
+      "dismissedPersonal": "Agentes descartados"
     },
     "firstTask": {
       "suggestion": "sugerencia",
@@ -16498,6 +16819,7 @@
     },
     "map": {
       "title": "El equipo como mapa",
+      "titlePersonal": "Tus agentes como mapa",
       "people": "Personas",
       "reviewer": "{{name}} revisa la semana del equipo",
       "waits": "Espera tu aprobación"
@@ -16512,15 +16834,24 @@
       "failed": "El equipo no se creó. El motivo está en la tarjeta de la conversación.",
       "none": "Ninguna de estas",
       "noneSub": "Cuenta lo que haces y {{name}} lo arma",
-      "tailor": "Después, solo pídeme que lo ajuste a tu negocio."
+      "tailor": "Después, solo pídeme que lo ajuste a tu negocio.",
+      "titlePersonal": "Tus agentes",
+      "leadPersonal": "Agentes listos para lo que necesitas. Después {{name}} los ajusta contigo.",
+      "heldLeadPersonal": "Elige lo más cercano a lo que necesitas. Puedes cambiarlo todo después.",
+      "createPersonal": "Crear mis agentes",
+      "failedPersonal": "Tus agentes no se crearon. El motivo está en la tarjeta de la conversación.",
+      "noneSubPersonal": "Cuenta lo que necesitas y {{name}} los arma",
+      "tailorPersonal": "Después, solo pídeme que los ajuste a tu rutina."
     },
     "weekly": {
-      "name": "La semana del equipo"
+      "name": "La semana del equipo",
+      "namePersonal": "Tu semana"
     }
   },
   "whoSees": {
     "label": "Quién lo ve",
     "everyone": "Todo el espacio de trabajo",
+    "everyonePersonal": "Todos aquí",
     "me": "Solo yo",
     "people": "Personas específicas",
     "only": "Solo {{name}}",
@@ -16531,6 +16862,7 @@
     "taskTitle": "Quién ve esta tarea",
     "pageTitle": "Quién ve esta página",
     "admins": "Los administradores siempre lo ven.",
+    "adminsPersonal": "Quienes administran este espacio también lo ven.",
     "tied": "Sigue a quienes están en la conversación, hasta que lo cambies.",
     "search": "Buscar persona",
     "noMatch": "Nadie con ese nombre",
@@ -16544,13 +16876,17 @@
     "title": "Compartir {{name}}",
     "conversation": "Solo la conversación",
     "people": "Personas y roles que elijas",
+    "peoplePersonal": "Personas que elijas",
     "everyone": "Todo el espacio de trabajo",
+    "everyonePersonal": "Todos aquí",
     "whereDm": "El mensaje directo con {{name}}",
     "whereDmGone": "Un mensaje directo",
     "whereDmBetween": "El mensaje directo entre {{names}}",
     "whereChannel": "Miembros de #{{name}}",
     "add": "Añadir una persona o un rol",
+    "addPersonal": "Añadir una persona",
     "addSearch": "Buscar personas y roles",
+    "addSearchPersonal": "Buscar personas",
     "noResults": "Nadie con ese nombre",
     "groupPeople": "Personas",
     "groupRoles": "Roles",
@@ -16560,6 +16896,7 @@
     "role": "Rol",
     "remove": "Quitar a {{name}}",
     "admins": "Los administradores siempre lo ven.",
+    "adminsPersonal": "Quienes administran este espacio también lo ven.",
     "copyLink": "Copiar enlace",
     "copied": "Enlace copiado.",
     "done": "Listo",
@@ -16567,7 +16904,9 @@
     "choosePeople": "Elegir personas",
     "readOnly": "Solo quien está en la conversación cambia quién lo ve.",
     "open": "Todo el espacio de trabajo ve este archivo.",
+    "openPersonal": "Todos aquí ven este archivo.",
     "savedEveryone": "Ahora todo el espacio de trabajo ve el archivo.",
+    "savedEveryonePersonal": "Ahora todos aquí ven el archivo.",
     "savedPeople": "Ahora las personas que elegiste ven el archivo.",
     "savedConversation": "Ahora solo la conversación ve el archivo.",
     "undo": "Deshacer",
@@ -16620,6 +16959,37 @@
   },
   "teamTemplates": {
     "lead": "Un equipo para {{org}}, cada agente en su canal. Puedes ajustarlo antes de crearlo.",
+    "leadPersonal": "Tus agentes, cada uno hablando contigo en su propio chat. Puedes ajustarlos antes de crearlos.",
+    "life": {
+      "name": "Vida en orden",
+      "sub": "Agenda, recordatorios y cuentas",
+      "desc": "Para mantener en orden tus días y tu dinero."
+    },
+    "health": {
+      "name": "Salud",
+      "sub": "Entrenamiento y alimentación",
+      "desc": "Para entrenar con constancia y comer mejor."
+    },
+    "studies": {
+      "name": "Estudios e ideas",
+      "sub": "Plan de estudio, repasos y escritura",
+      "desc": "Para aprender algo nuevo y poner tus ideas en palabras."
+    },
+    "home": {
+      "name": "Casa",
+      "sub": "Compras, tareas de la casa y cuentas",
+      "desc": "Para llevar la casa sin olvidar nada."
+    },
+    "travel": {
+      "name": "Viajes",
+      "sub": "Viajes planeados hasta el último detalle",
+      "desc": "Para planear viajes, de los precios al itinerario día a día."
+    },
+    "freelance": {
+      "name": "Trabajo por tu cuenta",
+      "sub": "Clientes, facturas y agenda",
+      "desc": "Para quienes trabajan por su cuenta y se ocupan de sus propios clientes y su dinero."
+    },
     "agency": {
       "name": "Agencia de marketing",
       "sub": "Contenido, anuncios y atención",
@@ -16698,12 +17068,72 @@
         "line": "Mantiene la base de respuestas al día con lo que responde el equipo.",
         "routine": "Actualizar la base con las respuestas de la semana",
         "task": "Escribe las respuestas a estas preguntas de clientes:"
+      },
+      "clara": {
+        "role": "Agenda y recordatorios",
+        "line": "Lleva tu agenda y te recuerda lo importante antes de que sea tarde.",
+        "routine": "Enviar la agenda del día",
+        "task": "Pon esto en mi agenda y recuérdamelo el día anterior:"
+      },
+      "duda": {
+        "role": "Cuentas y gastos",
+        "line": "Lleva el control de tus cuentas y gastos y te avisa antes de que algo venza.",
+        "routine": "Listar las cuentas del mes y lo que falta pagar",
+        "task": "Organiza estos gastos por categoría:"
+      },
+      "leo": {
+        "role": "Entrenamiento",
+        "line": "Arma tus entrenamientos y te mantiene en marcha, a tu ritmo.",
+        "routine": "Enviar el entrenamiento del día",
+        "task": "Ármame un entrenamiento de 30 minutos para hoy con:"
+      },
+      "mel": {
+        "role": "Alimentación",
+        "line": "Planea tus comidas y la lista de compras, a tu gusto y a tu bolsillo.",
+        "routine": "Planear las comidas de la semana y la lista de compras",
+        "task": "Sugiéreme tres cenas rápidas con:"
+      },
+      "gabi": {
+        "role": "Estudios",
+        "line": "Arma tu plan de estudio y te hace preguntas sobre lo que aprendiste.",
+        "routine": "Repasar el tema del día con tres preguntas",
+        "task": "Explícame este tema de forma sencilla y hazme tres preguntas:"
+      },
+      "lu": {
+        "role": "Escritura e ideas",
+        "line": "Guarda tus notas e ideas y te ayuda a convertirlas en textos.",
+        "routine": "Reunir las ideas y notas de la semana",
+        "task": "Convierte estas notas en un texto corto:"
+      },
+      "rosa": {
+        "role": "Casa y compras",
+        "line": "Lleva la lista de compras, las tareas de la casa y lo que hay que arreglar.",
+        "routine": "Armar la lista de compras y las tareas de la semana",
+        "task": "Arma una lista de compras de la semana para:"
+      },
+      "vic": {
+        "role": "Viajes",
+        "line": "Planea tus viajes: fechas, precios, reservas e itinerario día a día.",
+        "routine": "Revisar los precios de los viajes que estás planeando",
+        "task": "Planea un viaje de 3 días a:"
+      },
+      "rui": {
+        "role": "Clientes",
+        "line": "Da seguimiento a tus clientes, escribe propuestas y facturas, y le recuerda a quien no pagó.",
+        "routine": "Listar lo que cada cliente espera hoy",
+        "task": "Escribe una propuesta corta para este cliente:"
       }
     },
     "example": {
       "iara": "Hola, Marina. Tu pedido salió ayer y llega antes del viernes. El código de seguimiento está aquí abajo. Si el viernes no te va bien, busco otra fecha.",
       "lia": "1. Tres errores comunes al contratar una agencia. 2. Los bastidores de un proyecto que casi sale mal. 3. Una pregunta para quienes los siguen: ¿qué quieren ver aquí?",
-      "nina": "Mañana: 9:00 Carla, 10:30 Pedro, 14:00 libre. Pedro aún no confirmó. ¿Quieres que le escriba?"
+      "nina": "Mañana: 9:00 Carla, 10:30 Pedro, 14:00 libre. Pedro aún no confirmó. ¿Quieres que le escriba?",
+      "clara": "Hoy: 9:00 dentista, 12:30 almuerzo con Paula, 18:00 recoger el paquete. Mañana es el cumpleaños de tu mamá. ¿Quieres que te lo recuerde por la mañana?",
+      "leo": "Hoy, 30 minutos: 5 minutos de calentamiento, 3 rondas de 12 sentadillas, 10 flexiones y 30 segundos de plancha, luego 5 minutos de estiramiento. Cuéntame cómo te fue y ajusto el del miércoles.",
+      "gabi": "Tema de hoy: la fotosíntesis. En resumen, las plantas transforman luz, agua y dióxido de carbono en azúcar y oxígeno. Tres preguntas: ¿dónde ocurre, qué entra y qué sale?",
+      "rosa": "Esta semana: arroz, frijoles, huevos, plátanos, café y detergente. En casa: cambiar las sábanas el jueves y llamar a alguien por el grifo de la cocina.",
+      "vic": "Lisboa en 3 días: día 1, Alfama y el castillo. Día 2, Belém y el río. Día 3, Sintra. Los vuelos más baratos son el martes 12. ¿Quieres que esté pendiente del precio?",
+      "rui": "Hola, Marcos, aquí va la propuesta: un sitio nuevo de 5 páginas, entregado en 3 semanas, pagado en dos partes. Si te parece bien, te envío el contrato hoy."
     },
     "channels": {
       "iara": "atencion",
@@ -16741,6 +17171,7 @@
         "line": "qué revisar antes de abrir un PR"
       }
     },
-    "approvals": "Lo que sale para los clientes espera tu aprobación. Puedes liberarlo después, cuando confíes en ellos."
+    "approvals": "Lo que sale para los clientes espera tu aprobación. Puedes liberarlo después, cuando confíes en ellos.",
+    "approvalsPersonal": "Todo lo que se envíe, se pague o se reserve a tu nombre espera tu aprobación. Puedes liberarlo después, cuando confíes en ellos."
   }
 }

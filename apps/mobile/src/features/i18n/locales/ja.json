@@ -126,6 +126,7 @@
     "refuseTitle": "リクエストを却下",
     "refuseAsk": "リクエストを却下しますか？",
     "leaves": "社外に出ます",
+    "leavesPersonal": "ワークスペースの外に出ます",
     "refuseWhyF": "{{name}}は理由から学びます。任意です。",
     "refuseWhyM": "{{name}}は理由から学びます。任意です。",
     "sheet": {
@@ -161,6 +162,7 @@
       "irreversible": "元に戻せません",
       "reversible": "元に戻せます",
       "external": "社外に出ます",
+      "externalPersonal": "ワークスペースの外に出ます",
       "unsent": "何も送信されません",
       "deletable": "削除できます"
     },
@@ -229,6 +231,9 @@
     "newChannelHint": "チームやトピック用",
     "channelPlaceholder": "チャンネル名（例: マーケティング）",
     "createChannel": "チャンネルを作成",
+    "newChannelHintPersonal": "ひとつの話題を複数のエージェントと",
+    "channelPlaceholderPersonal": "名前（例: 旅行）",
+    "createChannelPersonal": "グループ会話を作成",
     "waitIn": "{{where}}で",
     "workingNowLine_other": "{{count}}体のエージェントが作業中",
     "nobodyWorking": "作業中のエージェントはいません",
@@ -238,6 +243,7 @@
       "unmute": "ミュート解除"
     },
     "firstRunLine": "{{name}}がチームを準備中 · {{done}}/{{total}}",
+    "firstRunLinePersonal": "{{name}}がエージェントを準備中 · {{done}}/{{total}}",
     "first": {
       "title": "最初のエージェントから始めましょう",
       "subtitle": "名前を付けて、何をするかを伝えてください。ここにチャットとして表示されます。",
@@ -266,6 +272,8 @@
     "chat": "チャットする相手…",
     "name": "名前",
     "channelFine": "チームやトピック用。",
+    "channelPersonal": "グループ会話",
+    "channelFinePersonal": "ひとつの話題について、複数のエージェントと話せます。",
     "chatSearch": "人またはエージェントを検索",
     "to": "宛先:",
     "people": "人",
@@ -278,6 +286,7 @@
     "routineHint": "エージェントが予定どおり自動で実行",
     "wikiPage": "Wikiページ",
     "wikiHint": "チームとエージェントが読むためのページ",
+    "wikiHintPersonal": "あなたのエージェントが読むためのページ",
     "inviteHint": "メールまたはリンクで",
     "agent": {
       "question": "何をしますか？"
@@ -445,12 +454,14 @@
       "arrived": "{{name}}がチームに加わりました",
       "meet": "{{name}}との最初の会話",
       "roleIntro": "チームの{{role}}です。普段の言葉で頼んでください。",
+      "roleIntroPersonal": "あなたのための{{role}}です。普段の言葉で頼んでください。",
       "noIntro": "必要なことを、普段の言葉で頼んでください。",
       "firstTitle": "はじめに",
       "sendHint": "タップして送信",
       "hello": "{{person}}さん、こんにちは。{{name}}です。",
       "helloNoName": "こんにちは。{{name}}です。",
       "helloRole": "チームの{{role}}です。",
+      "helloRolePersonal": "あなたのための{{role}}です。",
       "helloAsk": "何から始めましょうか？",
       "now": "たった今",
       "start": {
@@ -764,6 +775,7 @@
     "noGroupSection": "部署なし",
     "workingSection": "作業中",
     "teamSection": "チーム",
+    "teamSectionPersonal": "あなたのエージェント",
     "managerQuiet": "進行中のものはありません",
     "state": {
       "waitsYou": "あなたのOK待ち",
@@ -972,7 +984,9 @@
     "title": "あなた",
     "role": {
       "owner": "オーナー",
-      "member": "メンバー"
+      "member": "メンバー",
+      "ownerPersonal": "あなたの個人用ワークスペース",
+      "memberPersonal": "あなたと共有されている個人用ワークスペース"
     },
     "appearance": "外観",
     "notifications": "通知",
@@ -1688,6 +1702,7 @@
     "loadFailed": "コネクタを読み込めませんでした。",
     "connectedCheck": "{{name}}、接続済み",
     "adminsOnly": "サービスを接続できるのは{{org}}の管理者だけです。管理者に頼んでください。",
+    "adminsOnlyPersonal": "アプリを接続できるのは、このワークスペースを管理している人だけです。その人に頼んでください。",
     "canTitle": "エージェントができるようになること",
     "asks": "{{text}} · あなたの承認が必要",
     "connect": "接続",
@@ -1832,6 +1847,7 @@
     "zoneChange": "変更",
     "zoneTitle": "タイムゾーン",
     "anotherTitle": "新しいワークスペースの名前は？",
+    "anotherPurpose": "新しいワークスペースは何に使いますか？",
     "anotherLead": "agentes.chatに作成します。{{org}}からは抜けず、いつでも切り替えられます。",
     "suggested": "{{domain}}のメールアドレスから、{{org}}を提案しました。",
     "create": "作成",
@@ -2221,7 +2237,11 @@
       "title": "エージェントのチームを作りましょう",
       "text": "各エージェントが役割を持ち、チャットで一緒に働きます。",
       "viewerTitle": "エージェントのチームはここに表示されます",
-      "viewerText": "このワークスペースでエージェントを作成できる人が最初の1体を追加すると、ここに表示されます。"
+      "viewerText": "このワークスペースでエージェントを作成できる人が最初の1体を追加すると、ここに表示されます。",
+      "titlePersonal": "自分専用のエージェントに手伝ってもらいましょう",
+      "textPersonal": "各エージェントがあなたのために一つのことを、チャットで直接引き受けます。",
+      "viewerTitlePersonal": "あなたのエージェントはここにいます",
+      "viewerTextPersonal": "ここでエージェントを作成できる人が最初の1体を追加すると、ここに表示されます。"
     },
     "agentsForYou": {
       "title": "あなたのエージェントはここに表示されます",
@@ -2231,13 +2251,20 @@
       "title": "チームが作ったものを一か所に",
       "text": "エージェントと人のレポート、表、ファイルがここに残り、すぐに見つかります。",
       "viewerTitle": "チームが作ったものを探す",
-      "viewerText": "エージェントや人がチャットで作成したものがここに表示されます。"
+      "viewerText": "エージェントや人がチャットで作成したものがここに表示されます。",
+      "titlePersonal": "エージェントが作ったものを、すべて一か所に",
+      "textPersonal": "エージェントのレポート、表、ファイルはここに残り、すぐに見つかります。",
+      "viewerTitlePersonal": "エージェントが作ったものを探す",
+      "viewerTextPersonal": "エージェントがあなたのチャットで作ったものがここに表示されます。"
     },
     "tasks": {
       "title": "仕事をチームに任せましょう",
       "text": "エージェントや人にタスクを作成し、最後まで見届けましょう。",
       "viewerTitle": "チームの仕事を追いかける",
-      "viewerText": "誰かが最初のタスクを作成すると、ここに表示されます。"
+      "viewerText": "誰かが最初のタスクを作成すると、ここに表示されます。",
+      "titlePersonal": "やることをエージェントに任せましょう",
+      "textPersonal": "エージェントにタスクを作成し、最後まで見届けましょう。",
+      "viewerTitlePersonal": "エージェントの仕事を見守る"
     },
     "routines": {
       "title": "繰り返しの仕事はエージェントに任せましょう",
@@ -2249,7 +2276,10 @@
       "title": "チームが知っておくべきことを残しましょう",
       "text": "人もエージェントもこのページを読むので、全員が同じ情報で働けます。",
       "viewerTitle": "チームの知識を調べる",
-      "viewerText": "Wikiを編集できる人が最初のページを書くと、ここに表示されます。"
+      "viewerText": "Wikiを編集できる人が最初のページを書くと、ここに表示されます。",
+      "titlePersonal": "エージェントが読めるメモを残しましょう",
+      "textPersonal": "エージェントはこれらのページを読み、あなたが書いた内容をもとに働きます。",
+      "viewerTitlePersonal": "ここに書かれていることを調べる"
     },
     "memory": {
       "title": "エージェントは働きながら学びます",
@@ -2272,13 +2302,21 @@
       "text": "チャンネルには、ひとつのテーマを担当する人が集まります。",
       "viewerTitle": "チームのチャンネルはここに表示されます",
       "viewerText": "チャンネルを作成できる人が最初のチャンネルを開くと、ここに表示されます。",
-      "action": "チャンネルを作成"
+      "action": "チャンネルを作成",
+      "titlePersonal": "複数のエージェントと一度に話しましょう",
+      "textPersonal": "グループ会話ごとに、一つのテーマのエージェントと人が集まります。",
+      "viewerTitlePersonal": "グループ会話はここに表示されます",
+      "viewerTextPersonal": "グループ会話を作成できる人が最初の1つを開くと、ここに表示されます。"
     },
     "people": {
       "title": "ここでチームと働きましょう",
       "text": "人を招待すると、その人やエージェントと一か所で話せます。",
       "viewerTitle": "チームはここに表示されます",
-      "viewerText": "人を招待できる人がチームのメンバーを呼ぶと、ここに表示されます。"
+      "viewerText": "人を招待できる人がチームのメンバーを呼ぶと、ここに表示されます。",
+      "titlePersonal": "家族や友だちを招待しましょう",
+      "textPersonal": "誰かを招待すると、あなたやエージェントと一か所で話せます。",
+      "viewerTitlePersonal": "家族や友だちはここに表示されます",
+      "viewerTextPersonal": "誰かが参加すると、ここに表示されます。"
     },
     "chat": {
       "title": "すべてはメッセージから始まります",
@@ -2298,7 +2336,11 @@
       "title": "パスワードを回さずにログインを共有",
       "text": "エージェントがチームのために使うログインとキーを保存しましょう。",
       "viewerTitle": "チームのログインはここに表示されます",
-      "viewerText": "ログインやキーを共有されると、ここに表示されます。"
+      "viewerText": "ログインやキーを共有されると、ここに表示されます。",
+      "titlePersonal": "共有のログインを一か所にまとめましょう",
+      "textPersonal": "エージェントがここにいる全員のために使うログインとキーを保存しましょう。",
+      "viewerTitlePersonal": "共有のログインはここに表示されます",
+      "viewerTextPersonal": "ここの誰かがログインやキーを共有すると、ここに表示されます。"
     },
     "skills": {
       "title": "仕事の進め方をエージェントに教えましょう",

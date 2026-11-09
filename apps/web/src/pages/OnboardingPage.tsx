@@ -5,7 +5,7 @@ import { settingUp } from "@agenteschat/client/lib/guards";
 import { sendsEmail } from "@agenteschat/client/lib/join-requests";
 import { finishOnboarding, RIGHT_HAND_DEFAULT } from "@agenteschat/client/lib/right-hand";
 import { browserTimezone, timezoneName } from "@agenteschat/client/lib/routines";
-import { type AgentAppearance, Button, Field, Icon, Input, Locked, Logo, OptionList } from "@agenteschat/ui";
+import { Button, Field, Icon, Input, Locked, Logo, OptionList, setGaze } from "@agenteschat/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
@@ -17,6 +17,7 @@ import { BillingLinkButton } from "@/components/BillingLinkButton";
 import { DeleteAccountEntry } from "@/components/DeleteAccount";
 import { DeleteWorkspaceDialog } from "@/components/DeleteWorkspace";
 import { ImageCropDialog, OrgMark } from "@/components/ProfilePhoto";
+import { PurposeScene } from "@/components/PurposeScene";
 import { BootSplash } from "@/components/Sky";
 import { ZonePicker } from "@/components/ZoneSelect";
 import { sendNewLink } from "@/lib/email-confirmation";
@@ -43,6 +44,16 @@ export function OnboardingPage() {
   // Who it is for (ADR 0158), then, for a team, its name: one question at a time.
   const [purpose, setPurpose] = useState<WorkspaceMode | null>(null);
   const [step, setStep] = useState<"purpose" | "name">("purpose");
+  // On the first question the chosen answer's agents look at the pointer (`PurposeScene`, its `data-gaze`).
+  useEffect(() => {
+    if (step !== "purpose") return;
+    const look = (e: PointerEvent) => setGaze({ x: e.clientX, y: e.clientY });
+    window.addEventListener("pointermove", look);
+    return () => {
+      window.removeEventListener("pointermove", look);
+      setGaze(null);
+    };
+  }, [step]);
   const personal = purpose === "personal";
   const [org, setOrg] = useState("");
   const [zone, setZone] = useState(() => browserTimezone() ?? "UTC");
@@ -61,6 +72,8 @@ export function OnboardingPage() {
   const inviteOnly = me.data?.user.canCreateWorkspace === false && created === null;
   const emails = sendsEmail(authConfig);
   const email = me.data?.user.email ?? "";
+  // Their face in the first question's drawings: the account's photo (Google's), else their initials.
+  const you = { name: me.data?.user.name || email, image: me.data?.user.image ?? null };
   // The address this tab's sign-up was emailed a link to confirm: the step says where it went. Read once and
   // forgotten once confirmed or set up, so a later onboarding (another workspace) says nothing of it.
   const [sentTo] = useState(() => sessionStore.get(STORAGE_KEYS.confirmationSent));
@@ -259,12 +272,13 @@ export function OnboardingPage() {
               <div className="onb__answer" key="purpose">
                 <OptionList<WorkspaceMode | "">
                   aria-label={t("onboarding.purpose.title")}
+                  layout="cards"
                   className="onb-purpose"
                   value={purpose ?? ""}
                   onValueChange={(v) => setPurpose(v || null)}
                   options={PURPOSES.map((mode) => ({
                     value: mode,
-                    leading: <PurposeFaces mode={mode} />,
+                    leading: <PurposeScene kind={mode} chosen={purpose === mode} you={you} />,
                     title: t(`onboarding.purpose.${mode}`),
                     description: (
                       <>
@@ -409,41 +423,6 @@ export function OnboardingPage() {
 /** The two answers to "What will you use agentes.chat for?" (ADR 0158), in this order. */
 const PURPOSES = ["personal", "team"] as const satisfies readonly WorkspaceMode[];
 
-/** Who is in each answer's faces: the person's agents for themselves; people and agents for a team. */
-const PURPOSE_AGENTS: Record<WorkspaceMode, AgentAppearance[]> = {
-  personal: [
-    { color: "violet", eyes: "happy", accessory: "bow" },
-    { color: "green", eyes: "dots", accessory: "cap" },
-    { color: "amber", eyes: "wide", accessory: "headphones" },
-    { color: "rose", eyes: "happy", accessory: "flower" },
-  ],
-  team: [
-    { color: "sky", eyes: "round", accessory: "headset" },
-    { color: "graphite", eyes: "dots", accessory: "antenna" },
-  ],
-};
-const PURPOSE_PEOPLE: Record<WorkspaceMode, number> = { personal: 0, team: 2 };
-
-/**
- * Who would be in a workspace of this kind, before its answer (ADR 0158): the agents in their own tiles, as everywhere
- * in the app, a little over each other; people as people's tiles. The chosen answer's agents come alive, the other's
- * rest (the option list fades an unchosen lead). Decorative: the words say it.
- */
-function PurposeFaces({ mode }: { mode: WorkspaceMode }) {
-  return (
-    <span className="onb-purpose__faces" aria-hidden="true">
-      {Array.from({ length: PURPOSE_PEOPLE[mode] }, (_, i) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: fixed, decorative placeholders
-        <span key={i} className="ac-avatar ac-avatar--framed onb-purpose__person">
-          <Icon name="person" size={18} />
-        </span>
-      ))}
-      {PURPOSE_AGENTS[mode].map((look, i) => (
-        <AgentAvatar key={`${mode}-${look.color}`} name={`${mode}-${i}`} appearance={look} size="md" />
-      ))}
-    </span>
-  );
-}
 
 /** Owning a workspace that waits for its first plan: said in place, with the way to that plan. */
 function UnpaidNote({ orgId, billing }: { orgId: string; billing: boolean }) {

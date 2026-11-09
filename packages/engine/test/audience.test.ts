@@ -180,6 +180,37 @@ describe("who can talk to the agent", () => {
     expect(team.audienceMode).toBe("everyone");
   });
 
+  test("a personal workspace's new agent starts with every connected app and the calendar; a team's does not", async () => {
+    await world();
+    const model = { model: "claude-sonnet-5-5" };
+    const [app] = await f.db
+      .insert(schema.connectorConnections)
+      .values({
+        orgId: f.org.id,
+        connector: "linear",
+        toolPrefix: "linear",
+        label: "Linear",
+        serverUrl: "https://linear.example.com/mcp",
+        authType: "none",
+      })
+      .returning();
+    const grantsOf = async (agentId: string) =>
+      (await f.db.select().from(schema.agentScopes).where(eq(schema.agentScopes.agentId, agentId))).map(
+        (g) => `${g.connectionId ?? "-"} ${g.scope}`,
+      );
+    await updateOrgSettings(f.db, f.owner.id, f.org.id, { mode: "personal" });
+    const mine = await createAgent(f.db, f.owner.id, f.org.id, { name: "Casa", handle: "casa" }, model);
+    // ADR 0158 §3a: broad by default; sensitive tools still ask on every call.
+    expect(await grantsOf(mine.id)).toEqual(
+      expect.arrayContaining([`${app?.id} connector:*`, "- calendar:read", "- calendar:write"]),
+    );
+    await updateOrgSettings(f.db, f.owner.id, f.org.id, { mode: "team" });
+    const team = await createAgent(f.db, f.owner.id, f.org.id, { name: "Time", handle: "time" }, model);
+    const teamGrants = await grantsOf(team.id);
+    expect(teamGrants).not.toContain(`${app?.id} connector:*`);
+    expect(teamGrants).not.toContain("- calendar:write");
+  });
+
   test("removing the last person keeps it restricted: only its owner, never everyone", async () => {
     const { bia } = await world();
     await setAgentAudience(f.db, f.owner.id, f.org.id, f.agent.id, { mode: "people", userIds: [bia.id] });

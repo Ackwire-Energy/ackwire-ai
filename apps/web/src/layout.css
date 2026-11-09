@@ -10878,6 +10878,21 @@ html:not([data-pointer]) .agp-subnav__item:focus-visible {
 .agp-col--cfg {
   gap: 16px;
 }
+/* A personal workspace's Settings (ADR 0158): its name, look and budget, without the side list. */
+.agp-cfg[data-part="basic"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+/* A personal workspace's Advanced tab: the tabs its bar leaves out, the hard settings, then the tools and rules. */
+.agp-adv {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.agp-adv__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 .agp-sec {
   scroll-margin-top: 64px;
 }

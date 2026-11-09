@@ -711,11 +711,11 @@ export const ptBR = {
       title: "Para que você vai usar o agentes.chat?",
       lead: "Dá para mudar depois, nada se perde.",
       personal: "Para mim",
-      personalText: "Agentes para a sua agenda, contas, treino e o que mais você pedir.",
+      personalText: "Agentes que cuidam do seu dia.",
       team: "Para minha empresa ou time",
       teamText: "Pessoas e agentes trabalham juntos, com canais, papéis e aprovações.",
-      personalExamples: "O seu dia às 7h · As contas do mês · O treino da semana",
-      teamExamples: "Atendimento · Financeiro · O relatório da semana do time",
+      personalExamples: "O seu dia às 7h · Contas · Treino",
+      teamExamples: "Atendimento · Financeiro · Relatórios",
     },
     personal: {
       name: "Pessoal",
@@ -4812,6 +4812,16 @@ export const ptBR = {
       activity: "Atividade",
       settings: "Configurações",
       more: "Mais",
+      /** A personal workspace's bar (ADR 0158): the access tab is what it can use; Settings keeps name, look, budget. */
+      accessPersonal: "Pode usar",
+      settingsPersonal: "Ajustes",
+      /** A personal workspace's tab with what one person rarely needs. */
+      advanced: "Avançado",
+    },
+    /** A personal workspace's Advanced tab: the tabs its bar leaves out, then the hard settings and tools. */
+    advanced: {
+      elsewhere: "Atividade, arquivos e uso",
+      tools: "Ferramentas e regras",
     },
     /** The overview's two lists of rows: how it works, then who it works with. */
     ficha: {
@@ -4891,7 +4901,8 @@ export const ptBR = {
       ownerPersonal_female:
         "Você é responsável da {{name}}: muda o jeito, quem pode falar, as conversas em grupo e o computador. O resto, só quem cuida daqui.",
       ownerInstructions: "Só admins editam as instruções. Você, como responsável, aprova as propostas de mudança.",
-      ownerInstructionsKeeper: "Só {{keeper}} edita as instruções. Você, como responsável, aprova as propostas de mudança.",
+      ownerInstructionsKeeper:
+        "Só {{keeper}} edita as instruções. Você, como responsável, aprova as propostas de mudança.",
       ownerInstructionsPersonal:
         "Só quem cuida daqui edita as instruções. Você, como responsável, aprova as propostas de mudança.",
       ownerAccess: "Só admins dão ou tiram acessos e repositórios.",
@@ -5800,6 +5811,8 @@ export const ptBR = {
       custom: { name: "Do zero", desc: "Você escreve tudo. Sem acessos até você liberar.", instructions: "" },
     },
     roleGroups: {
+      /** A personal workspace's one group: the right hand's personal agents (ADR 0158). */
+      personal: "Para o seu dia",
       tech: "Produto e tecnologia",
       customers: "Clientes",
       operations: "Operação",
@@ -16751,7 +16764,7 @@ export const ptBR = {
       leo: "Hoje, 30 minutos: 5 de aquecimento, 3 rodadas de 12 agachamentos, 10 flexões e 30 segundos de prancha, depois 5 de alongamento. Me conte como foi que eu ajusto o de quarta.",
       gabi: "Assunto de hoje: fotossíntese. Em resumo, as plantas transformam luz, água e gás carbônico em açúcar e oxigênio. Três perguntas: onde acontece, o que entra e o que sai?",
       rosa: "Nesta semana: arroz, feijão, ovos, banana, café e detergente. Em casa: trocar os lençóis na quinta e chamar alguém para a torneira da cozinha.",
-      vic: "Lisboa em 3 dias: dia 1, Alfama e o castelo; dia 2, Belém e a beira do rio; dia 3, Sintra. Os voos mais baratos são na terça, dia 12. Quer que eu fique de olho no preço?",
+      vic: "Lisboa em 3 dias: dia 1, Alfama e o castelo. Dia 2, Belém e a beira do rio. Dia 3, Sintra. Os voos mais baratos são na terça, dia 12. Quer que eu fique de olho no preço?",
       rui: "Oi, Marcos, segue a proposta: um site novo com 5 páginas, entregue em 3 semanas, pago em duas vezes. Se estiver bom para você, mando o contrato hoje.",
     },
     channels: {

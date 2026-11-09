@@ -23,9 +23,11 @@ members (a family): the mode is for the whole workspace, so everyone in it sees 
 
 ### 2. Onboarding
 
-The first question is what the workspace is for: "For me" or "For my company or team". "For me" asks no name or logo:
-the workspace is created as personal, named in the person's language ("Personal"), with the browser's time zone. "For
-my company" shows today's name, logo and time zone.
+The first question is what the workspace is for: "For me" or "For my company or team", two cards side by side, each
+drawn with the app's own faces over the cards' horizon: the person signing up (their account's photo, else their
+initials) in the middle of their agents, or on top of a small org chart of people and agents. "For me" asks no name or
+logo: the workspace is created as personal, named in the person's language ("Personal"), with the browser's time zone.
+"For my company" shows today's name, logo and time zone.
 
 The right hand's first-run card (ADR 0155 §6) has four rows in personal mode: what the person wants help with (areas of
 life, saved as the workspace's context), their agents, an AI, their apps. The people row is left out.
@@ -36,9 +38,11 @@ The web app and the phone app read the same mode and the same shared helpers (`p
 same shape.
 
 - **Sidebar:** the person's face and name on top (their menu: account, settings, switch workspace, sign out), with
-  notifications and collapse beside it; "Go to…" is a row of the list; no footer. In sight: Home, Routines, Drive and
-  More; Calendar, Tasks, Threads, Team and the rest start in More (the sidebar's existing per-person choices still
-  win). Agents come first; channels show as "Group conversations" only once there is one to show.
+  notifications and collapse beside it. Agents come first, with "New agent" under them: it asks in one sentence what
+  the agent should do and sends it to the right hand, which proposes the agent (the full form stays one link away).
+  Channels show as "Group conversations" only once there is one to show. "More" closes the list: Home, "Go to…" and
+  every tool start there (approvals show in the list while one waits); the sidebar's existing per-person choices still
+  win.
 - **A family:** every workspace has `#general`, and a personal one hides it, and the people with their direct messages,
   only while the person is its only member. Once others join, `#general` and the people show again.
 - **Defaults from the server:** the server answers a person's sidebar order and tool places for the workspace's mode
@@ -51,6 +55,15 @@ same shape.
 - **Settings:** six sections in one list (Your account, About you, AI and apps, Plan and usage, Vault, Computers) and
   the rest under Advanced, collapsed. People joins the list once others are members. Every section still opens by its
   address, from ⌘K and from the right hand's cards.
+- **An agent's page:** its bar is Overview, Instructions, Memory, "Can use" (its apps and mailboxes), Settings (name,
+  look and budget) and Advanced, with no "More". Advanced holds the rest, whole: Activity, Files and Usage a click away,
+  then its owner and who it reports to, who may talk to it, its brakes, conversations, computer, archive and delete,
+  and its built-in areas, databases, rules and skills. Every tab and section keeps its address: one that points into
+  Advanced opens it there.
+- **Creating an agent by hand:** four steps (role, identity, instructions, review). Its apps, where and who, and its AI
+  start filled in (every app, only its owner, Automático) and are passed over; the review still opens each one. The
+  starting points are the right hand's personal agents (calendar, bills, training, meals, studies, writing, home,
+  travel, clients), not a company's roles.
 - **Roles and permissions:** only the view is simpler. Inviting asks one plain question (they use the agents, or help
   you run the workspace, which is the highest role the inviter may give that holds `administrator`), says which agents
   will answer the new person, and pickers of who may talk to or see something offer people, with roles only when a role
@@ -71,6 +84,10 @@ same shape.
 - The right hand's proposals speak of the person's agents: each agent it proposes lives in its DM with the person,
   where its routines report, so `propose_team` and `propose_agent` leave the channel out unless the person asked for a
   group conversation. In a team's workspace each agent of `propose_team` still names its channel.
+- A new agent starts with broad access (`createAgent`): every app connected in the workspace (`connector:*`, as a new
+  connection gives every agent) and its calendar, when whoever creates it may give access (`manage_agents`), so a
+  family member's own agent starts as a team's does. The form's custom servers start at write too. Sensitive tools
+  still ask a person on every call; mail, databases and the computer keep their own switches.
 - Prompts, tool descriptions, emails, pushes and notices speak of one person and their agents. Names, schemas and what
   each tool does are the same in both modes, except that `propose_team`'s channel is optional in personal.
 

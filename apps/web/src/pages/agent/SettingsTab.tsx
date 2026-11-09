@@ -49,7 +49,13 @@ import { useOrg } from "@/components/org-context";
 import { ReportsList, ReportsToField } from "@/components/team/ReportsTo";
 import { useComputerEdition } from "@/components/WorkspaceComputer";
 import { useDirectory } from "@/hooks/useDirectory";
-import { AGENT_SECTIONS, type AgentSection, type Field as EditField, FIELD_PLACE } from "@/lib/agent-edit";
+import {
+  ADVANCED_SECTIONS,
+  AGENT_SECTIONS,
+  type AgentSection,
+  type Field as EditField,
+  FIELD_PLACE,
+} from "@/lib/agent-edit";
 import { BLANK_LOOK, cleanHandle } from "@/lib/new-agent";
 import { BrakesCard } from "./BrakesCard";
 import { CardHead, useAgentEdit, WasLine } from "./context";
@@ -190,17 +196,34 @@ function IdentityCard() {
   );
 }
 
-/** Configurações: identity and look, who thinks (and the API's model and key), budget, owner, audience, channels, computer. */
+/** Who it reports to (ADR 0148 addendum) and who reports to it: applied at once with Desfazer, never in the save bar. */
+function ReportsTo() {
+  const { agent } = useAgentEdit();
+  return (
+    <>
+      <ReportsToField agentId={agent.id} id="agp-reports-to" />
+      <ReportsList agentId={agent.id} name={agent.name} />
+    </>
+  );
+}
+
+/**
+ * Configurações: identity and look, who thinks (and the API's model and key), budget, owner, audience, channels, computer.
+ * In a personal workspace (ADR 0158 §3) it comes in two parts: `basic` (its name, look and budget, the Settings tab) and
+ * `advanced` (the rest, with who it reports to and its brakes, in the Advanced tab).
+ */
 export function SettingsTab({
   section,
   onSection,
   onArchive,
   onDelete,
+  part = "all",
 }: {
   section: AgentSection | undefined;
   onSection: (sec: AgentSection) => void;
   onArchive: () => void;
   onDelete: () => void;
+  part?: "all" | "basic" | "advanced";
 }) {
   const { t } = useTranslation();
   const { org, me } = useOrg();
@@ -210,7 +233,13 @@ export function SettingsTab({
   const groups = useAgentGroups(org.id).data ?? [];
   const inGroup = groupOf(groups, agent.id);
   // "Quem pensa" lives in the sentence under the name now (its dialog saves at once).
-  const sections = AGENT_SECTIONS.filter((s) => s !== "brain" && (s !== "danger" || admin));
+  const sections = AGENT_SECTIONS.filter(
+    (s) =>
+      s !== "brain" &&
+      (s !== "danger" || admin) &&
+      (part === "all" || ADVANCED_SECTIONS.includes(s) === (part === "advanced")),
+  );
+  const has = (s: AgentSection) => sections.includes(s);
   const visibleChannels = useVisibleChannels().list;
   // Where I may put it or take it out (the channels' ⓘ says so when some aren't).
   const placeable = visibleChannels.filter((c) => addsAgentsTo(c, me.user.id, org));
@@ -218,165 +247,182 @@ export function SettingsTab({
   return (
     <>
       <ReadOnlyNote />
-      <div className="agp-cfg">
-        <nav className="agp-subnav" aria-label={t("agentPage.settings.sections")}>
-          {sections.map((s) => {
-            const n = changes.filter((c) => FIELD_PLACE[c.field].sec === s).length;
-            return (
-              <button
-                key={s}
-                type="button"
-                className="agp-subnav__item"
-                data-danger={s === "danger" || undefined}
-                aria-current={section === s ? "true" : undefined}
-                onClick={() => onSection(s)}
-              >
-                <Icon name={SECTION_ICON[s]} size={14} />
-                {s === "computer" ? t("agentPage.settings.computer") : t(`agentPage.settings.${s}`)}
-                {n > 0 && (
-                  <span className="agp-tag agp-tag--dot">
-                    <Icon name="edit" size={14} />
-                    <span className="ac-visually-hidden">{t("agentPage.changesCount", { count: n })}</span>
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </nav>
-        <div className="agp-col agp-col--cfg">
-          <Section
-            id="identity"
-            title={t("agentPage.settings.identity")}
-            fields={["name", "handle", "role", "look", "group"]}
-            hint={{
-              name: t("common.about", { label: t("agentPage.settings.identity") }),
-              text: t("agent.identityHelp"),
-            }}
-            action={
-              can("look") ? (
-                <Button
-                  size="sm"
-                  icon="shuffle"
-                  onClick={() => set("look", { ...BLANK_LOOK, ...randomAppearance(look) } as Required<AgentAppearance>)}
+      <div className="agp-cfg" data-part={part === "basic" ? "basic" : undefined}>
+        {part !== "basic" && (
+          <nav className="agp-subnav" aria-label={t("agentPage.settings.sections")}>
+            {sections.map((s) => {
+              const n = changes.filter((c) => FIELD_PLACE[c.field].sec === s).length;
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  className="agp-subnav__item"
+                  data-danger={s === "danger" || undefined}
+                  aria-current={section === s ? "true" : undefined}
+                  onClick={() => onSection(s)}
                 >
-                  {t("newAgent.shuffle")}
-                </Button>
-              ) : undefined
-            }
-          >
-            <div className="agp-id">
-              <span
-                className="agp-id__look"
-                style={{ "--a": agentGradient(look.color)[0], "--b": agentGradient(look.color)[1] } as CSSProperties}
-              >
-                <AgentAvatar size="lg" framed={false} name={draft.name || agent.name} appearance={look} />
-              </span>
-              <div className="agp-id__fields">
-                <IdentityCard />
-                {/* Only once the workspace has groups (ADR 0083); they are made in the sidebar. */}
-                {groups.length > 0 && can("group") ? (
-                  <div className="agp-field">
-                    <Field label={t("agentPage.fields.group")} id="agp-group">
-                      <Select
-                        className="newag__sel"
-                        value={draft.group}
-                        onValueChange={(v) => set("group", v)}
-                        options={[
-                          { value: NO_GROUP, label: t("agentGroups.none") },
-                          ...groups.map((g) => ({ value: g.id, label: g.name })),
-                        ]}
-                      />
-                    </Field>
-                    <WasLine changeKey="group" />
-                  </div>
-                ) : (
-                  inGroup && (
+                  <Icon name={SECTION_ICON[s]} size={14} />
+                  {s === "computer" ? t("agentPage.settings.computer") : t(`agentPage.settings.${s}`)}
+                  {n > 0 && (
+                    <span className="agp-tag agp-tag--dot">
+                      <Icon name="edit" size={14} />
+                      <span className="ac-visually-hidden">{t("agentPage.changesCount", { count: n })}</span>
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </nav>
+        )}
+        <div className="agp-col agp-col--cfg">
+          {has("identity") && (
+            <Section
+              id="identity"
+              title={t("agentPage.settings.identity")}
+              fields={["name", "handle", "role", "look", "group"]}
+              hint={{
+                name: t("common.about", { label: t("agentPage.settings.identity") }),
+                text: t("agent.identityHelp"),
+              }}
+              action={
+                can("look") ? (
+                  <Button
+                    size="sm"
+                    icon="shuffle"
+                    onClick={() =>
+                      set("look", { ...BLANK_LOOK, ...randomAppearance(look) } as Required<AgentAppearance>)
+                    }
+                  >
+                    {t("newAgent.shuffle")}
+                  </Button>
+                ) : undefined
+              }
+            >
+              <div className="agp-id">
+                <span
+                  className="agp-id__look"
+                  style={{ "--a": agentGradient(look.color)[0], "--b": agentGradient(look.color)[1] } as CSSProperties}
+                >
+                  <AgentAvatar size="lg" framed={false} name={draft.name || agent.name} appearance={look} />
+                </span>
+                <div className="agp-id__fields">
+                  <IdentityCard />
+                  {/* Only once the workspace has groups (ADR 0083); they are made in the sidebar. */}
+                  {groups.length > 0 && can("group") ? (
                     <div className="agp-field">
-                      <span className="newag__label">{t("agentPage.fields.group")}</span>
-                      <ReadValue>{inGroup.name}</ReadValue>
+                      <Field label={t("agentPage.fields.group")} id="agp-group">
+                        <Select
+                          className="newag__sel"
+                          value={draft.group}
+                          onValueChange={(v) => set("group", v)}
+                          options={[
+                            { value: NO_GROUP, label: t("agentGroups.none") },
+                            ...groups.map((g) => ({ value: g.id, label: g.name })),
+                          ]}
+                        />
+                      </Field>
+                      <WasLine changeKey="group" />
                     </div>
-                  )
-                )}
-                {/* Responde a (ADR 0148 addendum): applied at once with Desfazer, never part of the save bar. */}
-                <ReportsToField agentId={agent.id} id="agp-reports-to" />
-                <ReportsList agentId={agent.id} name={agent.name} />
+                  ) : (
+                    inGroup && (
+                      <div className="agp-field">
+                        <span className="newag__label">{t("agentPage.fields.group")}</span>
+                        <ReadValue>{inGroup.name}</ReadValue>
+                      </div>
+                    )
+                  )}
+                  {/* Responde a (ADR 0148 addendum): applied at once with Desfazer, never part of the save bar. In a
+                    personal workspace it is in Advanced, with its owner. */}
+                  {part === "all" && <ReportsTo />}
+                </div>
               </div>
-            </div>
-            {can("look") ? (
-              <>
-                <LookRows look={look} onChange={(next) => set("look", next)} />
-                <WasLine changeKey="look" />
-              </>
-            ) : (
-              <span className="agp-chips">
-                <Chip icon="agent">
-                  {[
-                    t(`look.colors.${colorKey(look.color)}`),
-                    t(`look.eyesNames.${look.eyes}`),
-                    ...(look.accessory !== "none" ? [t(`look.accessories.${look.accessory}`)] : []),
-                  ].join(" · ")}
-                </Chip>
-              </span>
-            )}
-          </Section>
+              {can("look") ? (
+                <>
+                  <LookRows look={look} onChange={(next) => set("look", next)} />
+                  <WasLine changeKey="look" />
+                </>
+              ) : (
+                <span className="agp-chips">
+                  <Chip icon="agent">
+                    {[
+                      t(`look.colors.${colorKey(look.color)}`),
+                      t(`look.eyesNames.${look.eyes}`),
+                      ...(look.accessory !== "none" ? [t(`look.accessories.${look.accessory}`)] : []),
+                    ].join(" · ")}
+                  </Chip>
+                </span>
+              )}
+            </Section>
+          )}
 
-          <Section id="budget" title={t("agentPage.settings.budget")} fields={["budget"]}>
-            <BudgetEditor />
-          </Section>
+          {has("budget") && (
+            <Section id="budget" title={t("agentPage.settings.budget")} fields={["budget"]}>
+              <BudgetEditor />
+            </Section>
+          )}
 
-          <Section id="owner" title={t("newAgent.owner")} fields={["owner"]}>
-            <OwnerEditor />
-          </Section>
+          {has("owner") && (
+            <Section id="owner" title={t("newAgent.owner")} fields={["owner"]}>
+              <OwnerEditor />
+              {part === "advanced" && <ReportsTo />}
+            </Section>
+          )}
 
-          <Section id="audience" title={t("audience.title", g)} fields={["audience"]}>
-            <AudienceEditor />
-          </Section>
+          {has("audience") && (
+            <Section id="audience" title={t("audience.title", g)} fields={["audience"]}>
+              <AudienceEditor />
+            </Section>
+          )}
 
-          <BrakesCard />
+          {part !== "basic" && <BrakesCard />}
 
-          <Section
-            id="channels"
-            title={t("newAgent.channels")}
-            fields={["channels"]}
-            hint={
-              can("channels") && placeable.length < visibleChannels.length
-                ? {
-                    name: t("common.about", { label: t("newAgent.channels") }),
-                    text: t("agentPage.settings.channelsYours"),
+          {has("channels") && (
+            <Section
+              id="channels"
+              title={t("newAgent.channels")}
+              fields={["channels"]}
+              hint={
+                can("channels") && placeable.length < visibleChannels.length
+                  ? {
+                      name: t("common.about", { label: t("newAgent.channels") }),
+                      text: t("agentPage.settings.channelsYours"),
+                    }
+                  : undefined
+              }
+            >
+              <ChannelsEditor />
+            </Section>
+          )}
+
+          {has("computer") && (
+            <Section id="computer" title={t("computer.title", g)} fields={["machine"]}>
+              {viewer === "member" ? (
+                <p className="small muted">
+                  {t("agentPage.computer.hidden", { owner: ownerFirst ?? t("roles.adminLower") })}
+                </p>
+              ) : (
+                <AgentComputerPanel
+                  agent={agent}
+                  machineNote={
+                    // The Cloud's agents all work on the workspace's own computer: nothing to pick.
+                    can("machine") && edition === "selfhost" ? (
+                      <Button
+                        size="sm"
+                        icon="computer"
+                        onClick={() => openWork("computer")}
+                        style={{ alignSelf: "flex-start" }}
+                      >
+                        {t("agentPage.work.open.computer", g)}
+                      </Button>
+                    ) : undefined
                   }
-                : undefined
-            }
-          >
-            <ChannelsEditor />
-          </Section>
+                />
+              )}
+              <AgentSecretsList agent={agent} editable={admin} />
+            </Section>
+          )}
 
-          <Section id="computer" title={t("computer.title", g)} fields={["machine"]}>
-            {viewer === "member" ? (
-              <p className="small muted">
-                {t("agentPage.computer.hidden", { owner: ownerFirst ?? t("roles.adminLower") })}
-              </p>
-            ) : (
-              <AgentComputerPanel
-                agent={agent}
-                machineNote={
-                  // The Cloud's agents all work on the workspace's own computer: nothing to pick.
-                  can("machine") && edition === "selfhost" ? (
-                    <Button
-                      size="sm"
-                      icon="computer"
-                      onClick={() => openWork("computer")}
-                      style={{ alignSelf: "flex-start" }}
-                    >
-                      {t("agentPage.work.open.computer", g)}
-                    </Button>
-                  ) : undefined
-                }
-              />
-            )}
-            <AgentSecretsList agent={agent} editable={admin} />
-          </Section>
-
-          {admin && (
+          {has("danger") && (
             <Section id="danger" title={t("agentPage.settings.danger")} fields={[]} danger>
               <div className="agp-dz">
                 <span className="agp-dz__t">

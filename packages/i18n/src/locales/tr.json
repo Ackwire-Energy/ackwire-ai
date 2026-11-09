@@ -570,6 +570,22 @@
     "goneLead": "İptal edilmiş olabilir. Sizi davet eden kişiyle konuşun.",
     "entering": "{{org}} çalışma alanına katılınıyor",
     "enteringReady": "Hesabınız hazır.",
+    "personalName": "Çalışma alanı: {{name}}",
+    "personalNameNoName": "Kişisel bir çalışma alanı",
+    "helloPersonal": "Merhaba. {{name}} sizi davet etti.",
+    "helloNoNamePersonal": "Merhaba. Kişisel bir çalışma alanına davet edildiniz.",
+    "nameLeadPersonal": "Önce: ajanlar size nasıl hitap etsin?",
+    "newPasswordLeadPersonal": "Şimdi ve her seferinde onunla gireceksiniz.",
+    "enterPersonal": "Katıl",
+    "calledYouPersonal": "{{name}} sizi davet etti.",
+    "calledYouNoNamePersonal": "Kişisel bir çalışma alanına davet edildiniz.",
+    "passwordLeadPersonal": "{{name}} sizi davet etti. Şifrenizi girin, içeridesiniz.",
+    "passwordLeadNoNamePersonal": "Davet edildiniz. Şifrenizi girin, içeridesiniz.",
+    "otherLeadPersonal": "{{other}} olarak giriş yaptınız. İçeri girmek için davet edilen e-postayla giriş yapın.",
+    "fullTitlePersonal": "Bu çalışma alanında şu anda boş yer yok.",
+    "enteringPersonal": "Katılınıyor",
+    "usedTitlePersonal": "Zaten içeridesiniz.",
+    "openPersonal": "Aç",
     "ask": {
       "title": "{{org}} çalışma alanına katılmak isteyin",
       "lead": "Bu bağlantıyı {{name}} paylaştı. Her yeni kişiyi bir yönetici onaylar.",
@@ -630,7 +646,16 @@
       "signInTitle": "Onaylandı. Şimdi giriş yapmanız yeterli.",
       "signInLead": "Seçtiğiniz e-posta ve şifreyi kullanın.",
       "endedTitle": "İsteğiniz sona erdi.",
-      "endedLead": "Onaylandıysa hesabınızla giriş yapın."
+      "endedLead": "Onaylandıysa hesabınızla giriş yapın.",
+      "titlePersonal": "Bu çalışma alanına katılmak isteyin",
+      "helloPersonal": "Merhaba. Bu, kişisel bir çalışma alanına davet.",
+      "waitTitlePersonal": "Tamam. İsteğiniz gönderildi.",
+      "waitCardPersonal": "Yanıt bekleniyor",
+      "inTitlePersonal": "İçeridesiniz",
+      "memberTitlePersonal": "Zaten içeridesiniz",
+      "openPersonal": "Aç",
+      "approvedInPersonal": "Onaylandı. İçeridesiniz.",
+      "deniedTextPersonal": "Bir hata olduğunu düşünüyorsanız bağlantıyı size gönderen kişiden sizi davet etmesini isteyin."
     }
   },
   "onboarding": {
@@ -677,6 +702,19 @@
       "invite_other": "{{count}} kişiyi davet et"
     },
     "yourCompany": "şirketiniz",
+    "purpose": {
+      "title": "agentes.chat'i ne için kullanacaksınız?",
+      "lead": "Bunu sonra değiştirebilirsiniz, hiçbir şey kaybolmaz.",
+      "personal": "Kendim için",
+      "personalText": "Gününü düzenleyen ajanlar.",
+      "team": "Şirketim veya ekibim için",
+      "teamText": "Kişiler ve ajanlar kanallar, roller ve onaylarla birlikte çalışır.",
+      "personalExamples": "Saat 7'de günün · Faturalar · Antrenman",
+      "teamExamples": "Müşteri desteği · Finans · Raporlar"
+    },
+    "personal": {
+      "name": "Kişisel"
+    },
     "workspace": {
       "title": "Çalışma alanınızın adı ne?",
       "lead": "Ekibin ve ajanların konuştuğu yer.",
@@ -1316,6 +1354,7 @@
   },
   "shell": {
     "otherChannels": "Diğer kanallar",
+    "otherChannelsPersonal": "Diğer grup sohbetleri",
     "titleBar": {
       "back": "Geri",
       "forward": "İleri"
@@ -1333,13 +1372,25 @@
       "calendar": "Toplantılar ve son tarihler",
       "team": "Kim kimdir: kişiler, ajanlar ve grupları",
       "dashboards": "Ajanların güncel tuttuğu sayılar ve grafikler",
-      "taskManager": "Her ajanın şu an ne yaptığı ve gerekeni durdurma"
+      "taskManager": "Her ajanın şu an ne yaptığı ve gerekeni durdurma",
+      "approvalsPersonal": "Ajanlarınızın sizden izin istedikleri",
+      "proposalsPersonal": "Ajanlarınızın değiştirmeyi önerdikleri",
+      "threadsPersonal": "Yan sohbetler ve misyonlar",
+      "issuesPersonal": "Sizin ve ajanlarınızın görevleri",
+      "wikiPersonal": "Ajanlarınızın okuyabileceği notlar",
+      "calendarPersonal": "Randevularınız ve son tarihleriniz",
+      "teamPersonal": "Ajanlarınız ve burada başka kimler var",
+      "dashboardsPersonal": "Ajanlarınızın güncel tuttuğu sayılar ve grafikler",
+      "taskManagerPersonal": "Ajanlarınızın şu an ne yaptığı ve gerekeni durdurma",
+      "homePersonal": "Günün: seni bekleyenler ve ajanlarının şu an yaptıkları"
     },
     "customizeSidebar": "Kenar çubuğunu özelleştir",
     "sidebarMenu": {
       "title": "Kenar çubuğu",
       "newChannel": "Yeni kanal",
+      "newChannelPersonal": "Yeni grup sohbeti",
       "addToChannels": "Yeni kanal veya kategori",
+      "addToChannelsPersonal": "Yeni grup sohbeti veya kategori",
       "newMessage": "Yeni mesaj",
       "addMembers": "Kişi veya ajan ekle",
       "channelSettings": "Kanal ayarları",
@@ -1413,6 +1464,7 @@
     "drive": "Drive",
     "members": "Üyeler",
     "channels": "Kanallar",
+    "channelsPersonal": "Grup sohbetleri",
     "agents": "Ajanlar",
     "directMessages": "Doğrudan mesajlar",
     "createAgent": "Ajan oluştur",
@@ -1491,6 +1543,8 @@
     "more_one": "Ekip'te 1 ajan daha",
     "more_other": "Ekip'te {{count}} ajan daha",
     "createFirst": "İlk ajanı oluştur",
+    "createFirstPersonal": "İlk ajanınızı oluşturun",
+    "newAgent": "Yeni ajan",
     "working_one": "{{count}} çalışıyor",
     "working_other": "{{count}} çalışıyor",
     "count_one": "{{count}} ajan",
@@ -1942,21 +1996,30 @@
     "label": "sağ kolun",
     "newDot": "Yeni",
     "role": "Çalışma alanı asistanı",
+    "rolePersonal": "Kişisel asistan",
     "actsAsYou": "senin izinlerinle çalışır",
     "composerHint": "sen olmadan hiçbir şey değişmez",
     "intro": {
       "greeting": "Merhaba, ben {{name}}. Ekibi seninle birlikte kuruyorum.",
+      "greetingPersonal": "Merhaba, ben {{name}}. Ajanlarını seninle birlikte kuruyorum.",
       "lead": "Ajanları oluşturur, uygulamaları bağlar ve kişileri davet ederim. Sen istemeden hiçbir şey değişmez ve yalnızca senin yapabildiklerini yaparım.",
+      "leadPersonal": "Ajanlarını oluşturur, uygulamalarını bağlarım. Sen istemeden hiçbir şey değişmez.",
       "heldLead": "İşletmenin ne yaptığını seç, ekip burada belirsin. Çalışma alanının agentes.chat planı olunca ajanlar çalışmaya başlar.",
+      "heldLeadPersonal": "Neyle ilgili yardım istediğini seç, ajanların burada belirsin. agentes.chat planın olunca çalışmaya başlarlar.",
       "connect": {
         "title": "Ekip için bir yapay zeka bağla",
+        "titlePersonal": "Ajanların için bir yapay zeka bağla",
         "text": "Ajanlar çalışma alanının yapay zekasıyla düşünür. Claude veya ChatGPT planınla giriş yap, API anahtarı gerekmez.",
+        "textPersonal": "Ajanların bu yapay zekayla düşünür. Claude veya ChatGPT planınla giriş yap, API anahtarı gerekmez.",
         "action": "Bağla"
       },
       "again": {
         "question": "Ekibi benimle kurmak ister misin?",
         "action": "Ekibi kur",
-        "message": "Ekibi kurmama yardım et."
+        "message": "Ekibi kurmama yardım et.",
+        "questionPersonal": "Benimle daha fazla ajan kurmak ister misin?",
+        "actionPersonal": "Ajanları kur",
+        "messagePersonal": "Ajanlarımı kurmama yardım et."
       },
       "next": {
         "firstTask": "{{name}} için ilk görevi ver"
@@ -2703,6 +2766,7 @@
     "teammate": "Tekrarlanmadı: <b>{{who}}</b> bunu {{when}} {{target}} ile zaten yaptı",
     "self": "Tekrarlanmadı: bunu {{when}} {{target}} ile zaten yaptım",
     "someone": "Tekrarlanmadı: ekipten biri bunu {{when}} {{target}} ile zaten yaptı",
+    "someonePersonal": "Tekrarlanmadı: bu, {{when}} {{target}} ile zaten yapılmıştı",
     "inChannel": "#{{channel}} kanalında",
     "open": "Gör"
   },
@@ -2848,18 +2912,25 @@
   "newChannel": {
     "open": "Kanal oluştur",
     "title": "Kanal oluştur",
+    "titlePersonal": "Yeni grup sohbeti",
     "name": "Ad",
     "namePlaceholder": "örn. pazarlama",
+    "namePlaceholderPersonal": "örn. tatil",
     "nameHelp": "Küçük harf, rakam ve tire. #{{name}} olarak görünür.",
     "nameInvalid": "Harf veya rakamla başlayan küçük harf, rakam ve tire kullanın.",
     "nameTaken": "#{{name}} adında bir kanal zaten var.",
+    "nameTakenPersonal": "#{{name}} adında bir grup sohbeti zaten var.",
     "topic": "Açıklama",
     "topicPlaceholder": "Burada ne konuşulur",
     "visibility": "Kimler katılabilir",
     "public": "Herkese açık",
+    "publicPersonal": "Buradaki herkes katılabilir",
     "publicDesc": "Çalışma alanındaki herkes görür ve katılabilir.",
+    "publicDescPersonal": "Buradaki herkes görür ve katılabilir.",
     "private": "Özel",
+    "privatePersonal": "Yalnızca eklediklerim",
     "privateDesc": "Yalnızca eklenenler.",
+    "privateDescPersonal": "Yalnızca eklediğiniz kişiler görür.",
     "roles": "Departmanlar veya roller",
     "rolesDesc": "Seçilen rollerden birine sahip olan herkes kanalı görür ve katılır, şimdi veya sonra.",
     "rolesPick": "Kanalı gören roller",
@@ -2873,6 +2944,7 @@
     "publicBody": "Çalışma alanındaki herkes katılabilecek ve eskiler dahil tüm mesajları okuyabilecek.",
     "publicConfirm": "Herkese açık yap",
     "members": "İlk üyeler",
+    "membersPersonal": "Kimler katılıyor",
     "membersSearch": "Kişi veya ajan ara",
     "membersEmpty": "“{{q}}” için kimse bulunamadı.",
     "selected_one": "{{count}} seçildi",
@@ -2934,6 +3006,8 @@
     "addRow": "Kişi veya ajan ekle",
     "invite": "{{email}} adresini {{org}} ve #{{channel}} için davet et",
     "inviteOrg": "{{email}} adresini {{org}} için davet et",
+    "invitePersonal": "{{email}} adresini çalışma alanınıza ve #{{channel}} kanalına davet et",
+    "inviteOrgPersonal": "{{email}} adresini çalışma alanınıza davet et",
     "addTitle": "#{{channel}} kanalına ekle",
     "addSearch": "Kişi veya ajan ara",
     "addEmpty": "Kanal dışında “{{q}}” ile eşleşen kimse yok.",
@@ -3196,6 +3270,7 @@
     "tab": {
       "label": "Ne gösterilsin",
       "team": "Ekip",
+      "teamPersonal": "Paylaşılan",
       "personal": "Kişisel",
       "connections": "Bağlantılar"
     },
@@ -3210,9 +3285,11 @@
       "personalEmpty": "Girişlerinizi ve anahtarlarınızı güvende tutun",
       "personalEmptyText": "Bu öğeleri yalnızca siz görürsünüz. Ajanlarınız bunları yalnızca siz istediğinizde kullanır.",
       "teamEmpty": "Parola dolaştırmadan girişleri paylaşın",
+      "teamEmptyPersonal": "Paylaşılan girişleri tek yerde tutun",
       "teamEmptyText": "Bir giriş bilgisini, anahtarı ya da iletişim bilgilerini bir kez kaydedin ve hangi ajanların kullanabileceğini seçin.",
       "sharedEmpty": "Henüz sizinle paylaşılan bir şey yok",
-      "sharedEmptyText": "Biri sizinle ekibin bir giriş bilgisini ya da anahtarını paylaştığında burada görünür."
+      "sharedEmptyText": "Biri sizinle ekibin bir giriş bilgisini ya da anahtarını paylaştığında burada görünür.",
+      "sharedEmptyTextPersonal": "Buradan biri sizinle bir giriş ya da anahtar paylaştığında burada görünür."
     },
     "row": {
       "agents_one": "{{count}} ajan",
@@ -3239,13 +3316,16 @@
     "scope": {
       "personal": "Kişisel",
       "team": "Ekip",
+      "teamPersonal": "Paylaşılan",
       "personalText": "Yalnızca siz görürsünüz",
-      "teamText": "Çalışma alanıyla paylaşıldı"
+      "teamText": "Çalışma alanıyla paylaşıldı",
+      "teamTextPersonal": "Buradaki herkesle paylaşıldı"
     },
     "field": {
       "title": "Ad",
       "contactTitle": "Vault'taki adı",
       "loginPlaceholder": "Şirket e-postası",
+      "loginPlaceholderPersonal": "Kişisel e-posta",
       "keyPlaceholder": "Ödeme anahtarı",
       "contactPlaceholder": "Fatura bilgileri",
       "website": "Web sitesi",
@@ -3386,6 +3466,7 @@
       "what": "Ne kaydetmek istiyorsunuz?",
       "who": "Kim kullanabilir",
       "teamLocked": "Ekip öğelerini yalnızca Vault'u yönetenler kaydedebilir. Bu öğe size ait kalır.",
+      "teamLockedPersonal": "Paylaşılan öğeleri yalnızca Vault'u yönetenler kaydedebilir. Bu öğe size ait kalır.",
       "save": "Kaydet",
       "saved": "Vault'a kaydedildi"
     },
@@ -3444,8 +3525,10 @@
       "required": "Burayı doldurun.",
       "for": "Kimin için bağlanacak",
       "forTeam": "Öğeleri ekibe aittir. Kimin kullanacağına Vault'u yönetenler karar verir.",
+      "forTeamPersonal": "Öğeleri paylaşılır. Kimin kullanacağına Vault'u yönetenler karar verir.",
       "forPersonal": "Öğeleri yalnızca size aittir.",
       "teamLocked": "Öğeleri yalnızca size ait olacak. Ekip için bağlantıyı yalnızca Vault'u yönetenler kurar.",
+      "teamLockedPersonal": "Öğeleri yalnızca size ait olacak. Paylaşmak için bağlantıyı yalnızca Vault'u yönetenler kurar.",
       "sealed": "Buraya yazdıklarınız şifrelenir ve bir daha gösterilmez.",
       "connected_one": "{{name}} bağlandı. {{count}} öğe geldi.",
       "connected_other": "{{name}} bağlandı. {{count}} öğe geldi.",
@@ -3535,7 +3618,9 @@
       "scope": "Şu şekilde kaydet",
       "personalText": "Yalnızca siz görürsünüz",
       "teamText": "Çalışma alanı görür",
+      "teamTextPersonal": "Buradaki herkes görür",
       "teamLocked": "Ekip için yalnızca Vault'u yönetenler kaydeder",
+      "teamLockedPersonal": "Paylaşılan öğeleri yalnızca Vault'u yönetenler kaydeder",
       "agents": "Kullananlar",
       "choose": "Seç",
       "saved": "Vault'a kaydedildi",
@@ -3775,7 +3860,8 @@
       "waiting_one": "Sizi bekleyen {{count}} şey var",
       "waiting_other": "Sizi bekleyen {{count}} şey var",
       "calm": "Şu anda sizi bekleyen bir şey yok.",
-      "new": "Çalışma alanınız hazır. Buradan başlayın."
+      "new": "Çalışma alanınız hazır. Buradan başlayın.",
+      "newPersonal": "Her şey hazır. Buradan başlayın."
     },
     "start": {
       "label": "Uygulama açıldığında",
@@ -4237,6 +4323,7 @@
     "nameLabel": "Ad",
     "roleLabel": "Rol",
     "roleHelp": "Ekip için ne yaptığı, örneğin E-posta ve takvim asistanı.",
+    "roleHelpPersonal": "Sizin için ne yaptığı, örneğin E-posta ve takvim asistanı.",
     "editName": "Adı düzenle: {{name}}",
     "editHandle": "Bahsetmeleri düzenle: @{{handle}}",
     "editRole": "Rolü düzenle: {{role}}",
@@ -4266,6 +4353,7 @@
     "instructions": "Talimatlar",
     "howWorks": "{{name}} nasıl çalışır",
     "instructionsHelp": "{{org}} bağlamı (şirketin ne yaptığı, kurum kuralları) her sohbette bu talimatlardan önce gelir. Buraya yalnızca {{name}} ajanına özgü olanları yazın.",
+    "instructionsHelpPersonal": "Kendiniz hakkında anlattıklarınız her sohbette bu talimatlardan önce gelir. Buraya yalnızca {{name}} ajanına özgü olanları yazın.",
     "budgetUsed": "Kullanılan bütçe",
     "runsCount_one": "{{count}} çalıştırma",
     "runsCount_other": "{{count}} çalıştırma",
@@ -4578,7 +4666,14 @@
       "usage": "Kullanım",
       "activity": "Etkinlik",
       "settings": "Ayarlar",
-      "more": "Diğer"
+      "more": "Diğer",
+      "accessPersonal": "Kullanabilir",
+      "settingsPersonal": "Ayarlar",
+      "advanced": "Gelişmiş"
+    },
+    "advanced": {
+      "elsewhere": "Etkinlik, dosyalar ve kullanım",
+      "tools": "Araçlar ve kurallar"
     },
     "ficha": {
       "with": "Kimlerle",
@@ -4631,14 +4726,26 @@
     },
     "lock": {
       "admins": "Bunu yalnızca yöneticiler değiştirebilir",
-      "adminsAndOwner": "Bunu yöneticiler ve {{name}} değiştirebilir"
+      "adminsKeeper": "Bunu yalnızca {{keeper}} değiştirebilir",
+      "adminsPersonal": "Bunu yalnızca burayı yöneten kişiler değiştirebilir",
+      "adminsAndOwner": "Bunu yöneticiler ve {{name}} değiştirebilir",
+      "adminsAndOwnerPersonal": "Bunu {{name}} ve burayı yöneten kişiler değiştirebilir"
     },
     "readOnly": {
       "member": "{{name}} ajanının nasıl çalıştığını görüyorsunuz. Yalnızca yöneticiler düzenleyebilir.",
+      "memberKeeper": "{{name}} ajanının nasıl çalıştığını görüyorsunuz. Yalnızca {{keeper}} düzenleyebilir.",
+      "memberPersonal": "{{name}} ajanının nasıl çalıştığını görüyorsunuz. Yalnızca burayı yöneten kişiler düzenleyebilir.",
       "memberOwner": "{{name}} ajanının nasıl çalıştığını görüyorsunuz. Düzenleyebilenler: yöneticiler ve {{owner}} (sahip).",
+      "memberOwnerPersonal": "{{name}} ajanının nasıl çalıştığını görüyorsunuz. Düzenleyebilenler: {{owner}} (sahip) ve burayı yöneten kişiler.",
       "owner": "{{name}} ajanının sahibisiniz: görünümü, kimlerin konuşabileceğini, kanalları ve bilgisayarı siz değiştirirsiniz. Gerisini yalnızca yöneticiler.",
+      "ownerKeeper": "{{name}} ajanının sahibisiniz: görünümü, kimlerin konuşabileceğini, grup sohbetlerini ve bilgisayarı siz değiştirirsiniz. Gerisini yalnızca {{keeper}}.",
+      "ownerPersonal": "{{name}} ajanının sahibisiniz: görünümü, kimlerin konuşabileceğini, grup sohbetlerini ve bilgisayarı siz değiştirirsiniz. Gerisini yalnızca burayı yöneten kişiler.",
       "ownerInstructions": "Talimatları yalnızca yöneticiler düzenleyebilir. Sahip olarak önerilen değişiklikleri siz onaylarsınız.",
-      "ownerAccess": "Erişimi ve depoları yalnızca yöneticiler verebilir veya geri alabilir."
+      "ownerInstructionsKeeper": "Talimatları yalnızca {{keeper}} düzenleyebilir. Sahip olarak önerilen değişiklikleri siz onaylarsınız.",
+      "ownerInstructionsPersonal": "Talimatları yalnızca burayı yöneten kişiler düzenleyebilir. Sahip olarak önerilen değişiklikleri siz onaylarsınız.",
+      "ownerAccess": "Erişimi ve depoları yalnızca yöneticiler verebilir veya geri alabilir.",
+      "ownerAccessKeeper": "Erişimi ve depoları yalnızca {{keeper}} verebilir veya geri alabilir.",
+      "ownerAccessPersonal": "Erişimi ve depoları yalnızca burayı yöneten kişiler verebilir veya geri alabilir."
     },
     "status": {
       "idle": "Müsait",
@@ -4726,6 +4833,7 @@
       "allConnectors": "Bağlayıcılar:",
       "onlyRead": "Yalnızca okuma",
       "connectors": "{{org}} bağlayıcıları",
+      "connectorsPersonal": "Bağlayıcılarınız",
       "oneLevel": "Uygulama başına tek düzey",
       "builtin": "agentes içinde yerleşik",
       "builtinHelp": "Drive, görevler, bellek ve daha fazlası",
@@ -4957,6 +5065,7 @@
     "back": "{{name}}",
     "title": "{{name}} neler biliyor",
     "subtitle": "{{name}} kişisinin sohbetlerden ve ekibin düzeltmelerinden öğrendikleri.",
+    "subtitlePersonal": "{{name}} ajanının sohbetlerinizden ve düzeltmelerinizden öğrendikleri.",
     "proposals_one": "{{count}} iyileştirme önerisi",
     "proposals_other": "{{count}} iyileştirme önerisi",
     "tabsLabel": "Tür",
@@ -5001,6 +5110,7 @@
     "emptyTab": "Şimdilik burada bir şey yok.",
     "emptyTitle": "{{name}} belleği burada başlar",
     "emptyText": "Her sohbet, ekibin çalışma şekli hakkında yeni bir şey öğretir.",
+    "emptyTextPersonal": "Her sohbet, işlerin nasıl yapılmasını sevdiğinize dair yeni bir şey öğretir.",
     "how": "Bellek nasıl çalışır",
     "editTitle": "Düzenle: {{kind}}",
     "text": "Metin",
@@ -5027,6 +5137,7 @@
       "noChannel": "Hiçbir kanalda değil."
     },
     "subtitle": "Ajanların önerdiği değişiklikler. Biri kabul etmeden hiçbir şey değişmez.",
+    "subtitlePersonal": "Ajanlarınızın önerdiği değişiklikler. Siz kabul edene kadar hiçbir şey değişmez.",
     "list": "Öneriler",
     "proposes": "<b>{{agent}}</b> öneriyor · {{target}}",
     "proposesMany": "<b>{{agent}}</b> öneriyor · {{count}} ajanın talimatları",
@@ -5038,6 +5149,7 @@
     "targetSkill": "{{skill}} becerisi",
     "targetChanges": "{{name}} için değişiklikler",
     "targetContext": "{{org}} bağlamı",
+    "targetContextPersonal": "ajanlarınızın sizin hakkınızda bildikleri",
     "roleLine": "Rol: {{from}} → {{to}}",
     "accessOn": "Aç: {{app}}",
     "accessOff": "Kapat: {{app}}",
@@ -5083,6 +5195,7 @@
     "titleSettings": "{{name}} ayarlarını değiştir",
     "titleSkill": "{{skill}} becerisini düzelt",
     "titleContext": "{{org}} bağlamını güncelle",
+    "titleContextPersonal": "Ajanlarınızın sizin hakkınızda bildiklerini güncelle",
     "evidence": {
       "outcome": "Gözlenen sonuç",
       "human": "Bir kişi",
@@ -5120,6 +5233,7 @@
       "todoDesc": "Okumak hiçbir şeyi değiştirmez.",
       "action": "İzin verin",
       "todoNone": "{{org}} uygulamalarını kullanın",
+      "todoNonePersonal": "Uygulamalarınızı kullanın",
       "todoNoneDesc": "Gmail ve Drive gibi, zaten bağladıklarınız.",
       "done": "{{apps}} kullanıyorum",
       "doneNone": "Şimdilik uygulama yok",
@@ -5130,6 +5244,7 @@
       "ok_other": "{{count}} uygulamaya izin verin",
       "okNone": "Uygulamasız devam edin",
       "empty": "{{org}} için henüz bağlı uygulama yok.",
+      "emptyPersonal": "Henüz bağlı uygulamanız yok.",
       "connectOther": "Başka bir uygulama bağlayın"
     },
     "where": {
@@ -5149,10 +5264,12 @@
     },
     "who": {
       "todo": "{{org}} içindeki herkesle konuşun",
+      "todoPersonal": "Buradaki herkesle konuşun",
       "todoDesc": "Herkes bana seslenebilir.",
       "todoPlan": "Yalnızca sizinle konuşun",
       "todoPlanDesc": "Planınız kişiseldir.",
       "doneEveryone": "{{org}} içindeki herkesle konuşuyorum",
+      "doneEveryonePersonal": "Buradaki herkesle konuşuyorum",
       "doneYou": "Yalnızca sizinle konuşuyorum",
       "doneOwner": "Yalnızca {{name}} ile konuşuyorum",
       "donePeople": "Seçtiğiniz kişilerle konuşuyorum",
@@ -5174,6 +5291,7 @@
       "title": "{{name}} nasıl çalışır",
       "title_female": "{{name}} nasıl çalışır",
       "desc": "Ekibe yeni katılan birine yazar gibi yazın.",
+      "descPersonal": "Size ilk kez yardım edecek birine yazar gibi yazın.",
       "instructions": "Talimatlar",
       "budget": "Aylık limit",
       "budgetHelp": "%80'e gelince haber veririz. Limite ulaşınca duraklar ve size bildirir.",
@@ -5196,6 +5314,7 @@
     },
     "firstRun": {
       "title": "{{org}} ekibinin işe başlaması için",
+      "titlePersonal": "Ajanlarının işe başlaması için",
       "complete": "Her şey hazır.",
       "notNow": "Şimdi değil",
       "afterPlan": "Planla açılır.",
@@ -5207,7 +5326,14 @@
         "title": "{{org}} ne yapıyor?",
         "desc": "Bunu tüm ajanlar okur. İstediğin zaman değiştirebilirsin.",
         "line": "Tek cümleyle",
-        "optional": "İsteğe bağlı. Cümle yoksa seçtiğin tür geçerli."
+        "optional": "İsteğe bağlı. Cümle yoksa seçtiğin tür geçerli.",
+        "todoPersonal": "Bana biraz kendinden bahset.",
+        "todoDescPersonal": "Bunu tüm ajanların okur.",
+        "donePersonal": "Seni biraz tanıyorum",
+        "titlePersonal": "Neyle ilgili yardım istersin?",
+        "descPersonal": "Bunu tüm ajanların okur. İstediğin zaman değiştirebilirsin.",
+        "linePersonal": "Senin hakkında, tek cümleyle",
+        "optionalPersonal": "İsteğe bağlı. Cümle yoksa seçtiğin alanlar geçerli."
       },
       "team": {
         "todo": "Ekibi kur.",
@@ -5215,6 +5341,11 @@
         "action": "Ekibi gör",
         "done_one": "Ekipte {{count}} ajan",
         "done_other": "Ekipte {{count}} ajan",
+        "todoPersonal": "Ajanlarını seç.",
+        "todoDescPersonal": "Hazır bir başlangıç, sonra her şeyi değiştirebilirsin.",
+        "actionPersonal": "Ajanları gör",
+        "donePersonal_one": "{{count}} ajan",
+        "donePersonal_other": "{{count}} ajan",
         "card": "Aşağıdaki kartta devam et"
       },
       "ai": {
@@ -5235,7 +5366,11 @@
         "title": "İş uygulamaları",
         "desc": "Yeni kurduğun ekibin kullanacakları önce gelir. Okumak hiçbir şeyi değiştirmez, göndermek, silmek ve ödemek ise onayını ister.",
         "connect": "Bağla",
-        "all": "Tüm uygulamaları gör"
+        "all": "Tüm uygulamaları gör",
+        "todoPersonal": "Uygulamalarını bağla.",
+        "todoDescPersonal": "E-posta, takvim ve dosyalar. Okumak hiçbir şeyi değiştirmez.",
+        "titlePersonal": "Uygulamaların",
+        "descPersonal": "Ajanlarının kullanacakları önce gelir. Okumak hiçbir şeyi değiştirmez, göndermek, silmek ve ödemek ise onayını ister."
       },
       "people": {
         "todo": "Birlikte çalıştığın kişileri çağır.",
@@ -5250,14 +5385,57 @@
         "team": "Ekip geldi.",
         "ai": "Artık ekip düşünüyor.",
         "apps": "Tamam, artık uygulamaları okuyorum.",
-        "people": "Burada daha çok insan olması güzel."
+        "people": "Burada daha çok insan olması güzel.",
+        "aboutPersonal": "Not aldım. Bunu tüm ajanların okur.",
+        "teamPersonal": "Ajanların geldi.",
+        "aiPersonal": "Artık ajanların düşünebilir.",
+        "appsPersonal": "Tamam, artık uygulamalarını okuyabiliyorum.",
+        "peoplePersonal": "Yakınlarının burada olması güzel."
       },
       "asks": {
         "lead": "Şimdi benden bir şey iste:",
         "fit": "Ekibi işime göre ayarla",
-        "who": "Ekipte kim neyle ilgileniyor?"
+        "who": "Ekipte kim neyle ilgileniyor?",
+        "fitPersonal": "Ajanlarımı rutinime göre ayarla",
+        "whoPersonal": "Hangi ajan ne yapıyor?"
       }
     }
+  },
+  "newAgentAsk": {
+    "title": "Yeni ajanın ne yapsın?",
+    "lead": "Tek cümleyle söyle. {{name}} hazırlar ve oluşturmadan önce sana gösterir.",
+    "field": "Senin için ne yapar",
+    "placeholder": "Örn. Takvimimi düzenli tutmak ve önemli şeyleri hatırlatmak",
+    "ideas": "Fikirler",
+    "idea": {
+      "agenda": {
+        "label": "Takvim",
+        "text": "Takvimimi düzenli tutmak ve randevularımı hatırlatmak"
+      },
+      "money": {
+        "label": "Finans",
+        "text": "Faturalarımı takip etmek ve son günden önce haber vermek"
+      },
+      "training": {
+        "label": "Antrenman",
+        "text": "Haftalık antrenmanlarımı planlamak ve nasıl hissettiğime göre ayarlamak"
+      },
+      "studies": {
+        "label": "Ders",
+        "text": "Bana bir çalışma planı yapmak ve öğrendiklerimi sormak"
+      },
+      "home": {
+        "label": "Ev",
+        "text": "Alışveriş listesini ve ev işlerini düzenli tutmak"
+      },
+      "travel": {
+        "label": "Seyahat",
+        "text": "Seyahatlerimi planlamak: rota, rezervasyonlar ve belgeler"
+      }
+    },
+    "full": "Hepsini kendim doldurayım",
+    "create": "{{name}} ile oluştur",
+    "message": "Yeni bir ajan istiyorum: {{what}}"
   },
   "newAgent": {
     "title": "Ajan oluştur",
@@ -5274,7 +5452,8 @@
       "identity": {
         "name": "Kimlik",
         "title": "Kim olduğu",
-        "lead": "Ekibin sohbette ona nasıl seslendiği ve onu nasıl tanıdığı."
+        "lead": "Ekibin sohbette ona nasıl seslendiği ve onu nasıl tanıdığı.",
+        "leadPersonal": "Sohbette ona nasıl seslendiğiniz ve onu nasıl tanıdığınız."
       },
       "instructions": {
         "name": "Talimatlar",
@@ -5290,7 +5469,8 @@
       "where": {
         "name": "Nerede ve kimle",
         "title": "Nerede ve kimle çalışacak",
-        "lead": "{{name}}, işaretlediğiniz kanallara katılır ve ekipte bir sahibi olur."
+        "lead": "{{name}}, işaretlediğiniz kanallara katılır ve ekipte bir sahibi olur.",
+        "leadPersonal": "{{name}}, sizinle kendi sohbetinde konuşur ve işaretlediğiniz grup sohbetlerine katılır."
       },
       "model": {
         "name": "Model ve bütçe",
@@ -5453,6 +5633,7 @@
       }
     },
     "roleGroups": {
+      "personal": "Gününüz için",
       "tech": "Ürün ve teknoloji",
       "customers": "Müşteriler",
       "operations": "Operasyon"
@@ -5521,6 +5702,8 @@
     "ownerHelp": "Bütçe uyarılarını alır ve hassas işlemleri onaylar.",
     "ownerYours": "Ajanı oluşturan kişi onun sahibidir. Bir yönetici daha sonra başka birine devredebilir.",
     "accessAdmins": "Ajanlara uygulama ve posta kutusu erişimini yalnızca yöneticiler verir. Oluşturulduktan sonra bir yöneticiye sorun.",
+    "accessAdminsKeeper": "Ajanlara uygulama ve posta kutusu erişimini yalnızca {{keeper}} verir. Oluşturulduktan sonra {{keeper}} ile konuşun.",
+    "accessAdminsPersonal": "Ajanlara uygulama ve posta kutusu erişimini yalnızca burayı yöneten kişiler verir. Oluşturulduktan sonra istemeniz yeterli.",
     "modelAndCost": "Model ve maliyet",
     "model": "Model",
     "modelDesc": {
@@ -5596,12 +5779,17 @@
     "defaultName": "ajan",
     "newOnTeam": "Ekipte yeni",
     "createdTitle": "{{name}} ekibe katıldı",
+    "newOnTeamPersonal": "Yeni ajan",
+    "createdTitlePersonal": "{{name}} burada",
     "createdText": "Zaten {{channels}} içinde. Başlamak için bir sohbette @{{handle}} diye bahsedin.",
     "createdTextNoChannels": "Başlamak için {{name}} ajanını bir kanala ekleyin ve bir sohbette @{{handle}} diye bahsedin.",
+    "createdTextNoChannelsPersonal": "{{name}} ile sohbetinizi açın ve başlamak için bir şey isteyin.",
     "goTo": "#{{channel}} kanalına git",
     "openProfile": "Profili aç",
     "createAnother": "Başka bir ajan oluştur",
     "adminsOnly": "Ajanları yalnızca yöneticiler ve sahipler oluşturur. {{org}} yöneticilerinden birine sorun.",
+    "adminsOnlyKeeper": "Ajan oluşturmanıza {{keeper}} izin verebilir.",
+    "adminsOnlyPersonal": "Ajan oluşturmanıza izin vermesini burayı yöneten birinden isteyin.",
     "proposalClosed": "Bu öneri hakkında zaten karar verildi ya da süresi doldu.",
     "proposalNoAccess": "Bu öneriyi yalnızca sohbetindeki kişiler görebilir.",
     "backToChat": "Sohbete dön",
@@ -5623,6 +5811,7 @@
     "filters": "Kişileri filtrele",
     "rolesOf": "Roller: {{name}}",
     "everyoneNote": "Herkes, çalışma alanındaki her kişi için geçerlidir.",
+    "everyoneNotePersonal": "Rolü yoksa ajanları kullanır. {{role}} rolüyle buranın yönetimine yardım eder.",
     "noRolesToGive": "Verebileceğiniz, sizinkinden düşük bir rol yok.",
     "roleFilter": "Rol",
     "rolesCount_one": "{{count}} rol",
@@ -5630,6 +5819,8 @@
     "title": "Üyeler",
     "subtitle_one": "{{org}} içinde kimler var: {{people}} kişi ve {{agents}} ajan.",
     "subtitle_other": "{{org}} içinde kimler var: {{people}} kişi ve {{agents}} ajan.",
+    "subtitlePersonal_one": "Burada kimler var: {{people}} kişi ve {{agents}} ajan.",
+    "subtitlePersonal_other": "Burada kimler var: {{people}} kişi ve {{agents}} ajan.",
     "inviteTitle": "Kişileri davet et",
     "copyInviteLink": "Davet bağlantısını kopyala",
     "emailsPlaceholder": "ad@sirket.com",
@@ -5680,10 +5871,12 @@
       "roleOf": "Rol: {{email}}",
       "memberHint": "Herkesin yapabildikleri",
       "member": "zaten {{org}} içinde",
+      "memberPersonal": "zaten burada",
       "invited": "zaten davet edildi"
     },
     "dialog": {
       "title": "{{org}} çalışma alanına davet et",
+      "titlePersonal": "Çalışma alanınıza birini davet edin",
       "stepOf": "Adım {{n}}/{{total}} · {{step}}",
       "steps": {
         "who": "Kim",
@@ -5702,6 +5895,7 @@
       "note": "E-postadaki not",
       "optional": "(isteğe bağlı)",
       "notePlaceholder": "Merhaba. {{org}} çalışma alanına katılın: ekip ve ajanlar burada.",
+      "notePlaceholderPersonal": "Selam. Buraya gel: ajanlarım sana da yardım edebilir.",
       "or": "ya da bağlantıyı gönderin",
       "continueWith": "{{count}} kişiyle devam et",
       "send_one": "{{count}} kişiyi davet et",
@@ -5723,13 +5917,29 @@
         "titleMany": "Bu kişiler hangi rolle katılsın?",
         "lead": "Rol, her kişinin neler yapabileceğini belirler. Sonra değiştirebilirsiniz.",
         "each": "Her kişiye ayrı rol",
-        "same": "Herkese aynı rol"
+        "same": "Herkese aynı rol",
+        "titleOnePersonal": "{{name}} burada neler yapabilir?",
+        "titleManyPersonal": "Bu kişiler burada neler yapabilir?",
+        "leadPersonal": "Sonra değiştirebilirsiniz.",
+        "eachPersonal": "Her kişi için ayrı seçim",
+        "samePersonal": "Herkes için aynı",
+        "uses": "Ajanları kullanır",
+        "usesText": "Ajanlarla konuşur ve paylaşılanları kullanır.",
+        "helps": "Yönetmenize yardım eder",
+        "helpsText": "Sizin gibi ajanları, ayarları ve buradaki kişileri değiştirebilir."
+      },
+      "reach": {
+        "line_one": "<agents/> katılan herkese yanıt verecek.",
+        "line_other": "<agents/> katılan herkese yanıt verecek."
       },
       "where": {
         "titleOne": "{{name}} hemen hangi kanallara katılsın?",
         "titleMany": "Bu kişiler hemen hangi kanallara katılsın?",
+        "titleOnePersonal": "{{name}} hemen hangi grup sohbetlerine katılsın?",
+        "titleManyPersonal": "Bu kişiler hemen hangi grup sohbetlerine katılsın?",
         "lead": "Herkes #{{channel}} kanalında başlar. Diğerlerini siz seçersiniz.",
         "label": "Kanallar",
+        "labelPersonal": "Grup sohbetleri",
         "everyone": "Herkes katılır",
         "private": "Özel · siz de buradasınız",
         "people_one": "{{count}} kişi",
@@ -5762,6 +5972,7 @@
       "result": {
         "invited": "Gönderildi",
         "already_member": "zaten {{org}} içinde",
+        "already_memberPersonal": "zaten burada",
         "already_invited": "zaten daveti vardı",
         "invalid_email": "geçersiz e-posta"
       },
@@ -5769,6 +5980,7 @@
       "finish": "Bitir",
       "linkStep": {
         "title": "Bu, {{org}} bağlantısı.",
+        "titlePersonal": "Bu, çalışma alanınızın bağlantısı.",
         "lead": "Açan kişi katılmak için istekte bulunur. Her isteği size gösteririm, siz onaylarsınız.",
         "how1": "Kişi bağlantıyı açar ve kim olduğunu söyler.",
         "how2": "İstek, davet edebilen kişilere burada ve telefonda ulaşır.",
@@ -8711,13 +8923,17 @@
     "mode": {
       "everyone": "Çalışma alanındaki herkes",
       "people": "Yalnızca bazı kişiler veya roller",
-      "owner": "Yalnızca sahibi"
+      "owner": "Yalnızca sahibi",
+      "everyonePersonal": "Buradaki herkes",
+      "peoplePersonal": "Yalnızca bazı kişiler"
     },
     "modeText": {
       "everyone": "Çalışma alanındaki herkes {{name}} ajanına seslenebilir.",
       "people": "{{name}} ile konuşabilecek kişileri ve rolleri seçin.",
       "owner": "{{name}} ile yalnızca {{owner}} konuşur.",
-      "noOwner": "Bu seçeneği kullanmak için bir sahip belirleyin."
+      "noOwner": "Bu seçeneği kullanmak için bir sahip belirleyin.",
+      "everyonePersonal": "Buradaki herkes {{name}} ajanına seslenebilir.",
+      "peoplePersonal": "{{name}} ile konuşabilecek kişileri seçin."
     },
     "people": "Kişiler",
     "roles": "Roller",
@@ -8729,14 +8945,18 @@
     "onlyYouForNow": "Şimdilik yalnızca siz",
     "onlyOwnerForNow": "Şimdilik yalnızca {{name}}",
     "search": "Rol ve kişi ara",
+    "searchPeople": "Kişi ara",
     "noMatch": "Bu adda bir rol veya kişi yok.",
+    "noMatchPeople": "Bu adda kimse yok.",
     "pickSomeone": "En az bir kişi veya rol seçin.",
     "chip": {
       "owner": "Kişisel",
-      "people": "Kısıtlı"
+      "people": "Kısıtlı",
+      "ownerPersonal": "Yalnızca siz"
     },
     "summary": {
       "everyone": "Çalışma alanındaki herkes",
+      "everyonePersonal": "Buradaki herkes",
       "owner": "Yalnızca {{name}}",
       "nobody": "Şimdilik kimse",
       "someone": "Bazı kişiler",
@@ -8969,6 +9189,7 @@
     "goTo": "Git",
     "ask": "Bir ajana sor",
     "channel": "kanal",
+    "channelPersonal": "grup sohbeti",
     "agent": "ajan",
     "agentRole": "ajan · {{role}}",
     "person": "doğrudan mesaj",
@@ -10390,8 +10611,10 @@
     "emptyText": "Herhangi bir hizmeti adresiyle bağlayabilirsiniz.",
     "none": "Ajanlar, yalnızca izin verdiğiniz erişimle araçlarınızda çalışmaya başlar.",
     "noneTitle": "Ekibinizin uygulamalarını bağlayın",
+    "noneTitlePersonal": "Uygulamalarınızı bağlayın",
     "connectedFilter": "Bağlı",
     "suggested": "{{org}} için önerilenler",
+    "suggestedPersonal": "Size önerilenler",
     "more": "Diğer hizmetler",
     "tileConnected": "{{name}}, bağlı",
     "tileSoon": "{{name}}, yakında",
@@ -11758,6 +11981,7 @@
     "clearRecentAll": "Son aramaları temizle",
     "header": {
       "placeholder": "{{org}} içinde ara",
+      "placeholderPersonal": "Her yerde ara",
       "clear": "Aramayı temizle"
     },
     "panel": {
@@ -12968,8 +13192,13 @@
       "voice": "Ses",
       "apps": "Yapay zeka uygulamaları",
       "approvals": "Onaylar",
-      "about": "agentes.chat hakkında"
+      "about": "agentes.chat hakkında",
+      "generalPersonal": "Hakkınızda",
+      "keysPersonal": "Yapay zeka ve uygulamalar",
+      "usagePersonal": "Plan ve kullanım",
+      "membersPersonal": "Kişiler"
     },
+    "advanced": "Gelişmiş",
     "sectionText": {
       "account": "Profiliniz ve uygulamanın size nasıl göründüğü.",
       "notifications": "Burada size bildirim olarak ulaşanlar. Gelen kutusu her şeyi saklar.",
@@ -12991,7 +13220,13 @@
       "voice": "Konuşmalardaki sesli mesajlar ve sesi metne kimin dönüştürdüğü.",
       "apps": "Claude, Cursor ve diğer uygulamalardan ajanlara görev verin.",
       "approvals": "Bir ajan onayınızı istediğinde sizin yerinize kimin karar verdiği.",
-      "about": "Kimin yaptığı, lisansı ve kaynak kodunun yeri."
+      "about": "Kimin yaptığı, lisansı ve kaynak kodunun yeri.",
+      "generalPersonal": "Ajanlarınızın sizin hakkınızda bildikleri ve bu çalışma alanının nasıl işlediği.",
+      "keysPersonal": "Ajanlarınızın düşünürken kullandığı yapay zeka, kullandıkları uygulamalar ve beceriler.",
+      "usagePersonal": "Ajanlarınızın ne kadar yapay zeka kullandığı ve planınız.",
+      "connectorsPersonal": "Uygulamalarınız ve MCP sunucularınız, ajanlarınız için bir kez bağlanır.",
+      "membersPersonal": "Burada sizinle kimler var, ve davetler.",
+      "rolesPersonal": "Buradaki her kişinin neler yapabileceği. Sahip her şeyi yapabilir."
     },
     "about": {
       "basedOn": "Codari Global, LLC tarafından geliştirilen <site>agentes.chat</site> tabanlı",
@@ -13013,6 +13248,7 @@
         "densityHelp": "Yalnızca sizin için değişir, tüm cihazlarınızda",
         "where": "Nerede geçerli",
         "channels": "Kanallar",
+        "channelsPersonal": "Gruplar",
         "dms": "Doğrudan mesajlar",
         "comfortable": "Rahat",
         "left": "Hepsi solda",
@@ -13021,6 +13257,7 @@
         "toneDms": "Doğrudan mesajlardaki mesajlarım",
         "toneDmsHelp": "Konuştuğunuz ajanın renginde",
         "toneChannels": "Kanallardaki mesajlarım",
+        "toneChannelsPersonal": "Gruplardaki mesajlarım",
         "toneChannelsHelp": "Mavi renkte",
         "toneLight": "Açık",
         "toneStrong": "Güçlü",
@@ -13054,23 +13291,43 @@
       "agentStyleTechnical": "Teknik"
     },
     "orgTitle": "Çalışma alanı",
+    "orgTitlePersonal": "Bu çalışma alanı",
     "name": "Ad",
+    "namePersonal": "Çalışma alanı adı",
     "savedShort": "Kaydedildi",
     "context": "Çalışma alanı bağlamı",
+    "contextPersonal": "Hakkınızda",
     "contextTitle": "Ajanların {{name}} hakkında bildikleri",
+    "contextTitlePersonal": "Ajanlarınızın sizin hakkınızda bildikleri",
     "contextSubtitle": "Her ajan bunu her konuşmadan önce okur.",
     "contextPlaceholder": "Örn. Aileler için bir seyahat acentesiyiz. Müşterilere WhatsApp üzerinden hizmet veriyoruz…",
+    "contextPlaceholderPersonal": "Örn. Öğretmenim, eşim ve iki çocuğumuzla yaşıyorum. Faturalar, çocukların okulu ve koşu antrenmanlarım için yardım istiyorum…",
     "contextMissing": "Söylenmesi gerekenler:",
     "contextIdeas": {
       "who": "Kimin için",
       "now": "Şu anda önemli olan",
-      "never": "Asla yapılmaması gerekenler"
+      "never": "Asla yapılmaması gerekenler",
+      "whoPersonal": "Sizinle kimler yaşıyor",
+      "nowPersonal": "Şu anda önemli olan",
+      "neverPersonal": "Asla yapılmaması gerekenler"
     },
     "contextHelp": "{{name}} hakkında bugün işe başlayan birine anlatır gibi yazın.",
+    "contextHelpPersonal": "Size her gün yardım edecek birine kendinizi tanıtır gibi yazın.",
     "timezone": "Saat dilimi",
     "timezoneHelp": "Rutinler ve özetler bu saat dilimini kullanır.",
     "actionCheck": "Ajanlar ekibin zaten yaptıklarını kontrol eder",
+    "actionCheckPersonal": "Ajanlar zaten yapılanları kontrol eder",
     "actionCheckHelp": "Bir e-posta, mesaj ya da pull request'ten önce ajan, son 30 günde ekipten birinin aynı kişiye ya da yere bunu zaten yapıp yapmadığını kontrol eder ve tekrarlamaz.",
+    "actionCheckHelpPersonal": "Bir e-posta ya da mesajdan önce ajan, son 30 günde sizin ya da başka bir ajanın aynı kişiye veya yere bunu zaten yapıp yapmadığını kontrol eder ve tekrarlamaz.",
+    "mode": {
+      "label": "Çalışma alanı modu",
+      "team": "Ekip",
+      "personal": "Kişisel",
+      "teamHelp": "Birlikte çalışmak için kanallar, kişiler ve roller. Geçiş yalnızca görünenleri değiştirir.",
+      "personalHelp": "Daha sade: sizin ve davet ederseniz aileniz için. Geçiş yalnızca görünenleri değiştirir.",
+      "toTeam": "Ekibe geç…",
+      "toPersonal": "Kişisele geç…"
+    },
     "telemetry": {
       "title": "Kullanım istatistikleri",
       "label": "agentes.chat'e anonim kullanım istatistikleri gönder",
@@ -13237,6 +13494,41 @@
         "jev": "Ajanlar kendiliğinden çıkartmayı yalnızca Jev ile gönderir.",
         "jevLink": "Jev'i kur"
       }
+    }
+  },
+  "personalMode": {
+    "toTeam": {
+      "title": "Ekip çalışma alanına geç",
+      "lead": "Başkalarıyla çalışmak için. Kanallar ve kişiler görünür olur.",
+      "channels": "Kenar çubuğunda kanallar ve kişiler",
+      "roles": "Kişi davet etme ve herkesin neler yapabileceğini belirleyen roller",
+      "admin": "Başkaları adına onay ve denetim kaydı, yeniden Ayarlar'da",
+      "stays": "Ajanlarınız, sohbetleriniz, rutinleriniz ve dosyalarınız olduğu gibi kalır.",
+      "name": "Çalışma alanı adı",
+      "confirm": "Ekibe geç",
+      "done": "{{name}} artık bir ekip çalışma alanı."
+    },
+    "toPersonal": {
+      "title": "Kişisel çalışma alanına geç",
+      "lead": "Aynı çalışma alanı, tek başınıza kullanmak için daha sade.",
+      "sidebar": "Kenar çubuğu en çok kullandıklarınızı gösterir, gerisi Daha fazla altında",
+      "channels": "Kanallar grup sohbetleri olarak görünür",
+      "settings": "Ayarlar kısalır, gerisi Gelişmiş altında",
+      "bubbles": "Sohbetler baloncuk olarak açılır",
+      "others_one": "Buradaki diğer kişi de böyle görür",
+      "others_other": "Buradaki diğer {{count}} kişi de böyle görür",
+      "stays": "Hiçbir şey kaybolmaz: ajanlar, sohbetler, rutinler, dosyalar ve herkesin erişimi olduğu gibi kalır.",
+      "confirm": "Kişisele geç",
+      "done": "Bu çalışma alanı artık kişisel."
+    },
+    "invite": {
+      "title": "Kimi davet ediyorsunuz?",
+      "lead": "Çalışma alanınız kişisel.",
+      "family": "Aile ya da arkadaşlar",
+      "familyText": "Size burada katılırlar ve çalışma alanı kişisel kalır.",
+      "work": "Birlikte çalıştığınız kişiler",
+      "workText": "Önce bir ekip çalışma alanına geçin: kanallar, kişiler ve roller görünür olur.",
+      "workLocked": "Bu çalışma alanını yalnızca onu yönetenler ekibe geçirebilir."
     }
   },
   "peopleUsage": {
@@ -13678,6 +13970,7 @@
         "tooMany": "Art arda onaylanacak çok fazla şey var",
         "off": "Bu ajan için komut çalıştırma kapalı",
         "team": "Ekip bunu zaten yaptı",
+        "teamPersonal": "Bu zaten yapılmıştı",
         "unclear": "Açıkça okunamıyor",
         "outside": "Ajanın klasörü dışındaki dosyaları değiştiriyor",
         "upload": "Veri gönderiyor veya ajanın klasörü dışına kaydediyor",
@@ -14960,9 +15253,13 @@
     "managedNotRemovable": "Bu, çalışma alanının kendi bilgisayarı: kaldırılamaz.",
     "managedAccess": "Bu, çalışma alanının kendi bilgisayarı: araçları ve klasörleri olduğu gibi kalır.",
     "notification": {
-      "ready": "Çalışma alanınızın bilgisayarı hazır"
+      "ready": "Çalışma alanınızın bilgisayarı hazır",
+      "readyPersonal": "Ajanlarınızın bilgisayarı hazır"
     },
     "title": "{{org}} bilgisayarı",
+    "titlePersonal": "Ajanlarınızın bilgisayarı",
+    "titleInSentence": "{{org}} bilgisayarı",
+    "titleInSentencePersonal": "ajanlarınızın bilgisayarı",
     "users": "Her ajan için bir kullanıcı: her birinin kendi klasörü var.",
     "specs": "{{cpus}} CPU · {{memoryGb}} GB bellek · {{diskGb}} GB disk",
     "chip": {
@@ -15055,6 +15352,7 @@
     "notice": {
       "label": "Çalışma alanının bilgisayarı",
       "title": "{{org}} bilgisayarı kuruluyor",
+      "titlePersonal": "Ajanlarınızın bilgisayarı kuruluyor",
       "see": "Gör",
       "hide": "Gizle"
     },
@@ -15885,7 +16183,8 @@
   },
   "teamPlan": {
     "start": {
-      "templates": "Ekip şablonlarını gör"
+      "templates": "Ekip şablonlarını gör",
+      "templatesPersonal": "Hazır ajanları gör"
     },
     "business": {
       "agency": "Ajans",
@@ -15897,6 +16196,18 @@
       "other": "Başka bir şey"
     },
     "step": "Soru {{step}}/{{of}}",
+    "lifeArea": {
+      "routine": "Takvim ve rutin",
+      "money": "Finans",
+      "health": "Sağlık ve antrenman",
+      "studies": "Eğitim",
+      "home": "Ev ve alışveriş",
+      "travel": "Seyahat",
+      "work": "İş ve projeler",
+      "writing": "Yazı ve fikirler",
+      "other": "Başka bir şey"
+    },
+    "lifeAreaContext": "Şu konularda yardım istiyorum: {{areas}}.",
     "send": "{{count}} gönder",
     "card": {
       "new": "yeni",
@@ -15904,6 +16215,7 @@
       "skills": "Skill'ler",
       "create": "Ekibi oluştur",
       "adjust": "Ayarla",
+      "createPersonal": "Ajanları oluştur",
       "adjustName": "{{name}} ayarla",
       "map": "Harita olarak gör",
       "agents_one": "{{count}} ajan",
@@ -15913,15 +16225,20 @@
       "routineCount_one": "{{count}} rutin",
       "routineCount_other": "{{count}} rutin",
       "weekly": "ekibin haftasının nasıl geçtiğini burada anlatırım",
+      "weeklyPersonal": "ajanlarının haftasının nasıl geçtiğini burada anlatırım",
       "failed": "Ekip oluşturulmadı: {{step}} başarısız oldu ({{reason}}). Hiçbir şey oluşturulmadı, tekrar deneyebilirsin.",
       "retry": "Tekrar dene",
       "onlyCreators": "Ekibi yalnızca ajan oluşturabilenler oluşturur.",
       "created": "Ekibi {{name}} oluşturdu",
       "createdYou": "Ekibi sen oluşturdun",
+      "createdPersonal": "Ajanları {{name}} oluşturdu",
+      "createdYouPersonal": "Ajanları sen oluşturdun",
       "skillsWait": "Skill'ler bir yöneticiyi bekliyor.",
       "weeklyWait": "Haftalık değerlendirmem, rutinlerimi yöneten kişiyi bekliyor.",
       "undone": "Ekip geri alındı",
-      "dismissed": "Ekip bırakıldı"
+      "dismissed": "Ekip bırakıldı",
+      "undonePersonal": "Ajanlar geri alındı",
+      "dismissedPersonal": "Ajanlar bırakıldı"
     },
     "firstTask": {
       "suggestion": "öneri",
@@ -15943,6 +16260,7 @@
     },
     "map": {
       "title": "Harita olarak ekip",
+      "titlePersonal": "Harita olarak ajanların",
       "people": "Kişiler",
       "reviewer": "{{name}} ekibin haftasını değerlendirir",
       "waits": "Onayını bekliyor"
@@ -15957,15 +16275,24 @@
       "failed": "Ekip oluşturulmadı. Nedeni sohbetteki kartta.",
       "none": "Hiçbiri",
       "noneSub": "Ne yaptığını anlat, {{name}} kursun",
-      "tailor": "Sonra sadece işine göre ayarlamamı iste."
+      "tailor": "Sonra sadece işine göre ayarlamamı iste.",
+      "titlePersonal": "Ajanların",
+      "leadPersonal": "Yardım istediğin konular için hazır ajanlar. Sonra {{name}} onları sana göre uyarlar.",
+      "heldLeadPersonal": "İhtiyacına en yakın olanı seç. Sonra her şeyi değiştirebilirsin.",
+      "createPersonal": "Ajanlarımı oluştur",
+      "failedPersonal": "Ajanların oluşturulmadı. Nedeni sohbetteki kartta.",
+      "noneSubPersonal": "Neye ihtiyacın olduğunu anlat, {{name}} onları kursun",
+      "tailorPersonal": "Sonra sadece onları rutinine göre ayarlamamı iste."
     },
     "weekly": {
-      "name": "Ekibin haftası"
+      "name": "Ekibin haftası",
+      "namePersonal": "Haftan"
     }
   },
   "whoSees": {
     "label": "Kimler görüyor",
     "everyone": "Tüm çalışma alanı",
+    "everyonePersonal": "Buradaki herkes",
     "me": "Yalnızca ben",
     "people": "Belirli kişiler",
     "only": "Yalnızca {{name}}",
@@ -15975,6 +16302,7 @@
     "taskTitle": "Bu görevi kimler görüyor",
     "pageTitle": "Bu sayfayı kimler görüyor",
     "admins": "Yöneticiler her zaman görür.",
+    "adminsPersonal": "Burayı yöneten kişiler de görür.",
     "tied": "Siz değiştirene kadar konuşmadaki kişileri izler.",
     "search": "Kişi ara",
     "noMatch": "Bu adda kimse yok",
@@ -15988,13 +16316,17 @@
     "title": "{{name}} paylaş",
     "conversation": "Yalnızca sohbet",
     "people": "Seçtiğiniz kişiler ve roller",
+    "peoplePersonal": "Seçtiğiniz kişiler",
     "everyone": "Tüm çalışma alanı",
+    "everyonePersonal": "Buradaki herkes",
     "whereDm": "{{name}} ile doğrudan mesaj",
     "whereDmGone": "Bir doğrudan mesaj",
     "whereDmBetween": "{{names}} arasındaki doğrudan mesaj",
     "whereChannel": "#{{name}} üyeleri",
     "add": "Kişi veya rol ekle",
+    "addPersonal": "Kişi ekle",
     "addSearch": "Kişi ve rol ara",
+    "addSearchPersonal": "Kişi ara",
     "noResults": "Bu adda kimse yok",
     "groupPeople": "Kişiler",
     "groupRoles": "Roller",
@@ -16004,6 +16336,7 @@
     "role": "Rol",
     "remove": "{{name}} kişisini çıkar",
     "admins": "Yöneticiler her zaman görür.",
+    "adminsPersonal": "Burayı yöneten kişiler de görür.",
     "copyLink": "Bağlantıyı kopyala",
     "copied": "Bağlantı kopyalandı.",
     "done": "Bitti",
@@ -16011,7 +16344,9 @@
     "choosePeople": "Kişi seç",
     "readOnly": "Kimin göreceğini yalnızca sohbettekiler değiştirebilir.",
     "open": "Tüm çalışma alanı bu dosyayı görüyor.",
+    "openPersonal": "Buradaki herkes bu dosyayı görüyor.",
     "savedEveryone": "Artık tüm çalışma alanı dosyayı görüyor.",
+    "savedEveryonePersonal": "Artık buradaki herkes dosyayı görüyor.",
     "savedPeople": "Artık seçtiğiniz kişiler dosyayı görüyor.",
     "savedConversation": "Artık dosyayı yalnızca sohbet görüyor.",
     "undo": "Geri al",
@@ -16064,6 +16399,37 @@
   },
   "teamTemplates": {
     "lead": "{{org}} için bir ekip, her ajan kendi kanalında. Oluşturmadan önce ayarlayabilirsin.",
+    "leadPersonal": "Ajanların, her biri seninle kendi sohbetinde konuşur. Oluşturmadan önce ayarlayabilirsin.",
+    "life": {
+      "name": "Düzenli hayat",
+      "sub": "Takvim, hatırlatmalar ve faturalar",
+      "desc": "Günlerini ve paranı düzenli tutmak için."
+    },
+    "health": {
+      "name": "Sağlık",
+      "sub": "Antrenman ve beslenme",
+      "desc": "Düzenli antrenman yapmak ve daha iyi beslenmek için."
+    },
+    "studies": {
+      "name": "Eğitim ve fikirler",
+      "sub": "Çalışma planı, tekrarlar ve yazı",
+      "desc": "Yeni bir şey öğrenmek ve fikirlerini kelimelere dökmek için."
+    },
+    "home": {
+      "name": "Ev",
+      "sub": "Alışveriş, ev işleri ve faturalar",
+      "desc": "Hiçbir şeyi unutmadan evi çekip çevirmek için."
+    },
+    "travel": {
+      "name": "Seyahat",
+      "sub": "En ince ayrıntısına kadar planlanmış geziler",
+      "desc": "Fiyatlardan gün gün plana kadar gezileri planlamak için."
+    },
+    "freelance": {
+      "name": "Kendi hesabına çalışmak",
+      "sub": "Müşteriler, faturalar ve takvim",
+      "desc": "Kendi müşterileriyle ve parasıyla kendisi ilgilenen serbest çalışanlar için."
+    },
     "agency": {
       "name": "Pazarlama ajansı",
       "sub": "İçerik, reklam ve müşteri hizmetleri",
@@ -16142,12 +16508,72 @@
         "line": "Yanıt tabanını ekibin verdiği yanıtlarla güncel tutar.",
         "routine": "Tabanı haftanın yanıtlarıyla güncelle",
         "task": "Bu müşteri sorularının yanıtlarını yaz:"
+      },
+      "clara": {
+        "role": "Takvim ve hatırlatmalar",
+        "line": "Takvimini tutar ve önemli olanı iş işten geçmeden hatırlatır.",
+        "routine": "Bugünün programını gönder",
+        "task": "Bunu takvimime ekle ve bir gün önce bana hatırlat:"
+      },
+      "duda": {
+        "role": "Faturalar ve harcamalar",
+        "line": "Faturalarını ve harcamalarını takip eder, son ödeme tarihi gelmeden seni uyarır.",
+        "routine": "Bu ayın faturalarını ve ödenmesi gerekenleri listele",
+        "task": "Bu harcamaları kategoriye göre ayır:"
+      },
+      "leo": {
+        "role": "Antrenman",
+        "line": "Antrenmanlarını hazırlar ve seni kendi temponda motive eder.",
+        "routine": "Bugünün antrenmanını gönder",
+        "task": "Bana bugün için şunlarla 30 dakikalık bir antrenman hazırla:"
+      },
+      "mel": {
+        "role": "Beslenme",
+        "line": "Öğünlerini ve alışveriş listeni zevkine ve bütçene göre planlar.",
+        "routine": "Haftanın öğünlerini ve alışveriş listesini planla",
+        "task": "Şunlarla üç hızlı akşam yemeği öner:"
+      },
+      "gabi": {
+        "role": "Eğitim",
+        "line": "Çalışma planını hazırlar ve öğrendiklerinle ilgili sana sorular sorar.",
+        "routine": "Bugünün konusunu üç soruyla tekrar et",
+        "task": "Bu konuyu basitçe anlat ve bana üç soru sor:"
+      },
+      "lu": {
+        "role": "Yazı ve fikirler",
+        "line": "Notlarını ve fikirlerini saklar, onları metne dönüştürmene yardım eder.",
+        "routine": "Haftanın fikirlerini ve notlarını topla",
+        "task": "Bu notları kısa bir metne dönüştür:"
+      },
+      "rosa": {
+        "role": "Ev ve alışveriş",
+        "line": "Alışveriş listesini, ev işlerini ve tamir edilmesi gerekenleri takip eder.",
+        "routine": "Haftanın alışveriş listesini ve ev işlerini hazırla",
+        "task": "Şunlar için haftalık bir alışveriş listesi hazırla:"
+      },
+      "vic": {
+        "role": "Geziler",
+        "line": "Gezilerini planlar: tarihler, fiyatlar, rezervasyonlar ve gün gün plan.",
+        "routine": "Planladığın gezilerin fiyatlarına bak",
+        "task": "Şuraya 3 günlük bir gezi planla:"
+      },
+      "rui": {
+        "role": "Müşteriler",
+        "line": "Müşterilerini takip eder, teklif ve fatura yazar, ödemeyenlere hatırlatır.",
+        "routine": "Her müşterinin bugün ne beklediğini listele",
+        "task": "Bu müşteri için kısa bir teklif yaz:"
       }
     },
     "example": {
       "iara": "Merhaba Marina. Siparişin dün yola çıktı ve cumaya kadar ulaşacak. Takip kodu hemen aşağıda. Cuma uymazsa başka bir tarih bulurum.",
       "lia": "1. Ajans seçerken yapılan üç yaygın hata. 2. Neredeyse ters giden bir projenin perde arkası. 3. Takipçilerinize bir soru: burada ne görmek istersiniz?",
-      "nina": "Yarın: 9:00 Carla, 10:30 Pedro, 14:00 boş. Pedro henüz onaylamadı. Ona yazayım mı?"
+      "nina": "Yarın: 9:00 Carla, 10:30 Pedro, 14:00 boş. Pedro henüz onaylamadı. Ona yazayım mı?",
+      "clara": "Bugün: 9:00 diş hekimi, 12:30 Paula ile öğle yemeği, 18:00 paketi al. Yarın annenin doğum günü. Sabah sana hatırlatayım mı?",
+      "leo": "Bugün, 30 dakika: 5 dakika ısınma, 3 tur 12 squat, 10 şınav ve 30 saniye plank, ardından 5 dakika esneme. Nasıl geçtiğini anlat, çarşamba antrenmanını ona göre ayarlayayım.",
+      "gabi": "Bugünün konusu: fotosentez. Kısacası bitkiler ışığı, suyu ve karbondioksiti şekere ve oksijene dönüştürür. Üç soru: nerede gerçekleşir, ne girer ve ne çıkar?",
+      "rosa": "Bu hafta: pirinç, fasulye, yumurta, muz, kahve ve bulaşık deterjanı. Evde: perşembe çarşafları değiştirmek ve mutfak musluğu için birini çağırmak.",
+      "vic": "3 günde Lizbon: 1. gün Alfama ve kale. 2. gün Belém ve nehir. 3. gün Sintra. En ucuz uçuşlar 12'sinde, salı günü. Fiyatı takip edeyim mi?",
+      "rui": "Merhaba Marcos, teklif şöyle: 5 sayfalık yeni bir site, 3 haftada teslim, iki taksitte ödeme. Uygunsa sözleşmeyi bugün gönderirim."
     },
     "channels": {
       "iara": "destek",
@@ -16185,6 +16611,7 @@
         "line": "PR açmadan önce neyin kontrol edileceği"
       }
     },
-    "approvals": "Müşterilere gidenler onayını bekler. Onlara güvendiğinde daha sonra serbest bırakabilirsin."
+    "approvals": "Müşterilere gidenler onayını bekler. Onlara güvendiğinde daha sonra serbest bırakabilirsin.",
+    "approvalsPersonal": "Senin adına gönderilen, ödenen veya rezerve edilen her şey onayını bekler. Onlara güvendiğinde daha sonra serbest bırakabilirsin."
   }
 }
