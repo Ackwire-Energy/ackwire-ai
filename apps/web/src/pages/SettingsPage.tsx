@@ -281,7 +281,7 @@ function BillingSection() {
   return (
     <Card aria-label={t("settings.section.billing")}>
       <BillingMeters />
-      <div className="row">
+      <div className="ac-acts">
         <BillingLinkButton orgId={org.id} from="settings" variant="primary" icon="external">
           {t("billing.open")}
         </BillingLinkButton>
