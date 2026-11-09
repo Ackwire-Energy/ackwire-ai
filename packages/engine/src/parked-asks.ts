@@ -1,5 +1,5 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, type Executor, eq, inArray, rowsOf, schema, sql } from "@agenteschat/db";
+import { and, type Database, type Executor, eq, gte, inArray, rowsOf, schema, sql } from "@agenteschat/db";
 import { announceAgentStatus } from "./agent-status";
 import { getAgentCached } from "./agents";
 import { inMission } from "./auto-model";
@@ -293,15 +293,17 @@ async function closeParked(deps: ParkedDeps, run: AgentRun, r: Release): Promise
   await publishChannelEvent(deps.pubsub, { type: "agent.run", ...where, status: "done" });
   await publishChannelEvent(deps.pubsub, { type: "agent.idle", ...where });
   await publishChannelEvent(deps.pubsub, { type: "run.finished", ...where, status: "done", passed: true });
-  await publishChannelEvent(deps.pubsub, {
-    type: "message.handled",
-    channelId: run.channelId,
-    messageId: run.triggerMessageId,
-    agentId: run.agentId,
-    runId: run.id,
-    status: "done",
-    passed: true,
-  });
+  // Its trigger and whatever else those askers sent it: none of their receipts says it still waits.
+  for (const messageId of r.ids)
+    await publishChannelEvent(deps.pubsub, {
+      type: "message.handled",
+      channelId: run.channelId,
+      messageId,
+      agentId: run.agentId,
+      runId: run.id,
+      status: "done",
+      passed: true,
+    });
   await announceAgentStatus(deps.pubsub, run.orgId, run.agentId).catch(() => {});
   const line = lineMachineOf(run);
   if (line) await publishQueueChanged(deps.pubsub, run.orgId, line);
@@ -688,6 +690,8 @@ async function handledBy(db: Executor, run: AgentRun) {
       and(
         eq(messages.orgId, run.orgId),
         eq(messages.channelId, run.channelId),
+        // Joined it, so posted since it began: the channel's index reads only those, not the whole channel.
+        gte(messages.createdAt, run.createdAt),
         sql`${messages.meta}->'steeredRunIds' ? ${run.id}::text`,
       ),
     )

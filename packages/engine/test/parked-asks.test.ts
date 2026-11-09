@@ -272,6 +272,25 @@ test("the trigger's own asker handled while another still waits: the run ends wi
   expect(notices.map((n) => n.userId)).toEqual([bia.id]);
 });
 
+test("the trigger's asker let go with a follow-up of theirs that joined the run: neither receipt says it still waits", async () => {
+  const { handlers, deps, bia, asked, adaReplies } = await twoAskers({
+    bia: ["solved", "Ada"],
+    caio: ["needs_agent", null],
+  });
+  const more = await postPersonMessage(deps, bia.id, f.org.id, f.general.id, { body: "@dev e o changelog?" });
+  await drainOutbox(f.db, handlers, { now: later(1000) });
+  const [waiting] = await runsOf(f, f.agent.id);
+  expect(waiting?.pendingMessageIds).toContain(more.id);
+  const events = f.listen(f.general.id);
+  await adaReplies(asked.id, "Saiu às 14h, e o changelog também.");
+  await drainOutbox(f.db, handlers, { now: later(2 * 60_000) });
+  expect((await runsOf(f, f.agent.id))[0]?.status).toBe("done");
+  const handled = events.flatMap((e) =>
+    e.type === "message.handled" && e.agentId === f.agent.id && e.runId === waiting?.id ? [e.messageId] : [],
+  );
+  expect(handled).toEqual(expect.arrayContaining([asked.id, more.id]));
+});
+
 describe("a run that owes its first asker an answer still checks whoever joined it after", () => {
   /** The waiting run promised bia an answer (`answerOwed`); caio's ask joined later and Ada handled it in its thread. */
   async function owing() {
