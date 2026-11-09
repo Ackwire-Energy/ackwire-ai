@@ -17,7 +17,7 @@ test("words and their actions are action lines: the actions under the words when
   expect(rule(layout, ".machine-command")).toContain("gap: var(--space-1)");
   // A narrow list puts an agent's Abrir under its words, past the face.
   expect(layout).toContain(".machine-page__agents {\n  container-type: inline-size;\n}");
-  expect(rule(layout, ".settings-row--acts > .ac-actline")).toContain("flex: 1 1 0%");
+  expect(rule(layout, ".settings-row__lead")).toContain("display: flex");
   const blocks = await sheet("components/blocks/blocks.css");
   expect(rule(blocks, ".live-block__head")).toContain("gap: var(--space-2) var(--space-4)");
   const search = await sheet("components/search/search.css");

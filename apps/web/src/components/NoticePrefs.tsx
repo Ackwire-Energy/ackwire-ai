@@ -190,14 +190,16 @@ export function PrefRow({
       )}
     </span>
   );
+  // The icon and the words are the line's words: controls under them start from the row's edge, never leaving the
+  // icon a column beside three lines.
   if (actions)
     return (
-      <div className="settings-row settings-row--lead settings-row--acts">
-        {face}
-        <span className="ac-actline">
+      <div className="settings-row settings-row--lead settings-row--acts ac-actline">
+        <span className="settings-row__lead">
+          {face}
           {words}
-          <span className="settings-row__end">{actions}</span>
         </span>
+        <span className="settings-row__end">{actions}</span>
       </div>
     );
   const body = (

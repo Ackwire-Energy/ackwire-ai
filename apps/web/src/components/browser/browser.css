@@ -1424,6 +1424,10 @@ html:not([data-pointer]) .brw-trail__ext:focus-visible {
     clip: rect(0 0 0 0);
     white-space: nowrap;
   }
+  /* Its words gone to screen readers, the button is its icon in a 32 square. */
+  .brw-dm.ac-btn {
+    padding-inline: calc((var(--control-h-sm) - var(--control-icon-sm)) / 2);
+  }
 }
 
 .brw-dim__row > .ac-icon {

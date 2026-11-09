@@ -1413,7 +1413,7 @@ function DecisionBar({
       <div className="ap-bar__acts">
         <Locked when={deciding}>
           {approveAlwaysOffered(a) && <ApproveAlways approval={a} agent={agent} also={also} />}
-          <Button onClick={onRefuse}>
+          <Button size="sm" onClick={onRefuse}>
             {t("approval.refuse")}
             <Kbd>R</Kbd>
           </Button>

@@ -125,6 +125,7 @@ html:not([data-pointer]) .ag-rc__btn:focus-visible {
  */
 .ag-rc__act {
   display: inline-block;
+  vertical-align: top;
   white-space: nowrap;
 }
 .ag-rc__room {

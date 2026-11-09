@@ -21,7 +21,7 @@ function worst(status: "pending" | "approved") {
   if (!first) throw new Error("no approval");
   Object.assign(first, {
     why: "Rodei `bun test apps/web/test/request-card.test.tsx` e o deploy precisa de **aprovação** antes de `main`.",
-    detail: `send_email · to=${LONG_ADDRESS}`,
+    detail: "send_email · to=cliente@example.com",
     params: { to: LONG_ADDRESS, body: LONG_VALUE },
     ...(status === "pending"
       ? {}
