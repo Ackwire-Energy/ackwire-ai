@@ -218,6 +218,8 @@ describe("connecting a computer (device code)", () => {
     const token = await poll();
     if (!token.ok) throw new Error(token.error);
     expect(token).toMatchObject({ machineId: view.id, name: "Mac da Bia", org: { id: f.org.id, name: f.org.name } });
+    // Who may use it as it joined (a person's computer: its owner), named for the computer to say so.
+    expect(token).toMatchObject({ audience: "owner", owner: "bia" });
     expect(token.token).toMatch(/^agm_[A-Za-z0-9_-]{43}$/);
     const [machine] = await f.db.select().from(schema.machines).where(eq(schema.machines.id, view.id));
     expect(machine).toMatchObject({

@@ -77,6 +77,7 @@ import {
   PairingError,
   redeemIssuedCode,
   takeEnrollCode,
+  whoCanUse,
 } from "./pairing";
 import { agentWorkspace } from "./paths";
 import { connectVnc, type VncConnection, vncInit } from "./rfb";
@@ -375,6 +376,17 @@ async function pair(p: Parsed): Promise<number> {
   const details = [`Workspace: ${workspaceReal}${exec ? "" : " (commands off)"}`, `Config: ${configPath(home)}`];
   if (wait) wait.done(connected, ...details);
   else term.step(connected, ...details);
+  // An issued code is a provisioner's (the workspace computer): its rule is the workspace's, not a person's choice.
+  const who = enrollCode ? null : whoCanUse(grant, next.name);
+  if (who && grant.url) {
+    term.info(`${who} Change it on its page:`);
+    term.command(grant.url);
+  }
+  // Agents run as this OS user unless each has its own (system mode), so other people's read this user's files.
+  if (who && grant.audience !== "owner" && next.mode !== "system" && exec) {
+    const user = os.userInfo().username;
+    term.warn(`Other people's agents will run as ${user} and can read ${user}'s files.`);
+  }
   if (!term.inherited) {
     term.gap();
     term.info("Next: start it, or run it in the background");

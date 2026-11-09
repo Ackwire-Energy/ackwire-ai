@@ -70,6 +70,10 @@ test("connect link over HTTP: the one-line install, the computer asking to join,
   const { machineId } = (await approved.json()) as { machineId: string };
   const token = await runnerPost("/api/machines/device/token", { deviceCode: started.deviceCode });
   expect(token.status).toBe(200);
+  // The computer says who may use it and where that changes, as it connects.
+  const granted = (await token.json()) as { org: { id: string }; audience: string; owner: string; url: string };
+  expect(granted).toMatchObject({ machineId, audience: "everyone", owner: "sam" });
+  expect(granted.url).toBe(`${t.config.PUBLIC_URL}/org/${granted.org.id}/settings/devices/${machineId}`);
   const devices = (await (await rui("/devices")).json()) as {
     devices: { id: string; name: string; audience: { mode: string }; mayUse: boolean; mayManage: boolean }[];
     requests: unknown[];
