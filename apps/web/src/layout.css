@@ -10425,8 +10425,10 @@ html:not([data-pointer]) .agp-asks__see:focus-visible {
   gap: 8px;
   container-type: inline-size;
 }
-/* A MediaRow: the tile, the title and its button on one line, what it is about under them. */
+/* A MediaRow: the tile, the title and its button on one line, what it is about under them. Its own width decides when
+   the button goes under the title (`__end--wrap`), wherever the row sits (the overview's list, the instructions tab). */
 .agp-attn {
+  container-type: inline-size;
   padding: 12px 14px;
   border-radius: 16px;
   background: var(--raised);
