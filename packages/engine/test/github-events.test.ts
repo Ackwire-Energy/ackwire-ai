@@ -19,7 +19,11 @@ import { noticeText } from "../src/notices";
 import { type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
-afterEach(() => f?.close());
+afterEach(async () => {
+  const current = f;
+  f = undefined as unknown as Fixture;
+  await current?.close();
+});
 
 const SLUG = "agentes-chat";
 const MEMBER_GH = { id: 1001, login: "ana-gh", type: "User" };
