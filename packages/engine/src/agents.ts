@@ -33,6 +33,7 @@ import { newSetup, setupOf } from "./setup-checklist";
 import { DEFAULT_AGENT_SCOPES, dropForeignMailGrants, grantScopes } from "./tools/scopes";
 import { resyncBudgetCounter } from "./usage";
 import { resumeBudgetWaits } from "./usage-pause";
+import { isPersonalWorkspace } from "./workspace-mode";
 
 const { agents, importItems, machines, organizationMembers, providerCredentials } = schema;
 
@@ -198,6 +199,12 @@ export async function createAgent(
   const values = { ...fields, handle: fields.handle.toLowerCase(), model: fields.model ?? defaults.model };
   await validateAgentFields(db, orgId, values);
   const ownerUserId = input.ownerUserId === undefined ? actorId : input.ownerUserId;
+  // A personal workspace's new agent answers only its owner until someone says otherwise (ADR 0158): who joins later
+  // (family) isn't answered, nor shown its details, by every agent made while the person was alone. Only a default:
+  // an audience given wins (the apps send theirs), agents already there keep theirs, and the right hand, made
+  // elsewhere, answers everyone. With no owner nobody would be answered: everyone, as in a team's.
+  const audience =
+    audienceMode ?? (ownerUserId && (await isPersonalWorkspace(db, orgId)) ? ("owner" as const) : undefined);
   // Another agent's old handle still names that agent.
   const [held] = await db
     .select({ id: agents.id })
@@ -234,7 +241,7 @@ export async function createAgent(
         // Every new agent starts with its setup checklist, whichever way it was made (ADR 0155 §2).
         setup: newSetup(setup?.role),
         ...(autonomy ? { missionCommandApproval: autonomy } : {}),
-        ...(audienceMode ? { audienceMode } : {}),
+        ...(audience ? { audienceMode: audience } : {}),
       })
       .returning();
     if (!agent) throw new Error("agent insert returned nothing");

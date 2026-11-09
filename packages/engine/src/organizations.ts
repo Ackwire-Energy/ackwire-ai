@@ -59,7 +59,7 @@ import {
   workRefusal,
 } from "./standing";
 import type { Closed, DeletionDeps } from "./workspace-deletion";
-import { isWorkspaceMode, WORKSPACE_MODES, type WorkspaceMode } from "./workspace-mode";
+import { isWorkspaceMode, WORKSPACE_MODES, type WorkspaceMode, workspaceMode } from "./workspace-mode";
 
 const {
   organizations,
@@ -1907,7 +1907,8 @@ async function seatsFull(db: Executor, orgId: string) {
  * A link that was turned off, expired, or whose workspace is paused or being deleted, and an email invitation to a
  * workspace paused or being deleted, say only that (`closed`), never why. An email invitation also says how its
  * address signs in (`account`) and whether the workspace is full (`full`), before anyone makes an account
- * (ADR 0090).
+ * (ADR 0090). One that works also says who the workspace is for (`mode`): a personal one's page speaks of the
+ * person who invited, not of a team or of its name ("Personal"), ADR 0158.
  */
 /**
  * The role an invitation gives now: owner only while whoever sent it can still make owners, so removing or demoting
@@ -1966,6 +1967,7 @@ export async function previewInvitation(db: Database, token: string, now = new D
       role: link.link.role,
       kind: "link" as const,
       invitedBy: creator?.name ?? null,
+      mode: await workspaceMode(db, link.link.orgId),
       ...inviteLogo(token, link.orgLogo),
       ...(await inviteAgents(db, link.link.orgId)),
     };
@@ -1991,6 +1993,7 @@ export async function previewInvitation(db: Database, token: string, now = new D
     role,
     kind: "email" as const,
     invitedBy: inviter ? (row.invitedBy ?? null) : null,
+    mode: await workspaceMode(db, row.orgId),
     expiresAt: row.expiresAt.toISOString(),
     account: await invitedAccount(db, row.email),
     ...((await seatsFull(db, row.orgId)) ? { full: true as const } : {}),

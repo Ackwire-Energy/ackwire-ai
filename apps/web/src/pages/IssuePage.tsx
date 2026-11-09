@@ -56,6 +56,7 @@ import { SidePanel } from "@/components/SidePanel";
 import { TaskConversationButton, TaskConversationPanel, TaskConversationSummary } from "@/components/TaskConversation";
 import { IssueWhoSeesDialog, WhoSeesButton } from "@/components/WhoSees";
 import { useWikiLinkRenderer } from "@/components/WikiLinks";
+import { usePersonalView } from "@/hooks/usePersonalView";
 import {
   columnIdOf,
   columnsOf,
@@ -839,12 +840,22 @@ function useIssueFields(i: Issue) {
   };
 }
 
+/**
+ * Whether a task shows "Who sees it": always, but alone in a personal workspace only once it says anything but
+ * everyone (ADR 0158): nobody else is there to see it.
+ */
+function useWhoSeesShown(i: Issue) {
+  const { solo } = usePersonalView();
+  return !solo || (i.audience?.mode ?? "everyone") !== "everyone";
+}
+
 /** Column, who, priority and due date, at the top of the aside (on the page and in the dialog). */
 function Details({ issue: i }: { issue: Issue }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const f = useIssueFields(i);
   const [choosing, setChoosing] = useState(false);
+  const whoSees = useWhoSeesShown(i);
   return (
     <>
       <Field label={t("issues.column")} id={`is-col-${i.id}`}>
@@ -859,10 +870,12 @@ function Details({ issue: i }: { issue: Issue }) {
       <Field label={t("issues.form.assignee")} id={`is-who-${i.id}`}>
         <Select size="sm" value={f.who.value} onValueChange={f.who.onChange} options={f.who.options} />
       </Field>
-      <Field label={t("whoSees.label")} id={`is-who-sees-${i.id}`}>
-        <WhoSeesButton select value={i.audience ?? { mode: "everyone" }} onClick={() => setChoosing(true)} />
-        {choosing && <IssueWhoSeesDialog issue={i} onClose={() => setChoosing(false)} />}
-      </Field>
+      {whoSees && (
+        <Field label={t("whoSees.label")} id={`is-who-sees-${i.id}`}>
+          <WhoSeesButton select value={i.audience ?? { mode: "everyone" }} onClick={() => setChoosing(true)} />
+          {choosing && <IssueWhoSeesDialog issue={i} onClose={() => setChoosing(false)} />}
+        </Field>
+      )}
       <Field label={t("issues.form.priority")} id={`is-pri-${i.id}`}>
         <Select size="sm" value={f.priority.value} onValueChange={f.priority.onChange} options={f.priority.options} />
       </Field>
@@ -888,6 +901,7 @@ function PropsLine({ issue: i }: { issue: Issue }) {
   const actors = useActors();
   const f = useIssueFields(i);
   const [choosing, setChoosing] = useState(false);
+  const whoSees = useWhoSeesShown(i);
   const withLeading = (o: SelectOption) => (
     <span className="issue-prop__value">
       {o.leading}
@@ -936,10 +950,11 @@ function PropsLine({ issue: i }: { issue: Issue }) {
         />,
       )}
       {prop(t("issues.due"), <DatePicker size="sm" short aria-label={t("issues.due")} {...f.due} />)}
-      {prop(
-        t("whoSees.label"),
-        <WhoSeesButton value={i.audience ?? { mode: "everyone" }} onClick={() => setChoosing(true)} />,
-      )}
+      {whoSees &&
+        prop(
+          t("whoSees.label"),
+          <WhoSeesButton value={i.audience ?? { mode: "everyone" }} onClick={() => setChoosing(true)} />,
+        )}
       {choosing && <IssueWhoSeesDialog issue={i} onClose={() => setChoosing(false)} />}
       {(i.pullRequests.length > 0 || i.labels.length > 0 || i.githubUrl) && (
         <span className="issue-props__sep" aria-hidden="true" />

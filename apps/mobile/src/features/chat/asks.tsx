@@ -284,7 +284,7 @@ function ChangeProposalProbe({ ids, messageId, order }: { ids: string[]; message
         id,
         kind: "proposal" as const,
         agentId: proposerOf(open),
-        what: proposalTarget(t, open, agentName, org?.name ?? ""),
+        what: proposalTarget(t, open, agentName, org ?? ""),
         messageId,
         order,
       }

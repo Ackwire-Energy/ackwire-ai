@@ -1,6 +1,7 @@
 import type { Credential, Member } from "@agenteschat/client";
 import { apiPickOptions, type BrainPickOption, brainPickText } from "@agenteschat/client/lib/brain-picker";
 import { keyLine, type ModelChoice, providerLabel } from "@agenteschat/client/lib/providers";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import {
   AffixInput,
   AGENT_ACCESSORIES,
@@ -39,6 +40,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { useOrg } from "@/components/org-context";
 import { QUICK_BUDGETS, ROLE_IDS, ROLE_PRESETS, readBudget } from "@/lib/new-agent";
 
 /*
@@ -411,7 +413,10 @@ export function LookRows({
   );
 }
 
-/** "Responsável": a member (you marked) or "Sem responsável". */
+/**
+ * "Responsável": a member (you marked) or "Sem responsável". Each with their role under the name, which a personal
+ * workspace leaves out (ADR 0158): a family knows who is who.
+ */
 export function OwnerSelect({
   value,
   onChange,
@@ -427,6 +432,8 @@ export function OwnerSelect({
   card?: boolean;
 }) {
   const { t } = useTranslation();
+  const { org } = useOrg();
+  const roles = !isPersonal(org);
   return (
     <Select
       className={card ? "newag__sel" : undefined}
@@ -437,7 +444,7 @@ export function OwnerSelect({
         ...members.map((m) => ({
           value: m.userId,
           label: m.userId === meId ? t("newAgent.you", { name: m.name }) : m.name,
-          description: t(`roles.${m.role}`),
+          ...(roles ? { description: t(`roles.${m.role}`) } : {}),
           leading: <Avatar kind="person" size="sm" name={m.name} imageUrl={m.image} />,
         })),
         {
@@ -455,9 +462,13 @@ export function OwnerSelect({
   );
 }
 
-/** "Responsável" where it can't be changed: the person and their role, or "Sem responsável". */
+/**
+ * "Responsável" where it can't be changed: the person and their role (a team's workspace), or "Sem responsável".
+ */
 export function OwnerValue({ member, meId }: { member: Member | undefined; meId: string }) {
   const { t } = useTranslation();
+  const { org } = useOrg();
+  const role = member && !isPersonal(org) ? t(`roles.${member.role}`) : null;
   return (
     <div className="agp-person">
       {member ? (
@@ -469,14 +480,14 @@ export function OwnerValue({ member, meId }: { member: Member | undefined; meId:
       )}
       <span className="agp-person__t">
         {/* With the role under it the name takes the face's top; alone, it centres on the tile. */}
-        <b className={member ? "ac-captop" : undefined}>
+        <b className={role ? "ac-captop" : undefined}>
           {member
             ? member.userId === meId
               ? t("newAgent.you", { name: member.name })
               : member.name
             : t("newAgent.noOwnerOption")}
         </b>
-        {member && <span>{t(`roles.${member.role}`)}</span>}
+        {role && <span>{role}</span>}
       </span>
     </div>
   );

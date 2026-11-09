@@ -1,4 +1,4 @@
-import type { OrgRole, OrgSummary, WorkspaceMode } from "../api/types";
+import type { Member, OrgRole, OrgSummary, WorkspaceMode } from "../api/types";
 import { isPersonal } from "./workspace-mode";
 
 /**
@@ -33,23 +33,33 @@ export function personalSettingsHost(id: string, open: ReadonlySet<string>): str
 }
 
 /**
- * A personal workspace's settings list from the sections the person may open (`open`, in their usual order): the
- * short list, then Advanced with every other one (a section already on another's page isn't listed again).
+ * The short list once other people are members (a family): People comes after About you. Alone, it stays under
+ * Advanced, where inviting the first one still is.
  */
-export function personalSettingsNav<T extends { id: string }>(open: readonly T[]): { main: T[]; advanced: T[] } {
+const PERSONAL_SETTINGS_SHARED = ["account", "general", "members", "keys", "usage", "vault", "computers"] as const;
+
+/**
+ * A personal workspace's settings list from the sections the person may open (`open`, in their usual order): the
+ * short list, then Advanced with every other one (a section already on another's page isn't listed again). `others`:
+ * how many other people are members; with any, People joins the short list (unknown while loading: it doesn't).
+ */
+export function personalSettingsNav<T extends { id: string }>(
+  open: readonly T[],
+  others?: number,
+): { main: T[]; advanced: T[] } {
   const ids = new Set(open.map((s) => s.id));
-  const short = PERSONAL_SETTINGS as readonly string[];
+  const short: readonly string[] = others !== undefined && others > 0 ? PERSONAL_SETTINGS_SHARED : PERSONAL_SETTINGS;
   return {
-    main: PERSONAL_SETTINGS.flatMap((id) => open.filter((s) => s.id === id)),
+    main: short.flatMap((id) => open.filter((s) => s.id === id)),
     advanced: open.filter((s) => !short.includes(s.id) && personalSettingsHost(s.id, ids) === null),
   };
 }
 
-/** The sections a personal workspace names in its own words: About you, AI and apps, Plan and usage. */
-const RENAMED = ["general", "keys", "usage"] as const;
+/** The sections a personal workspace names in its own words: About you, People, AI and apps, Plan and usage. */
+const RENAMED = ["general", "members", "keys", "usage"] as const;
 type Renamed = (typeof RENAMED)[number];
 /** The sections whose line under the title has a personal variant. */
-const RETOLD = ["general", "keys", "usage", "connectors"] as const;
+const RETOLD = ["general", "members", "keys", "usage", "connectors", "roles"] as const;
 type Retold = (typeof RETOLD)[number];
 
 type NameKey<S extends string> = `settings.section.${S}` | `settings.section.${S & Renamed}Personal`;
@@ -120,3 +130,71 @@ export function personalHelperRole(roles: readonly OrgRole[]): OrgRole | null {
       .sort((a, b) => a.position - b.position)[0] ?? null
   );
 }
+
+/** How many people other than `meId` are members. */
+export const othersHere = (members: readonly Pick<Member, "userId">[], meId: string) =>
+  members.filter((m) => m.userId !== meId).length;
+
+/**
+ * Whether the viewer is alone in a personal workspace (ADR 0158): `others` is how many other people are members,
+ * undefined while that is loading, which never counts as alone, so a control a family member needs doesn't hide and
+ * come back. A control may leave the screen while alone only while it holds its default: a value someone set shows.
+ */
+export const isSolo = (org: Org, others: number | undefined) => isPersonal(org) && others === 0;
+
+/**
+ * Whether a picker's Roles group is worth showing (who talks to an agent, who sees an item, who joins a group
+ * conversation, limits per role): always in a team's workspace. In a personal one, only when one is already picked
+ * (`picked`, its ids) or a role exists besides the base one and those holding `administrator`: whoever holds those
+ * already sees everything shared (ADR 0151, 0157), so a family picks people instead. The roles themselves don't change.
+ */
+export function rolePicksInSight(
+  org: Org,
+  roles: readonly Pick<OrgRole, "kind" | "permissions">[],
+  picked: readonly string[] = [],
+): boolean {
+  return (
+    !isPersonal(org) ||
+    picked.length > 0 ||
+    roles.some((r) => r.kind === "custom" && !r.permissions.includes("administrator"))
+  );
+}
+
+/**
+ * A role's plain words in a personal workspace (the invitation's two choices): no role ("Uses the agents"), the
+ * helper's (`personalHelperRole`: "Helps you run it"); null for any other role, which goes by its own name.
+ */
+export function personalRoleKey(
+  roles: readonly OrgRole[],
+  roleId: string | null,
+): "members.dialog.role.uses" | "members.dialog.role.helps" | null {
+  if (roleId === null) return "members.dialog.role.uses";
+  return personalHelperRole(roles)?.id === roleId ? "members.dialog.role.helps" : null;
+}
+
+/**
+ * Who runs a personal workspace besides the viewer, by first name, for the notes a family member meets ("Only Ana can
+ * change this."): its one owner or holder of an `administrator` role (`roles`, when known) other than `meId`; null
+ * when there are several or none, and the note says it without a name.
+ */
+export function keeperName(
+  members: readonly Pick<Member, "userId" | "name" | "role" | "roleIds">[],
+  meId: string,
+  roles: readonly Pick<OrgRole, "id" | "permissions">[] = [],
+): string | null {
+  const admin = new Set(roles.filter((r) => r.permissions.includes("administrator")).map((r) => r.id));
+  const keepers = members.filter(
+    (m) => m.userId !== meId && (m.role === "owner" || (m.roleIds ?? []).some((id) => admin.has(id))),
+  );
+  const [only] = keepers;
+  if (!only || keepers.length > 1) return null;
+  return only.name.trim().split(/\s+/)[0] || null;
+}
+
+/**
+ * The key of a note on who may change something, for whoever can't (ADR 0158): a team's own key; in a personal
+ * workspace its words, naming who runs it (`keeper`, from `keeperName`, as `{{keeper}}`) with `<key>Keeper`, or
+ * without a name, `<key>Personal`, when that isn't one person. Only the words: who may change it is the same.
+ */
+export const keeperKey = <K extends string>(org: Org, keeper: string | null, key: K) =>
+  isPersonal(org) ? (keeper ? (`${key}Keeper` as const) : (`${key}Personal` as const)) : key;

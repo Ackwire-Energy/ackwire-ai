@@ -45,6 +45,7 @@ import {
 } from "@agenteschat/client/lib/new-agent";
 import { addsAgentsTo, can } from "@agenteschat/client/lib/permissions";
 import { AUTO, modelChoices, usableModels } from "@agenteschat/client/lib/providers";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { usePreventRemove } from "expo-router";
 import { Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -387,7 +388,9 @@ function NewAgentForm({
         // Its setup checklist suggests from the ready-made role it started from (ADR 0155 §2).
         setup: { role: role && role !== "custom" ? role : null },
         ownerUserId: meId ?? null,
-        audience: { mode: "everyone", userIds: [] },
+        // A personal workspace's new agent answers its owner only (ADR 0158 §3a): someone who joins later is not
+        // answered by every agent made while the person was alone.
+        audience: { mode: isPersonal(org) ? "owner" : "everyone", userIds: [] },
         credentialId: thinks.credentialId,
         monthlyBudgetUsd: null,
         appearance: look,
@@ -456,10 +459,13 @@ function NewAgentForm({
         successHaptic();
         // Agentes greets it once when it is next on screen (its row comes in, the others look at it).
         markArrived(agent.id);
-        // It joined, and what it thinks with, under its face: the one note before its conversation opens.
+        // It joined (a personal workspace has no team to join: it is here, ADR 0158), and what it thinks with, under
+        // its face: the one note before its conversation opens.
         const thinksLabel = chosen?.title ?? (start && useLast ? startText : t("brain.auto.label"));
         toast({
-          title: t("mobile.agents.created", { name: agent.name }),
+          title: isPersonal(org)
+            ? t("newAgent.createdTitlePersonal", { name: agent.name })
+            : t("mobile.agents.created", { name: agent.name }),
           subtitle: t("mobile.agents.thinksWith", { label: thinksLabel }),
           agentId: agent.id,
           // Its profile one tap away while its conversation opens under the toast.

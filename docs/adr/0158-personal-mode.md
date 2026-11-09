@@ -1,6 +1,6 @@
 # 0158. Personal mode: the same workspace, shaped for one person
 
-- Status: Proposed (being built)
+- Status: Accepted (being built: the server, the shared client, the web and the phone app, in one change)
 - Date: 2026-11-09
 - Amends: ADR 0137 §6 (the onboarding asks what the workspace is for; the right hand's first run has a personal set of
   rows), ADR 0155 §6 (the first-run checklist), ADR 0147 (a conversation's default look follows the mode)
@@ -30,15 +30,49 @@ my company" shows today's name, logo and time zone.
 The right hand's first-run card (ADR 0155 §6) has four rows in personal mode: what the person wants help with (areas of
 life, saved as the workspace's context), their agents, an AI, their apps. The people row is left out.
 
-### 3. The web app in personal mode
+### 3. The apps in personal mode
+
+The web app and the phone app read the same mode and the same shared helpers (`packages/client`), so both show the
+same shape.
 
 - **Sidebar:** the person's face and name on top (their menu: account, settings, switch workspace, sign out), with
   notifications and collapse beside it; "Go to…" is a row of the list; no footer. In sight: Home, Routines, Drive and
   More; Calendar, Tasks, Threads, Team and the rest start in More (the sidebar's existing per-person choices still
-  win). Agents come first; channels show as "Group conversations" only once there is one; people are not listed.
-- **Chat:** every conversation opens in bubbles (DMs already did); a person's own choice still wins.
+  win). Agents come first; channels show as "Group conversations" only once there is one to show.
+- **A family:** every workspace has `#general`, and a personal one hides it, and the people with their direct messages,
+  only while the person is its only member. Once others join, `#general` and the people show again.
+- **Defaults from the server:** the server answers a person's sidebar order and tool places for the workspace's mode
+  (the agents before the group conversations, the tools' personal order), in the same shape as a team's. Only a
+  person's own choices are stored, so a workspace that changes mode shows the new defaults for anything nobody moved,
+  and an order someone saved never reads as a default.
+- **Chat:** every conversation opens in bubbles (DMs already did); a person's own choice still wins. The panels on the
+  right of a conversation (the agent's panel beside its DM, a channel's members column) start closed at every width;
+  the person's own toggle is remembered and wins.
 - **Settings:** six sections in one list (Your account, About you, AI and apps, Plan and usage, Vault, Computers) and
-  the rest under Advanced, collapsed. Every section still opens from ⌘K and from the right hand's cards.
+  the rest under Advanced, collapsed. People joins the list once others are members. Every section still opens by its
+  address, from ⌘K and from the right hand's cards.
+- **Roles and permissions:** only the view is simpler. Inviting asks one plain question (they use the agents, or help
+  you run the workspace, which is the highest role the inviter may give that holds `administrator`), says which agents
+  will answer the new person, and pickers of who may talk to or see something offer people, with roles only when a role
+  other than the base and administrator ones exists or one is already picked. The access levels keep their words, and
+  every granular control stays where it was (the page's own advanced part, or Settings › Advanced). What anyone may do
+  never changes.
+- **Words:** a personal workspace's name ("Personal") says nothing to anyone, so the apps never show it where it would
+  stand for the workspace: an invitation's page goes by whose workspace it is (the invitation's preview carries the
+  `mode`), the workspace's context reads as what the agents know about the person, and the workspace's own computer is
+  named for the person's agents in every language. Channels are called group conversations in the sidebar, ⌘K and
+  the dialog that makes one.
+
+### 3a. The agents in personal mode
+
+- A new agent answers only its owner unless an audience is given (`createAgent`): someone who joins later is not
+  answered, nor shown its details, by every agent made while the person was alone. Agents already there keep theirs,
+  and the right hand still answers everyone.
+- The right hand's proposals speak of the person's agents: each agent it proposes lives in its DM with the person,
+  where its routines report, so `propose_team` and `propose_agent` leave the channel out unless the person asked for a
+  group conversation. In a team's workspace each agent of `propose_team` still names its channel.
+- Prompts, tool descriptions, emails, pushes and notices speak of one person and their agents. Names, schemas and what
+  each tool does are the same in both modes, except that `propose_team`'s channel is optional in personal.
 
 ### 4. Switching
 
@@ -50,7 +84,8 @@ personal shape too. Inviting someone in personal mode asks whether to stay perso
 ## Consequences
 
 - One code path: components read `isPersonal(org)` and pick defaults or words; there is no second app.
-- The phone app follows in a later change; until then it shows a personal workspace as it shows any other.
+- The phone app changes in the same change as the web app; a client that predates the mode reads every workspace as a
+  team's, since every new field is optional.
 - Strings are i18n keys in every language, personal variants included.
 
 ## Alternatives considered

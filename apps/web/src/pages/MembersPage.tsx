@@ -31,8 +31,10 @@ import {
 import { approvalNews, JOIN_NOTE_MAX, JOIN_REASON_MAX, sendsEmail } from "@agenteschat/client/lib/join-requests";
 import { membersFull } from "@agenteschat/client/lib/limits";
 import { can } from "@agenteschat/client/lib/permissions";
+import { settingsSectionNameKey } from "@agenteschat/client/lib/personal-view";
 import { grants, rolesOf } from "@agenteschat/client/lib/roles";
 import { isEmail } from "@agenteschat/client/lib/text";
+import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
 import {
   Alert,
   Avatar,
@@ -155,13 +157,16 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
     (m) =>
       roles.length === 0 || roles.some((r) => (r === "owner" ? m.role === "owner" : (m.roleIds ?? []).includes(r))),
   );
+  // A personal workspace (ADR 0158): a few people need no filter by role, and its owner's own row leaves their roles
+  // out (they say nothing to them); everyone else's keep theirs, and the "+" to give one.
+  const personal = isPersonal(org);
 
   return (
     <div className={`${embedded ? "settings__section" : "page"} members-page`}>
       <PageHeader
         level={embedded ? 2 : 1}
-        title={t("settings.section.members")}
-        meta={t("members.subtitle", {
+        title={t(settingsSectionNameKey(org, "members"))}
+        meta={t(modeKey(org, "members.subtitle"), {
           count: people.length,
           people: people.length,
           agents: dir.agents.length,
@@ -177,33 +182,35 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
 
         <section aria-labelledby="sec-people" className="section section--tight">
           <GroupHeading id="sec-people" title={t("members.people")} />
-          <FilterBar
-            label={t("members.filters")}
-            clearText={filterCopy.clearAll}
-            onClear={() => setRoles([])}
-            filters={[
-              {
-                key: "role",
-                active: roles.length > 0,
-                node: (
-                  <FilterChip
-                    label={t("members.roleFilter")}
-                    icon="members"
-                    multiple
-                    options={[
-                      { value: "owner", label: t("roles.owner") },
-                      ...orgRoles.filter((r) => r.kind === "custom").map((r) => ({ value: r.id, label: r.name })),
-                    ]}
-                    value={roles}
-                    onChange={setRoles}
-                    valueText={(o) => o.label}
-                    countText={(count) => t("members.rolesCount", { count })}
-                    clearLabel={filterCopy.clearOf(t("members.roleFilter"))}
-                  />
-                ),
-              },
-            ]}
-          />
+          {!personal && (
+            <FilterBar
+              label={t("members.filters")}
+              clearText={filterCopy.clearAll}
+              onClear={() => setRoles([])}
+              filters={[
+                {
+                  key: "role",
+                  active: roles.length > 0,
+                  node: (
+                    <FilterChip
+                      label={t("members.roleFilter")}
+                      icon="members"
+                      multiple
+                      options={[
+                        { value: "owner", label: t("roles.owner") },
+                        ...orgRoles.filter((r) => r.kind === "custom").map((r) => ({ value: r.id, label: r.name })),
+                      ]}
+                      value={roles}
+                      onChange={setRoles}
+                      valueText={(o) => o.label}
+                      countText={(count) => t("members.rolesCount", { count })}
+                      clearLabel={filterCopy.clearOf(t("members.roleFilter"))}
+                    />
+                  ),
+                },
+              ]}
+            />
+          )}
           {peopleQuery.isLoading && <LoadingList count={3} trailing />}
           <List>
             {people.map((m) => {
@@ -211,6 +218,7 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
               const held = rolesOf(m, orgRoles);
               // The server says who is below whom; here the "+" shows when there's anything to give.
               const gives = manage && (m.role !== "owner" || org.role === "owner") && orgRoles.some((r) => r.givable);
+              const ownRoles = personal && isMe && m.role === "owner";
               return (
                 <div key={m.userId} className="ac-list__row members-person" {...entityMenu(() => personEntries(m))}>
                   <ProfileTrigger
@@ -265,38 +273,40 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
                       />
                     )}
                   </span>
-                  <span className="members-roles">
-                    {m.role === "owner" && (
-                      <Chip icon="audienceOwner" title={t("roles.ownerTitle")}>
-                        {t("roles.owner")}
-                      </Chip>
-                    )}
-                    {held.map((r) => (
-                      <RoleChip key={r.id} role={r} />
-                    ))}
-                    {gives && (
-                      <RolesPicker
-                        roles={orgRoles}
-                        value={m.roleIds ?? []}
-                        onChange={(roleIds) =>
-                          setRolesOf.mutate(
-                            { userId: m.userId, roleIds },
-                            { onError: (e) => toast.show(errorText(t, e), "error") },
-                          )
-                        }
-                        label={t("members.rolesOf", { name: m.name })}
-                        trigger={
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            iconOnly
-                            icon="plus"
-                            aria-label={t("members.rolesOf", { name: m.name })}
-                          />
-                        }
-                      />
-                    )}
-                  </span>
+                  {!ownRoles && (
+                    <span className="members-roles">
+                      {m.role === "owner" && (
+                        <Chip icon="audienceOwner" title={t("roles.ownerTitle")}>
+                          {t("roles.owner")}
+                        </Chip>
+                      )}
+                      {held.map((r) => (
+                        <RoleChip key={r.id} role={r} />
+                      ))}
+                      {gives && (
+                        <RolesPicker
+                          roles={orgRoles}
+                          value={m.roleIds ?? []}
+                          onChange={(roleIds) =>
+                            setRolesOf.mutate(
+                              { userId: m.userId, roleIds },
+                              { onError: (e) => toast.show(errorText(t, e), "error") },
+                            )
+                          }
+                          label={t("members.rolesOf", { name: m.name })}
+                          trigger={
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              iconOnly
+                              icon="plus"
+                              aria-label={t("members.rolesOf", { name: m.name })}
+                            />
+                          }
+                        />
+                      )}
+                    </span>
+                  )}
                 </div>
               );
             })}

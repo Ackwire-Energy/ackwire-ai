@@ -83,7 +83,7 @@ export function OverviewTab() {
                   </Button>
                 </span>
                 <span className="ac-mediarow__body agp-attn__sub">
-                  {proposalTitle(t, p, org.name, (id) => dir.agentById.get(id)?.name ?? agent.name)} ·{" "}
+                  {proposalTitle(t, p, org, (id) => dir.agentById.get(id)?.name ?? agent.name)} ·{" "}
                   {p.canDecide
                     ? t("approval.waitingYou")
                     : p.decider.type === "user"

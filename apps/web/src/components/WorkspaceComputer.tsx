@@ -23,7 +23,7 @@ import { joinNames, lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { namesComputers } from "@agenteschat/client/lib/machines";
 import { around, endSentence } from "@agenteschat/client/lib/text";
-import { modeKey } from "@agenteschat/client/lib/workspace-mode";
+import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
 import {
   Button,
   Card,
@@ -281,7 +281,7 @@ export function WorkspaceComputerCard({ view }: { view: SetupView }) {
   const { org } = useOrg();
   const reader = useWaitReader();
   const machine = managedOf(useMachines(org.id).data);
-  const title = computerName(t, org.name, machine);
+  const title = computerName(t, org.name, machine, isPersonal(org));
   return (
     <Card aria-labelledby="sec-workspace-computer" className="setup-card" data-phase={view.phase}>
       <div className="computers-card__head">

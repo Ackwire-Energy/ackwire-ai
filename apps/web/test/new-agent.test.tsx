@@ -1564,6 +1564,65 @@ describe("Criar agente with Criar agentes alone: an agent of my own, without app
   });
 });
 
+describe("Criar agente in a personal workspace (ADR 0158)", () => {
+  /** The seeded workspace as a personal one; `alone`: Walter its only member. */
+  const personal = (alone: boolean) => {
+    const state = seedState();
+    const org = state.me?.organizations[0];
+    if (org) org.mode = "personal";
+    if (alone) state.members = state.members.filter((m) => m.userId === state.me?.user.id);
+    return state;
+  };
+
+  test("alone: no owner and no who can talk on the screen; it is created mine, answering only me", async () => {
+    const state = await open(personal(true));
+    await startAs("QA");
+    await proceed(3);
+    expect(title()).toBe("Onde trabalha e com quem");
+    expect(screen().queryByRole("combobox", { name: "Responsável" })).toBeNull();
+    expect(screen().queryByRole("radiogroup", { name: "Quem pode falar com a Iris" })).toBeNull();
+    await proceed(2);
+    const review = document.querySelector(".newag__review")?.textContent ?? "";
+    expect(review).not.toContain("Responsável");
+    expect(review).not.toContain("Quem pode falar");
+    await click(screen().getByRole("button", { name: "Criar Iris" }));
+    await settle(8);
+    expect(createdWith(state)).toMatchObject({ ownerUserId: "u-walter", audience: { mode: "owner" } });
+  });
+
+  test("with family: only the owner at first, in plain words; people to pick, without a Roles group", async () => {
+    const state = await open(personal(false));
+    await startAs("QA");
+    await proceed(3);
+    // The owner's list names each person without their role.
+    const owner = screen().getByRole("combobox", { name: "Responsável" });
+    owner.focus();
+    await act(async () => fireEvent.keyDown(owner, { key: "Enter" }));
+    expect(screen().getByRole("option", { name: /^João/ }).querySelector(".ac-menu__desc")).toBeNull();
+    // Closed on the same choice: still me.
+    await click(screen().getByRole("option", { name: /^Walter/ }));
+    const audience = screen().getByRole("radiogroup", { name: "Quem pode falar com a Iris" });
+    expect(
+      within(audience)
+        .getByRole("radio", { name: /^Só o responsável/ })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
+    expect(within(audience).getByRole("radio", { name: /^Todos daqui/ })).toBeTruthy();
+    await click(within(audience).getByRole("radio", { name: /^Só algumas pessoas/ }));
+    const results = screen().getByRole("region", { name: "Buscar pessoas" });
+    // Admin is the only role besides Todos, and whoever holds it sees everything already: people, not roles.
+    expect(within(results).queryByText("Papéis")).toBeNull();
+    await click(within(results).getByLabelText(/João/));
+    await proceed(2);
+    await click(screen().getByRole("button", { name: "Criar Iris" }));
+    await settle(8);
+    expect(createdWith(state)).toMatchObject({
+      ownerUserId: "u-walter",
+      audience: { mode: "people", userIds: ["u-joao"], roleIds: [] },
+    });
+  });
+});
+
 describe("new-agent rules", () => {
   const taken = new Set(["ada", "ada-2", "joao"]);
 

@@ -25,11 +25,21 @@ describe("the sidebar's defaults by the workspace's mode (ADR 0158)", () => {
     expect(sidebarPlace(undefined, "issues")).toBe("always");
   });
 
-  test("personal: Routines and Drive in sight, Approvals while something waits, the rest in More", () => {
-    expect(inSight(true)).toEqual(["routines", "drive"]);
+  test("personal: every tool in More, Approvals in sight while something waits", () => {
+    expect(inSight(true)).toEqual([]);
     expect(sidebarDefaults(true).approvals).toBe("auto");
     expect(inSidebarList(sidebarPlace({}, "approvals", true), 2)).toBe(true);
-    for (const id of ["calendar", "issues", "threads", "team", "wiki", "dashboards", "taskManager"] as const)
+    for (const id of [
+      "routines",
+      "drive",
+      "calendar",
+      "issues",
+      "threads",
+      "team",
+      "wiki",
+      "dashboards",
+      "taskManager",
+    ] as const)
       expect(sidebarPlace({}, id, true)).toBe("more");
   });
 
@@ -42,7 +52,7 @@ describe("the sidebar's defaults by the workspace's mode (ADR 0158)", () => {
 
   test("the person's own choice wins in both modes", () => {
     expect(sidebarPlace({ issues: "always" }, "issues", true)).toBe("always");
-    expect(sidebarPlace({ drive: "more" }, "drive", true)).toBe("more");
+    expect(sidebarPlace({ drive: "always" }, "drive", true)).toBe("always");
     expect(sidebarPlace({ team: "more" }, "team")).toBe("more");
   });
 
@@ -51,8 +61,8 @@ describe("the sidebar's defaults by the workspace's mode (ADR 0158)", () => {
     expect(withSidebarPlace({}, "issues", "always", true)).toEqual({ issues: "always" });
     // The same place is a team's default: there it would be dropped.
     expect(withSidebarPlace({}, "issues", "always")).toEqual({});
-    expect(withSidebarPlace({}, "routines", "always", true)).toEqual({});
-    expect(withSidebarPlace({}, "routines", "always")).toEqual({ routines: "always" });
+    expect(withSidebarPlace({}, "routines", "more", true)).toEqual({});
+    expect(withSidebarPlace({}, "routines", "always", true)).toEqual({ routines: "always" });
   });
 
   test("a saved order keeps its tools; the ones it lacks follow in the mode's order", () => {

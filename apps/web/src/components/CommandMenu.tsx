@@ -4,6 +4,7 @@ import { joinable } from "@agenteschat/client/lib/channel-access";
 import { setDraftFor } from "@agenteschat/client/lib/drafts";
 import { can } from "@agenteschat/client/lib/permissions";
 import { settingsSectionNameKey } from "@agenteschat/client/lib/personal-view";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import { Avatar, CommandPalette, Icon, type PaletteItem } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -63,7 +64,8 @@ export function CommandMenu() {
         key: `c:${c.id}`,
         group: goTo,
         label: `#${c.name}`,
-        sub: t("palette.channel"),
+        // A personal workspace calls its channels group conversations (ADR 0158).
+        sub: t(modeKey(org, "palette.channel")),
         mark: <Icon name="channel" size={16} />,
         onSelect: () => void navigate({ to: "/org/$orgId/c/$channelId", params: { orgId, channelId: c.id } }),
       });

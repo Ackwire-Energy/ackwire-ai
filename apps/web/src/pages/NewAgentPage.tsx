@@ -46,9 +46,10 @@ import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { choiceOf, defaultPolicy, MAIL_ACTIONS, toMailLevel } from "@agenteschat/client/lib/mail";
 import { type PlanChoice as AiPlan, planOfKind } from "@agenteschat/client/lib/no-ai";
 import { addsAgentsTo, can } from "@agenteschat/client/lib/permissions";
+import { keeperKey } from "@agenteschat/client/lib/personal-view";
 import { AUTO, apiProviderOf, isAuto, modelChoices, usableModels } from "@agenteschat/client/lib/providers";
 import { scopeText } from "@agenteschat/client/lib/scopes";
-import { modeKey } from "@agenteschat/client/lib/workspace-mode";
+import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
 import {
   AffixInput,
   type AgentAppearance,
@@ -109,6 +110,7 @@ import { SkillPicker } from "@/components/Skills";
 import { AgentBornSky, AgentPreviewSky, OnboardingHorizon } from "@/components/Sky";
 import { StepRail } from "@/components/StepRail";
 import { useFlowExit } from "@/hooks/useFlowExit";
+import { useKeeperName, usePersonalView } from "@/hooks/usePersonalView";
 import {
   BLANK_LOOK,
   cleanHandle,
@@ -203,6 +205,7 @@ export function NewAgentPage({
   const from = opened.current?.messageId === proposalId ? opened.current : null;
   const allowed = can(org, "create_agents");
   const closed = proposalId !== null && !from;
+  const keeper = useKeeperName();
   if (!allowed || closed) {
     return (
       <main className="shell__main">
@@ -211,7 +214,9 @@ export function NewAgentPage({
             <h1 className="page-title">{t("newAgent.title")}</h1>
           </header>
           {!allowed ? (
-            <EmptyState icon="agent">{t("newAgent.adminsOnly", { org: org.name })}</EmptyState>
+            <EmptyState icon="agent">
+              {t(keeperKey(org, keeper, "newAgent.adminsOnly"), { org: org.name, keeper })}
+            </EmptyState>
           ) : proposal.isPending ? (
             <Spinner />
           ) : (
@@ -334,7 +339,14 @@ function NewAgentFlow({
   const asked = channelId ? [channelId] : [];
   const [channelIds, setChannelIds] = useState<Set<string>>(new Set(draft?.channelIds ?? asked));
   const [owner, setOwner] = useState(me.user.id);
-  const [audience, setAudience] = useState<AgentAudience>({ mode: "everyone", userIds: [] });
+  // A personal workspace's new agent answers only its owner until they say otherwise (ADR 0158), as the server makes
+  // its agents; a team's answers everyone.
+  const audienceAtFirst = (): AgentAudience => ({ mode: isPersonal(org) ? "owner" : "everyone", userIds: [] });
+  const [audience, setAudience] = useState<AgentAudience>(audienceAtFirst);
+  // Alone in a personal workspace there is nobody else to own it or talk to it: its owner and who talks to it leave
+  // the screen while they hold that default (ADR 0158). Its page's Settings still has both.
+  const { solo } = usePersonalView();
+  const keeper = useKeeperName();
   // "Automático" for every new agent: each task gets its model and effort; a fixed model is one click away.
   const [model, setModel] = useState<string>(AUTO);
   // Or a plan (Claude Code, Codex) on a computer: saved as its "Quem pensa" once the agent exists. A proposal
@@ -436,6 +448,9 @@ function NewAgentFlow({
   }, [connectedList, role, managesAgents]);
 
   const ownerId = owner === NO_OWNER ? null : owner;
+  // Alone, both are the person's and leave the screen while they hold that: mine, answering only me.
+  const ownerHidden = solo && ownerId === me.user.id;
+  const audienceHidden = ownerHidden && audience.mode === "owner";
   const ownerMember = (members.data ?? []).find((m) => m.userId === ownerId);
   const ownerFirst = ownerMember?.name.split(/\s+/)[0] ?? null;
   const displayName = name.trim() || t("newAgent.defaultName");
@@ -736,7 +751,7 @@ function NewAgentFlow({
     setSkillIds(library.data ? new Set(library.data.filter((s) => s.defaultForNewAgents).map((s) => s.id)) : null);
     setChannelIds(new Set(asked));
     setOwner(me.user.id);
-    setAudience({ mode: "everyone", userIds: [] });
+    setAudience(audienceAtFirst());
     startWith(startOf(me.user.id));
     setAiPicked(false);
     setWithAutonomy(true);
@@ -876,7 +891,7 @@ function NewAgentFlow({
     </span>
   );
   const audienceText = () => {
-    if (audience.mode === "everyone") return t("audience.summary.everyone");
+    if (audience.mode === "everyone") return t(modeKey(org, "audience.summary.everyone"));
     if (audience.mode === "owner")
       return ownerFirst ? t("audience.summary.owner", { name: ownerFirst }) : t("audience.summary.nobody");
     if (audience.userIds.length === 0 && ownerFirst)
@@ -1165,7 +1180,7 @@ function NewAgentFlow({
           managesAgents
             ? t("newAgent.steps.tools.lead", { ...g, org: org.name })
             : t("newAgent.steps.tools.leadNoAccess", g),
-          managesAgents ? undefined : t("newAgent.accessAdmins"),
+          managesAgents ? undefined : t(keeperKey(org, keeper, "newAgent.accessAdmins"), { keeper }),
         )}
         <Card as="div" className="newag__card">
           {connectedList.length + mailboxes.length > 0 ? (
@@ -1311,50 +1326,60 @@ function NewAgentFlow({
         ) : (
           <p className="small muted">{t("newAgent.noChannels")}</p>
         )}
-        <div className="newag__sect">
-          {managesAgents ? (
-            ownerTitle
-          ) : (
-            <div className="ac-hintline">
-              {ownerTitle}
-              <InfoHint name={t("common.about", { label: t("newAgent.owner") })}>{t("newAgent.ownerYours")}</InfoHint>
+        {!ownerHidden && (
+          <>
+            <div className="newag__sect">
+              {managesAgents ? (
+                ownerTitle
+              ) : (
+                <div className="ac-hintline">
+                  {ownerTitle}
+                  <InfoHint name={t("common.about", { label: t("newAgent.owner") })}>
+                    {t("newAgent.ownerYours")}
+                  </InfoHint>
+                </div>
+              )}
             </div>
-          )}
-        </div>
-        <Card as="div" className="newag__card">
-          {managesAgents ? (
-            <OwnerSelect
-              value={owner}
-              members={members.data ?? []}
-              meId={me.user.id}
-              onChange={(v) => {
-                setOwner(v);
-                if (!aiPicked) startWith(startOf(v === NO_OWNER ? null : v));
-                if (v !== NO_OWNER) setAudience((a) => ({ ...a, userIds: a.userIds.filter((id) => id !== v) }));
-              }}
-            />
-          ) : (
-            <OwnerValue member={ownerMember} meId={me.user.id} />
-          )}
-          <span className="small muted">{ownerId ? t("newAgent.ownerHelp") : t("newAgent.noOwnerHelp")}</span>
-        </Card>
-        <div className="newag__sect">
-          <h2>
-            <Icon name="message" />
-            {t("audience.title", g)}
-          </h2>
-        </div>
-        <Card as="div" className="newag__card">
-          <AudienceChoice
-            compact
-            value={audience}
-            onChange={setAudience}
-            ownerUserId={ownerId}
-            agentName={displayName}
-            idPrefix="ag-audience"
-          />
-          {errorLine(errorOf("audience"))}
-        </Card>
+            <Card as="div" className="newag__card">
+              {managesAgents ? (
+                <OwnerSelect
+                  value={owner}
+                  members={members.data ?? []}
+                  meId={me.user.id}
+                  onChange={(v) => {
+                    setOwner(v);
+                    if (!aiPicked) startWith(startOf(v === NO_OWNER ? null : v));
+                    if (v !== NO_OWNER) setAudience((a) => ({ ...a, userIds: a.userIds.filter((id) => id !== v) }));
+                  }}
+                />
+              ) : (
+                <OwnerValue member={ownerMember} meId={me.user.id} />
+              )}
+              <span className="small muted">{ownerId ? t("newAgent.ownerHelp") : t("newAgent.noOwnerHelp")}</span>
+            </Card>
+          </>
+        )}
+        {!audienceHidden && (
+          <>
+            <div className="newag__sect">
+              <h2>
+                <Icon name="message" />
+                {t("audience.title", g)}
+              </h2>
+            </div>
+            <Card as="div" className="newag__card">
+              <AudienceChoice
+                compact
+                value={audience}
+                onChange={setAudience}
+                ownerUserId={ownerId}
+                agentName={displayName}
+                idPrefix="ag-audience"
+              />
+              {errorLine(errorOf("audience"))}
+            </Card>
+          </>
+        )}
       </>
     ),
     model: () => {
@@ -1551,13 +1576,14 @@ function NewAgentFlow({
                 t("newAgent.noChannelsReview"),
               ),
             )}
-            {row(
-              "where",
-              "members",
-              t("newAgent.owner"),
-              <span>{ownerMember?.name ?? t("newAgent.noOwnerAdmins")}</span>,
-            )}
-            {row("where", "message", t("audience.section"), <span>{audienceText()}</span>)}
+            {!ownerHidden &&
+              row(
+                "where",
+                "members",
+                t("newAgent.owner"),
+                <span>{ownerMember?.name ?? t("newAgent.noOwnerAdmins")}</span>,
+              )}
+            {!audienceHidden && row("where", "message", t("audience.section"), <span>{audienceText()}</span>)}
             {draft?.routine && (
               <div className="newag__rv">
                 <span className="newag__rv-k">
@@ -1808,12 +1834,16 @@ function NewAgentFlow({
                     <span className="newag__empty">{t("newAgent.noChannelsYet")}</span>
                   )}
                 </PreviewSection>
-                <PreviewSection label={t("newAgent.owner")}>
-                  <span className="newag__chips">{chip("person", ownerFirst ?? t("newAgent.noOwnerOption"))}</span>
-                </PreviewSection>
-                <PreviewSection label={t("audience.section")}>
-                  <span className="newag__chips">{chip("message", audienceText())}</span>
-                </PreviewSection>
+                {!ownerHidden && (
+                  <PreviewSection label={t("newAgent.owner")}>
+                    <span className="newag__chips">{chip("person", ownerFirst ?? t("newAgent.noOwnerOption"))}</span>
+                  </PreviewSection>
+                )}
+                {!audienceHidden && (
+                  <PreviewSection label={t("audience.section")}>
+                    <span className="newag__chips">{chip("message", audienceText())}</span>
+                  </PreviewSection>
+                )}
                 <PreviewSection label={t("newAgent.modelAndCost")}>
                   <span className="newag__chips">
                     {modelLabel && chip("bolt", modelLabel, "model")}

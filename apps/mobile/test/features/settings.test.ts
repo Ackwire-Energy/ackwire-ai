@@ -14,11 +14,14 @@ import {
   isGithubSkillLink,
   machineFacts,
   missingIdeas,
+  MODE_LINE_ICON,
   NO_COMPUTER,
   nameOnLeave,
   noComputerKey,
   pauseText,
   peoplesMachines,
+  personalAiParts,
+  personalSections,
   platformText,
   reduceTexts,
   type S3Form,
@@ -150,6 +153,116 @@ describe("the workspace's settings on the phone: who opens what (the web's sub-n
     expect(routes.length).toBeGreaterThan(10);
     // The workspace's settings page sits on the grouped gray like the screens it opens: all scroll under the bar.
     for (const route of routes) expect(layout).toContain(`name="${route}" options={{ ...pushed, ...scrollUnder }}`);
+  });
+});
+
+describe("a personal workspace's settings on the phone (ADR 0158 §3): one short list, the rest under Advanced", () => {
+  const ALL = ["read", "invite_people", "view_audit", "view_usage", "manage_agents", "configure", "create_agents"];
+  const owner = (mode?: "personal" | "team", permissions = [...ALL, "manage_roles"]) => ({
+    id: "o",
+    name: "Pessoal",
+    role: "owner" as const,
+    permissions,
+    ...(mode ? { mode } : {}),
+  });
+  const ids = (entries: readonly { id: string }[]) => entries.map((s) => s.id);
+  const src = (file: string) => readFileSync(join(import.meta.dir, "..", "..", "src", "features", file), "utf8");
+
+  test("alone: About you, AI and apps, Plan and usage, Vault, Computers; every other section under Advanced", () => {
+    const { main, advanced } = personalSections(owner("personal"), 0);
+    expect(ids(main)).toEqual(["general", "keys", "usage", "vault", "computers"]);
+    // Connectors and Skills are on AI and apps' screen, so neither list repeats them; the rest keeps its groups.
+    expect(ids(advanced)).toEqual([
+      "right_hand",
+      "media",
+      "members",
+      "roles",
+      "audit",
+      "access",
+      "apps",
+      "storage",
+      "import",
+    ]);
+    expect([...main, ...advanced].length + 2).toBe(visibleSections(owner("personal")).length);
+    expect(ids(personalAiParts(owner("personal")))).toEqual(["connectors", "skills"]);
+  });
+
+  test("People joins the short list after About you once someone else is a member, never while that loads", () => {
+    expect(ids(personalSections(owner("personal"), 2).main)).toEqual([
+      "general",
+      "members",
+      "keys",
+      "usage",
+      "vault",
+      "computers",
+    ]);
+    expect(ids(personalSections(owner("personal"), 2).advanced)).not.toContain("members");
+    expect(ids(personalSections(owner("personal"), undefined).main)).not.toContain("members");
+  });
+
+  test("only where a section is listed changes: a family member opens the same sections as in a team's", () => {
+    const member = { id: "o", name: "Pessoal", role: "member" as const, permissions: ["read", "post"] };
+    const { main, advanced } = personalSections({ ...member, mode: "personal" }, 1);
+    // No About you (the workspace's context is who configures it), and Skills isn't theirs: Connectors stays on AI and
+    // apps, which they open.
+    expect(ids(main)).toEqual(["members", "keys", "usage", "vault", "computers"]);
+    expect(ids(advanced)).toEqual(["apps"]);
+    expect(ids(personalAiParts({ ...member, mode: "personal" }))).toEqual(["connectors"]);
+    expect(new Set([...ids(main), ...ids(advanced), "connectors"])).toEqual(
+      new Set(ids(visibleSections({ ...member, mode: "personal" }))),
+    );
+  });
+
+  test("the settings screen picks the short list in a personal workspace; a team's keeps its groups", () => {
+    const screen = src("settings/WorkspaceScreen.tsx");
+    expect(screen).toContain("return personal ? <PersonalSettingsList others={others} /> : <TeamSettingsList />;");
+    // Your account first (the person's own page), then the sections in a personal workspace's names, then Advanced.
+    expect(screen).toContain('onPress={() => router.push("/me/account")}');
+    expect(screen).toContain("label={t(settingsSectionNameKey(org, s.id))}");
+    expect(screen).toContain('onPress={() => router.push("/settings/advanced")}');
+    const advanced = src("settings/AdvancedScreen.tsx");
+    expect(advanced).toContain("<SectionGroups");
+    expect(advanced).toContain('onPress={() => router.push("/me/approvals")}');
+    expect(advanced).toContain("<DeleteWorkspaceRow />");
+    // AI and apps ends with Connectors and Skills in a personal workspace.
+    expect(src("ai/AiAccountsScreen.tsx")).toContain("<PersonalParts />");
+  });
+
+  test("About you and General have the mode row, which opens the switch for who configures the workspace", () => {
+    const general = src("settings/GeneralScreen.tsx");
+    expect(general).toContain('label={t("settings.mode.label")}');
+    expect(general).toContain('{...(editable ? { chevron: true, onPress: () => router.push("/settings/mode") } : {})}');
+    const mode = src("settings/ModeScreen.tsx");
+    expect(mode).toContain("modeSwitchLines(to, others ?? 0)");
+    // Going to a team's asks the name; only a changed one is sent with the mode.
+    expect(mode).toContain("{ mode: to, ...(named !== org?.name ? { name: named } : {}) }");
+    // Every line of the switch has an icon of the phone's set.
+    expect(Object.keys(MODE_LINE_ICON).sort()).toEqual(
+      ["channel", "members", "message", "personAdd", "settings", "shield", "sidebar"].sort(),
+    );
+  });
+
+  test("alone, what has nobody else to be for waits until someone joins, unless it was set", () => {
+    // Who approves for you: only the right hand's part while alone with no cover set.
+    expect(src("me/ApprovalsPage.tsx")).toContain("{solo && !cover ? null : (");
+    // Answers other people on a plan: hidden while off, but on the agent's Advanced, where the switch always is.
+    expect(src("ai/parts.tsx")).toContain("if (solo && !on && !keep) return null;");
+    expect(src("ai/AgentAdvancedScreen.tsx")).toMatch(/disabled=\{busy\}\s+keep\s+\/>/);
+    // Delegated approvals move from You to Advanced in a personal workspace.
+    expect(src("me/MeScreen.tsx")).toMatch(/\{personal \? null : \(\s+<GroupedRow\s+key="approvals"/);
+  });
+
+  test("with family, an agent's Edit opens who talks to it, for whoever may change it", () => {
+    const edit = src("agents/AgentEditScreen.tsx");
+    expect(edit).toContain("personal && (others ?? 0) > 0 && !rightHand && agent.setup && (admin || owner)");
+    expect(edit).toContain('onPress={() => openSetupStep(id, "who")}');
+  });
+
+  test("the switch says what changes in the person's language", async () => {
+    const t = await translator("pt-BR");
+    expect(t("settings.section.generalPersonal")).toBe("Sobre você");
+    expect(t("personalMode.toPersonal.others", { count: 2 })).toBe("As outras 2 pessoas daqui também veem assim");
+    expect(t("personalMode.toTeam.name")).toBe("Nome do workspace");
   });
 });
 

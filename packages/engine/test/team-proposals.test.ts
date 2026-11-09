@@ -252,6 +252,32 @@ describe("the team card", () => {
     expect(stranger.isError).toBe(true);
   });
 
+  test("in a personal workspace an agent may go without a channel: it lives in its DM, and the result says so", async () => {
+    f = await setup({ rightHand: true });
+    const ctx = await lodiRun(f, f.owner.id, "Casa e contas");
+    const inDm = {
+      lead: "2 agentes para você",
+      agents: [{ name: "Clara", handle: "clara", role: "Casa", line: "Cuida das tarefas de casa." }],
+    };
+    // A team's right hand still names a channel for each agent.
+    const team = await call(f, ctx, PROPOSE_TEAM_TOOL, inDm);
+    expect(team.isError).toBe(true);
+    expect(team.content).toContain("channel: required");
+    expect(await f.db.select().from(schema.messages).where(eq(schema.messages.agentRunId, ctx.runId))).toEqual([]);
+
+    await updateOrgSettings(f.db, f.owner.id, f.org.id, { mode: "personal" });
+    const listed = (await gatewayOf(f).granted(ctx)).find((t) => t.name === PROPOSE_TEAM_TOOL);
+    expect(listed?.description).toContain("Each agent lives in its DM with the person");
+    expect(JSON.stringify(listed?.inputSchema)).toContain("Leave it out: the agent lives in its DM with the person");
+    const out = await call(f, ctx, PROPOSE_TEAM_TOOL, inDm);
+    expect(out.isError).toBeFalsy();
+    expect(out.content).toStartWith("Posted the card of their agents: Clara in its DM, 0 routines, 0 skills.");
+    expect(out.content).not.toContain("#");
+    const card = await cardOf(f, (out.data as { actionCard: { messageId: string } }).actionCard.messageId);
+    expect(card.params.agents.map((a) => a.channel)).toEqual([""]);
+    expect(card.params.newChannels).toEqual([]);
+  });
+
   test("Criar o time makes it all as the clicker, Desfazer takes it back", async () => {
     f = await setup({ rightHand: true });
     const ctx = await lodiRun(f, f.owner.id, "Só o Bruno");

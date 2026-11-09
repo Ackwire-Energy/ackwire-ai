@@ -814,6 +814,22 @@ describe("Aceitar convite", () => {
     expect(screen().getByRole("alert").textContent).toBe("Esse é o seu nome? É igual à senha que você digitou.");
   });
 
+  test("a personal workspace's invitation goes by whose it is, never by its name (ADR 0158)", async () => {
+    await openInvite({ orgName: "Pessoal", mode: "personal" });
+    // On top: whose workspace it is, which already says who invited.
+    const org = document.querySelector(".invite__org")?.textContent ?? "";
+    expect(org).toContain("Workspace de Ana Souza");
+    expect(org).not.toContain("Pessoal");
+    expect(org).not.toContain("Convite de");
+    expect(heading()).toBe("Oi. Ana chamou você para entrar.");
+    expect(lead()).toBe("Para começar: como os agentes devem te chamar?");
+    await type("Seu nome", "Rafael Costa");
+    await press(/^Continuar(?! com)/, 2);
+    expect(lead()).toBe("Com ela você entra agora e nas próximas vezes.");
+    expect(screen().getByRole("button", { name: "Entrar" })).toBeTruthy();
+    expect(document.body.textContent).not.toContain("Pessoal");
+  });
+
   test("an account with a password: only its password, Esqueci a senha in place, its provider too; then in", async () => {
     let tries = 0;
     const { auth, calls } = createFakeAuth();
@@ -958,6 +974,17 @@ describe("Aceitar convite", () => {
     expect(lead()).toBe("Este convite já foi usado, em 12 out. É só abrir.");
     await press("Abrir a Acme", 10);
     expect(router.state.location.pathname.startsWith(`/org/${ORG_ID}`)).toBe(true);
+    cleanup();
+
+    // A member of a personal workspace: never its name (ADR 0158).
+    const mine = seedState({ invitationStates: { used: { ...used, orgName: "Pessoal" } } });
+    const membership = mine.me?.organizations[0];
+    if (membership) membership.mode = "personal";
+    await renderApp("/invite/used", { api: createFakeApi(mine) });
+    await settle(4);
+    expect(heading()).toBe("Você já entrou.");
+    expect(screen().getByRole("button", { name: "Abrir" })).toBeTruthy();
+    expect(document.body.textContent).not.toContain("Pessoal");
     cleanup();
 
     // Signed out: signing in on the way.

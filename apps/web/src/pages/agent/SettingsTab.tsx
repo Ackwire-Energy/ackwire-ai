@@ -535,7 +535,8 @@ export function AudienceEditor({ layout = "cards" }: { layout?: "cards" | "rows"
   const dir = useDirectory(org.id);
   const { agent, draft, set, can, errors } = useAgentEdit();
   const ownerId = draft.owner === NO_OWNER ? null : draft.owner;
-  // On a plan (ADR 0059 §5) only its owner lets more people in.
+  // On a plan (ADR 0059 §5) only its owner lets more people in. Here every role is offered, in a personal workspace
+  // too (ADR 0158): its own page keeps the whole choice.
   const onPlan = engineOfBrain(agent.brain?.kind) !== "agent";
   const chooseAudience = (next: AgentAudience) => set("audience", next);
   return (
@@ -551,6 +552,7 @@ export function AudienceEditor({ layout = "cards" }: { layout?: "cards" | "rows"
             agentName={agent.name}
             idPrefix="agp-audience"
             onPlan={onPlan}
+            everyRole
           />
           {errors.audience && (
             <span className="newag__err" role="alert">
@@ -563,7 +565,9 @@ export function AudienceEditor({ layout = "cards" }: { layout?: "cards" | "rows"
       ) : (
         <>
           <span className="agp-chips">
-            <Chip icon="message">{audienceSummary(t, agent, (id) => dir.memberById.get(id)?.name, dir.roleName)}</Chip>
+            <Chip icon="message">
+              {audienceSummary(t, agent, (id) => dir.memberById.get(id)?.name, dir.roleName, org)}
+            </Chip>
           </span>
           <span className="small muted">{t("audience.notListed")}</span>
         </>

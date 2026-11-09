@@ -326,6 +326,11 @@ export function accountRoutes(deps: AppDeps) {
             role: Role,
             kind: z.enum(["email", "link"]),
             invitedBy: z.string().nullable().openapi({ description: "Who invited (their name), when known." }),
+            mode: z.enum(WORKSPACE_MODES).optional().openapi({
+              description:
+                "Who the workspace is for, `team` or `personal` (ADR 0158), so the page speaks of a team or of the " +
+                "person who invited. Absent on one that no longer works.",
+            }),
             logo: z
               .string()
               .optional()

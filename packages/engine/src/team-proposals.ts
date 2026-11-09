@@ -45,6 +45,7 @@ import { bodyCode } from "./run-tools";
 import { SKILL_NAME } from "./skills";
 import { billingHold } from "./standing";
 import { APPROVAL_TTL_MS } from "./tools/gateway";
+import type { JsonSchema } from "./tools/json-schema";
 import type { ToolContext, ToolDefinition, ToolOutput } from "./tools/types";
 import { isPersonalWorkspace } from "./workspace-mode";
 
@@ -878,6 +879,128 @@ const LOOK_SCHEMA = {
 } as const;
 
 /**
+ * What `propose_team` takes. `personal` (ADR 0158): an agent there usually lives in its DM with the person, so its
+ * `channel` may be left out (`checkTeam` and `createTeam` take an empty one) and the examples speak of one person; a
+ * team's right hand names a channel for each agent, as before.
+ */
+function teamSchema(personal: boolean): JsonSchema {
+  const channel = personal
+    ? {
+        type: "string",
+        maxLength: 81,
+        description:
+          "Leave it out: the agent lives in its DM with the person, where its routines report. A channel's name (an existing one, or a new one: lower-case, - or _) only when they asked for a group conversation for it.",
+      }
+    : {
+        type: "string",
+        minLength: 1,
+        maxLength: 81,
+        description: "The channel it lives in, by name (an existing one, or a new one: lower-case, - or _).",
+      };
+  return {
+    type: "object",
+    properties: {
+      lead: {
+        type: "string",
+        minLength: 1,
+        maxLength: 300,
+        description: personal
+          ? "The card's first line, in their language, e.g. '3 agents for your home, your money and your training. You talk to each one in its own chat.'"
+          : "The card's first line, in their language: '3 agentes para a Acme, cada um no seu canal. Você e o Bruno falam com eles por lá.'",
+      },
+      agents: {
+        type: "array",
+        minItems: 1,
+        maxItems: MAX_TEAM_AGENTS,
+        items: {
+          type: "object",
+          properties: {
+            name: { type: "string", minLength: 1, maxLength: 80 },
+            handle: { type: "string", pattern: "^@?[a-z0-9][a-z0-9_-]{1,31}$" },
+            role: { type: "string", maxLength: 200, description: "One or two words: Atendimento, Cobrança, Dev." },
+            line: {
+              type: "string",
+              minLength: 1,
+              maxLength: 300,
+              description: "What it does, one line in their language.",
+            },
+            instructions: { type: "string", maxLength: 50_000, description: "Its standing instructions." },
+            look: LOOK_SCHEMA,
+            channel,
+            routines: {
+              type: "array",
+              maxItems: MAX_ROUTINES_PER_AGENT,
+              items: {
+                type: "object",
+                properties: {
+                  schedule: {
+                    type: "string",
+                    minLength: 1,
+                    maxLength: 300,
+                    description: "5-field cron in the person's time zone: '0 9 * * 1-5' is weekdays at 9.",
+                  },
+                  prompt: { type: "string", minLength: 1, maxLength: 10_000 },
+                  title: { type: "string", maxLength: 120, description: "What it does, short, in their language." },
+                },
+                required: ["schedule", "prompt", "title"],
+                additionalProperties: false,
+              },
+            },
+            first_task: {
+              type: "string",
+              maxLength: 500,
+              description: "A short first thing for it to do today, in their words: typed in its DM, never sent.",
+            },
+          },
+          required: personal ? ["name", "handle", "role", "line"] : ["name", "handle", "role", "line", "channel"],
+          additionalProperties: false,
+        },
+      },
+      skills: {
+        type: "array",
+        maxItems: MAX_TEAM_SKILLS,
+        items: {
+          type: "object",
+          properties: {
+            title: { type: "string", minLength: 1, maxLength: 80, description: "'Tom de voz da Acme'" },
+            line: { type: "string", minLength: 1, maxLength: 200, description: "What it is, one line." },
+            instructions: { type: "string", maxLength: 20_000, description: "The skill itself, in Markdown." },
+            agents: { type: "array", items: { type: "string" }, maxItems: MAX_TEAM_AGENTS },
+          },
+          required: ["title", "line", "agents"],
+          additionalProperties: false,
+        },
+      },
+      approvals: {
+        type: "string",
+        maxLength: 300,
+        description:
+          "What waits for their approval, one line: 'As cobranças do Caio e os merges da Ada esperam a sua aprovação.'",
+      },
+      invite: {
+        type: "array",
+        items: { type: "string", minLength: 1, maxLength: 120 },
+        maxItems: 10,
+        description: personal
+          ? "Only people they asked to bring in (family, someone who helps them), by name or email, to invite once their agents exist."
+          : "The people they said work there, by name or email, to invite once the team exists.",
+      },
+      weekly_check: {
+        type: "boolean",
+        description: personal
+          ? "Add your own weekly look at how their agents did (Fridays at 17h, here). Yes for new agents."
+          : "Add your own weekly check of the team (Fridays at 17h, here). Yes for a new team.",
+      },
+    },
+    required: ["lead", "agents"],
+    additionalProperties: false,
+  };
+}
+
+/** `propose_team` as a personal workspace's right hand reads it (ADR 0158): its agents may go without a channel. */
+export const PROPOSE_TEAM_SCHEMA_PERSONAL = teamSchema(true);
+
+/**
  * The right hand's team setup (ADR 0137 §10): `offer_answers` puts tappable answers under a question (each tap is the
  * person's own message; typing works too), and `propose_team` posts the one team card. Only the right hand has them.
  */
@@ -953,104 +1076,7 @@ export function teamTools(deps: {
       description:
         "Propose a whole team with ONE card in this conversation: each agent with its face, name, role, a line on what it does, the channel it lives in (a new channel is created with the team), 1 to 3 routines, plus 1 or 2 skills, a line on what waits for the person's approval and your own weekly check. Whoever may create agents creates it all in one click ('Criar o time'), adjusts an agent first or dismisses it. Use it to start or rebuild a team (2 to 4 agents usually), never one propose_agent card per agent then. Nothing exists until they click: never say it does. A newer team card here replaces the open one.",
       scope: "setup:write",
-      inputSchema: {
-        type: "object",
-        properties: {
-          lead: {
-            type: "string",
-            minLength: 1,
-            maxLength: 300,
-            description:
-              "The card's first line, in their language: '3 agentes para a Acme, cada um no seu canal. Você e o Bruno falam com eles por lá.'",
-          },
-          agents: {
-            type: "array",
-            minItems: 1,
-            maxItems: MAX_TEAM_AGENTS,
-            items: {
-              type: "object",
-              properties: {
-                name: { type: "string", minLength: 1, maxLength: 80 },
-                handle: { type: "string", pattern: "^@?[a-z0-9][a-z0-9_-]{1,31}$" },
-                role: { type: "string", maxLength: 200, description: "One or two words: Atendimento, Cobrança, Dev." },
-                line: {
-                  type: "string",
-                  minLength: 1,
-                  maxLength: 300,
-                  description: "What it does, one line in their language.",
-                },
-                instructions: { type: "string", maxLength: 50_000, description: "Its standing instructions." },
-                look: LOOK_SCHEMA,
-                channel: {
-                  type: "string",
-                  minLength: 1,
-                  maxLength: 81,
-                  description: "The channel it lives in, by name (an existing one, or a new one: lower-case, - or _).",
-                },
-                routines: {
-                  type: "array",
-                  maxItems: MAX_ROUTINES_PER_AGENT,
-                  items: {
-                    type: "object",
-                    properties: {
-                      schedule: {
-                        type: "string",
-                        minLength: 1,
-                        maxLength: 300,
-                        description: "5-field cron in the person's time zone: '0 9 * * 1-5' is weekdays at 9.",
-                      },
-                      prompt: { type: "string", minLength: 1, maxLength: 10_000 },
-                      title: { type: "string", maxLength: 120, description: "What it does, short, in their language." },
-                    },
-                    required: ["schedule", "prompt", "title"],
-                    additionalProperties: false,
-                  },
-                },
-                first_task: {
-                  type: "string",
-                  maxLength: 500,
-                  description: "A short first thing for it to do today, in their words: typed in its DM, never sent.",
-                },
-              },
-              required: ["name", "handle", "role", "line", "channel"],
-              additionalProperties: false,
-            },
-          },
-          skills: {
-            type: "array",
-            maxItems: MAX_TEAM_SKILLS,
-            items: {
-              type: "object",
-              properties: {
-                title: { type: "string", minLength: 1, maxLength: 80, description: "'Tom de voz da Acme'" },
-                line: { type: "string", minLength: 1, maxLength: 200, description: "What it is, one line." },
-                instructions: { type: "string", maxLength: 20_000, description: "The skill itself, in Markdown." },
-                agents: { type: "array", items: { type: "string" }, maxItems: MAX_TEAM_AGENTS },
-              },
-              required: ["title", "line", "agents"],
-              additionalProperties: false,
-            },
-          },
-          approvals: {
-            type: "string",
-            maxLength: 300,
-            description:
-              "What waits for their approval, one line: 'As cobranças do Caio e os merges da Ada esperam a sua aprovação.'",
-          },
-          invite: {
-            type: "array",
-            items: { type: "string", minLength: 1, maxLength: 120 },
-            maxItems: 10,
-            description: "The people they said work there, by name or email, to invite once the team exists.",
-          },
-          weekly_check: {
-            type: "boolean",
-            description: "Add your own weekly check of the team (Fridays at 17h, here). Yes for a new team.",
-          },
-        },
-        required: ["lead", "agents"],
-        additionalProperties: false,
-      },
+      inputSchema: teamSchema(false),
       async execute(input, ctx) {
         try {
           const at = await cardPlace(ctx);
@@ -1078,10 +1104,13 @@ export function teamTools(deps: {
             forUserId,
           );
           const routines = params.agents.reduce((n, a) => n + a.routines.length, 0) + (params.weekly ? 1 : 0);
-          return {
-            content: `Posted the team card: ${params.agents.map((a) => `${a.name} in #${a.channel}`).join(", ")}${params.newChannels.length ? ` (new: ${params.newChannels.map((c) => `#${c}`).join(", ")})` : ""}, ${routines} routines, ${params.skills.length} skills. Nothing exists until a person clicks 'Criar o time': you'll be told. Say in one short line that it is ready to review.`,
-            data: { actionCard: { messageId: message.id } },
-          };
+          const where = params.agents.map((a) => `${a.name} ${livesIn(a)}`).join(", ");
+          const made = `${where}${params.newChannels.length ? ` (new: ${params.newChannels.map((c) => `#${c}`).join(", ")})` : ""}, ${routines} routines, ${params.skills.length} skills.`;
+          // A personal workspace's card is "Create the agents", for their own agents (ADR 0158).
+          const content = (await isPersonalWorkspace(ctx.db, ctx.orgId))
+            ? `Posted the card of their agents: ${made} Nothing exists until a person creates them from the card: you'll be told. Say in one short line that it is ready to review.`
+            : `Posted the team card: ${made} Nothing exists until a person clicks 'Criar o time': you'll be told. Say in one short line that it is ready to review.`;
+          return { content, data: { actionCard: { messageId: message.id } } };
         } catch (error) {
           return failed(error);
         }

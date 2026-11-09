@@ -4,11 +4,11 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, createFakeApi, ENG_ID, LODI_ID, ORG_ID, seedState, withRightHand } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
-/* A personal workspace's sidebar (ADR 0158): the person on top, Go to… as a row, no foot, Routines and Drive in
-   sight, the agents first, no people or #general while the person is alone. */
+/* A personal workspace's sidebar (ADR 0158): the person on top, the agents with no header and New agent under them,
+   group conversations and people only when there are some, one More at the end with Início, Go to… and every tool. */
 
 afterEach(() => {
   cleanup();
@@ -37,11 +37,6 @@ const click = async (el: Element) => {
 };
 const nav = () => document.getElementById("app-nav") as HTMLElement;
 const top = () => nav().querySelector(".sidebar__top") as HTMLElement;
-/** The tools' links in the list, under Início. */
-const listed = () =>
-  [...nav().querySelectorAll(".sidebar__tools > a.sidebar__item .sidebar__item-label")]
-    .map((l) => l.textContent)
-    .slice(1);
 const blocks = () => [...nav().querySelectorAll<HTMLElement>(".sidebar__block")].map((b) => b.dataset.section);
 const channelRows = () =>
   [...nav().querySelectorAll('.sidebar__item[data-kind="channel"] .sidebar__item-label')].map((l) => l.textContent);
@@ -81,25 +76,23 @@ describe("a personal workspace's sidebar", () => {
     expect(menu.textContent).toContain("Seus workspaces");
   });
 
-  test("Go to… is the list's first row, above Início; no ⌘K field on top", async () => {
+  test("no tool in sight while nothing waits; one More at the end with Início, Go to… and every tool", async () => {
     await go(personal());
-    const first = nav().querySelector(".sidebar__tools > .sidebar__item");
-    expect(first?.classList.contains("sidebar__goto")).toBe(true);
-    expect(first?.querySelector(".sidebar__item-label")?.textContent).toBe("Ir para…");
+    expect(nav().querySelector(".sidebar__tools")).toBeNull();
     expect(nav().querySelector(".sidebar__jump")).toBeNull();
-  });
-
-  test("Rotinas and Drive in sight; the rest in More, each with its line for one person", async () => {
-    await go(personal());
-    expect(listed()).toEqual(["Rotinas", "Drive"]);
-    await click(within(nav()).getByRole("button", { name: "Mais" }));
-    const more = screen().getByRole("dialog", { name: "Mais" });
-    const names = within(more)
+    const more = nav().querySelector(".sidebar__end .sidebar__more") as HTMLElement;
+    expect(more).not.toBeNull();
+    await click(more);
+    const menu = screen().getByRole("dialog", { name: "Mais" });
+    const names = within(menu)
       .getAllByRole("link")
       .map((l) => l.querySelector(".ac-menu__label")?.firstChild?.textContent);
     expect(names).toEqual([
+      "Início",
       "Aprovações",
       "Propostas de melhoria",
+      "Rotinas",
+      "Drive",
       "Calendário",
       "Tarefas",
       "Threads",
@@ -108,13 +101,44 @@ describe("a personal workspace's sidebar", () => {
       "Painéis",
       "Gerenciador de tarefas",
     ]);
-    const tasks = within(more).getByRole("link", { name: /Tarefas/ });
+    expect(within(menu).getByRole("button", { name: /Ir para…/ })).toBeTruthy();
+    const tasks = within(menu).getByRole("link", { name: /Tarefas/ });
     expect(tasks.querySelector(".ac-menu__desc")?.textContent).toBe("Suas tarefas e as dos seus agentes");
+  });
+
+  test("Aprovações comes into sight while something waits", async () => {
+    const state = personal();
+    const first = state.approvals[0];
+    if (first) first.status = "pending";
+    await go(state);
+    const rows = [...nav().querySelectorAll(".sidebar__tools .sidebar__item-label")].map((l) => l.textContent);
+    expect(rows).toEqual(["Aprovações"]);
+  });
+
+  test("the agents have no header; New agent sits right under them and asks what it should do", async () => {
+    const state = withRightHand(personal());
+    await go(state);
+    const agents = nav().querySelector('.sidebar__block[data-section="agents"]') as HTMLElement;
+    expect(agents.querySelector(".sidebar__section-toggle")).toBeNull();
+    const rows = [...agents.querySelectorAll(".sidebar__item")];
+    const last = rows.at(-1) as HTMLElement;
+    expect(last.classList.contains("sidebar__new-agent")).toBe(true);
+    expect(last.textContent).toBe("Novo agente");
+    await click(last);
+    const dialog = screen().getByRole("dialog", { name: "O que o seu novo agente vai fazer?" });
+    await click(within(dialog).getByRole("button", { name: "Agenda" }));
+    const field = within(dialog).getByRole("textbox") as HTMLTextAreaElement;
+    expect(field.value).toBe("Organizar minha agenda e me lembrar dos compromissos");
+    await click(within(dialog).getByRole("button", { name: "Criar com o Lodi" }));
+    const sent = state.calls.find((c) => c.method === "chat.post");
+    expect(sent).toBeTruthy();
+    expect(JSON.stringify(sent?.args)).toContain("Quero um agente novo: Organizar minha agenda");
+    expect(state.calls.some((c) => c.method === "dms.open" && JSON.stringify(c.args).includes(LODI_ID))).toBe(true);
   });
 
   test("the agents come first; channels are Conversas em grupo; with someone else in, people and #general show", async () => {
     await go(personal());
-    expect(blocks()).toEqual(["tools", "agents", "channels", "people"]);
+    expect(blocks()).toEqual(["agents", "channels", "people"]);
     const toggles = [...nav().querySelectorAll(".sidebar__section-toggle")].map((b) => b.textContent);
     expect(toggles).toContain("Conversas em grupo");
     expect(toggles).toContain("Mensagens diretas");
@@ -123,7 +147,7 @@ describe("a personal workspace's sidebar", () => {
 
   test("alone: no people and no #general; the channels show while there is another one", async () => {
     await go(personal({ alone: true }));
-    expect(blocks()).toEqual(["tools", "agents", "channels"]);
+    expect(blocks()).toEqual(["agents", "channels"]);
     expect(channelRows()).toEqual(["eng"]);
   });
 
@@ -131,12 +155,12 @@ describe("a personal workspace's sidebar", () => {
     const state = personal({ alone: true });
     state.channels = state.channels.filter((c) => c.name === "general");
     await go(state, `dm/agent/${ADA_ID}`);
-    expect(blocks()).toEqual(["tools", "agents"]);
+    expect(blocks()).toEqual(["agents"]);
   });
 
   test("a team's sidebar is as before: the workspace on top, ⌘K under it, me and the bell at the foot", async () => {
     await go(seedState());
-    expect(nav().querySelector(".sidebar__goto")).toBeNull();
+    expect(nav().querySelector(".sidebar__end")).toBeNull();
     expect(nav().querySelector(".sidebar__jump")).not.toBeNull();
     expect(nav().querySelector(".sidebar__foot .sidebar__bell")).not.toBeNull();
     expect(blocks()).toEqual(["tools", "channels", "agents", "people"]);

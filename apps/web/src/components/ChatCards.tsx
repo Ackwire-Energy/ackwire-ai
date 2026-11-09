@@ -225,7 +225,7 @@ export function InlineProposal({ proposalId }: { proposalId: string }) {
   if (!p) return null;
   const agentName = (id: string) => dir.anyAgent(id)?.name ?? t("channel.unknownAgent");
   const name = agentName(proposerOf(p));
-  const target = proposalTarget(t, p, agentName, org.name);
+  const target = proposalTarget(t, p, agentName, org);
   const text = draft ?? p.after;
   const pending = p.status === "pending" && !p.stale;
   const onError = (e: unknown) =>
@@ -262,7 +262,7 @@ export function InlineProposal({ proposalId }: { proposalId: string }) {
         label={t("inlineProposal.group", { name })}
         mine={p.canDecide}
         waitingFor={rowStatus(t, p) ?? undefined}
-        lead={proposalTitle(t, p, org.name, agentName)}
+        lead={proposalTitle(t, p, org, agentName)}
         object={{
           logo: (
             <RequestTile>
@@ -340,7 +340,7 @@ export function InlineProposal({ proposalId }: { proposalId: string }) {
   return (
     <ProposalDone
       label={t("inlineProposal.group", { name })}
-      what={<b>{proposalTitle(t, p, org.name, agentName)}</b>}
+      what={<b>{proposalTitle(t, p, org, agentName)}</b>}
       rows={[p]}
     >
       {hasDiff(p) ? diff : <SettingChange p={p} />}
@@ -411,7 +411,7 @@ export function ProposalGroup({ proposalIds }: { proposalIds: string[] }) {
   if (!first) return null;
   const agentName = (id: string) => dir.anyAgent(id)?.name ?? t("channel.unknownAgent");
   const proposer = agentName(proposerOf(first));
-  const head = cardHead(t, rows, proposer, agentName, org.name);
+  const head = cardHead(t, rows, proposer, agentName, org);
   const agents = new Set(rows.map((p) => p.agentId)).size;
   const { chosen, all } = chosenRows(rows, off);
   const decides = rows.some((p) => isOpen(p) && p.canDecide);

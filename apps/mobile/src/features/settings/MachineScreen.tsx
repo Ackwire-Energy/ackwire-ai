@@ -37,6 +37,7 @@ import {
 } from "@agenteschat/client/lib/machines";
 import { can } from "@agenteschat/client/lib/permissions";
 import { helpUrl } from "@agenteschat/client/lib/server";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { countryFlagSvg } from "@agenteschat/ui/brand/flags";
 import { useQueries } from "@tanstack/react-query";
 import { useState } from "react";
@@ -114,7 +115,7 @@ export function MachineScreen({ machineId }: { machineId: string }) {
   }
 
   const managed = m.kind === "managed";
-  const title = computerName(t, org?.name ?? "", m);
+  const title = computerName(t, org?.name ?? "", m, isPersonal(org));
   const paused = pauseText(t, i18n.language, m.paused);
   const askRemove = () => {
     const host = m.kind === "host";

@@ -1,4 +1,4 @@
-import { keys, useApi, useMe } from "@agenteschat/client";
+import { keys, useApi, useMe, type WorkspaceMode } from "@agenteschat/client";
 import { settingUp } from "@agenteschat/client/lib/guards";
 import { finishOnboarding } from "@agenteschat/client/lib/right-hand";
 import { useQueryClient } from "@tanstack/react-query";
@@ -8,7 +8,7 @@ import { Modal, Pressable, StyleSheet, View } from "react-native";
 import { signOut } from "@/features/account";
 import { authClient } from "@/lib/auth";
 import { useOrgGate } from "@/providers/org";
-import { Button, LineIcon, Locked, Text, useTheme } from "@/ui";
+import { Button, LineIcon, Locked, OptionTile, Text, useTheme } from "@/ui";
 import { AuthField } from "@/ui/auth/AuthField";
 import { AuthLink } from "@/ui/auth/AuthLink";
 import { AuthScaffold, CENTER } from "@/ui/auth/AuthScaffold";
@@ -18,16 +18,18 @@ import { chatHref } from "../links/logic";
 import { openWebPath } from "../links/open-web";
 import { ZoneList } from "../me/AccountPage";
 import { chooseAction } from "../settings/parts";
-import { orgNameFromEmail, phoneTimezone, stepFailedText, zoneLabel } from "./logic";
+import { orgNameFromEmail, PURPOSES, phoneTimezone, stepFailedText, workspaceAnswer, zoneLabel } from "./logic";
 
 /**
- * The first run on the phone, signed in with no workspace to open yet: one question on the sign-in's own screen, the
- * workspace's name (its time zone from the phone, said in one line; its logo later, in Configurações), the keyboard's
- * return key as the action; then the right hand's DM, where the rest of the setup happens (ADR 0137), as on the web.
- * A workspace still being set up (an older onboarding left at any step, here or on the web) is finished and opened
- * there, never a second one. Nothing destructive lives here: leaving the account is a quiet line, deleting it stays
- * on the website. `onLeave`: opened over a workspace being deleted, or from Adicionar workspace (ADR 0154), it goes
- * back until a new one is made; `another`: the name of the workspace the person is still in meanwhile.
+ * The first run on the phone, signed in with no workspace to open yet, on the sign-in's own screen: what the workspace
+ * is for (ADR 0158), two choices and Continue; "For me" makes a personal workspace at once, named in the person's
+ * language with the phone's time zone. A company or team then names it (its time zone from the phone, said in one
+ * line; its logo later, in Settings), the keyboard's return key as the action. Then the right hand's DM, where the rest
+ * of the setup happens (ADR 0137), as on the web. A workspace still being set up (an older onboarding left at any
+ * step, here or on the web) is finished and opened there, never a second one. Nothing destructive lives here: leaving
+ * the account is a quiet line, deleting it stays on the website. `onLeave`: opened over a workspace being deleted, or
+ * from Add workspace (ADR 0154), which asks the same question, it goes back until a new one is made; `another`: the
+ * name of the workspace the person is still in meanwhile.
  */
 export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; another?: string | null } = {}) {
   const { t, i18n } = useTranslation();
@@ -37,6 +39,9 @@ export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; ano
   const me = useMe();
   const { colors: c } = useTheme();
   const [created, setCreated] = useState<string | null>(null);
+  // Who it is for, then, for a team, its name: one question at a time.
+  const [purpose, setPurpose] = useState<WorkspaceMode | null>(null);
+  const [step, setStep] = useState<"purpose" | "name">("purpose");
   const [name, setName] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -85,9 +90,11 @@ export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; ano
 
   const save = () =>
     run(async () => {
+      // "For me" asks no name: the word for it in the person's language; a company or team, the name typed.
+      const answer = workspaceAnswer(t, purpose ?? "team", orgName);
       let orgId = created;
       if (!orgId) {
-        const res = await api.orgs.create({ name: orgName });
+        const res = await api.orgs.create(answer);
         orgId = res.organization.id;
         setCreated(orgId);
         await Promise.all([
@@ -95,7 +102,8 @@ export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; ano
           zone ? api.orgs.updateMe(orgId, { timezone: zone }) : null,
         ]).catch(() => undefined);
       } else {
-        await api.orgs.updateSettings(orgId, { name: orgName });
+        // Made here already (a step after it failed): the answer as it is now, the mode included.
+        await api.orgs.updateSettings(orgId, answer);
       }
       await open(orgId);
     });
@@ -134,19 +142,45 @@ export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; ano
   const submit = () => {
     if (orgName && !pending) void save();
   };
+  // Continue on the first question: "For me" makes the workspace now; a company or team names it first.
+  const next = () => {
+    if (!purpose || pending) return;
+    if (purpose === "team") setStep("name");
+    else void save();
+  };
+  const naming = step === "name";
 
   return (
     <AuthScaffold
       sky="low"
-      title={another ? t("mobile.onb.anotherTitle") : t("onboarding.workspace.title")}
+      stepKey={step}
+      title={
+        naming
+          ? another
+            ? t("mobile.onb.anotherTitle")
+            : t("onboarding.workspace.title")
+          : another
+            ? t("mobile.onb.anotherPurpose")
+            : t("onboarding.purpose.title")
+      }
       subtitle={
         another
           ? t("mobile.onb.anotherLead", { org: another })
-          : suggested && name === suggested
-            ? t("mobile.onb.suggested", { domain: email.split("@")[1] ?? "", org: suggested })
-            : t("onboarding.workspace.lead")
+          : !naming
+            ? t("onboarding.purpose.lead")
+            : suggested && name === suggested
+              ? t("mobile.onb.suggested", { domain: email.split("@")[1] ?? "", org: suggested })
+              : t("onboarding.workspace.lead")
       }
-      onBack={onLeave && !created ? onLeave : undefined}
+      onBack={
+        naming
+          ? () => {
+              if (!pending) setStep("purpose");
+            }
+          : onLeave && !created
+            ? onLeave
+            : undefined
+      }
       agentMode={pending ? "run" : "idle"}
       // Nothing destroys on screen: until a workspace is set up this is the only screen, so the way out of the account
       // is one quiet "Sair", which offers Sair and, in red, Apagar conta in the system's list (a person must always
@@ -173,35 +207,83 @@ export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; ano
         )
       }
     >
-      <Locked when={pending} keepKeyboard style={{ gap: 8 }}>
-        <AuthField
-          // Mounted again once the suggestion lands, so its focus selects it (`selectTextOnFocus`).
-          key={suggested ? "suggested" : "empty"}
-          value={name}
-          onChangeText={(value) => {
-            setName(value);
-            setError(null);
-          }}
-          placeholder={t("onboarding.workspace.namePlaceholder")}
-          accessibilityLabel={t("onboarding.workspace.name")}
-          autoCapitalize="words"
-          autoCorrect={false}
-          // The keyboard's blue key is the action ("continuar"); gray until a name is typed.
-          returnKeyType="go"
-          enablesReturnKeyAutomatically
-          onSubmitEditing={submit}
-          // The suggested name comes selected: one keystroke replaces it, the blue key keeps it.
-          selectTextOnFocus={Boolean(suggested)}
-          autoFocus
-        />
-      </Locked>
+      {naming ? (
+        <Locked when={pending} keepKeyboard style={{ gap: 8 }}>
+          <AuthField
+            // Mounted again once the suggestion lands, so its focus selects it (`selectTextOnFocus`).
+            key={suggested ? "suggested" : "empty"}
+            value={name}
+            onChangeText={(value) => {
+              setName(value);
+              setError(null);
+            }}
+            placeholder={t("onboarding.workspace.namePlaceholder")}
+            accessibilityLabel={t("onboarding.workspace.name")}
+            autoCapitalize="words"
+            autoCorrect={false}
+            // The keyboard's blue key is the action ("continuar"); gray until a name is typed.
+            returnKeyType="go"
+            enablesReturnKeyAutomatically
+            onSubmitEditing={submit}
+            // The suggested name comes selected: one keystroke replaces it, the blue key keeps it.
+            selectTextOnFocus={Boolean(suggested)}
+            autoFocus
+          />
+        </Locked>
+      ) : (
+        // The first question (ADR 0158): two raised choices, the picked one sunk with its check, then Continue.
+        <Locked when={pending} style={styles.purposes}>
+          {PURPOSES.map((mode) => {
+            const on = purpose === mode;
+            const title = t(`onboarding.purpose.${mode}`);
+            const text = t(`onboarding.purpose.${mode}Text`);
+            return (
+              <OptionTile
+                key={mode}
+                pressed={on}
+                label={`${title}. ${text}`}
+                onPress={() => {
+                  setPurpose(mode);
+                  setError(null);
+                }}
+              >
+                <View style={styles.tile}>
+                  <LineIcon
+                    name={mode === "personal" ? "person" : "members"}
+                    size={20}
+                    color={c.ink2}
+                    variant="subhead"
+                  />
+                  <View style={[styles.grow, on && styles.room]}>
+                    <Text variant="subhead" tone="ink" style={styles.bold}>
+                      {title}
+                    </Text>
+                    <Text variant="small" tone="muted">
+                      {text}
+                    </Text>
+                  </View>
+                </View>
+              </OptionTile>
+            );
+          })}
+          <Button
+            variant="primary"
+            wide
+            label={t("onboarding.actions.continue")}
+            loading={pending}
+            disabled={!purpose}
+            onPress={next}
+          />
+        </Locked>
+      )}
       {error ? (
         <Text variant="small" tone="danger" accessibilityLiveRegion="polite" style={CENTER}>
           {error}
         </Text>
       ) : null}
-      {/* The keyboard's blue key is the only action, as on the sign-in; the agent above works while it saves. */}
-      {zone ? (
+      {/* Naming it, the keyboard's blue key is the only action, as on the sign-in; the agent above works while it
+          saves. "For me" uses the phone's zone without a word (changed in Settings like any other). */}
+      {naming && zone ? (
         <Pressable
           onPress={() => setPickingZone(true)}
           disabled={pending}
@@ -292,6 +374,12 @@ const styles = StyleSheet.create({
   wait: { alignItems: "center", justifyContent: "center", gap: 12, padding: 24 },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
+  // The first question's choices, 8 apart, Continue under them on the same rhythm.
+  purposes: { gap: 8 },
+  // A choice's icon on its title's line, the words beside it.
+  tile: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
+  // Room for the check in the chosen tile's corner.
+  room: { paddingRight: 22 },
   note: { flexDirection: "row", alignItems: "flex-start", gap: 8, paddingTop: 8 },
   zone: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingTop: 8, maxWidth: "100%" },
   shrink: { flexShrink: 1 },

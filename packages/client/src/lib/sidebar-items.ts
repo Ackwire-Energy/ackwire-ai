@@ -31,8 +31,9 @@ export const SIDEBAR_DEFAULTS: Record<SidebarItem, SidebarPlace> = {
 };
 
 /**
- * The same in a personal workspace (ADR 0158): Routines and Drive in sight, Approvals while something waits, the rest
- * in More. Only what is in sight changes: every tool is still one click away, and a choice the person made still wins.
+ * The same in a personal workspace (ADR 0158): the sidebar is the person's conversations, so every tool starts in More
+ * and only Approvals comes into sight, while something waits. Only what is in sight changes: every tool is still one
+ * click away, and a choice the person made still wins.
  */
 export const PERSONAL_SIDEBAR_DEFAULTS: Record<SidebarItem, SidebarPlace> = {
   approvals: "auto",
@@ -40,8 +41,8 @@ export const PERSONAL_SIDEBAR_DEFAULTS: Record<SidebarItem, SidebarPlace> = {
   threads: "more",
   issues: "more",
   wiki: "more",
-  drive: "always",
-  routines: "always",
+  drive: "more",
+  routines: "more",
   calendar: "more",
   team: "more",
   dashboards: "more",
@@ -53,7 +54,7 @@ export const sidebarDefaults = (personal = false) => (personal ? PERSONAL_SIDEBA
 
 /**
  * The tools' default order in a personal workspace (mirrors `PERSONAL_SIDEBAR_ITEMS`, packages/engine/src/
- * sidebar-items.ts): what waits for the person first, as in a team's, then Routines and Drive, then what More holds.
+ * sidebar-items.ts): what waits for the person first, as in a team's, then Routines and Drive, the ones they use most.
  */
 export const PERSONAL_SIDEBAR_ITEMS: readonly SidebarItem[] = [
   "approvals",

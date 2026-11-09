@@ -434,6 +434,11 @@ export interface InvitationPreview {
   /** Who invited (their name), when known. */
   invitedBy?: string | null;
   /**
+   * Who the workspace is for (ADR 0158): a personal one's page speaks of the person who invited, not of a team or of
+   * its name. Absent from an older server and on one that no longer works: a team's words.
+   */
+  mode?: WorkspaceMode;
+  /**
    * The workspace's logo, served for this invitation or link only (absent without one, or while it is paused or
    * being deleted).
    */

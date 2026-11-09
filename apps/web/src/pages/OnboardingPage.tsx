@@ -5,7 +5,7 @@ import { settingUp } from "@agenteschat/client/lib/guards";
 import { sendsEmail } from "@agenteschat/client/lib/join-requests";
 import { finishOnboarding, RIGHT_HAND_DEFAULT } from "@agenteschat/client/lib/right-hand";
 import { browserTimezone, timezoneName } from "@agenteschat/client/lib/routines";
-import { Button, Field, Icon, Input, Locked, Logo, OptionList } from "@agenteschat/ui";
+import { type AgentAppearance, Button, Field, Icon, Input, Locked, Logo, OptionList } from "@agenteschat/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
@@ -259,18 +259,19 @@ export function OnboardingPage() {
               <div className="onb__answer" key="purpose">
                 <OptionList<WorkspaceMode | "">
                   aria-label={t("onboarding.purpose.title")}
-                  layout="cards"
+                  className="onb-purpose"
                   value={purpose ?? ""}
                   onValueChange={(v) => setPurpose(v || null)}
                   options={PURPOSES.map((mode) => ({
                     value: mode,
-                    leading: (
-                      <span className="audience-card__icon">
-                        <Icon name={mode === "personal" ? "person" : "members"} size={20} />
-                      </span>
-                    ),
+                    leading: <PurposeFaces mode={mode} />,
                     title: t(`onboarding.purpose.${mode}`),
-                    description: t(`onboarding.purpose.${mode}Text`),
+                    description: (
+                      <>
+                        <span>{t(`onboarding.purpose.${mode}Text`)}</span>
+                        <span className="onb-purpose__examples">{t(`onboarding.purpose.${mode}Examples`)}</span>
+                      </>
+                    ),
                   }))}
                 />
                 {unpaidElsewhere && <UnpaidNote orgId={unpaidElsewhere} billing={Boolean(authConfig?.billingUrl)} />}
@@ -407,6 +408,42 @@ export function OnboardingPage() {
 
 /** The two answers to "What will you use agentes.chat for?" (ADR 0158), in this order. */
 const PURPOSES = ["personal", "team"] as const satisfies readonly WorkspaceMode[];
+
+/** Who is in each answer's faces: the person's agents for themselves; people and agents for a team. */
+const PURPOSE_AGENTS: Record<WorkspaceMode, AgentAppearance[]> = {
+  personal: [
+    { color: "violet", eyes: "happy", accessory: "bow" },
+    { color: "green", eyes: "dots", accessory: "cap" },
+    { color: "amber", eyes: "wide", accessory: "headphones" },
+    { color: "rose", eyes: "happy", accessory: "flower" },
+  ],
+  team: [
+    { color: "sky", eyes: "round", accessory: "headset" },
+    { color: "graphite", eyes: "dots", accessory: "antenna" },
+  ],
+};
+const PURPOSE_PEOPLE: Record<WorkspaceMode, number> = { personal: 0, team: 2 };
+
+/**
+ * Who would be in a workspace of this kind, before its answer (ADR 0158): the agents in their own tiles, as everywhere
+ * in the app, a little over each other; people as people's tiles. The chosen answer's agents come alive, the other's
+ * rest (the option list fades an unchosen lead). Decorative: the words say it.
+ */
+function PurposeFaces({ mode }: { mode: WorkspaceMode }) {
+  return (
+    <span className="onb-purpose__faces" aria-hidden="true">
+      {Array.from({ length: PURPOSE_PEOPLE[mode] }, (_, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: fixed, decorative placeholders
+        <span key={i} className="ac-avatar ac-avatar--framed onb-purpose__person">
+          <Icon name="person" size={18} />
+        </span>
+      ))}
+      {PURPOSE_AGENTS[mode].map((look, i) => (
+        <AgentAvatar key={`${mode}-${look.color}`} name={`${mode}-${i}`} appearance={look} size="md" />
+      ))}
+    </span>
+  );
+}
 
 /** Owning a workspace that waits for its first plan: said in place, with the way to that plan. */
 function UnpaidNote({ orgId, billing }: { orgId: string; billing: boolean }) {

@@ -12595,15 +12595,59 @@ html:not([data-pointer]) .sidebar__bell:focus-visible {
   height: var(--control-h-md);
   border-radius: var(--control-r-md);
 }
-/* Go to… as the list's first row in a personal workspace: its ⌘K quiet at the row's end, gone in the rail with the
-   rows' other ends (`.sidebar__item-meta`). */
+/* A personal workspace's end (ADR 0158): one More pinned under the list, where a team's foot is, with no line. */
+.sidebar__end {
+  flex: none;
+  padding-top: var(--space-2);
+}
+/*
+ * New agent under a personal workspace's agents: an empty face the exact box of the agents' (32 in the list, 28 on the
+ * rail, radius 30% of the side, the tile's hairline), so the row lines up with theirs; its name centres on it like a
+ * name alone.
+ */
+.sidebar__new-agent-face {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 30%;
+  background: var(--plate-soft, var(--plate));
+  /* The tile's own edge (`.ac-avatar--framed::before`): the hairline and the faint top highlight. */
+  box-shadow:
+    inset 0 0 0 1px var(--line),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  color: var(--muted);
+}
+[data-theme="dark"] .sidebar__new-agent-face {
+  box-shadow:
+    inset 0 0 0 1px var(--line),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+.sidebar:not([data-rail="true"]) .sidebar__new-agent-face {
+  width: 32px;
+  height: 32px;
+}
+.sidebar:not([data-rail="true"]) .sidebar__new-agent {
+  padding-block: 8px;
+  color: var(--muted);
+}
+.sidebar__new-agent:hover,
+.sidebar__new-agent:focus-visible {
+  color: var(--ink);
+}
+.sidebar__new-agent:hover .sidebar__new-agent-face {
+  color: var(--ink);
+}
+/* Go to… in a personal workspace's More (ADR 0158): its ⌘K quiet at the line's end. */
 .sidebar__goto-keys {
   display: inline-flex;
   flex: none;
+  margin-left: auto;
   gap: 2px;
   max-width: none;
 }
-.sidebar__goto .ac-kbd {
+.sidebar__more-item .sidebar__goto-keys .ac-kbd {
   color: var(--faint);
 }
 /* "Personalizar a barra lateral": a line per tool, the choices of every line starting in one column. */

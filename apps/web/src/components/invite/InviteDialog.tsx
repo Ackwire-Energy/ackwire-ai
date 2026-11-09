@@ -10,11 +10,13 @@ import {
   useRoles,
   useWorkspaceLimits,
 } from "@agenteschat/client";
+import { modeOf } from "@agenteschat/client/lib/audience";
 import { capitalize, joinNames, namesText } from "@agenteschat/client/lib/format";
 import { INVITE_NOTE_MAX, sendsEmail } from "@agenteschat/client/lib/join-requests";
 import { membersFull } from "@agenteschat/client/lib/limits";
 import { can } from "@agenteschat/client/lib/permissions";
 import { personalHelperRole } from "@agenteschat/client/lib/personal-view";
+import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { everyoneOf, isEveryone, roleSummary, sortRoles } from "@agenteschat/client/lib/roles";
 import { playSound } from "@agenteschat/client/lib/sounds";
 import { addressesIn, isEmail } from "@agenteschat/client/lib/text";
@@ -40,6 +42,7 @@ import { Link } from "@tanstack/react-router";
 import {
   type CSSProperties,
   createContext,
+  Fragment,
   type ReactNode,
   type RefObject,
   useCallback,
@@ -240,8 +243,9 @@ function InviteDialog({ request, open, onClose }: { request: InviteRequest; open
   const joinRequests = useJoinRequests(org.id, open && screen === "link");
 
   const everyone = everyoneOf(orgRoles);
-  // Personal: uses the agents (a member) or helps run it (the workspace's Admin, when this person may give it); the
-  // roles themselves, and what each one may do, stay as they are (Roles and permissions, under Advanced).
+  // Personal: uses the agents (a member) or helps run it (the workspace's Admin, when this person may give it), then
+  // any other role this person may give, by its own name (a new workspace has none); the roles themselves, and what
+  // each one may do, stay as they are (Roles and permissions, under Advanced).
   const helper = personal ? personalHelperRole(orgRoles) : null;
   const plain = (value: string, r: OrgRole | null, words: "uses" | "helps") => ({
     value,
@@ -249,17 +253,15 @@ function InviteDialog({ request, open, onClose }: { request: InviteRequest; open
     description: t(`members.dialog.role.${words}Text`),
     role: r,
   });
+  const givable = sortRoles(orgRoles.filter((r) => !isEveryone(r) && r.givable && r.id !== helper?.id)).map((r) => ({
+    value: r.id,
+    label: r.name,
+    description: roleSummary(t, i18n.language, r, everyone),
+    role: r,
+  }));
   const choices: { value: string; label: string; description: string; role: OrgRole | null }[] = personal
-    ? [plain(MEMBER, null, "uses"), ...(helper ? [plain(helper.id, helper, "helps")] : [])]
-    : [
-        { value: MEMBER, label: t("roles.member"), description: t("members.chips.memberHint"), role: null },
-        ...sortRoles(orgRoles.filter((r) => !isEveryone(r) && r.givable)).map((r) => ({
-          value: r.id,
-          label: r.name,
-          description: roleSummary(t, i18n.language, r, everyone),
-          role: r,
-        })),
-      ];
+    ? [plain(MEMBER, null, "uses"), ...(helper ? [plain(helper.id, helper, "helps")] : []), ...givable]
+    : [{ value: MEMBER, label: t("roles.member"), description: t("members.chips.memberHint"), role: null }, ...givable];
   const roleOptions = choices.map(({ value, label, description }) => ({ value, label, description }));
   // A role no longer there (or no longer this person's to give) reads as Membro.
   const known = (id: string | undefined) => (id && choices.some((c) => c.value === id) ? id : MEMBER);
@@ -276,6 +278,9 @@ function InviteDialog({ request, open, onClose }: { request: InviteRequest; open
     ? STEPS.filter((s) => (s !== "role" || choices.length > 1) && (s !== "where" || offered.length > 1))
     : STEPS;
   const index = steps.indexOf(screen as Step);
+  // Which agents answer whoever joins a personal workspace: said on the role step, or on the first one when there is
+  // no role to choose.
+  const reach = personal && <InviteReach onOpen={onClose} />;
 
   const next = () => {
     if (screen === "who") {
@@ -450,6 +455,7 @@ function InviteDialog({ request, open, onClose }: { request: InviteRequest; open
       <>
         <MembersFull />
         <OnlyYouNote orgId={org.id} viewerId={me.user.id} />
+        {!steps.includes("role") && reach}
         <label className="ac-visually-hidden" htmlFor="invite-dialog-emails">
           {t("members.dialog.emails")}
         </label>
@@ -520,6 +526,7 @@ function InviteDialog({ request, open, onClose }: { request: InviteRequest; open
           <Icon name="chevronRight" size={16} />
           {t(modeKey(org, "members.dialog.role.same"))}
         </button>
+        {reach}
       </>
     ) : (
       <>
@@ -550,6 +557,7 @@ function InviteDialog({ request, open, onClose }: { request: InviteRequest; open
             {t(modeKey(org, "members.dialog.role.each"))}
           </button>
         )}
+        {reach}
       </>
     );
   else if (screen === "where")
@@ -873,6 +881,51 @@ function RoleSeal({ role }: { role: OrgRole | null }) {
   );
 }
 
+/** How many agents the reach line names, before "N more". */
+const REACH_NAMED = 4;
+
+/**
+ * Which agents will answer whoever joins a personal workspace (ADR 0158 §4): the ones every member may talk to,
+ * besides the right hand, each name a way to its "Who can talk" to change it. Read only: nothing here changes an
+ * agent. Nothing when none does.
+ */
+function InviteReach({ onOpen }: { onOpen: () => void }) {
+  const { t, i18n } = useTranslation();
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  const open = dir.agents.filter((a) => !isRightHand(a) && modeOf(a) === "everyone");
+  if (open.length === 0) return null;
+  const named = open.slice(0, REACH_NAMED);
+  const more = open.length - named.length;
+  const words = [...named.map((a) => a.name), ...(more > 0 ? [t("notifications.namesMore", { count: more })] : [])];
+  let next = 0;
+  const names = new Intl.ListFormat(i18n.language).formatToParts(words).map((p, k) => {
+    const a = p.type === "element" ? named[next++] : undefined;
+    return a ? (
+      <Link
+        key={a.id}
+        to="/org/$orgId/agents/$agentId"
+        params={{ orgId: org.id, agentId: a.id }}
+        search={{ tab: "settings", sec: "audience" }}
+        onClick={onOpen}
+      >
+        {a.name}
+      </Link>
+    ) : (
+      // biome-ignore lint/suspicious/noArrayIndexKey: separators and "N more" have no identity of their own
+      <Fragment key={k}>{p.value}</Fragment>
+    );
+  });
+  return (
+    <p className="setup-line ac-iconline">
+      <Icon name="audienceEveryone" size={14} />
+      <span>
+        <Trans i18nKey="members.dialog.reach.line" count={open.length} components={{ agents: <>{names}</> }} />
+      </span>
+    </p>
+  );
+}
+
 /**
  * The invitation email as it arrives, in the words the server sends it in (the `invitation` template,
  * packages/engine/src/email.ts): who sent it and to whom, the subject, the headline, who invites to which workspace,
@@ -988,8 +1041,8 @@ export function InviteOfferRow({ email, channel, onPick }: { email: string; chan
         <Icon name="mail" />
       </span>
       {channel.name === "general"
-        ? t("channelMembers.inviteOrg", { email, org: org.name })
-        : t("channelMembers.invite", { email, org: org.name, channel: channel.name })}
+        ? t(modeKey(org, "channelMembers.inviteOrg"), { email, org: org.name })
+        : t(modeKey(org, "channelMembers.invite"), { email, org: org.name, channel: channel.name })}
     </button>
   );
 }

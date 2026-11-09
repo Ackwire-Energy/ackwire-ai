@@ -129,6 +129,7 @@ import { useAgentMenu, useChannelMenu, usePersonMenu } from "./entity-menus";
 import { useInviteDialog } from "./invite/InviteDialog";
 import { useNow } from "./missions/MissionBits";
 import { COMPACT_QUERY, useMediaQuery, useNavDrawer } from "./NavDrawer";
+import { NewAgentAsk } from "./NewAgentAsk";
 import { NewChannelDialog } from "./NewChannelDialog";
 import { OpenOnPhoneDialog } from "./OpenOnPhone";
 import { useOrg } from "./org-context";
@@ -326,6 +327,10 @@ export function Sidebar() {
   const rightHand = dir.agents.find((a) => isRightHand(a) && a.canTalk !== false);
   const dmOf = new Map((dms.data ?? []).map((d) => [d.with.id, d]));
   const rightHandDm = rightHand ? dmOf.get(rightHand.id) : undefined;
+  // New agent in a personal workspace (ADR 0158): one question, what it should do, and the right hand proposes it.
+  const [askingAgent, setAskingAgent] = useState(false);
+  const newAgent = () =>
+    rightHand ? setAskingAgent(true) : void navigate({ to: "/org/$orgId/agents/new", params: { orgId } });
   const sections = useSidebarSections(me.user.id, orgId);
   // "Fixar no topo": pinned rows sit on top of their own section, above a thin line.
   const pinned = useSidebarPins();
@@ -535,26 +540,57 @@ export function Sidebar() {
     { kind: "separator" },
     sectionOrder.restore,
   ]);
+  // The agents' rows, under the Agentes header in a team's workspace and with none in a personal one (ADR 0158).
+  const agentRows = (
+    <>
+      {rightHand && (
+        <RightHandRow
+          agent={rightHand}
+          unread={rightHandDm?.unread ?? 0}
+          onPrefetch={() => rightHandDm && prefetch(rightHandDm.channelId)}
+          onOpen={() => rightHandDm && markOpen(rightHandDm.channelId)}
+        />
+      )}
+      {dir.loading && team.length === 0 && <SidebarSkeleton count={2} avatar label={t("common.loadingList")} />}
+      {pinnedAgents.map(agentRow)}
+      {pinned.hint && (
+        <div className="sidebar__pins-hint" role="note">
+          <span>{t("sidebarPins.hint")}</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            icon="close"
+            aria-label={t("common.close")}
+            title={t("common.close")}
+            onClick={pinned.dismissHint}
+          />
+        </div>
+      )}
+      {pinnedAgents.length > 0 && (byGroup.ungrouped.length > 0 || agentGroups.length > 0) && (
+        <hr className="sidebar__pins-end" />
+      )}
+      {ordered(byGroup.ungrouped).map(agentRow)}
+      {!personal && !dir.loading && team.length === 0 && createAgentItem.length > 0 && (
+        <Link to="/org/$orgId/agents/new" params={{ orgId }} className="sidebar__item sidebar__item--quiet">
+          <Icon name="plus" />
+          <span className="sidebar__item-label">{t(modeKey(org, "sidebarAgents.createFirst"))}</span>
+        </Link>
+      )}
+    </>
+  );
   const blocks: Record<SectionKey, ReactNode> = {
-    tools: (
+    // A personal workspace's list is its conversations (ADR 0158): a tool comes into sight only while something
+    // waits in it, or once the person put it there; Início, Go to… and the other tools are in More at the end.
+    tools: personal ? (
+      listed.length > 0 && (
+        <div className="sidebar__group sidebar__tools">
+          <ToolList items={listed} row={toolRow} />
+        </div>
+      )
+    ) : (
       // The tools each person keeps in sight; the rest open beside the sidebar from More.
       <div className="sidebar__group sidebar__tools">
-        {/* A personal workspace has no ⌘K field on top: Go to… is the list's first row (ADR 0158). */}
-        {personal && (
-          <button
-            type="button"
-            className="sidebar__item sidebar__goto"
-            onClick={openPalette}
-            title={rail ? t("palette.jump") : undefined}
-          >
-            <Icon name="search" />
-            <span className="sidebar__item-label">{t("palette.jump")}</span>
-            <span className="sidebar__item-meta sidebar__goto-keys" aria-hidden="true">
-              <Kbd>{modKey()}</Kbd>
-              <Kbd>K</Kbd>
-            </span>
-          </button>
-        )}
         <Link to="/org/$orgId/home" params={{ orgId }} className="sidebar__item" title={railTip("home")}>
           <Icon name="home" />
           <span className="sidebar__item-label">{t("shell.home")}</span>
@@ -580,103 +616,75 @@ export function Sidebar() {
       rightHand ||
       (team.length > 0 ? shownAgents.length > 0 || manages : createAgentItem.length > 0)) && (
       <>
-        <SidebarSection
-          id="agents"
-          label={t("shell.agents")}
-          sections={sections}
-          className="sidebar__section--part"
-          headProps={sectionMenu("agents")}
-          // Closed, the part hides its groups too: their unread count with its own.
-          summary={agentsUnread > 0 && <UnreadCount count={agentsUnread} />}
-          action={
-            <>
-              <Menu
-                align="end"
-                label={t("sidebarAgents.options")}
-                trigger={
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    iconOnly
-                    icon="more"
-                    className="sidebar__section-add"
-                    aria-label={t("sidebarAgents.options")}
-                    title={t("sidebarAgents.options")}
+        {personal ? (
+          // No header in a personal workspace (ADR 0158): its agents are the list, its right hand first.
+          <div className="sidebar__group sidebar__agents-plain">{agentRows}</div>
+        ) : (
+          <SidebarSection
+            id="agents"
+            label={t("shell.agents")}
+            sections={sections}
+            className="sidebar__section--part"
+            headProps={sectionMenu("agents")}
+            // Closed, the part hides its groups too: their unread count with its own.
+            summary={agentsUnread > 0 && <UnreadCount count={agentsUnread} />}
+            action={
+              <>
+                <Menu
+                  align="end"
+                  label={t("sidebarAgents.options")}
+                  trigger={
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      iconOnly
+                      icon="more"
+                      className="sidebar__section-add"
+                      aria-label={t("sidebarAgents.options")}
+                      title={t("sidebarAgents.options")}
+                    />
+                  }
+                >
+                  <MenuRadioGroup
+                    label={t("sidebarAgents.order")}
+                    value={view.agentSort}
+                    onValueChange={(v) => setView((now) => ({ ...now, agentSort: v as AgentSort }))}
+                    options={AGENT_SORTS.map((value) => ({ value, label: t(`sidebarAgents.sort.${value}`) }))}
                   />
-                }
-              >
-                <MenuRadioGroup
-                  label={t("sidebarAgents.order")}
-                  value={view.agentSort}
-                  onValueChange={(v) => setView((now) => ({ ...now, agentSort: v as AgentSort }))}
-                  options={AGENT_SORTS.map((value) => ({ value, label: t(`sidebarAgents.sort.${value}`) }))}
-                />
-                {manages && (
-                  <>
-                    <MenuSeparator />
-                    <MenuCheckboxItem
-                      checked={view.showAllAgents}
-                      onCheckedChange={(on) => setView((now) => ({ ...now, showAllAgents: on }))}
+                  {manages && (
+                    <>
+                      <MenuSeparator />
+                      <MenuCheckboxItem
+                        checked={view.showAllAgents}
+                        onCheckedChange={(on) => setView((now) => ({ ...now, showAllAgents: on }))}
+                      >
+                        {t("sidebarAgents.showAll")}
+                      </MenuCheckboxItem>
+                    </>
+                  )}
+                  {(agentGroups.length > 0 || manages) && <MenuSeparator />}
+                  {agentGroups.length > 0 && (
+                    <MenuItem
+                      icon={groupsClosed ? "chevronDown" : "chevronUp"}
+                      onSelect={() => sections.setAll(groupIds, groupsClosed)}
                     >
-                      {t("sidebarAgents.showAll")}
-                    </MenuCheckboxItem>
-                  </>
-                )}
-                {(agentGroups.length > 0 || manages) && <MenuSeparator />}
-                {agentGroups.length > 0 && (
-                  <MenuItem
-                    icon={groupsClosed ? "chevronDown" : "chevronUp"}
-                    onSelect={() => sections.setAll(groupIds, groupsClosed)}
-                  >
-                    {groupsClosed ? t("sidebarAgents.expandAll") : t("sidebarAgents.collapseAll")}
-                  </MenuItem>
-                )}
-                {manages && (
-                  <MenuItem icon="layers" onSelect={() => void navigate({ to: "/org/$orgId/team", params: { orgId } })}>
-                    {t("sidebarAgents.organize")}
-                  </MenuItem>
-                )}
-              </Menu>
-              <SectionAdd label={t("sidebarAgents.add")} entries={[...createAgentItem, ...newGroupItem]} />
-            </>
-          }
-          drop={organize ? drag.zone(null) : undefined}
-        >
-          {rightHand && (
-            <RightHandRow
-              agent={rightHand}
-              unread={rightHandDm?.unread ?? 0}
-              onPrefetch={() => rightHandDm && prefetch(rightHandDm.channelId)}
-              onOpen={() => rightHandDm && markOpen(rightHandDm.channelId)}
-            />
-          )}
-          {dir.loading && team.length === 0 && <SidebarSkeleton count={2} avatar label={t("common.loadingList")} />}
-          {pinnedAgents.map(agentRow)}
-          {pinned.hint && (
-            <div className="sidebar__pins-hint" role="note">
-              <span>{t("sidebarPins.hint")}</span>
-              <Button
-                variant="ghost"
-                size="sm"
-                iconOnly
-                icon="close"
-                aria-label={t("common.close")}
-                title={t("common.close")}
-                onClick={pinned.dismissHint}
-              />
-            </div>
-          )}
-          {pinnedAgents.length > 0 && (byGroup.ungrouped.length > 0 || agentGroups.length > 0) && (
-            <hr className="sidebar__pins-end" />
-          )}
-          {ordered(byGroup.ungrouped).map(agentRow)}
-          {!dir.loading && team.length === 0 && createAgentItem.length > 0 && (
-            <Link to="/org/$orgId/agents/new" params={{ orgId }} className="sidebar__item sidebar__item--quiet">
-              <Icon name="plus" />
-              <span className="sidebar__item-label">{t(modeKey(org, "sidebarAgents.createFirst"))}</span>
-            </Link>
-          )}
-        </SidebarSection>
+                      {groupsClosed ? t("sidebarAgents.expandAll") : t("sidebarAgents.collapseAll")}
+                    </MenuItem>
+                  )}
+                  {manages && (
+                    <MenuItem icon="layers" onSelect={() => void navigate({ to: "/org/$orgId/team", params: { orgId } })}>
+                      {t("sidebarAgents.organize")}
+                    </MenuItem>
+                  )}
+                </Menu>
+                <SectionAdd label={t("sidebarAgents.add")} entries={[...createAgentItem, ...newGroupItem]} />
+              </>
+            }
+            drop={organize ? drag.zone(null) : undefined}
+          >
+            {agentRows}
+          </SidebarSection>
+        )}
         {agentGroups.map(({ group, items }) => {
           const list = ordered(items);
           // Where a dragged row would land: a line before the row at that place among the others.
@@ -726,8 +734,8 @@ export function Sidebar() {
             </span>
           </Link>
         )}
-        {/* The rail has no headers, and a personal workspace no foot: Create agent closes its agents. */}
-        {personal && rail && createAgentItem.length > 0 && <CreateAgentTile />}
+        {/* A personal workspace (ADR 0158): New agent right under its agents (the rail's tile, with no headers there). */}
+        {personal && createAgentItem.length > 0 && (rail ? <CreateAgentTile /> : <NewAgentRow onOpen={newAgent} />)}
       </>
     ),
     // A personal workspace lists people only once someone else is a member (a family, ADR 0158).
@@ -889,6 +897,13 @@ export function Sidebar() {
         {sectionOrder.order.filter((id) => blocks[id]).map((id) => sectionOrder.block(id, blocks[id], !rail))}
       </div>
 
+      {/* A personal workspace's end (ADR 0158): one More, holding Início, Go to… and every tool not in sight. */}
+      {personal && (
+        <div className="sidebar__end">
+          <MoreTools items={inMore} row={toolRow} countOf={countOf} onCustomize={() => setCustomizing(true)} home />
+        </div>
+      )}
+
       <ArchivedChannelsDialog open={showArchived} onClose={() => setShowArchived(false)} />
       <NewChannelDialog
         open={creatingChannel !== false}
@@ -901,6 +916,9 @@ export function Sidebar() {
         withChannel={newCategory?.withChannel}
       />
       <SidebarSetupDialog open={customizing} onClose={() => setCustomizing(false)} />
+      {personal && rightHand && (
+        <NewAgentAsk open={askingAgent} onClose={() => setAskingAgent(false)} rightHand={rightHand} />
+      )}
       {groupDialog && <GroupNameDialog purpose={groupDialog} onClose={() => setGroupDialog(null)} />}
 
       {/* No foot in a personal workspace (ADR 0158): the person, the bell and the collapse are on top. */}
@@ -921,6 +939,22 @@ export function Sidebar() {
 }
 
 /** Create agent as one of the rail's tiles (the full sidebar creates from the Agents header's +). */
+/**
+ * New agent under a personal workspace's agents (ADR 0158): a row like theirs, an empty face with a plus where a face
+ * would be, so it reads as the next one.
+ */
+function NewAgentRow({ onOpen }: { onOpen: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <button type="button" className="sidebar__item sidebar__new-agent" onClick={onOpen}>
+      <span className="sidebar__new-agent-face" aria-hidden="true">
+        <Icon name="plus" size={16} />
+      </span>
+      <span className="sidebar__item-label">{t("sidebarAgents.newAgent")}</span>
+    </button>
+  );
+}
+
 function CreateAgentTile() {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -1548,11 +1582,14 @@ function MoreTools({
   row,
   countOf,
   onCustomize,
+  home = false,
 }: {
   items: SidebarItem[];
   row: (id: SidebarItem) => ReactNode;
   countOf: (id: SidebarItem) => ReactNode;
   onCustomize: () => void;
+  /** At a personal workspace's end (ADR 0158): Início and Go to… open its list, and it opens upward. */
+  home?: boolean;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -1566,7 +1603,7 @@ function MoreTools({
         onOpenChange={setOpen}
         label={t("shell.more")}
         side="right"
-        align="start"
+        align={home ? "end" : "start"}
         className="sidebar__more-menu"
         trigger={
           <button ref={trigger} type="button" className="sidebar__item sidebar__more" title={t("shell.more")}>
@@ -1576,6 +1613,38 @@ function MoreTools({
           </button>
         }
       >
+        {home && (
+          <>
+            <Link
+              to="/org/$orgId/home"
+              params={{ orgId: org.id }}
+              className="ac-menu__item sidebar__more-item"
+              onClick={() => setOpen(false)}
+            >
+              <Icon name="home" />
+              <span className="ac-menu__label">
+                {t("shell.home")}
+                <span className="ac-menu__desc">{t("shell.moreWhat.homePersonal")}</span>
+              </span>
+            </Link>
+            <button
+              type="button"
+              className="ac-menu__item sidebar__more-item"
+              onClick={() => {
+                setOpen(false);
+                openPalette();
+              }}
+            >
+              <Icon name="search" />
+              <span className="ac-menu__label">{t("palette.jump")}</span>
+              <span className="sidebar__goto-keys" aria-hidden="true">
+                <Kbd>{modKey()}</Kbd>
+                <Kbd>K</Kbd>
+              </span>
+            </button>
+            <div className="ac-menu__separator" aria-hidden="true" />
+          </>
+        )}
         {items.map((id) => (
           <Link
             key={id}

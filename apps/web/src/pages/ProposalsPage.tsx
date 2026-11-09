@@ -76,9 +76,9 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
 
   const backAgent = agentId ? dir.agentById.get(agentId) : undefined;
   const agentName = (id: string) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent");
-  const targetLabel = (p: Proposal) => proposalTarget(t, p, agentName, org.name);
+  const targetLabel = (p: Proposal) => proposalTarget(t, p, agentName, org);
   const tt = t as unknown as (key: string, options: Record<string, string>) => string;
-  const titleOf = (p: Proposal) => proposalTitle(t, p, org.name, agentName);
+  const titleOf = (p: Proposal) => proposalTitle(t, p, org, agentName);
   const whereOf = (e: Proposal["evidence"][number]) =>
     e.type ? tt(`proposals.evidence.${e.type}`, { defaultValue: e.where }) : e.where;
   const statusText = (p: Proposal) =>

@@ -1,9 +1,9 @@
 import { expect, test } from "bun:test";
-import { readdirSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { ApiError } from "@agenteschat/client";
 import { knownErrorText } from "@agenteschat/client/lib/errors";
 import { isInviteToken } from "../../src/features/auth/links";
-import { stepFailedText, zoneCity, zoneLabel } from "../../src/features/onboarding/logic";
+import { PURPOSES, stepFailedText, workspaceAnswer, zoneCity, zoneLabel } from "../../src/features/onboarding/logic";
 import { translator } from "./fixtures";
 
 test("the time zone reads as its city; invitation tokens only url-safe", () => {
@@ -69,4 +69,20 @@ test("a step that failed says why the server refused it, else that it didn't sav
   expect(stepFailedText(await translator("en"), inviteOnly)).toBe("New workspaces need an invitation for now.");
   expect(stepFailedText(pt, new ApiError(500, "internal", "x"))).toBe(pt("mobile.onb.failed"));
   expect(stepFailedText(pt, new TypeError("Network request failed"))).toBe(pt("mobile.onb.failed"));
+});
+
+test("the first question makes a personal workspace at once, named in the person's language (ADR 0158)", async () => {
+  expect(PURPOSES).toEqual(["personal", "team"]);
+  const pt = await translator("pt-BR");
+  const en = await translator("en");
+  // "For me": no name asked, the word for it; whatever was in the name field doesn't count.
+  expect(workspaceAnswer(en, "personal", "Acme")).toEqual({ name: "Personal", mode: "personal" });
+  expect(workspaceAnswer(pt, "personal", "")).toEqual({ name: pt("onboarding.personal.name"), mode: "personal" });
+  // A company or team: the name typed, trimmed.
+  expect(workspaceAnswer(pt, "team", "  Acme ")).toEqual({ name: "Acme", mode: "team" });
+  // Add workspace asks the same question; the footer stays the quiet Sign out (workspace-computer.test.ts).
+  const flow = readFileSync(new URL("../../src/features/onboarding/OnboardingFlow.tsx", import.meta.url), "utf8");
+  expect(flow).toContain('t("mobile.onb.anotherPurpose")');
+  expect(flow).toContain("PURPOSES.map((mode) => {");
+  expect(flow).toContain('const answer = workspaceAnswer(t, purpose ?? "team", orgName);');
 });

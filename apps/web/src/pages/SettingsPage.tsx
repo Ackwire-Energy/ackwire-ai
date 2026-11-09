@@ -110,6 +110,7 @@ import { WorkspaceModeDialog } from "@/components/WorkspaceModeDialog";
 import { ZoneSelect } from "@/components/ZoneSelect";
 import { useCentreCurrent } from "@/hooks/useCentreCurrent";
 import { useDirectory } from "@/hooks/useDirectory";
+import { usePersonalView } from "@/hooks/usePersonalView";
 import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { useOpenParam } from "@/lib/open-param";
 import { workspaceUsesApi } from "@/lib/plan-usage";
@@ -176,7 +177,9 @@ function Settings({
   // and usage holding other sections, whose own addresses mark those entries. A team's: the groups.
   const personal = isPersonal(org);
   const opens = (id: SettingsSection) => visible.some((s) => s.id === id);
-  const nav = personal ? personalSettingsNav(visible) : null;
+  // People joins the short list once someone else is a member (a family).
+  const { others } = usePersonalView();
+  const nav = personal ? personalSettingsNav(visible, others) : null;
   const marked = settingsNavEntry(org, current, visible.map((s) => s.id));
   const inAdvanced = nav?.advanced.some((s) => s.id === marked) ?? false;
   const [advanced, setAdvanced] = useState(inAdvanced);

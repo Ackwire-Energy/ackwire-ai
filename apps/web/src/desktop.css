@@ -127,7 +127,7 @@ html[data-desktop] .shell {
   /* biome-ignore lint/suspicious/noDuplicateProperties: dvh with a vh fallback for older browsers */
   height: calc(100dvh - var(--titlebar-h));
 }
-html[data-desktop] :is(.sidebar__jump-row, .sidebar__goto, .sidebar__head-collapse) {
+html[data-desktop] :is(.sidebar__jump-row, .sidebar__head-collapse) {
   display: none;
 }
 /* Sign-in: the logo clears the window's buttons. */

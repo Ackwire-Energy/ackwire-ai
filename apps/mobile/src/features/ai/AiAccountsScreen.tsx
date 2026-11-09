@@ -28,8 +28,10 @@ import { joinNames, relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { agentAi, aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
+import { settingsSectionNameKey, settingsSectionTextKey } from "@agenteschat/client/lib/personal-view";
 import { planOf, signInProviderOf } from "@agenteschat/client/lib/plans";
 import { keyNamedAfterProvider, providerLabel } from "@agenteschat/client/lib/providers";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -37,6 +39,8 @@ import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, View } from
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
 import { Button, GroupedList, GroupedRow, InfoHint, ProviderLogo, Text, useToast } from "@/ui";
+import { router } from "@/ui/navigation";
+import { personalAiParts } from "../settings/logic";
 import { chooseAction } from "../settings/parts";
 import { FirstUse } from "../shared/FirstUse";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
@@ -66,6 +70,8 @@ const choose = chooseAction;
 export function AiAccountsScreen() {
   const { t, i18n } = useTranslation();
   const { orgId, org } = useOrg();
+  /** A computer's name in this workspace's words (a personal one's: its person's agents', ADR 0158). */
+  const computerOf = (name: string) => computerNameOf(t, org?.name ?? "", name, isPersonal(org));
   const api = useApi();
   const qc = useQueryClient();
   const toast = useToast();
@@ -134,9 +140,9 @@ export function AiAccountsScreen() {
           ? t("aiAccounts.page.disconnectAgents", {
               count: a.usedBy.length,
               agents: names(a.usedBy),
-              computer: computerNameOf(t, org?.name ?? "", a.computer),
+              computer: computerOf(a.computer),
             })
-          : t("aiAccounts.page.disconnectNone", { computer: computerNameOf(t, org?.name ?? "", a.computer) }),
+          : t("aiAccounts.page.disconnectNone", { computer: computerOf(a.computer) }),
         ...(endsOnClaude(a, machineOf(a)) ? [t("aiAccounts.page.revokeOnClaude")] : []),
       ].join(" "),
       [
@@ -192,7 +198,11 @@ export function AiAccountsScreen() {
   const none = !hold && ai.isSuccess && rows.length === 0 && own.length === 0;
   return (
     <View style={[styles.screen, { backgroundColor: c.grouped }]}>
-      <PushedHeader title={t("mobile.ai.row")} solid={false} grouped />
+      <PushedHeader
+        title={t(isPersonal(org) ? "settings.section.keysPersonal" : "mobile.ai.row")}
+        solid={false}
+        grouped
+      />
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={[styles.in, { paddingBottom: insets.bottom + 24 }]}
@@ -247,7 +257,7 @@ export function AiAccountsScreen() {
                     : identityUnknown(a, machineOf(a))
                       ? t("aiAccounts.page.identityUnknown")
                       : null),
-                several ? t("aiAccounts.page.on", { computer: computerNameOf(t, org?.name ?? "", a.computer) }) : null,
+                several ? t("aiAccounts.page.on", { computer: computerOf(a.computer) }) : null,
                 a.usedBy.length > 0
                   ? t("aiAccounts.page.usedBy", { count: a.usedBy.length, agents: names(a.usedBy) })
                   : t("aiAccounts.page.noAgent"),
@@ -324,7 +334,36 @@ export function AiAccountsScreen() {
           </View>
         )}
         {can(org, "manage_credentials") ? <KeysSection locale={i18n.language} /> : null}
+        <PersonalParts />
       </ScrollView>
+    </View>
+  );
+}
+
+/**
+ * AI and apps in a personal workspace (ADR 0158 §3): Connectors and MCPs and Skills at the foot of the AI accounts,
+ * those this person opens, each a row to its own screen as in Settings. Nothing in a team's workspace.
+ */
+function PersonalParts() {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const parts = isPersonal(org) ? personalAiParts(org) : [];
+  if (parts.length === 0) return null;
+  return (
+    <View style={styles.keysHead}>
+      <GroupedList>
+        {parts.map((s) => (
+          <GroupedRow
+            key={s.id}
+            icon={s.icon}
+            label={t(settingsSectionNameKey(org, s.id))}
+            sub={t(settingsSectionTextKey(org, s.id))}
+            subLines={2}
+            chevron
+            onPress={() => router.push(s.href as never)}
+          />
+        ))}
+      </GroupedList>
     </View>
   );
 }
