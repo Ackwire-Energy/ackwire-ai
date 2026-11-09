@@ -982,6 +982,42 @@ test("an agent's op running when a person takes control stops, and says why", as
   v.viewer().closed();
 });
 
+test("Stop while the screen opens in control ends it as soon as it's open; big pictures go one at a time", async () => {
+  const r = rig(ANDROID_STATE);
+  const target = { platform: "android", serial: PIXEL };
+  const sam = { runId: null, agentId: null, userId: "user-sam", since: "" };
+  const v = viewerSocket();
+  await r.manager.view({ ...target, holder: sam }, "control", async () => {
+    await r.op({ op: "phone.release", ...target, holder: r.holder("run-9"), force: true });
+    return v.socket;
+  });
+  expect(v.closed).toEqual([{ code: 4410, reason: "control ended" }]);
+  v.viewer().control?.({ type: "tap", x: 0.5, y: 0.5 });
+  await wait(100);
+  expect(r.calls().some((c) => c.join(" ").includes("input tap"))).toBe(false);
+
+  // Two of Sam's views taking control at once share it: the phone goes free once both closed.
+  const a = viewerSocket();
+  const b = viewerSocket();
+  await Promise.all([
+    r.manager.view({ ...target, holder: sam }, "control", async () => a.socket),
+    r.manager.view({ ...target, holder: sam }, "control", async () => b.socket),
+  ]);
+  a.viewer().closed();
+  expect(r.manager.list()[0]?.holder).toMatchObject({ userId: "user-sam" });
+  b.viewer().closed();
+  await until(() => r.manager.list()[0]?.holder === undefined, "the phone free");
+
+  r.setState({ ...ANDROID_STATE, changing: true, big: true });
+  const big = viewerSocket();
+  await r.manager.view({ ...target, holder: sam }, "watch", async () => big.socket);
+  await wait(600);
+  expect(big.sent).toHaveLength(1);
+  big.viewer().control?.({ type: "ack" });
+  await until(() => big.sent.length === 2, "the next picture once the big one was drawn");
+  big.viewer().closed();
+});
+
 test("iPhones: a simulator shows its pictures but takes no control, a real one needs the helper, a registered driver wins", async () => {
   const r = rig(ANDROID_STATE);
   const v = viewerSocket();

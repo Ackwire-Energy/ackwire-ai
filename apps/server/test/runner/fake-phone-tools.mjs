@@ -13,7 +13,7 @@
 //   real iPhone's 8100 and 9100: $FAKE_WDA_PORT and $FAKE_MJPEG_PORT) until SIGTERM (wdaRunFail: prints it, exit 65). wdaTree: its screen tree
 //   (wdaTrees: one per `source` call, the last kept). Its requests are logged as ["wda", method, path, body].
 //   ffmpeg: reads stdin to its end, then writes MP4DATA to its last argument
-//   changing: each screen capture differs from the last (a live screen)
+//   changing: each screen capture differs from the last (a live screen)   big: screen captures over 2 MB
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import net from "node:net";
@@ -30,7 +30,7 @@ const fail = (text) => process.stderr.write(text, () => process.exit(1));
 const flag = (name) => args.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
 // A 1080×2400 PNG's first bytes: what the size is read from.
 const png = () => {
-  const b = Buffer.alloc(33);
+  const b = Buffer.alloc(state.big ? (2 << 20) + 64 : 33);
   Buffer.from("89504e470d0a1a0a0000000d49484452", "hex").copy(b);
   b.writeUInt32BE(1080, 16);
   b.writeUInt32BE(2400, 20);

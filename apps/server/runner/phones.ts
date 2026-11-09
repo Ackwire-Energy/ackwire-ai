@@ -376,6 +376,7 @@ export class PhoneManager {
   private readonly locked = new Set<string>();
   /** Android phones whose authorization timeout was turned off (this process, once each). */
   private readonly prepared = new Set<string>();
+  private controlling: Promise<unknown> = Promise.resolve();
   private appleSeen: Phone[] | null = null;
   private tick = 0;
   private polling: Promise<void> | null = null;
@@ -672,7 +673,14 @@ export class PhoneManager {
    * it runs on the phone stops, and its calls answer `phone_busy` meanwhile. Another person in control keeps it; the
    * same person's second view shares their control.
    */
-  private async takeControl(key: string, phone: Phone, person: PhoneHolder, tools: Tools): Promise<Hold> {
+  private takeControl(key: string, phone: Phone, person: PhoneHolder, tools: Tools): Promise<Hold> {
+    // One at a time: two views opening at once would each set the other's control aside, one left without a hold.
+    const taken = this.controlling.then(() => this.takeControlNow(key, phone, person, tools));
+    this.controlling = taken.catch(() => undefined);
+    return taken;
+  }
+
+  private async takeControlNow(key: string, phone: Phone, person: PhoneHolder, tools: Tools): Promise<Hold> {
     const held = this.holds.get(key);
     if (held?.controls) {
       if (!sameHolder(held.holder, person)) {
@@ -834,6 +842,9 @@ export class PhoneManager {
       throw err;
     }
     let unacked = 0;
+    let last: Buffer | null = null;
+    // Big pictures go one at a time: two could pass what the server queues for a slow viewer (`viewerBufferedMax`).
+    const full = () => unacked >= (last && last.byteLength > BIG_PICTURE ? 1 : PHONE_VIEW.window);
     let closed = false;
     let wake: (() => void) | null = null;
     const nudge = () => {
@@ -888,9 +899,9 @@ export class PhoneManager {
       control: (f) => {
         if (f.type === "ack") {
           // Only a full window waits on it: the pictures' own pace stays.
-          const full = unacked >= PHONE_VIEW.window;
+          const waiting = full();
           unacked = Math.max(0, unacked - 1);
-          if (full) nudge();
+          if (waiting) nudge();
         } else if (control && (f.type === "tap" || f.type === "swipe" || f.type === "text" || f.type === "key")) {
           inputs.push(f);
           void drain();
@@ -903,8 +914,9 @@ export class PhoneManager {
         if (control) void this.endControl(key, control);
       },
     });
+    // Stopped (or the phone gone) while the screen opened.
+    if (control?.abort.signal.aborted) return end(STREAM_CLOSE.controlEnded, "control ended");
     void (async () => {
-      let last: Buffer | null = null;
       let failures = 0;
       let took = this.now();
       for (;;) {
@@ -917,7 +929,7 @@ export class PhoneManager {
         }
         // An unchanged screen is looked at less often; the person's input looks again at once.
         await pause(Math.max(0, (changed ? PHONE_VIEW.frameMs : PHONE_VIEW.idleMs) - (this.now() - took)));
-        while (!closed && unacked >= PHONE_VIEW.window) await pause(PHONE_VIEW.idleMs);
+        while (!closed && full()) await pause(PHONE_VIEW.idleMs);
         if (closed) return;
         took = this.now();
         try {
@@ -1452,6 +1464,9 @@ let iosScreenDriver: IosScreenDriverFactory | null = null;
 export function registerIosScreenDriver(factory: IosScreenDriverFactory | null) {
   iosScreenDriver = factory;
 }
+
+/** A picture this big (a full-size PNG of a busy screen) waits for the last one's acknowledgement first. */
+const BIG_PICTURE = 2 << 20;
 
 export const NO_IOS_CONTROL =
   "Controlling an iPhone from here needs the test helper, which isn't set up on this Mac yet. You can still watch it.";
