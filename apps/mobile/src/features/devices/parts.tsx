@@ -1,12 +1,12 @@
 import type { ComputerDevice, DeviceStatus, PhoneDevice } from "@agenteschat/client";
 import { useRoles } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { StyleSheet, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { ComputerPortrait } from "@/computer/ComputerPortrait";
 import { useOrg } from "@/providers/org";
-import { Button, Chip, fieldText, GroupedField, GroupedList, Icon, InkOrbit, Text, useToast } from "@/ui";
+import { Button, Chip, fieldText, GROUPED_ROW, GroupedList, GroupedRow, Icon, InkOrbit, Text, useToast } from "@/ui";
 import { AskButtons } from "../chat/asks";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useWhen } from "../shared/hooks";
@@ -176,6 +176,7 @@ export function PhoneNameField({ phone }: { phone: Pick<PhoneDevice, "id" | "nam
   const c = useColors();
   const toast = useToast();
   const [name, setName] = useState(phone.name);
+  const input = useRef<TextInput>(null);
   const rename = useDeviceMutation((api, orgId, v: string) => api.devices.updatePhone(orgId, phone.id, { name: v }));
   const save = () => {
     const clean = name.trim();
@@ -191,30 +192,40 @@ export function PhoneNameField({ phone }: { phone: Pick<PhoneDevice, "id" | "nam
       },
     });
   };
+  const label = t("mobile.devices.page.name");
+  // Read as the rows under it (the label, its value at the right edge), the pen where their chevrons are.
+  if (!phone.mayManage) return <GroupedRow label={label} value={phone.name} />;
   return (
-    <GroupedField label={t("mobile.devices.page.name")}>
-      {phone.mayManage ? (
-        <TextInput
-          value={name}
-          onChangeText={setName}
-          onEndEditing={save}
-          editable={!rename.isPending}
-          returnKeyType="done"
-          autoCorrect={false}
-          accessibilityLabel={t("mobile.devices.page.name")}
-          style={[fieldText("callout"), styles.input, { color: c.ink }]}
-        />
-      ) : (
-        <Text variant="callout" tone="ink" numberOfLines={2}>
-          {phone.name}
-        </Text>
-      )}
-    </GroupedField>
+    <Pressable onPress={() => input.current?.focus()} accessible={false} style={styles.nameRow}>
+      <Text variant="body" tone="ink">
+        {label}
+      </Text>
+      <TextInput
+        ref={input}
+        value={name}
+        onChangeText={setName}
+        onEndEditing={save}
+        editable={!rename.isPending}
+        returnKeyType="done"
+        autoCorrect={false}
+        textAlign="right"
+        accessibilityLabel={label}
+        style={[fieldText("callout"), styles.input, { color: c.faint }]}
+      />
+      <Icon name="pen" size={15} color={c.faint} />
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  input: { flex: 1, paddingVertical: 12, paddingHorizontal: 0 },
+  nameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    minHeight: GROUPED_ROW.minHeight,
+    paddingHorizontal: GROUPED_ROW.padX,
+  },
+  input: { flex: 1, minWidth: 0, paddingVertical: 12, paddingHorizontal: 0 },
   hero: { alignItems: "center", gap: 8, paddingTop: 24, paddingBottom: 24, paddingHorizontal: 16 },
   heroTitle: { flexDirection: "row", alignItems: "center", gap: 8, maxWidth: "100%" },
   tick: { width: 24, height: 24, borderRadius: 12, alignItems: "center", justifyContent: "center" },
