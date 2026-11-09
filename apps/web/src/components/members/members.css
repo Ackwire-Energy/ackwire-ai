@@ -24,13 +24,14 @@
   flex-direction: column;
   gap: 2px;
 }
-/* "Quem pode ver este canal": what the list is, for whoever doesn't know Discord's. */
-.members-side__caption {
-  margin: 0 0 -8px;
+/* "Members": the column's one title, over its groups. */
+.members-side__title {
+  margin: 0 0 -6px;
   padding: 0 8px;
-  font-size: 13px;
-  line-height: 18px;
-  color: var(--faint);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  color: var(--ink);
 }
 .members-side__head {
   display: flex;

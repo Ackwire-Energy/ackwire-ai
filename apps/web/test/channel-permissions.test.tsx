@@ -102,9 +102,11 @@ describe("channel permissions (ADR 0134)", () => {
     expect(screen().queryByRole("combobox", { name: "Mensagem para #eng" })).toBeNull();
   });
 
-  test("the members column says what it lists", async () => {
+  test("the members column has one title, Members, over its groups", async () => {
     await go();
-    expect(screen().getAllByText("Quem pode ver este canal").length).toBeGreaterThan(0);
+    const column = document.querySelector(".members-side");
+    expect(column?.querySelector(".members-side__title")?.textContent).toBe("Membros");
+    expect(within(column as HTMLElement).queryByText("Quem pode ver este canal")).toBeNull();
   });
 
   test("Membros says who the list is by access: open to the workspace when public, who can see it otherwise", async () => {
