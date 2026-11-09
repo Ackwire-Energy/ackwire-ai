@@ -1349,7 +1349,15 @@
           left: b.left + parseFloat(cs.borderLeftWidth),
           right: b.right - parseFloat(cs.borderRightWidth),
         };
-        // A side of the clip on the window's own edge cuts nothing the window wouldn't.
+        // A side of the clip on the window's own edge cuts nothing the window wouldn't. Nor does a scroller's side with
+        // more to scroll to: what it cuts there shows whole once scrolled (the work's sheet ends above the window's edge).
+        const more = {
+          top: clip.scrollTop > 0.5,
+          bottom: clip.scrollHeight - clip.clientHeight - clip.scrollTop > 0.5,
+          left: clip.scrollLeft > 0.5,
+          right: clip.scrollWidth - clip.clientWidth - clip.scrollLeft > 0.5,
+        };
+        const scrolls = (overflow) => overflow === "auto" || overflow === "scroll";
         const cut = [
           ["top", cs.overflowY, pad.top > 0.5 && a.top >= pad.top - 0.5 && a.top - reach.top < pad.top - 0.5],
           [
@@ -1365,7 +1373,7 @@
             cs.overflowX,
             pad.right < innerWidth - 0.5 && a.right <= pad.right + 0.5 && a.right + reach.right > pad.right + 0.5,
           ],
-        ].find(([, overflow, hit]) => hit && overflow !== "visible");
+        ].find(([side, overflow, hit]) => hit && overflow !== "visible" && !(scrolls(overflow) && more[side]));
         if (cut) out.push({ rule: "clip", node: el, el: sig(el), box: sig(clip), side: cut[0] });
       }
     },
