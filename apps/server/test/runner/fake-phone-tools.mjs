@@ -8,7 +8,15 @@
 //   simctl, devicectl: the JSON each lists   launchFail: devicectl's error   simlog: `log show`'s text
 //   maestroExit, maestroOutput   javaMissing: maestro says JAVA_HOME isn't set
 //   wait: recorders (scrcpy, simctl recordVideo, idevicesyslog) run until SIGINT instead of ending at once
-import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+//   xcodebuild: build-for-testing writes an .xctestrun (wdaBuildFail: prints it, exit 65); test-without-building
+//   serves a fake WebDriverAgent on TEST_RUNNER_USE_PORT and its MJPEG stream on TEST_RUNNER_MJPEG_SERVER_PORT (a
+//   real iPhone's 8100 and 9100: $FAKE_WDA_PORT and $FAKE_MJPEG_PORT) until SIGTERM (wdaRunFail: prints it, exit 65). wdaTree: its screen tree
+//   (wdaTrees: one per `source` call, the last kept). Its requests are logged as ["wda", method, path, body].
+//   ffmpeg: reads stdin to its end, then writes MP4DATA to its last argument
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import http from "node:http";
+import net from "node:net";
+import path from "node:path";
 
 const [tool, ...args] = process.argv.slice(2);
 appendFileSync(process.env.FAKE_PHONE_LOG, `${JSON.stringify([tool, ...args])}\n`);
@@ -61,7 +69,26 @@ if (tool === "adb") {
     } else out("");
   } else out("");
 } else if (tool === "xcode-select") out("/Applications/Xcode.app/Contents/Developer\n");
-else if (tool === "xcrun") {
+else if (tool === "xcrun" && args[0] === "xcodebuild") {
+  const at = (flag) => args[args.indexOf(flag) + 1];
+  if (args[1] === "-version") out("Xcode 26.3\nBuild version 17C529\n");
+  else if (args[1] === "build-for-testing") {
+    if (state.wdaBuildFail) out(state.wdaBuildFail, 65);
+    else {
+      const products = path.join(at("-derivedDataPath"), "Build", "Products");
+      mkdirSync(products, { recursive: true });
+      const sim = at("-destination").includes("Simulator");
+      writeFileSync(
+        path.join(products, `WebDriverAgentRunner_${sim ? "iphonesimulator" : "iphoneos"}26.2-arm64.xctestrun`),
+        "",
+      );
+      out("** TEST BUILD SUCCEEDED **\n");
+    }
+  } else if (args[1] === "test-without-building") {
+    if (state.wdaRunFail) out(state.wdaRunFail, 65);
+    else fakeWda();
+  } else out("", 1);
+} else if (tool === "xcrun") {
   const line = args.join(" ");
   const json = args[args.indexOf("--json-output") + 1];
   if (line.startsWith("simctl list devices")) out(JSON.stringify(state.simctl ?? { devices: {} }));
@@ -100,4 +127,71 @@ else if (tool === "idevicesyslog") {
   process.stdout.write("Nov  9 04:00:00 iPhone Acme(UIKitCore)[42] <Notice>: com.acme.app hello\n");
   process.on("SIGINT", () => process.exit(0));
   setInterval(() => {}, 1000);
+} else if (tool === "ffmpeg") {
+  if (args.includes("-encoders")) out(" V....D h264_videotoolbox    VideoToolbox H.264 Encoder\n");
+  else {
+    process.stdin.on("data", () => {});
+    process.stdin.on("end", () => {
+      writeFileSync(args.at(-1), "MP4DATA");
+      process.exit(0);
+    });
+  }
 } else out("", 1);
+
+/** WebDriverAgent as far as the runner talks to it, and its MJPEG stream (one tiny JPEG every 50 ms). */
+function fakeWda() {
+  // A real iPhone's ports (8100, 9100) are reached through the fake usbmuxd at $FAKE_WDA_PORT and $FAKE_MJPEG_PORT.
+  const env = process.env;
+  const port = Number(env.TEST_RUNNER_USE_PORT === "8100" ? env.FAKE_WDA_PORT : env.TEST_RUNNER_USE_PORT);
+  const mjpeg = Number(
+    env.TEST_RUNNER_MJPEG_SERVER_PORT === "9100" ? env.FAKE_MJPEG_PORT : env.TEST_RUNNER_MJPEG_SERVER_PORT,
+  );
+  let sources = 0;
+  http
+    .createServer((req, res) => {
+      let body = "";
+      req.on("data", (c) => {
+        body += c;
+      });
+      req.on("end", () => {
+        appendFileSync(
+          process.env.FAKE_PHONE_LOG,
+          `${JSON.stringify(["wda", req.method, req.url, body ? JSON.parse(body) : null])}\n`,
+        );
+        const now = JSON.parse(readFileSync(process.env.FAKE_PHONE_STATE, "utf8"));
+        const send = (value, extra = {}) => {
+          res.setHeader("content-type", "application/json");
+          res.end(JSON.stringify({ value, ...extra }));
+        };
+        if (req.url === "/status") send({ ready: true });
+        else if (req.url === "/session") send({ sessionId: "s1" }, { sessionId: "s1" });
+        else if (req.url === "/screenshot") send(png().toString("base64"));
+        else if (req.url.endsWith("/window/size")) send({ width: 390, height: 844 });
+        else if (req.url.includes("/source")) {
+          const trees = now.wdaTrees;
+          send(
+            trees
+              ? trees[Math.min(sources++, trees.length - 1)]
+              : (now.wdaTree ?? { type: "Application", children: [] }),
+          );
+        } else send(null);
+      });
+    })
+    .listen(port, "127.0.0.1");
+  const jpeg = Buffer.from("ffd8ffc0001108000a001403012200021101031101ffd9", "hex");
+  net
+    .createServer((sock) => {
+      sock.once("data", () => {
+        sock.write("HTTP/1.0 200 OK\r\nContent-Type: multipart/x-mixed-replace; boundary=--BoundaryString\r\n\r\n");
+        const timer = setInterval(() => {
+          sock.write(`--BoundaryString\r\nContent-type: image/jpeg\r\nContent-Length: ${jpeg.length}\r\n\r\n`);
+          sock.write(Buffer.concat([jpeg, Buffer.from("\r\n\r\n")]));
+        }, 50);
+        sock.on("close", () => clearInterval(timer));
+        sock.on("error", () => clearInterval(timer));
+      });
+    })
+    .listen(mjpeg, "127.0.0.1");
+  process.stdout.write("ServerURLHere->http://127.0.0.1:8100<-ServerURLHere\n");
+  process.on("SIGTERM", () => process.exit(0));
+}

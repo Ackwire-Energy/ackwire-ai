@@ -18,13 +18,15 @@ import type { RunnerError } from "../../runner/errors";
 import { type HandlerContext, handleRequest, OP_ROUTES, type RequestScope } from "../../runner/handlers";
 import { acquireLock } from "../../runner/lock";
 import { type PhoneIo, PhoneManager, type PhoneRequest } from "../../runner/phones";
+import { IosHelper, WDA_VERSION } from "../../runner/wda";
+import { fakeUsbmuxd, freePort } from "./fake-usbmuxd";
 import { errorCode, removeDirs, tempDir } from "./helpers";
 
 const dirs: string[] = [];
 afterEach(() => removeDirs(dirs));
 
 const FAKE = path.join(import.meta.dir, "fake-phone-tools.mjs");
-const TOOLS = ["adb", "xcrun", "xcode-select", "maestro", "scrcpy", "bundletool", "plutil", "idevicesyslog"];
+const TOOLS = ["adb", "xcrun", "xcode-select", "maestro", "scrcpy", "bundletool", "plutil", "idevicesyslog", "ffmpeg"];
 
 const PIXEL = "38021FDH2000AB";
 const EMU = "emulator-5554";
@@ -251,7 +253,13 @@ test("iPhones: only ones plugged in now, with trust and Developer Mode; booted i
 /** A computer with fake phone tools on its PATH, and a manager watching it. */
 function rig(
   state: Record<string, unknown>,
-  opts: { tools?: string[]; platform?: NodeJS.Platform; readOnly?: boolean } = {},
+  opts: {
+    tools?: string[];
+    platform?: NodeJS.Platform;
+    readOnly?: boolean;
+    /** The iPhone test helper (none by default: a real iPhone is ready to the Mac alone). */
+    ios?: (env: NodeJS.ProcessEnv, root: string, now: () => number) => IosHelper;
+  } = {},
 ) {
   const root = tempDir("phones-");
   dirs.push(root);
@@ -270,11 +278,13 @@ function rig(
   setState(state);
   const sent: RunnerPhone[][] = [];
   let now = Date.parse("2026-11-09T04:00:00Z");
+  const env = { PATH: bin, HOME: root, FAKE_PHONE_STATE: stateFile, FAKE_PHONE_LOG: logFile };
   const manager = new PhoneManager({
     log: () => {},
     onChange: (phones) => sent.push(phones),
     lockDir: path.join(root, "locks"),
-    env: { PATH: bin, HOME: root, FAKE_PHONE_STATE: stateFile, FAKE_PHONE_LOG: logFile },
+    env,
+    ios: opts.ios ? opts.ios(env, root, () => now) : null,
     platform: opts.platform ?? "darwin",
     home: root,
     dirs: [],
@@ -613,51 +623,123 @@ test("iOS simulator: install with its bundle id, launch, screenshot, record, flo
   expect(show.slice(-2)).toEqual(["--predicate", 'process == "Acme"']);
 });
 
-test("a real iPhone: install and launch through devicectl, what needs the person in words, the rest tool_missing", async () => {
-  const r = rig(ANDROID_STATE, { tools: ["adb", "xcrun", "xcode-select", "maestro", "plutil"] });
-  const t = { platform: "ios", serial: IPHONE, holder: r.holder("run-1") };
-  writeFileSync(path.join(r.folder, "Acme.ipa"), "IPA");
-  expect(await r.op({ op: "phone.install", ...t, path: "Acme.ipa" })).toEqual({
-    app: "com.acme.app",
-    output: "Installed",
-  });
-  const install = r.calls().find((c) => c[1] === "devicectl" && c[2] === "device") as string[];
-  expect(install.slice(1, 8)).toEqual([
-    "devicectl",
-    "device",
-    "install",
-    "app",
-    "--device",
-    IPHONE,
-    path.join(r.folder, "Acme.ipa"),
-  ]);
-  await r.op({ op: "phone.launch", ...t, app: "com.acme.app" });
-  r.setState({
-    ...ANDROID_STATE,
-    launchFail:
-      "ERROR: The application could not be launched because its profile has not been explicitly trusted by the user.\n",
-  });
-  const untrusted = await r.op({ op: "phone.launch", ...t, app: "com.acme.app" }).catch((e: Error) => e);
-  expect(untrusted).toMatchObject({ code: "phone_not_ready" });
-  for (const op of [
-    { op: "phone.screenshot" },
-    { op: "phone.record", seconds: 5 },
-    { op: "phone.flow", flow: "appId: x\n---\n- launchApp\n", timeoutSeconds: 60 },
-    { op: "phone.logs", lines: 10 },
-  ]) {
-    expect(await errorCode(() => r.op({ ...op, ...t }))).toBe("tool_missing");
+test("a real iPhone: install and launch through devicectl, the rest through its test helper once it's set up", async () => {
+  const [wda, mjpeg] = [await freePort(), await freePort()];
+  const muxDir = tempDir("mux-");
+  dirs.push(muxDir);
+  const mux = await fakeUsbmuxd(muxDir, [{ id: 5, serial: IPHONE }], { 8100: wda, 9100: mjpeg });
+  let helper: IosHelper | null = null;
+  const r = rig(
+    {
+      ...ANDROID_STATE,
+      wdaTree: {
+        type: "Application",
+        children: [{ type: "Button", label: "Sign in", rect: { x: 0, y: 100, width: 390, height: 44 } }],
+      },
+    },
+    {
+      tools: ["adb", "xcrun", "xcode-select", "maestro", "plutil", "ffmpeg"],
+      ios: (env, root, now) => {
+        mkdirSync(
+          path.join(root, ".agentes-runner", "wda", "src", `WebDriverAgent-${WDA_VERSION}`, "WebDriverAgent.xcodeproj"),
+          {
+            recursive: true,
+          },
+        );
+        helper = new IosHelper({
+          home: root,
+          env: { ...env, FAKE_WDA_PORT: String(wda), FAKE_MJPEG_PORT: String(mjpeg) },
+          log: () => {},
+          now,
+          usbmuxSocket: mux.file,
+          teams: async () => [{ id: "A1B2C3D4E5", name: "Sam Rivera", free: true }],
+        });
+        return helper;
+      },
+    },
+  );
+  try {
+    const t = { platform: "ios", serial: IPHONE, holder: r.holder("run-1") };
+    await r.manager.poll();
+    // Plugged in: the Mac builds the helper by itself, and says so on the phone.
+    expect(r.manager.list().find((p) => p.serial === IPHONE)).toMatchObject({
+      state: "preparing",
+      reason: "helper_missing",
+    });
+    // Meanwhile it installs and opens apps, but takes no screenshot yet.
+    writeFileSync(path.join(r.folder, "Acme.ipa"), "IPA");
+    expect(await r.op({ op: "phone.install", ...t, path: "Acme.ipa" })).toEqual({
+      app: "com.acme.app",
+      output: "Installed",
+    });
+    const install = r.calls().find((c) => c[1] === "devicectl" && c[2] === "device") as string[];
+    expect(install.slice(1, 8)).toEqual([
+      "devicectl",
+      "device",
+      "install",
+      "app",
+      "--device",
+      IPHONE,
+      path.join(r.folder, "Acme.ipa"),
+    ]);
+    await r.op({ op: "phone.launch", ...t, app: "com.acme.app" });
+    expect(await errorCode(() => r.op({ op: "phone.screenshot", ...t }))).toBe("phone_not_ready");
+    for (let i = 0; i < 200 && r.manager.list().find((p) => p.serial === IPHONE)?.state !== "ready"; i++) {
+      await Bun.sleep(50);
+      await r.manager.poll();
+    }
+    expect(r.manager.list().find((p) => p.serial === IPHONE)?.state).toBe("ready");
+    const shot = (await r.op({ op: "phone.screenshot", ...t })) as { path: string; width: number };
+    expect(shot.width).toBe(1080);
+    expect(readFileSync(path.join(r.folder, shot.path)).subarray(1, 4).toString()).toBe("PNG");
+    const rec = (await r.op({ op: "phone.record", ...t, seconds: 1 })) as { path: string; bytes: number };
+    expect(rec).toMatchObject({ path: expect.stringMatching(/recording\.mp4$/), bytes: 7 });
+    const ffmpeg = r.calls().find((c) => c[0] === "ffmpeg" && c.includes("pipe:0")) as string[];
+    expect(ffmpeg).toContain("h264_videotoolbox");
+    // Maestro dropped real iPhones: the flow runs through the helper.
+    const flow = (await r.op({
+      op: "phone.flow",
+      ...t,
+      flow: "appId: com.acme.app\n---\n- launchApp\n- tapOn: Sign in\n- takeScreenshot: signed in\n",
+      record: true,
+      timeoutSeconds: 60,
+    })) as { passed: boolean; output: string; video?: string; log: string };
+    expect(flow.passed).toBe(true);
+    expect(flow.video).toMatch(/flow\.mp4$/);
+    expect(flow.output).toContain("OK      tapOn Sign in");
+    expect(flow.output).toMatch(/Screenshot: \.agentes\/phone\/.+-signed-in\.png/);
+    expect(r.calls().some((c) => c[0] === "maestro")).toBe(false);
+    const wdaCalls = r
+      .calls()
+      .filter((c) => c[0] === "wda")
+      .map((c) => `${c[1]} ${c[2]}`);
+    expect(wdaCalls).toContain("POST /session/s1/wda/apps/launch");
+    expect(wdaCalls).toContain("POST /session/s1/wda/tap");
+    // What needs the person, in words: the developer not trusted.
+    r.setState({
+      ...ANDROID_STATE,
+      launchFail:
+        "ERROR: The application could not be launched because its profile has not been explicitly trusted by the user.\n",
+    });
+    const untrusted = await r.op({ op: "phone.launch", ...t, app: "com.acme.app" }).catch((e: Error) => e);
+    expect(untrusted).toMatchObject({ code: "phone_not_ready" });
+    // No libimobiledevice: its log can't be read.
+    expect(await errorCode(() => r.op({ op: "phone.logs", ...t, lines: 10 }))).toBe("tool_missing");
+    const withSyslog = rig(ANDROID_STATE);
+    const live = (await withSyslog.op({
+      op: "phone.logs",
+      ...t,
+      holder: withSyslog.holder("run-1"),
+      app: "com.acme.app",
+      lines: 10,
+    })) as {
+      text: string;
+    };
+    expect(live.text).toContain("com.acme.app hello");
+  } finally {
+    (helper as IosHelper | null)?.stopAll();
+    mux.close();
   }
-  const withSyslog = rig(ANDROID_STATE);
-  const live = (await withSyslog.op({
-    op: "phone.logs",
-    ...t,
-    holder: withSyslog.holder("run-1"),
-    app: "com.acme.app",
-    lines: 10,
-  })) as {
-    text: string;
-  };
-  expect(live.text).toContain("com.acme.app hello");
 });
 
 test("the runner routes phone ops with commands off, refuses them paused, and hands them the agent's folder", async () => {

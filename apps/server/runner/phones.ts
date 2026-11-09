@@ -31,9 +31,11 @@ import { APPLE_APP, appleNeedsYou, parseDevicectl, parseSimctl } from "./apple-d
 import { RunnerError } from "./errors";
 import { killTree } from "./exec";
 import { isExecutable } from "./executors";
+import { runIosFlow } from "./ios-flow";
 import { acquireLock, pidAlive, readLock } from "./lock";
 import { usualDirs } from "./login-path";
 import { isInside } from "./paths";
+import { HELPER_WORDS, IosHelper, wdaScreenDriver } from "./wda";
 
 /**
  * The phones this computer reaches (bring your own devices): Android over the adb server already running (USB,
@@ -170,7 +172,21 @@ const REASON_WORDS: Partial<Record<PhoneReason, string>> = {
   locked: "Unlock it and try again.",
   booting: "It's still starting.",
   os_too_old: "Its Android version is too old for these tools.",
+  helper_missing: "Its test helper is still being set up on this Mac (a few minutes the first time).",
+  helper_expired: "Its test helper is being renewed on this Mac.",
+  ...HELPER_WORDS,
 };
+
+/** Reasons only the test helper has: an iPhone still installs, opens apps and reads its log meanwhile. */
+const HELPER_REASONS = new Set<PhoneReason>([
+  "helper_missing",
+  "helper_expired",
+  "apple_account_missing",
+  "team_limit",
+  "helper_untrusted",
+  "ui_automation_off",
+]);
+const NEEDS_HELPER = new Set(["phone.screenshot", "phone.record", "phone.flow"]);
 
 export const TOOL_HELP = {
   adb: "Install Android platform-tools (or Android Studio), then try again.",
@@ -223,6 +239,7 @@ interface Tools {
   bundletool: string | null;
   syslog: string | null;
   plutil: string | null;
+  ffmpeg: string | null;
 }
 
 export interface PhoneManagerOptions {
@@ -249,6 +266,8 @@ export interface PhoneManagerOptions {
   liveLogMs?: number;
   /** Only looks: changes no setting on a phone (`doctor`). */
   readOnly?: boolean;
+  /** The iPhone test helper (default: one of this OS user's, on a Mac). */
+  ios?: IosHelper | null;
 }
 
 const keyOf = (p: { platform: string; serial: string }) => `${p.platform}:${p.serial}`;
@@ -328,12 +347,25 @@ export class PhoneManager {
   private readonly platform: NodeJS.Platform;
   private readonly home: string;
   private readonly now: () => number;
+  private readonly ios: IosHelper | null;
 
   constructor(private readonly opts: PhoneManagerOptions) {
     this.env = opts.env ?? process.env;
     this.platform = opts.platform ?? process.platform;
     this.home = opts.home ?? os.homedir();
     this.now = opts.now ?? Date.now;
+    this.ios =
+      opts.ios !== undefined
+        ? opts.ios
+        : this.platform === "darwin"
+          ? new IosHelper({ home: this.home, env: this.env, log: opts.log, now: this.now })
+          : null;
+    const ios = this.ios;
+    if (ios) {
+      registerIosScreenDriver((phone, tools) =>
+        tools.xcrun && phone.platform === "ios" ? wdaScreenDriver(ios, phone, tools.xcrun) : null,
+      );
+    }
   }
 
   start() {
@@ -348,6 +380,7 @@ export class PhoneManager {
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
     await Promise.all([...this.holds.keys()].map((key) => this.drop(key, true)));
+    this.ios?.stopAll();
     this.keepAwake(false);
   }
 
@@ -397,6 +430,7 @@ export class PhoneManager {
       if (!this.seen.has(key)) await this.drop(key, false);
       else if (hold.busy === 0 && now - hold.lastUsed >= (this.opts.idleMs ?? IDLE_MS)) await this.drop(key, true);
     }
+    this.ios?.reap(new Set([...this.holds.keys()].filter((k) => k.startsWith("ios:")).map((k) => k.slice(4))));
     this.changed();
   }
 
@@ -421,6 +455,7 @@ export class PhoneManager {
       bundletool: find("bundletool"),
       syslog: find("idevicesyslog"),
       plutil: this.platform === "darwin" ? find("plutil") : null,
+      ffmpeg: this.platform === "darwin" ? find("ffmpeg") : null,
     };
     this.cachedTools = { at: this.now(), tools };
     return tools;
@@ -506,7 +541,13 @@ export class PhoneManager {
       env: this.env,
     });
     try {
-      if (real.code === 0) out.push(...parseDevicectl(JSON.parse(await readFile(file, "utf8"))));
+      if (real.code === 0) {
+        for (const phone of parseDevicectl(JSON.parse(await readFile(file, "utf8")))) {
+          // Ready to the Mac, the iPhone still waits for its test helper: built, renewed and checked by itself.
+          const need = phone.state === "ready" && this.ios ? this.ios.need(phone.serial, xcrun) : null;
+          out.push(need ? { ...phone, ...need } : phone);
+        }
+      }
     } catch {
       // no devicectl (an Xcode before 15), or nothing written
     } finally {
@@ -591,6 +632,7 @@ export class PhoneManager {
     if (!hold) return false;
     this.holds.delete(key);
     hold.releaseFile();
+    if (key.startsWith("ios:")) this.ios?.stop(key.slice(4));
     if (restore && hold.restore) await hold.restore().catch(() => undefined);
     this.changed();
     return true;
@@ -615,7 +657,8 @@ export class PhoneManager {
     if (!this.seen.has(key)) await this.poll();
     const phone = this.seen.get(key);
     if (!phone) throw new RunnerError("phone_missing", "This phone isn't connected to this computer right now.");
-    const problem = phoneNotReady(phone);
+    const helperOnly = phone.reason !== undefined && HELPER_REASONS.has(phone.reason) && !NEEDS_HELPER.has(req.op);
+    const problem = helperOnly ? null : phoneNotReady(phone);
     if (problem) {
       throw new RunnerError(
         phone.state === "unsupported" ? "unsupported" : "phone_not_ready",
@@ -854,18 +897,20 @@ export class PhoneManager {
         return { output: out.trim() } satisfies MachineReplies["phone.launch"];
       }
       case "phone.screenshot": {
-        if (!sim) throw new RunnerError("tool_missing", TOOL_HELP.helper("Taking a screenshot of"));
         const out = await this.outFile(io, "screenshot", "png");
-        await ok(["simctl", "io", udid, "screenshot", "--type=png", out.abs], "The screenshot");
+        if (sim) await ok(["simctl", "io", udid, "screenshot", "--type=png", out.abs], "The screenshot");
+        else await writeFile(out.abs, await (await this.helper(phone, tools)).client.screenshot());
         const size = pngSize(await readFile(out.abs));
         return { path: out.rel, ...(size ?? {}) } satisfies MachineReplies["phone.screenshot"];
       }
       case "phone.record": {
-        if (!sim) throw new RunnerError("tool_missing", TOOL_HELP.helper("Recording"));
         const seconds = clampInt(req.seconds, 1, RECORD_MAX_SECONDS, 30);
         const out = await this.outFile(io, "recording", "mp4");
         const started = this.now();
-        await this.record(tools, phone, out.abs, seconds, io.signal).done;
+        await (sim
+          ? this.record(tools, phone, out.abs, seconds, io.signal)
+          : await this.iphoneRecorder(tools, phone, out.abs, seconds, io.signal)
+        ).done;
         const bytes = await sizeOf(out.abs);
         if (bytes === 0) throw new RunnerError("internal", "The recording came out empty.");
         return {
@@ -875,9 +920,8 @@ export class PhoneManager {
         } satisfies MachineReplies["phone.record"];
       }
       case "phone.flow":
-        // Maestro drives simulators; it dropped real iPhones (2.11.0).
-        if (!sim) throw new RunnerError("tool_missing", TOOL_HELP.helper("Running a flow on"));
-        return this.flow(req, phone, tools, io);
+        // Maestro drives simulators; it dropped real iPhones (2.11.0), which run the flow through the test helper.
+        return sim && tools.maestro ? this.flow(req, phone, tools, io) : this.iosFlow(req, phone, tools, io);
       case "phone.logs": {
         const lines = clampInt(req.lines, 1, 5000, 200);
         const app = req.app ? String(req.app) : null;
@@ -925,9 +969,21 @@ export class PhoneManager {
     return note + tail((mine.length > 0 ? mine : all).slice(-lines).join("\n"), LOG_MAX_CHARS);
   }
 
-  /** A Maestro flow, recorded around when asked. Its YAML, log and video land in `.agentes/phone/`. */
-  private async flow(req: Extract<PhoneRequest, { op: "phone.flow" }>, phone: Phone, tools: Tools, io: PhoneIo) {
-    if (!tools.maestro) throw new RunnerError("tool_missing", TOOL_HELP.maestro);
+  /** The phone's test helper running (an iPhone's or a simulator's), for an op that needs it. */
+  private helper(phone: Phone, tools: Tools) {
+    if (!this.ios || !tools.xcrun) throw new RunnerError("tool_missing", "iPhones need Xcode on this Mac.");
+    return this.ios.run(phone.kind, phone.serial, tools.xcrun);
+  }
+
+  /** A real iPhone's screen into `file`: the test helper's stream through ffmpeg (fetched on first use). */
+  private async iphoneRecorder(tools: Tools, phone: Phone, file: string, limit: number, signal: AbortSignal) {
+    const run = await this.helper(phone, tools);
+    const ios = this.ios as IosHelper;
+    return ios.record(run, await ios.ffmpeg(tools.ffmpeg), file, limit, signal);
+  }
+
+  /** A flow's YAML, variables and time limit, checked. */
+  private flowInput(req: Extract<PhoneRequest, { op: "phone.flow" }>) {
     const flow = typeof req.flow === "string" ? req.flow : "";
     if (!flow.trim()) throw new RunnerError("bad_request", "The flow is empty");
     if (Buffer.byteLength(flow) > FLOW_MAX_BYTES) throw new RunnerError("too_large", "The flow is too long");
@@ -937,7 +993,58 @@ export class PhoneManager {
         throw new RunnerError("bad_request", `${k} isn't a variable name a flow takes`);
       }
     }
-    const timeoutSeconds = clampInt(req.timeoutSeconds, 10, 20 * 60, 10 * 60);
+    return { flow, vars, timeoutSeconds: clampInt(req.timeoutSeconds, 10, 20 * 60, 10 * 60) };
+  }
+
+  /**
+   * A flow through the test helper (a real iPhone, or a simulator without Maestro), recorded around when asked: its
+   * YAML, log, screenshots and video land in `.agentes/phone/`.
+   */
+  private async iosFlow(req: Extract<PhoneRequest, { op: "phone.flow" }>, phone: Phone, tools: Tools, io: PhoneIo) {
+    const { flow, vars, timeoutSeconds } = this.flowInput(req);
+    const yaml = await this.outFile(io, "flow", "yaml");
+    await writeFile(yaml.abs, flow);
+    const run = await this.helper(phone, tools);
+    const video = req.record === true ? await this.outFile(io, "flow", "mp4") : null;
+    const recorder = video
+      ? phone.kind === "simulator"
+        ? this.record(tools, phone, video.abs, RECORD_MAX_SECONDS, io.signal)
+        : await this.iphoneRecorder(tools, phone, video.abs, RECORD_MAX_SECONDS, io.signal)
+      : null;
+    if (recorder) await sleep(this.opts.settleMs ?? 1500);
+    const started = this.now();
+    const result = await runIosFlow(flow, run.client, {
+      env: Object.fromEntries(vars),
+      signal: io.signal,
+      deadline: Date.now() + timeoutSeconds * 1000,
+      save: async (name, png) => {
+        const shot = await this.outFile(io, name, "png");
+        await writeFile(shot.abs, png);
+        return shot.rel;
+      },
+    }).catch((err: unknown) => {
+      if (err instanceof RunnerError && err.code === "bad_request") throw err;
+      return { passed: false, output: `FAILED  ${err instanceof Error ? err.message : String(err)}`, screenshots: [] };
+    });
+    const seconds = Math.round((this.now() - started) / 1000);
+    await recorder?.stop();
+    const log = yaml.rel.replace(/\.yaml$/, ".log");
+    const output = [result.output, ...result.screenshots.map((p) => `Screenshot: ${p}`)].join("\n");
+    await writeFile(yaml.abs.replace(/\.yaml$/, ".log"), output);
+    const kept = video && (await sizeOf(video.abs)) > 0;
+    return {
+      passed: result.passed,
+      output: tail(output, 8000),
+      seconds,
+      ...(kept && video ? { video: video.rel } : {}),
+      log,
+    } satisfies MachineReplies["phone.flow"];
+  }
+
+  /** A Maestro flow, recorded around when asked. Its YAML, log and video land in `.agentes/phone/`. */
+  private async flow(req: Extract<PhoneRequest, { op: "phone.flow" }>, phone: Phone, tools: Tools, io: PhoneIo) {
+    if (!tools.maestro) throw new RunnerError("tool_missing", TOOL_HELP.maestro);
+    const { flow, vars, timeoutSeconds } = this.flowInput(req);
     const yaml = await this.outFile(io, "flow", "yaml");
     await writeFile(yaml.abs, flow);
     const video = req.record === true ? await this.outFile(io, "flow", "mp4") : null;
@@ -1058,3 +1165,42 @@ const sizeOf = (file: string) =>
     (s) => s.size,
     () => 0,
   );
+
+// ── The screen live ───────────────────────────────────────────────────────────
+
+/** One picture of a phone's screen, and the size its input is given in (the picture's own, for Android). */
+export interface ScreenFrame {
+  jpeg?: Uint8Array;
+  png?: Uint8Array;
+  width: number;
+  height: number;
+}
+
+/**
+ * A phone's screen as a person sees and drives it from the apps (`PhoneManager.view`). Input comes in the space of
+ * the last `frame`'s `width` and `height`: the view maps the person's point there.
+ */
+export interface PhoneScreenDriver {
+  frame(signal: AbortSignal): Promise<{ jpeg?: Uint8Array; png?: Uint8Array; width: number; height: number }>;
+  tap(x: number, y: number): Promise<void>;
+  swipe(x1: number, y1: number, x2: number, y2: number, ms: number): Promise<void>;
+  text(s: string): Promise<void>;
+  key(k: "home" | "back" | "enter" | "delete" | "app_switch" | "volume_up" | "volume_down" | "power"): Promise<void>;
+}
+
+/** What a screen driver runs: the tools found on this computer, and their environment. */
+export interface ScreenTools {
+  adb: string | null;
+  xcrun: string | null;
+  env: NodeJS.ProcessEnv;
+}
+
+/** Makes an iPhone's (or a simulator's) driver; null leaves that phone to the built-in one. */
+export type IosScreenDriverFactory = (phone: RunnerPhone, tools: ScreenTools) => PhoneScreenDriver | null;
+
+let iosScreenDriver: IosScreenDriverFactory | null = null;
+
+/** The driver that shows and controls iPhones (WebDriverAgent, the test helper); null takes it back out. */
+export function registerIosScreenDriver(factory: IosScreenDriverFactory | null) {
+  iosScreenDriver = factory;
+}

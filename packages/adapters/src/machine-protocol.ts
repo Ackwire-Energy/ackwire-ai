@@ -615,6 +615,12 @@ export type PhoneReason =
   /** iPhone: the test helper isn't built yet, or its free signature ran out (`helper_expired`). */
   | "helper_missing"
   | "helper_expired"
+  /** iPhone: Xcode on the Mac is signed in to no Apple Account (Xcode › Settings › Accounts), so nothing signs the helper. */
+  | "apple_account_missing"
+  /** iPhone: a free Apple Account's limit (3 apps of its own per phone, 10 app ids a week) stops the helper. */
+  | "team_limit"
+  /** iPhone: the phone doesn't trust the helper's developer yet (Settings › General › VPN & Device Management). */
+  | "helper_untrusted"
   /** An emulator or simulator still starting. */
   | "booting"
   /** Windows sees no driver for this phone (install its maker's USB driver). */
@@ -668,6 +674,8 @@ export interface RunnerToolchains {
   maestro?: string;
   /** Xcode's version (macOS). */
   xcode?: string;
+  /** The Apple Account team that signs the iPhone test helper, as Xcode names it ("Sam Rivera (Personal Team)"). */
+  appleTeam?: string;
   node?: string;
 }
 
@@ -2673,6 +2681,7 @@ const TOOLCHAINS: readonly (keyof RunnerToolchains)[] = [
   "scrcpy",
   "maestro",
   "xcode",
+  "appleTeam",
   "node",
 ];
 const idOrNull = (v: unknown) => (isString(v) && v.length <= 64 ? v : null);

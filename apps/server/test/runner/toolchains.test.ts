@@ -31,7 +31,9 @@ function computer(tools: string[]) {
 test("what this computer builds with: each tool's version, the Android SDK's folder, nothing for what's missing", async () => {
   const c = computer(Object.keys(TOOLS));
   mkdirSync(path.join(c.root, "Library/Android/sdk"), { recursive: true });
-  expect(await probeToolchains({ env: c.env, platform: "darwin", home: c.root, dirs: [] })).toEqual({
+  // The iPhone helper's signing team: the Personal Team, as Xcode names it.
+  const teams = async () => [{ id: "A1B2C3D4E5", name: "Sam Rivera", free: true }];
+  expect(await probeToolchains({ env: c.env, platform: "darwin", home: c.root, dirs: [], teams })).toEqual({
     git: "2.50.1",
     java: "17.0.18",
     androidSdk: path.join(c.root, "Library/Android/sdk"),
@@ -39,6 +41,7 @@ test("what this computer builds with: each tool's version, the Android SDK's fol
     scrcpy: "4.0",
     maestro: "2.11.0",
     xcode: "26.3",
+    appleTeam: "Sam Rivera (Personal Team)",
     node: "24.22.1",
   });
   // Linux: no Xcode asked; without the tools, nothing said.
