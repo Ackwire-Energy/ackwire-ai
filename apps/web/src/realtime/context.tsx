@@ -66,6 +66,7 @@ import {
   keys,
   markStopping,
   type OpenConsult,
+  openConversation,
   RealtimeConnection,
   type ReceiptsState,
   realtimeUrl,
@@ -453,37 +454,10 @@ export function RealtimeProvider({
       void checkAppVersion();
       // Reactions heard live may be stale now: the refetched message lists carry them again.
       qc.removeQueries({ queryKey: ["org", orgId, "reactions"] });
-      // Notifications that arrived while offline: the inbox and the badge catch up.
-      void qc.invalidateQueries({ queryKey: keys.notifications(orgId) });
-      // The workspace's computer on its way, its standing and its limits (a new plan) may have moved meanwhile, and so
-      // may the computers (one back online, a pause) and the agents' screens.
-      void qc.invalidateQueries({ queryKey: keys.computerSetup(orgId) });
-      void qc.invalidateQueries({ queryKey: keys.machines(orgId) });
-      void qc.invalidateQueries({ queryKey: keys.agentDesktops(orgId) });
+      // Nothing sent while the socket was down reached this tab, so everything the workspace holds may be old: what
+      // is on screen reads again now, the rest when it is shown.
+      void qc.invalidateQueries({ queryKey: keys.org(orgId) });
       void qc.invalidateQueries({ queryKey: keys.me });
-      void qc.invalidateQueries({ queryKey: keys.limits(orgId) });
-      void qc.invalidateQueries({ queryKey: ["org", orgId, "channel"] });
-      // The agents, channels and people who came, changed or left meanwhile.
-      void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
-      void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
-      void qc.invalidateQueries({ queryKey: keys.dms(orgId) });
-      void qc.invalidateQueries({ queryKey: keys.members(orgId) });
-      // Who came and went while this socket was down: their `member.status` never reached it.
-      void qc.invalidateQueries({ queryKey: keys.people(orgId) });
-      void qc.invalidateQueries({ queryKey: keys.threads(orgId) });
-      // The groups of agents someone changed meanwhile.
-      void qc.invalidateQueries({ queryKey: keys.agentGroups(orgId) });
-      // The Vault, whose `vault.changed` may have come while offline (ADR 0144).
-      void qc.invalidateQueries({ queryKey: keys.vault(orgId) });
-      // The Drive, the Wiki, the calendar, the routines and the invitations someone changed meanwhile.
-      for (const key of [
-        keys.artifacts(orgId),
-        keys.wiki(orgId),
-        keys.calendar(orgId),
-        keys.routines(orgId),
-        keys.invitations(orgId),
-      ])
-        void qc.invalidateQueries({ queryKey: key });
     });
     // The first open too, for what a return from the billing service changes: a new plan's limits, standing and
     // computer can land in core between this page's first reads and the socket's open, and that event reaches no one.
@@ -810,7 +784,8 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
   }, [connection, enabled, orgId, channelId, qc, streams, api]);
   useEffect(() => {
     if (!connection || !enabled) return;
-    return connection.subscribe(channelId, (event) => {
+    const close = openConversation(qc, orgId, channelId);
+    const off = connection.subscribe(channelId, (event) => {
       if (handledEvents.has(event)) return;
       handledEvents.add(event);
       streams.apply(event);
@@ -893,6 +868,10 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
         if (threadId) refreshRepliedThread(qc, orgId, threadId);
       }
     });
+    return () => {
+      off();
+      close();
+    };
   }, [connection, enabled, orgId, channelId, qc, streams, api]);
 }
 

@@ -1425,7 +1425,12 @@ export async function catchUpChannel(
           ? [api.chat.messages(orgId, channelId, { threadId: rootId, limit: THREAD_PAGE })]
           : [],
     );
-  const read = (await Promise.all(reads).catch(() => [])).flat();
+  const settled = await Promise.allSettled(reads);
+  // A read that failed (a deploy, a dropped connection) would leave its list without what it came for until a
+  // reload: the lists read again through the query client, which tries again.
+  if (settled.some((r) => r.status === "rejected"))
+    void qc.invalidateQueries({ queryKey: prefix, predicate: (q) => isMessageList(q.queryKey) });
+  const read = settled.flatMap((r) => (r.status === "fulfilled" ? r.value : []));
   const known = new Set(
     qc
       .getQueriesData<Message[]>({ queryKey: prefix, predicate: (q) => isMessageList(q.queryKey) })
@@ -1436,6 +1441,35 @@ export async function catchUpChannel(
   // Only what it added: this runs on every channel opened, and a reconnect reads the thread lists on its own.
   for (const threadId of new Set(added.flatMap((m) => m.threadId ?? []))) refreshRepliedThread(qc, orgId, threadId);
   return read;
+}
+
+/** The screens open on each conversation (a thread beside its channel is a second one), per query client. */
+const openScreens = new WeakMap<QueryClient, Map<string, number>>();
+
+/**
+ * A screen opened that applies a conversation's live events to its caches; call what this returns when it closes.
+ * Once its last one closes, nothing keeps those caches current: they are marked stale, not read, so the next showing
+ * reads them whatever their `staleTime`, within which it would show the conversation (and its thread lines) as it
+ * was when it closed.
+ */
+export function openConversation(qc: QueryClient, orgId: string, channelId: string): () => void {
+  const counts = openScreens.get(qc) ?? new Map<string, number>();
+  openScreens.set(qc, counts);
+  const key = `${orgId}:${channelId}`;
+  counts.set(key, (counts.get(key) ?? 0) + 1);
+  let closed = false;
+  return () => {
+    if (closed) return;
+    closed = true;
+    const left = (counts.get(key) ?? 1) - 1;
+    if (left > 0) return void counts.set(key, left);
+    counts.delete(key);
+    const conversation = ["org", orgId, "channel", channelId];
+    // A read still on its way would be joined by the next showing, which would take an answer older than itself.
+    void qc.cancelQueries({ queryKey: conversation, predicate: (q) => q.getObserversCount() === 0 });
+    void qc.invalidateQueries({ queryKey: conversation, refetchType: "none" });
+    void qc.invalidateQueries({ queryKey: keys.threads(orgId), refetchType: "none" });
+  };
 }
 
 /** A read's receipts on the copies of its messages the channel's lists hold (nothing else of them changes). */
@@ -5175,6 +5209,9 @@ export function useThreadInfo(orgId: string, threadId: string | null | undefined
     queryFn: () => api.threads.get(orgId, threadId ?? ""),
     enabled: Boolean(threadId),
     staleTime: 15_000,
+    // Every opening reads it, as its replies: the open thread clears its unread in this cache before this query
+    // mounts, which would pass for a fresh read, and its count and people kept what they were when it last read.
+    refetchOnMount: "always",
     placeholderData: () => (threadId ? cachedThreadInfo(qc, orgId, threadId) : undefined),
   });
 }
@@ -5936,6 +5973,10 @@ const taskNoticeOf = (event: { type: string }) =>
 export function applyUnreadEvent(qc: QueryClient, orgId: string, event: { type: string }) {
   const e = event as UnreadEvent;
   if (e.type === "channel.activity") {
+    // Said where no screen of this app listens (a list loaded ahead, on hover or at start, counts as fresh): that
+    // conversation reads again when it is shown.
+    if (!openScreens.get(qc)?.has(`${orgId}:${e.channelId}`))
+      void qc.invalidateQueries({ queryKey: ["org", orgId, "channel", e.channelId], refetchType: "none" });
     if (e.dm) readOncePerBurst(`${orgId}:dms`, () => void qc.invalidateQueries({ queryKey: keys.dms(orgId) }));
     else readOncePerBurst(`${orgId}:channels`, () => void qc.invalidateQueries({ queryKey: keys.channels(orgId) }));
     if (e.threadId)
