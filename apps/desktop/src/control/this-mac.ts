@@ -62,6 +62,8 @@ export interface ThisMacDeps {
   revealFolder(path: string): Promise<void>;
   /** How long to wait for the runner's code. */
   codeTimeoutMs?: number;
+  /** The site confirmed a pairing it asked for: its agents work while the app runs, so it opens at login. */
+  onPaired?(): void;
 }
 
 const orgOf = (h: Home) => h.status?.org?.id;
@@ -129,7 +131,7 @@ export async function answerThisMac(deps: ThisMacDeps, request: ThisMacRequest):
  * confirms with their session (the site, or the app's own windows through `site_fetch`); null when already connected.
  */
 export async function connect(
-  { store, codeTimeoutMs = 20_000 }: Pick<ThisMacDeps, "store" | "codeTimeoutMs">,
+  { store, codeTimeoutMs = 20_000, onPaired }: Pick<ThisMacDeps, "store" | "codeTimeoutMs" | "onPaired">,
   orgId: string,
   origin: string,
 ): Promise<ThisMacConnect> {
@@ -158,7 +160,7 @@ export async function connect(
       }
     });
   });
-  void whenPaired(store, homeId);
+  void whenPaired(store, homeId, onPaired);
   try {
     await store.request(homeId, { type: "pair.start", server: origin });
   } catch (err) {
@@ -202,12 +204,14 @@ export function toolsHere(homes: readonly Home[]): { tools: RunnerTools; command
   return { tools: { ...tools, commands: all }, commandsOnlyFor: all ? [] : withCommands.map(orgName) };
 }
 
-/** Once the pairing is confirmed, the new organization's first tools. */
-export function whenPaired(store: DesktopStore, homeId: string) {
+/** Once the pairing is confirmed, the new organization's first tools, then `onDone`. */
+export function whenPaired(store: DesktopStore, homeId: string, onDone?: () => void) {
   const off = store.onEvent((id, event) => {
     if (id !== homeId || (event.kind !== "pair.done" && event.kind !== "pair.failed")) return;
     off();
-    if (event.kind === "pair.done") void firstTools(store, homeId);
+    if (event.kind !== "pair.done") return;
+    void firstTools(store, homeId);
+    onDone?.();
   });
   // A code nobody confirms expires; stop listening well after.
   setTimeout(off, 30 * 60_000);
