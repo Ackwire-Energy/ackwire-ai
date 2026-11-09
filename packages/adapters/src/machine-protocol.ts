@@ -698,6 +698,18 @@ export interface PhonePairing {
   expiresAt: string;
 }
 
+/** `192.168.1.20:37099` (or `[fe80::1]:37099`) as the phone shows it under Pair device with pairing code. */
+export function pairAddress(input: unknown): string | null {
+  if (typeof input !== "string") return null;
+  const text = input.trim();
+  const v4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3}):(\d{1,5})$/.exec(text);
+  const v6 = /^\[([0-9a-fA-F:%.\w]{2,60})\]:(\d{1,5})$/.exec(text);
+  const port = Number((v4 ? v4[5] : v6?.[2]) ?? 0);
+  if (port < 1 || port > 65535) return null;
+  if (v4?.slice(1, 5).every((o) => Number(o) <= 255)) return text;
+  return v6?.[1]?.includes(":") ? text : null;
+}
+
 /** What this computer can build and drive with (versions found, best effort; absent: not found). */
 export interface RunnerToolchains {
   git?: string;

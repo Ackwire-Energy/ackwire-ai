@@ -92,8 +92,12 @@ async function viewOf(db: Database, orgId: string, machineId: string, r: PhonePa
   return phone ? { ...view, phoneId: phone.id } : { ...view, state: "connecting" };
 }
 
-/** A runner from before Wi-Fi pairing answers its ops as a phone op without a phone (`bad_request`). */
-const tooOld = (error: unknown) => error instanceof MachineRequestError && error.code === "bad_request";
+/**
+ * A runner from before phones (`unsupported`, from the hub), or from before Wi-Fi pairing: it answers these ops as a
+ * phone op naming no phone (`bad_request`). The route checks the address and code as the runner does.
+ */
+const tooOld = (error: unknown) =>
+  error instanceof MachineRequestError && (error.code === "bad_request" || error.code === "unsupported");
 
 /** `POST …/computers/{machineId}/wifi-pairings`: the QR way, or with `address` and `code` the six-digit way. */
 export async function startWifiPairing(

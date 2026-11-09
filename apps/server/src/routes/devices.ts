@@ -1,3 +1,4 @@
+import { pairAddress } from "@agenteschat/adapters";
 import {
   approveDeviceJoin,
   cancelWifiPairing,
@@ -350,6 +351,7 @@ export function deviceAppRoutes(deps: AppDeps) {
                 .string()
                 .max(80)
                 .regex(/^(\d{1,3}(\.\d{1,3}){3}|\[[0-9a-fA-F:%.\w]{2,60}\]):\d{1,5}$/)
+                .refine((a) => pairAddress(a) !== null, "Not an IP address and port")
                 .openapi({ example: "192.168.1.20:37099" }),
               code: z.string().regex(/^\d{6}$/),
             })

@@ -491,6 +491,11 @@ test("Wi-Fi pairing: only who may manage the computer pairs with it; connected n
   expect(await wifiPairingState(d, f.owner.id, f.org.id, mac, id)).toMatchObject({ reason: "failed" });
   fail = new MachineRequestError("bad_request", "A phone op names its phone (platform and serial)");
   expect(await startWifiPairing(d, f.owner.id, f.org.id, mac, {})).toMatchObject({ state: "failed", reason: "update" });
+  fail = new MachineRequestError(
+    "unsupported",
+    "The computer MacBook needs an update before agents can use its phones.",
+  );
+  expect(await startWifiPairing(d, f.owner.id, f.org.id, mac, {})).toMatchObject({ state: "failed", reason: "update" });
   await cancelWifiPairing(d, f.owner.id, f.org.id, mac, id);
   expect(calls.at(-1)).toEqual({ machineId: mac, request: { op: "phone.pair.cancel", pairingId: id } });
   expect(isNewWork({ op: "phone.pair.start" })).toBe(false);

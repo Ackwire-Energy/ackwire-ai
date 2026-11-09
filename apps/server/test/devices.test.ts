@@ -131,6 +131,7 @@ test("Wi-Fi pairing over HTTP: the computer's owner only, a checked address and 
     { address: "192.168.1.20:37099" },
     { address: "192.168.1.20:37099", code: "12345" },
     { address: "-s 1", code: "123456" },
+    { address: "192.168.1.300:37099", code: "123456" },
   ])
     expect((await owner(path, { json: bad })).status).toBe(400);
   // Not connected now: the person is told it's offline (no runner here to pair with).
