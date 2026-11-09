@@ -132,6 +132,7 @@ import type {
   EndpointCheck,
   EndpointModel,
   EndpointStyle,
+  FeedbackInput,
   ForeignMailbox,
   FormerAgent,
   GifKey,
@@ -347,6 +348,8 @@ export interface ApiClient {
     /** `null` unless I am the installation's owner (and not on agentes.chat itself). */
     telemetry(): Promise<ServerTelemetry | null>;
     setTelemetry(enabled: boolean): Promise<ServerTelemetry>;
+    /** By email to whoever runs the server; only where it takes feedback (`AuthConfig.feedback`). */
+    sendFeedback(input: FeedbackInput): Promise<void>;
     /** `null` unless I am the installation's owner on a self-hosted server. */
     jev(): Promise<JevKey | null>;
     /** Checked with TypeSafe first: `jev_key_invalid` (422) when it refuses, `jev_key_env` (409) with an env key. */

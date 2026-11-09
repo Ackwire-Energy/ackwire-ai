@@ -198,6 +198,9 @@ export function accountRoutes(deps: AppDeps) {
             supportEmail: z.string().nullable().openapi({
               description: "Where people write to whoever runs this server (SUPPORT_EMAIL): hold, suspension.",
             }),
+            feedback: z.boolean().openapi({
+              description: "The apps offer the feedback form (FEEDBACK_EMAIL is set): `POST /api/app/feedback`.",
+            }),
             workspaceComputer: z.boolean().openapi({
               description:
                 "Every workspace gets a computer of its own (MACHINE_PROVISIONING=external): a new person's setup has none to connect.",

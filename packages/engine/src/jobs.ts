@@ -58,6 +58,7 @@ import {
 import { forgetCodeEmail } from "./email-codes";
 import { type DecidedBy, publishListChanged, publishRouted } from "./events";
 import { executeRun, type RunExecutorDeps } from "./executor";
+import { FEEDBACK_JOB, sendQueuedFeedback } from "./feedback";
 import { FOLLOW_UP_JOB, wakeFollowUp } from "./follow-through";
 import { cutText } from "./format";
 import type { GitHubAppAccess } from "./git/github-call";
@@ -941,6 +942,10 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         throw error;
       }
       await forgetCodeEmail(deps.db, job);
+    },
+    [FEEDBACK_JOB]: async (job) => {
+      if (!deps.email) throw new PermanentJobError("no email sender configured");
+      await sendQueuedFeedback(deps.email, job.payload);
     },
     [PLAN_WAITING_JOB]: async (job) => {
       if (deps.emailArt) await sendPlanWaitingEmail(deps.db, deps.emailArt.home, orgOf(job), job.payload.step);

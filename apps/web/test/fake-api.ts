@@ -1325,6 +1325,9 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         state.telemetry = { ...state.telemetry, enabled };
         return state.telemetry;
       },
+      sendFeedback: async (input) => {
+        log("system.sendFeedback", input);
+      },
       jev: async () => state.jev ?? null,
       saveJev: async (apiKey) => {
         log("system.saveJev", apiKey);
