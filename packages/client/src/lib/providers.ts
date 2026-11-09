@@ -214,8 +214,10 @@ export function apiProviderOf(model: string | null | undefined, models: readonly
 }
 
 /** The maker of the key an agent on Automático thinks with, as the AI status says (none while it can't think). */
-export const autoMakerOf = (status: Pick<AiStatus, "agents"> | undefined, agentId: string) =>
-  status?.agents.find((a) => a.agentId === agentId)?.provider;
+export const autoMakerOf = (
+  status: { agents: readonly Pick<AiStatus["agents"][number], "agentId" | "provider">[] } | undefined,
+  agentId: string,
+) => status?.agents.find((a) => a.agentId === agentId)?.provider;
 
 /**
  * What an agent on an API key thinks with, by name: its model ("Sonnet 5.5"), or on Automático the maker of the key it

@@ -136,12 +136,16 @@ test("the phone's greeting draws the checklist and Conversas has one line back t
   const card = src("right-hand/FirstRun.tsx");
   expect(card).toContain("apps: appNames,");
   expect(card).toContain("invited: run.invited.length ? joinNames(run.invited, t) : null,");
-  // As on the web: the AI row connects the whole team, the apps row is its own screen of suggested apps, and a skip
-  // says nothing (ADR 0158).
+  // As on the web: the AI row connects the whole team, the apps row is its own screen of suggested apps, a skip says
+  // nothing, and an invitation only sent says so, the welcome kept for someone joining (ADR 0158).
   expect(card).toContain("openConnectAi(team.length > 0 ? {} : { agentId: agent.id })");
   expect(card).toContain('apps: () => openSetupStep(agent.id, "apps")');
+  expect(card).toContain("firstRunBeats(doneHere, { members: run.members, invited: run.invited.length })");
+  expect(card).toContain('? t("agentSetup.firstRun.say.invited")');
   // biome-ignore lint/suspicious/noTemplateCurlyInString: the card's own source text, placeholder included.
-  expect(card).toContain('facts[step] ? t(`agentSetup.firstRun.say.${step}`, agentGrammar(agent.name)) : ""');
+  expect(card).toContain(": facts[beat]\n          ? t(`agentSetup.firstRun.say.${beat}`, agentGrammar(agent.name))");
+  // One first task, the team card's: the card's asks offer none.
+  expect(card).not.toContain("firstTask");
   const steps = src("agents/setup/SetupStepScreen.tsx");
   expect(steps).toContain("firstRun ? <FirstRunAppsStep /> : <AppsStep agent={agent} />");
   expect(steps).toContain("firstRunAppList(");
