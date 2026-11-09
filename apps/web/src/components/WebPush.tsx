@@ -28,14 +28,10 @@ import {
   type WebPushState,
 } from "@/lib/web-push";
 
-/** Read once per page load: what the browser offers doesn't change while it is open. */
-let offeredHere: boolean | undefined;
 /** Who the server last heard this browser's subscription for, in which language (`useWebPushRefresh`). */
 let refreshedFor: string | null = null;
-const offered = () => {
-  offeredHere ??= canOfferWebPush(readPushEnvironment());
-  return offeredHere;
-};
+/** Read each time, never kept here: these modules outlive the browser they first read (tests open many apps). */
+const offered = () => canOfferWebPush(readPushEnvironment());
 
 /**
  * "Avisos neste navegador" (ADR 0071): this browser's state and its switch, in Configurações › Notificações. `shown`

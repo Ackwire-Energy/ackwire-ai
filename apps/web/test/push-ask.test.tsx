@@ -12,7 +12,11 @@ import { renderApp, screen, settle } from "./render";
  * agent they wrote to, never on arrival, never as a dialog over the screen, never on a billing hold.
  */
 
-beforeAll(() => {
+beforeAll(async () => {
+  // An app opened before in a browser that takes no notifications (another test file, in the same process) decides
+  // nothing for the ones below.
+  await open(seedState());
+  cleanup();
   // A browser that takes notifications: secure, with service workers, push and the permission still unasked.
   Object.defineProperty(window, "isSecureContext", { value: true, configurable: true });
   const worker = {
