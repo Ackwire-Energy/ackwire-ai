@@ -921,6 +921,12 @@ html:not([data-pointer]) .thread-line:focus-visible {
 .thread-head--panel {
   padding-left: 18px;
 }
+/* Its ⋯ and × stand 8 apart, as every header's glyphs: the header's own gap is wider from the words. */
+@media (min-width: 761px) {
+  .thread-head--panel > .ac-btn + .ac-btn {
+    margin-inline-start: calc(var(--space-2) - var(--space-3));
+  }
+}
 .thread-panel__missing {
   flex: 1;
   overflow-y: auto;
