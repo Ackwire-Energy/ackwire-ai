@@ -3610,6 +3610,17 @@ export const ptBR = {
         field: {
           token: "Token da conta de serviço",
         },
+        error: {
+          invalid_input: "Isso não é um token de conta de serviço. Cole o token que começa com ops_.",
+          auth_failed: "O 1Password não aceitou este token. Crie uma nova conta de serviço e cole o token dela aqui.",
+          no_vault:
+            "Esta conta de serviço não tem acesso a nenhum cofre. Crie outra com acesso ao cofre dos seus agentes.",
+          many_vaults:
+            "Esta conta de serviço tem acesso a mais de um cofre. Crie outra com acesso só ao cofre dos seus agentes.",
+          unreachable: "Não deu para falar com o 1Password. Tente de novo em um minuto.",
+          unsupported:
+            "O 1Password não pode ser conectado aqui. Salve no Cofre os logins de que seus agentes precisam.",
+        },
       },
       bitwarden: {
         warning:

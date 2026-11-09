@@ -12,6 +12,7 @@ import {
   oauthReturnText,
   sendWaits,
   signInRefusalText,
+  vaultConnectRefusal,
 } from "../src/lib/errors";
 
 const failure = new TypeError("Failed to fetch");
@@ -295,6 +296,22 @@ test("an agent that doesn't answer this person says whom it answers, in the pers
     names: [],
   });
   expect(errorText(instance.t, nobody)).toBe("O Theo não está respondendo a ninguém agora.");
+});
+
+test("a password manager's refusal to connect: in its own words when the app has them, else as any refusal", () => {
+  const instance = i18next.createInstance();
+  void instance.init({ lng: "pt-BR", fallbackLng: "en", resources, initAsync: false });
+  const refusal = (code: string) => new ApiError(400, `vault.source.${code}`, "The password manager refused this.");
+  const own = ptBR.vault.source.onepassword.error;
+  expect(vaultConnectRefusal(instance.t, "onepassword", refusal("invalid_input"))).toBe(own.invalid_input);
+  expect(vaultConnectRefusal(instance.t, "onepassword", refusal("many_vaults"))).toBe(own.many_vaults);
+  expect(vaultConnectRefusal(instance.t, "onepassword", refusal("rate_limited"))).toBe(
+    ptBR.errors.vault.source.rateLimited,
+  );
+  const bitwarden = vaultConnectRefusal(instance.t, "bitwarden", refusal("auth_failed"));
+  expect(bitwarden).toBe(ptBR.errors.vault.source.authFailed);
+  const ours = new ApiError(500, "internal_error", "Something went wrong on our side");
+  expect(vaultConnectRefusal(instance.t, "onepassword", ours)).toBe(errorText(instance.t, ours));
 });
 
 test("the right hand refused a place: its own line, never ask an admin", () => {

@@ -7,7 +7,7 @@ import {
   type VaultScope,
   type VaultSourceInfo,
 } from "@agenteschat/client";
-import { errorText } from "@agenteschat/client/lib/errors";
+import { vaultConnectRefusal } from "@agenteschat/client/lib/errors";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
@@ -85,7 +85,7 @@ function ConnectForm({
     setRefusal(null);
   };
   // The password manager's refusal in plain words (wrong details, a vault too many), from the server's code.
-  const failed = (err: unknown) => setRefusal(errorText(t, err, i18n.language));
+  const failed = (err: unknown) => setRefusal(vaultConnectRefusal(t, k, err, i18n.language));
 
   const submit = () => {
     if (missing.length > 0 || busy) return;

@@ -8619,6 +8619,24 @@
   "vault.source.onepassword.field.token": {
     "value": "Service account token"
   },
+  "vault.source.onepassword.error.invalid_input": {
+    "value": "This isn't a service account token. Paste the token that starts with ops_."
+  },
+  "vault.source.onepassword.error.auth_failed": {
+    "value": "1Password didn't accept this token. Create a new service account and paste its token here."
+  },
+  "vault.source.onepassword.error.no_vault": {
+    "value": "This service account has no access to any vault. Create a new one with access to your agents' vault."
+  },
+  "vault.source.onepassword.error.many_vaults": {
+    "value": "This service account has access to more than one vault. Create a new one with access to your agents' vault only."
+  },
+  "vault.source.onepassword.error.unreachable": {
+    "value": "Couldn't reach 1Password. Try again in a minute."
+  },
+  "vault.source.onepassword.error.unsupported": {
+    "value": "1Password can't be connected here. Save the logins your agents need in the Vault instead."
+  },
   "vault.source.bitwarden.warning": {
     "value": "Use an account only for your agents. Its master password opens the whole account, so nothing personal should be in it."
   },

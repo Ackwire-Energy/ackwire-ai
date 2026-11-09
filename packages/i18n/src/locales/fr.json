@@ -506,6 +506,18 @@
       "continue": "Continuer sur ce {{device}}",
       "text": "Vous avez installé agentes.chat sur ce {{device}} : pas besoin de mot de passe."
     },
+    "server": {
+      "into": "Connexion à <b>{{server}}</b>",
+      "intoHere": "Connexion à l’agentes.chat <b>de ce {{device}}</b>"
+    },
+    "forgotHere": {
+      "ownerTitle": "Ici, pas besoin de mot de passe.",
+      "ownerLead": "Vous avez installé agentes.chat sur ce {{device}}. Entrez par ici, puis créez un nouveau mot de passe.",
+      "notOwner": "Ce n’est pas le compte de la personne qui l’a installé ? Demandez à un propriétaire de votre workspace un lien de nouveau mot de passe.",
+      "title": "Ce serveur n’envoie pas d’e-mails.",
+      "lead": "Demandez à un propriétaire de votre workspace un lien de nouveau mot de passe. Il le crée dans Membres, et le lien est valable 1 heure.",
+      "back": "Retour au mot de passe"
+    },
     "reset": {
       "title": "Créez un nouveau mot de passe.",
       "save": "Enregistrer le mot de passe",
@@ -525,18 +537,6 @@
       "wrongLinkLead": "Ouvrez le lien propriétaire le plus récent créé pour ce serveur.",
       "taken": "Ce serveur a déjà son propriétaire.",
       "takenLead": "Connectez-vous avec votre compte."
-    },
-    "server": {
-      "into": "Connexion à <b>{{server}}</b>",
-      "intoHere": "Connexion à l’agentes.chat <b>de ce {{device}}</b>"
-    },
-    "forgotHere": {
-      "ownerTitle": "Ici, pas besoin de mot de passe.",
-      "ownerLead": "Vous avez installé agentes.chat sur ce {{device}}. Entrez par ici, puis créez un nouveau mot de passe.",
-      "notOwner": "Ce n’est pas le compte de la personne qui l’a installé ? Demandez à un propriétaire de votre workspace un lien de nouveau mot de passe.",
-      "title": "Ce serveur n’envoie pas d’e-mails.",
-      "lead": "Demandez à un propriétaire de votre workspace un lien de nouveau mot de passe. Il le crée dans Membres, et le lien est valable 1 heure.",
-      "back": "Retour au mot de passe"
     }
   },
   "invite": {
@@ -1416,6 +1416,11 @@
     "addPasswordLabel": "Nouveau mot de passe",
     "addPasswordSaved": "Mot de passe ajouté.",
     "addPasswordReauth": "Reconnectez-vous pour ajouter un mot de passe.",
+    "newPassword": "Créer un nouveau mot de passe",
+    "newPasswordHint": "Vos autres sessions se ferment, et les apps d’IA connectées avec l’ancien mot de passe doivent être reconnectées.",
+    "newPasswordRow": "Pour changer le mot de passe que vous utilisez dans d’autres navigateurs et appareils",
+    "newPasswordSaved": "Nouveau mot de passe enregistré.",
+    "newPasswordReauth": "Reconnectez-vous pour créer un nouveau mot de passe.",
     "yourWorkspaces": "Vos espaces de travail",
     "youAreHere": "Vous êtes ici",
     "createdOn": "Créé le {{date}}",
@@ -1423,6 +1428,11 @@
     "addWorkspace": "Ajouter un espace de travail",
     "addWorkspaceHint": "Rejoindre un workspace existant, en créer un ou utiliser le serveur de votre équipe",
     "yourServer": "Votre serveur",
+    "serverHere": "L’agentes.chat de ce {{device}}",
+    "serverStopped": "arrêté",
+    "serverOffline": "hors ligne depuis {{time}}",
+    "serverSignedOut": "non connecté",
+    "serverSignIn": "Se connecter",
     "wiki": "Wiki",
     "settings": "Paramètres",
     "workspaceMenu": "Menu de l'espace de travail",
@@ -1508,17 +1518,7 @@
     "unreadThreads_other": "Fils : {{count}} avec des réponses non lues",
     "unreadNotifications_one": "{{count}} notification non lue",
     "unreadNotifications_many": "{{count}} notifications non lues",
-    "unreadNotifications_other": "{{count}} notifications non lues",
-    "newPassword": "Créer un nouveau mot de passe",
-    "newPasswordHint": "Vos autres sessions se ferment, et les apps d’IA connectées avec l’ancien mot de passe doivent être reconnectées.",
-    "newPasswordRow": "Pour changer le mot de passe que vous utilisez dans d’autres navigateurs et appareils",
-    "newPasswordSaved": "Nouveau mot de passe enregistré.",
-    "newPasswordReauth": "Reconnectez-vous pour créer un nouveau mot de passe.",
-    "serverHere": "L’agentes.chat de ce {{device}}",
-    "serverStopped": "arrêté",
-    "serverOffline": "hors ligne depuis {{time}}",
-    "serverSignedOut": "non connecté",
-    "serverSignIn": "Se connecter"
+    "unreadNotifications_other": "{{count}} notifications non lues"
   },
   "agentGroups": {
     "group": "Service",
@@ -3649,6 +3649,14 @@
         },
         "field": {
           "token": "Jeton du compte de service"
+        },
+        "error": {
+          "invalid_input": "Ce n'est pas un jeton de compte de service. Collez le jeton qui commence par ops_.",
+          "auth_failed": "1Password n'a pas accepté ce jeton. Créez un nouveau compte de service et collez son jeton ici.",
+          "no_vault": "Ce compte de service n'a accès à aucun coffre. Créez-en un nouveau avec accès au coffre de vos agents.",
+          "many_vaults": "Ce compte de service a accès à plus d'un coffre. Créez-en un nouveau avec accès au seul coffre de vos agents.",
+          "unreachable": "Impossible de joindre 1Password. Réessayez dans une minute.",
+          "unsupported": "1Password ne peut pas être connecté ici. Enregistrez plutôt dans le Vault les identifiants dont vos agents ont besoin."
         }
       },
       "bitwarden": {
@@ -5885,6 +5893,16 @@
     "agentsOnlyYouHint": "Avec un abonnement, vous pouvez laisser chacun répondre à d'autres personnes, depuis sa page.",
     "filters": "Filtrer les personnes",
     "rolesOf": "Rôles de {{name}}",
+    "moreOf": "Plus pour {{name}}",
+    "passwordLink": {
+      "item": "Créer un lien de nouveau mot de passe",
+      "hint": "Quand la personne a oublié son mot de passe",
+      "title": "Lien de nouveau mot de passe pour {{name}}",
+      "lead": "Il fonctionne une fois, pendant 1 heure. Envoyez-le là où vous discutez.",
+      "label": "Lien",
+      "making": "Création du lien…",
+      "copy": "Copier le lien"
+    },
     "everyoneNote": "Tout le monde s'applique à chaque personne de l'espace de travail.",
     "noRolesToGive": "Aucun rôle en dessous du vôtre à attribuer.",
     "roleFilter": "Rôle",
@@ -6178,17 +6196,7 @@
     "ownerLine": "Responsable : {{name}}",
     "noOwner": "Aucun responsable",
     "budgetLine": "{{percent}} du budget de {{month}}",
-    "noAgents": "Pas encore d'agents.",
-    "moreOf": "Plus pour {{name}}",
-    "passwordLink": {
-      "item": "Créer un lien de nouveau mot de passe",
-      "hint": "Quand la personne a oublié son mot de passe",
-      "title": "Lien de nouveau mot de passe pour {{name}}",
-      "lead": "Il fonctionne une fois, pendant 1 heure. Envoyez-le là où vous discutez.",
-      "label": "Lien",
-      "making": "Création du lien…",
-      "copy": "Copier le lien"
-    }
+    "noAgents": "Pas encore d'agents."
   },
   "empty": {
     "thread": {
@@ -12353,6 +12361,11 @@
     }
   },
   "errors": {
+    "passwordLink": {
+      "email": "Ce serveur envoie des e-mails : la personne demande son propre lien dans Mot de passe oublié.",
+      "serverOwner": "La personne qui a installé ce serveur se connecte sur l’ordinateur où il tourne, sans lien.",
+      "otherWorkspace": "Cette personne est aussi dans un workspace qui n’est pas le vôtre : seuls les propriétaires de tous peuvent créer le lien."
+    },
     "said": {
       "gone": "Ceci n'est plus là. Actualisez la page et réessayez.",
       "alreadyDone": "Ceci a déjà reçu une réponse ou est terminé. Actualisez pour voir où ça en est.",
@@ -12708,11 +12721,6 @@
         "invalidInput": "Vérifiez les champs et réessayez.",
         "tooManyItems": "Le Vault est plein. Supprimez des éléments avant d'en synchroniser plus."
       }
-    },
-    "passwordLink": {
-      "email": "Ce serveur envoie des e-mails : la personne demande son propre lien dans Mot de passe oublié.",
-      "serverOwner": "La personne qui a installé ce serveur se connecte sur l’ordinateur où il tourne, sans lien.",
-      "otherWorkspace": "Cette personne est aussi dans un workspace qui n’est pas le vôtre : seuls les propriétaires de tous peuvent créer le lien."
     }
   },
   "machines": {
