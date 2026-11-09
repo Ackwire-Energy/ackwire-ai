@@ -30933,18 +30933,6 @@
   "devices.android.allowText": {
     "value": "Check Always allow from this computer first."
   },
-  "devices.android.allowTextWifi": {
-    "value": "Check Always allow on this network first."
-  },
-  "devices.android.wifiPair": {
-    "value": "Pair it over Wi-Fi"
-  },
-  "devices.android.wifiPairText": {
-    "value": "Phone and computer on the same Wi-Fi."
-  },
-  "devices.android.wifiRun": {
-    "value": "Then run this on {{computer}}, with the address, port and code the phone shows:"
-  },
   "devices.android.wifiNote": {
     "value": "Wireless debugging turns off when the phone restarts. A cable is more reliable."
   },
@@ -31001,6 +30989,99 @@
   },
   "devices.android.prompt.allow": {
     "value": "Allow"
+  },
+  "devices.wifiPair.noComputer": {
+    "value": "Wi-Fi pairing works with a computer of yours. Use a cable, or connect one."
+  },
+  "devices.wifiPair.wireless": {
+    "value": "Turn on Wireless debugging"
+  },
+  "devices.wifiPair.wirelessText": {
+    "value": "Developer options › Wireless debugging. Check Always allow on this network, then tap Allow."
+  },
+  "devices.wifiPair.scan": {
+    "value": "Scan the code with the phone"
+  },
+  "devices.wifiPair.code": {
+    "value": "Type what the phone shows"
+  },
+  "devices.wifiPair.pathQr": {
+    "value": "Pair device with QR code"
+  },
+  "devices.wifiPair.making": {
+    "value": "Making the code…"
+  },
+  "devices.wifiPair.waiting": {
+    "value": "Waiting for the phone to scan…"
+  },
+  "devices.wifiPair.pairing": {
+    "value": "Found a phone. Pairing…"
+  },
+  "devices.wifiPair.connecting": {
+    "value": "Paired. Connecting…"
+  },
+  "devices.wifiPair.narrow": {
+    "value": "Open this page on a computer to show the code."
+  },
+  "devices.wifiPair.useCode": {
+    "value": "Use a pairing code instead"
+  },
+  "devices.wifiPair.useQr": {
+    "value": "Scan a QR code instead"
+  },
+  "devices.wifiPair.address": {
+    "value": "IP address and port"
+  },
+  "devices.wifiPair.addressExample": {
+    "value": "192.168.1.20:37099"
+  },
+  "devices.wifiPair.pairingCode": {
+    "value": "Wi-Fi pairing code"
+  },
+  "devices.wifiPair.pair": {
+    "value": "Pair"
+  },
+  "devices.wifiPair.tryAgain": {
+    "value": "Try again"
+  },
+  "devices.wifiPair.qrLabel": {
+    "value": "QR code for Wireless debugging on the phone"
+  },
+  "devices.wifiPair.qrLine": {
+    "value": "Scan with the phone"
+  },
+  "devices.wifiPair.qrCaption": {
+    "value": "Phone and computer on the same Wi-Fi."
+  },
+  "devices.wifiPair.fail.mdns_off": {
+    "value": "{{computer}} can't look for phones on the Wi-Fi. Update Android platform-tools there, or use a cable."
+  },
+  "devices.wifiPair.fail.same_wifi": {
+    "value": "Couldn't reach the phone. Put it on the same Wi-Fi as {{computer}} and try again."
+  },
+  "devices.wifiPair.fail.refused": {
+    "value": "The phone stopped the pairing. Keep its pairing screen open and try again."
+  },
+  "devices.wifiPair.fail.refusedCode": {
+    "value": "The phone didn't take that code. Check the code and the address, then pair again."
+  },
+  "devices.wifiPair.fail.timed_out": {
+    "value": "Nothing scanned the code in 2 minutes. Check the phone is on the same Wi-Fi as {{computer}} and try again."
+  },
+  "devices.wifiPair.fail.outdated": {
+    "value": "Wi-Fi pairing needs Android 14 or newer with the May 2026 security update. Update the phone, or use a cable."
+  },
+  "devices.wifiPair.fail.adb_missing": {
+    "value": "{{computer}} has no Android platform-tools. Install Android Studio there, then try again."
+  },
+  "devices.wifiPair.fail.update": {
+    "value": "Wi-Fi pairing needs a newer agentes.chat on {{computer}}. Update it, then try again."
+  },
+  "devices.wifiPair.fail.canceled": {
+    "value": "The pairing stopped. Try again."
+  },
+  "devices.wifiPair.fail.failed": {
+    "value": "The pairing didn't work. Try again, or use a cable."
   },
   "devices.iphone.title": {
     "value": "Connect an iPhone"

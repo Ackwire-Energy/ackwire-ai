@@ -1944,9 +1944,14 @@ export const featureKeysPtBR = {
       wifiText: "Celular e computador no mesmo Wi-Fi",
       cable: "Usar um cabo",
       wifi1: "Ative a Depuração por Wi-Fi",
-      wifi2: "Pareie pelo {{host}}",
-      wifi2Text:
-        "No Android Studio do {{host}}, abra o Device Manager e depois Pair Devices Using Wi-Fi. Escaneie o código aqui em Depuração por Wi-Fi.",
+      wifi1Text: "Marque Sempre permitir nesta rede e toque em Permitir.",
+      wifi2: "Escaneie o código num computador",
+      wifi2Text: "Em Depuração por Wi-Fi\u00a0›\u00a0Parear o dispositivo com um código QR.",
+      wifi2Hint:
+        "No agentes.chat num computador, abra Conectar um dispositivo\u00a0›\u00a0Celular Android\u00a0›\u00a0Por Wi-Fi e escolha {{host}}.",
+      codeHead: "Parear com um código de pareamento",
+      codeNote:
+        "Em Depuração por Wi-Fi\u00a0›\u00a0Parear o dispositivo com um código de pareamento. Abra as Configurações e o agentes.chat lado a lado para o código continuar na tela.",
       wifiNote: "O Wi-Fi pode cair depois de reiniciar. Um cabo é mais confiável.",
       done: "{{name}} está conectado",
       openFailed: "Este celular não abriu essa tela. Procure em Configurações.",

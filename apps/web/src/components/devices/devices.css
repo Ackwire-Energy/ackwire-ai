@@ -328,6 +328,33 @@ a.dv-row__detail {
   align-items: center;
   gap: var(--space-2);
 }
+/* The six-digit way: the address and the code side by side, Pair under them; one column on a phone. */
+.dv-step__more > .ac-locked {
+  align-self: stretch;
+}
+.dv-pair-code {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 8rem);
+  gap: var(--space-4) var(--space-3);
+}
+.dv-pair-code > .ac-btn {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+@media (width <= 640px) {
+  .dv-pair-code {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .dv-pair-code > .ac-btn {
+    justify-self: stretch;
+  }
+}
+/* What only a phone-sized screen says (the Wi-Fi QR is shown on computers alone). */
+@media (width > 640px) {
+  .dv-narrow {
+    display: none;
+  }
+}
 
 .dv-step[data-state="done"] .dv-step__mark {
   color: var(--ok);
@@ -631,6 +658,14 @@ a.dv-row__detail {
 /* Already scanned: the code fades and the words say where the steps are now. */
 .dv-qr--used .dv-qr__code {
   opacity: 0.35;
+}
+/* The code still on its way from the computer. */
+.dv-qr__wait {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  background: var(--raised);
 }
 
 /* ---------- Connect options (the chooser) ---------------------------------------------

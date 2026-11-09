@@ -1,7 +1,8 @@
 import type { ComputerDeviceInput, DeviceAudience, PhoneDeviceInput } from "@agenteschat/client";
-import { keys, useApi } from "@agenteschat/client";
+import { keys, useApi, useWifiPairState } from "@agenteschat/client";
 import { LINK_POLL_MS, linkPhase, linkPolls } from "@agenteschat/client/lib/devices";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 
 /**
  * The devices list (`GET /devices`) and what changes it. `devices.changed` refetches it (its key sits under
@@ -114,4 +115,51 @@ export function useLinkState(orgId: string, link: { id: string; expiresAt: strin
     refetchInterval: (q) => (link && linkPolls(linkPhase(q.state.data, link.expiresAt)) ? LINK_POLL_MS : false),
     meta: { quiet: true },
   });
+}
+
+/**
+ * Pairing a phone with `machineId` over Wi-Fi while `active`. The QR way starts by itself, fresh for each try and
+ * never from the cache (a refetch would show a new code under the person); `pairWithCode` starts the six-digit way.
+ * Leaving (`active` off: the cable way, a computer gone offline) stops it, and coming back starts afresh.
+ */
+export function useWifiPairing(orgId: string, machineId: string | null, active: boolean) {
+  const api = useApi();
+  const [tries, setTries] = useState(0);
+  const [way, setWay] = useState<"qr" | "code">("qr");
+  const qr = useQuery({
+    queryKey: ["wifi-pair", orgId, machineId, tries],
+    queryFn: () => api.devices.startWifiPairing(orgId, machineId ?? "", {}),
+    enabled: active && machineId !== null && way === "qr",
+    gcTime: 0,
+    staleTime: Number.POSITIVE_INFINITY,
+    retry: false,
+    refetchOnWindowFocus: false,
+    meta: { quiet: true },
+  });
+  const code = useMutation({
+    mutationFn: (input: { address: string; code: string }) =>
+      api.devices.startWifiPairing(orgId, machineId ?? "", input),
+    meta: { silent: true },
+  });
+  const { reset } = code;
+  useEffect(() => {
+    if (active) return;
+    setTries((n) => n + 1);
+    reset();
+  }, [active, reset]);
+  const pairing = useWifiPairState(orgId, machineId, active ? (way === "qr" ? qr.data : code.data) : undefined);
+  return {
+    way,
+    pairing,
+    starting: way === "qr" ? qr.isFetching : code.isPending,
+    error: (way === "qr" ? qr.error : code.error) ?? null,
+    pairWithCode: code.mutate,
+    /** A new QR (the code way's form stays, with what was typed). */
+    retry: () => setTries((n) => n + 1),
+    switchWay: (next: "qr" | "code") => {
+      setWay(next);
+      code.reset();
+      setTries((n) => n + 1);
+    },
+  };
 }

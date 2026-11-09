@@ -172,6 +172,67 @@ describe("Connect a device", () => {
     expect(screen().getByRole("dialog", { name: "Galaxy S24 is connected" })).toBeTruthy();
   });
 
+  test("an Android phone over Wi-Fi: Android's pairing QR, the computer's live line, then connected", async () => {
+    const { state, devices, services } = await open(`/org/${ORG_ID}/settings/devices`);
+    const ask = async () => {
+      await act(async () => {
+        await services.queryClient.invalidateQueries({ queryKey: ["wifi-pair-state"] });
+      });
+      await refetch(services);
+    };
+    await click(screen().getByRole("button", { name: "Connect a device" }));
+    await click(screen().getByRole("button", { name: /Android phone/ }));
+    const dialog = screen().getByRole("dialog", { name: "Connect an Android phone" });
+    await click(within(dialog).getByRole("radio", { name: "Over Wi-Fi" }));
+    expect(calls(state, "devices.startWifiPairing")[0]?.args).toEqual([ORG_ID, MAC, {}]);
+    expect(dialog.querySelector('.dv-qr svg[aria-label="QR code for Wireless debugging on the phone"]')).toBeTruthy();
+    expect(dialog.querySelector('.dv-step[data-state="current"]')?.textContent).toContain(
+      "Waiting for the phone to scan…",
+    );
+    expect(dialog.querySelector(".dv-path")?.textContent).toBe("Wireless debuggingPair device with QR code");
+    devices.setPairing({ state: "pairing" });
+    await ask();
+    expect(dialog.textContent).toContain("Found a phone. Pairing…");
+    expect(dialog.querySelector(".dv-qr--used")).toBeTruthy();
+
+    // Nothing in 2 minutes: the cause, and Try again makes a new code.
+    devices.setPairing({ state: "failed", reason: "timed_out" });
+    await ask();
+    const failed = dialog.querySelector('.dv-step[data-state="needs"]');
+    expect(failed?.textContent).toContain(
+      "Nothing scanned the code in 2 minutes. Check the phone is on the same Wi-Fi as Sam's MacBook Pro and try again.",
+    );
+    await click(within(dialog).getByRole("button", { name: "Try again" }));
+    expect(calls(state, "devices.startWifiPairing")).toHaveLength(2);
+
+    // The six-digit way: what the phone shows, typed here.
+    await click(within(dialog).getByRole("button", { name: "Use a pairing code instead" }));
+    expect(calls(state, "devices.cancelWifiPairing").length).toBeGreaterThan(0);
+    const pairButton = within(dialog).getByRole("button", { name: "Pair" }) as HTMLButtonElement;
+    expect(pairButton.disabled).toBe(true);
+    await act(async () => {
+      fireEvent.change(within(dialog).getByLabelText("IP address and port"), {
+        target: { value: "192.168.1.20:37099" },
+      });
+      fireEvent.change(within(dialog).getByLabelText("Wi-Fi pairing code"), { target: { value: "123456" } });
+    });
+    await click(pairButton);
+    expect(calls(state, "devices.startWifiPairing").at(-1)?.args).toEqual([
+      ORG_ID,
+      MAC,
+      { address: "192.168.1.20:37099", code: "123456" },
+    ]);
+    const list = acmeDevices();
+    const mac = list.devices.find((d) => d.id === MAC);
+    const pixel = mac?.phones.find((p) => p.id === PIXEL);
+    if (!mac || !pixel) throw new Error("fixture");
+    mac.phones.push({ ...pixel, id: "p-wifi", name: "Galaxy S24", transport: "wifi", status: { kind: "ready" } });
+    devices.set(list);
+    devices.setPairing({ state: "connected", phoneId: "p-wifi" });
+    await ask();
+    expect(screen().getByRole("dialog", { name: "Galaxy S24 is connected" })).toBeTruthy();
+  });
+
   test("the Android steps draw Android's own prompt in Portuguese", async () => {
     const app = await open(`/org/${ORG_ID}/settings/devices/android-setup?computer=${MAC}`);
     await showIn(app.services, "pt-BR");

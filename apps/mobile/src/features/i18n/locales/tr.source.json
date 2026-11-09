@@ -4703,11 +4703,23 @@
   "devices.android.wifi1": {
     "value": "Turn on Wireless debugging"
   },
+  "devices.android.wifi1Text": {
+    "value": "Check Always allow on this network, then tap Allow."
+  },
   "devices.android.wifi2": {
-    "value": "Pair it from {{host}}"
+    "value": "Scan the code on a computer"
   },
   "devices.android.wifi2Text": {
-    "value": "In Android Studio on {{host}}, open Device Manager, then Pair Devices Using Wi-Fi. Scan its code here in Wireless debugging."
+    "value": "From Wireless debugging › Pair device with QR code."
+  },
+  "devices.android.wifi2Hint": {
+    "value": "In agentes.chat on a computer, open Connect a device › Android phone › Over Wi-Fi and pick {{host}}."
+  },
+  "devices.android.codeHead": {
+    "value": "Pair with a pairing code"
+  },
+  "devices.android.codeNote": {
+    "value": "From Wireless debugging › Pair device with pairing code. Open Settings and agentes.chat side by side so the code stays on screen."
   },
   "devices.android.wifiNote": {
     "value": "Wi-Fi can drop after a restart. A cable is more reliable."

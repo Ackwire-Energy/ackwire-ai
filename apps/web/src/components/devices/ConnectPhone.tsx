@@ -8,6 +8,9 @@ import {
   iphoneSteps,
   phoneLine,
   type StepState,
+  wifiHosts,
+  wifiPairLive,
+  wifiPairText,
 } from "@agenteschat/client/lib/devices";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { computerKind } from "@agenteschat/client/lib/machines";
@@ -26,17 +29,13 @@ import {
 } from "@agenteschat/ui";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { CommandBlock } from "@/components/Machines";
 import { QrCode } from "@/components/OpenOnPhone";
 import { useOrg } from "@/components/org-context";
 import { useToast } from "@/lib/toast";
 import { FlowFooter, type FlowProps } from "./flow";
 import { DevicePortrait } from "./parts";
-import { useDevices, useUpdatePhone } from "./queries";
+import { useDevices, useUpdatePhone, useWifiPairing } from "./queries";
 import { WhoPicker, WhoSelect } from "./WhoCanUse";
-
-/** What to run on the computer for Wi-Fi pairing: adb's own words, with what the phone shows in capitals. */
-const ADB_PAIR = "adb pair IP:PORT CODE";
 
 /** While a phone flow is open, the list is asked every 2 s too: the phone may show up between events. */
 const PHONE_POLL_MS = 2000;
@@ -142,6 +141,140 @@ export function UsbPrompt({ wifi = false }: { wifi?: boolean }) {
   );
 }
 
+type WifiPair = ReturnType<typeof useWifiPairing>;
+
+/**
+ * Over Wi-Fi: Developer options, Wireless debugging (with Android's "on this network" prompt drawn), then the QR the
+ * computer shows beside the steps, or the six-digit code typed here. The last step's line follows the computer:
+ * waiting for the scan, found and pairing, connecting, or why it failed with Try again.
+ */
+function WifiSteps({ pair, computer }: { pair: WifiPair; computer: string }) {
+  const { t } = useTranslation();
+  const p = pair.pairing;
+  const found = p !== undefined && (p.state === "pairing" || p.state === "connecting" || p.state === "connected");
+  const failed = Boolean(pair.error) || p?.state === "failed";
+  const line = pair.error
+    ? errorText(t, pair.error)
+    : p
+      ? wifiPairText(t, p, computer)
+      : pair.way === "qr"
+        ? t("devices.wifiPair.making")
+        : undefined;
+  const code = pair.way === "code";
+  return (
+    <ol className="dv-steps">
+      <Step
+        state={found ? "done" : "waiting"}
+        title={t("devices.android.devOptions")}
+        text={t("devices.android.devOptionsText")}
+      >
+        <SettingRowDrawing title={t("devices.android.buildNumber")} sub={t("devices.android.buildNumberSub")} taps={7} />
+      </Step>
+      <Step
+        state={found ? "done" : "waiting"}
+        title={t("devices.wifiPair.wireless")}
+        text={t("devices.wifiPair.wirelessText")}
+      >
+        <UsbPrompt wifi />
+      </Step>
+      <Step
+        state={failed ? "needs" : p && !wifiPairLive(p) ? "done" : "current"}
+        title={t(code ? "devices.wifiPair.code" : "devices.wifiPair.scan")}
+        text={line}
+      >
+        <SettingsPath
+          label={t("devices.onThePhone")}
+          segments={[
+            t("devices.android.path.wireless"),
+            t(code ? "devices.android.path.pairCode" : "devices.wifiPair.pathQr"),
+          ]}
+        />
+        {code ? (
+          <CodeForm pair={pair} locked={pair.starting || wifiPairLive(p)} />
+        ) : (
+          <p className="dv-step__text dv-narrow">{t("devices.wifiPair.narrow")}</p>
+        )}
+        {failed && !code && (
+          <span className="dv-step__acts">
+            <Button size="sm" onClick={pair.retry}>
+              {t("devices.wifiPair.tryAgain")}
+            </Button>
+          </span>
+        )}
+        <button type="button" className="ac-link small" onClick={() => pair.switchWay(code ? "qr" : "code")}>
+          {t(code ? "devices.wifiPair.useQr" : "devices.wifiPair.useCode")}
+        </button>
+      </Step>
+    </ol>
+  );
+}
+
+/** The six digits and the address Pair device with pairing code shows, typed here; kept after a failure. */
+function CodeForm({ pair, locked }: { pair: WifiPair; locked: boolean }) {
+  const { t } = useTranslation();
+  const [address, setAddress] = useState("");
+  const [code, setCode] = useState("");
+  const ready = /^\S+:\d{1,5}$/.test(address.trim()) && /^\d{6}$/.test(code);
+  return (
+    <Locked when={locked}>
+      <form
+        className="dv-pair-code"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (ready && !locked) pair.pairWithCode({ address: address.trim(), code });
+        }}
+      >
+      <Field label={t("devices.wifiPair.address")} id="dv-pair-address">
+        <Input
+          value={address}
+          inputMode="decimal"
+          autoComplete="off"
+          spellCheck={false}
+          placeholder={t("devices.wifiPair.addressExample")}
+          maxLength={80}
+          onChange={(e) => setAddress(e.target.value)}
+        />
+      </Field>
+      <Field label={t("devices.wifiPair.pairingCode")} id="dv-pair-code">
+        <Input
+          value={code}
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          placeholder="123456"
+          maxLength={6}
+          onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+        />
+      </Field>
+        <Button type="submit" variant="primary" disabled={!ready || locked} loading={locked}>
+          {t("devices.wifiPair.pair")}
+        </Button>
+      </form>
+    </Locked>
+  );
+}
+
+/** Android's own pairing QR beside the steps, faded once the phone took it or the pairing ended. */
+function WifiCard({ pair }: { pair: WifiPair }) {
+  const { t } = useTranslation();
+  const p = pair.pairing;
+  const qr = p?.qr;
+  return (
+    <div className={(p && p.state !== "waiting") || pair.error ? "dv-qr dv-qr--used" : "dv-qr"}>
+      <span className="dv-qr__code">
+        {qr ? (
+          <QrCode text={qr} label={t("devices.wifiPair.qrLabel")} />
+        ) : (
+          <span className="dv-qr__wait">{pair.error ? <Icon name="alert" size={24} /> : <PixelSpinner size={24} />}</span>
+        )}
+      </span>
+      <span className="dv-qr__text">
+        <p className="dv-qr__line">{t("devices.wifiPair.qrLine")}</p>
+        <p className="dv-qr__caption">{t("devices.wifiPair.qrCaption")}</p>
+      </span>
+    </div>
+  );
+}
+
 /** A computer to plug into: its line icon, name and whether it's online, online ones first. */
 function HostSelect({
   hosts,
@@ -202,7 +335,8 @@ function NeedsComputer({ text, onConnect }: { text: string; onConnect: () => voi
 /**
  * An Android phone through a computer people connected: pick the computer, then a checklist the computer drives (it
  * sees the phone ask to allow USB debugging, then ready). Beside it a QR that opens the same steps in our phone app,
- * where buttons open each setting. Over Wi-Fi: Wireless debugging and `adb pair` on that computer.
+ * where buttons open each setting. Over Wi-Fi: the computer shows Android's pairing QR (or takes the six-digit code),
+ * then finds, pairs and connects the phone by itself.
  */
 export function AndroidFlow({
   onClose,
@@ -214,20 +348,26 @@ export function AndroidFlow({
   const { t } = useTranslation();
   const { org, me } = useOrg();
   const devices = useDevices(org.id, PHONE_POLL_MS);
-  const hosts = (devices.data?.devices ?? []).filter((d) => d.machineKind !== "managed").sort(onlineFirst);
+  const all = (devices.data?.devices ?? []).filter((d) => d.machineKind !== "managed").sort(onlineFirst);
   const [picked, setPicked] = useState<string | null>(hostId);
   const [way, setWay] = useState<"cable" | "wifi">("cable");
+  // Pairing puts the phone on the computer's own adb: only computers the person may manage.
+  const hosts = way === "wifi" ? wifiHosts(all) : all;
   const host = pickHost(hosts, picked, me.user.id);
+  const wifi = useWifiPairing(org.id, host?.id ?? null, way === "wifi" && host?.status.kind !== "offline");
+  const pairedId = wifi.pairing?.phoneId;
+  const paired = pairedId ? host?.phones.find((p) => p.id === pairedId) : undefined;
   // The phones each computer had when the dialog opened: only a new one (or one still asking) is the one being plugged.
   const known = useRef<Set<string> | null>(null);
   if (!known.current && devices.data)
     known.current = new Set(devices.data.devices.flatMap((d) => d.phones.map((p) => p.id)));
   const stage = androidStage(host, known.current ?? new Set());
-  const readyName = stage.kind === "ready" ? stage.phone.name : null;
+  const readyName = paired?.name ?? (stage.kind === "ready" ? stage.phone.name : null);
   useEffect(
     () => setTitle(readyName ? t("devices.android.connectedTitle", { name: readyName }) : t("devices.android.title")),
     [readyName, setTitle, t],
   );
+  if (paired && host) return <PhoneConnected phone={paired} host={host} onClose={onClose} />;
   if (stage.kind === "ready" && host) return <PhoneConnected phone={stage.phone} host={host} onClose={onClose} />;
   const origin = typeof window === "undefined" ? "" : window.location.origin;
   const guide = host
@@ -270,58 +410,24 @@ export function AndroidFlow({
         </Step>
       </ol>
     ) : (
-      <ol className="dv-steps">
-        <Step
-          state={allow ? "done" : "waiting"}
-          title={t("devices.android.devOptions")}
-          text={allow ? t("devices.android.found", { name: stage.phone.name }) : t("devices.android.devOptionsText")}
-        >
-          <SettingRowDrawing
-            title={t("devices.android.buildNumber")}
-            sub={t("devices.android.buildNumberSub")}
-            taps={7}
-          />
-        </Step>
-        <Step
-          state={allow ? "done" : "current"}
-          title={t("devices.android.wifiPair")}
-          text={allow ? t("devices.android.found", { name: stage.phone.name }) : t("devices.android.wifiPairText")}
-        >
-          <SettingsPath
-            label={t("devices.onThePhone")}
-            segments={[
-              t("devices.android.path.devOptions"),
-              t("devices.android.path.wireless"),
-              t("devices.android.path.pairCode"),
-            ]}
-          />
-          <span className="small muted">{t("devices.android.wifiRun", { computer: host?.name ?? "" })}</span>
-          <CommandBlock command={ADB_PAIR} />
-          <span className="small muted">{looking}</span>
-        </Step>
-        <Step
-          state={allow ? "needs" : "waiting"}
-          title={t("devices.android.allow")}
-          text={t("devices.android.allowTextWifi")}
-        >
-          <UsbPrompt wifi />
-        </Step>
-      </ol>
+      host && <WifiSteps pair={wifi} computer={host.name} />
     );
   return (
     <>
       <DialogBody className="dv-android">
-        {hosts.length === 0 ? (
+        {hosts.length === 0 && way === "cable" ? (
           <NeedsComputer text={t("devices.android.noComputer")} onConnect={onConnectComputer} />
         ) : (
           <div className="dv-split">
             <div className="stack-4" style={{ gap: "var(--space-4)" }}>
-              <Field
-                label={t(way === "cable" ? "devices.android.plugInto" : "devices.android.pairWith")}
-                id="dv-android-host"
-              >
-                <HostSelect hosts={hosts} value={host?.id ?? ""} onChange={setPicked} id="dv-android-host" />
-              </Field>
+              {host && (
+                <Field
+                  label={t(way === "cable" ? "devices.android.plugInto" : "devices.android.pairWith")}
+                  id="dv-android-host"
+                >
+                  <HostSelect hosts={hosts} value={host.id} onChange={setPicked} id="dv-android-host" />
+                </Field>
+              )}
               <Segmented
                 block
                 label={t("devices.android.way")}
@@ -340,7 +446,9 @@ export function AndroidFlow({
                   { value: "wifi", label: t("devices.android.wifi") },
                 ]}
               />
-              {host?.status.kind === "offline" ? (
+              {!host ? (
+                <NeedsComputer text={t("devices.wifiPair.noComputer")} onConnect={onConnectComputer} />
+              ) : host.status.kind === "offline" ? (
                 <p className="setup-progress setup-progress--line ac-iconline" role="status">
                   <Icon name="dash" size={14} />
                   <span>{t("devices.android.hostOffline", { computer: host.name })}</span>
@@ -349,7 +457,9 @@ export function AndroidFlow({
                 steps
               )}
             </div>
-            {guide && (
+            {way === "wifi" && wifi.way === "qr" && host ? (
+              <WifiCard pair={wifi} />
+            ) : guide ? (
               <div className="dv-qr">
                 <span className="dv-qr__code">
                   <QrCode text={guide} label={t("devices.android.qrLabel")} />
@@ -359,7 +469,7 @@ export function AndroidFlow({
                   <p className="dv-qr__caption">{t("devices.android.qrCaption")}</p>
                 </span>
               </div>
-            )}
+            ) : null}
           </div>
         )}
       </DialogBody>

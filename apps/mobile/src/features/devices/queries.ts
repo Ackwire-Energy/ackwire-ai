@@ -1,4 +1,4 @@
-import { type ApiClient, keys, useApi } from "@agenteschat/client";
+import { type ApiClient, keys, useApi, useWifiPairState } from "@agenteschat/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useOrgId } from "../shared/hooks";
 
@@ -45,4 +45,21 @@ export function useConnectLink(linkId: string | null) {
     },
     meta: { quiet: true },
   });
+}
+
+/** Pairing this phone with `machineId` the six-digit way: the code and the address Wireless debugging shows. */
+export function useWifiPairCode(machineId: string | null) {
+  const api = useApi();
+  const orgId = useOrgId();
+  const start = useMutation({
+    mutationFn: (input: { address: string; code: string }) =>
+      api.devices.startWifiPairing(orgId, machineId ?? "", input),
+    meta: { silent: true },
+  });
+  return {
+    pairing: useWifiPairState(orgId, machineId, start.data),
+    pending: start.isPending,
+    error: start.error,
+    pair: start.mutate,
+  };
 }

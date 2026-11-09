@@ -1987,9 +1987,14 @@ export const featureKeysEn = {
       wifiText: "Phone and computer on the same Wi-Fi",
       cable: "Use a cable instead",
       wifi1: "Turn on Wireless debugging",
-      wifi2: "Pair it from {{host}}",
-      wifi2Text:
-        "In Android Studio on {{host}}, open Device Manager, then Pair Devices Using Wi-Fi. Scan its code here in Wireless debugging.",
+      wifi1Text: "Check Always allow on this network, then tap Allow.",
+      wifi2: "Scan the code on a computer",
+      wifi2Text: "From Wireless debugging\u00a0›\u00a0Pair device with QR code.",
+      wifi2Hint:
+        "In agentes.chat on a computer, open Connect a device\u00a0›\u00a0Android phone\u00a0›\u00a0Over Wi-Fi and pick {{host}}.",
+      codeHead: "Pair with a pairing code",
+      codeNote:
+        "From Wireless debugging\u00a0›\u00a0Pair device with pairing code. Open Settings and agentes.chat side by side so the code stays on screen.",
       wifiNote: "Wi-Fi can drop after a restart. A cable is more reliable.",
       done: "{{name}} is connected",
       openFailed: "This phone didn't open that screen. Find it in Settings.",
