@@ -224,7 +224,7 @@ test("a request no person made, on a plan that answers only its owner: its line 
   const asked = await insertMessage(fx.db, {
     orgId: fx.org.id,
     channelId: fx.general.id,
-    author: { type: "agent", agentId: fx.agent.id, runId: null, hop: 1 },
+    author: { type: "agent", agentId: fx.agent.id, runId: null, hop: 1, stretchId: null },
     body: `@${agent.handle} cria o canal de vendas`,
   });
   const [run] = await createAgentRuns(fx.db, asked, [agent.id], "mention");
