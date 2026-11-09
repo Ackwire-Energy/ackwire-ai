@@ -1,9 +1,8 @@
 import type { Agent, TeamTemplate } from "@agenteschat/client";
-import { keys, useApi, useApplyTeamTemplate, useUpdateSettings } from "@agenteschat/client";
+import { useApplyTeamTemplate, useRoutines, useUpdateSettings } from "@agenteschat/client";
 import { planHoldPhoneLine } from "@agenteschat/client/lib/no-ai";
 import { firstJob } from "@agenteschat/client/lib/onboarding";
 import { BUSINESS_TYPES, type BusinessType, teamFailureText } from "@agenteschat/client/lib/team-plan";
-import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
@@ -148,10 +147,9 @@ export function TeamStep({
 }) {
   const { t, i18n } = useTranslation();
   const { colors: c } = useTheme();
+  // Pending until the team is in the agents' list, when the next step opens: a second tap never makes a second team.
   const use = useApplyTeamTemplate(orgId);
   const [failed, setFailed] = useState<string | null>(null);
-  // Made: busy until the team arrives with the agents' refetch, so a second tap never makes a second team.
-  const [made, setMade] = useState(false);
   if (team.length > 0)
     return (
       <>
@@ -189,14 +187,13 @@ export function TeamStep({
           if (out.state !== "created")
             return setFailed(out.error ? teamFailureText(t, out.error, i18n.language) : t("mobile.onb.failed"));
           setFailed(null);
-          setMade(true);
         },
         onError: (e) => setFailed(stepFailedText(t, e, i18n.language)),
       },
     );
   return (
     <>
-      <Locked when={use.isPending || made || leaving} style={styles.stack}>
+      <Locked when={use.isPending || leaving} style={styles.stack}>
         {chosen ? (
           <>
             {/* The template's name as the row's own line, whole: a value beside a label is cut at half the row. */}
@@ -245,7 +242,7 @@ export function TeamStep({
           variant="primary"
           wide
           label={t(failed ? "teamPlan.card.retry" : "teamPlan.templates.create")}
-          loading={use.isPending || made}
+          loading={use.isPending}
           disabled={!chosen || leaving}
           onPress={() => void create()}
         />
@@ -274,9 +271,8 @@ export function PlanStep({
   onEnter: () => void;
 }) {
   const { t } = useTranslation();
-  const api = useApi();
   const { colors: c } = useTheme();
-  const routines = useQuery({ queryKey: keys.routines(orgId), queryFn: () => api.routines.list(orgId) }).data;
+  const routines = useRoutines(orgId).data;
   return (
     <>
       <View style={styles.stack}>

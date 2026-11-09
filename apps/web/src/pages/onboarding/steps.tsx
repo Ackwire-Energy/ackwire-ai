@@ -1,10 +1,11 @@
 import type { Agent } from "@agenteschat/client";
-import { keys, useApplyTeamTemplate, useTeamTemplates } from "@agenteschat/client";
+import { keys, useApplyTeamTemplate, useRoutines, useTeamTemplates } from "@agenteschat/client";
+import type { PlanOffer } from "@agenteschat/client/lib/billing";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { firstJob } from "@agenteschat/client/lib/onboarding";
 import { BUSINESS_TYPES, type BusinessType, teamFailureText, templateFor } from "@agenteschat/client/lib/team-plan";
 import { Button, Field, Icon, Input, Locked, Select, Skeleton } from "@agenteschat/ui";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
@@ -13,7 +14,6 @@ import { useOpenBilling } from "@/components/BillingLinkButton";
 import { TeamAsleepSky } from "@/components/Sky";
 import { TeamPlanBody } from "@/components/TeamPlan";
 import { lookOf } from "@/lib/look";
-import { usePlanOffer } from "@/lib/plan-offer";
 
 /** The templates, the one step 3 shows (`business`'s, else the first), and the person's pick among them. */
 export function useTemplate(orgId: string | null, business: BusinessType | null, enabled: boolean) {
@@ -115,7 +115,6 @@ export function TeamStep({
   team,
   template,
   reviewer,
-  onCreated,
   onContinue,
   onImport,
   leaving,
@@ -124,16 +123,14 @@ export function TeamStep({
   team: Agent[];
   template: ReturnType<typeof useTemplate>;
   reviewer: string;
-  onCreated: () => void;
   onContinue: () => void;
   onImport: () => void;
   leaving: boolean;
 }) {
   const { t, i18n } = useTranslation();
+  // Pending until the team is in the agents' list, when the next step opens: a second press never makes a second team.
   const use = useApplyTeamTemplate(orgId);
   const [failed, setFailed] = useState<string | null>(null);
-  // Made: busy until the team arrives with the agents' refetch, so a second press never makes a second team.
-  const [made, setMade] = useState(false);
   const { chosen } = template;
   if (team.length > 0)
     return (
@@ -160,7 +157,7 @@ export function TeamStep({
     );
   return (
     <>
-      <Locked when={use.isPending || made || leaving}>
+      <Locked when={use.isPending || leaving}>
         <div className="onb__answer">
           <Field label={t("teamPlan.templates.title")} id="onb-template">
             <Select
@@ -217,7 +214,7 @@ export function TeamStep({
           kbd={["↵"]}
           data-enter=""
           disabled={!chosen || leaving}
-          loading={use.isPending || made}
+          loading={use.isPending}
           onClick={() =>
             chosen &&
             use.mutate(
@@ -230,8 +227,6 @@ export function TeamStep({
                       out.error ? teamFailureText(t, out.error, i18n.language) : t("teamPlan.templates.failed"),
                     );
                   setFailed(null);
-                  setMade(true);
-                  onCreated();
                 },
                 onError: (e) => setFailed(errorText(t, e)),
               },
@@ -253,18 +248,18 @@ export function TeamStep({
 export function PlanStep({
   orgId,
   team,
+  offer,
   skipping,
   onSkip,
 }: {
   orgId: string;
   team: Agent[];
+  offer: PlanOffer | null;
   skipping: boolean;
   onSkip: () => void;
 }) {
-  const { t, i18n } = useTranslation();
-  const api = useApi();
-  const offer = usePlanOffer(i18n.language);
-  const routines = useQuery({ queryKey: keys.routines(orgId), queryFn: () => api.routines.list(orgId) }).data;
+  const { t } = useTranslation();
+  const routines = useRoutines(orgId).data;
   const turnOn = useOpenBilling(orgId, "onboarding", offer?.key);
   const allPlans = useOpenBilling(orgId, "onboarding");
   return (

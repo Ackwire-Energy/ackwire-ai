@@ -830,16 +830,25 @@ export function useTeamTemplates(orgId: string, locale: string, enabled = true) 
   });
 }
 
-/** "Usar este modelo": its card and the right hand's first question land in the person's DM with it. */
+/**
+ * "Usar este modelo": its card and the right hand's first question land in the person's DM with it. Made, it stays
+ * pending until the team is in the agents' list, its routines and channels read before it: a screen that shows the
+ * team (the onboarding's last step, the sidebar) finds them there, and nothing on it changes while it arrives.
+ */
 export function useApplyTeamTemplate(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ templateId, locale }: { templateId: string; locale?: string }) =>
       api.agents.applyTeamTemplate(orgId, templateId, locale),
-    onSuccess: ({ channelId }) => {
+    onSuccess: async ({ channelId, state }) => {
       void qc.invalidateQueries({ queryKey: keys.messages(orgId, channelId) });
-      void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
+      if (state === "created")
+        await Promise.all([
+          qc.prefetchQuery({ ...routinesQuery(api, orgId), staleTime: 0 }),
+          qc.prefetchQuery({ ...channelsQuery(api, orgId), staleTime: 0 }),
+        ]);
+      await qc.invalidateQueries({ queryKey: keys.agents(orgId) });
     },
   });
 }
@@ -4172,13 +4181,12 @@ export function useIssueColumnAction(orgId: string) {
 
 // ── Routines ─────────────────────────────────────────────────────────────────
 
+export const routinesQuery = (api: ApiClient, orgId: string) =>
+  queryOptions({ queryKey: keys.routines(orgId), queryFn: () => api.routines.list(orgId) });
+
 export const useRoutines = (orgId: string) => {
   const api = useApi();
-  return useQuery({
-    queryKey: keys.routines(orgId),
-    queryFn: () => api.routines.list(orgId),
-    refetchInterval: (q) => usagePauseRefetchMs(q.state.data),
-  });
+  return useQuery({ ...routinesQuery(api, orgId), refetchInterval: (q) => usagePauseRefetchMs(q.state.data) });
 };
 
 export const useRoutineRuns = (orgId: string, id: string | null) => {

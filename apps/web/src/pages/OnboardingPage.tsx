@@ -28,6 +28,7 @@ import { ZonePicker } from "@/components/ZoneSelect";
 import { sendNewLink } from "@/lib/email-confirmation";
 import { lookOf } from "@/lib/look";
 import { useOpenParam } from "@/lib/open-param";
+import { usePlanOffer } from "@/lib/plan-offer";
 import { returnPlace } from "@/lib/return-to";
 import { STORAGE_KEYS, sessionStore, storage } from "@/lib/storage";
 import { useToast } from "@/lib/toast";
@@ -107,6 +108,8 @@ export function OnboardingPage() {
   const name = (mine?.name ?? org).trim();
   const kind = business ?? businessOfContext(t, context);
   const template = useTemplate(orgId, kind, step === "business" || step === "team");
+  // Read from the first step: step 4's price line is there when it opens, never a line that changes.
+  const offer = usePlanOffer(i18n.language);
 
   // On agentes.chat Cloud, while sign-up is by invitation, only accounts early access allowed make workspaces (ADR 0078).
   const inviteOnly = me.data?.user.canCreateWorkspace === false && orgId === null;
@@ -544,15 +547,19 @@ export function OnboardingPage() {
                 team={team}
                 template={template}
                 reviewer={lodiName}
-                // With no plan to wait for, the workspace opens once its team shows (the effect above).
-                onCreated={() => setPicked(null)}
                 onContinue={() => setPicked(null)}
                 onImport={() => open.mutate("import")}
                 leaving={open.isPending}
               />
             )}
             {step === "plan" && orgId && (
-              <PlanStep orgId={orgId} team={team} skipping={open.isPending} onSkip={() => open.mutate("skipped")} />
+              <PlanStep
+                orgId={orgId}
+                team={team}
+                offer={offer}
+                skipping={open.isPending}
+                onSkip={() => open.mutate("skipped")}
+              />
             )}
           </div>
           {wide && (
