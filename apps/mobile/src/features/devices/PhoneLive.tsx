@@ -235,7 +235,7 @@ export function PhoneLive({ phone: p, host }: { phone: PhoneDevice; host: string
         visible={mode === "control"}
         animationType="slide"
         presentationStyle="fullScreen"
-        supportedOrientations={["portrait"]}
+        supportedOrientations={["portrait", "landscape"]}
         onRequestClose={() => setMode("watch")}
       >
         <KeyboardAvoidingView
