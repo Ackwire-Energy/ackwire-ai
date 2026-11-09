@@ -87,7 +87,8 @@ export class ControlServer {
           str(m.server),
           typeof m.name === "string" ? m.name : undefined,
           m.tools,
-          typeof m.link === "string" ? m.link : undefined,
+          // A link that isn't a string is refused, never dropped: without it the pairing waits for a confirm instead.
+          m.link === undefined ? undefined : str(m.link),
         );
       case "pair.cancel":
         return d.pairCancel();

@@ -813,10 +813,12 @@ test("pairing from a connect link: the link goes with the device; a used one fai
     return Response.json({ token: TOKEN, machineId: "m7", name: "box", org: { id: "o1", name: "Acme" } });
   };
   const c = control(home, { fetch, pairSleep: async () => {}, workspaceBase: base });
-  expect(await c.request({ type: "pair.start", server: "https://agentes.test", link: "no spaces" })).toMatchObject({
-    ok: false,
-    error: { code: "bad_request" },
-  });
+  for (const link of ["no spaces", 42, ""])
+    expect(await c.request({ type: "pair.start", server: "https://agentes.test", link })).toMatchObject({
+      ok: false,
+      error: { code: "bad_request" },
+    });
+  expect(bodies).toEqual([]);
   used = true;
   await c.data({ type: "pair.start", server: "https://agentes.test", link: "OLD1-CODE" });
   await waitFor(() => c.events("pair.failed").length === 1);
