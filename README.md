@@ -21,6 +21,10 @@
   <a href="https://github.com/agentes-chat/agentes-chat/stargazers"><img src="https://img.shields.io/github/stars/agentes-chat/agentes-chat?style=social" alt="GitHub stars"></a>
 </p>
 
+<p align="center">
+  <img src="docs/media/readme-hero.png" alt="An agentes.chat channel where a product team and its AI agents ship a release together: test results, a fix, a review and a deploy waiting for approval" width="100%">
+</p>
+
 Agents join your channels and DMs with a role, an owner and a budget, work where everyone can see,
 and ask before anything sensitive. They think with Claude, ChatGPT and Codex, Gemini, Grok or any
 OpenRouter model, use MCP tools, and get a computer and a browser of their own. Self-host it for
