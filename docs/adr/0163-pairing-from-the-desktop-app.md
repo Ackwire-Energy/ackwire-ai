@@ -45,7 +45,9 @@ else, while the app already pairs this computer in one click behind the system's
 5. **The web's connect dialog** offers This computer, Another computer and A server or VPS on every setup. This
    computer in a browser makes a connect link (kind computer) and offers "Open the agentes.chat app" (the link above)
    for as long as it waits, with the downloads for after installing, the waiting line, today's join card, and one
-   line for a terminal as the way out. Another computer lists the app's steps and waits, live, for a computer of the
+   line for a terminal as the way out. Only where the app takes such a link (`appPairsWith`: https, not on this
+   computer); a page served over plain http or from this computer itself offers the one line, as before. Another
+   computer lists the app's steps and waits, live, for a computer of the
    person's that wasn't in the devices list when the dialog opened (the list and its events, no new endpoint), then
    says "Connected: {{name}}" with its page; one line for a terminal stays the way out. A server's flow is unchanged.
 6. **The phone** offers this phone, another computer through its app (the same steps and live wait, no button to

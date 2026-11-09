@@ -2,7 +2,7 @@ import { type DeviceJoinRequest, useMe } from "@agenteschat/client";
 import { joinFacts, linkPhase, newComputerOf } from "@agenteschat/client/lib/devices";
 import { computerKind, isHandheld, platformOf } from "@agenteschat/client/lib/machines";
 import { can } from "@agenteschat/client/lib/permissions";
-import { pairLink } from "@agenteschat/client/lib/server";
+import { appPairsWith, pairLink } from "@agenteschat/client/lib/server";
 import {
   Button,
   ComputerPortrait,
@@ -142,15 +142,22 @@ function Chooser({ onPick, onClose }: { onPick: (step: ConnectStep) => void; onC
     </button>
   );
   const thisMark = <ProviderLogo id={systemMark(platform)} size="sm" className="dv-tile" />;
+  // Inside the desktop app that may host agents, one click (below). In a browser, the app on this computer through
+  // a link, where the app takes one; a phone's browser has no computer to connect. Elsewhere (an app that runs this
+  // server, plain http, a server on this computer) only the one line.
+  const thisStep: ConnectStep | null = inDesktopApp()
+    ? "link"
+    : isHandheld(navigator.userAgent)
+      ? null
+      : appPairsWith(window.location.origin)
+        ? "this"
+        : "link";
   return (
     <>
       <DialogBody>
         <section aria-labelledby="dv-ch-computers">
           <GroupHeading level={3} id="dv-ch-computers" title={t("devices.choose.computers")} />
           <div className="dv-options">
-            {/* Inside the desktop app that may host agents, one click. In a browser, the app on this computer
-                through a link; a phone's browser has no computer to connect. Inside an app that runs this server,
-                this computer is already the server's own: only the one line, as before. */}
             {inDesktopApp() && agentsHere ? (
               <div className="dv-option dv-wide">
                 {thisMark}
@@ -162,10 +169,14 @@ function Chooser({ onPick, onClose }: { onPick: (step: ConnectStep) => void; onC
                   <ThisMacButton orgId={org.id} canPair={can(org, "pair_computers")} />
                 </span>
               </div>
-            ) : inDesktopApp() ? (
-              option("link", thisMark, t(thisLabel(platform)), t("devices.choose.serverLine"))
-            ) : isHandheld(navigator.userAgent) ? null : (
-              option("this", thisMark, t(thisLabel(platform)), t("devices.choose.thisLine"))
+            ) : (
+              thisStep &&
+              option(
+                thisStep,
+                thisMark,
+                t(thisLabel(platform)),
+                t(thisStep === "this" ? "devices.choose.thisLine" : "devices.choose.serverLine"),
+              )
             )}
             {option(
               "computer",

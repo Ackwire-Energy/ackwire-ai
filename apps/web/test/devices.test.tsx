@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { setupDom } from "@agenteschat/ui/testing/dom";
+import { domWindow, setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
@@ -9,8 +9,16 @@ import { notification } from "./fakes/notifications";
 import { ANA, acmeDevices, acmeState, IMAC, IPHONE, LIA, MAC, ORG_ID, PIXEL, RUI } from "./fixtures/devices";
 import { renderApp, screen, settle, showIn } from "./render";
 
+let home: string | undefined;
+/** The address this page is open at: the desktop app takes a pair link of an https server only. */
+const servedAt = (url: string) => {
+  home ??= domWindow().location.href;
+  domWindow().happyDOM.setURL(url);
+};
+
 afterEach(() => {
   cleanup();
+  if (home) domWindow().happyDOM.setURL(home);
 });
 
 const click = async (el: Element) => {
@@ -152,18 +160,21 @@ describe("Connect a device", () => {
       "Another computer",
       "A server or VPS",
     ]);
+    // Served over plain http here: the app wouldn't take a link to it, so this computer gets its one line.
+    await click(screen().getByRole("button", { name: /This computer/ }));
+    const line = screen().getByRole("dialog", { name: "Connect a computer" });
+    expect(within(line).queryByRole("link", { name: "Open the agentes.chat app" })).toBeNull();
   });
 
   test("this computer, from a browser: the app opens a link to this server, asks to join, the maker lets it in", async () => {
+    servedAt("https://app.agentes.chat/");
     const { state, devices, services } = await open(`/org/${ORG_ID}/settings/devices`);
     await click(screen().getByRole("button", { name: "Connect a device" }));
     await click(screen().getByRole("button", { name: /This computer/ }));
     const dialog = screen().getByRole("dialog", { name: "This computer" });
     expect(calls(state, "devices.createLink")[0]?.args).toEqual([ORG_ID, "computer"]);
     const app = within(dialog).getByRole("link", { name: "Open the agentes.chat app" });
-    expect(app.getAttribute("href")).toBe(
-      `agenteschat://pair?server=${encodeURIComponent(window.location.origin)}&link=7KQ2-M9X1`,
-    );
+    expect(app.getAttribute("href")).toBe("agenteschat://pair?server=https%3A%2F%2Fapp.agentes.chat&link=7KQ2-M9X1");
     expect(dialog.textContent).toContain("Waiting for the app on this computer…");
     expect(within(dialog).getByRole("heading", { name: "Don't have the app?" })).toBeTruthy();
     expect(dialog.textContent).toContain("After installing, press Open the agentes.chat app again.");
@@ -180,6 +191,7 @@ describe("Connect a device", () => {
   });
 
   test("this computer without the app: one line for its terminal, or a server's", async () => {
+    servedAt("https://app.agentes.chat/");
     await open(`/org/${ORG_ID}/settings/devices`);
     await click(screen().getByRole("button", { name: "Connect a device" }));
     await click(screen().getByRole("button", { name: /This computer/ }));

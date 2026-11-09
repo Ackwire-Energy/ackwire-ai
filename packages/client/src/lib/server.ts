@@ -122,6 +122,12 @@ export function connectLink(server: string, { token, claim }: Omit<ConnectLink, 
 export const pairLink = (server: string, link: string) => `agenteschat://pair?${new URLSearchParams({ server, link })}`;
 
 /**
+ * Whether the desktop app takes a `pairLink` of `server`: https, and not on this computer itself. The app drops any
+ * other one without a word (plain http, and a server here, which comes with this computer already).
+ */
+export const appPairsWith = (server: string) => normalizeServer(server) !== null && !isLoopback(server);
+
+/**
  * The server, one-time sign-in and owner claim of a connect link; null for any other text or code, a link over
  * 2 KB, or a token or claim that isn't one. Other parameters are ignored.
  */
