@@ -278,7 +278,11 @@ const styles = StyleSheet.create({
   frame: { width: "62%", borderRadius: 20, overflow: "hidden" },
   frameFull: { height: "100%", maxWidth: "100%", borderRadius: 20, overflow: "hidden" },
   cover: {
-    ...StyleSheet.absoluteFillObject,
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
     alignItems: "center",
     justifyContent: "center",
     gap: 8,

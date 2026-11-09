@@ -62,7 +62,7 @@ export async function desktopTarget(
   hub: Pick<MachineHub, "isLocal">,
   orgId: string,
   agentId: string,
-  kind: StreamRequest["kind"],
+  kind: Exclude<StreamRequest["kind"], "phone">,
 ): Promise<StreamTarget> {
   const [agent] = await db
     .select({ handle: agents.handle, name: agents.name, machineId: agents.machineId })

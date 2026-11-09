@@ -313,7 +313,7 @@ describe("a phone's screen", () => {
     expect(mayTakePhone(person, "u-rui")).toBe(true);
     // The pill names a person in control, and its detail is only the time.
     expect(statusPill(t, inUse(null, "u-rui"))).toBe("In use by Rui");
-    expect(statusDetail(t, "en", inUse(null, "u-rui"), { now: NOW })).toBe("since 14:10");
+    expect(statusDetail(t, "en-US", inUse(null, "u-rui"), { now: NOW })).toBe("since 2:10 PM");
   });
 
   test("what covers it: the cause, and Try again only where nothing retries by itself", () => {

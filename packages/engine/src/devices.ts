@@ -775,7 +775,10 @@ type PhoneStreamInput = Pick<StreamInput, "userId" | "orgId" | "request">;
  * owner, an admin, or whom the agent works for), which then waits until they give it back. Another person in
  * control keeps it. A refusal of control only (`controlEnded`) lets the viewer open again as a watcher.
  */
-async function phoneStreamAccess(db: Database, input: PhoneStreamInput) {
+async function phoneStreamAccess(
+  db: Database,
+  input: PhoneStreamInput,
+): Promise<{ refused: number; reason: string } | { phone: MachinePhoneRow; host: MachineRow }> {
   const { userId, orgId, request } = input;
   if (request.kind !== "phone") return { refused: STREAM_CLOSE.badRequest, reason: "bad_request" };
   const closed = closedRefusal(await orgStanding(db, orgId));
@@ -832,7 +835,7 @@ export async function authorizePhoneStream(
 /** The broker's `recheck` of a phone's screen: whether its person may still have it (`phoneStreamAccess`). */
 export async function recheckPhoneStream(db: Database, stream: Stream) {
   const access = await phoneStreamAccess(db, stream);
-  return "refused" in access ? access : null;
+  return "refused" in access ? { refused: access.refused, reason: access.reason } : null;
 }
 
 /** A phone's screen that ran, in the org's audit log: who, which phone and computer, how long, how many bytes. */

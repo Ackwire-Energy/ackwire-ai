@@ -824,7 +824,9 @@ export class PhoneManager {
     let socket: DataSocket;
     try {
       // Someone taking control means to use it: a dark screen lights up (and a lock screen without a PIN lifts).
-      if (control && platform === "android" && tools.adb) await this.shell(tools.adb, serial, WAKE_SHELL, 10_000);
+      if (control && platform === "android" && tools.adb) {
+        await this.shell(tools.adb, serial, WAKE_SHELL, 10_000).catch(() => "");
+      }
       frame = await driver.frame(stop.signal);
       socket = await dial();
     } catch (err) {

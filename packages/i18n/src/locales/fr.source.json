@@ -30339,6 +30339,105 @@
   "devices.onTheIphone": {
     "value": "On the iPhone"
   },
+  "devices.screen.title": {
+    "value": "Screen"
+  },
+  "devices.screen.label": {
+    "value": "{{name}}'s screen, live"
+  },
+  "devices.screen.take": {
+    "value": "Take control"
+  },
+  "devices.screen.give": {
+    "value": "Give back"
+  },
+  "devices.screen.yours": {
+    "value": "You're in control"
+  },
+  "devices.screen.yoursHint": {
+    "value": "Click to tap, drag to swipe and type on your keyboard, with Esc for Back."
+  },
+  "devices.screen.agentUses": {
+    "value": "{{agent}} is using it"
+  },
+  "devices.screen.agentUsesFor": {
+    "value": "{{agent}} is using it for {{person}}"
+  },
+  "devices.screen.takeHint": {
+    "value": "Taking control pauses {{agent}} until you give it back."
+  },
+  "devices.screen.noTake": {
+    "value": "Only its owner, an admin or the person {{agent}} works for can take control."
+  },
+  "devices.screen.personControls": {
+    "value": "{{name}} is in control"
+  },
+  "devices.screen.home": {
+    "value": "Home"
+  },
+  "devices.screen.fullExit": {
+    "value": "Exit full screen"
+  },
+  "devices.screen.opening": {
+    "value": "Opening the screen…"
+  },
+  "devices.screen.offline": {
+    "value": "{{name}} isn't reachable right now"
+  },
+  "devices.screen.offlineText": {
+    "value": "It shows again by itself once {{host}} sees it."
+  },
+  "devices.screen.busy": {
+    "value": "Too many people are watching"
+  },
+  "devices.screen.busyText": {
+    "value": "It shows again when someone leaves."
+  },
+  "devices.screen.notReady": {
+    "value": "{{name}} isn't ready"
+  },
+  "devices.screen.notReadyText": {
+    "value": "It shows again by itself once it's ready."
+  },
+  "devices.screen.forbidden": {
+    "value": "You can't see this screen"
+  },
+  "devices.screen.forbiddenText": {
+    "value": "Its owner chooses who can use {{name}}."
+  },
+  "devices.screen.outdated": {
+    "value": "The app on {{host}} is too old for this"
+  },
+  "devices.screen.outdatedText": {
+    "value": "Update agentes.chat on {{host}}, then try again."
+  },
+  "devices.screen.unavailable": {
+    "value": "This screen can't be shown"
+  },
+  "devices.screen.unavailableText": {
+    "value": "Check that {{host}} has adb or Xcode installed, then try again."
+  },
+  "devices.screen.needsHelper": {
+    "value": "Finish the iPhone setup on the Mac to add the test helper it needs."
+  },
+  "devices.screen.ended": {
+    "value": "The screen closed"
+  },
+  "devices.screen.someone": {
+    "value": "Someone else is in control of {{name}}."
+  },
+  "devices.screen.unsupported": {
+    "value": "Controlling an iPhone needs the test helper on the Mac. You can still watch it."
+  },
+  "devices.screen.paused": {
+    "value": "{{host}} is paused, so control waits until it's resumed."
+  },
+  "devices.screen.lost": {
+    "value": "Control ended. You're watching {{name}} again."
+  },
+  "devices.screen.typeLabel": {
+    "value": "Type on {{name}}"
+  },
   "devices.status.ready": {
     "value": "Ready"
   },

@@ -971,12 +971,12 @@ test("control: the person's input goes to the phone, an agent holding it waits, 
 test("an agent's op running when a person takes control stops, and says why", async () => {
   const r = rig({ ...ANDROID_STATE, wait: true }, {});
   const target = { platform: "android", serial: PIXEL };
-  const recording = r.op({ op: "phone.record", ...target, holder: r.holder("run-1"), seconds: 30 });
+  const recording = r.op({ op: "phone.record", ...target, holder: r.holder("run-1"), seconds: 30 }).catch((e) => e);
   await until(() => r.calls().some((c) => c[0] === "scrcpy"), "the recording");
   const v = viewerSocket();
   const sam = { runId: null, agentId: null, userId: "user-sam", since: "" };
   await r.manager.view({ platform: "android", serial: PIXEL, holder: sam }, "control", async () => v.socket);
-  const error = (await recording.catch((e: RunnerError) => e)) as RunnerError;
+  const error = (await recording) as RunnerError;
   expect(error.code).toBe("phone_busy");
   expect(error.message).toContain("took control");
   v.viewer().closed();
