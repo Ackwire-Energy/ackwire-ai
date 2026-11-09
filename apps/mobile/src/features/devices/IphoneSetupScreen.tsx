@@ -40,7 +40,9 @@ export function IphoneSetupScreen({ machineId }: { machineId?: string }) {
   const macs = phoneHosts(devices, meId, "ios");
   const seeing = devices.find((d) => thisPhoneOn(d.phones, "ios", Device.modelName));
   const host = devices.find((d) => d.id === picked) ?? seeing ?? (macs.length === 1 ? macs[0] : undefined);
-  const hostName = host ? computerName(t, org?.name ?? "", { kind: host.machineKind, name: host.name }, isPersonal(org)) : "";
+  const hostName = host
+    ? computerName(t, org?.name ?? "", { kind: host.machineKind, name: host.name }, isPersonal(org))
+    : "";
   const phone = host ? thisPhoneOn(host.phones, "ios", Device.modelName) : null;
   const step = iphoneStep(phone);
   if (host && phone && step === IPHONE_STEPS.length)

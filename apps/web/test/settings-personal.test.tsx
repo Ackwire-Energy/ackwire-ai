@@ -54,7 +54,7 @@ describe("a personal workspace's settings list", () => {
       "IA e apps",
       "Plano e uso",
       "Cofre",
-      "Computadores",
+      "Dispositivos",
       "Avançado",
     ]);
     expect(within(nav()).getByRole("button", { name: "Avançado" }).getAttribute("aria-expanded")).toBe("false");
@@ -71,7 +71,7 @@ describe("a personal workspace's settings list", () => {
       "IA e apps",
       "Plano e uso",
       "Cofre",
-      "Computadores",
+      "Dispositivos",
       "Avançado",
     ]);
   });

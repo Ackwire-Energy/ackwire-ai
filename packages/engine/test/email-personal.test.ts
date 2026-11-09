@@ -94,6 +94,8 @@ describe("a personal workspace's emails (ADR 0159)", () => {
     const personal = await budget();
     expect(personal).toMatchObject({ kind: "budget", personal: true });
     // In the owner's language (pt-BR here): the limit is theirs to raise.
-    expect(renderEmail(personal as NonNullable<typeof personal>).text).toContain("até você subir o limite na página do agente");
+    expect(renderEmail(personal as NonNullable<typeof personal>).text).toContain(
+      "até você subir o limite na página do agente",
+    );
   });
 });

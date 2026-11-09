@@ -17,8 +17,8 @@ import { Avatar, ComputerIcon, cx, Icon } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
 import { Trans, useTranslation } from "react-i18next";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
-import { useOrg } from "@/components/org-context";
 import { DeviceFace, DeviceHeadline } from "@/components/devices/DeviceNotice";
+import { useOrg } from "@/components/org-context";
 import type { useDirectory } from "@/hooks/useDirectory";
 import { TYPED_VALUES } from "@/i18n";
 

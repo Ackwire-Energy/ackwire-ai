@@ -43,7 +43,12 @@ export function PhoneScreen({ phoneId }: { phoneId: string }) {
       </SettingsPage>
     );
   }
-  const host = computerName(t, org?.name ?? "", { kind: found.computer.machineKind, name: found.computer.name }, isPersonal(org));
+  const host = computerName(
+    t,
+    org?.name ?? "",
+    { kind: found.computer.machineKind, name: found.computer.name },
+    isPersonal(org),
+  );
   const s = p.status;
   const holder = s.kind === "in_use" ? s : null;
   // An iPhone follows its Mac: its row shows and changes the Mac's rule (the footer says so).

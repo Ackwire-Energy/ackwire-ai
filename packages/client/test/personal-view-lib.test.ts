@@ -33,14 +33,19 @@ describe("a personal workspace's settings list", () => {
       "vault",
       "connectors",
       "skills",
-      "computers",
+      "devices",
       "usage",
       "keys",
       "storage",
       "billing",
     ]);
     const { main, advanced } = personalSettingsNav(open);
-    expect(main.map((s) => s.id)).toEqual([...PERSONAL_SETTINGS]);
+    // The web's section is Devices; the phone's is Computers: each lists its own.
+    expect(main.map((s) => s.id)).toEqual(PERSONAL_SETTINGS.filter((id) => id !== "computers"));
+    expect(personalSettingsNav(sections(["account", "computers"])).main.map((s) => s.id)).toEqual([
+      "account",
+      "computers",
+    ]);
     // Connectors, skills and billing are on AI and apps' and Plan and usage's pages, not listed again.
     expect(advanced.map((s) => s.id)).toEqual(["notifications", "members", "roles", "storage"]);
   });

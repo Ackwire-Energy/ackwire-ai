@@ -36,7 +36,16 @@ export function personalSettingsHost(id: string, open: ReadonlySet<string>): str
  * The short list once other people are members (a family): People comes after About you. Alone, it stays under
  * Advanced, where inviting the first one still is.
  */
-const PERSONAL_SETTINGS_SHARED = ["account", "general", "members", "keys", "usage", "vault", "devices", "computers"] as const;
+const PERSONAL_SETTINGS_SHARED = [
+  "account",
+  "general",
+  "members",
+  "keys",
+  "usage",
+  "vault",
+  "devices",
+  "computers",
+] as const;
 
 /**
  * A personal workspace's settings list from the sections the person may open (`open`, in their usual order): the
