@@ -170,7 +170,15 @@ html:not([data-pointer]) .vlt-list .vlt-row:focus-visible {
   align-items: center;
   gap: 6px;
 }
+/* The item's fields, and beside them who has access and its uses; under them when the dialog is narrow. */
+.vlt-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  align-items: flex-start;
+}
 .vlt-details__main {
+  flex: 999 1 520px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -320,9 +328,24 @@ html:not([data-pointer]) .vlt-list .vlt-row:focus-visible {
 
 /* The aside: who has access, then the recent uses, each a section of the dialog (the first without its rule). It
    scrolls with the dialog: the uses can make it taller than the window. */
-.ac-details .issue-aside.vlt-aside {
-  position: static;
+.vlt-aside {
+  flex: 1 1 260px;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
   gap: 16px;
+  padding: 16px;
+  border-radius: var(--radius-section);
+  background: var(--raised);
+  box-shadow: var(--e1), var(--top);
+}
+.vlt-aside > :where(p, ul, ol) {
+  margin-block: 0;
+}
+@media (max-width: 720px) {
+  .vlt-aside {
+    max-width: none;
+  }
 }
 .vlt-aside > .ac-details__section {
   gap: 12px;

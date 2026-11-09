@@ -6484,20 +6484,19 @@
     "statusLabel": "Status",
     "due": "Deadline",
     "noDue": "Geen deadline",
-    "seeCalendar": "bekijk in de agenda",
+    "seeCalendar": "Bekijk in de agenda",
     "removeDue": "De deadline verwijderen",
     "links": "Gekoppeld",
     "prBy": "PR #{{number}} · geopend door {{name}}",
     "artifactBy": "{{title}} ({{name}})",
-    "noLinks": "Nog niets gekoppeld.",
     "github": {
       "label": "GitHub-link",
       "placeholder": "Link van issue of PR",
       "invalid": "Dat is geen link van een GitHub-issue of pull request.",
-      "remove": "GitHub-link verwijderen"
+      "remove": "GitHub-link verwijderen",
+      "add": "GitHub-link toevoegen"
     },
     "openConversation": "Gesprek bekijken",
-    "labels": "Labels",
     "tabs": {
       "label": "Onderdelen van de taak",
       "details": "Gegevens",

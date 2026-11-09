@@ -6233,20 +6233,19 @@
     "statusLabel": "Status",
     "due": "Tenggat",
     "noDue": "Tanpa tenggat",
-    "seeCalendar": "lihat di kalender",
+    "seeCalendar": "Lihat di kalender",
     "removeDue": "Hapus tenggat",
     "links": "Tertaut",
     "prBy": "PR #{{number}} · dibuka oleh {{name}}",
     "artifactBy": "{{title}} ({{name}})",
-    "noLinks": "Belum ada yang ditautkan.",
     "github": {
       "label": "Tautan GitHub",
       "placeholder": "Tautan issue atau PR",
       "invalid": "Itu bukan tautan issue atau pull request GitHub.",
-      "remove": "Hapus tautan GitHub"
+      "remove": "Hapus tautan GitHub",
+      "add": "Tambahkan tautan GitHub"
     },
     "openConversation": "Lihat percakapan",
-    "labels": "Label",
     "tabs": {
       "label": "Bagian tugas",
       "details": "Rincian",

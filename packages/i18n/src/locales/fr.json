@@ -6669,20 +6669,19 @@
     "statusLabel": "Statut",
     "due": "Échéance",
     "noDue": "Aucune échéance",
-    "seeCalendar": "voir dans le calendrier",
+    "seeCalendar": "Voir dans le calendrier",
     "removeDue": "Retirer l'échéance",
     "links": "Liés",
     "prBy": "PR #{{number}} · ouverte par {{name}}",
     "artifactBy": "{{title}} ({{name}})",
-    "noLinks": "Rien de lié pour l'instant.",
     "github": {
       "label": "Lien GitHub",
       "placeholder": "Lien de l'issue ou PR",
       "invalid": "Ce n'est pas le lien d'une issue ou d'une pull request GitHub.",
-      "remove": "Retirer le lien GitHub"
+      "remove": "Retirer le lien GitHub",
+      "add": "Ajouter un lien GitHub"
     },
     "openConversation": "Voir la conversation",
-    "labels": "Étiquettes",
     "tabs": {
       "label": "Parties de la tâche",
       "details": "Détails",

@@ -6395,20 +6395,19 @@
     "statusLabel": "Durum",
     "due": "Son tarih",
     "noDue": "Son tarih yok",
-    "seeCalendar": "takvimde gör",
+    "seeCalendar": "Takvimde gör",
     "removeDue": "Son tarihi kaldır",
     "links": "Bağlantılı",
     "prBy": "PR #{{number}} · açan: {{name}}",
     "artifactBy": "{{title}} ({{name}})",
-    "noLinks": "Henüz bağlantılı bir şey yok.",
     "github": {
       "label": "GitHub bağlantısı",
       "placeholder": "Issue veya PR bağlantısı",
       "invalid": "Bu bir GitHub issue veya pull request bağlantısı değil.",
-      "remove": "GitHub bağlantısını kaldır"
+      "remove": "GitHub bağlantısını kaldır",
+      "add": "GitHub bağlantısı ekle"
     },
     "openConversation": "Konuşmayı gör",
-    "labels": "Etiketler",
     "tabs": {
       "label": "Görevin bölümleri",
       "details": "Ayrıntılar",

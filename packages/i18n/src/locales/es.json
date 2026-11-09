@@ -6617,20 +6617,19 @@
     "statusLabel": "Estado",
     "due": "Fecha límite",
     "noDue": "Sin fecha límite",
-    "seeCalendar": "ver en el calendario",
+    "seeCalendar": "Ver en el calendario",
     "removeDue": "Quitar la fecha límite",
     "links": "Vinculado",
     "prBy": "PR #{{number}} · abierto por {{name}}",
     "artifactBy": "{{title}} ({{name}})",
-    "noLinks": "Todavía no hay nada vinculado.",
     "github": {
       "label": "Enlace de GitHub",
       "placeholder": "Enlace del issue o PR",
       "invalid": "Ese no es el enlace de un issue o pull request de GitHub.",
-      "remove": "Quitar el enlace de GitHub"
+      "remove": "Quitar el enlace de GitHub",
+      "add": "Añadir un enlace de GitHub"
     },
     "openConversation": "Ver conversación",
-    "labels": "Etiquetas",
     "tabs": {
       "label": "Partes de la tarea",
       "details": "Detalles",

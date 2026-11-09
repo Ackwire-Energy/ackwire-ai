@@ -6250,15 +6250,14 @@
     "links": "关联内容",
     "prBy": "PR #{{number}} · 由 {{name}} 创建",
     "artifactBy": "{{title}}（{{name}}）",
-    "noLinks": "还没有关联内容。",
     "github": {
       "label": "GitHub 链接",
       "placeholder": "Issue 或 PR 链接",
       "invalid": "这不是 GitHub issue 或 pull request 的链接。",
-      "remove": "移除 GitHub 链接"
+      "remove": "移除 GitHub 链接",
+      "add": "添加 GitHub 链接"
     },
     "openConversation": "查看对话",
-    "labels": "标签",
     "tabs": {
       "label": "任务内容",
       "details": "详情",

@@ -6841,20 +6841,19 @@
     "statusLabel": "Статус",
     "due": "Срок",
     "noDue": "Без срока",
-    "seeCalendar": "посмотреть в календаре",
+    "seeCalendar": "Посмотреть в календаре",
     "removeDue": "Убрать срок",
     "links": "Связанное",
     "prBy": "PR #{{number}} · открыл(а) {{name}}",
     "artifactBy": "{{title}} ({{name}})",
-    "noLinks": "Пока ничего не связано.",
     "github": {
       "label": "Ссылка на GitHub",
       "placeholder": "Ссылка на issue или PR",
       "invalid": "Это не ссылка на issue или pull request в GitHub.",
-      "remove": "Убрать ссылку на GitHub"
+      "remove": "Убрать ссылку на GitHub",
+      "add": "Добавить ссылку на GitHub"
     },
     "openConversation": "Открыть переписку",
-    "labels": "Метки",
     "tabs": {
       "label": "Разделы задачи",
       "details": "Подробности",

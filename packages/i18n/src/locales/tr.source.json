@@ -15551,7 +15551,7 @@
     "value": "No due date"
   },
   "issues.seeCalendar": {
-    "value": "see in the calendar"
+    "value": "See in the calendar"
   },
   "issues.removeDue": {
     "value": "Remove the due date"
@@ -15565,9 +15565,6 @@
   "issues.artifactBy": {
     "value": "{{title}} ({{name}})"
   },
-  "issues.noLinks": {
-    "value": "Nothing linked yet."
-  },
   "issues.github.label": {
     "value": "GitHub link"
   },
@@ -15580,11 +15577,11 @@
   "issues.github.remove": {
     "value": "Remove the GitHub link"
   },
+  "issues.github.add": {
+    "value": "Add a GitHub link"
+  },
   "issues.openConversation": {
     "value": "View conversation"
-  },
-  "issues.labels": {
-    "value": "Labels"
   },
   "issues.tabs.label": {
     "value": "Task sections"

@@ -6201,15 +6201,14 @@
     "links": "リンク",
     "prBy": "PR #{{number}} · 作成者: {{name}}",
     "artifactBy": "{{title}}（{{name}}）",
-    "noLinks": "リンクされたものはまだありません。",
     "github": {
       "label": "GitHub リンク",
       "placeholder": "Issue または PR のリンク",
       "invalid": "GitHub の Issue または Pull Request のリンクではありません。",
-      "remove": "GitHub リンクを削除"
+      "remove": "GitHub リンクを削除",
+      "add": "GitHub リンクを追加"
     },
     "openConversation": "会話を見る",
-    "labels": "ラベル",
     "tabs": {
       "label": "タスクのセクション",
       "details": "詳細",

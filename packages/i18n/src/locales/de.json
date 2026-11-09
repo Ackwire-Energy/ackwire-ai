@@ -6434,20 +6434,19 @@
     "statusLabel": "Status",
     "due": "Fälligkeitsdatum",
     "noDue": "Kein Fälligkeitsdatum",
-    "seeCalendar": "im Kalender ansehen",
+    "seeCalendar": "Im Kalender ansehen",
     "removeDue": "Fälligkeitsdatum entfernen",
     "links": "Verknüpft",
     "prBy": "PR #{{number}} · geöffnet von {{name}}",
     "artifactBy": "{{title}} ({{name}})",
-    "noLinks": "Noch nichts verknüpft.",
     "github": {
       "label": "GitHub-Link",
       "placeholder": "Issue- oder PR-Link",
       "invalid": "Das ist kein Link zu einem GitHub-Issue oder Pull Request.",
-      "remove": "GitHub-Link entfernen"
+      "remove": "GitHub-Link entfernen",
+      "add": "GitHub-Link hinzufügen"
     },
     "openConversation": "Unterhaltung ansehen",
-    "labels": "Labels",
     "tabs": {
       "label": "Bereiche der Aufgabe",
       "details": "Übersicht",
