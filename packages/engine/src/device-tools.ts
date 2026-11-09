@@ -488,10 +488,17 @@ async function phoneFailure(db: Executor, r: Reached, error: unknown): Promise<T
       const who = agent
         ? `${agent.name}${person ? ` (${holder?.label ? `${holder.label} ` : ""}for ${person})` : ""}`
         : null;
+      // A person took control of its screen from the apps: they give it back when they're done.
+      if (!who && holder && person && !holder.runId) {
+        return refusal(
+          `${person} took control of ${name}, so it's theirs for now. ${waitHint(name)}`,
+          "device.phone_busy",
+        );
+      }
       return refusal(
         who && holder
           ? `${name} is in use by ${who} since ${seenAgo(holder.since).replace("last seen ", "")}. ${waitHint(name)}`
-          : `${name} is in use: ${error.message}. ${waitHint(name)}`,
+          : `${name} is in use: ${error.message} ${waitHint(name)}`,
         "device.phone_busy",
       );
     }

@@ -1,4 +1,5 @@
 import { computerName } from "@agenteschat/client/lib/computer";
+import { personInControl } from "@agenteschat/client/lib/devices";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Platform, StyleSheet, View } from "react-native";
@@ -10,12 +11,14 @@ import { useColors, useMeId } from "../shared/hooks";
 import { goBack } from "../shared/parts";
 import { openThisPhone } from "./DevicesScreen";
 import { findDevice, phoneFacts } from "./logic";
+import { PhoneLive } from "./PhoneLive";
 import { DevicePortrait, PhoneNameField, StatusLine, useAudienceText } from "./parts";
 import { useDeviceMutation, useDevices } from "./queries";
 
 /**
- * One phone, reached through a computer: its portrait and state, what it is and where, its name, who can use it (an
- * iPhone follows its Mac), Stop while an agent holds it (its owner, admins, or whom the agent works for), Forget.
+ * One phone, reached through a computer: its portrait and state, its screen live (`PhoneLive`), what it is and where,
+ * its name, who can use it (an iPhone follows its Mac), Stop while an agent holds it (its owner, admins, or whom the
+ * agent works for), Forget.
  */
 export function PhoneScreen({ phoneId }: { phoneId: string }) {
   const { t } = useTranslation();
@@ -47,7 +50,9 @@ export function PhoneScreen({ phoneId }: { phoneId: string }) {
   const holder = s.kind === "in_use" ? s : null;
   // An iPhone follows its Mac: its row shows and changes the Mac's rule (the footer says so).
   const ruled = p.audience ? p : found.computer;
-  const mayStop = holder !== null && (p.mayManage || (meId !== null && holder.userId === meId));
+  // A person in control gives it back on its screen instead.
+  const mayStop =
+    holder !== null && personInControl(s) !== meId && (p.mayManage || (meId !== null && holder.userId === meId));
   // The guide is for the phone in hand: an iPhone's steps on an iPhone, Android's on Android.
   const guide =
     s.kind === "needs_you" && (Platform.OS === "ios") === (p.platform === "ios") && p.phoneKind === "device";
@@ -80,6 +85,8 @@ export function PhoneScreen({ phoneId }: { phoneId: string }) {
           </Text>
         ) : null}
       </View>
+      <Gap />
+      <PhoneLive key={p.id} phone={p} host={host} />
       {guide ? (
         <>
           <Gap />

@@ -1057,3 +1057,94 @@ a.dv-chiplink:hover {
     flex-basis: 100%;
   }
 }
+
+/* ---------- A phone's screen, live (PhoneLive) --------------------------------------
+   The phone's own shape (its pictures' size), centred, never taller than the window leaves for it. A cover says why
+   it can't show; the last picture stays dimmed under it. In control the screen takes the pointer and the keys. */
+/* A status line with no action of its own: the same room on both sides. */
+.dv-screen__banner {
+  padding-inline: var(--space-3);
+}
+.dv-screen__acts {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.dv-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--screen-bg);
+  padding: var(--space-4);
+  outline: none;
+}
+.dv-screen:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+.dv-screen__frame {
+  --dv-screen-h: min(70vh, 40rem);
+  position: relative;
+  width: min(100%, calc(var(--dv-screen-h) * var(--dv-ratio)));
+  aspect-ratio: var(--dv-ratio);
+  overflow: hidden;
+  border-radius: var(--radius-xl);
+  background: var(--surface-sunken);
+}
+.dv-screen[data-full] {
+  justify-content: center;
+}
+.dv-screen[data-full] > .dv-screen__frame {
+  --dv-screen-h: calc(100vh - 2 * var(--space-4));
+}
+.dv-screen[data-full]:has(> .dv-screen__keys) > .dv-screen__frame {
+  --dv-screen-h: calc(100vh - 2 * var(--space-4) - var(--control-h-sm) - var(--space-3));
+}
+.dv-screen__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity var(--dur-base) ease;
+  touch-action: none;
+  user-select: none;
+}
+.dv-screen__canvas[data-shown] {
+  opacity: 1;
+}
+.dv-screen[data-control] .dv-screen__canvas {
+  cursor: pointer;
+}
+.dv-screen__cover {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  text-align: center;
+  color: var(--on-dark);
+  background: color-mix(in srgb, var(--screen-bg) 78%, transparent);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+.dv-screen__cover > strong {
+  font-size: var(--text-md);
+}
+.dv-screen__cover > span {
+  color: var(--on-dark-soft);
+}
+.dv-screen__keys {
+  justify-content: center;
+}
+@media (width <= 480px) {
+  .dv-screen {
+    padding: var(--space-3);
+  }
+  .dv-screen__frame {
+    --dv-screen-h: min(60vh, 35rem);
+  }
+}

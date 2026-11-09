@@ -13,6 +13,7 @@
 //   real iPhone's 8100 and 9100: $FAKE_WDA_PORT and $FAKE_MJPEG_PORT) until SIGTERM (wdaRunFail: prints it, exit 65). wdaTree: its screen tree
 //   (wdaTrees: one per `source` call, the last kept). Its requests are logged as ["wda", method, path, body].
 //   ffmpeg: reads stdin to its end, then writes MP4DATA to its last argument
+//   changing: each screen capture differs from the last (a live screen)
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import net from "node:net";
@@ -33,8 +34,11 @@ const png = () => {
   Buffer.from("89504e470d0a1a0a0000000d49484452", "hex").copy(b);
   b.writeUInt32BE(1080, 16);
   b.writeUInt32BE(2400, 20);
+  if (state.changing) b.writeUInt32BE(Math.floor(Math.random() * 2 ** 32), 29);
   return b;
 };
+// A 1206×2622 JPEG's first bytes: SOI, then SOF0 with the size.
+const jpeg = () => Buffer.from("ffd8ffc0001108" + "0a3e" + "04b6" + "03012200021101031101", "hex");
 /** A recorder: the file now, then until SIGINT (`wait`) or at once. */
 const recorder = (file) => {
   writeFileSync(file, "MP4DATA");
@@ -103,6 +107,8 @@ else if (tool === "xcrun" && args[0] === "xcodebuild") {
     }
   } else if (line.startsWith("devicectl device process launch")) {
     state.launchFail ? fail(state.launchFail) : out("Launched application with com.acme.app bundle identifier.\n");
+  } else if (line.includes(" screenshot ") && args.at(-1) === "-") {
+    process.stdout.write(jpeg(), () => process.exit(0));
   } else if (line.includes(" screenshot ")) {
     writeFileSync(args.at(-1), png());
     out("Wrote screenshot\n");

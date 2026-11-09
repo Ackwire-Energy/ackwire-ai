@@ -201,6 +201,60 @@ describe("A device's page", () => {
     expect(calls(state, "devices.stopPhone")[0]?.args).toEqual([ORG_ID, PIXEL]);
   });
 
+  test("a phone's screen: watched while Lia uses it, taken by its owner, input as frames, given back", async () => {
+    const drawn = globalThis.createImageBitmap;
+    globalThis.createImageBitmap = (async () => ({ width: 1080, height: 2400, close() {} })) as never;
+    try {
+      const { sockets } = await open(`/org/${ORG_ID}/settings/devices/phones/${PIXEL}`);
+      const screens = () => sockets.sockets.filter((s) => s.url.includes("/api/phone-screen"));
+      const watch = screens().at(-1);
+      expect(watch?.url).toContain(`phoneId=${PIXEL}&mode=watch`);
+      const card = screen().getByRole("region", { name: "Screen" });
+      expect(card.textContent).toContain("Lia is using it for Rui");
+      expect(card.textContent).toContain("Taking control pauses Lia until you give it back.");
+      expect(within(card).queryByRole("button", { name: "Take control" })).toBeNull();
+      // Its first picture: live, acknowledged, and Take control shows.
+      const picture = async (s: (typeof sockets.sockets)[number]) => {
+        await act(async () => {
+          s.onmessage?.({ data: new ArrayBuffer(8) });
+        });
+        await settle(4);
+      };
+      await act(async () => watch?.open());
+      await picture(watch as (typeof sockets.sockets)[number]);
+      expect(watch?.sent).toEqual([{ type: "ack" }]);
+      await click(within(card).getByRole("button", { name: "Take control" }));
+      expect(watch?.closed).toBe(true);
+      const control = screens().at(-1) as (typeof sockets.sockets)[number];
+      expect(control.url).toContain("mode=control");
+      await act(async () => control.open());
+      expect(card.textContent).toContain("You're in control");
+      const canvas = card.querySelector("canvas") as HTMLCanvasElement;
+      canvas.getBoundingClientRect = () => ({ left: 0, top: 0, width: 100, height: 200 }) as DOMRect;
+      await act(async () => {
+        fireEvent.pointerDown(canvas, { clientX: 50, clientY: 50, button: 0 });
+        fireEvent.pointerUp(canvas, { clientX: 50, clientY: 50, button: 0 });
+      });
+      const stage = screen().getByRole("application", { name: "Pixel 8's screen, live" });
+      await act(async () => {
+        fireEvent.keyDown(stage, { key: "a" });
+        fireEvent.keyDown(stage, { key: "Enter" });
+      });
+      await click(within(card).getByRole("button", { name: "Home" }));
+      expect(control.sent).toEqual([
+        { type: "tap", x: 0.5, y: 0.25 },
+        { type: "text", text: "a" },
+        { type: "key", key: "enter" },
+        { type: "key", key: "home" },
+      ]);
+      await click(within(card).getByRole("button", { name: "Give back" }));
+      expect(control.closed).toBe(true);
+      expect(screens().at(-1)?.url).toContain("mode=watch");
+    } finally {
+      globalThis.createImageBitmap = drawn;
+    }
+  });
+
   test("an iPhone follows its Mac", async () => {
     await open(`/org/${ORG_ID}/settings/devices/phones/${IPHONE}`);
     expect(document.querySelector(".settings-rows")?.textContent).toContain("Same as Sam's MacBook Pro");

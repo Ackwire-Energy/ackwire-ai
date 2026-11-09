@@ -17,7 +17,19 @@ import { appleNeedsYou, parseDevicectl, parseSimctl } from "../../runner/apple-d
 import type { RunnerError } from "../../runner/errors";
 import { type HandlerContext, handleRequest, OP_ROUTES, type RequestScope } from "../../runner/handlers";
 import { acquireLock } from "../../runner/lock";
-import { type PhoneIo, PhoneManager, type PhoneRequest } from "../../runner/phones";
+import {
+  androidText,
+  applyInput,
+  NO_IOS_CONTROL,
+  type PhoneIo,
+  PhoneManager,
+  type PhoneRequest,
+  type PhoneScreenDriver,
+  registerIosScreenDriver,
+  SimulatorScreen,
+  screenDriverFor,
+} from "../../runner/phones";
+import type { DataListener, DataSocket, DataSockets } from "../../runner/streams";
 import { IosHelper, WDA_VERSION } from "../../runner/wda";
 import { fakeUsbmuxd, freePort } from "./fake-usbmuxd";
 import { errorCode, removeDirs, tempDir } from "./helpers";
@@ -833,4 +845,242 @@ test("a manager that only looks (doctor) builds no iPhone test helper and runs n
   await Bun.sleep(100);
   expect(r.manager.list().find((p) => p.serial === IPHONE)).toMatchObject({ state: "preparing", reason: "helper_missing" });
   expect(r.calls().some((c) => c[0] === "xcrun" && c[1] === "xcodebuild")).toBe(false);
+});
+
+/** A viewer's data socket in memory: what the runner sent, how it closed, and its listener to play the viewer. */
+function viewerSocket() {
+  const sent: (string | Uint8Array)[] = [];
+  let listener: DataListener | null = null;
+  const closed: { code?: number; reason?: string }[] = [];
+  const socket: DataSocket = {
+    send: (d) => {
+      sent.push(d);
+    },
+    close: (code, reason) => {
+      closed.push({ code, reason });
+      listener?.closed();
+    },
+    bufferedAmount: 0,
+    listen: (on) => {
+      listener = on;
+    },
+  };
+  return { socket, sent, closed, viewer: () => listener as DataListener };
+}
+
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+async function until(check: () => boolean, what: string, ms = 5000) {
+  const end = Date.now() + ms;
+  while (!check()) {
+    if (Date.now() > end) throw new Error(`timed out waiting for ${what}`);
+    await wait(20);
+  }
+}
+
+test("a phone's screen live: pictures until the viewer stops acknowledging, an unchanged screen sent once", async () => {
+  const r = rig({ ...ANDROID_STATE, changing: true });
+  const v = viewerSocket();
+  const person = { runId: null, agentId: null, userId: "user-sam", since: "" };
+  await r.manager.view({ platform: "android", serial: PIXEL, holder: person }, "watch", async () => v.socket);
+  // The first picture is taken before the socket opens, so a phone that can't show refuses the stream instead.
+  await until(() => v.sent.length >= 2, "two pictures");
+  await wait(600);
+  // Two on their way and none acknowledged: it waits.
+  expect(v.sent).toHaveLength(2);
+  expect(pngSize(Buffer.from(v.sent[0] as Uint8Array))).toEqual({ width: 1080, height: 2400 });
+  v.viewer().control?.({ type: "ack" });
+  await until(() => v.sent.length === 3, "a third picture once one was drawn");
+  // Watching never takes the phone, and input from a watcher goes nowhere.
+  v.viewer().control?.({ type: "tap", x: 0.5, y: 0.5 });
+  await wait(200);
+  expect(r.calls().some((c) => c.join(" ").includes("input tap"))).toBe(false);
+  expect(r.manager.list()[0]?.holder).toBeUndefined();
+  v.viewer().closed();
+  const shots = r.calls().filter((c) => c.includes("screencap")).length;
+  await wait(600);
+  expect(r.calls().filter((c) => c.includes("screencap")).length).toBe(shots);
+
+  // An unchanged screen: one picture, however long it shows.
+  r.setState(ANDROID_STATE);
+  const still = viewerSocket();
+  await r.manager.view({ platform: "android", serial: PIXEL, holder: person }, "watch", async () => still.socket);
+  for (let i = 0; i < 3; i++) {
+    await wait(450);
+    still.viewer().control?.({ type: "ack" });
+  }
+  expect(still.sent).toHaveLength(1);
+  still.viewer().closed();
+});
+
+test("control: the person's input goes to the phone, an agent holding it waits, and gets it back after", async () => {
+  const r = rig(ANDROID_STATE);
+  const target = { platform: "android", serial: PIXEL };
+  await r.op({ op: "phone.claim", ...target, holder: r.holder("run-1", "Testing checkout") });
+  const v = viewerSocket();
+  const sam = { runId: null, agentId: null, userId: "user-sam", since: "" };
+  await r.manager.view({ platform: "android", serial: PIXEL, holder: sam }, "control", async () => v.socket);
+  // The person holds it now; the agent's calls wait until they give it back.
+  expect(r.manager.list()[0]?.holder).toMatchObject({ runId: null, userId: "user-sam" });
+  expect(await errorCode(() => r.op({ op: "phone.screenshot", ...target, holder: r.holder("run-1") }))).toBe(
+    "phone_busy",
+  );
+  // Taking control lights the screen up.
+  expect(r.calls()).toContainEqual(["adb", "-s", PIXEL, "shell", "input keyevent KEYCODE_WAKEUP; wm dismiss-keyguard"]);
+  const viewer = v.viewer();
+  viewer.control?.({ type: "tap", x: 0.5, y: 0.25 });
+  viewer.control?.({ type: "swipe", x1: 0.5, y1: 0.8, x2: 0.5, y2: 0.2, ms: 300 });
+  viewer.control?.({ type: "text", text: "it's 5" });
+  viewer.control?.({ type: "text", text: " o'clock" });
+  viewer.control?.({ type: "key", key: "home" });
+  const input = () =>
+    r.calls().filter((c) => c[3] === "shell" && /^input (tap|swipe|text|keyevent \d)/.test(String(c[4])));
+  await until(() => input().length >= 4, "the input");
+  expect(input().map((c) => c[4])).toEqual([
+    "input tap 540 600",
+    "input swipe 540 1920 540 480 300",
+    // Typed while the tap and the swipe went in: one call.
+    "input text 'it'\\''s%s5%so'\\''clock'",
+    "input keyevent 3",
+  ]);
+  // Given back: the agent holds it again.
+  viewer.closed();
+  await until(() => r.manager.list()[0]?.holder?.runId === "run-1", "the agent's hold back");
+  await r.op({ op: "phone.screenshot", ...target, holder: r.holder("run-1") });
+
+  // The run ends while the person controls it: the phone goes free when they give it back.
+  const again = viewerSocket();
+  await r.manager.view({ platform: "android", serial: PIXEL, holder: sam }, "control", async () => again.socket);
+  expect(await r.op({ op: "phone.release", ...target, holder: r.holder("run-1") })).toEqual({ released: true });
+  again.viewer().closed();
+  await until(() => r.manager.list()[0]?.holder === undefined, "the phone free");
+
+  // Stop (its owner, by force) ends a person's control too: their view closes as control ended.
+  const third = viewerSocket();
+  await r.manager.view({ platform: "android", serial: PIXEL, holder: sam }, "control", async () => third.socket);
+  // Someone else can't take it meanwhile.
+  const ana = { runId: null, agentId: null, userId: "user-ana", since: "" };
+  expect(
+    await errorCode(() =>
+      r.manager.view({ platform: "android", serial: PIXEL, holder: ana }, "control", async () => viewerSocket().socket),
+    ),
+  ).toBe("phone_busy");
+  await r.op({ op: "phone.release", ...target, holder: r.holder("run-9"), force: true });
+  expect(third.closed).toEqual([{ code: 4410, reason: "control ended" }]);
+});
+
+test("an agent's op running when a person takes control stops, and says why", async () => {
+  const r = rig({ ...ANDROID_STATE, wait: true }, {});
+  const target = { platform: "android", serial: PIXEL };
+  const recording = r.op({ op: "phone.record", ...target, holder: r.holder("run-1"), seconds: 30 });
+  await until(() => r.calls().some((c) => c[0] === "scrcpy"), "the recording");
+  const v = viewerSocket();
+  const sam = { runId: null, agentId: null, userId: "user-sam", since: "" };
+  await r.manager.view({ platform: "android", serial: PIXEL, holder: sam }, "control", async () => v.socket);
+  const error = (await recording.catch((e: RunnerError) => e)) as RunnerError;
+  expect(error.code).toBe("phone_busy");
+  expect(error.message).toContain("took control");
+  v.viewer().closed();
+});
+
+test("iPhones: a simulator shows its pictures but takes no control, a real one needs the helper, a registered driver wins", async () => {
+  const r = rig(ANDROID_STATE);
+  const v = viewerSocket();
+  const sam = { runId: null, agentId: null, userId: "user-sam", since: "" };
+  await r.manager.view({ platform: "ios", serial: SIM, holder: sam }, "watch", async () => v.socket);
+  await until(() => v.sent.length === 1, "the simulator's picture");
+  expect(r.calls()).toContainEqual(["xcrun", "simctl", "io", SIM, "screenshot", "--type=jpeg", "-"]);
+  v.viewer().closed();
+  const control = await r.manager
+    .view({ platform: "ios", serial: SIM, holder: sam }, "control", async () => viewerSocket().socket)
+    .catch((e: RunnerError) => e);
+  expect(control).toMatchObject({ code: "unsupported", message: NO_IOS_CONTROL });
+  expect(
+    await errorCode(() =>
+      r.manager.view({ platform: "ios", serial: IPHONE, holder: sam }, "watch", async () => viewerSocket().socket),
+    ),
+  ).toBe("tool_missing");
+
+  const taps: number[][] = [];
+  const helper: PhoneScreenDriver = {
+    frame: async () => ({ jpeg: new Uint8Array([0xff, 0xd8, 1]), width: 402, height: 874 }),
+    tap: async (x, y) => {
+      taps.push([x, y]);
+    },
+    swipe: async () => {},
+    text: async () => {},
+    key: async () => {},
+  };
+  registerIosScreenDriver((phone) => (phone.kind === "device" ? helper : null));
+  try {
+    const real = viewerSocket();
+    await r.manager.view({ platform: "ios", serial: IPHONE, holder: sam }, "control", async () => real.socket);
+    real.viewer().control?.({ type: "tap", x: 0.5, y: 0.5 });
+    await until(() => taps.length === 1, "the helper's tap");
+    // In the helper's own space: the size its pictures said.
+    expect(taps).toEqual([[201, 437]]);
+    real.viewer().closed();
+    // A simulator the helper leaves alone keeps the built-in pictures.
+    const sim = { platform: "ios", serial: SIM, kind: "simulator", model: "", osVersion: "", state: "ready" } as const;
+    expect(screenDriverFor(sim, { adb: null, xcrun: "/x", env: {} })).toBeInstanceOf(SimulatorScreen);
+  } finally {
+    registerIosScreenDriver(null);
+  }
+});
+
+test("input lands where the person pressed, in the picture's own size; text is one quoted word for the phone's shell", async () => {
+  const seen: unknown[] = [];
+  const driver = {
+    tap: async (...a: number[]) => void seen.push(["tap", ...a]),
+    swipe: async (...a: number[]) => void seen.push(["swipe", ...a]),
+    text: async (t: string) => void seen.push(["text", t]),
+    key: async (k: string) => void seen.push(["key", k]),
+  } as unknown as PhoneScreenDriver;
+  const size = { width: 1080, height: 2400 };
+  await applyInput(driver, { type: "tap", x: 1, y: 0 }, size);
+  await applyInput(driver, { type: "swipe", x1: 0, y1: 0.5, x2: 0.25, y2: 0.5, ms: 120 }, size);
+  expect(seen).toEqual([
+    ["tap", 1079, 0],
+    ["swipe", 0, 1200, 270, 1200, 120],
+  ]);
+  expect(androidText(`a b'c"; rm -rf $HOME \\`)).toBe(`'a%sb'\\''c";%srm%s-rf%s$HOME%s\\'`);
+});
+
+test("stream.open for a phone's screen needs no agent, goes to the phones, and control waits on a paused computer", async () => {
+  const views: unknown[] = [];
+  const dialed: string[] = [];
+  const phones = {
+    view: async (target: unknown, mode: string, dial: () => Promise<DataSocket>) => {
+      views.push({ target, mode });
+      await dial();
+    },
+  } as unknown as PhoneManager;
+  const streams = {
+    dial: async (_id: string, kind: string) => {
+      dialed.push(kind);
+      return viewerSocket().socket;
+    },
+  } as unknown as DataSockets;
+  let paused = false;
+  const ctx: HandlerContext = {
+    workspaceReal: "/tmp",
+    exec: false,
+    token: "agm_x",
+    phones,
+    streams,
+    paused: () => paused,
+  };
+  const scope: RequestScope = { signal: new AbortController().signal, output: () => {} };
+  const phone = {
+    platform: "android" as const,
+    serial: PIXEL,
+    holder: { runId: null, agentId: null, userId: "user-sam", since: "" },
+  };
+  const open = (mode: "watch" | "control") =>
+    ({ op: "stream.open", kind: "phone", mode, phoneId: "p1", streamId: "A".repeat(43), phone }) as const;
+  expect(await handleRequest(ctx, open("control"), scope)).toEqual({ opened: true });
+  expect(views).toEqual([{ target: phone, mode: "control" }]);
+  expect(dialed).toEqual(["phone"]);
+  paused = true;
+  expect(await errorCode(() => handleRequest(ctx, open("control"), scope))).toBe("paused");
+  expect(await handleRequest(ctx, open("watch"), scope)).toEqual({ opened: true });
 });

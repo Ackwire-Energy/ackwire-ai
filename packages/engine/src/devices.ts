@@ -1,10 +1,21 @@
-import type { PhoneHolder, PhonePlatform, PhoneReason, PhoneTarget, PubSub, RunnerPhone } from "@agenteschat/adapters";
+import {
+  PHONES_PROTOCOL,
+  type PhoneHolder,
+  type PhonePlatform,
+  type PhoneReason,
+  type PhoneTarget,
+  type PubSub,
+  type RateLimiter,
+  type RunnerPhone,
+  STREAM_CLOSE,
+  STREAM_LIMITS,
+} from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, gt, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { AUDIENCE_MODES, type AudienceMode } from "./audience";
 import { recordAudit } from "./audit";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
-import type { MachineCaller } from "./machine-hub";
+import type { MachineCaller, MachineHub } from "./machine-hub";
 import {
   cleanMachineName,
   getMachine,
@@ -15,6 +26,8 @@ import {
   publishMachineUpdated,
 } from "./machines";
 import { can, getMembership, type Membership, requirePermission } from "./organizations";
+import { closedRefusal, OrgDeletingError, orgStanding } from "./standing";
+import type { Stream, StreamInput, StreamTarget } from "./streams";
 
 const { agents, deviceAccessRequests, machineConnectLinks, machineDeviceCodes, machinePhones, machines, users } =
   schema;
@@ -752,6 +765,91 @@ export async function phoneStoppedBy(
     )
     .limit(1);
   return row ?? null;
+}
+
+type PhoneStreamInput = Pick<StreamInput, "userId" | "orgId" | "request">;
+
+/**
+ * Whether a person may see a phone's screen live, or control it (`kind: "phone"` streams): seeing it is using it (its
+ * rule, as for its screenshots); control also needs it free, already theirs, or held by an agent they may stop (its
+ * owner, an admin, or whom the agent works for), which then waits until they give it back. Another person in
+ * control keeps it. A refusal of control only (`controlEnded`) lets the viewer open again as a watcher.
+ */
+async function phoneStreamAccess(db: Database, input: PhoneStreamInput) {
+  const { userId, orgId, request } = input;
+  if (request.kind !== "phone") return { refused: STREAM_CLOSE.badRequest, reason: "bad_request" };
+  const closed = closedRefusal(await orgStanding(db, orgId));
+  if (closed) {
+    return { refused: STREAM_CLOSE.forbidden, reason: closed instanceof OrgDeletingError ? "deleting" : "suspended" };
+  }
+  const membership = await getMembership(db, userId, orgId);
+  if (!membership) return { refused: STREAM_CLOSE.forbidden, reason: "forbidden" };
+  const found = await phoneWithHost(db, orgId, request.phoneId).catch((error: unknown) => {
+    if (error instanceof NotFoundError) return null;
+    throw error;
+  });
+  if (!found) return { refused: STREAM_CLOSE.notFound, reason: "no_phone" };
+  const { phone, host } = found;
+  const rule = phoneRule(phone, machineRule(host));
+  if (!(await mayUseDevice(db, orgId, userId, rule, { membership }))) {
+    return { refused: STREAM_CLOSE.forbidden, reason: "forbidden" };
+  }
+  const h = phone.holder;
+  if (request.mode === "control" && h && !(h.runId === null && h.agentId === null && h.userId === userId)) {
+    if (h.runId === null && h.agentId === null)
+      return { refused: STREAM_CLOSE.controlEnded, reason: "someone_in_control" };
+    const mayStop = phone.ownerUserId === userId || h.userId === userId || can(membership, "configure");
+    if (!mayStop) return { refused: STREAM_CLOSE.controlEnded, reason: "in_use" };
+  }
+  return { phone, host };
+}
+
+/**
+ * The broker's `authorize` for a phone's screen: at most `opensPerMinute` opens a minute per person (shared with
+ * desktops and terminals), `phoneStreamAccess`, then its host: online on this server (streams don't cross servers)
+ * and new enough. Control goes to the host as the person's own hold of the phone.
+ */
+export async function authorizePhoneStream(
+  deps: { db: Database; hub: Pick<MachineHub, "isLocal">; rateLimiter?: RateLimiter },
+  input: StreamInput,
+): Promise<StreamTarget> {
+  const rate = await deps.rateLimiter?.consume(`stream-open:${input.userId}`, {
+    limit: STREAM_LIMITS.opensPerMinute,
+    windowMs: 60_000,
+  });
+  if (rate && !rate.allowed) return { refused: STREAM_CLOSE.tooMany, reason: "rate_limited" };
+  const access = await phoneStreamAccess(deps.db, input);
+  if ("refused" in access) return access;
+  const { phone, host } = access;
+  if (!deps.hub.isLocal(host.id)) {
+    return { refused: STREAM_CLOSE.unreachable, reason: machineOnline(host) ? "other_server" : "offline" };
+  }
+  if (host.protocol < PHONES_PROTOCOL) return { refused: STREAM_CLOSE.refused, reason: "runner_outdated" };
+  const holder = phoneHolder({ runId: null, agentId: null, userId: input.userId });
+  return { machineId: host.id, phone: phoneTargetOf(phone, holder) };
+}
+
+/** The broker's `recheck` of a phone's screen: whether its person may still have it (`phoneStreamAccess`). */
+export async function recheckPhoneStream(db: Database, stream: Stream) {
+  const access = await phoneStreamAccess(db, stream);
+  return "refused" in access ? access : null;
+}
+
+/** A phone's screen that ran, in the org's audit log: who, which phone and computer, how long, how many bytes. */
+export async function auditPhoneStream(db: Executor, s: Stream) {
+  if (s.request.kind !== "phone") return;
+  await recordAudit(db, {
+    orgId: s.orgId,
+    actor: { type: "person", id: s.userId },
+    action: s.request.mode === "control" ? "device.phone_controlled" : "device.phone_watched",
+    target: { type: "phone", id: s.request.phoneId },
+    details: {
+      machineId: s.machineId,
+      seconds: Math.round((Date.now() - (s.readyAt ?? s.openedAt)) / 1000),
+      bytesIn: s.bytesIn,
+      bytesOut: s.bytesOut,
+    },
+  });
 }
 
 /**

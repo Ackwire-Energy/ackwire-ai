@@ -849,9 +849,16 @@ async function handleStream(
 ): Promise<MachineReplies["stream.open"]> {
   const { agent, streamId } = req;
   const streams = ctx.streams;
-  if (!agent || !isStreamId(streamId)) throw new RunnerError("bad_request", "A stream needs an agent and its id");
+  if (!isStreamId(streamId)) throw new RunnerError("bad_request", "A stream needs its id");
   if (!streams) throw new RunnerError("bad_request", "This runner opens no streams");
   const dial = () => streams.dial(streamId, req.kind, scope.signal);
+  // A phone's screen (bring your own devices) is no agent's: it goes with the phone, commands on or off.
+  if (req.kind === "phone") {
+    if (!ctx.phones) throw new RunnerError("phone_missing", "This computer doesn't reach phones.");
+    await ctx.phones.view(req.phone, req.mode, dial);
+    return { opened: true };
+  }
+  if (!agent) throw new RunnerError("bad_request", "A stream needs an agent");
   if (req.kind === "desktop") {
     requireTool(ctx, "desktop");
     if (!ctx.desktops) throw new RunnerError("desktop_unavailable", "This runner runs no desktops");
@@ -876,7 +883,7 @@ async function handleStream(
       throw new RunnerError("bad_request", "The terminal's size is out of bounds");
     await ctx.terminals.open(agent, { cols: req.cols, rows: req.rows }, dial);
   } else {
-    throw new RunnerError("bad_request", "A stream shows a desktop or a terminal");
+    throw new RunnerError("bad_request", "A stream shows a desktop, a terminal or a phone");
   }
   return { opened: true };
 }

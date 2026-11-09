@@ -1,7 +1,8 @@
 import { afterEach, expect, test } from "bun:test";
-import { orgTopic, PHONES_PROTOCOL, type RunnerPhone } from "@agenteschat/adapters";
+import { orgTopic, PHONES_PROTOCOL, type RunnerPhone, STREAM_CLOSE } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import {
+  authorizePhoneStream,
   ForbiddenError,
   forgetPhone,
   isNewWork,
@@ -11,6 +12,7 @@ import {
   type MachinePhoneRow,
   MachineRequestError,
   phoneStoppedBy,
+  recheckPhoneStream,
   removeMember,
   requestTimeoutMs,
   setAgentComputerTarget,
@@ -356,4 +358,82 @@ test("Stop: the phone's lock is let go for anyone, and the run that held it lear
   expect((await phoneRows())[0]?.holder).toBeNull();
   expect(await phoneStoppedBy(f.db, f.org.id, phone?.id as string, runId)).toEqual({ userId: rui.id, name: "rui" });
   expect(await phoneStoppedBy(f.db, f.org.id, phone?.id as string, crypto.randomUUID())).toBeNull();
+});
+
+test("a phone's screen: whoever may use it watches; control is the person's own hold, not while another's agent or person has it", async () => {
+  f = await setup();
+  const rui = await addMember(f.db, f.org.id, "member", "rui");
+  const ana = await addMember(f.db, f.org.id, "member", "ana");
+  const mac = await pair(f.owner.id, "MacBook");
+  await online(mac);
+  const [phone] = await sync(mac, [pixel]);
+  const phoneId = phone?.id as string;
+  let here = true;
+  const hub = { isLocal: (id: string) => here && id === mac };
+  const input = (userId: string, mode: "watch" | "control") => ({
+    userId,
+    orgId: f.org.id,
+    agentId: "",
+    request: { kind: "phone" as const, mode, phoneId },
+  });
+  const open = (userId: string, mode: "watch" | "control") =>
+    authorizePhoneStream({ db: f.db, hub }, input(userId, mode));
+  const holdBy = (holder: Record<string, unknown> | null) =>
+    f.db
+      .update(schema.machinePhones)
+      .set({ holder: holder as never })
+      .where(eq(schema.machinePhones.id, phoneId));
+
+  // Only its owner, by default: a daily phone's screen shows whatever is on it.
+  expect(await open(rui.id, "watch")).toEqual({ refused: STREAM_CLOSE.forbidden, reason: "forbidden" });
+  expect(await open(f.owner.id, "control")).toEqual({
+    machineId: mac,
+    phone: {
+      platform: "android",
+      serial: pixel.serial,
+      holder: expect.objectContaining({ runId: null, agentId: null, userId: f.owner.id }),
+    },
+  });
+  await updatePhoneDevice(deps(), f.owner.id, f.org.id, phoneId, {
+    audience: { mode: "everyone", userIds: [], roleIds: [] },
+  });
+  expect(await open(rui.id, "watch")).toMatchObject({ machineId: mac });
+  expect(await open(rui.id, "control")).toMatchObject({ machineId: mac });
+
+  // An agent working for Ana holds it: Rui watches, but only its owner, an admin or Ana take control.
+  await holdBy({ runId: crypto.randomUUID(), agentId: f.agent.id, userId: ana.id, since: new Date().toISOString() });
+  expect(await open(rui.id, "watch")).toMatchObject({ machineId: mac });
+  expect(await open(rui.id, "control")).toEqual({ refused: STREAM_CLOSE.controlEnded, reason: "in_use" });
+  expect(await open(ana.id, "control")).toMatchObject({ machineId: mac });
+  expect(await open(f.owner.id, "control")).toMatchObject({ machineId: mac });
+
+  // Ana in control: it's hers until she gives it back, and the recheck keeps her stream.
+  await holdBy({ runId: null, agentId: null, userId: ana.id, since: new Date().toISOString() });
+  expect(await open(f.owner.id, "control")).toEqual({
+    refused: STREAM_CLOSE.controlEnded,
+    reason: "someone_in_control",
+  });
+  const hers = { ...input(ana.id, "control"), id: "s", machineId: mac } as never;
+  expect(await recheckPhoneStream(f.db, hers)).toBeNull();
+  // Narrowed to its owner while she watched: the recheck ends it.
+  await updatePhoneDevice(deps(), f.owner.id, f.org.id, phoneId, {
+    audience: { mode: "owner", userIds: [], roleIds: [] },
+  });
+  expect(await recheckPhoneStream(f.db, hers)).toEqual({ refused: STREAM_CLOSE.forbidden, reason: "forbidden" });
+
+  // Its computer elsewhere or away; a phone that isn't there.
+  here = false;
+  expect(await open(f.owner.id, "watch")).toEqual({ refused: STREAM_CLOSE.unreachable, reason: "other_server" });
+  here = true;
+  await f.db
+    .update(schema.machines)
+    .set({ protocol: PHONES_PROTOCOL - 1 })
+    .where(eq(schema.machines.id, mac));
+  expect(await open(f.owner.id, "watch")).toEqual({ refused: STREAM_CLOSE.refused, reason: "runner_outdated" });
+  expect(
+    await authorizePhoneStream(
+      { db: f.db, hub },
+      { ...input(f.owner.id, "watch"), request: { kind: "phone", mode: "watch", phoneId: crypto.randomUUID() } },
+    ),
+  ).toEqual({ refused: STREAM_CLOSE.notFound, reason: "no_phone" });
 });

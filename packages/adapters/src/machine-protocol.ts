@@ -587,7 +587,11 @@ export const BROWSER_VIEWPORT_PROTOCOL = 52;
  * Bring your own devices: `hello.phones` and `phones.changed` (the phones this computer reaches: Android over adb, an
  * iPhone through `devicectl`, its own emulators and simulators), `hello.toolchains`, and the `phone.*` ops. Each phone
  * op names one phone and the holder it runs for; the runner keeps the phone's lock and answers `phone_busy` for
- * another holder. Older runners report no phones, so nothing asks them.
+ * another holder. Older runners report no phones, so nothing asks them. A phone's screen live is a stream
+ * (`stream.open` with `kind: "phone"`): the runner sends its pictures as binary frames (a PNG or a JPEG each, at most
+ * `PHONE_VIEW.window` the viewer hasn't acknowledged), and a viewer in control sends `tap`, `swipe`, `text` and `key`
+ * text frames. Control takes the phone for the person (`phone.holder`); an agent holding it waits until they give it
+ * back, and what it was doing on the phone stops.
  */
 export const PHONES_PROTOCOL = 54;
 
@@ -686,6 +690,33 @@ export interface PhoneTarget {
   /** Whom it runs for: the call takes the phone, or renews the lock, as this holder. */
   holder: PhoneHolder;
 }
+
+/** The keys a person presses on a phone's screen from the apps. */
+export const PHONE_KEYS = [
+  "home",
+  "back",
+  "enter",
+  "delete",
+  "app_switch",
+  "volume_up",
+  "volume_down",
+  "power",
+] as const;
+export type PhoneKey = (typeof PHONE_KEYS)[number];
+
+/** A phone's screen live (`stream.open` with `kind: "phone"`). */
+export const PHONE_VIEW = {
+  /** Pictures on their way that the viewer hasn't acknowledged (`{"type":"ack"}` once it drew one). */
+  window: 2,
+  /** The shortest time between two pictures: about 8 a second at most. */
+  frameMs: 120,
+  /** How often an unchanged screen is looked at again. */
+  idleMs: 400,
+  /** A swipe's length, in milliseconds. */
+  swipeMs: [1, 5000] as [number, number],
+  /** Characters typed in one `text` frame. */
+  text: 2000,
+} as const;
 export const BROWSER_DEVICES = ["phone", "tablet", "desktop"] as const;
 export type BrowserDevice = (typeof BROWSER_DEVICES)[number];
 /** A phone's and a tablet's size when none is given, in CSS pixels, and their pixel ratio. */
@@ -1242,7 +1273,11 @@ export const STREAM_CLOSE = {
  * server may add a desktop's `keyboard` (a layout): it is ignored, as Xvnc types what the person's own layout made
  * (ADR 0058 §16).
  */
-export type StreamRequest = { kind: "desktop"; mode: DesktopMode } | { kind: "terminal"; cols: number; rows: number };
+export type StreamRequest =
+  | { kind: "desktop"; mode: DesktopMode }
+  | { kind: "terminal"; cols: number; rows: number }
+  /** A phone's screen (`PHONES_PROTOCOL`): `stream.open` carries the phone itself as `phone`, its holder the person. */
+  | { kind: "phone"; mode: DesktopMode; phoneId: string };
 
 /** A desktop stream's mode: `watch` logs in with the view-only password, `control` with the full one. */
 export type DesktopMode = "watch" | "control";
@@ -1255,7 +1290,7 @@ export type DesktopMode = "watch" | "control";
  * starts first; without it the runner refuses `desktop_off`, as runners before
  * it did. The server leaves it out while the agent may start nothing (held).
  */
-export type StreamOpenRequest = StreamRequest & { streamId: string; start?: boolean };
+export type StreamOpenRequest = StreamRequest & { streamId: string; start?: boolean; phone?: PhoneTarget };
 
 /**
  * A data socket's first frame (runner → server, text): the machine's token
@@ -1277,8 +1312,13 @@ export type StreamControl =
   | { type: "resize"; cols: number; rows: number }
   | { type: "exit"; code: number | null }
   | { type: "mode"; mode: DesktopMode }
-  /** Protocol 49: a browser view's frame arrived (server → runner): one more may go (`BROWSER_VIEW`). */
-  | { type: "ack" };
+  /** Protocol 49: a browser view's frame arrived (server → runner), or a phone's picture was drawn (viewer → runner). */
+  | { type: "ack" }
+  /** A person in control of a phone's screen (viewer → runner), at fractions (0 to 1) of its width and height. */
+  | { type: "tap"; x: number; y: number }
+  | { type: "swipe"; x1: number; y1: number; x2: number; y2: number; ms: number }
+  | { type: "text"; text: string }
+  | { type: "key"; key: PhoneKey };
 
 /**
  * A person's turn in an agent's browser (`browser.handoff`, ADR 0040 §6), as
@@ -3819,8 +3859,22 @@ export const isTerminalSize = (cols: unknown, rows: unknown) =>
 
 /** A text frame on a ready stream (either side); null when it isn't one or a size is out of bounds. */
 export function parseStreamControl(raw: string): StreamControl | null {
-  const f = smallJson(raw, 200);
+  // A phone's `text` may carry a pasted line (JSON escapes take up to 6 characters each); the rest are far shorter.
+  const f = smallJson(raw, PHONE_VIEW.text * 6 + 100);
   if (!isObject(f)) return null;
+  const share = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 1;
+  if (f.type === "tap") return share(f.x) && share(f.y) ? { type: "tap", x: f.x, y: f.y } : null;
+  if (f.type === "swipe") {
+    const { x1, y1, x2, y2, ms } = f;
+    if (!share(x1) || !share(y1) || !share(x2) || !share(y2) || !inRange(ms, PHONE_VIEW.swipeMs)) return null;
+    return { type: "swipe", x1, y1, x2, y2, ms };
+  }
+  if (f.type === "text") {
+    return isString(f.text) && f.text !== "" && f.text.length <= PHONE_VIEW.text
+      ? { type: "text", text: f.text }
+      : null;
+  }
+  if (f.type === "key") return PHONE_KEYS.includes(f.key as PhoneKey) ? { type: "key", key: f.key as PhoneKey } : null;
   if (f.type === "resize") {
     return isTerminalSize(f.cols, f.rows) ? { type: "resize", cols: f.cols as number, rows: f.rows as number } : null;
   }

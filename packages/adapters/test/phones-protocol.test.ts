@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { PHONES_PROTOCOL, parseRunnerFrame } from "../src/machine-protocol";
+import { PHONE_VIEW, PHONES_PROTOCOL, parseRunnerFrame, parseStreamControl } from "../src/machine-protocol";
 
 const pixel = {
   platform: "android",
@@ -51,4 +51,18 @@ test("phones.changed carries the whole list; one without a list is no frame", ()
     phones: [],
   });
   expect(parseRunnerFrame(JSON.stringify({ type: "phones.changed" }))).toBeNull();
+});
+
+test("a phone screen's input: points as fractions of the screen, a swipe's length, text and the apps' keys only", () => {
+  const parse = (f: unknown) => parseStreamControl(JSON.stringify(f));
+  expect(parse({ type: "tap", x: 0.5, y: 1 })).toEqual({ type: "tap", x: 0.5, y: 1 });
+  expect(parse({ type: "tap", x: 1.2, y: 0 })).toBeNull();
+  expect(parse({ type: "tap", x: "0.5", y: 0 })).toBeNull();
+  expect(parse({ type: "swipe", x1: 0, y1: 0.9, x2: 0, y2: 0.1, ms: 300 })).toMatchObject({ type: "swipe", ms: 300 });
+  expect(parse({ type: "swipe", x1: 0, y1: 0.9, x2: 0, y2: 0.1, ms: 9000 })).toBeNull();
+  expect(parse({ type: "text", text: "it's 5 o'clock" })).toEqual({ type: "text", text: "it's 5 o'clock" });
+  expect(parse({ type: "text", text: "" })).toBeNull();
+  expect(parse({ type: "text", text: "x".repeat(PHONE_VIEW.text + 1) })).toBeNull();
+  expect(parse({ type: "key", key: "home" })).toEqual({ type: "key", key: "home" });
+  expect(parse({ type: "key", key: "reboot" })).toBeNull();
 });

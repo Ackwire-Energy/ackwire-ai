@@ -505,7 +505,8 @@ describe("waiting for a device", () => {
     expect(await holdsMessages(f.db, held, f.owner.id)).toBe(false);
     expect((await currentWaits(f.db, held)).map((x: { kind: string }) => x.kind)).toEqual(["device"]);
 
-    // A report with the phone still busy wakes nobody; once ready and free, the run goes on.
+    // A report with the phone still busy wakes nobody; once ready and free (or given back to this run by a person
+    // who took control of it), the run goes on.
     expect(
       await resumePhoneWaits({ db: f.db }, { id: w.mac.machineId, orgId: f.org.id }, [
         { ...w.phone, state: "ready", holder: { runId: "x", agentId: null, userId: null, since: "" } },
@@ -514,7 +515,7 @@ describe("waiting for a device", () => {
     expect(await resumeComputerWaits({ db: f.db }, w.mac.machineId)).toEqual([]);
     expect(
       await resumePhoneWaits({ db: f.db, pubsub: f.pubsub }, { id: w.mac.machineId, orgId: f.org.id }, [
-        { ...w.phone, state: "ready", holder: null },
+        { ...w.phone, state: "ready", holder: { runId: run.id, agentId: null, userId: null, since: "" } },
       ]),
     ).toEqual([run.id]);
     await drainOutbox(f.db, f.handlers);

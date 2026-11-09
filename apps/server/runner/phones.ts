@@ -4,12 +4,18 @@ import { existsSync } from "node:fs";
 import { lchown, mkdir, readdir, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import type {
-  MachineReplies,
-  MachineRequest,
-  PhoneHolder,
-  PhoneReason,
-  RunnerPhone,
+import {
+  type DesktopMode,
+  type MachineReplies,
+  type MachineRequest,
+  PHONE_VIEW,
+  type PhoneHolder,
+  type PhoneKey,
+  type PhoneReason,
+  type PhoneTarget,
+  type RunnerPhone,
+  STREAM_CLOSE,
+  type StreamControl,
 } from "@agenteschat/adapters/machine-protocol";
 import {
   ANDROID_APP,
@@ -28,6 +34,7 @@ import {
   WAKE_SHELL,
 } from "./adb";
 import { APPLE_APP, appleNeedsYou, parseDevicectl, parseSimctl } from "./apple-devices";
+import { jpegSize } from "./browser";
 import { RunnerError } from "./errors";
 import { killTree } from "./exec";
 import { isExecutable } from "./executors";
@@ -36,6 +43,7 @@ import { acquireLock, pidAlive, readLock } from "./lock";
 import { usualDirs } from "./login-path";
 import { isInside } from "./paths";
 import { IosHelper, wdaScreenDriver } from "./wda";
+import type { DataSocket } from "./streams";
 
 /**
  * The phones this computer reaches (bring your own devices): Android over the adb server already running (USB,
@@ -237,6 +245,11 @@ interface Hold {
   releaseFile: () => void;
   /** Puts back what the session changed on the phone (stay awake). */
   restore: (() => Promise<unknown>) | null;
+  /** Stops what runs for this holder: an agent's ops when a person takes control, a person's view when they lose it. */
+  abort: AbortController;
+  /** A person in control of the screen (`view`): `busy` counts their views, `paused` is the agent's hold they took. */
+  controls?: true;
+  paused?: Hold | null;
 }
 
 interface Tools {
@@ -288,6 +301,27 @@ const clampInt = (n: unknown, min: number, max: number, fallback: number) => {
 const tail = (text: string, max: number) => (text.length > max ? `[…]\n${text.slice(-max)}` : text);
 const firstLine = (text: string) =>
   (text.split("\n").find((l) => /error|fail/i.test(l)) ?? text.trim().split("\n")[0] ?? "").trim().slice(0, 300);
+
+/** `adb -s serial args…`, its stdout; a failure in words (`what` failed), the phone gone as `phone_missing`. */
+async function adbRun(
+  adb: string,
+  serial: string,
+  args: string[],
+  what: string,
+  opts: { timeoutMs?: number; signal?: AbortSignal; env?: NodeJS.ProcessEnv },
+): Promise<Buffer> {
+  const r = await runTool(adb, ["-s", serial, ...args], { ...opts, timeoutMs: opts.timeoutMs ?? 30_000 });
+  if (r.code === 0 && !r.timedOut) return r.stdout;
+  const said = `${r.stderr}\n${r.stdout.toString("utf8")}`;
+  if (/device '.*' not found|no devices\/emulators found|device not found/i.test(said)) {
+    throw new RunnerError("phone_missing", "The phone went away (unplugged, or adb restarted).");
+  }
+  if (/device offline|unauthorized/i.test(said)) {
+    throw new RunnerError("phone_not_ready", "The phone stopped answering. Unplug it and plug it back in.");
+  }
+  if (r.timedOut) throw new RunnerError("internal", `${what} didn't answer in time.`);
+  throw new RunnerError("internal", `${what} failed: ${firstLine(said)}`);
+}
 
 const sameHolder = (a: PhoneHolder, b: PhoneHolder) =>
   a.runId !== null || b.runId !== null ? a.runId === b.runId : a.agentId === b.agentId && a.userId === b.userId;
@@ -601,6 +635,7 @@ export class PhoneManager {
     const held = this.holds.get(key);
     if (held) {
       if (!sameHolder(held.holder, holder)) {
+        if (held.controls) throw new RunnerError("phone_busy", `A person is in control of ${labelOf(phone)}.`);
         const what = held.holder.label ? ` (${held.holder.label})` : "";
         throw new RunnerError("phone_busy", `Another agent is using ${labelOf(phone)}${what}.`);
       }
@@ -618,11 +653,56 @@ export class PhoneManager {
         `Another workspace's connection on this computer is using ${labelOf(phone)}.`,
       );
     }
-    const hold: Hold = { holder, lastUsed: this.now(), busy: 0, releaseFile: file.release, restore: null };
+    const hold: Hold = {
+      holder,
+      lastUsed: this.now(),
+      busy: 0,
+      releaseFile: file.release,
+      restore: null,
+      abort: new AbortController(),
+    };
     this.holds.set(key, hold);
     if (phone.platform === "android" && tools.adb) hold.restore = await this.stayOn(tools.adb, phone);
     this.changed();
     return hold;
+  }
+
+  /**
+   * A person takes the phone to control its screen. An agent holding it is set aside until they give it back: what
+   * it runs on the phone stops, and its calls answer `phone_busy` meanwhile. Another person in control keeps it; the
+   * same person's second view shares their control.
+   */
+  private async takeControl(key: string, phone: Phone, person: PhoneHolder, tools: Tools): Promise<Hold> {
+    const held = this.holds.get(key);
+    if (held?.controls) {
+      if (!sameHolder(held.holder, person)) {
+        throw new RunnerError("phone_busy", `Someone else is in control of ${labelOf(phone)}.`);
+      }
+      held.busy++;
+      return held;
+    }
+    const control: Hold = held
+      ? { ...held, holder: person, busy: 1, abort: new AbortController(), controls: true, paused: held }
+      : { ...(await this.take(key, phone, person, tools)), busy: 1, controls: true, paused: null };
+    held?.abort.abort();
+    this.holds.set(key, control);
+    this.changed();
+    return control;
+  }
+
+  /** The person's view ended: the last one gives the phone back to the agent it was taken from, or lets it go. */
+  private async endControl(key: string, control: Hold) {
+    control.busy--;
+    if (control.busy > 0 || this.holds.get(key) !== control) return;
+    const paused = control.paused;
+    if (!paused || !this.seen.has(key)) {
+      await this.drop(key, true);
+      return;
+    }
+    paused.lastUsed = this.now();
+    paused.abort = new AbortController();
+    this.holds.set(key, paused);
+    this.changed();
   }
 
   /** The screen stays on while the session lasts (Developer options › Stay awake), then the person's setting is back. */
@@ -641,6 +721,8 @@ export class PhoneManager {
     const hold = this.holds.get(key);
     if (!hold) return false;
     this.holds.delete(key);
+    // A person's control ends with it (Stop, the phone gone): their view closes.
+    if (hold.controls) hold.abort.abort();
     hold.releaseFile();
     if (key.startsWith("ios:")) this.ios?.stop(key.slice(4));
     if (restore && hold.restore) await hold.restore().catch(() => undefined);
@@ -659,37 +741,196 @@ export class PhoneManager {
     const holder = holderOf(req.holder, this.now());
     if (req.op === "phone.release") {
       const hold = this.holds.get(key);
+      // A run ending while a person controls its phone: the phone goes free when they give it back.
+      if (hold?.paused && req.force !== true && sameHolder(hold.paused.holder, holder)) {
+        hold.paused = null;
+        return { released: true } satisfies MachineReplies["phone.release"];
+      }
       const mine = hold && (req.force === true || sameHolder(hold.holder, holder));
       return { released: mine ? await this.drop(key, true) : false } satisfies MachineReplies["phone.release"];
     }
+    const phone = await this.reach(key, { op: req.op });
+    const tools = await this.tools();
+    const hold = await this.take(key, phone, holder, tools);
+    if (req.op === "phone.claim") return { holder: hold.holder } satisfies MachineReplies["phone.claim"];
+    hold.busy++;
+    const taken = hold.abort.signal;
+    const run: PhoneIo = { ...io, signal: AbortSignal.any([io.signal, taken]) };
+    // What a person taking control cut short, even what still answered: a recording stopped early isn't the one asked.
+    const takenOver = () => taken.aborted && !io.signal.aborted;
+    const busy = () => new RunnerError("phone_busy", `A person took control of ${labelOf(phone)}, so this stopped.`);
+    try {
+      const out =
+        platform === "android"
+          ? await this.android(req, key, phone, tools, run)
+          : await this.apple(req, phone, tools, run);
+      if (takenOver()) throw busy();
+      return out;
+    } catch (err) {
+      throw takenOver() ? busy() : err;
+    } finally {
+      hold.busy--;
+      hold.lastUsed = this.now();
+      await giveBack(io.folder);
+    }
+  }
+
+  /**
+   * The phone `key` names, seen now and ready; a locked one too when `locked` (its screen shows the lock screen). An
+   * iPhone still waiting for its test helper takes the ops that don't need it (`op`).
+   */
+  private async reach(key: string, opts: { locked?: boolean; op?: string } = {}): Promise<Phone> {
     this.first ??= this.poll();
     await this.first;
     if (!this.seen.has(key)) await this.poll();
     const phone = this.seen.get(key);
     if (!phone) throw new RunnerError("phone_missing", "This phone isn't connected to this computer right now.");
-    const helperOnly = phone.reason !== undefined && HELPER_REASONS.has(phone.reason) && !NEEDS_HELPER.has(req.op);
-    const problem = helperOnly ? null : phoneNotReady(phone);
+    if (opts.locked && phone.reason === "locked") return phone;
+    const helper = phone.reason !== undefined && HELPER_REASONS.has(phone.reason);
+    const problem = helper && opts.op !== undefined && !NEEDS_HELPER.has(opts.op) ? null : phoneNotReady(phone);
     if (problem) {
-      const broken = phone.reason && HELPER_REASONS.has(phone.reason) ? this.ios?.unknownFailure(phone.serial) : null;
+      const broken = helper ? this.ios?.unknownFailure(phone.serial) : null;
       if (broken) throw new RunnerError("internal", `The iPhone test helper couldn't be set up on this Mac: ${broken}`);
       throw new RunnerError(
         phone.state === "unsupported" ? "unsupported" : "phone_not_ready",
         `${problem.title}. ${problem.fix}`,
       );
     }
-    const tools = await this.tools();
-    const hold = await this.take(key, phone, holder, tools);
-    if (req.op === "phone.claim") return { holder: hold.holder } satisfies MachineReplies["phone.claim"];
-    hold.busy++;
-    try {
-      return platform === "android"
-        ? await this.android(req, key, phone, tools, io)
-        : await this.apple(req, phone, tools, io);
-    } finally {
-      hold.busy--;
-      hold.lastUsed = this.now();
-      await giveBack(io.folder);
+    return phone;
+  }
+
+  /**
+   * A phone's screen live, for one viewer on the data socket `dial` opens (`stream.open` with `kind: "phone"`):
+   * pictures as binary frames, at most `PHONE_VIEW.window` the viewer hasn't acknowledged, an unchanged one not sent
+   * again. In control (`takeControl`) its taps, swipes, text and keys go to the phone. Answers once the socket is
+   * ready, with the first picture already taken (a phone that can't show refuses the stream instead).
+   */
+  async view(target: PhoneTarget | undefined, mode: DesktopMode, dial: () => Promise<DataSocket>): Promise<void> {
+    const platform = target?.platform === "android" || target?.platform === "ios" ? target.platform : null;
+    const serial = target?.serial;
+    if (!platform || typeof serial !== "string" || serial === "" || serial.length > 200) {
+      throw new RunnerError("bad_request", "A phone's screen names its phone (platform and serial)");
     }
+    if (mode !== "watch" && mode !== "control") throw new RunnerError("bad_request", "watch or control");
+    const key = `${platform}:${serial}`;
+    const phone = await this.reach(key, { locked: true });
+    const tools = await this.tools();
+    const driver = screenDriverFor(phone, { adb: tools.adb, xcrun: tools.xcrun, env: this.env });
+    if (mode === "control" && driver instanceof SimulatorScreen) throw new RunnerError("unsupported", NO_IOS_CONTROL);
+    const stop = new AbortController();
+    const control =
+      mode === "control" ? await this.takeControl(key, phone, holderOf(target?.holder, this.now()), tools) : null;
+    let frame: ScreenFrame;
+    let socket: DataSocket;
+    try {
+      // Someone taking control means to use it: a dark screen lights up (and a lock screen without a PIN lifts).
+      if (control && platform === "android" && tools.adb) await this.shell(tools.adb, serial, WAKE_SHELL, 10_000);
+      frame = await driver.frame(stop.signal);
+      socket = await dial();
+    } catch (err) {
+      if (control) await this.endControl(key, control);
+      throw err;
+    }
+    let unacked = 0;
+    let closed = false;
+    let wake: (() => void) | null = null;
+    const nudge = () => {
+      const w = wake;
+      wake = null;
+      w?.();
+    };
+    const pause = (ms: number) =>
+      new Promise<void>((resolve) => {
+        const timer = setTimeout(() => {
+          wake = null;
+          resolve();
+        }, ms);
+        wake = () => {
+          clearTimeout(timer);
+          resolve();
+        };
+      });
+    const end = (code: number, reason: string) => {
+      if (closed) return;
+      closed = true;
+      stop.abort();
+      nudge();
+      socket.close(code, reason);
+    };
+    control?.abort.signal.addEventListener("abort", () => end(STREAM_CLOSE.controlEnded, "control ended"), {
+      once: true,
+    });
+    const inputs: PhoneInput[] = [];
+    let typing = false;
+    const drain = async () => {
+      if (typing) return;
+      typing = true;
+      try {
+        for (let f = inputs.shift(); f && !closed; f = inputs.shift()) {
+          // Typed while the last text went in: one call for all of it.
+          while (f.type === "text" && inputs[0]?.type === "text") {
+            f = { type: "text", text: f.text + (inputs.shift() as { text: string }).text };
+          }
+          await applyInput(driver, f, frame);
+          nudge();
+        }
+      } catch (err) {
+        inputs.length = 0;
+        this.opts.log(`phone screen: ${err instanceof Error ? err.message : String(err)}`);
+      } finally {
+        typing = false;
+      }
+    };
+    socket.listen({
+      bytes: () => undefined,
+      control: (f) => {
+        if (f.type === "ack") {
+          // Only a full window waits on it: the pictures' own pace stays.
+          const full = unacked >= PHONE_VIEW.window;
+          unacked = Math.max(0, unacked - 1);
+          if (full) nudge();
+        } else if (control && (f.type === "tap" || f.type === "swipe" || f.type === "text" || f.type === "key")) {
+          inputs.push(f);
+          void drain();
+        }
+      },
+      closed: () => {
+        closed = true;
+        stop.abort();
+        nudge();
+        if (control) void this.endControl(key, control);
+      },
+    });
+    void (async () => {
+      let last: Buffer | null = null;
+      let failures = 0;
+      let took = this.now();
+      for (;;) {
+        const bytes = Buffer.from(frame.jpeg ?? frame.png ?? new Uint8Array());
+        const changed = last === null || !bytes.equals(last);
+        if (changed && bytes.byteLength > 0) {
+          socket.send(bytes);
+          unacked++;
+          last = bytes;
+        }
+        // An unchanged screen is looked at less often; the person's input looks again at once.
+        await pause(Math.max(0, (changed ? PHONE_VIEW.frameMs : PHONE_VIEW.idleMs) - (this.now() - took)));
+        while (!closed && unacked >= PHONE_VIEW.window) await pause(PHONE_VIEW.idleMs);
+        if (closed) return;
+        took = this.now();
+        try {
+          frame = await driver.frame(stop.signal);
+          failures = 0;
+        } catch (err) {
+          if (closed) return;
+          if (++failures >= 3) {
+            const gone = err instanceof RunnerError && err.code === "phone_missing";
+            return end(gone ? STREAM_CLOSE.notFound : STREAM_CLOSE.internal, gone ? "phone_missing" : "no picture");
+          }
+          await pause(PHONE_VIEW.idleMs);
+        }
+      }
+    })();
   }
 
   private shell(adb: string, serial: string, command: string, timeoutMs = 30_000, signal?: AbortSignal) {
@@ -699,7 +940,7 @@ export class PhoneManager {
   }
 
   /** `adb -s serial args…`, its stdout; a failure in words (`what` failed), the phone gone as `phone_missing`. */
-  private async adb(
+  private adb(
     adb: string,
     serial: string,
     args: string[],
@@ -707,17 +948,7 @@ export class PhoneManager {
     timeoutMs = 30_000,
     signal?: AbortSignal,
   ): Promise<Buffer> {
-    const r = await runTool(adb, ["-s", serial, ...args], { timeoutMs, signal, env: this.env });
-    if (r.code === 0 && !r.timedOut) return r.stdout;
-    const said = `${r.stderr}\n${r.stdout.toString("utf8")}`;
-    if (/device '.*' not found|no devices\/emulators found|device not found/i.test(said)) {
-      throw new RunnerError("phone_missing", "The phone went away (unplugged, or adb restarted).");
-    }
-    if (/device offline|unauthorized/i.test(said)) {
-      throw new RunnerError("phone_not_ready", "The phone stopped answering. Unplug it and plug it back in.");
-    }
-    if (r.timedOut) throw new RunnerError("internal", `${what} didn't answer in time.`);
-    throw new RunnerError("internal", `${what} failed: ${firstLine(said)}`);
+    return adbRun(adb, serial, args, what, { timeoutMs, signal, env: this.env });
   }
 
   /** The agent's folder for phone files (`.agentes/phone/`), and a new file's absolute and relative path. */
@@ -1218,4 +1449,150 @@ let iosScreenDriver: IosScreenDriverFactory | null = null;
 /** The driver that shows and controls iPhones (WebDriverAgent, the test helper); null takes it back out. */
 export function registerIosScreenDriver(factory: IosScreenDriverFactory | null) {
   iosScreenDriver = factory;
+}
+
+export const NO_IOS_CONTROL =
+  "Controlling an iPhone from here needs the test helper, which isn't set up on this Mac yet. You can still watch it.";
+
+/**
+ * The driver for a phone's screen: adb for Android; for an iPhone the registered one (`registerIosScreenDriver`),
+ * else a simulator's pictures only (`SimulatorScreen`). A real iPhone shows nothing without the test helper.
+ */
+export function screenDriverFor(phone: RunnerPhone, tools: ScreenTools): PhoneScreenDriver {
+  if (phone.platform === "android") {
+    if (!tools.adb) throw new RunnerError("tool_missing", TOOL_HELP.adb);
+    return new AndroidScreen(tools.adb, phone.serial, tools.env);
+  }
+  const registered = iosScreenDriver?.(phone, tools) ?? null;
+  if (registered) return registered;
+  if (!tools.xcrun) throw new RunnerError("tool_missing", "iPhones need Xcode on this Mac.");
+  if (phone.kind !== "simulator") throw new RunnerError("tool_missing", TOOL_HELP.helper("Showing the screen of"));
+  return new SimulatorScreen(tools.xcrun, phone.serial, tools.env);
+}
+
+/** Android's key codes for the keys the apps press. */
+export const ANDROID_KEYCODES: Record<PhoneKey, number> = {
+  home: 3,
+  back: 4,
+  enter: 66,
+  delete: 67,
+  app_switch: 187,
+  volume_up: 24,
+  volume_down: 25,
+  power: 26,
+};
+
+/**
+ * Text for `adb shell input text`, as one word of the phone's shell: single-quoted, so nothing in it runs. `input`
+ * reads `%s` as a space, so a space goes as one; a literal `%s` can't be typed this way.
+ */
+export const androidText = (s: string) => `'${s.replace(/ /g, "%s").replace(/'/g, "'\\''")}'`;
+
+/**
+ * Android over adb: `screencap -p` pictures (about 7 a second on an emulator), `input` for the rest.
+ * ponytail: a full-size PNG per changed picture (0.2 to 3 MB); scrcpy's H.264 stream when relay bandwidth matters.
+ */
+export class AndroidScreen implements PhoneScreenDriver {
+  constructor(
+    private readonly adb: string,
+    private readonly serial: string,
+    private readonly env: NodeJS.ProcessEnv,
+  ) {}
+
+  private input(args: string, what: string) {
+    return adbRun(this.adb, this.serial, ["shell", `input ${args}`], what, { timeoutMs: 15_000, env: this.env }).then(
+      () => undefined,
+    );
+  }
+
+  async frame(signal: AbortSignal): Promise<ScreenFrame> {
+    const raw = await adbRun(this.adb, this.serial, ["exec-out", "screencap", "-p"], "The screen", {
+      timeoutMs: 15_000,
+      signal,
+      env: this.env,
+    });
+    // A phone with more than one display prints a warning before the picture.
+    const png = pngFrom(raw);
+    const size = pngSize(png);
+    if (!size) throw new RunnerError("internal", "The phone didn't send a picture.");
+    return { png, ...size };
+  }
+
+  tap(x: number, y: number) {
+    return this.input(`tap ${Math.round(x)} ${Math.round(y)}`, "The tap");
+  }
+
+  swipe(x1: number, y1: number, x2: number, y2: number, ms: number) {
+    const at = [x1, y1, x2, y2].map((n) => Math.round(n)).join(" ");
+    return this.input(`swipe ${at} ${Math.round(ms)}`, "The swipe");
+  }
+
+  text(s: string) {
+    return this.input(`text ${androidText(s)}`, "Typing");
+  }
+
+  key(k: PhoneKey) {
+    return this.input(`keyevent ${ANDROID_KEYCODES[k]}`, "The key");
+  }
+}
+
+/** A simulator's pictures only (`simctl io screenshot`): pressing anything on it needs the test helper. */
+export class SimulatorScreen implements PhoneScreenDriver {
+  constructor(
+    private readonly xcrun: string,
+    private readonly udid: string,
+    private readonly env: NodeJS.ProcessEnv,
+  ) {}
+
+  async frame(signal: AbortSignal): Promise<ScreenFrame> {
+    const r = await runTool(this.xcrun, ["simctl", "io", this.udid, "screenshot", "--type=jpeg", "-"], {
+      timeoutMs: 15_000,
+      signal,
+      env: this.env,
+    });
+    const jpeg = r.stdout;
+    const size = r.code === 0 ? jpegSize(jpeg) : null;
+    if (!size) {
+      const said = `${r.stderr}\n${jpeg.subarray(0, 200).toString("utf8")}`;
+      if (/Invalid device|not booted|No devices are booted/i.test(said)) {
+        throw new RunnerError("phone_missing", "The simulator isn't running.");
+      }
+      throw new RunnerError("internal", `The screen failed: ${firstLine(said)}`);
+    }
+    return { jpeg, ...size };
+  }
+
+  private refuse(): Promise<void> {
+    return Promise.reject(new RunnerError("unsupported", NO_IOS_CONTROL));
+  }
+  tap() {
+    return this.refuse();
+  }
+  swipe() {
+    return this.refuse();
+  }
+  text() {
+    return this.refuse();
+  }
+  key() {
+    return this.refuse();
+  }
+}
+
+type PhoneInput = Extract<StreamControl, { type: "tap" | "swipe" | "text" | "key" }>;
+
+/** A person's input on the screen, from fractions of it to the driver's space (the last picture's size). */
+export function applyInput(driver: PhoneScreenDriver, f: PhoneInput, size: { width: number; height: number }) {
+  const x = (v: number) => Math.min(size.width - 1, Math.max(0, Math.round(v * size.width)));
+  const y = (v: number) => Math.min(size.height - 1, Math.max(0, Math.round(v * size.height)));
+  switch (f.type) {
+    case "tap":
+      return driver.tap(x(f.x), y(f.y));
+    case "swipe":
+      return driver.swipe(x(f.x1), y(f.y1), x(f.x2), y(f.y2), f.ms);
+    case "text":
+      return driver.text(f.text);
+    case "key":
+      return driver.key(f.key);
+  }
 }
