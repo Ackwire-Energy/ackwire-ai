@@ -55,7 +55,7 @@ async function mount(
 /** The first workspace's cards alone (the fake has two). */
 function OneWorkspace() {
   const homes = pairedHomes(useSnapshot()).slice(0, 1);
-  return homes.length ? <ThisMacCards homes={homes} /> : null;
+  return homes.length ? <ThisMacCards homes={homes} offers={[]} /> : null;
 }
 
 const rowOf = (el: HTMLElement, title: string) =>
@@ -69,9 +69,9 @@ describe("Preferences › This Mac", () => {
   test("agents, commands as this user, who can use it, and each phone with its state and one way out", () =>
     mount("prefs", <OneWorkspace />, async (el, host) => {
       await until(() => rowOf(el, "Pixel 8") && rowOf(el, "Who can use it")?.querySelector('[role="combobox"]'));
-      expect(rowOf(el, "Let agents use this Mac")?.querySelector('[role="switch"]')?.getAttribute("aria-checked")).toBe(
-        "true",
-      );
+      expect(
+        rowOf(el, "Let Acme's agents use this Mac")?.querySelector('[role="switch"]')?.getAttribute("aria-checked"),
+      ).toBe("true");
       expect(document.getElementById("mac-commands-hint")?.textContent).toContain("They run as sam");
       expect(rowOf(el, "Who can use it")?.querySelector('[role="combobox"]')?.textContent).toBe("Only me");
 
