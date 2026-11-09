@@ -1488,6 +1488,10 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
   margin: auto;
   font-size: calc(var(--who-face, 1.15em) * 0.6);
 }
+/* A face drawn at the 24 of the small avatar (a task card's who) keeps that avatar's letters, as every 24 face does. */
+.ac-who > .ac-avatar--sm > .ac-avatar__initials {
+  font-size: 11px;
+}
 /* The face stays with the name's first word; a long name (a person's full one) wraps between its words. */
 .ac-who > b {
   font-weight: inherit;
@@ -4118,9 +4122,17 @@ html:not([data-pointer]) .ac-receipt__check:focus-visible {
 }
 .ac-date__foot {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
+  gap: var(--space-2);
   padding-top: var(--menu-pad);
   border-top: 1px solid var(--line);
+}
+/* A way on from the date ("Ver no calendário") starts the row, the clear action ends it. */
+.ac-date__extra {
+  margin-inline-end: auto;
+  padding-inline-start: var(--space-1);
+  font-size: var(--control-fs-sm);
 }
 /* Its room is the menu's (`.ac-menu` sets the padding and the corner from it), so the head's buttons and the corner
    days are concentric with the box; the hairline over the foot has that room on both sides. */
@@ -11239,6 +11251,130 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
 }
 .ac-facts__item--done .ac-facts__icon {
   --fact-frame: color-mix(in srgb, var(--success) 45%, transparent);
+}
+
+/*
+ * ── Fact line: one quiet line of facts under a title (FactLine), each an icon and its words, no plates ──
+ * The line wraps between facts and never inside one. A label is its one pill, and only a label alone wider than the
+ * line wraps its own words. An icon centred on the 20px line sits within a third of a pixel of the capitals' middle.
+ */
+.ac-factline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px var(--space-3);
+  min-width: 0;
+  font-size: 12.5px;
+  line-height: 20px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.ac-factline__fact {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  white-space: nowrap;
+}
+/* Any mark: the kit's icons, a maker's logo drawn in the text's color. */
+.ac-factline__fact > svg {
+  flex: none;
+  color: var(--faint);
+}
+.ac-factline__fact[data-tone="warn"] {
+  color: var(--ink);
+  font-weight: 600;
+}
+.ac-factline__fact:is([data-tone="warn"], [data-tone="warn-icon"]) > svg {
+  color: var(--warn);
+}
+.ac-factline__fact[data-tone="ok"] > svg {
+  color: var(--ok);
+}
+.ac-factline__fact[data-tone="bold"] {
+  color: var(--ink);
+  font-weight: 700;
+}
+.ac-factline__fact[data-tone="label"] {
+  display: inline-block;
+  max-width: 100%;
+  padding: 0 7px;
+  border-radius: 10px;
+  background: var(--plate);
+  color: var(--ink2);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/*
+ * ── Props strip: a thing's properties as one row of controls (a task's Coluna, Responsável, Prioridade, Prazo, Quem
+ * vê; a routine's) ── Each control 32 high in the field look and as wide as its value, 8 apart. A value nobody here
+ * may change and a switch with its word wear the same look. A hairline sets the links and labels after them apart; on
+ * a phone it is a line break, so they start a line of their own instead of hanging after a divider at a line's end.
+ */
+.ac-props {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.ac-props .ac-select__trigger {
+  width: auto;
+  max-width: 100%;
+}
+/* A button opening a menu (who, priority) is a control of the strip: the field look; a face in it starts near its edge. */
+.ac-props > .ac-btn:not(.ac-btn--ghost),
+.ac-props > * > .ac-btn:not(.ac-btn--ghost) {
+  border: 0;
+  background: var(--field-bg);
+  box-shadow: inset 0 0 0 1px var(--field-line);
+}
+.ac-props .ac-btn .ac-avatar {
+  margin-inline-start: -2px;
+}
+/* The date is one more control as wide as its words: its calendar leads, as the others' icons and faces do. */
+.ac-props .ac-date__trigger > .ac-select__chev {
+  order: -1;
+}
+.ac-props__value,
+.ac-props__switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 100%;
+  min-height: var(--control-h-sm);
+  box-sizing: border-box;
+  padding: 0 var(--space-3) 0 10px;
+  border: 1px solid var(--field-line);
+  border-radius: var(--control-r-sm);
+  background: var(--field-bg);
+  font-size: var(--control-fs-sm);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.ac-props__value > .ac-icon {
+  flex: none;
+  color: var(--ink-muted);
+}
+.ac-props__switch {
+  font-weight: 600;
+  cursor: pointer;
+}
+.ac-props__sep {
+  flex: none;
+  width: 1px;
+  height: 18px;
+  background: var(--line2);
+}
+@media (max-width: 640px) {
+  .ac-props__sep {
+    flex-basis: 100%;
+    width: auto;
+    height: 0;
+    background: none;
+  }
 }
 
 /* ── Step track: a run's steps in one row, nodes joined by a line, a short label and the time under each ── */

@@ -233,3 +233,23 @@ test("a browser translating the trigger's text doesn't break it: the words sit i
   expect(container.querySelector(".ac-select__value")?.textContent).toBe("Admin");
   expect(() => unmount()).not.toThrow();
 });
+
+test("a value its options don't have shows the placeholder, never an empty box", () => {
+  const { container, rerender } = render(
+    <Select value="col-gone" onValueChange={() => {}} options={roles} placeholder="A fazer" aria-label="Coluna" />,
+  );
+  const trigger = container.querySelector(".ac-select__trigger") as HTMLElement;
+  expect(trigger.textContent).toBe("A fazer");
+  expect(trigger.hasAttribute("data-placeholder")).toBe(true);
+  // Once the options come, the chosen one's name.
+  rerender(
+    <Select
+      value="col-gone"
+      onValueChange={() => {}}
+      options={[...roles, { value: "col-gone", label: "Aguardando o jurídico" }]}
+      placeholder="A fazer"
+      aria-label="Coluna"
+    />,
+  );
+  expect(trigger.textContent).toBe("Aguardando o jurídico");
+});

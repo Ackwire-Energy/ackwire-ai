@@ -190,7 +190,9 @@ export function Select<V extends string = string>({
   return (
     <div className={cx("ac-select", size === "sm" && "ac-select--sm", className)}>
       <RSelect.Root
-        value={chosen ? toRadix(chosen.value) : value}
+        // A value none of the options has (a list still loading, an option gone) is nothing chosen to Radix ("", its
+        // placeholder): passed as it is, Radix shows that value with no item to draw it, an empty box.
+        value={chosen ? toRadix(chosen.value) : value === undefined ? undefined : ""}
         onValueChange={(v) => onValueChange((v === EMPTY_VALUE ? "" : v) as V)}
         disabled={disabled}
       >

@@ -174,6 +174,7 @@ export {
   EventPillMore,
   type EventPillProps,
 } from "./components/EventPill";
+export { FactLine, type LineFact, type LineFactTone } from "./components/FactLine";
 export { type Fact, FactStrip, type FactTone } from "./components/FactStrip";
 export {
   AffixInput,

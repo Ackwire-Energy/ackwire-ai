@@ -1,6 +1,6 @@
 import { appLocale, localeInfo } from "@agenteschat/i18n/locale";
 import { Popover as RPopover } from "radix-ui";
-import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { cx } from "../cx";
 import { EDGE_ROOM } from "../floating";
 import { Icon } from "../icons/Icon";
@@ -54,6 +54,8 @@ export interface DatePickerProps {
   className?: string;
   /** The chosen day without its weekday, and its year only when it isn't this one ("10 de nov."): a compact trigger. */
   short?: boolean;
+  /** Under the month, at the start of the clear action's row: a way on from the date ("Ver no calendário"). */
+  footer?: ReactNode;
 }
 
 /**
@@ -76,6 +78,7 @@ export function DatePicker({
   disabled,
   className,
   short = false,
+  footer,
   ...rest
 }: DatePickerProps) {
   const wiring = useFieldControl({ id });
@@ -243,19 +246,22 @@ export function DatePicker({
               ))}
             </tbody>
           </table>
-          {onClear && selected && labels.clear && (
+          {(footer || (onClear && selected && labels.clear)) && (
             <div className="ac-date__foot">
-              <Button
-                size="sm"
-                variant="ghost"
-                icon="close"
-                onClick={() => {
-                  onClear();
-                  setOpen(false);
-                }}
-              >
-                {labels.clear}
-              </Button>
+              {footer && <span className="ac-date__extra">{footer}</span>}
+              {onClear && selected && labels.clear && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  icon="close"
+                  onClick={() => {
+                    onClear();
+                    setOpen(false);
+                  }}
+                >
+                  {labels.clear}
+                </Button>
+              )}
             </div>
           )}
         </RPopover.Content>
