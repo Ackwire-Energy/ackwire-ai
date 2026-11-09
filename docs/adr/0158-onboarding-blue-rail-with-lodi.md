@@ -5,7 +5,7 @@
 - Amends: 0137 §6 (the onboarding asked only the workspace's name, then its right hand's DM), 0155 §6 (the right
   hand's card had five rows), 0079 §3 (the billing link's claims) and §7 (where a hold offers the plan), 0071 §3 (when
   our notifications ask opens)
-- Code: client `lib/onboarding.ts` (`railSteps`, `railStepAt`, `railState`, `landingOf`, `planStepShows`),
+- Code: client `lib/onboarding.ts` (`railSteps`, `railStepAt`, `railState`, `landingOf`),
   `lib/setup-checklist.ts` (three rows, invitations finish the people row), `lib/push-offer.ts` (`pushAskAt`),
   `lib/billing.ts` (`planOfferOf`); engine `team-templates.ts` (`sayTeamHello`), `standing.ts` (`TEAM_HELLO_JOB`
   queued by `setBillingHold`), `billing-link.ts` (`plan`); web `pages/OnboardingPage.tsx`, `pages/onboarding/*`,

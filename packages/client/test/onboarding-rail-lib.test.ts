@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
 import type { OrgStanding } from "../src/api/types";
-import { firstJob, landingOf, planStepShows, railState, railStepAt, railSteps } from "../src/lib/onboarding";
+import { firstJob, landingOf, railState, railStepAt, railSteps } from "../src/lib/onboarding";
 import { aboutContext, aboutOf, templateFor } from "../src/lib/team-plan";
 
 describe("the onboarding's rail (ADR 0158)", () => {
@@ -94,12 +94,5 @@ describe("the onboarding's rail (ADR 0158)", () => {
     expect(landingOf("paid")).toBe("general");
     expect(landingOf("done")).toBe("general");
     expect(landingOf("skipped")).toBe("rightHand");
-  });
-
-  test("the phone's plan step shows no price and no way to pay, the web's a price only when the billing says one", () => {
-    expect(planStepShows("phone", { price: "$49" })).toEqual({ price: false, billing: false });
-    expect(planStepShows("web", { price: "$49" })).toEqual({ price: true, billing: true });
-    expect(planStepShows("web", {})).toEqual({ price: false, billing: true });
-    expect(planStepShows("web", null)).toEqual({ price: false, billing: true });
   });
 });

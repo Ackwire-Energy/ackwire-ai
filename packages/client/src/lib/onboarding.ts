@@ -115,9 +115,3 @@ export const firstJob = (
 
 /** Where the workspace opens when the onboarding ends: #general, or its right hand's DM when the plan was left. */
 export const landingOf = (how: "paid" | "done" | "skipped") => (how === "skipped" ? "rightHand" : "general");
-
-/** What the plan step shows on each platform: the phone app never a price nor a way to pay (ADR 0079 §6). */
-export const planStepShows = (platform: "web" | "phone", offer: { price?: string } | null) => ({
-  price: platform === "web" && Boolean(offer?.price),
-  billing: platform === "web",
-});
