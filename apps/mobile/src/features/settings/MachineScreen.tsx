@@ -692,7 +692,11 @@ function DesktopUseSection({ machine: m }: { machine: Machine }) {
   const off = use.available && !(m.access?.tools.desktop && m.access.tools.commands);
   // A Mac or Windows has nothing to install for it: said in the app's words, not the runner's English.
   const linux = m.os === "linux";
-  const reason = use.available ? null : linux ? machineReasonText(t, use) : t("desktop.use.linuxOnly");
+  const reason = use.available
+    ? null
+    : linux
+      ? machineReasonText(t, use, "desktop_use_install")
+      : t("desktop.use.linuxOnly");
   const command = linux && !use.available ? commandInReason(use.reason) : null;
   return (
     <>

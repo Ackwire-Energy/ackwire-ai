@@ -474,7 +474,7 @@ function DesktopUseNote({ machine: m }: { machine: Machine }) {
         <span style={{ display: "block" }}>
           {t("desktop.use.agent", { ...g, computer: computerNameOf(t, org.name, m.name) })}
         </span>
-        <span className="small muted">{machineReasonText(t, use)}</span>
+        <span className="small muted">{machineReasonText(t, use, "desktop_use_install")}</span>
         {command && <CommandBlock command={command} />}
       </div>
     </div>
