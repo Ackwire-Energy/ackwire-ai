@@ -546,7 +546,7 @@ describe("external provisioning", () => {
     await updateOrganization(f.db, ana.id, beta.id, { name: "Beta Co" });
     expect(await name(english.machineId)).toBe("Beta Co's computer");
 
-    // A personal workspace's (ADR 0158): its person's agents' computer, named after no workspace, so a rename stays.
+    // A personal workspace's (ADR 0159): its person's agents' computer, named after no workspace, so a rename stays.
     const bia = await addUser(f.db, "bia");
     await f.db.update(schema.users).set({ locale: "en" }).where(eq(schema.users.id, bia.id));
     const { organization: home } = await createOrganization(f.db, bia.id, { name: "Personal", mode: "personal" });

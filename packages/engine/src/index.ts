@@ -200,6 +200,7 @@ export * from "./organizations";
 export * from "./out-of-office";
 export * from "./outbound";
 export * from "./outbox";
+export * from "./password-link";
 export * from "./pdf";
 export * from "./permissions";
 export * from "./person-usage";

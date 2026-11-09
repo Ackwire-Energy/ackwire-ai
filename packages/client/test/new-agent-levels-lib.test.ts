@@ -11,7 +11,7 @@ describe("presetLevels", () => {
     expect(presetLevels("custom", items)).toEqual({ cal: "write", mine: "none" });
   });
 
-  test("a personal workspace's agent starts with every app at write, custom servers too (ADR 0158)", () => {
+  test("a personal workspace's agent starts with every app at write, custom servers too (ADR 0159)", () => {
     expect(presetLevels("custom", items, true)).toEqual({ cal: "write", mine: "write" });
   });
 });

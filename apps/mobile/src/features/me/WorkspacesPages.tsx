@@ -102,7 +102,7 @@ export function useOpenWorkspaceRow() {
 }
 
 /**
- * A workspace's mark in a list: its logo (or the agent mark); a personal workspace of yours (ADR 0158) is you, so
+ * A workspace's mark in a list: its logo (or the agent mark); a personal workspace of yours (ADR 0159) is you, so
  * your own photo, as the tabs' bar shows it. One shared with you keeps its logo: that face would be someone else's.
  */
 export function WorkspaceMark({
@@ -125,7 +125,7 @@ export function WorkspaceMark({
  * The groups of workspaces, one per server (its host as the small header), each workspace with its own mark (logo,
  * or its initial), its role, the check on the current one and the unread count on the others; a server that didn't
  * answer this time keeps its workspaces in their place, faded ("Sem resposta agora" when none is known). Shared by the
- * page and the sheet. A personal workspace (ADR 0158) wears your face and says whose it is instead of a role.
+ * page and the sheet. A personal workspace (ADR 0159) wears your face and says whose it is instead of a role.
  */
 export function WorkspaceGroups({
   groups,

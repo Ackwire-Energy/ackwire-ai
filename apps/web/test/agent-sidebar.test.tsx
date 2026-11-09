@@ -113,7 +113,7 @@ describe("the toggle", () => {
     expect(side()).toBeNull();
   });
 
-  /** The seeded workspace as a personal one (ADR 0158). */
+  /** The seeded workspace as a personal one (ADR 0159). */
   const personalState = () => {
     const state = seedState();
     const org = state.me?.organizations[0];

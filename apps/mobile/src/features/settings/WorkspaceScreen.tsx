@@ -55,7 +55,7 @@ const SHORT: Partial<Record<SettingsSection, string>> = {
  * a state), the area's own screen says the rest. Owners get "Apagar <nome>" alone in red at the end, behind the
  * system's alert (one firm haptic as it confirms), then the proof and the hold. Opened often, so nothing animates
  * here beyond the rows' press highlight and the platform's push. A personal workspace gets its short list instead
- * (ADR 0158 §3, `PersonalSettingsList`).
+ * (ADR 0159 §3, `PersonalSettingsList`).
  */
 export function WorkspaceScreen() {
   const { personal, others } = usePersonalView();
@@ -75,7 +75,7 @@ function TeamSettingsList() {
 }
 
 /**
- * A personal workspace's settings (ADR 0158 §3): one list with no group names. Your account, then About you, AI and
+ * A personal workspace's settings (ADR 0159 §3): one list with no group names. Your account, then About you, AI and
  * apps, Plan and usage, Vault and Computers (and People once someone else is a member), each opening the same screen
  * as in a team's; then Advanced, a screen of its own with every other section, delegated approvals and deleting the
  * workspace. Nothing here changes what anyone may open.

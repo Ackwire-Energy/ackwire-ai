@@ -54,7 +54,7 @@ const NONE = "none";
 const whoFor = () =>
   `People are written by name, agents as @handle, and \`names\` lists who a message names, by @ or by name. \`latest_message\` may hold a few messages the same person sent in a row, one per line: they are one message. Messages a person sends in a row continue the same address: after "boa tarde walter", "como está hoje" is still for Walter. A message to a person, by @ or by name, is for that person, not for an agent. Greetings and small talk between people get no agent. When \`alone_with\` names an agent, the author is the only person in the channel with it: what they write to the room is for it. ${SPOKEN_TO}`;
 
-/** Who talks to whom (ADR 0158): in a personal workspace the person mostly talks to their agents. */
+/** Who talks to whom (ADR 0159): in a personal workspace the person mostly talks to their agents. */
 const TEAM_CHAT = "People in a team chat mostly talk among themselves";
 const PERSONAL_CHAT =
   "Here one person (and maybe their family) mostly talks to their agents, though family members may also talk among themselves";

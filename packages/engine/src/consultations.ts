@@ -266,7 +266,7 @@ export function createAskAgentToolSource(
     name: "consultations",
     tools: async (ctx) => {
       const tell = createTellAgentTool(deps);
-      // A personal workspace (ADR 0158): the same tools, about the person's own agents.
+      // A personal workspace (ADR 0159): the same tools, about the person's own agents.
       return inWorkspaceWords(ctx.db, ctx.orgId, [tool, tell], {
         [ASK_AGENT_TOOL]: tool.description.replace(ASK_TEAM_EXAMPLE, ASK_PERSONAL_EXAMPLE),
         [TELL_AGENT_TOOL]: tell.description.replace(TELL_TEAM_EXAMPLE, TELL_PERSONAL_EXAMPLE),
@@ -275,7 +275,7 @@ export function createAskAgentToolSource(
   };
 }
 
-/** How `ask_agent` and `tell_agent` open, and the same in a personal workspace (ADR 0158). */
+/** How `ask_agent` and `tell_agent` open, and the same in a personal workspace (ADR 0159). */
 const ASK_TEAM_EXAMPLE =
   "Ask another agent of the organization something, e.g. a dev agent asking @infra how staging is deployed.";
 const ASK_PERSONAL_EXAMPLE =

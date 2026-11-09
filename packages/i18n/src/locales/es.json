@@ -525,6 +525,18 @@
       "wrongLinkLead": "Abre el enlace de propietario más reciente creado para este servidor.",
       "taken": "Este servidor ya tiene propietario.",
       "takenLead": "Inicia sesión con tu cuenta."
+    },
+    "server": {
+      "into": "Entrando en <b>{{server}}</b>",
+      "intoHere": "Entrando en el agentes.chat <b>de esta {{device}}</b>"
+    },
+    "forgotHere": {
+      "ownerTitle": "Aquí no necesitas contraseña.",
+      "ownerLead": "Instalaste agentes.chat en esta {{device}}. Entra por aquí y crea una contraseña nueva después.",
+      "notOwner": "¿No es la cuenta de quien lo instaló? Pide a un propietario de tu workspace un enlace de contraseña nueva.",
+      "title": "Este servidor no envía correos.",
+      "lead": "Pide a un propietario de tu workspace un enlace de contraseña nueva. Lo genera en Miembros y el enlace vale 1 hora.",
+      "back": "Volver a la contraseña"
     }
   },
   "invite": {
@@ -1460,7 +1472,7 @@
     "createdOn": "Creado el {{date}}",
     "newWorkspace": "Nuevo espacio de trabajo",
     "addWorkspace": "Añadir espacio de trabajo",
-    "addWorkspaceHint": "Uno nuevo en agentes.chat o el servidor de tu equipo",
+    "addWorkspaceHint": "Entrar en uno que ya tienes, crear uno nuevo o usar el servidor de tu equipo",
     "yourServer": "Tu servidor",
     "wiki": "Wiki",
     "settings": "Configuración",
@@ -1548,7 +1560,17 @@
     "unreadThreads_other": "Hilos: {{count}} con respuestas sin leer",
     "unreadNotifications_one": "{{count}} notificación sin leer",
     "unreadNotifications_many": "{{count}} notificaciones sin leer",
-    "unreadNotifications_other": "{{count}} notificaciones sin leer"
+    "unreadNotifications_other": "{{count}} notificaciones sin leer",
+    "newPassword": "Crear una contraseña nueva",
+    "newPasswordHint": "Tus otras sesiones se cierran y las apps de IA conectadas con la contraseña anterior deben conectarse de nuevo.",
+    "newPasswordRow": "Para cambiar la contraseña que usas en otros navegadores y dispositivos",
+    "newPasswordSaved": "Contraseña nueva guardada.",
+    "newPasswordReauth": "Vuelve a entrar para crear una contraseña nueva.",
+    "serverHere": "El agentes.chat de esta {{device}}",
+    "serverStopped": "detenido",
+    "serverOffline": "sin conexión desde las {{time}}",
+    "serverSignedOut": "sin sesión",
+    "serverSignIn": "Entrar"
   },
   "agentGroups": {
     "group": "Departamento",
@@ -1620,11 +1642,13 @@
     "qr": "Código QR para iniciar sesión en la app agentes",
     "making": "Generando el código…",
     "stepApp": "Instala la app agentes en tu teléfono (App Store o Google Play).",
-    "stepTailscale": "Instala Tailscale en tu teléfono y únete a la red de este servidor (tailnet).",
+    "stepTailscale": "Instala Tailscale en tu teléfono e inicia sesión con la misma cuenta de Tailscale que este servidor.",
     "stepScan": "Apunta la cámara de tu teléfono al código.",
     "validFor": "Válido por {{time}}",
     "private": "Quien escanee este código inicia sesión como tú.",
-    "failed": "No se pudo generar el código."
+    "failed": "No se pudo generar el código.",
+    "localOnly": "Este servidor solo se abre en la computadora donde se ejecuta, así que tu teléfono no llega a él.",
+    "localOnlyHow": "En la app de agentes.chat de esa computadora, activa Accede desde tu teléfono y tu equipo en Preferencias › Servidores. Luego vuelve aquí."
   },
   "team": {
     "title": "Equipo",
@@ -6317,7 +6341,17 @@
     "ownerLine": "Responsable: {{name}}",
     "noOwner": "Sin responsable",
     "budgetLine": "{{percent}} del presupuesto de {{month}}",
-    "noAgents": "Aún no hay agentes."
+    "noAgents": "Aún no hay agentes.",
+    "moreOf": "Más de {{name}}",
+    "passwordLink": {
+      "item": "Generar enlace de contraseña nueva",
+      "hint": "Para cuando olvidó la contraseña",
+      "title": "Enlace de contraseña nueva para {{name}}",
+      "lead": "Funciona una vez, durante 1 hora. Envíalo por donde hablan.",
+      "label": "Enlace",
+      "making": "Generando el enlace…",
+      "copy": "Copiar enlace"
+    }
   },
   "empty": {
     "thread": {
@@ -12832,6 +12866,11 @@
         "invalidInput": "Revisa los campos e inténtalo de nuevo.",
         "tooManyItems": "El Vault está lleno. Elimina elementos antes de sincronizar más."
       }
+    },
+    "passwordLink": {
+      "email": "Este servidor envía correos: la persona pide su propio enlace en Olvidé la contraseña.",
+      "serverOwner": "Quien instaló este servidor entra desde el ordenador donde funciona, sin enlace.",
+      "otherWorkspace": "Esta persona también está en un workspace que no es tuyo: solo los propietarios de todos ellos pueden generar el enlace."
     }
   },
   "machines": {
@@ -13478,7 +13517,8 @@
       "member": {
         "joined": "Se unió al espacio de trabajo",
         "left": "Salió del espacio de trabajo",
-        "role_changed": "Cambió el rol de un miembro"
+        "role_changed": "Cambió el rol de un miembro",
+        "password_link": "Generó un enlace de contraseña nueva para un miembro"
       },
       "apps": {
         "connected": "Conectó {{app}}",

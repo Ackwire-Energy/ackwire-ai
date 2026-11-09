@@ -5415,7 +5415,7 @@ export function useSetSidebarItem(orgId: string, personal = false) {
 
 /**
  * A sidebar order's cache, per mode: the server answers an order never saved with the default of the workspace's mode
- * (ADR 0158), so a workspace that changes mode reads it again at once.
+ * (ADR 0159), so a workspace that changes mode reads it again at once.
  */
 const sidebarOrderKey = (orgId: string, personal: boolean) =>
   [...keys.sidebarOrder(orgId), personal ? "personal" : "team"] as const;

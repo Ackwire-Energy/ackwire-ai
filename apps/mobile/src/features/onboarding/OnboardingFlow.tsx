@@ -22,7 +22,7 @@ import { orgNameFromEmail, PURPOSES, phoneTimezone, stepFailedText, workspaceAns
 
 /**
  * The first run on the phone, signed in with no workspace to open yet, on the sign-in's own screen: what the workspace
- * is for (ADR 0158), two choices and Continue; "For me" makes a personal workspace at once, named in the person's
+ * is for (ADR 0159), two choices and Continue; "For me" makes a personal workspace at once, named in the person's
  * language with the phone's time zone. A company or team then names it (its time zone from the phone, said in one
  * line; its logo later, in Settings), the keyboard's return key as the action. Then the right hand's DM, where the rest
  * of the setup happens (ADR 0137), as on the web. A workspace still being set up (an older onboarding left at any
@@ -231,7 +231,7 @@ export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; ano
           />
         </Locked>
       ) : (
-        // The first question (ADR 0158): two raised choices, the picked one sunk with its check, then Continue.
+        // The first question (ADR 0159): two raised choices, the picked one sunk with its check, then Continue.
         <Locked when={pending} style={styles.purposes}>
           {PURPOSES.map((mode) => {
             const on = purpose === mode;

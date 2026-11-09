@@ -83,7 +83,7 @@ describe("the members column", () => {
     expect(body.querySelector(":scope > .channel__col .channel__composer")).toBeTruthy();
   });
 
-  test("a personal workspace starts it closed on a desktop; opening it is remembered (ADR 0158)", async () => {
+  test("a personal workspace starts it closed on a desktop; opening it is remembered (ADR 0159)", async () => {
     widthIs(DESKTOP_QUERY);
     const personal = () => {
       const state = seedState();
@@ -151,8 +151,11 @@ describe("the members column", () => {
     const ada = row(column() as HTMLElement, "Ada") as HTMLElement;
     // Named "Perfil de Ada", described by all it shows (presence, line, chips).
     expect(ada.getAttribute("aria-label")).toBe("Perfil de Ada");
-    expect(document.getElementById(ada.getAttribute("aria-describedby") ?? "")?.textContent).toContain("pensando");
-    expect(ada.textContent).toContain("pensando");
+    // What it does here: the pixel orbit beside its name, labelled, and the row's title; the row keeps its height.
+    expect(ada.querySelector(".members-side__name .ac-pixspin")?.getAttribute("aria-label")).toBe("pensando");
+    expect(document.getElementById(ada.getAttribute("aria-describedby") ?? "")?.getAttribute("title")).toContain(
+      "pensando",
+    );
     expect(ada.querySelector("[data-busy] .sidebar__trail")).toBeTruthy();
     // ↑/↓ between the rows.
     const rows = [...(column() as HTMLElement).querySelectorAll<HTMLElement>(".members-side__row")];

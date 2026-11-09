@@ -865,7 +865,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
       },
     },
   ];
-  // A personal workspace (ADR 0158): the same memory, about one person and their life rather than a company.
+  // A personal workspace (ADR 0159): the same memory, about one person and their life rather than a company.
   return { name: "context", tools: async (ctx) => inWorkspaceWords(ctx.db, ctx.orgId, tools, personalWords(tools)) };
 }
 
@@ -1398,7 +1398,7 @@ async function ownPastSteps(
     );
 }
 
-/** What `search_context` and `remember` say about a team, and the same for one person (ADR 0158). */
+/** What `search_context` and `remember` say about a team, and the same for one person (ADR 0159). */
 const PERSONAL_MEMORY_WORDS: readonly (readonly [string, string])[] = [
   ["Search this organization's messages", "Search this workspace's messages"],
   ["what the team did outside (emails sent", "what the agents here did outside (emails sent"],

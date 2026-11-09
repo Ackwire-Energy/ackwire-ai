@@ -438,7 +438,7 @@ export const EMAIL_SAMPLES: Record<string, EmailTemplate> = {
 };
 
 /**
- * A personal workspace's emails (ADR 0158): the samples whose words differ there, stamped as their jobs are, in a
+ * A personal workspace's emails (ADR 0159): the samples whose words differ there, stamped as their jobs are, in a
  * workspace named as onboarding names it. Apart from `EMAIL_SAMPLES` (each of which keeps a snapshot); the preview
  * shows them too.
  */

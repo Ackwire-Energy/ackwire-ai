@@ -76,7 +76,7 @@ import { useAgentChannels } from "./useAgentChannels";
  * The screens behind the setup checklist's buttons (ADR 0155 §2), the web's small dialogs on the phone: one step each,
  * the agent's role's suggestion marked, nothing saved until the word on the right of the bar. Each saves through the
  * same APIs as the agent's other screens, then confirms its step, and goes back to where the checklist was. A personal
- * workspace (ADR 0158) reads them in its own words, row 1 about the person (areas of life) instead of a business.
+ * workspace (ADR 0159) reads them in its own words, row 1 about the person (areas of life) instead of a business.
  */
 
 const STEPS: readonly SetupStep[] = ["apps", "where", "who", "how", "about"];
@@ -206,7 +206,7 @@ function AboutStep({ typed }: { typed: string | null }) {
 }
 
 /**
- * A personal workspace's row 1 (ADR 0158), as the web's dialog: "What do you want help with?", the areas of life to
+ * A personal workspace's row 1 (ADR 0159), as the web's dialog: "What do you want help with?", the areas of life to
  * pick, several at once, and one optional sentence about the person; saved as the workspace's context
  * (`aboutYouContext`), which every agent reads, and read back into the same answers when opened again (`readAboutYou`:
  * what was saved, else what was typed or tapped on the card). "Something else" asks for the sentence. Saved, it goes
@@ -531,7 +531,7 @@ const MODES: AudienceMode[] = ["everyone", "people", "owner"];
 
 /**
  * "Who talks to Leo": everyone, some people and roles, or only its owner; on a plan, whether it serves others. A
- * personal workspace (ADR 0158) says it in plain words and a family picks people: its roles come into sight only when
+ * personal workspace (ADR 0159) says it in plain words and a family picks people: its roles come into sight only when
  * one is picked already or one exists besides the base and admin ones (`rolePicksInSight`). The choice is the same.
  */
 function WhoStep({ agent }: { agent: Agent }) {

@@ -688,7 +688,7 @@ async function settle(
   if (!run) return;
   const [person] = await deps.db.select({ name: users.name }).from(users).where(eq(users.id, userId));
   const who = by ? `${by}, on behalf of ${person?.name ?? "a person"},` : (person?.name ?? "A person");
-  // A personal workspace has no team (ADR 0158): the agent joins its person's own.
+  // A personal workspace has no team (ADR 0159): the agent joins its person's own.
   const personal = await isPersonalWorkspace(deps.db, message.orgId);
   const joined = personal ? "It is one of their agents now." : "It is on the team now.";
   const notice: Notice = {

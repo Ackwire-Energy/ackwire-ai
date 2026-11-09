@@ -10,7 +10,7 @@ export const DM_SIDE_WIDE_QUERY = "(min-width: 1100px)";
 
 /**
  * A column on the right of a conversation: open by default at `openQuery`, closed below it, the person's last choice
- * in this workspace wins. A personal workspace starts it closed at every width (ADR 0158 §3): only a choice never
+ * in this workspace wins. A personal workspace starts it closed at every width (ADR 0159 §3): only a choice never
  * saved follows the mode, so a saved one (from either mode) still wins. At `sheetQuery` it isn't a column: it opens
  * over the conversation, and stays only until it closes.
  */

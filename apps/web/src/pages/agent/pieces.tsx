@@ -15,7 +15,7 @@ import { useAgentEdit } from "./context";
  * Who edits here, for those who can't edit everything: members read; the
  * owner (responsável) changes the look, audience and computer.
  * `field`: only when that part is read-only for the viewer.
- * A personal workspace names who runs it instead of "admins" (`keeperKey`, ADR 0158).
+ * A personal workspace names who runs it instead of "admins" (`keeperKey`, ADR 0159).
  */
 export function ReadOnlyNote({ field }: { field?: Field }) {
   const { t } = useTranslation();

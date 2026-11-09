@@ -134,11 +134,15 @@ describe("the desktop app's owner key (OWNER_KEY_SHA256)", () => {
 
     const first = await ownerKey({ key: KEY, name: "Ana", email: "ana@example.com" });
     expect(first.status).toBe(200);
-    const { token } = (await first.json()) as { token: string; expiresIn: number };
+    const { token, userId } = (await first.json()) as { token: string; expiresIn: number; userId: string };
     const { res, window } = await trade(token);
     expect(res.status).toBe(200);
-    const me = (await (await window("/api/app/me")).json()) as { user: { email: string; hasPassword: boolean } };
+    const me = (await (await window("/api/app/me")).json()) as {
+      user: { id: string; email: string; hasPassword: boolean };
+    };
     expect(me.user).toMatchObject({ email: "ana@example.com", hasPassword: false });
+    // Who the owner is: the app compares it with who its window was signed in as.
+    expect(userId).toBe(me.user.id);
     // Single use.
     expect((await trade(token)).res.status).toBe(401);
 
@@ -152,7 +156,7 @@ describe("the desktop app's owner key (OWNER_KEY_SHA256)", () => {
     expect(await t.db.select().from(schema.users)).toHaveLength(1);
   });
 
-  test("the owner adds a password for other browsers, once", async () => {
+  test("the owner adds a password for other browsers, then a new one after Continue on this Mac (ADR 0158)", async () => {
     t = await createTestServer({ env: { OWNER_KEY_SHA256: sha256(KEY) } });
     const { token } = (await (await ownerKey({ key: KEY, name: "Ana", email: "ana@example.com" })).json()) as {
       token: string;
@@ -166,9 +170,16 @@ describe("the desktop app's owner key (OWNER_KEY_SHA256)", () => {
     expect(
       (await browser(t)("/api/auth/sign-in/email", { json: { email: "ana@example.com", password: PASSWORD } })).status,
     ).toBe(200);
-    const twice = await window("/api/app/me/password", { json: { password: "another one entirely" } });
-    expect(twice.status).toBe(409);
-    expect(await twice.json()).toMatchObject({ error: { code: "password_set" } });
+    // Forgot it: the app signs the owner in again with its key, and the fresh sign-in sets a new one.
+    const again = (await (await ownerKey({ key: KEY })).json()) as { token: string };
+    const { window: fresh } = await trade(again.token);
+    expect((await fresh("/api/app/me/password", { json: { password: "another one entirely" } })).status).toBe(204);
+    // Every other session ended with the old password: only the window that set it stays signed in.
+    expect(await t.db.select().from(schema.sessions)).toHaveLength(1);
+    const signIn = (password: string) =>
+      browser(t)("/api/auth/sign-in/email", { json: { email: "ana@example.com", password } });
+    expect((await signIn(PASSWORD)).status).toBe(401);
+    expect((await signIn("another one entirely")).status).toBe(200);
   });
 
   test("the key follows the pinned owner, not whoever is oldest after a deletion", async () => {

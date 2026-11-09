@@ -370,7 +370,7 @@ export interface DecisionInput {
   card: Record<string, unknown>;
   /** The limits code already checked, in words. */
   limits: string;
-  /** A personal workspace (ADR 0158): the person's agents, not a team. */
+  /** A personal workspace (ADR 0159): the person's agents, not a team. */
   personal?: boolean;
 }
 

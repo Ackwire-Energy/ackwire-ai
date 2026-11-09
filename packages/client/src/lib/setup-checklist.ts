@@ -105,7 +105,7 @@ export interface SetupRowFacts {
   otherOwner: string | null;
   /** It thinks with someone's plan (whose terms say who it may answer). */
   onPlan: boolean;
-  /** A personal workspace (ADR 0158): the rows that name the workspace speak of "your apps" and "here" instead. */
+  /** A personal workspace (ADR 0159): the rows that name the workspace speak of "your apps" and "here" instead. */
   personal?: boolean;
 }
 
@@ -212,7 +212,7 @@ export interface FirstRunPowers {
   pay: boolean;
   connectors: boolean;
   invite: boolean;
-  /** A personal workspace (ADR 0158): its first run has no people row, it is for one person. */
+  /** A personal workspace (ADR 0159): its first run has no people row, it is for one person. */
   personal?: boolean;
 }
 
@@ -287,12 +287,12 @@ export interface FirstRunRowFacts {
   /** The apps connected ("o Gmail e o Drive"); null when none. */
   apps: string | null;
   members: number;
-  /** A personal workspace (ADR 0158): rows in its words (`PERSONAL_ROW_WORDS`). */
+  /** A personal workspace (ADR 0159): rows in its words (`PERSONAL_ROW_WORDS`). */
   personal?: boolean;
 }
 
 /**
- * The words a personal workspace's rows say differently (ADR 0158), each a `<key>Personal` sibling of the row's key:
+ * The words a personal workspace's rows say differently (ADR 0159), each a `<key>Personal` sibling of the row's key:
  * about the person instead of the company, their agents instead of a team, their apps instead of work apps.
  */
 export const PERSONAL_ROW_WORDS: Partial<Record<FirstRunStep, readonly string[]>> = {
@@ -359,7 +359,7 @@ const TEMPLATE_ROLES: Record<string, RoleId> = {
 };
 
 /**
- * The apps (catalog connector ids) a personal template's agents use (ADR 0158; mirror of the personal `MEMBERS` in
+ * The apps (catalog connector ids) a personal template's agents use (ADR 0159; mirror of the personal `MEMBERS` in
  * packages/engine/src/team-templates.ts), by handle: a person's calendar, files and lists rather than a team's tools.
  */
 const PERSONAL_TEMPLATE_APPS: Record<string, readonly string[]> = {

@@ -140,7 +140,7 @@ export function ShareDialog({ artifact, onClose }: { artifact: Artifact; onClose
 
   const roleList = sortRoles((roles.data?.roles ?? []).filter((r) => !isEveryone(r)));
   // A personal workspace's family picks people: roles to add only when one is worth it or already listed, and alone,
-  // no word on who else sees it (ADR 0158).
+  // no word on who else sees it (ADR 0159).
   const offersRoles = rolePicksInSight(org, roles.data?.roles ?? [], listed.roleIds);
   const { solo } = usePersonalView();
   const everyoneText = t(modeKey(org, "share.everyone"));

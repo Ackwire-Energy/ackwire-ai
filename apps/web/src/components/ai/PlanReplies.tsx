@@ -6,7 +6,7 @@ import { usePersonalView } from "@/hooks/usePersonalView";
 
 /**
  * Whether a plan's panel shows "Answers other people": alone in a personal workspace there is nobody else to answer,
- * so off it waits until someone joins (ADR 0158); on, it shows, to turn it off. The agent's page always shows it.
+ * so off it waits until someone joins (ADR 0159); on, it shows, to turn it off. The agent's page always shows it.
  */
 export function usePlanRepliesShown(on: boolean) {
   return !usePersonalView().solo || on;

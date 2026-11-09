@@ -122,7 +122,7 @@ function yourRoutine(n: Notice) {
  * colleague in the chat (the news first, a greeting on the day's first message, never a verdict on the
  * run), the concrete findings kept even when a decision is asked, what it would do only when there is
  * something to do, the decision last; never redoing the routine's lookups. A routine that reports every time keeps the whole report.
- * In a personal workspace (ADR 0158) the voice is a trusted assistant's, not a colleague's.
+ * In a personal workspace (ADR 0159) the voice is a trusted assistant's, not a colleague's.
  */
 export function handoffGuidance(report: string | undefined, personal = false) {
   return [
@@ -150,7 +150,7 @@ export const handedBackPartly = (pending: string) =>
 
 /**
  * A notice as the agent it is for reads it in its conversation (null when the message isn't one); `personal`: a
- * personal workspace's words (ADR 0158).
+ * personal workspace's words (ADR 0159).
  */
 export function noticeText(
   meta: Record<string, unknown> | null | undefined,

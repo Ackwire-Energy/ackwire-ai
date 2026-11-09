@@ -136,7 +136,7 @@ describe("waiting for the answer", () => {
   });
 });
 
-describe("an invitation to a personal workspace (ADR 0158): never its name, who invited instead", () => {
+describe("an invitation to a personal workspace (ADR 0159): never its name, who invited instead", () => {
   const src = (file: string) =>
     readFileSync(join(import.meta.dir, "..", "..", "src", "features", "auth", file), "utf8");
 

@@ -425,7 +425,7 @@ function ago(at: string, now: Date) {
 
 /**
  * The one line the agent gets (English, like every prompt); summaries are outside text, so they go in the envelope.
- * `personal`: a personal workspace's (ADR 0158), where one person and their agents act, not a team.
+ * `personal`: a personal workspace's (ADR 0159), where one person and their agents act, not a team.
  */
 export function teamNoticeText(
   matches: TeamActionMatch[],

@@ -64,7 +64,7 @@ export function CommandMenu() {
         key: `c:${c.id}`,
         group: goTo,
         label: `#${c.name}`,
-        // A personal workspace calls its channels group conversations (ADR 0158).
+        // A personal workspace calls its channels group conversations (ADR 0159).
         sub: t(modeKey(org, "palette.channel")),
         mark: <Icon name="channel" size={16} />,
         onSelect: () => void navigate({ to: "/org/$orgId/c/$channelId", params: { orgId, channelId: c.id } }),
@@ -142,7 +142,7 @@ export function CommandMenu() {
       });
     for (const s of SETTINGS_SECTIONS) {
       if (!s.allowed(org, server)) continue;
-      // Every section, by the name its settings list shows (a personal workspace's About you, ADR 0158), found by its
+      // Every section, by the name its settings list shows (a personal workspace's About you, ADR 0159), found by its
       // usual name too.
       const label = t(settingsSectionNameKey(org, s.id));
       const usual = t(`settings.section.${s.id}`);

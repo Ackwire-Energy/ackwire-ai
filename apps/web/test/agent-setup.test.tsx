@@ -63,7 +63,7 @@ describe("the setup checklist in a new agent's DM", () => {
     expect(card()).toBeNull();
   });
 
-  test("alone in a personal workspace nobody else could talk to it: no who step, back once someone joins (ADR 0158)", async () => {
+  test("alone in a personal workspace nobody else could talk to it: no who step, back once someone joins (ADR 0159)", async () => {
     const personal = (alone: boolean) => {
       const state = withSetup(seedState());
       const org = state.me?.organizations[0];

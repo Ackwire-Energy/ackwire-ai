@@ -7,11 +7,11 @@ import { useTranslation } from "react-i18next";
 import { useOrg } from "./org-context";
 import "./team-plan.css";
 
-/** The ideas under the field: each fills it with a sentence the person can change (ADR 0158). */
+/** The ideas under the field: each fills it with a sentence the person can change (ADR 0159). */
 const IDEAS = ["agenda", "money", "training", "studies", "home", "travel"] as const;
 
 /**
- * New agent in a personal workspace (ADR 0158): one question, what it should do, in the person's words. It goes to
+ * New agent in a personal workspace (ADR 0159): one question, what it should do, in the person's words. It goes to
  * the right hand as their own message, which proposes the agent on its usual card (Criar, Editar antes); nothing is
  * made before they press it. "Fill everything in" opens the full form.
  */
@@ -78,6 +78,7 @@ export function NewAgentAsk({
                 autoFocus
               />
             </Field>
+            {/* biome-ignore lint/a11y/useSemanticElements: a row of suggestion chips, not a native fieldset */}
             <div className="tp-chips__row" role="group" aria-label={t("newAgentAsk.ideas")}>
               {IDEAS.map((id) => (
                 <button

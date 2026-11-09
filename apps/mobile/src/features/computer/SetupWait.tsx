@@ -43,7 +43,7 @@ export interface WaitWorkspace {
  * The time left now, on the clock every time line shares (`useEtaNow`), and whether "we'll email you" holds for
  * this person: only owners get the email. A workspace on hold shows neither: its provisioner waits too. `now`:
  * that clock's time, while it waits. `org`: the workspace's name; `mode`: its mode, whose words name the computer
- * (a personal one's is its person's agents', ADR 0158).
+ * (a personal one's is its person's agents', ADR 0159).
  */
 export function useSetupWait(view: SetupView | null, workspace?: WaitWorkspace) {
   const chosen = useOrgMaybe();

@@ -249,7 +249,7 @@ const CREATE_LOOK: Record<Exclude<CreateItem, "invite">, { icon: IconName; color
 
 /**
  * What to start, as rows: a soft tile of its color, a short name and a hint under it. A personal workspace's channel
- * is a group conversation, and its wiki is for its person's agents (ADR 0158).
+ * is a group conversation, and its wiki is for its person's agents (ADR 0159).
  */
 function CreateList({ items }: { items: CreateItem[] }) {
   const { t } = useTranslation();

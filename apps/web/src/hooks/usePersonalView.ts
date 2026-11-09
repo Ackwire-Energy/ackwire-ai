@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
 
 /**
- * What a personal workspace's view reads (ADR 0158): `personal`; `others`, how many other people are members
+ * What a personal workspace's view reads (ADR 0159): `personal`; `others`, how many other people are members
  * (undefined while that loads); `solo`, the viewer alone in a personal workspace, which a control may leave the screen
  * for only while it holds its default (`isSolo`). Only the view: nothing here changes who may do what.
  */
@@ -29,7 +29,7 @@ export function useKeeperName(): string | null {
   return keeperName(members.data, me.user.id, roles.data?.roles ?? []);
 }
 
-/** "Only admins change this", in a personal workspace naming who runs it (`keeperKey`, ADR 0158). */
+/** "Only admins change this", in a personal workspace naming who runs it (`keeperKey`, ADR 0159). */
 export function useAdminsLock(): string {
   const { t } = useTranslation();
   const { org } = useOrg();

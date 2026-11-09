@@ -120,7 +120,7 @@ describe("the first-run checklist", () => {
   });
 });
 
-describe("in a personal workspace (ADR 0158)", () => {
+describe("in a personal workspace (ADR 0159)", () => {
   const personal = () => {
     const state = fresh();
     const org = state.me?.organizations[0];

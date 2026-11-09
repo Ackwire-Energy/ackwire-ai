@@ -47,7 +47,7 @@ test("a new workspace's right hand starts the checklist; only Agora não is stor
   expect(messages.messages.some((m) => m.meta?.replyChips)).toBe(false);
 });
 
-test("a personal workspace (ADR 0158): made with its mode, its templates are for one person's life, made with no channel", async () => {
+test("a personal workspace (ADR 0159): made with its mode, its templates are for one person's life, made with no channel", async () => {
   t = await createTestServer();
   const owner = browser(t);
   await signUp(owner, "solo@example.com");

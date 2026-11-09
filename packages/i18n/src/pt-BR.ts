@@ -500,6 +500,20 @@ export const ptBR = {
       continue: "Continuar neste {{device}}",
       text: "Você instalou o agentes.chat neste {{device}}: não precisa de senha.",
     },
+    /** The line over the sign-in in the desktop app: which server it signs in to (ADR 0158). */
+    server: {
+      into: "Entrando em <b>{{server}}</b>",
+      intoHere: "Entrando no agentes.chat <b>deste {{device}}</b>",
+    },
+    /** "Forgot password" on a server that sends no email (ADR 0158). */
+    forgotHere: {
+      ownerTitle: "Aqui você não precisa de senha.",
+      ownerLead: "Você instalou o agentes.chat neste {{device}}. Entre por aqui e crie uma senha nova em seguida.",
+      notOwner: "Não é a conta de quem instalou? Peça a um dono do seu workspace um link de senha nova.",
+      title: "Este servidor não manda e-mail.",
+      lead: "Peça a um dono do seu workspace um link de senha nova. Ele gera em Membros, e o link vale por 1 hora.",
+      back: "Voltar para a senha",
+    },
     reset: {
       title: "Crie uma senha nova.",
       save: "Salvar senha",
@@ -1405,14 +1419,26 @@ export const ptBR = {
     addPasswordLabel: "Nova senha",
     addPasswordSaved: "Senha adicionada.",
     addPasswordReauth: "Entre de novo para adicionar uma senha.",
+    newPassword: "Criar uma senha nova",
+    newPasswordHint:
+      "As outras sessões saem, e os apps de IA conectados com a senha antiga precisam ser conectados de novo.",
+    newPasswordRow: "Para trocar a senha que você usa nos outros navegadores e aparelhos",
+    newPasswordSaved: "Senha nova salva.",
+    newPasswordReauth: "Entre de novo para criar uma senha nova.",
     yourWorkspaces: "Seus workspaces",
     youAreHere: "Você está aqui",
     /** Beside a workspace's name, only when another of the person's has the same name. */
     createdOn: "Criado em {{date}}",
     newWorkspace: "Novo workspace",
     addWorkspace: "Adicionar workspace",
-    addWorkspaceHint: "Um novo no agentes.chat, ou o servidor da sua equipe",
+    addWorkspaceHint: "Entrar em um que já existe, criar um novo ou usar o servidor da equipe",
     yourServer: "Seu servidor",
+    /** A server's line in "Your workspaces" in the desktop app: the one on this computer, and its state (ADR 0158). */
+    serverHere: "O agentes.chat neste {{device}}",
+    serverStopped: "parado",
+    serverOffline: "fora do ar desde {{time}}",
+    serverSignedOut: "sem login",
+    serverSignIn: "Entrar",
     wiki: "Wiki",
     settings: "Configurações",
     workspaceMenu: "Menu do workspace",
@@ -1559,11 +1585,14 @@ export const ptBR = {
     qr: "QR code para entrar no app agentes",
     making: "Gerando o código…",
     stepApp: "Instale o app agentes no celular (App Store ou Google Play).",
-    stepTailscale: "Instale o Tailscale no celular e entre na mesma rede (tailnet) deste servidor.",
+    stepTailscale: "Instale o Tailscale no celular e entre com a mesma conta do Tailscale deste servidor.",
     stepScan: "Aponte a câmera do celular para o código.",
     validFor: "Vale por {{time}}",
     private: "Quem escanear este código entra na sua conta.",
     failed: "Não deu para gerar o código.",
+    localOnly: "Este servidor só abre no computador onde ele roda, então o celular não chega a ele.",
+    localOnlyHow:
+      "No app do agentes.chat desse computador, ligue Acessar pelo celular e pela equipe em Preferências › Servidores. Depois volte aqui.",
   },
   team: {
     title: "Equipe",
@@ -4812,7 +4841,7 @@ export const ptBR = {
       activity: "Atividade",
       settings: "Configurações",
       more: "Mais",
-      /** A personal workspace's bar (ADR 0158): the access tab is what it can use; Settings keeps name, look, budget. */
+      /** A personal workspace's bar (ADR 0159): the access tab is what it can use; Settings keeps name, look, budget. */
       accessPersonal: "Pode usar",
       settingsPersonal: "Ajustes",
       /** A personal workspace's tab with what one person rarely needs. */
@@ -5811,7 +5840,7 @@ export const ptBR = {
       custom: { name: "Do zero", desc: "Você escreve tudo. Sem acessos até você liberar.", instructions: "" },
     },
     roleGroups: {
-      /** A personal workspace's one group: the right hand's personal agents (ADR 0158). */
+      /** A personal workspace's one group: the right hand's personal agents (ADR 0159). */
       personal: "Para o seu dia",
       tech: "Produto e tecnologia",
       customers: "Clientes",
@@ -5996,6 +6025,17 @@ export const ptBR = {
     agentsOnlyYouHint: "Num plano, você pode deixar cada um atender outras pessoas na página dele.",
     filters: "Filtrar pessoas",
     rolesOf: "Papéis de {{name}}",
+    moreOf: "Mais de {{name}}",
+    /** On a server that sends no email, an owner's new-password link for a member (ADR 0158). */
+    passwordLink: {
+      item: "Gerar link de senha nova",
+      hint: "Para quando a pessoa esqueceu a senha",
+      title: "Link de senha nova para {{name}}",
+      lead: "Funciona uma vez, por 1 hora. Mande por onde vocês conversam.",
+      label: "Link",
+      making: "Gerando o link…",
+      copy: "Copiar link",
+    },
     everyoneNote: "Todos vale para toda pessoa do workspace.",
     everyoneNotePersonal: "Sem papel, a pessoa usa os agentes. Com {{role}}, ajuda você a cuidar daqui.",
     noRolesToGive: "Nenhum papel abaixo do seu para dar.",
@@ -11946,6 +11986,13 @@ export const ptBR = {
     },
   },
   errors: {
+    /** A new-password link an owner can't make (ADR 0158). */
+    passwordLink: {
+      email: "Este servidor manda e-mail: a pessoa pede o link dela mesma em Esqueci a senha.",
+      serverOwner: "Quem instalou este servidor entra pelo computador onde ele roda, sem link.",
+      otherWorkspace:
+        "Essa pessoa também está num workspace que não é seu: só os donos de todos eles podem gerar o link.",
+    },
     /** Refusals in plain words: each server code that needs no line of its own shares one of these. */
     said: {
       gone: "Isso não está mais aqui. Atualize a página e tente de novo.",
@@ -12965,6 +13012,7 @@ export const ptBR = {
         joined: "Entrou no workspace",
         left: "Saiu do workspace",
         role_changed: "Mudou o papel de um membro",
+        password_link: "Gerou um link de senha nova para um membro",
       },
       apps: {
         connected: "Conectou o {{app}}",

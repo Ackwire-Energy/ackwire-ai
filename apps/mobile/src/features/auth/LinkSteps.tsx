@@ -231,7 +231,7 @@ export function LinkSteps({
   const fix = step === "email" ? emailTypoFix(email) : null;
   const mail = webmailOf(typed);
   const bubble: Record<AskStep, [string, string | undefined]> = {
-    // A personal workspace's words (ADR 0158): never its name ("Personal"), who invited instead.
+    // A personal workspace's words (ADR 0159): never its name ("Personal"), who invited instead.
     email: isPersonal(preview)
       ? [by ? t("invite.calledYouPersonal", { name: by }) : t("invite.ask.helloPersonal"), t("invite.ask.leadNoName")]
       : [

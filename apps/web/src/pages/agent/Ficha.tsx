@@ -79,7 +79,7 @@ export function Ficha() {
 
   const owner = agent.ownerUserId ? dir.memberById.get(agent.ownerUserId) : undefined;
   // Alone in a personal workspace, being its owner and who talks to it say nothing new while they hold what they hold
-  // there (the person's, everyone or only them): Settings keeps both, and a list of people always shows (ADR 0158).
+  // there (the person's, everyone or only them): Settings keeps both, and a list of people always shows (ADR 0159).
   const ownerShown = !(solo && agent.ownerUserId === me.user.id);
   const audienceShown = !solo || modeOf(agent) === "people";
   const channels = (detail.data?.channels ?? []).filter((c) => saved.channels?.includes(c.id) ?? true);

@@ -37,7 +37,7 @@ export type AgentSection = (typeof AGENT_SECTIONS)[number];
 export const isAgentSection = (v: unknown): v is AgentSection => AGENT_SECTIONS.includes(v as AgentSection);
 
 /*
- * A personal workspace's agent page (ADR 0158 §3): the same page, simpler. Its bar keeps what one person uses
+ * A personal workspace's agent page (ADR 0159 §3): the same page, simpler. Its bar keeps what one person uses
  * (Overview, Instructions, Memory, the apps it can use, its name and look) and an Advanced tab holds the rest: who owns
  * it and talks to it, its conversations, computer, brakes and danger zone, its built-in areas, databases, skills and
  * rules, with Activity, Files and Usage a click away. Every tab and section keeps its address.

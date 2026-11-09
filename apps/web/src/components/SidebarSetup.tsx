@@ -53,7 +53,7 @@ export const SIDEBAR_TOOLS = {
 
 /**
  * The person's order of the tools in this workspace (`…/me/sidebar/tools`), saved as `null` when it is the default of
- * the workspace's mode (`personal`, ADR 0158). `put(next, from)` keeps the focus on `from` (or, once it is disabled at
+ * the workspace's mode (`personal`, ADR 0159). `put(next, from)` keeps the focus on `from` (or, once it is disabled at
  * an end, its row's other arrow): React moves a row down by re-inserting its node, which blurs whatever was focused
  * inside it.
  */
@@ -154,7 +154,7 @@ export function ToolList({ items, row }: { items: SidebarItem[]; row: (id: Sideb
  * "Personalizar a barra lateral", from More: one line per tool and where it goes, Sempre, Em Mais or, for a tool with
  * a count, Quando tiver algo. A choice applies at once (no Save) and is kept on the server for this person in this
  * workspace, so their other devices and the desktop app show the same sidebar. What shows before any choice, and what
- * Reset to default goes back to, is the workspace's mode's (ADR 0158).
+ * Reset to default goes back to, is the workspace's mode's (ADR 0159).
  */
 export function SidebarSetupDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { t } = useTranslation();

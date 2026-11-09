@@ -4,6 +4,8 @@
   min-height: 56px;
   padding-top: 8px;
   padding-bottom: 8px;
+  /* Its 32px icon boxes carry their own air: 12px to the edge. */
+  padding-right: 12px;
 }
 /* The name, and the topic beside it only when it fits whole: a topic that doesn't fit wraps to a second line,
    which the box hides. */
@@ -41,15 +43,14 @@
   flex: none;
   height: 30px;
   line-height: 30px;
-  padding-left: 12px;
-  border-left: 1px solid var(--line2);
   white-space: nowrap;
+  color: var(--muted);
 }
 .channel__acts {
   flex: none;
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 2px;
 }
 @media (max-width: 760px) {
   /* Its buttons all show their plates: the header's own 8px between them, as in a DM, leaves the title its room
@@ -58,82 +59,86 @@
     column-gap: 8px;
   }
 }
-/* No plate on hover, pressed or open: the icon's own color says it, as Discord's header does. */
-/* Each box is a square that reaches 7px into the gap on both sides, so 14px of gap reads as the glyphs' own air: one
-   glyph every 26px. Its target keeps the header's 40px height (`::after`). */
+/* Bare icons of one 32px box, a plate only under the pointer or while pressed or open; a count sits beside its icon
+   inside the box (threads "10"), never over it. */
 .channel__icon.ac-btn {
   position: relative;
-  width: 26px;
-  min-width: 26px;
-  height: 26px;
-  min-height: 26px;
-  margin: 0 -7px;
+  width: auto;
+  min-width: 32px;
+  height: 32px;
+  min-height: 32px;
+  margin: 0;
   padding: 0;
+  gap: 5px;
+  border-radius: 10px;
+  background: none;
+  box-shadow: none;
   color: var(--muted);
+}
+.channel__icon.ac-btn:has(> .channel__icon-count) {
+  padding: 0 9px 0 7px;
 }
 .channel__icon.ac-btn::after {
   content: "";
   position: absolute;
-  inset: calc((26px - var(--control-h-md)) / 2) 0;
-}
-.channel__icon.ac-btn,
-.channel__icon.ac-btn:hover,
-.channel__icon.ac-btn:active,
-.channel__icon.ac-btn[aria-pressed="true"],
-.channel__icon.ac-btn[aria-expanded="true"] {
-  background: none;
-  box-shadow: none;
+  inset: calc((32px - var(--control-h-md)) / 2) 0;
 }
 .channel__icon.ac-btn > .ac-icon {
-  width: 20px;
-  height: 20px;
+  width: 19px;
+  height: 19px;
 }
-.channel__icon.ac-btn:hover,
-.channel__icon.ac-btn[aria-pressed="true"],
-.channel__icon.ac-btn[aria-expanded="true"] {
+.channel__icon.ac-btn:is(:hover, :active, [aria-pressed="true"], [aria-expanded="true"]) {
+  background: var(--plate);
+  box-shadow: none;
   color: var(--ink);
 }
 html:not([data-pointer]) .channel__icon.ac-btn:focus-visible {
   box-shadow: var(--focus-ring);
 }
-/* An ink pill (the page's color on the ink), as the sidebar's red one but neutral: a count of threads, not a call on
-   me. The ring of the header's color cuts it from the glyph. The rail's 16px count's type (10px): at 10.5px the
-   figures' cap box rounds half a pixel low on a 2x screen. */
+/* The count as plain figures beside the icon, in the text's ink: a count of threads, not a call on me. */
 .channel__icon-count.ac-count {
-  position: absolute;
-  top: -4px;
-  right: -2px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--pane);
-  background: var(--ink2);
-  box-shadow: 0 0 0 2px var(--pane);
-}
-.members-sheet .channel__icon-count.ac-count {
-  box-shadow: 0 0 0 2px var(--side);
+  position: static;
+  min-width: 0;
+  height: auto;
+  padding: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  background: none;
+  box-shadow: none;
 }
 .channel__search-icon.ac-btn {
   display: none;
 }
 
-/* The header's search field: narrow at rest, wider while it is used. */
+/* The header's search field: a soft plate with no line at rest, narrow, the field's own look and wider while used. */
 .channel__search.search-box {
-  margin-left: 4px;
-  width: 248px;
-  transition: width 0.16s var(--out);
+  margin-left: 8px;
+  width: 220px;
+  transition: width 0.2s var(--out);
 }
 .channel__search.search-box:focus-within {
-  width: 320px;
+  width: 300px;
 }
 .channel__search .search-box__field {
   flex-wrap: nowrap;
   min-height: var(--control-h-sm);
   padding: 2px 8px 2px 32px;
+  border-color: transparent;
   border-radius: var(--control-r-sm);
+  background: var(--plate-soft);
+  box-shadow: none;
   overflow: hidden;
+}
+.channel__search .search-box__field:hover {
+  background: var(--plate);
+}
+.channel__search .search-box__field:focus-within {
+  background: var(--field-bg);
+  box-shadow:
+    inset 0 0 0 1px var(--field-line),
+    var(--focus-ring);
 }
 .channel__search .search-box__icon {
   left: 10px;
@@ -146,6 +151,11 @@ html:not([data-pointer]) .channel__icon.ac-btn:focus-visible {
 }
 .channel__search .ac-token {
   flex: none;
+  border: 0;
+  border-radius: 7px;
+  background: var(--raised);
+  box-shadow: 0 0 0 1px var(--line);
+  font-weight: 550;
 }
 @media (prefers-reduced-motion: reduce) {
   .channel__search.search-box {

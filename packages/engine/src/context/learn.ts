@@ -305,7 +305,7 @@ const LEARN_SYSTEM = [
 ].join("\n");
 
 /**
- * The same for a personal workspace (ADR 0158): what one person's agents keep about them and their life. The kinds
+ * The same for a personal workspace (ADR 0159): what one person's agents keep about them and their life. The kinds
  * and scopes are the same (`team` is what all their agents keep).
  */
 const PERSONAL_LEARN_WORDS: readonly (readonly [string, string])[] = [

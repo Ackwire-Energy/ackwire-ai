@@ -261,7 +261,7 @@ function Gallery() {
           )}
           {!searching && suggestions.length > 0 ? (
             <>
-              {/* A personal workspace's are suggested for its person, never "for Personal" (ADR 0158). */}
+              {/* A personal workspace's are suggested for its person, never "for Personal" (ADR 0159). */}
               <SectionHeader
                 title={
                   isPersonal(org)

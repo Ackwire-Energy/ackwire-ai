@@ -13,7 +13,7 @@ import { closeSheetsAndOpen, SheetHeader } from "./parts";
 
 /**
  * "New channel": only the name; people and agents are called in later, by name. A personal workspace's channels are
- * its group conversations (ADR 0158).
+ * its group conversations (ADR 0159).
  */
 export function NewChannelForm() {
   const { t } = useTranslation();

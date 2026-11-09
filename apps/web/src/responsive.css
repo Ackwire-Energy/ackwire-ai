@@ -29,10 +29,24 @@
   .shell__main--chat {
     padding-bottom: 0;
   }
+  /* A phone has no room for the sheet's margin: the page fills the screen, square, as before. */
   .shell__work {
     flex: 1 1 auto;
     min-height: 0;
     height: auto;
+    padding: 0;
+    background: var(--pane);
+  }
+  .shell__pages,
+  [data-theme="light"] .shell__pages {
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .shell__work > .outages {
+    margin-bottom: 0;
+    border-radius: 0;
+    box-shadow: none;
+    border-bottom: 1px solid var(--line);
   }
   /* Chat pages hide the bar: the notice keeps clear of the notch itself. */
   .shell:has(.channel__header) .outages {

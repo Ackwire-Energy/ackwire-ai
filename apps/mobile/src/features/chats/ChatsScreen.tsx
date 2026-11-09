@@ -53,7 +53,7 @@ const LIVE_ROWS = 6;
 export const openKindList = (kind: ListKind | `category-${string}`) => router.push(`/conversations/${kind}`);
 
 /**
- * Whether the lists leave a quiet #general out (ADR 0158): in a personal workspace while its person is the only member
+ * Whether the lists leave a quiet #general out (ADR 0159): in a personal workspace while its person is the only member
  * (or while the members load), as the web's sidebar. With family in it, #general shows.
  */
 export function useHidesQuietGeneral(): boolean {
@@ -76,7 +76,7 @@ export function useHidesQuietGeneral(): boolean {
  * Search and Threads have their own tabs. Empty, it invites the first agent. Nothing opens over it on its own: the
  * offer to turn on notifications comes as a line in the right hand's conversation. When the server doesn't answer
  * it says so (`HomeServerError`), over the kept rows as a card, and tries again on its own. A personal workspace
- * (ADR 0158) calls its channels group conversations and, while its person is alone in it, leaves a quiet #general out.
+ * (ADR 0159) calls its channels group conversations and, while its person is alone in it, leaves a quiet #general out.
  */
 const OTHER_CHANNELS = "otherChannels";
 

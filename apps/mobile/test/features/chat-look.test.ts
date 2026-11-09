@@ -53,7 +53,7 @@ describe("the rows follow the same choice as the web", () => {
     expect(mineOnRight("left")).toBe(false);
   });
 
-  test("a personal workspace opens every conversation in bubbles; the person's choice wins (ADR 0158)", async () => {
+  test("a personal workspace opens every conversation in bubbles; the person's choice wins (ADR 0159)", async () => {
     expect(chatLookOf(undefined, false, true).style).toBe("bubbles");
     expect(chatLookOf(undefined, true, true).style).toBe("bubbles");
     expect(chatLookOf({ channelStyle: "compact" }, false, true).style).toBe("compact");

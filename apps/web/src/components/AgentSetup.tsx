@@ -23,12 +23,7 @@ import {
   resourcesOf,
 } from "@agenteschat/client/lib/access-levels";
 import { channelsAfter, sameAudience } from "@agenteschat/client/lib/agent-edit";
-import {
-  audienceModeKey,
-  audienceModeTextKey,
-  audienceOf,
-  audiencePatch,
-} from "@agenteschat/client/lib/audience";
+import { audienceModeKey, audienceModeTextKey, audienceOf, audiencePatch } from "@agenteschat/client/lib/audience";
 import { setDraftFor } from "@agenteschat/client/lib/drafts";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { formatTime, joinNames } from "@agenteschat/client/lib/format";
@@ -115,7 +110,7 @@ const STEP_ICON: Record<AgentSetupStep, IconName> = {
 
 /**
  * The steps this person sees for this agent (none: the checklist isn't theirs, or the agent has none). Alone in a
- * personal workspace there is nobody else to talk to it: "who" waits until someone joins (ADR 0158), read live.
+ * personal workspace there is nobody else to talk to it: "who" waits until someone joins (ADR 0159), read live.
  */
 export function useSetupSteps(agent: Agent | undefined): AgentSetupStep[] {
   const { org, me } = useOrg();
@@ -798,7 +793,7 @@ function WhoDialog({ agent, onClose, onSaved }: { agent: Agent; onClose: () => v
   const ownerName = owner ? dir.memberById.get(owner)?.name : undefined;
   const pickedPeople = new Set(audience.userIds);
   const pickedRoles = new Set(audience.roleIds ?? []);
-  // A personal workspace's family picks people first, and a role only when one is worth it (ADR 0158).
+  // A personal workspace's family picks people first, and a role only when one is worth it (ADR 0159).
   const personal = isPersonal(org);
   const allRoles = roles.data?.roles ?? [];
   const roleList = rolePicksInSight(org, allRoles, audience.roleIds ?? [])

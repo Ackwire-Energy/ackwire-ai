@@ -53,7 +53,8 @@ test("every case is well formed: known presets, connectors and tools", () => {
     for (const id of c.connectors ?? []) expect(Object.keys(CONNECTORS)).toContain(id);
     const tools = [
       ...Object.keys(c.fixtures ?? {}),
-      ...(c.expect.mustCall ?? []).flatMap((g) => g.split("|")),
+      // "a+key": the tool `a`, called with `key`.
+      ...(c.expect.mustCall ?? []).flatMap((g) => g.split("|").map((t) => t.split("+")[0] ?? t)),
       ...(c.expect.mustNotExecute ?? []),
       ...(c.expect.mustNotCall ?? []),
       ...(c.expect.approval ?? []),
@@ -144,6 +145,26 @@ test("a routine run: background work from its brief, the conversation it reports
   expect(run.routineRun?.status).toBe("silent");
   expect(run.noReply).toBe(true);
   expect(run.reply).toBe("");
+  expect(deterministicChecks(c.expect, run).filter((k) => !k.pass)).toEqual([]);
+});
+
+test("a good-morning GIF routine: hand_off takes `gif`, and its message goes with the GIF (ADR 0091)", async () => {
+  const provider = script([
+    {
+      chunks: [],
+      toolUses: [{ name: "hand_off", input: { message: "Bom dia, pessoal! ☕", gif: "good morning coffee" } }],
+    },
+    { chunks: ["Bom dia enviado com GIF de café."] },
+  ]);
+  const c = byId("routine-good-morning-gif");
+  const run = await runCase(c, { apiKey: "sk-ant-fake-key-1234", provider, maxToolTurns: 4 });
+  const handOff = provider.calls[0]?.request.tools?.find((t) => t.name === "hand_off");
+  expect(Object.keys((handOff?.inputSchema.properties ?? {}) as Record<string, unknown>)).toContain("gif");
+  expect(handOff?.description).toContain("Never paste a link to a GIF site");
+  expect(run.calls).toMatchObject([{ name: "hand_off", executed: true }]);
+  expect(run.calls[0]?.isError).toBeFalsy();
+  expect(run.calls[0]?.result).toStartWith("Posted with a GIF.");
+  expect(run.routineRun?.status).toBe("reported");
   expect(deterministicChecks(c.expect, run).filter((k) => !k.pass)).toEqual([]);
 });
 

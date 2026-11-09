@@ -37,7 +37,7 @@ export function RolesPicker({
   const { t } = useTranslation();
   const { org } = useOrg();
   const givable = sortRoles(roles.filter((r) => !isEveryone(r) && r.givable));
-  // A personal workspace says it in the invitation's plain words (ADR 0158), naming its helper role as it's called.
+  // A personal workspace says it in the invitation's plain words (ADR 0159), naming its helper role as it's called.
   const helper = isPersonal(org) ? personalHelperRole(roles) : null;
   const picked = sortRoles(roles.filter((r) => value.includes(r.id)));
   const toggle = (id: string, on: boolean) =>

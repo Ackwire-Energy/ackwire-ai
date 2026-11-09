@@ -104,7 +104,7 @@ describe("the words", () => {
       }
   });
 
-  test("a personal workspace reads its own words where the place has them, the usual ones otherwise (ADR 0158)", () => {
+  test("a personal workspace reads its own words where the place has them, the usual ones otherwise (ADR 0159)", () => {
     expect(firstUseCopy("agents", true, true)).toEqual({
       title: "mobile.empty.agents.titlePersonal",
       text: "mobile.empty.agents.textPersonal",

@@ -13,7 +13,7 @@ export const NEW_AGENT_STEPS = ["role", "identity", "instructions", "tools", "wh
 export type NewAgentStep = (typeof NEW_AGENT_STEPS)[number];
 
 /**
- * A personal workspace's walk through Criar agente (ADR 0158 §3): the technical steps start filled in (every app it
+ * A personal workspace's walk through Criar agente (ADR 0159 §3): the technical steps start filled in (every app it
  * can use, only its owner, Automático) and are passed over; Revisar still opens each one.
  */
 export const PERSONAL_SKIPPED_STEPS: readonly NewAgentStep[] = ["tools", "where", "model"];
@@ -145,7 +145,7 @@ export const ROLE_DEFAULTS = {
 } satisfies Record<RoleId, RoleDefaults>;
 
 /**
- * A personal workspace's starting points in Criar agente (ADR 0158 §3), in place of a team's roles: the agents of the
+ * A personal workspace's starting points in Criar agente (ADR 0159 §3), in place of a team's roles: the agents of the
  * right hand's personal templates (the server's `MEMBERS` in team-templates.ts), their words in
  * `teamTemplates.agents.{id}` (`role`, `line`). One starts from scratch with its name, look, role and line filled in.
  */
@@ -168,7 +168,7 @@ export const BLANK_LOOK = { color: "sky", eyes: "round", accessory: "none" } as 
 /**
  * Each connection's level for a role: the preset's level for its catalog connector, else write, as every agent already
  * has it (`grantToEveryAgent`). A custom server's account starts with none: only its first one is everyone's. In a
- * personal workspace (`broad`) it starts at write too: one person's agents start with everything (ADR 0158 §3a).
+ * personal workspace (`broad`) it starts at write too: one person's agents start with everything (ADR 0159 §3a).
  */
 export function presetLevels(role: RoleId, items: { id: string; def: { id: string } | null }[], broad = false) {
   const levels: Record<string, Level> = ROLE_DEFAULTS[role].levels;

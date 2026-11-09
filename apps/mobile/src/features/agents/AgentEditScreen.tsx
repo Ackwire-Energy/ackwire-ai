@@ -234,7 +234,7 @@ export function AgentEditScreen({ id }: { id: string }) {
 
           {fields.has("look") ? <LookList look={draft.look} onChange={(look) => set("look", look)} /> : null}
 
-          {/* With family in a personal workspace (ADR 0158), who talks to it is a row here for whoever may change
+          {/* With family in a personal workspace (ADR 0159), who talks to it is a row here for whoever may change
               it, to its step's screen (otherwise only the setup card opens it). The same audience, one more way in. */}
           {personal && (others ?? 0) > 0 && !rightHand && agent.setup && (admin || owner) ? (
             <>

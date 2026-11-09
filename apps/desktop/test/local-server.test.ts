@@ -167,12 +167,16 @@ describe("what the popover, the cover and Preferences say", () => {
     expect(hereLine({ ...running, phase: "updating" })).toBe("desktop.server.updating");
     expect(hereLine({ ...running, phase: "failing" })).toBe("desktop.server.failing");
     expect(hereLine({ ...running, phase: "stopped" })).toBe("desktop.server.stopped");
+    // Starting again by itself is never "stopped"; Tailscale off here means nobody else reaches it.
+    expect(hereLine({ ...running, phase: "restarting" })).toBe("desktop.server.restarting");
+    expect(hereLine({ ...reached, tailnetDown: true })).toBe("desktop.server.tailnetDown");
   });
 
   test("the popover's banners", () => {
     expect(hereBanner(running)).toBeNull();
     expect(hereBanner({ ...running, phase: "stopped" })).toBe("stopped");
     expect(hereBanner({ ...running, phase: "failing" })).toBe("failing");
+    expect(hereBanner({ ...running, phase: "restarting" })).toBeNull();
     expect(hereBanner({ ...running, backTo: "0.6.0" })).toBe("back");
     expect(hereBanner({ ...running, run: false, phase: "off" })).toBeNull();
   });
@@ -187,6 +191,7 @@ describe("what the popover, the cover and Preferences say", () => {
 
   test("the cover: each state over the server here, and Tailscale not connected at its Tailscale address", () => {
     expect(coverHere({ ...running, phase: "starting" }, LOCAL, false)).toBe("starting");
+    expect(coverHere({ ...running, phase: "restarting" }, LOCAL, false)).toBe("starting");
     expect(coverHere({ ...running, phase: "updating" }, LOCAL, false)).toBe("migrating");
     expect(coverHere({ ...running, phase: "stopped" }, LOCAL, false)).toBe("stopped");
     expect(coverHere({ ...running, phase: "failing" }, LOCAL, false)).toBe("failing");

@@ -24,7 +24,7 @@ import { Page } from "./parts";
  * Perfil › Aprovações (ADR 0139), the web's Configurações › Você › Aprovações: who approves for me (one person or
  * no one), when (only while my status says out, or always), until when and whether risky actions are in, each saved
  * as it is tapped; then whom I approve for, each with Não quero cobrir. In a personal workspace it is listed in
- * Settings › Advanced (ADR 0158 §3), and alone there the cover part waits until someone joins or one is set.
+ * Settings › Advanced (ADR 0159 §3), and alone there the cover part waits until someone joins or one is set.
  */
 export function ApprovalsPage() {
   const { t, i18n } = useTranslation();
@@ -54,7 +54,7 @@ export function ApprovalsPage() {
   const days = DUE_CHOICES.filter((c) => c !== "none").map((c) => ({ choice: c, day: dueDateOf(c) as string }));
   return (
     <Page title={t("settings.section.approvals")}>
-      {/* Alone in a personal workspace there is no one to approve for you (ADR 0158): only the right hand's part,
+      {/* Alone in a personal workspace there is no one to approve for you (ADR 0159): only the right hand's part,
           unless a cover is already set, which always shows. */}
       {solo && !cover ? null : (
         <>

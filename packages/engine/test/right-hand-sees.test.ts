@@ -136,7 +136,7 @@ describe("what it may use", () => {
     expect((await gateway(createTeamStatusToolSource()).granted(ctx)).map((t) => t.name)).not.toContain("team_status");
   });
 
-  test("in a personal workspace team_status speaks of the person's agents, its title too (ADR 0158)", async () => {
+  test("in a personal workspace team_status speaks of the person's agents, its title too (ADR 0159)", async () => {
     f = await setup({ rightHand: true });
     const ctx = await lodiRun(f.owner.id);
     const listed = async () =>

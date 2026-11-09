@@ -12,7 +12,7 @@ const ELSEWHERE: { tab: AgentTab; icon: IconName }[] = [
 ];
 
 /**
- * A personal workspace's Advanced tab (ADR 0158 §3): what one person rarely needs, all of it still here. Activity,
+ * A personal workspace's Advanced tab (ADR 0159 §3): what one person rarely needs, all of it still here. Activity,
  * Files and Usage a click away; then Configurações' advanced part (owner and who it reports to, who talks to it, its
  * brakes, conversations, computer, danger zone) and the access tab's (built-in areas, databases, rules, skills).
  */

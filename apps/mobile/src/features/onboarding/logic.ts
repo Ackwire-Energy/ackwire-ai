@@ -5,11 +5,11 @@ import { webmailOf } from "@agenteschat/client/lib/text";
 import type { TFunction } from "i18next";
 
 /**
- * The phone's first run: what the workspace is for (ADR 0158), then, for a company or team, its name, asked by its
+ * The phone's first run: what the workspace is for (ADR 0159), then, for a company or team, its name, asked by its
  * right hand; then its DM (ADR 0137). Pure: no React Native imports.
  */
 
-/** The two answers to "What will you use agentes.chat for?" (ADR 0158), in this order. */
+/** The two answers to "What will you use agentes.chat for?" (ADR 0159), in this order. */
 export const PURPOSES = ["personal", "team"] as const satisfies readonly WorkspaceMode[];
 
 /**

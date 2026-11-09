@@ -15,7 +15,7 @@ export type BusinessType = (typeof BUSINESS_TYPES)[number];
 export const isTemplateBusiness = (b: BusinessType): b is Exclude<BusinessType, "other"> => b !== "other";
 
 /**
- * A personal workspace's row 1 (ADR 0158): the areas of life the person wants help with, several at once, labelled
+ * A personal workspace's row 1 (ADR 0159): the areas of life the person wants help with, several at once, labelled
  * `teamPlan.lifeArea.{id}`; `other` asks for a sentence.
  */
 export const LIFE_AREAS = [
@@ -165,7 +165,7 @@ export const firstTasks = (card: TeamProposalCard) =>
 
 /**
  * The team as a map ("See as a map"): one column per channel, its agents and their routines. An agent with no channel
- * lives in its DM with the person (a personal template, ADR 0158): a column of its own, `channel` empty.
+ * lives in its DM with the person (a personal template, ADR 0159): a column of its own, `channel` empty.
  */
 export function teamColumns(plan: TeamPlan) {
   const columns = new Map<string, { key: string; channel: string; fresh: boolean; agents: TeamPlan["agents"] }>();
@@ -183,7 +183,7 @@ export function teamColumns(plan: TeamPlan) {
   return [...columns.values()];
 }
 
-/** Whether every agent on the card lives in its DM with the person, so the card names no channel (ADR 0158). */
+/** Whether every agent on the card lives in its DM with the person, so the card names no channel (ADR 0159). */
 export const teamInDms = (plan: TeamPlan) => plan.agents.length > 0 && plan.agents.every((a) => !a.channel);
 
 /** "O time não foi criado: … deu erro (…)": the failed step, with its reason in the reader's language when known. */

@@ -842,7 +842,7 @@ function useIssueFields(i: Issue) {
 
 /**
  * Whether a task shows "Who sees it": always, but alone in a personal workspace only once it says anything but
- * everyone (ADR 0158): nobody else is there to see it.
+ * everyone (ADR 0159): nobody else is there to see it.
  */
 function useWhoSeesShown(i: Issue) {
   const { solo } = usePersonalView();

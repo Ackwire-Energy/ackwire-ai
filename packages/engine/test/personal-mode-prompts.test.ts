@@ -20,13 +20,14 @@ import {
   TEAM_INTERVIEW,
   teamPrompt,
   turnMeans,
+  updateOrgSettings,
 } from "../src";
 import { agentMediaQuestions, agentMediaState, FITS_QUESTION, FITS_QUESTION_PERSONAL } from "../src/agent-media";
 import { handoffGuidance, noticeText } from "../src/notices";
 import { type Fixture, setup } from "./fixtures";
 
 /*
- * Personal mode (ADR 0158): what models read speaks of one person (and maybe their family) and their agents, never a
+ * Personal mode (ADR 0159): what models read speaks of one person (and maybe their family) and their agents, never a
  * company, a team or colleagues, while every rule and capability stays. The team's text stays exactly as it was.
  */
 
@@ -38,11 +39,8 @@ afterEach(async () => {
   f = undefined;
 });
 
-const makePersonal = (fx: Fixture) =>
-  fx.db
-    .update(schema.organizationSettings)
-    .set({ mode: "personal" })
-    .where(eq(schema.organizationSettings.orgId, fx.org.id));
+/** The workspace as a personal one, as Settings makes it (its settings row may not exist yet). */
+const makePersonal = (fx: Fixture) => updateOrgSettings(fx.db, fx.owner.id, fx.org.id, { mode: "personal" });
 
 describe("the rules every agent reads", () => {
   test("a personal workspace's rules keep every line, in words for one person", () => {
@@ -111,14 +109,13 @@ describe("the rules every agent reads", () => {
   test("a personal workspace's run says whose workspace it is", async () => {
     f = await setup();
     const fx = f;
-    const ask = async () => {
-      const said = await postPersonMessage({ db: fx.db, pubsub: fx.pubsub }, fx.owner.id, fx.org.id, fx.general.id, {
-        body: "@dev oi",
-      });
-      const [run] = await fx.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, said.id));
-      if (!run) throw new Error("no run");
-      return buildRunContext(fx.db, run, fx.agent, { maxMessages: 10, toolsAvailable: true });
-    };
+    const said = await postPersonMessage({ db: fx.db, pubsub: fx.pubsub }, fx.owner.id, fx.org.id, fx.general.id, {
+      body: "@dev oi",
+    });
+    const [run] = await fx.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, said.id));
+    if (!run) throw new Error("no run");
+    // The same run's context, built again after the mode changes (a second mention would land in this run's inbox).
+    const ask = () => buildRunContext(fx.db, run, fx.agent, { maxMessages: 10, toolsAvailable: true });
     const team = await ask();
     expect(team.personal).toBe(false);
     const teamText = systemText(team.system);

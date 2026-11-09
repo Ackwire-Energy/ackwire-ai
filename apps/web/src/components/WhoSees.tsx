@@ -110,7 +110,7 @@ export function WhoSeesButton({
 /**
  * "Quem vê" (ADR 0151), for a task and a wiki page alike: everyone, only me, or specific people. Administrators always
  * see, so one may leave themselves out of a list; anyone else stays in it. A personal workspace says it its way, and
- * alone, leaves out who else sees it: nobody else is there (ADR 0158).
+ * alone, leaves out who else sees it: nobody else is there (ADR 0159).
  */
 export function WhoSeesDialog({
   title,

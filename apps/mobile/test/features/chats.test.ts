@@ -129,7 +129,7 @@ describe("the list", () => {
   });
 });
 
-describe("a personal workspace's #general (ADR 0158)", () => {
+describe("a personal workspace's #general (ADR 0159)", () => {
   const rows = (general: Partial<Channel>) =>
     buildConversations({
       channels: [channel("c1", "general", true, general), channel("c2", "family")],

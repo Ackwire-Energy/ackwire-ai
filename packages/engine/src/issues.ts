@@ -1744,7 +1744,7 @@ export async function openTasksBrief(
   agentId: string,
   channelId: string,
   updates: boolean,
-  /** A personal workspace (ADR 0158): the person, not a team, sees the work. */
+  /** A personal workspace (ADR 0159): the person, not a team, sees the work. */
   personal = false,
 ) {
   const visible = await agentSearchChannels(db, orgId, agentId, channelId);

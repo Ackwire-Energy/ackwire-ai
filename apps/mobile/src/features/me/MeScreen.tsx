@@ -47,7 +47,7 @@ type WorkRow = "issues" | "proposals" | "routines" | "wiki" | "drive" | "dashboa
 /** A team's workspace: Threads is a tab and Team a row of Agents. */
 const TEAM_WORK: WorkRow[] = ["issues", "proposals", "routines", "wiki", "drive", "dashboards", "memory"];
 /**
- * A personal workspace (ADR 0158): what its sidebar keeps in sight first, then the rest of its More; Threads (no tab
+ * A personal workspace (ADR 0159): what its sidebar keeps in sight first, then the rest of its More; Threads (no tab
  * there) and Team (no row in Agents) live here, Team last.
  */
 const PERSONAL_WORK: WorkRow[] = [
@@ -88,7 +88,7 @@ let horizonArrived = false;
  * preferences; Sons and Aparência change in their row through the system's choice on iOS (a screen on Android, whose
  * dialog holds three buttons at most). Sair alone in red; the version is in Sobre. A settings page is opened many
  * times a day, so nothing here animates beyond the rows' press highlight and the platform's push. A personal workspace
- * (ADR 0158) is yours: no workspace name after your @, your face as its mark, and its work led by what its sidebar
+ * (ADR 0159) is yours: no workspace name after your @, your face as its mark, and its work led by what its sidebar
  * keeps in sight (Routines, Drive), with Threads (no tab there) and Team (no row in Agents) in it.
  */
 export function MeScreen() {
@@ -342,7 +342,7 @@ export function MeScreen() {
               onPress={() => open("/me/notifications")}
             />
             {/* Who approves for me, and whom I approve for (ADR 0139); a personal workspace lists it in Settings ›
-                Advanced instead (ADR 0158 §3). */}
+                Advanced instead (ADR 0159 §3). */}
             {personal ? null : (
               <GroupedRow
                 key="approvals"

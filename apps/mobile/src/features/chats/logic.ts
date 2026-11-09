@@ -395,7 +395,7 @@ export const isQuietGeneral = (r: ConversationRow) =>
 
 /**
  * The rows without a quiet #general when `hide` (pure): a personal workspace while its person is the only member
- * leaves it out of the home and of its channels' "See all", as the web's sidebar does (ADR 0158). Every workspace has
+ * leaves it out of the home and of its channels' "See all", as the web's sidebar does (ADR 0159). Every workspace has
  * one; with family in it, or something new there, it shows.
  */
 export const withoutQuietGeneral = (rows: ConversationRow[], hide: boolean) =>

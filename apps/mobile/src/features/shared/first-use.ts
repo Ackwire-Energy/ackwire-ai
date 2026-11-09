@@ -5,7 +5,7 @@ export type EmptyPlace = keyof typeof featureKeysEn.empty;
 /**
  * The words of a place with nothing in it yet: what it gives and, when a person can't take the first step and the
  * place has words for them, a title they can use and who does it. The button is the screen's, shown only when `acts`.
- * A personal workspace (`personal`, ADR 0158) reads the place's words for one person where it has them (the sibling
+ * A personal workspace (`personal`, ADR 0159) reads the place's words for one person where it has them (the sibling
  * `titlePersonal`, `textPersonal`, `viewerTitlePersonal`, `viewerTextPersonal`), its usual ones otherwise.
  */
 export function firstUseCopy(place: EmptyPlace, acts: boolean, personal = false) {

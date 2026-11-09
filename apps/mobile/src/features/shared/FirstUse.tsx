@@ -54,7 +54,7 @@ export function FirstUse({
 }) {
   const { t } = useTranslation();
   const fallback = useEmptyLook();
-  // A personal workspace's places speak to one person (ADR 0158).
+  // A personal workspace's places speak to one person (ADR 0159).
   const copy = firstUseCopy(place, acts, isPersonal(useOrgMaybe()?.org));
   return (
     <EmptyState

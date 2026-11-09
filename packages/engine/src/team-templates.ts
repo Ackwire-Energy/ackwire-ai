@@ -28,7 +28,7 @@ import { isPersonalWorkspace } from "./workspace-mode";
  */
 export const BUSINESS_TEMPLATES = ["agency", "store", "clinic", "software", "support", "services"] as const;
 /**
- * A personal workspace's templates (ADR 0158): areas of one person's life, each a few agents that work in their DM with
+ * A personal workspace's templates (ADR 0159): areas of one person's life, each a few agents that work in their DM with
  * the person, so they make no channel.
  */
 export const PERSONAL_TEMPLATES = ["life", "health", "studies", "home", "travel", "freelance"] as const;
@@ -88,7 +88,7 @@ const MEMBERS: Record<Member, { name: string; look: AgentAppearance; cron: strin
     cron: "0 16 * * 5",
     skill: "answers",
   },
-  // A personal workspace's agents (ADR 0158): routines on one person's clock.
+  // A personal workspace's agents (ADR 0159): routines on one person's clock.
   clara: {
     name: "Clara",
     look: { color: "violet", eyes: "happy", accessory: "bow" },
@@ -198,7 +198,7 @@ async function blockedChannels(db: Database, orgId: string, userId: string, loca
 /**
  * The tool's input for a template, in `locale`, with a free handle for each agent (`iara-2` when Iara is taken) and a
  * usable channel name (`financeiro-2` when #financeiro is a private channel this person isn't in). A personal
- * template's agents get no channel: each lives in its DM with the person (ADR 0158).
+ * template's agents get no channel: each lives in its DM with the person (ADR 0159).
  */
 function templateInput(
   id: TeamTemplateId,
@@ -249,7 +249,7 @@ function templateInput(
       agents: members.filter((m) => MEMBERS[m].skill === k).map((m) => handles.get(m)),
     })),
     approvals: t(personal ? "teamTemplates.approvalsPersonal" : "teamTemplates.approvals"),
-    // The right hand's weekly check reports on a team's work: one person's agents don't need it (ADR 0158).
+    // The right hand's weekly check reports on a team's work: one person's agents don't need it (ADR 0159).
     weekly_check: !personal,
     template: id,
     ...(held ? { example: t(`teamTemplates.example.${members[0]}`) } : {}),
@@ -266,7 +266,7 @@ async function orgName(db: Database, orgId: string) {
 
 /**
  * The gallery (`GET …/team-templates`), for who may create agents, read in the person's language and time zone: a
- * personal workspace's templates there (ADR 0158), the business ones anywhere else.
+ * personal workspace's templates there (ADR 0159), the business ones anywhere else.
  */
 export async function listTeamTemplates(
   deps: { db: Database; context?: ContextDeps },

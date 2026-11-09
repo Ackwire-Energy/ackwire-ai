@@ -52,7 +52,7 @@ const TRAIT_ICON = {
 } as const;
 
 /**
- * A trait's words. What leaves a personal workspace (ADR 0158) leaves its person's workspace, not a company: the one
+ * A trait's words. What leaves a personal workspace (ADR 0159) leaves its person's workspace, not a company: the one
  * trait with a personal sibling.
  */
 export const traitKey = (trait: keyof typeof TRAIT_ICON, personal: boolean) =>

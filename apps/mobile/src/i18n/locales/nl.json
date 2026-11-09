@@ -47,7 +47,7 @@
       "now": "Nu op {{host}}",
       "invalid": "Controleer het adres, iets als agentes.jouwteam.ts.net.",
       "unreachable": "We kunnen {{host}} niet bereiken. Controleer het adres en je verbinding en probeer het opnieuw.",
-      "unreachableTailscale": "We kunnen {{host}} niet bereiken. Het draait op Tailscale: open de Tailscale-app, maak verbinding en probeer het opnieuw.",
+      "unreachableTailscale": "We kunnen {{host}} niet bereiken. Hij staat op Tailscale: open de Tailscale-app, maak verbinding en probeer het opnieuw. Al verbonden? De computer van de server slaapt misschien, of de app is gesloten.",
       "certificate": "Het certificaat van {{host}} is niet geldig. Neem contact op met wie de server beheert.",
       "notAgentes": "{{host}} is geen agentes.chat-server. Controleer het adres.",
       "serverTooOld": "{{host}} heeft een update nodig om met deze app te werken.",

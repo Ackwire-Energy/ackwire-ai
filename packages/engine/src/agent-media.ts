@@ -243,7 +243,7 @@ export interface AgentMediaInput {
   conversation: { from: string; kind: "person" | "agent"; text: string; media?: MessageMedia["kind"] }[];
   /** The agent's reply, as it wrote it. */
   reply: string;
-  /** A personal workspace (ADR 0158): one person, maybe their family, and their agents; not a team. */
+  /** A personal workspace (ADR 0159): one person, maybe their family, and their agents; not a team. */
   personal?: boolean;
 }
 
@@ -287,7 +287,7 @@ export const FITS_QUESTION: JudgeQuestion = {
   },
 };
 
-/** The same in a personal workspace (ADR 0158): one of a person's own agents, not a teammate. */
+/** The same in a personal workspace (ADR 0159): one of a person's own agents, not a teammate. */
 export const FITS_QUESTION_PERSONAL: JudgeQuestion = {
   ...FITS_QUESTION,
   instructions:
@@ -327,7 +327,7 @@ export const GIF_CRITERIA = {
 export function agentMediaQuestions(options: {
   gif: boolean;
   reversed?: boolean;
-  /** A personal workspace (ADR 0158). */
+  /** A personal workspace (ADR 0159). */
   personal?: boolean;
 }): Record<string, JudgeQuestion> {
   const ordered = (criteria: Record<string, string>) =>

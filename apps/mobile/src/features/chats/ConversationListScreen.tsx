@@ -24,7 +24,7 @@ const LIVE_ROWS = 8;
 /**
  * Every conversation of one kind, pushed from a section's "Ver todos" on Conversas (agents, channels,
  * people), by latest activity, in Conversas' rows (an agent's says it waits on you, or what it is doing). A personal
- * workspace (ADR 0158) titles its channels as group conversations and, as on the home, leaves a quiet #general out
+ * workspace (ADR 0159) titles its channels as group conversations and, as on the home, leaves a quiet #general out
  * while its person is alone in it.
  */
 export function ConversationListScreen({ kind, categoryId }: { kind: ListKind; categoryId?: string }) {

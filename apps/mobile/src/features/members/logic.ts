@@ -169,7 +169,7 @@ export const sentWords = (emails: boolean) =>
 
 /**
  * The role an address joins with, in Invite people's words: its name, or Member with none. A personal workspace says
- * its two plain choices instead (ADR 0158 §4, `personalRoleKey`): "Uses the agents" for none (or a role no longer
+ * its two plain choices instead (ADR 0159 §4, `personalRoleKey`): "Uses the agents" for none (or a role no longer
  * there) and "Helps you run it" for its helper role; any other role still by its name. Only the words: the same role.
  */
 export function joinRoleWord(t: TFunction, roles: readonly OrgRole[], roleId: string | null, personal: boolean) {

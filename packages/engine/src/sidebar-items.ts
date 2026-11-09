@@ -10,7 +10,7 @@ const { organizationMembers } = schema;
  * (`organization_members.sidebar_items`): `always` in the list, `more` only in the More menu, `auto` in the list
  * while its count is above zero and in More otherwise. An item they never moved keeps the app's default for the
  * workspace's mode (`SIDEBAR_DEFAULTS` and `PERSONAL_SIDEBAR_DEFAULTS`, packages/client/src/lib/sidebar-items.ts,
- * which mirrors these lists): only choices are stored here, so a workspace that changes mode (ADR 0158) shows the new
+ * which mirrors these lists): only choices are stored here, so a workspace that changes mode (ADR 0159) shows the new
  * defaults for every tool nobody moved.
  */
 export const SIDEBAR_ITEMS = [
@@ -28,7 +28,7 @@ export const SIDEBAR_ITEMS = [
 ] as const;
 export type SidebarItem = (typeof SIDEBAR_ITEMS)[number];
 /**
- * The tools' default order in a personal workspace (ADR 0158): what waits for the person first, then Routines and
+ * The tools' default order in a personal workspace (ADR 0159): what waits for the person first, then Routines and
  * Drive, then what starts in More. Mirrors `PERSONAL_SIDEBAR_ITEMS` in packages/client/src/lib/sidebar-items.ts.
  */
 export const PERSONAL_SIDEBAR_ITEMS: readonly SidebarItem[] = [
@@ -138,7 +138,7 @@ export async function setMySidebarItems(
 export const SIDEBAR_SECTIONS = ["tools", "channels", "agents", "people"] as const;
 export type SidebarSection = (typeof SIDEBAR_SECTIONS)[number];
 /**
- * The default order in a personal workspace (ADR 0158): the agents before the group conversations. Mirrors
+ * The default order in a personal workspace (ADR 0159): the agents before the group conversations. Mirrors
  * `PERSONAL_SIDEBAR_SECTIONS` in packages/client/src/lib/sidebar-items.ts.
  */
 export const PERSONAL_SIDEBAR_SECTIONS: readonly SidebarSection[] = ["tools", "agents", "channels", "people"];

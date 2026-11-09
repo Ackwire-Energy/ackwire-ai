@@ -10,7 +10,7 @@ const deepOf = (color: AgentColor) => agentGradient(color)[1];
 /**
  * How this conversation looks to me (`chatLookOf`). A thread opened inside a DM is that DM's: it keeps its bubbles'
  * color from the view around it. My bubbles take the color of the agent I talk to, and the workspace's sky elsewhere.
- * In a personal workspace every conversation opens in bubbles (ADR 0158) until I choose otherwise.
+ * In a personal workspace every conversation opens in bubbles (ADR 0159) until I choose otherwise.
  */
 export function useConversationLook(dm: boolean, agentColor?: AgentColor) {
   const { org } = useOrg();

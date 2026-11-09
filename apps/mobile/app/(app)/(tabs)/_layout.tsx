@@ -14,7 +14,7 @@ import { tabGlyphFamily } from "@/ui/tabIcons";
 
 const TABS: { name: string; glyph: TabGlyph; label: string; role?: "search"; teamOnly?: true }[] = [
   { name: "(chats)", glyph: "chats", label: "mobile.tabs.chats" },
-  // A conversation that branches is rare for one person: a personal workspace (ADR 0158) opens Threads from You › Work.
+  // A conversation that branches is rare for one person: a personal workspace (ADR 0159) opens Threads from You › Work.
   { name: "threads", glyph: "threads", label: "mobile.tabs.threads", teamOnly: true },
   { name: "agents", glyph: "agents", label: "mobile.tabs.agents" },
   { name: "activity", glyph: "activity", label: "mobile.tabs.activity" },
@@ -27,7 +27,7 @@ const TABS: { name: string; glyph: TabGlyph; label: string; role?: "search"; tea
  * (UITabBarController on iOS, Liquid Glass on iOS 26; Material bottom navigation on Android). Our own glyphs on both platforms (outline, filled when
  * selected), drawn as template images the bar tints. Badges for unread conversations (Conversas: channels
  * and DMs; Threads: its rows, never both) and what waits on you. Every tab holds a stack with a native header. A
- * personal workspace (ADR 0158) leaves Threads out of the bar (`hidden`, the system bar's own way: changing it redraws
+ * personal workspace (ADR 0159) leaves Threads out of the bar (`hidden`, the system bar's own way: changing it redraws
  * the tabs from Conversas); its row in You › Work opens the same list, pushed.
  */
 export default function TabsLayout() {

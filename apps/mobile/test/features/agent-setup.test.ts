@@ -59,7 +59,7 @@ test("each step but thinking is a pushed screen, registered in the stack; thinki
   expect(steps).toContain("goBack();");
 });
 
-test("alone in a personal workspace, nothing asks who else talks to an agent (ADR 0158)", () => {
+test("alone in a personal workspace, nothing asks who else talks to an agent (ADR 0159)", () => {
   const steps = ["ai", "apps", "where", "who", "how"] as const;
   // Alone: everyone and only its owner are both just the person, so "who" leaves the card.
   expect(setupStepsInSight(steps, { mode: "everyone" }, true)).toEqual(["ai", "apps", "where", "how"]);
@@ -86,6 +86,7 @@ test("a personal workspace's rows and screens read its own words, the same choic
   // Who talks to it: plain words, and a family picks people; its roles only when one is picked or exists beyond the
   // base and admin ones.
   expect(steps).toContain("rolePicksInSight(org, roles.data?.roles ?? [], audience.roleIds ?? [])");
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: the screen's own template, read as source text
   expect(steps).toContain("t(modeKey(org, `audience.mode.${mode}`))");
   const en = await translator("en");
   expect(en("audience.mode.everyonePersonal")).toBe("Everyone here");

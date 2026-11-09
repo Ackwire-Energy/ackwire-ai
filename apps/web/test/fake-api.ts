@@ -1286,7 +1286,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
   };
   // Budgets like the backend: every agent has one (its own or the default); members see only percentages.
   const seesCost = () => state.me?.organizations[0]?.role !== "member";
-  // A personal workspace (ADR 0158), as `me` says.
+  // A personal workspace (ADR 0159), as `me` says.
   const personalOrg = (orgId: string) => state.me?.organizations.find((o) => o.id === orgId)?.mode === "personal";
   // A new `me` with the org's logo changed, as the server answers: what the app read before stays as it was.
   const setOrgLogo = (orgId: string, logo: string | null) => {
@@ -1533,7 +1533,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           name: input.name,
           role: "owner",
           onboarding: { step: "context", generalChannelId: general },
-          // Who it is for (ADR 0158), as the server keeps it.
+          // Who it is for (ADR 0159), as the server keeps it.
           ...(input.mode ? { mode: input.mode } : {}),
         });
         state.channels.push({
@@ -1674,7 +1674,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         state.sidebarItems = structuredClone(items);
         return structuredClone(items);
       },
-      // As the server: an order never saved is the default of the workspace's mode (ADR 0158).
+      // As the server: an order never saved is the default of the workspace's mode (ADR 0159).
       sidebarOrder: async (orgId) => [...(state.sidebarOrder ?? sidebarSections(personalOrg(orgId)))],
       setSidebarOrder: async (orgId, order) => {
         log("orgs.setSidebarOrder", orgId, order);
@@ -1759,6 +1759,13 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         state.members = state.members.filter((m) => m.userId !== userId);
         for (const a of state.agents) if (a.ownerUserId === userId) a.ownerUserId = state.me?.user.id ?? null;
       },
+      passwordLink: async (orgId, userId) => {
+        log("orgs.passwordLink", orgId, userId);
+        return {
+          url: `https://agentes.example.com/reset-password?token=link-for-${userId}`,
+          expiresAt: new Date(Date.now() + 3600_000).toISOString(),
+        };
+      },
       invitations: async () => structuredClone(state.invitations),
       invite: async (orgId, input) => {
         log("orgs.invite", orgId, input);
@@ -1802,7 +1809,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       }),
       updateSettings: async (orgId, input) => {
         log("orgs.updateSettings", orgId, input);
-        // A switch of mode (ADR 0158), with the name it may bring: `me` says them at once, as the server's.
+        // A switch of mode (ADR 0159), with the name it may bring: `me` says them at once, as the server's.
         const { mode, name } = input;
         if (mode !== undefined && state.me) {
           const named = name ? { name } : {};

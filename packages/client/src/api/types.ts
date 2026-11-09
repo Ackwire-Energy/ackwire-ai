@@ -258,13 +258,13 @@ export interface OrgSummary {
   /** How conversations look to me here: only what I chose (`chatLookOf`); absent from an older server. */
   chatPrefs?: ChatPrefs;
   /**
-   * Who the workspace is for (ADR 0158): `team` or `personal`. Read it with `isPersonal` (lib/workspace-mode); absent
+   * Who the workspace is for (ADR 0159): `team` or `personal`. Read it with `isPersonal` (lib/workspace-mode); absent
    * from an older server, which is a team's.
    */
   mode?: WorkspaceMode;
 }
 
-/** Who a workspace is for (ADR 0158): the server's `WORKSPACE_MODES`. */
+/** Who a workspace is for (ADR 0159): the server's `WORKSPACE_MODES`. */
 export const WORKSPACE_MODES = ["team", "personal"] as const;
 export type WorkspaceMode = (typeof WORKSPACE_MODES)[number];
 
@@ -434,7 +434,7 @@ export interface InvitationPreview {
   /** Who invited (their name), when known. */
   invitedBy?: string | null;
   /**
-   * Who the workspace is for (ADR 0158): a personal one's page speaks of the person who invited, not of a team or of
+   * Who the workspace is for (ADR 0159): a personal one's page speaks of the person who invited, not of a team or of
    * its name. Absent from an older server and on one that no longer works: a team's words.
    */
   mode?: WorkspaceMode;
@@ -911,7 +911,7 @@ export interface TeamAgentDraft {
   line: string;
   instructions: string;
   appearance: Required<AgentLookInput> | null;
-  /** The channel it lives in, by name; empty: it lives in its DM with the person (a personal template, ADR 0158). */
+  /** The channel it lives in, by name; empty: it lives in its DM with the person (a personal template, ADR 0159). */
   channel: string;
   routines: ProposedRoutine[];
   firstTask: string | null;
@@ -2227,7 +2227,7 @@ export interface OrgSettings {
   gifsAvailable: boolean;
   /** Read only: this server can decide when agents send one (agents send none on their own without it). */
   agentMediaAvailable: boolean;
-  /** Who the workspace is for (ADR 0158); absent from an older server, which is a team's. */
+  /** Who the workspace is for (ADR 0159); absent from an older server, which is a team's. */
   mode?: WorkspaceMode;
 }
 

@@ -84,7 +84,7 @@ export type EmailTemplate =
       role: string;
       /** The inviter's words (ADR 0090), made inert in the body. */
       note?: string | null;
-      /** A personal workspace's email (ADR 0158), stamped when queued (`modeStamp`); absent: a team's. */
+      /** A personal workspace's email (ADR 0159), stamped when queued (`modeStamp`); absent: a team's. */
       personal?: true;
     }
   | { kind: "password_reset"; locale?: EmailLocale; url: string }
@@ -158,7 +158,7 @@ export type EmailTemplate =
       orgName?: string;
       support: string | null;
       url: string;
-      /** With `orgName`: a personal workspace's (ADR 0158). */
+      /** With `orgName`: a personal workspace's (ADR 0159). */
       personal?: true;
     }
   /**
@@ -398,7 +398,7 @@ const JOIN_NAME_SHOWN = 60;
 const JOIN_REASON_SHOWN = 300;
 
 /**
- * The template's stamp for a personal workspace (ADR 0158), spread into it where it is queued: the mode it had then
+ * The template's stamp for a personal workspace (ADR 0159), spread into it where it is queued: the mode it had then
  * decides the words, since a job may run after the workspace is gone (or queued with no `orgId`). Only the words
  * change: the same emails go to the same people at the same moments.
  */

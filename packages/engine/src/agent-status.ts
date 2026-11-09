@@ -881,7 +881,7 @@ export function createSetStatusToolSource(deps: { pubsub?: PubSub } = {}): ToolS
       return { content: text ? "Status set." : "Status cleared." };
     },
   };
-  // A personal workspace (ADR 0158): the person sees the line, not a team.
+  // A personal workspace (ADR 0159): the person sees the line, not a team.
   return {
     name: "status",
     tools: async (ctx) =>

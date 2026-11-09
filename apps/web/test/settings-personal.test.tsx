@@ -8,7 +8,7 @@ import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADMIN_ROLE_ID, ATLAS_ID, createFakeApi, ORG_ID, seedRoles, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
-/* Settings in a personal workspace (ADR 0158 §3, §4): one short list and Advanced, About you with the Mode row, the
+/* Settings in a personal workspace (ADR 0159 §3, §4): one short list and Advanced, About you with the Mode row, the
    switch both ways, and the question inviting asks. Only the view changes: every section still opens. */
 
 afterEach(() => cleanup());
@@ -81,7 +81,7 @@ describe("a personal workspace's settings list", () => {
     await click(within(nav()).getByRole("button", { name: "Avançado" }));
     expect(within(nav()).getByRole("button", { name: "Avançado" }).getAttribute("aria-expanded")).toBe("true");
     const all = rows();
-    for (const name of ["Notificações", "Membros e convites", "Papéis e permissões", "Auditoria", "Armazenamento"])
+    for (const name of ["Notificações", "Pessoas", "Papéis e permissões", "Auditoria", "Armazenamento"])
       expect(all).toContain(name);
     expect(all).not.toContain("Conectores e MCPs");
     expect(all).not.toContain("Skills");
@@ -254,7 +254,11 @@ describe("inviting in a personal workspace", () => {
   test("another role comes after the two by its name; the agents that answer everyone are named; Admin is sent", async () => {
     const state = personal();
     const [admin, everyone] = seedRoles() as [OrgRole, OrgRole];
-    state.roles = [admin, { ...admin, id: "role-kids", name: "Crianças", permissions: ["post"], position: 1 }, everyone];
+    state.roles = [
+      admin,
+      { ...admin, id: "role-kids", name: "Crianças", permissions: ["post"], position: 1 },
+      everyone,
+    ];
     const atlas = state.agents.find((a) => a.id === ATLAS_ID);
     if (atlas) atlas.audience = { mode: "owner", userIds: [] };
     await go(state, "settings/members");

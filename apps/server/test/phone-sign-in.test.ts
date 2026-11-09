@@ -97,6 +97,20 @@ describe("one-time sign-in for the phone", () => {
     t = await createTestServer();
     expect((await trade("not-a-real-code")).status).toBe(401);
   });
+
+  test("a computer's own server at its own address: no code, since no phone could open it", async () => {
+    t = await createTestServer({ env: { INSTALL_MODE: "desktop" } });
+    const web = browser(t);
+    await signUp(web, "ana@example.com");
+    const res = await web("/api/app/phone-sign-in", { json: {} });
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe("phone.local_only");
+    const stored = await t.db
+      .select()
+      .from(schema.verifications)
+      .where(like(schema.verifications.identifier, "phone-sign-in:%"));
+    expect(stored).toHaveLength(0);
+  });
 });
 
 describe("GET /api/instance", () => {

@@ -350,7 +350,7 @@ function AboutDialog({ context, typed, onClose, onSaved }: AboutProps) {
 }
 
 /**
- * A personal workspace's row 1 (ADR 0158): the areas of life the person wants help with, several at once, and one
+ * A personal workspace's row 1 (ADR 0159): the areas of life the person wants help with, several at once, and one
  * optional sentence about them; saved as the workspace's context (`aboutYouContext`), which every agent reads, and
  * read back into the same answers when opened again. "Something else" asks for the sentence.
  */

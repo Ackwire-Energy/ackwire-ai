@@ -88,7 +88,7 @@ export const ConversationRowView = memo(function ConversationRowView({
   const agentDm = r.kind === "dm" && r.with.type === "agent";
   /**
    * A DM with nothing in it yet: who the agent is (as its first conversation says), or a word to start. A personal
-   * workspace's agent is there for its person, not on a team (ADR 0158).
+   * workspace's agent is there for its person, not on a team (ADR 0159).
    */
   const introLine = (): string => {
     if (r.kind !== "dm") return "";

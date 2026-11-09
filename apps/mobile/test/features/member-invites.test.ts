@@ -237,7 +237,7 @@ describe("Convidar pessoas (ADR 0090 §5)", () => {
   });
 });
 
-describe("Invite people in a personal workspace (ADR 0158 §4)", () => {
+describe("Invite people in a personal workspace (ADR 0159 §4)", () => {
   const src = (file: string) =>
     readFileSync(join(import.meta.dir, "..", "..", "src", "features", "members", file), "utf8");
 

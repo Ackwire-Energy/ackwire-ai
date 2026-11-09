@@ -62,28 +62,34 @@ const origin = (ctx: ToolContext) => ({
 /** Posting where the run already is: a reply. */
 const SAME_CONVERSATION = "That is this conversation: just reply.";
 
-/** `post_message`'s GIF, listed only when the agent may send one (`AgentGifPoster.offered`), never to background work. */
+/** `post_message`'s GIF, listed only when the agent may send one (`AgentGifPoster.offered`). */
 const GIF_PROPERTY = {
   type: "string",
   maxLength: 100,
   description: 'What the GIF shows, in English, 1 to 6 words (e.g. "good night moon cat").',
 } as const;
 const GIF_HELP =
-  ' When someone asks for a GIF there, add one with `gif`: what it shows as a short search in English (e.g. "good night moon"), whatever language the conversation is in. It goes in the same message, with the text or alone.';
+  ' When someone (or the routine you run) asks for a GIF there, add one with `gif`: what it shows as a short search in English (e.g. "good night moon"), whatever language the conversation is in. It goes in the same message, with the text or alone. Never post a link to a GIF site instead.';
 
 /**
- * The GIF `post_message` posts for `search` in `channelId`, or what to tell the model when none goes: only for a
- * person's request (a routine sends none, as with `send_gif`), with GIFs on for the agent, found the way `send_gif`
- * finds one. Looked up before anything is posted or copied, so a failed search leaves nothing behind.
+ * The GIF `post_message` posts for `search` in `channelId`, or what to tell the model when none goes: for a person's
+ * request or a routine whose creator is still there (`routine`: its creator asked for its posts, ADR 0091 addendum
+ * 2026-11-09), never for a run nobody asked for, with GIFs on for the agent, found the way `send_gif` finds one.
+ * Looked up before anything is posted or copied, so a failed search leaves nothing behind.
  */
 async function gifToPost(
   poster: AgentGifPoster | undefined,
   ctx: ToolContext,
-  input: { search: unknown; requester: string | null; channelId: string },
+  input: { search: unknown; requester: string | null; routine: boolean; channelId: string },
 ): Promise<{ gif: GifMedia } | { error: string }> {
-  if (!input.requester || ctx.background) return { error: "Only a person's request posts a GIF: post the text alone." };
+  if (!input.requester && !input.routine) {
+    return { error: "Only a person's request or a routine posts a GIF: post the text alone." };
+  }
   const found = poster
-    ? await poster.find(ctx, input.search, `${ctx.runId}:${input.channelId}`)
+    ? await poster.find(ctx, input.search, `${ctx.runId}:${input.channelId}`, {
+        channelId: input.channelId,
+        threadId: null,
+      })
     : { none: "off" as const };
   if ("gif" in found) return found;
   switch (found.none) {
@@ -139,7 +145,7 @@ export async function findMember(
 /** What `send_dm` does, as the model reads it. */
 const SEND_DM_DESCRIPTION =
   'Send a direct message to a person in the organization, e.g. "avisa a Ana na DM". `person` is their name, @handle or email. It goes in your DM with them (they get a notification); say in the text who asked and why, in their language, unless they asked in a DM: then only what they told you to say. Attach files (a video, a PDF, an image, a document) with `artifact_ids`: from list_artifacts, files you made, or files attached in this conversation; a file from another DM goes as a copy. Never send only a file\'s name when the person should get the file. Only when someone asked you. If several people match, ask which one. Then reply here saying you sent it.';
-/** `send_dm` as a personal workspace's agents read it (ADR 0158): the people here are the person and their family. */
+/** `send_dm` as a personal workspace's agents read it (ADR 0159): the people here are the person and their family. */
 const SEND_DM_PERSONAL = {
   [SEND_DM_TOOL]: SEND_DM_DESCRIPTION.replace(
     "Send a direct message to a person in the organization,",
@@ -155,8 +161,8 @@ const SEND_DM_PERSONAL = {
  * the way `share_artifact` does it (the same file when it's visible there, a
  * copy from a DM or a private channel the person is in). The post is an
  * agent message like any reply (same run and hop, so mentions follow the hop
- * limit). Audited. With `gif` (listed when the agent may send GIFs, called for a person), the same message carries
- * a GIF, drawn under its text by the apps (ADR 0091 addendum 2026-11-05).
+ * limit). Audited. With `gif` (listed when the agent may send GIFs, called for a person or a routine), the same
+ * message carries a GIF, drawn under its text by the apps (ADR 0091 addenda 2026-11-05 and 2026-11-09).
  */
 export function createChatToolSource(deps: {
   pubsub?: PubSub;
@@ -259,7 +265,12 @@ export function createChatToolSource(deps: {
           }
           let gif: GifMedia | null = null;
           if (gifAsked) {
-            const found = await gifToPost(deps.gif, ctx, { search: input.gif, requester, channelId: channel.id });
+            const found = await gifToPost(deps.gif, ctx, {
+              search: input.gif,
+              requester,
+              routine: routine !== null,
+              channelId: channel.id,
+            });
             if ("error" in found) return { content: found.error, isError: true };
             gif = found.gif;
           }
@@ -478,7 +489,7 @@ export function createChatToolSource(deps: {
     },
   ];
   const [postMessage, ...others] = tools as [ToolDefinition, ...ToolDefinition[]];
-  // The same tool with `gif` where the agent may send one for a person; the call checks again.
+  // The same tool with `gif` where the agent may send one (for a person or a routine); the call checks again.
   const postWithGif: ToolDefinition = {
     ...postMessage,
     description: `${postMessage.description}${GIF_HELP}`,
@@ -490,13 +501,12 @@ export function createChatToolSource(deps: {
   return {
     name: "chat",
     tools: async (ctx) => {
-      const gif = !ctx.background && ctx.runId && deps.gif ? await deps.gif.offered(ctx) : false;
-      // A personal workspace (ADR 0158): the people here are the person and maybe their family.
+      const gif = ctx.runId && deps.gif ? await deps.gif.offered(ctx) : false;
+      // A personal workspace (ADR 0159): the people here are the person and maybe their family.
       return inWorkspaceWords(ctx.db, ctx.orgId, [gif ? postWithGif : postMessage, ...others], SEND_DM_PERSONAL);
     },
   };
 }
-
 
 /** How many of the conversation's latest messages `to` looks through for its author's. */
 const REACT_LOOKBACK = 50;

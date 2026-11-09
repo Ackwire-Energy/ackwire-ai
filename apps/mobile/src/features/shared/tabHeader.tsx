@@ -18,7 +18,7 @@ const RING = 2;
 
 /**
  * Your name and photo as the directory has them (as Você shows them): `me` comes from the session, which the server
- * caches for minutes, so a new photo only reached the bar later. A personal workspace's mark (ADR 0158).
+ * caches for minutes, so a new photo only reached the bar later. A personal workspace's mark (ADR 0159).
  */
 export function useMyFace(): { name: string; photo: ReturnType<typeof usePersonPhoto> } {
   const me = useMe();
@@ -32,7 +32,7 @@ export function useMyFace(): { name: string; photo: ReturnType<typeof usePersonP
 /**
  * The bar of the three tabs: on the left the workspace you are in (its logo, your photo small on its corner)
  * opens Você; "+" on the right pushes "New" (start a conversation or create something), in the native bar. A personal
- * workspace (ADR 0158) is yours: your photo alone, at the logo's size, and the label names only Você.
+ * workspace (ADR 0159) is yours: your photo alone, at the logo's size, and the label names only Você.
  */
 export function useTabHeader(): { left: ReactNode; actions: HeaderAction[] } {
   const { t } = useTranslation();

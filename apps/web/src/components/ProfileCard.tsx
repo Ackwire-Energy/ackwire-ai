@@ -327,7 +327,7 @@ function PersonCard({ userId, onDone }: { userId: string; onDone: () => void }) 
   const roleIds = person?.roleIds ?? member?.roleIds ?? [];
   const held = rolesOf({ roleIds }, roles);
   const gives = can(org, "manage_members") && (!owner || org.role === "owner") && roles.some((r) => r.givable);
-  // A personal workspace's owner learns nothing from their own roles (ADR 0158): their card leaves them out; anyone
+  // A personal workspace's owner learns nothing from their own roles (ADR 0159): their card leaves them out; anyone
   // else's keeps them, and the "+" to give one.
   const ownRoles = isPersonal(org) && owner && userId === me.user.id;
   const setTo = (next: string[]) =>

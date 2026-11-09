@@ -445,7 +445,7 @@ export function applyWorkspaceEvent(qc: QueryClient, orgId: string, event: { typ
     return true;
   }
   if (event.type === "org.mode") {
-    // The workspace became personal or a team's (ADR 0158): its shape follows at once, in every member's apps.
+    // The workspace became personal or a team's (ADR 0159): its shape follows at once, in every member's apps.
     const e = event as { orgId?: unknown; mode?: unknown };
     const target = typeof e.orgId === "string" ? e.orgId : orgId;
     if (isWorkspaceMode(e.mode)) {

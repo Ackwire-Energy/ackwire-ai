@@ -525,6 +525,18 @@
       "wrongLinkLead": "Ouvrez le lien propriétaire le plus récent créé pour ce serveur.",
       "taken": "Ce serveur a déjà son propriétaire.",
       "takenLead": "Connectez-vous avec votre compte."
+    },
+    "server": {
+      "into": "Connexion à <b>{{server}}</b>",
+      "intoHere": "Connexion à l’agentes.chat <b>de ce {{device}}</b>"
+    },
+    "forgotHere": {
+      "ownerTitle": "Ici, pas besoin de mot de passe.",
+      "ownerLead": "Vous avez installé agentes.chat sur ce {{device}}. Entrez par ici, puis créez un nouveau mot de passe.",
+      "notOwner": "Ce n’est pas le compte de la personne qui l’a installé ? Demandez à un propriétaire de votre workspace un lien de nouveau mot de passe.",
+      "title": "Ce serveur n’envoie pas d’e-mails.",
+      "lead": "Demandez à un propriétaire de votre workspace un lien de nouveau mot de passe. Il le crée dans Membres, et le lien est valable 1 heure.",
+      "back": "Retour au mot de passe"
     }
   },
   "invite": {
@@ -1460,7 +1472,7 @@
     "createdOn": "Créé le {{date}}",
     "newWorkspace": "Nouvel espace de travail",
     "addWorkspace": "Ajouter un espace de travail",
-    "addWorkspaceHint": "Un nouveau sur agentes.chat, ou le serveur de votre équipe",
+    "addWorkspaceHint": "Rejoindre un workspace existant, en créer un ou utiliser le serveur de votre équipe",
     "yourServer": "Votre serveur",
     "wiki": "Wiki",
     "settings": "Paramètres",
@@ -1548,7 +1560,17 @@
     "unreadThreads_other": "Fils : {{count}} avec des réponses non lues",
     "unreadNotifications_one": "{{count}} notification non lue",
     "unreadNotifications_many": "{{count}} notifications non lues",
-    "unreadNotifications_other": "{{count}} notifications non lues"
+    "unreadNotifications_other": "{{count}} notifications non lues",
+    "newPassword": "Créer un nouveau mot de passe",
+    "newPasswordHint": "Vos autres sessions se ferment, et les apps d’IA connectées avec l’ancien mot de passe doivent être reconnectées.",
+    "newPasswordRow": "Pour changer le mot de passe que vous utilisez dans d’autres navigateurs et appareils",
+    "newPasswordSaved": "Nouveau mot de passe enregistré.",
+    "newPasswordReauth": "Reconnectez-vous pour créer un nouveau mot de passe.",
+    "serverHere": "L’agentes.chat de ce {{device}}",
+    "serverStopped": "arrêté",
+    "serverOffline": "hors ligne depuis {{time}}",
+    "serverSignedOut": "non connecté",
+    "serverSignIn": "Se connecter"
   },
   "agentGroups": {
     "group": "Service",
@@ -1620,11 +1642,13 @@
     "qr": "QR code pour vous connecter à l'app agentes",
     "making": "Création du code…",
     "stepApp": "Installez l'app agentes sur votre téléphone (App Store ou Google Play).",
-    "stepTailscale": "Installez Tailscale sur votre téléphone et rejoignez le réseau de ce serveur (tailnet).",
+    "stepTailscale": "Installez Tailscale sur votre téléphone et connectez-vous avec le même compte Tailscale que ce serveur.",
     "stepScan": "Pointez l'appareil photo de votre téléphone vers le code.",
     "validFor": "Valable {{time}}",
     "private": "Toute personne qui scanne ce code se connecte en tant que vous.",
-    "failed": "Impossible de créer le code."
+    "failed": "Impossible de créer le code.",
+    "localOnly": "Ce serveur ne s'ouvre que sur l'ordinateur où il tourne, donc votre téléphone ne peut pas le joindre.",
+    "localOnlyHow": "Dans l'app agentes.chat de cet ordinateur, activez Y accéder depuis votre téléphone et vos collègues dans Préférences › Serveurs. Puis revenez ici."
   },
   "team": {
     "title": "Équipe",
@@ -6369,7 +6393,17 @@
     "ownerLine": "Responsable : {{name}}",
     "noOwner": "Aucun responsable",
     "budgetLine": "{{percent}} du budget de {{month}}",
-    "noAgents": "Pas encore d'agents."
+    "noAgents": "Pas encore d'agents.",
+    "moreOf": "Plus pour {{name}}",
+    "passwordLink": {
+      "item": "Créer un lien de nouveau mot de passe",
+      "hint": "Quand la personne a oublié son mot de passe",
+      "title": "Lien de nouveau mot de passe pour {{name}}",
+      "lead": "Il fonctionne une fois, pendant 1 heure. Envoyez-le là où vous discutez.",
+      "label": "Lien",
+      "making": "Création du lien…",
+      "copy": "Copier le lien"
+    }
   },
   "empty": {
     "thread": {
@@ -12903,6 +12937,11 @@
         "invalidInput": "Vérifiez les champs et réessayez.",
         "tooManyItems": "Le Vault est plein. Supprimez des éléments avant d'en synchroniser plus."
       }
+    },
+    "passwordLink": {
+      "email": "Ce serveur envoie des e-mails : la personne demande son propre lien dans Mot de passe oublié.",
+      "serverOwner": "La personne qui a installé ce serveur se connecte sur l’ordinateur où il tourne, sans lien.",
+      "otherWorkspace": "Cette personne est aussi dans un workspace qui n’est pas le vôtre : seuls les propriétaires de tous peuvent créer le lien."
     }
   },
   "machines": {
@@ -13549,7 +13588,8 @@
       "member": {
         "joined": "A rejoint l'espace de travail",
         "left": "A quitté l'espace de travail",
-        "role_changed": "A changé le rôle d'un membre"
+        "role_changed": "A changé le rôle d'un membre",
+        "password_link": "A créé un lien de nouveau mot de passe pour un membre"
       },
       "apps": {
         "connected": "A connecté {{app}}",

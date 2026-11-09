@@ -87,7 +87,7 @@ const InviteContext = createContext<{
   open: (request?: InviteRequest) => void;
   /**
    * Before something that invites without the dialog (Members' "Copy invitation link"): in a personal workspace, the
-   * question of who is invited first (ADR 0158 §4); in a team's, `then` at once.
+   * question of who is invited first (ADR 0159 §4); in a team's, `then` at once.
    */
   ask: (then: () => void) => void;
 } | null>(null);
@@ -180,7 +180,7 @@ const hostOf = (agents: readonly Agent[]) =>
 function InviteDialog({ request, open, onClose }: { request: InviteRequest; open: boolean; onClose: () => void }) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
-  // A personal workspace's view (ADR 0158): its own words, two plain roles, and no question with only one answer.
+  // A personal workspace's view (ADR 0159): its own words, two plain roles, and no question with only one answer.
   const personal = isPersonal(org);
   const toast = useToast();
   const api = useApi();
@@ -885,7 +885,7 @@ function RoleSeal({ role }: { role: OrgRole | null }) {
 const REACH_NAMED = 4;
 
 /**
- * Which agents will answer whoever joins a personal workspace (ADR 0158 §4): the ones every member may talk to,
+ * Which agents will answer whoever joins a personal workspace (ADR 0159 §4): the ones every member may talk to,
  * besides the right hand, each name a way to its "Who can talk" to change it. Read only: nothing here changes an
  * agent. Nothing when none does.
  */

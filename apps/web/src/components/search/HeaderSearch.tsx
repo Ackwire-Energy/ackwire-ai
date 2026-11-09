@@ -68,7 +68,7 @@ export function HeaderSearch({ channelId, onOpen, dm }: { channelId: string; onO
       className="channel__search"
       inputRef={sheetBox ? undefined : input}
       autoFocus={sheetBox}
-      // A personal workspace's name ("Personal") says nothing here: its own words, without it (ADR 0158).
+      // A personal workspace's name ("Personal") says nothing here: its own words, without it (ADR 0159).
       placeholder={
         dm
           ? t(narrow ? "searchPage.label" : "searchPage.searchHere")

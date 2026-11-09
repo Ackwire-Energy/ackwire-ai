@@ -62,10 +62,12 @@ import {
   SwapLabel,
   Textarea,
 } from "@agenteschat/ui";
+import { useMutation } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useApi } from "@/api/context";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { usePlanHold } from "@/components/ai/ConnectAiSteps";
 import { usePersonMenu } from "@/components/entity-menus";
@@ -152,12 +154,16 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
   // `?request=…&do=approve|deny`: the admins' email opens that request here.
   const search = useSearch({ strict: false }) as { request?: string; do?: string };
   const filterCopy = useFilterCopy();
+  const authConfig = useAuthConfig();
+  // On a server that sends no email, an owner makes the link for a member who forgot their password (ADR 0158).
+  const makesPasswordLinks = org.role === "owner" && authConfig.data !== undefined && !authConfig.data.passwordReset;
+  const [passwordLinkFor, setPasswordLinkFor] = useState<{ userId: string; name: string } | null>(null);
   // The filter's values: `owner`, or a role's id.
   const people = allPeople.filter(
     (m) =>
       roles.length === 0 || roles.some((r) => (r === "owner" ? m.role === "owner" : (m.roleIds ?? []).includes(r))),
   );
-  // A personal workspace (ADR 0158): a few people need no filter by role, and its owner's own row leaves their roles
+  // A personal workspace (ADR 0159): a few people need no filter by role, and its owner's own row leaves their roles
   // out (they say nothing to them); everyone else's keep theirs, and the "+" to give one.
   const personal = isPersonal(org);
 
@@ -272,6 +278,29 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
                         }
                       />
                     )}
+                    {!isMe && makesPasswordLinks && (
+                      <Menu
+                        align="end"
+                        label={t("members.moreOf", { name: m.name })}
+                        trigger={
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            iconOnly
+                            icon="more"
+                            aria-label={t("members.moreOf", { name: m.name })}
+                          />
+                        }
+                      >
+                        <MenuItem
+                          icon="key"
+                          description={t("members.passwordLink.hint")}
+                          onSelect={() => setPasswordLinkFor({ userId: m.userId, name: m.name })}
+                        >
+                          {t("members.passwordLink.item")}
+                        </MenuItem>
+                      </Menu>
+                    )}
                   </span>
                   {!ownRoles && (
                     <span className="members-roles">
@@ -311,6 +340,7 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
               );
             })}
           </List>
+          <PasswordLinkDialog person={passwordLinkFor} onClose={() => setPasswordLinkFor(null)} />
         </section>
 
         <section aria-labelledby="sec-agents" className="section section--tight">
@@ -380,8 +410,72 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
 }
 
 /**
+ * Members › the person › "Make a new-password link" (ADR 0158): made when it opens, shown to copy and send where the
+ * team talks. It works once, for an hour; making another ends this one.
+ */
+function PasswordLinkDialog({
+  person,
+  onClose,
+}: {
+  person: { userId: string; name: string } | null;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const api = useApi();
+  const { org } = useOrg();
+  const [copied, copy] = useCopied();
+  const make = useMutation({
+    mutationFn: (userId: string) => api.orgs.passwordLink(org.id, userId),
+    meta: { silent: true },
+  });
+  const { mutate, reset } = make;
+  useEffect(() => {
+    if (person) mutate(person.userId);
+    else reset();
+  }, [person, mutate, reset]);
+  const url = make.data?.url;
+  return (
+    <Dialog
+      open={person !== null}
+      onOpenChange={(o) => !o && onClose()}
+      title={t("members.passwordLink.title", { name: person?.name ?? "" })}
+      description={t("members.passwordLink.lead")}
+      closeLabel={t("common.close")}
+      width={460}
+    >
+      <DialogBody>
+        {make.isError ? (
+          <Alert>{errorText(t, make.error)}</Alert>
+        ) : (
+          <Field label={t("members.passwordLink.label")} id="password-link">
+            <Input readOnly value={url ?? ""} placeholder={t("members.passwordLink.making")} />
+          </Field>
+        )}
+      </DialogBody>
+      <DialogFooter>
+        <Button onClick={onClose}>{t("common.close")}</Button>
+        <Button
+          variant="primary"
+          disabled={!url}
+          loading={make.isPending}
+          onClick={() => url && copy("password-link", url)}
+        >
+          <SwapLabel
+            icon="copy"
+            altIcon="check"
+            label={t("members.passwordLink.copy")}
+            alt={t("common.copied")}
+            showAlt={copied !== null}
+          />
+        </Button>
+      </DialogFooter>
+    </Dialog>
+  );
+}
+
+/**
  * The page's own actions for whoever may invite: copy the workspace's link (made the first time, ADR 0068) and open
- * the invite dialog. In a personal workspace both ask first who is invited (ADR 0158 §4).
+ * the invite dialog. In a personal workspace both ask first who is invited (ADR 0159 §4).
  */
 function InviteActions() {
   const { t } = useTranslation();

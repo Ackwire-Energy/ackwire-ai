@@ -113,7 +113,7 @@ export const HOW_YOU_WORK = [
 ].join("\n");
 
 /**
- * The words of the rules that speak of a company and its team, as a personal workspace reads them (ADR 0158): one
+ * The words of the rules that speak of a company and its team, as a personal workspace reads them (ADR 0159): one
  * person (and maybe their family) with their agents. Each pair replaces its first match; the team's text stays as it
  * is, so its cached prefix doesn't move.
  */
@@ -138,7 +138,7 @@ const PERSONAL_RULE_WORDS: readonly (readonly [string, string])[] = [
 const inPersonalWords = (text: string) =>
   PERSONAL_RULE_WORDS.reduce((out, [team, personal]) => out.replace(team, personal), text);
 
-/** `HOW_YOU_WORK` for a personal workspace (ADR 0158). */
+/** `HOW_YOU_WORK` for a personal workspace (ADR 0159). */
 export const HOW_YOU_WORK_PERSONAL = inPersonalWords(HOW_YOU_WORK);
 
 /**
@@ -188,7 +188,7 @@ export const CONTINUE_THE_CONVERSATION =
 export const REQUEST_APPROVAL_LINE =
   "When your instructions, the workspace's rules or the person say something needs someone's approval (the owner, a role like the board, named people), ask for it with `request_approval` and wait for the decision: never with `ask_user` or a question to the person who made the request, who can't approve their own request. It reaches the approvers wherever they are, and you are told who decided.";
 
-/** `REQUEST_APPROVAL_LINE` for a personal workspace (ADR 0158). */
+/** `REQUEST_APPROVAL_LINE` for a personal workspace (ADR 0159). */
 export const REQUEST_APPROVAL_LINE_PERSONAL = inPersonalWords(REQUEST_APPROVAL_LINE);
 
 /**
@@ -489,7 +489,7 @@ export interface RunContext {
    * picked up again.
    */
   sessionPrompt: string[];
-  /** A personal workspace (ADR 0158): the blocks the executor adds speak of one person and their agents too. */
+  /** A personal workspace (ADR 0159): the blocks the executor adds speak of one person and their agents too. */
   personal: boolean;
 }
 
@@ -563,7 +563,7 @@ export async function buildRunContext(
     // A run started by the root itself (a new top-level message) can't have one yet: no query.
     // Its mission (ADR 0029) comes from the same read.
     run.threadRootId === run.triggerMessageId ? null : threadRunInfo(db, run.orgId, run.threadRootId),
-    // A personal workspace (ADR 0158): the rules and the workspace's block speak of one person and their agents.
+    // A personal workspace (ADR 0159): the rules and the workspace's block speak of one person and their agents.
     workspaceMode(db, run.orgId),
   ]);
   const personal = mode === "personal";
@@ -1316,7 +1316,7 @@ async function routineContext(
   agent: Agent,
   trigger: Message,
   orgZone: string,
-  /** A personal workspace (ADR 0158): the shared Drive is for everyone here, not "the whole team". */
+  /** A personal workspace (ADR 0159): the shared Drive is for everyone here, not "the whole team". */
   personal: boolean,
   now = new Date(),
 ): Promise<RoutineContext | null> {
@@ -2241,7 +2241,7 @@ export function toTurns(
     origins?: Map<string, string>;
     /** What people left in the blocks a message showed (`blockStateNotes`), by message id. */
     blocks?: Map<string, string>;
-    /** A personal workspace (ADR 0158): notices speak of one person and their agents. */
+    /** A personal workspace (ADR 0159): notices speak of one person and their agents. */
     personal?: boolean;
   } = {},
 ): ModelMessage[] {

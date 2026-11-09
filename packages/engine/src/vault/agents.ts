@@ -507,7 +507,7 @@ async function assertMayReplace(db: Executor, item: ItemRow, run: VaultRun, pers
   );
 }
 
-/** Whose a shared item is, in the refusal: the team's, or the workspace's in a personal one (ADR 0158). */
+/** Whose a shared item is, in the refusal: the team's, or the workspace's in a personal one (ADR 0159). */
 const sharedWords = async (db: Executor, run: VaultRun) =>
   (await isPersonalWorkspace(db, run.orgId)) ? "shared in this workspace" : "the team's";
 

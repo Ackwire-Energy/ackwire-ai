@@ -323,7 +323,7 @@ export async function setProvisioning(
 /**
  * The workspace's computer's name until someone renames it, in its first owner's language: what the apps call
  * it (mirrors `computerSetup.title` in packages/i18n). A name like any computer's, so every message that names
- * it says a computer, never the bare workspace. A personal workspace's (ADR 0158) is its person's agents' computer
+ * it says a computer, never the bare workspace. A personal workspace's (ADR 0159) is its person's agents' computer
  * (`computerSetup.titlePersonal`), which names no workspace, so a rename never touches it.
  */
 export const managedMachineName = (orgName: string, locale: EmailLocale, personal = false) =>

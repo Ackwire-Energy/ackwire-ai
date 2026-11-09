@@ -57,7 +57,7 @@ import { MembersFullNote } from "./MembersFullNote";
 /**
  * Convidar pessoas (ADR 0090 §5), the web's invite dialog as a pushed screen: an address a row with its role, the
  * channels they also join and a note in the email on screens of their own, then the workspace's link. A server that
- * sends no email invites through the link only. A personal workspace first asks who they are (ADR 0158 §4,
+ * sends no email invites through the link only. A personal workspace first asks who they are (ADR 0159 §4,
  * `WhoQuestion`) and says each role in its plain words.
  */
 export function InvitePeopleScreen() {
@@ -86,7 +86,7 @@ function InvitePeople() {
   const input = useRef<TextInputInstance | null>(null);
   const [typed, setTyped] = useState("");
   const personal = isPersonal(org);
-  // Family or friends, in a personal workspace: asked once each time this screen opens (ADR 0158 §4).
+  // Family or friends, in a personal workspace: asked once each time this screen opens (ADR 0159 §4).
   const [family, setFamily] = useState(false);
   // An agent's invite card opens it with its addresses (`?emails=a@x,b@y`), a channel's add sheet with that channel.
   const { emails, channel } = useLocalSearchParams<{ emails?: string; channel?: string }>();
@@ -281,7 +281,7 @@ function InvitePeople() {
           </GroupedFooter>
           <View style={styles.gap} />
           <GroupedList>
-            {/* A personal workspace with no group conversation besides #general has nothing to pick (ADR 0158). */}
+            {/* A personal workspace with no group conversation besides #general has nothing to pick (ADR 0159). */}
             {personal && others.length === 0 ? null : (
               <GroupedRow
                 label={personal ? t("shell.channelsPersonal") : t("mobile.invitePeople.channels")}
@@ -306,7 +306,7 @@ function InvitePeople() {
 }
 
 /**
- * Before inviting to a personal workspace (ADR 0158 §4), the web's question: family or friends join and it stays
+ * Before inviting to a personal workspace (ADR 0159 §4), the web's question: family or friends join and it stays
  * personal; people from work switch it to a team's first, on the mode screen (only who configures it can; for anyone
  * else that choice is off and says why), which comes back here in a team's words. Who may invite, and the roles,
  * stay as they are.

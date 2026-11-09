@@ -438,8 +438,13 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
       ...(together && !c.schedule ? [createAskAgentToolSource({ pubsub })] : []),
       createReactToolSource({ pubsub }),
       createMediaToolSource({ pubsub, gifs: c.noGifs ? null : createFakeGifs() }),
-      // Routine cases run in the background and speak through it.
-      createHandOffToolSource({ pubsub, judge: resourceful, tools: () => tools }),
+      // Routine cases run in the background and speak through it, with a GIF as in production.
+      createHandOffToolSource({
+        pubsub,
+        judge: resourceful,
+        tools: () => tools,
+        gif: createAgentGifPoster(c.noGifs ? null : createFakeGifs()),
+      }),
       ...(c.web
         ? [createWebToolSource({ fetch: fakeWebFetch(c.web), resolveHost: async () => ["93.184.216.34"] })]
         : []),
@@ -917,11 +922,24 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
     const { runs, runIds, steps, calls, approvalRows, posted, turns } = await observe(null);
     const approvals = approvalRows.map((r) => r.tool);
     // A routine's ledger row: a report every time (`always`) can arrive without a hand_off (`auto_report`).
-    const [routineRun] = routine
+    const [ledger] = routine
       ? await db
-          .select({ status: schema.routineRuns.status, code: schema.routineRuns.code })
+          .select({
+            status: schema.routineRuns.status,
+            code: schema.routineRuns.code,
+            messageId: schema.routineRuns.messageId,
+          })
           .from(schema.routineRuns)
           .where(eq(schema.routineRuns.id, routine.routine.runId))
+      : [];
+    const routineRun = ledger ? { status: ledger.status, code: ledger.code } : undefined;
+    // The routine's own message where it reports (its hand_off, or its final text delivered for it): it carries no
+    // run's id (nobody is behind it), so `posted` misses it, yet it is what the people read.
+    const [delivered] = ledger?.messageId
+      ? await db
+          .select({ body: schema.messages.body })
+          .from(schema.messages)
+          .where(and(eq(schema.messages.orgId, org.id), eq(schema.messages.id, ledger.messageId)))
       : [];
     const u = schema.usageRecords;
     const [usage] = await db
@@ -1002,7 +1020,7 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
     return {
       turns,
       calls,
-      reply: posted.map((m) => m.body).join("\n\n"),
+      reply: [...(delivered ? [delivered.body] : []), ...posted.map((m) => m.body)].join("\n\n"),
       // A routine is silent unless it reported (a hand_off, or its final text when it reports every time);
       // the conversation run then posts the report.
       noReply: routine

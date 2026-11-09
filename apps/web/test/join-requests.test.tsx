@@ -1187,7 +1187,7 @@ test("the inviter's notice when someone joins: their face and name, a Members ch
   expect(document.querySelector('[data-n="n-in"] .nt-what')?.textContent).toBe("Carla Dias aceitou seu convite");
 });
 
-test("in a personal workspace the inviter's notice names no workspace: its name says no place (ADR 0158)", async () => {
+test("in a personal workspace the inviter's notice names no workspace: its name says no place (ADR 0159)", async () => {
   const state = seedState({
     notifications: [
       notification({

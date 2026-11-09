@@ -29,7 +29,7 @@ type AccessFilter = "all" | "on" | "ask";
 
 /**
  * Ferramentas e acesso: one level per connector and built-in area, and the skills. Saved with the save bar. In a
- * personal workspace (ADR 0158 §3) it comes in two parts: `basic` (its apps and mailboxes, the "Can use" tab) and
+ * personal workspace (ADR 0159 §3) it comes in two parts: `basic` (its apps and mailboxes, the "Can use" tab) and
  * `advanced` (built-in areas, databases, rules and skills, in the Advanced tab).
  */
 export function AccessTab({ part = "all" }: { part?: "all" | "basic" | "advanced" }) {

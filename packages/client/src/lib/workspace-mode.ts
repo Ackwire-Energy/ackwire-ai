@@ -1,7 +1,7 @@
 import { type OrgSummary, WORKSPACE_MODES, type WorkspaceMode } from "../api/types";
 
 /**
- * Who a workspace is for (ADR 0158). Personal mode changes defaults, words and what is in sight, never what exists or
+ * Who a workspace is for (ADR 0159). Personal mode changes defaults, words and what is in sight, never what exists or
  * who may do what: read it only to pick a default, a word or a place, never to refuse something.
  */
 export const isWorkspaceMode = (v: unknown): v is WorkspaceMode => WORKSPACE_MODES.includes(v as WorkspaceMode);

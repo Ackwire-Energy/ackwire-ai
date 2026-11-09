@@ -110,6 +110,13 @@ describe("transcript checks", () => {
     ];
     expect(missingCalls(calls, ["github_search_code", "github_get_file_contents|github_search_code"])).toEqual([]);
     expect(missingCalls(calls, ["github_get_file_contents"])).toEqual(["github_get_file_contents"]);
+    // "+key": called with that input set.
+    const handOff = [{ name: "hand_off", input: { message: "Bom dia!", gif: "good morning coffee" } }];
+    expect(missingCalls(handOff, ["hand_off+gif", "hand_off"])).toEqual([]);
+    expect(missingCalls([{ name: "hand_off", input: { message: "Bom dia!", gif: "" } }], ["hand_off+gif"])).toEqual([
+      "hand_off+gif",
+    ]);
+    expect(missingCalls(handOff, ["post_message+gif|hand_off+gif"])).toEqual([]);
     expect(executedForbidden(calls, ["github_merge_pull_request"])).toEqual([]);
     expect(
       executedForbidden(

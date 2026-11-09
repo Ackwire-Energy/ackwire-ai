@@ -165,7 +165,7 @@ export function ConnectSheet({
             <Button variant="primary" wide label={t("mobile.connectors.connect")} onPress={() => setStep("connect")} />
           ) : (
             <Text variant="small" tone="muted">
-              {/* A personal workspace's are whoever runs it, never "an admin of Personal" (ADR 0158). */}
+              {/* A personal workspace's are whoever runs it, never "an admin of Personal" (ADR 0159). */}
               {t(modeKey(org, "mobile.connectors.adminsOnly"), { org: org?.name ?? "" })}
             </Text>
           )}

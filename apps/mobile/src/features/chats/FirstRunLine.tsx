@@ -12,7 +12,7 @@ import { useDirectory } from "../shared/hooks";
  * While the right hand's first-run checklist has a row left (ADR 0155 §6), Conversas has one line back to it, as
  * Início on the web: never a second list that could disagree with the card. One row of the list, on its ruler (the
  * right hand's face in the 52 column, a chevron since it opens the conversation), saying who is doing it and how far
- * it got: "Atlas está montando o time · 2 de 5"; in a personal workspace (ADR 0158), the person's agents instead.
+ * it got: "Atlas está montando o time · 2 de 5"; in a personal workspace (ADR 0159), the person's agents instead.
  */
 export function FirstRunLine() {
   const { t } = useTranslation();

@@ -742,7 +742,7 @@ export const sessionLostNote = (folder: string) =>
 
 /**
  * What a mission's main session reads when its agent's settings changed since it started (`BrainPlan.settingsChanged`);
- * `personal`: a personal workspace's words (ADR 0158).
+ * `personal`: a personal workspace's words (ADR 0159).
  */
 const settingsChangedNote = (system: readonly SystemBlock[], personal: boolean) =>
   [

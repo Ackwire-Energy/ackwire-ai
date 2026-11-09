@@ -117,7 +117,7 @@ describe("a channel for departments or roles (ADR 0125)", () => {
   });
 });
 
-describe("a group conversation in a personal workspace (ADR 0158)", () => {
+describe("a group conversation in a personal workspace (ADR 0159)", () => {
   /** The seeded workspace as a personal one; `alone`: Walter its only member. */
   const personal = (alone: boolean) => {
     const state = seedState();

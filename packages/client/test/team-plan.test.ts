@@ -151,7 +151,7 @@ test("a failed try names its step, with a known reason in the reader's words and
   expect(teamFailureText(t, { step: "#eng", reason: "Something went wrong", status: 500 })).toContain("common.ourSide");
 });
 
-test("a personal workspace's areas of life (ADR 0158): the template each opens, and the context they make", () => {
+test("a personal workspace's areas of life (ADR 0159): the template each opens, and the context they make", () => {
   // Every area but "Something else" opens one of the server's personal templates.
   const personal = ["life", "health", "studies", "home", "travel", "freelance"];
   for (const a of LIFE_AREAS) {

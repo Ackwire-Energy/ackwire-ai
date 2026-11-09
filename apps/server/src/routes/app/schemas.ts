@@ -153,7 +153,7 @@ export const Organization = z
     }),
     mode: z.enum(WORKSPACE_MODES).optional().openapi({
       description:
-        "Who the workspace is for (ADR 0158): `team` or `personal`. It changes the apps' defaults and words, never what anyone may do. Changed with `PATCH …/settings`.",
+        "Who the workspace is for (ADR 0159): `team` or `personal`. It changes the apps' defaults and words, never what anyone may do. Changed with `PATCH …/settings`.",
     }),
   })
   .openapi("Organization");

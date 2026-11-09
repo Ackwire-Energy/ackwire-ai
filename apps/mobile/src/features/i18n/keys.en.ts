@@ -139,7 +139,7 @@ export const featureKeysEn = {
     refuseAsk: "Decline the request?",
     /** On a high-risk request's top line, after its kind: it acts outside the workspace. */
     leaves: "goes outside the company",
-    /** The same in a personal workspace (ADR 0158): one person's, not a company's. */
+    /** The same in a personal workspace (ADR 0159): one person's, not a company's. */
     leavesPersonal: "goes outside your workspace",
     refuseWhyF: "{{name}} learns from the reason. Optional.",
     refuseWhyM: "{{name}} learns from the reason. Optional.",
@@ -248,7 +248,7 @@ export const featureKeysEn = {
     newChannelHint: "For a team or a topic",
     channelPlaceholder: "Channel name, e.g. marketing",
     createChannel: "Create channel",
-    /** A personal workspace's channels are its group conversations (ADR 0158). */
+    /** A personal workspace's channels are its group conversations (ADR 0159). */
     newChannelHintPersonal: "For one subject, with several agents",
     channelPlaceholderPersonal: "Name, e.g. travel",
     createChannelPersonal: "Create group conversation",
@@ -262,7 +262,7 @@ export const featureKeysEn = {
     swipe: { mute: "Mute", unmute: "Unmute" },
     /** Conversas' one line back to the right hand's first-run checklist (ADR 0155 §6). */
     firstRunLine: "{{name}} is setting up the team · {{done}} of {{total}}",
-    /** The same line in a personal workspace (ADR 0158): one person's agents, no team. */
+    /** The same line in a personal workspace (ADR 0159): one person's agents, no team. */
     firstRunLinePersonal: "{{name}} is setting up your agents · {{done}} of {{total}}",
     first: {
       title: "Start with your first agent",
@@ -292,7 +292,7 @@ export const featureKeysEn = {
     chat: "Chat with…",
     name: "Name",
     channelFine: "For a team or a topic.",
-    /** A personal workspace's (ADR 0158): the New sheet's row and the line under the name. */
+    /** A personal workspace's (ADR 0159): the New sheet's row and the line under the name. */
     channelPersonal: "Group conversation",
     channelFinePersonal: "For one subject, with several agents.",
     chatSearch: "Search for a person or an agent",
@@ -500,7 +500,7 @@ export const featureKeysEn = {
       arrived: "{{name}} joined the team",
       meet: "Your first conversation with {{name}}",
       roleIntro: "{{role}} on your team. Ask in plain words.",
-      /** In a personal workspace (ADR 0158): one person's agent, no team. */
+      /** In a personal workspace (ADR 0159): one person's agent, no team. */
       roleIntroPersonal: "{{role}}, here for you. Ask in plain words.",
       noIntro: "Ask for what you need, in plain words.",
       firstTitle: "To start",
@@ -836,7 +836,7 @@ export const featureKeysEn = {
     workingSection: "Working",
     /** The free agents, in no department: the team itself. */
     teamSection: "Team",
-    /** The same section in a personal workspace (ADR 0158). */
+    /** The same section in a personal workspace (ADR 0159). */
     teamSectionPersonal: "Your agents",
     /** Under the task manager's row when nothing runs or waits. */
     managerQuiet: "Nothing in progress",
@@ -1116,7 +1116,7 @@ export const featureKeysEn = {
     role: {
       owner: "owner",
       member: "member",
-      /** Under a personal workspace's name (ADR 0158): whose it is, never a role. */
+      /** Under a personal workspace's name (ADR 0159): whose it is, never a role. */
       ownerPersonal: "your personal workspace",
       memberPersonal: "a personal workspace shared with you",
     },
@@ -1886,7 +1886,7 @@ export const featureKeysEn = {
     loadFailed: "Couldn't load the connectors.",
     connectedCheck: "{{name}}, connected",
     adminsOnly: "Only an admin of {{org}} connects services. Ask one of them.",
-    /** In a personal workspace (ADR 0158): its owner and whoever helps run it, never "an admin of Personal". */
+    /** In a personal workspace (ADR 0159): its owner and whoever helps run it, never "an admin of Personal". */
     adminsOnlyPersonal: "Only whoever runs this workspace connects apps. Ask them.",
     canTitle: "Agents will be able to",
     asks: "{{text}} · asks for your approval",
@@ -2041,7 +2041,7 @@ export const featureKeysEn = {
     zoneTitle: "Time zone",
     /** A second workspace from Adicionar workspace (ADR 0154): where it lives, and that nothing is left. */
     anotherTitle: "What's the new workspace called?",
-    /** Its first question (ADR 0158), before the name: "For me" or "For my company or team". */
+    /** Its first question (ADR 0159), before the name: "For me" or "For my company or team". */
     anotherPurpose: "What's the new workspace for?",
     anotherLead: "On agentes.chat. You stay in {{org}} and can switch any time.",
     /** The first run's name, suggested from a work address's domain. */
@@ -2465,7 +2465,7 @@ export const featureKeysEn = {
       text: "Each agent takes on a role and works with you right in the chat.",
       viewerTitle: "Your team of agents lives here",
       viewerText: "Whoever creates agents in this workspace adds the first one, and it shows up here.",
-      /** A personal workspace's words (ADR 0158), for one person: `firstUseCopy`'s `…Personal` siblings. */
+      /** A personal workspace's words (ADR 0159), for one person: `firstUseCopy`'s `…Personal` siblings. */
       titlePersonal: "Get help from your own agents",
       textPersonal: "Each agent takes care of one thing for you, right in the chat.",
       viewerTitlePersonal: "Your agents live here",

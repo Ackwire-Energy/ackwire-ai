@@ -14,10 +14,10 @@ import {
   postPersonMessage,
   runChecksForReply,
   searchVisible,
-  teamNoticeText,
   type ToolContext,
   type ToolDefinition,
   type ToolSource,
+  teamNoticeText,
   updateOrgSettings,
 } from "../src";
 import { type Fixture, setup } from "./fixtures";
@@ -312,7 +312,7 @@ describe("team actions in the Tool Gateway", () => {
   });
 });
 
-test("a personal workspace's notice speaks of one person's agents, never a team (ADR 0158)", () => {
+test("a personal workspace's notice speaks of one person's agents, never a team (ADR 0159)", () => {
   const at = new Date("2026-11-09T12:00:00Z");
   const match = (agentId: string | null) => ({
     actionId: "a1",

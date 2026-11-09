@@ -150,7 +150,7 @@ describe("who can talk to the agent", () => {
     const model = { model: "claude-sonnet-5-5" };
     await updateOrgSettings(f.db, f.owner.id, f.org.id, { mode: "personal" });
     const mine = await createAgent(f.db, f.owner.id, f.org.id, { name: "Casa", handle: "casa" }, model);
-    // Made while the person was alone: whoever joins later isn't answered until its owner says so (ADR 0158).
+    // Made while the person was alone: whoever joins later isn't answered until its owner says so (ADR 0159).
     expect(mine).toMatchObject({ audienceMode: "owner", audienceUserIds: [], ownerUserId: f.owner.id });
     expect(canTalkTo(mine, f.owner.id, NO_PERSON)).toBe(true);
     expect(canTalkTo(mine, bia.id, NO_PERSON)).toBe(false);
@@ -200,7 +200,7 @@ describe("who can talk to the agent", () => {
       );
     await updateOrgSettings(f.db, f.owner.id, f.org.id, { mode: "personal" });
     const mine = await createAgent(f.db, f.owner.id, f.org.id, { name: "Casa", handle: "casa" }, model);
-    // ADR 0158 §3a: broad by default; sensitive tools still ask on every call.
+    // ADR 0159 §3a: broad by default; sensitive tools still ask on every call.
     expect(await grantsOf(mine.id)).toEqual(
       expect.arrayContaining([`${app?.id} connector:*`, "- calendar:read", "- calendar:write"]),
     );

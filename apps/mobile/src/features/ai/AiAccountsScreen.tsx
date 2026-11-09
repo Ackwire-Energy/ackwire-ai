@@ -70,7 +70,7 @@ const choose = chooseAction;
 export function AiAccountsScreen() {
   const { t, i18n } = useTranslation();
   const { orgId, org } = useOrg();
-  /** A computer's name in this workspace's words (a personal one's: its person's agents', ADR 0158). */
+  /** A computer's name in this workspace's words (a personal one's: its person's agents', ADR 0159). */
   const computerOf = (name: string) => computerNameOf(t, org?.name ?? "", name, isPersonal(org));
   const api = useApi();
   const qc = useQueryClient();
@@ -341,7 +341,7 @@ export function AiAccountsScreen() {
 }
 
 /**
- * AI and apps in a personal workspace (ADR 0158 §3): Connectors and MCPs and Skills at the foot of the AI accounts,
+ * AI and apps in a personal workspace (ADR 0159 §3): Connectors and MCPs and Skills at the foot of the AI accounts,
  * those this person opens, each a row to its own screen as in Settings. Nothing in a team's workspace.
  */
 function PersonalParts() {

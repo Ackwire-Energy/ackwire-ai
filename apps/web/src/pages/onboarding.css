@@ -727,7 +727,7 @@ html:not([data-pointer]) .onb__logo:focus-visible {
   }
 }
 /*
- * What the workspace is for (ADR 0158), the onboarding's brand moment: two cards side by side (OptionList `cards`),
+ * What the workspace is for (ADR 0159), the onboarding's brand moment: two cards side by side (OptionList `cards`),
  * on top who would be there (`PurposeScene`: you with your agents around you, or a team's chart), the words under it.
  */
 .onb-purpose .ac-optlist__cards {

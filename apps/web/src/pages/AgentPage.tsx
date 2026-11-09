@@ -102,7 +102,7 @@ const sortIds = (ids: string[]) => [...ids].sort();
 
 /**
  * The tabs always in the bar; the rest live in its "More" menu, and the one open from there shows in the bar. A
- * personal workspace's bar (ADR 0158 §3) is `PERSONAL_AGENT_TABS`, with Advanced instead of "More".
+ * personal workspace's bar (ADR 0159 §3) is `PERSONAL_AGENT_TABS`, with Advanced instead of "More".
  */
 const MAIN_TABS: AgentTab[] = ["overview", "instructions", "memory", "activity"];
 const MORE_TABS = AGENT_TABS.filter((id) => !MAIN_TABS.includes(id) && id !== "advanced");
@@ -197,7 +197,7 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
   const dir = useDirectory(org.id);
   const admin = can(org, "manage_agents");
   const viewer: Viewer = admin ? "admin" : agent.ownerUserId === me.user.id ? "owner" : "member";
-  // A personal workspace's page (ADR 0158 §3): a shorter bar, the hard parts in Advanced; every address still works.
+  // A personal workspace's page (ADR 0159 §3): a shorter bar, the hard parts in Advanced; every address still works.
   const personal = isPersonal(org);
   const view = shownAgentTab(tab, section, personal);
   const models = useModels();

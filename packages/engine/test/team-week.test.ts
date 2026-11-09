@@ -255,7 +255,7 @@ describe("the card", () => {
     expect(inbox.map((n) => n.kind)).toContain("agent_reply");
   });
 
-  test("a personal workspace's card says the week is the person's own (ADR 0158)", async () => {
+  test("a personal workspace's card says the week is the person's own (ADR 0159)", async () => {
     f = await setup({ rightHand: true });
     await busyWeek(f);
     await f.db

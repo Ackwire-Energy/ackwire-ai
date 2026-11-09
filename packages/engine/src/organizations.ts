@@ -108,7 +108,7 @@ export interface Membership {
   agentStyle?: AgentStyle | null;
   /** How conversations look to the person here (listMemberships, `setChatPrefs`); only what they chose. */
   chatPrefs?: ChatPrefs;
-  /** Who the workspace is for (listMemberships, ADR 0158): `team` or `personal`. */
+  /** Who the workspace is for (listMemberships, ADR 0159): `team` or `personal`. */
   mode?: WorkspaceMode;
 }
 
@@ -312,7 +312,7 @@ export async function createOrganization(
     if (!organization) throw new Error("organization insert returned nothing");
     await recordFirstWorkspace(tx, userId, organization.id);
     await tx.insert(organizationMembers).values({ orgId: organization.id, userId, role: "owner" });
-    // A personal workspace (ADR 0158) is one from the start: its first screens are already shaped for one person.
+    // A personal workspace (ADR 0159) is one from the start: its first screens are already shaped for one person.
     if (input.mode === "personal")
       await tx.insert(schema.organizationSettings).values({ orgId: organization.id, mode: "personal" });
     await createDefaultRoles(tx, organization.id);
@@ -1908,7 +1908,7 @@ async function seatsFull(db: Executor, orgId: string) {
  * workspace paused or being deleted, say only that (`closed`), never why. An email invitation also says how its
  * address signs in (`account`) and whether the workspace is full (`full`), before anyone makes an account
  * (ADR 0090). One that works also says who the workspace is for (`mode`): a personal one's page speaks of the
- * person who invited, not of a team or of its name ("Personal"), ADR 0158.
+ * person who invited, not of a team or of its name ("Personal"), ADR 0159.
  */
 /**
  * The role an invitation gives now: owner only while whoever sent it can still make owners, so removing or demoting

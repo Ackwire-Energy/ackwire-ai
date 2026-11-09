@@ -34,7 +34,7 @@ test("the sidebar's tools: the engine and the apps know the same ones, and the a
     expect(sidebarPlaceAllowed(item as SidebarItem, place)).toBe(true);
 });
 
-test("a personal workspace's defaults (ADR 0158): the engine and the apps agree, every tool once, places it takes", () => {
+test("a personal workspace's defaults (ADR 0159): the engine and the apps agree, every tool once, places it takes", () => {
   expect([...APP_PERSONAL_ITEMS]).toEqual([...PERSONAL_SIDEBAR_ITEMS]);
   expect([...APP_PERSONAL_SECTIONS]).toEqual([...PERSONAL_SIDEBAR_SECTIONS]);
   expect([...PERSONAL_SIDEBAR_ITEMS].sort()).toEqual([...SIDEBAR_ITEMS].sort());
@@ -313,7 +313,7 @@ test("the sidebar view: each person's own, per workspace, beside the tools' plac
   expect(await view(member)).toEqual({ agentSort: "workspace", showAllAgents: false, pins: null });
 });
 
-test("a personal workspace reads its own default orders (ADR 0158); a saved order stays, the team's included", async () => {
+test("a personal workspace reads its own default orders (ADR 0159); a saved order stays, the team's included", async () => {
   t = await createTestServer();
   const owner = browser(t);
   await signUp(owner, "owner@example.com");

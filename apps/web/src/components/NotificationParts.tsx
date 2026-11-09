@@ -209,7 +209,7 @@ export function Headline({
   channelName: (id: string) => string;
 }) {
   const { t, i18n } = useTranslation();
-  // A personal workspace (ADR 0158): its computer is its person's agents', and its name ("Personal") says no place.
+  // A personal workspace (ADR 0159): its computer is its person's agents', and its name ("Personal") says no place.
   const personal = isPersonal(useOrg().org);
   const name = nameOf(t, dir, n.actors[0]);
   const names = namesText(

@@ -323,7 +323,7 @@ const givenNames = (orgName: string): string[] => [
  * language (mirrors `managedMachineName` in packages/engine/src/machine-provisioning.ts) until someone renames
  * it: until then it reads in the reader's words, as before it exists, in the workspace's mode (a name given in the
  * other mode reads as this one's too). Any other computer goes by its own name, and the server's own, until its
- * runner names it, by what it is. `personal`: the workspace is personal (ADR 0158), where its own computer is its
+ * runner names it, by what it is. `personal`: the workspace is personal (ADR 0159), where its own computer is its
  * person's agents' (`computerSetup.titlePersonal`), never "Personal's computer".
  */
 export function computerName(

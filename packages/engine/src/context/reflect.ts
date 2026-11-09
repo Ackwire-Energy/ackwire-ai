@@ -46,7 +46,7 @@ const REFLECT_SYSTEM = [
 ].join("\n");
 
 /**
- * The same for a personal workspace (ADR 0158): the memory of one person's life and their agents. The kinds and
+ * The same for a personal workspace (ADR 0159): the memory of one person's life and their agents. The kinds and
  * scopes are the same (`team` is what all their agents keep).
  */
 const REFLECT_SYSTEM_PERSONAL = [

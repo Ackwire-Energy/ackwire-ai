@@ -16,7 +16,7 @@ import {
   settingsSectionTextKey,
 } from "../src/lib/personal-view";
 
-/* What a personal workspace shows (ADR 0158): only the view changes, for the web and the phone app alike. */
+/* What a personal workspace shows (ADR 0159): only the view changes, for the web and the phone app alike. */
 
 const personal = { mode: "personal" as const };
 const team = { mode: "team" as const };

@@ -478,7 +478,7 @@ describe("a computer command (its permission check)", () => {
     const none = ((key: string, o?: { defaultValue?: string }) =>
       key.endsWith(".new") ? (o?.defaultValue ?? "") : key) as TFunction;
     expect(toolWhy(none, { why: BECAUSE, refusal: "new" })).toBeNull();
-    // A personal workspace (ADR 0158): its own words where it has them ("This was already done"), else the team's.
+    // A personal workspace (ADR 0159): its own words where it has them ("This was already done"), else the team's.
     const known = (key: string) => key === "chat.work.refusal.teamPersonal" || !key.endsWith("Personal");
     const own = ((key: string, o?: { defaultValue?: string }) =>
       known(key) ? key : (o?.defaultValue ?? "")) as TFunction;

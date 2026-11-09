@@ -7,7 +7,7 @@ import { useOrg } from "@/providers/org";
 
 /**
  * A section's "Ver todos" from Conversas: all agents, channels or people, or one channel category's channels
- * (`category-<id>`, ADR 0080). Threads and missions are a tab; a personal workspace has no Threads tab (ADR 0158), so
+ * (`category-<id>`, ADR 0080). Threads and missions are a tab; a personal workspace has no Threads tab (ADR 0159), so
  * its row in You › Work pushes them here.
  */
 export default function ConversationListRoute() {

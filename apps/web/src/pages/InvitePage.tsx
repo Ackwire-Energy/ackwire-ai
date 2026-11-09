@@ -76,7 +76,7 @@ interface OrgFacts {
   by?: string | null;
   agents?: Agentish[];
   more?: number;
-  /** A personal workspace (ADR 0158): its name ("Personal") says nothing to who is invited, whose space it is does. */
+  /** A personal workspace (ADR 0159): its name ("Personal") says nothing to who is invited, whose space it is does. */
   personal?: boolean;
 }
 
@@ -187,7 +187,7 @@ function OrgLine({ org }: { org: OrgFacts }) {
           ),
         })
       : null;
-  // A personal workspace goes by whose it is (ADR 0158), which already says who invited.
+  // A personal workspace goes by whose it is (ADR 0159), which already says who invited.
   const name = !org.personal
     ? org.name
     : org.by
@@ -870,7 +870,7 @@ function GoneInvitation({ token }: { token: string }) {
 
   if (dead.state === "accepted") {
     const { orgId, orgName } = dead;
-    // A member knows the workspace's mode: a personal one is never named by its name ("Personal"), ADR 0158.
+    // A member knows the workspace's mode: a personal one is never named by its name ("Personal"), ADR 0159.
     const mine = me.data?.organizations.find((o) => o.id === orgId);
     const member = mine !== undefined;
     const open = () =>

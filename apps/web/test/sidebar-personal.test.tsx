@@ -7,7 +7,7 @@ import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, createFakeApi, ENG_ID, LODI_ID, ORG_ID, seedState, withRightHand } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
-/* A personal workspace's sidebar (ADR 0158): the person on top, the agents with no header and New agent under them,
+/* A personal workspace's sidebar (ADR 0159): the person on top, the agents with no header and New agent under them,
    group conversations and people only when there are some, one More at the end with Início, Go to… and every tool. */
 
 afterEach(() => {
@@ -64,7 +64,11 @@ describe("a personal workspace's sidebar", () => {
     });
     await settle(3);
     const menu = screen().getAllByRole("menu")[0] as HTMLElement;
-    expect(within(menu).getAllByRole("menuitem").map((el) => el.textContent)).toEqual([
+    expect(
+      within(menu)
+        .getAllByRole("menuitem")
+        .map((el) => el.textContent),
+    ).toEqual([
       "Definir status",
       "Editar perfil",
       "Sua conta",

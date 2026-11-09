@@ -43,7 +43,7 @@ const row = (id: string) => {
   return el;
 };
 
-/** #eng with João, me and Ada; `personal`: in a personal workspace (ADR 0158). */
+/** #eng with João, me and Ada; `personal`: in a personal workspace (ADR 0159). */
 async function openChannel(prefs?: ChatPrefs, personal = false) {
   const messages = [
     said(ENG_ID, "j1", "u-joao", "Bom dia!", 30),

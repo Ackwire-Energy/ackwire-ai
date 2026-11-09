@@ -9,7 +9,7 @@ import { type MenuEntry, openContextMenu } from "@/lib/context-menu";
 
 /**
  * A section's name as its header (or, for the tools, the dialog) says it. A personal workspace's channels are its
- * group conversations (ADR 0158).
+ * group conversations (ADR 0159).
  */
 export const sectionName = (t: TFunction, id: SidebarSection, personal = false) =>
   id === "tools"
@@ -25,7 +25,7 @@ const SECTION_DRAG = "application/x-agentes-section";
 /**
  * The order of the sidebar's sections, the person's own in this workspace (`…/me/sidebar/order`): Move up / Move down
  * and Restore default order for a section's menus, and dragging a section by its grip. The default is the workspace's
- * mode's (`personal`: the agents first, ADR 0158).
+ * mode's (`personal`: the agents first, ADR 0159).
  */
 export function useSectionOrder(orgId: string, personal = false) {
   const { t } = useTranslation();

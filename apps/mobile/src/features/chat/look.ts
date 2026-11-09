@@ -41,7 +41,7 @@ export const useRowLook = () => useContext(RowLookContext);
 
 /**
  * The conversation's look. My bubbles take the color of the agent I talk to, and the workspace's sky elsewhere. In a
- * personal workspace every conversation opens in bubbles, as a DM does (ADR 0158); the person's own choice wins.
+ * personal workspace every conversation opens in bubbles, as a DM does (ADR 0159); the person's own choice wins.
  */
 export function useConversationLook(dm: boolean, agentColor?: AgentColorName): RowLook {
   const { org } = useOrg();

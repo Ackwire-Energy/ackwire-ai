@@ -91,6 +91,7 @@ describe("permissions", () => {
         showActivity: false,
         agentStyle: null,
         chatPrefs: {},
+        mode: "team",
         orgCreatedAt: expect.any(Date),
       },
     ]);
@@ -174,7 +175,7 @@ describe("invitations", () => {
     expect(general.map((g) => g.channelId)).toEqual([f.general.id]);
   });
 
-  test("an invitation says who the workspace is for, so a personal one's page never names it (ADR 0158)", async () => {
+  test("an invitation says who the workspace is for, so a personal one's page never names it (ADR 0159)", async () => {
     const { token } = await createInvitation(f.db, f.owner.id, f.org.id, { email: "bia@example.com", role: "member" });
     expect(await previewInvitation(f.db, token)).toMatchObject({ orgName: "Acme", mode: "team" });
     await updateOrgSettings(f.db, f.owner.id, f.org.id, { mode: "personal" });

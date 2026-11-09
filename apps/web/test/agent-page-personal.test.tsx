@@ -7,7 +7,7 @@ import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, createFakeApi, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
-/* A personal workspace's agent page (ADR 0158 §3): a shorter bar, the hard parts in Advanced, every address working. */
+/* A personal workspace's agent page (ADR 0159 §3): a shorter bar, the hard parts in Advanced, every address working. */
 
 afterEach(() => cleanup());
 

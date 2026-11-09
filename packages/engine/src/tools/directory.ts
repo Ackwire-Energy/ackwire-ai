@@ -772,7 +772,7 @@ export const HAND_OVER_TOOLS = [
 export const HAND_OVER_STEP =
   "A step only a person can do (sign in, scan a QR code, type a code sent to them, a captcha, approve, grant a permission, a key, a file or a fact only they have, something done by hand) is never a blocker or a reason to say you can't: do everything up to it, hand it over with its request (on a page or app: `browser_ask_person` or `desktop_ask_person` once at that step; a key: `request_secret`; an approval only someone else can give: `request_approval`; a permission: `request_permission`; else `ask_user`), then go on.";
 
-/** The run's general means; `personal`: a personal workspace's words (ADR 0158), its other agents not "teammates". */
+/** The run's general means; `personal`: a personal workspace's words (ADR 0159), its other agents not "teammates". */
 export function turnMeans(names: ReadonlySet<string>, teammates: string[] = [], personal = false): string[] {
   const out: string[] = [];
   if (names.has("web_search")) out.push("the web: `web_search` to search it, `web_fetch` to read any public page");

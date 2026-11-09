@@ -141,14 +141,14 @@ export function ChatLookSettings() {
   const [kind, setKind] = useState<"channels" | "dms">("channels");
   const dm = kind === "dms";
   const prefs = org.chatPrefs;
-  // What shows checked is what the conversations use: in a personal workspace, bubbles for channels too (ADR 0158).
+  // What shows checked is what the conversations use: in a personal workspace, bubbles for channels too (ADR 0159).
   const { style, tone } = chatLookOf(prefs, dm, isPersonal(org));
   const textSize = textSizeOf(prefs);
   const openAt: ChatOpenAt = prefs?.openAt ?? "latest";
   const save = (patch: Parameters<typeof set.mutate>[0]) =>
     set.mutate(patch, { onError: () => toast.show(t("settings.account.activityFailed")) });
   const mine = agentGradient(dm ? SAMPLE_AGENT.color : "sky")[1];
-  // A personal workspace calls its channels group conversations (ADR 0158).
+  // A personal workspace calls its channels group conversations (ADR 0159).
   const toneLabel = dm ? "settings.account.chat.toneDms" : modeKey(org, "settings.account.chat.toneChannels");
   const lookOf = (s: ChatStyle) => ({ style: s, tone, mine, names: !dm, faces: facesShown(s, dm) });
   const talk: Line[] = [
@@ -225,9 +225,7 @@ export function ChatLookSettings() {
           <div className="settings-row ac-actrow">
             <span className="settings-row__text ac-actrow__text">
               <span className="ac-hintline">
-                <span className="settings-row__label">
-                  {t(toneLabel)}
-                </span>
+                <span className="settings-row__label">{t(toneLabel)}</span>
                 <InfoHint
                   name={t("common.about", {
                     label: t(toneLabel),

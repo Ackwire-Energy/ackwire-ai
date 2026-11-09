@@ -44,7 +44,7 @@ function TeamCheckRow({ check, selfId }: { check: TeamCheck; selfId: string | nu
   if (!match) return null;
   const when = relativeTime(t, i18n.language, match.at);
   const values = { target, when, who: match.agentName ?? "" };
-  // Whoever it was can't be shown: a personal workspace (ADR 0158) has no team to name.
+  // Whoever it was can't be shown: a personal workspace (ADR 0159) has no team to name.
   const key = !match.agentId
     ? modeKey(org, "teamChecks.someone")
     : match.agentId === selfId

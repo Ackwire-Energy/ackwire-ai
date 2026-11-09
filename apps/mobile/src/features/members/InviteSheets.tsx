@@ -41,7 +41,7 @@ function useRoleRows(roles: readonly OrgRole[]) {
 /**
  * An address on Convidar pessoas: its role, one pick that closes the sheet (Membro plus what the person may give, as
  * the web's role menu), or, for one that won't be sent, why; either way it can leave the list. A personal workspace
- * asks it plainly (ADR 0158 §4): "Uses the agents" (no role) and "Helps you run it" (`personalHelperRole`) first, then
+ * asks it plainly (ADR 0159 §4): "Uses the agents" (no role) and "Helps you run it" (`personalHelperRole`) first, then
  * any other role this person may give by its own name; the roles given are the same.
  */
 export function AddressSheet({
@@ -253,7 +253,7 @@ function InvitationRolesSheet({ invitation: inv }: { invitation: InvitationWithS
   const toast = useToast();
   const roles = useRoles(orgId).data?.roles ?? [];
   const rows = useRoleRows(roles);
-  // A personal workspace's note ties its roles to the invitation's plain words (ADR 0158 §4).
+  // A personal workspace's note ties its roles to the invitation's plain words (ADR 0159 §4).
   const helper = isPersonal(org) ? personalHelperRole(roles) : null;
   const save = useSetInvitationRoles(orgId);
   const [value, setValue] = useState<string[]>(inv.roleIds ?? []);

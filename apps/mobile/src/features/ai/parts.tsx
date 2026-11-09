@@ -106,7 +106,7 @@ export function Note({
  * "Atende outras pessoas" (ADR 0059 §5), the web's `PlanReplies`: off, an agent on its owner's plan answers only them;
  * on, everyone who may talk to it. Under it, a line saying which, on which plan (whose, to an admin), and the plan's
  * terms behind its ⓘ.
- * A plan's page and the agent's AI draw the same. Alone in a personal workspace (ADR 0158) it waits while off, there
+ * A plan's page and the agent's AI draw the same. Alone in a personal workspace (ADR 0159) it waits while off, there
  * being nobody else to answer, but where `keep` asks (the agent's Advanced): it comes back as someone joins, and shows
  * whenever it is on.
  */

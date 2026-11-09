@@ -4,7 +4,7 @@ import { caches } from "./cache";
 import { publishOrgEvent } from "./events";
 
 /**
- * Who a workspace is for (ADR 0158): `team` (the default) or `personal`. The mode changes defaults, words and what is
+ * Who a workspace is for (ADR 0159): `team` (the default) or `personal`. The mode changes defaults, words and what is
  * in sight, never what exists or who may do what, so nothing here gates a permission.
  */
 export const WORKSPACE_MODES = ["team", "personal"] as const;
@@ -41,7 +41,7 @@ export const publishWorkspaceMode = (pubsub: PubSub | undefined, orgId: string, 
   });
 
 /**
- * Tools as the agents of a personal workspace read them (ADR 0158): a description in `words` replaces the tool's own,
+ * Tools as the agents of a personal workspace read them (ADR 0159): a description in `words` replaces the tool's own,
  * so they speak of one person and their agents instead of a company and its team. Names and schemas never change: a
  * tool works the same in both modes.
  */

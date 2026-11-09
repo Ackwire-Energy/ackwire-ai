@@ -28,7 +28,7 @@ import { useToast } from "@/lib/toast";
 import "./onboarding.css";
 
 /**
- * The onboarding, asked by its right hand: what the workspace is for (ADR 0158), then, for a company or team, its name
+ * The onboarding, asked by its right hand: what the workspace is for (ADR 0159), then, for a company or team, its name
  * (with its logo and time zone); "For me" makes a personal workspace at once, named in the person's language with the
  * browser's time zone. Then the right hand's DM, where the rest of the setup is cards (ADR 0137). A workspace still
  * being set up from an older onboarding, whatever step it was on, is finished and opened there.
@@ -41,7 +41,7 @@ export function OnboardingPage() {
   const navigate = useNavigate();
   const toast = useToast();
 
-  // Who it is for (ADR 0158), then, for a team, its name: one question at a time.
+  // Who it is for (ADR 0159), then, for a team, its name: one question at a time.
   const [purpose, setPurpose] = useState<WorkspaceMode | null>(null);
   const [step, setStep] = useState<"purpose" | "name">("purpose");
   // On the first question the chosen answer's agents look at the pointer (`PurposeScene`, its `data-gaze`).
@@ -403,14 +403,7 @@ export function OnboardingPage() {
           )}
 
           <div className="onb__actions">
-            <Button
-              variant="primary"
-              size="lg"
-              kbd={["↵"]}
-              onClick={next}
-              disabled={blocked || busy}
-              loading={busy}
-            >
+            <Button variant="primary" size="lg" kbd={["↵"]} onClick={next} disabled={blocked || busy} loading={busy}>
               {t("onboarding.actions.continue")}
             </Button>
           </div>
@@ -420,9 +413,8 @@ export function OnboardingPage() {
   );
 }
 
-/** The two answers to "What will you use agentes.chat for?" (ADR 0158), in this order. */
+/** The two answers to "What will you use agentes.chat for?" (ADR 0159), in this order. */
 const PURPOSES = ["personal", "team"] as const satisfies readonly WorkspaceMode[];
-
 
 /** Owning a workspace that waits for its first plan: said in place, with the way to that plan. */
 function UnpaidNote({ orgId, billing }: { orgId: string; billing: boolean }) {

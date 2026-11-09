@@ -22,7 +22,7 @@ const LIVE_ROWS = 8;
  * works); what is closed sits at the end of its section. What waits on you is on Conversas' strip and in Atividade,
  * not repeated here. Loading: rows of its own shape. Empty: the sky with the team, and the way to the conversations.
  * `pushed`: the same list pushed from You › Work, with the back button in its bar, where a personal workspace
- * (ADR 0158) keeps it instead of a tab.
+ * (ADR 0159) keeps it instead of a tab.
  */
 export function ThreadsScreen({ pushed = false }: { pushed?: boolean }) {
   const { t } = useTranslation();

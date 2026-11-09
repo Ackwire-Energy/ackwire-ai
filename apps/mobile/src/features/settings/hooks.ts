@@ -22,7 +22,7 @@ import { stepAt } from "./logic";
 /** The web's settings hooks (`AccessLevels.tsx`, `useAgentsAccess`), on the phone. */
 
 /**
- * A personal workspace's view (ADR 0158): whether it is personal, how many other people are members (undefined while
+ * A personal workspace's view (ADR 0159): whether it is personal, how many other people are members (undefined while
  * the list loads) and `solo`, personal with nobody else in it yet. A control leaves the screen while solo only when it
  * still holds its default, and while the list loads the full control shows, so nothing hides and then comes back for
  * a family member. Read it for what is in sight, never to refuse anything.

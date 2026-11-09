@@ -28,7 +28,7 @@ import { useToast } from "@/lib/toast";
  * any AI is connected: its greeting, then, for the workspace's owners, the first-run checklist (ADR 0155 §6), whose
  * rows hold the whole setup. Anyone else gets one card at a time (`introCards`): Connect AI while there is none, then
  * how agents talk to them (ADR 0147); the owner gets that question once the checklist is complete. With no card left,
- * a line to build the team with it, at any time; a personal workspace's words speak of one person's agents (ADR 0158).
+ * a line to build the team with it, at any time; a personal workspace's words speak of one person's agents (ADR 0159).
  * On the person's first visit, its waving sticker under the greeting, drawn as a sticker message is and decorative (the
  * greeting already says hello). Its face and name open the profile card, as on any message.
  */

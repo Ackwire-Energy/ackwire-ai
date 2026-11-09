@@ -101,7 +101,7 @@ describe("Quem vê on a task", () => {
   });
 });
 
-describe("Quem vê in a personal workspace (ADR 0158)", () => {
+describe("Quem vê in a personal workspace (ADR 0159)", () => {
   /** The seeded workspace as a personal one; `alone`: Walter its only member. */
   const personal = (alone: boolean) => {
     const state = seedState();

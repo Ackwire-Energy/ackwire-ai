@@ -211,7 +211,7 @@ describe("a card of proposals", () => {
     expect(String(one.values.target)).toContain('proposals.targetChanges {"name":"Ada"');
   });
 
-  test("the context: the workspace's by its name, a personal workspace's as what its agents know (ADR 0158)", () => {
+  test("the context: the workspace's by its name, a personal workspace's as what its agents know (ADR 0159)", () => {
     const name = () => "Ada";
     const context = row("1", { target: { type: "org_context" }, title: "Update the context" });
     // By name only, as before; a team's workspace reads the same.

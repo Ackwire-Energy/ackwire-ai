@@ -137,7 +137,7 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = ["org", "people", "agen
 /** The sections this membership opens, in order. */
 export const visibleSections = (org: OrgSummary | null | undefined) => SETTINGS_SECTIONS.filter((s) => s.allowed(org));
 
-// ── A personal workspace's settings (ADR 0158 §3) ───────────────────────────
+// ── A personal workspace's settings (ADR 0159 §3) ───────────────────────────
 
 export interface PersonalSettings {
   /** The short list, in its order (Your account comes before it: it is the person's own, not a section). */
@@ -147,7 +147,7 @@ export interface PersonalSettings {
 }
 
 /**
- * A personal workspace's settings on the phone (ADR 0158 §3), from the sections this person opens, as the web lists
+ * A personal workspace's settings on the phone (ADR 0159 §3), from the sections this person opens, as the web lists
  * them (`personalSettingsNav`): About you, AI and apps, Plan and usage, Vault and Computers in one list, with People
  * after About you once someone else is a member (`others`, unknown while loading: it doesn't); every other one under
  * Advanced, but for Connectors and Skills, which AI and apps shows at its foot. Only where a section is listed

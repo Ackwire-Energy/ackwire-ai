@@ -729,7 +729,7 @@ export function OpenPageCardView({ card }: { card: OpenPageCard }) {
   const section = SETTINGS_SECTIONS.find(
     (s) => page.web === `/settings/${s.id}` || page.web.startsWith(`/settings/${s.id}?`),
   );
-  // A settings section by the name the settings list shows (a personal workspace's About you, ADR 0158).
+  // A settings section by the name the settings list shows (a personal workspace's About you, ADR 0159).
   const named =
     section && page.label === `settings.section.${section.id}`
       ? t(settingsSectionNameKey(org, section.id))

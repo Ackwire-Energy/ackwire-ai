@@ -54,7 +54,7 @@ export interface PushTextInput {
   percent?: number | null;
   /** `widget_failed`: its coded reason (ADR 0135 §6); `agent_reported` sends the agent's words in `text`. */
   reason?: string | null;
-  /** The workspace is personal (ADR 0158): the words for one person and their agents, where a team's would differ. */
+  /** The workspace is personal (ADR 0159): the words for one person and their agents, where a team's would differ. */
   personal?: boolean;
 }
 

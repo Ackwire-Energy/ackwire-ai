@@ -146,7 +146,7 @@ export function ReplyChips({ message }: { message: Message }) {
 
 /**
  * The team on a card or a template: a row per agent, the routines, the skills and what waits for approval. An agent's
- * channel shows only in a team's workspace and when it has one: in a personal workspace (ADR 0158) each agent is
+ * channel shows only in a team's workspace and when it has one: in a personal workspace (ADR 0159) each agent is
  * someone to talk to, not a place.
  */
 export function TeamPlanBody({
@@ -246,7 +246,7 @@ export function TeamPlanBody({
   );
 }
 
-/** "3 agents · 2 new channels · 3 routines"; a personal workspace counts no channels (ADR 0158). */
+/** "3 agents · 2 new channels · 3 routines"; a personal workspace counts no channels (ADR 0159). */
 const countsText = (t: TFunction, plan: TeamPlan, personal: boolean) => {
   const n = teamCounts(plan);
   return [
@@ -344,7 +344,7 @@ export function TeamPlanCardView({ message, card }: { message: Message; card: Te
                   {t(card.error ? "teamPlan.card.retry" : modeKey(org, "teamPlan.card.create"))}
                 </Button>
               )}
-              {/* Agents that each live in a DM with the person have no map to show (ADR 0158): the list says it all. */}
+              {/* Agents that each live in a DM with the person have no map to show (ADR 0159): the list says it all. */}
               {!teamInDms(plan) && (
                 <Button size="sm" icon="diagram" onClick={() => setMap(true)}>
                   {t("teamPlan.card.map")}
@@ -463,7 +463,7 @@ function FirstTaskCard({ message, card, held }: { message: Message; card: TeamPr
   const invite = useInviteDialog();
   const [later, setLater] = useState(false);
   const tasks = firstTasks(card).filter((f) => dir.agentById.has(f.agentId));
-  // No "Invite …" in a personal workspace (ADR 0158): it is for one person, inviting stays in Settings.
+  // No "Invite …" in a personal workspace (ADR 0159): it is for one person, inviting stays in Settings.
   const people = held || isPersonal(org) ? [] : card.params.invite;
   const example = held && tasks[0] ? card.params.example : undefined;
   if (later || (tasks.length === 0 && people.length === 0)) return null;
@@ -614,7 +614,7 @@ function AdjustDialog({
             <Field label={t("teamPlan.adjust.line")}>
               <Input value={v.line} onChange={set("line")} maxLength={300} required />
             </Field>
-            {/* An agent with no channel lives in its DM with the person (ADR 0158): nothing to name. */}
+            {/* An agent with no channel lives in its DM with the person (ADR 0159): nothing to name. */}
             {agent.channel && (
               <Field label={t("teamPlan.adjust.channel")}>
                 <Input value={v.channel} onChange={set("channel")} maxLength={80} required />
@@ -722,7 +722,7 @@ export function TeamMapDialog({ plan, open, onClose }: { plan: TeamPlan; open: b
 /**
  * "Team templates": the templates by business type, one picked (`initial`: the business row 1 saved), and "Create the
  * team" makes it at once (ADR 0155 §6). Under the list, the other ways in: an import, or one agent from scratch. In a
- * personal workspace (ADR 0158) the server lists them by area of life, and the words are about the person's agents.
+ * personal workspace (ADR 0159) the server lists them by area of life, and the words are about the person's agents.
  */
 export function TeamTemplatesDialog({
   open,

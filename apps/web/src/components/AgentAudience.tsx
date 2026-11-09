@@ -72,7 +72,7 @@ export function OnlyYouNote({ orgId, viewerId }: { orgId: string; viewerId: stri
 
 /**
  * Chip "Pessoal" / "Restrito" next to the agent's name (nothing when everyone can talk to it). Alone in a personal
- * workspace, nothing either: there is nobody else it could answer (ADR 0158).
+ * workspace, nothing either: there is nobody else it could answer (ADR 0159).
  */
 export function AudienceChip({ agent }: { agent: Agent }) {
   const { t } = useTranslation();
@@ -93,7 +93,7 @@ export function AudienceChip({ agent }: { agent: Agent }) {
  * the rest (ADR 0085 addendum).
  * `compact`: a segmented control and one line about the choice ("Criar agente").
  * A personal workspace says them plainly, people before roles, and offers roles only when one is worth picking
- * (`rolePicksInSight`) unless `everyRole` (ADR 0158); the choices themselves are the same.
+ * (`rolePicksInSight`) unless `everyRole` (ADR 0159); the choices themselves are the same.
  */
 export function AudienceChoice({
   value,
@@ -286,7 +286,7 @@ export function AudienceChoice({
                     })}
                   </>
                 )}
-                {/* A personal workspace's family picks people first (ADR 0158). */}
+                {/* A personal workspace's family picks people first (ADR 0159). */}
                 {roleRows.length > 0 && personal && roleGroup}
               </>
             )}

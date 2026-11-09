@@ -220,7 +220,7 @@ export function NavScrim() {
 /**
  * The top bar on narrow screens: menu, workspace, search. Chat pages hide it
  * (their header carries the menu button instead; see layout.css). A personal
- * workspace shows the person, as its sidebar does on top (ADR 0158).
+ * workspace shows the person, as its sidebar does on top (ADR 0159).
  */
 export function ShellBar() {
   const { t } = useTranslation();

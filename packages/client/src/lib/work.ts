@@ -432,7 +432,7 @@ const plainWhy = (text: string) => {
 /**
  * Why a line failed, under it, for people: a refusal's reason in their words (`chat.work.refusal.<code>`), else
  * nothing. What the tool said is its own text (often English, a connector's JSON): the line's open view shows it.
- * `personal`: a personal workspace's (ADR 0158), whose reasons say no team where it has its own words for one.
+ * `personal`: a personal workspace's (ADR 0159), whose reasons say no team where it has its own words for one.
  */
 export function toolWhy(
   t: TFunction,

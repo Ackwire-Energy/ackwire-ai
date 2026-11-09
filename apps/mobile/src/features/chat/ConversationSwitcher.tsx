@@ -19,7 +19,7 @@ type Conversation = Extract<ConversationRow, { kind: "dm" | "channel" }>;
  * "Trocar de conversa", the sheet that holding the conversation's pill opens: every DM and channel, newest first
  * within Agentes, Canais and Pessoas, with a search on top. The current one has a check; the others their unread
  * count. A tap picks (`onPick`); the screen swaps the conversation in place. A personal workspace's channels are its
- * group conversations (ADR 0158).
+ * group conversations (ADR 0159).
  */
 export function ConversationSwitcher({
   channelId,

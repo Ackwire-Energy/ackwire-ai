@@ -69,7 +69,7 @@ export interface PushStrings {
   /** Lodi's daily card ("Resumo do dia") came. */
   teamDayReady: string;
   /**
-   * A personal workspace's words (ADR 0158), where the team's would speak of a workspace, a team or its admins: one
+   * A personal workspace's words (ADR 0159), where the team's would speak of a workspace, a team or its admins: one
    * person and their agents (and maybe their family) read these. `renderPush` picks them for `personal`.
    */
   machineConnectedTitlePersonal: string;

@@ -40,7 +40,7 @@ const NOBODY = "none";
  * Configurações › Você › Aprovações (ADR 0139): "Quem aprova por mim" (one person, always or only while my status
  * says out, until a day, risky actions off unless turned on), each change saved at once; then the people I approve
  * for, each with "Não quero cobrir". Alone in a personal workspace there is nobody to approve for you: only the right
- * hand's part, until someone joins or while a cover is set (ADR 0158).
+ * hand's part, until someone joins or while a cover is set (ADR 0159).
  */
 export function ApprovalsSection() {
   const { t, i18n } = useTranslation();

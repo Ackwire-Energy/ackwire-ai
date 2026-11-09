@@ -21,7 +21,7 @@ import {
 import { RESTRICTED_HERE, sendHeldToDm } from "./wiki-dm";
 import { inWorkspaceWords } from "./workspace-mode";
 
-/** `search_wiki` as a personal workspace's agents read it (ADR 0158). */
+/** `search_wiki` as a personal workspace's agents read it (ADR 0159). */
 const WIKI_PERSONAL = {
   search_wiki:
     "Search this workspace's wiki (what the person keeps written down: notes, decisions, how-tos, lists). Returns pages with their [[link]] to cite.",
@@ -321,6 +321,6 @@ export function createWikiToolSource(deps: Omit<WikiDeps, "db">): ToolSource {
       },
     },
   ];
-  // A personal workspace (ADR 0158): the same wiki, kept by one person (and maybe their family).
+  // A personal workspace (ADR 0159): the same wiki, kept by one person (and maybe their family).
   return { name: "wiki", tools: async (ctx) => inWorkspaceWords(ctx.db, ctx.orgId, tools, WIKI_PERSONAL) };
 }

@@ -574,7 +574,7 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
       id={a.id}
       kind="approval"
       // A request that leaves the workspace (an e-mail, a post, a payment) says so before anything else; a personal
-      // workspace's is no company's (ADR 0158).
+      // workspace's is no company's (ADR 0159).
       kindNote={high ? t(modeKey(org, "mobile.approval.leaves")) : undefined}
       agentId={a.agentId}
       waitsFor={a.canDecide ? "you" : owner ? t("ask.waitingFor", { name: owner }) : null}

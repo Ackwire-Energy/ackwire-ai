@@ -72,7 +72,7 @@ test("the chips read their answer from the conversation, as on the web", () => {
   expect(answerPicks(chips?.choices ?? [], answerAfter(list, "q"))).toEqual(["Cobrar", "Bugs"]);
 });
 
-test("a personal workspace's row 1 asks about the person, the areas of life saved as one sentence (ADR 0158)", () => {
+test("a personal workspace's row 1 asks about the person, the areas of life saved as one sentence (ADR 0159)", () => {
   const steps = src("agents/setup/SetupStepScreen.tsx");
   expect(steps).toContain(
     "isPersonal(org) ? <AboutYouStep typed={text ?? null} /> : <AboutStep typed={text ?? null} />",
@@ -88,9 +88,10 @@ test("a personal workspace's row 1 asks about the person, the areas of life save
 
 test("an agent with no channel lives in its DM: no bare #, a block of its own, no map when none has one", () => {
   const card = src("right-hand/TeamCard.tsx");
-  // Its channel only when it has one, and never in a personal workspace (ADR 0158).
+  // Its channel only when it has one, and never in a personal workspace (ADR 0159).
   expect(card).toContain('const channelOf = (a: TeamAgentDraft) => (personal ? "" : a.channel);');
   expect(card).toContain("{channelOf(a) ? (");
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: the card's own template, read as source text
   expect(card).toContain("`${channelOf(agent) ? `${agent.name}, #${agent.channel}` : agent.name}: ${routine.name}`");
   // The map keys its blocks by `col.key` (two agents in DMs share no channel) and names a channel only when there is
   // one; with every agent in a DM, there is no map to see.

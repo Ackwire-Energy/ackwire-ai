@@ -72,7 +72,7 @@ export const WEEKLY_CHECK_CRON = "0 17 * * 5";
 const WEEKLY_CHECK_PROMPT =
   "Write this week's check of the team for the person in this conversation, in their language: four numbers (runs, failed runs, approvals waiting, questions nobody answered), what worked, then one fix per problem (an agent stuck or in no channel, a budget near its limit, a request made by hand more than once), each as one of your cards. When there is nothing to say, write one short line.";
 /**
- * The same in a personal workspace (ADR 0158): how the person's own agents did. An agent there may live in its DM
+ * The same in a personal workspace (ADR 0159): how the person's own agents did. An agent there may live in its DM
  * with no channel, which is no problem to fix.
  */
 const WEEKLY_CHECK_PROMPT_PERSONAL =
@@ -88,7 +88,7 @@ export interface TeamAgent {
   appearance: AgentAppearance | null;
   /**
    * The channel it lives in, by name (created with the team when it doesn't exist). Empty: no channel, it lives in its
-   * DM with the person and its routines report there (a personal workspace's template, ADR 0158).
+   * DM with the person and its routines report there (a personal workspace's template, ADR 0159).
    */
   channel: string;
   routines: ProposedRoutine[];
@@ -289,7 +289,7 @@ export async function checkTeam(
     const role = str(a.role).slice(0, 200);
     const line = str(a.line).slice(0, 300);
     if (!line) throw new ValidationError(`Say in \`line\` what ${name} does, in one line.`);
-    // None: it lives in its DM with the person (a personal workspace's template, ADR 0158).
+    // None: it lives in its DM with the person (a personal workspace's template, ADR 0159).
     const channel = str(a.channel).replace(/^#/, "").toLowerCase();
     if (channel && (!CHANNEL_NAME_PATTERN.test(channel) || channel.startsWith("dm-"))) {
       throw new ValidationError(`#${channel}: a channel name is lower-case letters, digits, - or _.`);
@@ -335,7 +335,7 @@ export async function checkTeam(
       agents: named,
     };
   });
-  // A personal workspace's weekly check looks at the person's own agents, named for them (ADR 0158).
+  // A personal workspace's weekly check looks at the person's own agents, named for them (ADR 0159).
   const personal = input.weekly_check === true && (await isPersonalWorkspace(deps.db, at.orgId));
   const weekly =
     input.weekly_check === true
@@ -605,7 +605,7 @@ export async function createTeam(deps: TeamDeps, userId: string, orgId: string, 
           if (a.appearance) row = await setAgentAppearance(tx, userId, orgId, row.id, a.appearance, events);
           // An admin's team gets the apps every agent has; anyone else's starts without access (ADR 0085 §5).
           if (admin) await giveApps(tx, userId, orgId, row.id, []);
-          // With no channel it lives in its DM with the person, where its routines report (ADR 0158).
+          // With no channel it lives in its DM with the person, where its routines report (ADR 0159).
           const channelId = a.channel ? (channelOf.get(a.channel) as string) : null;
           if (channelId) await addChannelMember(tx, userId, orgId, channelId, { agentId: row.id }, events);
           for (const r of a.routines) {
@@ -613,9 +613,7 @@ export async function createTeam(deps: TeamDeps, userId: string, orgId: string, 
               name: r.name,
               agentId: row.id,
               prompt: r.prompt,
-              target: channelId
-                ? { type: "conversation", channelId, threadId: null, reminder: false }
-                : { type: "dm" },
+              target: channelId ? { type: "conversation", channelId, threadId: null, reminder: false } : { type: "dm" },
               trigger: r.rule
                 ? { type: "schedule", rule: r.rule }
                 : { type: "schedule", phrase: r.cron, timezone: r.timezone },
@@ -841,7 +839,7 @@ export async function adjustTeamAgent(
   if (!name || name.length > 80) throw new ValidationError("Give it a name of up to 80 characters.");
   const line = patch.line !== undefined ? str(patch.line).slice(0, 300) : current.line;
   if (!line) throw new ValidationError("Say in one line what it does.");
-  // Empty keeps it in its DM with the person, with no channel (ADR 0158).
+  // Empty keeps it in its DM with the person, with no channel (ADR 0159).
   const channel = patch.channel !== undefined ? str(patch.channel).replace(/^#/, "").toLowerCase() : current.channel;
   if (channel && (!CHANNEL_NAME_PATTERN.test(channel) || channel.startsWith("dm-"))) {
     throw new ValidationError("channel name: lower-case letters, digits, - or _ (max 80)", "channel.invalid_name");
@@ -879,7 +877,7 @@ const LOOK_SCHEMA = {
 } as const;
 
 /**
- * What `propose_team` takes. `personal` (ADR 0158): an agent there usually lives in its DM with the person, so its
+ * What `propose_team` takes. `personal` (ADR 0159): an agent there usually lives in its DM with the person, so its
  * `channel` may be left out (`checkTeam` and `createTeam` take an empty one) and the examples speak of one person; a
  * team's right hand names a channel for each agent, as before.
  */
@@ -997,7 +995,7 @@ function teamSchema(personal: boolean): JsonSchema {
   };
 }
 
-/** `propose_team` as a personal workspace's right hand reads it (ADR 0158): its agents may go without a channel. */
+/** `propose_team` as a personal workspace's right hand reads it (ADR 0159): its agents may go without a channel. */
 export const PROPOSE_TEAM_SCHEMA_PERSONAL = teamSchema(true);
 
 /**
@@ -1106,7 +1104,7 @@ export function teamTools(deps: {
           const routines = params.agents.reduce((n, a) => n + a.routines.length, 0) + (params.weekly ? 1 : 0);
           const where = params.agents.map((a) => `${a.name} ${livesIn(a)}`).join(", ");
           const made = `${where}${params.newChannels.length ? ` (new: ${params.newChannels.map((c) => `#${c}`).join(", ")})` : ""}, ${routines} routines, ${params.skills.length} skills.`;
-          // A personal workspace's card is "Create the agents", for their own agents (ADR 0158).
+          // A personal workspace's card is "Create the agents", for their own agents (ADR 0159).
           const content = (await isPersonalWorkspace(ctx.db, ctx.orgId))
             ? `Posted the card of their agents: ${made} Nothing exists until a person creates them from the card: you'll be told. Say in one short line that it is ready to review.`
             : `Posted the team card: ${made} Nothing exists until a person clicks 'Criar o time': you'll be told. Say in one short line that it is ready to review.`;

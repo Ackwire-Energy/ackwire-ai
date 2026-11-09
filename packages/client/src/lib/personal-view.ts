@@ -2,7 +2,7 @@ import type { Member, OrgRole, OrgSummary, WorkspaceMode } from "../api/types";
 import { isPersonal } from "./workspace-mode";
 
 /**
- * What a personal workspace shows its person (ADR 0158): a simpler view of the same workspace. Nothing here changes
+ * What a personal workspace shows its person (ADR 0159): a simpler view of the same workspace. Nothing here changes
  * what exists or who may do what; it only picks which sections come first, their words, and what a switch of mode or
  * an invitation says. Pure, for the web and the phone app.
  */
@@ -10,7 +10,7 @@ import { isPersonal } from "./workspace-mode";
 type Org = Pick<OrgSummary, "mode"> | null | undefined;
 
 /**
- * Settings in a personal workspace (ADR 0158 §3), in this order: Your account, About you, AI and apps, Plan and usage,
+ * Settings in a personal workspace (ADR 0159 §3), in this order: Your account, About you, AI and apps, Plan and usage,
  * Vault, Computers. Every other section the person may open is under Advanced. Ids are the settings sections'
  * (`/settings/{id}` on the web).
  */
@@ -97,7 +97,7 @@ export interface ModeSwitchLine {
 }
 
 /**
- * What switching a workspace `to` a mode says (ADR 0158 §4): what comes into sight going to a team's; what changes
+ * What switching a workspace `to` a mode says (ADR 0159 §4): what comes into sight going to a team's; what changes
  * going to personal, and with `others` other members, that they see it too. What stays is its own line
  * (`personalMode.<to>.stays`).
  */
@@ -119,7 +119,7 @@ export function modeSwitchLines(to: WorkspaceMode, others: number): ModeSwitchLi
 }
 
 /**
- * Inviting in a personal workspace asks one plain question (ADR 0158 §4): the person uses the agents (a member, no
+ * Inviting in a personal workspace asks one plain question (ADR 0159 §4): the person uses the agents (a member, no
  * role) or helps run the workspace, which is the highest role the inviter may give that holds `administrator` (a new
  * workspace's Admin). Null when there is none to give: only the first choice is offered. The roles stay what they are.
  */
@@ -136,7 +136,7 @@ export const othersHere = (members: readonly Pick<Member, "userId">[], meId: str
   members.filter((m) => m.userId !== meId).length;
 
 /**
- * Whether the viewer is alone in a personal workspace (ADR 0158): `others` is how many other people are members,
+ * Whether the viewer is alone in a personal workspace (ADR 0159): `others` is how many other people are members,
  * undefined while that is loading, which never counts as alone, so a control a family member needs doesn't hide and
  * come back. A control may leave the screen while alone only while it holds its default: a value someone set shows.
  */
@@ -192,7 +192,7 @@ export function keeperName(
 }
 
 /**
- * The key of a note on who may change something, for whoever can't (ADR 0158): a team's own key; in a personal
+ * The key of a note on who may change something, for whoever can't (ADR 0159): a team's own key; in a personal
  * workspace its words, naming who runs it (`keeper`, from `keeperName`, as `{{keeper}}`) with `<key>Keeper`, or
  * without a name, `<key>Personal`, when that isn't one person. Only the words: who may change it is the same.
  */

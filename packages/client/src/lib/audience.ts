@@ -20,7 +20,7 @@ type ModeOrg = Pick<OrgSummary, "mode"> | null | undefined;
 
 /**
  * The i18n key of an audience choice's name (`audience.mode.*`): a personal workspace says it plainly ("Everyone
- * here", "Only some people", ADR 0158); "Only the owner" reads the same in both.
+ * here", "Only some people", ADR 0159); "Only the owner" reads the same in both.
  */
 export const audienceModeKey = (org: ModeOrg, mode: AudienceMode) =>
   mode === "owner" ? ("audience.mode.owner" as const) : modeKey(org, `audience.mode.${mode}` as const);
@@ -289,7 +289,7 @@ export function audienceLines<P extends { userId: string }>(
 
 /**
  * "Pessoal" (only the owner) or "Restrito" (some people); nothing for everyone. `viewer`: a personal workspace tells
- * its owner "Only you" on their own agent (ADR 0158).
+ * its owner "Only you" on their own agent (ADR 0159).
  */
 export function audienceChip(t: TFunction, agent: Agent, viewer?: { org: ModeOrg; meId: string }): string | null {
   const mode = modeOf(agent);
@@ -375,7 +375,7 @@ export function unavailableNotice(
 
 /**
  * The profile summary: "Todos do workspace", "Suporte, Tecnologia e mais 2 pessoas", "Só Walter". `org`: a personal
- * workspace says "everyone" its way (ADR 0158).
+ * workspace says "everyone" its way (ADR 0159).
  */
 export function audienceSummary(
   t: TFunction,

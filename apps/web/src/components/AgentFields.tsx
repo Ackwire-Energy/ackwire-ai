@@ -415,7 +415,7 @@ export function LookRows({
 
 /**
  * "Responsável": a member (you marked) or "Sem responsável". Each with their role under the name, which a personal
- * workspace leaves out (ADR 0158): a family knows who is who.
+ * workspace leaves out (ADR 0159): a family knows who is who.
  */
 export function OwnerSelect({
   value,

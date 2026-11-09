@@ -83,7 +83,7 @@ export interface OrgSettings extends MediaSettings {
   voiceMessages: boolean;
   /** Per provider, the models "Automático" picks per tier where the workspace chose its own (ADR 0087). */
   autoModels: AutoModels;
-  /** Who the workspace is for (ADR 0158): `team` or `personal`. */
+  /** Who the workspace is for (ADR 0159): `team` or `personal`. */
   mode: WorkspaceMode;
 }
 

@@ -10,7 +10,7 @@ import {
 import { type CSSProperties, useEffect, useRef } from "react";
 
 /**
- * The scene of an answer to "what will you use agentes.chat for?" (ADR 0158), the onboarding's brand moment, drawn
+ * The scene of an answer to "what will you use agentes.chat for?" (ADR 0159), the onboarding's brand moment, drawn
  * with the app's own faces and the org chart's lines, over the cards' horizon (`CardHorizon`). For me: the person
  * signing up in the middle (their photo, or their initials as everywhere), their agents around them, each joined to
  * them. For a team: an org chart, them on top, people and agents under them. The other answer rests (its agents doze,
@@ -68,7 +68,13 @@ const LINES: Record<PurposeKind, string[]> = {
   personal: ME.slice(1).map((a) => `M${ME[0]?.x} ${ME[0]?.y}L${a.x} ${a.y}`),
   team: (() => {
     const [lead, a, person, b, c, d] = TEAM as [Face, Face, Face, Face, Face, Face];
-    return [elbow(lead, person, 60), elbow(lead, a, 60), elbow(lead, b, 60), elbow(person, c, 118), elbow(person, d, 118)];
+    return [
+      elbow(lead, person, 60),
+      elbow(lead, a, 60),
+      elbow(lead, b, 60),
+      elbow(person, c, 118),
+      elbow(person, d, 118),
+    ];
   })(),
 };
 
@@ -110,42 +116,42 @@ export function PurposeScene({ kind, chosen, you }: { kind: PurposeKind; chosen:
         />
       </span>
       <span className="onb-scene__room">
-      <span className="onb-scene__stage">
-        <svg className="onb-scene__lines" viewBox={`0 0 ${W} ${H}`} width={W} height={H} aria-hidden="true">
-          {LINES[kind].map((d, i) => (
-            <path
-              // biome-ignore lint/suspicious/noArrayIndexKey: a fixed drawing
-              key={i}
-              d={d}
-              pathLength={1}
-              className="onb-scene__line"
-              style={{ "--i": i } as CSSProperties}
-            />
-          ))}
-        </svg>
-        {faces.map((f, i) => (
-          <span
-            // biome-ignore lint/suspicious/noArrayIndexKey: a fixed cast
-            key={i}
-            className="onb-scene__face"
-            style={{ left: f.x - f.size / 2, top: f.y - f.size / 2, width: f.size, height: f.size }}
-          >
-            {"look" in f ? (
-              <Avatar
-                kind="agent"
-                name={`purpose-${kind}-${i}`}
-                appearance={f.look}
-                size="md"
-                state={chosen ? "idle" : "sleeping"}
-                reactionKey={`purpose-${kind}-${i}`}
+        <span className="onb-scene__stage">
+          <svg className="onb-scene__lines" viewBox={`0 0 ${W} ${H}`} width={W} height={H} aria-hidden="true">
+            {LINES[kind].map((d, i) => (
+              <path
+                // biome-ignore lint/suspicious/noArrayIndexKey: a fixed drawing
+                key={i}
+                d={d}
+                pathLength={1}
+                className="onb-scene__line"
+                style={{ "--i": i } as CSSProperties}
               />
-            ) : "you" in f ? (
-              <Avatar kind="person" name={you.name} imageUrl={you.image ?? undefined} size="lg" />
-            ) : (
-              <Avatar kind="person" name="" imageUrl={f.photo} size="lg" />
-            )}
-          </span>
-        ))}
+            ))}
+          </svg>
+          {faces.map((f, i) => (
+            <span
+              // biome-ignore lint/suspicious/noArrayIndexKey: a fixed cast
+              key={i}
+              className="onb-scene__face"
+              style={{ left: f.x - f.size / 2, top: f.y - f.size / 2, width: f.size, height: f.size }}
+            >
+              {"look" in f ? (
+                <Avatar
+                  kind="agent"
+                  name={`purpose-${kind}-${i}`}
+                  appearance={f.look}
+                  size="md"
+                  state={chosen ? "idle" : "sleeping"}
+                  reactionKey={`purpose-${kind}-${i}`}
+                />
+              ) : "you" in f ? (
+                <Avatar kind="person" name={you.name} imageUrl={you.image ?? undefined} size="lg" />
+              ) : (
+                <Avatar kind="person" name="" imageUrl={f.photo} size="lg" />
+              )}
+            </span>
+          ))}
         </span>
       </span>
     </span>

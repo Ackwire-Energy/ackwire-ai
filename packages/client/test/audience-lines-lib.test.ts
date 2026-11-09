@@ -225,7 +225,7 @@ describe("unavailableNotice (an agent I named won't answer me)", () => {
   });
 });
 
-describe("a personal workspace's audience words (ADR 0158)", () => {
+describe("a personal workspace's audience words (ADR 0159)", () => {
   const t = ((key: string) => key) as unknown as TFunction;
   const personal = { mode: "personal" } as Pick<OrgSummary, "mode">;
   const team = { mode: "team" } as Pick<OrgSummary, "mode">;
@@ -252,9 +252,15 @@ describe("a personal workspace's audience words (ADR 0158)", () => {
 
   test("the summary of everyone in its words", () => {
     const open = agent({ audience: { mode: "everyone", userIds: [] } });
-    expect(audienceSummary(t, open, () => undefined, () => undefined, personal)).toBe(
-      "audience.summary.everyonePersonal",
-    );
+    expect(
+      audienceSummary(
+        t,
+        open,
+        () => undefined,
+        () => undefined,
+        personal,
+      ),
+    ).toBe("audience.summary.everyonePersonal");
     expect(audienceSummary(t, open, () => undefined)).toBe("audience.summary.everyone");
   });
 });

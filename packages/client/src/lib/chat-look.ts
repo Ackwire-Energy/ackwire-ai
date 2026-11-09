@@ -54,7 +54,7 @@ export const CHAT_RHYTHM: Record<ChatStyle, { part: number; turn: number; card: 
 };
 
 /**
- * A channel's look by default in a personal workspace (ADR 0158): a group conversation of one person and their agents
+ * A channel's look by default in a personal workspace (ADR 0159): a group conversation of one person and their agents
  * reads like a chat app's, as a DM already does.
  */
 export const PERSONAL_CHANNEL_STYLE: ChatStyle = "bubbles";
@@ -65,7 +65,7 @@ export const defaultChannelStyle = (personal = false): ChatStyle =>
 
 /**
  * What a conversation shows. A DM has two speakers; anything with more, or with no one person across, is a channel.
- * `personal`: the workspace is personal (ADR 0158), where a channel opens in bubbles too; the person's choice wins.
+ * `personal`: the workspace is personal (ADR 0159), where a channel opens in bubbles too; the person's choice wins.
  */
 export function chatLookOf(
   prefs: ChatPrefs | undefined,

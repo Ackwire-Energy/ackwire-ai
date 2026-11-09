@@ -122,6 +122,8 @@ pub fn start(app: &AppHandle) {
         if app.state::<crate::runners::Runners>().is_quitting() {
             return;
         }
+        // Tailscale turned off here since: its line says nobody else reaches it, until it is shared again.
+        local_server::check_tailnet(&app);
         local_server::ensure_served(&app);
         sync_now(&app, &[]);
     });

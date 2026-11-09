@@ -26,7 +26,7 @@ import { MODE_LINE_ICON } from "./logic";
 import { Gap, SettingsPage } from "./parts";
 
 /**
- * Switching the workspace between team and personal (ADR 0158 §4), the web's dialog as a pushed screen: from About
+ * Switching the workspace between team and personal (ADR 0159 §4), the web's dialog as a pushed screen: from About
  * you (General in a team's) and from inviting people you work with to a personal workspace, for who configures it.
  * Going to a team's it says what comes into sight and asks the workspace's name; going to personal it says what
  * changes and, with other members, that they see it too. What stays is said apart. Only the view changes: every

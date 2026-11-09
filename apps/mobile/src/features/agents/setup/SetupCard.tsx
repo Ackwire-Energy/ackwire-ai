@@ -41,7 +41,7 @@ import { useAgentChannels } from "./useAgentChannels";
  * never stored, in its voice. Five steps (think, apps, channels, who talks to it, how it works); each button opens a
  * screen of its own with the suggestion marked (managing is a pushed screen), think opens Connect AI. Only who may set
  * the agent up sees it: who manages agents all the steps, its owner the ones they may change. Its screen shows the
- * same card while something is left. Alone in a personal workspace (ADR 0158), "who talks to it" isn't asked while it
+ * same card while something is left. Alone in a personal workspace (ADR 0159), "who talks to it" isn't asked while it
  * holds its default (`setupStepsInSight`), and the rows read the workspace's own words.
  */
 

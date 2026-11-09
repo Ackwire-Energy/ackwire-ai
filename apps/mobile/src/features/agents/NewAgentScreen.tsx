@@ -388,7 +388,7 @@ function NewAgentForm({
         // Its setup checklist suggests from the ready-made role it started from (ADR 0155 §2).
         setup: { role: role && role !== "custom" ? role : null },
         ownerUserId: meId ?? null,
-        // A personal workspace's new agent answers its owner only (ADR 0158 §3a): someone who joins later is not
+        // A personal workspace's new agent answers its owner only (ADR 0159 §3a): someone who joins later is not
         // answered by every agent made while the person was alone.
         audience: { mode: isPersonal(org) ? "owner" : "everyone", userIds: [] },
         credentialId: thinks.credentialId,
@@ -459,7 +459,7 @@ function NewAgentForm({
         successHaptic();
         // Agentes greets it once when it is next on screen (its row comes in, the others look at it).
         markArrived(agent.id);
-        // It joined (a personal workspace has no team to join: it is here, ADR 0158), and what it thinks with, under
+        // It joined (a personal workspace has no team to join: it is here, ADR 0159), and what it thinks with, under
         // its face: the one note before its conversation opens.
         const thinksLabel = chosen?.title ?? (start && useLast ? startText : t("brain.auto.label"));
         toast({

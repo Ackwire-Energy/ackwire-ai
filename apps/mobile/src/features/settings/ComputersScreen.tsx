@@ -90,7 +90,7 @@ function machineRow(t: TFunction, locale: string, m: Machine): GroupedRowProps {
 
 /**
  * What "no computer" stands for, by name: the workspace's own computer on its way reads in its mode's words (a
- * personal one's: its person's agents', ADR 0158), else plainly none.
+ * personal one's: its person's agents', ADR 0159), else plainly none.
  */
 function noComputerName(t: TFunction, org: OrgSummary | null, choice: NoComputer) {
   const key = noComputerKey(choice);

@@ -328,7 +328,7 @@ function NewAgentFlow({
   const importFlow = useImportFlow(org.id);
   // The draft
   const [role, setRole] = useState<RoleId | null>(draft ? "custom" : null);
-  // A personal workspace's starting point (one of its template agents), on top of "custom" (ADR 0158 §3).
+  // A personal workspace's starting point (one of its template agents), on top of "custom" (ADR 0159 §3).
   const [starter, setStarter] = useState<PersonalStarter["id"] | null>(null);
   const [roleText, setRoleText] = useState(draft?.role ?? "");
   const [name, setName] = useState(draft?.name ?? "");
@@ -348,14 +348,14 @@ function NewAgentFlow({
   const asked = channelId ? [channelId] : [];
   const [channelIds, setChannelIds] = useState<Set<string>>(new Set(draft?.channelIds ?? asked));
   const [owner, setOwner] = useState(me.user.id);
-  // A personal workspace's new agent answers only its owner until they say otherwise (ADR 0158), as the server makes
+  // A personal workspace's new agent answers only its owner until they say otherwise (ADR 0159), as the server makes
   // its agents; a team's answers everyone.
-  // A personal workspace's agent starts with every app at write, custom ones too (ADR 0158 §3a).
+  // A personal workspace's agent starts with every app at write, custom ones too (ADR 0159 §3a).
   const personal = isPersonal(org);
   const audienceAtFirst = (): AgentAudience => ({ mode: personal ? "owner" : "everyone", userIds: [] });
   const [audience, setAudience] = useState<AgentAudience>(audienceAtFirst);
   // Alone in a personal workspace there is nobody else to own it or talk to it: its owner and who talks to it leave
-  // the screen while they hold that default (ADR 0158). Its page's Settings still has both.
+  // the screen while they hold that default (ADR 0159). Its page's Settings still has both.
   const { solo } = usePersonalView();
   const keeper = useKeeperName();
   // "Automático" for every new agent: each task gets its model and effort; a fixed model is one click away.
@@ -375,7 +375,7 @@ function NewAgentFlow({
 
   const step = NEW_AGENT_STEPS[index] ?? "role";
   const total = NEW_AGENT_STEPS.length;
-  // A personal workspace passes over the technical steps, filled in; Revisar still opens them (ADR 0158 §3).
+  // A personal workspace passes over the technical steps, filled in; Revisar still opens them (ADR 0159 §3).
   const skipped = personal ? PERSONAL_SKIPPED_STEPS : NO_SKIP;
   const walked = NEW_AGENT_STEPS.filter((s) => !skipped.includes(s));
   const dmChannels = useMemo(() => new Set((dms.data ?? []).map((d) => d.channelId)), [dms.data]);
@@ -1022,7 +1022,7 @@ function NewAgentFlow({
               )}
             </div>
             {personal && (
-              // One person's agents (ADR 0158 §3): the right hand's personal ones, not a company's roles.
+              // One person's agents (ADR 0159 §3): the right hand's personal ones, not a company's roles.
               <section className="newag__section" aria-labelledby="ag-roles-personal">
                 <div className="newag__sect">
                   <h2 id="ag-roles-personal">

@@ -41,7 +41,7 @@ describe("after the workspace's name", () => {
     const state = seedState({ agents: [] });
     if (state.me) state.me.organizations = [];
     const { router } = await renderApp("/onboarding", { api: createFakeApi(state) });
-    // First what it is for (ADR 0158): a company or team names it next.
+    // First what it is for (ADR 0159): a company or team names it next.
     expect(screen().getByText("Para que você vai usar o agentes.chat?")).toBeTruthy();
     expect(button("Continuar").hasAttribute("disabled")).toBe(true);
     await click(answer(/Para minha empresa ou time/));
@@ -98,7 +98,7 @@ describe("after the workspace's name", () => {
   });
 });
 
-describe("for me (ADR 0158)", () => {
+describe("for me (ADR 0159)", () => {
   test("no name to ask: a personal workspace, named in the person's language, opens in Lodi's DM in its words", async () => {
     const state = seedState({ agents: [] });
     if (state.me) state.me.organizations = [];

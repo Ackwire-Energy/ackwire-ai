@@ -62,7 +62,7 @@ import { ChoiceChip, TeamTemplatesSheet, useSendAnswer } from "./TeamCard";
  * The right hand's first run on the phone (ADR 0155 §6), as on the web: one checklist card inside its greeting for
  * the workspace's owners, five rows, each a pushed screen (what the workspace does, the apps), a sheet (the team's
  * templates), Connect AI or the invite screen. On a billing hold the AI row says so in words (App Store 3.1.1). A
- * personal workspace (ADR 0158) has four, in its words: what the person wants help with (areas of life), their agents,
+ * personal workspace (ADR 0159) has four, in its words: what the person wants help with (areas of life), their agents,
  * an AI, their apps.
  */
 
@@ -350,7 +350,7 @@ function AboutAnswers({ onOther, onSaved }: { onOther: () => void; onSaved: (bus
 }
 
 /**
- * A personal workspace's first question (ADR 0158), answered in place: the areas of life as answers to tap, several at
+ * A personal workspace's first question (ADR 0159), answered in place: the areas of life as answers to tap, several at
  * once, as the right hand's other questions; Save keeps them as the workspace's context in one sentence
  * (`aboutYouContext`, the same save as the step's own screen) and the agents' templates open with the first area's
  * picked. "Something else" opens the screen to write a sentence about the person, with the areas tapped so far

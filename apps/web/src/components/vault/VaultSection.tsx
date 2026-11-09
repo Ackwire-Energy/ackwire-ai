@@ -122,7 +122,7 @@ export function VaultSection() {
   const current: Tab = tab ?? (data && !data.canManageTeam && team.length === 0 ? "personal" : "team");
   const scope: VaultScope = current === "personal" ? "personal" : "team";
   const canManageTeam = data?.canManageTeam ?? false;
-  // The team's items are the shared ones in a personal workspace (ADR 0158): the same items, its own word.
+  // The team's items are the shared ones in a personal workspace (ADR 0159): the same items, its own word.
   const teamTab = t(modeKey(org, "vault.tab.team"));
   const inTab = current === "personal" ? personal : team;
   const shown = sortItems(

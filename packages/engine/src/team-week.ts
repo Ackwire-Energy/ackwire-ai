@@ -646,7 +646,7 @@ export async function postTeamWeek(
   });
   if (!built) return null;
   const card: TeamWeekCard = { ...built, period, done: {}, dismissedAt: null };
-  // A personal workspace's week is the person's own with their agents (ADR 0158), not a team's.
+  // A personal workspace's week is the person's own with their agents (ADR 0159), not a team's.
   const week = member.mode === "personal" ? "teamWeekReadyPersonal" : "teamWeekReady";
   const message = await db.transaction(async (tx) => {
     const dm = await openPersonAgentDm(tx, orgId, userId, lodi.id);

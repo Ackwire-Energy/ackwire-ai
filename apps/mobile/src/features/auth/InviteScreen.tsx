@@ -147,7 +147,7 @@ function Invitation({ token, mail, onAsked }: { token: string; mail?: string; on
   }
 
   const by = invitation.invitedBy ? invitation.invitedBy.split(/\s+/)[0] : null;
-  // A personal workspace's name ("Personal") says nothing to who is invited: who invited does (ADR 0158).
+  // A personal workspace's name ("Personal") says nothing to who is invited: who invited does (ADR 0159).
   const personal = isPersonal(invitation);
   const title = personal
     ? by

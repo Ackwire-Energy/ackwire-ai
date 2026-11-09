@@ -5,7 +5,7 @@ import { type EmailTemplate, queueBudgetEmail, renderEmail } from "../src";
 import { EMAIL_SAMPLES, PERSONAL_EMAIL_SAMPLES } from "./email-samples";
 import { type Fixture, setup } from "./fixtures";
 
-/** A personal workspace's emails (ADR 0158): the same emails, to the same people, in words for one person. */
+/** A personal workspace's emails (ADR 0159): the same emails, to the same people, in words for one person. */
 
 let f: Fixture;
 afterEach(async () => {
@@ -23,7 +23,7 @@ const TEAM_WORDS = {
 const render = (id: string, more: Partial<EmailTemplate> = {}) =>
   renderEmail({ ...(PERSONAL_EMAIL_SAMPLES[id] as EmailTemplate), ...more } as EmailTemplate);
 
-describe("a personal workspace's emails (ADR 0158)", () => {
+describe("a personal workspace's emails (ADR 0159)", () => {
   test("every one in every language: whole words, nothing left unfilled", () => {
     for (const locale of LOCALE_CODES)
       for (const [id, sample] of Object.entries(PERSONAL_EMAIL_SAMPLES)) {
@@ -58,9 +58,8 @@ describe("a personal workspace's emails (ADR 0158)", () => {
       "Open a conversation with one of your agents and say what you need.",
     );
     expect(render("computer_ready-task-personal.en").text).toContain("Your agents' computer is on and set up");
-    expect(render("invitation-personal.en").text).toContain(
-      "Ana Souza (ana@souzabakery.com) invited you to their personal workspace on agentes.chat.",
-    );
+    // The address is made inert in the text (no link a mail app would make of it), so only the words around it here.
+    expect(render("invitation-personal.en").text).toContain("invited you to their personal workspace on agentes.chat.");
     expect(render("approval_digest-one-personal.en").text).toContain(
       "One of your agents asked to do something that needs your approval.",
     );
@@ -85,7 +84,7 @@ describe("a personal workspace's emails (ADR 0158)", () => {
       const e = { agent: { ...fx.agent }, level: "exhausted" as const, spentNanoUsd: 10e9, budgetNanoUsd: 10e9 };
       await queueBudgetEmail(fx.db, "https://chat.example.com", e);
       const [job] = (await fx.db.select().from(schema.outbox)).filter((j) => j.kind === "email.send");
-      return (job?.payload as { template: EmailTemplate }).template;
+      return (job?.payload as { template: EmailTemplate } | undefined)?.template;
     };
     expect(await budget()).not.toHaveProperty("personal");
     await fx.db
@@ -94,6 +93,7 @@ describe("a personal workspace's emails (ADR 0158)", () => {
       .onConflictDoUpdate({ target: schema.organizationSettings.orgId, set: { mode: "personal" } });
     const personal = await budget();
     expect(personal).toMatchObject({ kind: "budget", personal: true });
-    expect(renderEmail(personal).text).toContain("until you raise the limit on the agent's page");
+    // In the owner's language (pt-BR here): the limit is theirs to raise.
+    expect(renderEmail(personal).text).toContain("até você subir o limite na página do agente");
   });
 });

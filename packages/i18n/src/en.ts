@@ -507,6 +507,20 @@ export const en = {
       continue: "Continue on this {{device}}",
       text: "You set up agentes.chat on this {{device}}: no password needed.",
     },
+    /** The line over the sign-in in the desktop app: which server it signs in to (ADR 0158). */
+    server: {
+      into: "Signing in to <b>{{server}}</b>",
+      intoHere: "Signing in to the agentes.chat <b>on this {{device}}</b>",
+    },
+    /** "Forgot password" on a server that sends no email (ADR 0158). */
+    forgotHere: {
+      ownerTitle: "You don't need a password here.",
+      ownerLead: "You set up agentes.chat on this {{device}}. Sign in here, then create a new password.",
+      notOwner: "Not the account of whoever set it up? Ask an owner of your workspace for a new-password link.",
+      title: "This server doesn't send email.",
+      lead: "Ask an owner of your workspace for a new-password link. They make it in Members, and it works for 1 hour.",
+      back: "Back to the password",
+    },
     reset: {
       title: "Create a new password.",
       save: "Save password",
@@ -581,7 +595,7 @@ export const en = {
     entering: "Joining {{org}}",
     enteringReady: "Your account is ready.",
     /**
-     * A personal workspace's invitation (ADR 0158): someone's own space with their agents, often family. Its name
+     * A personal workspace's invitation (ADR 0159): someone's own space with their agents, often family. Its name
      * ("Personal") says nothing to who is invited, so these never name it: the top line says whose it is, with
      * `name` the full name of who invited.
      */
@@ -664,7 +678,7 @@ export const en = {
       signInLead: "Use the email and password you chose.",
       endedTitle: "Your request ended.",
       endedLead: "If it was approved, sign in with your account.",
-      /** A personal workspace's link (ADR 0158): never its name ("Personal"), as `invite.personalName`. */
+      /** A personal workspace's link (ADR 0159): never its name ("Personal"), as `invite.personalName`. */
       titlePersonal: "Ask to join this workspace",
       helloPersonal: "Hi. This is an invitation to a personal workspace.",
       waitTitlePersonal: "Done. Your request was sent.",
@@ -720,7 +734,7 @@ export const en = {
       invite_other: "Invite {{count}} people",
     },
     yourCompany: "your company",
-    /** The first question (ADR 0158): who the workspace is for. "For me" makes a personal one at once. */
+    /** The first question (ADR 0159): who the workspace is for. "For me" makes a personal one at once. */
     purpose: {
       title: "What will you use agentes.chat for?",
       lead: "You can change this later, nothing is lost.",
@@ -1351,7 +1365,7 @@ export const en = {
   },
   shell: {
     otherChannels: "Other channels",
-    /** A personal workspace's channels (ADR 0158). */
+    /** A personal workspace's channels (ADR 0159). */
     otherChannelsPersonal: "Other group conversations",
     // The Mac app's own title bar (ADR 0036).
     titleBar: { back: "Back", forward: "Forward" },
@@ -1369,7 +1383,7 @@ export const en = {
       team: "Who's who: people, agents and their groups",
       dashboards: "Numbers and charts the agents keep up to date",
       taskManager: "What each agent does now, and stop what you need",
-      /** In a personal workspace (ADR 0158): one person (maybe a family) and their agents, no team. */
+      /** In a personal workspace (ADR 0159): one person (maybe a family) and their agents, no team. */
       approvalsPersonal: "What your agents ask you to allow",
       proposalsPersonal: "What your agents propose to change",
       threadsPersonal: "Side conversations, and missions",
@@ -1379,7 +1393,7 @@ export const en = {
       teamPersonal: "Your agents, and who else is here",
       dashboardsPersonal: "Numbers and charts your agents keep up to date",
       taskManagerPersonal: "What your agents do now, and stop what you need",
-      /** In a personal workspace's More (ADR 0158), where Início lives. */
+      /** In a personal workspace's More (ADR 0159), where Início lives. */
       homePersonal: "Your day: what waits for you and what your agents are doing",
     },
     customizeSidebar: "Customize sidebar",
@@ -1387,7 +1401,7 @@ export const en = {
     sidebarMenu: {
       title: "Sidebar",
       newChannel: "New channel",
-      /** A personal workspace calls its channels group conversations (ADR 0158). */
+      /** A personal workspace calls its channels group conversations (ADR 0159). */
       newChannelPersonal: "New group conversation",
       addToChannels: "New channel or category",
       addToChannelsPersonal: "New group conversation or category",
@@ -1419,6 +1433,11 @@ export const en = {
     addPasswordLabel: "New password",
     addPasswordSaved: "Password added.",
     addPasswordReauth: "Sign in again to add a password.",
+    newPassword: "Create a new password",
+    newPasswordHint: "Your other sessions end, and AI apps connected with the old password need to be connected again.",
+    newPasswordRow: "To change the password you use in other browsers and on other devices",
+    newPasswordSaved: "New password saved.",
+    newPasswordReauth: "Sign in again to create a new password.",
     yourWorkspaces: "Your workspaces",
     youAreHere: "You are here",
     /** Beside a workspace's name, only when another of the person's has the same name. */
@@ -1426,9 +1445,15 @@ export const en = {
     newWorkspace: "New workspace",
     /** In the desktop app, in place of New workspace: the app's window to add one (ADR 0154). */
     addWorkspace: "Add workspace",
-    addWorkspaceHint: "A new one on agentes.chat, or your team's server",
+    addWorkspaceHint: "Join one you already have, create one, or use your team's server",
     /** Beside a server's name above its workspaces, when it isn't agentes.chat. */
     yourServer: "Your server",
+    /** A server's line in "Your workspaces" in the desktop app: the one on this computer, and its state (ADR 0158). */
+    serverHere: "The agentes.chat on this {{device}}",
+    serverStopped: "stopped",
+    serverOffline: "offline since {{time}}",
+    serverSignedOut: "not signed in",
+    serverSignIn: "Sign in",
     wiki: "Wiki",
     settings: "Settings",
     workspaceMenu: "Workspace menu",
@@ -1467,7 +1492,7 @@ export const en = {
     drive: "Drive",
     members: "Members",
     channels: "Channels",
-    /** The channels' section in a personal workspace's sidebar (ADR 0158): only once there is one to show. */
+    /** The channels' section in a personal workspace's sidebar (ADR 0159): only once there is one to show. */
     channelsPersonal: "Group conversations",
     agents: "Agents",
     directMessages: "Direct messages",
@@ -1549,7 +1574,7 @@ export const en = {
     more_other: "{{count}} more agents in Team",
     createFirst: "Create the first agent",
     createFirstPersonal: "Create your first agent",
-    /** The row under a personal workspace's agents (ADR 0158): opens "What should your new agent do?". */
+    /** The row under a personal workspace's agents (ADR 0159): opens "What should your new agent do?". */
     newAgent: "New agent",
     working_one: "{{count}} working",
     working_other: "{{count}} working",
@@ -1579,11 +1604,15 @@ export const en = {
     qr: "QR code to sign in to the agentes app",
     making: "Making the code…",
     stepApp: "Install the agentes app on your phone (App Store or Google Play).",
-    stepTailscale: "Install Tailscale on your phone and join this server's network (tailnet).",
+    stepTailscale: "Install Tailscale on your phone and sign in with the same Tailscale account as this server.",
     stepScan: "Point your phone's camera at the code.",
     validFor: "Valid for {{time}}",
     private: "Whoever scans this code signs in as you.",
     failed: "Couldn't make the code.",
+    /** The desktop app's server with access from other devices off: no phone reaches it. */
+    localOnly: "This server only opens on the computer it runs on, so your phone can't reach it.",
+    localOnlyHow:
+      "In the agentes.chat app on that computer, turn on Reach it from your phone and teammates in Preferences › Servers. Then come back here.",
   },
   team: {
     title: "Team",
@@ -2020,7 +2049,7 @@ export const en = {
     newDot: "New",
     /** Its role, wherever an agent's role shows. */
     role: "Workspace assistant",
-    /** Its role in a personal workspace (ADR 0158). */
+    /** Its role in a personal workspace (ADR 0159). */
     rolePersonal: "Personal assistant",
     /** In its DM's header, after the label. */
     actsAsYou: "acts with your permissions",
@@ -2029,7 +2058,7 @@ export const en = {
     /** The top of its DM, drawn by the app (no model): its greeting and the first card the workspace needs. */
     intro: {
       greeting: "Hi, I'm {{name}}. I'll build the team with you.",
-      /** `<key>Personal`: the same lines in a personal workspace (ADR 0158), about one person's agents. */
+      /** `<key>Personal`: the same lines in a personal workspace (ADR 0159), about one person's agents. */
       greetingPersonal: "Hi, I'm {{name}}. I'll set up your agents with you.",
       lead: "I create the agents, connect the apps and invite the people. Nothing changes unless you ask, and I only do what you can do.",
       leadPersonal: "I create your agents and connect your apps. Nothing changes unless you ask.",
@@ -2842,7 +2871,7 @@ export const en = {
     teammate: "Didn't repeat: <b>{{who}}</b> already did this with {{target}} {{when}}",
     self: "Didn't repeat: I already did this with {{target}} {{when}}",
     someone: "Didn't repeat: someone on the team already did this with {{target}} {{when}}",
-    /** In a personal workspace (ADR 0158): no team, only the person and their agents. */
+    /** In a personal workspace (ADR 0159): no team, only the person and their agents. */
     someonePersonal: "Didn't repeat: this was already done with {{target}} {{when}}",
     inChannel: "in #{{channel}}",
     open: "View",
@@ -2997,7 +3026,7 @@ export const en = {
   newChannel: {
     open: "Create channel",
     title: "Create channel",
-    /** `<key>Personal`: a personal workspace calls a channel a group conversation (ADR 0158). */
+    /** `<key>Personal`: a personal workspace calls a channel a group conversation (ADR 0159). */
     titlePersonal: "New group conversation",
     name: "Name",
     namePlaceholder: "e.g. marketing",
@@ -3095,7 +3124,7 @@ export const en = {
     /** An address nobody in the workspace has, typed in the search (ADR 0090). */
     invite: "Invite {{email}} to {{org}} and #{{channel}}",
     inviteOrg: "Invite {{email}} to {{org}}",
-    /** A personal workspace (ADR 0158), whose name ("Personal") says nothing to who is invited. */
+    /** A personal workspace (ADR 0159), whose name ("Personal") says nothing to who is invited. */
     invitePersonal: "Invite {{email}} to your workspace and #{{channel}}",
     inviteOrgPersonal: "Invite {{email}} to your workspace",
     addTitle: "Add to #{{channel}}",
@@ -3371,7 +3400,7 @@ export const en = {
     tab: {
       label: "What to show",
       team: "Team",
-      /** A personal workspace's word for the team's items (ADR 0158): shared with everyone in it. */
+      /** A personal workspace's word for the team's items (ADR 0159): shared with everyone in it. */
       teamPersonal: "Shared",
       personal: "Personal",
       connections: "Connections",
@@ -3635,7 +3664,7 @@ export const en = {
       required: "Fill this in.",
       for: "Connect for",
       forTeam: "Its items are the team's. Who manages the Vault decides who uses them.",
-      /** `forTeam` in a personal workspace (ADR 0158); `forPersonal` is the line of items only you see. */
+      /** `forTeam` in a personal workspace (ADR 0159); `forPersonal` is the line of items only you see. */
       forTeamPersonal: "Its items are shared. Who manages the Vault decides who uses them.",
       forPersonal: "Its items are yours alone.",
       teamLocked: "Its items will be yours alone. Only who manages the Vault connects one for the team.",
@@ -4485,7 +4514,7 @@ export const en = {
     howWorks: "How {{name}} works",
     instructionsHelp:
       "{{org}}'s context (what the company does, house rules) goes before these instructions in every conversation: write here only what's {{name}}'s.",
-    /** A personal workspace's context is what the person told about themselves (ADR 0158). */
+    /** A personal workspace's context is what the person told about themselves (ADR 0159). */
     instructionsHelpPersonal:
       "What you told about yourself goes before these instructions in every conversation: write here only what's {{name}}'s.",
     budgetUsed: "Budget used",
@@ -4805,7 +4834,7 @@ export const en = {
       activity: "Activity",
       settings: "Settings",
       more: "More",
-      /** A personal workspace's bar (ADR 0158): the access tab is what it can use; Settings keeps name, look, budget. */
+      /** A personal workspace's bar (ADR 0159): the access tab is what it can use; Settings keeps name, look, budget. */
       accessPersonal: "Can use",
       settingsPersonal: "Settings",
       /** A personal workspace's tab with what one person rarely needs. */
@@ -4863,7 +4892,7 @@ export const en = {
     budgetDefaultAmount: "Default ({{amount}})",
     tier: { "1": "Cheapest", "2": "Mid cost", "3": "Most expensive" },
     /**
-     * In a personal workspace (ADR 0158) these notes name who runs it: `<key>Keeper` with `keeper`, the first name of
+     * In a personal workspace (ADR 0159) these notes name who runs it: `<key>Keeper` with `keeper`, the first name of
      * its one owner or administrator; `<key>Personal` when there are several.
      */
     lock: {
@@ -5286,7 +5315,7 @@ export const en = {
     targetSkill: "the skill {{skill}}",
     targetChanges: "changes for {{name}}",
     targetContext: "{{org}} context",
-    /** A personal workspace's context (ADR 0158): what the person told their agents about themselves. */
+    /** A personal workspace's context (ADR 0159): what the person told their agents about themselves. */
     targetContextPersonal: "what your agents know about you",
     roleLine: "Role: {{from}} → {{to}}",
     accessOn: "Turn on: {{app}}",
@@ -5452,7 +5481,7 @@ export const en = {
      */
     firstRun: {
       title: "Getting {{org}}'s team to work",
-      /** `<key>Personal`: a personal workspace's words (ADR 0158), its rows about the person and their agents. */
+      /** `<key>Personal`: a personal workspace's words (ADR 0159), its rows about the person and their agents. */
       titlePersonal: "So your agents can start",
       complete: "All set.",
       notNow: "Not now",
@@ -5545,7 +5574,7 @@ export const en = {
       },
     },
   },
-  /** New agent in a personal workspace (ADR 0158): one question, sent to the right hand, which proposes it. */
+  /** New agent in a personal workspace (ADR 0159): one question, sent to the right hand, which proposes it. */
   newAgentAsk: {
     title: "What should your new agent do?",
     lead: "Say it in one sentence. {{name}} sets it up and shows it to you before creating it.",
@@ -5758,7 +5787,7 @@ export const en = {
       custom: { name: "From scratch", desc: "You write everything. No access until you grant it.", instructions: "" },
     },
     roleGroups: {
-      /** A personal workspace's one group: the right hand's personal agents (ADR 0158). */
+      /** A personal workspace's one group: the right hand's personal agents (ADR 0159). */
       personal: "For your day",
       tech: "Product and tech",
       customers: "Customers",
@@ -5818,7 +5847,7 @@ export const en = {
     ownerHelp: "Gets the budget alerts and approves sensitive actions.",
     ownerYours: "Whoever creates the agent is its owner. An admin can hand it to someone else later.",
     accessAdmins: "Only admins give agents access to apps and mailboxes. Once it's created, ask an admin.",
-    /** A personal workspace (ADR 0158): `keeper` is who runs it, as `agentPage.lock`. */
+    /** A personal workspace (ADR 0159): `keeper` is who runs it, as `agentPage.lock`. */
     accessAdminsKeeper: "Only {{keeper}} gives agents access to apps and mailboxes. Once it's created, ask {{keeper}}.",
     accessAdminsPersonal:
       "Only the people who run this space give agents access to apps and mailboxes. Once it's created, ask one of them.",
@@ -5933,8 +5962,19 @@ export const en = {
     agentsOnlyYouHint: "On a plan, you can let each one answer other people on its page.",
     filters: "Filter people",
     rolesOf: "{{name}}'s roles",
+    moreOf: "More for {{name}}",
+    /** On a server that sends no email, an owner's new-password link for a member (ADR 0158). */
+    passwordLink: {
+      item: "Make a new-password link",
+      hint: "For when they forgot their password",
+      title: "New-password link for {{name}}",
+      lead: "It works once, for 1 hour. Send it wherever you talk.",
+      label: "Link",
+      making: "Making the link…",
+      copy: "Copy link",
+    },
     everyoneNote: "Everyone applies to every person in the workspace.",
-    /** A personal workspace (ADR 0158): `role` is its helper role's own name ("Admin"). */
+    /** A personal workspace (ADR 0159): `role` is its helper role's own name ("Admin"). */
     everyoneNotePersonal: "Without a role, they use the agents. With {{role}}, they help you run it.",
     noRolesToGive: "No roles below yours to give.",
     roleFilter: "Role",
@@ -5943,7 +5983,7 @@ export const en = {
     title: "Members",
     subtitle_one: "Who's part of {{org}}: {{people}} person and {{agents}} agents.",
     subtitle_other: "Who's part of {{org}}: {{people}} people and {{agents}} agents.",
-    /** A personal workspace (ADR 0158): its name ("Personal") says nothing here. */
+    /** A personal workspace (ADR 0159): its name ("Personal") says nothing here. */
     subtitlePersonal_one: "Who's here: {{people}} person and {{agents}} agents.",
     subtitlePersonal_other: "Who's here: {{people}} people and {{agents}} agents.",
     inviteTitle: "Invite people",
@@ -6004,7 +6044,7 @@ export const en = {
     // workspace's first agent asking each one in its bubble; the link on a screen of its own.
     dialog: {
       title: "Invite to {{org}}",
-      // A personal workspace's words (ADR 0158): its name ("Personal") reads oddly in a sentence.
+      // A personal workspace's words (ADR 0159): its name ("Personal") reads oddly in a sentence.
       titlePersonal: "Invite someone to your workspace",
       /** Under the title: the step out of four, and its name. */
       stepOf: "Step {{n}} of {{total}} · {{step}}",
@@ -6046,7 +6086,7 @@ export const en = {
         lead: "The role says what each person can do. You can change it later.",
         each: "A role for each person",
         same: "The same role for everyone",
-        // A personal workspace asks it plainly (ADR 0158): two choices, each one of the workspace's roles.
+        // A personal workspace asks it plainly (ADR 0159): two choices, each one of the workspace's roles.
         titleOnePersonal: "What can {{name}} do here?",
         titleManyPersonal: "What can they do here?",
         leadPersonal: "You can change it later.",
@@ -6061,7 +6101,7 @@ export const en = {
           "Can change agents, settings and who's here, as you can. Sees everything shared here, except your direct messages.",
       },
       /**
-       * A personal workspace's role step (ADR 0158): the agents every member may talk to, which answer whoever joins.
+       * A personal workspace's role step (ADR 0159): the agents every member may talk to, which answer whoever joins.
        * `<agents/>` is their names, joined as a list ("Leo and Bia"), each one a link.
        */
       reach: {
@@ -8960,7 +9000,7 @@ export const en = {
       everyone: "Everyone in the workspace",
       people: "Only some people or roles",
       owner: "Only the owner",
-      /** `<key>Personal`: a personal workspace's plain words (ADR 0158), where a family picks people, not roles. */
+      /** `<key>Personal`: a personal workspace's plain words (ADR 0159), where a family picks people, not roles. */
       everyonePersonal: "Everyone here",
       peoplePersonal: "Only some people",
     },
@@ -8982,12 +9022,12 @@ export const en = {
     onlyYouForNow: "Only you, for now",
     onlyOwnerForNow: "Only {{name}}, for now",
     search: "Search roles and people",
-    /** With no role to pick (a personal workspace, ADR 0158): people only. */
+    /** With no role to pick (a personal workspace, ADR 0159): people only. */
     searchPeople: "Search people",
     noMatch: "No role or person with that name.",
     noMatchPeople: "Nobody with that name.",
     pickSomeone: "Pick at least one person or role.",
-    /** `ownerPersonal`: a personal workspace's own agent that answers only its owner, to that owner (ADR 0158). */
+    /** `ownerPersonal`: a personal workspace's own agent that answers only its owner, to that owner (ADR 0159). */
     chip: { owner: "Personal", people: "Restricted", ownerPersonal: "Only you" },
     summary: {
       everyone: "Everyone in the workspace",
@@ -9222,7 +9262,7 @@ export const en = {
     goTo: "Go to",
     ask: "Ask an agent",
     channel: "channel",
-    /** A channel's row in a personal workspace (ADR 0158). */
+    /** A channel's row in a personal workspace (ADR 0159). */
     channelPersonal: "group conversation",
     agent: "agent",
     agentRole: "agent · {{role}}",
@@ -11797,7 +11837,7 @@ export const en = {
     moreFiltersHint: "dates, agents only, pinned",
     clearRecentAll: "Clear recent searches",
     /** The search at the top of a channel (Discord style): the field, and the results in the panel beside it. */
-    /** `placeholderPersonal`: a personal workspace (ADR 0158), whose name ("Personal") says nothing here. */
+    /** `placeholderPersonal`: a personal workspace (ADR 0159), whose name ("Personal") says nothing here. */
     header: { placeholder: "Search {{org}}", placeholderPersonal: "Search everything", clear: "Clear search" },
     panel: {
       label: "Search results",
@@ -11867,6 +11907,12 @@ export const en = {
     },
   },
   errors: {
+    /** A new-password link an owner can't make (ADR 0158). */
+    passwordLink: {
+      email: "This server sends email: they ask for their own link in Forgot password.",
+      serverOwner: "Whoever set up this server signs in on the computer it runs on, with no link.",
+      otherWorkspace: "They're also in a workspace that isn't yours: only the owners of all of them can make the link.",
+    },
     /** Refusals in plain words: each server code that needs no line of its own shares one of these. */
     said: {
       gone: "This isn't here anymore. Refresh the page and try again.",
@@ -12891,6 +12937,7 @@ export const en = {
         joined: "Joined the workspace",
         left: "Left the workspace",
         role_changed: "Changed a member's role",
+        password_link: "Made a new-password link for a member",
       },
       apps: {
         connected: "Connected {{app}}",
@@ -13056,7 +13103,7 @@ export const en = {
       apps: "AI apps",
       approvals: "Approvals",
       about: "About agentes.chat",
-      // A personal workspace's names (ADR 0158): General, AI accounts and Budget and usage in their own words.
+      // A personal workspace's names (ADR 0159): General, AI accounts and Budget and usage in their own words.
       generalPersonal: "About you",
       /** AI accounts, connectors and skills on one page. */
       keysPersonal: "AI and apps",
@@ -13122,7 +13169,7 @@ export const en = {
         densityHelp: "Changes only for you, on all your devices",
         where: "Where it applies",
         channels: "Channels",
-        /** A personal workspace's channels (ADR 0158). */
+        /** A personal workspace's channels (ADR 0159). */
         channelsPersonal: "Groups",
         dms: "DMs",
         comfortable: "Comfortable",
@@ -13202,7 +13249,7 @@ export const en = {
       "Before an email, a message or a pull request, the agent checks whether anyone on the team already did it to the same person or place in the last 30 days, and doesn't repeat it.",
     actionCheckHelpPersonal:
       "Before an email or a message, the agent checks whether you or another agent already did it to the same person or place in the last 30 days, and doesn't repeat it.",
-    /** Who the workspace is for (ADR 0158): a row of General and About you, with the button that switches it. */
+    /** Who the workspace is for (ADR 0159): a row of General and About you, with the button that switches it. */
     mode: {
       label: "Workspace mode",
       /** The mode it is in now, before the button. */
@@ -13375,7 +13422,7 @@ export const en = {
     },
   },
   /**
-   * Switching a workspace between team and personal (ADR 0158 §4), and the question inviting asks in a personal one.
+   * Switching a workspace between team and personal (ADR 0159 §4), and the question inviting asks in a personal one.
    * Only the view changes: nothing is deleted, and nobody may do more or less.
    */
   personalMode: {
@@ -13873,7 +13920,7 @@ export const en = {
         tooMany: "Too many to approve in a row",
         off: "Running commands is off for this agent",
         team: "The team already did this",
-        /** In a personal workspace (ADR 0158). */
+        /** In a personal workspace (ADR 0159). */
         teamPersonal: "This was already done",
         unclear: "It can't be read plainly",
         outside: "It changes files outside the agent's folder",
@@ -15260,12 +15307,12 @@ export const en = {
     managedAccess: "This is the workspace's own computer: its tools and folders stay as they are.",
     notification: {
       ready: "Your workspace's computer is ready",
-      /** In a personal workspace (ADR 0158): the person's computer for their agents. */
+      /** In a personal workspace (ADR 0159): the person's computer for their agents. */
       readyPersonal: "Your agents' computer is ready",
     },
     title: "{{org}}'s computer",
     /**
-     * In a personal workspace (ADR 0158), also the name the server gives it (`managedMachineName`): never "Your
+     * In a personal workspace (ADR 0159), also the name the server gives it (`managedMachineName`): never "Your
      * computer", which is the person's own laptop.
      */
     titlePersonal: "Your agents' computer",
@@ -16203,7 +16250,7 @@ export const en = {
   teamPlan: {
     start: {
       templates: "See team templates",
-      /** A personal workspace's gallery: ready agents for one person (ADR 0158). */
+      /** A personal workspace's gallery: ready agents for one person (ADR 0159). */
       templatesPersonal: "See ready agents",
     },
     business: {
@@ -16216,7 +16263,7 @@ export const en = {
       other: "Something else",
     },
     step: "Question {{step}} of {{of}}",
-    /** A personal workspace's row 1 (ADR 0158): the areas of life the person wants help with. */
+    /** A personal workspace's row 1 (ADR 0159): the areas of life the person wants help with. */
     lifeArea: {
       routine: "Calendar and routine",
       money: "Finances",
@@ -16300,7 +16347,7 @@ export const en = {
       none: "None of these",
       noneSub: "Tell what you do and {{name}} builds it",
       tailor: "Later, just ask me to fit it to your business.",
-      /** `<key>Personal`: the gallery in a personal workspace (ADR 0158), its templates by area of life. */
+      /** `<key>Personal`: the gallery in a personal workspace (ADR 0159), its templates by area of life. */
       titlePersonal: "Your agents",
       leadPersonal: "Ready agents for what you want help with. Then {{name}} fits them to you.",
       heldLeadPersonal: "Pick the closest to what you need. You can change everything later.",
@@ -16318,7 +16365,7 @@ export const en = {
   whoSees: {
     label: "Who sees it",
     everyone: "Everyone in the workspace",
-    /** `<key>Personal`: a personal workspace's words (ADR 0158). */
+    /** `<key>Personal`: a personal workspace's words (ADR 0159). */
     everyonePersonal: "Everyone here",
     me: "Only me",
     people: "Specific people",
@@ -16345,7 +16392,7 @@ export const en = {
     conversation: "Only the conversation",
     people: "People and roles you choose",
     /**
-     * `<key>Personal`: a personal workspace's words (ADR 0158); its people choice and its Add, while there is no role
+     * `<key>Personal`: a personal workspace's words (ADR 0159); its people choice and its Add, while there is no role
      * worth picking, name people only.
      */
     peoplePersonal: "People you choose",
@@ -16439,7 +16486,7 @@ export const en = {
   },
   teamTemplates: {
     lead: "A team for {{org}}, each agent in its own channel. You can adjust it before creating.",
-    /** A personal workspace's templates (ADR 0158): agents for one person's life, each in its own chat with them. */
+    /** A personal workspace's templates (ADR 0159): agents for one person's life, each in its own chat with them. */
     leadPersonal: "Your agents, each one talking to you in its own chat. You can adjust them before creating.",
     life: {
       name: "Life in order",

@@ -234,7 +234,7 @@ export function EmailSteps({
   };
 
   const first = firstName(name);
-  // A personal workspace's words (ADR 0158): never its name ("Personal"), who invited instead.
+  // A personal workspace's words (ADR 0159): never its name ("Personal"), who invited instead.
   const calledYou = by
     ? t(modeKey(preview, "invite.calledYou"), { name: by, org })
     : t(modeKey(preview, "invite.calledYouNoName"), { org });

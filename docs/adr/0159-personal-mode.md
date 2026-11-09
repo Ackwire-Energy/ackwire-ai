@@ -1,4 +1,4 @@
-# 0158. Personal mode: the same workspace, shaped for one person
+# 0159. Personal mode: the same workspace, shaped for one person
 
 - Status: Accepted (being built: the server, the shared client, the web and the phone app, in one change)
 - Date: 2026-11-09

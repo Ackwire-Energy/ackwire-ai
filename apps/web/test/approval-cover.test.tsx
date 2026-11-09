@@ -70,7 +70,7 @@ describe("Configurações › Você › Aprovações (ADR 0139)", () => {
     expect(section().queryByRole("region", { name: "Você aprova por" })).toBeNull();
   });
 
-  test("alone in a personal workspace nobody can approve for you: no Quem aprova por mim, unless one is set (ADR 0158)", async () => {
+  test("alone in a personal workspace nobody can approve for you: no Quem aprova por mim, unless one is set (ADR 0159)", async () => {
     const personal = (alone: boolean) => {
       const state = seedState();
       const org = state.me?.organizations[0];

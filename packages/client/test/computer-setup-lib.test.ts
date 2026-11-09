@@ -253,7 +253,7 @@ describe("the workspace's own computer (ADR 0056 §10)", () => {
     expect(computerNameOf(t, "Oficina", "MacBook Air")).toBe("MacBook Air");
   });
 
-  test("a personal workspace's own computer is its person's agents', under either mode's given name (ADR 0158)", () => {
+  test("a personal workspace's own computer is its person's agents', under either mode's given name (ADR 0159)", () => {
     const managed = (name: string) => ({ kind: "managed" as const, name });
     const mine = t("computerSetup.titlePersonal");
     const team = t("computerSetup.title", { org: "Oficina" });
@@ -276,7 +276,7 @@ describe("the workspace's own computer (ADR 0056 §10)", () => {
     expect(computerName(t, "Oficina", managed("オフィスのコンピューター"))).toBe("オフィスのコンピューター");
   });
 
-  test("the names the server gives it are the ones it recognises, in every language (ADR 0158)", () => {
+  test("the names the server gives it are the ones it recognises, in every language (ADR 0159)", () => {
     const team = GIVEN_COMPUTER_NAMES.team as readonly string[];
     const personal = GIVEN_COMPUTER_NAMES.personal as readonly string[];
     for (const code of LOCALE_CODES) {

@@ -35,7 +35,7 @@ test("every push kind in every language: words, within the phone's limits (ADR 0
       for (const variant of [
         { actorName: "Ana", actorType: "user" as const, text: "olha", title: "Deploy", label: "geral" },
         { actorType: "agent" as const, highRisk: true, reminder: true, screen: "desktop", suggestedBy: "Bia" },
-        // A personal workspace's words (ADR 0158), with no words of the agent's own to stand in for them.
+        // A personal workspace's words (ADR 0159), with no words of the agent's own to stand in for them.
         { actorName: "Ana", actorType: "user" as const, title: "Deploy", reason: "creator_left", personal: true },
         { actorType: "agent" as const, suggestedBy: "Bia", personal: true },
       ]) {
@@ -47,7 +47,7 @@ test("every push kind in every language: words, within the phone's limits (ADR 0
       }
 });
 
-test("a personal workspace's pushes speak of one person and their agents, never a team (ADR 0158)", () => {
+test("a personal workspace's pushes speak of one person and their agents, never a team (ADR 0159)", () => {
   const push = (kind: string, more: object = {}) =>
     renderPush("en", { kind, waiting: true, actorName: "Ana", label: "Personal", personal: true, ...more });
   expect(push("join_request", { title: "Bia" }).title).toBe("Bia asks to join your workspace");

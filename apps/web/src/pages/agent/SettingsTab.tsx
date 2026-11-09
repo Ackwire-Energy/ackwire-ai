@@ -209,7 +209,7 @@ function ReportsTo() {
 
 /**
  * Configurações: identity and look, who thinks (and the API's model and key), budget, owner, audience, channels, computer.
- * In a personal workspace (ADR 0158 §3) it comes in two parts: `basic` (its name, look and budget, the Settings tab) and
+ * In a personal workspace (ADR 0159 §3) it comes in two parts: `basic` (its name, look and budget, the Settings tab) and
  * `advanced` (the rest, with who it reports to and its brakes, in the Advanced tab).
  */
 export function SettingsTab({
@@ -582,7 +582,7 @@ export function AudienceEditor({ layout = "cards" }: { layout?: "cards" | "rows"
   const { agent, draft, set, can, errors } = useAgentEdit();
   const ownerId = draft.owner === NO_OWNER ? null : draft.owner;
   // On a plan (ADR 0059 §5) only its owner lets more people in. Here every role is offered, in a personal workspace
-  // too (ADR 0158): its own page keeps the whole choice.
+  // too (ADR 0159): its own page keeps the whole choice.
   const onPlan = engineOfBrain(agent.brain?.kind) !== "agent";
   const chooseAudience = (next: AgentAudience) => set("audience", next);
   return (

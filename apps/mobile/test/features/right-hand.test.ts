@@ -102,7 +102,7 @@ test("its greeting's cards beside the checklist: one question at a time (ADR 015
   expect(introLeadKey(true, true)).toBe("rightHand.intro.lead");
   expect(introLeadKey(false, false)).toBe("rightHand.intro.lead");
   const src = (f: string) => readFileSync(new URL(f, import.meta.url), "utf8");
-  // A personal workspace reads its own sibling (ADR 0158), on both.
+  // A personal workspace reads its own sibling (ADR 0159), on both.
   for (const f of ["../../src/features/right-hand/Intro.tsx", "../../../web/src/components/RightHandIntro.tsx"])
     expect(src(f)).toContain("t(modeKey(org, introLeadKey(held, team.length > 0)))");
 });
@@ -112,10 +112,10 @@ test("the phone's greeting draws the checklist and Conversas has one line back t
   expect(src("right-hand/Intro.tsx")).toContain("<FirstRunCard agent={agent} channelId={channelId} />");
   expect(src("chats/ChatsScreen.tsx")).toContain("<FirstRunLine />");
   // One line that says who is setting up the team and how far ("Atlas is setting up the team · 2 of 5"); a personal
-  // workspace's says "your agents" (ADR 0158).
+  // workspace's says "your agents" (ADR 0159).
   expect(src("chats/FirstRunLine.tsx")).toContain('t(modeKey(org, "mobile.chats.firstRunLine")');
   // The apps row names what it reads, as the web's does, never "Sem apps" with apps connected; a personal workspace's
-  // rows read its own words (ADR 0158).
+  // rows read its own words (ADR 0159).
   const card = src("right-hand/FirstRun.tsx");
   expect(card).toContain(
     '{ org: org?.name ?? "", agents: team.length, label, apps: appNames, members: run.members, personal }',

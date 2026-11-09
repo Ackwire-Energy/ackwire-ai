@@ -17,7 +17,7 @@ import {
 const inSight = (personal: boolean) =>
   sidebarItemOrder(personal).filter((id) => inSidebarList(sidebarPlace({}, id, personal), 0));
 
-describe("the sidebar's defaults by the workspace's mode (ADR 0158)", () => {
+describe("the sidebar's defaults by the workspace's mode (ADR 0159)", () => {
   test("a team's stay as they were: the default when no mode is given", () => {
     expect(sidebarSections()).toEqual(SIDEBAR_SECTIONS);
     expect(sidebarItemOrder()).toEqual(SIDEBAR_ITEMS);

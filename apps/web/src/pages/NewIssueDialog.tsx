@@ -88,7 +88,7 @@ export function NewIssueDialog({
   const [another, setAnother] = useState(false);
   const [audience, setAudience] = useState<AudienceChoice>(EVERYONE);
   // Alone in a personal workspace there is nobody else to see it: "Who sees it" leaves the form while it says
-  // everyone, the default (ADR 0158). Anything else always shows.
+  // everyone, the default (ADR 0159). Anything else always shows.
   const { solo } = usePersonalView();
   const whoSeesShown = !solo || audience.mode !== "everyone";
   const [choosing, setChoosing] = useState(false);

@@ -31,7 +31,7 @@ export const SIDEBAR_DEFAULTS: Record<SidebarItem, SidebarPlace> = {
 };
 
 /**
- * The same in a personal workspace (ADR 0158): the sidebar is the person's conversations, so every tool starts in More
+ * The same in a personal workspace (ADR 0159): the sidebar is the person's conversations, so every tool starts in More
  * and only Approvals comes into sight, while something waits. Only what is in sight changes: every tool is still one
  * click away, and a choice the person made still wins.
  */
@@ -49,7 +49,7 @@ export const PERSONAL_SIDEBAR_DEFAULTS: Record<SidebarItem, SidebarPlace> = {
   taskManager: "more",
 };
 
-/** Where each tool goes by default in a workspace of this mode (`personal`: ADR 0158). */
+/** Where each tool goes by default in a workspace of this mode (`personal`: ADR 0159). */
 export const sidebarDefaults = (personal = false) => (personal ? PERSONAL_SIDEBAR_DEFAULTS : SIDEBAR_DEFAULTS);
 
 /**
@@ -78,7 +78,7 @@ export const SIDEBAR_COUNTED: readonly SidebarItem[] = ["approvals", "proposals"
 
 /** The sidebar's sections in their default order (mirrors `SIDEBAR_SECTIONS`, packages/engine/src/sidebar-items.ts). */
 export const SIDEBAR_SECTIONS: readonly SidebarSection[] = ["tools", "channels", "agents", "people"];
-/** The same in a personal workspace (ADR 0158): the agents before the group conversations. */
+/** The same in a personal workspace (ADR 0159): the agents before the group conversations. */
 export const PERSONAL_SIDEBAR_SECTIONS: readonly SidebarSection[] = ["tools", "agents", "channels", "people"];
 
 /** The sections' default order in a workspace of this mode. */

@@ -279,7 +279,7 @@ export async function teammateMeans(
  * "# Your team" for the system prompt: the other agents the person
  * behind the run can talk to, one short line each, so an agent knows who
  * exists even in a DM. Details stay behind `find_agent`. Agents already
- * described in "Where you are" (channel members) are left out. In a personal workspace (ADR 0158) they are the
+ * described in "Where you are" (channel members) are left out. In a personal workspace (ADR 0159) they are the
  * person's other agents, not a team.
  */
 export function teamPrompt(
@@ -309,7 +309,7 @@ const words = (s: string) =>
     .split(/[^\p{L}\p{N}]+/u)
     .filter((w) => w.length >= 3);
 
-/** `find_agent` as a personal workspace's agents read it (ADR 0158). */
+/** `find_agent` as a personal workspace's agents read it (ADR 0159). */
 const FIND_AGENT_PERSONAL = {
   [FIND_AGENT_TOOL]:
     "Find this person's other agents: who knows or can do something (e.g. bills, travel, training), what each one can do, who is responsible for it and whether it is busy now. Leave `query` empty to list them all. To ask one, use ask_agent.",

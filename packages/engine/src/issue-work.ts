@@ -41,7 +41,7 @@ export async function issueWorkBrief(
   db: Executor,
   orgId: string,
   issueId: string,
-  /** `personal`: a personal workspace's words (ADR 0158). */
+  /** `personal`: a personal workspace's words (ADR 0159). */
   options: { asked?: boolean; inConversation?: boolean; personal?: boolean } = {},
 ): Promise<string | null> {
   const asked = options.asked ?? true;

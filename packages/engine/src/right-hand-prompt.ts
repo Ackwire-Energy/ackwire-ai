@@ -25,7 +25,7 @@ export const TEAM_INTERVIEW = [
 ].join("\n");
 
 /**
- * The same in a personal workspace (ADR 0158): their agents for the areas of their life, from one person's answers.
+ * The same in a personal workspace (ADR 0159): their agents for the areas of their life, from one person's answers.
  * Who lives with them is context they may give, never a question about who works there, and nobody is invited unless
  * they ask.
  */
@@ -110,7 +110,7 @@ export async function rightHandPrompt(
       .select({ setup: agents.setup })
       .from(agents)
       .where(and(eq(agents.orgId, orgId), eq(agents.id, agent.id))),
-    // A personal workspace (ADR 0158): one person and their agents, so no team words and no nudge to invite people.
+    // A personal workspace (ADR 0159): one person and their agents, so no team words and no nudge to invite people.
     isPersonalWorkspace(db, orgId),
   ]);
   const roleNames = membership?.roleIds.length
@@ -215,7 +215,7 @@ export async function rightHandPrompt(
   ].filter(Boolean);
   // What the team's agents lack, which no row of the first-run checklist shows.
   const teamThings = [
-    // A personal workspace's agents may live in their DMs with the person (ADR 0158): no channel is nothing to fix.
+    // A personal workspace's agents may live in their DMs with the person (ADR 0159): no channel is nothing to fix.
     !personal && seen.some((a) => seatsOf(a.id).length === 0)
       ? "An agent is in no channel: offer to add it to one (propose_settings_change, its channels)."
       : "",

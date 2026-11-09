@@ -71,7 +71,7 @@ test("a step that failed says why the server refused it, else that it didn't sav
   expect(stepFailedText(pt, new TypeError("Network request failed"))).toBe(pt("mobile.onb.failed"));
 });
 
-test("the first question makes a personal workspace at once, named in the person's language (ADR 0158)", async () => {
+test("the first question makes a personal workspace at once, named in the person's language (ADR 0159)", async () => {
   expect(PURPOSES).toEqual(["personal", "team"]);
   const pt = await translator("pt-BR");
   const en = await translator("en");

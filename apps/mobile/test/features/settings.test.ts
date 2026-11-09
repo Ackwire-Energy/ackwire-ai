@@ -12,9 +12,9 @@ import {
   exportFileName,
   grantCommand,
   isGithubSkillLink,
+  MODE_LINE_ICON,
   machineFacts,
   missingIdeas,
-  MODE_LINE_ICON,
   NO_COMPUTER,
   nameOnLeave,
   noComputerKey,
@@ -156,7 +156,7 @@ describe("the workspace's settings on the phone: who opens what (the web's sub-n
   });
 });
 
-describe("a personal workspace's settings on the phone (ADR 0158 §3): one short list, the rest under Advanced", () => {
+describe("a personal workspace's settings on the phone (ADR 0159 §3): one short list, the rest under Advanced", () => {
   const ALL = ["read", "invite_people", "view_audit", "view_usage", "manage_agents", "configure", "create_agents"];
   const owner = (mode?: "personal" | "team", permissions = [...ALL, "manage_roles"]) => ({
     id: "o",

@@ -41,6 +41,7 @@ import { audienceChip, audienceNames, audienceNotice, canTalk, hiddenAgentIds } 
 import { workspaceNotes } from "@agenteschat/client/lib/deletion";
 import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
 import { errorText } from "@agenteschat/client/lib/errors";
+import { formatTime } from "@agenteschat/client/lib/format";
 import { waitingAgents } from "@agenteschat/client/lib/outages";
 import { can, managesChannel } from "@agenteschat/client/lib/permissions";
 import { AVAILABILITIES, isOutOfOffice, presenceOfAvailability, statusEndNote } from "@agenteschat/client/lib/presence";
@@ -73,6 +74,7 @@ import {
   MenuSeparator,
   MenuSub,
   modKey,
+  PixelSpinner,
   Popover,
   PresenceBadge,
   ProviderLogo,
@@ -112,7 +114,7 @@ import { entityMenu } from "@/lib/entity-menu";
 import { useOpenParam } from "@/lib/open-param";
 import { markOpen } from "@/lib/perf";
 import { ownPlanLines, planNearLimit, planWord } from "@/lib/plan-usage";
-import { rightHandSeen, STORAGE_KEYS, storage, storedStrings } from "@/lib/storage";
+import { rightHandSeen, STORAGE_KEYS, sessionStore, storage, storedStrings } from "@/lib/storage";
 import { useToast } from "@/lib/toast";
 import type { SettingsSection } from "@/pages/settings-sections";
 import { useStreams } from "@/realtime/context";
@@ -215,7 +217,7 @@ export function channelInitials(name: string) {
 }
 
 /**
- * The workspace sidebar. A personal workspace (ADR 0158) has the person on top (their menu, the bell and the collapse
+ * The workspace sidebar. A personal workspace (ADR 0159) has the person on top (their menu, the bell and the collapse
  * beside it), Go to… as the list's first row and no foot; what sits in sight changes, never what can be reached.
  */
 export function Sidebar() {
@@ -271,7 +273,7 @@ export function Sidebar() {
     proposals: proposalsWaiting,
     threads: missionsWaiting + unreadThreads,
   };
-  // The mode's defaults and order (ADR 0158): in a personal workspace, Routines and Drive in sight, the rest in More.
+  // The mode's defaults and order (ADR 0159): in a personal workspace, Routines and Drive in sight, the rest in More.
   const toolOrder = sidebarItemOrder(personal);
   const listed = toolOrder.filter((id) => inSidebarList(sidebarPlace(sidebarItems, id, personal), counts[id] ?? 0));
   const inMore = toolOrder.filter((id) => !listed.includes(id));
@@ -327,7 +329,7 @@ export function Sidebar() {
   const rightHand = dir.agents.find((a) => isRightHand(a) && a.canTalk !== false);
   const dmOf = new Map((dms.data ?? []).map((d) => [d.with.id, d]));
   const rightHandDm = rightHand ? dmOf.get(rightHand.id) : undefined;
-  // New agent in a personal workspace (ADR 0158): one question, what it should do, and the right hand proposes it.
+  // New agent in a personal workspace (ADR 0159): one question, what it should do, and the right hand proposes it.
   const [askingAgent, setAskingAgent] = useState(false);
   const newAgent = () =>
     rightHand ? setAskingAgent(true) : void navigate({ to: "/org/$orgId/agents/new", params: { orgId } });
@@ -517,7 +519,7 @@ export function Sidebar() {
     ? [item("new-group", t("agentGroups.newGroup"), "layers", () => setGroupDialog({ mode: "create" }))]
     : [];
   const groupsClosed = groupIds.every((id) => !sections.isOpen(id, groupsOpen));
-  // The channels the sidebar lists. A personal workspace (ADR 0158) leaves out #general while no one else is in it
+  // The channels the sidebar lists. A personal workspace (ADR 0159) leaves out #general while no one else is in it
   // (unless it is open or something new waits there), and shows its group conversations only once there is one.
   const quietGeneral = (c: Channel) =>
     c.name === "general" && !looksUnread(c) && !c.mentionCount && !pathname.endsWith(`/c/${c.id}`);
@@ -540,7 +542,7 @@ export function Sidebar() {
     { kind: "separator" },
     sectionOrder.restore,
   ]);
-  // The agents' rows, under the Agentes header in a team's workspace and with none in a personal one (ADR 0158).
+  // The agents' rows, under the Agentes header in a team's workspace and with none in a personal one (ADR 0159).
   const agentRows = (
     <>
       {rightHand && (
@@ -580,7 +582,7 @@ export function Sidebar() {
     </>
   );
   const blocks: Record<SectionKey, ReactNode> = {
-    // A personal workspace's list is its conversations (ADR 0158): a tool comes into sight only while something
+    // A personal workspace's list is its conversations (ADR 0159): a tool comes into sight only while something
     // waits in it, or once the person put it there; Início, Go to… and the other tools are in More at the end.
     tools: personal ? (
       listed.length > 0 && (
@@ -617,7 +619,7 @@ export function Sidebar() {
       (team.length > 0 ? shownAgents.length > 0 || manages : createAgentItem.length > 0)) && (
       <>
         {personal ? (
-          // No header in a personal workspace (ADR 0158): its agents are the list, its right hand first.
+          // No header in a personal workspace (ADR 0159): its agents are the list, its right hand first.
           <div className="sidebar__group sidebar__agents-plain">{agentRows}</div>
         ) : (
           <SidebarSection
@@ -672,7 +674,10 @@ export function Sidebar() {
                     </MenuItem>
                   )}
                   {manages && (
-                    <MenuItem icon="layers" onSelect={() => void navigate({ to: "/org/$orgId/team", params: { orgId } })}>
+                    <MenuItem
+                      icon="layers"
+                      onSelect={() => void navigate({ to: "/org/$orgId/team", params: { orgId } })}
+                    >
                       {t("sidebarAgents.organize")}
                     </MenuItem>
                   )}
@@ -734,11 +739,11 @@ export function Sidebar() {
             </span>
           </Link>
         )}
-        {/* A personal workspace (ADR 0158): New agent right under its agents (the rail's tile, with no headers there). */}
+        {/* A personal workspace (ADR 0159): New agent right under its agents (the rail's tile, with no headers there). */}
         {personal && createAgentItem.length > 0 && (rail ? <CreateAgentTile /> : <NewAgentRow onOpen={newAgent} />)}
       </>
     ),
-    // A personal workspace lists people only once someone else is a member (a family, ADR 0158).
+    // A personal workspace lists people only once someone else is a member (a family, ADR 0159).
     people: !(personal && alone) && (
       <SidebarSection
         id="people"
@@ -835,7 +840,7 @@ export function Sidebar() {
       <div className="sidebar__top">
         <WorkspaceSky part="side" rail={rail} />
         {personal ? (
-          // A personal workspace (ADR 0158): the person on top (their account, settings and workspaces in one menu),
+          // A personal workspace (ADR 0159): the person on top (their account, settings and workspaces in one menu),
           // the bell and the collapse beside them. The desktop app's title bar has its own collapse (desktop.css).
           <div className="sidebar__org sidebar__org--person">
             <AccountMenu personal />
@@ -897,7 +902,7 @@ export function Sidebar() {
         {sectionOrder.order.filter((id) => blocks[id]).map((id) => sectionOrder.block(id, blocks[id], !rail))}
       </div>
 
-      {/* A personal workspace's end (ADR 0158): one More, holding Início, Go to… and every tool not in sight. */}
+      {/* A personal workspace's end (ADR 0159): one More, holding Início, Go to… and every tool not in sight. */}
       {personal && (
         <div className="sidebar__end">
           <MoreTools items={inMore} row={toolRow} countOf={countOf} onCustomize={() => setCustomizing(true)} home />
@@ -921,7 +926,7 @@ export function Sidebar() {
       )}
       {groupDialog && <GroupNameDialog purpose={groupDialog} onClose={() => setGroupDialog(null)} />}
 
-      {/* No foot in a personal workspace (ADR 0158): the person, the bell and the collapse are on top. */}
+      {/* No foot in a personal workspace (ADR 0159): the person, the bell and the collapse are on top. */}
       {!personal && (
         <div className="sidebar__foot">
           <SidebarHorizon working={working} total={dir.agents.length} />
@@ -940,7 +945,7 @@ export function Sidebar() {
 
 /** Create agent as one of the rail's tiles (the full sidebar creates from the Agents header's +). */
 /**
- * New agent under a personal workspace's agents (ADR 0158): a row like theirs, an empty face with a plus where a face
+ * New agent under a personal workspace's agents (ADR 0159): a row like theirs, an empty face with a plus where a face
  * would be, so it reads as the next one.
  */
 function NewAgentRow({ onOpen }: { onOpen: () => void }) {
@@ -1460,7 +1465,7 @@ function SidebarChannels({
     <>
       <SidebarSection
         id="channels"
-        // A personal workspace's are its group conversations (ADR 0158).
+        // A personal workspace's are its group conversations (ADR 0159).
         label={t(modeKey(org, "shell.channels"))}
         sections={sections}
         className="sidebar__section--part"
@@ -1568,7 +1573,7 @@ function SidebarChannels({
   );
 }
 
-/** The tools whose line in More has a personal workspace's words (ADR 0158); Routines' and Drive's fit both. */
+/** The tools whose line in More has a personal workspace's words (ADR 0159); Routines' and Drive's fit both. */
 type PersonalWhat = Exclude<SidebarItem, "routines" | "drive">;
 const hasPersonalWhat = (id: SidebarItem): id is PersonalWhat => id !== "routines" && id !== "drive";
 
@@ -1588,7 +1593,7 @@ function MoreTools({
   row: (id: SidebarItem) => ReactNode;
   countOf: (id: SidebarItem) => ReactNode;
   onCustomize: () => void;
-  /** At a personal workspace's end (ADR 0158): Início and Go to… open its list, and it opens upward. */
+  /** At a personal workspace's end (ADR 0159): Início and Go to… open its list, and it opens upward. */
   home?: boolean;
 }) {
   const { t } = useTranslation();
@@ -1746,19 +1751,26 @@ function AgentRow({
   // Listed for who manages agents though it doesn't talk to them: the line says who it talks to.
   const locked = !canTalk(a);
   const names = locked ? audienceNames(a, (id) => dir.memberById.get(id)?.name, dir.roleName) : [];
+  // Working: the pixel orbit in its color beside its name (what it is on in its label and the row's title), so the
+  // row never changes height.
+  const working = busy || shown?.line?.kind === "work";
+  const now = busy
+    ? here
+      ? t("sidebarAgents.workingIn", { channel: here })
+      : t(`sky.busy.${state}`)
+    : working
+      ? line?.text
+      : undefined;
+  // Under the name, one line of one height: who it talks to when that is limited, why it is out, else its role (the
+  // agent's fixed label) as a tag.
+  const out = shown?.presence === "out" && line ? line.text : null;
   const under = locked
     ? names.length > 1
       ? t("sidebarAgents.talksOnlyMore", { name: names[0], count: names.length - 1 })
       : names[0]
         ? t("sidebarAgents.talksOnly", { name: names[0] })
         : chip
-    : busy
-      ? here
-        ? t("sidebarAgents.workingIn", { channel: here })
-        : t(`sky.busy.${state}`)
-      : (shown?.line?.kind === "work" || shown?.presence === "out") && line
-        ? line.text
-        : a.role;
+    : (out ?? a.role);
   return (
     <div className="sidebar__row" data-agent-row={a.id} data-live={live || undefined} data-acts={edits ? 1 : undefined}>
       <Link
@@ -1766,7 +1778,7 @@ function AgentRow({
         to="/org/$orgId/dm/agent/$agentId"
         params={{ orgId: org.id, agentId: a.id }}
         className="sidebar__item"
-        title={[a.name, a.role, word, line?.text].filter(Boolean).join(" · ")}
+        title={[a.name, a.role, now ?? word, line?.text].filter(Boolean).join(" · ")}
         onMouseEnter={onPrefetch}
         onFocus={onPrefetch}
         onClick={onOpen}
@@ -1788,17 +1800,11 @@ function AgentRow({
           {...(waitingFor ? { state: "idle" as const, expression: "closed" as const } : {})}
         />
         <span className="sidebar__item-text">
-          <span className={under ? "sidebar__item-label ac-captop" : "sidebar__item-label"}>{a.name}</span>
-          {under && (
-            <span
-              className={cx(
-                "sidebar__item-role",
-                (busy || shown?.line?.kind === "work") && !locked && "sidebar__item-work",
-              )}
-            >
-              {under}
-            </span>
-          )}
+          <span className={under ? "sidebar__item-label ac-captop" : "sidebar__item-label"}>
+            {a.name}
+            {working && <PixelSpinner size={14} color={color} label={now} className="sidebar__item-spin" />}
+          </span>
+          {under && <span className={cx("sidebar__item-role", !locked && !out && "ac-tag")}>{under}</span>}
         </span>
         {unread > 0 ? (
           <UnreadCount count={unread} />
@@ -1842,8 +1848,9 @@ function AgentRow({
 }
 
 /**
- * The team's right hand (ADR 0137), always the first row of AGENTES on a soft tint: its face, its name over "seu braço
- * direito", a one-time "Novo" until its DM first opens (in this browser), and its DM's unread count. It opens the
+ * The team's right hand (ADR 0137), always the first row of Agents, a plain row like any agent's: its face, its name
+ * over its label as a tag ("your right hand"), a one-time "New" until its DM first opens (in this browser), and its
+ * DM's unread count. It opens the
  * person's DM with it. Never sorted, pinned, dragged or hidden; a closed AGENTES still shows it.
  */
 function RightHandRow({
@@ -1877,7 +1884,7 @@ function RightHandRow({
       <AgentAvatar agentId={a.id} name={a.name} size="sm" presence={shown?.presence ?? null} />
       <span className="sidebar__item-text">
         <span className="sidebar__item-label ac-captop">{a.name}</span>
-        <span className="sidebar__item-role">{label}</span>
+        <span className="sidebar__item-role ac-tag">{label}</span>
       </span>
       {unread > 0 ? (
         <UnreadCount count={unread} />
@@ -1973,7 +1980,7 @@ function UnreadCount({
  * it. It and adding a password keep their dialogs here, in the address (`?account=delete`, `?account=password`) on any
  * page: adding a password may ask for a sign-in again, which comes back.
  *
- * In a personal workspace (`personal`, ADR 0158) it is the sidebar's top row (face, name and ▾, no foot) and its menu,
+ * In a personal workspace (`personal`, ADR 0159) it is the sidebar's top row (face, name and ▾, no foot) and its menu,
  * opening down, also holds what the workspace menu held for one person: Your account, Settings and the person's
  * workspaces. Mounted once either way: the dialogs live here.
  */
@@ -1998,6 +2005,13 @@ function AccountMenu({ personal = false }: { personal?: boolean }) {
       setPhone(true);
     });
   }, []);
+  // Forgot password › Continue on this Mac (ADR 0158): signed in now, the new password it came for.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once, as the account menu mounts
+  useEffect(() => {
+    if (sessionStore.get(STORAGE_KEYS.newPasswordAsk) !== "1") return;
+    sessionStore.remove(STORAGE_KEYS.newPasswordAsk);
+    setAccount("password");
+  }, []);
   const handle = dir.memberById.get(me.user.id)?.handle;
   // How you appear to yourself, read as the members column reads it (hidden stays hidden), and your line.
   const shown = usePersonPresence(me.user.id);
@@ -2012,6 +2026,7 @@ function AccountMenu({ personal = false }: { personal?: boolean }) {
 
   const signOut = async () => {
     await auth.signOut();
+    storage.set(STORAGE_KEYS.signedOut, "1");
     qc.clear();
     await navigate({ to: "/login" });
   };
@@ -2152,17 +2167,14 @@ function AccountMenu({ personal = false }: { personal?: boolean }) {
       <ProfileDialog focus={profile ? "name" : null} onClose={() => setProfile(false)} />
       <SetStatusDialog open={statusOpen} onClose={() => setStatusOpen(false)} />
       <OpenOnPhoneDialog open={phone} onClose={() => setPhone(false)} />
-      <AddPasswordDialog
-        open={account === "password" && me.user.hasPassword === false}
-        onClose={() => setAccount(null)}
-      />
+      <AddPasswordDialog open={account === "password"} onClose={() => setAccount(null)} />
       <DeleteAccountDialog open={account === "delete"} onClose={() => setAccount(null)} />
     </>
   );
 }
 
 /**
- * Your workspaces in the account menu of a personal workspace (ADR 0158): the workspace menu's list (by server in the
+ * Your workspaces in the account menu of a personal workspace (ADR 0159): the workspace menu's list (by server in the
  * desktop app, ADR 0154), then New workspace or Add workspace. Mounted only while the menu is open: the counts load
  * then. No role beside each: one person's own workspaces.
  */
@@ -2392,10 +2404,36 @@ function WorkspaceMenuOptions({ onDone }: { onDone: () => void }) {
             {groups.map((g) => (
               <Fragment key={g.server}>
                 {groups.length > 1 && (
-                  <span className="sidebar__menu-server">
-                    <Icon name={g.cloud ? "cloud" : "computer"} size={14} />
-                    {g.name}
-                    {!g.cloud && <em>· {t("shell.yourServer")}</em>}
+                  <span className="sidebar__menu-server" data-state={g.state}>
+                    <Icon name={g.cloud ? "cloud" : g.thisComputer ? "computer" : "globe"} size={14} />
+                    {g.thisComputer ? t("shell.serverHere") : g.name}
+                    {/* Its state as words in the line, never a pill (ADR 0158): stopped, offline since, signed out. */}
+                    {g.state === "offline" ? (
+                      <em className="sidebar__menu-server-state">
+                        ·{" "}
+                        {g.thisComputer
+                          ? t("shell.serverStopped")
+                          : t("shell.serverOffline", {
+                              time: formatTime(i18n.language, new Date(g.offlineSince ?? Date.now()).toISOString()),
+                            })}
+                      </em>
+                    ) : g.state === "signedOut" ? (
+                      <>
+                        <em className="sidebar__menu-server-state">· {t("shell.serverSignedOut")} ·</em>
+                        <button
+                          type="button"
+                          className="ac-link"
+                          onClick={() => {
+                            onDone();
+                            void thisMac.openServer(g.server).catch(() => thisMac.otherServer().catch(() => {}));
+                          }}
+                        >
+                          {t("shell.serverSignIn")}
+                        </button>
+                      </>
+                    ) : (
+                      !g.cloud && !g.thisComputer && <em>· {t("shell.yourServer")}</em>
+                    )}
                   </span>
                 )}
                 {g.rows.map((o) => {
@@ -2403,7 +2441,12 @@ function WorkspaceMenuOptions({ onDone }: { onDone: () => void }) {
                   return (
                     <MenuOverlayItem
                       key={o.id}
-                      leading={<OrgMark logo={o.logo} size={32} />}
+                      leading={
+                        // A server not answering: its last workspaces, dimmed.
+                        <span className={g.state === "offline" ? "sidebar__menu-dim" : undefined}>
+                          <OrgMark logo={o.logo} size={32} />
+                        </span>
+                      }
                       description={
                         here ? [t(`roles.${here.role}`), notes.get(o.id)].filter(Boolean).join(" · ") : undefined
                       }

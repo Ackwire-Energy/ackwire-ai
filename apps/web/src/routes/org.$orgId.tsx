@@ -163,7 +163,7 @@ function OrgLayout() {
                     )}
                     {/* The work area: notices on top (agents paused, the workspace's computer on its way, a computer
                     the agents run on went offline), then the page. */}
-                    <div className="shell__work">
+                    <div className={focused ? "shell__work shell__work--bare" : "shell__work"}>
                       {!focused && <HoldBanner />}
                       {!focused && <ComputerSetupNotice />}
                       {!focused && <OutageNotices />}

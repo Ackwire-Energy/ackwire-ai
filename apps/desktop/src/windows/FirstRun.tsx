@@ -10,6 +10,7 @@ import {
   CLOUD_SERVER,
   type ConnectLink,
   connectLink,
+  isLoopback,
   parseConnectLink,
   type ServerCheck,
 } from "@agenteschat/client/lib/server";
@@ -34,6 +35,7 @@ import { useTranslation } from "react-i18next";
 import { useHost } from "../app";
 import {
   type Candidate,
+  CHECK_MS,
   type ConnectProblem,
   connectOutcome,
   escapeAction,
@@ -44,8 +46,10 @@ import {
   type LinkView,
   LOOK_MS,
   linkView,
+  ownAddresses,
   ownServerScreen,
   PROBLEM_TEXT,
+  terminalStartCommand,
   typedServer,
 } from "../control/first-run";
 import {
@@ -59,9 +63,10 @@ import {
   setupSteps,
   stepClock,
   stepStates,
+  tailscaleFrom,
 } from "../control/local-server";
 import { serverKind, serverName } from "../control/server";
-import { useOnShown, useTailnet } from "../hooks";
+import { useOnShown, useTailnet, writePref } from "../hooks";
 import { BrandFace, CommandCopy, HelpLink } from "../ui/bits";
 import { CopyDetails, ReachProblem, ReachProgress, ReachRow, ServerTile } from "../ui/here";
 import { hintFor, PrefRow } from "../ui/settings";
@@ -86,10 +91,20 @@ export function FirstRun() {
   const [screen, setScreen] = useState<FirstScreen>("choose");
   // Opened by the site's "Add a workspace" (ADR 0154): its first screen says so.
   const [adding, setAdding] = useState(false);
+  // Adding a workspace with agentes.chat already signed in here: making one is the big button, not signing in.
+  const [cloudSignedIn, setCloudSignedIn] = useState(false);
   const [trail, setTrail] = useState<FirstScreen[]>([]);
-  const [link, setLink] = useState<{ raw: string; parsed: ConnectLink | null; view: LinkView } | null>(null);
+  // `typed`: the sheet confirms an address typed or picked in Connect, so Cancel goes back there with it.
+  const [link, setLink] = useState<{ raw: string; parsed: ConnectLink | null; view: LinkView; typed?: boolean } | null>(
+    null,
+  );
   // This build carries the server (Mac and Linux): "Run agentes.chat on this computer" is offered.
   const [canRunHere, setCanRunHere] = useState(false);
+  // The agentes.chat this computer runs (the app's, or one from the terminal): named as such, never by its address,
+  // and its owner page opened directly while it waits for one.
+  const [local, setLocal] = useState<LocalServerStatus | null>(null);
+  // Connect's address: it stays when a sheet about it is cancelled (the screen comes back new).
+  const [address, setAddress] = useState("");
   // The setup's screen is up (running, failed or done): Esc and the window shown again leave it on screen.
   const settingUp = useRef(false);
   const setSettingUp = useCallback((busy: boolean) => {
@@ -133,7 +148,7 @@ export function FirstRun() {
         button: "connect",
         leave: current && current !== server ? serverName(current) : null,
       };
-      setLink({ raw: "", parsed: { server }, view });
+      setLink({ raw: "", parsed: { server }, view, typed: true });
       go("link");
     },
     [host, go],
@@ -164,22 +179,28 @@ export function FirstRun() {
   );
 
   // How it opened: taken when it's made, and each time it shows again.
-  const takeMode = useCallback(
-    () =>
-      void host
-        .welcomeMode()
-        .then((mode) => setAdding(mode === "add"))
-        .catch(() => setAdding(false)),
-    [host],
-  );
+  const takeMode = useCallback(() => {
+    void host
+      .welcomeMode()
+      .then((mode) => setAdding(mode === "add"))
+      .catch(() => setAdding(false));
+    void host
+      .workspaces()
+      .then((list) => setCloudSignedIn(list.some((s) => s.server === CLOUD_SERVER && s.signedIn)))
+      .catch(() => setCloudSignedIn(false));
+  }, [host]);
   useEffect(takeMode, [takeMode]);
 
   useEffect(() => {
     void host
       .localServer()
-      .then((s) => setCanRunHere(s.bundled))
+      .then((s) => {
+        setCanRunHere(s.bundled);
+        setLocal(s);
+      })
       .catch(() => {});
   }, [host]);
+  const own = ownAddresses(local?.run || local?.installed === "terminal" ? local : null);
 
   // A link waiting when the window opens, and any that arrives while it's open.
   useEffect(() => {
@@ -200,6 +221,7 @@ export function FirstRun() {
     if (screen === "link" || settingUp.current) return;
     setTrail([]);
     setScreen("choose");
+    setAddress("");
   });
 
   useEffect(() => {
@@ -222,17 +244,25 @@ export function FirstRun() {
         {screen === "choose" && (
           <Choose
             adding={adding}
+            cloudSignedIn={cloudSignedIn}
             onCloud={(page) => void finish(CLOUD_SERVER, page)}
             onOwn={() => go(ownServerScreen(canRunHere))}
           />
         )}
-        {screen === "own" && <Own onBack={back} onConnect={() => go("connect")} onHere={() => go("here")} />}
+        {screen === "own" && (
+          <Own adding={adding} onBack={back} onConnect={() => go("connect")} onHere={() => go("here")} />
+        )}
         {screen === "connect" && (
           <Connect
             onBack={back}
             backLabel={trail[trail.length - 1] === "own" ? "own" : "choose"}
+            local={local}
+            own={own}
+            address={address}
+            onAddress={setAddress}
             onUse={finish}
             onConfirm={confirm}
+            onLink={openLink}
           />
         )}
         {screen === "here" && (
@@ -241,10 +271,13 @@ export function FirstRun() {
         {screen === "link" && link && (
           <LinkSheet
             view={link.view}
+            own={own}
             onRetry={() => void (link.raw ? openLink(link.raw) : link.parsed && confirm(link.parsed.server))}
             onAccept={(server, page) => void finish(server, page)}
             onCancel={() => {
               setLink(null);
+              // An address typed in Connect: back there with it, as Esc does.
+              if (link.typed && trail.length > 0) return back();
               void host.servers().then(({ current }) => {
                 if (current) void host.hideWindow("welcome").catch(() => {});
                 else if (trail.length > 0) back();
@@ -264,11 +297,24 @@ export function FirstRun() {
 }
 
 /**
- * agentes.chat, big; your own server, small. `adding` (the site's "Add a workspace", ADR 0154): a new workspace on
- * agentes.chat is the big one, and the team's server the small one; the workspaces already there stay.
+ * agentes.chat, big; your own server, small. `adding` (the site's "Add a workspace", ADR 0154): signing in to
+ * agentes.chat (the workspaces an account already has, or was invited to) is the big one and a new workspace the
+ * line under it; with agentes.chat already signed in here, a new workspace is the big one. The team's server stays
+ * the small one; the workspaces already there stay.
  */
-function Choose({ adding, onCloud, onOwn }: { adding: boolean; onCloud: (page: string) => void; onOwn: () => void }) {
+function Choose({
+  adding,
+  cloudSignedIn,
+  onCloud,
+  onOwn,
+}: {
+  adding: boolean;
+  cloudSignedIn: boolean;
+  onCloud: (page: string) => void;
+  onOwn: () => void;
+}) {
   const { t } = useTranslation();
+  const makeFirst = adding && cloudSignedIn;
   return (
     <>
       <div className="dk-fr__hello">
@@ -281,17 +327,24 @@ function Choose({ adding, onCloud, onOwn }: { adding: boolean; onCloud: (page: s
           variant="primary"
           className="dk-btn-lg dk-fr__cloud"
           autoFocus
-          onClick={() => onCloud(adding ? "/onboarding" : "/login")}
+          onClick={() => onCloud(makeFirst ? "/onboarding" : "/login")}
         >
-          {t(adding ? "desktop.first.addCloud" : "desktop.first.cloud")}
+          {t(makeFirst ? "desktop.first.addCloud" : "desktop.first.cloud")}
           <Icon name="arrowRight" size={16} />
         </Button>
-        <span className="dk-help">
-          {t("desktop.first.create")}{" "}
-          <button type="button" className="ac-link dk-link" onClick={() => onCloud("/signup")}>
-            {t("desktop.first.createLink")}
-          </button>
-        </span>
+        {/* The other way under it: an account (first run) or a new workspace (adding, signed in there or not). */}
+        {!makeFirst && (
+          <span className="dk-help">
+            {t(adding ? "desktop.first.addNew" : "desktop.first.create")}{" "}
+            <button
+              type="button"
+              className="ac-link dk-link"
+              onClick={() => onCloud(adding ? "/onboarding" : "/signup")}
+            >
+              {t(adding ? "desktop.first.addNewLink" : "desktop.first.createLink")}
+            </button>
+          </span>
+        )}
       </div>
       <button type="button" className="dk-fr__own" onClick={onOwn}>
         {t(adding ? "desktop.first.addOwn" : "desktop.first.own")}
@@ -310,14 +363,24 @@ function BackLink({ label, onClick }: { label: string; onClick: () => void }) {
   );
 }
 
-/** The two ways to use your own server. */
-function Own({ onBack, onConnect, onHere }: { onBack: () => void; onConnect: () => void; onHere: () => void }) {
+/** The two ways to use your own server; adding a workspace, it reads as the line that led here. */
+function Own({
+  adding,
+  onBack,
+  onConnect,
+  onHere,
+}: {
+  adding: boolean;
+  onBack: () => void;
+  onConnect: () => void;
+  onHere: () => void;
+}) {
   const { t } = useTranslation();
   const host = useHost();
   return (
     <>
       <BackLink label={t("desktop.own.back")} onClick={onBack} />
-      <h1>{t("desktop.own.title")}</h1>
+      <h1>{t(adding ? "desktop.first.addOwn" : "desktop.own.title")}</h1>
       <p className="dk-lead">{t("desktop.own.lead")}</p>
       <div className="dk-fr__cards">
         <button type="button" className="dk-fr__card" onClick={onConnect}>
@@ -348,60 +411,122 @@ function Own({ onBack, onConnect, onHere }: { onBack: () => void; onConnect: () 
   );
 }
 
-function ProblemLine({ problem, host }: { problem: ConnectProblem; host: string }) {
+/**
+ * What's wrong with an address, with the one thing that fixes it where the app can do it: its updates for a server
+ * newer than this app, Tailscale's app for a server on a Tailscale network it can't reach.
+ */
+function ProblemLine({ problem, host: where }: { problem: ConnectProblem; host: string }) {
   const { t } = useTranslation();
+  const host = useHost();
+  const tailnet = useTailnet();
+  const action =
+    problem === "app-too-old"
+      ? {
+          label: t("desktop.connect.checkUpdates"),
+          run: () => {
+            writePref("prefsTab", "updates");
+            void host.showWindow("prefs").catch(() => {});
+          },
+        }
+      : problem === "unreachable-tailnet" && tailscaleFrom(host.platform, tailnet) === "app"
+        ? { label: t("desktop.here.openTailscale"), run: () => void host.openTailscale("app").catch(() => {}) }
+        : null;
   return (
     <span className="dk-honest dk-fr__problem ac-iconline" role="alert">
       <Icon name="alert" size={16} />
-      <span>{t(PROBLEM_TEXT[problem], PROBLEM_HOSTLESS.has(problem) ? {} : { host })}</span>
+      <span>
+        {t(PROBLEM_TEXT[problem], PROBLEM_HOSTLESS.has(problem) ? {} : { host: where })}
+        {action && (
+          <>
+            {" "}
+            <button type="button" className="ac-link dk-link" onClick={action.run}>
+              {action.label}
+            </button>
+          </>
+        )}
+      </span>
     </span>
   );
 }
 
-/** The address, what was found, and the one-command setup for a server that has none yet. */
+const wait = (ms: number) => new Promise<"late">((r) => setTimeout(() => r("late"), ms));
+
+/**
+ * The address, what was found, and the one-command setup for a server that has none yet. Discovery lists each server
+ * as soon as its check answers, one that answered with a problem with that problem, and can look again. While this
+ * computer's Tailscale is off it says the servers there can't show up. The address typed stays when a sheet about it
+ * is cancelled (`address` lives in the window).
+ */
 function Connect({
   onBack,
   backLabel,
+  local,
+  own,
+  address,
+  onAddress,
   onUse,
   onConfirm,
+  onLink,
 }: {
   onBack: () => void;
   backLabel: "own" | "choose";
+  /** The agentes.chat this computer runs or has from the terminal (its owner claim, while it waits for one). */
+  local: LocalServerStatus | null;
+  /** Its addresses (`ownAddresses`). */
+  own: readonly string[];
+  address: string;
+  onAddress: (address: string) => void;
   onUse: (server: string) => Promise<void>;
   onConfirm: (server: string) => Promise<void>;
+  onLink: (raw: string) => Promise<void>;
 }) {
   const { t } = useTranslation();
   const host = useHost();
-  const [address, setAddress] = useState("");
+  const tailnet = useTailnet();
   const [checking, setChecking] = useState<string | null>(null);
   const [problem, setProblem] = useState<{ problem: ConnectProblem; host: string } | null>(null);
   const [looking, setLooking] = useState(true);
-  const [found, setFound] = useState<Candidate[]>([]);
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [checks, setChecks] = useState<(ServerCheck | null)[]>([]);
+  // "Look again" bumps it: discovery runs once more from the start.
+  const [scan, setScan] = useState(0);
 
-  // Discovery: this computer and the Tailscale network, for at most LOOK_MS; only servers that answered show.
+  // Discovery: this computer and the Tailscale network. The list comes within LOOK_MS, then each candidate's check
+  // within CHECK_MS of its own; only servers that answered show, each as soon as it did.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `scan` asks for the search again
   useEffect(() => {
     let live = true;
-    const budget = new Promise<"late">((r) => setTimeout(() => r("late"), LOOK_MS));
+    setLooking(true);
+    setCandidates([]);
+    setChecks([]);
     void (async () => {
-      const candidates = await Promise.race([host.discover().catch(() => [] as Candidate[]), budget]);
-      if (candidates === "late") return live && setLooking(false);
-      const checks: (ServerCheck | null)[] = candidates.map(() => null);
+      const listed = await Promise.race([host.discover().catch(() => [] as Candidate[]), wait(LOOK_MS)]);
+      if (!live) return;
+      if (listed === "late" || listed.length === 0) return setLooking(false);
+      setCandidates(listed);
+      setChecks(listed.map(() => null));
       await Promise.race([
         Promise.all(
-          candidates.map(async (c, i) => {
-            checks[i] = await host.checkServer(c.server).catch(() => null);
+          listed.map(async (c, i) => {
+            const check = await host.checkServer(c.server).catch(() => null);
+            if (live) setChecks((now) => now.map((x, j) => (j === i ? check : x)));
           }),
         ),
-        budget,
+        wait(CHECK_MS),
       ]);
-      if (!live) return;
-      setFound(foundServers(candidates, checks));
-      setLooking(false);
+      if (live) setLooking(false);
     })();
     return () => {
       live = false;
     };
-  }, [host]);
+  }, [host, scan]);
+  const found = foundServers(candidates, checks);
+
+  // A server on this computer still waiting for its owner: the app knows its owner link, so its page opens.
+  const claimHere = (server: string) =>
+    local?.claim && (isLoopback(server) || own.includes(server))
+      ? connectLink(local.url ?? server, { claim: local.claim })
+      : null;
 
   const submit = async (input: string) => {
     if (checking) return;
@@ -411,8 +536,10 @@ function Connect({
     setChecking(typed.server);
     const check = await host.checkServer(typed.server);
     setChecking(null);
-    const outcome = connectOutcome(typed.server, check);
-    if (outcome.kind === "problem") setProblem(outcome);
+    const outcome = connectOutcome(typed.server, check, own);
+    const claim = outcome.kind === "problem" && outcome.problem === "no-owner" ? claimHere(typed.server) : null;
+    if (claim) await onLink(claim);
+    else if (outcome.kind === "problem") setProblem(outcome);
     else if (outcome.kind === "use") await onUse(outcome.server);
     else await onConfirm(outcome.server);
   };
@@ -421,6 +548,7 @@ function Connect({
     if (address.trim()) void submit(address);
   };
   const none = hintFor(t, t("desktop.connect.none"), t("desktop.connect.noneText"));
+  const hereCount = found.filter((o) => o.where === "here").length;
 
   return (
     <>
@@ -433,12 +561,13 @@ function Connect({
           value={address}
           placeholder={t("desktop.connect.placeholder")}
           aria-label={t("desktop.connect.label")}
+          aria-describedby="connect-address-hint"
           autoCapitalize="none"
           autoCorrect="off"
           spellCheck={false}
           invalid={problem !== null}
           onChange={(e) => {
-            setAddress(e.target.value);
+            onAddress(e.target.value);
             setProblem(null);
           }}
         />
@@ -453,37 +582,85 @@ function Connect({
           )}
         </Button>
       </form>
-      {problem && <ProblemLine problem={problem.problem} host={problem.host} />}
+      {problem ? (
+        <ProblemLine problem={problem.problem} host={problem.host} />
+      ) : (
+        <span className="dk-help" id="connect-address-hint">
+          {t("desktop.connect.addressHint")}
+        </span>
+      )}
+      {found.length > 0 && (
+        <section className="dk-fr__found" aria-label={t("desktop.connect.found")}>
+          <h2 className="dk-ctitle">{t("desktop.connect.found")}</h2>
+          {found.map((f) => {
+            const mine = f.where === "here" || own.includes(f.server);
+            const claim = f.problem === "no-owner" ? claimHere(f.server) : null;
+            // Used as is; one with a problem only when the app can take it from there (its owner page here).
+            const usable = !f.problem || claim !== null;
+            return (
+              <div key={f.server} className="dk-fr__foundrow">
+                <ServerTile kind={f.where} />
+                <span className="dk-fr__foundtext">
+                  {/* This computer by its name; its address only when more than one answers here. */}
+                  <b>{mine ? t("desktop.link.chipHere") : serverName(f.server)}</b>
+                  <small>
+                    {f.problem && !claim
+                      ? t(PROBLEM_TEXT[f.problem], { host: mine ? t("desktop.link.thisServer") : serverName(f.server) })
+                      : f.where === "tailnet"
+                        ? t("desktop.connect.foundTailnet")
+                        : hereCount > 1
+                          ? `${t("desktop.connect.foundHere")} · ${serverName(f.server)}`
+                          : claim
+                            ? t("desktop.connect.foundNoOwner")
+                            : t("desktop.connect.foundHere")}
+                  </small>
+                </span>
+                {usable && (
+                  <Button
+                    size="sm"
+                    disabled={checking !== null}
+                    onClick={() => void (claim ? onLink(claim) : submit(f.server))}
+                  >
+                    {claim ? t("desktop.connect.setUp") : t("desktop.connect.use")}
+                  </Button>
+                )}
+              </div>
+            );
+          })}
+        </section>
+      )}
       {looking ? (
         <p className="dk-fr__looking" aria-live="polite">
           <PixelSpinner size={14} color="sky" />
           <span className="dk-shimmer">{t("desktop.connect.looking")}</span>
         </p>
       ) : (
-        found.length > 0 && (
-          <section className="dk-fr__found" aria-label={t("desktop.connect.found")}>
-            <h2 className="dk-ctitle">{t("desktop.connect.found")}</h2>
-            {found.map((f) => (
-              <div key={f.server} className="dk-fr__foundrow">
-                <ServerTile kind={f.where} />
-                <span className="dk-fr__foundtext">
-                  {/* This computer by its name; its address too when it answers at more than one. */}
-                  <b>{f.where === "tailnet" ? serverName(f.server) : t("desktop.link.chipHere")}</b>
-                  <small>
-                    {f.where === "tailnet"
-                      ? t("desktop.connect.foundTailnet")
-                      : found.filter((o) => o.where === "here").length > 1
-                        ? `${t("desktop.connect.foundHere")} · ${serverName(f.server)}`
-                        : t("desktop.connect.foundHere")}
-                  </small>
-                </span>
-                <Button size="sm" disabled={checking !== null} onClick={() => void submit(f.server)}>
-                  {t("desktop.connect.use")}
-                </Button>
-              </div>
-            ))}
-          </section>
-        )
+        <p className="dk-help dk-fr__lookagain">
+          {found.length === 0 && <>{t("desktop.connect.noneFound")} </>}
+          <button type="button" className="ac-link dk-link" onClick={() => setScan((n) => n + 1)}>
+            {t("desktop.connect.lookAgain")}
+          </button>
+        </p>
+      )}
+      {tailnet?.state === "off" && (
+        <p className="dk-help dk-fr__tailnet ac-iconline">
+          <Icon name="globe" size={14} />
+          <span>
+            {t("desktop.connect.tailnetOff")}
+            {tailscaleFrom(host.platform, tailnet) === "app" && (
+              <>
+                {" "}
+                <button
+                  type="button"
+                  className="ac-link dk-link"
+                  onClick={() => void host.openTailscale("app").catch(() => {})}
+                >
+                  {t("desktop.here.openTailscale")}
+                </button>
+              </>
+            )}
+          </span>
+        </p>
       )}
       {INSTALL_COMMAND_LIVE && (
         <section className="dk-fr__none" aria-label={t("desktop.connect.none")}>
@@ -590,7 +767,7 @@ function RunHere({
       <>
         <BackLink label={t("desktop.own.title")} onClick={onBack} />
         <h1>{t("desktop.here.running")}</h1>
-        <p className="dk-lead">{t("desktop.here.runningText", { url: view.server })}</p>
+        <p className="dk-lead">{t("desktop.here.runningText")}</p>
         <div className="dk-fr__end" data-near>
           <Button variant="primary" autoFocus onClick={() => void onUse(view.server)}>
             {t("desktop.here.openIt")}
@@ -606,6 +783,7 @@ function RunHere({
         <BackLink label={t("desktop.own.title")} onClick={onBack} />
         <h1>{t("desktop.here.notRunning")}</h1>
         <p className="dk-lead">{t("desktop.here.notRunningText", { path: shortPath(status.dir) })}</p>
+        <CommandCopy command={terminalStartCommand(status.dir)} />
         <div className="dk-fr__end" data-near>
           <Button variant="primary" icon="refresh" autoFocus onClick={read}>
             {t("desktop.common.retry")}
@@ -619,7 +797,7 @@ function RunHere({
     const use = async () => {
       if (view.claim) return onLink(connectLink(view.server, { claim: view.claim }));
       setChecking(true);
-      const outcome = connectOutcome(view.server, await host.checkServer(view.server));
+      const outcome = connectOutcome(view.server, await host.checkServer(view.server), ownAddresses(status));
       setChecking(false);
       if (outcome.kind === "problem") setProblem(outcome);
       else if (outcome.kind === "use") await onUse(outcome.server);
@@ -629,7 +807,10 @@ function RunHere({
       <>
         <BackLink label={t("desktop.own.title")} onClick={onBack} />
         <h1>{t("desktop.here.already")}</h1>
-        <p className="dk-lead">{t("desktop.here.alreadyText", { url: view.server })}</p>
+        {/* From the terminal, or the Docker install answering on this computer: how it runs, never its address. */}
+        <p className="dk-lead">
+          {t(status.installed === "terminal" ? "desktop.here.alreadyText" : "desktop.here.alreadyDocker")}
+        </p>
         {problem && <ProblemLine problem={problem.problem} host={problem.host} />}
         <div className="dk-fr__end" data-near>
           <Button variant="primary" autoFocus loading={checking} onClick={() => void use()}>
@@ -908,21 +1089,28 @@ function HereSetup({
   );
 }
 
-/** L: a server in large type, asked about before anything changes. */
+/**
+ * L: a server in large type, asked about before anything changes. The agentes.chat this computer runs reads as such
+ * (at its local or its Tailscale address alike), never as an address; one on a Tailscale network says what that means.
+ */
 function LinkSheet({
   view,
+  own,
   onRetry,
   onAccept,
   onCancel,
 }: {
   view: LinkView;
+  own: readonly string[];
   onRetry: () => void;
   onAccept: (server: string, page?: string) => void;
   onCancel: () => void;
 }) {
   const { t } = useTranslation();
   const server = view.kind === "notALink" ? null : view.server;
+  const mine = server !== null && (own.includes(server) || serverKind(server) === "here");
   const kind = server ? serverKind(server) : null;
+  const name = server ? (mine ? t("desktop.link.thisServer") : serverName(server)) : "";
   let body: ReactNode;
   let acts: ReactNode;
   if (view.kind === "notALink") {
@@ -950,7 +1138,7 @@ function LinkSheet({
       </>
     );
   } else if (view.kind === "problem") {
-    body = <ProblemLine problem={view.problem} host={serverName(view.server)} />;
+    body = <ProblemLine problem={view.problem} host={name} />;
     acts = (
       <>
         <Button variant="ghost" onClick={onCancel}>
@@ -965,7 +1153,13 @@ function LinkSheet({
     body = (
       <>
         <p className="dk-fr__question">{t(`desktop.link.${view.question}`)}</p>
-        {view.leave && <p className="dk-help">{t("desktop.link.leave", { current: view.leave })}</p>}
+        {view.leave && (
+          <p className="dk-help">
+            {t("desktop.link.leave", {
+              current: own.some((o) => serverName(o) === view.leave) ? t("desktop.link.thisServer") : view.leave,
+            })}
+          </p>
+        )}
       </>
     );
     acts = (
@@ -983,14 +1177,11 @@ function LinkSheet({
     <div className="dk-fr__sheet">
       {server && (
         <div className="dk-fr__server">
-          <span className="dk-fr__host">{serverName(server)}</span>
-          {(kind === "tailnet" || kind === "here") && (
-            <Chip icon={kind === "tailnet" ? "globe" : "computer"}>
-              {kind === "tailnet" ? t("desktop.link.chipTailnet") : t("desktop.link.chipHere")}
-            </Chip>
-          )}
+          <span className="dk-fr__host">{name}</span>
+          {kind === "tailnet" && !mine && <Chip icon="globe">{t("desktop.link.chipTailnet")}</Chip>}
         </div>
       )}
+      {kind === "tailnet" && !mine && <p className="dk-help">{t("desktop.link.tailnetHelp")}</p>}
       {body}
       <div className="dk-fr__acts">{acts}</div>
     </div>

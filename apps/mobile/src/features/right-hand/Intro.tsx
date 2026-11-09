@@ -31,7 +31,7 @@ import { useSendAnswer } from "./TeamCard";
  * 0155 §6). Anyone else gets one card at a time (`introCards`): a waiting pill with "Connect" (tinted) while there is
  * no AI, then how agents talk to them (ADR 0147); the owner gets that question once the checklist is complete. With
  * no card left, a line to build the team with it, at any time; a personal workspace's words speak of one person's
- * agents (ADR 0158). On the person's first visit (`waveFrom`, when its wave started), its waving sticker under the
+ * agents (ADR 0159). On the person's first visit (`waveFrom`, when its wave started), its waving sticker under the
  * greeting, drawn as a sticker message is and decorative.
  */
 export function RightHandIntro({ agent, channelId, waveFrom }: { agent: Agent; channelId: string; waveFrom?: number }) {

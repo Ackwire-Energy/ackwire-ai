@@ -17,7 +17,7 @@ import { modeKey } from "./workspace-mode";
 
 /**
  * The workspace a proposal is in, for its context's words: its name, or the workspace itself, whose mode says them. A
- * personal workspace's context is what its person's agents know about them (ADR 0158), never "Personal context".
+ * personal workspace's context is what its person's agents know about them (ADR 0159), never "Personal context".
  */
 export type ProposalWorkspace = string | Pick<OrgSummary, "name" | "mode">;
 

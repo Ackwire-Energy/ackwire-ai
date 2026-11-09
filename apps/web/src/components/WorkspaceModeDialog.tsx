@@ -11,7 +11,7 @@ import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 
 /**
- * Switching a workspace between team and personal (ADR 0158 §4), for who configures it. Going to a team's it says what
+ * Switching a workspace between team and personal (ADR 0159 §4), for who configures it. Going to a team's it says what
  * comes into sight and asks the workspace's name; going to personal it says what changes and, with other members,
  * that they see it too. What stays is said apart. Only the view changes: every agent, conversation, file and
  * permission stays as it is, and every member's apps reshape on the server's `org.mode`.
@@ -111,7 +111,7 @@ export function WorkspaceModeDialog({
 }
 
 /**
- * Before inviting someone to a personal workspace (ADR 0158 §4): family or friends keep it personal; people from work
+ * Before inviting someone to a personal workspace (ADR 0159 §4): family or friends keep it personal; people from work
  * switch it to a team's first (only who may configure it can), then the invitation goes on. `onGo` does what inviting
  * was about to do (open the invite dialog, copy the link). The roles and who may invite stay as they are.
  */

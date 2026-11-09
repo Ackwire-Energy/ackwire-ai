@@ -62,7 +62,7 @@ export const en = {
     small: "The invitation works for 7 days. Accept it with this email address.",
     why: (org: string) =>
       `You got this email because someone at ${org} invited this address. If you don't know them, ignore it. Nothing happens until you accept.`,
-    /** A personal workspace's (ADR 0158): someone's family or friends, with no workspace name nor role to read. */
+    /** A personal workspace's (ADR 0159): someone's family or friends, with no workspace name nor role to read. */
     personal: {
       body: (inviter: string, email: string | null): Text =>
         inviter
@@ -156,7 +156,7 @@ export const en = {
     button: "See the budget",
     why: (org: string) =>
       `You got this email because you own this agent, or are an admin of ${org}. It goes out at 80% and at 100%, once a month each.`,
-    /** A personal workspace's (ADR 0158): one person and their own agents, no admin to ask. */
+    /** A personal workspace's (ADR 0159): one person and their own agents, no admin to ask. */
     personal: {
       warning: "At 100% it stops and tells you. You can change the limit on the agent's page.",
       exhausted: "It won't answer until the month turns, or until you raise the limit on the agent's page.",
@@ -228,7 +228,7 @@ export const en = {
     button: { ai: "Connect your AI", task: "Give a first task", create: "Create an agent" },
     why: (org: string) =>
       `You got this email because you own ${org} on agentes.chat. It's the only email about this computer.`,
-    /** A personal workspace's (ADR 0158): the person's computer for their agents, who they talk to directly. */
+    /** A personal workspace's (ADR 0159): the person's computer for their agents, who they talk to directly. */
     personal: {
       body: (): Text =>
         "Thanks for waiting. Your agents' computer is on and set up, with a user of its own for each agent. It stays on day and night, so your agents can work any time.",
@@ -286,7 +286,7 @@ export const en = {
       small: "If you think it's a mistake, ask someone there to invite you by email.",
     },
     why: (org: string) => `You got this email because this address asked to join ${org} on agentes.chat.`,
-    /** Joining someone's personal workspace (ADR 0158): the person who answered, not a company. */
+    /** Joining someone's personal workspace (ADR 0159): the person who answered, not a company. */
     personal: {
       joined: { body: (who: string): Text => `${who} approved your request. You're in their workspace now.` },
       invited: { body: (who: string): Text => `${who} approved your request to join their workspace.` },
@@ -514,7 +514,7 @@ export const en = {
     },
     button: "See agentes.chat plans",
     why: (org: string) => `You got this email because you run ${org} on agentes.chat. We send two of these, then stop.`,
-    /** A personal workspace's (ADR 0158): the person's agents and routines, no team nor channels. */
+    /** A personal workspace's (ADR 0159): the person's agents and routines, no team nor channels. */
     personal: {
       subject: "Your agents are waiting",
       headline: "Your agents are waiting",

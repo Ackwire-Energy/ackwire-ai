@@ -148,7 +148,7 @@ export async function continuationVerdict(
     runKind: TurnKind;
     /** Agents and people its reply @named that aren't in the conversation (`unreachedNote`), "" none. */
     unreached?: string;
-    /** A personal workspace (ADR 0158): what is worth keeping is about the person, not a company. */
+    /** A personal workspace (ADR 0159): what is worth keeping is about the person, not a company. */
     personal?: boolean;
     /**
      * Asks the same call whether the turn taught something worth keeping (ADR 0120) and hands the answer here: no
@@ -245,13 +245,12 @@ const LEARN_QUESTION = {
   },
 };
 
-/** `LEARN_QUESTION` in a personal workspace (ADR 0158): facts about the person and their life, not a company. */
+/** `LEARN_QUESTION` in a personal workspace (ADR 0159): facts about the person and their life, not a company. */
 const LEARN_QUESTION_PERSONAL = {
   ...LEARN_QUESTION,
   criteria: {
     ...LEARN_QUESTION.criteria,
-    fact:
-      "A person's message or a tool result gave a lasting fact about the person, their life, the people in it or their things and accounts.",
+    fact: "A person's message or a tool result gave a lasting fact about the person, their life, the people in it or their things and accounts.",
     access:
       "Someone here got, lost or was named for an access: the agent or another signed in to a service, got a login, a key, a connector or a mailbox, or a person said who handles a service.",
   },

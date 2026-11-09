@@ -478,7 +478,7 @@ export function ChatLookPage() {
   const [kind, setKind] = useState<"channels" | "dms">("channels");
   const dm = kind === "dms";
   const prefs = org?.chatPrefs;
-  // A personal workspace's channels are its group conversations, in bubbles until the person picks (ADR 0158).
+  // A personal workspace's channels are its group conversations, in bubbles until the person picks (ADR 0159).
   const { style, tone } = chatLookOf(prefs, dm, isPersonal(org));
   const textSize = textSizeOf(prefs);
   // While the slider moves the preview follows it; the size is saved when the thumb lands.

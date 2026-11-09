@@ -53,7 +53,7 @@ export function AskWaiting({ asked }: { asked: Asked }) {
   // it, they rise in when it comes.
   const preview = useQuery({ ...invitationQuery(api, token), retry: false });
   const agents = preview.data?.agents ?? [];
-  // A personal workspace's words once its invitation is read (ADR 0158): never its name ("Personal").
+  // A personal workspace's words once its invitation is read (ADR 0159): never its name ("Personal").
   const words = preview.data ?? null;
   const crew = (happy: boolean) => (agents.length > 0 ? <InviteCrew agents={agents} happy={happy} /> : undefined);
   const claim = useQuery({

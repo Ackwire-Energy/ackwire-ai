@@ -65,7 +65,7 @@ import { TextArea } from "../shared/TextArea";
 /**
  * The right hand's team setup on the phone (ADR 0137 §10), as on the web: answers to tap as chips (each the person's
  * own message), the team card as stacked rows with the same buttons, the templates and the map as sheets. In a
- * personal workspace (ADR 0158) the words are about the person's agents, and an agent with no channel lives in its DM
+ * personal workspace (ADR 0159) the words are about the person's agents, and an agent with no channel lives in its DM
  * with the person: no channel is named for it and, when none has one, there is no map to see.
  */
 
@@ -193,7 +193,7 @@ export function ReplyChips({ message: m }: { message: Message }) {
  * The team: a row per agent, its routines, its skills and what waits for approval. Flat on the card that holds it
  * (rows divided by hairlines, icons on the first line), never a plate or a box in a card. An agent's row is a MediaRow:
  * its face, name and role on one line, what it does, its channel and "Adjust" under them at the card's width. Its
- * channel shows only in a team's workspace and when it has one: in a personal one (ADR 0158) each agent is someone to
+ * channel shows only in a team's workspace and when it has one: in a personal one (ADR 0159) each agent is someone to
  * talk to, not a place.
  */
 function TeamRows({ plan, onAdjust }: { plan: TeamPlan; onAdjust?: (a: TeamAgentDraft) => void }) {
@@ -296,7 +296,7 @@ function TeamRows({ plan, onAdjust }: { plan: TeamPlan; onAdjust?: (a: TeamAgent
   );
 }
 
-/** "3 agents · 2 new channels · 3 routines"; a personal workspace counts no channels (ADR 0158). */
+/** "3 agents · 2 new channels · 3 routines"; a personal workspace counts no channels (ADR 0159). */
 const countsText = (t: TFunction, plan: TeamPlan, personal: boolean) => {
   const n = teamCounts(plan);
   return [
@@ -338,7 +338,7 @@ function TeamCardView({ message: m, card }: { message: Message; card: TeamPropos
   if (status === "open") {
     const decides = can(org, "create_agents");
     const busy = team.create.isPending || team.deny.isPending || card.state === "creating";
-    // Agents that each live in a DM with the person have no map to show (ADR 0158): the rows say it all.
+    // Agents that each live in a DM with the person have no map to show (ADR 0159): the rows say it all.
     const mapButton = teamInDms(plan) ? null : (
       <Button variant="secondary" size="card" wide label={t("teamPlan.card.map")} onPress={() => setMap(true)} />
     );
@@ -497,7 +497,7 @@ function FirstTasks({ message: m, card, held }: { message: Message; card: TeamPr
   const openDm = useOpenDm();
   const [later, setLater] = useState(false);
   const tasks = firstTasks(card).filter((f) => dir.agentById.has(f.agentId));
-  // No "Invite …" in a personal workspace (ADR 0158): it is for one person, inviting stays in Settings.
+  // No "Invite …" in a personal workspace (ADR 0159): it is for one person, inviting stays in Settings.
   const people = held || isPersonal(org) ? [] : card.params.invite;
   const example = held && tasks[0] ? card.params.example : undefined;
   if (later || (tasks.length === 0 && people.length === 0)) return null;
@@ -659,7 +659,7 @@ function AdjustForm({
         {input("name", t("teamPlan.adjust.name"), 80)}
         {input("role", t("teamPlan.adjust.role"), 200)}
         {input("line", t("teamPlan.adjust.line"), 300)}
-        {/* An agent with no channel lives in its DM with the person (ADR 0158): nothing to name. */}
+        {/* An agent with no channel lives in its DM with the person (ADR 0159): nothing to name. */}
         {agent.channel ? input("channel", t("teamPlan.adjust.channel"), 80) : null}
         <View style={styles.formRow}>
           <Text variant="footnote" tone="muted">
@@ -681,7 +681,7 @@ function AdjustForm({
 
 /**
  * "See as a map" as a sheet: the people, a block per channel with its agents and routines, the weekly reviewer. An
- * agent with no channel (it lives in its DM with the person, ADR 0158) has a block of its own, with no channel on top.
+ * agent with no channel (it lives in its DM with the person, ADR 0159) has a block of its own, with no channel on top.
  */
 export function TeamMapSheet({ plan, open, onClose }: { plan: TeamPlan; open: boolean; onClose: () => void }) {
   const { t, i18n } = useTranslation();
@@ -755,7 +755,7 @@ export function TeamMapSheet({ plan, open, onClose }: { plan: TeamPlan; open: bo
 
 /**
  * "Team templates" as a sheet: the templates, each opening its team; "Create the team" makes it. In a personal
- * workspace (ADR 0158) the server lists them by area of life, and the words are about the person's agents.
+ * workspace (ADR 0159) the server lists them by area of life, and the words are about the person's agents.
  */
 export function TeamTemplatesSheet({
   open,

@@ -93,7 +93,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = ["you", "org", "agents", "costs"
 export const isSettingsSection = (v: unknown): v is SettingsSection => SETTINGS_SECTIONS.some((s) => s.id === v);
 
 /**
- * The nav entry that stands for the open section: in a personal workspace (ADR 0158 §3) connectors and skills open on
+ * The nav entry that stands for the open section: in a personal workspace (ADR 0159 §3) connectors and skills open on
  * AI and apps' entry, billing on Plan and usage's, when the person may open those; else the section itself.
  */
 export function settingsNavEntry(

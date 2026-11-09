@@ -234,7 +234,7 @@ export function reportsUnder(team: readonly { id: string; reportsToAgentId: stri
 }
 
 /**
- * `team_status` as a personal workspace's right hand reads it (ADR 0158): its description, and its title in the audit
+ * `team_status` as a personal workspace's right hand reads it (ADR 0159): its description, and its title in the audit
  * (the call's own words, as every other call's), speak of the person's agents instead of a team.
  */
 const TEAM_STATUS_PERSONAL = {
@@ -291,7 +291,7 @@ export function createTeamStatusToolSource(): ToolSource {
     name: "team-status",
     tools: async (ctx) => {
       const [row] = await ctx.db.select({ builtin: agents.builtin }).from(agents).where(eq(agents.id, ctx.agentId));
-      // A personal workspace (ADR 0158): the person's agents, not a team. Only words: a read that fails keeps a team's.
+      // A personal workspace (ADR 0159): the person's agents, not a team. Only words: a read that fails keeps a team's.
       if (isRightHand(row)) {
         return [(await isPersonalWorkspace(ctx.db, ctx.orgId).catch(() => false)) ? personalTool : tool];
       }

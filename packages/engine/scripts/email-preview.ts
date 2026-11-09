@@ -47,7 +47,7 @@ if (to) {
   const index: Record<string, { subject: string; preheader: string }> = {};
   const samples = {
     ...EMAIL_SAMPLES,
-    // A personal workspace's (ADR 0158), where its words differ.
+    // A personal workspace's (ADR 0159), where its words differ.
     ...PERSONAL_EMAIL_SAMPLES,
     // A self-hosted server: its footer names it.
     "verify_email-selfhost.en": EMAIL_SAMPLES["verify_email.en"],

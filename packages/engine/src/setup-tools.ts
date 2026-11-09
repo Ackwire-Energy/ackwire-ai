@@ -961,7 +961,7 @@ export function createSetupToolSource(deps: {
   return {
     name: "setup",
     // Only the right hand starts the rest of the app with cards (ADR 0137). A personal workspace reads them in its own
-    // words (ADR 0158): the same tools, for one person and their agents, whose team card may leave an agent's channel
+    // words (ADR 0159): the same tools, for one person and their agents, whose team card may leave an agent's channel
     // out (it lives in its DM with the person). Only words and that one field: a read that fails keeps the team's.
     tools: async (ctx) => {
       const listed = isRightHand(await getAgentCached(ctx.db, ctx.orgId, ctx.agentId)) ? rightHand : all;
@@ -976,7 +976,7 @@ export function createSetupToolSource(deps: {
 }
 
 /**
- * The setup tools as a personal workspace's agents read them (ADR 0158): one person, maybe their family, and their
+ * The setup tools as a personal workspace's agents read them (ADR 0159): one person, maybe their family, and their
  * agents. Each does what it does in a team workspace; only who it speaks of changes, and inviting is for when they ask.
  */
 const SETUP_TOOLS_PERSONAL: Record<string, string> = {

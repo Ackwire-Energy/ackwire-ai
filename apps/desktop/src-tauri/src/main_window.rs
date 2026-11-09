@@ -752,6 +752,14 @@ fn checked(request: &Value) -> Result<Value, String> {
         // Every server's workspaces (ADR 0154): the app reads them; the page asks nothing of its own.
         Some("workspaces") => Ok(json!({ "kind": "workspaces" })),
         Some("addWorkspace") => Ok(json!({ "kind": "addWorkspace" })),
+        // A server of the app's list: only its origin.
+        Some("openServer") => {
+            let server = text("server").unwrap_or_default();
+            if servers::origin_of(server).as_deref() != Some(server) {
+                return Err("bad server".into());
+            }
+            Ok(json!({ "kind": "openServer", "server": server }))
+        }
         // A workspace of another server of the app's list: only its origin and the workspace's id.
         Some("openWorkspace") => {
             let server = text("server").unwrap_or_default();
@@ -887,6 +895,11 @@ pub fn notice(app: &AppHandle, title: &str, body: &str, url: Url) {
 pub fn focused(app: &AppHandle) {
     keep_lights(app);
     crate::workspaces::on_focus(app);
+    // Brought forward by a notification of the server here: the popover says what happened and how to fix it.
+    if crate::local_server::take_notice_click() {
+        let _ = crate::present(app, "popover");
+        return;
+    }
     let pending = {
         let notices = app.state::<Notices>();
         let mut state = notices.0.lock().unwrap_or_else(|e| e.into_inner());
@@ -1003,7 +1016,12 @@ pub async fn this_mac(app: AppHandle, webview: tauri::Webview, request: Value) -
         }
         // The other servers' workspaces, as last read (the page's own server lists its own).
         Some("workspaces") => {
-            if crate::workspaces::stale(&app) {
+            // Never read yet (the app's first check ran before this window existed): read now and answer with it,
+            // so the site's menu never starts empty for a minute.
+            if crate::workspaces::never_read(&app) {
+                let reader = app.clone();
+                let _ = tauri::async_runtime::spawn_blocking(move || crate::workspaces::refresh_now(&reader)).await;
+            } else if crate::workspaces::stale(&app) {
                 crate::workspaces::trigger(&app);
             }
             let others: Vec<_> = crate::workspaces::list(&app).into_iter().filter(|s| s.server != origin).collect();
@@ -1024,6 +1042,16 @@ pub async fn this_mac(app: AppHandle, webview: tauri::Webview, request: Value) -
             let url: Url = format!("{server}/org/{}", request["orgId"].as_str().unwrap_or_default())
                 .parse()
                 .map_err(|_| "not a URL")?;
+            show_url(&app, url)?;
+            return Ok(json!({}));
+        }
+        // Another server of the list on its first page: its sign-in when the window has no session there.
+        Some("openServer") => {
+            let server = request["server"].as_str().unwrap_or_default();
+            if !servers::get(&app).servers.iter().any(|s| s == server) {
+                return Err("not a server of this app".into());
+            }
+            let url: Url = server.parse().map_err(|_| "not a URL")?;
             show_url(&app, url)?;
             return Ok(json!({}));
         }
@@ -1247,6 +1275,11 @@ mod tests {
     fn workspaces_across_servers() {
         assert_eq!(checked(&json!({ "kind": "workspaces", "server": "x" })), Ok(json!({ "kind": "workspaces" })));
         assert_eq!(checked(&json!({ "kind": "addWorkspace", "page": "/x" })), Ok(json!({ "kind": "addWorkspace" })));
+        assert_eq!(
+            checked(&json!({ "kind": "openServer", "server": "https://agentes.exemplo.com.br", "path": "/x" })),
+            Ok(json!({ "kind": "openServer", "server": "https://agentes.exemplo.com.br" }))
+        );
+        assert!(checked(&json!({ "kind": "openServer", "server": "https://agentes.exemplo.com.br/login" })).is_err());
         assert_eq!(
             checked(&json!({ "kind": "openWorkspace", "server": "https://agentes.exemplo.com.br", "orgId": "o-1", "path": "/x" })),
             Ok(json!({ "kind": "openWorkspace", "server": "https://agentes.exemplo.com.br", "orgId": "o-1" }))

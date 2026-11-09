@@ -74,11 +74,11 @@ function useZonePick(): string | null {
 
 /**
  * "Editar workspace" (the web's Geral), from the workspace's settings: its logo, name and time zone, whether agents
- * check what the team already did, the context every agent reads, the workspace's mode (ADR 0158 §4: who configures
+ * check what the team already did, the context every agent reads, the workspace's mode (ADR 0159 §4: who configures
  * it switches it on a screen of its own), and the usage report's switch for the installation's owner. Every change
  * saves by itself (the name when its field is left, the zone when picked, the context while typing), and "Salvo"
  * shows under the title; who can't change them reads them. Its owners delete it from the workspace's page
- * (`WorkspaceScreen`), the last row there. In a personal workspace it is About you (ADR 0158 §3): what the agents know
+ * (`WorkspaceScreen`), the last row there. In a personal workspace it is About you (ADR 0159 §3): what the agents know
  * about the person first, in its own words, then the workspace's zone, name, check and mode, and no logo (switching
  * to team brings it back).
  */
@@ -326,7 +326,7 @@ export function GeneralScreen() {
       />
     </GroupedList>
   );
-  // Who the workspace is for (ADR 0158 §4): the mode it is in, and for who configures it the screen that switches it.
+  // Who the workspace is for (ADR 0159 §4): the mode it is in, and for who configures it the screen that switches it.
   const mode = (
     <GroupedList>
       <GroupedRow

@@ -173,14 +173,18 @@ function Settings({
   const refused = section && current !== section && !serverLacks ? section : null;
   const setup = useComputerSetup(org.id);
   const edition = computerEdition(setup.data);
-  // A personal workspace (ADR 0158 §3): one short list, every other section under Advanced, and AI and apps and Plan
+  // A personal workspace (ADR 0159 §3): one short list, every other section under Advanced, and AI and apps and Plan
   // and usage holding other sections, whose own addresses mark those entries. A team's: the groups.
   const personal = isPersonal(org);
   const opens = (id: SettingsSection) => visible.some((s) => s.id === id);
   // People joins the short list once someone else is a member (a family).
   const { others } = usePersonalView();
   const nav = personal ? personalSettingsNav(visible, others) : null;
-  const marked = settingsNavEntry(org, current, visible.map((s) => s.id));
+  const marked = settingsNavEntry(
+    org,
+    current,
+    visible.map((s) => s.id),
+  );
   const inAdvanced = nav?.advanced.some((s) => s.id === marked) ?? false;
   const [advanced, setAdvanced] = useState(inAdvanced);
   // A section of Advanced opened by its address (⌘K, a card, a notice) shows in the list.
@@ -338,7 +342,7 @@ function Settings({
 }
 
 /**
- * A section on another one's page in a personal workspace (ADR 0158 §3): Connectors and MCPs and Skills on AI and
+ * A section on another one's page in a personal workspace (ADR 0159 §3): Connectors and MCPs and Skills on AI and
  * apps, Plan and billing on Plan and usage, each under its own heading.
  */
 function SettingsPart({ id, children }: { id: "connectors" | "skills" | "billing"; children: ReactNode }) {
@@ -379,7 +383,7 @@ function BillingSection() {
 /**
  * Geral: the org's rows, the context every agent reads, then a
  * tile per area with how it is now. Every change saves by itself: name on blur, zone on pick, context
- * while typing. In a personal workspace it is About you (ADR 0158 §3): the context first, in the person's words, then
+ * while typing. In a personal workspace it is About you (ADR 0159 §3): the context first, in the person's words, then
  * the time zone, name, checks and mode, and no tiles.
  */
 function GeneralSection() {
@@ -458,7 +462,7 @@ function GeneralSection() {
   const missing = ideas.filter((label) => !context.toLowerCase().includes(label.toLowerCase()));
   const actionCheck = t(modeKey(org, "settings.actionCheck"));
 
-  // Personal (ADR 0158 §3): About you, the context first; the logo, which a personal workspace shows nowhere it
+  // Personal (ADR 0159 §3): About you, the context first; the logo, which a personal workspace shows nowhere it
   // matters, stays a team's row (switching to team brings it back).
   const logoRow = !personal && (
     <div className="settings-row ac-actrow">
@@ -541,7 +545,7 @@ function GeneralSection() {
       </div>
     </div>
   );
-  // Who the workspace is for (ADR 0158 §4): the mode it is in now and, for who configures it, the switch to the other.
+  // Who the workspace is for (ADR 0159 §4): the mode it is in now and, for who configures it, the switch to the other.
   const modeRow = (
     <div className="settings-row ac-actrow">
       <div className="settings-row__text ac-actrow__text">

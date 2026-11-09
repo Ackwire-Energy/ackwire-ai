@@ -246,7 +246,7 @@ describe("Orçamento e uso › Pessoas", () => {
     expect(text(document.body)).not.toContain("US$");
   });
 
-  test("alone in a personal workspace: the summary without tabs; with someone else here, the tabs (ADR 0158)", async () => {
+  test("alone in a personal workspace: the summary without tabs; with someone else here, the tabs (ADR 0159)", async () => {
     const personal = (alone: boolean) => {
       const state = seedState();
       const org = state.me?.organizations[0];

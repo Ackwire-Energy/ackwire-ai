@@ -97,7 +97,7 @@ export interface RoutingInput {
   /** A rule already picks (a reply to an agent, a person alone with one agent): a slow step leaves it to the rule. */
   ruleDecides?: boolean;
   /**
-   * A personal workspace (ADR 0158): one person, and maybe their family, with their agents. Most messages there are
+   * A personal workspace (ADR 0159): one person, and maybe their family, with their agents. Most messages there are
    * the person talking to their agents, not people talking among themselves.
    */
   personal?: boolean;
@@ -324,7 +324,7 @@ export const socialChoice = (emoji: string) =>
 export const SPOKEN_TO =
   'A message speaks to the agent it asks to answer or to act (by @, by name or by its role), not to an agent it only names as someone to ask, involve or hand over to, or only talks about: "Mila, ask Omar for the sales numbers" speaks to Mila, and Mila asks Omar. A follow-up that names another agent only as someone to ask, involve or hand over to still speaks to the agent the person was just talking to: right after Omar spoke, "ask Mila if the PR is up" speaks to Omar.';
 
-/** The router's rules; `personal`: a personal workspace's (ADR 0158), where people mostly talk to their agents. */
+/** The router's rules; `personal`: a personal workspace's (ADR 0159), where people mostly talk to their agents. */
 const routerSystem = (personal: boolean) =>
   [
     personal
@@ -355,7 +355,7 @@ const routerSystem = (personal: boolean) =>
   ].join("\n");
 
 export const ROUTER_SYSTEM = routerSystem(false);
-/** `ROUTER_SYSTEM` in a personal workspace (ADR 0158). */
+/** `ROUTER_SYSTEM` in a personal workspace (ADR 0159). */
 export const ROUTER_SYSTEM_PERSONAL = routerSystem(true);
 
 /** The router's question, the same for a small model and a plan: system prompt, prompt and answer schema. */
@@ -993,7 +993,7 @@ export async function routeMessage(
       .from(organizationMembers)
       .innerJoin(users, eq(users.id, organizationMembers.userId))
       .where(eq(organizationMembers.orgId, message.orgId)),
-    // A personal workspace (ADR 0158): the person mostly talks to their agents, not to other people.
+    // A personal workspace (ADR 0159): the person mostly talks to their agents, not to other people.
     isPersonalWorkspace(db, message.orgId),
   ]);
   if (byAgent) {

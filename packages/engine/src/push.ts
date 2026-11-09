@@ -424,7 +424,7 @@ export async function deliverPush(
     status: latest.statusTo ?? null,
     percent: latest.percent ?? null,
     reason: typeof latest.reason === "string" ? latest.reason : null,
-    // Read once for every device: only the words change (ADR 0158), never who is told or when.
+    // Read once for every device: only the words change (ADR 0159), never who is told or when.
     personal: await isPersonalWorkspace(db, row.orgId),
   };
 

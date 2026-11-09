@@ -205,7 +205,7 @@ export async function createAgent(
   const values = { ...fields, handle: fields.handle.toLowerCase(), model: fields.model ?? defaults.model };
   await validateAgentFields(db, orgId, values);
   const ownerUserId = input.ownerUserId === undefined ? actorId : input.ownerUserId;
-  // A personal workspace's new agent answers only its owner until someone says otherwise (ADR 0158): who joins later
+  // A personal workspace's new agent answers only its owner until someone says otherwise (ADR 0159): who joins later
   // (family) isn't answered, nor shown its details, by every agent made while the person was alone. Only a default:
   // an audience given wins (the apps send theirs), agents already there keep theirs, and the right hand, made
   // elsewhere, answers everyone. With no owner nobody would be answered: everyone, as in a team's.
@@ -258,7 +258,7 @@ export async function createAgent(
       agent.id,
       DEFAULT_AGENT_SCOPES.map((scope) => ({ connectionId: null, scope })),
     );
-    // A personal workspace's agent starts with broad access (ADR 0158 §3a): every app connected there and its
+    // A personal workspace's agent starts with broad access (ADR 0159 §3a): every app connected there and its
     // calendar. Only from someone who may give access, so a family member's own agent starts as a team's does.
     // Sensitive tools still ask a person on every call; mail, databases and the computer keep their own switches.
     const broad = personal && can(membership, "manage_agents");

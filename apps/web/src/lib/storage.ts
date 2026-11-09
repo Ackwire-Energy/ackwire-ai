@@ -46,6 +46,16 @@ export const STORAGE_KEYS = {
   lastPlace: "agentes.lastPlace",
   /** How this browser signed in last ("google", "github", "apple" or "email"): marked on the sign-in screen. */
   lastSignIn: "agentes.lastSignIn",
+  /**
+   * "1" after Sign out (or Switch account) by hand: on the server the desktop app runs here, the sign-in screen waits
+   * for the owner's click instead of signing them in again at once. Any sign-in removes it.
+   */
+  signedOut: "agentes.signedOut",
+  /**
+   * sessionStorage, "1": the owner chose Forgot password › Continue on this Mac, so once signed in the app opens
+   * "Create a new password" (ADR 0158).
+   */
+  newPasswordAsk: "agentes.newPasswordAsk",
   /** "0" when the person switched off the picture viewer's hover lens (on by default). */
   imageLens: "agentes.image.lens",
   /** The Drive's view: "grid" (default) or "list". */

@@ -221,7 +221,7 @@ export function channelNameError(name: string, taken: Set<string>): "invalid" | 
  * "Criar canal", in one column: name, topic, sidebar category, who can join, then the initial members (people and
  * agents: search and a list that scrolls in its own box). The footer, with the count and Criar, stays in view. A
  * personal workspace calls it a group conversation, and alone leaves out who can join while it is the default, open to
- * everyone here (ADR 0158): the same channel either way.
+ * everyone here (ADR 0159): the same channel either way.
  */
 export function NewChannelDialog({
   open,

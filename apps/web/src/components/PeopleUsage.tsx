@@ -106,7 +106,7 @@ const agentName = (t: TFunction, dir: Dir, id: string) => dir.anyAgent(id)?.name
 
 /**
  * The tabs of Orçamento e uso: Resumo (what was there) and Pessoas for who sees money, else Seu uso. Alone in a
- * personal workspace, only Resumo, without tabs (ADR 0158): an owner has no limit and nobody else uses it. A link to a
+ * personal workspace, only Resumo, without tabs (ADR 0159): an owner has no limit and nobody else uses it. A link to a
  * person still opens Pessoas.
  */
 export function UsageTabs({ summary, person }: { summary: ReactNode; person?: string }) {
@@ -880,7 +880,7 @@ function LimitsView({ switcher }: { switcher: ReactNode }) {
       <LoadingList count={4} avatar={false} trailing />
     );
   }
-  // Limits per role, in a personal workspace only once a role is worth it or one already has a limit (ADR 0158).
+  // Limits per role, in a personal workspace only once a role is worth it or one already has a limit (ADR 0159).
   const allRoles = roles.data?.roles ?? [];
   const roleList = rolePicksInSight(org, allRoles, Object.keys(limits.data?.roles ?? {}))
     ? allRoles.filter((r) => r.kind === "custom")

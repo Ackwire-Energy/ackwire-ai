@@ -77,7 +77,7 @@ export function ItemChips({ item }: { item: VaultItem }) {
 export function ScopeLine({ scope }: { scope: VaultScope }) {
   const { t } = useTranslation();
   const { org } = useOrg();
-  // Team reads Shared in a personal workspace (ADR 0158).
+  // Team reads Shared in a personal workspace (ADR 0159).
   const team = scope === "team";
   return (
     <span className="vlt-scope">

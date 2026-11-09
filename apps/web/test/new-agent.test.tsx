@@ -1564,7 +1564,7 @@ describe("Criar agente with Criar agentes alone: an agent of my own, without app
   });
 });
 
-describe("Criar agente in a personal workspace (ADR 0158)", () => {
+describe("Criar agente in a personal workspace (ADR 0159)", () => {
   /** The seeded workspace as a personal one; `alone`: Walter its only member. */
   const personal = (alone: boolean) => {
     const state = seedState();
@@ -1576,13 +1576,13 @@ describe("Criar agente in a personal workspace (ADR 0158)", () => {
 
   test("alone: no owner and no who can talk on the screen; it is created mine, answering only me", async () => {
     const state = await open(personal(true));
-    // One person's starting points: the right hand's personal agents, not a company's roles (ADR 0158 §3).
+    // One person's starting points: the right hand's personal agents, not a company's roles (ADR 0159 §3).
     expect(screen().getByRole("heading", { name: "Para o seu dia" })).toBeTruthy();
     expect(screen().queryByRole("heading", { name: "Produto e tecnologia" })).toBeNull();
     expect(screen().queryByRole("button", { name: /^QA/ })).toBeNull();
     await startAs("Clara");
     expect((screen().getByLabelText("Nome") as HTMLInputElement).value).toBe("Clara");
-    // Its technical steps start filled in and are passed over (ADR 0158 §3): four steps, Instruções on to Revisar.
+    // Its technical steps start filled in and are passed over (ADR 0159 §3): four steps, Instruções on to Revisar.
     expect(screen().getByText("Passo 2 de 4")).toBeTruthy();
     await proceed(2);
     expect(screen().getByText("Passo 4 de 4")).toBeTruthy();

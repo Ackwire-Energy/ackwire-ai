@@ -185,7 +185,7 @@ export function AgentsScreen() {
       {showsManager ? (
         <ManagerRow working={working.length} waiting={waiting.length} onPress={() => router.push("/task-manager")} />
       ) : null}
-      {/* Equipe's org chart and channels (ADR 0148). A personal workspace (ADR 0158) keeps it as the last row of You ›
+      {/* Equipe's org chart and channels (ADR 0148). A personal workspace (ADR 0159) keeps it as the last row of You ›
           Work: one person's agents rarely need an org chart in sight. */}
       {total > 0 && !isPersonal(org) ? <TeamEntry /> : null}
       <LayoutAnimationConfig skipEntering>
@@ -323,7 +323,7 @@ function FreeSections({
   onRoutine: ReadonlyMap<string, string>;
 }) {
   const { t } = useTranslation();
-  // A personal workspace's free agents are its person's, not a team (ADR 0158).
+  // A personal workspace's free agents are its person's, not a team (ADR 0159).
   const { org } = useOrg();
   const { collapsed, toggle } = useCollapsedSections<string>(STORED.agentGroupsCollapsed, null);
   const pins = usePins();

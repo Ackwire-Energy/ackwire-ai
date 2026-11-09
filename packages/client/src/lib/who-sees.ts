@@ -37,7 +37,7 @@ export function wikiAudienceOf(next: AudienceChoice, roleIds: string[], kind: Au
 
 /**
  * The setting in a few words: "Todos no workspace", "Só eu", "Só Ana", "Ana e Bia", "Ana, Bia e mais 2". `org`: a
- * personal workspace says "everyone" its way (ADR 0158).
+ * personal workspace says "everyone" its way (ADR 0159).
  */
 export function whoSeesLabel(
   t: TFunction,

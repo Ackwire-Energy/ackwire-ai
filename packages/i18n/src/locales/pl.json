@@ -531,6 +531,18 @@
       "wrongLinkLead": "Otwórz najnowszy link właściciela utworzony dla tego serwera.",
       "taken": "Ten serwer ma już właściciela.",
       "takenLead": "Zaloguj się na swoje konto."
+    },
+    "server": {
+      "into": "Logowanie do <b>{{server}}</b>",
+      "intoHere": "Logowanie do agentes.chat <b>na tym urządzeniu ({{device}})</b>"
+    },
+    "forgotHere": {
+      "ownerTitle": "Tutaj nie potrzebujesz hasła.",
+      "ownerLead": "agentes.chat jest zainstalowany na tym urządzeniu ({{device}}). Wejdź tutaj, a potem ustaw nowe hasło.",
+      "notOwner": "To nie konto osoby, która go zainstalowała? Poproś właściciela swojego workspace o link do nowego hasła.",
+      "title": "Ten serwer nie wysyła e-maili.",
+      "lead": "Poproś właściciela swojego workspace o link do nowego hasła. Tworzy go w Członkach, a link działa 1 godzinę.",
+      "back": "Wróć do hasła"
     }
   },
   "invite": {
@@ -1496,7 +1508,7 @@
     "createdOn": "Utworzona {{date}}",
     "newWorkspace": "Nowa przestrzeń robocza",
     "addWorkspace": "Dodaj przestrzeń roboczą",
-    "addWorkspaceHint": "Nową w agentes.chat albo serwer twojego zespołu",
+    "addWorkspaceHint": "Dołącz do istniejącego, utwórz nowy albo użyj serwera swojego zespołu",
     "yourServer": "Twój serwer",
     "wiki": "Wiki",
     "settings": "Ustawienia",
@@ -1592,7 +1604,17 @@
     "unreadNotifications_one": "{{count}} nieprzeczytane powiadomienie",
     "unreadNotifications_few": "{{count}} nieprzeczytane powiadomienia",
     "unreadNotifications_many": "{{count}} nieprzeczytanych powiadomień",
-    "unreadNotifications_other": "{{count}} nieprzeczytane powiadomienia"
+    "unreadNotifications_other": "{{count}} nieprzeczytane powiadomienia",
+    "newPassword": "Ustaw nowe hasło",
+    "newPasswordHint": "Twoje inne sesje się zakończą, a aplikacje AI połączone starym hasłem trzeba połączyć ponownie.",
+    "newPasswordRow": "Aby zmienić hasło używane w innych przeglądarkach i na innych urządzeniach",
+    "newPasswordSaved": "Nowe hasło zapisane.",
+    "newPasswordReauth": "Zaloguj się ponownie, aby ustawić nowe hasło.",
+    "serverHere": "agentes.chat na tym urządzeniu ({{device}})",
+    "serverStopped": "zatrzymany",
+    "serverOffline": "offline od {{time}}",
+    "serverSignedOut": "niezalogowano",
+    "serverSignIn": "Zaloguj się"
   },
   "agentGroups": {
     "group": "Dział",
@@ -1668,11 +1690,13 @@
     "qr": "Kod QR do logowania w aplikacji agentes",
     "making": "Tworzę kod…",
     "stepApp": "Zainstaluj aplikację agentes na telefonie (App Store lub Google Play).",
-    "stepTailscale": "Zainstaluj Tailscale na telefonie i dołącz do sieci tego serwera (tailnet).",
+    "stepTailscale": "Zainstaluj Tailscale na telefonie i zaloguj się tym samym kontem Tailscale co ten serwer.",
     "stepScan": "Skieruj aparat telefonu na kod.",
     "validFor": "Ważny przez {{time}}",
     "private": "Kto zeskanuje ten kod, zaloguje się jako ty.",
-    "failed": "Nie udało się utworzyć kodu."
+    "failed": "Nie udało się utworzyć kodu.",
+    "localOnly": "Ten serwer otwiera się tylko na komputerze, na którym działa, więc telefon się do niego nie dostanie.",
+    "localOnlyHow": "W aplikacji agentes.chat na tamtym komputerze włącz Dostęp z telefonu i dla zespołu w Preferencje › Serwery. Potem wróć tutaj."
   },
   "team": {
     "title": "Zespół",
@@ -6575,7 +6599,17 @@
     "ownerLine": "Właściciel: {{name}}",
     "noOwner": "Brak właściciela",
     "budgetLine": "{{percent}} budżetu na {{month}}",
-    "noAgents": "Na razie brak agentów."
+    "noAgents": "Na razie brak agentów.",
+    "moreOf": "Więcej: {{name}}",
+    "passwordLink": {
+      "item": "Utwórz link do nowego hasła",
+      "hint": "Gdy ktoś zapomniał hasła",
+      "title": "Link do nowego hasła dla: {{name}}",
+      "lead": "Działa raz, przez 1 godzinę. Wyślij go tam, gdzie rozmawiacie.",
+      "label": "Link",
+      "making": "Tworzenie linku…",
+      "copy": "Kopiuj link"
+    }
   },
   "empty": {
     "thread": {
@@ -13353,6 +13387,11 @@
         "invalidInput": "Sprawdź pola i spróbuj ponownie.",
         "tooManyItems": "Vault jest pełny. Usuń elementy, zanim zsynchronizujesz więcej."
       }
+    },
+    "passwordLink": {
+      "email": "Ten serwer wysyła e-maile: osoba sama prosi o link w Nie pamiętam hasła.",
+      "serverOwner": "Osoba, która zainstalowała ten serwer, loguje się na komputerze, na którym działa, bez linku.",
+      "otherWorkspace": "Ta osoba jest też w workspace, który nie jest twój: link mogą utworzyć tylko właściciele wszystkich z nich."
     }
   },
   "machines": {
@@ -14014,7 +14053,8 @@
       "member": {
         "joined": "Dołączono do przestrzeni roboczej",
         "left": "Opuszczono przestrzeń roboczą",
-        "role_changed": "Zmieniono rolę członka"
+        "role_changed": "Zmieniono rolę członka",
+        "password_link": "Utworzono link do nowego hasła dla członka"
       },
       "apps": {
         "connected": "Połączono {{app}}",

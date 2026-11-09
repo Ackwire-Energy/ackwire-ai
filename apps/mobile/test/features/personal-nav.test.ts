@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { featureKeysEn } from "../../src/features/i18n/keys.en";
 import { featureKeysPtBR } from "../../src/features/i18n/keys.pt-BR";
 
-// A personal workspace on the phone (ADR 0158): the same screens and data, only what is in sight and its words change.
+// A personal workspace on the phone (ADR 0159): the same screens and data, only what is in sight and its words change.
 const ROOT = join(import.meta.dir, "..", "..");
 const read = (path: string) => readFileSync(join(ROOT, path), "utf8");
 

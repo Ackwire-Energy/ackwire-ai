@@ -10,7 +10,7 @@ const src = (path: string) => readFileSync(join(SRC, path), "utf8");
 const at = (tree: object, path: string): unknown =>
   path.split(".").reduce<unknown>((o, k) => (o as Record<string, unknown> | undefined)?.[k], tree);
 
-/** The phone's words with a personal sibling (ADR 0158): what a person alone reads in place of a team's. */
+/** The phone's words with a personal sibling (ADR 0159): what a person alone reads in place of a team's. */
 const PERSONAL = [
   "approval.leaves",
   "approval.trait.external",
@@ -25,7 +25,7 @@ const PERSONAL = [
   "connectors.adminsOnly",
 ] as const;
 
-describe("a personal workspace's words on the phone (ADR 0158)", () => {
+describe("a personal workspace's words on the phone (ADR 0159)", () => {
   test("each team-worded line has a personal sibling in both languages, with no team or company in it", () => {
     for (const key of PERSONAL) {
       const en = at(featureKeysEn, `${key}Personal`);

@@ -90,7 +90,7 @@ export function FirstDay({
   const hello = person
     ? t("mobile.chat.intent.hello", { person, name: agent.name })
     : t("mobile.chat.intent.helloNoName", { name: agent.name });
-  // A personal workspace's agent is there for its person, not on a team (ADR 0158).
+  // A personal workspace's agent is there for its person, not on a team (ADR 0159).
   const about =
     intro.kind === "what"
       ? intro.text
