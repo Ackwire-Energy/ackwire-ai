@@ -552,7 +552,9 @@ export class PhoneManager {
       if (real.code === 0) {
         for (const phone of parseDevicectl(JSON.parse(await readFile(file, "utf8")))) {
           // Ready to the Mac, the iPhone still waits for its test helper: built, renewed and checked by itself.
-          const need = phone.state === "ready" && this.ios ? this.ios.need(phone.serial, xcrun) : null;
+          // Read-only (`doctor`) says the helper's state and builds nothing (`need` without xcrun only looks).
+          const need =
+            phone.state === "ready" && this.ios ? this.ios.need(phone.serial, this.opts.readOnly ? null : xcrun) : null;
           out.push(need ? { ...phone, ...need } : phone);
         }
       }

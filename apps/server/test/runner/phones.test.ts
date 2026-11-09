@@ -821,3 +821,16 @@ test("a manager that only looks (doctor) changes no setting, and sees a phone an
   expect(r.manager.heldElsewhere(pixel)).toMatch(/^\d{4}-\d\d-\d\dT/);
   held.release();
 });
+
+test("a manager that only looks (doctor) builds no iPhone test helper and runs nothing on the iPhone", async () => {
+  const r = rig(ANDROID_STATE, {
+    tools: ["adb", "xcrun", "xcode-select", "plutil"],
+    readOnly: true,
+    ios: (env, root, now) =>
+      new IosHelper({ home: root, env, log: () => {}, now, teams: async () => [{ id: "A1B2C3D4E5", name: "Sam Rivera", free: true }] }),
+  });
+  for (let i = 0; i < 3; i++) await r.manager.poll();
+  await Bun.sleep(100);
+  expect(r.manager.list().find((p) => p.serial === IPHONE)).toMatchObject({ state: "preparing", reason: "helper_missing" });
+  expect(r.calls().some((c) => c[0] === "xcrun" && c[1] === "xcodebuild")).toBe(false);
+});
