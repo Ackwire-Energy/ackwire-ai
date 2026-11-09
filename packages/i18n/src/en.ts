@@ -16079,6 +16079,12 @@ export const en = {
         ready: "Plan active! Let's get to work!",
         created: "The team is here! Let's get to work!",
       },
+      /** The same, while no AI is connected: the plan brings none, and the bar under the lines connects one. */
+      lodiNoAi: {
+        starting: "Plan active! My computer is starting up. Connect an AI and we'll get to work.",
+        ready: "Plan active! Connect an AI and we'll get to work.",
+        created: "The team is here! Connect an AI and we'll get to work.",
+      },
     },
     agents: {
       iara: {

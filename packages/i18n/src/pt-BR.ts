@@ -16296,6 +16296,12 @@ export const ptBR = {
         ready: "Plano ativo! Vamos começar o trabalho!",
         created: "Time montado! Vamos começar o trabalho!",
       },
+      /** The same, while no AI is connected: the plan brings none, and the bar under the lines connects one. */
+      lodiNoAi: {
+        starting: "Plano ativo! Meu computador já está iniciando. Conecte uma IA e a gente começa o trabalho.",
+        ready: "Plano ativo! Conecte uma IA e a gente começa o trabalho.",
+        created: "Time montado! Conecte uma IA e a gente começa o trabalho.",
+      },
     },
     agents: {
       iara: {

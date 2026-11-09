@@ -4,6 +4,7 @@ import {
   addChannelMember,
   drainOutbox,
   HELLO_GAP_MS,
+  listAgents,
   sayTeamHello,
   setBillingHold,
   TEAM_HELLO_JOB,
@@ -91,6 +92,32 @@ describe("after the first plan", () => {
       .from(schema.outbox)
       .where(and(eq(schema.outbox.orgId, f.org.id), eq(schema.outbox.kind, "notifications.message")));
     expect(notified).toHaveLength(0);
+  });
+
+  test("while nothing here thinks, Lodi asks for an AI instead of starting the work: the plan brings none", async () => {
+    f = await setup({ rightHand: true });
+    await f.db
+      .update(schema.providerCredentials)
+      .set({ revokedAt: new Date() })
+      .where(eq(schema.providerCredentials.orgId, f.org.id));
+    await hold("payment");
+    await makeStore();
+    await hold(null);
+    await drainInTime();
+    expect((await hellos()).map((h) => h.body)).toEqual([
+      "Plano ativo! Conecte uma IA e a gente começa o trabalho.",
+      "Oi, ana! Deixa comigo quem escrever no WhatsApp.",
+      "Cheguei. Fico de olho nos pedidos e aviso se faltar algo no estoque.",
+      "Oi, pessoal! Os posts da semana ficam comigo.",
+    ]);
+  });
+
+  test("the team made at once keeps its template's order in the agents' list, as every screen lists it", async () => {
+    f = await setup({ rightHand: true });
+    await makeStore();
+    const names = (await listAgents(f.db, f.owner.id, f.org.id)).map((a) => a.name);
+    expect(names.filter((n) => ["Iara", "Otto", "Lia"].includes(n))).toEqual(["Iara", "Otto", "Lia"]);
+    expect(names[0]).toBe("Lodi");
   });
 
   test("its computer clause only while the workspace's computer is still on its way", async () => {

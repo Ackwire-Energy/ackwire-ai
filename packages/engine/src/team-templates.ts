@@ -3,6 +3,7 @@ import { and, asc, type Database, eq, isNull, schema, sql } from "@agenteschat/d
 import { serverText } from "@agenteschat/i18n";
 import type { AppLocale } from "@agenteschat/i18n/locale";
 import { takenHandles } from "./agents";
+import { type AiStatusDeps, orgHasAi } from "./ai-status";
 import type { AgentAppearance } from "./appearance";
 import { addChannelMember, CHANNEL_NAME_PATTERN } from "./channels";
 import type { ContextDeps } from "./context/summaries";
@@ -266,10 +267,13 @@ const memberOf = (handle: string): Member | null => {
  * agent says nothing. Each greeter's job: a template agent joins #general answering only when called (`autoReply`
  * off), the right hand speaks there from no channel as always, then its line, marked `meta.greeting`, starting no run
  * and notifying nobody, in the language of whoever paid or made the team. The computer clause only while the
- * workspace's computer is still on its way.
+ * workspace's computer is still on its way. The plan brings no AI: while nothing here thinks, the right hand's line
+ * asks for one instead of starting the work (the bar under the lines connects it).
  */
 export async function sayTeamHello(
-  deps: { db: Database; pubsub?: PubSub; workspaceComputer?: unknown },
+  deps: { db: Database; pubsub?: PubSub; workspaceComputer?: unknown } & Partial<
+    Pick<AiStatusDeps, "gateway" | "machines">
+  >,
   orgId: string,
   payload: Record<string, unknown>,
 ) {
@@ -361,9 +365,13 @@ export async function sayTeamHello(
   ]);
   const lodiWord =
     how !== "paid" ? "created" : deps.workspaceComputer && computer?.state !== "ready" ? "starting" : "ready";
+  const thinks =
+    member !== null ||
+    !deps.gateway ||
+    (await orgHasAi({ db: deps.db, gateway: deps.gateway, machines: deps.machines }, orgId));
   const body = member
     ? serverText(locale, `teamTemplates.agents.${member}.hello`, { first: firstName(person?.name ?? "") })
-    : serverText(locale, `teamTemplates.hello.lodi.${lodiWord}`);
+    : serverText(locale, `teamTemplates.hello.${thinks ? "lodi" : "lodiNoAi"}.${lodiWord}`);
   const message = await insertMessage(deps.db, {
     orgId,
     channelId: general.id,
