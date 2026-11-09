@@ -309,6 +309,17 @@ html[data-pointer] :focus-visible {
   padding-inline: var(--ghost-plate);
 }
 /*
+ * Two plated buttons side by side stand 8 apart, as in a dialog's foot: the row's gap is a ghost's. Two icon buttons
+ * keep their plates 8 apart, never touching: the first reaches into the gap only by its glyph's air, past which its
+ * plate ends. By the first's end, so the one that wraps to a line of its own starts on the row's edge.
+ */
+.ac-acts > .ac-btn:not(.ac-btn--ghost):has(+ .ac-btn:not(.ac-btn--ghost)) {
+  margin-inline-end: calc(var(--space-2) - 2 * var(--ghost-plate));
+}
+.ac-acts > :is(.ac-btn--ghost.ac-btn--icon, .ac-btn--glyph):has(+ :is(.ac-btn--ghost.ac-btn--icon, .ac-btn--glyph)) {
+  margin-inline-end: calc(var(--space-2) - var(--ghost-plate) - var(--glyph-air, 0px));
+}
+/*
  * A ghost whose icon leaves air inside its box (`--glyph-air` on each side, e.g. the ×'s 5.2 of its 20 units) reaches
  * out by that air too, so the row's gap stands between what shows. Its plate and focus ring keep to the box less that
  * air: they end where a neighbour's plate starts, under its glyph.
