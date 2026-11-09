@@ -16766,15 +16766,15 @@ export const ptBR = {
     /** The team's hello in #general once it can work (ADR 0162): Lodi's line, then each agent's. */
     hello: {
       lodi: {
-        starting: "Plano ativo! Meu computador já está iniciando. Vamos começar o trabalho!",
-        ready: "Plano ativo! Vamos começar o trabalho!",
-        created: "Time montado! Vamos começar o trabalho!",
+        starting: "Plano ativo. Meu computador já está iniciando. Vamos começar o trabalho.",
+        ready: "Plano ativo. Vamos começar o trabalho.",
+        created: "Time montado. Vamos começar o trabalho.",
       },
       /** The same, while no AI is connected: the plan brings none, and the bar under the lines connects one. */
       lodiNoAi: {
-        starting: "Plano ativo! Meu computador já está iniciando. Conecte uma IA e a gente começa o trabalho.",
-        ready: "Plano ativo! Conecte uma IA e a gente começa o trabalho.",
-        created: "Time montado! Conecte uma IA e a gente começa o trabalho.",
+        starting: "Plano ativo. Meu computador já está iniciando. Conecte uma IA e a gente começa o trabalho.",
+        ready: "Plano ativo. Conecte uma IA e a gente começa o trabalho.",
+        created: "Time montado. Conecte uma IA e a gente começa o trabalho.",
       },
     },
     agents: {
@@ -16783,42 +16783,42 @@ export const ptBR = {
         line: "Responde os clientes no WhatsApp e no e-mail. Chama você quando não sabe.",
         routine: "Resumir o que ficou sem resposta",
         task: "Escreva uma resposta para esta mensagem de cliente:",
-        hello: "Oi, {{first}}! Deixa comigo quem escrever no WhatsApp.",
+        hello: "Oi, {{first}}. Deixa comigo quem escrever no WhatsApp.",
       },
       caio: {
         role: "Cobrança",
         line: "Lembra quem atrasou o pagamento e manda a cobrança depois do seu ok.",
         routine: "Listar quem está com o pagamento atrasado",
         task: "Escreva um lembrete gentil de pagamento para:",
-        hello: "Olá! Cuido das cobranças e só mando lembrete depois do seu ok.",
+        hello: "Olá. Cuido das cobranças e só mando lembrete depois do seu ok.",
       },
       ada: {
         role: "Dev",
         line: "Corrige os bugs que os clientes reportam e abre o PR.",
         routine: "Listar os bugs novos",
         task: "Me diga por onde começar a investigar este bug:",
-        hello: "Oi! Me passem os bugs que chegarem, eu investigo e abro o PR.",
+        hello: "Oi. Me passem os bugs que chegarem, eu investigo e abro o PR.",
       },
       lia: {
         role: "Conteúdo",
         line: "Escreve posts e roteiros no tom da empresa e agenda depois do seu ok.",
         routine: "Propor os posts da semana",
         task: "Proponha três posts para esta semana sobre:",
-        hello: "Oi, pessoal! Os posts da semana ficam comigo.",
+        hello: "Oi, pessoal. Os posts da semana ficam comigo.",
       },
       theo: {
         role: "Vendas",
         line: "Segue quem pediu orçamento e escreve as propostas.",
         routine: "Listar quem pediu orçamento e ficou sem resposta",
         task: "Escreva um orçamento curto para este pedido:",
-        hello: "Oi, {{first}}! Ninguém que pedir orçamento vai ficar sem resposta.",
+        hello: "Oi, {{first}}. Ninguém que pedir orçamento vai ficar sem resposta.",
       },
       nina: {
         role: "Agenda",
         line: "Marca, confirma e remarca horários, e lembra os clientes na véspera.",
         routine: "Confirmar os horários de amanhã",
         task: "Organize estes horários de amanhã:",
-        hello: "Olá! A agenda fica comigo, e lembro os clientes na véspera.",
+        hello: "Olá. A agenda fica comigo, e lembro os clientes na véspera.",
       },
       otto: {
         role: "Pedidos",
@@ -16832,7 +16832,7 @@ export const ptBR = {
         line: "Mantém a base de respostas em dia com o que o time responde.",
         routine: "Atualizar a base com as respostas da semana",
         task: "Escreva as respostas para estas perguntas de clientes:",
-        hello: "Oi! Vou manter a base de respostas em dia com o que o time responder.",
+        hello: "Oi. Vou manter a base de respostas em dia com o que o time responder.",
       },
     },
     channels: {

@@ -16634,14 +16634,14 @@
     },
     "hello": {
       "lodi": {
-        "starting": "Tarif aktiv! Mein Computer startet gerade. An die Arbeit!",
-        "ready": "Tarif aktiv! An die Arbeit!",
-        "created": "Das Team ist da! An die Arbeit!"
+        "starting": "Tarif aktiv. Mein Computer startet gerade. An die Arbeit.",
+        "ready": "Tarif aktiv. An die Arbeit.",
+        "created": "Das Team ist da. An die Arbeit."
       },
       "lodiNoAi": {
-        "starting": "Tarif aktiv! Mein Computer startet gerade. Verbinde eine KI, dann legen wir los.",
-        "ready": "Tarif aktiv! Verbinde eine KI, dann legen wir los.",
-        "created": "Das Team ist da! Verbinde eine KI, dann legen wir los."
+        "starting": "Tarif aktiv. Mein Computer startet gerade. Verbinde eine KI, dann legen wir los.",
+        "ready": "Tarif aktiv. Verbinde eine KI, dann legen wir los.",
+        "created": "Das Team ist da. Verbinde eine KI, dann legen wir los."
       }
     },
     "agents": {
@@ -16650,42 +16650,42 @@
         "line": "Antwortet Kunden auf WhatsApp und per E-Mail. Ruft dich, wenn sie etwas nicht weiß.",
         "routine": "Zusammenfassen, was unbeantwortet blieb",
         "task": "Schreib eine Antwort auf diese Kundennachricht:",
-        "hello": "Hallo {{first}}! Wer auf WhatsApp schreibt, übernehme ich."
+        "hello": "Hallo {{first}}. Wer auf WhatsApp schreibt, übernehme ich."
       },
       "caio": {
         "role": "Abrechnung",
         "line": "Erinnert alle, die mit der Zahlung im Rückstand sind, und schickt die Mahnung nach deinem Ok.",
         "routine": "Auflisten, wer mit der Zahlung im Rückstand ist",
         "task": "Schreib eine freundliche Zahlungserinnerung für:",
-        "hello": "Hallo! Ich kümmere mich um die Zahlungen und schicke Erinnerungen erst nach deinem Okay."
+        "hello": "Hallo. Ich kümmere mich um die Zahlungen und schicke Erinnerungen erst nach deinem Okay."
       },
       "ada": {
         "role": "Dev",
         "line": "Behebt die Bugs, die Kunden melden, und öffnet den PR.",
         "routine": "Die neuen Bugs auflisten",
         "task": "Sag mir, wo ich bei diesem Bug anfangen soll:",
-        "hello": "Hi! Schickt mir die Bugs, die reinkommen, ich untersuche sie und öffne den PR."
+        "hello": "Hi. Schickt mir die Bugs, die reinkommen, ich untersuche sie und öffne den PR."
       },
       "lia": {
         "role": "Inhalte",
         "line": "Schreibt Posts und Skripte im Ton der Firma und plant sie nach deinem Ok.",
         "routine": "Die Posts der Woche vorschlagen",
         "task": "Schlag drei Posts für diese Woche vor zum Thema:",
-        "hello": "Hallo zusammen! Die Posts der Woche übernehme ich."
+        "hello": "Hallo zusammen. Die Posts der Woche übernehme ich."
       },
       "theo": {
         "role": "Vertrieb",
         "line": "Hakt bei allen nach, die ein Angebot angefragt haben, und schreibt die Angebote.",
         "routine": "Auflisten, wer ein Angebot angefragt und keine Antwort bekommen hat",
         "task": "Schreib ein kurzes Angebot für diese Anfrage:",
-        "hello": "Hallo {{first}}! Wer ein Angebot anfragt, bleibt nicht ohne Antwort."
+        "hello": "Hallo {{first}}. Wer ein Angebot anfragt, bleibt nicht ohne Antwort."
       },
       "nina": {
         "role": "Termine",
         "line": "Vereinbart, bestätigt und verschiebt Termine und erinnert Kunden am Vortag.",
         "routine": "Die Termine von morgen bestätigen",
         "task": "Ordne diese Termine für morgen:",
-        "hello": "Hallo! Der Kalender gehört mir, und ich erinnere die Kunden am Vortag."
+        "hello": "Hallo. Der Kalender gehört mir, und ich erinnere die Kunden am Vortag."
       },
       "otto": {
         "role": "Bestellungen",
@@ -16699,7 +16699,7 @@
         "line": "Hält die Antwortbasis mit dem aktuell, was das Team antwortet.",
         "routine": "Die Basis mit den Antworten der Woche aktualisieren",
         "task": "Schreib die Antworten auf diese Kundenfragen:",
-        "hello": "Hi! Ich halte die Antwortbasis mit dem auf dem Laufenden, was das Team antwortet."
+        "hello": "Hi. Ich halte die Antwortbasis mit dem auf dem Laufenden, was das Team antwortet."
       }
     },
     "channels": {

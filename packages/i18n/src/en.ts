@@ -16550,15 +16550,15 @@ export const en = {
     /** The team's hello in #general once it can work (ADR 0162): Lodi's line, then each agent's. */
     hello: {
       lodi: {
-        starting: "Plan active! My computer is starting up. Let's get to work!",
-        ready: "Plan active! Let's get to work!",
-        created: "The team is here! Let's get to work!",
+        starting: "Plan active. My computer is starting up. Let's get to work.",
+        ready: "Plan active. Let's get to work.",
+        created: "The team is here. Let's get to work.",
       },
       /** The same, while no AI is connected: the plan brings none, and the bar under the lines connects one. */
       lodiNoAi: {
-        starting: "Plan active! My computer is starting up. Connect an AI and we'll get to work.",
-        ready: "Plan active! Connect an AI and we'll get to work.",
-        created: "The team is here! Connect an AI and we'll get to work.",
+        starting: "Plan active. My computer is starting up. Connect an AI and we'll get to work.",
+        ready: "Plan active. Connect an AI and we'll get to work.",
+        created: "The team is here. Connect an AI and we'll get to work.",
       },
     },
     agents: {
@@ -16567,42 +16567,42 @@ export const en = {
         line: "Answers customers on WhatsApp and email. Calls you when she doesn't know.",
         routine: "Sum up what was left unanswered",
         task: "Write a reply to this customer message:",
-        hello: "Hi, {{first}}! Leave whoever writes on WhatsApp to me.",
+        hello: "Hi, {{first}}. Leave whoever writes on WhatsApp to me.",
       },
       caio: {
         role: "Billing",
         line: "Reminds whoever is late on payment and sends the reminder after your ok.",
         routine: "List who is late on payment",
         task: "Write a friendly payment reminder for:",
-        hello: "Hello! I'll handle billing and only send reminders after your ok.",
+        hello: "Hello. I'll handle billing and only send reminders after your ok.",
       },
       ada: {
         role: "Dev",
         line: "Fixes the bugs customers report and opens the PR.",
         routine: "List the new bugs",
         task: "Tell me where to start looking at this bug:",
-        hello: "Hi! Send me the bugs that come in, I'll dig in and open the PR.",
+        hello: "Hi. Send me the bugs that come in, I'll dig in and open the PR.",
       },
       lia: {
         role: "Content",
         line: "Writes posts and scripts in the company's voice and schedules them after your ok.",
         routine: "Propose the week's posts",
         task: "Suggest three posts for this week about:",
-        hello: "Hi, everyone! This week's posts are on me.",
+        hello: "Hi, everyone. This week's posts are on me.",
       },
       theo: {
         role: "Sales",
         line: "Follows up on everyone who asked for a quote and writes the proposals.",
         routine: "List who asked for a quote and got no answer",
         task: "Write a short quote for this request:",
-        hello: "Hi, {{first}}! Nobody who asks for a quote will go unanswered.",
+        hello: "Hi, {{first}}. Nobody who asks for a quote will go unanswered.",
       },
       nina: {
         role: "Scheduling",
         line: "Books, confirms and moves appointments, and reminds clients the day before.",
         routine: "Confirm tomorrow's appointments",
         task: "Organize tomorrow's schedule:",
-        hello: "Hello! The calendar is mine, and I'll remind clients the day before.",
+        hello: "Hello. The calendar is mine, and I'll remind clients the day before.",
       },
       otto: {
         role: "Orders",
@@ -16616,7 +16616,7 @@ export const en = {
         line: "Keeps the answer base up to date with what the team answers.",
         routine: "Update the base with the week's answers",
         task: "Write answers to these customer questions:",
-        hello: "Hi! I'll keep the answer base up to date with what the team says.",
+        hello: "Hi. I'll keep the answer base up to date with what the team says.",
       },
     },
     channels: {

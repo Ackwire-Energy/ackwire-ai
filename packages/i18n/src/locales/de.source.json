@@ -40130,22 +40130,22 @@
     "value": "For an office that books clients, sends proposals and bills them."
   },
   "teamTemplates.hello.lodi.starting": {
-    "value": "Plan active! My computer is starting up. Let's get to work!"
+    "value": "Plan active. My computer is starting up. Let's get to work."
   },
   "teamTemplates.hello.lodi.ready": {
-    "value": "Plan active! Let's get to work!"
+    "value": "Plan active. Let's get to work."
   },
   "teamTemplates.hello.lodi.created": {
-    "value": "The team is here! Let's get to work!"
+    "value": "The team is here. Let's get to work."
   },
   "teamTemplates.hello.lodiNoAi.starting": {
-    "value": "Plan active! My computer is starting up. Connect an AI and we'll get to work."
+    "value": "Plan active. My computer is starting up. Connect an AI and we'll get to work."
   },
   "teamTemplates.hello.lodiNoAi.ready": {
-    "value": "Plan active! Connect an AI and we'll get to work."
+    "value": "Plan active. Connect an AI and we'll get to work."
   },
   "teamTemplates.hello.lodiNoAi.created": {
-    "value": "The team is here! Connect an AI and we'll get to work."
+    "value": "The team is here. Connect an AI and we'll get to work."
   },
   "teamTemplates.agents.iara.role": {
     "value": "Customer service"
@@ -40160,7 +40160,7 @@
     "value": "Write a reply to this customer message:"
   },
   "teamTemplates.agents.iara.hello": {
-    "value": "Hi, {{first}}! Leave whoever writes on WhatsApp to me."
+    "value": "Hi, {{first}}. Leave whoever writes on WhatsApp to me."
   },
   "teamTemplates.agents.caio.role": {
     "value": "Billing"
@@ -40175,7 +40175,7 @@
     "value": "Write a friendly payment reminder for:"
   },
   "teamTemplates.agents.caio.hello": {
-    "value": "Hello! I'll handle billing and only send reminders after your ok."
+    "value": "Hello. I'll handle billing and only send reminders after your ok."
   },
   "teamTemplates.agents.ada.role": {
     "value": "Dev"
@@ -40190,7 +40190,7 @@
     "value": "Tell me where to start looking at this bug:"
   },
   "teamTemplates.agents.ada.hello": {
-    "value": "Hi! Send me the bugs that come in, I'll dig in and open the PR."
+    "value": "Hi. Send me the bugs that come in, I'll dig in and open the PR."
   },
   "teamTemplates.agents.lia.role": {
     "value": "Content"
@@ -40205,7 +40205,7 @@
     "value": "Suggest three posts for this week about:"
   },
   "teamTemplates.agents.lia.hello": {
-    "value": "Hi, everyone! This week's posts are on me."
+    "value": "Hi, everyone. This week's posts are on me."
   },
   "teamTemplates.agents.theo.role": {
     "value": "Sales"
@@ -40220,7 +40220,7 @@
     "value": "Write a short quote for this request:"
   },
   "teamTemplates.agents.theo.hello": {
-    "value": "Hi, {{first}}! Nobody who asks for a quote will go unanswered."
+    "value": "Hi, {{first}}. Nobody who asks for a quote will go unanswered."
   },
   "teamTemplates.agents.nina.role": {
     "value": "Scheduling"
@@ -40235,7 +40235,7 @@
     "value": "Organize tomorrow's schedule:"
   },
   "teamTemplates.agents.nina.hello": {
-    "value": "Hello! The calendar is mine, and I'll remind clients the day before."
+    "value": "Hello. The calendar is mine, and I'll remind clients the day before."
   },
   "teamTemplates.agents.otto.role": {
     "value": "Orders"
@@ -40265,7 +40265,7 @@
     "value": "Write answers to these customer questions:"
   },
   "teamTemplates.agents.bia.hello": {
-    "value": "Hi! I'll keep the answer base up to date with what the team says."
+    "value": "Hi. I'll keep the answer base up to date with what the team says."
   },
   "teamTemplates.channels.iara": {
     "value": "support"

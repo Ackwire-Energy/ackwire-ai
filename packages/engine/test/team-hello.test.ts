@@ -67,10 +67,10 @@ describe("after the first plan", () => {
     await hold(null);
     await drainInTime();
     expect(await hellos()).toEqual([
-      { name: "Lodi", body: "Plano ativo! Vamos começar o trabalho!" },
-      { name: "Iara", body: "Oi, ana! Deixa comigo quem escrever no WhatsApp." },
+      { name: "Lodi", body: "Plano ativo. Vamos começar o trabalho." },
+      { name: "Iara", body: "Oi, ana. Deixa comigo quem escrever no WhatsApp." },
       { name: "Otto", body: "Cheguei. Fico de olho nos pedidos e aviso se faltar algo no estoque." },
-      { name: "Lia", body: "Oi, pessoal! Os posts da semana ficam comigo." },
+      { name: "Lia", body: "Oi, pessoal. Os posts da semana ficam comigo." },
     ]);
     // The team is in #general, answering there only when called; the right hand stays in no channel.
     const seats = await f.db
@@ -105,10 +105,10 @@ describe("after the first plan", () => {
     await hold(null);
     await drainInTime();
     expect((await hellos()).map((h) => h.body)).toEqual([
-      "Plano ativo! Conecte uma IA e a gente começa o trabalho.",
-      "Oi, ana! Deixa comigo quem escrever no WhatsApp.",
+      "Plano ativo. Conecte uma IA e a gente começa o trabalho.",
+      "Oi, ana. Deixa comigo quem escrever no WhatsApp.",
       "Cheguei. Fico de olho nos pedidos e aviso se faltar algo no estoque.",
-      "Oi, pessoal! Os posts da semana ficam comigo.",
+      "Oi, pessoal. Os posts da semana ficam comigo.",
     ]);
   });
 
@@ -129,7 +129,7 @@ describe("after the first plan", () => {
     const payload = { agentId: lodi?.id, userId: f.owner.id, how: "paid" };
     await sayTeamHello({ db: f.db, workspaceComputer: { billing: true } }, f.org.id, payload);
     expect((await hellos()).map((h) => h.body)).toEqual([
-      "Plano ativo! Meu computador já está iniciando. Vamos começar o trabalho!",
+      "Plano ativo. Meu computador já está iniciando. Vamos começar o trabalho.",
     ]);
     // Said once, whatever runs again.
     await sayTeamHello({ db: f.db, workspaceComputer: { billing: true } }, f.org.id, payload);
@@ -171,9 +171,9 @@ describe("with no plan to wait for", () => {
     await useTeamTemplate({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, "support", "en");
     await drainInTime();
     expect(await hellos()).toEqual([
-      { name: "Lodi", body: "The team is here! Let's get to work!" },
-      { name: "Iara", body: "Hi, ana! Leave whoever writes on WhatsApp to me." },
-      { name: "Bia", body: "Hi! I'll keep the answer base up to date with what the team says." },
+      { name: "Lodi", body: "The team is here. Let's get to work." },
+      { name: "Iara", body: "Hi, ana. Leave whoever writes on WhatsApp to me." },
+      { name: "Bia", body: "Hi. I'll keep the answer base up to date with what the team says." },
     ]);
     // A second template team later: the hello was the workspace's start, not each team's.
     await useTeamTemplate({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, "store", "en");

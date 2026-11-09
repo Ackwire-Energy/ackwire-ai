@@ -17266,14 +17266,14 @@
     },
     "hello": {
       "lodi": {
-        "starting": "Abonnement actif ! Mon ordinateur démarre. Au travail !",
-        "ready": "Abonnement actif ! Au travail !",
-        "created": "L'équipe est là ! Au travail !"
+        "starting": "Abonnement actif. Mon ordinateur démarre. Au travail.",
+        "ready": "Abonnement actif. Au travail.",
+        "created": "L'équipe est là. Au travail."
       },
       "lodiNoAi": {
-        "starting": "Abonnement actif ! Mon ordinateur démarre. Connectez une IA et on se met au travail.",
-        "ready": "Abonnement actif ! Connectez une IA et on se met au travail.",
-        "created": "L'équipe est là ! Connectez une IA et on se met au travail."
+        "starting": "Abonnement actif. Mon ordinateur démarre. Connectez une IA et on se met au travail.",
+        "ready": "Abonnement actif. Connectez une IA et on se met au travail.",
+        "created": "L'équipe est là. Connectez une IA et on se met au travail."
       }
     },
     "agents": {
@@ -17282,42 +17282,42 @@
         "line": "Répond aux clients sur WhatsApp et par e-mail. T'appelle quand elle ne sait pas.",
         "routine": "Résumer ce qui est resté sans réponse",
         "task": "Écris une réponse à ce message client :",
-        "hello": "Bonjour {{first}} ! Je m'occupe de ceux qui écrivent sur WhatsApp."
+        "hello": "Bonjour {{first}}. Je m'occupe de ceux qui écrivent sur WhatsApp."
       },
       "caio": {
         "role": "Facturation",
         "line": "Relance les retards de paiement et envoie la relance après ton accord.",
         "routine": "Lister qui a un paiement en retard",
         "task": "Écris un rappel de paiement aimable pour :",
-        "hello": "Bonjour ! Je gère les paiements et j'envoie un rappel seulement après votre accord."
+        "hello": "Bonjour. Je gère les paiements et j'envoie un rappel seulement après votre accord."
       },
       "ada": {
         "role": "Dev",
         "line": "Corrige les bugs signalés par les clients et ouvre la PR.",
         "routine": "Lister les nouveaux bugs",
         "task": "Dis-moi par où commencer pour enquêter sur ce bug :",
-        "hello": "Salut ! Envoyez-moi les bugs qui arrivent, j'enquête et j'ouvre la PR."
+        "hello": "Salut. Envoyez-moi les bugs qui arrivent, j'enquête et j'ouvre la PR."
       },
       "lia": {
         "role": "Contenu",
         "line": "Écrit posts et scripts dans le ton de l'entreprise et les programme après ton accord.",
         "routine": "Proposer les posts de la semaine",
         "task": "Propose trois posts pour cette semaine sur :",
-        "hello": "Bonjour à tous ! Les posts de la semaine, c'est pour moi."
+        "hello": "Bonjour à tous. Les posts de la semaine, c'est pour moi."
       },
       "theo": {
         "role": "Ventes",
         "line": "Relance toutes les personnes qui ont demandé un devis et rédige les propositions.",
         "routine": "Lister qui a demandé un devis sans réponse",
         "task": "Écris un devis court pour cette demande :",
-        "hello": "Bonjour {{first}} ! Personne qui demande un devis ne restera sans réponse."
+        "hello": "Bonjour {{first}}. Personne qui demande un devis ne restera sans réponse."
       },
       "nina": {
         "role": "Agenda",
         "line": "Prend, confirme et déplace les rendez-vous, et rappelle les clients la veille.",
         "routine": "Confirmer les rendez-vous de demain",
         "task": "Organise ces horaires de demain :",
-        "hello": "Bonjour ! Je m'occupe de l'agenda et je rappelle les clients la veille."
+        "hello": "Bonjour. Je m'occupe de l'agenda et je rappelle les clients la veille."
       },
       "otto": {
         "role": "Commandes",
@@ -17331,7 +17331,7 @@
         "line": "Tient la base de réponses à jour avec ce que l'équipe répond.",
         "routine": "Mettre à jour la base avec les réponses de la semaine",
         "task": "Écris les réponses à ces questions de clients :",
-        "hello": "Salut ! Je tiens la base de réponses à jour avec ce que répond l'équipe."
+        "hello": "Salut. Je tiens la base de réponses à jour avec ce que répond l'équipe."
       }
     },
     "channels": {

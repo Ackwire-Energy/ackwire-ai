@@ -16183,14 +16183,14 @@
     },
     "hello": {
       "lodi": {
-        "starting": "Paket aktif! Komputerku sedang menyala. Ayo mulai bekerja!",
-        "ready": "Paket aktif! Ayo mulai bekerja!",
-        "created": "Timnya sudah lengkap! Ayo mulai bekerja!"
+        "starting": "Paket aktif. Komputerku sedang menyala. Ayo mulai bekerja.",
+        "ready": "Paket aktif. Ayo mulai bekerja.",
+        "created": "Timnya sudah lengkap. Ayo mulai bekerja."
       },
       "lodiNoAi": {
-        "starting": "Paket aktif! Komputerku sedang menyala. Hubungkan AI dan kita mulai bekerja.",
-        "ready": "Paket aktif! Hubungkan AI dan kita mulai bekerja.",
-        "created": "Timnya sudah lengkap! Hubungkan AI dan kita mulai bekerja."
+        "starting": "Paket aktif. Komputerku sedang menyala. Hubungkan AI dan kita mulai bekerja.",
+        "ready": "Paket aktif. Hubungkan AI dan kita mulai bekerja.",
+        "created": "Timnya sudah lengkap. Hubungkan AI dan kita mulai bekerja."
       }
     },
     "agents": {
@@ -16199,42 +16199,42 @@
         "line": "Menjawab pelanggan di WhatsApp dan email. Memanggilmu saat tidak tahu.",
         "routine": "Merangkum yang belum dijawab",
         "task": "Tulis balasan untuk pesan pelanggan ini:",
-        "hello": "Hai, {{first}}! Serahkan padaku siapa pun yang menulis lewat WhatsApp."
+        "hello": "Hai, {{first}}. Serahkan padaku siapa pun yang menulis lewat WhatsApp."
       },
       "caio": {
         "role": "Penagihan",
         "line": "Mengingatkan yang terlambat bayar dan mengirim tagihan setelah kamu setuju.",
         "routine": "Mendaftar siapa yang terlambat bayar",
         "task": "Tulis pengingat pembayaran yang ramah untuk:",
-        "hello": "Halo! Aku mengurus tagihan dan hanya mengirim pengingat setelah kamu setuju."
+        "hello": "Halo. Aku mengurus tagihan dan hanya mengirim pengingat setelah kamu setuju."
       },
       "ada": {
         "role": "Dev",
         "line": "Memperbaiki bug yang dilaporkan pelanggan dan membuka PR.",
         "routine": "Mendaftar bug baru",
         "task": "Beri tahu saya harus mulai dari mana menyelidiki bug ini:",
-        "hello": "Hai! Kirim bug yang masuk ke aku, aku selidiki dan buka PR-nya."
+        "hello": "Hai. Kirim bug yang masuk ke aku, aku selidiki dan buka PR-nya."
       },
       "lia": {
         "role": "Konten",
         "line": "Menulis posting dan naskah dengan gaya perusahaan dan menjadwalkannya setelah kamu setuju.",
         "routine": "Mengusulkan posting minggu ini",
         "task": "Usulkan tiga posting minggu ini tentang:",
-        "hello": "Hai, semuanya! Postingan minggu ini urusanku."
+        "hello": "Hai, semuanya. Postingan minggu ini urusanku."
       },
       "theo": {
         "role": "Penjualan",
         "line": "Menindaklanjuti semua yang meminta penawaran dan menulis proposalnya.",
         "routine": "Mendaftar siapa yang meminta penawaran dan belum dijawab",
         "task": "Tulis penawaran singkat untuk permintaan ini:",
-        "hello": "Hai, {{first}}! Tidak ada yang minta penawaran harga dibiarkan tanpa jawaban."
+        "hello": "Hai, {{first}}. Tidak ada yang minta penawaran harga dibiarkan tanpa jawaban."
       },
       "nina": {
         "role": "Jadwal",
         "line": "Membuat, mengonfirmasi, dan memindahkan janji, dan mengingatkan klien sehari sebelumnya.",
         "routine": "Mengonfirmasi janji besok",
         "task": "Atur jadwal besok ini:",
-        "hello": "Halo! Jadwal aku yang pegang, dan aku ingatkan klien sehari sebelumnya."
+        "hello": "Halo. Jadwal aku yang pegang, dan aku ingatkan klien sehari sebelumnya."
       },
       "otto": {
         "role": "Pesanan",
@@ -16248,7 +16248,7 @@
         "line": "Menjaga basis jawaban tetap sesuai dengan jawaban tim.",
         "routine": "Memperbarui basis dengan jawaban minggu ini",
         "task": "Tulis jawaban untuk pertanyaan pelanggan ini:",
-        "hello": "Hai! Aku jaga basis jawaban tetap terbaru dengan jawaban tim."
+        "hello": "Hai. Aku jaga basis jawaban tetap terbaru dengan jawaban tim."
       }
     },
     "channels": {

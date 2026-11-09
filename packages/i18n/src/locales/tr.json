@@ -16564,14 +16564,14 @@
     },
     "hello": {
       "lodi": {
-        "starting": "Plan aktif! Bilgisayarım açılıyor. Hadi işe başlayalım!",
-        "ready": "Plan aktif! Hadi işe başlayalım!",
-        "created": "Ekip hazır! Hadi işe başlayalım!"
+        "starting": "Plan aktif. Bilgisayarım açılıyor. Hadi işe başlayalım.",
+        "ready": "Plan aktif. Hadi işe başlayalım.",
+        "created": "Ekip hazır. Hadi işe başlayalım."
       },
       "lodiNoAi": {
-        "starting": "Plan aktif! Bilgisayarım açılıyor. Bir yapay zeka bağla, işe başlayalım.",
-        "ready": "Plan aktif! Bir yapay zeka bağla, işe başlayalım.",
-        "created": "Ekip hazır! Bir yapay zeka bağla, işe başlayalım."
+        "starting": "Plan aktif. Bilgisayarım açılıyor. Bir yapay zeka bağla, işe başlayalım.",
+        "ready": "Plan aktif. Bir yapay zeka bağla, işe başlayalım.",
+        "created": "Ekip hazır. Bir yapay zeka bağla, işe başlayalım."
       }
     },
     "agents": {
@@ -16580,42 +16580,42 @@
         "line": "Müşterilere WhatsApp ve e-postadan yanıt verir. Bilmediğinde seni çağırır.",
         "routine": "Yanıtsız kalanları özetle",
         "task": "Bu müşteri mesajına bir yanıt yaz:",
-        "hello": "Merhaba {{first}}! WhatsApp'tan yazanları bana bırak."
+        "hello": "Merhaba {{first}}. WhatsApp'tan yazanları bana bırak."
       },
       "caio": {
         "role": "Tahsilat",
         "line": "Ödemesi gecikenlere hatırlatır ve onayından sonra ödeme hatırlatmasını gönderir.",
         "routine": "Ödemesi gecikenleri listele",
         "task": "Şu kişi için nazik bir ödeme hatırlatması yaz:",
-        "hello": "Merhaba! Ödemeleri ben takip ederim ve hatırlatmayı yalnızca senin onayından sonra gönderirim."
+        "hello": "Merhaba. Ödemeleri ben takip ederim ve hatırlatmayı yalnızca senin onayından sonra gönderirim."
       },
       "ada": {
         "role": "Dev",
         "line": "Müşterilerin bildirdiği hataları düzeltir ve PR açar.",
         "routine": "Yeni hataları listele",
         "task": "Bu hatayı araştırmaya nereden başlayacağımı söyle:",
-        "hello": "Selam! Gelen hataları bana gönderin, inceleyip PR'ı açarım."
+        "hello": "Selam. Gelen hataları bana gönderin, inceleyip PR'ı açarım."
       },
       "lia": {
         "role": "İçerik",
         "line": "Şirketin üslubuyla gönderi ve senaryo yazar, onayından sonra planlar.",
         "routine": "Haftanın gönderilerini öner",
         "task": "Şu konuda bu hafta için üç gönderi öner:",
-        "hello": "Herkese merhaba! Bu haftanın gönderileri bende."
+        "hello": "Herkese merhaba. Bu haftanın gönderileri bende."
       },
       "theo": {
         "role": "Satış",
         "line": "Teklif isteyen herkesi takip eder ve teklifleri yazar.",
         "routine": "Teklif isteyip yanıt alamayanları listele",
         "task": "Bu talep için kısa bir teklif yaz:",
-        "hello": "Merhaba {{first}}! Teklif isteyen kimse cevapsız kalmayacak."
+        "hello": "Merhaba {{first}}. Teklif isteyen kimse cevapsız kalmayacak."
       },
       "nina": {
         "role": "Randevu",
         "line": "Randevu verir, onaylar, değiştirir ve müşterilere bir gün önce hatırlatır.",
         "routine": "Yarının randevularını onayla",
         "task": "Yarının şu saatlerini düzenle:",
-        "hello": "Merhaba! Ajanda bende, müşterilere bir gün önceden hatırlatırım."
+        "hello": "Merhaba. Ajanda bende, müşterilere bir gün önceden hatırlatırım."
       },
       "otto": {
         "role": "Siparişler",
@@ -16629,7 +16629,7 @@
         "line": "Yanıt tabanını ekibin verdiği yanıtlarla güncel tutar.",
         "routine": "Tabanı haftanın yanıtlarıyla güncelle",
         "task": "Bu müşteri sorularının yanıtlarını yaz:",
-        "hello": "Selam! Cevap tabanını ekibin verdiği cevaplarla güncel tutacağım."
+        "hello": "Selam. Cevap tabanını ekibin verdiği cevaplarla güncel tutacağım."
       }
     },
     "channels": {

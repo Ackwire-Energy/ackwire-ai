@@ -17269,14 +17269,14 @@
     },
     "hello": {
       "lodi": {
-        "starting": "Piano attivo! Il mio computer si sta avviando. Al lavoro!",
-        "ready": "Piano attivo! Al lavoro!",
-        "created": "Il team è qui! Al lavoro!"
+        "starting": "Piano attivo. Il mio computer si sta avviando. Al lavoro.",
+        "ready": "Piano attivo. Al lavoro.",
+        "created": "Il team è qui. Al lavoro."
       },
       "lodiNoAi": {
-        "starting": "Piano attivo! Il mio computer si sta avviando. Collega un'IA e ci mettiamo al lavoro.",
-        "ready": "Piano attivo! Collega un'IA e ci mettiamo al lavoro.",
-        "created": "Il team è qui! Collega un'IA e ci mettiamo al lavoro."
+        "starting": "Piano attivo. Il mio computer si sta avviando. Collega un'IA e ci mettiamo al lavoro.",
+        "ready": "Piano attivo. Collega un'IA e ci mettiamo al lavoro.",
+        "created": "Il team è qui. Collega un'IA e ci mettiamo al lavoro."
       }
     },
     "agents": {
@@ -17285,42 +17285,42 @@
         "line": "Risponde ai clienti su WhatsApp e via e-mail. Ti chiama quando non sa.",
         "routine": "Riassumere ciò che è rimasto senza risposta",
         "task": "Scrivi una risposta a questo messaggio del cliente:",
-        "hello": "Ciao {{first}}! Chi scrive su WhatsApp lascialo a me."
+        "hello": "Ciao {{first}}. Chi scrive su WhatsApp lascialo a me."
       },
       "caio": {
         "role": "Pagamenti",
         "line": "Ricorda a chi è in ritardo con il pagamento e manda il sollecito dopo il tuo ok.",
         "routine": "Elencare chi è in ritardo con il pagamento",
         "task": "Scrivi un promemoria di pagamento gentile per:",
-        "hello": "Ciao! Mi occupo dei pagamenti e mando i promemoria solo dopo il tuo ok."
+        "hello": "Ciao. Mi occupo dei pagamenti e mando i promemoria solo dopo il tuo ok."
       },
       "ada": {
         "role": "Dev",
         "line": "Corregge i bug segnalati dai clienti e apre la PR.",
         "routine": "Elencare i nuovi bug",
         "task": "Dimmi da dove iniziare a indagare su questo bug:",
-        "hello": "Ciao! Passatemi i bug che arrivano, indago io e apro la PR."
+        "hello": "Ciao. Passatemi i bug che arrivano, indago io e apro la PR."
       },
       "lia": {
         "role": "Contenuti",
         "line": "Scrive post e copioni nel tono dell'azienda e li programma dopo il tuo ok.",
         "routine": "Proporre i post della settimana",
         "task": "Proponi tre post per questa settimana su:",
-        "hello": "Ciao a tutti! I post della settimana sono miei."
+        "hello": "Ciao a tutti. I post della settimana sono miei."
       },
       "theo": {
         "role": "Vendite",
         "line": "Ricontatta chi ha chiesto un preventivo e scrive le proposte.",
         "routine": "Elencare chi ha chiesto un preventivo senza risposta",
         "task": "Scrivi un preventivo breve per questa richiesta:",
-        "hello": "Ciao {{first}}! Nessuno che chiede un preventivo resterà senza risposta."
+        "hello": "Ciao {{first}}. Nessuno che chiede un preventivo resterà senza risposta."
       },
       "nina": {
         "role": "Agenda",
         "line": "Fissa, conferma e sposta gli appuntamenti, e ricorda ai clienti il giorno prima.",
         "routine": "Confermare gli appuntamenti di domani",
         "task": "Organizza questi orari di domani:",
-        "hello": "Ciao! L'agenda la tengo io, e ricordo gli appuntamenti ai clienti il giorno prima."
+        "hello": "Ciao. L'agenda la tengo io, e ricordo gli appuntamenti ai clienti il giorno prima."
       },
       "otto": {
         "role": "Ordini",
@@ -17334,7 +17334,7 @@
         "line": "Tiene aggiornata la base di risposte con ciò che risponde il team.",
         "routine": "Aggiornare la base con le risposte della settimana",
         "task": "Scrivi le risposte a queste domande dei clienti:",
-        "hello": "Ciao! Terrò aggiornata la base di risposte con quello che risponde il team."
+        "hello": "Ciao. Terrò aggiornata la base di risposte con quello che risponde il team."
       }
     },
     "channels": {

@@ -17746,14 +17746,14 @@
     },
     "hello": {
       "lodi": {
-        "starting": "Plan aktywny! Mój komputer się uruchamia. Do roboty!",
-        "ready": "Plan aktywny! Do roboty!",
-        "created": "Zespół jest gotowy! Do roboty!"
+        "starting": "Plan aktywny. Mój komputer się uruchamia. Do roboty.",
+        "ready": "Plan aktywny. Do roboty.",
+        "created": "Zespół jest gotowy. Do roboty."
       },
       "lodiNoAi": {
-        "starting": "Plan aktywny! Mój komputer się uruchamia. Podłącz AI i bierzemy się do roboty.",
-        "ready": "Plan aktywny! Podłącz AI i bierzemy się do roboty.",
-        "created": "Zespół jest gotowy! Podłącz AI i bierzemy się do roboty."
+        "starting": "Plan aktywny. Mój komputer się uruchamia. Podłącz AI i bierzemy się do roboty.",
+        "ready": "Plan aktywny. Podłącz AI i bierzemy się do roboty.",
+        "created": "Zespół jest gotowy. Podłącz AI i bierzemy się do roboty."
       }
     },
     "agents": {
@@ -17762,42 +17762,42 @@
         "line": "Odpowiada klientom na WhatsAppie i mailowo. Woła cię, gdy czegoś nie wie.",
         "routine": "Podsumować, co zostało bez odpowiedzi",
         "task": "Napisz odpowiedź na tę wiadomość od klienta:",
-        "hello": "Cześć, {{first}}! Tych, którzy piszą na WhatsAppie, zostaw mnie."
+        "hello": "Cześć, {{first}}. Tych, którzy piszą na WhatsAppie, zostaw mnie."
       },
       "caio": {
         "role": "Płatności",
         "line": "Przypomina zalegającym z płatnością i wysyła upomnienie po twojej zgodzie.",
         "routine": "Wypisać, kto zalega z płatnością",
         "task": "Napisz uprzejme przypomnienie o płatności dla:",
-        "hello": "Dzień dobry! Zajmę się płatnościami i wyślę przypomnienie dopiero po twojej zgodzie."
+        "hello": "Dzień dobry. Zajmę się płatnościami i wyślę przypomnienie dopiero po twojej zgodzie."
       },
       "ada": {
         "role": "Dev",
         "line": "Naprawia błędy zgłaszane przez klientów i otwiera PR.",
         "routine": "Wypisać nowe błędy",
         "task": "Powiedz, od czego zacząć badanie tego błędu:",
-        "hello": "Cześć! Podsyłajcie mi zgłaszane bugi, zbadam je i otworzę PR."
+        "hello": "Cześć. Podsyłajcie mi zgłaszane bugi, zbadam je i otworzę PR."
       },
       "lia": {
         "role": "Treści",
         "line": "Pisze posty i scenariusze w tonie firmy i planuje je po twojej zgodzie.",
         "routine": "Zaproponować posty na ten tydzień",
         "task": "Zaproponuj trzy posty na ten tydzień o:",
-        "hello": "Cześć wszystkim! Posty na ten tydzień biorę na siebie."
+        "hello": "Cześć wszystkim. Posty na ten tydzień biorę na siebie."
       },
       "theo": {
         "role": "Sprzedaż",
         "line": "Pilnuje wszystkich, którzy prosili o wycenę, i pisze oferty.",
         "routine": "Wypisać, kto prosił o wycenę i nie dostał odpowiedzi",
         "task": "Napisz krótką wycenę dla tego zlecenia:",
-        "hello": "Cześć, {{first}}! Nikt, kto poprosi o wycenę, nie zostanie bez odpowiedzi."
+        "hello": "Cześć, {{first}}. Nikt, kto poprosi o wycenę, nie zostanie bez odpowiedzi."
       },
       "nina": {
         "role": "Terminy",
         "line": "Umawia, potwierdza i przesuwa wizyty oraz przypomina klientom dzień wcześniej.",
         "routine": "Potwierdzić jutrzejsze wizyty",
         "task": "Uporządkuj te jutrzejsze godziny:",
-        "hello": "Dzień dobry! Kalendarz biorę na siebie i dzień wcześniej przypomnę klientom."
+        "hello": "Dzień dobry. Kalendarz biorę na siebie i dzień wcześniej przypomnę klientom."
       },
       "otto": {
         "role": "Zamówienia",
@@ -17811,7 +17811,7 @@
         "line": "Aktualizuje bazę odpowiedzi według tego, co odpowiada zespół.",
         "routine": "Zaktualizować bazę odpowiedziami z tygodnia",
         "task": "Napisz odpowiedzi na te pytania klientów:",
-        "hello": "Cześć! Będę aktualizować bazę odpowiedzi tym, co odpowiada zespół."
+        "hello": "Cześć. Będę aktualizować bazę odpowiedzi tym, co odpowiada zespół."
       }
     },
     "channels": {

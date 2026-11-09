@@ -16809,14 +16809,14 @@
     },
     "hello": {
       "lodi": {
-        "starting": "Abonnement actief! Mijn computer start op. Aan de slag!",
-        "ready": "Abonnement actief! Aan de slag!",
-        "created": "Het team is er! Aan de slag!"
+        "starting": "Abonnement actief. Mijn computer start op. Aan de slag.",
+        "ready": "Abonnement actief. Aan de slag.",
+        "created": "Het team is er. Aan de slag."
       },
       "lodiNoAi": {
-        "starting": "Abonnement actief! Mijn computer start op. Koppel een AI en we gaan aan de slag.",
-        "ready": "Abonnement actief! Koppel een AI en we gaan aan de slag.",
-        "created": "Het team is er! Koppel een AI en we gaan aan de slag."
+        "starting": "Abonnement actief. Mijn computer start op. Koppel een AI en we gaan aan de slag.",
+        "ready": "Abonnement actief. Koppel een AI en we gaan aan de slag.",
+        "created": "Het team is er. Koppel een AI en we gaan aan de slag."
       }
     },
     "agents": {
@@ -16825,42 +16825,42 @@
         "line": "Beantwoordt klanten via WhatsApp en e-mail. Roept je als ze het niet weet.",
         "routine": "Samenvatten wat onbeantwoord bleef",
         "task": "Schrijf een antwoord op dit klantbericht:",
-        "hello": "Hoi {{first}}! Wie via WhatsApp schrijft, laat je aan mij over."
+        "hello": "Hoi {{first}}. Wie via WhatsApp schrijft, laat je aan mij over."
       },
       "caio": {
         "role": "Facturen",
         "line": "Herinnert wie te laat betaalt en stuurt de herinnering na jouw ok.",
         "routine": "Opsommen wie te laat betaalt",
         "task": "Schrijf een vriendelijke betalingsherinnering voor:",
-        "hello": "Hallo! Ik doe de betalingen en stuur pas een herinnering na jouw oké."
+        "hello": "Hallo. Ik doe de betalingen en stuur pas een herinnering na jouw oké."
       },
       "ada": {
         "role": "Dev",
         "line": "Lost de bugs op die klanten melden en opent de PR.",
         "routine": "De nieuwe bugs opsommen",
         "task": "Vertel me waar ik moet beginnen met deze bug:",
-        "hello": "Hoi! Stuur me de bugs die binnenkomen, ik zoek het uit en open de PR."
+        "hello": "Hoi. Stuur me de bugs die binnenkomen, ik zoek het uit en open de PR."
       },
       "lia": {
         "role": "Content",
         "line": "Schrijft posts en scripts in de toon van het bedrijf en plant ze na jouw ok.",
         "routine": "De posts van de week voorstellen",
         "task": "Stel drie posts voor deze week voor over:",
-        "hello": "Hoi allemaal! De posts van deze week zijn voor mij."
+        "hello": "Hoi allemaal. De posts van deze week zijn voor mij."
       },
       "theo": {
         "role": "Verkoop",
         "line": "Volgt iedereen op die een offerte vroeg en schrijft de voorstellen.",
         "routine": "Opsommen wie een offerte vroeg en geen antwoord kreeg",
         "task": "Schrijf een korte offerte voor deze aanvraag:",
-        "hello": "Hoi {{first}}! Niemand die om een offerte vraagt, blijft zonder antwoord."
+        "hello": "Hoi {{first}}. Niemand die om een offerte vraagt, blijft zonder antwoord."
       },
       "nina": {
         "role": "Agenda",
         "line": "Plant, bevestigt en verzet afspraken en herinnert klanten de dag ervoor.",
         "routine": "De afspraken van morgen bevestigen",
         "task": "Orden deze tijden van morgen:",
-        "hello": "Hallo! De agenda is van mij, en ik herinner klanten de dag ervoor."
+        "hello": "Hallo. De agenda is van mij, en ik herinner klanten de dag ervoor."
       },
       "otto": {
         "role": "Bestellingen",
@@ -16874,7 +16874,7 @@
         "line": "Houdt de antwoordenbank bij met wat het team antwoordt.",
         "routine": "De bank bijwerken met de antwoorden van de week",
         "task": "Schrijf de antwoorden op deze klantvragen:",
-        "hello": "Hoi! Ik hou de antwoordbank bij met wat het team antwoordt."
+        "hello": "Hoi. Ik hou de antwoordbank bij met wat het team antwoordt."
       }
     },
     "channels": {
