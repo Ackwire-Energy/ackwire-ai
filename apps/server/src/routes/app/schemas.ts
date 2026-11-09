@@ -442,6 +442,10 @@ export const Agent = z
         speed: z.literal("fast").optional().openapi({
           description: "Set to `fast` where that applies to what it thinks with (ADR 0149); absent: standard speed.",
         }),
+        maker: z.string().optional().openapi({
+          description:
+            "An API brain on Automático: the maker its models come from (its own key's, else the workspace's), whose logo shows beside it.",
+        }),
       })
       .optional()
       .openapi({ description: "Who thinks for it (ADR 0032), to show next to its name." }),

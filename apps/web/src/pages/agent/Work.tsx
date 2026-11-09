@@ -307,7 +307,8 @@ export function WorkCard({
     : kind === "model"
       ? "key"
       : planOfAccount({ kind, provider: agent.brain?.provider ?? null });
-  const keyProvider = apiProviderOf(saved.model, models.data?.models ?? []);
+  // The model's maker; on Automático, the maker the server says its models come from.
+  const keyProvider = apiProviderOf(saved.model, models.data?.models ?? []) ?? agent.brain?.maker;
   const orgModel = isAuto(saved.model)
     ? t("brain.auto.label")
     : (models.data?.models.find((m) => m.id === saved.model)?.label ?? saved.model);

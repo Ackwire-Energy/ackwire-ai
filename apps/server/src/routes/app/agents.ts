@@ -2,7 +2,7 @@ import {
   type AgentBrainSummary,
   type Agent as AgentRow,
   adjustTeamAgent,
-  agentBrainSummaries,
+  agentBrainLines,
   agentBudgetsThisMonth,
   agentStatuses,
   agentView,
@@ -618,7 +618,7 @@ export function agentRoutes(deps: AppDeps) {
       const [seesCost, budgets, brains, viewer, old] = await Promise.all([
         canViewCost(db, actor, orgId),
         agentBudgetsThisMonth(db, orgId),
-        agentBrainSummaries(db, actor, orgId, list),
+        agentBrainLines(db, actor, orgId, list),
         getMembership(db, actor, orgId),
         oldHandlesByAgent(db, orgId),
       ]);
@@ -1483,7 +1483,7 @@ export function agentRoutes(deps: AppDeps) {
       }
       const [seesCost, brains, viewer, old] = await Promise.all([
         canViewCost(db, actor, orgId),
-        agentBrainSummaries(db, actor, orgId, [agent]),
+        agentBrainLines(db, actor, orgId, [agent]),
         getMembership(db, actor, orgId),
         oldHandlesByAgent(db, orgId),
       ]);
@@ -1519,7 +1519,7 @@ export function agentRoutes(deps: AppDeps) {
       if (!agent) throw new NotFoundError("Agent not found");
       const [seesCost, brains, viewer, old] = await Promise.all([
         canViewCost(db, actor, orgId),
-        agentBrainSummaries(db, actor, orgId, [agent]),
+        agentBrainLines(db, actor, orgId, [agent]),
         getMembership(db, actor, orgId),
         oldHandlesByAgent(db, orgId),
       ]);

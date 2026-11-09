@@ -116,7 +116,7 @@ export function RightHandMineRow({ agent }: { agent: Agent }) {
   const connect = useConnectAi();
   const view = useAgentBrain(org.id, agent.id).data;
   const platform = usePlatformKey(org.id).data === true;
-  const status = mineStatus(view, me.user.id, platform);
+  const status = mineStatus(view, me.user.id, platform, agent.brain?.maker);
   if (!status) return null;
   const first = (id: string) => dir.memberById.get(id)?.name.split(" ")[0] ?? "";
   const back = () =>
