@@ -1,4 +1,4 @@
-import { Children, Fragment, isValidElement, type ReactNode, useState } from "react";
+import { Children, createContext, Fragment, isValidElement, type ReactNode, useContext, useState } from "react";
 import {
   ActivityIndicator,
   type LayoutChangeEvent,
@@ -22,6 +22,10 @@ import { CHROME_MAX_SCALE } from "./type-scale";
  * conversation's, not a voice, and it grows with the person's text size as they do. Its line, for the time beside it.
  */
 const WORDS_LINE = 20;
+/** An action's word (the label, 13 on 18) on the sentence's first line: the frame's 6, then half of 20 less half of 18. */
+const FIRST_LINE_TOP = 6 + (WORDS_LINE - 18) / 2;
+/** Beside the sentence (not under it): the actions sit on its first line, never on the middle of a tall frame. */
+const BesideContext = createContext(false);
 const MARK = 14;
 /** The small controls' corner, cut at the bottom left (the app's "cut corner"). */
 const RADIUS = 10;
@@ -96,7 +100,7 @@ export function EventPill({ mark, markColor, children, time, actions, below, wai
                 <View key={i} style={styles.slot}>
                   {/* A hairline before each; under the sentence, the first starts at the frame's edge. */}
                   {stacked && i === 0 ? null : <View style={[styles.rule, { backgroundColor: c.line }]} />}
-                  {action}
+                  <BesideContext.Provider value={!stacked}>{action}</BesideContext.Provider>
                 </View>
               ))}
             </View>
@@ -145,6 +149,7 @@ export function EventPillAction({
   accessibilityHint,
 }: EventPillActionProps) {
   const { colors: c } = useTheme();
+  const beside = useContext(BesideContext);
   const opens = expanded !== undefined;
   // The attention color at 10%, 18% while pressed: the web's `--attention` mixed into nothing.
   const tint = (pressed: boolean) => withAlpha(c.amber, pressed ? 0.18 : 0.1);
@@ -163,20 +168,28 @@ export function EventPillAction({
       hitSlop={{ top: 6, bottom: 6 }}
       style={({ pressed }) => [
         styles.action,
+        // Beside a sentence of two or three lines the word stays on its first line, with the mark and the time (it sat
+        // on the middle of the frame, apart from them).
+        beside ? styles.actionBeside : null,
         primary ? { backgroundColor: tint(pressed) } : pressed ? { backgroundColor: c.plate } : null,
         disabled || loading ? styles.dim : null,
       ]}
     >
+      {/* Each glyph in a box of the word's line, so it stays on the word's middle when the action sits on top. */}
       {loading ? (
-        <ActivityIndicator size="small" color={primary ? c.ink : c.ink2} style={styles.spinner} />
+        <View style={styles.onLine}>
+          <ActivityIndicator size="small" color={primary ? c.ink : c.ink2} style={styles.spinner} />
+        </View>
       ) : lead ? (
-        <Icon name={lead} size={12} color={primary ? c.ink : c.ink2} />
+        <View style={styles.onLine}>
+          <Icon name={lead} size={12} color={primary ? c.ink : c.ink2} />
+        </View>
       ) : null}
       <Text variant="label" tone={primary ? "ink" : "ink2"} numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_SCALE}>
         {label}
       </Text>
       {opens ? (
-        <View style={expanded ? styles.turned : undefined}>
+        <View style={[styles.onLine, expanded ? styles.turned : undefined]}>
           <Icon name="right" size={12} color={c.faint} />
         </View>
       ) : null}
@@ -227,6 +240,8 @@ const styles = StyleSheet.create({
   slot: { flexDirection: "row", alignItems: "stretch", minHeight: 30 },
   rule: { width: 1 },
   action: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12 },
+  actionBeside: { alignItems: "flex-start", paddingTop: FIRST_LINE_TOP },
+  onLine: { height: 18, justifyContent: "center" },
   spinner: { transform: [{ scale: 0.7 }] },
   dim: { opacity: 0.6 },
   turned: { transform: [{ rotate: "90deg" }] },
