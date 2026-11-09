@@ -13380,6 +13380,23 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
   border-radius: var(--radius-lg);
   background: var(--raised);
   box-shadow: var(--e1);
+  transition:
+    opacity 0.3s var(--out),
+    transform 0.3s var(--out);
+}
+/* It comes under an answer that just arrived: it rises in, never pops. */
+@starting-style {
+  .push-ask {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  @starting-style {
+    .push-ask {
+      transform: none;
+    }
+  }
 }
 .push-ask__title {
   gap: var(--space-2);
