@@ -11850,7 +11850,6 @@ html[data-menu-overlay] .shell {
 }
 /* An agent's row breathes: the face 12px from its words, a little air between the name and its line. */
 .sidebar:not([data-rail="true"]) :is([data-agent-row] > .sidebar__item, .sidebar__item[data-right-hand]) {
-  padding-block: 7px;
   gap: 12px;
 }
 .sidebar:not([data-rail="true"])
