@@ -532,7 +532,7 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     missionEngine: deps.missionEngine ?? null,
   };
 
-  return {
+  const handlers: JobHandlers = {
     // A wake the brakes deferred (its agent at its cap of unrequested work, or its computer full) looks again.
     [LATER_JOB]: async (job) => {
       const orgId = orgOf(job);
@@ -558,8 +558,6 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       const message = await getMessage(deps.db, input.orgId, input.messageId);
       if (!message) return;
       if (deps.context && message.threadId) await maybeEnqueueReflection(deps, message.orgId, message.threadId);
-      // A waiting run whose ask may have just been handled here checks early (`parked-asks.ts`).
-      await scheduleParkedChecks(deps.db, message).catch(() => {});
       // An issue's work card, its start (the run is already started) and the "took issue #N" line route to nobody.
       // A task conversation's root (ADR 0145) stands for the task: nobody is routed either.
       if (message.meta.issueWork || message.meta.issueWorkStart || message.meta.issueTaken) return;
@@ -1105,6 +1103,19 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       await queueAutonomyEmail(deps.db, job.payload, { router: deps.router?.enabled ?? false });
     },
   };
+  // A waiting run whose ask may have just been handled here checks early (`parked-asks.ts`). After the routing, not
+  // before it: ahead of the routing, that statement delays the walk to the message's root (`messageRoot`), which the
+  // run the message starts shares, and that run's reads then do the walk themselves.
+  const posted = handlers["message.posted"];
+  handlers["message.posted"] = async (job, ctx) => {
+    try {
+      await posted?.(job, ctx);
+    } finally {
+      const message = await getMessage(deps.db, orgOf(job), String(job.payload.messageId)).catch(() => null);
+      if (message) await scheduleParkedChecks(deps.db, message).catch(() => {});
+    }
+  };
+  return handlers;
 }
 
 /** The message opens by addressing `handle` ("@ada …", after any other leading mentions). */
