@@ -4,12 +4,12 @@
  * visible portraits are drawn; with reduced motion each one is drawn once,
  * still (and again when its kind or state changes).
  */
-import { COMPUTER_ART, type ComputerKind, type ComputerState, drawComputer } from "./portrait.js";
+import { COMPUTER_ART, type ComputerState, drawComputer, type PortraitKind } from "./portrait.js";
 
 export interface LiveComputer {
   canvas: HTMLCanvasElement;
   /** Read each frame: what to draw. */
-  look: () => { kind: ComputerKind; state: ComputerState };
+  look: () => { kind: PortraitKind; state: ComputerState };
 }
 
 const computers = new Set<LiveComputer>();

@@ -294,8 +294,8 @@ export function WorkspaceComputerCard({ view }: { view: SetupView }) {
             <h2 id="sec-workspace-computer" className="ac-card__title">
               {machine ? (
                 <Link
-                  to="/org/$orgId/settings/computers/$machineId"
-                  params={{ orgId: org.id, machineId: machine.id }}
+                  to="/org/$orgId/settings/devices/$deviceId"
+                  params={{ orgId: org.id, deviceId: machine.id }}
                   className="machine-row__name"
                 >
                   {title}
@@ -348,7 +348,7 @@ export function ComputerSetupNotice() {
   const { org } = useOrg();
   const there = useMatchRoute()({
     to: "/org/$orgId/settings/$section",
-    params: { orgId: org.id, section: "computers" },
+    params: { orgId: org.id, section: "devices" },
   });
   const reader = useWaitReader();
   const view = useSetupView(org.id);
@@ -386,7 +386,7 @@ export function ComputerSetupNotice() {
         </span>
         <span className="outage__acts">
           <Button asChild variant="ghost" size="sm">
-            <Link to="/org/$orgId/settings/$section" params={{ orgId: org.id, section: "computers" }}>
+            <Link to="/org/$orgId/settings/$section" params={{ orgId: org.id, section: "devices" }}>
               {t("computerSetup.notice.see")}
             </Link>
           </Button>

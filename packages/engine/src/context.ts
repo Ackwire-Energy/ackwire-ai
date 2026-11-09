@@ -29,6 +29,7 @@ import { summarizeScopes } from "./capabilities";
 import { peopleAllIn } from "./channels";
 import { consultationOrigin, type HandOff, handOffsFrom } from "./consultations";
 import { widgetRunContext } from "./dashboards/refresh-context";
+import { deviceRoster, osName } from "./device-resolve";
 import { isAgentOnlyDm } from "./dms";
 import { cutText, stringsOf } from "./format";
 import { issueWorkBrief, issueWorkOf } from "./issue-work";
@@ -550,6 +551,12 @@ export async function buildRunContext(
       ? heldSecretsOf(db, run.orgId, agent.id, threadInfo.missionMachineId).catch(() => [])
       : Promise.resolve([])
     : heldSecretsOf(db, run.orgId, agent.id, agent.machineId).catch(() => []);
+  // People's own devices it may name (bring your own devices), only with the computer's tools.
+  const otherDevices = options.toolsAvailable
+    ? deviceRoster(db, run.orgId)
+        .then((d) => ({ computers: d.computers.filter((c) => c.id !== agent.machineId), phones: d.phones }))
+        .catch(() => null)
+    : null;
   // A routine's run keeps to its own task, as with "Your recent work" below.
   const openTasks =
     options.routine || run.background
@@ -1059,6 +1066,11 @@ export async function buildRunContext(
         )
       : []),
     ...(await heldSecrets.then((rows) => (rows.length > 0 ? [{ text: heldSecretsText(rows) }] : []))),
+    ...(otherDevices
+      ? await otherDevices.then((d) =>
+          d && (d.computers.length > 0 || d.phones.length > 0) ? [{ text: devicesText(d) }] : [],
+        )
+      : []),
     // A routine's background run (ADR 0053 §4): its routine and what people said where it reports.
     ...(routine
       ? [
@@ -1974,19 +1986,44 @@ export interface WorkspaceComputer {
 }
 
 /**
- * For every agent where people can't connect a computer (`machine.pairing_off`): the models' own habit is a bigger
- * server, and nothing else in the prompt says it can't be done here. It speaks of computers for the agents only: a
- * server of the customer's own stays work an agent may reach. Plans stay on the billing service (ADR 0079), so the
- * prompt names none.
+ * For every agent where each workspace gets its own computer (`MACHINE_PROVISIONING=external`): the models' own habit
+ * is a bigger server. People's own devices (bring your own devices) are targets, never the agents' computer. Plans
+ * stay on the billing service (ADR 0079), so the prompt names none.
  */
 export function workspaceComputerText({ billing }: WorkspaceComputer) {
   return [
     "# The computer",
-    `The agents work on one always-on, self-updating computer. No other can join it, nobody SSHes in: never suggest renting or connecting one, nor installing the runner. When full, work slows or queues: finish or stop what can wait (Task manager), one heavy job at a time. ${
+    `The workspace computer is the agents' computer, always on and self-updating. When full, work queues: stop what can wait (Task manager), one heavy job at a time. ${
       billing
         ? "Past that: a bigger plan may bring a bigger one (Settings › Plan and billing); another workspace, on its own plan, has its own."
         : "Past that: only whoever runs this server can give it a bigger one."
-    } Nothing else exists: say so.`,
+    } People may connect their own devices (computers, phones) under Settings › Devices; suggest it when a task needs a phone, a Mac or more power.`,
+  ].join("\n");
+}
+
+/**
+ * The devices people connected besides the agent's own computer (bring your own devices), named in one short block
+ * so "use my Pixel" or "compile on our Windows machine" reads as a device; `computer_status` says which it may use.
+ */
+export function devicesText(devices: {
+  computers: { name: string; os: string }[];
+  phones: { name: string; platform: string }[];
+}) {
+  const list = (items: string[]) =>
+    items.slice(0, 8).join(", ") + (items.length > 8 ? ` and ${items.length - 8} more` : "");
+  const parts = [
+    devices.computers.length > 0
+      ? `computers ${list(devices.computers.map((c) => `"${c.name}" (${osName(c.os)})`))}`
+      : "",
+    devices.phones.length > 0
+      ? `phones ${list(devices.phones.map((p) => `"${p.name}" (${p.platform === "ios" ? "iPhone" : "Android"})`))}`
+      : "",
+  ].filter(Boolean);
+  return [
+    "# Other devices",
+    `People connected more devices here: ${parts.join("; ")}. computer_status says which you may use for the person you work for and how each is; name a computer with \`computer\` and a phone with the phone tools.${
+      devices.computers.some((c) => c.os === "windows") ? " Commands on Windows run in cmd.exe." : ""
+    }`,
   ].join("\n");
 }
 

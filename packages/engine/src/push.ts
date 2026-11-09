@@ -312,6 +312,9 @@ export const PUSH_PLACE_KEYS = [
   // A widget or a board (ADR 0135): the apps open the widget, else the board.
   "dashboardId",
   "widgetId",
+  // A device and a request about it (bring your own devices): the apps open its page or the request.
+  "phoneId",
+  "requestId",
 ] as const;
 
 /** The in-app page a browser notification opens: the inbox, which opens the notification itself. */
@@ -437,6 +440,8 @@ export async function deliverPush(
       ...renderPush(pushLocale(d.locale), text),
       data,
       priority: row.waiting ? "high" : "default",
+      // A device's notice has buttons on the lock screen (Stop; Allow once, Always, No), by its kind.
+      ...(row.kind.startsWith("device.") ? { category: row.kind } : {}),
     }));
     try {
       const results = await deps.push.send(messages);

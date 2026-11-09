@@ -392,6 +392,7 @@ export async function issueManagedMachine(
         orgId,
         kind: "managed",
         name: name || managedMachineName(org.name, emailLocale(owner?.locale)),
+        audienceMode: "everyone",
         createdAt: now,
         updatedAt: now,
       })

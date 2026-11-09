@@ -13,11 +13,14 @@ export interface ChipProps {
   leading?: ReactNode;
   /** Words after the label that never shrink (a state): a long label ends in "…" first. */
   trailing?: string;
+  /** `wait`: it waits on a person (amber words on an amber tint, the one color for that). */
+  tone?: "neutral" | "wait";
 }
 
 /** A small neutral tag: a light gray pill, muted text. */
-export function Chip({ icon, label, leading, trailing }: ChipProps) {
+export function Chip({ icon, label, leading, trailing, tone = "neutral" }: ChipProps) {
   const { colors } = useTheme();
+  const ink = tone === "wait" ? colors.amberInk : colors.muted;
   return (
     <View
       style={{
@@ -27,17 +30,17 @@ export function Chip({ icon, label, leading, trailing }: ChipProps) {
         minHeight: 24,
         paddingHorizontal: 10,
         borderRadius: 999,
-        backgroundColor: colors.chip,
+        backgroundColor: tone === "wait" ? `${colors.amber}22` : colors.chip,
         alignSelf: "flex-start",
         // In a tight row the label ends in "…" instead of the chip leaving the row.
         maxWidth: "100%",
       }}
     >
-      {leading ?? (icon ? <Icon name={icon} size={12} color={colors.muted} /> : null)}
+      {leading ?? (icon ? <Icon name={icon} size={12} color={ink} /> : null)}
       <RNText
         numberOfLines={1}
         maxFontSizeMultiplier={CHROME_MAX_SCALE}
-        style={[systemText("caption", weights.semibold), { color: colors.muted, flexShrink: 1 }]}
+        style={[systemText("caption", weights.semibold), { color: ink, flexShrink: 1 }]}
       >
         {label}
       </RNText>
@@ -45,7 +48,7 @@ export function Chip({ icon, label, leading, trailing }: ChipProps) {
         <RNText
           numberOfLines={1}
           maxFontSizeMultiplier={CHROME_MAX_SCALE}
-          style={[systemText("caption", weights.regular), { color: colors.muted, flexShrink: 0 }]}
+          style={[systemText("caption", weights.regular), { color: ink, flexShrink: 0 }]}
         >
           {trailing}
         </RNText>

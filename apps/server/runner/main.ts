@@ -63,6 +63,7 @@ import { runDesktopBrowser } from "./desktop-browser";
 import { DesktopSessions, type DesktopSessionsOptions, runnerUser, systemDesktopUser } from "./desktop-session";
 import { RUNNER_VERSION } from "./errors";
 import { defaultHostState, HostComputer, readTokenFile, runnerChild } from "./host";
+import { writeJson } from "./json-file";
 import { hasBunTerminal, runningCompiled, thisRunner } from "./launch";
 import { acquireLock, lockedMessage, pidAlive, readLock } from "./lock";
 import { RotatingFile } from "./logfile";
@@ -83,6 +84,7 @@ import { installService, installSystemService, serviceStatus, uninstallService }
 import type { DataListener, DataSocket } from "./streams";
 import { runTaskWrapper } from "./tasks";
 import { runnerTerminalUser, systemTerminalUser, Terminals, type TerminalsOptions } from "./terminal";
+import { probeToolchains, TOOLCHAINS_FILE } from "./toolchains";
 import { runWorker } from "./worker";
 
 const HELP = `agentes-runner ${RUNNER_VERSION}: connects this computer to agentes.chat
@@ -98,6 +100,9 @@ Usage:
   agentes-runner pair --server <url> --enroll-file <path> [--dir <workspace>] [--name <name>] [--no-exec]
       Connects with a code issued for this computer by whoever provisions it. Nobody confirms it.
       The file is removed as soon as it is read.
+  agentes-runner pair --server <url> --link <code> [--dir <workspace>] [--name <name>] [--no-exec]
+      Connects with the code of a link made under Settings > Devices (what curl <server>/i/<code> | sh
+      runs). The link's maker lets this computer join, or says no.
   agentes-runner start
       Connects and stays connected (reconnects on its own).
   agentes-runner service install|uninstall
@@ -181,6 +186,7 @@ const VALUE_FLAGS = new Set([
   "state",
   "enroll-file",
   "rotate",
+  "link",
 ]);
 const LIST_FLAGS = new Set(["agent", "rotate"]);
 
@@ -240,7 +246,7 @@ function storedOrNull(home = runnerHome()): StoredConfig | null {
  */
 async function pair(p: Parsed): Promise<number> {
   const usage =
-    "Usage: agentes-runner pair --server <url> [--enroll-file <path>] [--dir <workspace>] [--name <name>] [--no-exec] [--new]";
+    "Usage: agentes-runner pair --server <url> [--enroll-file <path> | --link <code>] [--dir <workspace>] [--name <name>] [--no-exec] [--new]";
   const term = createTerm();
   term.intro("connect this computer");
   // Typed wide: the code's callback sets it, and TypeScript would keep it narrowed to null.
@@ -260,6 +266,11 @@ async function pair(p: Parsed): Promise<number> {
       return refuse(err instanceof Error ? err.message : String(err));
     }
   }
+  const link = p.flags.has("link") ? (flagString(p, "link") ?? "") : undefined;
+  if (link !== undefined && !/^[A-Za-z0-9-]{4,40}$/.test(link)) {
+    return refuse("--link takes the code at the end of the link (like 7KQ2-M9XD)");
+  }
+  if (link !== undefined && enrollCode) return refuse("--link and --enroll-file each connect this computer: use one");
   if (p.flags.has("code")) {
     return refuse(
       "Pairing codes from the site are gone: run agentes-runner pair --server <url> and confirm the code it shows.",
@@ -284,6 +295,8 @@ async function pair(p: Parsed): Promise<number> {
   const ac = new AbortController();
   const onSignal = () => ac.abort();
   process.once("SIGINT", onSignal);
+  // Looked at while the person confirms, so the first connection already says what this computer builds with.
+  const toolchains = probeToolchains().catch(() => null);
   let grant: DeviceGrant;
   try {
     if (enrollCode) {
@@ -292,8 +305,19 @@ async function pair(p: Parsed): Promise<number> {
     } else {
       grant = await devicePair(
         server,
-        deviceInfo(name, p.flags.has("new") ? undefined : previousMachineFor(prev, server)),
+        {
+          ...deviceInfo(name, p.flags.has("new") ? undefined : previousMachineFor(prev, server)),
+          ...(link ? { link } : {}),
+        },
         (code) => {
+          if (link) {
+            const who = code.maker ?? "the person who made the link";
+            wait = term.spin(
+              `Waiting for ${who} to let this computer join${code.orgName ? ` ${code.orgName}` : ""}…`,
+              "Let it join under Settings › Devices.",
+            );
+            return;
+          }
           term.info(
             `To connect this computer, open this link and confirm the code ${term.accent(formatUserCode(code.userCode))}:`,
           );
@@ -316,6 +340,11 @@ async function pair(p: Parsed): Promise<number> {
         return 130;
       }
       if (enrollCode) return refuse(err.message);
+      if (link && err.code === "denied")
+        return refuse("The link's maker didn't let this computer join. Nothing changed.");
+      if (link && err.code === "expired") {
+        return refuse("Nobody let this computer join in time. Make a new link under Settings › Devices.");
+      }
       if (err.code === "denied") return refuse("The connection was refused on the site. Nothing changed.");
       if (err.code === "expired") return refuse("The code expired before it was confirmed. Run this again.");
       return refuse(err.message);
@@ -334,6 +363,14 @@ async function pair(p: Parsed): Promise<number> {
     desktop: false,
   });
   writeConfig(next, home);
+  const found = await toolchains;
+  if (found) {
+    try {
+      writeJson(path.join(home, TOOLCHAINS_FILE), found);
+    } catch {
+      // the first session looks again
+    }
+  }
   const connected = `Connected${grant.org.name ? ` to ${grant.org.name}` : ""} as "${next.name}"`;
   const details = [`Workspace: ${workspaceReal}${exec ? "" : " (commands off)"}`, `Config: ${configPath(home)}`];
   if (wait) wait.done(connected, ...details);

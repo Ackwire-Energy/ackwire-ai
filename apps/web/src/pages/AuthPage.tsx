@@ -468,11 +468,7 @@ export function AuthPage({
           />
         )}
       </span>
-      <button
-        type="button"
-        className="auth__who-change"
-        onClick={() => void thisMac.otherServer().catch(() => {})}
-      >
+      <button type="button" className="auth__who-change" onClick={() => void thisMac.otherServer().catch(() => {})}>
         {t("auth.flow.change")}
       </button>
     </span>
@@ -681,11 +677,7 @@ export function AuthPage({
                     providers={linkedProviders}
                     onSocial={desktop ? (p) => void signInInBrowser(p) : undefined}
                   />
-                  <button
-                    type="button"
-                    className="auth__quiet"
-                    onClick={() => go(canReset ? "forgot" : "forgotHere")}
-                  >
+                  <button type="button" className="auth__quiet" onClick={() => go(canReset ? "forgot" : "forgotHere")}>
                     {t("auth.flow.createPassword")}
                   </button>
                 </>

@@ -31,8 +31,7 @@ export function DesktopHandoverPage({ to }: { to?: string }) {
       if (r.ok) {
         storage.remove(STORAGE_KEYS.signedOut);
         window.location.assign(to ?? "/");
-      }
-      else setFailed(true);
+      } else setFailed(true);
     });
   }, [auth, to]);
 

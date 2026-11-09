@@ -277,7 +277,8 @@ export const desktopPtBR = {
     alreadyDocker: "Ele roda sozinho, instalado pelo Docker. Use ele neste app.",
     useIt: "Usar",
     notRunning: "O agentes.chat está instalado neste {{device}}, mas não está rodando",
-    notRunningText: "Ele foi instalado pelo terminal, em {{path}}. Para iniciar, rode isto no terminal e tente de novo:",
+    notRunningText:
+      "Ele foi instalado pelo terminal, em {{path}}. Para iniciar, rode isto no terminal e tente de novo:",
     running: "O agentes.chat já roda neste {{device}}",
     runningText: "Este app roda ele. Abra para entrar.",
     openIt: "Abrir",

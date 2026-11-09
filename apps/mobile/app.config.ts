@@ -64,6 +64,7 @@ export const APP_LINK_PATTERNS = [
   "/org/*/settings/keys",
   "/org/*/settings/storage",
   "/org/*/settings/computers",
+  "/org/*/settings/devices",
   "/org/*/settings/usage",
   "/org/*/settings/import",
   "/org/*/settings/media",
@@ -73,6 +74,7 @@ export const APP_LINK_PATTERNS = [
   "/org/*/settings/vault",
   "/org/*/settings/about",
   "/org/*/settings/computers/*",
+  "/org/*/settings/devices/*",
 ];
 // Our EAS project on expo.dev (not a secret: it only names the project).
 const projectId = process.env.EAS_PROJECT_ID ?? "8514d5b3-87e0-4980-89a0-4c692f6f4702";

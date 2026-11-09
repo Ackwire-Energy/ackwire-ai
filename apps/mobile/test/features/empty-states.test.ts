@@ -52,7 +52,7 @@ describe("who gets the first step", () => {
     ["chats/ConversationListScreen.tsx", '"people" as const', 'mayCreate(org, "invite")'],
     ["new/ChatTargets.tsx", 'place="people"', 'mayCreate(org, "invite")'],
     ["settings/AccessScreen.tsx", 'place="access"', 'acts={can(org, "manage_connectors")}'],
-    ["settings/ComputersScreen.tsx", 'firstUseCopy("computers", pairs)', 'can(org, "pair_computers")'],
+    ["devices/DevicesScreen.tsx", 'firstUseCopy("computers", pairs)', 'can(org, "pair_computers")'],
     ["connectors/ConnectorsScreen.tsx", 'firstUseCopy("connectors", acts)', "<EmptyHint acts={admin} />"],
   ])("%s gates %s on the permission", (file, place, gate) => {
     const code = source(file);

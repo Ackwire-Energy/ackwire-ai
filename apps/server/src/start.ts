@@ -75,6 +75,7 @@ import {
   retireMillionSendMailboxes,
   setMessageLinkBase,
   setRestrictionNotices,
+  setWorkspaceComputers,
   surfaceRoomFiles,
   vapidKeys,
   vapidSubject,
@@ -128,6 +129,8 @@ export function applyBootSwitches(config: Config) {
   setMessageLinkBase(config.PUBLIC_URL);
   // The operator API's events feed records only while that API is on (ADR 0056).
   enableOperatorEvents(Boolean(config.OPERATOR_API_TOKEN));
+  // Where each workspace gets its own computer, the computers people bring are targets, never agents' homes.
+  setWorkspaceComputers(config.MACHINE_PROVISIONING === "external");
 }
 
 /**

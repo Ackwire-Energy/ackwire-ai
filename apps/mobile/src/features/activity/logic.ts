@@ -6,6 +6,7 @@ import { mediaKindOf } from "@agenteschat/client/lib/media";
 import { askersOf, oneToolChangePerServer, runFailedGroupOf } from "@agenteschat/client/lib/notifications";
 import { routineNotificationWords, type Words } from "@agenteschat/client/lib/routine-view";
 import type { TFunction } from "i18next";
+import { isDeviceNotice } from "../devices/logic";
 import { daysAgo } from "../shared/logic";
 
 /**
@@ -149,11 +150,13 @@ export function subtitleOf(
     return [origin ? say(origin) : "", l.title ?? l.text ?? ""].filter(Boolean).join(" · ");
   }
   if (n.kind === "issue_assigned") return l.title ?? l.text ?? "";
+  // Its title names the device and whom the agent works for (`latest.title`): only what it is doing goes under it.
+  if (isDeviceNotice(n.kind)) return l.text ?? "";
   return written(l) || word || (l.text ?? l.title ?? "");
 }
 
-/** Where it happened ("#produto", the thread's title, the mission's name). */
-export const placeOf = (n: AppNotification) => n.source.label ?? "";
+/** Where it happened ("#produto", the thread's title, the mission's name); a device's notice names it already. */
+export const placeOf = (n: AppNotification) => (isDeviceNotice(n.kind) ? "" : (n.source.label ?? ""));
 
 /** Emojis a reaction card shows (at most 5, from the server). */
 export const emojisOf = (n: AppNotification) => (n.kind === "reaction" ? (n.latest.emojis ?? []).slice(0, 5) : []);

@@ -54,7 +54,7 @@ export function AwayPill({ message: m }: { message: Pick<Message, "meta" | "auth
   if (!o) return null;
   return (
     <View style={[styles.pill, { backgroundColor: `${c.amber}22` }]}>
-      <Text variant="caption" numberOfLines={1} style={[styles.pillText, { color: c.amber }]}>
+      <Text variant="caption" numberOfLines={1} style={[styles.pillText, { color: c.amberInk }]}>
         {awayText(t, o.offlineSince, now)}
       </Text>
     </View>

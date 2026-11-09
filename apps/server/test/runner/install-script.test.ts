@@ -25,12 +25,17 @@ import {
 import { lastLine, REQUIREMENTS as SETUP_REQUIREMENTS } from "@agenteschat/setup/src/lib";
 import { TERM_SH } from "@agenteschat/setup/src/term-sh";
 import {
+  expiredLinkScript,
+  expiredLinkScriptPowerShell,
   GOOGLE_APT,
   GOOGLE_CHROME_LINUX,
   installScript,
+  installScriptPowerShell,
+  LINK_EXPIRED,
   REQUIREMENTS,
   RUNNER_BUN_SHA256,
   RUNNER_BUN_VERSION,
+  RUNNER_BUN_WINDOWS_SHA256,
   SYSTEM_BROWSER_DIR,
   shQuote,
 } from "../../runner/install-script";
@@ -1050,5 +1055,85 @@ test("service files: systemd unit, launchd plist and the Windows task command", 
   });
   expect(win.install).toBe(
     'schtasks /Create /TN agentes-runner /SC ONLOGON /RL LIMITED /F /TR "\\"C:\\Program Files\\nodejs\\node.exe\\" \\"C:\\Users\\me\\.agentes-runner\\agentes-runner.mjs\\" start"',
+  );
+});
+
+test.skipIf(process.platform === "win32")(
+  "a connect link baked in: pair --link with no arguments, also in a home already connected; a bad code stops",
+  () => {
+    const dir = tempDir("install-");
+    dirs.push(dir);
+    const site = path.join(dir, "site");
+    const calls = path.join(dir, "calls");
+    mkdirSync(path.join(site, "runner"), { recursive: true });
+    writeFileSync(
+      path.join(site, "runner", "agentes-runner.mjs"),
+      `import { appendFileSync } from "node:fs";\nappendFileSync(${JSON.stringify(calls)}, process.argv.slice(2).join(" ") + "\\n");\n`,
+    );
+    const home = path.join(dir, "home");
+    mkdirSync(home);
+    writeFileSync(path.join(home, "config.json"), '{ "token": "agm_x" }\n');
+    const script = installScript(`file://${site}`, { link: "7KQ2-M9XD" });
+    expect(script).toContain("LINK='7KQ2-M9XD'");
+    const install = (text: string, ...args: string[]) =>
+      spawnSync("sh", ["-s", "--", ...args, "--no-service"], {
+        input: text,
+        env: {
+          ...process.env,
+          PATH: `${path.dirname(process.execPath)}:${process.env.PATH}`,
+          AGENTES_RUNNER_HOME: home,
+        },
+        encoding: "utf8",
+      });
+    const run = install(script);
+    expect(run.stderr).toBe("");
+    expect(run.status).toBe(0);
+    expect(readFileSync(calls, "utf8")).toBe(`pair --server file://${site} --link 7KQ2-M9XD\n`);
+
+    const bad = install(installScript(`file://${site}`), "--link", "7KQ2;M9XD");
+    expect(bad.status).toBe(1);
+    expect(bad.stdout + bad.stderr).toContain("--link takes the code at the end of the link");
+    const both = install(script, "--enroll-file", "/run/agentes/enroll-code");
+    expect(both.status).toBe(1);
+    expect(both.stdout + both.stderr).toContain("use one");
+  },
+);
+
+test.skipIf(process.platform === "win32")("a used or expired link's installer says so in one line and fails", () => {
+  const r = spawnSync("sh", ["-s"], { input: expiredLinkScript(), encoding: "utf8" });
+  expect(r.status).toBe(1);
+  expect(r.stderr).toBe(`${LINK_EXPIRED}\n`);
+  expect(expiredLinkScriptPowerShell()).toBe(
+    "Write-Host ('This link expired. Make a new one under Settings ' + [char]0x203a + ' Devices.') -ForegroundColor Red\n",
+  );
+});
+
+test("the PowerShell installer: the link and server baked in, Bun pinned by SHA-256, a task at sign-in, ASCII only", () => {
+  const ps = installScriptPowerShell("https://agentes.test/", { link: "7KQ2-M9XD" });
+  // `irm` reads a script without a charset as Latin-1: anything past ASCII would arrive garbled.
+  expect([...ps].every((c) => c.charCodeAt(0) < 128)).toBe(true);
+  expect(ps).toContain("$Server = 'https://agentes.test'");
+  expect(ps).toContain("$Link = '7KQ2-M9XD'");
+  expect(ps).toContain(`$BunVersion = '${RUNNER_BUN_VERSION}'`);
+  for (const [target, sha] of Object.entries(RUNNER_BUN_WINDOWS_SHA256)) {
+    expect(ps).toContain(`$Target = '${target}'; $Sha = '${sha}'`);
+    expect(sha).toMatch(/^[0-9a-f]{64}$/);
+  }
+  expect(ps).toContain("https://github.com/oven-sh/bun/releases/download/bun-v$BunVersion/bun-$Target.zip");
+  expect(ps).toContain("Get-FileHash -Algorithm SHA256");
+  expect(ps).toContain('"$Server/runner/agentes-runner.mjs"');
+  expect(ps).toContain("& $Bun $Bundle pair --server $Server --link $Link");
+  expect(ps).toContain("Register-ScheduledTask -TaskName $Task");
+  expect(ps).toContain("$Task = 'agentes-runner'");
+  expect(ps).toContain("[Environment]::GetFolderPath('Startup')");
+  // Everything runs from the last line, and nothing exits the window `iex` runs in.
+  expect(ps.trimEnd().split("\n").at(-1)).toBe(
+    'try { Install-AgentesRunner } catch { Write-Host "$([char]0x25A0)  $($_.Exception.Message)" -ForegroundColor Red }',
+  );
+  expect(ps).not.toMatch(/^\s*exit\b/m);
+  expect(ps.split("{").length).toBe(ps.split("}").length);
+  // A value with a quote stays one PowerShell string.
+  expect(installScriptPowerShell("https://o'neil.test", { link: "AB12-CD34" })).toContain(
+    "$Server = 'https://o''neil.test'",
   );
 });

@@ -1,8 +1,9 @@
-import { AGENT_FOLDERS_PROTOCOL, type SandboxProvider } from "@agenteschat/adapters";
+import { AGENT_FOLDERS_PROTOCOL, type PubSub, type SandboxProvider } from "@agenteschat/adapters";
 import { type Database, eq, schema } from "@agenteschat/db";
 import { getAgent, getAgentCached } from "./agents";
 import { recordAudit } from "./audit";
 import type { WorkspaceComputer } from "./context";
+import { checkDeviceUse, noteDeviceInUse, pickDevice, seenAgo, waitHint, workspaceDevices } from "./device-resolve";
 import { ForbiddenError, NotFoundError } from "./errors";
 import { cutText, cutTextEnd } from "./format";
 import { computerBackSoon, type MachineCaller } from "./machine-hub";
@@ -51,6 +52,8 @@ export interface SandboxDeps {
   publicUrl?: string;
   /** Each workspace gets its own computer here: an agent with none waits for it (`computerPreparing`). */
   workspaceComputer?: WorkspaceComputer;
+  /** Tells a device's owner when someone else's agent uses it (`device.in_use`). */
+  pubsub?: PubSub;
 }
 
 /** Told when the agent has no computer. */
@@ -144,9 +147,19 @@ export async function withSandbox<T>(
   deps: SandboxDeps,
   ctx: ToolContext,
   fn: (computer: ComputerHandle) => Promise<T>,
-  options: { allowPaused?: boolean } = {},
+  options: { allowPaused?: boolean; computer?: string; label?: string } = {},
 ): Promise<T> {
   const [agent, mission] = await Promise.all([getAgentCached(deps.db, ctx.orgId, ctx.agentId), missionOfRun(ctx)]);
+  const asked = options.computer?.trim();
+  if (asked) {
+    if (mission) {
+      const own = mission.machineId ? await deps.machines?.hub.status(mission.machineId) : null;
+      if (!own || (own.id !== asked && own.name.toLowerCase() !== asked.toLowerCase()))
+        throw new SandboxUnavailableError(
+          "In a mission's thread the work runs on the mission's computer: leave `computer` out.",
+        );
+    } else return withTargetComputer(deps, ctx, asked, agent, fn, options);
+  }
   // In a mission's thread the work runs on the mission's computer (ADR 0029), never on another one.
   if (mission) {
     if (!mission.machineId) {
@@ -165,6 +178,53 @@ export async function withSandbox<T>(
   }
   const preparing = await computerPreparing(deps, ctx.orgId);
   throw new SandboxUnavailableError(preparing ? PREPARING_COMPUTER_MESSAGE : NO_COMPUTER_MESSAGE);
+}
+
+/**
+ * A device the agent named (`computer`, bring your own devices): resolved by name, checked against its rule for the
+ * person the agent works for (its own computer always passes), then used like the agent's own. Its `access` stays the
+ * ceiling; an offline one says how to wait for it.
+ */
+async function withTargetComputer<T>(
+  deps: SandboxDeps,
+  ctx: ToolContext,
+  asked: string,
+  agent: { handle: string; name: string } | null,
+  fn: (computer: ComputerHandle) => Promise<T>,
+  options: { allowPaused?: boolean; label?: string },
+): Promise<T> {
+  const settings = await getSandboxSettings(deps.db, ctx.orgId);
+  if (!settings.enabled)
+    throw new SandboxUnavailableError("The agents' computers are turned off for this organization.");
+  const hub = deps.machines?.hub;
+  if (!hub) throw new SandboxUnavailableError("Connected computers are not available on this server.");
+  const picked = pickDevice((await workspaceDevices(ctx.db, ctx.orgId)).computers, asked, "computer");
+  if (!picked.ok) throw new SandboxUnavailableError(picked.message);
+  const computer = picked.item;
+  const target = { kind: "computer" as const, computer };
+  const check = await checkDeviceUse(deps, ctx, target, options.label);
+  if (!check.ok) throw new SandboxUnavailableError(check.message);
+  let entered = false;
+  try {
+    return await withConnectedMachine(
+      hub,
+      ctx,
+      { machineId: computer.id, handle: agent?.handle ?? "agent", ...(agent?.name ? { name: agent.name } : {}) },
+      async (handle) => {
+        entered = true;
+        await noteDeviceInUse(deps, ctx, target, check.requester, options.label);
+        return fn(handle);
+      },
+      options,
+    );
+  } catch (error) {
+    // Away before anything was sent (a drop midway may have run, and says so itself).
+    if (!entered && error instanceof MachineOfflineError)
+      throw new SandboxUnavailableError(
+        `${computer.name} is offline (${seenAgo(computer.lastSeenAt)}). ${waitHint(computer.name)}`,
+      );
+    throw error;
+  }
 }
 
 /**

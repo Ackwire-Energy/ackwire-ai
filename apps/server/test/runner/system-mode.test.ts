@@ -438,6 +438,15 @@ test("a system-mode runner (root) without workers does no agent work; machine-le
     "stream.open",
     // The live view's data socket needs the machine token, which only root holds (ADR 0040 §7.1).
     "browser.view.open",
+    // The phones belong to the computer, not to one agent: their lock and adb, simctl and devicectl stay with root.
+    "phone.claim",
+    "phone.release",
+    "phone.install",
+    "phone.launch",
+    "phone.flow",
+    "phone.record",
+    "phone.screenshot",
+    "phone.logs",
   ]);
 
   if (posix) {

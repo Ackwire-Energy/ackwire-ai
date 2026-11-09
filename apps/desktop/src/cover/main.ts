@@ -224,7 +224,10 @@ function useOnlyHere() {
   say(fillIn(words.onlyHereWorking, { device }));
   buttons([]);
   void invoke<{ ok: boolean }>("local_server_reach", { on: false })
-    .then((r) => r.ok, () => false)
+    .then(
+      (r) => r.ok,
+      () => false,
+    )
     .then((ok) => {
       if (ok) return;
       say(fillIn(words.onlyHereFailed, { device }));
@@ -256,16 +259,15 @@ function showHere(
     // Stopped to stay stopped (Stop): until when, Start now, and another server of the list meanwhile.
     const until = status.held && status.heldUntil ? clockTime(status.heldUntil) : null;
     say(
-      until
-        ? fillIn(words.heldUntil, { device, time: until })
-        : status.held
-          ? fill(words.held)
-          : fill(words.stopped),
+      until ? fillIn(words.heldUntil, { device, time: until }) : status.held ? fill(words.held) : fill(words.stopped),
     );
     buttons([
       [status.held ? words.startNow : words.start, start],
       ...(other
-        ? ([[fillIn(words.openOther, { server: serverName(other) }), () => openServer(other)]] as [string, () => void][])
+        ? ([[fillIn(words.openOther, { server: serverName(other) }), () => openServer(other)]] as [
+            string,
+            () => void,
+          ][])
         : []),
     ]);
   } else if (state === "failing") {

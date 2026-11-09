@@ -1131,7 +1131,7 @@ async function offPlansNotOwners(tx: Executor, orgId: string, ids: string[]) {
 
 /**
  * Removes a member (or lets a member leave). The last owner can't leave. Their agents pass on (`heirOf`); the plans they signed in leave the agents, which go back to the API, and the computers they connected
- * here go with them (`personalMachines`). Every agent loses their mailboxes (`dropMailOfOwner`). Their messages stay.
+ * here go with them (`personalMachines`) unless marked the workspace's (`releaseLeaverDevices`). Every agent loses their mailboxes (`dropMailOfOwner`). Their messages stay.
  */
 export async function removeMember(
   db: Database,
@@ -1147,6 +1147,7 @@ export async function removeMember(
   // Loaded here: these modules build on this one.
   const { announceReleasedAccounts, forgetAgents, releaseMemberAccounts } = await import("./machine-accounts");
   const { announceRemovedMachine, detachMachine, personalMachines } = await import("./machines");
+  const { releaseLeaverDevices } = await import("./devices");
   const { cancelSecretRequestsFor, publishSecret } = await import("./secrets");
   const { cancelMailboxApprovals, publishApproval } = await import("./approvals");
   const { dropMailOfOwner } = await import("./tools/scopes");
@@ -1258,6 +1259,7 @@ export async function removeMember(
     for (const computer of await personalMachines(tx, targetUserId, [orgId])) {
       removed.push({ computer, freed: await detachMachine(tx, computer) });
     }
+    await releaseLeaverDevices(tx, orgId, targetUserId);
     const touched = [...new Set([...handed.map((a) => a.id), ...removed.flatMap((r) => r.freed)])];
     await offPlansNotOwners(tx, orgId, touched);
     const changed = [...new Set([...touched, ...released.agents.flatMap((a) => a.agentIds)])];
@@ -1280,6 +1282,13 @@ export async function removeMember(
   await announceReleasedAccounts(options.pubsub, released);
   for (const { computer, freed } of removed) {
     await announceRemovedMachine({ db, pubsub: options.pubsub }, computer, { type: "person", id: actorId }, freed);
+  }
+  // Runs waiting on a device that left with them stop waiting and say so (bring your own devices).
+  if (removed.length > 0) {
+    const { endWaitsOnLeftDevice } = await import("./device-waits");
+    for (const { computer } of removed) {
+      await endWaitsOnLeftDevice({ db, pubsub: options.pubsub }, orgId, computer.id, targetUserId).catch(() => 0);
+    }
   }
   // Their open WebSocket connections lose every subscription now, not on reconnect.
   const quiet = actorId === targetUserId ? { quiet: true as const } : {};

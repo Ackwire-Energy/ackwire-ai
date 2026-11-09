@@ -645,7 +645,7 @@ describe("Criar agente: what gets created", () => {
     } finally {
       window.open = realOpen;
     }
-    expect(opened).toEqual([[`/org/${ORG_ID}/settings/computers`, "_blank", "noopener"]]);
+    expect(opened).toEqual([[`/org/${ORG_ID}/settings/devices`, "_blank", "noopener"]]);
     await click(payWith(box, "Com chave de API"));
     await act(async () =>
       fireEvent.change(within(box).getByLabelText("Cole aqui"), {

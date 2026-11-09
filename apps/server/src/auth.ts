@@ -703,9 +703,7 @@ export async function hashPassword(auth: Auth, password: string) {
 export async function replacePassword(auth: Auth, db: Database, userId: string, password: string, keepToken: string) {
   const context = await auth.$context;
   await context.internalAdapter.updatePassword(userId, await context.password.hash(password));
-  await db
-    .delete(schema.sessions)
-    .where(and(eq(schema.sessions.userId, userId), ne(schema.sessions.token, keepToken)));
+  await db.delete(schema.sessions).where(and(eq(schema.sessions.userId, userId), ne(schema.sessions.token, keepToken)));
   await revokeUserApps(db, userId);
 }
 

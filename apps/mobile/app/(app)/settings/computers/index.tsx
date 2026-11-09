@@ -1,6 +1,6 @@
-import { ComputersScreen } from "@/features/settings/ComputersScreen";
+import { Redirect } from "expo-router";
 
-/** Configurações › Computadores: where the agents work and which computer each one uses. */
+/** Configurações › Computadores became Dispositivos: old links land there. */
 export default function SettingsComputersRoute() {
-  return <ComputersScreen />;
+  return <Redirect href="/settings/devices" />;
 }

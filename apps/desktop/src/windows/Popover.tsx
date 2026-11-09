@@ -821,8 +821,7 @@ function HereCard({ local, onPrefs }: { local: LocalServerStatus; onPrefs: () =>
             </>
           }
         >
-          {t("desktop.server.failingWhy")}{" "}
-          <HelpLink slug="run-on-your-computer">{t("desktop.server.help")}</HelpLink>
+          {t("desktop.server.failingWhy")} <HelpLink slug="run-on-your-computer">{t("desktop.server.help")}</HelpLink>
         </Banner>
       )}
       {banner === "back" && local.backTo !== backSeen && (

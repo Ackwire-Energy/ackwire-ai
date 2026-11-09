@@ -35,6 +35,7 @@ import { type AppDeps, agentDetailsGate } from "./routes/app/context";
 import { dashboardRoutes } from "./routes/app/dashboards";
 import { databaseRoutes } from "./routes/app/databases";
 import { desktopRoutes } from "./routes/app/desktop";
+import { deviceWaitRoutes } from "./routes/app/device-waits";
 import { dmRoutes } from "./routes/app/dms";
 import { gifKeyRoutes } from "./routes/app/gif-key";
 import { gifRoutes } from "./routes/app/gifs";
@@ -70,6 +71,7 @@ import {
   registerDesktopRoutes,
   registerNativeRoutes,
 } from "./routes/desktop";
+import { deviceAppRoutes, registerConnectScripts } from "./routes/devices";
 import { registerGitProxy } from "./routes/git";
 import { githubAppRoutes, registerGitHubAppWebhook } from "./routes/github-app";
 import { registerHealth } from "./routes/health";
@@ -123,6 +125,7 @@ export interface AppOptions {
  * - `/api/ws`             WebSocket (real-time)
  * - `/api/openapi.json`   OpenAPI 3.1 document; `/api/reference` interactive docs
  * - `/install`            the self-host installer, `install.sh` (`curl -fsSL <server>/install | sh`)
+ * - `/i/<code>`           a new computer's installer with a connect link baked in (`/i/<code>/ps` for Windows)
  * - `/install/docker-compose.yml` the compose file of this release, which the setup downloads
  * - `/sw.js`              the web app's service worker (browser push, ADR 0071)
  * - everything else       web app (single-page app), when built
@@ -206,6 +209,8 @@ export function createApp(options: AppOptions) {
     api.route("/app", agentImportRoutes(deps));
     api.route("/app", sandboxRoutes(deps));
     api.route("/app", machineAppRoutes(deps));
+    api.route("/app", deviceWaitRoutes(deps));
+    api.route("/app", deviceAppRoutes(deps));
     api.route("/app", machineAccountRoutes(deps));
     api.route("/app", planUsageRoutes(deps));
     api.route("/app", personUsageRoutes(deps));
@@ -328,6 +333,7 @@ export function createApp(options: AppOptions) {
   app.use("/api/*", errorPages(options.services?.config.PUBLIC_URL));
   app.route("/api", api);
   if (options.services) {
+    registerConnectScripts(app, { log, ...options.services });
     registerAppLinks(app, options.services.config);
     registerAppsRoot(app, { log, ...options.services }, { version, fetchDocument: options.appsFetchDocument });
   }

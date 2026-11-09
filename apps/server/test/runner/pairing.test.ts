@@ -8,10 +8,12 @@ import {
   devicePair,
   type FetchFn,
   formatUserCode,
+  LINK_INVALID,
   orgSlug,
   PairingError,
   pollDeviceToken,
   redeemIssuedCode,
+  requestDeviceCode,
   takeEnrollCode,
   uniqueWorkspace,
 } from "../../runner/pairing";
@@ -396,3 +398,46 @@ test("update: the new runner is a step done, and a service that won't start is t
     server.stop(true);
   }
 }, 30_000);
+
+test("a connect link: sent with the device, its maker and workspace read back; a used or expired one in words", async () => {
+  const calls: unknown[] = [];
+  const answer =
+    (res: Response): FetchFn =>
+    async (_url, init) => {
+      calls.push(JSON.parse(String(init.body)));
+      return res;
+    };
+  const code = await requestDeviceCode(
+    SERVER,
+    { os: "linux", arch: "x64", hostname: "build-box", version: "1", link: "7KQ2-M9XD" },
+    {
+      fetch: answer(
+        json(200, {
+          deviceCode: "dc_secret",
+          userCode: "K7Q4ZP",
+          verificationUrl: `${SERVER}/conectar?code=K7Q4ZP`,
+          expiresIn: 600,
+          interval: 3,
+          maker: { name: "Sam Rivera" },
+          org: { id: "o1", name: "Acme" },
+        }),
+      ),
+    },
+  );
+  expect(calls[0]).toMatchObject({ hostname: "build-box", link: "7KQ2-M9XD" });
+  expect(code).toMatchObject({ maker: "Sam Rivera", orgName: "Acme", deviceCode: "dc_secret" });
+
+  const refused = await requestDeviceCode(
+    SERVER,
+    { os: "linux", arch: "x64", hostname: "build-box", version: "1", link: "OLD1-CODE" },
+    { fetch: answer(json(400, { error: { code: "machine.link_invalid", message: "This link was used already." } })) },
+  ).catch((e: unknown) => e);
+  expect(refused).toBeInstanceOf(PairingError);
+  expect(refused).toMatchObject({ code: "link_invalid", message: "This link was used already." });
+  const bare = await requestDeviceCode(
+    SERVER,
+    { os: "linux", arch: "x64", hostname: "build-box", version: "1", link: "OLD1-CODE" },
+    { fetch: answer(json(400, { error: "machine.link_invalid" })) },
+  ).catch((e: unknown) => e);
+  expect(bare).toMatchObject({ code: "link_invalid", message: LINK_INVALID });
+});

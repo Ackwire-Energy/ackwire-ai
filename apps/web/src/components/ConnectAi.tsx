@@ -345,13 +345,13 @@ function ConnectAiDialog({
       : undefined;
   const toComputers = () => {
     if (request.forNewAgent) {
-      window.open(`/org/${org.id}/settings/computers`, "_blank", "noopener");
+      window.open(`/org/${org.id}/settings/devices`, "_blank", "noopener");
       return;
     }
     onClose();
     void navigate({
       to: "/org/$orgId/settings/$section",
-      params: { orgId: org.id, section: "computers" },
+      params: { orgId: org.id, section: "devices" },
     });
   };
   return (

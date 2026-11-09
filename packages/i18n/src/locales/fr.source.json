@@ -29398,6 +29398,15 @@
   "errors.artifact.notInDrive": {
     "value": "This lives only in its conversation, so it can't be shared."
   },
+  "errors.device.notLinkMaker": {
+    "value": "Only the person who made the link can let this computer join."
+  },
+  "errors.device.widenForbidden": {
+    "value": "Admins can only narrow who can use someone's own device."
+  },
+  "errors.device.notHome": {
+    "value": "Agents live on the workspace computer and use this one when they name it."
+  },
   "errors.machine.forbidden": {
     "value": "Only an admin, or whoever connected the computer, can do that."
   },
@@ -30152,6 +30161,933 @@
   },
   "machines.access.agentPlaceholder": {
     "value": "<agent>"
+  },
+  "devices.leadCloud": {
+    "value": "Where your agents work: the workspace computer and the devices people connect."
+  },
+  "devices.lead": {
+    "value": "Where your agents work: the computers and phones people connect."
+  },
+  "devices.connect": {
+    "value": "Connect a device"
+  },
+  "devices.connectPhone": {
+    "value": "Connect a phone"
+  },
+  "devices.connectComputer": {
+    "value": "Connect a computer"
+  },
+  "devices.search": {
+    "value": "Search"
+  },
+  "devices.searchLabel": {
+    "value": "Search devices"
+  },
+  "devices.filter.label": {
+    "value": "Show"
+  },
+  "devices.filter.all": {
+    "value": "All"
+  },
+  "devices.filter.computers": {
+    "value": "Computers"
+  },
+  "devices.filter.phones": {
+    "value": "Phones"
+  },
+  "devices.how": {
+    "value": "How devices work"
+  },
+  "devices.back": {
+    "value": "Devices"
+  },
+  "devices.done": {
+    "value": "Done"
+  },
+  "devices.workspace": {
+    "value": "Workspace"
+  },
+  "devices.cloud": {
+    "value": "Cloud"
+  },
+  "devices.cpus": {
+    "value": {
+      "one": "{{count}} CPU",
+      "other": "{{count}} CPU"
+    }
+  },
+  "devices.memory": {
+    "value": "{{gb}} GB"
+  },
+  "devices.system.android": {
+    "value": "Android {{version}}"
+  },
+  "devices.system.ios": {
+    "value": "iOS {{version}}"
+  },
+  "devices.phoneKind.emulator": {
+    "value": "Emulator"
+  },
+  "devices.phoneKind.simulator": {
+    "value": "Simulator"
+  },
+  "devices.transport.usb": {
+    "value": "USB"
+  },
+  "devices.transport.wifi": {
+    "value": "Wi-Fi"
+  },
+  "devices.onHost": {
+    "value": "on {{host}}"
+  },
+  "devices.onHostChip": {
+    "value": "On {{host}}"
+  },
+  "devices.menu": {
+    "value": "{{name}} actions"
+  },
+  "devices.rename": {
+    "value": "Rename"
+  },
+  "devices.renameName": {
+    "value": "Rename {{name}}"
+  },
+  "devices.renameTitle": {
+    "value": "Rename the device"
+  },
+  "devices.renamed": {
+    "value": "Renamed to {{name}}."
+  },
+  "devices.name": {
+    "value": "Name"
+  },
+  "devices.nameHelp": {
+    "value": "How people and agents see it."
+  },
+  "devices.remove": {
+    "value": "Remove"
+  },
+  "devices.removeTitle": {
+    "value": "Remove {{name}}?"
+  },
+  "devices.removeText": {
+    "value": "Agents stop using it. Connecting it again takes a new link."
+  },
+  "devices.removed": {
+    "value": "{{name}} removed."
+  },
+  "devices.forget": {
+    "value": "Forget"
+  },
+  "devices.forgetTitle": {
+    "value": "Forget {{name}}?"
+  },
+  "devices.forgetText": {
+    "value": "It comes back if its computer sees it again."
+  },
+  "devices.forgotten": {
+    "value": "{{name}} forgotten."
+  },
+  "devices.stop": {
+    "value": "Stop"
+  },
+  "devices.stopped": {
+    "value": "Stopped. {{name}} is free."
+  },
+  "devices.showMe": {
+    "value": "Show me how"
+  },
+  "devices.notFound": {
+    "value": "This device isn't here anymore"
+  },
+  "devices.notFoundText": {
+    "value": "It was removed, or this link is wrong."
+  },
+  "devices.sharing": {
+    "value": "Sharing"
+  },
+  "devices.phonesHere": {
+    "value": "Phones on this computer"
+  },
+  "devices.maxTasks": {
+    "value": "Tasks at once"
+  },
+  "devices.maxTasksHint": {
+    "value": "How many background tasks agents run here at the same time. The rest wait their turn."
+  },
+  "devices.belongs": {
+    "value": "Belongs to the workspace"
+  },
+  "devices.belongsHint": {
+    "value": "It stays when the person who connected it leaves, and everyone can use it while nobody owns it."
+  },
+  "devices.connectedBy": {
+    "value": "Connected by {{name}}"
+  },
+  "devices.downloadFor": {
+    "value": "Download for {{system}}"
+  },
+  "devices.downloadApp": {
+    "value": "Download the app"
+  },
+  "devices.otherSystems": {
+    "value": "Other systems"
+  },
+  "devices.onThePhone": {
+    "value": "On the phone"
+  },
+  "devices.onTheIphone": {
+    "value": "On the iPhone"
+  },
+  "devices.status.ready": {
+    "value": "Ready"
+  },
+  "devices.status.inUse": {
+    "value": "In use"
+  },
+  "devices.status.inUseBy": {
+    "value": "In use by {{name}}"
+  },
+  "devices.status.busy": {
+    "value": "Busy {{running}}/{{max}}"
+  },
+  "devices.status.needs": {
+    "value": "Needs you"
+  },
+  "devices.status.preparing": {
+    "value": "Preparing"
+  },
+  "devices.status.paused": {
+    "value": "Paused"
+  },
+  "devices.status.offline": {
+    "value": "Offline"
+  },
+  "devices.status.unsupported": {
+    "value": "Not supported"
+  },
+  "devices.detail.forSince": {
+    "value": "for {{name}} since {{time}}"
+  },
+  "devices.detail.since": {
+    "value": "since {{time}}"
+  },
+  "devices.detail.until": {
+    "value": "until {{time}}"
+  },
+  "devices.detail.withHost": {
+    "value": "with {{host}}"
+  },
+  "devices.detail.lastSeen": {
+    "value": "last seen {{time}}"
+  },
+  "devices.line.ready": {
+    "value": "Agents can use it now."
+  },
+  "devices.line.busy": {
+    "value": {
+      "one": "{{count}} of {{max}} tasks running",
+      "other": "{{count}} of {{max}} tasks running"
+    }
+  },
+  "devices.line.offline": {
+    "value": "Agents wait for it to come back."
+  },
+  "devices.line.offlineSeen": {
+    "value": "Last seen {{time}}. Agents wait for it to come back."
+  },
+  "devices.line.offlineWithHost": {
+    "value": "{{host}} is offline. Agents wait for it to come back."
+  },
+  "devices.reason.locked": {
+    "value": "The phone is locked"
+  },
+  "devices.reason.unauthorized": {
+    "value": "USB debugging isn't allowed for this computer yet"
+  },
+  "devices.reason.untrusted": {
+    "value": "The iPhone doesn't trust this Mac yet"
+  },
+  "devices.reason.developer_mode_off": {
+    "value": "Developer Mode is off"
+  },
+  "devices.reason.ui_automation_off": {
+    "value": "UI Automation is off"
+  },
+  "devices.reason.xcode_missing": {
+    "value": "Xcode isn't installed on the Mac"
+  },
+  "devices.reason.xcode_too_old": {
+    "value": "Xcode is too old for this iOS"
+  },
+  "devices.reason.device_support": {
+    "value": "The Mac is getting the iPhone tools"
+  },
+  "devices.reason.helper_missing": {
+    "value": "The test helper isn't set up yet"
+  },
+  "devices.reason.helper_expired": {
+    "value": "The test helper needs renewing"
+  },
+  "devices.reason.booting": {
+    "value": "Starting"
+  },
+  "devices.reason.no_driver": {
+    "value": "Windows has no driver for this phone"
+  },
+  "devices.reason.os_too_old": {
+    "value": "This system is too old for the tools"
+  },
+  "devices.reason.adb_offline": {
+    "value": "The phone isn't answering"
+  },
+  "devices.reason.other": {
+    "value": "It needs something on the device"
+  },
+  "devices.fix.locked": {
+    "value": "Unlock it"
+  },
+  "devices.fix.unauthorized": {
+    "value": "Tap Allow on the phone"
+  },
+  "devices.fix.untrusted": {
+    "value": "Tap Trust on the iPhone"
+  },
+  "devices.fix.developer_mode_off": {
+    "value": "Turn on Developer Mode"
+  },
+  "devices.fix.ui_automation_off": {
+    "value": "Turn on UI Automation"
+  },
+  "devices.fix.xcode_missing": {
+    "value": "Install Xcode"
+  },
+  "devices.fix.xcode_too_old": {
+    "value": "Update Xcode"
+  },
+  "devices.fix.device_support": {
+    "value": "Keep the Mac on"
+  },
+  "devices.fix.helper_missing": {
+    "value": "Open the app on the Mac"
+  },
+  "devices.fix.helper_expired": {
+    "value": "Open the app on the Mac"
+  },
+  "devices.fix.booting": {
+    "value": "Wait for it to start"
+  },
+  "devices.fix.no_driver": {
+    "value": "Install the phone's USB driver"
+  },
+  "devices.fix.os_too_old": {
+    "value": "Update the phone"
+  },
+  "devices.fix.adb_offline": {
+    "value": "Plug it in again"
+  },
+  "devices.fix.other": {
+    "value": "See what it needs"
+  },
+  "devices.facts.system": {
+    "value": "System"
+  },
+  "devices.facts.cpu": {
+    "value": "CPU"
+  },
+  "devices.facts.memory": {
+    "value": "Memory"
+  },
+  "devices.facts.lastSeen": {
+    "value": "Last seen"
+  },
+  "devices.facts.toolchains": {
+    "value": "Toolchains found"
+  },
+  "devices.facts.model": {
+    "value": "Model"
+  },
+  "devices.facts.connection": {
+    "value": "Connection"
+  },
+  "devices.tools.java": {
+    "value": "JDK {{version}}"
+  },
+  "devices.tools.androidSdk": {
+    "value": "Android SDK {{version}}"
+  },
+  "devices.tools.adb": {
+    "value": "adb {{version}}"
+  },
+  "devices.tools.git": {
+    "value": "Git {{version}}"
+  },
+  "devices.tools.xcode": {
+    "value": "Xcode {{version}}"
+  },
+  "devices.tools.node": {
+    "value": "Node {{version}}"
+  },
+  "devices.tools.maestro": {
+    "value": "Maestro {{version}}"
+  },
+  "devices.tools.scrcpy": {
+    "value": "scrcpy {{version}}"
+  },
+  "devices.tools.other": {
+    "value": "{{name}} {{version}}"
+  },
+  "devices.who.title": {
+    "value": "Who can use it"
+  },
+  "devices.who.everyone": {
+    "value": "Everyone"
+  },
+  "devices.who.only": {
+    "value": "Only {{name}}"
+  },
+  "devices.who.onlyOwner": {
+    "value": "Only the owner"
+  },
+  "devices.who.people": {
+    "value": {
+      "one": "{{count}} person",
+      "other": "{{count}} people"
+    }
+  },
+  "devices.who.roles": {
+    "value": {
+      "one": "{{count}} role",
+      "other": "{{count}} roles"
+    }
+  },
+  "devices.who.phoneOnly": {
+    "value": "{{who}}, phone only"
+  },
+  "devices.who.sameAs": {
+    "value": "Same as {{host}}"
+  },
+  "devices.who.sameAsMac": {
+    "value": "Same as its Mac"
+  },
+  "devices.who.rolesHint": {
+    "value": "Anyone with the role can use it, including whoever gets it later."
+  },
+  "devices.who.computerHint": {
+    "value": "Whose agents may run tasks here. Admins can narrow it, only its owner can widen it."
+  },
+  "devices.who.phoneHint": {
+    "value": "Sharing a phone never shares {{host}}."
+  },
+  "devices.who.followsHint": {
+    "value": "An iPhone follows the rule of the Mac it's plugged into."
+  },
+  "devices.who.serverHelp": {
+    "value": "Each agent runs as its own user on it."
+  },
+  "devices.who.computerHelp": {
+    "value": "Agents' commands run as your user on it."
+  },
+  "devices.request.title": {
+    "value": "{{name}} wants to join {{org}}"
+  },
+  "devices.request.list": {
+    "value": "Asking to join"
+  },
+  "devices.request.letJoin": {
+    "value": "Let it join"
+  },
+  "devices.request.deny": {
+    "value": "Deny"
+  },
+  "devices.request.denied": {
+    "value": "{{name}} won't join."
+  },
+  "devices.request.joined": {
+    "value": "{{name}} joined."
+  },
+  "devices.empty.title": {
+    "value": "No devices yet"
+  },
+  "devices.empty.text": {
+    "value": "Connect a computer or a phone for your agents to work on."
+  },
+  "devices.empty.phonesTitle": {
+    "value": "No phones yet"
+  },
+  "devices.empty.phonesText": {
+    "value": "Plug an Android phone into a connected computer, or an iPhone into a Mac."
+  },
+  "devices.empty.searchTitle": {
+    "value": "No device matches"
+  },
+  "devices.empty.searchText": {
+    "value": "Try another name."
+  },
+  "devices.choose.computers": {
+    "value": "Computers"
+  },
+  "devices.choose.phones": {
+    "value": "Phones"
+  },
+  "devices.choose.thisMac": {
+    "value": "This Mac"
+  },
+  "devices.choose.thisPc": {
+    "value": "This PC"
+  },
+  "devices.choose.thisComputer": {
+    "value": "This computer"
+  },
+  "devices.choose.thisLine": {
+    "value": "Through the agentes.chat app"
+  },
+  "devices.choose.openApp": {
+    "value": "Open the app"
+  },
+  "devices.choose.server": {
+    "value": "A server or VPS"
+  },
+  "devices.choose.serverLine": {
+    "value": "One line to paste in its terminal"
+  },
+  "devices.choose.other": {
+    "value": "Another computer"
+  },
+  "devices.choose.otherLine": {
+    "value": "Install the app on it"
+  },
+  "devices.choose.android": {
+    "value": "Android phone"
+  },
+  "devices.choose.androidLine": {
+    "value": "Through any connected computer"
+  },
+  "devices.choose.iphone": {
+    "value": "iPhone"
+  },
+  "devices.choose.iphoneLine": {
+    "value": "Through a Mac"
+  },
+  "devices.computer.title": {
+    "value": "Connect another computer"
+  },
+  "devices.computer.step1": {
+    "value": "Download the app on it:"
+  },
+  "devices.computer.step2": {
+    "value": "Open it and sign in to {{org}}."
+  },
+  "devices.computer.step3": {
+    "value": "Turn on Let agents use this computer."
+  },
+  "devices.computer.orLine": {
+    "value": "Or paste one line in its terminal"
+  },
+  "devices.link.serverTitle": {
+    "value": "Connect a server"
+  },
+  "devices.link.computerTitle": {
+    "value": "Connect a computer"
+  },
+  "devices.link.joinedTitle": {
+    "value": "{{name}} is connected"
+  },
+  "devices.link.step1Server": {
+    "value": "Run this in the server's terminal:"
+  },
+  "devices.link.step1Computer": {
+    "value": "Run this in the computer's terminal:"
+  },
+  "devices.link.step2": {
+    "value": "Let it join when it asks."
+  },
+  "devices.link.step3": {
+    "value": "Name it and choose who can use it."
+  },
+  "devices.link.system": {
+    "value": "System"
+  },
+  "devices.link.unix": {
+    "value": "Linux and macOS"
+  },
+  "devices.link.windows": {
+    "value": "Windows"
+  },
+  "devices.link.making": {
+    "value": "Making the line"
+  },
+  "devices.link.once": {
+    "value": "Works once, for 10 minutes"
+  },
+  "devices.link.onceHint": {
+    "value": "The computer that runs it only asks to join. You let it in here."
+  },
+  "devices.link.waitingServer": {
+    "value": "Waiting for the server…"
+  },
+  "devices.link.waitingComputer": {
+    "value": "Waiting for the computer…"
+  },
+  "devices.link.expired": {
+    "value": "This line expired."
+  },
+  "devices.link.denied": {
+    "value": "You denied that computer."
+  },
+  "devices.link.again": {
+    "value": "Make a new line"
+  },
+  "devices.link.failed": {
+    "value": "Couldn't make the line. Try again in a moment."
+  },
+  "devices.link.readScript": {
+    "value": "Read the script first"
+  },
+  "devices.link.openPage": {
+    "value": "Open its page"
+  },
+  "devices.host.online": {
+    "value": "{{name}} · online"
+  },
+  "devices.host.offline": {
+    "value": "{{name}} · offline"
+  },
+  "devices.android.title": {
+    "value": "Connect an Android phone"
+  },
+  "devices.android.connectedTitle": {
+    "value": "{{name}} is connected"
+  },
+  "devices.android.plugInto": {
+    "value": "Plug it into"
+  },
+  "devices.android.pairWith": {
+    "value": "Pair it with"
+  },
+  "devices.android.way": {
+    "value": "How it connects"
+  },
+  "devices.android.cable": {
+    "value": "With a cable"
+  },
+  "devices.android.recommended": {
+    "value": "Recommended"
+  },
+  "devices.android.wifi": {
+    "value": "Over Wi-Fi"
+  },
+  "devices.android.noComputer": {
+    "value": "Phones connect through a computer, and none is connected yet."
+  },
+  "devices.android.hostOffline": {
+    "value": "{{computer}} is offline. Turn it on, or pick another one."
+  },
+  "devices.android.devOptions": {
+    "value": "Turn on Developer options"
+  },
+  "devices.android.devOptionsText": {
+    "value": "Settings › About phone, then tap Build number 7 times."
+  },
+  "devices.android.usbDebugging": {
+    "value": "Turn on USB debugging"
+  },
+  "devices.android.usbDebuggingText": {
+    "value": "Settings › System › Developer options › USB debugging."
+  },
+  "devices.android.plug": {
+    "value": "Plug the phone in"
+  },
+  "devices.android.plugged": {
+    "value": "Plugged into {{computer}}"
+  },
+  "devices.android.looking": {
+    "value": "Looking for a phone on {{computer}}…"
+  },
+  "devices.android.found": {
+    "value": "Done on {{name}}"
+  },
+  "devices.android.allow": {
+    "value": "Tap Allow on the phone"
+  },
+  "devices.android.allowText": {
+    "value": "Check Always allow from this computer first."
+  },
+  "devices.android.allowTextWifi": {
+    "value": "Check Always allow on this network first."
+  },
+  "devices.android.wifiPair": {
+    "value": "Pair it over Wi-Fi"
+  },
+  "devices.android.wifiPairText": {
+    "value": "Phone and computer on the same Wi-Fi."
+  },
+  "devices.android.wifiRun": {
+    "value": "Then run this on {{computer}}, with the address, port and code the phone shows:"
+  },
+  "devices.android.wifiNote": {
+    "value": "Wireless debugging turns off when the phone restarts. A cable is more reliable."
+  },
+  "devices.android.notShowing": {
+    "value": "Phone not showing up?"
+  },
+  "devices.android.notShowingHelp": {
+    "value": "Try another cable or port, and pick File transfer if the phone asks what the USB is for. On Samsung, turn off Auto Blocker in Settings › Security and privacy."
+  },
+  "devices.android.qrLabel": {
+    "value": "QR code that opens these steps on the phone"
+  },
+  "devices.android.qrLine": {
+    "value": "Do it from your phone"
+  },
+  "devices.android.qrCaption": {
+    "value": "Scan to open these steps in the agentes.chat app, with buttons for each setting."
+  },
+  "devices.android.buildNumber": {
+    "value": "Build number"
+  },
+  "devices.android.buildNumberSub": {
+    "value": "BP2A.250605.031"
+  },
+  "devices.android.usbRow": {
+    "value": "USB debugging"
+  },
+  "devices.android.usbRowSub": {
+    "value": "Debug mode when USB is connected"
+  },
+  "devices.android.path.devOptions": {
+    "value": "Developer options"
+  },
+  "devices.android.path.wireless": {
+    "value": "Wireless debugging"
+  },
+  "devices.android.path.pairCode": {
+    "value": "Pair device with pairing code"
+  },
+  "devices.android.prompt.title": {
+    "value": "Allow USB debugging?"
+  },
+  "devices.android.prompt.titleWifi": {
+    "value": "Allow wireless debugging on this network?"
+  },
+  "devices.android.prompt.always": {
+    "value": "Always allow from this computer"
+  },
+  "devices.android.prompt.alwaysWifi": {
+    "value": "Always allow on this network"
+  },
+  "devices.android.prompt.cancel": {
+    "value": "Cancel"
+  },
+  "devices.android.prompt.allow": {
+    "value": "Allow"
+  },
+  "devices.iphone.title": {
+    "value": "Connect an iPhone"
+  },
+  "devices.iphone.lead": {
+    "value": "iPhones connect through a Mac, where the agentes.chat app does the setup."
+  },
+  "devices.iphone.mac": {
+    "value": "Mac"
+  },
+  "devices.iphone.noMac": {
+    "value": "Agents can use an iPhone only through a Mac, and none is connected yet."
+  },
+  "devices.iphone.noMacNote": {
+    "value": "No Mac? Ask a teammate to connect theirs."
+  },
+  "devices.iphone.steps.xcode": {
+    "value": "Xcode"
+  },
+  "devices.iphone.steps.tools": {
+    "value": "iPhone tools"
+  },
+  "devices.iphone.steps.connected": {
+    "value": "iPhone connected"
+  },
+  "devices.iphone.steps.trust": {
+    "value": "Trust this Mac"
+  },
+  "devices.iphone.steps.developerMode": {
+    "value": "Turn on Developer Mode"
+  },
+  "devices.iphone.steps.uiAutomation": {
+    "value": "Turn on UI Automation"
+  },
+  "devices.iphone.steps.helper": {
+    "value": "Test helper"
+  },
+  "devices.iphone.xcodeDone": {
+    "value": "Version {{version}}"
+  },
+  "devices.iphone.xcodeText": {
+    "value": "Install Xcode from the App Store on {{mac}}. The setup goes on when it's there."
+  },
+  "devices.iphone.getXcode": {
+    "value": "Get Xcode"
+  },
+  "devices.iphone.toolsDone": {
+    "value": "Downloaded by the Mac"
+  },
+  "devices.iphone.toolsText": {
+    "value": "The Mac downloads them, about 8 GB."
+  },
+  "devices.iphone.connectedDone": {
+    "value": "{{name}} · iOS {{version}}"
+  },
+  "devices.iphone.connectedText": {
+    "value": "Plug the iPhone into {{mac}} with a cable."
+  },
+  "devices.iphone.trustDone": {
+    "value": "Trusted"
+  },
+  "devices.iphone.trustText": {
+    "value": "Tap Trust on the iPhone and enter its passcode."
+  },
+  "devices.iphone.devModeDone": {
+    "value": "On"
+  },
+  "devices.iphone.devModeText": {
+    "value": "Turn it on and tap Restart. After the restart, tap Turn On and enter your passcode."
+  },
+  "devices.iphone.uiAutomationText": {
+    "value": "In Settings › Developer, after the restart."
+  },
+  "devices.iphone.helperText": {
+    "value": "Built and renewed by the Mac every 7 days. A free Apple Account in Xcode is enough."
+  },
+  "devices.iphone.ready": {
+    "value": "{{name}} is ready for agents."
+  },
+  "devices.iphone.path.settings": {
+    "value": "Settings"
+  },
+  "devices.iphone.path.privacy": {
+    "value": "Privacy & Security"
+  },
+  "devices.iphone.path.devMode": {
+    "value": "Developer Mode"
+  },
+  "devices.iphone.path.developer": {
+    "value": "Developer"
+  },
+  "devices.iphone.path.uiAutomation": {
+    "value": "Enable UI Automation"
+  },
+  "devices.wait.title": {
+    "value": "Waiting for {{deviceName}}"
+  },
+  "devices.wait.tryNow": {
+    "value": "Try now"
+  },
+  "devices.wait.useAnother": {
+    "value": "Use another device"
+  },
+  "devices.wait.stop": {
+    "value": "Stop waiting"
+  },
+  "devices.wait.noOther": {
+    "value": "No other device can take it now."
+  },
+  "devices.wait.useInstead": {
+    "value": "@{{handle}} use {{name}} instead"
+  },
+  "devices.wait.useInsteadPlain": {
+    "value": "Use {{name}} instead"
+  },
+  "devices.wait.hostOffline": {
+    "value": "{{host}} is offline, so I can't reach {{deviceName}} on it. I'll start when it's back."
+  },
+  "devices.wait.hostOfflineSeen": {
+    "value": "{{host}} is offline (last seen {{time}}), so I can't reach {{deviceName}} on it. I'll start when it's back."
+  },
+  "devices.wait.offline": {
+    "value": "{{deviceName}} is offline. I'll start when it's back."
+  },
+  "devices.wait.offlineSeen": {
+    "value": "{{deviceName}} is offline (last seen {{time}}). I'll start when it's back."
+  },
+  "devices.wait.busy": {
+    "value": "{{deviceName}} is busy. I'll start when it's free."
+  },
+  "devices.wait.needs": {
+    "value": "{{deviceName}} can't take work yet. {{reason}}. I'll start when it can."
+  },
+  "devices.wait.asked": {
+    "value": "I've asked {{owner}} to let me use {{deviceName}}."
+  },
+  "devices.wait.askedOwner": {
+    "value": "I've asked its owner to let me use {{deviceName}}."
+  },
+  "devices.wait.missing": {
+    "value": "{{host}} doesn't see {{deviceName}} right now. I'll start when it's plugged back in."
+  },
+  "devices.wait.ended.back": {
+    "value": "{{deviceName}} is back"
+  },
+  "devices.wait.ended.retried": {
+    "value": "Tried {{deviceName}} again"
+  },
+  "devices.wait.ended.stopped": {
+    "value": "Stopped waiting"
+  },
+  "devices.wait.ended.movedOn": {
+    "value": "Moved on without it"
+  },
+  "devices.wait.ended.allowed": {
+    "value": "{{owner}} said yes to {{deviceName}}"
+  },
+  "devices.wait.ended.allowedAny": {
+    "value": "Allowed to use {{deviceName}}"
+  },
+  "devices.wait.ended.denied": {
+    "value": "{{owner}} said no to {{deviceName}}"
+  },
+  "devices.wait.ended.deniedAny": {
+    "value": "Not allowed to use {{deviceName}}"
+  },
+  "devices.wait.ended.gaveUp": {
+    "value": "Stopped waiting for {{deviceName}} after a day"
+  },
+  "devices.wait.ended.left": {
+    "value": "{{deviceName}} left the workspace"
+  },
+  "devices.notice.source": {
+    "value": "Devices"
+  },
+  "devices.notice.agentFor": {
+    "value": "{{agent}} (for {{person}})"
+  },
+  "devices.notice.join": {
+    "value": "<b>{{name}}</b> wants to join {{org}}"
+  },
+  "devices.notice.inUse": {
+    "value": "<b>{{who}}</b> is using <b>{{deviceName}}</b>"
+  },
+  "devices.notice.access": {
+    "value": "<b>{{who}}</b> asks to use <b>{{deviceName}}</b>"
+  },
+  "devices.notice.waiting": {
+    "value": "<b>{{who}}</b> is waiting for <b>{{deviceName}}</b>"
+  },
+  "devices.notice.once": {
+    "value": "Allow once"
+  },
+  "devices.notice.always": {
+    "value": "Always"
+  },
+  "devices.notice.no": {
+    "value": "No"
+  },
+  "devices.notice.decided.once": {
+    "value": "Allowed once."
+  },
+  "devices.notice.decided.always": {
+    "value": "{{deviceName}} is shared with them now."
+  },
+  "devices.notice.decided.no": {
+    "value": "You said no."
   },
   "computers.agents.title": {
     "value": "Which computer each agent uses"
@@ -31608,6 +32544,9 @@
   "settings.section.computers": {
     "value": "Computers"
   },
+  "settings.section.devices": {
+    "value": "Devices"
+  },
   "settings.section.usage": {
     "value": "Budget and usage"
   },
@@ -31795,7 +32734,7 @@
     "value": "Of messages, in every conversation and on all your devices"
   },
   "settings.account.chat.textSizePhone": {
-    "value": "Your phone's own text size setting applies too"
+    "value": "Applies to the whole app, on top of your phone's text size"
   },
   "settings.account.chat.textXs": {
     "value": "Smaller"
@@ -31970,6 +32909,15 @@
   },
   "settings.tileState.noComputers": {
     "value": "No computer yet"
+  },
+  "settings.tileState.devices": {
+    "value": {
+      "one": "{{online}} of {{count}} on",
+      "other": "{{online}} of {{count}} on"
+    }
+  },
+  "settings.tileState.noDevices": {
+    "value": "No device yet"
   },
   "settings.tileState.usage": {
     "value": "{{percent}} of the budget used this month"
@@ -33701,6 +34649,12 @@
   "chat.work.step.updatingDashboard": {
     "value": "Worked on a dashboard"
   },
+  "chat.work.step.testingOnPhone": {
+    "value": "Tested on a phone"
+  },
+  "chat.work.step.waitingForDevice": {
+    "value": "Waited for a device"
+  },
   "chat.work.step.readingDashboards": {
     "value": "Looked at the dashboards"
   },
@@ -34018,6 +34972,12 @@
   },
   "chat.activity.updatingDashboard": {
     "value": "working on a dashboard"
+  },
+  "chat.activity.testingOnPhone": {
+    "value": "testing on a phone"
+  },
+  "chat.activity.waitingForDevice": {
+    "value": "waiting for a device"
   },
   "chat.activity.readingDashboards": {
     "value": "looking at the dashboards"

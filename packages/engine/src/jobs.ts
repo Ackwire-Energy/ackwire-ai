@@ -33,6 +33,7 @@ import { LEARN_JOB, learnRun } from "./context/learn";
 import { REFLECT_DEFAULTS, reflectThread } from "./context/reflect";
 import { judgeOf } from "./context/summaries";
 import { reportDroppedMentions, tellWakeSkipped } from "./continuation";
+import { DEVICE_WAIT_EXPIRED_JOB, expireDeviceWait } from "./device-waits";
 import {
   deferMentionReport,
   deliverParked,
@@ -999,6 +1000,14 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       await wakeForAccessDecision({ db: deps.db, pubsub: deps.pubsub }, String(job.payload.requestId), {
         maxHops: deps.maxHops,
       });
+    },
+    // A run waited a day for a device (`wait_for_device`): still waiting, it stops and says so.
+    [DEVICE_WAIT_EXPIRED_JOB]: async (job) => {
+      await expireDeviceWait(
+        { db: deps.db, pubsub: deps.pubsub },
+        String(job.payload.runId),
+        String(job.payload.waitId),
+      );
     },
     // A machine went offline a grace ago: if still offline, its running tasks are interrupted (one notice per thread).
     "machine.tasks_offline": async (job) => {

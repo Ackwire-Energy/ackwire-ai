@@ -75,7 +75,7 @@ import {
   releaseAgents,
   sharesSignIns,
 } from "./machine-accounts";
-import { getMachine, type MachineRow, machineOnline, publishMachineAgentsChanged } from "./machines";
+import { getMachine, type MachineRow, machineOnline, mayBeHome, publishMachineAgentsChanged } from "./machines";
 import {
   agentMissionApproval,
   type CommandApproval,
@@ -582,7 +582,7 @@ async function candidateMachines(
     .from(schema.machines)
     .where(and(eq(schema.machines.orgId, orgId), isNull(schema.machines.deletedAt)));
   return rows
-    .filter((m) => admin || m.pairedByUserId === userId || m.id === current)
+    .filter((m) => (admin || m.pairedByUserId === userId || m.id === current) && (mayBeHome(m) || m.id === current))
     .map((m) => ({ machineId: m.id, name: m.name, online: machineOnline(m), options: brainOptions(m) }));
 }
 

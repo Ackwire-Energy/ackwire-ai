@@ -82,6 +82,8 @@ import { StretchCard } from "../ai/StretchCard";
 import { UsagePauseCard, UsageWaitCancel } from "../ai/UsagePauseCard";
 import { HandoffCard } from "../browser/HandoffCard";
 import { TrailCard } from "../browser/TrailCard";
+import { DeviceWait } from "../devices/DeviceWait";
+import { deviceWaitOf } from "../devices/logic";
 import { MessageFiles } from "../files/MessageFiles";
 import { chatHref, consultationHref, routineHref } from "../links/logic";
 import { DecisionCard, MissionCard, PlanCard, ReviewCard, SetupFailedCard } from "../missions/cards";
@@ -394,7 +396,9 @@ export const MessageRow = memo(function MessageRow({
     ...(trails?.desktop.length ? (["desktop"] as const) : []),
   ];
   // "Esperando o MacBook Air voltar": its brain's computer is offline (the card, when it says which computer).
-  const brainWait = isAgent && Boolean(brainUnavailableOf(meta)?.machineId);
+  // Waiting for a device someone brought (a phone, another computer): its own pill, with what can be done about it.
+  const deviceWait = isAgent && deviceWaitOf(meta) !== null;
+  const brainWait = isAgent && !deviceWait && Boolean(brainUnavailableOf(meta)?.machineId);
   // The root of an issue's work thread (asked an agent to implement it): the issue card.
   const issueWork = issueWorkOf(meta);
   // My own message. In the styles that keep it apart, a bubble on the right with no face or name; in the others, a row
@@ -682,22 +686,20 @@ export const MessageRow = memo(function MessageRow({
         </Text>
       </View>
     ) : null;
-  const words = brainWait ? (
-    <BrainWait
-      message={m}
-      fallback={
-        body ? (
-          <MessageText
-            body={body}
-            muted={m.local === "pending"}
-            selectable={false}
-            accent={accent}
-            channelRefs={channelRefsOf(m.meta)}
-            everyone={m.meta?.mentionsEveryone === true}
-          />
-        ) : null
-      }
+  const messageWords = body ? (
+    <MessageText
+      body={body}
+      muted={m.local === "pending"}
+      selectable={false}
+      accent={accent}
+      channelRefs={channelRefsOf(m.meta)}
+      everyone={m.meta?.mentionsEveryone === true}
     />
+  ) : null;
+  const words = deviceWait ? (
+    <DeviceWait message={m} fallback={messageWords} />
+  ) : brainWait ? (
+    <BrainWait message={m} fallback={messageWords} />
   ) : choiceReply ? (
     choiceReply
   ) : body ? (
@@ -711,7 +713,7 @@ export const MessageRow = memo(function MessageRow({
     />
   ) : null;
   // The bubble holds its words, the tags of its name line and, at its end, the time; a row with none keeps its line.
-  const inBubble = bubbled && Boolean(body) && !brainWait && !choiceReply;
+  const inBubble = bubbled && Boolean(body) && !brainWait && !deviceWait && !choiceReply;
   const tagged = Boolean(reminder || via || routine || talker || helping || m.pinned);
   const opener = opened?.said ? <MessageText body={opened.said} selectable={false} accent={accent} /> : null;
   // Outside a bubble the line it opened with is a part of its own, as the web's second text.
