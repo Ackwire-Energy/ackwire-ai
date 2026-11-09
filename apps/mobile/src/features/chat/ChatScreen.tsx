@@ -68,6 +68,7 @@ import { localMeta } from "@agenteschat/client/lib/reply";
 import { retryAnswer } from "@agenteschat/client/lib/retry-answer";
 import { isRightHand, rightHandSeenKey } from "@agenteschat/client/lib/right-hand";
 import { seenMessageId } from "@agenteschat/client/lib/seen";
+import { lastPostedId } from "@agenteschat/client/lib/timeline";
 import { voiceOf } from "@agenteschat/client/lib/voice";
 import { isIdHandle } from "@agenteschat/ui/names";
 import { KeyboardAwareLegendList, useKeyboardChatComposerInset } from "@legendapp/list/keyboard";
@@ -737,6 +738,7 @@ function Chat({
       rows.map((r) => ({
         key: r.key,
         kind: r.kind === "message" ? "message" : r.kind === "run" ? "run" : "other",
+        ...(r.kind === "message" ? { id: r.message.id } : {}),
         mine: r.kind === "message" && r.message.author.type === "person" && r.message.author.id === meId,
         // An agent's sticker or GIF after its reply (ADR 0091) is never news of its own.
         silent: r.kind === "message" && isMediaAfterReply(r.message.meta),
@@ -756,15 +758,16 @@ function Chat({
   // the end until the person gets there, sends, or takes the pill.
   const [readHold, setReadHold] = useState(false);
   const [seenKey, setSeenKey] = useState<string | null>(null);
-  // The blocks at work when the person was last at the end: the message each lands in its row is new to them too.
-  const [seenTurns, setSeenTurns] = useState<ReadonlySet<string>>(() => new Set());
+  // The message posted last when the person was last at the end: one posted since in a place above the last row they
+  // saw (a reply keeps the place of its first words) is new to them too.
+  const [seenPostedId, setSeenPostedId] = useState<string | undefined>();
   const latestSeen = lastSeenKey(scrollRows);
-  const turnsNow = scrollRows.flatMap((r) => (r.kind === "run" ? [r.key] : [])).join(" ");
+  const postedNow = useMemo(() => lastPostedId(list), [list]);
   useEffect(() => {
     if (!atEnd) return;
     setSeenKey(latestSeen);
-    setSeenTurns(new Set(turnsNow ? turnsNow.split(" ") : []));
-  }, [atEnd, latestSeen, turnsNow]);
+    setSeenPostedId(postedNow);
+  }, [atEnd, latestSeen, postedNow]);
   // More than a screen above the end: the round button shows even with nothing new below, and the header's pill
   // closes to the face.
   const [far, setFar] = useState(false);
@@ -772,8 +775,8 @@ function Chat({
     () =>
       atEnd
         ? { messages: 0, firstKey: null, authors: [], working: [], mentionsMe: false }
-        : unseenBelow(scrollRows, seenKey, seenTurns),
-    [atEnd, scrollRows, seenKey, seenTurns],
+        : unseenBelow(scrollRows, seenKey, seenPostedId),
+    [atEnd, scrollRows, seenKey, seenPostedId],
   );
   // "Novas": before the first new row while the person reads above; it fades a while after they reach it.
   const [divider, setDivider] = useState<{ beforeKey: string; fading: boolean } | null>(null);
@@ -881,18 +884,18 @@ function Chat({
   );
 
   // ── Read ──
-  // Seen up to the latest message: the list's badges (a channel's or DM's, or a thread's) clear at once.
+  // Seen up to the message posted last, wherever its place: the list's badges (a channel's or DM's, or a thread's)
+  // clear at once.
   const markRead = useMarkChannelRead(orgId).mutate;
   const markThreadRead = useMarkThreadRead(orgId).mutate;
-  const lastId = list.at(-1)?.id;
   // Peeked at from the list (iOS's long press preview): nothing is read until it is opened.
   const peeking = useIsPreview();
   useEffect(() => {
-    if (peeking || !member || !lastId || lastId.startsWith("local-")) return;
+    if (peeking || !member || !postedNow) return;
     const mark = readMark(channelId, threadId);
     if (mark.kind === "thread") markThreadRead(mark.id);
     else markRead(mark.id);
-  }, [peeking, markRead, markThreadRead, channelId, threadId, member, lastId]);
+  }, [peeking, markRead, markThreadRead, channelId, threadId, member, postedNow]);
 
   // ── Older pages (channel view) ──
   const [loadingOlder, setLoadingOlder] = useState(false);

@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import type { ActiveRun } from "../src/api/types";
 import { firstUnreadId } from "../src/lib/chat-look";
-import { blockPlaces, landedAfter, PLACE_KEPT_MS, postedAtOf } from "../src/lib/timeline";
+import { blockPlaces, landedAfter, lastPostedId, PLACE_KEPT_MS, postedAtOf } from "../src/lib/timeline";
 import { applyChannelEvent, emptyStreams, reconcileRuns } from "../src/realtime/streams";
 
 /** A UUIDv7 as the server makes them: its first 48 bits are the clock at the insert (ms). */
@@ -92,4 +92,16 @@ test("what landed after a read: written after it, or posted since in a place bef
   // The reply is the first unread: "Novas" goes above it, though it sits above my message, sent before I read.
   expect(firstUnreadId([reply, mine], "2026-11-08T16:34:00.000Z", "me")).toBe(reply.id);
   expect(firstUnreadId([{ ...reply, id: v7(read - 1_000) }, mine], "2026-11-08T16:34:00.000Z", "me")).toBeNull();
+});
+
+test("the message posted last, wherever its place: what reading marks read up to", () => {
+  const read = at("2026-11-08T16:34:00.000Z");
+  const meanwhile = { id: v7(read - 5_000) };
+  // Posted after the message sent meanwhile, in a place above it.
+  const reply = { id: v7(read + 12_000) };
+  expect(lastPostedId([reply, meanwhile])).toBe(reply.id);
+  // One still on its way isn't the server's yet.
+  expect(lastPostedId([meanwhile, { id: "local-abc" }])).toBe(meanwhile.id);
+  expect(lastPostedId([{ id: "local-abc" }])).toBeUndefined();
+  expect(lastPostedId(undefined)).toBeUndefined();
 });

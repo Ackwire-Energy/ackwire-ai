@@ -36,6 +36,16 @@ export const PLACE_KEPT_MS = 10 * 60_000;
 export const postedAtOf = (id: string) => Number.parseInt(id.slice(0, 8) + id.slice(9, 13), 16);
 
 /**
+ * The id of the message the server posted last, wherever its place: a reply that keeps the place of its first words
+ * lands above what was sent while it was written. Messages still on their way (`local-…`) are left out.
+ */
+export function lastPostedId(list: readonly Pick<Message, "id">[] | undefined): string | undefined {
+  let last: string | undefined;
+  for (const m of list ?? []) if (!m.id.startsWith("local-") && (last === undefined || m.id > last)) last = m.id;
+  return last;
+}
+
+/**
  * A message landed after `at` (ms), for whoever last looked then: written after it, or posted since in a place before
  * it (`PLACE_KEPT_MS`). As the server counts unread (`landedAfterSql`).
  */

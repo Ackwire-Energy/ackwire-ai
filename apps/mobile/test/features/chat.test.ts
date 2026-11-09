@@ -182,6 +182,13 @@ describe("timeline", () => {
     expect(row).toContain('(run === "end" || run === "solo")');
   });
 
+  test("reading marks read up to the message posted last, wherever its place, and counts a reply placed above as new", async () => {
+    const screen = await source("features/chat/ChatScreen.tsx");
+    expect(screen).toContain("const postedNow = useMemo(() => lastPostedId(list), [list]);");
+    expect(screen).toContain("if (peeking || !member || !postedNow) return;");
+    expect(screen).toContain("unseenBelow(scrollRows, seenKey, seenPostedId)");
+  });
+
   test("hidden messages leave no row", () => {
     const rows = buildRows([message({ id: "1" }), message({ id: "2", threadId: "t" })], (m) => m.threadId === "t");
     expect(rows.filter((r) => r.kind === "message")).toHaveLength(1);

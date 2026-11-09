@@ -146,7 +146,13 @@ import { seenMessageId } from "@agenteschat/client/lib/seen";
 import { hiddenCount, tasksOf, todayStart } from "@agenteschat/client/lib/task-manager";
 import { holdsText } from "@agenteschat/client/lib/text";
 import { contextMarks, hiddenByThreads, rangeCandidates, threadStartOf } from "@agenteschat/client/lib/threads";
-import { blockPlaces, buildTimeline, mergeTimeline, type TimelineItem } from "@agenteschat/client/lib/timeline";
+import {
+  blockPlaces,
+  buildTimeline,
+  lastPostedId,
+  mergeTimeline,
+  type TimelineItem,
+} from "@agenteschat/client/lib/timeline";
 import { usageWaitOf } from "@agenteschat/client/lib/usage-pause";
 import { appVia } from "@agenteschat/client/lib/via";
 import { voiceOf } from "@agenteschat/client/lib/voice";
@@ -1103,9 +1109,9 @@ function ChannelView({
   // On screen, this conversation raises no notice on the island (ADR 0071 §9): its messages already show here.
   const screenThread = thread?.id ?? null;
   useEffect(() => holdOnScreen({ channelId: channel.id, threadId: screenThread }), [channel.id, screenThread]);
-  const lastId = channelMessages.data?.at(-1)?.id;
+  const lastId = lastPostedId(channelMessages.data);
   useEffect(() => {
-    if (!isMember || !lastId || lastId.startsWith("local-")) return;
+    if (!isMember || !lastId) return;
     const mark = () => {
       if (document.visibilityState === "visible") markChannelRead(channel.id);
     };
@@ -1116,9 +1122,9 @@ function ChannelView({
   // A thread open in view: its replies are read (its unread and the Threads mark clear, on every device).
   const markThreadRead = useMarkThreadRead(org.id).mutate;
   const threadId = thread?.id;
-  const lastReplyId = threadId && !threadMessages.isPlaceholderData ? threadMessages.data?.at(-1)?.id : undefined;
+  const lastReplyId = threadId && !threadMessages.isPlaceholderData ? lastPostedId(threadMessages.data) : undefined;
   useEffect(() => {
-    if (!threadId || !isMember || !lastReplyId || lastReplyId.startsWith("local-")) return;
+    if (!threadId || !isMember || !lastReplyId) return;
     const mark = () => {
       if (document.visibilityState === "visible") markThreadRead(threadId);
     };
@@ -1548,6 +1554,7 @@ function ChannelView({
     clearUnseen();
   };
   const previousSlots = useRef(slotsKey);
+  const previousKeys = useRef<ReadonlySet<string>>(new Set());
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll whenever rows or agents' blocks come
   useLayoutEffect(() => {
     // A new row glides down (streaming text is followed by the ResizeObserver above).
@@ -1556,6 +1563,8 @@ function ChannelView({
     const newRow = before !== lastKey;
     const settled = before !== undefined && Date.now() - openedAt.current > 1500;
     previousLastKey.current = lastKey;
+    const keysBefore = previousKeys.current;
+    previousKeys.current = new Set(timeline.map((i) => i.key));
     const blocks = previousSlots.current.split(" ");
     const shown = slotsKey.split(" ");
     const newBlock = shown.some((k) => k && !blocks.includes(k));
@@ -1568,7 +1577,7 @@ function ChannelView({
     if (stick.current) follow((newRow || newBlock) && settled);
     // Holding a long answer at its start: "Fim da resposta" already leads to what comes after it.
     else if (!holdingRef.current) {
-      const landed = gone.size > 0 ? landedKey(timeline, blockRowByRun(timeline, new Set()), gone) : null;
+      const landed = gone.size > 0 ? landedKey(timeline, blockRowByRun(timeline, new Set()), gone, keysBefore) : null;
       const first = earlierKey(timeline, newRow ? firstNewKey(timeline, before) : null, landed);
       if (first) {
         const drawn = unseenFromRef.current !== null;

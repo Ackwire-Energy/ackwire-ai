@@ -40,12 +40,19 @@ export function firstNewKey(items: TimelineItem[], previousLastKey: string | und
 }
 
 /**
- * The reply highest up of these runs, whose blocks just went (`lastByRun`: each run's last message): it took its
- * block's place, where its first words showed, so it can land above rows that came after it. Null when none is here.
+ * The reply highest up of these runs, whose blocks just went (`lastByRun`: each run's last message), that wasn't among
+ * the rows before (`before`, their keys): it took its block's place, where its first words showed, so it can land above
+ * rows that came after it. A run that ended with nothing more to say leaves its earlier message, already read. Null
+ * when none is here.
  */
-export function landedKey(items: TimelineItem[], lastByRun: ReadonlyMap<string, string>, runIds: ReadonlySet<string>) {
+export function landedKey(
+  items: TimelineItem[],
+  lastByRun: ReadonlyMap<string, string>,
+  runIds: ReadonlySet<string>,
+  before: ReadonlySet<string>,
+) {
   const keys = new Set([...runIds].flatMap((id) => lastByRun.get(id) ?? []));
-  return items.find((i) => keys.has(i.key))?.key ?? null;
+  return items.find((i) => keys.has(i.key) && !before.has(i.key))?.key ?? null;
 }
 
 /** Of two rows' keys, the one higher up in `items`; the other when one is null or not there. */
