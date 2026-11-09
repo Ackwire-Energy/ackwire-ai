@@ -330,3 +330,9 @@ Asked to create a role for a marketing person who may not merge or deploy, the r
 - The catalog's invitations and requests to join send email through the server's address and secret, passed to the setup tools and the card's route.
 - Left for later, in the audit's order: a task's or a page's audience, approval covers, deleting tasks and board columns, the language and the rest of their own settings, pins and channel categories, invitation links, the task manager's paused runs, routines' stop, duplicate and take over, models and per-person limits, the Drive, the calendar, skills, agents' extras, proposals waiting on them, apps, AI keys and computers housekeeping, knowledge and memories by hand, dashboards' extras and missions. Also not in the catalog yet: undoing another agent's change from its receipt, correcting an agent's reply (a lesson), Responder agora, an agent's request to show a board to more people, a new agent's setup checklist, and one agent's Quem pensa and Autonomia for others. Posting as the right hand elsewhere waits on the owner's call.
 - Desfazer of taking a role away gives the role back, not the seats in the channels the person left with it (they may join again through it), nor the notifications those channels cleared. Leaving a private channel through `channel_people` is undone only by someone who manages it.
+
+## Amendment (2026-11-08): the onboarding has four steps before the DM (§6)
+
+ADR 0158: the workspace's name, what it does, its team from a template and, where the workspace waits for its first
+plan, the plan come before the workspace opens, on the blue rail with the right hand on its horizon. Paid or done, it
+opens in #general, where the team says hi; the plan left for later opens the right hand's DM.

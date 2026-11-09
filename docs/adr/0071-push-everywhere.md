@@ -37,3 +37,8 @@ Phone push changes (sending straight to Firebase and Apple, a push relay for sel
 - A browser's notifications aren't taken down while no tab of the app is open; they are the next time one is.
 - The desktop app's own notifications aren't taken down when read elsewhere.
 - Left for later: phone push without Expo and through a relay for self-hosted servers, sealed phone pushes, clear on read for phones, a manifest so the site installs on iPhone.
+
+## Amendment (2026-11-08): our ask waits for the first answer (§3)
+
+ADR 0158: the web's dialog of examples is gone. Our ask is a card under the first answer from an agent the person
+wrote to, then once more under the first request waiting on them, never on arrival and never on a billing hold.
