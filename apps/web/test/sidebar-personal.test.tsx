@@ -73,7 +73,8 @@ describe("a personal workspace's sidebar", () => {
       "Editar perfil",
       "Sua conta",
       "Configurações",
-      "AcmeVocê está aqui",
+      // A personal workspace of mine is me: my face (its initial here) and my name, never the workspace's.
+      "WWalterVocê está aqui",
       "Novo workspace",
       "Sair",
     ]);

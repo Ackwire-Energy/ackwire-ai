@@ -2174,6 +2174,29 @@ function AccountMenu({ personal = false }: { personal?: boolean }) {
 }
 
 /**
+ * A workspace in your lists of them (ADR 0159): a personal one of yours is you, by your photo and your name, as its
+ * sidebar shows you; with more than one, each one's own name goes under yours to tell them apart. Any other (a team's,
+ * or a personal one shared with you, whose face would be someone else's) by its mark and its name.
+ */
+function useWorkspaceLook() {
+  const { me } = useOrg();
+  const mine = (id: string) => {
+    const o = me.organizations.find((m) => m.id === id);
+    return o !== undefined && isPersonal(o) && o.role === "owner";
+  };
+  const several = me.organizations.filter((o) => mine(o.id)).length > 1;
+  return (o: { id: string; name: string; logo?: string | null }, face: "sm" | "md", mark: number) =>
+    mine(o.id)
+      ? {
+          leading: <Avatar kind="person" name={me.user.name} imageUrl={me.user.image} size={face} />,
+          name: me.user.name,
+          sub: several ? o.name : null,
+          personal: true,
+        }
+      : { leading: <OrgMark logo={o.logo} size={mark} />, name: o.name, sub: null, personal: false };
+}
+
+/**
  * Your workspaces in the account menu of a personal workspace (ADR 0159): the workspace menu's list (by server in the
  * desktop app, ADR 0154), then New workspace or Add workspace. Mounted only while the menu is open: the counts load
  * then. No role beside each: one person's own workspaces.
@@ -2181,6 +2204,7 @@ function AccountMenu({ personal = false }: { personal?: boolean }) {
 function MenuWorkspaces() {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
+  const look = useWorkspaceLook();
   const notes = workspaceNotes(t, i18n.language, me.organizations);
   const groups = useWorkspaceGroups({ orgs: me.organizations, currentOrgId: org.id });
   const navigate = useNavigate();
@@ -2194,20 +2218,25 @@ function MenuWorkspaces() {
             {groups.length > 1 && (
               <MenuHeading>{g.cloud ? g.name : `${g.name} · ${t("shell.yourServer")}`}</MenuHeading>
             )}
-            {g.rows.map((o) => (
-              <MenuItem
-                key={o.id}
-                leading={<OrgMark logo={o.logo} size={20} />}
-                description={g.here ? notes.get(o.id) : undefined}
-                hint={o.current ? t("shell.youAreHere") : o.unread > 0 ? <CountChip>{o.unread}</CountChip> : undefined}
-                onSelect={() => {
-                  if (!g.here) void thisMac.openWorkspace(g.server, o.id).catch(() => {});
-                  else if (!o.current) go(o.id);
-                }}
-              >
-                {o.name}
-              </MenuItem>
-            ))}
+            {g.rows.map((o) => {
+              const shown = g.here ? look(o, "sm", 20) : look({ ...o, id: "" }, "sm", 20);
+              return (
+                <MenuItem
+                  key={o.id}
+                  leading={shown.leading}
+                  description={[shown.sub, g.here ? notes.get(o.id) : null].filter(Boolean).join(" · ") || undefined}
+                  hint={
+                    o.current ? t("shell.youAreHere") : o.unread > 0 ? <CountChip>{o.unread}</CountChip> : undefined
+                  }
+                  onSelect={() => {
+                    if (!g.here) void thisMac.openWorkspace(g.server, o.id).catch(() => {});
+                    else if (!o.current) go(o.id);
+                  }}
+                >
+                  {shown.name}
+                </MenuItem>
+              );
+            })}
           </Fragment>
         ))}
         <MenuItem
@@ -2222,17 +2251,20 @@ function MenuWorkspaces() {
   return (
     <>
       <MenuHeading>{t("shell.yourWorkspaces")}</MenuHeading>
-      {me.organizations.map((o) => (
-        <MenuItem
-          key={o.id}
-          leading={<OrgMark logo={o.logo} size={20} />}
-          description={notes.get(o.id)}
-          hint={o.id === org.id ? t("shell.youAreHere") : undefined}
-          onSelect={() => o.id !== org.id && go(o.id)}
-        >
-          {o.name}
-        </MenuItem>
-      ))}
+      {me.organizations.map((o) => {
+        const shown = look(o, "sm", 20);
+        return (
+          <MenuItem
+            key={o.id}
+            leading={shown.leading}
+            description={[shown.sub, notes.get(o.id)].filter(Boolean).join(" · ") || undefined}
+            hint={o.id === org.id ? t("shell.youAreHere") : undefined}
+            onSelect={() => o.id !== org.id && go(o.id)}
+          >
+            {shown.name}
+          </MenuItem>
+        );
+      })}
       {/* On agentes.chat Cloud, while sign-up is by invitation, only an invitation makes a workspace (ADR 0078). */}
       {me.user.canCreateWorkspace !== false && (
         <MenuItem icon="plus" onSelect={() => void navigate({ to: "/onboarding" })}>
@@ -2336,6 +2368,7 @@ function WorkspaceMenu({ summary }: { summary: string | null }) {
 function WorkspaceMenuOptions({ onDone }: { onDone: () => void }) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
+  const look = useWorkspaceLook();
   const notes = workspaceNotes(t, i18n.language, me.organizations);
   const groups = useWorkspaceGroups({ orgs: me.organizations, currentOrgId: org.id });
   const navigate = useNavigate();
@@ -2438,17 +2471,20 @@ function WorkspaceMenuOptions({ onDone }: { onDone: () => void }) {
                 )}
                 {g.rows.map((o) => {
                   const here = g.here ? me.organizations.find((m) => m.id === o.id) : undefined;
+                  const shown = look(here ? o : { ...o, id: "" }, "md", 32);
                   return (
                     <MenuOverlayItem
                       key={o.id}
                       leading={
                         // A server not answering: its last workspaces, dimmed.
-                        <span className={g.state === "offline" ? "sidebar__menu-dim" : undefined}>
-                          <OrgMark logo={o.logo} size={32} />
-                        </span>
+                        <span className={g.state === "offline" ? "sidebar__menu-dim" : undefined}>{shown.leading}</span>
                       }
                       description={
-                        here ? [t(`roles.${here.role}`), notes.get(o.id)].filter(Boolean).join(" · ") : undefined
+                        here
+                          ? [shown.personal ? shown.sub : t(`roles.${here.role}`), notes.get(o.id)]
+                              .filter(Boolean)
+                              .join(" · ") || undefined
+                          : undefined
                       }
                       current={o.current}
                       hint={
@@ -2460,7 +2496,7 @@ function WorkspaceMenuOptions({ onDone }: { onDone: () => void }) {
                         else if (!o.current) void navigate({ to: "/org/$orgId", params: { orgId: o.id } });
                       }}
                     >
-                      {o.name}
+                      {shown.name}
                     </MenuOverlayItem>
                   );
                 })}
@@ -2480,21 +2516,27 @@ function WorkspaceMenuOptions({ onDone }: { onDone: () => void }) {
           </>
         ) : (
           <>
-            {me.organizations.map((o) => (
-              <MenuOverlayItem
-                key={o.id}
-                leading={<OrgMark logo={o.logo} size={32} />}
-                description={[t(`roles.${o.role}`), notes.get(o.id)].filter(Boolean).join(" · ")}
-                current={o.id === org.id}
-                hint={o.id === org.id ? t("shell.youAreHere") : undefined}
-                onSelect={() => {
-                  onDone();
-                  if (o.id !== org.id) void navigate({ to: "/org/$orgId", params: { orgId: o.id } });
-                }}
-              >
-                {o.name}
-              </MenuOverlayItem>
-            ))}
+            {me.organizations.map((o) => {
+              const shown = look(o, "md", 32);
+              return (
+                <MenuOverlayItem
+                  key={o.id}
+                  leading={shown.leading}
+                  description={
+                    [shown.personal ? shown.sub : t(`roles.${o.role}`), notes.get(o.id)].filter(Boolean).join(" · ") ||
+                    undefined
+                  }
+                  current={o.id === org.id}
+                  hint={o.id === org.id ? t("shell.youAreHere") : undefined}
+                  onSelect={() => {
+                    onDone();
+                    if (o.id !== org.id) void navigate({ to: "/org/$orgId", params: { orgId: o.id } });
+                  }}
+                >
+                  {shown.name}
+                </MenuOverlayItem>
+              );
+            })}
             {/* On agentes.chat Cloud, while sign-up is by invitation, only an invitation makes a workspace (ADR 0078). */}
             {me.user.canCreateWorkspace !== false && (
               <>
