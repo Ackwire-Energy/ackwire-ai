@@ -46,7 +46,7 @@ export function AndroidSetupScreen({ machineId }: { machineId?: string }) {
   const toast = useToast();
   const { org } = useOrg();
   const { list, hosts, host, setPicked } = useHost(machineId);
-  const [opened, setOpened] = useState({ about: false, usb: false });
+  const [opened, setOpened] = useState({ about: false, usb: false, wifi: false });
   const [wifi, setWifi] = useState(false);
   const hostName = host ? computerName(t, org?.name ?? "", { kind: host.machineKind, name: host.name }) : "";
   const phone = host ? thisPhoneOn(host.phones, "android", Device.modelName) : null;
@@ -56,9 +56,7 @@ export function AndroidSetupScreen({ machineId }: { machineId?: string }) {
   const open = (screen: keyof typeof SCREENS) => {
     const s = SCREENS[screen];
     Linking.sendIntent(s.action, [{ key: ":settings:fragment_args_key", value: s.row }]).then(
-      () => {
-        if (screen !== "wifi") setOpened((o) => ({ ...o, [screen]: true }));
-      },
+      () => setOpened((o) => ({ ...o, [screen]: true })),
       () => toast({ title: t("mobile.devices.android.openFailed"), icon: "x" }),
     );
   };
@@ -167,7 +165,7 @@ export function AndroidSetupScreen({ machineId }: { machineId?: string }) {
             <Step
               n={1}
               title={t("mobile.devices.android.wifi1")}
-              state={seen ? "done" : "now"}
+              state={seen || opened.wifi ? "done" : "now"}
               side={
                 <Button
                   size="sm"
@@ -182,7 +180,7 @@ export function AndroidSetupScreen({ machineId }: { machineId?: string }) {
               n={2}
               divider
               title={t("mobile.devices.android.wifi2", { host: hostName })}
-              state={seen ? "done" : "now"}
+              state={seen ? "done" : opened.wifi ? "now" : "later"}
             >
               <StepText>{t("mobile.devices.android.wifi2Text", { host: hostName })}</StepText>
               {seen ? null : liveLine}
