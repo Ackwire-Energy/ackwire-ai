@@ -4,15 +4,11 @@ import { answerAfter, answerPicks, BUSINESS_TYPES, replyChipsOf } from "@agentes
 
 const src = (f: string) => readFileSync(new URL(`../../src/features/${f}`, import.meta.url), "utf8");
 
-test("row 1 asks what the workspace does with the business types, then opens their template (ADR 0155 §6)", () => {
+test("what the workspace does: the business types, saved as its context (ADR 0155 §6)", () => {
   const about = src("agents/setup/SetupStepScreen.tsx");
   expect(about).toContain("BUSINESS_TYPES.map((b) => (");
   expect(about).toContain('t("agentSetup.firstRun.about.title", { org: org?.name ?? "" })');
   expect(about).toContain("{ context: text }");
-  expect(about).toContain("openTemplatesAfterAbout(business && isTemplateBusiness(business) ? business : undefined)");
-  const run = src("right-hand/FirstRun.tsx");
-  expect(run).toContain("<TeamTemplatesSheet");
-  expect(run).toContain("initial={templates?.initial}");
   expect(BUSINESS_TYPES.at(-1)).toBe("other");
 });
 

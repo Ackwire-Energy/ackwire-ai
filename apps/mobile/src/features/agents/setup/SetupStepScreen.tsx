@@ -40,7 +40,7 @@ import {
   suggestedChannels,
   suggestedLevels,
 } from "@agenteschat/client/lib/setup-checklist";
-import { BUSINESS_TYPES, type BusinessType, isTemplateBusiness } from "@agenteschat/client/lib/team-plan";
+import { BUSINESS_TYPES, type BusinessType } from "@agenteschat/client/lib/team-plan";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -52,7 +52,6 @@ import { openAgentAi } from "../../ai/AgentAiScreen";
 import { PlanReplies } from "../../ai/parts";
 import { useWidenAsk } from "../../chat/ReachLines";
 import { ConnectorIcon } from "../../connectors/ConnectorIcon";
-import { openTemplatesAfterAbout } from "../../right-hand/FirstRun";
 import { useFailed } from "../../routines/hooks";
 import { resourceName, useConnectedById, useSetLevels } from "../../settings/hooks";
 import { SettingsPage } from "../../settings/parts";
@@ -117,9 +116,8 @@ export function SetupStepScreen({
 }
 
 /**
- * The first run's row 1: "O que a Acme faz?", the business types to pick one and a sentence, saved as the workspace's
- * context, which every agent reads ("Outra coisa" asks for the sentence). Saved, it goes back and the card opens the
- * team's templates with that business's picked.
+ * "O que a Acme faz?": the business types to pick one and a sentence, saved as the workspace's context, which every
+ * agent reads ("Outra coisa" asks for the sentence). Saved, it goes back.
  */
 function AboutStep({ typed }: { typed: string | null }) {
   const { t } = useTranslation();
@@ -146,7 +144,6 @@ function AboutStep({ typed }: { typed: string | null }) {
               onSuccess: () => {
                 successHaptic();
                 goBack();
-                openTemplatesAfterAbout(business && isTemplateBusiness(business) ? business : undefined);
               },
               onError: failed,
             },

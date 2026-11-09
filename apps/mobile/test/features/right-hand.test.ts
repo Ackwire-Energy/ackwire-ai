@@ -110,16 +110,18 @@ test("the phone's greeting draws the checklist and Conversas has one line back t
   const src = (f: string) => readFileSync(new URL(`../../src/features/${f}`, import.meta.url), "utf8");
   expect(src("right-hand/Intro.tsx")).toContain("<FirstRunCard agent={agent} channelId={channelId} />");
   expect(src("chats/ChatsScreen.tsx")).toContain("<FirstRunLine />");
-  // One line that says who is setting up the team and how far ("Atlas is setting up the team · 2 of 5").
+  // One line that says who is setting up the team and how far ("Atlas is setting up the team · 1 of 3").
   expect(src("chats/FirstRunLine.tsx")).toContain('t("mobile.chats.firstRunLine"');
-  // The apps row names what it reads, as the web's does, never "Sem apps" with apps connected.
+  // The apps row names what it reads, as the web's does, never "Sem apps" with apps connected; an invitation waiting
+  // finishes the people row, saying who.
   const card = src("right-hand/FirstRun.tsx");
-  expect(card).toContain('{ org: org?.name ?? "", agents: team.length, label, apps: appNames, members: run.members }');
-  // As on the web: row 3 connects the whole team, row 4 is its own screen of suggested apps, row 1 comes filled with
-  // what was typed.
+  expect(card).toContain("apps: appNames,");
+  expect(card).toContain("invited: run.invited.length ? joinNames(run.invited, t) : null,");
+  // As on the web: the AI row connects the whole team, the apps row is its own screen of suggested apps, and a skip
+  // says nothing (ADR 0158).
   expect(card).toContain("openConnectAi(team.length > 0 ? {} : { agentId: agent.id })");
   expect(card).toContain('apps: () => openSetupStep(agent.id, "apps")');
-  expect(card).toContain('about: () => openSetupStep(agent.id, "about", run.typed)');
+  expect(card).toContain("facts[step] ? t(`agentSetup.firstRun.say.${step}`, agentGrammar(agent.name)) : \"\"");
   const steps = src("agents/setup/SetupStepScreen.tsx");
   expect(steps).toContain("firstRun ? <FirstRunAppsStep /> : <AppsStep agent={agent} />");
   expect(steps).toContain("firstRunAppList(");

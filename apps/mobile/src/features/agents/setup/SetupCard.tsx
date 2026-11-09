@@ -418,9 +418,10 @@ export function useDoneSay<S extends string>(ready: boolean, doneNow: readonly S
     seen.current = now;
     if (!before) return;
     const fresh = [...now].find((s) => !before.has(s));
-    if (!fresh) return;
+    const text = fresh ? say.current(fresh) : "";
+    if (!fresh || !text) return;
     successHaptic();
-    setSaid({ step: fresh, text: say.current(fresh) });
+    setSaid({ step: fresh, text });
     clearTimeout(timer.current);
     timer.current = setTimeout(() => setSaid(null), 2600);
   }, [ready, doneKey]);

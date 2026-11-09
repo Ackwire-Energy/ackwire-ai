@@ -36,7 +36,7 @@ interface PushApi {
 
 const PushContext = createContext<PushApi>({
   ask: async () => false,
-  offer: { home: false, approval: false },
+  offer: { answer: false, approval: false },
   markOffered: () => {},
 });
 
@@ -175,7 +175,7 @@ export function PushProvider({ children }: { children: ReactNode }) {
     const state = { permission, turnedOff, offers };
     return {
       ask,
-      offer: { home: pushOfferDue(state, "home"), approval: pushOfferDue(state, "approval") },
+      offer: { answer: pushOfferDue(state, "answer"), approval: pushOfferDue(state, "approval") },
       markOffered,
     };
   }, [ask, markOffered, permission, turnedOff, offers]);

@@ -4,6 +4,7 @@ import {
   type TeamAgentDraft,
   type TeamPlan,
   type TeamProposalCard,
+  useAiStatus,
   useApplyTeamTemplate,
   useMessages,
   usePostMessage,
@@ -446,27 +447,27 @@ function TeamCardView({ message: m, card }: { message: Message; card: TeamPropos
 }
 
 /**
- * A first task per agent (its DM opens with it typed, never sent, for the person to finish) and inviting the people. On
- * a billing hold, a labelled example of what the first agent delivers, and where the plan is, in words only.
+ * A first task per agent (its DM opens with it typed, never sent, for the person to finish) and inviting the people.
+ * Only once the team can answer: never on a billing hold, nor before an AI.
  */
 function FirstTasks({ message: m, card, held }: { message: Message; card: TeamProposalCard; held: boolean }) {
   const { t } = useTranslation();
-  const { org } = useOrg();
+  const { org, orgId } = useOrg();
   const dir = useDirectory();
   const c = useColors();
   const openDm = useOpenDm();
+  const thinks = useAiStatus(orgId).data?.any === true;
   const [later, setLater] = useState(false);
   const tasks = firstTasks(card).filter((f) => dir.agentById.has(f.agentId));
-  const people = held ? [] : card.params.invite;
-  const example = held && tasks[0] ? card.params.example : undefined;
-  if (later || (tasks.length === 0 && people.length === 0)) return null;
+  const people = card.params.invite;
+  if (later || held || !thinks || (tasks.length === 0 && people.length === 0)) return null;
   return (
     <AskCard
       id={`${m.id}-first`}
       kind="firstTask"
       agentId={m.author.id ?? ""}
       waitsFor={t("teamPlan.firstTask.suggestion")}
-      lead={t(held ? "teamPlan.firstTask.heldLead" : "teamPlan.firstTask.lead")}
+      lead={t("teamPlan.firstTask.lead")}
       body={
         <View style={styles.rows}>
           {tasks.map((f, i) => (
@@ -492,19 +493,6 @@ function FirstTasks({ message: m, card, held }: { message: Message; card: TeamPr
               </MediaRow>
             </View>
           ))}
-          {example && tasks[0] ? (
-            <View style={[styles.example, { backgroundColor: c.sunken }]}>
-              <Text variant="footnote" tone="muted">
-                {t("teamPlan.firstTask.example", { name: tasks[0].name })}
-              </Text>
-              <Text variant="small">{example}</Text>
-            </View>
-          ) : null}
-          {held ? (
-            <Text variant="footnote" tone="muted">
-              {t(can(org, "manage_billing") ? "connectAi.billingWeb" : "standing.billing.askAdmin")}
-            </Text>
-          ) : null}
         </View>
       }
       foot={
@@ -867,7 +855,6 @@ export function TeamTemplatesSheet({
 
 const styles = StyleSheet.create({
   wave: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
-  example: { gap: 6, padding: 12, borderRadius: 12, marginTop: 8 },
   chips: { gap: 8, marginTop: 6 },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chipFoot: { flexDirection: "row", alignItems: "center", gap: 12 },
