@@ -162,18 +162,20 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
           <b>{a.title}</b>
           {questions.length > 1 && <small>{t("choices.step", { step: d.step + 1, total: questions.length })}</small>}
         </span>
-        <Button
-          variant="ghost"
-          size="sm"
-          iconOnly
-          icon="close"
-          aria-label={t("choices.close")}
-          title={t("choices.close")}
-          onClick={() => setClosed(true)}
-        />
+        <span className="ac-acts">
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            icon="close"
+            aria-label={t("choices.close")}
+            title={t("choices.close")}
+            onClick={() => setClosed(true)}
+          />
+        </span>
       </header>
       <p className="choices__question" id={`choices-${id}-q`}>
-        {q.question}
+        {inlineWords(q.question, "q")}
       </p>
       <fieldset
         ref={list}

@@ -348,15 +348,22 @@
   .newag__work {
     padding: 0 16px;
   }
+  /* Narrow: the name of what is reviewed and its Editar (or switch) on one line, the value under them at the row's
+     whole width, never a column beside the button. */
   .newag__rv {
     grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "k end" "v v";
+    align-items: center;
   }
   .newag__rv-k {
-    grid-column: 1 / -1;
+    grid-area: k;
     padding: 0;
   }
   .newag__rv-v {
-    grid-column: 1;
+    grid-area: v;
+  }
+  .newag__rv > :last-child:not(.newag__rv-v) {
+    grid-area: end;
   }
   .newag__born {
     min-height: 520px;

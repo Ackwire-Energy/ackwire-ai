@@ -968,7 +968,8 @@ html:not([data-pointer]) .issues-dest:focus-visible {
 .ac-details__bar:has(.issue-bartitle) {
   align-items: flex-start;
 }
-/* The title in the eyebrow's place: the 24 characters it keeps beside the buttons (`.ac-actrow`) are the title's. */
+/* The title in the eyebrow's place, the words of the bar's action line (`.ac-actline`): its buttons go under it when
+   they don't fit beside it. */
 .ac-details__eyebrow:has(> .issue-bartitle) {
   font-size: 20px;
 }
@@ -1005,10 +1006,6 @@ html:not([data-pointer]) .issues-dest:focus-visible {
 /* "Saved" on the title's first line (28px), not centred on a title that wraps. */
 .issue-bartitle__saved {
   flex: none;
-  height: 28px;
-}
-/* The bar's buttons centre on that line too (the shared titled bar does the same). */
-.ac-details__bar:has(.issue-bartitle) > .ac-details__actions {
   height: 28px;
 }
 /* "✓ Salvo" (SavedNote) at the end of the source line. */

@@ -522,10 +522,9 @@
   padding: 14px var(--card-pad) 18px;
   border-top: 1px solid var(--line);
 }
+/* The setting's name and its Canais | DMs in an `.ac-actline`: under the name when they don't fit beside it. */
 .chat-look__top {
-  display: flex;
   align-items: center;
-  gap: 20px;
 }
 .chat-look__cards {
   display: grid;

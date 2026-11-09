@@ -11300,6 +11300,10 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
   max-width: 100%;
   margin-inline-start: 0;
 }
+/* A slot with nothing to offer (an action its viewer may not take) takes no room, not even a gap or a row. */
+.ac-actline > :is(span, div):empty {
+  display: none;
+}
 
 /*
  * MediaRow: the face (32, or 24 in a list row with `--row`), then the name and the role on its line, everything else

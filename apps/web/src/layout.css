@@ -2194,17 +2194,14 @@ html:not([data-pointer]) .artifact-table__sort:focus-visible {
   box-shadow: inset 0 0 0 1px var(--line);
   overflow: hidden;
 }
+/* The language and the buttons (an `.ac-acts`) in an `.ac-actline`, both on the code's own 16px edges
+   (`.code-card__code`). */
 .code-card__top {
-  display: flex;
   align-items: center;
-  gap: 2px;
-  height: 38px;
-  /* The language starts on the code's own 16px edge (`.code-card__code`). */
-  padding: 0 5px 0 16px;
+  min-height: 38px;
+  padding: 0 16px;
 }
 .code-card__lang {
-  flex: 1;
-  min-width: 0;
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -2378,17 +2375,14 @@ html:not([data-pointer]) .artifact-table__sort:focus-visible {
   color: var(--faint);
   font-size: 13.5px;
 }
+/* The title and its buttons (an `.ac-acts`, the last icon on the card's 16px side) in an `.ac-actline`: buttons that
+   don't fit beside the title go under it, from its edge. */
 .chart-card__top {
-  display: flex;
-  align-items: flex-start;
-  gap: 2px;
-  padding: 6px 6px 4px 16px;
+  padding: 6px 16px 4px;
 }
 /* The title's line centred on the 32px buttons beside it ((32 - 20) / 2 down), its capitals still 12px under the
    card's top; a subtitle goes on under it. */
 .chart-card__titles {
-  flex: 1;
-  min-width: 0;
   display: flex;
   flex-direction: column;
   padding-top: 6px;
@@ -7605,6 +7599,7 @@ html:not([data-pointer]) .izoom__stage:focus-visible {
 .machine-command {
   display: flex;
   align-items: flex-start;
+  gap: var(--space-1);
   border-radius: var(--control-r-md);
   background: var(--surface-sunken);
   box-shadow: inset 0 0 0 1px var(--line);
@@ -8057,6 +8052,22 @@ html:not([data-pointer]) .machine-connect__toggle:focus-visible {
 .machine-page__screen {
   flex: none;
   margin-right: 10px;
+}
+/* A narrow list (a phone, a side pane): an agent's Abrir goes under its words, from their edge past the face, instead
+   of a column beside them; its words 8 under theirs, the row's padding under it. */
+.machine-page__agents {
+  container-type: inline-size;
+}
+@container (max-width: 479px) {
+  .machine-page__agents:not(.pf-list) > .machine-page__agent-row {
+    flex-wrap: wrap;
+  }
+  .machine-page__agents:not(.pf-list) > .machine-page__agent-row > .machine-page__agent {
+    flex-basis: 100%;
+  }
+  .machine-page__agent-row > .machine-page__screen {
+    margin: -9px 0 3px calc(14px + 32px + var(--space-3) - var(--ghost-plate));
+  }
 }
 .machine-page__agent:hover {
   background: color-mix(in srgb, var(--surface-sunken) 60%, transparent);
@@ -13439,6 +13450,22 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
   flex: none;
   display: flex;
   align-items: center;
+}
+/* A row whose end is a group (PrefRow's `actions`): the group under the words when they don't fit beside them, from
+   their edge; the icon on the words' line, which keeps the controls' height. */
+.settings-row--acts {
+  align-items: flex-start;
+}
+.settings-row--acts > .ac-actline {
+  flex: 1 1 0%;
+  align-items: center;
+}
+.settings-row--acts .settings-row__text {
+  min-height: var(--control-h-sm);
+  justify-content: center;
+}
+.settings-row--acts > .settings-row__icon {
+  margin-block: calc((var(--control-h-sm) - 28px) / 2);
 }
 /* Configurações › Aprovações (ADR 0139): a row whose box is the choice, centred on its label, on the label's first line
    when a line says under it why it is off. */

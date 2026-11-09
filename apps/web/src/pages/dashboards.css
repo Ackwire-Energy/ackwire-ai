@@ -506,9 +506,7 @@ html:not([data-pointer]) .nw-quiet:focus-visible {
 }
 /* The ask changed since the test: what Create would make isn't what shows. */
 .nwc__stale {
-  display: flex;
   align-items: center;
-  gap: var(--icon-gap);
   margin: 8px 12px 0;
   padding: 8px 12px;
   border-radius: 12px;
@@ -517,12 +515,13 @@ html:not([data-pointer]) .nw-quiet:focus-visible {
   line-height: 18px;
   color: var(--ink);
 }
-/* Its icon on the first line of the words (`.ac-iconline`), which take the ActionRow's width. */
+/* Its icon on the first line of the words (`.ac-iconline`), an `.ac-actline`: Testar de novo goes under them when they
+   don't fit beside it, from the words' edge (past the icon). */
 .nwc__stale .ac-iconline > .ac-icon {
   color: var(--warn);
 }
-.nwc__stale .ac-btn {
-  flex: none;
+.nwc__stale > .ac-btn {
+  margin-inline-start: calc(16px + var(--icon-gap));
 }
 /* The ask, written in the card's body. */
 .nwc-ask {

@@ -62,8 +62,8 @@ export function NoAiBanner({ agentIds, dmAgentId }: { agentIds: string[]; dmAgen
     const agent = dir.agentById.get(dmAgentId);
     const name = agent?.name ?? t("channel.unknownAgent");
     return (
-      <div className="noai-banner ac-actrow" role="status">
-        <span className="noai-banner__text ac-iconline ac-actrow__text">
+      <div className="noai-banner ac-actline" role="status">
+        <span className="noai-banner__text ac-iconline">
           <Icon name="plug" size={16} />
           <b>{t(noAiStatusKey(status.data, dmAgentId), agentGrammar(name))}</b>
         </span>
@@ -78,8 +78,8 @@ export function NoAiBanner({ agentIds, dmAgentId }: { agentIds: string[]; dmAgen
   if (status.data.any || agentIds.length === 0) return null;
   const action = t("noAi.banner.orgAction");
   return (
-    <div className="noai-banner ac-actrow" role="status">
-      <span className="noai-banner__text ac-iconline ac-actrow__text">
+    <div className="noai-banner ac-actline" role="status">
+      <span className="noai-banner__text ac-iconline">
         <Icon name="plug" size={16} />
         {/* Asking in the chat is understood only where Jev reads the message (`ai-intent.ts`). */}
         {status.data.routing?.by === "jev" ? (

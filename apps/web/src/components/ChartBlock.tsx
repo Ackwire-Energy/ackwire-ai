@@ -105,37 +105,39 @@ export function ChartBlock({
   const remember = useGrowFrom(open, card, ".chart-viewer");
   return (
     <figure className="chart-card" ref={card}>
-      <figcaption className="chart-card__top">
+      <figcaption className="chart-card__top ac-actline">
         <span className="chart-card__titles">
           <b>{spec.title}</b>
           {spec.subtitle && <small>{spec.subtitle}</small>}
         </span>
-        {pinnable && (
+        <span className="ac-acts">
+          {pinnable && (
+            <Button
+              variant="ghost"
+              size="sm"
+              iconOnly
+              icon="pin"
+              aria-label={t("widgets.pin.label")}
+              title={t("widgets.pin.label")}
+              onClick={() => setPinning(true)}
+            />
+          )}
+          <Button variant="ghost" size="sm" aria-pressed={table} onClick={() => setTable((v) => !v)}>
+            {t("common.table")}
+          </Button>
           <Button
             variant="ghost"
             size="sm"
             iconOnly
-            icon="pin"
-            aria-label={t("widgets.pin.label")}
-            title={t("widgets.pin.label")}
-            onClick={() => setPinning(true)}
+            icon="expand"
+            aria-label={t("common.fullScreen")}
+            title={t("common.fullScreen")}
+            onClick={() => {
+              remember();
+              setOpen(true);
+            }}
           />
-        )}
-        <Button variant="ghost" size="sm" aria-pressed={table} onClick={() => setTable((v) => !v)}>
-          {t("common.table")}
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          iconOnly
-          icon="expand"
-          aria-label={t("common.fullScreen")}
-          title={t("common.fullScreen")}
-          onClick={() => {
-            remember();
-            setOpen(true);
-          }}
-        />
+        </span>
       </figcaption>
       <div className="chart-card__body">
         <ChartStill.Provider value={still}>

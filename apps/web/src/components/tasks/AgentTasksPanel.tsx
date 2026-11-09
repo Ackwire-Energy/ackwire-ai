@@ -260,34 +260,38 @@ function TaskCard({
   const hasSteps = steps.data?.steps.some((s) => s.kind === "tool_call") ?? false;
   return (
     <li className="tm-taskcard ac-card" data-open={open || undefined}>
-      <div className="tm-taskcard__row ac-actrow">
+      <div className="tm-taskcard__row">
         <TaskMark task={task} />
-        <span className="tm-taskcard__label ac-actrow__text">
-          <span className="tm-taskcard__title">
-            <b>{title}</b>
+        <span className="ac-actline">
+          <span className="tm-taskcard__label">
+            <span className="tm-taskcard__title">
+              <b>{title}</b>
+            </span>
+            <small>{sub}</small>
           </span>
-          <small>{sub}</small>
+          <span className="ac-acts">
+            {place && (
+              <Button size="sm" variant="ghost" onClick={() => setQueueOf(place.machineId)}>
+                {t("queue.see")}
+              </Button>
+            )}
+            {working && (
+              <Button size="sm" variant="ghost" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+                {t("taskManager.panel.steps")}
+                <Icon name={open ? "chevronDown" : "chevronRight"} size={14} />
+              </Button>
+            )}
+            {task.canStop && (
+              <StopTaskButton
+                label={t("taskManager.actions.stop")}
+                title={title}
+                stopping={stopping}
+                onClick={onStop}
+                compact
+              />
+            )}
+          </span>
         </span>
-        {place && (
-          <Button size="sm" variant="ghost" onClick={() => setQueueOf(place.machineId)}>
-            {t("queue.see")}
-          </Button>
-        )}
-        {working && (
-          <Button size="sm" variant="ghost" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
-            {t("taskManager.panel.steps")}
-            <Icon name={open ? "chevronDown" : "chevronRight"} size={14} />
-          </Button>
-        )}
-        {task.canStop && (
-          <StopTaskButton
-            label={t("taskManager.actions.stop")}
-            title={title}
-            stopping={stopping}
-            onClick={onStop}
-            compact
-          />
-        )}
       </div>
       {open && (
         <div className="tm-taskcard__steps">

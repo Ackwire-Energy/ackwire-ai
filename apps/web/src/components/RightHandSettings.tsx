@@ -488,7 +488,7 @@ function TeamWeekPref({ name }: { name: string }) {
       icon="calendar"
       label={t(admin ? "teamWeek.settings.label" : "teamWeek.settings.dayLabel")}
       hint={t(admin ? "teamWeek.settings.help" : "teamWeek.settings.dayHelp", agentGrammar(name))}
-      control={
+      actions={
         <span className="rh-set__week">
           <TeamWeekSchedule
             prefs={prefs}

@@ -40,7 +40,13 @@
   margin-block: 4px;
   color: var(--ink2);
 }
-/* No width of its own: the kit's ActionRow (`.ac-actrow__text`) sets it, and a page rule would outrank the kit. */
+/* The sentence and its action in an `.ac-actline` after the icon: an action that doesn't fit beside the sentence goes
+   under it, from its edge. Its words stand as far under the sentence as its own height leaves them. */
+.ag-rc > .ac-actline {
+  flex: 1 1 0%;
+  row-gap: 0;
+}
+/* No width of its own: the kit's line (`.ac-actline`) or ActionRow (`.ac-actrow__text`) sets it. */
 .ag-rc__tx {
   display: flex;
   flex-direction: column;

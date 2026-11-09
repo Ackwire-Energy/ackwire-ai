@@ -427,10 +427,14 @@
 .tm-taskcard__row > .tm-mark {
   margin-top: 2px;
 }
-.tm-taskcard__row > .ac-btn {
+/* The task's words and its actions in an `.ac-actline` after its mark: actions that don't fit beside the words go
+   under them, from their edge. */
+.tm-taskcard__row > .ac-actline {
+  flex: 1 1 0%;
+}
+.tm-taskcard__row .ac-acts {
   margin-top: -4px;
 }
-/* No width of its own: the kit's ActionRow (`.ac-actrow__text`) sets it, and a page rule would outrank the kit. */
 .tm-taskcard__label {
   display: flex;
   flex-direction: column;
