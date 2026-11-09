@@ -4,6 +4,7 @@ import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } fr
 import { haptics } from "./haptics";
 import { Icon, type IconName } from "./Icon";
 import { useInfoHint } from "./InfoHint";
+import { MEDIA_ROW } from "./media-row";
 import { GROUPED_ROW } from "./rhythm";
 import { Text, textLineOf } from "./Text";
 import { ToggleSwitch } from "./Toggle";
@@ -191,6 +192,11 @@ export interface GroupedRowProps {
   hint?: { name: string; text: string };
   /** An × at the row's end that takes it off the list; VoiceOver merges it into the row, so it is the row's action too. */
   remove?: { label: string; onPress: () => void };
+  /**
+   * The web's MediaRow: the lead, the label and what ends it on one line, `sub` and `below` under them at the row's
+   * full width. For a row whose lead would otherwise sit beside three lines or more.
+   */
+  media?: boolean;
 }
 
 /** One row of a group: icon tile, label, the value in faint, a chevron, a check or a switch. */
@@ -233,6 +239,7 @@ function Row({
   disabled = false,
   onPress,
   remove,
+  media = false,
   said,
   labelAfter,
 }: Omit<GroupedRowProps, "hint"> & { said?: string; labelAfter?: ReactNode }) {
@@ -247,34 +254,15 @@ function Row({
           onPress();
         }
       : onPress;
+  // What goes under the label goes under the lead too: the lead, the label and the end share one centred line.
+  const flat = media && Boolean(icon || leading) && Boolean(sub || below || belowText);
   // Text that can take more than one line: the tile sits at the top and what is on the right stays on the
   // label's line (centred on the whole row it floated between lines). One-line rows keep everything centred.
-  const tall = labelLines > 1 || subLines > 1 || Boolean(below) || Boolean(belowText);
+  const tall = !flat && (labelLines > 1 || subLines > 1 || Boolean(below) || Boolean(belowText));
   const line = tall ? textLineOf("body", fontScale) : null;
   const onLine = (size: number) => (line ? [leadBox(line, size), styles.onLine] : null);
-  return (
-    <Pressable
-      onPress={press}
-      disabled={disabled || !onPress}
-      accessibilityRole={toggle !== undefined ? "switch" : "button"}
-      accessibilityLabel={[label, belowText, said, value, valueNote].filter(Boolean).join(", ")}
-      {...(remove
-        ? {
-            accessibilityActions: [{ name: "delete", label: remove.label }],
-            onAccessibilityAction: remove.onPress,
-          }
-        : {})}
-      accessibilityState={{
-        disabled,
-        ...(toggle !== undefined ? { checked: toggle } : {}),
-        ...(checked !== undefined ? { selected: checked } : {}),
-      }}
-      style={({ pressed }) => [
-        styles.row,
-        tall ? styles.tall : null,
-        pressed && onPress ? { backgroundColor: c.sunken } : null,
-      ]}
-    >
+  const lead = (
+    <>
       {/* One column for whatever leads (an icon's tile, a 24 to 36 face, a mark): the text, and the hairline above,
           start at 64 in every row, so a list mixing tiles and faces reads as one column. */}
       {icon ? (
@@ -285,27 +273,13 @@ function Row({
         </View>
       ) : null}
       {leading ? <View style={styles.lead}>{leading}</View> : null}
-      <View style={styles.grow}>
-        {labelAfter ? (
-          <View style={styles.labelLine}>
-            <Text variant="body" numberOfLines={labelLines} style={[styles.shrink, { color: tone }]}>
-              {labelParts
-                ? labelParts.map((part, i) =>
-                    part.mark ? (
-                      // biome-ignore lint/suspicious/noArrayIndexKey: segments of one fixed text
-                      <Text key={i} variant="body" style={[{ color: tone }, styles.marked]}>
-                        {part.text}
-                      </Text>
-                    ) : (
-                      part.text
-                    ),
-                  )
-                : label}
-            </Text>
-            {labelAfter}
-          </View>
-        ) : (
-          <Text variant="body" numberOfLines={labelLines} style={{ color: tone }}>
+    </>
+  );
+  const labelText = (
+    <>
+      {labelAfter ? (
+        <View style={styles.labelLine}>
+          <Text variant="body" numberOfLines={labelLines} style={[styles.shrink, { color: tone }]}>
             {labelParts
               ? labelParts.map((part, i) =>
                   part.mark ? (
@@ -319,19 +293,43 @@ function Row({
                 )
               : label}
           </Text>
-        )}
-        {sub ? (
-          <Text variant="footnote" tone="faint" numberOfLines={subLines}>
-            {sub}
-          </Text>
-        ) : null}
-        {below}
-        {belowText ? (
-          <Text variant="footnote" tone="faint" numberOfLines={2}>
-            {belowText}
-          </Text>
-        ) : null}
-      </View>
+          {labelAfter}
+        </View>
+      ) : (
+        <Text variant="body" numberOfLines={labelLines} style={{ color: tone }}>
+          {labelParts
+            ? labelParts.map((part, i) =>
+                part.mark ? (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: segments of one fixed text
+                  <Text key={i} variant="body" style={[{ color: tone }, styles.marked]}>
+                    {part.text}
+                  </Text>
+                ) : (
+                  part.text
+                ),
+              )
+            : label}
+        </Text>
+      )}
+    </>
+  );
+  const under = (
+    <>
+      {sub ? (
+        <Text variant="footnote" tone="faint" numberOfLines={subLines}>
+          {sub}
+        </Text>
+      ) : null}
+      {below}
+      {belowText ? (
+        <Text variant="footnote" tone="faint" numberOfLines={2}>
+          {belowText}
+        </Text>
+      ) : null}
+    </>
+  );
+  const end = (
+    <>
       {valueLeading || valueNote ? (
         <View
           style={[
@@ -390,6 +388,50 @@ function Row({
           <Icon name="x" size={16} color={c.faint} />
         </Pressable>
       ) : null}
+    </>
+  );
+  return (
+    <Pressable
+      onPress={press}
+      disabled={disabled || !onPress}
+      accessibilityRole={toggle !== undefined ? "switch" : "button"}
+      accessibilityLabel={[label, belowText, said, value, valueNote].filter(Boolean).join(", ")}
+      {...(remove
+        ? {
+            accessibilityActions: [{ name: "delete", label: remove.label }],
+            onAccessibilityAction: remove.onPress,
+          }
+        : {})}
+      accessibilityState={{
+        disabled,
+        ...(toggle !== undefined ? { checked: toggle } : {}),
+        ...(checked !== undefined ? { selected: checked } : {}),
+      }}
+      style={({ pressed }) => [
+        styles.row,
+        flat ? styles.media : tall ? styles.tall : null,
+        pressed && onPress ? { backgroundColor: c.sunken } : null,
+      ]}
+    >
+      {flat ? (
+        <>
+          <View style={styles.mediaHead}>
+            {lead}
+            <View style={styles.grow}>{labelText}</View>
+            {end}
+          </View>
+          <View>{under}</View>
+        </>
+      ) : (
+        <>
+          {lead}
+          <View style={styles.grow}>
+            {labelText}
+            {under}
+          </View>
+          {end}
+        </>
+      )}
     </Pressable>
   );
 }
@@ -504,6 +546,8 @@ const styles = StyleSheet.create({
   },
   // Wrapping text starts where a one-line row's label does, not 8 from the top.
   tall: { alignItems: "flex-start", paddingVertical: GROUPED_ROW.tallPadY },
+  media: { flexDirection: "column", alignItems: "stretch", gap: MEDIA_ROW.under },
+  mediaHead: { flexDirection: "row", alignItems: "center", gap: 12 },
   // A control taller than the label's line (the 28-point switch) is centred on it rather than pushed below it.
   onLine: { justifyContent: "center" },
   tile: {

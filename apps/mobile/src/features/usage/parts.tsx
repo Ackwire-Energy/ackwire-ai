@@ -200,21 +200,22 @@ export function AccountHead({ account, extra }: { account: PlanAccountInfo; extr
   const c = useColors();
   const whose =
     account.email ?? (account.ownerName ? t("usageViews.whose", { name: account.ownerName.split(" ")[0] }) : null);
+  // The maker's logo, the account and its plan on one line, whose it is under them at the row's width.
   return (
-    <View style={styles.acct}>
-      <ProviderLogo id={account.provider ?? account.kind} size="sm" off={account.signedOut} />
-      <View style={styles.grow}>
-        <View style={styles.acctName}>
+    <View style={styles.acctBox}>
+      <View style={styles.acct}>
+        <ProviderLogo id={account.provider ?? account.kind} size="sm" off={account.signedOut} />
+        <View style={[styles.grow, styles.acctName]}>
           <Text variant="callout" tone="ink" style={styles.bold}>
             {accountName(t, account)}
           </Text>
           {account.plan ? <Tag text={planName(account.plan)} color={c.muted} /> : null}
           {account.signedOut ? <Tag text={t("usageViews.signedOut")} color={c.warn} /> : null}
         </View>
-        <Text variant="small" tone="muted">
-          {[brandOf(account), whose, extra].filter(Boolean).join(" · ")}
-        </Text>
       </View>
+      <Text variant="small" tone="muted">
+        {[brandOf(account), whose, extra].filter(Boolean).join(" · ")}
+      </Text>
     </View>
   );
 }
@@ -399,6 +400,7 @@ const styles = StyleSheet.create({
   meterCompact: { gap: 4 },
   window: { gap: 4 },
   windowLine: { flexDirection: "row", alignItems: "baseline", gap: 8 },
+  acctBox: { gap: 4 },
   acct: { flexDirection: "row", alignItems: "center", gap: 12 },
   // The name wraps instead of losing its end, the plan's tag after it, on the next line when there's no room.
   acctName: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 7, rowGap: 4 },

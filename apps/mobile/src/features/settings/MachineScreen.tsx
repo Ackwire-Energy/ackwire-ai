@@ -370,6 +370,7 @@ function FoldersSection({ machine: m }: { machine: Machine }) {
               label={t("machines.access.ownFolder")}
               sub={t("machines.access.ownFolderText")}
               subLines={2}
+              media
             />
             {shared ? (
               <GroupedRow
@@ -377,6 +378,7 @@ function FoldersSection({ machine: m }: { machine: Machine }) {
                 label={t("machines.shared.title")}
                 sub={shared}
                 subLines={2}
+                media
                 below={
                   <Text variant="caption" tone="faint" numberOfLines={4}>
                     {`${t("machines.shared.text")} ${sharedFolderFacts(t, i18n.language, m.disk)}`}
@@ -391,6 +393,7 @@ function FoldersSection({ machine: m }: { machine: Machine }) {
                 label={folderName(f.path)}
                 sub={f.path}
                 subLines={2}
+                media
                 below={
                   <Text variant="caption" tone="faint" numberOfLines={2}>
                     {f.agents.length > 0 ? joinNames(f.agents.map(nameOf), t) : t("machines.access.nobody")}
@@ -435,6 +438,7 @@ function ToolsSection({ machine: m, onReduce }: { machine: Machine; onReduce: (r
               label={t(`machines.access.tool.${tool}`)}
               sub={sub}
               subLines={3}
+              media
               value={on ? t("machines.access.on") : t("machines.access.off")}
               {...(on && reduces ? { onPress: () => onReduce({ kind: "tool", tool }) } : {})}
             />
@@ -633,6 +637,7 @@ function BrowserSection({ machine: m, onTurnOff }: { machine: Machine; onTurnOff
                     labelLines={2}
                     {...(open.kind === "ask" && open.instructions ? { sub: open.instructions } : {})}
                     subLines={2}
+                    media
                     {...(waiting ? { value: t("browser.machine.waitingChip") } : {})}
                     chevron
                     onPress={() => use(agent.id, agent.name)}
@@ -659,6 +664,7 @@ function BrowserSection({ machine: m, onTurnOff }: { machine: Machine; onTurnOff
                       : t("browser.machine.whoAny")
                   }
                   subLines={2}
+                  media
                 />
               ))}
             </GroupedList>

@@ -71,6 +71,7 @@ function machineRow(t: TFunction, locale: string, m: Machine): GroupedRowProps {
     label: machineTitle(m, t("machines.host.label")),
     sub: machineFacts(t, locale, m),
     subLines: 2,
+    media: true,
     below: (
       <Text variant="caption" tone="faint" numberOfLines={2}>
         {[usedByText(t, m.agents), m.execAllowed ? null : t("machines.execOff")].filter(Boolean).join(" · ")}
@@ -161,6 +162,7 @@ function WorkspaceComputer({ view }: { view: SetupView }) {
               label={computerName(t, org?.name ?? "", machine)}
               sub={usedByText(t, machine.agents)}
               subLines={2}
+              media
               value={machine.online ? t("machines.online") : t("machines.offline")}
               chevron
               onPress={() => openMachine(machine.id)}
@@ -204,6 +206,7 @@ function HostComputer() {
             label={label}
             sub={t("machines.host.offText")}
             subLines={2}
+            media
           />
           {admin ? (
             <GroupedRow
