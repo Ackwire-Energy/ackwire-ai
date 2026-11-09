@@ -143,3 +143,14 @@ describe("FilterChip", () => {
     expect(options.map((o) => o.querySelector(".ac-countchip")?.textContent ?? null)).toEqual(["3", "1", null]);
   });
 });
+
+test("a raised button in a toolbar takes the field look of the search beside it: nothing outside it for a scroller to cut", async () => {
+  const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+  const raised =
+    '.ac-toolbar .ac-btn:not(.ac-btn--primary, .ac-btn--ghost, .ac-btn--agent, .ac-btn--danger, [aria-pressed="true"])';
+  const look = css.split(`\n${raised} {`)[1]?.split("}")[0] ?? "";
+  expect(look).toContain("background: var(--field-bg)");
+  expect(look).toContain("box-shadow: inset 0 0 0 1px var(--field-line)");
+  // The search's own look, so the row reads as one kind of control.
+  expect(css.split("\n.ac-searchfield {")[1]?.split("}")[0]).toContain("box-shadow: inset 0 0 0 1px var(--field-line)");
+});

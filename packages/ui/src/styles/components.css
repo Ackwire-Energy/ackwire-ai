@@ -9019,6 +9019,19 @@ html:not([data-pointer]) .ac-grouphead__title > button:focus-visible {
   width: var(--tool-h);
   padding: 0;
 }
+/*
+ * A raised button there takes the field look of the search and the toggles beside it (a fill and an inset hairline):
+ * a row that scrolls has no ring or shadow outside a control to cut.
+ */
+.ac-toolbar .ac-btn:not(.ac-btn--primary, .ac-btn--ghost, .ac-btn--agent, .ac-btn--danger, [aria-pressed="true"]) {
+  background: var(--field-bg);
+  box-shadow: inset 0 0 0 1px var(--field-line);
+}
+.ac-toolbar
+  .ac-btn:not(.ac-btn--primary, .ac-btn--ghost, .ac-btn--agent, .ac-btn--danger, [aria-pressed="true"]):hover {
+  background: var(--plate-soft);
+  box-shadow: inset 0 0 0 1px var(--field-line);
+}
 .ac-toolbar .ac-select__trigger {
   height: var(--tool-h);
   padding-left: var(--control-px-sm);
