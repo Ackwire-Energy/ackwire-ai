@@ -35,6 +35,8 @@ import {
   freeHandle,
   handleForName,
   handleProblem,
+  PERSONAL_STARTERS,
+  type PersonalStarter,
   presetChannels,
   presetLevels,
   ROLE_DEFAULTS,
@@ -200,6 +202,9 @@ function NewAgentForm({
   const [tried, setTried] = useState(false);
   const [busy, setBusy] = useState(false);
   const [role, setRole] = useState<RoleId | null>(proposed || initialWhat ? "custom" : null);
+  // A personal workspace's starting point (one of the right hand's personal agents), on top of "custom" (ADR 0159 §3).
+  const [starter, setStarter] = useState<PersonalStarter["id"] | null>(null);
+  const personal = isPersonal(org);
   const [roleText, setRoleText] = useState(proposed?.role ?? "");
   const [name, setName] = useState(proposed?.name ?? (initialWhat ? suggested : ""));
   const [handle, setHandle] = useState(proposed?.handle ?? (initialWhat ? handleForName(suggested) : ""));
@@ -341,8 +346,9 @@ function NewAgentForm({
   const pickRole = (id: RoleId) => {
     tapHaptic();
     setRole(id);
+    setStarter(null);
     // A new role fills in the rest. The role it already has keeps what was typed, and a proposal keeps its draft.
-    if (id !== role && !proposed) {
+    if ((id !== role || starter) && !proposed) {
       const agentName = id === "custom" ? "" : t(`newAgent.roles.${id}.agent`);
       setRoleText("");
       setName(agentName);
@@ -353,6 +359,22 @@ function NewAgentForm({
       setChannelIds(new Set([...asked, ...presetChannels(id, myChannels)]));
     }
     // A tap is the answer: on to the next step, or back to Revisar on a proposal.
+    setTimeout(() => goTo(proposed ? total - 1 : 1), 180);
+  };
+  /** A personal workspace's starting point: from scratch, with its agent's name, look, role and line filled in. */
+  const pickStarter = (s: PersonalStarter) => {
+    tapHaptic();
+    setRole("custom");
+    setStarter(s.id);
+    if (starter !== s.id && !proposed) {
+      setRoleText(t(`teamTemplates.agents.${s.id}.role`));
+      setName(s.name);
+      setHandle(handleForName(s.name));
+      setHandleTouched(false);
+      setLook(fullLook(s.look));
+      setInstructions(t(`teamTemplates.agents.${s.id}.line`));
+      setChannelIds(new Set(asked));
+    }
     setTimeout(() => goTo(proposed ? total - 1 : 1), 180);
   };
   const refuse = () => {
@@ -571,14 +593,38 @@ function NewAgentForm({
             label={t("newAgent.roles.custom.name")}
             sub={t("newAgent.roles.custom.desc")}
             subLines={2}
-            checked={role === "custom"}
+            checked={role === "custom" && !starter}
             onPress={() => pickRole("custom")}
           />
         </GroupedList>
-        {role === "custom" ? (
+        {role === "custom" && !starter ? (
           <RoleInput value={roleText} onChangeText={setRoleText} placeholder={t("agent.roleHelp")} grouped />
         ) : null}
-        {ROLE_GROUPS.map((group) => (
+        {personal ? (
+          // One person's agents (ADR 0159 §3): the right hand's personal ones, not a company's roles.
+          <>
+            <GroupedHeader>{t("newAgent.roleGroups.personal")}</GroupedHeader>
+            <GroupedList>
+              {PERSONAL_STARTERS.map((s) => (
+                <GroupedRow
+                  key={s.id}
+                  leading={<AgentAvatar agent={fullLook(s.look)} size={36} live={false} />}
+                  label={t(`teamTemplates.agents.${s.id}.role`)}
+                  sub={roleLine(
+                    t(`teamTemplates.agents.${s.id}.line`),
+                    t("newAgent.startsAs", { name: s.name }),
+                    s.name,
+                    i18n.language,
+                  )}
+                  subLines={2}
+                  checked={starter === s.id}
+                  onPress={() => pickStarter(s)}
+                />
+              ))}
+            </GroupedList>
+          </>
+        ) : null}
+        {(personal ? [] : ROLE_GROUPS).map((group) => (
           <Fragment key={group.id}>
             <GroupedHeader>{t(`newAgent.roleGroups.${group.id}`)}</GroupedHeader>
             <GroupedList>

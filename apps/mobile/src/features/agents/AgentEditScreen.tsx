@@ -45,6 +45,7 @@ import { openAgentDelete } from "./DeleteAgentScreen";
 import { type AgentDraft, agentChanges, editableFields, fullLook } from "./edit";
 import { ErrorLine, HandleInput } from "./HandleInput";
 import { LookList } from "./LookPicker";
+import { openAgentMore } from "./more-link";
 import { ReportsToSection } from "./ReportsToSection";
 import { RoleInput } from "./RoleInput";
 import { openSetupStep } from "./setup/SetupStepScreen";
@@ -287,8 +288,13 @@ export function AgentEditScreen({ id }: { id: string }) {
           ) : (
             <>
               {admin ? <BudgetSection agent={agent} /> : null}
-              <BrakesSection agent={agent} />
-              <ReportsToSection agentId={id} />
+              {/* A personal workspace keeps these in Advanced (ADR 0159 §3): each saves on its own, as here. */}
+              {personal ? null : (
+                <>
+                  <BrakesSection agent={agent} />
+                  <ReportsToSection agentId={id} />
+                </>
+              )}
 
               <GroupedHeader>{t("agent.instructions")}</GroupedHeader>
               {/* The list draws the field's surface (radius 14, raised), as on "Create agent". */}
@@ -319,8 +325,23 @@ export function AgentEditScreen({ id }: { id: string }) {
             </>
           )}
 
+          {/* A personal workspace's Advanced (ADR 0159 §3): its brakes, who it reports to, its rules, deleting it. */}
+          {personal && !rightHand ? (
+            <>
+              <View style={styles.gap} />
+              <GroupedList>
+                <GroupedRow
+                  icon="more"
+                  label={t("agentPage.tabs.advanced")}
+                  chevron
+                  onPress={() => openAgentMore(id)}
+                />
+              </GroupedList>
+            </>
+          ) : null}
+
           {/* Deleting for good asks for its name on a screen of its own (ADR 0082). */}
-          {admin && !rightHand ? (
+          {admin && !rightHand && !personal ? (
             <>
               <View style={styles.gap} />
               <GroupedList>

@@ -18,7 +18,9 @@ import { chatHref } from "../links/logic";
 import { openWebPath } from "../links/open-web";
 import { ZoneList } from "../me/AccountPage";
 import { chooseAction } from "../settings/parts";
+import { usePersonPhoto } from "../shared/photo";
 import { orgNameFromEmail, PURPOSES, phoneTimezone, stepFailedText, workspaceAnswer, zoneLabel } from "./logic";
+import { PurposeScene } from "./PurposeScene";
 
 /**
  * The first run on the phone, signed in with no workspace to open yet, on the sign-in's own screen: what the workspace
@@ -51,10 +53,16 @@ export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; ano
   const orgName = name.trim();
   // A work address names its company: the field starts with it, selected, so typing replaces it (`suggested`).
   const [suggested, setSuggested] = useState<string | null>(null);
+  // The first question's cards, side by side: each half of the row, less the gap between them.
+  const [cardsWidth, setCardsWidth] = useState(0);
+  const cardWidth = cardsWidth > 0 ? (cardsWidth - CARD_GAP) / 2 : 0;
 
   // The address this sign-up was emailed a link to confirm (features/auth/confirmation.ts): the step says where it
   // went, until `me` says it's confirmed.
   const email = me.data?.user.email ?? "";
+  // You, in the first question's drawings: the account's photo (Google's), else the initial of your name.
+  const youName = me.data?.user.name || email;
+  const photo = usePersonPhoto(me.data?.user.image);
   useEffect(() => {
     if (another || created || name !== "" || suggested !== null || !email) return;
     const guess = orgNameFromEmail(email);
@@ -231,41 +239,43 @@ export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; ano
           />
         </Locked>
       ) : (
-        // The first question (ADR 0159): two raised choices, the picked one sunk with its check, then Continue.
+        // The first question (ADR 0159): two cards side by side, as the web's, the picked one sunk with its check: on
+        // top who would be there (you amid your agents, or a small org chart), the words under it; then Continue.
         <Locked when={pending} style={styles.purposes}>
-          {PURPOSES.map((mode) => {
-            const on = purpose === mode;
-            const title = t(`onboarding.purpose.${mode}`);
-            const text = t(`onboarding.purpose.${mode}Text`);
-            return (
-              <OptionTile
-                key={mode}
-                pressed={on}
-                label={`${title}. ${text}`}
-                onPress={() => {
-                  setPurpose(mode);
-                  setError(null);
-                }}
-              >
-                <View style={styles.tile}>
-                  <LineIcon
-                    name={mode === "personal" ? "person" : "members"}
-                    size={20}
-                    color={c.ink2}
-                    variant="subhead"
-                  />
-                  <View style={[styles.grow, on && styles.room]}>
+          <View style={styles.cards} onLayout={(e) => setCardsWidth(e.nativeEvent.layout.width)}>
+            {PURPOSES.map((mode) => {
+              const on = purpose === mode;
+              const title = t(`onboarding.purpose.${mode}`);
+              const text = t(`onboarding.purpose.${mode}Text`);
+              return (
+                <OptionTile
+                  key={mode}
+                  pressed={on}
+                  label={`${title}. ${text}`}
+                  style={styles.card}
+                  onPress={() => {
+                    setPurpose(mode);
+                    setError(null);
+                  }}
+                >
+                  {cardWidth > 0 ? (
+                    <PurposeScene kind={mode} chosen={on} width={cardWidth} you={{ name: youName, photo }} />
+                  ) : null}
+                  <View style={styles.words}>
                     <Text variant="subhead" tone="ink" style={styles.bold}>
                       {title}
                     </Text>
                     <Text variant="small" tone="muted">
                       {text}
                     </Text>
+                    <Text variant="caption" tone="faint" style={styles.examples}>
+                      {t(`onboarding.purpose.${mode}Examples`)}
+                    </Text>
                   </View>
-                </View>
-              </OptionTile>
-            );
-          })}
+                </OptionTile>
+              );
+            })}
+          </View>
           <Button
             variant="primary"
             wide
@@ -369,17 +379,21 @@ function ConfirmationNote({ email }: { email: string }) {
   );
 }
 
+/** Between the first question's two cards. */
+const CARD_GAP = 10;
+
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   wait: { alignItems: "center", justifyContent: "center", gap: 12, padding: 24 },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
-  // The first question's choices, 8 apart, Continue under them on the same rhythm.
-  purposes: { gap: 8 },
-  // A choice's icon on its title's line, the words beside it.
-  tile: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
-  // Room for the check in the chosen tile's corner.
-  room: { paddingRight: 22 },
+  // The first question's cards, then Continue under them on the same rhythm.
+  purposes: { gap: 12 },
+  cards: { flexDirection: "row", gap: CARD_GAP, alignItems: "stretch" },
+  // Edge to edge for the drawing; the words keep the card's own padding.
+  card: { flex: 1, padding: 0, overflow: "hidden" },
+  words: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 12, gap: 2 },
+  examples: { marginTop: 6 },
   note: { flexDirection: "row", alignItems: "flex-start", gap: 8, paddingTop: 8 },
   zone: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingTop: 8, maxWidth: "100%" },
   shrink: { flexShrink: 1 },

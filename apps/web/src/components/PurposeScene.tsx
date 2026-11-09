@@ -1,4 +1,12 @@
 import {
+  type PurposeKind,
+  SCENE_COLOR,
+  SCENE_FACES,
+  SCENE_H,
+  SCENE_LINES,
+  SCENE_W,
+} from "@agenteschat/client/lib/purpose-scene";
+import {
   type AgentAppearance,
   Avatar,
   horizonCrest,
@@ -17,69 +25,16 @@ import { type CSSProperties, useEffect, useRef } from "react";
  * their zz); choosing one draws its lines and wakes its agents with a hop, and from then on they look at the pointer.
  * Decorative: the answer says it in words.
  *
- * Laid out on a fixed stage (`W`×`H`, scaled down on a phone), so the lines and the faces share one set of numbers.
+ * Laid out on the shared stage (`SCENE_W`×`SCENE_H`, scaled down on a phone), the phone's drawing too.
  */
-export type PurposeKind = "personal" | "team";
-
-const W = 240;
-const H = 172;
-
-type Face = { x: number; y: number; size: number } & ({ look: AgentAppearance } | { photo: string } | { you: true });
-
 /** Who is signing up: their account's name and photo (Google's, or one they set), if any. */
 export type PurposeYou = { name: string; image: string | null };
 
-/** For me: you in the middle and six agents around you. */
-const ME: Face[] = [
-  { x: 120, y: 86, size: 60, you: true },
-  { x: 30, y: 86, size: 36, look: { color: "green", eyes: "round", accessory: "cap" } },
-  { x: 70, y: 30, size: 36, look: { color: "amber", eyes: "wide", accessory: "headphones" } },
-  { x: 170, y: 30, size: 36, look: { color: "rose", eyes: "happy", accessory: "flower" } },
-  { x: 210, y: 86, size: 36, look: { color: "teal", eyes: "happy", accessory: "bow" } },
-  { x: 170, y: 142, size: 36, look: { color: "sky", eyes: "dots", accessory: "beanie" } },
-  { x: 70, y: 142, size: 36, look: { color: "violet", eyes: "round", accessory: "antenna" } },
-];
-
-/** For a team: you on top; an agent, a person and an agent under you; two agents under that person. */
-const TEAM: Face[] = [
-  { x: 120, y: 28, size: 40, you: true },
-  { x: 46, y: 89, size: 34, look: { color: "amber", eyes: "round", accessory: "headset" } },
-  // A pixel portrait of someone on the team (anyone).
-  { x: 120, y: 89, size: 34, photo: "/onboarding/person-31.jpg" },
-  { x: 194, y: 89, size: 34, look: { color: "green", eyes: "wide", accessory: "antenna" } },
-  { x: 88, y: 145, size: 30, look: { color: "rose", eyes: "happy", accessory: "scarf" } },
-  { x: 152, y: 145, size: 30, look: { color: "teal", eyes: "dots", accessory: "cap" } },
-];
-
-/** An org chart's line from a parent's foot down to a bar at `bar`, across, and down to a child's head; round turns. */
-function elbow(from: Face, to: Face, bar: number): string {
-  const top = from.y + from.size / 2;
-  const end = to.y - to.size / 2;
-  if (to.x === from.x) return `M${from.x} ${top}V${end}`;
-  const r = 6;
-  const dir = to.x > from.x ? 1 : -1;
-  return `M${from.x} ${top}V${bar - r}Q${from.x} ${bar} ${from.x + dir * r} ${bar}H${to.x - dir * r}Q${to.x} ${bar} ${to.x} ${bar + r}V${end}`;
-}
-
-const FACES: Record<PurposeKind, Face[]> = { personal: ME, team: TEAM };
-
-/** The lines: for me, from the person to each agent; for a team, from each lead to who is under them. */
-const LINES: Record<PurposeKind, string[]> = {
-  personal: ME.slice(1).map((a) => `M${ME[0]?.x} ${ME[0]?.y}L${a.x} ${a.y}`),
-  team: (() => {
-    const [lead, a, person, b, c, d] = TEAM as [Face, Face, Face, Face, Face, Face];
-    return [
-      elbow(lead, person, 60),
-      elbow(lead, a, 60),
-      elbow(lead, b, 60),
-      elbow(person, c, 118),
-      elbow(person, d, 118),
-    ];
-  })(),
-};
+/** A pixel portrait of someone on the team (anyone). */
+const TEAMMATE = "/onboarding/person-31.jpg";
 
 export function PurposeScene({ kind, chosen, you }: { kind: PurposeKind; chosen: boolean; you: PurposeYou }) {
-  const faces = FACES[kind];
+  const faces = SCENE_FACES[kind];
   // Choosing it wakes its agents with a hop (the engine's "up" reaction), once per choice, as its lines arrive.
   const was = useRef(chosen);
   useEffect(() => {
@@ -89,7 +44,7 @@ export function PurposeScene({ kind, chosen, you }: { kind: PurposeKind; chosen:
       });
     was.current = chosen;
   }, [chosen, kind, faces]);
-  const color = kind === "personal" ? "violet" : "sky";
+  const color = SCENE_COLOR[kind];
   return (
     <span className="onb-scene" data-kind={kind} data-chosen={chosen || undefined} data-gaze="" aria-hidden="true">
       <span className="onb-scene__sky">
@@ -117,8 +72,14 @@ export function PurposeScene({ kind, chosen, you }: { kind: PurposeKind; chosen:
       </span>
       <span className="onb-scene__room">
         <span className="onb-scene__stage">
-          <svg className="onb-scene__lines" viewBox={`0 0 ${W} ${H}`} width={W} height={H} aria-hidden="true">
-            {LINES[kind].map((d, i) => (
+          <svg
+            className="onb-scene__lines"
+            viewBox={`0 0 ${SCENE_W} ${SCENE_H}`}
+            width={SCENE_W}
+            height={SCENE_H}
+            aria-hidden="true"
+          >
+            {SCENE_LINES[kind].map((d, i) => (
               <path
                 // biome-ignore lint/suspicious/noArrayIndexKey: a fixed drawing
                 key={i}
@@ -140,7 +101,7 @@ export function PurposeScene({ kind, chosen, you }: { kind: PurposeKind; chosen:
                 <Avatar
                   kind="agent"
                   name={`purpose-${kind}-${i}`}
-                  appearance={f.look}
+                  appearance={f.look as AgentAppearance}
                   size="md"
                   state={chosen ? "idle" : "sleeping"}
                   reactionKey={`purpose-${kind}-${i}`}
@@ -148,7 +109,7 @@ export function PurposeScene({ kind, chosen, you }: { kind: PurposeKind; chosen:
               ) : "you" in f ? (
                 <Avatar kind="person" name={you.name} imageUrl={you.image ?? undefined} size="lg" />
               ) : (
-                <Avatar kind="person" name="" imageUrl={f.photo} size="lg" />
+                <Avatar kind="person" name="" imageUrl={TEAMMATE} size="lg" />
               )}
             </span>
           ))}
@@ -157,3 +118,5 @@ export function PurposeScene({ kind, chosen, you }: { kind: PurposeKind; chosen:
     </span>
   );
 }
+
+export type { PurposeKind };
