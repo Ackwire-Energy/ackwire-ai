@@ -1914,20 +1914,21 @@
       }
     },
     /**
-     * On a phone, a lone main button fills what holds it (rule 23): the only plated button in a card, a request's
-     * foot, a notice, a dialog's foot, an empty state or a MediaRow's end that went under the row, and a primary,
-     * at 90% or more of that box's width inside its padding. Phone widths only (`PHONE_ONLY` in check.ts).
+     * On a phone, a lone main button fills what holds it (rule 23): the only button in a card, a request's foot, a
+     * notice, a dialog's foot, an empty state or a MediaRow's end that went under the row, and a primary, at 90% or
+     * more of that box's width inside its padding. One beside a ghost (Cancelar, Ver) is a pair, not lone. Phone
+     * widths only (`PHONE_ONLY` in check.ts).
      */
     loneprimary(out) {
       if (innerWidth >= 640) return;
       const HOLDS = ".ac-card,.rq__foot,.outage,.ac-dialog__foot,.ac-empty__actions,.ac-mediarow__end--wrap";
       for (const box of document.querySelectorAll(HOLDS)) {
         if (!seen(box)) continue;
-        const plated = [...box.querySelectorAll(".ac-btn:not(.ac-btn--ghost)")].filter(
+        const buttons = [...box.querySelectorAll(".ac-btn")].filter(
           (b) => seen(b) && b.parentElement.closest(HOLDS) === box,
         );
-        const [only] = plated;
-        if (plated.length !== 1 || !only.matches(".ac-btn--primary")) continue;
+        const [only] = buttons;
+        if (buttons.length !== 1 || !only.matches(".ac-btn--primary")) continue;
         const s = style(box);
         const inside =
           box.getBoundingClientRect().width -

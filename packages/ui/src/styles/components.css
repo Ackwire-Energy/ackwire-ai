@@ -9674,12 +9674,15 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
 }
 /*
  * On a phone a lone button takes the width of what holds it, at its own height (rule 23): a card's line of buttons and
- * a MediaRow's end under its row (a plated one), a dialog's foot and an empty state's actions (any one).
+ * a MediaRow's end under its row (a plated one), a dialog's foot and an empty state's actions (their one button, on a
+ * line of its own under the foot's note).
  */
 @media (max-width: 640px) {
-  .ac-card > .ac-acts > .ac-btn:only-child:not(.ac-btn--ghost),
-  :is(.ac-dialog__foot, .ac-empty__actions) > .ac-btn:only-child {
+  .ac-card > .ac-acts > .ac-btn:only-child:not(.ac-btn--ghost) {
     flex: 1 1 auto;
+  }
+  :is(.ac-dialog__foot, .ac-empty__actions):not(:has(> .ac-btn ~ .ac-btn)) > .ac-btn {
+    flex: 1 1 100%;
   }
 }
 /* A phone's page head takes half the screen: the button stays in reach. */

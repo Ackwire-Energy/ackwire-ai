@@ -7687,6 +7687,14 @@ a.machine-row__name:hover {
   gap: 10px;
   min-width: 0;
 }
+/* On a phone the app's download, the card's one button, takes its width; its note goes under it. A card's form with
+   one button (a field and Salvar) puts it under the field at the form's width. */
+@media (max-width: 640px) {
+  .machine-connect__release > .row > .ac-btn,
+  .ac-card > form.row:not(:has(> .ac-btn ~ .ac-btn)) > .ac-btn--primary {
+    flex: 1 1 100%;
+  }
+}
 .machine-connect__other {
   align-items: flex-start;
   gap: 8px;

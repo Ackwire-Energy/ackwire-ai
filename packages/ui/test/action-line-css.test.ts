@@ -17,8 +17,10 @@ test("the action line: words on their one-line width, actions beside them only w
 
 test("on a phone a lone button takes the width of what holds it, at its own height", () => {
   const phone = css.split("@media (max-width: 640px) {\n  .ac-card > .ac-acts > .ac-btn:only-child")[1] ?? "";
-  expect(phone.split("}")[0]).toContain(
-    ":not(.ac-btn--ghost),\n  :is(.ac-dialog__foot, .ac-empty__actions) > .ac-btn:only-child {\n    flex: 1 1 auto;",
+  expect(phone.split("}")[0]).toContain(":not(.ac-btn--ghost) {\n    flex: 1 1 auto;");
+  // A dialog's foot or an empty state with one button: it takes a line of its own, under the foot's note.
+  expect(rule(":is(.ac-dialog__foot, .ac-empty__actions):not(:has(> .ac-btn ~ .ac-btn)) > .ac-btn")).toContain(
+    "flex: 1 1 100%",
   );
   // A MediaRow's end that went under its row: the end takes the row, its one plated button too.
   expect(rule(".ac-mediarow__end--wrap:has(> .ac-btn:only-child:not(.ac-btn--ghost))")).toContain(
