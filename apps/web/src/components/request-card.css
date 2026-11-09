@@ -603,7 +603,7 @@ html:not([data-pointer]) .rq__choice:focus-visible {
   margin-inline-start: calc(22px + 10px);
 }
 @container (max-width: 479px) {
-  .rq__item > .rq__item-acts {
+  .rq__item > :is(.rq__item-acts, .rq__item-outcome) {
     margin-inline-start: 0;
   }
 }

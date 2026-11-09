@@ -43,6 +43,8 @@ describe("a request card on the compact rhythm", () => {
     expect(last(narrow, ".rq__well", "display")).toBe("grid");
     expect(last(narrow, ".rq__well > .rq__wt", "display")).toBe("contents");
     expect(last(narrow, ".rq__wt > :not(b)", "grid-column")).toBe("1/-1");
+    // A grouped item's decision, or how it ended, starts at the card's edge too, under the mark.
+    expect(last(narrow, ".rq__item > :is(.rq__item-acts, .rq__item-outcome)", "margin-inline-start")).toBe("0");
     // The old column beside the words, and the grouped card's own narrow rule, are gone.
     expect(shipped).not.toContain("@container (max-width:520px)");
     expect(shipped).not.toContain(".rq__well>.rq__more");
