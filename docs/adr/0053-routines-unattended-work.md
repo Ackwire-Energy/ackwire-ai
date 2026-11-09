@@ -230,3 +230,5 @@ What went wrong: in a busy hour, agents' runs and a burst of routines held every
 4. **Routines ramp.** A scheduled routine fires at its slot plus a stable offset into that minute from its id (0–59 s), and the firing tick runs every 5 s (it was 30 s, at most 100 routines a tick), so the routines of 09:00 fire across the minute instead of together. Its slot, its next run as shown and its run's `at` stay the minute.
 
 This changes §10's last bullet: background jobs take at most half of the long slots, and quick jobs keep slots of their own. ADR 0046's priority column stays a proposal: lanes by kind need no migration.
+
+ADR 0161 takes this further: workspaces take turns in each lane, the long lane grows as far as memory allows instead of 4 jobs per database connection, and worker processes add slots.

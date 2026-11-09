@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import { totalmem } from "node:os";
 import { join, resolve } from "node:path";
 import {
   type Adapters,
@@ -66,6 +67,7 @@ import {
   type GifKey,
   isAgentesCloud,
   isBlockedAddress,
+  laneLimits,
   meterComposio,
   moveIssueComments,
   publicHttpsFetch,
@@ -390,6 +392,24 @@ async function boot(
       if (moved > 0) log.info("files moved out of agent rooms", { moved });
     })
     .catch((error: unknown) => log.warn("files move out of agent rooms failed", { error: String(error) }));
+  const slots = { quick: config.OUTBOX_QUICK_SLOTS, long: config.OUTBOX_MAX_IN_FLIGHT - config.OUTBOX_QUICK_SLOTS };
+  const outbox = {
+    maxInFlight: config.OUTBOX_MAX_IN_FLIGHT,
+    quickSlots: config.OUTBOX_QUICK_SLOTS,
+    // The built-in database is one process's, on one computer: its slots stay where they start.
+    ...(database.client && {
+      limits: laneLimits(
+        slots,
+        {
+          memoryBytes: process.constrainedMemory() || totalmem(),
+          rssBytes: process.memoryUsage().rss,
+          dbConnections: config.DATABASE_POOL_MAX,
+        },
+        config.OUTBOX_MAX_IN_FLIGHT_CEILING,
+      ),
+    }),
+  };
+  log.info("job slots", { start: slots, upTo: outbox.limits ?? "fixed", role: config.SERVER_ROLE });
   const workers = startWorkers({
     db: database.db,
     handlers: engine.handlers,
@@ -404,15 +424,13 @@ async function boot(
     ...(config.OPS_REPORT_EMAIL?.length
       ? { opsReport: { to: config.OPS_REPORT_EMAIL, publicUrl: config.PUBLIC_URL } }
       : {}),
-    outbox: {
-      maxInFlight: config.OUTBOX_MAX_IN_FLIGHT,
-      quickSlots: config.OUTBOX_QUICK_SLOTS,
-      ceiling: config.OUTBOX_MAX_IN_FLIGHT_CEILING,
-      dbConnections: database.client ? config.DATABASE_POOL_MAX : 1,
-    },
+    outbox,
     log,
   });
-  const telemetry = startTelemetry({ db: database.db, config, log });
+  // A worker (`SERVER_ROLE=worker`) runs jobs only: no HTTP, sockets or usage report. Its runs reach computers through
+  // the process that holds their socket (`machine_rpc`).
+  const worker = config.SERVER_ROLE === "worker";
+  const telemetry = worker ? null : startTelemetry({ db: database.db, config, log });
 
   const auth = createAuth({
     db: database.db,
@@ -459,7 +477,7 @@ async function boot(
     pingDatabase: database.ping,
     webDir: existsSync(webDir) ? webDir : undefined,
   });
-  if (!existsSync(webDir)) log.warn("web app not found; serving API only", { webDir });
+  if (!worker && !existsSync(webDir)) log.warn("web app not found; serving API only", { webDir });
 
   const realtime = createRealtime({
     db: database.db,
@@ -487,32 +505,37 @@ async function boot(
     const { pathname, search } = new URL(req.url);
     return Response.redirect(new URL(pathname + search, publicUrl).href, 302);
   };
-  const server = Bun.serve<SocketData>({
-    hostname: config.HOST,
-    port: config.PORT,
-    // Bun's default (10 s) cuts a request still waiting on its answer: opening a site in an agent's
-    // browser waits for the page, and a closed browser starts first (up to 90 s on the computer).
-    idleTimeout: 120,
-    fetch: (req, srv) => ownHostAnswer(req) ?? realtime.fetch(req, srv, (r) => app.fetch(r)),
-    websocket: realtime.websocket,
-    // What the HTTP app doesn't answer itself: a WebSocket upgrade that failed before the socket opened.
-    error(error) {
-      log.error("request failed", { error, stack: error.stack });
-      return new Response("Something went wrong on our side\n", { status: 500 });
-    },
-  });
-  log.info("listening", { url: `http://${config.HOST}:${config.PORT}` });
-  const operator = serveOperatorApi({
-    db: database.db,
-    config,
-    version: release,
-    log,
-    pubsub: adapters.pubsub,
-    hub: engine.machineHub,
-    emails: adapters.email.delivers,
-    humanCheck: adapters.humanCheck,
-    sessions: engine.sessions,
-  });
+  const server = worker
+    ? null
+    : Bun.serve<SocketData>({
+        hostname: config.HOST,
+        port: config.PORT,
+        // Bun's default (10 s) cuts a request still waiting on its answer: opening a site in an agent's
+        // browser waits for the page, and a closed browser starts first (up to 90 s on the computer).
+        idleTimeout: 120,
+        fetch: (req, srv) => ownHostAnswer(req) ?? realtime.fetch(req, srv, (r) => app.fetch(r)),
+        websocket: realtime.websocket,
+        // What the HTTP app doesn't answer itself: a WebSocket upgrade that failed before the socket opened.
+        error(error) {
+          log.error("request failed", { error, stack: error.stack });
+          return new Response("Something went wrong on our side\n", { status: 500 });
+        },
+      });
+  if (server) log.info("listening", { url: `http://${config.HOST}:${config.PORT}` });
+  else log.info("running jobs only, with no HTTP (SERVER_ROLE=worker)");
+  const operator = worker
+    ? null
+    : serveOperatorApi({
+        db: database.db,
+        config,
+        version: release,
+        log,
+        pubsub: adapters.pubsub,
+        hub: engine.machineHub,
+        emails: adapters.email.delivers,
+        humanCheck: adapters.humanCheck,
+        sessions: engine.sessions,
+      });
   if (operator) {
     log.info("operator API listening", { url: `http://${config.HOST}:${operator.port}${OPERATOR_API_PREFIX}` });
   }
@@ -531,8 +554,8 @@ async function boot(
     if (config.SHUTDOWN_DELAY_MS > 0) await Bun.sleep(config.SHUTDOWN_DELAY_MS);
     // HTTP stops taking requests (the new deploy serves them). Not awaited: the
     // promise resolves only once every socket is closed, and browser tabs never close theirs.
-    telemetry.stop();
-    void server.stop();
+    telemetry?.stop();
+    void server?.stop();
     void operator?.stop();
     // Runners reconnect to the next instance, and people's desktops and terminals open again there.
     await engine.machineHub.stop();
@@ -556,7 +579,7 @@ async function boot(
     if (interrupted.length > 0) log.info("runs handed back for the next instance", { runs: interrupted });
     if (handed > 0) log.info("jobs handed back for the next instance", { jobs: handed });
     // Browser tabs, left open so they saw those runs finish, reconnect to the next instance.
-    await server.stop(true);
+    await server?.stop(true);
     for (const module of modules) await module.onStop?.();
     await adapters.pubsub.close?.();
     await database.close();

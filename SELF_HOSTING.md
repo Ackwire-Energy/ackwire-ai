@@ -1473,6 +1473,55 @@ back. On Tailscale, run it from another device in your tailnet.
 </details>
 
 <details>
+<summary><b>More at once: worker processes</b></summary>
+
+The app runs its jobs (agents' runs, routines, messages' routing, notifications, emails) in its own
+process: 48 at once to start with, 12 of them kept for the quick ones. While jobs wait for a slot, it
+gives itself more, every 30 seconds: agents' runs as far as half of its memory holds them, about 4 MB
+each while they wait on their model or their computer, and quick jobs up to 4 per database connection
+(`DATABASE_POOL_MAX`). Workspaces take turns, so one workspace's burst of routines makes only that
+workspace wait. When jobs keep waiting anyway, the log says so, with `add a worker process`, and so do
+the error reports when they are on (`SENTRY_DSN`).
+
+A worker process runs jobs only, with no HTTP. Add one next to `agentes` in the compose file, with the
+same image and settings:
+
+```yaml
+  agentes-worker:
+    image: "${AGENTES_IMAGE:-ghcr.io/agentes-chat/agentes:latest}"
+    env_file: .env
+    environment:
+      DATABASE_URL: "postgres://agentes:${POSTGRES_PASSWORD}@postgres:5432/agentes"
+      FILES_DIR: /data/files
+      SERVER_ROLE: worker
+    volumes:
+      - files:/data/files
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [default, speech]
+    restart: unless-stopped
+    stop_grace_period: 40s
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+```
+
+Then `docker compose up -d`. Every process takes jobs from the same queue in Postgres and never the
+same one twice, so each worker adds as many jobs at once as the app runs. Each process keeps up to
+`DATABASE_POOL_MAX` connections (20): keep their sum under Postgres's `max_connections` (100 in the
+compose file's Postgres). Before a reboot, stop the worker with the app (`docker compose stop agentes
+agentes-worker`). The built-in database (on this computer, without Docker) belongs to one process and
+takes no worker.
+
+</details>
+
+<details>
 <summary><b>From source</b></summary>
 
 To run your own changes, or before anything is published to GHCR and npm, build the image and the
