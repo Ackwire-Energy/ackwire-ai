@@ -230,7 +230,8 @@ export function FirstRun() {
   // Opened again ("Add a server…"): from the start, unless a link or the setup is on screen.
   useOnShown("welcome", () => {
     takeMode();
-    if (screen === "link" || screen === "pair" || settingUp.current) return;
+    // A sheet closed by hiding the window leaves its screen with nothing to draw: that one starts over too.
+    if ((screen === "link" && link) || (screen === "pair" && pair) || settingUp.current) return;
     setTrail([]);
     setScreen("choose");
     setAddress("");

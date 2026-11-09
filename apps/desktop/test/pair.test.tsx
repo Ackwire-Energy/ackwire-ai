@@ -233,6 +233,10 @@ describe("pairing from the app", () => {
         await until(() => el.textContent?.includes("This link expired. Make a new one under Settings › Devices."));
         expect(button(el, "Connect")).toBeUndefined();
         expect(host.runners.size).toBe(2);
+        // Closed with a server open, the window hides; opened again ("Add a server…"), it starts over.
+        await act(async () => button(el, "Close")?.click());
+        await act(async () => host.showWindow("welcome"));
+        await until(() => el.querySelector('[data-screen="choose"]'));
       },
       pairLink("WXYZWXYZ"),
     );
