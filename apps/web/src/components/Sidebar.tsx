@@ -2175,8 +2175,9 @@ function AccountMenu({ personal = false }: { personal?: boolean }) {
 
 /**
  * A workspace in your lists of them (ADR 0159): a personal one of yours is you, by your photo and your name, as its
- * sidebar shows you; with more than one, each one's own name goes under yours to tell them apart. Any other (a team's,
- * or a personal one shared with you, whose face would be someone else's) by its mark and its name.
+ * sidebar shows you; with more than one, your photo and each one's own name (the same name on each would tell them
+ * apart by nothing). Any other (a team's, or a personal one shared with you, whose face would be someone else's) by its
+ * mark and its name.
  */
 function useWorkspaceLook() {
   const { me } = useOrg();
@@ -2189,8 +2190,8 @@ function useWorkspaceLook() {
     mine(o.id)
       ? {
           leading: <Avatar kind="person" name={me.user.name} imageUrl={me.user.image} size={face} />,
-          name: me.user.name,
-          sub: several ? o.name : null,
+          name: several ? o.name : me.user.name,
+          sub: null,
           personal: true,
         }
       : { leading: <OrgMark logo={o.logo} size={mark} />, name: o.name, sub: null, personal: false };

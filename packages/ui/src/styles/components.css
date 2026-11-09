@@ -2368,11 +2368,19 @@ html:not([data-pointer]) .ac-menu__item:focus-visible,
   flex-direction: row;
   align-items: baseline;
   column-gap: 0.4em;
+  /* The room the face and what ends the row (the hint, the check) leave, never more: its description ends in "…"
+     instead of running under the hint (WebKit sizes a flex item by its content first). */
+  flex: 1 1 0%;
+  overflow: hidden;
+}
+:is(.ac-menu, .ac-palette__list):has(.ac-menu__leading > .ac-avatar) .ac-menu__hint {
+  flex: none;
 }
 :is(.ac-menu, .ac-palette__list):has(.ac-menu__leading > .ac-avatar) .ac-menu__label > :first-child {
   flex: none;
 }
 :is(.ac-menu, .ac-palette__list):has(.ac-menu__leading > .ac-avatar) .ac-menu__desc {
+  flex-shrink: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

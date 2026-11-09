@@ -126,7 +126,8 @@ export function WorkspaceMark({
  * or its initial), its role, the check on the current one and the unread count on the others; a server that didn't
  * answer this time keeps its workspaces in their place, faded ("Sem resposta agora" when none is known). Shared by the
  * page and the sheet. A personal workspace of yours (ADR 0159) is you: your face and your name, and whose it is
- * instead of a role; with more than one, each one's own name under yours tells them apart.
+ * instead of a role; with more than one, your face and each one's own name (the same name on each would tell them
+ * apart by nothing).
  */
 export function WorkspaceGroups({
   groups,
@@ -157,8 +158,8 @@ export function WorkspaceGroups({
                     <GroupedRow
                       key={o.id}
                       leading={<WorkspaceMark org={o} server={g.server} />}
-                      label={mine(o) && face.name ? face.name : o.name}
-                      sub={notes.get(o.id) ?? (mine(o) && several ? o.name : t(modeKey(o, `mobile.me.role.${o.role}`)))}
+                      label={mine(o) && !several && face.name ? face.name : o.name}
+                      sub={notes.get(o.id) ?? t(modeKey(o, `mobile.me.role.${o.role}`))}
                       checked={here}
                       faint={g.quiet}
                       {...(!here && o.unread > 0 ? { value: String(o.unread) } : {})}
