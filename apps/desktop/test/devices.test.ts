@@ -76,6 +76,13 @@ describe("the iPhone setup's checklist", () => {
   test("an iPhone that needs a newer Xcode, or the Mac still preparing it, goes back to that step", () => {
     expect(at(READY, iphone({ state: "needs_you", reason: "xcode_too_old" })).current).toBe("xcode");
     expect(at(READY, iphone({ state: "preparing", reason: "device_support" }))).toMatchObject({ current: "tools" });
+    // The test helper's own reasons, from a runner that builds it: no Apple Account to sign it, not trusted yet.
+    const reason = (r: string) => r as RunnerPhone["reason"];
+    expect(at(READY, iphone({ state: "needs_you", reason: reason("apple_account_missing") })).current).toBe("account");
+    expect(at(READY, iphone({ state: "needs_you", reason: reason("helper_untrusted") }))).toMatchObject({
+      current: "helper",
+      state: "needs",
+    });
   });
 
   test("the download starts by itself only when Xcode is here and nothing downloads or failed", () => {

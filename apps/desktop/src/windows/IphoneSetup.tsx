@@ -12,6 +12,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useHost, useSnapshot, useStore } from "../app";
 import {
+  deviceServer,
   downloadDue,
   IPHONE_SETUP_STEPS,
   type IphoneSetupStep,
@@ -19,8 +20,8 @@ import {
   iphoneSteps,
   iphoneStepsUrl,
 } from "../control/devices";
-import { homeServer } from "../control/server";
 import { pairedHomes } from "../control/store";
+import { useLocalServer } from "../hooks";
 import { hintFor } from "../ui/settings";
 
 /** How often the Mac is asked while the window is open: Xcode installed, the download's progress, a new account. */
@@ -30,6 +31,7 @@ export function IphoneSetup({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
   const host = useHost();
   const store = useStore();
+  const local = useLocalServer();
   const home = pairedHomes(useSnapshot())[0];
   const homeId = home?.homeId;
   const [setup, setSetup] = useState<ControlIphoneSetup | null>(null);
@@ -38,11 +40,19 @@ export function IphoneSetup({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     if (!homeId) return;
     let live = true;
-    const ask = () =>
+    // One ask at a time: a slow `simctl` would otherwise stack a new check every tick.
+    let asking = false;
+    const ask = () => {
+      if (asking) return;
+      asking = true;
       void store
         .request(homeId, { type: "iphone.setup" })
         .then((s) => live && setSetup(s))
-        .catch(() => {});
+        .catch(() => {})
+        .finally(() => {
+          asking = false;
+        });
+    };
     ask();
     const timer = setInterval(ask, ASK_MS);
     return () => {
@@ -81,7 +91,8 @@ export function IphoneSetup({ onClose }: { onClose: () => void }) {
   const phone = iphoneHere(home?.status?.phones);
   const { states, current, done } = iphoneSteps(setup, phone);
   const mac = home?.status?.machine;
-  const server = home ? homeServer(home) : null;
+  // The server here's home points at its loopback, which a phone can't open: its public address instead.
+  const server = home ? deviceServer(home, local) : null;
   const orgId = home?.status?.org?.id;
   const reason = phone?.state === "ready" ? undefined : phone?.reason;
   const platform = setup?.platform;

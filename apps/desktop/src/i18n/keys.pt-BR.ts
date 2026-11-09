@@ -674,7 +674,6 @@ export const desktopPtBR = {
       folderDesc: "Uma pasta por workspace, com uma pasta para cada agente.",
     },
   },
-  /** The main window's cover (cover/main.ts): the server can't be reached (it tries again by itself), or the server here's state. */
   iphone: {
     lead: "Este {{device}} faz a configuração. Você só toca no iPhone quando um passo pedir.",
     account: "Conta Apple no Xcode",
@@ -686,7 +685,7 @@ export const desktopPtBR = {
     toolsProgress: "{{done}} de {{total}}",
     toolsPercent: "{{percent}}% baixado",
     toolsFailed: "O download parou: {{message}}",
-    accountText: "Adicione em Xcode\u00a0›\u00a0Ajustes\u00a0›\u00a0Contas. Uma Conta Apple gratuita basta.",
+    accountText: "Adicione em Xcode\u00a0›\u00a0Settings\u00a0›\u00a0Accounts. Uma Conta Apple gratuita basta.",
     openXcode: "Abrir o Xcode",
     personalTeam: "{{name}} · Equipe pessoal",
     unlockText: "Desbloqueie o iPhone e deixe desbloqueado por um momento.",
@@ -703,6 +702,7 @@ export const desktopPtBR = {
       "Para um iPhone de testes que fica conectado: Bloqueio Automático Nunca, atualizações automáticas desligadas, sem código, e este {{device}} na tomada.",
     progress: "Configuração do iPhone",
   },
+  /** The main window's cover (cover/main.ts): the server can't be reached (it tries again by itself), or the server here's state. */
   cover: {
     offline: "Sem conexão com a internet · tentando de novo…",
     unreachable: "Sem acesso a {{host}} · tentando de novo…",

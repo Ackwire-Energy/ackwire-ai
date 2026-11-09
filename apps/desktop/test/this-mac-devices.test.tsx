@@ -110,8 +110,12 @@ describe("Preferences › This Mac", () => {
 describe("the iPhone setup window", () => {
   test("Preferences' Show me how opens it in the welcome window; the Mac downloads what Xcode needs by itself", async () => {
     writePref(IPHONE_SETUP_PREF, true);
-    await mount("welcome", <WindowView name="welcome" />, async (el) => {
+    await mount("welcome", <WindowView name="welcome" />, async (el, host) => {
       await until(() => el.querySelector('[data-screen="iphone"]') && el.querySelector('[aria-current="step"]'));
+      expect(readPref(IPHONE_SETUP_PREF, true)).toBe(false);
+      // Asked again while it shows: taken at once, so the next welcome window is the first run again.
+      writePref(IPHONE_SETUP_PREF, true);
+      await act(() => host.showWindow("welcome"));
       expect(readPref(IPHONE_SETUP_PREF, true)).toBe(false);
       expect(el.querySelector("h1")?.textContent).toBe("Connect an iPhone");
       // Xcode is there, the iOS platform isn't: it starts downloading and reaches the iPhone's own step.

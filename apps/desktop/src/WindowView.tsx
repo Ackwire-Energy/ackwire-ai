@@ -29,8 +29,11 @@ function Welcome() {
   useEffect(() => {
     if (iphone) writePref(IPHONE_SETUP_PREF, false);
   }, [iphone]);
+  // Cleared here too: asked again while it already shows, the state doesn't change and the effect wouldn't run.
   useOnShown("welcome", () => {
-    if (readPref(IPHONE_SETUP_PREF, false)) setIphone(true);
+    if (!readPref(IPHONE_SETUP_PREF, false)) return;
+    writePref(IPHONE_SETUP_PREF, false);
+    setIphone(true);
   });
   return iphone ? <IphoneSetup onClose={() => void host.hideWindow("welcome").catch(() => {})} /> : <FirstRun />;
 }

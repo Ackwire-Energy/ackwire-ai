@@ -85,6 +85,10 @@ const PHONE_STEP: Partial<Record<string, IphoneSetupStep>> = {
   ui_automation_off: "uiAutomation",
   helper_missing: "helper",
   helper_expired: "helper",
+  // Reasons a newer runner may report (the test helper's builder): keyed by string, so an older type still compiles.
+  apple_account_missing: "account",
+  helper_untrusted: "helper",
+  team_limit: "helper",
 };
 
 /**
@@ -104,7 +108,7 @@ export function iphoneSteps(
   else if (!setup.xcode || fromPhone === "xcode") at = "xcode";
   else if (setup.platform.state !== "installed" || fromPhone === "tools")
     [at, mac] = ["tools", setup.platform.state !== "failed"];
-  else if (!setup.account) at = "account";
+  else if (!setup.account || fromPhone === "account") at = "account";
   else if (!phone) [at, mac] = ["connected", true];
   else if (fromPhone) [at, mac] = [fromPhone, fromPhone === "helper" && phone.state === "preparing"];
   else if (phone.state !== "ready") [at, mac] = ["helper", phone.state === "preparing"];
