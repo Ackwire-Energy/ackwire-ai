@@ -406,9 +406,14 @@ html:not([data-pointer]) .onb__logo:focus-visible {
   padding-bottom: var(--space-6);
   font-size: 14px;
 }
-/* The preview: the workspace's sidebar at its own size, in a frame, showing only what exists now. */
+/*
+ * The preview: the workspace's sidebar at its own size, in a frame, showing only what exists now. Never wider: the
+ * sidebar's one-line names (a long workspace or person) end in its ellipsis there, as in the app, instead of widening
+ * the preview into the question's column.
+ */
 .onb-preview {
   flex: 0 0 272px;
+  min-width: 0;
   position: sticky;
   top: 0;
   padding-top: 40px;
