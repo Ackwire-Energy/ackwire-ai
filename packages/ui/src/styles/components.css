@@ -1686,13 +1686,15 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
   min-width: 0;
 }
 /* Its actions keep their one line: where they and the sentence don't fit side by side, they go under the sentence
-   instead of squeezing it to a word a line. */
+   instead of squeezing it to a word a line. There the first action's hairline, drawn 1px left of the actions, falls
+   outside the frame and is cut, so the frame's left edge stays one line. The plates stay inside its corners too. */
 .ac-eventpill__frame {
   display: inline-flex;
   flex-wrap: wrap;
   align-items: stretch;
   max-width: 100%;
   min-height: var(--control-h-sm);
+  overflow: hidden;
   border-radius: var(--control-r-sm) var(--control-r-sm) var(--control-r-sm) 3px;
   box-shadow: inset 0 0 0 1px var(--line2);
   font-size: 13.5px;
@@ -1751,6 +1753,7 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
   align-items: stretch;
   /* Under the sentence, still the frame's height. */
   min-height: inherit;
+  margin-left: -1px;
 }
 .ac-eventpill__action {
   display: inline-flex;
@@ -1789,9 +1792,10 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
   cursor: progress;
   opacity: 0.6;
 }
+/* Inside the action: the frame cuts what passes its edges. */
 html:not([data-pointer]) .ac-eventpill__action:focus-visible {
   outline: none;
-  box-shadow: var(--focus-ring);
+  box-shadow: var(--focus-ring-inset);
 }
 @media (prefers-reduced-motion: reduce) {
   .ac-eventpill__chev {

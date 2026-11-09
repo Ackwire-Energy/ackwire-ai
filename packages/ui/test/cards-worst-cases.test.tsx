@@ -14,12 +14,18 @@ const body = () => within(document.body);
  * The worst realistic data through the heads that keep words beside their actions: CI's geometry check lays these
  * screens out at 1280, 320 and 390 (the capture preload saves them), so a head that squeezes its title fails there.
  */
-test("an event pill's line is the control's 32: 7 over and under its 18px line", async () => {
+test("an event pill's line is the control's 32: 7 over and under its 18px line, one hairline on its left edge", async () => {
   const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
   const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
   expect(rule(".ac-eventpill__main")).toContain("padding: 7px 12px");
   expect(rule(".ac-eventpill__frame")).toContain("line-height: 18px");
   expect(rule(".ac-eventpill__frame")).toContain("min-height: var(--control-h-sm)");
+  // Actions that went under the sentence start on the frame's edge: their first hairline, 1px out, is cut there.
+  expect(rule(".ac-eventpill__frame")).toContain("overflow: hidden;");
+  expect(rule(".ac-eventpill__actions")).toContain("margin-left: -1px;");
+  expect(rule(".ac-eventpill__action")).toContain("border-left: 1px solid var(--line);");
+  // The frame cuts what passes it: an action's focus ring is drawn inside it.
+  expect(rule("html:not([data-pointer]) .ac-eventpill__action:focus-visible")).toContain("var(--focus-ring-inset)");
 });
 
 describe("worst cases: words and their actions", () => {
