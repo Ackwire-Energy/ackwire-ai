@@ -438,6 +438,8 @@ html:not([data-pointer]) .consult-pair__row:focus-visible {
   width: 15px;
   height: 15px;
   margin: 0 1px;
+  /* On the names' capitals' middle, which in this 13px line sits 1px above the row's middle (measured). */
+  translate: 0 -1px;
 }
 .consult-pair__faces {
   flex: none;
