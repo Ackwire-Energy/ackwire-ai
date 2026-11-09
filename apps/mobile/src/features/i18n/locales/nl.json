@@ -2140,7 +2140,8 @@
     "suggested": "Op basis van je e-mail bij {{domain}} stelde ik {{org}} voor.",
     "create": "Aanmaken",
     "shareMessage": "Kom bij {{org}} op agentes.chat: {{url}}",
-    "failed": "Opslaan lukte niet. Probeer het opnieuw."
+    "failed": "Opslaan lukte niet. Probeer het opnieuw.",
+    "enter": "Naar de werkruimte"
   },
   "ai": {
     "yourPlan": "Je AI-abonnement",

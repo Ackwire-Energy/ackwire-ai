@@ -185,7 +185,7 @@ export function SetupNotice() {
       <Pressable
         onPress={() => router.push("/computer-setup")}
         accessibilityRole="button"
-        accessibilityLabel={`${title}. ${line}`}
+        accessibilityLabel={line ? `${title}. ${line}` : title}
         style={({ pressed }) => [styles.card, surface, pressed && styles.pressed]}
       >
         <LineIcon variant="callout" size={22}>
@@ -195,9 +195,11 @@ export function SetupNotice() {
           <Text variant="callout" tone="ink" style={styles.bold} numberOfLines={2}>
             {title}
           </Text>
-          <Text variant="small" tone="muted" numberOfLines={2}>
-            {line}
-          </Text>
+          {line ? (
+            <Text variant="small" tone="muted" numberOfLines={2}>
+              {line}
+            </Text>
+          ) : null}
         </View>
         {/* On the title's line, as the icon on the left: in the card's middle it floated between the lines. */}
         <LineIcon variant="callout" name="right" size={16} color={c.faint} />

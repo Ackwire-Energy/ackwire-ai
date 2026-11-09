@@ -2038,7 +2038,8 @@
     "suggested": "Dari emailmu di {{domain}}, aku menyarankan {{org}}.",
     "create": "Buat",
     "shareMessage": "Gabung ke {{org}} di agentes.chat: {{url}}",
-    "failed": "Tidak bisa menyimpan. Coba lagi."
+    "failed": "Tidak bisa menyimpan. Coba lagi.",
+    "enter": "Masuk ke ruang kerja"
   },
   "ai": {
     "yourPlan": "Paket AI-mu",

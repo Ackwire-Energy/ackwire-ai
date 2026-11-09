@@ -11,7 +11,6 @@ import {
   createFakeApi,
   ENG_ID,
   GENERAL_ID,
-  LODI_ID,
   ORG_ID,
   seedDm,
   seedState,
@@ -43,7 +42,7 @@ describe("route guards", () => {
     expect(screen().getByRole("heading", { name: "Como se chama o seu workspace?" })).toBeTruthy();
   });
 
-  test("a workspace still being set up is finished for its owner and opens in its right hand's DM; never for someone invited", async () => {
+  test("a workspace still being set up resumes in the onboarding for its owner, at its next step; never for someone invited", async () => {
     const as = (role: "owner" | "member") => {
       // Left at the older onboarding's agents step.
       const state = withRightHand(seedState({ agents: [] }));
@@ -54,8 +53,9 @@ describe("route guards", () => {
     for (const path of ["/", `/org/${ORG_ID}`, `/org/${ORG_ID}/drive`]) {
       const { router } = await renderApp(path, { api: as("owner") });
       await settle(10);
-      expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/dm/agent/${LODI_ID}`);
-      // Never the form that would make another workspace.
+      expect(router.state.location.pathname).toBe("/onboarding");
+      // At what it does, its next step (ADR 0158): never the form that would make another workspace.
+      expect(screen().getByRole("heading", { name: "O que a Acme faz?" })).toBeTruthy();
       expect(screen().queryByRole("heading", { name: "Como se chama o seu workspace?" })).toBeNull();
       cleanup();
     }

@@ -87,7 +87,7 @@ Amended 2026-11-04: on a plan, the plan's owner pays, as for any agent on a plan
 
 ## Consequences
 
-- Every workspace gets one more agent row. Lists that count "the team" leave it out; its row is its entry: the first row of Agentes, where the agents' DMs live (the web sidebar and Conversas on the phone), on a soft tint of the agent blue with "seu braço direito", outside the section's sorting and pins, never dragged or hidden, and still shown while Agentes is closed (alone on top of Conversas while there is no Agentes section); never under Mensagens diretas.
+- Every workspace gets one more agent row. Lists that count "the team" leave it out; its row is its entry: the first row of Agentes, where the agents' DMs live (the web sidebar and Conversas on the phone), on a soft tint of the agent blue with "seu braço direito", outside the section's sorting and pins, never dragged or hidden, and still shown while Agentes is closed (alone on top of Conversas while there is no Agentes section); never under Mensagens diretas. Amended 2026-11-09 (ADR 0158): the workspace's agent count under its name ("1 membro · 4 agentes") counts it, as it lists it right under that count; "seu braço direito" is its one role name everywhere (its panel, its card and the phone's screens too, never the stored "Workspace assistant"); and it is never away (ADR 0084 §15).
 - `agents.coordinator` and its index stay in the database, read and written by nothing, until no running version selects them (`check:migrations`); a later migration drops them. Workspaces that had a coordinator get an ordinary agent back, and nothing is posted.
 - Stored decisions keep their strategy `rule:coordinator`, read as the default rule's line, and still count toward the per-channel cap for their hour.
 - `PATCH …/agents/{agentId}` ignores an incoming `coordinator` and answers 200, because phones without an over-the-air update still send it.
@@ -330,3 +330,9 @@ Asked to create a role for a marketing person who may not merge or deploy, the r
 - The catalog's invitations and requests to join send email through the server's address and secret, passed to the setup tools and the card's route.
 - Left for later, in the audit's order: a task's or a page's audience, approval covers, deleting tasks and board columns, the language and the rest of their own settings, pins and channel categories, invitation links, the task manager's paused runs, routines' stop, duplicate and take over, models and per-person limits, the Drive, the calendar, skills, agents' extras, proposals waiting on them, apps, AI keys and computers housekeeping, knowledge and memories by hand, dashboards' extras and missions. Also not in the catalog yet: undoing another agent's change from its receipt, correcting an agent's reply (a lesson), Responder agora, an agent's request to show a board to more people, a new agent's setup checklist, and one agent's Quem pensa and Autonomia for others. Posting as the right hand elsewhere waits on the owner's call.
 - Desfazer of taking a role away gives the role back, not the seats in the channels the person left with it (they may join again through it), nor the notifications those channels cleared. Leaving a private channel through `channel_people` is undone only by someone who manages it.
+
+## Amendment (2026-11-08): the onboarding has four steps before the DM (§6)
+
+ADR 0158: the workspace's name, what it does, its team from a template and, where the workspace waits for its first
+plan, the plan come before the workspace opens, on the blue rail with the right hand on its horizon. Paid or done, it
+opens in #general, where the team says hi; the plan left for later opens the right hand's DM.

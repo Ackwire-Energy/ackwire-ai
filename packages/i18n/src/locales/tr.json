@@ -671,6 +671,42 @@
       "left_other": "{{count}} adım kaldı",
       "done": "Her şey hazır"
     },
+    "flow": {
+      "steps": {
+        "name": "Çalışma alanı adı",
+        "business": "Ne yapıyorsunuz",
+        "team": "Ekibin",
+        "plan": "Ekibi başlat"
+      },
+      "stepOf": "Adım {{n}}/{{total}}",
+      "lodi": {
+        "name": "Merhaba {{first}}. Ben {{name}}. Ekibi seninle yaklaşık iki dakikada kuracağım.",
+        "business": "Bununla ekibe kimi çağıracağımı biliyorum.",
+        "team": "Ben olsam bu ekibi kurardım. Her şeyi sonra değiştirebilirsin.",
+        "plan": "Plandan sonra sadece bir yapay zeka bağlamak kalıyor. Nerede olduğunu gösteririm."
+      },
+      "preview": {
+        "label": "Sen cevapladıkça çalışma alanın",
+        "name": "Çalışma alanın",
+        "ghost": "Ekibin burada görünecek"
+      },
+      "team": {
+        "title": "Ekibin"
+      },
+      "plan": {
+        "title": "Ekibini başlat",
+        "lead": "Ekibin hazır. Plan ve bir yapay zekayla bugün başlıyor.",
+        "asleep": "Plana kadar uykuda",
+        "price": "<b>{{name}} planı</b> · ayda {{price}}",
+        "name": "<b>{{name}} planı</b>",
+        "generic": "Bir agentes.chat planı",
+        "cancel": "İstediğin zaman iptal et",
+        "cta": "Ekibi başlat",
+        "all": "Tüm planları gör",
+        "skip": "Başlatmadan çalışma alanına gir"
+      },
+      "account": "Hesabın"
+    },
     "railValue": {
       "context": "Yazıldı",
       "skipped": "Atlandı",
@@ -1303,27 +1339,19 @@
     }
   },
   "webPushAsk": {
-    "title": "Bir ajan size ihtiyaç duyduğunda haberiniz olsun",
-    "text": "Siz başka bir şey yaparken onlar çalışır. Sekme kapalıyken bile onayınıza ihtiyaç duyduklarında, istediğinizi bitirdiklerinde ya da sizi çağırdıklarında size haber veririz.",
     "on": "Bildirimleri aç",
     "later": "Şimdi değil",
     "done": "Bu tarayıcıda bildirimler açık",
     "failed": "Bildirimler açılamadı. Ayarlar › Bildirimler bölümünden yeniden deneyin.",
     "someone": "Bir ajan",
-    "examples": "Bildirim örnekleri",
     "now": "şimdi",
-    "minutes": "{{n}} dk",
-    "approval": {
-      "title": "{{name}} onayınızı bekliyor",
-      "body": "İstediğiniz şeye devam edebilir miyim?"
-    },
     "finished": {
       "title": "{{name}} bitirdi",
       "body": "İstediğiniz şey hazır."
     },
-    "mention": {
-      "title": "{{name}} sizi çağırdı",
-      "body": "Bir dakikanız olduğunda bakabilir misiniz?"
+    "inline": {
+      "title": "{{name}} cevap verdiği anda haberin olsun mu?",
+      "why": "Sekme kapalıyken bile. İstediğin zaman Ayarlar › Bildirimler bölümünden değiştir."
     }
   },
   "shell": {
@@ -1966,7 +1994,6 @@
   "rightHand": {
     "label": "sağ kolun",
     "newDot": "Yeni",
-    "role": "Çalışma alanı asistanı",
     "actsAsYou": "senin izinlerinle çalışır",
     "composerHint": "sen olmadan hiçbir şey değişmez",
     "intro": {
@@ -1982,9 +2009,6 @@
         "question": "Ekibi benimle kurmak ister misin?",
         "action": "Ekibi kur",
         "message": "Ekibi kurmama yardım et."
-      },
-      "next": {
-        "firstTask": "{{name}} için ilk görevi ver"
       },
       "style": {
         "question": "Sizinle nasıl konuşmamı istersiniz?",
@@ -5230,31 +5254,17 @@
       "notNow": "Şimdi değil",
       "afterPlan": "Planla açılır.",
       "about": {
-        "todo": "{{org}} ne yapıyor, anlat.",
-        "todoDesc": "Bunu tüm ajanlar okur.",
-        "action": "Anlat",
-        "done": "{{org}} ne yapıyor biliyorum",
         "title": "{{org}} ne yapıyor?",
         "desc": "Bunu tüm ajanlar okur. İstediğin zaman değiştirebilirsin.",
         "line": "Tek cümleyle",
         "optional": "İsteğe bağlı. Cümle yoksa seçtiğin tür geçerli."
-      },
-      "team": {
-        "todo": "Ekibi kur.",
-        "todoDesc": "İşin için bir şablon, sonra her şeyi değiştirebilirsin.",
-        "action": "Ekibi gör",
-        "done_one": "Ekipte {{count}} ajan",
-        "done_other": "Ekipte {{count}} ajan",
-        "card": "Aşağıdaki kartta devam et"
       },
       "ai": {
         "todo": "Bir yapay zekâ bağla.",
         "todoDesc": "Zaten ödediğin olur.",
         "action": "Bağla",
         "done": "{{label}} ile düşünüyorum",
-        "doneAny": "Artık bir yapay zekâ ile düşünüyorum",
-        "plan": "agentes.chat planıyla açılır.",
-        "planAction": "agentes.chat planlarını gör"
+        "doneAny": "Artık bir yapay zekâ ile düşünüyorum"
       },
       "apps": {
         "todo": "İş uygulamalarını bağla.",
@@ -5273,14 +5283,17 @@
         "action": "Davet et",
         "done_one": "Burada {{count}} kişi",
         "done_other": "Burada {{count}} kişi",
-        "doneNone": "Şimdilik sadece sen"
+        "doneNone": "Şimdilik sadece sen",
+        "invited": "{{names}} davet edildi · bekleniyor",
+        "email": "ad@sirket.com",
+        "send": "Gönder",
+        "more": "Diğer seçenekler"
       },
       "say": {
-        "about": "Not aldım. Bunu tüm ajanlar okur.",
-        "team": "Ekip geldi.",
         "ai": "Artık ekip düşünüyor.",
         "apps": "Tamam, artık uygulamaları okuyorum.",
-        "people": "Burada daha çok insan olması güzel."
+        "people": "Burada daha çok insan olması güzel.",
+        "invited": "Davet gönderildi."
       },
       "asks": {
         "lead": "Şimdi benden bir şey iste:",
@@ -16382,9 +16395,8 @@
     "firstTask": {
       "suggestion": "öneri",
       "lead": "Her ajan için kısa bir görev, bugün her birini çalışırken gör.",
-      "heldLead": "Her ajan için kısa bir görev. Cümleyi tamamlayıp gönder. Çalışma alanının agentes.chat planı olunca başlarlar.",
-      "example": "{{name}} tarafından sunulanlara örnek",
       "open": "Görevle aç",
+      "finish": "Cümleyi tamamla ve gönder",
       "invite": "{{names}} davet et",
       "later": "Sonra"
     },
@@ -16537,7 +16549,7 @@
     },
     "software": {
       "name": "Yazılım ve uygulamalar",
-      "sub": "Destek, ödeme ve kod",
+      "sub": "Müşteri hizmetleri, ödemeler ve kod",
       "desc": "Yazılım satan ve kendi müşterileriyle ilgilenen bir şirket için."
     },
     "support": {
@@ -16550,60 +16562,75 @@
       "sub": "Muhasebe, hukuk, danışmanlık",
       "desc": "Müşterilere randevu veren, teklif gönderen ve fatura kesen bir ofis için."
     },
+    "hello": {
+      "lodi": {
+        "starting": "Plan aktif! Bilgisayarım açılıyor. Hadi işe başlayalım!",
+        "ready": "Plan aktif! Hadi işe başlayalım!",
+        "created": "Ekip hazır! Hadi işe başlayalım!"
+      },
+      "lodiNoAi": {
+        "starting": "Plan aktif! Bilgisayarım açılıyor. Bir yapay zeka bağla, işe başlayalım.",
+        "ready": "Plan aktif! Bir yapay zeka bağla, işe başlayalım.",
+        "created": "Ekip hazır! Bir yapay zeka bağla, işe başlayalım."
+      }
+    },
     "agents": {
       "iara": {
         "role": "Müşteri hizmetleri",
         "line": "Müşterilere WhatsApp ve e-postadan yanıt verir. Bilmediğinde seni çağırır.",
         "routine": "Yanıtsız kalanları özetle",
-        "task": "Bu müşteri mesajına bir yanıt yaz:"
+        "task": "Bu müşteri mesajına bir yanıt yaz:",
+        "hello": "Merhaba {{first}}! WhatsApp'tan yazanları bana bırak."
       },
       "caio": {
         "role": "Tahsilat",
         "line": "Ödemesi gecikenlere hatırlatır ve onayından sonra ödeme hatırlatmasını gönderir.",
         "routine": "Ödemesi gecikenleri listele",
-        "task": "Şu kişi için nazik bir ödeme hatırlatması yaz:"
+        "task": "Şu kişi için nazik bir ödeme hatırlatması yaz:",
+        "hello": "Merhaba! Ödemeleri ben takip ederim ve hatırlatmayı yalnızca senin onayından sonra gönderirim."
       },
       "ada": {
         "role": "Dev",
         "line": "Müşterilerin bildirdiği hataları düzeltir ve PR açar.",
         "routine": "Yeni hataları listele",
-        "task": "Bu hatayı araştırmaya nereden başlayacağımı söyle:"
+        "task": "Bu hatayı araştırmaya nereden başlayacağımı söyle:",
+        "hello": "Selam! Gelen hataları bana gönderin, inceleyip PR'ı açarım."
       },
       "lia": {
         "role": "İçerik",
         "line": "Şirketin üslubuyla gönderi ve senaryo yazar, onayından sonra planlar.",
         "routine": "Haftanın gönderilerini öner",
-        "task": "Şu konuda bu hafta için üç gönderi öner:"
+        "task": "Şu konuda bu hafta için üç gönderi öner:",
+        "hello": "Herkese merhaba! Bu haftanın gönderileri bende."
       },
       "theo": {
         "role": "Satış",
         "line": "Teklif isteyen herkesi takip eder ve teklifleri yazar.",
         "routine": "Teklif isteyip yanıt alamayanları listele",
-        "task": "Bu talep için kısa bir teklif yaz:"
+        "task": "Bu talep için kısa bir teklif yaz:",
+        "hello": "Merhaba {{first}}! Teklif isteyen kimse cevapsız kalmayacak."
       },
       "nina": {
         "role": "Randevu",
         "line": "Randevu verir, onaylar, değiştirir ve müşterilere bir gün önce hatırlatır.",
         "routine": "Yarının randevularını onayla",
-        "task": "Yarının şu saatlerini düzenle:"
+        "task": "Yarının şu saatlerini düzenle:",
+        "hello": "Merhaba! Ajanda bende, müşterilere bir gün önceden hatırlatırım."
       },
       "otto": {
         "role": "Siparişler",
         "line": "Siparişleri ve stoku takip eder, biten şeyleri haber verir.",
         "routine": "Stokta bitmek üzere olanları haber ver",
-        "task": "Bu siparişlerde yapılacak işleri listele:"
+        "task": "Bu siparişlerde yapılacak işleri listele:",
+        "hello": "Geldim. Siparişleri takip eder, stok azalınca haber veririm."
       },
       "bia": {
         "role": "Yanıt tabanı",
         "line": "Yanıt tabanını ekibin verdiği yanıtlarla güncel tutar.",
         "routine": "Tabanı haftanın yanıtlarıyla güncelle",
-        "task": "Bu müşteri sorularının yanıtlarını yaz:"
+        "task": "Bu müşteri sorularının yanıtlarını yaz:",
+        "hello": "Selam! Cevap tabanını ekibin verdiği cevaplarla güncel tutacağım."
       }
-    },
-    "example": {
-      "iara": "Merhaba Marina. Siparişin dün yola çıktı ve cumaya kadar ulaşacak. Takip kodu hemen aşağıda. Cuma uymazsa başka bir tarih bulurum.",
-      "lia": "1. Ajans seçerken yapılan üç yaygın hata. 2. Neredeyse ters giden bir projenin perde arkası. 3. Takipçilerinize bir soru: burada ne görmek istersiniz?",
-      "nina": "Yarın: 9:00 Carla, 10:30 Pedro, 14:00 boş. Pedro henüz onaylamadı. Ona yazayım mı?"
     },
     "channels": {
       "iara": "destek",

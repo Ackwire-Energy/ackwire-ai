@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next";
 import type { ApiClient } from "../api/client";
-import type { Agent, AgentBrain, BrainScope, Credential, DirectMessage, Model } from "../api/types";
+import type { Agent, AgentBrain, AgentStatus, BrainScope, Credential, DirectMessage, Model } from "../api/types";
 import { agentGrammar } from "./grammar";
 import { AUTO, keyRuns } from "./providers";
 
@@ -162,8 +162,9 @@ export const offersTeamSetup = (s: {
 /**
  * The cards under the right hand's greeting at the top of its DM besides the first-run checklist (ADR 0137, ADR 0155
  * §6), one question at a time. The owner's checklist has the setup in its rows: while it is open nothing else asks,
- * and once complete, how the person wants agents to talk to them (ADR 0147) until they pick. Anyone else: Connect AI
- * while there is none, then that question. On a billing hold neither: an AI comes after the plan.
+ * and once complete, how the person wants agents to talk to them (ADR 0147) until they pick, asked only once the team
+ * answered them (`answered`), so it never stands beside the first task. Anyone else: Connect AI while there is none,
+ * then that question. On a billing hold neither: an AI comes after the plan.
  */
 export function introCards(s: {
   noAi: boolean;
@@ -176,9 +177,20 @@ export function introCards(s: {
   /** A no-AI card already answered them in this conversation: its Connect is the one to press. */
   noAiCard?: boolean;
   checklist?: FirstRunState;
+  /** `teamAnswered`; absent, nothing to wait for. */
+  answered?: boolean;
 }): ("connect" | "style")[] {
   if (s.checklist === "open") return [];
   if (s.noAi && !s.held && s.checklist !== "complete") return s.noAiCard ? [] : ["connect"];
-  if (s.askStyle && s.aiKnown && !s.held) return ["style"];
+  if (s.askStyle && s.aiKnown && !s.held && s.answered !== false) return ["style"];
   return [];
 }
+
+/**
+ * A team agent has worked (`activeAt`: its last run's end, null while it never did): the person's first task had its
+ * answer, or a routine ran. With no team there is no first task to wait for; before the statuses load, it waits.
+ */
+export const teamAnswered = (
+  team: readonly Pick<Agent, "id">[],
+  statuses: readonly Pick<AgentStatus, "agentId" | "activeAt">[] | undefined,
+) => team.length === 0 || (statuses?.some((s) => s.activeAt !== null && team.some((a) => a.id === s.agentId)) ?? false);

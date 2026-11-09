@@ -6388,5 +6388,8 @@
   },
   "empty.audit.text": {
     "value": "When an agent does something outside the conversation, it shows up here."
+  },
+  "onb.enter": {
+    "value": "Go to the workspace"
   }
 }

@@ -7062,6 +7062,15 @@ html:not([data-pointer]) .run-continue:focus-visible {
   --sky-glass: rgba(241, 248, 255, 0.74);
   --sky-line: rgba(4, 32, 63, 0.12);
 }
+/* A label on a sky (a name, a state): the kit's chip in the sky's glass and ink, readable on every tone of the sky's
+   dither in both themes. */
+.ac-chip.sky-chip {
+  background: var(--sky-glass);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 0 0 1px var(--sky-line);
+  color: var(--sky-ink);
+}
 
 /* Channel: the greeting of a new day */
 .sky-welcome {
@@ -8393,13 +8402,12 @@ html:not([data-pointer]) .onb__step:focus-visible {
 .onb__step[aria-current="step"] .onb__step-name {
   font-weight: 650;
 }
+/* What a done step answered wraps whole (a long workspace or agent name keeps every word). */
 .onb__step-sub {
-  overflow: hidden;
   font-size: 12.5px;
   font-weight: 450;
   color: var(--faint);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 /* Progress, each step's column, the import and the welcome: pages/onboarding.css. */
 .onb__head {
@@ -13480,68 +13488,68 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
   border-top: 0;
 }
 
-/* The notifications dialog (WebPush.tsx `WebPushAsk`, ADR 0071): three notifications as the computer shows them,
-   stacked like the phone's sheet, then "Ativar avisos" and "Agora não" full width. */
-.web-push-ask {
-  gap: 16px;
-}
-.web-push-ask__examples {
-  list-style: none;
-  margin: 0;
-  padding: 4px 0 0;
+/* Our notifications ask (WebPush.tsx `PushAskInline`, ADR 0071), under an agent's answer: the question, a
+   notification as the computer shows it, why, "Ativar avisos" and "Agora não". One card width with the other cards. */
+.push-ask {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-3);
+  max-width: var(--msg-card-w);
+  margin-top: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--raised);
+  box-shadow: var(--e1);
+  transition:
+    opacity 0.3s var(--out),
+    transform 0.3s var(--out);
 }
-.web-push-ask__example {
+/* It comes under an answer that just arrived: it rises in, never pops. */
+@starting-style {
+  .push-ask {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  @starting-style {
+    .push-ask {
+      transform: none;
+    }
+  }
+}
+.push-ask__title {
+  gap: var(--space-2);
+  margin: 0;
+  font-size: 14.5px;
+  overflow-wrap: anywhere;
+}
+.push-ask__why {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.push-ask__acts {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 14px;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+/* A notification as the computer shows it: a MediaRow (the face and the title on one line, the words full width). */
+.web-push-ask__example {
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
   background: var(--raised);
   box-shadow: var(--e2);
-}
-.web-push-ask__example img {
-  flex: none;
-  border-radius: 8px;
-}
-.web-push-ask__text {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-.web-push-ask__top {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-.web-push-ask__top strong {
-  flex: 1;
-  min-width: 0;
-  font-size: 13.5px;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.web-push-ask__top span {
-  font-size: 12px;
-  color: var(--faint);
 }
 .web-push-ask__body {
   font-size: 13px;
   line-height: 18px;
   color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
-.web-push-ask__acts {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+@media (max-width: 640px) {
+  .push-ask__acts > .ac-btn--primary {
+    flex: 1;
+  }
 }
 
 /* The person's own settings, Sua conta and Notificações (PrefRow in NoticePrefs.tsx): settings rows with an icon

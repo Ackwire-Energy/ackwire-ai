@@ -1812,7 +1812,7 @@ function Chat({
   }, [list]);
   const [offerAt, setOfferAt] = useState<string | null>(null);
   const { markOffered } = push;
-  const mayOffer = push.offer.home && member;
+  const mayOffer = push.offer.answer && member;
   useEffect(() => {
     if (offerAt || !longWorkAt || !mayOffer) return;
     setOfferAt(longWorkAt);

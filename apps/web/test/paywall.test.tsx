@@ -249,6 +249,11 @@ test("a first task opens with the caret at its blank, in the box", async () => {
   expect(document.activeElement).toBe(box);
   expect(box.selectionStart).toBe(box.value.length);
   expect(box.value.endsWith(": ")).toBe(true);
+  // Until the person types, a line over the box says what the blank is for.
+  expect(screen().getByRole("note").textContent).toBe("Complete a frase e envie");
+  await act(async () => fireEvent.change(box, { target: { value: `${box.value}Oi, Marina` } }));
+  await settle(2);
+  expect(screen().queryByRole("note")).toBeNull();
 });
 
 describe("Lodi's DM on a hold", () => {
@@ -279,37 +284,20 @@ describe("Lodi's DM on a hold", () => {
     expect(text).toContain("Crio os agentes, conecto os apps e convido as pessoas.");
   });
 
-  test("rows 1 and 2 open; the AI row leads to the plan; apps and people wait for it; no asks (ADR 0155 §6)", async () => {
+  test("every row waits for the plan, whose one button is the banner's; no asks (ADR 0158)", async () => {
     await open(lodi(), dm);
-    expect(within(row("Me conte o que a Acme faz.")).getByRole("button", { name: "Contar" })).toBeTruthy();
-    expect(within(row("Monte o time.")).getByRole("button", { name: "Ver o time" })).toBeTruthy();
-    expect(
-      within(row("Abre com o plano do agentes.chat.")).getByRole("button", { name: "Ver planos do agentes.chat" }),
-    ).toBeTruthy();
-    for (const waits of ["Conecte os apps do trabalho.", "Chame quem trabalha com você."]) {
+    for (const waits of ["Conecte uma IA.", "Conecte os apps do trabalho.", "Chame quem trabalha com você."]) {
       expect(row(waits).textContent).toContain("Abre com o plano.");
       expect(within(row(waits)).queryByRole("button")).toBeNull();
     }
+    expect(document.querySelector(".setup-cl")?.querySelectorAll("button")).toHaveLength(0);
     expect(document.body.textContent).not.toContain("Agora me peça algo:");
   });
 
   test("a saved key on a hold reads as ready, and still the AI row waits for the plan", async () => {
     await open(lodi({ any: true, agents: [{ agentId: LODI_ID, state: "ready" }] }), dm);
-    expect(row("Abre com o plano do agentes.chat.")).toBeTruthy();
-    expect(document.querySelector(".setup-cl__head small")?.textContent).toBe("0 de 5");
-  });
-
-  test("row 1 saves what the workspace does on a hold, sending no message", async () => {
-    const state = lodi();
-    await open(state, dm);
-    await click(within(row("Me conte o que a Acme faz.")).getByRole("button", { name: "Contar" }));
-    const dialog = screen().getByRole("dialog", { name: "O que a Acme faz?" });
-    await click(within(dialog).getByRole("button", { name: "Loja online" }));
-    await click(within(dialog).getByRole("button", { name: "Salvar" }));
-    expect(calls(state, "orgs.updateSettings").map((c) => c.args[1])).toEqual([{ context: "Loja online" }]);
-    expect(calls(state, "chat.send")).toHaveLength(0);
-    // Straight into the team, its template picked.
-    expect(screen().getByRole("dialog", { name: "Modelos de time" })).toBeTruthy();
+    expect(row("Conecte uma IA.").textContent).toContain("Abre com o plano.");
+    expect(document.querySelector(".setup-cl__head small")?.textContent).toBe("0 de 3");
   });
 });
 
@@ -335,7 +323,6 @@ describe("Primeira tarefa on a hold", () => {
     approvals: "",
     invite: ["bia@acme.com"],
     template: "store",
-    example: "Oi, Marina!",
   } as unknown as TeamProposalCard["params"];
   const created: Partial<TeamProposalCard> = {
     kind: "team_proposal",
@@ -359,24 +346,29 @@ describe("Primeira tarefa on a hold", () => {
     createdAt: NOW.toISOString(),
   });
 
-  test("the lead, the labelled example and the plans, with nobody to invite yet", async () => {
+  test("it waits for the plan: no task, no example and no plans button on a hold", async () => {
     const state = withRightHand(held(seedState()));
     state.messages.push(made());
     await open(state);
-    const text = document.body.textContent ?? "";
-    expect(text).toContain("Complete a frase e envie.");
-    expect(text).toContain("Exemplo do que Ada entrega");
-    expect(text).toContain("Oi, Marina!");
-    expect(screen().queryByRole("button", { name: /Convidar/ })).toBeNull();
-    expect(screen().getAllByRole("button", { name: PLANS }).length).toBeGreaterThan(0);
+    expect(screen().queryByRole("group", { name: "Primeira tarefa" })).toBeNull();
+    expect(document.body.textContent).not.toContain("Exemplo do que");
   });
 
-  test("with a plan in force, no example and no plans button", async () => {
+  test("with a plan in force and an AI: the tasks and the invite, no plans button", async () => {
     const state = withRightHand(seedState());
     state.messages.push(made());
     await open(state);
-    expect(document.body.textContent).not.toContain("Exemplo do que");
+    expect(screen().getByRole("group", { name: "Primeira tarefa" }).textContent).toContain(
+      "Escreva uma resposta para esta mensagem de cliente:",
+    );
     expect(screen().queryByRole("button", { name: PLANS })).toBeNull();
+  });
+
+  test("with a plan in force but no AI yet, it waits too", async () => {
+    const state = withRightHand(seedState({ aiStatus: { any: false, agents: [] } }));
+    state.messages.push(made());
+    await open(state);
+    expect(screen().queryByRole("group", { name: "Primeira tarefa" })).toBeNull();
   });
 });
 

@@ -235,6 +235,9 @@ export async function createAgent(
         setup: newSetup(setup?.role),
         ...(autonomy ? { missionCommandApproval: autonomy } : {}),
         ...(audienceMode ? { audienceMode } : {}),
+        // The moment of this insert, not its transaction's start (`now()`): agents made together (a template team)
+        // keep the order they were made in, which the agents' list and every screen after it follow.
+        createdAt: sql`clock_timestamp()`,
       })
       .returning();
     if (!agent) throw new Error("agent insert returned nothing");
@@ -520,11 +523,12 @@ export async function unarchiveAgent(
 
 export async function listAgents(db: Database, actorId: string, orgId: string): Promise<Agent[]> {
   await requirePermission(db, actorId, orgId, "read");
+  // As they were made. A team made before each insert had its own time shares one: by name among them.
   return db
     .select()
     .from(agents)
     .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt)))
-    .orderBy(asc(agents.createdAt));
+    .orderBy(asc(agents.createdAt), asc(agents.name));
 }
 
 /** An agent, archived or not; null for a deleted one (its tombstone only names what it left, `listFormerAgents`). */

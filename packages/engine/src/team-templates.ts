@@ -1,14 +1,18 @@
-import { type Database, eq, schema } from "@agenteschat/db";
+import type { PubSub } from "@agenteschat/adapters";
+import { and, asc, type Database, eq, isNull, schema, sql } from "@agenteschat/db";
 import { serverText } from "@agenteschat/i18n";
 import type { AppLocale } from "@agenteschat/i18n/locale";
 import { takenHandles } from "./agents";
+import { type AiStatusDeps, orgHasAi } from "./ai-status";
 import type { AgentAppearance } from "./appearance";
-import { CHANNEL_NAME_PATTERN } from "./channels";
+import { addChannelMember, CHANNEL_NAME_PATTERN } from "./channels";
 import type { ContextDeps } from "./context/summaries";
 import { publishMessageCreated } from "./events";
-import { getMessage, messageView } from "./messages";
+import { firstName } from "./format";
+import { getMessage, insertMessage, messageView } from "./messages";
 import { requirePermission } from "./organizations";
-import { billingHold } from "./standing";
+import { enqueue } from "./outbox";
+import { billingHold, TEAM_HELLO_JOB } from "./standing";
 import {
   channelPlaces,
   checkTeam,
@@ -117,15 +121,7 @@ async function blockedChannels(db: Database, orgId: string, userId: string, loca
  * The tool's input for a template, in `locale`, with a free handle for each agent (`iara-2` when Iara is taken) and a
  * usable channel name (`financeiro-2` when #financeiro is a private channel this person isn't in).
  */
-function templateInput(
-  id: TeamTemplateId,
-  locale: AppLocale,
-  org: string,
-  taken: Set<string>,
-  blocked: Set<string>,
-  /** A billing hold: nobody can answer yet, so the card shows what its first agent delivers. */
-  held = false,
-) {
+function templateInput(id: TeamTemplateId, locale: AppLocale, org: string, taken: Set<string>, blocked: Set<string>) {
   const t = (key: string, vars: Record<string, string> = {}) => serverText(locale, key, { org, ...vars });
   const members = TEAMS[id];
   const handleOf = (m: Member) => {
@@ -167,7 +163,6 @@ function templateInput(
     approvals: t("teamTemplates.approvals"),
     weekly_check: true,
     template: id,
-    ...(held ? { example: t(`teamTemplates.example.${members[0]}`) } : {}),
   };
 }
 
@@ -220,7 +215,6 @@ export async function useTeamTemplate(
   preferred?: string | null,
 ) {
   await requirePermission(deps.db, userId, orgId, "create_agents");
-  const held = (await billingHold(deps.db, orgId)) !== null;
   const [locale, org, taken, { lodi, dm }] = await Promise.all([
     personLocale(deps.db, userId, preferred),
     orgName(deps.db, orgId),
@@ -231,7 +225,7 @@ export async function useTeamTemplate(
   const params = await checkTeam(
     deps,
     { orgId, channelId: dm.id, personId: userId },
-    templateInput(id, locale, org, taken, blocked, held),
+    templateInput(id, locale, org, taken, blocked),
     locale,
   );
   const place = { orgId, channelId: dm.id, threadId: null, agentId: lodi.id, runId: null, hop: 0 };
@@ -244,5 +238,146 @@ export async function useTeamTemplate(
     const now = await getMessage(deps.db, orgId, card.id);
     if (deps.pubsub && now) await publishMessageCreated(deps.pubsub, messageView(now));
   }
+  // With no plan to wait for, the team can work now: it says hi (on a hold, once the first plan starts).
+  if (made.card.state === "created" && (await billingHold(deps.db, orgId)) === null)
+    await enqueue(deps.db, {
+      orgId,
+      kind: TEAM_HELLO_JOB,
+      payload: { how: "created", userId },
+      dedupeKey: `${TEAM_HELLO_JOB}:${orgId}`,
+    });
   return { channelId: dm.id, messageId: card.id, state: made.card.state, error: made.card.error ?? null };
+}
+
+/* ---------- The team's hello (ADR 0158) ---------- */
+
+/** Between two lines in #general: one after the other, as people type. */
+export const HELLO_GAP_MS = 1100;
+
+/** The template agent an agent is, by its handle (`iara-2` is Iara's), or null for any other. */
+const memberOf = (handle: string): Member | null => {
+  const m = handle.replace(/-\d+$/, "");
+  return m in MEMBERS ? (m as Member) : null;
+};
+
+/**
+ * `TEAM_HELLO_JOB` (ADR 0158): the team says hi in #general, one line each, with no model call, once the team can work
+ * (the first plan started, or a template team was made where no plan is waited for). Its first job lines the
+ * greeters up, the right hand first, then each template agent in the order it was made, `HELLO_GAP_MS` apart; a custom
+ * agent says nothing. Each greeter's job: a template agent joins #general answering only when called (`autoReply`
+ * off), the right hand speaks there from no channel as always, then its line, marked `meta.greeting`, starting no run
+ * and notifying nobody, in the language of whoever paid or made the team. The computer clause only while the
+ * workspace's computer is still on its way. The plan brings no AI: while nothing here thinks, the right hand's line
+ * asks for one instead of starting the work (the bar under the lines connects it).
+ */
+export async function sayTeamHello(
+  deps: { db: Database; pubsub?: PubSub; workspaceComputer?: unknown } & Partial<
+    Pick<AiStatusDeps, "gateway" | "machines">
+  >,
+  orgId: string,
+  payload: Record<string, unknown>,
+) {
+  const { agents, channelMembers, channels, machineProvisioning, messages, organizationMembers, users } = schema;
+  const how = payload.how === "paid" ? "paid" : "created";
+  const [general] = await deps.db
+    .select({ id: channels.id, creator: channels.createdByUserId })
+    .from(channels)
+    .where(and(eq(channels.orgId, orgId), eq(channels.name, "general"), isNull(channels.archivedAt)));
+  if (!general) return;
+  if (typeof payload.agentId !== "string") {
+    // Paid: in the language of whoever made the workspace (#general's creator) while they own it, else an owner's.
+    const owners = await deps.db
+      .select({ userId: organizationMembers.userId })
+      .from(organizationMembers)
+      .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.role, "owner")));
+    const userId =
+      typeof payload.userId === "string"
+        ? payload.userId
+        : (owners.find((o) => o.userId === general.creator) ?? owners[0])?.userId;
+    if (!userId) return;
+    const rows = await deps.db
+      .select({ id: agents.id, handle: agents.handle, builtin: agents.builtin, createdAt: agents.createdAt })
+      .from(agents)
+      .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt)))
+      .orderBy(asc(agents.createdAt));
+    const made = rows.flatMap((a) => {
+      const member = a.builtin ? null : memberOf(a.handle);
+      return member ? [{ ...a, member, at: a.createdAt.getTime() }] : [];
+    });
+    // A team is made in one transaction, so its agents share a creation time: among them, their template's order.
+    const rank = (a: (typeof made)[number]) => {
+      const group = made.filter((b) => b.at === a.at).map((b) => b.member);
+      return (Object.values(TEAMS).find((team) => group.every((m) => team.includes(m))) ?? group).indexOf(a.member);
+    };
+    const greeters = [
+      ...rows.filter((a) => a.builtin === "right_hand"),
+      ...made.sort((a, b) => a.at - b.at || rank(a) - rank(b)),
+    ];
+    const now = Date.now();
+    for (const [i, a] of greeters.entries()) {
+      await enqueue(deps.db, {
+        orgId,
+        kind: TEAM_HELLO_JOB,
+        payload: { agentId: a.id, userId, how },
+        dedupeKey: `${TEAM_HELLO_JOB}:${orgId}:${a.id}`,
+        runAt: new Date(now + i * HELLO_GAP_MS),
+      });
+    }
+    return;
+  }
+  const agentId = payload.agentId;
+  const userId = String(payload.userId);
+  const [agent] = await deps.db
+    .select({ handle: agents.handle, builtin: agents.builtin })
+    .from(agents)
+    .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId), isNull(agents.archivedAt)));
+  const member = agent && !agent.builtin ? memberOf(agent.handle) : null;
+  if (!agent || (!agent.builtin && !member)) return;
+  const [said] = await deps.db
+    .select({ id: messages.id })
+    .from(messages)
+    .where(
+      and(
+        eq(messages.channelId, general.id),
+        eq(messages.authorAgentId, agentId),
+        sql`${messages.meta}->>'greeting' = 'true'`,
+      ),
+    )
+    .limit(1);
+  if (said) return;
+  // A seat someone already gave it in #general keeps its own auto-reply.
+  const [seated] = member
+    ? await deps.db
+        .select({ agentId: channelMembers.agentId })
+        .from(channelMembers)
+        .where(and(eq(channelMembers.channelId, general.id), eq(channelMembers.agentId, agentId)))
+        .limit(1)
+    : [];
+  if (member && !seated)
+    await addChannelMember(deps.db, userId, orgId, general.id, { agentId, autoReply: false }, deps);
+  const [[person], [computer], locale] = await Promise.all([
+    deps.db.select({ name: users.name }).from(users).where(eq(users.id, userId)),
+    deps.db
+      .select({ state: machineProvisioning.state })
+      .from(machineProvisioning)
+      .where(eq(machineProvisioning.orgId, orgId)),
+    personLocale(deps.db, userId),
+  ]);
+  const lodiWord =
+    how !== "paid" ? "created" : deps.workspaceComputer && computer?.state !== "ready" ? "starting" : "ready";
+  const thinks =
+    member !== null ||
+    !deps.gateway ||
+    (await orgHasAi({ db: deps.db, gateway: deps.gateway, machines: deps.machines }, orgId));
+  const body = member
+    ? serverText(locale, `teamTemplates.agents.${member}.hello`, { first: firstName(person?.name ?? "") })
+    : serverText(locale, `teamTemplates.hello.${thinks ? "lodi" : "lodiNoAi"}.${lodiWord}`);
+  const message = await insertMessage(deps.db, {
+    orgId,
+    channelId: general.id,
+    author: { type: "agent", agentId, runId: null, hop: 0, stretchId: null },
+    body,
+    meta: { greeting: true },
+  });
+  if (deps.pubsub) await publishMessageCreated(deps.pubsub, messageView(message));
 }

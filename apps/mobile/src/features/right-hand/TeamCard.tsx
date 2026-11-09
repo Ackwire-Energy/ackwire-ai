@@ -4,6 +4,7 @@ import {
   type TeamAgentDraft,
   type TeamPlan,
   type TeamProposalCard,
+  useAiStatus,
   useApplyTeamTemplate,
   useMessages,
   usePostMessage,
@@ -13,7 +14,7 @@ import {
 import { teamProposalOf } from "@agenteschat/client/lib/action-cards";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
-import { isRightHand } from "@agenteschat/client/lib/right-hand";
+import { isRightHand, RIGHT_HAND_DEFAULT } from "@agenteschat/client/lib/right-hand";
 import {
   answerAfter,
   answerPicks,
@@ -168,12 +169,19 @@ export function ReplyChips({ message: m }: { message: Message }) {
  * The team: a row per agent, its routines, its skills and what waits for approval. Flat on the card that holds it
  * (rows divided by hairlines, icons on the first line), never a plate or a box in a card. An agent's row is a MediaRow:
  * its face, name and role on one line, what it does, its channel and "Ajustar" under them at the card's width.
+ * `reviewer`: the right hand's name, which keeps the weekly check (the onboarding has no workspace open to read it from).
  */
-function TeamRows({ plan, onAdjust }: { plan: TeamPlan; onAdjust?: (a: TeamAgentDraft) => void }) {
+export function TeamRows({
+  plan,
+  reviewer,
+  onAdjust,
+}: {
+  plan: TeamPlan;
+  reviewer: string;
+  onAdjust?: (a: TeamAgentDraft) => void;
+}) {
   const { t, i18n } = useTranslation();
   const c = useColors();
-  const dir = useDirectory();
-  const lodi = dir.agents.find(isRightHand);
   return (
     <View style={styles.rows}>
       {plan.agents.map((a, i) => (
@@ -223,7 +231,7 @@ function TeamRows({ plan, onAdjust }: { plan: TeamPlan; onAdjust?: (a: TeamAgent
                 ·{" "}
                 {agent
                   ? `${agent.name}, #${agent.channel}: ${routine.name}`
-                  : `${lodi?.name ?? "Lodi"}: ${t("teamPlan.card.weekly")}`}
+                  : `${reviewer}: ${t("teamPlan.card.weekly")}`}
               </Text>
             </View>
           ))}
@@ -309,7 +317,11 @@ function TeamCardView({ message: m, card }: { message: Message; card: TeamPropos
           lead={plan.lead || names}
           body={
             <>
-              <TeamRows plan={plan} onAdjust={decides ? setAdjusting : undefined} />
+              <TeamRows
+                plan={plan}
+                reviewer={dir.agents.find(isRightHand)?.name ?? RIGHT_HAND_DEFAULT.name}
+                onAdjust={decides ? setAdjusting : undefined}
+              />
               {card.error ? (
                 <Text variant="small" tone="danger" accessibilityRole="alert">
                   {teamFailureText(t, card.error, i18n.language)}
@@ -446,27 +458,27 @@ function TeamCardView({ message: m, card }: { message: Message; card: TeamPropos
 }
 
 /**
- * A first task per agent (its DM opens with it typed, never sent, for the person to finish) and inviting the people. On
- * a billing hold, a labelled example of what the first agent delivers, and where the plan is, in words only.
+ * A first task per agent (its DM opens with it typed, never sent, for the person to finish) and inviting the people.
+ * Only once the team can answer: never on a billing hold, nor before an AI.
  */
 function FirstTasks({ message: m, card, held }: { message: Message; card: TeamProposalCard; held: boolean }) {
   const { t } = useTranslation();
-  const { org } = useOrg();
+  const { org, orgId } = useOrg();
   const dir = useDirectory();
   const c = useColors();
   const openDm = useOpenDm();
+  const thinks = useAiStatus(orgId).data?.any === true;
   const [later, setLater] = useState(false);
   const tasks = firstTasks(card).filter((f) => dir.agentById.has(f.agentId));
-  const people = held ? [] : card.params.invite;
-  const example = held && tasks[0] ? card.params.example : undefined;
-  if (later || (tasks.length === 0 && people.length === 0)) return null;
+  const people = card.params.invite;
+  if (later || held || !thinks || (tasks.length === 0 && people.length === 0)) return null;
   return (
     <AskCard
       id={`${m.id}-first`}
       kind="firstTask"
       agentId={m.author.id ?? ""}
       waitsFor={t("teamPlan.firstTask.suggestion")}
-      lead={t(held ? "teamPlan.firstTask.heldLead" : "teamPlan.firstTask.lead")}
+      lead={t("teamPlan.firstTask.lead")}
       body={
         <View style={styles.rows}>
           {tasks.map((f, i) => (
@@ -492,19 +504,6 @@ function FirstTasks({ message: m, card, held }: { message: Message; card: TeamPr
               </MediaRow>
             </View>
           ))}
-          {example && tasks[0] ? (
-            <View style={[styles.example, { backgroundColor: c.sunken }]}>
-              <Text variant="footnote" tone="muted">
-                {t("teamPlan.firstTask.example", { name: tasks[0].name })}
-              </Text>
-              <Text variant="small">{example}</Text>
-            </View>
-          ) : null}
-          {held ? (
-            <Text variant="footnote" tone="muted">
-              {t(can(org, "manage_billing") ? "connectAi.billingWeb" : "standing.billing.askAdmin")}
-            </Text>
-          ) : null}
         </View>
       }
       foot={
@@ -725,7 +724,7 @@ export function TeamTemplatesSheet({
   const failed = useFailed();
   const dir = useDirectory();
   const held = usePlanHold(orgId, org) !== null;
-  const name = dir.agents.find(isRightHand)?.name ?? "Lodi";
+  const name = dir.agents.find(isRightHand)?.name ?? RIGHT_HAND_DEFAULT.name;
   const list = useTeamTemplates(orgId, i18n.language, open);
   const use = useApplyTeamTemplate(orgId);
   const [picked, setPicked] = useState<string | null>(null);
@@ -748,7 +747,7 @@ export function TeamTemplatesSheet({
         </Text>
         {chosen ? (
           <>
-            <TeamRows plan={chosen.team} />
+            <TeamRows plan={chosen.team} reviewer={name} />
             {held ? null : (
               <Text variant="footnote" tone="muted">
                 {t("teamPlan.templates.tailor")}
@@ -867,7 +866,6 @@ export function TeamTemplatesSheet({
 
 const styles = StyleSheet.create({
   wave: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
-  example: { gap: 6, padding: 12, borderRadius: 12, marginTop: 8 },
   chips: { gap: 8, marginTop: 6 },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chipFoot: { flexDirection: "row", alignItems: "center", gap: 12 },

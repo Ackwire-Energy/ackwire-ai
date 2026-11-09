@@ -2140,7 +2140,8 @@
     "suggested": "Anhand deiner E-Mail bei {{domain}} habe ich {{org}} vorgeschlagen.",
     "create": "Erstellen",
     "shareMessage": "Tritt {{org}} auf agentes.chat bei: {{url}}",
-    "failed": "Speichern hat nicht geklappt. Versuch es noch einmal."
+    "failed": "Speichern hat nicht geklappt. Versuch es noch einmal.",
+    "enter": "Zum Workspace"
   },
   "ai": {
     "yourPlan": "Dein KI-Abo",

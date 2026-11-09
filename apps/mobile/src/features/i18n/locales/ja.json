@@ -2038,7 +2038,8 @@
     "suggested": "{{domain}}のメールアドレスから、{{org}}を提案しました。",
     "create": "作成",
     "shareMessage": "agentes.chatで{{org}}に参加しましょう: {{url}}",
-    "failed": "保存できませんでした。もう一度お試しください。"
+    "failed": "保存できませんでした。もう一度お試しください。",
+    "enter": "ワークスペースへ"
   },
   "ai": {
     "yourPlan": "あなたのAIプラン",

@@ -8,6 +8,7 @@ import {
   introLeadKey,
   offersTeamSetup,
   rightHandOf,
+  teamAnswered,
   tellsNameStory,
 } from "@agenteschat/client/lib/right-hand";
 import { STICKER_STILL_T, WAVE_SECONDS } from "@agenteschat/ui/agent/stickers";
@@ -106,20 +107,45 @@ test("its greeting's cards beside the checklist: one question at a time (ADR 015
     expect(src(f)).toContain("t(introLeadKey(held, team.length > 0))");
 });
 
+test("how agents should talk waits for the team's first answer, so it never stands beside the first task", () => {
+  const base = { noAi: false, aiKnown: true, askStyle: true, checklist: "complete" as const };
+  expect(introCards({ ...base, answered: false })).toEqual([]);
+  expect(introCards({ ...base, answered: true })).toEqual(["style"]);
+  const iara = agent({ id: "a-iara", name: "Iara" });
+  const status = (agentId: string, activeAt: string | null) => ({ agentId, activeAt });
+  // The team made, nobody of it worked yet (the right hand's own runs don't count): it waits.
+  expect(teamAnswered([iara], [status("a-iara", null), status("a-lodi", at(0))])).toBe(false);
+  expect(teamAnswered([iara], undefined)).toBe(false);
+  // Iara answered the first task.
+  expect(teamAnswered([iara], [status("a-iara", at(0))])).toBe(true);
+  // No team: no first task to wait for.
+  expect(teamAnswered([], undefined)).toBe(true);
+  const src = (f: string) => readFileSync(new URL(f, import.meta.url), "utf8");
+  for (const f of ["../../src/features/right-hand/Intro.tsx", "../../../web/src/components/RightHandIntro.tsx"])
+    expect(src(f)).toContain("answered: useTeamAnswered(");
+});
+
 test("the phone's greeting draws the checklist and Conversas has one line back to it, not a second list", () => {
   const src = (f: string) => readFileSync(new URL(`../../src/features/${f}`, import.meta.url), "utf8");
   expect(src("right-hand/Intro.tsx")).toContain("<FirstRunCard agent={agent} channelId={channelId} />");
   expect(src("chats/ChatsScreen.tsx")).toContain("<FirstRunLine />");
-  // One line that says who is setting up the team and how far ("Atlas is setting up the team · 2 of 5").
+  // One line that says who is setting up the team and how far ("Atlas is setting up the team · 1 of 3").
   expect(src("chats/FirstRunLine.tsx")).toContain('t("mobile.chats.firstRunLine"');
-  // The apps row names what it reads, as the web's does, never "Sem apps" with apps connected.
+  // The apps row names what it reads, as the web's does, never "Sem apps" with apps connected; an invitation waiting
+  // finishes the people row, saying who.
   const card = src("right-hand/FirstRun.tsx");
-  expect(card).toContain('{ org: org?.name ?? "", agents: team.length, label, apps: appNames, members: run.members }');
-  // As on the web: row 3 connects the whole team, row 4 is its own screen of suggested apps, row 1 comes filled with
-  // what was typed.
+  expect(card).toContain("apps: appNames,");
+  expect(card).toContain("invited: run.invited.length ? joinNames(run.invited, t) : null,");
+  // As on the web: the AI row connects the whole team, the apps row is its own screen of suggested apps, a skip says
+  // nothing, and an invitation only sent says so, the welcome kept for someone joining (ADR 0158).
   expect(card).toContain("openConnectAi(team.length > 0 ? {} : { agentId: agent.id })");
   expect(card).toContain('apps: () => openSetupStep(agent.id, "apps")');
-  expect(card).toContain('about: () => openSetupStep(agent.id, "about", run.typed)');
+  expect(card).toContain("firstRunBeats(doneHere, { members: run.members, invited: run.invited.length })");
+  expect(card).toContain('? t("agentSetup.firstRun.say.invited")');
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: the card's own source text, placeholder included.
+  expect(card).toContain(": facts[beat]\n          ? t(`agentSetup.firstRun.say.${beat}`, agentGrammar(agent.name))");
+  // One first task, the team card's: the card's asks offer none.
+  expect(card).not.toContain("firstTask");
   const steps = src("agents/setup/SetupStepScreen.tsx");
   expect(steps).toContain("firstRun ? <FirstRunAppsStep /> : <AppsStep agent={agent} />");
   expect(steps).toContain("firstRunAppList(");

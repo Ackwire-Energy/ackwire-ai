@@ -36,7 +36,7 @@ import { learnPlanModels } from "../lib/plans";
 import { setMyReaction } from "../lib/reactions";
 import { recentConversations } from "../lib/recent";
 import { replyOf } from "../lib/reply";
-import { firstVisitOf } from "../lib/right-hand";
+import { firstVisitOf, teamAnswered } from "../lib/right-hand";
 import { usagePauseRefetchMs } from "../lib/routine-view";
 import { withRead } from "../lib/seen";
 import {
@@ -830,16 +830,25 @@ export function useTeamTemplates(orgId: string, locale: string, enabled = true) 
   });
 }
 
-/** "Usar este modelo": its card and the right hand's first question land in the person's DM with it. */
+/**
+ * "Usar este modelo": its card and the right hand's first question land in the person's DM with it. Made, it stays
+ * pending until the team is in the agents' list, its routines and channels read before it: a screen that shows the
+ * team (the onboarding's last step, the sidebar) finds them there, and nothing on it changes while it arrives.
+ */
 export function useApplyTeamTemplate(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ templateId, locale }: { templateId: string; locale?: string }) =>
       api.agents.applyTeamTemplate(orgId, templateId, locale),
-    onSuccess: ({ channelId }) => {
+    onSuccess: async ({ channelId, state }) => {
       void qc.invalidateQueries({ queryKey: keys.messages(orgId, channelId) });
-      void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
+      if (state === "created")
+        await Promise.all([
+          qc.prefetchQuery({ ...routinesQuery(api, orgId), staleTime: 0 }),
+          qc.prefetchQuery({ ...channelsQuery(api, orgId), staleTime: 0 }),
+        ]);
+      await qc.invalidateQueries({ queryKey: keys.agents(orgId) });
     },
   });
 }
@@ -2677,6 +2686,21 @@ export const useAgentStatuses = (orgId: string, enabled = true) => {
   });
 };
 
+/**
+ * Whether the team answered the person once (`teamAnswered`), from the agents' statuses the sidebar keeps fresh: no
+ * poll of its own.
+ */
+export const useTeamAnswered = (orgId: string, team: readonly Pick<Agent, "id">[]) => {
+  const api = useApi();
+  const statuses = useQuery({
+    queryKey: keys.agentStatus(orgId),
+    queryFn: () => api.agents.statuses(orgId),
+    staleTime: 15_000,
+    enabled: orgId.length > 0,
+  }).data;
+  return teamAnswered(team, statuses);
+};
+
 export const useAllInvitations = (orgId: string, enabled = true) => {
   const api = useApi();
   return useQuery({ queryKey: keys.allInvitations(orgId), queryFn: () => api.orgs.allInvitations(orgId), enabled });
@@ -4206,13 +4230,12 @@ export function useIssueColumnAction(orgId: string) {
 
 // ── Routines ─────────────────────────────────────────────────────────────────
 
+export const routinesQuery = (api: ApiClient, orgId: string) =>
+  queryOptions({ queryKey: keys.routines(orgId), queryFn: () => api.routines.list(orgId) });
+
 export const useRoutines = (orgId: string) => {
   const api = useApi();
-  return useQuery({
-    queryKey: keys.routines(orgId),
-    queryFn: () => api.routines.list(orgId),
-    refetchInterval: (q) => usagePauseRefetchMs(q.state.data),
-  });
+  return useQuery({ ...routinesQuery(api, orgId), refetchInterval: (q) => usagePauseRefetchMs(q.state.data) });
 };
 
 export const useRoutineRuns = (orgId: string, id: string | null) => {

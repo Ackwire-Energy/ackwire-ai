@@ -1628,6 +1628,78 @@
   "onboarding.progress.done": {
     "value": "All set"
   },
+  "onboarding.flow.steps.name": {
+    "value": "Workspace name"
+  },
+  "onboarding.flow.steps.business": {
+    "value": "What you do"
+  },
+  "onboarding.flow.steps.team": {
+    "value": "Your team"
+  },
+  "onboarding.flow.steps.plan": {
+    "value": "Turn the team on"
+  },
+  "onboarding.flow.stepOf": {
+    "value": "Step {{n}} of {{total}}"
+  },
+  "onboarding.flow.lodi.name": {
+    "value": "Hi, {{first}}. I'm {{name}}. I'll put the team together with you in about two minutes."
+  },
+  "onboarding.flow.lodi.business": {
+    "value": "With that I'll know who to bring onto the team."
+  },
+  "onboarding.flow.lodi.team": {
+    "value": "This is the team I'd put together. You can change anything later."
+  },
+  "onboarding.flow.lodi.plan": {
+    "value": "After the plan, all that's left is connecting an AI. I'll show you where."
+  },
+  "onboarding.flow.preview.label": {
+    "value": "Your workspace, as you answer"
+  },
+  "onboarding.flow.preview.name": {
+    "value": "Your workspace"
+  },
+  "onboarding.flow.preview.ghost": {
+    "value": "Your team shows up here"
+  },
+  "onboarding.flow.team.title": {
+    "value": "Your team"
+  },
+  "onboarding.flow.plan.title": {
+    "value": "Turn your team on"
+  },
+  "onboarding.flow.plan.lead": {
+    "value": "Your team is ready. With the plan and an AI, it starts today."
+  },
+  "onboarding.flow.plan.asleep": {
+    "value": "Asleep until the plan"
+  },
+  "onboarding.flow.plan.price": {
+    "value": "<b>{{name}} plan</b> · {{price}} a month"
+  },
+  "onboarding.flow.plan.name": {
+    "value": "<b>{{name}} plan</b>"
+  },
+  "onboarding.flow.plan.generic": {
+    "value": "An agentes.chat plan"
+  },
+  "onboarding.flow.plan.cancel": {
+    "value": "Cancel anytime"
+  },
+  "onboarding.flow.plan.cta": {
+    "value": "Turn the team on"
+  },
+  "onboarding.flow.plan.all": {
+    "value": "See all plans"
+  },
+  "onboarding.flow.plan.skip": {
+    "value": "Go to the workspace without it"
+  },
+  "onboarding.flow.account": {
+    "value": "Your account"
+  },
   "onboarding.railValue.context": {
     "value": "Written"
   },
@@ -3134,12 +3206,6 @@
   "noticePrefs.category.reactions.help": {
     "value": "When someone reacts to a message of yours"
   },
-  "webPushAsk.title": {
-    "value": "Know when an agent needs you"
-  },
-  "webPushAsk.text": {
-    "value": "They work while you do something else. Even with the tab closed, we'll tell you when they need your ok, finish what you asked or call you."
-  },
   "webPushAsk.on": {
     "value": "Turn on notifications"
   },
@@ -3155,20 +3221,8 @@
   "webPushAsk.someone": {
     "value": "An agent"
   },
-  "webPushAsk.examples": {
-    "value": "Examples of notifications"
-  },
   "webPushAsk.now": {
     "value": "now"
-  },
-  "webPushAsk.minutes": {
-    "value": "{{n}} min"
-  },
-  "webPushAsk.approval.title": {
-    "value": "{{name}} needs your ok"
-  },
-  "webPushAsk.approval.body": {
-    "value": "Can I go ahead with what you asked?"
   },
   "webPushAsk.finished.title": {
     "value": "{{name}} is done"
@@ -3176,11 +3230,11 @@
   "webPushAsk.finished.body": {
     "value": "What you asked for is ready."
   },
-  "webPushAsk.mention.title": {
-    "value": "{{name}} called you"
+  "webPushAsk.inline.title": {
+    "value": "Want to know the moment {{name}} answers?"
   },
-  "webPushAsk.mention.body": {
-    "value": "Can you take a look when you have a minute?"
+  "webPushAsk.inline.why": {
+    "value": "Even with the tab closed. Change it anytime in Settings › Notifications."
   },
   "shell.otherChannels": {
     "value": "Other channels"
@@ -4811,9 +4865,6 @@
   "rightHand.newDot": {
     "value": "New"
   },
-  "rightHand.role": {
-    "value": "Workspace assistant"
-  },
   "rightHand.actsAsYou": {
     "value": "acts with your permissions"
   },
@@ -4846,9 +4897,6 @@
   },
   "rightHand.intro.again.message": {
     "value": "Help me build the team."
-  },
-  "rightHand.intro.next.firstTask": {
-    "value": "Give {{name}} a first task"
   },
   "rightHand.intro.style.question": {
     "value": "How should I talk to you?"
@@ -12870,18 +12918,6 @@
   "agentSetup.firstRun.afterPlan": {
     "value": "Opens with the plan."
   },
-  "agentSetup.firstRun.about.todo": {
-    "value": "Tell me what {{org}} does."
-  },
-  "agentSetup.firstRun.about.todoDesc": {
-    "value": "Every agent reads this."
-  },
-  "agentSetup.firstRun.about.action": {
-    "value": "Tell"
-  },
-  "agentSetup.firstRun.about.done": {
-    "value": "I know what {{org}} does"
-  },
   "agentSetup.firstRun.about.title": {
     "value": "What does {{org}} do?"
   },
@@ -12893,24 +12929,6 @@
   },
   "agentSetup.firstRun.about.optional": {
     "value": "Optional. Without one, the type you picked counts."
-  },
-  "agentSetup.firstRun.team.todo": {
-    "value": "Build the team."
-  },
-  "agentSetup.firstRun.team.todoDesc": {
-    "value": "A template for your business, you can change everything later."
-  },
-  "agentSetup.firstRun.team.action": {
-    "value": "See the team"
-  },
-  "agentSetup.firstRun.team.done": {
-    "value": {
-      "one": "{{count}} agent on the team",
-      "other": "{{count}} agents on the team"
-    }
-  },
-  "agentSetup.firstRun.team.card": {
-    "value": "Continue on the card below"
   },
   "agentSetup.firstRun.ai.todo": {
     "value": "Connect an AI."
@@ -12926,12 +12944,6 @@
   },
   "agentSetup.firstRun.ai.doneAny": {
     "value": "I think with an AI now"
-  },
-  "agentSetup.firstRun.ai.plan": {
-    "value": "Opens with the agentes.chat plan."
-  },
-  "agentSetup.firstRun.ai.planAction": {
-    "value": "See agentes.chat plans"
   },
   "agentSetup.firstRun.apps.todo": {
     "value": "Connect your work apps."
@@ -12978,11 +12990,17 @@
   "agentSetup.firstRun.people.doneNone": {
     "value": "Just you for now"
   },
-  "agentSetup.firstRun.say.about": {
-    "value": "Noted. Every agent reads this."
+  "agentSetup.firstRun.people.invited": {
+    "value": "Invited {{names}} · waiting"
   },
-  "agentSetup.firstRun.say.team": {
-    "value": "The team is here."
+  "agentSetup.firstRun.people.email": {
+    "value": "name@company.com"
+  },
+  "agentSetup.firstRun.people.send": {
+    "value": "Send"
+  },
+  "agentSetup.firstRun.people.more": {
+    "value": "More options"
   },
   "agentSetup.firstRun.say.ai": {
     "value": "Now the team thinks."
@@ -12992,6 +13010,9 @@
   },
   "agentSetup.firstRun.say.people": {
     "value": "Good to have more people here."
+  },
+  "agentSetup.firstRun.say.invited": {
+    "value": "Invite sent."
   },
   "agentSetup.firstRun.asks.lead": {
     "value": "Now ask me something:"
@@ -39748,14 +39769,11 @@
   "teamPlan.firstTask.lead": {
     "value": "One short task per agent, so you see each one working today."
   },
-  "teamPlan.firstTask.heldLead": {
-    "value": "One short task per agent. Finish the sentence and send it. They start once the workspace has an agentes.chat plan."
-  },
-  "teamPlan.firstTask.example": {
-    "value": "Example of what {{name}} delivers"
-  },
   "teamPlan.firstTask.open": {
     "value": "Open with the task"
+  },
+  "teamPlan.firstTask.finish": {
+    "value": "Finish the sentence and send it"
   },
   "teamPlan.firstTask.invite": {
     "value": "Invite {{names}}"
@@ -40088,7 +40106,7 @@
     "value": "Software and apps"
   },
   "teamTemplates.software.sub": {
-    "value": "Support, billing and code"
+    "value": "Customer care, billing and code"
   },
   "teamTemplates.software.desc": {
     "value": "For a company that sells software and looks after its own customers."
@@ -40111,6 +40129,24 @@
   "teamTemplates.services.desc": {
     "value": "For an office that books clients, sends proposals and bills them."
   },
+  "teamTemplates.hello.lodi.starting": {
+    "value": "Plan active! My computer is starting up. Let's get to work!"
+  },
+  "teamTemplates.hello.lodi.ready": {
+    "value": "Plan active! Let's get to work!"
+  },
+  "teamTemplates.hello.lodi.created": {
+    "value": "The team is here! Let's get to work!"
+  },
+  "teamTemplates.hello.lodiNoAi.starting": {
+    "value": "Plan active! My computer is starting up. Connect an AI and we'll get to work."
+  },
+  "teamTemplates.hello.lodiNoAi.ready": {
+    "value": "Plan active! Connect an AI and we'll get to work."
+  },
+  "teamTemplates.hello.lodiNoAi.created": {
+    "value": "The team is here! Connect an AI and we'll get to work."
+  },
   "teamTemplates.agents.iara.role": {
     "value": "Customer service"
   },
@@ -40122,6 +40158,9 @@
   },
   "teamTemplates.agents.iara.task": {
     "value": "Write a reply to this customer message:"
+  },
+  "teamTemplates.agents.iara.hello": {
+    "value": "Hi, {{first}}! Leave whoever writes on WhatsApp to me."
   },
   "teamTemplates.agents.caio.role": {
     "value": "Billing"
@@ -40135,6 +40174,9 @@
   "teamTemplates.agents.caio.task": {
     "value": "Write a friendly payment reminder for:"
   },
+  "teamTemplates.agents.caio.hello": {
+    "value": "Hello! I'll handle billing and only send reminders after your ok."
+  },
   "teamTemplates.agents.ada.role": {
     "value": "Dev"
   },
@@ -40146,6 +40188,9 @@
   },
   "teamTemplates.agents.ada.task": {
     "value": "Tell me where to start looking at this bug:"
+  },
+  "teamTemplates.agents.ada.hello": {
+    "value": "Hi! Send me the bugs that come in, I'll dig in and open the PR."
   },
   "teamTemplates.agents.lia.role": {
     "value": "Content"
@@ -40159,6 +40204,9 @@
   "teamTemplates.agents.lia.task": {
     "value": "Suggest three posts for this week about:"
   },
+  "teamTemplates.agents.lia.hello": {
+    "value": "Hi, everyone! This week's posts are on me."
+  },
   "teamTemplates.agents.theo.role": {
     "value": "Sales"
   },
@@ -40170,6 +40218,9 @@
   },
   "teamTemplates.agents.theo.task": {
     "value": "Write a short quote for this request:"
+  },
+  "teamTemplates.agents.theo.hello": {
+    "value": "Hi, {{first}}! Nobody who asks for a quote will go unanswered."
   },
   "teamTemplates.agents.nina.role": {
     "value": "Scheduling"
@@ -40183,6 +40234,9 @@
   "teamTemplates.agents.nina.task": {
     "value": "Organize tomorrow's schedule:"
   },
+  "teamTemplates.agents.nina.hello": {
+    "value": "Hello! The calendar is mine, and I'll remind clients the day before."
+  },
   "teamTemplates.agents.otto.role": {
     "value": "Orders"
   },
@@ -40194,6 +40248,9 @@
   },
   "teamTemplates.agents.otto.task": {
     "value": "List what's left to do on these orders:"
+  },
+  "teamTemplates.agents.otto.hello": {
+    "value": "I'm here. I'll watch the orders and tell you if stock runs low."
   },
   "teamTemplates.agents.bia.role": {
     "value": "Answer base"
@@ -40207,14 +40264,8 @@
   "teamTemplates.agents.bia.task": {
     "value": "Write answers to these customer questions:"
   },
-  "teamTemplates.example.iara": {
-    "value": "Hi Marina. Your order left yesterday and arrives by Friday. The tracking code is right below. If Friday doesn't work, I'll find another date."
-  },
-  "teamTemplates.example.lia": {
-    "value": "1. Three common mistakes when hiring an agency. 2. Behind the scenes of a project that almost went wrong. 3. A question for your followers: what do you want to see here?"
-  },
-  "teamTemplates.example.nina": {
-    "value": "Tomorrow: 9:00 Carla, 10:30 Pedro, 14:00 open. Pedro hasn't confirmed yet. Want me to write to him?"
+  "teamTemplates.agents.bia.hello": {
+    "value": "Hi! I'll keep the answer base up to date with what the team says."
   },
   "teamTemplates.channels.iara": {
     "value": "support"

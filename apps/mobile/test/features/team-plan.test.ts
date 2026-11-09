@@ -4,15 +4,16 @@ import { answerAfter, answerPicks, BUSINESS_TYPES, replyChipsOf } from "@agentes
 
 const src = (f: string) => readFileSync(new URL(`../../src/features/${f}`, import.meta.url), "utf8");
 
-test("row 1 asks what the workspace does with the business types, then opens their template (ADR 0155 §6)", () => {
-  const about = src("agents/setup/SetupStepScreen.tsx");
-  expect(about).toContain("BUSINESS_TYPES.map((b) => (");
-  expect(about).toContain('t("agentSetup.firstRun.about.title", { org: org?.name ?? "" })');
-  expect(about).toContain("{ context: text }");
-  expect(about).toContain("openTemplatesAfterAbout(business && isTemplateBusiness(business) ? business : undefined)");
-  const run = src("right-hand/FirstRun.tsx");
-  expect(run).toContain("<TeamTemplatesSheet");
-  expect(run).toContain("initial={templates?.initial}");
+test("what the workspace does: the onboarding's step 2, the business types saved as its context (ADR 0158)", () => {
+  const step = src("onboarding/steps.tsx");
+  expect(step).toContain("BUSINESS_TYPES.map((b) => (");
+  expect(step).toContain("save.mutate({ context: text }");
+  // The type and the sentence go together and come back together, as on the web (`aboutContext`, `aboutOf`).
+  expect(step).toContain("const text = aboutContext(t, kind, line);");
+  expect(step).toContain("useState(() => aboutOf(t, context).line)");
+  expect(src("onboarding/OnboardingFlow.tsx")).toContain('t("agentSetup.firstRun.about.title", { org: workspace })');
+  // The setup card's own screen for it is gone: the onboarding asks it once.
+  expect(src("agents/setup/SetupStepScreen.tsx")).not.toContain("BUSINESS_TYPES");
   expect(BUSINESS_TYPES.at(-1)).toBe("other");
 });
 

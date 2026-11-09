@@ -584,13 +584,20 @@ export function dimmedLine(
   return gateLine(t, { gate, ...where })?.text ?? t("aiAccounts.connect.noComputer");
 }
 
+/** What a hold stops, said first on the phone: a plan's sign-in, the keys, or the team the onboarding just made. */
+const HOLD_LEAD = {
+  plan: "connectAi.billing",
+  keys: "connectAi.key.closed",
+  team: "standing.billing.teamReady",
+} as const;
+
 /**
- * The phone's words for a plan a billing hold stops: paying has no button or link there (ADR 0079 §6, App Store 3.1.1),
+ * The phone's words for what a billing hold stops: paying has no button or link there (ADR 0079 §6, App Store 3.1.1),
  * so whoever pays reads where, and anyone else who can.
  */
-export const planHoldPhoneLine = (t: TFunction, mayPay: boolean, keys = false) =>
+export const planHoldPhoneLine = (t: TFunction, mayPay: boolean, lead: keyof typeof HOLD_LEAD = "plan") =>
   t("common.joinSentences", {
-    a: t(keys ? "connectAi.key.closed" : "connectAi.billing"),
+    a: t(HOLD_LEAD[lead]),
     b: t(mayPay ? "connectAi.billingWeb" : "standing.billing.askAdmin"),
   });
 

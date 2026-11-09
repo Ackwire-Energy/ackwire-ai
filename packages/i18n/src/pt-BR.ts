@@ -678,6 +678,43 @@ export const ptBR = {
       left_other: "Faltam {{count}} etapas",
       done: "Tudo certo",
     },
+    /** The blue rail with Lodi (ADR 0158): its steps, Lodi's line on each, the preview and the plan step. */
+    flow: {
+      steps: {
+        name: "Nome do workspace",
+        business: "O que vocês fazem",
+        team: "Seu time",
+        plan: "Ligar o time",
+      },
+      stepOf: "Passo {{n}} de {{total}}",
+      lodi: {
+        name: "Oi, {{first}}. Eu sou o {{name}}. Vou montar o time com você em uns dois minutos.",
+        name_female: "Oi, {{first}}. Eu sou a {{name}}. Vou montar o time com você em uns dois minutos.",
+        business: "Com isso eu já sei quem chamar para o time.",
+        team: "Esse é o time que eu montaria. Você muda tudo depois.",
+        plan: "Depois do plano, falta só conectar uma IA. Eu mostro onde.",
+      },
+      preview: {
+        label: "O seu workspace, enquanto você responde",
+        /** The workspace's name in the preview until one is typed. */
+        name: "Seu workspace",
+        ghost: "O time aparece aqui",
+      },
+      team: { title: "Seu time" },
+      plan: {
+        title: "Ligue o time",
+        lead: "O time está pronto. Com o plano e uma IA, ele começa hoje.",
+        asleep: "Dormindo até o plano",
+        price: "<b>Plano {{name}}</b> · {{price}} por mês",
+        name: "<b>Plano {{name}}</b>",
+        generic: "Um plano do agentes.chat",
+        cancel: "Cancele quando quiser",
+        cta: "Ligar o time",
+        all: "Ver todos os planos",
+        skip: "Entrar no workspace sem ligar",
+      },
+      account: "Sua conta",
+    },
     railValue: {
       context: "Escrito",
       skipped: "Pulado",
@@ -1300,19 +1337,19 @@ export const ptBR = {
     },
   },
   webPushAsk: {
-    title: "Saiba quando um agente precisar de você",
-    text: "Eles trabalham enquanto você faz outra coisa. Mesmo com a aba fechada, avisamos quando pedem seu ok, terminam o que você pediu ou chamam você.",
     on: "Ativar avisos",
     later: "Agora não",
     done: "Avisos ativados neste navegador",
     failed: "Não deu para ativar os avisos. Tente de novo em Configurações\u00a0›\u00a0Notificações.",
     someone: "Um agente",
-    examples: "Exemplos de avisos",
     now: "agora",
-    minutes: "{{n}} min",
-    approval: { title: "{{name}} pede seu ok", body: "Posso seguir com o que você pediu?" },
     finished: { title: "{{name}} terminou", body: "Está pronto o que você pediu." },
-    mention: { title: "{{name}} chamou você", body: "Dá uma olhada quando puder?" },
+    /** Under an agent's first answer to the person (ADR 0071): never on arrival. */
+    inline: {
+      title: "Quer saber na hora quando o {{name}} responder?",
+      title_female: "Quer saber na hora quando a {{name}} responder?",
+      why: "Mesmo com a aba fechada. Você muda quando quiser em Configurações\u00a0›\u00a0Notificações.",
+    },
   },
   shell: {
     otherChannels: "Outros canais",
@@ -1975,7 +2012,6 @@ export const ptBR = {
   rightHand: {
     label: "seu braço direito",
     newDot: "Novo",
-    role: "Assistente do workspace",
     actsAsYou: "age com as suas permissões",
     composerHint: "nada muda sem você",
     /** The top of its DM, drawn by the app (no model): its greeting and the first card the workspace needs. */
@@ -1995,10 +2031,6 @@ export const ptBR = {
         question: "Quer montar o time comigo?",
         action: "Montar o time",
         message: "Me ajuda a montar o time.",
-      },
-      next: {
-        firstTask: "Dar a primeira tarefa para o {{name}}",
-        firstTask_female: "Dar a primeira tarefa para a {{name}}",
       },
       /** Asked once, until the person picks (ADR 0147): how every agent here talks to them. */
       style: {
@@ -5314,7 +5346,7 @@ export const ptBR = {
       todo: "Ler {{apps}}",
       todoDesc: "Ler nunca muda nada.",
       action: "Liberar",
-      todoNone: "Usar os apps de {{org}}",
+      todoNone: "Usar os apps da {{org}}",
       todoNoneDesc: "Os que vocês já conectaram, como Gmail e Drive.",
       done: "Uso {{apps}}",
       doneNone: "Sem apps por enquanto",
@@ -5324,7 +5356,7 @@ export const ptBR = {
       ok_one: "Liberar {{count}} app",
       ok_other: "Liberar {{count}} apps",
       okNone: "Continuar sem apps",
-      empty: "Ainda não tem nenhum app conectado em {{org}}.",
+      empty: "Ainda não tem nenhum app conectado na {{org}}.",
       connectOther: "Conectar outro app",
     },
     where: {
@@ -5343,11 +5375,11 @@ export const ptBR = {
       ok_other: "Entrar em {{count}} canais",
     },
     who: {
-      todo: "Falar com todos de {{org}}",
+      todo: "Falar com todos da {{org}}",
       todoDesc: "Qualquer um pode me chamar.",
       todoPlan: "Falar só com você",
       todoPlanDesc: "O seu plano é pessoal.",
-      doneEveryone: "Falo com todos de {{org}}",
+      doneEveryone: "Falo com todos da {{org}}",
       doneYou: "Falo só com você",
       doneOwner: "Falo só com {{name}}",
       donePeople: "Falo com quem você escolheu",
@@ -5403,23 +5435,10 @@ export const ptBR = {
       /** Apps and people on a billing hold: no button, they open with the plan. */
       afterPlan: "Abre com o plano.",
       about: {
-        todo: "Me conte o que a {{org}} faz.",
-        todoDesc: "Todos os agentes leem isso.",
-        action: "Contar",
-        done: "Já sei o que a {{org}} faz",
         title: "O que a {{org}} faz?",
         desc: "Todos os agentes leem isso. Você muda quando quiser.",
         line: "Em uma frase",
         optional: "Opcional. Sem frase, vale o tipo que você marcou.",
-      },
-      team: {
-        todo: "Monte o time.",
-        todoDesc: "Um modelo para o seu negócio, você muda tudo depois.",
-        action: "Ver o time",
-        done_one: "{{count}} agente no time",
-        done_other: "{{count}} agentes no time",
-        /** While a team card the right hand proposed waits in the chat. */
-        card: "Continue no card abaixo",
       },
       ai: {
         todo: "Conecte uma IA.",
@@ -5427,8 +5446,6 @@ export const ptBR = {
         action: "Conectar",
         done: "Penso com {{label}}",
         doneAny: "Já penso com uma IA",
-        plan: "Abre com o plano do agentes.chat.",
-        planAction: "Ver planos do agentes.chat",
       },
       apps: {
         todo: "Conecte os apps do trabalho.",
@@ -5448,14 +5465,19 @@ export const ptBR = {
         done_one: "{{count}} pessoa aqui",
         done_other: "{{count}} pessoas aqui",
         doneNone: "Só você por enquanto",
+        /** Invited, not in yet: the row is done, saying who. */
+        invited: "Convidei {{names}} · aguardando",
+        email: "nome@empresa.com",
+        send: "Enviar",
+        more: "Mais opções",
       },
-      /** Its line for a moment once a row is done. */
+      /** Its line for a moment once a row is done (a skip says nothing). */
       say: {
-        about: "Anotado. Todos os agentes leem isso.",
-        team: "O time chegou.",
         ai: "Agora o time pensa.",
         apps: "Pronto, já leio os apps.",
         people: "Que bom ter mais gente aqui.",
+        /** An invitation sent, nobody in yet: it says it went out, and celebrates nothing. */
+        invited: "Convite enviado.",
       },
       /** Once the team can think: what the person may ask next. `fit` and `who` are sent to the right hand as written. */
       asks: {
@@ -11706,7 +11728,7 @@ export const ptBR = {
     moreFiltersHint: "datas, só agentes, fixadas",
     clearRecentAll: "Limpar buscas recentes",
     /** A busca no topo de um canal (estilo Discord): o campo e os resultados no painel ao lado. */
-    header: { placeholder: "Buscar em {{org}}", clear: "Limpar busca" },
+    header: { placeholder: "Buscar na {{org}}", clear: "Limpar busca" },
     panel: {
       label: "Resultados da busca",
       count_one: "{{count}} resultado",
@@ -16565,10 +16587,8 @@ export const ptBR = {
     firstTask: {
       suggestion: "sugestão",
       lead: "Uma tarefa curta por agente, para você ver cada um trabalhando hoje.",
-      heldLead:
-        "Uma tarefa curta por agente. Complete a frase e envie. Eles começam quando o workspace tiver um plano do agentes.chat.",
-      example: "Exemplo do que {{name}} entrega",
       open: "Abrir com a tarefa",
+      finish: "Complete a frase e envie",
       invite: "Convidar {{names}}",
       later: "Depois",
     },
@@ -16730,11 +16750,11 @@ export const ptBR = {
     },
     software: {
       name: "Software e apps",
-      sub: "Suporte, cobrança e código",
+      sub: "Atendimento, cobrança e código",
       desc: "Para quem vende um sistema e cuida dos próprios clientes.",
     },
     support: {
-      name: "Atendimento e suporte",
+      name: "Atendimento ao cliente",
       sub: "Fila de clientes e base de respostas",
       desc: "Para um time que atende muitos clientes todo dia.",
     },
@@ -16743,60 +16763,77 @@ export const ptBR = {
       sub: "Contabilidade, advocacia, consultoria",
       desc: "Para um escritório que agenda clientes, manda propostas e cobra.",
     },
+    /** The team's hello in #general once it can work (ADR 0158): Lodi's line, then each agent's. */
+    hello: {
+      lodi: {
+        starting: "Plano ativo! Meu computador já está iniciando. Vamos começar o trabalho!",
+        ready: "Plano ativo! Vamos começar o trabalho!",
+        created: "Time montado! Vamos começar o trabalho!",
+      },
+      /** The same, while no AI is connected: the plan brings none, and the bar under the lines connects one. */
+      lodiNoAi: {
+        starting: "Plano ativo! Meu computador já está iniciando. Conecte uma IA e a gente começa o trabalho.",
+        ready: "Plano ativo! Conecte uma IA e a gente começa o trabalho.",
+        created: "Time montado! Conecte uma IA e a gente começa o trabalho.",
+      },
+    },
     agents: {
       iara: {
         role: "Atendimento",
         line: "Responde os clientes no WhatsApp e no e-mail. Chama você quando não sabe.",
         routine: "Resumir o que ficou sem resposta",
         task: "Escreva uma resposta para esta mensagem de cliente:",
+        hello: "Oi, {{first}}! Deixa comigo quem escrever no WhatsApp.",
       },
       caio: {
         role: "Cobrança",
         line: "Lembra quem atrasou o pagamento e manda a cobrança depois do seu ok.",
         routine: "Listar quem está com o pagamento atrasado",
         task: "Escreva um lembrete gentil de pagamento para:",
+        hello: "Olá! Cuido das cobranças e só mando lembrete depois do seu ok.",
       },
       ada: {
         role: "Dev",
         line: "Corrige os bugs que os clientes reportam e abre o PR.",
         routine: "Listar os bugs novos",
         task: "Me diga por onde começar a investigar este bug:",
+        hello: "Oi! Me passem os bugs que chegarem, eu investigo e abro o PR.",
       },
       lia: {
         role: "Conteúdo",
         line: "Escreve posts e roteiros no tom da empresa e agenda depois do seu ok.",
         routine: "Propor os posts da semana",
         task: "Proponha três posts para esta semana sobre:",
+        hello: "Oi, pessoal! Os posts da semana ficam comigo.",
       },
       theo: {
         role: "Vendas",
         line: "Segue quem pediu orçamento e escreve as propostas.",
         routine: "Listar quem pediu orçamento e ficou sem resposta",
         task: "Escreva um orçamento curto para este pedido:",
+        hello: "Oi, {{first}}! Ninguém que pedir orçamento vai ficar sem resposta.",
       },
       nina: {
         role: "Agenda",
         line: "Marca, confirma e remarca horários, e lembra os clientes na véspera.",
         routine: "Confirmar os horários de amanhã",
         task: "Organize estes horários de amanhã:",
+        hello: "Olá! A agenda fica comigo, e lembro os clientes na véspera.",
       },
       otto: {
         role: "Pedidos",
         line: "Acompanha pedidos e estoque e avisa o que está acabando.",
         routine: "Avisar o que está acabando no estoque",
         task: "Liste o que falta fazer nestes pedidos:",
+        hello: "Cheguei. Fico de olho nos pedidos e aviso se faltar algo no estoque.",
       },
       bia: {
         role: "Base de respostas",
         line: "Mantém a base de respostas em dia com o que o time responde.",
         routine: "Atualizar a base com as respostas da semana",
         task: "Escreva as respostas para estas perguntas de clientes:",
+        hello: "Oi! Vou manter a base de respostas em dia com o que o time responder.",
       },
-    },
-    example: {
-      iara: "Oi, Marina. Seu pedido saiu ontem e chega até sexta. O código de rastreio está aqui embaixo. Se sexta não for bom, eu vejo outra data.",
-      lia: "1. Três erros comuns ao contratar uma agência. 2. Os bastidores de um projeto que quase deu errado. 3. Uma pergunta para quem segue vocês: o que querem ver aqui?",
-      nina: "Amanhã: 9h Carla, 10h30 Pedro, 14h livre. O Pedro ainda não confirmou. Quer que eu escreva para ele?",
     },
     channels: {
       iara: "atendimento",

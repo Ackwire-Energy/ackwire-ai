@@ -54,6 +54,11 @@ export interface AgentAi {
    * own (ADR 0041 §1).
    */
   own?: "claude_code" | "codex" | "cursor" | "opencode" | "grok" | "antigravity";
+  /**
+   * Ready on an API key with Automático: the maker of the key it thinks with, which the apps name it by ("Claude"), as
+   * the right hand's panel names its key. Asked with no run only (the apps' question).
+   */
+  provider?: string;
 }
 
 export interface AiStatusDeps {
@@ -107,7 +112,12 @@ export async function agentAiState(deps: AiStatusDeps, given: AiAgent, run?: AiR
   }
   const mission = run ? await missionTurnFor(deps.db, run).catch(() => null) : null;
   const kind = mission?.brain ?? brainOf(agent.brain);
-  if (kind === "model") return (await modelReady(deps, agent)) ? READY : { state: "no_ai", reason: "no_key" };
+  if (kind === "model") {
+    if (!(await modelReady(deps, agent))) return { state: "no_ai", reason: "no_key" };
+    if (run || !isAutoModel(agent.model)) return READY;
+    const provider = await autoProvider(deps.db, agent).catch(() => null);
+    return provider ? { state: "ready", provider } : READY;
+  }
   const machineId = mission?.session?.machineId ?? agent.machineId ?? null;
   const [status, account] = await Promise.all([
     machineId && deps.machines ? deps.machines.status(machineId).catch(() => null) : null,

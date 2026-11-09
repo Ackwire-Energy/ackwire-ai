@@ -201,7 +201,6 @@
       "timezone.group.Oceania",
       "toolReview.ok",
       "usageViews.tokens",
-      "webPushAsk.minutes",
       "wiki.editor.link",
       "wiki.form.tags",
       "wiki.import.stat.links",
@@ -448,7 +447,6 @@
       "timezone.group.Asia",
       "toolReview.ok",
       "usageViews.tokens",
-      "webPushAsk.minutes",
       "wiki.audienceRoles",
       "wiki.legend.obsidian",
       "wiki.markdown",
@@ -788,7 +786,6 @@
       "threads.tabs.missions",
       "timezone.group.Europe",
       "toolReview.ok",
-      "webPushAsk.minutes",
       "wiki.ask.agent",
       "wiki.audienceAgentDetail",
       "wiki.audienceAgents",
@@ -1539,7 +1536,6 @@
       "toolReview.ok",
       "usageQueue.routine",
       "usageQueue.thread",
-      "webPushAsk.minutes",
       "wiki.editor.link",
       "wiki.home",
       "wiki.import.stat.links",
@@ -2040,7 +2036,6 @@
       "toolReview.ok",
       "toolReview.subjectCount",
       "usageViews.tokens",
-      "webPushAsk.minutes",
       "wiki.ask.agent",
       "wiki.audienceAgentDetail",
       "wiki.audienceAgents",
@@ -2278,7 +2273,8 @@
       "routines.setup.github.secret",
       "routines.setup.github.type",
       "routines.setup.github.url",
-      "routines.setup.sentry.url"
+      "routines.setup.sentry.url",
+      "agentSetup.firstRun.people.email"
     ],
     "ko": [
       "devices.system.android",
@@ -2421,7 +2417,8 @@
       "routines.setup.github.secret",
       "routines.setup.github.type",
       "routines.setup.github.url",
-      "routines.setup.sentry.url"
+      "routines.setup.sentry.url",
+      "agentSetup.firstRun.people.email"
     ],
     "zh-Hans": [
       "devices.system.android",
@@ -2556,7 +2553,8 @@
       "routines.setup.github.secret",
       "routines.setup.github.type",
       "routines.setup.github.url",
-      "routines.setup.sentry.url"
+      "routines.setup.sentry.url",
+      "agentSetup.firstRun.people.email"
     ],
     "id": [
       "devices.cpus",
@@ -3193,7 +3191,6 @@
       "threads.panel.agent",
       "timezone.group.Oceania",
       "toolReview.ok",
-      "webPushAsk.minutes",
       "wiki.ask.agent",
       "wiki.audienceAgentDetail",
       "wiki.editor.link",
@@ -3372,7 +3369,8 @@
       "routines.setup.github.secret",
       "routines.setup.github.type",
       "routines.setup.github.url",
-      "routines.setup.sentry.url"
+      "routines.setup.sentry.url",
+      "agentSetup.firstRun.people.email"
     ]
   },
   "mobile-base": {

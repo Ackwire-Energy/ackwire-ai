@@ -114,6 +114,7 @@ export function RightHandMineRow({ agent }: { agent: Agent }) {
   const qc = useQueryClient();
   const toast = useToast();
   const connect = useConnectAi();
+  const held = usePlanHold() !== null;
   const view = useAgentBrain(org.id, agent.id).data;
   const platform = usePlatformKey(org.id).data === true;
   const status = mineStatus(view, me.user.id, platform);
@@ -172,7 +173,9 @@ export function RightHandMineRow({ agent }: { agent: Agent }) {
   } else {
     face = <Icon name="bulb" size={16} className="muted" />;
     name = t("rightHand.settings.mineNobody");
-    acts = connectTo(t("rightHand.settings.connectMine"), true);
+    // On a billing hold nothing connects before the plan, whose one way in is the hold's banner (ADR 0158).
+    if (held) what = t("agentSetup.firstRun.afterPlan");
+    else acts = connectTo(t("rightHand.settings.connectMine"), true);
   }
   return (
     <div className="rh-mine ac-mediarow ac-mediarow--row">

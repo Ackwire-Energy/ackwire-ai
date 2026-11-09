@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
 import { ApiError } from "../src/api/http";
 import type { AppNotification } from "../src/api/types";
-import { BILLING_HOLDS, billingHoldOf } from "../src/lib/billing";
+import { BILLING_HOLDS, billingHoldOf, planOfferOf } from "../src/lib/billing";
 import { errorText, holdText, restrictionLine } from "../src/lib/errors";
 import { workspaceHeadline } from "../src/lib/notifications";
 import { can } from "../src/lib/permissions";
@@ -62,5 +62,31 @@ describe("billing holds in words (ADR 0079)", () => {
       can(of("post"), "manage_billing"),
       can(null, "manage_billing"),
     ]).toEqual([true, false, false]);
+  });
+});
+
+describe("the plan the onboarding offers (the billing service's plan list)", () => {
+  const list = (plans: unknown[], recommended = "team") => ({ recommended, plans });
+  test("the recommended plan, with its price as the billing service writes it", () => {
+    const json = list([
+      { key: "personal", name: "Pessoal", price: "$29", period: "month" },
+      { key: "team", name: "Equipe", price: "$49", period: "month" },
+    ]);
+    expect(planOfferOf(json)).toEqual({ key: "team", name: "Equipe", price: "$49" });
+  });
+
+  test("a plan with no price is named alone", () => {
+    expect(planOfferOf(list([{ key: "team", name: "Equipe" }]))).toEqual({ key: "team", name: "Equipe" });
+    expect(planOfferOf(list([{ key: "team", name: "Equipe", price: "" }]))).toEqual({ key: "team", name: "Equipe" });
+  });
+
+  test("anything else names no plan", () => {
+    expect(planOfferOf(null)).toBeNull();
+    expect(planOfferOf("plans")).toBeNull();
+    expect(planOfferOf({ plans: [] })).toBeNull();
+    expect(planOfferOf(list([{ key: "solo", name: "Solo" }]))).toBeNull();
+    expect(planOfferOf(list([{ key: "team" }]))).toBeNull();
+    expect(planOfferOf(list([{ key: "Team!", name: "Equipe" }], "Team!"))).toBeNull();
+    expect(planOfferOf(list([{ key: "team", name: "x".repeat(41) }]))).toBeNull();
   });
 });

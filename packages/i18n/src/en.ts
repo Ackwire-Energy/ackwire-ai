@@ -685,6 +685,42 @@ export const en = {
       left_other: "{{count}} steps left",
       done: "All set",
     },
+    /** The blue rail with Lodi (ADR 0158): its steps, Lodi's line on each, the preview and the plan step. */
+    flow: {
+      steps: {
+        name: "Workspace name",
+        business: "What you do",
+        team: "Your team",
+        plan: "Turn the team on",
+      },
+      stepOf: "Step {{n}} of {{total}}",
+      lodi: {
+        name: "Hi, {{first}}. I'm {{name}}. I'll put the team together with you in about two minutes.",
+        business: "With that I'll know who to bring onto the team.",
+        team: "This is the team I'd put together. You can change anything later.",
+        plan: "After the plan, all that's left is connecting an AI. I'll show you where.",
+      },
+      preview: {
+        label: "Your workspace, as you answer",
+        /** The workspace's name in the preview until one is typed. */
+        name: "Your workspace",
+        ghost: "Your team shows up here",
+      },
+      team: { title: "Your team" },
+      plan: {
+        title: "Turn your team on",
+        lead: "Your team is ready. With the plan and an AI, it starts today.",
+        asleep: "Asleep until the plan",
+        price: "<b>{{name}} plan</b> · {{price}} a month",
+        name: "<b>{{name}} plan</b>",
+        generic: "An agentes.chat plan",
+        cancel: "Cancel anytime",
+        cta: "Turn the team on",
+        all: "See all plans",
+        skip: "Go to the workspace without it",
+      },
+      account: "Your account",
+    },
     railValue: {
       context: "Written",
       skipped: "Skipped",
@@ -1302,19 +1338,18 @@ export const en = {
     },
   },
   webPushAsk: {
-    title: "Know when an agent needs you",
-    text: "They work while you do something else. Even with the tab closed, we'll tell you when they need your ok, finish what you asked or call you.",
     on: "Turn on notifications",
     later: "Not now",
     done: "Notifications on in this browser",
     failed: "Couldn't turn on notifications. Try again in Settings\u00a0›\u00a0Notifications.",
     someone: "An agent",
-    examples: "Examples of notifications",
     now: "now",
-    minutes: "{{n}} min",
-    approval: { title: "{{name}} needs your ok", body: "Can I go ahead with what you asked?" },
     finished: { title: "{{name}} is done", body: "What you asked for is ready." },
-    mention: { title: "{{name}} called you", body: "Can you take a look when you have a minute?" },
+    /** Under an agent's first answer to the person (ADR 0071): never on arrival. */
+    inline: {
+      title: "Want to know the moment {{name}} answers?",
+      why: "Even with the tab closed. Change it anytime in Settings\u00a0›\u00a0Notifications.",
+    },
   },
   shell: {
     otherChannels: "Other channels",
@@ -1980,8 +2015,6 @@ export const en = {
     label: "your right hand",
     /** The one-time dot on its row until it is first opened. */
     newDot: "New",
-    /** Its role, wherever an agent's role shows. */
-    role: "Workspace assistant",
     /** In its DM's header, after the label. */
     actsAsYou: "acts with your permissions",
     /** After "Message to {{name}} ·" in its DM's composer. */
@@ -2003,9 +2036,6 @@ export const en = {
         question: "Want to build the team with me?",
         action: "Build the team",
         message: "Help me build the team.",
-      },
-      next: {
-        firstTask: "Give {{name}} a first task",
       },
       /** Asked once, until the person picks (ADR 0147): how every agent here talks to them. */
       style: {
@@ -5344,23 +5374,10 @@ export const en = {
       /** Apps and people on a billing hold: no button, they open with the plan. */
       afterPlan: "Opens with the plan.",
       about: {
-        todo: "Tell me what {{org}} does.",
-        todoDesc: "Every agent reads this.",
-        action: "Tell",
-        done: "I know what {{org}} does",
         title: "What does {{org}} do?",
         desc: "Every agent reads this. You can change it anytime.",
         line: "In one sentence",
         optional: "Optional. Without one, the type you picked counts.",
-      },
-      team: {
-        todo: "Build the team.",
-        todoDesc: "A template for your business, you can change everything later.",
-        action: "See the team",
-        done_one: "{{count}} agent on the team",
-        done_other: "{{count}} agents on the team",
-        /** While a team card the right hand proposed waits in the chat. */
-        card: "Continue on the card below",
       },
       ai: {
         todo: "Connect an AI.",
@@ -5368,8 +5385,6 @@ export const en = {
         action: "Connect",
         done: "I think with {{label}}",
         doneAny: "I think with an AI now",
-        plan: "Opens with the agentes.chat plan.",
-        planAction: "See agentes.chat plans",
       },
       apps: {
         todo: "Connect your work apps.",
@@ -5389,14 +5404,19 @@ export const en = {
         done_one: "{{count}} person here",
         done_other: "{{count}} people here",
         doneNone: "Just you for now",
+        /** Invited, not in yet: the row is done, saying who. */
+        invited: "Invited {{names}} · waiting",
+        email: "name@company.com",
+        send: "Send",
+        more: "More options",
       },
-      /** Its line for a moment once a row is done. */
+      /** Its line for a moment once a row is done (a skip says nothing). */
       say: {
-        about: "Noted. Every agent reads this.",
-        team: "The team is here.",
         ai: "Now the team thinks.",
         apps: "Done, I can read the apps now.",
         people: "Good to have more people here.",
+        /** An invitation sent, nobody in yet: it says it went out, and celebrates nothing. */
+        invited: "Invite sent.",
       },
       /** Once the team can think: what the person may ask next. `fit` and `who` are sent to the right hand as written. */
       asks: {
@@ -16350,11 +16370,9 @@ export const en = {
     firstTask: {
       suggestion: "suggestion",
       lead: "One short task per agent, so you see each one working today.",
-      heldLead:
-        "One short task per agent. Finish the sentence and send it. They start once the workspace has an agentes.chat plan.",
-      /** Over the template's sample of its first agent's work: an example, never something it wrote. */
-      example: "Example of what {{name}} delivers",
       open: "Open with the task",
+      /** Over the composer while a first task waits, untouched, for the person to finish its sentence. */
+      finish: "Finish the sentence and send it",
       invite: "Invite {{names}}",
       later: "Later",
     },
@@ -16516,7 +16534,7 @@ export const en = {
     },
     software: {
       name: "Software and apps",
-      sub: "Support, billing and code",
+      sub: "Customer care, billing and code",
       desc: "For a company that sells software and looks after its own customers.",
     },
     support: {
@@ -16529,61 +16547,77 @@ export const en = {
       sub: "Accounting, law, consulting",
       desc: "For an office that books clients, sends proposals and bills them.",
     },
+    /** The team's hello in #general once it can work (ADR 0158): Lodi's line, then each agent's. */
+    hello: {
+      lodi: {
+        starting: "Plan active! My computer is starting up. Let's get to work!",
+        ready: "Plan active! Let's get to work!",
+        created: "The team is here! Let's get to work!",
+      },
+      /** The same, while no AI is connected: the plan brings none, and the bar under the lines connects one. */
+      lodiNoAi: {
+        starting: "Plan active! My computer is starting up. Connect an AI and we'll get to work.",
+        ready: "Plan active! Connect an AI and we'll get to work.",
+        created: "The team is here! Connect an AI and we'll get to work.",
+      },
+    },
     agents: {
       iara: {
         role: "Customer service",
         line: "Answers customers on WhatsApp and email. Calls you when she doesn't know.",
         routine: "Sum up what was left unanswered",
         task: "Write a reply to this customer message:",
+        hello: "Hi, {{first}}! Leave whoever writes on WhatsApp to me.",
       },
       caio: {
         role: "Billing",
         line: "Reminds whoever is late on payment and sends the reminder after your ok.",
         routine: "List who is late on payment",
         task: "Write a friendly payment reminder for:",
+        hello: "Hello! I'll handle billing and only send reminders after your ok.",
       },
       ada: {
         role: "Dev",
         line: "Fixes the bugs customers report and opens the PR.",
         routine: "List the new bugs",
         task: "Tell me where to start looking at this bug:",
+        hello: "Hi! Send me the bugs that come in, I'll dig in and open the PR.",
       },
       lia: {
         role: "Content",
         line: "Writes posts and scripts in the company's voice and schedules them after your ok.",
         routine: "Propose the week's posts",
         task: "Suggest three posts for this week about:",
+        hello: "Hi, everyone! This week's posts are on me.",
       },
       theo: {
         role: "Sales",
         line: "Follows up on everyone who asked for a quote and writes the proposals.",
         routine: "List who asked for a quote and got no answer",
         task: "Write a short quote for this request:",
+        hello: "Hi, {{first}}! Nobody who asks for a quote will go unanswered.",
       },
       nina: {
         role: "Scheduling",
         line: "Books, confirms and moves appointments, and reminds clients the day before.",
         routine: "Confirm tomorrow's appointments",
         task: "Organize tomorrow's schedule:",
+        hello: "Hello! The calendar is mine, and I'll remind clients the day before.",
       },
       otto: {
         role: "Orders",
         line: "Follows orders and stock and warns what is running out.",
         routine: "Warn what is running out in stock",
         task: "List what's left to do on these orders:",
+        hello: "I'm here. I'll watch the orders and tell you if stock runs low.",
       },
       bia: {
         role: "Answer base",
         line: "Keeps the answer base up to date with what the team answers.",
         routine: "Update the base with the week's answers",
         task: "Write answers to these customer questions:",
+        hello: "Hi! I'll keep the answer base up to date with what the team says.",
       },
-    },
-    /** On a billing hold, under Primeira tarefa: what the template's first agent delivers, labelled and never posted. */
-    example: {
-      iara: "Hi Marina. Your order left yesterday and arrives by Friday. The tracking code is right below. If Friday doesn't work, I'll find another date.",
-      lia: "1. Three common mistakes when hiring an agency. 2. Behind the scenes of a project that almost went wrong. 3. A question for your followers: what do you want to see here?",
-      nina: "Tomorrow: 9:00 Carla, 10:30 Pedro, 14:00 open. Pedro hasn't confirmed yet. Want me to write to him?",
     },
     channels: {
       iara: "support",

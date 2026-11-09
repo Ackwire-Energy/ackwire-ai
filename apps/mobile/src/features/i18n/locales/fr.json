@@ -2235,7 +2235,8 @@
     "suggested": "D'après votre e-mail {{domain}}, j'ai suggéré {{org}}.",
     "create": "Créer",
     "shareMessage": "Rejoignez {{org}} sur agentes.chat : {{url}}",
-    "failed": "Impossible d'enregistrer. Réessayez."
+    "failed": "Impossible d'enregistrer. Réessayez.",
+    "enter": "Entrer dans l'espace de travail"
   },
   "ai": {
     "yourPlan": "Votre abonnement IA",

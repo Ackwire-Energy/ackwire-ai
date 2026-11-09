@@ -2235,7 +2235,8 @@
     "suggested": "Por tu correo de {{domain}}, sugerí {{org}}.",
     "create": "Crear",
     "shareMessage": "Únete a {{org}} en agentes.chat: {{url}}",
-    "failed": "No se pudo guardar. Inténtalo de nuevo."
+    "failed": "No se pudo guardar. Inténtalo de nuevo.",
+    "enter": "Entrar al espacio de trabajo"
   },
   "ai": {
     "yourPlan": "Tu plan de IA",

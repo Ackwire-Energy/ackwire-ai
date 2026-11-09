@@ -1,4 +1,11 @@
-import { type Agent, useAiStatus, useComputerSetup, useMessages, useSetAgentStyle } from "@agenteschat/client";
+import {
+  type Agent,
+  useAiStatus,
+  useComputerSetup,
+  useMessages,
+  useSetAgentStyle,
+  useTeamAnswered,
+} from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiStateOf, noAiCardOf } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -28,7 +35,8 @@ import { useSendAnswer } from "./TeamCard";
  * The top of the right hand's DM (ADR 0137), drawn by the app and never stored, so it costs nothing and works before
  * any AI is connected, as on the web: its greeting, then, for the workspace's owners, the first-run checklist (ADR
  * 0155 §6). Anyone else gets one card at a time (`introCards`): a waiting pill with "Connect" (tinted) while there is
- * no AI, then how agents talk to them (ADR 0147); the owner gets that question once the checklist is complete. With
+ * no AI, then how agents talk to them (ADR 0147); the owner gets that question once the checklist is complete and the
+ * team answered them once, so it never stands beside the first task. With
  * no card left, a line to build the team with it, at any time. On the person's first visit (`waveFrom`, when its wave
  * started), its waving sticker under the greeting, drawn as a sticker message is and decorative.
  */
@@ -41,7 +49,7 @@ export function RightHandIntro({ agent, channelId, waveFrom }: { agent: Agent; c
   const team = dir.agents.filter((a) => !isRightHand(a));
   const held = usePlanHold(orgId, org) !== null;
   const setup = useComputerSetup(orgId);
-  const checklist = useFirstRun(agent, channelId).state;
+  const checklist = useFirstRun(agent).state;
   // A hold is known with the edition: until then no card, so Connect doesn't flash before the checklist.
   const noAi = aiStateOf(status.data, agent.id) === "no_ai";
   const aiKnown = Boolean(status.data) && !setup.isPending;
@@ -53,6 +61,7 @@ export function RightHandIntro({ agent, channelId, waveFrom }: { agent: Agent; c
     held,
     noAiCard: useMessages(orgId, channelId).data?.some((m) => noAiCardOf(m.meta)),
     checklist,
+    answered: useTeamAnswered(orgId, team),
   });
   const send = useSendAnswer(channelId);
   return (

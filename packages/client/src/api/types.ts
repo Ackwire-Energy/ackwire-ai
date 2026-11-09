@@ -924,8 +924,6 @@ export interface TeamPlan {
   /** People named as working there, invited after. */
   invite: string[];
   template?: string;
-  /** On a billing hold, from a template: what its first agent delivers, shown labelled and never posted. */
-  example?: string;
 }
 
 /** The right hand's team card (`meta.actionCard`): several agents created in one click ("Criar o time"). */
@@ -1327,6 +1325,8 @@ export interface AiStatus {
       | "plan_not_shared"
       | "runner_outdated"
       | "plan_tools";
+    /** Ready on an API key with Automático: the maker of the key it thinks with (`aiNameOf`). */
+    provider?: string;
   }[];
 }
 

@@ -11,6 +11,7 @@ import {
   setupEta,
   setupLines,
   setupNoticeKey,
+  setupNoticeStatusKey,
   setupNoticeTitleKey,
   setupPending,
   setupPortrait,
@@ -361,14 +362,12 @@ export function ComputerSetupNotice() {
   const key = setupNoticeKey(org.id, view);
   if (hidden === key) return null;
   const waiting = agentsWaitingForComputer(agents.data ?? [], machines.data ?? []);
-  const data = [
-    view.step
-      ? t("computerSetup.stepOf", { n: view.stepNumber, total: SETUP_STEPS.length, step: t(view.textKey) })
-      : t(view.textKey),
-    eta ? lowerFirst(etaLine(t, eta), i18n.language) : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const status = setupNoticeStatusKey(view);
+  const where = view.step
+    ? t("computerSetup.stepOf", { n: view.stepNumber, total: SETUP_STEPS.length, step: t(view.textKey) })
+    : status && t(status);
+  const left = eta ? etaLine(t, eta) : null;
+  const data = [where, left && where ? lowerFirst(left, i18n.language) : left].filter(Boolean).join(" · ");
   const line =
     view.phase === "waiting" && email && reader.owner ? `${endSentence(data)} ${t("computerSetup.email.short")}` : data;
   return (
@@ -377,7 +376,7 @@ export function ComputerSetupNotice() {
         <ComputerIcon kind={WORKSPACE_COMPUTER_KIND} size={20} className="outage__icon" />
         <span className="outage__text">
           <b>{t(setupNoticeTitleKey(view), { org: org.name })}</b>
-          <span>{line}</span>
+          {line && <span>{line}</span>}
         </span>
         <span className="outage__crew">
           {waiting.slice(0, 4).map((a) => (

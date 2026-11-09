@@ -681,6 +681,42 @@
       "left_other": "Mancano {{count}} passaggi",
       "done": "Tutto pronto"
     },
+    "flow": {
+      "steps": {
+        "name": "Nome dello spazio di lavoro",
+        "business": "Cosa fate",
+        "team": "Il tuo team",
+        "plan": "Attiva il team"
+      },
+      "stepOf": "Passo {{n}} di {{total}}",
+      "lodi": {
+        "name": "Ciao {{first}}. Sono {{name}}. Metto su il team con te in circa due minuti.",
+        "business": "Con questo so già chi chiamare nel team.",
+        "team": "Questo è il team che metterei su. Puoi cambiare tutto dopo.",
+        "plan": "Dopo il piano, manca solo collegare un'IA. Ti mostro dove."
+      },
+      "preview": {
+        "label": "Il tuo spazio di lavoro, mentre rispondi",
+        "name": "Il tuo spazio di lavoro",
+        "ghost": "Il tuo team appare qui"
+      },
+      "team": {
+        "title": "Il tuo team"
+      },
+      "plan": {
+        "title": "Attiva il tuo team",
+        "lead": "Il tuo team è pronto. Con il piano e un'IA, inizia oggi.",
+        "asleep": "Dorme fino al piano",
+        "price": "<b>Piano {{name}}</b> · {{price}} al mese",
+        "name": "<b>Piano {{name}}</b>",
+        "generic": "Un piano agentes.chat",
+        "cancel": "Disdici quando vuoi",
+        "cta": "Attiva il team",
+        "all": "Vedi tutti i piani",
+        "skip": "Entra nello spazio di lavoro senza attivarlo"
+      },
+      "account": "Il tuo account"
+    },
     "railValue": {
       "context": "Scritto",
       "skipped": "Saltato",
@@ -1339,27 +1375,19 @@
     }
   },
   "webPushAsk": {
-    "title": "Sappi quando un agente ha bisogno di te",
-    "text": "Lavorano mentre fai altro. Anche con la scheda chiusa, ti avvisiamo quando serve il tuo ok, quando finiscono ciò che hai chiesto o quando ti chiamano.",
     "on": "Attiva le notifiche",
     "later": "Non ora",
     "done": "Notifiche attive in questo browser",
     "failed": "Non è stato possibile attivare le notifiche. Riprova in Impostazioni › Notifiche.",
     "someone": "Un agente",
-    "examples": "Esempi di notifiche",
     "now": "ora",
-    "minutes": "{{n}} min",
-    "approval": {
-      "title": "{{name}} ha bisogno del tuo ok",
-      "body": "Posso procedere con ciò che hai chiesto?"
-    },
     "finished": {
       "title": "{{name}} ha finito",
       "body": "Ciò che hai chiesto è pronto."
     },
-    "mention": {
-      "title": "{{name}} ti ha chiamato",
-      "body": "Puoi dare un'occhiata quando hai un minuto?"
+    "inline": {
+      "title": "Vuoi sapere subito quando {{name}} risponde?",
+      "why": "Anche con la scheda chiusa. Puoi cambiarlo quando vuoi in Impostazioni › Notifiche."
     }
   },
   "shell": {
@@ -2046,7 +2074,6 @@
   "rightHand": {
     "label": "il tuo braccio destro",
     "newDot": "Nuovo",
-    "role": "Assistente del workspace",
     "actsAsYou": "agisce con i tuoi permessi",
     "composerHint": "nulla cambia senza di te",
     "intro": {
@@ -2062,9 +2089,6 @@
         "question": "Vuoi costruire il team con me?",
         "action": "Costruisci il team",
         "message": "Aiutami a costruire il team."
-      },
-      "next": {
-        "firstTask": "Dai un primo compito a {{name}}"
       },
       "style": {
         "question": "Come preferisci che ti parli?",
@@ -5461,31 +5485,17 @@
       "notNow": "Non ora",
       "afterPlan": "Si apre con il piano.",
       "about": {
-        "todo": "Dimmi cosa fa {{org}}.",
-        "todoDesc": "Tutti gli agenti lo leggono.",
-        "action": "Racconta",
-        "done": "So cosa fa {{org}}",
         "title": "Cosa fa {{org}}?",
         "desc": "Tutti gli agenti lo leggono. Puoi cambiarlo quando vuoi.",
         "line": "In una frase",
         "optional": "Facoltativo. Senza frase vale il tipo che hai scelto."
-      },
-      "team": {
-        "todo": "Crea il team.",
-        "todoDesc": "Un modello per la tua attività, puoi cambiare tutto dopo.",
-        "action": "Vedi il team",
-        "done_one": "{{count}} agente nel team",
-        "done_other": "{{count}} agenti nel team",
-        "card": "Continua nella scheda qui sotto"
       },
       "ai": {
         "todo": "Collega un'IA.",
         "todoDesc": "Va bene quella che paghi già.",
         "action": "Collega",
         "done": "Penso con {{label}}",
-        "doneAny": "Penso con un'IA",
-        "plan": "Si apre con il piano di agentes.chat.",
-        "planAction": "Vedi i piani di agentes.chat"
+        "doneAny": "Penso con un'IA"
       },
       "apps": {
         "todo": "Collega le app di lavoro.",
@@ -5504,14 +5514,17 @@
         "action": "Invita",
         "done_one": "{{count}} persona qui",
         "done_other": "{{count}} persone qui",
-        "doneNone": "Solo tu per ora"
+        "doneNone": "Solo tu per ora",
+        "invited": "Ho invitato {{names}} · in attesa",
+        "email": "nome@azienda.com",
+        "send": "Invia",
+        "more": "Altre opzioni"
       },
       "say": {
-        "about": "Annotato. Tutti gli agenti lo leggono.",
-        "team": "Il team è arrivato.",
         "ai": "Ora il team pensa.",
         "apps": "Fatto, ora leggo le app.",
-        "people": "Che bello avere più persone qui."
+        "people": "Che bello avere più persone qui.",
+        "invited": "Invito inviato."
       },
       "asks": {
         "lead": "Ora chiedimi qualcosa:",
@@ -17086,9 +17099,8 @@
     "firstTask": {
       "suggestion": "suggerimento",
       "lead": "Un breve compito per agente, per vedere ognuno al lavoro oggi.",
-      "heldLead": "Un compito breve per agente. Completa la frase e inviala. Iniziano quando il workspace ha un piano agentes.chat.",
-      "example": "Esempio di ciò che {{name}} consegna",
       "open": "Apri con il compito",
+      "finish": "Completa la frase e inviala",
       "invite": "Invita {{names}}",
       "later": "Più tardi"
     },
@@ -17242,7 +17254,7 @@
     },
     "software": {
       "name": "Software e app",
-      "sub": "Supporto, pagamenti e codice",
+      "sub": "Assistenza clienti, pagamenti e codice",
       "desc": "Per chi vende un software e segue i propri clienti."
     },
     "support": {
@@ -17255,60 +17267,75 @@
       "sub": "Contabilità, legale, consulenza",
       "desc": "Per uno studio che prenota clienti, invia proposte e incassa."
     },
+    "hello": {
+      "lodi": {
+        "starting": "Piano attivo! Il mio computer si sta avviando. Al lavoro!",
+        "ready": "Piano attivo! Al lavoro!",
+        "created": "Il team è qui! Al lavoro!"
+      },
+      "lodiNoAi": {
+        "starting": "Piano attivo! Il mio computer si sta avviando. Collega un'IA e ci mettiamo al lavoro.",
+        "ready": "Piano attivo! Collega un'IA e ci mettiamo al lavoro.",
+        "created": "Il team è qui! Collega un'IA e ci mettiamo al lavoro."
+      }
+    },
     "agents": {
       "iara": {
         "role": "Assistenza",
         "line": "Risponde ai clienti su WhatsApp e via e-mail. Ti chiama quando non sa.",
         "routine": "Riassumere ciò che è rimasto senza risposta",
-        "task": "Scrivi una risposta a questo messaggio del cliente:"
+        "task": "Scrivi una risposta a questo messaggio del cliente:",
+        "hello": "Ciao {{first}}! Chi scrive su WhatsApp lascialo a me."
       },
       "caio": {
         "role": "Pagamenti",
         "line": "Ricorda a chi è in ritardo con il pagamento e manda il sollecito dopo il tuo ok.",
         "routine": "Elencare chi è in ritardo con il pagamento",
-        "task": "Scrivi un promemoria di pagamento gentile per:"
+        "task": "Scrivi un promemoria di pagamento gentile per:",
+        "hello": "Ciao! Mi occupo dei pagamenti e mando i promemoria solo dopo il tuo ok."
       },
       "ada": {
         "role": "Dev",
         "line": "Corregge i bug segnalati dai clienti e apre la PR.",
         "routine": "Elencare i nuovi bug",
-        "task": "Dimmi da dove iniziare a indagare su questo bug:"
+        "task": "Dimmi da dove iniziare a indagare su questo bug:",
+        "hello": "Ciao! Passatemi i bug che arrivano, indago io e apro la PR."
       },
       "lia": {
         "role": "Contenuti",
         "line": "Scrive post e copioni nel tono dell'azienda e li programma dopo il tuo ok.",
         "routine": "Proporre i post della settimana",
-        "task": "Proponi tre post per questa settimana su:"
+        "task": "Proponi tre post per questa settimana su:",
+        "hello": "Ciao a tutti! I post della settimana sono miei."
       },
       "theo": {
         "role": "Vendite",
         "line": "Ricontatta chi ha chiesto un preventivo e scrive le proposte.",
         "routine": "Elencare chi ha chiesto un preventivo senza risposta",
-        "task": "Scrivi un preventivo breve per questa richiesta:"
+        "task": "Scrivi un preventivo breve per questa richiesta:",
+        "hello": "Ciao {{first}}! Nessuno che chiede un preventivo resterà senza risposta."
       },
       "nina": {
         "role": "Agenda",
         "line": "Fissa, conferma e sposta gli appuntamenti, e ricorda ai clienti il giorno prima.",
         "routine": "Confermare gli appuntamenti di domani",
-        "task": "Organizza questi orari di domani:"
+        "task": "Organizza questi orari di domani:",
+        "hello": "Ciao! L'agenda la tengo io, e ricordo gli appuntamenti ai clienti il giorno prima."
       },
       "otto": {
         "role": "Ordini",
         "line": "Segue ordini e magazzino e avvisa cosa sta finendo.",
         "routine": "Avvisare cosa sta finendo in magazzino",
-        "task": "Elenca cosa resta da fare su questi ordini:"
+        "task": "Elenca cosa resta da fare su questi ordini:",
+        "hello": "Eccomi. Tengo d'occhio gli ordini e avviso se il magazzino sta finendo."
       },
       "bia": {
         "role": "Base di risposte",
         "line": "Tiene aggiornata la base di risposte con ciò che risponde il team.",
         "routine": "Aggiornare la base con le risposte della settimana",
-        "task": "Scrivi le risposte a queste domande dei clienti:"
+        "task": "Scrivi le risposte a queste domande dei clienti:",
+        "hello": "Ciao! Terrò aggiornata la base di risposte con quello che risponde il team."
       }
-    },
-    "example": {
-      "iara": "Ciao Marina. Il tuo ordine è partito ieri e arriva entro venerdì. Il codice di tracciamento è qui sotto. Se venerdì non va bene, trovo un'altra data.",
-      "lia": "1. Tre errori comuni nello scegliere un'agenzia. 2. Il dietro le quinte di un progetto che stava per andare male. 3. Una domanda per chi vi segue: cosa volete vedere qui?",
-      "nina": "Domani: 9:00 Carla, 10:30 Pedro, 14:00 libero. Pedro non ha ancora confermato. Vuoi che gli scriva?"
     },
     "channels": {
       "iara": "assistenza",

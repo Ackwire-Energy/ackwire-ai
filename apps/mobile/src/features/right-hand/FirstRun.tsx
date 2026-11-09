@@ -1,78 +1,64 @@
 import type { Agent } from "@agenteschat/client";
 import {
+  useAgentBrain,
   useAiStatus,
   useCatalog,
   useConfirmSetup,
   useConnections,
+  useInvitations,
   useMembers,
-  useMessages,
   useModelLabel,
-  useSettings,
-  useUpdateSettings,
+  useModels,
 } from "@agenteschat/client";
-import { teamProposalOf } from "@agenteschat/client/lib/action-cards";
 import { brainLine } from "@agenteschat/client/lib/brain";
-import { firstName, joinNames } from "@agenteschat/client/lib/format";
+import { emailName, firstName, joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { stepPermissions } from "@agenteschat/client/lib/home";
 import { aiStateOf, planHoldPhoneLine } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
-import { isAuto } from "@agenteschat/client/lib/providers";
+import { apiProviderOf, isAuto } from "@agenteschat/client/lib/providers";
 import type { FirstRunState } from "@agenteschat/client/lib/right-hand";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { connectorName } from "@agenteschat/client/lib/scopes";
 import {
+  beatRow,
+  type FirstRunFacts,
   type FirstRunStep,
+  firstRunAiLabel,
   firstRunAsks,
+  firstRunBeats,
   firstRunDone,
   firstRunRow,
   firstRunRowState,
   firstRunSteps,
 } from "@agenteschat/client/lib/setup-checklist";
-import {
-  answerAfter,
-  BUSINESS_TYPES,
-  type BusinessType,
-  firstTasks,
-  isTemplateBusiness,
-  teamStatus,
-} from "@agenteschat/client/lib/team-plan";
-import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Button, type IconName } from "@/ui";
+import type { IconName } from "@/ui";
 import { router } from "@/ui/navigation";
 import { SetupAsks, SetupCardView, useDoneSay } from "../agents/setup/SetupCard";
 import { openSetupStep } from "../agents/setup/SetupStepScreen";
 import { openConnectAi } from "../ai/NoAiCard";
 import { usePlanHold } from "../ai/parts";
-import { useOpenDm } from "../new/useOpenDm";
-import { useFailed } from "../routines/hooks";
 import { useDirectory, useMeId } from "../shared/hooks";
-import { successHaptic, tapHaptic } from "../shared/parts";
-import { TeamTemplatesSheet, useSendAnswer } from "./TeamCard";
+import { tapHaptic } from "../shared/parts";
+import { useSendAnswer } from "./TeamCard";
 
 /*
- * The right hand's first run on the phone (ADR 0155 §6), as on the web: one checklist card inside its greeting for
- * the workspace's owners, five rows, each a pushed screen (what the workspace does, the apps), a sheet (the team's
- * templates), Connect AI or the invite screen. On a billing hold the AI row says so in words (App Store 3.1.1).
+ * The right hand's first run on the phone (ADR 0155 §6, ADR 0158), as on the web: one checklist card inside its
+ * greeting for the workspace's owners, with what the onboarding didn't do (an AI, apps, people), each row Connect AI,
+ * a pushed screen or the invite screen. On a billing hold every row waits, the AI row saying where the plan is in
+ * words only (App Store 3.1.1).
  */
 
 const ROW_ICON: Record<FirstRunStep, IconName> = {
-  about: "doc",
-  team: "members",
   ai: "brain",
   apps: "bolt",
   people: "person",
 };
 
-/** Row 1's screen saved a business with a template: the card opens that template once it is back in view. */
-let templatesAfterAbout: ((template: string | undefined) => void) | null = null;
-export const openTemplatesAfterAbout = (template: string | undefined) => templatesAfterAbout?.(template);
-
-/** Where the card stands for this person, and what its rows read; Conversas reads it with no conversation (null). */
-export function useFirstRun(agent: Agent | undefined, channelId: string | null) {
+/** Where the card stands for this person, and what its rows read (Conversas reads it too). */
+export function useFirstRun(agent: Agent | undefined) {
   const { orgId, org } = useOrg();
   const dir = useDirectory();
   const meId = useMeId();
@@ -81,8 +67,6 @@ export function useFirstRun(agent: Agent | undefined, channelId: string | null) 
     ? []
     : firstRunSteps(agent, {
         owner: org?.role === "owner",
-        configure: can(org, "configure"),
-        createAgents: may.createAgents,
         connectAi: may.connectAi,
         pay: may.pay,
         connectors: can(org, "manage_connectors"),
@@ -90,70 +74,60 @@ export function useFirstRun(agent: Agent | undefined, channelId: string | null) 
       });
   const status = useAiStatus(orgId);
   const members = useMembers(orgId);
-  const settings = useSettings(orgId);
+  const invitations = useInvitations(orgId, steps.includes("people"));
   const connections = useConnections(orgId, steps.includes("apps"));
-  const messages = useMessages(orgId, channelId ?? "", channelId !== null).data;
   const held = usePlanHold(orgId, org) !== null;
   const team = dir.agents.filter((a) => !isRightHand(a));
   const aiState = agent ? aiStateOf(status.data, agent.id) : undefined;
   const live = (connections.data ?? []).filter((c) => !c.revokedAt);
-  const done =
-    agent?.setup && steps.length > 0
-      ? firstRunDone(agent.setup, {
-          context: Boolean(settings.data?.context.trim()),
-          team: team.length > 0,
-          ai: !held && (aiState === "ready" || aiState === "waiting"),
-          apps: live.length > 0,
-          people: (members.data?.length ?? 1) > 1,
-        })
-      : new Set<FirstRunStep>();
-  const cards = (messages ?? []).flatMap((m) => {
-    const card = teamProposalOf(m.meta);
-    return card ? [card] : [];
-  });
+  const waiting = invitations.data ?? [];
+  const facts: FirstRunFacts = {
+    ai: !held && (aiState === "ready" || aiState === "waiting"),
+    apps: live.length > 0,
+    people: (members.data?.length ?? 1) > 1 || waiting.length > 0,
+  };
+  const done = agent?.setup && steps.length > 0 ? firstRunDone(agent.setup, facts) : new Set<FirstRunStep>();
   const left = steps.filter((s) => !done.has(s));
   const state: FirstRunState = steps.length === 0 ? "none" : left.length > 0 ? "open" : "complete";
   return {
     steps,
     done,
+    facts,
     held,
     team,
     state,
-    ready: status.isSuccess && members.isSuccess && settings.isSuccess,
+    ready: status.isSuccess && members.isSuccess,
     members: members.data?.length ?? 1,
+    invited: waiting.map((i) => emailName(i.email)),
     connections: live,
-    teamCard: cards.some((c) => teamStatus(c) === "open"),
-    created: cards.filter((c) => c.state === "created").at(-1) ?? null,
-    typed: answerAfter(messages, null),
   };
 }
 
 export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: string }) {
   const { t } = useTranslation();
   const { orgId, org } = useOrg();
-  const openDm = useOpenDm();
   const send = useSendAnswer(channelId);
   const confirm = useConfirmSetup(orgId, agent.id);
-  const run = useFirstRun(agent, channelId);
+  const run = useFirstRun(agent);
   const catalog = useCatalog();
   const dir = useDirectory();
   const modelLabel = useModelLabel();
-  const [templates, setTemplates] = useState<{ initial?: string } | null>(null);
-  const { steps, done, held, team } = run;
-  // Once, while the team row is still open for this person.
-  const teamOpen = useRef(false);
-  teamOpen.current = steps.includes("team") && !done.has("team");
-  useEffect(() => {
-    templatesAfterAbout = (initial) => {
-      if (teamOpen.current) setTemplates(initial ? { initial } : {});
-    };
-    return () => {
-      templatesAfterAbout = null;
-    };
-  }, []);
+  const models = useModels();
+  // Through the API, the workspace's key it runs on names its maker, as on the web (Automático names none).
+  const keyMaker = useAgentBrain(orgId, agent.id).data?.workspaceAi?.key?.provider;
+  const { steps, done, held, team, facts } = run;
   const doneHere = steps.filter((s) => done.has(s));
-  const said = useDoneSay(run.ready, doneHere, (step) =>
-    t(`agentSetup.firstRun.say.${step}`, agentGrammar(agent.name)),
+  // "Agora não" moves the row on and says nothing: only something done gets its line. An invitation is only sent: its
+  // line says so, and someone joining gets the welcome.
+  const said = useDoneSay(
+    run.ready,
+    firstRunBeats(doneHere, { members: run.members, invited: run.invited.length }),
+    (beat) =>
+      beat === "invited"
+        ? t("agentSetup.firstRun.say.invited")
+        : facts[beat]
+          ? t(`agentSetup.firstRun.say.${beat}`, agentGrammar(agent.name))
+          : "",
   );
   if (run.state === "none") return null;
 
@@ -163,19 +137,18 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
     return def ? [connectorName(t, def)] : [];
   });
   const appNames = names.length ? joinNames(names, t) : null;
-  // What it thinks with, as the web names it ("Penso com Sonnet pelo plano do Claude").
+  // The AI it thinks with, as the web names it: an API key's maker ("Claude"), a plan's line.
   const ownerName = agent.ownerUserId ? dir.memberById.get(agent.ownerUserId)?.name : undefined;
-  const label = brainLine(
+  const thinks = brainLine(
     t,
     agent.brain,
     isAuto(agent.model) ? t("brain.auto.label") : (modelLabel(agent.model) ?? agent.model),
     { owner: ownerName ? firstName(ownerName) : undefined, agents: dir.agents },
-  ).text;
-  const stateOf = (s: FirstRunStep) => firstRunRowState(s, { done, held, teamCard: run.teamCard });
+  );
+  const label = firstRunAiLabel(thinks, keyMaker ?? apiProviderOf(agent.model, models.data?.models ?? []));
+  const stateOf = (s: FirstRunStep) => firstRunRowState(s, { done, held });
   const next = steps.find((s) => stateOf(s) === "open");
   const act: Record<FirstRunStep, () => void> = {
-    about: () => openSetupStep(agent.id, "about", run.typed),
-    team: () => (done.has("team") ? router.push("/team" as never) : setTemplates({})),
     // For the whole team, as the web's row: with agents besides it, every agent of the person's is chosen.
     ai: () => openConnectAi(team.length > 0 ? {} : { agentId: agent.id }),
     apps: () => openSetupStep(agent.id, "apps"),
@@ -187,20 +160,26 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
       t,
       s,
       state,
-      { org: org?.name ?? "", agents: team.length, label, apps: appNames, members: run.members },
+      {
+        org: org?.name ?? "",
+        label,
+        apps: appNames,
+        members: run.members,
+        invited: run.invited.length ? joinNames(run.invited, t) : null,
+      },
       agent.setup?.done.includes(s) ?? false,
     );
+    // On a hold, the AI row says where the plan is chosen, in words only (App Store 3.1.1).
+    const plan = s === "ai" && state === "afterPlan";
     return {
       key: s,
       icon: ROW_ICON[s],
       done: state === "done",
-      // On a hold, the AI row says where the plan is chosen, in words only (App Store 3.1.1).
-      title: state === "plan" ? planHoldPhoneLine(t, can(org, "manage_billing")) : words.title,
-      desc: state === "plan" ? undefined : words.desc,
-      dim: state === "afterPlan" || state === "card" || state === "plan",
-      saying: said?.step === s ? said.text : null,
-      // The first question is answered by the buttons under it (`AboutAnswers`), not a button of its own.
-      ...(words.action && state !== "plan" && !(s === "about" && next === "about")
+      title: plan ? planHoldPhoneLine(t, can(org, "manage_billing")) : words.title,
+      desc: plan ? undefined : words.desc,
+      dim: state === "afterPlan",
+      saying: said && beatRow(said.step) === s ? said.text : null,
+      ...(words.action
         ? {
             action: {
               label: words.action,
@@ -218,117 +197,30 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
     };
   });
 
-  const first = run.created ? firstTasks(run.created)[0] : undefined;
-  const asks = firstRunAsks(done, held)
-    ? [
-        ...(first
-          ? [
-              {
-                label: t("rightHand.intro.next.firstTask", agentGrammar(first.name)),
-                onPress: () => void openDm({ agentId: first.agentId }, { compose: true, text: first.task }),
-              },
-            ]
-          : []),
-        ...(["fit", "who"] as const).map((k) => ({
-          label: t(`agentSetup.firstRun.asks.${k}`),
-          onPress: () => send(t(`agentSetup.firstRun.asks.${k}`)),
-        })),
-      ]
+  // What to ask it. The team's first task is offered once, by the team card ("Primeira tarefa"), never here too.
+  const asks = firstRunAsks(done, held, team.length > 0)
+    ? (["fit", "who"] as const).map((k) => ({
+        label: t(`agentSetup.firstRun.asks.${k}`),
+        onPress: () => send(t(`agentSetup.firstRun.asks.${k}`)),
+      }))
     : [];
 
   // One question at a time, as in a conversation: the next open step with its button, and a step just done while it
-  // says so; the count says how far the rest is ("2 de 5"). Complete, the card keeps every row as the record.
+  // says so; the count says how far the rest is ("1 de 3"). Complete, the card keeps every row as the record.
   const focus = next ?? rows.find((r) => !r.done && !r.dim)?.key;
   const shown = run.state === "complete" ? rows : rows.filter((r) => r.key === focus || r.saying);
 
   return (
-    <>
-      <SetupCardView
-        title={
-          run.state === "complete"
-            ? t("agentSetup.firstRun.complete")
-            : t("agentSetup.firstRun.title", { org: org?.name ?? "" })
-        }
-        done={doneHere.length}
-        total={steps.length}
-        rows={shown.length > 0 ? shown : rows}
-        foot={
-          next === "about" && !done.has("about") && run.state !== "complete" ? (
-            <AboutAnswers
-              onOther={act.about}
-              onSaved={(business) => {
-                if (teamOpen.current) setTemplates(isTemplateBusiness(business) ? { initial: business } : {});
-              }}
-            />
-          ) : asks.length > 0 ? (
-            <SetupAsks lead={t("agentSetup.firstRun.asks.lead")} asks={asks} />
-          ) : null
-        }
-      />
-      <TeamTemplatesSheet
-        open={templates !== null}
-        initial={templates?.initial}
-        onClose={() => setTemplates(null)}
-        onNone={() => setTemplates(null)}
-      />
-    </>
+    <SetupCardView
+      title={
+        run.state === "complete"
+          ? t("agentSetup.firstRun.complete")
+          : t("agentSetup.firstRun.title", { org: org?.name ?? "" })
+      }
+      done={doneHere.length}
+      total={steps.length}
+      rows={shown.length > 0 ? shown : rows}
+      foot={asks.length > 0 ? <SetupAsks lead={t("agentSetup.firstRun.asks.lead")} asks={asks} /> : null}
+    />
   );
 }
-
-/**
- * The first question, answered in place: the business types as buttons in two columns, as ready answers in a
- * conversation (toca e manda). A type is saved as the workspace's context, which every agent reads (the same save as
- * the step's own screen), and the team's templates open with that business picked; "Outra coisa" opens the screen to
- * write it in a sentence.
- */
-function AboutAnswers({ onOther, onSaved }: { onOther: () => void; onSaved: (business: BusinessType) => void }) {
-  const { t } = useTranslation();
-  const { orgId } = useOrg();
-  const save = useUpdateSettings(orgId);
-  const failed = useFailed();
-  const [picked, setPicked] = useState<BusinessType | null>(null);
-  const answer = (business: BusinessType) => {
-    if (save.isPending) return;
-    tapHaptic();
-    if (business === "other") {
-      onOther();
-      return;
-    }
-    setPicked(business);
-    save.mutate(
-      { context: t(`teamPlan.business.${business}`) },
-      {
-        onSuccess: () => {
-          successHaptic();
-          onSaved(business);
-        },
-        onError: (e) => {
-          setPicked(null);
-          failed(e);
-        },
-      },
-    );
-  };
-  return (
-    <View style={styles.answers}>
-      {BUSINESS_TYPES.map((b) => (
-        <View key={b} style={styles.answer}>
-          <Button
-            variant="secondary"
-            wide
-            label={t(`teamPlan.business.${b}`)}
-            loading={save.isPending && picked === b}
-            disabled={save.isPending && picked !== b}
-            onPress={() => answer(b)}
-          />
-        </View>
-      ))}
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  // Two columns of equal buttons, 8 apart, as ready answers under a question.
-  answers: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  answer: { flexBasis: "47%", flexGrow: 1 },
-});

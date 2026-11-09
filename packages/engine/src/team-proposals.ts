@@ -119,8 +119,6 @@ export interface TeamParams {
   invite: string[];
   /** From "Usar este modelo": the template's id. */
   template?: string;
-  /** On a billing hold, from a template: what its first agent delivers, shown labelled and never posted. */
-  example?: string;
 }
 
 /** `failed` is never stored: a failure leaves it `pending` with `error`. */
@@ -342,7 +340,6 @@ export async function checkTeam(
     approvals: str(input.approvals).slice(0, 300),
     invite: [...new Set(list(input.invite).map(str).filter(Boolean))].slice(0, 10),
     ...(str(input.template) ? { template: str(input.template) } : {}),
-    ...(str(input.example) ? { example: str(input.example) } : {}),
   };
 }
 

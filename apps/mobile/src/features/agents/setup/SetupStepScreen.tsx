@@ -10,9 +10,7 @@ import {
   useConnections,
   useModelLabel,
   useRoles,
-  useSettings,
   useUpdateAgent,
-  useUpdateSettings,
   useWidenAudience,
 } from "@agenteschat/client";
 import {
@@ -40,7 +38,6 @@ import {
   suggestedChannels,
   suggestedLevels,
 } from "@agenteschat/client/lib/setup-checklist";
-import { BUSINESS_TYPES, type BusinessType, isTemplateBusiness } from "@agenteschat/client/lib/team-plan";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -52,7 +49,6 @@ import { openAgentAi } from "../../ai/AgentAiScreen";
 import { PlanReplies } from "../../ai/parts";
 import { useWidenAsk } from "../../chat/ReachLines";
 import { ConnectorIcon } from "../../connectors/ConnectorIcon";
-import { openTemplatesAfterAbout } from "../../right-hand/FirstRun";
 import { useFailed } from "../../routines/hooks";
 import { resourceName, useConnectedById, useSetLevels } from "../../settings/hooks";
 import { SettingsPage } from "../../settings/parts";
@@ -67,34 +63,21 @@ import { useAgentChannels } from "./useAgentChannels";
  * same APIs as the agent's other screens, then confirms its step, and goes back to where the checklist was.
  */
 
-const STEPS: readonly SetupStep[] = ["apps", "where", "who", "how", "about"];
+const STEPS: readonly SetupStep[] = ["apps", "where", "who", "how"];
 
-/** Opens one step's screen (`ai` is Connect AI, not a screen of this); `text` fills row 1's sentence. */
-export const openSetupStep = (agentId: string, step: SetupStep, text?: string | null) =>
-  router.push({
-    pathname: "/agent-step/[id]",
-    params: { id: agentId, step, ...(text ? { text: text.slice(0, 500) } : {}) },
-  });
+/** Opens one step's screen (`ai` is Connect AI, not a screen of this). */
+export const openSetupStep = (agentId: string, step: SetupStep) =>
+  router.push({ pathname: "/agent-step/[id]", params: { id: agentId, step } });
 
-/** The right hand's first run has its own screens for these (ADR 0155 §6); a new agent's checklist, the rest. */
-const FIRST_RUN_SCREENS: ReadonlySet<SetupStep> = new Set<SetupStep>(["about", "apps"]);
-
-export function SetupStepScreen({
-  agentId,
-  step,
-  text,
-}: {
-  agentId: string;
-  step: string | undefined;
-  text?: string | undefined;
-}) {
+export function SetupStepScreen({ agentId, step }: { agentId: string; step: string | undefined }) {
   const { t } = useTranslation();
   const c = useColors();
   const dir = useDirectory();
   const agent = dir.agentById.get(agentId);
   const known = STEPS.find((s) => s === step);
   const firstRun = isRightHand(agent);
-  if (!agent?.setup || !known || (firstRun ? !FIRST_RUN_SCREENS.has(known) : known === "about")) {
+  // The right hand's first run has its own screen for apps only (ADR 0155 §6); a new agent's checklist, all four.
+  if (!agent?.setup || !known || (firstRun && known !== "apps")) {
     return (
       <View style={[styles.fill, { backgroundColor: c.bg }]}>
         <PushedHeader title={t("agentSetup.title")} solid={false} />
@@ -103,8 +86,6 @@ export function SetupStepScreen({
     );
   }
   switch (known) {
-    case "about":
-      return <AboutStep typed={text ?? null} />;
     case "apps":
       return firstRun ? <FirstRunAppsStep /> : <AppsStep agent={agent} />;
     case "where":
@@ -114,82 +95,6 @@ export function SetupStepScreen({
     default:
       return <HowStep agent={agent} />;
   }
-}
-
-/**
- * The first run's row 1: "O que a Acme faz?", the business types to pick one and a sentence, saved as the workspace's
- * context, which every agent reads ("Outra coisa" asks for the sentence). Saved, it goes back and the card opens the
- * team's templates with that business's picked.
- */
-function AboutStep({ typed }: { typed: string | null }) {
-  const { t } = useTranslation();
-  const { orgId, org } = useOrg();
-  const settings = useSettings(orgId);
-  const save = useUpdateSettings(orgId);
-  const failed = useFailed();
-  const [business, setBusiness] = useState<BusinessType | null>(null);
-  const [line, setLine] = useState<string | null>(null);
-  const shown = line ?? (settings.data?.context || typed || "");
-  const other = business === "other";
-  const text = shown.trim() || (business && !other ? t(`teamPlan.business.${business}`) : "");
-  return (
-    <SettingsPage
-      title={t("agentSetup.firstRun.about.title", { org: org?.name ?? "" })}
-      locked={save.isPending}
-      action={{
-        label: t("common.save"),
-        disabled: !text || save.isPending || !settings.isSuccess,
-        onPress: () =>
-          save.mutate(
-            { context: text },
-            {
-              onSuccess: () => {
-                successHaptic();
-                goBack();
-                openTemplatesAfterAbout(business && isTemplateBusiness(business) ? business : undefined);
-              },
-              onError: failed,
-            },
-          ),
-      }}
-    >
-      <GroupedFooter>{t("agentSetup.firstRun.about.desc")}</GroupedFooter>
-      <GroupedList>
-        {BUSINESS_TYPES.map((b) => (
-          <GroupedRow
-            key={b}
-            label={t(`teamPlan.business.${b}`)}
-            checked={b === business}
-            disabled={save.isPending}
-            onPress={() => {
-              tapHaptic();
-              setBusiness(b === business ? null : b);
-            }}
-          />
-        ))}
-      </GroupedList>
-      <GroupedHeader
-        {...(other
-          ? {}
-          : {
-              hint: {
-                name: t("common.about", { label: t("agentSetup.firstRun.about.line") }),
-                text: t("agentSetup.firstRun.about.optional"),
-              },
-            })}
-      >
-        {t("agentSetup.firstRun.about.line")}
-      </GroupedHeader>
-      <TextArea
-        value={shown}
-        onChangeText={setLine}
-        accessibilityLabel={t("agentSetup.firstRun.about.line")}
-        minHeight={88}
-        scrollEnabled={false}
-        editable={!save.isPending}
-      />
-    </SettingsPage>
-  );
 }
 
 /**

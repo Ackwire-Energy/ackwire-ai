@@ -165,6 +165,8 @@ export async function loadAgentStatuses(
         statusSource: agents.statusSource,
         statusKind: agents.statusKind,
         statusSubject: agents.statusSubject,
+        builtin: agents.builtin,
+        createdAt: agents.createdAt,
         // Its last finished run however long ago ("Parado desde…"): none means it never worked. Newest first along
         // the (org, agent, created) index, so this stops at the first one.
         // Written out: Drizzle drops a column's table in a one-table select, and `id` would read the run's.
@@ -264,13 +266,16 @@ export async function loadAgentStatuses(
       mine.some((w) => w.status === "live" && (w.state === null || w.state === "working"));
     const outNow = out && !thinking;
     if (outNow && stored?.line.by !== "self") status = outLine(out, catchUps.length);
+    // Away is for an agent idle a while since it last worked: one just made counts from its making, and the right hand,
+    // where the workspace's people come to talk, never idles away.
+    const fresh = activeAt ?? new Date(a.createdAt);
     const presence: AgentPresence = a.heldAt
       ? "offline"
       : outNow
         ? "out"
         : heavy
           ? "busy"
-          : runs.length > 0 || (activeAt && ms - activeAt.getTime() < AGENT_AWAY_AFTER_MS)
+          : runs.length > 0 || a.builtin === "right_hand" || ms - fresh.getTime() < AGENT_AWAY_AFTER_MS
             ? "online"
             : "away";
     return { agentId: a.id, presence, status, activeAt: activeAt?.toISOString() ?? null, working: thinking };

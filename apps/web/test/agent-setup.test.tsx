@@ -47,19 +47,73 @@ describe("the setup checklist in a new agent's DM", () => {
     const state = withSetup(seedState());
     await openDm(state);
     const who = [...(card()?.querySelectorAll<HTMLElement>(".setup-row") ?? [])].find((r) =>
-      r.textContent?.includes("Falar com todos de Acme"),
+      r.textContent?.includes("Falar com todos da Acme"),
     );
     expect(who).toBeTruthy();
     await click(within(who as HTMLElement).getByRole("button", { name: "Escolher" }));
     const dialog = screen().getByRole("dialog");
     await click(within(dialog).getByRole("button", { name: "Salvar" }));
     expect(state.calls).toContainEqual({ method: "agents.confirmSetup", args: [ORG_ID, ADA_ID, "who"] });
-    expect(card()?.textContent).toContain("Falo com todos de Acme");
+    // The workspace with the article the app gives it everywhere ("da Acme", as "o time da Acme").
+    expect(card()?.textContent).toContain("Falo com todos da Acme");
+  });
+
+  test("with nothing left, its greeting asks for no help over a card that is all done", async () => {
+    const state = withSetup(seedState(), ["apps", "who", "how"]);
+    await openDm(state);
+    expect(card()?.textContent).toContain("5 de 5");
+    expect(document.body.textContent).not.toContain("Pra eu começar");
   });
 
   test("an agent made before the checklist shows none: its empty conversation as before", async () => {
     const state = seedState();
     await openDm(state);
     expect(card()).toBeNull();
+  });
+});
+
+describe("a template agent's greeting", () => {
+  test("in its own role, never 'Você me pediu', and never a doubled period", async () => {
+    const state = seedState();
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (ada) {
+      ada.setup = { role: null, done: [] };
+      ada.role = "Atendimento";
+      ada.instructions = "Responde os clientes no WhatsApp.";
+    }
+    await openDm(state);
+    const text = document.body.textContent ?? "";
+    expect(text).not.toContain("Você me pediu");
+    expect(text).toContain("a nova de atendimento");
+  });
+
+  test("an agent with no role says back what it was asked, closing its sentence once", async () => {
+    const state = seedState();
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (ada) {
+      ada.setup = { role: null, done: [] };
+      ada.role = "";
+      ada.instructions = "Responde os clientes no WhatsApp.";
+    }
+    await openDm(state);
+    expect(document.body.textContent).toContain("Você me pediu: “Responde os clientes no WhatsApp”.");
+    expect(document.body.textContent).not.toContain(".”.");
+  });
+
+  test("apps skipped on the right hand's card stay skipped for the team's agents", async () => {
+    const state = seedState();
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (ada) ada.setup = { role: "dev", done: [] };
+    if (ada)
+      state.agents.push({
+        ...ada,
+        id: "lodi-x",
+        name: "Lodi",
+        handle: "lodi",
+        builtin: "right_hand",
+        setup: { role: null, done: ["apps"] },
+      });
+    await openDm(state);
+    expect(card()?.textContent).toContain("Sem apps por enquanto");
   });
 });

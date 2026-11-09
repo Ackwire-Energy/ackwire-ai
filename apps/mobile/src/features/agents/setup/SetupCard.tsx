@@ -6,6 +6,7 @@ import { firstName, joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiStateOf, planHoldPhoneLine } from "@agenteschat/client/lib/no-ai";
 import { addsAgentsTo, can } from "@agenteschat/client/lib/permissions";
+import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import {
   askedLine,
   nextStep,
@@ -60,15 +61,73 @@ export function useSetupSteps(agent: Agent | undefined): AgentSetupStep[] {
   return agent && meId ? setupSteps(agent, { meId, admin: can(org, "manage_agents") }) : [];
 }
 
-/** The top of a new agent's DM: its greeting and the checklist, as its first message. */
+/**
+ * What its checklist reads for this person (ADR 0155 §2), as on the web: their steps, the ones done (confirmed, or
+ * done as its data says), and whether everything it reads has loaded.
+ */
+function useSetupProgress(agent: Agent) {
+  const { orgId, org } = useOrg();
+  const dir = useDirectory();
+  const admin = can(org, "manage_agents");
+  const steps = useSetupSteps(agent);
+  const status = useAiStatus(orgId);
+  const access = useAgentAccess(orgId, agent.id, admin && steps.includes("apps"));
+  const detail = useAgentDetail(orgId, agent.id);
+  const visible = useAgentChannels();
+  const connectors = access.data ? resourcesOf(access.data).filter((r) => r.kind === "connector") : [];
+  const granted = connectors.filter((r) => levelOf(r) !== "none");
+  const visibleIds = new Set(visible.list.map((ch) => ch.id));
+  const inChannels = (detail.data?.channels ?? []).filter((ch) => visibleIds.has(ch.id));
+  const aiState = aiStateOf(status.data, agent.id);
+  // On a billing hold nothing thinks, a saved key included: the AI row says where the plan is, in words.
+  const held = usePlanHold(orgId, org) !== null;
+  // "Agora não" to apps on the right hand's card is for the team: its agents don't ask again (as on the web).
+  const appsLater = dir.agents.find(isRightHand)?.setup?.done.includes("apps") ?? false;
+  const done = agent.setup
+    ? setupDone(agent.setup, {
+        ai: !held && (aiState === "ready" || aiState === "waiting"),
+        apps: granted.length > 0 || appsLater,
+        where: inChannels.length > 0,
+      })
+    : new Set<AgentSetupStep>();
+  const doneHere = steps.filter((s) => done.has(s));
+  return {
+    steps,
+    done,
+    doneHere,
+    all: doneHere.length === steps.length,
+    // Everything it reads has loaded: a step that turns done after this was done now (its line and a haptic).
+    ready: status.isSuccess && detail.isSuccess && visible.ready && (!steps.includes("apps") || !access.isPending),
+    held,
+    connectors,
+    granted,
+    inChannels,
+    visible,
+  };
+}
+
+/**
+ * The top of a new agent's DM: its greeting and the checklist, as its first message. The greeting asks for help only
+ * when something is left as the conversation first shows its checklist loaded; done meanwhile, the ask stays as asked.
+ */
 export function AgentSetupIntro({ agent, channelId }: { agent: Agent; channelId: string }) {
   const { t, i18n } = useTranslation();
   const me = useMe();
+  const progress = useSetupProgress(agent);
+  const [asks, setAsks] = useState<boolean | null>(null);
+  if (asks === null && progress.ready) setAsks(!progress.all);
   const g = agentGrammar(agent.name);
   const role = setupRole(agent.setup);
   const person = firstName(me.data?.user.name ?? "");
-  const asked = role ? null : askedLine(agent.instructions);
-  const roleName = role ? roleWord(t(`newAgent.roles.${role}.name`), i18n.language) : null;
+  // A ready-made role's name, else the role it was given (a template's "Atendimento"); only an agent with neither
+  // says back what it was asked (as on the web).
+  const own = agent.role.trim();
+  const asked = role || own ? null : askedLine(agent.instructions);
+  const roleName = role
+    ? roleWord(t(`newAgent.roles.${role}.name`), i18n.language)
+    : own
+      ? roleWord(own, i18n.language)
+      : null;
   const greeting = roleName
     ? t("agentSetup.greetingRole", { ...g, person, role: roleName })
     : t("agentSetup.greeting", { ...g, person });
@@ -82,7 +141,7 @@ export function AgentSetupIntro({ agent, channelId }: { agent: Agent; channelId:
       </View>
       <View style={styles.text}>
         <Text variant="body" tone="ink2">
-          {[greeting, asked ? t("agentSetup.asked", { what: asked }) : null, t("agentSetup.lead")]
+          {[greeting, asked ? t("agentSetup.asked", { what: asked }) : null, asks ? t("agentSetup.lead") : null]
             .filter(Boolean)
             .join(" ")}
         </Text>
@@ -111,40 +170,15 @@ export function AgentSetupCard({
   channelId?: string;
 }) {
   const { t, i18n } = useTranslation();
-  const { orgId, org } = useOrg();
+  const { org } = useOrg();
   const dir = useDirectory();
   const meId = useMeId();
   const openDm = useOpenDm();
-  const admin = can(org, "manage_agents");
-  const steps = useSetupSteps(agent);
-  const status = useAiStatus(orgId);
-  const access = useAgentAccess(orgId, agent.id, admin && steps.includes("apps"));
-  const detail = useAgentDetail(orgId, agent.id);
-  const visible = useAgentChannels();
+  const { steps, done, doneHere, all, ready, held, connectors, granted, inChannels, visible } = useSetupProgress(agent);
   const items = useConnectedById();
   const g = agentGrammar(agent.name);
   const role = setupRole(agent.setup);
-
-  const connectors = access.data ? resourcesOf(access.data).filter((r) => r.kind === "connector") : [];
-  const granted = connectors.filter((r) => levelOf(r) !== "none");
-  const visibleIds = new Set(visible.list.map((ch) => ch.id));
-  const inChannels = (detail.data?.channels ?? []).filter((ch) => visibleIds.has(ch.id));
-  const aiState = aiStateOf(status.data, agent.id);
-  // On a billing hold nothing thinks, a saved key included: the AI row says where the plan is, in words.
-  const held = usePlanHold(orgId, org) !== null;
-  const done = agent.setup
-    ? setupDone(agent.setup, {
-        ai: !held && (aiState === "ready" || aiState === "waiting"),
-        apps: granted.length > 0,
-        where: inChannels.length > 0,
-      })
-    : new Set<AgentSetupStep>();
-  const doneHere = steps.filter((s) => done.has(s));
-  const all = doneHere.length === steps.length;
   const next = nextStep(steps, done);
-
-  // Everything it reads has loaded: a step that turns done after this was done now (its line and a haptic).
-  const ready = status.isSuccess && detail.isSuccess && visible.ready && (!steps.includes("apps") || !access.isPending);
   const said = useDoneSay(ready, doneHere, (step) => t(`agentSetup.say.${step}`, agentGrammar(agent.name)));
 
   // In the new agent's conversation its first card's steps arrive one after another, once per agent while the app
@@ -418,9 +452,10 @@ export function useDoneSay<S extends string>(ready: boolean, doneNow: readonly S
     seen.current = now;
     if (!before) return;
     const fresh = [...now].find((s) => !before.has(s));
-    if (!fresh) return;
+    const text = fresh ? say.current(fresh) : "";
+    if (!fresh || !text) return;
     successHaptic();
-    setSaid({ step: fresh, text: say.current(fresh) });
+    setSaid({ step: fresh, text });
     clearTimeout(timer.current);
     timer.current = setTimeout(() => setSaid(null), 2600);
   }, [ready, doneKey]);

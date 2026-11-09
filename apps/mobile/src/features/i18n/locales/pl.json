@@ -2344,7 +2344,8 @@
     "suggested": "Na podstawie twojego adresu w domenie {{domain}} proponuję {{org}}.",
     "create": "Utwórz",
     "shareMessage": "Dołącz do {{org}} w agentes.chat: {{url}}",
-    "failed": "Nie udało się zapisać. Spróbuj ponownie."
+    "failed": "Nie udało się zapisać. Spróbuj ponownie.",
+    "enter": "Wejdź do przestrzeni roboczej"
   },
   "ai": {
     "yourPlan": "Twój plan AI",
