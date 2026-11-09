@@ -17,6 +17,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { useAuth } from "@/auth/context";
+import { AgentAvatar } from "@/components/AgentAvatar";
 import { BillingLinkButton } from "@/components/BillingLinkButton";
 import { DeleteAccountDialog } from "@/components/DeleteAccount";
 import { DeleteWorkspaceDialog } from "@/components/DeleteWorkspace";
@@ -388,12 +389,7 @@ export function OnboardingPage() {
             <div className="onb__phone-top">
               <OnboardingProgress progress={answered / steps.length} />
               <div className="onb__lodi-row">
-                <Avatar
-                  kind="agent"
-                  name={lodiName}
-                  appearance={lookOf(lodi) ?? RIGHT_HAND_DEFAULT.appearance}
-                  size="sm"
-                />
+                <AgentAvatar name={lodiName} appearance={lookOf(lodi) ?? RIGHT_HAND_DEFAULT.appearance} size="sm" />
                 <p className="onb__say" key={step}>
                   {say}
                 </p>
