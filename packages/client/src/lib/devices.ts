@@ -397,9 +397,6 @@ const IPHONE_REASON: Record<string, IphoneStep> = {
   helper_untrusted: "helper",
 };
 
-/** The helper's steps the person does on the iPhone (amber); the Mac builds and renews it by itself. */
-const HELPER_NEEDS_YOU = new Set(["team_limit", "helper_untrusted"]);
-
 /** The iPhone a Mac reaches (a real one first), for the iPhone guide. */
 export const iphoneOf = (host: ComputerDevice | undefined) =>
   host?.phones.find((p) => p.platform === "ios" && p.phoneKind === "device" && p.status.kind !== "offline") ?? null;
@@ -419,16 +416,19 @@ export function iphoneSteps(
     at = !host?.toolchains.xcode ? "xcode" : !host.toolchains.appleTeam ? "account" : "connected";
     needs = at !== "connected";
   } else if (phone.status.kind === "needs_you" || phone.status.kind === "preparing") {
-    const reason = phone.status.reason;
-    at = IPHONE_REASON[reason] ?? "helper";
-    needs = phone.status.kind === "needs_you" && (at !== "helper" || HELPER_NEEDS_YOU.has(reason));
+    at = IPHONE_REASON[phone.status.reason] ?? "helper";
+    // While the Mac builds or renews the test helper the phone is preparing; needs_you there means it failed.
+    needs = phone.status.kind === "needs_you";
   } else {
     at = null;
   }
   const index = at ? IPHONE_STEPS.indexOf(at) : IPHONE_STEPS.length;
-  return Object.fromEntries(
+  const states = Object.fromEntries(
     IPHONE_STEPS.map((id, i) => [id, i < index ? "done" : i > index ? "waiting" : needs ? "needs" : "current"]),
   ) as Record<IphoneStep, StepState>;
+  // The Mac looks for the Apple Account only once the iPhone is plugged in, trusted and in Developer Mode.
+  if (phone && at === "account") states.connected = states.trust = states.developerMode = "done";
+  return states;
 }
 
 // ── In the chat and the inbox ───────────────────────────────────────────────

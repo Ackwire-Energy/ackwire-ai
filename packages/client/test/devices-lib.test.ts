@@ -187,11 +187,16 @@ describe("connecting a phone", () => {
     // The Mac builds the test helper by itself; trusting it on the iPhone is the person's.
     const at = (status: PhoneDevice["status"]) => iphoneSteps(mac, phone({ platform: "ios", status }));
     expect(at({ kind: "preparing", reason: "helper_missing" }).helper).toBe("current");
+    // Its build failed: the person sees it.
+    expect(at({ kind: "needs_you", reason: "helper_missing" }).helper).toBe("needs");
     expect(at({ kind: "needs_you", reason: "helper_untrusted" }).helper).toBe("needs");
     expect(at({ kind: "needs_you", reason: "team_limit" }).helper).toBe("needs");
+    // Plugged in, trusted and in Developer Mode before the Mac looks for the account.
     expect(at({ kind: "needs_you", reason: "apple_account_missing" })).toMatchObject({
       account: "needs",
-      connected: "waiting",
+      connected: "done",
+      developerMode: "done",
+      uiAutomation: "waiting",
     });
   });
 });
