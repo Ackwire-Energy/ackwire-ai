@@ -622,6 +622,12 @@ export class FakeRunner {
     this.emit({ kind: "job.started", job });
   }
 
+  /** The phones change (plugged in, unplugged, a step further): the app hears a new status, as the runner sends. */
+  setPhones(phones: RunnerPhone[]) {
+    this.phones = phones;
+    this.emit({ kind: "status", status: this.status() });
+  }
+
   private emit(event: ControlEvent) {
     this.later(() => this.write({ type: "event", event }), 40);
   }

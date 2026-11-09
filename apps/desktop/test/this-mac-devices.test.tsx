@@ -142,6 +142,15 @@ describe("the iPhone setup window", () => {
       ).toBeTruthy();
       expect(button(el, "Back")).toBeTruthy();
       expect(button(el, "Cancel")).toBeTruthy();
+
+      // The helper built, but the iPhone doesn't trust its developer yet: where on the iPhone to trust it.
+      for (const runner of host.runners.values())
+        runner.setPhones(runner.phones.map((p) => (p.platform === "ios" ? { ...p, reason: "helper_untrusted" } : p)));
+      await until(() => el.querySelector('[aria-current="step"] b')?.textContent === "Test helper");
+      expect(el.querySelector('[aria-current="step"]')?.textContent).toContain("Tap the developer's name, then Trust.");
+      expect(el.querySelector('[aria-current="step"] .ac-setpath')?.textContent).toBe(
+        "SettingsGeneralVPN & Device Management",
+      );
     });
   });
 

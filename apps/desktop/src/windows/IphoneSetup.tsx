@@ -212,6 +212,21 @@ export function IphoneSetup({ onClose }: { onClose: () => void }) {
           </>
         );
       default:
+        if (reason === "helper_untrusted")
+          return (
+            <>
+              {t("devices.iphone.helperUntrustedText")}
+              <SettingsPath
+                label={t("devices.onTheIphone")}
+                segments={[
+                  t("devices.iphone.path.settings"),
+                  t("devices.iphone.path.general"),
+                  t("devices.iphone.path.deviceManagement"),
+                ]}
+              />
+            </>
+          );
+        if (reason === "team_limit") return t("devices.iphone.teamLimitText");
         return states.helper === "active" ? t("desktop.iphone.helperBuilding") : t("desktop.iphone.helperText");
     }
   };
