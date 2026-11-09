@@ -472,21 +472,33 @@ describe("a task's number and title on one row; its conversation on the card", (
     expect(conversationLine(issue({ number: 5, conversation: talk(2, true) }))?.working).toBe(true);
   });
 
-  test("the board card and the task's head: '#N' inside the title's line, the card's conversation last", async () => {
+  test("the board card in the web card's three parts: the title whole, one row of facts, who has it and one state", async () => {
     const parts = await read("issues/parts.tsx");
-    const card = parts.slice(parts.indexOf("export const BoardCard"), parts.indexOf("function CardConversation("));
-    expect(card).toMatch(
-      /<Text variant="callout" numberOfLines=\{3\} style=\{\[styles\.title, styles\.step\]\}>\s*<Text variant="callout" tone="faint" style=\{styles\.number\}>\s*#\{i\.number\}/,
+    const card = parts.slice(
+      parts.indexOf("export const BoardCard"),
+      parts.indexOf("const styles = StyleSheet.create("),
     );
-    // The unread mentions' count ends the title's row.
-    expect(card).toMatch(/\{i\.title\}\s*<\/Text>\s*<MentionCount count=\{mentions\} \/>/);
-    // Not again in the meta row.
-    expect(card.split("#{i.number}")).toHaveLength(2);
-    expect(card.indexOf("<AssigneeFace")).toBeLessThan(card.indexOf("<CardConversation issue={i} />"));
-    const talk = parts.slice(parts.indexOf("function CardConversation("));
-    expect(talk).toContain("conversationLine(issue)");
-    expect(talk).toContain('t("threads.status.working")');
-    expect(talk).toContain("{ color: c.agent }");
+    // The title whole: no number in it, never cut.
+    expect(card).toMatch(/<Text variant="callout" style=\{styles\.title\}>\s*\{i\.title\}\s*<\/Text>/);
+    expect(card).not.toContain("numberOfLines");
+    // Then its facts, then who has it with its state.
+    expect(card.indexOf("<CardFacts")).toBeGreaterThan(card.indexOf("{i.title}"));
+    expect(card.indexOf("<AssigneeFace issue={i} size={24}")).toBeGreaterThan(card.indexOf("<CardFacts"));
+    expect(card.indexOf("<StateWords")).toBeGreaterThan(card.indexOf("<AssigneeFace"));
+    // One state, from the client's shared cardState (the web's too); waiting on a person, the agent's sky on top.
+    expect(parts).toContain("cardState(i, Boolean(i.conversation?.working))");
+    expect(parts).toContain("cardStateText(t, state)");
+    expect(card).toContain("cardWaits(state) ?");
+    expect(card.indexOf("cardWaits(state) ?")).toBeLessThan(card.indexOf("{i.title}"));
+    // What the task's screen has leaves the card.
+    for (const gone of ["StateLine", "CriteriaTrack", "BoardWork", "CardConversation"])
+      expect(parts).not.toContain(gone);
+    const facts = parts.slice(parts.indexOf("function CardFacts("), parts.indexOf("export const BoardCard"));
+    // The number first, the label as a chip, the date in words, the mentions beside the conversation's count.
+    expect(facts.indexOf("#{i.number}")).toBeLessThan(facts.indexOf("<Chip label="));
+    expect(facts).toContain('t("mobile.issues.until", { date: due.text })');
+    expect(facts).toContain("<MentionCount count={mentions} />");
+    expect(facts).toContain('provider="github"');
     const screen = await read("issues/IssueScreen.tsx");
     const head = screen.slice(screen.indexOf("function Head("), screen.indexOf("function WorkCard("));
     expect(head).toMatch(
@@ -495,6 +507,36 @@ describe("a task's number and title on one row; its conversation on the card", (
     // "Criada por…" under the title, the number no longer in it.
     expect(head.indexOf('accessibilityRole="header"')).toBeLessThan(head.indexOf("{line}"));
     expect(head).not.toMatch(/`#\$\{i\.number\}`,/);
+  });
+
+  test("a row in the list says the card's one state in its words, else its due date", async () => {
+    const screen = await read("issues/IssuesScreen.tsx");
+    const row = screen.slice(screen.indexOf("function TaskRow("), screen.indexOf("function Board("));
+    expect(row).toContain("useCardState(i)");
+    expect(row).toContain("<StateWords issue={i} state={state} words={words} />");
+    expect(row).not.toContain("mobile.issues.waitsYou");
+  });
+
+  test("the task's head: its fields as the web's strip, in its order, each 32 high and opening its picker", async () => {
+    const screen = await read("issues/IssueScreen.tsx");
+    const head = screen.slice(screen.indexOf("function Head("), screen.indexOf("/** Pastes, changes or removes"));
+    const fields = [...head.matchAll(/<PropChip\s+label=\{t\("([\w.]+)"\)\}[\s\S]*?onPress=\{pickers\.(\w+)\}/g)].map(
+      (m) => [m[1], m[2]],
+    );
+    expect(fields).toEqual([
+      ["issues.column", "pickColumn"],
+      ["issues.form.assignee", "pickAssignee"],
+      ["issues.form.priority", "pickPriority"],
+      ["issues.due", "pickDue"],
+      ["whoSees.label", "pickWhoSees"],
+    ]);
+    // A control, not a pill: 32 high (the toolbar's), the web's control radius, its target grown to a finger's.
+    expect(screen).toMatch(/prop: \{[^}]*minHeight: TOOL_H,[^}]*borderRadius: 10,/);
+    expect(head).toContain("hitSlop={{ top: (TOUCH - TOOL_H) / 2, bottom: (TOUCH - TOOL_H) / 2 }}");
+    // The head and "…" open the same pickers.
+    const menu = screen.slice(screen.indexOf("function IssueMenu("));
+    for (const picker of ["pickColumn", "pickPriority", "pickAssignee", "pickWhoSees"])
+      expect(menu).toContain(`pickers.${picker}`);
   });
 });
 
@@ -518,8 +560,9 @@ describe("a task's GitHub link", () => {
     expect(screen).toContain("<Locked when={action.isPending}>");
   });
 
-  test("on a narrow card the date, the chip and the face wrap onto the next line instead of running past its edge", () => {
-    expect(source("parts.tsx")).toMatch(/meta: \{ flexDirection: "row", flexWrap: "wrap",/);
+  test("on a narrow card the facts wrap between facts, and the state under the name, instead of running past its edge", () => {
+    expect(source("parts.tsx")).toMatch(/facts: \{ flexDirection: "row", flexWrap: "wrap",/);
+    expect(source("parts.tsx")).toMatch(/who: \{ flexDirection: "row", flexWrap: "wrap",/);
   });
 });
 

@@ -21,7 +21,6 @@ import {
   Icon,
   IconButton,
   ListRow,
-  PixelOrbit,
   SCREEN_X,
   SearchField,
   SectionHeader,
@@ -35,11 +34,10 @@ import { mayCreate } from "../new/logic";
 import { Face } from "../shared/Face";
 import { FirstUse } from "../shared/FirstUse";
 import { useColors, useDirectory, useMeId, useOrgId, usePullRefresh } from "../shared/hooks";
-import { agentLook } from "../shared/logic";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { FocusLive, PushedHeader } from "../shared/parts";
-import { type BoardColumn, issueBoard, issueState, taskListSections } from "./logic";
-import { BoardCard, ColumnHeader, useColumnLabel } from "./parts";
+import { type BoardColumn, issueBoard, taskListSections } from "./logic";
+import { BoardCard, ColumnHeader, StateWords, useCardState, useColumnLabel } from "./parts";
 
 /** Cards and rows whose agent moves (a long list stays light). */
 const LIVE_CARDS = 8;
@@ -170,21 +168,19 @@ function TaskList({
 }
 
 /**
- * A task in the list: the check (green once done, faint before), its title, then who has it (the agent's face, its
- * orbit and "trabalhando" while it works) and its state or due date in words; "espera você" in the waiting color.
+ * A task in the list: the check (green once done, faint before), its title, then who has it (the agent's face, moving
+ * while it works) and its one state in the board card's words ("Pergunta algo" in the attention color), else its due
+ * date in words.
  */
 function TaskRow({ issue: i, divider, live }: { issue: Issue; divider: boolean; live: boolean }) {
   const { t, i18n } = useTranslation();
   const c = useColors();
   const dir = useDirectory();
-  const state = issueState(i);
+  const { state, words } = useCardState(i);
   const done = i.status === "done";
-  const running = state === "running";
-  const agent = i.assignee?.type === "agent" ? dir.agentById.get(i.assignee.id) : undefined;
+  const running = state?.kind === "running";
   const who = i.assignee ? dir.nameOf(i.assignee) : t("mobile.issues.nobody");
   const due = i.dueDate && !done ? dueLabel(t, i18n.language, i.dueDate) : null;
-  const tail = running ? null : state === "waiting" ? t("mobile.issues.waitsYou") : due;
-  const working = t("mobile.chat.turn.working");
   return (
     <ListRow
       divider={divider}
@@ -199,25 +195,13 @@ function TaskRow({ issue: i, divider, live }: { issue: Issue; divider: boolean; 
           {i.assignee ? <Face who={i.assignee} size={16} live={live} mode={running ? "run" : "idle"} /> : null}
           <Text variant="subhead" tone="muted" numberOfLines={1} style={styles.shrink}>
             {who}
-            {tail ? " · " : ""}
-            {tail ? (
-              <Text variant="subhead" style={state === "waiting" ? [styles.bold, { color: c.amber }] : undefined}>
-                {tail}
-              </Text>
-            ) : null}
-            {running ? " · " : ""}
+            {state || due ? " · " : ""}
+            {!state && due ? due : null}
           </Text>
-          {running ? (
-            <>
-              <PixelOrbit color={agentLook(agent).color} size={11} />
-              <Text variant="subhead" tone="ink2" numberOfLines={1}>
-                {working}
-              </Text>
-            </>
-          ) : null}
+          {state && words ? <StateWords issue={i} state={state} words={words} /> : null}
         </View>
       }
-      accessibilityLabel={[i.title, who, running ? working : tail].filter(Boolean).join(", ")}
+      accessibilityLabel={[i.title, who, words ?? due].filter(Boolean).join(", ")}
       onPress={() => router.push(`/issues/${i.number}`)}
     />
   );
