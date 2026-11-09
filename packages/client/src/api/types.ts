@@ -257,7 +257,16 @@ export interface OrgSummary {
   agentStyle?: AgentStyle | null;
   /** How conversations look to me here: only what I chose (`chatLookOf`); absent from an older server. */
   chatPrefs?: ChatPrefs;
+  /**
+   * Who the workspace is for (ADR 0158): `team` or `personal`. Read it with `isPersonal` (lib/workspace-mode); absent
+   * from an older server, which is a team's.
+   */
+  mode?: WorkspaceMode;
 }
+
+/** Who a workspace is for (ADR 0158): the server's `WORKSPACE_MODES`. */
+export const WORKSPACE_MODES = ["team", "personal"] as const;
+export type WorkspaceMode = (typeof WORKSPACE_MODES)[number];
 
 /** How agents talk to a person (ADR 0147): the server's `AGENT_STYLES`. */
 export const AGENT_STYLES = ["simple", "technical"] as const;
@@ -2213,6 +2222,8 @@ export interface OrgSettings {
   gifsAvailable: boolean;
   /** Read only: this server can decide when agents send one (agents send none on their own without it). */
   agentMediaAvailable: boolean;
+  /** Who the workspace is for (ADR 0158); absent from an older server, which is a team's. */
+  mode?: WorkspaceMode;
 }
 
 /** `OrgSettings` the server works out itself: never in a PATCH. */

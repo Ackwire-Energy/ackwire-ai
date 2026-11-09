@@ -208,6 +208,8 @@ export interface FirstRunPowers {
   pay: boolean;
   connectors: boolean;
   invite: boolean;
+  /** A personal workspace (ADR 0158): its first run has no people row, it is for one person. */
+  personal?: boolean;
 }
 
 /**
@@ -222,7 +224,7 @@ export function firstRunSteps(agent: Pick<Agent, "setup" | "builtin">, may: Firs
     team: may.createAgents,
     ai: may.connectAi || may.pay,
     apps: may.connectors,
-    people: may.invite,
+    people: may.invite && !may.personal,
   };
   return FIRST_RUN_STEPS.filter((s) => row[s]);
 }

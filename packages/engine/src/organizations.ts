@@ -59,6 +59,7 @@ import {
   workRefusal,
 } from "./standing";
 import type { Closed, DeletionDeps } from "./workspace-deletion";
+import { isWorkspaceMode, WORKSPACE_MODES, type WorkspaceMode } from "./workspace-mode";
 
 const {
   organizations,
@@ -107,6 +108,8 @@ export interface Membership {
   agentStyle?: AgentStyle | null;
   /** How conversations look to the person here (listMemberships, `setChatPrefs`); only what they chose. */
   chatPrefs?: ChatPrefs;
+  /** Who the workspace is for (listMemberships, ADR 0158): `team` or `personal`. */
+  mode?: WorkspaceMode;
 }
 
 /** What opens when the app starts in a workspace (ADR 0108), the person's own. */
@@ -163,16 +166,19 @@ export async function listMemberships(db: Database, userId: string): Promise<Mem
       showActivity: organizationMembers.showActivity,
       agentStyle: organizationMembers.agentStyle,
       chatPrefs: organizationMembers.chatPrefs,
+      mode: schema.organizationSettings.mode,
       ...ROLE_COLUMNS,
     })
     .from(organizationMembers)
     .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
     .innerJoin(users, eq(users.id, organizationMembers.userId))
+    .leftJoin(schema.organizationSettings, eq(schema.organizationSettings.orgId, organizations.id))
     .where(and(eq(organizationMembers.userId, userId), accountInUse))
     .orderBy(asc(organizations.createdAt));
-  return rows.map(({ startPage, startChannelId, chatPrefs, ...row }) => ({
+  return rows.map(({ startPage, startChannelId, chatPrefs, mode, ...row }) => ({
     ...withPermissions(row),
     chatPrefs: chatPrefsOf(chatPrefs),
+    mode: isWorkspaceMode(mode) ? mode : "team",
     start: { page: startPage, channelId: startPage === "channel" ? startChannelId : null },
   }));
 }
@@ -255,9 +261,11 @@ export function assertInviting(membership: Membership) {
 export async function createOrganization(
   db: Database,
   userId: string,
-  input: { name: string; context?: string },
+  input: { name: string; context?: string; mode?: WorkspaceMode },
   options: { holdForPayment?: boolean; needsAllowance?: boolean; onboarding?: boolean } = {},
 ) {
+  if (input.mode !== undefined && !isWorkspaceMode(input.mode))
+    throw new ValidationError(`mode must be one of ${WORKSPACE_MODES.join(", ")}`);
   return db.transaction(async (tx) => {
     // One create at a time per person, checked after the lock: two at once would both start waiting for a plan. A
     // deletion of the account waits for this workspace, or this finds the account gone (a cached session cookie
@@ -304,6 +312,9 @@ export async function createOrganization(
     if (!organization) throw new Error("organization insert returned nothing");
     await recordFirstWorkspace(tx, userId, organization.id);
     await tx.insert(organizationMembers).values({ orgId: organization.id, userId, role: "owner" });
+    // A personal workspace (ADR 0158) is one from the start: its first screens are already shaped for one person.
+    if (input.mode === "personal")
+      await tx.insert(schema.organizationSettings).values({ orgId: organization.id, mode: "personal" });
     await createDefaultRoles(tx, organization.id);
     await assignHandle(tx, organization.id, userId);
     // The team's right hand comes with the workspace (ADR 0137), after the owner's handle so `@lodi` stays theirs if
@@ -319,7 +330,7 @@ export async function createOrganization(
       type: "organization.created",
       orgId: organization.id,
       userId,
-      data: { name: organization.name },
+      data: { name: organization.name, mode: input.mode ?? "team" },
     });
     return { organization, general, existing: false };
   });
