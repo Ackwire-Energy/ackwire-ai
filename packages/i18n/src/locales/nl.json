@@ -13635,6 +13635,10 @@
     "statusReplyTurn": "Ik zit midden in een taak ({{duration}}) en kan nog niet antwoorden. Je bericht staat in de wachtrij en ik lees het als deze werkronde klaar is.",
     "statusReplyQueued": "Ik wacht op de computer ({{duration}}). Ik lees je bericht zodra ik aan de beurt ben.",
     "statusReplyAway": "Ik wacht tot mijn computer terug is. Ik lees je bericht zodra hij terug is.",
+    "statusReplyPlan": "Ik wacht tot mijn abonnement terug is ({{when}}). Ik lees je bericht als het terug is.",
+    "statusReplyPlanUnknown": "Ik wacht tot mijn abonnement terug is. Ik lees je bericht zodra het terug is.",
+    "statusReplyBudget": "Ik wacht tot mijn budget voor deze maand wordt vernieuwd ({{when}}). Ik lees je bericht dan, of eerder als een beheerder de limiet verhoogt.",
+    "statusReplyBudgetUnknown": "Ik wacht tot mijn budget voor deze maand wordt vernieuwd. Ik lees je bericht dan, of eerder als een beheerder de limiet verhoogt.",
     "status": {
       "one": "Bezig met: {{subject}}",
       "oneUntitled": "Bezig op de achtergrond",

@@ -14525,6 +14525,10 @@
     "statusReplyTurn": "Jestem w trakcie zadania ({{duration}}) i nie mogę jeszcze odpowiedzieć. Twoja wiadomość czeka w kolejce, przeczytam ją, gdy skończy się ta runda pracy.",
     "statusReplyQueued": "Czekam na komputer ({{duration}}). Przeczytam twoją wiadomość, gdy przyjdzie moja kolej.",
     "statusReplyAway": "Czekam, aż mój komputer wróci. Przeczytam twoją wiadomość, gdy tylko wróci.",
+    "statusReplyPlan": "Czekam, aż mój plan wróci ({{when}}). Przeczytam twoją wiadomość, gdy wróci.",
+    "statusReplyPlanUnknown": "Czekam, aż mój plan wróci. Przeczytam twoją wiadomość, gdy tylko wróci.",
+    "statusReplyBudget": "Czekam, aż odnowi się mój miesięczny budżet ({{when}}). Przeczytam twoją wiadomość wtedy albo wcześniej, jeśli administrator podniesie limit.",
+    "statusReplyBudgetUnknown": "Czekam, aż odnowi się mój miesięczny budżet. Przeczytam twoją wiadomość wtedy albo wcześniej, jeśli administrator podniesie limit.",
     "status": {
       "one": "Pracuje nad: {{subject}}",
       "oneUntitled": "Pracuje w tle",

@@ -13125,6 +13125,10 @@
     "statusReplyTurn": "Saya sedang di tengah tugas ({{duration}}) dan belum bisa menjawab. Pesan Anda sudah antre dan saya baca setelah putaran kerja ini selesai.",
     "statusReplyQueued": "Menunggu komputer ({{duration}}). Saya baca pesan Anda saat tiba giliran saya.",
     "statusReplyAway": "Menunggu komputer saya kembali. Saya baca pesan Anda begitu komputer kembali.",
+    "statusReplyPlan": "Menunggu paket saya kembali ({{when}}). Saya baca pesan Anda saat paket kembali.",
+    "statusReplyPlanUnknown": "Menunggu paket saya kembali. Saya baca pesan Anda begitu paket kembali.",
+    "statusReplyBudget": "Menunggu anggaran bulanan saya diperbarui ({{when}}). Saya baca pesan Anda saat itu, atau lebih cepat jika admin menaikkan batasnya.",
+    "statusReplyBudgetUnknown": "Menunggu anggaran bulanan saya diperbarui. Saya baca pesan Anda saat itu, atau lebih cepat jika admin menaikkan batasnya.",
     "status": {
       "one": "Sedang mengerjakan: {{subject}}",
       "oneUntitled": "Bekerja di latar belakang",

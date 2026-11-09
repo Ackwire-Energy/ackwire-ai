@@ -14050,6 +14050,10 @@
     "statusReplyTurn": "Je suis en pleine tâche ({{duration}}) et je ne peux pas encore répondre. Votre message est en attente et je le lis quand cette série de travail se termine.",
     "statusReplyQueued": "J'attends l'ordinateur ({{duration}}). Je lis votre message dès que c'est mon tour.",
     "statusReplyAway": "J'attends que mon ordinateur revienne. Je lis votre message dès son retour.",
+    "statusReplyPlan": "J'attends que mon abonnement revienne ({{when}}). Je lis votre message à son retour.",
+    "statusReplyPlanUnknown": "J'attends que mon abonnement revienne. Je lis votre message dès son retour.",
+    "statusReplyBudget": "J'attends que mon budget du mois se renouvelle ({{when}}). Je lis votre message à ce moment-là, ou plus tôt si un admin augmente la limite.",
+    "statusReplyBudgetUnknown": "J'attends que mon budget du mois se renouvelle. Je lis votre message à ce moment-là, ou plus tôt si un admin augmente la limite.",
     "status": {
       "one": "Travaille sur : {{subject}}",
       "oneUntitled": "Travaille en arrière-plan",

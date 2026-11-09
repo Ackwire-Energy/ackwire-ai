@@ -13126,6 +13126,10 @@
     "statusReplyTurn": "我正在处理一项任务（{{duration}}），暂时无法回复。你的消息已在队列中，这一轮工作结束后我会读到。",
     "statusReplyQueued": "正在等待电脑（{{duration}}）。轮到我时我会读你的消息。",
     "statusReplyAway": "正在等我的电脑恢复。电脑一恢复我就读你的消息。",
+    "statusReplyPlan": "正在等我的套餐恢复（{{when}}）。套餐恢复后我就读你的消息。",
+    "statusReplyPlanUnknown": "正在等我的套餐恢复。套餐一恢复我就读你的消息。",
+    "statusReplyBudget": "正在等我本月的预算更新（{{when}}）。到时我会读你的消息，如果管理员提高限额会更早。",
+    "statusReplyBudgetUnknown": "正在等我本月的预算更新。到时我会读你的消息，如果管理员提高限额会更早。",
     "status": {
       "one": "正在处理：{{subject}}",
       "oneUntitled": "正在后台工作",
