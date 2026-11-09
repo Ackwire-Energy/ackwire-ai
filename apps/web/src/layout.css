@@ -220,16 +220,17 @@ p {
   background: var(--side);
 }
 /* The work as one sheet on the sidebar's paper: the page, its header and anything beside it (members, panels) share
-   its surface and its rounded edge, so no line runs between the sidebar and the conversation. In dark the two
-   surfaces part by their tone alone; in light a hairline keeps the white sheet off the near-white paper. */
+   its surface and its edge, so no line runs between the sidebar and the conversation. A card's shape (`.ac-card`: the
+   section's radius, the bottom-left corner cut) and a hairline round it in both themes; light adds a soft lift. */
 .shell__pages {
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
   display: flex;
-  border-radius: 16px;
+  border-radius: var(--radius-section) var(--radius-section) var(--radius-section) 4px;
   overflow: hidden;
   background: var(--pane);
+  box-shadow: 0 0 0 1px var(--line);
 }
 [data-theme="light"] .shell__pages {
   box-shadow:
@@ -265,10 +266,8 @@ p {
 .shell__work > .outages {
   margin-bottom: 8px;
   border-bottom: 0;
-  border-radius: 16px;
+  border-radius: var(--radius-section) var(--radius-section) var(--radius-section) 4px;
   overflow: hidden;
-}
-[data-theme="light"] .shell__work > .outages {
   box-shadow: 0 0 0 1px var(--line);
 }
 .outage {

@@ -42,8 +42,7 @@
     border-radius: 0;
     box-shadow: none;
   }
-  .shell__work > .outages,
-  [data-theme="light"] .shell__work > .outages {
+  .shell__work > .outages {
     margin-bottom: 0;
     border-radius: 0;
     box-shadow: none;
