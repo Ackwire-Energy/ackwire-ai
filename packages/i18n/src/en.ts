@@ -17126,7 +17126,25 @@ export const en = {
     goesServer: "What you write goes by email to whoever runs this server.",
     placeholder: "Write it your way",
     goesWith:
-      "Your email ({{email}}) goes along, so you can be answered, and the app's version. No conversation is sent.",
+      "Sent along: your email ({{email}}), the screen you are on and what is open on it, your browser and the app's latest errors. No conversation is sent.",
+    /** The last entry of a right-click menu: it opens this form about what was clicked. */
+    report: "Report a problem here",
+    /** Over the excerpt of the thing the feedback is about. */
+    aboutMessage: "About {{name}}'s message",
+    aboutItem: "About: {{name}}",
+    aboutThis: "About what you clicked",
+    aboutDrop: "Don't send this excerpt",
+    attach: "Add a photo or video",
+    /** Beside Add a photo or video. */
+    filesHint: "Up to {{images}} photos of {{imageMb}} MB and one video of {{videoMb}} MB, kept for {{days}} days.",
+    removeFile: "Remove {{name}}",
+    /** A file being uploaded: read by screen readers only. */
+    uploading: "Sending {{name}}",
+    fileType: "Only photos and videos can be attached.",
+    fileTooLarge: "{{name}} is too large: the limit is {{mb}} MB.",
+    fileTooMany: "One feedback takes up to {{images}} photos and one video.",
+    goesWithAbout:
+      "Sent along: your email ({{email}}), the screen you are on and what is open on it, your browser and the app's latest errors. From your conversations, only the excerpt above.",
     send: "Send",
     thanks: "Delivered. Thank you!",
     reply: "Everything is read. An answer, if one is needed, comes to {{email}}.",

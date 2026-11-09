@@ -95,6 +95,29 @@ export interface FeedbackInput {
   /** The screen they are on (a path), and the app that sends it. */
   where?: string;
   app?: string;
+  /** The thing the feedback is about (a right click's), and what it says, as the form showed it. */
+  about?: FeedbackAbout;
+  /** What the app knows of where the person is, label and value, as the form listed it. */
+  facts?: [string, string][];
+  /** Files added with `uploadFeedbackFile`. */
+  files?: string[];
+}
+
+export interface FeedbackAbout {
+  /** The app's own word for the thing: `message`, `card`, `button`… */
+  kind: string;
+  /** Its name on screen: an author, a title. */
+  label?: string;
+  text?: string;
+}
+
+/** A picture or a video added to the feedback being written (`POST /api/app/feedback/files`). */
+export interface FeedbackFile {
+  id: string;
+  name: string;
+  size: number;
+  kind: "image" | "video";
+  contentType: string;
 }
 
 export interface AuthConfig {

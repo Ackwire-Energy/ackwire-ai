@@ -391,6 +391,103 @@
   resize: vertical;
 }
 
+/* What the feedback is about: its name, then its words behind a rule, as a quote. No box inside the dialog. */
+.arrival-about {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.arrival-about__title {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+.arrival-about__text {
+  display: -webkit-box;
+  overflow: hidden;
+  max-width: 100%;
+  margin: 0;
+  padding-left: 12px;
+  border-left: 2px solid var(--line2);
+  color: var(--ink2);
+  font-size: 14px;
+  line-height: 20px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  -webkit-box-orient: vertical;
+}
+.arrival-about__drop {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  text-decoration: underline;
+  text-decoration-color: var(--line2);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.arrival-about__drop:hover {
+  color: var(--ink);
+  text-decoration-color: var(--ink);
+}
+/* The files added: a small picture, the name, the size, and the way to take each out. Rows, no tiles. */
+.arrival-files {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.arrival-files li {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 4px 0;
+}
+.arrival-files li + li {
+  border-top: 1px solid var(--line);
+}
+.arrival-files__thumb {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  color: var(--muted);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.arrival-files__name {
+  overflow: hidden;
+  font-size: 14px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.arrival-files__size {
+  display: inline-flex;
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.arrival-feedback__attach {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: center;
+  margin-left: -8px;
+}
+.arrival-feedback__limits {
+  color: var(--faint);
+  font-size: 13px;
+  line-height: 18px;
+}
+
 /* The way to the feedback form: a quiet row at the sidebar's bottom, over its foot when it has one. */
 .sidebar__feedback {
   flex: none;

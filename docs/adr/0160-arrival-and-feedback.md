@@ -4,8 +4,9 @@
 - Date: 2026-11-09
 - Code: web `components/arrival/*` (`Arrival`, `BetaDialog`, `TeamScene`, `ConnectChoices`, `FeedbackDialog`,
   `FeedbackMark`), `components/ConnectAi.tsx` (`ConnectAiRequest.arrival`), `pages/OnboardingPage.tsx`
-  (`?arrival=1`); server `routes/app/feedback.ts` (`POST /api/app/feedback`), `auth.ts` (`auth-config.feedback`);
-  engine `feedback.ts` (job `feedback.send`); config `FEEDBACK_EMAIL`
+  (`?arrival=1`); server `routes/app/feedback.ts` (`POST /api/app/feedback`, `…/feedback/files`, `GET /api/feedback-files/{token}`), `auth.ts` (`auth-config.feedback`);
+  engine `feedback.ts` (jobs `feedback.send`, `feedback.file.purge`); config `FEEDBACK_EMAIL`; web
+  `lib/feedback.ts`, `lib/context-menu.ts` (`setMenuReporter`); table `feedback_files` (migration 0246)
 
 ## Context
 
@@ -42,9 +43,12 @@ with Postgres alone, and must not need a third-party widget in the apps.
    default, the apps show no form and the route answers 404: a self-hosted server sends nothing anywhere unless its
    operator asks for it. agentes.chat sets it to its own address.
 
-6. **What a feedback carries.** The text the person typed, their name and address (the email's reply-to, so the
-   answer goes to them), the workspace's name when they are a member of the one the app named, the screen's path,
-   the app and the server's version. Never a conversation, a file or a screenshot. The form says so before sending.
+6. **What a feedback carries.** The text the person typed; their name and address (the email's reply-to, so the
+   answer goes to them); the workspace's name and their role when they are a member of the one the app named; what
+   the app knows of where they are (the route's pattern and its ids, the agent open and what it thinks with, the
+   connection, the language, the browser, the window, the build and the app's last errors); and what they chose to
+   show: the thing they right-clicked, and files. The form says in their language what goes along, before sending.
+   No conversation is sent except the excerpt the form shows, which the person can take out.
 
 7. **Through the outbox, as every email.** The route only queues job `feedback.send`; the job sends one plain email,
    outside the branded templates, since its reader is the operator. The app makes an id per message, so a request
@@ -56,12 +60,36 @@ with Postgres alone, and must not need a third-party widget in the apps.
    envelope, takes notes while the person types and the envelope flies once it is sent. It only illustrates: no
    agent reads or sends the feedback, and the form's words say who does.
 
+9. **Report a problem here, on every right click.** Every menu a right click opens ends in that entry
+   (`openContextMenu` with the click's target; a button's menu has none). It opens the form about the thing clicked:
+   a message says who wrote it and what it says, anything else its role, its name and its words (`describeElement`),
+   or only the text the person had selected there. Where it sits in the page goes along as a fact, for whoever has
+   the code.
+
+10. **Pictures and a video, kept for a while.** A feedback takes up to three pictures of 5 MB and one video of
+    50 MB. Each is uploaded as it is added (`POST /api/app/feedback/files`), into the platform's blob store, with a
+    row in `feedback_files`. Sent, it gets a link only the email holds (a random token, stored hashed) that works for
+    thirty days; pictures also ride inside the email. Never sent, it goes in an hour, or at once when the person
+    takes it out or closes the form.
+
+11. **What keeps it from being abused.**
+    - A file is what its first bytes say (PNG, JPEG, GIF, WebP, HEIC, MP4, MOV, WebM), never what the upload calls
+      itself; nothing a browser would run is among them.
+    - Sizes are refused by the declared length before a byte is read, and checked again once read.
+    - A person adds thirty files an hour, four of them videos, holds six not sent yet, and sends ten feedbacks an
+      hour. Only their own files, not sent yet, attach to their feedback.
+    - The link answers only as a download (`content-disposition: attachment`, `nosniff`, a sandboxing policy,
+      `no-store`), so this origin never shows the file; an address opens sixty a minute.
+    - Everything typed or collected is inert in the email: escaped in its HTML, one line per fact, each capped.
+    - A purge job per deadline removes the row and the bytes; an account's deletion removes its rows at once and
+      the same job its bytes.
+
 ## Consequences
 
 - A server with no `FEEDBACK_EMAIL` has no feedback channel in the apps; its people use whatever its operator gives
   them.
-- A screenshot can't be attached yet. The email sender takes pictures only inline in a template, and a picture in an
-  outbox job's payload would sit in the database.
+- Whoever has a feedback's email can open its files for thirty days without signing in: the email is the key.
+- On a server with neither S3 nor a files folder, a 50 MB video sits in Postgres until it expires.
 - The phone app has neither the arrival nor the form yet.
 - The arrival's choice cards and the picker (ADR 0061) are two views of the same choices: a plan added to
   `PLAN_CHOICES` shows in both.

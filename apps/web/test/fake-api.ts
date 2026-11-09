@@ -1328,6 +1328,20 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       sendFeedback: async (input) => {
         log("system.sendFeedback", input);
       },
+      uploadFeedbackFile: async (file) => {
+        log("system.uploadFeedbackFile", file.name);
+        const kind = file.type.startsWith("video/") ? "video" : "image";
+        return {
+          id: `00000000-0000-4000-8000-0000000f${String(state.calls.length).padStart(4, "0")}`,
+          name: file.name,
+          size: file.size,
+          kind,
+          contentType: file.type,
+        };
+      },
+      dropFeedbackFile: async (id) => {
+        log("system.dropFeedbackFile", id);
+      },
       jev: async () => state.jev ?? null,
       saveJev: async (apiKey) => {
         log("system.saveJev", apiKey);

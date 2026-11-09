@@ -8,6 +8,7 @@ import { useTranslation } from "react-i18next";
 import { requireUserIn } from "@/app/guards";
 import { usePageTextSize } from "@/chat/look";
 import { Arrival } from "@/components/arrival/Arrival";
+import { FeedbackHost } from "@/components/arrival/FeedbackDialog";
 import { ArtifactViewerProvider } from "@/components/artifacts/ArtifactViewer";
 import { CommandMenu } from "@/components/CommandMenu";
 import { ConnectAiProvider } from "@/components/ConnectAi";
@@ -177,6 +178,7 @@ function OrgLayout() {
                               {!focused && <NoticeIsland />}
                               <WebPushAsk />
                               <Arrival />
+                              <FeedbackHost />
                               <Outlet />
                             </DetailsHost>
                           </ComputerDialogProvider>

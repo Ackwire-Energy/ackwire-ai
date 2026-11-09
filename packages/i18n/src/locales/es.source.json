@@ -41327,7 +41327,46 @@
     "value": "Write it your way"
   },
   "feedback.goesWith": {
-    "value": "Your email ({{email}}) goes along, so you can be answered, and the app's version. No conversation is sent."
+    "value": "Sent along: your email ({{email}}), the screen you are on and what is open on it, your browser and the app's latest errors. No conversation is sent."
+  },
+  "feedback.report": {
+    "value": "Report a problem here"
+  },
+  "feedback.aboutMessage": {
+    "value": "About {{name}}'s message"
+  },
+  "feedback.aboutItem": {
+    "value": "About: {{name}}"
+  },
+  "feedback.aboutThis": {
+    "value": "About what you clicked"
+  },
+  "feedback.aboutDrop": {
+    "value": "Don't send this excerpt"
+  },
+  "feedback.attach": {
+    "value": "Add a photo or video"
+  },
+  "feedback.filesHint": {
+    "value": "Up to {{images}} photos of {{imageMb}} MB and one video of {{videoMb}} MB, kept for {{days}} days."
+  },
+  "feedback.removeFile": {
+    "value": "Remove {{name}}"
+  },
+  "feedback.uploading": {
+    "value": "Sending {{name}}"
+  },
+  "feedback.fileType": {
+    "value": "Only photos and videos can be attached."
+  },
+  "feedback.fileTooLarge": {
+    "value": "{{name}} is too large: the limit is {{mb}} MB."
+  },
+  "feedback.fileTooMany": {
+    "value": "One feedback takes up to {{images}} photos and one video."
+  },
+  "feedback.goesWithAbout": {
+    "value": "Sent along: your email ({{email}}), the screen you are on and what is open on it, your browser and the app's latest errors. From your conversations, only the excerpt above."
   },
   "feedback.send": {
     "value": "Send"

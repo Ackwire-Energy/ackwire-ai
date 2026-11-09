@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import type { FeedbackInput } from "@agenteschat/client";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { describeElement, openFeedback } from "@/lib/feedback";
 import { createFakeApi, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
@@ -87,5 +89,79 @@ describe("feedback", () => {
     await click(screen().getByRole("button", { name: "Enviar outro" }));
     const again = screen().getByRole("dialog", { name: "O que faltou, quebrou ou incomodou?" });
     expect(within(again).getByRole("textbox")).toHaveProperty("value", "");
+  });
+});
+
+describe("feedback about what was clicked", () => {
+  const page = () => {
+    const host = document.createElement("div");
+    host.innerHTML =
+      '<div data-message-id="m1"><article class="ac-msg ac-msg--agent"><span class="ac-msg__author">Ada</span>' +
+      '<div class="ac-msg__body"><p>Deploy   done.</p><p>All green.</p></div></article></div>' +
+      "<section><h2>Plano</h2><button>Assinar</button></section>";
+    document.body.append(host);
+    return host;
+  };
+
+  test("a message says who wrote it and what it says; a selection, only itself; anything else, its role and words", () => {
+    const host = page();
+    const said = describeElement(host.querySelector("p"));
+    expect(said).toMatchObject({
+      message: true,
+      about: { kind: "agent message", label: "Ada", text: "Deploy done.\nAll green." },
+    });
+    expect(said?.facts[0]).toEqual(["Message id", "m1"]);
+    expect(describeElement(host.querySelector("p"), "All green")?.about.text).toBe("All green");
+    expect(describeElement(host.querySelector("button"))).toMatchObject({
+      message: false,
+      about: { kind: "button", text: "Assinar" },
+    });
+    expect(describeElement(null)).toBeNull();
+    host.remove();
+  });
+
+  test("the form shows the excerpt, sends it with where the person is, and leaves it out when asked", async () => {
+    const { state } = await open(seedState({ authConfig: { feedback: true } }));
+    const host = page();
+    await act(async () => openFeedback(describeElement(host.querySelector("p"))));
+    let form = screen().getByRole("dialog", { name: "O que faltou, quebrou ou incomodou?" });
+    expect(within(form).getByText("Sobre a mensagem de Ada")).toBeTruthy();
+    expect(within(form).getByText(/Deploy done\./)).toBeTruthy();
+    await type(within(form).getByRole("textbox"), "Resposta errada");
+    await click(within(form).getByRole("button", { name: /^Enviar/ }));
+    await settle(4);
+    const sent = state.calls.findLast((c) => c.method === "system.sendFeedback")?.args[0] as FeedbackInput;
+    expect(sent.about).toEqual({ kind: "agent message", label: "Ada", text: "Deploy done.\nAll green." });
+    expect(sent.facts?.map(([k]) => k)).toEqual(expect.arrayContaining(["Route", "Message id", "Browser"]));
+
+    await act(async () => openFeedback(describeElement(host.querySelector("p"))));
+    form = screen().getByRole("dialog", { name: "O que faltou, quebrou ou incomodou?" });
+    await click(within(form).getByRole("button", { name: "Não enviar este trecho" }));
+    expect(within(form).queryByText(/Deploy done\./)).toBeNull();
+    await type(within(form).getByRole("textbox"), "Só o aviso");
+    await click(within(form).getByRole("button", { name: /^Enviar/ }));
+    await settle(4);
+    const bare = state.calls.findLast((c) => c.method === "system.sendFeedback")?.args[0] as FeedbackInput;
+    expect(bare.about).toMatchObject({ kind: "agent message", label: "Ada" });
+    expect(bare.about?.text).toBeUndefined();
+    host.remove();
+  });
+
+  test("a picture is added, listed and sent by its id; anything else is refused before it is uploaded", async () => {
+    const { state } = await open(seedState({ authConfig: { feedback: true } }));
+    await click(screen().getByRole("button", { name: "Enviar feedback" }));
+    const form = screen().getByRole("dialog", { name: "O que faltou, quebrou ou incomodou?" });
+    const picker = form.querySelector('input[type="file"]') as HTMLInputElement;
+    const choose = (files: File[]) => act(async () => fireEvent.change(picker, { target: { files } }));
+    await choose([new File(["x"], "notas.pdf", { type: "application/pdf" })]);
+    expect(state.calls.some((c) => c.method === "system.uploadFeedbackFile")).toBe(false);
+    await choose([new File(["x"], "tela.png", { type: "image/png" })]);
+    await settle(4);
+    expect(within(form).getByText("tela.png")).toBeTruthy();
+    await type(within(form).getByRole("textbox"), "Olha a tela");
+    await click(within(form).getByRole("button", { name: /^Enviar/ }));
+    await settle(4);
+    const sent = state.calls.findLast((c) => c.method === "system.sendFeedback")?.args[0] as FeedbackInput;
+    expect(sent.files).toHaveLength(1);
   });
 });
