@@ -1,5 +1,5 @@
 import {
-  PHONES_PROTOCOL,
+  PHONE_SCREEN_PROTOCOL,
   type PhoneHolder,
   type PhonePlatform,
   type PhoneReason,
@@ -827,7 +827,7 @@ export async function authorizePhoneStream(
   if (!deps.hub.isLocal(host.id)) {
     return { refused: STREAM_CLOSE.unreachable, reason: machineOnline(host) ? "other_server" : "offline" };
   }
-  if (host.protocol < PHONES_PROTOCOL) return { refused: STREAM_CLOSE.refused, reason: "runner_outdated" };
+  if (host.protocol < PHONE_SCREEN_PROTOCOL) return { refused: STREAM_CLOSE.refused, reason: "runner_outdated" };
   const holder = phoneHolder({ runId: null, agentId: null, userId: input.userId });
   return { machineId: host.id, phone: phoneTargetOf(phone, holder) };
 }

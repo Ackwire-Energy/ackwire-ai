@@ -3,7 +3,7 @@ import {
   BROWSER_WARM_PROTOCOL,
   DESKTOP_PROTOCOL,
   DESKTOP_SWITCH_PROTOCOL,
-  PHONES_PROTOCOL,
+  PHONE_SCREEN_PROTOCOL,
   type RunnerAccess,
   type RunnerInfo,
   STREAM_CLOSE,
@@ -309,7 +309,7 @@ test("a phone's screen through the server: its pictures to the person (base64 fo
     osVersion: "16",
     state: "ready",
   } as const;
-  const runner = await connectRunner(machine.token, { hello: { protocol: PHONES_PROTOCOL, phones: [pixel] } });
+  const runner = await connectRunner(machine.token, { hello: { protocol: PHONE_SCREEN_PROTOCOL, phones: [pixel] } });
   let phoneId = "";
   await until(async () => {
     const [row] = await t.db.select().from(schema.machinePhones).where(eq(schema.machinePhones.orgId, org.orgId));

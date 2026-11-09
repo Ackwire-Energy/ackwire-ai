@@ -1,5 +1,13 @@
 import { expect, test } from "bun:test";
-import { PHONE_VIEW, PHONES_PROTOCOL, parseRunnerFrame, parseStreamControl } from "../src/machine-protocol";
+import {
+  MACHINE_PROTOCOL_VERSION,
+  PHONE_PAIRING_PROTOCOL,
+  PHONE_SCREEN_PROTOCOL,
+  PHONE_VIEW,
+  PHONES_PROTOCOL,
+  parseRunnerFrame,
+  parseStreamControl,
+} from "../src/machine-protocol";
 
 const pixel = {
   platform: "android",
@@ -65,4 +73,9 @@ test("a phone screen's input: points as fractions of the screen, a swipe's lengt
   expect(parse({ type: "text", text: "x".repeat(PHONE_VIEW.text + 1) })).toBeNull();
   expect(parse({ type: "key", key: "home" })).toEqual({ type: "key", key: "home" });
   expect(parse({ type: "key", key: "reboot" })).toBeNull();
+});
+
+test("a runner of this version speaks every phone gate", () => {
+  for (const gate of [PHONES_PROTOCOL, PHONE_SCREEN_PROTOCOL, PHONE_PAIRING_PROTOCOL])
+    expect(MACHINE_PROTOCOL_VERSION).toBeGreaterThanOrEqual(gate);
 });

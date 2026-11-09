@@ -85,7 +85,6 @@ const PHONE_STEP: Partial<Record<string, IphoneSetupStep>> = {
   ui_automation_off: "uiAutomation",
   helper_missing: "helper",
   helper_expired: "helper",
-  // Reasons a newer runner may report (the test helper's builder): keyed by string, so an older type still compiles.
   apple_account_missing: "account",
   helper_untrusted: "helper",
   team_limit: "helper",

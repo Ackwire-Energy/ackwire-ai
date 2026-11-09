@@ -7,7 +7,7 @@ import type { MergeDone } from "./command-policy";
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 54;
+export const MACHINE_PROTOCOL_VERSION = 55;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -587,13 +587,19 @@ export const BROWSER_VIEWPORT_PROTOCOL = 52;
  * Bring your own devices: `hello.phones` and `phones.changed` (the phones this computer reaches: Android over adb, an
  * iPhone through `devicectl`, its own emulators and simulators), `hello.toolchains`, and the `phone.*` ops. Each phone
  * op names one phone and the holder it runs for; the runner keeps the phone's lock and answers `phone_busy` for
- * another holder. Older runners report no phones, so nothing asks them. A phone's screen live is a stream
- * (`stream.open` with `kind: "phone"`): the runner sends its pictures as binary frames (a PNG or a JPEG each, at most
- * `PHONE_VIEW.window` the viewer hasn't acknowledged), and a viewer in control sends `tap`, `swipe`, `text` and `key`
- * text frames. Control takes the phone for the person (`phone.holder`); an agent holding it waits until they give it
- * back, and what it was doing on the phone stops.
+ * another holder. Older runners report no phones, so nothing asks them.
  */
 export const PHONES_PROTOCOL = 54;
+/**
+ * A phone's screen live, a stream (`stream.open` with `kind: "phone"`): the runner sends its pictures as binary frames
+ * (a PNG or a JPEG each, at most `PHONE_VIEW.window` the viewer hasn't acknowledged), and a viewer in control sends
+ * `tap`, `swipe`, `text` and `key` text frames. Control takes the phone for the person (`phone.holder`); an agent
+ * holding it waits until they give it back, and what it was doing on the phone stops. Older runners don't know the
+ * stream: the server refuses it as `runner_outdated`.
+ */
+export const PHONE_SCREEN_PROTOCOL = 55;
+/** Pairing an Android phone over Wi-Fi (`phone.pair.*`): the server asks no older runner. */
+export const PHONE_PAIRING_PROTOCOL = 55;
 
 export type PhonePlatform = "android" | "ios";
 export type PhoneKind = "device" | "emulator" | "simulator";

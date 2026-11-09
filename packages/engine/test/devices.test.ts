@@ -1,5 +1,12 @@
 import { afterEach, expect, test } from "bun:test";
-import { orgTopic, PHONES_PROTOCOL, type RunnerPhone, STREAM_CLOSE } from "@agenteschat/adapters";
+import {
+  orgTopic,
+  PHONE_PAIRING_PROTOCOL,
+  PHONE_SCREEN_PROTOCOL,
+  PHONES_PROTOCOL,
+  type RunnerPhone,
+  STREAM_CLOSE,
+} from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import {
   authorizePhoneStream,
@@ -317,6 +324,11 @@ test("the computer's socket: phones and toolchains in hello, phones.changed, the
   await expect(refused).rejects.toBeInstanceOf(MachineRequestError);
   await expect(refused).rejects.toMatchObject({ code: "unsupported" });
   old.disconnect();
+  // Phones, but from before Wi-Fi pairing: no `phone.pair.*` reaches it.
+  const first = fakeRunner(hub);
+  await first.hello(paired.token, { protocol: PHONE_PAIRING_PROTOCOL - 1 });
+  await expect(hub.call(paired.machineId, { op: "phone.pair.start" })).rejects.toMatchObject({ code: "unsupported" });
+  first.disconnect();
 
   const target = { platform: "android" as const, serial: "x", holder };
   expect(requestTimeoutMs({ op: "phone.flow", ...target, flow: "", timeoutSeconds: 3600 })).toBe(720_000);
@@ -430,7 +442,7 @@ test("a phone's screen: whoever may use it watches; control is the person's own 
   here = true;
   await f.db
     .update(schema.machines)
-    .set({ protocol: PHONES_PROTOCOL - 1 })
+    .set({ protocol: PHONE_SCREEN_PROTOCOL - 1 })
     .where(eq(schema.machines.id, mac));
   expect(await open(f.owner.id, "watch")).toEqual({ refused: STREAM_CLOSE.refused, reason: "runner_outdated" });
   expect(

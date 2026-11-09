@@ -17,6 +17,7 @@ import {
   machineRpcReplyTopic,
   machineRpcTopic,
   PAUSE_PROTOCOL,
+  PHONE_PAIRING_PROTOCOL,
   PHONES_PROTOCOL,
   type PubSub,
   parseRunnerFrame,
@@ -1438,8 +1439,9 @@ export function createMachineHub(deps: MachineHubDeps) {
     ): Promise<MachineReplies[Op]> {
       const conn = local.get(machineId);
       const phoneOp = request.op.startsWith("phone.");
+      const phonesNeed = request.op.startsWith("phone.pair.") ? PHONE_PAIRING_PROTOCOL : PHONES_PROTOCOL;
       if (conn) {
-        if (phoneOp && conn.protocol < PHONES_PROTOCOL) throw phonesTooOld(conn.name);
+        if (phoneOp && conn.protocol < phonesNeed) throw phonesTooOld(conn.name);
         if (isNewWork(request)) {
           // A workspace on hold or suspended, or a held agent, starts nothing (`standing.ts`).
           if (conn.orgId) await assertCanWork(db, conn.orgId, request.agent?.id);
@@ -1456,7 +1458,7 @@ export function createMachineHub(deps: MachineHubDeps) {
       if (!machineOnline(row) || !row.connectedReplica || row.connectedReplica === replicaId) {
         throw new MachineOfflineError(row.name, row.kind);
       }
-      if (phoneOp && row.protocol < PHONES_PROTOCOL) throw phonesTooOld(row.name);
+      if (phoneOp && row.protocol < phonesNeed) throw phonesTooOld(row.name);
       if (isNewWork(request)) {
         await assertCanWork(db, row.orgId, request.agent?.id);
         await assertNotPaused(db, row);
