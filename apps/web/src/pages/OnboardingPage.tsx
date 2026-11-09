@@ -110,15 +110,19 @@ export function OnboardingPage() {
     team: team.length,
     picked,
   });
-  // Read once is enough: a refetch that fails later keeps the step on screen with what it read.
-  const known = orgId === null || (settings.data !== undefined && agents.data !== undefined && mine !== undefined);
+  // Read from the first step, so the plan step has it when it opens.
+  const plans = usePlanOffer(i18n.language);
+  const offer = plans.offer;
+  // Read once is enough: a refetch that fails later keeps the step on screen with what it read. The plan step opens
+  // whole, back from the billing page too: with its price, or with none once the list is late, never a line that changes.
+  const known =
+    (orgId === null || (settings.data !== undefined && agents.data !== undefined && mine !== undefined)) &&
+    !(step === "plan" && plans.loading);
   const name = (mine?.name ?? org).trim();
   // Back on step 1, the workspace's own zone (saved on another visit, maybe another device), never this browser's.
   const zoneNow = zone ?? settings.data?.timezone ?? browserTimezone() ?? "UTC";
   const kind = business ?? aboutOf(t, context).business;
   const template = useTemplate(orgId, kind, step === "business" || step === "team");
-  // Read from the first step: step 4's price line is there when it opens, never a line that changes.
-  const offer = usePlanOffer(i18n.language);
 
   // On agentes.chat Cloud, while sign-up is by invitation, only accounts early access allowed make workspaces (ADR 0078).
   const inviteOnly = me.data?.user.canCreateWorkspace === false && orgId === null;

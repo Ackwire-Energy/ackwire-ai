@@ -275,6 +275,23 @@ describe("the plan step (agentes.chat Cloud)", () => {
     expect(calls(state, "orgs.billingLink").at(-1)?.args).toEqual([orgId, "onboarding"]);
   });
 
+  test("back at the plan step from the billing page: it opens whole, its price there from its first frame", async () => {
+    const state = settingUp({ context: "Loja online", team: true, held: true });
+    let answer: (r: Response) => void = () => {};
+    globalThis.fetch = (() =>
+      new Promise<Response>((done) => {
+        answer = done;
+      })) as unknown as typeof fetch;
+    await renderApp(`/org/${ORG_ID}/onboarding`, { api: createFakeApi(state) });
+    await settle(14);
+    // The billing service's plan list still on its way: no step yet, rather than one whose price line would change.
+    expect(planCard()).toBeNull();
+    const list = new Response(JSON.stringify(PLANS), { status: 200, headers: { "content-type": "application/json" } });
+    await act(async () => answer(list));
+    await settle(10);
+    expect(document.querySelector(".onb__plan-price")?.textContent).toContain("Plano Equipe · $49 por mês");
+  });
+
   test("with no plan data, the plan is named generically and both ways open the billing page", async () => {
     const state = newcomer(true);
     plans(null);
