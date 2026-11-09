@@ -299,6 +299,7 @@ export const SELF_TESTED = [
   "factwrap",
   "undoinline",
   "countfill",
+  "calstack",
 ];
 
 /** Rules about a desktop layout only (panes floating beside the conversation, a toolbar's one row): a phone has none. */

@@ -89,6 +89,8 @@ describe("geometry check", () => {
     // one line, Desfazer in its sentence, a count that calls on someone readable on what's behind it.
     for (const rule of ["squeeze", "loneprimary", "btngap", "toolheight", "factwrap", "undoinline", "countfill"])
       expect(SELF_TESTED).toContain(rule);
+    // A calendar item never covers another: what meets sits beside it.
+    expect(SELF_TESTED).toContain("calstack");
     for (const rule of SELF_TESTED) {
       expect(fixture).toContain(`bad-${rule}`);
       expect(fixture).toContain(`good-${rule}`);
