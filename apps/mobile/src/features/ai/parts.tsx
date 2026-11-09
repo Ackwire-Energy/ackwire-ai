@@ -19,6 +19,7 @@ import {
   Icon,
   type IconName,
   InfoHint,
+  InkOrbit,
   LineIcon,
   ProviderLogo,
   Text,
@@ -353,12 +354,12 @@ export function PasteField({
   );
 }
 
-/** "Esperando…" beside a step that waits on the computer. */
+/** "Esperando…" beside a step that waits on the computer, after the pixel loader as on the web. */
 export function Waiting({ label }: { label: string }) {
   const c = useColors();
   return (
     <View style={styles.wait} accessibilityLiveRegion="polite">
-      <Icon name="clock" size={13} color={c.faint} />
+      <InkOrbit size={13} color={c.faint} />
       <Text variant="caption" tone="faint" style={styles.bold}>
         {label}
       </Text>
