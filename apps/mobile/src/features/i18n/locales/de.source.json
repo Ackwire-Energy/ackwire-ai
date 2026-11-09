@@ -4779,22 +4779,22 @@
     "value": "{{device}} wants to join {{org}}"
   },
   "devices.notice.in_use": {
-    "value": "{{names}} is using your {{device}}"
+    "value": "{{names}} is using {{device}}"
   },
   "devices.notice.in_useFor": {
-    "value": "{{names}} is using your {{device}} for {{person}}"
+    "value": "{{names}} is using {{device}} for {{person}}"
   },
   "devices.notice.access_request": {
-    "value": "{{names}} asks to use your {{device}}"
+    "value": "{{names}} asks to use {{device}}"
   },
   "devices.notice.access_requestFor": {
-    "value": "{{names}} asks to use your {{device}} for {{person}}"
+    "value": "{{names}} asks to use {{device}} for {{person}}"
   },
   "devices.notice.waiting": {
-    "value": "{{names}} is waiting for your {{device}}"
+    "value": "{{names}} is waiting for {{device}}"
   },
   "devices.notice.waitingFor": {
-    "value": "{{names}} is waiting for your {{device}} for {{person}}"
+    "value": "{{names}} is waiting for {{device}} for {{person}}"
   },
   "devices.notice.allowOnce": {
     "value": "Allow once"
