@@ -663,7 +663,7 @@ function DecisionBody({ decision: d, mission: m }: { decision: MissionDecision; 
         </span>
       </div>
       <div className="mi-q">
-        <h3>{d.question}</h3>
+        <h3>{inlineWords(d.question, "dq")}</h3>
       </div>
       <Locked when={choose.isPending || opine.isPending}>
         <RadioGroup className="mi-opts" value={pick ?? ""} onValueChange={(v) => setPick(v)} aria-label={d.question}>
@@ -693,7 +693,7 @@ function DecisionBody({ decision: d, mission: m }: { decision: MissionDecision; 
                 <AgentAvatar agentId={m.agentId} name={dir.agentById.get(m.agentId)?.name ?? ""} size="xs" />
                 {t("missions.decision.why")}
               </span>
-              <span>{d.why}</span>
+              <span>{inlineWords(d.why, "dw")}</span>
             </>
           )}
           {d.impact && (

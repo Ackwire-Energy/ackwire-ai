@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
 import { CardSky, colorOf } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
+import { inlineWords } from "@/lib/markdown";
 import { useToast } from "@/lib/toast";
 import "./blocks.css";
 
@@ -45,7 +46,7 @@ export function PollCard({ id, version }: { id: string; version?: number }) {
       <CardSky color={colorOf(dir.anyAgent(a.createdBy.id))} />
       <header className="live-block__head">
         <span className="live-block__titles">
-          <b>{question}</b>
+          <b>{inlineWords(question, "pq")}</b>
           <small>{open ? t("blocks.pollCloses", { time: closes }) : t("blocks.pollClosed")}</small>
         </span>
       </header>

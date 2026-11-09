@@ -68,7 +68,7 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
         <ul className="choices__summary">
           {choiceSummary(questions, answered.picks, answered.others).map((s) => (
             <li key={s.question}>
-              {questions.length > 1 && <span className="choices__asked">{s.question}</span>}
+              {questions.length > 1 && <span className="choices__asked">{inlineWords(s.question, "sq")}</span>}
               <span className="choices__picked">
                 <span className="choices__letter" aria-hidden="true">
                   {s.letter}

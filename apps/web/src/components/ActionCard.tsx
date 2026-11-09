@@ -654,7 +654,7 @@ export function AgentProposalCardView({
           <span className="small muted">{[`@${draft.handle}`, draft.role].filter(Boolean).join(" · ")}</span>
         </span>
       </span>
-      {byRightHand && delegate?.reason ? <p>{delegate.reason}</p> : why && <p>{why}</p>}
+      {byRightHand && delegate?.reason ? <p>{inlineWords(delegate.reason)}</p> : why && <p>{inlineWords(why)}</p>}
       {lines.length > 0 && <ProposalLines lines={lines} draft={draft} />}
       {byRightHand && delegate?.state === "approved" ? (
         <span className="small muted ac-iconline">
