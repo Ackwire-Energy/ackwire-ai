@@ -249,7 +249,7 @@ pub async fn server_remove(app: AppHandle, server: String) -> Result<(), String>
     // Cookies are per host, not per port: on this computer they are also the other servers' here, so they stay.
     if let (Some(page), Ok(url), false) = (page, server.parse::<Url>(), is_loopback(&server)) {
         tauri::async_runtime::spawn_blocking(move || {
-            for cookie in page.cookies_for_url(url).unwrap_or_default() {
+            for cookie in page.cookies().unwrap_or_default().into_iter().filter(|c| crate::workspaces::sent_to(c, &url)) {
                 let _ = page.delete_cookie(cookie);
             }
         })
@@ -283,7 +283,8 @@ pub async fn server_sign_out(app: AppHandle, server: String) -> Result<(), Strin
     let showing = page.url().is_ok_and(|u| u.origin().ascii_serialization() == server);
     let (asking, shared) = (server.clone(), is_loopback(&server));
     tauri::async_runtime::spawn_blocking(move || {
-        let cookies = page.cookies_for_url(url).unwrap_or_default();
+        let cookies: Vec<_> =
+            page.cookies().unwrap_or_default().into_iter().filter(|c| crate::workspaces::sent_to(c, &url)).collect();
         let cookie = crate::workspaces::cookie_header(cookies.iter().map(|c| (c.name(), c.value())));
         if !cookie.is_empty() {
             let agent = ureq::AgentBuilder::new().timeout(std::time::Duration::from_secs(10)).redirects(0).build();

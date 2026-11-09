@@ -1,5 +1,5 @@
 //! Workspaces across servers (ADR 0154): every server of the list, read with that server's own session (the
-//! cookies the main window keeps for it, `cookies_for_url`), the way the phone app asks (no `Origin`,
+//! cookies the main window keeps for it, `sent_to`), the way the phone app asks (no `Origin`,
 //! `X-Agentes-Client: mobile`): its workspaces (`GET /api/app/me`) and their unread counts (`GET /api/app/me/unread`),
 //! every minute and when the window comes to the front. The site's workspace menu lists them by server
 //! (`this_mac` `workspaces`), Preferences › Servers shows them under each server, and a server not open in the window
@@ -133,7 +133,7 @@ fn refresh(app: &AppHandle) {
     let mut next = Vec::with_capacity(file.servers.len());
     for server in &file.servers {
         let Ok(url) = server.parse::<Url>() else { continue };
-        let cookies = page.cookies_for_url(url).unwrap_or_default();
+        let cookies: Vec<_> = page.cookies().unwrap_or_default().into_iter().filter(|c| sent_to(c, &url)).collect();
         let cookie = cookie_header(cookies.iter().map(|c| (c.name(), c.value())));
         let here = crate::local_server::is_here(app, server);
         match ask(&agent, server, &cookie, &mut logos) {
@@ -196,7 +196,8 @@ fn ask(agent: &ureq::Agent, server: &str, cookie: &str, logos: &mut HashMap<Stri
 /// check does; None when signed out there or it didn't answer. Not from a command or an event handler (Windows).
 pub fn window_user(app: &AppHandle, server: &str) -> Option<String> {
     let page = app.get_webview(main_window::LABEL)?;
-    let cookies = page.cookies_for_url(server.parse::<Url>().ok()?).ok()?;
+    let url = server.parse::<Url>().ok()?;
+    let cookies: Vec<_> = page.cookies().ok()?.into_iter().filter(|c| sent_to(c, &url)).collect();
     let cookie = cookie_header(cookies.iter().map(|c| (c.name(), c.value())));
     if cookie.is_empty() {
         return None;
@@ -252,6 +253,45 @@ fn logo_data(
     let logo = read();
     logos.insert(url.to_string(), logo.clone());
     logo
+}
+
+/// Whether the window's cookie goes with a request to `url`. Not wry's `cookies_for_url`: it compares the cookie's
+/// domain with `Url::domain`, which is None for an IP address, so the server on this computer
+/// (`http://127.0.0.1:4310`) got no cookie, read as signed out and left the site's workspace menu.
+pub fn sent_to<C: CookieLike>(cookie: &C, url: &Url) -> bool {
+    cookie_for(cookie.domain_of(), cookie.secure_of(), cookie.path_of(), url)
+}
+
+/// The cookie crate's `Cookie`, as `sent_to` reads it (a trait so the rule is tested without a web view).
+pub trait CookieLike {
+    fn domain_of(&self) -> Option<&str>;
+    fn secure_of(&self) -> bool;
+    fn path_of(&self) -> Option<&str>;
+}
+
+impl CookieLike for tauri::webview::Cookie<'_> {
+    fn domain_of(&self) -> Option<&str> {
+        self.domain()
+    }
+    fn secure_of(&self) -> bool {
+        self.secure().unwrap_or(false)
+    }
+    fn path_of(&self) -> Option<&str> {
+        self.path()
+    }
+}
+
+/// The browser's rule, enough for our servers: the same host (an IP address too) or a parent domain the cookie names
+/// (".example.com"), a path the request's starts with, and a secure cookie only over https or on this computer.
+pub fn cookie_for(domain: Option<&str>, secure: bool, path: Option<&str>, url: &Url) -> bool {
+    let (Some(host), Some(domain)) = (url.host_str(), domain) else { return false };
+    let host = host.trim_start_matches('[').trim_end_matches(']').to_ascii_lowercase();
+    let domain = domain.trim_start_matches('.').to_ascii_lowercase();
+    let host_ok = host == domain || (url.domain().is_some() && host.ends_with(&format!(".{domain}")));
+    let here = host == "localhost" || host.parse::<std::net::IpAddr>().is_ok_and(|ip| ip.is_loopback());
+    let secure_ok = !secure || url.scheme() == "https" || here;
+    let path_ok = path.is_none_or(|p| p.is_empty() || url.path().starts_with(p));
+    host_ok && secure_ok && path_ok
 }
 
 /// The `Cookie` header for a server from the window's cookies for it.
@@ -393,6 +433,23 @@ mod tests {
     }
     fn server(s: &str, signed_in: bool, orgs: Vec<Org>) -> ServerWorkspaces {
         ServerWorkspaces { server: s.into(), signed_in, orgs, ..Default::default() }
+    }
+
+    #[test]
+    fn the_window_cookies_a_server_gets() {
+        let url = |u: &str| u.parse::<Url>().unwrap();
+        // The server on this computer, by its IP address: wry's own lookup gave it none.
+        assert!(cookie_for(Some("127.0.0.1"), false, Some("/"), &url("http://127.0.0.1:4310")));
+        assert!(cookie_for(Some("localhost"), true, Some("/"), &url("http://localhost:3000")));
+        assert!(cookie_for(Some(".exemplo.com.br"), true, Some("/"), &url("https://agentes.exemplo.com.br")));
+        assert!(cookie_for(Some("agentes.exemplo.com.br"), true, None, &url("https://agentes.exemplo.com.br/x")));
+        // Another host, a secure cookie over plain http elsewhere, another path: not sent.
+        assert!(!cookie_for(Some("agentes-1.tail1234.ts.net"), true, Some("/"), &url("https://agentes.tail1234.ts.net")));
+        assert!(!cookie_for(Some("chat.example.com"), true, Some("/"), &url("http://chat.example.com")));
+        assert!(!cookie_for(Some("127.0.0.1"), false, Some("/api/auth"), &url("http://127.0.0.1:4310/")));
+        assert!(!cookie_for(None, false, Some("/"), &url("http://127.0.0.1:4310")));
+        // An IP address never takes a parent domain's cookie.
+        assert!(!cookie_for(Some("0.0.1"), false, Some("/"), &url("http://127.0.0.1:4310")));
     }
 
     #[test]
