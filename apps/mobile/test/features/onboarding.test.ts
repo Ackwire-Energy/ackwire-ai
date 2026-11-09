@@ -100,6 +100,9 @@ test("the phone's steps are the web's, read from the workspace's data (ADR 0158)
   expect(flow.match(/refetchOnWindowFocus: "always"/g)).toHaveLength(3);
   // Another business on step 2 starts the team step on its template again; the same one keeps the template picked.
   expect(flow).toContain("if (picked !== kind) setTemplate(null);");
+  // Back on step 1, the workspace's own zone, sent again only when picked here.
+  expect(flow).toContain("const zone = pickedZone ?? settings.data?.timezone ?? phoneTimezone();");
+  expect(flow).toContain("...(pickedZone ? { timezone: pickedZone } : {})");
 });
 
 test("the phone's plan step: the team asleep and where to turn it on, with no price, no plan's name and no link", async () => {

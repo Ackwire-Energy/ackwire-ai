@@ -54,7 +54,8 @@ export function OnboardingPage() {
   const wide = useMediaQuery(DESKTOP_QUERY);
 
   const [org, setOrg] = useState("");
-  const [zone, setZone] = useState(() => browserTimezone() ?? "UTC");
+  // The zone the person picked here, if they did.
+  const [zone, setZone] = useState<string | null>(null);
   const [zoneOpen, setZoneOpen] = useState(false);
   const [logo, setLogo] = useState<{ imageBase64: string; contentType: string } | null>(null);
   const [logoDirty, setLogoDirty] = useState(false);
@@ -112,6 +113,8 @@ export function OnboardingPage() {
   // Read once is enough: a refetch that fails later keeps the step on screen with what it read.
   const known = orgId === null || (settings.data !== undefined && agents.data !== undefined && mine !== undefined);
   const name = (mine?.name ?? org).trim();
+  // Back on step 1, the workspace's own zone (saved on another visit, maybe another device), never this browser's.
+  const zoneNow = zone ?? settings.data?.timezone ?? browserTimezone() ?? "UTC";
   const kind = business ?? aboutOf(t, context).business;
   const template = useTemplate(orgId, kind, step === "business" || step === "team");
   // Read from the first step: step 4's price line is there when it opens, never a line that changes.
@@ -168,12 +171,12 @@ export function OnboardingPage() {
       if (!orgId) {
         const res = await api.orgs.create({ name: org.trim() });
         made = { orgId: res.organization.id, generalChannelId: res.generalChannelId };
-        await api.orgs.updateSettings(made.orgId, { timezone: zone });
+        await api.orgs.updateSettings(made.orgId, { timezone: zoneNow });
         // The person's own zone, detected here: agents read the local time from it (the language is `useServerLocale`'s).
         const mine = browserTimezone();
         if (mine) await api.orgs.updateMe(made.orgId, { timezone: mine }).catch(() => undefined);
       } else {
-        await api.orgs.updateSettings(orgId, { name: org.trim() || name, timezone: zone });
+        await api.orgs.updateSettings(orgId, { name: org.trim(), ...(zone ? { timezone: zone } : {}) });
       }
       const id = made?.orgId ?? orgId ?? "";
       // The logo needs the workspace: picked before it existed, sent now.
@@ -323,7 +326,11 @@ export function OnboardingPage() {
         <StepRail
           label={t("onboarding.stepsLabel")}
           current={index}
-          onGo={(i) => setPicked(steps[i] ?? null)}
+          onGo={(i) => {
+            // Back on the name, its field holds the saved one, to change or clear.
+            if (steps[i] === "name") setOrg(name);
+            setPicked(steps[i] ?? null);
+          }}
           doneLabel={t("onboarding.stepDone")}
           steps={steps.map((s, i) => ({
             id: s,
@@ -450,7 +457,7 @@ export function OnboardingPage() {
                       <Input
                         className="onb__big"
                         aria-label={t("onboarding.workspace.name")}
-                        value={org || (orgId ? name : "")}
+                        value={org}
                         onChange={(e) => setOrg(e.target.value)}
                         placeholder={t("onboarding.workspace.namePlaceholder")}
                         spellCheck={false}
@@ -468,14 +475,14 @@ export function OnboardingPage() {
                       >
                         <ZonePicker
                           id="org-zone"
-                          value={zone}
+                          value={zoneNow}
                           onChange={setZone}
                           suggested={[browserTimezone() ?? "", "UTC"].filter(Boolean)}
                         />
                       </Field>
                     ) : (
                       <p className="onb__help">
-                        {t("onboarding.workspace.zone", { zone: timezoneName(zone, i18n.language) })} ·{" "}
+                        {t("onboarding.workspace.zone", { zone: timezoneName(zoneNow, i18n.language) })} ·{" "}
                         <button type="button" className="ac-link onb__link" onClick={() => setZoneOpen(true)}>
                           {t("onboarding.workspace.zoneChange")}
                         </button>
@@ -558,7 +565,7 @@ export function OnboardingPage() {
                     kbd={["↵"]}
                     data-enter=""
                     onClick={() => save.mutate()}
-                    disabled={!(org.trim() || name) || inviteOnly || busy}
+                    disabled={!org.trim() || inviteOnly || busy}
                     loading={save.isPending}
                   >
                     {t("onboarding.actions.continue")}

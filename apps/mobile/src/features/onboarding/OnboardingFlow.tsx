@@ -58,8 +58,8 @@ export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; ano
   const [name, setName] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // The phone's zone, said in one line with Trocar beside it; the person may pick another before the workspace exists.
-  const [zone, setZone] = useState<string | null>(phoneTimezone);
+  // The zone the person picked here, if they did; said in one line with Trocar beside it.
+  const [pickedZone, setZone] = useState<string | null>(null);
   const [pickingZone, setPickingZone] = useState(false);
   const orgName = name.trim();
   // A work address names its company: the field starts with it, selected, so typing replaces it (`suggested`).
@@ -103,6 +103,8 @@ export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; ano
   });
   // Read once is enough: a refetch that fails later keeps the step on screen with what it read.
   const known = orgId === null || (settings.data !== undefined && agents.data !== undefined && mine !== undefined);
+  // Back on step 1, the workspace's own zone (saved on another visit, maybe on the web), never the phone's.
+  const zone = pickedZone ?? settings.data?.timezone ?? phoneTimezone();
   const kind = business ?? aboutOf(t, context).business;
   const templates = useTeamTemplates(
     orgId ?? "",
@@ -179,7 +181,7 @@ export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; ano
         await qc.invalidateQueries({ queryKey: keys.me });
         setCreated({ orgId: id, generalChannelId: res.generalChannelId });
       } else {
-        await api.orgs.updateSettings(orgId, { name: orgName, ...(zone ? { timezone: zone } : {}) });
+        await api.orgs.updateSettings(orgId, { name: orgName, ...(pickedZone ? { timezone: pickedZone } : {}) });
         await qc.invalidateQueries({ queryKey: keys.me });
       }
       setPicked(null);

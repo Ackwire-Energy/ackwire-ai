@@ -410,6 +410,25 @@ describe("the name step's other cases", () => {
     expect(document.querySelector(".onb__answer .row button")).not.toBeNull();
   });
 
+  test("back on the name after another visit: the workspace's own zone and name, the zone kept unless changed", async () => {
+    const state = settingUp({ context: "Loja online" });
+    const api = createFakeApi(state);
+    const read = api.orgs.settings;
+    api.orgs.settings = async (orgId) => ({ ...(await read(orgId)), timezone: "Asia/Tokyo" });
+    await renderApp("/onboarding", { api });
+    await settle(14);
+    await click(document.querySelectorAll(".onb__step")[0] as HTMLElement, 8);
+    expect(document.querySelector(".onb__help")?.textContent).toContain("Tóquio");
+    expect((screen().getByLabelText("Nome") as HTMLInputElement).value).toBe("Ateliê Couto");
+    // The field clears like any other, and an empty name goes nowhere.
+    await type("Nome", "");
+    expect((screen().getByLabelText("Nome") as HTMLInputElement).value).toBe("");
+    expect((button("Continuar") as HTMLButtonElement).disabled).toBe(true);
+    await type("Nome", "Ateliê Couto e Filhas");
+    await click(button("Continuar"), 14);
+    expect(calls(state, "orgs.updateSettings").at(-1)?.args).toEqual([ORG_ID, { name: "Ateliê Couto e Filhas" }]);
+  });
+
   test("invite-only: the step says so and Continuar stays off", async () => {
     const state = newcomer(false);
     if (state.me) state.me.user = { ...state.me.user, canCreateWorkspace: false };
