@@ -4,7 +4,7 @@ import { accountChoices, accountTitle, ownSignInReady } from "./ai-accounts";
 import { thinksWith } from "./brain";
 import { isClaudeAlias } from "./brain-advanced";
 import { namesComputers } from "./machines";
-import { kindOf, PLAN_CHOICES, type PlanChoice, planLabel, planMark, planOfAccount } from "./no-ai";
+import { kindOf, PLAN_CHOICES, type PlanChoice, planLabel, planMark, planOfAccount, planSearchNames } from "./no-ai";
 import {
   type BrainModelChoice,
   brainModelChoices,
@@ -168,6 +168,7 @@ export function brainPickOptions(
     const kind = kindOf(choice);
     const coding = planOf(choice);
     const name = thinksWith(t, choice, null);
+    const searched = `${name} ${planSearchNames(choice)}`;
     const freeHint = planFreeHint(t, coding);
     const on = machines.filter((m) => m.options.some((o) => o.kind === kind && o.available));
     const rows = (
@@ -191,7 +192,7 @@ export function brainPickOptions(
           ...(freeHint ? { hint: freeHint } : {}),
           disabled: false,
           free: false,
-          keywords: name,
+          keywords: searched,
           pick: { ...base, model: AUTO },
         },
         ...models.map((m) => {
@@ -206,7 +207,7 @@ export function brainPickOptions(
             ...(m.needs ? { needs: m.needs, hint: t(`brain.modelNeeds.${m.needs}`) } : {}),
             disabled: false,
             free: m.free === true,
-            keywords: `${name} ${m.maker ? providerLabel(m.maker) : ""} ${m.free ? `free ${t("brain.free")}` : ""}`,
+            keywords: `${searched} ${m.maker ? providerLabel(m.maker) : ""} ${m.free ? `free ${t("brain.free")}` : ""}`,
             pick: { ...base, model: m.value },
           };
         }),
@@ -271,7 +272,7 @@ export function brainPickOptions(
               : t("brain.foot.unavailable"),
           disabled: true,
           free: false,
-          keywords: "",
+          keywords: planSearchNames(choice),
           pick: { kind: "connect", choice },
         },
       ];
