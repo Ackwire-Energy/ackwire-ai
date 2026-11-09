@@ -8,6 +8,7 @@ import { router } from "@/ui/navigation";
 import { Note } from "../ai/parts";
 import { CommandBlock, Gap, SettingsPage } from "../settings/parts";
 import { openComputer, openThisPhone } from "./DevicesScreen";
+import { joinFacts } from "./logic";
 import { ConnectedHero, DevicePortrait, JoinRequestCard } from "./parts";
 import { useConnectLink, useDeviceMutation } from "./queries";
 
@@ -93,7 +94,7 @@ function LinkFlow({ kind }: { kind: "server" | "computer" }) {
               <DevicePortrait computer={{ os: state?.request?.os ?? "linux", status: { kind: "ready" } }} size={96} />
             }
             title={t("mobile.devices.connect.joined", { name })}
-            line={state?.request?.hostname ?? ""}
+            line={state?.request ? joinFacts(t, state.request) : ""}
           />
         </>
       ) : status === "asking" && state?.request ? (
@@ -104,20 +105,25 @@ function LinkFlow({ kind }: { kind: "server" | "computer" }) {
       ) : (
         <>
           <Gap />
-          <Segmented
-            items={[
-              { key: "unix", label: t("mobile.devices.connect.unix") },
-              { key: "windows", label: t("mobile.devices.connect.windows") },
-            ]}
-            value={shell}
-            onChange={(k) => setShell(k as "unix" | "windows")}
-            wide
-          />
-          <Gap />
-          {link && !ended ? (
-            <CommandBlock command={link.commands[shell]} copiedTitle={t("mobile.devices.connect.copied")} />
-          ) : null}
-          {!ended ? <GroupedFooter>{t("mobile.devices.connect.once")}</GroupedFooter> : null}
+          {/* An ended link has no line left to pick: only why, and a new link. */}
+          {ended ? null : (
+            <>
+              <Segmented
+                items={[
+                  { key: "unix", label: t("mobile.devices.connect.unix") },
+                  { key: "windows", label: t("mobile.devices.connect.windows") },
+                ]}
+                value={shell}
+                onChange={(k) => setShell(k as "unix" | "windows")}
+                wide
+              />
+              <Gap />
+              {link ? (
+                <CommandBlock command={link.commands[shell]} copiedTitle={t("mobile.devices.connect.copied")} />
+              ) : null}
+              <GroupedFooter>{t("mobile.devices.connect.once")}</GroupedFooter>
+            </>
+          )}
           <View style={styles.live}>
             {make.isError ? (
               <Note icon="x">{errorText(t, make.error)}</Note>
@@ -133,13 +139,15 @@ function LinkFlow({ kind }: { kind: "server" | "computer" }) {
               </Note>
             ) : null}
             {ended || make.isError ? (
-              <Button
-                size="sm"
-                variant="secondary"
-                label={t("mobile.devices.connect.again")}
-                disabled={make.isPending}
-                onPress={again}
-              />
+              <View style={styles.inset}>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  label={t("mobile.devices.connect.again")}
+                  disabled={make.isPending}
+                  onPress={again}
+                />
+              </View>
             ) : null}
           </View>
         </>
@@ -149,5 +157,7 @@ function LinkFlow({ kind }: { kind: "server" | "computer" }) {
 }
 
 const styles = StyleSheet.create({
-  live: { paddingHorizontal: 4, paddingTop: 16, gap: 12, alignItems: "flex-start" },
+  // The note and its button start where the footer's words above them do (the note pads itself by 4).
+  live: { paddingHorizontal: 12, paddingTop: 16, gap: 12, alignItems: "flex-start" },
+  inset: { paddingHorizontal: 4 },
 });
