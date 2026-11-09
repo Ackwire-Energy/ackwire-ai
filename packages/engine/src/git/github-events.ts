@@ -1,5 +1,5 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, eq, isNull, schema, sql } from "@agenteschat/db";
+import { and, type Database, eq, gte, isNull, schema, sql } from "@agenteschat/db";
 import { getAgent } from "../agents";
 import { audienceError, canTalkTo, speakerOf } from "../audience";
 import { UUID } from "../authority";
@@ -335,7 +335,8 @@ export async function handleGitHubAppEvent(
     .from(channels)
     .where(and(eq(channels.orgId, orgId), eq(channels.id, target.channelId)));
   if (!agent || agent.archivedAt || !channel || channel.archivedAt) return "ignored";
-  // The job ran before (a worker lost it after writing): its notice is there already.
+  // The job ran before (a worker lost it after writing): its notice is there already. Its retries come within minutes,
+  // so a day back is plenty and keeps the read to the newest partitions.
   if (e.delivery) {
     const [seen] = await db
       .select({ id: messages.id })
@@ -344,6 +345,7 @@ export async function handleGitHubAppEvent(
         and(
           eq(messages.orgId, orgId),
           eq(messages.channelId, target.channelId),
+          gte(messages.createdAt, new Date(Date.now() - 86_400_000)),
           eq(messages.authorAgentId, agent.id),
           sql`${messages.meta}->'notice'->'refs'->>'delivery' = ${e.delivery}`,
         ),
@@ -446,6 +448,7 @@ export async function answerGitHubNotice(
         and(
           eq(messages.orgId, orgId),
           eq(messages.id, original.id),
+          eq(messages.createdAt, original.createdAt),
           sql`${messages.meta}->'notice'->'refs'->>'answeredBy' is null`,
         ),
       )
