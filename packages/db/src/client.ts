@@ -40,14 +40,19 @@ export interface DatabaseHandle {
   client: postgres.Sql | null;
   /**
    * Applies pending migrations, after checking that the applied ones are
-   * exactly this build's (`assertMigrationsMatch`). Safe to run
-   * concurrently on a server: drizzle takes an advisory lock.
+   * exactly this build's (`assertMigrationsMatch`). Processes booting
+   * together (the app and its workers) take turns on an advisory lock
+   * (`MIGRATIONS_LOCK`): drizzle's migrator takes none, and two of them
+   * would both apply, and both record, a migration with no DDL.
    */
   migrate: () => Promise<void>;
   /** Cheap connectivity check for health endpoints. */
   ping: () => Promise<void>;
   close: () => Promise<void>;
 }
+
+/** The advisory lock every process takes around its migrations (`DatabaseHandle.migrate`). */
+export const MIGRATIONS_LOCK = 4_242_017;
 
 /** A Postgres server for a `postgres://` URL, the built-in database for `pglite:///folder` (`pglite.ts`). */
 export function createDatabase(options: DatabaseOptions): DatabaseHandle {
@@ -64,8 +69,17 @@ export function createDatabase(options: DatabaseOptions): DatabaseHandle {
     db: db as unknown as Database,
     client,
     migrate: async () => {
-      await assertMigrationsMatch(db as unknown as Database, migrationsFolder);
-      await migrate(db, { migrationsFolder });
+      // On a connection of its own: with a pool of one, the migrations need that one.
+      const lock = postgres(options.url, { max: 1, onnotice: () => {} });
+      try {
+        await lock`select pg_advisory_lock(${MIGRATIONS_LOCK}::bigint)`;
+        await assertMigrationsMatch(db as unknown as Database, migrationsFolder);
+        await migrate(db, { migrationsFolder });
+        await lock`select pg_advisory_unlock(${MIGRATIONS_LOCK}::bigint)`;
+      } finally {
+        // Closing the session releases the lock too, when the migrations failed.
+        await lock.end({ timeout: 5 });
+      }
     },
     ping: async () => {
       await client`select 1`;
