@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { type Database, eq, schema } from "@agenteschat/db";
+import { type Database, eq, inArray, schema } from "@agenteschat/db";
 import { createTestDatabase } from "@agenteschat/db/testing";
 import {
   claimJobs,
+  claimLaneAlarm,
   clearOldOutboxPayloads,
   completeJob,
   createOutboxPump,
@@ -15,6 +16,7 @@ import {
   laneLimits,
   MissingCredentialError,
   PermanentJobError,
+  POOL_SLOW_MS,
   processOutbox,
   RUN_MEMORY_BYTES,
   releaseJobs,
@@ -503,8 +505,11 @@ test("resizeLanes: a lane that waits doubles within its limit and the total, qui
     quick: 20,
     long: 80,
   });
-  // A busy processor: nothing grows.
-  expect(resizeLanes(base, base, limits, { quick: waiting, long: waiting }, 500)).toEqual(base);
+  // Something brakes: nothing grows. Memory running out: the long lane halves, waiting or not.
+  expect(resizeLanes(base, base, limits, { quick: waiting, long: waiting }, { busy: true })).toEqual(base);
+  expect(
+    resizeLanes({ quick: 24, long: 288 }, base, limits, { quick: waiting, long: waiting }, { busy: true, shed: true }),
+  ).toEqual({ quick: 24, long: 144 });
   // Waiting for nothing and half used at most: half, never below the base; a lane still using more keeps it.
   expect(resizeLanes({ quick: 24, long: 288 }, base, limits, { quick: calm, long: calm })).toEqual({
     quick: 12,
@@ -587,6 +592,112 @@ test("workspaces take turns: one workspace's burst queues only that workspace", 
   const rest = await claimJobs(db, { workerId: "w", batchSize: 50 });
   expect(rest).toHaveLength(17);
   expect(rest.every((j) => j.orgId === busyOrg)).toBe(true);
+});
+
+test("a workspace running jobs on another worker claims after one that runs none, though its own job is older", async () => {
+  const [other] = await db.insert(schema.organizations).values({ name: "Globex" }).returning();
+  const busyOrg = orgId;
+  const waitingOrg = other?.id ?? "";
+  await db.insert(schema.outbox).values(
+    Array.from({ length: 3 }, () => ({
+      orgId: busyOrg,
+      kind: "agent_run.execute",
+      payload: {},
+      status: "processing" as const,
+      attempts: 1,
+      lockedUntil: at(60_000),
+      lockedBy: "other",
+    })),
+  );
+  await enqueue(db, { orgId: busyOrg, kind: "agent_run.execute", payload: {}, runAt: at(-60_000) });
+  for (let i = 0; i < 2; i++) await enqueue(db, { orgId: waitingOrg, kind: "agent_run.execute", payload: { i } });
+  const claimed = await claimJobs(db, { workerId: "w", batchSize: 2 });
+  expect(claimed.map((j) => j.orgId)).toEqual([waitingOrg, waitingOrg]);
+});
+
+test("jobs of no workspace each take a turn of their own", async () => {
+  for (let i = 0; i < 3; i++)
+    await enqueue(db, { orgId: null, kind: "email.send", payload: { i }, runAt: at(-60_000) });
+  for (let i = 0; i < 2; i++) await enqueue(db, job("message.posted", { payload: { i } }));
+  const claimed = await claimJobs(db, { workerId: "w", batchSize: 4 });
+  // Each email is a first turn, like the workspace's first job; its second job waits.
+  expect(claimed.filter((j) => j.orgId === null)).toHaveLength(3);
+  expect(claimed.filter((j) => j.orgId === orgId)).toHaveLength(1);
+});
+
+// Locks between connections: a real server only (`TEST_DATABASE_URL`); PGlite is one connection.
+test.skipIf(!process.env.TEST_DATABASE_URL)(
+  "a claim skips the jobs another worker is taking, without waiting on it",
+  async () => {
+    for (let i = 0; i < 4; i++) await enqueue(db, job("message.posted", { payload: { i } }));
+    const ids = (await rows()).map((r) => r.id).sort();
+    await db.transaction(async (tx) => {
+      // Another worker's claim, its transaction still open: two rows locked.
+      await tx
+        .select()
+        .from(schema.outbox)
+        .where(inArray(schema.outbox.id, ids.slice(0, 2)))
+        .for("update");
+      const claimed = await claimJobs(db, { workerId: "w", batchSize: 4 });
+      expect(claimed.map((j) => j.id).sort()).toEqual(ids.slice(2));
+    });
+  },
+);
+
+test("createOutboxPump: quick jobs run no more at once than their lane's limit, however many slots are free", async () => {
+  let release: () => void = () => {};
+  const held = new Promise<void>((r) => {
+    release = r;
+  });
+  const limits = { lanes: { quick: 3, long: 8 }, total: 11 };
+  const pump = createOutboxPump(
+    db,
+    { "message.posted": () => held },
+    { workerId: "w", maxInFlight: 10, quickSlots: 2, limits },
+  );
+  for (let i = 0; i < 6; i++) await enqueue(db, job("message.posted"));
+  expect(await pump.pump()).toBe(3);
+  expect(await pump.pump()).toBe(0);
+  release();
+  await pump.idle();
+});
+
+test("createOutboxPump.tune: nothing grows while the processor, the database or memory is short; then the long lane sheds", async () => {
+  const limits = { lanes: { quick: 8, long: 24 }, total: 32 };
+  const pump = createOutboxPump(db, {}, { workerId: "w", maxInFlight: 8, quickSlots: 2, limits, memoryBytes: 1000 });
+  await enqueue(db, job("message.posted", { runAt: at(-60_000) }));
+  await enqueue(db, job("agent_run.execute", { runAt: at(-60_000) }));
+  const step = async (input: { lateBeats?: number; rssBytes?: number }) => {
+    const t = await pump.tune({ rssBytes: 100, ...input });
+    return [t.quick, t.long, t.braked];
+  };
+  expect(await step({ lateBeats: 31 })).toEqual([2, 6, ["processor"]]);
+  expect(await step({ rssBytes: 750 })).toEqual([2, 6, ["memory"]]);
+  const execute = db.execute;
+  db.execute = (async (query: Parameters<typeof execute>[0]) => {
+    await Bun.sleep(POOL_SLOW_MS + 50);
+    return execute.call(db, query);
+  }) as typeof db.execute;
+  try {
+    expect(await step({})).toEqual([2, 6, ["database"]]);
+  } finally {
+    db.execute = execute;
+  }
+  expect(await step({})).toEqual([4, 12, []]);
+  expect(await step({})).toEqual([8, 24, []]);
+  // Past 85% of its memory the process gives back half its long slots, though jobs still wait.
+  expect(await step({ rssBytes: 900 })).toEqual([8, 12, ["memory"]]);
+});
+
+test("claimLaneAlarm: one process tells about a lane each hour, the first to record it", async () => {
+  const now = new Date("2026-11-10T09:10:00Z");
+  const later = (minutes: number) => new Date(now.getTime() + minutes * 60_000);
+  expect(await claimLaneAlarm(db, "long", now)).toBe(true);
+  expect(await claimLaneAlarm(db, "long", later(20))).toBe(false);
+  expect(await claimLaneAlarm(db, "quick", later(20))).toBe(true);
+  expect(await claimLaneAlarm(db, "long", later(60))).toBe(true);
+  // The record is never a job to run.
+  expect(await claimJobs(db, { workerId: "w", now: later(120) })).toEqual([]);
 });
 
 test("two workers on one database never claim the same job, and workspaces take turns across both", async () => {

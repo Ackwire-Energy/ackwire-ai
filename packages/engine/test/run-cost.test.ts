@@ -5,7 +5,7 @@ import {
   createChannel,
   createOutboxPump,
   insertMessage,
-  LOOP_LAG_MAX_MS,
+  LOOP_LATE_MS,
   RUN_MEMORY_BYTES,
 } from "../src";
 import { type Fixture, setup } from "./fixtures";
@@ -77,5 +77,5 @@ test("a run waiting on its model holds less than RUN_MEMORY_BYTES and leaves the
   };
   console.log("run cost", JSON.stringify({ runs, ...perRun, loopLateMs: Math.round(late) }));
   expect(perRun.heapBytes).toBeLessThan(RUN_MEMORY_BYTES);
-  expect(late).toBeLessThan(LOOP_LAG_MAX_MS);
+  expect(late).toBeLessThan(LOOP_LATE_MS);
 });

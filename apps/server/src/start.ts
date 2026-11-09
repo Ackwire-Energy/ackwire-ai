@@ -397,6 +397,7 @@ async function boot(
     })
     .catch((error: unknown) => log.warn("files move out of agent rooms failed", { error: String(error) }));
   const slots = { quick: config.OUTBOX_QUICK_SLOTS, long: config.OUTBOX_MAX_IN_FLIGHT - config.OUTBOX_QUICK_SLOTS };
+  const memoryBytes = process.constrainedMemory() || totalmem();
   const outbox = {
     maxInFlight: config.OUTBOX_MAX_IN_FLIGHT,
     quickSlots: config.OUTBOX_QUICK_SLOTS,
@@ -404,13 +405,10 @@ async function boot(
     ...(database.client && {
       limits: laneLimits(
         slots,
-        {
-          memoryBytes: process.constrainedMemory() || totalmem(),
-          rssBytes: process.memoryUsage().rss,
-          dbConnections: config.DATABASE_POOL_MAX,
-        },
+        { memoryBytes, rssBytes: process.memoryUsage().rss, dbConnections: config.DATABASE_POOL_MAX },
         config.OUTBOX_MAX_IN_FLIGHT_CEILING,
       ),
+      memoryBytes,
     }),
   };
   log.info("job slots", { start: slots, upTo: outbox.limits ?? "fixed", role: config.SERVER_ROLE });
@@ -429,6 +427,7 @@ async function boot(
       ? { opsReport: { to: config.OPS_REPORT_EMAIL, publicUrl: config.PUBLIC_URL } }
       : {}),
     outbox,
+    builtInDatabase: !database.client,
     log,
   });
   // A worker (`SERVER_ROLE=worker`) runs jobs only: no app, API, sockets or usage report, its health check alone. Its
