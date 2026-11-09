@@ -153,7 +153,7 @@ export interface NoticeView {
 }
 
 /** A GitHub event's line (packages/engine/src/git/github-events.ts), by what happened and to which kind of item. */
-function githubLineKey(r: Record<string, string>) {
+export function githubLineKey(r: Record<string, string>) {
   const issue = r.item === "issue";
   const discussion = r.item === "discussion";
   switch (r.event) {

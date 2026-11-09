@@ -380,6 +380,8 @@ export async function handleGitHubAppEvent(
       url: e.url,
       login: e.sender.login,
       who,
+      // For what lists it with no directory at hand (previews, notifications): the chat names the agent as it is now.
+      agent: agent.name,
       ...(e.delivery ? { delivery: e.delivery } : {}),
       ...(e.state ? { state: e.state } : {}),
       ...(task ? { task: `#${task.number} «${cutText(task.title, 200)}»` } : {}),

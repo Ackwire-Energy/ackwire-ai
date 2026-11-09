@@ -213,7 +213,7 @@ export async function deliverNoticeToRun(
  * (and start) an agent.
  */
 export function forPeople(notice: Notice) {
-  const text = `${notice.from ? `${notice.from}: ` : ""}${notice.text}`;
+  const text = [notice.from, notice.text].filter(Boolean).join(": ");
   return text.replace(/(^|[^\w@.])@(?=[a-zA-Z0-9])/g, "$1").slice(0, 40_000);
 }
 

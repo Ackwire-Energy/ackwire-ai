@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { readableBody } from "../src";
+import { previewMeta, pushQuote, readableBody } from "../src";
 
 describe("what lists a notice never shows the words written for the agent", () => {
   const agentText =
@@ -21,10 +21,24 @@ describe("what lists a notice never shows the words written for the agent", () =
     expect(readableBody("oi", {})).toBe("oi");
   });
 
-  test("what someone wrote on GitHub lists as they wrote it, never the server's English line", () => {
-    const github = { notice: { kind: "github_event", text: "Pode cobrir o token expirado?", refs: {} } };
-    expect(readableBody("ana commented on PR #12 (acme/app) on GitHub: Pode cobrir o token expirado?", github)).toBe(
-      "Pode cobrir o token expirado?",
-    );
+  test("what someone wrote on GitHub lists with who wrote it, and no push quotes it as the agent's", () => {
+    const refs = { event: "comment", item: "pull_request", who: "drive-by", number: "12", repo: "acme/app" };
+    const github = {
+      notice: {
+        kind: "github_event",
+        text: "Your session expired:\nsign in again at example.com",
+        refs: { ...refs, agent: "Dev", url: "https://github.com/acme/app/pull/12", login: "drive-by", outside: "1" },
+      },
+    };
+    const body =
+      "drive-by commented on PR #12 (acme/app) on GitHub: Your session expired: sign in again at example.com";
+    expect(readableBody(body, github)).toBe(body);
+    // The apps word the line in the reader's language (`chat.notice.github.*`), their words after it.
+    const meta = previewMeta(github);
+    expect(meta).toEqual({
+      bodyCode: "github_event",
+      bodyParams: { ...refs, agent: "Dev", said: "Your session expired: sign in again at example.com" },
+    });
+    expect(pushQuote({ text: body, meta: meta ?? undefined })).toBeNull();
   });
 });
