@@ -25,6 +25,7 @@ import {
   removeFolder,
   resolveAgentHandle,
   setTool,
+  TOOL_LABELS,
   TOOL_NAMES,
 } from "./access";
 import { type AgentUser, AgentUsers, agentGid, denySchedulers, systemLauncher } from "./agent-users";
@@ -61,6 +62,7 @@ import { configFromGrant, deviceInfo, prepareWorkspace, previousMachineFor, Runn
 import { DesktopManager } from "./desktop";
 import { runDesktopBrowser } from "./desktop-browser";
 import { DesktopSessions, type DesktopSessionsOptions, runnerUser, systemDesktopUser } from "./desktop-session";
+import { localSources, runDoctor } from "./doctor";
 import { RUNNER_VERSION } from "./errors";
 import { defaultHostState, HostComputer, readTokenFile, runnerChild } from "./host";
 import { writeJson } from "./json-file";
@@ -129,6 +131,10 @@ Usage:
       Downloads the latest runner from the server and restarts the service (keeps the pairing).
   agentes-runner status
       The connection, the service, and whether the agents' desktops and the terminal can run here.
+  agentes-runner doctor [--wait | --no-wait] [--json]
+      What this computer gives agents: its connections, the agent apps, the toolchains and the phones,
+      with the fix for whatever needs you. On a terminal it then waits for those fixes (--wait anywhere,
+      --no-wait never). Exits 0 when nothing needs you, 1 otherwise.
   agentes-runner computer
       What this computer has, what is free now, and which agents use the most of it (they share it).
       Agents run it before something heavy.
@@ -961,26 +967,14 @@ function tools(p: Parsed): number {
   if (!paired) return 1;
   const [, sub = "list", tool] = p.positional;
   const access = effectiveAccess(paired.stored);
-  const label: Record<keyof RunnerTools, string> = {
-    claude: "Claude Code",
-    codex: "Codex",
-    cursor: "Cursor",
-    opencode: "OpenCode",
-    grok: "Grok Build",
-    antigravity: "Antigravity CLI (Gemini)",
-    commands: "Commands",
-    browser: "Browser",
-    desktop: "Desktops (each agent's own screen, watched and controlled from the app)",
-    terminal: "Terminal (a shell as the agent, opened from the app)",
-  };
   if (sub === "list") {
-    for (const t of TOOL_NAMES) console.log(`${t.padEnd(9)} ${access.tools[t] ? "on " : "off"}  ${label[t]}`);
+    for (const t of TOOL_NAMES) console.log(`${t.padEnd(9)} ${access.tools[t] ? "on " : "off"}  ${TOOL_LABELS[t]}`);
     return 0;
   }
   if ((sub === "enable" || sub === "disable") && tool && (TOOL_NAMES as readonly string[]).includes(tool)) {
     const t = tool as keyof RunnerTools;
     saveAccess(home, setTool(access, t, sub === "enable"));
-    console.log(`${label[t]} ${sub === "enable" ? "on" : "off"}.`);
+    console.log(`${TOOL_LABELS[t]} ${sub === "enable" ? "on" : "off"}.`);
     return 0;
   }
   console.error(
@@ -1319,6 +1313,18 @@ async function main(argv: string[]): Promise<number> {
       return app();
     case "status":
       return status();
+    case "doctor": {
+      const json = p.flags.has("json");
+      const interactive = process.stdout.isTTY === true && process.stdin.isTTY === true;
+      return runDoctor({
+        // Ctrl-C while it waits: something still needs the person.
+        term: createTerm({ canceled: () => process.exit(1) }),
+        sources: localSources(runnerHome()),
+        wait: p.flags.has("wait") || (!p.flags.has("no-wait") && !json && interactive),
+        json,
+        write: (text) => process.stdout.write(text),
+      });
+    }
     case "computer":
       console.log(await computerNow());
       return 0;

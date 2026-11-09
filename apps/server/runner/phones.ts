@@ -31,7 +31,7 @@ import { APPLE_APP, appleNeedsYou, parseDevicectl, parseSimctl } from "./apple-d
 import { RunnerError } from "./errors";
 import { killTree } from "./exec";
 import { isExecutable } from "./executors";
-import { acquireLock } from "./lock";
+import { acquireLock, pidAlive, readLock } from "./lock";
 import { usualDirs } from "./login-path";
 import { isInside } from "./paths";
 
@@ -181,7 +181,14 @@ export const TOOL_HELP = {
   helper: (what: string) => `${what} a real iPhone needs the test helper, which isn't set up on this Mac yet.`,
 } as const;
 
-const labelOf = (p: Phone) => p.name ?? p.model;
+export const labelOf = (p: Pick<Phone, "name" | "model">) => p.name ?? p.model;
+
+/** Why a phone can't be used now, as the phone ops and `doctor` word it; null when it's ready. */
+export function phoneNotReady(p: Phone): { title: string; fix: string } | null {
+  if (p.state === "ready") return null;
+  const fix = (p.reason && REASON_WORDS[p.reason]) ?? "Try again in a moment.";
+  return { title: `${labelOf(p)} ${p.state === "unsupported" ? "can't be used" : "isn't ready"}`, fix };
+}
 
 // ── The manager ───────────────────────────────────────────────────────────────
 
@@ -240,9 +247,12 @@ export interface PhoneManagerOptions {
   caffeinate?: boolean;
   /** How long a real iPhone's live log is read for (`IPHONE_LOG_MS`). */
   liveLogMs?: number;
+  /** Only looks: changes no setting on a phone (`doctor`). */
+  readOnly?: boolean;
 }
 
 const keyOf = (p: { platform: string; serial: string }) => `${p.platform}:${p.serial}`;
+const lockFileOf = (key: string) => `${key.replace(/[^\w.-]/g, "_")}.lock`;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const clampInt = (n: unknown, min: number, max: number, fallback: number) => {
   const v = typeof n === "number" && Number.isFinite(n) ? Math.floor(n) : fallback;
@@ -339,6 +349,16 @@ export class PhoneManager {
     this.timer = null;
     await Promise.all([...this.holds.keys()].map((key) => this.drop(key, true)));
     this.keepAwake(false);
+  }
+
+  private get lockDir() {
+    return this.opts.lockDir ?? path.join(this.home, ".agentes-runner", "phone-locks");
+  }
+
+  /** Since when another process of this OS user (a runner of another workspace, or `start`) holds it; null if none. */
+  heldElsewhere(p: { platform: string; serial: string }): string | null {
+    const lock = readLock(this.lockDir, lockFileOf(keyOf(p)));
+    return lock && lock.pid !== process.pid && pidAlive(lock.pid) ? lock.startedAt || null : null;
   }
 
   /** What `hello` and `phones.changed` say. */
@@ -446,7 +466,7 @@ export class PhoneManager {
         if (keyguardShowing(lock)) Object.assign(phone, { state: "needs_you", reason: "locked" });
         else this.locked.delete(key);
       }
-      if (phone.state === "ready" && phone.kind === "device" && !this.prepared.has(key)) {
+      if (phone.state === "ready" && phone.kind === "device" && !this.opts.readOnly && !this.prepared.has(key)) {
         this.prepared.add(key);
         // An authorization lapses after 7 days without a connection (Android 11+) unless this is off.
         void this.shell(adb, e.serial, "settings put global adb_allowed_connection_time 0").catch(() => undefined);
@@ -540,8 +560,7 @@ export class PhoneManager {
       }
       return held;
     }
-    const lockDir = this.opts.lockDir ?? path.join(this.home, ".agentes-runner", "phone-locks");
-    const file = acquireLock(lockDir, "phone", { file: `${key.replace(/[^\w.-]/g, "_")}.lock` });
+    const file = acquireLock(this.lockDir, "phone", { file: lockFileOf(key) });
     if (!file.ok) {
       throw new RunnerError(
         "phone_busy",
@@ -596,11 +615,12 @@ export class PhoneManager {
     if (!this.seen.has(key)) await this.poll();
     const phone = this.seen.get(key);
     if (!phone) throw new RunnerError("phone_missing", "This phone isn't connected to this computer right now.");
-    if (phone.state !== "ready") {
-      const words = (phone.reason && REASON_WORDS[phone.reason]) ?? "Try again in a moment.";
-      if (phone.state === "unsupported")
-        throw new RunnerError("unsupported", `${labelOf(phone)} can't be used. ${words}`);
-      throw new RunnerError("phone_not_ready", `${labelOf(phone)} isn't ready. ${words}`);
+    const problem = phoneNotReady(phone);
+    if (problem) {
+      throw new RunnerError(
+        phone.state === "unsupported" ? "unsupported" : "phone_not_ready",
+        `${problem.title}. ${problem.fix}`,
+      );
     }
     const tools = await this.tools();
     const hold = await this.take(key, phone, holder, tools);

@@ -16,6 +16,7 @@ import {
 import { appleNeedsYou, parseDevicectl, parseSimctl } from "../../runner/apple-devices";
 import type { RunnerError } from "../../runner/errors";
 import { type HandlerContext, handleRequest, OP_ROUTES, type RequestScope } from "../../runner/handlers";
+import { acquireLock } from "../../runner/lock";
 import { type PhoneIo, PhoneManager, type PhoneRequest } from "../../runner/phones";
 import { errorCode, removeDirs, tempDir } from "./helpers";
 
@@ -248,7 +249,10 @@ test("iPhones: only ones plugged in now, with trust and Developer Mode; booted i
 });
 
 /** A computer with fake phone tools on its PATH, and a manager watching it. */
-function rig(state: Record<string, unknown>, opts: { tools?: string[]; platform?: NodeJS.Platform } = {}) {
+function rig(
+  state: Record<string, unknown>,
+  opts: { tools?: string[]; platform?: NodeJS.Platform; readOnly?: boolean } = {},
+) {
   const root = tempDir("phones-");
   dirs.push(root);
   const bin = path.join(root, "bin");
@@ -279,6 +283,7 @@ function rig(state: Record<string, unknown>, opts: { tools?: string[]; platform?
     settleMs: 0,
     caffeinate: false,
     liveLogMs: 2000,
+    ...(opts.readOnly ? { readOnly: true } : {}),
   });
   const calls = () =>
     existsSync(logFile)
@@ -710,4 +715,18 @@ test("the runner routes phone ops with commands off, refuses them paused, and ha
   // The process that holds the phones' locks answers them, in either mode.
   for (const op of ["phone.claim", "phone.release", "phone.flow", "phone.logs"] as const)
     expect(OP_ROUTES[op]).toBe("machine");
+});
+
+test("a manager that only looks (doctor) changes no setting, and sees a phone another runner holds", async () => {
+  const r = rig(ANDROID_STATE, { readOnly: true });
+  await r.manager.poll();
+  expect(r.manager.list().find((p) => p.serial === PIXEL)?.state).toBe("ready");
+  expect(r.calls().some((c) => c.join(" ").includes("settings put"))).toBe(false);
+  const pixel = { platform: "android", serial: PIXEL };
+  expect(r.manager.heldElsewhere(pixel)).toBeNull();
+  // Another live process of this user (here the test's parent) holds it, in the lock file the phone ops take.
+  const held = acquireLock(path.join(r.root, "locks"), "phone", { file: `android_${PIXEL}.lock`, pid: process.ppid });
+  if (!held.ok) throw new Error("no lock");
+  expect(r.manager.heldElsewhere(pixel)).toMatch(/^\d{4}-\d\d-\d\dT/);
+  held.release();
 });

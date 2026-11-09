@@ -277,7 +277,7 @@ export function deviceInfo(name?: string, previous?: { machineId: string; token:
 }
 
 /** `16:24`, or `Oct 18 16:24` when not today (local time; the person's own computer). */
-function shortTime(iso: string, now = Date.now()) {
+export function shortTime(iso: string, now = Date.now()) {
   const d = new Date(iso);
   const hm = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
   const today = new Date(now);
