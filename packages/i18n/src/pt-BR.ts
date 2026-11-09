@@ -12417,6 +12417,7 @@ export const ptBR = {
       someone: "Outra pessoa está no controle de {{name}}.",
       unsupported: "Controlar um iPhone precisa do assistente de testes no Mac. Você ainda pode assistir.",
       paused: "{{host}} está pausado, então o controle espera até ele voltar.",
+      held: "Este workspace está pausado, então o controle espera até ele voltar a ficar ativo.",
       lost: "O controle acabou. Você voltou a assistir {{name}}.",
       typeLabel: "Digitar em {{name}}",
     },

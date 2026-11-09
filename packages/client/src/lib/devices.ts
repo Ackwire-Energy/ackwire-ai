@@ -607,7 +607,7 @@ export type PhoneScreenState =
   | "ended";
 
 /** Why control was refused, or ended: the screen opens again as a watcher and says so. */
-export type PhoneControlRefusal = "in_use" | "someone" | "unsupported" | "paused" | "lost";
+export type PhoneControlRefusal = "in_use" | "someone" | "unsupported" | "paused" | "held" | "lost";
 
 /** The most text one `text` frame carries (mirror of `PHONE_VIEW.text` in `@agenteschat/adapters`). */
 export const PHONE_TEXT_MAX = 2000;
@@ -648,6 +648,8 @@ export function phoneCloseState(
     case DESKTOP_CLOSE.refused:
       if (reason === "unsupported") return watchAgain("unsupported");
       if (reason === "machine_paused") return watchAgain("paused");
+      // The workspace is on hold: nothing new starts on its computers, control included.
+      if (reason === "held") return watchAgain("held");
       if (reason === "phone_busy") return watchAgain("someone");
       if (reason === "phone_missing") return { state: "offline", retry: "later" };
       if (reason === "phone_not_ready") return { state: "notReady", retry: "later" };
@@ -739,6 +741,8 @@ export function controlRefusalText(
       return t("devices.screen.unsupported");
     case "paused":
       return t("devices.screen.paused", { host: v.host });
+    case "held":
+      return t("devices.screen.held");
     default:
       return t("devices.screen.lost", { name: v.name });
   }

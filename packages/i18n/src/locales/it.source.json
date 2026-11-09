@@ -30432,6 +30432,9 @@
   "devices.screen.paused": {
     "value": "{{host}} is paused, so control waits until it's resumed."
   },
+  "devices.screen.held": {
+    "value": "This workspace is paused, so control waits until it's active again."
+  },
   "devices.screen.lost": {
     "value": "Control ended. You're watching {{name}} again."
   },

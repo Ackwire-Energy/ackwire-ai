@@ -12152,6 +12152,7 @@
       "someone": "Orang lain sedang mengendalikan {{name}}.",
       "unsupported": "Mengendalikan iPhone butuh helper pengujian di Mac. Kamu tetap bisa menonton.",
       "paused": "{{host}} sedang dijeda, jadi kendali menunggu sampai dilanjutkan.",
+      "held": "Ruang kerja ini dijeda, jadi kontrol menunggu sampai aktif lagi.",
       "lost": "Kendali berakhir. Kamu menonton {{name}} lagi.",
       "typeLabel": "Ketik di {{name}}"
     },

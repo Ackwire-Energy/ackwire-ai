@@ -12511,6 +12511,7 @@
       "someone": "{{name}} kontrolü başka birinde.",
       "unsupported": "Bir iPhone'u kontrol etmek için Mac'te test yardımcısı gerekir. Yine de izleyebilirsiniz.",
       "paused": "{{host}} duraklatıldı, bu yüzden kontrol devam edene kadar bekler.",
+      "held": "Bu çalışma alanı duraklatıldı, bu yüzden kontrol yeniden etkin olana kadar bekler.",
       "lost": "Kontrol sona erdi. {{name}} cihazını yeniden izliyorsunuz.",
       "typeLabel": "{{name}} üzerinde yaz"
     },

@@ -102,15 +102,16 @@ export function PhoneLive({ phone: p, host }: { phone: PhoneDevice; host: string
       if (done) return;
       socketRef.current = null;
       const next = phoneCloseState(ev.code, (ev as { reason?: string }).reason ?? "");
-      if (next.control) {
+      // A watcher meets these only when the phone itself can't be used: opening again at once would loop.
+      if (next.control && mode === "control") {
         toast.show(
           controlRefusalText(t, next.control, { host, name, agent: agent ?? name }),
           next.control === "lost" ? "success" : "error",
         );
-        if (mode === "control") setMode("watch");
-        else setRound((r) => r + 1);
+        setMode("watch");
         return;
       }
+      if (next.control) return setView("unavailable");
       setView(next.state);
       if (next.retry === "now") setRound((r) => r + 1);
       else if (next.retry === "later")
@@ -131,6 +132,10 @@ export function PhoneLive({ phone: p, host }: { phone: PhoneDevice; host: string
     document.addEventListener("fullscreenchange", onChange);
     return () => document.removeEventListener("fullscreenchange", onChange);
   }, []);
+  // The keyboard types on the phone from the moment control starts, not after a first click on it.
+  useEffect(() => {
+    if (inControl) stageRef.current?.focus();
+  }, [inControl]);
 
   const send = (frame: object) => {
     const socket = socketRef.current;

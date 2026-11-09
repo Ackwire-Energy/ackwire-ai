@@ -12310,6 +12310,7 @@ export const en = {
       someone: "Someone else is in control of {{name}}.",
       unsupported: "Controlling an iPhone needs the test helper on the Mac. You can still watch it.",
       paused: "{{host}} is paused, so control waits until it's resumed.",
+      held: "This workspace is paused, so control waits until it's active again.",
       lost: "Control ended. You're watching {{name}} again.",
       typeLabel: "Type on {{name}}",
     },

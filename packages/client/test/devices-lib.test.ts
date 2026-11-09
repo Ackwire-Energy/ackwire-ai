@@ -295,6 +295,11 @@ describe("a phone's screen", () => {
     expect(phoneCloseState(4410, "in_use")).toEqual({ state: "connecting", retry: "now", control: "in_use" });
     expect(phoneCloseState(4410, "control ended").control).toBe("lost");
     expect(phoneCloseState(4502, "unsupported").control).toBe("unsupported");
+    // A workspace on hold starts nothing on its computers: control is refused, watching goes on.
+    expect(phoneCloseState(4502, "held").control).toBe("held");
+    expect(controlRefusalText(t, "held", { name: "Pixel 8", host: "Sam's MacBook Pro", agent: "Lia" })).toBe(
+      "This workspace is paused, so control waits until it's active again.",
+    );
     expect(phoneCloseState(4502, "phone_missing")).toEqual({ state: "offline", retry: "later" });
     expect(phoneCloseState(4502, "runner_outdated")).toEqual({ state: "outdated", retry: "never" });
     expect(phoneCloseState(4403)).toEqual({ state: "forbidden", retry: "never" });

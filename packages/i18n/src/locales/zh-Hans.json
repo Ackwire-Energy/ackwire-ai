@@ -12159,6 +12159,7 @@
       "someone": "其他人正在控制 {{name}}。",
       "unsupported": "控制 iPhone 需要 Mac 上的测试助手。你仍然可以观看。",
       "paused": "{{host}} 已暂停，控制会等到它恢复。",
+      "held": "此工作区已暂停，恢复后才能控制。",
       "lost": "控制已结束。你又在观看 {{name}} 了。",
       "typeLabel": "在 {{name}} 上输入"
     },

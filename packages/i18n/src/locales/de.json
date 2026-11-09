@@ -12575,6 +12575,7 @@
       "someone": "Jemand anderes hat die Steuerung von {{name}}.",
       "unsupported": "Ein iPhone zu steuern braucht die Test-App auf dem Mac. Zuschauen kannst du trotzdem.",
       "paused": "{{host}} ist pausiert, deshalb wartet die Steuerung, bis es weitergeht.",
+      "held": "Dieser Workspace ist angehalten, daher wartet die Steuerung, bis er wieder aktiv ist.",
       "lost": "Die Steuerung ist vorbei. Du schaust {{name}} wieder zu.",
       "typeLabel": "Auf {{name}} schreiben"
     },

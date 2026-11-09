@@ -13461,6 +13461,7 @@
       "someone": "Kontrolę nad urządzeniem {{name}} ma ktoś inny.",
       "unsupported": "Sterowanie iPhone’em wymaga pomocnika testowego na Macu. Nadal możesz oglądać.",
       "paused": "Urządzenie {{host}} jest wstrzymane, więc kontrola czeka na wznowienie.",
+      "held": "Ta przestrzeń robocza jest wstrzymana, więc sterowanie czeka, aż znów będzie aktywna.",
       "lost": "Kontrola się skończyła. Znów oglądasz urządzenie {{name}}.",
       "typeLabel": "Pisz na urządzeniu {{name}}"
     },

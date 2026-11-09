@@ -13013,6 +13013,7 @@
       "someone": "Quelqu'un d'autre a la main sur {{name}}.",
       "unsupported": "Contrôler un iPhone demande l'app de test sur le Mac. Vous pouvez quand même regarder.",
       "paused": "{{host}} est en pause, le contrôle attend donc sa reprise.",
+      "held": "Cet espace de travail est en pause, donc la prise de contrôle attend qu'il soit de nouveau actif.",
       "lost": "Le contrôle est terminé. Vous regardez à nouveau {{name}}.",
       "typeLabel": "Écrire sur {{name}}"
     },

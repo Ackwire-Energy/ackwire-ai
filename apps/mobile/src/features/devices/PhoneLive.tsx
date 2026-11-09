@@ -91,15 +91,16 @@ export function PhoneLive({ phone: p, host }: { phone: PhoneDevice; host: string
       if (done) return;
       socketRef.current = null;
       const next = phoneCloseState(ev.code, (ev as { reason?: string }).reason ?? "");
-      if (next.control) {
+      // A watcher meets these only when the phone itself can't be used: opening again at once would loop.
+      if (next.control && mode === "control") {
         toast({
           title: controlRefusalText(t, next.control, { host, name: p.name, agent: agent ?? p.name }),
           icon: next.control === "lost" ? "check" : "x",
         });
-        if (mode === "control") setMode("watch");
-        else setRound((r) => r + 1);
+        setMode("watch");
         return;
       }
+      if (next.control) return setView("unavailable");
       setView(next.state);
       if (next.retry === "now") setRound((r) => r + 1);
       else if (next.retry === "later")
@@ -119,11 +120,18 @@ export function PhoneLive({ phone: p, host }: { phone: PhoneDevice; host: string
     const socket = socketRef.current;
     if (mode === "control" && socket?.readyState === 1) socket.send(JSON.stringify(f));
   };
-  const point = (e: GestureResponderEvent) => ({
-    x: e.nativeEvent.locationX / box.current.width,
-    y: e.nativeEvent.locationY / box.current.height,
-    at: e.nativeEvent.timestamp,
-  });
+  // A picture wider than the room left for it (a phone turned sideways, a tablet) sits letterboxed in its frame.
+  const point = (e: GestureResponderEvent) => {
+    const { width, height } = box.current;
+    const k = Math.min(width / shape.width, height / shape.height);
+    const w = shape.width * k;
+    const h = shape.height * k;
+    return {
+      x: (e.nativeEvent.locationX - (width - w) / 2) / w,
+      y: (e.nativeEvent.locationY - (height - h) / 2) / h,
+      at: e.nativeEvent.timestamp,
+    };
+  };
   const typeIt = () => {
     const words = text.slice(0, PHONE_TEXT_MAX);
     if (!words) return;

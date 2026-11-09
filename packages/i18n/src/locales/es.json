@@ -12944,6 +12944,7 @@
       "someone": "Otra persona tiene el control de {{name}}.",
       "unsupported": "Controlar un iPhone necesita la app de pruebas en el Mac. Aún puedes mirarlo.",
       "paused": "{{host}} está en pausa, así que el control espera hasta que se reanude.",
+      "held": "Este espacio de trabajo está en pausa, así que el control espera hasta que vuelva a estar activo.",
       "lost": "El control terminó. Vuelves a mirar {{name}}.",
       "typeLabel": "Escribir en {{name}}"
     },

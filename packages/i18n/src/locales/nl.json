@@ -12636,6 +12636,7 @@
       "someone": "Iemand anders heeft de controle over {{name}}.",
       "unsupported": "Een iPhone besturen vraagt de testhelper op de Mac. Meekijken kan nog steeds.",
       "paused": "{{host}} is gepauzeerd, dus de controle wacht tot het verdergaat.",
+      "held": "Deze werkruimte is gepauzeerd, dus de bediening wacht tot hij weer actief is.",
       "lost": "De controle is voorbij. Je kijkt weer mee met {{name}}.",
       "typeLabel": "Typen op {{name}}"
     },
