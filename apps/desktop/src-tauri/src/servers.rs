@@ -179,6 +179,8 @@ pub fn replace(app: &AppHandle, old: &str, new: &str) {
     };
     write(app, &file);
     crate::menus::servers_changed(app);
+    // The site's workspace menu lists the new address now, never the old one for a minute.
+    crate::workspaces::trigger(app);
 }
 
 pub fn remove(app: &AppHandle, origin: &str) {

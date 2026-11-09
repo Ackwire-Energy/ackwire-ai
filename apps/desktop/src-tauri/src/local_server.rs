@@ -1154,6 +1154,13 @@ fn set_phase(app: &AppHandle, phase: Phase) {
     emit_status(app);
 }
 
+/// It can't start: every way there says so the same, on screen and with the system's notification (not only after
+/// the tries ran out), since nobody can use it meanwhile.
+fn failed(app: &AppHandle) {
+    set_phase(app, Phase::Failing);
+    notify(app, "hereFailing", "", None);
+}
+
 fn note(app: &AppHandle, line: String) {
     let mut inner = state(app);
     if inner.lines.len() >= STDERR_LINES {
@@ -1184,7 +1191,7 @@ pub fn start(app: &AppHandle) {
         state(&app).launching = false;
         if let Err(err) = result {
             note(&app, format!("start: {err}"));
-            set_phase(&app, Phase::Failing);
+            failed(&app);
         }
     });
 }
@@ -1340,21 +1347,21 @@ fn watch(app: &AppHandle, mut child: Child, generation: u64, port: u16, folder: 
             if wanted {
                 if let Err(err) = spawn(app, Phase::Starting) {
                     note(app, format!("restart: {err}"));
-                    set_phase(app, Phase::Failing);
+                    failed(app);
                 }
             }
         }
         Next::Upgrade { from } => {
             if let Err(err) = upgrade(app, from.as_deref()) {
                 note(app, format!("database upgrade: {err}"));
-                set_phase(app, Phase::Failing);
+                failed(app);
             }
         }
         // Its port was taken meanwhile: the start moves to a free one.
         Next::NewPort => {
             if let Err(err) = spawn(app, Phase::Starting) {
                 note(app, format!("port: {err}"));
-                set_phase(app, Phase::Failing);
+                failed(app);
             }
         }
         Next::GoBack { to } => {
@@ -1375,13 +1382,12 @@ fn watch(app: &AppHandle, mut child: Child, generation: u64, port: u16, folder: 
                 Ok(()) => notify(app, "hereBack", "", Some(&to)),
                 Err(err) => {
                     note(app, format!("going back: {err}"));
-                    set_phase(app, Phase::Failing);
+                    failed(app);
                 }
             }
         }
         Next::GiveUp => {
-            set_phase(app, Phase::Failing);
-            notify(app, "hereFailing", "", None);
+            failed(app);
         }
     }
 }
@@ -1840,11 +1846,23 @@ fn reach_on(app: &AppHandle) -> Result<String, crate::tailscale::ServeError> {
         return Ok(url);
     }
     write_env(&folder, &[("PUBLIC_URL", url.clone())]).map_err(|_| crate::tailscale::ServeError::Serve)?;
-    if let Some(old) = old {
-        crate::servers::replace(app, &old, &url);
+    if let Some(old) = old.as_deref() {
+        crate::servers::replace(app, old, &url);
     }
     reach_stage(app, "restarting", None);
-    restart(app).map_err(|_| crate::tailscale::ServeError::Start)?;
+    if restart(app).is_err() {
+        // Back to the address it had, so the switch, the list and the window never point where it doesn't answer.
+        if let Some(old) = old {
+            let _ = write_env(&folder, &[("PUBLIC_URL", old.clone())]);
+            crate::servers::replace(app, &url, &old);
+            if crate::servers::is_loopback(&old) {
+                crate::tailscale::unserve(&url);
+                state(app).served = false;
+            }
+            let _ = restart(app);
+        }
+        return Err(crate::tailscale::ServeError::Start);
+    }
     Ok(url)
 }
 
@@ -2121,8 +2139,14 @@ pub async fn local_server_reach(app: AppHandle, webview: tauri::Webview, on: boo
             let folder = folder(&app).ok_or("no folder")?;
             let port = port_of(&folder).ok_or("no port")?;
             reach_stage(&app, "signingIn", None);
-            if let Ok(token) = owner_sign_in(&folder, port, None) {
-                open_signed_in(&app, &url, &token)?;
+            match owner_sign_in(&folder, port, None) {
+                Ok(token) => open_signed_in(&app, &url, &token)?,
+                // No sign-in for the new address: the window still goes there, to its sign-in page.
+                Err(_) => {
+                    if let Ok(page) = url.parse::<Url>() {
+                        crate::main_window::show_url(&app, page)?;
+                    }
+                }
             }
         }
         Ok(json!({ "ok": true, "url": url }))
