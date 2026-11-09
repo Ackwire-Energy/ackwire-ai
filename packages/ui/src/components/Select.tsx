@@ -32,6 +32,8 @@ export interface SelectProps<V extends string = string> {
   /** Taken from the surrounding `Field` when omitted. */
   id?: string;
   "aria-label"?: string;
+  /** What the choice means, outside a `Field` (a strip's control: its meaning lives in its tip). */
+  "aria-describedby"?: string;
   placeholder?: string;
   size?: "md" | "sm";
   disabled?: boolean;
@@ -200,7 +202,9 @@ export function Select<V extends string = string>({
           className="ac-select__trigger"
           id={wiring.id}
           aria-label={rest["aria-label"]}
-          aria-describedby={wiring["aria-describedby"]}
+          aria-describedby={
+            [wiring["aria-describedby"], rest["aria-describedby"]].filter(Boolean).join(" ") || undefined
+          }
           aria-invalid={wiring["aria-invalid"]}
         >
           <span className="ac-select__value">

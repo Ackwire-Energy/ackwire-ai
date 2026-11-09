@@ -318,6 +318,14 @@ describe("Issues (board and list)", () => {
     expect((within(dialog).getByLabelText("Título") as HTMLInputElement).value).toBe("Exportar agenda");
     expect(field("Descrição", "TEXTAREA")[0]?.value).toBe("Pedido de clientes.");
     expect(field("Critérios de aceite", "INPUT").map((e) => e.value)).toEqual(["Botão na agenda"]);
+    // Its fields as the quick form's strip, under the title and over the description: no side column.
+    expect(dialog.querySelector(".issue-new__side, aside")).toBeNull();
+    const strip = dialog.querySelector(".issue-new__props") as HTMLElement;
+    expect(strip.classList.contains("ac-props")).toBe(true);
+    expect(strip.previousElementSibling?.getAttribute("aria-label")).toBe("Título");
+    expect([...strip.querySelectorAll("button")].map((b) => b.getAttribute("aria-label")?.replace(/:.*$/, ""))).toEqual(
+      ["Responsável", "Prioridade", "Quem vê", "Prazo"],
+    );
     const add = within(dialog).getByPlaceholderText("Adicionar critério");
     await type(add, "PDF com o logo");
     await key(add, "Enter");

@@ -1352,38 +1352,17 @@ html:not([data-pointer]) .issue-ask__other:focus-visible {
   gap: 6px;
   margin: 0;
 }
-/* Nova tarefa's chips: 8 apart, each 32 in the field look (fill and hairline), the date one of them. */
-.issue-new__props {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
+/* Nova tarefa's strip (`.ac-props`): in the quick form, under the text and its files, after a hairline. Its date reads
+   as the buttons beside it do, their ink and weight. */
+.issue-new__quick > .issue-new__props {
   padding-top: 12px;
   border-top: 1px solid var(--line);
 }
-.issue-new__props .ac-btn .ac-avatar {
-  margin-left: -2px;
-}
-.issue-new__props > :is(.ac-btn, .ac-date__trigger),
-.issue-new__props > * > .ac-btn {
-  height: var(--control-h-sm);
-  min-height: var(--control-h-sm);
-  border: 0;
-  background: var(--field-bg);
-  box-shadow: inset 0 0 0 1px var(--field-line);
-}
-/* The due date is one more chip in the row, as wide as its words, not a field taking a line of its own: its glyph
-   first, its name in the chips' ink and weight. */
-.issue-new__props > .ac-date__trigger {
-  width: auto;
-  gap: 6px;
+.issue-new__props .ac-date__trigger {
   font-weight: 600;
   color: var(--ink);
 }
-.issue-new__props > .ac-date__trigger .ac-icon {
-  order: -1;
-}
-.issue-new__props > .ac-date__trigger .ac-date__placeholder {
+.issue-new__props .ac-date__placeholder {
   color: inherit;
 }
 .issue-new__grow {
@@ -1421,29 +1400,16 @@ html:not([data-pointer]) .issue-ask__other:focus-visible {
   font-size: 15px;
   color: var(--ink);
 }
+/* The full form: one column, its fields as the strip under the title. */
 .issue-new__wide {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 280px;
-  gap: 0;
   padding: 0;
 }
-/* The dialog's room on every side, so the hairline between the form and its fields has the same air on both. */
 .issue-new__main {
   display: flex;
   flex-direction: column;
   gap: 16px;
   min-width: 0;
   padding: 0 var(--dialog-pad) var(--dialog-pad);
-}
-.issue-new__side {
-  position: sticky;
-  top: 0;
-  align-self: start;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  padding: 4px var(--dialog-pad) var(--dialog-pad);
-  border-left: 1px solid var(--line);
 }
 .issue-new__editor {
   display: flex;
@@ -1538,15 +1504,6 @@ html:not([data-pointer]) .issue-ask__other:focus-visible {
   box-shadow: inset 0 0 0 1.5px var(--line-strong);
 }
 /* The face on the sentence's first line (`.ac-iconline`). */
-.issue-new__who {
-  gap: 10px;
-  padding: 12px;
-  border-radius: var(--radius-lg);
-  background: var(--sunken);
-  font-size: 13.5px;
-  line-height: 19px;
-  color: var(--ink-muted);
-}
 
 /* ── A tarefa: abas, arquivos sob a descrição, Anexos, Histórico ───────── */
 .issue-details .ac-tabpanel {
@@ -1776,15 +1733,6 @@ html:not([data-pointer]) .issue-files__open:focus-visible {
   background: var(--sunken);
 }
 @media (max-width: 640px) {
-  .issue-new__wide {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .issue-new__side {
-    position: static;
-    border-left: 0;
-    border-top: 1px solid var(--line);
-    padding-top: 16px;
-  }
   .issue-files__row {
     grid-template-columns: minmax(0, 1fr) auto;
   }
