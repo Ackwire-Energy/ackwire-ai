@@ -78,6 +78,7 @@ import {
   setMessageLinkBase,
   setRestrictionNotices,
   setWorkspaceComputers,
+  shareCacheInvalidations,
   surfaceRoomFiles,
   vapidKeys,
   vapidSubject,
@@ -323,6 +324,8 @@ async function boot(
 
   // Per-process caches for agent/org/channel config, scopes, connections, credential rows (30 s TTL).
   enableCaches();
+  // A write in any process (the app, a worker) clears what every process cached of it.
+  shareCacheInvalidations(adapters.pubsub);
   // OpenRouter's public model list (ADR 0087): read only while a workspace has an OpenRouter key.
   enableOpenRouterModels(fetch);
   applyBootSwitches(config);

@@ -1,9 +1,12 @@
+import type { PubSub } from "@agenteschat/adapters";
+
 /**
  * Per-process caches for data read on every run but rarely changed (agent
  * config, org settings, channel rows and members, scopes, connections,
- * credential rows). Short TTL so other replicas' writes show up quickly;
- * writes in this process invalidate at once. Decrypted secrets are never
- * cached, only database rows.
+ * credential rows). A write invalidates at once in this process and, through
+ * `shareCacheInvalidations`, in every other one on the database (the app and
+ * its workers); the short TTL covers an invalidation lost on the way.
+ * Decrypted secrets are never cached, only database rows.
  */
 let enabled = false;
 
@@ -43,17 +46,30 @@ export class TtlCache<V> {
     this.entries.set(key, { value, expires: Date.now() + this.ttlMs });
   }
 
+  /** Told of each invalidation made in this process (`shareCacheInvalidations`). */
+  onInvalidate?: (op: CacheOp, key: string) => void;
+
   delete(key: string) {
-    this.entries.delete(key);
+    this.apply("delete", key);
+    this.onInvalidate?.("delete", key);
   }
 
   /** Drops every key starting with `prefix` (e.g. everything of one org). */
   deletePrefix(prefix: string) {
-    for (const key of this.entries.keys()) if (key.startsWith(prefix)) this.entries.delete(key);
+    this.apply("deletePrefix", prefix);
+    this.onInvalidate?.("deletePrefix", prefix);
   }
 
   clear() {
-    this.entries.clear();
+    this.apply("clear", "");
+    this.onInvalidate?.("clear", "");
+  }
+
+  /** An invalidation, here only: another process's, which it already told everyone. */
+  apply(op: CacheOp, key: string) {
+    if (op === "clear") this.entries.clear();
+    else if (op === "delete") this.entries.delete(key);
+    else for (const k of this.entries.keys()) if (k.startsWith(key)) this.entries.delete(k);
   }
 
   /** Returns the cached value or loads, caches and returns it (`undefined`/null results are cached too). */
@@ -109,4 +125,31 @@ export function invalidateOrg(orgId: string) {
 
 export function clearCaches() {
   for (const c of Object.values(caches)) c.clear();
+}
+
+export type CacheOp = "delete" | "deletePrefix" | "clear";
+
+/** Pub/sub topic that carries every process's cache invalidations to the others (Postgres LISTEN/NOTIFY). */
+export const CACHE_TOPIC = "system:cache-invalidate";
+
+/**
+ * Every process forgets what any process changed (ADR 0161): an invalidation of `caches` made here is published,
+ * and one received is applied here without being published again. Without it, a worker would go on reading a revoked
+ * scope, a removed member or a changed credential until its entry's TTL ran out. Returns the way to stop.
+ */
+export function shareCacheInvalidations(pubsub: Pick<PubSub, "publish" | "subscribe">) {
+  const named: Record<string, TtlCache<unknown>> = caches;
+  for (const [cache, c] of Object.entries(named))
+    c.onInvalidate = (op, key) =>
+      void pubsub.publish(CACHE_TOPIC, { type: "cache.invalidate", cache, op, key }).catch(() => {});
+  const off = pubsub.subscribe(CACHE_TOPIC, (event) => {
+    const target = typeof event.cache === "string" ? named[event.cache] : undefined;
+    const op = event.op;
+    if (target && typeof event.key === "string" && (op === "delete" || op === "deletePrefix" || op === "clear"))
+      target.apply(op, event.key);
+  });
+  return () => {
+    off();
+    for (const c of Object.values(named)) c.onInvalidate = undefined;
+  };
 }
