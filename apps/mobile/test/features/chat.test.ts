@@ -1288,6 +1288,7 @@ describe("automatic lines (notices) and fast replies", () => {
       // Its note to itself is the agent's: nothing to open.
       detail: null,
       pending: true,
+      answer: false,
     });
     const canceled = eventLineOf(
       agentMsg("n2", { notice: { kind: "follow_up", text: "x", refs: { ...refs, state: "canceled" } } }),
