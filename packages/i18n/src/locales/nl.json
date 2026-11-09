@@ -16045,7 +16045,11 @@
       "text": "Vraag een agent om een widget of maak een blok uit de chat vast, en het blijft hier actueel.",
       "viewer": "Wie dit dashboard bewerkt, voegt widgets toe, en ze verschijnen hier."
     },
-    "onlyHome": "Maak met “Nieuw dashboard” een dashboard voor de werkruimte of voor sommige rollen.",
+    "first": {
+      "title": "Maak het eerste dashboard van het team",
+      "text": "Een dashboard brengt getallen en grafieken samen op één pagina, en de agents houden alles actueel.",
+      "ask": "Help me het eerste dashboard van het team te maken."
+    },
     "create": {
       "title": "Nieuw dashboard",
       "subtitle": "Widgets samen op één pagina, voor jou of voor het team.",

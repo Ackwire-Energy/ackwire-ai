@@ -2358,7 +2358,6 @@
   "dashboards": {
     "homeRow": "Solo tú · tus propios widgets",
     "loadFailed": "No se pudieron cargar los paneles.",
-    "onlyHome": "Los paneles del espacio de trabajo o de tus roles aparecen aquí.",
     "create": "Crear",
     "routineTarget": "su widget",
     "pin": {

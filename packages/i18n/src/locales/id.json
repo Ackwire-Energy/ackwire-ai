@@ -15421,7 +15421,11 @@
       "text": "Minta widget ke agen atau sematkan blok dari chat, dan itu tetap terbarui di sini.",
       "viewer": "Orang yang mengedit dasbor ini menambahkan widget, lalu muncul di sini."
     },
-    "onlyHome": "Buat dasbor untuk ruang kerja atau beberapa peran dengan “Dasbor baru”.",
+    "first": {
+      "title": "Buat dasbor pertama tim",
+      "text": "Dasbor mengumpulkan angka dan grafik dalam satu halaman, dan agen menjaga semuanya tetap terbaru.",
+      "ask": "Bantu aku membuat dasbor pertama tim."
+    },
     "create": {
       "title": "Dasbor baru",
       "subtitle": "Widget berkumpul di satu halaman, untukmu atau untuk tim.",

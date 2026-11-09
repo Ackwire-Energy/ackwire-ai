@@ -16505,7 +16505,11 @@
       "text": "Chiedi un widget a un agente o fissa un blocco della chat, e resta aggiornato qui.",
       "viewer": "Chi modifica questa dashboard aggiunge i widget, e compaiono qui."
     },
-    "onlyHome": "Crea una dashboard per lo spazio di lavoro o per alcuni ruoli con “Nuova dashboard”.",
+    "first": {
+      "title": "Crea la prima dashboard del team",
+      "text": "Una dashboard riunisce numeri e grafici in una pagina, e gli agenti tengono tutto aggiornato.",
+      "ask": "Aiutami a creare la prima dashboard del team."
+    },
     "create": {
       "title": "Nuova dashboard",
       "subtitle": "Widget riuniti in una pagina, per te o per il team.",

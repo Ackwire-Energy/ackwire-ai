@@ -2358,7 +2358,6 @@
   "dashboards": {
     "homeRow": "Vous seul · vos propres widgets",
     "loadFailed": "Impossible de charger les tableaux de bord.",
-    "onlyHome": "Les tableaux de bord de l'espace de travail ou de vos rôles apparaissent ici.",
     "create": "Créer",
     "routineTarget": "son widget",
     "pin": {

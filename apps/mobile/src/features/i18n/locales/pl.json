@@ -2480,7 +2480,6 @@
   "dashboards": {
     "homeRow": "Tylko ty · twoje własne widżety",
     "loadFailed": "Nie udało się wczytać dashboardów.",
-    "onlyHome": "Tu pojawią się dashboardy przestrzeni roboczej albo twoich ról.",
     "create": "Utwórz",
     "routineTarget": "jego widżet",
     "pin": {

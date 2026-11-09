@@ -15800,7 +15800,11 @@
       "text": "Bir ajandan widget isteyin veya sohbetten bir bloğu sabitleyin, burada güncel kalsın.",
       "viewer": "Bu panoyu düzenleyen kişi widget ekler ve burada görünürler."
     },
-    "onlyHome": "“Yeni pano” ile çalışma alanı ya da bazı roller için bir pano oluşturun.",
+    "first": {
+      "title": "Ekibin ilk panosunu oluşturun",
+      "text": "Pano, sayıları ve grafikleri tek bir sayfada toplar, ajanlar da hepsini güncel tutar.",
+      "ask": "Ekibin ilk panosunu oluşturmama yardım edin."
+    },
     "create": {
       "title": "Yeni pano",
       "subtitle": "Widget'lar tek sayfada bir arada. Sizin için ya da ekip için.",

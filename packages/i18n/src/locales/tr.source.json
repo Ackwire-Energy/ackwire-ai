@@ -38257,8 +38257,14 @@
   "dashboards.empty.viewer": {
     "value": "Whoever edits this dashboard adds widgets, and they show up here."
   },
-  "dashboards.onlyHome": {
-    "value": "Make a dashboard for the workspace or some roles with “New dashboard”."
+  "dashboards.first.title": {
+    "value": "Build the team's first dashboard"
+  },
+  "dashboards.first.text": {
+    "value": "A dashboard puts numbers and charts on one page, and the agents keep them up to date."
+  },
+  "dashboards.first.ask": {
+    "value": "Help me build the team's first dashboard."
   },
   "dashboards.create.title": {
     "value": "New dashboard"

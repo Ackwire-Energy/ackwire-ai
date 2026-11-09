@@ -16502,7 +16502,11 @@
       "text": "Demandez un widget à un agent ou épinglez un bloc du chat, et il reste à jour ici.",
       "viewer": "Les personnes qui modifient ce tableau de bord ajoutent les widgets, et ils apparaissent ici."
     },
-    "onlyHome": "Créez un tableau de bord pour l'espace de travail ou certains rôles avec « Nouveau tableau de bord ».",
+    "first": {
+      "title": "Créez le premier tableau de bord de l'équipe",
+      "text": "Un tableau de bord réunit des chiffres et des graphiques sur une page, et les agents tiennent tout à jour.",
+      "ask": "Aide-moi à créer le premier tableau de bord de l'équipe."
+    },
     "create": {
       "title": "Nouveau tableau de bord",
       "subtitle": "Des widgets réunis sur une page, pour vous ou pour l'équipe.",

@@ -16978,7 +16978,11 @@
       "text": "Poproś agenta o widżet albo przypnij blok z czatu, a będzie tu aktualny.",
       "viewer": "Widżety dodaje osoba edytująca ten dashboard, a one pojawią się tutaj."
     },
-    "onlyHome": "Utwórz dashboard dla przestrzeni roboczej albo niektórych ról przyciskiem „Nowy dashboard”.",
+    "first": {
+      "title": "Utwórz pierwszy dashboard zespołu",
+      "text": "Dashboard zbiera liczby i wykresy na jednej stronie, a agenci utrzymują wszystko w aktualności.",
+      "ask": "Pomóż mi utworzyć pierwszy dashboard zespołu."
+    },
     "create": {
       "title": "Nowy dashboard",
       "subtitle": "Widżety razem na jednej stronie, dla ciebie albo dla zespołu.",

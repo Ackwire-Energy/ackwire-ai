@@ -15970,7 +15970,12 @@ export const ptBR = {
       text: "Peça um widget a um agente ou fixe um bloco do chat, e ele se atualiza aqui.",
       viewer: "Quem edita este painel adiciona os widgets, e eles aparecem aqui.",
     },
-    onlyHome: "Crie um painel para o workspace ou para alguns papéis em “Novo painel”.",
+    /** With only Meu Início: what a dashboard is, with Novo painel and an ask to the right hand (`ask`, its draft). */
+    first: {
+      title: "Monte o primeiro painel do time",
+      text: "Um painel junta números e gráficos numa página, e os agentes mantêm tudo em dia.",
+      ask: "Me ajuda a montar o primeiro painel do time.",
+    },
     create: {
       title: "Novo painel",
       subtitle: "Widgets juntos numa página, para você ou para o time.",

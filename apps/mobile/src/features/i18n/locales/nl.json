@@ -2262,7 +2262,6 @@
   "dashboards": {
     "homeRow": "Alleen jij · je eigen widgets",
     "loadFailed": "De dashboards konden niet worden geladen.",
-    "onlyHome": "Dashboards van de werkruimte of jouw rollen verschijnen hier.",
     "create": "Maken",
     "routineTarget": "zijn widget",
     "pin": {

@@ -5513,9 +5513,6 @@
   "dashboards.loadFailed": {
     "value": "Couldn't load the dashboards."
   },
-  "dashboards.onlyHome": {
-    "value": "Dashboards for the workspace or your roles show up here."
-  },
   "dashboards.create": {
     "value": "Create"
   },

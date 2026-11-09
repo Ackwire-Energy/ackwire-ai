@@ -16361,7 +16361,11 @@
       "text": "Pide un widget a un agente o fija un bloque del chat, y se mantiene al día aquí.",
       "viewer": "Quien edita este panel agrega los widgets, y aparecen aquí."
     },
-    "onlyHome": "Crea un panel para el espacio de trabajo o para algunos roles con “Nuevo panel”.",
+    "first": {
+      "title": "Crea el primer panel del equipo",
+      "text": "Un panel reúne números y gráficos en una página, y los agentes lo mantienen todo al día.",
+      "ask": "Ayúdame a crear el primer panel del equipo."
+    },
     "create": {
       "title": "Nuevo panel",
       "subtitle": "Widgets juntos en una página, para ti o para el equipo.",

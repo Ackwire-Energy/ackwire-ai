@@ -15870,7 +15870,11 @@
       "text": "Bitte einen Agenten um ein Widget oder pinne einen Block aus dem Chat, und es bleibt hier aktuell.",
       "viewer": "Wer dieses Dashboard bearbeitet, fügt Widgets hinzu, und sie erscheinen hier."
     },
-    "onlyHome": "Erstelle mit „Neues Dashboard“ ein Dashboard für den Workspace oder einige Rollen.",
+    "first": {
+      "title": "Erstelle das erste Dashboard des Teams",
+      "text": "Ein Dashboard bringt Zahlen und Diagramme auf eine Seite, und die Agenten halten alles aktuell.",
+      "ask": "Hilf mir, das erste Dashboard des Teams zu erstellen."
+    },
     "create": {
       "title": "Neues Dashboard",
       "subtitle": "Widgets zusammen auf einer Seite, für dich oder fürs Team.",

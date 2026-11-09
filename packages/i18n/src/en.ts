@@ -15750,8 +15750,12 @@ export const en = {
       text: "Ask an agent for a widget or pin a block from the chat, and it stays up to date here.",
       viewer: "Whoever edits this dashboard adds widgets, and they show up here.",
     },
-    /** Under "My Home" when the person sees no other board; "New dashboard" is the page's button. */
-    onlyHome: "Make a dashboard for the workspace or some roles with “New dashboard”.",
+    /** With only My Home: what a dashboard is, with New dashboard and an ask to the right hand (`ask`, its draft). */
+    first: {
+      title: "Build the team's first dashboard",
+      text: "A dashboard puts numbers and charts on one page, and the agents keep them up to date.",
+      ask: "Help me build the team's first dashboard.",
+    },
     create: {
       title: "New dashboard",
       subtitle: "Widgets together on one page, for you or for the team.",
