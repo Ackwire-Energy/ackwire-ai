@@ -1909,5 +1909,51 @@
         });
       });
     },
+    /**
+     * What opens from another layer stacks above it: a profile card (a popover), a popover from it, a confirm dialog from
+     * that, a list from the dialog, put in the page in that order as Radix portals them, each over the whole window.
+     * The ones that aren't the topmost thing at their center when they open.
+     */
+    layers() {
+      document.body.innerHTML = "";
+      const box = (className) => {
+        const el = document.createElement("div");
+        el.className = className;
+        return el;
+      };
+      // Radix's popper: the content in a fixed wrapper that takes the content's own z-index.
+      const floating = (className) => {
+        const wrapper = document.createElement("div");
+        wrapper.setAttribute("data-radix-popper-content-wrapper", "");
+        wrapper.style.cssText = "position: fixed; inset: 0";
+        const content = box(className);
+        content.style.cssText = "width: 100%; height: 100%; max-width: none; max-height: none";
+        wrapper.append(content);
+        document.body.append(wrapper);
+        wrapper.style.zIndex = getComputedStyle(content).zIndex;
+        return content;
+      };
+      const dialog = () => {
+        const panel = box("ac-dialog");
+        panel.style.height = "240px";
+        document.body.append(box("ac-dialog__scrim"), panel);
+        return panel;
+      };
+      const onTop = (el) => {
+        const r = el.getBoundingClientRect();
+        const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        return hit !== null && el.contains(hit);
+      };
+      const under = [];
+      for (const [name, open] of [
+        ["a card", () => floating("ac-menu ac-popover profile-card")],
+        ["a popover from the card", () => floating("ac-menu ac-popover")],
+        ["a dialog from the popover", dialog],
+        ["a list from the dialog", () => floating("ac-menu ac-menu--select")],
+      ])
+        if (!onTop(open())) under.push(name);
+      document.body.innerHTML = "";
+      return under;
+    },
   };
 })();

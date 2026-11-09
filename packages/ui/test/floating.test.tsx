@@ -13,6 +13,7 @@ import {
   MessageText,
   monthGrid,
   normalizeTime,
+  Popover,
   Select,
   Token,
   timeOptions,
@@ -32,10 +33,10 @@ const click = (el: Element) => act(async () => fireEvent.click(el));
 const css = (file: string) => Bun.file(new URL(`../src/styles/${file}`, import.meta.url).pathname).text();
 
 describe("floating layers", () => {
-  test("one layering scale: lists, menus and popovers sit above dialogs and sheets", async () => {
+  test("one layering scale: dialogs, sheets and what floats share one layer, so what opens later stacks above", async () => {
     const layers = await css("layers.css");
     const z = (name: string) => Number(layers.match(new RegExp(`--z-${name}:\\s*(\\d+)`))?.[1]);
-    expect(z("floating")).toBeGreaterThan(z("dialog"));
+    expect(z("floating")).toBe(z("dialog"));
     expect(z("scrim")).toBe(z("dialog"));
     expect(z("toast")).toBeGreaterThan(z("floating"));
     const components = await css("components.css");
@@ -46,6 +47,26 @@ describe("floating layers", () => {
     expect(rule(".ac-dialog")).toContain("z-index: var(--z-dialog)");
     expect(rule(".ac-details")).toContain("z-index: var(--z-dialog)");
     expect(await css("index.css")).toContain('@import "./layers.css"');
+  });
+
+  test("a dialog opened from a popover comes after it in the page, so on their one layer it paints above it", async () => {
+    function Card() {
+      const [asking, setAsking] = useState(false);
+      return (
+        <Popover open label="Bento" trigger={<button type="button">Bento</button>}>
+          <button type="button" onClick={() => setAsking(true)}>
+            Salvar
+          </button>
+          <Dialog open={asking} onOpenChange={setAsking} title="Usar o plano de Wagner?" closeLabel="Fechar" />
+        </Popover>
+      );
+    }
+    render(<Card />);
+    const card = body().getByRole("dialog", { name: "Bento" });
+    await click(within(card).getByRole("button", { name: "Salvar" }));
+    const ask = body().getByRole("dialog", { name: "Usar o plano de Wagner?" });
+    expect(card.contains(ask)).toBe(false);
+    expect(card.compareDocumentPosition(ask) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   test("every anchored layer keeps room from the viewport's edges", async () => {
