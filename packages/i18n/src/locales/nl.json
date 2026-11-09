@@ -1528,7 +1528,6 @@
     "pin": "Bovenaan vastzetten",
     "unpin": "Losmaken",
     "pinned": "Bovenaan vastgezet",
-    "hint": "Je agents blijven bovenaan. Klik met rechts op een gesprek om het vast te zetten.",
     "full": {
       "agents": "Je hebt al 5 agents vastgezet. Maak er een los om deze vast te zetten.",
       "channels": "Je hebt al 5 kanalen vastgezet. Maak er een los om dit vast te zetten.",

@@ -1528,7 +1528,6 @@
     "pin": "Oben anheften",
     "unpin": "Lösen",
     "pinned": "Oben angeheftet",
-    "hint": "Deine Agenten bleiben oben. Klicke mit rechts auf eine Unterhaltung, um sie anzuheften.",
     "full": {
       "agents": "Du hast schon 5 Agenten angeheftet. Löse einen, um diesen anzuheften.",
       "channels": "Du hast schon 5 Kanäle angeheftet. Löse einen, um diesen anzuheften.",

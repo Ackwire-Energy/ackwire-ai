@@ -1518,7 +1518,6 @@ export const ptBR = {
     pin: "Fixar no topo",
     unpin: "Tirar do topo",
     pinned: "Fixado no topo",
-    hint: "Seus agentes ficam no topo. Clique com o direito em qualquer conversa para fixar.",
     full: {
       agents: "Você já fixou 5 agentes. Tire um do topo para fixar este.",
       channels: "Você já fixou 5 canais. Tire um do topo para fixar este.",

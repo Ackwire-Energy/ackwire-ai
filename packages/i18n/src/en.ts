@@ -1523,7 +1523,6 @@ export const en = {
     pin: "Pin to top",
     unpin: "Unpin",
     pinned: "Pinned",
-    hint: "Your agents stay on top. Right-click any conversation to pin it.",
     full: {
       agents: "You already pinned 5 agents. Unpin one to pin this one.",
       channels: "You already pinned 5 channels. Unpin one to pin this one.",

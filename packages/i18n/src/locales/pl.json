@@ -1624,7 +1624,6 @@
     "pin": "Przypnij na górze",
     "unpin": "Odepnij",
     "pinned": "Przypięte na górze",
-    "hint": "Twoi agenci zostają na górze. Kliknij prawym przyciskiem dowolną rozmowę, aby ją przypiąć.",
     "full": {
       "agents": "Masz już 5 przypiętych agentów. Odepnij jednego, aby przypiąć tego.",
       "channels": "Masz już 5 przypiętych kanałów. Odepnij jeden, aby przypiąć ten.",

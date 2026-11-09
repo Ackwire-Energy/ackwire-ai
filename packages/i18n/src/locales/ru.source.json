@@ -3707,9 +3707,6 @@
   "sidebarPins.pinned": {
     "value": "Pinned"
   },
-  "sidebarPins.hint": {
-    "value": "Your agents stay on top. Right-click any conversation to pin it."
-  },
   "sidebarPins.full.agents": {
     "value": "You already pinned 5 agents. Unpin one to pin this one."
   },

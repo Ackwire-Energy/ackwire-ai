@@ -12410,24 +12410,6 @@ html:not([data-pointer]) .channel-perms__target:focus-visible {
   margin: 3px 8px 3px 36px;
   border: 0;
 }
-/* Day one: the line about the pins, once, with its ✕. */
-.sidebar__pins-hint {
-  display: flex;
-  align-items: flex-start;
-  gap: 4px;
-  margin: 2px 0;
-  padding: 8px 4px 8px 12px;
-  border-radius: var(--control-r-sm);
-  background: var(--plate-soft);
-  font-size: 12.5px;
-  line-height: 17px;
-  color: var(--ink-muted);
-}
-.sidebar__pins-hint > span {
-  flex: 1;
-  min-width: 0;
-  padding-top: 3px;
-}
 .sidebar__see-all {
   color: var(--ink-muted);
 }
@@ -12443,7 +12425,7 @@ html:not([data-pointer]) .channel-perms__target:focus-visible {
   line-height: 17px;
   color: var(--faint);
 }
-.sidebar[data-rail="true"] :is(.sidebar__see-all, .sidebar__pins-hint, .sidebar__pins-end, .sidebar__section-count) {
+.sidebar[data-rail="true"] :is(.sidebar__see-all, .sidebar__pins-end, .sidebar__section-count) {
   display: none;
 }
 /* More: the other tools in a panel beside the sidebar, each with a line on what it is for. */

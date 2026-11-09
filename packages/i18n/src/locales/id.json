@@ -1480,7 +1480,6 @@
     "pin": "Sematkan di atas",
     "unpin": "Lepas sematan",
     "pinned": "Disematkan di atas",
-    "hint": "Agenmu tetap di atas. Klik kanan percakapan mana pun untuk menyematkannya.",
     "full": {
       "agents": "Kamu sudah menyematkan 5 agen. Lepaskan satu untuk menyematkan yang ini.",
       "channels": "Kamu sudah menyematkan 5 kanal. Lepaskan satu untuk menyematkan yang ini.",

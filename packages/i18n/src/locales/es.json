@@ -1576,7 +1576,6 @@
     "pin": "Fijar arriba",
     "unpin": "Quitar de arriba",
     "pinned": "Fijado arriba",
-    "hint": "Tus agentes quedan arriba. Haz clic derecho en cualquier conversación para fijarla.",
     "full": {
       "agents": "Ya fijaste 5 agentes. Quita uno para fijar este.",
       "channels": "Ya fijaste 5 canales. Quita uno para fijar este.",

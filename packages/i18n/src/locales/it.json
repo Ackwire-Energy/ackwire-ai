@@ -1576,7 +1576,6 @@
     "pin": "Fissa in alto",
     "unpin": "Togli dall’alto",
     "pinned": "Fissato in alto",
-    "hint": "I tuoi agenti restano in alto. Fai clic destro su una conversazione per fissarla.",
     "full": {
       "agents": "Hai già fissato 5 agenti. Toglierne uno per fissare questo.",
       "channels": "Hai già fissato 5 canali. Toglierne uno per fissare questo.",

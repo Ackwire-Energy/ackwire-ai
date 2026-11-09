@@ -1528,7 +1528,6 @@
     "pin": "En üste sabitle",
     "unpin": "Sabitlemeyi kaldır",
     "pinned": "En üste sabitlendi",
-    "hint": "Ajanlarınız en üstte kalır. Sabitlemek için herhangi bir konuşmaya sağ tıklayın.",
     "full": {
       "agents": "Zaten 5 ajan sabitlediniz. Bunu sabitlemek için birini kaldırın.",
       "channels": "Zaten 5 kanal sabitlediniz. Bunu sabitlemek için birini kaldırın.",
