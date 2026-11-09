@@ -282,11 +282,9 @@ describe("the steps", () => {
       await click(button("Loja online"), 4);
       await click(button("Continuar"), 14);
       // The template's order, the one step 3 lists, before and after the team is made.
-      expect([...document.querySelectorAll(".onb__body .tp-agent b")].map((b) => b.textContent)).toEqual([
-        "Iara",
-        "Otto",
-        "Lia",
-      ]);
+      expect(
+        [...document.querySelectorAll(".onb__body .tp-agent .ac-mediarow__head b")].map((b) => b.textContent),
+      ).toEqual(["Iara", "Otto", "Lia"]);
       expect(agents()).toEqual(["Lodi", "Iara", "Otto", "Lia"]);
       expect(meta()).toBe("1 membro · 4 agentes");
       await click(button("Criar o time"), 16);
