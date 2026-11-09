@@ -191,10 +191,10 @@ describe("Tamanho do texto on the phone", () => {
     expect(page).toContain('t("settings.account.chat.textSizePhone")');
   });
 
-  test("the time beside the name and code follow the step, capped as the words, the default as it was", async () => {
-    // At the default: the time is iOS's footnote and code the card's own 13 on 20.
-    expect(chatTimeOf(CHAT_TEXT.md).fontSize).toBe(typeScale("ios").footnote.fontSize);
-    expect(chatCodeOf(CHAT_TEXT.md)).toEqual({ fontSize: 13, lineHeight: 20 });
+  test("the time beside the name and code follow the step, capped as the words", async () => {
+    // At the default (iOS's body, 17 on 24): the time and code two points under the words.
+    expect(chatTimeOf(CHAT_TEXT.md).fontSize).toBe(15);
+    expect(chatCodeOf(CHAT_TEXT.md)).toEqual({ fontSize: 15, lineHeight: 23 });
     // Capped as the name is: an uncapped time grows past the name and the words at the system's largest sizes.
     const row = await read("chat/MessageRow.tsx");
     expect(row).toContain("const timeSize = look.text ? chatTimeOf(look.text) : undefined;");

@@ -538,10 +538,16 @@ describe("working line", () => {
     // The step takes its own width, so its time follows the words instead of floating after a fixed gap.
     const lines = await source("features/chat/LiveRows.tsx");
     expect(lines).toContain("barStep: { flexShrink: 1, minWidth: 0 },");
-    // "Ver" only once its row is in the conversation; no stop of the line's own (the composer's, under it, is the one).
+    // "Ver" only once its row is in the conversation; "Parar", the word, only for the agents whose rows are out of view
+    // (a row on screen has its own at its end). It is the one stop: the composer keeps only its send.
     const line = lines.slice(lines.indexOf("export function WorkingLine("), lines.indexOf("type LinePiece"));
     expect(line).toContain("const seeable = away && turnShows(away) ? away : undefined;");
-    expect(line).not.toContain("<LineStop");
+    expect(line).toContain("const stopHere = stop ? stop.runs.filter((r) => !rowInView(r)) : [];");
+    expect(line).toContain('<LineStop runs={stopHere} onStop={stop.onStop} place="word" />');
+    const screen = await source("features/chat/ChatScreen.tsx");
+    expect(screen).toContain(
+      "const working = useMemo<ComposerWorking | null>(() => (busyRuns.length === 0 ? null : {}), [busyRuns]);",
+    );
   });
 
   test("the row's stop: the latest run here I may stop (the web's rule), never a guess", () => {

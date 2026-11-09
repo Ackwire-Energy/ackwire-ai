@@ -100,17 +100,17 @@ export const CHAT_TEXT: Record<ChatTextSize, { fontSize: number; lineHeight: num
  */
 export const CHAT_TEXT_MAX_SCALE = 2;
 export type ChatText = (typeof CHAT_TEXT)[ChatTextSize];
-/** The name over the words: a step under them, on a line that holds it (14 on 19 at the default, as before). */
+/** The name over the words: a step under them, on a line that holds it (16 on 22 at the default). */
 export const chatNameOf = (text: ChatText) => ({
   fontSize: text.fontSize - 1,
   lineHeight: text.lineHeight - 2,
 });
-/** The time beside the name, on its line: 13 at the default (iOS's footnote), never under 11. */
+/** The time beside the name, on its line: two points under the words (15 at the default), never under 11. */
 export const chatTimeOf = (text: ChatText) => ({
   fontSize: Math.max(11, text.fontSize - 2),
   lineHeight: text.lineHeight - 2,
 });
-/** Code, inline or in its card: the mono face runs wide, so two points under the words (13 on 20 at the default). */
+/** Code, inline or in its card: the mono face runs wide, so two points under the words (15 on 23 at the default). */
 export const chatCodeOf = (text: ChatText) => ({
   fontSize: text.fontSize - 2,
   lineHeight: text.lineHeight - 1,
