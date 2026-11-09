@@ -1592,21 +1592,22 @@ function AgentRow({
   // Listed for who manages agents though it doesn't talk to them: the line says who it talks to.
   const locked = !canTalk(a);
   const names = locked ? audienceNames(a, (id) => dir.memberById.get(id)?.name, dir.roleName) : [];
+  // What it is on, or why it is out: words beside its name, on the name's line.
+  const now = busy
+    ? here
+      ? t("sidebarAgents.workingIn", { channel: here })
+      : t(`sky.busy.${state}`)
+    : (shown?.line?.kind === "work" || shown?.presence === "out") && line
+      ? line.text
+      : null;
+  // Under the name: who it talks to when that is limited, else its role, the agent's fixed label, as a tag.
   const under = locked
     ? names.length > 1
       ? t("sidebarAgents.talksOnlyMore", { name: names[0], count: names.length - 1 })
       : names[0]
         ? t("sidebarAgents.talksOnly", { name: names[0] })
         : chip
-    : busy
-      ? here
-        ? t("sidebarAgents.workingIn", { channel: here })
-        : t(`sky.busy.${state}`)
-      : (shown?.line?.kind === "work" || shown?.presence === "out") && line
-        ? line.text
-        : a.role;
-  // The role, the agent's fixed label, is a tag; what it is on or why it is out stays words.
-  const roleTag = !locked && !busy && under === a.role;
+    : a.role;
   return (
     <div className="sidebar__row" data-agent-row={a.id} data-live={live || undefined} data-acts={edits ? 1 : undefined}>
       <Link
@@ -1637,17 +1638,8 @@ function AgentRow({
         />
         <span className="sidebar__item-text">
           <span className={under ? "sidebar__item-label ac-captop" : "sidebar__item-label"}>{a.name}</span>
-          {under && (
-            <span
-              className={cx(
-                "sidebar__item-role",
-                (busy || shown?.line?.kind === "work") && !locked && "sidebar__item-work",
-                roleTag && "ac-tag",
-              )}
-            >
-              {under}
-            </span>
-          )}
+          {now && <span className="sidebar__item-state">{now}</span>}
+          {under && <span className={cx("sidebar__item-role", !locked && "ac-tag")}>{under}</span>}
         </span>
         {unread > 0 ? (
           <UnreadCount count={unread} />

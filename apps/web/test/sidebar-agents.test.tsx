@@ -127,10 +127,9 @@ describe("Agentes and its groups", () => {
     );
     await settle(4);
     expect(head("Integrations").querySelector(".sidebar__section-working")?.textContent).toBe("1 trabalhando");
-    // The live line under its name says where, in place of the pill.
-    expect(atlas.querySelector(".sidebar__item-role")?.textContent).toBe("trabalhando em #general");
-    // What it is on is words, not the role's tag.
-    expect(atlas.querySelector(".sidebar__item-role")?.classList.contains("ac-tag")).toBe(false);
+    // Where it works sits beside its name, in words, in place of the pill; its role stays the tag under the name.
+    expect(atlas.querySelector(".sidebar__item-state")?.textContent).toBe("trabalhando em #general");
+    expect(atlas.querySelector(".sidebar__item-state")?.classList.contains("ac-tag")).toBe(false);
     expect(atlas.querySelector(".sidebar__busy")).toBeNull();
   });
 

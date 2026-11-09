@@ -285,9 +285,9 @@ function AgentRow({ agent, channelId, busy }: { agent: Agent; channelId: string;
   const line = shown?.line ? agentStatusShort(t, shown.line, i18n.language) : null;
   const full = agentLine(t, shown?.line ?? null, i18n.language)?.text;
   const doing = state !== "idle" ? t(`channel.agentState.${state}`) : null;
-  const text = line?.text ?? doing ?? agent.role ?? word;
-  // The role, the agent's fixed label, is a tag even while it works elsewhere; what it does or its presence is words.
-  const isRole = !line && !doing && !!agent.role && text === agent.role;
+  // Under the name: its role, the agent's fixed label, as a tag; with no role, its presence in words (unless a line or
+  // what it does here already says more, beside the name).
+  const under = agent.role || (line || doing ? null : word);
   const shows = useId();
   return (
     <ProfileTrigger
@@ -317,15 +317,14 @@ function AgentRow({ agent, channelId, busy }: { agent: Agent; channelId: string;
         <span className="members-side__text">
           <span className="members-side__name">
             <span className="members-side__label">{agent.name}</span>
-          </span>
-          {text &&
-            (line ? (
-              <StatusLine {...line} className="members-side__line members-side__work" />
+            {/* What it does here, or its line: words beside the name, on one line. */}
+            {line ? (
+              <StatusLine {...line} className="members-side__state" />
             ) : (
-              <span className={cx("members-side__line", busy && !isRole && "members-side__work", isRole && "ac-tag")}>
-                {text}
-              </span>
-            ))}
+              doing && <span className="members-side__state">{doing}</span>
+            )}
+          </span>
+          {under && <span className={cx("members-side__line", agent.role && "ac-tag")}>{under}</span>}
         </span>
       </span>
     </ProfileTrigger>

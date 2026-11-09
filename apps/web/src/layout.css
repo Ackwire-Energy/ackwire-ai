@@ -1129,9 +1129,31 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   background: var(--plate);
   color: var(--ink2);
 }
-/* What the agent is on: one line like the role, a step louder; the row's title has it whole. */
-.sidebar__item-work {
+/* What the agent is on, or why it is out, beside its name on the name's line: the name keeps its room, the words
+   end in "…" (the row's title has them whole); under both, the role's tag. Never a second line of its own. */
+.sidebar:not([data-rail="true"]) .sidebar__item-text:has(> .sidebar__item-state) {
+  display: grid;
+  grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+  align-items: baseline;
+  column-gap: 6px;
+  row-gap: 2px;
+}
+.sidebar__item-text:has(> .sidebar__item-state) > .sidebar__item-role {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+.sidebar__item-state {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 12.5px;
+  font-weight: 400;
+  line-height: 20px;
   color: var(--muted);
+}
+.sidebar[data-rail="true"] .sidebar__item-state {
+  display: none;
 }
 .sidebar__lock {
   display: inline-flex;

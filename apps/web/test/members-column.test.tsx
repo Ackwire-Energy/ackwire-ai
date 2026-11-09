@@ -131,8 +131,8 @@ describe("the members column", () => {
     expect(ada.getAttribute("aria-label")).toBe("Perfil de Ada");
     expect(document.getElementById(ada.getAttribute("aria-describedby") ?? "")?.textContent).toContain("pensando");
     expect(ada.textContent).toContain("pensando");
-    // Its state here is words, not the role's tag.
-    expect(ada.querySelector(".members-side__line")?.classList.contains("ac-tag")).toBe(false);
+    // What it does here sits beside its name, in words, never the role's tag.
+    expect(ada.querySelector(".members-side__name .members-side__state")?.textContent).toBe("pensando");
     expect(ada.querySelector("[data-busy] .sidebar__trail")).toBeTruthy();
     // ↑/↓ between the rows.
     const rows = [...(column() as HTMLElement).querySelectorAll<HTMLElement>(".members-side__row")];
@@ -218,7 +218,7 @@ describe("the members column", () => {
     await open(state);
     await settle(4);
     const ada = row(column() as HTMLElement, "Ada") as HTMLElement;
-    const line = ada.querySelector(".members-side__line") as HTMLElement;
+    const line = ada.querySelector(".members-side__state") as HTMLElement;
     expect(line.textContent).toMatch(/^Sem limite · volta às \d{1,2}:\d{2}$/);
     expect(line.querySelector(".status-line__emoji")).toBeNull();
     const inner = ada.querySelector(".members-side__inner") as HTMLElement;
