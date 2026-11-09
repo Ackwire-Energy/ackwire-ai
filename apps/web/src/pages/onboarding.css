@@ -217,6 +217,11 @@ html:not([data-pointer]) .onb__back:focus-visible {
   height: var(--control-h-lg);
   font-size: 17px;
 }
+/* The business in a sentence: one line as tall as a field, growing as the words wrap (up to 500 characters). */
+.onb__line.ac-input {
+  padding-block: var(--space-2);
+  resize: none;
+}
 .onb__help {
   margin: 0;
   padding: 0 var(--space-1);

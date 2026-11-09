@@ -4,7 +4,7 @@ import type { PlanOffer } from "@agenteschat/client/lib/billing";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { firstJob } from "@agenteschat/client/lib/onboarding";
 import { BUSINESS_TYPES, type BusinessType, teamFailureText, templateFor } from "@agenteschat/client/lib/team-plan";
-import { Button, Chip, Field, Icon, Input, Locked, Select, Skeleton } from "@agenteschat/ui";
+import { Button, Chip, Field, Icon, Locked, Select, Skeleton, Textarea } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
@@ -79,7 +79,15 @@ export function BusinessStep({
               text: other ? undefined : t("agentSetup.firstRun.about.optional"),
             }}
           >
-            <Input value={line} onChange={(e) => setLine(e.target.value)} maxLength={500} required={other} />
+            <Textarea
+              className="onb__line"
+              rows={1}
+              autoGrow
+              value={line}
+              onChange={(e) => setLine(e.target.value)}
+              maxLength={500}
+              required={other}
+            />
           </Field>
           {save.isError && (
             <p className="onb__error" role="alert">

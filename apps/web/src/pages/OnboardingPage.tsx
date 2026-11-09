@@ -335,9 +335,10 @@ export function OnboardingPage() {
       <main
         className="onb__main"
         onKeyDown={(e) => {
-          // Enter presses the step's button that shows ↵ (the plan has none), except where Enter means something else.
+          // Enter presses the step's button that shows ↵ (the plan has none), except where Enter means something else
+          // (Shift+Enter: a new line in the business's sentence).
           const el = e.target as HTMLElement;
-          if (e.key !== "Enter" || e.defaultPrevented || e.nativeEvent.isComposing) return;
+          if (e.key !== "Enter" || e.shiftKey || e.defaultPrevented || e.nativeEvent.isComposing) return;
           if (el.closest("button, a, [role='dialog'], [role='listbox'], [role='combobox']")) return;
           const go = e.currentTarget.querySelector<HTMLButtonElement>("button[data-enter]:not(:disabled)");
           if (!go) return;
