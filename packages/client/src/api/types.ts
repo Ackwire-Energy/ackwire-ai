@@ -1325,7 +1325,7 @@ export interface AiStatus {
       | "plan_not_shared"
       | "runner_outdated"
       | "plan_tools";
-    /** Ready on an API key with Automático: the maker of the key it thinks with (`aiNameOf`). */
+    /** Ready on an API key with Automático: the maker of the key it thinks with (`autoMakerOf`). */
     provider?: string;
   }[];
 }

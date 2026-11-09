@@ -84,7 +84,7 @@ test("auto: the provider its runs would pick decides, with or without a key", as
   const deps = { db: f.db, gateway: f.gateway };
   // `auto` isn't in the catalog: before, every new agent read as "no AI". Ready, it names the maker of the key it
   // thinks with, which the apps say instead of "Automático".
-  const claude = { state: "ready", provider: "anthropic" };
+  const claude = { state: "ready", provider: "anthropic" } as const;
   expect(await agentAiState(deps, { ...f.agent, model: "auto" })).toEqual(claude);
   expect(await agentAiState(deps, { ...f.agent, model: "auto", credentialId: null })).toEqual(claude);
   await revokeKeys();
