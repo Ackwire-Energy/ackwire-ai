@@ -11840,9 +11840,9 @@ html[data-menu-overlay] .shell {
 .sidebar:not([data-rail="true"]) .sidebar__item:has(> .ac-avatar) {
   padding-block: 8px;
 }
-/* An agent's row breathes: the face 12px from its words, a little air between the name and its line. */
+/* An agent's row breathes: the face 12px from its words, a little air between the name and its line. Its face keeps
+   the 8px from the plate's edges every face row has. */
 .sidebar:not([data-rail="true"]) :is([data-agent-row] > .sidebar__item, .sidebar__item[data-right-hand]) {
-  padding-block: 7px;
   gap: 12px;
 }
 .sidebar:not([data-rail="true"])
