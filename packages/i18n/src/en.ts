@@ -1322,19 +1322,18 @@ export const en = {
     },
   },
   webPushAsk: {
-    title: "Know when an agent needs you",
-    text: "They work while you do something else. Even with the tab closed, we'll tell you when they need your ok, finish what you asked or call you.",
     on: "Turn on notifications",
     later: "Not now",
     done: "Notifications on in this browser",
     failed: "Couldn't turn on notifications. Try again in Settings\u00a0›\u00a0Notifications.",
     someone: "An agent",
-    examples: "Examples of notifications",
     now: "now",
-    minutes: "{{n}} min",
-    approval: { title: "{{name}} needs your ok", body: "Can I go ahead with what you asked?" },
     finished: { title: "{{name}} is done", body: "What you asked for is ready." },
-    mention: { title: "{{name}} called you", body: "Can you take a look when you have a minute?" },
+    /** Under an agent's first answer to the person (ADR 0071): never on arrival. */
+    inline: {
+      title: "Want to know the moment {{name}} answers?",
+      why: "Even with the tab closed. Change it anytime in Settings\u00a0›\u00a0Notifications.",
+    },
   },
   shell: {
     otherChannels: "Other channels",
@@ -15896,11 +15895,9 @@ export const en = {
     firstTask: {
       suggestion: "suggestion",
       lead: "One short task per agent, so you see each one working today.",
-      heldLead:
-        "One short task per agent. Finish the sentence and send it. They start once the workspace has an agentes.chat plan.",
-      /** Over the template's sample of its first agent's work: an example, never something it wrote. */
-      example: "Example of what {{name}} delivers",
       open: "Open with the task",
+      /** Over the composer while a first task waits, untouched, for the person to finish its sentence. */
+      finish: "Finish the sentence and send it",
       invite: "Invite {{names}}",
       later: "Later",
     },

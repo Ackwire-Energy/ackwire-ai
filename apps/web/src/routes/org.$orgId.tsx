@@ -26,7 +26,7 @@ import { RemoveMemberProvider } from "@/components/RemoveMember";
 import { Sidebar } from "@/components/Sidebar";
 import { BootSplash } from "@/components/Sky";
 import { DeletingScreen, HoldBanner, SuspendedScreen } from "@/components/Standing";
-import { useWebPushClear, useWebPushRefresh, WebPushAsk } from "@/components/WebPush";
+import { useWebPushClear, useWebPushRefresh } from "@/components/WebPush";
 import { ComputerSetupNotice } from "@/components/WorkspaceComputer";
 import { HeaderSearchProvider } from "@/hooks/useWorkspaceSearch";
 import { useServerLocale } from "@/i18n";
@@ -174,7 +174,6 @@ function OrgLayout() {
                               <PushOpens />
                               {/* What reaches me while I'm here, at the top of the work area (ADR 0071 §9). */}
                               {!focused && <NoticeIsland />}
-                              <WebPushAsk />
                               <Outlet />
                             </DetailsHost>
                           </ComputerDialogProvider>

@@ -1321,19 +1321,19 @@ export const ptBR = {
     },
   },
   webPushAsk: {
-    title: "Saiba quando um agente precisar de você",
-    text: "Eles trabalham enquanto você faz outra coisa. Mesmo com a aba fechada, avisamos quando pedem seu ok, terminam o que você pediu ou chamam você.",
     on: "Ativar avisos",
     later: "Agora não",
     done: "Avisos ativados neste navegador",
     failed: "Não deu para ativar os avisos. Tente de novo em Configurações\u00a0›\u00a0Notificações.",
     someone: "Um agente",
-    examples: "Exemplos de avisos",
     now: "agora",
-    minutes: "{{n}} min",
-    approval: { title: "{{name}} pede seu ok", body: "Posso seguir com o que você pediu?" },
     finished: { title: "{{name}} terminou", body: "Está pronto o que você pediu." },
-    mention: { title: "{{name}} chamou você", body: "Dá uma olhada quando puder?" },
+    /** Under an agent's first answer to the person (ADR 0071): never on arrival. */
+    inline: {
+      title: "Quer saber na hora quando o {{name}} responder?",
+      title_female: "Quer saber na hora quando a {{name}} responder?",
+      why: "Mesmo com a aba fechada. Você muda quando quiser em Configurações\u00a0›\u00a0Notificações.",
+    },
   },
   shell: {
     otherChannels: "Outros canais",
@@ -16113,10 +16113,8 @@ export const ptBR = {
     firstTask: {
       suggestion: "sugestão",
       lead: "Uma tarefa curta por agente, para você ver cada um trabalhando hoje.",
-      heldLead:
-        "Uma tarefa curta por agente. Complete a frase e envie. Eles começam quando o workspace tiver um plano do agentes.chat.",
-      example: "Exemplo do que {{name}} entrega",
       open: "Abrir com a tarefa",
+      finish: "Complete a frase e envie",
       invite: "Convidar {{names}}",
       later: "Depois",
     },

@@ -249,6 +249,11 @@ test("a first task opens with the caret at its blank, in the box", async () => {
   expect(document.activeElement).toBe(box);
   expect(box.selectionStart).toBe(box.value.length);
   expect(box.value.endsWith(": ")).toBe(true);
+  // Until the person types, a line over the box says what the blank is for.
+  expect(screen().getByRole("note").textContent).toBe("Complete a frase e envie");
+  await act(async () => fireEvent.change(box, { target: { value: `${box.value}Oi, Marina` } }));
+  await settle(2);
+  expect(screen().queryByRole("note")).toBeNull();
 });
 
 describe("Lodi's DM on a hold", () => {
