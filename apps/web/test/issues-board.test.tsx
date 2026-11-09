@@ -231,6 +231,41 @@ describe("Tarefas: a card", () => {
   });
 });
 
+describe("Tarefas: + in a column's head", () => {
+  test("A fazer's head has + left of its ⋯, 8 apart; it opens Nova tarefa in that column; no button under the cards", async () => {
+    await go();
+    const head = column("A fazer").querySelector(".issues-col__head") as HTMLElement;
+    const buttons = [...head.querySelectorAll("button")];
+    expect(buttons.map((b) => b.getAttribute("aria-label"))).toEqual([
+      "Nova tarefa em A fazer",
+      "Opções da coluna A fazer",
+    ]);
+    expect(column("A fazer").querySelector(".issues-col__add")).toBeNull();
+    expect(within(column("A fazer")).queryByText("Nova tarefa")).toBeNull();
+    // Only A fazer's columns take one.
+    expect(within(column("Em andamento")).queryByRole("button", { name: /^Nova tarefa/ })).toBeNull();
+    await click(buttons[0] as HTMLElement);
+    await settle(3);
+    expect(screen().getByRole("dialog", { name: "Nova tarefa" })).toBeTruthy();
+    const css = await Bun.file(new URL("../src/pages/issues.css", import.meta.url).pathname).text();
+    expect(css.split("\n.issues-col__head {")[1]?.split("}")[0]).toContain("gap: 8px");
+  });
+
+  test("a custom column of A fazer gets its own +; who may not create tasks sees none", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    await api.issues.addColumn(ORG_ID, { name: "Benachrichtigungseinstellungen", stage: "todo" });
+    await go(state, api);
+    expect(screen().getByRole("button", { name: "Nova tarefa em Benachrichtigungseinstellungen" })).toBeTruthy();
+    cleanup();
+    const viewer = seedState();
+    const org = viewer.me?.organizations[0];
+    if (org) org.permissions = ["read"];
+    await go(viewer);
+    expect(screen().queryByRole("button", { name: /^Nova tarefa em/ })).toBeNull();
+  });
+});
+
 describe("Tarefas: moving a card", () => {
   test("grouped by assignee: dropped in another column, the task changes hands, with Desfazer", async () => {
     const { api } = await go(seedState({ issuesView: view({ group: "assignee" }) }));

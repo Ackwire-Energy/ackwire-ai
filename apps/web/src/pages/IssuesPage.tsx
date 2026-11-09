@@ -261,7 +261,7 @@ export function IssuesPage() {
               all={all}
               openNumber={openNumber}
               onOpen={toggle}
-              onNew={(columnId) => setCreating({ columnId })}
+              onNew={posts ? (columnId) => setCreating({ columnId }) : undefined}
             />
           )}
         </div>
@@ -309,7 +309,8 @@ function IssuesBody({
   all: Issue[];
   openNumber: number | null;
   onOpen: (n: number) => void;
-  onNew: (columnId: string) => void;
+  /** Who may create tasks: "+" in A fazer's columns. */
+  onNew?: (columnId: string) => void;
 }) {
   const { t, i18n } = useTranslation();
   const actors = useActors();

@@ -335,26 +335,34 @@ html:not([data-pointer]) .issues-layout:focus-visible {
 .issues-col.is-canceled {
   opacity: 0.8;
 }
+/* Its icon, name and count on the middle of its 32 buttons ("+", "…"); a long name wraps, its first line there too. */
 .issues-col__head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   min-height: 40px;
   padding: 2px 2px 8px 6px;
   color: var(--muted);
 }
+.issues-col__head > .ac-icon {
+  margin-block: calc((var(--control-h-sm) - 16px) / 2);
+}
+.issues-col__head > .ac-avatar {
+  margin-block: calc((var(--control-h-sm) - 18px) / 2);
+}
 .issues-col__head h2 {
   margin: 0;
   min-width: 0;
+  padding-block: calc((var(--control-h-sm) - 20px) / 2);
   font-size: 13px;
+  line-height: 20px;
   font-weight: 650;
   color: var(--ink2);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 .issues-col__head > .tabular {
   font-size: 12.5px;
+  line-height: var(--control-h-sm);
   color: var(--faint);
 }
 .issues-col__head .issues-col__grow {
@@ -390,14 +398,6 @@ html:not([data-pointer]) .issues-layout:focus-visible {
 .issues-col__drop {
   color: var(--ink2);
   font-weight: 600;
-}
-.issues-col__add.ac-btn {
-  margin-top: 6px;
-  justify-content: flex-start;
-  color: var(--faint);
-}
-.issues-col__add.ac-btn:hover {
-  color: var(--ink);
 }
 @media (min-width: 941px) and (min-height: 560px) {
   .issues-board {
