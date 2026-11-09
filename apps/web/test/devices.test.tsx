@@ -189,7 +189,7 @@ describe("Connect a device", () => {
     expect(dialog.querySelector('.dv-step[data-state="current"]')?.textContent).toContain(
       "Waiting for the phone to scan…",
     );
-    expect(dialog.querySelector(".dv-path")?.textContent).toBe("Wireless debuggingPair device with QR code");
+    expect(dialog.querySelector(".ac-setpath")?.textContent).toBe("Wireless debuggingPair device with QR code");
     devices.setPairing({ state: "pairing" });
     await ask();
     expect(dialog.textContent).toContain("Found a phone. Pairing…");

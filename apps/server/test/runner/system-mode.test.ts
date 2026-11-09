@@ -613,7 +613,7 @@ test.if(posix)(
   () => {
     const fake = home();
     const tools = home();
-    for (const tool of ["sed", "grep", "dirname"]) symlinkSync(Bun.which(tool) as string, path.join(tools, tool));
+    for (const tool of ["sed", "grep", "dirname", "date"]) symlinkSync(Bun.which(tool) as string, path.join(tools, tool));
     // Root on Linux, as far as the script can tell, with Debian's systemd.
     writeFileSync(path.join(tools, "id"), "#!/bin/sh\necho 0\n", { mode: 0o755 });
     writeFileSync(path.join(tools, "uname"), "#!/bin/sh\necho Linux\n", { mode: 0o755 });

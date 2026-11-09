@@ -295,6 +295,8 @@ export interface PhoneManagerOptions {
   readOnly?: boolean;
   /** The iPhone test helper (default: one of this OS user's, on a Mac). */
   ios?: IosHelper | null;
+  /** What shows and controls an iPhone's screen (default: the test helper's, `ios`). */
+  iosScreen?: IosScreenDriverFactory | null;
   /** How often a Wi-Fi pairing looks at the network (`PAIR_POLL_MS`). */
   pairPollMs?: number;
 }
@@ -410,6 +412,7 @@ export class PhoneManager {
   private readonly home: string;
   private readonly now: () => number;
   private readonly ios: IosHelper | null;
+  private readonly iosScreen: IosScreenDriverFactory | null;
 
   constructor(private readonly opts: PhoneManagerOptions) {
     this.env = opts.env ?? process.env;
@@ -423,11 +426,13 @@ export class PhoneManager {
           ? new IosHelper({ home: this.home, env: this.env, log: opts.log, now: this.now, phoneLocks: opts.lockDir })
           : null;
     const ios = this.ios;
-    if (ios) {
-      registerIosScreenDriver((phone, tools) =>
-        tools.xcrun && phone.platform === "ios" ? wdaScreenDriver(ios, phone, tools.xcrun) : null,
-      );
-    }
+    this.iosScreen =
+      opts.iosScreen !== undefined
+        ? opts.iosScreen
+        : ios
+          ? (phone, tools) =>
+              tools.xcrun && phone.platform === "ios" ? wdaScreenDriver(ios, phone, tools.xcrun) : null
+          : null;
     const known = readJson<unknown>(this.wifiFile());
     this.wifiKnown = new Set(Array.isArray(known) ? known.filter((s): s is string => typeof s === "string") : []);
     this.pairer = new WifiPairer({
@@ -948,6 +953,7 @@ export class PhoneManager {
       { ...phone, serial: this.at(phone) },
       { adb: tools.adb, xcrun: tools.xcrun, env: this.env },
       mode,
+      this.iosScreen,
     );
     if (mode === "control" && driver instanceof SimulatorScreen) throw new RunnerError("unsupported", NO_IOS_CONTROL);
     const stop = new AbortController();
@@ -1583,13 +1589,6 @@ export interface ScreenTools {
 /** Makes an iPhone's (or a simulator's) driver; null leaves that phone to the built-in one. */
 export type IosScreenDriverFactory = (phone: RunnerPhone, tools: ScreenTools) => PhoneScreenDriver | null;
 
-let iosScreenDriver: IosScreenDriverFactory | null = null;
-
-/** The driver that shows and controls iPhones (WebDriverAgent, the test helper); null takes it back out. */
-export function registerIosScreenDriver(factory: IosScreenDriverFactory | null) {
-  iosScreenDriver = factory;
-}
-
 /** A picture this big (a full-size PNG of a busy screen) waits for the last one's acknowledgement first. */
 const BIG_PICTURE = 2 << 20;
 
@@ -1597,10 +1596,15 @@ export const NO_IOS_CONTROL =
   "Controlling an iPhone from here needs the test helper, which isn't set up on this Mac yet. You can still watch it.";
 
 /**
- * The driver for a phone's screen: adb for Android; for an iPhone the registered one (`registerIosScreenDriver`),
- * else a simulator's pictures only (`SimulatorScreen`). A real iPhone shows nothing without the test helper.
+ * The driver for a phone's screen: adb for Android; for an iPhone the test helper's (`ios`), else a simulator's
+ * pictures only (`SimulatorScreen`). A real iPhone shows nothing without the test helper.
  */
-export function screenDriverFor(phone: RunnerPhone, tools: ScreenTools, mode: DesktopMode = "control"): PhoneScreenDriver {
+export function screenDriverFor(
+  phone: RunnerPhone,
+  tools: ScreenTools,
+  mode: DesktopMode = "control",
+  ios: IosScreenDriverFactory | null = null,
+): PhoneScreenDriver {
   if (phone.platform === "android") {
     if (!tools.adb) throw new RunnerError("tool_missing", TOOL_HELP.adb);
     return new AndroidScreen(tools.adb, phone.serial, tools.env);
@@ -1609,8 +1613,8 @@ export function screenDriverFor(phone: RunnerPhone, tools: ScreenTools, mode: De
   if (mode === "watch" && phone.kind === "simulator" && tools.xcrun) {
     return new SimulatorScreen(tools.xcrun, phone.serial, tools.env);
   }
-  const registered = iosScreenDriver?.(phone, tools) ?? null;
-  if (registered) return registered;
+  const helper = ios?.(phone, tools) ?? null;
+  if (helper) return helper;
   if (!tools.xcrun) throw new RunnerError("tool_missing", "iPhones need Xcode on this Mac.");
   if (phone.kind !== "simulator") throw new RunnerError("tool_missing", TOOL_HELP.helper("Showing the screen of"));
   return new SimulatorScreen(tools.xcrun, phone.serial, tools.env);

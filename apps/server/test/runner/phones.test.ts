@@ -20,19 +20,19 @@ import { acquireLock } from "../../runner/lock";
 import {
   androidText,
   applyInput,
+  type IosScreenDriverFactory,
   NO_IOS_CONTROL,
   type PhoneIo,
   PhoneManager,
   type PhoneRequest,
   type PhoneScreenDriver,
-  registerIosScreenDriver,
   SimulatorScreen,
   screenDriverFor,
 } from "../../runner/phones";
 import type { DataListener, DataSocket, DataSockets } from "../../runner/streams";
 import { IosHelper, WDA_VERSION } from "../../runner/wda";
-import { fakeUsbmuxd, freePort } from "./fake-usbmuxd";
 import { pairingQr, pairOutcome, parseMdnsServices, serialOfMdnsName } from "../../runner/wifi-pair";
+import { fakeUsbmuxd, freePort } from "./fake-usbmuxd";
 import { errorCode, removeDirs, tempDir } from "./helpers";
 
 const dirs: string[] = [];
@@ -272,6 +272,7 @@ function rig(
     readOnly?: boolean;
     /** The iPhone test helper (none by default: a real iPhone is ready to the Mac alone). */
     ios?: (env: NodeJS.ProcessEnv, root: string, now: () => number) => IosHelper;
+    iosScreen?: IosScreenDriverFactory;
   } = {},
 ) {
   const root = tempDir("phones-");
@@ -307,6 +308,7 @@ function rig(
     caffeinate: false,
     liveLogMs: 2000,
     ...(opts.readOnly ? { readOnly: true } : {}),
+    ...(opts.iosScreen ? { iosScreen: opts.iosScreen } : {}),
     pairPollMs: 5,
   });
   const calls = () =>
@@ -841,11 +843,20 @@ test("a manager that only looks (doctor) builds no iPhone test helper and runs n
     tools: ["adb", "xcrun", "xcode-select", "plutil"],
     readOnly: true,
     ios: (env, root, now) =>
-      new IosHelper({ home: root, env, log: () => {}, now, teams: async () => [{ id: "A1B2C3D4E5", name: "Sam Rivera", free: true }] }),
+      new IosHelper({
+        home: root,
+        env,
+        log: () => {},
+        now,
+        teams: async () => [{ id: "A1B2C3D4E5", name: "Sam Rivera", free: true }],
+      }),
   });
   for (let i = 0; i < 3; i++) await r.manager.poll();
   await Bun.sleep(100);
-  expect(r.manager.list().find((p) => p.serial === IPHONE)).toMatchObject({ state: "preparing", reason: "helper_missing" });
+  expect(r.manager.list().find((p) => p.serial === IPHONE)).toMatchObject({
+    state: "preparing",
+    reason: "helper_missing",
+  });
   expect(r.calls().some((c) => c[0] === "xcrun" && c[1] === "xcodebuild")).toBe(false);
 });
 
@@ -1020,8 +1031,9 @@ test("Stop while the screen opens in control ends it as soon as it's open; big p
   big.viewer().closed();
 });
 
-test("iPhones: a simulator shows its pictures but takes no control, a real one needs the helper, a registered driver wins", async () => {
-  const r = rig(ANDROID_STATE);
+test("iPhones: a simulator shows its pictures but takes no control, a real one needs the helper, the helper's driver wins", async () => {
+  let iosScreen: IosScreenDriverFactory | null = null;
+  const r = rig(ANDROID_STATE, { iosScreen: (phone, tools) => iosScreen?.(phone, tools) ?? null });
   const v = viewerSocket();
   const sam = { runId: null, agentId: null, userId: "user-sam", since: "" };
   await r.manager.view({ platform: "ios", serial: SIM, holder: sam }, "watch", async () => v.socket);
@@ -1048,25 +1060,21 @@ test("iPhones: a simulator shows its pictures but takes no control, a real one n
     text: async () => {},
     key: async () => {},
   };
-  registerIosScreenDriver((phone) => (phone.kind === "device" ? helper : null));
-  try {
-    const real = viewerSocket();
-    await r.manager.view({ platform: "ios", serial: IPHONE, holder: sam }, "control", async () => real.socket);
-    real.viewer().control?.({ type: "tap", x: 0.5, y: 0.5 });
-    await until(() => taps.length === 1, "the helper's tap");
-    // In the helper's own space: the size its pictures said.
-    expect(taps).toEqual([[201, 437]]);
-    real.viewer().closed();
-    // A simulator the helper leaves alone keeps the built-in pictures.
-    const sim = { platform: "ios", serial: SIM, kind: "simulator", model: "", osVersion: "", state: "ready" } as const;
-    expect(screenDriverFor(sim, { adb: null, xcrun: "/x", env: {} })).toBeInstanceOf(SimulatorScreen);
-    // Watching a simulator never waits for the helper's first build, even when the helper drives it.
-    registerIosScreenDriver(() => helper);
-    expect(screenDriverFor(sim, { adb: null, xcrun: "/x", env: {} }, "watch")).toBeInstanceOf(SimulatorScreen);
-    expect(screenDriverFor(sim, { adb: null, xcrun: "/x", env: {} }, "control")).toBe(helper);
-  } finally {
-    registerIosScreenDriver(null);
-  }
+  iosScreen = (phone) => (phone.kind === "device" ? helper : null);
+  const real = viewerSocket();
+  await r.manager.view({ platform: "ios", serial: IPHONE, holder: sam }, "control", async () => real.socket);
+  real.viewer().control?.({ type: "tap", x: 0.5, y: 0.5 });
+  await until(() => taps.length === 1, "the helper's tap");
+  // In the helper's own space: the size its pictures said.
+  expect(taps).toEqual([[201, 437]]);
+  real.viewer().closed();
+  // A simulator the helper leaves alone keeps the built-in pictures.
+  const sim = { platform: "ios", serial: SIM, kind: "simulator", model: "", osVersion: "", state: "ready" } as const;
+  const tools = { adb: null, xcrun: "/x", env: {} };
+  expect(screenDriverFor(sim, tools, "control", iosScreen)).toBeInstanceOf(SimulatorScreen);
+  // Watching a simulator never waits for the helper's first build, even when the helper drives it.
+  expect(screenDriverFor(sim, tools, "watch", () => helper)).toBeInstanceOf(SimulatorScreen);
+  expect(screenDriverFor(sim, tools, "control", () => helper)).toBe(helper);
 });
 
 test("input lands where the person pressed, in the picture's own size; text is one quoted word for the phone's shell", async () => {

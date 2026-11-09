@@ -31,7 +31,6 @@ import {
 } from "@agenteschat/ui";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { CommandBlock } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
 import { useToast } from "@/lib/toast";
 import { FlowFooter, type FlowProps } from "./flow";
