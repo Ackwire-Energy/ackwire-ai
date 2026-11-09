@@ -10142,6 +10142,9 @@ export const en = {
     noChannel: "No channel",
     files: "Files",
     select: "Select {{title}}",
+    /** The list's head checkbox and the selection bar's button: everything the Drive shows now. */
+    selectAll_one: "Select {{count}}",
+    selectAll_other: "Select all {{count}}",
     selection: "Selection",
     selected_one: "{{count}} selected",
     selected_other: "{{count}} selected",

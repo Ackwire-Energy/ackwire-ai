@@ -10141,6 +10141,8 @@
     "noChannel": "Kanal yok",
     "files": "Dosyalar",
     "select": "Seç: {{title}}",
+    "selectAll_one": "{{count}} öğeyi seç",
+    "selectAll_other": "{{count}} öğenin tümünü seç",
     "selection": "Seçim",
     "selected_one": "{{count}} seçildi",
     "selected_other": "{{count}} seçildi",

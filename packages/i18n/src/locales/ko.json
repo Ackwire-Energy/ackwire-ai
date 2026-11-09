@@ -9763,6 +9763,7 @@
     "noChannel": "채널 없음",
     "files": "파일",
     "select": "{{title}} 선택",
+    "selectAll_other": "{{count}}개 모두 선택",
     "selection": "선택 항목",
     "selected_other": "{{count}}개 선택됨",
     "clearSelection": "선택 해제",

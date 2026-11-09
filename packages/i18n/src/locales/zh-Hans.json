@@ -9834,6 +9834,7 @@
     "noChannel": "无频道",
     "files": "文件",
     "select": "选择 {{title}}",
+    "selectAll_other": "全选 {{count}} 项",
     "selection": "已选内容",
     "selected_other": "已选择 {{count}} 项",
     "clearSelection": "清除选择",

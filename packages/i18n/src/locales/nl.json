@@ -10266,6 +10266,8 @@
     "noChannel": "Geen kanaal",
     "files": "Bestanden",
     "select": "{{title}} selecteren",
+    "selectAll_one": "{{count}} selecteren",
+    "selectAll_other": "Alle {{count}} selecteren",
     "selection": "Selectie",
     "selected_one": "{{count}} geselecteerd",
     "selected_other": "{{count}} geselecteerd",

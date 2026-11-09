@@ -9823,6 +9823,7 @@
     "noChannel": "Tanpa kanal",
     "files": "File",
     "select": "Pilih {{title}}",
+    "selectAll_other": "Pilih semua {{count}}",
     "selection": "Pilihan",
     "selected_other": "{{count}} dipilih",
     "clearSelection": "Hapus pilihan",

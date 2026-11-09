@@ -10201,6 +10201,8 @@
     "noChannel": "Kein Kanal",
     "files": "Dateien",
     "select": "{{title}} auswählen",
+    "selectAll_one": "{{count}} auswählen",
+    "selectAll_other": "Alle {{count}} auswählen",
     "selection": "Auswahl",
     "selected_one": "{{count}} ausgewählt",
     "selected_other": "{{count}} ausgewählt",

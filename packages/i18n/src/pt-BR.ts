@@ -10259,6 +10259,9 @@ export const ptBR = {
     noChannel: "Sem canal",
     files: "Arquivos",
     select: "Selecionar {{title}}",
+    /** The list's head checkbox and the selection bar's button: everything the Drive shows now. */
+    selectAll_one: "Selecionar {{count}}",
+    selectAll_other: "Selecionar os {{count}}",
     selection: "Seleção",
     selected_one: "{{count}} selecionado",
     selected_other: "{{count}} selecionados",

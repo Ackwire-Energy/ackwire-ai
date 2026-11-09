@@ -9769,6 +9769,7 @@
     "noChannel": "チャンネルなし",
     "files": "ファイル",
     "select": "{{title}}を選択",
+    "selectAll_other": "{{count}}件をすべて選択",
     "selection": "選択中",
     "selected_other": "{{count}}件を選択中",
     "clearSelection": "選択を解除",

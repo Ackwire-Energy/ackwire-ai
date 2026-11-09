@@ -24774,6 +24774,12 @@
   "drive.select": {
     "value": "Select {{title}}"
   },
+  "drive.selectAll": {
+    "value": {
+      "one": "Select {{count}}",
+      "other": "Select all {{count}}"
+    }
+  },
   "drive.selection": {
     "value": "Selection"
   },
