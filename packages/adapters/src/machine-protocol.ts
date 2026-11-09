@@ -667,6 +667,37 @@ export interface RunnerPhone {
   holder?: PhoneHolder | null;
 }
 
+/** `PHONES_PROTOCOL`: where pairing an Android phone over Wi-Fi (Wireless debugging) stands on its computer. */
+export type PhonePairState = "waiting" | "pairing" | "connecting" | "connected" | "failed";
+/** Why a Wi-Fi pairing failed, as a code the apps word. */
+export type PhonePairFailure =
+  /** adb's mDNS is off on the computer, so it can't find phones on the network. */
+  | "mdns_off"
+  /** The phone couldn't be reached (another network, or one that keeps devices apart). */
+  | "same_wifi"
+  /** The phone didn't take the pairing (a wrong code, or its pairing screen closed). */
+  | "refused"
+  /** Nothing scanned the code, or nothing answered, in 2 minutes. */
+  | "timed_out"
+  /** Under Android 14, or a security patch before 2026-05-01 (CVE-2026-0073): disconnected again. */
+  | "outdated"
+  | "adb_missing"
+  | "canceled"
+  | "failed";
+
+export interface PhonePairing {
+  id: string;
+  way: "qr" | "code";
+  state: PhonePairState;
+  reason?: PhonePairFailure;
+  /** Only in `phone.pair.start`'s answer: the QR text, `WIFI:T:ADB;S:<service>;P:<password>;;`. */
+  qr?: string;
+  /** Connected: the phone's own serial, as `phones.changed` reports it. */
+  serial?: string;
+  /** ISO: when it stops waiting for the phone. */
+  expiresAt: string;
+}
+
 /** What this computer can build and drive with (versions found, best effort; absent: not found). */
 export interface RunnerToolchains {
   git?: string;
@@ -2255,6 +2286,15 @@ export type MachineRequest = (
   | ({ op: "phone.screenshot" } & PhoneTarget)
   /** The phone's log: the last `lines`, only `app`'s when given. */
   | ({ op: "phone.logs" } & PhoneTarget & { app?: string; lines: number })
+  /**
+   * `PHONES_PROTOCOL`: pair an Android phone over Wi-Fi. `start` answers the QR the phone scans (Wireless debugging ›
+   * Pair device with QR code); `code` pairs with the six digits and the address the phone shows instead. Either goes
+   * on by itself until connected, failed or 2 minutes; `status` says where it is. One at a time: a new one ends the last.
+   */
+  | { op: "phone.pair.start" }
+  | { op: "phone.pair.code"; address: string; code: string }
+  | { op: "phone.pair.status"; pairingId: string }
+  | { op: "phone.pair.cancel"; pairingId: string }
 ) & {
   agent?: AgentScope;
   /** Protocol 34: a `browser.*` op in this browser profile's session instead of the agent's (ADR 0110). */
@@ -2321,6 +2361,10 @@ export const MACHINE_OPS: readonly MachineOp[] = [
   "phone.record",
   "phone.screenshot",
   "phone.logs",
+  "phone.pair.start",
+  "phone.pair.code",
+  "phone.pair.status",
+  "phone.pair.cancel",
 ];
 
 /** What each op answers with `ok: true`. */
@@ -2471,6 +2515,10 @@ export interface MachineReplies {
   "phone.record": { path: string; seconds: number; bytes: number };
   "phone.screenshot": { path: string; width?: number; height?: number };
   "phone.logs": { text: string };
+  "phone.pair.start": PhonePairing;
+  "phone.pair.code": PhonePairing;
+  "phone.pair.status": PhonePairing;
+  "phone.pair.cancel": { canceled: boolean };
 }
 
 /** An element numbered on a `browser.capture` image: its ref and box (CSS pixels). */

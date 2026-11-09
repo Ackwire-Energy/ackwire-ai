@@ -1,6 +1,6 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import type { EventEmitter } from "node:events";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { lchown, mkdir, readdir, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -39,15 +39,19 @@ import { RunnerError } from "./errors";
 import { killTree } from "./exec";
 import { isExecutable } from "./executors";
 import { parseIosFlow, runIosFlow } from "./ios-flow";
+import { readJson, writeJson } from "./json-file";
 import { acquireLock, pidAlive, readLock } from "./lock";
 import { usualDirs } from "./login-path";
 import { isInside } from "./paths";
-import { IosHelper, wdaScreenDriver } from "./wda";
 import type { DataSocket } from "./streams";
+import { IosHelper, wdaScreenDriver } from "./wda";
+import { type PairRequest, parseMdnsServices, serialOfMdnsName, WifiPairer } from "./wifi-pair";
 
 /**
  * The phones this computer reaches (bring your own devices): Android over the adb server already running (USB,
- * Wi-Fi paired in Android Studio, emulators), iPhones and booted simulators on a Mac. It looks every `POLL_MS`,
+ * Wi-Fi paired here or in Android Studio, emulators), iPhones and booted simulators on a Mac. A phone over Wi-Fi goes
+ * by its own serial (`ro.serialno`, as over a cable): adb's serial for it changes with the port. One paired here over
+ * Wi-Fi is connected again when it shows up on the network. It looks every `POLL_MS`,
  * reports the whole list when anything changed (`phones.changed`), keeps each phone's lock in memory (one holder
  * at a time, renewed by each call, let go on `phone.release`, after `IDLE_MS` without a call, or when the phone
  * goes), and runs the `phone.*` ops. A lock file in the OS user's runner home keeps a second runner of the same
@@ -61,6 +65,8 @@ export const IDLE_MS = 5 * 60_000;
 /** A phone's facts (model, screen, battery) are read again after this long. */
 export const FACTS_TTL_MS = 5 * 60_000;
 const TOOLS_TTL_MS = 30_000;
+/** How often a known Wi-Fi phone that isn't connected is looked for on the network. */
+export const RECONNECT_MS = 15_000;
 /** The longest screen recording, whatever records it: about 45 MB at 2 Mbps, under the 50 MB file limit. */
 export const RECORD_MAX_SECONDS = 170;
 export const IPHONE_LOG_MS = 5000;
@@ -289,6 +295,8 @@ export interface PhoneManagerOptions {
   readOnly?: boolean;
   /** The iPhone test helper (default: one of this OS user's, on a Mac). */
   ios?: IosHelper | null;
+  /** How often a Wi-Fi pairing looks at the network (`PAIR_POLL_MS`). */
+  pairPollMs?: number;
 }
 
 const keyOf = (p: { platform: string; serial: string }) => `${p.platform}:${p.serial}`;
@@ -377,6 +385,15 @@ export class PhoneManager {
   /** Android phones whose authorization timeout was turned off (this process, once each). */
   private readonly prepared = new Set<string>();
   private controlling: Promise<unknown> = Promise.resolve();
+  /** adb's serial for each phone found by its own serial (a Wi-Fi one), by key. */
+  private adbNames = new Map<string, string>();
+  /** The own serial of Wi-Fi phones adb named (`192.168.1.20:41235`), for when it can't be read (offline). */
+  private readonly ownSerial = new Map<string, string>();
+  /** Phones paired here over Wi-Fi, by own serial (kept in `wifiFile`). */
+  private readonly wifiKnown: Set<string>;
+  private lastReconnect = 0;
+  private reconnecting: Promise<void> | null = null;
+  private readonly pairer: WifiPairer;
   private appleSeen: Phone[] | null = null;
   private tick = 0;
   private polling: Promise<void> | null = null;
@@ -409,6 +426,49 @@ export class PhoneManager {
         tools.xcrun && phone.platform === "ios" ? wdaScreenDriver(ios, phone, tools.xcrun) : null,
       );
     }
+    const known = readJson<unknown>(this.wifiFile());
+    this.wifiKnown = new Set(Array.isArray(known) ? known.filter((s): s is string => typeof s === "string") : []);
+    this.pairer = new WifiPairer({
+      adb: async () => (await this.tools()).adb,
+      run: runTool,
+      connected: async (serial, adbSerial) => {
+        this.ownSerial.set(adbSerial, serial);
+        this.knowWifi(serial);
+        // A look already under way may have left it out: one after it.
+        await this.polling;
+        await this.poll();
+      },
+      log: opts.log,
+      env: this.env,
+      now: this.now,
+      ...(opts.pairPollMs !== undefined ? { pollMs: opts.pairPollMs } : {}),
+    });
+  }
+
+  /** `phone.pair.*`: pairing an Android phone over Wi-Fi with this computer's adb. */
+  pair(req: PairRequest) {
+    return this.pairer.handle(req);
+  }
+
+  private wifiFile() {
+    const lockDir = this.opts.lockDir ?? path.join(this.home, ".agentes-runner", "phone-locks");
+    return path.join(path.dirname(lockDir), "wifi-phones.json");
+  }
+
+  private knowWifi(serial: string) {
+    if (this.wifiKnown.has(serial)) return;
+    this.wifiKnown.add(serial);
+    try {
+      mkdirSync(path.dirname(this.wifiFile()), { recursive: true });
+      writeJson(this.wifiFile(), [...this.wifiKnown]);
+    } catch {
+      // kept in memory only: an unwritable home
+    }
+  }
+
+  /** What adb calls this phone now (its own serial over a cable, `host:port` or an mDNS name over Wi-Fi). */
+  private at(p: Pick<Phone, "platform" | "serial">) {
+    return this.adbNames.get(keyOf(p)) ?? p.serial;
   }
 
   start() {
@@ -420,6 +480,7 @@ export class PhoneManager {
 
   async stop() {
     this.stopped = true;
+    this.pairer.stop();
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
     await Promise.all([...this.holds.keys()].map((key) => this.drop(key, true)));
@@ -460,7 +521,8 @@ export class PhoneManager {
   private async scan() {
     const tools = await this.tools();
     const found: Phone[] = [];
-    if (tools.adb) found.push(...(await this.scanAndroid(tools.adb)));
+    const reach = new Map<string, string>();
+    if (tools.adb) found.push(...(await this.scanAndroid(tools.adb, reach)));
     if (tools.xcrun) {
       if (this.appleSeen === null || this.tick % APPLE_EVERY === 0) this.appleSeen = await this.scanApple(tools.xcrun);
       found.push(...this.appleSeen);
@@ -468,7 +530,9 @@ export class PhoneManager {
     this.tick++;
     if (this.stopped) return;
     this.seen = new Map(found.map((p) => [keyOf(p), p]));
+    this.adbNames = reach;
     const now = this.now();
+    if (tools.adb) this.reconnect(tools.adb, now);
     for (const [key, hold] of [...this.holds]) {
       if (!this.seen.has(key)) await this.drop(key, false);
       else if (hold.busy === 0 && now - hold.lastUsed >= (this.opts.idleMs ?? IDLE_MS)) await this.drop(key, true);
@@ -504,24 +568,36 @@ export class PhoneManager {
     return tools;
   }
 
-  private async scanAndroid(adb: string): Promise<Phone[]> {
+  private async scanAndroid(adb: string, reach: Map<string, string>): Promise<Phone[]> {
     const r = await runTool(adb, ["devices", "-l"], { timeoutMs: 10_000, env: this.env });
     if (r.code !== 0) return [];
-    const out: Phone[] = [];
+    const out = new Map<string, Phone>();
+    /** One phone over a cable and Wi-Fi at once, or a stale Wi-Fi entry beside a new one: the ready one, a cable first. */
+    const keep = (phone: Phone, adbSerial: string) => {
+      const key = keyOf(phone);
+      const rank = (p: Phone) => (p.state === "ready" ? 2 : 0) + (p.transport === "usb" ? 1 : 0);
+      const had = out.get(key);
+      if (had && rank(had) >= rank(phone)) return;
+      out.set(key, phone);
+      if (adbSerial !== phone.serial) reach.set(key, adbSerial);
+      else reach.delete(key);
+    };
     for (const e of parseAdbDevices(r.stdout.toString("utf8"))) {
-      const key = `android:${e.serial}`;
+      if (this.pairer.hides(e.serial)) continue;
+      const transport = androidTransport(e.serial);
       const phone: Phone = {
         platform: "android",
         serial: e.serial,
         kind: androidKind(e.serial),
         model: e.model ?? "Android phone",
         osVersion: "",
-        transport: androidTransport(e.serial),
+        transport,
         ...adbStateOf(e.state),
       };
       if (e.state !== "device") {
-        this.facts.delete(key);
-        out.push(phone);
+        this.facts.delete(`android:${e.serial}`);
+        if (transport === "wifi") phone.serial = this.ownSerial.get(e.serial) ?? serialOfMdnsName(e.serial) ?? e.serial;
+        keep(phone, e.serial);
         continue;
       }
       const facts = await this.androidFacts(adb, e.serial);
@@ -539,6 +615,14 @@ export class PhoneManager {
         if (!facts.booted) Object.assign(phone, { state: "preparing", reason: "booting" });
         else if (facts.sdk > 0 && facts.sdk < 21) Object.assign(phone, { state: "unsupported", reason: "os_too_old" });
       }
+      if (transport === "wifi" && phone.kind === "device") {
+        const own = facts?.serialno ?? serialOfMdnsName(e.serial);
+        if (own) {
+          phone.serial = own;
+          this.ownSerial.set(e.serial, own);
+        }
+      }
+      const key = keyOf(phone);
       if (phone.state === "ready" && this.locked.has(key)) {
         const lock = await this.shell(adb, e.serial, KEYGUARD_SHELL).catch(() => "");
         if (keyguardShowing(lock)) Object.assign(phone, { state: "needs_you", reason: "locked" });
@@ -549,9 +633,34 @@ export class PhoneManager {
         // An authorization lapses after 7 days without a connection (Android 11+) unless this is off.
         void this.shell(adb, e.serial, "settings put global adb_allowed_connection_time 0").catch(() => undefined);
       }
-      out.push(phone);
+      keep(phone, e.serial);
     }
-    return out;
+    return [...out.values()];
+  }
+
+  /**
+   * Connects again, in the background, a phone paired here over Wi-Fi that isn't ready now, once its connect
+   * service shows up on the network (Wireless debugging back on, the phone back in range, on a new port). adb does it
+   * by itself when its mDNS works; this covers when it doesn't. Never while a pairing runs.
+   */
+  private reconnect(adb: string, now: number) {
+    if (this.reconnecting || this.pairer.busy || now - this.lastReconnect < RECONNECT_MS) return;
+    const missing = [...this.wifiKnown].filter((s) => this.seen.get(`android:${s}`)?.state !== "ready");
+    if (missing.length === 0) return;
+    this.lastReconnect = now;
+    this.reconnecting = (async () => {
+      const r = await runTool(adb, ["mdns", "services"], { timeoutMs: 10_000, env: this.env });
+      for (const s of parseMdnsServices(r.stdout.toString("utf8"))) {
+        const own = s.kind === "connect" ? serialOfMdnsName(s.name) : null;
+        if (!own || !missing.includes(own)) continue;
+        const done = await runTool(adb, ["connect", s.address], { timeoutMs: 15_000, env: this.env });
+        this.opts.log(`phones: Wi-Fi ${s.address}: ${done.stdout.toString("utf8").trim().slice(0, 200)}`);
+      }
+    })()
+      .catch(() => undefined)
+      .finally(() => {
+        this.reconnecting = null;
+      });
   }
 
   private async androidFacts(adb: string, serial: string) {
@@ -716,10 +825,10 @@ export class PhoneManager {
   /** The screen stays on while the session lasts (Developer options › Stay awake), then the person's setting is back. */
   private async stayOn(adb: string, phone: Phone): Promise<(() => Promise<unknown>) | null> {
     try {
-      const before = (await this.shell(adb, phone.serial, "settings get global stay_on_while_plugged_in")).trim();
-      await this.shell(adb, phone.serial, `svc power stayon ${phone.transport === "usb" ? "usb" : "true"}`);
+      const before = (await this.shell(adb, this.at(phone), "settings get global stay_on_while_plugged_in")).trim();
+      await this.shell(adb, this.at(phone), `svc power stayon ${phone.transport === "usb" ? "usb" : "true"}`);
       const value = /^\d+$/.test(before) ? before : "0";
-      return () => this.shell(adb, phone.serial, `settings put global stay_on_while_plugged_in ${value}`);
+      return () => this.shell(adb, this.at(phone), `settings put global stay_on_while_plugged_in ${value}`);
     } catch {
       return null;
     }
@@ -979,9 +1088,9 @@ export class PhoneManager {
 
   /** Wakes an Android screen and lifts a lock screen without a PIN; one with a PIN waits for the person. */
   private async unlock(adb: string, key: string, phone: Phone, signal: AbortSignal) {
-    await this.shell(adb, phone.serial, WAKE_SHELL, 10_000, signal).catch(() => "");
+    await this.shell(adb, this.at(phone), WAKE_SHELL, 10_000, signal).catch(() => "");
     await sleep(this.opts.settleMs ?? 700);
-    const out = await this.shell(adb, phone.serial, KEYGUARD_SHELL, 10_000, signal).catch(() => "");
+    const out = await this.shell(adb, this.at(phone), KEYGUARD_SHELL, 10_000, signal).catch(() => "");
     if (!keyguardShowing(out)) return;
     this.locked.add(key);
     this.seen.set(key, { ...phone, state: "needs_you", reason: "locked" });
@@ -992,7 +1101,7 @@ export class PhoneManager {
   private async android(req: PhoneRequest, key: string, phone: Phone, tools: Tools, io: PhoneIo): Promise<unknown> {
     const adb = tools.adb;
     if (!adb) throw new RunnerError("tool_missing", TOOL_HELP.adb);
-    const serial = phone.serial;
+    const serial = this.at(phone);
     switch (req.op) {
       case "phone.install": {
         const file = await io.resolve(String(req.path ?? ""));
@@ -1313,7 +1422,7 @@ export class PhoneManager {
     const started = this.now();
     const r = await runTool(
       tools.maestro,
-      ["--device", phone.serial, "test", ...vars.flatMap(([k, v]) => ["-e", `${k}=${v}`]), yaml.abs],
+      ["--device", this.at(phone), "test", ...vars.flatMap(([k, v]) => ["-e", `${k}=${v}`]), yaml.abs],
       {
         timeoutMs: timeoutSeconds * 1000,
         signal: io.signal,
@@ -1322,7 +1431,7 @@ export class PhoneManager {
           ...this.env,
           MAESTRO_CLI_NO_ANALYTICS: "1",
           MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED: "true",
-          ...(phone.platform === "android" ? { ANDROID_SERIAL: phone.serial } : {}),
+          ...(phone.platform === "android" ? { ANDROID_SERIAL: this.at(phone) } : {}),
         },
       },
     );
@@ -1373,7 +1482,7 @@ export class PhoneManager {
       const run = startTool(
         tools.scrcpy,
         [
-          `--serial=${phone.serial}`,
+          `--serial=${this.at(phone)}`,
           "--no-playback",
           "--no-window",
           "--no-audio",
@@ -1398,19 +1507,19 @@ export class PhoneManager {
     const remote = `/data/local/tmp/agentes-${stamp(this.now())}.mp4`;
     const run = startTool(
       adb,
-      ["-s", phone.serial, "shell", `screenrecord --time-limit ${Math.min(limit, 180)} --bit-rate 2000000 ${remote}`],
+      ["-s", this.at(phone), "shell", `screenrecord --time-limit ${Math.min(limit, 180)} --bit-rate 2000000 ${remote}`],
       grace,
     );
     let final: Promise<void> | null = null;
     const finish = () =>
       (final ??= run.done.then(async () => {
-        await runTool(adb, ["-s", phone.serial, "pull", remote, file], { timeoutMs: 120_000, env: this.env });
-        await runTool(adb, ["-s", phone.serial, "shell", `rm -f ${remote}`], { timeoutMs: 10_000, env: this.env });
+        await runTool(adb, ["-s", this.at(phone), "pull", remote, file], { timeoutMs: 120_000, env: this.env });
+        await runTool(adb, ["-s", this.at(phone), "shell", `rm -f ${remote}`], { timeoutMs: 10_000, env: this.env });
       }));
     return {
       done: finish(),
       stop: async () => {
-        await runTool(adb, ["-s", phone.serial, "shell", "pkill -INT screenrecord"], {
+        await runTool(adb, ["-s", this.at(phone), "shell", "pkill -INT screenrecord"], {
           timeoutMs: 10_000,
           env: this.env,
         });

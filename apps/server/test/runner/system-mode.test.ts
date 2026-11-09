@@ -447,6 +447,11 @@ test("a system-mode runner (root) without workers does no agent work; machine-le
     "phone.record",
     "phone.screenshot",
     "phone.logs",
+    // Pairing over Wi-Fi puts the phone on the person's adb, like the rest.
+    "phone.pair.start",
+    "phone.pair.code",
+    "phone.pair.status",
+    "phone.pair.cancel",
   ]);
 
   if (posix) {

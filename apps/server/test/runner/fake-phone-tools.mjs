@@ -14,6 +14,9 @@
 //   (wdaTrees: one per `source` call, the last kept). Its requests are logged as ["wda", method, path, body].
 //   ffmpeg: reads stdin to its end, then writes MP4DATA to its last argument
 //   changing: each screen capture differs from the last (a live screen)   big: screen captures over 2 MB
+//   mdnsOff: `adb mdns check` fails   mdns: what `adb mdns services` lists after its heading
+//   pair: what `adb pair` prints (pairFail: on stderr, exit 1)
+//   connectable: { "host:port": "the adb devices -l line `adb connect` adds" }
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import net from "node:net";
@@ -53,6 +56,19 @@ if (tool === "adb") {
   const [cmd, ...rest] = args;
   if (cmd === "devices") out(state.adbDevices ?? "List of devices attached\n\n");
   else if (cmd === "version") out("Android Debug Bridge version 1.0.41\nVersion 36.0.2-14143358\n");
+  else if (cmd === "mdns" && rest[0] === "check")
+    state.mdnsOff ? fail("ERROR: mdns daemon unavailable\n") : out("mdns daemon version [Openscreen discovery 0.0.0]\n");
+  else if (cmd === "mdns") out(`List of discovered mdns services\n${state.mdns ?? ""}\n`);
+  else if (cmd === "pair") state.pairFail ? fail(state.pairFail) : out(state.pair ?? "");
+  else if (cmd === "connect") {
+    const line = state.connectable?.[rest[0]];
+    if (!line) out(`failed to connect to '${rest[0]}': Connection refused\n`);
+    else {
+      const listed = state.adbDevices ?? "List of devices attached\n";
+      writeFileSync(process.env.FAKE_PHONE_STATE, JSON.stringify({ ...state, adbDevices: `${listed}${line}\n` }));
+      out(`connected to ${rest[0]}\n`);
+    }
+  } else if (cmd === "disconnect") out(`disconnected ${rest[0]}\n`);
   else if (cmd === "install")
     state.installFail ? fail(state.installFail) : out(state.install ?? "Performing Streamed Install\nSuccess\n");
   else if (cmd === "exec-out") process.stdout.write(png(), () => process.exit(0));

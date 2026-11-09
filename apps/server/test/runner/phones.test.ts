@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import type { RunnerPhone } from "@agenteschat/adapters/machine-protocol";
+import type { PhonePairing, RunnerPhone } from "@agenteschat/adapters/machine-protocol";
 import {
   adbStateOf,
   androidKind,
@@ -32,6 +32,7 @@ import {
 import type { DataListener, DataSocket, DataSockets } from "../../runner/streams";
 import { IosHelper, WDA_VERSION } from "../../runner/wda";
 import { fakeUsbmuxd, freePort } from "./fake-usbmuxd";
+import { pairAddress, pairingQr, pairOutcome, parseMdnsServices, serialOfMdnsName } from "../../runner/wifi-pair";
 import { errorCode, removeDirs, tempDir } from "./helpers";
 
 const dirs: string[] = [];
@@ -306,6 +307,7 @@ function rig(
     caffeinate: false,
     liveLogMs: 2000,
     ...(opts.readOnly ? { readOnly: true } : {}),
+    pairPollMs: 5,
   });
   const calls = () =>
     existsSync(logFile)
@@ -1123,4 +1125,202 @@ test("stream.open for a phone's screen needs no agent, goes to the phones, and c
   paused = true;
   expect(await errorCode(() => handleRequest(ctx, open("control"), scope))).toBe("paused");
   expect(await handleRequest(ctx, open("watch"), scope)).toEqual({ opened: true });
+});
+
+// ── Wi-Fi pairing ─────────────────────────────────────────────────────────────
+
+/** `adb mdns services` as adb 36.0.2 prints it on a Mac (tab-separated), and as adb before 34 did (a trailing dot). */
+const MDNS_36 = `List of discovered mdns services
+adb-${PIXEL}-AbCdEf\t_adb-tls-connect._tcp\t192.168.1.20:41235
+agentes-Qx7Kp2Mz9a\t_adb-tls-pairing._tcp\t192.168.1.20:37099
+
+`;
+
+test("adb's mDNS listing, the phone's own serial in its service name, the QR, adb pair's answers, an address", () => {
+  expect(parseMdnsServices(MDNS_36)).toEqual([
+    { name: `adb-${PIXEL}-AbCdEf`, kind: "connect", address: "192.168.1.20:41235" },
+    { name: "agentes-Qx7Kp2Mz9a", kind: "pairing", address: "192.168.1.20:37099" },
+  ]);
+  expect(parseMdnsServices("adb-R5CT12-Zz9yX1\t_adb-tls-connect._tcp.\t10.0.0.7:5555\nnoise\n")).toEqual([
+    { name: "adb-R5CT12-Zz9yX1", kind: "connect", address: "10.0.0.7:5555" },
+  ]);
+  expect(serialOfMdnsName(`adb-${PIXEL}-AbCdEf`)).toBe(PIXEL);
+  expect(serialOfMdnsName(`adb-${PIXEL}-AbCdEf._adb-tls-connect._tcp`)).toBe(PIXEL);
+  expect(serialOfMdnsName("192.168.1.20:41235")).toBeNull();
+  expect(pairingQr("agentes-Qx7Kp2Mz9a", "p4ssW0rd")).toBe("WIFI:T:ADB;S:agentes-Qx7Kp2Mz9a;P:p4ssW0rd;;");
+  const said = (text: string, timedOut = false) => pairOutcome({ text, code: 0, timedOut });
+  expect(said("Successfully paired to 192.168.1.20:37099 [guid=adb-38021FDH2000AB-AbCdEf]\n")).toEqual({
+    ok: true,
+    guid: "adb-38021FDH2000AB-AbCdEf",
+  });
+  expect(said("Failed: Wrong password or connection was dropped.\n")).toEqual({ ok: false, reason: "refused" });
+  expect(said("Failed: Unable to start pairing client.\n")).toEqual({ ok: false, reason: "same_wifi" });
+  // What adb 36.0.2 printed on a Mac for an address nothing listened on.
+  expect(said("error: protocol fault (couldn't read status message): Undefined error: 0\n")).toEqual({
+    ok: false,
+    reason: "same_wifi",
+  });
+  expect(said("", true)).toEqual({ ok: false, reason: "same_wifi" });
+  expect(said("Failed: something new\n")).toEqual({ ok: false, reason: "failed" });
+  expect(pairAddress(" 192.168.1.20:37099 ")).toBe("192.168.1.20:37099");
+  expect(pairAddress("[fe80::1%wlan0]:37099")).toBe("[fe80::1%wlan0]:37099");
+  for (const bad of ["192.168.1.20", "192.168.1.300:37099", "192.168.1.20:70000", "-s:1", "host:22", 42])
+    expect(pairAddress(bad)).toBeNull();
+});
+
+const WIFI_FACTS = `${PIXEL_FACTS}serialno=${PIXEL}\npatch=2026-06-05\n`;
+const WIFI_AT = "192.168.1.20:41235";
+
+/** A Pixel 8 with Wireless debugging on, on the same Wi-Fi: its pairing service shows once the QR is scanned. */
+const wifiState = (service: string, over: Record<string, unknown> = {}) => ({
+  adbDevices: "List of devices attached\n",
+  mdns: `adb-${PIXEL}-AbCdEf\t_adb-tls-connect._tcp\t${WIFI_AT}\n${service}\t_adb-tls-pairing._tcp\t192.168.1.20:37099\n`,
+  pair: `Successfully paired to 192.168.1.20:37099 [guid=adb-${PIXEL}-AbCdEf]\n`,
+  connectable: { [WIFI_AT]: `${WIFI_AT} device product:shiba model:Pixel_8 device:shiba transport_id:9` },
+  facts: { [WIFI_AT]: WIFI_FACTS, "192.168.1.20:40001": WIFI_FACTS },
+  ...over,
+});
+
+/** Asks where the pairing is until it ends. */
+async function settle(r: ReturnType<typeof rig>, id: string) {
+  for (let i = 0; i < 400; i++) {
+    const s = (await r.manager.pair({ op: "phone.pair.status", pairingId: id })) as PhonePairing;
+    if (s.state === "connected" || s.state === "failed") return s;
+    await new Promise((done) => setTimeout(done, 5));
+  }
+  throw new Error("the pairing never ended");
+}
+
+test("the QR way: the phone scans, the computer pairs and connects it, and it keeps its own serial on a new port", async () => {
+  const r = rig({ adbDevices: "List of devices attached\n" }, { tools: ["adb"] });
+  const started = (await r.manager.pair({ op: "phone.pair.start" })) as PhonePairing;
+  expect(started).toMatchObject({ way: "qr", state: "waiting" });
+  const qr = /^WIFI:T:ADB;S:(agentes-\w{10});P:(\w{12});;$/.exec(started.qr ?? "");
+  expect(qr).not.toBeNull();
+  const [, service = "", password = ""] = qr ?? [];
+  r.setState(wifiState(service));
+  const done = await settle(r, started.id);
+  expect(done).toMatchObject({ state: "connected", serial: PIXEL });
+  expect(done.qr).toBeUndefined();
+  expect(r.calls()).toContainEqual(["adb", "pair", "192.168.1.20:37099", password]);
+  expect(r.calls()).toContainEqual(["adb", "connect", WIFI_AT]);
+  // The list already has it, by its own serial, over Wi-Fi; ops reach it at adb's serial for it.
+  expect(r.manager.list().map((p) => [p.serial, p.transport, p.state])).toEqual([[PIXEL, "wifi", "ready"]]);
+  await r.op({ op: "phone.screenshot", platform: "android", serial: PIXEL, holder: r.holder("run-1") });
+  expect(r.calls()).toContainEqual(["adb", "-s", WIFI_AT, "exec-out", "screencap", "-p"]);
+  expect(JSON.parse(readFileSync(path.join(r.root, "wifi-phones.json"), "utf8"))).toEqual([PIXEL]);
+  // Wireless debugging back on after a restart: a new port, the same phone (its row, its rule, its lock).
+  r.setState({
+    ...wifiState(service),
+    adbDevices: "List of devices attached\n192.168.1.20:40001 device product:shiba model:Pixel_8 transport_id:12\n",
+  });
+  await r.manager.poll();
+  expect(r.manager.list().map((p) => [p.serial, p.transport])).toEqual([[PIXEL, "wifi"]]);
+  await r.op({ op: "phone.screenshot", platform: "android", serial: PIXEL, holder: r.holder("run-1") });
+  expect(r.calls().at(-1)).toEqual(["adb", "-s", "192.168.1.20:40001", "exec-out", "screencap", "-p"]);
+  // Over a cable and Wi-Fi at once it is one phone, by the cable.
+  r.setState({
+    ...wifiState(service),
+    adbDevices: `List of devices attached\n192.168.1.20:40001 device model:Pixel_8\n${PIXEL} device usb:1-1 model:Pixel_8\n`,
+    facts: { "192.168.1.20:40001": WIFI_FACTS, [PIXEL]: PIXEL_FACTS },
+  });
+  await r.manager.poll();
+  expect(r.manager.list().map((p) => [p.serial, p.transport])).toEqual([[PIXEL, "usb"]]);
+});
+
+test("a Wi-Fi phone seen before is connected again when it shows up on the network, even after a restart", async () => {
+  const root = tempDir("phones-known-");
+  dirs.push(root);
+  const r = rig(
+    {
+      adbDevices: "List of devices attached\n",
+      mdns: `adb-${PIXEL}-AbCdEf\t_adb-tls-connect._tcp\t192.168.1.20:40001\nadb-OTHER123-Zz9yX1\t_adb-tls-connect._tcp\t192.168.1.31:5555\n`,
+      connectable: { "192.168.1.20:40001": "192.168.1.20:40001 device model:Pixel_8" },
+      facts: { "192.168.1.20:40001": WIFI_FACTS },
+    },
+    { tools: ["adb"] },
+  );
+  writeFileSync(path.join(r.root, "wifi-phones.json"), JSON.stringify([PIXEL]));
+  // A new runner reads who it knows.
+  const manager = new PhoneManager({
+    log: () => {},
+    onChange: () => {},
+    lockDir: path.join(r.root, "locks"),
+    env: (r.manager as unknown as { env: NodeJS.ProcessEnv }).env,
+    platform: "darwin",
+    home: r.root,
+    dirs: [],
+    adbServer: async () => null,
+    caffeinate: false,
+  });
+  await manager.poll();
+  for (let i = 0; i < 200 && !r.calls().some((c) => c[1] === "connect"); i++)
+    await new Promise((done) => setTimeout(done, 5));
+  // Only the phone it knows: a stranger's phone with Wireless debugging on is left alone.
+  expect(r.calls().filter((c) => c[1] === "connect")).toEqual([["adb", "connect", "192.168.1.20:40001"]]);
+  for (let i = 0; i < 200 && manager.list().length === 0; i++) {
+    await new Promise((done) => setTimeout(done, 5));
+    await manager.poll();
+  }
+  expect(manager.list().map((p) => [p.serial, p.transport, p.state])).toEqual([[PIXEL, "wifi", "ready"]]);
+  await manager.stop();
+});
+
+test("pairing failures say why: mDNS off, a code the phone refused, nothing in 2 minutes, an unpatched phone", async () => {
+  const off = rig({ mdnsOff: true }, { tools: ["adb"] });
+  expect(await off.manager.pair({ op: "phone.pair.start" })).toMatchObject({ state: "failed", reason: "mdns_off" });
+
+  const none = rig({}, { tools: [] });
+  expect(await none.manager.pair({ op: "phone.pair.start" })).toMatchObject({ state: "failed", reason: "adb_missing" });
+
+  const refused = rig({}, { tools: ["adb"] });
+  const s1 = (await refused.manager.pair({ op: "phone.pair.start" })) as PhonePairing;
+  const service = /S:([\w-]+);/.exec(s1.qr ?? "")?.[1] ?? "";
+  refused.setState(wifiState(service, { pair: "", pairFail: "Failed: Wrong password or connection was dropped.\n" }));
+  expect(await settle(refused, s1.id)).toMatchObject({ state: "failed", reason: "refused" });
+
+  const late = rig({ adbDevices: "List of devices attached\n" }, { tools: ["adb"] });
+  const s2 = (await late.manager.pair({ op: "phone.pair.start" })) as PhonePairing;
+  late.tick(2 * 60_000);
+  expect(await settle(late, s2.id)).toMatchObject({ state: "failed", reason: "timed_out" });
+
+  const old = rig({}, { tools: ["adb"] });
+  const s3 = (await old.manager.pair({ op: "phone.pair.start" })) as PhonePairing;
+  const oldFacts = WIFI_FACTS.replace("sdk=36", "sdk=33").replace("release=16", "release=13");
+  old.setState(wifiState(/S:([\w-]+);/.exec(s3.qr ?? "")?.[1] ?? "", { facts: { [WIFI_AT]: oldFacts } }));
+  expect(await settle(old, s3.id)).toMatchObject({ state: "failed", reason: "outdated" });
+  expect(old.calls()).toContainEqual(["adb", "disconnect", WIFI_AT]);
+  expect(existsSync(path.join(old.root, "wifi-phones.json"))).toBe(false);
+
+  // A new pairing ends the one before; cancel ends it; an unknown one is gone.
+  const two = rig({ adbDevices: "List of devices attached\n" }, { tools: ["adb"] });
+  const first = (await two.manager.pair({ op: "phone.pair.start" })) as PhonePairing;
+  const second = (await two.manager.pair({ op: "phone.pair.start" })) as PhonePairing;
+  expect(await two.manager.pair({ op: "phone.pair.status", pairingId: first.id })).toBeDefined();
+  expect(await errorCode(() => two.manager.pair({ op: "phone.pair.status", pairingId: first.id }))).toBe("not_found");
+  expect(await two.manager.pair({ op: "phone.pair.cancel", pairingId: second.id })).toEqual({ canceled: true });
+  expect(await two.manager.pair({ op: "phone.pair.status", pairingId: second.id })).toMatchObject({
+    state: "failed",
+    reason: "canceled",
+  });
+});
+
+test("the six-digit way pairs with what the phone shows, and refuses an address or a code it can't be", async () => {
+  const r = rig({}, { tools: ["adb"] });
+  r.setState(wifiState("unused"));
+  expect(
+    await errorCode(() => r.manager.pair({ op: "phone.pair.code", address: "-s 1", code: "123456" })),
+  ).toBe("bad_request");
+  expect(
+    await errorCode(() => r.manager.pair({ op: "phone.pair.code", address: "192.168.1.20:37099", code: "12345" })),
+  ).toBe("bad_request");
+  const started = (await r.manager.pair({
+    op: "phone.pair.code",
+    address: "192.168.1.20:37099",
+    code: "123 456",
+  })) as PhonePairing;
+  expect(started).toMatchObject({ way: "code" });
+  expect(started.qr).toBeUndefined();
+  expect(await settle(r, started.id)).toMatchObject({ state: "connected", serial: PIXEL });
+  expect(r.calls()).toContainEqual(["adb", "pair", "192.168.1.20:37099", "123456"]);
 });
