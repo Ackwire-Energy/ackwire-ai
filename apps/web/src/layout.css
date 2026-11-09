@@ -12709,7 +12709,27 @@ html:not([data-pointer]) .sidebar__bell:focus-visible {
   padding-top: var(--space-2);
 }
 /*
- * New agent under a personal workspace's agents: an empty face the exact box of the agents' (32 in the list, 28 on the
+ * A personal workspace's agents are its list (ADR 0159), with no header between them, so each row breathes as a
+ * conversation's does: a face as tall as the name and its role (40, the name's capitals on its top), 4px between rows.
+ */
+.sidebar:not([data-rail="true"]) .sidebar__agents-plain {
+  gap: 4px;
+}
+.sidebar:not([data-rail="true"])
+  .sidebar__agents-plain
+  :is([data-agent-row] > .sidebar__item, .sidebar__item[data-right-hand]) {
+  padding-block: 8px;
+}
+.sidebar:not([data-rail="true"])
+  .sidebar__agents-plain
+  :is([data-agent-row] > .sidebar__item, .sidebar__item[data-right-hand])
+  > .ac-avatar--sm {
+  width: 40px;
+  height: 40px;
+  font-size: 15px;
+}
+/*
+ * New agent under a personal workspace's agents: an empty face the exact box of the agents' (40 in the list, 28 on the
  * rail, radius 30% of the side, the tile's hairline), so the row lines up with theirs; its name centres on it like a
  * name alone.
  */
@@ -12733,8 +12753,8 @@ html:not([data-pointer]) .sidebar__bell:focus-visible {
     inset 0 1px 0 rgba(255, 255, 255, 0.07);
 }
 .sidebar:not([data-rail="true"]) .sidebar__new-agent-face {
-  width: 32px;
-  height: 32px;
+  width: 40px;
+  height: 40px;
 }
 .sidebar:not([data-rail="true"]) .sidebar__new-agent {
   padding-block: 8px;

@@ -226,10 +226,14 @@ function Settings({
       <nav className="settings__nav" data-scroll-restoration-id="settings-nav" aria-label={t("settings.nav")}>
         <div className="settings__head">
           <h1 className="settings__title">{t("settings.title")}</h1>
-          <span className="settings__org ac-iconline">
-            <OrgMark logo={org.logo} size={18} />
-            <span>{org.name}</span>
-          </span>
+          {/* Whose settings: the workspace's, by its mark and name; a personal workspace's are the person's own and
+              name no workspace (ADR 0159). */}
+          {!personal && (
+            <span className="settings__org ac-iconline">
+              <OrgMark logo={org.logo} size={18} />
+              <span>{org.name}</span>
+            </span>
+          )}
         </div>
         <div className="settings__groups" ref={strip}>
           {nav ? (
