@@ -6,24 +6,25 @@ const ROOT = path.join(import.meta.dir, "../../..");
 const sheet = (file: string) => Bun.file(path.join(ROOT, file)).text();
 const last = (pairs: (readonly [string, string])[], property: string) => pairs.findLast(([p]) => p === property)?.[1];
 
-test("a narrow task card wraps its chips onto the next line, whole, never past its edge", async () => {
-  const issues = await sheet("apps/web/src/pages/issues.css");
-  // "Pergunta algo" and "PR #109" side by side ran off a board card's right edge.
-  expect(last(declarations(issues, ".issue-card__foot"), "flex-wrap")).toBe("wrap");
-  expect(last(declarations(issues, ".issue-card__top"), "flex-wrap")).toBe("wrap");
-  // Whole chips: a state or a link is never cut to "Pergu…".
-  expect(last(declarations(issues, ".issue-card .ac-chip"), "flex")).toBe("none");
+test("a narrow task card wraps its facts between facts, never inside one or past its edge", async () => {
+  const kit = await sheet("packages/ui/src/styles/components.css");
+  // "Pergunta algo" and "PR #109" side by side ran off a board card's right edge: no plates now, one line of facts.
+  expect(last(declarations(kit, ".ac-factline"), "flex-wrap")).toBe("wrap");
+  expect(last(declarations(kit, ".ac-factline__fact"), "white-space")).toBe("nowrap");
+  // Only a label alone wider than the card wraps its own words.
+  expect(last(declarations(kit, '.ac-factline__fact[data-tone="label"]'), "overflow-wrap")).toBe("anywhere");
 });
 
-test("on a phone a task row wraps its chips under its title and its face, never past the row's edge", async () => {
+test("on a phone a task row is stacked as a card: its facts wrap under its title, from the row's start", async () => {
   const issues = await sheet("apps/web/src/pages/issues.css");
   // "Pede aprovação" beside the face ran 23px past its column and 9px past the row at 390px.
   const narrow = atRule(issues, "@media (max-width: 720px)");
-  // The title's chips are the row's own items there (the number inline in the title's words), so the row wraps them;
-  // who works on it wraps its own.
-  expect(last(declarations(narrow, ".issue-list__title"), "display")).toBe("contents");
-  for (const box of [".issue-list__row", ".issue-list__who"])
-    expect(last(declarations(narrow, box), "flex-wrap")).toBe("wrap");
+  expect(last(declarations(narrow, ".issue-list__row"), "flex-direction")).toBe("column");
+  expect(last(declarations(narrow, ".issue-list__row > .issue-card__facts"), "justify-content")).toBe("flex-start");
+  // The number joins the facts there.
+  expect(last(declarations(narrow, ".issue-list__row > .issue-card__facts > :first-child"), "display")).toBe(
+    "inline-flex",
+  );
 });
 
 test("a version's note longer than its line breaks instead of running past its card", async () => {

@@ -84,11 +84,35 @@ export function AgentWho({
 /**
  * Anyone named in a line of text: an agent's face or a person's, at the text's size, then their name (`.ac-who`).
  * `faceOnly` where the words after it say who, or say what it is (a calendar item's title after its owner's face).
+ * `size` draws a face larger than the text (`--who-face` sets its box); an agent at `work` moves, or rests stopped.
  */
-export function ActorWho({ actor, name, faceOnly }: { actor: Actor; name: string; faceOnly?: boolean }) {
+export function ActorWho({
+  actor,
+  name,
+  faceOnly,
+  size = "xs",
+  work,
+}: {
+  actor: Actor;
+  name: string;
+  faceOnly?: boolean;
+  size?: "xs" | "sm";
+  work?: "running" | "stalled";
+}) {
   return (
     <span className="ac-who" ref={markLead}>
-      <ActorAvatar actor={actor} size="xs" name={name} />
+      {actor.type === "agent" && work ? (
+        <AgentAvatar
+          agentId={actor.id}
+          size={size}
+          name={name}
+          running={work === "running"}
+          state={work === "running" ? "writing" : undefined}
+          expression={work === "stalled" ? "closed" : undefined}
+        />
+      ) : (
+        <ActorAvatar actor={actor} size={size} name={name} />
+      )}
       {!faceOnly && <b>{name}</b>}
     </span>
   );

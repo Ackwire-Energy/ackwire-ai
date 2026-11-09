@@ -61,12 +61,14 @@ describe("Issues (board and list)", () => {
     expect(column("Feito").textContent).toContain("2");
     // The route title link goes to the detail.
     expect(wa.getAttribute("href")).toBe(`/org/${ORG_ID}/issues/131`);
-    // An agent with a live run: "working now", its step on the card, criteria in pixels.
+    // An agent with a live run: "working now" with its step; on the card, its one state and the criteria done.
     const now = screen().getByRole("region", { name: "Agentes trabalhando agora" });
     expect(now.textContent).toContain("Timeout no agendamento em horários de pico");
     expect(now.textContent).toContain("Atualizou uma tarefa · #129");
-    const timeout = screen().getByRole("link", { name: "#129 Timeout no agendamento em horários de pico" });
-    expect(within(timeout).getByRole("img", { name: "1 de 2 critérios de aceite" })).toBeTruthy();
+    const timeout = screen().getByRole("link", {
+      name: "#129 Timeout no agendamento em horários de pico, Trabalhando",
+    });
+    expect(timeout.querySelector('[title="1 de 2 critérios de aceite"]')?.textContent).toBe("1/2");
   });
 
   test("a click opens the details dialog (kept in the URL); Escape closes it", async () => {
@@ -550,7 +552,7 @@ describe("Issue detail", () => {
     expect(dialog.className).not.toContain("ac-details--side");
   });
 
-  test("a card with a conversation ends with the chat's thread line; one with none stays as it is", async () => {
+  test("a card with a conversation counts its messages among its facts; a turn live in it is the card's one state", async () => {
     const api = createFakeApi(seedState());
     const list = api.issues.list;
     const conversation = {
@@ -569,24 +571,16 @@ describe("Issue detail", () => {
     const logged = spyOn(console, "error").mockImplementation(() => {});
     try {
       await go("issues", api);
-      // Each face of the stack has its key: React warns of none.
       expect(logged.mock.calls.some((c) => String(c[0]).includes('unique "key"'))).toBe(false);
     } finally {
       logged.mockRestore();
     }
-    const talking = document.querySelector('[data-card="131"] .issue-card__talk');
-    expect(talking?.classList.contains("thread-line")).toBe(true);
-    expect(talking?.textContent).toContain("6 mensagens");
-    expect(talking?.textContent).toContain("Trabalhando");
-    // The chat's faces: one size, framed, agents and people alike (an unframed agent stands taller than the letters).
-    const faces = [...(talking?.querySelectorAll(".thread-line__who .ac-avatar") ?? [])];
-    expect(
-      faces.map((a) => [a.getAttribute("data-kind"), a.className.includes("ac-avatar--xs ac-avatar--framed")]),
-    ).toEqual([
-      ["person", true],
-      ["agent", true],
-    ]);
-    expect(document.querySelector('[data-card="132"] .issue-card__talk')).toBeNull();
+    const card = document.querySelector('[data-card="131"]') as HTMLElement;
+    expect(card.querySelector('.ac-factline__fact[title="6 mensagens"]')?.textContent).toBe("6");
+    expect(card.querySelector(".issue-card__state")?.textContent).toBe("Trabalhando");
+    // The faces and the time of the old thread line live in the task's details now.
+    expect(card.querySelector(".thread-line")).toBeNull();
+    expect(document.querySelector('[data-card="132"] .ac-factline__fact[title$="mensagens"]')).toBeNull();
   });
 
   test("a link with a message opens the task's conversation at it", async () => {
