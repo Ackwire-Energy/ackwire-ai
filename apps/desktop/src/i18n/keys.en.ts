@@ -274,7 +274,8 @@ export const desktopEn = {
     useIt: "Use it",
     notRunning: "agentes.chat is installed on this {{device}}, but it isn't running",
     /** The command to copy follows. */
-    notRunningText: "It was installed from the terminal, in {{path}}. To start it, run this in the terminal, then try again:",
+    notRunningText:
+      "It was installed from the terminal, in {{path}}. To start it, run this in the terminal, then try again:",
     running: "agentes.chat already runs on this {{device}}",
     runningText: "This app runs it. Open it to sign in.",
     openIt: "Open it",

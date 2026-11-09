@@ -1369,7 +1369,8 @@ export const ptBR = {
     addPasswordSaved: "Senha adicionada.",
     addPasswordReauth: "Entre de novo para adicionar uma senha.",
     newPassword: "Criar uma senha nova",
-    newPasswordHint: "As outras sessões saem, e os apps de IA conectados com a senha antiga precisam ser conectados de novo.",
+    newPasswordHint:
+      "As outras sessões saem, e os apps de IA conectados com a senha antiga precisam ser conectados de novo.",
     newPasswordRow: "Para trocar a senha que você usa nos outros navegadores e aparelhos",
     newPasswordSaved: "Senha nova salva.",
     newPasswordReauth: "Entre de novo para criar uma senha nova.",
@@ -11751,7 +11752,8 @@ export const ptBR = {
     passwordLink: {
       email: "Este servidor manda e-mail: a pessoa pede o link dela mesma em Esqueci a senha.",
       serverOwner: "Quem instalou este servidor entra pelo computador onde ele roda, sem link.",
-      otherWorkspace: "Essa pessoa também está num workspace que não é seu: só os donos de todos eles podem gerar o link.",
+      otherWorkspace:
+        "Essa pessoa também está num workspace que não é seu: só os donos de todos eles podem gerar o link.",
     },
     /** Refusals in plain words: each server code that needs no line of its own shares one of these. */
     said: {

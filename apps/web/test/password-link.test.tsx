@@ -36,7 +36,11 @@ test("an owner makes the link for a member and copies it; their own row has none
     "https://agentes.example.com/reset-password?token=link-for-u-joao",
   );
   expect(state.calls.filter((c) => c.method === "orgs.passwordLink")).toHaveLength(1);
-  expect(within(dialog).getByRole("button", { name: /Copiar link/ }).hasAttribute("disabled")).toBe(false);
+  expect(
+    within(dialog)
+      .getByRole("button", { name: /Copiar link/ })
+      .hasAttribute("disabled"),
+  ).toBe(false);
 });
 
 test("not where the server emails the person their own link, nor for someone who isn't an owner", async () => {

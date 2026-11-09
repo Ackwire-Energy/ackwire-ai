@@ -157,7 +157,11 @@ describe("brain settings", () => {
     expect(reasons(mac({ access: { tools: { claude: true } } }))[1]).toEqual(["claude_code", true, null]);
     // Commands off (the app's default for a new workspace) with Claude Code on: the plan still thinks there, as the
     // runner runs it; "no permission to run programs" is only for a runner that reports no tools.
-    const commandsOff = mac({ ...both, execAllowed: false, access: { tools: { claude: true, codex: true, commands: false } } });
+    const commandsOff = mac({
+      ...both,
+      execAllowed: false,
+      access: { tools: { claude: true, codex: true, commands: false } },
+    });
     expect(reasons(commandsOff).slice(1, 3)).toEqual([
       ["claude_code", true, null],
       ["codex", true, null],
