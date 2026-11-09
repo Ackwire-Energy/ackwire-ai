@@ -236,7 +236,10 @@ export function OnboardingPage() {
     ...(team.length > 0
       ? team.map((a: Agent) => ({ name: a.name, role: a.role, look: lookOf(a), asleep: step === "plan" }))
       : step === "team" && template.chosen
-        ? template.chosen.team.agents.map((a) => ({ name: a.name, role: a.role, look: lookOf(a), fresh: true }))
+        ? // In the sidebar's order, the team's once made: making it moves no row.
+          [...template.chosen.team.agents]
+            .sort((a, b) => a.name.localeCompare(b.name, i18n.language))
+            .map((a) => ({ name: a.name, role: a.role, look: lookOf(a), fresh: true }))
         : []),
   ];
 
