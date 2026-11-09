@@ -107,6 +107,7 @@ import { NetworkChangingError, RUNNER_VERSION, RunnerError } from "./errors";
 import { cachedExecutors, EXECUTORS_TTL_MS, type ExecutorRun } from "./executors";
 import { systemGitCache } from "./git";
 import type { HandlerContext, RequestObserver, RequestOutcome } from "./handlers";
+import { IphoneSetup, type IphoneSetupOptions } from "./iphone-setup";
 import { currentProcess, isCompiled, selfCommand } from "./launch";
 import { tailLines } from "./logfile";
 import { LoopbackGuard, loopbackEndpoints, runnerEndpoints } from "./loopback-guard";
@@ -285,6 +286,15 @@ export function shortTime(iso: string, now = Date.now()) {
   return `${d.toLocaleString("en", { month: "short" })} ${d.getDate()} ${hm}`;
 }
 
+/** Who agents' commands run as on this computer (`os.userInfo` throws for a uid with no passwd entry). */
+const OS_USER = (() => {
+  try {
+    return os.userInfo().username;
+  } catch {
+    return "";
+  }
+})();
+
 const firstLine = (s: string, max = 120) => {
   const t = s.replace(/\s+/g, " ").trim();
   return t.length > max ? `${t.slice(0, max)}…` : t;
@@ -364,6 +374,8 @@ export interface DaemonOptions {
   toolchains?: () => RunnerToolchains | undefined;
   /** Tests: the phones' tools and folders, or `false` for none (a single-user runner looks for phones). */
   phones?: Partial<PhoneManagerOptions> | false;
+  /** Tests: the iPhone setup's tools and folders. */
+  iphone?: Partial<IphoneSetupOptions>;
 }
 
 /** What a task is in its activity words: a shell task's command, or the CLI that works it (the app names it). */
@@ -454,6 +466,8 @@ export class RunnerDaemon implements RequestObserver {
   private toldPhones = "[]";
   /** What this computer builds with, cached (`hello.toolchains`); looked at from the first session on. */
   private toolchains: { get(): RunnerToolchains | undefined; stop(): void } | null = null;
+  /** The Mac's side of an iPhone's setup (the desktop app asks), made on its first request. */
+  private iphone: IphoneSetup | null = null;
 
   constructor(private readonly opts: DaemonOptions) {
     this.uidNetworks = new AgentNetworks({}, readNetworkPins(opts.home));
@@ -768,6 +782,7 @@ export class RunnerDaemon implements RequestObserver {
     this.session = null;
     if (s) await this.closeSession(s);
     await this.phones?.stop();
+    this.iphone?.stop();
     this.toolchains?.stop();
     await this.accounts.close().catch(() => undefined);
     await this.chain.catch(() => undefined);
@@ -1347,7 +1362,10 @@ export class RunnerDaemon implements RequestObserver {
     if (!this.phones && config.mode !== "system" && this.opts.phones !== false) {
       this.phones = new PhoneManager({
         log,
-        onChange: (phones) => void this.send({ type: "phones.changed", phones }),
+        onChange: (phones) => {
+          this.send({ type: "phones.changed", phones });
+          this.queueStatus();
+        },
         ...(this.opts.caffeinate !== undefined ? { caffeinate: this.opts.caffeinate } : {}),
         ...this.opts.phones,
       });
@@ -1980,6 +1998,8 @@ export class RunnerDaemon implements RequestObserver {
       agents: this.agents.map((a) => ({ ...a })),
       access: this.access(),
       browsers,
+      ...(this.phones ? { phones: this.phones.list() } : {}),
+      ...(OS_USER ? { user: OS_USER } : {}),
       seq: ++this.statusSeq,
     };
   }
@@ -2030,6 +2050,12 @@ export class RunnerDaemon implements RequestObserver {
     const out = await s.browser.stop({ id: agentId, handle: agent?.handle ?? "agent" });
     this.browsersChanged();
     return out;
+  }
+
+  /** The desktop app's iPhone setup: what the Mac has, a download of the iOS platform, Xcode opened. */
+  iphoneSetup(): IphoneSetup {
+    this.iphone ??= new IphoneSetup({ log: this.opts.log, ...this.opts.iphone });
+    return this.iphone;
   }
 
   // ── Accounts (ADR 0041) ────────────────────────────────────────────────────
