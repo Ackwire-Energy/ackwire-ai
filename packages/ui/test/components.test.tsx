@@ -117,6 +117,8 @@ describe("Avatar", () => {
   test("initials", () => {
     expect(initialsOf("Ada")).toBe("A");
     expect(initialsOf("Marina Souza Lima")).toBe("ML");
+    expect(initialsOf("佐藤 花子")).toBe("佐");
+    expect(initialsOf("김 민수")).toBe("김");
     expect(initialsOf("  ")).toBe("?");
   });
 });
