@@ -289,6 +289,10 @@ describe("A device's page", () => {
       const control = screens().at(-1) as (typeof sockets.sockets)[number];
       expect(control.url).toContain("mode=control");
       await act(async () => control.open());
+      // Nothing of its own until its first picture: opening, and no input goes anywhere yet.
+      expect(card.textContent).toContain("Opening the screen…");
+      expect(card.textContent).not.toContain("You're in control");
+      await picture(control);
       expect(card.textContent).toContain("You're in control");
       const canvas = card.querySelector("canvas") as HTMLCanvasElement;
       canvas.getBoundingClientRect = () => ({ left: 0, top: 0, width: 100, height: 200 }) as DOMRect;
@@ -303,6 +307,7 @@ describe("A device's page", () => {
       });
       await click(within(card).getByRole("button", { name: "Home" }));
       expect(control.sent).toEqual([
+        { type: "ack" },
         { type: "tap", x: 0.5, y: 0.25 },
         { type: "text", text: "a" },
         { type: "key", key: "enter" },

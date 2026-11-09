@@ -72,6 +72,9 @@ export function PhoneLive({ phone: p, host }: { phone: PhoneDevice; host: string
     if (!p.mayUse || away) return;
     let done = false;
     let retry: ReturnType<typeof setTimeout> | undefined;
+    // A new stream (control taken, given back) shows nothing of its own until its first picture: an iPhone's test
+    // helper starts in several seconds, and input before then would go nowhere.
+    setView("connecting");
     const socket = createSocket(phoneScreenUrl(window.location, { orgId: org.id, phoneId: p.id, mode }));
     (socket as unknown as WebSocket).binaryType = "arraybuffer";
     socketRef.current = socket;
@@ -180,9 +183,10 @@ export function PhoneLive({ phone: p, host }: { phone: PhoneDevice; host: string
         {t("devices.screen.take")}
       </Button>
     ) : undefined;
-  const banner =
-    mode === "control"
-      ? { title: t("devices.screen.yours"), text: null }
+  const banner = inControl
+    ? { title: t("devices.screen.yours"), text: null }
+    : mode === "control"
+      ? null
       : controller
         ? { title: t("devices.screen.personControls", { name: person ?? "" }), text: null }
         : agent

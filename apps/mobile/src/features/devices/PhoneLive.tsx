@@ -75,6 +75,9 @@ export function PhoneLive({ phone: p, host }: { phone: PhoneDevice; host: string
     if (!p.mayUse || away || !active) return;
     let done = false;
     let retry: ReturnType<typeof setTimeout> | undefined;
+    // A new stream (control taken, given back) shows nothing of its own until its first picture: an iPhone's test
+    // helper starts in several seconds, and input before then would go nowhere.
+    setView("connecting");
     const socket = createSocketFactory(lastCookie)(
       phoneScreenUrl(serverUrl(), { orgId, phoneId: p.id, mode, text: true }),
     );
