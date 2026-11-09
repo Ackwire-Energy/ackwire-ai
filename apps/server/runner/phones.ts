@@ -35,7 +35,7 @@ import { runIosFlow } from "./ios-flow";
 import { acquireLock, pidAlive, readLock } from "./lock";
 import { usualDirs } from "./login-path";
 import { isInside } from "./paths";
-import { HELPER_WORDS, IosHelper, wdaScreenDriver } from "./wda";
+import { IosHelper, wdaScreenDriver } from "./wda";
 
 /**
  * The phones this computer reaches (bring your own devices): Android over the adb server already running (USB,
@@ -162,7 +162,7 @@ export const extraToolDirs = (home: string) => [...usualDirs(home), path.join(ho
 
 // ── Words ─────────────────────────────────────────────────────────────────────
 
-const REASON_WORDS: Partial<Record<PhoneReason, string>> = {
+export const REASON_WORDS: Partial<Record<PhoneReason, string>> = {
   unauthorized: "Tap Allow on the phone (check Always allow from this computer first).",
   adb_offline: "The phone shows as offline. Unplug it and plug it back in.",
   no_driver: "This computer can't open the phone. On Linux, add udev rules for it.",
@@ -174,7 +174,15 @@ const REASON_WORDS: Partial<Record<PhoneReason, string>> = {
   os_too_old: "Its Android version is too old for these tools.",
   helper_missing: "Its test helper is still being set up on this Mac (a few minutes the first time).",
   helper_expired: "Its test helper is being renewed on this Mac.",
-  ...HELPER_WORDS,
+  team_limit:
+    "The free Apple Account has reached its limit of apps on this iPhone. Remove an app you built yourself from it, then try again.",
+  apple_account_missing:
+    "Xcode on this Mac isn't signed in to an Apple Account: Xcode › Settings › Accounts, then add one (a free one is enough).",
+  helper_untrusted:
+    "The iPhone doesn't trust the test helper yet: on the iPhone, Settings › General › VPN & Device Management, tap the developer, then Trust.",
+  ui_automation_off: "Turn on UI Automation on the iPhone: Settings › Developer › Enable UI Automation.",
+  xcode_too_old: "This iPhone's iOS needs a newer Xcode on this Mac.",
+  device_support: "Xcode is still preparing the iPhone. Try again in a few minutes.",
 };
 
 /** Reasons only the test helper has: an iPhone still installs, opens apps and reads its log meanwhile. */

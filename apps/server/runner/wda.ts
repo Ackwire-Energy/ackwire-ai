@@ -13,7 +13,7 @@ import { RunnerError } from "./errors";
 import { killTree } from "./exec";
 import { readJson, writeJson } from "./json-file";
 import { acquireLock } from "./lock";
-import { type PhoneScreenDriver, runTool, startTool } from "./phones";
+import { type PhoneScreenDriver, REASON_WORDS, runTool, startTool } from "./phones";
 import { USBMUXD_SOCKET, usbmuxForward } from "./usbmux";
 
 /**
@@ -69,21 +69,8 @@ export function helperReason(text: string): PhoneReason | null {
   return null;
 }
 
-export const HELPER_WORDS: Partial<Record<PhoneReason, string>> = {
-  team_limit:
-    "The free Apple Account has reached its limit of apps on this iPhone. Remove an app you built yourself from it, then try again.",
-  apple_account_missing:
-    "Xcode on this Mac isn't signed in to an Apple Account: Xcode › Settings › Accounts, then add one (a free one is enough).",
-  helper_untrusted:
-    "The iPhone doesn't trust the test helper yet: on the iPhone, Settings › General › VPN & Device Management, tap the developer, then Trust.",
-  ui_automation_off: "Turn on UI Automation on the iPhone: Settings › Developer › Enable UI Automation.",
-  locked: "The iPhone is locked. Unlock it and try again.",
-  xcode_too_old: "This iPhone's iOS needs a newer Xcode on this Mac.",
-  device_support: "Xcode is still preparing the iPhone. Try again in a few minutes.",
-};
-
 export const helperWords = (reason: PhoneReason, detail: string) =>
-  HELPER_WORDS[reason] ?? `The test helper couldn't be set up: ${detail}`;
+  REASON_WORDS[reason] ?? `The test helper couldn't be set up: ${detail}`;
 
 /** The first line of xcodebuild's output that says what failed. */
 export const failureLine = (text: string) =>
