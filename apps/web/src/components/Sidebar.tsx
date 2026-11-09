@@ -846,8 +846,8 @@ export function Sidebar() {
           >
             <Icon name="bell" />
             {unreadNotifications > 0 && (
-              <CountBadge key={bumps} className={bumps > 0 ? "sidebar__bump" : undefined}>
-                {unreadNotifications}
+              <CountBadge key={bumps} className={cx("sidebar__unread", bumps > 0 && "sidebar__bump")}>
+                {badgeCount(unreadNotifications)}
               </CountBadge>
             )}
           </Link>

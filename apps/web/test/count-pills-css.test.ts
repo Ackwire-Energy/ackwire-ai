@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { builtCss, rules, topLevel } from "./built-css";
+import { builtCss, declarations, rules, topLevel } from "./built-css";
 
 const css = topLevel(
   await builtCss(
@@ -37,6 +37,16 @@ test("every count pill centres its figures' own box, and the production build ke
       .map(([p, v]) => `${r.selectors.join(",")} ${p}:${v}`),
   );
   expect(undo.filter((d) => !d.startsWith(".ac-count,.ac-countchip "))).toEqual([]);
+});
+
+test("in the build the bell's unread count keeps the sidebar's red, after the kit's neutral count, on the bell's corner", () => {
+  const painted = (selector: string) =>
+    rules(css).findLastIndex((r) => r.selectors.includes(selector) && r.declarations.some(([p]) => p === "background"));
+  expect(painted(".sidebar__unread")).toBeGreaterThan(painted(".ac-count"));
+  const corner = Object.fromEntries(
+    declarations(css, '.sidebar:not([data-rail="true"]) .sidebar__bell > .sidebar__unread'),
+  );
+  expect([corner.position, corner["box-shadow"]]).toEqual(["absolute", "0 0 0 2px var(--raised)"]);
 });
 
 test("a text button has no plate and no padding: house links, and Não rodar's words where the message's start", () => {

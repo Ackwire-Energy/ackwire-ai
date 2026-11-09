@@ -3910,21 +3910,29 @@ html:not([data-pointer]) .sidebar__org-button:focus-visible {
 .sidebar__foot {
   flex: none;
 }
+/*
+ * You and the bell in one raised card, each with its own plate: the card's corner less its padding, so the plates
+ * follow its curve. The rail sets them apart again as two of its tiles.
+ */
 .sidebar__me {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 14px;
+  background: var(--raised);
+  box-shadow: var(--e1);
 }
 /*
- * The workspace header's side insets and gap, so both cards line up, and as much room over the face and the name's
- * capitals as under the face and the last line's baseline.
+ * The face 6 from its plate's edges, as an option keeps it from its highlight (so 10 from the card's), and as much
+ * room over the face and the name's capitals as under the face and the last line's baseline.
  */
 .sidebar__me > .sidebar__user {
   flex: 1;
   min-width: 0;
   gap: var(--space-2);
-  padding: 8px 10px 8px 8px;
-  border-radius: inherit;
+  padding: 6px 8px 6px 6px;
+  border-radius: 10px;
 }
 /* The face as tall as the two lines from the name's capitals to the last baseline (28px, as the workspace's mark
    above), so the face and the words fill the card's middle together. */
@@ -5855,7 +5863,7 @@ html:not([data-pointer]) .tr-ok:focus-visible {
 }
 
 /* ── Design system 2026-10 in the app (docs/design/refresh-2026-10.md) ── */
-/* Sidebar: on the sky's paper, nothing raised in it. The active item is the page's
+/* Sidebar: on the sky's paper, nothing raised in it but the account card at its foot. The active item is the page's
    white with a hairline, painted on the item itself (no sliding); counts are plain numbers. */
 .sidebar {
   position: relative;
@@ -6908,6 +6916,7 @@ html:not([data-pointer]) .run-continue:focus-visible {
 .sidebar[data-rail="true"] .sidebar__user {
   justify-content: center;
   padding: 6px;
+  border-radius: var(--control-r-md);
 }
 /* A routine's "when": Horário / Evento / Email, then one quiet panel with the
    sentence, "Ajustar" and the next runs; the picker opens inside it. */
@@ -7255,10 +7264,6 @@ html:not([data-pointer]) .sky-welcome__close:focus-visible {
   left: -12px;
   right: -11px;
   height: 60px;
-}
-/* The whole row is the account button (no inner margin it doesn't answer to); flat on the horizon. */
-.sidebar__me {
-  border-radius: 12px;
 }
 .sidebar__me > .sidebar__user:hover {
   background: var(--plate);
@@ -12607,26 +12612,34 @@ html:not([data-pointer]) .sidebar__grip:focus-visible {
   font-size: 12px;
   font-weight: 650;
 }
-/* The bell at the end of the account row: the inbox, its unread count beside it, both on the row's middle. */
+/*
+ * The bell at the end of the account card: the inbox, 40 wide and as tall as the card's inside on every pointer, its
+ * glyph the kit's 20, as the rail's tools have it.
+ */
 .sidebar__bell {
+  position: relative;
   flex: none;
+  align-self: stretch;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  box-sizing: border-box;
-  height: var(--control-h-sm);
-  min-width: var(--control-h-sm);
-  padding: 0 7px;
-  border-radius: var(--control-r-sm);
+  justify-content: center;
+  width: var(--control-h-md);
+  border-radius: 10px;
   color: var(--ink-muted);
   text-decoration: none;
   transition:
     background-color 0.15s,
     color 0.15s;
 }
-.sidebar__bell > .ac-icon {
-  width: 18px;
-  height: 18px;
+/*
+ * Unread is a call: the sidebar's red count on the glyph's top corner, where the rail's tiles put theirs, cut from it by
+ * a ring in the card's color. It widens leftward over the dome, so "20" or "99+" still leaves the bell's rim in sight.
+ */
+.sidebar:not([data-rail="true"]) .sidebar__bell > .sidebar__unread {
+  position: absolute;
+  top: 2px;
+  right: 0;
+  box-shadow: 0 0 0 2px var(--raised);
 }
 .sidebar__bell:hover,
 .sidebar__bell[data-status="active"] {
@@ -12639,11 +12652,7 @@ html:not([data-pointer]) .sidebar__bell:focus-visible {
 }
 /* The rail: one of its 40px tiles, the count on its corner like the other tiles'. */
 .sidebar[data-rail="true"] .sidebar__bell {
-  position: relative;
-  justify-content: center;
-  width: var(--control-h-md);
   height: var(--control-h-md);
-  padding: 0;
   border-radius: var(--control-r-md);
 }
 /* "Personalizar a barra lateral": a line per tool, the choices of every line starting in one column. */
@@ -12687,11 +12696,6 @@ html:not([data-pointer]) .sidebar__bell:focus-visible {
   .sidebar:not([data-rail="true"]) :is(.sidebar__item, .sidebar__create.ac-btn) {
     height: auto;
     min-height: 36px;
-  }
-  .sidebar:not([data-rail="true"]) .sidebar__bell {
-    height: var(--control-h-md);
-    min-width: var(--control-h-md);
-    padding: 0 11px;
   }
   .sidebar__section-head,
   .sidebar__section-toggle {
