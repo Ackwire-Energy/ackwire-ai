@@ -924,8 +924,6 @@ export interface TeamPlan {
   /** People named as working there, invited after. */
   invite: string[];
   template?: string;
-  /** On a billing hold, from a template: what its first agent delivers, shown labelled and never posted. */
-  example?: string;
 }
 
 /** The right hand's team card (`meta.actionCard`): several agents created in one click ("Criar o time"). */

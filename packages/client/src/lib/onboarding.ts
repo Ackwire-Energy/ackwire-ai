@@ -54,3 +54,36 @@ export const ONBOARDING_STEPS = [
 export type OnboardingStepId = (typeof ONBOARDING_STEPS)[number]["id"];
 
 export const stepIndex = (id: OnboardingStepId) => ONBOARDING_STEPS.findIndex((s) => s.id === id);
+
+/**
+ * The onboarding's steps on the rail (ADR 0158), web and phone: the workspace's name, what it does, its team, and the
+ * plan, which only a workspace waiting for its first plan has (agentes.chat Cloud).
+ */
+export type RailStep = "name" | "business" | "team" | "plan";
+export const railSteps = (waitsForPlan: boolean): RailStep[] =>
+  waitsForPlan ? ["name", "business", "team", "plan"] : ["name", "business", "team"];
+
+/**
+ * The step to show, read from the workspace's data (it exists, has its context, has a team, waits for its plan), so a
+ * workspace left at any step resumes there; "open" once it is ready to open.
+ */
+export function railStepAt(f: {
+  created: boolean;
+  context: boolean;
+  team: boolean;
+  waitsForPlan: boolean;
+}): RailStep | "open" {
+  if (!f.created) return "name";
+  if (!f.context) return "business";
+  if (!f.team) return "team";
+  return f.waitsForPlan ? "plan" : "open";
+}
+
+/** Where the workspace opens when the onboarding ends: #general, or its right hand's DM when the plan was left. */
+export const landingOf = (how: "paid" | "done" | "skipped") => (how === "skipped" ? "rightHand" : "general");
+
+/** What the plan step shows on each platform: the phone app never a price nor a way to pay (ADR 0079 §6). */
+export const planStepShows = (platform: "web" | "phone", offer: { price?: string } | null) => ({
+  price: platform === "web" && Boolean(offer?.price),
+  billing: platform === "web",
+});

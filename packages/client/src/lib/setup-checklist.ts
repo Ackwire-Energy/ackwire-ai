@@ -78,9 +78,12 @@ export function suggestedChannels<C extends { id: string; name: string }>(
 export const TASK_KEYS = ["a", "b", "c"] as const;
 export const BLANK_TASK_KEYS = ["a", "b"] as const;
 
-/** One line of instructions short enough to say back ("Você me pediu: …"): what an agent from scratch was asked. */
+/**
+ * One line of instructions short enough to say back ("Você me pediu: …"): what an agent from scratch was asked, without
+ * its closing period, which the sentence saying it back closes.
+ */
 export function askedLine(instructions: string): string | null {
-  const text = instructions.trim();
+  const text = instructions.trim().replace(/\.+$/, "");
   return text && !text.includes("\n") && text.length <= 200 ? text : null;
 }
 
@@ -193,17 +196,18 @@ export function setupRow(t: TFunction, step: AgentSetupStep, done: boolean, f: S
   }
 }
 
-/* ---------- The right hand's first run (ADR 0155 §6) ---------- */
+/* ---------- The right hand's first run (ADR 0155 §6, ADR 0158) ---------- */
 
-/** Its rows, one order everywhere: AI after the team, because on the Cloud an AI opens only after the plan. */
-export const FIRST_RUN_STEPS = ["about", "team", "ai", "apps", "people"] as const satisfies readonly SetupStep[];
+/**
+ * Its rows, one order everywhere: what the onboarding's steps leave (they made the workspace, said what it does and
+ * made the team): an AI, apps, people.
+ */
+export const FIRST_RUN_STEPS = ["ai", "apps", "people"] as const satisfies readonly SetupStep[];
 export type FirstRunStep = (typeof FIRST_RUN_STEPS)[number];
 
-/** What may each row's button do for this person (`stepPermissions` in lib/home, plus `configure`). */
+/** What may each row's button do for this person (`stepPermissions` in lib/home). */
 export interface FirstRunPowers {
   owner: boolean;
-  configure: boolean;
-  createAgents: boolean;
   connectAi: boolean;
   pay: boolean;
   connectors: boolean;
@@ -218,8 +222,6 @@ export interface FirstRunPowers {
 export function firstRunSteps(agent: Pick<Agent, "setup" | "builtin">, may: FirstRunPowers): FirstRunStep[] {
   if (agent.builtin !== "right_hand" || !agent.setup || !may.owner) return [];
   const row: Record<FirstRunStep, boolean> = {
-    about: may.configure,
-    team: may.createAgents,
     ai: may.connectAi || may.pay,
     apps: may.connectors,
     people: may.invite,
@@ -229,58 +231,45 @@ export function firstRunSteps(agent: Pick<Agent, "setup" | "builtin">, may: Firs
 
 /** What the workspace's data says, read by the apps (mirror of the prompt's `cardOpen`, engine right-hand-prompt). */
 export interface FirstRunFacts {
-  /** The workspace's context isn't empty. */
-  context: boolean;
-  /** An agent besides the right hand exists. */
-  team: boolean;
   /** The right hand's AI is ready or waiting for its computer, and no billing hold. */
   ai: boolean;
   /** An app is connected. */
   apps: boolean;
-  /** More than one member. */
+  /** More than one member, or an invitation waiting for its answer. */
   people: boolean;
 }
 
 /** The rows done: from the data, or skipped ("Agora não", the only thing stored). */
 export function firstRunDone(setup: AgentSetupChecklist, facts: FirstRunFacts): Set<FirstRunStep> {
   const done = new Set<FirstRunStep>();
-  if (facts.context) done.add("about");
-  if (facts.team) done.add("team");
   if (facts.ai) done.add("ai");
   if (facts.apps || setup.done.includes("apps")) done.add("apps");
   if (facts.people || setup.done.includes("people")) done.add("people");
   return done;
 }
 
-/** How a row reads now: done; open; open with a team card waiting in the chat; or waiting for the plan. */
-export type FirstRunRowState = "done" | "open" | "card" | "plan" | "afterPlan";
+/** How a row reads now: done, open, or waiting for the plan (a billing hold: the hold's banner holds the plan). */
+export type FirstRunRowState = "done" | "open" | "afterPlan";
 
-/** A row's state on a billing hold: the AI opens with the plan, apps and people after it; the rest as they are. */
-export function firstRunRowState(
+export const firstRunRowState = (
   step: FirstRunStep,
-  s: { done: ReadonlySet<FirstRunStep>; held: boolean; teamCard: boolean },
-): FirstRunRowState {
-  if (s.done.has(step)) return "done";
-  if (s.held && step === "ai") return "plan";
-  if (s.held && (step === "apps" || step === "people")) return "afterPlan";
-  if (step === "team" && s.teamCard) return "card";
-  return "open";
-}
+  s: { done: ReadonlySet<FirstRunStep>; held: boolean },
+): FirstRunRowState => (s.done.has(step) ? "done" : s.held ? "afterPlan" : "open");
 
-/** The foot's asks wait for a team that can think: rows 2 and 3, and never on a hold. */
-export const firstRunAsks = (done: ReadonlySet<FirstRunStep>, held: boolean) =>
-  !held && done.has("team") && done.has("ai");
+/** The foot's asks wait for a team that can think: a team and an AI, never on a hold. */
+export const firstRunAsks = (done: ReadonlySet<FirstRunStep>, held: boolean, team: boolean) =>
+  !held && team && done.has("ai");
 
 /** What the rows say, from what the app read: names already joined in the person's language. */
 export interface FirstRunRowFacts {
   org: string;
-  /** Agents besides the right hand. */
-  agents: number;
   /** What the right hand thinks with ("Claude"), once it does. */
   label: string | null;
   /** The apps connected ("o Gmail e o Drive"); null when none. */
   apps: string | null;
   members: number;
+  /** Who was invited and hasn't answered yet ("João e Ana"); null when nobody. */
+  invited: string | null;
 }
 
 /** One row's words: its title, a line under it while open, its button's word, and "Agora não" where a row skips. */
@@ -294,24 +283,22 @@ export function firstRunRow(
   // Keys built from the row's id, so read through an untyped `t`.
   const t = tr as unknown as (key: string, o?: Record<string, unknown>) => string;
   const k = (key: string) => `agentSetup.firstRun.${step}.${key}`;
-  if (state === "plan")
-    return { title: t("agentSetup.firstRun.ai.plan"), action: t("agentSetup.firstRun.ai.planAction") };
   if (state === "afterPlan")
     return { title: t(k("todo"), { org: f.org }), desc: t("agentSetup.firstRun.afterPlan"), action: "" };
-  if (state === "card") return { title: t(k("todo")), desc: t("agentSetup.firstRun.team.card"), action: "" };
   if (state === "done") {
     switch (step) {
-      case "about":
-        return { title: t(k("done"), { org: f.org }), action: t("agentSetup.change") };
-      case "team":
-        return { title: t(k("done"), { count: f.agents }), action: t("agentSetup.see") };
       case "ai":
         return { title: f.label ? t(k("done"), { label: f.label }) : t(k("doneAny")), action: t("agentSetup.switch") };
       case "apps":
         return { title: f.apps ? t(k("done"), { apps: f.apps }) : t(k("doneNone")), action: t("agentSetup.change") };
       case "people":
         return {
-          title: skipped && f.members <= 1 ? t(k("doneNone")) : t(k("done"), { count: f.members }),
+          title:
+            f.members <= 1 && f.invited
+              ? t(k("invited"), { names: f.invited })
+              : skipped && f.members <= 1
+                ? t(k("doneNone"))
+                : t(k("done"), { count: f.members }),
           action: t(k("action")),
         };
     }

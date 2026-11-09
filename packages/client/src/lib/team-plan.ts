@@ -14,6 +14,10 @@ export type BusinessType = (typeof BUSINESS_TYPES)[number];
 /** Every business type but `other` is a team template's id too (the server's `TEAM_TEMPLATES`). */
 export const isTemplateBusiness = (b: BusinessType): b is Exclude<BusinessType, "other"> => b !== "other";
 
+/** The business type a workspace's context names when it is only that type's words (saved with no sentence). */
+export const businessOfContext = (t: TFunction, context: string): BusinessType | null =>
+  BUSINESS_TYPES.find((b) => isTemplateBusiness(b) && t(`teamPlan.business.${b}`) === context.trim()) ?? null;
+
 /** Several answers tapped together go as one message, in this order. */
 export const ANSWER_JOINER = " · ";
 
