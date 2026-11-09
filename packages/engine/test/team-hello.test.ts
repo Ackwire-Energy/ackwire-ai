@@ -1,6 +1,14 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { and, eq, schema } from "@agenteschat/db";
-import { drainOutbox, HELLO_GAP_MS, sayTeamHello, setBillingHold, TEAM_HELLO_JOB, useTeamTemplate } from "../src";
+import {
+  addChannelMember,
+  drainOutbox,
+  HELLO_GAP_MS,
+  sayTeamHello,
+  setBillingHold,
+  TEAM_HELLO_JOB,
+  useTeamTemplate,
+} from "../src";
 import { type Fixture, setup } from "./fixtures";
 
 /*
@@ -99,6 +107,26 @@ describe("after the first plan", () => {
     // Said once, whatever runs again.
     await sayTeamHello({ db: f.db, workspaceComputer: { billing: true } }, f.org.id, payload);
     expect(await hellos()).toHaveLength(1);
+  });
+
+  test("an agent someone already put in #general keeps the auto-reply they gave it", async () => {
+    f = await setup({ rightHand: true });
+    await hold("payment");
+    await makeStore();
+    const [iara] = await f.db
+      .select({ id: schema.agents.id })
+      .from(schema.agents)
+      .where(and(eq(schema.agents.orgId, f.org.id), eq(schema.agents.handle, "iara")));
+    if (!iara) throw new Error("no Iara");
+    await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { agentId: iara.id, autoReply: true });
+    await hold(null);
+    await drainInTime();
+    expect((await hellos()).map((h) => h.name)).toEqual(["Lodi", "Iara", "Otto", "Lia"]);
+    const [seat] = await f.db
+      .select({ autoReply: schema.channelMembers.autoReply })
+      .from(schema.channelMembers)
+      .where(and(eq(schema.channelMembers.channelId, f.general.id), eq(schema.channelMembers.agentId, iara.id)));
+    expect(seat?.autoReply).toBe(true);
   });
 
   test("a later lift (a plan that lapsed, then paid) queues nothing", async () => {

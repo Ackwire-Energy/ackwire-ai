@@ -273,7 +273,7 @@ export async function sayTeamHello(
   orgId: string,
   payload: Record<string, unknown>,
 ) {
-  const { agents, channels, machineProvisioning, messages, organizationMembers, users } = schema;
+  const { agents, channelMembers, channels, machineProvisioning, messages, organizationMembers, users } = schema;
   const how = payload.how === "paid" ? "paid" : "created";
   const [general] = await deps.db
     .select({ id: channels.id, creator: channels.createdByUserId })
@@ -341,7 +341,16 @@ export async function sayTeamHello(
     )
     .limit(1);
   if (said) return;
-  if (member) await addChannelMember(deps.db, userId, orgId, general.id, { agentId, autoReply: false }, deps);
+  // A seat someone already gave it in #general keeps its own auto-reply.
+  const [seated] = member
+    ? await deps.db
+        .select({ agentId: channelMembers.agentId })
+        .from(channelMembers)
+        .where(and(eq(channelMembers.channelId, general.id), eq(channelMembers.agentId, agentId)))
+        .limit(1)
+    : [];
+  if (member && !seated)
+    await addChannelMember(deps.db, userId, orgId, general.id, { agentId, autoReply: false }, deps);
   const [[person], [computer], locale] = await Promise.all([
     deps.db.select({ name: users.name }).from(users).where(eq(users.id, userId)),
     deps.db
