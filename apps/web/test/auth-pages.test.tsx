@@ -1355,7 +1355,14 @@ describe("Onboarding: the workspace's name", () => {
     const css = sheet("pages/onboarding.css");
     const desktop = sheet("desktop.css");
     const rule = (from: string, selector: string) => from.slice(from.indexOf(`${selector} {`)).split("}")[0] ?? "";
-    const px = (decls: string, prop: string) => Number(decls.match(new RegExp(`\\n\\s*${prop}: (-?[\\d.]+)px`))?.[1]);
+    const tokens = readFileSync(join(import.meta.dir, "../../../packages/ui/src/styles/tokens.css"), "utf8");
+    // A length in px, through the kit's token where the rule names one (`var(--control-h-sm)`).
+    const px = (decls: string, prop: string) => {
+      const value = decls.match(new RegExp(`\\n\\s*${prop}: ([^;\\s]+)`))?.[1] ?? "";
+      const token = value.match(/^var\((--[\w-]+)\)$/)?.[1];
+      const raw = token ? tokens.match(new RegExp(`${token}: (-?[\\d.]+)px`))?.[1] : value.match(/^(-?[\d.]+)px/)?.[1];
+      return Number(raw);
+    };
     // No room above the step that follows what's in it, centring it or pinned as it opens.
     const rows = css.match(/\.onb__body[^{]*::before \{[^}]*\}/g) ?? [];
     expect(rows.filter((r) => /auto|--onb-lead/.test(r))).toEqual([]);

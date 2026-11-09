@@ -140,6 +140,15 @@ html:not([data-pointer]) .onb__me:focus-visible {
     opacity 0.36s var(--out),
     transform 0.36s var(--out);
 }
+/* Back shows on step 1 only, for someone with another workspace: a row of its height and margins keeps its room on
+   every other step, so the question never moves between steps. A phone keeps its first step under the step bar. */
+@media (min-width: 761px) {
+  .onb__body:not(:has(> .onb__back))::before {
+    content: "";
+    height: var(--control-h-sm);
+    margin: -16px 0 -8px;
+  }
+}
 /* A transition from the starting style, played once on insertion: a keyframe entrance replays whenever something
    resets its `animation`, as password managers do to an input's container (see .auth__step in auth.css). */
 @starting-style {
