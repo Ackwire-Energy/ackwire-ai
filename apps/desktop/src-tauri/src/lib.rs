@@ -615,6 +615,7 @@ pub fn run() {
             servers::servers_get,
             servers::server_choose,
             servers::server_remove,
+            servers::server_sign_out,
             discover::discover,
             deep_link::link_take,
             local_server::local_server_status,
@@ -644,7 +645,8 @@ pub fn run() {
             cover::page_ready,
             cover::cover_retry,
             cover::cover_hide,
-            cover::cover_server
+            cover::cover_server,
+            cover::cover_details
         ])
         .on_menu_event(|app, event| menus::on_event(app, event.id().as_ref()))
         .on_window_event(|window, event| match event {
@@ -768,7 +770,14 @@ pub fn run() {
         }
         // A click on the Dock icon: bring the app's window back.
         #[cfg(target_os = "macos")]
-        RunEvent::Reopen { .. } => open_app(app),
+        RunEvent::Reopen { .. } => {
+            // A click on a notification of the server here brings the app forward: the popover, which says why.
+            if local_server::take_notice_click() {
+                let _ = present(app, "popover");
+            } else {
+                open_app(app);
+            }
+        }
         _ => {}
     });
 }

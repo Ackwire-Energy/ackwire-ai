@@ -160,12 +160,12 @@ describe("Run agentes.chat on this Mac", () => {
       { here: { run: false } },
     ));
 
-  test("running here already: where, in one sentence", () =>
+  test("running here already: one sentence, never its address", () =>
     firstRun("here", async ({ el, press, until }) => {
       await press("Use your own server");
       await press("Run agentes.chat on this Mac");
       await until(() => el.querySelector("h1")?.textContent === "agentes.chat already runs on this Mac");
-      expect(el.querySelector(".dk-lead")?.textContent).toBe("This app runs it, at http://127.0.0.1:4310.");
+      expect(el.querySelector(".dk-lead")?.textContent).toBe("This app runs it. Open it to sign in.");
     }));
 
   test("without Tailscale the switch can't be used, and one line says why, with what fixes it", async () => {

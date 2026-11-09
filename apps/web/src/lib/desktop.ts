@@ -216,6 +216,11 @@ export const thisMac = {
   openWorkspace: (server: string, orgId: string) => invoke<unknown>({ kind: "openWorkspace", server, orgId }),
   /** The app's own window to add a workspace: a new one on agentes.chat, or the team's server. */
   addWorkspace: () => invoke<unknown>({ kind: "addWorkspace" }),
+  /**
+   * The window goes to a server of the app's list on its own first page (its sign-in when the app has no session
+   * there). An app without it refuses: the caller falls back to the app's servers window.
+   */
+  openServer: (server: string) => invoke<unknown>({ kind: "openServer", server }),
 };
 
 /** The app lists every server's workspaces (`workspaces` in `window.__agentesDesktop`, ADR 0154); older apps don't. */

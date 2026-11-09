@@ -238,12 +238,18 @@ describe("Entrar (e-mail primeiro)", () => {
     expect(screen().getByRole("link", { name: "Abrir o Gmail" }).getAttribute("href")).toBe("https://mail.google.com");
   });
 
-  test("without e-mail on the server, no 'forgot password'", async () => {
+  test("without e-mail on the server, 'forgot password' says the way back in, never sends (ADR 0158)", async () => {
     const { api } = authApi(ACCOUNT, { reset: false });
-    await renderApp("/login", { api, auth: createFakeAuth().auth });
+    const { auth, calls } = createFakeAuth();
+    await renderApp("/login", { api, auth });
     await type("E-mail", "marina@acme.com.br");
     await press(/^Continuar(?! com)/);
-    expect(screen().queryByRole("button", { name: "Esqueci a senha" })).toBeNull();
+    await press("Esqueci a senha", 2);
+    expect(heading()).toBe("Este servidor não manda e-mail.");
+    expect(lead()).toContain("Peça a um dono do seu workspace um link de senha nova.");
+    expect(calls.some((c) => c.method === "requestPasswordReset")).toBe(false);
+    await press("Voltar para a senha", 2);
+    expect(heading()).toBe("Bom te ver de novo.");
   });
 
   test("a blocked account is told so; another refusal in plain words, never the server's English", async () => {

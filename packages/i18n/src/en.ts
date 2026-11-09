@@ -507,6 +507,20 @@ export const en = {
       continue: "Continue on this {{device}}",
       text: "You set up agentes.chat on this {{device}}: no password needed.",
     },
+    /** The line over the sign-in in the desktop app: which server it signs in to (ADR 0158). */
+    server: {
+      into: "Signing in to <b>{{server}}</b>",
+      intoHere: "Signing in to the agentes.chat <b>on this {{device}}</b>",
+    },
+    /** "Forgot password" on a server that sends no email (ADR 0158). */
+    forgotHere: {
+      ownerTitle: "You don't need a password here.",
+      ownerLead: "You set up agentes.chat on this {{device}}. Sign in here, then create a new password.",
+      notOwner: "Not the account of whoever set it up? Ask an owner of your workspace for a new-password link.",
+      title: "This server doesn't send email.",
+      lead: "Ask an owner of your workspace for a new-password link. They make it in Members, and it works for 1 hour.",
+      back: "Back to the password",
+    },
     reset: {
       title: "Create a new password.",
       save: "Save password",
@@ -1355,6 +1369,11 @@ export const en = {
     addPasswordLabel: "New password",
     addPasswordSaved: "Password added.",
     addPasswordReauth: "Sign in again to add a password.",
+    newPassword: "Create a new password",
+    newPasswordHint: "Your other sessions end, and AI apps connected with the old password need to be connected again.",
+    newPasswordRow: "To change the password you use in other browsers and on other devices",
+    newPasswordSaved: "New password saved.",
+    newPasswordReauth: "Sign in again to create a new password.",
     yourWorkspaces: "Your workspaces",
     youAreHere: "You are here",
     /** Beside a workspace's name, only when another of the person's has the same name. */
@@ -1365,6 +1384,12 @@ export const en = {
     addWorkspaceHint: "A new one on agentes.chat, or your team's server",
     /** Beside a server's name above its workspaces, when it isn't agentes.chat. */
     yourServer: "Your server",
+    /** A server's line in "Your workspaces" in the desktop app: the one on this computer, and its state (ADR 0158). */
+    serverHere: "The agentes.chat on this {{device}}",
+    serverStopped: "stopped",
+    serverOffline: "offline since {{time}}",
+    serverSignedOut: "not signed in",
+    serverSignIn: "Sign in",
     wiki: "Wiki",
     settings: "Settings",
     workspaceMenu: "Workspace menu",
@@ -1510,11 +1535,15 @@ export const en = {
     qr: "QR code to sign in to the agentes app",
     making: "Making the code…",
     stepApp: "Install the agentes app on your phone (App Store or Google Play).",
-    stepTailscale: "Install Tailscale on your phone and join this server's network (tailnet).",
+    stepTailscale: "Install Tailscale on your phone and sign in with the same Tailscale account as this server.",
     stepScan: "Point your phone's camera at the code.",
     validFor: "Valid for {{time}}",
     private: "Whoever scans this code signs in as you.",
     failed: "Couldn't make the code.",
+    /** The desktop app's server with access from other devices off: no phone reaches it. */
+    localOnly: "This server only opens on the computer it runs on, so your phone can't reach it.",
+    localOnlyHow:
+      "In the agentes.chat app on that computer, turn on Reach it from your phone and teammates in Preferences › Servers. Then come back here.",
   },
   team: {
     title: "Team",
@@ -5719,6 +5748,17 @@ export const en = {
     agentsOnlyYouHint: "On a plan, you can let each one answer other people on its page.",
     filters: "Filter people",
     rolesOf: "{{name}}'s roles",
+    moreOf: "More for {{name}}",
+    /** On a server that sends no email, an owner's new-password link for a member (ADR 0158). */
+    passwordLink: {
+      item: "Make a new-password link",
+      hint: "For when they forgot their password",
+      title: "New-password link for {{name}}",
+      lead: "It works once, for 1 hour. Send it wherever you talk.",
+      label: "Link",
+      making: "Making the link…",
+      copy: "Copy link",
+    },
     everyoneNote: "Everyone applies to every person in the workspace.",
     noRolesToGive: "No roles below yours to give.",
     roleFilter: "Role",
@@ -11598,6 +11638,12 @@ export const en = {
     },
   },
   errors: {
+    /** A new-password link an owner can't make (ADR 0158). */
+    passwordLink: {
+      email: "This server sends email: they ask for their own link in Forgot password.",
+      serverOwner: "Whoever set up this server signs in on the computer it runs on, with no link.",
+      otherWorkspace: "They're also in a workspace that isn't yours: only the owners of all of them can make the link.",
+    },
     /** Refusals in plain words: each server code that needs no line of its own shares one of these. */
     said: {
       gone: "This isn't here anymore. Refresh the page and try again.",
@@ -12622,6 +12668,7 @@ export const en = {
         joined: "Joined the workspace",
         left: "Left the workspace",
         role_changed: "Changed a member's role",
+        password_link: "Made a new-password link for a member",
       },
       apps: {
         connected: "Connected {{app}}",

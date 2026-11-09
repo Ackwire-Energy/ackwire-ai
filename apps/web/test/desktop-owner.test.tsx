@@ -4,7 +4,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import type { SignInOptions } from "@agenteschat/client";
-import { act, cleanup, fireEvent } from "@testing-library/react";
+import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import type { ThisMacStatus } from "@/lib/desktop";
 import { createFakeApi, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
@@ -113,6 +113,43 @@ describe("Entrar no servidor que o app roda neste computador", () => {
     await renderApp("/login", { api: withProviders() });
     await settle(6);
     expect(google()).toBeTruthy();
+  });
+
+  test("the line over the sign-in names the server, Trocar opens the app's servers (ADR 0158)", async () => {
+    byHand();
+    const asked = inTheApp({ orgs: [], agentsHere: false, local: true });
+    (win().__agentesDesktop as Record<string, unknown>).servers = true;
+    await renderApp("/login", { api: signedOut() });
+    await settle(6);
+    const line = document.querySelector(".auth__server");
+    expect(line?.textContent).toContain("Entrando no agentes.chat deste Mac");
+    await act(async () => fireEvent.click(within(line as HTMLElement).getByRole("button", { name: "Trocar" })));
+    await settle(2);
+    expect(asked.filter((r) => r.kind === "servers")).toEqual([{ kind: "servers" }]);
+    cleanup();
+    // Another server: by its address, never "this Mac".
+    inTheApp({ orgs: [], agentsHere: true, local: false });
+    (win().__agentesDesktop as Record<string, unknown>).servers = true;
+    await renderApp("/login", { api: signedOut() });
+    await settle(6);
+    expect(document.querySelector(".auth__server")?.textContent).toContain(`Entrando em ${window.location.host}`);
+  });
+
+  test("forgot password on this computer's server: Continue on this Mac, then a new password (ADR 0158)", async () => {
+    byHand();
+    const asked = inTheApp({ orgs: [], agentsHere: false, local: true });
+    await renderApp("/login", { api: signedOut({ account: true, password: true, providers: [], canSignUp: false }) });
+    await act(async () => fireEvent.change(screen().getByLabelText("E-mail"), { target: { value: "ana@acme.com" } }));
+    await act(async () => fireEvent.click(screen().getByRole("button", { name: /^Continuar(?! neste| com)/ })));
+    await settle(6);
+    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Esqueci a senha" })));
+    await settle(2);
+    expect(screen().getByRole("heading").textContent).toBe("Aqui você não precisa de senha.");
+    await act(async () => fireEvent.click(continueHere() as HTMLElement));
+    await settle(2);
+    expect(asked.filter((r) => r.kind === "signIn")).toEqual([{ kind: "signIn" }]);
+    expect(sessionStorage.getItem("agentes.newPasswordAsk")).toBe("1");
+    sessionStorage.removeItem("agentes.newPasswordAsk");
   });
 
   test("another server in the app, or a browser: the ordinary sign-in", async () => {

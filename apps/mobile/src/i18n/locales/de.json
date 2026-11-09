@@ -47,7 +47,7 @@
       "now": "Jetzt auf {{host}}",
       "invalid": "Prüf die Adresse, etwa agentes.deinteam.ts.net.",
       "unreachable": "Wir erreichen {{host}} nicht. Prüf die Adresse und deine Verbindung und versuch es noch einmal.",
-      "unreachableTailscale": "Wir erreichen {{host}} nicht. Der Server läuft über Tailscale: Öffne die Tailscale-App, verbinde dich und versuch es noch einmal.",
+      "unreachableTailscale": "Wir erreichen {{host}} nicht. Der Server läuft über Tailscale: Öffne die Tailscale-App, verbinde dich und versuch es noch einmal. Schon verbunden? Der Computer, auf dem er läuft, schläft vielleicht oder seine App ist geschlossen.",
       "certificate": "Das Zertifikat von {{host}} ist ungültig. Sprich mit der Person, die den Server betreibt.",
       "notAgentes": "{{host}} ist kein agentes.chat-Server. Prüf die Adresse.",
       "serverTooOld": "{{host}} braucht ein Update, um mit dieser App zu funktionieren.",

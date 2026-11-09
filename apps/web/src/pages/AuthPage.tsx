@@ -15,6 +15,7 @@ import {
 } from "@agenteschat/client/lib/errors";
 import { signInFor } from "@agenteschat/client/lib/guards";
 import { type HumanAction, isHumanCheckRefusal, withHumanCheck } from "@agenteschat/client/lib/human-check";
+import { CLOUD_SERVER, serverHost } from "@agenteschat/client/lib/server";
 import {
   emailTypoFix,
   isEmail,
@@ -28,7 +29,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import { useAuth } from "@/auth/context";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { AuthShell } from "@/components/AuthLayout";
@@ -66,6 +67,8 @@ type Step =
   | "closed"
   | "expired"
   | "forgot"
+  /** "Forgot password" on a server that sends no email: the way back in, said (ADR 0158). */
+  | "forgotHere"
   | "sent"
   | "browser"
   | "ownerWaits";
@@ -421,6 +424,9 @@ export function AuthPage({
         : t("auth.flow.expiredLeadAsk"),
     ],
     forgot: [t("auth.flow.forgot"), t("auth.flow.forgotLead")],
+    forgotHere: local
+      ? [t("auth.forgotHere.ownerTitle"), t("auth.forgotHere.ownerLead")]
+      : [t("auth.forgotHere.title"), t("auth.forgotHere.lead")],
     sent: [t("auth.flow.sent", { email: email.trim() }), t("auth.flow.sentLead")],
     browser: [
       t("auth.desktop.browser"),
@@ -440,6 +446,33 @@ export function AuthPage({
       <Icon name="mail" size={14} />
       <span className="auth__who-email">{email.trim()}</span>
       <button type="button" className="auth__who-change" onClick={() => go("email")}>
+        {t("auth.flow.change")}
+      </button>
+    </span>
+  );
+
+  // In the desktop app, which server this signs in to, on every step, with Change (the app's window of servers): the
+  // app keeps several, and the same screen on another one looks the same (ADR 0158).
+  const here = window.location.origin;
+  const serverLine = desktopPicksServer() && placeKnown && (
+    <span className="auth__who auth__server">
+      <Icon name={local ? "computer" : here === CLOUD_SERVER ? "cloud" : "globe"} size={14} />
+      <span className="auth__who-email">
+        {local ? (
+          <Trans i18nKey="auth.server.intoHere" components={{ b: <b /> }} />
+        ) : (
+          <Trans
+            i18nKey="auth.server.into"
+            values={{ server: here === CLOUD_SERVER ? "agentes.chat" : serverHost(here) }}
+            components={{ b: <b /> }}
+          />
+        )}
+      </span>
+      <button
+        type="button"
+        className="auth__who-change"
+        onClick={() => void thisMac.otherServer().catch(() => {})}
+      >
         {t("auth.flow.change")}
       </button>
     </span>
@@ -497,6 +530,7 @@ export function AuthPage({
   return (
     <AuthShell>
       <form className="auth__form" onSubmit={submit} noValidate>
+        {serverLine}
         <header className="auth__ask" ref={header} data-burst>
           <AgentAvatar
             name="agentes.chat"
@@ -634,8 +668,8 @@ export function AuthPage({
                 </>
               )}
 
-              {step === "password" && canReset && (
-                <button type="button" className="auth__quiet" onClick={() => go("forgot")}>
+              {step === "password" && (
+                <button type="button" className="auth__quiet" onClick={() => go(canReset ? "forgot" : "forgotHere")}>
                   {t("auth.forgotPassword")}
                 </button>
               )}
@@ -647,11 +681,13 @@ export function AuthPage({
                     providers={linkedProviders}
                     onSocial={desktop ? (p) => void signInInBrowser(p) : undefined}
                   />
-                  {canReset && (
-                    <button type="button" className="auth__quiet" onClick={() => go("forgot")}>
-                      {t("auth.flow.createPassword")}
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    className="auth__quiet"
+                    onClick={() => go(canReset ? "forgot" : "forgotHere")}
+                  >
+                    {t("auth.flow.createPassword")}
+                  </button>
                 </>
               )}
 
@@ -677,6 +713,34 @@ export function AuthPage({
                   {t("auth.flow.otherEmail")}
                 </Button>
               )}
+
+              {step === "forgotHere" &&
+                (local ? (
+                  <>
+                    <Button
+                      type="button"
+                      variant="primary"
+                      size="lg"
+                      block
+                      loading={ownerPending}
+                      onClick={() => {
+                        // Once signed in, the account menu opens "Create a new password" (`newPasswordAsk`).
+                        sessionStore.set(STORAGE_KEYS.newPasswordAsk, "1");
+                        void continueHere();
+                      }}
+                    >
+                      {t("auth.desktopOwner.continue")}
+                    </Button>
+                    <p className="auth__fine">{t("auth.forgotHere.notOwner")}</p>
+                    <button type="button" className="auth__quiet" onClick={() => go("password")}>
+                      {t("auth.flow.back")}
+                    </button>
+                  </>
+                ) : (
+                  <Button type="button" size="lg" block onClick={() => go(options?.password ? "password" : "email")}>
+                    {t("auth.forgotHere.back")}
+                  </Button>
+                ))}
 
               {step === "forgot" && (
                 <button
@@ -711,16 +775,6 @@ export function AuthPage({
                   <a href={privacyUrl}>{t("auth.privacy")}</a>
                   {t("auth.termsAfter")}
                 </p>
-              )}
-
-              {step === "email" && desktopPicksServer() && (
-                <button
-                  type="button"
-                  className="auth__quiet"
-                  onClick={() => void thisMac.otherServer().catch(() => {})}
-                >
-                  {t("auth.desktop.otherServer")}
-                </button>
               )}
             </Locked>
           </div>

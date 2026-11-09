@@ -19,6 +19,10 @@ export const REAUTH_PASSWORD = "reauth.password";
  * takes `untranslatedText`; a guard test (`error-words.test.ts`) fails on a new code that isn't here or on its list.
  */
 const KNOWN = {
+  // A new-password link an owner can't make (ADR 0158).
+  "password_link.email": "errors.passwordLink.email",
+  "password_link.server_owner": "errors.passwordLink.serverOwner",
+  "password_link.other_workspace": "errors.passwordLink.otherWorkspace",
   "webhook.github_no_access": "errors.webhook.githubNoAccess",
   "webhook.github_failed": "errors.webhook.githubFailed",
   "webhook.invalid_secret": "errors.webhook.invalidSecret",

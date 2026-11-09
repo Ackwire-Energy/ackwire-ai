@@ -519,6 +519,18 @@
       "wrongLinkLead": "Open de nieuwste eigenaarslink die voor deze server is gemaakt.",
       "taken": "Deze server heeft al een eigenaar.",
       "takenLead": "Log in met je account."
+    },
+    "server": {
+      "into": "Aanmelden bij <b>{{server}}</b>",
+      "intoHere": "Aanmelden bij agentes.chat <b>op deze {{device}}</b>"
+    },
+    "forgotHere": {
+      "ownerTitle": "Hier heb je geen wachtwoord nodig.",
+      "ownerLead": "Je hebt agentes.chat op deze {{device}} geïnstalleerd. Meld je hier aan en maak daarna een nieuw wachtwoord.",
+      "notOwner": "Niet het account van wie het installeerde? Vraag een eigenaar van je workspace om een link voor een nieuw wachtwoord.",
+      "title": "Deze server verstuurt geen e-mail.",
+      "lead": "Vraag een eigenaar van je workspace om een link voor een nieuw wachtwoord. Die maakt hem bij Leden, en de link werkt 1 uur.",
+      "back": "Terug naar het wachtwoord"
     }
   },
   "invite": {
@@ -1452,7 +1464,17 @@
     "unreadThreads_one": "Threads: {{count}} met ongelezen antwoorden",
     "unreadThreads_other": "Threads: {{count}} met ongelezen antwoorden",
     "unreadNotifications_one": "{{count}} ongelezen melding",
-    "unreadNotifications_other": "{{count}} ongelezen meldingen"
+    "unreadNotifications_other": "{{count}} ongelezen meldingen",
+    "newPassword": "Nieuw wachtwoord maken",
+    "newPasswordHint": "Je andere sessies eindigen, en AI-apps die met het oude wachtwoord verbonden zijn, moeten opnieuw worden verbonden.",
+    "newPasswordRow": "Om het wachtwoord te wijzigen dat je in andere browsers en op andere apparaten gebruikt",
+    "newPasswordSaved": "Nieuw wachtwoord opgeslagen.",
+    "newPasswordReauth": "Meld je opnieuw aan om een nieuw wachtwoord te maken.",
+    "serverHere": "agentes.chat op deze {{device}}",
+    "serverStopped": "gestopt",
+    "serverOffline": "offline sinds {{time}}",
+    "serverSignedOut": "niet aangemeld",
+    "serverSignIn": "Aanmelden"
   },
   "agentGroups": {
     "group": "Afdeling",
@@ -1518,11 +1540,13 @@
     "qr": "QR-code om in te loggen in de agentes-app",
     "making": "Code maken…",
     "stepApp": "Installeer de agentes-app op je telefoon (App Store of Google Play).",
-    "stepTailscale": "Installeer Tailscale op je telefoon en word lid van het netwerk van deze server (tailnet).",
+    "stepTailscale": "Installeer Tailscale op je telefoon en log in met hetzelfde Tailscale-account als deze server.",
     "stepScan": "Richt de camera van je telefoon op de code.",
     "validFor": "Geldig voor {{time}}",
     "private": "Wie deze code scant, logt in als jou.",
-    "failed": "Wie deze code scant, logt in als jij."
+    "failed": "Wie deze code scant, logt in als jij.",
+    "localOnly": "Deze server opent alleen op de computer waarop hij draait, dus je telefoon kan hem niet bereiken.",
+    "localOnlyHow": "Zet in de agentes.chat-app op die computer Bereik het vanaf je telefoon en je teamgenoten aan bij Voorkeuren › Servers. Kom daarna hier terug."
   },
   "team": {
     "title": "Team",
@@ -5979,7 +6003,17 @@
     "ownerLine": "Eigenaar: {{name}}",
     "noOwner": "Geen eigenaar",
     "budgetLine": "{{percent}} van het budget van {{month}}",
-    "noAgents": "Nog geen agents."
+    "noAgents": "Nog geen agents.",
+    "moreOf": "Meer voor {{name}}",
+    "passwordLink": {
+      "item": "Link voor nieuw wachtwoord maken",
+      "hint": "Voor als iemand het wachtwoord vergat",
+      "title": "Link voor een nieuw wachtwoord voor {{name}}",
+      "lead": "Hij werkt één keer, 1 uur lang. Stuur hem waar jullie praten.",
+      "label": "Link",
+      "making": "Link maken…",
+      "copy": "Link kopiëren"
+    }
   },
   "empty": {
     "thread": {
@@ -12298,6 +12332,11 @@
         "invalidInput": "Controleer de velden en probeer het opnieuw.",
         "tooManyItems": "De Vault is vol. Verwijder items voordat je meer synchroniseert."
       }
+    },
+    "passwordLink": {
+      "email": "Deze server verstuurt e-mail: de persoon vraagt zelf een link aan bij Wachtwoord vergeten.",
+      "serverOwner": "Wie deze server installeerde, meldt zich aan op de computer waarop hij draait, zonder link.",
+      "otherWorkspace": "Deze persoon zit ook in een workspace die niet van jou is: alleen de eigenaren van al die workspaces kunnen de link maken."
     }
   },
   "machines": {
@@ -12930,7 +12969,8 @@
       "member": {
         "joined": "Lid geworden van de werkruimte",
         "left": "De werkruimte verlaten",
-        "role_changed": "De rol van een lid gewijzigd"
+        "role_changed": "De rol van een lid gewijzigd",
+        "password_link": "Maakte een link voor een nieuw wachtwoord voor een lid"
       },
       "apps": {
         "connected": "{{app}} gekoppeld",

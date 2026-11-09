@@ -148,15 +148,18 @@ export function ReachProgress({ stage }: { stage: ReachStage }) {
 }
 
 /**
- * Why reach didn't turn on, with "Turn it on" where the tailnet's admin page fixes it, the command to copy where
- * the terminal does, "Copy details" when the server didn't answer again, and where to get Tailscale when it can't
- * share. Under the setup's step its mark already says it (the alert icon is Preferences' only), and where to try
- * again comes last, after the fix.
+ * Why reach didn't turn on, with "Turn it on" where the tailnet's admin page fixes it, Open Tailscale (or the
+ * command to connect it) when Tailscale isn't connected here, the command to copy where the terminal does, "Copy
+ * details" when the server didn't answer again, and where to get Tailscale when it can't share. Turning it off that
+ * failed says so in its own words. Under the setup's step its mark already says it (the alert icon is Preferences'
+ * only), and where to try again comes last, after the fix.
  */
 export function ReachProblem({ problem, text }: { problem: ServeProblem; text: "fail" | "prefs" }) {
   const { t } = useTranslation();
   const host = useHost();
   const reason = t(REASON_TEXT[problem.reason]);
+  const connectFrom =
+    problem.reason === "notConnected" ? tailscaleFrom(host.platform, { state: "off", app: problem.app }) : null;
   return (
     <span
       className={text === "prefs" ? "dk-honest dk-fr__problem ac-iconline" : "dk-honest dk-fr__problem"}
@@ -164,8 +167,27 @@ export function ReachProblem({ problem, text }: { problem: ServeProblem; text: "
     >
       {text === "prefs" && <Icon name="alert" size={16} />}
       <span>
-        {t("desktop.server.reachFailed", { reason })}
+        {problem.reason === "back" ? reason : t("desktop.server.reachFailed", { reason })}
         {problem.reason === "serve" && ` ${t("desktop.here.serveFix")}`}
+        {connectFrom === "terminal" && (
+          <>
+            {" "}
+            <CommandCopy command={TAILSCALE_UP} inline />
+          </>
+        )}
+        {connectFrom === "tray" && ` ${t("desktop.here.connectTray")}`}
+        {connectFrom === "app" && (
+          <>
+            {" "}
+            <button
+              type="button"
+              className="ac-link dk-link"
+              onClick={() => void host.openTailscale("app").catch(() => {})}
+            >
+              {t("desktop.here.openTailscale")}
+            </button>
+          </>
+        )}
         {problem.reason === "https" && (
           <>
             {" "}
@@ -185,7 +207,7 @@ export function ReachProblem({ problem, text }: { problem: ServeProblem; text: "
             <CommandCopy command={TAILSCALE_OPERATOR} />
           </>
         )}
-        {problem.reason === "start" && (
+        {(problem.reason === "start" || problem.reason === "back") && (
           <>
             {" "}
             <CopyDetails as="link" />

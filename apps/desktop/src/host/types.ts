@@ -91,6 +91,8 @@ export interface Host {
   welcomeMode(): Promise<"add" | null>;
   /** Takes `server` out of the list (the server and the account there stay as they are). */
   removeServer(server: string): Promise<void>;
+  /** Signs the app out of `server`, which stays in the list (signed out); a window on it goes to its sign-in. */
+  signOutServer(server: string): Promise<void>;
   /** Where a server may be: this computer and the person's Tailscale network, not checked yet. */
   discover(): Promise<Candidate[]>;
   /** Whether `server` is an agentes.chat server this app can use (`GET /api/instance`). */
@@ -197,4 +199,6 @@ export type MenuAction =
   | "pause1h"
   | "pauseTomorrow"
   | "pauseManual"
-  | "resume";
+  | "resume"
+  // The Mac's Servers › this computer's server › Restart (menus.rs `here_menu`).
+  | "hereRestart";

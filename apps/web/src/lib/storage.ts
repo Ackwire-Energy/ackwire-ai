@@ -51,6 +51,11 @@ export const STORAGE_KEYS = {
    * for the owner's click instead of signing them in again at once. Any sign-in removes it.
    */
   signedOut: "agentes.signedOut",
+  /**
+   * sessionStorage, "1": the owner chose Forgot password › Continue on this Mac, so once signed in the app opens
+   * "Create a new password" (ADR 0158).
+   */
+  newPasswordAsk: "agentes.newPasswordAsk",
   /** "0" when the person switched off the picture viewer's hover lens (on by default). */
   imageLens: "agentes.image.lens",
   /** The Drive's view: "grid" (default) or "list". */

@@ -11693,6 +11693,14 @@ html[data-menu-overlay] .shell {
   font-style: normal;
   font-weight: 500;
 }
+/* A server's state, as words in the line (ADR 0158): stopped or offline in the waiting color, signed out muted. */
+.sidebar__menu-server[data-state="offline"] .sidebar__menu-server-state {
+  color: var(--warn);
+}
+.sidebar__menu-dim {
+  display: inline-flex;
+  opacity: 0.5;
+}
 .sidebar__menu-crew {
   display: inline-flex;
   align-items: center;

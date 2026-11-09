@@ -519,6 +519,18 @@
       "wrongLinkLead": "Bu sunucu için oluşturulan en yeni sahip bağlantısını açın.",
       "taken": "Bu sunucunun zaten bir sahibi var.",
       "takenLead": "Hesabınızla giriş yapın."
+    },
+    "server": {
+      "into": "<b>{{server}}</b> sunucusuna giriş",
+      "intoHere": "Bu {{device}} üzerindeki <b>agentes.chat</b>'e giriş"
+    },
+    "forgotHere": {
+      "ownerTitle": "Burada şifreye ihtiyacın yok.",
+      "ownerLead": "agentes.chat'i bu {{device}} üzerine sen kurdun. Buradan gir, ardından yeni bir şifre oluştur.",
+      "notOwner": "Kuran kişinin hesabı değil mi? Çalışma alanının bir sahibinden yeni şifre bağlantısı iste.",
+      "title": "Bu sunucu e-posta göndermiyor.",
+      "lead": "Çalışma alanının bir sahibinden yeni şifre bağlantısı iste. Üyeler bölümünde oluşturur ve bağlantı 1 saat geçerlidir.",
+      "back": "Şifreye dön"
     }
   },
   "invite": {
@@ -1452,7 +1464,17 @@
     "unreadThreads_one": "Konular: okunmamış yanıtı olan {{count}} konu",
     "unreadThreads_other": "Konular: okunmamış yanıtı olan {{count}} konu",
     "unreadNotifications_one": "{{count}} okunmamış bildirim",
-    "unreadNotifications_other": "{{count}} okunmamış bildirim"
+    "unreadNotifications_other": "{{count}} okunmamış bildirim",
+    "newPassword": "Yeni şifre oluştur",
+    "newPasswordHint": "Diğer oturumların kapanır ve eski şifreyle bağlanan yapay zekâ uygulamalarının yeniden bağlanması gerekir.",
+    "newPasswordRow": "Diğer tarayıcılarda ve cihazlarda kullandığın şifreyi değiştirmek için",
+    "newPasswordSaved": "Yeni şifre kaydedildi.",
+    "newPasswordReauth": "Yeni şifre oluşturmak için yeniden giriş yap.",
+    "serverHere": "Bu {{device}} üzerindeki agentes.chat",
+    "serverStopped": "durduruldu",
+    "serverOffline": "{{time}} saatinden beri çevrim dışı",
+    "serverSignedOut": "giriş yapılmadı",
+    "serverSignIn": "Giriş yap"
   },
   "agentGroups": {
     "group": "Departman",
@@ -1518,11 +1540,13 @@
     "qr": "agentes uygulamasına giriş yapmak için QR kodu",
     "making": "Kod oluşturuluyor…",
     "stepApp": "agentes uygulamasını telefonunuza yükleyin (App Store veya Google Play).",
-    "stepTailscale": "Telefonunuza Tailscale'i yükleyin ve bu sunucunun ağına (tailnet) katılın.",
+    "stepTailscale": "Telefonunuza Tailscale'i kurun ve bu sunucuyla aynı Tailscale hesabıyla giriş yapın.",
     "stepScan": "Telefonunuzun kamerasını koda tutun.",
     "validFor": "{{time}} geçerli",
     "private": "Bu kodu tarayan herkes sizin adınıza giriş yapar.",
-    "failed": "Kod oluşturulamadı."
+    "failed": "Kod oluşturulamadı.",
+    "localOnly": "Bu sunucu yalnızca çalıştığı bilgisayarda açılıyor, bu yüzden telefonunuz ona ulaşamıyor.",
+    "localOnlyHow": "O bilgisayardaki agentes.chat uygulamasında Tercihler › Sunucular bölümünden Telefonunuzdan ve ekip arkadaşlarınızdan erişin seçeneğini açın. Sonra buraya dönün."
   },
   "team": {
     "title": "Ekip",
@@ -5899,7 +5923,17 @@
     "ownerLine": "Sahip: {{name}}",
     "noOwner": "Sahip yok",
     "budgetLine": "{{month}} bütçesinin {{percent}} kadarı",
-    "noAgents": "Henüz ajan yok."
+    "noAgents": "Henüz ajan yok.",
+    "moreOf": "{{name}} için daha fazlası",
+    "passwordLink": {
+      "item": "Yeni şifre bağlantısı oluştur",
+      "hint": "Şifresini unuttuğunda",
+      "title": "{{name}} için yeni şifre bağlantısı",
+      "lead": "Bir kez, 1 saat boyunca çalışır. Konuştuğunuz yerden gönder.",
+      "label": "Bağlantı",
+      "making": "Bağlantı oluşturuluyor…",
+      "copy": "Bağlantıyı kopyala"
+    }
   },
   "empty": {
     "thread": {
@@ -12173,6 +12207,11 @@
         "invalidInput": "Alanları kontrol edip tekrar deneyin.",
         "tooManyItems": "Vault dolu. Daha fazlasını eşitlemeden önce öğe silin."
       }
+    },
+    "passwordLink": {
+      "email": "Bu sunucu e-posta gönderiyor: kişi kendi bağlantısını Şifremi unuttum bölümünden ister.",
+      "serverOwner": "Bu sunucuyu kuran kişi, sunucunun çalıştığı bilgisayardan bağlantısız girer.",
+      "otherWorkspace": "Bu kişi senin olmayan bir çalışma alanında da var: bağlantıyı yalnızca hepsinin sahipleri oluşturabilir."
     }
   },
   "machines": {
@@ -12805,7 +12844,8 @@
       "member": {
         "joined": "Çalışma alanına katıldı",
         "left": "Çalışma alanından ayrıldı",
-        "role_changed": "Bir üyenin rolünü değiştirdi"
+        "role_changed": "Bir üyenin rolünü değiştirdi",
+        "password_link": "Bir üye için yeni şifre bağlantısı oluşturdu"
       },
       "apps": {
         "connected": "{{app}} bağladı",

@@ -270,6 +270,46 @@ pub async fn server_remove(app: AppHandle, server: String) -> Result<(), String>
     Ok(())
 }
 
+/// "Sign out of this server" (Preferences › Servers): the server ends the window's session there (as the phone signs
+/// out, no `Origin`, `X-Agentes-Client: mobile`), its cookies go (not on this computer, where they are shared by
+/// port), and it stays in the list, signed out; a window on it goes to its sign-in. Async for the cookies (Windows).
+#[tauri::command]
+pub async fn server_sign_out(app: AppHandle, server: String) -> Result<(), String> {
+    if !get(&app).servers.iter().any(|s| *s == server) {
+        return Err("not a server of this app".into());
+    }
+    let url: Url = server.parse().map_err(|_| "not a URL")?;
+    let Some(page) = app.get_webview(crate::main_window::LABEL) else { return Ok(()) };
+    let showing = page.url().is_ok_and(|u| u.origin().ascii_serialization() == server);
+    let (asking, shared) = (server.clone(), is_loopback(&server));
+    tauri::async_runtime::spawn_blocking(move || {
+        let cookies = page.cookies_for_url(url).unwrap_or_default();
+        let cookie = crate::workspaces::cookie_header(cookies.iter().map(|c| (c.name(), c.value())));
+        if !cookie.is_empty() {
+            let agent = ureq::AgentBuilder::new().timeout(std::time::Duration::from_secs(10)).redirects(0).build();
+            let _ = agent
+                .post(&format!("{asking}/api/auth/sign-out"))
+                .set("Cookie", &cookie)
+                .set("X-Agentes-Client", "mobile")
+                .set("Content-Type", "application/json")
+                .send_string("{}");
+        }
+        if !shared {
+            for cookie in cookies {
+                let _ = page.delete_cookie(cookie);
+            }
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    crate::workspaces::trigger(&app);
+    if showing {
+        let login: Url = format!("{server}/login").parse().map_err(|_| "not a URL")?;
+        crate::main_window::show_url(&app, login)?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

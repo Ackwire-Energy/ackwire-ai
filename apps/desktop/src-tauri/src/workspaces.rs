@@ -192,6 +192,20 @@ fn ask(agent: &ureq::Agent, server: &str, cookie: &str, logos: &mut HashMap<Stri
     Some(ServerWorkspaces { server: server.to_string(), signed_in: true, orgs, ..Default::default() })
 }
 
+/// Who the main window is signed in as on `server` (the account's id), read with its cookies there as the minute's
+/// check does; None when signed out there or it didn't answer. Not from a command or an event handler (Windows).
+pub fn window_user(app: &AppHandle, server: &str) -> Option<String> {
+    let page = app.get_webview(main_window::LABEL)?;
+    let cookies = page.cookies_for_url(server.parse::<Url>().ok()?).ok()?;
+    let cookie = cookie_header(cookies.iter().map(|c| (c.name(), c.value())));
+    if cookie.is_empty() {
+        return None;
+    }
+    let agent = ureq::AgentBuilder::new().timeout(TIMEOUT).redirects(0).build();
+    let me = get_json(&agent, &format!("{server}/api/app/me"), &cookie).ok()??;
+    me.pointer("/user/id").and_then(Value::as_str).map(str::to_string)
+}
+
 /// The answer as JSON; Ok(None) when the session isn't (any longer) signed in there.
 fn get_json(agent: &ureq::Agent, url: &str, cookie: &str) -> Result<Option<Value>, ()> {
     match agent.get(url).set("Cookie", cookie).set("X-Agentes-Client", "mobile").set("Accept", "application/json").call() {

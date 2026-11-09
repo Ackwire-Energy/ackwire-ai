@@ -114,6 +114,8 @@ export function createFakeHost(
   const shownListeners = new Set<(n: WindowName) => void>();
   const devListeners = new Set<() => void>();
   let signIns = 0;
+  /** Servers the app signed out of (`signOutServer`): listed with no workspaces. */
+  const signedOut = new Set<string>();
   let tray: TrayState = "idle";
   let autostart = true;
   let version = "0.6.0";
@@ -275,9 +277,10 @@ export function createFakeHost(
     workspaces: async (): Promise<ServerWorkspaces[]> =>
       list.servers.map((server, i) => ({
         server,
-        signedIn: true,
-        orgs:
-          i === 0
+        signedIn: !signedOut.has(server),
+        orgs: signedOut.has(server)
+          ? []
+          : i === 0
             ? [
                 { id: "o-acme", name: "Acme", logo: null, unread: 0, waiting: 0 },
                 { id: "o-norte", name: "Estúdio Norte", logo: null, unread: 3, waiting: 0 },
@@ -288,6 +291,10 @@ export function createFakeHost(
     removeServer: async (server) => {
       list.servers = list.servers.filter((s) => s !== server);
       if (list.current === server) list.current = list.servers[0] ?? null;
+      devChanged();
+    },
+    signOutServer: async (server) => {
+      signedOut.add(server);
       devChanged();
     },
     discover: async (): Promise<Candidate[]> => {
