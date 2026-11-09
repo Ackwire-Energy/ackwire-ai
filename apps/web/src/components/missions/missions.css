@@ -1652,11 +1652,10 @@ html:not([data-pointer]) .mi-quiet:focus-visible {
   gap: 10px;
   width: 100%;
 }
+/* An `.ac-iconline`: words that wrap on a phone keep the check on their first line. */
 .mi-cfg__saved {
   flex: 1;
   min-width: 0;
-  display: inline-flex;
-  align-items: center;
   gap: 6px;
   font-size: 13px;
   color: var(--faint);
