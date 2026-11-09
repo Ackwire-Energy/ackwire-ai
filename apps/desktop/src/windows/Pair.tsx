@@ -7,7 +7,7 @@
 import type { DeviceAudience } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { Button, Checkbox, Icon, type IconName, PixelSpinner, Select } from "@agenteschat/ui";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useHost, useSnapshot, useStore } from "../app";
 import { type LinkFailure, type LinkInfo, type PairTarget, pairWithLink, pairWithSession } from "../control/pair";
@@ -82,8 +82,8 @@ export function PairOffer({ target, onClose }: { target: PairTarget; onClose: ()
     setState("busy");
     setFailed(null);
     try {
-      if (atLogin) await host.setAutostart(true).catch(() => {});
       await pairWithSession(host, store, target, audience);
+      if (atLogin) await host.setAutostart(true).catch(() => {});
       setState("done");
     } catch (err) {
       setFailed(errorText(t, err, i18n.language));
@@ -186,8 +186,7 @@ type LinkState =
   | { kind: "expired" }
   | { kind: "unreachable" }
   | { kind: "ask"; info: LinkInfo }
-  /** `cancel`: null while the runner is still being asked. */
-  | { kind: "waiting"; info: LinkInfo; cancel: (() => Promise<void>) | null }
+  | { kind: "waiting"; info: LinkInfo }
   | { kind: "done"; org: string }
   | { kind: "failed"; info: LinkInfo; code: LinkFailure };
 
@@ -203,6 +202,16 @@ export function PairLinkSheet({ server, code, onClose }: { server: string; code:
   const [state, setState] = useState<LinkState>({ kind: "checking" });
   const [asked, setAsked] = useState(0);
   const from = serverName(server);
+  // The sheet gone (Cancel, Esc, a newer link): the runner stops asking, even if it hadn't started yet.
+  const pairing = useRef<{ cancel: () => Promise<void> } | null>(null);
+  const gone = useRef(false);
+  useEffect(() => {
+    gone.current = false;
+    return () => {
+      gone.current = true;
+      void pairing.current?.cancel();
+    };
+  }, []);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `asked` is Try again
   useEffect(() => {
@@ -218,16 +227,20 @@ export function PairLinkSheet({ server, code, onClose }: { server: string; code:
   }, [host, server, code, asked]);
 
   const connect = async (info: LinkInfo) => {
+    setState({ kind: "waiting", info });
     try {
+      const started = await pairWithLink(store, server, code);
+      pairing.current = started;
+      if (gone.current) return void started.cancel();
+      const org = await started.done;
+      pairing.current = null;
       // Agents of a computer paired here work while the app runs.
-      setState({ kind: "waiting", info, cancel: null });
       await host.setAutostart(true).catch(() => {});
-      const pairing = await pairWithLink(store, server, code);
-      setState({ kind: "waiting", info, cancel: pairing.cancel });
-      setState({ kind: "done", org: await pairing.done });
+      if (!gone.current) setState({ kind: "done", org });
     } catch (err) {
+      pairing.current = null;
       const word = err instanceof Error ? err.message : "";
-      if (word === "canceled") return;
+      if (gone.current || word === "canceled") return;
       setState({ kind: "failed", info, code: isFailure(word) ? word : "internal" });
     }
   };
@@ -291,7 +304,7 @@ export function PairLinkSheet({ server, code, onClose }: { server: string; code:
       <Sheet
         title={title}
         acts={
-          <Button variant="ghost" onClick={() => void (state.cancel?.() ?? Promise.resolve()).then(onClose)}>
+          <Button variant="ghost" onClick={onClose}>
             {t("desktop.common.cancel")}
           </Button>
         }

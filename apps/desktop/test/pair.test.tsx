@@ -193,16 +193,36 @@ describe("pairing from the app", () => {
       pairLink(FAKE_LINKS.live),
     ));
 
+  test("a pair link cancelled while waiting: the runner stops asking and nothing joins", () =>
+    mount(
+      "welcome",
+      <WindowView name="welcome" />,
+      async (el, host, store) => {
+        await until(() => button(el, "Connect"));
+        await act(async () => button(el, "Connect")?.click());
+        await act(async () => button(el, "Cancel")?.click());
+        expect(el.textContent).not.toContain("Waiting for Sam Rivera");
+        // Longer than the fake maker takes to let it in.
+        await act(() => new Promise((resolve) => setTimeout(resolve, 2500)));
+        expect(pairedWith(store, "o-norte")).toBe(false);
+        expect([...host.runners.values()].some((r) => r.pendingCode)).toBe(false);
+        expect(await host.autostart()).toBe(false);
+      },
+      pairLink(FAKE_LINKS.live),
+    ));
+
   test("a pair link whose maker says no, and one that expired", async () => {
     await mount(
       "welcome",
       <WindowView name="welcome" />,
-      async (el) => {
+      async (el, host) => {
         await until(() => button(el, "Connect"));
         await act(async () => button(el, "Connect")?.click());
         await until(() => el.textContent?.includes("Sam Rivera didn't let it in. Nothing changed."));
         expect(button(el, "Close")).toBeTruthy();
         expect(button(el, "Try again")).toBeUndefined();
+        // Open at login only comes with a computer that joined.
+        expect(await host.autostart()).toBe(false);
       },
       pairLink(FAKE_LINKS.denied),
     );

@@ -138,9 +138,9 @@ export function ThisMacCards({ homes, offers, bottom }: { homes: Home[]; offers:
     run(targetKey(target), async () => {
       try {
         if (!(await host.askToPair(target.server, target.name))) return;
+        await pairWithSession(host, store, target);
         // Its agents work while the app runs.
         await host.setAutostart(true).catch(() => {});
-        await pairWithSession(host, store, target);
         toast(t("desktop.pair.done", { org: target.name }));
       } catch (err) {
         toast(errorText(t, err, i18n.language), "alert");
