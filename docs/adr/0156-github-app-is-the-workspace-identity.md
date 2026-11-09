@@ -219,6 +219,8 @@ its page on GitHub (`missingGitHubAppEvents`, from `GET /app`). `git/github-even
 - **What the agent reads.** A `github_event` notice: the server's line ("Ana commented on PR #12 (acme/app) on GitHub",
   with the link), the GitHub text inside the outside-content envelope, and what to do: answer there with its GitHub
   tools (signed as always) and keep the conversation short; hand an unowned item on; bring its task in line with a
-  merge or a close. People see the same line in their language, the text and the link on "Ver".
+  merge or a close. People see the same line in their language, the text and the link on "Ver". Conversation lists and
+  notifications show that line with what they wrote (`previewMeta`, `bodyCode` `github_event`), never their words
+  alone under the agent's name, and a push never quotes it.
 - **Not done.** `pull_request_review_thread` (resolved threads) is subscribed but wakes nobody. Who wrote a review the
   bot left isn't known from a reply to it: the item's agent hears it. An edit to a comment wakes nobody.
