@@ -220,6 +220,11 @@ export type ControlRequest =
        * unless chosen). Commands always start off from the app. Absent: both off.
        */
       tools?: { claude?: boolean; codex?: boolean };
+      /**
+       * A connect link's code (`agenteschat://pair`): the server asks the link's maker to let this computer in, as
+       * `agentes-runner pair --link` does, and nobody confirms the device code. `pair.code` still comes first.
+       */
+      link?: string;
     }
   | { type: "pair.cancel" }
   /** Forgets the pairing (the token is deleted; the server side is the site's "Desconectar"). */
@@ -319,7 +324,8 @@ export type ControlEvent =
   | { kind: "activity"; entry: ActivityEntry }
   | { kind: "pair.code"; userCode: string; verificationUrl: string; expiresAt: string }
   | { kind: "pair.done"; org: { id: string; name: string }; machine: { id: string; name: string } }
-  | { kind: "pair.failed"; code: "expired" | "denied" | "network" | "internal"; message: string }
+  /** `link_invalid`: the link expired or was used (an older runner says `internal`). */
+  | { kind: "pair.failed"; code: "expired" | "denied" | "network" | "internal" | "link_invalid"; message: string }
   | { kind: "access.requested"; request: ControlAccessRequest }
   | { kind: "access.resolved"; requestId: string; decision: "granted" | "denied" | "expired" }
   | { kind: "access.changed"; access: RunnerAccess };

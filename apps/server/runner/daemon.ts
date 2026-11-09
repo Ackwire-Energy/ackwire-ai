@@ -127,7 +127,7 @@ import {
   writeNetworkState,
 } from "./network-state";
 import { type CachedLogo, logoDataUrl, readCachedLogo, removeCachedLogo, syncOrgLogo } from "./org-logo";
-import { type DeviceGrant, devicePair, type FetchFn, PairingError, uniqueWorkspace } from "./pairing";
+import { type DeviceGrant, devicePair, type FetchFn, LINK_CODE, PairingError, uniqueWorkspace } from "./pairing";
 import { agentId8, agentWorkspace } from "./paths";
 import { PhoneManager, type PhoneManagerOptions } from "./phones";
 import { agentSecrets, dropStoredSiteSecrets, secretValue } from "./secrets";
@@ -2161,9 +2161,15 @@ export class RunnerDaemon implements RequestObserver {
    * "Reconectar este Mac" on a home the server refused: the same server's
    * previous machine id goes along, so the site brings that machine back.
    */
-  pairStart(server: string, name?: string, tools?: { claude?: boolean; codex?: boolean }): { started: true } {
+  pairStart(
+    server: string,
+    name?: string,
+    tools?: { claude?: boolean; codex?: boolean },
+    link?: string,
+  ): { started: true } {
     if (this.config && this.connState !== "refused")
       throw new ControlError("already_paired", "This computer is already connected. Disconnect it first.");
+    if (link !== undefined && !LINK_CODE.test(link)) throw new ControlError("bad_request", "Not a connect link's code");
     let url: string;
     try {
       url = normalizeServerUrl(String(server ?? ""));
@@ -2176,7 +2182,7 @@ export class RunnerDaemon implements RequestObserver {
     this.pairing = ac;
     void devicePair(
       url,
-      deviceInfo(label, previousMachineFor(this.stored, url)),
+      { ...deviceInfo(label, previousMachineFor(this.stored, url)), ...(link ? { link } : {}) },
       (code) =>
         this.emit({
           kind: "pair.code",
@@ -2226,7 +2232,7 @@ export class RunnerDaemon implements RequestObserver {
       },
       (err: unknown) => {
         if (this.pairing === ac) this.pairing = null;
-        const code = err instanceof PairingError && err.code !== "link_invalid" ? err.code : "internal";
+        const code = err instanceof PairingError ? err.code : "internal";
         if (code === "canceled") return;
         this.emit({ kind: "pair.failed", code, message: err instanceof Error ? err.message : String(err) });
       },

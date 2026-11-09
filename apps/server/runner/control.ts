@@ -83,7 +83,12 @@ export class ControlServer {
       case "config.set":
         return d.configSet(m.patch);
       case "pair.start":
-        return d.pairStart(str(m.server), typeof m.name === "string" ? m.name : undefined, m.tools);
+        return d.pairStart(
+          str(m.server),
+          typeof m.name === "string" ? m.name : undefined,
+          m.tools,
+          typeof m.link === "string" ? m.link : undefined,
+        );
       case "pair.cancel":
         return d.pairCancel();
       case "unpair":
