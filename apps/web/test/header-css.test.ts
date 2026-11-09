@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { atRule, builtCss, declarations, topLevel } from "./built-css";
 
-test("the channel header's icons never get a plate, sit 14px apart, and a phone keeps the search as an icon", async () => {
+test("the channel header's icons never get a plate, are 32 boxes 8 apart, and a phone keeps the search as an icon", async () => {
   const css = await builtCss("src/styles.css", "src/components/channel-header.css", "src/components/search/search.css");
   const shipped = topLevel(css);
   const phone = atRule(css, "@media (max-width: 760px)");
@@ -10,7 +10,7 @@ test("the channel header's icons never get a plate, sit 14px apart, and a phone 
       .filter(([p]) => p === property)
       .at(-1)?.[1];
 
-  expect(last(shipped, ".channel__acts", "gap")).toBe("14px");
+  expect(last(shipped, ".channel__acts", "gap")).toBe("var(--space-2)");
   // Hover, a press or an open popover only change the icon's color, as Discord's header does.
   for (const state of ["", ":hover", ":active", "[aria-pressed=true]", "[aria-expanded=true]"]) {
     const selector = `.channel__icon.ac-btn${state}`;
@@ -20,10 +20,14 @@ test("the channel header's icons never get a plate, sit 14px apart, and a phone 
   }
   expect(last(shipped, ".channel__icon.ac-btn", "color")).toBe("var(--muted)");
   expect(last(shipped, ".channel__icon.ac-btn:hover", "color")).toBe("var(--ink)");
-  // A square, one glyph every 26px (its 26 less the 7 it reaches into each side of the 14px gap).
-  expect(last(shipped, ".channel__icon.ac-btn", "width")).toBe("26px");
-  expect(last(shipped, ".channel__icon.ac-btn", "height")).toBe("26px");
-  expect(last(shipped, ".channel__icon.ac-btn", "margin")).toBe("0 -7px");
+  // A 32 box with no reach into the gap: boxes 8 apart, their 44 targets 4 past each side, never shared; the last
+  // glyph's ink on the header's padding line.
+  expect(last(shipped, ".channel__icon.ac-btn", "width")).toBe("var(--control-h-sm)");
+  expect(last(shipped, ".channel__icon.ac-btn", "height")).toBe("var(--control-h-sm)");
+  expect(last(shipped, ".channel__icon.ac-btn", "margin")).toBe("0");
+  expect(last(shipped, ".channel__icon.ac-btn:after", "inset")).toBe(
+    "calc((var(--control-h-sm) - var(--touch-target)) / 2) calc(-1 * var(--space-1))",
+  );
 
   // The threads count: an ink pill in either theme (the page's color on the ink), never the header's own gray.
   expect(last(shipped, ".channel__icon-count.ac-count", "background")).toBe("var(--ink2)");
