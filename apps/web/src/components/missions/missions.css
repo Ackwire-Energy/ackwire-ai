@@ -553,6 +553,16 @@ a.mi-ref:hover code {
   .mh__end {
     grid-column: 3;
   }
+  /* The title keeps its words: its state goes under it when both don't fit, never squeezing it to a letter. The
+     buttons on each side stay at its height, not in the middle of the lines under it. */
+  .mh__line {
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
+  .mh__lead,
+  .mh__end {
+    align-self: start;
+  }
   .mh__mini,
   .mh[data-compact] .mh__mini,
   .mh__exec,
