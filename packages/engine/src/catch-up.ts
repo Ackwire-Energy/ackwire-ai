@@ -114,7 +114,7 @@ export async function catchUpText(
 export async function writtenSince(
   db: Executor,
   orgId: string,
-  where: { channelId: string; threadId: string | null; after: Date; exceptAgentId: string },
+  where: { channelId: string; threadId: string | null; after: Date; triggerId: string; exceptAgentId: string },
 ): Promise<{ count: number; names: string[] }> {
   const rows = await db
     .select({ person: users.name, agent: agents.name, agentId: messages.authorAgentId })
@@ -127,6 +127,9 @@ export async function writtenSince(
         eq(messages.channelId, where.channelId),
         where.threadId ? eq(messages.threadId, where.threadId) : isNull(messages.threadId),
         landedAfterSql(messages, where.after),
+        // `after` is cut to milliseconds while Postgres keeps microseconds, and the trigger's id can be from a later
+        // millisecond than its `created_at`: never the trigger itself.
+        sql`${messages.id} <> ${where.triggerId}::uuid`,
         isNull(messages.deletedAt),
         sql`${messages.meta}->'usageWait' is null and ${messages.meta}->'notice' is null`,
       ),
