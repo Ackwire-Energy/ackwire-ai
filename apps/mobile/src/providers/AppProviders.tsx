@@ -8,12 +8,12 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { frameClock } from "@/agent/clock";
+import { PickerHost } from "@/features/shared/PickerSheet";
 import { createApi } from "@/lib/api";
 import { authClient } from "@/lib/auth";
 import { outboxStoreFor } from "@/lib/outbox";
 import { useServer } from "@/lib/server";
 import { snapshotStoreFor } from "@/lib/snapshot";
-import { ChoiceHost } from "@/ui/ChoiceHost";
 import { hintTouches } from "@/ui/hints";
 import { ToastHost } from "@/ui/Toast";
 import { TextScaleProvider } from "@/ui/text-scale";
@@ -88,8 +88,8 @@ export function AppProviders({ children }: { children: ReactNode }) {
                           <PushProvider>
                             <ToastHost>
                               {children}
-                              {/* Choices longer than Android's dialog (three buttons), once for the whole app. */}
-                              <ChoiceHost />
+                              {/* Every picker (`pickOne`) and Android's action menus, in the app's sheet, once for the whole app. */}
+                              <PickerHost />
                             </ToastHost>
                           </PushProvider>
                         </RealtimeProvider>

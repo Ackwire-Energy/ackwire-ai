@@ -27,11 +27,11 @@ import {
 } from "@/ui";
 import { CoverBarBackdrop, useCoverScroll } from "@/ui/cover";
 import { router } from "@/ui/navigation";
-import { chooseAction } from "../settings/parts";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { OrgAvatar } from "../shared/OrgAvatar";
+import { pickOne } from "../shared/PickerSheet";
 import { goBack, MentionCount, PushedHeader } from "../shared/parts";
 import { usePersonPhoto } from "../shared/photo";
 import { useTasksUnreadMarks } from "../shared/queries";
@@ -114,42 +114,40 @@ export function MeScreen() {
   const soundValue = sounds === "off" ? t("mobile.me.soundsOff") : styleLabel(sounds);
   const themeValue = t(`mobile.theme.${theme.preference}`);
 
-  // Sons, Aparência and Idioma change in their row through the system's list (an action sheet on iOS, the app's list
-  // on Android, the one in use checked there), never a screen of their own for one pick.
+  // Sons, Aparência and Idioma change in their row through the app's picker (the one in use checked, the languages
+  // searchable), never a screen of their own for one pick.
   const pickSound = () => {
     const choices: SoundChoice[] = ["tactile", "sky", "pixel", "off"];
-    chooseAction(
-      t("mobile.me.sounds"),
-      choices.map((choice) => ({
+    void pickOne({
+      title: t("mobile.me.sounds"),
+      value: sounds,
+      options: choices.map((choice) => ({
+        key: choice,
         label: choice === "off" ? t("mobile.me.soundsOff") : styleLabel(choice),
-        checked: sounds === choice,
-        onPress: () => setSoundChoice(choice),
       })),
-      t("mobile.common.cancel"),
-    );
+    }).then((key) => {
+      if (key) setSoundChoice(key as SoundChoice);
+    });
   };
   const pickTheme = () => {
     const choices: ThemePreference[] = ["system", "light", "dark"];
-    chooseAction(
-      t("mobile.me.appearance"),
-      choices.map((choice) => ({
-        label: t(`mobile.theme.${choice}`),
-        checked: theme.preference === choice,
-        onPress: () => theme.setPreference(choice),
-      })),
-      t("mobile.common.cancel"),
-    );
+    void pickOne({
+      title: t("mobile.me.appearance"),
+      value: theme.preference,
+      options: choices.map((choice) => ({ key: choice, label: t(`mobile.theme.${choice}`) })),
+    }).then((key) => {
+      if (key) theme.setPreference(key as ThemePreference);
+    });
   };
   const pickLanguage = () =>
-    chooseAction(
-      t("mobile.me.language"),
-      readyLocales().map((l) => ({
-        label: l.native,
-        checked: language.choice === l.code,
-        onPress: () => language.pick(l.code),
-      })),
-      t("mobile.common.cancel"),
-    );
+    void pickOne({
+      title: t("mobile.me.language"),
+      value: language.choice,
+      options: readyLocales().map((l) => ({ key: l.code, label: l.native })),
+      search: true,
+    }).then((key) => {
+      if (key) language.pick(key as Parameters<typeof language.pick>[0]);
+    });
   const confirmSignOut = () =>
     Alert.alert(t("mobile.me.signOutConfirm"), t("mobile.me.signOutConfirmText"), [
       { text: t("mobile.common.cancel"), style: "cancel" },

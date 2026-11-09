@@ -7,10 +7,14 @@ import { useOrg } from "@/providers/org";
 import { EmptyState, GroupedFooter, GroupedHeader, GroupedList, GroupedRow, haptics, useToast } from "@/ui";
 import { router } from "@/ui/navigation";
 import { plainRole } from "../agents/logic";
-import { chooseAction, SettingsPage } from "../settings/parts";
+import { SettingsPage } from "../settings/parts";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
+import { pickOne } from "../shared/PickerSheet";
 import { goBack } from "../shared/parts";
+
+/** The picker's key for "Ninguém" (no person). */
+const NOBODY = "\u0000nobody";
 
 /**
  * One setor (ADR 0148), from Equipe's list: who cares for it and who stands in (a tap picks another person, in place,
@@ -44,18 +48,25 @@ export function SectorScreen({ id }: { id: string }) {
   const nameOf = (userId: string | null | undefined) =>
     userId ? dir.nameOf({ type: "person", id: userId }) || t("channel.unknownPerson") : t("team.sectors.nobody");
   const failed = (e: unknown) => toast({ title: errorText(t, e), icon: "x" });
-  // A person for the lead or the stand-in, in place (the system's list), "Ninguém" first to clear it.
-  const pick = (title: string, set: (userId: string | null) => void) =>
-    chooseAction(
+  // A person for the lead or the stand-in, in the app's picker: "Ninguém" first to clear it, then each person with
+  // their photo and @handle, the one in place checked.
+  const pick = (title: string, current: string | null | undefined, set: (userId: string | null) => void) =>
+    void pickOne({
       title,
-      [
-        { label: t("team.sectors.nobody"), onPress: () => set(null) },
-        ...people.map((m) => ({ label: m.name, onPress: () => set(m.userId) })),
+      value: current ?? NOBODY,
+      options: [
+        { key: NOBODY, label: t("team.sectors.nobody"), leading: { kind: "icon", name: "x" } },
+        ...people.map((m) => ({
+          key: m.userId,
+          label: m.name,
+          sub: `@${m.handle}`,
+          leading: { kind: "person" as const, userId: m.userId },
+        })),
       ],
-      t("common.cancel"),
-    );
+    }).then((key) => {
+      if (key !== null) set(key === NOBODY ? null : key);
+    });
   const setPerson = (field: "leadUserId" | "backupUserId") => (userId: string | null) => {
-    haptics.selection();
     action.mutate({ type: "update", groupId: group.id, [field]: userId }, { onError: failed });
   };
   const remove = () =>
@@ -90,7 +101,10 @@ export function SectorScreen({ id }: { id: string }) {
           label={t("team.sectors.leadLabel")}
           value={nameOf(group.leadUserId)}
           {...(manages
-            ? { menu: true, onPress: () => pick(t("team.sectors.leadLabel"), setPerson("leadUserId")) }
+            ? {
+                menu: true,
+                onPress: () => pick(t("team.sectors.leadLabel"), group.leadUserId, setPerson("leadUserId")),
+              }
             : {})}
         />
         <GroupedRow
@@ -98,7 +112,10 @@ export function SectorScreen({ id }: { id: string }) {
           label={t("team.sectors.backupLabel")}
           value={nameOf(group.backupUserId)}
           {...(manages
-            ? { menu: true, onPress: () => pick(t("team.sectors.backupLabel"), setPerson("backupUserId")) }
+            ? {
+                menu: true,
+                onPress: () => pick(t("team.sectors.backupLabel"), group.backupUserId, setPerson("backupUserId")),
+              }
             : {})}
         />
       </GroupedList>

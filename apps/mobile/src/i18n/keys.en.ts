@@ -162,6 +162,10 @@ export const mobileEn = {
   search: {
     placeholder: "Search",
   },
+  picker: {
+    /** A picker's search found none of its options. */
+    none: "Nothing matches “{{text}}”.",
+  },
 };
 
 /** Every language of these strings has this shape (English is the source). */

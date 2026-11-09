@@ -1,6 +1,5 @@
 import { keys, useAgentAccess, useApi, useCustomServerAction, useDisconnect, useGitHubApp } from "@agenteschat/client";
 import {
-  LEVELS,
   type Level,
   type LevelState,
   levelIn,
@@ -18,10 +17,11 @@ import { StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, Icon, useToast } from "@/ui";
 import { useAgentsAccess } from "../settings/hooks";
-import { chooseAction, confirmAction } from "../settings/parts";
+import { confirmAction } from "../settings/parts";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 import { errorHaptic, successHaptic } from "../shared/parts";
+import { pickLevel } from "./pick-level";
 
 /**
  * Who uses a connection, as the phone's settings list it: one row per agent, its face in its sky at 36, the level
@@ -64,15 +64,6 @@ const useLevelWord = () => {
   return (level: LevelState) => t(`access.level.${level}`);
 };
 
-/** The system's choice of a level (an action sheet on iOS, a dialog on Android). */
-function pickLevel(title: string, cancel: string, word: (l: LevelState) => string, choose: (l: Level) => void) {
-  chooseAction(
-    title,
-    LEVELS.map((l) => ({ label: word(l), onPress: () => choose(l) })),
-    cancel,
-  );
-}
-
 function AgentLevelRow({
   orgId,
   agentId,
@@ -112,14 +103,17 @@ function AgentLevelRow({
       })
       .finally(() => setSaving(null));
   };
-  const open = () => pickLevel(agent?.name ?? "", t("common.cancel"), word, choose);
+  const open = () =>
+    void pickLevel(t, agent?.name ?? "", current).then((level) => {
+      if (level) choose(level);
+    });
   return (
     <GroupedRow
       leading={leading}
       label={agent?.name ?? ""}
       {...(agent?.role ? { sub: agent.role } : {})}
       value={word(current)}
-      // The value changes in its row, through the system's choice: its mark, not a chevron to a screen.
+      // The value changes in its row, through the app's picker: its mark, not a chevron to a screen.
       menu={mayChange}
       disabled={Boolean(saving)}
       {...(mayChange ? { onPress: open } : {})}
