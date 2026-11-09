@@ -840,6 +840,38 @@ struct HereFile {
     owner: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     skip: Option<String>,
+    /// Stopped by the person to stay stopped: the app doesn't start it (not even when it opens again) until Start,
+    /// or until `until` (Unix seconds) when it was "for an hour".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    hold: Option<Hold>,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+struct Hold {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    until: Option<u64>,
+}
+
+fn now_secs() -> u64 {
+    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
+}
+
+/// What a saved hold means at `now`: it stays stopped (until Start, or until a time still ahead), or the hold is
+/// over (a time gone by, while the app was closed too).
+pub fn hold_left(until: Option<u64>, now: u64) -> HoldLeft {
+    match until {
+        None => HoldLeft::UntilStart,
+        Some(t) if t > now => HoldLeft::For(t - now),
+        Some(_) => HoldLeft::Over,
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum HoldLeft {
+    UntilStart,
+    /// Seconds still to wait.
+    For(u64),
+    Over,
 }
 
 #[derive(Default)]
@@ -1035,6 +1067,10 @@ pub struct Status {
     /// A terminal install still waiting for its owner, and running: its claim (the welcome window only).
     claim: Option<String>,
     back_to: Option<String>,
+    /// Stopped by the person to stay stopped (Stop): until Start, or until `held_until`.
+    held: bool,
+    /// When a stop "for an hour" ends and it starts again by itself (Unix milliseconds).
+    held_until: Option<u64>,
 }
 
 fn system_name() -> Option<String> {
@@ -1103,6 +1139,8 @@ pub fn status(app: &AppHandle, welcome: bool) -> Status {
         serving,
         claim,
         back_to,
+        held: run && here.hold.is_some(),
+        held_until: here.hold.and_then(|h| h.until).map(|t| t * 1000),
     }
 }
 
@@ -1432,6 +1470,7 @@ pub fn stop(app: &AppHandle, forget: bool) {
         inner.on_purpose = true;
         if forget {
             inner.here.run = false;
+            inner.here.hold = None;
         }
         (inner.pid, inner.here.clone())
     };
@@ -1484,10 +1523,65 @@ pub fn load(app: &AppHandle) {
         .and_then(|p| fs::read_to_string(p).ok())
         .and_then(|t| serde_json::from_str(&t).ok())
         .unwrap_or_default();
+    let hold = here.hold;
     state(app).here = here;
-    if runs(app) {
-        start(app);
+    if !runs(app) {
+        return;
     }
+    match hold.map(|h| hold_left(h.until, now_secs())) {
+        Some(HoldLeft::UntilStart) => emit_status(app),
+        Some(HoldLeft::For(_)) => release_at(app, hold.and_then(|h| h.until).unwrap_or_default()),
+        Some(HoldLeft::Over) | None => {
+            if hold.is_some() {
+                set_hold(app, None);
+            }
+            start(app);
+        }
+    }
+}
+
+fn set_hold(app: &AppHandle, hold: Option<Hold>) {
+    let here = {
+        let mut inner = state(app);
+        inner.here.hold = hold;
+        inner.here.clone()
+    };
+    save_here(app, &here);
+    emit_status(app);
+}
+
+/// Stop, by the person: it stays stopped until Start (`minutes` None), or starts again by itself after `minutes`.
+/// Tailscale stops sharing it and the agents of its workspaces stop working here meanwhile, as with any stop.
+pub fn hold_stopped(app: &AppHandle, minutes: Option<u64>) {
+    let until = minutes.map(|m| now_secs() + m * 60);
+    stop_by_hand(app, false);
+    set_hold(app, Some(Hold { until }));
+    if let Some(until) = until {
+        release_at(app, until);
+    }
+}
+
+/// Start, by the person (the popover, Preferences, the menus): any hold ends.
+pub fn start_by_hand(app: &AppHandle) {
+    if state(app).here.hold.is_some() {
+        set_hold(app, None);
+    }
+    start(app);
+}
+
+/// At `until`, a stop "for an hour" ends: it starts again, unless the person changed it meanwhile (started it,
+/// stopped it again, stopped running it here).
+fn release_at(app: &AppHandle, until: u64) {
+    emit_status(app);
+    let app = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_secs(until.saturating_sub(now_secs())));
+        let still = state(&app).here.hold == Some(Hold { until: Some(until) });
+        if still && runs(&app) {
+            set_hold(&app, None);
+            start(&app);
+        }
+    });
 }
 
 /// The person stopped it (Stop, "Stop running it here…"): Tailscale stops sharing it too, and the agents of its
@@ -1628,6 +1722,7 @@ fn install(app: &AppHandle, choice: &Choice) -> Result<(), String> {
     {
         let mut inner = state(app);
         inner.here.run = true;
+        inner.here.hold = None;
         inner.failed = 0;
         inner.back_to = None;
         inner.on_purpose = false;
@@ -1933,6 +2028,8 @@ pub fn local_server_start(app: AppHandle, webview: tauri::Webview) -> Result<(),
     {
         let mut inner = state(&app);
         inner.here.run = true;
+        // Start ends a stop the person asked to keep.
+        inner.here.hold = None;
         inner.failed = 0;
         inner.back_to = None;
         let here = inner.here.clone();
@@ -1943,15 +2040,28 @@ pub fn local_server_start(app: AppHandle, webview: tauri::Webview) -> Result<(),
     Ok(())
 }
 
+/// Stop: `forget` stops running it here; otherwise it stays stopped until Start, or for `minutes` (an hour, from
+/// the popover's choices) and then starts again by itself. Either way it no longer starts when the app opens again.
 #[tauri::command]
-pub async fn local_server_stop(app: AppHandle, webview: tauri::Webview, forget: bool) -> Result<(), String> {
+pub async fn local_server_stop(
+    app: AppHandle,
+    webview: tauri::Webview,
+    forget: bool,
+    minutes: Option<u64>,
+) -> Result<(), String> {
     app_window(&webview, &["popover", "prefs"])?;
     // The popover's Stop during a setup is its Cancel.
     if setting_up(&app) {
         app.state::<LocalServer>().cancel.store(true, SeqCst);
     }
+    // At most a day: a longer stop is "until Start".
+    let minutes = minutes.filter(|m| (1..=24 * 60).contains(m));
     tauri::async_runtime::spawn_blocking(move || {
-        stop_by_hand(&app, forget);
+        if forget {
+            stop_by_hand(&app, true);
+        } else {
+            hold_stopped(&app, minutes);
+        }
         if forget {
             if let Some(origin) = public_url(&app) {
                 crate::servers::remove(&app, &origin);
@@ -2081,6 +2191,23 @@ pub async fn local_server_sync(app: AppHandle, webview: tauri::Webview, rotate: 
 mod tests {
     use super::*;
     use std::sync::Arc;
+
+    #[test]
+    fn a_kept_stop_and_its_end() {
+        assert_eq!(hold_left(None, 1_000), HoldLeft::UntilStart);
+        assert_eq!(hold_left(Some(1_060), 1_000), HoldLeft::For(60));
+        // The hour ended while the app was closed: it starts as the app opens.
+        assert_eq!(hold_left(Some(1_000), 1_000), HoldLeft::Over);
+        assert_eq!(hold_left(Some(900), 1_000), HoldLeft::Over);
+        // Saved and read back; a record from before holds existed reads as none.
+        let here = HereFile { run: true, owner: true, skip: None, hold: Some(Hold { until: Some(1_060) }) };
+        let back: HereFile = serde_json::from_str(&serde_json::to_string(&here).unwrap()).unwrap();
+        assert_eq!(back.hold, Some(Hold { until: Some(1_060) }));
+        let until_start: HereFile = serde_json::from_str(r#"{"run":true,"owner":true,"hold":{}}"#).unwrap();
+        assert_eq!(until_start.hold, Some(Hold { until: None }));
+        let older: HereFile = serde_json::from_str(r#"{"run":true,"owner":true}"#).unwrap();
+        assert_eq!(older.hold, None);
+    }
 
     /// A new temporary folder for one test.
     fn temp(name: &str) -> PathBuf {

@@ -160,8 +160,11 @@ export interface Host {
   cancelLocalSetup(): Promise<void>;
   onSetupStep(cb: (change: StepChange) => void): () => void;
   startLocalServer(): Promise<void>;
-  /** Stops it; `forget`: it no longer starts with the app (its data stays). */
-  stopLocalServer(forget: boolean): Promise<void>;
+  /**
+   * Stops it, and it stays stopped (also when the app opens again) until Start, or for `minutes` and then it starts
+   * by itself. `forget`: the app no longer runs it here (its data stays).
+   */
+  stopLocalServer(forget: boolean, minutes?: number): Promise<void>;
   restartLocalServer(): Promise<void>;
   /** Reach from the person's other devices (Tailscale), on or off; the main window follows the address. */
   setLocalReach(on: boolean): Promise<ReachResult>;

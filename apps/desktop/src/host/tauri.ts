@@ -96,7 +96,7 @@ export function createTauriHost(): Host {
     cancelLocalSetup: () => invoke<void>("local_server_cancel"),
     onSetupStep: (cb) => subscribe<StepChange>("local-server://step", cb),
     startLocalServer: () => invoke<void>("local_server_start"),
-    stopLocalServer: (forget) => invoke<void>("local_server_stop", { forget }),
+    stopLocalServer: (forget, minutes) => invoke<void>("local_server_stop", { forget, minutes: minutes ?? null }),
     restartLocalServer: () => invoke<void>("local_server_restart"),
     setLocalReach: (on) => invoke<ReachResult>("local_server_reach", { on }),
     onLocalReach: (cb) => subscribe<ReachStage>("local-server://reach", cb),

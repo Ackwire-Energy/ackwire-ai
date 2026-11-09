@@ -35,6 +35,10 @@ export interface LocalServerStatus {
   claim: string | null;
   /** An update didn't start and it went back to this version. */
   backTo: string | null;
+  /** Stopped by the person to stay stopped: it doesn't start with the app until Start, or until `heldUntil`. */
+  held: boolean;
+  /** When a stop for a while ends and it starts again by itself (milliseconds since 1970); null: until Start. */
+  heldUntil: number | null;
 }
 
 /** `app`: Tailscale's Mac app is there to open, not only its command-line tool (Homebrew's). */
@@ -102,6 +106,8 @@ export const NO_SERVER: LocalServerStatus = {
   serving: false,
   claim: null,
   backTo: null,
+  held: false,
+  heldUntil: null,
 };
 
 /** "Setting it up", in order; access from other devices only when it was asked for. */

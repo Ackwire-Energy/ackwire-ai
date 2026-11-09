@@ -44,7 +44,7 @@ import {
   thisMac,
 } from "@/lib/desktop";
 import { useHumanCheck } from "@/lib/human-check";
-import { STORAGE_KEYS, sessionStore } from "@/lib/storage";
+import { STORAGE_KEYS, sessionStore, storage } from "@/lib/storage";
 
 /**
  * Sign in and sign up in one flow: the e-mail
@@ -214,6 +214,18 @@ export function AuthPage({
       setOwnerPending(false);
     }
   };
+  // The owner's session ended (it expired, or this window never had one) on the server the app runs here: the app
+  // signs them in again at once, as Continue on this Mac does. Not after Sign out by hand, nor when the page came for
+  // something else (an invitation, a provider's refusal, an address to sign in with): the screen waits then.
+  const ownerAgain = local && start === "in" && !refused && !goal && !initialEmail;
+  const ownerTried = useRef(false);
+  useEffect(() => {
+    if (!ownerAgain || ownerTried.current || storage.get(STORAGE_KEYS.signedOut) === "1") return;
+    ownerTried.current = true;
+    setOwnerPending(true);
+    // Refused (too soon after another, the server not up yet): the screen stays, its button one click away.
+    void thisMac.signIn().catch(() => setOwnerPending(false));
+  }, [ownerAgain]);
 
   const go = (next: Step) => {
     setError(null);

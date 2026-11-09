@@ -137,10 +137,10 @@ pub fn on_event(app: &AppHandle, id: &str) {
         }
         "open" => crate::open_app(app),
         // The tray's line for the server here (Windows and Linux).
-        "hereStart" => crate::local_server::start(app),
+        "hereStart" => crate::local_server::start_by_hand(app),
         "hereStop" => {
             let app = app.clone();
-            std::thread::spawn(move || crate::local_server::stop_by_hand(&app, false));
+            std::thread::spawn(move || crate::local_server::hold_stopped(&app, None));
         }
         // The popover owns updates, quitting (it asks first while agents are working), access requests, the
         // Servers tab and pausing.

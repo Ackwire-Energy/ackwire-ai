@@ -20,7 +20,10 @@ afterEach(() => {
   cleanup();
   delete win().__agentesDesktop;
   delete win().__TAURI_INTERNALS__;
+  localStorage.removeItem("agentes.signedOut");
 });
+/** The person signed out by hand: the screen waits for their click (no sign-in at once). */
+const byHand = () => localStorage.setItem("agentes.signedOut", "1");
 
 /** The app around the site: answers `this_mac` with `status`, records every request. */
 function inTheApp(status: ThisMacStatus) {
@@ -46,7 +49,28 @@ const signedOut = (options?: SignInOptions) => {
 const continueHere = () => screen().queryByRole("button", { name: /^Continuar neste/ });
 
 describe("Entrar no servidor que o app roda neste computador", () => {
+  test("the owner's session ended: the app signs them in again at once, with no click", async () => {
+    const asked = inTheApp({ orgs: [], agentsHere: false, local: true });
+    await renderApp("/login", { api: signedOut() });
+    await settle(6);
+    expect(asked.filter((r) => r.kind === "signIn")).toEqual([{ kind: "signIn" }]);
+  });
+
+  test("after Sign out by hand, or with an address to sign in with, the screen waits", async () => {
+    byHand();
+    const asked = inTheApp({ orgs: [], agentsHere: false, local: true });
+    await renderApp("/login", { api: signedOut() });
+    await settle(6);
+    expect(continueHere()).toBeTruthy();
+    cleanup();
+    localStorage.removeItem("agentes.signedOut");
+    await renderApp("/login?email=bruno%40acme.com", { api: signedOut() });
+    await settle(6);
+    expect(asked.filter((r) => r.kind === "signIn")).toEqual([]);
+  });
+
   test("one click asks the app, which signs the owner in; the e-mail stays for anyone else", async () => {
+    byHand();
     const asked = inTheApp({ orgs: [], agentsHere: false, local: true });
     await renderApp("/login", { api: signedOut() });
     await settle(6);
@@ -60,6 +84,7 @@ describe("Entrar no servidor que o app roda neste computador", () => {
   });
 
   test("an account with no password, typed in: the same one click, never 'open the app'", async () => {
+    byHand();
     inTheApp({ orgs: [], agentsHere: false, local: true });
     await renderApp("/login", { api: signedOut({ account: true, password: false, providers: [], canSignUp: false }) });
     await act(async () => fireEvent.change(screen().getByLabelText("E-mail"), { target: { value: "ana@acme.com" } }));
@@ -76,6 +101,7 @@ describe("Entrar no servidor que o app roda neste computador", () => {
       return createFakeApi(state);
     };
     const google = () => screen().queryByRole("button", { name: /Continuar com Google/ });
+    byHand();
     inTheApp({ orgs: [], agentsHere: false, local: true });
     await renderApp("/login", { api: withProviders() });
     await settle(6);

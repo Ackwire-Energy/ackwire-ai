@@ -1854,6 +1854,7 @@ function AccountMenu() {
 
   const signOut = async () => {
     await auth.signOut();
+    storage.set(STORAGE_KEYS.signedOut, "1");
     qc.clear();
     await navigate({ to: "/login" });
   };

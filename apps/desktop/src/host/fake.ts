@@ -442,13 +442,18 @@ export function createFakeHost(
     },
     cancelLocalSetup: async () => cancelSetup?.(),
     startLocalServer: async () => {
-      setLocal({ run: true, phase: "starting", backTo: null });
+      setLocal({ run: true, phase: "starting", backTo: null, held: false, heldUntil: null });
       await wait(1200);
       setLocal({ phase: "running" });
     },
-    stopLocalServer: async (forget) => {
+    stopLocalServer: async (forget, minutes) => {
       await wait(600);
-      setLocal({ phase: forget ? "off" : "stopped", run: !forget });
+      setLocal({
+        phase: forget ? "off" : "stopped",
+        run: !forget,
+        held: !forget,
+        heldUntil: !forget && minutes ? Date.now() + minutes * 60_000 : null,
+      });
       if (forget) await host.removeServer(local.publicUrl ?? LOCAL_URL);
     },
     restartLocalServer: async () => {
