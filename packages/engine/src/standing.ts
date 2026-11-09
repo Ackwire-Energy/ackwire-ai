@@ -9,6 +9,7 @@ import { publishOrgEvent } from "./events";
 import type { Judge } from "./judge";
 import type { MachineHub } from "./machine-hub";
 import { notifyAgentHold, notifyOrgStanding, resolveAgentHold } from "./notification-producers";
+import { enqueue } from "./outbox";
 import { isAgentesCloud } from "./telemetry";
 
 const { organizations, agents, users, sessions, pushDevices, organizationMembers, machineProvisioning } = schema;
@@ -335,9 +336,12 @@ export async function setOrgStanding(
   return done.after;
 }
 
+/** The team's hello in #general once it can work (`sayTeamHello` in team-templates, ADR 0158). */
+export const TEAM_HELLO_JOB = "team.hello";
+
 /**
  * Puts the billing service's hold on a workspace, moves it to another code, or lifts it (`null`), through the same
- * write as `setOrgStanding`. A suspension or any other hold is never replaced nor lifted from here: `applied` false,
+ * write as `setOrgStanding`. Lifting the first plan's hold queues the team's hello. A suspension or any other hold is never replaced nor lifted from here: `applied` false,
  * as when it is already so. Null when there is no such workspace.
  */
 export async function setBillingHold(
@@ -349,7 +353,15 @@ export async function setBillingHold(
     const [before] = await lockStanding(tx, orgId);
     if (!before) return null;
     const change = billingChange(before, hold);
-    return { before, written: change ? await writeStanding(tx, orgId, before, change) : null };
+    const written = change ? await writeStanding(tx, orgId, before, change) : null;
+    if (written && hold === null && before.reason === "payment")
+      await enqueue(tx, {
+        orgId,
+        kind: TEAM_HELLO_JOB,
+        payload: { how: "paid" },
+        dedupeKey: `${TEAM_HELLO_JOB}:${orgId}`,
+      });
+    return { before, written };
   });
   if (!done) return null;
   if (!done.written) return { applied: false, standing: done.before };

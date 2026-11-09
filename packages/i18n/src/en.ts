@@ -16040,7 +16040,7 @@ export const en = {
     },
     software: {
       name: "Software and apps",
-      sub: "Support, billing and code",
+      sub: "Customer care, billing and code",
       desc: "For a company that sells software and looks after its own customers.",
     },
     support: {
@@ -16053,61 +16053,71 @@ export const en = {
       sub: "Accounting, law, consulting",
       desc: "For an office that books clients, sends proposals and bills them.",
     },
+    /** The team's hello in #general once it can work (ADR 0158): Lodi's line, then each agent's. */
+    hello: {
+      lodi: {
+        starting: "Plan active! My computer is starting up. Let's get to work!",
+        ready: "Plan active! Let's get to work!",
+        created: "The team is here! Let's get to work!",
+      },
+    },
     agents: {
       iara: {
         role: "Customer service",
         line: "Answers customers on WhatsApp and email. Calls you when she doesn't know.",
         routine: "Sum up what was left unanswered",
         task: "Write a reply to this customer message:",
+        hello: "Hi, {{first}}! Leave whoever writes on WhatsApp to me.",
       },
       caio: {
         role: "Billing",
         line: "Reminds whoever is late on payment and sends the reminder after your ok.",
         routine: "List who is late on payment",
         task: "Write a friendly payment reminder for:",
+        hello: "Hello! I'll handle billing and only send reminders after your ok.",
       },
       ada: {
         role: "Dev",
         line: "Fixes the bugs customers report and opens the PR.",
         routine: "List the new bugs",
         task: "Tell me where to start looking at this bug:",
+        hello: "Hi! Send me the bugs that come in, I'll dig in and open the PR.",
       },
       lia: {
         role: "Content",
         line: "Writes posts and scripts in the company's voice and schedules them after your ok.",
         routine: "Propose the week's posts",
         task: "Suggest three posts for this week about:",
+        hello: "Hi, everyone! This week's posts are on me.",
       },
       theo: {
         role: "Sales",
         line: "Follows up on everyone who asked for a quote and writes the proposals.",
         routine: "List who asked for a quote and got no answer",
         task: "Write a short quote for this request:",
+        hello: "Hi, {{first}}! Nobody who asks for a quote will go unanswered.",
       },
       nina: {
         role: "Scheduling",
         line: "Books, confirms and moves appointments, and reminds clients the day before.",
         routine: "Confirm tomorrow's appointments",
         task: "Organize tomorrow's schedule:",
+        hello: "Hello! The calendar is mine, and I'll remind clients the day before.",
       },
       otto: {
         role: "Orders",
         line: "Follows orders and stock and warns what is running out.",
         routine: "Warn what is running out in stock",
         task: "List what's left to do on these orders:",
+        hello: "I'm here. I'll watch the orders and tell you if stock runs low.",
       },
       bia: {
         role: "Answer base",
         line: "Keeps the answer base up to date with what the team answers.",
         routine: "Update the base with the week's answers",
         task: "Write answers to these customer questions:",
+        hello: "Hi! I'll keep the answer base up to date with what the team says.",
       },
-    },
-    /** On a billing hold, under Primeira tarefa: what the template's first agent delivers, labelled and never posted. */
-    example: {
-      iara: "Hi Marina. Your order left yesterday and arrives by Friday. The tracking code is right below. If Friday doesn't work, I'll find another date.",
-      lia: "1. Three common mistakes when hiring an agency. 2. Behind the scenes of a project that almost went wrong. 3. A question for your followers: what do you want to see here?",
-      nina: "Tomorrow: 9:00 Carla, 10:30 Pedro, 14:00 open. Pedro hasn't confirmed yet. Want me to write to him?",
     },
     channels: {
       iara: "support",

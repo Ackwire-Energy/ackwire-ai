@@ -145,6 +145,27 @@ describe("mintBillingLink", () => {
     expect(claims).toMatchObject({ role: "admin", locale: "en", usage: { members: 2 } });
   });
 
+  test("the plan picked in the app goes as a claim, untouched; anything not a plan key is left out", async () => {
+    const planOf = async (plan: string | undefined) =>
+      claimsOf(
+        (
+          await mintBillingLink(f.db, {
+            secret: SECRET,
+            baseUrl: "https://billing.example.com",
+            userId: f.owner.id,
+            orgId: f.org.id,
+            from: "onboarding",
+            plan,
+            now: NOW,
+          })
+        ).url,
+      ).plan;
+    expect(await planOf("team")).toBe("team");
+    expect(await planOf("pro_yearly")).toBe("pro_yearly");
+    expect(await planOf(undefined)).toBeUndefined();
+    for (const junk of ["Team", "team plan", "x".repeat(40), "1team", ""]) expect(await planOf(junk)).toBeUndefined();
+  });
+
   test("back to the page it was opened from when that is one of this workspace's; anything else, the default", async () => {
     const org = `/org/${f.org.id}`;
     const back = async (from: (typeof BILLING_FROM)[number], returnTo: string) =>

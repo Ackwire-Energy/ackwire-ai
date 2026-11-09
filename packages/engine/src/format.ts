@@ -11,6 +11,9 @@ export const cutMarked = (text: string, max: number) => (text.length > max ? `${
 /** Whether `text` asks something by its punctuation, in any script: `?`, the full-width `？`, the Arabic `؟`. */
 export const hasQuestionMark = (text: string) => /[?？؟]/.test(text);
 
+/** A person's first name, from their whole name. */
+export const firstName = (name: string) => name.trim().split(/\s+/)[0] ?? "";
+
 const WORDS = new Intl.Segmenter(undefined, { granularity: "word" });
 /** How many words `text` has, in any script: Chinese, Japanese or Thai, written without spaces, count theirs too. */
 export function wordCount(text: string) {

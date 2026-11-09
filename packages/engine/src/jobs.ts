@@ -107,8 +107,10 @@ import { indexSource, reindexOrg } from "./search";
 import { activateDeliveredSecret, discardClosedSecret } from "./secrets";
 import { runSkillUpdates, SKILL_UPDATES_JOB } from "./skill-updates";
 import type { SkillDeps } from "./skills";
+import { TEAM_HELLO_JOB } from "./standing";
 import { purgeOrgFiles, purgeUserFiles, runMigration, type StorageDeps } from "./storage";
 import { postStretchCard, STRETCH_JOB, type StretchHold } from "./stretch";
+import { sayTeamHello } from "./team-templates";
 import { postTeamWeek, TEAM_WEEK_JOB } from "./team-week";
 import { isAgentesCloud } from "./telemetry";
 import { assessThread } from "./thread-assess";
@@ -940,6 +942,10 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         throw error;
       }
       await forgetCodeEmail(deps.db, job);
+    },
+    // The team says hi in #general once it can work (ADR 0158).
+    [TEAM_HELLO_JOB]: async (job) => {
+      await sayTeamHello(deps, orgOf(job), job.payload);
     },
     [PLAN_WAITING_JOB]: async (job) => {
       if (deps.emailArt) await sendPlanWaitingEmail(deps.db, deps.emailArt.home, orgOf(job), job.payload.step);
