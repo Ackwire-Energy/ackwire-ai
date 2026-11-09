@@ -37,8 +37,8 @@ const {
 /**
  * What happens on GitHub wakes the agent it concerns (ADR 0156): the app's webhook queues each event GitHub sends once
  * (`queueGitHubAppEvent`, deduped by its delivery id), and its job (`handleGitHubAppEvent`) brings it to the agent that
- * opened or wrote on the item, in the conversation that work came from (`github_items`), or a member's mention of the
- * app on an item no agent worked on to the workspace's right hand. A member whose GitHub account is linked to their
+ * opened or wrote on the item, in the conversation that work came from (`github_items`), or a mention of the app on an
+ * item no agent worked on to the workspace's right hand, to hand on. A member whose GitHub account is linked to their
  * sign-in wakes the agent with them behind the run; anyone else only leaves the notice, which a member may ask the
  * agent to answer (`answerGitHubNotice`). Bots, the app's own included, and what our agents wrote are never news.
  */
@@ -274,7 +274,20 @@ async function linkedMember(db: Database, orgId: string, githubId: number) {
   return row ?? null;
 }
 
-/** The workspace's right hand, in the member's DM with it. */
+/** Who connected that GitHub account to the workspace, while they belong to it. */
+async function installerOf(db: Database, orgId: string, installationId: number) {
+  const [row] = await db
+    .select({ id: organizationMembers.userId })
+    .from(githubAppInstallations)
+    .innerJoin(
+      organizationMembers,
+      and(eq(organizationMembers.userId, githubAppInstallations.createdByUserId), eq(organizationMembers.orgId, orgId)),
+    )
+    .where(and(eq(githubAppInstallations.orgId, orgId), eq(githubAppInstallations.installationId, installationId)));
+  return row?.id ?? null;
+}
+
+/** The workspace's right hand, in the person's DM with it. */
 async function rightHandConversation(db: Database, orgId: string, userId: string) {
   const [hand] = await db
     .select({ id: agents.id })
@@ -289,11 +302,10 @@ async function rightHandConversation(db: Database, orgId: string, userId: string
 
 /**
  * Brings one GitHub event to its agent (job `github_app.event`): the item's agent in the conversation it came from
- * (a merge or a close only of an item the agent opened), else a member's mention of the app to the right hand in their
- * DM. A member who may read that conversation and talk to the agent wakes it, behind the run; anyone else leaves a
- * notice only (`refs.outside`). A merge or a close wakes the agent whoever did it. A stranger naming the app on an item
- * no agent worked on is dropped: nobody here asked for that item, and any public repository's comments could fill a
- * person's DM.
+ * (a merge or a close only of an item the agent opened), else a mention of the app to the right hand, to hand on: in
+ * the DM of the member who wrote it, or of whoever connected that GitHub account here for anyone else. A member who
+ * may read that conversation and talk to the agent wakes it, behind the run; anyone else leaves a notice only
+ * (`refs.outside`). A merge or a close wakes the agent whoever did it.
  */
 export async function handleGitHubAppEvent(
   deps: { db: Database; pubsub?: PubSub },
@@ -310,10 +322,11 @@ export async function handleGitHubAppEvent(
   const closing = e.action === "merged" || e.action === "closed";
   if (closing ? !item?.authored : !item && !e.mentioned) return "ignored";
   const member = await linkedMember(db, orgId, e.sender.id);
+  const dmWith = item ? null : (member?.id ?? (await installerOf(db, orgId, e.installationId)));
   const target = item
     ? { agentId: item.agentId, channelId: item.channelId, threadId: item.threadId }
-    : member
-      ? await rightHandConversation(db, orgId, member.id)
+    : dmWith
+      ? await rightHandConversation(db, orgId, dmWith)
       : null;
   if (!target) return "ignored";
   const agent = await getAgent(db, orgId, target.agentId);

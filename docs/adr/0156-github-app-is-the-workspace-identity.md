@@ -207,9 +207,9 @@ its page on GitHub (`missingGitHubAppEvents`, from `GET /app`). `git/github-even
   them) an agent opened or wrote on through its GitHub tools (the signed ones, and `open_pull_request`), with the
   conversation it worked from (a routine's run: where it reports) and the run. The agent that opened an item keeps it;
   one only written on goes to whichever agent wrote last. Events on an item go to its agent, in that conversation; a
-  merge or a close only to the agent that opened it. A member naming the app on an item no agent worked on goes to the
-  right hand, in their DM with it, to hand on. A stranger naming it there is dropped: nobody here asked for that item,
-  and any public repository's comments could fill a person's DM.
+  merge or a close only to the agent that opened it. A mention of the app on an item no agent worked on goes to the
+  right hand, to hand on: in the DM of the member who wrote it, or for anyone else in the DM of whoever connected that
+  GitHub account here (the installation's `createdByUserId`, while a member), where it wakes nobody until they ask.
 - **Who is behind it.** A commenter whose GitHub account is a member's sign-in (`accounts`, `providerId` `github`), who
   reads that conversation (work handed to the agent in the agents' DM, which no person reads: who belongs to the
   workspace) and may talk to the agent, wakes it with them behind the run (the notice's server-set `refs.personId`,
