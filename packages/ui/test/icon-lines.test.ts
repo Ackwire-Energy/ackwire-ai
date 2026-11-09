@@ -289,12 +289,12 @@ describe("a picture beside lines, a bubble beside a face, a row of actions", () 
     // reach into it, less the first's glyph air.
     const plates = await kitRule(".ac-acts > .ac-btn:not(.ac-btn--ghost):has(+ .ac-btn:not(.ac-btn--ghost))");
     expect(plates).toContain("margin-inline-end: calc(var(--space-2) - 2 * var(--ghost-plate))");
-    const icons = await kitRule(
-      ".ac-acts > :is(.ac-btn--ghost.ac-btn--icon, .ac-btn--glyph):has(+ :is(.ac-btn--ghost.ac-btn--icon, .ac-btn--glyph))",
-    );
-    expect(icons).toContain("margin-inline-end: calc(var(--space-2) - var(--ghost-plate) - var(--glyph-air, 0px))");
-    // Never by the second's start: on a line of its own it would stick out of the row.
+    // Its selector holds a comma inside `:is()`, which the rule list splits on: read from the sheet itself.
     const css = await Bun.file(join(ROOT, "packages/ui/src/styles/components.css")).text();
+    expect(css).toContain(
+      ".ac-acts > :is(.ac-btn--ghost.ac-btn--icon, .ac-btn--glyph):has(+ :is(.ac-btn--ghost.ac-btn--icon, .ac-btn--glyph)) {\n  margin-inline-end: calc(var(--space-2) - var(--ghost-plate) - var(--glyph-air, 0px));\n}",
+    );
+    // Never by the second's start: on a line of its own it would stick out of the row.
     expect(css).not.toMatch(/\.ac-acts > [^{]*\+ [^{]*\{\s*margin-inline-start/);
   });
 

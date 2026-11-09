@@ -47,7 +47,9 @@ describe("worst cases: words and their actions", () => {
     );
     const dialog = body().getByRole("dialog");
     expect(dialog.querySelector(".ac-details__lead.ac-actline > .ac-details__actions")).not.toBeNull();
-    expect(dialog.querySelector(".ac-details__close > [aria-label='Mais ações'] + [aria-label='Fechar']")).not.toBeNull();
+    expect(
+      dialog.querySelector(".ac-details__close > [aria-label='Mais ações'] + [aria-label='Fechar']"),
+    ).not.toBeNull();
   });
 
   test("a document's 82-character title with Baixar, Editar and the ⋯", () => {
@@ -103,7 +105,11 @@ describe("worst cases: words and their actions", () => {
           />
         </Card>
         <Card>
-          <CardHeader title="接続されている他のコンピューター" subtitle="この作業スペース" action={<Button size="sm">ダウンロード</Button>} />
+          <CardHeader
+            title="接続されている他のコンピューター"
+            subtitle="この作業スペース"
+            action={<Button size="sm">ダウンロード</Button>}
+          />
         </Card>
       </>,
     );

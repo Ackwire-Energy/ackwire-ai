@@ -1766,9 +1766,9 @@ describe("the dialog's size (computer.css)", () => {
       new URL("../../../packages/ui/src/styles/components.css", import.meta.url).pathname,
     ).text();
     expect(rule(kit, ".ac-dialog__title")).toContain("line-height: 24px");
-    expect(rule(kit, ".ac-dialog__title + .ac-dialog__acts,\n.ac-actline:has(> .ac-dialog__title) + .ac-dialog__close")).toContain(
-      "translate: 0 calc(-1 * var(--title-cap-mid, var(--cap-mid)))",
-    );
+    expect(
+      rule(kit, ".ac-dialog__title + .ac-dialog__acts,\n.ac-actline:has(> .ac-dialog__title) + .ac-dialog__close"),
+    ).toContain("translate: 0 calc(-1 * var(--title-cap-mid, var(--cap-mid)))");
     // The line under the name keeps its room while empty, so the name and the controls stay where they are.
     expect(rule(text, ".cmp-sub:empty::before")).toContain('content: "\\00a0"');
     // Full screen's bar is its own box: the controls in its middle, beside both lines (the kit's 24 + 18 px).

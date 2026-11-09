@@ -229,10 +229,16 @@ describe("viewer", () => {
 describe("a document's head", () => {
   test("the bar keeps ×, Copiar texto and ⋯; the name and its line take a row of their own under it, never cut", () => {
     const viewer = readFileSync(join(import.meta.dir, "../../src/features/files/DocumentViewer.tsx"), "utf8");
-    const bar = viewer.slice(viewer.indexOf("<View style={[styles.top,"), viewer.indexOf("<View style={styles.heading}>"));
+    const bar = viewer.slice(
+      viewer.indexOf("<View style={[styles.top,"),
+      viewer.indexOf("<View style={styles.heading}>"),
+    );
     expect(bar).not.toContain("info?.name");
     expect(bar).not.toContain("styles.balance");
-    const heading = viewer.slice(viewer.indexOf("<View style={styles.heading}>"), viewer.indexOf("<View style={styles.body}>"));
+    const heading = viewer.slice(
+      viewer.indexOf("<View style={styles.heading}>"),
+      viewer.indexOf("<View style={styles.body}>"),
+    );
     expect(heading).toContain("numberOfLines={3}");
     expect(heading).toContain("{info?.name");
     expect(heading).not.toContain("numberOfLines={1}");

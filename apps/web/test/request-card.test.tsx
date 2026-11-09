@@ -24,7 +24,8 @@ describe("a request card on the compact rhythm", () => {
     expect(last(top, ".rq__foot", "padding")).toBe("8px 16px");
     expect(last(top, ".rq__foot", "min-height")).toBe("48px");
     expect(last(top, ".rq__foot > .ac-btn", "height")).toBe("32px");
-    expect(last(top, ".rq__foot,.rq__item-acts", "column-gap")).toBe("var(--space-2)");
+    expect(last(top, ".rq__foot", "column-gap")).toBe("var(--space-2)");
+    expect(last(top, ".rq__item-acts", "column-gap")).toBe("var(--space-2)");
     // A ghost keeps its own padding: no reach into the gap, so its plate never meets the button before it.
     expect(declarations(top, ".rq__foot > .ac-btn--ghost")).toEqual([]);
     const touch = atRule(shipped, "@media (pointer: coarse)");
@@ -33,8 +34,10 @@ describe("a request card on the compact rhythm", () => {
   });
 
   test("the well: Ver … under the words on their edge; in a narrow card the words take the well's width under the mark's line", () => {
-    expect(last(top, ".rq__wt > .rq__more", "align-self")).toBe("flex-start");
-    expect(last(top, ".rq__wt > .rq__more", "margin")).toBe("2px 0 0 -6px");
+    // The build folds align-self and justify-self into place-self.
+    const more = Object.fromEntries(declarations(top, ".rq__wt > .rq__more"));
+    expect(more["place-self"] ?? more["align-self"]).toMatch(/^flex-start/);
+    expect(more.margin).toBe("2px 0 0 -6px");
     expect(last(top, ".rq__well", "padding")).toBe("var(--row-py) 16px");
     const narrow = atRule(shipped, "@container (max-width: 479px)");
     expect(last(narrow, ".rq__well", "display")).toBe("grid");
@@ -47,7 +50,8 @@ describe("a request card on the compact rhythm", () => {
 
   test("a grouped request is an action line: its decision beside its words while they fit on one line, else under them", () => {
     expect(declarations(top, ".rq__item").map(([p]) => p)).not.toContain("display");
-    expect(last(top, ".rq__item > :not(.rq__well,.rq__item-acts)", "flex")).toBe("1 1 100%");
+    // `1 1 100%`, which the build writes as `100%`.
+    expect(["1 1 100%", "100%"]).toContain(last(top, ".rq__item > :not(.rq__well,.rq__item-acts)", "flex") ?? "");
   });
 
   test("Ver … sits in the words' column, and the agent's words show code between backticks as code", () => {

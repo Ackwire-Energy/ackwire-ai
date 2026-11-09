@@ -330,7 +330,9 @@ describe("the secret card on the phone", () => {
     expect(line.slice(line.indexOf("<View style={styles.lineTop}>"), line.indexOf("{well.detail"))).not.toContain(
       "lineMore",
     );
-    expect(asks).toContain('lineMore: { flexDirection: "row", alignItems: "center", gap: 3, alignSelf: "flex-start", marginLeft: 30');
+    expect(asks).toContain(
+      'lineMore: { flexDirection: "row", alignItems: "center", gap: 3, alignSelf: "flex-start", marginLeft: 30',
+    );
     // The agent's words and the detail are formatted text: code between backticks is drawn as code.
     expect(line).toContain("<Spans inline={parseInline(well.detail)} />");
     expect(asks).toContain("<Spans inline={parseInline(lead)} />");

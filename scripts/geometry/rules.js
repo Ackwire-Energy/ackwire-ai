@@ -2021,7 +2021,9 @@
         if (!seen(bar)) continue;
         const all = [...bar.querySelectorAll(KIT)].filter((el) => seen(el));
         check(
-          order(all.filter((el) => !all.some((o) => o !== el && o.contains(el))).filter((el) => !el.closest(".ac-menu"))),
+          order(
+            all.filter((el) => !all.some((o) => o !== el && o.contains(el))).filter((el) => !el.closest(".ac-menu")),
+          ),
           bar,
         );
       }
