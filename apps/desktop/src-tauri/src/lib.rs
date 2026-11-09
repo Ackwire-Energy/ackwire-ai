@@ -661,6 +661,7 @@ pub fn run() {
             main_window::this_mac_listening,
             main_window::notify_site_set,
             workspaces::workspaces_get,
+            workspaces::site_fetch,
             workspaces::welcome_mode_take,
             dock::dock_set,
             menus::app_menu_set,

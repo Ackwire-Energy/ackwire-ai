@@ -16,6 +16,7 @@ import { AgentFace, ConnectionChip, MacPortrait, OrgTile } from "../../ui/bits";
 import { CardTitle, hintFor, PrefCard, PrefHead, PrefRow } from "../../ui/settings";
 import { useToast } from "../../ui/Toast";
 import { shortPath } from "../../ui/time";
+import { ThisMacCards } from "./ThisMac";
 
 export function General() {
   const { t, i18n } = useTranslation();
@@ -142,6 +143,8 @@ export function General() {
               }
             />
           </PrefCard>
+
+          <ThisMacCards homes={homes} />
 
           <CardTitle>{t("desktop.prefs.general.orgs")}</CardTitle>
           <PrefCard>

@@ -34,6 +34,7 @@ import type { Platform } from "../control/platform";
 import type { ServerList, ServerWorkspaces } from "../control/server";
 import type { TrayState } from "../control/tray";
 import { acmeSeed, FAKE_SERVER, FakeRunner, horizonteSeed } from "../dev/fake-runner";
+import { createFakeSite, type FakeSite } from "../dev/fake-site";
 import type { AppInfo, Host, RunnerInfo, RunnerStateChange, WindowName } from "./types";
 
 export type Scenario = "first" | "windows" | "linux" | "cloud" | "selfhost" | "link" | "here";
@@ -66,6 +67,8 @@ export interface FakeHost extends Host {
   readonly runners: Map<string, FakeRunner>;
   readonly tray: TrayState;
   readonly list: ServerList;
+  /** The server's devices API behind `siteFetch`. */
+  readonly site: FakeSite;
   onDev(cb: () => void): () => void;
   setVersion(version: string): void;
 }
@@ -215,12 +218,18 @@ export function createFakeHost(
     signIns = 1;
   }
 
+  const site = createFakeSite((orgId) => {
+    const ids = [...runners.values()].map((r) => r.ids()).find((i) => i?.orgId === orgId);
+    return ids ? { machineId: ids.machineId, name: ids.name } : null;
+  });
+
   const host: FakeHost = {
     window: initial,
     fake: true,
     platform,
     runners,
     list,
+    site,
     get tray() {
       return tray;
     },
@@ -288,6 +297,10 @@ export function createFakeHost(
             : [{ id: `o-${i}`, name: "Oficina", logo: null, unread: 1, waiting: 0 }],
       })),
     welcomeMode: async () => (options.welcomeAdd ? "add" : null),
+    siteFetch: async (server, method, path, body) => {
+      if (!list.servers.includes(server)) throw "not a server of this app";
+      return site.answer(method, path, body);
+    },
     removeServer: async (server) => {
       list.servers = list.servers.filter((s) => s !== server);
       if (list.current === server) list.current = list.servers[0] ?? null;
