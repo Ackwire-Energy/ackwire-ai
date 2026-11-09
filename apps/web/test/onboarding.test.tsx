@@ -384,6 +384,16 @@ describe("a workspace being set up resumes from its data", () => {
     await settle(14);
     expect(heading()).toBe("Ligue o time");
     expect(calls(back, "orgs.saveOnboarding")).toEqual([]);
+    cleanup();
+
+    // Back without paying to one set up meanwhile in another tab: it opens as it is, never a new workspace's step 1.
+    const meanwhile = settingUp({ context: "Loja online", team: true, held: true });
+    const org = meanwhile.me?.organizations[0];
+    if (org) delete org.onboarding;
+    const again = await renderApp(`/org/${ORG_ID}/onboarding`, { api: createFakeApi(meanwhile) });
+    await settle(14);
+    expect(again.router.state.location.pathname.startsWith(`/org/${ORG_ID}/`)).toBe(true);
+    expect(document.querySelector(".onb")).toBeNull();
   });
 
   test("asked to delete the workspace being set up: its dialog, and nothing is finished", async () => {

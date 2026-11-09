@@ -1,5 +1,6 @@
 import { keys, meQuery, useMe } from "@agenteschat/client";
 import { isPaidReturn } from "@agenteschat/client/lib/billing";
+import { settingUp } from "@agenteschat/client/lib/guards";
 import { finishOnboarding } from "@agenteschat/client/lib/right-hand";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { requireUser } from "@/app/guards";
@@ -18,11 +19,16 @@ export const Route = createFileRoute("/onboarding")({
   loaderDeps: ({ search }) => ({ resume: search.resume, paid: search.paid }),
   // Paid, the workspace opens in #general, where the team says hi once the plan starts (ADR 0158), the payment said as
   // being confirmed until then; else its right hand's DM, or the workspace as it is. Back without paying, the
-  // onboarding resumes on its plan step.
+  // onboarding resumes on its plan step, unless the workspace was set up meanwhile (another tab): it opens as it is.
   loader: async ({ context, deps: { resume, paid } }) => {
-    if (!resume || !paid) return;
+    if (!resume) return;
     const me = await context.queryClient.fetchQuery(meQuery(context.api)).catch(() => null);
-    const general = me?.organizations.find((o) => o.id === resume)?.onboarding?.generalChannelId;
+    const org = me?.organizations.find((o) => o.id === resume);
+    if (!paid) {
+      if (org && !settingUp(org)) throw redirect({ to: "/org/$orgId", params: { orgId: resume } });
+      return;
+    }
+    const general = org?.onboarding?.generalChannelId;
     const at = await finishOnboarding(context.api, resume).catch(() => null);
     await context.queryClient.refetchQueries({ queryKey: keys.me });
     const search = { paid: true as const };
