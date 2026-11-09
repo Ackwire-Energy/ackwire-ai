@@ -40,7 +40,8 @@ test("the channel header's icons are 32px boxes with a plate only under the poin
   expect(last(shipped, ".channel__search.search-box", "width")).toBe("220px");
   expect(last(shipped, ".channel__search.search-box:focus-within", "width")).toBe("300px");
   expect(last(shipped, ".channel__search .search-box__field", "background")).toBe("var(--plate-soft)");
-  expect(last(shipped, ".channel__search .search-box__field", "border-color")).toBe("transparent");
+  // The minifier writes `transparent` as `#0000`.
+  expect(last(shipped, ".channel__search .search-box__field", "border-color")).toBe("#0000");
   // The topic follows the title with no line between them.
   expect(last(shipped, ".channel__head-text .channel__topic", "border-left")).toBeUndefined();
   expect(last(shipped, ".channel__head-text .channel__topic", "color")).toBe("var(--muted)");
