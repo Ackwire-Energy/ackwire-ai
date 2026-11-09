@@ -16,6 +16,17 @@ const DAY = 86_400_000;
 const soon = (days: number) => new Date(Date.now() + days * DAY).toISOString();
 const click = (el: Element) => act(async () => fireEvent.click(el));
 const type = (el: Element, value: string) => act(async () => fireEvent.change(el, { target: { value } }));
+/** The onboarding's account menu, on its rail (Radix: keyboard), and the menu it opens. */
+async function accountMenu() {
+  const me = screen().getByRole("button", { name: "Sua conta" });
+  me.focus();
+  await act(async () => {
+    fireEvent.keyDown(me, { key: "Enter" });
+    fireEvent.keyUp(me, { key: "Enter" });
+  });
+  await settle(2);
+  return screen().getByRole("menu");
+}
 const meEvery = (qc: QueryClient) =>
   qc
     .getQueryCache()
@@ -458,10 +469,10 @@ describe("deleting your account (Configurações › Sua conta)", () => {
     state.me.organizations = [];
     await renderApp("/onboarding", { api: createFakeApi(state) });
     await settle(8);
-    const account = document.querySelector(".onb__account");
-    expect(account?.textContent).toContain("Sua conta inteira");
-    if (!account) throw new Error("no account section");
-    await click(within(account as HTMLElement).getByRole("button", { name: "Apagar conta" }));
+    // The onboarding's account menu (ADR 0158): Apagar conta beside Sair.
+    const menu = await accountMenu();
+    expect(within(menu).getByRole("menuitem", { name: "Sair" })).toBeTruthy();
+    await click(within(menu).getByRole("menuitem", { name: "Apagar conta" }));
     await settle(6);
     expect(screen().getByRole("dialog", { name: "Apagar a sua conta inteira?" })).toBeTruthy();
   });
@@ -494,7 +505,10 @@ describe("deleting your account (Configurações › Sua conta)", () => {
     await renderApp("/onboarding", { api: createFakeApi(state) });
     await settle(8);
     noAccountDeletion();
-    expect(document.querySelector(".onb__account")).toBeNull();
+    // Its account menu has Sair and no Apagar conta: Beta opens, and Sua conta there has it.
+    const menu = await accountMenu();
+    expect(within(menu).getByRole("menuitem", { name: "Sair" })).toBeTruthy();
+    expect(within(menu).queryByRole("menuitem", { name: "Apagar conta" })).toBeNull();
   });
 
   test("one still being set up doesn't count as a way to Sua conta", async () => {
