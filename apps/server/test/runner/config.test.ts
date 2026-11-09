@@ -197,6 +197,9 @@ test("credentials are masked in free text", () => {
   expect(text).not.toContain("sk-ant-api03-abcdefghijklmnop");
   expect(text).not.toContain("ghp_abcdefghijklmnopqrstuvwxyz0123");
   expect(text).not.toContain("hunter2");
+  // GitHub's stateless App token (`ghs_<app id>_<JWT>`): all of it, dots and dashes included.
+  const app = `ghs_123_eyJhbGciOiJSUzI1NiJ9.${"e".repeat(40)}.${"s-ig_".repeat(8)}`;
+  expect(redactCommon(`fetch with ${app} failed`)).toBe("fetch with gh_*** failed");
 });
 
 test("activity log: newest first, pages with before, filters by agent, rotates, masks secrets", () => {

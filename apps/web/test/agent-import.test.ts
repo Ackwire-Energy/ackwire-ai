@@ -1051,6 +1051,9 @@ describe("helpers", () => {
       text: "key [redacted] ok",
       redacted: true,
     });
+    // GitHub's stateless App token (`ghs_<app id>_<JWT>`): all of it, dots and dashes included.
+    const app = `ghs_123_eyJhbGciOiJSUzI1NiJ9.${"e".repeat(40)}.${"s-ig_".repeat(8)}`;
+    expect(scrubSecrets(`key ${app} ok`)).toEqual({ text: "key [redacted] ok", redacted: true });
     expect(scrubSecrets("nothing here")).toEqual({ text: "nothing here", redacted: false });
     expect(importedModel({ model: null }, MODELS, "claude-sonnet-5-5")).toBe("claude-sonnet-5-5");
     expect(importedModel({ model: "gpt-6.1-sol" }, MODELS, "claude-sonnet-5-5")).toBe("gpt-6.1-sol");

@@ -722,12 +722,27 @@ describe("Rotinas: quando chegar um email", () => {
   test("only the mailboxes the routine's agent reads; none read says so and where its access is given", async () => {
     const { api, state, mail } = mailApi([{ address: "ana@example.com" }, { address: "vendas@example.com" }]);
     reads(mail, state, ["mail-2"]);
+    // What the agent reads answers late: until then neither select is an empty box.
+    let release = () => {};
+    const held = new Promise<void>((r) => {
+      release = r;
+    });
+    const agentMail = api.mail.agent;
+    api.mail.agent = async (orgId, agentId) => {
+      await held;
+      return agentMail(orgId, agentId);
+    };
     await renderApp(`/org/${ORG_ID}/routines`, { api });
     await settle(8);
     await click(screen().getByRole("button", { name: "Nova rotina" }));
     const dialog = screen().getByRole("dialog", { name: "Nova rotina" });
     await settle(4);
     await click(within(dialog).getByRole("radio", { name: "Email" }));
+    await settle(6);
+    const loading = within(dialog).getByRole("combobox", { name: "Caixa de email" }) as HTMLButtonElement;
+    expect([loading.textContent, loading.disabled]).toEqual(["Carregando…", true]);
+    expect(within(dialog).getByRole("combobox", { name: "Pasta" }).textContent).toBe("Caixa de entrada");
+    await act(async () => release());
     await settle(6);
     const box = within(dialog).getByRole("combobox", { name: "Caixa de email" });
     expect(box.textContent).toContain("vendas@example.com");

@@ -3,7 +3,9 @@ import {
   GIT_CHECKOUTS_DIR,
   GIT_DIRECT_PROTOCOL,
   GIT_PROTOCOL,
+  GIT_STATELESS_TOKEN_PROTOCOL,
   GIT_SYNC_LIMITS,
+  GITHUB_APP_TOKEN,
   type GitSyncRepo,
   type GitSyncRequest,
   gitCheckoutDir,
@@ -34,7 +36,7 @@ import { runCoAuthor } from "./signature";
  * repositories, pushes only to `agentes/<handle>/…`); GitHub's token stays here.
  *
  * ADR 0116: with our GitHub App installed for a repository, a runner on
- * protocol 35 also gets a one-hour installation token for that repository
+ * protocol 53 also gets a one-hour installation token for that repository
  * alone (contents: read), so its fetches go straight to GitHub instead of
  * through this server; pushes still go through the proxy. Never the
  * connection's own (OAuth or pasted) token: without the App, all of it goes
@@ -120,8 +122,10 @@ export async function machineGitSetup(
 /**
  * Single-repository read tokens of our GitHub App for the repositories among `repos` the agent may use, keyed by
  * repository; empty without the App, on an older runner, where the App isn't installed, or for an agent that is
- * archived, held or suspended (as the proxy refuses it). Never the connection's own token. Each token handed out
- * is audited as a fetch (`via: github-direct`): the fetches themselves no longer pass through us.
+ * archived, held or suspended (as the proxy refuses it). Only what the runner takes as an installation token
+ * (`GITHUB_APP_TOKEN`), never the connection's own. Never throws: a repository without a token fetches through the
+ * proxy. Each token handed out is audited as a fetch (`via: github-direct`): the fetches themselves no longer pass
+ * through us.
  */
 export async function directFetchTokens(
   deps: MachineGitDeps,
@@ -131,31 +135,37 @@ export async function directFetchTokens(
 ): Promise<Map<string, string>> {
   const out = new Map<string, string>();
   const github = deps.github;
-  if (!github || protocol < GIT_DIRECT_PROTOCOL || repos.length === 0) return out;
-  const [agent] = await deps.db
-    .select({ archivedAt: schema.agents.archivedAt })
-    .from(schema.agents)
-    .where(and(eq(schema.agents.id, target.agentId), eq(schema.agents.orgId, target.orgId)));
-  if (!agent || agent.archivedAt || (await standingRefusal(deps.db, target.orgId, target.agentId))) return out;
-  const list = await agentRepositoryList(deps.db, target.orgId, target.agentId);
-  await Promise.all(
-    repos.map(async (repo) => {
-      const [owner = "", name = ""] = repo.split("/");
-      if (!repoInList(list, owner, name)) return;
-      const token = await appTokenForRepo(github.app, github.http, { db: deps.db, orgId: target.orgId }, owner, name, {
-        contents: "read",
-      }).catch(() => null);
-      if (!token) return;
-      out.set(repo, token);
-      await recordAudit(deps.db, {
-        orgId: target.orgId,
-        actor: { type: "agent", id: target.agentId },
-        action: "git.fetch",
-        target: { type: "git_repo", id: repo },
-        details: { via: "github-direct", machineId: target.machineId },
-      }).catch(() => undefined);
-    }),
-  );
+  if (!github || protocol < GIT_STATELESS_TOKEN_PROTOCOL || repos.length === 0) return out;
+  try {
+    const [agent] = await deps.db
+      .select({ archivedAt: schema.agents.archivedAt })
+      .from(schema.agents)
+      .where(and(eq(schema.agents.id, target.agentId), eq(schema.agents.orgId, target.orgId)));
+    if (!agent || agent.archivedAt || (await standingRefusal(deps.db, target.orgId, target.agentId))) return out;
+    const list = await agentRepositoryList(deps.db, target.orgId, target.agentId);
+    const tenant = { db: deps.db, orgId: target.orgId };
+    await Promise.all(
+      repos.map(async (repo) => {
+        const [owner = "", name = ""] = repo.split("/");
+        if (!repoInList(list, owner, name)) return;
+        const token = await appTokenForRepo(github.app, github.http, tenant, owner, name, { contents: "read" }).catch(
+          () => null,
+        );
+        // The runner refuses a whole `git.sync` over one token it doesn't take.
+        if (!token || !GITHUB_APP_TOKEN.test(token)) return;
+        out.set(repo, token);
+        await recordAudit(deps.db, {
+          orgId: target.orgId,
+          actor: { type: "agent", id: target.agentId },
+          action: "git.fetch",
+          target: { type: "git_repo", id: repo },
+          details: { via: "github-direct", machineId: target.machineId },
+        }).catch(() => undefined);
+      }),
+    );
+  } catch {
+    // The database didn't answer: no tokens this time, and the sync still goes (through the proxy).
+  }
   return out;
 }
 
@@ -303,37 +313,55 @@ export interface CodeTurn {
  * repository the conversation names, else the agent's first repository, else
  * its first checkout) and writes the "# Your code" block for the system text, and where it starts ("You start in …")
  * for the turn's own prompt: the system text stays the same from turn to turn. Null when there is
- * nothing to do: a mission turn (it has its own folder), an older runner, no
- * GitHub or no git access, or nothing granted or checked out.
+ * nothing to do: a mission turn (it has its own folder; only the computer's proxy credential is refreshed), an
+ * older runner, no GitHub or no git access, or nothing granted or checked out.
  */
 export async function prepareAgentCode(
   deps: MachineGitDeps,
   turn: CodeTurn,
   options: { signal?: AbortSignal } = {},
 ): Promise<CodeSetup | null> {
-  // A chat turn starts in the agent's folder (""); a mission's turn has its own folder; a session started afresh
-  // there because its folder was gone stays there.
-  const session = turn.session?.cwd === "" && !turn.session.ownFolder ? turn.session : null;
-  if (!session) return null;
+  const machineId = turn.session?.machineId;
+  if (!machineId) return null;
   try {
-    // A mission's thread works in the mission's own folder.
-    if (turn.threadRootId && (await missionOfRun({ db: deps.db, ...turn, threadRootId: turn.threadRootId }))) {
+    const status = await deps.hub.status(machineId);
+    if (!status || machineGitUnavailable(status, turn.orgId)) return null;
+    const setup = await machineGitSetup(deps, turn.orgId, turn.agentId, machineId);
+    if (!setup) return null;
+    const { agent, ...rest } = setup;
+    const sync = (repos: GitSyncRequest["repos"], existing: boolean) =>
+      deps.hub.call(
+        machineId,
+        {
+          op: "git.sync",
+          agent,
+          ...rest,
+          repos,
+          ...(existing ? { existing } : {}),
+          timeoutSeconds: PRE_TURN_SYNC_SECONDS,
+        },
+        { timeoutMs: (PRE_TURN_SYNC_SECONDS + 15) * 1000, ...(options.signal ? { signal: options.signal } : {}) },
+      );
+    // A chat turn starts in the agent's folder (""); a mission's turn (its thread) works in the mission's own folder;
+    // a session started afresh there because its folder was gone stays there. Those update no checkout, but their
+    // pushes go through the proxy too: the computer's credential (6 h) is refreshed before them all the same.
+    const chat =
+      turn.session?.cwd === "" &&
+      !turn.session.ownFolder &&
+      !(turn.threadRootId && (await missionOfRun({ db: deps.db, ...turn, threadRootId: turn.threadRootId })));
+    if (!chat) {
+      await sync([], false);
       return null;
     }
-    const status = await deps.hub.status(session.machineId);
-    if (!status || machineGitUnavailable(status, turn.orgId)) return null;
-    const setup = await machineGitSetup(deps, turn.orgId, turn.agentId, session.machineId);
-    if (!setup) return null;
     const credit = await creditLine(deps, turn);
     const list = await agentRepositoryList(deps.db, turn.orgId, turn.agentId);
     const explicit = list.filter((r) => !r.endsWith("/*"));
-    const { agent, ...rest } = setup;
     // An `owner/*` (or all) grant names no repository: its checkouts are found on the computer, so they fetch
     // straight from GitHub too instead of going back to the proxy.
     const wildcard = list.length === 0 || list.length > explicit.length;
     const found =
-      wildcard && deps.github && status.protocol >= GIT_DIRECT_PROTOCOL
-        ? await checkoutsOnMachine(deps.hub, session.machineId, agent, options.signal)
+      wildcard && deps.github && status.protocol >= GIT_STATELESS_TOKEN_PROTOCOL
+        ? await checkoutsOnMachine(deps.hub, machineId, agent, options.signal)
         : [];
     const lowerExplicit = new Set(explicit.map((r) => r.toLowerCase()));
     const repos = [...explicit, ...found.filter((r) => !lowerExplicit.has(r.toLowerCase()))].slice(
@@ -342,21 +370,13 @@ export async function prepareAgentCode(
     );
     // Fresh each turn (GitHub's tokens last an hour; cached until a few minutes before), so the agent's own
     // `git fetch` keeps working between syncs.
-    const tokens = await directFetchTokens(deps, { ...turn, machineId: session.machineId }, status.protocol, repos);
-    const reply = await deps.hub.call(
-      session.machineId,
-      {
-        op: "git.sync",
-        agent,
-        ...rest,
-        repos: repos.map((repo) => {
-          const github = tokens.get(repo);
-          return { repo, dir: gitCheckoutDir(repo), clone: false, ...(github ? { github } : {}) };
-        }),
-        existing: true,
-        timeoutSeconds: PRE_TURN_SYNC_SECONDS,
-      },
-      { timeoutMs: (PRE_TURN_SYNC_SECONDS + 15) * 1000, ...(options.signal ? { signal: options.signal } : {}) },
+    const tokens = await directFetchTokens(deps, { ...turn, machineId }, status.protocol, repos);
+    const reply = await sync(
+      repos.map((repo) => {
+        const github = tokens.get(repo);
+        return { repo, dir: gitCheckoutDir(repo), clone: false, ...(github ? { github } : {}) };
+      }),
+      true,
     );
     const present = reply.repos.filter((r) => {
       const [owner = "", name = ""] = r.repo.split("/");

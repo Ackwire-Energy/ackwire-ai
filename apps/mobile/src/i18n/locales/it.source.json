@@ -38,6 +38,18 @@
   "auth.errors.generic": {
     "value": "Something went wrong. Try again."
   },
+  "auth.errors.offlineRetry": {
+    "value": "No internet right now. I'll go on as soon as it's back."
+  },
+  "auth.flow.email": {
+    "value": "What's your e-mail?"
+  },
+  "auth.flow.emailLead": {
+    "value": "To sign in or create your account."
+  },
+  "auth.flow.signUp": {
+    "value": "Nice to meet you. What does the team call you?"
+  },
   "auth.server.line": {
     "value": "Server: {{host}} ·"
   },
@@ -45,10 +57,10 @@
     "value": "Change"
   },
   "auth.server.title": {
-    "value": "Your server"
+    "value": "Where is your agentes.chat?"
   },
   "auth.server.subtitle": {
-    "value": "Your team's agentes.chat address, the same one you see in the browser."
+    "value": "The address your team opens in the browser."
   },
   "auth.server.label": {
     "value": "Server address"
@@ -67,6 +79,30 @@
   },
   "auth.server.backTo": {
     "value": "Back to {{host}}"
+  },
+  "auth.server.footChange": {
+    "value": "Change"
+  },
+  "auth.server.footChoose": {
+    "value": "Server and language"
+  },
+  "auth.server.footServer": {
+    "value": "Another server"
+  },
+  "auth.server.footLanguage": {
+    "value": "Language"
+  },
+  "auth.server.footTeam": {
+    "value": "Use your team's server?"
+  },
+  "auth.server.footTeamAction": {
+    "value": "Sign in through it"
+  },
+  "auth.server.footOn": {
+    "value": "Signing in on {{host}}"
+  },
+  "auth.server.footSwitch": {
+    "value": "Change"
   },
   "auth.server.now": {
     "value": "Now on {{host}}"
@@ -98,6 +134,18 @@
   "auth.server.down.text": {
     "value": "It may be down or outside your network. The app opens on its own once it's back."
   },
+  "auth.server.down.tryNow": {
+    "value": "Try now"
+  },
+  "auth.server.down.switchServer": {
+    "value": "Change server"
+  },
+  "auth.server.down.retryIn": {
+    "value": {
+      "one": "tries again in {{count}} s",
+      "other": "tries again in {{count}} s"
+    }
+  },
   "auth.connect.title": {
     "value": "Connect to this server?"
   },
@@ -113,6 +161,9 @@
   "auth.connect.confirm": {
     "value": "Connect"
   },
+  "auth.connect.notNow": {
+    "value": "Not now"
+  },
   "auth.connect.checking": {
     "value": "Checking the server…"
   },
@@ -126,7 +177,10 @@
     "value": "Signing in is taking longer than it should. Sign in with your email, or show a new code on the computer."
   },
   "auth.scan.hint": {
-    "value": "Point at the QR code on the computer."
+    "value": "Point at the QR code on the computer"
+  },
+  "auth.scan.typeAddress": {
+    "value": "Type the address"
   },
   "auth.scan.notOurs": {
     "value": "This QR code isn't from an agentes.chat server."
@@ -178,6 +232,12 @@
   },
   "push.channelDescription": {
     "value": "What's waiting for you, mentions and conversations."
+  },
+  "push.offer.line": {
+    "value": "Want to know when {{name}} is done?"
+  },
+  "push.offer.action": {
+    "value": "Notify me"
   },
   "push.ask.title": {
     "value": "Know when an agent needs you"
@@ -272,7 +332,13 @@
   "composer.choice": {
     "value": "How to send while the agent works"
   },
+  "composer.holdToStop": {
+    "value": "Hold to stop and send"
+  },
   "search.placeholder": {
     "value": "Search"
+  },
+  "picker.none": {
+    "value": "Nothing matches “{{text}}”."
   }
 }

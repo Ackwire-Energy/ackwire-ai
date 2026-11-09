@@ -454,22 +454,26 @@ describe("Perfil: agora, cada coisa uma vez", () => {
     expect(screen).toContain('{ key: "today", label: t("common.today") }');
     expect(screen).toContain('{ key: "access", label: t("agentPage.fields.levels") }');
     expect(screen).toContain('{ key: "memory", label: t("agentPage.tabs.memory") }');
-    expect(screen).toContain('kind={{ icon: "shield", label: t("ask.kind.approval") }}');
+    expect(screen).toContain('kind={{ icon: "shield", label: t("mobile.intentAgents.asksApproval") }}');
     expect(screen).toContain('!(waitingNow && l.href?.kind === "approval" && l.href.id === waitingNow.id)');
     expect(screen).toContain("statusCardShown(statusLine, { working: busy, asking: asking.length > 0 })");
     expect(screen).toContain("<PixelOrbit color={look.color} size={14} />");
     // One surface level: grouped lists on the gray, no pills, sections or cards of its own.
     expect(screen).not.toContain("NowPill");
     expect(screen).not.toMatch(/<(Section|Card|Row)\b/);
-    // Mailboxes are rows of "Can use"; the computer is a square beside Chat.
+    // Mailboxes are rows of "Can use"; the computer is a named button beside Chat, as wide as it.
     expect(mail).toContain("export function useAgentMailboxes(agentId: string, enabled = true): MailboxLine[]");
-    expect(screen).toContain("{details && !rightHand ? <AgentComputerButton agentId={id} /> : null}");
-    expect(computer).toContain("const SIZE = BUTTON_SIZES.md.height;");
-    // The screen's recent picture on Today; the rules people gave on Memory; where it merges on Access; the right
-    // hand's own AI above how it works: each in the grouped lists, none a section of its own.
+    expect(screen).toContain(
+      "{details && !rightHand ? (\n              <View style={styles.grow}>\n                <AgentComputerButton agentId={id} />",
+    );
+    expect(computer).toContain('wide\n      label={helps ? t("agentComputer.help") : t("agentComputer.button")}');
+    // The screen's recent picture on Today; the rules people gave on Memory, under what it learned; where it merges on
+    // Access; the right hand's own AI above how it works: each in the grouped lists, none a section of its own.
     expect(screen).toContain("      {nowBlock}\n      <AgentComputerPicture agentId={id} />");
     expect(computer).toContain("asksPicture(focused, view.desktopQ.data ?? null)");
-    expect(screen).toContain("      <GivenRules agentId={id} />\n      {knows.data ? memoryKnows : null}");
+    expect(screen).toContain(
+      "      {knows.data ? memoryKnows : null}\n      {/* What people told it to always do, under what it learned, as the web's Memória. */}\n      <GivenRules agentId={id} name={name} />",
+    );
     expect(screen).toContain(
       '<MergeReposSection agentId={id} name={name} mayEdit={mine || can(org, "manage_agents")} />',
     );
@@ -480,6 +484,7 @@ describe("Perfil: agora, cada coisa uma vez", () => {
     const tabs = [t("common.today"), t("agentPage.fields.levels"), t("agentPage.tabs.memory")];
     expect(tabs).toEqual(["Hoje", "Acesso", "Memória"]);
     expect(t("ask.kind.approval")).toBe("Pede sua aprovação");
+    expect(t("mobile.intentAgents.asksApproval")).toBe("Pede sua aprovação");
     expect(t("mobile.agent.canUse")).toBe("Pode usar");
   });
 });

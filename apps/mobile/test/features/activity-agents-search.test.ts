@@ -104,9 +104,10 @@ describe("Atividade", () => {
     // The kinds the chat asks keep the chat's words and icons ("Pede sua aprovação" with the shield).
     expect(screen).toContain("label: t(`ask.kind.");
     expect(screen).toContain("icon: ASK_ICON[ask]");
-    // One request this person may decide is decided on the card; the rest open where they are decided.
+    // One request this person may decide is decided on the card (the page's one primary on its first card); the rest
+    // open where they are decided.
     expect(screen).toContain("request?.canDecide && onCard <= 1 ? request : null");
-    expect(screen).toContain("decision={decidable ? <ApproveHere approval={decidable} /> : undefined}");
+    expect(screen).toContain("decision={decidable ? <ApproveHere approval={decidable} primary={first} /> : undefined}");
     // How many wait is said once, on the section, not again on the filter.
     expect(screen).toContain('<SectionHeader title={t("mobile.home.waiting")} count={waitingCount} />');
     expect(screen).not.toContain("count: waitingCount");

@@ -17,19 +17,33 @@
     },
     "errors": {
       "network": "Nessuna connessione. Controlla internet e riprova.",
-      "generic": "Qualcosa è andato storto. Riprova."
+      "generic": "Qualcosa è andato storto. Riprova.",
+      "offlineRetry": "Niente internet al momento. Continuo appena torna."
+    },
+    "flow": {
+      "email": "Qual è la tua email?",
+      "emailLead": "Per accedere o creare il tuo account.",
+      "signUp": "Piacere di conoscerti. Come ti chiama il team?"
     },
     "server": {
       "line": "Server: {{host}} ·",
       "change": "Cambia",
-      "title": "Il tuo server",
-      "subtitle": "L'indirizzo agentes.chat del tuo team, lo stesso che vedi nel browser.",
+      "title": "Dov'è il tuo agentes.chat?",
+      "subtitle": "L'indirizzo che il tuo team apre nel browser.",
       "label": "Indirizzo del server",
       "placeholder": "agentes.iltuoteam.ts.net",
       "use": "Usa questo server",
       "checking": "Verifica in corso…",
       "scan": "Scansiona il codice QR",
       "backTo": "Torna a {{host}}",
+      "footChange": "Cambia",
+      "footChoose": "Server e lingua",
+      "footServer": "Un altro server",
+      "footLanguage": "Lingua",
+      "footTeam": "Usi il server del tuo team?",
+      "footTeamAction": "Accedi da lì",
+      "footOn": "Accesso su {{host}}",
+      "footSwitch": "Cambia",
       "now": "Ora su {{host}}",
       "invalid": "Controlla l'indirizzo, qualcosa come agentes.iltuoteam.ts.net.",
       "unreachable": "Non riusciamo a raggiungere {{host}}. Controlla l'indirizzo e la connessione, poi riprova.",
@@ -40,7 +54,11 @@
       "appTooOld": "Aggiorna l'app agentes per usare {{host}}.",
       "down": {
         "line": "{{host}} non ha risposto.",
-        "text": "Potrebbe essere offline o fuori dalla tua rete. L'app si apre da sola appena torna disponibile."
+        "text": "Potrebbe essere offline o fuori dalla tua rete. L'app si apre da sola appena torna disponibile.",
+        "tryNow": "Riprova ora",
+        "switchServer": "Cambia server",
+        "retryIn_one": "riprova tra {{count}} s",
+        "retryIn_other": "riprova tra {{count}} s"
       }
     },
     "connect": {
@@ -49,13 +67,15 @@
       "on": "Server: {{host}}",
       "leave": "Verrai disconnesso dall'account attuale su questo telefono.",
       "confirm": "Connetti",
+      "notNow": "Non ora",
       "checking": "Verifica del server…",
       "notALink": "Questo link non proviene da un server agentes.chat.",
       "tokenFailed": "Il codice è scaduto o è già stato usato. Accedi con la tua email o mostra un nuovo codice sul computer.",
       "signInSlow": "L'accesso sta richiedendo più del previsto. Accedi con la tua email o mostra un nuovo codice sul computer."
     },
     "scan": {
-      "hint": "Inquadra il codice QR sul computer.",
+      "hint": "Inquadra il codice QR sul computer",
+      "typeAddress": "Scrivi l'indirizzo",
       "notOurs": "Questo codice QR non proviene da un server agentes.chat.",
       "cameraTitle": "Usa la fotocamera",
       "cameraText": "Serve solo a leggere il codice QR.",
@@ -82,6 +102,10 @@
   "push": {
     "channel": "Avvisi",
     "channelDescription": "Cosa ti aspetta, menzioni e conversazioni.",
+    "offer": {
+      "line": "Vuoi sapere quando {{name}} finisce?",
+      "action": "Avvisami"
+    },
     "ask": {
       "title": "Sappi quando un agente ha bisogno di te",
       "text": "Lavorano mentre fai altro. Ti avvisiamo quando serve il tuo ok, quando finiscono quello che hai chiesto o quando ti chiamano.",
@@ -124,9 +148,13 @@
     "placeholder": "Scrivi un messaggio",
     "join": "Aggiungi all'attività in corso",
     "now": "Interrompi e invia",
-    "choice": "Come inviare mentre l'agente lavora"
+    "choice": "Come inviare mentre l'agente lavora",
+    "holdToStop": "Tieni premuto per interrompere e inviare"
   },
   "search": {
     "placeholder": "Cerca"
+  },
+  "picker": {
+    "none": "Nessun risultato per “{{text}}”."
   }
 }

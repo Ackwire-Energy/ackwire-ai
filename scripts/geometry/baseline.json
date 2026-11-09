@@ -439,6 +439,7 @@
   "stack@390 span.rh-set__face + div.agp-look in div.ac-dialog__body",
   "stack@390 ul.agp-delete + div.ac-field in div.ac-dialog__body",
   "stub@1280 span.ac-chip__text in span.issue-card__top.tabular",
+  "stub@1280 span.cal-chip__title in span.cal-chip__text",
   "stub@1280 span.issue-who__name in span.issue-card__foot",
   "stub@320 b in button.brw-mf-end__row",
   "stub@320 b in button.nwc-who",

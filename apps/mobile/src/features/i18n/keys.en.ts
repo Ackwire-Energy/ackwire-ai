@@ -862,10 +862,11 @@ export const featureKeysEn = {
     identityLead: "Its name, how to call it in the chat, and its face.",
     handleMention: "Mention @{{handle}} to call it.",
     /** Under the name while it is typed: the @ follows the name until the person changes it. */
-    handleFromName: "In the chat: @{{handle}}. It comes from the name; you can change it.",
+    handleFromName: "In the chat: @{{handle}}. It comes from the name. You can change it.",
     handleFromNameEmpty: "Its @ in the chat comes from the name.",
     reviewLead: "Tap a line to change it.",
     planHint: "Or connect your AI plan: {{name}} then thinks with it, without spending the key.",
+    planHint_female: "Or connect your AI plan: {{name}} then thinks with it, without spending the key.",
     partly: "The agent was created, but part of what its role brings didn't go through. Adjust it on its profile.",
     import: {
       where: {
@@ -1190,7 +1191,7 @@ export const featureKeysEn = {
     teamServerFoot: "You don't leave any workspace: your team's server joins your list, with your account there.",
     /** The sheet from holding the workspace's mark in the bar, and its shorter words (ADR 0154). */
     workspacesHoldHint: "Hold to switch workspace",
-    workspacesSheetFoot: "You stay signed in to all of them; each one's notices reach you here.",
+    workspacesSheetFoot: "You stay signed in to all of them. Each one's notices reach you here.",
     addWorkspaceTeamShort: "Join your team's server",
     addWorkspaceTeamSubShort: "Address or the computer's QR code",
     addWorkspaceFoot: "You don't leave any workspace.",
@@ -1488,6 +1489,7 @@ export const featureKeysEn = {
     /** The system alert before stopping one task from its screen. */
     stopTitle: "Stop “{{title}}”?",
     stopBody: "{{name}} stops now and tells the conversation what was done so far.",
+    stopBody_female: "{{name}} stops now and tells the conversation what was done so far.",
   },
   // intentional: chats/activity/ui
   homeNow: {
@@ -1595,9 +1597,11 @@ export const featureKeysEn = {
       footSwipe: "Tap to correct. Swipe to forget.",
       forgetTitle: "Forget this?",
       forgetBody: "{{name}} stops using this memory. The messages stay.",
+      forgetBody_female: "{{name}} stops using this memory. The messages stay.",
       forget: "Forget",
       ruleTitle: "Remove this rule?",
-      ruleBody: "{{name}} stops following this rule. Whoever gave it can give it again.",
+      ruleBody: "{{name}} stops following this rule. Whoever gave the rule can give the same one again.",
+      ruleBody_female: "{{name}} stops following this rule. Whoever gave the rule can give the same one again.",
       ruleRemove: "Remove",
       footOwner: "Only {{name}} or an admin can correct these.",
       footAdmins: "Only an admin can correct these.",
@@ -2014,7 +2018,7 @@ export const featureKeysEn = {
     zoneTitle: "Time zone",
     /** A second workspace from Adicionar workspace (ADR 0154): where it lives, and that nothing is left. */
     anotherTitle: "What's the new workspace called?",
-    anotherLead: "On agentes.chat. You stay in {{org}}; you can switch any time.",
+    anotherLead: "On agentes.chat. You stay in {{org}} and can switch any time.",
     /** The first run's name, suggested from a work address's domain. */
     suggested: "From your {{domain}} e-mail, I suggested {{org}}.",
     create: "Create",
@@ -2046,6 +2050,7 @@ export const featureKeysEn = {
     another: "Another AI",
     /** Connect an AI, first page: one question, then the two ways and what the workspace already has. */
     question: "How will {{name}} think?",
+    question_female: "How will {{name}} think?",
     questionAny: "How will the agents think?",
     questionLead: "You can change it later, on the profile.",
     planRow: "My AI plan",

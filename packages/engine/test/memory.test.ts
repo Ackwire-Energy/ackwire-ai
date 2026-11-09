@@ -95,6 +95,9 @@ describe("guardrails", () => {
   test("secrets are recognized by their format", () => {
     expect(looksLikeSecret("use sk-ant-api03-abcdefghijklmnopqrstuvwxyz")).toBe(true);
     expect(looksLikeSecret("token: ghp_abcdefghijklmnopqrstuvwxyz0123")).toBe(true);
+    // GitHub's stateless App token (`ghs_<app id>_<JWT>`), named by nothing but its format.
+    const app = `ghs_123_eyJhbGciOiJSUzI1NiJ9.${"e".repeat(40)}.${"s-ig_".repeat(8)}`;
+    expect(looksLikeSecret(`fetch with ${app}`)).toBe(true);
     expect(looksLikeSecret("senha = hunter22secret")).toBe(true);
     expect(looksLikeSecret("we use tokens to price calls")).toBe(false);
     // A placeholder in a doc or a skill is not a key.

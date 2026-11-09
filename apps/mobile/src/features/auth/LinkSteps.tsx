@@ -264,7 +264,7 @@ export function LinkSteps({
               autoComplete="email"
               textContentType="emailAddress"
               // The keyboard's blue key is the action: "continuar", gray until something is typed.
-              returnKeyType="continue"
+              returnKeyType="go"
               enablesReturnKeyAutomatically
               onSubmitEditing={submit}
               autoFocus

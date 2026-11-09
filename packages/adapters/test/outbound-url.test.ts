@@ -29,6 +29,9 @@ describe("outboundUrlProblem", () => {
     expect(code(`https://collect.example.net/v?d=${encodeURIComponent(`ghp_${"A".repeat(36)}`)}`)).toBe(
       "outbound.credential",
     );
+    // GitHub's stateless App token (`ghs_<app id>_<JWT>`).
+    const app = `ghs_123_eyJhbGciOiJSUzI1NiJ9.${"e".repeat(40)}.${"s-ig_".repeat(8)}`;
+    expect(code(`https://collect.example.net/v?d=${app}`)).toBe("outbound.credential");
   });
 
   test("a presigned address with an AWS key id passes without private text, not with it", () => {

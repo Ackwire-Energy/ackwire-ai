@@ -25,7 +25,8 @@ describe("a reply's tools sit last, live and saved", () => {
           "<TurnTools",
           "<SavedTools",
           "<NoAiCard message={m} />",
-          "{foot}\n          </RowPartContext.Provider>\n        </View>\n      </Pressable>\n    </>\n  );\n});",
+          // The foot is the reply's last part: only the double tap's one-time hint and its 👍 over the row follow it.
+          "{foot}\n          </RowPartContext.Provider>\n          {hintNode}\n        </View>\n        {popNode}\n      </Pressable>\n    </>\n  );\n});",
         ]),
       ),
     ).toBe(true);
@@ -43,7 +44,7 @@ describe("a reply's tools sit last, live and saved", () => {
     const row = source("MessageRow.tsx");
     const [toolsAt, footAt] = at(row, [
       "<SavedTools\n",
-      "{foot}\n          </RowPartContext.Provider>\n        </View>\n      </Pressable>\n    </>\n  );\n});",
+      "{foot}\n          </RowPartContext.Provider>\n          {hintNode}\n        </View>\n        {popNode}\n      </Pressable>\n    </>\n  );\n});",
     ]);
     const last = row.slice(toolsAt, footAt);
     for (const card of [
@@ -79,7 +80,7 @@ describe("agents it asked first: one pair row right before the reply, never insi
     expect(ascending(at(row, ["const grouped = groupedIn && !pair;", "{pair}\n      {quote && !inBubble"]))).toBe(true);
     const [bodyAt, endAt] = at(row, [
       "<View style={[styles.body, { gap: rhythm.part }]}>",
-      "{foot}\n          </RowPartContext.Provider>\n        </View>\n      </Pressable>",
+      "{foot}\n          </RowPartContext.Provider>\n          {hintNode}\n        </View>\n        {popNode}\n      </Pressable>",
     ]);
     expect(row.slice(bodyAt, endAt)).not.toContain("Consult");
   });
@@ -250,25 +251,24 @@ describe("an approval card's layout", () => {
     return cards.slice(start, cards.indexOf("\nfunction ", start + 1));
   };
 
-  test("the buttons sit in one row (a grouped request's at its row's end), Aprovar, Aprovar sempre, Agora não, what it covers under them", () => {
-    for (const name of ["ApprovalAsk", "ApprovalGroupItem"]) {
+  test("the buttons sit in one row (a grouped request's at its row's end), Aprovar, Aprovar sempre on a grouped request, Recusar, what it covers under them", () => {
+    const rows: [string, string[]][] = [
+      ["ApprovalAsk", ['variant="primary"', 't("mobile.approval.refuse")', "</View>"]],
+      [
+        "ApprovalGroupItem",
+        ['variant="primary"', "<ApproveAlwaysButton", 't("mobile.approval.refuse")', "</View>", "<ApproveAlwaysHint"],
+      ],
+    ];
+    for (const [name, pieces] of rows) {
       const card = fn(name);
       const row = card.slice(card.indexOf("<View style={styles.itemActs}>"));
-      expect([
-        name,
-        ascending(
-          at(row, [
-            'variant="primary"',
-            "<ApproveAlwaysButton",
-            't("approval.notNow")',
-            "</View>",
-            "<ApproveAlwaysHint",
-          ]),
-        ),
-      ]).toEqual([name, true]);
+      expect([name, ascending(at(row, pieces))]).toEqual([name, true]);
       // Never a wide button stretched beside the text: each its own width, left-aligned in the row.
       expect([name, row.slice(0, row.indexOf("</View>")).includes(" wide")]).toEqual([name, false]);
     }
+    // One request's card has only the two: its "Aprovar sempre" is a switch in the request's sheet.
+    const ask = fn("ApprovalAsk");
+    expect(ask.slice(...at(ask, ["foot={", "</AskFoot>"]))).not.toContain("ApproveAlways");
     expect(cards).toContain('itemActs: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 }');
     // A grouped request: its words and its buttons on one line while they fit, the buttons under the words otherwise.
     const item = fn("ApprovalGroupItem");

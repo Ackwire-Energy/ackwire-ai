@@ -73,9 +73,11 @@ export function ConnectorTriggerFields({
         {options.length > 1 && (
           <Field label={t("routines.form.kind.connector")} id="nr-connection">
             <Select
-              value={value.connectionId || undefined}
+              value={value.connectionId || first?.id}
               onValueChange={(connectionId) => onChange({ ...value, connectionId })}
               options={options.map((s) => ({ value: s.id, label: s.label }))}
+              placeholder={waiting ? t("common.loading") : undefined}
+              disabled={waiting}
             />
           </Field>
         )}

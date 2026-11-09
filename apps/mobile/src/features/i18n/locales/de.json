@@ -82,7 +82,13 @@
     "hoursAgo_one": "vor {{count}} Std.",
     "hoursAgo_other": "vor {{count}} Std.",
     "daysAgo_one": "vor {{count}} Tag",
-    "daysAgo_other": "vor {{count}} Tagen"
+    "daysAgo_other": "vor {{count}} Tagen",
+    "short": {
+      "now": "jetzt",
+      "minutes": "{{count}} Min.",
+      "hours": "{{count}} Std.",
+      "days": "{{count}} T."
+    }
   },
   "names": {
     "two": "{{first}} und {{second}}",
@@ -124,6 +130,17 @@
     "tapNote": "Mit der Freigabe passiert es sofort.",
     "tapNoteAhead": "Eine Freigabe jetzt gilt für {{when}}.",
     "refuseTitle": "Anfrage ablehnen",
+    "refuseAsk": "Anfrage ablehnen?",
+    "leaves": "verlässt das Unternehmen",
+    "refuseWhyF": "{{name}} lernt aus der Begründung. Optional.",
+    "refuseWhyM": "{{name}} lernt aus der Begründung. Optional.",
+    "sheet": {
+      "title": "Anfrage",
+      "request": "Die Anfrage",
+      "why": "Warum",
+      "service": "Dienst",
+      "nextTime": "Nächstes Mal"
+    },
     "whyPlaceholderF": "Warum? Optional, aber {{name}} lernt daraus",
     "whyPlaceholderM": "Warum? Optional, aber {{name}} lernt daraus",
     "approved": "Freigegeben",
@@ -224,6 +241,12 @@
     "workingNowLine_one": "{{count}} Agent arbeitet gerade",
     "workingNowLine_other": "{{count}} Agenten arbeiten gerade",
     "nobodyWorking": "Gerade arbeitet kein Agent",
+    "workingOne": "{{name}} arbeitet",
+    "swipe": {
+      "mute": "Stumm",
+      "unmute": "Ton an"
+    },
+    "firstRunLine": "{{name}} richtet das Team ein · {{done}} von {{total}}",
     "first": {
       "title": "Starte mit deinem ersten Agenten",
       "subtitle": "Gib ihm einen Namen und sag, was er macht. Er erscheint hier als Chat.",
@@ -253,6 +276,7 @@
     "name": "Name",
     "channelFine": "Für ein Team oder ein Thema.",
     "chatSearch": "Nach einer Person oder einem Agenten suchen",
+    "to": "An:",
     "people": "Personen",
     "search": "Person oder Agent",
     "create": "Erstellen",
@@ -267,6 +291,37 @@
     "agent": {
       "question": "Was soll er machen?"
     }
+  },
+  "along": {
+    "agent": "Ein Agent",
+    "waits": "{{name}} wartet auf dein Okay",
+    "on": "{{name}} · {{what}}",
+    "working": "{{name}} arbeitet",
+    "more": "+{{count}}"
+  },
+  "share": {
+    "title": "Teilen",
+    "to": "An",
+    "line": "Schreib etwas dazu, wenn du magst",
+    "send": "An {{name}} senden",
+    "pick": "Wähle einen Agenten",
+    "more": "+{{count}}",
+    "firstTen": "Die ersten {{count}} kommen in diese Nachricht.",
+    "waiting": "Wird empfangen…",
+    "nothing": "Nichts zu teilen",
+    "nothingHint": "Öffne, was du senden willst, und tippe auf Teilen.",
+    "noAgents": "Noch keine Agenten",
+    "noAgentsHint": "Erstelle einen, dann erscheint er hier, bereit zum Empfangen.",
+    "createAgent": "Agent erstellen"
+  },
+  "voice": {
+    "slideToCancel": "zum Abbrechen wischen",
+    "slideUpToLock": "zum Fixieren nach oben wischen",
+    "locked": "Fixiert",
+    "recording": "Aufnahme",
+    "discard": "Löschen",
+    "send": "Senden",
+    "seeAll": "Alles anzeigen"
   },
   "chat": {
     "someone": "Jemand",
@@ -384,6 +439,16 @@
     },
     "uploading": "Datei wird gesendet…",
     "uploadFailed": "Die Datei ließ sich nicht senden.",
+    "doubleTapHint": "Doppeltippen = 👍",
+    "react": "Reagieren",
+    "attach": {
+      "more": "Noch ein Foto oder eine Datei",
+      "remove": "{{name}} entfernen",
+      "waiting": "{{name}}, wartet auf das Senden",
+      "sending": "{{name}}, wird gesendet",
+      "tooMany": "Bis zu {{count}} Dateien pro Nachricht."
+    },
+    "swipeReply": "Zum Antworten nach rechts wischen",
     "intent": {
       "suggest": {
         "merge": "Mach den Merge",
@@ -398,6 +463,58 @@
       "noIntro": "Frag nach dem, was du brauchst, in deinen Worten.",
       "firstTitle": "Für den Anfang",
       "sendHint": "Zum Senden tippen",
+      "hello": "Hallo, {{person}}! Ich bin {{name}}.",
+      "helloNoName": "Hallo! Ich bin {{name}}.",
+      "helloRole": "{{role}} im Team.",
+      "helloAsk": "Womit fangen wir an?",
+      "now": "jetzt",
+      "start": {
+        "support": {
+          "how": "Was für dich dringend ist",
+          "task": "Zur Frist antworten",
+          "routine": "Dringendes, jeden Morgen"
+        },
+        "ops": {
+          "how": "Wie du Ausfälle erkennst",
+          "task": "Prüfen, ob alles läuft",
+          "routine": "Die Nacht, jeden Morgen"
+        },
+        "qa": {
+          "how": "Was du zuerst testest",
+          "task": "Testfälle für die Anmeldung",
+          "routine": "Was kaputtging, jede Woche"
+        },
+        "dev": {
+          "how": "Was du in unserem Code machst",
+          "task": "Den neuesten Pull Request prüfen",
+          "routine": "Was sich geändert hat, jeden Freitag"
+        },
+        "research": {
+          "how": "Was du am besten recherchierst",
+          "task": "Drei Wettbewerber vergleichen",
+          "routine": "Der Markt, jeden Montag"
+        },
+        "writing": {
+          "how": "Was du am besten schreibst",
+          "task": "Einen Text von mir verbessern",
+          "routine": "Deine Woche in Texten"
+        },
+        "product": {
+          "how": "Wie du Prioritäten setzt",
+          "task": "Was bei den Aufgaben im Verzug ist",
+          "routine": "Der Plan, jeden Montag"
+        },
+        "sales": {
+          "how": "Wie du gute Leads findest",
+          "task": "Eine E-Mail zum Produkt",
+          "routine": "Neue Leads, jeden Montag"
+        },
+        "general": {
+          "how": "Was du für mich tun kannst",
+          "task": "Zeig mir ein Beispiel",
+          "routine": "Deine Woche, jeden Montag"
+        }
+      },
       "first": {
         "support": {
           "how": "Wie entscheidest du, was dringend ist?",
@@ -451,6 +568,7 @@
     "camera": "Kamera",
     "photos": "Fotos",
     "file": "Datei",
+    "media": "GIFs",
     "noCamera": "Kein Kamerazugriff. Erlaube ihn in den Einstellungen des Handys.",
     "mission": "Mission starten",
     "missionHint": "Lange Arbeit, mit Plan, von Anfang bis Ende",
@@ -504,7 +622,9 @@
     "empty": "Hier ist noch nichts angepinnt. Halte eine Nachricht gedrückt und tippe auf Anpinnen.",
     "bar_one": "Angeheftete Nachrichten ({{count}})",
     "bar_other": "Angeheftete Nachrichten ({{count}})",
-    "unpinOf": "Nachricht von {{name}} lösen"
+    "unpinOf": "Nachricht von {{name}} lösen",
+    "peek": "Angepinnt",
+    "peekHint": "Nach unten ziehen, um die angepinnten Nachrichten zu sehen"
   },
   "thread": {
     "threadIn": "Thread in #{{channel}}",
@@ -645,7 +765,7 @@
     }
   },
   "threads": {
-    "title": "Threads und Missionen",
+    "title": "Threads",
     "section": {
       "missions": "Missionen",
       "threads": "Threads"
@@ -664,10 +784,24 @@
     "created": "{{name}} ist jetzt im Team",
     "createFailed": "Der Agent ließ sich nicht erstellen. Vielleicht ist der Name schon vergeben.",
     "freeSection": "Frei",
-    "noGroupSection": "Keine Abteilung"
+    "noGroupSection": "Keine Abteilung",
+    "workingSection": "Bei der Arbeit",
+    "teamSection": "Team",
+    "managerQuiet": "Nichts in Arbeit",
+    "state": {
+      "waitsYou": "wartet auf dein Okay",
+      "noAi": "Keine KI verbunden",
+      "connect": "Verbinden",
+      "archived": "Archiviert",
+      "routine": "In einer Routine · {{time}}",
+      "routineShort": "in einer Routine"
+    },
+    "thinksWith": "Denkt mit {{label}}"
   },
   "team": {
-    "entry": "Liste, Organigramm und Karte",
+    "entry": "Organigramm und Kanäle",
+    "sectorLead": "{{name}} leitet",
+    "sectorBackup": "{{name}} vertritt",
     "mapHint": "Um einen Agenten in einen anderen Kanal zu verschieben, nutze die Karte im Web oder sprich mit {{name}}."
   },
   "agentEdit": {
@@ -683,6 +817,13 @@
     "leaveTitle": "Ohne Erstellen verlassen?",
     "leaveText": "Der angefangene Agent wird nicht erstellt.",
     "keepGoing": "Weiter erstellen",
+    "identityQuestion": "Wer ist der Agent?",
+    "identityLead": "Sein Name, wie du ihn im Chat rufst, und sein Gesicht.",
+    "handleMention": "Erwähne @{{handle}}, um ihn zu rufen.",
+    "handleFromName": "Im Chat: @{{handle}}. Das kommt vom Namen. Du kannst es ändern.",
+    "handleFromNameEmpty": "Sein @ im Chat kommt vom Namen.",
+    "reviewLead": "Tippe auf eine Zeile, um sie zu ändern.",
+    "planHint": "Oder verbinde dein KI-Abo: Dann denkt {{name}} damit, ohne den Schlüssel zu belasten.",
     "partly": "Der Agent wurde erstellt, aber ein Teil dessen, was seine Rolle mitbringt, hat nicht geklappt. Pass es in seinem Profil an.",
     "import": {
       "where": {
@@ -732,9 +873,11 @@
     "chooseModel": "Anderes Modell wählen",
     "filter": {
       "all": "Alle",
-      "waiting": "Wartet auf dich",
+      "waiting": "Anfragen",
       "done": "Erledigt"
     },
+    "doneToast": "Erledigt",
+    "undo": "Rückgängig",
     "day": {
       "today": "Heute",
       "yesterday": "Gestern",
@@ -866,6 +1009,13 @@
       "all": "Alle"
     },
     "nothing": "Nichts für „{{q}}“.",
+    "filters": "Filter",
+    "filterWord": {
+      "from": "Von",
+      "in": "In",
+      "has": "Mit Datei",
+      "date": "Datum"
+    },
     "action": {
       "newConversation": "Neuer Chat",
       "newTask": "Aufgabe anfordern",
@@ -946,10 +1096,24 @@
     "on": "An",
     "off": "Aus",
     "notificationsPhone": "Benachrichtigungen auf diesem Handy",
+    "chatOpenAtHelp": "Wo du aufgehört hast, markiert eine Linie „Neu“, was danach kam.",
     "notificationsOnHint": "Sie kommen auch im Browser und in der Desktop-App an, wenn sie dort eingeschaltet sind.",
     "notificationsOffHint": "Schalte sie ein, um hier Benachrichtigungen zu bekommen. Die Arten unten gelten für alle deine Geräte.",
     "notificationsKindsHint": "In der Aktivität bleibt alles. Das gilt für diesen Workspace, auf all deinen Geräten.",
     "version": "agentes.chat · Version {{version}}",
+    "edit": "Bearbeiten",
+    "status": "Status",
+    "workspace": "Workspace",
+    "workspaceMore_one": "{{count}} weiterer",
+    "workspaceMore_other": "{{count}} weitere",
+    "workspaceMoreElsewhere_one": "{{count}} weiterer, auf einem anderen Server",
+    "workspaceMoreElsewhere_other": "{{count}} weitere, auf einem anderen Server",
+    "workspaceMoreServers_one": "{{count}} weiterer, auf anderen Servern",
+    "workspaceMoreServers_other": "{{count}} weitere, auf anderen Servern",
+    "allAgents": "Alle ansehen",
+    "work": "Arbeit",
+    "dashboards": "Dashboards",
+    "agentStyle": "Wie Agenten sprechen",
     "workspaces": "Workspaces",
     "workspacesIn": "Du bist in",
     "workspacesFoot": "Du bleibst in jedem angemeldet und bekommst die Benachrichtigungen von allen. Tippe auf einen Workspace, um ihn zu öffnen.",
@@ -962,6 +1126,13 @@
     "teamServer": "Server des Teams",
     "teamServerLead": "Die agentes.chat-Adresse deines Teams, dieselbe wie im Browser.",
     "teamServerFoot": "Du verlässt keinen Workspace: Der Server deines Teams kommt in deine Liste, mit deinem Konto dort.",
+    "workspacesHoldHint": "Gedrückt halten, um den Workspace zu wechseln",
+    "workspacesSheetFoot": "Du bleibst in allen angemeldet. Die Benachrichtigungen von jedem kommen hier an.",
+    "addWorkspaceTeamShort": "Dem Server deines Teams beitreten",
+    "addWorkspaceTeamSubShort": "Adresse oder QR-Code des Computers",
+    "addWorkspaceFoot": "Du verlässt keinen Workspace.",
+    "teamServerLeadShort": "Was dein Team im Browser öffnet.",
+    "teamServerQuestion": "Wie lautet die Adresse deines Teams?",
     "account": {
       "title": "Konto",
       "save": "Fertig",
@@ -1057,6 +1228,17 @@
   "issues": {
     "title": "Aufgaben",
     "new": "Neue Aufgabe",
+    "viewList": "Liste",
+    "viewBoard": "Board",
+    "search": "Aufgaben suchen",
+    "noMatch": "Keine Aufgabe mit diesem Namen.",
+    "list": {
+      "mine": "Für dich",
+      "in_progress": "In Arbeit",
+      "in_review": "In Prüfung",
+      "todo": "Zu erledigen",
+      "doneToday": "Heute erledigt"
+    },
     "filters": "Aufgaben filtern",
     "section": {
       "todo": "Zu erledigen",
@@ -1187,6 +1369,12 @@
   },
   "wiki": {
     "map": "Seitenkarte",
+    "graph": "Verknüpfungen",
+    "links_one": "{{count}} Verknüpfung",
+    "links_other": "{{count}} Verknüpfungen",
+    "linksOut": "Verlinkt auf",
+    "continue": "Weiterlesen",
+    "more": "Weitere Optionen",
     "mapAgent": "Agent, der diese Woche Seiten gelesen hat",
     "usedBy": "Agenten, die sie nutzen",
     "readsWeek_one": "{{count}}-mal gelesen diese Woche",
@@ -1214,11 +1402,24 @@
   "routines": {
     "loadFailed": "Die Routinen ließen sich nicht laden.",
     "anyAgent": "Alle Agenten",
-    "create": "Erstellen"
+    "create": "Erstellen",
+    "when": {
+      "custom": "Auf deine Art",
+      "write": "Auf deine Art schreiben…",
+      "day": "Tag",
+      "monthDay": "Tag {{day}}",
+      "lastDay": "Letzter Tag"
+    }
   },
   "taskManager": {
     "loadFailed": "Die Aufgaben konnten nicht geladen werden.",
-    "gone": "Diese Aufgabe ist nicht mehr da."
+    "gone": "Diese Aufgabe ist nicht mehr da.",
+    "quiet": "Nichts in Arbeit",
+    "doneToday_one": "{{count}} heute erledigt",
+    "doneToday_other": "{{count}} heute erledigt",
+    "request": "Anfrage",
+    "stopTitle": "„{{title}}“ stoppen?",
+    "stopBody": "{{name}} stoppt sofort und schreibt in die Unterhaltung, was bisher erledigt ist."
   },
   "homeNow": {
     "working_one": "{{count}} arbeitet",
@@ -1319,6 +1520,13 @@
       "title_female": "Was sie über dich weiß",
       "footF": "Tippe, um zu korrigieren oder zu vergessen.",
       "footM": "Tippe, um zu korrigieren oder zu vergessen.",
+      "footSwipe": "Tippe, um zu korrigieren. Wische, um zu vergessen.",
+      "forgetTitle": "Das vergessen?",
+      "forgetBody": "{{name}} nutzt diese Erinnerung nicht mehr. Die Nachrichten bleiben.",
+      "forget": "Vergessen",
+      "ruleTitle": "Diese Regel entfernen?",
+      "ruleBody": "{{name}} folgt dieser Regel nicht mehr. Wer sie festgelegt hat, kann sie noch einmal festlegen.",
+      "ruleRemove": "Entfernen",
       "footOwner": "Nur {{name}} oder ein Admin kann das korrigieren.",
       "footAdmins": "Nur ein Admin kann das korrigieren.",
       "emptyF": "{{name}} hat noch nichts über dich gespeichert.",
@@ -1345,6 +1553,7 @@
       "forgotten": "Vergessen"
     },
     "thinks": "Denkt mit",
+    "asksApproval": "Bittet um deine Freigabe",
     "uses": {
       "title": "Was er nutzen kann",
       "title_female": "Was sie nutzen kann",
@@ -1553,12 +1762,23 @@
       }
     }
   },
+  "computer": {
+    "pick": "Computer wählen",
+    "pickHelp": "Wähle einen der eingeschalteten Computer."
+  },
   "connectors": {
-    "title": "Konnektoren und MCP",
-    "search": "Dienst suchen",
+    "title": "Konnektoren",
+    "search": "Suchen oder Adresse einfügen",
     "mcps": "MCP",
     "mcpsNone": "Hier erscheinen die MCP-Server, die du über ihre Adresse verbindest.",
     "addMcp": "MCP hinzufügen",
+    "add": "Hinzufügen",
+    "allServices": "Alle Dienste",
+    "waitLine_one": "{{count}} Tool braucht dich",
+    "waitLine_other": "{{count}} Tools brauchen dich",
+    "toolsWait_one": "{{count}} braucht dich",
+    "toolsWait_other": "{{count}} brauchen dich",
+    "connectedState": "Verbunden",
     "connected": "Verbunden",
     "suggested": "Vorgeschlagen für {{org}}",
     "all": "Alle",
@@ -1593,16 +1813,16 @@
     "disconnectFailed": "{{name}} ließ sich nicht trennen. Versuch es noch einmal.",
     "needsReconnect": "Das Konto bei {{name}} funktioniert nicht mehr. Agenten können es erst nutzen, wenn jemand es neu verbindet.",
     "noTools": "Die Tools von {{name}} ließen sich nicht lesen. Die Agenten haben sie erst wieder, wenn sie unter Tools neu gelesen werden.",
-    "accountTitle": "Dieses Konto",
+    "accountTitle": "Konto",
     "renameFailed": "Umbenennen hat nicht geklappt. Versuch es noch einmal.",
-    "whoTitle": "Wer es nutzt und wie weit",
+    "whoTitle": "Wer es nutzt",
     "level": {
       "none": "Nutzt es nicht",
       "read": "Schaut nur",
       "write": "Kann ändern",
       "custom": "Auf deine Art"
     },
-    "safe": "Löschen, Veröffentlichen und Kunden antworten fragen immer nach deiner Freigabe.",
+    "safe": "Löschen und Veröffentlichen fragen dich immer vorher.",
     "done": "Fertig",
     "step": "Schritt {{n}} von {{total}}: {{label}}",
     "disconnect": "Trennen",
@@ -1634,10 +1854,27 @@
     "wrongAccount": "Diese Einladung ist für {{email}}.",
     "otherAccount": "Anderes Konto nutzen",
     "failed": "Die Einladung ließ sich nicht annehmen. Versuch es noch einmal.",
+    "askNewOf": "{{name}} um eine neue bitten",
+    "ask": {
+      "called": "{{name}} hat dich zu {{org}} eingeladen.",
+      "calledNoName": "Das ist die Einladung von {{org}}.",
+      "approves": "Jemand bei {{org}} stimmt deinem Beitritt zu.",
+      "youTitle": "Nur du fehlst noch.",
+      "emailConfirmed": "E-Mail bestätigt",
+      "stepOf": "{{n}} von {{total}} · {{name}}",
+      "step": {
+        "email": "Deine E-Mail",
+        "code": "Code",
+        "you": "Du"
+      },
+      "haveAccount": "Ich habe ein Konto",
+      "notePlaceholder": "Eine Nachricht für die Person, die zustimmt? Optional"
+    },
     "join": {
       "skip": "Überspringen",
       "sharedBy": "{{name}} hat diesen Link geteilt",
       "waitLead": "Du bist drin, sobald ein Admin zustimmt. Du kannst die App schließen: Wir sagen dir per E-Mail Bescheid.",
+      "waitLeadOpen": "Bei offener App bist du von selbst drin, sobald sie zustimmen. Ist sie geschlossen, sagen wir dir per E-Mail Bescheid.",
       "passwordLead": "Dein Passwort, und du bist drin."
     }
   },
@@ -1681,7 +1918,8 @@
   "entering": {
     "title": "{{org}} wird geöffnet…",
     "titleNew": "Wird geöffnet…",
-    "lead": "Deine Unterhaltungen sind unterwegs."
+    "lead": "Deine Unterhaltungen sind unterwegs.",
+    "team": "Das Team ist schon da."
   },
   "splash": {
     "slow": "Wird verbunden…",
@@ -1692,6 +1930,12 @@
     "logoHelp": "Optional.",
     "logoPick": "Auswählen",
     "zone": "Zeitzone: {{zone}}",
+    "zoneChange": "Ändern",
+    "zoneTitle": "Zeitzone",
+    "anotherTitle": "Wie heißt der neue Workspace?",
+    "anotherLead": "Auf agentes.chat. Du bleibst in {{org}} und kannst jederzeit wechseln.",
+    "suggested": "Anhand deiner E-Mail bei {{domain}} habe ich {{org}} vorgeschlagen.",
+    "create": "Erstellen",
     "shareMessage": "Tritt {{org}} auf agentes.chat bei: {{url}}",
     "failed": "Speichern hat nicht geklappt. Versuch es noch einmal."
   },
@@ -1717,7 +1961,16 @@
     "moveHere": "Hierher verschieben",
     "audience": "Wem er antwortet",
     "audience_female": "Wem sie antwortet",
-    "another": "Andere KI"
+    "another": "Andere KI",
+    "question": "Wie soll {{name}} denken?",
+    "questionAny": "Wie sollen die Agenten denken?",
+    "questionLead": "Du kannst es später im Profil ändern.",
+    "planRow": "Mein KI-Abo",
+    "planRowSub": "Meldet sich auf dem Computer des Agenten an, ohne Schlüssel",
+    "keyRow": "Ein Schlüssel",
+    "keyRowSub": "Du zahlst nach Nutzung, direkt an den Anbieter",
+    "already": "Schon bei {{org}}",
+    "stepOf": "{{step}} von {{total}}"
   },
   "crash": {
     "title": "Auf diesem Bildschirm ist etwas schiefgelaufen",
@@ -1731,6 +1984,28 @@
   },
   "settings": {
     "edit": "Workspace bearbeiten",
+    "editSub": "Name, Logo, Zeitzone und was die Agenten wissen",
+    "group": {
+      "org": "Workspace",
+      "people": "Personen",
+      "agents": "Agenten",
+      "costs": "Kosten und Daten"
+    },
+    "section": {
+      "members": "Mitglieder",
+      "roles": "Rollen",
+      "access": "Zugriff der Agenten",
+      "connectors": "Konnektoren",
+      "usage": "Nutzung und Budget"
+    },
+    "ofOnline": "{{online}} von {{count}}",
+    "deleteName": "{{name}} löschen",
+    "deleteFoot": "Du hast 7 Tage Zeit, es dir anders zu überlegen.",
+    "deleteAlert": "Alle verlieren sofort den Zugriff. Wiederherstellen geht noch 7 Tage lang.",
+    "deleteAction": "Löschen",
+    "deleteIntro": "{{name}} wird sofort für alle geschlossen und in 7 Tagen endgültig gelöscht.",
+    "holdDelete": "Zum Löschen gedrückt halten",
+    "deleteFailed": "Der Workspace ließ sich nicht löschen. Versuch es noch einmal.",
     "access": {
       "how": "Tippe auf eine Zeile, um die Stufe zu ändern: Kein Zugriff, Lesen, Lesen und schreiben."
     },

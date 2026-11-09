@@ -77,7 +77,13 @@
     "justNow": "刚刚",
     "minutesAgo_other": "{{count}} 分钟前",
     "hoursAgo_other": "{{count}} 小时前",
-    "daysAgo_other": "{{count}} 天前"
+    "daysAgo_other": "{{count}} 天前",
+    "short": {
+      "now": "刚刚",
+      "minutes": "{{count}} 分钟",
+      "hours": "{{count}} 小时",
+      "days": "{{count}} 天"
+    }
   },
   "names": {
     "two": "{{first}}和{{second}}",
@@ -118,6 +124,17 @@
     "tapNote": "批准后会立即执行。",
     "tapNoteAhead": "现在批准将覆盖{{when}}。",
     "refuseTitle": "拒绝请求",
+    "refuseAsk": "拒绝请求？",
+    "leaves": "会发到公司外部",
+    "refuseWhyF": "{{name}} 会从原因中学习。可选。",
+    "refuseWhyM": "{{name}} 会从原因中学习。可选。",
+    "sheet": {
+      "title": "请求",
+      "request": "请求内容",
+      "why": "原因",
+      "service": "服务",
+      "nextTime": "下次"
+    },
     "whyPlaceholderF": "为什么？可选，但 {{name}} 会从中学习",
     "whyPlaceholderM": "为什么？可选，但 {{name}} 会从中学习",
     "approved": "已批准",
@@ -215,6 +232,12 @@
     "waitIn": "在 {{where}}",
     "workingNowLine_other": "{{count}} 个智能体正在工作",
     "nobodyWorking": "目前没有智能体在工作",
+    "workingOne": "{{name}} 正在工作",
+    "swipe": {
+      "mute": "静音",
+      "unmute": "取消静音"
+    },
+    "firstRunLine": "{{name}} 正在组建团队 · {{done}}/{{total}}",
     "first": {
       "title": "从你的第一个智能体开始",
       "subtitle": "给它起个名字，说明它做什么。它会以聊天的形式出现在这里。",
@@ -244,6 +267,7 @@
     "name": "名称",
     "channelFine": "用于团队或话题。",
     "chatSearch": "搜索成员或智能体",
+    "to": "发给：",
     "people": "成员",
     "search": "成员或智能体",
     "create": "创建",
@@ -258,6 +282,37 @@
     "agent": {
       "question": "它要做什么？"
     }
+  },
+  "along": {
+    "agent": "一个智能体",
+    "waits": "{{name}} 在等你确认",
+    "on": "{{name}} · {{what}}",
+    "working": "{{name}} 正在工作",
+    "more": "+{{count}}"
+  },
+  "share": {
+    "title": "分享",
+    "to": "发给",
+    "line": "愿意的话，附上一句话",
+    "send": "发送给 {{name}}",
+    "pick": "选择一个智能体",
+    "more": "+{{count}}",
+    "firstTen": "这条消息会包含前 {{count}} 个。",
+    "waiting": "正在接收…",
+    "nothing": "没有可分享的内容",
+    "nothingHint": "打开你想发送的内容，然后点按“分享”。",
+    "noAgents": "还没有智能体",
+    "noAgentsHint": "创建后会显示在这里，随时可以接收。",
+    "createAgent": "创建智能体"
+  },
+  "voice": {
+    "slideToCancel": "滑动以取消",
+    "slideUpToLock": "上滑以锁定",
+    "locked": "已锁定",
+    "recording": "正在录音",
+    "discard": "删除",
+    "send": "发送",
+    "seeAll": "查看全部"
   },
   "chat": {
     "someone": "某人",
@@ -369,6 +424,16 @@
     },
     "uploading": "正在发送文件…",
     "uploadFailed": "无法发送文件。",
+    "doubleTapHint": "双击 = 👍",
+    "react": "回应",
+    "attach": {
+      "more": "再添加照片或文件",
+      "remove": "移除 {{name}}",
+      "waiting": "{{name}}，等待发送",
+      "sending": "{{name}}，正在发送",
+      "tooMany": "每条消息最多 {{count}} 个文件。"
+    },
+    "swipeReply": "向右滑动以回复",
     "intent": {
       "suggest": {
         "merge": "直接合并吧",
@@ -383,6 +448,58 @@
       "noIntro": "用平常的话说出你需要什么。",
       "firstTitle": "从这里开始",
       "sendHint": "点按发送",
+      "hello": "{{person}}，你好！我是 {{name}}。",
+      "helloNoName": "你好！我是 {{name}}。",
+      "helloRole": "团队的{{role}}。",
+      "helloAsk": "我们从哪里开始？",
+      "now": "刚刚",
+      "start": {
+        "support": {
+          "how": "怎样算紧急",
+          "task": "回复截止日期的询问",
+          "routine": "每天早上的紧急事项"
+        },
+        "ops": {
+          "how": "如何发现故障",
+          "task": "检查一切是否正常",
+          "routine": "每天早上的夜间情况"
+        },
+        "qa": {
+          "how": "先测试什么",
+          "task": "登录的测试用例",
+          "routine": "每周出的问题"
+        },
+        "dev": {
+          "how": "你在代码里能做什么",
+          "task": "审阅最新的拉取请求",
+          "routine": "每周五的代码变更"
+        },
+        "research": {
+          "how": "你最擅长的调研",
+          "task": "比较三个竞争对手",
+          "routine": "每周一的市场动态"
+        },
+        "writing": {
+          "how": "你最擅长写的内容",
+          "task": "改进我的一篇文字",
+          "routine": "你这周写了什么"
+        },
+        "product": {
+          "how": "如何确定优先级",
+          "task": "任务中延期的事项",
+          "routine": "每周一的周计划"
+        },
+        "sales": {
+          "how": "如何找到优质潜在客户",
+          "task": "一封介绍产品的邮件",
+          "routine": "每周一的新潜在客户"
+        },
+        "general": {
+          "how": "你能为我做什么",
+          "task": "给我看个例子",
+          "routine": "每周一的工作回顾"
+        }
+      },
       "first": {
         "support": {
           "how": "你如何判断什么是紧急的？",
@@ -436,6 +553,7 @@
     "camera": "相机",
     "photos": "照片",
     "file": "文件",
+    "media": "GIF",
     "noCamera": "无法访问相机。请在手机的设置中允许。",
     "mission": "开始专项任务",
     "missionHint": "有计划、从头到尾的长期工作",
@@ -488,7 +606,9 @@
     "none": "还没有置顶内容",
     "empty": "这里还没有置顶内容。长按一条消息，然后点按“置顶”。",
     "bar_other": "置顶消息（{{count}}）",
-    "unpinOf": "取消置顶 {{name}} 的消息"
+    "unpinOf": "取消置顶 {{name}} 的消息",
+    "peek": "已置顶",
+    "peekHint": "下拉查看置顶消息"
   },
   "thread": {
     "threadIn": "#{{channel}} 中的话题",
@@ -623,7 +743,7 @@
     }
   },
   "threads": {
-    "title": "话题和专项任务",
+    "title": "话题",
     "section": {
       "missions": "专项任务",
       "threads": "话题"
@@ -641,10 +761,24 @@
     "created": "{{name}} 加入了团队",
     "createFailed": "无法创建智能体。可能这个名称已被使用。",
     "freeSection": "空闲",
-    "noGroupSection": "无部门"
+    "noGroupSection": "无部门",
+    "workingSection": "工作中",
+    "teamSection": "团队",
+    "managerQuiet": "没有进行中的事项",
+    "state": {
+      "waitsYou": "等你确认",
+      "noAi": "未连接 AI",
+      "connect": "连接",
+      "archived": "已归档",
+      "routine": "例行工作中 · {{time}}",
+      "routineShort": "例行工作中"
+    },
+    "thinksWith": "使用 {{label}} 思考"
   },
   "team": {
-    "entry": "列表、组织架构图和地图",
+    "entry": "组织架构图和频道",
+    "sectorLead": "{{name}} 负责",
+    "sectorBackup": "{{name}} 替补",
     "mapHint": "要把智能体移到另一个频道，请使用网页版的地图，或和 {{name}} 对话。"
   },
   "agentEdit": {
@@ -660,6 +794,13 @@
     "leaveTitle": "不创建就离开？",
     "leaveText": "你开始创建的智能体将不会被创建。",
     "keepGoing": "继续创建",
+    "identityQuestion": "这个智能体是谁？",
+    "identityLead": "名字、聊天中的称呼和头像。",
+    "handleMention": "提及 @{{handle}} 即可呼叫。",
+    "handleFromName": "聊天中：@{{handle}}。根据名字生成，可以更改。",
+    "handleFromNameEmpty": "聊天中的 @ 根据名字生成。",
+    "reviewLead": "点按一行即可更改。",
+    "planHint": "或者连接你的 AI 套餐：之后 {{name}} 会用它思考，不消耗密钥。",
     "partly": "智能体已创建，但其角色附带的部分内容没有成功。请在它的资料中调整。",
     "import": {
       "where": {
@@ -708,9 +849,11 @@
     "chooseModel": "选择其他模型",
     "filter": {
       "all": "全部",
-      "waiting": "等你处理",
+      "waiting": "请求",
       "done": "已完成"
     },
+    "doneToast": "已完成",
+    "undo": "撤销",
     "day": {
       "today": "今天",
       "yesterday": "昨天",
@@ -795,6 +938,13 @@
       "all": "全部"
     },
     "nothing": "没有找到“{{q}}”的结果。",
+    "filters": "筛选",
+    "filterWord": {
+      "from": "来自",
+      "in": "位置",
+      "has": "含文件",
+      "date": "日期"
+    },
     "action": {
       "newConversation": "新建聊天",
       "newTask": "布置任务",
@@ -872,10 +1022,21 @@
     "on": "开",
     "off": "关",
     "notificationsPhone": "此手机上的通知",
+    "chatOpenAtHelp": "在你上次停下的地方，“新消息”分隔线会标出之后收到的内容。",
     "notificationsOnHint": "如果浏览器和桌面应用中开启了通知，也会在那里收到。",
     "notificationsOffHint": "开启后即可在这里收到通知。以下类型适用于你的所有设备。",
     "notificationsKindsHint": "“动态”会保留所有内容。此设置适用于此工作区，在你的所有设备上生效。",
     "version": "agentes.chat · 版本 {{version}}",
+    "edit": "编辑",
+    "status": "状态",
+    "workspace": "工作区",
+    "workspaceMore_other": "还有 {{count}} 个",
+    "workspaceMoreElsewhere_other": "还有 {{count}} 个，在另一台服务器上",
+    "workspaceMoreServers_other": "还有 {{count}} 个，在其他服务器上",
+    "allAgents": "查看全部",
+    "work": "工作",
+    "dashboards": "仪表盘",
+    "agentStyle": "智能体的说话方式",
     "workspaces": "工作区",
     "workspacesIn": "你所在的",
     "workspacesFoot": "你在每个工作区都保持登录,并接收所有工作区的通知。点按工作区即可打开。",
@@ -888,6 +1049,13 @@
     "teamServer": "团队服务器",
     "teamServerLead": "你团队的 agentes.chat 地址,和浏览器里显示的一样。",
     "teamServerFoot": "你不会退出任何工作区:团队的服务器会加入你的列表,使用你在那里的账号。",
+    "workspacesHoldHint": "长按以切换工作区",
+    "workspacesSheetFoot": "你在所有工作区都保持登录。每个工作区的通知都会发到这里。",
+    "addWorkspaceTeamShort": "加入团队的服务器",
+    "addWorkspaceTeamSubShort": "地址或电脑上的二维码",
+    "addWorkspaceFoot": "你不会退出任何工作区。",
+    "teamServerLeadShort": "你的团队在浏览器中打开的地址。",
+    "teamServerQuestion": "你团队的地址是什么？",
     "account": {
       "title": "账号",
       "save": "确定",
@@ -983,6 +1151,17 @@
   "issues": {
     "title": "任务",
     "new": "新建任务",
+    "viewList": "列表",
+    "viewBoard": "看板",
+    "search": "搜索任务",
+    "noMatch": "没有这个名称的任务。",
+    "list": {
+      "mine": "给你的",
+      "in_progress": "进行中",
+      "in_review": "审阅中",
+      "todo": "待办",
+      "doneToday": "今天完成"
+    },
     "filters": "筛选任务",
     "section": {
       "todo": "待办",
@@ -1109,6 +1288,11 @@
   },
   "wiki": {
     "map": "页面地图",
+    "graph": "关联",
+    "links_other": "{{count}} 个链接",
+    "linksOut": "链接到",
+    "continue": "继续阅读",
+    "more": "更多选项",
     "mapAgent": "本周读过页面的智能体",
     "usedBy": "使用它的智能体",
     "readsWeek_other": "本周阅读 {{count}} 次",
@@ -1134,11 +1318,23 @@
   "routines": {
     "loadFailed": "无法加载例行工作。",
     "anyAgent": "所有智能体",
-    "create": "创建"
+    "create": "创建",
+    "when": {
+      "custom": "自定义",
+      "write": "用自己的话写…",
+      "day": "日",
+      "monthDay": "{{day}} 日",
+      "lastDay": "最后一天"
+    }
   },
   "taskManager": {
     "loadFailed": "无法加载任务。",
-    "gone": "这个任务已经不在这里了。"
+    "gone": "这个任务已经不在这里了。",
+    "quiet": "没有进行中的事项",
+    "doneToday_other": "今天完成 {{count}} 个",
+    "request": "请求",
+    "stopTitle": "停止“{{title}}”？",
+    "stopBody": "{{name}} 会立即停止，并在对话中说明目前完成了什么。"
   },
   "homeNow": {
     "working_other": "{{count}} 个工作中",
@@ -1236,6 +1432,13 @@
       "title_female": "她对你的了解",
       "footF": "点按可更正或忘记。",
       "footM": "点按可更正或忘记。",
+      "footSwipe": "点按可更正，滑动可忘记。",
+      "forgetTitle": "忘记这条？",
+      "forgetBody": "{{name}} 将不再使用这条记忆。消息会保留。",
+      "forget": "忘记",
+      "ruleTitle": "移除这条规则？",
+      "ruleBody": "{{name}} 将不再遵循这条规则。定下这条规则的人可以再次定下同样的规则。",
+      "ruleRemove": "移除",
       "footOwner": "只有 {{name}} 或管理员可以更正这些内容。",
       "footAdmins": "只有管理员可以更正这些内容。",
       "emptyF": "{{name}} 还没有保存关于你的任何内容。",
@@ -1262,6 +1465,7 @@
       "forgotten": "已忘记"
     },
     "thinks": "使用的模型",
+    "asksApproval": "请求你审批",
     "uses": {
       "title": "他可以使用的内容",
       "title_female": "她可以使用的内容",
@@ -1461,12 +1665,21 @@
       }
     }
   },
+  "computer": {
+    "pick": "选择电脑",
+    "pickHelp": "从开机的电脑中选择一台。"
+  },
   "connectors": {
-    "title": "连接器和 MCP",
-    "search": "搜索服务",
+    "title": "连接器",
+    "search": "搜索或粘贴地址",
     "mcps": "MCP",
     "mcpsNone": "通过地址连接的 MCP 服务器会显示在这里。",
     "addMcp": "添加 MCP",
+    "add": "添加",
+    "allServices": "所有服务",
+    "waitLine_other": "{{count}} 个工具需要你处理",
+    "toolsWait_other": "{{count}} 个需要你处理",
+    "connectedState": "已连接",
     "connected": "已连接",
     "suggested": "为 {{org}} 推荐",
     "all": "全部",
@@ -1501,16 +1714,16 @@
     "disconnectFailed": "无法断开 {{name}}，请重试。",
     "needsReconnect": "{{name}} 账号已失效。在有人重新连接之前，智能体无法使用它。",
     "noTools": "无法读取{{name}}的工具。在工具中重新读取之前，智能体用不了它们。",
-    "accountTitle": "此账号",
+    "accountTitle": "账号",
     "renameFailed": "无法重命名，请重试。",
-    "whoTitle": "谁在使用，权限多大",
+    "whoTitle": "谁在使用",
     "level": {
       "none": "不使用",
       "read": "仅查看",
       "write": "可以更改",
       "custom": "自定义"
     },
-    "safe": "删除、发布和回复客户始终需要你审批。",
+    "safe": "删除和发布始终会先请你审批。",
     "done": "完成",
     "step": "第 {{n}} 步，共 {{total}} 步：{{label}}",
     "disconnect": "断开连接",
@@ -1541,10 +1754,27 @@
     "wrongAccount": "此邀请是发给 {{email}} 的。",
     "otherAccount": "使用其他账号",
     "failed": "无法接受邀请，请重试。",
+    "askNewOf": "请 {{name}} 再发一个",
+    "ask": {
+      "called": "{{name}} 叫你加入 {{org}}。",
+      "calledNoName": "这是 {{org}} 的邀请。",
+      "approves": "{{org}} 会有人批准你加入。",
+      "youTitle": "就差你了。",
+      "emailConfirmed": "邮箱已确认",
+      "stepOf": "{{n}}/{{total}} · {{name}}",
+      "step": {
+        "email": "你的邮箱",
+        "code": "验证码",
+        "you": "你"
+      },
+      "haveAccount": "我已有账号",
+      "notePlaceholder": "有话要对审批人说吗？可选"
+    },
     "join": {
       "skip": "跳过",
       "sharedBy": "{{name}} 分享了此链接",
       "waitLead": "管理员批准后你就能加入。你可以关闭应用：我们会通过邮件通知你。",
+      "waitLeadOpen": "应用开着时，对方批准后你会自动加入。应用关闭时，我们会通过邮件通知你。",
       "passwordLead": "设置你的密码，就可以加入了。"
     }
   },
@@ -1587,7 +1817,8 @@
   "entering": {
     "title": "正在进入 {{org}}…",
     "titleNew": "正在进入…",
-    "lead": "你的对话马上就来。"
+    "lead": "你的对话马上就来。",
+    "team": "团队已经就位。"
   },
   "splash": {
     "slow": "正在连接…",
@@ -1598,6 +1829,12 @@
     "logoHelp": "可选。",
     "logoPick": "选择",
     "zone": "时区：{{zone}}",
+    "zoneChange": "更改",
+    "zoneTitle": "时区",
+    "anotherTitle": "新工作区叫什么名字？",
+    "anotherLead": "在 agentes.chat 上创建。你仍留在 {{org}}，随时可以切换。",
+    "suggested": "根据你的 {{domain}} 邮箱，我建议用 {{org}}。",
+    "create": "创建",
     "shareMessage": "在 agentes.chat 上加入 {{org}}：{{url}}",
     "failed": "无法保存，请重试。"
   },
@@ -1621,7 +1858,16 @@
     "moveHere": "移到这里",
     "audience": "他回复谁",
     "audience_female": "她回复谁",
-    "another": "其他 AI"
+    "another": "其他 AI",
+    "question": "{{name}} 用什么来思考？",
+    "questionAny": "智能体用什么来思考？",
+    "questionLead": "之后可以在资料中更改。",
+    "planRow": "我的 AI 套餐",
+    "planRowSub": "在智能体的电脑上登录，无需密钥",
+    "keyRow": "密钥",
+    "keyRowSub": "按用量付费，直接付给提供方",
+    "already": "{{org}} 已有的",
+    "stepOf": "{{step}}/{{total}}"
   },
   "crash": {
     "title": "此页面出了点问题",
@@ -1635,6 +1881,28 @@
   },
   "settings": {
     "edit": "编辑工作区",
+    "editSub": "名称、标志、时区和智能体知道的内容",
+    "group": {
+      "org": "工作区",
+      "people": "人员",
+      "agents": "智能体",
+      "costs": "费用和数据"
+    },
+    "section": {
+      "members": "成员",
+      "roles": "角色",
+      "access": "智能体的权限",
+      "connectors": "连接器",
+      "usage": "用量和预算"
+    },
+    "ofOnline": "{{online}}/{{count}} 台在线",
+    "deleteName": "删除 {{name}}",
+    "deleteFoot": "你有 7 天时间改变主意。",
+    "deleteAlert": "所有人会立即无法访问。7 天内可以恢复。",
+    "deleteAction": "删除",
+    "deleteIntro": "{{name}} 会立即对所有人关闭，并在 7 天后永久删除。",
+    "holdDelete": "长按以删除",
+    "deleteFailed": "无法删除工作区，请重试。",
     "access": {
       "how": "点按一行可更改其级别：无权限、读取、读写。"
     },

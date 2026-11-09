@@ -134,11 +134,15 @@ describe("rows with a face (#41)", () => {
     expect(screen).toMatch(/name=\{agent\}\s*meta=\{sub \|\| undefined\}\s*>/);
     // The row opens the task (stopping lives on its screen): the title on one line, its state as words under it, and
     // a chevron, never a stop button squeezing the title.
-    expect(screen).toMatch(/\{title\}\s*<\/Text>\s*<StateLine task=\{task\} state=\{state\} now=\{now\} \/>\s*<\/MediaRow>/);
+    expect(screen).toMatch(
+      /\{title\}\s*<\/Text>\s*<StateLine task=\{task\} state=\{state\} now=\{now\} \/>\s*<\/MediaRow>/,
+    );
     expect(screen).not.toContain("end={stop}");
     expect(screen).not.toContain("numberOfLines={2}");
     expect(screen).toContain('<Icon name="right" size={15} color={c.faint} />');
-    expect(screen).toContain("flatTask: { flexDirection: \"row\", alignItems: \"center\", gap: 12, paddingVertical: 12, paddingHorizontal: 16 }");
+    expect(screen).toContain(
+      'flatTask: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, paddingHorizontal: 16 }',
+    );
   });
 
   test("stopping several asks with the agent's face and the question on one line, what happens under them", () => {

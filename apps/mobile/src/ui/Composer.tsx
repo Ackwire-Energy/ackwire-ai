@@ -467,8 +467,8 @@ function SendButton({
   };
   const longPress = useLongPressGesture({
     enabled: Boolean(hold),
-    minDurationMs: HOLD_SEND_MS,
-    maxDist: 24,
+    minDuration: HOLD_SEND_MS,
+    maxDistance: 24,
     onBegin: () => {
       "worklet";
       held.value = false;

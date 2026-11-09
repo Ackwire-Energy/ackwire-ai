@@ -1,7 +1,7 @@
 import { previewBody } from "@agenteschat/client/lib/message-body";
 import { useTranslation } from "react-i18next";
 import { Pressable, type StyleProp, StyleSheet, type ViewStyle } from "react-native";
-import Animated from "react-native-reanimated";
+import Animated, { type AnimatedStyle } from "react-native-reanimated";
 import type { AgentMode } from "@/agent/poses";
 import { Text } from "@/ui";
 import { router } from "@/ui/navigation";
@@ -28,7 +28,7 @@ export function RightHandAsk({
   /** The face's mode: asleep under the splash, it wakes as Conversas arrives (`useWake`). */
   faceMode?: AgentMode;
   /** The face's own motion (the hop as it wakes). */
-  faceStyle?: StyleProp<ViewStyle>;
+  faceStyle?: StyleProp<AnimatedStyle<ViewStyle>>;
 }) {
   const { t } = useTranslation();
   const surface = useSurface();

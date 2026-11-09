@@ -6,6 +6,7 @@ import {
   type AgentScope,
   GIT_CHECKOUTS_DIR,
   GIT_SYNC_LIMITS,
+  GITHUB_APP_TOKEN,
   type GitSyncRepo,
   type GitSyncRequest,
   isGitRepoName,
@@ -53,8 +54,6 @@ import { resolveInWorkspace } from "./paths";
 
 const TOKEN = /^agtgit1\.[A-Za-z0-9_-]{10,2000}\.[A-Za-z0-9_-]{20,100}$/;
 const AGENT_ID = /^[A-Za-z0-9-]{1,64}$/;
-/** A GitHub App installation token. */
-const GITHUB_TOKEN = /^ghs_[A-Za-z0-9_]{20,255}$/;
 const GITHUB_ORIGIN = "https://github.com";
 
 /** Clones running at once on this computer (root's slots in system mode); the others wait their turn. */
@@ -493,7 +492,7 @@ export function systemGitCache(o: SystemGitCacheOptions) {
     if (
       !CONNECTION.test(input.connection) ||
       !isGitRepoName(input.repo) ||
-      !GITHUB_TOKEN.test(input.github) ||
+      !GITHUB_APP_TOKEN.test(input.github) ||
       !Number.isSafeInteger(input.uid)
     ) {
       return Promise.resolve(null);
@@ -672,18 +671,21 @@ async function awaitClone(
 /** `git.sync`: clones or updates the request's repositories (one at a time, within the deadline). */
 export async function gitSync(ctx: GitContext, req: GitSyncRequest): Promise<MachineReplies["git.sync"]> {
   const proxy = checkProxy(req.proxy);
+  const agentId = String(ctx.agent.id);
+  if (!AGENT_ID.test(agentId)) throw new RunnerError("bad_request", "agent.id is invalid");
+  // Before anything else in the request can refuse it: the agent's own `git fetch` and `git push` through the
+  // proxy work only while this credential is fresh.
+  const tokenFile = writeSecret(path.join(ctx.gitDir, `${agentId}.token`), proxy.token);
   const author = {
     name: typeof req.author?.name === "string" ? req.author.name.slice(0, 200) : "",
     email: typeof req.author?.email === "string" ? req.author.email.slice(0, 200) : "",
   };
   if (!author.name || !author.email) throw new RunnerError("bad_request", "author is required");
   if (!Array.isArray(req.repos)) throw new RunnerError("bad_request", "repos must be a list");
-  const agentId = String(ctx.agent.id);
-  if (!AGENT_ID.test(agentId)) throw new RunnerError("bad_request", "agent.id is invalid");
   const wanted: { repo: string; dir: string; clone: boolean; github?: string }[] = [];
   for (const r of req.repos.slice(0, GIT_SYNC_LIMITS.repos)) {
     if (!isGitRepoName(r?.repo)) throw new RunnerError("bad_request", "repo must be owner/name");
-    if (r.github !== undefined && (typeof r.github !== "string" || !GITHUB_TOKEN.test(r.github))) {
+    if (r.github !== undefined && (typeof r.github !== "string" || !GITHUB_APP_TOKEN.test(r.github))) {
       throw new RunnerError("bad_request", "github is not a GitHub App token");
     }
     const dir = typeof r.dir === "string" && r.dir.trim() ? r.dir.trim() : `${GIT_CHECKOUTS_DIR}/${r.repo}`;
@@ -698,7 +700,6 @@ export async function gitSync(ctx: GitContext, req: GitSyncRequest): Promise<Mac
   }
   const seconds = Math.max(1, Math.min(GIT_SYNC_LIMITS.maxSeconds, Math.floor(Number(req.timeoutSeconds) || 60)));
   const deadline = Date.now() + seconds * 1000;
-  const tokenFile = writeSecret(path.join(ctx.gitDir, `${agentId}.token`), proxy.token);
   const out: GitSyncRepo[] = [];
   for (const w of wanted) {
     const base: GitSyncRepo = { repo: w.repo, dir: w.dir, status: "failed" };

@@ -1169,7 +1169,7 @@ export const featureKeysPtBR = {
     teamServerFoot: "Você não sai de nenhum workspace: o servidor da sua equipe entra na lista, com a sua conta de lá.",
     /** The sheet from holding the workspace's mark in the bar, and its shorter words (ADR 0154). */
     workspacesHoldHint: "Segure para trocar de workspace",
-    workspacesSheetFoot: "Você fica conectado em todos; os avisos de cada um chegam aqui.",
+    workspacesSheetFoot: "Você fica conectado em todos. Os avisos de cada um chegam aqui.",
     addWorkspaceTeamShort: "Entrar no servidor da equipe",
     addWorkspaceTeamSubShort: "Endereço ou QR code do computador",
     addWorkspaceFoot: "Você não sai de nenhum workspace.",
@@ -1973,7 +1973,7 @@ export const featureKeysPtBR = {
     zoneTitle: "Fuso horário",
     /** A second workspace from Adicionar workspace (ADR 0154): where it lives, and that nothing is left. */
     anotherTitle: "Como se chama o workspace novo?",
-    anotherLead: "No agentes.chat. Você continua na {{org}}; dá para trocar a qualquer hora.",
+    anotherLead: "No agentes.chat. Você continua na {{org}} e pode trocar a qualquer hora.",
     /** O nome do primeiro uso, sugerido pelo domínio de um e-mail de trabalho. */
     suggested: "Pelo seu e-mail da {{domain}}, sugeri {{org}}.",
     create: "Criar",

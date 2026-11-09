@@ -509,24 +509,6 @@ function Home({
   const noPlan = PLAN_CHOICES.every(dims);
   return (
     <View>
-      <GroupedList>
-        <GroupedRow
-          icon="sparkle"
-          label={t("mobile.ai.planRow")}
-          sub={t("mobile.ai.planRowSub")}
-          faint={noPlan}
-          chevron
-          onPress={() => onView({ page: "plans" })}
-        />
-        <GroupedRow
-          icon="key"
-          label={t("mobile.ai.keyRow")}
-          sub={t("mobile.ai.keyRowSub")}
-          chevron
-          onPress={() => onView({ page: "key" })}
-        />
-      </GroupedList>
-      {noPlan ? <GroupedFooter>{dimmedWhy("claude")}</GroupedFooter> : null}
       {have.length > 0 ? (
         <>
           <GroupedHeader>
@@ -558,8 +540,27 @@ function Home({
             ) : null}
           </GroupedList>
           {dimmed && !noPlan ? <GroupedFooter>{dimmedWhy(dimmed)}</GroupedFooter> : null}
+          <GroupedHeader>{t("connectAi.have.other")}</GroupedHeader>
         </>
       ) : null}
+      <GroupedList>
+        <GroupedRow
+          icon="sparkle"
+          label={t("mobile.ai.planRow")}
+          sub={t("mobile.ai.planRowSub")}
+          faint={noPlan}
+          chevron
+          onPress={() => onView({ page: "plans" })}
+        />
+        <GroupedRow
+          icon="key"
+          label={t("mobile.ai.keyRow")}
+          sub={t("mobile.ai.keyRowSub")}
+          chevron
+          onPress={() => onView({ page: "key" })}
+        />
+      </GroupedList>
+      {noPlan ? <GroupedFooter>{dimmedWhy("claude")}</GroupedFooter> : null}
     </View>
   );
 }

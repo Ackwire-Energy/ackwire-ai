@@ -295,7 +295,7 @@ export function EmailSteps({
             autoCapitalize="words"
             autoComplete="name"
             textContentType="name"
-            returnKeyType="continue"
+            returnKeyType="go"
             enablesReturnKeyAutomatically
             onSubmitEditing={submit}
             autoFocus

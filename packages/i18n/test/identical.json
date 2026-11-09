@@ -3104,13 +3104,20 @@
       "invitePeople.ok",
       "me.account.save",
       "me.soundPixel",
+      "me.status",
+      "me.workspace",
       "me.workspaces",
       "mission.minutes",
       "onb.logo",
+      "plus.media",
+      "settings.group.org",
       "status.title",
       "tabs.threads",
       "threads.section.threads",
       "threads.title",
+      "time.short.days",
+      "time.short.hours",
+      "time.short.minutes",
       "vault.connection.items",
       "vault.field.keyNamePlaceholder",
       "vault.field.websitePlaceholder",
@@ -3133,7 +3140,12 @@
       "mission.plan.section",
       "onb.logo",
       "plus.audio",
+      "plus.media",
+      "settings.section.roles",
       "tabs.chats",
+      "time.short.days",
+      "time.short.hours",
+      "time.short.minutes",
       "vault.access.everyoneOut",
       "vault.access.roles",
       "vault.field.keyName",
@@ -3202,7 +3214,14 @@
       "vault.field.keyNamePlaceholder",
       "vault.field.websitePlaceholder",
       "vault.use.routine",
-      "files.video.pause"
+      "files.video.pause",
+      "time.short.minutes",
+      "time.short.hours",
+      "approval.sheet.service",
+      "plus.media",
+      "find.filterWord.date",
+      "invite.ask.step.code",
+      "settings.group.agents"
     ],
     "de": [
       "activityNow.kind.browser",
@@ -3262,7 +3281,17 @@
       "vault.kinds.login",
       "vault.scope.team",
       "vault.tab.team",
-      "files.type.video"
+      "files.type.video",
+      "plus.media",
+      "agents.teamSection",
+      "find.filterWord.in",
+      "me.status",
+      "me.workspace",
+      "me.dashboards",
+      "issues.viewBoard",
+      "invite.ask.step.code",
+      "settings.group.org",
+      "threads.title"
     ],
     "it": [
       "activityNow.kind.browser",
@@ -3302,7 +3331,12 @@
       "vault.scope.team",
       "vault.tab.team",
       "vault.use.routine",
-      "files.type.video"
+      "files.type.video",
+      "time.short.minutes",
+      "time.short.hours",
+      "agents.teamSection",
+      "find.filterWord.in",
+      "connectors.accountTitle"
     ],
     "nl": [
       "activityNow.kind.browser",
@@ -3364,7 +3398,20 @@
       "vault.scope.team",
       "vault.tab.team",
       "vault.use.routine",
-      "files.type.video"
+      "files.type.video",
+      "time.short.minutes",
+      "time.short.days",
+      "agents.teamSection",
+      "find.filters",
+      "find.filterWord.in",
+      "me.status",
+      "me.dashboards",
+      "wiki.links",
+      "invite.ask.step.code",
+      "settings.group.agents",
+      "settings.section.connectors",
+      "threads.title",
+      "connectors.accountTitle"
     ],
     "ja": [
       "browser.live.key.Enter",
@@ -3419,7 +3466,8 @@
       "vault.field.keyNamePlaceholder",
       "vault.field.websitePlaceholder",
       "vault.kind.login",
-      "files.type.video"
+      "files.type.video",
+      "me.status"
     ],
     "tr": [
       "activityNow.kind.limit",
@@ -3455,7 +3503,10 @@
       "dashboards.notice.card.proposal",
       "vault.field.keyNamePlaceholder",
       "vault.field.websitePlaceholder",
-      "vault.kind.login"
+      "vault.kind.login",
+      "time.short.minutes",
+      "time.short.days",
+      "me.status"
     ],
     "ru": [
       "browser.live.key.Enter",

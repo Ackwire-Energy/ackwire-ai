@@ -17,19 +17,33 @@
     },
     "errors": {
       "network": "Tidak ada koneksi. Periksa internet lalu coba lagi.",
-      "generic": "Ada yang salah. Coba lagi."
+      "generic": "Ada yang salah. Coba lagi.",
+      "offlineRetry": "Sedang tidak ada internet. Aku lanjutkan begitu koneksi kembali."
+    },
+    "flow": {
+      "email": "Apa alamat emailmu?",
+      "emailLead": "Untuk masuk atau membuat akunmu.",
+      "signUp": "Senang bertemu denganmu. Tim memanggilmu apa?"
     },
     "server": {
       "line": "Server: {{host}} ·",
       "change": "Ganti",
-      "title": "Servermu",
-      "subtitle": "Alamat agentes.chat timmu, sama dengan yang kamu lihat di browser.",
+      "title": "Di mana agentes.chat-mu?",
+      "subtitle": "Alamat yang dibuka timmu di browser.",
       "label": "Alamat server",
       "placeholder": "agentes.timkamu.ts.net",
       "use": "Pakai server ini",
       "checking": "Memeriksa…",
       "scan": "Pindai kode QR",
       "backTo": "Kembali ke {{host}}",
+      "footChange": "Ganti",
+      "footChoose": "Server dan bahasa",
+      "footServer": "Server lain",
+      "footLanguage": "Bahasa",
+      "footTeam": "Pakai server timmu?",
+      "footTeamAction": "Masuk lewat server itu",
+      "footOn": "Masuk ke {{host}}",
+      "footSwitch": "Ganti",
       "now": "Sekarang di {{host}}",
       "invalid": "Periksa alamatnya, misalnya agentes.timkamu.ts.net.",
       "unreachable": "Kami tidak bisa menjangkau {{host}}. Periksa alamat dan koneksimu, lalu coba lagi.",
@@ -40,7 +54,10 @@
       "appTooOld": "Perbarui aplikasi agentes untuk memakai {{host}}.",
       "down": {
         "line": "{{host}} tidak menjawab.",
-        "text": "Mungkin sedang mati atau di luar jaringanmu. Aplikasi akan terbuka sendiri begitu server kembali."
+        "text": "Mungkin sedang mati atau di luar jaringanmu. Aplikasi akan terbuka sendiri begitu server kembali.",
+        "tryNow": "Coba sekarang",
+        "switchServer": "Ganti server",
+        "retryIn_other": "mencoba lagi dalam {{count}} dtk"
       }
     },
     "connect": {
@@ -49,13 +66,15 @@
       "on": "Server: {{host}}",
       "leave": "Kamu akan keluar dari akun saat ini di ponsel ini.",
       "confirm": "Hubungkan",
+      "notNow": "Nanti saja",
       "checking": "Memeriksa server…",
       "notALink": "Tautan ini bukan dari server agentes.chat.",
       "tokenFailed": "Kode sudah kedaluwarsa atau sudah dipakai. Masuk dengan emailmu, atau tampilkan kode baru di komputer.",
       "signInSlow": "Proses masuk lebih lama dari seharusnya. Masuk dengan emailmu, atau tampilkan kode baru di komputer."
     },
     "scan": {
-      "hint": "Arahkan ke kode QR di komputer.",
+      "hint": "Arahkan ke kode QR di komputer",
+      "typeAddress": "Ketik alamatnya",
       "notOurs": "Kode QR ini bukan dari server agentes.chat.",
       "cameraTitle": "Pakai kamera",
       "cameraText": "Kamera hanya dipakai untuk membaca kode QR.",
@@ -82,6 +101,10 @@
   "push": {
     "channel": "Peringatan",
     "channelDescription": "Yang menunggumu, sebutan, dan percakapan.",
+    "offer": {
+      "line": "Mau tahu saat {{name}} selesai?",
+      "action": "Beri tahu aku"
+    },
     "ask": {
       "title": "Ketahui saat agen membutuhkanmu",
       "text": "Mereka bekerja selagi kamu mengerjakan hal lain. Kami akan memberi tahu saat mereka butuh persetujuanmu, menyelesaikan permintaanmu, atau memanggilmu.",
@@ -124,9 +147,13 @@
     "placeholder": "Tulis pesan",
     "join": "Tambahkan ke tugas yang sedang berjalan",
     "now": "Hentikan dan kirim",
-    "choice": "Cara mengirim selagi agen bekerja"
+    "choice": "Cara mengirim selagi agen bekerja",
+    "holdToStop": "Tahan untuk menghentikan dan mengirim"
   },
   "search": {
     "placeholder": "Cari"
+  },
+  "picker": {
+    "none": "Tidak ada yang cocok dengan “{{text}}”."
   }
 }
