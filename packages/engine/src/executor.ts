@@ -3140,6 +3140,8 @@ async function executeRunInner(
     }
     // A background run never posts by itself (ADR 0053 §5): its cards speak for it.
     if (run.background || repeatsLastPost(text)) text = "";
+    // The bridge posted its cards when it asked: what it says goes with them, not up where its words first showed.
+    takePlace(replyThreadId);
     const message = text ? await post(db, replyThreadId, text, withFallback(t, takeMemoryUpdates(t)), at) : null;
     if (message) t.postedCount++;
     t.postedUpTo = t.messages.length;
