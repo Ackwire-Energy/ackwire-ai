@@ -2114,13 +2114,6 @@ html:not([data-pointer]) .artifact-table__sort:focus-visible {
 .md__details > :not(summary) + * {
   margin-top: 10px;
 }
-.md code {
-  font-family: var(--font-mono);
-  font-size: 0.9em;
-  padding: 1px 4px;
-  border-radius: 4px;
-  background: var(--surface-sunken);
-}
 .md__code {
   padding: 12px;
   border-radius: var(--radius-sm);
@@ -3165,14 +3158,6 @@ html:not([data-pointer]) .artifact-table__sort:focus-visible {
   text-decoration: underline;
   text-decoration-color: var(--line-strong);
   text-underline-offset: 3px;
-}
-.md--message code {
-  /* The mono face runs wide: a step smaller than the text so code doesn't shout. */
-  font-size: 0.84em;
-  padding: 2px 6px;
-  border-radius: 6px;
-  background: var(--plate);
-  color: var(--ink2);
 }
 .md--message .md__code {
   margin: 0;

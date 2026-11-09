@@ -153,7 +153,11 @@ export function renderInline(
       continue;
     }
     if (m[1]) {
-      const code = <code key={k}>{tok.slice(1, -1)}</code>;
+      const code = (
+        <code key={k} className="ac-inlinecode">
+          {tok.slice(1, -1)}
+        </code>
+      );
       const id = idRef && !words ? loneIdRef(tok.slice(1, -1)) : null;
       out.push(id && idRef ? idRef(id, tok.slice(1, -1), k, code) : code);
     } else if (m[2]) out.push(<strong key={k}>{inner(tok.slice(2, -2), k)}</strong>);

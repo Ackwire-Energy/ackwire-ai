@@ -1401,14 +1401,20 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
-/* Inline code on a plate (mono only for code), a step under the words: the mono face runs wide. */
-.ac-msg__text code {
+/*
+ * Text between backticks, wherever formatted words show (a message, a document, an agent's words on a card): mono a
+ * step under its words (the mono face runs wide), on the plate. Each line of one that wraps keeps its padding and
+ * corners.
+ */
+.ac-inlinecode {
   font-family: var(--font-mono);
-  font-size: 0.84em;
+  font-size: 0.86em;
+  padding: 1px 5px;
+  border-radius: 5px;
   background: var(--plate);
   color: var(--ink2);
-  padding: 2px 6px;
-  border-radius: 6px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
 }
 .ac-msg__text pre {
   margin: var(--space-2) 0;
