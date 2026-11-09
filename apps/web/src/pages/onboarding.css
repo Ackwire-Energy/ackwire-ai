@@ -115,6 +115,7 @@ html:not([data-pointer]) .onb__me:focus-visible {
 }
 /* The step's column and, on wide screens, the workspace's preview beside it. */
 .onb__cols {
+  --onb-gutter: clamp(16px, 4vw, 32px);
   display: flex;
   justify-content: center;
   align-items: flex-start;
@@ -128,7 +129,6 @@ html:not([data-pointer]) .onb__me:focus-visible {
  * 24px padding at the logo's size 22, measured): Back's middle sits on it.
  */
 .onb__body {
-  --onb-gutter: clamp(16px, 4vw, 32px);
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
@@ -481,6 +481,7 @@ html:not([data-pointer]) .onb__logo:focus-visible {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+  padding: var(--space-4) var(--onb-gutter) 0;
 }
 .onb__phone-top .onb__progress-sky {
   height: 24px;
@@ -506,7 +507,7 @@ html:not([data-pointer]) .onb__logo:focus-visible {
     display: block;
   }
   .onb__body {
-    padding-top: var(--space-4);
+    padding-top: var(--space-6);
   }
   .onb--rail .onb__title {
     font-size: 22px;

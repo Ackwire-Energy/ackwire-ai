@@ -347,21 +347,24 @@ export function OnboardingPage() {
         }}
       >
         <div className="onb__cols">
-          <div className="onb__body" key={step}>
-            {phone && (
-              <div className="onb__phone-top">
-                <OnboardingProgress progress={answered / steps.length} />
-                <div className="onb__lodi-row">
-                  <Avatar
-                    kind="agent"
-                    name={lodiName}
-                    appearance={lookOf(lodi) ?? RIGHT_HAND_DEFAULT.appearance}
-                    size="sm"
-                  />
-                  <p className="onb__say">{say}</p>
-                </div>
+          {/* Outside the step, as the rail is on wide screens: the pixel agent walks on as a step is done. */}
+          {phone && (
+            <div className="onb__phone-top">
+              <OnboardingProgress progress={answered / steps.length} />
+              <div className="onb__lodi-row">
+                <Avatar
+                  kind="agent"
+                  name={lodiName}
+                  appearance={lookOf(lodi) ?? RIGHT_HAND_DEFAULT.appearance}
+                  size="sm"
+                />
+                <p className="onb__say" key={step}>
+                  {say}
+                </p>
               </div>
-            )}
+            </div>
+          )}
+          <div className="onb__body" key={step}>
             {step === "name" && leaveTo && (
               <button
                 type="button"
