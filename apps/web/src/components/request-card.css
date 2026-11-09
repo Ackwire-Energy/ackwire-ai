@@ -345,13 +345,15 @@ html:not([data-pointer]) .rq__more:focus-visible {
 .rq__item-acts {
   column-gap: var(--space-2);
 }
-/* On a phone a lone button takes the footer's width (rule 23), the time left under it at the end. Beside a ghost
-   (Depois) a main button is one of a pair: it grows into the row and the ghost keeps its place there. */
+/* On a phone a lone button with nothing else to press takes the footer's width (rule 23), the time left under it at
+   the end. One main button beside ghosts (Depois, or a waiting card's Lembrar depois and Concluído after it) grows into
+   their row and they keep their place there; two main buttons keep their widths. */
 @media (max-width: 640px) {
-  .rq__foot:not(:has(> .ac-btn ~ .ac-btn)) > .ac-btn:not(.ac-btn--ghost) {
+  .rq__foot:not(:has(> .ac-btn ~ .ac-btn)):not(:has(.ac-btn--ghost)) > .ac-btn {
     flex: 1 1 100%;
   }
-  .rq__foot:has(> .ac-btn--ghost) > .ac-btn:not(.ac-btn--ghost) {
+  .rq__foot:has(.ac-btn--ghost):not(:has(> .ac-btn:not(.ac-btn--ghost) ~ .ac-btn:not(.ac-btn--ghost)))
+    > .ac-btn:not(.ac-btn--ghost) {
     flex: 1 1 auto;
   }
 }
