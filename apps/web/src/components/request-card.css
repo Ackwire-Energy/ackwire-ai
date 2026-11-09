@@ -647,6 +647,10 @@ html:not([data-pointer]) .rq__choice:focus-visible {
   font-size: 12.5px;
   color: var(--muted);
 }
+/* Cancelar after how it ended: on its words' middle (an inline button's baseline is its icon's bottom). */
+.rq__item-outcome > .ac-btn {
+  vertical-align: middle;
+}
 /* A run's requests, unfolded under its line: each a row of its own, indented on the words' column. */
 .rq__run > .rq__items {
   margin: 10px -16px calc(-1 * var(--row-py)) 16px;
