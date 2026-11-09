@@ -274,27 +274,17 @@ html[data-pointer] :focus-visible {
 .ac-captail:has(> .ac-btn:not(.ac-btn--ghost)) {
   margin-block: calc((var(--control-h-sm) + 2 * var(--action-clear) - 22px - 2 * var(--row-py)) / 2);
 }
-@media (pointer: coarse) {
-  .ac-captail:has(> .ac-btn:not(.ac-btn--ghost)) {
-    margin-block: calc((var(--control-h-md) + 2 * var(--action-clear) - 22px - 2 * var(--row-py)) / 2);
-  }
-}
 
 /*
- * The plate around a small ghost button's icon (32px around 16px, 40px on touch): what shows only on hover. A ghost
+ * The plate around a small ghost button's icon (32px around 16px, on touch too): what shows only on hover. A ghost
  * at a row's edge reaches out by it, so its icon sits on the padding line.
  */
 :root {
   --ghost-plate: 8px;
 }
-@media (pointer: coarse) {
-  :root {
-    --ghost-plate: 12px;
-  }
-}
 
 /*
- * A row of actions: 16px between what the eye sees, 24px on touch. A ghost shows only its icon or words until
+ * A row of actions: 16px between what the eye sees, on touch too. A ghost shows only its icon or words until
  * hovered, so its plate reaches half into the gap on each side: its icon or words stand as far from the next shape
  * as two boxes do, and at either end of the row they sit on its edge. The gap is a column gap, so a row that wraps
  * starts each line on the same edge. A nested `.ac-acts` (a slot another component fills) joins the row.
@@ -1432,8 +1422,8 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
 }
 /*
  * An error line with its fix and its × after it, out of the .ac-iconline: they stay on the reason's first line, not the
- * middle of a reason that wraps. The words start as far down as a small button (32, 40 on touch) centres a line, so a
- * one-line error is as tall as before and its first line runs through the buttons' middle.
+ * middle of a reason that wraps. The words start as far down as a small button (32) centres a line, so a one-line
+ * error is as tall as before and its first line runs through the buttons' middle.
  */
 .ac-msg__error-row {
   display: flex;
@@ -1443,11 +1433,6 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
 .ac-msg__error-row > .ac-msg__error {
   min-width: 0;
   margin: calc((var(--control-h-sm) - 20px) / 2) 0 0;
-}
-@media (pointer: coarse) {
-  .ac-msg__error-row > .ac-msg__error {
-    margin-top: calc((var(--control-h-md) - 20px) / 2);
-  }
 }
 .ac-mention {
   color: var(--ink);
@@ -3157,12 +3142,6 @@ html:not([data-pointer]) .ac-row:focus-visible {
 .ac-empty__actions .ac-btn--sm {
   min-height: var(--control-h-sm);
   padding-block: 6px;
-}
-/* Touch keeps the 40px target every small button grows to (the rule above outranks that one). */
-@media (pointer: coarse) {
-  .ac-empty__actions .ac-btn--sm {
-    min-height: var(--control-h-md);
-  }
 }
 
 /* Inline alert (an `.ac-iconline`) */
@@ -9733,30 +9712,32 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
     transform: none;
   }
 }
-/* Touch: compact controls grow to the default step of the ruler (40, r12). */
+/*
+ * Touch: a small button keeps its 32 plate, as on a desktop, and its target grows to 44 past it. One with words grows
+ * up and down only, so two buttons 8 apart never share a target; an icon alone grows 4 to each side too. Positioned
+ * at no weight: a button a component places absolutely keeps its place.
+ */
 @media (pointer: coarse) {
-  .ac-btn--sm {
-    min-height: var(--control-h-md);
-    border-radius: var(--control-r-md);
+  :where(.ac-btn--sm) {
+    position: relative;
   }
-  .ac-btn--sm.ac-btn--icon {
-    min-width: var(--control-h-md);
+  .ac-btn--sm::after {
+    content: "";
+    position: absolute;
+    inset: calc((var(--control-h-sm) - var(--touch-target)) / 2) 0;
   }
-  /* Except the message bar's: at 40px the bar (46px) would cover the lines around a grouped message's text, 38.35px
-     apart. Its plates stay 32px and their targets grow to 40px past them, 8px apart so they never overlap. */
+  .ac-btn--sm.ac-btn--icon::after {
+    inset: calc((var(--control-h-sm) - var(--touch-target)) / 2) calc(-1 * var(--space-1));
+  }
+  /* The message bar's 26px plates grow to the 32 of every small one here, 8px apart: their targets touch, never
+     overlap. */
   .ac-msg__actions {
     gap: 8px;
   }
   .ac-msg__actions .ac-btn--sm {
-    position: relative;
     min-width: var(--control-h-sm);
     min-height: var(--control-h-sm);
     border-radius: calc(var(--bar-r) - var(--bar-pad));
-  }
-  .ac-msg__actions .ac-btn--sm::after {
-    content: "";
-    position: absolute;
-    inset: -4px;
   }
   .ac-composer__format-btn {
     width: var(--control-h-md);
@@ -11295,17 +11276,12 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
   column-gap: var(--space-2);
 }
 /* A button with its plate, a select or a segmented control ending the name's line: the line's axis is its middle, so it
-   keeps the row's padding above and below (a small button grows to 40 on touch). */
+   keeps the row's padding above and below. */
 .ac-mediarow:has(> .ac-mediarow__end :is(.ac-btn--sm:not(.ac-btn--ghost), .ac-select, .ac-seg)) {
   --mediarow-axis: max(var(--mediarow-face), var(--control-h-sm));
 }
 .ac-mediarow:has(> .ac-mediarow__end .ac-btn:not(.ac-btn--sm, .ac-btn--ghost)) {
   --mediarow-axis: max(var(--mediarow-face), var(--control-h-md));
-}
-@media (pointer: coarse) {
-  .ac-mediarow:has(> .ac-mediarow__end .ac-btn--sm:not(.ac-btn--ghost)) {
-    --mediarow-axis: max(var(--mediarow-face), var(--control-h-md));
-  }
 }
 /* As wide and tall as a face at least, so a glyph in a face's place (a check, an icon) keeps the names in line. */
 .ac-mediarow__face {

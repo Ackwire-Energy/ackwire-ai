@@ -268,13 +268,14 @@ describe("a picture beside lines, a bubble beside a face, a row of actions", () 
     );
   });
 
-  test("a row of actions: 16px between what shows, 24px on touch, ghosts reaching into the gap by their plate", async () => {
+  test("a row of actions: 16px between what shows, on touch too, ghosts reaching into the gap by their plate", async () => {
     const css = (await Bun.file(join(ROOT, "packages/ui/src/styles/components.css")).text()).replace(
       /\/\*[\s\S]*?\*\//g,
       "",
     );
     expect(css).toMatch(/:root \{\s*--ghost-plate: 8px;\s*\}/);
-    expect(css).toMatch(/@media \(pointer: coarse\) \{\s*:root \{\s*--ghost-plate: 12px;\s*\}\s*\}/);
+    // A small plate stays 32 on touch, so its ghost's plate does too.
+    expect(css).not.toMatch(/@media \(pointer: coarse\) \{\s*:root \{\s*--ghost-plate:/);
     expect(await kitRule(".ac-acts")).toContain("column-gap: calc(2 * var(--ghost-plate))");
     expect(await kitRule(".ac-acts > .ac-acts")).toContain("display: contents");
     expect(await kitRule(".ac-acts > .ac-btn--ghost")).toContain("margin-inline: calc(-1 * var(--ghost-plate))");

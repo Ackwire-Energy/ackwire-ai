@@ -17,8 +17,8 @@ test("what ships keeps an empty conversation's suggestions inside their card at 
   expect(last(shipped, ".ac-empty__actions .ac-btn", "white-space")).toBe("normal");
   expect(last(shipped, ".ac-empty__actions .ac-btn", "height")).toBe("auto");
   expect(last(shipped, ".channel__suggestions", "max-width")).toBe("100%");
-  // On touch a small one keeps the 40px target every small button grows to.
-  expect(last(touch, ".ac-empty__actions .ac-btn--sm", "min-height")).toBe("var(--control-h-md)");
+  // On touch a small one keeps its 32px plate, as every small button does (its target grows past it).
+  expect(last(touch, ".ac-empty__actions .ac-btn--sm", "min-height")).toBeUndefined();
 
   // A phone: one suggestion per row, as wide as the card.
   expect(last(phone, ".channel__suggestions", "flex-direction")).toBe("column");

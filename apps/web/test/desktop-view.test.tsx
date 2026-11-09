@@ -1500,12 +1500,12 @@ describe("the dialog's size (computer.css)", () => {
     const line = rule(desk, ".dsk-line");
     expect(line).toContain("align-items: flex-start");
     expect(line).toContain("line-height: 22px");
-    // The 22 px line's middle on the button's, a touch control as tall as the ruler's default step: (40 − 22) / 2.
-    expect(rule(desk, ".dsk-line > .ac-btn ~ *")).toContain("margin-top: calc((var(--control-h-md) - 22px) / 2)");
+    // The 22 px line's middle on the button's, a small button that keeps its 32 px plate on touch: (32 − 22) / 2.
+    expect(rule(desk, ".dsk-line > .ac-btn ~ *")).toContain("margin-top: calc((var(--control-h-sm) - 22px) / 2)");
     const kit = await Bun.file(
       new URL("../../../packages/ui/src/styles/components.css", import.meta.url).pathname,
     ).text();
-    expect(kit).toContain("@media (pointer: coarse) {\n  .ac-btn--sm {\n    min-height: var(--control-h-md);");
+    expect(kit).not.toContain("@media (pointer: coarse) {\n  .ac-btn--sm {\n    min-height");
   });
 
   test("the line's ⓘ is its sentence's: 4 px after its last letter", async () => {
@@ -1791,9 +1791,8 @@ describe("the dialog's size (computer.css)", () => {
   test("what comes over or under the screen takes the screen's room, never the window's", async () => {
     const text = await css();
     expect(text).toContain(".ac-dialog.cmp-dialog {\n  --cmp-button: var(--control-h-sm);\n  --cmp-line: 22px;\n}");
-    expect(text).toContain(
-      "@media (pointer: coarse) {\n  .ac-dialog.cmp-dialog {\n    --cmp-button: var(--control-h-md);",
-    );
+    // Its head's small buttons keep their 32 px plates on touch too.
+    expect(text).not.toContain("@media (pointer: coarse) {\n  .ac-dialog.cmp-dialog {\n    --cmp-button:");
     // A banner, the request and the hand-back bar sit in the body's column with the screen's stage, which gets what they leave
     // and shrinks the screen inside it, keeping its shape.
     const column = rule(text, ".cmp-body > .dsk");
@@ -1834,9 +1833,9 @@ describe("the dialog's size (computer.css)", () => {
     const text = await css();
     const tablet = text.split("@media (pointer: coarse) and (min-width: 721px) {")[1] ?? "";
     const inTablet = (selector: string) => tablet.split(`\n  ${selector} {`)[1]?.split("}")[0] ?? "";
-    // The line under the screen is as tall as the 40 px touch control it holds in control, in every state, so the frame
+    // The line under the screen is as tall as the small button it holds in control, in every state, so the frame
     // (which reads it) is the same watching or in control, and the steps' line takes that room too.
-    expect(inTablet(".ac-dialog.cmp-dialog")).toContain("--cmp-line: var(--control-h-md)");
+    expect(inTablet(".ac-dialog.cmp-dialog")).toContain("--cmp-line: var(--control-h-sm)");
     expect(tablet.split("\n}\n")[0]).not.toContain("height:");
     // After the line's own value, which it outweighs at the same weight.
     expect(text.indexOf("@media (pointer: coarse) and (min-width: 721px)")).toBeGreaterThan(

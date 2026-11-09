@@ -555,7 +555,6 @@ label.routine-onair__text {
 .routine-own li .ac-btn {
   width: 20px;
   height: 20px;
-  /* Touch grows small buttons to 40px; this one stays inside its 26px label. */
   min-width: 20px;
   min-height: 20px;
   margin-right: -6px;

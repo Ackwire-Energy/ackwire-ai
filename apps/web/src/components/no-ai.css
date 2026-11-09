@@ -26,7 +26,7 @@
   flex: none;
 }
 /* Its words can wrap in a narrow column: the button stays on their first line, not the middle of the lines. The words
-   start as far down as the small button (32, 40 on touch) centres a line, so a one-line banner is as tall as before. */
+   start as far down as the small button (32) centres a line, so a one-line banner is as tall as before. */
 .noai-banner:has(> .ac-btn) {
   align-items: flex-start;
 }
@@ -36,16 +36,6 @@
 @supports (top: 1lh) {
   .noai-banner:has(> .ac-btn) > .noai-banner__text {
     margin-top: calc((var(--control-h-sm) - 1lh) / 2);
-  }
-}
-@media (pointer: coarse) {
-  .noai-banner:has(> .ac-btn) > .noai-banner__text {
-    margin-top: calc((var(--control-h-md) - 22px) / 2);
-  }
-  @supports (top: 1lh) {
-    .noai-banner:has(> .ac-btn) > .noai-banner__text {
-      margin-top: calc((var(--control-h-md) - 1lh) / 2);
-    }
   }
 }
 

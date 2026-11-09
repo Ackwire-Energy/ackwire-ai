@@ -32,6 +32,19 @@ test("the kit's screens, grouped rows and toolbar controls read those numbers in
   expect(source("Row.tsx")).toContain("paddingHorizontal: CARD_PAD");
 });
 
+test("a small button and a card's footer button are the web's 32, their targets grown to 44 above and below only", () => {
+  const button = source("Button.tsx");
+  expect(button).toContain("const SMALL = { height: TOOL_H, radius: 10, padding: 12");
+  expect(button).toMatch(/card: SMALL,\s*sm: SMALL,/);
+  expect(button).toContain("const grow = (TOUCH - height) / 2;");
+  expect(button).toContain("return grow > 0 ? { top: grow, bottom: grow } : undefined;");
+  expect(button).toContain("hitSlop={slopOf(s.height)}");
+  expect(source("HoldButton.tsx")).toContain("hitSlop={slopOf(s.height)}");
+  // Nothing sizes a button of its own past the kit's sizes.
+  const sized = files(SRC).filter((f) => /<(Button|HoldButton)\b[^>]*\bminHeight/.test(readFileSync(f, "utf8")));
+  expect(sized.map((f) => relative(SRC, f))).toEqual([]);
+});
+
 test("no screen keeps a 20-point side of its own: screens read SCREEN_X and cards CARD_PAD", () => {
   // A button's own padding isn't a screen's side.
   const NOT_A_SIDE = new Set(["ui/Button.tsx"]);
