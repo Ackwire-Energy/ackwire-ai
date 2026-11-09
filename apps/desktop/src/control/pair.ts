@@ -66,13 +66,24 @@ export function unpairedWorkspaces(list: readonly ServerWorkspaces[], snap: Snap
   );
 }
 
+const signedIn = (list: readonly ServerWorkspaces[]) =>
+  new Set(list.flatMap((s) => (s.signedIn ? s.orgs.map((o) => targetKey({ server: s.server, orgId: o.id })) : [])));
+
 /**
- * The next workspace to offer this computer to once, if any. None until every running home said whether it is
+ * The next workspace to offer this computer to once, if any: one the person signed in to (or made) since the list
+ * read `before`. The first read (`before` null) offers nothing, so a session that was already there never opens a
+ * window by itself, and neither does an unread count changing. None until every running home said whether it is
  * paired: a home still starting would read as a workspace this computer doesn't work for.
  */
-export function nextOffer(list: readonly ServerWorkspaces[], snap: Snapshot, offered: readonly string[]) {
-  if (!snap.loaded || snap.homes.some((h) => h.running && !h.status)) return null;
-  return unpairedWorkspaces(list, snap).find((t) => !offered.includes(targetKey(t))) ?? null;
+export function nextOffer(
+  list: readonly ServerWorkspaces[],
+  before: readonly ServerWorkspaces[] | null,
+  snap: Snapshot,
+  offered: readonly string[],
+) {
+  if (!before || !snap.loaded || snap.homes.some((h) => h.running && !h.status)) return null;
+  const had = signedIn(before);
+  return unpairedWorkspaces(list, snap).find((t) => !had.has(targetKey(t)) && !offered.includes(targetKey(t))) ?? null;
 }
 
 /**

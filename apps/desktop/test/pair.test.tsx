@@ -94,7 +94,7 @@ describe("pairing from the app", () => {
       expect(parsePairLink(bad)).toBeNull();
   });
 
-  test("offered: signed-in workspaces that may pair, where agents may work, not paired here yet, once each", () => {
+  test("offered after sign-in: workspaces that may pair, where agents may work, not paired here yet, once each", () => {
     const list: ServerWorkspaces[] = [
       {
         server: FAKE_SERVER,
@@ -133,12 +133,17 @@ describe("pairing from the app", () => {
     });
     const snap = { loaded: true, homes: [home("org_acme")] } as unknown as Snapshot;
     expect(unpairedWorkspaces(list, snap).map((t) => t.orgId)).toEqual(["o-norte"]);
-    expect(nextOffer(list, snap, [])?.name).toBe("Estúdio Norte");
-    expect(nextOffer(list, snap, [`${FAKE_SERVER} o-norte`])).toBeNull();
+    // Offered right after signing in there: the read before had the server signed out.
+    const signedOut = list.map((s) => ({ ...s, signedIn: false, orgs: [] }));
+    expect(nextOffer(list, signedOut, snap, [])?.name).toBe("Estúdio Norte");
+    expect(nextOffer(list, signedOut, snap, [`${FAKE_SERVER} o-norte`])).toBeNull();
+    // The app's first read, and a read after one where it was already signed in (an unread count changed): nothing.
+    expect(nextOffer(list, null, snap, [])).toBeNull();
+    expect(nextOffer(list, list, snap, [])).toBeNull();
     // A home whose runner hasn't said yet whether it's paired: nothing offered until it has.
     const starting = { loaded: true, homes: [{ ...home("org_acme"), status: null }] } as unknown as Snapshot;
-    expect(nextOffer(list, starting, [])).toBeNull();
-    expect(nextOffer(list, { loaded: false, homes: [] }, [])).toBeNull();
+    expect(nextOffer(list, signedOut, starting, [])).toBeNull();
+    expect(nextOffer(list, signedOut, { loaded: false, homes: [] }, [])).toBeNull();
   });
 
   test("the card after sign-in: Allow pairs with the window's session and turns on open at login", () => {

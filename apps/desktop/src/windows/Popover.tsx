@@ -27,7 +27,7 @@ import { NOTCH_PREF } from "../control/notch";
 import { SITE_NOTIFY_PREF } from "../control/notify";
 import { nextOffer, PAIR_OFFER_PREF, PAIR_OFFERED_PREF, targetKey } from "../control/pair";
 import { combinedPause, extendPause, type PauseChoice, pauseUntil } from "../control/pause";
-import { homeServer, type ServerList, serverName } from "../control/server";
+import { homeServer, type ServerList, type ServerWorkspaces, serverName } from "../control/server";
 import { type Home, isIncompatible, isRefusedHome, orgName, pairedHomes } from "../control/store";
 import { answerThisMac, type PrefsTab, whenHostHomeReady } from "../control/this-mac";
 import { isOnline, macStateOf, trayStateOf } from "../control/tray";
@@ -89,14 +89,17 @@ export function Popover() {
   // The server here's sync made a home: its first tools once its runner is up.
   useEffect(() => host.onNewHostHome((homeId) => whenHostHomeReady(store, homeId)), [host, store]);
   // Signed in to a workspace this computer doesn't work for yet: its card, once, in the welcome window.
+  const workspacesSeen = useRef<ServerWorkspaces[] | null>(null);
   useEffect(
     () =>
       host.onWorkspaces(() => {
         void host
           .workspaces()
           .then((list) => {
+            const before = workspacesSeen.current;
+            workspacesSeen.current = list;
             const offered = readPref<string[]>(PAIR_OFFERED_PREF, []);
-            const offer = nextOffer(list, store.getSnapshot(), offered);
+            const offer = nextOffer(list, before, store.getSnapshot(), offered);
             if (!offer) return;
             writePref(PAIR_OFFERED_PREF, [...offered, targetKey(offer)]);
             writePref(PAIR_OFFER_PREF, offer);
