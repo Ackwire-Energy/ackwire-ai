@@ -76,10 +76,10 @@ describe("calendar items the Google Calendar way", () => {
     }
   });
 
-  test("side by side, a column of runs alone gives the meeting beside it room for its name, never under a face's width", async () => {
+  test("side by side, a column of runs alone gives the meeting beside it room for its name, never under a face's width or past an even share", async () => {
     const css = await sheet("apps/web/src/pages/calendar.css");
     const items = declarations(css, ".cal-week__col > :is(.cal-chip--block, .cal-week__runs)");
-    expect(last(items, "--thin")).toBe("max(32px, var(--even) - 60px)");
+    expect(last(items, "--thin")).toBe("min(var(--even), max(32px, var(--even) - 60px))");
     expect(last(items, "width")).toBe("var(--wide)");
     expect(last(declarations(css, ".cal-week__col > .cal-week__runs[data-thin]"), "width")).toBe("var(--thin)");
   });

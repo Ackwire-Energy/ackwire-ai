@@ -345,12 +345,12 @@ html:not([data-pointer]) .cal-chip:focus-visible {
 /*
  * Side by side, 2px apart and from the column's edges (`layoutDay`): each of `--cols` columns as wide, but a column of
  * routine runs alone beside a meeting (`data-thin`) gives 60px of its share to the meeting, never narrower than a face,
- * so the meeting keeps room for its name.
+ * so the meeting keeps room for its name. A day narrower than that (a phone's week) shares evenly.
  */
 .cal-week__col > :is(.cal-chip--block, .cal-week__runs) {
   --gaps: calc(2px * (var(--cols) + 1));
   --even: calc((100% - var(--gaps)) / var(--cols));
-  --thin: max(32px, var(--even) - 60px);
+  --thin: min(var(--even), max(32px, var(--even) - 60px));
   --wide: calc((100% - var(--gaps) - var(--thins) * var(--thin)) / (var(--cols) - var(--thins)));
   --before: calc(var(--thin-before) * var(--thin) + (var(--col) - var(--thin-before)) * var(--wide));
   left: calc(2px * (var(--col) + 1) + var(--before));
