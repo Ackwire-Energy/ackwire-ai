@@ -1,6 +1,6 @@
 {
   "identifier": "welcome",
-  "description": "The first run and \"Add a server…\": the servers this app opens, what discovery found, the link waiting, choosing a server (the main window opens there), and running agentes.chat on this computer (setting it up and cancelling it, Tailscale's state for reach).",
+  "description": "The first run and \"Add a server…\": the servers this app opens, what discovery found, the link waiting, choosing a server (the main window opens there), and running agentes.chat on this computer (setting it up and cancelling it, Tailscale's state for reach), and pairing this computer with a workspace once the person confirms here (a pair link's maker and workspace from its server, a new home, its code confirmed with the main window's session, open at login).",
   "windows": ["welcome"],
   "permissions": [
     "core:default",
@@ -21,6 +21,10 @@
     "allow-local-server-start",
     "allow-local-server-diagnostics",
     "allow-tailscale-status",
-    "allow-tailscale-open"
+    "allow-tailscale-open",
+    "allow-runner-add",
+    "allow-autostart-set",
+    "allow-site-fetch",
+    "allow-pair-link-info"
   ]
 }
