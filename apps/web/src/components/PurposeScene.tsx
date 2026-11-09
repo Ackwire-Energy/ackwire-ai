@@ -16,6 +16,7 @@ import {
   playAgentReaction,
 } from "@agenteschat/ui";
 import { type CSSProperties, useEffect, useRef } from "react";
+import { AgentAvatar } from "@/components/AgentAvatar";
 
 /**
  * The scene of an answer to "what will you use agentes.chat for?" (ADR 0159), the onboarding's brand moment, drawn
@@ -98,8 +99,7 @@ export function PurposeScene({ kind, chosen, you }: { kind: PurposeKind; chosen:
               style={{ left: f.x - f.size / 2, top: f.y - f.size / 2, width: f.size, height: f.size }}
             >
               {"look" in f ? (
-                <Avatar
-                  kind="agent"
+                <AgentAvatar
                   name={`purpose-${kind}-${i}`}
                   appearance={f.look as AgentAppearance}
                   size="md"
