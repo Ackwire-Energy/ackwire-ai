@@ -323,7 +323,7 @@ html:not([data-pointer]) .routine-row__title:focus-visible {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 4px;
+  gap: var(--space-2);
 }
 .routine-row__actions .ac-switch {
   margin-right: 6px;

@@ -281,7 +281,7 @@ p {
   flex: none;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-2);
 }
 /* On the strip it follows the buttons at their own gap; on phones it goes up to the title's line (responsive.css). */
 .outage__close {
@@ -1606,7 +1606,7 @@ html:not([data-pointer]) .artifact-tile__open:focus-visible {
   right: 8px;
   z-index: 2;
   display: flex;
-  gap: 2px;
+  gap: var(--space-2);
   padding: 2px;
   border-radius: var(--radius-item);
   background: var(--glass-solid);
@@ -9411,7 +9411,7 @@ html:not([data-pointer]) .newag__sel .ac-select__trigger:focus-visible {
   top: 14px;
   right: 14px;
   display: flex;
-  gap: 6px;
+  gap: var(--space-2);
 }
 .agp-glass.ac-btn {
   background: var(--sky-glass);

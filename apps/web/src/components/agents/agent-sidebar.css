@@ -180,7 +180,7 @@ html:not([data-pointer]) .dm-side__screen:focus-visible {
 }
 .dm-side__acts {
   display: flex;
-  gap: 6px;
+  gap: var(--space-2);
   margin: 8px 0 10px;
 }
 .dm-side__acts:empty {
@@ -288,10 +288,6 @@ html:not([data-pointer]) .dm-side__row--link:focus-visible {
   flex-wrap: wrap;
 }
 /* The header's toggle: a plate while it is open. */
-.dm-side-toggle.ac-btn[aria-pressed="true"] {
-  background: color-mix(in srgb, var(--ink) 9%, transparent);
-  color: var(--ink);
-}
 /* Under the sidebar's breakpoint one header row holds the computer, the search and the toggle: the search gives way. */
 @media (max-width: 1099px) {
   .channel__header:has(> .dm-side-toggle) {

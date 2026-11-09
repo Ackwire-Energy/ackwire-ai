@@ -133,7 +133,7 @@ export function DmPage({ target, focusMessageId }: { target: DmTarget; focusMess
           variant="ghost"
           iconOnly
           icon="sidebar"
-          className="dm-side-toggle"
+          className="channel__icon dm-side-toggle"
           aria-label={t("agentSide.label")}
           aria-pressed={side.open}
           title={t(side.open ? "agentSide.hide" : "agentSide.show")}
