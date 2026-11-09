@@ -13481,6 +13481,10 @@
     "statusReplyTurn": "작업하는 중이라({{duration}}) 아직 답할 수 없습니다. 메시지는 대기 중이며 이번 작업 차례가 끝나면 읽겠습니다.",
     "statusReplyQueued": "컴퓨터를 기다리는 중입니다({{duration}}). 제 차례가 되면 메시지를 읽겠습니다.",
     "statusReplyAway": "컴퓨터가 돌아오기를 기다리는 중입니다. 돌아오는 대로 메시지를 읽겠습니다.",
+    "statusReplyPlan": "요금제가 돌아오기를 기다리는 중입니다({{when}}). 돌아오면 메시지를 읽겠습니다.",
+    "statusReplyPlanUnknown": "요금제가 돌아오기를 기다리는 중입니다. 돌아오는 대로 메시지를 읽겠습니다.",
+    "statusReplyBudget": "이번 달 예산이 갱신되기를 기다리는 중입니다({{when}}). 그때 메시지를 읽겠습니다. 관리자가 한도를 올리면 더 일찍 읽겠습니다.",
+    "statusReplyBudgetUnknown": "이번 달 예산이 갱신되기를 기다리는 중입니다. 그때 메시지를 읽겠습니다. 관리자가 한도를 올리면 더 일찍 읽겠습니다.",
     "status": {
       "one": "작업 중: {{subject}}",
       "oneUntitled": "백그라운드에서 작업 중",

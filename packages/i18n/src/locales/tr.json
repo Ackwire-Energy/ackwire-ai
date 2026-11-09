@@ -13933,6 +13933,10 @@
     "statusReplyTurn": "Bir görevin ortasındayım ({{duration}}) ve henüz yanıt veremiyorum. Mesajın sırada, bu çalışma turu bitince okuyacağım.",
     "statusReplyQueued": "Bilgisayarı bekliyorum ({{duration}}). Sıram gelince mesajını okuyacağım.",
     "statusReplyAway": "Bilgisayarımın geri gelmesini bekliyorum. Geri gelir gelmez mesajını okuyacağım.",
+    "statusReplyPlan": "Planımın geri gelmesini bekliyorum ({{when}}). Geri geldiğinde mesajını okuyacağım.",
+    "statusReplyPlanUnknown": "Planımın geri gelmesini bekliyorum. Geri gelir gelmez mesajını okuyacağım.",
+    "statusReplyBudget": "Aylık bütçemin yenilenmesini bekliyorum ({{when}}). Mesajını o zaman okuyacağım, bir yönetici sınırı artırırsa daha erken.",
+    "statusReplyBudgetUnknown": "Aylık bütçemin yenilenmesini bekliyorum. Mesajını o zaman okuyacağım, bir yönetici sınırı artırırsa daha erken.",
     "status": {
       "one": "Üzerinde çalışıyor: {{subject}}",
       "oneUntitled": "Arka planda çalışıyor",

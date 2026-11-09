@@ -8,7 +8,7 @@ import type { ModelGateway } from "./gateway";
 import { insertMessage, type Message, messageView } from "./messages";
 import type { Notice } from "./notices";
 import { holdsMessages } from "./run-hold";
-import { type AgentRun, addRunStep, computerWaitOf, isTerminal, replyThreadOf } from "./runs";
+import { type AgentRun, addRunStep, computerWaitOf, isTerminal, replyThreadOf, usageWaitOf } from "./runs";
 import { runStretchOf } from "./stretch";
 import { loadTalkerSnapshot, type TalkerSnapshot } from "./talker-snapshot";
 import type { WaitMessageOutcome } from "./waits";
@@ -286,6 +286,21 @@ const FAILED = Symbol("failed");
  * automatic status line), worded by the apps (`talker_status`); the English is the fallback.
  */
 export async function statusReply(db: Executor, run: AgentRun, now: Date, options: { turn?: boolean } = {}) {
+  // Parked on its plan or budget it isn't working: the wait is the plan's, and it is back at the reset (`until`).
+  const usage = usageWaitOf(run);
+  if (usage) {
+    const until = (run.transcript as { waitingForBrain?: { resetsAt?: string } } | null)?.waitingForBrain?.resetsAt;
+    return {
+      text:
+        usage === "budget"
+          ? "I'm waiting for my monthly budget to renew. I'll read your message then, or sooner if an admin raises the limit."
+          : "I'm waiting for my plan to come back. I'll read your message when it's back.",
+      meta: {
+        bodyCode: "talker_status",
+        bodyParams: { minutes: "0", steps: "0", wait: usage, ...(until ? { until } : {}) },
+      },
+    };
+  }
   const wait = computerWaitOf(run);
   if (wait === "away") {
     return {

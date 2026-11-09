@@ -123,6 +123,7 @@ import {
   closedNoteOf,
   otherAgentAnswering,
   overruledHere,
+  type ReleasedAsks,
   type TriageRecord,
   type TriageVerdict,
   triageBrief,
@@ -663,6 +664,16 @@ export interface Transcript {
   catchUp?: { since: number; mayPass?: true };
   /** The check before that catch-up (`catch-up-triage.ts`): its last verdict, reused while nothing new came in. */
   catchUpTriage?: TriageRecord;
+  /** Asks it let go while it waited (`parked-asks.ts`): handled elsewhere, never answered nor read as news. */
+  releasedAsks?: ReleasedAsks[];
+  /** The early check of its own open requests (`parked-asks.ts`): its calls, as the catch-up check counts them. */
+  requestTriage?: { at: number; calls: number; seenThrough: number };
+  /**
+   * Requests of its own withdrawn because their need was met here (`parked-asks.ts`), by id: what its waiting call
+   * reads instead of "nobody will answer". `requestMoot`: it may stay quiet after one (`replyPolicyFor`).
+   */
+  mootRequests?: Record<string, string>;
+  requestMoot?: true;
   /** Time spent working before this claim (ms), without its waits: the long-work safety net counts it (ADR 0121). */
   activeMs?: number;
   /** The "unavailable" note already posted in this run (its code): not repeated while it waits. */
@@ -1728,6 +1739,7 @@ async function executeRunInner(
     followUp: await routedAsFollowUp(db, run).catch(() => false),
     answerOwed: Boolean(atClaim?.answerOwed),
     catchUp: catchUpMayPass,
+    moot: Boolean(atClaim?.requestMoot),
   });
 
   // Before a catch-up, one Jev call per asker: is what they asked still open (`catch-up-triage.ts`)? It ends here,
@@ -1741,7 +1753,6 @@ async function executeRunInner(
       ? triageGate({
           snapshot,
           prior,
-          owed: Boolean(atClaim?.answerOwed),
           mission: await inMission(db, run).catch(() => false),
           overruled: await overruledHere(db, run).catch(() => true),
           noJev: judge.name === "llm",
@@ -2305,8 +2316,13 @@ async function executeRunInner(
     let byPerson = false;
     /** Who decided, by name: not always the person who asked the agent, and its reply is for them. */
     const deciders = new Set<string>();
+    /** Its requests withdrawn because their need was met here (`parked-asks.ts`): what each call reads instead. */
+    const moot = transcript.mootRequests ?? {};
+    /** Calls nobody decided: withdrawn as moot. Only those leave it free to stay quiet. */
+    let mootCalls = 0;
     for (const call of transcript.pending.calls) {
       let result = call.result;
+      const mootText = moot[call.questionId ?? call.secretRequestId ?? call.waitId ?? ""];
       if (!result && call.secretRequestId) {
         const [request] = await db.select().from(secretRequests).where(eq(secretRequests.id, call.secretRequestId));
         if (request?.status === "delivered" || request?.status === "declined") {
@@ -2314,7 +2330,10 @@ async function executeRunInner(
           // Only the person it was asked of can deliver or decline it.
           deciders.add(await deciderName(db, request.requestedForUserId, null));
         }
-        result = { isError: false, ...secretResult(request) };
+        result =
+          request?.status === "canceled" && mootText
+            ? { isError: false, content: mootText }
+            : { isError: false, ...secretResult(request) };
         await addRunStep(db, run, "tool_result", {
           toolUseId: call.toolUseId,
           name: call.name,
@@ -2328,7 +2347,10 @@ async function executeRunInner(
           byPerson = true;
           if (question.answeredByUserId) deciders.add(await deciderName(db, question.answeredByUserId, null));
         }
-        result = { isError: false, ...questionResult(question) };
+        result =
+          question?.status === "canceled" && mootText
+            ? { isError: false, content: mootText }
+            : { isError: false, ...questionResult(question) };
         await addRunStep(db, run, "tool_result", {
           toolUseId: call.toolUseId,
           name: call.name,
@@ -2356,8 +2378,9 @@ async function executeRunInner(
         }
       }
       const line = `${call.name}${result?.isError ? " (not done)" : ""}: ${result?.content ?? ""}`;
-      // Cut in the middle: a result in an outside envelope keeps its end and closing marker.
-      decided.push(truncateOutput(line, DECIDED_LINE_MAX));
+      if (mootText && result?.content === mootText) mootCalls++;
+      // Cut in the middle: a result in an outside envelope keeps its end and closing marker. A moot one decided nothing.
+      else decided.push(truncateOutput(line, DECIDED_LINE_MAX));
       // A computer brain's call (through the bridge): its tool_use is in the brain's session, so the
       // result goes back as text in the resumed session.
       if (call.bridged) {
@@ -2382,8 +2405,10 @@ async function executeRunInner(
     }
     if (meanwhile) resumeText = resumeText ? `${resumeText}\n\n${meanwhile}` : meanwhile;
     if (resumeText) appendUserText(transcript, resumeText);
-    // Someone decided or answered what it waited on: it answers them now, it can't pass anymore.
-    transcript.answerOwed = true;
+    // Someone decided or answered what it waited on: it answers them now, it can't pass anymore. Not when all it waited
+    // on was withdrawn as moot: nobody answered it, and what met the need may leave nothing to say.
+    if (mootCalls < transcript.pending.calls.length) transcript.answerOwed = true;
+    delete transcript.mootRequests;
     transcript.decided = decided.join("\n");
     // The last turn's verdict no longer holds a mission; a person's answer starts the extra turns over.
     delete transcript.followThroughVerdict;
@@ -5805,7 +5830,7 @@ export function continuedTranscript(stopped: Transcript, line: string): Transcri
 }
 
 /** Adds text to the conversation as the person's side (joined to a last user message, never two in a row). */
-function appendUserText(t: Transcript, text: string) {
+export function appendUserText(t: Pick<Transcript, "messages">, text: string) {
   const last = t.messages.at(-1);
   if (last?.role === "user") {
     const blocks: ContentBlock[] =

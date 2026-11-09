@@ -61,6 +61,16 @@ export const usageWaitSql = sql<"plan" | "budget" | null>`(case when ${agentRuns
   when 'plan_limit' then 'plan' when 'budget' then 'budget'
   when 'usage_pause' then coalesce(${agentRuns.transcript}->'waitingForBrain'->>'source', 'plan') end) end)`;
 
+/** `usageWaitSql` for a loaded run. */
+export function usageWaitOf(run: Pick<AgentRun, "status" | "waitingMachineId" | "transcript">) {
+  if (run.status !== "waiting_input" || run.waitingMachineId) return null;
+  const wait = (run.transcript as { waitingForBrain?: { code?: string; source?: string } } | null)?.waitingForBrain;
+  if (wait?.code === "plan_limit") return "plan" as const;
+  if (wait?.code === "budget") return "budget" as const;
+  if (wait?.code === "usage_pause") return wait.source === "budget" ? ("budget" as const) : ("plan" as const);
+  return null;
+}
+
 /**
  * Where a run's replies go: asked in the main timeline (a channel or a
  * DM), it answers in the main timeline; asked in a thread, in

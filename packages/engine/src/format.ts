@@ -8,6 +8,21 @@ export const cutText = (text: string, max: number) => text.slice(0, max).replace
 /** `cutText` for text people read: a cut ends in "…", never passing for the whole. */
 export const cutMarked = (text: string, max: number) => (text.length > max ? `${cutText(text, max - 1)}…` : text);
 
+/** "Ana's", for the English the agents read. */
+export const possessive = (name: string) => `${name}'s`;
+
+/** "in 3 h", "in 2 days": how soon `at` comes, for the English the agents read. */
+export function fromNow(at: Date, now = Date.now()) {
+  const minutes = Math.max(1, Math.round((at.getTime() - now) / 60_000));
+  if (minutes < 60) return `in ${minutes} min`;
+  const hours = Math.round(minutes / 60);
+  return hours < 48 ? `in ${hours} h` : `in ${Math.round(hours / 24)} days`;
+}
+
+/** "Ana, Bia and Caio", for the English the agents read. */
+export const andList = (xs: string[]) =>
+  xs.length < 2 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`;
+
 /** Whether `text` asks something by its punctuation, in any script: `?`, the full-width `？`, the Arabic `؟`. */
 export const hasQuestionMark = (text: string) => /[?？؟]/.test(text);
 

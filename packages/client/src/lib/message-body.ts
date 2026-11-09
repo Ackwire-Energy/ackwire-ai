@@ -24,6 +24,8 @@ const USAGE_NOTES = new Set([
   "plan_model_off_wait",
   "plan_inactive_wait",
   "budget_wait",
+  // A skipped ask's note where its run had none of its own to say it on: always `usageWait.closed`.
+  "catch_up_closed",
 ]);
 
 type Meta = Record<string, unknown> | undefined;
@@ -160,7 +162,7 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
   // Long work's own update of a silent work (ADR 0121): what it does now, in the reader's words.
   if (code === "work_auto_update") return autoUpdateText(t, params);
   // The autonomy brakes (ADR 0131): a working agent's status line, a proposal of costly work, the noise digest.
-  if (code === "talker_status") return talkerStatusText(t, params);
+  if (code === "talker_status") return talkerStatusText(t, params, locale);
   if (code === "autonomy_proposal")
     return t(
       `chat.body.autonomy_proposal.${params.cost === "install" || params.cost === "long" ? params.cost : "pr"}`,

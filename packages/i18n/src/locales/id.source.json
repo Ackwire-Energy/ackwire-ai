@@ -33954,6 +33954,18 @@
   "work.statusReplyAway": {
     "value": "Waiting for my computer to come back. I'll read your message as soon as it's back."
   },
+  "work.statusReplyPlan": {
+    "value": "I'm waiting for my plan to come back ({{when}}). I'll read your message when it's back."
+  },
+  "work.statusReplyPlanUnknown": {
+    "value": "I'm waiting for my plan to come back. I'll read your message as soon as it's back."
+  },
+  "work.statusReplyBudget": {
+    "value": "I'm waiting for my monthly budget to renew ({{when}}). I'll read your message then, or sooner if an admin raises the limit."
+  },
+  "work.statusReplyBudgetUnknown": {
+    "value": "I'm waiting for my monthly budget to renew. I'll read your message then, or sooner if an admin raises the limit."
+  },
   "work.status.one": {
     "value": "Working on: {{subject}}"
   },

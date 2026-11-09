@@ -13850,6 +13850,14 @@ export const ptBR = {
       "Estou no meio de uma tarefa ({{duration}}) e ainda não consigo responder. Sua mensagem está na fila e eu leio quando esta rodada de trabalho terminar.",
     statusReplyQueued: "Aguardando o computador ({{duration}}). Leio sua mensagem quando chegar minha vez.",
     statusReplyAway: "Aguardando meu computador voltar. Leio sua mensagem assim que ele voltar.",
+    /** A mesma linha para um agente esperando o plano renovar: {{when}} é quando ele volta ("quarta às 14:00"). */
+    statusReplyPlan: "Estou esperando o plano voltar ({{when}}). Leio sua mensagem quando ele voltar.",
+    statusReplyPlanUnknown: "Estou esperando o plano voltar. Leio sua mensagem assim que ele voltar.",
+    /** A mesma linha para um agente cujo orçamento do mês acabou. */
+    statusReplyBudget:
+      "Estou esperando meu orçamento do mês renovar ({{when}}). Leio sua mensagem quando ele renovar, ou antes se um admin aumentar o limite.",
+    statusReplyBudgetUnknown:
+      "Estou esperando meu orçamento do mês renovar. Leio sua mensagem quando ele renovar, ou antes se um admin aumentar o limite.",
     status: {
       one: "Trabalhando em: {{subject}}",
       oneUntitled: "Trabalhando em segundo plano",

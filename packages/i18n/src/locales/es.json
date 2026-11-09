@@ -14409,6 +14409,10 @@
     "statusReplyTurn": "Estoy en medio de una tarea ({{duration}}) y todavía no puedo responder. Tu mensaje está en cola y lo leo cuando termine esta ronda de trabajo.",
     "statusReplyQueued": "Esperando la computadora ({{duration}}). Leo tu mensaje cuando llegue mi turno.",
     "statusReplyAway": "Esperando a que vuelva mi computadora. Leo tu mensaje en cuanto vuelva.",
+    "statusReplyPlan": "Estoy esperando a que vuelva mi plan ({{when}}). Leo tu mensaje cuando vuelva.",
+    "statusReplyPlanUnknown": "Estoy esperando a que vuelva mi plan. Leo tu mensaje en cuanto vuelva.",
+    "statusReplyBudget": "Estoy esperando a que se renueve mi presupuesto del mes ({{when}}). Leo tu mensaje entonces, o antes si un admin aumenta el límite.",
+    "statusReplyBudgetUnknown": "Estoy esperando a que se renueve mi presupuesto del mes. Leo tu mensaje entonces, o antes si un admin aumenta el límite.",
     "status": {
       "one": "Trabajando en: {{subject}}",
       "oneUntitled": "Trabajando en segundo plano",

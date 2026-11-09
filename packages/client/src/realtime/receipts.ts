@@ -426,13 +426,14 @@ export function applyReceiptEvent(
     case "message.created": {
       const m = event.message;
       // An agent's sticker after its reply (ADR 0091) answers nobody: a newer message's receipt stays. Neither does its
-      // note that it still waits for its computer.
+      // note that it still waits for its computer, or for its plan or budget, or why it didn't answer.
       if (
         m?.author?.type === "agent" &&
         m.author.id &&
         m.threadId &&
         !m.meta?.approvalId &&
         !m.meta?.brainUnavailable &&
+        !m.meta?.usageWait &&
         !isMediaAfterReply(m.meta)
       ) {
         return setForRun(state, m.agentRunId, m.threadId, m.author.id, "handled");

@@ -14003,6 +14003,10 @@
     "statusReplyTurn": "Ich bin mitten in einer Aufgabe ({{duration}}) und kann noch nicht antworten. Deine Nachricht ist vorgemerkt und ich lese sie, wenn diese Arbeitsrunde endet.",
     "statusReplyQueued": "Ich warte auf den Computer ({{duration}}). Ich lese deine Nachricht, sobald ich dran bin.",
     "statusReplyAway": "Ich warte darauf, dass mein Computer zurückkommt. Ich lese deine Nachricht, sobald er wieder da ist.",
+    "statusReplyPlan": "Ich warte darauf, dass mein Abo wieder verfügbar ist ({{when}}). Ich lese deine Nachricht, wenn es wieder da ist.",
+    "statusReplyPlanUnknown": "Ich warte darauf, dass mein Abo wieder verfügbar ist. Ich lese deine Nachricht, sobald es wieder da ist.",
+    "statusReplyBudget": "Ich warte darauf, dass sich mein Monatsbudget erneuert ({{when}}). Ich lese deine Nachricht dann, oder früher, wenn ein Admin das Limit erhöht.",
+    "statusReplyBudgetUnknown": "Ich warte darauf, dass sich mein Monatsbudget erneuert. Ich lese deine Nachricht dann, oder früher, wenn ein Admin das Limit erhöht.",
     "status": {
       "one": "Arbeitet an: {{subject}}",
       "oneUntitled": "Arbeitet im Hintergrund",
