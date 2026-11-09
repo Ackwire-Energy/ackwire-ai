@@ -8847,6 +8847,14 @@ html:not([data-pointer]) .newag__addrow:focus-visible {
   font-size: 13.5px;
   text-wrap: pretty;
 }
+/* Its line is longer than a template's: where it can't keep one line beside the +, the name and the line go under it
+   (a square never owns a column of three lines). */
+.newag__role--blank .newag__role-head {
+  flex-wrap: wrap;
+}
+.newag__role--blank .newag__role-name {
+  flex: 1 1 max-content;
+}
 .newag__blank-icon {
   display: grid;
   place-items: center;

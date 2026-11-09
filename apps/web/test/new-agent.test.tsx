@@ -266,7 +266,8 @@ describe("Criar agente: steps", () => {
     expect(names("Clientes")).toEqual(["Atendimento", "Vendas", "Marketing", "Conteúdo"]);
     expect(names("Operação")).toEqual(["Dados", "Financeiro", "Pessoas", "Pesquisa", "Assistente"]);
     expect(within(step).getAllByRole("button")[0]?.textContent).toContain("Do zero");
-    // Every card, Do zero too, opens on its tile with the name and its line centred beside it (no cap-top rise).
+    // Every card, Do zero too, opens on its tile with the name and its line centred beside it (no cap-top rise); Do
+    // zero's longer line goes under its tile, with the name, where it can't keep one line beside it.
     const firstRows = [...step.querySelectorAll(".newag__role")].map(
       (card) => [...card.children].find((c) => !c.classList.contains("newag__check"))?.className,
     );
