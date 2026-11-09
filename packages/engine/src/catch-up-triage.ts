@@ -71,6 +71,11 @@ export interface TriageAsker {
   userId: string;
   name: string;
   asks: { id?: string; text: string; at: Date; editedSincePause: boolean }[];
+  /**
+   * The run owes them an answer (`answerOwed`): never closed, and it answers them. Its trigger's asker: the run can't
+   * end while it owes anyone, and letting its trigger go ends it.
+   */
+  owed?: true;
 }
 
 export interface TriageSnapshot {
@@ -258,6 +263,8 @@ export async function triageSnapshot(
     return p.key;
   };
   asked.sort((a, b) => a.at.getTime() - b.at.getTime());
+  const owes = (run.transcript as { answerOwed?: boolean } | null | undefined)?.answerOwed === true;
+  const owed = owes ? asked.find((m) => m.id === run.triggerMessageId)?.userId : undefined;
   const askers: TriageAsker[] = [];
   let notPeople = asked.length === 0;
   for (const m of asked) {
@@ -269,7 +276,13 @@ export async function triageSnapshot(
     keyOf("person", m.userId, name);
     let a = askers.find((x) => x.userId === m.userId);
     if (!a) {
-      a = { key: `a${askers.length + 1}`, userId: m.userId, name, asks: [] };
+      a = {
+        key: `a${askers.length + 1}`,
+        userId: m.userId,
+        name,
+        asks: [],
+        ...(m.userId === owed ? { owed: true } : {}),
+      };
       askers.push(a);
     }
     a.asks.push({ id: m.id, text: m.body, at: m.at, editedSincePause: (m.editedAt?.getTime() ?? 0) > since });
@@ -360,8 +373,6 @@ export const triageHasNews = (s: TriageSnapshot) => s.latest > s.since || s.post
 export function triageGate(input: {
   snapshot: TriageSnapshot;
   prior: TriageRecord | undefined;
-  /** A person asked for this run by hand, or it owes what it started (`answerOwed`, a cut turn). */
-  owed: boolean;
   mission: boolean;
   /** "Responder mesmo assim" in this conversation in the last 7 days. */
   overruled: boolean;
@@ -371,8 +382,10 @@ export function triageGate(input: {
 }): { skip: "skipped_rule" | "skipped_quiet" } | { reuse: TriageRecord } | null {
   const { snapshot: s, prior } = input;
   const now = input.now ?? Date.now();
-  if (input.owed || input.mission || input.overruled || input.noJev) return { skip: "skipped_rule" };
+  if (input.mission || input.overruled || input.noJev) return { skip: "skipped_rule" };
   if (s.notPeople || s.askers.length === 0 || s.askers.length > TRIAGE_MAX_ASKERS) return { skip: "skipped_rule" };
+  // Owing every asker an answer, there is nobody to check: the others who joined still are.
+  if (s.askers.every((a) => a.owed)) return { skip: "skipped_rule" };
   if (!triageHasNews(s)) return { skip: "skipped_quiet" };
   // The cap counts every call, failed ones too: a Jev outage across hourly probes doesn't call on and on.
   if (prior && prior.calls >= TRIAGE_MAX_CALLS) return { reuse: prior };
@@ -507,7 +520,8 @@ function top(a: JudgeAnswer | undefined): [string | null, number] {
  * asker, by someone who posted since the pause or by whoever moved the task to done; `withdrawn` by that asker only
  * (from the asker, p(solved) + p(not_needed) counts as one: both mean "don't run");
  * `task_canceled` by whoever canceled the task. App posts are never a source. Closed when every asker clears and the
- * product of their p is at least `bar`; any asker likely still open runs with their name; anything else is unsure.
+ * product of their p is at least `bar`; any asker likely still open, or one the run owes (`owed`), runs with their
+ * name; anything else is unsure.
  */
 export function catchUpDecision(answers: Record<string, JudgeAnswer>, s: TriageSnapshot, bar: number): TriageVerdict {
   const posters = new Set(s.posts.flatMap((p) => (p.key ? [p.key] : [])));
@@ -522,7 +536,7 @@ export function catchUpDecision(answers: Record<string, JudgeAnswer>, s: TriageS
     };
     const [who, sure] = top(answers[`who_${a.key}`]);
     const out: TriageAskerVerdict = { key: a.key, userId: a.userId, name: a.name, p };
-    if (!who || who === "nobody" || sure < WHO_AT) return out;
+    if (a.owed || !who || who === "nobody" || sure < WHO_AT) return out;
     // The asker closes their own ask only by something they did after asking it (a post, a reaction, an edit, a later
     // ask): their one ask alone never reads as "done".
     const self =
@@ -551,7 +565,8 @@ export function catchUpDecision(answers: Record<string, JudgeAnswer>, s: TriageS
   const product = askers.reduce((n, a, i) => n * (a.reason ? (certainty[i] ?? 0) : 0), 1);
   if (askers.length > 0 && askers.every((a) => a.reason) && product >= bar)
     return { outcome: "closed", askers, p: product };
-  return { outcome: askers.some((a) => !a.reason && a.p.needs_agent >= OPEN_AT) ? "run" : "unsure", askers };
+  const open = (a: TriageAskerVerdict, i: number) => !a.reason && (s.askers[i]?.owed || a.p.needs_agent >= OPEN_AT);
+  return { outcome: askers.some(open) ? "run" : "unsure", askers };
 }
 
 /** What a closed note says: one reason and one name when they all share it, else "what they asked was handled". */

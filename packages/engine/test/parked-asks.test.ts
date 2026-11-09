@@ -270,6 +270,56 @@ test("the trigger's own asker handled while another still waits: the run ends wi
   expect(notices.map((n) => n.userId)).toEqual([bia.id]);
 });
 
+describe("a run that owes its first asker an answer still checks whoever joined it after", () => {
+  /** The waiting run promised bia an answer (`answerOwed`); caio's ask joined later and Ada handled it in its thread. */
+  async function owing() {
+    const set = await twoAskers({ bia: ["solved", "Ada"], caio: ["solved", "Ada"] });
+    const [waiting] = await runsOf(f, f.agent.id);
+    if (!waiting) throw new Error("no waiting run");
+    const t = { ...(waiting.transcript as Record<string, unknown>), answerOwed: true };
+    await f.db
+      .update(schema.agentRuns)
+      .set({ transcript: t as never })
+      .where(eq(schema.agentRuns.id, waiting.id));
+    await set.adaReplies(set.second.id, "Criei a tarefa #12 do rollback.");
+    // Routed, its early check scheduled a minute later.
+    await drainOutbox(f.db, set.handlers, { now: later(1000) });
+    return { ...set, waiting };
+  }
+
+  test("early: caio's ask goes, bia's stays although the check judged it handled too", async () => {
+    const { handlers, bia, second, waiting } = await owing();
+    await drainOutbox(f.db, handlers, { now: later(2 * 60_000) });
+    const [still, skipped] = await runsOf(f, f.agent.id);
+    expect(still?.id).toBe(waiting.id);
+    expect(still?.status).toBe("waiting_input");
+    expect(still?.pendingMessageIds).toEqual([]);
+    expect(skipped).toMatchObject({ status: "done", triggerMessageId: second.id });
+    expect((still?.transcript as { catchUpTriage?: unknown } | undefined)?.catchUpTriage).toMatchObject({
+      outcome: "run",
+      askers: [expect.objectContaining({ userId: bia.id })],
+    });
+  });
+
+  test("when the plan is back: the check runs for caio instead of skipping the run, and the agent reads it was handled", async () => {
+    const { handlers, seen, waiting } = await owing();
+    // No early check: only the one when it is back.
+    await f.db.delete(schema.outbox).where(eq(schema.outbox.kind, "catch_up.check"));
+    const t = waiting.transcript as { usageWait: { since: number } };
+    t.usageWait.since = Date.now() - 2 * 24 * 3600_000;
+    await f.db
+      .update(schema.agentRuns)
+      .set({ transcript: { ...t, answerOwed: true } as never })
+      .where(eq(schema.agentRuns.id, waiting.id));
+    clearPlanLimits();
+    await drainOutbox(f.db, handlers, { now: later(3600_000 + RESUME_AFTER_MS + 1000) });
+    expect(judgeCalls(f, "catch_up_triage")).toHaveLength(1);
+    expect(String(seen[1]?.trigger)).toContain(
+      "A quick check judged bia's ask still open and caio's handled by Ada. It can be wrong, so read below.",
+    );
+  });
+});
+
 /** @dev waits (`wait`) on bia's "@dev @ada …"; Ada's run answers the same message. */
 async function waitingBeside(wait: "plan" | "budget" | "queued") {
   f = await setup();

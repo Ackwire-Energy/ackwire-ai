@@ -154,8 +154,9 @@ const stepOf = (record: TriageRecord) => {
 async function checkAsks(deps: ParkedDeps, judge: Judge, run: AgentRun, trigger: Message, agentName: string) {
   const { db } = deps;
   const t = transcriptOf(run);
-  // Owing what it started (calls made, a cut turn, a person it answers), it answers all of it when it is back.
-  if (t.executedCalls || t.interruptedTurn || t.answerOwed) return;
+  // Owing what it started (calls made, a cut turn), it answers all of it when it is back. A person it owes an answer
+  // (`answerOwed`) is never let go, but whoever joined after still is (`TriageAsker.owed`).
+  if (t.executedCalls || t.interruptedTurn) return;
   const asks = [run.triggerMessageId, ...run.pendingMessageIds];
   // Another agent still writing there: its answer lands as a message, which checks again.
   if (await otherAgentAnswering(db, run, asks)) return;
@@ -165,7 +166,6 @@ async function checkAsks(deps: ParkedDeps, judge: Judge, run: AgentRun, trigger:
   const gate = triageGate({
     snapshot,
     prior,
-    owed: false,
     mission: await inMission(db, run),
     overruled: await overruledHere(db, run).catch(() => true),
     noJev: false,

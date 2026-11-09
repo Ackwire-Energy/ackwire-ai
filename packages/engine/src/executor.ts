@@ -1738,7 +1738,6 @@ async function executeRunInner(
       ? triageGate({
           snapshot,
           prior,
-          owed: Boolean(atClaim?.answerOwed),
           mission: await inMission(db, run).catch(() => false),
           overruled: await overruledHere(db, run).catch(() => true),
           noJev: judge.name === "llm",
