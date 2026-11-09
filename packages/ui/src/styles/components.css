@@ -10956,11 +10956,14 @@ html:not([data-pointer]) .ac-msg__note:focus-visible {
   position: relative;
   min-width: 0;
 }
+/* Its padding is the room its cards' ring and shadow keep inside the scroller, and a card snaps to that room, not to
+   the scroller's edge, where the ring would be cut. */
 .ac-carousel__track {
   display: flex;
   gap: 6px;
   min-width: 0;
   padding: 2px;
+  scroll-padding-inline: 2px;
   overflow-x: auto;
   overflow-y: hidden;
   scroll-snap-type: x mandatory;

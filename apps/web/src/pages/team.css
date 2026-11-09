@@ -172,9 +172,11 @@
   align-items: center;
   gap: 12px;
 }
+/* A scroller: the room around it keeps the top node's ring and shadow inside it, where they'd be cut at its edge. */
 .team-tree {
   overflow-x: auto;
-  padding-bottom: 8px;
+  margin: -4px -4px 0;
+  padding: 4px 4px 8px;
 }
 .team-tree__top {
   position: relative;

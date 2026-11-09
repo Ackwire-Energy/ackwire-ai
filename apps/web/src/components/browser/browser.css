@@ -344,11 +344,13 @@ html:not([data-pointer]) .brw-site button:focus-visible {
     opacity: 0;
   }
 }
+/* Its padding keeps the box's ring and shadow inside the card, which clips them at its edge on a narrow screen. */
 .brw-dim {
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
+  padding: 12px;
   background: color-mix(in srgb, var(--bg) 55%, transparent);
   backdrop-filter: blur(2px);
   z-index: 5;
