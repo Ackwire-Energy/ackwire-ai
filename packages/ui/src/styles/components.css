@@ -2116,6 +2116,7 @@ html:not([data-pointer]) .ac-select__trigger:focus-visible,
   flex-direction: column;
   gap: 2px;
   padding: var(--menu-pad);
+  --bleed: var(--menu-pad);
   background: var(--surface-raised);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
@@ -2706,6 +2707,7 @@ html:not([data-pointer]) .ac-tab:focus-visible {
   line-height: 22px;
   /* One inset for every edge: the head's top, the sides, and the bottom under the last body item, list or footer. */
   --dialog-pad: 20px;
+  --bleed: var(--dialog-pad);
 }
 .ac-dialog:focus {
   outline: none;
@@ -3041,6 +3043,7 @@ html:not([data-pointer]) .ac-tab:focus-visible {
   gap: var(--space-3);
   /* Read by the foot to reach the card's edges; pages that change the padding set this instead. */
   --card-pad: var(--space-4);
+  --bleed: var(--card-pad);
   padding: var(--card-pad);
   background: var(--surface-raised);
   border: 1px solid var(--line);
@@ -3402,6 +3405,7 @@ html:not([data-pointer]) .ac-back:focus-visible {
   line-height: 22px;
   /* One inset for every edge, as in `.ac-dialog`. */
   --details-pad: 24px;
+  --bleed: var(--details-pad);
 }
 .ac-details--lg {
   width: min(960px, calc(100% - 48px));
@@ -8816,11 +8820,15 @@ html:not([data-pointer]) .ac-recur__day:focus-visible {
 /*
  * Every page's room, Settings, the wiki and the calendar included: the first line starts `--page-top` under the work
  * area's top and `--page-x` in from its side. From 761px the title's line centres on the sidebar's workspace row,
- * whose middle is 38px from the top (the sidebar's 16 above its 44px row).
+ * whose middle is 38px from the top (the sidebar's 16 above its 44px row). A strip that scrolls sideways runs out over
+ * the side room of what holds it, `--bleed`, to its edge, so what scrolls slides under that edge instead of being cut
+ * on a line inside the room. A box with a room of its own (a dialog, a card, a menu) sets it to that room: running out
+ * past the box's edge would scroll the box sideways.
  */
 :root {
   --page-top: calc(38px - var(--control-h-md) / 2);
   --page-x: 24px;
+  --bleed: var(--page-x);
 }
 @media (max-width: 760px) {
   :root {
@@ -9094,9 +9102,11 @@ html:not([data-pointer]) .ac-grouphead__title > button:focus-visible {
 }
 /*
  * Two rows, on a phone and when one doesn't fit: the search and the actions on top, the tabs and filters under them in
- * one row that scrolls sideways. That row is the only scroller (the filter bar inside it doesn't scroll on its own),
- * and its 4px of room keep the controls' rings whole. Its basis counts the room its margins give back, so it never
- * fits beside a search that has no actions to share its row, which would squeeze that search to nothing.
+ * one row that scrolls sideways. That row is the only scroller (the filter bar inside it doesn't scroll on its own).
+ * It runs out over the page's side room (`--bleed`) to the edge, its first control on the page's line, and its 4px up
+ * and down keep the controls' rings whole. Where something shares its row (the actions before it, or after it in a
+ * toolbar without a search), that side keeps only those 4px. Its basis counts the room its margins give back, so it
+ * never fits beside a search that has no actions to share its row, which would squeeze that search to nothing.
  */
 @media (max-width: 760px) {
   .ac-toolbar > .ac-toolbar__search {
@@ -9108,19 +9118,23 @@ html:not([data-pointer]) .ac-grouphead__title > button:focus-visible {
   }
   .ac-toolbar:has(> .ac-toolbar__search) > .ac-toolbar__filters {
     order: 2;
-    flex: 1 1 calc(100% + 8px);
+    flex: 1 1 calc(100% + 2 * var(--bleed));
   }
   .ac-toolbar__filters,
   .ac-toolbar__filters > .ac-filterbar {
     flex-wrap: nowrap;
   }
   .ac-toolbar__filters {
-    max-width: calc(100% + 8px);
-    margin: -2px -4px;
-    padding: 4px;
+    max-width: calc(100% + 2 * var(--bleed));
+    margin: -2px calc(-1 * var(--bleed));
+    padding: 4px var(--bleed);
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: none;
+  }
+  .ac-toolbar:not(:has(> .ac-toolbar__search)):has(> .ac-toolbar__actions) > .ac-toolbar__filters {
+    margin-right: -4px;
+    padding-right: 4px;
   }
   .ac-toolbar__filters::-webkit-scrollbar {
     display: none;
@@ -9139,11 +9153,11 @@ html:not([data-pointer]) .ac-grouphead__title > button:focus-visible {
 }
 .ac-toolbar[data-stack] > .ac-toolbar__filters {
   order: 2;
-  flex: 1 1 calc(100% + 8px);
+  flex: 1 1 calc(100% + 2 * var(--bleed));
   flex-wrap: nowrap;
-  max-width: calc(100% + 8px);
-  margin: -2px -4px;
-  padding: 4px;
+  max-width: calc(100% + 2 * var(--bleed));
+  margin: -2px calc(-1 * var(--bleed));
+  padding: 4px var(--bleed);
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
@@ -9165,6 +9179,8 @@ html:not([data-pointer]) .ac-grouphead__title > button:focus-visible {
 }
 .ac-toolbar[data-stack="split"] > .ac-toolbar__filters {
   flex: 1 1 0;
+  margin-left: -4px;
+  padding-left: 4px;
 }
 .ac-toolbar[data-stack="split"]:not(:has(> .ac-toolbar__filters)) > .ac-toolbar__actions {
   flex: 1 1 100%;

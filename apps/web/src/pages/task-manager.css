@@ -425,8 +425,15 @@ html:not([data-pointer]) .tm-more:focus-visible {
   .tm-card.ac-card {
     width: 156px;
   }
+  /* No arrows: a strip a finger swipes, out over the page's side room so the cards slide under the screen's edges,
+     each settling on the page's line. */
   .tm-cards .ac-carousel__arrow {
     display: none;
+  }
+  .tm-cards .ac-carousel__track {
+    margin-inline: calc(-1 * var(--page-x));
+    padding-inline: var(--page-x);
+    scroll-padding-inline: var(--page-x);
   }
 }
 

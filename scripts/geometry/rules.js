@@ -1844,6 +1844,49 @@
         }
       }
     },
+    /**
+     * A strip that scrolls sideways on a page (the task board, a row of chips or tabs) runs out over the page's side
+     * room (`--page-x`) to the work area's edge, its own padding putting its first item on the page's line: what
+     * scrolls slides under the work area's edge. One that stops in that room, on the page's padding line or a ring's
+     * width past it, cuts its items in mid-air. Only on a side where the box that frames it (the nearest that clips or
+     * shows a surface: the work area, a split's column, a card) meets the work area's edge: in a card or a field it
+     * stops at that box's edge, which shows.
+     */
+    bleed(out) {
+      const room = lengthOf("--page-x");
+      for (const strip of document.querySelectorAll(".shell__main *")) {
+        const s = style(strip);
+        if (!/^(auto|scroll)$/.test(s.overflowX) || strip.scrollWidth <= strip.clientWidth + 1) continue;
+        if (strip.matches("textarea,input,select") || !seen(strip) || hasSurface(s)) continue;
+        const main = strip.parentElement.closest(".shell__main");
+        let frame = strip.parentElement;
+        while (frame !== main && !hasSurface(style(frame)) && style(frame).overflowX === "visible")
+          frame = frame.parentElement;
+        const edges = (el) => {
+          const left = el.getBoundingClientRect().left + el.clientLeft;
+          return { left, right: left + el.clientWidth };
+        };
+        const area = edges(main);
+        const box = edges(frame);
+        const r = strip.getBoundingClientRect();
+        const short = { left: r.left - box.left, right: box.right - r.right };
+        const sides = ["left", "right"].filter(
+          (side) => Math.abs(box[side] - area[side]) <= 0.5 && short[side] > 0.5 && short[side] <= room + 0.5,
+        );
+        if (!sides.length) continue;
+        let page = strip;
+        while (page.parentElement !== main) page = page.parentElement;
+        const px = Math.max(...sides.map((side) => short[side]));
+        out.push({
+          rule: "bleed",
+          node: strip,
+          el: sig(strip),
+          box: sig(page),
+          side: sides.join(" "),
+          px: +px.toFixed(1),
+        });
+      }
+    },
   };
 
   /**

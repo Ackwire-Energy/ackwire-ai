@@ -739,14 +739,15 @@ html:not([data-pointer]) .ap-li:focus-visible {
   padding: 0 0 16px 28px;
   border-left: 1px solid var(--line);
 }
-/* Its own column (`.page-split`): out to the work area's right edge, where its scrollbar runs. Its decision bar floats
-   16px over the column's bottom, the column's padding (Chrome sets a sticky box's offset inside the padding). */
+/* Its own column (`.page-split`): out over the page's side room to the work area's right edge, where its scrollbar
+   runs. Its decision bar floats 16px over the column's bottom, the column's padding (Chrome sets a sticky box's offset
+   inside the padding). */
 @media (min-width: 941px) and (min-height: 560px) {
-  .ap-review {
-    margin-right: -24px;
-    padding-right: 24px;
+  .page-split > .ap-review {
+    margin-right: calc(-1 * var(--page-x));
+    padding-right: var(--page-x);
   }
-  .ap-review > .ap-bar--float {
+  .page-split > .ap-review > .ap-bar--float {
     bottom: 0;
   }
 }

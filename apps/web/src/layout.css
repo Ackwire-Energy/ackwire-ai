@@ -4115,7 +4115,8 @@ html:not([data-pointer]) .settings__link:focus-visible {
  * to the work area's right edge, so the wheel scrolls it there too, and its text keeps the old width: the page's
  * centred 1120px, its side room every page's (`--page-x`, or half of what the window has past 1120px). The page's top
  * room moves into the columns, so they scroll up to the window's top. Both keep room for the shadows and focus rings
- * at their edges, which their scroll would cut.
+ * at their edges, which their scroll would cut. A strip in the section runs out over the section's own room on the
+ * left, beside the nav, and no further (`--bleed`): past it the column would scroll sideways.
  */
 @media (min-width: 941px) and (min-height: 560px) {
   .settings {
@@ -4129,8 +4130,9 @@ html:not([data-pointer]) .settings__link:focus-visible {
     padding: var(--page-top) 6px 24px;
   }
   .settings__body {
-    margin-left: -12px;
-    padding: var(--page-top) max(var(--page-x), calc(100% - 1064px)) 96px 12px;
+    --bleed: 12px;
+    margin-left: calc(-1 * var(--bleed));
+    padding: var(--page-top) max(var(--page-x), calc(100% - 1064px)) 96px var(--bleed);
   }
 }
 .settings__section {
@@ -9394,6 +9396,7 @@ html:not([data-pointer]) .newag__sel .ac-select__trigger:focus-visible {
 .agp {
   /* Open sky: the page is the cover's width; what is under it keeps every page's side room. */
   --agp-gutter: var(--page-x);
+  --bleed: var(--agp-gutter);
   max-width: none;
   gap: 0;
   padding: 0 0 24px;
