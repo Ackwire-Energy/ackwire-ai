@@ -191,7 +191,7 @@ function Receipts({ message, list: server }: { message: Message; list: AgentActi
         undoneBy={a.undoneAt ? byName(a) : null}
         button={
           !canAct ? null : phase === "undo" ? (
-            <button type="button" className="ag-rc__btn" disabled={busy} onClick={() => undo(a)}>
+            <button type="button" className="ag-rc__btn" data-undo="" disabled={busy} onClick={() => undo(a)}>
               {single && <Icon name="undo" size={14} />}
               {t("agentActions.undo")}
               {single && (
@@ -204,7 +204,7 @@ function Receipts({ message, list: server }: { message: Message; list: AgentActi
               )}
             </button>
           ) : (
-            <button type="button" className="ag-rc__btn" disabled={busy} onClick={() => redo(a)}>
+            <button type="button" className="ag-rc__btn" data-undo="" disabled={busy} onClick={() => redo(a)}>
               {t("agentActions.redo")}
             </button>
           )
@@ -272,7 +272,7 @@ function Receipt({
   const hadButton = useRef(false);
   if (button) hadButton.current = true;
   return (
-    <div className={cx(single ? "ag-rc" : "ag-rcg__it", "ac-actrow", struck && "is-undone")} data-phase={phase}>
+    <div className={cx(single ? "ag-rc" : "ag-rcg__it", struck && "is-undone")} data-phase={phase}>
       {single ? (
         <span className="ag-rc__ic" aria-hidden="true">
           <Icon name={iconOf(a)} size={16} />
@@ -280,7 +280,7 @@ function Receipt({
       ) : (
         <Icon name={iconOf(a)} size={14} className="ag-rcg__ic" />
       )}
-      <span className="ag-rc__tx ac-actrow__text">
+      <span className="ag-rc__tx">
         <span className="ag-rc__sentence">
           <Trans
             // i18next contexts: `issue.assigned_self`, `routine.updated_paused`…
@@ -288,6 +288,23 @@ function Receipt({
             values={values}
             components={{ b: <ReceiptTarget action={a} /> }}
           />
+          {/* Desfazer at the end of its sentence, wrapping with its words: never a column beside them. */}
+          {hadButton.current && (
+            <>
+              {" "}
+              <span className="ag-rc__act">
+                <span className="ag-rc__room" aria-hidden="true">
+                  <span className="ag-rc__btn">
+                    {single && <Icon name="undo" size={14} />}
+                    {t("agentActions.undo")}
+                    {single && <span className="ag-rc__time ac-num">{formatTimeLeft(0)}</span>}
+                  </span>
+                  <span className="ag-rc__btn">{t("agentActions.redo")}</span>
+                </span>
+                {button}
+              </span>
+            </>
+          )}
         </span>
         {ownActions.length > 0 && (
           <span className="ag-rc__by">
@@ -308,19 +325,6 @@ function Receipt({
         {a.kind === "issue.created" && !struck && <ReceiptWhoSees action={a} />}
         <CopyHookButton action={a} />
       </span>
-      {hadButton.current && (
-        <span className="ag-rc__act">
-          {button}
-          <span className="ag-rc__room" aria-hidden="true">
-            <span className="ag-rc__btn">
-              {single && <Icon name="undo" size={14} />}
-              {t("agentActions.undo")}
-              {single && <span className="ag-rc__time ac-num">{formatTimeLeft(0)}</span>}
-            </span>
-            <span className="ag-rc__btn">{t("agentActions.redo")}</span>
-          </span>
-        </span>
-      )}
     </div>
   );
 }
