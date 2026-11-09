@@ -1842,7 +1842,8 @@ async function executeRunInner(
   const outsideMemo: OutsideMemo = {};
   /**
    * Where the reply it is writing first showed words (`createDeltaPublisher`), since it last posted: the message it
-   * posts next takes that place, so what people sent while it wrote stays below it, as the apps drew it live.
+   * posts next takes that place, so what people sent while it wrote stays below it, as the apps drew it live. A "stop
+   * and send" (`steer: "now"`) drops it: what it writes next answers that message, below it.
    */
   const place: ShownPlace = { at: null, channelId: run.channelId, threadId: null };
   /** That place for a message posted now in `threadId`, once (the next words open a new one); none past `PLACE_KEPT_MS`. */
@@ -3974,6 +3975,7 @@ async function executeRunInner(
       // A message to read now landed after the steering was taken above: read it first, no call spent.
       if (turnAbort?.signal.aborted) {
         unregisterTurnAbort(run.id, turnAbort);
+        place.at = null;
         continue;
       }
       const io: BrainIO = {
@@ -4226,6 +4228,7 @@ async function executeRunInner(
         }
         if (turnAbort?.signal.aborted) {
           await interruptedTurn(turn, deltas.text());
+          place.at = null;
           continue;
         }
         if (turnPlan.kind !== "model") {

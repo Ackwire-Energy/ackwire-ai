@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { channelTopic } from "@agenteschat/adapters";
 import { schema } from "@agenteschat/db";
+import { systemText } from "@agenteschat/providers";
 import {
   buildRunContext,
   catchUpText,
@@ -14,6 +15,7 @@ import {
   openDm,
   PLACE_KEPT_MS,
   postPersonMessage,
+  THREAD_ASSESS_DELAY_MS,
 } from "../src";
 import { runReadOutsideById } from "../src/outside";
 import { type Fixture, setup } from "./fixtures";
@@ -248,4 +250,68 @@ test("asked by a reply another agent wrote over a while, a run reads what was se
   expect(read).not.toContain("alguém viu?");
   // What it read relays outside content, so what it posts says so (ADR 0117).
   expect(await runReadOutsideById(f.db, f.org.id, run.id)).toBe(true);
+});
+
+test("stopped to read a message sent to it, the answer it writes next goes below that message", async () => {
+  let dmId = "";
+  f = await setup({
+    reply: (_request, call) =>
+      call === 1
+        ? {
+            chunks: [LONG, "isto nunca chega"],
+            // "Parar e mandar" once its first words are on screen: the call is cut, the message read at once.
+            hold: wordsOf(dmId, 1).then(() =>
+              postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, dmId, {
+                body: "na verdade, olha o refresh",
+                steer: "now",
+              }),
+            ),
+          }
+        : { chunks: ["Certo, olhei o refresh: a chave expira antes do token."] },
+  });
+  dmId = (await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id })).id;
+  await postIn(dmId, "por que o login cai?");
+  await drainOutbox(f.db, f.handlers);
+
+  expect(f.provider.calls).toHaveLength(2);
+  const dm = await listMessages(f.db, f.owner.id, f.org.id, dmId);
+  expect(dm.map((m) => m.body)).toEqual([
+    "por que o login cai?",
+    "na verdade, olha o refresh",
+    "Certo, olhei o refresh: a chave expira antes do token.",
+  ]);
+});
+
+test("a reply that kept its place above one posted before it still gets its thread assessed", async () => {
+  const isAssess = (system: Parameters<typeof systemText>[0]) =>
+    systemText(system).startsWith("You read a conversation thread");
+  f = await setup({
+    reply: (request) => ({
+      chunks: [isAssess(request.system) ? JSON.stringify({ title: "Login caindo no refresh", resolved: true }) : "ok"],
+    }),
+  });
+  const assessed = () => f.provider.calls.filter((c) => isAssess(c.request.system));
+  const later = () => drainOutbox(f.db, f.handlers, { now: new Date(Date.now() + THREAD_ASSESS_DELAY_MS + 60_000) });
+  const root = await postIn(f.general.id, "o login cai depois do refresh");
+  const shownAt = new Date();
+  await Bun.sleep(5);
+  // Sent in the thread while the agent wrote its answer; assessed before the answer landed.
+  await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+    body: "acontece no iOS também",
+    threadId: root.id,
+  });
+  await later();
+  const before = assessed().length;
+  // The answer lands in the place where its words first showed, above that message.
+  await insertMessage(f.db, {
+    orgId: f.org.id,
+    channelId: f.general.id,
+    threadId: root.id,
+    author: { type: "agent", agentId: f.agent.id, runId: null, hop: 1, stretchId: null },
+    body: "Corrigido: a chave do cache expirava antes do token.",
+    createdAt: shownAt,
+  });
+  await later();
+  expect(assessed()).toHaveLength(before + 1);
+  expect(JSON.stringify(assessed().at(-1)?.request.messages)).toContain("Corrigido");
 });
