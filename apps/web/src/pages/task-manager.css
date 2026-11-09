@@ -140,6 +140,13 @@ html:not([data-pointer]) .tm-card:has(.tm-card__text:focus-visible) {
   font-weight: 650;
   letter-spacing: -0.01em;
 }
+/* Its tools are one group: after the heading while they fit, else together on the line under it. */
+.tm-tools__acts {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+}
 .tm-tool-stop.ac-btn:not(:disabled) {
   color: var(--danger);
 }

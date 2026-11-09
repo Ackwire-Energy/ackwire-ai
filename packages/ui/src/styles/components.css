@@ -2829,16 +2829,33 @@ html:not([data-pointer]) .ac-tab:focus-visible {
 .ac-form__actions {
   flex-wrap: wrap;
 }
-/* Beside the buttons while it fits on one line, on a line of its own above them when it doesn't: at its content's width,
-   the wrap gives it the line before the buttons could squeeze it word by word. */
+/* A note and its buttons are an action line: the buttons, one group 8 apart (`__foot-acts`), beside the note while it
+   keeps one line there, else on a row of their own under it at the footer's end. The note takes its content's width,
+   so the wrap gives it the line before the buttons could squeeze it word by word. */
+.ac-dialog__foot:has(> .ac-dialog__foot-acts) {
+  column-gap: var(--space-4);
+}
 .ac-dialog__foot-note {
   flex: 1 1 auto;
   min-width: 0;
   font-size: 13px;
   color: var(--ink-muted);
 }
+.ac-dialog__foot-acts {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  max-width: 100%;
+}
+.ac-dialog__foot-acts:empty {
+  display: none;
+}
 /* A ghost at the footer's start or end, or in its note: its words on the dialog's edge, as `.ac-acts` does in a row. */
 .ac-dialog__foot > .ac-btn--ghost:not(.ac-btn--icon):is(:first-child, :last-child),
+.ac-dialog__foot-acts > .ac-btn--ghost:not(.ac-btn--icon):last-child,
 .ac-dialog__foot-note > .ac-btn--ghost:not(.ac-btn--icon):first-child {
   padding-inline: var(--ghost-plate);
 }
@@ -2846,7 +2863,8 @@ html:not([data-pointer]) .ac-tab:focus-visible {
 .ac-dialog__foot-note > .ac-btn--ghost:not(.ac-btn--icon):first-child {
   margin-inline-start: calc(-1 * var(--ghost-plate));
 }
-.ac-dialog__foot > .ac-btn--ghost:not(.ac-btn--icon):last-child {
+.ac-dialog__foot > .ac-btn--ghost:not(.ac-btn--icon):last-child,
+.ac-dialog__foot-acts > .ac-btn--ghost:not(.ac-btn--icon):last-child {
   margin-inline-end: calc(-1 * var(--ghost-plate));
 }
 
@@ -9720,6 +9738,10 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
     flex: 1 1 auto;
   }
   :is(.ac-dialog__foot, .ac-empty__actions):not(:has(> .ac-btn ~ .ac-btn)) > .ac-btn {
+    flex: 1 1 100%;
+  }
+  .ac-dialog__foot-acts:not(:has(> .ac-btn ~ .ac-btn)),
+  .ac-dialog__foot-acts:not(:has(> .ac-btn ~ .ac-btn)) > .ac-btn {
     flex: 1 1 100%;
   }
 }

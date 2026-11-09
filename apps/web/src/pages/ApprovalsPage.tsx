@@ -892,13 +892,14 @@ export function RefuseBox({ approval, agent, onCancel }: { approval: Approval; a
         </div>
         <div className="ap-refuse__row">
           <span className="ap-refuse__learn">{t("approvals.refuseLearn", { context: g.context, name: g.name })}</span>
-          <span className="ap-grow" />
-          <Button variant="ghost" size="sm" onClick={onCancel}>
-            {t("approvals.back")}
-          </Button>
-          <Button variant="danger" size="sm" kbd={["⌘", "↵"]} loading={decide.isPending} onClick={send}>
-            {t("approvals.refuseConfirm")}
-          </Button>
+          <span className="ap-refuse__acts">
+            <Button variant="ghost" size="sm" onClick={onCancel}>
+              {t("approvals.back")}
+            </Button>
+            <Button variant="danger" size="sm" kbd={["⌘", "↵"]} loading={decide.isPending} onClick={send}>
+              {t("approvals.refuseConfirm")}
+            </Button>
+          </span>
         </div>
       </Locked>
     </div>

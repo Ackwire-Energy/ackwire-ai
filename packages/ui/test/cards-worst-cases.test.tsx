@@ -4,7 +4,7 @@ import { setupDom } from "../testing/dom";
 setupDom();
 
 import { cleanup, render, within } from "@testing-library/react";
-import { Button, Card, CardHeader, DetailsDialog, Dialog, DialogBody, FactStrip } from "../src";
+import { Button, Card, CardHeader, DetailsDialog, Dialog, DialogBody, DialogFooter, FactStrip } from "../src";
 
 afterEach(cleanup);
 
@@ -92,6 +92,30 @@ describe("worst cases: words and their actions", () => {
     );
     const head = body().getByRole("dialog").querySelector(".ac-dialog__head") as HTMLElement;
     expect(head.lastElementChild?.className).toBe("ac-dialog__close ac-acts");
+  });
+
+  test("a dialog's footer in German: a long note over three buttons that keep one group, a short note beside two", () => {
+    render(
+      <Dialog open onOpenChange={() => {}} title="MCP-Server verbinden" closeLabel="Schließen">
+        <DialogBody>
+          <p>Adresse</p>
+        </DialogBody>
+        <DialogFooter
+          bar
+          note="Beim Verbinden können alle Agenten ihn nutzen. Das änderst du in Schritt 3, bevor etwas geteilt wird."
+        >
+          <Button>Abbrechen</Button>
+          <Button>Mit API-Schlüssel verbinden</Button>
+          <Button variant="primary">Verbinden</Button>
+        </DialogFooter>
+        <DialogFooter note="Schritt 1 von 3">
+          <Button>Abbrechen</Button>
+          <Button variant="primary">Weiter</Button>
+        </DialogFooter>
+      </Dialog>,
+    );
+    const feet = [...body().getByRole("dialog").querySelectorAll(".ac-dialog__foot")];
+    expect(feet.map((f) => f.querySelectorAll(":scope > .ac-dialog__foot-acts > .ac-btn").length)).toEqual([3, 2]);
   });
 
   test("a card's head: a long title with its key and an action, Japanese beside it", () => {

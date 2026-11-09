@@ -392,16 +392,18 @@ export function TaskManagerPage({
         <section className="tm-now" aria-label={heading}>
           <div className="tm-tools">
             <h2>{heading}</h2>
-            <Button
-              size="sm"
-              variant="ghost"
-              icon="list"
-              disabled={!selTask}
-              onClick={() => selTask && setPanel(selTask.runId)}
-            >
-              {t("taskManager.actions.steps")}
-            </Button>
-            {stopTool}
+            <span className="tm-tools__acts">
+              <Button
+                size="sm"
+                variant="ghost"
+                icon="list"
+                disabled={!selTask}
+                onClick={() => selTask && setPanel(selTask.runId)}
+              >
+                {t("taskManager.actions.steps")}
+              </Button>
+              {stopTool}
+            </span>
           </div>
           {shown.length === 0 ? (
             <EmptyState size="panel" actions={<Button onClick={() => setQ("")}>{t("filters.clearSearch")}</Button>}>

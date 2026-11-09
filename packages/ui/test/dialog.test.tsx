@@ -365,6 +365,31 @@ describe("Dialog without a footer", () => {
     );
   });
 
+  test("a footer's note and its buttons are an action line: the buttons one group, never split one over the other", async () => {
+    render(
+      <Dialog open onOpenChange={() => {}} title="Conectar servidor MCP" closeLabel="Fechar">
+        <DialogBody>
+          <p>Endereço</p>
+        </DialogBody>
+        <DialogFooter bar note="Ao conectar, todos os agentes podem usar. Você muda isso no passo 3.">
+          <Button>Cancelar</Button>
+          <Button variant="primary">Conectar</Button>
+        </DialogFooter>
+      </Dialog>,
+    );
+    const foot = body().getByRole("dialog").querySelector(".ac-dialog__foot") as HTMLElement;
+    expect([...foot.children].map((c) => c.className)).toEqual(["ac-dialog__foot-note", "ac-dialog__foot-acts"]);
+    expect([...(foot.lastElementChild?.children ?? [])].map((b) => b.textContent)).toEqual(["Cancelar", "Conectar"]);
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+    // Beside the note while it keeps one line, else on a row of their own under it, at the footer's end, 8 apart.
+    expect(rule(".ac-dialog__foot-note")).toContain("flex: 1 1 auto;");
+    expect(rule(".ac-dialog__foot-acts")).toContain("flex: none;");
+    expect(rule(".ac-dialog__foot-acts")).toContain("gap: var(--space-2);");
+    expect(css).toMatch(/\n\.ac-dialog__foot \{[^}]*justify-content: flex-end;/);
+    expect(rule(".ac-dialog__foot:has(> .ac-dialog__foot-acts)")).toContain("column-gap: var(--space-4);");
+  });
+
   test("an empty footer renders nothing, so a list above it ends on the dialog's own edge", () => {
     render(
       <Dialog open onOpenChange={() => {}} title="Membros" closeLabel="Fechar">

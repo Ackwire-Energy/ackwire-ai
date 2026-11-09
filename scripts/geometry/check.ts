@@ -295,6 +295,7 @@ export const SELF_TESTED = [
   "squeeze",
   "loneprimary",
   "btngap",
+  "btnsplit",
   "toolheight",
   "factwrap",
   "undoinline",

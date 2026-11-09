@@ -1991,6 +1991,36 @@
       }
     },
     /**
+     * A footer's buttons (a dialog's, a viewer's) never split one over the other while they fit side by side there:
+     * words before them (the footer's note) took the first row's room. They are one group, beside the words or on a
+     * row of their own under them (rule 17).
+     */
+    btnsplit(out) {
+      for (const row of document.body.querySelectorAll(".ac-dialog__foot,.ac-dialog__foot-acts,.ac-details__foot")) {
+        if (!seen(row)) continue;
+        const s = style(row);
+        if (!isRow(s) || !s.flexWrap.startsWith("wrap")) continue;
+        const buttons = flow(row).filter((k) => k.matches(".ac-btn"));
+        if (buttons.length < 2) continue;
+        const rects = buttons.map((b) => b.getBoundingClientRect());
+        if (rects.every((r) => sameLine(rects[0], r))) continue;
+        const outer = (b, r) =>
+          r.width + (parseFloat(style(b).marginLeft) || 0) + (parseFloat(style(b).marginRight) || 0);
+        const need =
+          buttons.reduce((sum, b, i) => sum + outer(b, rects[i]), 0) +
+          (parseFloat(s.columnGap) || 0) * (buttons.length - 1);
+        const room = row.clientWidth - parseFloat(s.paddingLeft) - parseFloat(s.paddingRight);
+        if (need <= room + 0.5)
+          out.push({
+            rule: "btnsplit",
+            node: row,
+            el: sig(row),
+            px: +(room - need).toFixed(1),
+            text: words(buttons[0]),
+          });
+      }
+    },
+    /**
      * Controls side by side share one height (rule 7): in a toolbar or a page head, and in any row of the kit's
      * controls (a plated button, a select, a field, a date, a filter, a search field, a segmented control), two on one
      * line are as tall as each other.
