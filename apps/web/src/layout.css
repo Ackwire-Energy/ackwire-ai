@@ -4179,7 +4179,9 @@ html:not([data-pointer]) .settings__link:focus-visible {
   padding: var(--row-py) var(--card-pad);
   border-top: 1px solid var(--line);
 }
-.settings-row :is(.ac-select__trigger, .ac-input, .ac-input-affix, .ac-btn:not(.ac-btn--glyph, .ac-btn--icon)) {
+/* A text field of several lines (the right hand's guidance) keeps its rows: the kit's `textarea.ac-input` sizes it. */
+.settings-row
+:is(.ac-select__trigger, .ac-input:not(textarea), .ac-input-affix, .ac-btn:not(.ac-btn--glyph, .ac-btn--icon)) {
   height: var(--control-h-sm);
 }
 .settings-row:first-child {
