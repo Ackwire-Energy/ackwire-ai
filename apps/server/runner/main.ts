@@ -383,7 +383,7 @@ async function pair(p: Parsed): Promise<number> {
   if (wait) wait.done(connected, ...details);
   else term.step(connected, ...details);
   // An issued code is a provisioner's (the workspace computer): its rule is the workspace's, not a person's choice.
-  const who = enrollCode ? null : whoCanUse(grant, next.name);
+  const who = enrollCode ? null : whoCanUse(grant, next.name ?? grant.name);
   if (who && grant.url) {
     term.info(`${who} Change it on its page:`);
     term.command(grant.url);

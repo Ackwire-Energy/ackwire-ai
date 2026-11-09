@@ -284,7 +284,7 @@ test.skipIf(process.platform === "win32")(
   async () => {
     const pc = fakeComputer({ bun: fakeBun(RUNNER_BUN_VERSION, true) });
     writeFileSync(path.join(pc.fake, "curl"), CURL_404, { mode: 0o755 });
-    for (const tool of ["date", "sleep", "stty", "fold", "tail", "tr"]) {
+    for (const tool of ["sleep", "stty", "fold", "tail", "tr"]) {
       const real = Bun.which(tool);
       if (real) symlinkSync(real, path.join(pc.sys, tool));
     }
