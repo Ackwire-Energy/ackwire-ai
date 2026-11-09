@@ -984,7 +984,7 @@ test("an agent's op running when a person takes control stops, and says why", as
 
 test("Stop while the screen opens in control ends it as soon as it's open; big pictures go one at a time", async () => {
   const r = rig(ANDROID_STATE);
-  const target = { platform: "android", serial: PIXEL };
+  const target = { platform: "android", serial: PIXEL } as const;
   const sam = { runId: null, agentId: null, userId: "user-sam", since: "" };
   const v = viewerSocket();
   await r.manager.view({ ...target, holder: sam }, "control", async () => {
