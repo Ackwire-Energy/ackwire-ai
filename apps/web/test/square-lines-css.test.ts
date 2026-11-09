@@ -32,7 +32,7 @@ test("a square never keeps a column beside three lines: its line under it at the
   const open = ".settings-row--lead.settings-row--open:has(> .settings-row__text > .settings-row__status)";
   expect(last(rows, open, "display")).toBe("grid");
   expect(last(rows, `${open} > .settings-row__chevron`, "grid-area")).toBe("1 / -2");
-  expect(last(rows, ".settings-row--lead.settings-row--open > .settings-row__text > .settings-row__status", "grid-column")).toBe(
-    "1 / -1",
-  );
+  expect(
+    last(rows, ".settings-row--lead.settings-row--open > .settings-row__text > .settings-row__status", "grid-column"),
+  ).toBe("1 / -1");
 });

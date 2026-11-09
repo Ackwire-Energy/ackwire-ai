@@ -13653,7 +13653,9 @@ html:not([data-pointer]) .settings-row--open:focus-visible {
     align-items: center;
     gap: 2px var(--space-3);
   }
-  .settings-row--lead.settings-row--open:has(> .settings-row__value):has(> .settings-row__text > .settings-row__status) {
+  .settings-row--lead.settings-row--open:has(> .settings-row__value):has(
+    > .settings-row__text > .settings-row__status
+  ) {
     grid-template-columns: auto minmax(0, 1fr) auto auto;
   }
   .settings-row--lead.settings-row--open > .settings-row__text:has(> .settings-row__status) {
