@@ -11809,13 +11809,13 @@ html[data-menu-overlay] .shell {
   font-size: 12px;
 }
 /*
- * Faces in the full list: 32, 8 from the plate's edges (48 rows). A name alone centres on its face; a name over a role
- * is a face line: the name's capitals on the face's top (`.ac-captop`), the role under it, what ends the row on its
- * middle.
+ * Faces in the full list: a message's size (`--name-face`), 8 from the plate's edges (48 rows). A name alone centres on
+ * its face; a name over a role is a face line: the name's capitals on the face's top (`.ac-captop`), the role under
+ * it, what ends the row on its middle.
  */
 .sidebar:not([data-rail="true"]) .sidebar__item > .ac-avatar--sm {
-  width: 32px;
-  height: 32px;
+  width: var(--name-face);
+  height: var(--name-face);
   font-size: 13px;
 }
 .sidebar:not([data-rail="true"]) .sidebar__item:has(> .ac-avatar) {

@@ -595,7 +595,11 @@ describe("Message", () => {
     const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
     const rule = (selector: string) => css.split(`${selector} {`)[1]?.split("}")[0] ?? "";
     expect(rule(".ac-msg")).toContain("align-items: flex-start");
-    expect(rule(".ac-msg__avatar,\n.ac-msg__gutter")).toContain("flex: 0 0 36px");
+    // One face size beside a name, in a message as in the sidebar's rows and a MediaRow: `--name-face`, 32.
+    expect(css).toContain("--name-face: 32px;");
+    expect(rule(".ac-msg__avatar,\n.ac-msg__gutter")).toContain("flex: 0 0 var(--name-face)");
+    expect(rule(".ac-msg__avatar .ac-avatar:not(.ac-avatar--xs)")).toContain("width: var(--name-face)");
+    expect(rule(".ac-mediarow")).toContain("--mediarow-face: var(--name-face);");
     expect(rule(".ac-msg__avatar")).toContain("align-self: flex-start");
   });
 });

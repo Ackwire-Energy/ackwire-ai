@@ -34,20 +34,20 @@
   --msg-bubble: var(--own-bubble);
   --msg-mine-mix: 30%;
 }
-/* Quiet rows (an event pill, a thread's line) on the text's column: the messages' side padding, 36px face and gap. */
+/* Quiet rows (an event pill, a thread's line) on the text's column: the messages' side padding, the face and gap. */
 .channel__messages {
-  --thread-indent: 64px;
+  --thread-indent: calc(16px + var(--name-face) + var(--space-3));
 }
-/* Where the messages' side padding narrows to 12px (`responsive.css`). */
+/* Where the messages' side padding narrows to 12px and their gap to 10px (`responsive.css`). */
 @media (max-width: 760px) {
   .channel__messages {
-    --thread-indent: 58px;
+    --thread-indent: calc(12px + var(--name-face) + 10px);
   }
 }
 .channel__messages[data-look="bubbles"] {
   padding-inline: 12px;
-  /* Quiet rows (an event pill, a thread's line) on the bubbles' column: the row's 8px, the 32px face, the 8px gap. */
-  --thread-indent: 48px;
+  /* Quiet rows (an event pill, a thread's line) on the bubbles' column: the row's 8px, the face, the 8px gap. */
+  --thread-indent: calc(8px + var(--name-face) + 8px);
 }
 .ac-msg[data-look="bubbles"] {
   --msg-inline: 8px;
@@ -73,21 +73,13 @@
 [data-theme="dark"] .ac-msg[data-look="bubbles"]:is(:hover, [data-menu-open="true"]) .ac-msg__text {
   filter: brightness(1.14);
 }
-.ac-msg[data-look="bubbles"] :is(.ac-msg__avatar, .ac-msg__gutter) {
-  flex-basis: 32px;
-  width: 32px;
-}
-.ac-msg[data-look="bubbles"] .ac-msg__avatar .ac-avatar:not(.ac-avatar--xs) {
-  width: 32px;
-  height: 32px;
-}
 .ac-msg[data-look="bubbles"] .ac-msg__gutter-time {
   display: none;
 }
-/* The pair row before a reply ("Theo ⇄ Iris"): its first face centred over the bubbles' 32px face (the row's 8px +
-   7px, less the button's own 10px). A reach line's pair row keeps its place in the line. */
+/* The pair row before a reply ("Theo ⇄ Iris"): its 18px first face centred over the bubbles' face (the row's 8px and
+   half of what the face has over 18, less the button's own 10px). A reach line's pair row keeps its place in the line. */
 .channel__messages[data-look="bubbles"] .consult-pair:not(.ag-rc--talk > .consult-pair) {
-  padding-left: 5px;
+  padding-left: calc(8px + (var(--name-face) - 18px) / 2 - 10px);
 }
 /* Everyone's words in a bubble, as wide as what they say, up to 76% of the column; cards stay out, on its left edge. */
 .ac-msg[data-look="bubbles"] .ac-msg__text {
@@ -180,7 +172,6 @@
   color: var(--stamp-ink);
 }
 .ac-msg[data-look="bubbles"] > .ac-msg__reply {
-  --reply-face: 32px;
   --reply-gap: 8px;
 }
 /* Name inside the bubble, in its color, a step under the words; a DM's two speakers leave it to screen readers. */

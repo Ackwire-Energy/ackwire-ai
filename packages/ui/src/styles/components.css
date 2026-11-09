@@ -1098,8 +1098,13 @@ textarea.ac-input {
   --msg-turn-gap: 20px;
   --msg-card-gap: 12px;
   --msg-block: 4px;
+  /*
+   * A person's or an agent's face beside its name, one size wherever it sits: a message's, a row of the sidebar's and
+   * of the members column's, a MediaRow's. The faces' scale has 24 for a row's small face and 32 for this one.
+   */
+  --name-face: 32px;
   /* The avatar column and its gap: how far a body stands in from its row. */
-  --msg-lead: calc(36px + var(--space-3));
+  --msg-lead: calc(var(--name-face) + var(--space-3));
 }
 /*
  * Tamanho do texto (`textSize`, packages/client/src/lib/chat-look.ts), the same in every look: a message's words
@@ -1186,7 +1191,7 @@ textarea.ac-input {
   row-gap: 2px;
 }
 .ac-msg > .ac-msg__reply {
-  --reply-face: 36px;
+  --reply-face: var(--name-face);
   --reply-gap: var(--space-3);
   position: relative;
   flex: 0 0 100%;
@@ -1223,11 +1228,11 @@ textarea.ac-input {
   background: color-mix(in srgb, currentColor 8%, transparent);
   color: inherit;
 }
-/* The face is 36px in the feed, the sidebar's size. */
+/* The face in the feed: the sidebar's size (`--name-face`). */
 .ac-msg__avatar,
 .ac-msg__gutter {
-  flex: 0 0 36px;
-  width: 36px;
+  flex: 0 0 var(--name-face);
+  width: var(--name-face);
   display: flex;
   justify-content: center;
 }
@@ -1243,8 +1248,8 @@ textarea.ac-input {
   align-self: flex-start;
 }
 .ac-msg__avatar .ac-avatar:not(.ac-avatar--xs) {
-  width: 36px;
-  height: 36px;
+  width: var(--name-face);
+  height: var(--name-face);
 }
 /* On the words' first line, whatever their size. */
 .ac-msg__gutter-time {
@@ -4414,7 +4419,7 @@ html:not([data-pointer]) .ac-switch:focus-visible {
 }
 .ac-skeleton-msg__gutter {
   flex: none;
-  width: 36px;
+  width: var(--name-face);
 }
 .ac-skeleton-msg__body {
   flex: 1;
@@ -11313,7 +11318,7 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
    name's first line sits on the line's axis however many lines the head wraps to, and what ends that line on it too
    (a box as tall as the axis, anything taller reaching as far above as below): never the wrapped head's middle. */
 .ac-mediarow {
-  --mediarow-face: 32px;
+  --mediarow-face: var(--name-face);
   /* The first line's axis: the face's middle, or a control's that ends the line and is taller than the face. */
   --mediarow-axis: var(--mediarow-face);
   display: grid;

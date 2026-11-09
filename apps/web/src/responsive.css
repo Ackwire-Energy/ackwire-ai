@@ -195,7 +195,7 @@
     mask-image: linear-gradient(to bottom, #000 calc(100% - 10px), transparent), var(--scroll-strip);
   }
   .channel__messages .ac-msg:not([data-look="bubbles"], [data-look="compact"]) {
-    --msg-lead: 46px;
+    --msg-lead: calc(var(--name-face) + 10px);
   }
   .channel__messages .ac-msg {
     --msg-inline: 12px;

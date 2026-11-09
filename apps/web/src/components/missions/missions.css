@@ -884,7 +884,7 @@ a.mi-pr:hover {
 /* One event pill (`EventPill`) in the messages' text column: its words wrap inside the frame, its actions ("Ver
    plano", "Revogar") in it, what it opens (commands, a request's command) under it. */
 .mi-evt {
-  margin-inline: var(--thread-indent, 64px) 12px;
+  margin-inline: var(--thread-indent, calc(16px + var(--name-face) + var(--space-3))) 12px;
   animation: mi-fade 0.35s var(--out) both;
 }
 /* A command allowed without a card: quiet, the command in mono. */
@@ -929,7 +929,7 @@ a.mi-pr:hover {
 
 /* ── Ephemeral cards (`/summary`, `/plan`): only you see them ─────────────── */
 .mi-ephemeral {
-  margin: 8px 12px 4px var(--thread-indent, 64px);
+  margin: 8px 12px 4px var(--thread-indent, calc(16px + var(--name-face) + var(--space-3)));
   max-width: 640px;
 }
 .mi-ephemeral__head {
@@ -1547,7 +1547,7 @@ html:not([data-pointer]) .mi-quiet:focus-visible {
 
 /* A mission's card in place of its thread's start marker (threads proposed before the link card). */
 .mi-linkrow {
-  margin-inline: var(--thread-indent, 64px) 12px;
+  margin-inline: var(--thread-indent, calc(16px + var(--name-face) + var(--space-3))) 12px;
 }
 
 /* ── Delivery card: the mission's end (like an approval) ─────────────────── */
