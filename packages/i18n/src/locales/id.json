@@ -494,6 +494,18 @@
       "continue": "Lanjutkan di {{device}} ini",
       "text": "Kamu memasang agentes.chat di {{device}} ini: tidak perlu kata sandi."
     },
+    "server": {
+      "into": "Masuk ke <b>{{server}}</b>",
+      "intoHere": "Masuk ke agentes.chat <b>di {{device}} ini</b>"
+    },
+    "forgotHere": {
+      "ownerTitle": "Di sini kamu tidak perlu kata sandi.",
+      "ownerLead": "Kamu memasang agentes.chat di {{device}} ini. Masuk dari sini, lalu buat kata sandi baru.",
+      "notOwner": "Bukan akun orang yang memasangnya? Minta tautan kata sandi baru kepada pemilik workspace kamu.",
+      "title": "Server ini tidak mengirim email.",
+      "lead": "Minta tautan kata sandi baru kepada pemilik workspace kamu. Ia membuatnya di Anggota, dan tautannya berlaku 1 jam.",
+      "back": "Kembali ke kata sandi"
+    },
     "reset": {
       "title": "Buat kata sandi baru.",
       "save": "Simpan kata sandi",
@@ -513,18 +525,6 @@
       "wrongLinkLead": "Buka tautan pemilik terbaru yang dibuat untuk server ini.",
       "taken": "Server ini sudah punya pemilik.",
       "takenLead": "Masuk dengan akunmu."
-    },
-    "server": {
-      "into": "Masuk ke <b>{{server}}</b>",
-      "intoHere": "Masuk ke agentes.chat <b>di {{device}} ini</b>"
-    },
-    "forgotHere": {
-      "ownerTitle": "Di sini kamu tidak perlu kata sandi.",
-      "ownerLead": "Kamu memasang agentes.chat di {{device}} ini. Masuk dari sini, lalu buat kata sandi baru.",
-      "notOwner": "Bukan akun orang yang memasangnya? Minta tautan kata sandi baru kepada pemilik workspace kamu.",
-      "title": "Server ini tidak mengirim email.",
-      "lead": "Minta tautan kata sandi baru kepada pemilik workspace kamu. Ia membuatnya di Anggota, dan tautannya berlaku 1 jam.",
-      "back": "Kembali ke kata sandi"
     }
   },
   "invite": {
@@ -1344,6 +1344,11 @@
     "addPasswordLabel": "Kata sandi baru",
     "addPasswordSaved": "Kata sandi ditambahkan.",
     "addPasswordReauth": "Masuk lagi untuk menambahkan kata sandi.",
+    "newPassword": "Buat kata sandi baru",
+    "newPasswordHint": "Sesi kamu yang lain berakhir, dan aplikasi AI yang terhubung dengan kata sandi lama perlu dihubungkan lagi.",
+    "newPasswordRow": "Untuk mengganti kata sandi yang kamu pakai di browser dan perangkat lain",
+    "newPasswordSaved": "Kata sandi baru disimpan.",
+    "newPasswordReauth": "Masuk lagi untuk membuat kata sandi baru.",
     "yourWorkspaces": "Ruang kerjamu",
     "youAreHere": "Kamu di sini",
     "createdOn": "Dibuat pada {{date}}",
@@ -1351,6 +1356,11 @@
     "addWorkspace": "Tambah ruang kerja",
     "addWorkspaceHint": "Masuk ke yang sudah ada, buat yang baru, atau pakai server tim kamu",
     "yourServer": "Servermu",
+    "serverHere": "agentes.chat di {{device}} ini",
+    "serverStopped": "berhenti",
+    "serverOffline": "offline sejak {{time}}",
+    "serverSignedOut": "belum masuk",
+    "serverSignIn": "Masuk",
     "wiki": "Wiki",
     "settings": "Pengaturan",
     "workspaceMenu": "Menu ruang kerja",
@@ -1420,17 +1430,7 @@
     "unreadMark": "Belum dibaca",
     "unreadMentions_other": "{{count}} sebutan untuk Anda",
     "unreadThreads_other": "Thread: {{count}} dengan balasan belum dibaca",
-    "unreadNotifications_other": "{{count}} notifikasi belum dibaca",
-    "newPassword": "Buat kata sandi baru",
-    "newPasswordHint": "Sesi kamu yang lain berakhir, dan aplikasi AI yang terhubung dengan kata sandi lama perlu dihubungkan lagi.",
-    "newPasswordRow": "Untuk mengganti kata sandi yang kamu pakai di browser dan perangkat lain",
-    "newPasswordSaved": "Kata sandi baru disimpan.",
-    "newPasswordReauth": "Masuk lagi untuk membuat kata sandi baru.",
-    "serverHere": "agentes.chat di {{device}} ini",
-    "serverStopped": "berhenti",
-    "serverOffline": "offline sejak {{time}}",
-    "serverSignedOut": "belum masuk",
-    "serverSignIn": "Masuk"
+    "unreadNotifications_other": "{{count}} notifikasi belum dibaca"
   },
   "agentGroups": {
     "group": "Departemen",
@@ -4917,6 +4917,15 @@
     "include": "Sertakan {{name}}",
     "acceptAll": "Terima untuk semua",
     "acceptSome": "Terima untuk {{count}}",
+    "all": {
+      "label": "Putuskan semua usulan",
+      "accept": "Terima semua",
+      "refuse": "Tolak semua",
+      "acceptAsk_other": "Terima {{count}} usulan? Masing-masing langsung berlaku.",
+      "refuseAsk_other": "Tolak {{count}} usulan? Agen tidak akan mengusulkannya lagi.",
+      "acceptGo_other": "Terima {{count}}",
+      "refuseGo_other": "Tolak {{count}}"
+    },
     "staleSome_other": "{{count}} tidak diterima: teksnya berubah setelah usulan dibuat.",
     "staleSomeAgent_other": "{{count}} tidak diterima: agennya berubah setelah usulan dibuat.",
     "waitingFor": "Menunggu {{name}}",
@@ -5499,6 +5508,16 @@
     "agentsOnlyYouHint": "Dengan paket, kamu bisa membiarkan tiap agen menjawab orang lain dari halamannya.",
     "filters": "Filter orang",
     "rolesOf": "Peran {{name}}",
+    "moreOf": "Lainnya untuk {{name}}",
+    "passwordLink": {
+      "item": "Buat tautan kata sandi baru",
+      "hint": "Untuk saat ia lupa kata sandi",
+      "title": "Tautan kata sandi baru untuk {{name}}",
+      "lead": "Berlaku sekali, selama 1 jam. Kirim lewat tempat kalian biasa mengobrol.",
+      "label": "Tautan",
+      "making": "Membuat tautan…",
+      "copy": "Salin tautan"
+    },
     "everyoneNote": "Semua berlaku untuk setiap orang di ruang kerja.",
     "noRolesToGive": "Tidak ada peran di bawah peranmu yang bisa diberikan.",
     "roleFilter": "Peran",
@@ -5760,17 +5779,7 @@
     "ownerLine": "Pemilik: {{name}}",
     "noOwner": "Tanpa pemilik",
     "budgetLine": "{{percent}} dari anggaran {{month}}",
-    "noAgents": "Belum ada agen.",
-    "moreOf": "Lainnya untuk {{name}}",
-    "passwordLink": {
-      "item": "Buat tautan kata sandi baru",
-      "hint": "Untuk saat ia lupa kata sandi",
-      "title": "Tautan kata sandi baru untuk {{name}}",
-      "lead": "Berlaku sekali, selama 1 jam. Kirim lewat tempat kalian biasa mengobrol.",
-      "label": "Tautan",
-      "making": "Membuat tautan…",
-      "copy": "Salin tautan"
-    }
+    "noAgents": "Belum ada agen."
   },
   "empty": {
     "thread": {
@@ -11494,6 +11503,11 @@
     }
   },
   "errors": {
+    "passwordLink": {
+      "email": "Server ini mengirim email: orang itu meminta tautannya sendiri di Lupa kata sandi.",
+      "serverOwner": "Orang yang memasang server ini masuk dari komputer tempat server berjalan, tanpa tautan.",
+      "otherWorkspace": "Orang ini juga ada di workspace yang bukan milikmu: hanya pemilik semua workspace itu yang bisa membuat tautan."
+    },
     "said": {
       "gone": "Ini sudah tidak ada di sini. Muat ulang halaman dan coba lagi.",
       "alreadyDone": "Ini sudah dijawab atau selesai. Muat ulang untuk melihat statusnya.",
@@ -11847,11 +11861,6 @@
         "invalidInput": "Periksa kolom-kolomnya lalu coba lagi.",
         "tooManyItems": "Vault penuh. Hapus item sebelum menyinkronkan lebih banyak."
       }
-    },
-    "passwordLink": {
-      "email": "Server ini mengirim email: orang itu meminta tautannya sendiri di Lupa kata sandi.",
-      "serverOwner": "Orang yang memasang server ini masuk dari komputer tempat server berjalan, tanpa tautan.",
-      "otherWorkspace": "Orang ini juga ada di workspace yang bukan milikmu: hanya pemilik semua workspace itu yang bisa membuat tautan."
     }
   },
   "machines": {

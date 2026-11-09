@@ -500,6 +500,18 @@
       "continue": "Doorgaan op deze {{device}}",
       "text": "Je hebt agentes.chat op deze {{device}} ingericht: geen wachtwoord nodig."
     },
+    "server": {
+      "into": "Aanmelden bij <b>{{server}}</b>",
+      "intoHere": "Aanmelden bij agentes.chat <b>op deze {{device}}</b>"
+    },
+    "forgotHere": {
+      "ownerTitle": "Hier heb je geen wachtwoord nodig.",
+      "ownerLead": "Je hebt agentes.chat op deze {{device}} geïnstalleerd. Meld je hier aan en maak daarna een nieuw wachtwoord.",
+      "notOwner": "Niet het account van wie het installeerde? Vraag een eigenaar van je workspace om een link voor een nieuw wachtwoord.",
+      "title": "Deze server verstuurt geen e-mail.",
+      "lead": "Vraag een eigenaar van je workspace om een link voor een nieuw wachtwoord. Die maakt hem bij Leden, en de link werkt 1 uur.",
+      "back": "Terug naar het wachtwoord"
+    },
     "reset": {
       "title": "Maak een nieuw wachtwoord.",
       "save": "Wachtwoord opslaan",
@@ -519,18 +531,6 @@
       "wrongLinkLead": "Open de nieuwste eigenaarslink die voor deze server is gemaakt.",
       "taken": "Deze server heeft al een eigenaar.",
       "takenLead": "Log in met je account."
-    },
-    "server": {
-      "into": "Aanmelden bij <b>{{server}}</b>",
-      "intoHere": "Aanmelden bij agentes.chat <b>op deze {{device}}</b>"
-    },
-    "forgotHere": {
-      "ownerTitle": "Hier heb je geen wachtwoord nodig.",
-      "ownerLead": "Je hebt agentes.chat op deze {{device}} geïnstalleerd. Meld je hier aan en maak daarna een nieuw wachtwoord.",
-      "notOwner": "Niet het account van wie het installeerde? Vraag een eigenaar van je workspace om een link voor een nieuw wachtwoord.",
-      "title": "Deze server verstuurt geen e-mail.",
-      "lead": "Vraag een eigenaar van je workspace om een link voor een nieuw wachtwoord. Die maakt hem bij Leden, en de link werkt 1 uur.",
-      "back": "Terug naar het wachtwoord"
     }
   },
   "invite": {
@@ -1380,6 +1380,11 @@
     "addPasswordLabel": "Nieuw wachtwoord",
     "addPasswordSaved": "Wachtwoord toegevoegd.",
     "addPasswordReauth": "Log opnieuw in om een wachtwoord toe te voegen.",
+    "newPassword": "Nieuw wachtwoord maken",
+    "newPasswordHint": "Je andere sessies eindigen, en AI-apps die met het oude wachtwoord verbonden zijn, moeten opnieuw worden verbonden.",
+    "newPasswordRow": "Om het wachtwoord te wijzigen dat je in andere browsers en op andere apparaten gebruikt",
+    "newPasswordSaved": "Nieuw wachtwoord opgeslagen.",
+    "newPasswordReauth": "Meld je opnieuw aan om een nieuw wachtwoord te maken.",
     "yourWorkspaces": "Je werkruimtes",
     "youAreHere": "Je bent hier",
     "createdOn": "Gemaakt op {{date}}",
@@ -1387,6 +1392,11 @@
     "addWorkspace": "Werkruimte toevoegen",
     "addWorkspaceHint": "Doe mee met een bestaande, maak een nieuwe of gebruik de server van je team",
     "yourServer": "Je server",
+    "serverHere": "agentes.chat op deze {{device}}",
+    "serverStopped": "gestopt",
+    "serverOffline": "offline sinds {{time}}",
+    "serverSignedOut": "niet aangemeld",
+    "serverSignIn": "Aanmelden",
     "wiki": "Wiki",
     "settings": "Instellingen",
     "workspaceMenu": "Werkruimtemenu",
@@ -1464,17 +1474,7 @@
     "unreadThreads_one": "Threads: {{count}} met ongelezen antwoorden",
     "unreadThreads_other": "Threads: {{count}} met ongelezen antwoorden",
     "unreadNotifications_one": "{{count}} ongelezen melding",
-    "unreadNotifications_other": "{{count}} ongelezen meldingen",
-    "newPassword": "Nieuw wachtwoord maken",
-    "newPasswordHint": "Je andere sessies eindigen, en AI-apps die met het oude wachtwoord verbonden zijn, moeten opnieuw worden verbonden.",
-    "newPasswordRow": "Om het wachtwoord te wijzigen dat je in andere browsers en op andere apparaten gebruikt",
-    "newPasswordSaved": "Nieuw wachtwoord opgeslagen.",
-    "newPasswordReauth": "Meld je opnieuw aan om een nieuw wachtwoord te maken.",
-    "serverHere": "agentes.chat op deze {{device}}",
-    "serverStopped": "gestopt",
-    "serverOffline": "offline sinds {{time}}",
-    "serverSignedOut": "niet aangemeld",
-    "serverSignIn": "Aanmelden"
+    "unreadNotifications_other": "{{count}} ongelezen meldingen"
   },
   "agentGroups": {
     "group": "Afdeling",
@@ -5135,6 +5135,19 @@
     "include": "{{name}} meenemen",
     "acceptAll": "Voor iedereen accepteren",
     "acceptSome": "Voor {{count}} accepteren",
+    "all": {
+      "label": "Over alle voorstellen beslissen",
+      "accept": "Alles accepteren",
+      "refuse": "Alles weigeren",
+      "acceptAsk_one": "Het voorstel accepteren? Het geldt meteen.",
+      "acceptAsk_other": "Alle {{count}} voorstellen accepteren? Elk geldt meteen.",
+      "refuseAsk_one": "Het voorstel weigeren? De agent stelt het niet nog eens voor.",
+      "refuseAsk_other": "Alle {{count}} voorstellen weigeren? De agents stellen ze niet nog eens voor.",
+      "acceptGo_one": "Accepteren",
+      "acceptGo_other": "{{count}} accepteren",
+      "refuseGo_one": "Weigeren",
+      "refuseGo_other": "{{count}} weigeren"
+    },
     "staleSome_one": "Eén is niet geaccepteerd: de tekst is na het voorstel gewijzigd.",
     "staleSome_other": "{{count}} zijn niet geaccepteerd: de tekst is na het voorstel gewijzigd.",
     "staleSomeAgent_one": "Eén is niet geaccepteerd: de agent is na het voorstel gewijzigd.",
@@ -5723,6 +5736,16 @@
     "agentsOnlyYouHint": "Met een abonnement kun je op de pagina van elke agent instellen dat hij ook anderen antwoordt.",
     "filters": "Mensen filteren",
     "rolesOf": "Rollen van {{name}}",
+    "moreOf": "Meer voor {{name}}",
+    "passwordLink": {
+      "item": "Link voor nieuw wachtwoord maken",
+      "hint": "Voor als iemand het wachtwoord vergat",
+      "title": "Link voor een nieuw wachtwoord voor {{name}}",
+      "lead": "Hij werkt één keer, 1 uur lang. Stuur hem waar jullie praten.",
+      "label": "Link",
+      "making": "Link maken…",
+      "copy": "Link kopiëren"
+    },
     "everyoneNote": "Iedereen geldt voor elke persoon in de werkruimte.",
     "noRolesToGive": "Geen rollen onder de jouwe om toe te kennen.",
     "roleFilter": "Rol",
@@ -6001,17 +6024,7 @@
     "ownerLine": "Eigenaar: {{name}}",
     "noOwner": "Geen eigenaar",
     "budgetLine": "{{percent}} van het budget van {{month}}",
-    "noAgents": "Nog geen agents.",
-    "moreOf": "Meer voor {{name}}",
-    "passwordLink": {
-      "item": "Link voor nieuw wachtwoord maken",
-      "hint": "Voor als iemand het wachtwoord vergat",
-      "title": "Link voor een nieuw wachtwoord voor {{name}}",
-      "lead": "Hij werkt één keer, 1 uur lang. Stuur hem waar jullie praten.",
-      "label": "Link",
-      "making": "Link maken…",
-      "copy": "Link kopiëren"
-    }
+    "noAgents": "Nog geen agents."
   },
   "empty": {
     "thread": {
@@ -11976,6 +11989,11 @@
     }
   },
   "errors": {
+    "passwordLink": {
+      "email": "Deze server verstuurt e-mail: de persoon vraagt zelf een link aan bij Wachtwoord vergeten.",
+      "serverOwner": "Wie deze server installeerde, meldt zich aan op de computer waarop hij draait, zonder link.",
+      "otherWorkspace": "Deze persoon zit ook in een workspace die niet van jou is: alleen de eigenaren van al die workspaces kunnen de link maken."
+    },
     "said": {
       "gone": "Dit is er niet meer. Vernieuw de pagina en probeer het opnieuw.",
       "alreadyDone": "Dit is al beantwoord of afgerond. Vernieuw om te zien hoe het ervoor staat.",
@@ -12330,11 +12348,6 @@
         "invalidInput": "Controleer de velden en probeer het opnieuw.",
         "tooManyItems": "De Vault is vol. Verwijder items voordat je meer synchroniseert."
       }
-    },
-    "passwordLink": {
-      "email": "Deze server verstuurt e-mail: de persoon vraagt zelf een link aan bij Wachtwoord vergeten.",
-      "serverOwner": "Wie deze server installeerde, meldt zich aan op de computer waarop hij draait, zonder link.",
-      "otherWorkspace": "Deze persoon zit ook in een workspace die niet van jou is: alleen de eigenaren van al die workspaces kunnen de link maken."
     }
   },
   "machines": {

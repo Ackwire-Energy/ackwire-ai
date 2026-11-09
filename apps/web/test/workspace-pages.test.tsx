@@ -301,6 +301,43 @@ describe("Memória e propostas (fase 5)", () => {
     expect(screen().getByRole("tab", { name: /Pedidos/ }).textContent).toBe("Pedidos");
   });
 
+  test("Aceitar todas at the tabs' right asks once, then decides every waiting proposal oldest first", async () => {
+    const state = seedState();
+    const [newer, older] = state.proposals;
+    if (!newer || !older) throw new Error("two proposals expected");
+    for (const p of state.proposals) p.canDecide = true;
+    Object.assign(newer, { createdAt: "2026-11-05T10:00:00.000Z" });
+    Object.assign(older, { createdAt: "2026-11-01T10:00:00.000Z" });
+    const r = await go("proposals", state);
+    const bar = screen().getByRole("group", { name: "Decidir todas as propostas" });
+    expect(bar.closest(".tabs-bar")).not.toBeNull();
+    await click(within(bar).getByRole("button", { name: "Aceitar todas" }));
+    expect(bar.textContent).toContain("Aceitar as 2 propostas? Cada uma muda na hora.");
+    expect(r.state.calls.some((c) => c.method === "proposals.accept")).toBe(false);
+    await click(within(bar).getByRole("button", { name: "Aceitar as 2" }));
+    await settle(4);
+    const accepted = r.state.calls.filter((c) => c.method === "proposals.accept").map((c) => c.args[1]);
+    expect(accepted).toEqual([older.id, newer.id]);
+  });
+
+  test("Recusar todas asks first, and Cancelar decides nothing; one proposal to decide has no bar", async () => {
+    const state = seedState();
+    for (const p of state.proposals) p.canDecide = true;
+    const r = await go("proposals", state);
+    const bar = screen().getByRole("group", { name: "Decidir todas as propostas" });
+    await click(within(bar).getByRole("button", { name: "Recusar todas" }));
+    expect(bar.textContent).toContain("Recusar as 2 propostas? Os agentes não propõem isso de novo.");
+    await click(within(bar).getByRole("button", { name: "Cancelar" }));
+    expect(within(bar).getByRole("button", { name: "Recusar todas" })).toBeTruthy();
+    expect(r.state.calls.some((c) => c.method === "proposals.refuse")).toBe(false);
+    cleanup();
+    const one = seedState();
+    const [first] = one.proposals;
+    for (const p of one.proposals) p.canDecide = p === first;
+    await go("proposals", one);
+    expect(screen().queryByRole("group", { name: "Decidir todas as propostas" })).toBeNull();
+  });
+
   test("proposals you can't decide have no actions", async () => {
     const state = seedState();
     for (const p of state.proposals) p.canDecide = false;

@@ -494,6 +494,18 @@
       "continue": "この{{device}}で続ける",
       "text": "この{{device}}でagentes.chatをセットアップしたので、パスワードは不要です。"
     },
+    "server": {
+      "into": "<b>{{server}}</b> にサインイン",
+      "intoHere": "この{{device}}の<b>agentes.chat</b>にサインイン"
+    },
+    "forgotHere": {
+      "ownerTitle": "ここではパスワードは不要です。",
+      "ownerLead": "この{{device}}に agentes.chat をインストールしたのはあなたです。ここから入り、そのあと新しいパスワードを作成してください。",
+      "notOwner": "インストールした人のアカウントではありませんか？ workspace のオーナーに新しいパスワードのリンクを頼んでください。",
+      "title": "このサーバーはメールを送りません。",
+      "lead": "workspace のオーナーに新しいパスワードのリンクを頼んでください。オーナーがメンバーで作成し、リンクは1時間有効です。",
+      "back": "パスワードに戻る"
+    },
     "reset": {
       "title": "新しいパスワードを作成してください。",
       "save": "パスワードを保存",
@@ -513,18 +525,6 @@
       "wrongLinkLead": "このサーバー用に作成された最新のオーナー用リンクを開いてください。",
       "taken": "このサーバーにはすでにオーナーがいます。",
       "takenLead": "あなたのアカウントでログインしてください。"
-    },
-    "server": {
-      "into": "<b>{{server}}</b> にサインイン",
-      "intoHere": "この{{device}}の<b>agentes.chat</b>にサインイン"
-    },
-    "forgotHere": {
-      "ownerTitle": "ここではパスワードは不要です。",
-      "ownerLead": "この{{device}}に agentes.chat をインストールしたのはあなたです。ここから入り、そのあと新しいパスワードを作成してください。",
-      "notOwner": "インストールした人のアカウントではありませんか？ workspace のオーナーに新しいパスワードのリンクを頼んでください。",
-      "title": "このサーバーはメールを送りません。",
-      "lead": "workspace のオーナーに新しいパスワードのリンクを頼んでください。オーナーがメンバーで作成し、リンクは1時間有効です。",
-      "back": "パスワードに戻る"
     }
   },
   "invite": {
@@ -1344,6 +1344,11 @@
     "addPasswordLabel": "新しいパスワード",
     "addPasswordSaved": "パスワードを追加しました。",
     "addPasswordReauth": "パスワードを追加するには、もう一度ログインしてください。",
+    "newPassword": "新しいパスワードを作成",
+    "newPasswordHint": "ほかのセッションは終了し、古いパスワードで接続した AI アプリは接続し直す必要があります。",
+    "newPasswordRow": "ほかのブラウザやデバイスで使うパスワードを変更します",
+    "newPasswordSaved": "新しいパスワードを保存しました。",
+    "newPasswordReauth": "新しいパスワードを作成するには、もう一度サインインしてください。",
     "yourWorkspaces": "あなたのワークスペース",
     "youAreHere": "現在地",
     "createdOn": "{{date}}に作成",
@@ -1351,6 +1356,11 @@
     "addWorkspace": "ワークスペースを追加",
     "addWorkspaceHint": "既存のワークスペースに参加、新規作成、またはチームのサーバーを使う",
     "yourServer": "自分のサーバー",
+    "serverHere": "この{{device}}の agentes.chat",
+    "serverStopped": "停止中",
+    "serverOffline": "{{time}} からオフライン",
+    "serverSignedOut": "未サインイン",
+    "serverSignIn": "サインイン",
     "wiki": "Wiki",
     "settings": "設定",
     "workspaceMenu": "ワークスペースのメニュー",
@@ -1420,17 +1430,7 @@
     "unreadMark": "未読",
     "unreadMentions_other": "あなたへのメンション {{count}} 件",
     "unreadThreads_other": "スレッド: 未読の返信あり {{count}} 件",
-    "unreadNotifications_other": "{{count}}件の未読の通知",
-    "newPassword": "新しいパスワードを作成",
-    "newPasswordHint": "ほかのセッションは終了し、古いパスワードで接続した AI アプリは接続し直す必要があります。",
-    "newPasswordRow": "ほかのブラウザやデバイスで使うパスワードを変更します",
-    "newPasswordSaved": "新しいパスワードを保存しました。",
-    "newPasswordReauth": "新しいパスワードを作成するには、もう一度サインインしてください。",
-    "serverHere": "この{{device}}の agentes.chat",
-    "serverStopped": "停止中",
-    "serverOffline": "{{time}} からオフライン",
-    "serverSignedOut": "未サインイン",
-    "serverSignIn": "サインイン"
+    "unreadNotifications_other": "{{count}}件の未読の通知"
   },
   "agentGroups": {
     "group": "部署",
@@ -4899,6 +4899,15 @@
     "include": "{{name}}を含める",
     "acceptAll": "すべてに適用して承認",
     "acceptSome": "{{count}}件を承認",
+    "all": {
+      "label": "すべての提案を判断",
+      "accept": "すべて承認",
+      "refuse": "すべて却下",
+      "acceptAsk_other": "{{count}}件の提案をすべて承認しますか？それぞれすぐに反映されます。",
+      "refuseAsk_other": "{{count}}件の提案をすべて却下しますか？エージェントは同じ提案をしなくなります。",
+      "acceptGo_other": "{{count}}件を承認",
+      "refuseGo_other": "{{count}}件を却下"
+    },
     "staleSome_other": "{{count}}件は承認されませんでした。提案後にテキストが変更されています。",
     "staleSomeAgent_other": "{{count}}件は承認されませんでした。提案後にエージェントが変更されています。",
     "waitingFor": "{{name}}の対応待ち",
@@ -5471,6 +5480,16 @@
     "agentsOnlyYouHint": "プランがあれば、エージェントのページでほかの人にも返信できるよう設定できます。",
     "filters": "人を絞り込む",
     "rolesOf": "{{name}}のロール",
+    "moreOf": "{{name}} のその他の操作",
+    "passwordLink": {
+      "item": "新しいパスワードのリンクを作成",
+      "hint": "パスワードを忘れたときに",
+      "title": "{{name}} の新しいパスワードのリンク",
+      "lead": "1回だけ、1時間有効です。いつも話している場所で送ってください。",
+      "label": "リンク",
+      "making": "リンクを作成中…",
+      "copy": "リンクをコピー"
+    },
     "everyoneNote": "「全員」はワークスペースのすべての人に適用されます。",
     "noRolesToGive": "付与できる、あなたより下のロールはありません。",
     "roleFilter": "ロール",
@@ -5732,17 +5751,7 @@
     "ownerLine": "オーナー: {{name}}",
     "noOwner": "オーナーなし",
     "budgetLine": "{{month}}の予算の{{percent}}",
-    "noAgents": "エージェントはまだいません。",
-    "moreOf": "{{name}} のその他の操作",
-    "passwordLink": {
-      "item": "新しいパスワードのリンクを作成",
-      "hint": "パスワードを忘れたときに",
-      "title": "{{name}} の新しいパスワードのリンク",
-      "lead": "1回だけ、1時間有効です。いつも話している場所で送ってください。",
-      "label": "リンク",
-      "making": "リンクを作成中…",
-      "copy": "リンクをコピー"
-    }
+    "noAgents": "エージェントはまだいません。"
   },
   "empty": {
     "thread": {
@@ -11440,6 +11449,11 @@
     }
   },
   "errors": {
+    "passwordLink": {
+      "email": "このサーバーはメールを送ります。本人が「パスワードを忘れた」から自分のリンクを依頼します。",
+      "serverOwner": "このサーバーをインストールした人は、サーバーが動いているコンピューターからリンクなしで入ります。",
+      "otherWorkspace": "この人はあなたがオーナーでない workspace にも参加しています。リンクを作成できるのは、そのすべてのオーナーだけです。"
+    },
     "said": {
       "gone": "これはもうありません。ページを更新して、もう一度お試しください。",
       "alreadyDone": "これはすでに回答済みか終了しています。更新して状況を確認してください。",
@@ -11793,11 +11807,6 @@
         "invalidInput": "入力欄を確認して、もう一度お試しください。",
         "tooManyItems": "Vaultがいっぱいです。さらに同期する前に項目を削除してください。"
       }
-    },
-    "passwordLink": {
-      "email": "このサーバーはメールを送ります。本人が「パスワードを忘れた」から自分のリンクを依頼します。",
-      "serverOwner": "このサーバーをインストールした人は、サーバーが動いているコンピューターからリンクなしで入ります。",
-      "otherWorkspace": "この人はあなたがオーナーでない workspace にも参加しています。リンクを作成できるのは、そのすべてのオーナーだけです。"
     }
   },
   "machines": {

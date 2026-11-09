@@ -12468,6 +12468,39 @@
   "proposals.acceptSome": {
     "value": "Accept for {{count}}"
   },
+  "proposals.all.label": {
+    "value": "Decide every proposal"
+  },
+  "proposals.all.accept": {
+    "value": "Accept all"
+  },
+  "proposals.all.refuse": {
+    "value": "Refuse all"
+  },
+  "proposals.all.acceptAsk": {
+    "value": {
+      "one": "Accept the proposal? It applies right away.",
+      "other": "Accept all {{count}} proposals? Each one applies right away."
+    }
+  },
+  "proposals.all.refuseAsk": {
+    "value": {
+      "one": "Refuse the proposal? The agent won't propose it again.",
+      "other": "Refuse all {{count}} proposals? The agents won't propose them again."
+    }
+  },
+  "proposals.all.acceptGo": {
+    "value": {
+      "one": "Accept",
+      "other": "Accept {{count}}"
+    }
+  },
+  "proposals.all.refuseGo": {
+    "value": {
+      "one": "Refuse",
+      "other": "Refuse {{count}}"
+    }
+  },
   "proposals.staleSome": {
     "value": {
       "one": "One wasn't accepted: its text changed after the proposal.",

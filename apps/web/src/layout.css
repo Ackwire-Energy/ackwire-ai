@@ -1446,6 +1446,21 @@ html:not([data-pointer]) .member-row--add:focus-visible {
     max-width: none;
   }
 }
+/* Aceitar todas and Recusar todas at the tabs' right, small and 8 apart, as the tabs bar's toolbar sits; asked again in
+   the same spot. Under the tabs, at the right, when the row has no room. */
+.proposals-all {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2) auto;
+}
+.proposals-all__ask {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--muted);
+}
 .proposals__actions {
   display: flex;
   flex-wrap: wrap;
