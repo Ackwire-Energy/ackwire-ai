@@ -1,16 +1,17 @@
 # 0158. Onboarding: the blue rail with Lodi
 
-- Status: Accepted (web and server built; the phone app's steps follow)
+- Status: Accepted
 - Date: 2026-11-08
 - Amends: 0137 §6 (the onboarding asked only the workspace's name, then its right hand's DM), 0155 §6 (the right
   hand's card had five rows), 0079 §3 (the billing link's claims) and §7 (where a hold offers the plan), 0071 §3 (when
   our notifications ask opens)
-- Code: client `lib/onboarding.ts` (`railSteps`, `railStepAt`, `landingOf`, `planStepShows`), `lib/setup-checklist.ts`
-  (three rows, invitations finish the people row), `lib/push-offer.ts` (`pushAskAt`), `lib/billing.ts`
-  (`planOfferOf`); engine `team-templates.ts` (`sayTeamHello`), `standing.ts` (`TEAM_HELLO_JOB` queued by
-  `setBillingHold`), `billing-link.ts` (`plan`); web `pages/OnboardingPage.tsx`, `pages/onboarding/*`,
+- Code: client `lib/onboarding.ts` (`railSteps`, `railStepAt`, `railState`, `landingOf`, `planStepShows`),
+  `lib/setup-checklist.ts` (three rows, invitations finish the people row), `lib/push-offer.ts` (`pushAskAt`),
+  `lib/billing.ts` (`planOfferOf`); engine `team-templates.ts` (`sayTeamHello`), `standing.ts` (`TEAM_HELLO_JOB`
+  queued by `setBillingHold`), `billing-link.ts` (`plan`); web `pages/OnboardingPage.tsx`, `pages/onboarding/*`,
   `components/Sky.tsx` (`OnboardingProgress`, `TeamAsleepSky`), `lib/plan-offer.ts`, `components/FirstRun.tsx`,
-  `components/WebPush.tsx` (`PushAskInline`), `routes/onboarding.tsx`
+  `components/WebPush.tsx` (`PushAskInline`), `routes/onboarding.tsx`; phone `features/onboarding/OnboardingFlow.tsx`,
+  `features/onboarding/steps.tsx`
 
 ## Context
 
@@ -60,6 +61,14 @@ address in place. On a hold every row waits for the plan with no button of its o
 
 Never on arrival and never a dialog: a card under the first answer from an agent the person wrote to, and once more
 under the first request waiting on them. Never on a billing hold.
+
+### 7. The phone
+
+The same steps from the same data (`railState`), on the screen the sign-in already uses: the right hand stands on the
+sky and says its line for each step under the question, the template's team joins it there on step 3 and sleeps there
+on step 4. Step 2 is the business list and the sentence, step 3 the template's team with its picker, step 4 what each
+agent does first and, in words only, where the plan is chosen ("Entrar no workspace" opens the right hand's DM). The
+way out of the account stays one quiet "Sair".
 
 ## Consequences
 
