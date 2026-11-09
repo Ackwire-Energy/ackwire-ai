@@ -2053,19 +2053,20 @@
     },
     /**
      * A fact keeps its value on one line (rule 17): a value that wraps is a finding, unless its fact is alone on its
-     * line and as wide as the strip, which only a value longer than the strip is.
+     * line and as wide as the strip, which only a value longer than the strip is. A line of facts (`.ac-factline`,
+     * a task card's) is held the same: it wraps between facts, never inside one.
      */
     factwrap(out) {
-      for (const value of document.querySelectorAll(".ac-facts__value")) {
+      for (const value of document.querySelectorAll(".ac-facts__value, .ac-factline__fact")) {
         if (!seen(value)) continue;
         const rects = [];
         const walker = document.createTreeWalker(value, NodeFilter.SHOW_TEXT);
         for (let n = walker.nextNode(); n; n = walker.nextNode()) if (n.textContent.trim()) rects.push(...textRects(n));
         if (lineCount(rects) < 2) continue;
-        const item = value.closest(".ac-facts__item") ?? value;
-        const strip = value.closest(".ac-facts") ?? item;
+        const item = value.closest(".ac-facts__item, .ac-factline__fact") ?? value;
+        const strip = value.closest(".ac-facts, .ac-factline") ?? item;
         const r = item.getBoundingClientRect();
-        const alone = [...strip.querySelectorAll(".ac-facts__item")].every(
+        const alone = [...strip.querySelectorAll(".ac-facts__item, .ac-factline__fact")].every(
           (o) => o === item || !seen(o) || !sameLine(o.getBoundingClientRect(), r),
         );
         if (alone && r.width >= strip.clientWidth - 1) continue;
