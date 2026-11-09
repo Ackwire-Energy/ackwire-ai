@@ -631,6 +631,11 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       removal: (orgId, userId) => request<RemovalPreview>(`${org(orgId)}/members/${enc(userId)}/removal`),
       removeMember: (orgId, userId, via) =>
         request<void>(`${org(orgId)}/members/${enc(userId)}`, { method: "DELETE", query: via ? { via } : {} }),
+      passwordLink: (orgId, userId) =>
+        request<{ url: string; expiresAt: string }>(`${org(orgId)}/members/${enc(userId)}/password-link`, {
+          method: "POST",
+          json: {},
+        }),
       invitations: async (orgId) =>
         (await request<{ invitations: Invitation[] }>(`${org(orgId)}/invitations`)).invitations,
       invite: (orgId, input) =>

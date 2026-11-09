@@ -1754,6 +1754,13 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         state.members = state.members.filter((m) => m.userId !== userId);
         for (const a of state.agents) if (a.ownerUserId === userId) a.ownerUserId = state.me?.user.id ?? null;
       },
+      passwordLink: async (orgId, userId) => {
+        log("orgs.passwordLink", orgId, userId);
+        return {
+          url: `https://agentes.example.com/reset-password?token=link-for-${userId}`,
+          expiresAt: new Date(Date.now() + 3600_000).toISOString(),
+        };
+      },
       invitations: async () => structuredClone(state.invitations),
       invite: async (orgId, input) => {
         log("orgs.invite", orgId, input);

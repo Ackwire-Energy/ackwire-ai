@@ -513,6 +513,18 @@
       "wrongLinkLead": "このサーバー用に作成された最新のオーナー用リンクを開いてください。",
       "taken": "このサーバーにはすでにオーナーがいます。",
       "takenLead": "あなたのアカウントでログインしてください。"
+    },
+    "server": {
+      "into": "<b>{{server}}</b> にサインイン",
+      "intoHere": "この{{device}}の<b>agentes.chat</b>にサインイン"
+    },
+    "forgotHere": {
+      "ownerTitle": "ここではパスワードは不要です。",
+      "ownerLead": "この{{device}}に agentes.chat をインストールしたのはあなたです。ここから入り、そのあと新しいパスワードを作成してください。",
+      "notOwner": "インストールした人のアカウントではありませんか？ workspace のオーナーに新しいパスワードのリンクを頼んでください。",
+      "title": "このサーバーはメールを送りません。",
+      "lead": "workspace のオーナーに新しいパスワードのリンクを頼んでください。オーナーがメンバーで作成し、リンクは1時間有効です。",
+      "back": "パスワードに戻る"
     }
   },
   "invite": {
@@ -1337,7 +1349,7 @@
     "createdOn": "{{date}}に作成",
     "newWorkspace": "新しいワークスペース",
     "addWorkspace": "ワークスペースを追加",
-    "addWorkspaceHint": "agentes.chatで新しく作るか、チームのサーバーを使う",
+    "addWorkspaceHint": "既存のワークスペースに参加、新規作成、またはチームのサーバーを使う",
     "yourServer": "自分のサーバー",
     "wiki": "Wiki",
     "settings": "設定",
@@ -1408,7 +1420,17 @@
     "unreadMark": "未読",
     "unreadMentions_other": "あなたへのメンション {{count}} 件",
     "unreadThreads_other": "スレッド: 未読の返信あり {{count}} 件",
-    "unreadNotifications_other": "{{count}}件の未読の通知"
+    "unreadNotifications_other": "{{count}}件の未読の通知",
+    "newPassword": "新しいパスワードを作成",
+    "newPasswordHint": "ほかのセッションは終了し、古いパスワードで接続した AI アプリは接続し直す必要があります。",
+    "newPasswordRow": "ほかのブラウザやデバイスで使うパスワードを変更します",
+    "newPasswordSaved": "新しいパスワードを保存しました。",
+    "newPasswordReauth": "新しいパスワードを作成するには、もう一度サインインしてください。",
+    "serverHere": "この{{device}}の agentes.chat",
+    "serverStopped": "停止中",
+    "serverOffline": "{{time}} からオフライン",
+    "serverSignedOut": "未サインイン",
+    "serverSignIn": "サインイン"
   },
   "agentGroups": {
     "group": "部署",
@@ -1470,11 +1492,13 @@
     "qr": "agentesアプリにログインするためのQRコード",
     "making": "コードを作成中…",
     "stepApp": "スマートフォンにagentesアプリをインストールしてください（App StoreまたはGoogle Play）。",
-    "stepTailscale": "スマートフォンにTailscaleをインストールして、このサーバーのネットワーク（tailnet）に参加してください。",
+    "stepTailscale": "スマートフォンにTailscaleをインストールし、このサーバーと同じTailscaleアカウントでサインインしてください。",
     "stepScan": "スマートフォンのカメラをコードに向けてください。",
     "validFor": "有効期限: {{time}}",
     "private": "このコードをスキャンした人は、あなたとしてログインします。",
-    "failed": "コードを作成できませんでした。"
+    "failed": "コードを作成できませんでした。",
+    "localOnly": "このサーバーは動いているコンピューターでしか開けないため、スマートフォンからは届きません。",
+    "localOnlyHow": "そのコンピューターのagentes.chatアプリで、環境設定 › サーバーの「スマートフォンやチームメイトからアクセスする」をオンにしてから、ここに戻ってください。"
   },
   "team": {
     "title": "チーム",
@@ -5710,7 +5734,17 @@
     "ownerLine": "オーナー: {{name}}",
     "noOwner": "オーナーなし",
     "budgetLine": "{{month}}の予算の{{percent}}",
-    "noAgents": "エージェントはまだいません。"
+    "noAgents": "エージェントはまだいません。",
+    "moreOf": "{{name}} のその他の操作",
+    "passwordLink": {
+      "item": "新しいパスワードのリンクを作成",
+      "hint": "パスワードを忘れたときに",
+      "title": "{{name}} の新しいパスワードのリンク",
+      "lead": "1回だけ、1時間有効です。いつも話している場所で送ってください。",
+      "label": "リンク",
+      "making": "リンクを作成中…",
+      "copy": "リンクをコピー"
+    }
   },
   "empty": {
     "thread": {
@@ -11761,6 +11795,11 @@
         "invalidInput": "入力欄を確認して、もう一度お試しください。",
         "tooManyItems": "Vaultがいっぱいです。さらに同期する前に項目を削除してください。"
       }
+    },
+    "passwordLink": {
+      "email": "このサーバーはメールを送ります。本人が「パスワードを忘れた」から自分のリンクを依頼します。",
+      "serverOwner": "このサーバーをインストールした人は、サーバーが動いているコンピューターからリンクなしで入ります。",
+      "otherWorkspace": "この人はあなたがオーナーでない workspace にも参加しています。リンクを作成できるのは、そのすべてのオーナーだけです。"
     }
   },
   "machines": {
@@ -12379,7 +12418,8 @@
       "member": {
         "joined": "ワークスペースに参加",
         "left": "ワークスペースから退出",
-        "role_changed": "メンバーのロールを変更"
+        "role_changed": "メンバーのロールを変更",
+        "password_link": "メンバーの新しいパスワードのリンクを作成しました"
       },
       "apps": {
         "connected": "{{app}}を接続",

@@ -41,6 +41,7 @@ import { audienceChip, audienceNames, audienceNotice, canTalk, hiddenAgentIds } 
 import { workspaceNotes } from "@agenteschat/client/lib/deletion";
 import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
 import { errorText } from "@agenteschat/client/lib/errors";
+import { formatTime } from "@agenteschat/client/lib/format";
 import { waitingAgents } from "@agenteschat/client/lib/outages";
 import { can, managesChannel } from "@agenteschat/client/lib/permissions";
 import { AVAILABILITIES, isOutOfOffice, presenceOfAvailability, statusEndNote } from "@agenteschat/client/lib/presence";
@@ -111,7 +112,7 @@ import { entityMenu } from "@/lib/entity-menu";
 import { useOpenParam } from "@/lib/open-param";
 import { markOpen } from "@/lib/perf";
 import { ownPlanLines, planNearLimit, planWord } from "@/lib/plan-usage";
-import { rightHandSeen, STORAGE_KEYS, storage, storedStrings } from "@/lib/storage";
+import { rightHandSeen, STORAGE_KEYS, sessionStore, storage, storedStrings } from "@/lib/storage";
 import { useToast } from "@/lib/toast";
 import type { SettingsSection } from "@/pages/settings-sections";
 import { useStreams } from "@/realtime/context";
@@ -1843,6 +1844,13 @@ function AccountMenu() {
       setPhone(true);
     });
   }, []);
+  // Forgot password › Continue on this Mac (ADR 0158): signed in now, the new password it came for.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once, as the account menu mounts
+  useEffect(() => {
+    if (sessionStore.get(STORAGE_KEYS.newPasswordAsk) !== "1") return;
+    sessionStore.remove(STORAGE_KEYS.newPasswordAsk);
+    setAccount("password");
+  }, []);
   const handle = dir.memberById.get(me.user.id)?.handle;
   // How you appear to yourself, read as the members column reads it (hidden stays hidden), and your line.
   const shown = usePersonPresence(me.user.id);
@@ -1857,6 +1865,7 @@ function AccountMenu() {
 
   const signOut = async () => {
     await auth.signOut();
+    storage.set(STORAGE_KEYS.signedOut, "1");
     qc.clear();
     await navigate({ to: "/login" });
   };
@@ -1970,10 +1979,7 @@ function AccountMenu() {
       <ProfileDialog focus={profile ? "name" : null} onClose={() => setProfile(false)} />
       <SetStatusDialog open={statusOpen} onClose={() => setStatusOpen(false)} />
       <OpenOnPhoneDialog open={phone} onClose={() => setPhone(false)} />
-      <AddPasswordDialog
-        open={account === "password" && me.user.hasPassword === false}
-        onClose={() => setAccount(null)}
-      />
+      <AddPasswordDialog open={account === "password"} onClose={() => setAccount(null)} />
       <DeleteAccountDialog open={account === "delete"} onClose={() => setAccount(null)} />
     </>
   );
@@ -2140,10 +2146,36 @@ function WorkspaceMenuOptions({ onDone }: { onDone: () => void }) {
             {groups.map((g) => (
               <Fragment key={g.server}>
                 {groups.length > 1 && (
-                  <span className="sidebar__menu-server">
-                    <Icon name={g.cloud ? "cloud" : "computer"} size={14} />
-                    {g.name}
-                    {!g.cloud && <em>· {t("shell.yourServer")}</em>}
+                  <span className="sidebar__menu-server" data-state={g.state}>
+                    <Icon name={g.cloud ? "cloud" : g.thisComputer ? "computer" : "globe"} size={14} />
+                    {g.thisComputer ? t("shell.serverHere") : g.name}
+                    {/* Its state as words in the line, never a pill (ADR 0158): stopped, offline since, signed out. */}
+                    {g.state === "offline" ? (
+                      <em className="sidebar__menu-server-state">
+                        ·{" "}
+                        {g.thisComputer
+                          ? t("shell.serverStopped")
+                          : t("shell.serverOffline", {
+                              time: formatTime(i18n.language, new Date(g.offlineSince ?? Date.now()).toISOString()),
+                            })}
+                      </em>
+                    ) : g.state === "signedOut" ? (
+                      <>
+                        <em className="sidebar__menu-server-state">· {t("shell.serverSignedOut")} ·</em>
+                        <button
+                          type="button"
+                          className="ac-link"
+                          onClick={() => {
+                            onDone();
+                            void thisMac.openServer(g.server).catch(() => thisMac.otherServer().catch(() => {}));
+                          }}
+                        >
+                          {t("shell.serverSignIn")}
+                        </button>
+                      </>
+                    ) : (
+                      !g.cloud && !g.thisComputer && <em>· {t("shell.yourServer")}</em>
+                    )}
                   </span>
                 )}
                 {g.rows.map((o) => {
@@ -2151,7 +2183,12 @@ function WorkspaceMenuOptions({ onDone }: { onDone: () => void }) {
                   return (
                     <MenuOverlayItem
                       key={o.id}
-                      leading={<OrgMark logo={o.logo} size={32} />}
+                      leading={
+                        // A server not answering: its last workspaces, dimmed.
+                        <span className={g.state === "offline" ? "sidebar__menu-dim" : undefined}>
+                          <OrgMark logo={o.logo} size={32} />
+                        </span>
+                      }
                       description={
                         here ? [t(`roles.${here.role}`), notes.get(o.id)].filter(Boolean).join(" · ") : undefined
                       }

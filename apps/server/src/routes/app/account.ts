@@ -1,3 +1,4 @@
+import { isLoopback } from "@agenteschat/client/lib/server";
 import {
   acceptInvitation,
   accountDeletionPlan,
@@ -25,6 +26,7 @@ import {
   listInvitations,
   listMembers,
   listMemberships,
+  memberPasswordLink,
   myAccount,
   NotFoundError,
   needsWorkspaceAllowance,
@@ -68,6 +70,7 @@ import {
   authUiConfig,
   deletionProof,
   mintPhoneSignIn,
+  replacePassword,
   sessionUser,
   signedInLately,
   signupOpen,
@@ -642,23 +645,28 @@ export function accountRoutes(deps: AppDeps) {
       path: "/me/password",
       tags,
       security,
-      summary: "Add a password to an account that has none",
+      summary: "Add a password, or set a new one",
       description:
-        "For an account that signs in another way (Google, Apple, or the desktop app that runs this server), so it can also sign in with its email from other browsers. Needs a sign-in in the last 10 minutes (403 `reauth.sign_in`): a password proves it's the person, so a session alone can't add one. Refused with `password_set` when it has one: changing a password is the reset flow.",
+        "For an account that signs in another way (Google, Apple, or the desktop app that runs this server), so it can also sign in with its email from other browsers, and to set a new password in place of one (ADR 0158 §4: the server's owner after Continue on this Mac, or anyone who just signed in). Needs a sign-in in the last 10 minutes (403 `reauth.sign_in`): a password proves it's the person, so a session alone can't set one. A new password ends every other session and cuts off the AI apps the old one let in.",
       request: { body: body(z.object({ password: z.string().min(8).max(128) })) },
-      responses: { 204: noContent[204], ...errors, 409: errorResponse("Already has a password (`password_set`)") },
+      responses: { 204: noContent[204], ...errors },
     }),
     async (c) => {
-      if (!(await signedInLately(deps.auth, c.req.raw.headers, c.get("user").id))) {
-        return apiError(c, 403, "reauth.sign_in", "Sign in again to add a password");
+      const userId = c.get("user").id;
+      if (!(await signedInLately(deps.auth, c.req.raw.headers, userId))) {
+        return apiError(c, 403, "reauth.sign_in", "Sign in again to set a password");
       }
-      if (await hasPassword(db, c.get("user").id)) {
-        return apiError(c, 409, "password_set", "This account already has a password");
+      const { password } = c.req.valid("json");
+      if (await hasPassword(db, userId)) {
+        const current = await deps.auth.api.getSession({
+          headers: c.req.raw.headers,
+          query: { disableCookieCache: true },
+        });
+        if (!current) return apiError(c, 401, "unauthorized", "Sign in to continue");
+        await replacePassword(deps.auth, db, userId, password, current.session.token);
+        return c.body(null, 204);
       }
-      await deps.auth.api.setPassword({
-        body: { newPassword: c.req.valid("json").password },
-        headers: c.req.raw.headers,
-      });
+      await deps.auth.api.setPassword({ body: { newPassword: password }, headers: c.req.raw.headers });
       return c.body(null, 204);
     },
   );
@@ -671,7 +679,7 @@ export function accountRoutes(deps: AppDeps) {
       security,
       summary: "A one-time sign-in for the phone app",
       description:
-        "For the QR code of “Abrir no celular”: `agenteschat://connect?server=…&token=…`. The phone trades the token at `POST /api/auth/sign-in/one-time-token` for a session of its own: once, within a few minutes, and only while this session lasts.",
+        "For the QR code of “Abrir no celular”: `agenteschat://connect?server=…&token=…`. The phone trades the token at `POST /api/auth/sign-in/one-time-token` for a session of its own: once, within a few minutes, and only while this session lasts. Refused with 409 `phone.local_only` while a computer's own install (`INSTALL_MODE` desktop or native) has this computer's address (the desktop app's server with access from other devices off): no phone could reach it.",
       responses: {
         201: json(
           z.object({
@@ -682,10 +690,17 @@ export function accountRoutes(deps: AppDeps) {
           "Created",
         ),
         401: errors[401],
+        409: errorResponse("The server answers only on its own computer (`phone.local_only`)"),
         429: errorResponse("Too many codes"),
       },
     }),
     async (c) => {
+      const server = new URL(config.PUBLIC_URL).origin;
+      // A computer's own install (the desktop app's server, or one from the terminal) at an address only that computer
+      // answers: a code would open nothing on the phone. Development servers keep theirs (a simulator reaches them).
+      if (isLoopback(server) && (config.INSTALL_MODE === "desktop" || config.INSTALL_MODE === "native")) {
+        return apiError(c, 409, "phone.local_only", "This server answers only on its own computer");
+      }
       const current = await deps.auth.api.getSession({
         headers: c.req.raw.headers,
         query: { disableCookieCache: true },
@@ -697,7 +712,7 @@ export function accountRoutes(deps: AppDeps) {
       });
       if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many codes. Try again later.");
       const { token, expiresIn } = await mintPhoneSignIn(deps.auth, current.session.token);
-      return c.json({ token, server: new URL(config.PUBLIC_URL).origin, expiresIn }, 201);
+      return c.json({ token, server, expiresIn }, 201);
     },
   );
 
@@ -1336,6 +1351,42 @@ export function accountRoutes(deps: AppDeps) {
         via: c.req.valid("query").via,
       });
       return c.body(null, 204);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/members/{userId}/password-link",
+      tags,
+      security,
+      summary: "A new-password link for a member (owners, servers without email)",
+      description:
+        "ADR 0158: the reset link the email would carry, for a member who forgot their password on a server that sends no email. It works once, for an hour, and ends the earlier one; the audit log keeps who made it, never the link. 403 for oneself, the server's owner (`password_link.server_owner`) and someone who also belongs to a workspace the caller doesn't own (`password_link.other_workspace`); 409 `password_link.email` where the server emails it.",
+      request: { params: MemberParams },
+      responses: {
+        201: json(z.object({ url: z.string(), expiresAt: z.string() }), "Created"),
+        ...errors,
+        409: errorResponse("The server emails the person their own link (`password_link.email`)"),
+        429: errorResponse("Too many links"),
+      },
+    }),
+    async (c) => {
+      const { orgId, userId } = c.req.valid("param");
+      const actorId = c.get("user").id;
+      const limit = await deps.adapters.rateLimiter.consume(`password-link:${actorId}`, {
+        limit: 20,
+        windowMs: 3600_000,
+      });
+      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many links. Try again later.");
+      const link = await memberPasswordLink(
+        db,
+        { publicUrl: config.PUBLIC_URL, emailDelivers: deps.adapters.email.delivers === true },
+        actorId,
+        orgId,
+        userId,
+      );
+      return c.json({ url: link.url, expiresAt: link.expiresAt.toISOString() }, 201);
     },
   );
 

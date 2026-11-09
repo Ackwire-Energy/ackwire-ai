@@ -513,6 +513,18 @@
       "wrongLinkLead": "请打开为这个服务器生成的最新所有者链接。",
       "taken": "这个服务器已有所有者。",
       "takenLead": "请用你的账号登录。"
+    },
+    "server": {
+      "into": "正在登录 <b>{{server}}</b>",
+      "intoHere": "正在登录<b>这台 {{device}}</b> 上的 agentes.chat"
+    },
+    "forgotHere": {
+      "ownerTitle": "这里不需要密码。",
+      "ownerLead": "agentes.chat 是你安装在这台 {{device}} 上的。从这里进入，然后设置新密码。",
+      "notOwner": "不是安装者的账号？请向你的 workspace 所有者要一个新密码链接。",
+      "title": "这台服务器不发送邮件。",
+      "lead": "请向你的 workspace 所有者要一个新密码链接。所有者在「成员」中生成，链接 1 小时内有效。",
+      "back": "返回密码"
     }
   },
   "invite": {
@@ -1337,7 +1349,7 @@
     "createdOn": "创建于 {{date}}",
     "newWorkspace": "新建工作区",
     "addWorkspace": "添加工作区",
-    "addWorkspaceHint": "在 agentes.chat 新建一个，或使用你团队的服务器",
+    "addWorkspaceHint": "加入已有的工作区、创建新的，或使用团队的服务器",
     "yourServer": "你的服务器",
     "wiki": "Wiki",
     "settings": "设置",
@@ -1408,7 +1420,17 @@
     "unreadMark": "未读",
     "unreadMentions_other": "{{count}} 条提及你的消息",
     "unreadThreads_other": "话题：{{count}} 个有未读回复",
-    "unreadNotifications_other": "{{count}} 条未读通知"
+    "unreadNotifications_other": "{{count}} 条未读通知",
+    "newPassword": "设置新密码",
+    "newPasswordHint": "你的其他会话会结束，用旧密码连接的 AI 应用需要重新连接。",
+    "newPasswordRow": "更改你在其他浏览器和设备上使用的密码",
+    "newPasswordSaved": "新密码已保存。",
+    "newPasswordReauth": "请重新登录以设置新密码。",
+    "serverHere": "这台 {{device}} 上的 agentes.chat",
+    "serverStopped": "已停止",
+    "serverOffline": "自 {{time}} 起离线",
+    "serverSignedOut": "未登录",
+    "serverSignIn": "登录"
   },
   "agentGroups": {
     "group": "部门",
@@ -1470,11 +1492,13 @@
     "qr": "用于登录 agentes 应用的二维码",
     "making": "正在生成二维码…",
     "stepApp": "在手机上安装 agentes 应用（App Store 或 Google Play）。",
-    "stepTailscale": "在手机上安装 Tailscale，并加入这台服务器的网络（tailnet）。",
+    "stepTailscale": "在手机上安装 Tailscale，并用与这台服务器相同的 Tailscale 账号登录。",
     "stepScan": "用手机相机对准二维码。",
     "validFor": "{{time}}内有效",
     "private": "扫描此二维码的人会以你的身份登录。",
-    "failed": "无法生成二维码。"
+    "failed": "无法生成二维码。",
+    "localOnly": "这台服务器只能在运行它的电脑上打开，所以你的手机无法访问它。",
+    "localOnlyHow": "在那台电脑的 agentes.chat 应用中，打开偏好设置 › 服务器里的“从你的手机和队友那里访问”，然后回到这里。"
   },
   "team": {
     "title": "团队",
@@ -5750,7 +5774,17 @@
     "ownerLine": "所有者：{{name}}",
     "noOwner": "无所有者",
     "budgetLine": "已用 {{month}} 预算的 {{percent}}",
-    "noAgents": "还没有智能体。"
+    "noAgents": "还没有智能体。",
+    "moreOf": "{{name}} 的更多操作",
+    "passwordLink": {
+      "item": "生成新密码链接",
+      "hint": "在对方忘记密码时使用",
+      "title": "{{name}} 的新密码链接",
+      "lead": "只能用一次，1 小时内有效。通过你们平时聊天的地方发送。",
+      "label": "链接",
+      "making": "正在生成链接…",
+      "copy": "复制链接"
+    }
   },
   "empty": {
     "thread": {
@@ -11822,6 +11856,11 @@
         "invalidInput": "请检查各字段后重试。",
         "tooManyItems": "Vault 已满。请先删除项目，再同步更多。"
       }
+    },
+    "passwordLink": {
+      "email": "这台服务器会发送邮件：对方可以在「忘记密码」中自己申请链接。",
+      "serverOwner": "安装这台服务器的人在运行它的电脑上直接登录，不需要链接。",
+      "otherWorkspace": "此人也在一个不属于你的 workspace 中：只有所有这些 workspace 的所有者才能生成链接。"
     }
   },
   "machines": {
@@ -12440,7 +12479,8 @@
       "member": {
         "joined": "加入了工作区",
         "left": "离开了工作区",
-        "role_changed": "更改了一位成员的角色"
+        "role_changed": "更改了一位成员的角色",
+        "password_link": "为成员生成了新密码链接"
       },
       "apps": {
         "connected": "连接了 {{app}}",

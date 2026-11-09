@@ -137,15 +137,20 @@ pub fn on_event(app: &AppHandle, id: &str) {
         }
         "open" => crate::open_app(app),
         // The tray's line for the server here (Windows and Linux).
-        "hereStart" => crate::local_server::start(app),
+        "hereStart" => crate::local_server::start_by_hand(app),
         "hereStop" => {
             let app = app.clone();
-            std::thread::spawn(move || crate::local_server::stop_by_hand(&app, false));
+            std::thread::spawn(move || crate::local_server::hold_stopped(&app, None));
+        }
+        // The Mac's Servers › this computer's server (ADR 0158): an hour, then it starts again by itself.
+        "hereStop1h" => {
+            let app = app.clone();
+            std::thread::spawn(move || crate::local_server::hold_stopped(&app, Some(60)));
         }
         // The popover owns updates, quitting (it asks first while agents are working), access requests, the
         // Servers tab and pausing.
         "updates" | "quit" | "requests" | "thisMac" | "servers" | "pause1h" | "pauseTomorrow" | "pauseManual"
-        | "resume" => {
+        | "resume" | "hereRestart" => {
             let _ = app.emit_to("popover", "menu://action", action);
         }
         "reload" => to_site(app, "location.reload()".into()),
@@ -304,9 +309,14 @@ pub fn servers_menu(
     let file = crate::servers::get(app);
     let mut menu = SubmenuBuilder::new(app, l("servers"));
     for (n, server) in file.servers.iter().enumerate() {
+        // Named as everywhere else in the app: agentes.chat, the server here by what it is, any other by its host.
         let here = crate::local_server::is_here(app, server).then(|| l("serverTitle"));
-        let name = here.as_deref().unwrap_or_else(|| server.strip_prefix("https://").unwrap_or(server));
+        let name = crate::workspaces::server_name(server, "agentes.chat", here.as_deref());
         let current = file.current.as_deref() == Some(server.as_str());
+        if here.is_some() {
+            menu = menu.item(&here_menu(app, l, &name, n, current)?);
+            continue;
+        }
         let item = tauri::menu::CheckMenuItemBuilder::with_id(format!("server:{n}"), name).checked(current).build(app)?;
         menu = menu.item(&item);
     }
@@ -316,6 +326,55 @@ pub fn servers_menu(
     menu.item(&MenuItemBuilder::with_id("app:serversAdd", l("serversAdd")).build(app)?)
         .item(&MenuItemBuilder::with_id("app:servers", l("serversManage")).build(app)?)
         .build()
+}
+
+/// What the server here's submenu says of it: its state, and whether Stop (running or on its way) or Start fits.
+pub fn here_state(phase: crate::local_server::Phase) -> (&'static str, bool) {
+    use crate::local_server::Phase;
+    match phase {
+        Phase::Running => ("serverRunning", true),
+        Phase::Starting | Phase::Updating | Phase::Restarting => ("serverStarting", true),
+        Phase::Failing => ("serverFailing", false),
+        Phase::Stopped | Phase::Off => ("serverStopped", false),
+    }
+}
+
+/// "Servers › O agentes.chat neste Mac ›" (ADR 0158): its state, Open (✓ when the window is on it), then Restart,
+/// Stop for an hour and Stop until Start, or Start now.
+fn here_menu(
+    app: &AppHandle,
+    l: &dyn Fn(&str) -> String,
+    name: &str,
+    n: usize,
+    current: bool,
+) -> tauri::Result<Submenu<tauri::Wry>> {
+    let (state, up) = here_state(crate::local_server::phase(app));
+    let mut menu = SubmenuBuilder::new(app, name)
+        .item(&MenuItemBuilder::with_id("app:hereState", l(state)).enabled(false).build(app)?)
+        .item(&tauri::menu::CheckMenuItemBuilder::with_id(format!("server:{n}"), l("serverOpen")).checked(current).build(app)?)
+        .separator();
+    menu = if up {
+        menu.item(&MenuItemBuilder::with_id("app:hereRestart", l("serverRestart")).build(app)?)
+            .item(&MenuItemBuilder::with_id("app:hereStop1h", l("serverStop1h")).build(app)?)
+            .item(&MenuItemBuilder::with_id("app:hereStop", l("serverStopHeld")).build(app)?)
+    } else {
+        menu.item(&MenuItemBuilder::with_id("app:hereStart", l("serverStartNow")).build(app)?)
+    };
+    menu.build()
+}
+
+/// The server here changed phase: the Mac's menu bar says so (rebuilt only when what it shows changed).
+pub fn here_changed(app: &AppHandle) {
+    static SHOWN: Mutex<Option<(&'static str, bool)>> = Mutex::new(None);
+    let now = here_state(crate::local_server::phase(app));
+    {
+        let mut shown = SHOWN.lock().unwrap_or_else(|e| e.into_inner());
+        if *shown == Some(now) {
+            return;
+        }
+        *shown = Some(now);
+    }
+    let _ = rebuild(app);
 }
 
 /// The popover's labels for the menu bar (it knows the app's language); only the popover sets them.
@@ -483,6 +542,17 @@ pub fn context_menu(app: AppHandle, webview: tauri::Webview, token: u32, items: 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_server_here_in_the_menu_bar() {
+        use crate::local_server::Phase;
+        // On its way or up: Restart and Stop; down or not starting: Start now.
+        assert_eq!(here_state(Phase::Running), ("serverRunning", true));
+        assert_eq!(here_state(Phase::Restarting), ("serverStarting", true));
+        assert_eq!(here_state(Phase::Failing), ("serverFailing", false));
+        assert_eq!(here_state(Phase::Stopped), ("serverStopped", false));
+        assert_eq!(here_state(Phase::Off), ("serverStopped", false));
+    }
 
     fn item(id: &str) -> ContextItem {
         ContextItem::Item { id: id.into(), label: "Copiar".into(), disabled: false }

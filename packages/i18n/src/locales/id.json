@@ -513,6 +513,18 @@
       "wrongLinkLead": "Buka tautan pemilik terbaru yang dibuat untuk server ini.",
       "taken": "Server ini sudah punya pemilik.",
       "takenLead": "Masuk dengan akunmu."
+    },
+    "server": {
+      "into": "Masuk ke <b>{{server}}</b>",
+      "intoHere": "Masuk ke agentes.chat <b>di {{device}} ini</b>"
+    },
+    "forgotHere": {
+      "ownerTitle": "Di sini kamu tidak perlu kata sandi.",
+      "ownerLead": "Kamu memasang agentes.chat di {{device}} ini. Masuk dari sini, lalu buat kata sandi baru.",
+      "notOwner": "Bukan akun orang yang memasangnya? Minta tautan kata sandi baru kepada pemilik workspace kamu.",
+      "title": "Server ini tidak mengirim email.",
+      "lead": "Minta tautan kata sandi baru kepada pemilik workspace kamu. Ia membuatnya di Anggota, dan tautannya berlaku 1 jam.",
+      "back": "Kembali ke kata sandi"
     }
   },
   "invite": {
@@ -1337,7 +1349,7 @@
     "createdOn": "Dibuat pada {{date}}",
     "newWorkspace": "Ruang kerja baru",
     "addWorkspace": "Tambah ruang kerja",
-    "addWorkspaceHint": "Yang baru di agentes.chat, atau server timmu",
+    "addWorkspaceHint": "Masuk ke yang sudah ada, buat yang baru, atau pakai server tim kamu",
     "yourServer": "Servermu",
     "wiki": "Wiki",
     "settings": "Pengaturan",
@@ -1408,7 +1420,17 @@
     "unreadMark": "Belum dibaca",
     "unreadMentions_other": "{{count}} sebutan untuk Anda",
     "unreadThreads_other": "Thread: {{count}} dengan balasan belum dibaca",
-    "unreadNotifications_other": "{{count}} notifikasi belum dibaca"
+    "unreadNotifications_other": "{{count}} notifikasi belum dibaca",
+    "newPassword": "Buat kata sandi baru",
+    "newPasswordHint": "Sesi kamu yang lain berakhir, dan aplikasi AI yang terhubung dengan kata sandi lama perlu dihubungkan lagi.",
+    "newPasswordRow": "Untuk mengganti kata sandi yang kamu pakai di browser dan perangkat lain",
+    "newPasswordSaved": "Kata sandi baru disimpan.",
+    "newPasswordReauth": "Masuk lagi untuk membuat kata sandi baru.",
+    "serverHere": "agentes.chat di {{device}} ini",
+    "serverStopped": "berhenti",
+    "serverOffline": "offline sejak {{time}}",
+    "serverSignedOut": "belum masuk",
+    "serverSignIn": "Masuk"
   },
   "agentGroups": {
     "group": "Departemen",
@@ -1470,11 +1492,13 @@
     "qr": "Kode QR untuk masuk ke aplikasi agentes",
     "making": "Membuat kode…",
     "stepApp": "Pasang aplikasi agentes di ponselmu (App Store atau Google Play).",
-    "stepTailscale": "Pasang Tailscale di ponselmu dan gabung ke jaringan server ini (tailnet).",
+    "stepTailscale": "Pasang Tailscale di ponselmu dan masuk dengan akun Tailscale yang sama dengan server ini.",
     "stepScan": "Arahkan kamera ponselmu ke kode ini.",
     "validFor": "Berlaku selama {{time}}",
     "private": "Siapa pun yang memindai kode ini akan masuk sebagai kamu.",
-    "failed": "Kode tidak bisa dibuat."
+    "failed": "Kode tidak bisa dibuat.",
+    "localOnly": "Server ini hanya terbuka di komputer tempat ia berjalan, jadi ponselmu tidak bisa menjangkaunya.",
+    "localOnlyHow": "Di aplikasi agentes.chat pada komputer itu, nyalakan Akses dari ponselmu dan rekan tim di Preferensi › Server. Lalu kembali ke sini."
   },
   "team": {
     "title": "Tim",
@@ -5738,7 +5762,17 @@
     "ownerLine": "Pemilik: {{name}}",
     "noOwner": "Tanpa pemilik",
     "budgetLine": "{{percent}} dari anggaran {{month}}",
-    "noAgents": "Belum ada agen."
+    "noAgents": "Belum ada agen.",
+    "moreOf": "Lainnya untuk {{name}}",
+    "passwordLink": {
+      "item": "Buat tautan kata sandi baru",
+      "hint": "Untuk saat ia lupa kata sandi",
+      "title": "Tautan kata sandi baru untuk {{name}}",
+      "lead": "Berlaku sekali, selama 1 jam. Kirim lewat tempat kalian biasa mengobrol.",
+      "label": "Tautan",
+      "making": "Membuat tautan…",
+      "copy": "Salin tautan"
+    }
   },
   "empty": {
     "thread": {
@@ -11815,6 +11849,11 @@
         "invalidInput": "Periksa kolom-kolomnya lalu coba lagi.",
         "tooManyItems": "Vault penuh. Hapus item sebelum menyinkronkan lebih banyak."
       }
+    },
+    "passwordLink": {
+      "email": "Server ini mengirim email: orang itu meminta tautannya sendiri di Lupa kata sandi.",
+      "serverOwner": "Orang yang memasang server ini masuk dari komputer tempat server berjalan, tanpa tautan.",
+      "otherWorkspace": "Orang ini juga ada di workspace yang bukan milikmu: hanya pemilik semua workspace itu yang bisa membuat tautan."
     }
   },
   "machines": {
@@ -12433,7 +12472,8 @@
       "member": {
         "joined": "Bergabung ke ruang kerja",
         "left": "Keluar dari ruang kerja",
-        "role_changed": "Mengubah peran anggota"
+        "role_changed": "Mengubah peran anggota",
+        "password_link": "Membuat tautan kata sandi baru untuk anggota"
       },
       "apps": {
         "connected": "Menghubungkan {{app}}",

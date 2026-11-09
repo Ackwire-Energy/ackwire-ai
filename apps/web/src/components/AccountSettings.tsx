@@ -139,15 +139,13 @@ export function AccountSection() {
             status={t("shell.openOnPhoneHint")}
             onOpen={() => setPhone(true)}
           />
-          {me.user.hasPassword === false && (
-            <PrefRow
-              id="account-password"
-              icon="key"
-              label={t("shell.addPassword")}
-              status={t("shell.addPasswordHint")}
-              onOpen={() => setAccount("password")}
-            />
-          )}
+          <PrefRow
+            id="account-password"
+            icon="key"
+            label={t(me.user.hasPassword === false ? "shell.addPassword" : "shell.newPassword")}
+            status={t(me.user.hasPassword === false ? "shell.addPasswordHint" : "shell.newPasswordRow")}
+            onOpen={() => setAccount("password")}
+          />
         </div>
       </Card>
       {plans.length > 0 && (

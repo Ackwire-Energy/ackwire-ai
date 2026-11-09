@@ -91,6 +91,8 @@ export interface Host {
   welcomeMode(): Promise<"add" | null>;
   /** Takes `server` out of the list (the server and the account there stay as they are). */
   removeServer(server: string): Promise<void>;
+  /** Signs the app out of `server`, which stays in the list (signed out); a window on it goes to its sign-in. */
+  signOutServer(server: string): Promise<void>;
   /** Where a server may be: this computer and the person's Tailscale network, not checked yet. */
   discover(): Promise<Candidate[]>;
   /** Whether `server` is an agentes.chat server this app can use (`GET /api/instance`). */
@@ -160,8 +162,11 @@ export interface Host {
   cancelLocalSetup(): Promise<void>;
   onSetupStep(cb: (change: StepChange) => void): () => void;
   startLocalServer(): Promise<void>;
-  /** Stops it; `forget`: it no longer starts with the app (its data stays). */
-  stopLocalServer(forget: boolean): Promise<void>;
+  /**
+   * Stops it, and it stays stopped (also when the app opens again) until Start, or for `minutes` and then it starts
+   * by itself. `forget`: the app no longer runs it here (its data stays).
+   */
+  stopLocalServer(forget: boolean, minutes?: number): Promise<void>;
   restartLocalServer(): Promise<void>;
   /** Reach from the person's other devices (Tailscale), on or off; the main window follows the address. */
   setLocalReach(on: boolean): Promise<ReachResult>;
@@ -194,4 +199,6 @@ export type MenuAction =
   | "pause1h"
   | "pauseTomorrow"
   | "pauseManual"
-  | "resume";
+  | "resume"
+  // The Mac's Servers › this computer's server › Restart (menus.rs `here_menu`).
+  | "hereRestart";

@@ -519,6 +519,18 @@
       "wrongLinkLead": "Öffne den neuesten Inhaber-Link, der für diesen Server erstellt wurde.",
       "taken": "Dieser Server hat schon einen Inhaber.",
       "takenLead": "Melde dich mit deinem Konto an."
+    },
+    "server": {
+      "into": "Anmeldung bei <b>{{server}}</b>",
+      "intoHere": "Anmeldung bei agentes.chat <b>auf diesem {{device}}</b>"
+    },
+    "forgotHere": {
+      "ownerTitle": "Hier brauchst du kein Passwort.",
+      "ownerLead": "Du hast agentes.chat auf diesem {{device}} installiert. Melde dich hier an und lege danach ein neues Passwort fest.",
+      "notOwner": "Nicht das Konto der Person, die es installiert hat? Bitte einen Inhaber deines Workspace um einen Link für ein neues Passwort.",
+      "title": "Dieser Server verschickt keine E-Mails.",
+      "lead": "Bitte einen Inhaber deines Workspace um einen Link für ein neues Passwort. Er erstellt ihn unter Mitglieder, und der Link gilt 1 Stunde.",
+      "back": "Zurück zum Passwort"
     }
   },
   "invite": {
@@ -1373,7 +1385,7 @@
     "createdOn": "Erstellt am {{date}}",
     "newWorkspace": "Neuer Workspace",
     "addWorkspace": "Workspace hinzufügen",
-    "addWorkspaceHint": "Ein neuer bei agentes.chat oder der Server deines Teams",
+    "addWorkspaceHint": "Einem bestehenden beitreten, einen neuen erstellen oder den Server deines Teams nutzen",
     "yourServer": "Dein Server",
     "wiki": "Wiki",
     "settings": "Einstellungen",
@@ -1452,7 +1464,17 @@
     "unreadThreads_one": "Threads: {{count}} mit ungelesenen Antworten",
     "unreadThreads_other": "Threads: {{count}} mit ungelesenen Antworten",
     "unreadNotifications_one": "{{count}} ungelesene Benachrichtigung",
-    "unreadNotifications_other": "{{count}} ungelesene Benachrichtigungen"
+    "unreadNotifications_other": "{{count}} ungelesene Benachrichtigungen",
+    "newPassword": "Neues Passwort festlegen",
+    "newPasswordHint": "Deine anderen Sitzungen enden, und KI-Apps, die mit dem alten Passwort verbunden sind, müssen neu verbunden werden.",
+    "newPasswordRow": "Um das Passwort zu ändern, das du in anderen Browsern und auf anderen Geräten nutzt",
+    "newPasswordSaved": "Neues Passwort gespeichert.",
+    "newPasswordReauth": "Melde dich erneut an, um ein neues Passwort festzulegen.",
+    "serverHere": "agentes.chat auf diesem {{device}}",
+    "serverStopped": "gestoppt",
+    "serverOffline": "offline seit {{time}}",
+    "serverSignedOut": "nicht angemeldet",
+    "serverSignIn": "Anmelden"
   },
   "agentGroups": {
     "group": "Abteilung",
@@ -1518,11 +1540,13 @@
     "qr": "QR-Code zum Anmelden in der agentes-App",
     "making": "Code wird erstellt…",
     "stepApp": "Installiere die agentes-App auf deinem Handy (App Store oder Google Play).",
-    "stepTailscale": "Installiere Tailscale auf deinem Handy und tritt dem Netzwerk dieses Servers bei (Tailnet).",
+    "stepTailscale": "Installiere Tailscale auf deinem Handy und melde dich mit demselben Tailscale-Konto an wie dieser Server.",
     "stepScan": "Richte die Kamera deines Handys auf den Code.",
     "validFor": "Gültig für {{time}}",
     "private": "Wer diesen Code scannt, ist als du angemeldet.",
-    "failed": "Der Code konnte nicht erstellt werden."
+    "failed": "Der Code konnte nicht erstellt werden.",
+    "localOnly": "Dieser Server öffnet sich nur auf dem Computer, auf dem er läuft, deshalb erreicht dein Handy ihn nicht.",
+    "localOnlyHow": "Schalte in der agentes.chat-App auf diesem Computer unter Einstellungen › Server die Option Von deinem Handy und deinem Team erreichbar ein. Komm dann hierher zurück."
   },
   "team": {
     "title": "Team",
@@ -5938,7 +5962,17 @@
     "ownerLine": "Inhaber: {{name}}",
     "noOwner": "Kein Inhaber",
     "budgetLine": "{{percent}} des Budgets für {{month}}",
-    "noAgents": "Noch keine Agenten."
+    "noAgents": "Noch keine Agenten.",
+    "moreOf": "Mehr zu {{name}}",
+    "passwordLink": {
+      "item": "Link für neues Passwort erstellen",
+      "hint": "Wenn die Person ihr Passwort vergessen hat",
+      "title": "Link für ein neues Passwort für {{name}}",
+      "lead": "Er funktioniert einmal, 1 Stunde lang. Schick ihn dorthin, wo ihr euch schreibt.",
+      "label": "Link",
+      "making": "Link wird erstellt…",
+      "copy": "Link kopieren"
+    }
   },
   "empty": {
     "thread": {
@@ -12237,6 +12271,11 @@
         "invalidInput": "Prüf die Felder und versuch es noch einmal.",
         "tooManyItems": "Der Vault ist voll. Lösch Einträge, bevor du mehr synchronisierst."
       }
+    },
+    "passwordLink": {
+      "email": "Dieser Server verschickt E-Mails: Die Person fordert ihren eigenen Link unter Passwort vergessen an.",
+      "serverOwner": "Wer diesen Server installiert hat, meldet sich auf dem Computer an, auf dem er läuft, ohne Link.",
+      "otherWorkspace": "Diese Person ist auch in einem Workspace, der nicht dir gehört: Nur die Inhaber aller dieser Workspaces können den Link erstellen."
     }
   },
   "machines": {
@@ -12869,7 +12908,8 @@
       "member": {
         "joined": "Ist dem Workspace beigetreten",
         "left": "Hat den Workspace verlassen",
-        "role_changed": "Hat die Rolle eines Mitglieds geändert"
+        "role_changed": "Hat die Rolle eines Mitglieds geändert",
+        "password_link": "Hat einen Link für ein neues Passwort für ein Mitglied erstellt"
       },
       "apps": {
         "connected": "Hat {{app}} verbunden",

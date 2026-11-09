@@ -47,7 +47,7 @@
       "now": "Maintenant sur {{host}}",
       "invalid": "Vérifiez l'adresse, du type agentes.votreequipe.ts.net.",
       "unreachable": "Impossible de joindre {{host}}. Vérifiez l'adresse et votre connexion, puis réessayez.",
-      "unreachableTailscale": "Impossible de joindre {{host}}. Il est sur Tailscale : ouvrez l'app Tailscale, connectez-vous et réessayez.",
+      "unreachableTailscale": "Impossible de joindre {{host}}. Il est sur Tailscale : ouvrez l'app Tailscale, connectez-vous et réessayez. Déjà connecté ? L'ordinateur du serveur est peut-être en veille, ou son app est fermée.",
       "certificate": "Le certificat de {{host}} n'est pas valide. Contactez la personne qui gère le serveur.",
       "notAgentes": "{{host}} n'est pas un serveur agentes.chat. Vérifiez l'adresse.",
       "serverTooOld": "{{host}} doit être mis à jour pour fonctionner avec cette app.",

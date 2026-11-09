@@ -391,8 +391,8 @@ export interface ApiClient {
     /** A one-time sign-in for the phone app, shown as a QR code. */
     phoneSignIn(): Promise<PhoneSignIn>;
     /**
-     * A password for an account that has none (`password_set` 409 when it has one). `reauth.sign_in` (403) without a
-     * sign-in in the last 10 minutes.
+     * A password for an account that has none, or a new one in place of its own (ADR 0158: every other session ends).
+     * `reauth.sign_in` (403) without a sign-in in the last 10 minutes.
      */
     addPassword(password: string): Promise<void>;
     /** What deleting my account would close, leave and remove. */
@@ -506,6 +506,12 @@ export interface ApiClient {
     /** What removing them (or leaving) does; refused as the removal would be. */
     removal(orgId: string, userId: string): Promise<RemovalPreview>;
     removeMember(orgId: string, userId: string, via?: string): Promise<void>;
+    /**
+     * A one-time new-password link for a member, on a server that sends no email (owners only, ADR 0158): it works
+     * once, for an hour, and ends the earlier one. Refused (403) for oneself, the server's owner and someone in a
+     * workspace the caller doesn't own; 409 `password_link.email` where the server emails the person their own.
+     */
+    passwordLink(orgId: string, userId: string): Promise<{ url: string; expiresAt: string }>;
     invitations(orgId: string): Promise<Invitation[]>;
     invite(
       orgId: string,

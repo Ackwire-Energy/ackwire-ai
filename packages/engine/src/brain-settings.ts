@@ -337,10 +337,12 @@ export function brainOptions(machine: MachineLike | null): BrainOption[] {
   const found = machine ? machineExecutors(machine) : null;
   const computer = (kind: "claude_code" | "codex", executor: "claude" | "codex"): BrainOption => {
     let reason: BrainUnavailable | undefined;
+    // A runner that reports its tools (protocol 10) runs a coding CLI by that CLI's own switch, commands off or not
+    // (`toolOff` in brains/claude-code.ts, `toolOn` on the runner); only an older one follows commands (`exec`).
     if (!machine) reason = "no_computer";
-    else if (!machine.execAllowed) reason = "exec_off";
+    else if (!machine.access?.tools && !machine.execAllowed) reason = "exec_off";
     else if (machine.protocol < BRAIN_PROTOCOL) reason = "runner_old";
-    else if (machine.access?.tools && machine.access.tools[executor] === false) reason = "tool_off";
+    else if (machine.access?.tools && machine.access.tools[executor] !== true) reason = "tool_off";
     else if (!found?.available.includes(executor))
       reason = executor === "codex" && found?.codexTooOld ? "outdated" : missingCli(machine);
     return {
@@ -370,7 +372,7 @@ function cliOption(machine: MachineLike | null, kind: "cursor" | "opencode" | "g
   const tools = machine?.access?.tools;
   let reason: BrainUnavailable | undefined;
   if (!machine) reason = "no_computer";
-  else if (!machine.execAllowed) reason = "exec_off";
+  else if (!tools && !machine.execAllowed) reason = "exec_off";
   else if (
     machine.protocol <
     {
@@ -381,7 +383,7 @@ function cliOption(machine: MachineLike | null, kind: "cursor" | "opencode" | "g
     }[kind]
   )
     reason = "runner_old";
-  else if (tools && (tools[kind] ?? tools.codex) === false) reason = "tool_off";
+  else if (tools && (tools[kind] ?? tools.codex) !== true) reason = "tool_off";
   else if (!machine.executors?.[kind]) reason = missingCli(machine);
   return {
     kind,

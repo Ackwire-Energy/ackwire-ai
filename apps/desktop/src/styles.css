@@ -1261,6 +1261,13 @@ body[data-window="popover"] {
   flex-wrap: wrap;
   gap: 6px;
 }
+/* A server that doesn't answer: its last workspaces dimmed, its state in the waiting color (ADR 0158). */
+.dk-ws-list[data-dim] {
+  opacity: 0.5;
+}
+.dk-state-waiting {
+  color: var(--warn);
+}
 .dk-ws-logo {
   width: 16px;
   height: 16px;
