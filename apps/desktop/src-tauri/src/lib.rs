@@ -758,8 +758,8 @@ pub fn run() {
             if launcher.is_enabled().unwrap_or(false) {
                 let _ = launcher.enable();
             }
-            // The server here first (its own homes start with the rest); nothing starts without homes: in the
-            // Cloud, or with a server whose agents work elsewhere.
+            // The server here first (its own homes start with the rest); nothing starts without homes (no
+            // workspace lets its agents work on this computer yet).
             local_server::load(&handle);
             app.state::<Runners>().start_all(&handle);
             host_sync::start(&handle);

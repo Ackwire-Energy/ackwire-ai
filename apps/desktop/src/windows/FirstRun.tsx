@@ -230,7 +230,7 @@ export function FirstRun() {
   // Opened again ("Add a server…"): from the start, unless a link or the setup is on screen.
   useOnShown("welcome", () => {
     takeMode();
-    // A sheet closed by hiding the window leaves its screen with nothing to draw: that one starts over too.
+    // A link or pair screen whose sheet is gone has nothing to draw: it starts over too.
     if ((screen === "link" && link) || (screen === "pair" && pair) || settingUp.current) return;
     setTrail([]);
     setScreen("choose");
