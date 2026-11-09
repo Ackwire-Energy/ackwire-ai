@@ -187,7 +187,7 @@ export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; ano
           autoCapitalize="words"
           autoCorrect={false}
           // The keyboard's blue key is the action ("continuar"); gray until a name is typed.
-          returnKeyType="continue"
+          returnKeyType="go"
           enablesReturnKeyAutomatically
           onSubmitEditing={submit}
           // The suggested name comes selected: one keystroke replaces it, the blue key keeps it.
@@ -223,6 +223,7 @@ export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; ano
         visible={pickingZone}
         animationType="slide"
         presentationStyle="pageSheet"
+        supportedOrientations={["portrait", "landscape"]}
         onRequestClose={() => setPickingZone(false)}
       >
         <ZoneList

@@ -216,7 +216,7 @@ function Corner({ tone, at }: { tone: string; at: "tl" | "tr" | "br" | "bl" }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "black" },
-  center: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center" },
+  center: { ...StyleSheet.absoluteFill, alignItems: "center", justifyContent: "center" },
   target: { width: TARGET, height: TARGET },
   corner: { position: "absolute", width: PX * 3, height: PX * 3 },
   arm: { position: "absolute" },

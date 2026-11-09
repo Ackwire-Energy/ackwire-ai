@@ -332,7 +332,7 @@ function Thumb({ file, more }: { file: SharedFile; more: number }) {
       ) : null}
       {more > 0 ? (
         <View style={styles.more}>
-          <Text variant="headline" style={styles.moreText} maxFontSizeMultiplier={1.3}>
+          <Text variant="title" style={styles.moreText} maxFontSizeMultiplier={1.3}>
             {t("mobile.share.more", { count: more })}
           </Text>
         </View>
@@ -371,7 +371,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   more: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(0, 0, 0, 0.45)",
     alignItems: "center",
     justifyContent: "center",

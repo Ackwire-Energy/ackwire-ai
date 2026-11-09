@@ -409,7 +409,7 @@ describe("the agent's AI", () => {
     ).text();
     const home = connect.slice(connect.indexOf("function Home("));
     expect(home.indexOf('t("connectAi.have.title")')).toBeGreaterThan(-1);
-    expect(home.indexOf('t("connectAi.have.title")')).toBeLessThan(home.indexOf('t("mobile.ai.yourPlan")'));
+    expect(home.indexOf('t("connectAi.have.title")')).toBeLessThan(home.indexOf('t("mobile.ai.planRow")'));
     expect(home).toContain("<AiRow");
     // A plan or a key, one row each; whose is one searched list, the plan's page and the key's steps as before.
     expect(home).toContain('onView({ page: "plans" })');

@@ -443,7 +443,7 @@ export function AuthFlow({
             autoComplete="email"
             textContentType="username"
             // The keyboard's blue key is the action ("continuar" / "enviar"); it stays gray until something is typed.
-            returnKeyType={step === "email" ? "continue" : "send"}
+            returnKeyType={step === "email" ? "go" : "send"}
             enablesReturnKeyAutomatically
             onSubmitEditing={submit}
             accessibilityLabel={t("auth.email")}
