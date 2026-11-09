@@ -1141,7 +1141,7 @@ describe("Message on touch", () => {
 });
 
 describe("ListRow and RunMark", () => {
-  test("a list row is a neutral button: lead, the whole title on hover, meta", () => {
+  test("a list row is a neutral button: its lead on the title's first line, the title whole, meta", async () => {
     let clicked = 0;
     const { container } = render(
       <ListRow
@@ -1153,11 +1153,17 @@ describe("ListRow and RunMark", () => {
     );
     const row = within(container).getByRole("button", { name: /Revisão do roadmap/ });
     expect(row.getAttribute("type")).toBe("button");
-    expect(row.className).toBe("ac-row");
-    expect(row.querySelector(".ac-row__title")?.getAttribute("title")).toBe("Revisão do roadmap");
+    expect(row.className).toBe("ac-row ac-iconline");
+    expect(row.querySelector(".ac-row__title")?.textContent).toBe("Revisão do roadmap");
     expect(row.querySelector(".ac-row__meta")?.textContent).toBe("Hoje · 21:00");
     fireEvent.click(row);
     expect(clicked).toBe(1);
+    // A long title wraps: never "…" with the rest only on hover.
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+    expect(rule(".ac-row__title")).not.toContain("ellipsis");
+    expect(rule(".ac-row__title")).toContain("overflow-wrap: anywhere");
+    expect(rule(".ac-row")).toContain("align-items: flex-start");
   });
 
   test("a run mark is a decorative 8px canvas carrying its status", () => {

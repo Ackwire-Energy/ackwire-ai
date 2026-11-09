@@ -100,9 +100,9 @@ export function List({ className, ...rest }: HTMLAttributes<HTMLDivElement>) {
 }
 
 export interface ListRowProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "title"> {
-  /** A small avatar or an icon. */
+  /** A small avatar or an icon, on the title's first line. */
   lead?: ReactNode;
-  /** One line, cut with an ellipsis (the whole of it on hover). */
+  /** Whole: a long one wraps. */
   title: string;
   /** A quiet second line ("Hoje · 21:00"). */
   meta?: ReactNode;
@@ -115,12 +115,10 @@ export interface ListRowProps extends Omit<ButtonHTMLAttributes<HTMLButtonElemen
  */
 export function ListRow({ lead, title, meta, trailing, className, type = "button", ...rest }: ListRowProps) {
   return (
-    <button type={type} className={cx("ac-row", className)} {...rest}>
+    <button type={type} className={cx("ac-row", lead ? "ac-iconline" : undefined, className)} {...rest}>
       {lead && <span className="ac-row__lead">{lead}</span>}
       <span className="ac-row__text">
-        <span className="ac-row__title" title={title}>
-          {title}
-        </span>
+        <span className="ac-row__title">{title}</span>
         {meta && <span className="ac-row__meta">{meta}</span>}
       </span>
       {trailing}

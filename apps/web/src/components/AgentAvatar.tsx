@@ -1,4 +1,4 @@
-import type { AgentPresence } from "@agenteschat/client";
+import type { Actor, AgentPresence } from "@agenteschat/client";
 import { agentStateIn } from "@agenteschat/client";
 import { isOutOfOffice } from "@agenteschat/client/lib/presence";
 import { splitAtNames } from "@agenteschat/client/lib/text";
@@ -77,6 +77,19 @@ export function AgentWho({
     <span className="ac-who" ref={markLead}>
       <AgentAvatar agentId={agentId} size="xs" name={name} appearance={appearance} />
       <b>{name}</b>
+    </span>
+  );
+}
+
+/**
+ * Anyone named in a line of text: an agent's face or a person's, at the text's size, then their name (`.ac-who`).
+ * `faceOnly` where the words after it say who, or say what it is (a calendar item's title after its owner's face).
+ */
+export function ActorWho({ actor, name, faceOnly }: { actor: Actor; name: string; faceOnly?: boolean }) {
+  return (
+    <span className="ac-who" ref={markLead}>
+      <ActorAvatar actor={actor} size="xs" name={name} />
+      {!faceOnly && <b>{name}</b>}
     </span>
   );
 }
