@@ -9800,6 +9800,10 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
   .ac-btn--sm.ac-btn--icon::after {
     inset: calc((var(--control-h-sm) - var(--touch-target)) / 2) calc(-1 * var(--space-1));
   }
+  /* A dialog's scroll area ends past that target too: a small button at its end would make it scroll by a sliver. */
+  :is(.ac-dialog__body, .ac-dialog__list) {
+    padding-bottom: calc((var(--touch-target) - var(--control-h-sm)) / 2);
+  }
   /* The message bar's 26px plates grow to the 32 of every small one here, 8px apart: their targets touch, never
      overlap. */
   .ac-msg__actions {
