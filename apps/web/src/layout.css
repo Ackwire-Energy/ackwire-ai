@@ -12222,6 +12222,7 @@ html:not([data-pointer]) .channel-perms__target:focus-visible {
   right: 4px;
   translate: 0 -50%;
   display: flex;
+  gap: var(--space-2);
   opacity: 0;
   transition: opacity 0.15s;
   /* Hidden, they don't catch the pointer: a drag over another row's end lands before/after it, not in its part. */

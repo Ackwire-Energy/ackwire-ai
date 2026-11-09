@@ -1951,7 +1951,7 @@
      * Buttons side by side stand 8 apart (rule 8): two plated ones, or two icon buttons' plates (a glyph's plate is its
      * box less its air, `.ac-btn--glyph`). A ghost with words reads by its words (`.ac-acts`), and the parts of one
      * control (a split button, a segmented control, a token's ×, an event pill's actions, a message's bar) are drawn
-     * as one.
+     * as one, and so is the composer's strip of format toggles.
      */
     btngap(out) {
       const kind = (el) => {
@@ -1965,7 +1965,8 @@
         const air = parseFloat(getComputedStyle(el, "::before").left) || 0;
         return { left: r.left + air, right: r.right - air, top: r.top + air, bottom: r.bottom - air };
       };
-      const ONE = ".ac-split,.ac-seg,.ac-token,.ac-eventpill,.ac-msg__actions,[role=menu],[role=menubar],svg";
+      const ONE =
+        ".ac-split,.ac-seg,.ac-token,.ac-eventpill,.ac-msg__actions,.ac-composer__tools--format,[role=menu],[role=menubar],svg";
       for (const row of document.body.querySelectorAll("*")) {
         if (!seen(row) || row.closest(ONE) || !isRow(style(row))) continue;
         const kids = flow(row);
