@@ -84,6 +84,40 @@ test("connect link over HTTP: the one-line install, the computer asking to join,
   expect(devices.requests).toEqual([]);
 });
 
+test("a connect link's info, with no session: the workspace and its maker; one 404 for unknown and used; limited", async () => {
+  const { owner } = await start();
+  const link = (await (await owner("/devices/connect-links", { json: { kind: "computer" } })).json()) as {
+    code: string;
+    expiresAt: string;
+  };
+  const info = (code: string, ip = "203.0.113.40") =>
+    t.app.request(`/api/machines/connect-links/${code}`, { headers: { "x-forwarded-for": ip } });
+
+  const live = await info(link.code);
+  expect(live.status).toBe(200);
+  expect(await live.json()).toEqual({
+    org: { name: "Acme" },
+    by: { name: "sam" },
+    kind: "computer",
+    expiresAt: link.expiresAt,
+  });
+  expect((await info(link.code.replace("-", "").toLowerCase())).status).toBe(200);
+
+  const unknown = await info("ABCD-EFGH");
+  expect(unknown.status).toBe(404);
+  const gone = await unknown.json();
+  expect(gone).toEqual({ error: "link_expired" });
+  await runnerPost("/api/machines/device", { name: "build-box", ...RUNNER, link: link.code });
+  const used = await info(link.code);
+  expect(used.status).toBe(404);
+  expect(await used.json()).toEqual(gone);
+
+  // 30 a minute from one address, like the install line; another address still gets its answer.
+  for (let i = 0; i < 26; i++) await info("ABCD-EFGH");
+  expect((await info("ABCD-EFGH")).status).toBe(429);
+  expect((await info("ABCD-EFGH", "203.0.113.41")).status).toBe(404);
+});
+
 test("a computer and its phones over HTTP: rename, who can use it, stop, forget, remove", async () => {
   const { owner, rui } = await start();
   const paired = await pairComputer(t, owner, { ...RUNNER, exec: true }, { name: "MacBook" });

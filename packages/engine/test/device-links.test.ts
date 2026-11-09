@@ -3,6 +3,7 @@ import { eq, schema } from "@agenteschat/db";
 import {
   approveDeviceJoin,
   confirmDeviceCode,
+  connectLinkInfo,
   connectLinkState,
   createConnectLink,
   denyDeviceCode,
@@ -116,4 +117,18 @@ test("a computer link starts Only the maker; deny refuses the computer; an expir
   expect(await openConnectLink(f.db, old.code)).toBeNull();
   await expect(startLinkedDeviceCode(deps(), old.code, BUILD_BOX, fromAddress)).rejects.toThrow(ValidationError);
   expect(await connectLinkState({ db: f.db }, rui.id, f.org.id, old.id)).toEqual({ status: "expired" });
+});
+
+test("a link's info for the desktop app: the workspace and its maker while it waits; nothing once used or expired", async () => {
+  f = await setup();
+  const rui = await addMember(f.db, f.org.id, "member", "rui");
+  const link = await createConnectLink({ db: f.db }, PUBLIC_URL, rui.id, f.org.id, "computer");
+  const info = { org: { name: "Acme" }, by: { name: "rui" }, kind: "computer", expiresAt: link.expiresAt };
+  expect(await connectLinkInfo(f.db, link.code)).toEqual(info);
+  expect(await connectLinkInfo(f.db, link.code.replace("-", "").toLowerCase())).toEqual(info);
+  expect(await connectLinkInfo(f.db, "ABCD-EFGH")).toBeNull();
+  expect(await connectLinkInfo(f.db, "ABC")).toBeNull();
+  expect(await connectLinkInfo(f.db, link.code, new Date(Date.parse(link.expiresAt) + 1))).toBeNull();
+  await startLinkedDeviceCode(deps(), link.code, BUILD_BOX, fromAddress);
+  expect(await connectLinkInfo(f.db, link.code)).toBeNull();
 });
