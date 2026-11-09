@@ -1,11 +1,12 @@
 import { randomInt, randomUUID } from "node:crypto";
-import type {
-  MachineReplies,
-  MachineRequest,
-  PhonePairFailure,
-  PhonePairing,
+import {
+  type MachineReplies,
+  type MachineRequest,
+  type PhonePairFailure,
+  type PhonePairing,
+  pairAddress,
 } from "@agenteschat/adapters/machine-protocol";
-import { FACTS_SHELL, parseAdbDevices, parseAndroidFacts } from "./adb";
+import { type AndroidFacts, FACTS_SHELL, parseAdbDevices, parseAndroidFacts } from "./adb";
 import { RunnerError } from "./errors";
 import type { ToolOptions, ToolResult } from "./phones";
 
@@ -29,6 +30,8 @@ const KEEP_MS = 10 * 60_000;
  */
 export const MIN_WIFI_SDK = 34;
 export const MIN_WIFI_PATCH = "2026-05-01";
+export const wifiOutdated = (f: Pick<AndroidFacts, "sdk" | "patch">) =>
+  f.sdk < MIN_WIFI_SDK || !f.patch || f.patch < MIN_WIFI_PATCH;
 
 export type PairRequest = Extract<
   MachineRequest,
@@ -85,18 +88,6 @@ export function pairOutcome(
   return { ok: false, reason: "failed" };
 }
 
-/** `192.168.1.20:37099` (or `[fe80::1]:37099`) as the phone shows it under Pair device with pairing code. */
-export function pairAddress(input: unknown): string | null {
-  if (typeof input !== "string") return null;
-  const text = input.trim();
-  const v4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3}):(\d{1,5})$/.exec(text);
-  const v6 = /^\[([0-9a-fA-F:%.\w]{2,60})\]:(\d{1,5})$/.exec(text);
-  const port = Number((v4 ? v4[5] : v6?.[2]) ?? 0);
-  if (port < 1 || port > 65535) return null;
-  if (v4?.slice(1, 5).every((o) => Number(o) <= 255)) return text;
-  return v6?.[1]?.includes(":") ? text : null;
-}
-
 interface Pairing {
   id: string;
   way: "qr" | "code";
@@ -123,6 +114,8 @@ export interface WifiPairerOptions {
   run: (bin: string, args: string[], opts?: ToolOptions) => Promise<ToolResult>;
   /** It connected: `serial` is the phone's own, `adbSerial` what adb calls it now. Resolves once the list knows it. */
   connected: (serial: string, adbSerial: string) => Promise<void>;
+  /** Refused as outdated: its own serial (it keeps this computer's key, so adb may connect it again by itself). */
+  refused: (serial: string) => void;
   log: (line: string) => void;
   env: NodeJS.ProcessEnv;
   now: () => number;
@@ -321,11 +314,12 @@ export class WifiPairer {
     const r = await this.adb(adb, ["-s", adbSerial, "shell", FACTS_SHELL], p.abort.signal, 15_000);
     const facts = parseAndroidFacts(r.stdout.toString("utf8").replace(/\r\n/g, "\n"));
     if (r.code !== 0 || facts.sdk === 0) return this.end(p, "failed", "failed");
-    if (facts.sdk < MIN_WIFI_SDK || !facts.patch || facts.patch < MIN_WIFI_PATCH) {
+    const serial = facts.serialno ?? serialOfMdnsName(adbSerial) ?? adbSerial;
+    if (wifiOutdated(facts)) {
+      this.opts.refused(serial);
       await this.adb(adb, ["disconnect", adbSerial], p.abort.signal, 10_000);
       return this.end(p, "failed", "outdated");
     }
-    const serial = facts.serialno ?? serialOfMdnsName(adbSerial) ?? adbSerial;
     // Checked: the list may show it now, and says connected only once it does.
     p.guid = null;
     p.tried = undefined;

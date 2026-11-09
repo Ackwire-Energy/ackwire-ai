@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import type { PhonePairing, RunnerPhone } from "@agenteschat/adapters/machine-protocol";
+import { type PhonePairing, pairAddress, type RunnerPhone } from "@agenteschat/adapters/machine-protocol";
 import {
   adbStateOf,
   androidKind,
@@ -32,7 +32,7 @@ import {
 import type { DataListener, DataSocket, DataSockets } from "../../runner/streams";
 import { IosHelper, WDA_VERSION } from "../../runner/wda";
 import { fakeUsbmuxd, freePort } from "./fake-usbmuxd";
-import { pairAddress, pairingQr, pairOutcome, parseMdnsServices, serialOfMdnsName } from "../../runner/wifi-pair";
+import { pairingQr, pairOutcome, parseMdnsServices, serialOfMdnsName } from "../../runner/wifi-pair";
 import { errorCode, removeDirs, tempDir } from "./helpers";
 
 const dirs: string[] = [];
@@ -1287,10 +1287,19 @@ test("pairing failures say why: mDNS off, a code the phone refused, nothing in 2
   const old = rig({}, { tools: ["adb"] });
   const s3 = (await old.manager.pair({ op: "phone.pair.start" })) as PhonePairing;
   const oldFacts = WIFI_FACTS.replace("sdk=36", "sdk=33").replace("release=16", "release=13");
-  old.setState(wifiState(/S:([\w-]+);/.exec(s3.qr ?? "")?.[1] ?? "", { facts: { [WIFI_AT]: oldFacts } }));
+  const service3 = /S:([\w-]+);/.exec(s3.qr ?? "")?.[1] ?? "";
+  old.setState(wifiState(service3, { facts: { [WIFI_AT]: oldFacts } }));
   expect(await settle(old, s3.id)).toMatchObject({ state: "failed", reason: "outdated" });
   expect(old.calls()).toContainEqual(["adb", "disconnect", WIFI_AT]);
   expect(existsSync(path.join(old.root, "wifi-phones.json"))).toBe(false);
+  // It keeps this computer's key, so adb's own mDNS may connect it again: still unpatched, it stays off the list.
+  await old.manager.poll();
+  expect(old.manager.list()).toEqual([]);
+  // Updated, it's a phone like any other.
+  old.setState(wifiState(service3, { adbDevices: `List of devices attached\n${WIFI_AT} device model:Pixel_8\n` }));
+  old.tick(6 * 60_000);
+  await old.manager.poll();
+  expect(old.manager.list().map((p) => [p.serial, p.state])).toEqual([[PIXEL, "ready"]]);
 
   // A new pairing ends the one before; cancel ends it; an unknown one is gone.
   const two = rig({ adbDevices: "List of devices attached\n" }, { tools: ["adb"] });

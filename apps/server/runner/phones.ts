@@ -45,7 +45,7 @@ import { usualDirs } from "./login-path";
 import { isInside } from "./paths";
 import type { DataSocket } from "./streams";
 import { IosHelper, wdaScreenDriver } from "./wda";
-import { type PairRequest, parseMdnsServices, serialOfMdnsName, WifiPairer } from "./wifi-pair";
+import { type PairRequest, parseMdnsServices, serialOfMdnsName, WifiPairer, wifiOutdated } from "./wifi-pair";
 
 /**
  * The phones this computer reaches (bring your own devices): Android over the adb server already running (USB,
@@ -391,6 +391,8 @@ export class PhoneManager {
   private readonly ownSerial = new Map<string, string>();
   /** Phones paired here over Wi-Fi, by own serial (kept in `wifiFile`). */
   private readonly wifiKnown: Set<string>;
+  /** Phones refused at pairing as open to CVE-2026-0073, by own serial, while they stay unpatched. */
+  private readonly wifiRefused = new Set<string>();
   private lastReconnect = 0;
   private reconnecting: Promise<void> | null = null;
   private readonly pairer: WifiPairer;
@@ -432,12 +434,14 @@ export class PhoneManager {
       adb: async () => (await this.tools()).adb,
       run: runTool,
       connected: async (serial, adbSerial) => {
+        this.wifiRefused.delete(serial);
         this.ownSerial.set(adbSerial, serial);
         this.knowWifi(serial);
         // A look already under way may have left it out: one after it.
         await this.polling;
         await this.poll();
       },
+      refused: (serial) => this.wifiRefused.add(serial),
       log: opts.log,
       env: this.env,
       now: this.now,
@@ -620,6 +624,13 @@ export class PhoneManager {
         if (own) {
           phone.serial = own;
           this.ownSerial.set(e.serial, own);
+        }
+        if (own && this.wifiRefused.has(own)) {
+          if (facts && wifiOutdated(facts)) {
+            void runTool(adb, ["disconnect", e.serial], { timeoutMs: 10_000, env: this.env });
+            continue;
+          }
+          this.wifiRefused.delete(own);
         }
       }
       const key = keyOf(phone);
