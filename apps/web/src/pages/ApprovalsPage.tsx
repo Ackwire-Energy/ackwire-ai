@@ -1554,8 +1554,7 @@ function ApprovalDetails({
       }
       title={
         <>
-          {approvalTitle(t, a)}
-          <UndoChip approval={a} />
+          {approvalTitle(t, a)} <UndoChip approval={a} />
         </>
       }
       subtitle={

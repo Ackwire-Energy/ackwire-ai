@@ -796,6 +796,10 @@ html:not([data-pointer]) .ap-li:focus-visible {
   letter-spacing: 0;
   font-weight: 500;
 }
+/* In the dialog's title a space parts it from the title's words, so its name reads as two: the space is the gap. */
+.ac-details__title > .ap-review__undo.ac-chip {
+  margin-inline-start: 4px;
+}
 .ap-review__body {
   display: flex;
   flex-direction: column;
