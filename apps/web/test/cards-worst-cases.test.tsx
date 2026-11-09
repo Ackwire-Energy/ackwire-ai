@@ -3,8 +3,9 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
+import type { ManagedTask } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle, showIn } from "./render";
 
 afterEach(() => cleanup());
@@ -146,5 +147,94 @@ describe("heads at their worst", () => {
     const pane = document.querySelector(".ap-review") as HTMLElement;
     expect(pane.querySelector(".ap-review__title + .ap-review__undo")?.textContent).toBe("Reversível");
     expect([...pane.querySelectorAll(".ac-facts__label")].map((l) => l.textContent)).not.toContain("Desfazer");
+  });
+});
+
+// Names too long to share a phone's line with the header's glyphs.
+const LONG_PERSON = "Maria Eduarda Albuquerque de Figueiredo";
+const LONG_AGENT = "Assistente de Atendimento ao Cliente";
+const LONG_CHANNEL = "atendimento-ao-cliente-filial-norte";
+
+/** A header's name and its glyphs: an action line, the glyphs one group after the words (`.channel__acts`). */
+const lineOf = () => {
+  const header = document.querySelector(".channel__header") as HTMLElement;
+  const line = header.querySelector(":scope > .ac-actline") as HTMLElement;
+  expect(line).not.toBeNull();
+  const acts = line.querySelector(":scope > .channel__acts") as HTMLElement;
+  expect(acts).not.toBeNull();
+  return { header, line, acts };
+};
+
+describe("headers at their worst: the name wraps whole, the glyphs go under it as one group", () => {
+  test("a DM with a person: the face and the name, then the search", async () => {
+    const state = seedState();
+    state.members.push({
+      userId: "u-maria",
+      name: LONG_PERSON,
+      email: "maria.eduarda@example.com",
+      image: null,
+      role: "member",
+      joinedAt: new Date(Date.now() - 86_400_000).toISOString(),
+      handle: "maria",
+      timezone: "America/Sao_Paulo",
+    });
+    await renderApp(`/org/${ORG_ID}/dm/person/u-maria`, { api: createFakeApi(state) });
+    await settle(8);
+    const { header, line, acts } = lineOf();
+    expect(line.firstElementChild?.matches(".dm-who")).toBe(true);
+    expect(within(header).getByRole("heading", { level: 1, name: LONG_PERSON })).toBeTruthy();
+    expect(within(acts).getByRole("combobox", { name: "Buscar" })).toBeTruthy();
+  });
+
+  test("a DM with an agent: its tasks, the search and the side panel's toggle in one group", async () => {
+    const state = seedState();
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (!ada) throw new Error("no Ada");
+    ada.name = LONG_AGENT;
+    const at = new Date(Date.now() - 6 * 60_000).toISOString();
+    const task: ManagedTask = {
+      runId: "r-long",
+      agentId: ADA_ID,
+      channelId: ENG_ID,
+      channelKind: "channel",
+      channelName: "eng",
+      threadId: null,
+      status: "running",
+      startedAt: at,
+      createdAt: at,
+      label: "Responder os chamados da fila de reembolso",
+      background: false,
+      routine: null,
+      plan: null,
+      requester: { userId: "u-walter", name: "Walter" },
+      brain: "model",
+      machine: null,
+      now: null,
+      steps: 1,
+      pendingMessageIds: [],
+      canStop: true,
+    };
+    state.taskManager = { tasks: [task], ended: [], activity: {} };
+    await renderApp(`/org/${ORG_ID}/dm/agent/${ADA_ID}`, { api: createFakeApi(state) });
+    await settle(8);
+    const { header, line, acts } = lineOf();
+    expect(line.firstElementChild?.matches(".dm-who")).toBe(true);
+    expect(within(header).getByRole("heading", { level: 1, name: LONG_AGENT })).toBeTruthy();
+    expect(acts.querySelector(".tm-pill")).not.toBeNull();
+    expect(within(acts).getByRole("combobox", { name: "Buscar" })).toBeTruthy();
+    expect(acts.lastElementChild?.matches(".dm-side-toggle")).toBe(true);
+  });
+
+  test("a channel: the # and its name, then threads, pins, settings, members and the search", async () => {
+    const state = seedState();
+    const eng = state.channels.find((c) => c.id === ENG_ID);
+    if (!eng) throw new Error("no #eng");
+    eng.name = LONG_CHANNEL;
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+    await settle(8);
+    const { header, line, acts } = lineOf();
+    expect(line.firstElementChild?.matches(".channel__head-text")).toBe(true);
+    expect(within(header).getByRole("heading", { level: 1, name: LONG_CHANNEL })).toBeTruthy();
+    expect(within(acts).getByRole("button", { name: "Configurações do canal" })).toBeTruthy();
   });
 });

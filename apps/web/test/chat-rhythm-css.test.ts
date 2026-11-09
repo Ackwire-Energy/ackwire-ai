@@ -203,7 +203,7 @@ test("the agents' line is the conversation's width, the pair on its middle, and 
   expect(last(".consult-pair", "margin")).toBeUndefined();
   // The hidden chevron keeps no room on one side only.
   expect(last(".consult-pair__chev", "position")).toBe("absolute");
-  expect(last(".consult-pair__row", "padding")).toBe("0 20px");
+  expect(last(".consult-pair__row", "padding")).toBe("var(--space-1) 20px");
   // Inside a message it leaves the row's body for the same width.
   expect(last(".ag-rc--talk", "margin-left")).toBe("calc(-1 * var(--msg-lead))");
   // And comes short of the list's by what a look's rows stand in from it: the two lines end on the same point.

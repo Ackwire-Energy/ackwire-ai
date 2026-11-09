@@ -88,58 +88,67 @@ export function DmPage({ target, focusMessageId }: { target: DmTarget; focusMess
   const header = ({ onSearch, side }: { onSearch: () => void; side: DmSideControl | null }) => (
     <header className="channel__header">
       <NavToggle />
-      <DmWho agentId={agent?.id} userId={person?.userId} label={t("profile.of", { name })}>
-        {agent ? <AgentAvatar agentId={agent.id} name={agent.name} /> : <Avatar name={name} imageUrl={person?.image} />}
-        <div className="dm-who__text">
-          <h1 className={agent || person ? "channel__title ac-captop" : "channel__title"}>
-            <span className="channel__name">{name}</span>
-            {agent && <AudienceChip agent={agent} />}
-          </h1>
-          {agent && (
-            <span className="channel__topic" data-right-hand={rightHand || undefined}>
-              {rightHand
-                ? `${t("rightHand.label")} · ${t("rightHand.actsAsYou")}`
-                : owner
-                  ? t("dm.subtitle", { role, owner: owner.name })
-                  : t("dm.subtitleNoOwner", { role })}
-              {thinks?.text && (
-                <>
-                  {" · "}
-                  <span className="channel__brain ac-iconline">
-                    {thinks.mark ? (
-                      <ProviderLogo id={thinks.mark} size="xs" />
-                    ) : (
-                      <BrainIcon kind={thinks.kind} size={14} />
-                    )}
-                    {thinks.text}
-                  </span>
-                </>
-              )}
-            </span>
+      {/* Who it is with and the header's glyphs: the glyphs go under a name that can't keep its line beside them. */}
+      <div className="ac-actline channel__line">
+        <DmWho agentId={agent?.id} userId={person?.userId} label={t("profile.of", { name })}>
+          <div className="dm-who__text">
+            {agent ? (
+              <AgentAvatar agentId={agent.id} name={agent.name} />
+            ) : (
+              <Avatar name={name} imageUrl={person?.image} />
+            )}
+            <h1 className={agent || person ? "channel__title ac-captop" : "channel__title"}>
+              <span className="channel__name">{name}</span>
+              {agent && <AudienceChip agent={agent} />}
+            </h1>
+            {agent && (
+              <span className="channel__topic" data-right-hand={rightHand || undefined}>
+                {rightHand
+                  ? `${t("rightHand.label")} · ${t("rightHand.actsAsYou")}`
+                  : owner
+                    ? t("dm.subtitle", { role, owner: owner.name })
+                    : t("dm.subtitleNoOwner", { role })}
+                {thinks?.text && (
+                  <>
+                    {" · "}
+                    <span className="channel__brain ac-iconline">
+                      {thinks.mark ? (
+                        <ProviderLogo id={thinks.mark} size="xs" />
+                      ) : (
+                        <BrainIcon kind={thinks.kind} size={14} />
+                      )}
+                      {thinks.text}
+                    </span>
+                  </>
+                )}
+              </span>
+            )}
+            {person && <span className="channel__topic">{person.email}</span>}
+          </div>
+        </DmWho>
+        <div className="channel__acts">
+          {/* Its tasks (ADR 0128), while it has any: they open in the side panel. */}
+          {agent && <AgentTasksPill />}
+          {/* The sidebar has the computer: only a line of turns waiting for it still shows here. A viewer of its public
+              card gets the sidebar's head alone, so the way in stays for one who may still watch the computer. */}
+          {agent && !rightHand && <ComputerButton agent={agent} queueOnly={side?.docked && seesDetails(agent)} />}
+          {/* The same field as a channel's, held to this DM. */}
+          <HeaderSearch channelId={dm.data.channelId} onOpen={onSearch} dm />
+          {side && (
+            <Button
+              size="sm"
+              variant="ghost"
+              iconOnly
+              icon="sidebar"
+              className="channel__icon dm-side-toggle"
+              aria-label={t("agentSide.label")}
+              aria-pressed={side.open}
+              title={t(side.open ? "agentSide.hide" : "agentSide.show")}
+              onClick={side.toggle}
+            />
           )}
-          {person && <span className="channel__topic">{person.email}</span>}
         </div>
-      </DmWho>
-      {/* Its tasks (ADR 0128), while it has any: they open in the side panel. */}
-      {agent && <AgentTasksPill />}
-      {/* The sidebar has the computer: only a line of turns waiting for it still shows here. A viewer of its public
-          card gets the sidebar's head alone, so the way in stays for one who may still watch the computer. */}
-      {agent && !rightHand && <ComputerButton agent={agent} queueOnly={side?.docked && seesDetails(agent)} />}
-      {/* The same field as a channel's, held to this DM. */}
-      <HeaderSearch channelId={dm.data.channelId} onOpen={onSearch} dm />
-      {side && (
-        <Button
-          size="sm"
-          variant="ghost"
-          iconOnly
-          icon="sidebar"
-          className="channel__icon dm-side-toggle"
-          aria-label={t("agentSide.label")}
-          aria-pressed={side.open}
-          title={t(side.open ? "agentSide.hide" : "agentSide.show")}
-          onClick={side.toggle}
-        />
-      )}
+      </div>
     </header>
   );
   return (

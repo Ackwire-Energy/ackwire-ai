@@ -100,24 +100,26 @@ export function MembersSheet({
         }}
       >
         <header className="members-sheet__head">
-          <span className="members-sheet__title">
-            <Icon name="channel" size={18} />
-            <span>{channel.name}</span>
-          </span>
-          <span className="members-sheet__acts">
-            {isMember && <ChannelThreadsButton channelId={channel.id} channelName={channel.name} />}
-            {isMember && <ChannelPinsButton channelId={channel.id} channelName={channel.name} />}
-            <button
-              type="button"
-              className="ac-btn ac-btn--ghost ac-btn--icon channel__icon"
-              aria-label={settings}
-              title={settings}
-              onClick={onDetails}
-            >
-              <Icon name="cog" />
-            </button>
-            <Button size="sm" variant="ghost" iconOnly icon="close" aria-label={t("common.close")} onClick={onClose} />
-          </span>
+          <div className="ac-actline members-sheet__line">
+            <span className="members-sheet__title">
+              <Icon name="channel" size={18} />
+              <span>{channel.name}</span>
+            </span>
+            <span className="members-sheet__acts">
+              {isMember && <ChannelThreadsButton channelId={channel.id} channelName={channel.name} />}
+              {isMember && <ChannelPinsButton channelId={channel.id} channelName={channel.name} />}
+              <button
+                type="button"
+                className="ac-btn ac-btn--ghost ac-btn--icon channel__icon"
+                aria-label={settings}
+                title={settings}
+                onClick={onDetails}
+              >
+                <Icon name="cog" />
+              </button>
+            </span>
+          </div>
+          <Button size="sm" variant="ghost" iconOnly icon="close" aria-label={t("common.close")} onClick={onClose} />
         </header>
         <div className="members-sheet__find">
           <SearchField

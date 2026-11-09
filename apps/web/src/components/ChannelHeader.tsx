@@ -46,39 +46,45 @@ export function ChannelHeader({
   return (
     <header className="channel__header">
       <NavToggle />
-      <div className="channel__head-text" {...entityMenu(() => channelEntries(channel))}>
-        <h1 className="channel__title">
-          <Icon name="channel" className="channel__title-hash" />
-          <span>{channel.name}</span>
-        </h1>
-        {channel.topic && <span className="channel__topic">{channel.topic}</span>}
-      </div>
-      <div className="channel__acts">
-        <QueueButton machineId={queueMachine} />
-        {isMember && <ChannelThreadsButton channelId={channel.id} channelName={channel.name} />}
-        {isMember && <ChannelPinsButton channelId={channel.id} channelName={channel.name} />}
-        <button
-          type="button"
-          className="ac-btn ac-btn--ghost ac-btn--icon channel__icon channel__cog"
-          aria-label={settings}
-          title={settings}
-          onClick={onDetails}
-        >
-          <Icon name="cog" />
-        </button>
-        {total > 0 && (
+      <div className="ac-actline channel__line">
+        <div className="channel__head-text" {...entityMenu(() => channelEntries(channel))}>
+          <h1 className="channel__title">
+            <Icon name="channel" className="channel__title-hash" />
+            <span>{channel.name}</span>
+          </h1>
+          {channel.topic && (
+            <span className="channel__topic">
+              <span>{channel.topic}</span>
+            </span>
+          )}
+        </div>
+        <div className="channel__acts">
+          <QueueButton machineId={queueMachine} />
+          {isMember && <ChannelThreadsButton channelId={channel.id} channelName={channel.name} />}
+          {isMember && <ChannelPinsButton channelId={channel.id} channelName={channel.name} />}
           <button
             type="button"
-            className="ac-btn ac-btn--ghost ac-btn--icon channel__icon channel__members-toggle"
-            aria-label={t("channel.membersButton", { count: total })}
-            aria-pressed={membersOpen}
-            title={t(membersOpen ? "channel.header.hideMembers" : "channel.header.showMembers")}
-            onClick={onMembers}
+            className="ac-btn ac-btn--ghost ac-btn--icon channel__icon channel__cog"
+            aria-label={settings}
+            title={settings}
+            onClick={onDetails}
           >
-            <Icon name="members" />
+            <Icon name="cog" />
           </button>
-        )}
-        {isMember && <HeaderSearch channelId={channel.id} onOpen={onSearch} />}
+          {total > 0 && (
+            <button
+              type="button"
+              className="ac-btn ac-btn--ghost ac-btn--icon channel__icon channel__members-toggle"
+              aria-label={t("channel.membersButton", { count: total })}
+              aria-pressed={membersOpen}
+              title={t(membersOpen ? "channel.header.hideMembers" : "channel.header.showMembers")}
+              onClick={onMembers}
+            >
+              <Icon name="members" />
+            </button>
+          )}
+          {isMember && <HeaderSearch channelId={channel.id} onOpen={onSearch} />}
+        </div>
       </div>
     </header>
   );

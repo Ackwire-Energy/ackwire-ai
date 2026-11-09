@@ -290,6 +290,11 @@ html:not([data-pointer]) .pins-pop__item:has(> .thread-pop__row:focus-visible) {
   .thread-head > .thread-head__text + * {
     margin-left: auto;
   }
+  /* Its line stays one line, cut at its own edge: the place shortens first (`.thread-head__where`). */
+  .thread-head__meta {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 }
 .thread-title__text,
 .thread-title__button {

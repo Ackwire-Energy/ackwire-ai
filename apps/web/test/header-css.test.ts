@@ -36,6 +36,22 @@ test("the channel header's icons never get a plate, are 32 boxes 8 apart, and a 
   expect(last(shipped, ".channel__icon-count.ac-count", "font-size")).toBe("10px");
   expect(last(shipped, ".channel__icon-count.ac-count", "box-shadow")).toBe("0 0 0 2px var(--pane)");
 
+  // The name and the glyphs are an action line: the glyphs go under a name that can't keep its row beside them, and
+  // the name wraps whole, never cut. The topic beside it never widens the line: the name alone sets where they go.
+  // The minifier writes `1 1 0%` as `1`.
+  expect(last(shipped, ".channel__line", "flex")).toBe("1");
+  // On a phone the nav toggle stays on the name's first row.
+  expect(last(phone, ".channel__header:has(>.channel__line)", "align-items")).toBe("flex-start");
+  expect(last(phone, ".channel__head-text", "padding-block")).toContain("var(--control-h-md)");
+  const name = ".channel__head-text .channel__title>span";
+  expect(last(shipped, name, "text-overflow")).toBeUndefined();
+  expect(last(shipped, name, "white-space")).toBeUndefined();
+  expect(last(shipped, name, "overflow-wrap")).toBe("anywhere");
+  expect(last(shipped, ".channel__head-text", "height")).toBeUndefined();
+  expect(last(shipped, ".channel__head-text .channel__topic", "contain")).toBe("inline-size");
+  expect(last(shipped, ".channel__head-text .channel__topic", "overflow")).toBe("hidden");
+  expect(last(shipped, ".channel__head-text .channel__topic>span", "white-space")).toBe("nowrap");
+
   // The field grows while it is used.
   expect(last(shipped, ".channel__search.search-box", "width")).toBe("248px");
   expect(last(shipped, ".channel__search.search-box:focus-within", "width")).toBe("320px");

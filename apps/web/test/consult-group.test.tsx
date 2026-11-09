@@ -174,6 +174,28 @@ describe("the pair row before the reply that asked (ConsultPairRow)", () => {
     expect(rowButton().getAttribute("title")).toBe("Conversas de Ada com Atlas e Iris");
   });
 
+  test("long names wrap whole on the row, never cut: one sentence, each face with its name's first word", async () => {
+    const state = withAsk([consultation({}), consultation({ id: "q2", consultedAgentId: "agent-iris" })]);
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    const atlas = state.agents.find((a) => a.id === ATLAS_ID);
+    if (!ada || !atlas) throw new Error("no agents");
+    ada.name = "Assistente de Atendimento ao Cliente";
+    atlas.name = "Especialista em Faturamento Recorrente";
+    state.agents.push({ ...atlas, id: "agent-iris", name: "Iris", handle: "iris" });
+    await open(state);
+    const r = row() as HTMLElement;
+    expect([...r.querySelectorAll(".consult-pair__name")].map((n) => n.textContent)).toEqual([
+      "Assistente de Atendimento ao Cliente",
+      "Especialista em Faturamento Recorrente e mais 1",
+    ]);
+    // One sentence: each face keeps its name's first word (`__who`), the · follows the second name's last word.
+    const who = [...r.querySelectorAll(".consult-pair__row > .consult-pair__who")];
+    expect(who).toHaveLength(2);
+    expect(who[0]?.firstElementChild?.matches(".ac-avatar")).toBe(true);
+    expect(who[1]?.firstElementChild?.matches(".consult-pair__faces")).toBe(true);
+    expect(r.querySelector(".consult-pair__who + .consult-pair__sep")).not.toBeNull();
+  });
+
   test("waiting on a person, for its computer, on what it handed on: a short word in the same slot", async () => {
     await open(withAsk([consultation({ waiting: "approval" })]));
     expect(row()?.querySelector(".consult-pair__word")?.textContent).toBe("esperando aprovação");

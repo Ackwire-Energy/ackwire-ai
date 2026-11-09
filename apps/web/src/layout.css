@@ -335,8 +335,10 @@ p {
   color: var(--ink-muted);
 }
 
-/* The pair row right before a reply whose agent asked others first: "Theo ⇄ Atlas · 2 min", 26px tall, a line across
-   the whole conversation as the day and "Novas" are, the two agents on its middle. */
+/* The pair row right before a reply whose agent asked others first: "Theo ⇄ Atlas · 2 min", one 18px line 26 tall, a
+   line across the whole conversation as the day and "Novas" are, the two agents on its middle. Names too long for it
+   wrap whole, never cut: the row is one centred sentence, its faces and the ⇄ on the capitals of the words beside
+   them. */
 .consult-pair {
   display: grid;
   grid-template-columns: minmax(16px, 1fr) minmax(0, auto) minmax(16px, 1fr);
@@ -357,25 +359,50 @@ p {
 .consult-pair__row {
   position: relative;
   grid-area: 1 / 2;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+  display: inline-block;
   max-width: 100%;
-  height: 26px;
+  min-height: 26px;
   /* The same at both ends, the chevron in the room: the agents stay on the middle whether it shows or not. */
-  padding: 0 20px;
+  padding: var(--space-1) 20px;
   border: 0;
   border-radius: 8px;
   background: transparent;
   font: inherit;
   font-size: 13px;
-  line-height: 1;
+  line-height: 18px;
+  text-align: center;
+  overflow-wrap: anywhere;
   color: var(--muted);
-  white-space: nowrap;
   cursor: pointer;
   transition:
     background-color 0.12s,
     color 0.12s;
+}
+/* A face and its name's first word never part; the name wraps at its own spaces. */
+.consult-pair__who {
+  white-space: nowrap;
+}
+.consult-pair__who > .consult-pair__name {
+  white-space: normal;
+}
+/* The faces on the capitals' middle, as an inline face (`.ac-who`): the row's type, not the face's own. */
+.consult-pair__who > .ac-avatar,
+.consult-pair__faces {
+  font-size: inherit;
+  vertical-align: calc(var(--cap-top) - var(--cap-mid) - 9px);
+  margin-inline-end: 6px;
+}
+.consult-pair__faces {
+  display: inline-flex;
+}
+/* How it went: the · stays with the name's last word, the time with the word before it, each kept whole. */
+.consult-pair__sep,
+.consult-pair__time {
+  margin-inline-start: 6px;
+}
+.consult-pair__word,
+.consult-pair__time {
+  white-space: nowrap;
 }
 .consult-pair__row:hover {
   background: var(--plate);
@@ -392,21 +419,18 @@ html:not([data-pointer]) .consult-pair__row:focus-visible {
 .consult-pair__name {
   font-weight: 600;
   color: var(--ink2);
-  min-width: 0;
-  overflow: hidden;
 }
 .consult-pair__swap,
 .consult-pair__chev {
   flex: none;
   color: var(--faint);
 }
+/* On the capitals' middle of the words beside it, as an inline glyph (`.ac-icon--inline`). */
 .consult-pair__swap {
   width: 15px;
   height: 15px;
-  margin: 0 1px;
-}
-.consult-pair__faces {
-  flex: none;
+  margin-inline: 6px;
+  vertical-align: calc(var(--cap-top) - var(--cap-mid) - 7.5px);
 }
 /* Cut out of what is under them: the open row's blue too (the page's ring drew gray circles on it in dark). */
 .consult-pair__faces > .ac-avatar {
@@ -438,6 +462,8 @@ html:not([data-pointer]) .consult-pair__row:focus-visible {
 /* The chevron says it opens: on hover, keyboard focus, and while it is open. */
 .consult-pair__chev {
   position: absolute;
+  /* On the first line: its 14px glyph in the 18px line under the row's 4px. */
+  top: 6px;
   right: 4px;
   opacity: 0;
   transition:
@@ -930,25 +956,30 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
 .channel__topic[data-right-hand]::first-letter {
   text-transform: uppercase;
 }
-/* A DM's face and lines, one button (`DmWho`): it lies over them, its plate shows on hover. The face beside a name
-   that rises to it (`.ac-captop`, a name with a line under it) starts at one top with it. */
+/* A DM's face and lines, one button (`DmWho`): it lies over them, its plate shows on hover. The face floats at the
+   name's start, which rises to its top (`.ac-captop`): the name's lines go beside it, a line under them that passes
+   the face's foot goes under it at the header's width, so the face never keeps a column beside three lines. */
 .dm-who {
   position: relative;
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
   min-width: 0;
   margin: -4px auto -4px -8px;
   padding: 4px 8px;
   border-radius: var(--control-r-md);
 }
-.dm-who:has(.ac-captop) {
-  align-items: flex-start;
-}
+/* In the name's own block, so the name (a flex box, which keeps clear of the face) counts the face in its width. */
 .dm-who__text {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
+  display: flow-root;
+}
+.dm-who__text > .ac-avatar {
+  float: left;
+  margin-right: var(--space-3);
+}
+/* The line under the name never widens the header's line: the name alone sets where the glyphs go, and the line
+   wraps in the room that leaves, an address breaking where it must. */
+.dm-who__text > .channel__topic {
+  display: block;
+  contain: inline-size;
+  overflow-wrap: anywhere;
 }
 .dm-who__hit.profile-trigger {
   position: absolute;
