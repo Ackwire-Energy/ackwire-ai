@@ -5,6 +5,7 @@ setupDom();
 
 import type { TeamTemplate } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
+import { focusManager } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { createFakeApi, type FakeState, GENERAL_ID, LODI_ID, ORG_ID, seedState, withRightHand } from "./fake-api";
 import { pick } from "./new-agent-flow";
@@ -20,6 +21,7 @@ afterEach(() => {
   cleanup();
   sessionStorage.clear();
   globalThis.fetch = realFetch;
+  focusManager.setFocused(undefined);
 });
 
 const button = (name: string | RegExp) => screen().getByRole("button", { name });
@@ -310,6 +312,54 @@ describe("a workspace being set up resumes from its data", () => {
       expect(calls(state, "orgs.saveOnboarding")).toEqual([]);
       cleanup();
     }
+  });
+
+  test("a step answered in another tab meanwhile: this one moves on when it comes back, never a second team", async () => {
+    const state = settingUp({ context: "Loja online", held: true });
+    plans(PLANS);
+    await renderApp("/onboarding", { api: createFakeApi(state) });
+    await settle(14);
+    expect(heading()).toBe("Seu time");
+    // The other tab made the team.
+    state.agents.push(...seedState().agents);
+    await act(async () => {
+      focusManager.setFocused(false);
+      focusManager.setFocused(true);
+    });
+    await settle(14);
+    expect(heading()).toBe("Ligue o time");
+    expect(calls(state, "agents.applyTeamTemplate")).toEqual([]);
+  });
+
+  test("a read that fails, or a workspace that won't open, says so with a way on, never a sky that waits", async () => {
+    const broke = () => new ApiError(500, "internal", "Something broke");
+    const state = settingUp({ context: "Loja online" });
+    const api = createFakeApi(state);
+    const read = api.orgs.settings;
+    let fails = 1;
+    api.orgs.settings = async (orgId) => {
+      if (fails-- > 0) throw broke();
+      return read(orgId);
+    };
+    await renderApp("/onboarding", { api });
+    await settle(14);
+    await click(button("Tentar de novo"), 14);
+    expect(heading()).toBe("Seu time");
+    cleanup();
+
+    const ready = settingUp({ context: "Loja online", team: true });
+    const opening = createFakeApi(ready);
+    const finish = opening.orgs.saveOnboarding;
+    let refusals = 1;
+    opening.orgs.saveOnboarding = async (orgId, input) => {
+      if (refusals-- > 0) throw broke();
+      return finish(orgId, input);
+    };
+    const { router } = await renderApp("/onboarding", { api: opening });
+    await settle(16);
+    expect(router.state.location.pathname).toBe("/onboarding");
+    await click(button("Tentar de novo"), 16);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${GENERAL_ID}`);
   });
 
   test("everything done and no plan to wait for: it opens in #general", async () => {

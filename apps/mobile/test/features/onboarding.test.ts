@@ -96,6 +96,8 @@ test("the phone's steps are the web's, read from the workspace's data (ADR 0158)
   expect(flow).toContain('if (!known || at !== "open" || opening.current) return;');
   expect(flow).toContain('void open("done");');
   expect(flow).toContain('onEnter={() => void open("skipped")}');
+  // A step answered on the web meanwhile moves this one on as the app comes back, so it never makes a second team.
+  expect(flow.match(/refetchOnWindowFocus: "always"/g)).toHaveLength(3);
   // Another business on step 2 starts the team step on its template again; the same one keeps the template picked.
   expect(flow).toContain("if (picked !== kind) setTemplate(null);");
 });

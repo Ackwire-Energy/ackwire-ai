@@ -20,6 +20,7 @@ import { useAuth } from "@/auth/context";
 import { BillingLinkButton } from "@/components/BillingLinkButton";
 import { DeleteAccountDialog } from "@/components/DeleteAccount";
 import { DeleteWorkspaceDialog } from "@/components/DeleteWorkspace";
+import { ErrorState } from "@/components/Loading";
 import { COMPACT_QUERY, DESKTOP_QUERY, useMediaQuery } from "@/components/NavDrawer";
 import { ImageCropDialog, OrgMark } from "@/components/ProfilePhoto";
 import { BootSplash, OnboardingHorizon, OnboardingProgress } from "@/components/Sky";
@@ -80,15 +81,19 @@ export function OnboardingPage() {
       : null);
   const orgId = target?.orgId ?? null;
   const mine = me.data?.organizations.find((o) => o.id === orgId);
+  // Asked again whenever the tab comes back, as `me` is: a step answered meanwhile in another tab or on the phone moves
+  // this one on, so its button never makes a second team.
   const settings = useQuery({
     queryKey: keys.settings(orgId ?? ""),
     queryFn: () => api.orgs.settings(orgId ?? ""),
     enabled: orgId !== null,
+    refetchOnWindowFocus: "always",
   });
   const agents = useQuery({
     queryKey: keys.agents(orgId ?? ""),
     queryFn: () => api.agents.list(orgId ?? ""),
     enabled: orgId !== null,
+    refetchOnWindowFocus: "always",
   });
   const lodi = agents.data?.find(isRightHand);
   // By name, as the sidebar lists them: a team made at once shares one creation time, so the server's order is any.
@@ -104,7 +109,8 @@ export function OnboardingPage() {
     team: team.length,
     picked,
   });
-  const known = orgId === null || (settings.isSuccess && agents.isSuccess && mine !== undefined);
+  // Read once is enough: a refetch that fails later keeps the step on screen with what it read.
+  const known = orgId === null || (settings.data !== undefined && agents.data !== undefined && mine !== undefined);
   const name = (mine?.name ?? org).trim();
   const kind = business ?? aboutOf(t, context).business;
   const template = useTemplate(orgId, kind, step === "business" || step === "team");
@@ -145,7 +151,10 @@ export function OnboardingPage() {
       else
         await navigate({ to: "/org/$orgId/c/$channelId", params: { ...params, channelId: target.generalChannelId } });
     },
-    onError: (e) => toast.show(errorText(t, e), "error"),
+    // Opening by itself, a failure is the page's own (below); from a button, the step stays and a toast says it.
+    onError: (e, how) => {
+      if (how !== "done") toast.show(errorText(t, e), "error");
+    },
   });
 
   const save = useMutation({
@@ -211,6 +220,26 @@ export function OnboardingPage() {
   const shownLogo = logo ? `data:${logo.contentType};base64,${logo.imageBase64}` : (savedLogo ?? null);
   const lodiName = lodi?.name ?? RIGHT_HAND_DEFAULT.name;
 
+  // A read that failed, or a workspace that wouldn't open: said, with the way on, never a sky that waits for nothing.
+  const failed =
+    orgId === null
+      ? null
+      : ([settings, agents].find((q) => q.data === undefined && q.isError && !q.isFetching)?.error ??
+        (at === "open" && open.isError ? open.error : null));
+  if (failed)
+    return (
+      <div className="page page--mid">
+        <ErrorState
+          error={failed}
+          onRetry={() => {
+            opening.current = false;
+            open.reset();
+            if (settings.isError) void settings.refetch();
+            if (agents.isError) void agents.refetch();
+          }}
+        />
+      </div>
+    );
   if (!me.data || !known || (at === "open" && deleting === null)) return <BootSplash />;
 
   const say = t(`onboarding.flow.lodi.${step}`, { first: firstName(me.data.user.name), ...agentGrammar(lodiName) });

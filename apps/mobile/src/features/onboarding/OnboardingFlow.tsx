@@ -73,15 +73,19 @@ export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; ano
       : null);
   const orgId = target?.orgId ?? null;
   const mine = me.data?.organizations.find((o) => o.id === orgId);
+  // Asked again as the app comes back too: a step answered on the web meanwhile moves this one on, so its button never
+  // makes a second team.
   const settings = useQuery({
     queryKey: keys.settings(orgId ?? ""),
     queryFn: () => api.orgs.settings(orgId ?? ""),
     enabled: orgId !== null,
+    refetchOnWindowFocus: "always",
   });
   const agents = useQuery({
     queryKey: keys.agents(orgId ?? ""),
     queryFn: () => api.agents.list(orgId ?? ""),
     enabled: orgId !== null,
+    refetchOnWindowFocus: "always",
   });
   const lodi = agents.data?.find(isRightHand);
   // By name, as the lists show them: a team made at once shares one creation time, so the server's order is any.
@@ -97,7 +101,8 @@ export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; ano
     team: team.length,
     picked,
   });
-  const known = orgId === null || (settings.isSuccess && agents.isSuccess && mine !== undefined);
+  // Read once is enough: a refetch that fails later keeps the step on screen with what it read.
+  const known = orgId === null || (settings.data !== undefined && agents.data !== undefined && mine !== undefined);
   const kind = business ?? aboutOf(t, context).business;
   const templates = useTeamTemplates(
     orgId ?? "",
