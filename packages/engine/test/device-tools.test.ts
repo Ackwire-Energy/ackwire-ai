@@ -321,6 +321,13 @@ describe("phone tools", () => {
     const busy = await call(ctx, "phone_launch", { phone: "Pixel 8", app: "com.acme.app" });
     expect(busy.content).toStartWith("Pixel 8 is in use by Dev (testing checkout for Sam) since ");
     expect(busy.content).toContain('wait_for_device("Pixel 8")');
+    // Sam took control of its screen from the apps: it's Sam's until they give it back.
+    await f.db
+      .update(schema.machinePhones)
+      .set({ holder: { runId: null, agentId: null, userId: w.sam.id, since: new Date().toISOString() } })
+      .where(eq(schema.machinePhones.id, w.phone.id));
+    const taken = await call(ctx, "phone_launch", { phone: "Pixel 8", app: "com.acme.app" });
+    expect(taken.content).toStartWith("Sam took control of Pixel 8, so it's theirs for now. ");
     w.answer(() => {
       throw new MachineRequestError("phone_missing", "gone");
     });
