@@ -50,12 +50,11 @@ test("buttons side by side stand 8 apart: header glyph boxes 32, bulk pairs, a r
   expect(rule(approvals, ".ap-group__head")).toContain("padding: 0");
   expect(rule(approvals, ".ap-group__acts")).toContain("gap: var(--space-2)");
   const card = await sheet("components/request-card.css");
-  expect(
-    rule(
-      card,
-      ".rq__foot:not(:has(> .ac-btn:not(.ac-btn--ghost) ~ .ac-btn:not(.ac-btn--ghost))) > .ac-btn:not(.ac-btn--ghost)",
-    ),
-  ).toContain("flex: 1 1 auto");
+  // A lone button fills the footer; a main button with a ghost beside it grows into the row beside the ghost.
+  expect(rule(card, ".rq__foot:not(:has(> .ac-btn ~ .ac-btn)) > .ac-btn:not(.ac-btn--ghost)")).toContain(
+    "flex: 1 1 100%",
+  );
+  expect(rule(card, ".rq__foot:has(> .ac-btn--ghost) > .ac-btn:not(.ac-btn--ghost)")).toContain("flex: 1 1 auto");
   for (const [path, selector] of [
     ["components/members/members.css", ".members-sheet__acts"],
     ["pages/threads.css", ".thread-row__actions"],
