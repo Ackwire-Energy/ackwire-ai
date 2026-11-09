@@ -1,16 +1,19 @@
 import { type AppNotification, useNotificationAction } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { firstName } from "@agenteschat/client/lib/format";
+import { computerKind } from "@agenteschat/client/lib/machines";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
+import { ComputerIcon } from "@/computer/ComputerPortrait";
 import { useOrg } from "@/providers/org";
 import { Button, Text, useToast } from "@/ui";
 import { router } from "@/ui/navigation";
 import { AskButtons } from "../chat/asks";
-import { useDirectory, useOrgId, useWhen } from "../shared/hooks";
+import { useColors, useDirectory, useOrgId, useWhen } from "../shared/hooks";
+import { Tile } from "../shared/parts";
 import { WaitingCard } from "../shared/WaitingCard";
-import { type DeviceNotice, deviceHref, deviceNoticeOf, deviceNoticeTitle } from "./logic";
-import { JoinRequestCard } from "./parts";
+import { type DeviceNotice, deviceHref, deviceNoticeOf, deviceNoticeTitle, joinFacts } from "./logic";
+import { JoinButtons } from "./parts";
 import { useDeviceMutation, useDevices } from "./queries";
 
 /** Whom the agent works for, by first name ("" when it's the viewer or nobody says). */
@@ -37,16 +40,36 @@ function useDone(n: AppNotification) {
 
 function JoinNotice({ n, d }: { n: AppNotification; d: DeviceNotice }) {
   const { t } = useTranslation();
+  const c = useColors();
   const { org } = useOrg();
   const when = useWhen();
   const requests = useDevices().data?.requests;
   const done = useDone(n);
   const request = requests?.find((r) => r.id === d.requestId) ?? (requests?.length === 1 ? requests[0] : undefined);
-  if (request) return <JoinRequestCard request={request} onDone={done} />;
+  const kind = { icon: "laptop" as const, label: t("mobile.devices.notice.kind") };
+  if (request)
+    return (
+      <WaitingCard
+        leading={
+          <Tile>
+            <ComputerIcon kind={computerKind(request.os)} size={18} color={c.muted} />
+          </Tile>
+        }
+        name={request.name || request.hostname}
+        kind={kind}
+        title={t("mobile.devices.join.title", { name: request.name || request.hostname, org: org?.name ?? "" })}
+        where={when.short(n.updatedAt)}
+        decision={<JoinButtons request={request} onDone={done} />}
+      >
+        <Text variant="small" tone="muted">
+          {joinFacts(t, request)}
+        </Text>
+      </WaitingCard>
+    );
   // Answered elsewhere, or out of time: the card opens the devices.
   return (
     <WaitingCard
-      kind={{ icon: "laptop", label: t("mobile.devices.notice.kind") }}
+      kind={kind}
       title={deviceNoticeTitle(t, d, "", "", org?.name ?? "")}
       where={when.short(n.updatedAt)}
       action={{ label: t("mobile.activityNow.open"), onPress: () => router.push("/settings/devices") }}

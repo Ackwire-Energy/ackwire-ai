@@ -2014,16 +2014,19 @@ export const featureKeysEn = {
       waiting: "Waiting for {{host}} to see it",
       footer: "Your Mac does the rest, and renews the test helper every 7 days while it's on.",
     },
-    /** Notifications about devices, in the inbox. `{{names}}`: the agent, drawn bold. */
+    /**
+     * Notifications about devices, in the inbox. `{{names}}`: the agent, drawn bold. No "your": device names are
+     * often possessive already ("Sam's iPhone").
+     */
     notice: {
       kind: "Devices",
       join_request: "{{device}} wants to join {{org}}",
-      in_use: "{{names}} is using your {{device}}",
-      in_useFor: "{{names}} is using your {{device}} for {{person}}",
-      access_request: "{{names}} asks to use your {{device}}",
-      access_requestFor: "{{names}} asks to use your {{device}} for {{person}}",
-      waiting: "{{names}} is waiting for your {{device}}",
-      waitingFor: "{{names}} is waiting for your {{device}} for {{person}}",
+      in_use: "{{names}} is using {{device}}",
+      in_useFor: "{{names}} is using {{device}} for {{person}}",
+      access_request: "{{names}} asks to use {{device}}",
+      access_requestFor: "{{names}} asks to use {{device}} for {{person}}",
+      waiting: "{{names}} is waiting for {{device}}",
+      waitingFor: "{{names}} is waiting for {{device}} for {{person}}",
       allowOnce: "Allow once",
       always: "Always allow {{name}}",
       no: "No",

@@ -85,15 +85,10 @@ export function useAudienceText() {
  * A computer that ran a connect link, waiting for the link's maker: "build-box wants to join Acme", its facts (system,
  * address, rough place) and Let it join / Deny. Answered here, it leaves the list by itself.
  */
-export function JoinRequestCard({ request: r, onDone }: { request: DeviceJoin; onDone?: (joined: boolean) => void }) {
+export function JoinRequestCard({ request: r }: { request: DeviceJoin }) {
   const { t } = useTranslation();
-  const toast = useToast();
   const { org } = useOrg();
   const surface = useSurface();
-  const approve = useDeviceMutation((api, orgId, id: string) => api.devices.approveRequest(orgId, id, {}));
-  const deny = useDeviceMutation((api, orgId, id: string) => api.devices.denyRequest(orgId, id));
-  const busy = approve.isPending || deny.isPending;
-  const failed = (err: unknown) => toast({ title: errorText(t, err), icon: "x" });
   return (
     <View style={[styles.card, surface]}>
       <Text variant="callout" tone="ink" style={styles.bold}>
@@ -103,47 +98,60 @@ export function JoinRequestCard({ request: r, onDone }: { request: DeviceJoin; o
         {joinFacts(t, r)}
       </Text>
       <View style={styles.buttons}>
-        <AskButtons
-          primary={
-            <Button
-              variant="primary"
-              size="card"
-              wide
-              label={t("mobile.devices.join.allow")}
-              disabled={busy}
-              onPress={() =>
-                approve.mutate(r.id, {
-                  onSuccess: () => {
-                    successHaptic();
-                    toast({ title: t("mobile.devices.join.joined", { name: r.name || r.hostname }), icon: "check" });
-                    onDone?.(true);
-                  },
-                  onError: failed,
-                })
-              }
-            />
-          }
-          secondary={
-            <Button
-              size="card"
-              variant="secondary"
-              wide
-              label={t("mobile.devices.join.deny")}
-              disabled={busy}
-              onPress={() =>
-                deny.mutate(r.id, {
-                  onSuccess: () => {
-                    toast({ title: t("mobile.devices.join.denied", { name: r.name || r.hostname }), icon: "x" });
-                    onDone?.(false);
-                  },
-                  onError: failed,
-                })
-              }
-            />
-          }
-        />
+        <JoinButtons request={r} />
       </View>
     </View>
+  );
+}
+
+/** Let it join / Deny for a computer asking to join, on its card or on its notice in Atividade. */
+export function JoinButtons({ request: r, onDone }: { request: DeviceJoin; onDone?: (joined: boolean) => void }) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const approve = useDeviceMutation((api, orgId, id: string) => api.devices.approveRequest(orgId, id, {}));
+  const deny = useDeviceMutation((api, orgId, id: string) => api.devices.denyRequest(orgId, id));
+  const busy = approve.isPending || deny.isPending;
+  const failed = (err: unknown) => toast({ title: errorText(t, err), icon: "x" });
+  return (
+    <AskButtons
+      primary={
+        <Button
+          variant="primary"
+          size="card"
+          wide
+          label={t("mobile.devices.join.allow")}
+          disabled={busy}
+          onPress={() =>
+            approve.mutate(r.id, {
+              onSuccess: () => {
+                successHaptic();
+                toast({ title: t("mobile.devices.join.joined", { name: r.name || r.hostname }), icon: "check" });
+                onDone?.(true);
+              },
+              onError: failed,
+            })
+          }
+        />
+      }
+      secondary={
+        <Button
+          size="card"
+          variant="secondary"
+          wide
+          label={t("mobile.devices.join.deny")}
+          disabled={busy}
+          onPress={() =>
+            deny.mutate(r.id, {
+              onSuccess: () => {
+                toast({ title: t("mobile.devices.join.denied", { name: r.name || r.hostname }), icon: "x" });
+                onDone?.(false);
+              },
+              onError: failed,
+            })
+          }
+        />
+      }
+    />
   );
 }
 

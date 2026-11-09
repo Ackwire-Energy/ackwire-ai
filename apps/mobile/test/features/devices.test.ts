@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { DeviceAudience, DeviceStatus, PhoneDevice } from "@agenteschat/client";
+import { placeOf, subtitleOf } from "../../src/features/activity/logic";
 import {
   androidStage,
   audienceText,
@@ -150,10 +151,23 @@ describe("notices, waits and facts", async () => {
     expect(deviceHref({ phoneId: "../x", machineId: null })).toBe("/settings/devices");
     expect(deviceNoticeOf({ kind: "mention", source: {} })).toBeNull();
     if (!d) return;
-    expect(deviceNoticeTitle(en, d, "Lia", "Rui", "Acme")).toBe("Lia is using your Pixel 8 for Rui");
+    expect(deviceNoticeTitle(en, d, "Lia", "Rui", "Acme")).toBe("Lia is using Pixel 8 for Rui");
+    expect(deviceNoticeTitle(en, { ...d, device: "Sam's iPhone 16" }, "Lia", "", "Acme")).toBe(
+      "Lia is using Sam's iPhone 16",
+    );
     expect(deviceNoticeTitle(en, { ...d, kind: "device.join_request", device: "build-box" }, "", "", "Acme")).toBe(
       "build-box wants to join Acme",
     );
+  });
+  test("an inbox row of a device's notice says only what the agent is doing under its title", () => {
+    const n = {
+      kind: "device.in_use",
+      source: { phoneId: "p1", label: "Pixel 8", userId: "rui" },
+      latest: { title: "Rui", text: "Recording a test video" },
+    } as never;
+    expect(subtitleOf(n, () => "")).toBe("Recording a test video");
+    expect(placeOf(n)).toBe("");
+    expect(subtitleOf({ ...(n as object), kind: "device.waiting", latest: { title: "Rui" } } as never, () => "")).toBe("");
   });
   test("a wait for a device, from either place the run says it", () => {
     expect(
