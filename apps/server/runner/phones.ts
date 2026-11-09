@@ -823,7 +823,7 @@ export class PhoneManager {
     const key = `${platform}:${serial}`;
     const phone = await this.reach(key, { locked: true });
     const tools = await this.tools();
-    const driver = screenDriverFor(phone, { adb: tools.adb, xcrun: tools.xcrun, env: this.env });
+    const driver = screenDriverFor(phone, { adb: tools.adb, xcrun: tools.xcrun, env: this.env }, mode);
     if (mode === "control" && driver instanceof SimulatorScreen) throw new RunnerError("unsupported", NO_IOS_CONTROL);
     const stop = new AbortController();
     const control =
@@ -1475,10 +1475,14 @@ export const NO_IOS_CONTROL =
  * The driver for a phone's screen: adb for Android; for an iPhone the registered one (`registerIosScreenDriver`),
  * else a simulator's pictures only (`SimulatorScreen`). A real iPhone shows nothing without the test helper.
  */
-export function screenDriverFor(phone: RunnerPhone, tools: ScreenTools): PhoneScreenDriver {
+export function screenDriverFor(phone: RunnerPhone, tools: ScreenTools, mode: DesktopMode = "control"): PhoneScreenDriver {
   if (phone.platform === "android") {
     if (!tools.adb) throw new RunnerError("tool_missing", TOOL_HELP.adb);
     return new AndroidScreen(tools.adb, phone.serial, tools.env);
+  }
+  // Watching a simulator needs no test helper (its first build takes a while): simctl's pictures show it at once.
+  if (mode === "watch" && phone.kind === "simulator" && tools.xcrun) {
+    return new SimulatorScreen(tools.xcrun, phone.serial, tools.env);
   }
   const registered = iosScreenDriver?.(phone, tools) ?? null;
   if (registered) return registered;

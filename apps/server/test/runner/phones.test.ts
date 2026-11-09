@@ -1058,6 +1058,10 @@ test("iPhones: a simulator shows its pictures but takes no control, a real one n
     // A simulator the helper leaves alone keeps the built-in pictures.
     const sim = { platform: "ios", serial: SIM, kind: "simulator", model: "", osVersion: "", state: "ready" } as const;
     expect(screenDriverFor(sim, { adb: null, xcrun: "/x", env: {} })).toBeInstanceOf(SimulatorScreen);
+    // Watching a simulator never waits for the helper's first build, even when the helper drives it.
+    registerIosScreenDriver(() => helper);
+    expect(screenDriverFor(sim, { adb: null, xcrun: "/x", env: {} }, "watch")).toBeInstanceOf(SimulatorScreen);
+    expect(screenDriverFor(sim, { adb: null, xcrun: "/x", env: {} }, "control")).toBe(helper);
   } finally {
     registerIosScreenDriver(null);
   }
