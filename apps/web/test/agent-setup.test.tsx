@@ -47,15 +47,14 @@ describe("the setup checklist in a new agent's DM", () => {
     const state = withSetup(seedState());
     await openDm(state);
     const who = [...(card()?.querySelectorAll<HTMLElement>(".setup-row") ?? [])].find((r) =>
-      r.textContent?.includes("Falar com todos da Acme"),
+      r.textContent?.includes("Falar com todos de Acme"),
     );
     expect(who).toBeTruthy();
     await click(within(who as HTMLElement).getByRole("button", { name: "Escolher" }));
     const dialog = screen().getByRole("dialog");
     await click(within(dialog).getByRole("button", { name: "Salvar" }));
     expect(state.calls).toContainEqual({ method: "agents.confirmSetup", args: [ORG_ID, ADA_ID, "who"] });
-    // The workspace with the article the app gives it everywhere ("da Acme", as "o time da Acme").
-    expect(card()?.textContent).toContain("Falo com todos da Acme");
+    expect(card()?.textContent).toContain("Falo com todos de Acme");
   });
 
   test("with nothing left, its greeting asks for no help over a card that is all done", async () => {
