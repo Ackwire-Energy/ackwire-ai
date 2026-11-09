@@ -92,6 +92,12 @@ export const daysBetween = (iso: string, now: Date) =>
 export const capitalize = (s: string, locale?: string) => s.charAt(0).toLocaleUpperCase(locale) + s.slice(1);
 
 /**
+ * One fact of a line of facts kept whole ("há 40 min", "245 kB", "#eng ops"): its spaces don't break, so a narrow line
+ * breaks between facts, never inside one.
+ */
+export const keepWhole = (fact: string) => fact.replace(/ /g, "\u00a0");
+
+/**
  * A sentence's first letter in lower case, to follow a "·" ("Trabalhando · preencheu um campo"). German keeps it: its
  * nouns are capitalized, so only a translator knows a lowercase form there. A name ("GitHub", "PDF") stays as it is.
  */

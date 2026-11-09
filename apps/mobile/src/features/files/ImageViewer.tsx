@@ -139,15 +139,17 @@ function Viewer({
 
       <Chrome visible={chrome} drag={drag} style={[styles.top, { paddingTop: insets.top + 8 }]}>
         <Round icon="x" label={t("mobile.common.close")} onPress={close} />
+        <View style={styles.spacer} />
+        <Round icon="more" label={t("mobile.files.more")} onPress={() => actions.more(true)} disabled={!detail} />
+        {/* The name and its line on a row of their own under the buttons, the screen's width: never cut beside them. */}
         <View style={styles.title}>
-          <Text variant="subhead" style={[styles.bold, { color: WHITE }]} numberOfLines={1}>
+          <Text variant="subhead" style={[styles.bold, { color: WHITE }]} numberOfLines={3}>
             {info?.name ?? ""}
           </Text>
-          <Text variant="footnote" style={{ color: DIM }} numberOfLines={1}>
+          <Text variant="footnote" style={{ color: DIM }}>
             {sub}
           </Text>
         </View>
-        <Round icon="more" label={t("mobile.files.more")} onPress={() => actions.more(true)} disabled={!detail} />
       </Chrome>
 
       {/* Gone while zoomed, as the swipe is: the fingers move the picture then. */}
@@ -337,12 +339,14 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "center",
     gap: 10,
     paddingHorizontal: 14,
     paddingBottom: 10,
   },
-  title: { flex: 1, minWidth: 0, alignItems: "center" },
+  spacer: { flex: 1 },
+  title: { flexBasis: "100%", gap: 2 },
   bold: { fontWeight: "600" },
   round: { width: ROUND, height: ROUND, borderRadius: ROUND / 2 },
   center: { alignItems: "center", justifyContent: "center" },

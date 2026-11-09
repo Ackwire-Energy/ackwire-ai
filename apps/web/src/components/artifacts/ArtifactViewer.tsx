@@ -10,7 +10,7 @@ import {
 import { artifactText, KIND_ICON } from "@agenteschat/client/lib/artifacts";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { fileIcon, formatBytes, isPreviewImage, previewKind } from "@agenteschat/client/lib/files";
-import { relativeTime } from "@agenteschat/client/lib/format";
+import { keepWhole, relativeTime } from "@agenteschat/client/lib/format";
 import { filePath } from "@agenteschat/client/lib/message-links";
 import {
   Alert,
@@ -369,12 +369,13 @@ export function ArtifactViewer({
         a
           ? [
               place && sheet ? place : null,
+              // Each fact whole: a narrow head breaks the line between facts, never inside one.
               t(a.content.kind === "file" ? "artifacts.subtitleSize" : "artifacts.subtitle", {
-                kind: t(`artifacts.kind.${a.kind}`),
-                name: authorName(a.createdBy),
-                where: channel ? `#${channel.name}` : t("artifacts.noChannel"),
-                when: relativeTime(t, i18n.language, a.updatedAt),
-                size: a.content.kind === "file" ? formatBytes(i18n.language, a.content.size) : "",
+                kind: keepWhole(t(`artifacts.kind.${a.kind}`)),
+                name: keepWhole(authorName(a.createdBy)),
+                where: keepWhole(channel ? `#${channel.name}` : t("artifacts.noChannel")),
+                when: keepWhole(relativeTime(t, i18n.language, a.updatedAt)),
+                size: a.content.kind === "file" ? keepWhole(formatBytes(i18n.language, a.content.size)) : "",
               }),
             ]
               .filter(Boolean)

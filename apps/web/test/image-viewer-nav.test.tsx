@@ -5,6 +5,7 @@ setupDom();
 
 import { keys } from "@agenteschat/client";
 import { formatBytes } from "@agenteschat/client/lib/files";
+import { keepWhole } from "@agenteschat/client/lib/format";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { fileSaver } from "@/components/artifacts/ArtifactViewer";
 import { objectUrls } from "@/components/artifacts/FileView";
@@ -138,7 +139,7 @@ describe("moving through a message's pictures in the viewer", () => {
     await settle(4);
     expect(title()).toBe("tela-3.png");
     expect(place()).toBe("3 de 4");
-    expect(dialog().querySelector(".ac-details__subtitle")?.textContent).toContain(formatBytes("pt-BR", 7));
+    expect(dialog().querySelector(".ac-details__subtitle")?.textContent).toContain(keepWhole(formatBytes("pt-BR", 7)));
     await press("ArrowRight");
     expect(title()).toBe("tela-4.png");
     expect(place()).toBe("4 de 4");

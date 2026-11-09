@@ -262,8 +262,9 @@ test("a picture (an agent's screenshot): a big viewer, its details in the header
   // The title, its icon and details on the bar with the buttons, the size among the details.
   const bar = dialog.querySelector(".ac-details__bar") as HTMLElement;
   expect(bar.querySelector(".ac-details__title")?.textContent).toBe("tela.png");
+  // Each fact whole (no-break spaces inside one): a narrow head breaks the line between facts.
   expect(bar.querySelector(".ac-details__subtitle")?.textContent).toBe(
-    "Arquivo · Walter · sem canal · agora · 7 bytes",
+    "Arquivo · Walter · sem\u00a0canal · agora · 7\u00a0bytes",
   );
   expect(within(bar).getByRole("button", { name: "Baixar" })).toBeTruthy();
   expect(dialog.querySelector(".file-view__head, .file-summary")).toBeNull();
