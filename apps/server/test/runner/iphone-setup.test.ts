@@ -160,7 +160,9 @@ test("a failed download says why, and the next ask starts it again", async () =>
   }
   expect(now.platform).toEqual({ state: "failed", message: "Download failed: the network connection was lost." });
   await setup.start();
-  expect(calls().filter(([tool, flag]) => tool === "xcodebuild" && flag === "-downloadPlatform")).toHaveLength(2);
+  await waitFor(
+    () => calls().filter(([tool, flag]) => tool === "xcodebuild" && flag === "-downloadPlatform").length === 2,
+  );
 });
 
 test("opens Xcode, or its App Store page", async () => {
