@@ -3495,6 +3495,23 @@ html:not([data-pointer]) .ac-back:focus-visible {
   align-items: flex-start;
   gap: 12px;
 }
+/*
+ * The kind's tile (or a face) at the title's start: the lines as tall as it go beside it, every later one (a title's
+ * second line, the line under it) under it at the head's width, so it never keeps a column beside three lines.
+ */
+.ac-details__heading:has(> .ac-details__icon) {
+  display: flow-root;
+}
+.ac-details__heading > .ac-details__icon {
+  float: left;
+  margin: 0 12px 4px 0;
+}
+.ac-details__heading:has(> .ac-details__icon) > .ac-details__titles {
+  display: block;
+}
+.ac-details__heading:has(> .ac-details__icon) > .ac-details__titles > .ac-details__subtitle {
+  margin-top: 4px;
+}
 .ac-details__icon {
   flex: none;
   display: inline-flex;
