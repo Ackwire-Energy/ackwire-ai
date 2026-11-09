@@ -10,6 +10,7 @@ import {
   pickedOf,
   whoSeesLabel,
 } from "@agenteschat/client/lib/who-sees";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import {
   Avatar,
   Button,
@@ -26,10 +27,15 @@ import { type ReactNode, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
+import { usePersonalView } from "@/hooks/usePersonalView";
 import { useToast } from "@/lib/toast";
 import "./who-sees.css";
 
-const KINDS: { kind: AudienceKind; icon: "audienceEveryone" | "lock" | "person"; label: string }[] = [
+const KINDS: {
+  kind: AudienceKind;
+  icon: "audienceEveryone" | "lock" | "person";
+  label: "whoSees.everyone" | "whoSees.me" | "whoSees.people";
+}[] = [
   { kind: "everyone", icon: "audienceEveryone", label: "whoSees.everyone" },
   { kind: "me", icon: "lock", label: "whoSees.me" },
   { kind: "people", icon: "person", label: "whoSees.people" },
@@ -41,7 +47,7 @@ export function useWhoSeesLabel() {
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   return (a: { mode: "everyone" | "people"; userIds?: readonly string[] }) =>
-    whoSeesLabel(t, a, me.user.id, (id) => dir.members.find((m) => m.userId === id)?.name);
+    whoSeesLabel(t, a, me.user.id, (id) => dir.members.find((m) => m.userId === id)?.name, org);
 }
 
 /**
@@ -103,7 +109,8 @@ export function WhoSeesButton({
 
 /**
  * "Quem vê" (ADR 0151), for a task and a wiki page alike: everyone, only me, or specific people. Administrators always
- * see, so one may leave themselves out of a list; anyone else stays in it.
+ * see, so one may leave themselves out of a list; anyone else stays in it. A personal workspace says it its way, and
+ * alone, leaves out who else sees it: nobody else is there (ADR 0159).
  */
 export function WhoSeesDialog({
   title,
@@ -136,12 +143,15 @@ export function WhoSeesDialog({
   });
   const [picked, setPicked] = useState<ReadonlySet<string>>(() => pickedOf(value, myId));
   const stays = !can(org, "administrator");
+  const { solo } = usePersonalView();
   const [q, setQ] = useState("");
   const people = useMemo(() => {
     const words = q.trim().toLowerCase();
     return dir.members.filter((m) => !words || `${m.name} ${m.email}`.toLowerCase().includes(words));
   }, [dir.members, q]);
   const ready = kind !== "people" || picked.size > 0;
+  const admins = solo ? undefined : t(modeKey(org, "whoSees.admins"));
+  const noteText = [note, kind === "people" ? peopleNote : undefined, admins].filter(Boolean).join(" ");
   const toggle = (id: string, on: boolean) =>
     setPicked((now) => {
       const next = new Set(now);
@@ -174,7 +184,9 @@ export function WhoSeesDialog({
                   <Icon name={k.icon} size={16} />
                 </span>
                 <span className="ac-mediarow__head">
-                  <span className="ac-option__title">{t(k.label as "whoSees.everyone")}</span>
+                  <span className="ac-option__title">
+                    {t(k.kind === "everyone" ? modeKey(org, "whoSees.everyone") : k.label)}
+                  </span>
                 </span>
               </OptionCard>
             ))}
@@ -209,9 +221,7 @@ export function WhoSeesDialog({
               </ul>
             </>
           )}
-          <p className="small muted who-sees__note">
-            {[note, kind === "people" ? peopleNote : undefined, t("whoSees.admins")].filter(Boolean).join(" ")}
-          </p>
+          {noteText && <p className="small muted who-sees__note">{noteText}</p>}
         </Locked>
       </DialogBody>
       <DialogFooter>

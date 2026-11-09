@@ -57,7 +57,7 @@ describe("web addresses → the app's screens", () => {
     const to = (path: string) => (linkOf(`${W}/org/${O}${path}`) as { to?: string }).to;
     expect(to("")).toBe("/");
     expect(to("/home")).toBe("/");
-    expect(to("/threads")).toBe("/threads");
+    expect(to("/threads")).toBe("/conversations/threads");
     expect(to("/agents/a1")).toBe("/agent/a1");
     expect(to("/agents/a1/memory")).toBe("/memory?agent=a1");
     expect(to("/agents/new")).toBe("/new-agent");

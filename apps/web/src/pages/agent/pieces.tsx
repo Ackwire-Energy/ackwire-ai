@@ -1,10 +1,13 @@
 import type { Channel, Run } from "@agenteschat/client";
 import { useChannels, useDms } from "@agenteschat/client";
+import { keeperKey } from "@agenteschat/client/lib/personal-view";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import { Chip, Icon } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { AgentSpinner } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
+import { useKeeperName } from "@/hooks/usePersonalView";
 import type { Field } from "@/lib/agent-edit";
 import { useAgentEdit } from "./context";
 
@@ -12,9 +15,12 @@ import { useAgentEdit } from "./context";
  * Who edits here, for those who can't edit everything: members read; the
  * owner (responsável) changes the look, audience and computer.
  * `field`: only when that part is read-only for the viewer.
+ * A personal workspace names who runs it instead of "admins" (`keeperKey`, ADR 0159).
  */
 export function ReadOnlyNote({ field }: { field?: Field }) {
   const { t } = useTranslation();
+  const { org } = useOrg();
+  const keeper = useKeeperName();
   const { viewer, g, ownerFirst, can } = useAgentEdit();
   if (viewer === "admin") return null;
   if (field && can(field)) return null;
@@ -25,10 +31,10 @@ export function ReadOnlyNote({ field }: { field?: Field }) {
         <Icon name="person" size={16} />
         <span>
           {field === "instructions"
-            ? t("agentPage.readOnly.ownerInstructions")
+            ? t(keeperKey(org, keeper, "agentPage.readOnly.ownerInstructions"), { keeper })
             : field === "levels"
-              ? t("agentPage.readOnly.ownerAccess")
-              : t("agentPage.readOnly.owner", g)}
+              ? t(keeperKey(org, keeper, "agentPage.readOnly.ownerAccess"), { keeper })
+              : t(keeperKey(org, keeper, "agentPage.readOnly.owner"), { ...g, keeper })}
         </span>
       </p>
     );
@@ -38,8 +44,8 @@ export function ReadOnlyNote({ field }: { field?: Field }) {
       <Icon name="info" size={16} />
       <span>
         {ownerFirst
-          ? t("agentPage.readOnly.memberOwner", { ...g, owner: ownerFirst })
-          : t("agentPage.readOnly.member", g)}
+          ? t(modeKey(org, "agentPage.readOnly.memberOwner"), { ...g, owner: ownerFirst })
+          : t(keeperKey(org, keeper, "agentPage.readOnly.member"), { ...g, keeper })}
       </span>
     </p>
   );

@@ -83,7 +83,7 @@ function ProposalCard({ proposal }: { proposal: Proposal }) {
       <CardHeader
         id={`prop-${proposal.id}`}
         icon="document"
-        title={proposalTitle(t, proposal, org.name, () => agent.name)}
+        title={proposalTitle(t, proposal, org, () => agent.name)}
         action={
           proposal.stale ? (
             <Chip icon="close">{t("proposals.stale")}</Chip>

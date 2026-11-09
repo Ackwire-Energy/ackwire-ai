@@ -1,5 +1,6 @@
 import { computerName } from "@agenteschat/client/lib/computer";
 import { errorText } from "@agenteschat/client/lib/errors";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Platform, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
@@ -42,7 +43,12 @@ export function PhoneScreen({ phoneId }: { phoneId: string }) {
       </SettingsPage>
     );
   }
-  const host = computerName(t, org?.name ?? "", { kind: found.computer.machineKind, name: found.computer.name });
+  const host = computerName(
+    t,
+    org?.name ?? "",
+    { kind: found.computer.machineKind, name: found.computer.name },
+    isPersonal(org),
+  );
   const s = p.status;
   const holder = s.kind === "in_use" ? s : null;
   // An iPhone follows its Mac: its row shows and changes the Mac's rule (the footer says so).

@@ -16,6 +16,7 @@ import { can } from "@agenteschat/client/lib/permissions";
 import { modelLimitText } from "@agenteschat/client/lib/plan-usage";
 import { brainPlan, geminiPersonal, isPlanId, planFreeHint, planOf } from "@agenteschat/client/lib/plans";
 import { apiProviderOf, isAuto, providerLabel } from "@agenteschat/client/lib/providers";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { extraUsageOn, limitOffers, planState } from "@agenteschat/ui/plan-state";
 import { useQueryClient } from "@tanstack/react-query";
 import { Fragment, useEffect, useState } from "react";
@@ -150,7 +151,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
       ...(kind && !planOf(a?.provider) ? { intent: planOfKind(kind) } : {}),
       ...(also && a?.email ? { email: a.email } : {}),
     });
-  const computer = computerNameOf(t, org?.name ?? "", view?.computer?.name ?? "");
+  const computer = computerNameOf(t, org?.name ?? "", view?.computer?.name ?? "", isPersonal(org));
   const mayPick = view !== undefined && !busy;
   const choose = (a: MachineAccount | null) => {
     if (!view || !mayPick || (a?.id ?? null) === view.account) return;

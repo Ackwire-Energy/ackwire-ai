@@ -320,7 +320,10 @@ const TeamProposalCard = z
           line: z.string(),
           instructions: z.string(),
           appearance: AgentAppearance.nullable(),
-          channel: z.string(),
+          channel: z.string().openapi({
+            description:
+              "The channel it lives in, by name; empty when it lives in its DM with the person instead (a personal workspace's template, ADR 0159).",
+          }),
           routines: z.array(TeamRoutine),
           firstTask: z.string().nullable(),
         }),
@@ -1243,7 +1246,9 @@ export function agentRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/team-templates",
       tags,
       security,
-      summary: 'The team templates by business type ("Ver modelos de time"), in your language',
+      summary: 'The team templates ("See team templates"), in your language',
+      description:
+        "By business type; in a personal workspace, by area of the person's life instead, whose agents live in their DM with the person and make no channel (ADR 0159). Any template's id can be used in either mode.",
       request: { params: OrgParams, query: z.object({ locale: z.string().max(20).optional() }) },
       responses: { 200: json(z.object({ templates: z.array(TemplateView) })), ...errors },
     }),

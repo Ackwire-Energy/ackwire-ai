@@ -1,5 +1,6 @@
 import type { PhoneDevice } from "@agenteschat/client";
 import { computerName } from "@agenteschat/client/lib/computer";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import * as Device from "expo-device";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -48,7 +49,9 @@ export function AndroidSetupScreen({ machineId }: { machineId?: string }) {
   const { list, hosts, host, setPicked } = useHost(machineId);
   const [opened, setOpened] = useState({ about: false, usb: false, wifi: false });
   const [wifi, setWifi] = useState(false);
-  const hostName = host ? computerName(t, org?.name ?? "", { kind: host.machineKind, name: host.name }) : "";
+  const hostName = host
+    ? computerName(t, org?.name ?? "", { kind: host.machineKind, name: host.name }, isPersonal(org))
+    : "";
   const phone = host ? thisPhoneOn(host.phones, "android", Device.modelName) : null;
   const stage = androidStage(phone);
   if (host && phone && stage === "done") return <AndroidDone phone={phone} hostName={hostName} />;

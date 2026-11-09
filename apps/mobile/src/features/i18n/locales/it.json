@@ -138,6 +138,7 @@
     "refuseTitle": "Rifiuta la richiesta",
     "refuseAsk": "Rifiutare la richiesta?",
     "leaves": "esce dall'azienda",
+    "leavesPersonal": "esce dal tuo spazio di lavoro",
     "refuseWhyF": "{{name}} impara dal motivo. Facoltativo.",
     "refuseWhyM": "{{name}} impara dal motivo. Facoltativo.",
     "sheet": {
@@ -173,6 +174,7 @@
       "irreversible": "Non si può annullare",
       "reversible": "Si può annullare",
       "external": "Esce dall'azienda",
+      "externalPersonal": "Esce dal tuo spazio di lavoro",
       "unsent": "Non viene inviato nulla",
       "deletable": "Si può eliminare"
     },
@@ -245,6 +247,9 @@
     "newChannelHint": "Per un team o un argomento",
     "channelPlaceholder": "Nome del canale, es. marketing",
     "createChannel": "Crea canale",
+    "newChannelHintPersonal": "Per un argomento, con più agenti",
+    "channelPlaceholderPersonal": "Nome, es. viaggio",
+    "createChannelPersonal": "Crea conversazione di gruppo",
     "waitIn": "in {{where}}",
     "workingNowLine_one": "{{count}} agente al lavoro ora",
     "workingNowLine_many": "{{count}} agenti al lavoro ora",
@@ -256,6 +261,7 @@
       "unmute": "Riattiva"
     },
     "firstRunLine": "{{name}} sta preparando il team · {{done}} di {{total}}",
+    "firstRunLinePersonal": "{{name}} sta preparando i tuoi agenti · {{done}} di {{total}}",
     "first": {
       "title": "Inizia con il tuo primo agente",
       "subtitle": "Dagli un nome e scrivi cosa fa. Compare qui, come una chat.",
@@ -284,6 +290,8 @@
     "chat": "Chatta con…",
     "name": "Nome",
     "channelFine": "Per un team o un argomento.",
+    "channelPersonal": "Conversazione di gruppo",
+    "channelFinePersonal": "Per un argomento, con più agenti.",
     "chatSearch": "Cerca una persona o un agente",
     "to": "A:",
     "people": "Persone",
@@ -296,6 +304,7 @@
     "routineHint": "Un agente lo fa da solo, all'orario previsto",
     "wikiPage": "Pagina wiki",
     "wikiHint": "Da leggere per il team e gli agenti",
+    "wikiHintPersonal": "Da leggere per i tuoi agenti",
     "inviteHint": "Via email o link",
     "agent": {
       "question": "Cosa farà?"
@@ -475,12 +484,14 @@
       "arrived": "{{name}} si è unito al team",
       "meet": "La tua prima conversazione con {{name}}",
       "roleIntro": "{{role}} nel tuo team. Chiedi con parole semplici.",
+      "roleIntroPersonal": "{{role}}, qui per te. Chiedi con parole semplici.",
       "noIntro": "Chiedi quello che ti serve, con parole semplici.",
       "firstTitle": "Per iniziare",
       "sendHint": "Tocca per inviare",
       "hello": "Ciao, {{person}}! Sono {{name}}.",
       "helloNoName": "Ciao! Sono {{name}}.",
       "helloRole": "{{role}} nel team.",
+      "helloRolePersonal": "{{role}}, qui per te.",
       "helloAsk": "Da dove cominciamo?",
       "now": "ora",
       "start": {
@@ -810,6 +821,7 @@
     "noGroupSection": "Nessun reparto",
     "workingSection": "Al lavoro",
     "teamSection": "Team",
+    "teamSectionPersonal": "I tuoi agenti",
     "managerQuiet": "Niente in corso",
     "state": {
       "waitsYou": "aspetta il tuo ok",
@@ -1114,7 +1126,9 @@
     "title": "Tu",
     "role": {
       "owner": "proprietario",
-      "member": "membro"
+      "member": "membro",
+      "ownerPersonal": "il tuo workspace personale",
+      "memberPersonal": "un workspace personale condiviso con te"
     },
     "appearance": "Aspetto",
     "notifications": "Notifiche",
@@ -2083,6 +2097,7 @@
     "loadFailed": "Non è stato possibile caricare i connettori.",
     "connectedCheck": "{{name}}, connesso",
     "adminsOnly": "Solo un admin di {{org}} collega i servizi. Chiedi a uno di loro.",
+    "adminsOnlyPersonal": "Solo chi gestisce questo spazio di lavoro collega le app. Chiedi a questa persona.",
     "canTitle": "Gli agenti potranno",
     "asks": "{{text}} · chiede la tua approvazione",
     "connect": "Collega",
@@ -2231,6 +2246,7 @@
     "zoneChange": "Cambia",
     "zoneTitle": "Fuso orario",
     "anotherTitle": "Come si chiama il nuovo spazio di lavoro?",
+    "anotherPurpose": "A cosa serve il nuovo spazio di lavoro?",
     "anotherLead": "Su agentes.chat. Resti in {{org}} e puoi cambiare quando vuoi.",
     "suggested": "In base alla tua email di {{domain}}, ho suggerito {{org}}.",
     "create": "Crea",
@@ -2636,7 +2652,11 @@
       "title": "Crea il tuo team di agenti",
       "text": "Ogni agente assume un ruolo e lavora con te direttamente in chat.",
       "viewerTitle": "Il tuo team di agenti è qui",
-      "viewerText": "Chi crea gli agenti in questo workspace aggiunge il primo, e compare qui."
+      "viewerText": "Chi crea gli agenti in questo workspace aggiunge il primo, e compare qui.",
+      "titlePersonal": "Fatti aiutare dai tuoi agenti",
+      "textPersonal": "Ogni agente si occupa di una cosa per te, direttamente in chat.",
+      "viewerTitlePersonal": "I tuoi agenti sono qui",
+      "viewerTextPersonal": "Chi crea agenti qui aggiunge il primo, e compare qui."
     },
     "agentsForYou": {
       "title": "I tuoi agenti compaiono qui",
@@ -2646,13 +2666,20 @@
       "title": "Tutto ciò che il team crea, in un solo posto",
       "text": "Report, tabelle e file di agenti e persone restano qui, facili da trovare.",
       "viewerTitle": "Trova ciò che il team crea",
-      "viewerText": "Qui compare ciò che agenti e persone creano nelle chat."
+      "viewerText": "Qui compare ciò che agenti e persone creano nelle chat.",
+      "titlePersonal": "Tutto ciò che creano i tuoi agenti, in un solo posto",
+      "textPersonal": "Report, tabelle e file dei tuoi agenti restano qui, facili da trovare.",
+      "viewerTitlePersonal": "Trova ciò che creano i tuoi agenti",
+      "viewerTextPersonal": "Qui compare ciò che gli agenti creano nelle tue chat."
     },
     "tasks": {
       "title": "Affida il lavoro al team",
       "text": "Crea un'attività per un agente o una persona e seguila fino alla fine.",
       "viewerTitle": "Segui il lavoro del team",
-      "viewerText": "Le attività compaiono qui appena qualcuno crea la prima."
+      "viewerText": "Le attività compaiono qui appena qualcuno crea la prima.",
+      "titlePersonal": "Affida le tue cose da fare ai tuoi agenti",
+      "textPersonal": "Crea un'attività per un agente e seguila fino alla fine.",
+      "viewerTitlePersonal": "Segui il lavoro dei tuoi agenti"
     },
     "routines": {
       "title": "Lascia il lavoro ripetitivo ai tuoi agenti",
@@ -2664,7 +2691,10 @@
       "title": "Conserva ciò che il team deve sapere",
       "text": "Persone e agenti leggono queste pagine, così tutti lavorano con le stesse informazioni.",
       "viewerTitle": "Consulta ciò che il team sa",
-      "viewerText": "Chi modifica la wiki scrive la prima pagina, e compare qui."
+      "viewerText": "Chi modifica la wiki scrive la prima pagina, e compare qui.",
+      "titlePersonal": "Tieni note che i tuoi agenti possono leggere",
+      "textPersonal": "I tuoi agenti leggono queste pagine e lavorano con ciò che hai scritto.",
+      "viewerTitlePersonal": "Consulta ciò che è scritto qui"
     },
     "memory": {
       "title": "I tuoi agenti imparano lavorando",
@@ -2687,13 +2717,21 @@
       "text": "Ogni canale riunisce chi si occupa di un argomento.",
       "viewerTitle": "I canali del team sono qui",
       "viewerText": "Chi crea i canali apre il primo, e compare qui.",
-      "action": "Crea canale"
+      "action": "Crea canale",
+      "titlePersonal": "Parla con più agenti insieme",
+      "textPersonal": "Ogni conversazione di gruppo riunisce gli agenti e le persone su un argomento.",
+      "viewerTitlePersonal": "Le conversazioni di gruppo sono qui",
+      "viewerTextPersonal": "Chi crea conversazioni di gruppo apre la prima, e compare qui."
     },
     "people": {
       "title": "Lavora qui con il tuo team",
       "text": "Invita persone per parlare con loro e con i tuoi agenti in un solo posto.",
       "viewerTitle": "Il tuo team compare qui",
-      "viewerText": "Chi invita le persone porta il resto del team, e compaiono qui."
+      "viewerText": "Chi invita le persone porta il resto del team, e compaiono qui.",
+      "titlePersonal": "Porta qui la tua famiglia o i tuoi amici",
+      "textPersonal": "Invita qualcuno a parlare con te e con i tuoi agenti in un solo posto.",
+      "viewerTitlePersonal": "Famiglia e amici compaiono qui",
+      "viewerTextPersonal": "Quando qualcuno si unisce, compare qui."
     },
     "chat": {
       "title": "Tutto inizia con un messaggio",
@@ -2713,7 +2751,11 @@
       "title": "Condividi gli accessi senza passarti le password",
       "text": "Salva i login e le chiavi che i tuoi agenti usano per il team.",
       "viewerTitle": "I login del team compaiono qui",
-      "viewerText": "Quando qualcuno condivide con te un login o una chiave, compare qui."
+      "viewerText": "Quando qualcuno condivide con te un login o una chiave, compare qui.",
+      "titlePersonal": "Tieni gli accessi condivisi in un solo posto",
+      "textPersonal": "Salva gli accessi e le chiavi che i tuoi agenti usano per tutti qui.",
+      "viewerTitlePersonal": "Gli accessi condivisi compaiono qui",
+      "viewerTextPersonal": "Quando qualcuno qui condivide con te un accesso o una chiave, compare qui."
     },
     "skills": {
       "title": "Insegna ai tuoi agenti come lavorate",

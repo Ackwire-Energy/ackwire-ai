@@ -80,6 +80,7 @@ test("a link only asks: the same link every time, no sign-up from it, and an app
     role: "member",
     kind: "link",
     invitedBy: "owner",
+    mode: "team",
     agents: [{ id: agentId, name: "Dev", appearance: null }],
   });
   // The link's token never opens sign-up, nor joins anyone.

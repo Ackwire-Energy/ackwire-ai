@@ -11,6 +11,7 @@ import {
   sectorLineChanges,
   sectorSupervisor,
 } from "@agenteschat/client/lib/team-views";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { CountChip, RoleMark, Segmented } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { type DragEvent, Fragment, type HTMLAttributes, useState } from "react";
@@ -228,13 +229,16 @@ function ByPerson({ team, groups }: { team: Team; groups: AgentGroup[] }) {
     <div className="team-tree">
       <div className="team-tree__top">
         <span className="team-tree__org">
-          <span className="team-node team-node--org">
-            <OrgMark logo={org.logo} size={32} />
-            <span className="team-node__text">
-              <b className="ac-captop">{org.name}</b>
-              <span className="muted">{t("team.chart.workspace")}</span>
+          {/* The workspace on top; a personal workspace names none (ADR 0159), its right hand alone there. */}
+          {!isPersonal(org) && (
+            <span className="team-node team-node--org">
+              <OrgMark logo={org.logo} size={32} />
+              <span className="team-node__text">
+                <b className="ac-captop">{org.name}</b>
+                <span className="muted">{t("team.chart.workspace")}</span>
+              </span>
             </span>
-          </span>
+          )}
           {lodi && <LodiChip lodi={lodi} />}
         </span>
       </div>

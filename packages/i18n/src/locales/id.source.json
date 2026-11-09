@@ -1391,6 +1391,54 @@
   "invite.enteringReady": {
     "value": "Your account is ready."
   },
+  "invite.personalName": {
+    "value": "{{name}}'s workspace"
+  },
+  "invite.personalNameNoName": {
+    "value": "A personal workspace"
+  },
+  "invite.helloPersonal": {
+    "value": "Hi. {{name}} invited you in."
+  },
+  "invite.helloNoNamePersonal": {
+    "value": "Hi. You were invited to a personal workspace."
+  },
+  "invite.nameLeadPersonal": {
+    "value": "First: what should the agents call you?"
+  },
+  "invite.newPasswordLeadPersonal": {
+    "value": "You'll use it to get in now and every time after."
+  },
+  "invite.enterPersonal": {
+    "value": "Join"
+  },
+  "invite.calledYouPersonal": {
+    "value": "{{name}} invited you in."
+  },
+  "invite.calledYouNoNamePersonal": {
+    "value": "You were invited to a personal workspace."
+  },
+  "invite.passwordLeadPersonal": {
+    "value": "{{name}} invited you. Your password, and you're in."
+  },
+  "invite.passwordLeadNoNamePersonal": {
+    "value": "You were invited. Your password, and you're in."
+  },
+  "invite.otherLeadPersonal": {
+    "value": "You're signed in as {{other}}. Sign in with the invited email to get in."
+  },
+  "invite.fullTitlePersonal": {
+    "value": "This workspace has no seat left right now."
+  },
+  "invite.enteringPersonal": {
+    "value": "Joining"
+  },
+  "invite.usedTitlePersonal": {
+    "value": "You're already in."
+  },
+  "invite.openPersonal": {
+    "value": "Open"
+  },
   "invite.ask.title": {
     "value": "Ask to join {{org}}"
   },
@@ -1571,6 +1619,33 @@
   "invite.ask.endedLead": {
     "value": "If it was approved, sign in with your account."
   },
+  "invite.ask.titlePersonal": {
+    "value": "Ask to join this workspace"
+  },
+  "invite.ask.helloPersonal": {
+    "value": "Hi. This is an invitation to a personal workspace."
+  },
+  "invite.ask.waitTitlePersonal": {
+    "value": "Done. Your request was sent."
+  },
+  "invite.ask.waitCardPersonal": {
+    "value": "Waiting for an answer"
+  },
+  "invite.ask.inTitlePersonal": {
+    "value": "You're in"
+  },
+  "invite.ask.memberTitlePersonal": {
+    "value": "You're already in"
+  },
+  "invite.ask.openPersonal": {
+    "value": "Open"
+  },
+  "invite.ask.approvedInPersonal": {
+    "value": "Approved. You're in."
+  },
+  "invite.ask.deniedTextPersonal": {
+    "value": "If you think it's a mistake, ask whoever sent you the link to invite you."
+  },
   "onboarding.stepsLabel": {
     "value": "Steps to get started"
   },
@@ -1669,6 +1744,33 @@
   },
   "onboarding.yourCompany": {
     "value": "your company"
+  },
+  "onboarding.purpose.title": {
+    "value": "What will you use agentes.chat for?"
+  },
+  "onboarding.purpose.lead": {
+    "value": "You can change this later, nothing is lost."
+  },
+  "onboarding.purpose.personal": {
+    "value": "For me"
+  },
+  "onboarding.purpose.personalText": {
+    "value": "Agents that look after your day."
+  },
+  "onboarding.purpose.team": {
+    "value": "For my company or team"
+  },
+  "onboarding.purpose.teamText": {
+    "value": "People and agents work together, with channels, roles and approvals."
+  },
+  "onboarding.purpose.personalExamples": {
+    "value": "Your day at 7 · Bills · Training"
+  },
+  "onboarding.purpose.teamExamples": {
+    "value": "Customer support · Finance · Reports"
+  },
+  "onboarding.personal.name": {
+    "value": "Personal"
   },
   "onboarding.workspace.title": {
     "value": "What's your workspace called?"
@@ -3185,6 +3287,9 @@
   "shell.otherChannels": {
     "value": "Other channels"
   },
+  "shell.otherChannelsPersonal": {
+    "value": "Other group conversations"
+  },
   "shell.titleBar.back": {
     "value": "Back"
   },
@@ -3230,6 +3335,36 @@
   "shell.moreWhat.taskManager": {
     "value": "What each agent does now, and stop what you need"
   },
+  "shell.moreWhat.approvalsPersonal": {
+    "value": "What your agents ask you to allow"
+  },
+  "shell.moreWhat.proposalsPersonal": {
+    "value": "What your agents propose to change"
+  },
+  "shell.moreWhat.threadsPersonal": {
+    "value": "Side conversations, and missions"
+  },
+  "shell.moreWhat.issuesPersonal": {
+    "value": "Your to-dos and your agents'"
+  },
+  "shell.moreWhat.wikiPersonal": {
+    "value": "Notes your agents can read"
+  },
+  "shell.moreWhat.calendarPersonal": {
+    "value": "Your appointments and deadlines"
+  },
+  "shell.moreWhat.teamPersonal": {
+    "value": "Your agents, and who else is here"
+  },
+  "shell.moreWhat.dashboardsPersonal": {
+    "value": "Numbers and charts your agents keep up to date"
+  },
+  "shell.moreWhat.taskManagerPersonal": {
+    "value": "What your agents do now, and stop what you need"
+  },
+  "shell.moreWhat.homePersonal": {
+    "value": "Your day: what waits for you and what your agents are doing"
+  },
   "shell.customizeSidebar": {
     "value": "Customize sidebar"
   },
@@ -3239,8 +3374,14 @@
   "shell.sidebarMenu.newChannel": {
     "value": "New channel"
   },
+  "shell.sidebarMenu.newChannelPersonal": {
+    "value": "New group conversation"
+  },
   "shell.sidebarMenu.addToChannels": {
     "value": "New channel or category"
+  },
+  "shell.sidebarMenu.addToChannelsPersonal": {
+    "value": "New group conversation or category"
   },
   "shell.sidebarMenu.newMessage": {
     "value": "New message"
@@ -3451,6 +3592,9 @@
   },
   "shell.channels": {
     "value": "Channels"
+  },
+  "shell.channelsPersonal": {
+    "value": "Group conversations"
   },
   "shell.agents": {
     "value": "Agents"
@@ -3667,6 +3811,12 @@
   },
   "sidebarAgents.createFirst": {
     "value": "Create the first agent"
+  },
+  "sidebarAgents.createFirstPersonal": {
+    "value": "Create your first agent"
+  },
+  "sidebarAgents.newAgent": {
+    "value": "New agent"
   },
   "sidebarAgents.working": {
     "value": {
@@ -4811,6 +4961,9 @@
   "rightHand.role": {
     "value": "Workspace assistant"
   },
+  "rightHand.rolePersonal": {
+    "value": "Personal assistant"
+  },
   "rightHand.actsAsYou": {
     "value": "acts with your permissions"
   },
@@ -4820,17 +4973,32 @@
   "rightHand.intro.greeting": {
     "value": "Hi, I'm {{name}}. I'll build the team with you."
   },
+  "rightHand.intro.greetingPersonal": {
+    "value": "Hi, I'm {{name}}. I'll set up your agents with you."
+  },
   "rightHand.intro.lead": {
     "value": "I create the agents, connect the apps and invite the people. Nothing changes unless you ask, and I only do what you can do."
+  },
+  "rightHand.intro.leadPersonal": {
+    "value": "I create your agents and connect your apps. Nothing changes unless you ask."
   },
   "rightHand.intro.heldLead": {
     "value": "Pick what your business does and the team shows up here. The agents start working once the workspace has an agentes.chat plan."
   },
+  "rightHand.intro.heldLeadPersonal": {
+    "value": "Pick what you want help with and your agents show up here. They start working once you have an agentes.chat plan."
+  },
   "rightHand.intro.connect.title": {
     "value": "Connect an AI for the team"
   },
+  "rightHand.intro.connect.titlePersonal": {
+    "value": "Connect an AI for your agents"
+  },
   "rightHand.intro.connect.text": {
     "value": "The agents think with the workspace's AI. Sign in with your Claude or ChatGPT plan, no API key needed."
+  },
+  "rightHand.intro.connect.textPersonal": {
+    "value": "Your agents think with this AI. Sign in with your Claude or ChatGPT plan, no API key needed."
   },
   "rightHand.intro.connect.action": {
     "value": "Connect"
@@ -4843,6 +5011,15 @@
   },
   "rightHand.intro.again.message": {
     "value": "Help me build the team."
+  },
+  "rightHand.intro.again.questionPersonal": {
+    "value": "Want to set up more agents with me?"
+  },
+  "rightHand.intro.again.actionPersonal": {
+    "value": "Set up agents"
+  },
+  "rightHand.intro.again.messagePersonal": {
+    "value": "Help me set up my agents."
   },
   "rightHand.intro.next.firstTask": {
     "value": "Give {{name}} a first task"
@@ -6586,6 +6763,9 @@
   "teamChecks.someone": {
     "value": "Didn't repeat: someone on the team already did this with {{target}} {{when}}"
   },
+  "teamChecks.someonePersonal": {
+    "value": "Didn't repeat: this was already done with {{target}} {{when}}"
+  },
   "teamChecks.inChannel": {
     "value": "in #{{channel}}"
   },
@@ -6925,11 +7105,17 @@
   "newChannel.title": {
     "value": "Create channel"
   },
+  "newChannel.titlePersonal": {
+    "value": "New group conversation"
+  },
   "newChannel.name": {
     "value": "Name"
   },
   "newChannel.namePlaceholder": {
     "value": "e.g. marketing"
+  },
+  "newChannel.namePlaceholderPersonal": {
+    "value": "e.g. trip"
   },
   "newChannel.nameHelp": {
     "value": "Lowercase letters, digits and hyphens. Shows as #{{name}}."
@@ -6939,6 +7125,9 @@
   },
   "newChannel.nameTaken": {
     "value": "There is already a #{{name}} channel."
+  },
+  "newChannel.nameTakenPersonal": {
+    "value": "There is already a group conversation called #{{name}}."
   },
   "newChannel.topic": {
     "value": "Description"
@@ -6952,14 +7141,26 @@
   "newChannel.public": {
     "value": "Public"
   },
+  "newChannel.publicPersonal": {
+    "value": "Everyone here can join"
+  },
   "newChannel.publicDesc": {
     "value": "Anyone in the workspace sees and joins it."
+  },
+  "newChannel.publicDescPersonal": {
+    "value": "Anyone here sees and joins it."
   },
   "newChannel.private": {
     "value": "Private"
   },
+  "newChannel.privatePersonal": {
+    "value": "Only who I add"
+  },
   "newChannel.privateDesc": {
     "value": "Only who is added."
+  },
+  "newChannel.privateDescPersonal": {
+    "value": "Only the people you add see it."
   },
   "newChannel.roles": {
     "value": "Departments or roles"
@@ -6999,6 +7200,9 @@
   },
   "newChannel.members": {
     "value": "Initial members"
+  },
+  "newChannel.membersPersonal": {
+    "value": "Who's in it"
   },
   "newChannel.membersSearch": {
     "value": "Search people or agents"
@@ -7170,6 +7374,12 @@
   },
   "channelMembers.inviteOrg": {
     "value": "Invite {{email}} to {{org}}"
+  },
+  "channelMembers.invitePersonal": {
+    "value": "Invite {{email}} to your workspace and #{{channel}}"
+  },
+  "channelMembers.inviteOrgPersonal": {
+    "value": "Invite {{email}} to your workspace"
   },
   "channelMembers.addTitle": {
     "value": "Add to #{{channel}}"
@@ -7848,6 +8058,9 @@
   "vault.tab.team": {
     "value": "Team"
   },
+  "vault.tab.teamPersonal": {
+    "value": "Shared"
+  },
   "vault.tab.personal": {
     "value": "Personal"
   },
@@ -7884,6 +8097,9 @@
   "vault.list.teamEmpty": {
     "value": "Share logins without passing passwords around"
   },
+  "vault.list.teamEmptyPersonal": {
+    "value": "Keep shared logins in one place"
+  },
   "vault.list.teamEmptyText": {
     "value": "Save a login, a key or contact details once, and choose which agents may use it."
   },
@@ -7892,6 +8108,9 @@
   },
   "vault.list.sharedEmptyText": {
     "value": "When someone shares a team login or key with you, it shows here."
+  },
+  "vault.list.sharedEmptyTextPersonal": {
+    "value": "When someone here shares a login or key with you, it shows here."
   },
   "vault.row.agents": {
     "value": {
@@ -7947,11 +8166,17 @@
   "vault.scope.team": {
     "value": "Team"
   },
+  "vault.scope.teamPersonal": {
+    "value": "Shared"
+  },
   "vault.scope.personalText": {
     "value": "Only you see it"
   },
   "vault.scope.teamText": {
     "value": "Shared with the workspace"
+  },
+  "vault.scope.teamTextPersonal": {
+    "value": "Shared with everyone here"
   },
   "vault.field.title": {
     "value": "Name"
@@ -7961,6 +8186,9 @@
   },
   "vault.field.loginPlaceholder": {
     "value": "Company email"
+  },
+  "vault.field.loginPlaceholderPersonal": {
+    "value": "Personal email"
   },
   "vault.field.keyPlaceholder": {
     "value": "Payments key"
@@ -8316,6 +8544,9 @@
   "vault.new.teamLocked": {
     "value": "Only people who manage the Vault can save team items. This one stays yours."
   },
+  "vault.new.teamLockedPersonal": {
+    "value": "Only people who manage the Vault can save shared items. This one stays yours."
+  },
   "vault.new.save": {
     "value": "Save"
   },
@@ -8466,11 +8697,17 @@
   "vault.connections.forTeam": {
     "value": "Its items are the team's. Who manages the Vault decides who uses them."
   },
+  "vault.connections.forTeamPersonal": {
+    "value": "Its items are shared. Who manages the Vault decides who uses them."
+  },
   "vault.connections.forPersonal": {
     "value": "Its items are yours alone."
   },
   "vault.connections.teamLocked": {
     "value": "Its items will be yours alone. Only who manages the Vault connects one for the team."
+  },
+  "vault.connections.teamLockedPersonal": {
+    "value": "Its items will be yours alone. Only who manages the Vault connects one to share."
   },
   "vault.connections.sealed": {
     "value": "What you type here is encrypted and never shown again."
@@ -8667,8 +8904,14 @@
   "vault.card.teamText": {
     "value": "The workspace sees it"
   },
+  "vault.card.teamTextPersonal": {
+    "value": "Everyone here sees it"
+  },
   "vault.card.teamLocked": {
     "value": "Only who manages the Vault saves for the team"
+  },
+  "vault.card.teamLockedPersonal": {
+    "value": "Only who manages the Vault saves shared items"
   },
   "vault.card.agents": {
     "value": "Used by"
@@ -9257,6 +9500,9 @@
   },
   "home.summary.new": {
     "value": "Your workspace is ready. Start here."
+  },
+  "home.summary.newPersonal": {
+    "value": "Everything's ready. Start here."
   },
   "home.start.label": {
     "value": "When the app opens"
@@ -10422,6 +10668,9 @@
   "agent.roleHelp": {
     "value": "What it does for the team, e.g. Email and calendar assistant."
   },
+  "agent.roleHelpPersonal": {
+    "value": "What it does for you, e.g. Email and calendar assistant."
+  },
   "agent.editName": {
     "value": "Edit name: {{name}}"
   },
@@ -10506,6 +10755,9 @@
   },
   "agent.instructionsHelp": {
     "value": "{{org}}'s context (what the company does, house rules) goes before these instructions in every conversation: write here only what's {{name}}'s."
+  },
+  "agent.instructionsHelpPersonal": {
+    "value": "What you told about yourself goes before these instructions in every conversation: write here only what's {{name}}'s."
   },
   "agent.budgetUsed": {
     "value": "Budget used"
@@ -11287,6 +11539,21 @@
   "agentPage.tabs.more": {
     "value": "More"
   },
+  "agentPage.tabs.accessPersonal": {
+    "value": "Can use"
+  },
+  "agentPage.tabs.settingsPersonal": {
+    "value": "Settings"
+  },
+  "agentPage.tabs.advanced": {
+    "value": "Advanced"
+  },
+  "agentPage.advanced.elsewhere": {
+    "value": "Activity, files and usage"
+  },
+  "agentPage.advanced.tools": {
+    "value": "Tools and rules"
+  },
   "agentPage.ficha.with": {
     "value": "Who it works with"
   },
@@ -11413,23 +11680,59 @@
   "agentPage.lock.admins": {
     "value": "Only admins change this"
   },
+  "agentPage.lock.adminsKeeper": {
+    "value": "Only {{keeper}} changes this"
+  },
+  "agentPage.lock.adminsPersonal": {
+    "value": "Only the people who run this space change this"
+  },
   "agentPage.lock.adminsAndOwner": {
     "value": "Admins and {{name}} change this"
+  },
+  "agentPage.lock.adminsAndOwnerPersonal": {
+    "value": "{{name}} and the people who run this space change this"
   },
   "agentPage.readOnly.member": {
     "value": "You see how {{name}} works. Only admins edit."
   },
+  "agentPage.readOnly.memberKeeper": {
+    "value": "You see how {{name}} works. Only {{keeper}} edits."
+  },
+  "agentPage.readOnly.memberPersonal": {
+    "value": "You see how {{name}} works. Only the people who run this space edit."
+  },
   "agentPage.readOnly.memberOwner": {
     "value": "You see how {{name}} works. Who edits: admins and {{owner}} (owner)."
+  },
+  "agentPage.readOnly.memberOwnerPersonal": {
+    "value": "You see how {{name}} works. Who edits: {{owner}} (owner) and the people who run this space."
   },
   "agentPage.readOnly.owner": {
     "value": "You own {{name}}: you change the look, who can talk, the channels and the computer. The rest, only admins."
   },
+  "agentPage.readOnly.ownerKeeper": {
+    "value": "You own {{name}}: you change the look, who can talk, the group conversations and the computer. The rest, only {{keeper}}."
+  },
+  "agentPage.readOnly.ownerPersonal": {
+    "value": "You own {{name}}: you change the look, who can talk, the group conversations and the computer. The rest, only the people who run this space."
+  },
   "agentPage.readOnly.ownerInstructions": {
     "value": "Only admins edit the instructions. As the owner, you approve proposed changes."
   },
+  "agentPage.readOnly.ownerInstructionsKeeper": {
+    "value": "Only {{keeper}} edits the instructions. As the owner, you approve proposed changes."
+  },
+  "agentPage.readOnly.ownerInstructionsPersonal": {
+    "value": "Only the people who run this space edit the instructions. As the owner, you approve proposed changes."
+  },
   "agentPage.readOnly.ownerAccess": {
     "value": "Only admins give or take away access and repositories."
+  },
+  "agentPage.readOnly.ownerAccessKeeper": {
+    "value": "Only {{keeper}} gives or takes away access and repositories."
+  },
+  "agentPage.readOnly.ownerAccessPersonal": {
+    "value": "Only the people who run this space give or take away access and repositories."
   },
   "agentPage.status.idle": {
     "value": "Available"
@@ -11644,6 +11947,9 @@
   },
   "agentPage.access.connectors": {
     "value": "{{org}}'s connectors"
+  },
+  "agentPage.access.connectorsPersonal": {
+    "value": "Your connectors"
   },
   "agentPage.access.oneLevel": {
     "value": "One level per app"
@@ -12248,6 +12554,9 @@
   "memory.subtitle": {
     "value": "What {{name}} learned from conversations and the team's corrections."
   },
+  "memory.subtitlePersonal": {
+    "value": "What {{name}} learned from your conversations and corrections."
+  },
   "memory.proposals": {
     "value": {
       "one": "{{count}} improvement proposal",
@@ -12363,6 +12672,9 @@
   "memory.emptyText": {
     "value": "Every conversation teaches something new about how the team works."
   },
+  "memory.emptyTextPersonal": {
+    "value": "Every conversation teaches something new about how you like things done."
+  },
   "memory.how": {
     "value": "How memory works"
   },
@@ -12423,6 +12735,9 @@
   "proposals.subtitle": {
     "value": "Changes the agents propose. Nothing changes until someone accepts."
   },
+  "proposals.subtitlePersonal": {
+    "value": "Changes your agents propose. Nothing changes until you accept."
+  },
   "proposals.list": {
     "value": "Proposals"
   },
@@ -12455,6 +12770,9 @@
   },
   "proposals.targetContext": {
     "value": "{{org}} context"
+  },
+  "proposals.targetContextPersonal": {
+    "value": "what your agents know about you"
   },
   "proposals.roleLine": {
     "value": "Role: {{from}} → {{to}}"
@@ -12591,6 +12909,9 @@
   "proposals.titleContext": {
     "value": "Update the {{org}} context"
   },
+  "proposals.titleContextPersonal": {
+    "value": "Update what your agents know about you"
+  },
   "proposals.evidence.outcome": {
     "value": "Observed outcome"
   },
@@ -12669,6 +12990,9 @@
   "agentSetup.apps.todoNone": {
     "value": "Use the apps of {{org}}"
   },
+  "agentSetup.apps.todoNonePersonal": {
+    "value": "Use your apps"
+  },
   "agentSetup.apps.todoNoneDesc": {
     "value": "The ones you already connected, like Gmail and Drive."
   },
@@ -12695,6 +13019,9 @@
   },
   "agentSetup.apps.empty": {
     "value": "{{org}} has no apps connected yet."
+  },
+  "agentSetup.apps.emptyPersonal": {
+    "value": "You have no apps connected yet."
   },
   "agentSetup.apps.connectOther": {
     "value": "Connect another app"
@@ -12738,6 +13065,9 @@
   "agentSetup.who.todo": {
     "value": "Talk to everyone at {{org}}"
   },
+  "agentSetup.who.todoPersonal": {
+    "value": "Talk to everyone here"
+  },
   "agentSetup.who.todoDesc": {
     "value": "Anyone can call me."
   },
@@ -12749,6 +13079,9 @@
   },
   "agentSetup.who.doneEveryone": {
     "value": "I talk to everyone at {{org}}"
+  },
+  "agentSetup.who.doneEveryonePersonal": {
+    "value": "I talk to everyone here"
   },
   "agentSetup.who.doneYou": {
     "value": "I talk only to you"
@@ -12798,6 +13131,9 @@
   "agentSetup.how.desc": {
     "value": "Write as you would to someone new on the team."
   },
+  "agentSetup.how.descPersonal": {
+    "value": "Write as you would to someone helping you for the first time."
+  },
   "agentSetup.how.instructions": {
     "value": "Instructions"
   },
@@ -12843,6 +13179,9 @@
   "agentSetup.firstRun.title": {
     "value": "Getting {{org}}'s team to work"
   },
+  "agentSetup.firstRun.titlePersonal": {
+    "value": "So your agents can start"
+  },
   "agentSetup.firstRun.complete": {
     "value": "All set."
   },
@@ -12876,6 +13215,27 @@
   "agentSetup.firstRun.about.optional": {
     "value": "Optional. Without one, the type you picked counts."
   },
+  "agentSetup.firstRun.about.todoPersonal": {
+    "value": "Tell me a bit about yourself."
+  },
+  "agentSetup.firstRun.about.todoDescPersonal": {
+    "value": "All your agents read this."
+  },
+  "agentSetup.firstRun.about.donePersonal": {
+    "value": "I know a bit about you"
+  },
+  "agentSetup.firstRun.about.titlePersonal": {
+    "value": "What do you want help with?"
+  },
+  "agentSetup.firstRun.about.descPersonal": {
+    "value": "All your agents read this. You can change it anytime."
+  },
+  "agentSetup.firstRun.about.linePersonal": {
+    "value": "About you, in one sentence"
+  },
+  "agentSetup.firstRun.about.optionalPersonal": {
+    "value": "Optional. Without one, the areas you picked count."
+  },
   "agentSetup.firstRun.team.todo": {
     "value": "Build the team."
   },
@@ -12890,6 +13250,15 @@
       "one": "{{count}} agent on the team",
       "other": "{{count}} agents on the team"
     }
+  },
+  "agentSetup.firstRun.team.todoPersonal": {
+    "value": "Pick your agents."
+  },
+  "agentSetup.firstRun.team.todoDescPersonal": {
+    "value": "A ready start, you change everything later."
+  },
+  "agentSetup.firstRun.team.actionPersonal": {
+    "value": "See agents"
   },
   "agentSetup.firstRun.team.card": {
     "value": "Continue on the card below"
@@ -12942,6 +13311,18 @@
   "agentSetup.firstRun.apps.all": {
     "value": "See all apps"
   },
+  "agentSetup.firstRun.apps.todoPersonal": {
+    "value": "Connect your apps."
+  },
+  "agentSetup.firstRun.apps.todoDescPersonal": {
+    "value": "Email, calendar and files. Reading never changes anything."
+  },
+  "agentSetup.firstRun.apps.titlePersonal": {
+    "value": "Your apps"
+  },
+  "agentSetup.firstRun.apps.descPersonal": {
+    "value": "The ones your agents would use come first. Reading never changes anything, and sending, deleting and paying ask for your approval."
+  },
   "agentSetup.firstRun.people.todo": {
     "value": "Bring in the people you work with."
   },
@@ -12975,6 +13356,21 @@
   "agentSetup.firstRun.say.people": {
     "value": "Good to have more people here."
   },
+  "agentSetup.firstRun.say.aboutPersonal": {
+    "value": "Noted. All your agents read this."
+  },
+  "agentSetup.firstRun.say.teamPersonal": {
+    "value": "Your agents are here."
+  },
+  "agentSetup.firstRun.say.aiPersonal": {
+    "value": "Now your agents can think."
+  },
+  "agentSetup.firstRun.say.appsPersonal": {
+    "value": "Done, I can read your apps now."
+  },
+  "agentSetup.firstRun.say.peoplePersonal": {
+    "value": "Good to have your people here."
+  },
   "agentSetup.firstRun.asks.lead": {
     "value": "Now ask me something:"
   },
@@ -12983,6 +13379,72 @@
   },
   "agentSetup.firstRun.asks.who": {
     "value": "Who on the team does what?"
+  },
+  "agentSetup.firstRun.asks.fitPersonal": {
+    "value": "Adjust my agents to my routine"
+  },
+  "agentSetup.firstRun.asks.whoPersonal": {
+    "value": "Which agent does what?"
+  },
+  "newAgentAsk.title": {
+    "value": "What should your new agent do?"
+  },
+  "newAgentAsk.lead": {
+    "value": "Say it in one sentence. {{name}} sets it up and shows it to you before creating it."
+  },
+  "newAgentAsk.field": {
+    "value": "What it does for you"
+  },
+  "newAgentAsk.placeholder": {
+    "value": "E.g. Keep my calendar in order and remind me of what matters"
+  },
+  "newAgentAsk.ideas": {
+    "value": "Ideas"
+  },
+  "newAgentAsk.idea.agenda.label": {
+    "value": "Calendar"
+  },
+  "newAgentAsk.idea.agenda.text": {
+    "value": "Keep my calendar in order and remind me of my appointments"
+  },
+  "newAgentAsk.idea.money.label": {
+    "value": "Finances"
+  },
+  "newAgentAsk.idea.money.text": {
+    "value": "Keep track of my bills and tell me before anything is due"
+  },
+  "newAgentAsk.idea.training.label": {
+    "value": "Training"
+  },
+  "newAgentAsk.idea.training.text": {
+    "value": "Plan my workouts for the week and adjust them to how I feel"
+  },
+  "newAgentAsk.idea.studies.label": {
+    "value": "Studies"
+  },
+  "newAgentAsk.idea.studies.text": {
+    "value": "Make me a study plan and quiz me on what I learned"
+  },
+  "newAgentAsk.idea.home.label": {
+    "value": "Home"
+  },
+  "newAgentAsk.idea.home.text": {
+    "value": "Keep the shopping list and the house chores in order"
+  },
+  "newAgentAsk.idea.travel.label": {
+    "value": "Travel"
+  },
+  "newAgentAsk.idea.travel.text": {
+    "value": "Plan my trips: itinerary, bookings and documents"
+  },
+  "newAgentAsk.full": {
+    "value": "Fill everything in myself"
+  },
+  "newAgentAsk.create": {
+    "value": "Create with {{name}}"
+  },
+  "newAgentAsk.message": {
+    "value": "I want a new agent: {{what}}"
   },
   "newAgent.title": {
     "value": "Create agent"
@@ -13017,6 +13479,9 @@
   "newAgent.steps.identity.lead": {
     "value": "How the team calls and recognizes it in chat."
   },
+  "newAgent.steps.identity.leadPersonal": {
+    "value": "How you call and recognize it in chat."
+  },
   "newAgent.steps.instructions.name": {
     "value": "Instructions"
   },
@@ -13046,6 +13511,9 @@
   },
   "newAgent.steps.where.lead": {
     "value": "{{name}} joins the channels you check and has an owner on the team."
+  },
+  "newAgent.steps.where.leadPersonal": {
+    "value": "{{name}} talks to you in its own chat and joins the group conversations you check."
   },
   "newAgent.steps.model.name": {
     "value": "Model and budget"
@@ -13344,6 +13812,9 @@
   "newAgent.roles.custom.instructions": {
     "value": ""
   },
+  "newAgent.roleGroups.personal": {
+    "value": "For your day"
+  },
   "newAgent.roleGroups.tech": {
     "value": "Product and tech"
   },
@@ -13514,6 +13985,12 @@
   },
   "newAgent.accessAdmins": {
     "value": "Only admins give agents access to apps and mailboxes. Once it's created, ask an admin."
+  },
+  "newAgent.accessAdminsKeeper": {
+    "value": "Only {{keeper}} gives agents access to apps and mailboxes. Once it's created, ask {{keeper}}."
+  },
+  "newAgent.accessAdminsPersonal": {
+    "value": "Only the people who run this space give agents access to apps and mailboxes. Once it's created, ask one of them."
   },
   "newAgent.modelAndCost": {
     "value": "Model and cost"
@@ -13714,11 +14191,20 @@
   "newAgent.createdTitle": {
     "value": "{{name}} joined the team"
   },
+  "newAgent.newOnTeamPersonal": {
+    "value": "New agent"
+  },
+  "newAgent.createdTitlePersonal": {
+    "value": "{{name}} is here"
+  },
   "newAgent.createdText": {
     "value": "Already in {{channels}}. Mention @{{handle}} in a conversation to start."
   },
   "newAgent.createdTextNoChannels": {
     "value": "Add {{name}} to a channel and mention @{{handle}} in a conversation to start."
+  },
+  "newAgent.createdTextNoChannelsPersonal": {
+    "value": "Open your chat with {{name}} and ask for something to start."
   },
   "newAgent.goTo": {
     "value": "Go to #{{channel}}"
@@ -13731,6 +14217,12 @@
   },
   "newAgent.adminsOnly": {
     "value": "Only admins and owners create agents. Ask a {{org}} admin."
+  },
+  "newAgent.adminsOnlyKeeper": {
+    "value": "Ask {{keeper}} to let you create agents."
+  },
+  "newAgent.adminsOnlyPersonal": {
+    "value": "Ask whoever runs this space to let you create agents."
   },
   "newAgent.proposalClosed": {
     "value": "This proposal was already decided or expired."
@@ -13782,6 +14274,9 @@
   },
   "members.everyoneNote": {
     "value": "Everyone applies to every person in the workspace."
+  },
+  "members.everyoneNotePersonal": {
+    "value": "Without a role, they use the agents. With {{role}}, they help you run it."
   },
   "members.noRolesToGive": {
     "value": "No roles below yours to give."
@@ -13939,11 +14434,17 @@
   "members.chips.member": {
     "value": "already in {{org}}"
   },
+  "members.chips.memberPersonal": {
+    "value": "already here"
+  },
   "members.chips.invited": {
     "value": "already invited"
   },
   "members.dialog.title": {
     "value": "Invite to {{org}}"
+  },
+  "members.dialog.titlePersonal": {
+    "value": "Invite someone to your workspace"
   },
   "members.dialog.stepOf": {
     "value": "Step {{n}} of {{total}} · {{step}}"
@@ -13992,6 +14493,9 @@
   },
   "members.dialog.notePlaceholder": {
     "value": "Hi. Come join {{org}}: the team and the agents are all here."
+  },
+  "members.dialog.notePlaceholderPersonal": {
+    "value": "Hi. Come join me here: my agents can help you too."
   },
   "members.dialog.or": {
     "value": "or send the link"
@@ -14044,17 +14548,53 @@
   "members.dialog.role.same": {
     "value": "The same role for everyone"
   },
+  "members.dialog.role.titleOnePersonal": {
+    "value": "What can {{name}} do here?"
+  },
+  "members.dialog.role.titleManyPersonal": {
+    "value": "What can they do here?"
+  },
+  "members.dialog.role.leadPersonal": {
+    "value": "You can change it later."
+  },
+  "members.dialog.role.eachPersonal": {
+    "value": "A choice for each person"
+  },
+  "members.dialog.role.samePersonal": {
+    "value": "The same for everyone"
+  },
+  "members.dialog.role.uses": {
+    "value": "Uses the agents"
+  },
+  "members.dialog.role.usesText": {
+    "value": "Talks to the agents and uses what's shared with them."
+  },
+  "members.dialog.role.helps": {
+    "value": "Helps you run it"
+  },
+  "members.dialog.role.helpsText": {
+    "value": "Can change agents, settings and who's here, as you can. Sees everything shared here, except your direct messages."
+  },
   "members.dialog.where.titleOne": {
     "value": "Which channels does {{name}} join right away?"
   },
   "members.dialog.where.titleMany": {
     "value": "Which channels do these people join right away?"
   },
+  "members.dialog.where.titleOnePersonal": {
+    "value": "Which group conversations does {{name}} join right away?"
+  },
+  "members.dialog.where.titleManyPersonal": {
+    "value": "Which group conversations do these people join right away?"
+  },
   "members.dialog.where.lead": {
     "value": "Everyone starts in #{{channel}}. You pick the others."
   },
   "members.dialog.where.label": {
     "value": "Channels"
+  },
+  "members.dialog.where.labelPersonal": {
+    "value": "Group conversations"
   },
   "members.dialog.where.everyone": {
     "value": "Everyone joins"
@@ -14128,6 +14668,9 @@
   "members.dialog.result.already_member": {
     "value": "already in {{org}}"
   },
+  "members.dialog.result.already_memberPersonal": {
+    "value": "already here"
+  },
   "members.dialog.result.already_invited": {
     "value": "already had an invitation"
   },
@@ -14142,6 +14685,9 @@
   },
   "members.dialog.linkStep.title": {
     "value": "This is {{org}}'s link."
+  },
+  "members.dialog.linkStep.titlePersonal": {
+    "value": "This is your workspace's link."
   },
   "members.dialog.linkStep.lead": {
     "value": "Whoever opens it asks to join. I'll show you each request, and you approve."
@@ -21222,6 +21768,12 @@
   "audience.mode.owner": {
     "value": "Only the owner"
   },
+  "audience.mode.everyonePersonal": {
+    "value": "Everyone here"
+  },
+  "audience.mode.peoplePersonal": {
+    "value": "Only some people"
+  },
   "audience.modeText.everyone": {
     "value": "Anyone in the workspace can call {{name}}."
   },
@@ -21233,6 +21785,12 @@
   },
   "audience.modeText.noOwner": {
     "value": "Set an owner to use this option."
+  },
+  "audience.modeText.everyonePersonal": {
+    "value": "Anyone here can call {{name}}."
+  },
+  "audience.modeText.peoplePersonal": {
+    "value": "Pick the people who can talk to {{name}}."
   },
   "audience.people": {
     "value": "People"
@@ -21264,8 +21822,14 @@
   "audience.search": {
     "value": "Search roles and people"
   },
+  "audience.searchPeople": {
+    "value": "Search people"
+  },
   "audience.noMatch": {
     "value": "No role or person with that name."
+  },
+  "audience.noMatchPeople": {
+    "value": "Nobody with that name."
   },
   "audience.pickSomeone": {
     "value": "Pick at least one person or role."
@@ -21276,8 +21840,14 @@
   "audience.chip.people": {
     "value": "Restricted"
   },
+  "audience.chip.ownerPersonal": {
+    "value": "Only you"
+  },
   "audience.summary.everyone": {
     "value": "Everyone in the workspace"
+  },
+  "audience.summary.everyonePersonal": {
+    "value": "Everyone here"
   },
   "audience.summary.owner": {
     "value": "Only {{name}}"
@@ -21857,6 +22427,9 @@
   },
   "palette.channel": {
     "value": "channel"
+  },
+  "palette.channelPersonal": {
+    "value": "group conversation"
   },
   "palette.agent": {
     "value": "agent"
@@ -25519,11 +26092,17 @@
   "connectors.noneTitle": {
     "value": "Connect your team's apps"
   },
+  "connectors.noneTitlePersonal": {
+    "value": "Connect your apps"
+  },
   "connectors.connectedFilter": {
     "value": "Connected"
   },
   "connectors.suggested": {
     "value": "Suggested for {{org}}"
+  },
+  "connectors.suggestedPersonal": {
+    "value": "Suggested for you"
   },
   "connectors.more": {
     "value": "More services"
@@ -28641,6 +29220,9 @@
   },
   "searchPage.header.placeholder": {
     "value": "Search {{org}}"
+  },
+  "searchPage.header.placeholderPersonal": {
+    "value": "Search everything"
   },
   "searchPage.header.clear": {
     "value": "Clear search"
@@ -32574,6 +33156,21 @@
   "settings.section.about": {
     "value": "About agentes.chat"
   },
+  "settings.section.generalPersonal": {
+    "value": "About you"
+  },
+  "settings.section.keysPersonal": {
+    "value": "AI and apps"
+  },
+  "settings.section.usagePersonal": {
+    "value": "Plan and usage"
+  },
+  "settings.section.membersPersonal": {
+    "value": "People"
+  },
+  "settings.advanced": {
+    "value": "Advanced"
+  },
   "settings.sectionText.account": {
     "value": "Your profile and how the app looks for you."
   },
@@ -32637,6 +33234,24 @@
   "settings.sectionText.about": {
     "value": "Who makes it, its license and where its source code is."
   },
+  "settings.sectionText.generalPersonal": {
+    "value": "What your agents know about you, and how this workspace works."
+  },
+  "settings.sectionText.keysPersonal": {
+    "value": "The AI your agents think with, and the apps and skills they use."
+  },
+  "settings.sectionText.usagePersonal": {
+    "value": "How much AI your agents use, and your plan."
+  },
+  "settings.sectionText.connectorsPersonal": {
+    "value": "Your apps and MCP servers, connected once for your agents."
+  },
+  "settings.sectionText.membersPersonal": {
+    "value": "Who's here with you, and invitations."
+  },
+  "settings.sectionText.rolesPersonal": {
+    "value": "What each person here can do. The owner can do everything."
+  },
   "settings.about.basedOn": {
     "value": "Based on <site>agentes.chat</site> by Codari Global, LLC"
   },
@@ -32685,6 +33300,9 @@
   "settings.account.chat.channels": {
     "value": "Channels"
   },
+  "settings.account.chat.channelsPersonal": {
+    "value": "Groups"
+  },
   "settings.account.chat.dms": {
     "value": "DMs"
   },
@@ -32708,6 +33326,9 @@
   },
   "settings.account.chat.toneChannels": {
     "value": "My messages in channels"
+  },
+  "settings.account.chat.toneChannelsPersonal": {
+    "value": "My messages in groups"
   },
   "settings.account.chat.toneChannelsHelp": {
     "value": "In blue"
@@ -32796,8 +33417,14 @@
   "settings.orgTitle": {
     "value": "Workspace"
   },
+  "settings.orgTitlePersonal": {
+    "value": "This workspace"
+  },
   "settings.name": {
     "value": "Name"
+  },
+  "settings.namePersonal": {
+    "value": "Workspace name"
   },
   "settings.savedShort": {
     "value": "Saved"
@@ -32805,14 +33432,23 @@
   "settings.context": {
     "value": "Workspace context"
   },
+  "settings.contextPersonal": {
+    "value": "About you"
+  },
   "settings.contextTitle": {
     "value": "What agents know about {{name}}"
+  },
+  "settings.contextTitlePersonal": {
+    "value": "What your agents know about you"
   },
   "settings.contextSubtitle": {
     "value": "Every agent reads this before each conversation."
   },
   "settings.contextPlaceholder": {
     "value": "E.g. We are a travel agency for families. We serve customers on WhatsApp…"
+  },
+  "settings.contextPlaceholderPersonal": {
+    "value": "E.g. I'm a teacher and live with my wife and our two kids. I want help with bills, the kids' school and my running…"
   },
   "settings.contextMissing": {
     "value": "Still to say:"
@@ -32826,8 +33462,20 @@
   "settings.contextIdeas.never": {
     "value": "What never to do"
   },
+  "settings.contextIdeas.whoPersonal": {
+    "value": "Who lives with you"
+  },
+  "settings.contextIdeas.nowPersonal": {
+    "value": "What matters now"
+  },
+  "settings.contextIdeas.neverPersonal": {
+    "value": "What never to do"
+  },
   "settings.contextHelp": {
     "value": "Write it as if explaining {{name}} to someone who started today."
+  },
+  "settings.contextHelpPersonal": {
+    "value": "Write it as if introducing yourself to someone who will help you every day."
   },
   "settings.timezone": {
     "value": "Time zone"
@@ -32838,8 +33486,35 @@
   "settings.actionCheck": {
     "value": "Agents check what the team already did"
   },
+  "settings.actionCheckPersonal": {
+    "value": "Agents check what was already done"
+  },
   "settings.actionCheckHelp": {
     "value": "Before an email, a message or a pull request, the agent checks whether anyone on the team already did it to the same person or place in the last 30 days, and doesn't repeat it."
+  },
+  "settings.actionCheckHelpPersonal": {
+    "value": "Before an email or a message, the agent checks whether you or another agent already did it to the same person or place in the last 30 days, and doesn't repeat it."
+  },
+  "settings.mode.label": {
+    "value": "Workspace mode"
+  },
+  "settings.mode.team": {
+    "value": "Team"
+  },
+  "settings.mode.personal": {
+    "value": "Personal"
+  },
+  "settings.mode.teamHelp": {
+    "value": "Channels, people and roles for working together. Switching changes only what's in sight."
+  },
+  "settings.mode.personalHelp": {
+    "value": "Simpler, for you and your family if you invite them. Switching changes only what's in sight."
+  },
+  "settings.mode.toTeam": {
+    "value": "Switch to team…"
+  },
+  "settings.mode.toPersonal": {
+    "value": "Switch to personal…"
   },
   "settings.telemetry.title": {
     "value": "Usage statistics"
@@ -33272,6 +33947,81 @@
   },
   "settings.media.giphy.jevLink": {
     "value": "Set up Jev"
+  },
+  "personalMode.toTeam.title": {
+    "value": "Switch to a team workspace"
+  },
+  "personalMode.toTeam.lead": {
+    "value": "For working with other people. Channels and people come into sight."
+  },
+  "personalMode.toTeam.channels": {
+    "value": "Channels and people in the sidebar"
+  },
+  "personalMode.toTeam.roles": {
+    "value": "Inviting people, with roles for what each one can do"
+  },
+  "personalMode.toTeam.admin": {
+    "value": "Approving for others and the audit log, back in Settings"
+  },
+  "personalMode.toTeam.stays": {
+    "value": "Your agents, conversations, routines and files stay as they are."
+  },
+  "personalMode.toTeam.name": {
+    "value": "Workspace name"
+  },
+  "personalMode.toTeam.confirm": {
+    "value": "Switch to team"
+  },
+  "personalMode.toTeam.done": {
+    "value": "{{name}} is now a team workspace."
+  },
+  "personalMode.toPersonal.title": {
+    "value": "Switch to a personal workspace"
+  },
+  "personalMode.toPersonal.lead": {
+    "value": "The same workspace, simpler to use on your own."
+  },
+  "personalMode.toPersonal.sidebar": {
+    "value": "The sidebar shows what you use most, the rest is under More"
+  },
+  "personalMode.toPersonal.channels": {
+    "value": "Channels show as group conversations"
+  },
+  "personalMode.toPersonal.settings": {
+    "value": "Settings get shorter, with the rest under Advanced"
+  },
+  "personalMode.toPersonal.bubbles": {
+    "value": "Conversations open as bubbles"
+  },
+  "personalMode.toPersonal.stays": {
+    "value": "Nothing is lost: agents, conversations, routines, files and everyone's access stay as they are."
+  },
+  "personalMode.toPersonal.confirm": {
+    "value": "Switch to personal"
+  },
+  "personalMode.toPersonal.done": {
+    "value": "This workspace is now personal."
+  },
+  "personalMode.invite.title": {
+    "value": "Who are you inviting?"
+  },
+  "personalMode.invite.lead": {
+    "value": "Your workspace is personal."
+  },
+  "personalMode.invite.family": {
+    "value": "Family or friends"
+  },
+  "personalMode.invite.familyText": {
+    "value": "They join you here, and the workspace stays personal."
+  },
+  "personalMode.invite.work": {
+    "value": "People you work with"
+  },
+  "personalMode.invite.workText": {
+    "value": "Switch to a team workspace first: channels, people and roles come into sight."
+  },
+  "personalMode.invite.workLocked": {
+    "value": "Only whoever manages this workspace can switch it to a team's."
   },
   "peopleUsage.tabs.summary": {
     "value": "Summary"
@@ -34336,6 +35086,9 @@
   },
   "chat.work.refusal.team": {
     "value": "The team already did this"
+  },
+  "chat.work.refusal.teamPersonal": {
+    "value": "This was already done"
   },
   "chat.work.refusal.unclear": {
     "value": "It can't be read plainly"
@@ -37389,8 +38142,20 @@
   "computerSetup.notification.ready": {
     "value": "Your workspace's computer is ready"
   },
+  "computerSetup.notification.readyPersonal": {
+    "value": "Your agents' computer is ready"
+  },
   "computerSetup.title": {
     "value": "{{org}}'s computer"
+  },
+  "computerSetup.titlePersonal": {
+    "value": "Your agents' computer"
+  },
+  "computerSetup.titleInSentence": {
+    "value": "{{org}}'s computer"
+  },
+  "computerSetup.titleInSentencePersonal": {
+    "value": "your agents' computer"
   },
   "computerSetup.users": {
     "value": "One user per agent: each one has its own folder."
@@ -37568,6 +38333,9 @@
   },
   "computerSetup.notice.title": {
     "value": "Setting up {{org}}'s computer"
+  },
+  "computerSetup.notice.titlePersonal": {
+    "value": "Setting up your agents' computer"
   },
   "computerSetup.notice.see": {
     "value": "See"
@@ -39550,6 +40318,9 @@
   "teamPlan.start.templates": {
     "value": "See team templates"
   },
+  "teamPlan.start.templatesPersonal": {
+    "value": "See ready agents"
+  },
   "teamPlan.business.agency": {
     "value": "Agency"
   },
@@ -39574,6 +40345,36 @@
   "teamPlan.step": {
     "value": "Question {{step}} of {{of}}"
   },
+  "teamPlan.lifeArea.routine": {
+    "value": "Calendar and routine"
+  },
+  "teamPlan.lifeArea.money": {
+    "value": "Finances"
+  },
+  "teamPlan.lifeArea.health": {
+    "value": "Health and training"
+  },
+  "teamPlan.lifeArea.studies": {
+    "value": "Studies"
+  },
+  "teamPlan.lifeArea.home": {
+    "value": "Home and shopping"
+  },
+  "teamPlan.lifeArea.travel": {
+    "value": "Travel"
+  },
+  "teamPlan.lifeArea.work": {
+    "value": "Work and projects"
+  },
+  "teamPlan.lifeArea.writing": {
+    "value": "Writing and ideas"
+  },
+  "teamPlan.lifeArea.other": {
+    "value": "Something else"
+  },
+  "teamPlan.lifeAreaContext": {
+    "value": "I want help with: {{areas}}."
+  },
   "teamPlan.send": {
     "value": "Send {{count}}"
   },
@@ -39591,6 +40392,9 @@
   },
   "teamPlan.card.adjust": {
     "value": "Adjust"
+  },
+  "teamPlan.card.createPersonal": {
+    "value": "Create the agents"
   },
   "teamPlan.card.adjustName": {
     "value": "Adjust {{name}}"
@@ -39619,6 +40423,9 @@
   "teamPlan.card.weekly": {
     "value": "I tell you here how the team's week went"
   },
+  "teamPlan.card.weeklyPersonal": {
+    "value": "I tell you here how your agents' week went"
+  },
   "teamPlan.card.failed": {
     "value": "The team wasn't created: {{step}} failed ({{reason}}). Nothing was made, so you can try again."
   },
@@ -39634,6 +40441,12 @@
   "teamPlan.card.createdYou": {
     "value": "Team created by you"
   },
+  "teamPlan.card.createdPersonal": {
+    "value": "Agents created by {{name}}"
+  },
+  "teamPlan.card.createdYouPersonal": {
+    "value": "Agents created by you"
+  },
   "teamPlan.card.skillsWait": {
     "value": "The skills wait for an admin."
   },
@@ -39645,6 +40458,12 @@
   },
   "teamPlan.card.dismissed": {
     "value": "Team dismissed"
+  },
+  "teamPlan.card.undonePersonal": {
+    "value": "Agents undone"
+  },
+  "teamPlan.card.dismissedPersonal": {
+    "value": "Agents dismissed"
   },
   "teamPlan.firstTask.suggestion": {
     "value": "suggestion"
@@ -39691,6 +40510,9 @@
   "teamPlan.map.title": {
     "value": "The team as a map"
   },
+  "teamPlan.map.titlePersonal": {
+    "value": "Your agents as a map"
+  },
   "teamPlan.map.people": {
     "value": "People"
   },
@@ -39730,14 +40552,41 @@
   "teamPlan.templates.tailor": {
     "value": "Later, just ask me to fit it to your business."
   },
+  "teamPlan.templates.titlePersonal": {
+    "value": "Your agents"
+  },
+  "teamPlan.templates.leadPersonal": {
+    "value": "Ready agents for what you want help with. Then {{name}} fits them to you."
+  },
+  "teamPlan.templates.heldLeadPersonal": {
+    "value": "Pick the closest to what you need. You can change everything later."
+  },
+  "teamPlan.templates.createPersonal": {
+    "value": "Create my agents"
+  },
+  "teamPlan.templates.failedPersonal": {
+    "value": "Your agents weren't created. The reason is on the card in the chat."
+  },
+  "teamPlan.templates.noneSubPersonal": {
+    "value": "Tell what you need and {{name}} sets them up"
+  },
+  "teamPlan.templates.tailorPersonal": {
+    "value": "Later, just ask me to fit them to your routine."
+  },
   "teamPlan.weekly.name": {
     "value": "The team's week"
+  },
+  "teamPlan.weekly.namePersonal": {
+    "value": "Your week"
   },
   "whoSees.label": {
     "value": "Who sees it"
   },
   "whoSees.everyone": {
     "value": "Everyone in the workspace"
+  },
+  "whoSees.everyonePersonal": {
+    "value": "Everyone here"
   },
   "whoSees.me": {
     "value": "Only me"
@@ -39765,6 +40614,9 @@
   },
   "whoSees.admins": {
     "value": "Administrators always see it."
+  },
+  "whoSees.adminsPersonal": {
+    "value": "The people who run this space see it too."
   },
   "whoSees.tied": {
     "value": "It follows who's in the conversation until you change it."
@@ -39799,8 +40651,14 @@
   "share.people": {
     "value": "People and roles you choose"
   },
+  "share.peoplePersonal": {
+    "value": "People you choose"
+  },
   "share.everyone": {
     "value": "Everyone in the workspace"
+  },
+  "share.everyonePersonal": {
+    "value": "Everyone here"
   },
   "share.whereDm": {
     "value": "The DM with {{name}}"
@@ -39817,8 +40675,14 @@
   "share.add": {
     "value": "Add a person or a role"
   },
+  "share.addPersonal": {
+    "value": "Add a person"
+  },
   "share.addSearch": {
     "value": "Search people and roles"
+  },
+  "share.addSearchPersonal": {
+    "value": "Search people"
   },
   "share.noResults": {
     "value": "Nobody with that name"
@@ -39847,6 +40711,9 @@
   "share.admins": {
     "value": "Administrators always see it."
   },
+  "share.adminsPersonal": {
+    "value": "The people who run this space see it too."
+  },
   "share.copyLink": {
     "value": "Copy link"
   },
@@ -39868,8 +40735,14 @@
   "share.open": {
     "value": "Everyone in the workspace sees this file."
   },
+  "share.openPersonal": {
+    "value": "Everyone here sees this file."
+  },
   "share.savedEveryone": {
     "value": "Everyone in the workspace sees the file now."
+  },
+  "share.savedEveryonePersonal": {
+    "value": "Everyone here sees the file now."
   },
   "share.savedPeople": {
     "value": "The people you chose see the file now."
@@ -39960,6 +40833,63 @@
   },
   "teamTemplates.lead": {
     "value": "A team for {{org}}, each agent in its own channel. You can adjust it before creating."
+  },
+  "teamTemplates.leadPersonal": {
+    "value": "Your agents, each one talking to you in its own chat. You can adjust them before creating."
+  },
+  "teamTemplates.life.name": {
+    "value": "Life in order"
+  },
+  "teamTemplates.life.sub": {
+    "value": "Calendar, reminders and bills"
+  },
+  "teamTemplates.life.desc": {
+    "value": "For keeping your days and your money in order."
+  },
+  "teamTemplates.health.name": {
+    "value": "Health"
+  },
+  "teamTemplates.health.sub": {
+    "value": "Training and food"
+  },
+  "teamTemplates.health.desc": {
+    "value": "For training regularly and eating better."
+  },
+  "teamTemplates.studies.name": {
+    "value": "Studies and ideas"
+  },
+  "teamTemplates.studies.sub": {
+    "value": "Study plan, reviews and writing"
+  },
+  "teamTemplates.studies.desc": {
+    "value": "For learning something new and putting your ideas into words."
+  },
+  "teamTemplates.home.name": {
+    "value": "Home"
+  },
+  "teamTemplates.home.sub": {
+    "value": "Shopping, chores and bills"
+  },
+  "teamTemplates.home.desc": {
+    "value": "For running the house without forgetting anything."
+  },
+  "teamTemplates.travel.name": {
+    "value": "Travel"
+  },
+  "teamTemplates.travel.sub": {
+    "value": "Trips planned down to the details"
+  },
+  "teamTemplates.travel.desc": {
+    "value": "For planning trips, from prices to the day-by-day plan."
+  },
+  "teamTemplates.freelance.name": {
+    "value": "Working on your own"
+  },
+  "teamTemplates.freelance.sub": {
+    "value": "Clients, invoices and calendar"
+  },
+  "teamTemplates.freelance.desc": {
+    "value": "For freelancers who look after their own clients and money."
   },
   "teamTemplates.agency.name": {
     "value": "Marketing agency"
@@ -40111,6 +41041,114 @@
   "teamTemplates.agents.bia.task": {
     "value": "Write answers to these customer questions:"
   },
+  "teamTemplates.agents.clara.role": {
+    "value": "Calendar and reminders"
+  },
+  "teamTemplates.agents.clara.line": {
+    "value": "Keeps your calendar and reminds you of what matters before it's too late."
+  },
+  "teamTemplates.agents.clara.routine": {
+    "value": "Send today's agenda"
+  },
+  "teamTemplates.agents.clara.task": {
+    "value": "Put this on my calendar and remind me the day before:"
+  },
+  "teamTemplates.agents.duda.role": {
+    "value": "Bills and spending"
+  },
+  "teamTemplates.agents.duda.line": {
+    "value": "Keeps track of your bills and spending and warns you before something is due."
+  },
+  "teamTemplates.agents.duda.routine": {
+    "value": "List this month's bills and what's left to pay"
+  },
+  "teamTemplates.agents.duda.task": {
+    "value": "Sort these expenses by category:"
+  },
+  "teamTemplates.agents.leo.role": {
+    "value": "Training"
+  },
+  "teamTemplates.agents.leo.line": {
+    "value": "Puts together your workouts and keeps you going, at your pace."
+  },
+  "teamTemplates.agents.leo.routine": {
+    "value": "Send today's workout"
+  },
+  "teamTemplates.agents.leo.task": {
+    "value": "Make me a 30-minute workout for today with:"
+  },
+  "teamTemplates.agents.mel.role": {
+    "value": "Food"
+  },
+  "teamTemplates.agents.mel.line": {
+    "value": "Plans your meals and the shopping list, to your taste and budget."
+  },
+  "teamTemplates.agents.mel.routine": {
+    "value": "Plan the week's meals and the shopping list"
+  },
+  "teamTemplates.agents.mel.task": {
+    "value": "Suggest three quick dinners with:"
+  },
+  "teamTemplates.agents.gabi.role": {
+    "value": "Studies"
+  },
+  "teamTemplates.agents.gabi.line": {
+    "value": "Builds your study plan and quizzes you on what you learned."
+  },
+  "teamTemplates.agents.gabi.routine": {
+    "value": "Review today's topic with three questions"
+  },
+  "teamTemplates.agents.gabi.task": {
+    "value": "Explain this topic simply and ask me three questions:"
+  },
+  "teamTemplates.agents.lu.role": {
+    "value": "Writing and ideas"
+  },
+  "teamTemplates.agents.lu.line": {
+    "value": "Keeps your notes and ideas and helps you turn them into texts."
+  },
+  "teamTemplates.agents.lu.routine": {
+    "value": "Gather the week's ideas and notes"
+  },
+  "teamTemplates.agents.lu.task": {
+    "value": "Turn these notes into a short text:"
+  },
+  "teamTemplates.agents.rosa.role": {
+    "value": "Home and shopping"
+  },
+  "teamTemplates.agents.rosa.line": {
+    "value": "Keeps the shopping list, the house chores and what needs fixing."
+  },
+  "teamTemplates.agents.rosa.routine": {
+    "value": "Make the week's shopping list and chores"
+  },
+  "teamTemplates.agents.rosa.task": {
+    "value": "Make a shopping list for the week for:"
+  },
+  "teamTemplates.agents.vic.role": {
+    "value": "Trips"
+  },
+  "teamTemplates.agents.vic.line": {
+    "value": "Plans your trips: dates, prices, bookings and a day-by-day plan."
+  },
+  "teamTemplates.agents.vic.routine": {
+    "value": "Check prices for the trips you're planning"
+  },
+  "teamTemplates.agents.vic.task": {
+    "value": "Plan a 3-day trip to:"
+  },
+  "teamTemplates.agents.rui.role": {
+    "value": "Clients"
+  },
+  "teamTemplates.agents.rui.line": {
+    "value": "Follows up with your clients, writes proposals and invoices, and reminds whoever hasn't paid."
+  },
+  "teamTemplates.agents.rui.routine": {
+    "value": "List what each client is waiting for today"
+  },
+  "teamTemplates.agents.rui.task": {
+    "value": "Write a short proposal for this client:"
+  },
   "teamTemplates.example.iara": {
     "value": "Hi Marina. Your order left yesterday and arrives by Friday. The tracking code is right below. If Friday doesn't work, I'll find another date."
   },
@@ -40119,6 +41157,24 @@
   },
   "teamTemplates.example.nina": {
     "value": "Tomorrow: 9:00 Carla, 10:30 Pedro, 14:00 open. Pedro hasn't confirmed yet. Want me to write to him?"
+  },
+  "teamTemplates.example.clara": {
+    "value": "Today: 9:00 dentist, 12:30 lunch with Paula, 18:00 pick up the package. Tomorrow is your mother's birthday. Want me to remind you in the morning?"
+  },
+  "teamTemplates.example.leo": {
+    "value": "Today, 30 minutes: 5 minutes of warm-up, 3 rounds of 12 squats, 10 push-ups and a 30-second plank, then 5 minutes of stretching. Tell me how it went and I'll adjust Wednesday's."
+  },
+  "teamTemplates.example.gabi": {
+    "value": "Today's topic: photosynthesis. In short, plants turn light, water and carbon dioxide into sugar and oxygen. Three questions: where does it happen, what goes in and what comes out?"
+  },
+  "teamTemplates.example.rosa": {
+    "value": "This week: rice, beans, eggs, bananas, coffee and detergent. At home: change the sheets on Thursday and call someone about the kitchen tap."
+  },
+  "teamTemplates.example.vic": {
+    "value": "Lisbon in 3 days: day 1, Alfama and the castle. Day 2, Belém and the river. Day 3, Sintra. The cheapest flights are on Tuesday the 12th. Want me to keep an eye on the price?"
+  },
+  "teamTemplates.example.rui": {
+    "value": "Hi Marcos, here's the proposal: a new site with 5 pages, delivered in 3 weeks, paid in two parts. If it works for you, I'll send the contract today."
   },
   "teamTemplates.channels.iara": {
     "value": "support"
@@ -40182,5 +41238,8 @@
   },
   "teamTemplates.approvals": {
     "value": "What goes out to customers waits for your approval. You can let it go later, once you trust them."
+  },
+  "teamTemplates.approvalsPersonal": {
+    "value": "Anything sent, paid or booked in your name waits for your approval. You can let it go later, once you trust them."
   }
 }

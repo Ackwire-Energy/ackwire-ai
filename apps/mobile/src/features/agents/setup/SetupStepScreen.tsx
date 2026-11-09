@@ -29,6 +29,7 @@ import { audienceOf, audiencePatch } from "@agenteschat/client/lib/audience";
 import { firstName } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { addsAgentsTo, can } from "@agenteschat/client/lib/permissions";
+import { rolePicksInSight } from "@agenteschat/client/lib/personal-view";
 import { planOf } from "@agenteschat/client/lib/plans";
 import { AUTO } from "@agenteschat/client/lib/providers";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
@@ -40,7 +41,17 @@ import {
   suggestedChannels,
   suggestedLevels,
 } from "@agenteschat/client/lib/setup-checklist";
-import { BUSINESS_TYPES, type BusinessType, isTemplateBusiness } from "@agenteschat/client/lib/team-plan";
+import {
+  aboutYouContext,
+  BUSINESS_TYPES,
+  type BusinessType,
+  isTemplateBusiness,
+  LIFE_AREAS,
+  type LifeArea,
+  lifeAreaTemplate,
+  readAboutYou,
+} from "@agenteschat/client/lib/team-plan";
+import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -64,7 +75,8 @@ import { useAgentChannels } from "./useAgentChannels";
 /*
  * The screens behind the setup checklist's buttons (ADR 0155 §2), the web's small dialogs on the phone: one step each,
  * the agent's role's suggestion marked, nothing saved until the word on the right of the bar. Each saves through the
- * same APIs as the agent's other screens, then confirms its step, and goes back to where the checklist was.
+ * same APIs as the agent's other screens, then confirms its step, and goes back to where the checklist was. A personal
+ * workspace (ADR 0159) reads them in its own words, row 1 about the person (areas of life) instead of a business.
  */
 
 const STEPS: readonly SetupStep[] = ["apps", "where", "who", "how", "about"];
@@ -89,6 +101,7 @@ export function SetupStepScreen({
   text?: string | undefined;
 }) {
   const { t } = useTranslation();
+  const { org } = useOrg();
   const c = useColors();
   const dir = useDirectory();
   const agent = dir.agentById.get(agentId);
@@ -104,7 +117,7 @@ export function SetupStepScreen({
   }
   switch (known) {
     case "about":
-      return <AboutStep typed={text ?? null} />;
+      return isPersonal(org) ? <AboutYouStep typed={text ?? null} /> : <AboutStep typed={text ?? null} />;
     case "apps":
       return firstRun ? <FirstRunAppsStep /> : <AppsStep agent={agent} />;
     case "where":
@@ -193,12 +206,99 @@ function AboutStep({ typed }: { typed: string | null }) {
 }
 
 /**
+ * A personal workspace's row 1 (ADR 0159), as the web's dialog: "What do you want help with?", the areas of life to
+ * pick, several at once, and one optional sentence about the person; saved as the workspace's context
+ * (`aboutYouContext`), which every agent reads, and read back into the same answers when opened again (`readAboutYou`:
+ * what was saved, else what was typed or tapped on the card). "Something else" asks for the sentence. Saved, it goes
+ * back and the card opens the agents' templates with the first area's picked.
+ */
+function AboutYouStep({ typed }: { typed: string | null }) {
+  const { t } = useTranslation();
+  const { orgId } = useOrg();
+  const settings = useSettings(orgId);
+  const save = useUpdateSettings(orgId);
+  const failed = useFailed();
+  // What it starts from, until the person changes the areas or the sentence.
+  const start = readAboutYou(t, settings.data?.context || typed || "");
+  const [areas, setAreas] = useState<ReadonlySet<LifeArea> | null>(null);
+  const [line, setLine] = useState<string | null>(null);
+  const picked = areas ?? new Set(start.areas);
+  const shown = line ?? start.line;
+  const other = picked.has("other");
+  const text = aboutYouContext(t, picked, shown);
+  const toggle = (area: LifeArea) => {
+    tapHaptic();
+    setAreas((now) => {
+      const next = new Set(now ?? start.areas);
+      if (next.has(area)) next.delete(area);
+      else next.add(area);
+      return next;
+    });
+  };
+  return (
+    <SettingsPage
+      title={t("agentSetup.firstRun.about.titlePersonal")}
+      locked={save.isPending}
+      action={{
+        label: t("common.save"),
+        disabled: !text || save.isPending || !settings.isSuccess,
+        onPress: () =>
+          save.mutate(
+            { context: text },
+            {
+              onSuccess: () => {
+                successHaptic();
+                goBack();
+                openTemplatesAfterAbout(lifeAreaTemplate(picked) ?? undefined);
+              },
+              onError: failed,
+            },
+          ),
+      }}
+    >
+      <GroupedFooter>{t("agentSetup.firstRun.about.descPersonal")}</GroupedFooter>
+      <GroupedList>
+        {LIFE_AREAS.map((area) => (
+          <GroupedRow
+            key={area}
+            label={t(`teamPlan.lifeArea.${area}`)}
+            checked={picked.has(area)}
+            disabled={save.isPending}
+            onPress={() => toggle(area)}
+          />
+        ))}
+      </GroupedList>
+      <GroupedHeader
+        {...(other
+          ? {}
+          : {
+              hint: {
+                name: t("common.about", { label: t("agentSetup.firstRun.about.linePersonal") }),
+                text: t("agentSetup.firstRun.about.optionalPersonal"),
+              },
+            })}
+      >
+        {t("agentSetup.firstRun.about.linePersonal")}
+      </GroupedHeader>
+      <TextArea
+        value={shown}
+        onChangeText={setLine}
+        accessibilityLabel={t("agentSetup.firstRun.about.linePersonal")}
+        minHeight={88}
+        scrollEnabled={false}
+        editable={!save.isPending}
+      />
+    </SettingsPage>
+  );
+}
+
+/**
  * The first run's row 4, as the web's dialog: the apps the team just made would use, plug-and-play ones only, each
  * opening the same connect sheet as Apps (whose last step says which agents use it), and the whole list under them.
  */
 function FirstRunAppsStep() {
   const { t } = useTranslation();
-  const { orgId } = useOrg();
+  const { orgId, org } = useOrg();
   const c = useColors();
   const dir = useDirectory();
   const catalog = useCatalog();
@@ -210,8 +310,8 @@ function FirstRunAppsStep() {
     dir.agents.filter((a) => !isRightHand(a)),
   );
   return (
-    <SettingsPage title={t("agentSetup.firstRun.apps.title")}>
-      <GroupedFooter>{t("agentSetup.firstRun.apps.desc")}</GroupedFooter>
+    <SettingsPage title={t(modeKey(org, "agentSetup.firstRun.apps.title"))}>
+      <GroupedFooter>{t(modeKey(org, "agentSetup.firstRun.apps.desc"))}</GroupedFooter>
       {catalog.isPending || connections.isPending ? <ActivityIndicator color={c.muted} style={styles.loading} /> : null}
       {list.length > 0 ? (
         <GroupedList>
@@ -312,7 +412,7 @@ function AppsStep({ agent }: { agent: Agent }) {
       <GroupedFooter>{t("agentSetup.apps.desc")}</GroupedFooter>
       {access.isPending ? <ActivityIndicator color={c.muted} style={styles.loading} /> : null}
       {access.isSuccess && ordered.length === 0 ? (
-        <GroupedFooter>{t("agentSetup.apps.empty", { org: org?.name ?? "" })}</GroupedFooter>
+        <GroupedFooter>{t(modeKey(org, "agentSetup.apps.empty"), { org: org?.name ?? "" })}</GroupedFooter>
       ) : null}
       {ordered.length > 0 ? (
         <GroupedList>
@@ -429,10 +529,14 @@ function WhereStep({ agent }: { agent: Agent }) {
 
 const MODES: AudienceMode[] = ["everyone", "people", "owner"];
 
-/** "Who talks to Leo": everyone, some people and roles, or only its owner; on a plan, whether it serves others. */
+/**
+ * "Who talks to Leo": everyone, some people and roles, or only its owner; on a plan, whether it serves others. A
+ * personal workspace (ADR 0159) says it in plain words and a family picks people: its roles come into sight only when
+ * one is picked already or one exists besides the base and admin ones (`rolePicksInSight`). The choice is the same.
+ */
 function WhoStep({ agent }: { agent: Agent }) {
   const { t } = useTranslation();
-  const { orgId } = useOrg();
+  const { orgId, org } = useOrg();
   const api = useApi();
   const qc = useQueryClient();
   const meId = useMeId();
@@ -452,14 +556,17 @@ function WhoStep({ agent }: { agent: Agent }) {
   const ownerIsMe = Boolean(meId && owner === meId);
   const pickedPeople = new Set(audience.userIds);
   const pickedRoles = new Set(audience.roleIds ?? []);
-  const roleList = sortRoles((roles.data?.roles ?? []).filter((r) => !isEveryone(r)));
+  const rolesInSight = rolePicksInSight(org, roles.data?.roles ?? [], audience.roleIds ?? []);
+  const roleList = rolesInSight ? sortRoles((roles.data?.roles ?? []).filter((r) => !isEveryone(r))) : [];
   const people = [...dir.memberById.values()].filter((m) => m.userId !== owner);
+  const modeLabel = (mode: AudienceMode) =>
+    mode === "owner" ? t("audience.mode.owner") : t(modeKey(org, `audience.mode.${mode}`));
   const modeText = (mode: AudienceMode) =>
     mode === "owner"
       ? ownerName
         ? t("audience.modeText.owner", { ...g, owner: ownerIsMe ? t("agentSetup.who.you") : ownerName })
         : t("audience.modeText.noOwner")
-      : t(`audience.modeText.${mode}`, g);
+      : t(modeKey(org, `audience.modeText.${mode}`), g);
   const valid =
     audience.mode === "everyone" ||
     (audience.mode === "owner" ? Boolean(owner) : pickedPeople.size > 0 || pickedRoles.size > 0 || Boolean(owner));
@@ -497,7 +604,7 @@ function WhoStep({ agent }: { agent: Agent }) {
         {MODES.map((mode) => (
           <GroupedRow
             key={mode}
-            label={t(`audience.mode.${mode}`)}
+            label={modeLabel(mode)}
             sub={modeText(mode)}
             subLines={2}
             checked={audience.mode === mode}
@@ -516,7 +623,7 @@ function WhoStep({ agent }: { agent: Agent }) {
       )}
       {audience.mode === "people" ? (
         <>
-          <GroupedHeader>{t("agentSetup.who.people")}</GroupedHeader>
+          <GroupedHeader>{rolesInSight ? t("agentSetup.who.people") : t("audience.people")}</GroupedHeader>
           <GroupedList>
             {roleList.map((r) => (
               <GroupedRow
@@ -598,7 +705,7 @@ function HowStep({ agent }: { agent: Agent }) {
         scrollEnabled={false}
         editable={!busy}
       />
-      <GroupedFooter>{t("agentSetup.how.desc")}</GroupedFooter>
+      <GroupedFooter>{t(modeKey(org, "agentSetup.how.desc"))}</GroupedFooter>
       {seesBudget ? (
         <>
           <GroupedHeader

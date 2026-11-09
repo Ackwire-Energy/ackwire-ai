@@ -132,6 +132,7 @@
     "refuseTitle": "İsteği reddet",
     "refuseAsk": "İstek reddedilsin mi?",
     "leaves": "şirket dışına çıkar",
+    "leavesPersonal": "çalışma alanınızın dışına çıkar",
     "refuseWhyF": "{{name}} nedeninizden öğrenir. İsteğe bağlı.",
     "refuseWhyM": "{{name}} nedeninizden öğrenir. İsteğe bağlı.",
     "sheet": {
@@ -167,6 +168,7 @@
       "irreversible": "Geri alınamaz",
       "reversible": "Geri alınabilir",
       "external": "Şirket dışına çıkar",
+      "externalPersonal": "Çalışma alanınızın dışına çıkar",
       "unsent": "Hiçbir şey gönderilmez",
       "deletable": "Silinebilir"
     },
@@ -237,6 +239,9 @@
     "newChannelHint": "Bir ekip ya da konu için",
     "channelPlaceholder": "Kanal adı, ör. pazarlama",
     "createChannel": "Kanal oluştur",
+    "newChannelHintPersonal": "Tek bir konu için, birkaç ajanla",
+    "channelPlaceholderPersonal": "Ad, ör. tatil",
+    "createChannelPersonal": "Grup sohbeti oluştur",
     "waitIn": "yer: {{where}}",
     "workingNowLine_one": "Şu an {{count}} ajan çalışıyor",
     "workingNowLine_other": "Şu an {{count}} ajan çalışıyor",
@@ -247,6 +252,7 @@
       "unmute": "Sesi aç"
     },
     "firstRunLine": "{{name}} ekibi kuruyor · {{done}} / {{total}}",
+    "firstRunLinePersonal": "{{name}} ajanlarını hazırlıyor · {{done}} / {{total}}",
     "first": {
       "title": "İlk ajanınızla başlayın",
       "subtitle": "Ona bir ad verin ve ne yaptığını söyleyin. Burada bir sohbet olarak görünür.",
@@ -275,6 +281,8 @@
     "chat": "Şununla sohbet…",
     "name": "Ad",
     "channelFine": "Bir ekip ya da konu için.",
+    "channelPersonal": "Grup sohbeti",
+    "channelFinePersonal": "Tek bir konu için, birkaç ajanla.",
     "chatSearch": "Bir kişi veya ajan arayın",
     "to": "Kime:",
     "people": "Kişiler",
@@ -287,6 +295,7 @@
     "routineHint": "Bir ajan bunu kendi başına, planlanan saatte yapar",
     "wikiPage": "Wiki sayfası",
     "wikiHint": "Ekibin ve ajanların okuması için",
+    "wikiHintPersonal": "Ajanlarınızın okuması için",
     "inviteHint": "E-posta veya bağlantıyla",
     "agent": {
       "question": "Bu ajan ne yapacak?"
@@ -460,12 +469,14 @@
       "arrived": "{{name}} ekibe katıldı",
       "meet": "{{name}} ile ilk sohbetiniz",
       "roleIntro": "Ekibinizde {{role}}. Sade bir dille isteyin.",
+      "roleIntroPersonal": "{{role}}, sizin için burada. Sade bir dille isteyin.",
       "noIntro": "Neye ihtiyacınız varsa sade bir dille isteyin.",
       "firstTitle": "Başlamak için",
       "sendHint": "Göndermek için dokunun",
       "hello": "Merhaba {{person}}! Ben {{name}}.",
       "helloNoName": "Merhaba! Ben {{name}}.",
       "helloRole": "Ekipteki rolüm: {{role}}.",
+      "helloRolePersonal": "Rolüm: {{role}}. Sizin için buradayım.",
       "helloAsk": "Nereden başlayalım?",
       "now": "şimdi",
       "start": {
@@ -787,6 +798,7 @@
     "noGroupSection": "Departman yok",
     "workingSection": "Çalışıyor",
     "teamSection": "Ekip",
+    "teamSectionPersonal": "Ajanlarınız",
     "managerQuiet": "Devam eden bir şey yok",
     "state": {
       "waitsYou": "onayınızı bekliyor",
@@ -1043,7 +1055,9 @@
     "title": "Siz",
     "role": {
       "owner": "sahip",
-      "member": "üye"
+      "member": "üye",
+      "ownerPersonal": "kişisel çalışma alanınız",
+      "memberPersonal": "sizinle paylaşılan kişisel bir çalışma alanı"
     },
     "appearance": "Görünüm",
     "notifications": "Bildirimler",
@@ -1990,6 +2004,7 @@
     "loadFailed": "Bağlayıcılar yüklenemedi.",
     "connectedCheck": "{{name}}, bağlı",
     "adminsOnly": "Hizmetleri yalnızca {{org}} yöneticileri bağlayabilir. Birinden isteyin.",
+    "adminsOnlyPersonal": "Uygulamaları yalnızca bu çalışma alanını yöneten kişi bağlayabilir. Ondan isteyin.",
     "canTitle": "Ajanlar şunları yapabilecek",
     "asks": "{{text}} · onayınızı ister",
     "connect": "Bağlan",
@@ -2136,6 +2151,7 @@
     "zoneChange": "Değiştir",
     "zoneTitle": "Saat dilimi",
     "anotherTitle": "Yeni çalışma alanının adı ne?",
+    "anotherPurpose": "Yeni çalışma alanı ne için?",
     "anotherLead": "agentes.chat üzerinde. {{org}} çalışma alanında kalırsınız ve istediğiniz zaman geçiş yapabilirsiniz.",
     "suggested": "{{domain}} alan adlı e-postanıza bakarak {{org}} adını önerdim.",
     "create": "Oluştur",
@@ -2536,7 +2552,11 @@
       "title": "Ajan ekibinizi kurun",
       "text": "Her ajan bir rol üstlenir ve sohbette sizinle birlikte çalışır.",
       "viewerTitle": "Ajan ekibiniz burada",
-      "viewerText": "Bu çalışma alanında ajan oluşturan kişi ilkini ekler ve burada görünür."
+      "viewerText": "Bu çalışma alanında ajan oluşturan kişi ilkini ekler ve burada görünür.",
+      "titlePersonal": "Kendi ajanlarınızdan yardım alın",
+      "textPersonal": "Her ajan sizin için bir işi üstlenir, doğrudan sohbette.",
+      "viewerTitlePersonal": "Ajanlarınız burada",
+      "viewerTextPersonal": "Burada ajan oluşturan kişi ilkini ekler ve burada görünür."
     },
     "agentsForYou": {
       "title": "Ajanlarınız burada görünür",
@@ -2546,13 +2566,20 @@
       "title": "Ekibin ürettiği her şey tek yerde",
       "text": "Ajanların ve kişilerin raporları, tabloları ve dosyaları burada kalır, kolayca bulunur.",
       "viewerTitle": "Ekibin ürettiklerini bulun",
-      "viewerText": "Ajanların ve kişilerin sohbetlerde oluşturdukları burada görünür."
+      "viewerText": "Ajanların ve kişilerin sohbetlerde oluşturdukları burada görünür.",
+      "titlePersonal": "Ajanlarınızın ürettiği her şey tek yerde",
+      "textPersonal": "Ajanlarınızın raporları, tabloları ve dosyaları burada kalır, kolayca bulunur.",
+      "viewerTitlePersonal": "Ajanlarınızın ürettiklerini bulun",
+      "viewerTextPersonal": "Ajanların sohbetlerinizde oluşturdukları burada görünür."
     },
     "tasks": {
       "title": "İşi ekibe devredin",
       "text": "Bir ajan veya kişi için görev oluşturun ve sonuna kadar takip edin.",
       "viewerTitle": "Ekibin işini takip edin",
-      "viewerText": "Biri ilk görevi oluşturduğu anda görevler burada görünür."
+      "viewerText": "Biri ilk görevi oluşturduğu anda görevler burada görünür.",
+      "titlePersonal": "Yapılacaklarınızı ajanlarınıza bırakın",
+      "textPersonal": "Bir ajan için görev oluşturun ve sonuna kadar takip edin.",
+      "viewerTitlePersonal": "Ajanlarınızın işini takip edin"
     },
     "routines": {
       "title": "Tekrarlayan işleri ajanlarınıza bırakın",
@@ -2564,7 +2591,10 @@
       "title": "Ekibin bilmesi gerekenleri saklayın",
       "text": "Kişiler ve ajanlar bu sayfaları okur, böylece herkes aynı bilgiyle çalışır.",
       "viewerTitle": "Ekibin bildiklerine bakın",
-      "viewerText": "Wiki'yi düzenleyen kişi ilk sayfayı yazar ve burada görünür."
+      "viewerText": "Wiki'yi düzenleyen kişi ilk sayfayı yazar ve burada görünür.",
+      "titlePersonal": "Ajanlarınızın okuyabileceği notlar tutun",
+      "textPersonal": "Ajanlarınız bu sayfaları okur ve yazdıklarınızla çalışır.",
+      "viewerTitlePersonal": "Burada yazanlara göz atın"
     },
     "memory": {
       "title": "Ajanlarınız çalışırken öğrenir",
@@ -2587,13 +2617,21 @@
       "text": "Her kanal bir konuyla ilgilenenleri bir araya getirir.",
       "viewerTitle": "Ekibin kanalları burada",
       "viewerText": "Kanal oluşturan kişi ilkini açar ve burada görünür.",
-      "action": "Kanal oluştur"
+      "action": "Kanal oluştur",
+      "titlePersonal": "Birkaç ajanla aynı anda konuşun",
+      "textPersonal": "Her grup sohbeti bir konu için ajanları ve kişileri bir araya getirir.",
+      "viewerTitlePersonal": "Grup sohbetleri burada",
+      "viewerTextPersonal": "Grup sohbeti oluşturan kişi ilkini açar ve burada görünür."
     },
     "people": {
       "title": "Ekibinizle burada çalışın",
       "text": "Kişileri davet edip onlarla ve ajanlarınızla tek yerde konuşun.",
       "viewerTitle": "Ekibiniz burada görünür",
-      "viewerText": "Kişileri davet eden kişi ekibin geri kalanını getirir ve burada görünürler."
+      "viewerText": "Kişileri davet eden kişi ekibin geri kalanını getirir ve burada görünürler.",
+      "titlePersonal": "Ailenizi veya arkadaşlarınızı davet edin",
+      "textPersonal": "Sizinle ve ajanlarınızla tek yerde konuşması için birini davet edin.",
+      "viewerTitlePersonal": "Aileniz ve arkadaşlarınız burada görünür",
+      "viewerTextPersonal": "Biri katıldığında burada görünür."
     },
     "chat": {
       "title": "Her şey bir mesajla başlar",
@@ -2613,7 +2651,11 @@
       "title": "Parola dolaştırmadan girişleri paylaşın",
       "text": "Ajanlarınızın ekip için kullandığı giriş bilgilerini ve anahtarları kaydedin.",
       "viewerTitle": "Ekibin girişleri burada görünür",
-      "viewerText": "Biri sizinle bir giriş bilgisi veya anahtar paylaştığında burada görünür."
+      "viewerText": "Biri sizinle bir giriş bilgisi veya anahtar paylaştığında burada görünür.",
+      "titlePersonal": "Paylaşılan girişleri tek yerde tutun",
+      "textPersonal": "Ajanlarınızın buradaki herkes için kullandığı girişleri ve anahtarları kaydedin.",
+      "viewerTitlePersonal": "Paylaşılan girişler burada görünür",
+      "viewerTextPersonal": "Buradan biri sizinle bir giriş veya anahtar paylaştığında burada görünür."
     },
     "skills": {
       "title": "Ajanlarınıza işleri nasıl yaptığınızı öğretin",

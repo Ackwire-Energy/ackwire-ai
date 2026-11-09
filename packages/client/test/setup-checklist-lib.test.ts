@@ -117,6 +117,28 @@ describe("setup checklist", () => {
     expect(setupRow(t, "how", false, { ...facts, role: null }).desc).toBe("agentSetup.how.todoDescBlank");
     expect(setupRow(t, "how", true, facts)).toEqual({ title: "agentSetup.how.done", action: "agentSetup.see" });
   });
+
+  test("a personal workspace's rows say 'your apps' and 'here', never the workspace's name (ADR 0159)", () => {
+    const t = ((key: string, o?: Record<string, unknown>) =>
+      o ? `${key} ${JSON.stringify(o)}` : key) as never as TFunction;
+    const facts: SetupRowFacts = {
+      org: "Personal",
+      role: null,
+      granted: null,
+      suggested: null,
+      channels: null,
+      firstChannel: null,
+      audience: "everyone",
+      otherOwner: null,
+      onPlan: false,
+      personal: true,
+    };
+    expect(setupRow(t, "apps", false, facts).title).toBe("agentSetup.apps.todoNonePersonal");
+    expect(setupRow(t, "who", false, facts).title).toBe("agentSetup.who.todoPersonal");
+    expect(setupRow(t, "who", true, facts).title).toBe("agentSetup.who.doneEveryonePersonal");
+    // The rest reads as in a team's workspace.
+    expect(setupRow(t, "ai", false, facts).title).toBe("agentSetup.ai.todo");
+  });
 });
 
 describe("the right hand's first run (ADR 0155 §6)", () => {
@@ -196,6 +218,29 @@ describe("the right hand's first run (ADR 0155 §6)", () => {
     expect(firstRunRow(t, "people", "afterPlan", f, false).action).toBe("");
   });
 
+  test("a personal workspace (ADR 0159): no people row, and its rows in its own words", () => {
+    expect(firstRunSteps(lodi(), { ...owner, personal: true })).toEqual(["about", "team", "ai", "apps"]);
+    const t = ((key: string, o?: Record<string, unknown>) => (o ? `${key} ${JSON.stringify(o)}` : key)) as TFunction;
+    const f = { org: "Personal", agents: 2, label: "Claude", apps: null, members: 1, personal: true };
+    expect(firstRunRow(t, "about", "open", f, false)).toEqual({
+      title: 'agentSetup.firstRun.about.todoPersonal {"org":"Personal"}',
+      desc: 'agentSetup.firstRun.about.todoDescPersonal {"org":"Personal"}',
+      action: "agentSetup.firstRun.about.action",
+    });
+    expect(firstRunRow(t, "about", "done", f, false).title).toBe(
+      'agentSetup.firstRun.about.donePersonal {"org":"Personal"}',
+    );
+    expect(firstRunRow(t, "team", "open", f, false).action).toBe("agentSetup.firstRun.team.actionPersonal");
+    expect(firstRunRow(t, "team", "done", f, false).title).toBe('agentSetup.firstRun.team.donePersonal {"count":2}');
+    expect(firstRunRow(t, "team", "card", f, false).title).toBe("agentSetup.firstRun.team.todoPersonal");
+    expect(firstRunRow(t, "apps", "open", f, false).title).toBe(
+      'agentSetup.firstRun.apps.todoPersonal {"org":"Personal"}',
+    );
+    // Words with no personal variant stay the same.
+    expect(firstRunRow(t, "apps", "open", f, false).action).toBe("agentSetup.firstRun.apps.action");
+    expect(firstRunRow(t, "ai", "open", f, false).title).toBe('agentSetup.firstRun.ai.todo {"org":"Personal"}');
+  });
+
   test("the apps a team made from a template would use, the most suggested first", () => {
     const a = (handle: string) => ({ handle, setup: null });
     expect(teamRole(a("iara-2"))).toBe("support");
@@ -203,6 +248,10 @@ describe("the right hand's first run (ADR 0155 §6)", () => {
     expect(teamRole(a("zed"))).toBeNull();
     expect(firstRunApps([a("iara"), a("bia")]).slice(0, 1)).toEqual(["intercom"]);
     expect(firstRunApps([a("zed")])).toEqual([]);
+    // A personal template's agents (ADR 0159): a person's calendar, lists and files.
+    expect(teamRole(a("clara"))).toBeNull();
+    expect(firstRunApps([a("clara"), a("leo-2")])).toEqual(["google-calendar", "todoist"]);
+    expect(firstRunApps([a("duda")])).toEqual(["google-sheets", "drive"]);
   });
 
   test("row 4 lists the apps that connect in one click here, not connected yet, the team's first", () => {

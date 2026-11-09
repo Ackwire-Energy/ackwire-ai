@@ -26,6 +26,7 @@ import { textOrMedia } from "@agenteschat/client/lib/media";
 import { messagePath } from "@agenteschat/client/lib/message-links";
 import { summaryParts } from "@agenteschat/client/lib/missions";
 import { voiceOf } from "@agenteschat/client/lib/voice";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import { chartBlocksOf } from "@agenteschat/ui/widgets/spec";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
@@ -781,13 +782,18 @@ export function NewMissionForm({
   );
 }
 
-/** "As missões começam quando o Computador da Acme ficar pronto." on the Cloud; null elsewhere. */
+/**
+ * "Missions start once Acme's computer is ready." on the Cloud (a personal workspace's: once your agents' computer is,
+ * ADR 0159); null elsewhere.
+ */
 function useCloudMissionWait() {
   const { t } = useTranslation();
   const orgId = useOrgId();
   const org = useMe().data?.organizations.find((o) => o.id === orgId);
   if (useEdition() !== "cloud") return null;
-  return t("missions.waitingCloud", { computer: t("computerSetup.title", { org: org?.name ?? "" }) });
+  return t("missions.waitingCloud", {
+    computer: t(modeKey(org, "computerSetup.titleInSentence"), { org: org?.name ?? "" }),
+  });
 }
 
 /**

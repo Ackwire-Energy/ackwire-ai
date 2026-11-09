@@ -481,7 +481,10 @@
       "routines.setup.sentry.url",
       "team.chart.supervisor",
       "team.sectors.supervisor",
-      "share.groupRoles"
+      "share.groupRoles",
+      "settings.mode.personal",
+      "onboarding.personal.name",
+      "newAgentAsk.ideas"
     ],
     "fr": [
       "devices.cpus",
@@ -862,7 +865,11 @@
       "routines.setup.github.url",
       "routines.setup.sentry.url",
       "agentSetup.how.instructions",
-      "share.agent"
+      "share.agent",
+      "teamPlan.lifeArea.money",
+      "teamTemplates.agents.rui.role",
+      "newAgentAsk.idea.money.label",
+      "agentSetup.firstRun.team.donePersonal"
     ],
     "de": [
       "devices.workspace",
@@ -1260,7 +1267,10 @@
       "browser.live.emulated.desktop",
       "team.chart.supervisor",
       "team.sectors.supervisor",
-      "share.agent"
+      "share.agent",
+      "settings.mode.team",
+      "teamTemplates.agents.leo.role",
+      "newAgentAsk.idea.training.label"
     ],
     "it": [
       "devices.cpus",
@@ -1584,7 +1594,8 @@
       "browser.live.emulated.tablet",
       "browser.live.emulated.desktop",
       "artifacts.files",
-      "share.fileRef"
+      "share.fileRef",
+      "settings.mode.team"
     ],
     "nl": [
       "devices.filter.computers",
@@ -2127,7 +2138,11 @@
       "team.map.band",
       "team.sectors.supervisor",
       "agentSetup.how.model",
-      "share.agent"
+      "share.agent",
+      "settings.mode.team",
+      "teamTemplates.agents.leo.role",
+      "newAgentAsk.idea.training.label",
+      "agentSetup.firstRun.team.donePersonal"
     ],
     "ja": [
       "devices.system.android",
@@ -3234,7 +3249,8 @@
       "routines.setup.sentry.url",
       "browser.live.emulated.tablet",
       "agentSetup.how.model",
-      "share.agent"
+      "share.agent",
+      "agentSetup.firstRun.team.donePersonal"
     ],
     "ru": [
       "devices.system.android",

@@ -87,4 +87,11 @@ export const strings: Partial<PushStrings> = {
   deviceWaitingBody: "Cihaz geri geldiğinde başlar.",
   teamWeekReady: "Ekibinin haftası hazır",
   teamDayReady: "Günün özeti hazır",
+  machineConnectedTitlePersonal: "Yeni bir bilgisayar bağlandı",
+  computerReadyTitlePersonal: "Ajanlarınızın bilgisayarı hazır",
+  agentUnreachedBodyPersonal: "Rutini oluşturan kişi bu ajanla henüz konuşamıyor. İzin vermek için dokunun.",
+  widgetFailedReasonsPersonal: { creator_left: "Onu kuran kişi artık çalışma alanınızda değil." },
+  joinRequestTitlePersonal: (name) => `${name}, çalışma alanınıza katılmak istiyor`,
+  joinSuggestionTitlePersonal: (by, name) => `${by}, ${name} adlı kişiyi davet etmeyi önerdi`,
+  teamWeekReadyPersonal: "Haftan hazır",
 };

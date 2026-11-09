@@ -47,9 +47,10 @@ import { can, managesChannel } from "@agenteschat/client/lib/permissions";
 import { AVAILABILITIES, isOutOfOffice, presenceOfAvailability, statusEndNote } from "@agenteschat/client/lib/presence";
 import { recentDms } from "@agenteschat/client/lib/recent";
 import { isRightHand, rightHandSeenKey } from "@agenteschat/client/lib/right-hand";
-import { inSidebarList, SIDEBAR_ITEMS, sidebarPlace } from "@agenteschat/client/lib/sidebar-items";
+import { inSidebarList, sidebarItemOrder, sidebarPlace } from "@agenteschat/client/lib/sidebar-items";
 import { AGENT_SORTS, sortAgents } from "@agenteschat/client/lib/sidebar-view";
 import { badgeCount, looksUnread } from "@agenteschat/client/lib/unread";
+import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
 import {
   type AgentColor,
   Avatar,
@@ -63,6 +64,7 @@ import {
   Kbd,
   Menu,
   MenuCheckboxItem,
+  MenuHeading,
   MenuItem,
   MenuOverlay,
   MenuOverlayGroup,
@@ -129,6 +131,7 @@ import { useAgentMenu, useChannelMenu, usePersonMenu } from "./entity-menus";
 import { useInviteDialog } from "./invite/InviteDialog";
 import { useNow } from "./missions/MissionBits";
 import { COMPACT_QUERY, useMediaQuery, useNavDrawer } from "./NavDrawer";
+import { NewAgentAsk } from "./NewAgentAsk";
 import { NewChannelDialog } from "./NewChannelDialog";
 import { OpenOnPhoneDialog } from "./OpenOnPhone";
 import { useOrg } from "./org-context";
@@ -213,12 +216,18 @@ export function channelInitials(name: string) {
   return letters.charAt(0).toUpperCase() + letters.slice(1).toLowerCase();
 }
 
-/** The workspace sidebar. */
+/**
+ * The workspace sidebar. A personal workspace (ADR 0159) has the person on top (their menu, the bell and the collapse
+ * beside it), Go to… as the list's first row and no foot; what sits in sight changes, never what can be reached.
+ */
 export function Sidebar() {
   const { t } = useTranslation();
   const { org, me } = useOrg();
   const orgId = org.id;
+  const personal = isPersonal(org);
   const dir = useDirectory(orgId);
+  // No one else is a member (yet, or while the list loads): a personal workspace then lists no people and no #general.
+  const alone = !dir.members.some((m) => m.userId !== me.user.id);
   const channels = useChannels(orgId);
   const overview = useOverview(orgId);
   // A new channel: `true` with no category, or the category whose + opened it.
@@ -257,15 +266,17 @@ export function Sidebar() {
   // An unread reply counts as "something" for a Threads set to show "when there's something": it comes into the list
   // lit, and leaves once read, as Approvals does once nothing waits.
   // Proposals are a tab of Aprovações and count there, unless the person gave them a row of their own.
-  const proposalsRow = inSidebarList(sidebarPlace(sidebarItems, "proposals"), proposalsWaiting);
+  const proposalsRow = inSidebarList(sidebarPlace(sidebarItems, "proposals", personal), proposalsWaiting);
   const pending = (overview.data?.approvalsWaitingForMe ?? 0) + (proposalsRow ? 0 : proposalsWaiting);
   const counts: Partial<Record<SidebarItem, number>> = {
     approvals: pending,
     proposals: proposalsWaiting,
     threads: missionsWaiting + unreadThreads,
   };
-  const listed = SIDEBAR_ITEMS.filter((id) => inSidebarList(sidebarPlace(sidebarItems, id), counts[id] ?? 0));
-  const inMore = SIDEBAR_ITEMS.filter((id) => !listed.includes(id));
+  // The mode's defaults and order (ADR 0159): in a personal workspace, Routines and Drive in sight, the rest in More.
+  const toolOrder = sidebarItemOrder(personal);
+  const listed = toolOrder.filter((id) => inSidebarList(sidebarPlace(sidebarItems, id, personal), counts[id] ?? 0));
+  const inMore = toolOrder.filter((id) => !listed.includes(id));
   const countOf = (id: SidebarItem) =>
     id === "approvals" && pending > 0 ? (
       <CountBadge aria-label={t("shell.pendingApprovals", { count: pending })}>{pending}</CountBadge>
@@ -318,6 +329,10 @@ export function Sidebar() {
   const rightHand = dir.agents.find((a) => isRightHand(a) && a.canTalk !== false);
   const dmOf = new Map((dms.data ?? []).map((d) => [d.with.id, d]));
   const rightHandDm = rightHand ? dmOf.get(rightHand.id) : undefined;
+  // New agent in a personal workspace (ADR 0159): one question, what it should do, and the right hand proposes it.
+  const [askingAgent, setAskingAgent] = useState(false);
+  const newAgent = () =>
+    rightHand ? setAskingAgent(true) : void navigate({ to: "/org/$orgId/agents/new", params: { orgId } });
   const sections = useSidebarSections(me.user.id, orgId);
   // "Fixar no topo": pinned rows sit on top of their own section, above a thin line.
   const pinned = useSidebarPins();
@@ -469,9 +484,9 @@ export function Sidebar() {
   }, [pathname, channels.data, directs.length, shownAgents.length, rail]);
 
   // The person's order of the sections (SidebarOrder.tsx); a section with nothing to show leaves no line.
-  const sectionOrder = useSectionOrder(orgId);
+  const sectionOrder = useSectionOrder(orgId, personal);
   const sectionMenu = (id: SectionKey) =>
-    entityMenu(() => [{ kind: "header", label: sectionName(t, id) }, ...sectionOrder.entries(id)]);
+    entityMenu(() => [{ kind: "header", label: sectionName(t, id, personal) }, ...sectionOrder.entries(id)]);
   // What the headers' + and the sidebar's own menu (right click on its empty space) create, each as far as the role allows.
   const item = (id: string, label: string, icon: IconName, run: () => void): MenuEntry => ({
     kind: "item",
@@ -481,7 +496,7 @@ export function Sidebar() {
     run,
   });
   const newChannelItem = can(org, "create_channels")
-    ? [item("new-channel", t("shell.sidebarMenu.newChannel"), "channel", () => setCreatingChannel(true))]
+    ? [item("new-channel", t(modeKey(org, "shell.sidebarMenu.newChannel")), "channel", () => setCreatingChannel(true))]
     : [];
   const newCategoryItem = can(org, "manage_channels")
     ? [item("new-category", t("channelCategories.newCategory"), "layers", () => setNewCategory({}))]
@@ -504,6 +519,14 @@ export function Sidebar() {
     ? [item("new-group", t("agentGroups.newGroup"), "layers", () => setGroupDialog({ mode: "create" }))]
     : [];
   const groupsClosed = groupIds.every((id) => !sections.isOpen(id, groupsOpen));
+  // The channels the sidebar lists. A personal workspace (ADR 0159) leaves out #general while no one else is in it
+  // (unless it is open or something new waits there), and shows its group conversations only once there is one.
+  const quietGeneral = (c: Channel) =>
+    c.name === "general" && !looksUnread(c) && !c.mentionCount && !pathname.endsWith(`/c/${c.id}`);
+  const listedChannels = (channels.data ?? []).filter(
+    (c) => !dmChannels.has(c.id) && !(personal && alone && quietGeneral(c)),
+  );
+  const channelsShown = !personal || listedChannels.length > 0;
   // A tool's link keeps the browser's menu, from the mouse and the keyboard alike.
   const spaceEvent = (e: { target: EventTarget }) => !(e.target instanceof Element && e.target.closest("a[href]"));
   const sidebarMenu = entityMenu(() => [
@@ -519,8 +542,55 @@ export function Sidebar() {
     { kind: "separator" },
     sectionOrder.restore,
   ]);
+  // The agents' rows, under the Agentes header in a team's workspace and with none in a personal one (ADR 0159).
+  const agentRows = (
+    <>
+      {rightHand && (
+        <RightHandRow
+          agent={rightHand}
+          unread={rightHandDm?.unread ?? 0}
+          onPrefetch={() => rightHandDm && prefetch(rightHandDm.channelId)}
+          onOpen={() => rightHandDm && markOpen(rightHandDm.channelId)}
+        />
+      )}
+      {dir.loading && team.length === 0 && <SidebarSkeleton count={2} avatar label={t("common.loadingList")} />}
+      {pinnedAgents.map(agentRow)}
+      {pinned.hint && (
+        <div className="sidebar__pins-hint" role="note">
+          <span>{t("sidebarPins.hint")}</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            icon="close"
+            aria-label={t("common.close")}
+            title={t("common.close")}
+            onClick={pinned.dismissHint}
+          />
+        </div>
+      )}
+      {pinnedAgents.length > 0 && (byGroup.ungrouped.length > 0 || agentGroups.length > 0) && (
+        <hr className="sidebar__pins-end" />
+      )}
+      {ordered(byGroup.ungrouped).map(agentRow)}
+      {!personal && !dir.loading && team.length === 0 && createAgentItem.length > 0 && (
+        <Link to="/org/$orgId/agents/new" params={{ orgId }} className="sidebar__item sidebar__item--quiet">
+          <Icon name="plus" />
+          <span className="sidebar__item-label">{t(modeKey(org, "sidebarAgents.createFirst"))}</span>
+        </Link>
+      )}
+    </>
+  );
   const blocks: Record<SectionKey, ReactNode> = {
-    tools: (
+    // A personal workspace's list is its conversations (ADR 0159): a tool comes into sight only while something
+    // waits in it, or once the person put it there; Início, Go to… and the other tools are in More at the end.
+    tools: personal ? (
+      listed.length > 0 && (
+        <div className="sidebar__group sidebar__tools">
+          <ToolList items={listed} row={toolRow} />
+        </div>
+      )
+    ) : (
       // The tools each person keeps in sight; the rest open beside the sidebar from More.
       <div className="sidebar__group sidebar__tools">
         <Link to="/org/$orgId/home" params={{ orgId }} className="sidebar__item" title={railTip("home")}>
@@ -531,9 +601,9 @@ export function Sidebar() {
         <MoreTools items={inMore} row={toolRow} countOf={countOf} onCustomize={() => setCustomizing(true)} />
       </div>
     ),
-    channels: (
+    channels: channelsShown && (
       <SidebarChannels
-        channels={(channels.data ?? []).filter((c) => !dmChannels.has(c.id))}
+        channels={listedChannels}
         loading={channels.isLoading}
         sections={sections}
         onNewChannel={(categoryId) => setCreatingChannel(categoryId ?? true)}
@@ -548,103 +618,78 @@ export function Sidebar() {
       rightHand ||
       (team.length > 0 ? shownAgents.length > 0 || manages : createAgentItem.length > 0)) && (
       <>
-        <SidebarSection
-          id="agents"
-          label={t("shell.agents")}
-          sections={sections}
-          className="sidebar__section--part"
-          headProps={sectionMenu("agents")}
-          // Closed, the part hides its groups too: their unread count with its own.
-          summary={agentsUnread > 0 && <UnreadCount count={agentsUnread} />}
-          action={
-            <>
-              <Menu
-                align="end"
-                label={t("sidebarAgents.options")}
-                trigger={
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    iconOnly
-                    icon="more"
-                    className="sidebar__section-add"
-                    aria-label={t("sidebarAgents.options")}
-                    title={t("sidebarAgents.options")}
+        {personal ? (
+          // No header in a personal workspace (ADR 0159): its agents are the list, its right hand first.
+          <div className="sidebar__group sidebar__agents-plain">{agentRows}</div>
+        ) : (
+          <SidebarSection
+            id="agents"
+            label={t("shell.agents")}
+            sections={sections}
+            className="sidebar__section--part"
+            headProps={sectionMenu("agents")}
+            // Closed, the part hides its groups too: their unread count with its own.
+            summary={agentsUnread > 0 && <UnreadCount count={agentsUnread} />}
+            action={
+              <>
+                <Menu
+                  align="end"
+                  label={t("sidebarAgents.options")}
+                  trigger={
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      iconOnly
+                      icon="more"
+                      className="sidebar__section-add"
+                      aria-label={t("sidebarAgents.options")}
+                      title={t("sidebarAgents.options")}
+                    />
+                  }
+                >
+                  <MenuRadioGroup
+                    label={t("sidebarAgents.order")}
+                    value={view.agentSort}
+                    onValueChange={(v) => setView((now) => ({ ...now, agentSort: v as AgentSort }))}
+                    options={AGENT_SORTS.map((value) => ({ value, label: t(`sidebarAgents.sort.${value}`) }))}
                   />
-                }
-              >
-                <MenuRadioGroup
-                  label={t("sidebarAgents.order")}
-                  value={view.agentSort}
-                  onValueChange={(v) => setView((now) => ({ ...now, agentSort: v as AgentSort }))}
-                  options={AGENT_SORTS.map((value) => ({ value, label: t(`sidebarAgents.sort.${value}`) }))}
-                />
-                {manages && (
-                  <>
-                    <MenuSeparator />
-                    <MenuCheckboxItem
-                      checked={view.showAllAgents}
-                      onCheckedChange={(on) => setView((now) => ({ ...now, showAllAgents: on }))}
+                  {manages && (
+                    <>
+                      <MenuSeparator />
+                      <MenuCheckboxItem
+                        checked={view.showAllAgents}
+                        onCheckedChange={(on) => setView((now) => ({ ...now, showAllAgents: on }))}
+                      >
+                        {t("sidebarAgents.showAll")}
+                      </MenuCheckboxItem>
+                    </>
+                  )}
+                  {(agentGroups.length > 0 || manages) && <MenuSeparator />}
+                  {agentGroups.length > 0 && (
+                    <MenuItem
+                      icon={groupsClosed ? "chevronDown" : "chevronUp"}
+                      onSelect={() => sections.setAll(groupIds, groupsClosed)}
                     >
-                      {t("sidebarAgents.showAll")}
-                    </MenuCheckboxItem>
-                  </>
-                )}
-                {(agentGroups.length > 0 || manages) && <MenuSeparator />}
-                {agentGroups.length > 0 && (
-                  <MenuItem
-                    icon={groupsClosed ? "chevronDown" : "chevronUp"}
-                    onSelect={() => sections.setAll(groupIds, groupsClosed)}
-                  >
-                    {groupsClosed ? t("sidebarAgents.expandAll") : t("sidebarAgents.collapseAll")}
-                  </MenuItem>
-                )}
-                {manages && (
-                  <MenuItem icon="layers" onSelect={() => void navigate({ to: "/org/$orgId/team", params: { orgId } })}>
-                    {t("sidebarAgents.organize")}
-                  </MenuItem>
-                )}
-              </Menu>
-              <SectionAdd label={t("sidebarAgents.add")} entries={[...createAgentItem, ...newGroupItem]} />
-            </>
-          }
-          drop={organize ? drag.zone(null) : undefined}
-        >
-          {rightHand && (
-            <RightHandRow
-              agent={rightHand}
-              unread={rightHandDm?.unread ?? 0}
-              onPrefetch={() => rightHandDm && prefetch(rightHandDm.channelId)}
-              onOpen={() => rightHandDm && markOpen(rightHandDm.channelId)}
-            />
-          )}
-          {dir.loading && team.length === 0 && <SidebarSkeleton count={2} avatar label={t("common.loadingList")} />}
-          {pinnedAgents.map(agentRow)}
-          {pinned.hint && (
-            <div className="sidebar__pins-hint" role="note">
-              <span>{t("sidebarPins.hint")}</span>
-              <Button
-                variant="ghost"
-                size="sm"
-                iconOnly
-                icon="close"
-                aria-label={t("common.close")}
-                title={t("common.close")}
-                onClick={pinned.dismissHint}
-              />
-            </div>
-          )}
-          {pinnedAgents.length > 0 && (byGroup.ungrouped.length > 0 || agentGroups.length > 0) && (
-            <hr className="sidebar__pins-end" />
-          )}
-          {ordered(byGroup.ungrouped).map(agentRow)}
-          {!dir.loading && team.length === 0 && createAgentItem.length > 0 && (
-            <Link to="/org/$orgId/agents/new" params={{ orgId }} className="sidebar__item sidebar__item--quiet">
-              <Icon name="plus" />
-              <span className="sidebar__item-label">{t("sidebarAgents.createFirst")}</span>
-            </Link>
-          )}
-        </SidebarSection>
+                      {groupsClosed ? t("sidebarAgents.expandAll") : t("sidebarAgents.collapseAll")}
+                    </MenuItem>
+                  )}
+                  {manages && (
+                    <MenuItem
+                      icon="layers"
+                      onSelect={() => void navigate({ to: "/org/$orgId/team", params: { orgId } })}
+                    >
+                      {t("sidebarAgents.organize")}
+                    </MenuItem>
+                  )}
+                </Menu>
+                <SectionAdd label={t("sidebarAgents.add")} entries={[...createAgentItem, ...newGroupItem]} />
+              </>
+            }
+            drop={organize ? drag.zone(null) : undefined}
+          >
+            {agentRows}
+          </SidebarSection>
+        )}
         {agentGroups.map(({ group, items }) => {
           const list = ordered(items);
           // Where a dragged row would land: a line before the row at that place among the others.
@@ -694,9 +739,12 @@ export function Sidebar() {
             </span>
           </Link>
         )}
+        {/* A personal workspace (ADR 0159): New agent right under its agents (the rail's tile, with no headers there). */}
+        {personal && createAgentItem.length > 0 && (rail ? <CreateAgentTile /> : <NewAgentRow onOpen={newAgent} />)}
       </>
     ),
-    people: (
+    // A personal workspace lists people only once someone else is a member (a family, ADR 0159).
+    people: !(personal && alone) && (
       <SidebarSection
         id="people"
         label={t("shell.directMessages")}
@@ -755,43 +803,90 @@ export function Sidebar() {
     ),
   };
 
+  // The inbox: at the end of my row in the foot, or beside me on top in a personal workspace.
+  const bell = (
+    <Link
+      to="/org/$orgId/notifications"
+      params={{ orgId }}
+      className="sidebar__bell"
+      title={t("shell.notifications")}
+      aria-label={
+        unreadNotifications > 0
+          ? t("shell.unreadNotifications", { count: unreadNotifications })
+          : t("shell.notifications")
+      }
+    >
+      <Icon name="bell" />
+      {unreadNotifications > 0 && (
+        <CountBadge key={bumps} className={bumps > 0 ? "sidebar__bump" : undefined}>
+          {unreadNotifications}
+        </CountBadge>
+      )}
+    </Link>
+  );
+  // The collapse shows at desktop widths only: tablets always have the rail, a phone the drawer.
+  const collapseLabel = collapsed ? t("shell.expandNav") : t("shell.collapseNav");
+  // The workspace header's line. Each count with its own plural: one summary string followed the people's, so
+  // "1 agentes".
+  const summary = overview.data
+    ? [
+        t("settings.tileState.members", { count: overview.data.people }),
+        t("sidebarAgents.count", { count: overview.data.agents }),
+      ].join(" · ")
+    : null;
+
   return (
     <nav className="sidebar" aria-label={t("shell.nav")} data-rail={rail} {...drawer?.navProps}>
       <div className="sidebar__top">
         <WorkspaceSky part="side" rail={rail} />
-        <div className="sidebar__org">
-          <WorkspaceMenu
-            summary={
-              // Each count with its own plural: one summary string followed the people's, so "1 agentes".
-              overview.data
-                ? `${t("settings.tileState.members", { count: overview.data.people })} · ${t("sidebarAgents.count", {
-                    count: overview.data.agents,
-                  })}`
-                : null
-            }
-          />
-        </div>
+        {personal ? (
+          // A personal workspace (ADR 0159): the person on top (their account, settings and workspaces in one menu),
+          // the bell and the collapse beside them. The desktop app's title bar has its own collapse (desktop.css).
+          <div className="sidebar__org sidebar__org--person">
+            <AccountMenu personal />
+            {bell}
+            {!compact && !tablet && (
+              <Button
+                variant="ghost"
+                size="sm"
+                iconOnly
+                icon="sidebar"
+                className="sidebar__head-collapse"
+                aria-label={collapseLabel}
+                title={collapseLabel}
+                aria-expanded={!collapsed}
+                onClick={toggleCollapsed}
+              />
+            )}
+          </div>
+        ) : (
+          <>
+            <div className="sidebar__org">
+              <WorkspaceMenu summary={summary} />
+            </div>
 
-        <div className="sidebar__jump-row">
-          <button type="button" className="sidebar__jump" onClick={openPalette} title={t("palette.jump")}>
-            <Icon name="search" />
-            <span className="sidebar__item-label">{t("palette.jump")}</span>
-            <Kbd>{modKey()}</Kbd>
-            <Kbd>K</Kbd>
-          </button>
-          {!compact && !tablet && (
-            <Button
-              variant="ghost"
-              iconOnly
-              icon="sidebar"
-              className="sidebar__collapse"
-              aria-label={collapsed ? t("shell.expandNav") : t("shell.collapseNav")}
-              title={collapsed ? t("shell.expandNav") : t("shell.collapseNav")}
-              aria-expanded={!collapsed}
-              onClick={toggleCollapsed}
-            />
-          )}
-        </div>
+            <div className="sidebar__jump-row">
+              <button type="button" className="sidebar__jump" onClick={openPalette} title={t("palette.jump")}>
+                <Icon name="search" />
+                <span className="sidebar__item-label">{t("palette.jump")}</span>
+                <Kbd>{modKey()}</Kbd>
+                <Kbd>K</Kbd>
+              </button>
+              {!compact && !tablet && (
+                <Button
+                  variant="ghost"
+                  iconOnly
+                  icon="sidebar"
+                  className="sidebar__collapse"
+                  aria-label={collapseLabel}
+                  title={collapseLabel}
+                  aria-expanded={!collapsed}
+                  onClick={toggleCollapsed}
+                />
+              )}
+            </div>
+          </>
+        )}
       </div>
 
       {/* Space, not lines, between the tools, the channels, the agents and the people. A right click on the space
@@ -807,6 +902,13 @@ export function Sidebar() {
         {sectionOrder.order.filter((id) => blocks[id]).map((id) => sectionOrder.block(id, blocks[id], !rail))}
       </div>
 
+      {/* A personal workspace's end (ADR 0159): one More, holding Início, Go to… and every tool not in sight. */}
+      {personal && (
+        <div className="sidebar__end">
+          <MoreTools items={inMore} row={toolRow} countOf={countOf} onCustomize={() => setCustomizing(true)} home />
+        </div>
+      )}
+
       <ArchivedChannelsDialog open={showArchived} onClose={() => setShowArchived(false)} />
       <NewChannelDialog
         open={creatingChannel !== false}
@@ -819,43 +921,55 @@ export function Sidebar() {
         withChannel={newCategory?.withChannel}
       />
       <SidebarSetupDialog open={customizing} onClose={() => setCustomizing(false)} />
+      {personal && rightHand && (
+        <NewAgentAsk open={askingAgent} onClose={() => setAskingAgent(false)} rightHand={rightHand} />
+      )}
       {groupDialog && <GroupNameDialog purpose={groupDialog} onClose={() => setGroupDialog(null)} />}
 
-      <div className="sidebar__foot">
-        <SidebarHorizon working={working} total={dir.agents.length} />
-        {/* The full sidebar creates from the Agentes header's + (always shown on touch screens); the rail has no
-            headers. */}
-        {rail && can(org, "create_agents") && (
-          <Button asChild block variant="ghost" className="sidebar__create">
-            <Link to="/org/$orgId/agents/new" params={{ orgId }} title={t("shell.createAgent")}>
-              <Icon name="plus" />
-              <span className="sidebar__item-label">{t("shell.createAgent")}</span>
-            </Link>
-          </Button>
-        )}
-        <div className="sidebar__me">
-          <AccountMenu />
-          <Link
-            to="/org/$orgId/notifications"
-            params={{ orgId }}
-            className="sidebar__bell"
-            title={t("shell.notifications")}
-            aria-label={
-              unreadNotifications > 0
-                ? t("shell.unreadNotifications", { count: unreadNotifications })
-                : t("shell.notifications")
-            }
-          >
-            <Icon name="bell" />
-            {unreadNotifications > 0 && (
-              <CountBadge key={bumps} className={bumps > 0 ? "sidebar__bump" : undefined}>
-                {unreadNotifications}
-              </CountBadge>
-            )}
-          </Link>
+      {/* No foot in a personal workspace (ADR 0159): the person, the bell and the collapse are on top. */}
+      {!personal && (
+        <div className="sidebar__foot">
+          <SidebarHorizon working={working} total={dir.agents.length} />
+          {/* The full sidebar creates from the Agentes header's + (always shown on touch screens); the rail has no
+              headers. */}
+          {rail && can(org, "create_agents") && <CreateAgentTile />}
+          <div className="sidebar__me">
+            <AccountMenu />
+            {bell}
+          </div>
         </div>
-      </div>
+      )}
     </nav>
+  );
+}
+
+/** Create agent as one of the rail's tiles (the full sidebar creates from the Agents header's +). */
+/**
+ * New agent under a personal workspace's agents (ADR 0159): a row like theirs, an empty face with a plus where a face
+ * would be, so it reads as the next one.
+ */
+function NewAgentRow({ onOpen }: { onOpen: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <button type="button" className="sidebar__item sidebar__new-agent" onClick={onOpen}>
+      <span className="sidebar__new-agent-face" aria-hidden="true">
+        <Icon name="plus" size={16} />
+      </span>
+      <span className="sidebar__item-label">{t("sidebarAgents.newAgent")}</span>
+    </button>
+  );
+}
+
+function CreateAgentTile() {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  return (
+    <Button asChild block variant="ghost" className="sidebar__create">
+      <Link to="/org/$orgId/agents/new" params={{ orgId: org.id }} title={t("shell.createAgent")}>
+        <Icon name="plus" />
+        <span className="sidebar__item-label">{t("shell.createAgent")}</span>
+      </Link>
+    </Button>
   );
 }
 
@@ -1351,12 +1465,13 @@ function SidebarChannels({
     <>
       <SidebarSection
         id="channels"
-        label={t("shell.channels")}
+        // A personal workspace's are its group conversations (ADR 0159).
+        label={t(modeKey(org, "shell.channels"))}
         sections={sections}
         className="sidebar__section--part"
         headProps={headProps}
         summary={mentions > 0 && <UnreadCount count={mentions} mentions />}
-        action={<SectionAdd label={t("shell.sidebarMenu.addToChannels")} entries={addEntries} />}
+        action={<SectionAdd label={t(modeKey(org, "shell.sidebarMenu.addToChannels"))} entries={addEntries} />}
         // The channels with no category take a channel dragged out of one.
         drop={shown.length > 0 ? { "data-drop": dropMark("loose"), onDragOver: overLoose, onDrop: drop } : undefined}
       >
@@ -1366,11 +1481,11 @@ function SidebarChannels({
         {loose.map((c) => row(c))}
         {others.length > 0 && (
           <Menu
-            label={t("shell.otherChannels")}
+            label={t(modeKey(org, "shell.otherChannels"))}
             trigger={
               <button type="button" className="sidebar__item" data-kind="channel">
                 <Icon name="lock" />
-                <span className="sidebar__item-label">{t("shell.otherChannels")}</span>
+                <span className="sidebar__item-label">{t(modeKey(org, "shell.otherChannels"))}</span>
                 <CountChip className="sidebar__count">{others.length}</CountChip>
               </button>
             }
@@ -1458,6 +1573,10 @@ function SidebarChannels({
   );
 }
 
+/** The tools whose line in More has a personal workspace's words (ADR 0159); Routines' and Drive's fit both. */
+type PersonalWhat = Exclude<SidebarItem, "routines" | "drive">;
+const hasPersonalWhat = (id: SidebarItem): id is PersonalWhat => id !== "routines" && id !== "drive";
+
 /**
  * More: the tools the person keeps out of the list, in a panel beside the sidebar (so nothing below moves), each with a
  * line on what it is for, then "Personalizar a barra lateral". The one opened from it stays in sight under it (CSS
@@ -1468,14 +1587,18 @@ function MoreTools({
   row,
   countOf,
   onCustomize,
+  home = false,
 }: {
   items: SidebarItem[];
   row: (id: SidebarItem) => ReactNode;
   countOf: (id: SidebarItem) => ReactNode;
   onCustomize: () => void;
+  /** At a personal workspace's end (ADR 0159): Início and Go to… open its list, and it opens upward. */
+  home?: boolean;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
+  const personal = isPersonal(org);
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   return (
@@ -1485,7 +1608,7 @@ function MoreTools({
         onOpenChange={setOpen}
         label={t("shell.more")}
         side="right"
-        align="start"
+        align={home ? "end" : "start"}
         className="sidebar__more-menu"
         trigger={
           <button ref={trigger} type="button" className="sidebar__item sidebar__more" title={t("shell.more")}>
@@ -1495,6 +1618,38 @@ function MoreTools({
           </button>
         }
       >
+        {home && (
+          <>
+            <Link
+              to="/org/$orgId/home"
+              params={{ orgId: org.id }}
+              className="ac-menu__item sidebar__more-item"
+              onClick={() => setOpen(false)}
+            >
+              <Icon name="home" />
+              <span className="ac-menu__label">
+                {t("shell.home")}
+                <span className="ac-menu__desc">{t("shell.moreWhat.homePersonal")}</span>
+              </span>
+            </Link>
+            <button
+              type="button"
+              className="ac-menu__item sidebar__more-item"
+              onClick={() => {
+                setOpen(false);
+                openPalette();
+              }}
+            >
+              <Icon name="search" />
+              <span className="ac-menu__label">{t("palette.jump")}</span>
+              <span className="sidebar__goto-keys" aria-hidden="true">
+                <Kbd>{modKey()}</Kbd>
+                <Kbd>K</Kbd>
+              </span>
+            </button>
+            <div className="ac-menu__separator" aria-hidden="true" />
+          </>
+        )}
         {items.map((id) => (
           <Link
             key={id}
@@ -1506,7 +1661,9 @@ function MoreTools({
             <Icon name={SIDEBAR_TOOLS[id].icon} />
             <span className="ac-menu__label">
               {t(`shell.${id}`)}
-              <span className="ac-menu__desc">{t(`shell.moreWhat.${id}`)}</span>
+              <span className="ac-menu__desc">
+                {t(personal && hasPersonalWhat(id) ? `shell.moreWhat.${id}Personal` : `shell.moreWhat.${id}`)}
+              </span>
             </span>
             {countOf(id)}
           </Link>
@@ -1822,8 +1979,12 @@ function UnreadCount({
  * signing out. Deleting the account starts at the bottom of Sua conta, not here beside Sair, where a slip would open
  * it. It and adding a password keep their dialogs here, in the address (`?account=delete`, `?account=password`) on any
  * page: adding a password may ask for a sign-in again, which comes back.
+ *
+ * In a personal workspace (`personal`, ADR 0159) it is the sidebar's top row (face, name and ▾, no foot) and its menu,
+ * opening down, also holds what the workspace menu held for one person: Your account, Settings and the person's
+ * workspaces. Mounted once either way: the dialogs live here.
  */
-function AccountMenu() {
+function AccountMenu({ personal = false }: { personal?: boolean }) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
@@ -1869,6 +2030,10 @@ function AccountMenu() {
     qc.clear();
     await navigate({ to: "/login" });
   };
+  const openSettings = (section?: SettingsSection) =>
+    void (section
+      ? navigate({ to: "/org/$orgId/settings/$section", params: { orgId: org.id, section } })
+      : navigate({ to: "/org/$orgId/settings", params: { orgId: org.id } }));
   // A dialog opens once the menu is gone and focus is back on this row, so closing the dialog lands here too.
   const afterMenu = useRef<(() => void) | null>(null);
   const openAfter = (open: () => void) => () => {
@@ -1897,31 +2062,47 @@ function AccountMenu() {
   return (
     <>
       <Menu
-        side="top"
+        side={personal ? "bottom" : "top"}
         className="profile-menu"
         onClosed={() => {
           afterMenu.current?.();
           afterMenu.current = null;
         }}
         trigger={
-          <button
-            type="button"
-            // The face stands beside the lines under it (your status line): the name's capitals at its top. A name
-            // alone (while how you appear loads) centres on it.
-            className={cx("sidebar__user", under && "ac-faceline")}
-            aria-label={`${t("shell.account")}: ${who}`}
-            title={who}
-          >
-            <MyFace size="sm" presence={presence} presenceLabel={presenceWord} />
-            <span className="sidebar__user-text">
-              <span className={cx("sidebar__user-name", under && "ac-captop")}>{me.user.name}</span>
-              {line ? (
-                <StatusLine emoji={line.emoji} text={line.text} className="sidebar__user-line" />
-              ) : (
-                presenceWord && <StatusLine text={presenceWord} className="sidebar__user-line" />
-              )}
-            </span>
-          </button>
+          personal ? (
+            // On top, as the workspace's header is in a team's: the face (how you appear on it) and the name.
+            <button
+              type="button"
+              className="sidebar__org-button"
+              aria-label={`${t("shell.account")}: ${who}`}
+              title={who}
+            >
+              <MyFace size="sm" presence={presence} presenceLabel={presenceWord} />
+              <span className="sidebar__org-text">
+                <span className="sidebar__org-name">{me.user.name}</span>
+              </span>
+              <Icon name="chevronDown" size={16} />
+            </button>
+          ) : (
+            <button
+              type="button"
+              // The face stands beside the lines under it (your status line): the name's capitals at its top. A name
+              // alone (while how you appear loads) centres on it.
+              className={cx("sidebar__user", under && "ac-faceline")}
+              aria-label={`${t("shell.account")}: ${who}`}
+              title={who}
+            >
+              <MyFace size="sm" presence={presence} presenceLabel={presenceWord} />
+              <span className="sidebar__user-text">
+                <span className={cx("sidebar__user-name", under && "ac-captop")}>{me.user.name}</span>
+                {line ? (
+                  <StatusLine emoji={line.emoji} text={line.text} className="sidebar__user-line" />
+                ) : (
+                  presenceWord && <StatusLine text={presenceWord} className="sidebar__user-line" />
+                )}
+              </span>
+            </button>
+          )
         }
       >
         <div className="profile-card__head profile-menu__head">
@@ -1958,18 +2139,25 @@ function AccountMenu() {
         <MenuItem icon="edit" onSelect={openAfter(() => setProfile(true))}>
           {t("shell.editProfile")}
         </MenuItem>
-        <MenuItem
-          icon="settings"
-          onSelect={() =>
-            void navigate({ to: "/org/$orgId/settings/$section", params: { orgId: org.id, section: "account" } })
-          }
-        >
+        {personal && (
+          <MenuItem icon="person" onSelect={() => openSettings("account")}>
+            {t("settings.section.account")}
+          </MenuItem>
+        )}
+        {/* In a personal workspace: every section, what a team's workspace menu opens. In a team's: Your account. */}
+        <MenuItem icon="settings" onSelect={() => openSettings(personal ? undefined : "account")}>
           {t("shell.settings")}
         </MenuItem>
         {import.meta.env.DEV && (
           <MenuItem icon="grid" onSelect={() => void navigate({ to: "/dev/gallery" })}>
             {t("shell.gallery")}
           </MenuItem>
+        )}
+        {personal && (
+          <>
+            <MenuSeparator />
+            <MenuWorkspaces />
+          </>
         )}
         <MenuSeparator />
         <MenuItem icon="arrowRight" danger onSelect={() => void signOut()}>
@@ -1981,6 +2169,109 @@ function AccountMenu() {
       <OpenOnPhoneDialog open={phone} onClose={() => setPhone(false)} />
       <AddPasswordDialog open={account === "password"} onClose={() => setAccount(null)} />
       <DeleteAccountDialog open={account === "delete"} onClose={() => setAccount(null)} />
+    </>
+  );
+}
+
+/**
+ * A workspace in your lists of them (ADR 0159): a personal one of yours is you, by your photo and your name, as its
+ * sidebar shows you; with more than one, your photo and each one's own name (the same name on each would tell them
+ * apart by nothing). Any other (a team's, or a personal one shared with you, whose face would be someone else's) by its
+ * mark and its name.
+ */
+function useWorkspaceLook() {
+  const { me } = useOrg();
+  const mine = (id: string) => {
+    const o = me.organizations.find((m) => m.id === id);
+    return o !== undefined && isPersonal(o) && o.role === "owner";
+  };
+  const several = me.organizations.filter((o) => mine(o.id)).length > 1;
+  return (o: { id: string; name: string; logo?: string | null }, face: "sm" | "md", mark: number) =>
+    mine(o.id)
+      ? {
+          leading: <Avatar kind="person" name={me.user.name} imageUrl={me.user.image} size={face} />,
+          name: several ? o.name : me.user.name,
+          sub: null,
+          personal: true,
+        }
+      : { leading: <OrgMark logo={o.logo} size={mark} />, name: o.name, sub: null, personal: false };
+}
+
+/**
+ * Your workspaces in the account menu of a personal workspace (ADR 0159): the workspace menu's list (by server in the
+ * desktop app, ADR 0154), then New workspace or Add workspace. Mounted only while the menu is open: the counts load
+ * then. No role beside each: one person's own workspaces.
+ */
+function MenuWorkspaces() {
+  const { t, i18n } = useTranslation();
+  const { org, me } = useOrg();
+  const look = useWorkspaceLook();
+  const notes = workspaceNotes(t, i18n.language, me.organizations);
+  const groups = useWorkspaceGroups({ orgs: me.organizations, currentOrgId: org.id });
+  const navigate = useNavigate();
+  const go = (orgId: string) => void navigate({ to: "/org/$orgId", params: { orgId } });
+  if (groups)
+    return (
+      <>
+        <MenuHeading>{t("shell.yourWorkspaces")}</MenuHeading>
+        {groups.map((g) => (
+          <Fragment key={g.server}>
+            {groups.length > 1 && (
+              <MenuHeading>{g.cloud ? g.name : `${g.name} · ${t("shell.yourServer")}`}</MenuHeading>
+            )}
+            {g.rows.map((o) => {
+              const shown = g.here ? look(o, "sm", 20) : look({ ...o, id: "" }, "sm", 20);
+              return (
+                <MenuItem
+                  key={o.id}
+                  leading={shown.leading}
+                  description={[shown.sub, g.here ? notes.get(o.id) : null].filter(Boolean).join(" · ") || undefined}
+                  hint={
+                    o.current ? t("shell.youAreHere") : o.unread > 0 ? <CountChip>{o.unread}</CountChip> : undefined
+                  }
+                  onSelect={() => {
+                    if (!g.here) void thisMac.openWorkspace(g.server, o.id).catch(() => {});
+                    else if (!o.current) go(o.id);
+                  }}
+                >
+                  {shown.name}
+                </MenuItem>
+              );
+            })}
+          </Fragment>
+        ))}
+        <MenuItem
+          icon="plus"
+          description={t("shell.addWorkspaceHint")}
+          onSelect={() => void thisMac.addWorkspace().catch(() => {})}
+        >
+          {t("shell.addWorkspace")}
+        </MenuItem>
+      </>
+    );
+  return (
+    <>
+      <MenuHeading>{t("shell.yourWorkspaces")}</MenuHeading>
+      {me.organizations.map((o) => {
+        const shown = look(o, "sm", 20);
+        return (
+          <MenuItem
+            key={o.id}
+            leading={shown.leading}
+            description={[shown.sub, notes.get(o.id)].filter(Boolean).join(" · ") || undefined}
+            hint={o.id === org.id ? t("shell.youAreHere") : undefined}
+            onSelect={() => o.id !== org.id && go(o.id)}
+          >
+            {shown.name}
+          </MenuItem>
+        );
+      })}
+      {/* On agentes.chat Cloud, while sign-up is by invitation, only an invitation makes a workspace (ADR 0078). */}
+      {me.user.canCreateWorkspace !== false && (
+        <MenuItem icon="plus" onSelect={() => void navigate({ to: "/onboarding" })}>
+          {t("shell.newWorkspace")}
+        </MenuItem>
+      )}
     </>
   );
 }
@@ -2078,6 +2369,7 @@ function WorkspaceMenu({ summary }: { summary: string | null }) {
 function WorkspaceMenuOptions({ onDone }: { onDone: () => void }) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
+  const look = useWorkspaceLook();
   const notes = workspaceNotes(t, i18n.language, me.organizations);
   const groups = useWorkspaceGroups({ orgs: me.organizations, currentOrgId: org.id });
   const navigate = useNavigate();
@@ -2180,17 +2472,20 @@ function WorkspaceMenuOptions({ onDone }: { onDone: () => void }) {
                 )}
                 {g.rows.map((o) => {
                   const here = g.here ? me.organizations.find((m) => m.id === o.id) : undefined;
+                  const shown = look(here ? o : { ...o, id: "" }, "md", 32);
                   return (
                     <MenuOverlayItem
                       key={o.id}
                       leading={
                         // A server not answering: its last workspaces, dimmed.
-                        <span className={g.state === "offline" ? "sidebar__menu-dim" : undefined}>
-                          <OrgMark logo={o.logo} size={32} />
-                        </span>
+                        <span className={g.state === "offline" ? "sidebar__menu-dim" : undefined}>{shown.leading}</span>
                       }
                       description={
-                        here ? [t(`roles.${here.role}`), notes.get(o.id)].filter(Boolean).join(" · ") : undefined
+                        here
+                          ? [shown.personal ? shown.sub : t(`roles.${here.role}`), notes.get(o.id)]
+                              .filter(Boolean)
+                              .join(" · ") || undefined
+                          : undefined
                       }
                       current={o.current}
                       hint={
@@ -2202,7 +2497,7 @@ function WorkspaceMenuOptions({ onDone }: { onDone: () => void }) {
                         else if (!o.current) void navigate({ to: "/org/$orgId", params: { orgId: o.id } });
                       }}
                     >
-                      {o.name}
+                      {shown.name}
                     </MenuOverlayItem>
                   );
                 })}
@@ -2222,21 +2517,27 @@ function WorkspaceMenuOptions({ onDone }: { onDone: () => void }) {
           </>
         ) : (
           <>
-            {me.organizations.map((o) => (
-              <MenuOverlayItem
-                key={o.id}
-                leading={<OrgMark logo={o.logo} size={32} />}
-                description={[t(`roles.${o.role}`), notes.get(o.id)].filter(Boolean).join(" · ")}
-                current={o.id === org.id}
-                hint={o.id === org.id ? t("shell.youAreHere") : undefined}
-                onSelect={() => {
-                  onDone();
-                  if (o.id !== org.id) void navigate({ to: "/org/$orgId", params: { orgId: o.id } });
-                }}
-              >
-                {o.name}
-              </MenuOverlayItem>
-            ))}
+            {me.organizations.map((o) => {
+              const shown = look(o, "md", 32);
+              return (
+                <MenuOverlayItem
+                  key={o.id}
+                  leading={shown.leading}
+                  description={
+                    [shown.personal ? shown.sub : t(`roles.${o.role}`), notes.get(o.id)].filter(Boolean).join(" · ") ||
+                    undefined
+                  }
+                  current={o.id === org.id}
+                  hint={o.id === org.id ? t("shell.youAreHere") : undefined}
+                  onSelect={() => {
+                    onDone();
+                    if (o.id !== org.id) void navigate({ to: "/org/$orgId", params: { orgId: o.id } });
+                  }}
+                >
+                  {shown.name}
+                </MenuOverlayItem>
+              );
+            })}
             {/* On agentes.chat Cloud, while sign-up is by invitation, only an invitation makes a workspace (ADR 0078). */}
             {me.user.canCreateWorkspace !== false && (
               <>

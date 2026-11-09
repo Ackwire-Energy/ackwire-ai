@@ -62,8 +62,10 @@ import {
   unfinishedWorkspaces,
   updateOrganization,
   updateOrgSettings,
+  WORKSPACE_MODES,
   workspaceContents,
   workspaceDeletions,
+  workspaceMode,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import {
@@ -327,6 +329,14 @@ export function accountRoutes(deps: AppDeps) {
             role: Role,
             kind: z.enum(["email", "link"]),
             invitedBy: z.string().nullable().openapi({ description: "Who invited (their name), when known." }),
+            mode: z
+              .enum(WORKSPACE_MODES)
+              .optional()
+              .openapi({
+                description:
+                  "Who the workspace is for, `team` or `personal` (ADR 0159), so the page speaks of a team or of the " +
+                  "person who invited. Absent on one that no longer works.",
+              }),
             logo: z
               .string()
               .optional()
@@ -568,6 +578,7 @@ export function accountRoutes(deps: AppDeps) {
               showActivity: m.showActivity ?? false,
               agentStyle: m.agentStyle ?? null,
               chatPrefs: m.chatPrefs ?? {},
+              mode: m.mode ?? "team",
               ...(m.standing
                 ? { standing: { state: m.standing.state, reason: toldReason(m.standing), ...cloudNotice() } }
                 : {}),
@@ -1045,6 +1056,10 @@ export function accountRoutes(deps: AppDeps) {
             context: Context.optional(),
             teamSize: z.enum(["solo", "small", "medium", "large"]).optional(),
             timezone: z.string().max(64).optional().openapi({ description: "IANA zone, e.g. America/Sao_Paulo." }),
+            mode: z
+              .enum(WORKSPACE_MODES)
+              .optional()
+              .openapi({ description: "Who it is for (ADR 0159): `team` (the default) or `personal`." }),
           }),
         ),
       },
@@ -1077,6 +1092,7 @@ export function accountRoutes(deps: AppDeps) {
           permissions: [...resolvePermissions(true, [])],
           rank: null,
           context: organization.context,
+          mode: existing ? await workspaceMode(db, organization.id) : (input.mode ?? "team"),
         },
         generalChannelId: general.id,
       };
@@ -1143,6 +1159,7 @@ export function accountRoutes(deps: AppDeps) {
           // What the agents know of the workspace: only for who configures it.
           context: can(membership, "configure") ? (org?.context ?? "") : "",
           logo: org?.logo ?? null,
+          mode: await workspaceMode(db, orgId),
         },
         200,
       );

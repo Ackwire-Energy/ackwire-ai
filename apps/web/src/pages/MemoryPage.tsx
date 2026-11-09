@@ -3,6 +3,7 @@ import { useMemory, useMemoryAction, useProposals } from "@agenteschat/client";
 import { daysBetween, relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { memoryLine } from "@agenteschat/client/lib/proposals";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import {
   Button,
   Chip,
@@ -118,6 +119,7 @@ export function NoMemories({
   onClear: () => void;
 }) {
   const { t } = useTranslation();
+  const { org } = useOrg();
   if (q.trim())
     return (
       <EmptyState
@@ -139,7 +141,7 @@ export function NoMemories({
       title={t("memory.emptyTitle", { name: agent.name })}
       actions={<AskAgentButton agent={agent} variant="primary" />}
     >
-      {t("memory.emptyText")}
+      {t(modeKey(org, "memory.emptyText"))}
     </EmptyState>
   );
 }
@@ -167,7 +169,7 @@ function MemoryView({ agent }: { agent: Agent }) {
       </Link>
       <PageHeader
         title={t("memory.title", g)}
-        meta={t("memory.subtitle", g)}
+        meta={t(modeKey(org, "memory.subtitle"), g)}
         actions={
           pendingProposals.length > 0 && (
             <Button asChild>

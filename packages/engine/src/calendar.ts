@@ -3,7 +3,7 @@ import { and, type Database, type Executor, eq, gte, inArray, isNull, lte, or, s
 import { localeInfo } from "@agenteschat/i18n/locale";
 import { currentHandles, getAgent } from "./agents";
 import { zonedParts, zonedTime } from "./cron";
-import { type EmailLocale, emailLocale, queueEmail } from "./email";
+import { type EmailLocale, emailLocale, modeStamp, queueEmail } from "./email";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishListChanged, publishMessageCreated, publishUserEvent } from "./events";
 import { getOrgSettings } from "./management";
@@ -315,6 +315,7 @@ async function notifyInvited(deps: CalendarDeps, e: EventRow, inviterId: string,
       and(eq(organizationMembers.userId, users.id), eq(organizationMembers.orgId, e.orgId)),
     )
     .where(inArray(users.id, people));
+  const mode = await modeStamp(deps.db, e.orgId);
   for (const r of rows) {
     const zone = r.tz ?? e.timezone;
     await publishUserEvent(deps.pubsub, e.orgId, r.id, { type: "calendar.invited", eventId: e.id, title: e.title });
@@ -331,6 +332,7 @@ async function notifyInvited(deps: CalendarDeps, e: EventRow, inviterId: string,
         when: formatWhen(e.startAt, zone, emailLocale(r.locale)),
         // Its day puts the calendar on the event's week, where `open` finds it.
         url: `${(deps.publicUrl ?? "").replace(/\/$/, "")}/org/${e.orgId}/calendar?open=${e.id}&day=${localDate(e.startAt, zone)}`,
+        ...mode,
       },
     });
   }
