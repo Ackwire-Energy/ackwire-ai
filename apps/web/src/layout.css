@@ -6999,6 +6999,15 @@ html:not([data-pointer]) .run-continue:focus-visible {
   --sky-glass: rgba(241, 248, 255, 0.74);
   --sky-line: rgba(4, 32, 63, 0.12);
 }
+/* A label on a sky (a name, a state): the kit's chip in the sky's glass and ink, readable on every tone of the sky's
+   dither in both themes. */
+.ac-chip.sky-chip {
+  background: var(--sky-glass);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 0 0 1px var(--sky-line);
+  color: var(--sky-ink);
+}
 
 /* Channel: the greeting of a new day */
 .sky-welcome {

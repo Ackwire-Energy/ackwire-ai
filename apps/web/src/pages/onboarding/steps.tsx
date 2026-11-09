@@ -4,7 +4,7 @@ import type { PlanOffer } from "@agenteschat/client/lib/billing";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { firstJob } from "@agenteschat/client/lib/onboarding";
 import { BUSINESS_TYPES, type BusinessType, teamFailureText, templateFor } from "@agenteschat/client/lib/team-plan";
-import { Button, Field, Icon, Input, Locked, Select, Skeleton } from "@agenteschat/ui";
+import { Button, Chip, Field, Icon, Input, Locked, Select, Skeleton } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
@@ -270,10 +270,10 @@ export function PlanStep({
           {team.map((a) => (
             <span key={a.id} className="onb__plan-face">
               <AgentAvatar name={a.name} appearance={lookOf(a)} size="lg" state="sleeping" />
-              <small>{a.name}</small>
+              <Chip className="sky-chip">{a.name}</Chip>
             </span>
           ))}
-          <span className="onb__plan-zz">{t("onboarding.flow.plan.asleep")}</span>
+          <Chip className="sky-chip onb__plan-zz">{t("onboarding.flow.plan.asleep")}</Chip>
         </div>
         <ul className="onb__plan-week">
           {team.map((a) => (

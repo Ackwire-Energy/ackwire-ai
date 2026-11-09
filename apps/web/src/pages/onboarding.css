@@ -104,11 +104,8 @@ html:not([data-pointer]) .onb__me:focus-visible {
   gap: var(--space-1);
   margin-left: -6px;
 }
-.onb__lodi-who > b {
-  padding-bottom: var(--space-2);
-  font-size: 12px;
-  font-weight: 650;
-  color: var(--sky-ink2, var(--ink2));
+.onb__lodi-who > .ac-chip {
+  margin-bottom: var(--space-2);
 }
 .onb__main {
   display: flex;
@@ -358,19 +355,10 @@ html:not([data-pointer]) .onb__logo:focus-visible {
   align-items: center;
   gap: var(--space-1);
   min-width: 0;
-  max-width: 96px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--ink);
-  text-align: center;
-  overflow-wrap: anywhere;
 }
 .onb__plan-zz {
   margin-left: auto;
   align-self: center;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--muted);
 }
 .onb__plan-week {
   display: flex;

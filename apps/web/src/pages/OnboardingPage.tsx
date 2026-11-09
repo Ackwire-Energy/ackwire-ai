@@ -10,7 +10,7 @@ import { landingOf, type RailStep, railState } from "@agenteschat/client/lib/onb
 import { finishOnboarding, isRightHand, RIGHT_HAND_DEFAULT } from "@agenteschat/client/lib/right-hand";
 import { browserTimezone, timezoneName } from "@agenteschat/client/lib/routines";
 import { type BusinessType, businessOfContext } from "@agenteschat/client/lib/team-plan";
-import { AgentSticker, Avatar, Button, Field, Icon, Input, Locked, Logo, Menu, MenuItem } from "@agenteschat/ui";
+import { AgentSticker, Avatar, Button, Chip, Field, Icon, Input, Locked, Logo, Menu, MenuItem } from "@agenteschat/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
@@ -316,7 +316,7 @@ export function OnboardingPage() {
                 size={64}
                 seed="lodi"
               />
-              <b>{lodiName}</b>
+              <Chip className="sky-chip">{lodiName}</Chip>
             </span>
           </div>
         )}
