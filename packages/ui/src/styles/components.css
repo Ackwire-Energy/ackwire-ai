@@ -8190,11 +8190,12 @@ html:not([data-pointer]) .ac-msg:focus-within .ac-react--add,
   max-height: min(420px, 60vh);
   overflow-y: auto;
 }
+/* An option row's height (OptionRow) whatever the query finds, faces or none: the rows keep one height as it's typed. */
 .ac-palette__item {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 40px;
+  min-height: var(--option-h);
   padding: 0 10px;
   border-radius: calc(var(--radius-section) - var(--palette-pad));
   cursor: pointer;

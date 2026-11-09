@@ -275,7 +275,6 @@
   "menuitem@1280 button.ac-menu__item.ac-mo__item in div.ac-menu.ac-mo__group",
   "menuitem@1280 div.ac-menu__item in div.ac-menu.ac-menu--dropdown",
   "menuitem@1280 div.ac-menu__item in div.ac-menu.ac-menu--select",
-  "menuitem@1280 div.ac-menu__item.ac-suggest__item.search-from__item in div.ac-menu.search-box__menu",
   "menuitem@1280 div.ac-tz__option.ac-search__option in div.ac-menu.ac-tz__menu",
   "menuitem@320 button.ac-menu__item.ac-mo__item in div.ac-menu.ac-mo__group",
   "menuitem@320 div.ac-menu__item in div.ac-menu.ac-menu--dropdown",

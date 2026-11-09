@@ -1509,9 +1509,11 @@
           (el) => seen(el) && !el.closest(OWN) && !el.parentElement.closest(ITEM),
         );
         if (!items.length) continue;
-        const faces = items.some((el) =>
-          el.querySelector(":scope > .ac-menu__leading > .ac-avatar, :scope > .ac-avatar"),
-        );
+        // The palette (⌘K) finds people and agents among the rest: its rows are option rows whatever a query found,
+        // one height as it's typed.
+        const faces =
+          menu.matches(".ac-palette__list") ||
+          items.some((el) => el.querySelector(":scope > .ac-menu__leading > .ac-avatar, :scope > .ac-avatar"));
         // The workspace menu (MenuOverlay) fills the screen in 15px type: its rows are the touch ones everywhere.
         const roomy = touch || menu.matches(".ac-mo__group");
         const own = [...menu.querySelectorAll(OWN)].filter((x) => style(x).display !== "none");
