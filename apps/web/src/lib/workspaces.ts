@@ -19,6 +19,10 @@ export interface DesktopServerWorkspaces {
   server: string;
   signedIn: boolean;
   orgs: DesktopWorkspace[];
+  /** It didn't answer since this time (milliseconds since 1970): its last answer, kept. Absent: it answered. */
+  offlineSince?: number;
+  /** The server the app runs on this computer (also at its Tailscale address). Absent in older apps. */
+  here?: boolean;
 }
 
 export interface WorkspaceRow {

@@ -49,6 +49,11 @@ pub struct ServerWorkspaces {
     /// Its session in the window's cookies still answers; false lists no workspace (sign in there again).
     pub signed_in: bool,
     pub orgs: Vec<Org>,
+    /// It didn't answer (offline, an error) since this time (Unix milliseconds): what it said last stays, marked.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub offline_since: Option<u64>,
+    /// The server the app runs on this computer (at its local or its Tailscale address): named as such, never by it.
+    pub here: bool,
 }
 
 #[derive(Default)]
@@ -130,12 +135,13 @@ fn refresh(app: &AppHandle) {
         let Ok(url) = server.parse::<Url>() else { continue };
         let cookies = page.cookies_for_url(url).unwrap_or_default();
         let cookie = cookie_header(cookies.iter().map(|c| (c.name(), c.value())));
+        let here = crate::local_server::is_here(app, server);
         match ask(&agent, server, &cookie, &mut logos) {
-            Some(answer) => next.push(answer),
-            // Not reached (offline, an error): what it said last stays.
+            Some(answer) => next.push(ServerWorkspaces { here, ..answer }),
+            // Not reached (offline, an error): what it said last stays, marked since when.
             None => {
                 if let Some(old) = before.iter().find(|s| &s.server == server) {
-                    next.push(old.clone());
+                    next.push(ServerWorkspaces { here, ..unreachable(old, now_ms()) });
                 }
             }
         }
@@ -152,9 +158,18 @@ fn refresh(app: &AppHandle) {
     }
 }
 
+fn now_ms() -> u64 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
+}
+
+/// A server that didn't answer: its last answer, offline since the first time it didn't.
+pub fn unreachable(last: &ServerWorkspaces, now: u64) -> ServerWorkspaces {
+    ServerWorkspaces { offline_since: last.offline_since.or(Some(now)), ..last.clone() }
+}
+
 /// One server: signed out (no session, or it refused it) lists nothing; None when it couldn't be reached.
 fn ask(agent: &ureq::Agent, server: &str, cookie: &str, logos: &mut HashMap<String, Option<String>>) -> Option<ServerWorkspaces> {
-    let signed_out = ServerWorkspaces { server: server.to_string(), signed_in: false, orgs: vec![] };
+    let signed_out = ServerWorkspaces { server: server.to_string(), signed_in: false, ..Default::default() };
     if cookie.is_empty() {
         return Some(signed_out);
     }
@@ -174,7 +189,7 @@ fn ask(agent: &ureq::Agent, server: &str, cookie: &str, logos: &mut HashMap<Stri
             Org { id, name, logo, unread, waiting }
         })
         .collect();
-    Some(ServerWorkspaces { server: server.to_string(), signed_in: true, orgs })
+    Some(ServerWorkspaces { server: server.to_string(), signed_in: true, orgs, ..Default::default() })
 }
 
 /// The answer as JSON; Ok(None) when the session isn't (any longer) signed in there.
@@ -363,7 +378,17 @@ mod tests {
         Org { id: id.into(), name: id.to_uppercase(), logo: None, unread, waiting: 0 }
     }
     fn server(s: &str, signed_in: bool, orgs: Vec<Org>) -> ServerWorkspaces {
-        ServerWorkspaces { server: s.into(), signed_in, orgs }
+        ServerWorkspaces { server: s.into(), signed_in, orgs, ..Default::default() }
+    }
+
+    #[test]
+    fn a_server_that_stopped_answering() {
+        let last = server("https://agentes.exemplo.com.br", true, vec![]);
+        let first = unreachable(&last, 1_000);
+        assert_eq!(first.offline_since, Some(1_000));
+        assert!(first.signed_in, "its last answer stays");
+        // Still not answering a minute later: offline since the first time.
+        assert_eq!(unreachable(&first, 61_000).offline_since, Some(1_000));
     }
 
     #[test]
