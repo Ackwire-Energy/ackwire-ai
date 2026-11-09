@@ -2,7 +2,15 @@ import { holdEvents, type PubSub } from "@agenteschat/adapters";
 import { and, type Database, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { serverText } from "@agenteschat/i18n";
 import { type AppLocale, appLocale } from "@agenteschat/i18n/locale";
-import { checkRoutine, type DraftPlace, giveApps, type ProposedRoutine, suggestAgentAi } from "./agent-proposals";
+import {
+  agentsLike,
+  agentsLikeText,
+  checkRoutine,
+  type DraftPlace,
+  giveApps,
+  type ProposedRoutine,
+  suggestAgentAi,
+} from "./agent-proposals";
 import {
   type Agent,
   archiveAgent,
@@ -1024,6 +1032,11 @@ export function teamTools(deps: {
             type: "boolean",
             description: "Add your own weekly check of the team (Fridays at 17h, here). Yes for a new team.",
           },
+          also_new: {
+            type: "boolean",
+            description:
+              "Only once the person said to make them although agents like them already exist (this tool names them).",
+          },
         },
         required: ["lead", "agents"],
         additionalProperties: false,
@@ -1035,6 +1048,9 @@ export function teamTools(deps: {
           const full = await deps.cardsLeft(ctx, true);
           if (full) return full;
           const forUserId = await personBehindCall(ctx);
+          const drafts = list(input.agents).map(obj);
+          const like = input.also_new === true ? [] : await agentsLike(ctx.db, ctx.orgId, drafts, forUserId);
+          if (like.length > 0) return { content: agentsLikeText(like, PROPOSE_TEAM_TOOL) };
           const locale = await personLocale(ctx.db, forUserId);
           const params = await checkTeam(
             { db: ctx.db, context: deps.context },

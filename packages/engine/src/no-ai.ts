@@ -51,13 +51,19 @@ const REASON_TEXT: Partial<Record<NoAiCardReason, string>> = {
   commands_off: "I can't answer now: commands are turned off on my plan's computer.",
   plan_not_shared:
     "I can't answer you on the workspace's plan: it serves only its owner. Connect your own plan and I will.",
+  plan_unattended:
+    "I didn't answer: the request didn't come from a person, and the workspace's plan serves only its owner.",
   runner_outdated: "I can't answer now: the program on my plan's computer needs an update.",
   plan_tools: "I stopped before answering: my plan's AI on that computer offers tools of its own.",
   plan_hold: "I kept your message. I'll answer here once the workspace has an agentes.chat plan and an AI connected.",
 };
 
-/** `plan_hold`: no word on its AI: a billing hold stopped the run, and the card keeps the message for after the plan. */
-export type NoAiCardReason = NoAiReason | "plan_hold";
+/**
+ * `plan_hold`: no word on its AI: a billing hold stopped the run, and the card keeps the message for after the plan.
+ * `plan_unattended`: the right hand's run nobody is behind, on a plan that answers only its owner: no one's own plan
+ * would answer it, so the card never says to connect one.
+ */
+export type NoAiCardReason = NoAiReason | "plan_hold" | "plan_unattended";
 
 /** A conversation gets the card again only after this long (per agent; once while the organization has no AI). */
 export const NO_AI_CARD_EVERY_MS = 6 * 3600_000;

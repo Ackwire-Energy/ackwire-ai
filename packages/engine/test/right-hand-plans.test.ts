@@ -4,10 +4,12 @@ import { and, eq, schema } from "@agenteschat/db";
 import {
   type Brain,
   type BrainTurn,
+  createAgentRuns,
   createClaudeCodeBrain,
   createJobHandlers,
   drainOutbox,
   getAgentBrain,
+  insertMessage,
   type MachineStatus,
   machineAgents,
   mayFallBack,
@@ -204,6 +206,45 @@ test("its computer asleep: one line says why, the run fails at once, no wait and
   expect(usage.filter((u) => u.billedTo !== "plan")).toEqual([]);
 });
 
+test("a request no person made, on a plan that answers only its owner: its line never says to connect a plan", async () => {
+  const { fx, deps, lodi: helper } = await world();
+  await setAgentBrain(deps, fx.owner.id, fx.org.id, (await helper()).id, { brain: "claude_code", account: ANAS });
+  const agent = await helper();
+  let turns = 0;
+  const brain: Brain = {
+    kind: "claude_code",
+    async *run() {
+      turns++;
+      yield { type: "done", text: "ok" };
+    },
+  };
+  const machines = { status: async (id: string) => statusOf(id) };
+  const handlers = createJobHandlers({ ...fx.jobDeps, brains: { claude_code: () => brain }, machines });
+  // Another agent asks it on its own, in a channel: nobody is behind that.
+  const asked = await insertMessage(fx.db, {
+    orgId: fx.org.id,
+    channelId: fx.general.id,
+    author: { type: "agent", agentId: fx.agent.id, runId: null, hop: 1, stretchId: null },
+    body: `@${agent.handle} cria o canal de vendas`,
+  });
+  const [run] = await createAgentRuns(fx.db, asked, [agent.id], "mention");
+  if (!run) throw new Error("no run");
+  expect((await resolveBrain({ db: fx.db, machines }, agent, run, fx.general.id)).unavailable).toMatchObject({
+    code: "plan_unattended",
+  });
+  await drainOutbox(fx.db, handlers);
+  const [ended] = await fx.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.id, run.id));
+  expect(ended?.status).toBe("failed");
+  expect(turns).toBe(0);
+  const cards = (await fx.db.select().from(schema.messages).where(eq(schema.messages.authorAgentId, agent.id))).filter(
+    (m) => m.meta.bodyCode === "no_ai",
+  );
+  expect(cards.map((m) => (m.meta.noAi as { reason?: string }).reason)).toEqual(["plan_unattended"]);
+  expect(cards[0]?.body).toBe(
+    "I didn't answer: the request didn't come from a person, and the workspace's plan serves only its owner.",
+  );
+});
+
 test("its CLI killed at a tool of its own after a bridge call: nothing of the turn is posted, only its line", async () => {
   const { fx, deps, lodi } = await world();
   await setAgentBrain(deps, fx.owner.id, fx.org.id, (await lodi()).id, { brain: "claude_code", account: ANAS });
@@ -374,6 +415,7 @@ test("its DM's line names the real cause: a model's own limit or region, command
   expect(rightHandNoAiReason("exec_disabled")).toBe("commands_off");
   expect(rightHandNoAiReason("tool_off")).toBe("commands_off");
   expect(rightHandNoAiReason("plan_not_owner")).toBe("plan_not_shared");
+  expect(rightHandNoAiReason("plan_unattended")).toBe("plan_unattended");
   for (const code of ["cli_missing", "codex_missing", "opencode_missing", "antigravity_missing"])
     expect(rightHandNoAiReason(code)).toBe("cli_missing");
   // A failure that may pass is a problem on the computer: never "no AI connected", nor that it's away.

@@ -4,11 +4,11 @@ import { serverText } from "@agenteschat/i18n";
 import { appLocale } from "@agenteschat/i18n/locale";
 import { AUTO_MODEL } from "@agenteschat/providers";
 import type { Agent } from "./agents";
-import type { NoAiReason } from "./ai-status";
 import { recordAudit } from "./audit";
 import type { BrainUnavailability, ModelScope } from "./brains/select";
 import { ForbiddenError } from "./errors";
 import type { MachineStatus } from "./machine-hub";
+import type { NoAiCardReason } from "./no-ai";
 import { personBehindCall } from "./requester";
 import { runnerUpdateWay } from "./runner-update";
 import { type AgentRun, isCliFailure } from "./runs";
@@ -356,7 +356,9 @@ export async function rightHandPerson(
 
 /**
  * Why its turn can't think on the plan now, beyond what any computer brain checks (null: it can): a runner that
- * can't lock the CLI down, or someone else's DM while "Atende outras pessoas" is off. `agent` is `thinkingAgent`'s.
+ * can't lock the CLI down, or while "Atende outras pessoas" is off someone else's DM (`plan_not_shared`: their own
+ * plan answers them) or a run nobody is behind (`plan_unattended`: no person's plan can answer it). `agent` is
+ * `thinkingAgent`'s.
  */
 export async function rightHandPlanRefusal(
   db: Executor,
@@ -371,7 +373,13 @@ export async function rightHandPlanRefusal(
       runId: run.id,
       triggerMessageId: run.triggerMessageId,
     });
-    if (!person || person !== agent.ownerUserId) {
+    if (!person) {
+      return {
+        code: "plan_unattended",
+        message: `${agent.name} thinks with a plan that answers only its owner, and no person asked for this.`,
+      };
+    }
+    if (person !== agent.ownerUserId) {
       return { code: "plan_not_shared", message: `${agent.name} thinks with a plan that answers only its owner.` };
     }
   }
@@ -387,10 +395,10 @@ export async function rightHandPlanRefusal(
 /**
  * The line its DM shows when its plan can't think (ADR 0137 §7): it never falls back to an API key, nor waits with a
  * spinner. Its computer asleep or paused, the plan at its limit (or only its model's, the region that model needs, or
- * that model switched off for the key: `scope`), a plan that answers only its owner, a program to update or turned off there, the plan's CLI not
- * installed, or what any agent says.
+ * that model switched off for the key: `scope`), a plan that answers only its owner (to someone else, or to a run no
+ * person asked for), a program to update or turned off there, the plan's CLI not installed, or what any agent says.
  */
-export function rightHandNoAiReason(code: string, scope?: ModelScope): NoAiReason {
+export function rightHandNoAiReason(code: string, scope?: ModelScope): NoAiCardReason {
   if (code === "machine_offline" || code === "machine_paused") return "computer_away";
   if (code === "plan_limit")
     return scope === "region"
@@ -403,6 +411,7 @@ export function rightHandNoAiReason(code: string, scope?: ModelScope): NoAiReaso
             ? "model_limit"
             : "plan_limit";
   if (code === "plan_not_shared" || code === "plan_not_owner") return "plan_not_shared";
+  if (code === "plan_unattended") return "plan_unattended";
   if (code === "runner_outdated" || code === "codex_too_old") return "runner_outdated";
   if (code === "exec_disabled" || code === "tool_off") return "commands_off";
   if (code === "tools_not_locked") return "plan_tools";

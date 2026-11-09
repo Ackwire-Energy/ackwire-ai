@@ -2365,6 +2365,9 @@ export const en = {
       cli_failed: "{{name}} can't answer now: the plan's AI stopped with an error.",
       plan_limit: "{{name}} can't answer now: the plan reached its limit.",
       plan_not_shared: "Connect your own plan to talk to {{name}}: the workspace's plan serves only its owner.",
+      /** A request no person made (another agent's, a routine's): nobody's own plan would answer it. */
+      plan_unattended:
+        "{{name}} didn't answer: the request didn't come from a person, and the workspace's plan serves only its owner.",
       runner_outdated: "{{name}} can't answer now: the program on the plan's computer needs an update.",
       plan_tools:
         "{{name}} stopped before answering: the plan's AI on that computer didn't stay within agentes.chat's tools.",
@@ -14339,6 +14342,8 @@ export const en = {
       no_ai_plan_limit: "I can't answer now: the plan I think with reached its limit.",
       no_ai_plan_not_shared:
         "I can't answer you on the workspace's plan: it serves only its owner. Connect your own plan and I will.",
+      no_ai_plan_unattended:
+        "I didn't answer: the request didn't come from a person, and the workspace's plan serves only its owner.",
       no_ai_runner_outdated: "I can't answer now: the program on my plan's computer needs an update.",
       no_ai_plan_tools:
         "I stopped before answering: my plan's AI on that computer didn't stay within agentes.chat's tools.",

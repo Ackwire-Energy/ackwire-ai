@@ -5,6 +5,8 @@ import { actWithUndo, publishMessageActions } from "./agent-actions";
 import {
   AGENT_PROPOSAL_CARD,
   type AgentProposalCard,
+  agentsLike,
+  agentsLikeText,
   checkAgentDraft,
   deciderCanOpen,
   mayCreateAgents,
@@ -631,6 +633,11 @@ export function createSetupToolSource(deps: {
             description:
               "A first thing for it to do, in the person's words and language: the card then offers 'Criar e testar', which creates it and sends this to it in the person's DM with it.",
           },
+          also_new: {
+            type: "boolean",
+            description:
+              "Only once the person said to make it although an agent like it already exists (this tool names it).",
+          },
         },
         required: ["name", "handle", "instructions", "why"],
         additionalProperties: false,
@@ -643,6 +650,9 @@ export function createSetupToolSource(deps: {
           if (!at) return NOBODY_READS;
           const full = await cardsLeft(ctx);
           if (full) return full;
+          const forUserId = await personBehindCall(ctx);
+          const like = input.also_new === true ? [] : await agentsLike(ctx.db, ctx.orgId, [input], forUserId);
+          if (like.length > 0) return { content: agentsLikeText(like, PROPOSE_AGENT_TOOL) };
           // The right hand's card goes to whoever may create agents when the person who asked can't ("Pedir a um admin").
           const rightHand = isRightHand(await getAgentCached(ctx.db, ctx.orgId, ctx.agentId));
           if (!rightHand && !(await deciderCanOpen(ctx.db, ctx.orgId, at.channelId))) {
@@ -652,7 +662,6 @@ export function createSetupToolSource(deps: {
               isError: true,
             };
           }
-          const forUserId = await personBehindCall(ctx);
           const place = { orgId: ctx.orgId, channelId: at.channelId, personId: forUserId };
           const draft = {
             ...(await checkAgentDraft({ db: ctx.db, context: deps.context }, place, input)),

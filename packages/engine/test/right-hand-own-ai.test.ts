@@ -1,8 +1,10 @@
 import { afterEach, expect, test } from "bun:test";
 import { ACCOUNTS_PROTOCOL, MACHINE_PROTOCOL_VERSION } from "@agenteschat/adapters";
-import { and, eq, schema } from "@agenteschat/db";
+import { and, eq, ne, schema } from "@agenteschat/db";
 import {
+  decideProposal,
   getAgentBrain,
+  insertMessage,
   listMachineAccounts,
   MACHINE_CONTROL_TOPIC,
   type MachineStatus,
@@ -15,7 +17,9 @@ import {
   RIGHT_HAND,
   releaseMemberAccounts,
   resolveBrain,
+  runAuthority,
   setAgentBrain,
+  sha256,
   takeBackPlan,
 } from "../src";
 import { agentAiState, orgAiStatus, orgHasAi } from "../src/ai-status";
@@ -190,6 +194,56 @@ test("the workspace's plan serves only its owner until they open it; the AI stat
   if (!agent) throw new Error("no right hand");
   const caio = await addMember(fx.db, fx.org.id, "member", "dani");
   expect(await agentAiState(status, agent, undefined, caio.id)).toMatchObject({ state: "ready" });
+});
+
+test("a decision on its card wakes it for the person behind the card's run, on that person's own plan", async () => {
+  const { fx, deps, bia, lodi: helper } = await world();
+  // The workspace's AI is the owner's plan, for the owner alone; the member has a plan of her own.
+  await setAgentBrain(deps, fx.owner.id, fx.org.id, helper.id, { brain: "claude_code", account: ANAS });
+  await setAgentBrain(deps, bia.id, fx.org.id, helper.id, { scope: "mine", brain: "claude_code", account: BIAS });
+  const dm = await openPersonAgentDm(fx.db, fx.org.id, bia.id, helper.id);
+  const asked = await postPersonMessage({ db: fx.db, pubsub: fx.pubsub }, bia.id, fx.org.id, dm.id, {
+    body: "anota no contexto que respondemos em inglês",
+  });
+  const [run] = await fx.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, asked.id));
+  if (!run) throw new Error("no run");
+  // Its run proposed a change to the workspace's context there, showed the card and ended.
+  const [org] = await fx.db.select().from(schema.organizations).where(eq(schema.organizations.id, fx.org.id));
+  const context = org?.context ?? "";
+  const [proposal] = await fx.db
+    .insert(schema.contextProposals)
+    .values({
+      orgId: fx.org.id,
+      target: "org_context",
+      proposedByAgentId: helper.id,
+      requestedByUserId: bia.id,
+      baseHash: sha256(context),
+      proposedText: `${context}\n- Respondemos em inglês.`,
+      diff: "+- Respondemos em inglês.",
+      rationale: "Pedido no DM.",
+    })
+    .returning();
+  if (!proposal) throw new Error("no proposal");
+  await insertMessage(fx.db, {
+    orgId: fx.org.id,
+    channelId: dm.id,
+    author: { type: "agent", agentId: helper.id, runId: run.id, hop: run.hop },
+    body: "Propus.",
+    meta: { memoryUpdates: [{ action: "proposed", proposalId: proposal.id, proposalIds: [proposal.id], text: "x" }] },
+  });
+  await fx.db.update(schema.agentRuns).set({ status: "done" }).where(eq(schema.agentRuns.id, run.id));
+  await decideProposal(fx.db, fx.owner.id, fx.org.id, proposal.id, "accept", { pubsub: fx.pubsub });
+  const [next] = await fx.db
+    .select()
+    .from(schema.agentRuns)
+    .where(and(eq(schema.agentRuns.agentId, helper.id), ne(schema.agentRuns.id, run.id)));
+  if (!next) throw new Error("it wasn't told");
+  expect(await runAuthority(fx.db, next)).toEqual({ kind: "person", personId: bia.id });
+  const [agent] = await fx.db.select().from(schema.agents).where(eq(schema.agents.id, helper.id));
+  if (!agent) throw new Error("no right hand");
+  const plan = await resolveBrain({ db: fx.db, machines }, agent, next, dm.id);
+  expect(plan).toMatchObject({ kind: "claude_code", account: { id: BIAS } });
+  expect(plan.unavailable).toBeUndefined();
 });
 
 test("a person's plan on Lodi is an AI of the workspace, though Lodi's own row has none", async () => {

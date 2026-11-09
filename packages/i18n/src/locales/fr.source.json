@@ -5653,6 +5653,9 @@
   "noAi.rightHand.plan_not_shared": {
     "value": "Connect your own plan to talk to {{name}}: the workspace's plan serves only its owner."
   },
+  "noAi.rightHand.plan_unattended": {
+    "value": "{{name}} didn't answer: the request didn't come from a person, and the workspace's plan serves only its owner."
+  },
   "noAi.rightHand.runner_outdated": {
     "value": "{{name}} can't answer now: the program on the plan's computer needs an update."
   },
@@ -35401,6 +35404,9 @@
   },
   "chat.body.no_ai_plan_not_shared": {
     "value": "I can't answer you on the workspace's plan: it serves only its owner. Connect your own plan and I will."
+  },
+  "chat.body.no_ai_plan_unattended": {
+    "value": "I didn't answer: the request didn't come from a person, and the workspace's plan serves only its owner."
   },
   "chat.body.no_ai_runner_outdated": {
     "value": "I can't answer now: the program on my plan's computer needs an update."

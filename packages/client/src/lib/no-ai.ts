@@ -48,7 +48,8 @@ export interface NoAiCard {
   /**
    * The team's right hand on a plan (ADR 0137 §7): why that plan can't think now, said as one line with the way to an
    * API key (its computer away or with a problem, the plan at its limit or its model's own, the region that model needs, commands off
-   * there, a plan that answers only its owner, a runner to update there, the plan's CLI offering tools of its own).
+   * there, a plan that answers only its owner, to someone else or to a request no person made, a runner to update
+   * there, the plan's CLI offering tools of its own).
    */
   planLine?: RightHandPlanLine;
   /** With `model_limit`, `model_region` and `model_off`: the model's name. */
@@ -71,6 +72,7 @@ export type RightHandPlanLine =
   | "plan_inactive"
   | "commands_off"
   | "plan_not_shared"
+  | "plan_unattended"
   | "runner_outdated"
   | "plan_tools";
 export const RIGHT_HAND_PLAN_LINES: ReadonlySet<string> = new Set<RightHandPlanLine>([
@@ -84,6 +86,7 @@ export const RIGHT_HAND_PLAN_LINES: ReadonlySet<string> = new Set<RightHandPlanL
   "plan_inactive",
   "commands_off",
   "plan_not_shared",
+  "plan_unattended",
   "runner_outdated",
   "plan_tools",
 ]);
@@ -174,7 +177,8 @@ export const mayConnectAi = (
 
 /**
  * The way out of a plan line for this person: their own plan when the workspace's doesn't serve them, or when a key
- * isn't theirs to set (an API key is always the workspace's, §11), else an API key. Null: neither is theirs to do.
+ * isn't theirs to set (an API key is always the workspace's, §11), else an API key. A request no person made thinks
+ * with no one's own plan: only a key helps there. Null: neither is theirs to do.
  */
 export function planLineFix(
   line: RightHandPlanLine,
@@ -182,6 +186,7 @@ export function planLineFix(
   meId: string | null | undefined,
   org: Parameters<typeof can>[0],
 ): "connectMine" | "useKey" | null {
+  if (line === "plan_unattended") return maySetAgentAi(agent, meId, org) ? "useKey" : null;
   if (!mayConnectAi(agent, meId, org)) return null;
   return line === "plan_not_shared" || !maySetAgentAi(agent, meId, org) ? "connectMine" : "useKey";
 }
