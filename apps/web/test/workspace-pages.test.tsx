@@ -487,7 +487,9 @@ describe("Equipe (ADR 0148)", () => {
     state.approvals = state.approvals.filter((a) => a.agentId !== ATLAS_ID);
     await go("team", state);
     expect(screen().getByRole("heading", { name: "Equipe" })).toBeTruthy();
-    expect(document.querySelector(".ac-pagehead__meta")?.textContent).toBe("2 pessoas · 2 agentes · 0 setores");
+    // Its count on the title's row.
+    const count = document.querySelector(".ac-pagehead__titleline > .ac-pagehead__count");
+    expect(count?.textContent).toBe("2 pessoas · 2 agentes · 0 setores");
     // The same action as the sidebar's, in the same words.
     const head = document.querySelector(".ac-pagehead") as HTMLElement;
     expect(within(head).getByRole("link", { name: "Criar agente" })).toBeTruthy();

@@ -56,6 +56,16 @@ describe("one page top and side", () => {
     expect(body(".ac-pagehead__title")).toContain("line-height: var(--control-h-md);");
     expect(body(".ac-pagehead__actions")).toContain("min-height: var(--control-h-md);");
   });
+
+  test("a page's count is on the title's row, on its baseline, 12 after it, under it only without room", () => {
+    const line = body(".ac-pagehead__titleline:has(> .ac-pagehead__count)");
+    expect(line).toContain("flex-wrap: wrap;");
+    expect(line).toContain("column-gap: var(--space-3);");
+    expect(body(".ac-pagehead__titleline > .ac-pagehead__title:has(+ .ac-pagehead__count)")).toContain(
+      "align-self: baseline;",
+    );
+    expect(body(".ac-pagehead__count")).toContain("align-self: baseline;");
+  });
 });
 
 describe("cards and rows", () => {

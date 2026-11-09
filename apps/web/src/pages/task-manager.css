@@ -21,10 +21,14 @@
 }
 .tm-sum__item {
   display: inline-flex;
-  align-items: center;
+  align-items: baseline;
   gap: 6px;
   font-weight: 600;
   color: var(--ink2);
+}
+/* The mark centres on its words, so the row's baseline is the words' and the count sits on the title's. */
+.tm-sum__item > :first-child {
+  align-self: center;
 }
 .tm-sum__item--wait {
   color: var(--warn);

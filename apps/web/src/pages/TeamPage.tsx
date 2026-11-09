@@ -97,8 +97,8 @@ export function TeamPage() {
     <div className="page team">
       <PageHeader
         title={t("team.title")}
-        meta={
-          data &&
+        count={
+          !!data &&
           [
             t("team.people", { count: dir.members.length }),
             t("team.agents", { count: agents.length }),

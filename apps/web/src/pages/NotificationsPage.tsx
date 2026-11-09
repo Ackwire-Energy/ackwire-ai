@@ -1633,8 +1633,8 @@ export function NotificationsPage() {
     <div className="page page--list nt">
       <PageHeader
         title={t("notifications.title")}
-        // The counts the sidebar already has show at once; the list's own replace them when it arrives.
-        meta={(list.isSuccess || badge.isSuccess) && summary}
+        // On the title's row: the counts the sidebar already has show at once, the list's own replace them.
+        count={(list.isSuccess || badge.isSuccess) && summary}
         actions={
           <>
             <Menu
