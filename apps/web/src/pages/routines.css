@@ -611,6 +611,29 @@ label.routine-onair__text {
   min-width: 0;
   overflow-wrap: anywhere;
 }
+/* On a phone the icon and the title share a line, when it runs and Cancelar go under them at the row's width. */
+@media (max-width: 640px) {
+  .routine-ahead__item {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr);
+    align-items: center;
+    gap: 2px 10px;
+  }
+  .routine-ahead__item > .routine-ahead__text {
+    display: contents;
+  }
+  .routine-ahead__item .routine-ahead__title {
+    margin-block-start: 0;
+  }
+  .routine-ahead__item small,
+  .routine-ahead__item > .ac-acts {
+    grid-column: 1 / -1;
+  }
+  .routine-ahead__item > .ac-acts {
+    height: auto;
+    margin: 4px 0 0;
+  }
+}
 .routine-ahead__title {
   display: block;
   font-weight: 600;
@@ -735,21 +758,16 @@ label.routine-onair__text {
   margin-top: 2px;
   color: var(--ink2);
 }
+/* The apps' logos lead its sentence on the first line, its later lines under them: never a column beside its words. */
 .routine-needs {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 6px;
   color: var(--ink2);
 }
 .routine-needs > .connector-icon {
   width: 24px;
   height: 24px;
+  margin-right: 6px;
+  vertical-align: middle;
   border-radius: var(--radius-sm);
-}
-.routine-needs > span:last-child {
-  flex: 1 1 200px;
-  min-width: 0;
 }
 .routine-needs__connect {
   display: block;

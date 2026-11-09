@@ -8798,6 +8798,19 @@ html:not([data-pointer]) .newag__addrow:focus-visible {
   font-size: 13.5px;
   text-wrap: pretty;
 }
+/* Its tile on the name's line and the line under the name at the card's width: never a column beside its lines. */
+.newag__role--blank .newag__role-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2) 12px;
+}
+.newag__role--blank .newag__role-name {
+  display: contents;
+}
+.newag__role--blank .newag__role-name span {
+  grid-column: 1 / -1;
+}
 .newag__blank-icon {
   display: grid;
   place-items: center;

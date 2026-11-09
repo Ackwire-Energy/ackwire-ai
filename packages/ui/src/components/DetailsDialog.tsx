@@ -170,16 +170,17 @@ export function DetailsDialog({
   const main = (
     <>
       <div className="ac-details__head">
-        {/* With no eyebrow, the heading takes the bar's start beside the close, instead of a row of its own. The words
-            and the buttons share an action line, which puts the buttons under the words when they don't fit. */}
+        {/* With no eyebrow, the heading takes the bar's start beside the close, instead of a row of its own. It and the
+            buttons share an action line, which puts the buttons under it when they don't fit: from the kind's tile, so
+            the tile never keeps a column beside the title, its line and the buttons. */}
         {inline ? (
           <div className="ac-details__bar ac-details__bar--titled">
-            <div className="ac-details__heading">
-              {icon && <span className="ac-details__icon">{icon}</span>}
-              <div className="ac-details__lead ac-actline">
+            <div className="ac-details__lead ac-actline">
+              <div className="ac-details__heading">
+                {icon && <span className="ac-details__icon">{icon}</span>}
                 {titles}
-                {buttons}
               </div>
+              {buttons}
             </div>
             {close}
           </div>

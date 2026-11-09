@@ -79,7 +79,10 @@ describe("DetailsDialog", () => {
     const dialog = body().getByRole("dialog", { name: "tela.png" });
     const bar = dialog.querySelector(".ac-details__bar") as HTMLElement;
     expect(bar.classList.contains("ac-details__bar--titled")).toBe(true);
-    expect([...bar.children].map((c) => c.className)).toEqual(["ac-details__heading", "ac-details__close ac-acts"]);
+    expect([...bar.children].map((c) => c.className)).toEqual([
+      "ac-details__lead ac-actline",
+      "ac-details__close ac-acts",
+    ]);
     expect(dialog.querySelector(".ac-details__eyebrow")).toBeNull();
     expect(dialog.querySelectorAll(".ac-details__heading")).toHaveLength(1);
   });
@@ -100,10 +103,12 @@ describe("DetailsDialog", () => {
       </DetailsDialog>,
     );
     const dialog = body().getByRole("dialog");
-    const heading = dialog.querySelector(".ac-details__bar--titled > .ac-details__heading") as HTMLElement;
-    expect([...heading.children].map((c) => c.className)).toEqual(["ac-details__icon", "ac-details__lead ac-actline"]);
-    const line = heading.querySelector(".ac-details__lead") as HTMLElement;
-    expect([...line.children].map((c) => c.className)).toEqual(["ac-details__titles", "ac-details__actions ac-acts"]);
+    // The kind's tile and the titles are the line's words: buttons that go under them start at the tile, which never
+    // keeps a column beside the title, its line and the buttons.
+    const line = dialog.querySelector(".ac-details__bar--titled > .ac-details__lead.ac-actline") as HTMLElement;
+    expect([...line.children].map((c) => c.className)).toEqual(["ac-details__heading", "ac-details__actions ac-acts"]);
+    const heading = line.querySelector(".ac-details__heading") as HTMLElement;
+    expect([...heading.children].map((c) => c.className)).toEqual(["ac-details__icon", "ac-details__titles"]);
     // The ⋯ right before the ×, in their own group after the line: buttons that go under the title leave them there.
     const close = dialog.querySelector(".ac-details__bar--titled > .ac-details__close") as HTMLElement;
     expect([...close.children].map((c) => c.getAttribute("aria-label"))).toEqual(["Mais ações", "Fechar"]);

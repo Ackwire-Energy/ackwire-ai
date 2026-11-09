@@ -3495,10 +3495,6 @@ html:not([data-pointer]) .ac-back:focus-visible {
   align-items: flex-start;
   gap: 12px;
 }
-.ac-details__bar--titled > .ac-details__heading {
-  flex: 1 1 0%;
-  min-width: 0;
-}
 .ac-details__icon {
   flex: none;
   display: inline-flex;
