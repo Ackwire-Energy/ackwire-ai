@@ -168,9 +168,6 @@ html:not([data-pointer]) .onb__me:focus-visible {
   gap: 6px;
   margin: 0;
 }
-.onb__head .onb__eyebrow {
-  color: var(--sky-ink2, var(--muted));
-}
 .onb--rail .onb__title {
   outline: none;
   font-family: inherit;

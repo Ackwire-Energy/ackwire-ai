@@ -91,7 +91,10 @@ export function OnboardingPage() {
     enabled: orgId !== null,
   });
   const lodi = agents.data?.find(isRightHand);
-  const team = (agents.data ?? []).filter((a) => !isRightHand(a));
+  // By name, as the sidebar lists them: a team made at once shares one creation time, so the server's order is any.
+  const team = (agents.data ?? [])
+    .filter((a) => !isRightHand(a))
+    .sort((a, b) => a.name.localeCompare(b.name, i18n.language));
   const context = settings.data?.context?.trim() ?? "";
   // Before the workspace exists only the server's billing says whether a plan step will come.
   const waitsForPlan = orgId ? billingHoldOf(mine?.standing) === "payment" : Boolean(authConfig?.billingUrl);
@@ -252,17 +255,18 @@ export function OnboardingPage() {
             }
           >
             {orgId && (
-              <MenuItem icon="trash" onSelect={() => setDeleting(1)}>
+              <MenuItem icon="trash" danger onSelect={() => setDeleting(1)}>
                 {t("onboarding.deleteLink")}
               </MenuItem>
             )}
             {accountOutOfReach(me.data.organizations) && (
-              <MenuItem icon="userX" onSelect={() => setAccount("delete")}>
+              <MenuItem icon="trash" danger onSelect={() => setAccount("delete")}>
                 {t("deleteAccount.menu")}
               </MenuItem>
             )}
             <MenuItem
-              icon="logout"
+              icon="arrowRight"
+              danger
               onSelect={async () => {
                 await auth.signOut();
                 qc.clear();
