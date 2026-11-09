@@ -225,6 +225,14 @@ describe("propose_agent", () => {
     // An archived agent isn't on the team.
     await f.db.update(schema.agents).set({ archivedAt: new Date() }).where(eq(schema.agents.id, ada.id));
     expect((await propose(f, ctx, { ...ADA, handle: "ada-3" })).content).toStartWith("Posted the proposal of Ada");
+    // A role of only punctuation is none: a draft with no role isn't like it.
+    const caio = { name: "Caio", handle: "caio", role: "…", instructions: "Ajuda." };
+    await createAgent(f.db, f.owner.id, f.org.id, caio, NEW_AGENT_DEFAULTS);
+    const { role: _role, ...noRole } = ADA;
+    const fresh = await runFor(f, f.owner.id, "cria um agente");
+    expect((await propose(f, fresh, { ...noRole, name: "Dora", handle: "dora" })).content).toStartWith(
+      "Posted the proposal of Dora",
+    );
   });
 
   test("apps by name or by service: a Stripe account is 'stripe'; with two, its name says which", async () => {
@@ -694,6 +702,7 @@ describe("one request, one card: channels, mailboxes and a routine", () => {
     const github = await connect(f, "github", "GitHub");
     await mailbox(f, f.owner.id, "ana@acme.com");
     const ctx = await runFor(f, f.owner.id, "cria um agente que lê meus emails");
+    // The same agent on each card, on purpose: each is decided by someone else.
     const card = async () => {
       const out = await propose(f, ctx, {
         ...CAIO,
@@ -703,6 +712,7 @@ describe("one request, one card: channels, mailboxes and a routine", () => {
           { connector: "ana@acme.com", level: "read" },
           { connector: "github", level: "write" },
         ],
+        also_new: true,
       });
       return (out.data as { agentProposal: { messageId: string } }).agentProposal.messageId;
     };

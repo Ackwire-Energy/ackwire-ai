@@ -408,8 +408,10 @@ export async function agentsLike(
     .select({ name: agents.name, handle: agents.handle, role: agents.role })
     .from(agents)
     .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt), isNull(agents.deletedAt)));
-  const same = (have: string, asked: unknown) =>
-    have.trim() !== "" && normalizeNote(have) === normalizeNote(str(asked));
+  const same = (have: string, asked: unknown) => {
+    const plain = normalizeNote(have);
+    return plain !== "" && plain === normalizeNote(str(asked));
+  };
   return drafts.flatMap((d) => {
     const found = team.find((a) => same(a.name, d.name) || same(a.role, d.role));
     return found ? [{ draft: str(d.name), ...found }] : [];
