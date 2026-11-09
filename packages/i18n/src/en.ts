@@ -3664,6 +3664,18 @@ export const en = {
         field: {
           token: "Service account token",
         },
+        /** Its refusal of a connect, by the server's code (`vault.source.<code>`): what went wrong and what to do. */
+        error: {
+          invalid_input: "This isn't a service account token. Paste the token that starts with ops_.",
+          auth_failed: "1Password didn't accept this token. Create a new service account and paste its token here.",
+          /** A service account's vault access can't change once it is made: the way out is a new one. */
+          no_vault:
+            "This service account has no access to any vault. Create a new one with access to your agents' vault.",
+          many_vaults:
+            "This service account has access to more than one vault. Create a new one with access to your agents' vault only.",
+          unreachable: "Couldn't reach 1Password. Try again in a minute.",
+          unsupported: "1Password can't be connected here. Save the logins your agents need in the Vault instead.",
+        },
       },
       bitwarden: {
         warning:

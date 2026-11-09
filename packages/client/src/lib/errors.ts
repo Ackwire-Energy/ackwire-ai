@@ -903,6 +903,16 @@ export function keyRefusal(t: TFunction, error: unknown): { text: string; href: 
 const KEY_REFUSALS = new Set(["provider_key_invalid", "provider_key_no_credit", "provider_key_denied"]);
 
 /**
+ * A password manager's refusal to connect (`vault.source.<code>`, ADR 0144) in that source's own words when the app
+ * has them (`vault.source.<kind>.error.<code>`: 1Password's token, its one vault), else as `errorText` says it.
+ */
+export function vaultConnectRefusal(t: TFunction, kind: string, error: unknown, locale?: string): string {
+  const code = errorCode(error)?.match(/^vault\.source\.(\w+)$/)?.[1];
+  const say = t as unknown as (key: string, options: Record<string, unknown>) => string;
+  return (code && say(`vault.source.${kind}.error.${code}`, { defaultValue: "" })) || errorText(t, error, locale);
+}
+
+/**
  * A failed request in the person's words: a code the app knows, a file too big, a refusal, no answer (offline or the
  * server out of reach), else `untranslatedText`. Never a raw error's own words ("Failed to fetch", "Bad Gateway").
  */

@@ -494,6 +494,18 @@
       "continue": "在这台{{device}}上继续",
       "text": "你是在这台{{device}}上安装的 agentes.chat：无需密码。"
     },
+    "server": {
+      "into": "正在登录 <b>{{server}}</b>",
+      "intoHere": "正在登录<b>这台 {{device}}</b> 上的 agentes.chat"
+    },
+    "forgotHere": {
+      "ownerTitle": "这里不需要密码。",
+      "ownerLead": "agentes.chat 是你安装在这台 {{device}} 上的。从这里进入，然后设置新密码。",
+      "notOwner": "不是安装者的账号？请向你的 workspace 所有者要一个新密码链接。",
+      "title": "这台服务器不发送邮件。",
+      "lead": "请向你的 workspace 所有者要一个新密码链接。所有者在「成员」中生成，链接 1 小时内有效。",
+      "back": "返回密码"
+    },
     "reset": {
       "title": "设置新密码。",
       "save": "保存密码",
@@ -513,18 +525,6 @@
       "wrongLinkLead": "请打开为这个服务器生成的最新所有者链接。",
       "taken": "这个服务器已有所有者。",
       "takenLead": "请用你的账号登录。"
-    },
-    "server": {
-      "into": "正在登录 <b>{{server}}</b>",
-      "intoHere": "正在登录<b>这台 {{device}}</b> 上的 agentes.chat"
-    },
-    "forgotHere": {
-      "ownerTitle": "这里不需要密码。",
-      "ownerLead": "agentes.chat 是你安装在这台 {{device}} 上的。从这里进入，然后设置新密码。",
-      "notOwner": "不是安装者的账号？请向你的 workspace 所有者要一个新密码链接。",
-      "title": "这台服务器不发送邮件。",
-      "lead": "请向你的 workspace 所有者要一个新密码链接。所有者在「成员」中生成，链接 1 小时内有效。",
-      "back": "返回密码"
     }
   },
   "invite": {
@@ -1372,6 +1372,11 @@
     "addPasswordLabel": "新密码",
     "addPasswordSaved": "密码已设置。",
     "addPasswordReauth": "请重新登录后再设置密码。",
+    "newPassword": "设置新密码",
+    "newPasswordHint": "你的其他会话会结束，用旧密码连接的 AI 应用需要重新连接。",
+    "newPasswordRow": "更改你在其他浏览器和设备上使用的密码",
+    "newPasswordSaved": "新密码已保存。",
+    "newPasswordReauth": "请重新登录以设置新密码。",
     "yourWorkspaces": "你的工作区",
     "youAreHere": "你在这里",
     "createdOn": "创建于 {{date}}",
@@ -1379,6 +1384,11 @@
     "addWorkspace": "添加工作区",
     "addWorkspaceHint": "加入已有的工作区、创建新的，或使用团队的服务器",
     "yourServer": "你的服务器",
+    "serverHere": "这台 {{device}} 上的 agentes.chat",
+    "serverStopped": "已停止",
+    "serverOffline": "自 {{time}} 起离线",
+    "serverSignedOut": "未登录",
+    "serverSignIn": "登录",
     "wiki": "Wiki",
     "settings": "设置",
     "workspaceMenu": "工作区菜单",
@@ -1448,17 +1458,7 @@
     "unreadMark": "未读",
     "unreadMentions_other": "{{count}} 条提及你的消息",
     "unreadThreads_other": "话题：{{count}} 个有未读回复",
-    "unreadNotifications_other": "{{count}} 条未读通知",
-    "newPassword": "设置新密码",
-    "newPasswordHint": "你的其他会话会结束，用旧密码连接的 AI 应用需要重新连接。",
-    "newPasswordRow": "更改你在其他浏览器和设备上使用的密码",
-    "newPasswordSaved": "新密码已保存。",
-    "newPasswordReauth": "请重新登录以设置新密码。",
-    "serverHere": "这台 {{device}} 上的 agentes.chat",
-    "serverStopped": "已停止",
-    "serverOffline": "自 {{time}} 起离线",
-    "serverSignedOut": "未登录",
-    "serverSignIn": "登录"
+    "unreadNotifications_other": "{{count}} 条未读通知"
   },
   "agentGroups": {
     "group": "部门",
@@ -3439,6 +3439,14 @@
         },
         "field": {
           "token": "服务账号令牌"
+        },
+        "error": {
+          "invalid_input": "这不是服务账号令牌。请粘贴以 ops_ 开头的令牌。",
+          "auth_failed": "1Password 不接受这个令牌。请新建一个服务账号，并在这里粘贴它的令牌。",
+          "no_vault": "这个服务账号无法访问任何保险库。请新建一个能访问智能体保险库的服务账号。",
+          "many_vaults": "这个服务账号能访问多个保险库。请新建一个只能访问智能体保险库的服务账号。",
+          "unreachable": "无法连接到 1Password。请一分钟后重试。",
+          "unsupported": "这里无法连接 1Password。请改为把智能体需要的登录信息保存在 Vault 中。"
         }
       },
       "bitwarden": {
@@ -5534,6 +5542,16 @@
     "agentsOnlyYouHint": "升级套餐后，你可以在每个智能体的页面上允许它回复其他人。",
     "filters": "筛选成员",
     "rolesOf": "{{name}} 的角色",
+    "moreOf": "{{name}} 的更多操作",
+    "passwordLink": {
+      "item": "生成新密码链接",
+      "hint": "在对方忘记密码时使用",
+      "title": "{{name}} 的新密码链接",
+      "lead": "只能用一次，1 小时内有效。通过你们平时聊天的地方发送。",
+      "label": "链接",
+      "making": "正在生成链接…",
+      "copy": "复制链接"
+    },
     "everyoneNote": "“所有人”适用于工作区中的每个人。",
     "noRolesToGive": "没有比你低的角色可以授予。",
     "roleFilter": "角色",
@@ -5795,17 +5813,7 @@
     "ownerLine": "所有者：{{name}}",
     "noOwner": "无所有者",
     "budgetLine": "已用 {{month}} 预算的 {{percent}}",
-    "noAgents": "还没有智能体。",
-    "moreOf": "{{name}} 的更多操作",
-    "passwordLink": {
-      "item": "生成新密码链接",
-      "hint": "在对方忘记密码时使用",
-      "title": "{{name}} 的新密码链接",
-      "lead": "只能用一次，1 小时内有效。通过你们平时聊天的地方发送。",
-      "label": "链接",
-      "making": "正在生成链接…",
-      "copy": "复制链接"
-    }
+    "noAgents": "还没有智能体。"
   },
   "empty": {
     "thread": {
@@ -11527,6 +11535,11 @@
     }
   },
   "errors": {
+    "passwordLink": {
+      "email": "这台服务器会发送邮件：对方可以在「忘记密码」中自己申请链接。",
+      "serverOwner": "安装这台服务器的人在运行它的电脑上直接登录，不需要链接。",
+      "otherWorkspace": "此人也在一个不属于你的 workspace 中：只有所有这些 workspace 的所有者才能生成链接。"
+    },
     "said": {
       "gone": "这项内容已不在这里。请刷新页面后重试。",
       "alreadyDone": "这项已被回答或已结束。请刷新查看最新状态。",
@@ -11889,11 +11902,6 @@
         "invalidInput": "请检查各字段后重试。",
         "tooManyItems": "Vault 已满。请先删除项目，再同步更多。"
       }
-    },
-    "passwordLink": {
-      "email": "这台服务器会发送邮件：对方可以在「忘记密码」中自己申请链接。",
-      "serverOwner": "安装这台服务器的人在运行它的电脑上直接登录，不需要链接。",
-      "otherWorkspace": "此人也在一个不属于你的 workspace 中：只有所有这些 workspace 的所有者才能生成链接。"
     }
   },
   "machines": {
