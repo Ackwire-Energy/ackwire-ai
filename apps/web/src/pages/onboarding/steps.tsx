@@ -273,7 +273,8 @@ export function PlanStep({
   return (
     <>
       <section className="onb__plan" aria-label={t("onboarding.flow.steps.plan")}>
-        <div className="onb__plan-faces">
+        {/* A picture of the list under it (each name, then what it does first): read once, from the list. */}
+        <div className="onb__plan-faces" aria-hidden="true">
           <TeamAsleepSky />
           {team.map((a) => (
             <span key={a.id} className="onb__plan-face">
