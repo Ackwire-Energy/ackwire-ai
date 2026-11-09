@@ -46,6 +46,8 @@ const ALU = ["#fbfbf9", "#eeeeea", "#dcdcd7", "#c4c4be", "#a3a39d", "#7d7d77"];
 const GRAPHITE = ["#3a3a37", "#262624", "#161615"];
 const SKY = ["#0a2f5e", "#0b4590", "#0063d1", "#2f80e0", "#5ea0ee", "#8cc3ff", "#c6e1ff"];
 const NIGHT = ["#141413", "#1b1b1a", "#222220"];
+/* A dark screen on a dark surface: a step lighter than the surface, so the switched-off computer keeps its shape. */
+const NIGHT_ON_DARK = ["#2a2a28", "#323230", "#3b3b38"];
 const OK = "#5fc48a";
 const WARN = "#e0a84a";
 
@@ -86,9 +88,9 @@ function shadow(p, cx, y, w, dark) {
 }
 
 /* What a screen shows: our sky (deep at the top, the horizon glowing at the bottom), dark when off. */
-function screen(p, x, y, w, h, state, t) {
+function screen(p, x, y, w, h, state, t, dark) {
   if (state === "offline") {
-    p.ramp(x, y, w, h, NIGHT, (u, v) => 0.2 + 0.6 * u * v);
+    p.ramp(x, y, w, h, dark ? NIGHT_ON_DARK : NIGHT, (u, v) => 0.2 + 0.6 * u * v);
     return;
   }
   p.ramp(x, y, w, h, SKY, (u, v) => 0.1 + 0.85 * v * v + 0.06 * Math.sin(u * 6 + t));
@@ -131,7 +133,7 @@ function phone(p, state, dark, t, rail, r) {
   shadow(p, 24, y0 + h, 11, dark);
   const sx = x0 + 2;
   const sy = y0 + 2;
-  screen(p, sx, sy, w - 4, h - 4, state, t);
+  screen(p, sx, sy, w - 4, h - 4, state, t, dark);
   for (let y = y0; y < y0 + h; y++)
     for (let x = x0; x < x0 + w; x++) {
       if (!inRounded(x, y, x0, y0, w, h, r)) continue;
@@ -155,7 +157,7 @@ const DRAW = {
     // Lid: a graphite bezel with rounded corners, the screen inside.
     p.box(7, 6, 34, 26, GRAPHITE[2]);
     p.clear([7, 6], [40, 6]);
-    screen(p, 9, 8, 30, 22, state, t);
+    screen(p, 9, 8, 30, 22, state, t, dark);
     if (state !== "offline") {
       p.box(9, 8, 30, 1, "rgba(255,255,255,.55)");
       agent(p, 22, 18, state, t);
@@ -181,7 +183,7 @@ const DRAW = {
       p.set(43, y, ALU[4]);
     }
     p.clear([4, 5], [43, 5], [4, 32], [43, 32]);
-    screen(p, 6, 7, 36, 22, state, t);
+    screen(p, 6, 7, 36, 22, state, t, dark);
     if (state !== "offline") {
       // A window over the sky, and the taskbar with its start mark.
       p.box(11, 10, 17, 11, "#ffffff");
@@ -271,7 +273,7 @@ const DRAW = {
  * Draws a computer's portrait on `ctx`, one cell per unit (a 48×48 canvas, or
  * any context scaled to that grid). Clears the grid first. `t` is the time in
  * seconds (the screen's shimmer, the agent's bob and blink, the drive lights);
- * pass 0 for a still frame. `dark` deepens the floor shadow.
+ * pass 0 for a still frame. `dark` deepens the floor shadow and lifts a switched-off screen off the dark surface.
  */
 export function drawComputer(ctx, kind, state, { dark = false, t = 0 } = {}) {
   ctx.clearRect(0, 0, N, N);
