@@ -413,7 +413,10 @@ test("an agent's own question answered meanwhile is withdrawn quietly: it reads 
       toolUses: [
         {
           name: "ask_user",
-          input: { question: "Você já tem a conta de revisão?", why: "Para não criar uma segunda conta." },
+          input: {
+            question: "Você já tem a conta de revisão?",
+            why: "Para não criar uma segunda conta de revisão se ela já existe.",
+          },
         },
       ],
     };
@@ -455,7 +458,7 @@ test("an agent's own question answered meanwhile is withdrawn quietly: it reads 
     .from(schema.messages)
     .where(eq(schema.messages.id, withdrawn?.messageId ?? ""));
   expect(card?.meta.question).toMatchObject({ withdrawn: true });
-  const read = JSON.stringify(f.provider.calls.filter((c) => !c.request.outputSchema).at(-2)?.request.messages);
+  const read = JSON.stringify(f.provider.calls.filter((c) => !c.request.outputSchema).at(-1)?.request.messages);
   expect(read).toContain("Not needed anymore: bia already answered it here");
   expect(read).not.toContain("nobody will answer it");
   const [ended] = await runsOf(f, f.agent.id);
