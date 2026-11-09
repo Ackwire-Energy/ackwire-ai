@@ -681,10 +681,11 @@
         "name": "Ciao {{first}}. Sono {{name}}. Metto su il team con te in circa due minuti.",
         "business": "Con questo so già chi chiamare nel team.",
         "team": "Questo è il team che metterei su. Puoi cambiare tutto dopo.",
-        "plan": "Manca solo questo. Poi ti mostro il loro primo lavoro."
+        "plan": "Dopo il piano, manca solo collegare un'IA. Ti mostro dove."
       },
       "preview": {
         "label": "Il tuo spazio di lavoro, mentre rispondi",
+        "name": "Il tuo spazio di lavoro",
         "ghost": "Il tuo team appare qui"
       },
       "team": {
@@ -692,7 +693,7 @@
       },
       "plan": {
         "title": "Attiva il tuo team",
-        "lead": "Il tuo team è pronto. Con il piano, inizia oggi.",
+        "lead": "Il tuo team è pronto. Con il piano e un'IA, inizia oggi.",
         "asleep": "Dorme fino al piano",
         "price": "<b>Piano {{name}}</b> · {{price}} al mese",
         "name": "<b>Piano {{name}}</b>",
@@ -2048,7 +2049,6 @@
   "rightHand": {
     "label": "il tuo braccio destro",
     "newDot": "Nuovo",
-    "role": "Assistente del workspace",
     "actsAsYou": "agisce con i tuoi permessi",
     "composerHint": "nulla cambia senza di te",
     "intro": {
@@ -2064,9 +2064,6 @@
         "question": "Vuoi costruire il team con me?",
         "action": "Costruisci il team",
         "message": "Aiutami a costruire il team."
-      },
-      "next": {
-        "firstTask": "Dai un primo compito a {{name}}"
       },
       "style": {
         "question": "Come preferisci che ti parli?",
@@ -5496,7 +5493,8 @@
       "say": {
         "ai": "Ora il team pensa.",
         "apps": "Fatto, ora leggo le app.",
-        "people": "Che bello avere più persone qui."
+        "people": "Che bello avere più persone qui.",
+        "invited": "Invito inviato."
       },
       "asks": {
         "lead": "Ora chiedimi qualcosa:",
@@ -16813,6 +16811,11 @@
         "starting": "Piano attivo! Il mio computer si sta avviando. Al lavoro!",
         "ready": "Piano attivo! Al lavoro!",
         "created": "Il team è qui! Al lavoro!"
+      },
+      "lodiNoAi": {
+        "starting": "Piano attivo! Il mio computer si sta avviando. Collega un'IA e ci mettiamo al lavoro.",
+        "ready": "Piano attivo! Collega un'IA e ci mettiamo al lavoro.",
+        "created": "Il team è qui! Collega un'IA e ci mettiamo al lavoro."
       }
     },
     "agents": {

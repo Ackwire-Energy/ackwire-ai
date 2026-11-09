@@ -1653,10 +1653,13 @@
     "value": "This is the team I'd put together. You can change anything later."
   },
   "onboarding.flow.lodi.plan": {
-    "value": "Just this left. Then I'll show you their first work."
+    "value": "After the plan, all that's left is connecting an AI. I'll show you where."
   },
   "onboarding.flow.preview.label": {
     "value": "Your workspace, as you answer"
+  },
+  "onboarding.flow.preview.name": {
+    "value": "Your workspace"
   },
   "onboarding.flow.preview.ghost": {
     "value": "Your team shows up here"
@@ -1668,7 +1671,7 @@
     "value": "Turn your team on"
   },
   "onboarding.flow.plan.lead": {
-    "value": "Your team is ready. With the plan, it starts today."
+    "value": "Your team is ready. With the plan and an AI, it starts today."
   },
   "onboarding.flow.plan.asleep": {
     "value": "Asleep until the plan"
@@ -4859,9 +4862,6 @@
   "rightHand.newDot": {
     "value": "New"
   },
-  "rightHand.role": {
-    "value": "Workspace assistant"
-  },
   "rightHand.actsAsYou": {
     "value": "acts with your permissions"
   },
@@ -4894,9 +4894,6 @@
   },
   "rightHand.intro.again.message": {
     "value": "Help me build the team."
-  },
-  "rightHand.intro.next.firstTask": {
-    "value": "Give {{name}} a first task"
   },
   "rightHand.intro.style.question": {
     "value": "How should I talk to you?"
@@ -12995,6 +12992,9 @@
   },
   "agentSetup.firstRun.say.people": {
     "value": "Good to have more people here."
+  },
+  "agentSetup.firstRun.say.invited": {
+    "value": "Invite sent."
   },
   "agentSetup.firstRun.asks.lead": {
     "value": "Now ask me something:"
@@ -39081,6 +39081,15 @@
   },
   "teamTemplates.hello.lodi.created": {
     "value": "The team is here! Let's get to work!"
+  },
+  "teamTemplates.hello.lodiNoAi.starting": {
+    "value": "Plan active! My computer is starting up. Connect an AI and we'll get to work."
+  },
+  "teamTemplates.hello.lodiNoAi.ready": {
+    "value": "Plan active! Connect an AI and we'll get to work."
+  },
+  "teamTemplates.hello.lodiNoAi.created": {
+    "value": "The team is here! Connect an AI and we'll get to work."
   },
   "teamTemplates.agents.iara.role": {
     "value": "Customer service"

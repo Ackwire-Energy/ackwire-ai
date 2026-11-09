@@ -671,10 +671,11 @@
         "name": "Hoi {{first}}. Ik ben {{name}}. Ik stel het team in zo'n twee minuten met je samen.",
         "business": "Daarmee weet ik wie ik bij het team haal.",
         "team": "Dit is het team dat ik zou samenstellen. Je kunt later alles veranderen.",
-        "plan": "Alleen dit nog. Daarna laat ik je hun eerste werk zien."
+        "plan": "Na het abonnement hoef je alleen nog een AI te koppelen. Ik laat je zien waar."
       },
       "preview": {
         "label": "Je werkruimte, terwijl je antwoordt",
+        "name": "Je werkruimte",
         "ghost": "Hier verschijnt je team"
       },
       "team": {
@@ -682,7 +683,7 @@
       },
       "plan": {
         "title": "Zet je team aan",
-        "lead": "Je team is klaar. Met het abonnement begint het vandaag.",
+        "lead": "Je team is klaar. Met het abonnement en een AI begint het vandaag.",
         "asleep": "Slaapt tot het abonnement",
         "price": "<b>Abonnement {{name}}</b> · {{price}} per maand",
         "name": "<b>Abonnement {{name}}</b>",
@@ -1971,7 +1972,6 @@
   "rightHand": {
     "label": "je rechterhand",
     "newDot": "Nieuw",
-    "role": "Workspace-assistent",
     "actsAsYou": "handelt met jouw rechten",
     "composerHint": "niets verandert zonder jou",
     "intro": {
@@ -1987,9 +1987,6 @@
         "question": "Wil je het team met mij samenstellen?",
         "action": "Team samenstellen",
         "message": "Help me het team samen te stellen."
-      },
-      "next": {
-        "firstTask": "{{name}} een eerste taak geven"
       },
       "style": {
         "question": "Hoe wil je dat ik met je praat?",
@@ -5334,7 +5331,8 @@
       "say": {
         "ai": "Nu denkt het team.",
         "apps": "Klaar, ik lees de apps nu.",
-        "people": "Fijn dat er meer mensen zijn."
+        "people": "Fijn dat er meer mensen zijn.",
+        "invited": "Uitnodiging verstuurd."
       },
       "asks": {
         "lead": "Vraag me nu iets:",
@@ -16358,6 +16356,11 @@
         "starting": "Abonnement actief! Mijn computer start op. Aan de slag!",
         "ready": "Abonnement actief! Aan de slag!",
         "created": "Het team is er! Aan de slag!"
+      },
+      "lodiNoAi": {
+        "starting": "Abonnement actief! Mijn computer start op. Koppel een AI en we gaan aan de slag.",
+        "ready": "Abonnement actief! Koppel een AI en we gaan aan de slag.",
+        "created": "Het team is er! Koppel een AI en we gaan aan de slag."
       }
     },
     "agents": {

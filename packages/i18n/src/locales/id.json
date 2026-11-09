@@ -661,10 +661,11 @@
         "name": "Hai, {{first}}. Aku {{name}}. Aku akan menyusun tim bersamamu dalam sekitar dua menit.",
         "business": "Dengan ini aku tahu siapa yang perlu masuk tim.",
         "team": "Ini tim yang akan aku susun. Kamu bisa mengubah semuanya nanti.",
-        "plan": "Tinggal ini saja. Setelah itu aku tunjukkan pekerjaan pertama mereka."
+        "plan": "Setelah paketnya, tinggal hubungkan AI. Nanti aku tunjukkan di mana."
       },
       "preview": {
         "label": "Ruang kerjamu, saat kamu menjawab",
+        "name": "Ruang kerjamu",
         "ghost": "Timmu muncul di sini"
       },
       "team": {
@@ -672,7 +673,7 @@
       },
       "plan": {
         "title": "Nyalakan timmu",
-        "lead": "Timmu sudah siap. Dengan paketnya, tim mulai hari ini.",
+        "lead": "Timmu sudah siap. Dengan paketnya dan sebuah AI, tim mulai hari ini.",
         "asleep": "Tidur sampai ada paket",
         "price": "<b>Paket {{name}}</b> · {{price}} per bulan",
         "name": "<b>Paket {{name}}</b>",
@@ -1893,7 +1894,6 @@
   "rightHand": {
     "label": "tangan kanan Anda",
     "newDot": "Baru",
-    "role": "Asisten workspace",
     "actsAsYou": "bertindak dengan izin Anda",
     "composerHint": "tak ada yang berubah tanpa Anda",
     "intro": {
@@ -1909,9 +1909,6 @@
         "question": "Mau menyusun tim bersama saya?",
         "action": "Susun tim",
         "message": "Bantu saya menyusun tim."
-      },
-      "next": {
-        "firstTask": "Beri {{name}} tugas pertama"
       },
       "style": {
         "question": "Bagaimana sebaiknya saya bicara dengan kamu?",
@@ -5115,7 +5112,8 @@
       "say": {
         "ai": "Sekarang tim bisa berpikir.",
         "apps": "Selesai, saya sudah membaca aplikasinya.",
-        "people": "Senang ada lebih banyak orang di sini."
+        "people": "Senang ada lebih banyak orang di sini.",
+        "invited": "Undangan terkirim."
       },
       "asks": {
         "lead": "Sekarang minta sesuatu ke saya:",
@@ -15737,6 +15735,11 @@
         "starting": "Paket aktif! Komputerku sedang menyala. Ayo mulai bekerja!",
         "ready": "Paket aktif! Ayo mulai bekerja!",
         "created": "Timnya sudah lengkap! Ayo mulai bekerja!"
+      },
+      "lodiNoAi": {
+        "starting": "Paket aktif! Komputerku sedang menyala. Hubungkan AI dan kita mulai bekerja.",
+        "ready": "Paket aktif! Hubungkan AI dan kita mulai bekerja.",
+        "created": "Timnya sudah lengkap! Hubungkan AI dan kita mulai bekerja."
       }
     },
     "agents": {

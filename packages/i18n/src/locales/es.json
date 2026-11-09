@@ -681,10 +681,11 @@
         "name": "Hola, {{first}}. Soy {{name}}. Voy a armar el equipo contigo en unos dos minutos.",
         "business": "Con eso ya sé a quién llamar para el equipo.",
         "team": "Este es el equipo que yo armaría. Puedes cambiar todo después.",
-        "plan": "Solo falta esto. Después te muestro su primer trabajo."
+        "plan": "Después del plan, solo falta conectar una IA. Te muestro dónde."
       },
       "preview": {
         "label": "Tu espacio de trabajo, mientras respondes",
+        "name": "Tu espacio de trabajo",
         "ghost": "Tu equipo aparece aquí"
       },
       "team": {
@@ -692,7 +693,7 @@
       },
       "plan": {
         "title": "Activa tu equipo",
-        "lead": "Tu equipo está listo. Con el plan, empieza hoy.",
+        "lead": "Tu equipo está listo. Con el plan y una IA, empieza hoy.",
         "asleep": "Dormido hasta el plan",
         "price": "<b>Plan {{name}}</b> · {{price}} al mes",
         "name": "<b>Plan {{name}}</b>",
@@ -2049,7 +2050,6 @@
   "rightHand": {
     "label": "tu mano derecha",
     "newDot": "Nuevo",
-    "role": "Asistente del workspace",
     "actsAsYou": "actúa con tus permisos",
     "composerHint": "nada cambia sin ti",
     "intro": {
@@ -2065,9 +2065,6 @@
         "question": "¿Quieres armar el equipo conmigo?",
         "action": "Armar el equipo",
         "message": "Ayúdame a armar el equipo."
-      },
-      "next": {
-        "firstTask": "Darle una primera tarea a {{name}}"
       },
       "style": {
         "question": "¿Cómo prefieres que te hable?",
@@ -5448,7 +5445,8 @@
       "say": {
         "ai": "Ahora el equipo piensa.",
         "apps": "Listo, ya leo las apps.",
-        "people": "Qué bueno tener más gente aquí."
+        "people": "Qué bueno tener más gente aquí.",
+        "invited": "Invitación enviada."
       },
       "asks": {
         "lead": "Ahora pídeme algo:",
@@ -16669,6 +16667,11 @@
         "starting": "¡Plan activo! Mi computadora ya está arrancando. ¡Manos a la obra!",
         "ready": "¡Plan activo! ¡Manos a la obra!",
         "created": "¡El equipo está listo! ¡Manos a la obra!"
+      },
+      "lodiNoAi": {
+        "starting": "¡Plan activo! Mi computadora ya está arrancando. Conecta una IA y nos ponemos a trabajar.",
+        "ready": "¡Plan activo! Conecta una IA y nos ponemos a trabajar.",
+        "created": "¡El equipo está listo! Conecta una IA y nos ponemos a trabajar."
       }
     },
     "agents": {

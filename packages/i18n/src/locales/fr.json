@@ -681,10 +681,11 @@
         "name": "Bonjour {{first}}. Je suis {{name}}. Je monte l'équipe avec vous en deux minutes environ.",
         "business": "Avec ça, je sais qui appeler dans l'équipe.",
         "team": "Voici l'équipe que je monterais. Vous pourrez tout changer ensuite.",
-        "plan": "Il ne reste que ça. Ensuite je vous montre leur premier travail."
+        "plan": "Après l'abonnement, il ne reste qu'à connecter une IA. Je vous montre où."
       },
       "preview": {
         "label": "Votre espace de travail, pendant que vous répondez",
+        "name": "Votre espace de travail",
         "ghost": "Votre équipe apparaît ici"
       },
       "team": {
@@ -692,7 +693,7 @@
       },
       "plan": {
         "title": "Activez votre équipe",
-        "lead": "Votre équipe est prête. Avec l'abonnement, elle commence aujourd'hui.",
+        "lead": "Votre équipe est prête. Avec l'abonnement et une IA, elle commence aujourd'hui.",
         "asleep": "Endormie jusqu'à l'abonnement",
         "price": "<b>Abonnement {{name}}</b> · {{price}} par mois",
         "name": "<b>Abonnement {{name}}</b>",
@@ -2053,7 +2054,6 @@
   "rightHand": {
     "label": "votre bras droit",
     "newDot": "Nouveau",
-    "role": "Assistant du workspace",
     "actsAsYou": "agit avec vos permissions",
     "composerHint": "rien ne change sans vous",
     "intro": {
@@ -2069,9 +2069,6 @@
         "question": "Vous voulez monter l'équipe avec moi ?",
         "action": "Monter l'équipe",
         "message": "Aidez-moi à monter l'équipe."
-      },
-      "next": {
-        "firstTask": "Donner une première tâche à {{name}}"
       },
       "style": {
         "question": "Comment préférez-vous que je vous parle ?",
@@ -5500,7 +5497,8 @@
       "say": {
         "ai": "L'équipe pense maintenant.",
         "apps": "C'est fait, je lis les applis.",
-        "people": "Content d'avoir plus de monde ici."
+        "people": "Content d'avoir plus de monde ici.",
+        "invited": "Invitation envoyée."
       },
       "asks": {
         "lead": "Maintenant, demandez-moi quelque chose :",
@@ -16810,6 +16808,11 @@
         "starting": "Abonnement actif ! Mon ordinateur démarre. Au travail !",
         "ready": "Abonnement actif ! Au travail !",
         "created": "L'équipe est là ! Au travail !"
+      },
+      "lodiNoAi": {
+        "starting": "Abonnement actif ! Mon ordinateur démarre. Connectez une IA et on se met au travail.",
+        "ready": "Abonnement actif ! Connectez une IA et on se met au travail.",
+        "created": "L'équipe est là ! Connectez une IA et on se met au travail."
       }
     },
     "agents": {

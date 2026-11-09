@@ -671,10 +671,11 @@
         "name": "Merhaba {{first}}. Ben {{name}}. Ekibi seninle yaklaşık iki dakikada kuracağım.",
         "business": "Bununla ekibe kimi çağıracağımı biliyorum.",
         "team": "Ben olsam bu ekibi kurardım. Her şeyi sonra değiştirebilirsin.",
-        "plan": "Sadece bu kaldı. Sonra onların ilk işini gösteririm."
+        "plan": "Plandan sonra sadece bir yapay zeka bağlamak kalıyor. Nerede olduğunu gösteririm."
       },
       "preview": {
         "label": "Sen cevapladıkça çalışma alanın",
+        "name": "Çalışma alanın",
         "ghost": "Ekibin burada görünecek"
       },
       "team": {
@@ -682,7 +683,7 @@
       },
       "plan": {
         "title": "Ekibini başlat",
-        "lead": "Ekibin hazır. Planla bugün başlıyor.",
+        "lead": "Ekibin hazır. Plan ve bir yapay zekayla bugün başlıyor.",
         "asleep": "Plana kadar uykuda",
         "price": "<b>{{name}} planı</b> · ayda {{price}}",
         "name": "<b>{{name}} planı</b>",
@@ -1968,7 +1969,6 @@
   "rightHand": {
     "label": "sağ kolun",
     "newDot": "Yeni",
-    "role": "Çalışma alanı asistanı",
     "actsAsYou": "senin izinlerinle çalışır",
     "composerHint": "sen olmadan hiçbir şey değişmez",
     "intro": {
@@ -1984,9 +1984,6 @@
         "question": "Ekibi benimle kurmak ister misin?",
         "action": "Ekibi kur",
         "message": "Ekibi kurmama yardım et."
-      },
-      "next": {
-        "firstTask": "{{name}} için ilk görevi ver"
       },
       "style": {
         "question": "Sizinle nasıl konuşmamı istersiniz?",
@@ -5265,7 +5262,8 @@
       "say": {
         "ai": "Artık ekip düşünüyor.",
         "apps": "Tamam, artık uygulamaları okuyorum.",
-        "people": "Burada daha çok insan olması güzel."
+        "people": "Burada daha çok insan olması güzel.",
+        "invited": "Davet gönderildi."
       },
       "asks": {
         "lead": "Şimdi benden bir şey iste:",
@@ -16113,6 +16111,11 @@
         "starting": "Plan aktif! Bilgisayarım açılıyor. Hadi işe başlayalım!",
         "ready": "Plan aktif! Hadi işe başlayalım!",
         "created": "Ekip hazır! Hadi işe başlayalım!"
+      },
+      "lodiNoAi": {
+        "starting": "Plan aktif! Bilgisayarım açılıyor. Bir yapay zeka bağla, işe başlayalım.",
+        "ready": "Plan aktif! Bir yapay zeka bağla, işe başlayalım.",
+        "created": "Ekip hazır! Bir yapay zeka bağla, işe başlayalım."
       }
     },
     "agents": {
