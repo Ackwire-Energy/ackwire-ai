@@ -31,7 +31,6 @@ import { errorText } from "@agenteschat/client/lib/errors";
 import { formatTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { folderName } from "@agenteschat/client/lib/machines";
-import { plainInline } from "@agenteschat/client/lib/markdown";
 import {
   executorName,
   findingRefUrl,
@@ -79,6 +78,7 @@ import { useOrg } from "@/components/org-context";
 import { ShowRequestsButton, useIsThisMac } from "@/components/ThisMac";
 import { useNamesComputers } from "@/components/WorkspaceComputer";
 import { useDirectory } from "@/hooks/useDirectory";
+import { inlineWords } from "@/lib/markdown";
 import { useToast } from "@/lib/toast";
 import { useStreams } from "@/realtime/context";
 import {
@@ -401,6 +401,8 @@ export function MissionFindings({ mission, agentName }: { mission: Mission; agen
   const list = [...mission.findings].sort((a, b) => Number(a.kind === "decision") - Number(b.kind === "decision"));
   if (mission.openQuestion && !list.some((f) => f.kind === "decision"))
     list.push({ kind: "decision", text: mission.openQuestion });
+  // The sentence around the decision's own words, which keep their code and bold.
+  const decided = t("missions.findings.decisionText", { text: "\u0000" }).split("\u0000");
   return (
     <ul className="mi-findings" aria-label={t("missions.findings.label", { name: agentName })}>
       {list.map((f, i) => (
@@ -412,9 +414,9 @@ export function MissionFindings({ mission, agentName }: { mission: Mission; agen
         >
           <Icon name={FINDING_ICONS[f.kind]} size={16} label={t(`missions.findings.${f.kind}`)} />
           <span className="mi-finding__tx">
-            {f.kind === "decision"
-              ? t("missions.findings.decisionText", { text: plainInline(f.text) })
-              : plainInline(f.text)}
+            {f.kind === "decision" && decided[0]}
+            {inlineWords(f.text, `f${i}`)}
+            {f.kind === "decision" && decided[1]}
             {f.refs?.map((ref) => {
               const url = findingRefUrl(ref, repo);
               return url ? (

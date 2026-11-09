@@ -21,7 +21,7 @@ import {
   runKeys,
 } from "@agenteschat/client/lib/approval-card";
 import { aheadPhase, approveAlwaysOffered } from "@agenteschat/client/lib/approval-kind";
-import { approvalOriginShort, approvalWhy } from "@agenteschat/client/lib/approval-origin";
+import { approvalOriginShort, approvalWords } from "@agenteschat/client/lib/approval-origin";
 import {
   type ApprovalEffect,
   type ApprovalUndo,
@@ -101,7 +101,7 @@ import { TaskStepsBlock, useCallLogo } from "@/components/ToolCalls";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { TYPED_VALUES } from "@/i18n";
-import { Markdown } from "@/lib/markdown";
+import { inlineWords, Markdown } from "@/lib/markdown";
 import { useOpenParam } from "@/lib/open-param";
 import { useToast } from "@/lib/toast";
 import "./approvals.css";
@@ -612,6 +612,9 @@ export function ConnectorMark({ approval }: { approval: Approval }) {
  * with labels; a list shows a few as chips, the details every one, and the tool's own name and values
  * behind "Detalhes técnicos". An email shows as the email itself.
  */
+/** A value longer than this (a message, a command with its flags) takes a row of its own in the details, whole. */
+const LONG_VALUE = 80;
+
 export function ExactAction({
   approval,
   max,
@@ -639,9 +642,9 @@ export function ExactAction({
         (full ? (
           <dl className="ap-exact__rows">
             {values.map(([label, value]) => (
-              <div key={label}>
+              <div key={label} data-long={value.length > LONG_VALUE || undefined}>
                 <dt>{label}</dt>
-                <dd>{value}</dd>
+                <dd>{inlineWords(value)}</dd>
               </div>
             ))}
           </dl>
@@ -1109,7 +1112,7 @@ function ReviewBody({ approval: a, channel }: { approval: Approval; channel: str
   const { effect, undo } = approvalEffects(a);
   const target = approvalTarget(a);
   const text = approvalText(a);
-  const why = approvalWhy(a);
+  const why = approvalWords(a);
   const pr = prLink(a);
   const leftMs = new Date(a.expiresAt).getTime() - Date.now();
   const waits = approvalWaitsFor(a, dir.memberById.get(a.ownerUserId ?? agent?.ownerUserId ?? "")?.name);
@@ -1222,7 +1225,7 @@ function ReviewBody({ approval: a, channel }: { approval: Approval; channel: str
       {why && (
         <Card className="ap-review__card">
           <CardHeader icon="message" title={t("approvals.review.why", { name })} />
-          <p className="ap-review__why">{why}</p>
+          <p className="ap-review__why">{inlineWords(why)}</p>
           {a.issue && (
             <Link
               className="ap-link"

@@ -15,6 +15,8 @@ export function approvalOriginWords(a: Pick<Approval, "origin">): Words | null {
 
 /** Why the agent asks, trimmed; null when it said nothing. */
 export const approvalWhy = (a: Pick<Approval, "why">) => (a.why ? plainLine(a.why) : "") || null;
+/** The same why on one line with its marks kept (code between backticks, bold), for a card that draws them. */
+export const approvalWords = (a: Pick<Approval, "why">) => a.why?.replace(/\s+/g, " ").trim() || null;
 
 /** The same, short, on the line of who asks: "rotina «X»", "sem ninguém acompanhando". */
 export function approvalOriginShort(a: Pick<Approval, "origin">): Words | null {

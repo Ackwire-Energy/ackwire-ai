@@ -73,6 +73,7 @@ import { RemoveMemberDialog } from "@/components/RemoveMember";
 import { RequestCard, RequestDone, RequestOpen } from "@/components/RequestCard";
 import { DelegateNote, DelegateUndo, useDelegateLine } from "@/components/RightHandDelegate";
 import { useDirectory } from "@/hooks/useDirectory";
+import { inlineWords } from "@/lib/markdown";
 import { useToast } from "@/lib/toast";
 import { SETTINGS_SECTIONS } from "@/pages/settings-sections";
 import "./proposals.css";
@@ -373,7 +374,7 @@ function SettingsRow({
         label={label}
         more={
           byRightHand && delegate?.reason
-            ? { label: t("rightHandApprovals.card.why"), content: <p>{delegate.reason}</p> }
+            ? { label: t("rightHandApprovals.card.why"), content: <p>{inlineWords(delegate.reason)}</p> }
             : undefined
         }
         action={
@@ -563,7 +564,7 @@ export function ApprovalsCardView({ message, card }: { message: Message; card: A
     <CardVia messageId={message.id}>
       {/* biome-ignore lint/a11y/useSemanticElements: a labelled group inside a message, not a fieldset */}
       <div className="rh-cards" role="group" aria-label={t("rightHand.approvals.title")}>
-        {card.why && <p>{card.why}</p>}
+        {card.why && <p>{inlineWords(card.why)}</p>}
         {card.approvalIds.map((id) => (
           <CardApproval key={id} id={id} />
         ))}
@@ -755,7 +756,7 @@ export function OpenPageCardView({ card }: { card: OpenPageCard }) {
       below={
         card.why || !go ? (
           <>
-            {card.why && <p>{card.why}</p>}
+            {card.why && <p>{inlineWords(card.why)}</p>}
             {!go && <p>{t("rightHand.open.notAllowed")}</p>}
           </>
         ) : undefined

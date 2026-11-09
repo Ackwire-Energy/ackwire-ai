@@ -40,6 +40,7 @@ import { HelpLink } from "@/components/HelpLink";
 import { ErrorState, LoadingLine } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { lookOf } from "@/lib/look";
+import { inlineWords } from "@/lib/markdown";
 import { useToast } from "@/lib/toast";
 import {
   filterMemories,
@@ -195,7 +196,7 @@ function LearnedRow({ m }: { m: Memory }) {
       {draft === null ? (
         m.summary ? (
           <>
-            <span>{m.summary}</span>
+            <span>{inlineWords(m.summary)}</span>
             <details className="agp-mem__details">
               <summary className="small muted">{t("agentPage.memory.details")}</summary>
               <p className="small">{memoryLine(t, m)}</p>

@@ -265,6 +265,14 @@ html:not([data-pointer]) .ap-conn-mark:focus-visible {
   max-height: 200px;
   overflow-y: auto;
 }
+/* A long value takes a row of its own, whole: no scroll inside the card. */
+.ap-exact__rows > div[data-long] {
+  flex-basis: 100%;
+}
+.ap-exact__rows > div[data-long] dd {
+  max-height: none;
+  overflow-y: visible;
+}
 .ap-exact__tech summary {
   width: fit-content;
   font-size: 13px;

@@ -13,15 +13,9 @@ import {
   useState,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { renderInline } from "@/lib/markdown";
+import { inlineWords } from "@/lib/markdown";
 import { CardSky, colorOf } from "./Sky";
 import "./request-card.css";
-
-/** An agent's own words, as formatted text: code between backticks, bold, links (no address pills). */
-const said = (words: ReactNode) =>
-  typeof words === "string"
-    ? renderInline(words, "rq", undefined, undefined, undefined, false, undefined, false)
-    : words;
 
 /**
  * What an agent can ask of a person in the conversation: each says so in the card's header and in the bar.
@@ -236,7 +230,7 @@ export function RequestCard({
         {/* Who else it waits for; waiting for me needs no words (the buttons say it). */}
         {!mine && waitingFor && <span className="rq__state rq__state--other">{waitingFor}</span>}
       </div>
-      <p className="rq__lead">{said(lead)}</p>
+      <p className="rq__lead">{inlineWords(lead, "rq")}</p>
       {preview && !(open && details) && <div className="rq__preview">{preview}</div>}
       {object && (
         <div className="rq__well">
@@ -244,7 +238,7 @@ export function RequestCard({
           {/* "Ver …" under the words, never a column beside them that would squeeze them. */}
           <span className="rq__wt">
             <b>{object.title}</b>
-            {object.detail && <small>{said(object.detail)}</small>}
+            {object.detail && <small>{inlineWords(object.detail, "rq-d")}</small>}
             {object.more && (details || onOpenChange) && (
               <RequestMore open={open} onClick={toggle}>
                 {object.more}

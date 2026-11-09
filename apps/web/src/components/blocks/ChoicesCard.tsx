@@ -17,6 +17,7 @@ import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
 import { CardSky, colorOf } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
+import { codeAndBold, inlineWords } from "@/lib/markdown";
 import { useToast } from "@/lib/toast";
 import "./blocks.css";
 
@@ -73,7 +74,7 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
                   {s.letter}
                 </span>
                 <span className="choices__said" data-written={s.written ? "" : undefined}>
-                  {s.label}
+                  {codeAndBold(s.label, "s")}
                 </span>
               </span>
             </li>
@@ -199,11 +200,11 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
               </span>
             </span>
             <span className="ac-mediarow__head">
-              <span className="choices__label">{o.label}</span>
+              <span className="choices__label">{codeAndBold(o.label, "l")}</span>
             </span>
             {o.description && (
               <span className="ac-mediarow__body">
-                <span className="choices__description">{o.description}</span>
+                <span className="choices__description">{codeAndBold(o.description, "d")}</span>
               </span>
             )}
           </button>

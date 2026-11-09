@@ -1107,11 +1107,6 @@ a.mi-pr:hover {
 .mi-md__p {
   margin-top: 4px;
 }
-.mi-md code {
-  font-family: var(--font-mono);
-  font-size: 0.8em;
-  color: var(--ink);
-}
 .mi-md__empty {
   color: var(--faint);
 }
