@@ -27,7 +27,10 @@ export function AuthFootLine() {
         accessibilityRole="button"
         accessibilityLabel={
           onCloud
-            ? `${t("mobile.auth.server.footTeam")} ${t("mobile.auth.server.footTeamAction")}`
+            ? t("common.joinSentences", {
+                a: t("mobile.auth.server.footTeam"),
+                b: t("mobile.auth.server.footTeamAction"),
+              })
             : `${t("mobile.auth.server.footOn", { host: serverHost(server) })}. ${t("mobile.auth.server.footSwitch")}`
         }
         // An 18-point line: 12 of slop above and below reaches the 44-point target.

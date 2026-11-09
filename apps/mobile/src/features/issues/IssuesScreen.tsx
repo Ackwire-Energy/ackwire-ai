@@ -184,7 +184,7 @@ function TaskRow({ issue: i, divider, live }: { issue: Issue; divider: boolean; 
   const who = i.assignee ? dir.nameOf(i.assignee) : t("mobile.issues.nobody");
   const due = i.dueDate && !done ? dueLabel(t, i18n.language, i.dueDate) : null;
   const tail = running ? null : state === "waiting" ? t("mobile.issues.waitsYou") : due;
-  const working = t("mobile.issues.state.running").toLocaleLowerCase(i18n.language);
+  const working = t("mobile.chat.turn.working");
   return (
     <ListRow
       divider={divider}
