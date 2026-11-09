@@ -78,3 +78,23 @@ way out of the account stays one quiet "Sair".
 - The held template example, the card's about and team rows and the notifications dialog are gone, with their words in
   every language.
 - The billing service publishes `plans.json` and reads the link's `plan`: a change of its own, after this one.
+
+## Amended 2026-11-09: what the first end-to-end take showed
+
+- **The plan brings no AI, and the words say so.** Step 4 reads "Com o plano e uma IA, ele começa hoje", Lodi says
+  that after the plan an AI is left, and while nothing in the workspace thinks his hello asks for one
+  (`teamTemplates.hello.lodiNoAi`, `orgHasAi`) right above the bar that connects it, instead of starting the work.
+- **One team order everywhere, the template's.** Agents made in one transaction keep the order they were made in
+  (`createdAt` is the insert's `clock_timestamp()`), the agents' list follows it (by name only where older teams share a
+  time), and the onboarding, the rail, the preview, step 4 and the sidebar's day-one pins (`dayOnePins`) list it as
+  given. The members column keeps its own alphabetical order, as for people.
+- **The preview** names the workspace "Seu workspace" until one is typed, and counts every agent it lists, the right
+  hand included, as the workspace's sidebar now does (`orgOverview`).
+- **The right hand's card:** an invitation only sent says "Convite enviado." with no burst (`firstRunBeats`); someone
+  joining gets the welcome. The first task is offered once, on the team card ("Primeira tarefa"), never again among the
+  card's asks. "Como prefere que eu fale com você?" waits until a team agent worked once (`teamAnswered`), so it never
+  stands beside the first task.
+- **A new agent's greeting** asks for help only when something is left as its checklist first loads.
+- **The floating date** never floats over the conversation's start (the greeting and its cards): above the first day it
+  shows nothing (`dayAtTop`, the phone's `dayInView`).
+- **The computer notice** says no line under its title before the provisioner names a step (`setupNoticeStatusKey`).
