@@ -36,7 +36,7 @@ import { learnPlanModels } from "../lib/plans";
 import { setMyReaction } from "../lib/reactions";
 import { recentConversations } from "../lib/recent";
 import { replyOf } from "../lib/reply";
-import { firstVisitOf } from "../lib/right-hand";
+import { firstVisitOf, teamAnswered } from "../lib/right-hand";
 import { usagePauseRefetchMs } from "../lib/routine-view";
 import { withRead } from "../lib/seen";
 import {
@@ -2650,6 +2650,21 @@ export const useAgentStatuses = (orgId: string, enabled = true) => {
     refetchInterval: 30_000,
     enabled: enabled && orgId.length > 0,
   });
+};
+
+/**
+ * Whether the team answered the person once (`teamAnswered`), from the agents' statuses the sidebar keeps fresh: no
+ * poll of its own.
+ */
+export const useTeamAnswered = (orgId: string, team: readonly Pick<Agent, "id">[]) => {
+  const api = useApi();
+  const statuses = useQuery({
+    queryKey: keys.agentStatus(orgId),
+    queryFn: () => api.agents.statuses(orgId),
+    staleTime: 15_000,
+    enabled: orgId.length > 0,
+  }).data;
+  return teamAnswered(team, statuses);
 };
 
 export const useAllInvitations = (orgId: string, enabled = true) => {

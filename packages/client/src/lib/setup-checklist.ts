@@ -249,6 +249,19 @@ export function firstRunDone(setup: AgentSetupChecklist, facts: FirstRunFacts): 
   return done;
 }
 
+/**
+ * What the right hand's line of the moment follows: each row done, the people row twice, `invited` while its
+ * invitations only wait for an answer, then `people` once someone joined. Joining is what it celebrates; an
+ * invitation it only says is sent.
+ */
+export type FirstRunBeat = FirstRunStep | "invited";
+
+export const firstRunBeats = (done: readonly FirstRunStep[], f: { members: number; invited: number }): FirstRunBeat[] =>
+  done.map((s) => (s === "people" && f.members <= 1 && f.invited > 0 ? "invited" : s));
+
+/** The row a beat's line shows under. */
+export const beatRow = (beat: FirstRunBeat): FirstRunStep => (beat === "invited" ? "people" : beat);
+
 /** How a row reads now: done, open, or waiting for the plan (a billing hold: the hold's banner holds the plan). */
 export type FirstRunRowState = "done" | "open" | "afterPlan";
 

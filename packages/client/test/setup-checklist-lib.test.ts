@@ -3,6 +3,7 @@ import type { TFunction } from "i18next";
 import type { AgentSetupChecklist } from "../src/api/types";
 import {
   askedLine,
+  beatRow,
   FIRST_RUN_STEPS,
   type FirstRunFacts,
   type FirstRunPowers,
@@ -10,6 +11,7 @@ import {
   firstRunAppList,
   firstRunApps,
   firstRunAsks,
+  firstRunBeats,
   firstRunDone,
   firstRunRow,
   firstRunRowState,
@@ -200,6 +202,16 @@ describe("the right hand's first run (ADR 0155 §6, ADR 0158)", () => {
     expect(firstRunRow(t, "people", "done", { ...f, members: 2 }, false).title).toBe(
       'agentSetup.firstRun.people.done {"count":2}',
     );
+  });
+
+  test("an invitation only sent is a beat of its own, so the right hand says it went out; someone joining is the one it celebrates", () => {
+    expect(firstRunBeats(["ai", "people"], { members: 1, invited: 1 })).toEqual(["ai", "invited"]);
+    // The same row turns `people` as the invitee joins: a beat of its own, so it has its line then.
+    expect(firstRunBeats(["ai", "people"], { members: 2, invited: 0 })).toEqual(["ai", "people"]);
+    // Skipped with nobody invited: `people`, which says nothing (the card's rule for a skip).
+    expect(firstRunBeats(["people"], { members: 1, invited: 0 })).toEqual(["people"]);
+    expect(beatRow("invited")).toBe("people");
+    expect(beatRow("apps")).toBe("apps");
   });
 
   test("the apps a team made from a template would use, the most suggested first", () => {
