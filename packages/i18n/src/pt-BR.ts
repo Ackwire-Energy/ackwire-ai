@@ -10473,7 +10473,11 @@ export const ptBR = {
       line: {
         env: "Definido nas configurações deste servidor (GITHUB_APP_ID).",
         invalid: "Este servidor não consegue abrir o app salvo. Remova e crie de novo.",
+        /** O app não assina o que os agentes ouvem no GitHub: `events` são os nomes que o próprio GitHub dá a eles. */
+        events: "Para os agentes ouvirem o que acontece no GitHub, marque estes eventos no app: {{events}}.",
       },
+      /** Abre a página Permissions & events do app no GitHub. */
+      events: "Marcar os eventos",
       open: "Abrir no GitHub",
       remove: "Remover o app",
       removeTitle: "Remover o app do GitHub deste servidor?",
@@ -11831,6 +11835,10 @@ export const ptBR = {
       githubFailed: "O GitHub não criou o webhook no {{repo}} ({{status}}). Siga os passos abaixo para criar à mão.",
       invalidSecret: "Cole o Client Secret inteiro, sem espaços.",
       invalidRepo: "Escreva o repositório como dono/nome.",
+    },
+    /** "Pedir resposta" num aviso do GitHub que outra pessoa já pediu (a linha muda logo depois). */
+    githubEvent: {
+      answered: "Alguém já pediu essa resposta. O agente já foi chamado.",
     },
     issue: {
       assigneeOutside: "Essa pessoa não vê esta tarefa. Inclua ela em Quem vê primeiro.",
@@ -14037,6 +14045,28 @@ export const ptBR = {
         "Só algumas pessoas podem chamar {{agents}}, e este trabalho de {{name}} não veio de nenhuma delas. Alguém que pode chamar {{agents}} passa o pedido adiante.",
       wakeSkippedCallable:
         "As configurações de {{name}} não deixam chamar {{agents}} (outro projeto, ou fora da lista de agentes que pode chamar). Quem cuida de {{name}} muda isso na página do agente.",
+      /**
+       * O que aconteceu no GitHub num item em que um agente trabalhou, ou que chamou o app: `who` é o nome do membro
+       * ou o login no GitHub, `name` o do agente. "Ver" abre o que a pessoa escreveu lá e o link.
+       */
+      github: {
+        comment: "{{who}} comentou no PR #{{number}} ({{repo}}) no GitHub",
+        commentIssue: "{{who}} comentou na issue #{{number}} ({{repo}}) no GitHub",
+        commentDiscussion: "{{who}} comentou na discussão #{{number}} ({{repo}}) no GitHub",
+        /** Um PR, issue ou discussão novo que menciona o app. */
+        opened: "{{who}} chamou o app agentes.chat em #{{number}} ({{repo}}) no GitHub",
+        reviewed: "{{who}} revisou o PR #{{number}} ({{repo}}) no GitHub",
+        approved: "{{who}} aprovou o PR #{{number}} ({{repo}}) no GitHub",
+        changes: "{{who}} pediu mudanças no PR #{{number}} ({{repo}}) no GitHub",
+        reviewRequested: "{{who}} pediu a revisão de {{name}} no PR #{{number}} ({{repo}}) no GitHub",
+        merged: "{{who}} fez o merge do PR #{{number}} ({{repo}}) no GitHub",
+        closed: "{{who}} fechou o PR #{{number}} ({{repo}}) no GitHub",
+        closedIssue: "{{who}} fechou a issue #{{number}} ({{repo}}) no GitHub",
+        /** Na linha de alguém a quem o agente não responde: uma pessoa daqui pede para o agente responder lá. */
+        ask: "Pedir resposta",
+        /** A linha depois que alguém pediu (`asker`), no lugar do botão. */
+        asked: "{{asker}} pediu para {{name}} responder a {{who}} no GitHub",
+      },
       show: "Ver",
       hide: "Ocultar",
       talker: "enquanto trabalha",

@@ -10320,8 +10320,10 @@
       },
       "line": {
         "env": "Bu sunucunun ayarlarında tanımlı (GITHUB_APP_ID).",
-        "invalid": "Bu sunucu kayıtlı uygulamayı açamıyor. Kaldırıp yeniden oluşturun."
+        "invalid": "Bu sunucu kayıtlı uygulamayı açamıyor. Kaldırıp yeniden oluşturun.",
+        "events": "Ajanların GitHub'da olanları duyması için uygulamada şu olayları işaretleyin: {{events}}."
       },
+      "events": "Olayları işaretleyin",
       "open": "GitHub'da aç",
       "remove": "Uygulamayı kaldır",
       "removeTitle": "Bu sunucunun GitHub uygulaması kaldırılsın mı?",
@@ -11916,6 +11918,9 @@
       "githubFailed": "GitHub, {{repo}} içinde webhook'u oluşturmadı ({{status}}). Elle oluşturmak için aşağıdaki adımları izle.",
       "invalidSecret": "Client Secret'ın tamamını boşluksuz yapıştır.",
       "invalidRepo": "Depoyu sahip/ad biçiminde yaz."
+    },
+    "githubEvent": {
+      "answered": "Bu yanıtı zaten biri istedi. Ajan bununla ilgileniyor."
     },
     "issue": {
       "assigneeOutside": "Bu kişi bu görevi göremiyor. Önce onu Kimler görüyor listesine ekleyin.",
@@ -14072,6 +14077,21 @@
       "wakeSkippedAnon": "{{name}} adlı ajanın bahsetmesi başka bir ajana ulaşmadı",
       "wakeSkippedAudience": "{{agents}} ajanını yalnızca bazı kişiler çağırabilir ve {{name}} adlı ajanın bu işi onlardan birinden gelmedi. {{agents}} ajanını çağırabilen biri isteği iletebilir.",
       "wakeSkippedCallable": "{{name}} adlı ajanın ayarları {{agents}} ajanını çağırmasına izin vermiyor (başka bir proje ya da çağırabileceği ajanlar listesinde değil). {{name}} ile ilgilenen kişi bunu ajanın sayfasından değiştirebilir.",
+      "github": {
+        "comment": "{{who}}, GitHub'da bir PR'a yorum yaptı: #{{number}} ({{repo}})",
+        "commentIssue": "{{who}}, GitHub'da bir sorun kaydına yorum yaptı: #{{number}} ({{repo}})",
+        "commentDiscussion": "{{who}}, GitHub'da bir tartışmaya yorum yaptı: #{{number}} ({{repo}})",
+        "opened": "{{who}}, GitHub'da agentes.chat uygulamasını çağırdı: #{{number}} ({{repo}})",
+        "reviewed": "{{who}}, GitHub'da bir PR'ı inceledi: #{{number}} ({{repo}})",
+        "approved": "{{who}}, GitHub'da bir PR'ı onayladı: #{{number}} ({{repo}})",
+        "changes": "{{who}}, GitHub'da bir PR'da değişiklik istedi: #{{number}} ({{repo}})",
+        "reviewRequested": "{{who}}, GitHub'da {{name}} ajanından bir PR'ı incelemesini istedi: #{{number}} ({{repo}})",
+        "merged": "{{who}}, GitHub'da bir PR'ı birleştirdi: #{{number}} ({{repo}})",
+        "closed": "{{who}}, GitHub'da bir PR'ı kapattı: #{{number}} ({{repo}})",
+        "closedIssue": "{{who}}, GitHub'da bir sorun kaydını kapattı: #{{number}} ({{repo}})",
+        "ask": "Yanıt iste",
+        "asked": "{{asker}}, {{name}} ajanından GitHub'da {{who}} adlı kişiye yanıt vermesini istedi"
+      },
       "show": "Göster",
       "hide": "Gizle",
       "talker": "çalışırken",

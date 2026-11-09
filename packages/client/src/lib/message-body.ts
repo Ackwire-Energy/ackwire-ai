@@ -5,6 +5,7 @@ import { joinNames, lowerFirst } from "./format";
 import { autoUpdateText, talkerStatusText, workEndBody } from "./long-work";
 import { mediaKindOf, mediaWord } from "./media";
 import { RIGHT_HAND_PLAN_LINES } from "./no-ai";
+import { githubLineKey } from "./notices";
 import { brainName } from "./outages";
 import { usageWhen } from "./plan-usage";
 import { weekDay } from "./team-week";
@@ -214,6 +215,13 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
 export function previewBody(t: TFunction, text: string, meta: Meta | null, mediaKind?: unknown): string {
   // Never a voice message's words, even from a server that sent them (ADR 0100).
   if (isVoiceMeta(meta) || mediaKindOf(mediaKind) === "voice") return voiceWord(t, voiceLength(meta));
+  // What happened on GitHub, as the chat's line says it: someone's words alone, under the agent's name, would read as
+  // the agent's.
+  if (meta?.bodyCode === "github_event") {
+    const p = (meta.bodyParams ?? {}) as Record<string, string>;
+    const line = t(p.answerFor ? "chat.notice.github.asked" : githubLineKey(p), { ...p, name: p.agent ?? "" });
+    return previewOf(p.said ? `${line}: ${p.said}` : line);
+  }
   if (!text.trim()) {
     const kind = mediaKindOf(mediaKind) ?? mediaKindOf(meta?.mediaKind) ?? mediaKindOf(meta?.media);
     if (kind) return mediaWord(t, kind);

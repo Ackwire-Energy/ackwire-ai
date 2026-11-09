@@ -9947,8 +9947,10 @@
       },
       "line": {
         "env": "このサーバーの設定で指定されています（GITHUB_APP_ID）。",
-        "invalid": "このサーバーは保存されたアプリを開けません。削除して作り直してください。"
+        "invalid": "このサーバーは保存されたアプリを開けません。削除して作り直してください。",
+        "events": "エージェントがGitHubの出来事を受け取れるよう、アプリでこれらのイベントにチェックを入れてください：{{events}}。"
       },
+      "events": "イベントにチェックを入れる",
       "open": "GitHubで開く",
       "remove": "アプリを削除",
       "removeTitle": "このサーバーのGitHubアプリを削除しますか？",
@@ -11505,6 +11507,9 @@
       "githubFailed": "GitHubは{{repo}}にWebhookを作成しませんでした（{{status}}）。下の手順で手動で作成してください。",
       "invalidSecret": "Client Secretを空白なしで全部貼り付けてください。",
       "invalidRepo": "リポジトリは オーナー/名前 の形で書いてください。"
+    },
+    "githubEvent": {
+      "answered": "この返信はすでに誰かが頼んでいます。エージェントが対応しています。"
     },
     "issue": {
       "assigneeOutside": "この人はこのタスクを見ることができません。先に閲覧できる人に追加してください。",
@@ -13625,6 +13630,21 @@
       "wakeSkippedAnon": "{{name}} のメンションはほかのエージェントに届きませんでした",
       "wakeSkippedAudience": "{{agents}} を呼べるのは一部の人だけで、{{name}} のこの作業はその誰からの依頼でもありません。{{agents}} を呼べる人が依頼を引き継げます。",
       "wakeSkippedCallable": "{{name}} の設定では {{agents}} を呼べません（別のプロジェクト、または呼べるエージェントの一覧にない）。{{name}} の担当者がエージェントのページで変更できます。",
+      "github": {
+        "comment": "{{who}}がGitHubでPR #{{number}}（{{repo}}）にコメントしました",
+        "commentIssue": "{{who}}がGitHubでIssue #{{number}}（{{repo}}）にコメントしました",
+        "commentDiscussion": "{{who}}がGitHubでディスカッション #{{number}}（{{repo}}）にコメントしました",
+        "opened": "{{who}}がGitHubの#{{number}}（{{repo}}）でagentes.chatアプリを呼びました",
+        "reviewed": "{{who}}がGitHubでPR #{{number}}（{{repo}}）をレビューしました",
+        "approved": "{{who}}がGitHubでPR #{{number}}（{{repo}}）を承認しました",
+        "changes": "{{who}}がGitHubでPR #{{number}}（{{repo}}）に変更を依頼しました",
+        "reviewRequested": "{{who}}がGitHubで{{name}}にPR #{{number}}（{{repo}}）のレビューを依頼しました",
+        "merged": "{{who}}がGitHubでPR #{{number}}（{{repo}}）をマージしました",
+        "closed": "{{who}}がGitHubでPR #{{number}}（{{repo}}）をクローズしました",
+        "closedIssue": "{{who}}がGitHubでIssue #{{number}}（{{repo}}）をクローズしました",
+        "ask": "返信を頼む",
+        "asked": "{{asker}}が{{name}}に、GitHubで{{who}}へ返信するよう頼みました"
+      },
       "show": "表示",
       "hide": "隠す",
       "talker": "作業中に",

@@ -10351,7 +10351,11 @@ export const en = {
       line: {
         env: "Set in this server's settings (GITHUB_APP_ID).",
         invalid: "This server can't open the saved app. Remove it and create it again.",
+        /** The app isn't subscribed to what agents hear on GitHub: `events` are GitHub's own names for them. */
+        events: "For agents to hear what happens on GitHub, tick these events on the app: {{events}}.",
       },
+      /** Opens the app's Permissions & events page on GitHub. */
+      events: "Tick the events",
       open: "Open on GitHub",
       remove: "Remove the app",
       removeTitle: "Remove this server's GitHub app?",
@@ -11720,6 +11724,10 @@ export const en = {
         "GitHub didn't create the webhook in {{repo}} ({{status}}). Follow the steps below to add it by hand.",
       invalidSecret: "Paste the whole Client Secret, with no spaces.",
       invalidRepo: "Write the repository as owner/name.",
+    },
+    /** "Ask for a reply" on a GitHub notice someone else already asked about (the line changes right after). */
+    githubEvent: {
+      answered: "Someone already asked for this reply. The agent is on it.",
     },
     issue: {
       assigneeOutside: "This person can't see this task. Add them to who sees it first.",
@@ -13917,6 +13925,28 @@ export const en = {
       /** The same when the agent's own settings don't let it call them. */
       wakeSkippedCallable:
         "{{name}}'s settings don't let it call {{agents}} (another project, or not on its list of agents to call). Whoever looks after {{name}} can change that on the agent's page.",
+      /**
+       * What happened on GitHub to an item an agent worked on, or naming the app: `who` is the member's name or the
+       * GitHub login, `name` the agent's. "Show" opens what they wrote there and the link.
+       */
+      github: {
+        comment: "{{who}} commented on PR #{{number}} ({{repo}}) on GitHub",
+        commentIssue: "{{who}} commented on issue #{{number}} ({{repo}}) on GitHub",
+        commentDiscussion: "{{who}} commented on discussion #{{number}} ({{repo}}) on GitHub",
+        /** A new pull request, issue or discussion that names the app. */
+        opened: "{{who}} called the agentes.chat app in #{{number}} ({{repo}}) on GitHub",
+        reviewed: "{{who}} reviewed PR #{{number}} ({{repo}}) on GitHub",
+        approved: "{{who}} approved PR #{{number}} ({{repo}}) on GitHub",
+        changes: "{{who}} asked for changes on PR #{{number}} ({{repo}}) on GitHub",
+        reviewRequested: "{{who}} asked {{name}} to review PR #{{number}} ({{repo}}) on GitHub",
+        merged: "{{who}} merged PR #{{number}} ({{repo}}) on GitHub",
+        closed: "{{who}} closed PR #{{number}} ({{repo}}) on GitHub",
+        closedIssue: "{{who}} closed issue #{{number}} ({{repo}}) on GitHub",
+        /** On the line of someone the agent doesn't answer: a person here asks the agent to answer them there. */
+        ask: "Ask for a reply",
+        /** The line once someone asked (`asker`), in place of the button. */
+        asked: "{{asker}} asked {{name}} to reply to {{who}} on GitHub",
+      },
       show: "Show",
       hide: "Hide",
       talker: "while working",

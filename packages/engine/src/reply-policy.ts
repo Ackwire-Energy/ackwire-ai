@@ -70,9 +70,16 @@ export interface ReplyPolicy {
 
 /**
  * Notices that only inform the agent (ADR 0053 §10): another agent's note, the late result of a wait it
- * stopped waiting on, its own fast reply, its own follow-up coming due. The run one of them wakes may stay quiet.
+ * stopped waiting on, its own fast reply, its own follow-up coming due, what happened on GitHub (it answers there).
+ * The run one of them wakes may stay quiet.
  */
-const INFORMING_NOTICES: ReadonlySet<string> = new Set(["agent_note", "wait_result", "talker_reply", "follow_up"]);
+const INFORMING_NOTICES: ReadonlySet<string> = new Set([
+  "agent_note",
+  "wait_result",
+  "talker_reply",
+  "follow_up",
+  "github_event",
+]);
 
 /**
  * How a run must answer. Only runs nobody called by name may pass: the router

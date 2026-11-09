@@ -10012,8 +10012,10 @@
       },
       "line": {
         "env": "已在此服务器的设置中配置（GITHUB_APP_ID）。",
-        "invalid": "此服务器无法打开已保存的应用。请移除后重新创建。"
+        "invalid": "此服务器无法打开已保存的应用。请移除后重新创建。",
+        "events": "要让智能体收到 GitHub 上发生的事，请在应用中勾选这些事件：{{events}}。"
       },
+      "events": "勾选事件",
       "open": "在 GitHub 上打开",
       "remove": "移除应用",
       "removeTitle": "移除这台服务器的 GitHub 应用？",
@@ -11566,6 +11568,9 @@
       "githubFailed": "GitHub 没有在 {{repo}} 中创建 Webhook（{{status}}）。请按下面的步骤手动创建。",
       "invalidSecret": "请完整粘贴 Client Secret，不要带空格。",
       "invalidRepo": "请把仓库写成 所有者/名称。"
+    },
+    "githubEvent": {
+      "answered": "已经有人请求了这条回复。智能体正在处理。"
     },
     "issue": {
       "assigneeOutside": "这个人看不到这个任务。请先把他加入“谁能看到”。",
@@ -13691,6 +13696,21 @@
       "wakeSkippedAnon": "{{name}} 的提及没有叫到其他智能体",
       "wakeSkippedAudience": "只有部分人可以呼叫 {{agents}}，而 {{name}} 的这项工作并非来自其中任何人。可以呼叫 {{agents}} 的人可以把请求转交过去。",
       "wakeSkippedCallable": "{{name}} 的设置不允许它呼叫 {{agents}}（属于其他项目，或不在它可呼叫的智能体列表中）。负责 {{name}} 的人可以在该智能体的页面上更改。",
+      "github": {
+        "comment": "{{who}} 在 GitHub 上评论了 PR #{{number}}（{{repo}}）",
+        "commentIssue": "{{who}} 在 GitHub 上评论了 issue #{{number}}（{{repo}}）",
+        "commentDiscussion": "{{who}} 在 GitHub 上评论了讨论 #{{number}}（{{repo}}）",
+        "opened": "{{who}} 在 GitHub 的 #{{number}}（{{repo}}）中呼叫了 agentes.chat 应用",
+        "reviewed": "{{who}} 在 GitHub 上审查了 PR #{{number}}（{{repo}}）",
+        "approved": "{{who}} 在 GitHub 上批准了 PR #{{number}}（{{repo}}）",
+        "changes": "{{who}} 在 GitHub 上要求修改 PR #{{number}}（{{repo}}）",
+        "reviewRequested": "{{who}} 在 GitHub 上请 {{name}} 审查 PR #{{number}}（{{repo}}）",
+        "merged": "{{who}} 在 GitHub 上合并了 PR #{{number}}（{{repo}}）",
+        "closed": "{{who}} 在 GitHub 上关闭了 PR #{{number}}（{{repo}}）",
+        "closedIssue": "{{who}} 在 GitHub 上关闭了 issue #{{number}}（{{repo}}）",
+        "ask": "请求回复",
+        "asked": "{{asker}} 请 {{name}} 在 GitHub 上回复 {{who}}"
+      },
       "show": "显示",
       "hide": "隐藏",
       "talker": "工作间隙",

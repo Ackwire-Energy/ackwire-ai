@@ -10787,8 +10787,10 @@
       },
       "line": {
         "env": "Impostata nelle impostazioni di questo server (GITHUB_APP_ID).",
-        "invalid": "Questo server non riesce ad aprire l'app salvata. Rimuovila e creala di nuovo."
+        "invalid": "Questo server non riesce ad aprire l'app salvata. Rimuovila e creala di nuovo.",
+        "events": "Perché gli agenti sentano cosa succede su GitHub, spunta questi eventi nell'app: {{events}}."
       },
+      "events": "Spunta gli eventi",
       "open": "Apri su GitHub",
       "remove": "Rimuovi l'app",
       "removeTitle": "Rimuovere l'app GitHub di questo server?",
@@ -12425,6 +12427,9 @@
       "githubFailed": "GitHub non ha creato il webhook in {{repo}} ({{status}}). Segui i passaggi qui sotto per crearlo a mano.",
       "invalidSecret": "Incolla il Client Secret intero, senza spazi.",
       "invalidRepo": "Scrivi il repository come proprietario/nome."
+    },
+    "githubEvent": {
+      "answered": "Qualcuno ha già chiesto questa risposta. L'agente se ne sta occupando."
     },
     "issue": {
       "assigneeOutside": "Questa persona non vede questa attività. Aggiungila prima a Chi lo vede.",
@@ -14634,6 +14639,21 @@
       "wakeSkippedAnon": "La menzione di {{name}} non ha raggiunto un altro agente",
       "wakeSkippedAudience": "Solo alcune persone possono chiamare {{agents}}, e questo lavoro di {{name}} non è partito da nessuna di loro. Qualcuno che può chiamare {{agents}} può passargli la richiesta.",
       "wakeSkippedCallable": "Le impostazioni di {{name}} non gli permettono di chiamare {{agents}} (un altro progetto, o fuori dalla sua lista di agenti da chiamare). Chi si occupa di {{name}} può cambiarlo nella pagina dell’agente.",
+      "github": {
+        "comment": "{{who}} ha commentato la PR #{{number}} ({{repo}}) su GitHub",
+        "commentIssue": "{{who}} ha commentato la issue #{{number}} ({{repo}}) su GitHub",
+        "commentDiscussion": "{{who}} ha commentato la discussione #{{number}} ({{repo}}) su GitHub",
+        "opened": "{{who}} ha chiamato l'app agentes.chat in #{{number}} ({{repo}}) su GitHub",
+        "reviewed": "{{who}} ha revisionato la PR #{{number}} ({{repo}}) su GitHub",
+        "approved": "{{who}} ha approvato la PR #{{number}} ({{repo}}) su GitHub",
+        "changes": "{{who}} ha chiesto modifiche alla PR #{{number}} ({{repo}}) su GitHub",
+        "reviewRequested": "{{who}} ha chiesto a {{name}} di revisionare la PR #{{number}} ({{repo}}) su GitHub",
+        "merged": "{{who}} ha fatto il merge della PR #{{number}} ({{repo}}) su GitHub",
+        "closed": "{{who}} ha chiuso la PR #{{number}} ({{repo}}) su GitHub",
+        "closedIssue": "{{who}} ha chiuso la issue #{{number}} ({{repo}}) su GitHub",
+        "ask": "Chiedi una risposta",
+        "asked": "{{asker}} ha chiesto a {{name}} di rispondere a {{who}} su GitHub"
+      },
       "show": "Mostra",
       "hide": "Nascondi",
       "talker": "mentre lavora",

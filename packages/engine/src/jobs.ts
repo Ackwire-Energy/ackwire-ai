@@ -61,6 +61,7 @@ import { executeRun, type RunExecutorDeps } from "./executor";
 import { FOLLOW_UP_JOB, wakeFollowUp } from "./follow-through";
 import { cutText } from "./format";
 import type { GitHubAppAccess } from "./git/github-call";
+import { GITHUB_EVENT_JOB, type GitHubAppEvent, handleGitHubAppEvent } from "./git/github-events";
 import { FILE_JOIN_REQUEST_JOB, fileJoinRequest } from "./invite-requests";
 import { announceTaskConversation } from "./issues";
 import type { JevKey, JevKeySource } from "./jev-key";
@@ -1110,6 +1111,10 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     // Yesterday's stall-and-noise report, to the people who run the server (`OPS_REPORT_EMAIL`).
     [AUTONOMY_REPORT_JOB]: async (job) => {
       await queueAutonomyEmail(deps.db, job.payload, { router: deps.router?.enabled ?? false });
+    },
+    // What happened on GitHub to an item an agent worked on, or naming the app (ADR 0156).
+    [GITHUB_EVENT_JOB]: async (job) => {
+      await handleGitHubAppEvent({ db: deps.db, pubsub: deps.pubsub }, orgOf(job), job.payload.event as GitHubAppEvent);
     },
   };
   // A waiting run whose ask may have just been handled here checks early (`parked-asks.ts`). After the routing, not

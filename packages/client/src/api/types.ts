@@ -2006,6 +2006,11 @@ export interface GitHubAppSetup {
   state: "off" | "ok" | "invalid";
   /** No app yet: the manifest flow makes one. */
   canCreate: boolean;
+  /**
+   * The events agents hear that the app isn't subscribed to on GitHub (by GitHub's names), and its page there where
+   * they're ticked. Absent when it has them all, or GitHub didn't answer.
+   */
+  events?: { missing: string[]; url: string };
 }
 
 /** `GET …/github-app`: whether the app can be installed here, the organization's installations, the server's app. */

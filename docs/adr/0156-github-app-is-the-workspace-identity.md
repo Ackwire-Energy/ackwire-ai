@@ -188,3 +188,44 @@ permissions; each call still gets a token with only what its tool needs, and wha
   no new scope, so deleting a repository as an account fails (GitHub wants `delete_repo`). GitHub's REST schema for
   installation tokens doesn't list `repository_advisories` (its permissions reference does): one real advisory call
   checks that GitHub mints it.
+
+## Addendum (2026-11-08): what happens on GitHub wakes the agent
+
+The app subscribes to `issues`, `issue_comment`, `pull_request`, `pull_request_review`, `pull_request_review_comment`,
+`pull_request_review_thread`, `discussion` and `discussion_comment` (`GITHUB_APP_EVENTS`, in `githubAppManifest`). An
+app made before keeps the events it was made with: the server's owner sees in Settings › Connectors which to tick, with
+its page on GitHub (`missingGitHubAppEvents`, from `GET /app`). `git/github-events.ts` does the rest.
+
+- **Intake.** The webhook checks the signature, keeps installation events as before, and queues any other event agents
+  hear as one job (`github_app.event`) per `X-GitHub-Delivery` (the outbox's dedupe key, kept with the finished row),
+  so it answers at once and GitHub's Redeliver adds nothing. An event for an installation no workspace bound is dropped.
+- **What agents hear.** A comment (issue, pull request, review comment, discussion), a submitted review with a body or
+  a verdict, the app's bot asked to review, a pull request, issue or discussion opened naming the app (`@slug`), a pull
+  request merged or closed, an issue closed. Never a bot's text (the app's own included) nor a body that ends with our
+  signature line (an agent writing through an account's connection); a close by the app itself is an agent's own.
+- **Which agent.** `github_items` keeps each item (repository and number: issues, pull requests and discussions share
+  them) an agent opened or wrote on through its GitHub tools (the signed ones, and `open_pull_request`), with the
+  conversation it worked from (a routine's run: where it reports) and the run (the last one on a task: a run GitHub
+  woke, with none, keeps the one before, so a merge still names the task). The agent that opened an item keeps it;
+  one only written on goes to whichever agent wrote last. Events on an item go to its agent, in that conversation; a
+  merge or a close only to the agent that opened it. An agent taken out of that conversation since isn't brought back
+  there, as a mention wouldn't be: the event is dropped, and so is "Pedir resposta" on an older notice
+  (`github_event.agent_not_here`). A mention of the app on an item no agent worked on goes to the
+  right hand, to hand on: in the DM of the member who wrote it, or for anyone else in the DM of whoever connected that
+  GitHub account here (the installation's `createdByUserId`, while a member), where it wakes nobody until they ask.
+- **Who is behind it.** A commenter whose GitHub account is a member's sign-in (`accounts`, `providerId` `github`), who
+  reads that conversation (work handed to the agent in the agents' DM, which no person reads: who belongs to the
+  workspace) and may talk to the agent, wakes it with them behind the run (the notice's server-set `refs.personId`,
+  which `messageRoot` follows). Anyone else leaves a notice that wakes nobody (`refs.outside`), with
+  "Pedir resposta" for whoever reads the conversation and may talk to the agent: once, a second notice with that person
+  behind it wakes the agent. A merge or a close wakes the agent whoever did it, with nobody behind it but a member.
+- **What the agent reads.** A `github_event` notice: the server's line ("Ana commented on PR #12 (acme/app) on GitHub",
+  with the link), the GitHub text inside the outside-content envelope, and what to do: answer there with its GitHub
+  tools (signed as always) and keep the conversation short; hand an unowned item on; bring its task in line with a
+  merge or a close. A notice with GitHub text is outside content (`meta.readOutside`, ADR 0117), a member's own words
+  included: the run it wakes posts and learns as one that read outside (low trust, ADR 0120), and so does a later run
+  of that conversation. People see the same line in their language, the text and the link on "Ver". Conversation lists and
+  notifications show that line with what they wrote (`previewMeta`, `bodyCode` `github_event`), never their words
+  alone under the agent's name, and a push never quotes it.
+- **Not done.** `pull_request_review_thread` (resolved threads) is subscribed but wakes nobody. Who wrote a review the
+  bot left isn't known from a reply to it: the item's agent hears it. An edit to a comment wakes nobody.

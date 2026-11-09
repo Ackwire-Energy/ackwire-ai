@@ -10001,8 +10001,10 @@
       },
       "line": {
         "env": "Diatur di pengaturan server ini (GITHUB_APP_ID).",
-        "invalid": "Server ini tidak bisa membuka aplikasi yang tersimpan. Hapus lalu buat lagi."
+        "invalid": "Server ini tidak bisa membuka aplikasi yang tersimpan. Hapus lalu buat lagi.",
+        "events": "Agar agen mendengar apa yang terjadi di GitHub, centang event berikut di aplikasi: {{events}}."
       },
+      "events": "Centang event",
       "open": "Buka di GitHub",
       "remove": "Hapus aplikasi",
       "removeTitle": "Hapus aplikasi GitHub server ini?",
@@ -11559,6 +11561,9 @@
       "githubFailed": "GitHub tidak membuat webhook di {{repo}} ({{status}}). Ikuti langkah di bawah untuk membuatnya manual.",
       "invalidSecret": "Tempel Client Secret secara utuh, tanpa spasi.",
       "invalidRepo": "Tulis repositori sebagai pemilik/nama."
+    },
+    "githubEvent": {
+      "answered": "Seseorang sudah meminta balasan ini. Agen sedang menanganinya."
     },
     "issue": {
       "assigneeOutside": "Orang ini tidak bisa melihat tugas ini. Tambahkan dulu ke Siapa yang melihat.",
@@ -13679,6 +13684,21 @@
       "wakeSkippedAnon": "Sebutan dari {{name}} tidak sampai ke agen lain",
       "wakeSkippedAudience": "Hanya sebagian orang yang boleh memanggil {{agents}}, dan pekerjaan {{name}} ini tidak datang dari salah satu dari mereka. Orang yang boleh memanggil {{agents}} bisa meneruskan permintaannya.",
       "wakeSkippedCallable": "Pengaturan {{name}} tidak mengizinkannya memanggil {{agents}} (proyek lain, atau tidak ada di daftar agen yang boleh dipanggil). Orang yang mengurus {{name}} bisa mengubahnya di halaman agen.",
+      "github": {
+        "comment": "{{who}} berkomentar di PR #{{number}} ({{repo}}) di GitHub",
+        "commentIssue": "{{who}} berkomentar di issue #{{number}} ({{repo}}) di GitHub",
+        "commentDiscussion": "{{who}} berkomentar di diskusi #{{number}} ({{repo}}) di GitHub",
+        "opened": "{{who}} memanggil aplikasi agentes.chat di #{{number}} ({{repo}}) di GitHub",
+        "reviewed": "{{who}} meninjau PR #{{number}} ({{repo}}) di GitHub",
+        "approved": "{{who}} menyetujui PR #{{number}} ({{repo}}) di GitHub",
+        "changes": "{{who}} meminta perubahan di PR #{{number}} ({{repo}}) di GitHub",
+        "reviewRequested": "{{who}} meminta {{name}} meninjau PR #{{number}} ({{repo}}) di GitHub",
+        "merged": "{{who}} menggabungkan PR #{{number}} ({{repo}}) di GitHub",
+        "closed": "{{who}} menutup PR #{{number}} ({{repo}}) di GitHub",
+        "closedIssue": "{{who}} menutup issue #{{number}} ({{repo}}) di GitHub",
+        "ask": "Minta balasan",
+        "asked": "{{asker}} meminta {{name}} membalas {{who}} di GitHub"
+      },
       "show": "Tampilkan",
       "hide": "Sembunyikan",
       "talker": "sambil bekerja",
