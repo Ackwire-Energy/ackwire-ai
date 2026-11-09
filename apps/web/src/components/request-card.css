@@ -477,6 +477,14 @@ html:not([data-pointer]) .rq__choice:focus-visible {
   height: 5px;
   background: var(--ok);
 }
+/* When it runs or ran, under the pill on its words' edge (past the mark), quiet. */
+.rq-done__note {
+  margin: 0;
+  padding-inline: calc(12px + 14px + var(--icon-gap)) 12px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--faint);
+}
 /* Its words wrap, never cut. */
 .rq-done__text {
   min-width: 0;

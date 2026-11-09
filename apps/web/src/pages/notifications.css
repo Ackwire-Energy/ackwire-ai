@@ -707,17 +707,6 @@ html:not([data-pointer]) .nt-nb:focus-visible {
     -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent);
     mask-image: linear-gradient(90deg, #000 85%, transparent);
   }
-  /* A tap on the row opens it, so the words take Open's room. Open stays for screen readers and the keyboard. */
-  .nt-wr__open:not(:focus-visible) {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    margin: -1px;
-    padding: 0;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
   .nt-item {
     padding: 12px 14px;
   }

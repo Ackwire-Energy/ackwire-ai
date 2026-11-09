@@ -307,6 +307,7 @@ export function RequestDone({
   more,
   action,
   time,
+  note,
   children,
 }: {
   /** It went through. */
@@ -319,6 +320,8 @@ export function RequestDone({
   action?: ReactNode;
   /** When it was decided. */
   time?: string;
+  /** A quiet line under the pill (when one approved ahead runs, when it ran): a long time never squeezes the words. */
+  note?: ReactNode;
   /** The words: what it was and how it ended. */
   children: ReactNode;
 }) {
@@ -346,7 +349,14 @@ export function RequestDone({
       }
       time={time}
       actions={actions}
-      below={open && more ? <div className="rq__details">{more.content}</div> : undefined}
+      below={
+        note || (open && more) ? (
+          <>
+            {note && <p className="rq-done__note">{note}</p>}
+            {open && more && <div className="rq__details">{more.content}</div>}
+          </>
+        ) : undefined
+      }
     >
       <span className="rq-done__text">{children}</span>
     </EventPill>
