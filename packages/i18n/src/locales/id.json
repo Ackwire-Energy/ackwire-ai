@@ -649,6 +649,41 @@
       "left_other": "{{count}} langkah lagi",
       "done": "Semua siap"
     },
+    "flow": {
+      "steps": {
+        "name": "Nama ruang kerja",
+        "business": "Apa yang kalian lakukan",
+        "team": "Timmu",
+        "plan": "Nyalakan tim"
+      },
+      "stepOf": "Langkah {{n}} dari {{total}}",
+      "lodi": {
+        "name": "Hai, {{first}}. Aku {{name}}. Aku akan menyusun tim bersamamu dalam sekitar dua menit.",
+        "business": "Dengan ini aku tahu siapa yang perlu masuk tim.",
+        "team": "Ini tim yang akan aku susun. Kamu bisa mengubah semuanya nanti.",
+        "plan": "Tinggal ini saja. Setelah itu aku tunjukkan pekerjaan pertama mereka."
+      },
+      "preview": {
+        "label": "Ruang kerjamu, saat kamu menjawab",
+        "ghost": "Timmu muncul di sini"
+      },
+      "team": {
+        "title": "Timmu"
+      },
+      "plan": {
+        "title": "Nyalakan timmu",
+        "lead": "Timmu sudah siap. Dengan paketnya, tim mulai hari ini.",
+        "asleep": "Tidur sampai ada paket",
+        "price": "<b>Paket {{name}}</b> · {{price}} per bulan",
+        "name": "<b>Paket {{name}}</b>",
+        "generic": "Paket agentes.chat",
+        "cancel": "Batalkan kapan saja",
+        "cta": "Nyalakan tim",
+        "all": "Lihat semua paket",
+        "skip": "Masuk ke ruang kerja tanpa menyalakannya"
+      },
+      "account": "Akunmu"
+    },
     "railValue": {
       "context": "Sudah ditulis",
       "skipped": "Dilewati",
@@ -1255,27 +1290,19 @@
     }
   },
   "webPushAsk": {
-    "title": "Ketahui saat agen membutuhkanmu",
-    "text": "Mereka bekerja saat kamu melakukan hal lain. Bahkan saat tab ditutup, kami akan memberi tahu saat mereka butuh persetujuanmu, menyelesaikan permintaanmu, atau memanggilmu.",
     "on": "Aktifkan notifikasi",
     "later": "Nanti saja",
     "done": "Notifikasi aktif di browser ini",
     "failed": "Notifikasi tidak bisa diaktifkan. Coba lagi di Pengaturan › Notifikasi.",
     "someone": "Sebuah agen",
-    "examples": "Contoh notifikasi",
     "now": "sekarang",
-    "minutes": "{{n}} mnt",
-    "approval": {
-      "title": "{{name}} butuh persetujuanmu",
-      "body": "Boleh aku lanjutkan yang kamu minta?"
-    },
     "finished": {
       "title": "{{name}} sudah selesai",
       "body": "Yang kamu minta sudah siap."
     },
-    "mention": {
-      "title": "{{name}} memanggilmu",
-      "body": "Bisa lihat sebentar kalau ada waktu?"
+    "inline": {
+      "title": "Mau langsung tahu saat {{name}} membalas?",
+      "why": "Bahkan saat tab ditutup. Ubah kapan saja di Pengaturan › Notifikasi."
     }
   },
   "shell": {
@@ -5051,30 +5078,17 @@
       "notNow": "Nanti saja",
       "afterPlan": "Terbuka dengan paket.",
       "about": {
-        "todo": "Ceritakan apa yang dilakukan {{org}}.",
-        "todoDesc": "Semua agen membaca ini.",
-        "action": "Ceritakan",
-        "done": "Saya tahu apa yang dilakukan {{org}}",
         "title": "Apa yang dilakukan {{org}}?",
         "desc": "Semua agen membaca ini. Kamu bisa mengubahnya kapan saja.",
         "line": "Dalam satu kalimat",
         "optional": "Opsional. Tanpa kalimat, jenis yang kamu pilih yang dipakai."
-      },
-      "team": {
-        "todo": "Bentuk timnya.",
-        "todoDesc": "Template untuk bisnismu, semuanya bisa diubah nanti.",
-        "action": "Lihat tim",
-        "done_other": "{{count}} agen di tim",
-        "card": "Lanjutkan di kartu di bawah"
       },
       "ai": {
         "todo": "Hubungkan AI.",
         "todoDesc": "Yang sudah kamu bayar bisa dipakai.",
         "action": "Hubungkan",
         "done": "Saya berpikir dengan {{label}}",
-        "doneAny": "Saya sudah berpikir dengan AI",
-        "plan": "Terbuka dengan paket agentes.chat.",
-        "planAction": "Lihat paket agentes.chat"
+        "doneAny": "Saya sudah berpikir dengan AI"
       },
       "apps": {
         "todo": "Hubungkan aplikasi kerjamu.",
@@ -5092,11 +5106,13 @@
         "todoDesc": "Mereka juga bicara dengan agen.",
         "action": "Undang",
         "done_other": "{{count}} orang di sini",
-        "doneNone": "Baru kamu saja"
+        "doneNone": "Baru kamu saja",
+        "invited": "Mengundang {{names}} · menunggu",
+        "email": "nama@perusahaan.com",
+        "send": "Kirim",
+        "more": "Opsi lainnya"
       },
       "say": {
-        "about": "Dicatat. Semua agen membaca ini.",
-        "team": "Timnya sudah datang.",
         "ai": "Sekarang tim bisa berpikir.",
         "apps": "Selesai, saya sudah membaca aplikasinya.",
         "people": "Senang ada lebih banyak orang di sini."
@@ -15550,9 +15566,8 @@
     "firstTask": {
       "suggestion": "saran",
       "lead": "Satu tugas singkat per agen, supaya kamu melihat masing-masing bekerja hari ini.",
-      "heldLead": "Satu tugas singkat per agen. Lengkapi kalimatnya lalu kirim. Mereka mulai setelah workspace punya paket agentes.chat.",
-      "example": "Contoh hasil kerja {{name}}",
       "open": "Buka dengan tugasnya",
+      "finish": "Lengkapi kalimatnya lalu kirim",
       "invite": "Undang {{names}}",
       "later": "Nanti"
     },
@@ -15704,7 +15719,7 @@
     },
     "software": {
       "name": "Software dan aplikasi",
-      "sub": "Dukungan, tagihan, dan kode",
+      "sub": "Layanan pelanggan, tagihan, dan kode",
       "desc": "Untuk perusahaan yang menjual software dan mengurus pelanggannya sendiri."
     },
     "support": {
@@ -15717,60 +15732,70 @@
       "sub": "Akuntansi, hukum, konsultasi",
       "desc": "Untuk kantor yang menjadwalkan klien, mengirim proposal, dan menagih."
     },
+    "hello": {
+      "lodi": {
+        "starting": "Paket aktif! Komputerku sedang menyala. Ayo mulai bekerja!",
+        "ready": "Paket aktif! Ayo mulai bekerja!",
+        "created": "Timnya sudah lengkap! Ayo mulai bekerja!"
+      }
+    },
     "agents": {
       "iara": {
         "role": "Layanan pelanggan",
         "line": "Menjawab pelanggan di WhatsApp dan email. Memanggilmu saat tidak tahu.",
         "routine": "Merangkum yang belum dijawab",
-        "task": "Tulis balasan untuk pesan pelanggan ini:"
+        "task": "Tulis balasan untuk pesan pelanggan ini:",
+        "hello": "Hai, {{first}}! Serahkan padaku siapa pun yang menulis lewat WhatsApp."
       },
       "caio": {
         "role": "Penagihan",
         "line": "Mengingatkan yang terlambat bayar dan mengirim tagihan setelah kamu setuju.",
         "routine": "Mendaftar siapa yang terlambat bayar",
-        "task": "Tulis pengingat pembayaran yang ramah untuk:"
+        "task": "Tulis pengingat pembayaran yang ramah untuk:",
+        "hello": "Halo! Aku mengurus tagihan dan hanya mengirim pengingat setelah kamu setuju."
       },
       "ada": {
         "role": "Dev",
         "line": "Memperbaiki bug yang dilaporkan pelanggan dan membuka PR.",
         "routine": "Mendaftar bug baru",
-        "task": "Beri tahu saya harus mulai dari mana menyelidiki bug ini:"
+        "task": "Beri tahu saya harus mulai dari mana menyelidiki bug ini:",
+        "hello": "Hai! Kirim bug yang masuk ke aku, aku selidiki dan buka PR-nya."
       },
       "lia": {
         "role": "Konten",
         "line": "Menulis posting dan naskah dengan gaya perusahaan dan menjadwalkannya setelah kamu setuju.",
         "routine": "Mengusulkan posting minggu ini",
-        "task": "Usulkan tiga posting minggu ini tentang:"
+        "task": "Usulkan tiga posting minggu ini tentang:",
+        "hello": "Hai, semuanya! Postingan minggu ini urusanku."
       },
       "theo": {
         "role": "Penjualan",
         "line": "Menindaklanjuti semua yang meminta penawaran dan menulis proposalnya.",
         "routine": "Mendaftar siapa yang meminta penawaran dan belum dijawab",
-        "task": "Tulis penawaran singkat untuk permintaan ini:"
+        "task": "Tulis penawaran singkat untuk permintaan ini:",
+        "hello": "Hai, {{first}}! Tidak ada yang minta penawaran harga dibiarkan tanpa jawaban."
       },
       "nina": {
         "role": "Jadwal",
         "line": "Membuat, mengonfirmasi, dan memindahkan janji, dan mengingatkan klien sehari sebelumnya.",
         "routine": "Mengonfirmasi janji besok",
-        "task": "Atur jadwal besok ini:"
+        "task": "Atur jadwal besok ini:",
+        "hello": "Halo! Jadwal aku yang pegang, dan aku ingatkan klien sehari sebelumnya."
       },
       "otto": {
         "role": "Pesanan",
         "line": "Memantau pesanan dan stok dan memberi tahu yang hampir habis.",
         "routine": "Memberi tahu stok yang hampir habis",
-        "task": "Daftar yang masih harus dikerjakan pada pesanan ini:"
+        "task": "Daftar yang masih harus dikerjakan pada pesanan ini:",
+        "hello": "Aku datang. Aku pantau pesanan dan memberi tahu kalau stok menipis."
       },
       "bia": {
         "role": "Basis jawaban",
         "line": "Menjaga basis jawaban tetap sesuai dengan jawaban tim.",
         "routine": "Memperbarui basis dengan jawaban minggu ini",
-        "task": "Tulis jawaban untuk pertanyaan pelanggan ini:"
+        "task": "Tulis jawaban untuk pertanyaan pelanggan ini:",
+        "hello": "Hai! Aku jaga basis jawaban tetap terbaru dengan jawaban tim."
       }
-    },
-    "example": {
-      "iara": "Hai Marina. Pesananmu dikirim kemarin dan tiba paling lambat Jumat. Kode pelacakan ada di bawah ini. Kalau Jumat tidak cocok, saya carikan tanggal lain.",
-      "lia": "1. Tiga kesalahan umum saat memilih agensi. 2. Di balik layar proyek yang nyaris gagal. 3. Pertanyaan untuk pengikut kalian: apa yang ingin kalian lihat di sini?",
-      "nina": "Besok: 9.00 Carla, 10.30 Pedro, 14.00 kosong. Pedro belum konfirmasi. Mau saya kirim pesan ke dia?"
     },
     "channels": {
       "iara": "layanan",

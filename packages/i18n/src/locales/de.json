@@ -659,6 +659,41 @@
       "left_other": "Noch {{count}} Schritte",
       "done": "Alles bereit"
     },
+    "flow": {
+      "steps": {
+        "name": "Name des Workspace",
+        "business": "Was ihr macht",
+        "team": "Dein Team",
+        "plan": "Team einschalten"
+      },
+      "stepOf": "Schritt {{n}} von {{total}}",
+      "lodi": {
+        "name": "Hallo {{first}}. Ich bin {{name}}. Ich stelle das Team in etwa zwei Minuten mit dir zusammen.",
+        "business": "Damit weiß ich, wen ich ins Team hole.",
+        "team": "So würde ich das Team zusammenstellen. Du kannst später alles ändern.",
+        "plan": "Nur noch das. Danach zeige ich dir ihre erste Arbeit."
+      },
+      "preview": {
+        "label": "Dein Workspace, während du antwortest",
+        "ghost": "Hier erscheint dein Team"
+      },
+      "team": {
+        "title": "Dein Team"
+      },
+      "plan": {
+        "title": "Schalte dein Team ein",
+        "lead": "Dein Team ist bereit. Mit dem Tarif legt es heute los.",
+        "asleep": "Schläft bis zum Tarif",
+        "price": "<b>Tarif {{name}}</b> · {{price}} pro Monat",
+        "name": "<b>Tarif {{name}}</b>",
+        "generic": "Ein agentes.chat-Tarif",
+        "cancel": "Jederzeit kündbar",
+        "cta": "Team einschalten",
+        "all": "Alle Tarife ansehen",
+        "skip": "Ohne Einschalten in den Workspace"
+      },
+      "account": "Dein Konto"
+    },
     "railValue": {
       "context": "Geschrieben",
       "skipped": "Übersprungen",
@@ -1291,27 +1326,19 @@
     }
   },
   "webPushAsk": {
-    "title": "Erfahre, wann ein Agent dich braucht",
-    "text": "Sie arbeiten, während du etwas anderes tust. Auch bei geschlossenem Tab sagen wir dir Bescheid, wenn sie dein Okay brauchen, fertig sind mit dem, worum du gebeten hast, oder dich rufen.",
     "on": "Benachrichtigungen einschalten",
     "later": "Nicht jetzt",
     "done": "Benachrichtigungen in diesem Browser an",
     "failed": "Benachrichtigungen konnten nicht eingeschaltet werden. Versuch es noch einmal unter Einstellungen › Benachrichtigungen.",
     "someone": "Ein Agent",
-    "examples": "Beispiele für Benachrichtigungen",
     "now": "jetzt",
-    "minutes": "{{n}} Min.",
-    "approval": {
-      "title": "{{name}} braucht dein Okay",
-      "body": "Darf ich mit dem weitermachen, worum du gebeten hast?"
-    },
     "finished": {
       "title": "{{name}} ist fertig",
       "body": "Worum du gebeten hast, ist fertig."
     },
-    "mention": {
-      "title": "{{name}} hat dich gerufen",
-      "body": "Kannst du kurz draufschauen, wenn du eine Minute hast?"
+    "inline": {
+      "title": "Willst du sofort wissen, wenn {{name}} antwortet?",
+      "why": "Auch bei geschlossenem Tab. Ändern kannst du das jederzeit unter Einstellungen › Benachrichtigungen."
     }
   },
   "shell": {
@@ -5228,31 +5255,17 @@
       "notNow": "Jetzt nicht",
       "afterPlan": "Öffnet mit dem Tarif.",
       "about": {
-        "todo": "Erzähl mir, was {{org}} macht.",
-        "todoDesc": "Alle Agenten lesen das.",
-        "action": "Erzählen",
-        "done": "Ich weiß, was {{org}} macht",
         "title": "Was macht {{org}}?",
         "desc": "Alle Agenten lesen das. Du kannst es jederzeit ändern.",
         "line": "In einem Satz",
         "optional": "Optional. Ohne Satz zählt der Typ, den du gewählt hast."
-      },
-      "team": {
-        "todo": "Stell das Team zusammen.",
-        "todoDesc": "Eine Vorlage für dein Geschäft, du kannst später alles ändern.",
-        "action": "Team ansehen",
-        "done_one": "{{count}} Agent im Team",
-        "done_other": "{{count}} Agenten im Team",
-        "card": "Mach auf der Karte unten weiter"
       },
       "ai": {
         "todo": "Verbinde eine KI.",
         "todoDesc": "Die, für die du schon zahlst, funktioniert.",
         "action": "Verbinden",
         "done": "Ich denke mit {{label}}",
-        "doneAny": "Ich denke jetzt mit einer KI",
-        "plan": "Öffnet mit dem agentes.chat-Tarif.",
-        "planAction": "agentes.chat-Tarife ansehen"
+        "doneAny": "Ich denke jetzt mit einer KI"
       },
       "apps": {
         "todo": "Verbinde deine Arbeits-Apps.",
@@ -5271,11 +5284,13 @@
         "action": "Einladen",
         "done_one": "{{count}} Person hier",
         "done_other": "{{count}} Personen hier",
-        "doneNone": "Vorerst nur du"
+        "doneNone": "Vorerst nur du",
+        "invited": "{{names}} eingeladen · ausstehend",
+        "email": "name@firma.de",
+        "send": "Senden",
+        "more": "Weitere Optionen"
       },
       "say": {
-        "about": "Notiert. Alle Agenten lesen das.",
-        "team": "Das Team ist da.",
         "ai": "Jetzt denkt das Team.",
         "apps": "Fertig, ich lese jetzt die Apps.",
         "people": "Schön, dass mehr Leute hier sind."
@@ -15996,9 +16011,8 @@
     "firstTask": {
       "suggestion": "Vorschlag",
       "lead": "Eine kurze Aufgabe pro Agent, damit du heute jeden bei der Arbeit siehst.",
-      "heldLead": "Eine kurze Aufgabe pro Agent. Ergänze den Satz und sende ihn. Sie beginnen, sobald der Workspace einen agentes.chat-Tarif hat.",
-      "example": "Beispiel dafür, was {{name}} liefert",
       "open": "Mit der Aufgabe öffnen",
+      "finish": "Vervollständige den Satz und schick ihn ab",
       "invite": "{{names}} einladen",
       "later": "Später"
     },
@@ -16151,7 +16165,7 @@
     },
     "software": {
       "name": "Software und Apps",
-      "sub": "Support, Abrechnung und Code",
+      "sub": "Kundenservice, Abrechnung und Code",
       "desc": "Für eine Firma, die Software verkauft und ihre eigenen Kunden betreut."
     },
     "support": {
@@ -16164,60 +16178,70 @@
       "sub": "Buchhaltung, Recht, Beratung",
       "desc": "Für ein Büro, das Kunden einbucht, Angebote schickt und abrechnet."
     },
+    "hello": {
+      "lodi": {
+        "starting": "Tarif aktiv! Mein Computer startet gerade. An die Arbeit!",
+        "ready": "Tarif aktiv! An die Arbeit!",
+        "created": "Das Team ist da! An die Arbeit!"
+      }
+    },
     "agents": {
       "iara": {
         "role": "Kundenservice",
         "line": "Antwortet Kunden auf WhatsApp und per E-Mail. Ruft dich, wenn sie etwas nicht weiß.",
         "routine": "Zusammenfassen, was unbeantwortet blieb",
-        "task": "Schreib eine Antwort auf diese Kundennachricht:"
+        "task": "Schreib eine Antwort auf diese Kundennachricht:",
+        "hello": "Hallo {{first}}! Wer auf WhatsApp schreibt, übernehme ich."
       },
       "caio": {
         "role": "Abrechnung",
         "line": "Erinnert alle, die mit der Zahlung im Rückstand sind, und schickt die Mahnung nach deinem Ok.",
         "routine": "Auflisten, wer mit der Zahlung im Rückstand ist",
-        "task": "Schreib eine freundliche Zahlungserinnerung für:"
+        "task": "Schreib eine freundliche Zahlungserinnerung für:",
+        "hello": "Hallo! Ich kümmere mich um die Zahlungen und schicke Erinnerungen erst nach deinem Okay."
       },
       "ada": {
         "role": "Dev",
         "line": "Behebt die Bugs, die Kunden melden, und öffnet den PR.",
         "routine": "Die neuen Bugs auflisten",
-        "task": "Sag mir, wo ich bei diesem Bug anfangen soll:"
+        "task": "Sag mir, wo ich bei diesem Bug anfangen soll:",
+        "hello": "Hi! Schickt mir die Bugs, die reinkommen, ich untersuche sie und öffne den PR."
       },
       "lia": {
         "role": "Inhalte",
         "line": "Schreibt Posts und Skripte im Ton der Firma und plant sie nach deinem Ok.",
         "routine": "Die Posts der Woche vorschlagen",
-        "task": "Schlag drei Posts für diese Woche vor zum Thema:"
+        "task": "Schlag drei Posts für diese Woche vor zum Thema:",
+        "hello": "Hallo zusammen! Die Posts der Woche übernehme ich."
       },
       "theo": {
         "role": "Vertrieb",
         "line": "Hakt bei allen nach, die ein Angebot angefragt haben, und schreibt die Angebote.",
         "routine": "Auflisten, wer ein Angebot angefragt und keine Antwort bekommen hat",
-        "task": "Schreib ein kurzes Angebot für diese Anfrage:"
+        "task": "Schreib ein kurzes Angebot für diese Anfrage:",
+        "hello": "Hallo {{first}}! Wer ein Angebot anfragt, bleibt nicht ohne Antwort."
       },
       "nina": {
         "role": "Termine",
         "line": "Vereinbart, bestätigt und verschiebt Termine und erinnert Kunden am Vortag.",
         "routine": "Die Termine von morgen bestätigen",
-        "task": "Ordne diese Termine für morgen:"
+        "task": "Ordne diese Termine für morgen:",
+        "hello": "Hallo! Der Kalender gehört mir, und ich erinnere die Kunden am Vortag."
       },
       "otto": {
         "role": "Bestellungen",
         "line": "Verfolgt Bestellungen und Lager und warnt, was ausgeht.",
         "routine": "Warnen, was im Lager ausgeht",
-        "task": "Liste auf, was bei diesen Bestellungen noch offen ist:"
+        "task": "Liste auf, was bei diesen Bestellungen noch offen ist:",
+        "hello": "Bin da. Ich behalte die Bestellungen im Blick und sage Bescheid, wenn der Bestand knapp wird."
       },
       "bia": {
         "role": "Antwortbasis",
         "line": "Hält die Antwortbasis mit dem aktuell, was das Team antwortet.",
         "routine": "Die Basis mit den Antworten der Woche aktualisieren",
-        "task": "Schreib die Antworten auf diese Kundenfragen:"
+        "task": "Schreib die Antworten auf diese Kundenfragen:",
+        "hello": "Hi! Ich halte die Antwortbasis mit dem auf dem Laufenden, was das Team antwortet."
       }
-    },
-    "example": {
-      "iara": "Hallo Marina. Deine Bestellung ging gestern raus und kommt bis Freitag an. Die Sendungsnummer steht direkt unten. Wenn Freitag nicht passt, suche ich einen anderen Termin.",
-      "lia": "1. Drei häufige Fehler bei der Wahl einer Agentur. 2. Hinter den Kulissen eines Projekts, das fast schiefging. 3. Eine Frage an eure Follower: Was wollt ihr hier sehen?",
-      "nina": "Morgen: 9:00 Carla, 10:30 Pedro, 14:00 frei. Pedro hat noch nicht bestätigt. Soll ich ihm schreiben?"
     },
     "channels": {
       "iara": "support",

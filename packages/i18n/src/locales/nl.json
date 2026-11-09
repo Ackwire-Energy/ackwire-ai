@@ -659,6 +659,41 @@
       "left_other": "Nog {{count}} stappen",
       "done": "Alles klaar"
     },
+    "flow": {
+      "steps": {
+        "name": "Naam van de werkruimte",
+        "business": "Wat jullie doen",
+        "team": "Je team",
+        "plan": "Team aanzetten"
+      },
+      "stepOf": "Stap {{n}} van {{total}}",
+      "lodi": {
+        "name": "Hoi {{first}}. Ik ben {{name}}. Ik stel het team in zo'n twee minuten met je samen.",
+        "business": "Daarmee weet ik wie ik bij het team haal.",
+        "team": "Dit is het team dat ik zou samenstellen. Je kunt later alles veranderen.",
+        "plan": "Alleen dit nog. Daarna laat ik je hun eerste werk zien."
+      },
+      "preview": {
+        "label": "Je werkruimte, terwijl je antwoordt",
+        "ghost": "Hier verschijnt je team"
+      },
+      "team": {
+        "title": "Je team"
+      },
+      "plan": {
+        "title": "Zet je team aan",
+        "lead": "Je team is klaar. Met het abonnement begint het vandaag.",
+        "asleep": "Slaapt tot het abonnement",
+        "price": "<b>Abonnement {{name}}</b> · {{price}} per maand",
+        "name": "<b>Abonnement {{name}}</b>",
+        "generic": "Een agentes.chat-abonnement",
+        "cancel": "Altijd opzegbaar",
+        "cta": "Team aanzetten",
+        "all": "Alle abonnementen bekijken",
+        "skip": "Naar de werkruimte zonder aanzetten"
+      },
+      "account": "Je account"
+    },
     "railValue": {
       "context": "Geschreven",
       "skipped": "Overgeslagen",
@@ -1291,27 +1326,19 @@
     }
   },
   "webPushAsk": {
-    "title": "Weet wanneer een agent je nodig heeft",
-    "text": "Ze werken terwijl jij iets anders doet. Ook met het tabblad dicht laten we je weten wanneer ze je akkoord nodig hebben, klaar zijn met wat je vroeg of je roepen.",
     "on": "Meldingen aanzetten",
     "later": "Niet nu",
     "done": "Meldingen aan in deze browser",
     "failed": "Kon meldingen niet aanzetten. Probeer het opnieuw via Instellingen › Meldingen.",
     "someone": "Een agent",
-    "examples": "Voorbeelden van meldingen",
     "now": "nu",
-    "minutes": "{{n}} min",
-    "approval": {
-      "title": "{{name}} heeft je akkoord nodig",
-      "body": "Mag ik doorgaan met wat je vroeg?"
-    },
     "finished": {
       "title": "{{name}} is klaar",
       "body": "Wat je vroeg, is klaar."
     },
-    "mention": {
-      "title": "{{name}} riep je",
-      "body": "Kun je even kijken als je een minuutje hebt?"
+    "inline": {
+      "title": "Wil je meteen weten wanneer {{name}} antwoordt?",
+      "why": "Ook met het tabblad dicht. Pas het aan wanneer je wilt via Instellingen › Meldingen."
     }
   },
   "shell": {
@@ -5269,31 +5296,17 @@
       "notNow": "Niet nu",
       "afterPlan": "Opent met het abonnement.",
       "about": {
-        "todo": "Vertel me wat {{org}} doet.",
-        "todoDesc": "Alle agenten lezen dit.",
-        "action": "Vertellen",
-        "done": "Ik weet wat {{org}} doet",
         "title": "Wat doet {{org}}?",
         "desc": "Alle agenten lezen dit. Je wijzigt het wanneer je wilt.",
         "line": "In één zin",
         "optional": "Optioneel. Zonder zin telt het type dat je koos."
-      },
-      "team": {
-        "todo": "Stel het team samen.",
-        "todoDesc": "Een sjabloon voor je bedrijf, je kunt later alles wijzigen.",
-        "action": "Team bekijken",
-        "done_one": "{{count}} agent in het team",
-        "done_other": "{{count}} agenten in het team",
-        "card": "Ga verder op de kaart hieronder"
       },
       "ai": {
         "todo": "Koppel een AI.",
         "todoDesc": "Die waar je al voor betaalt werkt.",
         "action": "Koppelen",
         "done": "Ik denk met {{label}}",
-        "doneAny": "Ik denk nu met een AI",
-        "plan": "Opent met het agentes.chat-abonnement.",
-        "planAction": "agentes.chat-abonnementen bekijken"
+        "doneAny": "Ik denk nu met een AI"
       },
       "apps": {
         "todo": "Koppel je werk-apps.",
@@ -5312,11 +5325,13 @@
         "action": "Uitnodigen",
         "done_one": "{{count}} persoon hier",
         "done_other": "{{count}} mensen hier",
-        "doneNone": "Voorlopig alleen jij"
+        "doneNone": "Voorlopig alleen jij",
+        "invited": "{{names}} uitgenodigd · wacht",
+        "email": "naam@bedrijf.nl",
+        "send": "Versturen",
+        "more": "Meer opties"
       },
       "say": {
-        "about": "Genoteerd. Alle agenten lezen dit.",
-        "team": "Het team is er.",
         "ai": "Nu denkt het team.",
         "apps": "Klaar, ik lees de apps nu.",
         "people": "Fijn dat er meer mensen zijn."
@@ -16171,9 +16186,8 @@
     "firstTask": {
       "suggestion": "suggestie",
       "lead": "Eén korte taak per agent, zodat je ze vandaag allemaal aan het werk ziet.",
-      "heldLead": "Eén korte taak per agent. Maak de zin af en verstuur hem. Ze beginnen zodra de workspace een agentes.chat-abonnement heeft.",
-      "example": "Voorbeeld van wat {{name}} oplevert",
       "open": "Openen met de taak",
+      "finish": "Maak de zin af en verstuur hem",
       "invite": "{{names}} uitnodigen",
       "later": "Later"
     },
@@ -16326,7 +16340,7 @@
     },
     "software": {
       "name": "Software en apps",
-      "sub": "Support, facturen en code",
+      "sub": "Klantenservice, betalingen en code",
       "desc": "Voor een bedrijf dat software verkoopt en zijn eigen klanten helpt."
     },
     "support": {
@@ -16339,60 +16353,70 @@
       "sub": "Boekhouding, advocatuur, advies",
       "desc": "Voor een kantoor dat klanten inplant, voorstellen stuurt en factureert."
     },
+    "hello": {
+      "lodi": {
+        "starting": "Abonnement actief! Mijn computer start op. Aan de slag!",
+        "ready": "Abonnement actief! Aan de slag!",
+        "created": "Het team is er! Aan de slag!"
+      }
+    },
     "agents": {
       "iara": {
         "role": "Klantenservice",
         "line": "Beantwoordt klanten via WhatsApp en e-mail. Roept je als ze het niet weet.",
         "routine": "Samenvatten wat onbeantwoord bleef",
-        "task": "Schrijf een antwoord op dit klantbericht:"
+        "task": "Schrijf een antwoord op dit klantbericht:",
+        "hello": "Hoi {{first}}! Wie via WhatsApp schrijft, laat je aan mij over."
       },
       "caio": {
         "role": "Facturen",
         "line": "Herinnert wie te laat betaalt en stuurt de herinnering na jouw ok.",
         "routine": "Opsommen wie te laat betaalt",
-        "task": "Schrijf een vriendelijke betalingsherinnering voor:"
+        "task": "Schrijf een vriendelijke betalingsherinnering voor:",
+        "hello": "Hallo! Ik doe de betalingen en stuur pas een herinnering na jouw oké."
       },
       "ada": {
         "role": "Dev",
         "line": "Lost de bugs op die klanten melden en opent de PR.",
         "routine": "De nieuwe bugs opsommen",
-        "task": "Vertel me waar ik moet beginnen met deze bug:"
+        "task": "Vertel me waar ik moet beginnen met deze bug:",
+        "hello": "Hoi! Stuur me de bugs die binnenkomen, ik zoek het uit en open de PR."
       },
       "lia": {
         "role": "Content",
         "line": "Schrijft posts en scripts in de toon van het bedrijf en plant ze na jouw ok.",
         "routine": "De posts van de week voorstellen",
-        "task": "Stel drie posts voor deze week voor over:"
+        "task": "Stel drie posts voor deze week voor over:",
+        "hello": "Hoi allemaal! De posts van deze week zijn voor mij."
       },
       "theo": {
         "role": "Verkoop",
         "line": "Volgt iedereen op die een offerte vroeg en schrijft de voorstellen.",
         "routine": "Opsommen wie een offerte vroeg en geen antwoord kreeg",
-        "task": "Schrijf een korte offerte voor deze aanvraag:"
+        "task": "Schrijf een korte offerte voor deze aanvraag:",
+        "hello": "Hoi {{first}}! Niemand die om een offerte vraagt, blijft zonder antwoord."
       },
       "nina": {
         "role": "Agenda",
         "line": "Plant, bevestigt en verzet afspraken en herinnert klanten de dag ervoor.",
         "routine": "De afspraken van morgen bevestigen",
-        "task": "Orden deze tijden van morgen:"
+        "task": "Orden deze tijden van morgen:",
+        "hello": "Hallo! De agenda is van mij, en ik herinner klanten de dag ervoor."
       },
       "otto": {
         "role": "Bestellingen",
         "line": "Volgt bestellingen en voorraad en waarschuwt wat opraakt.",
         "routine": "Waarschuwen wat opraakt in de voorraad",
-        "task": "Noem wat er nog moet gebeuren bij deze bestellingen:"
+        "task": "Noem wat er nog moet gebeuren bij deze bestellingen:",
+        "hello": "Ik ben er. Ik hou de bestellingen in de gaten en meld het als de voorraad opraakt."
       },
       "bia": {
         "role": "Antwoordenbank",
         "line": "Houdt de antwoordenbank bij met wat het team antwoordt.",
         "routine": "De bank bijwerken met de antwoorden van de week",
-        "task": "Schrijf de antwoorden op deze klantvragen:"
+        "task": "Schrijf de antwoorden op deze klantvragen:",
+        "hello": "Hoi! Ik hou de antwoordbank bij met wat het team antwoordt."
       }
-    },
-    "example": {
-      "iara": "Hoi Marina. Je bestelling is gisteren verstuurd en komt uiterlijk vrijdag aan. De trackingcode staat hieronder. Komt vrijdag niet uit, dan zoek ik een andere datum.",
-      "lia": "1. Drie veelgemaakte fouten bij het kiezen van een bureau. 2. Achter de schermen van een project dat bijna misging. 3. Een vraag aan je volgers: wat willen jullie hier zien?",
-      "nina": "Morgen: 9:00 Carla, 10:30 Pedro, 14:00 vrij. Pedro heeft nog niet bevestigd. Zal ik hem schrijven?"
     },
     "channels": {
       "iara": "support",
