@@ -3665,9 +3665,6 @@
       "other": "{{count}} more agents in Team"
     }
   },
-  "sidebarAgents.createFirst": {
-    "value": "Create the first agent"
-  },
   "sidebarAgents.working": {
     "value": {
       "one": "{{count}} working",

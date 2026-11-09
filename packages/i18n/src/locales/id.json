@@ -1467,7 +1467,6 @@
     "expandAll": "Bentangkan semua",
     "organize": "Tata departemen di Tim",
     "more_other": "{{count}} agen lagi di Tim",
-    "createFirst": "Buat agen pertama",
     "working_other": "{{count}} sedang bekerja",
     "count_other": "{{count}} agen",
     "workingIn": "bekerja di #{{channel}}",

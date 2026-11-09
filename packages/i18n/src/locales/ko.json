@@ -1467,7 +1467,6 @@
     "expandAll": "모두 펼치기",
     "organize": "팀에서 부서 정리",
     "more_other": "팀에 에이전트 {{count}}개 더",
-    "createFirst": "첫 에이전트 만들기",
     "working_other": "{{count}}개 작업 중",
     "count_other": "에이전트 {{count}}개",
     "workingIn": "#{{channel}}에서 작업 중",

@@ -1512,7 +1512,6 @@
     "organize": "Abteilungen im Team ordnen",
     "more_one": "1 weiterer Agent in Team",
     "more_other": "{{count}} weitere Agenten in Team",
-    "createFirst": "Den ersten Agenten erstellen",
     "working_one": "{{count}} arbeitet",
     "working_other": "{{count}} arbeiten",
     "count_one": "{{count}} Agent",

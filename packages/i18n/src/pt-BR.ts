@@ -1501,7 +1501,6 @@ export const ptBR = {
     /** Under the agents, only when some aren't listed (they don't talk to me): it opens Equipe, where all are. */
     more_one: "Mais 1 agente na Equipe",
     more_other: "Mais {{count}} agentes na Equipe",
-    createFirst: "Criar o primeiro agente",
     working_one: "{{count}} trabalhando",
     working_other: "{{count}} trabalhando",
     count_one: "{{count}} agente",

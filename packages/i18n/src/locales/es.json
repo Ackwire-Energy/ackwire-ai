@@ -1557,7 +1557,6 @@
     "more_one": "1 agente más en Equipo",
     "more_many": "{{count}} agentes más en Equipo",
     "more_other": "{{count}} agentes más en Equipo",
-    "createFirst": "Crear el primer agente",
     "working_one": "{{count}} trabajando",
     "working_many": "{{count}} trabajando",
     "working_other": "{{count}} trabajando",

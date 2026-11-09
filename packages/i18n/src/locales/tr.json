@@ -1512,7 +1512,6 @@
     "organize": "Departmanları Ekip'te düzenle",
     "more_one": "Ekip'te 1 ajan daha",
     "more_other": "Ekip'te {{count}} ajan daha",
-    "createFirst": "İlk ajanı oluştur",
     "working_one": "{{count}} çalışıyor",
     "working_other": "{{count}} çalışıyor",
     "count_one": "{{count}} ajan",

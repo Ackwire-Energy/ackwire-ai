@@ -1467,7 +1467,6 @@
     "expandAll": "全部展开",
     "organize": "在团队中整理部门",
     "more_other": "团队中还有 {{count}} 个智能体",
-    "createFirst": "创建第一个智能体",
     "working_other": "{{count}} 个工作中",
     "count_other": "{{count}} 个智能体",
     "workingIn": "正在 #{{channel}} 工作",

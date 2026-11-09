@@ -1506,7 +1506,6 @@ export const en = {
     /** Under the agents, only when some aren't listed (they don't talk to me): it opens Team, where all are. */
     more_one: "1 more agent in Team",
     more_other: "{{count}} more agents in Team",
-    createFirst: "Create the first agent",
     working_one: "{{count}} working",
     working_other: "{{count}} working",
     count_one: "{{count}} agent",

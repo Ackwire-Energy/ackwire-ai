@@ -1512,7 +1512,6 @@
     "organize": "Afdelingen ordenen in Team",
     "more_one": "Nog 1 agent in Team",
     "more_other": "Nog {{count}} agents in Team",
-    "createFirst": "De eerste agent maken",
     "working_one": "{{count}} aan het werk",
     "working_other": "{{count}} aan het werk",
     "count_one": "{{count}} agent",

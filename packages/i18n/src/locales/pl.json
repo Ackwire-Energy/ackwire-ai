@@ -1602,7 +1602,6 @@
     "more_few": "Jeszcze {{count}} agenci w Zespole",
     "more_many": "Jeszcze {{count}} agentów w Zespole",
     "more_other": "Jeszcze {{count}} agenta w Zespole",
-    "createFirst": "Utwórz pierwszego agenta",
     "working_one": "{{count}} pracuje",
     "working_few": "{{count}} pracują",
     "working_many": "{{count}} pracuje",

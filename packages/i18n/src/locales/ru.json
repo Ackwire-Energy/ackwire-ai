@@ -1602,7 +1602,6 @@
     "more_few": "Ещё {{count}} агента в Команде",
     "more_many": "Ещё {{count}} агентов в Команде",
     "more_other": "Ещё {{count}} агента в Команде",
-    "createFirst": "Создать первого агента",
     "working_one": "{{count}} работает",
     "working_few": "{{count}} работают",
     "working_many": "{{count}} работают",
