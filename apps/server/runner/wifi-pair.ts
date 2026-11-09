@@ -76,7 +76,10 @@ export function pairOutcome(
   // adb words a wrong code and a phone that closed its pairing screen alike.
   if (/wrong password|connection was dropped/i.test(r.text)) return { ok: false, reason: "refused" };
   // adb 36 answers an address nothing listens on with "protocol fault (couldn't read status message)".
-  if (r.timedOut || /unable to start pairing|failed to connect|protocol fault|refused|no route|unreachable|timed out/i.test(r.text)) {
+  if (
+    r.timedOut ||
+    /unable to start pairing|failed to connect|protocol fault|refused|no route|unreachable|timed out/i.test(r.text)
+  ) {
     return { ok: false, reason: "same_wifi" };
   }
   return { ok: false, reason: "failed" };
@@ -90,8 +93,8 @@ export function pairAddress(input: unknown): string | null {
   const v6 = /^\[([0-9a-fA-F:%.\w]{2,60})\]:(\d{1,5})$/.exec(text);
   const port = Number((v4 ? v4[5] : v6?.[2]) ?? 0);
   if (port < 1 || port > 65535) return null;
-  if (v4 && v4.slice(1, 5).every((o) => Number(o) <= 255)) return text;
-  return v6 && v6[1]?.includes(":") ? text : null;
+  if (v4?.slice(1, 5).every((o) => Number(o) <= 255)) return text;
+  return v6?.[1]?.includes(":") ? text : null;
 }
 
 interface Pairing {

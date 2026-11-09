@@ -12672,7 +12672,8 @@ export const ptBR = {
         outdated:
           "O pareamento por Wi-Fi precisa do Android 14 ou mais novo com a atualização de segurança de maio de 2026. Atualize o celular, ou use um cabo.",
         adb_missing: "{{computer}} não tem o Android platform-tools. Instale o Android Studio nele e tente de novo.",
-        update: "O pareamento por Wi-Fi precisa de um agentes.chat mais novo em {{computer}}. Atualize e tente de novo.",
+        update:
+          "O pareamento por Wi-Fi precisa de um agentes.chat mais novo em {{computer}}. Atualize e tente de novo.",
         canceled: "O pareamento parou. Tente de novo.",
         failed: "O pareamento não deu certo. Tente de novo, ou use um cabo.",
       },

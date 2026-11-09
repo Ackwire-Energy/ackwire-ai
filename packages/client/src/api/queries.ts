@@ -17,9 +17,9 @@ import { newerBlockState, stateChanges, stateForPage } from "../lib/blocks";
 import type { ChatPrefs } from "../lib/chat-look";
 import type { ChoiceAnswer } from "../lib/choices";
 import { newerSetup } from "../lib/computer";
-import { WIFI_PAIR_POLL_MS, wifiPairLive } from "../lib/devices";
 import { CONSULT_CONVERSATION_POLL_MS, CONSULT_GROUP_POLL_MS } from "../lib/consult-group";
 import { forPeople } from "../lib/consultations";
+import { WIFI_PAIR_POLL_MS, wifiPairLive } from "../lib/devices";
 import { answerWithin, noAnswer, sendWaits } from "../lib/errors";
 import { ISSUES_VIEW_DEFAULT, type IssuesViewChange, withIssuesView } from "../lib/issues-view";
 import { LoginReadError, loginReadPasses } from "../lib/machines";
@@ -179,12 +179,12 @@ import type {
   UnreadEvent,
   WebhookProvider,
   WebhookSetup,
+  WifiPairing,
   WikiBulkFailed,
   WikiBulkTarget,
   WikiPage,
   WikiPageInput,
   WikiUpdateInput,
-  WifiPairing,
   WorkspaceActionCard,
   WorkspaceActionCardView,
   WorkView,

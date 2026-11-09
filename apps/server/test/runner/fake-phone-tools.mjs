@@ -57,7 +57,9 @@ if (tool === "adb") {
   if (cmd === "devices") out(state.adbDevices ?? "List of devices attached\n\n");
   else if (cmd === "version") out("Android Debug Bridge version 1.0.41\nVersion 36.0.2-14143358\n");
   else if (cmd === "mdns" && rest[0] === "check")
-    state.mdnsOff ? fail("ERROR: mdns daemon unavailable\n") : out("mdns daemon version [Openscreen discovery 0.0.0]\n");
+    state.mdnsOff
+      ? fail("ERROR: mdns daemon unavailable\n")
+      : out("mdns daemon version [Openscreen discovery 0.0.0]\n");
   else if (cmd === "mdns") out(`List of discovered mdns services\n${state.mdns ?? ""}\n`);
   else if (cmd === "pair") state.pairFail ? fail(state.pairFail) : out(state.pair ?? "");
   else if (cmd === "connect") {

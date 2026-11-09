@@ -392,7 +392,10 @@ export const wifiHosts = (hosts: readonly ComputerDevice[]) =>
 export function wifiPairText(t: TFunction, p: Pick<WifiPairing, "state" | "reason" | "way">, computer: string) {
   if (p.state === "failed") {
     const reason = p.reason === "refused" && p.way === "code" ? "refusedCode" : (p.reason ?? "failed");
-    return say(t, `devices.wifiPair.fail.${reason}`, { computer, defaultValue: say(t, "devices.wifiPair.fail.failed") });
+    return say(t, `devices.wifiPair.fail.${reason}`, {
+      computer,
+      defaultValue: say(t, "devices.wifiPair.fail.failed"),
+    });
   }
   return say(t, `devices.wifiPair.${p.state === "connected" ? "connecting" : p.state}`);
 }

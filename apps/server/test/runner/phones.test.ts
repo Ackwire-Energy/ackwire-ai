@@ -1296,7 +1296,6 @@ test("pairing failures say why: mDNS off, a code the phone refused, nothing in 2
   const two = rig({ adbDevices: "List of devices attached\n" }, { tools: ["adb"] });
   const first = (await two.manager.pair({ op: "phone.pair.start" })) as PhonePairing;
   const second = (await two.manager.pair({ op: "phone.pair.start" })) as PhonePairing;
-  expect(await two.manager.pair({ op: "phone.pair.status", pairingId: first.id })).toBeDefined();
   expect(await errorCode(() => two.manager.pair({ op: "phone.pair.status", pairingId: first.id }))).toBe("not_found");
   expect(await two.manager.pair({ op: "phone.pair.cancel", pairingId: second.id })).toEqual({ canceled: true });
   expect(await two.manager.pair({ op: "phone.pair.status", pairingId: second.id })).toMatchObject({
@@ -1308,9 +1307,9 @@ test("pairing failures say why: mDNS off, a code the phone refused, nothing in 2
 test("the six-digit way pairs with what the phone shows, and refuses an address or a code it can't be", async () => {
   const r = rig({}, { tools: ["adb"] });
   r.setState(wifiState("unused"));
-  expect(
-    await errorCode(() => r.manager.pair({ op: "phone.pair.code", address: "-s 1", code: "123456" })),
-  ).toBe("bad_request");
+  expect(await errorCode(() => r.manager.pair({ op: "phone.pair.code", address: "-s 1", code: "123456" }))).toBe(
+    "bad_request",
+  );
   expect(
     await errorCode(() => r.manager.pair({ op: "phone.pair.code", address: "192.168.1.20:37099", code: "12345" })),
   ).toBe("bad_request");

@@ -43,7 +43,6 @@ import { type McpTaskInfo, redactDeep } from "./mcp";
 import { missionWorktree } from "./mission-worktree";
 import { agentWorkspace, hiddenIn, isInside, resolveForAgent } from "./paths";
 import type { PhoneManager, PhoneRequest } from "./phones";
-import type { PairRequest } from "./wifi-pair";
 import { pullFile } from "./pull";
 import { type FetchLike, pushPath } from "./push";
 import { openDesktopStream } from "./rfb";
@@ -53,6 +52,7 @@ import type { DataSockets } from "./streams";
 import type { TaskManager } from "./tasks";
 import type { Terminals } from "./terminal";
 import { openExecKeys, parseExecVault, runnerVault, sealMadePassword } from "./vault";
+import type { PairRequest } from "./wifi-pair";
 
 /**
  * Requests one connection runs at once, whatever they are: a bound on a flood, far above what room allows

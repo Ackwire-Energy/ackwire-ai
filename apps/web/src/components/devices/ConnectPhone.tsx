@@ -168,7 +168,11 @@ function WifiSteps({ pair, computer }: { pair: WifiPair; computer: string }) {
         title={t("devices.android.devOptions")}
         text={t("devices.android.devOptionsText")}
       >
-        <SettingRowDrawing title={t("devices.android.buildNumber")} sub={t("devices.android.buildNumberSub")} taps={7} />
+        <SettingRowDrawing
+          title={t("devices.android.buildNumber")}
+          sub={t("devices.android.buildNumberSub")}
+          taps={7}
+        />
       </Step>
       <Step
         state={found ? "done" : "waiting"}
@@ -224,27 +228,27 @@ function CodeForm({ pair, locked }: { pair: WifiPair; locked: boolean }) {
           if (ready && !locked) pair.pairWithCode({ address: address.trim(), code });
         }}
       >
-      <Field label={t("devices.wifiPair.address")} id="dv-pair-address">
-        <Input
-          value={address}
-          inputMode="decimal"
-          autoComplete="off"
-          spellCheck={false}
-          placeholder={t("devices.wifiPair.addressExample")}
-          maxLength={80}
-          onChange={(e) => setAddress(e.target.value)}
-        />
-      </Field>
-      <Field label={t("devices.wifiPair.pairingCode")} id="dv-pair-code">
-        <Input
-          value={code}
-          inputMode="numeric"
-          autoComplete="one-time-code"
-          placeholder="123456"
-          maxLength={6}
-          onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-        />
-      </Field>
+        <Field label={t("devices.wifiPair.address")} id="dv-pair-address">
+          <Input
+            value={address}
+            inputMode="decimal"
+            autoComplete="off"
+            spellCheck={false}
+            placeholder={t("devices.wifiPair.addressExample")}
+            maxLength={80}
+            onChange={(e) => setAddress(e.target.value)}
+          />
+        </Field>
+        <Field label={t("devices.wifiPair.pairingCode")} id="dv-pair-code">
+          <Input
+            value={code}
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            placeholder="123456"
+            maxLength={6}
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+          />
+        </Field>
         <Button type="submit" variant="primary" disabled={!ready || locked} loading={locked}>
           {t("devices.wifiPair.pair")}
         </Button>
@@ -264,7 +268,9 @@ function WifiCard({ pair }: { pair: WifiPair }) {
         {qr ? (
           <QrCode text={qr} label={t("devices.wifiPair.qrLabel")} />
         ) : (
-          <span className="dv-qr__wait">{pair.error ? <Icon name="alert" size={24} /> : <PixelSpinner size={24} />}</span>
+          <span className="dv-qr__wait">
+            {pair.error ? <Icon name="alert" size={24} /> : <PixelSpinner size={24} />}
+          </span>
         )}
       </span>
       <span className="dv-qr__text">

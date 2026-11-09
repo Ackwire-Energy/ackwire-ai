@@ -233,9 +233,11 @@ describe("pairing over Wi-Fi", () => {
       "The phone stopped the pairing. Keep its pairing screen open and try again.",
     );
     expect(line({ state: "failed", way: "qr" })).toBe("The pairing didn't work. Try again, or use a cable.");
-    expect([wifiPairLive({ state: "connecting" }), wifiPairLive({ state: "connected" }), wifiPairLive(undefined)]).toEqual(
-      [true, false, false],
-    );
+    expect([
+      wifiPairLive({ state: "connecting" }),
+      wifiPairLive({ state: "connected" }),
+      wifiPairLive(undefined),
+    ]).toEqual([true, false, false]);
   });
 });
 

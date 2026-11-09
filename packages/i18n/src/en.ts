@@ -12536,7 +12536,8 @@ export const en = {
     wifiPair: {
       noComputer: "Wi-Fi pairing works with a computer of yours. Use a cable, or connect one.",
       wireless: "Turn on Wireless debugging",
-      wirelessText: "Developer options\u00a0›\u00a0Wireless debugging. Check Always allow on this network, then tap Allow.",
+      wirelessText:
+        "Developer options\u00a0›\u00a0Wireless debugging. Check Always allow on this network, then tap Allow.",
       scan: "Scan the code with the phone",
       code: "Type what the phone shows",
       pathQr: "Pair device with QR code",

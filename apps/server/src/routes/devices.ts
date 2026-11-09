@@ -155,9 +155,22 @@ const WifiPairing = z
     way: z.enum(["qr", "code"]),
     state: z.enum(["waiting", "pairing", "connecting", "connected", "failed"]),
     reason: z
-      .enum(["mdns_off", "same_wifi", "refused", "timed_out", "outdated", "adb_missing", "canceled", "failed", "update"])
+      .enum([
+        "mdns_off",
+        "same_wifi",
+        "refused",
+        "timed_out",
+        "outdated",
+        "adb_missing",
+        "canceled",
+        "failed",
+        "update",
+      ])
       .optional(),
-    qr: z.string().optional().openapi({ description: "Only when it starts: Android's `WIFI:T:ADB;S:…;P:…;;` QR text." }),
+    qr: z
+      .string()
+      .optional()
+      .openapi({ description: "Only when it starts: Android's `WIFI:T:ADB;S:…;P:…;;` QR text." }),
     phoneId: z.uuid().optional().openapi({ description: "Connected: the phone in `GET …/devices`." }),
     expiresAt: z.string(),
   })

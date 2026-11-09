@@ -109,7 +109,11 @@ export async function startWifiPairing(
   try {
     reply =
       way === "code"
-        ? await deps.hub.call(machine.id, { op: "phone.pair.code", address: input.address ?? "", code: input.code ?? "" })
+        ? await deps.hub.call(machine.id, {
+            op: "phone.pair.code",
+            address: input.address ?? "",
+            code: input.code ?? "",
+          })
         : await deps.hub.call(machine.id, { op: "phone.pair.start" });
   } catch (error) {
     if (tooOld(error)) return failed(way, "update");

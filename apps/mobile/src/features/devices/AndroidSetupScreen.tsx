@@ -218,12 +218,7 @@ export function AndroidSetupScreen({ machineId }: { machineId?: string }) {
             <PairByCode pairing={pairing} hostName={hostName} />
           ) : (
             <GroupedList>
-              <GroupedRow
-                icon="key"
-                label={t("devices.wifiPair.useCode")}
-                chevron
-                onPress={() => setByCode(true)}
-              />
+              <GroupedRow icon="key" label={t("devices.wifiPair.useCode")} chevron onPress={() => setByCode(true)} />
             </GroupedList>
           )}
           <GroupedFooter>{t("mobile.devices.android.wifiNote")}</GroupedFooter>
