@@ -1999,7 +1999,8 @@ export class RunnerDaemon implements RequestObserver {
       access: this.access(),
       browsers,
       ...(this.phones ? { phones: this.phones.list() } : {}),
-      ...(OS_USER ? { user: OS_USER } : {}),
+      // In system mode each agent runs as a user of its own, not as the runner's.
+      ...(OS_USER && c?.mode !== "system" && s?.mode !== "system" ? { user: OS_USER } : {}),
       seq: ++this.statusSeq,
     };
   }
