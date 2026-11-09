@@ -830,7 +830,7 @@ html:not([data-pointer]) .brw-ac__page.is-control:focus-visible {
     animation: none;
   }
 }
-/* The question's buttons: take control, and Cancelar under it, as stacked prompts space theirs (`.web-push-ask__acts`). */
+/* The question's buttons: take control, and Cancelar under it, stacked 4 apart. */
 .brw-dim__acts {
   display: flex;
   flex-direction: column;

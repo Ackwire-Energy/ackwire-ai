@@ -219,15 +219,15 @@ export function PushAskInline({
         <Icon name="bell" size={16} />
         <b>{t("webPushAsk.inline.title", agentGrammar(name))}</b>
       </p>
-      <div className="web-push-ask__example" aria-hidden="true">
-        <AgentAvatar agentId={agent?.id} name={name} size="sm" />
-        <span className="web-push-ask__text">
-          <span className="web-push-ask__top">
-            <strong>{t("webPushAsk.finished.title", { name })}</strong>
-            <span>{t("webPushAsk.now")}</span>
-          </span>
-          <span className="web-push-ask__body">{t("webPushAsk.finished.body")}</span>
+      <div className="web-push-ask__example ac-mediarow ac-mediarow--row" aria-hidden="true">
+        <span className="ac-mediarow__face">
+          <AgentAvatar agentId={agent?.id} name={name} size="sm" />
         </span>
+        <span className="ac-mediarow__head">
+          <b>{t("webPushAsk.finished.title", { name })}</b>
+        </span>
+        <span className="ac-mediarow__end ac-mediarow__meta">{t("webPushAsk.now")}</span>
+        <span className="ac-mediarow__body web-push-ask__body">{t("webPushAsk.finished.body")}</span>
       </div>
       <p className="push-ask__why">{t("webPushAsk.inline.why")}</p>
       <div className="push-ask__acts">
