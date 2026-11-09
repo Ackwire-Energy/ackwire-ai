@@ -51,6 +51,11 @@
   .shell__main .page-split > * > * {
     flex-shrink: 0;
   }
+  /* What follows the split ends the page, which gave its bottom padding up for the columns: it stands as far from the
+     work's bottom edge as the page's first line from its top, never cut by that edge. */
+  .shell__main .page-split ~ :last-child {
+    margin-bottom: var(--page-top);
+  }
 }
 
 /* What hangs under a bubble, in one width. */
