@@ -269,7 +269,7 @@ function WifiCard({ pair }: { pair: WifiPair }) {
           <QrCode text={qr} label={t("devices.wifiPair.qrLabel")} />
         ) : (
           <span className="dv-qr__wait">
-            {pair.error ? <Icon name="alert" size={24} /> : <PixelSpinner size={24} />}
+            {pair.error ? <Icon name="alert" size={20} /> : <PixelSpinner size={24} />}
           </span>
         )}
       </span>
