@@ -123,6 +123,7 @@ import { AddPasswordDialog } from "./AddPassword";
 import { AgentAvatar } from "./AgentAvatar";
 import { type GroupDialogFor, GroupNameDialog, useAgentDrag, useMoveAgent } from "./AgentGroups";
 import { ArchivedChannelsDialog } from "./ArchivedChannelsDialog";
+import { FeedbackMark } from "./arrival/FeedbackDialog";
 import { MoveChannelDialog, NewCategoryDialog, RenameCategoryDialog } from "./ChannelCategoryDialogs";
 import { openPalette } from "./CommandMenu";
 import { DeleteAccountDialog } from "./DeleteAccount";
@@ -844,6 +845,7 @@ export function Sidebar() {
           // the bell and the collapse beside them. The desktop app's title bar has its own collapse (desktop.css).
           <div className="sidebar__org sidebar__org--person">
             <AccountMenu personal />
+            {!rail && <FeedbackMark />}
             {bell}
             {!compact && !tablet && (
               <Button
@@ -935,6 +937,8 @@ export function Sidebar() {
           {rail && can(org, "create_agents") && <CreateAgentTile />}
           <div className="sidebar__me">
             <AccountMenu />
+            {/* Beta: the way to the feedback form, where this server takes it. The rail has room for the bell only. */}
+            {!rail && <FeedbackMark />}
             {bell}
           </div>
         </div>

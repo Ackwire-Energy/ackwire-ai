@@ -4,6 +4,7 @@ import { finishOnboarding } from "@agenteschat/client/lib/right-hand";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { requireUser } from "@/app/guards";
 import { useServerLocale } from "@/i18n";
+import { ARRIVAL_PARAM } from "@/lib/arrival";
 import { OnboardingPage } from "@/pages/OnboardingPage";
 
 export const Route = createFileRoute("/onboarding")({
@@ -22,7 +23,8 @@ export const Route = createFileRoute("/onboarding")({
     if (!resume) return;
     const at = await finishOnboarding(context.api, resume).catch(() => null);
     await context.queryClient.refetchQueries({ queryKey: keys.me });
-    const search = paid ? { paid: true as const } : {};
+    // As the onboarding's own last step: the workspace opens on its arrival (ADR 0160).
+    const search = { ...(paid ? { paid: true as const } : {}), [ARRIVAL_PARAM]: 1 } as never;
     if (at?.agentId)
       throw redirect({ to: "/org/$orgId/dm/agent/$agentId", params: { orgId: resume, agentId: at.agentId }, search });
     throw redirect({ to: "/org/$orgId", params: { orgId: resume }, search });
