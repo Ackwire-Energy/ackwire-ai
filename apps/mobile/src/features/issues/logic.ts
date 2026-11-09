@@ -1,6 +1,6 @@
 import type { Issue, IssueColumn, IssueConversationRef, IssueStatus, IssueWork } from "@agenteschat/client";
 import { toYmd } from "@agenteschat/client/lib/format";
-import { isOpen, STATUSES } from "@agenteschat/client/lib/issues";
+import { BOARD, isOpen, STATUSES } from "@agenteschat/client/lib/issues";
 import { foldSteps, stepPhrase } from "@agenteschat/client/lib/work";
 import type { TFunction } from "i18next";
 import { chatHref } from "../links/logic";
@@ -160,8 +160,8 @@ export function taskListSections(
   return out.filter((s) => s.items.length > 0);
 }
 
-/** The board's columns on the phone, always these four, so a swipe lands in the same place. */
-export const BOARD_STAGES: readonly IssueStatus[] = ["in_progress", "in_review", "todo", "done"];
+/** The board's columns on the phone, always these four in the web's order (`BOARD`), so a swipe lands in the same place. */
+export const BOARD_STAGES: readonly IssueStatus[] = BOARD;
 
 /** What needs someone comes first in a column, then what is moving. */
 const urgency = (i: Issue) => {

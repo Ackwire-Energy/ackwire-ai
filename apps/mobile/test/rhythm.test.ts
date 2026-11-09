@@ -11,13 +11,13 @@ const files = (dir: string): string[] =>
     return statSync(path).isDirectory() ? files(path) : /\.tsx?$/.test(name) ? [path] : [];
   });
 
-test("the phone's page rhythm is the web's: sides 16, cards 16 inside, a toolbar's controls 32 with a 44 target, grouped rows 44", () => {
+test("the phone's page rhythm: sides 16, cards 16 inside, a toolbar's controls 32 with a 44 target, grouped rows 52", () => {
   expect(SCREEN_X).toBe(16);
   expect(CARD_PAD).toBe(16);
   expect(TOOL_H).toBe(32);
   expect(TOUCH).toBe(44);
-  // A wrapping row's label starts where a one-line row's does: its 22-point line centred in 44.
-  expect(GROUPED_ROW).toEqual({ minHeight: 44, padX: 16, padY: 8, tallPadY: 11 });
+  // A wrapping row's label starts where a one-line row's does: its 22-point line centred in 52.
+  expect(GROUPED_ROW).toEqual({ minHeight: 52, padX: 16, padY: 10, tallPadY: 15 });
 });
 
 test("the kit's screens, grouped rows and toolbar controls read those numbers instead of their own", () => {
