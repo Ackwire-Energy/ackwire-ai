@@ -1840,7 +1840,6 @@ export const featureKeysPtBR = {
     memory: "{{gb}} GB",
     audience: {
       label: "Quem pode usar",
-      title: "Quem pode usar {{name}}",
       me: "Só eu",
       only: "Só {{name}}",
       everyone: "Todos",

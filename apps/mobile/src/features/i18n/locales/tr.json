@@ -1814,7 +1814,6 @@
     "memory": "{{gb}} GB",
     "audience": {
       "label": "Kimler kullanabilir",
-      "title": "{{name}} cihazını kimler kullanabilir",
       "me": "Yalnızca ben",
       "only": "Yalnızca {{name}}",
       "everyone": "Herkes",

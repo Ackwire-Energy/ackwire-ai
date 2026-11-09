@@ -1814,7 +1814,6 @@
     "memory": "{{gb}} GB",
     "audience": {
       "label": "Wie het mag gebruiken",
-      "title": "Wie {{name}} mag gebruiken",
       "me": "Alleen ik",
       "only": "Alleen {{name}}",
       "everyone": "Iedereen",

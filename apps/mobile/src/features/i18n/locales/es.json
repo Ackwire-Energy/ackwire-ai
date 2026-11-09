@@ -1907,7 +1907,6 @@
     "memory": "{{gb}} GB",
     "audience": {
       "label": "Quién puede usarlo",
-      "title": "Quién puede usar {{name}}",
       "me": "Solo yo",
       "only": "Solo {{name}}",
       "everyone": "Todos",

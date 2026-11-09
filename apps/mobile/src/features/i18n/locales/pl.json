@@ -2010,7 +2010,6 @@
     "memory": "{{gb}} GB",
     "audience": {
       "label": "Kto może używać",
-      "title": "Kto może używać: {{name}}",
       "me": "Tylko ja",
       "only": "Tylko {{name}}",
       "everyone": "Wszyscy",

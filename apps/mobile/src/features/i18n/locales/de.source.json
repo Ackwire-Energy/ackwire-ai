@@ -4436,9 +4436,6 @@
   "devices.audience.label": {
     "value": "Who can use it"
   },
-  "devices.audience.title": {
-    "value": "Who can use {{name}}"
-  },
   "devices.audience.me": {
     "value": "Only me"
   },

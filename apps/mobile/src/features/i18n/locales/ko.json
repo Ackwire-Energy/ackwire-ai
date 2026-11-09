@@ -1716,7 +1716,6 @@
     "memory": "{{gb}}GB",
     "audience": {
       "label": "사용할 수 있는 사람",
-      "title": "{{name}}을(를) 사용할 수 있는 사람",
       "me": "나만",
       "only": "{{name}} 님만",
       "everyone": "모두",

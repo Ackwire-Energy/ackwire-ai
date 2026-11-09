@@ -1882,7 +1882,6 @@ export const featureKeysEn = {
     memory: "{{gb}} GB",
     audience: {
       label: "Who can use it",
-      title: "Who can use {{name}}",
       me: "Only me",
       only: "Only {{name}}",
       everyone: "Everyone",

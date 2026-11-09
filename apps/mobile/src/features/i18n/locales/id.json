@@ -1716,7 +1716,6 @@
     "memory": "{{gb}} GB",
     "audience": {
       "label": "Siapa yang bisa memakai",
-      "title": "Siapa yang bisa memakai {{name}}",
       "me": "Hanya aku",
       "only": "Hanya {{name}}",
       "everyone": "Semua orang",

@@ -1716,7 +1716,6 @@
     "memory": "{{gb}} GB",
     "audience": {
       "label": "谁可以使用",
-      "title": "谁可以使用 {{name}}",
       "me": "仅限我",
       "only": "仅限 {{name}}",
       "everyone": "所有人",

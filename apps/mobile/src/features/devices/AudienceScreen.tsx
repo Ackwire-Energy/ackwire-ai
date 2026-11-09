@@ -8,7 +8,9 @@ import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet } from "react-native";
 import { useOrg } from "@/providers/org";
 import { EmptyState, GroupedFooter, GroupedHeader, GroupedList, GroupedRow, useToast } from "@/ui";
-import { SettingsPage } from "../settings/parts";
+import { RoleMark } from "../dashboards/parts";
+import { Gap, SettingsPage } from "../settings/parts";
+import { Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import { goBack, successHaptic, tapHaptic } from "../shared/parts";
 import { findDevice, narrowsAudience } from "./logic";
@@ -40,6 +42,7 @@ export function DeviceAudienceScreen({ deviceId }: { deviceId: string }) {
   const device = phone ?? computer;
   return (
     <AudienceForm
+      key={device.id}
       deviceId={device.id}
       phone={Boolean(phone)}
       name={device.name}
@@ -125,11 +128,12 @@ function AudienceForm({
       : null;
   return (
     <SettingsPage
-      title={t("mobile.devices.audience.title", { name })}
+      title={t("mobile.devices.audience.label")}
+      subtitle={name}
       locked={save.isPending}
       action={{ label: t("common.save"), onPress: submit, disabled: !valid || !changed || save.isPending }}
     >
-      <GroupedHeader>{t("mobile.devices.audience.label")}</GroupedHeader>
+      <Gap />
       <GroupedList>
         {MODES.map((mode) => (
           <GroupedRow
@@ -138,8 +142,9 @@ function AudienceForm({
             sub={modeText(mode)}
             subLines={2}
             checked={audience.mode === mode}
-            disabled={!allowed({ mode, userIds: audience.userIds, roleIds: audience.roleIds })}
-            onPress={() => pick(mode)}
+            {...(allowed({ mode, userIds: audience.userIds, roleIds: audience.roleIds })
+              ? { onPress: () => pick(mode) }
+              : { faint: true, disabled: true })}
           />
         ))}
       </GroupedList>
@@ -152,21 +157,21 @@ function AudienceForm({
             {roleList.map((r) => (
               <GroupedRow
                 key={r.id}
-                icon="members"
+                leading={<RoleMark color={r.color} size={22} />}
                 label={r.name}
                 checked={audience.roleIds.includes(r.id)}
-                disabled={!canAdd("roleIds", r.id)}
-                onPress={() => flip("roleIds", r.id)}
+                {...(canAdd("roleIds", r.id) ? { onPress: () => flip("roleIds", r.id) } : { faint: true, disabled: true })}
               />
             ))}
             {people.map((m) => (
               <GroupedRow
                 key={m.userId}
-                icon="person"
+                leading={<Face who={{ type: "person", id: m.userId }} size={26} live={false} />}
                 label={m.name}
                 checked={audience.userIds.includes(m.userId)}
-                disabled={!canAdd("userIds", m.userId)}
-                onPress={() => flip("userIds", m.userId)}
+                {...(canAdd("userIds", m.userId)
+                  ? { onPress: () => flip("userIds", m.userId) }
+                  : { faint: true, disabled: true })}
               />
             ))}
           </GroupedList>
