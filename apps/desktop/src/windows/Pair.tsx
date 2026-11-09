@@ -117,7 +117,8 @@ export function PairOffer({ target, onClose }: { target: PairTarget; onClose: ()
             <Button variant="ghost" disabled={busy} onClick={onClose}>
               {t("desktop.pair.notNow")}
             </Button>
-            <Button variant="primary" autoFocus loading={busy} onClick={() => void allow()}>
+            {/* Never focused first: it opens by itself after sign-in, while the person may be typing. */}
+            <Button variant="primary" loading={busy} onClick={() => void allow()}>
               {t("desktop.pair.allow")}
             </Button>
           </>
@@ -354,7 +355,8 @@ export function PairLinkSheet({ server, code, onClose }: { server: string; code:
           <Button variant="ghost" onClick={onClose}>
             {t("desktop.pair.notNow")}
           </Button>
-          <Button variant="primary" autoFocus onClick={() => void connect(info)}>
+          {/* Never focused first: a page can open this link while the person types elsewhere, and Enter isn't a yes. */}
+          <Button variant="primary" onClick={() => void connect(info)}>
             {t("desktop.link.connect")}
           </Button>
         </>

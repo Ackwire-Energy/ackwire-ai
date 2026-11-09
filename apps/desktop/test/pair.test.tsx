@@ -156,6 +156,7 @@ describe("pairing from the app", () => {
       expect(rowOf(el, "Who can use it")?.querySelector('[role="combobox"]')?.textContent).toBe("Only me");
       expect(rowOf(el, "Keep it ready: open agentes.chat at login")?.querySelector('[role="checkbox"]')).toBeTruthy();
       expect(button(el, "Not now")).toBeTruthy();
+      expect(document.activeElement).not.toBe(button(el, "Allow"));
 
       await act(async () => button(el, "Allow")?.click());
       await until(() => el.querySelector("h1")?.textContent === "Connected to Estúdio Norte");
@@ -182,6 +183,7 @@ describe("pairing from the app", () => {
         expect(rowOf(el, "From")?.textContent).toContain("agentes.tail1234.ts.net");
         expect(rowOf(el, "This Mac")?.textContent).toContain("Sam's MacBook Pro");
         expect(el.textContent).toContain("If you didn't ask for this, choose Not now.");
+        expect(document.activeElement).not.toBe(button(el, "Connect"));
 
         await act(async () => button(el, "Connect")?.click());
         await until(() => el.textContent?.includes("Waiting for Sam Rivera to let it in…"));
