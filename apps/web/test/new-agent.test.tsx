@@ -978,13 +978,18 @@ describe("Criar agente: what gets created", () => {
     await startAs("Assistente");
     await proceed(4);
     const list = await openBrain();
-    expect(optionsIn(list, "OpenCode Go")).toHaveLength(31);
+    expect(optionsIn(list, "OpenCode Go")).toHaveLength(32);
     await typeIn(screen().getByRole("combobox", { name: "Buscar modelos" }), "free");
     expect(
       within(list)
         .getAllByRole("option")
         .map((o) => o.textContent),
-    ).toEqual(["Beam FreeGrátis", "Crouton Alpha FreeGrátis", "Iceman Contributor FreeGrátis"]);
+    ).toEqual([
+      "LongCat 2.5 FreeGrátis",
+      "Beam FreeGrátis",
+      "Crouton Alpha FreeGrátis",
+      "Iceman Contributor FreeGrátis",
+    ]);
     await typeIn(screen().getByRole("combobox", { name: "Buscar modelos" }), "deepseek flash");
     await click(screen().getByRole("option", { name: /^DeepSeek V4\.1 Flash/ }));
     expect(brainBox().textContent).toStartWith("DeepSeek V4.1 Flash pelo OpenCode Go");
