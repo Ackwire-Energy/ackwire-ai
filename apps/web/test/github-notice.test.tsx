@@ -36,17 +36,26 @@ test("what a stranger wrote on GitHub is a quiet line with their words, and anyo
     },
     createdAt: new Date(Date.now() - minutesAgo * 60_000).toISOString(),
   });
+  // The worst case the line must wrap, never cut: a long name and repository, and both of its actions.
+  const long = {
+    outside: "1",
+    who: "Maria Aparecida dos Santos Figueiredo-Albuquerque",
+    number: "123456",
+    repo: "an-organization-with-a-long-name/a-repository-with-an-even-longer-name",
+  };
   state.messages.push(
     notice("m-asked", { outside: "1", answeredBy: "u-joao" }, 3),
     notice("m-new", { outside: "1" }, 2),
+    notice("m-long", long, 1),
   );
   await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
   await settle(6);
 
   expect(screen().getAllByText("drive-by comentou no PR #12 (acme/app) no GitHub").length).toBe(2);
-  // Only the one nobody asked about yet.
+  expect(screen().getByText(`${long.who} comentou no PR #${long.number} (${long.repo}) no GitHub`)).toBeTruthy();
+  // Only the ones nobody asked about yet.
   const ask = screen().getAllByRole("button", { name: "Pedir resposta" });
-  expect(ask.length).toBe(1);
+  expect(ask.length).toBe(2);
   await act(async () => fireEvent.click(ask[0] as HTMLElement));
   expect(state.calls.filter((c) => c.method === "chat.answerGitHub").map((c) => c.args)).toEqual([[ORG_ID, "m-new"]]);
 });
