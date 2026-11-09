@@ -23,9 +23,12 @@ const TILE = 32;
 
 /** How far a nested row (`tree`: a phone under its computer) moves in, and where its branch line runs. */
 const NEST = 24;
-const TREE_X = GROUPED_ROW.padX + 14;
+/** The trunk runs down the middle of the lead column, under the computer's portrait. */
+const TREE_X = GROUPED_ROW.padX + LEAD / 2;
 /** The branch meets a nested row at its 48-point portrait's middle. */
 const TREE_ELBOW = GROUPED_ROW.tallPadY + 24;
+/** The branch's curve into the nested row; a `mid` row's trunk carries on from where the curve leaves it. */
+const TREE_CURVE = 6;
 
 /** A row that comes or goes while the list is on screen fades; what is around it slides into place. */
 const ROW_IN = FadeIn.duration(motion.fast);
@@ -536,17 +539,18 @@ const styles = StyleSheet.create({
     paddingVertical: GROUPED_ROW.padY,
   },
   nested: { paddingLeft: GROUPED_ROW.padX + NEST },
-  trunkHost: { position: "absolute", left: TREE_X, top: GROUPED_ROW.tallPadY + 50, bottom: 0, width: 1 },
-  trunk: { position: "absolute", left: TREE_X, top: TREE_ELBOW, bottom: 0, width: 1 },
+  // From just under the drawing (a laptop's base, a tower's foot), not the bottom of its 48-point box.
+  trunkHost: { position: "absolute", left: TREE_X, top: GROUPED_ROW.tallPadY + 45, bottom: 0, width: 1 },
+  trunk: { position: "absolute", left: TREE_X, top: TREE_ELBOW - TREE_CURVE, bottom: 0, width: 1 },
   branch: {
     position: "absolute",
     left: TREE_X,
     top: 0,
-    width: 10,
+    width: 8,
     height: TREE_ELBOW,
     borderLeftWidth: 1,
     borderBottomWidth: 1,
-    borderBottomLeftRadius: 8,
+    borderBottomLeftRadius: TREE_CURVE,
   },
   // Wrapping text starts where a one-line row's label does, not 8 from the top.
   tall: { alignItems: "flex-start", paddingVertical: GROUPED_ROW.tallPadY },
