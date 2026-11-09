@@ -1,4 +1,5 @@
 import { useArtifact } from "@agenteschat/client";
+import { keepWhole } from "@agenteschat/client/lib/format";
 import { StatusBar } from "expo-status-bar";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -105,7 +106,9 @@ function Viewer({
   const info = detail ? fileInfo(detail) : null;
   const author = detail ? dir.nameOf(detail.createdBy) : "";
   const place = files.length > 1 ? t("mobile.files.place", { index: index + 1, count: files.length }) : "";
-  const sub = detail ? [place, author, savedWhen(savedAt(detail))].filter(Boolean).join(" · ") : place;
+  const sub = detail
+    ? [place, author, savedWhen(savedAt(detail))].filter(Boolean).map(keepWhole).join(" · ")
+    : keepWhole(place);
 
   return (
     <View style={styles.screen}>
