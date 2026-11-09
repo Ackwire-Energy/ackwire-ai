@@ -650,7 +650,8 @@ export function createSetupToolSource(deps: {
           if (!at) return NOBODY_READS;
           const full = await cardsLeft(ctx);
           if (full) return full;
-          const like = input.also_new === true ? [] : await agentsLike(ctx.db, ctx.orgId, [input]);
+          const forUserId = await personBehindCall(ctx);
+          const like = input.also_new === true ? [] : await agentsLike(ctx.db, ctx.orgId, [input], forUserId);
           if (like.length > 0) return { content: agentsLikeText(like, PROPOSE_AGENT_TOOL) };
           // The right hand's card goes to whoever may create agents when the person who asked can't ("Pedir a um admin").
           const rightHand = isRightHand(await getAgentCached(ctx.db, ctx.orgId, ctx.agentId));
@@ -661,7 +662,6 @@ export function createSetupToolSource(deps: {
               isError: true,
             };
           }
-          const forUserId = await personBehindCall(ctx);
           const place = { orgId: ctx.orgId, channelId: at.channelId, personId: forUserId };
           const draft = {
             ...(await checkAgentDraft({ db: ctx.db, context: deps.context }, place, input)),

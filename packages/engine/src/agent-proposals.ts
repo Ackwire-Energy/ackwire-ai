@@ -49,6 +49,7 @@ const {
   channelMembers,
   channels,
   connectorConnections,
+  contextProposals,
   machineAccounts,
   machines,
   mailAccounts,
@@ -397,17 +398,25 @@ export interface AgentLike {
 /**
  * Active agents that new ones would repeat: the same name, or the same role, case, accents and spacing aside. The
  * tools that propose agents post nothing then until the person says to make another (`also_new`), since a free
- * handle alone would put a second one on the team.
+ * handle alone would put a second one on the team. One `personId` asked to remove, on a card still open, is on its
+ * way out: starting the team over, its replacement is no repeat.
  */
 export async function agentsLike(
   db: Database,
   orgId: string,
   drafts: { name?: unknown; role?: unknown }[],
+  personId: string | null,
 ): Promise<AgentLike[]> {
+  const leaving = personId
+    ? sql`not exists (select 1 from ${contextProposals} where ${contextProposals.orgId} = ${agents.orgId}
+        and ${contextProposals.agentId} = ${agents.id} and ${contextProposals.requestedByUserId} = ${personId}
+        and ${contextProposals.status} = 'pending' and ${contextProposals.target} = 'agent_settings'
+        and (${contextProposals.settings} @> '[{"field":"archive"}]' or ${contextProposals.settings} @> '[{"field":"delete"}]'))`
+    : undefined;
   const team = await db
     .select({ name: agents.name, handle: agents.handle, role: agents.role })
     .from(agents)
-    .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt), isNull(agents.deletedAt)));
+    .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt), isNull(agents.deletedAt), leaving));
   const same = (have: string, asked: unknown) => {
     const plain = normalizeNote(have);
     return plain !== "" && plain === normalizeNote(str(asked));

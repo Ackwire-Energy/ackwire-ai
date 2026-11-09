@@ -1047,9 +1047,10 @@ export function teamTools(deps: {
           if (!at) return { content: NO_PERSON_READS, isError: true };
           const full = await deps.cardsLeft(ctx, true);
           if (full) return full;
-          const like = input.also_new === true ? [] : await agentsLike(ctx.db, ctx.orgId, list(input.agents).map(obj));
-          if (like.length > 0) return { content: agentsLikeText(like, PROPOSE_TEAM_TOOL) };
           const forUserId = await personBehindCall(ctx);
+          const drafts = list(input.agents).map(obj);
+          const like = input.also_new === true ? [] : await agentsLike(ctx.db, ctx.orgId, drafts, forUserId);
+          if (like.length > 0) return { content: agentsLikeText(like, PROPOSE_TEAM_TOOL) };
           const locale = await personLocale(ctx.db, forUserId);
           const params = await checkTeam(
             { db: ctx.db, context: deps.context },

@@ -22,6 +22,7 @@ import {
   insertMessage,
   NEW_AGENT_DEFAULTS,
   openPersonAgentDm,
+  PROPOSE_REMOVE_AGENTS_TOOL,
   setMemberRoles,
   suggestAgentAi,
   type ToolContext,
@@ -232,6 +233,32 @@ describe("propose_agent", () => {
     const fresh = await runFor(f, f.owner.id, "cria um agente");
     expect((await propose(f, fresh, { ...noRole, name: "Dora", handle: "dora" })).content).toStartWith(
       "Posted the proposal of Dora",
+    );
+  });
+
+  test("starting over: an agent the person asked to remove doesn't stop the one that replaces it", async () => {
+    f = await setup();
+    await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Ada", handle: "ada", role: "Designer", instructions: "Desenha." },
+      NEW_AGENT_DEFAULTS,
+    );
+    const ctx = await runFor(f, f.owner.id, "apaga os agentes e monta o time de novo");
+    const tools = createToolGateway({ sources: [createSetupToolSource({ pubsub: f.pubsub })] });
+    const removal = await tools.invoke(ctx, {
+      toolUseId: `tu_${crypto.randomUUID()}`,
+      name: PROPOSE_REMOVE_AGENTS_TOOL,
+      input: { agents: ["@ada"], reason: "recomeçar" },
+    });
+    expect(removal.type === "result" && removal.output.content).toContain("propose the new agents now");
+    expect((await propose(f, ctx, { ...ADA, handle: "ada-2" })).content).toStartWith("Posted the proposal of Ada");
+    // Someone else's ask to remove her keeps her on the team for another person.
+    const bia = await addMember(f.db, f.org.id, "member", "Bia Rocha");
+    const other = await runFor(f, bia.id, "cria um agente de design");
+    expect((await propose(f, other, { ...ADA, handle: "ada-3" })).content).toContain(
+      "Not posted: an agent like this already exists: Ada (@ada, Designer)",
     );
   });
 
