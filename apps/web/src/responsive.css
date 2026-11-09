@@ -209,6 +209,18 @@
     margin-left: 12px;
   }
 }
+/* The narrowest phones, beside the header's three buttons: a DM's audience pill keeps its lock and gives its word to
+   screen readers alone, so the name and the pill share a line and the face stays beside two lines. */
+@media (max-width: 359px) {
+  .dm-who .audience-chip > .ac-chip__text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
 
 /* ── Pages ── */
 @media (max-width: 640px) {
