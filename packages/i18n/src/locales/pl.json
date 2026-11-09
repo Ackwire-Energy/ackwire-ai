@@ -2156,6 +2156,7 @@
   },
   "rightHand": {
     "label": "twoja prawa ręka",
+    "labelCapitalized": "Twoja prawa ręka",
     "newDot": "Nowe",
     "actsAsYou": "działa z twoimi uprawnieniami",
     "composerHint": "nic się nie zmienia bez ciebie",

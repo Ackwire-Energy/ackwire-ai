@@ -2073,6 +2073,7 @@
   },
   "rightHand": {
     "label": "il tuo braccio destro",
+    "labelCapitalized": "Il tuo braccio destro",
     "newDot": "Nuovo",
     "actsAsYou": "agisce con i tuoi permessi",
     "composerHint": "nulla cambia senza di te",

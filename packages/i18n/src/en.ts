@@ -2011,8 +2011,10 @@ export const en = {
    * is the admins' to change (`{{name}}`); "Lodi" only by default.
    */
   rightHand: {
-    /** Muted, lowercase, on the right of its row in the sidebar; capitalized where it starts a line. */
+    /** Muted, lowercase, on the right of its row in the sidebar. */
     label: "your right hand",
+    /** The same where it starts a line: under its name on its page and side panel, and on its phone settings row. */
+    labelCapitalized: "Your right hand",
     /** The one-time dot on its row until it is first opened. */
     newDot: "New",
     /** In its DM's header, after the label. */

@@ -2011,6 +2011,7 @@ export const ptBR = {
    */
   rightHand: {
     label: "seu braço direito",
+    labelCapitalized: "Seu braço direito",
     newDot: "Novo",
     actsAsYou: "age com as suas permissões",
     composerHint: "nada muda sem você",

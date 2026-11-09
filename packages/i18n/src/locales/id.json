@@ -1918,6 +1918,7 @@
   },
   "rightHand": {
     "label": "tangan kanan Anda",
+    "labelCapitalized": "Tangan kanan Anda",
     "newDot": "Baru",
     "actsAsYou": "bertindak dengan izin Anda",
     "composerHint": "tak ada yang berubah tanpa Anda",

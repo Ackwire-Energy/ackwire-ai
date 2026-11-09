@@ -1996,6 +1996,7 @@
   },
   "rightHand": {
     "label": "je rechterhand",
+    "labelCapitalized": "Je rechterhand",
     "newDot": "Nieuw",
     "actsAsYou": "handelt met jouw rechten",
     "composerHint": "niets verandert zonder jou",

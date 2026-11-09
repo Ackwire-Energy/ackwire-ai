@@ -4862,6 +4862,9 @@
   "rightHand.label": {
     "value": "your right hand"
   },
+  "rightHand.labelCapitalized": {
+    "value": "Your right hand"
+  },
   "rightHand.newDot": {
     "value": "New"
   },

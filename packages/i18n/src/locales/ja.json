@@ -1918,6 +1918,7 @@
   },
   "rightHand": {
     "label": "あなたの右腕",
+    "labelCapitalized": "あなたの右腕",
     "newDot": "新規",
     "actsAsYou": "あなたの権限で動きます",
     "composerHint": "あなたなしでは何も変わりません",

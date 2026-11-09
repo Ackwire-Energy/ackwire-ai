@@ -1993,6 +1993,7 @@
   },
   "rightHand": {
     "label": "sağ kolun",
+    "labelCapitalized": "Sağ kolun",
     "newDot": "Yeni",
     "actsAsYou": "senin izinlerinle çalışır",
     "composerHint": "sen olmadan hiçbir şey değişmez",

@@ -1997,6 +1997,7 @@
   },
   "rightHand": {
     "label": "deine rechte Hand",
+    "labelCapitalized": "Deine rechte Hand",
     "newDot": "Neu",
     "actsAsYou": "handelt mit deinen Berechtigungen",
     "composerHint": "nichts ändert sich ohne dich",

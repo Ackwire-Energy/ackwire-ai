@@ -1917,6 +1917,7 @@
   },
   "rightHand": {
     "label": "你的得力助手",
+    "labelCapitalized": "你的得力助手",
     "newDot": "新",
     "actsAsYou": "以你的权限行事",
     "composerHint": "没有你，什么都不会变",

@@ -21,7 +21,7 @@ import { listsAgent, seesDetails } from "@agenteschat/client/lib/audience";
 import { brainLine } from "@agenteschat/client/lib/brain";
 import { effortLevel } from "@agenteschat/client/lib/brain-advanced";
 import { modelUnpriced } from "@agenteschat/client/lib/endpoints";
-import { capitalize, formatPercent, lowerFirst, timeLeft } from "@agenteschat/client/lib/format";
+import { formatPercent, lowerFirst, timeLeft } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { agentPlan, aiStateOf, planLabel, planOfAccount } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -338,7 +338,7 @@ function Profile({ id }: { id: string }) {
         : null;
   // The right hand's one role name, as its row in Conversas and its conversation's header say it.
   const roleLine = rightHand
-    ? capitalize(t("rightHand.label"), i18n.language)
+    ? t("rightHand.labelCapitalized")
     : [roleName || null, plain ? (roleName ? lowerFirst(plain, i18n.language) : plain) : null]
         .filter(Boolean)
         .join(" · ");

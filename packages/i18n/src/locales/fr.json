@@ -2078,6 +2078,7 @@
   },
   "rightHand": {
     "label": "votre bras droit",
+    "labelCapitalized": "Votre bras droit",
     "newDot": "Nouveau",
     "actsAsYou": "agit avec vos permissions",
     "composerHint": "rien ne change sans vous",
