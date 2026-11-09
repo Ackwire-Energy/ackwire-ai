@@ -2380,6 +2380,13 @@ export const en = {
       action: "Create routine",
       done: "Routine created",
     },
+    /** A how-to of the reader's agent reused past the bar (ADR 0167): `{{what}}` is its plain title. */
+    howto: {
+      title: "{{name}} learned: {{what}}",
+      line: "Used {{uses}}×. Make it a skill?",
+      action: "Make it a skill",
+      done: "Confirmed",
+    },
     stalled: {
       /** `{{number}}` is the task's number, `{{title}}` its title. */
       title: "Steps stopped in #{{number}} {{title}}",
@@ -2430,6 +2437,8 @@ export const en = {
   },
   routing: {
     title: "Who picks the agents",
+    /** Memory's reflection on finished conversations needs a provider key (Settings › AI accounts, above). */
+    reflectionOff: "Memory doesn't learn from finished conversations yet: that needs a provider key, added above.",
     how: "How agents are picked",
     by: {
       jev: "Jev picks who answers each message without a mention.",
@@ -5297,6 +5306,16 @@ export const en = {
       andMore: "{{names}} and more",
     },
   },
+  /** Memória do time (ADR 0167): Settings › General, the agent's memory tab and the phone's memory screen. */
+  teamMemory: {
+    title: "Team memory",
+    help: "What people asked every agent to keep, with who said it and when. Every agent reads it in all its work.",
+    empty: "Nothing yet. When someone asks every agent to remember something, it shows here.",
+    remove: "Remove",
+    removed: "Removed from team memory",
+    make: "Make it the team's",
+    made: "Every agent keeps it now",
+  },
   memory: {
     /** A lesson from a refused change: what it was. */
     fromRefusal: "Not to propose again: {{text}}",
@@ -5319,6 +5338,9 @@ export const en = {
     unverifiedTitle: "Only agents said this. It goes into context as a marked hint.",
     pinned: "Always in context",
     lowTrust: "External source, not trusted",
+    confirm: "Confirm",
+    confirmTitle: "Say it's right: agents then use it as trusted.",
+    confirmed: "Confirmed",
     used_zero: "never used",
     used_one: "used {{count}} time",
     used_other: "used {{count}} times",

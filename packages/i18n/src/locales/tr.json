@@ -2316,6 +2316,12 @@
       "action": "Rutin oluştur",
       "done": "Rutin oluşturuldu"
     },
+    "howto": {
+      "title": "{{name}} öğrendi: {{what}}",
+      "line": "{{uses}}× kullanıldı. Beceri yapılsın mı?",
+      "action": "Beceri yap",
+      "done": "Onaylandı"
+    },
     "stalled": {
       "title": "#{{number}} {{title}} görevindeki adımlar durdu",
       "line_one": "{{steps}} adımı #{{on}} için {{hours}} saattir bekliyor.",
@@ -2361,6 +2367,7 @@
   },
   "routing": {
     "title": "Ajanları kim seçer",
+    "reflectionOff": "Hafıza henüz biten konuşmalardan öğrenmiyor: bunun için yukarıda bir sağlayıcı anahtarı gerekir.",
     "how": "Ajanlar nasıl seçilir",
     "by": {
       "jev": "Bahsetme olmayan her mesajı kimin yanıtlayacağını Jev seçer.",
@@ -5123,6 +5130,15 @@
       "andMore": "{{names}} ve daha fazlası"
     }
   },
+  "teamMemory": {
+    "title": "Ekip hafızası",
+    "help": "İnsanların tüm ajanlardan saklamasını istedikleri, kimin ne zaman söylediğiyle birlikte. Her ajan bunu tüm işlerinde okur.",
+    "empty": "Henüz bir şey yok. Biri tüm ajanlardan bir şeyi hatırlamasını istediğinde burada görünür.",
+    "remove": "Kaldır",
+    "removed": "Ekip hafızasından kaldırıldı",
+    "make": "Ekibin yap",
+    "made": "Artık tüm ajanlar bunu saklıyor"
+  },
   "memory": {
     "fromRefusal": "Bir daha önerilmesin: {{text}}",
     "fromCorrection": "Bir kişi düzeltti: {{text}}",
@@ -5160,6 +5176,9 @@
     "unverifiedTitle": "Bunu yalnızca ajanlar söyledi. Bağlama işaretli bir ipucu olarak girer.",
     "pinned": "Her zaman bağlamda",
     "lowTrust": "Dış kaynak, güvenilir değil",
+    "confirm": "Onayla",
+    "confirmTitle": "Doğru olduğunu söyleyin: ajanlar bunu güvenilir olarak kullanır.",
+    "confirmed": "Onaylandı",
     "used_one": "{{count}} kez kullanıldı",
     "used_other": "{{count}} kez kullanıldı",
     "unusedFor": "{{days}} gündür kullanılmadı",

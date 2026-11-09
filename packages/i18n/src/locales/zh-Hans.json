@@ -2229,6 +2229,12 @@
       "action": "创建例行任务",
       "done": "例行任务已创建"
     },
+    "howto": {
+      "title": "{{name}} 学会了：{{what}}",
+      "line": "已使用 {{uses}} 次。要做成技能吗？",
+      "action": "做成技能",
+      "done": "已确认"
+    },
     "stalled": {
       "title": "#{{number}} {{title}} 的步骤停了",
       "line_other": "步骤 {{steps}} 已经停了 {{hours}} 小时，在等 #{{on}}。",
@@ -2272,6 +2278,7 @@
   },
   "routing": {
     "title": "谁来挑选智能体",
+    "reflectionOff": "记忆还不会从结束的对话中学习：需要在上方添加一个服务商密钥。",
     "how": "如何挑选智能体",
     "by": {
       "jev": "对于没有提及的消息，由 Jev 挑选回答者。",
@@ -5002,6 +5009,15 @@
       "andMore": "{{names}} 等"
     }
   },
+  "teamMemory": {
+    "title": "团队记忆",
+    "help": "大家要求所有智能体记住的内容，附上是谁在何时说的。每个智能体在所有工作中都会读到。",
+    "empty": "还没有内容。有人让所有智能体记住某件事时，会显示在这里。",
+    "remove": "移除",
+    "removed": "已从团队记忆中移除",
+    "make": "设为团队记忆",
+    "made": "现在所有智能体都会记住它"
+  },
   "memory": {
     "fromRefusal": "不再提议：{{text}}",
     "fromCorrection": "有人更正：{{text}}",
@@ -5038,6 +5054,9 @@
     "unverifiedTitle": "只是智能体这么说的。会作为带标记的提示进入上下文。",
     "pinned": "始终在上下文中",
     "lowTrust": "外部来源，不可信",
+    "confirm": "确认",
+    "confirmTitle": "确认无误后，智能体会把它当作可信内容使用。",
+    "confirmed": "已确认",
     "used_other": "已使用 {{count}} 次",
     "unusedFor": "已 {{days}} 天未使用",
     "supersedes": "取代：",

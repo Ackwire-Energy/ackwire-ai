@@ -23,6 +23,7 @@ import {
 } from "@agenteschat/db";
 import { agentIdsSeen, isPlaybook } from "./audience";
 import { caches } from "./cache";
+import { ACCESS_WORD, HOW_TO_WORD } from "./context/items";
 import { personAgentDmKey } from "./dms";
 import { cutText } from "./format";
 import type { ModelGateway } from "./gateway";
@@ -78,6 +79,11 @@ registerDocumentBuilder("context_item", async (db, orgId, id) => {
     channelIds: c.channelIds,
     title: `${c.kind}${c.title ? `: ${c.title}` : ""}`,
     body: c.content,
+    // Its key is English (`KEY_DESCRIPTION`): a request in another language still finds it by those words (ADR 0167).
+    keywords: c.subjectKey
+      .split(" ")
+      .filter((w) => w !== HOW_TO_WORD && w !== ACCESS_WORD)
+      .join(" "),
     createdAt: c.createdAt,
   };
 });
@@ -108,7 +114,9 @@ async function upsertWithEmbeddings(deps: SearchDeps, orgId: string, docs: Searc
   if (docs.length === 0) return;
   const embedded = await deps.gateway.embed({
     orgId,
-    texts: docs.map((d) => cutText(`${d.title ? `${d.title}\n` : ""}${d.body}`, 8000)),
+    texts: docs.map((d) =>
+      cutText(`${d.title ? `${d.title}\n` : ""}${d.body}${d.keywords ? `\n${d.keywords}` : ""}`, 8000),
+    ),
     inputType: "document",
   });
   const withVectors = docs.map((d, i) => ({

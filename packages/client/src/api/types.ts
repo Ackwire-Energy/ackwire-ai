@@ -1380,6 +1380,8 @@ export interface AiStatus {
   routing?: AiRouting;
   /** The organization has a key of its own, or the server's own Claude key. */
   apiKey?: boolean;
+  /** Memory reflects on finished conversations: there is a summary model it can call (absent from an older server). */
+  reflection?: boolean;
   agents: {
     agentId: string;
     /** `waiting`: its computer is away for now (not "no AI"). */

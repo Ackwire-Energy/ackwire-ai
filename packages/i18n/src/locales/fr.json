@@ -2412,6 +2412,12 @@
       "action": "Créer la routine",
       "done": "Routine créée"
     },
+    "howto": {
+      "title": "{{name}} a appris : {{what}}",
+      "line": "Utilisé {{uses}}×. En faire une compétence ?",
+      "action": "En faire une compétence",
+      "done": "Confirmé"
+    },
     "stalled": {
       "title": "Étapes à l’arrêt dans #{{number}} {{title}}",
       "line_one": "L’étape {{steps}} est à l’arrêt depuis {{hours}} h en attendant #{{on}}.",
@@ -2459,6 +2465,7 @@
   },
   "routing": {
     "title": "Qui choisit les agents",
+    "reflectionOff": "La mémoire n’apprend pas encore des conversations terminées : il faut pour cela une clé de fournisseur, ci-dessus.",
     "how": "Comment les agents sont choisis",
     "by": {
       "jev": "Jev choisit qui répond à chaque message sans mention.",
@@ -5344,6 +5351,15 @@
       "andMore": "{{names}} et plus"
     }
   },
+  "teamMemory": {
+    "title": "Mémoire de l’équipe",
+    "help": "Ce que les gens ont demandé à tous les agents de garder, avec qui l’a dit et quand. Chaque agent le lit dans tout son travail.",
+    "empty": "Rien pour l’instant. Quand quelqu’un demande à tous les agents de retenir quelque chose, cela apparaît ici.",
+    "remove": "Retirer",
+    "removed": "Retirée de la mémoire de l’équipe",
+    "make": "Passer à l’équipe",
+    "made": "Tous les agents la gardent maintenant"
+  },
   "memory": {
     "fromRefusal": "À ne plus proposer : {{text}}",
     "fromCorrection": "Une personne a corrigé : {{text}}",
@@ -5382,6 +5398,9 @@
     "unverifiedTitle": "Seuls des agents l'ont dit. Ça entre dans le contexte comme une piste signalée.",
     "pinned": "Toujours dans le contexte",
     "lowTrust": "Source externe, non fiable",
+    "confirm": "Confirmer",
+    "confirmTitle": "Dire que c’est juste : les agents l’utilisent alors comme fiable.",
+    "confirmed": "Confirmée",
     "used_one": "utilisé {{count}} fois",
     "used_many": "utilisé {{count}} fois",
     "used_other": "utilisé {{count}} fois",

@@ -2320,6 +2320,12 @@
       "action": "Routine erstellen",
       "done": "Routine erstellt"
     },
+    "howto": {
+      "title": "{{name}} hat gelernt: {{what}}",
+      "line": "{{uses}}× genutzt. Zum Skill machen?",
+      "action": "Zum Skill machen",
+      "done": "Bestätigt"
+    },
     "stalled": {
       "title": "Schritte stehen still in #{{number}} {{title}}",
       "line_one": "Schritt {{steps}} steht seit {{hours}} h still und wartet auf #{{on}}.",
@@ -2365,6 +2371,7 @@
   },
   "routing": {
     "title": "Wer die Agenten auswählt",
+    "reflectionOff": "Das Gedächtnis lernt noch nicht aus beendeten Gesprächen: Dafür braucht es oben einen Anbieter-Schlüssel.",
     "how": "Wie Agenten ausgewählt werden",
     "by": {
       "jev": "Jev wählt aus, wer auf jede Nachricht ohne Erwähnung antwortet.",
@@ -5139,6 +5146,15 @@
       "andMore": "{{names}} und mehr"
     }
   },
+  "teamMemory": {
+    "title": "Team-Gedächtnis",
+    "help": "Was alle Agenten auf Wunsch der Leute behalten, mit wer es sagte und wann. Jeder Agent liest es bei all seiner Arbeit.",
+    "empty": "Noch nichts. Wenn jemand alle Agenten bittet, sich etwas zu merken, erscheint es hier.",
+    "remove": "Entfernen",
+    "removed": "Aus dem Team-Gedächtnis entfernt",
+    "make": "Ins Team-Gedächtnis übernehmen",
+    "made": "Jetzt behalten es alle Agenten"
+  },
   "memory": {
     "fromRefusal": "Nicht erneut vorschlagen: {{text}}",
     "fromCorrection": "Eine Person hat korrigiert: {{text}}",
@@ -5179,6 +5195,9 @@
     "unverifiedTitle": "Das haben nur Agenten gesagt. Es kommt als markierter Hinweis in den Kontext.",
     "pinned": "Immer im Kontext",
     "lowTrust": "Externe Quelle, nicht vertrauenswürdig",
+    "confirm": "Bestätigen",
+    "confirmTitle": "Sagen, dass es stimmt: Die Agenten nutzen es dann als vertrauenswürdig.",
+    "confirmed": "Bestätigt",
     "used_zero": "nie genutzt",
     "used_one": "{{count}}-mal genutzt",
     "used_other": "{{count}}-mal genutzt",

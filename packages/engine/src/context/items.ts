@@ -18,13 +18,15 @@ import { setsCredential } from "@agenteschat/ui/names";
 import { getAgent } from "../agents";
 import { agentIdsSeen, isPlaybook, readsPlaybook, seesAgentDetails } from "../audience";
 import { caches, rulesPresenceKey } from "../cache";
+import { isAgentOnlyDm } from "../dms";
 import { ForbiddenError, NotFoundError, ValidationError } from "../errors";
 import { type Judge, triesToChangePermissions } from "../judge";
-import { can, type Membership, requirePermission } from "../organizations";
+import { can, getMembership, type Membership, requirePermission } from "../organizations";
+import { hasContact } from "../outside";
 import { enqueueIndex, userVisibleChannels } from "../search";
 import { type Plan, planConsolidation } from "./judgments";
 
-const { agentActions, agents, contextItems } = schema;
+const { agentActions, agents, contextItems, messages } = schema;
 
 export type ContextItem = typeof contextItems.$inferSelect;
 export type ContextKind = ContextItem["kind"];
@@ -145,6 +147,25 @@ export function mergeEvidence(a: Evidence[], b: Evidence[]) {
   return [...a, ...b.filter((e) => !seen.has(`${e.type}:${e.ref}`))];
 }
 
+/** Its content is a person's exact words (`quote` evidence): a model reads them without the agent's title (ADR 0167). */
+export const isQuote = (i: Pick<ContextItem, "evidence">) =>
+  i.evidence.some((e) => e.type === "human" && e.quote === true);
+
+/**
+ * Words of a fact about where and how things run (servers, hosts, addresses, deploys): such facts go stale, so past
+ * `RECHECK_AFTER_DAYS` a model reads them marked to check first (ADR 0167).
+ * ponytail: a word list in English and Portuguese; a kind of its own from the learning job if it misses too many.
+ */
+const INFRA_WORDS =
+  /(?<![\p{L}\p{N}])(?:prod|production|produção|staging|servers?|servidor(?:es)?|hosts?|hosting|hospedagem|deploys?|deployed|infra|infrastructure|infraestrutura|database|banco de dados|dns|domain|domínio|ip|vps|cluster|region|região|bucket|cdn|kubernetes|k8s|docker)(?![\p{L}\p{N}])/iu;
+export const RECHECK_AFTER_DAYS = 30;
+export const isInfraFact = (i: Pick<ContextItem, "kind" | "subjectKey" | "title" | "content">) =>
+  i.kind === "fact" && INFRA_WORDS.test(`${i.subjectKey} ${i.title} ${i.content}`);
+
+/** A person stands behind it in their own words (human evidence), not only through an app or an agent's claim. */
+export const personSaid = (i: Pick<ContextItem, "createdByKind" | "evidence">) =>
+  i.createdByKind === "person" && i.evidence.some((e) => e.type === "human");
+
 // ── Subjects and similarity ──────────────────────────────────────────────────
 
 /**
@@ -237,6 +258,35 @@ export function sameSentence(a: string, b: string) {
   let found = 0;
   for (const word of longer) if (word === shorter[found]) found++;
   return found > 0 && found === shorter.length && found / longer.length >= SAME_ITEM_SIMILARITY;
+}
+
+/**
+ * Whether a text names someone (ADR 0167): a workspace member by a word of their name, or anyone by an email address
+ * or a phone number. What names nobody is a method, safe to reach the agent's other conversations.
+ * ponytail: customers aren't listed anywhere, so only their contact details catch them; a contacts list if it misses.
+ */
+export async function namesSomeone(db: Executor, orgId: string, text: string): Promise<boolean> {
+  if (hasContact(text)) return true;
+  const said = new Set(wordList(text));
+  const people = await db
+    .select({ name: schema.users.name })
+    .from(schema.organizationMembers)
+    .innerJoin(schema.users, eq(schema.users.id, schema.organizationMembers.userId))
+    .where(eq(schema.organizationMembers.orgId, orgId));
+  return people.some((p) => wordList(p.name).some((w) => w.length >= 3 && said.has(w)));
+}
+
+/**
+ * Where a how-to saved in `channel` is read (ADR 0167): one worked out in an agents' DM that names nobody reaches the
+ * agent's other work; anything else stays where it was worked out.
+ */
+export async function howToChannels(
+  db: Executor,
+  orgId: string,
+  channel: { id: string; kind: string; dmKey: string | null },
+  text: string,
+): Promise<string[]> {
+  return isAgentOnlyDm(channel) && !(await namesSomeone(db, orgId, text)) ? [] : [channel.id];
 }
 
 // ── Writing ──────────────────────────────────────────────────────────────────
@@ -429,15 +479,23 @@ async function keepBeside(tx: Executor, old: ContextItem, input: NewContextItem)
 async function mergeInto(tx: Executor, old: ContextItem, input: NewContextItem) {
   checkContent(input.content);
   const evidence = mergeEvidence(old.evidence, input.evidence ?? []);
-  const low = old.trust === "low" || input.trust === "low";
+  // A person saying it again in their own words vouches for what an untrusted source wrote alike (ADR 0167).
+  const vouched =
+    input.trust === "high" &&
+    personSaid({ createdByKind: input.createdByKind ?? "job", evidence: input.evidence ?? [] });
+  const low = input.trust === "low" || (old.trust === "low" && !vouched);
   const [merged] = await tx
     .update(contextItems)
     .set({
       evidence,
-      verified: low ? false : old.kind === "note" || evidence.length === 0 ? old.verified : isVerified(evidence),
+      verified: low
+        ? false
+        : vouched || (old.kind !== "note" && evidence.length > 0)
+          ? isVerified(evidence)
+          : old.verified,
       recurrence: old.recurrence + 1,
       confidence: Math.max(old.confidence, input.confidence ?? 0),
-      // Low trust is sticky: one untrusted source taints the item.
+      // Low trust is sticky: one untrusted source taints the item, unless a person vouches for it.
       trust: low ? "low" : "high",
       sourceIds: [...new Set([...old.sourceIds, ...(input.sourceIds ?? [])])],
       channelIds: [...new Set([...old.channelIds, ...(input.channelIds ?? [])])],
@@ -639,6 +697,27 @@ async function requireEdit(db: Database, actorId: string, item: ContextItem) {
   throw new ForbiddenError("Only the agent's owner or an admin can change this");
 }
 
+/**
+ * Whether `actorId`, still a member, said what the item holds: they wrote it, or wrote a message it was saved from
+ * (its human evidence), where they still read it.
+ */
+async function saidBy(db: Database, actorId: string, item: ContextItem) {
+  if (!(await getMembership(db, actorId, item.orgId))) return false;
+  if (item.channelIds.length > 0 && !itemVisibleIn(item, await userVisibleChannels(db, item.orgId, actorId)))
+    return false;
+  if (item.createdByKind === "person" && item.createdById === actorId) return true;
+  const refs = item.evidence.filter((e) => e.type === "human" && UUID_REF.test(e.ref)).map((e) => e.ref);
+  if (refs.length === 0) return false;
+  const [said] = await db
+    .select({ id: messages.id })
+    .from(messages)
+    .where(and(eq(messages.orgId, item.orgId), inArray(messages.id, refs), eq(messages.authorUserId, actorId)))
+    .limit(1);
+  return Boolean(said);
+}
+
+const UUID_REF = /^[0-9a-f-]{36}$/i;
+
 /** Whether `actorId` may change or remove the item (`requireEdit`, as a yes/no). */
 export const mayEditItem = (db: Database, actorId: string, item: ContextItem) =>
   requireEdit(db, actorId, item).then(
@@ -664,11 +743,17 @@ export async function editContextItem(
   actorId: string,
   orgId: string,
   itemId: string,
-  input: { content?: string; title?: string; pinned?: boolean; archived?: boolean },
+  input: { content?: string; title?: string; pinned?: boolean; archived?: boolean; confirmed?: boolean },
   judge?: Judge,
 ): Promise<ContextItem> {
   const item = await loadItem(db, orgId, itemId);
-  await requireEdit(db, actorId, item);
+  // Confirmar (ADR 0167): who may edit it, or the person who said it, for that alone.
+  const onlyConfirms =
+    input.confirmed === true &&
+    input.content === undefined &&
+    input.pinned === undefined &&
+    input.archived === undefined;
+  if (!onlyConfirms || !(await saidBy(db, actorId, item))) await requireEdit(db, actorId, item);
   // A rule passes `requireEdit` only for its giver, the agent's owner or an admin: people who may give it anyway.
   if (input.content !== undefined && input.content !== item.content && item.kind !== "rule") {
     await checkPermissionText(judge, orgId, `${input.title ?? item.title ?? ""}\n${input.content}`);
@@ -698,13 +783,15 @@ export async function editContextItem(
       }),
     );
   }
-  // Saving an app-sent item's text unchanged is a person confirming it (ADR 0119 item 5).
+  // Confirmar vouches for what came from outside or isn't verified yet (ADR 0167); saving an app-sent item's text
+  // unchanged confirms it too (ADR 0119 item 5).
   const confirms =
-    input.content !== undefined &&
     current === item &&
-    item.trust !== "low" &&
-    item.evidence.some((e) => e.type === "app") &&
-    !isVerified(item.evidence);
+    ((input.confirmed === true && (item.trust === "low" || !item.verified)) ||
+      (input.content !== undefined &&
+        item.trust !== "low" &&
+        item.evidence.some((e) => e.type === "app") &&
+        !isVerified(item.evidence)));
   if (confirms || input.pinned !== undefined || input.archived !== undefined) {
     const evidence = confirms
       ? mergeEvidence(item.evidence, [{ type: "human", ref: actorId, at: new Date().toISOString() }])
@@ -712,7 +799,9 @@ export async function editContextItem(
     const [row] = await db
       .update(contextItems)
       .set({
-        ...(evidence ? { evidence, verified: true, confidence: Math.max(item.confidence, 0.9) } : {}),
+        ...(evidence
+          ? { evidence, trust: "high" as const, verified: true, confidence: Math.max(item.confidence, 0.9) }
+          : {}),
         ...(input.pinned !== undefined ? { pinned: input.pinned } : {}),
         ...(input.archived !== undefined
           ? { status: input.archived ? ("archived" as const) : ("active" as const) }
@@ -778,6 +867,106 @@ export async function addContextItemByPerson(
       createdById: actorId,
     }),
   );
+}
+
+// ── Team memory (ADR 0167) ──────────────────────────────────────────────────
+
+/** What a team memory may be: what every agent keeps for the whole team. */
+export const TEAM_KINDS = ["rule", "preference", "fact", "decision"] as const;
+
+/** A team memory: no agent's, in a person's words (theirs, or an admin's who made it the team's). */
+export const teamMemorySql = () =>
+  sql`(${contextItems.agentId} is null and ${contextItems.createdByKind} = 'person' and ${contextItems.kind} in ('rule', 'preference', 'fact', 'decision'))`;
+
+/** The team's rules and preferences for the whole workspace: every run reads them in its cached prompt. */
+export const teamWideSql = () =>
+  sql`(${teamMemorySql()} and ${contextItems.kind} in ('rule', 'preference') and ${contextItems.channelIds} = '{}')`;
+
+/** `teamWideSql` for an item in hand. */
+export const isTeamWide = (i: Pick<ContextItem, "agentId" | "createdByKind" | "kind" | "channelIds">) =>
+  !i.agentId &&
+  i.createdByKind === "person" &&
+  (i.kind === "rule" || i.kind === "preference") &&
+  i.channelIds.length === 0;
+
+/** "Memória do time": the current team memories a member may see (the channels they read). */
+export async function listTeamMemories(db: Database, actorId: string, orgId: string) {
+  await requirePermission(db, actorId, orgId, "read");
+  const visible = await userVisibleChannels(db, orgId, actorId);
+  const items = await db
+    .select()
+    .from(contextItems)
+    .where(
+      and(
+        eq(contextItems.orgId, orgId),
+        eq(contextItems.status, "active"),
+        isNull(contextItems.supersededBy),
+        teamMemorySql(),
+        arrayContained(contextItems.channelIds, visible),
+      ),
+    )
+    .orderBy(desc(contextItems.createdAt))
+    .limit(200);
+  return { items, visible };
+}
+
+/**
+ * "Tornar do time": an agent's fact, decision, preference or rule becomes the team's, read by every agent, and the
+ * copies agents kept of the same thing go (archived behind it, restorable). Who reviews memory. The person who said
+ * it stays its author.
+ */
+export async function makeTeamMemory(db: Database, actorId: string, orgId: string, itemId: string) {
+  await requirePermission(db, actorId, orgId, "review_memory");
+  const item = await loadItem(db, orgId, itemId);
+  if (!item.agentId || item.status !== "active" || !(TEAM_KINDS as readonly string[]).includes(item.kind))
+    throw new ValidationError("Only an agent's current fact, decision, preference or rule can become the team's");
+  return db.transaction(async (tx) => {
+    const team = await insertContextItem(tx, {
+      orgId,
+      kind: item.kind,
+      scopeType: "org",
+      scopeId: orgId,
+      agentId: null,
+      subject: item.subjectKey,
+      title: item.title,
+      content: item.content,
+      sourceIds: item.sourceIds,
+      channelIds: [],
+      trust: "high",
+      evidence: mergeEvidence(item.evidence, [{ type: "human", ref: actorId, at: new Date().toISOString() }]),
+      confidence: Math.max(item.confidence, 0.9),
+      createdByKind: "person",
+      createdById: personSaid(item) && item.createdById ? item.createdById : actorId,
+    });
+    const copies = (
+      await tx
+        .select()
+        .from(contextItems)
+        .where(
+          and(
+            eq(contextItems.orgId, orgId),
+            eq(contextItems.status, "active"),
+            isNull(contextItems.supersededBy),
+            eq(contextItems.kind, item.kind),
+            sql`${contextItems.agentId} is not null`,
+          ),
+        )
+    ).filter(
+      (c) =>
+        c.id === item.id ||
+        c.subjectKey === item.subjectKey ||
+        similarity(c.content, item.content) >= SAME_ITEM_SIMILARITY,
+    );
+    for (const c of copies) {
+      await tx
+        .update(contextItems)
+        .set({ status: "archived", supersededBy: team.id, updatedAt: new Date() })
+        .where(eq(contextItems.id, c.id));
+      await enqueueIndex(tx, { orgId, kind: "context_item", sourceId: c.id });
+      if (c.kind === "rule" && c.agentId) caches.contextPresence.delete(rulesPresenceKey(orgId, c.agentId));
+    }
+    return team;
+  });
 }
 
 /** Items by id regardless of status (for `expand`). */

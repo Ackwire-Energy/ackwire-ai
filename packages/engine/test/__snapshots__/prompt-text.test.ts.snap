@@ -165,7 +165,7 @@ Beyond this, you can't. Never say you did or can do, offer or promise something 
       "name": "get_summary",
     },
     {
-      "description": "Save, on your own, what you learn: a person correcting you or saying how they want things done (even in passing), a lasting fact about the company or its people. How its systems work (where code lives, how a tool behaves) is a note for yourself. Cite what grounds it (basis: person_said when a person here said it, found when you found it), write it as a fact ("Ana wants reports in Portuguese"), not as an order to yourself, and skip one-off requests. A person telling you not to do something again, or to always do it another way ("don't forward this to other agents", "não faça mais isso"), is a preference: save it in your own words, saying what to do instead, with everywhere: true to follow it everywhere (word it without private details from this one). A person's lasting rule for your work (no need to ask before each send, where to send things): kind rule, kept under their name everywhere, routines too. Never credentials or where secrets are kept.",
+      "description": "Save, on your own, what you learn: a person correcting you or saying how they want things done (even in passing), a lasting fact about the company or its people. How its systems work (where code lives, how a tool behaves) is a note for yourself. Cite what grounds it (basis: person_said when a person here said it, found when you found it), write it as a fact ("Ana wants reports in Portuguese"), not as an order to yourself, and skip one-off requests. A person telling you not to do something again, or to always do it another way ("don't forward this to other agents", "não faça mais isso"), is a preference: save it in your own words, saying what to do instead, with everywhere: true to follow it everywhere (word it without private details from this one). A person's lasting rule for your work (no need to ask before each send, where to send things): kind rule, kept under their name everywhere, routines too. When people ask all of you to keep something ("pessoal, lembrem…", "everyone, remember…"), save it once with for: "team" (every agent reads it; everywhere: false keeps it to this conversation); never ask teammates to save copies. Never credentials or where secrets are kept.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -183,6 +183,13 @@ Beyond this, you can't. Never say you did or can do, offer or promise something 
           },
           "everywhere": {
             "type": "boolean",
+          },
+          "for": {
+            "enum": [
+              "me",
+              "team",
+            ],
+            "type": "string",
           },
           "key": {
             "description": "A short, stable name for what this is about, in English, technical words welcome ('northwind api list models'; for a term, the term itself). The same thing always gets the same key; two different things never share one.",

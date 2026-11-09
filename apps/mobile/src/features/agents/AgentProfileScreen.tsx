@@ -1043,6 +1043,7 @@ export function MemoryFix({
   source,
   onSee,
   onDone,
+  title,
 }: {
   memory: Memory;
   agentId: string;
@@ -1051,6 +1052,8 @@ export function MemoryFix({
   source: string;
   onSee: (() => void) | undefined;
   onDone: () => void;
+  /** In place of "Corrigir a memória de…" (the team's memory, ADR 0167). */
+  title?: string;
 }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
@@ -1084,7 +1087,7 @@ export function MemoryFix({
     );
   return (
     <>
-      <SheetTitle title={t(`mobile.intentAgents.fix.title${g}`, { name: agentName })} />
+      <SheetTitle title={title ?? t(`mobile.intentAgents.fix.title${g}`, { name: agentName })} />
       <Locked when={action.isPending}>
         <TextArea value={text} onChangeText={setText} autoFocus maxLength={8000} />
       </Locked>

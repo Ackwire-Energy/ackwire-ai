@@ -14,6 +14,8 @@ export interface SearchDocument {
   channelIds: string[];
   title?: string;
   body: string;
+  /** Words it is also found by, never shown (a memory's English key, ADR 0167): matched like its title. */
+  keywords?: string;
   /** Optional vector (EMBEDDING_DIMENSIONS); without it the doc is full-text only. */
   embedding?: number[] | null;
   embeddingModel?: string | null;
@@ -191,7 +193,10 @@ export function createPostgresSearchResolver(db: Database): SearchIndexResolver 
               kind: d.kind,
               sourceId: d.sourceId,
               channelIds: d.channelIds,
-              title: d.title ?? "",
+              // Keywords ride on the title's second line: indexed and ranked as the title, cut off every hit.
+              title: d.keywords?.trim()
+                ? `${(d.title ?? "").replace(/\n/g, " ")}\n${d.keywords.trim()}`
+                : (d.title ?? ""),
               body: d.body,
               embedding: d.embedding ?? null,
               embeddingModel: d.embedding ? (d.embeddingModel ?? null) : null,
@@ -271,7 +276,7 @@ export function createPostgresSearchResolver(db: Database): SearchIndexResolver 
             kind: row.kind as SearchKind,
             sourceId: row.sourceId,
             channelIds: row.channelIds,
-            title: row.title,
+            title: row.title.split("\n")[0] ?? "",
             snippet: row.body.slice(0, 300),
             score,
             createdAt: row.sourceCreatedAt,

@@ -27,6 +27,7 @@ import { caches } from "./cache";
 import { summarizeScopes } from "./capabilities";
 import { peopleAllIn } from "./channels";
 import { consultationOrigin, type HandOff, handOffsFrom } from "./consultations";
+import { teamMemoryForPrompt } from "./context/tools";
 import { widgetRunContext } from "./dashboards/refresh-context";
 import { deviceRoster, osName } from "./device-resolve";
 import { isAgentOnlyDm } from "./dms";
@@ -552,7 +553,7 @@ export async function buildRunContext(
   // Independent lookups go out together (the database may be remote); org,
   // channel and members come from the per-process cache when enabled.
   const scope = and(eq(messages.orgId, run.orgId), eq(messages.channelId, run.channelId), isNull(messages.deletedAt));
-  const [org, channel, triggerRows, threadInfo, mode] = await Promise.all([
+  const [org, channel, triggerRows, threadInfo, mode, teamMemory] = await Promise.all([
     getOrgCached(db, run.orgId),
     getChannelCached(db, run.orgId, run.channelId),
     options.trigger
@@ -567,6 +568,8 @@ export async function buildRunContext(
     run.threadRootId === run.triggerMessageId ? null : threadRunInfo(db, run.orgId, run.threadRootId),
     // A personal workspace (ADR 0159): the rules and the workspace's block speak of one person and their agents.
     workspaceMode(db, run.orgId),
+    // What people asked every agent to keep (ADR 0167): with the org's context, in the cached prompt.
+    teamMemoryForPrompt(db, run.orgId).catch(() => ""),
   ]);
   const personal = mode === "personal";
   // A range from another channel counts only while everyone here can still see it (re-checked, cached).
@@ -1020,6 +1023,7 @@ export async function buildRunContext(
           ? `You work in "${org.name}" on agentes.chat, a personal workspace: one person, and maybe their family, with the AI agents that help them with their life and work. The app shows its channels to them as group conversations.`
           : `You work in "${org.name}" on agentes.chat, a workspace where people and AI agents work together.`,
         org.context.trim() ? `# About ${personal ? "the person" : "the organization"}\n${org.context.trim()}` : "",
+        teamMemory,
         options.workspaceComputer ? workspaceComputerText(options.workspaceComputer) : "",
       ]
         .filter(Boolean)

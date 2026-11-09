@@ -1293,6 +1293,8 @@
     "uses_other": "{{count}}번 사용됨",
     "confirmed": "사람이 확인함",
     "unconfirmed": "아직 확인되지 않음",
+    "confirm": "확인",
+    "confirmedToast": "확인됨",
     "details": "기술 세부 정보",
     "before": "이전 내용: {{text}}",
     "fix": "수정",
