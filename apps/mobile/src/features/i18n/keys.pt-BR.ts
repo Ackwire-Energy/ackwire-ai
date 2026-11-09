@@ -1913,7 +1913,7 @@ export const featureKeysPtBR = {
     },
     android: {
       entry: "Usar este celular com agentes",
-      title: "Deixar agentes usarem este celular",
+      title: "Liberar para os agentes",
       connecting: "Conectando ao {{host}}",
       computer: "Computador",
       noHost: "Este celular funciona por um computador seu. Conecte um primeiro.",
@@ -1923,12 +1923,12 @@ export const featureKeysPtBR = {
       openAbout: "Abrir Sobre o telefone",
       step2: "Ative a Depuração USB",
       openDev: "Abrir Opções do desenvolvedor",
-      step3: "Ligue no {{host}}",
+      step3: "Conecte o cabo no {{host}}",
       step3Hint:
         "Use um cabo que transmite dados, não um que só carrega. Se o celular perguntar para que serve o USB, escolha Transferência de arquivos.",
       looking: "Procurando este celular",
       step4: "Toque em Permitir neste celular",
-      step4Text: "Marque Sempre permitir neste computador antes.",
+      step4Text: "Antes, marque Sempre permitir neste computador.",
       prompt: {
         a11y: "O Android pergunta: Permitir a depuração USB? Marque Sempre permitir neste computador e toque em Permitir.",
         title: "Permitir a depuração USB?",
