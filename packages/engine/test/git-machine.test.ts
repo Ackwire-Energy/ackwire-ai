@@ -3,6 +3,7 @@ import { generateKeyPairSync } from "node:crypto";
 import {
   GIT_DIRECT_PROTOCOL,
   GIT_PROTOCOL,
+  GIT_STATELESS_TOKEN_PROTOCOL,
   type GitSyncRepo,
   MACHINE_PROTOCOL_VERSION,
   type ServerFrame,
@@ -19,6 +20,7 @@ import {
   deleteMachine,
   directFetchTokens,
   drainOutbox,
+  GIT_TOKEN_TTL_SECONDS,
   type GitHubAppConfig,
   handleGitProxy,
   issueGitToken,
@@ -401,6 +403,8 @@ const APP: GitHubAppConfig = {
     .toString(),
 };
 const API = "https://api.github.test";
+/** GitHub's stateless installation token (`ghs_<app id>_<JWT>`, about 520 characters), the kind it mints now. */
+const APP_TOKEN = `ghs_123_eyJhbGciOiJSUzI1NiJ9.${"e".repeat(420)}.${"s-ig_".repeat(16)}`;
 
 describe("fetches straight from GitHub with the App (ADR 0116)", () => {
   /** Our App installed (installation 9) for this org; GitHub mints `ghs_…` tokens and records what was asked. */
@@ -415,10 +419,7 @@ describe("fetches straight from GitHub with the App (ADR 0116)", () => {
       if (/\/repos\/acme\/[^/]+\/installation$/.test(url)) return Response.json({ id: 9 });
       if (url.endsWith("/app/installations/9/access_tokens")) {
         asked.push(JSON.parse(String(init?.body)));
-        return Response.json({
-          token: `ghs_${"t".repeat(36)}`,
-          expires_at: new Date(Date.now() + 3600_000).toISOString(),
-        });
+        return Response.json({ token: APP_TOKEN, expires_at: new Date(Date.now() + 3600_000).toISOString() });
       }
       return new Response("unexpected", { status: 500 });
     }) as typeof globalThis.fetch;
@@ -438,7 +439,7 @@ describe("fetches straight from GitHub with the App (ADR 0116)", () => {
     const clone = (await source.tools(ctx)).find((t) => t.name === "git_clone");
     expect((await clone?.execute({ repo: "acme/app" }, ctx))?.isError).toBeFalsy();
     const [sync] = w.runner.syncs();
-    expect(sync?.repos[0]?.github).toBe(`ghs_${"t".repeat(36)}`);
+    expect(sync?.repos[0]?.github).toBe(APP_TOKEN);
     expect(w.asked).toEqual([{ repositories: ["app"], permissions: { contents: "read" } }]);
     // The proxy credential still comes along: the checkout pushes there.
     expect(verifyGitToken(SECRET, sync?.proxy.token ?? "")?.kind).toBe("machine");
@@ -471,7 +472,7 @@ describe("fetches straight from GitHub with the App (ADR 0116)", () => {
       },
     );
     expect(w.runner.syncs().at(-1)?.repos).toEqual([
-      { repo: "acme/app", dir: "repos/acme/app", clone: false, github: `ghs_${"t".repeat(36)}` },
+      { repo: "acme/app", dir: "repos/acme/app", clone: false, github: APP_TOKEN },
     ]);
   });
 
@@ -481,7 +482,9 @@ describe("fetches straight from GitHub with the App (ADR 0116)", () => {
     const target = { orgId: f.org.id, agentId: f.agent.id, machineId: w.paired.machineId };
     const deps = { ...w.machineDeps, github: { app: APP, http: w.github } };
     expect((await directFetchTokens(deps, target, GIT_DIRECT_PROTOCOL - 1, ["acme/app"])).size).toBe(0);
-    expect((await directFetchTokens(deps, target, GIT_DIRECT_PROTOCOL, ["acme/app"])).size).toBe(1);
+    // Runners 35 to 52 take only GitHub's old kind and would refuse the whole sync over the one GitHub mints now.
+    expect((await directFetchTokens(deps, target, GIT_STATELESS_TOKEN_PROTOCOL - 1, ["acme/app"])).size).toBe(0);
+    expect((await directFetchTokens(deps, target, GIT_STATELESS_TOKEN_PROTOCOL, ["acme/app"])).size).toBe(1);
     const source = createGitToolSource({
       sandbox: { db: f.db, machines: { hub: w.hub }, git: w.git } as never,
       connectors: w.connectors,
@@ -494,11 +497,73 @@ describe("fetches straight from GitHub with the App (ADR 0116)", () => {
     expect(sync?.repos[0]?.github).toBeUndefined();
     expect(sync?.timeoutSeconds).toBe(MACHINE_CLONE_SECONDS);
   });
+
+  test("only an account connection, or an installation that doesn't cover the repository: no token, and the proxy takes the sync's fresh credential", async () => {
+    const w = await world();
+    await setAgentRepositories(f.db, f.owner.id, f.org.id, f.agent.id, ["acme/app", "acme/site"]);
+    const minted: string[] = [];
+    const fetch = (async (input: string | URL | Request) => {
+      const url = String(input);
+      // Installed on acme, for acme/app alone.
+      if (url.endsWith("/repos/acme/app/installation")) return Response.json({ id: 9 });
+      if (url.endsWith("/installation")) return Response.json({ message: "Not Found" }, { status: 404 });
+      if (url.endsWith("/app/installations/9/access_tokens")) {
+        minted.push(url);
+        return Response.json({ token: APP_TOKEN, expires_at: new Date(Date.now() + 3600_000).toISOString() });
+      }
+      return new Response("unexpected", { status: 500 });
+    }) as typeof globalThis.fetch;
+    const source = createGitToolSource({
+      sandbox: { db: f.db, machines: { hub: w.hub }, git: w.git } as never,
+      connectors: w.connectors,
+      app: APP,
+      github: { apiUrl: API, fetch },
+    });
+    const ctx = await runCtx();
+    const clone = (await source.tools(ctx)).find((t) => t.name === "git_clone");
+    const upstream = fakeUpstream();
+    const refs = (token: string, now?: Date) =>
+      handleGitProxy(
+        { db: f.db, secret: SECRET, connectors: w.connectors, upstream, ...(now ? { now: () => now } : {}) },
+        new Request(
+          `${PUBLIC_URL}/api/git/${f.org.id}/${w.connection.id}/acme/site.git/info/refs?service=git-upload-pack`,
+          {
+            headers: { authorization: `Basic ${Buffer.from(`agentes:${token}`).toString("base64")}` },
+          },
+        ),
+        { orgId: f.org.id, connectionId: w.connection.id, path: "acme/site.git/info/refs" },
+      );
+
+    // The account connection alone: the App is installed nowhere for this workspace.
+    expect((await clone?.execute({ repo: "acme/site" }, ctx))?.isError).toBeFalsy();
+    // Installed, but not on this repository.
+    await f.db
+      .insert(schema.githubAppInstallations)
+      .values({ orgId: f.org.id, installationId: 9, accountLogin: "acme", accountType: "Organization" });
+    expect((await clone?.execute({ repo: "acme/site" }, ctx))?.isError).toBeFalsy();
+    expect(minted).toHaveLength(0);
+    const syncs = w.runner.syncs();
+    expect(syncs).toHaveLength(2);
+    for (const sync of syncs) {
+      expect(sync.repos[0]?.github).toBeUndefined();
+      // Each sync brings a credential the proxy takes (it fetches with the account's token, server side).
+      expect((await refs(sync.proxy.token)).status).toBe(200);
+    }
+    // A credential no sync refreshed for its 6 hours is what the proxy refuses.
+    const stale = await refs(syncs[0]?.proxy.token ?? "", new Date(Date.now() + (GIT_TOKEN_TTL_SECONDS + 60) * 1000));
+    expect(stale.status).toBe(401);
+    expect(await stale.text()).toContain("sign in with the computer's git credential");
+
+    // The repository it covers gets the App's token; the account's own never reaches the computer.
+    await clone?.execute({ repo: "acme/app" }, ctx);
+    expect(w.runner.syncs().at(-1)?.repos[0]?.github).toBe(APP_TOKEN);
+    expect(JSON.stringify(w.runner.sent)).not.toContain(GH_TOKEN);
+  });
 });
 
 describe("fetches straight from GitHub: who gets a token, and what the turn is told (ADR 0116)", () => {
-  const TOKEN = `ghs_${"t".repeat(36)}`;
-  async function appWorld() {
+  const TOKEN = APP_TOKEN;
+  async function appWorld(token = TOKEN) {
     const w = await world();
     await f.db
       .insert(schema.githubAppInstallations)
@@ -507,7 +572,7 @@ describe("fetches straight from GitHub: who gets a token, and what the turn is t
       const url = String(input);
       if (/\/repos\/acme\/[^/]+\/installation$/.test(url)) return Response.json({ id: 9 });
       if (url.endsWith("/app/installations/9/access_tokens")) {
-        return Response.json({ token: TOKEN, expires_at: new Date(Date.now() + 3600_000).toISOString() });
+        return Response.json({ token, expires_at: new Date(Date.now() + 3600_000).toISOString() });
       }
       return new Response("unexpected", { status: 500 });
     }) as typeof globalThis.fetch;
@@ -541,6 +606,16 @@ describe("fetches straight from GitHub: who gets a token, and what the turn is t
     expect(audits.map((a) => [a.targetId, (a.details as { via?: string }).via])).toEqual([
       ["acme/app", "github-direct"],
     ]);
+  });
+
+  test("a token the runner wouldn't take is never sent: the checkout fetches through the proxy, the sync still goes", async () => {
+    const w = await appWorld("gho_notAnInstallationToken0123456789");
+    await setAgentRepositories(f.db, f.owner.id, f.org.id, f.agent.id, ["acme/app"]);
+    w.answers.fn = (req) => req.repos.map((r) => ({ repo: r.repo, dir: r.dir, status: "updated" as const }));
+    await prepareAgentCode(w.deps, turn(w.paired.machineId));
+    const [sync] = w.runner.syncs();
+    expect(sync?.repos).toEqual([{ repo: "acme/app", dir: "repos/acme/app", clone: false }]);
+    expect(verifyGitToken(SECRET, sync?.proxy.token ?? "")?.kind).toBe("machine");
   });
 
   test("an archived agent gets no token", async () => {

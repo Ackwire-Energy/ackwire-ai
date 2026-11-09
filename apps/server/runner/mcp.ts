@@ -449,7 +449,12 @@ export class McpBridge {
     const known = info.serverToken ? TOOL_NAME.test(tool) : MISSION_MCP_TOOLS.some((t) => t.name === tool);
     if (!known) return { ok: false, error: `Unknown tool ${tool}` };
     const given = req.args && typeof req.args === "object" && !Array.isArray(req.args) ? req.args : {};
-    if (JSON.stringify(given).length > MCP_ARGS_MAX_CHARS) return { ok: false, error: "The arguments are too large." };
+    if (JSON.stringify(given).length > MCP_ARGS_MAX_CHARS) {
+      return {
+        ok: false,
+        error: `The arguments are too large (more than ${MCP_ARGS_MAX_CHARS / (1024 * 1024)} MB). Keep big content in a file in your folder: to change a repository, commit and push it with git.`,
+      };
+    }
     // Secrets never leave the machine through our tools (the server masks again).
     const args = (info.redact ? redactDeep(given, info.redact) : given) as Record<string, unknown>;
     const pathArg = PATH_ARGS[tool];

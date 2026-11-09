@@ -7,7 +7,7 @@ import type { MergeDone } from "./command-policy";
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 52;
+export const MACHINE_PROTOCOL_VERSION = 53;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -358,9 +358,24 @@ export const BROWSER_WARM_PROTOCOL = 27;
  * (contents: read). The checkout then fetches straight from github.com with it and pushes through our proxy
  * (`remote.origin.pushurl`). A clone outlives its request: past `timeoutSeconds` the answer is `cloning` and the
  * download goes on (at most two at once per computer, the rest wait); a later `git.sync` of the same folder waits
- * for it again. The server sends `github` only to these runners and gives older ones the full clone deadline.
+ * for it again. The server gives older runners the full clone deadline, and sends `github` only from
+ * `GIT_STATELESS_TOKEN_PROTOCOL` on.
  */
 export const GIT_DIRECT_PROTOCOL = 35;
+
+/**
+ * Protocol 53: `git.sync`'s `github` may also be GitHub's stateless installation token (`ghs_<app id>_<JWT>`, about
+ * 520 characters, with dots and dashes), the only kind GitHub mints since its rollout ended on 2026-10-02 (GitHub
+ * changelog, "Stateless GitHub App installation tokens rolled out"). Runners 35 to 52 take only the old 40-character
+ * kind and refuse the whole `git.sync` on any other, so the server sends them no `github`: their checkouts fetch
+ * through the proxy.
+ */
+export const GIT_STATELESS_TOKEN_PROTOCOL = 53;
+/**
+ * A GitHub App installation token of either kind (GitHub's own pattern, `ghs_[A-Za-z0-9._-]{36,}`, bounded). Never a
+ * person's: OAuth (`gho_`), personal (`ghp_`, `github_pat_`) and user-to-server (`ghu_`) tokens don't match.
+ */
+export const GITHUB_APP_TOKEN = /^ghs_[A-Za-z0-9._-]{36,4096}$/;
 
 /**
  * Protocol 34: browser profiles (ADR 0110). Every `browser.*` op may carry `profile: { id }`: it runs in that
@@ -1309,7 +1324,8 @@ export interface GitSyncRequest {
   author: { name: string; email: string };
   /**
    * `clone: false`: update it only when it is already there. `dir` is relative to the agent's folder. `github`
-   * (protocol 35): a GitHub App installation token for this repository only (contents: read, 1 hour).
+   * (protocol 35; GitHub's stateless kind from protocol 53, `GITHUB_APP_TOKEN`): a GitHub App installation token for
+   * this repository only (contents: read, 1 hour).
    */
   repos: { repo: string; dir: string; clone: boolean; github?: string }[];
   /** Also update every checkout already under `repos/` (one `owner/name` level). */
@@ -2475,8 +2491,11 @@ export interface McpToolInfo {
 /** Most tools one `mcp.tools` frame carries. */
 export const MCP_TOOLS_MAX = 200;
 
-/** Largest `mcp.call` arguments (JSON characters). */
-export const MCP_ARGS_MAX_CHARS = 64 * 1024;
+/**
+ * Largest `mcp.call` arguments (JSON characters): a source file written whole through a connector's tool
+ * (`create_or_update_file`) fits. At most 3 MB in UTF-8, so the frame stays inside `MAX_FRAME_BYTES`.
+ */
+export const MCP_ARGS_MAX_CHARS = 1024 * 1024;
 
 export const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null;
 const isString = (v: unknown): v is string => typeof v === "string";

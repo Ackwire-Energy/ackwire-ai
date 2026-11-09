@@ -4,6 +4,7 @@ import path from "node:path";
 import { PassThrough } from "node:stream";
 import {
   BRIDGE_PROTOCOL,
+  MCP_ARGS_MAX_CHARS,
   MISSION_MCP_TOOLS,
   MISSION_PROTOCOL,
   MISSION_RULES_NO_GIT,
@@ -42,18 +43,21 @@ const posix = process.platform !== "win32";
 const TASK = "0193aaaa-0000-7000-8000-000000000042";
 const AGENT = { id: "0193aaaa-bbbb-7ccc-8ddd-eeeeffff0000", handle: "dev" };
 
-test("protocol 5: mcp.call and mcp.result parse; oversized arguments are dropped", () => {
+test("protocol 5: mcp.call and mcp.result parse; a whole source file fits, oversized arguments are dropped", () => {
   expect(MISSION_PROTOCOL).toBe(5);
-  expect(
-    parseRunnerFrame(
-      JSON.stringify({ type: "mcp.call", callId: "c1", taskId: TASK, tool: "report", args: { summary: "x" } }),
-    ),
-  ).toEqual({ type: "mcp.call", callId: "c1", taskId: TASK, tool: "report", args: { summary: "x" } });
-  expect(
-    parseRunnerFrame(
-      JSON.stringify({ type: "mcp.call", callId: "c1", taskId: TASK, tool: "report", args: { s: "x".repeat(70_000) } }),
-    ),
-  ).toBeNull();
+  const call = (args: Record<string, unknown>) =>
+    parseRunnerFrame(JSON.stringify({ type: "mcp.call", callId: "c1", taskId: TASK, tool: "report", args }));
+  expect(call({ summary: "x" })).toEqual({
+    type: "mcp.call",
+    callId: "c1",
+    taskId: TASK,
+    tool: "report",
+    args: { summary: "x" },
+  });
+  const file = "export const line = 1;\n".repeat(6600);
+  expect(file.length).toBeGreaterThan(150_000);
+  expect(call({ content: file })).toMatchObject({ type: "mcp.call", args: { content: file } });
+  expect(call({ s: "x".repeat(MCP_ARGS_MAX_CHARS) })).toBeNull();
   expect(parseServerFrame(JSON.stringify({ type: "mcp.result", callId: "c1", ok: true, text: "done" }))).toMatchObject({
     type: "mcp.result",
     ok: true,
@@ -551,6 +555,25 @@ test("with a server token the bridge asks the server for the list and relays any
     ok: false,
     error: "Unknown tool no spaces",
   });
+});
+
+test("the bridge relays a whole source file; past the limit it says the way out", async () => {
+  const { b, frames } = bridge({ token: "secret-token-1", missionId: "m1", running: true, serverToken: SERVER_TOKEN });
+  b.attach((f) => frames.push(f));
+  const req = { taskId: TASK, token: "secret-token-1", tool: "github_create_or_update_file" };
+  const content = "export const line = 1;\n".repeat(6600);
+  const pending = b.handle({ ...req, args: { path: "src/big.ts", content } });
+  await waitFor(() => frames.length === 1);
+  const sent = frames[0] as Extract<RunnerFrame, { type: "mcp.call" }>;
+  expect(sent.args).toEqual({ path: "src/big.ts", content });
+  b.result({ type: "mcp.result", callId: sent.callId, ok: true, text: "Committed." });
+  expect(await pending).toEqual({ ok: true, text: "Committed." });
+  expect(await b.handle({ ...req, args: { content: "x".repeat(MCP_ARGS_MAX_CHARS) } })).toEqual({
+    ok: false,
+    error:
+      "The arguments are too large (more than 1 MB). Keep big content in a file in your folder: to change a repository, commit and push it with git.",
+  });
+  expect(frames).toHaveLength(1);
 });
 
 test("without a server token (an older server) the list is the fixed mission tools", async () => {

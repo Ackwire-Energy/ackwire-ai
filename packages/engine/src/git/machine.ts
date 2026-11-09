@@ -3,7 +3,9 @@ import {
   GIT_CHECKOUTS_DIR,
   GIT_DIRECT_PROTOCOL,
   GIT_PROTOCOL,
+  GIT_STATELESS_TOKEN_PROTOCOL,
   GIT_SYNC_LIMITS,
+  GITHUB_APP_TOKEN,
   type GitSyncRepo,
   type GitSyncRequest,
   gitCheckoutDir,
@@ -34,7 +36,7 @@ import { runCoAuthor } from "./signature";
  * repositories, pushes only to `agentes/<handle>/…`); GitHub's token stays here.
  *
  * ADR 0116: with our GitHub App installed for a repository, a runner on
- * protocol 35 also gets a one-hour installation token for that repository
+ * protocol 53 also gets a one-hour installation token for that repository
  * alone (contents: read), so its fetches go straight to GitHub instead of
  * through this server; pushes still go through the proxy. Never the
  * connection's own (OAuth or pasted) token: without the App, all of it goes
@@ -120,8 +122,10 @@ export async function machineGitSetup(
 /**
  * Single-repository read tokens of our GitHub App for the repositories among `repos` the agent may use, keyed by
  * repository; empty without the App, on an older runner, where the App isn't installed, or for an agent that is
- * archived, held or suspended (as the proxy refuses it). Never the connection's own token. Each token handed out
- * is audited as a fetch (`via: github-direct`): the fetches themselves no longer pass through us.
+ * archived, held or suspended (as the proxy refuses it). Only what the runner takes as an installation token
+ * (`GITHUB_APP_TOKEN`), never the connection's own. Never throws: a repository without a token fetches through the
+ * proxy. Each token handed out is audited as a fetch (`via: github-direct`): the fetches themselves no longer pass
+ * through us.
  */
 export async function directFetchTokens(
   deps: MachineGitDeps,
@@ -131,31 +135,37 @@ export async function directFetchTokens(
 ): Promise<Map<string, string>> {
   const out = new Map<string, string>();
   const github = deps.github;
-  if (!github || protocol < GIT_DIRECT_PROTOCOL || repos.length === 0) return out;
-  const [agent] = await deps.db
-    .select({ archivedAt: schema.agents.archivedAt })
-    .from(schema.agents)
-    .where(and(eq(schema.agents.id, target.agentId), eq(schema.agents.orgId, target.orgId)));
-  if (!agent || agent.archivedAt || (await standingRefusal(deps.db, target.orgId, target.agentId))) return out;
-  const list = await agentRepositoryList(deps.db, target.orgId, target.agentId);
-  await Promise.all(
-    repos.map(async (repo) => {
-      const [owner = "", name = ""] = repo.split("/");
-      if (!repoInList(list, owner, name)) return;
-      const token = await appTokenForRepo(github.app, github.http, { db: deps.db, orgId: target.orgId }, owner, name, {
-        contents: "read",
-      }).catch(() => null);
-      if (!token) return;
-      out.set(repo, token);
-      await recordAudit(deps.db, {
-        orgId: target.orgId,
-        actor: { type: "agent", id: target.agentId },
-        action: "git.fetch",
-        target: { type: "git_repo", id: repo },
-        details: { via: "github-direct", machineId: target.machineId },
-      }).catch(() => undefined);
-    }),
-  );
+  if (!github || protocol < GIT_STATELESS_TOKEN_PROTOCOL || repos.length === 0) return out;
+  try {
+    const [agent] = await deps.db
+      .select({ archivedAt: schema.agents.archivedAt })
+      .from(schema.agents)
+      .where(and(eq(schema.agents.id, target.agentId), eq(schema.agents.orgId, target.orgId)));
+    if (!agent || agent.archivedAt || (await standingRefusal(deps.db, target.orgId, target.agentId))) return out;
+    const list = await agentRepositoryList(deps.db, target.orgId, target.agentId);
+    const tenant = { db: deps.db, orgId: target.orgId };
+    await Promise.all(
+      repos.map(async (repo) => {
+        const [owner = "", name = ""] = repo.split("/");
+        if (!repoInList(list, owner, name)) return;
+        const token = await appTokenForRepo(github.app, github.http, tenant, owner, name, { contents: "read" }).catch(
+          () => null,
+        );
+        // The runner refuses a whole `git.sync` over one token it doesn't take.
+        if (!token || !GITHUB_APP_TOKEN.test(token)) return;
+        out.set(repo, token);
+        await recordAudit(deps.db, {
+          orgId: target.orgId,
+          actor: { type: "agent", id: target.agentId },
+          action: "git.fetch",
+          target: { type: "git_repo", id: repo },
+          details: { via: "github-direct", machineId: target.machineId },
+        }).catch(() => undefined);
+      }),
+    );
+  } catch {
+    // The database didn't answer: no tokens this time, and the sync still goes (through the proxy).
+  }
   return out;
 }
 
@@ -332,7 +342,7 @@ export async function prepareAgentCode(
     // straight from GitHub too instead of going back to the proxy.
     const wildcard = list.length === 0 || list.length > explicit.length;
     const found =
-      wildcard && deps.github && status.protocol >= GIT_DIRECT_PROTOCOL
+      wildcard && deps.github && status.protocol >= GIT_STATELESS_TOKEN_PROTOCOL
         ? await checkoutsOnMachine(deps.hub, session.machineId, agent, options.signal)
         : [];
     const lowerExplicit = new Set(explicit.map((r) => r.toLowerCase()));

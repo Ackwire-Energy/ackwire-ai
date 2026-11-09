@@ -171,10 +171,12 @@ test("with a GitHub App token: fetches straight from github.com, pushes through 
   );
   expect(git(path.join(github, "acme", "app.git"), "branch", "--list", "agentes/dev/fix")).toBe("");
 
-  // A later sync with a fresh token rewrites it; one without (the App gone) puts the checkout back on the proxy.
-  const fresh = `ghs_${"d".repeat(36)}`;
+  // A later sync with a fresh token rewrites it, GitHub's stateless kind (`ghs_<app id>_<JWT>`) as well; one
+  // without (the App gone) puts the checkout back on the proxy.
+  const fresh = `ghs_123_eyJhbGciOiJSUzI1NiJ9.${"d".repeat(420)}.${"s-ig_".repeat(16)}`;
   expect((await sync(ctx, [{ repo: "acme/app", clone: false, github: fresh }]))[0]?.status).toBe("updated");
   expect(readFileSync(githubFile, "utf8")).toBe(fresh);
+  expect(ask("github.com")).toBe(`username=x-access-token\npassword=${fresh}\n`);
   expect((await sync(ctx, [{ repo: "acme/app", clone: false }]))[0]?.status).toBe("updated");
   expect(localConfig(checkout, "remote.origin.url")).toEqual([`${BASE}acme/app.git`]);
   expect(localConfig(checkout, "remote.origin.pushurl")).toEqual([]);
@@ -182,10 +184,13 @@ test("with a GitHub App token: fetches straight from github.com, pushes through 
   // ...and leaves no token on disk for it.
   expect(existsSync(githubFile)).toBe(false);
 
-  // Anything that isn't an App installation token is refused.
-  expect(sync(ctx, [{ repo: "acme/app", clone: false, github: "gho_oauthtoken1234567890abcdef" }])).rejects.toThrow(
-    "GitHub App token",
-  );
+  // Anything that isn't an App installation token is refused, a person's above all; the request's proxy
+  // credential is written all the same, so the agent's own git through the proxy keeps working.
+  for (const token of ["gho_oauthtoken1234567890abcdef", "ghp_personaltoken1234567890abcdef12345", "ghs_short"]) {
+    writeFileSync(proxyFile, "stale");
+    await expect(sync(ctx, [{ repo: "acme/app", clone: false, github: token }])).rejects.toThrow("GitHub App token");
+    expect(readFileSync(proxyFile, "utf8")).toBe(TOKEN);
+  }
 });
 
 test(`at most ${MAX_CLONES} clones at once; the rest wait, and a clone outlives the request that started it`, async () => {

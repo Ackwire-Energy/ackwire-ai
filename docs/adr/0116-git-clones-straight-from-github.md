@@ -26,3 +26,10 @@ Agents cloned big repositories at about 100 to 130 KB/s: a 2 GB repository took 
 - On the server's own computer, where each organization's runner has its own supervisor, each holds its own two slots.
 - Removing a cached repository once no `objects/info/alternates` points to it isn't built.
 - A clone killed with the runner leaves its folder; the next sync treats it as a checkout and fetches into it (git resumes no pack mid-way).
+
+## Addendum (2026-11-08): GitHub's stateless tokens, protocol 53
+
+Since 2026-10-02 GitHub mints only stateless installation tokens (`ghs_<app id>_<JWT>`, about 520 characters, with dots and dashes; GitHub changelog, "Stateless GitHub App installation tokens rolled out"). Runners up to protocol 52 take only the old 40-character kind and refuse a whole `git.sync` on any other, before writing its proxy credential: with the App installed, every sync failed (`git_clone`: "github is not a GitHub App token") and the computer's proxy credential ran out 6 hours after the last good one, so the agent's own fetches and pushes through the proxy were refused too.
+
+- Both kinds match `GITHUB_APP_TOKEN` (GitHub's own pattern, `ghs_[A-Za-z0-9._-]{36,}`, at most 4096 characters), shared by the runner and the server. The server hands over only a token it matches, and only to runners on protocol 53 (`GIT_STATELESS_TOKEN_PROTOCOL`); older ones get none and fetch through the proxy. A person's token (`gho_`, `ghp_`, `ghu_`, `github_pat_`) never matches.
+- The runner writes the request's proxy credential before anything else in the request can refuse it.
