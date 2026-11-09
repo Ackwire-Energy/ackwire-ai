@@ -40,6 +40,16 @@ describe("pricing", () => {
     expect(costNanoUsd("claude-sonnet-5-5", usage(0, 0, 1_000_000))).toBe(usdToNanoUsd(0.1));
   });
 
+  test("Fable 5.1: $10 / $0.25 / $12.50 / $50 across its whole 1M window, chosen only by people", () => {
+    const perMTok = [usage(1e6, 0), usage(0, 0, 1e6), usage(0, 0, 0, 1e6), usage(0, 1e6)].map(
+      (u) => costNanoUsd("claude-fable-5-1", u) / 1e9,
+    );
+    expect(perMTok).toEqual([10, 0.25, 12.5, 50]);
+    expect(costNanoUsd("claude-fable-5-1", usage(900_000, 0))).toBe(900_000 * 10000);
+    expect(MODEL_CATALOG["claude-fable-5-1"]).toMatchObject({ provider: "anthropic", contextWindow: 1_000_000 });
+    expect(MODEL_CATALOG["claude-fable-5-1"]?.tier).toBeUndefined();
+  });
+
   test("1-hour cache writes cost twice the input price, and reservations allow for them", () => {
     // Opus 5.5: $4 input, $5 per million for 5-minute writes, $8 for 1-hour ones.
     const written = { ...usage(0, 0, 0, 1_000_000), cacheWriteLongTokens: 800_000 };
@@ -78,6 +88,19 @@ describe("pricing", () => {
     // People pick it: never Automático's, the router's or the system tasks' choice.
     expect(MODEL_CATALOG["gpt-6.1-terra"]).toMatchObject({ provider: "openai", contextWindow: 1_050_000 });
     expect(MODEL_CATALOG["gpt-6.1-terra"]?.tier).toBeUndefined();
+  });
+
+  test("GPT-6 Astra: $10 / $1 / $12.50 / $50, and $20 / $2 / $25 / $75 above 272K prompt tokens", () => {
+    expect(costNanoUsd("gpt-6-astra", usage(100_000, 1000, 100_000, 72_000))).toBe(
+      100_000 * 10000 + 1000 * 50000 + 100_000 * 1000 + 72_000 * 12500,
+    );
+    expect(costNanoUsd("gpt-6-astra", usage(100_001, 1000, 100_000, 72_000))).toBe(
+      100_001 * 20000 + 1000 * 75000 + 100_000 * 2000 + 72_000 * 25000,
+    );
+    // People pick it: never Automático's, the router's or the system tasks' choice.
+    expect(MODEL_CATALOG["gpt-6-astra"]).toMatchObject({ provider: "openai", label: "GPT-6 Astra", reasoning: true });
+    expect(contextWindowOf("gpt-6-astra")).toBe(1_050_000);
+    expect(MODEL_CATALOG["gpt-6-astra"]?.tier).toBeUndefined();
   });
 
   test("GPT-6 Sol and Luna: input, cached input and cache writes 2×, output 1.5× above 272K prompt tokens", () => {

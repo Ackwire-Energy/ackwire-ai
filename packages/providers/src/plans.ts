@@ -164,7 +164,7 @@ export const CODING_PLANS = {
       // models answer only once the OpenCode workspace allows the Global region, the ones that train on what
       // they're sent only once it allows that (paid and free are separate switches); none has an alias, so
       // "Automático" never picks one.
-      // The fallback for `modelsUrl` (30 on 2026-11-06, all of them here), and what only we know of each model:
+      // The fallback for `modelsUrl` (31 on 2026-11-09, all of them here), and what only we know of each model:
       // its alias and tag. Zen's own free models (`deepseek-v4.1-flash-free`, `glm-5.3-flash-free`, `big-pickle`…)
       // aren't Go's: OpenCode serves its free tier only to the OpenCode CLI ("Free-tier chat models require
       // OpenCode", opencode.ai/v2/docs/console/models, read 2026-11-06), so they can't answer through Claude Code.
@@ -196,6 +196,7 @@ export const CODING_PLANS = {
         { id: "gemini-4-argon", label: "Gemini 4 Argon", tag: "smart", maker: "gemini" },
         { id: "grok-4.7", label: "Grok 4.7", maker: "xAI" },
         { id: "longcat-2.0", label: "LongCat 2.0", tag: "cheap", maker: "Meituan" },
+        { id: "longcat-2.5-free", label: "LongCat 2.5 Free", free: true, maker: "Meituan" },
         { id: "hy3", label: "Hy3", tag: "cheap", maker: "Tencent" },
         { id: "hy4", label: "Hy4", maker: "Tencent" },
         { id: "hy4-preview", label: "Hy4 Preview", maker: "Tencent" },
@@ -542,17 +543,22 @@ export const sharedSignIn = (kind: string, provider?: string | null) =>
 
 /**
  * OpenCode's free tier (ADR 0132): models OpenCode serves at no cost and only to its own CLI ("Free-tier chat models
- * require OpenCode", opencode.ai/docs/zen, read 2026-11-02). Its CLI runs them with no key at all. What `opencode
- * models` lists on the computer comes first; this list is the fallback where it listed nothing.
+ * require OpenCode", opencode.ai/docs/zen, read 2026-11-02; its free list read again 2026-11-09). Its CLI runs them
+ * with no key at all. What `opencode models` lists on the computer comes first; this list is the fallback where it
+ * listed nothing.
  * ponytail: hand-copied list, the CLI's own listing replaces it wherever the runner reports one.
  */
 export const OPENCODE_FREE_MODELS: readonly { id: string; label: string }[] = [
   { id: "opencode/big-pickle", label: "Big Pickle" },
   { id: "opencode/beam-free", label: "Beam Free" },
+  { id: "opencode/crouton-alpha-free", label: "Crouton Alpha Free" },
   { id: "opencode/deepseek-v4.1-flash-free", label: "DeepSeek V4.1 Flash Free" },
   { id: "opencode/flint-40b-free", label: "Flint 40B Free" },
   { id: "opencode/glm-5.3-flash-free", label: "GLM-5.3 Flash Free" },
+  { id: "opencode/iceman-free", label: "Iceman Free" },
+  { id: "opencode/inkling-2-small-free", label: "Inkling 2 Small Free" },
   { id: "opencode/jev-1.13-free", label: "Jev 1.13 Free" },
+  { id: "opencode/longcat-2.5-free", label: "LongCat 2.5 Free" },
   { id: "opencode/mimo-v2.6-flash-free", label: "MiMo V2.6 Flash Free" },
   { id: "opencode/nemotron-3-ultra-free", label: "Nemotron 3 Ultra Free" },
   { id: "opencode/nemotron-3.5-lightning-free", label: "Nemotron 3.5 Lightning Free" },
