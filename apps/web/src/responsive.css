@@ -549,4 +549,17 @@
   .setup-notice .outage__acts > .ac-btn--ghost:first-child {
     margin-left: -12px;
   }
+  /* Words with nothing before them (a hold's) take the lead's column too, from the padding, with no lift. */
+  .outage > .outage__text:first-child {
+    grid-column: 1 / -1;
+    translate: none;
+  }
+  /* A lone main button takes the notice's width, under the words (rule 23). */
+  .outage__acts:has(> .ac-btn:only-child:not(.ac-btn--ghost)) {
+    grid-column: 1 / -1;
+    margin-top: 6px;
+  }
+  .outage__acts > .ac-btn:only-child:not(.ac-btn--ghost) {
+    flex: 1 1 auto;
+  }
 }

@@ -9672,6 +9672,16 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
 .ac-empty--page .ac-empty__actions {
   margin-top: var(--space-6);
 }
+/*
+ * On a phone a lone button takes the width of what holds it, at its own height (rule 23): a card's line of buttons and
+ * a MediaRow's end under its row (a plated one), a dialog's foot and an empty state's actions (any one).
+ */
+@media (max-width: 640px) {
+  .ac-card > .ac-acts > .ac-btn:only-child:not(.ac-btn--ghost),
+  :is(.ac-dialog__foot, .ac-empty__actions) > .ac-btn:only-child {
+    flex: 1 1 auto;
+  }
+}
 /* A phone's page head takes half the screen: the button stays in reach. */
 @media (max-width: 640px) {
   .ac-empty--page {
@@ -11415,5 +11425,12 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
   /* Its control left the name's line: the face's middle is that line's axis again. */
   .ac-mediarow:has(> .ac-mediarow__end--wrap) > :is(.ac-mediarow__face, .ac-mediarow__head) {
     --mediarow-axis: var(--mediarow-face);
+  }
+  /* A lone plated button there takes the row's width (rule 23). */
+  .ac-mediarow__end--wrap:has(> .ac-btn:only-child:not(.ac-btn--ghost)) {
+    justify-self: stretch;
+  }
+  .ac-mediarow__end--wrap > .ac-btn:only-child:not(.ac-btn--ghost) {
+    flex: 1 1 auto;
   }
 }

@@ -345,6 +345,12 @@ html:not([data-pointer]) .rq__more:focus-visible {
 .rq__item-acts {
   column-gap: var(--space-2);
 }
+/* On a phone a lone plated button takes the footer's width (rule 23); the time left goes under it, at the end. */
+@media (max-width: 640px) {
+  .rq__foot:not(:has(> .ac-btn:not(.ac-btn--ghost) ~ .ac-btn:not(.ac-btn--ghost))) > .ac-btn:not(.ac-btn--ghost) {
+    flex: 1 1 100%;
+  }
+}
 /*
  * A question's choices: a list in the card's body, one a line, its number key on the left (1 to 9 answer while the
  * focus is in the list), "Other answer" its last line. Whole sentences wrap inside their line.

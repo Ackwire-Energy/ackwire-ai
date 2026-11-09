@@ -7887,12 +7887,21 @@ html:not([data-pointer]) .machine-connect__toggle:focus-visible {
     translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
   }
 }
+/* Words with nothing before them start on the padding, with no lift onto a lead's line. */
+.hold-banner > .outage__text:first-child {
+  translate: none;
+}
 /* The button on the first line, with the lead, however many lines the words take under it (a button in the middle of
-   the lines read as belonging to none). To the row it is one line tall, the rest of it overhanging evenly, so a
-   one-line hold keeps its strip. */
+   the lines read as belonging to none). To the row it is one line tall, the rest of it overhanging evenly; the strip
+   grows so it keeps the notice's room (`--action-clear`) above and below it. */
 .hold-banner > .outage__acts {
   align-self: flex-start;
   margin-block: calc(11px - var(--control-h-sm) / 2);
+}
+@media (min-width: 641px) {
+  .outage.hold-banner:has(> .outage__acts > .ac-btn:not(.ac-btn--ghost)) {
+    padding-block: calc(var(--action-clear) + var(--control-h-sm) / 2 - 11px);
+  }
 }
 /* Where to write for help: the address reads as part of the sentence. */
 .support-line a {
