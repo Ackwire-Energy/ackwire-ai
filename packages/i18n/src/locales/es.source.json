@@ -3884,6 +3884,12 @@
   "openOnPhone.stepTailscale": {
     "value": "Install Tailscale on your phone and join this server's network (tailnet)."
   },
+  "openOnPhone.appStore": {
+    "value": "App Store"
+  },
+  "openOnPhone.googlePlay": {
+    "value": "Google Play"
+  },
   "openOnPhone.stepScan": {
     "value": "Point your phone's camera at the code."
   },
