@@ -1016,7 +1016,12 @@ pub async fn this_mac(app: AppHandle, webview: tauri::Webview, request: Value) -
         }
         // The other servers' workspaces, as last read (the page's own server lists its own).
         Some("workspaces") => {
-            if crate::workspaces::stale(&app) {
+            // Never read yet (the app's first check ran before this window existed): read now and answer with it,
+            // so the site's menu never starts empty for a minute.
+            if crate::workspaces::never_read(&app) {
+                let reader = app.clone();
+                let _ = tauri::async_runtime::spawn_blocking(move || crate::workspaces::refresh_now(&reader)).await;
+            } else if crate::workspaces::stale(&app) {
                 crate::workspaces::trigger(&app);
             }
             let others: Vec<_> = crate::workspaces::list(&app).into_iter().filter(|s| s.server != origin).collect();

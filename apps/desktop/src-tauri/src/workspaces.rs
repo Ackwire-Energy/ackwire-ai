@@ -84,6 +84,16 @@ pub fn stale(app: &AppHandle) -> bool {
     lock(app).checked.map_or(true, |at| at.elapsed() > STALE)
 }
 
+/// No server read yet: the loop's first pass ran before the main window existed (there were no cookies to read).
+pub fn never_read(app: &AppHandle) -> bool {
+    lock(app).checked.is_none()
+}
+
+/// Every server read now, on the caller's thread (never a command's or an event handler's: Windows deadlocks).
+pub fn refresh_now(app: &AppHandle) {
+    refresh(app);
+}
+
 /// Asks every server again now (the loop does it on its own thread).
 pub fn trigger(app: &AppHandle) {
     if let Some(wake) = lock(app).wake.as_ref() {
