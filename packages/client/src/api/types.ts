@@ -4008,8 +4008,8 @@ export interface CalendarRange {
   routines: { routineId: string; name: string; agentId: string; at: string; target: RoutineTarget }[];
   /** Pending reminders the viewer may see (absent on an older server). */
   reminders?: CalendarReminder[];
-  /** Issues due in the range (all-day). */
-  deadlines: { issueId: string; number: number; title: string; date: string }[];
+  /** Issues due in the range (all-day), with who has each (absent on an older server). */
+  deadlines: { issueId: string; number: number; title: string; date: string; assignee?: Actor | null }[];
   proposals: CalendarProposal[];
 }
 
