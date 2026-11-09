@@ -19,18 +19,21 @@ export function WhoSelect({
   narrowOnly = false,
   disabled = false,
   id,
+  size = "md",
 }: {
   value: DeviceAudience;
   onChange: (next: DeviceAudience) => void;
   narrowOnly?: boolean;
   disabled?: boolean;
   id?: string;
+  /** A form's field (`md`, as tall as the fields beside it) or a settings row's control (`sm`). */
+  size?: "md" | "sm";
 }) {
   const { t } = useTranslation();
   return (
     <Select
       id={id}
-      size="sm"
+      size={size}
       align="end"
       aria-label={id ? undefined : t("devices.who.title")}
       value={value.mode}
@@ -108,7 +111,15 @@ export function WhoCanUseRow({
         icon="audiencePeople"
         label={t("devices.who.title")}
         hint={hint}
-        control={<WhoSelect value={value} onChange={onChange} narrowOnly={narrowOnly} disabled={!editable || saving} />}
+        control={
+          <WhoSelect
+            size="sm"
+            value={value}
+            onChange={onChange}
+            narrowOnly={narrowOnly}
+            disabled={!editable || saving}
+          />
+        }
       />
       {editable && (
         <WhoPicker

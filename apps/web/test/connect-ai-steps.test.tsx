@@ -823,7 +823,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
     await click(within(dialog).getByRole("button", { name: "Conectar um computador" }));
     await settle(4);
     expect(screen().queryByRole("dialog")).toBeNull();
-    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/computers`);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/devices`);
   });
 
   test("before the server says which edition this is: a wait, never a computer to connect", async () => {

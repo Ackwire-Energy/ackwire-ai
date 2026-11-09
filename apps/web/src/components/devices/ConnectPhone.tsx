@@ -515,6 +515,12 @@ export function IphoneFlow({
       />
     ),
   };
+  const note = (
+    <span className="ac-iconline small muted">
+      <Icon name="info" size={14} />
+      <span>{t("devices.iphone.noMacNote")}</span>
+    </span>
+  );
   return (
     <>
       <DialogBody>
@@ -549,16 +555,7 @@ export function IphoneFlow({
           </>
         )}
       </DialogBody>
-      <FlowFooter
-        onClose={onClose}
-        onBack={onBack}
-        note={
-          <span className="ac-iconline small muted">
-            <Icon name="info" size={14} />
-            <span>{t("devices.iphone.noMacNote")}</span>
-          </span>
-        }
-      >
+      <FlowFooter onClose={onClose} onBack={onBack} note={note}>
         {ready ? (
           <Button variant="primary" onClick={onClose}>
             {t("devices.done")}

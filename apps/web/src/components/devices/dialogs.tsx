@@ -157,7 +157,7 @@ export function JoinRequestForm({
           <div className="ac-faceline dv-join">
             <ComputerPortrait kind={computerKind(request.os)} state="online" />
             <span className="dv-connected__text">
-              <span className="dv-connected__name">{request.name}</span>
+              <span className="dv-connected__name ac-captop">{request.name}</span>
               <span className="dv-connected__facts">{joinFacts(t, request)}</span>
             </span>
           </div>

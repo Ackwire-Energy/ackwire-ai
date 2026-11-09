@@ -12599,6 +12599,11 @@
       "sharingTooMany": "Choisissez au plus {{max}} personnes et {{max}} rôles.",
       "notInDrive": "Ceci ne vit que dans sa conversation, il ne peut donc pas être partagé."
     },
+    "device": {
+      "notLinkMaker": "Seule la personne qui a créé le lien peut laisser cet ordinateur rejoindre.",
+      "widenForbidden": "Les admins peuvent seulement restreindre qui utilise l'appareil personnel de quelqu'un.",
+      "notHome": "Les agents vivent sur l'ordinateur du workspace et utilisent celui-ci quand ils le nomment."
+    },
     "machine": {
       "forbidden": "Seul un admin, ou la personne qui a connecté l'ordinateur, peut faire cela.",
       "notFound": "Cet ordinateur n'est plus connecté.",
@@ -14756,6 +14761,8 @@
         "withdrawingRequest": "A retiré une demande",
         "schedulingAction": "A préparé une action pour plus tard",
         "updatingDashboard": "A travaillé sur un tableau de bord",
+        "testingOnPhone": "A testé sur un téléphone",
+        "waitingForDevice": "A attendu un appareil",
         "readingDashboards": "A regardé les tableaux de bord",
         "pushingBranch": "A demandé à envoyer du code",
         "deletingBranches": "A supprimé des branches",
@@ -14865,6 +14872,8 @@
       "withdrawingRequest": "retrait d'une demande",
       "schedulingAction": "préparation d'une action pour plus tard",
       "updatingDashboard": "travail sur un tableau de bord",
+      "testingOnPhone": "test sur un téléphone",
+      "waitingForDevice": "attente d'un appareil",
       "readingDashboards": "consultation des tableaux de bord",
       "pushingBranch": "demande d'envoi de code",
       "deletingBranches": "suppression de branches",

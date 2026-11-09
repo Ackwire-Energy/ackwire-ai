@@ -11682,6 +11682,11 @@
       "sharingTooMany": "사람은 최대 {{max}}명, 역할은 최대 {{max}}개까지 선택할 수 있어요.",
       "notInDrive": "이것은 대화 안에만 있어서 공유할 수 없어요."
     },
+    "device": {
+      "notLinkMaker": "링크를 만든 사람만 이 컴퓨터를 참여시킬 수 있어요.",
+      "widenForbidden": "관리자는 다른 사람의 개인 기기를 쓸 수 있는 사람을 줄이는 것만 할 수 있어요.",
+      "notHome": "에이전트는 워크스페이스 컴퓨터에 있고, 이름을 부를 때 이 컴퓨터를 써요."
+    },
     "machine": {
       "forbidden": "관리자나 컴퓨터를 연결한 사람만 할 수 있어요.",
       "notFound": "이 컴퓨터는 더 이상 연결되어 있지 않아요.",
@@ -13738,6 +13743,8 @@
         "withdrawingRequest": "요청을 철회했어요",
         "schedulingAction": "나중에 할 작업을 준비했어요",
         "updatingDashboard": "대시보드에서 작업했어요",
+        "testingOnPhone": "휴대폰에서 테스트했어요",
+        "waitingForDevice": "기기를 기다렸어요",
         "readingDashboards": "대시보드를 살펴봤어요",
         "pushingBranch": "코드를 보내도 되는지 요청했어요",
         "deletingBranches": "브랜치를 삭제했어요",
@@ -13847,6 +13854,8 @@
       "withdrawingRequest": "요청을 철회하는 중",
       "schedulingAction": "나중에 할 작업을 준비하는 중",
       "updatingDashboard": "대시보드에서 작업하는 중",
+      "testingOnPhone": "휴대폰에서 테스트하는 중",
+      "waitingForDevice": "기기를 기다리는 중",
       "readingDashboards": "대시보드를 살펴보는 중",
       "pushingBranch": "코드를 보내도 되는지 요청하는 중",
       "deletingBranches": "브랜치를 삭제하는 중",

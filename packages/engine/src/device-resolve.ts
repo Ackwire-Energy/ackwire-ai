@@ -1,7 +1,8 @@
 import type { PhoneReason, PubSub } from "@agenteschat/adapters";
-import { and, type Database, type Executor, eq, gt, inArray, isNull, ne, schema } from "@agenteschat/db";
+import { and, type Database, type Executor, eq, gt, inArray, isNull, ne, rowsOf, schema, sql } from "@agenteschat/db";
 import { getAgentCached } from "./agents";
 import { accountablePerson, runAuthorityById } from "./authority";
+import { caches, cachesEnabled } from "./cache";
 import {
   type ComputerDevice,
   type DeviceRule,
@@ -436,31 +437,46 @@ export async function decideDeviceAccess(
 }
 
 /** Whether the workspace has a device besides this computer: the `computer` argument is offered then. */
-export async function hasOtherDevices(db: Executor, orgId: string, exceptMachineId: string | null): Promise<boolean> {
-  const [computer] = await db
-    .select({ id: machines.id })
-    .from(machines)
-    .where(
-      and(
-        eq(machines.orgId, orgId),
-        isNull(machines.deletedAt),
-        exceptMachineId ? ne(machines.id, exceptMachineId) : undefined,
-      ),
-    )
-    .limit(1);
-  if (computer) return true;
-  return workspaceHasPhones(db, orgId);
+/** The workspace's devices by name, for the prompt and the tool lists (`deviceRoster`). */
+export interface DeviceRoster {
+  computers: { id: string; name: string; os: string }[];
+  phones: { id: string; name: string; platform: string }[];
 }
 
-/** Whether any phone was seen in the workspace: the phone tools are offered then. */
-export async function workspaceHasPhones(db: Executor, orgId: string): Promise<boolean> {
-  const [phone] = await db
-    .select({ id: machinePhones.id })
-    .from(machinePhones)
-    .where(and(eq(machinePhones.orgId, orgId), isNull(machinePhones.deletedAt)))
-    .limit(1);
-  return Boolean(phone);
+async function loadRoster(db: Executor, orgId: string): Promise<DeviceRoster> {
+  const rows = rowsOf<{ kind: string; id: string; name: string; os: string }>(
+    await db.execute(sql`select 'computer' as kind, m.id::text as id, m.name, m.os from machines m
+      where m.org_id = ${orgId}::uuid and m.deleted_at is null
+      union all
+      select 'phone', p.id::text, p.name, p.platform from machine_phones p
+      where p.org_id = ${orgId}::uuid and p.deleted_at is null`),
+  );
+  return {
+    computers: rows.filter((r) => r.kind === "computer").map(({ id, name, os }) => ({ id, name, os })),
+    phones: rows.filter((r) => r.kind === "phone").map(({ id, name, os }) => ({ id, name, platform: os })),
+  };
 }
+
+/**
+ * The workspace's computers and phones by name, in one statement that a run's prompt and its tool lists share
+ * (`caches.deviceRoster`, a few seconds). Picking a device for an op reads `workspaceDevices` fresh instead.
+ */
+export function deviceRoster(db: Executor, orgId: string): Promise<DeviceRoster> {
+  if (!cachesEnabled()) return loadRoster(db, orgId);
+  const key = `${orgId}:roster`;
+  const hit = caches.deviceRoster.get(key) as Promise<DeviceRoster> | undefined;
+  if (hit) return hit;
+  const loading = loadRoster(db, orgId);
+  caches.deviceRoster.set(key, loading);
+  loading.catch(() => caches.deviceRoster.delete(key));
+  return loading;
+}
+
+/** Whether the roster has a phone, and a device besides `machineId` (the agent's own computer). */
+export const rosterFacts = (roster: DeviceRoster, machineId: string | null) => {
+  const phones = roster.phones.length > 0;
+  return { phones, others: phones || roster.computers.some((c) => c.id !== machineId) };
+};
 
 /** "macOS", "Windows", "Linux", or the word the runner said. */
 export const osName = (os: string) =>

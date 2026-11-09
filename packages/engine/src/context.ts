@@ -29,7 +29,7 @@ import { summarizeScopes } from "./capabilities";
 import { peopleAllIn } from "./channels";
 import { consultationOrigin, type HandOff, handOffsFrom } from "./consultations";
 import { widgetRunContext } from "./dashboards/refresh-context";
-import { osName, workspaceDevices } from "./device-resolve";
+import { deviceRoster, osName } from "./device-resolve";
 import { isAgentOnlyDm } from "./dms";
 import { cutText, stringsOf } from "./format";
 import { issueWorkBrief, issueWorkOf } from "./issue-work";
@@ -553,7 +553,7 @@ export async function buildRunContext(
     : heldSecretsOf(db, run.orgId, agent.id, agent.machineId).catch(() => []);
   // People's own devices it may name (bring your own devices), only with the computer's tools.
   const otherDevices = options.toolsAvailable
-    ? workspaceDevices(db, run.orgId)
+    ? deviceRoster(db, run.orgId)
         .then((d) => ({ computers: d.computers.filter((c) => c.id !== agent.machineId), phones: d.phones }))
         .catch(() => null)
     : null;

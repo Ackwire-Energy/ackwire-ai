@@ -203,7 +203,7 @@ function IphoneDone({ phone, hostName }: { phone: PhoneDevice; hostName: string 
   return (
     <SettingsPage
       title={t("mobile.devices.iphone.title")}
-      bottom={<Button variant="primary" wide label={t("common.done")} onPress={goBack} />}
+      bottom={<Button variant="primary" wide label={t("mobile.common.done")} onPress={goBack} />}
     >
       <Gap />
       <ConnectedHero

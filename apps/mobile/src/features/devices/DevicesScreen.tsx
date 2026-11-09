@@ -1,6 +1,7 @@
 import type { ComputerDevice } from "@agenteschat/client";
 import { useComputerSetup, useMachines } from "@agenteschat/client";
 import { computerName, setupPending, setupView } from "@agenteschat/client/lib/computer";
+import { can } from "@agenteschat/client/lib/permissions";
 import { helpUrl } from "@agenteschat/client/lib/server";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Platform, StyleSheet, View } from "react-native";
@@ -11,6 +12,7 @@ import { Note, openPage } from "../ai/parts";
 import { SetupWait } from "../computer/SetupWait";
 import { AgentComputers, HostComputerOff } from "../settings/ComputersScreen";
 import { Gap, SettingsPage } from "../settings/parts";
+import { firstUseCopy } from "../shared/first-use";
 import { useColors } from "../shared/hooks";
 import { Loaded } from "../shared/parts";
 import { DevicePortrait, JoinRequestCard, StatusLine } from "./parts";
@@ -33,7 +35,8 @@ export const openThisPhone = (machineId?: string) =>
 export function DevicesScreen() {
   const { t, i18n } = useTranslation();
   const c = useColors();
-  const { orgId } = useOrg();
+  const { orgId, org } = useOrg();
+  const pairs = can(org, "pair_computers");
   const list = useDevices();
   const setup = useComputerSetup(orgId);
   const view = setupView(setup.data, setup.dataUpdatedAt);
@@ -71,16 +74,18 @@ export function DevicesScreen() {
           <Button size="sm" variant="secondary" label={t("common.retry")} onPress={() => void list.refetch()} />
         </View>
       ) : (
-        <DeviceList devices={list.data?.devices ?? []} />
+        <DeviceList devices={list.data?.devices ?? []} pairs={pairs} />
       )}
       <Gap />
       <GroupedList>
-        <GroupedRow
-          icon="plus"
-          label={t("mobile.devices.connect.title")}
-          chevron
-          onPress={() => router.push("/settings/devices/connect")}
-        />
+        {pairs ? (
+          <GroupedRow
+            icon="plus"
+            label={t("mobile.devices.connect.title")}
+            chevron
+            onPress={() => router.push("/settings/devices/connect")}
+          />
+        ) : null}
         <GroupedRow
           icon="join"
           label={Platform.OS === "ios" ? t("mobile.devices.iphone.title") : t("mobile.devices.android.entry")}
@@ -104,18 +109,22 @@ export function DevicesScreen() {
 }
 
 /** Every computer and, under each, the phones it reaches; each row opens its page. */
-function DeviceList({ devices }: { devices: ComputerDevice[] }) {
+function DeviceList({ devices, pairs }: { devices: ComputerDevice[]; pairs: boolean }) {
   const { t } = useTranslation();
   const { org } = useOrg();
+  // Who can't connect one reads who does instead.
+  const copy = pairs
+    ? ({ title: "mobile.devices.empty.title", text: "mobile.devices.empty.text" } as const)
+    : firstUseCopy("computers", pairs);
   if (devices.length === 0)
     return (
       <GroupedList>
         <View style={styles.empty}>
           <Text variant="callout" tone="ink" style={[styles.bold, styles.center]}>
-            {t("mobile.devices.empty.title")}
+            {t(copy.title)}
           </Text>
           <Text variant="small" tone="muted" style={styles.center}>
-            {t("mobile.devices.empty.text")}
+            {t(copy.text)}
           </Text>
         </View>
       </GroupedList>

@@ -1841,10 +1841,10 @@
       "switchA11y": "Tombol Mode Pengembang, mati",
       "step3Text": "Nyalakan, lalu ketuk Mulai Ulang. Setelah dimulai ulang, ketuk Nyalakan dan masukkan kode sandimu.",
       "step4": "Nyalakan Otomatisasi UI",
-      "step4Text": "Pengaturan › Pengembang › Aktifkan Otomatisasi UI",
+      "step4Text": "Pengaturan › Pengembang › Aktifkan Otomatisasi UI",
       "step5": "Percayai helper pengujian",
       "step5Hint": "Aplikasi yang dipasang {{host}} agar agen bisa mengetuk dan mengetik di iPhone ini. Aplikasi ini muncul di daftar ini setelah terpasang.",
-      "step5Text": "Pengaturan › Umum › VPN & Manajemen Perangkat. Ketuk nama developernya, lalu Percayai.",
+      "step5Text": "Pengaturan › Umum › VPN & Manajemen Perangkat. Ketuk nama developernya, lalu Percayai.",
       "waiting": "Menunggu {{host}} melihatnya",
       "footer": "Mac-mu mengurus sisanya, dan memperbarui helper pengujian setiap 7 hari selama menyala."
     },

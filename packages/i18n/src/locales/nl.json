@@ -12224,6 +12224,11 @@
       "sharingTooMany": "Kies hoogstens {{max}} mensen en {{max}} rollen.",
       "notInDrive": "Dit bestaat alleen in zijn gesprek, dus het kan niet worden gedeeld."
     },
+    "device": {
+      "notLinkMaker": "Alleen wie de link heeft gemaakt, kan deze computer laten deelnemen.",
+      "widenForbidden": "Admins kunnen alleen beperken wie iemands eigen apparaat mag gebruiken.",
+      "notHome": "Agents wonen op de computer van de workspace en gebruiken deze als ze hem bij naam noemen."
+    },
     "machine": {
       "forbidden": "Alleen een beheerder, of wie de computer heeft gekoppeld, kan dat doen.",
       "notFound": "Deze computer is niet meer gekoppeld.",
@@ -14331,6 +14336,8 @@
         "withdrawingRequest": "Een verzoek ingetrokken",
         "schedulingAction": "Een actie voor later voorbereid",
         "updatingDashboard": "Aan een dashboard gewerkt",
+        "testingOnPhone": "Op een telefoon getest",
+        "waitingForDevice": "Op een apparaat gewacht",
         "readingDashboards": "De dashboards bekeken",
         "pushingBranch": "Gevraagd om code te versturen",
         "deletingBranches": "Branches verwijderd",
@@ -14440,6 +14447,8 @@
       "withdrawingRequest": "een verzoek aan het intrekken",
       "schedulingAction": "een actie voor later aan het voorbereiden",
       "updatingDashboard": "aan een dashboard aan het werken",
+      "testingOnPhone": "op een telefoon aan het testen",
+      "waitingForDevice": "op een apparaat aan het wachten",
       "readingDashboards": "de dashboards aan het bekijken",
       "pushingBranch": "aan het vragen om code te versturen",
       "deletingBranches": "branches aan het verwijderen",

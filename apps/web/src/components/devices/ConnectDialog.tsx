@@ -121,7 +121,7 @@ function Chooser({ onPick, onClose }: { onPick: (step: ConnectStep) => void; onC
     <button type="button" className="dv-option" onClick={() => onPick(step)}>
       {mark}
       <span className="dv-option__text">
-        <span className="dv-option__title">{title}</span>
+        <span className="dv-option__title ac-captop">{title}</span>
         <span className="dv-option__line">{line}</span>
       </span>
       <Icon name="chevronRight" size={16} className="dv-option__arrow" />
@@ -139,7 +139,7 @@ function Chooser({ onPick, onClose }: { onPick: (step: ConnectStep) => void; onC
               <div className="dv-option dv-wide">
                 <ProviderLogo id={platform === "mac" ? "apple" : platform} size="sm" className="dv-tile" />
                 <span className="dv-option__text">
-                  <span className="dv-option__title">{t(thisLabel(platform))}</span>
+                  <span className="dv-option__title ac-captop">{t(thisLabel(platform))}</span>
                   <span className="dv-option__line">{t("devices.choose.thisLine")}</span>
                 </span>
                 <span className="dv-option__acts">

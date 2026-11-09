@@ -2006,11 +2006,12 @@ export const featureKeysEn = {
       switchA11y: "The Developer Mode switch, off",
       step3Text: "Turn it on and tap Restart. After the restart, tap Turn On and enter your passcode.",
       step4: "Turn on UI Automation",
-      step4Text: "Settings › Developer › Enable UI Automation",
+      step4Text: "Settings\u00a0›\u00a0Developer\u00a0›\u00a0Enable UI Automation",
       step5: "Trust the test helper",
       step5Hint:
         "The app {{host}} installs so agents can tap and type on this iPhone. It shows up in this list once installed.",
-      step5Text: "Settings › General › VPN & Device Management. Tap the developer's name, then Trust.",
+      step5Text:
+        "Settings\u00a0›\u00a0General\u00a0›\u00a0VPN & Device Management. Tap the developer's name, then Trust.",
       waiting: "Waiting for {{host}} to see it",
       footer: "Your Mac does the rest, and renews the test helper every 7 days while it's on.",
     },

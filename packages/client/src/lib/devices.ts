@@ -1,4 +1,3 @@
-import { fold } from "@agenteschat/ui/search";
 import type { TFunction } from "i18next";
 import type {
   AppNotification,
@@ -10,6 +9,7 @@ import type {
 } from "../api/types";
 import { clockAt, firstName } from "./format";
 import { computerKind } from "./machines";
+import { norm as fold } from "./tool-review";
 
 /**
  * Bring your own devices: the words, pictures and order the web and phone apps give the devices list

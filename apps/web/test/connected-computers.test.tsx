@@ -348,7 +348,7 @@ describe("Configurações → Dispositivos (self-host)", () => {
     expect(card.textContent).toContain("Nenhum computador");
   });
 
-  test("download: the app for the system this page is open on, the other two in a small menu", async () => {
+  test("download: Another computer offers the app for the system this page is open on, the other two in a small menu", async () => {
     const state = seedState();
     const api = createFakeApi(state);
     fakeMachinesOf.get(api)?.setRelease({
@@ -362,9 +362,11 @@ describe("Configurações → Dispositivos (self-host)", () => {
     await settle(8);
     await click(screen().getByRole("button", { name: "Conectar um dispositivo" }));
     await settle(4);
-    const dialog = screen().getByRole("dialog", { name: "Conectar um dispositivo" });
-    // A web page can't know whether the app is installed: Open the app and the download, always both.
-    expect(within(dialog).getByRole("link", { name: "Abrir o app" })).toBeTruthy();
+    await click(
+      within(screen().getByRole("dialog", { name: "Conectar um dispositivo" })).getByText("Outro computador"),
+    );
+    await settle(4);
+    const dialog = screen().getByRole("dialog", { name: "Conectar outro computador" });
     const download = within(dialog).getByRole("link", { name: "Baixar para macOS" });
     expect(download.getAttribute("href")).toBe(
       "http://localhost:3000/api/desktop/download/0.2.0/agentes_0.2.0_aarch64.dmg",

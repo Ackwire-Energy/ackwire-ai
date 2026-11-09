@@ -12530,6 +12530,11 @@
       "sharingTooMany": "Elige como máximo {{max}} personas y {{max}} roles.",
       "notInDrive": "Esto vive solo en su conversación, así que no se puede compartir."
     },
+    "device": {
+      "notLinkMaker": "Solo quien creó el enlace puede dejar entrar a esta computadora.",
+      "widenForbidden": "Los admins solo pueden restringir quién usa el dispositivo propio de alguien.",
+      "notHome": "Los agentes viven en la computadora del workspace y usan esta cuando la nombran."
+    },
     "machine": {
       "forbidden": "Solo un admin, o quien conectó la computadora, puede hacer eso.",
       "notFound": "Esta computadora ya no está conectada.",
@@ -14676,6 +14681,8 @@
         "withdrawingRequest": "Retiró un pedido",
         "schedulingAction": "Preparó una acción para después",
         "updatingDashboard": "Trabajó en un panel",
+        "testingOnPhone": "Probó en un teléfono",
+        "waitingForDevice": "Esperó un dispositivo",
         "readingDashboards": "Miró los paneles",
         "pushingBranch": "Pidió enviar código",
         "deletingBranches": "Borró ramas",
@@ -14785,6 +14792,8 @@
       "withdrawingRequest": "retirando un pedido",
       "schedulingAction": "preparando una acción para después",
       "updatingDashboard": "trabajando en un panel",
+      "testingOnPhone": "probando en un teléfono",
+      "waitingForDevice": "esperando un dispositivo",
       "readingDashboards": "mirando los paneles",
       "pushingBranch": "pidiendo enviar código",
       "deletingBranches": "borrando ramas",

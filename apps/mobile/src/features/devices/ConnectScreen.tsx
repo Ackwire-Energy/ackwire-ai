@@ -78,7 +78,7 @@ function LinkFlow({ kind }: { kind: "server" | "computer" }) {
               <Button
                 variant="primary"
                 wide
-                label={t("common.done")}
+                label={t("mobile.common.done")}
                 onPress={() => (state.machineId ? openComputer(state.machineId) : undefined)}
               />
             ),

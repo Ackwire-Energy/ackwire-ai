@@ -42,13 +42,15 @@
 
 /* ---------- Device row (on .ac-list__row) -------------------------------------------
    portrait · name over kind · status pill over its detail · owner over who can use it · ⋯
-   Every column's first line is one 22 box, so the second lines share a baseline. */
+   Every column's first line is one 22 box, so the second lines share a baseline. The columns start where two lines
+   centre on the portrait, and a column that wraps grows down: its pill never rises above the portrait's top. */
 .ac-list__row.dv-row {
   --dv-col-status: 148px;
   --dv-col-people: 172px;
+  --dv-lines: calc(22px + 2px + 18px);
   display: grid;
   grid-template-columns: 48px minmax(0, 1fr) var(--dv-col-status) var(--dv-col-people) var(--control-h-sm);
-  align-items: center;
+  align-items: start;
   column-gap: var(--space-3);
   position: relative;
 }
@@ -60,7 +62,8 @@
   align-items: flex-start;
   gap: 2px;
   min-width: 0;
-  min-height: calc(22px + 2px + 18px);
+  min-height: var(--dv-lines);
+  margin-block-start: calc((48px - var(--dv-lines)) / 2);
 }
 .dv-row__name {
   display: flex;
@@ -110,9 +113,22 @@ a.dv-row__detail {
   flex: none;
   color: var(--faint);
 }
+/* A row's name rises to the portrait's top (`.ac-captop`) only where it leads lines under it (a phone's width, a
+   computer asking to join): on a wide row it centres on its status pill's line. */
+@media (width > 640px) {
+  .dv-row:not(.dv-row--ask) .dv-row__name.ac-captop {
+    margin-block-start: 0;
+  }
+}
 .dv-row__end {
   display: flex;
   justify-content: flex-end;
+  margin-block-start: calc((48px - var(--control-h-sm)) / 2);
+}
+@media (pointer: coarse) {
+  .dv-row__end {
+    margin-block-start: calc((48px - var(--control-h-md)) / 2);
+  }
 }
 
 /* A phone under its host: indented to the host's text column, with an elbow from the host's portrait,
@@ -149,15 +165,13 @@ a.dv-row__detail {
   pointer-events: none;
 }
 
-/* Phone width: the name with its status pill and detail under it, two lines beside the 48 portrait.
-   Kind and people live on the device's page. Phones indent less, the elbow keeps its 4.5 gap to the phone. */
+/* Phone width: the name beside the 48 portrait, its capitals at the portrait's top, and the status pill with its detail
+   under both at the row's full width (a portrait never owns a column of three lines). Kind and people live on the
+   device's page. Phones indent less, the elbow keeps its 4.5 gap to the phone. */
 @media (width <= 640px) {
   .ac-list__row.dv-row {
     grid-template-columns: 48px minmax(0, 1fr) var(--control-h-sm);
-    row-gap: var(--space-1);
-  }
-  .dv-row > .dv-pic {
-    grid-row: 1 / span 2;
+    row-gap: var(--space-2);
   }
   .dv-row__kind,
   .dv-row__people {
@@ -166,9 +180,13 @@ a.dv-row__detail {
   .dv-row__main,
   .dv-row__status {
     min-height: 0;
+    margin-block-start: 0;
+  }
+  .dv-row__name {
+    min-height: 0;
   }
   .dv-row__status {
-    grid-column: 2;
+    grid-column: 1 / -1;
     grid-row: 2;
     flex-direction: row;
     flex-wrap: wrap;
@@ -177,7 +195,7 @@ a.dv-row__detail {
   }
   .dv-row__end {
     grid-column: 3;
-    grid-row: 1 / span 2;
+    grid-row: 1;
   }
   .ac-list__row.dv-row--child {
     padding-left: calc(var(--space-4) + 36px);
@@ -240,7 +258,7 @@ a.dv-row__detail {
   counter-increment: dv-step;
   display: grid;
   grid-template-columns: 24px minmax(0, 1fr);
-  grid-template-areas: "mark head" ". more";
+  grid-template-areas: "mark title" "text text" "more more";
   column-gap: var(--space-3);
   row-gap: 0;
   align-items: center;
@@ -264,14 +282,14 @@ a.dv-row__detail {
 .dv-step__mark:empty::before {
   content: counter(dv-step);
 }
+/* The mark centres on the title alone: the line under it takes the step's full width (a mark never owns a column of
+   three lines). */
 .dv-step__head {
-  grid-area: head;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
+  display: contents;
 }
 .dv-step__title {
+  grid-area: title;
+  min-width: 0;
   margin: 0;
   font-size: 14px;
   line-height: 20px;
@@ -280,6 +298,7 @@ a.dv-row__detail {
   overflow-wrap: anywhere;
 }
 .dv-step__text {
+  grid-area: text;
   margin: 0;
   font-size: var(--text-sm);
   line-height: 18px;
@@ -652,7 +671,7 @@ button.dv-option {
 :is(a, button).dv-option:hover {
   background: var(--plate-soft);
 }
-:is(a, button).dv-option:focus-visible {
+html:not([data-pointer]) :is(a, button).dv-option:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring-inset);
 }
@@ -685,7 +704,7 @@ button.dv-option {
   color: var(--ink);
 }
 .dv-option__acts {
-  grid-column: 2 / -1;
+  grid-column: 1 / -1;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -785,7 +804,6 @@ button.dv-option {
   padding: var(--space-4);
   border-radius: var(--radius-lg);
   box-shadow: inset 0 0 0 1px var(--line);
-  align-items: center;
 }
 
 /* A quiet word after a segment's label ("With a cable  Recommended"). */
@@ -800,11 +818,13 @@ button.dv-option {
 
 /* ---------- Copyable command (on .machine-command) ---------------------------------------
    The real block (one line that scrolls), with a labelled Copy that turns into Copied for a moment. */
-.dv-cmd__copy {
-  gap: var(--space-1);
+/* The screen's main thing: a size up from the kit's block, and it wraps so a narrow dialog never hides its end. The
+   labelled Copy stands its gap from the code. */
+.dv-cmd {
+  column-gap: var(--space-2);
 }
-/* The screen's main thing: a size up from the kit's block, and it wraps so a narrow dialog never hides its end. */
 .dv-cmd > .machine-command__code {
+  padding-inline-end: 0;
   font-size: 13px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -866,9 +886,30 @@ button.dv-option {
 }
 
 /* ---------- The device page --------------------------------------------------------------- */
+/* The 96 portrait leads the name and the chips under it: the name's capitals start at its top (`.ac-captop` on the
+   name's row, in the title's type, so it rises by the title's air). The pencil centres on the title's line without
+   making it taller. */
+.machine-page__head.dv-head {
+  align-items: flex-start;
+}
 .dv-title {
   gap: var(--space-1);
   align-items: center;
+  flex-wrap: nowrap;
+  font-size: 18px;
+  line-height: 24px;
+}
+.dv-title > h2 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.dv-title > .ac-btn {
+  margin-block: calc((24px - var(--control-h-sm)) / 2);
+}
+@media (pointer: coarse) {
+  .dv-title > .ac-btn {
+    margin-block: calc((24px - var(--control-h-md)) / 2);
+  }
 }
 .dv-headchips {
   gap: var(--space-2);
@@ -895,29 +936,69 @@ a.dv-chiplink:hover {
   padding: 0 var(--space-4) var(--space-4);
 }
 
-/* A computer asking to join, on top of the list: its words, then Deny and Let it join. */
+/* A computer asking to join, on top of the list: its portrait and title (capitals at the portrait's top), Deny and Let
+   it join centred on the portrait, and what it says about itself under them at the row's full width. */
 .ac-list__row.dv-row--ask {
   grid-template-columns: 48px minmax(0, 1fr) auto;
+  row-gap: var(--space-2);
+}
+.dv-row--ask > .dv-row__main {
+  display: contents;
+}
+.dv-row--ask .dv-row__name {
+  grid-column: 2;
+  grid-row: 1;
+  min-height: 0;
+}
+.dv-row--ask .dv-row__kind {
+  grid-column: 1 / -1;
+  grid-row: 2;
 }
 .dv-row__acts {
   display: flex;
   align-items: center;
   gap: var(--space-2);
 }
+.dv-row--ask > .dv-row__acts {
+  grid-column: 3;
+  grid-row: 1;
+  align-self: center;
+}
 @media (width <= 640px) {
-  .ac-list__row.dv-row--ask {
-    grid-template-columns: 48px minmax(0, 1fr);
+  .dv-row--ask .dv-row__name {
+    grid-column: 2 / -1;
   }
   /* What a computer asking to join says about itself stays: it's what Let it join is decided on. */
   .dv-row--ask .dv-row__kind {
     display: block;
   }
   .dv-row--ask > .dv-row__acts {
-    grid-column: 2;
+    grid-column: 1 / -1;
+    grid-row: 3;
   }
-  /* The page portrait drops to the 48 grid, and the status line wraps only its action. */
+  /* The page portrait drops to the 48 grid with the menu on its line, and the name and the chips go under it at the full
+     width (a phone has no room for a name beside both). The status line wraps only its action. */
   .dv-pic--page {
     zoom: 0.5;
+  }
+  .machine-page__head.dv-head {
+    flex-wrap: wrap;
+    row-gap: var(--space-3);
+  }
+  .dv-head > .machine-page__title {
+    display: contents;
+  }
+  .dv-head .dv-title {
+    order: 1;
+    flex-basis: 100%;
+    margin-block-start: 0;
+  }
+  .dv-head .dv-headchips {
+    order: 2;
+    flex-basis: 100%;
+  }
+  .dv-head > :last-child:not(.machine-page__title) {
+    margin-inline-start: auto;
   }
   .dv-statusline {
     flex-wrap: wrap;
@@ -928,5 +1009,51 @@ a.dv-chiplink:hover {
   }
   .dv-statusline > .ac-btn {
     margin-left: auto;
+  }
+}
+
+/* ---------- Narrow screens: no picture owns a column of three lines -------------------------
+   The chooser's line, a connected device's facts and the page header's chips drop under the picture at the full
+   width; what stays beside it (a title, a name) centres on it. */
+/* A chooser row's title rises to its tile's top (`.ac-captop`) only where its line drops under it. */
+@media (width > 480px) {
+  .dv-option__title.ac-captop {
+    margin-block-start: 0;
+  }
+}
+@media (width <= 480px) {
+  .dv-option {
+    row-gap: var(--space-1);
+  }
+  .dv-option > .dv-option__text {
+    display: contents;
+  }
+  .dv-option__title {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: start;
+  }
+  .dv-option__line {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .dv-option > .dv-option__arrow {
+    grid-column: 3;
+    grid-row: 1;
+  }
+  .ac-faceline:has(> .dv-connected__text) {
+    flex-wrap: wrap;
+  }
+  .ac-faceline > .dv-connected__text {
+    display: contents;
+  }
+  .dv-connected__text > .dv-connected__name {
+    flex: 1 1 0;
+    min-width: 0;
+    align-self: center;
+    margin-block-start: 0;
+  }
+  .dv-connected__text > .dv-connected__facts {
+    flex-basis: 100%;
   }
 }

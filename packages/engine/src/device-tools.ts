@@ -14,16 +14,16 @@ import {
   checkDeviceUse,
   type DeviceComputer,
   type DeviceTarget,
+  deviceRoster,
   firstNames,
-  hasOtherDevices,
   noteDeviceInUse,
   phoneAliases,
   phoneReasonText,
   pickDevice,
+  rosterFacts,
   seenAgo,
   waitHint,
   workspaceDevices,
-  workspaceHasPhones,
 } from "./device-resolve";
 import { type DeviceWaitReason, startDeviceWait } from "./device-waits";
 import { type MachinePhoneRow, phoneHolder, phoneStoppedBy, phoneTargetOf } from "./devices";
@@ -454,10 +454,7 @@ export function createDeviceToolSource(deps: DeviceToolDeps): ToolSource {
     name: "devices",
     async tools(ctx) {
       const agent = await getAgentCached(ctx.db, ctx.orgId, ctx.agentId);
-      const [phones, others] = await Promise.all([
-        workspaceHasPhones(ctx.db, ctx.orgId),
-        hasOtherDevices(ctx.db, ctx.orgId, agent?.machineId ?? null),
-      ]);
+      const { phones, others } = rosterFacts(await deviceRoster(ctx.db, ctx.orgId), agent?.machineId ?? null);
       return [...(phones ? phoneTools : []), ...(others ? [waitTool] : [])];
     },
   };

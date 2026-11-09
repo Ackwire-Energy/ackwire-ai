@@ -1963,11 +1963,12 @@ export const featureKeysPtBR = {
       switchA11y: "A chave do Modo de Desenvolvedor, desligada",
       step3Text: "Ative e toque em Reiniciar. Depois de reiniciar, toque em Ativar e digite seu código.",
       step4: "Ative a Automação da IU",
-      step4Text: "Ajustes › Desenvolvedor › Ativar Automação da IU",
+      step4Text: "Ajustes\u00a0›\u00a0Desenvolvedor\u00a0›\u00a0Ativar Automação da IU",
       step5: "Confie no app de testes",
       step5Hint:
         "O app que o {{host}} instala para os agentes tocarem e digitarem neste iPhone. Ele aparece nesta lista depois de instalado.",
-      step5Text: "Ajustes › Geral › VPN e Gerenciamento de Dispositivos. Toque no nome do desenvolvedor e em Confiar.",
+      step5Text:
+        "Ajustes\u00a0›\u00a0Geral\u00a0›\u00a0VPN e Gerenciamento de Dispositivos. Toque no nome do desenvolvedor e em Confiar.",
       waiting: "Esperando o {{host}} ver o iPhone",
       footer: "Seu Mac faz o resto e renova o app de testes a cada 7 dias enquanto estiver ligado.",
     },

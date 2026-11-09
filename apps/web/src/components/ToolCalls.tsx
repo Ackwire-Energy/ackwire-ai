@@ -110,6 +110,8 @@ const KIND_ICON: Partial<Record<ActivityKind, IconName>> = {
   runningCommand: "code",
   runningCommandAny: "code",
   usingScreen: "computer",
+  testingOnPhone: "phone",
+  waitingForDevice: "waiting",
   cloningRepo: "repo",
   openingPullRequest: "pullRequest",
   handingOff: "routines",

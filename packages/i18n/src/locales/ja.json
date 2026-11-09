@@ -11688,6 +11688,11 @@
       "sharingTooMany": "選べるのは最大{{max}}人と{{max}}個のロールです。",
       "notInDrive": "これは会話の中だけにあるため、共有できません。"
     },
+    "device": {
+      "notLinkMaker": "このコンピューターを参加させられるのは、リンクを作った人だけです。",
+      "widenForbidden": "管理者は、誰かの個人デバイスを使える人を絞ることしかできません。",
+      "notHome": "エージェントはワークスペースのコンピューターにいて、名前を指定したときにこのコンピューターを使います。"
+    },
     "machine": {
       "forbidden": "それができるのは、管理者かコンピューターを接続した人だけです。",
       "notFound": "このコンピューターはもう接続されていません。",
@@ -13746,6 +13751,8 @@
         "withdrawingRequest": "リクエストを取り下げました",
         "schedulingAction": "後で行う操作を準備しました",
         "updatingDashboard": "ダッシュボードで作業しました",
+        "testingOnPhone": "スマートフォンでテストしました",
+        "waitingForDevice": "デバイスを待ちました",
         "readingDashboards": "ダッシュボードを確認しました",
         "pushingBranch": "コードの送信を依頼しました",
         "deletingBranches": "ブランチを削除しました",
@@ -13855,6 +13862,8 @@
       "withdrawingRequest": "リクエストを取り下げ中",
       "schedulingAction": "後で行う操作を準備中",
       "updatingDashboard": "ダッシュボードで作業中",
+      "testingOnPhone": "スマートフォンでテスト中",
+      "waitingForDevice": "デバイスを待機中",
       "readingDashboards": "ダッシュボードを確認中",
       "pushingBranch": "コードの送信を依頼中",
       "deletingBranches": "ブランチを削除中",

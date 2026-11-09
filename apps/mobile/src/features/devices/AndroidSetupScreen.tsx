@@ -273,7 +273,7 @@ function AndroidDone({ phone: p, hostName }: { phone: PhoneDevice; hostName: str
   return (
     <SettingsPage
       title={t("mobile.devices.android.title")}
-      bottom={<Button variant="primary" wide label={t("common.done")} onPress={goBack} />}
+      bottom={<Button variant="primary" wide label={t("mobile.common.done")} onPress={goBack} />}
     >
       <Gap />
       <ConnectedHero

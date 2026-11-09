@@ -98,10 +98,10 @@ function Head({
 }) {
   const { t } = useTranslation();
   return (
-    <div className="row machine-page__head">
+    <div className="row machine-page__head dv-head">
       <DevicePortrait device={device} size={96} />
       <span className="list-col machine-page__title">
-        <span className="row dv-title">
+        <span className="row dv-title ac-captop">
           <h2 id="dv-page-title" className="ac-card__title">
             {deviceName(t, device)}
           </h2>

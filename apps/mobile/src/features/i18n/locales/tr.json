@@ -1939,10 +1939,10 @@
       "switchA11y": "Geliştirici Modu anahtarı, kapalı",
       "step3Text": "Açın ve Yeniden Başlat'a dokunun. Yeniden başladıktan sonra Aç'a dokunun ve parolanızı girin.",
       "step4": "UI Otomasyonu'nu açın",
-      "step4Text": "Ayarlar › Geliştirici › UI Otomasyonunu Etkinleştir",
+      "step4Text": "Ayarlar › Geliştirici › UI Otomasyonunu Etkinleştir",
       "step5": "Test yardımcısına güvenin",
       "step5Hint": "Ajanların bu iPhone'da dokunup yazabilmesi için {{host}} bilgisayarının yüklediği uygulama. Yüklendiğinde bu listede görünür.",
-      "step5Text": "Ayarlar › Genel › VPN ve Aygıt Yönetimi. Geliştiricinin adına, ardından Güven'e dokunun.",
+      "step5Text": "Ayarlar › Genel › VPN ve Aygıt Yönetimi. Geliştiricinin adına, ardından Güven'e dokunun.",
       "waiting": "{{host}} bilgisayarının onu görmesi bekleniyor",
       "footer": "Gerisini Mac'iniz yapar ve açık olduğu sürece test yardımcısını her 7 günde bir yeniler."
     },

@@ -1,7 +1,7 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import type { EventEmitter } from "node:events";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
+import { lchown, mkdir, readdir, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type {
@@ -280,6 +280,21 @@ interface Recorder {
   done: Promise<void>;
   /** Stops it now; resolves when the file is final. */
   stop(): Promise<void>;
+}
+
+/**
+ * Under root (a system-mode runner), the phone files an op wrote go to the agent's OS user, who owns its folder, so
+ * the agent can read and clear them.
+ * ponytail: re-owns the whole `.agentes/phone` folder after each op; track the op's own files if it grows large.
+ */
+async function giveBack(folder: string | null) {
+  if (!folder || process.getuid?.() !== 0) return;
+  const owner = await stat(folder).catch(() => null);
+  if (!owner || owner.uid === 0) return;
+  const dir = path.join(folder, ".agentes", "phone");
+  const names = await readdir(dir).catch(() => [] as string[]);
+  const paths = [dir, ...names.map((n) => path.join(dir, n))];
+  await Promise.all(paths.map((p) => lchown(p, owner.uid, owner.gid).catch(() => undefined)));
 }
 
 export class PhoneManager {
@@ -598,6 +613,7 @@ export class PhoneManager {
     } finally {
       hold.busy--;
       hold.lastUsed = this.now();
+      await giveBack(io.folder);
     }
   }
 

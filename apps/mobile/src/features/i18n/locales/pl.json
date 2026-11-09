@@ -2135,10 +2135,10 @@
       "switchA11y": "Przełącznik Tryb dewelopera, wyłączony",
       "step3Text": "Włącz go i stuknij Uruchom ponownie. Po ponownym uruchomieniu stuknij Włącz i wpisz kod.",
       "step4": "Włącz automatyzację UI",
-      "step4Text": "Ustawienia › Deweloper › Włącz automatyzację UI",
+      "step4Text": "Ustawienia › Deweloper › Włącz automatyzację UI",
       "step5": "Zaufaj pomocnikowi testowemu",
       "step5Hint": "Aplikacja, którą {{host}} instaluje, żeby agenci mogli stukać i pisać na tym iPhonie. Pojawi się na tej liście po instalacji.",
-      "step5Text": "Ustawienia › Ogólne › VPN i zarządzanie urządzeniem. Stuknij nazwę dewelopera, a potem Zaufaj.",
+      "step5Text": "Ustawienia › Ogólne › VPN i zarządzanie urządzeniem. Stuknij nazwę dewelopera, a potem Zaufaj.",
       "waiting": "Czekam, aż {{host}} go wykryje",
       "footer": "Resztę zrobi twój Mac, a gdy jest włączony, odnawia pomocnika testowego co 7 dni."
     },

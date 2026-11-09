@@ -4758,7 +4758,7 @@
     "value": "Turn on UI Automation"
   },
   "devices.iphone.step4Text": {
-    "value": "Settings › Developer › Enable UI Automation"
+    "value": "Settings › Developer › Enable UI Automation"
   },
   "devices.iphone.step5": {
     "value": "Trust the test helper"
@@ -4767,7 +4767,7 @@
     "value": "The app {{host}} installs so agents can tap and type on this iPhone. It shows up in this list once installed."
   },
   "devices.iphone.step5Text": {
-    "value": "Settings › General › VPN & Device Management. Tap the developer's name, then Trust."
+    "value": "Settings › General › VPN & Device Management. Tap the developer's name, then Trust."
   },
   "devices.iphone.waiting": {
     "value": "Waiting for {{host}} to see it"

@@ -36,7 +36,7 @@ import {
 import { recordAudit } from "./audit";
 import { fedByRoutine, runAuthorityById } from "./authority";
 import { sniffModelImage } from "./avatars";
-import { devicesForRequester, hasOtherDevices, secretsMayGo } from "./device-resolve";
+import { deviceRoster, devicesForRequester, rosterFacts, secretsMayGo } from "./device-resolve";
 import { publishChannelEvent } from "./events";
 import { copyToComputer } from "./file-pulls";
 import { cutText, formatBytes, textOfBytes } from "./format";
@@ -1672,7 +1672,10 @@ export function createSandboxToolSource(
         ctx.agentId,
         mission ? { machineId: mission.machineId } : null,
       );
-      const devices = await hasOtherDevices(ctx.db, ctx.orgId, computer.kind === "machine" ? computer.machineId : null);
+      const { others: devices } = rosterFacts(
+        await deviceRoster(ctx.db, ctx.orgId),
+        computer.kind === "machine" ? computer.machineId : null,
+      );
       const tools = keep(
         build(settings.requireApproval, settings.execTimeoutSeconds, computer, ctx.threadRootId, devices),
       );

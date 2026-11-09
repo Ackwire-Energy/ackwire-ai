@@ -191,7 +191,7 @@ function JoinRow({ request: r, onLetJoin }: { request: DeviceJoinRequest; onLetJ
         <ComputerPortrait kind={computerKind(r.os)} state="online" />
       </span>
       <span className="dv-row__main">
-        <b className="dv-row__name">{t("devices.request.title", { name: r.name, org: org.name })}</b>
+        <b className="dv-row__name ac-captop">{t("devices.request.title", { name: r.name, org: org.name })}</b>
         <span className="dv-row__kind">{joinFacts(t, r)}</span>
       </span>
       <span className="dv-row__acts ac-acts">
@@ -258,7 +258,7 @@ export function DeviceRowView({
           <Link
             to="/org/$orgId/settings/devices/phones/$phoneId"
             params={{ orgId: org.id, phoneId: d.id }}
-            className="dv-row__name machine-row__name"
+            className="dv-row__name machine-row__name ac-captop"
           >
             {deviceName(t, d)}
           </Link>
@@ -266,7 +266,7 @@ export function DeviceRowView({
           <Link
             to="/org/$orgId/settings/devices/$deviceId"
             params={{ orgId: org.id, deviceId: d.id }}
-            className="dv-row__name machine-row__name"
+            className="dv-row__name machine-row__name ac-captop"
           >
             {deviceName(t, d)}
           </Link>

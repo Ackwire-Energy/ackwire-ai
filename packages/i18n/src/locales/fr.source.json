@@ -29398,6 +29398,15 @@
   "errors.artifact.notInDrive": {
     "value": "This lives only in its conversation, so it can't be shared."
   },
+  "errors.device.notLinkMaker": {
+    "value": "Only the person who made the link can let this computer join."
+  },
+  "errors.device.widenForbidden": {
+    "value": "Admins can only narrow who can use someone's own device."
+  },
+  "errors.device.notHome": {
+    "value": "Agents live on the workspace computer and use this one when they name it."
+  },
   "errors.machine.forbidden": {
     "value": "Only an admin, or whoever connected the computer, can do that."
   },
@@ -30778,13 +30787,13 @@
     "value": "Turn on Developer options"
   },
   "devices.android.devOptionsText": {
-    "value": "Settings › About phone, then tap Build number 7 times."
+    "value": "Settings › About phone, then tap Build number 7 times."
   },
   "devices.android.usbDebugging": {
     "value": "Turn on USB debugging"
   },
   "devices.android.usbDebuggingText": {
-    "value": "Settings › System › Developer options › USB debugging."
+    "value": "Settings › System › Developer options › USB debugging."
   },
   "devices.android.plug": {
     "value": "Plug the phone in"
@@ -30823,7 +30832,7 @@
     "value": "Phone not showing up?"
   },
   "devices.android.notShowingHelp": {
-    "value": "Try another cable or port, and pick File transfer if the phone asks what the USB is for. On Samsung, turn off Auto Blocker in Settings › Security and privacy."
+    "value": "Try another cable or port, and pick File transfer if the phone asks what the USB is for. On Samsung, turn off Auto Blocker in Settings › Security and privacy."
   },
   "devices.android.qrLabel": {
     "value": "QR code that opens these steps on the phone"
@@ -30943,7 +30952,7 @@
     "value": "Turn it on and tap Restart. After the restart, tap Turn On and enter your passcode."
   },
   "devices.iphone.uiAutomationText": {
-    "value": "In Settings › Developer, after the restart."
+    "value": "In Settings › Developer, after the restart."
   },
   "devices.iphone.helperText": {
     "value": "Built and renewed by the Mac every 7 days. A free Apple Account in Xcode is enough."
@@ -34640,6 +34649,12 @@
   "chat.work.step.updatingDashboard": {
     "value": "Worked on a dashboard"
   },
+  "chat.work.step.testingOnPhone": {
+    "value": "Tested on a phone"
+  },
+  "chat.work.step.waitingForDevice": {
+    "value": "Waited for a device"
+  },
   "chat.work.step.readingDashboards": {
     "value": "Looked at the dashboards"
   },
@@ -34957,6 +34972,12 @@
   },
   "chat.activity.updatingDashboard": {
     "value": "working on a dashboard"
+  },
+  "chat.activity.testingOnPhone": {
+    "value": "testing on a phone"
+  },
+  "chat.activity.waitingForDevice": {
+    "value": "waiting for a device"
   },
   "chat.activity.readingDashboards": {
     "value": "looking at the dashboards"
