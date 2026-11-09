@@ -24,3 +24,17 @@ export function landedAfterSql(m: { createdAt: Column; id: Column }, at: SQL | D
   return sql`(${m.createdAt} > ${t} - ${PLACE_KEPT_MS / 1000}::int * interval '1 second'
     and (${m.createdAt} > ${t} or ${m.id} > ${postedFrom}))`;
 }
+
+/**
+ * SQL: message `m` was in the conversation when message `ref` was posted: placed before it, or posted before it in a
+ * place after it (what people sent while `ref`'s reply was written, `PLACE_KEPT_MS`). What a run asked by `ref` reads.
+ */
+export function postedBySql(
+  m: { createdAt: Column; id: Column },
+  ref: { createdAt: SQL | Date; id: SQL | string },
+): SQL {
+  const t = ref.createdAt instanceof Date ? sql`${ref.createdAt.toISOString()}::timestamptz` : ref.createdAt;
+  const id = typeof ref.id === "string" ? sql`${ref.id}::uuid` : ref.id;
+  return sql`(${m.createdAt} <= ${t} + ${PLACE_KEPT_MS / 1000}::int * interval '1 second'
+    and (${m.createdAt} <= ${t} or ${m.id} < ${id}))`;
+}

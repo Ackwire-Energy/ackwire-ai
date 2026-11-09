@@ -2,7 +2,9 @@ import { afterEach, expect, test } from "bun:test";
 import { channelTopic } from "@agenteschat/adapters";
 import { schema } from "@agenteschat/db";
 import {
+  buildRunContext,
   catchUpText,
+  createAgent,
   drainOutbox,
   insertMessage,
   listChannels,
@@ -13,6 +15,7 @@ import {
   PLACE_KEPT_MS,
   postPersonMessage,
 } from "../src";
+import { runReadOutsideById } from "../src/outside";
 import { type Fixture, setup } from "./fixtures";
 
 /**
@@ -195,4 +198,54 @@ test("posted after someone read, in a place before their read: unread for them, 
   );
   expect(text).toContain("Já olhei o refresh.");
   expect(text).not.toContain("Lido antes.");
+});
+
+test("asked by a reply another agent wrote over a while, a run reads what was sent while it was written", async () => {
+  f = await setup();
+  const qa = await createAgent(
+    f.db,
+    f.owner.id,
+    f.org.id,
+    { name: "QA", handle: "qa", role: "Testes", credentialId: f.credential.id },
+    { model: "claude-sonnet-5-5" },
+  );
+  const qaSays = (body: string, meta?: Record<string, unknown>, createdAt?: Date) =>
+    insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      author: { type: "agent", agentId: qa.id, runId: null, hop: 1, stretchId: null },
+      body,
+      ...(meta ? { meta } : {}),
+      ...(createdAt ? { createdAt } : {}),
+    });
+  // QA's words showed 30 s ago; a person and a relayed e-mail came in as it wrote, then its reply took that place.
+  const shownAt = new Date(Date.now() - 30_000);
+  await postIn(f.general.id, "o deploy já foi revertido");
+  await qaSays("O e-mail do cliente diz que voltou a cair.", { readOutside: true });
+  const ask = await qaSays("@dev olha o deploy de ontem", undefined, shownAt);
+  const [run] = await f.db
+    .insert(schema.agentRuns)
+    .values({
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      channelId: f.general.id,
+      threadRootId: ask.id,
+      triggerMessageId: ask.id,
+      trigger: "mention",
+      hop: 2,
+      status: "running",
+    })
+    .returning();
+  if (!run) throw new Error("no run");
+  await Bun.sleep(5);
+  await postIn(f.general.id, "alguém viu?");
+
+  const read = JSON.stringify((await buildRunContext(f.db, run, f.agent, { maxMessages: 30 })).messages);
+  expect(read).toContain("o deploy já foi revertido");
+  expect(read).toContain("O e-mail do cliente");
+  expect(read).toContain("olha o deploy de ontem");
+  // Sent after it was asked: it comes to the run as it works, not as what was there.
+  expect(read).not.toContain("alguém viu?");
+  // What it read relays outside content, so what it posts says so (ADR 0117).
+  expect(await runReadOutsideById(f.db, f.org.id, run.id)).toBe(true);
 });
