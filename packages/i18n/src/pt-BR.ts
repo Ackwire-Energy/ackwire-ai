@@ -664,6 +664,41 @@ export const ptBR = {
       left_other: "Faltam {{count}} etapas",
       done: "Tudo certo",
     },
+    /** The blue rail with Lodi (ADR 0158): its steps, Lodi's line on each, the preview and the plan step. */
+    flow: {
+      steps: {
+        name: "Nome do workspace",
+        business: "O que vocês fazem",
+        team: "Seu time",
+        plan: "Ligar o time",
+      },
+      stepOf: "Passo {{n}} de {{total}}",
+      lodi: {
+        name: "Oi, {{first}}. Eu sou o {{name}}. Vou montar o time com você em uns dois minutos.",
+        name_female: "Oi, {{first}}. Eu sou a {{name}}. Vou montar o time com você em uns dois minutos.",
+        business: "Com isso eu já sei quem chamar para o time.",
+        team: "Esse é o time que eu montaria. Você muda tudo depois.",
+        plan: "Falta só isso. Depois eu mostro o primeiro trabalho deles.",
+      },
+      preview: {
+        label: "O seu workspace, enquanto você responde",
+        ghost: "O time aparece aqui",
+      },
+      team: { title: "Seu time" },
+      plan: {
+        title: "Ligue o time",
+        lead: "O time está pronto. Com o plano, ele começa hoje.",
+        asleep: "Dormindo até o plano",
+        price: "<b>Plano {{name}}</b> · {{price}} por mês",
+        name: "<b>Plano {{name}}</b>",
+        generic: "Um plano do agentes.chat",
+        cancel: "Cancele quando quiser",
+        cta: "Ligar o time",
+        all: "Ver todos os planos",
+        skip: "Entrar no workspace sem ligar",
+      },
+      account: "Sua conta",
+    },
     railValue: {
       context: "Escrito",
       skipped: "Pulado",

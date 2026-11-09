@@ -671,6 +671,40 @@ export const en = {
       left_other: "{{count}} steps left",
       done: "All set",
     },
+    /** The blue rail with Lodi (ADR 0158): its steps, Lodi's line on each, the preview and the plan step. */
+    flow: {
+      steps: {
+        name: "Workspace name",
+        business: "What you do",
+        team: "Your team",
+        plan: "Turn the team on",
+      },
+      stepOf: "Step {{n}} of {{total}}",
+      lodi: {
+        name: "Hi, {{first}}. I'm {{name}}. I'll put the team together with you in about two minutes.",
+        business: "With that I'll know who to bring onto the team.",
+        team: "This is the team I'd put together. You can change anything later.",
+        plan: "Just this left. Then I'll show you their first work.",
+      },
+      preview: {
+        label: "Your workspace, as you answer",
+        ghost: "Your team shows up here",
+      },
+      team: { title: "Your team" },
+      plan: {
+        title: "Turn your team on",
+        lead: "Your team is ready. With the plan, it starts today.",
+        asleep: "Asleep until the plan",
+        price: "<b>{{name}} plan</b> · {{price}} a month",
+        name: "<b>{{name}} plan</b>",
+        generic: "An agentes.chat plan",
+        cancel: "Cancel anytime",
+        cta: "Turn the team on",
+        all: "See all plans",
+        skip: "Go to the workspace without it",
+      },
+      account: "Your account",
+    },
     railValue: {
       context: "Written",
       skipped: "Skipped",

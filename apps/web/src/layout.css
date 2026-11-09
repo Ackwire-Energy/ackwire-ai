@@ -8321,13 +8321,12 @@ html:not([data-pointer]) .onb__step:focus-visible {
 .onb__step[aria-current="step"] .onb__step-name {
   font-weight: 650;
 }
+/* What a done step answered wraps whole (a long workspace or agent name keeps every word). */
 .onb__step-sub {
-  overflow: hidden;
   font-size: 12.5px;
   font-weight: 450;
   color: var(--faint);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 /* Progress, each step's column, the import and the welcome: pages/onboarding.css. */
 .onb__head {

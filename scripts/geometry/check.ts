@@ -22,8 +22,11 @@ const BASELINE = join(HERE, "baseline.json");
 const WIDTHS = [1280, 320, 390];
 /** One browser each: tabs on the same file:// origin share a renderer, so they'd lay out one at a time. */
 const BROWSERS = 4;
-/** Fewer than this means the capture broke, and an empty run must not read as a clean one. */
-const MIN_STATES = 300;
+/**
+ * Fewer than this means the capture broke, and an empty run must not read as a clean one. `GEOMETRY_MIN_STATES` lowers
+ * it for a local run over a few test files.
+ */
+const MIN_STATES = Number(process.env.GEOMETRY_MIN_STATES ?? 300);
 /** The window's height, and how much taller the second look at a `sliver` is. */
 const HEIGHT = 900;
 const TALLER = 40;
