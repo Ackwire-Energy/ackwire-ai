@@ -914,15 +914,15 @@ describe("Calendário", () => {
     expect(screen().getByRole("button", { name: "Daily de produto, 10:00–11:00" })).toBeTruthy();
     expect(screen().getAllByRole("button", { name: "Rotina Erros do Sentry do dia, 18:00" })).toHaveLength(5);
     expect(screen().getByRole("button", { name: "#133 Fechar a release, dia todo" })).toBeTruthy();
-    // A routine run is a quiet pixel mark, not a chip; a click lists the slot's runs.
+    // A routine's run is a row at its time with its agent's face and name, never a pixel dot; a click opens it.
     const routine = screen().getByRole("button", { name: "Rotina Resumo da semana, 09:00" });
-    expect(routine.classList.contains("cal-marks")).toBe(true);
-    expect(routine.querySelectorAll(".ac-run-mark")).toHaveLength(1);
-    expect(routine.querySelector(".cal-chip__title")).toBeNull();
+    expect(routine.classList.contains("cal-chip--run")).toBe(true);
+    expect(routine.querySelector(".ac-run-mark")).toBeNull();
+    expect(routine.querySelector(".cal-chip__title")?.textContent).toBe("Resumo da semana");
     await click(routine);
     await settle(2);
-    const runs = screen().getByRole("region", { name: "Rotinas às 09:00" });
-    expect(runs.textContent).toContain("Resumo da semana");
+    const runs = screen().getByRole("region", { name: "Resumo da semana" });
+    expect(runs.querySelector(".cal-details__owner")?.textContent).toBe("Atlas · Ops");
     expect(runs.textContent).toContain("última: respondeu");
     expect(within(runs).getByRole("link", { name: "Abrir rotina" }).getAttribute("href")).toContain("?open=");
     await act(async () => fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" }));
@@ -945,8 +945,10 @@ describe("Calendário", () => {
     await click(screen().getByRole("button", { name: "Daily de produto, 10:00–11:00" }));
     await settle(2);
     const details = screen().getByRole("region", { name: "Daily de produto" });
-    expect(details.textContent).toContain("Evento");
-    expect(details.textContent).toContain("Walter");
+    // Whose it is, first: who made it, their face and name.
+    const owner = details.firstElementChild as HTMLElement;
+    expect(owner.querySelector(".ac-who > .ac-avatar")?.getAttribute("data-kind")).toBe("person");
+    expect(owner.querySelector(".ac-who > b")?.textContent).toBe("Walter");
     expect(within(details).getByRole("button", { name: "Editar" })).toBeTruthy();
     await act(async () => fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" }));
     await settle(2);
@@ -957,6 +959,8 @@ describe("Calendário", () => {
     const proposal = within(side).getByRole("group", { name: "Proposta de evento" });
     expect(proposal.textContent).toContain("Revisão do roadmap");
     expect(proposal.textContent).toContain("livre para todos");
+    // Each person once.
+    expect(proposal.textContent).toContain(" · Walter e João · ");
     await click(within(proposal).getByRole("button", { name: "Confirmar e convidar" }));
     await settle(5);
     expect(screen().getByText("Evento criado e convites enviados.")).toBeTruthy();
