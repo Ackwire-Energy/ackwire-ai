@@ -1705,7 +1705,7 @@ describe("the dialog's size (computer.css)", () => {
     const kit = await Bun.file(
       new URL("../../../packages/ui/src/styles/components.css", import.meta.url).pathname,
     ).text();
-    expect(rule(kit, ".ac-dialog__acts > .ac-btn--glyph:last-child")).toContain(
+    expect(rule(kit, ".ac-dialog__close > .ac-btn--glyph")).toContain(
       "--glyph-air: calc(var(--control-icon-sm) * 5.2 / 20)",
     );
     // The kit reaches out by that air; its plate and ring keep to the box less it on every side, a square under the
