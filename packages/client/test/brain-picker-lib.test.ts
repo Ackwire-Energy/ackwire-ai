@@ -155,6 +155,7 @@ describe("Quem pensa as one list (the new agent's step)", () => {
     expect(free).toContain("opencode@m1#acc-go/iceman-contributor-free");
     expect(options.filter((o) => o.free).map((o) => o.value)).toEqual([
       "some-free-model",
+      "opencode@m1#acc-go/longcat-2.5-free",
       "opencode@m1#acc-go/beam-free",
       "opencode@m1#acc-go/crouton-alpha-free",
       "opencode@m1#acc-go/iceman-contributor-free",
