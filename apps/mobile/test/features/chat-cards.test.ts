@@ -179,11 +179,49 @@ describe("what an agent changed reads whole", () => {
     for (const file of ["Receipts.tsx", "TeamChecks.tsx"]) expect(source(file)).not.toContain("numberOfLines");
   });
 
-  test("Desfazer leaving keeps its room, the time left inside it: the sentence never rewraps", () => {
+  test("Desfazer ends its sentence with the time left, never a column beside it, and its room stays once it goes", () => {
     const receipts = source("Receipts.tsx");
-    expect(receipts).toContain("return v.button ? swapped : <Room>{button}</Room>;");
-    expect(receipts).toContain("detail={redo ? undefined : v.timeLeft || formatTimeLeft(0)}");
+    const sentence = receipts.slice(
+      receipts.indexOf("function Sentence("),
+      receipts.indexOf("/**\n * A webhook routine"),
+    );
+    // In the sentence's own Text, after its words, wrapping with them.
+    expect(
+      ascending(
+        at(sentence, [
+          "{runs.map(",
+          "{shown && undo ? (",
+          "onPress={unseen ? undefined : redo ? undo.onRedo : undo.onUndo}",
+        ]),
+      ),
+    ).toBe(true);
+    expect(receipts).not.toContain("RowButton");
+    expect(receipts).not.toContain("ACT_LINE");
+    // The word and its time wrap as one; past the window its room keeps the last second's width, unseen, untouchable
+    // and unread.
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the component's own template, read as source text
+    expect(sentence).toContain("`\\u00a0·\\u00a0${time}`");
+    expect(sentence).toContain("undo?.view.timeLeft || formatTimeLeft(0)");
+    expect(sentence).toContain('accessibilityLabel={unseen ? runs.map((r) => r.text).join("") : undefined}');
+    expect(receipts).toContain('unseen: { color: "transparent" }');
+    // Greedy breaks: what ends the sentence never moves the words before it; an undone one's Refazer isn't struck.
+    expect(sentence).toContain('textBreakStrategy="simple"');
+    expect(receipts).toContain('link: { fontWeight: "600", textDecorationLine: "none" }');
     expect(receipts).not.toContain('t("agentActions.timeLeft"');
+  });
+
+  test("a team check's icon stays outside its action line: Abrir goes under the words, from their edge", () => {
+    const checks = source("TeamChecks.tsx");
+    expect(
+      ascending(
+        at(checks, [
+          "<LineIcon name={ICONS[targetKind(target)]}",
+          "<View style={[ACT_LINE.row, styles.line]}>",
+          "<RowAction",
+        ]),
+      ),
+    ).toBe(true);
+    expect(checks).not.toContain("styles.one, ACT_LINE.row");
   });
 
   test("they wear the tool block's card (the face a step up, a hairline), never the sunken gray of a pressed row", () => {
@@ -270,17 +308,24 @@ describe("an approval card's layout", () => {
     const ask = fn("ApprovalAsk");
     expect(ask.slice(...at(ask, ["foot={", "</AskFoot>"]))).not.toContain("ApproveAlways");
     expect(cards).toContain('itemActs: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 }');
-    // A grouped request: its words and its buttons on one line while they fit, the buttons under the words otherwise.
+    // A grouped request: its words and its buttons on one line while the words fit theirs, the buttons under the
+    // words otherwise (the action line), its words whole and their code drawn as code.
     const item = fn("ApprovalGroupItem");
     expect(
       ascending(
         at(item, [
-          "<View style={styles.itemWrap}>",
-          "<View style={styles.itemText}>",
+          "<View style={[ACT_LINE.row, styles.itemWrap]}>",
+          "<View style={ACT_LINE.text}>",
           "<View style={styles.itemActs}>",
         ]),
       ),
     ).toBe(true);
+    expect(item.slice(0, item.indexOf("<View style={styles.itemActs}>"))).not.toContain("numberOfLines");
+    expect(item).toContain("<Spans inline={parseInline(detail)} />");
+    expect(item).toContain("<Spans inline={parseInline(own.why)} />");
+    // A run's head too.
+    expect(fn("ApprovalGroupAsk")).toContain("<View style={[ACT_LINE.row, styles.itemWrap]}>");
+    expect(cards).not.toContain("flexBasis: 160");
   });
 
   test("waiting requests of one kind in a row fold into one run: its head, Aprovar todos and Ver cada um", () => {

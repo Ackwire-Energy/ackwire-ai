@@ -507,6 +507,6 @@ const styles = StyleSheet.create({
   heading: { paddingHorizontal: 4, paddingTop: 4, paddingBottom: 8 },
   note: { textAlign: "center" },
   checkRoom: { width: 18 },
-  actions: { flexDirection: "row", gap: 10, alignItems: "center" },
+  actions: { flexDirection: "row", gap: 8, alignItems: "center" },
   grow: { flex: 1 },
 });

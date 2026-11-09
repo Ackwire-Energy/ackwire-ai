@@ -55,35 +55,38 @@ function Row({ check, selfId }: { check: TeamCheck; selfId: string | null }) {
     .join(" · ");
   const channelId = match.channelId;
   return (
-    <View style={[styles.one, ACT_LINE.row, { backgroundColor: colors.raised, borderColor: colors.line2 }]}>
+    <View style={[styles.one, { backgroundColor: colors.raised, borderColor: colors.line2 }]}>
       <View style={styles.tx}>
         <LineIcon name={ICONS[targetKind(target)]} size={15} color={colors.muted} variant="small" />
       </View>
-      <View style={[ACT_LINE.text, styles.tx]}>
-        <Text variant="small" tone="ink2">
-          {runs.map((r, i) =>
-            r.bold ? (
-              <Text key={String(i)} variant="small" tone="ink" style={styles.bold}>
-                {r.text}
-              </Text>
-            ) : (
-              r.text
-            ),
-          )}
-        </Text>
-        {detail ? (
-          <Text variant="caption" tone="faint" style={styles.detail}>
-            {detail}
+      {/* The words and Abrir in one line past the icon: Abrir under them, from their edge, once they wrap. */}
+      <View style={[ACT_LINE.row, styles.line]}>
+        <View style={[ACT_LINE.text, styles.tx]}>
+          <Text variant="small" tone="ink2">
+            {runs.map((r, i) =>
+              r.bold ? (
+                <Text key={String(i)} variant="small" tone="ink" style={styles.bold}>
+                  {r.text}
+                </Text>
+              ) : (
+                r.text
+              ),
+            )}
           </Text>
+          {detail ? (
+            <Text variant="caption" tone="faint" style={styles.detail}>
+              {detail}
+            </Text>
+          ) : null}
+        </View>
+        {channelId ? (
+          <RowAction
+            label={t("teamChecks.open")}
+            accessibilityRole="link"
+            onPress={() => router.push(chatHref(channelId))}
+          />
         ) : null}
       </View>
-      {channelId ? (
-        <RowAction
-          label={t("teamChecks.open")}
-          accessibilityRole="link"
-          onPress={() => router.push(chatHref(channelId))}
-        />
-      ) : null}
     </View>
   );
 }
@@ -108,5 +111,6 @@ const styles = StyleSheet.create({
   },
   // The "small" line (20) on the action's middle.
   tx: { paddingTop: (32 - 20) / 2 },
+  line: { flex: 1, minWidth: 0, alignItems: "flex-start", columnGap: 8 },
   detail: { marginTop: 2 },
 });
