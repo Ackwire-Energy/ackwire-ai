@@ -14,7 +14,7 @@ import {
 import { teamProposalOf } from "@agenteschat/client/lib/action-cards";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
-import { isRightHand } from "@agenteschat/client/lib/right-hand";
+import { isRightHand, RIGHT_HAND_DEFAULT } from "@agenteschat/client/lib/right-hand";
 import {
   answerAfter,
   answerPicks,
@@ -169,12 +169,19 @@ export function ReplyChips({ message: m }: { message: Message }) {
  * The team: a row per agent, its routines, its skills and what waits for approval. Flat on the card that holds it
  * (rows divided by hairlines, icons on the first line), never a plate or a box in a card. An agent's row is a MediaRow:
  * its face, name and role on one line, what it does, its channel and "Ajustar" under them at the card's width.
+ * `reviewer`: the right hand's name, which keeps the weekly check (the onboarding has no workspace open to read it from).
  */
-function TeamRows({ plan, onAdjust }: { plan: TeamPlan; onAdjust?: (a: TeamAgentDraft) => void }) {
+export function TeamRows({
+  plan,
+  reviewer,
+  onAdjust,
+}: {
+  plan: TeamPlan;
+  reviewer: string;
+  onAdjust?: (a: TeamAgentDraft) => void;
+}) {
   const { t, i18n } = useTranslation();
   const c = useColors();
-  const dir = useDirectory();
-  const lodi = dir.agents.find(isRightHand);
   return (
     <View style={styles.rows}>
       {plan.agents.map((a, i) => (
@@ -224,7 +231,7 @@ function TeamRows({ plan, onAdjust }: { plan: TeamPlan; onAdjust?: (a: TeamAgent
                 ·{" "}
                 {agent
                   ? `${agent.name}, #${agent.channel}: ${routine.name}`
-                  : `${lodi?.name ?? "Lodi"}: ${t("teamPlan.card.weekly")}`}
+                  : `${reviewer}: ${t("teamPlan.card.weekly")}`}
               </Text>
             </View>
           ))}
@@ -310,7 +317,11 @@ function TeamCardView({ message: m, card }: { message: Message; card: TeamPropos
           lead={plan.lead || names}
           body={
             <>
-              <TeamRows plan={plan} onAdjust={decides ? setAdjusting : undefined} />
+              <TeamRows
+                plan={plan}
+                reviewer={dir.agents.find(isRightHand)?.name ?? RIGHT_HAND_DEFAULT.name}
+                onAdjust={decides ? setAdjusting : undefined}
+              />
               {card.error ? (
                 <Text variant="small" tone="danger" accessibilityRole="alert">
                   {teamFailureText(t, card.error, i18n.language)}
@@ -713,7 +724,7 @@ export function TeamTemplatesSheet({
   const failed = useFailed();
   const dir = useDirectory();
   const held = usePlanHold(orgId, org) !== null;
-  const name = dir.agents.find(isRightHand)?.name ?? "Lodi";
+  const name = dir.agents.find(isRightHand)?.name ?? RIGHT_HAND_DEFAULT.name;
   const list = useTeamTemplates(orgId, i18n.language, open);
   const use = useApplyTeamTemplate(orgId);
   const [picked, setPicked] = useState<string | null>(null);
@@ -736,7 +747,7 @@ export function TeamTemplatesSheet({
         </Text>
         {chosen ? (
           <>
-            <TeamRows plan={chosen.team} />
+            <TeamRows plan={chosen.team} reviewer={name} />
             {held ? null : (
               <Text variant="footnote" tone="muted">
                 {t("teamPlan.templates.tailor")}

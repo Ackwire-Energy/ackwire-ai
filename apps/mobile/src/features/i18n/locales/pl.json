@@ -1880,6 +1880,7 @@
     "logoHelp": "Opcjonalnie.",
     "logoPick": "Wybierz",
     "zone": "Strefa czasowa: {{zone}}",
+    "enter": "Wejdź do przestrzeni roboczej",
     "shareMessage": "Dołącz do {{org}} w agentes.chat: {{url}}",
     "failed": "Nie udało się zapisać. Spróbuj ponownie."
   },

@@ -1786,6 +1786,7 @@
     "logoHelp": "Opcional.",
     "logoPick": "Elegir",
     "zone": "Zona horaria: {{zone}}",
+    "enter": "Entrar al espacio de trabajo",
     "shareMessage": "Únete a {{org}} en agentes.chat: {{url}}",
     "failed": "No se pudo guardar. Inténtalo de nuevo."
   },

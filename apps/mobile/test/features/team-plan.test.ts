@@ -4,11 +4,13 @@ import { answerAfter, answerPicks, BUSINESS_TYPES, replyChipsOf } from "@agentes
 
 const src = (f: string) => readFileSync(new URL(`../../src/features/${f}`, import.meta.url), "utf8");
 
-test("what the workspace does: the business types, saved as its context (ADR 0155 §6)", () => {
-  const about = src("agents/setup/SetupStepScreen.tsx");
-  expect(about).toContain("BUSINESS_TYPES.map((b) => (");
-  expect(about).toContain('t("agentSetup.firstRun.about.title", { org: org?.name ?? "" })');
-  expect(about).toContain("{ context: text }");
+test("what the workspace does: the onboarding's step 2, the business types saved as its context (ADR 0158)", () => {
+  const step = src("onboarding/steps.tsx");
+  expect(step).toContain("BUSINESS_TYPES.map((b) => (");
+  expect(step).toContain("save.mutate({ context: text }");
+  expect(src("onboarding/OnboardingFlow.tsx")).toContain('t("agentSetup.firstRun.about.title", { org: workspace })');
+  // The setup card's own screen for it is gone: the onboarding asks it once.
+  expect(src("agents/setup/SetupStepScreen.tsx")).not.toContain("BUSINESS_TYPES");
   expect(BUSINESS_TYPES.at(-1)).toBe("other");
 });
 

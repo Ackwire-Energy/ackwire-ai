@@ -1692,6 +1692,7 @@
     "logoHelp": "Optional.",
     "logoPick": "Auswählen",
     "zone": "Zeitzone: {{zone}}",
+    "enter": "Zum Workspace",
     "shareMessage": "Tritt {{org}} auf agentes.chat bei: {{url}}",
     "failed": "Speichern hat nicht geklappt. Versuch es noch einmal."
   },

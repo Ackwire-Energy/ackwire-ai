@@ -2018,6 +2018,8 @@ export const featureKeysEn = {
     /** The first run's name, suggested from a work address's domain. */
     suggested: "From your {{domain}} e-mail, I suggested {{org}}.",
     create: "Create",
+    /** The onboarding's plan step on the phone, which can't take the plan: into the workspace, the team asleep. */
+    enter: "Go to the workspace",
     shareMessage: "Join {{org}} on agentes.chat: {{url}}",
     failed: "Couldn't save. Try again.",
   },

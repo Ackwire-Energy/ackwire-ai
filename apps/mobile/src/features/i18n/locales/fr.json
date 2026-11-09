@@ -1786,6 +1786,7 @@
     "logoHelp": "Facultatif.",
     "logoPick": "Choisir",
     "zone": "Fuseau horaire : {{zone}}",
+    "enter": "Entrer dans l'espace de travail",
     "shareMessage": "Rejoignez {{org}} sur agentes.chat : {{url}}",
     "failed": "Impossible d'enregistrer. Réessayez."
   },

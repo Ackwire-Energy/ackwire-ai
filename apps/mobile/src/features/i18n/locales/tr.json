@@ -1692,6 +1692,7 @@
     "logoHelp": "İsteğe bağlı.",
     "logoPick": "Seç",
     "zone": "Saat dilimi: {{zone}}",
+    "enter": "Çalışma alanına gir",
     "shareMessage": "agentes.chat üzerinde {{org}} çalışma alanına katılın: {{url}}",
     "failed": "Kaydedilemedi. Tekrar deneyin."
   },

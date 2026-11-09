@@ -1692,6 +1692,7 @@
     "logoHelp": "Optioneel.",
     "logoPick": "Kiezen",
     "zone": "Tijdzone: {{zone}}",
+    "enter": "Naar de werkruimte",
     "shareMessage": "Kom bij {{org}} op agentes.chat: {{url}}",
     "failed": "Opslaan lukte niet. Probeer het opnieuw."
   },

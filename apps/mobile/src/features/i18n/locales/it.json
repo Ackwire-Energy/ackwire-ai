@@ -1786,6 +1786,7 @@
     "logoHelp": "Facoltativo.",
     "logoPick": "Scegli",
     "zone": "Fuso orario: {{zone}}",
+    "enter": "Entra nello spazio di lavoro",
     "shareMessage": "Entra in {{org}} su agentes.chat: {{url}}",
     "failed": "Non è stato possibile salvare. Riprova."
   },

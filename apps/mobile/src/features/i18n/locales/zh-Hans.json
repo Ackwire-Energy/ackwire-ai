@@ -1598,6 +1598,7 @@
     "logoHelp": "可选。",
     "logoPick": "选择",
     "zone": "时区：{{zone}}",
+    "enter": "进入工作区",
     "shareMessage": "在 agentes.chat 上加入 {{org}}：{{url}}",
     "failed": "无法保存，请重试。"
   },

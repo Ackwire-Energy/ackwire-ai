@@ -4148,6 +4148,9 @@
   "onb.zone": {
     "value": "Time zone: {{zone}}"
   },
+  "onb.enter": {
+    "value": "Go to the workspace"
+  },
   "onb.shareMessage": {
     "value": "Join {{org}} on agentes.chat: {{url}}"
   },
