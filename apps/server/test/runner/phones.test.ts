@@ -719,7 +719,8 @@ test("the runner routes phone ops with commands off, refuses them paused, and ha
 
 test("a manager that only looks (doctor) changes no setting, and sees a phone another runner holds", async () => {
   const r = rig(ANDROID_STATE, { readOnly: true });
-  await r.manager.poll();
+  // The setting is written without waiting for it: a few looks give it time to land.
+  for (let i = 0; i < 3; i++) await r.manager.poll();
   expect(r.manager.list().find((p) => p.serial === PIXEL)?.state).toBe("ready");
   expect(r.calls().some((c) => c.join(" ").includes("settings put"))).toBe(false);
   const pixel = { platform: "android", serial: PIXEL };

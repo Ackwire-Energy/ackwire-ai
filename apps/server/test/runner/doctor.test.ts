@@ -191,7 +191,7 @@ test("connections: this home and the agentes app's, running while their runner h
   writeFileSync(path.join(home, "orgs", "o-3", "config.json"), "{}");
   const lock = acquireLock(home, "start");
   if (!lock.ok) throw new Error("no lock");
-  expect(connections(home).map((c) => [c.name, c.org, c.running, c.managedBy ?? null, c.commands])).toEqual([
+  expect(connections(home)?.map((c) => [c.name, c.org, c.running, c.managedBy ?? null, c.commands])).toEqual([
     ["build-box", "Acme", true, null, true],
     ["Sam's MacBook Pro", "Globex", false, "desktop", true],
   ]);
