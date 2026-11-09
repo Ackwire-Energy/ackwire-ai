@@ -75,6 +75,7 @@ import {
   turnRuns,
   turnShows,
   turnSignature,
+  turnsInPlace,
   withContinued,
   withOpacity,
 } from "../../src/features/chat/turn";
@@ -179,6 +180,13 @@ describe("timeline", () => {
     const row = await source("features/chat/MessageRow.tsx");
     expect(row).toContain("BUBBLE_RUN[run]");
     expect(row).toContain('(run === "end" || run === "solo")');
+  });
+
+  test("reading marks read up to the message posted last, wherever its place, and counts a reply placed above as new", async () => {
+    const screen = await source("features/chat/ChatScreen.tsx");
+    expect(screen).toContain("const postedNow = useMemo(() => lastPostedId(list), [list]);");
+    expect(screen).toContain("if (peeking || !member || !postedNow) return;");
+    expect(screen).toContain("unseenBelow(scrollRows, seenKey, seenPostedId)");
   });
 
   test("hidden messages leave no row", () => {
@@ -1085,6 +1093,31 @@ describe("an agent's turn as one block", () => {
       run({ runId: "d", work: [call("1", "sentry_list_issues", true)] }),
     ];
     expect(turnOrder(runs).map((r) => r.runId)).toEqual(["b", "c", "a", "d"]);
+  });
+
+  test("a block sits where its words first showed: what was sent meanwhile is below it and shows its name again", () => {
+    // Two messages of one person, the second grouped under the first; the agent's words showed between them.
+    const rows = buildRows([message({ id: "ask", createdAt: at(10) }), message({ id: "meanwhile", createdAt: at(8) })]);
+    const writing = run({ runId: "w", agentId: "ada", text: "O login cai depois do refresh.", shownAt: at(9) });
+    const thinking = run({ runId: "t", agentId: "ada" });
+    const placed = turnsInPlace(rows, [thinking, writing], (r) => ({
+      kind: "run" as const,
+      key: `turn-${r.runId}`,
+      run: r,
+    }));
+    const shown = (r: (typeof placed.rows)[number]) =>
+      r.kind === "run"
+        ? `run ${r.run.runId}`
+        : r.kind === "message"
+          ? `${r.message.id} ${r.grouped} ${r.continued}`
+          : r.kind;
+    expect(placed.rows.map(shown)).toEqual(["day", "ask false false", "run w", "meanwhile false undefined"]);
+    // No words yet: at the end, as before.
+    expect(placed.last.map((r) => r.run.runId)).toEqual(["t"]);
+    // Nothing came after its words: nothing moves.
+    const alone = turnsInPlace(rows, [run({ runId: "late", agentId: "ada", text: "Oi", shownAt: at(1) })], (r) => r);
+    expect(alone.rows).toEqual(rows);
+    expect(alone.last.map((r) => r.runId)).toEqual(["late"]);
   });
 
   test("a stopped run's call that was running shows as stopped", () => {

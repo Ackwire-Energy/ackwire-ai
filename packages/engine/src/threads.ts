@@ -19,6 +19,7 @@ import { type Channel, requireChannelAccess } from "./channels";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishMessageCreated, publishUserEvent } from "./events";
 import { followsThreadSql, threadReadAtSql } from "./follows";
+import { landedAfterSql } from "./message-place";
 import { type PreviewMeta, previewMeta, readableBody } from "./message-preview";
 import { type Message, messageView, replyExcerpt } from "./messages";
 import { pendingCommandsSql } from "./mission-command-rules";
@@ -1354,15 +1355,15 @@ export const MAX_THREAD_UNREAD = 100;
 
 /**
  * Reply `ur` of thread `root` that this person hasn't read: not theirs, shown to people, not an agent's silent
- * sticker after its reply (ADR 0091), and after their read of the thread, else their joining its channel (`joinedAt`).
- * Reading the channel doesn't count: its main timeline doesn't show replies. Messages moved in from the channel
- * ("Tirar do canal") aren't replies: they were read, or not, in the channel.
+ * sticker after its reply (ADR 0091), and landed after their read of the thread, else their joining its channel
+ * (`joinedAt`). Reading the channel doesn't count: its main timeline doesn't show replies. Messages moved in from the
+ * channel ("Tirar do canal") aren't replies: they were read, or not, in the channel.
  */
 function unreadReplySql(orgId: string, userId: string, root: SQL, joinedAt: SQL): SQL {
   return sql`ur.org_id = ${orgId}::uuid and ur.thread_id = ${root} and ur.deleted_at is null
     and (ur.author_user_id is null or ur.author_user_id <> ${userId})
     and not ${quietNoticeSql(sql`ur.meta`)} and ur.meta->>'mediaAfter' is null
-    and ur.created_at > greatest(${joinedAt}, ${threadReadAtSql(userId, root)})
+    and ${landedAfterSql({ createdAt: sql`ur.created_at`, id: sql`ur.id` }, sql`greatest(${joinedAt}, ${threadReadAtSql(userId, root)})`)}
     and not exists (select 1 from ${threads} mt where mt.root_message_id = ${root}
       and ur.id = any(mt.context_moved_message_ids))`;
 }

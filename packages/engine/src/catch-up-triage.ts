@@ -2,6 +2,7 @@ import { and, desc, type Executor, eq, gt, inArray, isNull, ne, or, type SQL, sc
 import { ago } from "./context";
 import { andList, cutText, possessive } from "./format";
 import type { Judge, JudgeAnswer, JudgeQuestion } from "./judge";
+import { landedAfterSql } from "./message-place";
 import { stripSentinel } from "./reply-policy";
 import { type AgentRun, replyThreadOf } from "./runs";
 import { neutralizeUntrusted } from "./untrusted";
@@ -194,7 +195,7 @@ export async function triageSnapshot(
     sql`${messages.authorAgentId} is distinct from ${run.agentId}::uuid`,
     // A promise ("I'll answer when it resets") is no answer, nor is a notice.
     sql`${messages.meta}->'usageWait' is null and ${messages.meta}->'notice' is null`,
-    gt(messages.createdAt, trigger.createdAt),
+    landedAfterSql(messages, trigger.createdAt),
   );
   const author = {
     id: messages.id,

@@ -5,6 +5,7 @@ import { runBrainOf } from "./brains/select";
 import { endsAsking } from "./brakes";
 import { publishMessageCreated } from "./events";
 import type { ModelGateway } from "./gateway";
+import { landedAfterSql } from "./message-place";
 import { insertMessage, type Message, messageView } from "./messages";
 import type { Notice } from "./notices";
 import { holdsMessages } from "./run-hold";
@@ -400,7 +401,8 @@ async function postReply(
     if (last && (at.getTime() - last.getTime() < TALKER_MIN_GAP_MS || last >= message.createdAt)) {
       return "rate_limited" as const;
     }
-    // The agent already wrote after the person (the task answered); its notices don't count.
+    // The agent already wrote after the person (the task answered), its reply possibly in a place above theirs (where
+    // its words first showed); its notices don't count.
     const [answered] = await tx
       .select({ id: messages.id })
       .from(messages)
@@ -409,7 +411,7 @@ async function postReply(
           eq(messages.orgId, run.orgId),
           eq(messages.channelId, run.channelId),
           eq(messages.authorAgentId, run.agentId),
-          gt(messages.createdAt, message.createdAt),
+          landedAfterSql(messages, message.createdAt),
           sql`${messages.meta}->'notice' is null`,
         ),
       )

@@ -1,7 +1,8 @@
-import { and, asc, desc, type Executor, eq, gt, inArray, isNull, type SQL, schema, sql } from "@agenteschat/db";
+import { and, asc, desc, type Executor, eq, inArray, isNull, type SQL, schema, sql } from "@agenteschat/db";
 import type { ReleasedAsks } from "./catch-up-triage";
 import { ago } from "./context";
 import { andList, cutText, possessive } from "./format";
+import { landedAfterSql } from "./message-place";
 import { stripSentinel } from "./reply-policy";
 import { type AgentRun, replyThreadOf } from "./runs";
 
@@ -74,7 +75,7 @@ export async function catchUpText(
           eq(messages.orgId, run.orgId),
           eq(messages.channelId, run.channelId),
           where,
-          gt(messages.createdAt, trigger.createdAt),
+          landedAfterSql(messages, trigger.createdAt),
           sql`not (${messages.id} = any(${`{${skip.join(",")}}`}::uuid[]))`,
           isNull(messages.deletedAt),
           sql`${messages.meta}->'usageWait' is null and ${messages.meta}->'notice' is null`,
@@ -139,7 +140,7 @@ export async function catchUpText(
 export async function writtenSince(
   db: Executor,
   orgId: string,
-  where: { channelId: string; threadId: string | null; after: Date; exceptAgentId: string },
+  where: { channelId: string; threadId: string | null; after: Date; triggerId: string; exceptAgentId: string },
 ): Promise<{ count: number; names: string[] }> {
   const rows = await db
     .select({ person: users.name, agent: agents.name, agentId: messages.authorAgentId })
@@ -151,7 +152,10 @@ export async function writtenSince(
         eq(messages.orgId, orgId),
         eq(messages.channelId, where.channelId),
         where.threadId ? eq(messages.threadId, where.threadId) : isNull(messages.threadId),
-        gt(messages.createdAt, where.after),
+        landedAfterSql(messages, where.after),
+        // `after` is cut to milliseconds while Postgres keeps microseconds, and the trigger's id can be from a later
+        // millisecond than its `created_at`: never the trigger itself.
+        sql`${messages.id} <> ${where.triggerId}::uuid`,
         isNull(messages.deletedAt),
         sql`${messages.meta}->'usageWait' is null and ${messages.meta}->'notice' is null`,
       ),

@@ -1,4 +1,5 @@
 import type { Message } from "../api/types";
+import { landedAfter } from "./timeline";
 
 /**
  * How a person's conversations look (`chatPrefs` on their membership, on every device). `comfortable` is the original
@@ -72,15 +73,16 @@ export const facesShown = (style: ChatStyle, dm: boolean) => !(dm && mineOnRight
 /** Where a conversation opens the first time it is shown with `unread` messages waiting. */
 export const opensAtLastRead = (prefs: ChatPrefs | undefined, unread: number) => prefs?.openAt === "read" && unread > 0;
 
-/** The first message after `lastReadAt` that isn't mine: where the "Novas" line goes. Null: none in what's loaded. */
+/**
+ * The first message that landed after `lastReadAt` and isn't mine: where the "Novas" line goes. Null: none in what's
+ * loaded.
+ */
 export function firstUnreadId(
   messages: readonly Pick<Message, "id" | "author" | "createdAt">[],
   lastReadAt: string | null | undefined,
   meId: string | null,
 ): string | null {
   const after = lastReadAt ? Date.parse(lastReadAt) : -Infinity;
-  const first = messages.find(
-    (m) => Date.parse(m.createdAt) > after && !(m.author.type === "person" && m.author.id === meId),
-  );
+  const first = messages.find((m) => landedAfter(m, after) && !(m.author.type === "person" && m.author.id === meId));
   return first?.id ?? null;
 }

@@ -7,7 +7,6 @@ import {
   eq,
   inArray,
   isNull,
-  lte,
   ne,
   notInArray,
   or,
@@ -37,6 +36,7 @@ import { openTasksBrief } from "./issues";
 import type { MachineCaller } from "./machine-hub";
 import { type MessageMedia, mediaOf } from "./media";
 import { type DescribedMessage, describeMessages } from "./message-links";
+import { postedBySql } from "./message-place";
 import { type Message, unreachedNote } from "./messages";
 import { missionBrief } from "./mission-brief";
 import { handoffGuidance, noticeForOthers, noticeText } from "./notices";
@@ -571,7 +571,9 @@ export async function buildRunContext(
   const handOffs =
     options.routine || run.background || isAgentOnlyDm(channel) ? null : handOffsFrom(db, run).catch(() => null);
 
-  const upToTrigger = lte(messages.createdAt, trigger.createdAt);
+  // What was here when it was asked: a trigger an agent wrote over a while keeps the place of its first words, and what
+  // people sent meanwhile sits after it.
+  const upToTrigger = postedBySql(messages, trigger);
   const rootIsTrigger = run.threadRootId === trigger.id;
   // Asked in the main timeline: the run answers there, not in a thread.
   const flat = rootIsTrigger;
@@ -637,7 +639,7 @@ export async function buildRunContext(
               and(
                 scope,
                 sql`${messages.threadId} is distinct from ${run.threadRootId}::uuid`,
-                sql`${messages.createdAt} <= ${rootTime}`,
+                postedBySql(messages, { createdAt: rootTime, id: run.threadRootId }),
                 ne(messages.id, run.threadRootId),
               ),
             )

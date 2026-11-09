@@ -1409,9 +1409,9 @@ export interface ActiveRun {
   background?: boolean;
   /**
    * What its current model call streamed so far past its last tool: `text` starts at `at` of the call's text, so an
-   * app opened mid-answer goes on from `at` plus its length.
+   * app opened mid-answer goes on from `at` plus its length. `shownAt`: as `agent.delta.shownAt`.
    */
-  live?: { turn: number; at: number; text: string };
+  live?: { turn: number; at: number; text: string; shownAt?: string };
 }
 
 /** Real-time channel events (packages/engine/src/events.ts, docs/adr/0010-realtime.md). */
@@ -1493,6 +1493,8 @@ export type ChannelEvent =
       at?: number;
       /** Where its stretch starts in the turn's text (a stretch: the text between two calls of a computer brain). */
       from?: number;
+      /** When its reply first showed words (ISO, the server's clock): its message is posted there (`LiveRun.shownAt`). */
+      shownAt?: string;
     }
   | {
       type: "agent.run";
