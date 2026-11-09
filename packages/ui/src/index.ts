@@ -140,6 +140,8 @@ export {
   ComputerPortrait,
   type ComputerPortraitProps,
   type ComputerState,
+  type PhoneKind,
+  type PortraitKind,
 } from "./components/Computer";
 export { DatePicker, type DatePickerProps, monthGrid, parseYmd, ymd } from "./components/DatePicker";
 export {
@@ -398,7 +400,7 @@ export {
 } from "./components/voice-recorder";
 export { Reaction, Reactions, type WorkStep, WorkSummary } from "./components/Work";
 export { WorkLine, WorkLineAction, type WorkLineTone, WorkPlan } from "./components/WorkLine";
-export { COMPUTER_GRID, COMPUTER_KINDS, COMPUTER_STATES, drawComputer } from "./computer/portrait.js";
+export { COMPUTER_GRID, COMPUTER_KINDS, COMPUTER_STATES, drawComputer, PHONE_KINDS } from "./computer/portrait.js";
 export { cx } from "./cx";
 export { hoverPointer, movesByKeys, onScreenKeyboard, onScreenNow, trackInput } from "./device";
 export {

@@ -140,6 +140,7 @@ export async function syncHostComputer(deps: HostDeps, input: HostSyncInput): Pr
         orgId: o.id,
         kind: "host" as const,
         name,
+        audienceMode: "everyone" as const,
         pairedByUserId: ownerId,
         hostname: (input.hostname ?? "").slice(0, 200),
         os: OSES.has(input.os ?? "") ? (input.os as string) : "other",
@@ -277,7 +278,7 @@ export async function addHostComputer(db: Database, orgId: string) {
     .limit(1);
   await db
     .insert(machines)
-    .values({ orgId, kind: "host", name: "", ...same, pairedByUserId: ownerId })
+    .values({ orgId, kind: "host", name: "", ...same, pairedByUserId: ownerId, audienceMode: "everyone" })
     .onConflictDoNothing();
 }
 

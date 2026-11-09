@@ -6097,6 +6097,14 @@ export type NotificationKind =
   | "reaction"
   /** ADR 0036 §5: a new computer joined the organization (admins). `source.machineId`; `source.label` = its name. */
   | "machine_connected"
+  /** A computer ran a connect link and asks to join (its maker). `source.requestId`; `source.label` = its name. */
+  | "device.join_request"
+  /** Someone else's agent uses this person's device (once per run). `source.phoneId` or `machineId`; Stop. */
+  | "device.in_use"
+  /** An agent asks to use this person's device. `source.requestId`; Allow once, Always, No. */
+  | "device.access_request"
+  /** Someone's agent waits for this person's device to come back. `source.phoneId` or `machineId`. */
+  | "device.waiting"
   /** ADR 0040 §6: an agent needs a person in its browser (sign in, a code). `source.handoffId`. */
   | "browser_handoff"
   /**
@@ -6294,6 +6302,9 @@ export interface NotificationSource {
   accountId?: string;
   /** `machine_connected`: the computer. */
   machineId?: string;
+  /** Bring your own devices: the join or access request, and the phone. */
+  requestId?: string;
+  phoneId?: string;
   /** `browser_handoff`: the request (its chat card has the same id). */
   handoffId?: string;
   /** `change_request`: the proposal to decide. */
@@ -7425,4 +7436,118 @@ export interface PersonLimitCard {
   runId: string;
   renewsAt: string;
   byUserId?: string;
+}
+
+/** Bring your own devices: who may point their agents at a device (the words of an agent's audience). */
+export interface DeviceAudience {
+  mode: "everyone" | "people" | "owner";
+  userIds: string[];
+  roleIds: string[];
+}
+
+/** A device's state, worded by the apps. Reason codes: `PhoneReason` in the machine protocol, plus the server's own. */
+export type DeviceStatus =
+  | { kind: "ready" }
+  | {
+      kind: "in_use";
+      agentId: string | null;
+      agentName: string | null;
+      userId: string | null;
+      userName: string | null;
+      label?: string;
+      since: string;
+    }
+  | { kind: "busy"; running: number; max: number }
+  | { kind: "needs_you"; reason: string }
+  | { kind: "preparing"; reason: string }
+  | { kind: "paused"; until: string | null }
+  | { kind: "offline"; lastSeenAt: string | null; withHost?: boolean }
+  | { kind: "unsupported"; reason: string };
+
+export interface PhoneDevice {
+  id: string;
+  platform: "android" | "ios";
+  phoneKind: "device" | "emulator" | "simulator";
+  name: string;
+  model: string;
+  osVersion: string;
+  hostMachineId: string | null;
+  ownerUserId: string | null;
+  /** null: it follows its host's rule (an iPhone). */
+  audience: DeviceAudience | null;
+  status: DeviceStatus;
+  transport: "usb" | "wifi" | "local" | null;
+  lastSeenAt: string | null;
+  mayUse: boolean;
+  mayManage: boolean;
+}
+
+export interface ComputerDevice {
+  id: string;
+  machineKind: "connected" | "host" | "managed";
+  name: string;
+  os: string;
+  arch: string;
+  hostname: string;
+  cpus: number | null;
+  memoryGb: number | null;
+  ownerUserId: string | null;
+  belongsToWorkspace: boolean;
+  systemMode: boolean;
+  audience: DeviceAudience;
+  status: DeviceStatus;
+  maxTasks: number | null;
+  toolchains: Record<string, string>;
+  lastSeenAt: string | null;
+  mayUse: boolean;
+  mayManage: boolean;
+  phones: PhoneDevice[];
+}
+
+/**
+ * A computer that ran a connect link and waits for the link's maker to let it join. Not `JoinRequest`, a person's
+ * request to join the workspace: two interfaces of one name would merge into one.
+ */
+export interface DeviceJoinRequest {
+  id: string;
+  linkId: string;
+  name: string;
+  hostname: string;
+  os: string;
+  arch: string;
+  ip: string;
+  location: string | null;
+  createdAt: string;
+  expiresAt: string;
+}
+
+export interface DevicesList {
+  devices: ComputerDevice[];
+  requests: DeviceJoinRequest[];
+}
+
+/** A one-line install: works once, for a few minutes, and the computer still asks to join. */
+export interface ConnectLink {
+  id: string;
+  code: string;
+  expiresAt: string;
+  commands: { unix: string; windows: string };
+}
+
+export interface ConnectLinkState {
+  status: "waiting" | "asking" | "joined" | "denied" | "expired";
+  request?: DeviceJoinRequest;
+  machineId?: string;
+}
+
+export interface ComputerDeviceInput {
+  name?: string;
+  audience?: DeviceAudience;
+  belongsToWorkspace?: boolean;
+  maxTasks?: number;
+}
+
+export interface PhoneDeviceInput {
+  name?: string;
+  audience?: DeviceAudience;
 }

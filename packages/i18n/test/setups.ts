@@ -211,6 +211,18 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     "desktop.prefs.updates.",
     "desktop.server.reveal",
     "desktop.cover.tailnetUp",
+    // An iPhone works only through a Mac, so its states and steps name the Mac; "This Mac" shows only on a Mac.
+    "devices.iphone.",
+    "devices.reason.untrusted",
+    "devices.reason.xcode_missing",
+    "devices.reason.device_support",
+    "devices.fix.device_support",
+    "devices.fix.helper_missing",
+    "devices.fix.helper_expired",
+    "devices.who.followsHint",
+    "devices.choose.thisMac",
+    "mobile.devices.reason.xcode_missing",
+    "mobile.devices.reason.device_support",
   ],
 };
 
@@ -235,6 +247,9 @@ export const ANYWHERE: readonly string[] = [
   "desktop.servers.",
   // The desktop app's workspaces by server: the line under a server that isn't agentes.chat, whichever server this is.
   "shell.yourServer",
+  // People connect their own computers and phones in every setup, the Cloud included.
+  "devices.",
+  "mobile.devices.",
 ];
 
 /** A key's agent-gender variant (`_female`, ADR 0122) goes where its base key goes. */

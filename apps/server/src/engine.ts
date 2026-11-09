@@ -40,6 +40,7 @@ import {
   createDatabaseToolSource,
   createDesktopControl,
   createDesktopToolSource,
+  createDeviceToolSource,
   createFindAgentToolSource,
   createFollowUpToolSource,
   createGitHubAppSettings,
@@ -78,6 +79,7 @@ import {
   createWithdrawRequestToolSource,
   createWorkspaceToolSource,
   createWorkToolSource,
+  deviceWaitHooks,
   type EmailArt,
   emailArtAt,
   envSpeechEngines,
@@ -104,6 +106,7 @@ import {
   type RunExecutorDeps,
   reauthorizeStream,
   recheckStream,
+  releaseRunPhones,
   resolveSummaryModel,
   type SandboxDeps,
   type ScheduleReader,
@@ -475,6 +478,14 @@ export function buildEngine(o: EngineOptions) {
         // Saved keys for one command (`run_code` with `keys`, ADR 0144).
         vault,
       }),
+      // Phones through connected computers and waiting for a device (bring your own devices).
+      createDeviceToolSource({
+        db,
+        machines: { hub: machineHub },
+        pubsub: adapters.pubsub,
+        artifacts,
+        publicUrl: config.PUBLIC_URL,
+      }),
       browserTools,
       // Reading the web, for every agent and run (ADR 0109): a search service when configured, else the agent's
       // own browser, else DuckDuckGo's HTML page.
@@ -510,7 +521,18 @@ export function buildEngine(o: EngineOptions) {
     pubsub: adapters.pubsub,
   });
   // Mission tasks' tools and computer-brain runs' tools come through the hub's MCP bridge (ADR 0032).
-  machineHub.setMissionHooks(createMissionHooks({ db, ...missionDeps, tools }));
+  // Runs waiting for a device (bring your own devices) go on when its computer is back or its phones report it free.
+  const missionHooks = createMissionHooks({ db, ...missionDeps, tools });
+  const deviceWaits = deviceWaitHooks({ db, pubsub: adapters.pubsub });
+  const hooks = {
+    ...missionHooks,
+    online: async (machineId: string) => {
+      await missionHooks.online?.(machineId);
+      await deviceWaits.online(machineId).catch(() => undefined);
+    },
+    phonesChanged: deviceWaits.phonesChanged,
+  };
+  machineHub.setMissionHooks(hooks);
   // The agent's Chrome started ahead of its first command (ADR 0040 §11): a head start, so a refusal costs nothing.
   const warmBrowser = (at: Parameters<typeof warmAgentBrowser>[2]) =>
     void warmAgentBrowser(db, machineHub, at).catch(() => {});
@@ -734,6 +756,7 @@ export function buildEngine(o: EngineOptions) {
     prepareCode,
     machines: machineHub,
     workspaceComputer,
+    releaseRunPhones: (run) => releaseRunPhones({ db, hub: machineHub }, run),
     maxOutputTokens: config.AGENT_MAX_OUTPUT_TOKENS,
     contextMessages: config.AGENT_CONTEXT_MESSAGES,
     blockSpec: (orgId, artifactId, version) => blockSpecAt(artifacts, orgId, artifactId, version),

@@ -236,6 +236,27 @@ export const NOTIFICATION_KINDS = [
    * until they turn it back on, so it reaches their devices.
    */
   "right_hand_paused",
+  /**
+   * A computer ran a connect link this person made and asks to join (bring your own devices): its maker, waiting, one
+   * row per request (`source.requestId`), the computer's name in `source.label`, the workspace's in `latest.title`
+   * and its OS, address and rough location in `latest.text`. Done once let in or denied.
+   */
+  "device.join_request",
+  /**
+   * Bring your own devices, to a device's owner; for all three the agent is the actor, whom it works for is
+   * `source.userId` (their first name in `latest.title`), the device is `source.machineId` (and `phoneId` for a phone)
+   * with its name in `source.label`, and the run is `source.runId`.
+   * `device.in_use`: someone else's agent is using it, once per run and device; what it does in `latest.text`. Stop
+   * ends it (`POST …/devices/phones/{id}/stop`).
+   */
+  "device.in_use",
+  /**
+   * An agent asks to use the device for someone its rule leaves out: waiting, one per request
+   * (`source.requestId`), the agent's reason in `latest.text`. Allow once, Always or No; done once answered.
+   */
+  "device.access_request",
+  /** Someone else's agent waits for the device to be back or free, one per wait; done once the wait ends. */
+  "device.waiting",
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
@@ -284,6 +305,15 @@ export interface NotificationSource {
   accountId?: string;
   /** The connected MCP server whose approved tools changed (`connector_tool_changed`, ADR 0117). */
   connectionId?: string;
+  /**
+   * `device.join_request`: the computer asking to join (`POST …/devices/requests/{id}/approve`);
+   * `device.access_request`: the agent's request to use a device (`POST …/devices/access-requests/{id}/decide`).
+   */
+  requestId?: string;
+  /** A phone reached through a connected computer (bring your own devices). */
+  phoneId?: string;
+  /** `device.in_use`, `device.waiting`, `device.access_request`: the agent's run on the device. */
+  runId?: string;
   /** Channel name, thread title, issue title, topic title, mission or routine name, widget or board title. */
   label?: string;
 }

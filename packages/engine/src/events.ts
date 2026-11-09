@@ -706,6 +706,14 @@ export type ChannelEvent =
       messageId: string;
       card: Record<string, unknown>;
     }
+  /** A device wait's card ended or changed (bring your own devices): the message's whole `meta.deviceWait` now. */
+  | {
+      type: "device_wait.updated";
+      channelId: string;
+      threadId: string | null;
+      messageId: string;
+      deviceWait: Record<string, unknown>;
+    }
   /** The right hand looked at a card for someone (ADR 0139): its `meta.actionCard.delegate` now (null: nothing to say). */
   | {
       type: "card.delegate";

@@ -24,7 +24,7 @@ export type SettingsSection =
   | "skills"
   | "keys"
   | "storage"
-  | "computers"
+  | "devices"
   | "usage"
   | "billing"
   | "import"
@@ -70,8 +70,8 @@ export const SETTINGS_SECTIONS: {
   { id: "access", icon: "agent", group: "agents", allowed: (o) => can(o, "manage_agents") },
   { id: "connectors", icon: "plug", group: "agents", allowed: () => true },
   { id: "skills", icon: "bulb", group: "agents", allowed: (o) => can(o, "manage_agents") },
-  // Every member sees the computers and can pair one (ADR 0025).
-  { id: "computers", icon: "computer", group: "agents", allowed: (o) => can(o, "read") },
+  // Every member sees the devices and can connect one (ADR 0025): computers and the phones they reach.
+  { id: "devices", icon: "computer", group: "agents", allowed: (o) => can(o, "read") },
   // Everyone (ADR 0063): their plans' meters and the agents whose details they see, in tokens and percentages;
   // money and the workspace's report only for who has `view_usage`.
   { id: "usage", icon: "wallet", group: "costs", allowed: () => true },

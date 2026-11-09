@@ -219,6 +219,13 @@ function AppStack() {
       <Stack.Screen name="settings/skills/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/skills/new" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/skills/edit" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/devices/index" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/devices/[machineId]" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/devices/phone/[phoneId]" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/devices/audience" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/devices/android-setup" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/devices/iphone-setup" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/devices/connect" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/computers/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/computers/[machineId]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/computers/rename" options={{ ...pushed, ...scrollUnder }} />

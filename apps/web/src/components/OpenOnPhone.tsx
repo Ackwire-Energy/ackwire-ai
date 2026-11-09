@@ -119,7 +119,7 @@ function PhoneCode() {
 }
 
 /** Dark modules on white whatever the theme: phone cameras read that best. */
-function QrCode({ text, label }: { text: string; label: string }) {
+export function QrCode({ text, label }: { text: string; label: string }) {
   const { size, data } = encode(text, { ecc: "M", border: 2 });
   let path = "";
   data.forEach((row, y) => {

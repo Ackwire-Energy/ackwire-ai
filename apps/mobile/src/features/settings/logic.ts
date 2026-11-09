@@ -116,8 +116,8 @@ export const SETTINGS_SECTIONS: readonly SettingsEntry[] = [
     allowed: (o) => can(o, "manage_agents"),
   },
   { id: "connectors", group: "agents", icon: "join", href: "/connectors", allowed: () => true },
-  // Every member sees the computers and connects one (ADR 0025).
-  { id: "computers", group: "agents", icon: "laptop", href: "/settings/computers", allowed: (o) => can(o, "read") },
+  // Dispositivos: every member sees the computers and the phones they reach, and connects their own (ADR 0025).
+  { id: "computers", group: "agents", icon: "laptop", href: "/settings/devices", allowed: (o) => can(o, "read") },
   // The Vault (ADR 0144): every member keeps their own logins and keys there and sees the team's shared with them.
   { id: "vault", group: "agents", icon: "key", href: "/settings/vault", allowed: (o) => can(o, "read") },
   { id: "skills", group: "agents", icon: "sparkle", href: "/settings/skills", allowed: (o) => can(o, "manage_agents") },

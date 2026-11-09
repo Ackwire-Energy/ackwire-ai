@@ -61,6 +61,7 @@ import {
 } from "@agenteschat/client";
 import { type AgentUnavailableEvent, isAgentUnavailable } from "@agenteschat/client/lib/audience";
 import { newerBlockState } from "@agenteschat/client/lib/blocks";
+import { deviceWaitEventOf } from "@agenteschat/client/lib/devices";
 import { playSound } from "@agenteschat/client/lib/sounds";
 import { type QueryClient, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
@@ -354,8 +355,15 @@ function applyToCache(qc: QueryClient, orgId: string, channelId: string, event: 
       if (event.task.threadId) void qc.invalidateQueries({ queryKey: keys.threadTasks(orgId, event.task.threadId) });
       if (event.task.missionId) void qc.invalidateQueries({ queryKey: keys.mission(orgId, event.task.missionId) });
       break;
-    default:
+    default: {
+      // An agent's wait for a device ended (or changed): its card says how, without a reload.
+      const wait = deviceWaitEventOf(event);
+      if (wait) {
+        cacheMessageMeta(qc, orgId, wait.channelId, wait.messageId, () => ({ deviceWait: wait.deviceWait }));
+        if (wait.threadId) void qc.invalidateQueries({ queryKey: keys.thread(orgId, wait.channelId, wait.threadId) });
+      }
       break;
+    }
   }
 }
 

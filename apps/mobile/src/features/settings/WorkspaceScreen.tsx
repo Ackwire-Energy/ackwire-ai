@@ -41,6 +41,7 @@ import { Gap, SettingsPage } from "./parts";
 
 /** The rows whose group already says the rest get a shorter name (`mobile.settings.section.*`). */
 const SHORT: Partial<Record<SettingsSection, string>> = {
+  computers: "mobile.devices.title",
   members: "mobile.settings.section.members",
   roles: "mobile.settings.section.roles",
   access: "mobile.settings.section.access",

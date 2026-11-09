@@ -95,6 +95,8 @@ export const caches = {
   messageRoots: new TtlCache<unknown>(24 * 3600_000, 20_000),
   /** Runs that read outside content (`runReadOutside`): only `true` is kept, since it never turns false. */
   readOutsideRuns: new TtlCache<true>(3600_000, 20_000),
+  /** The workspace's devices by name (`deviceRoster`): a run's prompt and its tool lists read it once. */
+  deviceRoster: new TtlCache<unknown>(5_000),
 };
 
 /** `caches.contextPresence`'s key for whether an agent holds a rule people gave (`rulesForRun`). */

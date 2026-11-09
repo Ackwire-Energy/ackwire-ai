@@ -234,9 +234,9 @@ html:not([data-pointer]) .nt-item:focus-visible {
   font-size: 13.5px;
   color: var(--muted);
 }
-/* The chips 4 under the headline, the snippet the body's 8 under them. */
+/* A source chip ("Devices", "Routine") never touches the headline above it: 8 under it, like the snippet under them. */
 .nt-item:has(> .ac-mediarow__body > .nt-tags:first-child) {
-  row-gap: var(--space-1);
+  row-gap: var(--space-2);
 }
 /* In the body its parts stand the body's gap apart. */
 .nt-item > .ac-mediarow__body > * {

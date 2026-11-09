@@ -18,6 +18,8 @@ export interface PushMessage {
   data: Record<string, unknown>;
   /** `high` wakes the device right away (things waiting for the person). */
   priority?: "default" | "high";
+  /** The app's notification category (iOS `categoryId`): the buttons it shows on the lock screen. */
+  category?: string;
 }
 
 export interface PushResult {
@@ -190,6 +192,7 @@ export function createExpoPushSender(
                 data: m.data,
                 sound: "default",
                 priority: m.priority ?? "default",
+                ...(m.category ? { categoryId: m.category } : {}),
               })),
             ),
           });

@@ -92,6 +92,7 @@ import {
 } from "@agenteschat/client";
 import { type AgentUnavailableEvent, isAgentUnavailable } from "@agenteschat/client/lib/audience";
 import { newerBlockState } from "@agenteschat/client/lib/blocks";
+import { deviceWaitEventOf } from "@agenteschat/client/lib/devices";
 import { knownErrorText } from "@agenteschat/client/lib/errors";
 import { formatPercent } from "@agenteschat/client/lib/format";
 import { nextMonthIso, usageWhen } from "@agenteschat/client/lib/plan-usage";
@@ -835,6 +836,15 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
       if (event.type === "card.delegate") cacheCardDelegate(qc, orgId, event, event.delegate);
       // A right hand's card of a workspace change was applied, dismissed or sent on: the whole card.
       if (event.type === "action_card.updated") cacheActionCard(qc, orgId, event, event.card);
+      // An agent's wait for a device ended (or changed): its card flips to how it ended, without a reload.
+      const deviceWait = deviceWaitEventOf(event);
+      if (deviceWait) {
+        cacheMessageMeta(qc, orgId, deviceWait.channelId, deviceWait.messageId, () => ({
+          deviceWait: deviceWait.deviceWait,
+        }));
+        if (deviceWait.threadId)
+          void qc.invalidateQueries({ queryKey: keys.thread(orgId, deviceWait.channelId, deviceWait.threadId) });
+      }
       // A DM between people: the other one read it ("Visto" moves).
       if (event.type === "channel.read") cacheDmRead(qc, orgId, event);
       // Someone reacted: the pills under that message change for everyone.

@@ -173,6 +173,22 @@ export function renderPush(locale: PushLocale, input: PushTextInput): { title: s
       if (by) return out(s.joinSuggestionTitle(by, who, input.label?.trim() || ""), s.joinRequestBody);
       return out(s.joinRequestTitle(who, input.label?.trim() || ""), s.joinRequestBody);
     }
+    case "device.join_request":
+      // The computer's name as it said it; letting it in happens in the app, never from the notification.
+      return out(
+        s.deviceJoinRequestTitle(input.label?.trim() || s.someone, input.title?.trim() || ""),
+        s.deviceJoinRequestBody,
+      );
+    // The agent's name, whom it works for (`title`) and the device's name (`label`); what it does in `text`.
+    case "device.in_use":
+      return out(
+        s.deviceInUseTitle(actor, input.title?.trim() ?? "", input.label?.trim() ?? ""),
+        text || s.deviceInUseBody,
+      );
+    case "device.access_request":
+      return out(s.deviceAccessTitle(actor, input.title?.trim() ?? "", input.label?.trim() ?? ""), s.deviceAccessBody);
+    case "device.waiting":
+      return out(s.deviceWaitingTitle(input.title?.trim() || actor, input.label?.trim() ?? ""), s.deviceWaitingBody);
     case "usage_limit":
       // Percentages only for the person; who decides reads the person's name (ADR 0141).
       switch (input.status) {

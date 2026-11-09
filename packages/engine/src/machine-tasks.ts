@@ -371,10 +371,14 @@ export async function taskSignIn(
  * Records a task and asks the machine to start it. On failure the row is
  * kept as `failed` with the reason, and the error goes up.
  */
-export async function startMachineTask(deps: TaskDeps & { call: TaskCall }, input: StartTaskInput) {
+export async function startMachineTask(
+  deps: TaskDeps & { call: TaskCall },
+  input: StartTaskInput,
+  options: { requeue?: boolean } = {},
+) {
   await checkTaskProtocol(deps.db, input);
   const row = await insertTask(deps.db, input, null);
-  return (await launchTask(deps, row, input)).row;
+  return (await launchTask(deps, row, input, options)).row;
 }
 
 async function checkTaskProtocol(
@@ -557,7 +561,7 @@ export async function queueMachineTask(deps: TaskDeps, input: StartTaskInput) {
 /**
  * Claims the next task of a machine's queue that may start now, oldest first
  * (ADR 0044): its mission is active and its folder ready (a setup task needs
- * neither), and a write item waits while another write item of its mission
+ * neither; a task of no mission, `start_task` on another device, neither), and a write item waits while another write item of its mission
  * holds the folder (running, being started, or interrupted and may come
  * back) and while a turn of the mission's main session that began before it
  * was queued still runs (that turn may be writing in the folder: the item
@@ -577,10 +581,10 @@ export async function claimQueuedTask(
       .from(machineTasks)
       .where(
         sql`${machineTasks.id} = (select q.id from ${machineTasks} q
-          join ${schema.missions} m on m.id = q.mission_id
+          left join ${schema.missions} m on m.id = q.mission_id
           where q.machine_id = ${machineId}::uuid and q.status = 'queued' and q.ended_at is null
             and q.start_request is not null
-            and (q.mode = 'setup' or (m.status in ('active', 'awaiting_close') and m.worktree_state = 'ready'))
+            and (q.mission_id is null or q.mode = 'setup' or (m.status in ('active', 'awaiting_close') and m.worktree_state = 'ready'))
             and (q.mode is distinct from 'write' or (
               not exists (select 1 from ${machineTasks} w
                 where w.mission_id = q.mission_id and w.id <> q.id and w.mode = 'write'

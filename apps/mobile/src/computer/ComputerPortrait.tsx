@@ -8,7 +8,14 @@ import { frameClock } from "@/agent/clock";
 import { useLivePaused } from "@/agent/live";
 import { Icon } from "@/ui/Icon";
 import { useTheme } from "@/ui/theme";
-import { type CellRun, type ComputerKind, type ComputerState, cellsToSvg, portraitFrame } from "./cells";
+import {
+  type CellRun,
+  type ComputerKind,
+  type ComputerState,
+  cellsToSvg,
+  type PortraitKind,
+  portraitFrame,
+} from "./cells";
 
 /** The design's pace (~11 frames a second): screens shimmer, agents bob, drive lights blink. */
 const FPS = 11;
@@ -43,7 +50,8 @@ function usePortraitTime(active: boolean): number {
 }
 
 export interface ComputerPortraitProps {
-  kind: ComputerKind;
+  /** A computer, or a phone it reaches (`android`, `iphone`). */
+  kind: PortraitKind;
   state: ComputerState;
   /** 48 (rows, default) or 96 points: whole-number scales of the 48 grid. */
   size?: 48 | 96;

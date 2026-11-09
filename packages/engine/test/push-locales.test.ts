@@ -23,6 +23,7 @@ const KINDS = [
   "browser_handoff",
   "secret_request",
   "join_request",
+  "device.join_request",
   "widget_alert",
   "widget_failed",
   "dashboard_proposal",

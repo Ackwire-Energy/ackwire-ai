@@ -4364,6 +4364,513 @@
   "computer.pickHelp": {
     "value": "Pick one of the computers that are on."
   },
+  "devices.title": {
+    "value": "Devices"
+  },
+  "devices.empty.title": {
+    "value": "No devices yet"
+  },
+  "devices.empty.text": {
+    "value": "Connect a computer, then plug a phone into it."
+  },
+  "devices.status.ready": {
+    "value": "Ready"
+  },
+  "devices.status.inUse": {
+    "value": "In use by {{name}}"
+  },
+  "devices.status.inUseFor": {
+    "value": "for {{person}} since {{time}}"
+  },
+  "devices.status.since": {
+    "value": "since {{time}}"
+  },
+  "devices.status.busy": {
+    "value": "Busy {{running}}/{{max}}"
+  },
+  "devices.status.needsYou": {
+    "value": "Needs you"
+  },
+  "devices.status.preparing": {
+    "value": "Getting ready"
+  },
+  "devices.status.paused": {
+    "value": "Paused"
+  },
+  "devices.status.until": {
+    "value": "until {{time}}"
+  },
+  "devices.status.offline": {
+    "value": "Offline"
+  },
+  "devices.status.seen": {
+    "value": "last seen {{when}}"
+  },
+  "devices.status.withHost": {
+    "value": "with {{host}}"
+  },
+  "devices.status.unsupported": {
+    "value": "Can't be used"
+  },
+  "devices.reason.locked": {
+    "value": "The screen is locked"
+  },
+  "devices.reason.unauthorized": {
+    "value": "Tap Allow on the phone"
+  },
+  "devices.reason.untrusted": {
+    "value": "Tap Trust on the iPhone"
+  },
+  "devices.reason.developer_mode_off": {
+    "value": "Developer Mode is off"
+  },
+  "devices.reason.ui_automation_off": {
+    "value": "UI Automation is off"
+  },
+  "devices.reason.xcode_missing": {
+    "value": "The Mac needs Xcode"
+  },
+  "devices.reason.xcode_too_old": {
+    "value": "Xcode is too old for this iPhone"
+  },
+  "devices.reason.device_support": {
+    "value": "The Mac is preparing this iPhone"
+  },
+  "devices.reason.helper_missing": {
+    "value": "The test helper isn't set up yet"
+  },
+  "devices.reason.helper_expired": {
+    "value": "The test helper needs renewing"
+  },
+  "devices.reason.booting": {
+    "value": "Starting up"
+  },
+  "devices.reason.no_driver": {
+    "value": "Windows needs this phone's USB driver"
+  },
+  "devices.reason.os_too_old": {
+    "value": "This phone's system is too old"
+  },
+  "devices.reason.adb_offline": {
+    "value": "Unplug the cable and plug it in again"
+  },
+  "devices.reason.other": {
+    "value": "Not ready yet"
+  },
+  "devices.os.android": {
+    "value": "Android {{version}}"
+  },
+  "devices.os.ios": {
+    "value": "iOS {{version}}"
+  },
+  "devices.onHost": {
+    "value": "on {{host}}"
+  },
+  "devices.cpus": {
+    "value": {
+      "one": "{{count}} CPU",
+      "other": "{{count}} CPUs"
+    }
+  },
+  "devices.memory": {
+    "value": "{{gb}} GB"
+  },
+  "devices.audience.label": {
+    "value": "Who can use it"
+  },
+  "devices.audience.me": {
+    "value": "Only me"
+  },
+  "devices.audience.only": {
+    "value": "Only {{name}}"
+  },
+  "devices.audience.everyone": {
+    "value": "Everyone"
+  },
+  "devices.audience.sameAs": {
+    "value": "Same as {{host}}"
+  },
+  "devices.audience.mode.owner": {
+    "value": "Only me"
+  },
+  "devices.audience.mode.ownerOf": {
+    "value": "Only {{name}}"
+  },
+  "devices.audience.mode.everyone": {
+    "value": "Everyone in the workspace"
+  },
+  "devices.audience.mode.people": {
+    "value": "Only some people or roles"
+  },
+  "devices.audience.modeText.owner": {
+    "value": "You, and agents working for you."
+  },
+  "devices.audience.modeText.ownerOf": {
+    "value": "{{name}}, and agents working for them."
+  },
+  "devices.audience.modeText.everyone": {
+    "value": "Anyone's agents in the workspace can use it."
+  },
+  "devices.audience.modeText.people": {
+    "value": "Pick the people and roles whose agents can use it."
+  },
+  "devices.audience.people": {
+    "value": "People and roles"
+  },
+  "devices.audience.pickSomeone": {
+    "value": "Pick at least one person or role."
+  },
+  "devices.audience.narrowOnly": {
+    "value": "You can narrow who uses {{name}}'s device, never widen it."
+  },
+  "devices.audience.runsAs": {
+    "value": "Other people's agents will run as you on it and can read your files."
+  },
+  "devices.audience.phoneOnly": {
+    "value": "This shares only the phone, never {{host}}."
+  },
+  "devices.audience.saved": {
+    "value": "Saved"
+  },
+  "devices.page.belongs": {
+    "value": "Belongs to the workspace"
+  },
+  "devices.page.belongsHint": {
+    "value": "It stays when its owner leaves the workspace, and Only me then reads as everyone."
+  },
+  "devices.page.phones": {
+    "value": "Phones"
+  },
+  "devices.page.ownerReads": {
+    "value": "Its owner can read the code, files and builds your agent puts here."
+  },
+  "devices.page.followsHost": {
+    "value": "An iPhone follows its Mac's rule."
+  },
+  "devices.page.shareNote": {
+    "value": "Sharing a phone never shares {{host}}."
+  },
+  "devices.page.showHow": {
+    "value": "Show me how"
+  },
+  "devices.page.name": {
+    "value": "Name"
+  },
+  "devices.page.renamed": {
+    "value": "Renamed to {{name}}"
+  },
+  "devices.page.stop": {
+    "value": "Stop {{name}}"
+  },
+  "devices.page.stopped": {
+    "value": "{{device}} is back from {{name}}"
+  },
+  "devices.page.forget": {
+    "value": "Forget this phone"
+  },
+  "devices.page.forgetTitle": {
+    "value": "Forget {{name}}?"
+  },
+  "devices.page.forgetText": {
+    "value": "It comes back if {{host}} sees it again."
+  },
+  "devices.page.forgotten": {
+    "value": "{{name}} was forgotten"
+  },
+  "devices.page.notFound": {
+    "value": "This device isn't here anymore"
+  },
+  "devices.page.notFoundText": {
+    "value": "It was removed, or it left with its owner."
+  },
+  "devices.join.header": {
+    "value": "Asking to join"
+  },
+  "devices.join.title": {
+    "value": "{{name}} wants to join {{org}}"
+  },
+  "devices.join.allow": {
+    "value": "Let it join"
+  },
+  "devices.join.deny": {
+    "value": "Deny"
+  },
+  "devices.join.joined": {
+    "value": "{{name}} joined"
+  },
+  "devices.join.denied": {
+    "value": "{{name}} was denied"
+  },
+  "devices.connect.title": {
+    "value": "Connect a device"
+  },
+  "devices.connect.thisPhone": {
+    "value": "This phone"
+  },
+  "devices.connect.computers": {
+    "value": "Computers"
+  },
+  "devices.connect.androidText": {
+    "value": "Through a computer it's plugged into"
+  },
+  "devices.connect.iphoneText": {
+    "value": "Through a Mac"
+  },
+  "devices.connect.server": {
+    "value": "A server or VPS"
+  },
+  "devices.connect.serverText": {
+    "value": "One line to paste in its terminal"
+  },
+  "devices.connect.computer": {
+    "value": "Another computer"
+  },
+  "devices.connect.computerText": {
+    "value": "Mac, Windows or Linux"
+  },
+  "devices.connect.appNote": {
+    "value": "On a Mac or a PC you use, the agentes.chat desktop app connects it too."
+  },
+  "devices.connect.unix": {
+    "value": "Linux and macOS"
+  },
+  "devices.connect.windows": {
+    "value": "Windows"
+  },
+  "devices.connect.once": {
+    "value": "Works once, for 10 minutes. Run it on the computer, then let it join here."
+  },
+  "devices.connect.copied": {
+    "value": "Command copied. Paste it in the computer's terminal."
+  },
+  "devices.connect.waiting": {
+    "value": "Waiting for the computer to run it"
+  },
+  "devices.connect.joined": {
+    "value": "{{name}} is connected"
+  },
+  "devices.connect.denied": {
+    "value": "You didn't let {{name}} join."
+  },
+  "devices.connect.expired": {
+    "value": "This link expired."
+  },
+  "devices.connect.again": {
+    "value": "Make a new link"
+  },
+  "devices.android.entry": {
+    "value": "Use this phone with agents"
+  },
+  "devices.android.title": {
+    "value": "Let agents use this phone"
+  },
+  "devices.android.connecting": {
+    "value": "Connecting to {{host}}"
+  },
+  "devices.android.computer": {
+    "value": "Computer"
+  },
+  "devices.android.noHost": {
+    "value": "This phone works through a computer of yours. Connect one first."
+  },
+  "devices.android.hostOffline": {
+    "value": "{{host}} is offline. Turn it on and open agentes.chat there."
+  },
+  "devices.android.step1": {
+    "value": "Turn on Developer options"
+  },
+  "devices.android.step1Text": {
+    "value": "Tap Build number 7 times, then enter your PIN."
+  },
+  "devices.android.openAbout": {
+    "value": "Open About phone"
+  },
+  "devices.android.step2": {
+    "value": "Turn on USB debugging"
+  },
+  "devices.android.openDev": {
+    "value": "Open Developer options"
+  },
+  "devices.android.step3": {
+    "value": "Plug it into {{host}}"
+  },
+  "devices.android.step3Hint": {
+    "value": "Use a cable that carries data, not one that only charges. If the phone asks what the USB is for, pick File transfer."
+  },
+  "devices.android.looking": {
+    "value": "Looking for this phone"
+  },
+  "devices.android.step4": {
+    "value": "Tap Allow on this phone"
+  },
+  "devices.android.step4Text": {
+    "value": "Check Always allow from this computer first."
+  },
+  "devices.android.prompt.a11y": {
+    "value": "Android asks: Allow USB debugging? Check Always allow from this computer, then tap Allow."
+  },
+  "devices.android.prompt.title": {
+    "value": "Allow USB debugging?"
+  },
+  "devices.android.prompt.fingerprint": {
+    "value": "The computer's RSA key fingerprint is:"
+  },
+  "devices.android.prompt.always": {
+    "value": "Always allow from this computer"
+  },
+  "devices.android.prompt.cancel": {
+    "value": "Cancel"
+  },
+  "devices.android.prompt.allow": {
+    "value": "Allow"
+  },
+  "devices.android.wifi": {
+    "value": "No cable? Pair over Wi-Fi"
+  },
+  "devices.android.wifiText": {
+    "value": "Phone and computer on the same Wi-Fi"
+  },
+  "devices.android.cable": {
+    "value": "Use a cable instead"
+  },
+  "devices.android.wifi1": {
+    "value": "Turn on Wireless debugging"
+  },
+  "devices.android.wifi2": {
+    "value": "Pair it from {{host}}"
+  },
+  "devices.android.wifi2Text": {
+    "value": "In Android Studio on {{host}}, open Device Manager, then Pair Devices Using Wi-Fi. Scan its code here in Wireless debugging."
+  },
+  "devices.android.wifiNote": {
+    "value": "Wi-Fi can drop after a restart. A cable is more reliable."
+  },
+  "devices.android.done": {
+    "value": "{{name}} is connected"
+  },
+  "devices.android.openFailed": {
+    "value": "This phone didn't open that screen. Find it in Settings."
+  },
+  "devices.iphone.title": {
+    "value": "Connect this iPhone"
+  },
+  "devices.iphone.with": {
+    "value": "With {{host}}"
+  },
+  "devices.iphone.noHost": {
+    "value": "An iPhone connects through a Mac of yours. Connect one first."
+  },
+  "devices.iphone.step1": {
+    "value": "Plug into {{host}}"
+  },
+  "devices.iphone.step2": {
+    "value": "Tap Trust on this iPhone"
+  },
+  "devices.iphone.step2Text": {
+    "value": "Then enter your passcode."
+  },
+  "devices.iphone.step3": {
+    "value": "Turn on Developer Mode"
+  },
+  "devices.iphone.step3Hint": {
+    "value": "iPhone apps can't open another app's settings, so here is the path."
+  },
+  "devices.iphone.path.settings": {
+    "value": "Settings"
+  },
+  "devices.iphone.path.privacy": {
+    "value": "Privacy & Security"
+  },
+  "devices.iphone.path.devMode": {
+    "value": "Developer Mode"
+  },
+  "devices.iphone.pathA11y": {
+    "value": "On this iPhone: Settings, then Privacy & Security, then Developer Mode"
+  },
+  "devices.iphone.switchA11y": {
+    "value": "The Developer Mode switch, off"
+  },
+  "devices.iphone.step3Text": {
+    "value": "Turn it on and tap Restart. After the restart, tap Turn On and enter your passcode."
+  },
+  "devices.iphone.step4": {
+    "value": "Turn on UI Automation"
+  },
+  "devices.iphone.step4Text": {
+    "value": "Settings › Developer › Enable UI Automation"
+  },
+  "devices.iphone.step5": {
+    "value": "Trust the test helper"
+  },
+  "devices.iphone.step5Hint": {
+    "value": "The app {{host}} installs so agents can tap and type on this iPhone. It shows up in this list once installed."
+  },
+  "devices.iphone.step5Text": {
+    "value": "Settings › General › VPN & Device Management. Tap the developer's name, then Trust."
+  },
+  "devices.iphone.waiting": {
+    "value": "Waiting for {{host}} to see it"
+  },
+  "devices.iphone.footer": {
+    "value": "Your Mac does the rest, and renews the test helper every 7 days while it's on."
+  },
+  "devices.notice.kind": {
+    "value": "Devices"
+  },
+  "devices.notice.join_request": {
+    "value": "{{device}} wants to join {{org}}"
+  },
+  "devices.notice.in_use": {
+    "value": "{{names}} is using {{device}}"
+  },
+  "devices.notice.in_useFor": {
+    "value": "{{names}} is using {{device}} for {{person}}"
+  },
+  "devices.notice.access_request": {
+    "value": "{{names}} asks to use {{device}}"
+  },
+  "devices.notice.access_requestFor": {
+    "value": "{{names}} asks to use {{device}} for {{person}}"
+  },
+  "devices.notice.waiting": {
+    "value": "{{names}} is waiting for {{device}}"
+  },
+  "devices.notice.waitingFor": {
+    "value": "{{names}} is waiting for {{device}} for {{person}}"
+  },
+  "devices.notice.allowOnce": {
+    "value": "Allow once"
+  },
+  "devices.notice.always": {
+    "value": "Always allow {{name}}"
+  },
+  "devices.notice.no": {
+    "value": "No"
+  },
+  "devices.notice.stop": {
+    "value": "Stop"
+  },
+  "devices.wait.waiting": {
+    "value": "Waiting for {{device}}"
+  },
+  "devices.wait.back": {
+    "value": "{{device}} is back"
+  },
+  "devices.wait.tryNow": {
+    "value": "Try now"
+  },
+  "devices.wait.other": {
+    "value": "Use another device"
+  },
+  "devices.wait.stop": {
+    "value": "Stop waiting"
+  },
+  "devices.wait.useInstead": {
+    "value": "Use {{name}} instead"
+  },
+  "devices.wait.none": {
+    "value": "No other device you can use is ready."
+  },
   "connectors.title": {
     "value": "Connectors"
   },

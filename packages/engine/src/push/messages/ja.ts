@@ -61,6 +61,8 @@ export const strings: Partial<PushStrings> = {
   joinRequestTitle: (name, org) => `${name} が ${org} への参加をリクエストしています`,
   joinSuggestionTitle: (by, name, org) => `${by} が ${name} を ${org} に推薦しました`,
   joinRequestBody: "タップして承認または却下",
+  deviceJoinRequestTitle: (computer, org) => `${computer} が ${org} への参加を求めています`,
+  deviceJoinRequestBody: "タップして参加を許可または却下",
   waitingTitle: "あなたの対応待ちがあります",
   openBody: "タップして開く",
   sentGif: "GIF を送信しました",
@@ -75,6 +77,14 @@ export const strings: Partial<PushStrings> = {
   usageRaisedTitle: (a) => `${a} が今月の上限を上げました`,
   usageRaisedBody: "続けられます。",
   usageRefusedTitle: (a) => `${a} が利用の追加の依頼を断りました`,
+  deviceInUseTitle: (a, p, d) =>
+    p ? `${a}（${p} の依頼）があなたの ${d} を使用中です` : `${a} があなたの ${d} を使用中です`,
+  deviceInUseBody: "タップして停止",
+  deviceAccessTitle: (a, p, d) =>
+    p ? `${a}（${p} の依頼）があなたの ${d} の使用を求めています` : `${a} があなたの ${d} の使用を求めています`,
+  deviceAccessBody: "タップして今回のみ許可、常に許可、または断る",
+  deviceWaitingTitle: (p, d) => `${p} のエージェントがあなたの ${d} を待っています`,
+  deviceWaitingBody: "戻ったら始まります。",
   teamWeekReady: "チームの1週間のまとめができました",
   teamDayReady: "今日のまとめができました",
   machineConnectedTitlePersonal: "新しいコンピューターが接続されました",

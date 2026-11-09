@@ -2161,7 +2161,7 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
           ) : (
             <Link
               to="/org/$orgId/settings/$section"
-              params={{ orgId: org.id, section: "computers" }}
+              params={{ orgId: org.id, section: "devices" }}
               className="small agp-wdlg__link"
             >
               <Icon name="plus" size={14} />

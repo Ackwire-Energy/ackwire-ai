@@ -104,7 +104,7 @@ describe("finding the settings", () => {
       ["skills", "Skills"],
       ["keys", "Contas de IA"],
       ["storage", "Armazenamento"],
-      ["computers", "Computadores"],
+      ["devices", "Dispositivos"],
       ["usage", "Orçamento e uso"],
       ["import", "Importar e exportar"],
     ];

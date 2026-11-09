@@ -148,7 +148,7 @@ function OutageNotice({
       </span>
       <span className="outage__acts">
         <Button asChild variant="ghost" size="sm">
-          <Link to="/org/$orgId/settings/computers/$machineId" params={{ orgId: org.id, machineId: o.machineId }}>
+          <Link to="/org/$orgId/settings/devices/$deviceId" params={{ orgId: org.id, deviceId: o.machineId }}>
             {t("outage.view")}
           </Link>
         </Button>

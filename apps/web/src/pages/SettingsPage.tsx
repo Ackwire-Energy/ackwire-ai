@@ -86,13 +86,14 @@ import { usePlanHold } from "@/components/ai/ConnectAiSteps";
 import { EndpointForm } from "@/components/ai/EndpointForm";
 import { WhoPicksSection } from "@/components/ai/Jev";
 import { BillingLinkButton } from "@/components/BillingLinkButton";
-import { ComputersSection } from "@/components/Computers";
 import { ConnectorsSection } from "@/components/Connectors";
 import { DeleteWorkspaceDialog } from "@/components/DeleteWorkspace";
+import type { ConnectStart } from "@/components/devices/ConnectDialog";
+import { DevicePage } from "@/components/devices/DevicePage";
+import { DevicesSection } from "@/components/devices/DevicesSection";
 import { ImportExportSection } from "@/components/ImportFlow";
 import { BillingMeters } from "@/components/Limits";
 import { ErrorState, LoadingLine, LoadingList } from "@/components/Loading";
-import { MachinePage } from "@/components/Machines";
 import { MediaSettingsSection } from "@/components/MediaSettings";
 import { NoticePrefsSection } from "@/components/NoticePrefs";
 import { useOrg } from "@/components/org-context";
@@ -134,7 +135,8 @@ function Settings({
   review,
   mail,
   account,
-  machineId,
+  device,
+  connect,
   install,
   skill,
   agent,
@@ -153,8 +155,10 @@ function Settings({
   install?: string;
   /** Skills: the skill to open (a notice of its update). */
   skill?: string;
-  /** Computadores → one computer (`/settings/computers/{id}`). */
-  machineId?: string;
+  /** Devices → one device: a computer's id, or `phones/<id>` (`/settings/devices/{path}`). */
+  device?: string;
+  /** Devices, with the connect dialog open on this flow (the phone guide's link opens the Android one). */
+  connect?: ConnectStart;
   /** Auditoria: the agent it opens filtered to. */
   agent?: string;
   /** Orçamento e uso › Pessoas: the person whose month opens (a limit's notice). */
@@ -276,10 +280,10 @@ function Settings({
             level={2}
             title={sectionName(current)}
             meta={
-              current !== "computers" ? (
+              current !== "devices" ? (
                 t(settingsSectionTextKey(org, current))
               ) : edition ? (
-                t(edition === "cloud" ? "computers.leadCloud" : "computers.lead")
+                t(edition === "cloud" ? "devices.leadCloud" : "devices.lead")
               ) : setup.isError ? null : (
                 // Never one edition's words before the server says which this is (the section says if it couldn't).
                 <LoadingLine width={320} />
@@ -322,7 +326,7 @@ function Settings({
           </>
         )}
         {current === "storage" && <StorageSection />}
-        {current === "computers" && (machineId ? <MachinePage machineId={machineId} /> : <ComputersSection />)}
+        {current === "devices" && (device ? <DevicePage path={device} /> : <DevicesSection start={connect} />)}
         {current === "usage" && (
           <>
             <UsageTabs person={person} summary={<UsageSection />} />
@@ -766,7 +770,7 @@ function SettingsTiles() {
   const invitations = useInvitations(org.id, can(org, "invite_people"));
   const connections = useConnections(org.id);
   const skills = useSkills(org.id, shown("skills"));
-  const machines = useMachines(org.id, shown("computers"));
+  const machines = useMachines(org.id, shown("devices"));
   const managesKeys = can(org, "manage_credentials");
   const credentials = useCredentials(org.id, managesKeys);
   const plans = useAiAccounts(org.id, shown("keys") && !managesKeys);
@@ -807,11 +811,11 @@ function SettingsTiles() {
               .join(", "),
           ].join(" · ")),
     skills: skills.data && t("settings.tileState.skills", { count: skills.data.length }),
-    computers:
+    devices:
       machines.data &&
       (machines.data.length === 0
-        ? t("settings.tileState.noComputers")
-        : t("settings.tileState.computers", { count: machines.data.length, online })),
+        ? t("settings.tileState.noDevices")
+        : t("settings.tileState.devices", { count: machines.data.length, online })),
     usage:
       budget !== null ? t("settings.tileState.usage", { percent: formatPercent(i18n.language, budget) }) : undefined,
     keys: managesKeys

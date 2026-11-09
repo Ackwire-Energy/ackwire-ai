@@ -26,6 +26,7 @@ const MACHINE_EVENTS = new Set([
   "machine.deleted",
   "machine.agents_moved",
   "computer.queue",
+  "devices.changed",
 ]);
 const isMachineEvent = (type: string) => MACHINE_EVENTS.has(type);
 
@@ -84,6 +85,8 @@ function patchTargets(
  */
 export function applyMachineEvent(qc: QueryClient, orgId: string, event: { type: string }): boolean {
   if (!isMachineEvent(event.type)) return false;
+  // The devices list (`devices.changed`, and every computer's state, pause or name in it) is read again.
+  void qc.invalidateQueries({ queryKey: keys.devices(orgId) });
   const e = event as {
     type: string;
     machineId?: unknown;

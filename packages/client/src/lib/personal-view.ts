@@ -11,10 +11,10 @@ type Org = Pick<OrgSummary, "mode"> | null | undefined;
 
 /**
  * Settings in a personal workspace (ADR 0159 §3), in this order: Your account, About you, AI and apps, Plan and usage,
- * Vault, Computers. Every other section the person may open is under Advanced. Ids are the settings sections'
- * (`/settings/{id}` on the web).
+ * Vault, Devices (the web's `devices`, the phone's `computers`). Every other section the person may open is under
+ * Advanced. Ids are the settings sections' (`/settings/{id}` on the web).
  */
-export const PERSONAL_SETTINGS = ["account", "general", "keys", "usage", "vault", "computers"] as const;
+export const PERSONAL_SETTINGS = ["account", "general", "keys", "usage", "vault", "devices", "computers"] as const;
 
 /**
  * Sections a personal workspace shows on another one's page: AI and apps holds connectors and skills, Plan and usage
@@ -36,7 +36,7 @@ export function personalSettingsHost(id: string, open: ReadonlySet<string>): str
  * The short list once other people are members (a family): People comes after About you. Alone, it stays under
  * Advanced, where inviting the first one still is.
  */
-const PERSONAL_SETTINGS_SHARED = ["account", "general", "members", "keys", "usage", "vault", "computers"] as const;
+const PERSONAL_SETTINGS_SHARED = ["account", "general", "members", "keys", "usage", "vault", "devices", "computers"] as const;
 
 /**
  * A personal workspace's settings list from the sections the person may open (`open`, in their usual order): the

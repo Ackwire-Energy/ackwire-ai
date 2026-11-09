@@ -238,7 +238,9 @@ export function PushedHeader({
       ...(plate ? coverBarOptions : solid ? {} : scrollUnder),
       ...(barTone && !plate ? { headerStyle: { backgroundColor: barTone } } : null),
       title: text,
-      headerTitle: custom ? () => <HeaderTitle text={text} node={titleNode} subtitle={subtitle} /> : text,
+      headerTitle: custom
+        ? () => <HeaderTitle text={text} node={titleNode} subtitle={subtitle} beside={word !== null} />
+        : text,
       ...(word !== null && IOS
         ? {
             unstable_headerRightItems: () => [
@@ -283,11 +285,24 @@ export interface HeaderWordAction {
   disabled?: boolean;
 }
 
-/** A title with a subtitle under it, in the native bar (centered on iOS, leading on Android). */
-function HeaderTitle({ text, node, subtitle }: { text: string; node: HeaderSlotStore; subtitle?: string | undefined }) {
+/**
+ * A title with a subtitle under it, in the native bar (centered on iOS, leading on Android). `beside`: a word action
+ * (Save) on the right, wider than the back button: the centered title keeps clear of it on both sides.
+ */
+function HeaderTitle({
+  text,
+  node,
+  subtitle,
+  beside = false,
+}: {
+  text: string;
+  node: HeaderSlotStore;
+  subtitle?: string | undefined;
+  beside?: boolean;
+}) {
   const { width } = useWindowDimensions();
   return (
-    <View style={[styles.headerTitle, { maxWidth: width - 150 }]}>
+    <View style={[styles.headerTitle, { maxWidth: width - (beside ? 200 : 150) }]}>
       {text ? (
         <Text variant="body" numberOfLines={1} style={styles.titleText}>
           {text}

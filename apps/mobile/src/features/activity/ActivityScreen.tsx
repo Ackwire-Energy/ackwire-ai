@@ -49,6 +49,8 @@ import type { AskKind } from "../chat/ask-store";
 import { ASK_ICON, AskButtons } from "../chat/asks";
 import { ConnectorIcon } from "../connectors/ConnectorIcon";
 import { dashboardWaitingCard } from "../dashboards/logic";
+import { isDeviceNotice } from "../devices/logic";
+import { DeviceNoticeActions, DeviceNoticeCard } from "../devices/notices";
 import { notificationHref, notificationWebPath, routineHref } from "../links/logic";
 import { openWebPath } from "../links/open-web";
 import { ChangeRequestCard } from "../right-hand/SettingsCard";
@@ -140,7 +142,11 @@ export function ActivityScreen() {
             <View style={styles.cards}>
               {waiting.map((n, i) => (
                 <Animated.View key={n.id} {...cardMotion}>
-                  <WaitingCardView item={n} first={i === 0} />
+                  {isDeviceNotice(n.kind) ? (
+                    <DeviceNoticeCard item={n} first={i === 0} />
+                  ) : (
+                    <WaitingCardView item={n} first={i === 0} />
+                  )}
                 </Animated.View>
               ))}
             </View>
@@ -592,6 +598,12 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
       {n.kind === "plan_model_dropped" && href && !n.doneAt ? (
         <View style={styles.change}>
           <Button variant="secondary" size="sm" label={t("mobile.activity.chooseModel")} onPress={open} />
+        </View>
+      ) : null}
+      {/* An agent holds the person's phone: Stop, right here. */}
+      {isDeviceNotice(n.kind) ? (
+        <View style={styles.change}>
+          <DeviceNoticeActions item={n} />
         </View>
       ) : null}
       {/* A person asks for more (ADR 0141): raised or refused right here. */}

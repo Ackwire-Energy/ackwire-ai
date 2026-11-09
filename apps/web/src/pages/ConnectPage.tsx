@@ -97,8 +97,8 @@ export function ConnectPage({ code }: { code: string }) {
             actions={
               <Button asChild variant="primary">
                 <Link
-                  to="/org/$orgId/settings/computers/$machineId"
-                  params={{ orgId: outcome.orgId, machineId: outcome.machine.id }}
+                  to="/org/$orgId/settings/devices/$deviceId"
+                  params={{ orgId: outcome.orgId, deviceId: outcome.machine.id }}
                 >
                   {t("connect.openComputer")}
                 </Link>

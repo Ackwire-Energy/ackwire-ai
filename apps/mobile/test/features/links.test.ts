@@ -80,8 +80,14 @@ describe("push payloads", () => {
     expect(hrefForPush({ ...at, kind: "issue_assigned", issueNumber: "131" })).toBe("/issues/131");
     expect(hrefForPush({ ...at, kind: "routine_failed", routineId: "r1", channelId: "c1" })).toBe("/routines/r1");
     expect(hrefForPush({ ...at, kind: "agent_unreached", agentId: "a1", channelId: "c1" })).toBe("/agent/a1");
-    expect(hrefForPush({ ...at, kind: "computer_disk_full", machineId: "k1" })).toBe("/settings/computers/k1");
-    expect(hrefForPush({ ...at, kind: "machine_connected", machineId: "k1" })).toBe("/settings/computers/k1");
+    expect(hrefForPush({ ...at, kind: "computer_disk_full", machineId: "k1" })).toBe("/settings/devices/k1");
+    expect(hrefForPush({ ...at, kind: "machine_connected", machineId: "k1" })).toBe("/settings/devices/k1");
+    // A device's notices open the phone, else the computer, else Devices.
+    expect(hrefForPush({ ...at, kind: "device.in_use", phoneId: "p1", machineId: "k1" })).toBe(
+      "/settings/devices/phone/p1",
+    );
+    expect(hrefForPush({ ...at, kind: "device.waiting", machineId: "k1" })).toBe("/settings/devices/k1");
+    expect(hrefForPush({ ...at, kind: "device.join_request", requestId: "r1" })).toBe("/settings/devices");
     expect(hrefForPush({ ...at, kind: "browser_handoff", handoffId: "h1", channelId: "c1" })).toBe(
       "/chat/c1?handoff=h1",
     );
@@ -150,7 +156,7 @@ describe("inbox items", () => {
     );
     expect(notificationHref(notification({ id: "n", kind: "skill_update", source: {} }))).toBe("/settings/skills");
     expect(notificationHref(notification({ id: "n", kind: "machine_connected", source: {} }))).toBe(
-      "/settings/computers",
+      "/settings/devices",
     );
     expect(notificationHref(notification({ id: "n", kind: "org_standing", source: { agentId: "a1" } }))).toBe(
       "/agent/a1",
@@ -212,10 +218,10 @@ describe("inbox items", () => {
       actors: [],
       source: { machineId: "m1", label: "Build box" },
     });
-    expect(notificationHref(n)).toBe("/settings/computers/m1");
+    expect(notificationHref(n)).toBe("/settings/devices/m1");
     expect(notificationHref({ ...n, source: { label: "Build box" } })).toBeNull();
     // A computer without Google Chrome (ADR 0133) opens it too.
-    expect(notificationHref({ ...n, kind: "computer_no_chrome" })).toBe("/settings/computers/m1");
+    expect(notificationHref({ ...n, kind: "computer_no_chrome" })).toBe("/settings/devices/m1");
   });
 });
 

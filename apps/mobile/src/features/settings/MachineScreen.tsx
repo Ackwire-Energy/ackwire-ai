@@ -61,6 +61,10 @@ import {
 } from "@/ui";
 import { router } from "@/ui/navigation";
 import { Note, openPage } from "../ai/parts";
+import { ComputerSection } from "../devices/ComputerSection";
+import { findDevice } from "../devices/logic";
+import { StatusLine } from "../devices/parts";
+import { useDevices } from "../devices/queries";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 import { goBack, MONO, successHaptic } from "../shared/parts";
@@ -87,6 +91,8 @@ export function MachineScreen({ machineId }: { machineId: string }) {
   const setupQ = useComputerSetup(orgId);
   const setup = setupView(setupQ.data, setupQ.dataUpdatedAt);
   const m = machines.data?.find((x) => x.id === machineId);
+  // Its state, who can use it and its phones (`GET …/devices`); the page reads without them while they load.
+  const device = findDevice(useDevices().data?.devices, machineId)?.computer;
   // Each agent's screen as this person sees it (the agent page's cache): it answers only who may watch it.
   const desktops = useQueries({
     queries: (m?.agents ?? []).map((a) => ({
@@ -141,8 +147,16 @@ export function MachineScreen({ machineId }: { machineId: string }) {
 
   const chips: { icon: IconName; label: string }[] = [
     ...(m.kind === "host" && m.name ? [{ icon: "server" as const, label: t("machines.host.label") }] : []),
-    { icon: m.online ? "check" : "circle", label: m.online ? t("machines.online") : t("machines.offline") },
-    ...(paused ? [{ icon: "pause" as const, label: paused }] : []),
+    // The device's state says online, busy or paused in its own chip.
+    ...(device
+      ? []
+      : [
+          {
+            icon: m.online ? ("check" as const) : ("circle" as const),
+            label: m.online ? t("machines.online") : t("machines.offline"),
+          },
+          ...(paused ? [{ icon: "pause" as const, label: paused }] : []),
+        ]),
     ...(m.pairedBy ? [{ icon: "members" as const, label: t("machines.pairedBy", { name: m.pairedBy.name }) }] : []),
   ];
   const facts = [
@@ -168,6 +182,7 @@ export function MachineScreen({ machineId }: { machineId: string }) {
     <SettingsPage title={title}>
       <View style={styles.head}>
         <ComputerPortrait kind={computerKind(m.os)} state={computerState(m)} size={96} />
+        {device ? <StatusLine status={device.status} center /> : null}
         <View style={styles.chips}>
           {chips.map((x) => (
             <Chip key={x.label} icon={x.icon} label={x.label} />
@@ -206,6 +221,8 @@ export function MachineScreen({ machineId }: { machineId: string }) {
           </Text>
         ) : null}
       </View>
+
+      {device ? <ComputerSection device={device} name={title} /> : null}
 
       {m.agents.length > 0 ? (
         <>
