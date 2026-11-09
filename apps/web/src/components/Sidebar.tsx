@@ -845,7 +845,6 @@ export function Sidebar() {
           // the bell and the collapse beside them. The desktop app's title bar has its own collapse (desktop.css).
           <div className="sidebar__org sidebar__org--person">
             <AccountMenu personal />
-            {!rail && <FeedbackMark />}
             {bell}
             {!compact && !tablet && (
               <Button
@@ -928,6 +927,9 @@ export function Sidebar() {
       )}
       {groupDialog && <GroupNameDialog purpose={groupDialog} onClose={() => setGroupDialog(null)} />}
 
+      {/* Beta: the way to the feedback form, a row of its own at the bottom, where this server takes it. Not beside
+          the person's name, which it would leave no room for; the rail has no room for a row's words. */}
+      {!rail && <FeedbackMark />}
       {/* No foot in a personal workspace (ADR 0159): the person, the bell and the collapse are on top. */}
       {!personal && (
         <div className="sidebar__foot">
@@ -937,8 +939,6 @@ export function Sidebar() {
           {rail && can(org, "create_agents") && <CreateAgentTile />}
           <div className="sidebar__me">
             <AccountMenu />
-            {/* Beta: the way to the feedback form, where this server takes it. The rail has room for the bell only. */}
-            {!rail && <FeedbackMark />}
             {bell}
           </div>
         </div>

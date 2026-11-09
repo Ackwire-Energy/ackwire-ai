@@ -8,6 +8,7 @@ import {
   DialogBody,
   DialogFooter,
   type Expression,
+  Icon,
   modKey,
   SettingNote,
   Textarea,
@@ -210,25 +211,21 @@ export function FeedbackDialog({ onClose }: { onClose: () => void }) {
 }
 
 /**
- * The Beta mark beside the person's name: it opens the feedback form. Only where the server takes feedback
- * (`FEEDBACK_EMAIL`): elsewhere there is no mark.
+ * The way to the feedback form: a quiet row at the bottom of the sidebar, marked Beta. Only where the server takes
+ * feedback (`FEEDBACK_EMAIL`): elsewhere there is no row.
  */
 export function FeedbackMark() {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   if (useAuthConfig().data?.feedback !== true) return null;
   return (
-    <>
-      <button
-        type="button"
-        className="sidebar__beta"
-        title={t("feedback.open")}
-        aria-label={t("feedback.open")}
-        onClick={() => setOpen(true)}
-      >
-        <Chip icon="message">{t("feedback.mark")}</Chip>
+    <div className="sidebar__feedback">
+      <button type="button" className="sidebar__item" aria-label={t("feedback.open")} onClick={() => setOpen(true)}>
+        <Icon name="message" />
+        <span className="sidebar__item-label">{t("feedback.open")}</span>
+        <Chip>{t("feedback.mark")}</Chip>
       </button>
       {open && <FeedbackDialog onClose={() => setOpen(false)} />}
-    </>
+    </div>
   );
 }

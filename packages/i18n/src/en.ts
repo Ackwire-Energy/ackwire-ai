@@ -17094,8 +17094,8 @@ export const en = {
         title: "Your feedback decides what comes next",
         text: "Tell us what was missing or got in your way. We read everything.",
       },
-      /** The Beta mark is the small label beside the person's name, at the bottom of the sidebar. */
-      where: "To write to us, use the Beta mark beside your name.",
+      /** "Send feedback" is the row at the bottom of the sidebar (`feedback.open`): the same words. */
+      where: "To write to us, use Send feedback, at the bottom of the sidebar.",
     },
     /** Over the sky where the workspace's agents stand: asleep at night, then awake by day. */
     stage: {
@@ -17118,7 +17118,7 @@ export const en = {
   },
   /** The feedback form behind the Beta mark (ADR 0160): what the person writes goes by email. */
   feedback: {
-    /** The small label beside the person's name. */
+    /** The small label at the end of the Send feedback row. */
     mark: "Beta",
     open: "Send feedback",
     ask: "What was missing, broke or got in your way?",

@@ -382,24 +382,22 @@
   resize: vertical;
 }
 
-/* The Beta mark beside the person's name: it opens the feedback form. */
-.sidebar__beta {
-  display: inline-flex;
+/* The way to the feedback form: a quiet row at the sidebar's bottom, over its foot when it has one. */
+.sidebar__feedback {
   flex: none;
-  margin: 0 4px 0 0;
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius-full);
-  background: none;
-  font: inherit;
-  cursor: pointer;
+  margin-top: auto;
 }
-.sidebar__beta:hover .ac-chip {
-  background: var(--plate);
+.sidebar__feedback + .sidebar__foot {
+  margin-top: 0;
 }
-html:not([data-pointer]) .sidebar__beta:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
+.sidebar__feedback > .sidebar__item {
+  color: var(--muted);
+}
+.sidebar__feedback > .sidebar__item > .ac-icon {
+  color: inherit;
+}
+.sidebar__feedback .ac-chip {
+  margin-left: auto;
 }
 
 @media (prefers-reduced-motion: reduce) {

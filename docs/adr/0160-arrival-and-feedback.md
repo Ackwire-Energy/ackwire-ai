@@ -50,10 +50,11 @@ with Postgres alone, and must not need a third-party widget in the apps.
    outside the branded templates, since its reader is the operator. The app makes an id per message, so a request
    sent twice goes once. A person sends at most ten an hour.
 
-8. **The way in is a Beta mark beside the person's name**, in the sidebar's foot, shown only where the server takes
-   feedback. On the form the right hand stands with an envelope, takes notes while the person types and the envelope
-   flies once it is sent. It only illustrates: no agent reads or sends the feedback, and the form's words say who
-   does.
+8. **The way in is a row at the bottom of the sidebar**, "Send feedback" with a Beta mark at its end, shown only
+   where the server takes feedback. It is not beside the person's name: a personal workspace has the person, the bell
+   and the collapse on one line, with no room for a fourth thing. On the form the right hand stands with an
+   envelope, takes notes while the person types and the envelope flies once it is sent. It only illustrates: no
+   agent reads or sends the feedback, and the form's words say who does.
 
 ## Consequences
 

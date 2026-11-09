@@ -115,3 +115,10 @@ personal shape too. Inviting someone in personal mode asks whether to stay perso
   workspace is the unit people set up and talk about.
 - **A separate personal product:** two apps to keep in step for the same features. Rejected.
 - **Hiding features in personal mode:** the user asked to keep every feature; only what is in sight changes.
+
+## Amended 2026-11-09
+
+Opening a personal workspace with no start place chosen (ADR 0108, "Início") lands on the last conversation that
+browser showed there, else on the right hand's; the home only when there is neither. A chosen channel or "where I left
+off" works as in a team workspace (web `routes/org.$orgId.index.tsx`).
+

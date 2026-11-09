@@ -17240,7 +17240,7 @@ export const ptBR = {
         title: "O seu feedback decide o que vem",
         text: "Conte o que faltou ou incomodou. A gente lê tudo.",
       },
-      where: "Para escrever para a gente, use o selo Beta ao lado do seu nome.",
+      where: "Para escrever para a gente, use Enviar feedback, no fim da barra lateral.",
     },
     stage: {
       ready: "O seu time está pronto",
