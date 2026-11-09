@@ -1838,9 +1838,11 @@
     squeeze(out) {
       const ACT =
         "button,[role=button],a.ac-btn,a[class*='btn'],select,[role=switch],[role=combobox],[role=menuitem],[role=tab],input[type=checkbox],input[type=radio]";
+      // A close, and the ⋯ the kit keeps beside it (`.ac-details__close`), stay beside the title by design.
       const isClose = (c) =>
         /^(fechar|close|dispensar|dismiss)\b/i.test(c.getAttribute("aria-label") ?? c.getAttribute("title") ?? "") ||
-        /(^|[\s_-])close\b/.test(typeof c.className === "string" ? c.className : "");
+        /(^|[\s_-])close\b/.test(typeof c.className === "string" ? c.className : "") ||
+        Boolean(c.closest(".ac-details__close,.ac-dialog__close"));
       /** Words `el` shows outside any control: its text nodes laid out wider than a pixel. */
       const loose = (el) => {
         const found = [];
