@@ -437,6 +437,7 @@
       "share.groupRoles"
     ],
     "fr": [
+      "calendar.moreRuns",
       "filters.kinds",
       "settings.about.version",
       "wiki.bulk.agents",
@@ -505,9 +506,7 @@
       "calendar.filter.routine",
       "calendar.form.description",
       "calendar.form.participants",
-      "calendar.kind.routine",
       "calendar.runAria",
-      "calendar.runsOn",
       "channel.emoji",
       "channel.membersAgents",
       "channel.messages",
@@ -873,7 +872,6 @@
       "browser.profiles.name",
       "browser.title",
       "browser.watch.live",
-      "calendar.kind.routine",
       "calendar.runAria",
       "calendar.views.agenda",
       "channel.emoji",
@@ -1172,6 +1170,7 @@
       "share.agent"
     ],
     "it": [
+      "calendar.moreRuns",
       "queue.fill.routine",
       "access.area.browser",
       "access.area.desktop",
@@ -1234,7 +1233,6 @@
       "browser.live.secure",
       "browser.title",
       "browser.watch.no",
-      "calendar.kind.routine",
       "calendar.runAria",
       "calendar.views.agenda",
       "channel.emoji",
@@ -1473,6 +1471,7 @@
       "share.fileRef"
     ],
     "nl": [
+      "calendar.moreRuns",
       "wiki.bulk.agents",
       "deleteAccount.agentCount",
       "queue.fill.routine",
@@ -1582,9 +1581,7 @@
       "calendar.filter.agent",
       "calendar.filter.routine",
       "calendar.filters",
-      "calendar.kind.routine",
       "calendar.runAria",
-      "calendar.runsOn",
       "calendar.views.week",
       "channel.emoji",
       "channel.membersAgents",

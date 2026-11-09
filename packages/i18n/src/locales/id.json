@@ -7967,6 +7967,8 @@
     },
     "upcoming": "Mendatang",
     "upcomingEmpty": "Tidak ada yang akan datang.",
+    "owners": "Agen dan orang",
+    "showOwner": "Tampilkan {{name}}",
     "viewZone": "Zona waktu kalender",
     "miniMonth": "Pilih hari",
     "new": "Acara baru",
@@ -7992,12 +7994,6 @@
         "declined": "Kamu tidak hadir."
       }
     },
-    "kind": {
-      "event": "Acara",
-      "routine": "Rutinitas",
-      "reminder": "Pengingat",
-      "deadline": "Tenggat tugas"
-    },
     "every": {
       "hour": "setiap jam",
       "hours": "setiap {{count}} jam",
@@ -8005,22 +8001,19 @@
     },
     "perDay": "{{count}}× sehari",
     "runs_other": "{{count}} proses di hari-hari ini.",
-    "routineDetail": "Rutinitas {{agent}} · dikirim ke {{target}}.",
+    "routineDetail": "Rutinitas · dikirim ke {{target}}",
     "deadlineDetail": "Tugas ini jatuh tempo.",
     "reminderBy": "Dibuat oleh {{name}}",
-    "reminderPosted": "Diposting oleh {{agent}} · {{target}}",
+    "reminderPosted": "Pengingat · diposting di {{target}}",
     "cancelReminder": "Batalkan pengingat",
     "reminderCancelled": "Pengingat dibatalkan",
     "openIssue": "Buka tugas",
     "openRoutines": "Lihat di Rutinitas",
     "openRoutine": "Buka rutinitas",
     "runAria": "Rutinitas {{name}}, {{time}}",
-    "runsAria": "{{count}} rutinitas pukul {{time}}: {{names}}",
     "runHint": "{{name}} · {{agent}} · {{time}}",
     "runsAt": "Rutinitas pukul {{time}}",
-    "runsOn": "Rutinitas · {{day}}",
-    "runsCount_other": "{{count}} proses rutinitas",
-    "dayRunsAria_other": "{{count}} proses rutinitas pada {{day}}: {{names}}",
+    "moreRuns_other": "+{{count}} rutinitas",
     "runTimes": "×{{count}}",
     "result": {
       "ok": "membalas",
