@@ -61,7 +61,7 @@ export type Evidence = ContextItem["evidence"][number];
 /** Keys by their format. */
 const KEY_FORMATS = [
   /\bsk-[a-z0-9_-]{16,}/i, // Anthropic/OpenAI-style keys
-  /\bgh[pousr]_[a-z0-9]{20,}/i, // GitHub tokens
+  /\bgh[pousr]_[a-z0-9._-]{20,}/i, // GitHub tokens (an App's: `ghs_<app id>_<JWT>`)
   /\bAKIA[0-9A-Z]{16}\b/, // AWS access keys
   /\bxox[abprs]-[a-z0-9-]{10,}/i, // Slack tokens
   /-----BEGIN [A-Z ]*PRIVATE KEY-----/,

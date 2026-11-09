@@ -319,7 +319,7 @@ const KEY_FORMATS: [RegExp, string][] = [
   [/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)/g, REDACTED],
   [/sk-ant-[A-Za-z0-9_-]{10,}/g, REDACTED],
   [/\bsk-[A-Za-z0-9_-]{16,}/gi, REDACTED],
-  [/\bgh[pousr]_[A-Za-z0-9]{20,}/gi, REDACTED],
+  [/\bgh[pousr]_[A-Za-z0-9._-]{20,}/gi, REDACTED],
   [/\bgithub_pat_[A-Za-z0-9_]{20,}/g, REDACTED],
   [/\bAKIA[0-9A-Z]{16}\b/g, REDACTED],
   [/\bxox[abprs]-[A-Za-z0-9-]{10,}/gi, REDACTED],
