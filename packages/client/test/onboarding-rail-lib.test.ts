@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import type { TFunction } from "i18next";
 import type { OrgStanding } from "../src/api/types";
 import { firstJob, landingOf, planStepShows, railState, railStepAt, railSteps } from "../src/lib/onboarding";
-import { templateFor } from "../src/lib/team-plan";
+import { aboutContext, aboutOf, templateFor } from "../src/lib/team-plan";
 
 describe("the onboarding's rail (ADR 0158)", () => {
   test("four steps where the workspace waits for its first plan, three anywhere else (a self-hosted server)", () => {
@@ -57,6 +58,27 @@ describe("the onboarding's rail (ADR 0158)", () => {
       "Resumir o que ficou sem resposta",
     );
     expect(firstJob(iara)).toBe("Atendimento");
+  });
+
+  test("step 2's type and sentence are saved together and read back, on any device", () => {
+    const words: Record<string, string> = {
+      "teamPlan.business.store": "Loja online",
+      "teamPlan.business.clinic": "Clínica ou consultório",
+    };
+    const t = ((key: string) => words[key] ?? key) as TFunction;
+    expect(aboutContext(t, "clinic", " Atendemos com hora marcada ")).toBe(
+      "Clínica ou consultório · Atendemos com hora marcada",
+    );
+    expect(aboutContext(t, "store", "")).toBe("Loja online");
+    expect(aboutContext(t, "other", "Roupas sob medida")).toBe("Roupas sob medida");
+    expect(aboutContext(t, null, "")).toBe("");
+    expect(aboutOf(t, "Clínica ou consultório · Atendemos com hora marcada")).toEqual({
+      business: "clinic",
+      line: "Atendemos com hora marcada",
+    });
+    expect(aboutOf(t, "Loja online")).toEqual({ business: "store", line: "" });
+    // A sentence alone (Outra coisa, or written in Configurações): no type, the whole sentence.
+    expect(aboutOf(t, "Lojas online de roupas")).toEqual({ business: null, line: "Lojas online de roupas" });
   });
 
   test("the team step's template: the one picked, else the business's, else the first", () => {

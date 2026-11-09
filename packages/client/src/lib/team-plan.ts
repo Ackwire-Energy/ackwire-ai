@@ -14,10 +14,6 @@ export type BusinessType = (typeof BUSINESS_TYPES)[number];
 /** Every business type but `other` is a team template's id too (the server's `TEAM_TEMPLATES`). */
 export const isTemplateBusiness = (b: BusinessType): b is Exclude<BusinessType, "other"> => b !== "other";
 
-/** The business type a workspace's context names when it is only that type's words (saved with no sentence). */
-export const businessOfContext = (t: TFunction, context: string): BusinessType | null =>
-  BUSINESS_TYPES.find((b) => isTemplateBusiness(b) && t(`teamPlan.business.${b}`) === context.trim()) ?? null;
-
 /** The template the onboarding's team step shows: the one picked, else the business's, else the first. */
 export const templateFor = <T extends { id: string }>(
   templates: readonly T[],
@@ -30,6 +26,28 @@ export const templateFor = <T extends { id: string }>(
 
 /** Several answers tapped together go as one message, in this order. */
 export const ANSWER_JOINER = " · ";
+
+/**
+ * The context the onboarding's step 2 saves (ADR 0158): the business type's words, then the sentence, joined as tapped
+ * answers are ("Loja online · Vendemos cerâmica"), so a later visit on any device reads both back (`aboutOf`).
+ */
+export const aboutContext = (t: TFunction, business: BusinessType | null, line: string) =>
+  [business && isTemplateBusiness(business) ? t(`teamPlan.business.${business}`) : "", line.trim()]
+    .filter(Boolean)
+    .join(ANSWER_JOINER);
+
+/** Step 2's answers in a workspace's context (`aboutContext`): the business type its words start with, the sentence. */
+export function aboutOf(t: TFunction, context: string): { business: BusinessType | null; line: string } {
+  const text = context.trim();
+  for (const b of BUSINESS_TYPES) {
+    if (!isTemplateBusiness(b)) continue;
+    const words = t(`teamPlan.business.${b}`);
+    if (text === words) return { business: b, line: "" };
+    if (text.startsWith(`${words}${ANSWER_JOINER}`))
+      return { business: b, line: text.slice(words.length + ANSWER_JOINER.length).trim() };
+  }
+  return { business: null, line: text };
+}
 
 export function replyChipsOf(meta: Record<string, unknown> | null | undefined): ReplyChips | null {
   const raw = meta?.replyChips as Partial<ReplyChips> | undefined;

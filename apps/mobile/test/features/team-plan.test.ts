@@ -8,6 +8,9 @@ test("what the workspace does: the onboarding's step 2, the business types saved
   const step = src("onboarding/steps.tsx");
   expect(step).toContain("BUSINESS_TYPES.map((b) => (");
   expect(step).toContain("save.mutate({ context: text }");
+  // The type and the sentence go together and come back together, as on the web (`aboutContext`, `aboutOf`).
+  expect(step).toContain("const text = aboutContext(t, kind, line);");
+  expect(step).toContain("useState(() => aboutOf(t, context).line)");
   expect(src("onboarding/OnboardingFlow.tsx")).toContain('t("agentSetup.firstRun.about.title", { org: workspace })');
   // The setup card's own screen for it is gone: the onboarding asks it once.
   expect(src("agents/setup/SetupStepScreen.tsx")).not.toContain("BUSINESS_TYPES");

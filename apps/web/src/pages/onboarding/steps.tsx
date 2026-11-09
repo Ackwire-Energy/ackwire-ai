@@ -3,7 +3,14 @@ import { keys, useApplyTeamTemplate, useRoutines, useTeamTemplates } from "@agen
 import type { PlanOffer } from "@agenteschat/client/lib/billing";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { firstJob } from "@agenteschat/client/lib/onboarding";
-import { BUSINESS_TYPES, type BusinessType, teamFailureText, templateFor } from "@agenteschat/client/lib/team-plan";
+import {
+  aboutContext,
+  aboutOf,
+  BUSINESS_TYPES,
+  type BusinessType,
+  teamFailureText,
+  templateFor,
+} from "@agenteschat/client/lib/team-plan";
 import { Button, Chip, Field, Icon, Locked, Select, Skeleton, Textarea } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -25,8 +32,8 @@ export function useTemplate(orgId: string | null, business: BusinessType | null,
 }
 
 /**
- * Step 2, "O que a Acme faz?": the business types to tap and one optional sentence, saved as the workspace's context,
- * which every agent reads. "Outra coisa" asks for the sentence.
+ * Step 2, "O que a Acme faz?": the business types to tap and one optional sentence, saved together as the workspace's
+ * context, which every agent reads. "Outra coisa" asks for the sentence.
  */
 export function BusinessStep({
   orgId,
@@ -43,10 +50,9 @@ export function BusinessStep({
   const api = useApi();
   const qc = useQueryClient();
   const [kind, setKind] = useState<BusinessType | null>(business);
-  // The sentence: the saved context, unless it is only the type's words.
-  const [line, setLine] = useState(business && business !== "other" ? "" : context);
+  const [line, setLine] = useState(() => aboutOf(t, context).line);
   const other = kind === "other";
-  const text = line.trim() || (kind && !other ? t(`teamPlan.business.${kind}`) : "");
+  const text = aboutContext(t, kind, line);
   const save = useMutation({
     mutationFn: () => api.orgs.updateSettings(orgId, { context: text }),
     onSuccess: (settings) => {

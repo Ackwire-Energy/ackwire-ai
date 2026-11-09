@@ -5,7 +5,7 @@ import { settingUp } from "@agenteschat/client/lib/guards";
 import { landingOf, type RailStep, railState } from "@agenteschat/client/lib/onboarding";
 import { can } from "@agenteschat/client/lib/permissions";
 import { finishOnboarding, isRightHand, RIGHT_HAND_DEFAULT } from "@agenteschat/client/lib/right-hand";
-import { type BusinessType, businessOfContext, templateFor } from "@agenteschat/client/lib/team-plan";
+import { aboutOf, type BusinessType, templateFor } from "@agenteschat/client/lib/team-plan";
 import { useIsMutating, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -98,7 +98,7 @@ export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; ano
     picked,
   });
   const known = orgId === null || (settings.isSuccess && agents.isSuccess && mine !== undefined);
-  const kind = business ?? businessOfContext(t, context);
+  const kind = business ?? aboutOf(t, context).business;
   const templates = useTeamTemplates(
     orgId ?? "",
     i18n.language,
@@ -379,8 +379,9 @@ export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; ano
           context={context}
           business={kind}
           onDone={(picked) => {
+            // Another business starts the team step on its own template again; the same keeps the one picked.
+            if (picked !== kind) setTemplate(null);
             setBusiness(picked);
-            setTemplate(null);
             setPicked(null);
           }}
         />

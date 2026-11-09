@@ -96,6 +96,8 @@ test("the phone's steps are the web's, read from the workspace's data (ADR 0158)
   expect(flow).toContain('if (!known || at !== "open" || opening.current) return;');
   expect(flow).toContain('void open("done");');
   expect(flow).toContain('onEnter={() => void open("skipped")}');
+  // Another business on step 2 starts the team step on its template again; the same one keeps the template picked.
+  expect(flow).toContain("if (picked !== kind) setTemplate(null);");
 });
 
 test("the phone's plan step: the team asleep and where to turn it on, with no price, no plan's name and no link", async () => {

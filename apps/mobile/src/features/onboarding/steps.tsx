@@ -2,7 +2,13 @@ import type { Agent, TeamTemplate } from "@agenteschat/client";
 import { useApplyTeamTemplate, useRoutines, useUpdateSettings } from "@agenteschat/client";
 import { planHoldPhoneLine } from "@agenteschat/client/lib/no-ai";
 import { firstJob } from "@agenteschat/client/lib/onboarding";
-import { BUSINESS_TYPES, type BusinessType, teamFailureText } from "@agenteschat/client/lib/team-plan";
+import {
+  aboutContext,
+  aboutOf,
+  BUSINESS_TYPES,
+  type BusinessType,
+  teamFailureText,
+} from "@agenteschat/client/lib/team-plan";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
@@ -59,10 +65,9 @@ export function BusinessStep({
   const { t, i18n } = useTranslation();
   const save = useUpdateSettings(orgId);
   const [kind, setKind] = useState<BusinessType | null>(business);
-  // The sentence: the saved context, unless it is only the type's words.
-  const [line, setLine] = useState(business && business !== "other" ? "" : context);
+  const [line, setLine] = useState(() => aboutOf(t, context).line);
   const other = kind === "other";
-  const text = line.trim() || (kind && !other ? t(`teamPlan.business.${kind}`) : "");
+  const text = aboutContext(t, kind, line);
   return (
     <>
       <Locked when={save.isPending}>

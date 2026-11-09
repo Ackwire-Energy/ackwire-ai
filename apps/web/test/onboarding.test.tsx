@@ -7,6 +7,7 @@ import type { TeamTemplate } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { createFakeApi, type FakeState, GENERAL_ID, LODI_ID, ORG_ID, seedState, withRightHand } from "./fake-api";
+import { pick } from "./new-agent-flow";
 import { renderApp, screen, settle, showIn } from "./render";
 
 /*
@@ -167,6 +168,50 @@ describe("the steps", () => {
     // The store's team, picked for its business.
     expect(document.querySelector(".tp-agents")?.textContent).toContain("Otto");
     expect(document.querySelector(".onb__steps")?.textContent).toContain("Loja online");
+  });
+
+  test("a type and a sentence are saved together: going back, or coming back later, finds both", async () => {
+    const state = newcomer(false);
+    await renderApp("/onboarding", { api: createFakeApi(state) });
+    await settle(10);
+    await type("Nome", "Ateliê Couto");
+    await click(button("Continuar"), 14);
+    await click(button("Clínica ou consultório"), 4);
+    await type("Em uma frase", "Atendemos com hora marcada");
+    await click(button("Continuar"), 14);
+    const orgId = state.me?.organizations[0]?.id;
+    const context = "Clínica ou consultório · Atendemos com hora marcada";
+    expect(calls(state, "orgs.updateSettings").at(-1)?.args).toEqual([orgId, { context }]);
+    // Back on step 2: the type still picked, the sentence still there, and Continuar keeps both.
+    await click(document.querySelectorAll(".onb__step")[1] as HTMLElement, 8);
+    expect(button("Clínica ou consultório").getAttribute("aria-pressed")).toBe("true");
+    expect((screen().getByLabelText("Em uma frase") as HTMLTextAreaElement).value).toBe("Atendemos com hora marcada");
+    await click(button("Continuar"), 14);
+    expect(calls(state, "orgs.updateSettings").at(-1)?.args).toEqual([orgId, { context }]);
+    cleanup();
+    // Another visit (a reload, the phone): the team step starts on the clinic's template, not the first one.
+    await renderApp("/onboarding", { api: createFakeApi(settingUp({ context })) });
+    await settle(14);
+    expect(heading()).toBe("Seu time");
+    expect(document.querySelector(".tp-agents")?.textContent).toContain("Nina");
+  });
+
+  test("a template picked stays picked, until step 2 names another business: then that business's template", async () => {
+    const state = settingUp({ context: "Roupas sob medida para noivas" });
+    await renderApp("/onboarding", { api: createFakeApi(state) });
+    await settle(14);
+    const team = () => document.querySelector(".tp-agents")?.textContent;
+    expect(team()).toContain("Otto");
+    await pick(screen().getByRole("combobox", { name: "Modelos de time" }), "Clínica ou consultório");
+    expect(team()).toContain("Nina");
+    const backToStep2 = () => click(document.querySelectorAll(".onb__step")[1] as HTMLElement, 8);
+    await backToStep2();
+    await click(button("Continuar"), 14);
+    expect(team()).toContain("Nina");
+    await backToStep2();
+    await click(button("Loja online"), 4);
+    await click(button("Continuar"), 14);
+    expect(team()).toContain("Otto");
   });
 
   test("Outra coisa asks for the sentence", async () => {

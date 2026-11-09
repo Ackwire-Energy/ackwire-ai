@@ -9,7 +9,7 @@ import { sendsEmail } from "@agenteschat/client/lib/join-requests";
 import { landingOf, type RailStep, railState } from "@agenteschat/client/lib/onboarding";
 import { finishOnboarding, isRightHand, RIGHT_HAND_DEFAULT } from "@agenteschat/client/lib/right-hand";
 import { browserTimezone, timezoneName } from "@agenteschat/client/lib/routines";
-import { type BusinessType, businessOfContext } from "@agenteschat/client/lib/team-plan";
+import { aboutOf, type BusinessType } from "@agenteschat/client/lib/team-plan";
 import { AgentSticker, Avatar, Button, Chip, Field, Icon, Input, Locked, Logo, Menu, MenuItem } from "@agenteschat/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
@@ -106,7 +106,7 @@ export function OnboardingPage() {
   });
   const known = orgId === null || (settings.isSuccess && agents.isSuccess && mine !== undefined);
   const name = (mine?.name ?? org).trim();
-  const kind = business ?? businessOfContext(t, context);
+  const kind = business ?? aboutOf(t, context).business;
   const template = useTemplate(orgId, kind, step === "business" || step === "team");
   // Read from the first step: step 4's price line is there when it opens, never a line that changes.
   const offer = usePlanOffer(i18n.language);
@@ -543,6 +543,8 @@ export function OnboardingPage() {
                 context={context}
                 business={kind}
                 onDone={(picked) => {
+                  // Another business starts the team step on its own template again; the same keeps the one picked.
+                  if (picked !== kind) template.pick(null);
                   setBusiness(picked);
                   setPicked(null);
                 }}
