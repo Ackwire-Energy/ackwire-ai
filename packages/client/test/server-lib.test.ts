@@ -8,6 +8,7 @@ import {
   isLoopback,
   isTailnet,
   normalizeServer,
+  pairLink,
   parseConnectLink,
   readInstance,
   serverHost,
@@ -146,6 +147,13 @@ describe("connect links", () => {
       "WIFI:S:office;T:WPA;P:secret;;",
     ])
       expect(parseConnectLink(other)).toBeNull();
+  });
+
+  test("the desktop app's pair link: the server and the connect link's code", () => {
+    expect(pairLink("https://app.agentes.chat", "K7QM-4ZPA")).toBe(
+      "agenteschat://pair?server=https%3A%2F%2Fapp.agentes.chat&link=K7QM-4ZPA",
+    );
+    expect(parseConnectLink(pairLink("https://app.agentes.chat", "K7QM-4ZPA"))).toBeNull();
   });
 });
 

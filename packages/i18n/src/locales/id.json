@@ -12520,10 +12520,26 @@
     },
     "computer": {
       "title": "Hubungkan komputer lain",
-      "step1": "Unduh aplikasinya di komputer itu:",
-      "step2": "Buka, lalu masuk ke {{org}}.",
-      "step3": "Nyalakan Izinkan agen memakai komputer ini.",
-      "orLine": "Atau tempel satu baris di terminalnya"
+      "step1": "Pasang aplikasi agentes.chat di komputer itu:",
+      "step2": "Buka, lalu masuk dengan akun Anda sendiri.",
+      "step3": "Klik Izinkan saat aplikasinya bertanya apakah agen {{org}} boleh memakainya.",
+      "shows": "Komputer itu muncul di sini dengan sendirinya, hanya untuk Anda sampai Anda membagikannya.",
+      "waiting": "Menunggu komputer Anda…",
+      "connected": "Terhubung: {{name}}",
+      "orLine": "Atau tempel satu baris di terminalnya",
+      "noApp": "Tidak bisa memasang aplikasinya di sana? Pakai satu baris di terminal"
+    },
+    "thisApp": {
+      "text": "Aplikasi agentes.chat menghubungkannya dengan satu klik, dan bertanya dulu kepada Anda.",
+      "open": "Buka aplikasi agentes.chat",
+      "browserAsks": "Browser akan bertanya apakah boleh membukanya: pilih Buka, dan Selalu izinkan jika ditawarkan.",
+      "noApp": "Belum punya aplikasinya?",
+      "afterInstall": "Setelah terpasang, klik lagi Buka aplikasi agentes.chat. Tautan ini berlaku sekali, selama 10 menit.",
+      "waiting": "Menunggu aplikasi di komputer ini…",
+      "expired": "Tautan ini sudah kedaluwarsa.",
+      "again": "Buat tautan baru",
+      "failed": "Tidak bisa membuat tautannya. Coba lagi sebentar lagi.",
+      "server": "Server? Pakai satu baris di terminal"
     },
     "link": {
       "serverTitle": "Hubungkan server",

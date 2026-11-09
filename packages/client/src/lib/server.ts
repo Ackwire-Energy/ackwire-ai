@@ -116,6 +116,12 @@ export function connectLink(server: string, { token, claim }: Omit<ConnectLink, 
 }
 
 /**
+ * The desktop app connects this computer with a connect link (`link`, as `ABCD-EFGH`) of `server`, after the
+ * person confirms in the app; the link's maker still lets it join on the web.
+ */
+export const pairLink = (server: string, link: string) => `agenteschat://pair?${new URLSearchParams({ server, link })}`;
+
+/**
  * The server, one-time sign-in and owner claim of a connect link; null for any other text or code, a link over
  * 2 KB, or a token or claim that isn't one. Other parameters are ignored.
  */

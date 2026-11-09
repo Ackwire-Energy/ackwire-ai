@@ -13012,10 +13012,26 @@
     },
     "computer": {
       "title": "Nog een computer koppelen",
-      "step1": "Download de app erop:",
-      "step2": "Open hem en log in bij {{org}}.",
-      "step3": "Zet „Agents deze computer laten gebruiken” aan.",
-      "orLine": "Of plak één regel in de terminal"
+      "step1": "Zet de agentes.chat-app erop:",
+      "step2": "Open hem en log in met je eigen account.",
+      "step3": "Klik op Toestaan als hij vraagt of de agents van {{org}} hem mogen gebruiken.",
+      "shows": "Hij verschijnt hier vanzelf, alleen voor jou tot je hem deelt.",
+      "waiting": "Wachten op een computer van jou…",
+      "connected": "Gekoppeld: {{name}}",
+      "orLine": "Of plak één regel in de terminal",
+      "noApp": "Kun je de app er niet op zetten? Gebruik een regel in de terminal"
+    },
+    "thisApp": {
+      "text": "De agentes.chat-app koppelt hem met één klik, en vraagt het je eerst.",
+      "open": "Open de agentes.chat-app",
+      "browserAsks": "Je browser vraagt of hij hem mag openen: kies Openen, en Altijd toestaan als hij dat aanbiedt.",
+      "noApp": "Heb je de app nog niet?",
+      "afterInstall": "Klik na het installeren nog een keer op Open de agentes.chat-app. De link werkt één keer, 10 minuten lang.",
+      "waiting": "Wachten op de app op deze computer…",
+      "expired": "Deze link is verlopen.",
+      "again": "Nieuwe link maken",
+      "failed": "Kon de link niet maken. Probeer het zo opnieuw.",
+      "server": "Een server? Gebruik een regel in de terminal"
     },
     "link": {
       "serverTitle": "Server koppelen",
