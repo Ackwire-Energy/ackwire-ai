@@ -468,6 +468,7 @@ export function IphoneFlow({
   const phone = iphoneOf(mac);
   const states = iphoneSteps(mac, phone);
   const ready = IPHONE_STEPS.every((s) => states[s] === "done");
+  const helperReason = phone && "reason" in phone.status ? phone.status.reason : null;
   useEffect(() => setTitle(t("devices.iphone.title")), [setTitle, t]);
   const text: Record<IphoneStep, ReactNode> = {
     xcode:
@@ -475,6 +476,10 @@ export function IphoneFlow({
         ? t("devices.iphone.xcodeDone", { version: mac?.toolchains.xcode ?? "" })
         : t("devices.iphone.xcodeText", { mac: mac?.name ?? "" }),
     tools: states.tools === "done" ? t("devices.iphone.toolsDone") : t("devices.iphone.toolsText"),
+    account:
+      states.account === "done"
+        ? (mac?.toolchains.appleTeam ?? t("devices.iphone.accountDone"))
+        : t("devices.iphone.accountText", { mac: mac?.name ?? "" }),
     connected:
       states.connected === "done" && phone
         ? t("devices.iphone.connectedDone", { name: phone.name, version: phone.osVersion })
@@ -482,7 +487,12 @@ export function IphoneFlow({
     trust: states.trust === "done" ? t("devices.iphone.trustDone") : t("devices.iphone.trustText"),
     developerMode: states.developerMode === "done" ? t("devices.iphone.devModeDone") : t("devices.iphone.devModeText"),
     uiAutomation: t("devices.iphone.uiAutomationText"),
-    helper: t("devices.iphone.helperText"),
+    helper:
+      helperReason === "helper_untrusted"
+        ? t("devices.iphone.helperUntrustedText")
+        : helperReason === "team_limit"
+          ? t("devices.iphone.teamLimitText")
+          : t("devices.iphone.helperText"),
   };
   const more: Partial<Record<IphoneStep, ReactNode>> = {
     xcode: (
@@ -514,6 +524,20 @@ export function IphoneFlow({
         ]}
       />
     ),
+    ...(helperReason === "helper_untrusted"
+      ? {
+          helper: (
+            <SettingsPath
+              label={t("devices.onTheIphone")}
+              segments={[
+                t("devices.iphone.path.settings"),
+                t("devices.iphone.path.general"),
+                t("devices.iphone.path.deviceManagement"),
+              ]}
+            />
+          ),
+        }
+      : {}),
   };
   const note = (
     <span className="ac-iconline small muted">

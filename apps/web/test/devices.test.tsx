@@ -186,7 +186,7 @@ describe("Connect a device", () => {
     await click(screen().getByRole("button", { name: /iPhone/ }));
     const dialog = screen().getByRole("dialog", { name: "Connect an iPhone" });
     const states = [...dialog.querySelectorAll(".dv-step")].map((s) => s.getAttribute("data-state"));
-    expect(states).toEqual(["done", "done", "done", "done", "needs", "waiting", "waiting"]);
+    expect(states).toEqual(["done", "done", "done", "done", "done", "needs", "waiting", "waiting"]);
     expect(dialog.querySelector(".dv-path")?.textContent).toBe("SettingsPrivacy & SecurityDeveloper Mode");
   });
 });

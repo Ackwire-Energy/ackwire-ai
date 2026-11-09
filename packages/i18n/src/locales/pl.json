@@ -13468,6 +13468,9 @@
       "device_support": "Mac pobiera narzędzia dla iPhone'a",
       "helper_missing": "Pomocnik testowy nie jest jeszcze skonfigurowany",
       "helper_expired": "Pomocnik testowy wymaga odnowienia",
+      "apple_account_missing": "W Xcode nie zalogowano się do Apple Account",
+      "team_limit": "Bezpłatne konto Apple Account osiągnęło limit aplikacji",
+      "helper_untrusted": "iPhone jeszcze nie ufa pomocnikowi testowemu",
       "booting": "Uruchamianie",
       "no_driver": "Windows nie ma sterownika dla tego telefonu",
       "os_too_old": "Ten system jest za stary dla narzędzi",
@@ -13485,6 +13488,9 @@
       "device_support": "Nie wyłączaj Maca",
       "helper_missing": "Otwórz aplikację na Macu",
       "helper_expired": "Otwórz aplikację na Macu",
+      "apple_account_missing": "Zaloguj się w Xcode",
+      "team_limit": "Usuń własną aplikację",
+      "helper_untrusted": "Zaufaj mu na iPhonie",
       "booting": "Poczekaj, aż się uruchomi",
       "no_driver": "Zainstaluj sterownik USB telefonu",
       "os_too_old": "Zaktualizuj telefon",
@@ -13659,6 +13665,7 @@
       "steps": {
         "xcode": "Xcode",
         "tools": "Narzędzia dla iPhone'a",
+        "account": "Apple Account w Xcode",
         "connected": "iPhone podłączony",
         "trust": "Zaufaj temu Macowi",
         "developerMode": "Włącz tryb dewelopera",
@@ -13670,6 +13677,8 @@
       "getXcode": "Pobierz Xcode",
       "toolsDone": "Pobrane przez Maca",
       "toolsText": "Mac je pobiera, to około 8 GB.",
+      "accountDone": "Zalogowano",
+      "accountText": "Dodaj je w Xcode na {{mac}}, bezpłatne lub płatne: Settings › Accounts.",
       "connectedDone": "{{name}} · iOS {{version}}",
       "connectedText": "Podłącz iPhone'a do {{mac}} kablem.",
       "trustDone": "Zaufany",
@@ -13678,13 +13687,17 @@
       "devModeText": "Włącz go i stuknij Uruchom ponownie. Po ponownym uruchomieniu stuknij Włącz i wpisz kod.",
       "uiAutomationText": "W Ustawienia › Deweloper, po ponownym uruchomieniu.",
       "helperText": "Mac go buduje i odnawia co 7 dni. Wystarczy bezpłatne konto Apple Account w Xcode.",
+      "helperUntrustedText": "Stuknij nazwę dewelopera, a potem Zaufaj.",
+      "teamLimitText": "Usuń z iPhone'a jedną własną aplikację: bezpłatne konto Apple Account pozwala na 3.",
       "ready": "{{name}} jest gotowy dla agentów.",
       "path": {
         "settings": "Ustawienia",
         "privacy": "Prywatność i ochrona",
         "devMode": "Tryb dewelopera",
         "developer": "Deweloper",
-        "uiAutomation": "Włącz automatyzację UI"
+        "uiAutomation": "Włącz automatyzację UI",
+        "general": "Ogólne",
+        "deviceManagement": "VPN i zarządzanie urządzeniem"
       }
     },
     "wait": {

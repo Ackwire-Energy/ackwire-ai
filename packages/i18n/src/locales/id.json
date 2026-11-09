@@ -12156,6 +12156,9 @@
       "device_support": "Mac sedang mengambil alat untuk iPhone",
       "helper_missing": "Helper pengujian belum disiapkan",
       "helper_expired": "Helper pengujian perlu diperbarui",
+      "apple_account_missing": "Xcode belum masuk ke Apple Account",
+      "team_limit": "Apple Account gratis sudah mencapai batas aplikasinya",
+      "helper_untrusted": "iPhone belum memercayai helper pengujian",
       "booting": "Sedang memulai",
       "no_driver": "Windows tidak punya driver untuk ponsel ini",
       "os_too_old": "Sistem ini terlalu lama untuk alat-alatnya",
@@ -12173,6 +12176,9 @@
       "device_support": "Biarkan Mac tetap menyala",
       "helper_missing": "Buka aplikasinya di Mac",
       "helper_expired": "Buka aplikasinya di Mac",
+      "apple_account_missing": "Masuk di Xcode",
+      "team_limit": "Hapus aplikasi buatan sendiri",
+      "helper_untrusted": "Percayai di iPhone",
       "booting": "Tunggu sampai menyala",
       "no_driver": "Pasang driver USB ponsel",
       "os_too_old": "Perbarui ponsel",
@@ -12341,6 +12347,7 @@
       "steps": {
         "xcode": "Xcode",
         "tools": "Alat iPhone",
+        "account": "Apple Account di Xcode",
         "connected": "iPhone terhubung",
         "trust": "Percayai Mac ini",
         "developerMode": "Nyalakan Mode Pengembang",
@@ -12352,6 +12359,8 @@
       "getXcode": "Dapatkan Xcode",
       "toolsDone": "Diunduh oleh Mac",
       "toolsText": "Mac mengunduhnya, sekitar 8 GB.",
+      "accountDone": "Sudah masuk",
+      "accountText": "Tambahkan satu, gratis atau berbayar, di Xcode pada {{mac}}: Settings › Accounts.",
       "connectedDone": "{{name}} · iOS {{version}}",
       "connectedText": "Colokkan iPhone ke {{mac}} dengan kabel.",
       "trustDone": "Dipercaya",
@@ -12360,13 +12369,17 @@
       "devModeText": "Nyalakan, lalu ketuk Mulai Ulang. Setelah dimulai ulang, ketuk Nyalakan dan masukkan kode sandimu.",
       "uiAutomationText": "Di Pengaturan › Pengembang, setelah dimulai ulang.",
       "helperText": "Dibuat dan diperbarui oleh Mac setiap 7 hari. Apple Account gratis di Xcode sudah cukup.",
+      "helperUntrustedText": "Ketuk nama developernya, lalu Percayai.",
+      "teamLimitText": "Hapus dari iPhone satu aplikasi buatan sendiri: Apple Account gratis hanya mengizinkan 3.",
       "ready": "{{name}} siap untuk agen.",
       "path": {
         "settings": "Pengaturan",
         "privacy": "Privasi & Keamanan",
         "devMode": "Mode Pengembang",
         "developer": "Pengembang",
-        "uiAutomation": "Aktifkan Otomatisasi UI"
+        "uiAutomation": "Aktifkan Otomatisasi UI",
+        "general": "Umum",
+        "deviceManagement": "VPN & Manajemen Perangkat"
       }
     },
     "wait": {

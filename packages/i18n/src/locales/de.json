@@ -12580,6 +12580,9 @@
       "device_support": "Der Mac lädt die iPhone-Tools",
       "helper_missing": "Die Test-App ist noch nicht eingerichtet",
       "helper_expired": "Die Test-App muss erneuert werden",
+      "apple_account_missing": "Xcode ist bei keinem Apple Account angemeldet",
+      "team_limit": "Der kostenlose Apple Account hat sein App-Limit erreicht",
+      "helper_untrusted": "Das iPhone vertraut der Test-App noch nicht",
       "booting": "Startet",
       "no_driver": "Windows hat keinen Treiber für dieses Handy",
       "os_too_old": "Dieses System ist zu alt für die Tools",
@@ -12597,6 +12600,9 @@
       "device_support": "Lass den Mac eingeschaltet",
       "helper_missing": "Öffne die App auf dem Mac",
       "helper_expired": "Öffne die App auf dem Mac",
+      "apple_account_missing": "Melde dich in Xcode an",
+      "team_limit": "Entferne eine selbst erstellte App",
+      "helper_untrusted": "Vertraue ihr auf dem iPhone",
       "booting": "Warte, bis es gestartet ist",
       "no_driver": "Installiere den USB-Treiber des Handys",
       "os_too_old": "Aktualisiere das Handy",
@@ -12767,6 +12773,7 @@
       "steps": {
         "xcode": "Xcode",
         "tools": "iPhone-Tools",
+        "account": "Apple Account in Xcode",
         "connected": "iPhone verbunden",
         "trust": "Diesem Mac vertrauen",
         "developerMode": "Entwicklermodus einschalten",
@@ -12778,6 +12785,8 @@
       "getXcode": "Xcode holen",
       "toolsDone": "Vom Mac geladen",
       "toolsText": "Der Mac lädt sie herunter, etwa 8 GB.",
+      "accountDone": "Angemeldet",
+      "accountText": "Füge in Xcode auf {{mac}} einen hinzu, kostenlos oder bezahlt: Settings › Accounts.",
       "connectedDone": "{{name}} · iOS {{version}}",
       "connectedText": "Schließ das iPhone mit einem Kabel an {{mac}} an.",
       "trustDone": "Vertraut",
@@ -12786,13 +12795,17 @@
       "devModeText": "Schalte ihn ein und tippe auf Neustart. Tippe nach dem Neustart auf Aktivieren und gib deinen Code ein.",
       "uiAutomationText": "Unter Einstellungen › Entwickler, nach dem Neustart.",
       "helperText": "Wird vom Mac erstellt und alle 7 Tage erneuert. Ein kostenloser Apple Account in Xcode reicht.",
+      "helperUntrustedText": "Tippe auf den Namen des Entwicklers und dann auf Vertrauen.",
+      "teamLimitText": "Entferne eine selbst erstellte App vom iPhone: Ein kostenloser Apple Account erlaubt 3.",
       "ready": "{{name}} ist bereit für Agenten.",
       "path": {
         "settings": "Einstellungen",
         "privacy": "Datenschutz & Sicherheit",
         "devMode": "Entwicklermodus",
         "developer": "Entwickler",
-        "uiAutomation": "UI-Automatisierung aktivieren"
+        "uiAutomation": "UI-Automatisierung aktivieren",
+        "general": "Allgemein",
+        "deviceManagement": "VPN & Geräteverwaltung"
       }
     },
     "wait": {

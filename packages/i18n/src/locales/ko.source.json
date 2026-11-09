@@ -30429,6 +30429,15 @@
   "devices.reason.helper_expired": {
     "value": "The test helper needs renewing"
   },
+  "devices.reason.apple_account_missing": {
+    "value": "Xcode isn't signed in to an Apple Account"
+  },
+  "devices.reason.team_limit": {
+    "value": "The free Apple Account reached its app limit"
+  },
+  "devices.reason.helper_untrusted": {
+    "value": "The iPhone doesn't trust the test helper yet"
+  },
   "devices.reason.booting": {
     "value": "Starting"
   },
@@ -30473,6 +30482,15 @@
   },
   "devices.fix.helper_expired": {
     "value": "Open the app on the Mac"
+  },
+  "devices.fix.apple_account_missing": {
+    "value": "Sign in to Xcode"
+  },
+  "devices.fix.team_limit": {
+    "value": "Remove an app you built"
+  },
+  "devices.fix.helper_untrusted": {
+    "value": "Trust it on the iPhone"
   },
   "devices.fix.booting": {
     "value": "Wait for it to start"
@@ -30903,6 +30921,9 @@
   "devices.iphone.steps.tools": {
     "value": "iPhone tools"
   },
+  "devices.iphone.steps.account": {
+    "value": "Apple Account in Xcode"
+  },
   "devices.iphone.steps.connected": {
     "value": "iPhone connected"
   },
@@ -30933,6 +30954,12 @@
   "devices.iphone.toolsText": {
     "value": "The Mac downloads them, about 8 GB."
   },
+  "devices.iphone.accountDone": {
+    "value": "Signed in"
+  },
+  "devices.iphone.accountText": {
+    "value": "Add a free or paid one in Xcode on {{mac}}: Settings › Accounts."
+  },
   "devices.iphone.connectedDone": {
     "value": "{{name}} · iOS {{version}}"
   },
@@ -30957,6 +30984,12 @@
   "devices.iphone.helperText": {
     "value": "Built and renewed by the Mac every 7 days. A free Apple Account in Xcode is enough."
   },
+  "devices.iphone.helperUntrustedText": {
+    "value": "Tap the developer's name, then Trust."
+  },
+  "devices.iphone.teamLimitText": {
+    "value": "Remove an app you built yourself from the iPhone: a free Apple Account allows 3."
+  },
   "devices.iphone.ready": {
     "value": "{{name}} is ready for agents."
   },
@@ -30974,6 +31007,12 @@
   },
   "devices.iphone.path.uiAutomation": {
     "value": "Enable UI Automation"
+  },
+  "devices.iphone.path.general": {
+    "value": "General"
+  },
+  "devices.iphone.path.deviceManagement": {
+    "value": "VPN & Device Management"
   },
   "devices.wait.title": {
     "value": "Waiting for {{deviceName}}"

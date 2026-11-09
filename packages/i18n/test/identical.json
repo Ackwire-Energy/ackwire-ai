@@ -268,6 +268,7 @@
       "devices.iphone.connectedDone"
     ],
     "es": [
+      "devices.iphone.path.general",
       "devices.cpus",
       "devices.memory",
       "devices.system.android",
@@ -865,6 +866,7 @@
       "share.agent"
     ],
     "de": [
+      "devices.iphone.steps.account",
       "devices.workspace",
       "devices.cpus",
       "devices.memory",
@@ -1263,6 +1265,7 @@
       "share.agent"
     ],
     "it": [
+      "devices.iphone.steps.account",
       "devices.cpus",
       "devices.memory",
       "devices.system.android",
@@ -1587,6 +1590,7 @@
       "share.fileRef"
     ],
     "nl": [
+      "devices.iphone.steps.account",
       "devices.filter.computers",
       "devices.cpus",
       "devices.phoneKind.emulator",

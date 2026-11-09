@@ -58,6 +58,10 @@ export interface DeviceToolDeps {
   publicUrl?: string;
 }
 
+/** The Maestro commands a real iPhone's test helper runs (the runner's `IOS_FLOW_COMMANDS`). */
+const IOS_FLOW_COMMAND_LIST =
+  "launchApp, stopApp, tapOn (text, id or point), inputText, eraseText, assertVisible, assertNotVisible, scrollUntilVisible, scroll, swipe, back, pressKey, waitForAnimationToEnd and takeScreenshot";
+
 /** Recordings fit the file limit at the host's bitrate: about 45 MB for this long. */
 export const MAX_RECORD_SECONDS = 170;
 /** A flow with its recording may run this long. */
@@ -287,7 +291,7 @@ export function createDeviceToolSource(deps: DeviceToolDeps): ToolSource {
     },
     {
       name: "phone_flow",
-      description: `Run a Maestro flow (YAML) on a phone: the way to drive an app and test it end to end, the same every time. With record, the screen is recorded around it and the video comes into this conversation. With save_as, the flow is also saved in your folder on the phone's computer (in the repo: .maestro/<feature>.yaml) so it can run again after changes. A failed or cut flow re-runs from the start. Up to ${MAX_FLOW_SECONDS / 60} minutes.`,
+      description: `Run a Maestro flow (YAML) on a phone: the way to drive an app and test it end to end, the same every time. With record, the screen is recorded around it and the video comes into this conversation. With save_as, the flow is also saved in your folder on the phone's computer (in the repo: .maestro/<feature>.yaml) so it can run again after changes. A failed or cut flow re-runs from the start. Up to ${MAX_FLOW_SECONDS / 60} minutes. On a real iPhone the flow runs through its test helper, which takes these commands: ${IOS_FLOW_COMMAND_LIST}.`,
       scope: SANDBOX_SCOPE,
       inputSchema: {
         type: "object",
@@ -498,23 +502,11 @@ async function phoneFailure(db: Executor, r: Reached, error: unknown): Promise<T
         "device.phone_not_ready",
       );
     }
-    case "tool_missing": {
-      // A real iPhone records, screenshots and runs flows only once its test helper is set up: say so, and name the
-      // phones that can do it now.
-      if (r.phone.platform === "ios" && r.phone.kind === "device") {
-        const others = (await workspaceDevices(db, r.phone.orgId)).phones.filter(
-          (p) => p.id !== r.phone.id && p.machineId && (p.platform === "android" || p.kind === "simulator"),
-        );
-        return refusal(
-          `${error.message} Installing, opening apps and reading the log work on ${name}; screenshots, recordings and flows don't yet.${others.length > 0 ? ` These can do it now: ${others.map((p) => `"${p.name}"`).join(", ")}.` : " An iOS simulator on the Mac or an Android phone can."}`,
-          "device.tool_missing",
-        );
-      }
+    case "tool_missing":
       return refusal(
         `${error.message} (on ${r.host.name}). Ask the person to install it there; that step is theirs. ${waitHint(name)}`,
         "device.tool_missing",
       );
-    }
     case "not_found":
       return refusal(
         `That app isn't installed on ${name}: install it first with phone_install. (${error.message})`,

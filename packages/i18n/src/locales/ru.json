@@ -13419,6 +13419,9 @@
       "device_support": "Mac загружает инструменты для iPhone",
       "helper_missing": "Тестовый помощник ещё не настроен",
       "helper_expired": "Тестовый помощник нужно обновить",
+      "apple_account_missing": "В Xcode не выполнен вход в Apple Account",
+      "team_limit": "Бесплатный Apple Account достиг лимита приложений",
+      "helper_untrusted": "iPhone ещё не доверяет тестовому помощнику",
       "booting": "Запускается",
       "no_driver": "В Windows нет драйвера для этого телефона",
       "os_too_old": "Эта система слишком старая для инструментов",
@@ -13436,6 +13439,9 @@
       "device_support": "Не выключайте Mac",
       "helper_missing": "Откройте приложение на Mac",
       "helper_expired": "Откройте приложение на Mac",
+      "apple_account_missing": "Войдите в Xcode",
+      "team_limit": "Удалите своё приложение",
+      "helper_untrusted": "Сделайте его доверенным на iPhone",
       "booting": "Дождитесь запуска",
       "no_driver": "Установите USB-драйвер телефона",
       "os_too_old": "Обновите телефон",
@@ -13610,6 +13616,7 @@
       "steps": {
         "xcode": "Xcode",
         "tools": "Инструменты для iPhone",
+        "account": "Apple Account в Xcode",
         "connected": "iPhone подключён",
         "trust": "Доверие к этому Mac",
         "developerMode": "Включите режим разработчика",
@@ -13621,6 +13628,8 @@
       "getXcode": "Скачать Xcode",
       "toolsDone": "Mac их загрузил",
       "toolsText": "Mac загружает их, это около 8 ГБ.",
+      "accountDone": "Вход выполнен",
+      "accountText": "Добавьте его в Xcode на {{mac}}, бесплатный или платный: Settings › Accounts.",
       "connectedDone": "{{name}} · iOS {{version}}",
       "connectedText": "Подсоедините iPhone к {{mac}} кабелем.",
       "trustDone": "Доверяет",
@@ -13629,13 +13638,17 @@
       "devModeText": "Включите его и нажмите «Перезапустить». После перезапуска нажмите «Включить» и введите код-пароль.",
       "uiAutomationText": "В Настройки › Разработчик, после перезапуска.",
       "helperText": "Mac собирает и обновляет его каждые 7 дней. Достаточно бесплатного Apple Account в Xcode.",
+      "helperUntrustedText": "Нажмите имя разработчика, затем «Доверять».",
+      "teamLimitText": "Удалите с iPhone одно своё приложение: бесплатный Apple Account разрешает 3.",
       "ready": "{{name}} готов для агентов.",
       "path": {
         "settings": "Настройки",
         "privacy": "Конфиденциальность и безопасность",
         "devMode": "Режим разработчика",
         "developer": "Разработчик",
-        "uiAutomation": "Включить автоматизацию UI"
+        "uiAutomation": "Включить автоматизацию UI",
+        "general": "Основные",
+        "deviceManagement": "VPN и управление устройством"
       }
     },
     "wait": {

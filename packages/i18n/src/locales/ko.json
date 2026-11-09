@@ -12094,6 +12094,9 @@
       "device_support": "Mac이 iPhone 도구를 받는 중이에요",
       "helper_missing": "테스트 도우미가 아직 설정되지 않았어요",
       "helper_expired": "테스트 도우미를 갱신해야 해요",
+      "apple_account_missing": "Xcode에 Apple 계정으로 로그인되어 있지 않아요",
+      "team_limit": "무료 Apple 계정의 앱 한도에 도달했어요",
+      "helper_untrusted": "iPhone이 아직 테스트 도우미를 신뢰하지 않아요",
       "booting": "시작하는 중",
       "no_driver": "Windows에 이 휴대폰의 드라이버가 없어요",
       "os_too_old": "이 시스템은 도구를 쓰기에 너무 오래됐어요",
@@ -12111,6 +12114,9 @@
       "device_support": "Mac을 켜 두세요",
       "helper_missing": "Mac에서 앱 열기",
       "helper_expired": "Mac에서 앱 열기",
+      "apple_account_missing": "Xcode에 로그인",
+      "team_limit": "직접 만든 앱 삭제",
+      "helper_untrusted": "iPhone에서 신뢰하기",
       "booting": "시작될 때까지 기다리기",
       "no_driver": "휴대폰 USB 드라이버 설치",
       "os_too_old": "휴대폰 업데이트",
@@ -12279,6 +12285,7 @@
       "steps": {
         "xcode": "Xcode",
         "tools": "iPhone 도구",
+        "account": "Xcode의 Apple 계정",
         "connected": "iPhone 연결됨",
         "trust": "이 Mac 신뢰",
         "developerMode": "개발자 모드 켜기",
@@ -12290,6 +12297,8 @@
       "getXcode": "Xcode 받기",
       "toolsDone": "Mac이 다운로드함",
       "toolsText": "Mac이 약 8GB를 다운로드해요.",
+      "accountDone": "로그인됨",
+      "accountText": "{{mac}}의 Xcode에서 Settings › Accounts로 추가하세요(무료도 돼요).",
       "connectedDone": "{{name}} · iOS {{version}}",
       "connectedText": "케이블로 iPhone을 {{mac}}에 연결하세요.",
       "trustDone": "신뢰함",
@@ -12298,13 +12307,17 @@
       "devModeText": "켜고 재시동을 탭하세요. 재시동 후 켜기를 탭하고 암호를 입력하세요.",
       "uiAutomationText": "재시동 후 설정 › 개발자에서 켜세요.",
       "helperText": "Mac이 7일마다 빌드하고 갱신해요. Xcode에 무료 Apple 계정만 있으면 돼요.",
+      "helperUntrustedText": "개발자 이름을 탭한 다음 신뢰를 탭하세요.",
+      "teamLimitText": "직접 만든 앱 하나를 iPhone에서 삭제하세요(무료 Apple 계정은 3개까지).",
       "ready": "이제 에이전트가 {{name}}을(를) 사용할 수 있어요.",
       "path": {
         "settings": "설정",
         "privacy": "개인정보 보호 및 보안",
         "devMode": "개발자 모드",
         "developer": "개발자",
-        "uiAutomation": "UI 자동화 활성화"
+        "uiAutomation": "UI 자동화 활성화",
+        "general": "일반",
+        "deviceManagement": "VPN 및 기기 관리"
       }
     },
     "wait": {

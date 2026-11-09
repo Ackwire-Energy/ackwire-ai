@@ -379,7 +379,7 @@ describe("phone tools", () => {
     expect(w.asked.at(-1)).toMatchObject({ op: "phone.release", serial: "R5CT1234", holder: { runId: ctx.runId } });
   });
 
-  test("a real iPhone says what it can't do yet and which phones can; a missing app says to install it", async () => {
+  test("a real iPhone whose test helper waits on the person says what to do; a missing app says to install it", async () => {
     const w = await world();
     await f.db.update(schema.machines).set({ audienceMode: "everyone" }).where(eq(schema.machines.id, w.mac.machineId));
     await f.db
@@ -396,18 +396,18 @@ describe("phone tools", () => {
       osVersion: "26.1",
       ownerUserId: w.sam.id,
       followsHost: true,
+      state: "needs_you",
+      reason: "helper_untrusted",
     });
     w.answer((req) => {
       if (req.op === "phone.launch") throw new MachineRequestError("not_found", "com.acme.app is not installed");
-      throw new MachineRequestError(
-        "tool_missing",
-        "Screenshots of a real iPhone need the test helper, which isn't set up on this Mac yet.",
-      );
+      throw new MachineRequestError("phone_not_ready", "The iPhone doesn't trust the test helper yet.");
     });
     const ctx = await runCtx();
     const shot = await call(ctx, "phone_screenshot", { phone: "iphone 16" });
-    expect(shot.content).toBe(
-      "Screenshots of a real iPhone need the test helper, which isn't set up on this Mac yet. Installing, opening apps and reading the log work on Sam's iPhone; screenshots, recordings and flows don't yet. These can do it now: \"Pixel 8\".",
+    expect(shot).toMatchObject({ isError: true, data: { code: "device.phone_not_ready" } });
+    expect(shot.content).toStartWith(
+      "Sam's iPhone doesn't trust the test helper yet. Ask the person to trust the developer on it: Settings → General → VPN & Device Management. Then ",
     );
     const launch = await call(ctx, "phone_launch", { phone: "Pixel 8", app: "com.acme.app" });
     expect(launch).toMatchObject({ isError: true, data: { code: "device.app_missing" } });

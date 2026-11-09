@@ -129,6 +129,9 @@ export function IphoneSetupScreen({ machineId }: { machineId?: string }) {
                 state={state(4)}
               >
                 <StepText>{t("mobile.devices.iphone.step5Text")}</StepText>
+                {step === 4 && reason && !IPHONE_STEP_REASONS.has(reason) ? (
+                  <Note icon="info">{reasonText(t, reason)}</Note>
+                ) : null}
               </Step>
             </StepsCard>
           </View>

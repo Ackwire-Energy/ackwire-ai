@@ -12641,6 +12641,9 @@
       "device_support": "De Mac haalt de iPhone-tools op",
       "helper_missing": "De testhelper is nog niet ingesteld",
       "helper_expired": "De testhelper moet worden vernieuwd",
+      "apple_account_missing": "Xcode is niet ingelogd met een Apple Account",
+      "team_limit": "Het gratis Apple Account heeft zijn app-limiet bereikt",
+      "helper_untrusted": "De iPhone vertrouwt de testhelper nog niet",
       "booting": "Wordt opgestart",
       "no_driver": "Windows heeft geen driver voor deze telefoon",
       "os_too_old": "Dit systeem is te oud voor de tools",
@@ -12658,6 +12661,9 @@
       "device_support": "Laat de Mac aan staan",
       "helper_missing": "Open de app op de Mac",
       "helper_expired": "Open de app op de Mac",
+      "apple_account_missing": "Log in bij Xcode",
+      "team_limit": "Verwijder een zelfgemaakte app",
+      "helper_untrusted": "Vertrouw hem op de iPhone",
       "booting": "Wacht tot hij is opgestart",
       "no_driver": "Installeer de USB-driver van de telefoon",
       "os_too_old": "Werk de telefoon bij",
@@ -12828,6 +12834,7 @@
       "steps": {
         "xcode": "Xcode",
         "tools": "iPhone-tools",
+        "account": "Apple Account in Xcode",
         "connected": "iPhone verbonden",
         "trust": "Deze Mac vertrouwen",
         "developerMode": "Zet Ontwikkelaarsmodus aan",
@@ -12839,6 +12846,8 @@
       "getXcode": "Xcode downloaden",
       "toolsDone": "Gedownload door de Mac",
       "toolsText": "De Mac downloadt ze, ongeveer 8 GB.",
+      "accountDone": "Ingelogd",
+      "accountText": "Voeg er een toe in Xcode op {{mac}}, gratis of betaald: Settings › Accounts.",
       "connectedDone": "{{name}} · iOS {{version}}",
       "connectedText": "Sluit de iPhone met een kabel aan op {{mac}}.",
       "trustDone": "Vertrouwd",
@@ -12847,13 +12856,17 @@
       "devModeText": "Zet hem aan en tik op Herstart. Tik na het herstarten op Zet aan en voer je toegangscode in.",
       "uiAutomationText": "In Instellingen › Ontwikkelaar, na het herstarten.",
       "helperText": "De Mac bouwt en vernieuwt hem elke 7 dagen. Een gratis Apple Account in Xcode is genoeg.",
+      "helperUntrustedText": "Tik op de naam van de ontwikkelaar en dan op Vertrouw.",
+      "teamLimitText": "Verwijder een zelfgemaakte app van de iPhone: een gratis Apple Account staat er 3 toe.",
       "ready": "{{name}} is klaar voor agents.",
       "path": {
         "settings": "Instellingen",
         "privacy": "Privacy en beveiliging",
         "devMode": "Ontwikkelaarsmodus",
         "developer": "Ontwikkelaar",
-        "uiAutomation": "Schakel UI-automatisering in"
+        "uiAutomation": "Schakel UI-automatisering in",
+        "general": "Algemeen",
+        "deviceManagement": "VPN en apparaatbeheer"
       }
     },
     "wait": {

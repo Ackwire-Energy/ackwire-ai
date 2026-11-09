@@ -13028,6 +13028,9 @@
       "device_support": "Il Mac sta scaricando gli strumenti per l'iPhone",
       "helper_missing": "L'app di test non è ancora configurata",
       "helper_expired": "L'app di test va rinnovata",
+      "apple_account_missing": "Xcode non ha effettuato l'accesso a un Apple Account",
+      "team_limit": "L'Apple Account gratuito ha raggiunto il limite di app",
+      "helper_untrusted": "L'iPhone non ha ancora autorizzato l'app di test",
       "booting": "Avvio in corso",
       "no_driver": "Windows non ha un driver per questo telefono",
       "os_too_old": "Questo sistema è troppo vecchio per gli strumenti",
@@ -13045,6 +13048,9 @@
       "device_support": "Tieni acceso il Mac",
       "helper_missing": "Apri l'app sul Mac",
       "helper_expired": "Apri l'app sul Mac",
+      "apple_account_missing": "Accedi in Xcode",
+      "team_limit": "Rimuovi un'app che hai creato",
+      "helper_untrusted": "Autorizzala sull'iPhone",
       "booting": "Aspetta che si avvii",
       "no_driver": "Installa il driver USB del telefono",
       "os_too_old": "Aggiorna il telefono",
@@ -13217,6 +13223,7 @@
       "steps": {
         "xcode": "Xcode",
         "tools": "Strumenti per iPhone",
+        "account": "Apple Account in Xcode",
         "connected": "iPhone collegato",
         "trust": "Autorizza questo Mac",
         "developerMode": "Attiva la modalità sviluppatore",
@@ -13228,6 +13235,8 @@
       "getXcode": "Scarica Xcode",
       "toolsDone": "Scaricati dal Mac",
       "toolsText": "Il Mac li scarica, circa 8 GB.",
+      "accountDone": "Accesso effettuato",
+      "accountText": "Aggiungine uno, gratuito o a pagamento, in Xcode su {{mac}}: Settings › Accounts.",
       "connectedDone": "{{name}} · iOS {{version}}",
       "connectedText": "Collega l'iPhone a {{mac}} con un cavo.",
       "trustDone": "Autorizzato",
@@ -13236,13 +13245,17 @@
       "devModeText": "Attivala e tocca Riavvia. Dopo il riavvio, tocca Attiva e inserisci il codice.",
       "uiAutomationText": "In Impostazioni › Sviluppatore, dopo il riavvio.",
       "helperText": "Creata e rinnovata dal Mac ogni 7 giorni. Basta un Apple Account gratuito in Xcode.",
+      "helperUntrustedText": "Tocca il nome dello sviluppatore, poi Autorizza.",
+      "teamLimitText": "Rimuovi dall'iPhone un'app creata da te: un Apple Account gratuito ne consente 3.",
       "ready": "{{name}} è pronto per gli agenti.",
       "path": {
         "settings": "Impostazioni",
         "privacy": "Privacy e sicurezza",
         "devMode": "Modalità sviluppatore",
         "developer": "Sviluppatore",
-        "uiAutomation": "Abilita automazione UI"
+        "uiAutomation": "Abilita automazione UI",
+        "general": "Generali",
+        "deviceManagement": "VPN e gestione dispositivi"
       }
     },
     "wait": {

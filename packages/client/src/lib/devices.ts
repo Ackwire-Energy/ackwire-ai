@@ -70,6 +70,9 @@ const REASONS = new Set([
   "device_support",
   "helper_missing",
   "helper_expired",
+  "apple_account_missing",
+  "team_limit",
+  "helper_untrusted",
   "booting",
   "no_driver",
   "os_too_old",
@@ -370,6 +373,7 @@ export type StepState = "done" | "current" | "waiting" | "needs";
 export const IPHONE_STEPS = [
   "xcode",
   "tools",
+  "account",
   "connected",
   "trust",
   "developerMode",
@@ -388,7 +392,13 @@ const IPHONE_REASON: Record<string, IphoneStep> = {
   ui_automation_off: "uiAutomation",
   helper_missing: "helper",
   helper_expired: "helper",
+  apple_account_missing: "account",
+  team_limit: "helper",
+  helper_untrusted: "helper",
 };
+
+/** The helper's steps the person does on the iPhone (amber); the Mac builds and renews it by itself. */
+const HELPER_NEEDS_YOU = new Set(["team_limit", "helper_untrusted"]);
 
 /** The iPhone a Mac reaches (a real one first), for the iPhone guide. */
 export const iphoneOf = (host: ComputerDevice | undefined) =>
@@ -396,7 +406,8 @@ export const iphoneOf = (host: ComputerDevice | undefined) =>
 
 /**
  * The iPhone guide's checklist, mirrored from what the Mac reports: steps before the phone's reason are done, that
- * one is current (amber when only the person can do it), the rest wait. No Xcode on the Mac stops at step one.
+ * one is current (amber when only the person can do it), the rest wait. No Xcode on the Mac stops at step one; with
+ * no iPhone plugged in yet, the Apple Account comes from what the Mac found in Xcode.
  */
 export function iphoneSteps(
   host: ComputerDevice | undefined,
@@ -405,11 +416,12 @@ export function iphoneSteps(
   let at: IphoneStep | null;
   let needs = false;
   if (!phone) {
-    at = host?.toolchains.xcode ? "connected" : "xcode";
-    needs = at === "xcode";
+    at = !host?.toolchains.xcode ? "xcode" : !host.toolchains.appleTeam ? "account" : "connected";
+    needs = at !== "connected";
   } else if (phone.status.kind === "needs_you" || phone.status.kind === "preparing") {
-    at = IPHONE_REASON[phone.status.reason] ?? "helper";
-    needs = phone.status.kind === "needs_you" && at !== "helper";
+    const reason = phone.status.reason;
+    at = IPHONE_REASON[reason] ?? "helper";
+    needs = phone.status.kind === "needs_you" && (at !== "helper" || HELPER_NEEDS_YOU.has(reason));
   } else {
     at = null;
   }

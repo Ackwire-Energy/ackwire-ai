@@ -12102,6 +12102,9 @@
       "device_support": "MacがiPhone用のツールを取得しています",
       "helper_missing": "テストヘルパーがまだ設定されていません",
       "helper_expired": "テストヘルパーの更新が必要です",
+      "apple_account_missing": "XcodeでApple Accountにサインインしていません",
+      "team_limit": "無料のApple Accountでアプリの上限に達しました",
+      "helper_untrusted": "iPhoneがまだテストヘルパーを信頼していません",
       "booting": "起動中",
       "no_driver": "Windowsにこのスマートフォンのドライバがありません",
       "os_too_old": "このシステムはツールに対して古すぎます",
@@ -12119,6 +12122,9 @@
       "device_support": "Macの電源を入れたままにする",
       "helper_missing": "Macでアプリを開く",
       "helper_expired": "Macでアプリを開く",
+      "apple_account_missing": "Xcodeにサインイン",
+      "team_limit": "自分で作ったアプリを削除",
+      "helper_untrusted": "iPhoneで信頼する",
       "booting": "起動を待つ",
       "no_driver": "スマートフォンのUSBドライバをインストール",
       "os_too_old": "スマートフォンをアップデート",
@@ -12287,6 +12293,7 @@
       "steps": {
         "xcode": "Xcode",
         "tools": "iPhone用ツール",
+        "account": "XcodeのApple Account",
         "connected": "iPhoneを接続",
         "trust": "このMacを信頼",
         "developerMode": "デベロッパモードをオンにする",
@@ -12298,6 +12305,8 @@
       "getXcode": "Xcodeを入手",
       "toolsDone": "Macがダウンロード済み",
       "toolsText": "Macがダウンロードします。約8 GBです。",
+      "accountDone": "サインイン済み",
+      "accountText": "{{mac}}のXcodeのSettings › Accountsで追加してください（無料でも可）。",
       "connectedDone": "{{name}} · iOS {{version}}",
       "connectedText": "ケーブルでiPhoneを{{mac}}につないでください。",
       "trustDone": "信頼済み",
@@ -12306,13 +12315,17 @@
       "devModeText": "オンにして「再起動」をタップします。再起動後に「オンにする」をタップし、パスコードを入力します。",
       "uiAutomationText": "再起動後に「設定 › デベロッパ」で行います。",
       "helperText": "Macが7日ごとにビルドして更新します。XcodeでApple Account（無料）を使えば十分です。",
+      "helperUntrustedText": "デベロッパ名をタップしてから「信頼」をタップします。",
+      "teamLimitText": "自分で作ったアプリを1つiPhoneから削除してください（無料のApple Accountでは3つまで）。",
       "ready": "{{name}}はエージェントが使える状態です。",
       "path": {
         "settings": "設定",
         "privacy": "プライバシーとセキュリティ",
         "devMode": "デベロッパモード",
         "developer": "デベロッパ",
-        "uiAutomation": "UIオートメーションを有効にする"
+        "uiAutomation": "UIオートメーションを有効にする",
+        "general": "一般",
+        "deviceManagement": "VPNとデバイス管理"
       }
     },
     "wait": {

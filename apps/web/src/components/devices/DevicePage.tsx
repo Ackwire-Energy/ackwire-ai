@@ -165,7 +165,10 @@ const TOOL_ORDER = ["java", "androidSdk", "adb", "git", "xcode", "node", "maestr
 function Toolchains({ tools }: { tools: Record<string, string> }) {
   const { t } = useTranslation();
   const say = t as unknown as (key: string, options: Record<string, string>) => string;
-  const found = Object.keys(tools).sort((a, b) => TOOL_ORDER.indexOf(a) - TOOL_ORDER.indexOf(b));
+  // The Apple Account that signs the iPhone helper is no tool: the iPhone guide shows it.
+  const found = Object.keys(tools)
+    .filter((k) => k !== "appleTeam")
+    .sort((a, b) => TOOL_ORDER.indexOf(a) - TOOL_ORDER.indexOf(b));
   return (
     <span className="dv-tools">
       {found.map((k) => {

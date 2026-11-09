@@ -159,11 +159,22 @@ describe("connecting a phone", () => {
   });
 
   test("iPhone: steps before the phone's reason are done, that one waits on the person", () => {
-    const mac = computer({ toolchains: { xcode: "27.0" } });
-    expect(iphoneSteps(mac, null)).toMatchObject({ xcode: "done", tools: "done", connected: "current" });
+    const mac = computer({ toolchains: { xcode: "27.0", appleTeam: "Sam Rivera (Personal Team)" } });
+    expect(iphoneSteps(mac, null)).toMatchObject({
+      xcode: "done",
+      tools: "done",
+      account: "done",
+      connected: "current",
+    });
     expect(iphoneSteps(computer({}), null).xcode).toBe("needs");
+    // No Apple Account in Xcode yet: that's the person's step.
+    expect(iphoneSteps(computer({ toolchains: { xcode: "27.0" } }), null)).toMatchObject({
+      account: "needs",
+      connected: "waiting",
+    });
     const iphone = phone({ platform: "ios", status: { kind: "needs_you", reason: "developer_mode_off" } });
     expect(Object.values(iphoneSteps(mac, iphone))).toEqual([
+      "done",
       "done",
       "done",
       "done",
@@ -173,6 +184,15 @@ describe("connecting a phone", () => {
       "waiting",
     ]);
     expect(Object.values(iphoneSteps(mac, phone({ platform: "ios" }))).every((s) => s === "done")).toBe(true);
+    // The Mac builds the test helper by itself; trusting it on the iPhone is the person's.
+    const at = (status: PhoneDevice["status"]) => iphoneSteps(mac, phone({ platform: "ios", status }));
+    expect(at({ kind: "preparing", reason: "helper_missing" }).helper).toBe("current");
+    expect(at({ kind: "needs_you", reason: "helper_untrusted" }).helper).toBe("needs");
+    expect(at({ kind: "needs_you", reason: "team_limit" }).helper).toBe("needs");
+    expect(at({ kind: "needs_you", reason: "apple_account_missing" })).toMatchObject({
+      account: "needs",
+      connected: "waiting",
+    });
   });
 });
 
