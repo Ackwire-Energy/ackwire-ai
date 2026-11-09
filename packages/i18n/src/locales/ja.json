@@ -1092,7 +1092,11 @@
     "routine_paused": "ルーティンが一時停止されました",
     "browser_handoff": "エージェントがブラウザであなたを必要としています",
     "secret_request": "エージェントがあなたにシークレットを求めています",
-    "waiting": "あなたの対応を待っているものがあります"
+    "waiting": "あなたの対応を待っているものがあります",
+    "deviceInUse": "{{agent}}が{{deviceName}}を使っています",
+    "deviceInUseAny": "エージェントが{{deviceName}}を使っています",
+    "deviceDoingFor": "{{person}}のために{{doing}}",
+    "deviceFor": "{{person}}のため"
   },
   "island": {
     "label": "新しい通知",

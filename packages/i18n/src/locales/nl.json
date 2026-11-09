@@ -1128,7 +1128,11 @@
     "routine_paused": "Een routine is gepauzeerd",
     "browser_handoff": "Een agent heeft je nodig in de browser",
     "secret_request": "Een agent heeft een geheim van je nodig",
-    "waiting": "Er wacht iets op jou"
+    "waiting": "Er wacht iets op jou",
+    "deviceInUse": "{{agent}} gebruikt {{deviceName}}",
+    "deviceInUseAny": "Een agent gebruikt {{deviceName}}",
+    "deviceDoingFor": "{{doing}} voor {{person}}",
+    "deviceFor": "Voor {{person}}"
   },
   "island": {
     "label": "Nieuwe meldingen",

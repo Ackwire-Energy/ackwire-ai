@@ -106,6 +106,26 @@ describe("the desktop app's notifications", () => {
     expect(desktopNotice(t, "o1", n({ latest: { text: "x".repeat(400) } }))?.body).toHaveLength(180);
   });
 
+  test("someone's agent on a phone of mine: who, what for whom, the phone's page and its Stop", () => {
+    const inUse = n({
+      kind: "device.in_use",
+      actors: [{ type: "agent", id: "ag_lia" }],
+      source: { phoneId: "p-1", machineId: "m-1", userId: "u_rui", label: "Pixel 8" },
+      latest: { title: "Rui Tanaka", text: "Recording a test video" },
+    });
+    expect(desktopNotice(t, "o1", inUse, (id) => (id === "ag_lia" ? "Lia" : undefined))).toEqual({
+      title: "Lia is using Pixel 8",
+      body: "Recording a test video for Rui",
+      path: "/org/o1/settings/devices/phones/p-1",
+      phoneId: "p-1",
+    });
+    // An agent this page doesn't know yet, and nothing said about what it does.
+    expect(desktopNotice(t, "o1", n({ ...inUse, latest: { title: "Rui Tanaka" } }))).toMatchObject({
+      title: "An agent is using Pixel 8",
+      body: "For Rui",
+    });
+  });
+
   test("merged into one already shown, read, done, or not worth a notification: none", () => {
     expect(desktopNotice(t, "o1", n({ count: 2 }))).toBeNull();
     expect(desktopNotice(t, "o1", n({ readAt: "2026-10-25T10:00:00Z" }))).toBeNull();

@@ -1140,6 +1140,10 @@ export const ptBR = {
     browser_handoff: "Um agente precisa de você no navegador",
     secret_request: "Um agente precisa de um segredo seu",
     waiting: "Tem algo esperando você",
+    deviceInUse: "{{agent}} está usando {{deviceName}}",
+    deviceInUseAny: "Um agente está usando {{deviceName}}",
+    deviceDoingFor: "{{doing}} para {{person}}",
+    deviceFor: "Para {{person}}",
   },
   // The island at the top of the screen (ADR 0071 §9): what reaches me while the app is open.
   island: {

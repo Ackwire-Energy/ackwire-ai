@@ -1164,7 +1164,11 @@
     "routine_paused": "Se pausó una rutina",
     "browser_handoff": "Un agente te necesita en el navegador",
     "secret_request": "Un agente necesita un secreto tuyo",
-    "waiting": "Hay algo esperándote"
+    "waiting": "Hay algo esperándote",
+    "deviceInUse": "{{agent}} está usando {{deviceName}}",
+    "deviceInUseAny": "Un agente está usando {{deviceName}}",
+    "deviceDoingFor": "{{doing}} para {{person}}",
+    "deviceFor": "Para {{person}}"
   },
   "island": {
     "label": "Notificaciones nuevas",

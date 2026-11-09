@@ -1200,7 +1200,11 @@
     "routine_paused": "Rutyna została wstrzymana",
     "browser_handoff": "Agent potrzebuje cię w przeglądarce",
     "secret_request": "Agent potrzebuje od ciebie sekretu",
-    "waiting": "Coś czeka na ciebie"
+    "waiting": "Coś czeka na ciebie",
+    "deviceInUse": "{{agent}} używa: {{deviceName}}",
+    "deviceInUseAny": "Agent używa: {{deviceName}}",
+    "deviceDoingFor": "{{doing}} dla: {{person}}",
+    "deviceFor": "Dla: {{person}}"
   },
   "island": {
     "label": "Nowe powiadomienia",

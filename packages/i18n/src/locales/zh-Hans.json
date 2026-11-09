@@ -1092,7 +1092,11 @@
     "routine_paused": "一项例行工作已暂停",
     "browser_handoff": "有智能体需要你在浏览器中协助",
     "secret_request": "有智能体需要你提供一项机密信息",
-    "waiting": "有事项在等你处理"
+    "waiting": "有事项在等你处理",
+    "deviceInUse": "{{agent}} 正在使用 {{deviceName}}",
+    "deviceInUseAny": "有智能体正在使用 {{deviceName}}",
+    "deviceDoingFor": "为 {{person}} {{doing}}",
+    "deviceFor": "为 {{person}}"
   },
   "island": {
     "label": "新通知",

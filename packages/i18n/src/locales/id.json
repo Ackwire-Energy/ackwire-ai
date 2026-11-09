@@ -1092,7 +1092,11 @@
     "routine_paused": "Sebuah rutinitas dijeda",
     "browser_handoff": "Agen membutuhkanmu di browser",
     "secret_request": "Agen membutuhkan rahasia darimu",
-    "waiting": "Ada yang menunggumu"
+    "waiting": "Ada yang menunggumu",
+    "deviceInUse": "{{agent}} sedang memakai {{deviceName}}",
+    "deviceInUseAny": "Seorang agen sedang memakai {{deviceName}}",
+    "deviceDoingFor": "{{doing}} untuk {{person}}",
+    "deviceFor": "Untuk {{person}}"
   },
   "island": {
     "label": "Notifikasi baru",

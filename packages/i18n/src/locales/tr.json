@@ -1128,7 +1128,11 @@
     "routine_paused": "Bir rutin duraklatıldı",
     "browser_handoff": "Bir ajanın tarayıcıda size ihtiyacı var",
     "secret_request": "Bir ajanın sizden bir gizli bilgiye ihtiyacı var",
-    "waiting": "Sizi bekleyen bir şey var"
+    "waiting": "Sizi bekleyen bir şey var",
+    "deviceInUse": "{{agent}}, {{deviceName}} cihazını kullanıyor",
+    "deviceInUseAny": "Bir ajan {{deviceName}} cihazını kullanıyor",
+    "deviceDoingFor": "{{person}} için {{doing}}",
+    "deviceFor": "{{person}} için"
   },
   "island": {
     "label": "Yeni bildirimler",

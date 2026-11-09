@@ -2720,6 +2720,18 @@
   "desktopNotice.waiting": {
     "value": "Something is waiting for you"
   },
+  "desktopNotice.deviceInUse": {
+    "value": "{{agent}} is using {{deviceName}}"
+  },
+  "desktopNotice.deviceInUseAny": {
+    "value": "An agent is using {{deviceName}}"
+  },
+  "desktopNotice.deviceDoingFor": {
+    "value": "{{doing}} for {{person}}"
+  },
+  "desktopNotice.deviceFor": {
+    "value": "For {{person}}"
+  },
   "island.label": {
     "value": "New notifications"
   },

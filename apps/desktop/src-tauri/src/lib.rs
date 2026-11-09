@@ -763,6 +763,7 @@ pub fn run() {
             host_sync::start(&handle);
             // Every server's workspaces, for the site's menu and Preferences (ADR 0154).
             workspaces::start(&handle);
+            main_window::stop_from_notices(&handle);
             deep_link::setup(&handle);
             // Started at login: in the background (the popover, the tray). Opened by hand: the main window on
             // the server open now, or the first run while there is none.

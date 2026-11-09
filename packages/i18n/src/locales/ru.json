@@ -1200,7 +1200,11 @@
     "routine_paused": "Регулярная задача приостановлена",
     "browser_handoff": "Агенту нужна ваша помощь в браузере",
     "secret_request": "Агенту нужен от вас секрет",
-    "waiting": "Вас кое-что ждёт"
+    "waiting": "Вас кое-что ждёт",
+    "deviceInUse": "{{agent}} пользуется устройством «{{deviceName}}»",
+    "deviceInUseAny": "Агент пользуется устройством «{{deviceName}}»",
+    "deviceDoingFor": "{{doing}} для {{person}}",
+    "deviceFor": "Для {{person}}"
   },
   "island": {
     "label": "Новые уведомления",

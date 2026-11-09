@@ -1143,6 +1143,11 @@ export const en = {
     browser_handoff: "An agent needs you in the browser",
     secret_request: "An agent needs a secret from you",
     waiting: "Something is waiting for you",
+    /** Someone's agent uses a phone of the person's: the agent and the phone, then what it does for whom. */
+    deviceInUse: "{{agent}} is using {{deviceName}}",
+    deviceInUseAny: "An agent is using {{deviceName}}",
+    deviceDoingFor: "{{doing}} for {{person}}",
+    deviceFor: "For {{person}}",
   },
   // The island at the top of the screen (ADR 0071 §9): what reaches me while the app is open.
   island: {

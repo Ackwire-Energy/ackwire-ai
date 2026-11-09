@@ -1092,7 +1092,11 @@
     "routine_paused": "루틴이 일시 중지됐어요",
     "browser_handoff": "에이전트가 브라우저에서 도움을 요청해요",
     "secret_request": "에이전트가 비밀 정보를 요청해요",
-    "waiting": "기다리는 항목이 있어요"
+    "waiting": "기다리는 항목이 있어요",
+    "deviceInUse": "{{agent}}이(가) {{deviceName}}을(를) 사용 중이에요",
+    "deviceInUseAny": "에이전트가 {{deviceName}}을(를) 사용 중이에요",
+    "deviceDoingFor": "{{person}}을(를) 위해 {{doing}}",
+    "deviceFor": "{{person}}을(를) 위해"
   },
   "island": {
     "label": "새 알림",
