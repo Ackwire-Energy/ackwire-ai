@@ -45,6 +45,8 @@ export function PhoneScreen({ phoneId }: { phoneId: string }) {
   const host = computerName(t, org?.name ?? "", { kind: found.computer.machineKind, name: found.computer.name });
   const s = p.status;
   const holder = s.kind === "in_use" ? s : null;
+  // An iPhone follows its Mac: its row shows and changes the Mac's rule (the footer says so).
+  const ruled = p.audience ? p : found.computer;
   const mayStop = holder !== null && (p.mayManage || (meId !== null && holder.userId === meId));
   // The guide is for the phone in hand: an iPhone's steps on an iPhone, Android's on Android.
   const guide =
@@ -96,11 +98,11 @@ export function PhoneScreen({ phoneId }: { phoneId: string }) {
         <PhoneNameField key={p.name} phone={p} />
         <GroupedRow
           label={t("mobile.devices.audience.label")}
-          value={audienceText(p.audience, p.ownerUserId, host)}
-          {...(p.audience && p.mayManage
+          value={audienceText(ruled.audience, ruled.ownerUserId, host)}
+          {...(ruled.mayManage
             ? {
                 chevron: true,
-                onPress: () => router.push({ pathname: "/settings/devices/audience", params: { id: p.id } }),
+                onPress: () => router.push({ pathname: "/settings/devices/audience", params: { id: ruled.id } }),
               }
             : {})}
         />
