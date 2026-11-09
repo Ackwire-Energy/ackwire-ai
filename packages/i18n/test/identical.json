@@ -265,7 +265,8 @@
       "devices.android.buildNumberSub",
       "devices.iphone.mac",
       "devices.iphone.steps.xcode",
-      "devices.iphone.connectedDone"
+      "devices.iphone.connectedDone",
+      "members.passwordLink.label"
     ],
     "es": [
       "devices.cpus",
@@ -1260,7 +1261,8 @@
       "browser.live.emulated.desktop",
       "team.chart.supervisor",
       "team.sectors.supervisor",
-      "share.agent"
+      "share.agent",
+      "members.passwordLink.label"
     ],
     "it": [
       "devices.cpus",
@@ -1584,7 +1586,8 @@
       "browser.live.emulated.tablet",
       "browser.live.emulated.desktop",
       "artifacts.files",
-      "share.fileRef"
+      "share.fileRef",
+      "members.passwordLink.label"
     ],
     "nl": [
       "devices.filter.computers",
@@ -2127,7 +2130,8 @@
       "team.map.band",
       "team.sectors.supervisor",
       "agentSetup.how.model",
-      "share.agent"
+      "share.agent",
+      "members.passwordLink.label"
     ],
     "ja": [
       "devices.system.android",
@@ -3234,7 +3238,8 @@
       "routines.setup.sentry.url",
       "browser.live.emulated.tablet",
       "agentSetup.how.model",
-      "share.agent"
+      "share.agent",
+      "members.passwordLink.label"
     ],
     "ru": [
       "devices.system.android",
