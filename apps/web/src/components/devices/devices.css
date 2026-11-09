@@ -1076,7 +1076,7 @@ a.dv-chiplink:hover {
   padding: var(--space-4);
   outline: none;
 }
-.dv-screen:focus-visible {
+html:not([data-pointer]) .dv-screen:focus-visible {
   box-shadow: var(--focus-ring);
 }
 .dv-screen__frame {
