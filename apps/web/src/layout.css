@@ -10656,6 +10656,24 @@ html:not([data-pointer]) .agp-chipbtn:focus-visible {
   color: var(--muted);
   font-size: 12.5px;
 }
+/* On a phone the face and the name share a line, the line under the name takes the card's width under them. */
+@media (max-width: 640px) {
+  .agp-person:has(> .agp-person__t > span) {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 4px 12px;
+  }
+  .agp-person:has(> .agp-person__t > span) > .agp-person__t {
+    display: contents;
+  }
+  .agp-person > .agp-person__t > b.ac-captop {
+    margin-block-start: 0;
+  }
+  .agp-person > .agp-person__t > span {
+    grid-column: 1 / -1;
+  }
+}
 .agp-budget {
   display: flex;
   flex-direction: column;
