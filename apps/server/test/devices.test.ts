@@ -121,3 +121,24 @@ test("a computer and its phones over HTTP: rename, who can use it, stop, forget,
   expect((await owner(`/devices/computers/${machine.id}`, { method: "DELETE" })).status).toBe(204);
   expect(((await (await owner("/devices")).json()) as { devices: unknown[] }).devices).toEqual([]);
 });
+
+test("Wi-Fi pairing over HTTP: the computer's owner only, a checked address and code, its computer reached", async () => {
+  const { owner, rui } = await start();
+  const paired = await pairComputer(t, owner, { ...RUNNER, exec: true }, { name: "MacBook" });
+  const path = `/devices/computers/${paired.machineId}/wifi-pairings`;
+  expect((await rui(path, { json: {} })).status).toBe(403);
+  for (const bad of [
+    { address: "192.168.1.20:37099" },
+    { address: "192.168.1.20:37099", code: "12345" },
+    { address: "-s 1", code: "123456" },
+  ])
+    expect((await owner(path, { json: bad })).status).toBe(400);
+  // Not connected now: the person is told it's offline (no runner here to pair with).
+  const offline = await owner(path, { json: { address: "192.168.1.20:37099", code: "123456" } });
+  expect(offline.status).toBe(409);
+  expect(((await offline.json()) as { error: { code: string } }).error.code).toBe("machine.offline");
+  expect((await owner(`${path}/${crypto.randomUUID()}`)).status).toBe(409);
+  expect((await rui(`${path}/${crypto.randomUUID()}`, { method: "DELETE" })).status).toBe(403);
+  // Cancel never fails on a computer that's gone.
+  expect((await owner(`${path}/${crypto.randomUUID()}`, { method: "DELETE" })).status).toBe(204);
+});

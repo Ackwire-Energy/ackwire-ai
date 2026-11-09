@@ -6,6 +6,7 @@ import type {
   DeviceAudience,
   DeviceStatus,
   PhoneDevice,
+  WifiPairing,
 } from "../api/types";
 import { DESKTOP_CLOSE, type DesktopMode, type DesktopRetry } from "../desktop";
 import { type SocketBase, socketUrl } from "../realtime/connection";
@@ -371,6 +372,29 @@ export function androidStage(host: ComputerDevice | undefined, known: ReadonlySe
   if (fresh)
     return fresh.status.kind === "needs_you" ? { kind: "allow", phone: fresh } : { kind: "ready", phone: fresh };
   return { kind: "looking" };
+}
+
+/** How often a Wi-Fi pairing is asked where it stands while it runs. */
+export const WIFI_PAIR_POLL_MS = 1500;
+
+/** The computer still looks for the phone, pairs or connects it. */
+export const wifiPairLive = (p: Pick<WifiPairing, "state"> | undefined) =>
+  p?.state === "waiting" || p?.state === "pairing" || p?.state === "connecting";
+
+/** Computers a person may pair a phone with over Wi-Fi: ones they may manage that run as a person (not a server). */
+export const wifiHosts = (hosts: readonly ComputerDevice[]) =>
+  hosts.filter((h) => h.machineKind === "connected" && h.mayManage && !h.systemMode);
+
+/**
+ * The line a Wi-Fi pairing shows: where it is while it runs, else why it failed (the cause and the way out). A code
+ * the phone refused reads differently from a pairing it stopped.
+ */
+export function wifiPairText(t: TFunction, p: Pick<WifiPairing, "state" | "reason" | "way">, computer: string) {
+  if (p.state === "failed") {
+    const reason = p.reason === "refused" && p.way === "code" ? "refusedCode" : (p.reason ?? "failed");
+    return say(t, `devices.wifiPair.fail.${reason}`, { computer, defaultValue: say(t, "devices.wifiPair.fail.failed") });
+  }
+  return say(t, `devices.wifiPair.${p.state === "connected" ? "connecting" : p.state}`);
 }
 
 export type StepState = "done" | "current" | "waiting" | "needs";

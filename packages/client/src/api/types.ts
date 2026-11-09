@@ -7524,6 +7524,31 @@ export interface ConnectLinkState {
   machineId?: string;
 }
 
+/** Pairing an Android phone over Wi-Fi with a computer: where it stands. */
+export interface WifiPairing {
+  id: string;
+  way: "qr" | "code";
+  state: "waiting" | "pairing" | "connecting" | "connected" | "failed";
+  /** Why it failed; `update`: the computer's agentes.chat is too old for it. */
+  reason?: WifiPairFailure;
+  /** Only when it starts: Android's QR text for Wireless debugging. */
+  qr?: string;
+  /** Connected: the phone in the devices list. */
+  phoneId?: string;
+  expiresAt: string;
+}
+
+export type WifiPairFailure =
+  | "mdns_off"
+  | "same_wifi"
+  | "refused"
+  | "timed_out"
+  | "outdated"
+  | "adb_missing"
+  | "canceled"
+  | "failed"
+  | "update";
+
 export interface ComputerDeviceInput {
   name?: string;
   audience?: DeviceAudience;

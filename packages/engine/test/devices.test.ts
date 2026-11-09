@@ -3,6 +3,7 @@ import { orgTopic, PHONES_PROTOCOL, type RunnerPhone, STREAM_CLOSE } from "@agen
 import { eq, schema } from "@agenteschat/db";
 import {
   authorizePhoneStream,
+  cancelWifiPairing,
   ForbiddenError,
   forgetPhone,
   isNewWork,
@@ -17,11 +18,13 @@ import {
   requestTimeoutMs,
   setAgentComputerTarget,
   setWorkspaceComputers,
+  startWifiPairing,
   stopPhone,
   syncMachinePhones,
   updateComputerDevice,
   updatePhoneDevice,
   ValidationError,
+  wifiPairingState,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
 import { fakeRunner, pairMachine, RUNNER } from "./machine-fixtures";
@@ -436,4 +439,59 @@ test("a phone's screen: whoever may use it watches; control is the person's own 
       { ...input(f.owner.id, "watch"), request: { kind: "phone", mode: "watch", phoneId: crypto.randomUUID() } },
     ),
   ).toEqual({ refused: STREAM_CLOSE.notFound, reason: "no_phone" });
+});
+
+test("Wi-Fi pairing: only who may manage the computer pairs with it; connected names the phone once its row is there", async () => {
+  f = await setup();
+  const rui = await addMember(f.db, f.org.id, "member", "rui");
+  const mac = await pair(f.owner.id, "MacBook");
+  await online(mac);
+  const id = crypto.randomUUID();
+  const expiresAt = new Date(Date.now() + 120_000).toISOString();
+  const calls: unknown[] = [];
+  let reply: Record<string, unknown> = {
+    id,
+    way: "qr",
+    state: "waiting",
+    qr: "WIFI:T:ADB;S:agentes-Qx7Kp2Mz9a;P:p4ssW0rdAbCd;;",
+    expiresAt,
+  };
+  let fail: Error | null = null;
+  const hub = {
+    call: async (machineId: string, request: unknown) => {
+      calls.push({ machineId, request });
+      if (fail) throw fail;
+      return reply;
+    },
+  } as unknown as Parameters<typeof startWifiPairing>[0]["hub"];
+  const d = { db: f.db, hub };
+
+  await expect(startWifiPairing(d, rui.id, f.org.id, mac, {})).rejects.toThrow(ForbiddenError);
+  expect(calls).toEqual([]);
+  const started = await startWifiPairing(d, f.owner.id, f.org.id, mac, {});
+  expect(started).toEqual({ id, way: "qr", state: "waiting", qr: reply.qr as string, expiresAt });
+  expect(calls.at(-1)).toEqual({ machineId: mac, request: { op: "phone.pair.start" } });
+  await startWifiPairing(d, f.owner.id, f.org.id, mac, { address: "192.168.1.20:37099", code: "123456" });
+  expect(calls.at(-1)).toEqual({
+    machineId: mac,
+    request: { op: "phone.pair.code", address: "192.168.1.20:37099", code: "123456" },
+  });
+
+  // Connected, but its phones report hasn't landed: still connecting; then the phone's id. The QR isn't said again.
+  reply = { id, way: "qr", state: "connected", serial: pixel.serial, qr: reply.qr, expiresAt };
+  expect(await wifiPairingState(d, f.owner.id, f.org.id, mac, id)).toMatchObject({ state: "connecting" });
+  const [row] = await sync(mac, [{ ...pixel, transport: "wifi" }]);
+  const done = await wifiPairingState(d, f.owner.id, f.org.id, mac, id);
+  expect(done).toEqual({ id, way: "qr", state: "connected", phoneId: row?.id as string, expiresAt });
+
+  // A failure keeps its reason; a code it doesn't know reads as failed; a runner from before Wi-Fi pairing: update.
+  reply = { id, way: "code", state: "failed", reason: "refused", expiresAt };
+  expect(await wifiPairingState(d, f.owner.id, f.org.id, mac, id)).toMatchObject({ reason: "refused" });
+  reply = { id, way: "code", state: "failed", reason: "weird", expiresAt };
+  expect(await wifiPairingState(d, f.owner.id, f.org.id, mac, id)).toMatchObject({ reason: "failed" });
+  fail = new MachineRequestError("bad_request", "A phone op names its phone (platform and serial)");
+  expect(await startWifiPairing(d, f.owner.id, f.org.id, mac, {})).toMatchObject({ state: "failed", reason: "update" });
+  await cancelWifiPairing(d, f.owner.id, f.org.id, mac, id);
+  expect(calls.at(-1)).toEqual({ machineId: mac, request: { op: "phone.pair.cancel", pairingId: id } });
+  expect(isNewWork({ op: "phone.pair.start" })).toBe(false);
 });

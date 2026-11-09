@@ -328,6 +328,7 @@ import type {
   WikiTopRead,
   WikiUpdateInput,
   WikiVersion,
+  WifiPairing,
   WorkingRun,
   WorkspaceActionCard,
   WorkspaceActionCardView,
@@ -1007,6 +1008,10 @@ export interface ApiClient {
     denyRequest(orgId: string, requestId: string): Promise<void>;
     decideAccess(orgId: string, requestId: string, decision: "once" | "always" | "no"): Promise<void>;
     deviceWait(orgId: string, runId: string, action: "retry" | "stop"): Promise<void>;
+    /** Pairs an Android phone with the computer over Wi-Fi: the QR way, or the six-digit `code` and its `address`. */
+    startWifiPairing(orgId: string, machineId: string, input: { address?: string; code?: string }): Promise<WifiPairing>;
+    wifiPairing(orgId: string, machineId: string, pairingId: string): Promise<WifiPairing>;
+    cancelWifiPairing(orgId: string, machineId: string, pairingId: string): Promise<void>;
   };
   /** Connected computers (ADR 0025): machines running `agentes-runner`. */
   machines: {

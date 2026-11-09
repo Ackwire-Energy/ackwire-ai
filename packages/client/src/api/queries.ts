@@ -17,6 +17,7 @@ import { newerBlockState, stateChanges, stateForPage } from "../lib/blocks";
 import type { ChatPrefs } from "../lib/chat-look";
 import type { ChoiceAnswer } from "../lib/choices";
 import { newerSetup } from "../lib/computer";
+import { WIFI_PAIR_POLL_MS, wifiPairLive } from "../lib/devices";
 import { CONSULT_CONVERSATION_POLL_MS, CONSULT_GROUP_POLL_MS } from "../lib/consult-group";
 import { forPeople } from "../lib/consultations";
 import { answerWithin, noAnswer, sendWaits } from "../lib/errors";
@@ -183,6 +184,7 @@ import type {
   WikiPage,
   WikiPageInput,
   WikiUpdateInput,
+  WifiPairing,
   WorkspaceActionCard,
   WorkspaceActionCardView,
   WorkView,
@@ -6350,4 +6352,28 @@ export function useAppActions(orgId: string) {
       onSuccess: done,
     }),
   };
+}
+
+/**
+ * Where a Wi-Fi pairing that `started` stands (bring your own devices), asked every 1.5 s while the computer looks
+ * for the phone, pairs or connects it. Another try, another computer or leaving the screen stops it on the computer.
+ * The QR comes only with the start, so it is kept from there.
+ */
+export function useWifiPairState(orgId: string, machineId: string | null, started: WifiPairing | undefined) {
+  const api = useApi();
+  const id = started && wifiPairLive(started) ? started.id : null;
+  const state = useQuery({
+    queryKey: ["wifi-pair-state", orgId, machineId, id],
+    queryFn: () => api.devices.wifiPairing(orgId, machineId ?? "", id ?? ""),
+    enabled: id !== null && machineId !== null,
+    gcTime: 0,
+    retry: false,
+    refetchInterval: (q) => (wifiPairLive(q.state.data ?? started) ? WIFI_PAIR_POLL_MS : false),
+    meta: { quiet: true },
+  });
+  useEffect(() => {
+    if (!id || !machineId) return;
+    return () => void api.devices.cancelWifiPairing(orgId, machineId, id).catch(() => undefined);
+  }, [api, orgId, machineId, id]);
+  return started && state.data ? { ...state.data, qr: started.qr } : started;
 }

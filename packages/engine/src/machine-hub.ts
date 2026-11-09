@@ -330,6 +330,11 @@ export function isNewWork(request: MachineRequest) {
     case "desktop.text":
     // Letting a phone go (a run ended, its owner pressed Stop).
     case "phone.release":
+    // A person pairing a phone with the computer isn't agent work.
+    case "phone.pair.start":
+    case "phone.pair.code":
+    case "phone.pair.status":
+    case "phone.pair.cancel":
       return false;
     case "secret":
       return request.action !== "discard" && request.action !== "remove" && request.action !== "activate";

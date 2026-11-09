@@ -23,6 +23,9 @@ import {
   statusPill,
   waitEndedText,
   waitText,
+  wifiHosts,
+  wifiPairLive,
+  wifiPairText,
 } from "../src/lib/devices";
 
 const i18n = i18next.createInstance();
@@ -204,6 +207,35 @@ describe("connecting a phone", () => {
       developerMode: "done",
       uiAutomation: "waiting",
     });
+  });
+});
+
+describe("pairing over Wi-Fi", () => {
+  test("computers one may manage that run as a person; the live line, then the cause and the way out", () => {
+    const hosts = [
+      computer({ id: "mine" }),
+      computer({ id: "theirs", mayManage: false }),
+      computer({ id: "server", systemMode: true }),
+      computer({ id: "cloud", machineKind: "managed" }),
+    ];
+    expect(wifiHosts(hosts).map((h) => h.id)).toEqual(["mine"]);
+    const line = (p: Parameters<typeof wifiPairText>[1]) => wifiPairText(t, p, "Sam's MacBook Pro");
+    expect(line({ state: "waiting", way: "qr" })).toBe("Waiting for the phone to scan…");
+    expect(line({ state: "pairing", way: "qr" })).toBe("Found a phone. Pairing…");
+    expect(line({ state: "connected", way: "qr" })).toBe("Paired. Connecting…");
+    expect(line({ state: "failed", way: "qr", reason: "same_wifi" })).toBe(
+      "Couldn't reach the phone. Put it on the same Wi-Fi as Sam's MacBook Pro and try again.",
+    );
+    expect(line({ state: "failed", way: "code", reason: "refused" })).toBe(
+      "The phone didn't take that code. Check the code and the address, then pair again.",
+    );
+    expect(line({ state: "failed", way: "qr", reason: "refused" })).toBe(
+      "The phone stopped the pairing. Keep its pairing screen open and try again.",
+    );
+    expect(line({ state: "failed", way: "qr" })).toBe("The pairing didn't work. Try again, or use a cable.");
+    expect([wifiPairLive({ state: "connecting" }), wifiPairLive({ state: "connected" }), wifiPairLive(undefined)]).toEqual(
+      [true, false, false],
+    );
   });
 });
 
