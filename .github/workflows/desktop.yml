@@ -51,12 +51,13 @@ jobs:
       tag: ${{ steps.version.outputs.tag }}
       ref: ${{ steps.version.outputs.ref }}
     steps:
+      # main only takes pull requests; the release's deploy key is the one push the ruleset lets through.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
+          ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}
 
-      # Before any build, so a failed bump costs no build minutes. Pushes made with the workflow token don't
-      # start other workflows.
+      # Before any build, so a failed bump costs no build minutes.
       - name: Bump the version, commit and tag
         if: ${{ inputs.release && inputs.release != 'none' }}
         shell: bash
@@ -64,7 +65,12 @@ jobs:
           RELEASE: ${{ inputs.release }}
           NOTES: ${{ inputs.notes }}
           PLATFORMS: ${{ inputs.platforms || 'all' }}
+          HAS_KEY: ${{ secrets.RELEASE_DEPLOY_KEY != '' }}
         run: |
+          if [ "$HAS_KEY" != "true" ]; then
+            echo "::error::The RELEASE_DEPLOY_KEY secret is missing: a release pushes its version commit to main with that deploy key"
+            exit 1
+          fi
           if [ "$GITHUB_REF" != "refs/heads/main" ]; then
             echo "::error::Releases are cut from main (this run is on $GITHUB_REF); pick release = none for a test build"
             exit 1
