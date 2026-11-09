@@ -1540,7 +1540,6 @@
     "organize": "Departmanları Ekip'te düzenle",
     "more_one": "Ekip'te 1 ajan daha",
     "more_other": "Ekip'te {{count}} ajan daha",
-    "createFirst": "İlk ajanı oluştur",
     "working_one": "{{count}} çalışıyor",
     "working_other": "{{count}} çalışıyor",
     "count_one": "{{count}} ajan",
@@ -1557,7 +1556,6 @@
     "pin": "En üste sabitle",
     "unpin": "Sabitlemeyi kaldır",
     "pinned": "En üste sabitlendi",
-    "hint": "Ajanlarınız en üstte kalır. Sabitlemek için herhangi bir konuşmaya sağ tıklayın.",
     "full": {
       "agents": "Zaten 5 ajan sabitlediniz. Bunu sabitlemek için birini kaldırın.",
       "channels": "Zaten 5 kanal sabitlediniz. Bunu sabitlemek için birini kaldırın.",
@@ -5107,6 +5105,19 @@
     "include": "{{name}} dahil et",
     "acceptAll": "Hepsi için kabul et",
     "acceptSome": "{{count}} tanesi için kabul et",
+    "all": {
+      "label": "Tüm önerilere karar ver",
+      "accept": "Tümünü kabul et",
+      "refuse": "Tümünü reddet",
+      "acceptAsk_one": "Öneri kabul edilsin mi? Hemen geçerli olur.",
+      "acceptAsk_other": "{{count}} önerinin tümü kabul edilsin mi? Her biri hemen geçerli olur.",
+      "refuseAsk_one": "Öneri reddedilsin mi? Ajan bunu bir daha önermez.",
+      "refuseAsk_other": "{{count}} önerinin tümü reddedilsin mi? Ajanlar bunları bir daha önermez.",
+      "acceptGo_one": "Kabul et",
+      "acceptGo_other": "{{count}} öneriyi kabul et",
+      "refuseGo_one": "Reddet",
+      "refuseGo_other": "{{count}} öneriyi reddet"
+    },
     "staleSome_one": "Biri kabul edilmedi: metni öneriden sonra değişti.",
     "staleSome_other": "{{count}} tanesi kabul edilmedi: metinleri öneriden sonra değişti.",
     "staleSomeAgent_one": "Biri kabul edilmedi: ajan öneriden sonra değişti.",
@@ -5138,6 +5149,8 @@
     "refuseNote": "Reddetmek, {{name}} ajanına bunu bir daha önermemeyi öğretir.",
     "added": "Eklendi:",
     "removed": "Kaldırıldı:",
+    "sameLines_one": "{{count}} değişmeyen satır",
+    "sameLines_other": "{{count}} değişmeyen satır",
     "empty": "Biri bir ajandan değişiklik istediğinde veya bir ders tekrarlandığında öneri burada görünür.",
     "emptyTitle": "İncelenecek bir şey yok",
     "titleInstructions": "{{name}} talimatlarını güncelle",
@@ -10159,6 +10172,8 @@
     "noChannel": "Kanal yok",
     "files": "Dosyalar",
     "select": "Seç: {{title}}",
+    "selectAll_one": "{{count}} öğeyi seç",
+    "selectAll_other": "{{count}} öğenin tümünü seç",
     "selection": "Seçim",
     "selected_one": "{{count}} seçildi",
     "selected_other": "{{count}} seçildi",
@@ -16223,7 +16238,11 @@
       "text": "Bir ajandan widget isteyin veya sohbetten bir bloğu sabitleyin, burada güncel kalsın.",
       "viewer": "Bu panoyu düzenleyen kişi widget ekler ve burada görünürler."
     },
-    "onlyHome": "“Yeni pano” ile çalışma alanı ya da bazı roller için bir pano oluşturun.",
+    "first": {
+      "title": "Ekibin ilk panosunu oluşturun",
+      "text": "Pano, sayıları ve grafikleri tek bir sayfada toplar, ajanlar da hepsini güncel tutar.",
+      "ask": "Ekibin ilk panosunu oluşturmama yardım edin."
+    },
     "create": {
       "title": "Yeni pano",
       "subtitle": "Widget'lar tek sayfada bir arada. Sizin için ya da ekip için.",

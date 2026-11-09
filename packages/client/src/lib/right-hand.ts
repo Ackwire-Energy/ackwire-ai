@@ -2,7 +2,7 @@ import type { TFunction } from "i18next";
 import type { ApiClient } from "../api/client";
 import type { Agent, AgentBrain, AgentStatus, BrainScope, Credential, DirectMessage, Model } from "../api/types";
 import { agentGrammar } from "./grammar";
-import { AUTO, keyRuns } from "./providers";
+import { AUTO, keyRuns, providerLabel } from "./providers";
 
 /** The workspace's right hand (ADR 0137): every surface that treats it apart asks here. */
 export const isRightHand = (agent: Pick<Agent, "builtin"> | null | undefined) => agent?.builtin === "right_hand";
@@ -42,8 +42,8 @@ export function rightHandFallback(
 /**
  * "Sua IA" as one status, web and phone alike: what answers the person in their own DM with the right hand. `own`: a
  * plan of theirs or one shared with them (`ownerId` when it isn't theirs); `key`: the workspace's API key, or this
- * server's own where the workspace has none (`label` absent); `plan`: the workspace's plan, which serves them;
- * `nobody`: nothing does yet. Null while the view loads.
+ * server's own where the workspace has none (by its maker, the right hand's brain line's `maker`, when known); `plan`:
+ * the workspace's plan, which serves them; `nobody`: nothing does yet. Null while the view loads.
  */
 export type MineStatus =
   | { kind: "own"; brain: AgentBrain["brain"]; label?: string; ownerId?: string }
@@ -51,7 +51,12 @@ export type MineStatus =
   | { kind: "plan"; brain: AgentBrain["brain"] }
   | { kind: "nobody" };
 
-export function mineStatus(view: AgentBrain | undefined, meId: string, platform: boolean): MineStatus | null {
+export function mineStatus(
+  view: AgentBrain | undefined,
+  meId: string,
+  platform: boolean,
+  maker?: string,
+): MineStatus | null {
   if (!view) return null;
   if (view.brain !== "model") {
     const signIn = view.accounts.find((a) => a.id === view.account);
@@ -62,7 +67,8 @@ export function mineStatus(view: AgentBrain | undefined, meId: string, platform:
   if (!ai) return { kind: "nobody" };
   if (ai.brain === "model") {
     if (ai.key) return { kind: "key", label: ai.key.label, provider: ai.key.provider };
-    return ai.key === null && !platform ? { kind: "nobody" } : { kind: "key" };
+    if (ai.key === null && !platform) return { kind: "nobody" };
+    return maker ? { kind: "key", label: providerLabel(maker), provider: maker } : { kind: "key" };
   }
   return ai.servesYou ? { kind: "plan", brain: ai.brain } : { kind: "nobody" };
 }

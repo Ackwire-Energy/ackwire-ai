@@ -1540,7 +1540,6 @@
     "organize": "Abteilungen im Team ordnen",
     "more_one": "1 weiterer Agent in Team",
     "more_other": "{{count}} weitere Agenten in Team",
-    "createFirst": "Den ersten Agenten erstellen",
     "working_one": "{{count}} arbeitet",
     "working_other": "{{count}} arbeiten",
     "count_one": "{{count}} Agent",
@@ -1557,7 +1556,6 @@
     "pin": "Oben anheften",
     "unpin": "Lösen",
     "pinned": "Oben angeheftet",
-    "hint": "Deine Agenten bleiben oben. Klicke mit rechts auf eine Unterhaltung, um sie anzuheften.",
     "full": {
       "agents": "Du hast schon 5 Agenten angeheftet. Löse einen, um diesen anzuheften.",
       "channels": "Du hast schon 5 Kanäle angeheftet. Löse einen, um diesen anzuheften.",
@@ -5131,6 +5129,19 @@
     "include": "{{name}} einbeziehen",
     "acceptAll": "Für alle annehmen",
     "acceptSome": "Für {{count}} annehmen",
+    "all": {
+      "label": "Alle Vorschläge entscheiden",
+      "accept": "Alle annehmen",
+      "refuse": "Alle ablehnen",
+      "acceptAsk_one": "Den Vorschlag annehmen? Er gilt sofort.",
+      "acceptAsk_other": "Alle {{count}} Vorschläge annehmen? Jeder gilt sofort.",
+      "refuseAsk_one": "Den Vorschlag ablehnen? Der Agent schlägt das nicht noch einmal vor.",
+      "refuseAsk_other": "Alle {{count}} Vorschläge ablehnen? Die Agenten schlagen das nicht noch einmal vor.",
+      "acceptGo_one": "Annehmen",
+      "acceptGo_other": "{{count}} annehmen",
+      "refuseGo_one": "Ablehnen",
+      "refuseGo_other": "{{count}} ablehnen"
+    },
     "staleSome_one": "Einer wurde nicht angenommen: Sein Text hat sich nach dem Vorschlag geändert.",
     "staleSome_other": "{{count}} wurden nicht angenommen: Ihr Text hat sich nach dem Vorschlag geändert.",
     "staleSomeAgent_one": "Einer wurde nicht angenommen: Der Agent hat sich nach dem Vorschlag geändert.",
@@ -5163,6 +5174,8 @@
     "refuseNote_female": "Wenn du ablehnst, lernt {{name}}, das nicht noch einmal vorzuschlagen.",
     "added": "Hinzugefügt: ",
     "removed": "Entfernt: ",
+    "sameLines_one": "{{count}} unveränderte Zeile",
+    "sameLines_other": "{{count}} unveränderte Zeilen",
     "empty": "Wenn jemand einen Agenten um eine Änderung bittet oder sich eine Lektion wiederholt, erscheint der Vorschlag hier.",
     "emptyTitle": "Nichts zu prüfen",
     "titleInstructions": "Anweisungen von {{name}} aktualisieren",
@@ -10219,6 +10232,8 @@
     "noChannel": "Kein Kanal",
     "files": "Dateien",
     "select": "{{title}} auswählen",
+    "selectAll_one": "{{count}} auswählen",
+    "selectAll_other": "Alle {{count}} auswählen",
     "selection": "Auswahl",
     "selected_one": "{{count}} ausgewählt",
     "selected_other": "{{count}} ausgewählt",
@@ -16293,7 +16308,11 @@
       "text": "Bitte einen Agenten um ein Widget oder pinne einen Block aus dem Chat, und es bleibt hier aktuell.",
       "viewer": "Wer dieses Dashboard bearbeitet, fügt Widgets hinzu, und sie erscheinen hier."
     },
-    "onlyHome": "Erstelle mit „Neues Dashboard“ ein Dashboard für den Workspace oder einige Rollen.",
+    "first": {
+      "title": "Erstelle das erste Dashboard des Teams",
+      "text": "Ein Dashboard bringt Zahlen und Diagramme auf eine Seite, und die Agenten halten alles aktuell.",
+      "ask": "Hilf mir, das erste Dashboard des Teams zu erstellen."
+    },
     "create": {
       "title": "Neues Dashboard",
       "subtitle": "Widgets zusammen auf einer Seite, für dich oder fürs Team.",

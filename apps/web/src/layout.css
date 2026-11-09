@@ -1448,6 +1448,21 @@ html:not([data-pointer]) .member-row--add:focus-visible {
     max-width: none;
   }
 }
+/* Aceitar todas and Recusar todas at the tabs' right, small and 8 apart, as the tabs bar's toolbar sits; asked again in
+   the same spot. Under the tabs, at the right, when the row has no room. */
+.proposals-all {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2) auto;
+}
+.proposals-all__ask {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--muted);
+}
 .proposals__actions {
   display: flex;
   flex-wrap: wrap;
@@ -2104,6 +2119,19 @@ html:not([data-pointer]) .artifact-table__sort:focus-visible {
 .artifact-split__row {
   display: grid;
   grid-template-columns: 1fr 1fr;
+}
+/* Its corner cells follow the box's rounded corners, as a unified diff's rows do (`.ac-diff > :first-child`). */
+.artifact-split > .artifact-split__row:first-child > .ac-diff__line:first-child {
+  border-top-left-radius: calc(var(--radius-sm) - 1px);
+}
+.artifact-split > .artifact-split__row:first-child > .ac-diff__line:last-child {
+  border-top-right-radius: calc(var(--radius-sm) - 1px);
+}
+.artifact-split > .artifact-split__row:last-child > .ac-diff__line:first-child {
+  border-bottom-left-radius: calc(var(--radius-sm) - 1px);
+}
+.artifact-split > .artifact-split__row:last-child > .ac-diff__line:last-child {
+  border-bottom-right-radius: calc(var(--radius-sm) - 1px);
 }
 .artifact-split__row > .ac-diff__line:first-child {
   border-right: 1px solid var(--line);
@@ -11847,13 +11875,13 @@ html[data-menu-overlay] .shell {
   font-size: 12px;
 }
 /*
- * Faces in the full list: 32, 8 from the plate's edges (48 rows). A name alone centres on its face; a name over a role
- * is a face line: the name's capitals on the face's top (`.ac-captop`), the role under it, what ends the row on its
- * middle.
+ * Faces in the full list: a message's size (`--name-face`), 8 from the plate's edges (48 rows). A name alone centres on
+ * its face; a name over a role is a face line: the name's capitals on the face's top (`.ac-captop`), the role under
+ * it, what ends the row on its middle.
  */
 .sidebar:not([data-rail="true"]) .sidebar__item > .ac-avatar--sm {
-  width: 32px;
-  height: 32px;
+  width: var(--name-face);
+  height: var(--name-face);
   font-size: 13px;
 }
 .sidebar:not([data-rail="true"]) .sidebar__item:has(> .ac-avatar) {
@@ -12448,24 +12476,6 @@ html:not([data-pointer]) .channel-perms__target:focus-visible {
   margin: 3px 8px 3px 36px;
   border: 0;
 }
-/* Day one: the line about the pins, once, with its ✕. */
-.sidebar__pins-hint {
-  display: flex;
-  align-items: flex-start;
-  gap: 4px;
-  margin: 2px 0;
-  padding: 8px 4px 8px 12px;
-  border-radius: var(--control-r-sm);
-  background: var(--plate-soft);
-  font-size: 12.5px;
-  line-height: 17px;
-  color: var(--ink-muted);
-}
-.sidebar__pins-hint > span {
-  flex: 1;
-  min-width: 0;
-  padding-top: 3px;
-}
 .sidebar__see-all {
   color: var(--ink-muted);
 }
@@ -12481,7 +12491,7 @@ html:not([data-pointer]) .channel-perms__target:focus-visible {
   line-height: 17px;
   color: var(--faint);
 }
-.sidebar[data-rail="true"] :is(.sidebar__see-all, .sidebar__pins-hint, .sidebar__pins-end, .sidebar__section-count) {
+.sidebar[data-rail="true"] :is(.sidebar__see-all, .sidebar__pins-end, .sidebar__section-count) {
   display: none;
 }
 /* More: the other tools in a panel beside the sidebar, each with a line on what it is for. */

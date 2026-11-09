@@ -207,7 +207,8 @@ html:not([data-pointer]) .drive-row:has(.drive-hit:focus-visible) {
   border-top: 1px solid var(--line);
   transition: background 0.12s;
 }
-.drive-row > .drive-check {
+.drive-row > .drive-check,
+.drive-table__head > .drive-check {
   justify-self: center;
 }
 .drive-row:hover {

@@ -158,7 +158,7 @@ export {
   DialogSearchList,
   useUnsavedInDialog,
 } from "./components/Dialog";
-export { Diff, type DiffKind, type DiffLine, diffLines } from "./components/Diff";
+export { Diff, type DiffBlock, type DiffKind, type DiffLine, diffBlocks, diffLines } from "./components/Diff";
 export { drawEffort, EffortPixels, type EffortStep } from "./components/EffortPixels";
 export {
   EMOJI_COLUMNS,

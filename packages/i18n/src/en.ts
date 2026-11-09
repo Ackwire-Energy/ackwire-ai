@@ -1541,7 +1541,6 @@ export const en = {
     /** Under the agents, only when some aren't listed (they don't talk to me): it opens Team, where all are. */
     more_one: "1 more agent in Team",
     more_other: "{{count}} more agents in Team",
-    createFirst: "Create the first agent",
     working_one: "{{count}} working",
     working_other: "{{count}} working",
     count_one: "{{count}} agent",
@@ -1559,7 +1558,6 @@ export const en = {
     pin: "Pin to top",
     unpin: "Unpin",
     pinned: "Pinned",
-    hint: "Your agents stay on top. Right-click any conversation to pin it.",
     full: {
       agents: "You already pinned 5 agents. Unpin one to pin this one.",
       channels: "You already pinned 5 channels. Unpin one to pin this one.",
@@ -5231,6 +5229,20 @@ export const en = {
     include: "Include {{name}}",
     acceptAll: "Accept for all",
     acceptSome: "Accept for {{count}}",
+    /** At the tabs' right on Improvement proposals: the waiting proposals the person may decide (two or more), asked once. */
+    all: {
+      label: "Decide every proposal",
+      accept: "Accept all",
+      refuse: "Refuse all",
+      acceptAsk_one: "Accept the proposal? It applies right away.",
+      acceptAsk_other: "Accept all {{count}} proposals? Each one applies right away.",
+      refuseAsk_one: "Refuse the proposal? The agent won't propose it again.",
+      refuseAsk_other: "Refuse all {{count}} proposals? The agents won't propose them again.",
+      acceptGo_one: "Accept",
+      acceptGo_other: "Accept {{count}}",
+      refuseGo_one: "Refuse",
+      refuseGo_other: "Refuse {{count}}",
+    },
     staleSome_one: "One wasn't accepted: its text changed after the proposal.",
     staleSome_other: "{{count}} weren't accepted: their text changed after the proposal.",
     staleSomeAgent_one: "One wasn't accepted: the agent changed after the proposal.",
@@ -5262,6 +5274,9 @@ export const en = {
     refuseNote: "Refusing teaches {{name}} not to propose this again.",
     added: "Added: ",
     removed: "Removed: ",
+    /** A run of unchanged lines folded away in a change to an agent's instructions or the context. */
+    sameLines_one: "{{count}} unchanged line",
+    sameLines_other: "{{count}} unchanged lines",
     empty: "When someone asks an agent for a change, or a lesson repeats, the proposal shows up here.",
     emptyTitle: "Nothing to review",
     titleInstructions: "Update {{name}}'s instructions",
@@ -10179,6 +10194,9 @@ export const en = {
     noChannel: "No channel",
     files: "Files",
     select: "Select {{title}}",
+    /** The list's head checkbox and the selection bar's button: everything the Drive shows now. */
+    selectAll_one: "Select {{count}}",
+    selectAll_other: "Select all {{count}}",
     selection: "Selection",
     selected_one: "{{count}} selected",
     selected_other: "{{count}} selected",
@@ -16195,8 +16213,12 @@ export const en = {
       text: "Ask an agent for a widget or pin a block from the chat, and it stays up to date here.",
       viewer: "Whoever edits this dashboard adds widgets, and they show up here.",
     },
-    /** Under "My Home" when the person sees no other board; "New dashboard" is the page's button. */
-    onlyHome: "Make a dashboard for the workspace or some roles with “New dashboard”.",
+    /** With only My Home: what a dashboard is, with New dashboard and an ask to the right hand (`ask`, its draft). */
+    first: {
+      title: "Build the team's first dashboard",
+      text: "A dashboard puts numbers and charts on one page, and the agents keep them up to date.",
+      ask: "Help me build the team's first dashboard.",
+    },
     create: {
       title: "New dashboard",
       subtitle: "Widgets together on one page, for you or for the team.",

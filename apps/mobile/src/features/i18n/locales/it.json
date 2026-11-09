@@ -2563,7 +2563,6 @@
   "dashboards": {
     "homeRow": "Solo tu · i tuoi widget",
     "loadFailed": "Impossibile caricare le dashboard.",
-    "onlyHome": "Le dashboard dello spazio di lavoro o dei tuoi ruoli compaiono qui.",
     "create": "Crea",
     "routineTarget": "il suo widget",
     "pin": {

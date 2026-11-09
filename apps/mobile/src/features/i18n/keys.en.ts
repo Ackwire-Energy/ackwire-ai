@@ -2571,8 +2571,6 @@ export const featureKeysEn = {
   dashboards: {
     homeRow: "Only you · your own widgets",
     loadFailed: "Couldn't load the dashboards.",
-    /** Under "My Home" when the person sees no other board; "+" in the bar makes one. */
-    onlyHome: "Dashboards for the workspace or your roles show up here.",
     create: "Create",
     routineTarget: "its widget",
     pin: {

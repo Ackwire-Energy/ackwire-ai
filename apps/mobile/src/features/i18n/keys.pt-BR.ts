@@ -2509,7 +2509,6 @@ export const featureKeysPtBR = {
   dashboards: {
     homeRow: "Só você · seus próprios widgets",
     loadFailed: "Não deu para carregar os painéis.",
-    onlyHome: "Os painéis do workspace ou dos seus papéis aparecem aqui.",
     create: "Criar",
     routineTarget: "o widget dela",
     pin: {

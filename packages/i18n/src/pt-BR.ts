@@ -1539,7 +1539,6 @@ export const ptBR = {
     /** Under the agents, only when some aren't listed (they don't talk to me): it opens Equipe, where all are. */
     more_one: "Mais 1 agente na Equipe",
     more_other: "Mais {{count}} agentes na Equipe",
-    createFirst: "Criar o primeiro agente",
     working_one: "{{count}} trabalhando",
     working_other: "{{count}} trabalhando",
     count_one: "{{count}} agente",
@@ -1557,7 +1556,6 @@ export const ptBR = {
     pin: "Fixar no topo",
     unpin: "Tirar do topo",
     pinned: "Fixado no topo",
-    hint: "Seus agentes ficam no topo. Clique com o direito em qualquer conversa para fixar.",
     full: {
       agents: "Você já fixou 5 agentes. Tire um do topo para fixar este.",
       channels: "Você já fixou 5 canais. Tire um do topo para fixar este.",
@@ -5275,6 +5273,20 @@ export const ptBR = {
     include: "Incluir {{name}}",
     acceptAll: "Aceitar para todos",
     acceptSome: "Aceitar para {{count}}",
+    /** At the tabs' right on Propostas de melhoria: the waiting proposals the person may decide (two or more), asked once. */
+    all: {
+      label: "Decidir todas as propostas",
+      accept: "Aceitar todas",
+      refuse: "Recusar todas",
+      acceptAsk_one: "Aceitar a proposta? Ela muda na hora.",
+      acceptAsk_other: "Aceitar as {{count}} propostas? Cada uma muda na hora.",
+      refuseAsk_one: "Recusar a proposta? O agente não propõe isso de novo.",
+      refuseAsk_other: "Recusar as {{count}} propostas? Os agentes não propõem isso de novo.",
+      acceptGo_one: "Aceitar",
+      acceptGo_other: "Aceitar as {{count}}",
+      refuseGo_one: "Recusar",
+      refuseGo_other: "Recusar as {{count}}",
+    },
     staleSome_one: "Uma não foi aceita: o texto mudou desde a proposta.",
     staleSome_other: "{{count}} não foram aceitas: o texto mudou desde a proposta.",
     staleSomeAgent_one: "Uma não foi aceita: o agente mudou desde a proposta.",
@@ -5307,6 +5319,9 @@ export const ptBR = {
     refuseNote_female: "Recusar ensina a {{name}} a não propor isso de novo.",
     added: "Adicionado: ",
     removed: "Removido: ",
+    /** A run of unchanged lines folded away in a change to an agent's instructions or the context. */
+    sameLines_one: "{{count}} linha igual",
+    sameLines_other: "{{count}} linhas iguais",
     empty: "Quando alguém pedir uma mudança a um agente, ou uma lição se repetir, a proposta aparece aqui.",
     emptyTitle: "Nada para revisar",
     titleInstructions: "Atualizar as instruções do {{name}}",
@@ -10297,6 +10312,9 @@ export const ptBR = {
     noChannel: "Sem canal",
     files: "Arquivos",
     select: "Selecionar {{title}}",
+    /** The list's head checkbox and the selection bar's button: everything the Drive shows now. */
+    selectAll_one: "Selecionar {{count}}",
+    selectAll_other: "Selecionar os {{count}}",
     selection: "Seleção",
     selected_one: "{{count}} selecionado",
     selected_other: "{{count}} selecionados",
@@ -16415,7 +16433,12 @@ export const ptBR = {
       text: "Peça um widget a um agente ou fixe um bloco do chat, e ele se atualiza aqui.",
       viewer: "Quem edita este painel adiciona os widgets, e eles aparecem aqui.",
     },
-    onlyHome: "Crie um painel para o workspace ou para alguns papéis em “Novo painel”.",
+    /** With only Meu Início: what a dashboard is, with Novo painel and an ask to the right hand (`ask`, its draft). */
+    first: {
+      title: "Monte o primeiro painel do time",
+      text: "Um painel junta números e gráficos numa página, e os agentes mantêm tudo em dia.",
+      ask: "Me ajuda a montar o primeiro painel do time.",
+    },
     create: {
       title: "Novo painel",
       subtitle: "Widgets juntos numa página, para você ou para o time.",

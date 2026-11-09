@@ -2466,7 +2466,6 @@
   "dashboards": {
     "homeRow": "Yalnızca siz · kendi widget'larınız",
     "loadFailed": "Panolar yüklenemedi.",
-    "onlyHome": "Çalışma alanının ya da rollerinizin panoları burada görünür.",
     "create": "Oluştur",
     "routineTarget": "widget'ı",
     "pin": {

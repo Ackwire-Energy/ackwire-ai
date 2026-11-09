@@ -320,8 +320,7 @@ export function Sidebar() {
   const rightHandDm = rightHand ? dmOf.get(rightHand.id) : undefined;
   const sections = useSidebarSections(me.user.id, orgId);
   // "Fixar no topo": pinned rows sit on top of their own section, above a thin line.
-  const pinned = useSidebarPins();
-  const { view, setView, pins } = pinned;
+  const { view, setView, pins } = useSidebarPins();
   // "Mensagens diretas": the people I talked to or just opened a DM with, latest first (an agent's row in AGENTES is its DM), pinned ones on top.
   const pinnedPeople = pins.people.flatMap((id) => {
     const m = id === me.user.id ? undefined : dir.memberById.get(id);
@@ -620,30 +619,10 @@ export function Sidebar() {
           )}
           {dir.loading && team.length === 0 && <SidebarSkeleton count={2} avatar label={t("common.loadingList")} />}
           {pinnedAgents.map(agentRow)}
-          {pinned.hint && (
-            <div className="sidebar__pins-hint" role="note">
-              <span>{t("sidebarPins.hint")}</span>
-              <Button
-                variant="ghost"
-                size="sm"
-                iconOnly
-                icon="close"
-                aria-label={t("common.close")}
-                title={t("common.close")}
-                onClick={pinned.dismissHint}
-              />
-            </div>
-          )}
           {pinnedAgents.length > 0 && (byGroup.ungrouped.length > 0 || agentGroups.length > 0) && (
             <hr className="sidebar__pins-end" />
           )}
           {ordered(byGroup.ungrouped).map(agentRow)}
-          {!dir.loading && team.length === 0 && createAgentItem.length > 0 && (
-            <Link to="/org/$orgId/agents/new" params={{ orgId }} className="sidebar__item sidebar__item--quiet">
-              <Icon name="plus" />
-              <span className="sidebar__item-label">{t("sidebarAgents.createFirst")}</span>
-            </Link>
-          )}
         </SidebarSection>
         {agentGroups.map(({ group, items }) => {
           const list = ordered(items);

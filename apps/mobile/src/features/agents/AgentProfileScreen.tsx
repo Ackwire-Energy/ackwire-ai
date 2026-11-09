@@ -365,6 +365,8 @@ function Profile({ id }: { id: string }) {
     : apiModelName(t, agent.model, modelLabel(agent.model) ?? undefined, autoMakerOf(aiStatus.data, id));
   const monthLabel =
     shown.plan?.account ?? thinksPlan ?? thinks?.text ?? apiModel ?? t("usageViews.agent.title", agentGrammar(name));
+  // A plan's maker, or the maker Automático's models come from through the API.
+  const monthMark = thinks?.mark ?? agent?.brain?.maker;
   // A short value fits on the right ("week 40%", "$3.20 of $50.00"); a sentence goes under the name.
   const monthValue = planNow?.top
     ? `${meter.short(planNow.top)} ${planNow.top.used}%`
@@ -475,7 +477,7 @@ function Profile({ id }: { id: string }) {
       <GroupedHeader>{t("mobile.intentAgents.thinks")}</GroupedHeader>
       <GroupedList>
         <GroupedRow
-          {...(thinks?.mark ? { leading: <ProviderLogo id={thinks.mark} size="sm" /> } : { icon: "key" as const })}
+          {...(monthMark ? { leading: <ProviderLogo id={monthMark} size="sm" /> } : { icon: "key" as const })}
           label={monthLabel}
           {...(monthValue ? { value: monthValue } : {})}
           {...(monthSub ? { sub: monthSub, subLines: 2 } : {})}
@@ -767,7 +769,9 @@ function Profile({ id }: { id: string }) {
               <GroupedRow icon="lock" label={t("rightHand.profile.private")} labelLines={2} />
               <GroupedRow icon="hash" label={t("rightHand.profile.channels")} labelLines={2} />
               <GroupedRow
-                icon="brain"
+                {...(agent.brain?.maker
+                  ? { leading: <ProviderLogo id={agent.brain.maker} size="sm" /> }
+                  : { icon: "brain" as const })}
                 label={t("rightHand.profile.model")}
                 {...modelRow(
                   t,

@@ -1102,8 +1102,13 @@ textarea.ac-input {
   --msg-turn-gap: 20px;
   --msg-card-gap: 12px;
   --msg-block: 4px;
+  /*
+   * A person's or an agent's face beside its name, one size wherever it sits: a message's, a row of the sidebar's and
+   * of the members column's, a MediaRow's. The faces' scale has 24 for a row's small face and 32 for this one.
+   */
+  --name-face: 32px;
   /* The avatar column and its gap: how far a body stands in from its row. */
-  --msg-lead: calc(36px + var(--space-3));
+  --msg-lead: calc(var(--name-face) + var(--space-3));
 }
 /*
  * Tamanho do texto (`textSize`, packages/client/src/lib/chat-look.ts), the same in every look: a message's words
@@ -1190,7 +1195,7 @@ textarea.ac-input {
   row-gap: 2px;
 }
 .ac-msg > .ac-msg__reply {
-  --reply-face: 36px;
+  --reply-face: var(--name-face);
   --reply-gap: var(--space-3);
   position: relative;
   flex: 0 0 100%;
@@ -1227,11 +1232,11 @@ textarea.ac-input {
   background: color-mix(in srgb, currentColor 8%, transparent);
   color: inherit;
 }
-/* The face is 36px in the feed, the sidebar's size. */
+/* The face in the feed: the sidebar's size (`--name-face`). */
 .ac-msg__avatar,
 .ac-msg__gutter {
-  flex: 0 0 36px;
-  width: 36px;
+  flex: 0 0 var(--name-face);
+  width: var(--name-face);
   display: flex;
   justify-content: center;
 }
@@ -1247,8 +1252,8 @@ textarea.ac-input {
   align-self: flex-start;
 }
 .ac-msg__avatar .ac-avatar:not(.ac-avatar--xs) {
-  width: 36px;
-  height: 36px;
+  width: var(--name-face);
+  height: var(--name-face);
 }
 /* On the words' first line, whatever their size. */
 .ac-msg__gutter-time {
@@ -3328,13 +3333,22 @@ html:not([data-pointer]) .ac-back:focus-visible {
   border-radius: var(--radius-cut);
 }
 
-/* Neutral before/after diff: no green or red. */
+/* Before and after, as GitHub shows a change: added on green with a green bar, removed on red, struck through. */
 .ac-diff {
   display: flex;
   flex-direction: column;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   overflow: hidden;
+}
+/* The rows on its rounded corners take its radius less its border, so a row's tint and bar follow the corner. */
+.ac-diff > :first-child {
+  border-top-left-radius: calc(var(--radius-sm) - 1px);
+  border-top-right-radius: calc(var(--radius-sm) - 1px);
+}
+.ac-diff > :last-child {
+  border-bottom-left-radius: calc(var(--radius-sm) - 1px);
+  border-bottom-right-radius: calc(var(--radius-sm) - 1px);
 }
 .ac-diff__line {
   display: flex;
@@ -3353,15 +3367,44 @@ html:not([data-pointer]) .ac-back:focus-visible {
   flex: 1;
   min-width: 0;
 }
-.ac-diff__line--add {
-  background: var(--surface-sunken);
+.ac-diff__line--add,
+.ac-diff__block--add {
+  background: color-mix(in srgb, var(--ok) 12%, transparent);
+  box-shadow: inset 3px 0 0 var(--ok);
 }
-.ac-diff__line--add .ac-diff__text {
-  font-weight: 600;
+.ac-diff__line--del,
+.ac-diff__block--del {
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  box-shadow: inset 3px 0 0 var(--danger);
 }
-.ac-diff__line--del .ac-diff__text {
+.ac-diff__line--add .ac-diff__mark {
+  color: var(--ok);
+}
+.ac-diff__line--del .ac-diff__mark {
+  color: var(--danger);
+}
+.ac-diff__line--del .ac-diff__text,
+.ac-diff__block--del {
   color: var(--ink-muted);
   text-decoration: line-through;
+}
+/* Words: each run rendered as one block, every block's text on the same 12px from the edge. */
+.ac-diff__block {
+  padding: 8px 12px;
+  min-width: 0;
+}
+.ac-diff__block > :not(.ac-visually-hidden) > :first-child {
+  margin-top: 0;
+}
+.ac-diff__block > :not(.ac-visually-hidden) > :last-child {
+  margin-bottom: 0;
+}
+.ac-diff__fold {
+  padding: 4px 12px;
+  font-size: 12.5px;
+  line-height: 18px;
+  color: var(--ink-muted);
+  background: var(--surface-sunken);
 }
 
 .ac-diff--code .ac-diff__line {
@@ -4451,7 +4494,7 @@ html:not([data-pointer]) .ac-switch:focus-visible {
 }
 .ac-skeleton-msg__gutter {
   flex: none;
-  width: 36px;
+  width: var(--name-face);
 }
 .ac-skeleton-msg__body {
   flex: 1;
@@ -8842,9 +8885,8 @@ html:not([data-pointer]) .ac-recur__day:focus-visible {
 }
 /*
  * Every inner page's header (PageHeader): the title, 28px on a line as tall as the page's buttons (so they centre on
- * it), the page's line under it (always there, always one line), the buttons at the end of the title's line, then the
- * page's bar. One shape and one height on every page, so a title and what follows start at the same place wherever
- * you go.
+ * it), the page's line under it (always one line) or its count beside it, the buttons at the end of the title's line,
+ * then the page's bar. One shape on every page, so a title and what follows start at the same place wherever you go.
  */
 .ac-pagehead {
   display: flex;
@@ -8884,6 +8926,22 @@ html:not([data-pointer]) .ac-recur__day:focus-visible {
 .ac-pagehead__meta {
   min-height: 20px;
   margin: -2px 0 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--muted);
+}
+/* The page's count on the title's row: on the title's baseline, 12 after it; under it only when the row has no room. */
+.ac-pagehead__titleline:has(> .ac-pagehead__count) {
+  flex-wrap: wrap;
+  column-gap: var(--space-3);
+  row-gap: 0;
+}
+.ac-pagehead__titleline > .ac-pagehead__title:has(+ .ac-pagehead__count),
+.ac-pagehead__count {
+  align-self: baseline;
+}
+.ac-pagehead__count {
+  margin: 0;
   font-size: 14px;
   line-height: 20px;
   color: var(--muted);
@@ -11348,7 +11406,7 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
    name's first line sits on the line's axis however many lines the head wraps to, and what ends that line on it too
    (a box as tall as the axis, anything taller reaching as far above as below): never the wrapped head's middle. */
 .ac-mediarow {
-  --mediarow-face: 32px;
+  --mediarow-face: var(--name-face);
   /* The first line's axis: the face's middle, or a control's that ends the line and is taller than the face. */
   --mediarow-axis: var(--mediarow-face);
   display: grid;

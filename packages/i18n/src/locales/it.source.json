@@ -3719,9 +3719,6 @@
       "other": "{{count}} more agents in Team"
     }
   },
-  "sidebarAgents.createFirst": {
-    "value": "Create the first agent"
-  },
   "sidebarAgents.working": {
     "value": {
       "one": "{{count}} working",
@@ -3763,9 +3760,6 @@
   },
   "sidebarPins.pinned": {
     "value": "Pinned"
-  },
-  "sidebarPins.hint": {
-    "value": "Your agents stay on top. Right-click any conversation to pin it."
   },
   "sidebarPins.full.agents": {
     "value": "You already pinned 5 agents. Unpin one to pin this one."
@@ -12561,6 +12555,39 @@
   "proposals.acceptSome": {
     "value": "Accept for {{count}}"
   },
+  "proposals.all.label": {
+    "value": "Decide every proposal"
+  },
+  "proposals.all.accept": {
+    "value": "Accept all"
+  },
+  "proposals.all.refuse": {
+    "value": "Refuse all"
+  },
+  "proposals.all.acceptAsk": {
+    "value": {
+      "one": "Accept the proposal? It applies right away.",
+      "other": "Accept all {{count}} proposals? Each one applies right away."
+    }
+  },
+  "proposals.all.refuseAsk": {
+    "value": {
+      "one": "Refuse the proposal? The agent won't propose it again.",
+      "other": "Refuse all {{count}} proposals? The agents won't propose them again."
+    }
+  },
+  "proposals.all.acceptGo": {
+    "value": {
+      "one": "Accept",
+      "other": "Accept {{count}}"
+    }
+  },
+  "proposals.all.refuseGo": {
+    "value": {
+      "one": "Refuse",
+      "other": "Refuse {{count}}"
+    }
+  },
   "proposals.staleSome": {
     "value": {
       "one": "One wasn't accepted: its text changed after the proposal.",
@@ -12653,6 +12680,12 @@
   },
   "proposals.removed": {
     "value": "Removed: "
+  },
+  "proposals.sameLines": {
+    "value": {
+      "one": "{{count}} unchanged line",
+      "other": "{{count}} unchanged lines"
+    }
   },
   "proposals.empty": {
     "value": "When someone asks an agent for a change, or a lesson repeats, the proposal shows up here."
@@ -24809,6 +24842,12 @@
   },
   "drive.select": {
     "value": "Select {{title}}"
+  },
+  "drive.selectAll": {
+    "value": {
+      "one": "Select {{count}}",
+      "other": "Select all {{count}}"
+    }
   },
   "drive.selection": {
     "value": "Selection"
@@ -39316,8 +39355,14 @@
   "dashboards.empty.viewer": {
     "value": "Whoever edits this dashboard adds widgets, and they show up here."
   },
-  "dashboards.onlyHome": {
-    "value": "Make a dashboard for the workspace or some roles with “New dashboard”."
+  "dashboards.first.title": {
+    "value": "Build the team's first dashboard"
+  },
+  "dashboards.first.text": {
+    "value": "A dashboard puts numbers and charts on one page, and the agents keep them up to date."
+  },
+  "dashboards.first.ask": {
+    "value": "Help me build the team's first dashboard."
   },
   "dashboards.create.title": {
     "value": "New dashboard"

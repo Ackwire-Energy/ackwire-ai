@@ -1540,7 +1540,6 @@
     "organize": "Afdelingen ordenen in Team",
     "more_one": "Nog 1 agent in Team",
     "more_other": "Nog {{count}} agents in Team",
-    "createFirst": "De eerste agent maken",
     "working_one": "{{count}} aan het werk",
     "working_other": "{{count}} aan het werk",
     "count_one": "{{count}} agent",
@@ -1557,7 +1556,6 @@
     "pin": "Bovenaan vastzetten",
     "unpin": "Losmaken",
     "pinned": "Bovenaan vastgezet",
-    "hint": "Je agents blijven bovenaan. Klik met rechts op een gesprek om het vast te zetten.",
     "full": {
       "agents": "Je hebt al 5 agents vastgezet. Maak er een los om deze vast te zetten.",
       "channels": "Je hebt al 5 kanalen vastgezet. Maak er een los om dit vast te zetten.",
@@ -5176,6 +5174,19 @@
     "include": "{{name}} meenemen",
     "acceptAll": "Voor iedereen accepteren",
     "acceptSome": "Voor {{count}} accepteren",
+    "all": {
+      "label": "Over alle voorstellen beslissen",
+      "accept": "Alles accepteren",
+      "refuse": "Alles weigeren",
+      "acceptAsk_one": "Het voorstel accepteren? Het geldt meteen.",
+      "acceptAsk_other": "Alle {{count}} voorstellen accepteren? Elk geldt meteen.",
+      "refuseAsk_one": "Het voorstel weigeren? De agent stelt het niet nog eens voor.",
+      "refuseAsk_other": "Alle {{count}} voorstellen weigeren? De agents stellen ze niet nog eens voor.",
+      "acceptGo_one": "Accepteren",
+      "acceptGo_other": "{{count}} accepteren",
+      "refuseGo_one": "Weigeren",
+      "refuseGo_other": "{{count}} weigeren"
+    },
     "staleSome_one": "Eén is niet geaccepteerd: de tekst is na het voorstel gewijzigd.",
     "staleSome_other": "{{count}} zijn niet geaccepteerd: de tekst is na het voorstel gewijzigd.",
     "staleSomeAgent_one": "Eén is niet geaccepteerd: de agent is na het voorstel gewijzigd.",
@@ -5207,6 +5218,8 @@
     "refuseNote": "Door te weigeren leert {{name}} dit niet nog eens voor te stellen.",
     "added": "Toegevoegd: ",
     "removed": "Verwijderd: ",
+    "sameLines_one": "{{count}} ongewijzigde regel",
+    "sameLines_other": "{{count}} ongewijzigde regels",
     "empty": "Als iemand een agent om een wijziging vraagt, of een les zich herhaalt, verschijnt het voorstel hier.",
     "emptyTitle": "Niets te beoordelen",
     "titleInstructions": "Instructies van {{name}} bijwerken",
@@ -10284,6 +10297,8 @@
     "noChannel": "Geen kanaal",
     "files": "Bestanden",
     "select": "{{title}} selecteren",
+    "selectAll_one": "{{count}} selecteren",
+    "selectAll_other": "Alle {{count}} selecteren",
     "selection": "Selectie",
     "selected_one": "{{count}} geselecteerd",
     "selected_other": "{{count}} geselecteerd",
@@ -16468,7 +16483,11 @@
       "text": "Vraag een agent om een widget of maak een blok uit de chat vast, en het blijft hier actueel.",
       "viewer": "Wie dit dashboard bewerkt, voegt widgets toe, en ze verschijnen hier."
     },
-    "onlyHome": "Maak met “Nieuw dashboard” een dashboard voor de werkruimte of voor sommige rollen.",
+    "first": {
+      "title": "Maak het eerste dashboard van het team",
+      "text": "Een dashboard brengt getallen en grafieken samen op één pagina, en de agents houden alles actueel.",
+      "ask": "Help me het eerste dashboard van het team te maken."
+    },
     "create": {
       "title": "Nieuw dashboard",
       "subtitle": "Widgets samen op één pagina, voor jou of voor het team.",

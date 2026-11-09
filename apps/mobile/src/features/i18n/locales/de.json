@@ -2466,7 +2466,6 @@
   "dashboards": {
     "homeRow": "Nur du · deine eigenen Widgets",
     "loadFailed": "Die Dashboards konnten nicht geladen werden.",
-    "onlyHome": "Dashboards für den Workspace oder deine Rollen erscheinen hier.",
     "create": "Erstellen",
     "routineTarget": "sein Widget",
     "pin": {

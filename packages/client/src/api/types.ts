@@ -795,6 +795,8 @@ export interface AgentBrainLine {
   usage?: PlanUsage;
   /** Set to Rápida where that applies to what it thinks with; absent: standard speed. */
   speed?: "fast";
+  /** An API brain on Automático: the maker its models come from, whose logo shows beside it. */
+  maker?: string;
 }
 
 /** `appearance` as stored: the UI only draws known values. */

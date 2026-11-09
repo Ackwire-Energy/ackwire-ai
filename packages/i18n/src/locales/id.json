@@ -1495,7 +1495,6 @@
     "expandAll": "Bentangkan semua",
     "organize": "Tata departemen di Tim",
     "more_other": "{{count}} agen lagi di Tim",
-    "createFirst": "Buat agen pertama",
     "working_other": "{{count}} sedang bekerja",
     "count_other": "{{count}} agen",
     "workingIn": "bekerja di #{{channel}}",
@@ -1509,7 +1508,6 @@
     "pin": "Sematkan di atas",
     "unpin": "Lepas sematan",
     "pinned": "Disematkan di atas",
-    "hint": "Agenmu tetap di atas. Klik kanan percakapan mana pun untuk menyematkannya.",
     "full": {
       "agents": "Kamu sudah menyematkan 5 agen. Lepaskan satu untuk menyematkan yang ini.",
       "channels": "Kamu sudah menyematkan 5 kanal. Lepaskan satu untuk menyematkan yang ini.",
@@ -4958,6 +4956,15 @@
     "include": "Sertakan {{name}}",
     "acceptAll": "Terima untuk semua",
     "acceptSome": "Terima untuk {{count}}",
+    "all": {
+      "label": "Putuskan semua usulan",
+      "accept": "Terima semua",
+      "refuse": "Tolak semua",
+      "acceptAsk_other": "Terima {{count}} usulan? Masing-masing langsung berlaku.",
+      "refuseAsk_other": "Tolak {{count}} usulan? Agen tidak akan mengusulkannya lagi.",
+      "acceptGo_other": "Terima {{count}}",
+      "refuseGo_other": "Tolak {{count}}"
+    },
     "staleSome_other": "{{count}} tidak diterima: teksnya berubah setelah usulan dibuat.",
     "staleSomeAgent_other": "{{count}} tidak diterima: agennya berubah setelah usulan dibuat.",
     "waitingFor": "Menunggu {{name}}",
@@ -4988,6 +4995,7 @@
     "refuseNote_female": "Menolak mengajari {{name}} agar tidak mengusulkan ini lagi.",
     "added": "Ditambahkan: ",
     "removed": "Dihapus: ",
+    "sameLines_other": "{{count}} baris tidak berubah",
     "empty": "Saat seseorang meminta perubahan ke agen, atau suatu pelajaran berulang, usulannya muncul di sini.",
     "emptyTitle": "Tidak ada yang perlu ditinjau",
     "titleInstructions": "Perbarui instruksi {{name}}",
@@ -9846,6 +9854,7 @@
     "noChannel": "Tanpa kanal",
     "files": "File",
     "select": "Pilih {{title}}",
+    "selectAll_other": "Pilih semua {{count}}",
     "selection": "Pilihan",
     "selected_other": "{{count}} dipilih",
     "clearSelection": "Hapus pilihan",
@@ -15846,7 +15855,11 @@
       "text": "Minta widget ke agen atau sematkan blok dari chat, dan itu tetap terbarui di sini.",
       "viewer": "Orang yang mengedit dasbor ini menambahkan widget, lalu muncul di sini."
     },
-    "onlyHome": "Buat dasbor untuk ruang kerja atau beberapa peran dengan “Dasbor baru”.",
+    "first": {
+      "title": "Buat dasbor pertama tim",
+      "text": "Dasbor mengumpulkan angka dan grafik dalam satu halaman, dan agen menjaga semuanya tetap terbaru.",
+      "ask": "Bantu aku membuat dasbor pertama tim."
+    },
     "create": {
       "title": "Dasbor baru",
       "subtitle": "Widget berkumpul di satu halaman, untukmu atau untuk tim.",

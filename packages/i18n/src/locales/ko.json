@@ -1495,7 +1495,6 @@
     "expandAll": "모두 펼치기",
     "organize": "팀에서 부서 정리",
     "more_other": "팀에 에이전트 {{count}}개 더",
-    "createFirst": "첫 에이전트 만들기",
     "working_other": "{{count}}개 작업 중",
     "count_other": "에이전트 {{count}}개",
     "workingIn": "#{{channel}}에서 작업 중",
@@ -1509,7 +1508,6 @@
     "pin": "맨 위에 고정",
     "unpin": "고정 해제",
     "pinned": "맨 위에 고정됨",
-    "hint": "내 에이전트는 맨 위에 있어요. 고정하려면 대화를 오른쪽 클릭하세요.",
     "full": {
       "agents": "이미 에이전트 5개를 고정했어요. 이걸 고정하려면 하나를 해제하세요.",
       "channels": "이미 채널 5개를 고정했어요. 이걸 고정하려면 하나를 해제하세요.",
@@ -4938,6 +4936,15 @@
     "include": "{{name}} 포함",
     "acceptAll": "모두 수락",
     "acceptSome": "{{count}}개 수락",
+    "all": {
+      "label": "모든 제안 결정",
+      "accept": "모두 수락",
+      "refuse": "모두 거절",
+      "acceptAsk_other": "제안 {{count}}개를 모두 수락할까요? 각각 바로 적용돼요.",
+      "refuseAsk_other": "제안 {{count}}개를 모두 거절할까요? 에이전트가 같은 제안을 다시 하지 않아요.",
+      "acceptGo_other": "{{count}}개 수락",
+      "refuseGo_other": "{{count}}개 거절"
+    },
     "staleSome_other": "{{count}}개는 수락되지 않았어요. 제안 이후 텍스트가 바뀌었어요.",
     "staleSomeAgent_other": "{{count}}개는 수락되지 않았어요. 제안 이후 에이전트가 바뀌었어요.",
     "waitingFor": "{{name}} 대기 중",
@@ -4968,6 +4975,7 @@
     "refuseNote_female": "거절하면 {{name}}이(가) 같은 제안을 다시 하지 않도록 배워요.",
     "added": "추가됨: ",
     "removed": "삭제됨: ",
+    "sameLines_other": "바뀌지 않은 {{count}}줄",
     "empty": "누군가 에이전트에게 변경을 요청하거나 같은 교훈이 반복되면 제안이 여기에 표시돼요.",
     "emptyTitle": "검토할 항목이 없어요",
     "titleInstructions": "{{name}}의 지침 업데이트",
@@ -9786,6 +9794,7 @@
     "noChannel": "채널 없음",
     "files": "파일",
     "select": "{{title}} 선택",
+    "selectAll_other": "{{count}}개 모두 선택",
     "selection": "선택 항목",
     "selected_other": "{{count}}개 선택됨",
     "clearSelection": "선택 해제",
@@ -15736,7 +15745,11 @@
       "text": "에이전트에게 위젯을 요청하거나 채팅의 블록을 고정하면 여기서 계속 업데이트돼요.",
       "viewer": "이 대시보드를 편집하는 사람이 위젯을 추가하면 여기에 표시돼요."
     },
-    "onlyHome": "“새 대시보드”로 워크스페이스나 일부 역할을 위한 대시보드를 만들 수 있어요.",
+    "first": {
+      "title": "팀의 첫 대시보드를 만들어 보세요",
+      "text": "대시보드는 숫자와 차트를 한 페이지에 모으고, 에이전트가 모두 최신 상태로 유지해요.",
+      "ask": "팀의 첫 대시보드를 만드는 걸 도와주세요."
+    },
     "create": {
       "title": "새 대시보드",
       "subtitle": "위젯을 한 페이지에 모아요. 나를 위해, 또는 팀을 위해.",

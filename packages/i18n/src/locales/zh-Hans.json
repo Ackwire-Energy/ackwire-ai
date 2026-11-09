@@ -1495,7 +1495,6 @@
     "expandAll": "全部展开",
     "organize": "在团队中整理部门",
     "more_other": "团队中还有 {{count}} 个智能体",
-    "createFirst": "创建第一个智能体",
     "working_other": "{{count}} 个工作中",
     "count_other": "{{count}} 个智能体",
     "workingIn": "正在 #{{channel}} 工作",
@@ -1509,7 +1508,6 @@
     "pin": "置顶",
     "unpin": "取消置顶",
     "pinned": "已置顶",
-    "hint": "你的智能体会保持在顶部。右键点击任意对话即可置顶。",
     "full": {
       "agents": "你已置顶 5 个智能体。取消一个才能置顶这个。",
       "channels": "你已置顶 5 个频道。取消一个才能置顶这个。",
@@ -4984,6 +4982,15 @@
     "include": "包括 {{name}}",
     "acceptAll": "全部接受",
     "acceptSome": "接受 {{count}} 项",
+    "all": {
+      "label": "处理全部建议",
+      "accept": "全部接受",
+      "refuse": "全部拒绝",
+      "acceptAsk_other": "接受全部 {{count}} 条建议？每条都会立即生效。",
+      "refuseAsk_other": "拒绝全部 {{count}} 条建议？智能体不会再提这些建议。",
+      "acceptGo_other": "接受 {{count}} 条",
+      "refuseGo_other": "拒绝 {{count}} 条"
+    },
     "staleSome_other": "有 {{count}} 项未被接受：提议后文本已更改。",
     "staleSomeAgent_other": "有 {{count}} 项未被接受：提议后智能体已更改。",
     "waitingFor": "等待 {{name}}",
@@ -5013,6 +5020,7 @@
     "refuseNote": "拒绝后，{{name}} 就不会再提这条建议。",
     "added": "新增：",
     "removed": "删除：",
+    "sameLines_other": "{{count}} 行未改动",
     "empty": "有人请智能体做出改变，或某条经验反复出现时，建议会显示在这里。",
     "emptyTitle": "没有待审核的内容",
     "titleInstructions": "更新 {{name}} 的指令",
@@ -9857,6 +9865,7 @@
     "noChannel": "无频道",
     "files": "文件",
     "select": "选择 {{title}}",
+    "selectAll_other": "全选 {{count}} 项",
     "selection": "已选内容",
     "selected_other": "已选择 {{count}} 项",
     "clearSelection": "清除选择",
@@ -15919,7 +15928,11 @@
       "text": "请智能体做一个小组件，或固定聊天里的区块，它会在这里保持更新。",
       "viewer": "能编辑此仪表盘的成员添加小组件后，它们会显示在这里。"
     },
-    "onlyHome": "用“新建仪表盘”为工作区或部分角色创建仪表盘。",
+    "first": {
+      "title": "创建团队的第一个仪表盘",
+      "text": "仪表盘把数字和图表汇集在一页上，智能体会让一切保持最新。",
+      "ask": "帮我创建团队的第一个仪表盘。"
+    },
     "create": {
       "title": "新建仪表盘",
       "subtitle": "把小组件放在同一页上，给你自己或给团队。",

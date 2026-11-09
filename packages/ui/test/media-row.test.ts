@@ -32,7 +32,9 @@ describe("MediaRow", () => {
   });
 
   test("a face of 32 in a card's head, 24 in a list row, 12 and 8 from the name", () => {
-    expect(body(".ac-mediarow")).toContain("--mediarow-face: 32px;");
+    // The card's head takes the one face size beside a name (`--name-face`, 32).
+    expect(body(".ac-mediarow")).toContain("--mediarow-face: var(--name-face);");
+    expect(body(":root")).toContain("--name-face: 32px;");
     expect(body(".ac-mediarow--row")).toContain("--mediarow-face: 24px;");
     expect(body(".ac-mediarow > .ac-mediarow__face > :not(svg)")).toContain("width: var(--mediarow-face);");
     expect(body(".ac-mediarow__face")).toContain("min-width: var(--mediarow-face);");

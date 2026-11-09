@@ -10,7 +10,13 @@ export const LICENSE_URL = "https://www.gnu.org/licenses/agpl-3.0.html";
 export const PUBLIC_SOURCE_URL = "https://github.com/agentes-chat/agentes-chat";
 
 /**
- * Whether the About screen shows: on every self-hosted server, for everyone; never on agentes.chat Cloud, which is
- * agentes.chat itself. Nor before the server's config arrives, so the Cloud never shows it for a moment.
+ * A self-hosted server: never agentes.chat Cloud, nor before the server's config arrives, so the Cloud never shows
+ * what is only for self-hosting for a moment.
  */
-export const showsAbout = (server: AuthConfig | undefined) => server !== undefined && server.cloud !== true;
+export const selfHosted = (server: AuthConfig | undefined) => server !== undefined && server.cloud !== true;
+
+/**
+ * Whether the About screen shows: on every self-hosted server, for everyone; never on agentes.chat Cloud, which is
+ * agentes.chat itself.
+ */
+export const showsAbout = selfHosted;

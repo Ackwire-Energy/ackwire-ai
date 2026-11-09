@@ -1021,17 +1021,28 @@ html:not([data-pointer]) .brw-kc:focus-visible {
   box-shadow: var(--card-well-shadow, inset 0 0 0 1px var(--line));
 }
 .brw-steps__head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  font-size: 14px;
+  line-height: 20px;
   color: var(--ink2);
 }
-.brw-steps__head b {
-  font-size: 14px;
+/* The title takes the row's room, so Esperando ends it, or starts the next line on the title's edge when both don't
+   fit. */
+.brw-steps__headline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  flex: 1;
+  min-width: 0;
+}
+.brw-steps__headline > b {
+  flex: 1 1 auto;
   font-weight: 650;
 }
 .brw-steps__wait {
-  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   color: var(--faint);
   font-size: 12px;
   font-weight: 600;

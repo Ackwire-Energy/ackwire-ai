@@ -296,6 +296,7 @@ export const SELF_TESTED = [
   "timeedge",
   "panefill",
   "bleed",
+  "stampout",
 ];
 
 /** Rules about a desktop layout only (panes floating beside the conversation, a toolbar's one row): a phone has none. */

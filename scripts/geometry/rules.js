@@ -952,6 +952,28 @@
       }
     },
     /**
+     * A bubble's time (`.ac-msg__stamp`, with what the row is doing and its stop button) inside its bubble: one wider
+     * than the words widens the bubble, it never hangs past the bubble's edge.
+     */
+    stampout(out) {
+      for (const stamp of document.querySelectorAll(".ac-msg__text > .ac-msg__stamp")) {
+        const bubble = stamp.parentElement;
+        if (!seen(stamp) || !painted(style(bubble).backgroundColor)) continue;
+        const s = stamp.getBoundingClientRect();
+        const b = bubble.getBoundingClientRect();
+        const px = Math.max(b.left - s.left, s.right - b.right);
+        if (px > 0.5)
+          out.push({
+            rule: "stampout",
+            node: stamp,
+            el: sig(stamp),
+            box: sig(bubble),
+            px: +px.toFixed(1),
+            text: words(stamp),
+          });
+      }
+    },
+    /**
      * A box that scrolls for a few px: margins, a border or rounding past its edge show a scrollbar (and let the wheel
      * nudge it) over content that, to the eye, fits. The check keeps one only if it stays in a taller window
      * (`lasting` in check.ts). A box with no class of its own is named by the nearest one with a class around it, so

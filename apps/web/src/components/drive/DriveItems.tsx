@@ -11,7 +11,12 @@ import { useAuthorName } from "@/components/artifacts/ArtifactViewer";
 import { entityMenu } from "@/lib/entity-menu";
 import { DrivePreview } from "./DrivePreview";
 
-/** The details panel's id (cards and rows control it). */
+/** Shift on a checkbox picks the range from the last pick, as Shift on a title does. */
+const shiftRange = (e: MouseEvent<HTMLButtonElement>, a: Artifact, onPick: ItemProps["onPick"]) => {
+  if (!e.shiftKey) return;
+  e.preventDefault();
+  onPick(a, e);
+};
 
 /** The kind's icon; uploaded files by their name (the list has no content type). */
 export const itemIcon = (a: Pick<Artifact, "kind" | "title">): IconName =>
@@ -24,7 +29,7 @@ export interface ItemProps {
   selected: boolean;
   /** Where it came from: "#eng", "DM com Theo", "sem canal". */
   channelName: (a: Artifact) => string;
-  /** A click: details, or selection with Shift / ⌘ / while selecting. */
+  /** A click: details, or selection with Shift / ⌘ / while selecting. Shift on a checkbox comes here too. */
   onPick: (a: Artifact, e: MouseEvent) => void;
   onToggle: (a: Artifact) => void;
   /** Straight to the viewer ("Abrir"; a double click goes there through the details it opens). */
@@ -87,6 +92,7 @@ export function DriveCard({
           className="drive-check"
           checked={selected}
           onCheckedChange={() => onToggle(a)}
+          onClick={(e) => shiftRange(e, a, onPick)}
           aria-label={t("drive.select", { title: a.title })}
         />
       </article>
@@ -135,6 +141,7 @@ export function DriveRow({
           className="drive-check"
           checked={selected}
           onCheckedChange={() => onToggle(a)}
+          onClick={(e) => shiftRange(e, a, onPick)}
           aria-label={t("drive.select", { title: a.title })}
         />
         <span className="drive-row__name">
