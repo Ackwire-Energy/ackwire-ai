@@ -24,12 +24,14 @@ import {
   Input,
   Locked,
   PixelSpinner,
+  QrCode,
   Segmented,
   Select,
+  SettingsPath,
 } from "@agenteschat/ui";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { QrCode } from "@/components/OpenOnPhone";
+import { CommandBlock } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
 import { useToast } from "@/lib/toast";
 import { FlowFooter, type FlowProps } from "./flow";
@@ -73,19 +75,6 @@ function Step({
       </div>
       {children && state !== "done" && <div className="dv-step__more">{children}</div>}
     </li>
-  );
-}
-
-/** Where to go in the phone's own Settings, when no button can open it. */
-function SettingsPath({ segments, label }: { segments: string[]; label: string }) {
-  return (
-    <ol className="dv-path" aria-label={label}>
-      {segments.map((s) => (
-        <li key={s}>
-          <span className="dv-path__seg">{s}</span>
-        </li>
-      ))}
-    </ol>
   );
 }
 
