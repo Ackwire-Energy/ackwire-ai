@@ -434,10 +434,12 @@ html:not([data-pointer]) .consult-pair__row:focus-visible {
   flex: none;
   color: var(--faint);
 }
+/* On the names' capitals' middle, which sits --cap-mid above their line's middle, where the row centres it. */
 .consult-pair__swap {
   width: 15px;
   height: 15px;
   margin: 0 1px;
+  translate: 0 calc(-1 * var(--cap-mid));
 }
 .consult-pair__faces {
   flex: none;
