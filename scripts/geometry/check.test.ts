@@ -11,6 +11,7 @@ import {
   edgesOf,
   keyOf,
   lasting,
+  PHONE_ONLY,
   playwrightChromes,
   SELF_TESTED,
 } from "./check";
@@ -84,6 +85,10 @@ describe("geometry check", () => {
     for (const rule of ["pagetop", "groupedge", "menuitem", "rowpad", "emptyselect", "toolorder", "toolrow", "captop"])
       expect(SELF_TESTED).toContain(rule);
     for (const rule of ["timeedge", "panefill"]) expect(SELF_TESTED).toContain(rule);
+    // Words squeezed beside actions, a lone main button on a phone, buttons 8 apart, one height in a row, a fact on
+    // one line, Desfazer in its sentence, a count that calls on someone readable on what's behind it.
+    for (const rule of ["squeeze", "loneprimary", "btngap", "toolheight", "factwrap", "undoinline", "countfill"])
+      expect(SELF_TESTED).toContain(rule);
     for (const rule of SELF_TESTED) {
       expect(fixture).toContain(`bad-${rule}`);
       expect(fixture).toContain(`good-${rule}`);
@@ -91,11 +96,18 @@ describe("geometry check", () => {
     }
   });
 
-  test("the self-test runs every rule at every checked width, but a desktop-only rule at the phone's", () => {
+  test("the self-test runs every rule at every checked width, but a desktop-only rule at the phone's and a phone-only one at a desktop's", () => {
     const check = readFileSync(join(import.meta.dir, "check.ts"), "utf8");
     expect(check).toMatch(/async function selfTest[\s\S]*for \(const width of WIDTHS\)/);
+    expect(check).toContain(
+      "const here = (r: string) => (width >= 640 ? !PHONE_ONLY.includes(r) : !DESKTOP_ONLY.includes(r));",
+    );
     expect(DESKTOP_ONLY).toEqual(["floating", "toolorder"]);
-    for (const rule of DESKTOP_ONLY) expect(SELF_TESTED).toContain(rule);
+    expect(PHONE_ONLY).toEqual(["loneprimary"]);
+    for (const rule of [...DESKTOP_ONLY, ...PHONE_ONLY]) expect(SELF_TESTED).toContain(rule);
+    // The rule itself says nothing at a desktop's width, so a screen never fails it there.
+    const rules = readFileSync(join(import.meta.dir, "rules.js"), "utf8");
+    expect(rules).toMatch(/loneprimary\(out\) \{\s*if \(innerWidth >= 640\) return;/);
   });
 
   test("a captured toolbar stacks where the app's does: rules.js measures one row as Toolbar.tsx's fitsOneRow", () => {
