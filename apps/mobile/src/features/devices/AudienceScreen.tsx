@@ -160,7 +160,9 @@ function AudienceForm({
                 leading={<RoleMark color={r.color} size={22} />}
                 label={r.name}
                 checked={audience.roleIds.includes(r.id)}
-                {...(canAdd("roleIds", r.id) ? { onPress: () => flip("roleIds", r.id) } : { faint: true, disabled: true })}
+                {...(canAdd("roleIds", r.id)
+                  ? { onPress: () => flip("roleIds", r.id) }
+                  : { faint: true, disabled: true })}
               />
             ))}
             {people.map((m) => (

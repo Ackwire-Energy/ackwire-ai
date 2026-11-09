@@ -3,7 +3,7 @@ import { useRoles } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { type ReactNode, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, StyleSheet, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, TextInput, type TextInputInstance, View } from "react-native";
 import { ComputerPortrait } from "@/computer/ComputerPortrait";
 import { useOrg } from "@/providers/org";
 import { Button, Chip, fieldText, GROUPED_ROW, GroupedList, GroupedRow, Icon, InkOrbit, Text, useToast } from "@/ui";
@@ -184,7 +184,7 @@ export function PhoneNameField({ phone }: { phone: Pick<PhoneDevice, "id" | "nam
   const c = useColors();
   const toast = useToast();
   const [name, setName] = useState(phone.name);
-  const input = useRef<TextInput>(null);
+  const input = useRef<TextInputInstance | null>(null);
   const rename = useDeviceMutation((api, orgId, v: string) => api.devices.updatePhone(orgId, phone.id, { name: v }));
   const save = () => {
     const clean = name.trim();

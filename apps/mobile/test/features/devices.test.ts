@@ -167,7 +167,8 @@ describe("notices, waits and facts", async () => {
     } as never;
     expect(subtitleOf(n, () => "")).toBe("Recording a test video");
     expect(placeOf(n)).toBe("");
-    expect(subtitleOf({ ...(n as object), kind: "device.waiting", latest: { title: "Rui" } } as never, () => "")).toBe("");
+    const waiting = { ...(n as object), kind: "device.waiting", latest: { title: "Rui" } } as never;
+    expect(subtitleOf(waiting, () => "")).toBe("");
   });
   test("a wait for a device, from either place the run says it", () => {
     expect(
