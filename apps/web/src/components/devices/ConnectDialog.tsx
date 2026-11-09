@@ -241,7 +241,9 @@ function ComputerFlow({
   const myId = useMe().data?.user.id;
   const devices = useDevices(org.id);
   const known = useRef<Set<string> | null>(null);
-  if (!known.current && devices.data) known.current = new Set(devices.data.devices.map((d) => d.id));
+  // From a list read now, not the cache: a computer that joined while nothing watched isn't the new one.
+  if (!known.current && devices.data && !devices.isFetching)
+    known.current = new Set(devices.data.devices.map((d) => d.id));
   const found = known.current ? newComputerOf(devices.data?.devices, known.current, myId) : undefined;
   useEffect(() => setTitle(t("devices.computer.title")), [setTitle, t]);
   return (

@@ -72,7 +72,8 @@ function AppFlow() {
   const meId = useMeId();
   const list = useDevices();
   const known = useRef<Set<string> | null>(null);
-  if (!known.current && list.data) known.current = new Set(list.data.devices.map((d) => d.id));
+  // From a list read now, not the cache: a computer that joined while nothing watched isn't the new one.
+  if (!known.current && list.data && !list.isFetching) known.current = new Set(list.data.devices.map((d) => d.id));
   const found = known.current ? newComputerOf(list.data?.devices, known.current, meId ?? undefined) : undefined;
   const state = found ? "done" : "now";
   return (
