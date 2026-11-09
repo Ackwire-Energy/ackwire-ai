@@ -26,10 +26,12 @@ DM with Lodi alone saying thanks.
 
 The rail of the older onboarding comes back with Lodi on its horizon, one line per step, and the progress strip with its
 walking pixel agent: the workspace's name (which creates it), what it does (the business types and one optional
-sentence, saved as its context), its team (a template made in one click, no model call), and, only on a workspace that
-waits for its first plan, the plan. On wide screens the workspace's sidebar fills in beside the question. The step is
-read from the workspace's data (it exists, has a context, has a team, waits for a plan), so a workspace left at any step
-resumes there and is never finished behind the person's back.
+sentence, saved together as its context, "Loja online · Vendemos cerâmica", so any later visit reads both back), its
+team (a template made in one click, no model call), and, only on a workspace that waits for its first plan, the plan.
+On wide screens the workspace's sidebar fills in beside the question. The step is read from the workspace's data (it
+exists, has a context, has a team, waits for a plan), asked again whenever the tab or the app comes back, so a workspace
+left at any step, or answered in another tab or on the phone, resumes there and is never finished behind the person's
+back.
 
 ### 2. The plan step
 
