@@ -39,7 +39,9 @@ export const usePlanHold = (orgId: string, org: OrgSummary | null | undefined) =
 /** A plan this workspace's billing hold stops, said where it would sign in (`planHoldPhoneLine`). */
 export function PlanHoldNote({ org, keys }: { org: OrgSummary | null | undefined; keys?: boolean }) {
   const { t } = useTranslation();
-  return <Note icon="pause">{planHoldPhoneLine(t, org ? can(org, "manage_billing") : false, keys)}</Note>;
+  return (
+    <Note icon="pause">{planHoldPhoneLine(t, org ? can(org, "manage_billing") : false, keys ? "keys" : "plan")}</Note>
+  );
 }
 
 /**

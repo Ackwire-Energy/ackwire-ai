@@ -1,13 +1,12 @@
 import type { Agent } from "@agenteschat/client";
 import { ApiError, keys, meQuery, useAuthConfig } from "@agenteschat/client";
-import { billingHoldOf } from "@agenteschat/client/lib/billing";
 import { accountOutOfReach } from "@agenteschat/client/lib/deletion";
 import { errorCode, errorText } from "@agenteschat/client/lib/errors";
 import { firstName, joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { settingUp } from "@agenteschat/client/lib/guards";
 import { sendsEmail } from "@agenteschat/client/lib/join-requests";
-import { landingOf, type RailStep, railStepAt, railSteps } from "@agenteschat/client/lib/onboarding";
+import { landingOf, type RailStep, railState } from "@agenteschat/client/lib/onboarding";
 import { finishOnboarding, isRightHand, RIGHT_HAND_DEFAULT } from "@agenteschat/client/lib/right-hand";
 import { browserTimezone, timezoneName } from "@agenteschat/client/lib/routines";
 import { type BusinessType, businessOfContext } from "@agenteschat/client/lib/team-plan";
@@ -96,14 +95,14 @@ export function OnboardingPage() {
     .filter((a) => !isRightHand(a))
     .sort((a, b) => a.name.localeCompare(b.name, i18n.language));
   const context = settings.data?.context?.trim() ?? "";
-  // Before the workspace exists only the server's billing says whether a plan step will come.
-  const waitsForPlan = orgId ? billingHoldOf(mine?.standing) === "payment" : Boolean(authConfig?.billingUrl);
-  const steps = railSteps(waitsForPlan);
-  const at = railStepAt({ created: orgId !== null, context: context !== "", team: team.length > 0, waitsForPlan });
-  const reached = at === "open" ? steps.length : steps.indexOf(at);
-  const step: RailStep =
-    picked && steps.indexOf(picked) < reached ? picked : (steps[Math.min(reached, steps.length - 1)] ?? "name");
-  const index = steps.indexOf(step);
+  const { steps, at, reached, step, index } = railState({
+    orgId,
+    standing: mine?.standing,
+    billingUrl: authConfig?.billingUrl,
+    context,
+    team: team.length,
+    picked,
+  });
   const known = orgId === null || (settings.isSuccess && agents.isSuccess && mine !== undefined);
   const name = (mine?.name ?? org).trim();
   const kind = business ?? businessOfContext(t, context);

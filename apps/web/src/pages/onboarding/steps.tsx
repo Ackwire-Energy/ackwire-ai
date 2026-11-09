@@ -1,7 +1,8 @@
-import type { Agent, TeamTemplate } from "@agenteschat/client";
+import type { Agent } from "@agenteschat/client";
 import { keys, useApplyTeamTemplate, useTeamTemplates } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
-import { BUSINESS_TYPES, type BusinessType, teamFailureText } from "@agenteschat/client/lib/team-plan";
+import { firstJob } from "@agenteschat/client/lib/onboarding";
+import { BUSINESS_TYPES, type BusinessType, teamFailureText, templateFor } from "@agenteschat/client/lib/team-plan";
 import { Button, Field, Icon, Input, Locked, Select, Skeleton } from "@agenteschat/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -20,9 +21,7 @@ export function useTemplate(orgId: string | null, business: BusinessType | null,
   const list = useTeamTemplates(orgId ?? "", i18n.language, orgId !== null && enabled);
   const [picked, pick] = useState<string | null>(null);
   const templates = list.data ?? [];
-  const wanted = picked ?? (business && business !== "other" ? business : null);
-  const chosen: TeamTemplate | undefined = templates.find((x) => x.id === wanted) ?? templates[0];
-  return { templates, chosen, pick, failed: list.isError };
+  return { templates, chosen: templateFor(templates, picked, business), pick, failed: list.isError };
 }
 
 /**
@@ -179,7 +178,7 @@ export function TeamStep({
             <TeamPlanBody plan={chosen.team} reviewer={reviewer} />
           ) : template.failed ? (
             <p className="onb__error" role="alert">
-              {t("teamPlan.templates.failed")}
+              {t("common.loadFailed")}
             </p>
           ) : (
             // The team's final shape while the templates load, so nothing moves when they arrive.
@@ -268,7 +267,6 @@ export function PlanStep({
   const routines = useQuery({ queryKey: keys.routines(orgId), queryFn: () => api.routines.list(orgId) }).data;
   const turnOn = useOpenBilling(orgId, "onboarding", offer?.key);
   const allPlans = useOpenBilling(orgId, "onboarding");
-  const does = (a: Agent) => routines?.find((r) => r.agentId === a.id)?.name ?? a.role;
   return (
     <>
       <section className="onb__plan" aria-label={t("onboarding.flow.steps.plan")}>
@@ -287,7 +285,7 @@ export function PlanStep({
             <li key={a.id} className="ac-iconline">
               <Icon name="check" size={14} />
               <span>
-                <b>{a.name}</b> · {does(a)}
+                <b>{a.name}</b> · {firstJob(a, routines)}
               </span>
             </li>
           ))}

@@ -18,6 +18,16 @@ export const isTemplateBusiness = (b: BusinessType): b is Exclude<BusinessType, 
 export const businessOfContext = (t: TFunction, context: string): BusinessType | null =>
   BUSINESS_TYPES.find((b) => isTemplateBusiness(b) && t(`teamPlan.business.${b}`) === context.trim()) ?? null;
 
+/** The template the onboarding's team step shows: the one picked, else the business's, else the first. */
+export const templateFor = <T extends { id: string }>(
+  templates: readonly T[],
+  picked: string | null,
+  business: BusinessType | null,
+): T | undefined => {
+  const wanted = picked ?? (business && isTemplateBusiness(business) ? business : null);
+  return templates.find((x) => x.id === wanted) ?? templates[0];
+};
+
 /** Several answers tapped together go as one message, in this order. */
 export const ANSWER_JOINER = " · ";
 
