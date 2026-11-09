@@ -127,8 +127,10 @@ describe("Agentes and its groups", () => {
     );
     await settle(4);
     expect(head("Integrations").querySelector(".sidebar__section-working")?.textContent).toBe("1 trabalhando");
-    // The live line under its name says where, in place of the pill.
-    expect(atlas.querySelector(".sidebar__item-role")?.textContent).toBe("trabalhando em #general");
+    // Working: the pixel orbit beside its name, labelled with where, in place of the pill; the row keeps its height.
+    expect(atlas.querySelector(".sidebar__item-label .ac-pixspin")?.getAttribute("aria-label")).toBe(
+      "trabalhando em #general",
+    );
     expect(atlas.querySelector(".sidebar__busy")).toBeNull();
   });
 

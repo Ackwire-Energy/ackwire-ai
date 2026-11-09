@@ -42,7 +42,7 @@ const click = async (el: Element, rounds = 6) => {
 };
 
 describe("the right hand's row in the sidebar", () => {
-  test("the first row of AGENTES, above the pinned agents, tinted and with its label; never under Mensagens diretas", async () => {
+  test("the first row of Agentes, above the pinned agents, with its label as a tag; never under Mensagens diretas", async () => {
     const state = withRightHand(seedState());
     seedDm(state, { type: "agent", id: LODI_ID }, { ago: 2 });
     seedDm(state, { type: "agent", id: ADA_ID }, { ago: 5 });
@@ -61,10 +61,11 @@ describe("the right hand's row in the sidebar", () => {
     expect(row?.getAttribute("href")).toBe(`/org/${ORG_ID}/dm/agent/${LODI_ID}`);
     expect(row?.querySelector(".sidebar__item-label")?.textContent).toBe("Lodi");
     expect(row?.querySelector(".sidebar__item-role")?.textContent).toBe("seu braço direito");
+    expect(row?.querySelector(".sidebar__item-role")?.classList.contains("ac-tag")).toBe(true);
     const dms = [...nav().querySelectorAll<HTMLElement>("[data-agent-row]")].map((r) => r.dataset.agentRow);
     expect(dms[0]).toBe(ADA_ID);
     expect(dms).not.toContain(LODI_ID);
-    // Closed, AGENTES still shows it (the stylesheet keeps `[data-right-hand]` in sight).
+    // Closed, Agentes still shows it (the stylesheet keeps `[data-right-hand]` in sight).
     await click(agents?.querySelector(".sidebar__section-toggle") as HTMLElement);
     expect(agents?.querySelector(".sidebar__section")?.getAttribute("data-open")).toBe("false");
     expect(body?.firstElementChild).toBe(pinRow());

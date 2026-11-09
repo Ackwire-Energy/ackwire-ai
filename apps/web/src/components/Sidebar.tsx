@@ -71,6 +71,7 @@ import {
   MenuSeparator,
   MenuSub,
   modKey,
+  PixelSpinner,
   Popover,
   PresenceBadge,
   ProviderLogo,
@@ -1592,19 +1593,26 @@ function AgentRow({
   // Listed for who manages agents though it doesn't talk to them: the line says who it talks to.
   const locked = !canTalk(a);
   const names = locked ? audienceNames(a, (id) => dir.memberById.get(id)?.name, dir.roleName) : [];
+  // Working: the pixel orbit in its color beside its name (what it is on in its label and the row's title), so the
+  // row never changes height.
+  const working = busy || shown?.line?.kind === "work";
+  const now = busy
+    ? here
+      ? t("sidebarAgents.workingIn", { channel: here })
+      : t(`sky.busy.${state}`)
+    : working
+      ? line?.text
+      : undefined;
+  // Under the name, one line of one height: who it talks to when that is limited, why it is out, else its role (the
+  // agent's fixed label) as a tag.
+  const out = shown?.presence === "out" && line ? line.text : null;
   const under = locked
     ? names.length > 1
       ? t("sidebarAgents.talksOnlyMore", { name: names[0], count: names.length - 1 })
       : names[0]
         ? t("sidebarAgents.talksOnly", { name: names[0] })
         : chip
-    : busy
-      ? here
-        ? t("sidebarAgents.workingIn", { channel: here })
-        : t(`sky.busy.${state}`)
-      : (shown?.line?.kind === "work" || shown?.presence === "out") && line
-        ? line.text
-        : a.role;
+    : (out ?? a.role);
   return (
     <div className="sidebar__row" data-agent-row={a.id} data-live={live || undefined} data-acts={edits ? 1 : undefined}>
       <Link
@@ -1612,7 +1620,7 @@ function AgentRow({
         to="/org/$orgId/dm/agent/$agentId"
         params={{ orgId: org.id, agentId: a.id }}
         className="sidebar__item"
-        title={[a.name, a.role, word, line?.text].filter(Boolean).join(" · ")}
+        title={[a.name, a.role, now ?? word, line?.text].filter(Boolean).join(" · ")}
         onMouseEnter={onPrefetch}
         onFocus={onPrefetch}
         onClick={onOpen}
@@ -1634,17 +1642,11 @@ function AgentRow({
           {...(waitingFor ? { state: "idle" as const, expression: "closed" as const } : {})}
         />
         <span className="sidebar__item-text">
-          <span className={under ? "sidebar__item-label ac-captop" : "sidebar__item-label"}>{a.name}</span>
-          {under && (
-            <span
-              className={cx(
-                "sidebar__item-role",
-                (busy || shown?.line?.kind === "work") && !locked && "sidebar__item-work",
-              )}
-            >
-              {under}
-            </span>
-          )}
+          <span className={under ? "sidebar__item-label ac-captop" : "sidebar__item-label"}>
+            {a.name}
+            {working && <PixelSpinner size={14} color={color} label={now} className="sidebar__item-spin" />}
+          </span>
+          {under && <span className={cx("sidebar__item-role", !locked && !out && "ac-tag")}>{under}</span>}
         </span>
         {unread > 0 ? (
           <UnreadCount count={unread} />
@@ -1688,8 +1690,9 @@ function AgentRow({
 }
 
 /**
- * The team's right hand (ADR 0137), always the first row of AGENTES on a soft tint: its face, its name over "seu braço
- * direito", a one-time "Novo" until its DM first opens (in this browser), and its DM's unread count. It opens the
+ * The team's right hand (ADR 0137), always the first row of Agents, a plain row like any agent's: its face, its name
+ * over its label as a tag ("your right hand"), a one-time "New" until its DM first opens (in this browser), and its
+ * DM's unread count. It opens the
  * person's DM with it. Never sorted, pinned, dragged or hidden; a closed AGENTES still shows it.
  */
 function RightHandRow({
@@ -1723,7 +1726,7 @@ function RightHandRow({
       <AgentAvatar agentId={a.id} name={a.name} size="sm" presence={shown?.presence ?? null} />
       <span className="sidebar__item-text">
         <span className="sidebar__item-label ac-captop">{a.name}</span>
-        <span className="sidebar__item-role">{label}</span>
+        <span className="sidebar__item-role ac-tag">{label}</span>
       </span>
       {unread > 0 ? (
         <UnreadCount count={unread} />

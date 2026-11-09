@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { atRule, builtCss, declarations, topLevel } from "./built-css";
 
-test("the members column: 264px on the sidebar's surface, offline rows quieter, round role marks, a sheet on a phone", async () => {
+test("the members column: 264px on the work's sheet, group titles in normal case, offline rows quieter, round role marks, a sheet on a phone", async () => {
   const css = await builtCss(
     "src/styles.css",
     "src/components/members/members.css",
@@ -15,7 +15,15 @@ test("the members column: 264px on the sidebar's surface, offline rows quieter, 
       .at(-1)?.[1];
 
   expect(last(shipped, ".members-side", "width")).toBe("264px");
-  expect(last(shipped, ".members-side", "background")).toBe("var(--side)");
+  // On the work's sheet, not the sidebar's paper: the presence rings cut the faces from the same surface.
+  expect(last(shipped, ".members-side", "background")).toBe("var(--pane)");
+  expect(last(shipped, ".members-side", "--presence-ring")).toBe("var(--pane)");
+  // Each group's title in normal case, as the sidebar's.
+  expect(last(shipped, ".members-side__head", "text-transform")).toBe("none");
+  expect(last(shipped, ".members-side__head", "font-size")).toBe("13px");
+  // An agent's role is a tag, as in the sidebar.
+  expect(last(shipped, ".members-side__line.ac-tag", "display")).toBe("inline-block");
+  expect(last(shipped, ".members-side__line.ac-tag", "align-self")).toBe("flex-start");
   // Inside the chat's main, beside the conversation's column and under the header (whose line spans both).
   expect(last(shipped, ".members-side", "height")).toBeUndefined();
   expect(last(shipped, ".channel__body", "display")).toBe("flex");
