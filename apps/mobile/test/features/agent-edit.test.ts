@@ -248,10 +248,10 @@ describe("creating an agent on the phone", () => {
     expect(screen).toContain("checked={role === id}");
     expect(screen).not.toContain("RoleCard");
     expect(screen).toContain("const footer = importing || backs || goes;");
-    // A proposal's levels come from the system's list of the three, never cycled by taps.
+    // A proposal's levels come from the app's picker of the three, never cycled by taps.
     expect(screen).not.toContain("nextLevel");
-    expect(screen).toContain("const pickLevel = (title: string, choose: (level: Level) => void) =>");
-    expect(screen).toContain("pickLevel(app, (l) => setProposedLevels((p) => ({ ...p, [i.id]: l })))");
+    expect(screen).toContain("const chooseLevel = (title: string, current: string, choose: (level: Level) => void) =>");
+    expect(screen).toContain("chooseLevel(app, level, (l) => setProposedLevels((p) => ({ ...p, [i.id]: l })))");
     // The look in the list: swatches checked inside, the eyes and the accessory each in a sheet of checked rows.
     expect(screen).toContain("<LookList look={look} onChange={setLook} />");
     expect(look).toContain("checked={o.key === value}");

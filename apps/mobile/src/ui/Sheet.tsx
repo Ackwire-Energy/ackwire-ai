@@ -31,6 +31,11 @@ export interface SheetProps {
    * sheet, and its answer never comes.
    */
   onGone?: () => void;
+  /**
+   * Pinned over the content while it scrolls (a picker's bar and its search): it drags the sheet as the grabber does,
+   * and a tap still reaches what is in it.
+   */
+  header?: ReactNode;
 }
 
 /** After the sheet unmounts, the time iOS takes to dismiss its modal before something else may be presented. */
@@ -50,7 +55,7 @@ const WIDE_WIDTH = 560;
  * the screen's curve, glass on iOS and an opaque surface on Android, a grabber to drag down, a scrim to tap
  * away. Keyboard-aware for forms: with the keyboard up it fits the room above it and scrolls.
  */
-export function Sheet({ open, onClose, children, solid = false, onGone }: SheetProps) {
+export function Sheet({ open, onClose, children, solid = false, onGone, header }: SheetProps) {
   const { colors, shadows, reducedMotion, motion } = useTheme();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -102,8 +107,9 @@ export function Sheet({ open, onClose, children, solid = false, onGone }: SheetP
   const pan = useMemo(
     () =>
       PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: (_e, g) => g.dy > 4,
+        // A tap goes to what is under the finger (the header's buttons and field); a move down takes the sheet.
+        onStartShouldSetPanResponder: () => false,
+        onMoveShouldSetPanResponder: (_e, g) => g.dy > 4 && Math.abs(g.dy) > Math.abs(g.dx),
         onPanResponderMove: (_e, g) => {
           y.value = Math.max(0, g.dy);
         },
@@ -153,6 +159,7 @@ export function Sheet({ open, onClose, children, solid = false, onGone }: SheetP
             >
               <View style={[styles.grabBar, { backgroundColor: colors.grabber }]} />
             </View>
+            {header ? <View {...pan.panHandlers}>{header}</View> : null}
             <ScrollView
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}

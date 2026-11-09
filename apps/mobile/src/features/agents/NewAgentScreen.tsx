@@ -18,7 +18,7 @@ import {
   usePlatformKey,
   useSkills,
 } from "@agenteschat/client";
-import { LEVELS, type Level, saveLevels } from "@agenteschat/client/lib/access-levels";
+import { type Level, saveLevels } from "@agenteschat/client/lib/access-levels";
 import { draftLevels, draftMailLevels, suggestedAiText } from "@agenteschat/client/lib/action-cards";
 import { newAgentStart, newAgentStartText } from "@agenteschat/client/lib/agent-setup";
 import {
@@ -75,6 +75,7 @@ import { newAgentAi, pickedAi } from "../ai/logic";
 import { openConnectAi } from "../ai/NoAiCard";
 import { usePlanHold } from "../ai/parts";
 import { ConnectorIcon } from "../connectors/ConnectorIcon";
+import { pickLevel } from "../connectors/pick-level";
 import { suggestAgentName } from "../new/logic";
 import { useOpenDm } from "../new/useOpenDm";
 import { useFailed } from "../routines/hooks";
@@ -548,13 +549,11 @@ function NewAgentForm({
     review: t("actionCard.agentProposal.review"),
   };
   const roleName = role && role !== "custom" ? t(`newAgent.roles.${role}.name`) : roleText.trim();
-  // A level is chosen among the three, as everywhere else on the phone (the system's list), never cycled by taps.
-  const pickLevel = (title: string, choose: (level: Level) => void) =>
-    chooseAction(
-      title,
-      LEVELS.map((l) => ({ label: t(`access.level.${l}`), onPress: () => choose(l) })),
-      t("common.cancel"),
-    );
+  // A level is chosen among the three in the app's picker, as everywhere else on the phone, never cycled by taps.
+  const chooseLevel = (title: string, current: string, choose: (level: Level) => void) =>
+    void pickLevel(t, title, current).then((level) => {
+      if (level) choose(level);
+    });
 
   const views: Record<PhoneStep, () => ReactNode> = {
     role: () => (
@@ -844,9 +843,9 @@ function NewAgentForm({
                 }
                 {...(proposed
                   ? {
-                      // Chosen in place (the system's list), not on a screen: the value's up-down mark.
+                      // Chosen in place (the app's picker), not on a screen: the value's up-down mark.
                       menu: true,
-                      onPress: () => pickLevel(app, (l) => setProposedLevels((p) => ({ ...p, [i.id]: l }))),
+                      onPress: () => chooseLevel(app, level, (l) => setProposedLevels((p) => ({ ...p, [i.id]: l }))),
                     }
                   : {})}
               />
@@ -859,7 +858,11 @@ function NewAgentForm({
               label={box.address}
               value={t(`access.level.${mailLevels[box.accountId] ?? "none"}`)}
               menu
-              onPress={() => pickLevel(box.address, (l) => setMailLevels((p) => ({ ...p, [box.accountId]: l })))}
+              onPress={() =>
+                chooseLevel(box.address, mailLevels[box.accountId] ?? "none", (l) =>
+                  setMailLevels((p) => ({ ...p, [box.accountId]: l })),
+                )
+              }
             />
           ))}
           {listedApps.length + myMail.length === 0 ? (

@@ -166,4 +166,8 @@ export const mobilePtBR = {
   search: {
     placeholder: "Buscar",
   },
+  picker: {
+    /** A picker's search found none of its options. */
+    none: "Nada com “{{text}}”.",
+  },
 } satisfies LocaleStrings;

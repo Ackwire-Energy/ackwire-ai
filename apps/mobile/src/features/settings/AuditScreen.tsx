@@ -52,8 +52,12 @@ import { chatHref } from "../links/logic";
 import { Face } from "../shared/Face";
 import { useEmptyLook } from "../shared/FirstUse";
 import { useColors, useDirectory, useWhen } from "../shared/hooks";
+import { pickOne } from "../shared/PickerSheet";
 import { copyText, Tile } from "../shared/parts";
-import { chooseAction, Gap, SettingsPage } from "./parts";
+import { Gap, SettingsPage } from "./parts";
+
+/** The picker's key for "Qualquer agente" (no filter). */
+const ANY_AGENT = "\u0000any";
 
 /*
  * Configurações › Auditoria on the phone (admins), as the web's: the log by day, a sentence per row (who, what),
@@ -88,15 +92,23 @@ export function AuditScreen({ agentId: first = null }: { agentId?: string | null
   const rows = useMemo(() => audit.data?.pages.flatMap((p) => p.rows) ?? [], [audit.data]);
   const days = useMemo(() => byDay(rows, when.day), [rows, when.day]);
   const agent = agentId ? dir.agentById.get(agentId) : undefined;
+  // In the app's picker: "Qualquer agente" first, then each agent with its face and role, the one shown checked.
   const pickAgent = () =>
-    chooseAction(
-      t("audit.agent"),
-      [
-        { label: t("audit.anyAgent"), onPress: () => setAgentId(null) },
-        ...dir.agents.map((a) => ({ label: a.name, onPress: () => setAgentId(a.id) })),
+    void pickOne({
+      title: t("audit.agent"),
+      value: agentId ?? ANY_AGENT,
+      options: [
+        { key: ANY_AGENT, label: t("audit.anyAgent"), leading: { kind: "icon", name: "members" } },
+        ...dir.agents.map((a) => ({
+          key: a.id,
+          label: a.name,
+          ...(a.role?.trim() ? { sub: a.role.trim() } : {}),
+          leading: { kind: "agent" as const, agentId: a.id },
+        })),
       ],
-      t("common.cancel"),
-    );
+    }).then((key) => {
+      if (key !== null) setAgentId(key === ANY_AGENT ? null : key);
+    });
 
   return (
     <SettingsPage title={t("settings.section.audit")}>

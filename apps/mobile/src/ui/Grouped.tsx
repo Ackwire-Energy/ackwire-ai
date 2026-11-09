@@ -17,7 +17,9 @@ import { leadBox } from "./type-scale";
  */
 const LEAD = 36;
 /** A row's icon tile; its corner is 30% of it, as every tile's. */
-const TILE = 28;
+// 32 in the 36 column: 18 from the card's side and 10 from the row's top and bottom, so the tile sits square in its
+// corner of the card instead of hugging the top.
+const TILE = 32;
 
 /** A row that comes or goes while the list is on screen fades; what is around it slides into place. */
 const ROW_IN = FadeIn.duration(motion.fast);

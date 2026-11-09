@@ -6,13 +6,14 @@ import { can } from "@agenteschat/client/lib/permissions";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/providers/org";
 import { useToast } from "@/ui";
+import { computerIcon } from "../outages/logic";
 import { agentComputerPick } from "../settings/logic";
-import { chooseAction } from "../settings/parts";
 import { useDirectory, useMeId } from "../shared/hooks";
+import { pickOne } from "../shared/PickerSheet";
 import { errorHaptic, successHaptic } from "../shared/parts";
 
 /**
- * Choosing an agent's computer right where it says it has none: the system's list of the computers this person may
+ * Choosing an agent's computer right where it says it has none: the app's picker with the computers this person may
  * pick for it (the same rule as Computadores' "Qual computador cada agente usa", `agentComputerPick`; an offline one
  * says so), and a pick saves with a toast. Null while it loads or when this person picks none for it, so the screen
  * offers nothing it can't do.
@@ -37,29 +38,36 @@ export function usePickComputer(agentId: string): (() => void) | null {
   });
   if (!pick.canPick) return null;
   const host = t("machines.host.label");
-  return () =>
-    chooseAction(
-      t("computers.agents.pick", { name: agent.name }),
-      pick.choices.map((m) => {
-        const title = machineTitle(m, host);
-        return {
-          label: m.online ? title : `${title} · ${t("machines.offline")}`,
-          onPress: () =>
-            setTarget.mutate(
-              { agentId, machineId: m.id },
-              {
-                onSuccess: () => {
-                  successHaptic();
-                  toast({ title: t("computers.agents.saved", { name: agent.name, computer: title }), icon: "check" });
-                },
-                onError: (err) => {
-                  errorHaptic();
-                  toast({ title: errorText(t, err), icon: "x" });
-                },
-              },
-            ),
-        };
-      }),
-      t("common.cancel"),
+  const save = (m: (typeof pick.choices)[number]) => {
+    const title = machineTitle(m, host);
+    setTarget.mutate(
+      { agentId, machineId: m.id },
+      {
+        onSuccess: () => {
+          successHaptic();
+          toast({ title: t("computers.agents.saved", { name: agent.name, computer: title }), icon: "check" });
+        },
+        onError: (err) => {
+          errorHaptic();
+          toast({ title: errorText(t, err), icon: "x" });
+        },
+      },
     );
+  };
+  // The app's picker: each computer with its system's mark and, when it's off, "Desligado" under its name; the one the
+  // agent uses checked.
+  return () =>
+    void pickOne({
+      title: t("computers.agents.pick", { name: agent.name }),
+      value: pick.value,
+      options: pick.choices.map((m) => ({
+        key: m.id,
+        label: machineTitle(m, host),
+        ...(m.online ? {} : { sub: t("machines.offline") }),
+        leading: { kind: "icon" as const, name: computerIcon(m.os) },
+      })),
+    }).then((key) => {
+      const chosen = key ? pick.choices.find((m) => m.id === key) : undefined;
+      if (chosen && key !== pick.value) save(chosen);
+    });
 }

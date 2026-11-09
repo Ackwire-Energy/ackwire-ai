@@ -79,6 +79,14 @@ describe("the event pill", () => {
     expect(pill).not.toContain("fontSize");
   });
 
+  test("a sentence that takes more than a line puts its actions under it, on its column, with no rule", () => {
+    const pill = src("ui/EventPill.tsx");
+    expect(pill).toContain("e.nativeEvent.lines.length > 1");
+    expect(pill).toContain("list.length > 0 && (wraps ||");
+    expect(pill).toContain("{stacked ? null : <View style={[styles.rule");
+    expect(pill).toContain("paddingLeft: 12 + MARK + 8");
+  });
+
   test("the automatic lines use it: notices, stops, decided requests, the task taken, the speed fallback", () => {
     for (const file of [
       "features/chat/EventLine.tsx",

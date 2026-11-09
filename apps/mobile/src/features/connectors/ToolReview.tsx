@@ -12,9 +12,20 @@ import { type ReviewTool, reviewDecisions, reviewToolsOf } from "@agenteschat/cl
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
-import { Button, GroupedFooter, GroupedHeader, GroupedList, GroupedRow, Icon, Locked, SearchField, Text } from "@/ui";
-import { chooseAction } from "../settings/parts";
+import {
+  Button,
+  GroupedFooter,
+  GroupedHeader,
+  GroupedList,
+  GroupedRow,
+  Icon,
+  type IconName,
+  Locked,
+  SearchField,
+  Text,
+} from "@/ui";
 import { useColors, useOrgId } from "../shared/hooks";
+import { pickOne } from "../shared/PickerSheet";
 import { errorHaptic, successHaptic } from "../shared/parts";
 import { Problem } from "./Problem";
 import {
@@ -32,6 +43,9 @@ import {
   subjectsOf,
   waitingHits,
 } from "./review";
+
+/** Each tool level's mark in the picker. */
+const TOOL_LEVEL_ICON: Record<string, IconName> = { read: "eye", write: "pen", approval: "shield", off: "eyeoff" };
 
 /** What a screen pins at its bottom for the review's save: the words, whether it is busy, what a tap does. */
 export interface SaveBar {
@@ -283,22 +297,32 @@ function ToolList({
   const hits = state ? waitingHits(state, tools, query) : [];
   const rest = subjectsOf(t, state ? tools.filter((x) => !isWaiting(state, x)) : tools, query).flatMap((g) => g.hits);
   const reviewable = tools.filter((x) => x.pending).length;
+  // A tool's level in the app's picker: each level with its mark and what it means ("Só consulta" over "vê dados,
+  // não muda nada"), the one it has checked.
   const pick = (tool: ReviewTool) => {
     if (!review) return;
     const now = chosenLevel(review.state, tool);
-    chooseAction(
-      tool.label,
-      choicesOf(tool).map((level) => ({
-        label: t(`toolReview.help.${level}`),
-        onPress: () =>
-          review.onChange(
-            level === now && isWaiting(review.state, tool)
-              ? confirm(review.state, tool)
-              : choose(review.state, tool, level),
-          ),
-      })),
-      t("common.cancel"),
-    );
+    void pickOne({
+      title: tool.label,
+      value: now,
+      options: choicesOf(tool).map((level) => {
+        const [label, ...rest] = t(`toolReview.help.${level}`).split(": ");
+        return {
+          key: level,
+          label: label ?? level,
+          ...(rest.length ? { sub: rest.join(": ") } : {}),
+          leading: { kind: "icon" as const, name: TOOL_LEVEL_ICON[level] ?? "circle" },
+        };
+      }),
+    }).then((key) => {
+      const level = choicesOf(tool).find((l) => l === key);
+      if (!level) return;
+      review.onChange(
+        level === now && isWaiting(review.state, tool)
+          ? confirm(review.state, tool)
+          : choose(review.state, tool, level),
+      );
+    });
   };
   const row = ({ tool, tech }: { tool: ReviewTool; tech: boolean }, suggested = false) => (
     <GroupedRow
