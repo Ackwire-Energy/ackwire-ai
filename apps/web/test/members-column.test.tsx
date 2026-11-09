@@ -131,6 +131,8 @@ describe("the members column", () => {
     expect(ada.getAttribute("aria-label")).toBe("Perfil de Ada");
     expect(document.getElementById(ada.getAttribute("aria-describedby") ?? "")?.textContent).toContain("pensando");
     expect(ada.textContent).toContain("pensando");
+    // Its state here is words, not the role's tag.
+    expect(ada.querySelector(".members-side__line")?.classList.contains("ac-tag")).toBe(false);
     expect(ada.querySelector("[data-busy] .sidebar__trail")).toBeTruthy();
     // ↑/↓ between the rows.
     const rows = [...(column() as HTMLElement).querySelectorAll<HTMLElement>(".members-side__row")];

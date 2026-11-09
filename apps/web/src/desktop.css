@@ -34,6 +34,13 @@ html[data-desktop="linux"] {
   user-select: none;
   -webkit-user-select: none;
 }
+/* With the work as a sheet on the sidebar's paper (layout.css `.shell__work`), the bar and that paper are one
+   surface: no hairline under the bar. A narrow window keeps it, its work being flat under the bar. */
+@media (min-width: 761px) {
+  html[data-desktop] .titlebar {
+    border-bottom: 0;
+  }
+}
 /* The workspace's sky over the sidebar's width, its hairline included: one sky with the header below. */
 .workspace-sky--bar {
   top: 0;

@@ -4,7 +4,7 @@ import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { memberGroups } from "@agenteschat/client/lib/member-groups";
 import { agentStatusShort, isOutOfOffice } from "@agenteschat/client/lib/presence";
-import { Avatar, Button, Icon, matchesWords, RoleMark, SearchField } from "@agenteschat/ui";
+import { Avatar, Button, cx, Icon, matchesWords, RoleMark, SearchField } from "@agenteschat/ui";
 import { type KeyboardEvent, type TouchEvent, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
@@ -286,6 +286,8 @@ function AgentRow({ agent, channelId, busy }: { agent: Agent; channelId: string;
   const full = agentLine(t, shown?.line ?? null, i18n.language)?.text;
   const doing = state !== "idle" ? t(`channel.agentState.${state}`) : null;
   const text = line?.text ?? doing ?? agent.role ?? word;
+  // The role, the agent's fixed label, is a tag even while it works elsewhere; what it does or its presence is words.
+  const isRole = !line && !doing && !!agent.role && text === agent.role;
   const shows = useId();
   return (
     <ProfileTrigger
@@ -320,7 +322,11 @@ function AgentRow({ agent, channelId, busy }: { agent: Agent; channelId: string;
             (line ? (
               <StatusLine {...line} className="members-side__line members-side__work" />
             ) : (
-              <span className={busy ? "members-side__line members-side__work" : "members-side__line"}>{text}</span>
+              <span
+                className={cx("members-side__line", busy && !isRole && "members-side__work", isRole && "ac-tag")}
+              >
+                {text}
+              </span>
             ))}
         </span>
       </span>

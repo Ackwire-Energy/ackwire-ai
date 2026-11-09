@@ -215,19 +215,43 @@ p {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: var(--pane);
+  padding: 8px 8px 8px 0;
+  box-sizing: border-box;
+  background: var(--side);
 }
+/* The work as one sheet on the sidebar's paper: the page, its header and anything beside it (members, panels) share
+   its surface and its rounded edge, so no line runs between the sidebar and the conversation. In dark the two
+   surfaces part by their tone alone; in light a hairline keeps the white sheet off the near-white paper. */
 .shell__pages {
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
   display: flex;
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--pane);
+}
+[data-theme="light"] .shell__pages {
+  box-shadow:
+    0 0 0 1px var(--line),
+    0 1px 3px rgba(9, 20, 34, 0.05);
+}
+/* A focused flow with its own rail and no sidebar (a new agent): no sheet, it fills the window and scrolls with it. */
+.shell__work--bare {
+  padding: 0;
+  background: var(--pane);
+}
+.shell__work--bare > .shell__pages,
+[data-theme="light"] .shell__work--bare > .shell__pages {
+  border-radius: 0;
+  overflow: visible;
+  box-shadow: none;
 }
 .shell__pages > .shell__main {
   height: auto;
 }
 
-/* "O MacBook Air desconectou": a thin neutral strip on top of the work area, one line, our attention
+/* "The MacBook Air went offline": a thin neutral strip on top of the work area, one line, our attention
    color only on its icon. Flat (a hairline under it), so nothing below can clip it. */
 .outages {
   flex: none;
@@ -235,6 +259,17 @@ p {
   flex-direction: column;
   border-bottom: 1px solid var(--line);
   background: var(--surface-raised);
+}
+/* On the paper above the work's sheet: each notice is its own rounded card, 8px clear of the sheet, never a square
+   strip over the sheet's rounded corners. */
+.shell__work > .outages {
+  margin-bottom: 8px;
+  border-bottom: 0;
+  border-radius: 16px;
+  overflow: hidden;
+}
+[data-theme="light"] .shell__work > .outages {
+  box-shadow: 0 0 0 1px var(--line);
 }
 .outage {
   display: flex;
@@ -906,7 +941,7 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   align-items: center;
   gap: var(--space-3);
   padding: 12px 24px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
   background: var(--surface);
 }
 /* Its reset at no weight, so a rise to the face's top (`.ac-captop`) wins it. */
@@ -917,7 +952,8 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 18px;
+  font-size: 17px;
+  letter-spacing: -0.01em;
   line-height: 24px;
   font-weight: 650;
 }
@@ -1041,14 +1077,6 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   font-size: 13px;
   color: var(--ink-muted);
 }
-/* The right hand's row (ADR 0137), first in AGENTES: a soft tint of the agent blue, under the hover and the chosen
-   plate. */
-.sidebar__item[data-right-hand]:not([data-status="active"]) {
-  background: color-mix(in srgb, var(--agent-soft) 60%, transparent);
-}
-.sidebar__item[data-right-hand]:not([data-status="active"]):hover {
-  background: var(--agent-soft);
-}
 /* Its one-time "Novo": a small dot in the info tone before the word. */
 .sidebar__new {
   display: inline-flex;
@@ -1081,21 +1109,35 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 400;
   line-height: 16px;
-  color: var(--ink-muted);
+  color: var(--faint);
 }
 .sidebar__item[data-status="active"] .sidebar__item-role {
   color: var(--ink2);
 }
-/* What the agent is on: one line like the role, in a stronger ink; the row's title has it whole. */
-.sidebar__item-work {
+/* The role as a tag (`.ac-tag`): its own small plate, as wide as its words, under the name. */
+.sidebar__item-role.ac-tag {
+  align-self: flex-start;
+  margin-top: 1px;
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 18px;
+  color: var(--muted);
+}
+.sidebar__item[data-status="active"] .sidebar__item-role.ac-tag {
+  background: var(--plate);
   color: var(--ink2);
+}
+/* What the agent is on: one line like the role, a step louder; the row's title has it whole. */
+.sidebar__item-work {
+  color: var(--muted);
 }
 .sidebar__lock {
   display: inline-flex;
   flex: none;
+  color: var(--faint);
 }
 /* First-message suggestions in an empty conversation: neutral buttons that wrap, each inside the card. */
 .channel__suggestions {
@@ -5848,12 +5890,6 @@ html:not([data-pointer]) .tr-ok:focus-visible {
 [data-theme="dark"] .sidebar {
   --side-active: color-mix(in srgb, var(--ink) 7%, var(--side));
 }
-/* Light: the paper and the white work area meet on a hairline (dark keeps the step in tone; the drawer has its shadow). */
-@media (min-width: 761px) {
-  :root:not([data-theme="dark"]) .sidebar {
-    box-shadow: inset -1px 0 0 var(--line);
-  }
-}
 .sidebar > *,
 .sidebar__scroll > * {
   position: relative;
@@ -5964,8 +6000,7 @@ html:not([data-pointer]) .tr-ok:focus-visible {
   padding: 0 8px 0 10px;
   border: 0;
   border-radius: var(--control-r-sm);
-  background: var(--side-active);
-  box-shadow: inset 0 0 0 1px var(--line);
+  background: var(--plate-soft);
   font: inherit;
   font-size: var(--control-fs-sm);
   line-height: normal;
@@ -5984,7 +6019,7 @@ html:not([data-pointer]) .tr-ok:focus-visible {
   border-radius: 6px;
 }
 .sidebar__jump:hover {
-  box-shadow: inset 0 0 0 1px var(--line-strong);
+  background: var(--plate);
   color: var(--muted);
 }
 html:not([data-pointer]) .sidebar__jump:focus-visible {
@@ -5998,19 +6033,19 @@ html:not([data-pointer]) .sidebar__jump:focus-visible {
   gap: 6px;
   margin-top: -8px;
 }
-/* The same 32px tile as the field beside it (a bare icon looked smaller than the field). */
+/* The same 32px box as the field beside it, a bare icon until hovered. */
 .sidebar__collapse.ac-btn {
   flex: none;
   width: var(--control-h-sm);
   height: var(--control-h-sm);
   border-radius: var(--control-r-sm);
-  background: var(--side-active);
-  box-shadow: inset 0 0 0 1px var(--line);
+  background: none;
+  box-shadow: none;
   color: var(--muted);
 }
 .sidebar__collapse.ac-btn:hover {
-  background: var(--side-active);
-  box-shadow: inset 0 0 0 1px var(--line-strong);
+  background: var(--plate);
+  box-shadow: none;
   color: var(--ink);
 }
 @media (prefers-reduced-motion: no-preference) {
@@ -7237,6 +7272,15 @@ html:not([data-pointer]) .sky-welcome__close:focus-visible {
   left: -12px;
   right: -11px;
   height: 60px;
+}
+/* The sky (both of its parts: the desktop title bar's and the sidebar's, one sky) and the horizon stay a light touch,
+   fading out before the work's sheet so its corner never meets them. */
+.workspace-sky--side,
+.workspace-sky--bar,
+.sidebar__horizon {
+  opacity: 0.38;
+  -webkit-mask-image: linear-gradient(to right, #000 55%, transparent);
+  mask-image: linear-gradient(to right, #000 55%, transparent);
 }
 /* The whole row is the account button (no inner margin it doesn't answer to); flat on the horizon. */
 .sidebar__me {
@@ -11702,12 +11746,12 @@ html[data-menu-overlay] .shell {
 
 /* ── Sidebar ──────────────────────────────────────────────────────
    The tools each person keeps in sight are plain rows; the rest open beside the sidebar from More. Space, not
-   lines, sets the sidebar's parts apart (tools, channels, agents, people), each under a small-capitals title. Conversations sit in categories that open and
+   lines, sets the sidebar's parts apart (tools, channels, agents, people), each under a plain title. Conversations sit in categories that open and
    close, every mark (an icon, a "#", a face, a category's chevron) in one column and every name in the next;
    closed, a category shows only the open page's row and a count. Dense, so a small workspace fits a laptop's
    screen without scrolling. The icon rail ignores the headers. */
 .sidebar:not([data-rail="true"]) .sidebar__scroll {
-  gap: 4px;
+  gap: 6px;
 }
 .sidebar:not([data-rail="true"]) :is(.sidebar__group, .sidebar__section-body) {
   gap: 1px;
@@ -11762,6 +11806,16 @@ html[data-menu-overlay] .shell {
 .sidebar:not([data-rail="true"]) .sidebar__item:has(> .ac-avatar) {
   padding-block: 8px;
 }
+/* An agent's row breathes: the face 12px from its words, a little air between the name and its line. */
+.sidebar:not([data-rail="true"]) :is([data-agent-row] > .sidebar__item, .sidebar__item[data-right-hand]) {
+  padding-block: 7px;
+  gap: 12px;
+}
+.sidebar:not([data-rail="true"])
+  :is([data-agent-row] > .sidebar__item, .sidebar__item[data-right-hand])
+  .sidebar__item-text {
+  gap: 2px;
+}
 .sidebar:not([data-rail="true"]) .sidebar__item:has(> .ac-avatar + .sidebar__item-text > .sidebar__item-role) {
   align-items: flex-start;
 }
@@ -11786,6 +11840,7 @@ html[data-menu-overlay] .shell {
   align-items: center;
   gap: 2px;
   min-height: 28px;
+  margin-bottom: 4px;
   padding-right: 2px;
   border-radius: var(--control-r-sm);
   transition: background-color 0.15s;
@@ -11839,8 +11894,8 @@ html:not([data-pointer]) .sidebar__section-toggle:focus-visible {
 .sidebar__section[data-open="true"] .sidebar__section-chevron {
   transform: none;
 }
-/* The sidebar's own parts (Canais with no categories, Agentes, Mensagens diretas): a title in small capitals from the
-   icons' edge, its chevron after it, so a part never reads as one of the categories in it. */
+/* The sidebar's own parts (Channels with no categories, Agents, Direct messages): a plain title from the icons' edge,
+   its chevron after it, so a part never reads as one of the categories in it. */
 .sidebar__section--part .sidebar__section-toggle {
   gap: 2px;
 }
@@ -11849,13 +11904,14 @@ html:not([data-pointer]) .sidebar__section-toggle:focus-visible {
   margin: 0 2px;
 }
 .sidebar__section--part .sidebar__section-head .sidebar__label {
-  font-size: 11.5px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--faint);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted);
 }
 .sidebar__section--part .sidebar__section-toggle:hover .sidebar__label {
-  color: var(--muted);
+  color: var(--ink2);
 }
 /* Channel categories: small and gray, quieter than any unread channel (Discord's), the chevron after the name. */
 .sidebar__section--category .sidebar__section-toggle {
@@ -11867,13 +11923,13 @@ html:not([data-pointer]) .sidebar__section-toggle:focus-visible {
   margin: 0 2px;
 }
 .sidebar__section--category .sidebar__section-head .sidebar__label {
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   letter-spacing: 0;
-  color: var(--faint);
+  color: var(--muted);
 }
 .sidebar__section--category .sidebar__section-head:hover .sidebar__label {
-  color: var(--muted);
+  color: var(--ink2);
 }
 .sidebar__section-body {
   display: flex;
@@ -12285,10 +12341,18 @@ html:not([data-pointer]) .channel-perms__target:focus-visible {
 .sidebar__section--group[data-open="false"] .sidebar__section-body > [data-live="true"] {
   display: flex;
 }
+/* A group stands apart from the agents above it; its mark in gray, as quiet as its name. */
+.sidebar:not([data-rail="true"]) .sidebar__section--group {
+  margin-top: 8px;
+}
+.sidebar__section--group .sidebar__section-toggle > .ac-rolemark {
+  filter: grayscale(1);
+  opacity: 0.6;
+}
 .sidebar__section-count {
   min-width: 24px;
   padding: 0 8px 0 4px;
-  font-size: 12px;
+  font-size: 12.5px;
   font-variant-numeric: tabular-nums;
   text-align: right;
   color: var(--faint);
@@ -12306,16 +12370,30 @@ html:not([data-pointer]) .channel-perms__target:focus-visible {
 .sidebar__item[data-presence="out"]:not([data-status="active"]) .ac-avatar {
   opacity: 0.6;
 }
-/* "Fixar no topo": a small pin at a pinned row's end, and a thin line under the pinned rows, in the names' column. */
+/* "Pin to top": a small pin at a pinned row's end, shown with the row's hover (always on a touch screen), and a
+   little space, no line, after the pinned rows. */
 .sidebar__pinned {
   display: inline-flex;
   color: var(--faint);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.sidebar__item:is(:hover, :focus-visible) .sidebar__pinned {
+  opacity: 1;
+}
+/* A row with hover buttons (`data-acts`) trades its end for them on hover, so its pin shows at rest instead. */
+.sidebar__row[data-acts] .sidebar__pinned {
+  opacity: 1;
+}
+@media (hover: none) {
+  .sidebar__pinned {
+    opacity: 1;
+  }
 }
 .sidebar__pins-end {
   flex: none;
   margin: 3px 8px 3px 36px;
   border: 0;
-  border-top: 1px solid var(--line);
 }
 /* Day one: the line about the pins, once, with its ✕. */
 .sidebar__pins-hint {
@@ -12414,7 +12492,7 @@ html:not([data-pointer]) .sidebar__more:focus-visible {
   flex-direction: column;
   gap: 2px;
 }
-/* 14px over each part's title with the list's own gap. */
+/* 16px over each part's title with the list's own gap. */
 .sidebar:not([data-rail="true"]) .sidebar__block + .sidebar__block {
   margin-top: 10px;
 }

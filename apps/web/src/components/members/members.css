@@ -1,4 +1,4 @@
-/* A channel's members on the right (Discord's member list): under the channel's header, the sidebar's surface, its
+/* A channel's members on the right: under the channel's header, on the work's sheet, its
    own scroll. The thread, search and agent panels float over it. */
 .members-side {
   flex: 0 0 264px;
@@ -6,17 +6,18 @@
   overflow-y: auto;
   padding: 18px 10px 24px 12px;
   box-sizing: border-box;
-  background: var(--side);
-  box-shadow: inset 1px 0 0 var(--line);
-  --presence-ring: var(--side);
-}
-[data-theme="dark"] .members-side {
-  box-shadow: inset 1px 0 0 var(--line2);
+  background: var(--pane);
+  box-shadow: inset 1px 0 0 color-mix(in srgb, var(--line) 80%, transparent);
+  --presence-ring: var(--pane);
+  /* Row plates step from the work's sheet, not the sidebar's paper (dark's paper hover is invisible on the sheet).
+     Opaque, so the presence ring that reuses them matches the plate it sits on. */
+  --side-hover: color-mix(in srgb, var(--ink) 6%, var(--pane));
+  --side-chosen: color-mix(in srgb, var(--ink) 11%, var(--pane));
 }
 .members-side__groups {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 20px;
 }
 .members-side__group {
   display: flex;
@@ -27,22 +28,22 @@
 .members-side__caption {
   margin: 0 0 -8px;
   padding: 0 8px;
-  font-size: 12.5px;
+  font-size: 13px;
   line-height: 18px;
-  color: var(--ink-muted);
+  color: var(--faint);
 }
 .members-side__head {
   display: flex;
   align-items: center;
   gap: 6px;
   margin: 0;
-  padding: 0 8px 6px;
-  font-size: 11.5px;
-  font-weight: 650;
+  padding: 0 8px 4px;
+  font-size: 13px;
+  font-weight: 600;
   line-height: 16px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--faint);
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted);
 }
 /* Last in the list, for who manages the channel: the channel details' add flow (the plus tile is theirs too).
    A smaller tile and text than a member's row and less room on the right, so the label stays on one line in 264px
@@ -173,6 +174,14 @@ html:not([data-pointer]) .members-side__row.profile-trigger:focus-visible {
 .members-side__line.status-line > :first-child {
   translate: none;
 }
+/* An agent's role as a tag (`.ac-tag`), as in the sidebar: its own small plate, as wide as its words. */
+.members-side__line.ac-tag {
+  display: inline-block;
+  align-self: flex-start;
+  margin-top: 1px;
+  font-size: 11.5px;
+  line-height: 18px;
+}
 /* Over the status line's own muted ink (presence.css), a sheet in another chunk. */
 .members-side__line.members-side__work {
   color: var(--ink2);
@@ -260,11 +269,12 @@ html:not([data-pointer]) .members-side__row.profile-trigger:focus-visible {
   flex: none;
   color: var(--faint);
 }
+/* The 32px icon boxes carry their own air: the phone header's 8px between them. */
 .members-sheet__acts {
   flex: none;
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 8px;
 }
 .members-sheet__find {
   padding: 4px 14px 8px;

@@ -1605,6 +1605,8 @@ function AgentRow({
       : (shown?.line?.kind === "work" || shown?.presence === "out") && line
         ? line.text
         : a.role;
+  // The role, the agent's fixed label, is a tag; what it is on or why it is out stays words.
+  const roleTag = !locked && !busy && under === a.role;
   return (
     <div className="sidebar__row" data-agent-row={a.id} data-live={live || undefined} data-acts={edits ? 1 : undefined}>
       <Link
@@ -1640,6 +1642,7 @@ function AgentRow({
               className={cx(
                 "sidebar__item-role",
                 (busy || shown?.line?.kind === "work") && !locked && "sidebar__item-work",
+                roleTag && "ac-tag",
               )}
             >
               {under}
@@ -1688,8 +1691,9 @@ function AgentRow({
 }
 
 /**
- * The team's right hand (ADR 0137), always the first row of AGENTES on a soft tint: its face, its name over "seu braço
- * direito", a one-time "Novo" until its DM first opens (in this browser), and its DM's unread count. It opens the
+ * The team's right hand (ADR 0137), always the first row of Agents, a plain row like any agent's: its face, its name
+ * over its label as a tag ("your right hand"), a one-time "New" until its DM first opens (in this browser), and its
+ * DM's unread count. It opens the
  * person's DM with it. Never sorted, pinned, dragged or hidden; a closed AGENTES still shows it.
  */
 function RightHandRow({
@@ -1723,7 +1727,7 @@ function RightHandRow({
       <AgentAvatar agentId={a.id} name={a.name} size="sm" presence={shown?.presence ?? null} />
       <span className="sidebar__item-text">
         <span className="sidebar__item-label ac-captop">{a.name}</span>
-        <span className="sidebar__item-role">{label}</span>
+        <span className="sidebar__item-role ac-tag">{label}</span>
       </span>
       {unread > 0 ? (
         <UnreadCount count={unread} />
