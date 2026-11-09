@@ -122,6 +122,34 @@ html:not([data-pointer]) .setup-row__link:focus-visible {
   min-width: 104px;
   justify-content: center;
 }
+/* A row's own field (the people row's address and Enviar): one height side by side, the dialog's link under them. */
+.setup-invite {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  width: 100%;
+  margin-top: var(--space-1);
+}
+.setup-invite__line {
+  display: flex;
+  gap: var(--space-2);
+  width: 100%;
+}
+.setup-invite__email.ac-input {
+  flex: 1;
+  min-width: 0;
+  height: var(--control-h-sm);
+  font-size: 14px;
+}
+.setup-invite__error {
+  font-size: 13px;
+  color: var(--danger);
+  overflow-wrap: anywhere;
+}
+.setup-invite__more {
+  font-size: 13px;
+}
 @keyframes setup-row-pop {
   from {
     transform: scale(0.98);

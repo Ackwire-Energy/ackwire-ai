@@ -5302,23 +5302,10 @@ export const en = {
       /** Apps and people on a billing hold: no button, they open with the plan. */
       afterPlan: "Opens with the plan.",
       about: {
-        todo: "Tell me what {{org}} does.",
-        todoDesc: "Every agent reads this.",
-        action: "Tell",
-        done: "I know what {{org}} does",
         title: "What does {{org}} do?",
         desc: "Every agent reads this. You can change it anytime.",
         line: "In one sentence",
         optional: "Optional. Without one, the type you picked counts.",
-      },
-      team: {
-        todo: "Build the team.",
-        todoDesc: "A template for your business, you can change everything later.",
-        action: "See the team",
-        done_one: "{{count}} agent on the team",
-        done_other: "{{count}} agents on the team",
-        /** While a team card the right hand proposed waits in the chat. */
-        card: "Continue on the card below",
       },
       ai: {
         todo: "Connect an AI.",
@@ -5326,8 +5313,6 @@ export const en = {
         action: "Connect",
         done: "I think with {{label}}",
         doneAny: "I think with an AI now",
-        plan: "Opens with the agentes.chat plan.",
-        planAction: "See agentes.chat plans",
       },
       apps: {
         todo: "Connect your work apps.",
@@ -5347,11 +5332,14 @@ export const en = {
         done_one: "{{count}} person here",
         done_other: "{{count}} people here",
         doneNone: "Just you for now",
+        /** Invited, not in yet: the row is done, saying who. */
+        invited: "Invited {{names}} · waiting",
+        email: "name@company.com",
+        send: "Send",
+        more: "More options",
       },
-      /** Its line for a moment once a row is done. */
+      /** Its line for a moment once a row is done (a skip says nothing). */
       say: {
-        about: "Noted. Every agent reads this.",
-        team: "The team is here.",
         ai: "Now the team thinks.",
         apps: "Done, I can read the apps now.",
         people: "Good to have more people here.",

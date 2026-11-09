@@ -5361,23 +5361,10 @@ export const ptBR = {
       /** Apps and people on a billing hold: no button, they open with the plan. */
       afterPlan: "Abre com o plano.",
       about: {
-        todo: "Me conte o que a {{org}} faz.",
-        todoDesc: "Todos os agentes leem isso.",
-        action: "Contar",
-        done: "Já sei o que a {{org}} faz",
         title: "O que a {{org}} faz?",
         desc: "Todos os agentes leem isso. Você muda quando quiser.",
         line: "Em uma frase",
         optional: "Opcional. Sem frase, vale o tipo que você marcou.",
-      },
-      team: {
-        todo: "Monte o time.",
-        todoDesc: "Um modelo para o seu negócio, você muda tudo depois.",
-        action: "Ver o time",
-        done_one: "{{count}} agente no time",
-        done_other: "{{count}} agentes no time",
-        /** While a team card the right hand proposed waits in the chat. */
-        card: "Continue no card abaixo",
       },
       ai: {
         todo: "Conecte uma IA.",
@@ -5385,8 +5372,6 @@ export const ptBR = {
         action: "Conectar",
         done: "Penso com {{label}}",
         doneAny: "Já penso com uma IA",
-        plan: "Abre com o plano do agentes.chat.",
-        planAction: "Ver planos do agentes.chat",
       },
       apps: {
         todo: "Conecte os apps do trabalho.",
@@ -5406,11 +5391,14 @@ export const ptBR = {
         done_one: "{{count}} pessoa aqui",
         done_other: "{{count}} pessoas aqui",
         doneNone: "Só você por enquanto",
+        /** Invited, not in yet: the row is done, saying who. */
+        invited: "Convidei {{names}} · aguardando",
+        email: "nome@empresa.com",
+        send: "Enviar",
+        more: "Mais opções",
       },
-      /** Its line for a moment once a row is done. */
+      /** Its line for a moment once a row is done (a skip says nothing). */
       say: {
-        about: "Anotado. Todos os agentes leem isso.",
-        team: "O time chegou.",
         ai: "Agora o time pensa.",
         apps: "Pronto, já leio os apps.",
         people: "Que bom ter mais gente aqui.",

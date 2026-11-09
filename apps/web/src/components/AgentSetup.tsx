@@ -32,6 +32,7 @@ import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { addsAgentsTo, can } from "@agenteschat/client/lib/permissions";
 import { planOf } from "@agenteschat/client/lib/plans";
 import { AUTO, modelChoices } from "@agenteschat/client/lib/providers";
+import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { isEveryone, sortRoles } from "@agenteschat/client/lib/roles";
 import {
   askedLine,
@@ -80,7 +81,6 @@ import { AgentAvatar } from "@/components/AgentAvatar";
 import { ModelSelect, modelOptions, NO_OWNER, OwnerSelect } from "@/components/AgentFields";
 import { usePlanHold } from "@/components/ai/ConnectAiSteps";
 import { PlanReplies } from "@/components/ai/PlanReplies";
-import { BillingLinkButton } from "@/components/BillingLinkButton";
 import { useConnectAi } from "@/components/ConnectAi";
 import { useChannelActions } from "@/components/channel-actions";
 import { useOrg } from "@/components/org-context";
@@ -118,8 +118,15 @@ export function AgentSetupIntro({ agent }: { agent: Agent }) {
   const g = agentGrammar(agent.name);
   const role = setupRole(agent.setup);
   const person = me.user.name.split(/\s+/)[0] ?? me.user.name;
-  const asked = role ? null : askedLine(agent.instructions);
-  const roleName = role ? roleWord(t(`newAgent.roles.${role}.name`), i18n.language) : null;
+  // A ready-made role's name, else the role it was given (a template's "Atendimento"); only an agent with neither
+  // says back what it was asked.
+  const own = agent.role.trim();
+  const asked = role || own ? null : askedLine(agent.instructions);
+  const roleName = role
+    ? roleWord(t(`newAgent.roles.${role}.name`), i18n.language)
+    : own
+      ? roleWord(own, i18n.language)
+      : null;
   return (
     <Message
       agent
@@ -177,10 +184,12 @@ export function AgentSetupCard({ agent, place }: { agent: Agent; place: "dm" | "
   const aiState = aiStateOf(status.data, agent.id);
   // On a billing hold nothing thinks, a saved key included: the AI row leads to the plan.
   const held = usePlanHold() !== null;
+  // "Agora não" to apps on the right hand's card is for the team: its agents don't ask again.
+  const appsLater = dir.agents.find(isRightHand)?.setup?.done.includes("apps") ?? false;
   const done = agent.setup
     ? setupDone(agent.setup, {
         ai: !held && (aiState === "ready" || aiState === "waiting"),
-        apps: granted.length > 0,
+        apps: granted.length > 0 || appsLater,
         where: inChannels.length > 0,
       })
     : new Set<AgentSetupStep>();
@@ -259,26 +268,15 @@ export function AgentSetupCard({ agent, place }: { agent: Agent; place: "dm" | "
         const row = rowOf(s);
         const isDone = done.has(s);
         const acts = s !== "ai" || Boolean(connect);
+        // On a hold it waits for the plan, whose one button is the hold's banner.
         if (s === "ai" && held && !isDone) {
           return {
             key: s,
             icon: STEP_ICON[s],
             done: false,
-            title: t("agentSetup.firstRun.ai.plan"),
-            ...(can(org, "manage_billing")
-              ? {
-                  actionNode: (
-                    <BillingLinkButton
-                      orgId={org.id}
-                      from="hold"
-                      size="sm"
-                      variant={s === next ? "primary" : undefined}
-                    >
-                      {t("agentSetup.firstRun.ai.planAction")}
-                    </BillingLinkButton>
-                  ),
-                }
-              : {}),
+            title: row.title,
+            desc: t("agentSetup.firstRun.afterPlan"),
+            dim: true,
           };
         }
         return {
@@ -327,6 +325,8 @@ export interface SetupCardRow {
   skip?: { label: string; onClick: () => void; busy?: boolean };
   /** It waits for something else (the plan): drawn quieter, with no button. */
   dim?: boolean;
+  /** What the row asks for in place (an address to invite), at its full width under its text. */
+  form?: ReactNode;
 }
 
 /**
@@ -396,6 +396,7 @@ export function SetupCardView({
                 {r.saying ? <span className="setup-row__say">{r.saying}</span> : <span>{r.desc}</span>}
               </span>
             )}
+            {!r.done && r.form && <span className="ac-mediarow__body setup-row__form">{r.form}</span>}
             {!r.done && (r.action || r.actionNode || r.skip) && (
               <span className="ac-mediarow__end ac-mediarow__end--wrap setup-row__act">
                 {r.skip && (
@@ -468,8 +469,9 @@ export function useDoneSay<S extends string>(
     seen.current = now;
     if (!before) return;
     const fresh = [...now].find((s) => !before.has(s));
-    if (!fresh) return;
-    setSaid({ step: fresh, text: say.current(fresh) });
+    const text = fresh ? say.current(fresh) : "";
+    if (!fresh || !text) return;
+    setSaid({ step: fresh, text });
     burst(burstRef.current, color, now.size === total);
     clearTimeout(timer.current);
     timer.current = setTimeout(() => setSaid(null), 2600);

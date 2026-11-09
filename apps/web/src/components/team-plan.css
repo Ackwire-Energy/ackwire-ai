@@ -248,19 +248,6 @@ html:not([data-pointer]) .tp-gallery__item:focus-visible {
   gap: 8px;
   margin-top: 8px;
 }
-.tp-example {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin: 12px 0 0;
-}
-.tp-example__message {
-  padding: 12px;
-  border-radius: 12px;
-  background: var(--card-well);
-  box-shadow: var(--card-well-shadow);
-}
-
 /* Under the templates: the other ways in (an import, one agent from scratch). The dialog body's gap is its room above. */
 .tp-gallery__more {
   display: flex;

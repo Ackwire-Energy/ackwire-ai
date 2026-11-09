@@ -294,6 +294,14 @@ function ConnectAiDialog({
     void qc.invalidateQueries({ queryKey: keys.brainMachines(org.id) });
     onConnected();
   };
+  // The right hand among the agents it was opened for (one, or the whole team with no AI yet): the key becomes the
+  // workspace's AI, so its DM answers with it too.
+  const hand = rightHand
+    ? one
+    : named?.flatMap((id) => {
+        const a = dir.agentById.get(id);
+        return a && isRightHand(a) && noAi(a.id) ? [a] : [];
+      })[0];
   const saveKey = () => {
     if (draft.provider === CUSTOM_PROVIDER) return;
     setRefused(null);
@@ -309,8 +317,8 @@ function ConnectAiDialog({
           // The right hand asked for a key ("Usar uma chave de API"): the workspace's AI from now on, and the person's
           // own DM goes back to it.
           let moved = false;
-          if (one && rightHand) {
-            moved = await rightHandOnKey(api, org.id, one, key, models.data?.models ?? []).then(
+          if (hand) {
+            moved = await rightHandOnKey(api, org.id, hand, key, models.data?.models ?? []).then(
               () => true,
               (error) => {
                 toast.show(errorText(t, error), "error");
@@ -318,13 +326,13 @@ function ConnectAiDialog({
               },
             );
             void qc.invalidateQueries({ queryKey: keys.agents(org.id) });
-            void qc.invalidateQueries({ queryKey: keys.agentBrain(org.id, one.id) });
+            void qc.invalidateQueries({ queryKey: keys.agentBrain(org.id, hand.id) });
           }
           setKeyNote(
             key.check === "unchecked"
               ? t("connectAi.key.savedUnchecked", { provider })
-              : moved && one
-                ? thinksWithLine(t, "workspace", one.name, key.label)
+              : moved && hand
+                ? thinksWithLine(t, "workspace", hand.name, key.label)
                 : undefined,
           );
           setKeySaved(true);

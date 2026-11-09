@@ -36,6 +36,7 @@ import {
   GroupHeading,
   Icon,
   InfoHint,
+  PresenceBadge,
   ProviderLogo,
   Switch,
 } from "@agenteschat/ui";
@@ -184,8 +185,9 @@ function AgentHead({ agent }: { agent: Agent }) {
         <StatusLine {...line} className="dm-side__status" />
       ) : (
         word && (
-          <p className="dm-side__status" data-offline={(!busy && shown?.presence === "offline") || undefined}>
-            <span className="dm-side__dot" aria-hidden="true" />
+          <p className="dm-side__status">
+            {/* The presence's own badge, as beside its face everywhere: away wears its clock, offline its outline. */}
+            <PresenceBadge presence={busy ? "online" : (shown?.presence ?? "offline")} ring={false} />
             {word}
           </p>
         )

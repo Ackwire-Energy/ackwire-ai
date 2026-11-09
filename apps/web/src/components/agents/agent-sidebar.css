@@ -83,17 +83,6 @@
   max-width: 100%;
   margin-top: 2px;
 }
-.dm-side__dot {
-  flex: none;
-  width: 8px;
-  height: 8px;
-  background: var(--ok);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ok) 25%, transparent);
-}
-.dm-side__status[data-offline] .dm-side__dot {
-  background: var(--faint);
-  box-shadow: none;
-}
 .dm-side__sec {
   padding: 12px 16px 2px;
   border-top: 1px solid var(--line);
