@@ -1745,9 +1745,12 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
 .ac-eventpill__more[aria-expanded="true"] .ac-eventpill__chev {
   transform: rotate(90deg);
 }
+/* More actions than the width holds wrap onto another line of the frame instead of running out of it. */
 .ac-eventpill__actions {
   display: inline-flex;
-  flex: none;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  max-width: 100%;
   align-items: stretch;
   /* Under the sentence, still the frame's height. */
   min-height: inherit;
