@@ -373,8 +373,11 @@ describe("a message I send keeps its size when the server has it", () => {
       .filter((c) => !c.matches(".ac-msg__actions") && c.childNodes.length > 0)
       .map((c) => c.className),
   });
+  // By the message's own words: a row's hidden head also reads its day ("segunda-feira, 9 de novembro").
   const rowWith = (text: string) =>
-    [...document.querySelectorAll<HTMLElement>("article")].find((a) => a.textContent?.includes(text)) as HTMLElement;
+    [...document.querySelectorAll<HTMLElement>("article")].find((a) =>
+      a.querySelector(".ac-msg__text")?.textContent?.includes(text),
+    ) as HTMLElement;
 
   test("sending and sent: the same row, the same parts, the time in the sending state's box; nothing scrolls", async () => {
     let release = () => {};
