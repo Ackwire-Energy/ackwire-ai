@@ -1208,6 +1208,14 @@ test("the QR way: the phone scans, the computer pairs and connects it, and it ke
   expect(r.manager.list().map((p) => [p.serial, p.transport, p.state])).toEqual([[PIXEL, "wifi", "ready"]]);
   await r.op({ op: "phone.screenshot", platform: "android", serial: PIXEL, holder: r.holder("run-1") });
   expect(r.calls()).toContainEqual(["adb", "-s", WIFI_AT, "exec-out", "screencap", "-p"]);
+  // Its screen live too.
+  const v = viewerSocket();
+  const sam = { runId: null, agentId: null, userId: "user-sam", since: "" };
+  await r.manager.view({ platform: "android", serial: PIXEL, holder: sam }, "control", async () => v.socket);
+  v.viewer().control?.({ type: "key", key: "home" });
+  await until(() => r.calls().some((c) => c[4] === "input keyevent 3"), "the key");
+  v.viewer().closed();
+  expect(r.calls().filter((c) => c[1] === "-s" && c[2] === PIXEL)).toEqual([]);
   expect(JSON.parse(readFileSync(path.join(r.root, "wifi-phones.json"), "utf8"))).toEqual([PIXEL]);
   // Wireless debugging back on after a restart: a new port, the same phone (its row, its rule, its lock).
   r.setState({

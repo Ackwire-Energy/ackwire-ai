@@ -943,7 +943,12 @@ export class PhoneManager {
     const key = `${platform}:${serial}`;
     const phone = await this.reach(key, { locked: true });
     const tools = await this.tools();
-    const driver = screenDriverFor(phone, { adb: tools.adb, xcrun: tools.xcrun, env: this.env }, mode);
+    // adb reaches a phone over Wi-Fi at its address, not its own serial.
+    const driver = screenDriverFor(
+      { ...phone, serial: this.at(phone) },
+      { adb: tools.adb, xcrun: tools.xcrun, env: this.env },
+      mode,
+    );
     if (mode === "control" && driver instanceof SimulatorScreen) throw new RunnerError("unsupported", NO_IOS_CONTROL);
     const stop = new AbortController();
     const control =
@@ -953,7 +958,7 @@ export class PhoneManager {
     try {
       // Someone taking control means to use it: a dark screen lights up (and a lock screen without a PIN lifts).
       if (control && platform === "android" && tools.adb) {
-        await this.shell(tools.adb, serial, WAKE_SHELL, 10_000).catch(() => "");
+        await this.shell(tools.adb, this.at(phone), WAKE_SHELL, 10_000).catch(() => "");
       }
       frame = await driver.frame(stop.signal);
       socket = await dial();
