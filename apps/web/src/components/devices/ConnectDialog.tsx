@@ -133,27 +133,27 @@ function Chooser({ onPick, onClose }: { onPick: (step: ConnectStep) => void; onC
         <section aria-labelledby="dv-ch-computers">
           <GroupHeading level={3} id="dv-ch-computers" title={t("devices.choose.computers")} />
           <div className="dv-options">
-            {/* A phone has no "this computer": the app is for computers. */}
-            <div className="dv-option dv-wide">
-              <ProviderLogo id={platform === "mac" ? "apple" : platform} size="sm" className="dv-tile" />
-              <span className="dv-option__text">
-                <span className="dv-option__title">{t(thisLabel(platform))}</span>
-                <span className="dv-option__line">{t("devices.choose.thisLine")}</span>
-              </span>
-              <span className="dv-option__acts">
-                {inDesktopApp() && agentsHere ? (
+            {/* Inside the desktop app that can host agents, one click; elsewhere this computer's one line, which
+                works on a Mac, a PC or Linux today (the app's own switch is for self-hosted servers). */}
+            {inDesktopApp() && agentsHere ? (
+              <div className="dv-option dv-wide">
+                <ProviderLogo id={platform === "mac" ? "apple" : platform} size="sm" className="dv-tile" />
+                <span className="dv-option__text">
+                  <span className="dv-option__title">{t(thisLabel(platform))}</span>
+                  <span className="dv-option__line">{t("devices.choose.thisLine")}</span>
+                </span>
+                <span className="dv-option__acts">
                   <ThisMacButton orgId={org.id} canPair={can(org, "pair_computers")} />
-                ) : (
-                  <>
-                    {/* A web page can't know whether the app is installed: both, always. */}
-                    <Button asChild size="sm" icon="external">
-                      <a href="agenteschat://desktop/devices">{t("devices.choose.openApp")}</a>
-                    </Button>
-                    <DownloadButtons />
-                  </>
-                )}
-              </span>
-            </div>
+                </span>
+              </div>
+            ) : (
+              option(
+                "link",
+                <ProviderLogo id={platform === "mac" ? "apple" : platform} size="sm" className="dv-tile" />,
+                t(thisLabel(platform)),
+                t("devices.choose.serverLine"),
+              )
+            )}
             {option(
               "server",
               <ProviderLogo id="linux" size="sm" className="dv-tile" />,
