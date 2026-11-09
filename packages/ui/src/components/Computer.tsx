@@ -6,14 +6,17 @@ import {
   COMPUTER_ROWS,
   type ComputerKind,
   type ComputerState,
+  type PhoneKind,
+  type PortraitKind,
 } from "../computer/portrait.js";
 import { cx } from "../cx";
 import { Icon, type IconName } from "../icons/Icon";
 
-export type { ComputerKind, ComputerState };
+export type { ComputerKind, ComputerState, PhoneKind, PortraitKind };
 
 export interface ComputerPortraitProps {
-  kind: ComputerKind;
+  /** A computer, or a phone reached through one. */
+  kind: PortraitKind;
   state: ComputerState;
   /** 48 (list rows, default), 96 (the computer page) or 144 (empty states): whole-number scales of the grid. */
   size?: 48 | 96 | 144;

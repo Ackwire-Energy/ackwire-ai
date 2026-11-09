@@ -1326,6 +1326,27 @@ export async function notifyMachineConnected(
   });
 }
 
+/** A computer ran a connect link and asks to join: the link's maker decides, in the app (`device-links.ts`). */
+export async function notifyDeviceJoinRequest(
+  deps: NotificationDeps,
+  request: { id: string; name: string },
+  to: { orgId: string; orgName: string; makerId: string; facts: string },
+) {
+  await notify(deps, {
+    orgId: to.orgId,
+    userIds: [to.makerId],
+    kind: "device.join_request",
+    groupKey: `device.join_request:${request.id}`,
+    waiting: true,
+    source: { requestId: request.id, label: request.name },
+    // The workspace's name: the push says "build-box wants to join Acme".
+    latest: { title: to.orgName, ...(to.facts ? { text: notificationSnippet(to.facts) } : {}) },
+  });
+}
+
+export const resolveDeviceJoinRequest = (deps: NotificationDeps, orgId: string, requestId: string) =>
+  resolveNotifications(deps, orgId, { groupKey: `device.join_request:${requestId}` });
+
 /** The share of a computer's workspace disk in use past which its admins hear it (ADR 0115). */
 export const DISK_WARN_USE = 0.85;
 /** Under this share the warning is armed again, so a disk hovering at the line doesn't notify on every report. */

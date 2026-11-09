@@ -70,7 +70,12 @@ import type {
   CommandApproval,
   ComposioUsage,
   ComputerQueue,
+  ComputerDevice,
   ComputerSetup,
+  ConnectLink,
+  ConnectLinkState,
+  DevicesList,
+  PhoneDevice,
   ComputerTarget,
   Connection,
   ConnectOutcome,
@@ -1141,6 +1146,28 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
           method: "PUT",
           json: { machineId },
         }),
+    },
+    devices: {
+      list: (orgId) => request<DevicesList>(`${org(orgId)}/devices`),
+      updateComputer: (orgId, machineId, input) =>
+        request<ComputerDevice>(`${org(orgId)}/devices/computers/${enc(machineId)}`, { method: "PATCH", json: input }),
+      removeComputer: (orgId, machineId) =>
+        request<void>(`${org(orgId)}/devices/computers/${enc(machineId)}`, { method: "DELETE" }),
+      updatePhone: (orgId, phoneId, input) =>
+        request<PhoneDevice>(`${org(orgId)}/devices/phones/${enc(phoneId)}`, { method: "PATCH", json: input }),
+      forgetPhone: (orgId, phoneId) => request<void>(`${org(orgId)}/devices/phones/${enc(phoneId)}`, { method: "DELETE" }),
+      stopPhone: (orgId, phoneId) =>
+        request<void>(`${org(orgId)}/devices/phones/${enc(phoneId)}/stop`, { json: {} }),
+      createLink: (orgId, kind) => request<ConnectLink>(`${org(orgId)}/devices/connect-links`, { json: { kind } }),
+      link: (orgId, linkId) => request<ConnectLinkState>(`${org(orgId)}/devices/connect-links/${enc(linkId)}`),
+      approveRequest: (orgId, requestId, input) =>
+        request<{ machineId: string }>(`${org(orgId)}/devices/requests/${enc(requestId)}/approve`, { json: input }),
+      denyRequest: (orgId, requestId) =>
+        request<void>(`${org(orgId)}/devices/requests/${enc(requestId)}/deny`, { json: {} }),
+      decideAccess: (orgId, requestId, decision) =>
+        request<void>(`${org(orgId)}/devices/access-requests/${enc(requestId)}/decide`, { json: { decision } }),
+      deviceWait: (orgId, runId, action) =>
+        request<void>(`${org(orgId)}/runs/${enc(runId)}/device-wait`, { json: { action } }),
     },
     machines: {
       list: async (orgId) => (await request<{ machines: Machine[] }>(`${org(orgId)}/machines`)).machines,

@@ -61,6 +61,8 @@ export const strings: Partial<PushStrings> = {
   joinRequestTitle: (name, org) => `${name} minta bergabung ke ${org}`,
   joinSuggestionTitle: (by, name, org) => `${by} menyarankan ${name} untuk ${org}`,
   joinRequestBody: "Ketuk untuk menyetujui atau menolak.",
+  deviceJoinRequestTitle: (computer, org) => `${computer} ingin bergabung ke ${org}`,
+  deviceJoinRequestBody: "Ketuk untuk mengizinkan bergabung atau menolak.",
   waitingTitle: "Ada yang menunggumu",
   openBody: "Ketuk untuk membuka.",
   sentGif: "Mengirim GIF",
@@ -75,6 +77,14 @@ export const strings: Partial<PushStrings> = {
   usageRaisedTitle: (a) => `${a} menaikkan batasmu bulan ini`,
   usageRaisedBody: "Kamu bisa lanjut.",
   usageRefusedTitle: (a) => `${a} menolak permintaan tambahan pemakaianmu`,
+  deviceInUseTitle: (a, p, d) =>
+    p ? `${a} (untuk ${p}) sedang memakai ${d} milikmu` : `${a} sedang memakai ${d} milikmu`,
+  deviceInUseBody: "Ketuk untuk menghentikannya.",
+  deviceAccessTitle: (a, p, d) =>
+    p ? `${a} (untuk ${p}) minta izin memakai ${d} milikmu` : `${a} minta izin memakai ${d} milikmu`,
+  deviceAccessBody: "Ketuk untuk mengizinkan sekali, selalu, atau menolak.",
+  deviceWaitingTitle: (p, d) => `Agen ${p} sedang menunggu ${d} milikmu`,
+  deviceWaitingBody: "Mulai begitu perangkatnya kembali.",
   teamWeekReady: "Ringkasan minggu timmu sudah siap",
   teamDayReady: "Ringkasan harimu sudah siap",
 };

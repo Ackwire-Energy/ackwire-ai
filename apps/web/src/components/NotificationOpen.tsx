@@ -14,6 +14,7 @@ import { requestBrowserCard } from "@/components/browser/open";
 import { useConnectAi } from "@/components/ConnectAi";
 import { useOpenComputer } from "@/components/computer/open";
 import { OpenDetailsContext } from "@/components/details-link";
+import { deviceTarget } from "@/components/devices/DeviceNotice";
 import { LoadingPage } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { fallbackTarget, type PushOpenData, setPushOpenHandler } from "@/lib/push-open";
@@ -38,6 +39,14 @@ export const targetOptions = (orgId: string, target: OpenTarget, replace = false
 export function goToTarget(navigate: Navigate, orgId: string, target: OpenTarget, replace = false) {
   void navigate(targetOptions(orgId, target, replace));
 }
+
+/** A device's page (`phones/<id>` or a computer's id), or the Devices list for "". */
+const deviceOptions = (orgId: string, path: string, replace = false) =>
+  (path.startsWith("phones/")
+    ? { to: "/org/$orgId/settings/devices/phones/$phoneId", params: { orgId, phoneId: path.slice(7) }, replace }
+    : path
+      ? { to: "/org/$orgId/settings/devices/$deviceId", params: { orgId, deviceId: path }, replace }
+      : { to: "/org/$orgId/settings/$section", params: { orgId, section: "devices" }, search: {}, replace }) as never;
 
 /** The inbox itself, with nothing to open. */
 function goToInbox(navigate: Navigate, orgId: string, replace: boolean) {
@@ -81,6 +90,12 @@ export function useNotificationOpener() {
         openDetails({ kind: "usage_queue", id: agent.id, tab: "skipped" });
         return "dialog";
       }
+      // A device's notice: its page (a phone's, a computer's), or the list where a computer asks to join.
+      const device = deviceTarget(n);
+      if (device !== null) {
+        void navigate(deviceOptions(orgId, device, options.replace ?? false));
+        return "page";
+      }
       const found = openTarget(n);
       if (!found) return null;
       // A widget of My Home opens on Home (ADR 0135), when this tab knows which board that is.
@@ -108,6 +123,8 @@ export function useNotificationHref() {
   const router = useRouter();
   return useCallback(
     (n: AppNotification, orgId: string): string => {
+      const device = deviceTarget(n);
+      if (device !== null) return router.buildLocation(deviceOptions(orgId, device)).href;
       const target = opensOnComputer(n) || n.kind === "computer_ready" ? null : openTarget(n);
       const options = target
         ? targetOptions(orgId, target)

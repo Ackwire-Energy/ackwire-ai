@@ -97,6 +97,8 @@ test("the OpenAPI document lists the app API", async () => {
     "/app/me",
     "/app/organizations/{orgId}/agents",
     "/app/organizations/{orgId}/channels/{channelId}/messages",
+    "/app/organizations/{orgId}/devices",
+    "/app/organizations/{orgId}/devices/requests/{requestId}/approve",
   ]) {
     expect(Object.keys(doc.paths)).toContain(path);
   }

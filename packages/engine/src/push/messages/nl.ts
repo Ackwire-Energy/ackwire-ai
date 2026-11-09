@@ -61,6 +61,8 @@ export const strings: Partial<PushStrings> = {
   joinRequestTitle: (name, org) => `${name} wil lid worden van ${org}`,
   joinSuggestionTitle: (by, name, org) => `${by} heeft ${name} voorgesteld voor ${org}`,
   joinRequestBody: "Tik om goed te keuren of te weigeren.",
+  deviceJoinRequestTitle: (computer, org) => `${computer} wil lid worden van ${org}`,
+  deviceJoinRequestBody: "Tik om toe te laten of te weigeren.",
   waitingTitle: "Er wacht iets op je",
   openBody: "Tik om te openen.",
   sentGif: "Heeft een GIF gestuurd",
@@ -75,6 +77,13 @@ export const strings: Partial<PushStrings> = {
   usageRaisedTitle: (a) => `${a} heeft je limiet voor deze maand verhoogd`,
   usageRaisedBody: "Je kunt verder.",
   usageRefusedTitle: (a) => `${a} heeft je verzoek om meer gebruik geweigerd`,
+  deviceInUseTitle: (a, p, d) => (p ? `${a} (voor ${p}) gebruikt je ${d}` : `${a} gebruikt je ${d}`),
+  deviceInUseBody: "Tik om het te stoppen.",
+  deviceAccessTitle: (a, p, d) =>
+    p ? `${a} (voor ${p}) vraagt om je ${d} te gebruiken` : `${a} vraagt om je ${d} te gebruiken`,
+  deviceAccessBody: "Tik om één keer of altijd toe te staan, of om nee te zeggen.",
+  deviceWaitingTitle: (p, d) => `De agent van ${p} wacht op je ${d}`,
+  deviceWaitingBody: "Hij begint zodra die terug is.",
   teamWeekReady: "De week van je team staat klaar",
   teamDayReady: "Je dagoverzicht staat klaar",
 };

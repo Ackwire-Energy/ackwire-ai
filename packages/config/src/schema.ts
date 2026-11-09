@@ -968,7 +968,7 @@ export const envVars = {
   MACHINE_PROVISIONING: {
     schema: z.enum(["off", "external"]).default("off"),
     description:
-      "Where workspaces get their computer. `off` (default): people connect their own computers. `external`: from a provisioner you run (ADR 0056 §10): every workspace without a ready computer is a request it reads on the operator API, its people see the computer being prepared, and it hands the computer a single-use code to connect with. People can't connect computers of their own then (pairing answers 403 `machine.pairing_off`). Needs `OPERATOR_API_TOKEN`; can't be set with `HOST_COMPUTER_TOKEN`.",
+      "Where workspaces get their computer. `off` (default): people connect their own computers. `external`: from a provisioner you run (ADR 0056 §10): every workspace without a ready computer is a request it reads on the operator API, its people see the computer being prepared, and it hands the computer a single-use code to connect with. People may still connect computers of their own under Settings › Devices: agents use them when they name them, but always live on the workspace's computer. Needs `OPERATOR_API_TOKEN`; can't be set with `HOST_COMPUTER_TOKEN`.",
     section: "Operator",
   },
   TELEMETRY: {

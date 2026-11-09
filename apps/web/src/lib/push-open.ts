@@ -122,6 +122,7 @@ export function fallbackTarget(data: PushOpenData): OpenTarget | null {
   // (`openTarget`); a push names no person to talk to, so without it, Members, where they now are.
   if (kind === "join_request" || kind === "invitation_accepted")
     return { to: "/org/$orgId/settings/$section", params: { section: "members" } };
+  // Settings › Computers is Devices now: its old address redirects there.
   if (kind === "machine_connected" || kind === "computer_ready")
     return { to: "/org/$orgId/settings/$section", params: { section: "computers" } };
   if (kind && ROUTINE_TROUBLE.has(kind as NotificationKind)) return { to: "/org/$orgId/routines" };

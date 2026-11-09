@@ -740,7 +740,7 @@ describe("machines and targets", () => {
     await expect(deleteMachine(deps(), f.owner.id, f.org.id, mine.machineId)).rejects.toThrow(NotFoundError);
   });
 
-  test("whoever leaves or is removed takes the computers they connected; a system-mode one stays, and their AI accounts leave it", async () => {
+  test("whoever leaves or is removed takes the computers they connected, a server too; one marked the workspace's stays, nobody's now, and their AI accounts leave it", async () => {
     f = await setup();
     const bia = await addMember(f.db, f.org.id, "admin", "bia");
     const cy = await addMember(f.db, f.org.id, "member", "cy");
@@ -748,9 +748,14 @@ describe("machines and targets", () => {
     const server = (await pair(bia.id, "Team server")).machineId;
     await f.db
       .update(schema.machines)
-      .set({ executors: { mode: "system" } })
+      .set({ executors: { mode: "system" }, belongsToWorkspace: true })
       .where(eq(schema.machines.id, server));
     const cyLaptop = (await pair(cy.id, "Cy's laptop")).machineId;
+    const cyServer = (await pair(cy.id, "Cy's server")).machineId;
+    await f.db
+      .update(schema.machines)
+      .set({ executors: { mode: "system" } })
+      .where(eq(schema.machines.id, cyServer));
     await f.db.insert(schema.machineAccounts).values({
       id: crypto.randomUUID(),
       orgId: f.org.id,
@@ -767,10 +772,11 @@ describe("machines and targets", () => {
     await removeMember(f.db, bia.id, f.org.id, bia.id, { pubsub: f.pubsub });
     await removeMember(f.db, f.owner.id, f.org.id, cy.id, { pubsub: f.pubsub });
     const rows = await f.db.select().from(schema.machines).orderBy(schema.machines.createdAt);
-    expect(rows.map((m) => [m.name, m.deletedAt !== null])).toEqual([
-      ["Bia's laptop", true],
-      ["Team server", false],
-      ["Cy's laptop", true],
+    expect(rows.map((m) => [m.name, m.deletedAt !== null, m.pairedByUserId])).toEqual([
+      ["Bia's laptop", true, bia.id],
+      ["Team server", false, null],
+      ["Cy's laptop", true, cy.id],
+      ["Cy's server", true, cy.id],
     ]);
     expect(signals).toEqual(
       expect.arrayContaining([
@@ -786,6 +792,7 @@ describe("machines and targets", () => {
     expect(audit.map((a) => [a.targetId, a.actorId])).toEqual([
       [laptop, bia.id],
       [cyLaptop, f.owner.id],
+      [cyServer, f.owner.id],
     ]);
     const accounts = await f.db.select().from(schema.machineAccounts);
     expect(accounts).toMatchObject([{ machineId: server, status: "removing" }]);

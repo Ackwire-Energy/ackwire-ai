@@ -331,8 +331,9 @@ test("what it and the agents advise about computers follows where the server get
     [f.agent, agentRun],
   ] as const) {
     const cloud = await text(agent, run, { billing: true });
+    expect(cloud).toContain("The workspace computer is the agents' computer, always on and self-updating.");
     expect(cloud).toContain(
-      "No other can join it, nobody SSHes in: never suggest renting or connecting one, nor installing the runner.",
+      "People may connect their own devices (computers, phones) under Settings › Devices; suggest it when a task needs a phone, a Mac or more power.",
     );
     expect(cloud).toContain("a bigger plan may bring a bigger one (Settings › Plan and billing)");
     expect(cloud).toContain("another workspace, on its own plan, has its own");

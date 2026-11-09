@@ -154,6 +154,8 @@ const READS = new Set([
   "web_search",
   "web_fetch",
   "list_dashboards",
+  "phone_screenshot",
+  "phone_logs",
 ]);
 
 /**
@@ -216,7 +218,12 @@ export function toolKind(tool: PolicyTool): ToolKind {
   if (tool.name === "hand_off") return { kind: "hand_off" };
   if (tool.name === "update_widget" && tool.scope === "") return { kind: "widget" };
   if (tool.name === "pass") return { kind: "pass" };
-  if (tool.name === "set_status" || tool.name === "withdraw_request" || tool.name === "set_reply_style")
+  if (
+    tool.name === "set_status" ||
+    tool.name === "withdraw_request" ||
+    tool.name === "set_reply_style" ||
+    tool.name === "wait_for_device"
+  )
     return { kind: "self" };
   // Long work (ADR 0121): the run's own work only; who may go to the background is the tool source's.
   if (!tool.scope && SELF_WORK.has(tool.name)) return { kind: "self" };

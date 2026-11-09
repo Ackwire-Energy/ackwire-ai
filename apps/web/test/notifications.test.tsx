@@ -506,7 +506,7 @@ describe("a new computer connected (ADR 0036, admins)", () => {
     expect(row.textContent).toContain("Computador");
     await click(within(row).getByRole("button", { name: "Abrir" }));
     await settle(4);
-    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/computers/m-9`);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/devices/m-9`);
   });
 });
 
@@ -726,7 +726,7 @@ describe("its computer is ready: what comes next", () => {
     const other = await go(seedState({ notifications: [ready] }));
     await click(within(row()).getByRole("button", { name: "Abrir" }));
     await settle(4);
-    expect(other.router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/computers/m-9`);
+    expect(other.router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/devices/m-9`);
   });
 
   test("a plain click opens Connect an AI while no agent has one; then the computer's page, and on a phone it picks the row first", async () => {
@@ -752,7 +752,7 @@ describe("its computer is ready: what comes next", () => {
     const wide = await go(seedState({ notifications: [ready()] }));
     await click(row());
     await settle(4);
-    expect(wide.router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/computers/m-9`);
+    expect(wide.router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/devices/m-9`);
     cleanup();
 
     // On a phone the first tap picks the row as any row's does, so Feito and Lembrar depois (shown by that tap) stay
@@ -774,7 +774,7 @@ describe("its computer is ready: what comes next", () => {
       for (const name of ["Feito", "Lembrar depois"]) expect(within(row()).getByRole("button", { name })).toBeTruthy();
       await click(within(row()).getByRole("button", { name: "Abrir" }));
       await settle(4);
-      expect(other.router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/computers/m-9`);
+      expect(other.router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/devices/m-9`);
     } finally {
       window.matchMedia = matchMedia;
     }

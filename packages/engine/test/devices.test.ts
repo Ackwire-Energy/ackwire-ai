@@ -1,0 +1,359 @@
+import { afterEach, expect, test } from "bun:test";
+import { orgTopic, PHONES_PROTOCOL, type RunnerPhone } from "@agenteschat/adapters";
+import { eq, schema } from "@agenteschat/db";
+import {
+  ForbiddenError,
+  forgetPhone,
+  isNewWork,
+  issueManagedMachine,
+  listDevices,
+  type MachineHub,
+  type MachinePhoneRow,
+  MachineRequestError,
+  phoneStoppedBy,
+  removeMember,
+  requestTimeoutMs,
+  setAgentComputerTarget,
+  setWorkspaceComputers,
+  stopPhone,
+  syncMachinePhones,
+  updateComputerDevice,
+  updatePhoneDevice,
+  ValidationError,
+} from "../src";
+import { addMember, type Fixture, setup } from "./fixtures";
+import { fakeRunner, pairMachine, RUNNER } from "./machine-fixtures";
+
+let f: Fixture;
+afterEach(async () => {
+  setWorkspaceComputers(false);
+  await f?.machineHub?.stop();
+  const current = f;
+  f = undefined as unknown as Fixture;
+  await current?.close();
+});
+
+const deps = () => ({ db: f.db, pubsub: f.pubsub });
+const pair = async (userId: string, name: string) =>
+  (await pairMachine(deps(), userId, f.org.id, { name, ...RUNNER })).machineId;
+const machineRow = async (id: string) =>
+  (
+    await f.db.select().from(schema.machines).where(eq(schema.machines.id, id))
+  )[0] as typeof schema.machines.$inferSelect;
+const online = (id: string) =>
+  f.db.update(schema.machines).set({ online: true, lastSeenAt: new Date() }).where(eq(schema.machines.id, id));
+const sync = async (machineId: string, phones: RunnerPhone[]) =>
+  syncMachinePhones(f.db, await machineRow(machineId), phones);
+const phoneRows = () => f.db.select().from(schema.machinePhones).orderBy(schema.machinePhones.createdAt);
+
+const pixel: RunnerPhone = {
+  platform: "android",
+  serial: "33141FDH2000AB",
+  kind: "device",
+  model: "Pixel 8",
+  osVersion: "16",
+  state: "ready",
+  transport: "usb",
+};
+const iphone: RunnerPhone = {
+  platform: "ios",
+  serial: "00008130-001A2B3C4D5E",
+  kind: "device",
+  model: "iPhone 16",
+  name: "Sam's iPhone",
+  osVersion: "26.1",
+  state: "needs_you",
+  reason: "developer_mode_off",
+};
+const emulator: RunnerPhone = {
+  ...pixel,
+  serial: "emulator-5554",
+  kind: "emulator",
+  model: "sdk_gphone64",
+  transport: "local",
+};
+
+test("the list: the workspace's computer first, each computer's status, its phones, and who may use or change them", async () => {
+  f = await setup();
+  const rui = await addMember(f.db, f.org.id, "member", "rui");
+  const mac = await pair(f.owner.id, "MacBook");
+  await pair(f.owner.id, "Build PC");
+  const lab = await pair(f.owner.id, "Lab box");
+  const managed = await issueManagedMachine({ db: f.db }, f.org.id, { name: "Acme computer" });
+  await online(mac);
+  await online(lab);
+  await f.db
+    .update(schema.machines)
+    .set({ paused: true, size: { cpus: 8, memoryGb: 16, diskGb: 512 } })
+    .where(eq(schema.machines.id, lab));
+  await f.db.insert(schema.machineTasks).values({
+    orgId: f.org.id,
+    agentId: f.agent.id,
+    machineId: mac,
+    channelId: f.general.id,
+    title: "Gradle build",
+    executor: "shell",
+    status: "running",
+  });
+  const since = new Date().toISOString();
+  await sync(mac, [
+    { ...pixel, holder: { runId: null, agentId: f.agent.id, userId: rui.id, label: "Recording a test video", since } },
+    iphone,
+  ]);
+
+  const seen = await listDevices(f.db, f.org.id, rui.id);
+  expect(seen.devices.map((d) => [d.name, d.machineKind, d.status.kind])).toEqual([
+    ["Acme computer", "managed", "offline"],
+    ["MacBook", "connected", "busy"],
+    ["Build PC", "connected", "offline"],
+    ["Lab box", "connected", "paused"],
+  ]);
+  const [workspace, macbook, , labBox] = seen.devices;
+  expect(workspace).toMatchObject({ id: managed?.machineId, hostname: "", mayUse: true, mayManage: false });
+  expect(macbook).toMatchObject({
+    status: { kind: "busy", running: 1, max: 3 },
+    ownerUserId: f.owner.id,
+    audience: { mode: "owner", userIds: [], roleIds: [] },
+    mayUse: false,
+    mayManage: false,
+  });
+  expect(labBox).toMatchObject({ cpus: 8, memoryGb: 16, status: { kind: "paused", until: null } });
+  expect(macbook?.phones).toMatchObject([
+    {
+      name: "Pixel 8",
+      platform: "android",
+      transport: "usb",
+      audience: { mode: "owner" },
+      status: { kind: "in_use", agentName: "Dev", userId: rui.id, userName: "rui", label: "Recording a test video" },
+    },
+    { name: "Sam's iPhone", audience: null, status: { kind: "needs_you", reason: "developer_mode_off" } },
+  ]);
+  const mine = (await listDevices(f.db, f.org.id, f.owner.id)).devices[1];
+  expect(mine).toMatchObject({ mayUse: true, mayManage: true });
+  expect(mine?.phones.every((p) => p.mayUse && p.mayManage)).toBe(true);
+
+  // Its computer gone quiet: its phones read offline with it.
+  await f.db.update(schema.machines).set({ online: false }).where(eq(schema.machines.id, mac));
+  const away = (await listDevices(f.db, f.org.id, rui.id)).devices[1]?.phones[0];
+  expect(away?.status).toMatchObject({ kind: "offline", withHost: true });
+});
+
+test("phones sync: a phone keeps its name and rule moving between its owner's computers, starts over on someone else's or once forgotten", async () => {
+  f = await setup();
+  const rui = await addMember(f.db, f.org.id, "member", "rui");
+  const mac = await pair(f.owner.id, "MacBook");
+  const mini = await pair(f.owner.id, "Mac mini");
+  const ruiPc = await pair(rui.id, "Rui's PC");
+
+  const first = await sync(mac, [pixel, emulator]);
+  expect(first.map((p) => [p.name, p.ownerUserId, p.followsHost])).toEqual([
+    ["Pixel 8", f.owner.id, false],
+    ["sdk_gphone64", f.owner.id, false],
+  ]);
+  const phoneId = first[0]?.id as string;
+  await updatePhoneDevice(deps(), f.owner.id, f.org.id, phoneId, {
+    name: "Test Pixel",
+    audience: { mode: "everyone", userIds: [], roleIds: [] },
+  });
+
+  // Plugged into the owner's other computer: same row, name and rule.
+  const moved = await sync(mini, [pixel]);
+  expect(moved).toMatchObject([{ id: phoneId, name: "Test Pixel", audienceMode: "everyone", machineId: mini }]);
+  // The first computer no longer sees its emulator; the phone that moved isn't its to mark.
+  const left = await sync(mac, []);
+  expect(left.map((p) => [p.name, p.state])).toEqual([["sdk_gphone64", "offline"]]);
+
+  // Another person's computer reports it: a new phone of theirs, Only them.
+  const taken = await sync(ruiPc, [pixel, emulator]);
+  expect(taken.find((p) => p.id === phoneId)).toMatchObject({
+    name: "Pixel 8",
+    ownerUserId: rui.id,
+    audienceMode: "owner",
+  });
+  // An emulator's serial is its own computer's: two emulator-5554 are two phones.
+  expect((await phoneRows()).filter((p) => p.kind === "emulator").map((p) => p.machineId)).toEqual([mac, ruiPc]);
+
+  await updatePhoneDevice(deps(), rui.id, f.org.id, phoneId, { name: "Rui's Pixel" });
+  await forgetPhone(deps(), rui.id, f.org.id, phoneId);
+  expect((await listDevices(f.db, f.org.id, rui.id)).devices.find((d) => d.id === ruiPc)?.phones).toHaveLength(1);
+  const back = await sync(ruiPc, [pixel, emulator]);
+  expect(back.find((p) => p.id === phoneId)).toMatchObject({ name: "Pixel 8", deletedAt: null });
+});
+
+test("who can use it: the owner sets it; an admin renames, marks it the workspace's and only narrows someone's own device", async () => {
+  f = await setup();
+  const sam = await addMember(f.db, f.org.id, "admin", "sam");
+  const rui = await addMember(f.db, f.org.id, "member", "rui");
+  const laptop = await pair(rui.id, "Rui's laptop");
+  const everyone = { mode: "everyone" as const, userIds: [], roleIds: [] };
+  const onlySam = { mode: "people" as const, userIds: [sam.id], roleIds: [] };
+
+  await expect(updateComputerDevice(deps(), sam.id, f.org.id, laptop, { audience: everyone })).rejects.toMatchObject({
+    code: "device.widen_forbidden",
+  });
+  const other = await addMember(f.db, f.org.id, "member", "lia");
+  await expect(updateComputerDevice(deps(), other.id, f.org.id, laptop, { name: "Mine" })).rejects.toThrow(
+    ForbiddenError,
+  );
+
+  expect(await updateComputerDevice(deps(), rui.id, f.org.id, laptop, { audience: everyone })).toMatchObject({
+    audience: everyone,
+  });
+  expect(
+    await updateComputerDevice(deps(), sam.id, f.org.id, laptop, { name: "Build laptop", audience: onlySam }),
+  ).toMatchObject({
+    name: "Build laptop",
+    audience: onlySam,
+  });
+  await expect(updateComputerDevice(deps(), sam.id, f.org.id, laptop, { audience: everyone })).rejects.toMatchObject({
+    code: "device.widen_forbidden",
+  });
+  // Marked the workspace's, it is the admins' to open up.
+  await updateComputerDevice(deps(), sam.id, f.org.id, laptop, { belongsToWorkspace: true });
+  expect(await updateComputerDevice(deps(), sam.id, f.org.id, laptop, { audience: everyone })).toMatchObject({
+    belongsToWorkspace: true,
+    audience: everyone,
+  });
+  await expect(
+    updateComputerDevice(deps(), rui.id, f.org.id, laptop, {
+      audience: { mode: "people", userIds: [], roleIds: [crypto.randomUUID()] },
+    }),
+  ).rejects.toThrow(ValidationError);
+  // People with nobody left is Only the owner.
+  expect(
+    await updateComputerDevice(deps(), rui.id, f.org.id, laptop, {
+      audience: { mode: "people", userIds: ["user_gone"], roleIds: [] },
+    }),
+  ).toMatchObject({ audience: { mode: "owner" } });
+
+  const [phone] = await sync(laptop, [iphone]);
+  await expect(
+    updatePhoneDevice(deps(), rui.id, f.org.id, phone?.id as string, { audience: everyone }),
+  ).rejects.toMatchObject({ code: "device.follows_host" });
+  const managed = await issueManagedMachine({ db: f.db }, f.org.id);
+  await expect(
+    updateComputerDevice(deps(), f.owner.id, f.org.id, managed?.machineId as string, { name: "x" }),
+  ).rejects.toMatchObject({ code: "machine.managed" });
+});
+
+test("where workspaces have their own computer, a brought one is a target, never an agent's home", async () => {
+  f = await setup();
+  setWorkspaceComputers(true);
+  const brought = await pair(f.owner.id, "MacBook");
+  await expect(setAgentComputerTarget(deps(), f.owner.id, f.org.id, f.agent.id, brought)).rejects.toMatchObject({
+    code: "device.not_home",
+  });
+  const managed = await issueManagedMachine({ db: f.db }, f.org.id);
+  expect(
+    await setAgentComputerTarget(deps(), f.owner.id, f.org.id, f.agent.id, managed?.machineId ?? null),
+  ).toMatchObject({
+    kind: "machine",
+  });
+  setWorkspaceComputers(false);
+  expect(await setAgentComputerTarget(deps(), f.owner.id, f.org.id, f.agent.id, brought)).toMatchObject({
+    machineId: brought,
+  });
+});
+
+test("someone leaving: their own devices go with them; one marked the workspace's stays, nobody's, its phones too", async () => {
+  f = await setup();
+  const rui = await addMember(f.db, f.org.id, "member", "rui");
+  const lia = await addMember(f.db, f.org.id, "member", "lia");
+  const mac = await pair(rui.id, "Rui's Mac");
+  const lab = await pair(rui.id, "Lab box");
+  await f.db.update(schema.machines).set({ belongsToWorkspace: true }).where(eq(schema.machines.id, lab));
+  await sync(mac, [pixel]);
+  await sync(lab, [{ ...pixel, serial: "R58N12ABCDE", model: "Galaxy S24" }]);
+
+  await removeMember(f.db, rui.id, f.org.id, rui.id, { pubsub: f.pubsub });
+  const phones = await phoneRows();
+  expect(phones.map((p) => [p.name, p.machineId, p.ownerUserId, p.deletedAt !== null])).toEqual([
+    ["Pixel 8", null, rui.id, true],
+    ["Galaxy S24", lab, null, false],
+  ]);
+  const seen = await listDevices(f.db, f.org.id, lia.id);
+  expect(seen.devices.map((d) => [d.name, d.ownerUserId, d.mayUse])).toEqual([["Lab box", null, true]]);
+  expect(seen.devices[0]?.phones.map((p) => p.mayUse)).toEqual([true]);
+});
+
+test("the computer's socket: phones and toolchains in hello, phones.changed, the hook, and no phone op for an older runner", async () => {
+  f = await setup({ machines: true });
+  const hub = f.machineHub as MachineHub;
+  const paired = await pairMachine(deps(), f.owner.id, f.org.id, { name: "MacBook", ...RUNNER });
+  const reported: MachinePhoneRow[][] = [];
+  hub.setMissionHooks({
+    phonesChanged: async (_machine, phones) => {
+      reported.push(phones);
+    },
+  });
+  const events: unknown[] = [];
+  f.pubsub.subscribe(orgTopic(f.org.id), (e) => events.push(e));
+  const runner = fakeRunner(hub);
+  await runner.hello(paired.token, { phones: [pixel], toolchains: { adb: "35.0.2", maestro: "1.40.0" } });
+  await new Promise((r) => setTimeout(r, 5));
+  expect((await machineRow(paired.machineId)).executors.toolchains).toEqual({ adb: "35.0.2", maestro: "1.40.0" });
+  expect(reported.at(-1)?.map((p) => [p.name, p.state])).toEqual([["Pixel 8", "ready"]]);
+
+  await runner.frame({ type: "phones.changed", phones: [] });
+  await new Promise((r) => setTimeout(r, 5));
+  expect(reported.at(-1)?.map((p) => p.state)).toEqual(["offline"]);
+  expect(events).toContainEqual(expect.objectContaining({ event: { type: "devices.changed", orgId: f.org.id } }));
+  // A hello that leaves the toolchains out keeps the last ones.
+  runner.disconnect();
+  const again = fakeRunner(hub);
+  await again.hello(paired.token);
+  expect((await machineRow(paired.machineId)).executors.toolchains).toEqual({ adb: "35.0.2", maestro: "1.40.0" });
+  again.disconnect();
+
+  const old = fakeRunner(hub);
+  await old.hello(paired.token, { protocol: PHONES_PROTOCOL - 1 });
+  const holder = { runId: null, agentId: null, userId: f.owner.id, since: new Date().toISOString() };
+  const refused = hub.call(paired.machineId, { op: "phone.screenshot", platform: "android", serial: "x", holder });
+  await expect(refused).rejects.toBeInstanceOf(MachineRequestError);
+  await expect(refused).rejects.toMatchObject({ code: "unsupported" });
+  old.disconnect();
+
+  const target = { platform: "android" as const, serial: "x", holder };
+  expect(requestTimeoutMs({ op: "phone.flow", ...target, flow: "", timeoutSeconds: 3600 })).toBe(720_000);
+  expect(requestTimeoutMs({ op: "phone.install", ...target, path: "app.apk" })).toBe(300_000);
+  expect(requestTimeoutMs({ op: "phone.logs", ...target, lines: 100 })).toBe(60_000);
+  expect(isNewWork({ op: "phone.release", ...target })).toBe(false);
+  expect(isNewWork({ op: "phone.record", ...target, seconds: 30 })).toBe(true);
+});
+
+test("Stop: the phone's lock is let go for anyone, and the run that held it learns who stopped it", async () => {
+  f = await setup();
+  const rui = await addMember(f.db, f.org.id, "member", "rui");
+  const lia = await addMember(f.db, f.org.id, "member", "lia");
+  const mac = await pair(f.owner.id, "MacBook");
+  await online(mac);
+  const runId = crypto.randomUUID();
+  const holder = {
+    runId,
+    agentId: f.agent.id,
+    userId: rui.id,
+    label: "Testing checkout",
+    since: new Date().toISOString(),
+  };
+  const [phone] = await sync(mac, [{ ...emulator, holder }]);
+  const calls: unknown[] = [];
+  const hub = {
+    call: async (machineId: string, request: unknown) => {
+      calls.push({ machineId, request });
+      return { released: true };
+    },
+  } as unknown as Parameters<typeof stopPhone>[0]["hub"];
+
+  await expect(stopPhone({ ...deps(), hub }, lia.id, f.org.id, phone?.id as string)).rejects.toThrow(ForbiddenError);
+  // The person the agent works for may stop it, like its owner and admins.
+  await stopPhone({ ...deps(), hub }, rui.id, f.org.id, phone?.id as string);
+  expect(calls).toEqual([
+    {
+      machineId: mac,
+      request: { op: "phone.release", platform: "android", serial: "emulator-5554", holder, force: true },
+    },
+  ]);
+  expect((await phoneRows())[0]?.holder).toBeNull();
+  expect(await phoneStoppedBy(f.db, f.org.id, phone?.id as string, runId)).toEqual({ userId: rui.id, name: "rui" });
+  expect(await phoneStoppedBy(f.db, f.org.id, phone?.id as string, crypto.randomUUID())).toBeNull();
+});

@@ -1,0 +1,1024 @@
+import { type ChildProcess, spawn } from "node:child_process";
+import type { EventEmitter } from "node:events";
+import { existsSync } from "node:fs";
+import { mkdir, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import type {
+  MachineReplies,
+  MachineRequest,
+  PhoneHolder,
+  PhoneReason,
+  RunnerPhone,
+} from "@agenteschat/adapters/machine-protocol";
+import {
+  ANDROID_APP,
+  adbStateOf,
+  androidKind,
+  androidTransport,
+  FACTS_SHELL,
+  findAdb,
+  KEYGUARD_SHELL,
+  keyguardShowing,
+  parseAdbDevices,
+  parseAndroidFacts,
+  pngFrom,
+  pngSize,
+  runningAdbServer,
+  WAKE_SHELL,
+} from "./adb";
+import { APPLE_APP, appleNeedsYou, parseDevicectl, parseSimctl } from "./apple-devices";
+import { RunnerError } from "./errors";
+import { killTree } from "./exec";
+import { isExecutable } from "./executors";
+import { acquireLock } from "./lock";
+import { usualDirs } from "./login-path";
+import { isInside } from "./paths";
+
+/**
+ * The phones this computer reaches (bring your own devices): Android over the adb server already running (USB,
+ * Wi-Fi paired in Android Studio, emulators), iPhones and booted simulators on a Mac. It looks every `POLL_MS`,
+ * reports the whole list when anything changed (`phones.changed`), keeps each phone's lock in memory (one holder
+ * at a time, renewed by each call, let go on `phone.release`, after `IDLE_MS` without a call, or when the phone
+ * goes), and runs the `phone.*` ops. A lock file in the OS user's runner home keeps a second runner of the same
+ * user (another workspace) off a phone this one drives.
+ */
+
+export const POLL_MS = 3_000;
+/** iPhones and simulators are looked at every this many polls (`devicectl` costs about a second). */
+export const APPLE_EVERY = 2;
+export const IDLE_MS = 5 * 60_000;
+/** A phone's facts (model, screen, battery) are read again after this long. */
+export const FACTS_TTL_MS = 5 * 60_000;
+const TOOLS_TTL_MS = 30_000;
+/** The longest screen recording, whatever records it: about 45 MB at 2 Mbps, under the 50 MB file limit. */
+export const RECORD_MAX_SECONDS = 170;
+export const IPHONE_LOG_MS = 5000;
+const FLOW_MAX_BYTES = 256 * 1024;
+const LOG_MAX_CHARS = 200_000;
+
+// ── Running the tools ─────────────────────────────────────────────────────────
+
+export interface ToolResult {
+  stdout: Buffer;
+  stderr: string;
+  code: number | null;
+  timedOut: boolean;
+}
+
+export interface ToolOptions {
+  timeoutMs?: number;
+  signal?: AbortSignal;
+  env?: NodeJS.ProcessEnv;
+  cwd?: string;
+}
+
+const MAX_STDOUT = 64 * 1024 * 1024;
+const winQuote = (a: string) => `"${a.replace(/"/g, '""')}"`;
+
+/** Starts `bin` with `args` (no shell; a Windows `.cmd`/`.bat` through cmd.exe, quoted); never throws. */
+export function startTool(
+  bin: string,
+  args: string[],
+  opts: ToolOptions = {},
+): { child: ChildProcess | null; done: Promise<ToolResult> } {
+  const viaCmd = process.platform === "win32" && /\.(cmd|bat)$/i.test(bin);
+  let child: ChildProcess;
+  try {
+    child = spawn(
+      viaCmd ? process.env.ComSpec || "cmd.exe" : bin,
+      viaCmd ? ["/d", "/s", "/c", `"${[bin, ...args].map(winQuote).join(" ")}"`] : args,
+      {
+        cwd: opts.cwd,
+        env: opts.env ?? process.env,
+        stdio: ["ignore", "pipe", "pipe"],
+        windowsHide: true,
+        windowsVerbatimArguments: viaCmd,
+        // Its own process group, so a timeout takes what it started too (Maestro's Java).
+        detached: process.platform !== "win32",
+      },
+    );
+  } catch (err) {
+    const stderr = err instanceof Error ? err.message : String(err);
+    return { child: null, done: Promise.resolve({ stdout: Buffer.alloc(0), stderr, code: null, timedOut: false }) };
+  }
+  const done = new Promise<ToolResult>((resolve) => {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    let stderr = "";
+    let timedOut = false;
+    let finished = false;
+    const finish = (code: number | null) => {
+      if (finished) return;
+      finished = true;
+      if (timer) clearTimeout(timer);
+      opts.signal?.removeEventListener("abort", onAbort);
+      resolve({ stdout: Buffer.concat(chunks), stderr, code, timedOut });
+    };
+    const timer = opts.timeoutMs
+      ? setTimeout(() => {
+          timedOut = true;
+          killTree(child, "SIGKILL");
+        }, opts.timeoutMs)
+      : null;
+    const onAbort = () => killTree(child, "SIGKILL");
+    opts.signal?.addEventListener("abort", onAbort, { once: true });
+    child.stdout?.on("data", (chunk: Buffer) => {
+      size += chunk.byteLength;
+      if (size <= MAX_STDOUT) chunks.push(chunk);
+    });
+    child.stderr?.on("data", (chunk: Buffer) => {
+      if (stderr.length < 64 * 1024) stderr += chunk.toString("utf8");
+    });
+    const events = child as unknown as EventEmitter;
+    events.on("error", (err: Error) => {
+      stderr += err.message;
+      finish(null);
+    });
+    events.on("close", (code: number | null) => finish(code));
+  });
+  return { child, done };
+}
+
+export const runTool = (bin: string, args: string[], opts?: ToolOptions) => startTool(bin, args, opts).done;
+
+/** `name` on `dirs` (with Windows' extensions), or null. */
+export function which(name: string, dirs: readonly string[], platform: NodeJS.Platform = process.platform) {
+  const exts = platform === "win32" ? [".exe", ".cmd", ".bat"] : [""];
+  for (const dir of dirs) {
+    if (!dir) continue;
+    for (const ext of exts) {
+      const file = path.join(dir, name + ext);
+      if (existsSync(file) && (platform === "win32" || isExecutable(file))) return file;
+    }
+  }
+  return null;
+}
+
+/** Where tools are looked for after the PATH: the usual install folders (a service's PATH is bare) and Maestro's. */
+export const extraToolDirs = (home: string) => [...usualDirs(home), path.join(home, ".maestro", "bin")];
+
+// ── Words ─────────────────────────────────────────────────────────────────────
+
+const REASON_WORDS: Partial<Record<PhoneReason, string>> = {
+  unauthorized: "Tap Allow on the phone (check Always allow from this computer first).",
+  adb_offline: "The phone shows as offline. Unplug it and plug it back in.",
+  no_driver: "This computer can't open the phone. On Linux, add udev rules for it.",
+  untrusted: "Tap Trust on the iPhone and enter its passcode.",
+  developer_mode_off:
+    "Turn on Developer Mode: Settings › Privacy & Security › Developer Mode, then restart the iPhone.",
+  locked: "Unlock it and try again.",
+  booting: "It's still starting.",
+  os_too_old: "Its Android version is too old for these tools.",
+};
+
+export const TOOL_HELP = {
+  adb: "Install Android platform-tools (or Android Studio), then try again.",
+  maestro: "Install Maestro: curl -fsSL https://get.maestro.mobile.dev | bash",
+  java: "Maestro needs Java 17 or newer. Install a JDK (on a Mac: brew install openjdk@17).",
+  bundletool: "Installing an .aab needs bundletool (brew install bundletool). An .apk installs without it.",
+  syslog: "Reading a real iPhone's log needs libimobiledevice: brew install libimobiledevice",
+  helper: (what: string) => `${what} a real iPhone needs the test helper, which isn't set up on this Mac yet.`,
+} as const;
+
+const labelOf = (p: Phone) => p.name ?? p.model;
+
+// ── The manager ───────────────────────────────────────────────────────────────
+
+type Phone = Omit<RunnerPhone, "holder">;
+type PhoneOp = "phone.claim" | "phone.release" | "phone.install" | "phone.launch" | "phone.flow" | "phone.record";
+export type PhoneRequest = Extract<MachineRequest, { op: PhoneOp | "phone.screenshot" | "phone.logs" }>;
+
+/** Where a phone op's files go and come from. */
+export interface PhoneIo {
+  /** The request's agent's folder (real path); null when the request has no agent. */
+  folder: string | null;
+  /** A path the agent may read, absolute; throws when it can't. */
+  resolve(input: string): Promise<string>;
+  signal: AbortSignal;
+}
+
+interface Hold {
+  holder: PhoneHolder;
+  lastUsed: number;
+  /** Ops running for it now: it isn't idle while one runs (a 10-minute flow). */
+  busy: number;
+  releaseFile: () => void;
+  /** Puts back what the session changed on the phone (stay awake). */
+  restore: (() => Promise<unknown>) | null;
+}
+
+interface Tools {
+  adb: string | null;
+  xcrun: string | null;
+  scrcpy: string | null;
+  maestro: string | null;
+  bundletool: string | null;
+  syslog: string | null;
+  plutil: string | null;
+}
+
+export interface PhoneManagerOptions {
+  log: (line: string) => void;
+  /** The list changed: a phone came or went, a state or a holder changed. */
+  onChange: (phones: RunnerPhone[]) => void;
+  /** Shared by every runner of this OS user (default `~/.agentes-runner/phone-locks`). */
+  lockDir?: string;
+  env?: NodeJS.ProcessEnv;
+  platform?: NodeJS.Platform;
+  /** The OS user's home (the Android SDK's default folder, the usual tool folders). */
+  home?: string;
+  /** Tool folders after the PATH (default `extraToolDirs`). */
+  dirs?: string[];
+  /** The running adb server's binary (default: asked on port 5037). */
+  adbServer?: () => Promise<string | null>;
+  now?: () => number;
+  idleMs?: number;
+  /** How long a screen takes to wake or a recorder to start, before going on. */
+  settleMs?: number;
+  /** macOS: keep the computer awake while a phone is attached (default on a Mac). */
+  caffeinate?: boolean;
+  /** How long a real iPhone's live log is read for (`IPHONE_LOG_MS`). */
+  liveLogMs?: number;
+}
+
+const keyOf = (p: { platform: string; serial: string }) => `${p.platform}:${p.serial}`;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const clampInt = (n: unknown, min: number, max: number, fallback: number) => {
+  const v = typeof n === "number" && Number.isFinite(n) ? Math.floor(n) : fallback;
+  return Math.max(min, Math.min(max, v));
+};
+const tail = (text: string, max: number) => (text.length > max ? `[…]\n${text.slice(-max)}` : text);
+const firstLine = (text: string) =>
+  (text.split("\n").find((l) => /error|fail/i.test(l)) ?? text.trim().split("\n")[0] ?? "").trim().slice(0, 300);
+
+const sameHolder = (a: PhoneHolder, b: PhoneHolder) =>
+  a.runId !== null || b.runId !== null ? a.runId === b.runId : a.agentId === b.agentId && a.userId === b.userId;
+
+function holderOf(v: unknown, now: number): PhoneHolder {
+  const h = typeof v === "object" && v !== null ? (v as Record<string, unknown>) : {};
+  const id = (x: unknown) => (typeof x === "string" && x !== "" && x.length <= 200 ? x : null);
+  const label = typeof h.label === "string" && h.label.trim() ? h.label.trim().slice(0, 200) : undefined;
+  return {
+    runId: id(h.runId),
+    agentId: id(h.agentId),
+    userId: id(h.userId),
+    ...(label ? { label } : {}),
+    since: new Date(now).toISOString(),
+  };
+}
+
+/** `20261109-041205123`: a file name that sorts by time. */
+const stamp = (now: number) =>
+  new Date(now)
+    .toISOString()
+    .replace(/[-:.Z]/g, "")
+    .replace("T", "-");
+
+interface Recorder {
+  /** Resolves when it stopped by itself (its time limit) and the file is final. */
+  done: Promise<void>;
+  /** Stops it now; resolves when the file is final. */
+  stop(): Promise<void>;
+}
+
+export class PhoneManager {
+  private seen = new Map<string, Phone>();
+  private readonly holds = new Map<string, Hold>();
+  private readonly facts = new Map<string, { at: number; facts: ReturnType<typeof parseAndroidFacts> }>();
+  /** Phones an op found behind a lock screen: polls look again until it's gone. */
+  private readonly locked = new Set<string>();
+  /** Android phones whose authorization timeout was turned off (this process, once each). */
+  private readonly prepared = new Set<string>();
+  private appleSeen: Phone[] | null = null;
+  private tick = 0;
+  private polling: Promise<void> | null = null;
+  private first: Promise<void> | null = null;
+  private cachedTools: { at: number; tools: Tools } | null = null;
+  private timer: ReturnType<typeof setInterval> | null = null;
+  private lastJson = "[]";
+  private awake: ChildProcess | null = null;
+  private stopped = false;
+  private readonly env: NodeJS.ProcessEnv;
+  private readonly platform: NodeJS.Platform;
+  private readonly home: string;
+  private readonly now: () => number;
+
+  constructor(private readonly opts: PhoneManagerOptions) {
+    this.env = opts.env ?? process.env;
+    this.platform = opts.platform ?? process.platform;
+    this.home = opts.home ?? os.homedir();
+    this.now = opts.now ?? Date.now;
+  }
+
+  start() {
+    if (this.timer || this.stopped) return;
+    this.timer = setInterval(() => void this.poll(), POLL_MS);
+    this.timer.unref?.();
+    void this.poll();
+  }
+
+  async stop() {
+    this.stopped = true;
+    if (this.timer) clearInterval(this.timer);
+    this.timer = null;
+    await Promise.all([...this.holds.keys()].map((key) => this.drop(key, true)));
+    this.keepAwake(false);
+  }
+
+  /** What `hello` and `phones.changed` say. */
+  list(): RunnerPhone[] {
+    return [...this.seen.values()]
+      .sort((a, b) => (keyOf(a) < keyOf(b) ? -1 : 1))
+      .map((p) => {
+        const hold = this.holds.get(keyOf(p));
+        return hold ? { ...p, holder: hold.holder } : p;
+      });
+  }
+
+  /** One look at the phones (concurrent calls share it). */
+  poll(): Promise<void> {
+    this.polling ??= this.scan()
+      .catch((err: unknown) => this.opts.log(`phones: ${err instanceof Error ? err.message : String(err)}`))
+      .finally(() => {
+        this.polling = null;
+      });
+    return this.polling;
+  }
+
+  private async scan() {
+    const tools = await this.tools();
+    const found: Phone[] = [];
+    if (tools.adb) found.push(...(await this.scanAndroid(tools.adb)));
+    if (tools.xcrun) {
+      if (this.appleSeen === null || this.tick % APPLE_EVERY === 0) this.appleSeen = await this.scanApple(tools.xcrun);
+      found.push(...this.appleSeen);
+    } else this.appleSeen = null;
+    this.tick++;
+    if (this.stopped) return;
+    this.seen = new Map(found.map((p) => [keyOf(p), p]));
+    const now = this.now();
+    for (const [key, hold] of [...this.holds]) {
+      if (!this.seen.has(key)) await this.drop(key, false);
+      else if (hold.busy === 0 && now - hold.lastUsed >= (this.opts.idleMs ?? IDLE_MS)) await this.drop(key, true);
+    }
+    this.changed();
+  }
+
+  private async tools(): Promise<Tools> {
+    const cached = this.cachedTools;
+    if (cached && this.now() - cached.at < TOOLS_TTL_MS) return cached.tools;
+    const dirs = [...(this.env.PATH ?? "").split(path.delimiter), ...(this.opts.dirs ?? extraToolDirs(this.home))];
+    const find = (name: string) => which(name, dirs, this.platform);
+    const running = await (this.opts.adbServer ?? (() => runningAdbServer()))();
+    const adb = running && existsSync(running) ? running : findAdb(this.env, this.platform, this.home, dirs);
+    let xcrun = this.platform === "darwin" ? find("xcrun") : null;
+    // Without the developer tools, macOS answers xcrun with a dialog offering to install them: asked first.
+    const select = xcrun ? find("xcode-select") : null;
+    if (xcrun && (!select || (await runTool(select, ["-p"], { timeoutMs: 5000, env: this.env })).code !== 0)) {
+      xcrun = null;
+    }
+    const tools: Tools = {
+      adb,
+      xcrun,
+      scrcpy: find("scrcpy"),
+      maestro: find("maestro"),
+      bundletool: find("bundletool"),
+      syslog: find("idevicesyslog"),
+      plutil: this.platform === "darwin" ? find("plutil") : null,
+    };
+    this.cachedTools = { at: this.now(), tools };
+    return tools;
+  }
+
+  private async scanAndroid(adb: string): Promise<Phone[]> {
+    const r = await runTool(adb, ["devices", "-l"], { timeoutMs: 10_000, env: this.env });
+    if (r.code !== 0) return [];
+    const out: Phone[] = [];
+    for (const e of parseAdbDevices(r.stdout.toString("utf8"))) {
+      const key = `android:${e.serial}`;
+      const phone: Phone = {
+        platform: "android",
+        serial: e.serial,
+        kind: androidKind(e.serial),
+        model: e.model ?? "Android phone",
+        osVersion: "",
+        transport: androidTransport(e.serial),
+        ...adbStateOf(e.state),
+      };
+      if (e.state !== "device") {
+        this.facts.delete(key);
+        out.push(phone);
+        continue;
+      }
+      const facts = await this.androidFacts(adb, e.serial);
+      if (facts) {
+        Object.assign(phone, {
+          model: facts.model,
+          osVersion: facts.osVersion,
+          kind: facts.emulator ? "emulator" : phone.kind,
+          ...(facts.name ? { name: facts.name } : {}),
+          ...(facts.abi ? { abi: facts.abi } : {}),
+          ...(facts.screen ? { screen: facts.screen } : {}),
+          ...(facts.power ? { power: facts.power } : {}),
+          ...(facts.battery !== undefined ? { battery: facts.battery } : {}),
+        });
+        if (!facts.booted) Object.assign(phone, { state: "preparing", reason: "booting" });
+        else if (facts.sdk > 0 && facts.sdk < 21) Object.assign(phone, { state: "unsupported", reason: "os_too_old" });
+      }
+      if (phone.state === "ready" && this.locked.has(key)) {
+        const lock = await this.shell(adb, e.serial, KEYGUARD_SHELL).catch(() => "");
+        if (keyguardShowing(lock)) Object.assign(phone, { state: "needs_you", reason: "locked" });
+        else this.locked.delete(key);
+      }
+      if (phone.state === "ready" && phone.kind === "device" && !this.prepared.has(key)) {
+        this.prepared.add(key);
+        // An authorization lapses after 7 days without a connection (Android 11+) unless this is off.
+        void this.shell(adb, e.serial, "settings put global adb_allowed_connection_time 0").catch(() => undefined);
+      }
+      out.push(phone);
+    }
+    return out;
+  }
+
+  private async androidFacts(adb: string, serial: string) {
+    const key = `android:${serial}`;
+    const cached = this.facts.get(key);
+    if (cached?.facts.booted && this.now() - cached.at < FACTS_TTL_MS) return cached.facts;
+    try {
+      const facts = parseAndroidFacts(await this.shell(adb, serial, FACTS_SHELL));
+      this.facts.set(key, { at: this.now(), facts });
+      return facts;
+    } catch {
+      return cached?.facts ?? null;
+    }
+  }
+
+  private async scanApple(xcrun: string): Promise<Phone[]> {
+    const out: Phone[] = [];
+    const sims = await runTool(xcrun, ["simctl", "list", "devices", "booted", "-j"], {
+      timeoutMs: 15_000,
+      env: this.env,
+    });
+    try {
+      if (sims.code === 0) out.push(...parseSimctl(JSON.parse(sims.stdout.toString("utf8"))));
+    } catch {
+      // not JSON: an Xcode mid-update
+    }
+    const file = path.join(os.tmpdir(), `agentes-devicectl-${process.pid}-${this.tick}.json`);
+    const real = await runTool(xcrun, ["devicectl", "list", "devices", "--quiet", "--json-output", file], {
+      timeoutMs: 20_000,
+      env: this.env,
+    });
+    try {
+      if (real.code === 0) out.push(...parseDevicectl(JSON.parse(await readFile(file, "utf8"))));
+    } catch {
+      // no devicectl (an Xcode before 15), or nothing written
+    } finally {
+      await rm(file, { force: true });
+    }
+    return out;
+  }
+
+  /** Sends the list if it changed since the last one sent. */
+  private changed() {
+    const list = this.list();
+    const json = JSON.stringify(list);
+    if (json === this.lastJson) return;
+    this.lastJson = json;
+    this.keepAwake(list.length > 0);
+    this.opts.onChange(list);
+  }
+
+  /** macOS: no system sleep on power while a phone is attached (`caffeinate` ends with this process). */
+  private keepAwake(on: boolean) {
+    if (!(this.opts.caffeinate ?? this.platform === "darwin")) return;
+    if (on && !this.awake && !this.stopped) {
+      try {
+        const child = spawn("caffeinate", ["-s", "-w", String(process.pid)], { stdio: "ignore" });
+        (child as unknown as EventEmitter).on("error", () => {
+          if (this.awake === child) this.awake = null;
+        });
+        this.awake = child;
+      } catch {
+        this.awake = null;
+      }
+    } else if (!on && this.awake) {
+      this.awake.kill();
+      this.awake = null;
+    }
+  }
+
+  // ── Locks ───────────────────────────────────────────────────────────────────
+
+  private async take(key: string, phone: Phone, holder: PhoneHolder, tools: Tools): Promise<Hold> {
+    const held = this.holds.get(key);
+    if (held) {
+      if (!sameHolder(held.holder, holder)) {
+        const what = held.holder.label ? ` (${held.holder.label})` : "";
+        throw new RunnerError("phone_busy", `Another agent is using ${labelOf(phone)}${what}.`);
+      }
+      held.lastUsed = this.now();
+      if (holder.label && holder.label !== held.holder.label) {
+        held.holder = { ...held.holder, label: holder.label };
+        this.changed();
+      }
+      return held;
+    }
+    const lockDir = this.opts.lockDir ?? path.join(this.home, ".agentes-runner", "phone-locks");
+    const file = acquireLock(lockDir, "phone", { file: `${key.replace(/[^\w.-]/g, "_")}.lock` });
+    if (!file.ok) {
+      throw new RunnerError(
+        "phone_busy",
+        `Another workspace's connection on this computer is using ${labelOf(phone)}.`,
+      );
+    }
+    const hold: Hold = { holder, lastUsed: this.now(), busy: 0, releaseFile: file.release, restore: null };
+    this.holds.set(key, hold);
+    if (phone.platform === "android" && tools.adb) hold.restore = await this.stayOn(tools.adb, phone);
+    this.changed();
+    return hold;
+  }
+
+  /** The screen stays on while the session lasts (Developer options › Stay awake), then the person's setting is back. */
+  private async stayOn(adb: string, phone: Phone): Promise<(() => Promise<unknown>) | null> {
+    try {
+      const before = (await this.shell(adb, phone.serial, "settings get global stay_on_while_plugged_in")).trim();
+      await this.shell(adb, phone.serial, `svc power stayon ${phone.transport === "usb" ? "usb" : "true"}`);
+      const value = /^\d+$/.test(before) ? before : "0";
+      return () => this.shell(adb, phone.serial, `settings put global stay_on_while_plugged_in ${value}`);
+    } catch {
+      return null;
+    }
+  }
+
+  private async drop(key: string, restore: boolean) {
+    const hold = this.holds.get(key);
+    if (!hold) return false;
+    this.holds.delete(key);
+    hold.releaseFile();
+    if (restore && hold.restore) await hold.restore().catch(() => undefined);
+    this.changed();
+    return true;
+  }
+
+  // ── Ops ─────────────────────────────────────────────────────────────────────
+
+  async handle(req: PhoneRequest, io: PhoneIo): Promise<unknown> {
+    const platform = req.platform === "android" || req.platform === "ios" ? req.platform : null;
+    if (!platform || typeof req.serial !== "string" || req.serial === "" || req.serial.length > 200) {
+      throw new RunnerError("bad_request", "A phone op names its phone (platform and serial)");
+    }
+    const key = `${platform}:${req.serial}`;
+    const holder = holderOf(req.holder, this.now());
+    if (req.op === "phone.release") {
+      const hold = this.holds.get(key);
+      const mine = hold && (req.force === true || sameHolder(hold.holder, holder));
+      return { released: mine ? await this.drop(key, true) : false } satisfies MachineReplies["phone.release"];
+    }
+    this.first ??= this.poll();
+    await this.first;
+    if (!this.seen.has(key)) await this.poll();
+    const phone = this.seen.get(key);
+    if (!phone) throw new RunnerError("phone_missing", "This phone isn't connected to this computer right now.");
+    if (phone.state !== "ready") {
+      const words = (phone.reason && REASON_WORDS[phone.reason]) ?? "Try again in a moment.";
+      if (phone.state === "unsupported")
+        throw new RunnerError("unsupported", `${labelOf(phone)} can't be used. ${words}`);
+      throw new RunnerError("phone_not_ready", `${labelOf(phone)} isn't ready. ${words}`);
+    }
+    const tools = await this.tools();
+    const hold = await this.take(key, phone, holder, tools);
+    if (req.op === "phone.claim") return { holder: hold.holder } satisfies MachineReplies["phone.claim"];
+    hold.busy++;
+    try {
+      return platform === "android"
+        ? await this.android(req, key, phone, tools, io)
+        : await this.apple(req, phone, tools, io);
+    } finally {
+      hold.busy--;
+      hold.lastUsed = this.now();
+    }
+  }
+
+  private shell(adb: string, serial: string, command: string, timeoutMs = 30_000, signal?: AbortSignal) {
+    return this.adb(adb, serial, ["shell", command], "The phone", timeoutMs, signal).then((b) =>
+      b.toString("utf8").replace(/\r\n/g, "\n"),
+    );
+  }
+
+  /** `adb -s serial args…`, its stdout; a failure in words (`what` failed), the phone gone as `phone_missing`. */
+  private async adb(
+    adb: string,
+    serial: string,
+    args: string[],
+    what: string,
+    timeoutMs = 30_000,
+    signal?: AbortSignal,
+  ): Promise<Buffer> {
+    const r = await runTool(adb, ["-s", serial, ...args], { timeoutMs, signal, env: this.env });
+    if (r.code === 0 && !r.timedOut) return r.stdout;
+    const said = `${r.stderr}\n${r.stdout.toString("utf8")}`;
+    if (/device '.*' not found|no devices\/emulators found|device not found/i.test(said)) {
+      throw new RunnerError("phone_missing", "The phone went away (unplugged, or adb restarted).");
+    }
+    if (/device offline|unauthorized/i.test(said)) {
+      throw new RunnerError("phone_not_ready", "The phone stopped answering. Unplug it and plug it back in.");
+    }
+    if (r.timedOut) throw new RunnerError("internal", `${what} didn't answer in time.`);
+    throw new RunnerError("internal", `${what} failed: ${firstLine(said)}`);
+  }
+
+  /** The agent's folder for phone files (`.agentes/phone/`), and a new file's absolute and relative path. */
+  private async outFile(io: PhoneIo, what: string, ext: string) {
+    if (!io.folder) throw new RunnerError("bad_request", "A phone's files go to an agent's folder");
+    const dir = path.join(io.folder, ".agentes", "phone");
+    await mkdir(dir, { recursive: true });
+    if (!isInside(io.folder, await realpath(dir))) {
+      throw new RunnerError("outside_workspace", ".agentes/phone points outside the agent's folder");
+    }
+    const name = `${stamp(this.now())}-${what}.${ext}`;
+    return { abs: path.join(dir, name), rel: `.agentes/phone/${name}` };
+  }
+
+  /** Wakes an Android screen and lifts a lock screen without a PIN; one with a PIN waits for the person. */
+  private async unlock(adb: string, key: string, phone: Phone, signal: AbortSignal) {
+    await this.shell(adb, phone.serial, WAKE_SHELL, 10_000, signal).catch(() => "");
+    await sleep(this.opts.settleMs ?? 700);
+    const out = await this.shell(adb, phone.serial, KEYGUARD_SHELL, 10_000, signal).catch(() => "");
+    if (!keyguardShowing(out)) return;
+    this.locked.add(key);
+    this.seen.set(key, { ...phone, state: "needs_you", reason: "locked" });
+    this.changed();
+    throw new RunnerError("phone_not_ready", `${labelOf(phone)} is locked. Unlock it and try again.`);
+  }
+
+  private async android(req: PhoneRequest, key: string, phone: Phone, tools: Tools, io: PhoneIo): Promise<unknown> {
+    const adb = tools.adb;
+    if (!adb) throw new RunnerError("tool_missing", TOOL_HELP.adb);
+    const serial = phone.serial;
+    switch (req.op) {
+      case "phone.install": {
+        const file = await io.resolve(String(req.path ?? ""));
+        const ext = path.extname(file).toLowerCase();
+        if (ext === ".apk") {
+          const out = (
+            await this.adb(adb, serial, ["install", "-r", "-t", file], "Installing the app", 300_000, io.signal)
+          ).toString("utf8");
+          return { output: out.trim() } satisfies MachineReplies["phone.install"];
+        }
+        if (ext !== ".aab") throw new RunnerError("bad_request", "An Android phone installs an .apk or an .aab.");
+        if (!tools.bundletool) throw new RunnerError("tool_missing", TOOL_HELP.bundletool);
+        const apks = path.join(os.tmpdir(), `agentes-${stamp(this.now())}.apks`);
+        try {
+          const args = [`--device-id=${serial}`, `--adb=${adb}`];
+          for (const step of [
+            ["build-apks", `--bundle=${file}`, `--output=${apks}`, "--connected-device", "--overwrite", ...args],
+            ["install-apks", `--apks=${apks}`, ...args],
+          ]) {
+            const r = await runTool(tools.bundletool, step, { timeoutMs: 300_000, signal: io.signal, env: this.env });
+            if (r.code !== 0) {
+              throw new RunnerError("internal", `Installing the app failed: ${firstLine(`${r.stderr}\n${r.stdout}`)}`);
+            }
+          }
+        } finally {
+          await rm(apks, { force: true });
+        }
+        return { output: "Installed" } satisfies MachineReplies["phone.install"];
+      }
+      case "phone.launch": {
+        const app = String(req.app ?? "");
+        if (!ANDROID_APP.test(app))
+          throw new RunnerError("bad_request", `${app} isn't an Android app id (com.acme.app)`);
+        await this.unlock(adb, key, phone, io.signal);
+        const out = await this.shell(
+          adb,
+          serial,
+          app.includes("/") ? `am start -n ${app}` : `monkey -p ${app} -c android.intent.category.LAUNCHER 1`,
+          30_000,
+          io.signal,
+        );
+        if (/No activities found|does not exist|^Error:/im.test(out)) {
+          throw new RunnerError("not_found", `${app} isn't installed on ${labelOf(phone)}.`);
+        }
+        return { output: out.trim() } satisfies MachineReplies["phone.launch"];
+      }
+      case "phone.screenshot": {
+        const raw = await this.adb(adb, serial, ["exec-out", "screencap", "-p"], "The screenshot", 30_000, io.signal);
+        // A phone with more than one display (a foldable, an external screen) prints a warning before the picture.
+        const data = pngFrom(raw);
+        const size = pngSize(data);
+        if (!size) throw new RunnerError("internal", "The phone didn't send a picture.");
+        const out = await this.outFile(io, "screenshot", "png");
+        await writeFile(out.abs, data);
+        return { path: out.rel, ...size } satisfies MachineReplies["phone.screenshot"];
+      }
+      case "phone.record": {
+        const seconds = clampInt(req.seconds, 1, RECORD_MAX_SECONDS, 30);
+        await this.unlock(adb, key, phone, io.signal);
+        const out = await this.outFile(io, "recording", "mp4");
+        const started = this.now();
+        await this.record(tools, phone, out.abs, seconds, io.signal).done;
+        let bytes = await sizeOf(out.abs);
+        if (bytes === 0 && tools.scrcpy) {
+          // scrcpy couldn't (an old one, a phone it doesn't take): the phone's own recorder.
+          await this.record({ ...tools, scrcpy: null }, phone, out.abs, seconds, io.signal).done;
+          bytes = await sizeOf(out.abs);
+        }
+        if (bytes === 0) throw new RunnerError("internal", "The recording came out empty.");
+        return {
+          path: out.rel,
+          seconds: Math.round((this.now() - started) / 1000),
+          bytes,
+        } satisfies MachineReplies["phone.record"];
+      }
+      case "phone.flow":
+        await this.unlock(adb, key, phone, io.signal);
+        return this.flow(req, phone, tools, io);
+      case "phone.logs": {
+        const lines = clampInt(req.lines, 1, 5000, 200);
+        const args = ["logcat", "-d", "-t", String(lines)];
+        let note = "";
+        if (req.app) {
+          const app = String(req.app);
+          if (!ANDROID_APP.test(app) || app.includes("/")) {
+            throw new RunnerError("bad_request", `${app} isn't an Android app id (com.acme.app)`);
+          }
+          const pid = (await this.shell(adb, serial, `pidof ${app}`, 10_000, io.signal).catch(() => ""))
+            .trim()
+            .split(/\s+/)[0];
+          if (pid && /^\d+$/.test(pid)) args.push(`--pid=${pid}`);
+          else note = `${app} isn't running, so this is the phone's whole log.\n`;
+        }
+        const text = (await this.adb(adb, serial, args, "Reading the log", 30_000, io.signal)).toString("utf8");
+        return { text: note + tail(text, LOG_MAX_CHARS) } satisfies MachineReplies["phone.logs"];
+      }
+      default:
+        throw new RunnerError("bad_request", `Unknown op ${(req as { op: string }).op}`);
+    }
+  }
+
+  private async apple(req: PhoneRequest, phone: Phone, tools: Tools, io: PhoneIo): Promise<unknown> {
+    const xcrun = tools.xcrun;
+    if (!xcrun) throw new RunnerError("tool_missing", "iPhones need Xcode on this Mac.");
+    const udid = phone.serial;
+    const sim = phone.kind === "simulator";
+    const ok = async (args: string[], what: string, timeoutMs = 120_000) => {
+      const r = await runTool(xcrun, args, { timeoutMs, signal: io.signal, env: this.env });
+      if (r.code === 0 && !r.timedOut) return r.stdout.toString("utf8");
+      const said = `${r.stderr}\n${r.stdout.toString("utf8")}`;
+      const needs = appleNeedsYou(said);
+      if (needs) throw new RunnerError("phone_not_ready", needs);
+      throw new RunnerError(
+        "internal",
+        r.timedOut ? `${what} didn't answer in time.` : `${what} failed: ${firstLine(said)}`,
+      );
+    };
+    switch (req.op) {
+      case "phone.install": {
+        const file = await io.resolve(String(req.path ?? ""));
+        const ext = path.extname(file).toLowerCase();
+        if (sim) {
+          if (ext !== ".app") throw new RunnerError("bad_request", "A simulator installs a simulator build (.app).");
+          await ok(["simctl", "install", udid, file], "Installing the app", 300_000);
+          const app = await this.plist(tools, path.join(file, "Info.plist"), "CFBundleIdentifier");
+          return { ...(app ? { app } : {}), output: "Installed" } satisfies MachineReplies["phone.install"];
+        }
+        if (ext !== ".app" && ext !== ".ipa")
+          throw new RunnerError("bad_request", "An iPhone installs an .ipa or an .app.");
+        const json = path.join(os.tmpdir(), `agentes-install-${stamp(this.now())}.json`);
+        try {
+          await ok(
+            ["devicectl", "device", "install", "app", "--device", udid, file, "--quiet", "--json-output", json],
+            "Installing the app",
+            300_000,
+          );
+          const result = JSON.parse(await readFile(json, "utf8").catch(() => "{}")) as {
+            result?: { installedApplications?: { bundleID?: unknown }[] };
+          };
+          const app = result.result?.installedApplications?.[0]?.bundleID;
+          return {
+            ...(typeof app === "string" ? { app } : {}),
+            output: "Installed",
+          } satisfies MachineReplies["phone.install"];
+        } finally {
+          await rm(json, { force: true });
+        }
+      }
+      case "phone.launch": {
+        const app = String(req.app ?? "");
+        if (!APPLE_APP.test(app))
+          throw new RunnerError("bad_request", `${app} isn't an app's bundle id (com.acme.app)`);
+        const out = sim
+          ? await ok(["simctl", "launch", udid, app], "Opening the app")
+          : await ok(
+              ["devicectl", "device", "process", "launch", "--device", udid, "--terminate-existing", app],
+              "Opening the app",
+            );
+        return { output: out.trim() } satisfies MachineReplies["phone.launch"];
+      }
+      case "phone.screenshot": {
+        if (!sim) throw new RunnerError("tool_missing", TOOL_HELP.helper("Taking a screenshot of"));
+        const out = await this.outFile(io, "screenshot", "png");
+        await ok(["simctl", "io", udid, "screenshot", "--type=png", out.abs], "The screenshot");
+        const size = pngSize(await readFile(out.abs));
+        return { path: out.rel, ...(size ?? {}) } satisfies MachineReplies["phone.screenshot"];
+      }
+      case "phone.record": {
+        if (!sim) throw new RunnerError("tool_missing", TOOL_HELP.helper("Recording"));
+        const seconds = clampInt(req.seconds, 1, RECORD_MAX_SECONDS, 30);
+        const out = await this.outFile(io, "recording", "mp4");
+        const started = this.now();
+        await this.record(tools, phone, out.abs, seconds, io.signal).done;
+        const bytes = await sizeOf(out.abs);
+        if (bytes === 0) throw new RunnerError("internal", "The recording came out empty.");
+        return {
+          path: out.rel,
+          seconds: Math.round((this.now() - started) / 1000),
+          bytes,
+        } satisfies MachineReplies["phone.record"];
+      }
+      case "phone.flow":
+        // Maestro drives simulators; it dropped real iPhones (2.11.0).
+        if (!sim) throw new RunnerError("tool_missing", TOOL_HELP.helper("Running a flow on"));
+        return this.flow(req, phone, tools, io);
+      case "phone.logs": {
+        const lines = clampInt(req.lines, 1, 5000, 200);
+        const app = req.app ? String(req.app) : null;
+        if (app !== null && !APPLE_APP.test(app)) {
+          throw new RunnerError("bad_request", `${app} isn't an app's bundle id (com.acme.app)`);
+        }
+        if (!sim) return { text: await this.iphoneLog(tools, udid, app, lines, io.signal) };
+        const args = ["simctl", "spawn", udid, "log", "show", "--last", "10m", "--style", "compact"];
+        if (app) {
+          const container = (await ok(["simctl", "get_app_container", udid, app, "app"], "Finding the app")).trim();
+          const exe = await this.plist(tools, path.join(container, "Info.plist"), "CFBundleExecutable");
+          if (exe && /^[\w .+-]+$/.test(exe)) args.push("--predicate", `process == "${exe}"`);
+        }
+        const text = await ok(args, "Reading the log");
+        return {
+          text: tail(text.split("\n").slice(-lines).join("\n"), LOG_MAX_CHARS),
+        } satisfies MachineReplies["phone.logs"];
+      }
+      default:
+        throw new RunnerError("bad_request", `Unknown op ${(req as { op: string }).op}`);
+    }
+  }
+
+  /** A key of an app's Info.plist (`plutil`), or null. */
+  private async plist(tools: Tools, file: string, key: string) {
+    if (!tools.plutil) return null;
+    const r = await runTool(tools.plutil, ["-extract", key, "raw", "-o", "-", file], {
+      timeoutMs: 10_000,
+      env: this.env,
+    });
+    const value = r.code === 0 ? r.stdout.toString("utf8").trim() : "";
+    return value || null;
+  }
+
+  /** A real iPhone keeps no log a Mac can read back: a few seconds of its live log (libimobiledevice). */
+  private async iphoneLog(tools: Tools, udid: string, app: string | null, lines: number, signal: AbortSignal) {
+    if (!tools.syslog) throw new RunnerError("tool_missing", TOOL_HELP.syslog);
+    const run = startTool(tools.syslog, ["-u", udid, "--no-colors"], { timeoutMs: 30_000, signal, env: this.env });
+    await sleep(this.opts.liveLogMs ?? IPHONE_LOG_MS);
+    run.child?.kill("SIGINT");
+    const all = (await run.done).stdout.toString("utf8").split("\n");
+    const name = app?.split(".").pop()?.toLowerCase() ?? "";
+    const mine = app ? all.filter((l) => l.includes(app) || (name !== "" && l.toLowerCase().includes(name))) : all;
+    const note = app && mine.length === 0 ? `Nothing from ${app} in a few seconds of the iPhone's live log:\n` : "";
+    return note + tail((mine.length > 0 ? mine : all).slice(-lines).join("\n"), LOG_MAX_CHARS);
+  }
+
+  /** A Maestro flow, recorded around when asked. Its YAML, log and video land in `.agentes/phone/`. */
+  private async flow(req: Extract<PhoneRequest, { op: "phone.flow" }>, phone: Phone, tools: Tools, io: PhoneIo) {
+    if (!tools.maestro) throw new RunnerError("tool_missing", TOOL_HELP.maestro);
+    const flow = typeof req.flow === "string" ? req.flow : "";
+    if (!flow.trim()) throw new RunnerError("bad_request", "The flow is empty");
+    if (Buffer.byteLength(flow) > FLOW_MAX_BYTES) throw new RunnerError("too_large", "The flow is too long");
+    const vars = Object.entries(req.env ?? {});
+    for (const [k, v] of vars) {
+      if (!/^[A-Za-z_]\w{0,63}$/.test(k) || typeof v !== "string") {
+        throw new RunnerError("bad_request", `${k} isn't a variable name a flow takes`);
+      }
+    }
+    const timeoutSeconds = clampInt(req.timeoutSeconds, 10, 20 * 60, 10 * 60);
+    const yaml = await this.outFile(io, "flow", "yaml");
+    await writeFile(yaml.abs, flow);
+    const video = req.record === true ? await this.outFile(io, "flow", "mp4") : null;
+    const recorder = video ? this.record(tools, phone, video.abs, RECORD_MAX_SECONDS, io.signal) : null;
+    if (recorder) await sleep(this.opts.settleMs ?? 1500);
+    const started = this.now();
+    const r = await runTool(
+      tools.maestro,
+      ["--device", phone.serial, "test", ...vars.flatMap(([k, v]) => ["-e", `${k}=${v}`]), yaml.abs],
+      {
+        timeoutMs: timeoutSeconds * 1000,
+        signal: io.signal,
+        cwd: path.dirname(yaml.abs),
+        env: {
+          ...this.env,
+          MAESTRO_CLI_NO_ANALYTICS: "1",
+          MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED: "true",
+          ...(phone.platform === "android" ? { ANDROID_SERIAL: phone.serial } : {}),
+        },
+      },
+    );
+    const seconds = Math.round((this.now() - started) / 1000);
+    await recorder?.stop();
+    const output = `${r.stdout.toString("utf8")}${r.stderr ? `\n${r.stderr}` : ""}`.trim();
+    const log = yaml.rel.replace(/\.yaml$/, ".log");
+    await writeFile(yaml.abs.replace(/\.yaml$/, ".log"), output);
+    if (r.code !== 0 && /JAVA_HOME|no 'java' command|Unable to locate a Java Runtime/i.test(output)) {
+      throw new RunnerError("tool_missing", TOOL_HELP.java);
+    }
+    const kept = video && (await sizeOf(video.abs)) > 0;
+    return {
+      passed: r.code === 0 && !r.timedOut,
+      output: tail(output, 8000) + (r.timedOut ? `\nStopped after ${timeoutSeconds} s.` : ""),
+      seconds,
+      ...(kept && video ? { video: video.rel } : {}),
+      log,
+    } satisfies MachineReplies["phone.flow"];
+  }
+
+  /**
+   * Records the screen into `file` for at most `limit` seconds: a simulator with `simctl io recordVideo`, an Android
+   * phone with scrcpy where it's installed (its window off), else the phone's own `screenrecord`, pulled after.
+   * scrcpy and simctl finish their file on SIGINT, which Windows can't send: there the phone's own recorder.
+   */
+  private record(tools: Tools, phone: Phone, file: string, limit: number, signal: AbortSignal): Recorder {
+    const grace = { timeoutMs: (limit + 60) * 1000, signal, env: this.env };
+    if (phone.platform === "ios") {
+      const run = startTool(
+        tools.xcrun ?? "xcrun",
+        ["simctl", "io", phone.serial, "recordVideo", "--codec=h264", "--force", file],
+        grace,
+      );
+      const timer = setTimeout(() => run.child?.kill("SIGINT"), limit * 1000);
+      const done = run.done.then(() => clearTimeout(timer));
+      return {
+        done,
+        stop: async () => {
+          clearTimeout(timer);
+          run.child?.kill("SIGINT");
+          await done;
+        },
+      };
+    }
+    const adb = tools.adb as string;
+    if (tools.scrcpy && process.platform !== "win32") {
+      const run = startTool(
+        tools.scrcpy,
+        [
+          `--serial=${phone.serial}`,
+          "--no-playback",
+          "--no-window",
+          "--no-audio",
+          `--record=${file}`,
+          "--record-format=mp4",
+          "--video-bit-rate=2M",
+          "--max-size=1280",
+          `--time-limit=${limit}`,
+        ],
+        // scrcpy uses this adb (the running server's), never its own.
+        { ...grace, env: { ...this.env, ADB: adb } },
+      );
+      const done = run.done.then(() => undefined);
+      return {
+        done,
+        stop: async () => {
+          run.child?.kill("SIGINT");
+          await done;
+        },
+      };
+    }
+    const remote = `/data/local/tmp/agentes-${stamp(this.now())}.mp4`;
+    const run = startTool(
+      adb,
+      ["-s", phone.serial, "shell", `screenrecord --time-limit ${Math.min(limit, 180)} --bit-rate 2000000 ${remote}`],
+      grace,
+    );
+    let final: Promise<void> | null = null;
+    const finish = () =>
+      (final ??= run.done.then(async () => {
+        await runTool(adb, ["-s", phone.serial, "pull", remote, file], { timeoutMs: 120_000, env: this.env });
+        await runTool(adb, ["-s", phone.serial, "shell", `rm -f ${remote}`], { timeoutMs: 10_000, env: this.env });
+      }));
+    return {
+      done: finish(),
+      stop: async () => {
+        await runTool(adb, ["-s", phone.serial, "shell", "pkill -INT screenrecord"], {
+          timeoutMs: 10_000,
+          env: this.env,
+        });
+        await finish();
+      },
+    };
+  }
+}
+
+const sizeOf = (file: string) =>
+  stat(file).then(
+    (s) => s.size,
+    () => 0,
+  );

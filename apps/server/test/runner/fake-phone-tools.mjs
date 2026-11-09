@@ -1,0 +1,103 @@
+#!/usr/bin/env node
+// Fake adb, xcrun, xcode-select, maestro, scrcpy, bundletool, plutil and idevicesyslog for the phone tests:
+// `fake-phone-tools.mjs <tool> args…`. Answers come from $FAKE_PHONE_STATE (JSON, read on every call); every call
+// is logged to $FAKE_PHONE_LOG as one JSON line, [tool, ...args]. State:
+//   adbDevices: what `adb devices -l` prints
+//   facts: { serial: what the facts shell prints }   keyguard: { serial: what the lock screen check prints }
+//   install: adb install's answer (installFail: its error, exit 1)   monkey, logcat, pidof: { app: pid }
+//   simctl, devicectl: the JSON each lists   launchFail: devicectl's error   simlog: `log show`'s text
+//   maestroExit, maestroOutput   javaMissing: maestro says JAVA_HOME isn't set
+//   wait: recorders (scrcpy, simctl recordVideo, idevicesyslog) run until SIGINT instead of ending at once
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+
+const [tool, ...args] = process.argv.slice(2);
+appendFileSync(process.env.FAKE_PHONE_LOG, `${JSON.stringify([tool, ...args])}\n`);
+const state = existsSync(process.env.FAKE_PHONE_STATE)
+  ? JSON.parse(readFileSync(process.env.FAKE_PHONE_STATE, "utf8"))
+  : {};
+// Written, then exited: a pipe's write is asynchronous on macOS and would be cut short by an exit.
+const out = (text, code = 0) => process.stdout.write(text, () => process.exit(code));
+const fail = (text) => process.stderr.write(text, () => process.exit(1));
+const flag = (name) => args.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
+// A 1080×2400 PNG's first bytes: what the size is read from.
+const png = () => {
+  const b = Buffer.alloc(33);
+  Buffer.from("89504e470d0a1a0a0000000d49484452", "hex").copy(b);
+  b.writeUInt32BE(1080, 16);
+  b.writeUInt32BE(2400, 20);
+  return b;
+};
+/** A recorder: the file now, then until SIGINT (`wait`) or at once. */
+const recorder = (file) => {
+  writeFileSync(file, "MP4DATA");
+  if (!state.wait) process.exit(0);
+  process.on("SIGINT", () => process.exit(0));
+  setInterval(() => {}, 1000);
+};
+
+if (tool === "adb") {
+  let serial = null;
+  if (args[0] === "-s") serial = args.splice(0, 2)[1];
+  const [cmd, ...rest] = args;
+  if (cmd === "devices") out(state.adbDevices ?? "List of devices attached\n\n");
+  else if (cmd === "version") out("Android Debug Bridge version 1.0.41\nVersion 36.0.2-14143358\n");
+  else if (cmd === "install")
+    state.installFail ? fail(state.installFail) : out(state.install ?? "Performing Streamed Install\nSuccess\n");
+  else if (cmd === "exec-out") process.stdout.write(png(), () => process.exit(0));
+  else if (cmd === "logcat") out(state.logcat ?? "11-09 04:00:00.000  1234  1234 I Acme: hello\n");
+  else if (cmd === "pull") {
+    writeFileSync(rest[1], "MP4DATA");
+    out(`${rest[0]}: 1 file pulled\n`);
+  } else if (cmd === "shell") {
+    const line = rest.join(" ");
+    if (line.includes('echo "model=')) out(state.facts?.[serial] ?? "");
+    else if (line.includes("dumpsys window")) out(state.keyguard?.[serial] ?? "");
+    else if (line.startsWith("settings get global stay_on_while_plugged_in")) out("0\n");
+    else if (line.startsWith("monkey")) out(state.monkey ?? "Events injected: 1\n");
+    else if (line.startsWith("am start")) out("Starting: Intent { cmp=com.acme.app/.Main }\n");
+    else if (line.startsWith("pidof ")) {
+      const pid = state.pidof?.[line.slice(6)];
+      pid ? out(`${pid}\n`) : out("", 1);
+    } else out("");
+  } else out("");
+} else if (tool === "xcode-select") out("/Applications/Xcode.app/Contents/Developer\n");
+else if (tool === "xcrun") {
+  const line = args.join(" ");
+  const json = args[args.indexOf("--json-output") + 1];
+  if (line.startsWith("simctl list devices")) out(JSON.stringify(state.simctl ?? { devices: {} }));
+  else if (line.startsWith("devicectl list devices")) {
+    writeFileSync(json, JSON.stringify(state.devicectl ?? { result: { devices: [] } }));
+    out("");
+  } else if (line.startsWith("devicectl device install app")) {
+    if (state.launchFail) fail(state.launchFail);
+    else {
+      writeFileSync(json, JSON.stringify({ result: { installedApplications: [{ bundleID: "com.acme.app" }] } }));
+      out("");
+    }
+  } else if (line.startsWith("devicectl device process launch")) {
+    state.launchFail ? fail(state.launchFail) : out("Launched application with com.acme.app bundle identifier.\n");
+  } else if (line.includes(" screenshot ")) {
+    writeFileSync(args.at(-1), png());
+    out("Wrote screenshot\n");
+  } else if (line.includes(" recordVideo ")) recorder(args.at(-1));
+  else if (line.startsWith("simctl launch")) out(`${args.at(-1)}: 4242\n`);
+  else if (line.startsWith("simctl get_app_container")) out("/tmp/Acme.app\n");
+  else if (line.startsWith("simctl spawn")) out(state.simlog ?? "one\ntwo\nthree\n");
+  else out("");
+} else if (tool === "maestro") {
+  if (args[0] === "--version") out("2.11.0\n");
+  else if (state.javaMissing) fail("ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH.\n");
+  else out(state.maestroOutput ?? "Flow passed\n", state.maestroExit ?? 0);
+} else if (tool === "scrcpy") {
+  if (args[0] === "--version") out("scrcpy 4.0 <https://github.com/Genymobile/scrcpy>\n");
+  else recorder(flag("record"));
+} else if (tool === "bundletool") {
+  const output = flag("output");
+  if (output) writeFileSync(output, "APKS");
+  out("");
+} else if (tool === "plutil") out(args[1] === "CFBundleExecutable" ? "Acme\n" : "com.acme.app\n");
+else if (tool === "idevicesyslog") {
+  process.stdout.write("Nov  9 04:00:00 iPhone Acme(UIKitCore)[42] <Notice>: com.acme.app hello\n");
+  process.on("SIGINT", () => process.exit(0));
+  setInterval(() => {}, 1000);
+} else out("", 1);

@@ -491,6 +491,8 @@ export interface EngineDeps {
    * §11): its first command then skips Chrome's start. Never waited on.
    */
   warmBrowser?(at: { orgId: string; agentId: string; threadRootId: string }): void;
+  /** Lets go of the phones a run held once it ends (`releaseRunPhones`, bring your own devices). */
+  releaseRunPhones?(run: { id: string; orgId: string; agentId: string }): Promise<unknown>;
 }
 
 /**
@@ -1245,6 +1247,8 @@ async function executeRunInner(
     }
     // The turn's bridge tokens die with it (a resumed turn gets a new one).
     if (brainPlan && brainPlan.kind !== "model") await revokeRunToolTokens(db, { runId: run.id }).catch(() => {});
+    if (status === "done" || status === "failed" || status === "canceled")
+      await deps.releaseRunPhones?.(run).catch(() => {});
     await publishChannelEvent(deps.pubsub, { type: "agent.idle", ...where, ...bg });
     await publishChannelEvent(deps.pubsub, {
       type: "run.finished",

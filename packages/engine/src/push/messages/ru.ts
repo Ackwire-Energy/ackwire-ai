@@ -61,6 +61,8 @@ export const strings: Partial<PushStrings> = {
   joinRequestTitle: (name, org) => `${name} просит доступ в ${org}`,
   joinSuggestionTitle: (by, name, org) => `${by} предлагает добавить ${name} в ${org}`,
   joinRequestBody: "Нажмите, чтобы одобрить или отклонить.",
+  deviceJoinRequestTitle: (computer, org) => `${computer} хочет присоединиться к ${org}`,
+  deviceJoinRequestBody: "Нажмите, чтобы впустить или отклонить.",
   waitingTitle: "Вас кое-что ждёт",
   openBody: "Нажмите, чтобы открыть.",
   sentGif: "Отправлен GIF",
@@ -75,6 +77,14 @@ export const strings: Partial<PushStrings> = {
   usageRaisedTitle: (a) => `${a}: ваш лимит на этот месяц повышен`,
   usageRaisedBody: "Можно продолжать.",
   usageRefusedTitle: (a) => `${a}: в большем лимите отказано`,
+  deviceInUseTitle: (a, p, d) =>
+    p ? `${a} (для ${p}) использует ваше устройство ${d}` : `${a} использует ваше устройство ${d}`,
+  deviceInUseBody: "Нажмите, чтобы остановить.",
+  deviceAccessTitle: (a, p, d) =>
+    p ? `${a} (для ${p}) просит доступ к вашему устройству ${d}` : `${a} просит доступ к вашему устройству ${d}`,
+  deviceAccessBody: "Нажмите, чтобы разрешить один раз, всегда или отказать.",
+  deviceWaitingTitle: (p, d) => `Агент для ${p} ждёт ваше устройство ${d}`,
+  deviceWaitingBody: "Начнёт, когда оно вернётся.",
   teamWeekReady: "Итоги недели команды готовы",
   teamDayReady: "Итоги дня готовы",
 };

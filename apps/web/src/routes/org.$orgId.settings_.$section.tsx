@@ -6,7 +6,15 @@ import { isSettingsSection, settingsSearch } from "@/pages/settings-sections";
 /** One settings section per URL: `/settings/connectors` (OAuth returns here with `?connected`/`?review=1`/`?mail`). */
 export const Route = createFileRoute("/org/$orgId/settings_/$section")({
   validateSearch: settingsSearch,
-  beforeLoad: ({ params }) => {
+  beforeLoad: ({ params, search }) => {
+    // Settings › Computers became Devices: old links still land there.
+    if (params.section === "computers")
+      throw redirect({
+        to: "/org/$orgId/settings/$section",
+        params: { ...params, section: "devices" },
+        search,
+        replace: true,
+      });
     if (!isSettingsSection(params.section)) {
       throw redirect({ to: "/org/$orgId/settings", params: { orgId: params.orgId } });
     }

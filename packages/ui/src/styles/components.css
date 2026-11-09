@@ -795,6 +795,10 @@ textarea.ac-input {
 .ac-brand svg {
   fill: currentColor;
 }
+/* An image mark that isn't square (Tux) keeps its shape in the square box. */
+.ac-brand img {
+  object-fit: contain;
+}
 /* A mark's second color (Kimi's dot, OpenCode's block), as its maker draws it on each theme. */
 .ac-brand__part {
   fill: var(--part);

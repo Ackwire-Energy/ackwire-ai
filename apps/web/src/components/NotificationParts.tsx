@@ -1,6 +1,7 @@
 import type { AppNotification, NotificationActor } from "@agenteschat/client";
 import { appCreatedLine } from "@agenteschat/client/lib/apps";
 import { WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
+import { deviceNoticeOf } from "@agenteschat/client/lib/devices";
 import { formatUsd, namesText } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
@@ -15,6 +16,7 @@ import { Avatar, ComputerIcon, cx, Icon } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
 import { Trans, useTranslation } from "react-i18next";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
+import { DeviceFace, DeviceHeadline } from "@/components/devices/DeviceNotice";
 import type { useDirectory } from "@/hooks/useDirectory";
 import { TYPED_VALUES } from "@/i18n";
 
@@ -82,6 +84,7 @@ export function SystemFace({ n, className = "nt-av24" }: { n: AppNotification; c
   // A board's notice with nobody named: its agent (ADR 0135).
   const widget = widgetNoticeOf(n);
   if (widget?.agentId) return <AgentAvatar agentId={widget.agentId} name="" size="md" className={className} />;
+  if (deviceNoticeOf(n)) return <DeviceFace n={n} className={className} />;
   if (n.kind === "join_request") return <Avatar name={askersOf(n).names[0] ?? ""} size="sm" className={className} />;
   if (n.kind === "computer_ready")
     return (
@@ -224,6 +227,7 @@ export function Headline({
   const own = workspaceHeadline(n);
   if (own) return t(own, { name: n.source.label });
   if (n.kind === "app_created") return appCreatedLine(t, n);
+  if (deviceNoticeOf(n)) return <DeviceHeadline n={n} dir={dir} />;
   // A board's notice (ADR 0135): the agent who looks after the widget or asks to publish the board.
   const widget = widgetNoticeOf(n);
   if (widget) {

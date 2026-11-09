@@ -81,7 +81,7 @@ describe("an offline computer: the notice", () => {
     expect(notice.textContent).toContain("O MacBook Air desconectou há 12 min");
     expect(notice.textContent).toContain("Ada e Atlas esperam por ele · 3 tarefas paradas");
     expect(within(notice).getByRole("link", { name: "Ver computador" }).getAttribute("href")).toBe(
-      `/org/${ORG_ID}/settings/computers/${MAC}`,
+      `/org/${ORG_ID}/settings/devices/${MAC}`,
     );
     await click(within(notice).getByRole("button", { name: "Trocar computador" }));
     await settle(2);

@@ -10,6 +10,8 @@
  *   mac      an aluminum laptop with the screen notch; the screen shows our sky with a pixel agent
  *   windows  a light monitor on a stand; a window and a taskbar over the sky
  *   linux    a server tower: drive bays, vents, a green light (most Linux machines are servers)
+ *   android  a phone with a silver rail and a punch-hole camera (a phone reached through a computer)
+ *   iphone   a phone with a darker rail, rounder corners and the island
  * The screen goes dark when the computer is offline and dims when it's paused.
  * Drawn on a 48×48 grid (one canvas pixel per cell), scaled by whole numbers so
  * every pixel stays crisp.
@@ -18,17 +20,25 @@
 /** The grid's side, in cells. */
 export const COMPUTER_GRID = 48;
 export const COMPUTER_KINDS = ["mac", "windows", "linux"];
+/** Phones people plug into a computer: drawn by the same engine, told apart by the camera and the rail. */
+export const PHONE_KINDS = ["android", "iphone"];
 export const COMPUTER_STATES = ["online", "paused", "offline"];
 /**
  * The columns each drawing covers, shadow included, in every state and frame: [first, count]. A portrait's box
  * is this wide, so its pixels meet the row's edge like any other lead (the tower is half the grid's width).
  */
-export const COMPUTER_ART = { mac: [3, 42], windows: [4, 40], linux: [12, 25] };
+export const COMPUTER_ART = {
+  mac: [3, 42],
+  windows: [4, 40],
+  linux: [12, 25],
+  android: [13, 23],
+  iphone: [13, 23],
+};
 /**
  * The rows each drawing covers, in every state and frame: [first, count]. The box keeps the whole grid's height, so
  * a row that starts text at a picture's top (`.ac-faceline`) starts it at the drawing's first row instead.
  */
-export const COMPUTER_ROWS = { mac: [6, 33], windows: [5, 39], linux: [3, 42] };
+export const COMPUTER_ROWS = { mac: [6, 33], windows: [5, 39], linux: [3, 42], android: [4, 42], iphone: [4, 42] };
 
 const N = COMPUTER_GRID;
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
@@ -105,6 +115,39 @@ function agent(p, x, y, state, t) {
 }
 
 const light = (state) => (state === "offline" ? ALU[4] : state === "paused" ? WARN : OK);
+
+/* Whether cell (x, y)'s centre is inside the rounded box at (x0, y0), w×h, corner radius r. */
+function inRounded(x, y, x0, y0, w, h, r) {
+  const qx = Math.max(x0 + r - (x + 0.5), 0, x + 0.5 - (x0 + w - r));
+  const qy = Math.max(y0 + r - (y + 0.5), 0, y + 0.5 - (y0 + h - r));
+  return qx * qx + qy * qy <= r * r;
+}
+
+/* The phones' shared body, standing on its foot (cols 14..33, rows 4..43): a metal rail lit from the top left, a
+   black bezel, the rounded screen. `rail` is [lit, turning, shaded]. */
+const PHONE = { x: 14, y: 4, w: 20, h: 40 };
+function phone(p, state, dark, t, rail, r) {
+  const { x: x0, y: y0, w, h } = PHONE;
+  shadow(p, 24, y0 + h, 11, dark);
+  const sx = x0 + 2;
+  const sy = y0 + 2;
+  screen(p, sx, sy, w - 4, h - 4, state, t);
+  for (let y = y0; y < y0 + h; y++)
+    for (let x = x0; x < x0 + w; x++) {
+      if (!inRounded(x, y, x0, y0, w, h, r)) continue;
+      if (inRounded(x, y, sx, sy, w - 4, h - 4, r - 2)) continue;
+      const out = (dx, dy) => !inRounded(x + dx, y + dy, x0, y0, w, h, r);
+      const lit = out(-1, 0) || out(0, -1);
+      const shaded = out(1, 0) || out(0, 1);
+      p.set(x, y, lit && shaded ? rail[1] : lit ? rail[0] : shaded ? rail[2] : GRAPHITE[2]);
+    }
+  if (state === "offline") return;
+  // The status bar (the time on the left, the battery on the right) and the home bar.
+  p.box(17, 7, 2, 1, "rgba(255,255,255,.85)");
+  p.box(29, 7, 2, 1, "rgba(255,255,255,.85)");
+  p.box(21, 40, 6, 1, "rgba(4,32,63,.5)");
+  agent(p, 22, 17, state, t);
+}
 
 const DRAW = {
   mac(p, state, dark, t) {
@@ -195,6 +238,32 @@ const DRAW = {
     p.box(22, 38, 3, 2, ALU[3]);
     p.set(23, 38, ALU[5]);
     p.set(27, 39, light(state));
+  },
+  /* A modern Android phone: a silver rail, a punch-hole camera, app icons over a search bar, buttons on the right. */
+  android(p, state, dark, t) {
+    phone(p, state, dark, t, [ALU[3], ALU[4], ALU[5]], 4);
+    p.box(23, 7, 2, 2, GRAPHITE[2]);
+    if (state !== "offline") {
+      for (const x of [17, 21, 25, 29]) p.box(x, 31, 2, 2, "#ffffff");
+      p.box(17, 35, 14, 2, "rgba(255,255,255,.9)");
+    }
+    p.box(34, 13, 1, 3, ALU[5]);
+    p.box(34, 18, 1, 6, ALU[5]);
+  },
+  /* An iPhone: a darker rail, rounder corners, the Dynamic Island, a dock, the action and volume buttons on the left. */
+  iphone(p, state, dark, t) {
+    phone(p, state, dark, t, [ALU[5], GRAPHITE[0], GRAPHITE[1]], 5);
+    p.box(21, 7, 6, 2, GRAPHITE[2]);
+    if (state !== "offline") {
+      for (let y = 32; y < 36; y++)
+        for (let x = 16; x < 32; x++)
+          if (!((x === 16 || x === 31) && (y === 32 || y === 35))) p.set(x, y, "rgba(255,255,255,.25)");
+      for (const x of [17, 21, 25, 29]) p.box(x, 33, 2, 2, "#ffffff");
+    }
+    p.box(13, 11, 1, 2, GRAPHITE[0]);
+    p.box(13, 14, 1, 4, GRAPHITE[0]);
+    p.box(13, 19, 1, 4, GRAPHITE[0]);
+    p.box(34, 15, 1, 6, GRAPHITE[1]);
   },
 };
 

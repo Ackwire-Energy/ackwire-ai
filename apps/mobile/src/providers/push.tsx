@@ -5,6 +5,7 @@ import * as Notifications from "expo-notifications";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AppState } from "react-native";
+import { registerDeviceActions, runDeviceAction } from "@/features/devices/push";
 import { hrefForPush, notificationWebPath, pushAsNotification } from "@/features/links/logic";
 import { openWebPath } from "@/features/links/open-web";
 import { openWorkspace } from "@/features/server";
@@ -111,6 +112,11 @@ export function PushProvider({ children }: { children: ReactNode }) {
     };
   }, [ready, locale, t]);
 
+  // A device notification's buttons on the lock screen, in the person's language.
+  useEffect(() => {
+    if (ready) void registerDeviceActions(t);
+  }, [ready, t]);
+
   // Android: FCM may hand the app a new token while it runs; it's registered again (ADR 0152).
   useEffect(() => {
     if (!ready) return;
@@ -139,6 +145,9 @@ export function PushProvider({ children }: { children: ReactNode }) {
       const orgId = data.orgId;
       if (orgId && !pushOpens(qc.getQueryData<Me | null>(keys.me)?.organizations ?? [], orgId)) return;
       if (orgId) setOrgRef.current?.(orgId);
+      // A button pressed on the notification (Stop, Let it join…): done first, then its screen opens as a tap would.
+      if (orgId && response.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER)
+        runDeviceAction(api, orgId, data, response.actionIdentifier);
       // The computer being ready opens Connect an AI while no agent has one: its AI status is asked first.
       const ai: Promise<AiStatus | undefined> =
         data.kind === "computer_ready" && orgId

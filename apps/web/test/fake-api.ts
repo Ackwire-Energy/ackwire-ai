@@ -119,6 +119,7 @@ import type { MockContext } from "./fakes/context";
 import { createMockCustomConnectors } from "./fakes/custom-connectors";
 import { createFakeDashboards, type FakeDashboards } from "./fakes/dashboards";
 import { createFakeDatabases, type FakeDatabases } from "./fakes/databases";
+import { createFakeDevices, type FakeDevices } from "./fakes/devices";
 import { createFakeMachines, type FakeMachines } from "./fakes/machines";
 import { createFakeMail, type FakeMail } from "./fakes/mail";
 import { createFakeMissions } from "./fakes/missions";
@@ -1206,6 +1207,7 @@ type FakedParts =
   | "notifications"
   | "sandbox"
   | "machines"
+  | "devices"
   | "skills"
   | "access"
   | "invites"
@@ -3750,6 +3752,8 @@ function newInvitation(email: string, role: Role, roleIds: string[] = []): Invit
 
 /** The connected-computers fake behind each `createFakeApi` client (tests pair machines with it). */
 export const fakeMachinesOf = new WeakMap<ApiClient, FakeMachines>();
+/** The devices fake behind each client (tests set the list and move a connect link on with it). */
+export const fakeDevicesOf = new WeakMap<ApiClient, FakeDevices>();
 
 /** The mailboxes fake behind each `createFakeApi` client (tests add mailboxes and failures with it). */
 export const fakeMailOf = new WeakMap<ApiClient, FakeMail>();
@@ -3784,6 +3788,12 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
   const threads = createFakeThreads(ctx, (method, ...args) => state.calls.push({ method, args }));
   state.openThread = threads.openByReply;
   const machines = createFakeMachines(ctx, (method, ...args) => state.calls.push({ method, args }));
+  const devices = createFakeDevices(
+    (method, ...args) => state.calls.push({ method, args }),
+    ctx.now,
+    () => machines.all(),
+    (orgId, id) => machines.client.remove(orgId, id),
+  );
   const agentIds = async (orgId: string) => (await http.agents.list(orgId)).map((a) => a.id);
   const customConnectors = createMockCustomConnectors(
     ctx,
@@ -3815,6 +3825,7 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
     apps: apps.client,
     sandbox: createFakeSandbox(ctx, (method, ...args) => state.calls.push({ method, args }), machines),
     machines: machines.client,
+    devices: devices.client,
     notifications: createFakeNotifications(
       {
         get items() {
@@ -4029,6 +4040,7 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
       : {}),
   };
   fakeMachinesOf.set(client, machines);
+  fakeDevicesOf.set(client, devices);
   fakeMailOf.set(client, mail);
   fakeDatabasesOf.set(client, databases);
   fakeDashboardsOf.set(client, dashboards);

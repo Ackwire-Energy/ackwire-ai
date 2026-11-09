@@ -109,6 +109,7 @@ import { choiceReplyLine } from "@agenteschat/client/lib/choices";
 import { draftKeyOf } from "@agenteschat/client/lib/composer-drafts";
 import { consultsForLine } from "@agenteschat/client/lib/consult-group";
 import { consultationsOf } from "@agenteschat/client/lib/consultations";
+import { deviceWaitOf } from "@agenteschat/client/lib/devices";
 import { clearDraft, peekDraft } from "@agenteschat/client/lib/drafts";
 import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
 import { errorCode, errorText, restrictionLine, runErrorText, runFailureLine } from "@agenteschat/client/lib/errors";
@@ -281,6 +282,7 @@ import { type ChannelActions, ChannelActionsContext, useChannelActions } from "@
 import { DatePill, type DatePillHandle } from "@/components/DatePill";
 import { DeleteChannelDialog } from "@/components/DeleteChannelDialog";
 import { MenuEntries } from "@/components/DesktopMenus";
+import { DeviceWaitCard } from "@/components/devices/DeviceWaitCard";
 import { useArchiveChannelWithUndo } from "@/components/entity-menus";
 import { InPlaceProvider } from "@/components/InPlace";
 import { HandedTaskChips, IssueTakenLine, IssueWorkCard } from "@/components/IssueWork";
@@ -4163,6 +4165,8 @@ export const TimelineMessage = memo(function TimelineMessage({
   // "O Claude Code não está disponível agora": its computer is offline; one card that waits, then says it's back.
   const brainNotice = m.author.type === "agent" ? brainUnavailableOf(meta) : null;
   const waitNotice = brainNotice && isOfflineNotice(brainNotice) ? brainNotice : null;
+  // An agent's run parked until a device it named is back: one card that waits, then says it's back.
+  const deviceWait = m.author.type === "agent" ? deviceWaitOf(meta) : null;
   // "Ada não vai responder porque não tem uma IA conectada": one card with Connect, in place of its text.
   const noAi = m.author.type === "agent" && noAiCardOf(meta) !== null;
   // An agent's card whose button opens the app's own dialog, filled in ("Conectar uma IA para Ada").
@@ -4174,6 +4178,7 @@ export const TimelineMessage = memo(function TimelineMessage({
   const card =
     approvalId ||
     waitNotice ||
+    deviceWait ||
     noAi ||
     actionCard ||
     proposalId ||
@@ -4625,6 +4630,7 @@ export const TimelineMessage = memo(function TimelineMessage({
                 .filter((u) => u.action === "proposed")
                 .map((u) => <MemoryChangeCard key={`${u.action}-${u.itemId}`} update={u} agentId={agent.id} />)}
             {waitNotice && <WaitingCard notice={waitNotice} agentId={m.author.id ?? null} />}
+            {deviceWait && <DeviceWaitCard wait={deviceWait} message={m} />}
             {noAi && <NoAiCard message={m} />}
             {actionCard && <ActionCard message={m} />}
             {m.author.type === "agent" && !m.local && m.meta?.replyChips ? <ReplyChips message={m} /> : null}

@@ -3,6 +3,7 @@ import { and, type Database, type Executor, eq, inArray, schema } from "@agentes
 import { getAgentCached } from "./agents";
 import { type BrowserHandoffRow, finishHandoff } from "./browser/handoff";
 import type { AgentConsultationRow } from "./consultations";
+import { endDeviceWaitCards, isDeviceWaitId } from "./device-waits";
 import { cutText } from "./format";
 import type { Judge } from "./judge";
 import type { Message } from "./messages";
@@ -19,7 +20,16 @@ export interface WaitMessageOutcome {
   outcome: "resolved" | "woke" | "held";
 }
 
-export type WaitKind = "browser_handoff" | "consultation" | "approval" | "question" | "secret" | "mission" | "machine";
+export type WaitKind =
+  | "browser_handoff"
+  | "consultation"
+  | "approval"
+  | "question"
+  | "secret"
+  | "mission"
+  | "machine"
+  /** `wait_for_device`: a device to be back, free or allowed (`device-waits.ts`). */
+  | "device";
 
 /** One thing a waiting run waits on: a pending tool call of its transcript, or its computer. */
 export interface RunWait {
@@ -80,6 +90,7 @@ export async function currentWaits(
     if (c.approvalId) out.push({ kind: "approval", id: c.approvalId, ...base });
     else if (c.secretRequestId) out.push({ kind: "secret", id: c.secretRequestId, ...base });
     else if (c.questionId) out.push({ kind: "question", id: c.questionId, ...base });
+    else if (c.waitId && isDeviceWaitId(c.waitId)) out.push({ kind: "device", id: c.waitId, ...base });
     else if (c.waitId) {
       const waitId = c.waitId;
       const handoff = handoffs.find((h) => h.id === waitId);
@@ -188,6 +199,14 @@ export function detachOf(wait: RunWait): Detach | null {
       text: `Still open: your request for a person's help in your browser ("${cutText(h.instructions, 300)}"). ${MEANWHILE} Its result will reach you as a notice later; until then your browser stays with the person (your browser tools wait for it). If their message means you no longer need it (they chose another way), withdraw it at once with withdraw_request (id ${h.id}).`,
     };
   }
+  if (wait.kind === "device") {
+    return {
+      waitId: wait.id,
+      kind: wait.kind,
+      from: "The device you waited for",
+      text: `You stopped waiting for the device. ${MEANWHILE} Do what it asks; if the device is still needed, call wait_for_device again.`,
+    };
+  }
   if (wait.kind === "consultation" && wait.consultation) {
     const handle = `@${wait.consultation.handle}`;
     return {
@@ -274,7 +293,7 @@ export async function onMessageWhileWaiting(
   if (waits.length === 0) return null;
   const held = waits.find((w) => w.kind === "approval" || w.kind === "secret");
   if (held) return { waitKind: held.kind, outcome: "held" };
-  if (waits.some((w) => w.kind !== "browser_handoff" && w.kind !== "consultation")) return null;
+  if (waits.some((w) => w.kind !== "browser_handoff" && w.kind !== "consultation" && w.kind !== "device")) return null;
   const [first] = waits;
   if (!first) return null;
 
@@ -305,5 +324,12 @@ export async function onMessageWhileWaiting(
   const detach = waits.map(detachOf).filter((d): d is Detach => d !== null);
   if (detach.length !== waits.length) return null;
   const woke = await detachWaits(deps.db, run.id, detach);
+  if (woke)
+    await endDeviceWaitCards(
+      deps,
+      run,
+      detach.map((d) => d.waitId),
+      "moved_on",
+    ).catch(() => undefined);
   return woke ? { waitKind: first.kind, outcome: "woke" } : null;
 }

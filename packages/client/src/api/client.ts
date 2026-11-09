@@ -100,7 +100,15 @@ import type {
   CommandApproval,
   ComposioUsage,
   ComputerQueue,
+  ComputerDevice,
+  ComputerDeviceInput,
   ComputerSetup,
+  ConnectLink,
+  ConnectLinkState,
+  DeviceAudience,
+  DevicesList,
+  PhoneDevice,
+  PhoneDeviceInput,
   ComputerTarget,
   Connection,
   ConnectOutcome,
@@ -978,6 +986,27 @@ export interface ApiClient {
     computer(orgId: string, agentId: string): Promise<AgentComputer>;
     /** Which computer the agent uses: a connected machine, or `null` for none. */
     setTarget(orgId: string, agentId: string, machineId: string | null): Promise<ComputerTarget>;
+  };
+  /** Bring your own devices: computers people connect and the phones they reach, as agents' targets. */
+  devices: {
+    list(orgId: string): Promise<DevicesList>;
+    updateComputer(orgId: string, machineId: string, input: ComputerDeviceInput): Promise<ComputerDevice>;
+    removeComputer(orgId: string, machineId: string): Promise<void>;
+    updatePhone(orgId: string, phoneId: string, input: PhoneDeviceInput): Promise<PhoneDevice>;
+    /** Forgets it; it comes back if its host sees it again. */
+    forgetPhone(orgId: string, phoneId: string): Promise<void>;
+    /** Takes the phone back from the agent using it. */
+    stopPhone(orgId: string, phoneId: string): Promise<void>;
+    createLink(orgId: string, kind: "server" | "computer"): Promise<ConnectLink>;
+    link(orgId: string, linkId: string): Promise<ConnectLinkState>;
+    approveRequest(
+      orgId: string,
+      requestId: string,
+      input: { name?: string; audience?: DeviceAudience },
+    ): Promise<{ machineId: string }>;
+    denyRequest(orgId: string, requestId: string): Promise<void>;
+    decideAccess(orgId: string, requestId: string, decision: "once" | "always" | "no"): Promise<void>;
+    deviceWait(orgId: string, runId: string, action: "retry" | "stop"): Promise<void>;
   };
   /** Connected computers (ADR 0025): machines running `agentes-runner`. */
   machines: {

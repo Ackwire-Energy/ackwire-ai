@@ -41,11 +41,6 @@ afterEach(() => {
 });
 
 const MAC_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/18.0 Safari/605.1.15";
-const WINDOWS_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0 Safari/537.36";
-const LINUX_UA = "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:131.0) Gecko/20100101 Firefox/131.0";
-const ARM_LINUX_UA = "Mozilla/5.0 (X11; Linux aarch64; rv:131.0) Gecko/20100101 Firefox/131.0";
-const ANDROID_UA =
-  "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36";
 /** The page as a browser on that system opens it (the test DOM's own user agent comes back after each test). */
 const asBrowserOn = (ua: string) => Object.defineProperty(navigator, "userAgent", { configurable: true, value: ua });
 
@@ -271,7 +266,7 @@ test("a picture (an agent's screenshot): a big viewer, its details in the header
   expect(within(dialog).queryByRole("navigation", { name: "Versões" })).toBeNull();
 });
 
-describe("Configurações → Computadores", () => {
+describe("Configurações → Dispositivos (self-host)", () => {
   const go = async (state = seedState()) => {
     const api = createFakeApi(state);
     const r = await renderApp(`/org/${ORG_ID}/settings/computers`, { api });
@@ -286,25 +281,26 @@ describe("Configurações → Computadores", () => {
       machines: fakeMachinesOf.get(api) as NonNullable<ReturnType<typeof fakeMachinesOf.get>>,
     };
   };
+  const row = (name: string) =>
+    [...document.querySelectorAll<HTMLElement>(".dv-row")].find(
+      (r) => r.querySelector(".dv-row__name")?.textContent === name,
+    ) as HTMLElement;
 
-  test("one section: one lead line, other computers and how to connect one", async () => {
-    await go();
+  test("one section: one lead line, the devices and Connect a device", async () => {
+    const { router } = await go();
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/devices`);
     const nav = screen().getByRole("navigation", { name: "Seções das configurações" });
     const links = within(nav)
       .getAllByRole("link")
       .map((l) => l.textContent);
-    expect(links).toContain("Computadores");
+    expect(links).toContain("Dispositivos");
     expect(links).not.toContain("Sandbox");
     const body = document.querySelector(".settings__body") as HTMLElement;
-    expect(body.textContent).toContain("Onde os agentes trabalham: este servidor e outros que você conectar.");
-    // No kinds side by side anymore, and never "in the cloud" here.
-    expect(screen().queryByRole("region", { name: "Onde os agentes trabalham" })).toBeNull();
+    expect(body.textContent).toContain(
+      "Onde seus agentes trabalham: os computadores e celulares que as pessoas conectam.",
+    );
     expect(body.textContent).not.toMatch(/Na nuvem|No seu computador|Computador na nuvem/);
-    expect(screen().getByRole("region", { name: "Outros computadores" })).toBeTruthy();
-    // How to connect one is the card right under it: the empty state's button goes there.
-    expect(screen().getByText("Rode agentes em qualquer computador")).toBeTruthy();
-    expect(body.textContent).not.toContain("Conecte um Mac pelo app agentes");
-    expect(screen().getByRole("region", { name: "Conectar outro computador" })).toBeTruthy();
+    expect(screen().getByRole("button", { name: "Conectar um dispositivo" })).toBeTruthy();
     // Never internal names in the UI.
     expect(body.textContent).not.toMatch(/runner|MCP/i);
   });
@@ -326,7 +322,7 @@ describe("Configurações → Computadores", () => {
     expect(document.body.textContent).toContain("Ada agora usa Escritório.");
     expect(within(card).getByRole("combobox", { name: "Computador de Ada" }).textContent).toContain("Escritório");
     // The row's portrait is the Mac's.
-    expect(document.querySelector(".machine-row canvas.ac-computer")?.getAttribute("data-kind")).toBe("mac");
+    expect(document.querySelector(".dv-row canvas.ac-computer")?.getAttribute("data-kind")).toBe("mac");
   });
 
   test("which computer each agent uses: this server's computer, before its runner names it, by what it is", async () => {
@@ -352,244 +348,98 @@ describe("Configurações → Computadores", () => {
     expect(card.textContent).toContain("Nenhum computador");
   });
 
-  test("download: the Mac app from the latest build (version, size, SHA-256), first-run steps, other ways", async () => {
+  test("download: the app for the system this page is open on, the other two in a small menu", async () => {
     const state = seedState();
     const api = createFakeApi(state);
-    const sha = "9f2c4e1b7a3d5f60c8e9a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f6";
     fakeMachinesOf.get(api)?.setRelease({
       version: "0.2.0",
       url: "/api/desktop/download/0.2.0/agentes_0.2.0_aarch64.dmg",
-      sha256: sha,
+      sha256: "",
       publishedAt: "2026-10-16T12:00:00.000Z",
-      size: 12 * 1024 * 1024,
     });
     asBrowserOn(MAC_UA);
-    await renderApp(`/org/${ORG_ID}/settings/computers`, { api });
+    await renderApp(`/org/${ORG_ID}/settings/devices`, { api });
     await settle(8);
-    expect(state.calls.find((c) => c.method === "machines.desktopLatest")?.args).toEqual(["darwin", "aarch64"]);
-    const card = screen().getByRole("region", { name: "Conectar outro computador" });
-    expect(shownText(card)).toContain("Instale o app do agentes.chat no computador.");
-    expect(card.querySelector(".ac-computer")?.getAttribute("data-kind")).toBe("mac");
-    expect(card.textContent).not.toContain("numa janela própria");
-    const download = within(card).getByRole("link", { name: "Baixar o app para macOS" });
+    await click(screen().getByRole("button", { name: "Conectar um dispositivo" }));
+    await settle(4);
+    const dialog = screen().getByRole("dialog", { name: "Conectar um dispositivo" });
+    // A web page can't know whether the app is installed: Open the app and the download, always both.
+    expect(within(dialog).getByRole("link", { name: "Abrir o app" })).toBeTruthy();
+    const download = within(dialog).getByRole("link", { name: "Baixar para macOS" });
     expect(download.getAttribute("href")).toBe(
       "http://localhost:3000/api/desktop/download/0.2.0/agentes_0.2.0_aarch64.dmg",
     );
-    expect(card.textContent).toMatch(/Versão 0\.2\.0 · 12\sMB/);
-    expect(card.querySelector(".machine-connect__hash")?.textContent).toBe(sha);
-    expect(within(card).getByRole("button", { name: "Copiar SHA-256" })).toBeTruthy();
-    // What to do with the hash is its ⓘ, not a line under it.
-    expect(hintOf("SHA-256", card).text).toBe("Confira se é o mesmo do arquivo baixado: o app só é publicado aqui.");
-    expect(shownText(card)).not.toContain("Confira se é o mesmo");
-    // The first time's steps stay on the card: they are how to connect it.
-    expect(card.textContent).toContain("Na primeira vez");
-    expect(card.textContent).toContain("arraste o agentes.chat para Aplicativos");
-    expect(card.textContent).toContain("Entre e clique em Usar este Mac em Configurações → Computadores.");
-    // Signed and notarized: no Terminal unlock on first run.
-    expect(card.textContent).not.toContain("xattr");
-    // The old flow is gone: no code made on the site, no install command with a code.
-    expect(screen().queryByRole("button", { name: "Gerar comando" })).toBeNull();
-    const commands = () => [...card.querySelectorAll(".machine-command__code")].map((el) => el.textContent ?? "");
-    // No command before "Outras formas" opens.
-    expect(commands()).toEqual([]);
-    const other = within(card).getByRole("button", { name: "Outras formas: servidor ou Linux" });
-    expect(other.getAttribute("aria-expanded")).toBe("false");
-    await click(other);
-    const command = commands().at(-1) ?? "";
-    expect(command).toBe("curl -fsSL http://localhost:3000/api/machines/install.sh | sh");
-    expect(command).not.toContain("--code");
-    // A command wider than a phone scrolls beside its copy button, never under it.
-    const css = await Bun.file(new URL("../src/layout.css", import.meta.url).pathname).text();
-    const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
-    expect(rule(".machine-command")).toContain("display: flex");
-    expect(rule(".machine-command__copy")).not.toContain("position: absolute");
-    expect(shownText(card)).toContain("Rode no terminal do computador e confirme o código que ele mostrar.");
-    expect(card.textContent).not.toContain("Não precisa instalar nada antes");
+    expect(within(dialog).getByRole("button", { name: "Outros sistemas" })).toBeTruthy();
+    expect(dialog.textContent).not.toMatch(/instalado|installed/i);
   });
 
-  test("a PC or a Linux computer's browser gets the app for its own system, with its own first step", async () => {
-    for (const [ua, target, system, device, kind] of [
-      [WINDOWS_UA, "windows", "Windows", "PC", "windows"],
-      [LINUX_UA, "linux", "Linux", "computador", "linux"],
-    ] as const) {
-      cleanup();
-      const state = seedState();
-      const api = createFakeApi(state);
-      fakeMachinesOf.get(api)?.setRelease({
-        version: "0.6.0",
-        url: `/api/desktop/download/0.6.0/agentes_0.6.0_${target}`,
-        sha256: "",
-        publishedAt: "2026-10-26T12:00:00.000Z",
-        size: null,
-      });
-      asBrowserOn(ua);
-      await renderApp(`/org/${ORG_ID}/settings/computers`, { api });
-      await settle(8);
-      expect(state.calls.find((c) => c.method === "machines.desktopLatest")?.args).toEqual([target, "x86_64"]);
-      const card = screen().getByRole("region", { name: "Conectar outro computador" });
-      expect(within(card).getByRole("link", { name: `Baixar o app para ${system}` })).toBeTruthy();
-      expect(card.querySelector(".ac-computer")?.getAttribute("data-kind")).toBe(kind);
-      const steps = [...card.querySelectorAll(".machine-pair__steps > li")].map((li) => li.textContent);
-      expect(steps[0]).toBe("Abra o arquivo baixado para instalar.");
-      expect(steps[1]).toContain(`Entre e clique em Usar este ${device} em Configurações → Computadores.`);
-      expect(card.textContent).not.toMatch(/Aplicativos|\bMac\b/);
-    }
-  });
-
-  test("no build published (404): a calm note instead of the button, and nothing to install; the terminal stays", async () => {
-    const api = createFakeApi(seedState());
-    asBrowserOn(LINUX_UA);
-    await renderApp(`/org/${ORG_ID}/settings/computers`, { api });
-    await settle(8);
-    const card = screen().getByRole("region", { name: "Conectar outro computador" });
-    expect(within(card).queryByRole("link", { name: /^Baixar o app para/ })).toBeNull();
-    expect(card.textContent).toContain("O app ainda não está disponível. Por enquanto, use o comando abaixo.");
-    expect(card.textContent).not.toContain("Instale o app do agentes.chat");
-    expect(within(card).getByRole("button", { name: "Outras formas: servidor ou Linux" })).toBeTruthy();
-    // The command below is a shell script, which Windows' own terminal doesn't run.
-    cleanup();
-    asBrowserOn(WINDOWS_UA);
-    await renderApp(`/org/${ORG_ID}/settings/computers`, { api: createFakeApi(seedState()) });
-    await settle(8);
-    const pc = screen().getByRole("region", { name: "Conectar outro computador" });
-    expect(pc.textContent).toContain("O app ainda não está disponível.");
-    expect(pc.textContent).not.toContain("use o comando abaixo");
-  });
-
-  test("a phone gets no system guessed, and a Linux on another chip no x64 build", async () => {
-    const cardOn = async (ua: string) => {
-      cleanup();
-      const state = seedState();
-      const api = createFakeApi(state);
-      fakeMachinesOf.get(api)?.setRelease({
-        version: "0.6.0",
-        url: "/api/desktop/download/0.6.0/agentes_0.6.0_amd64.deb",
-        sha256: "",
-        publishedAt: "2026-10-26T12:00:00.000Z",
-        size: null,
-      });
-      asBrowserOn(ua);
-      await renderApp(`/org/${ORG_ID}/settings/computers`, { api });
-      await settle(8);
-      expect(state.calls.some((c) => c.method === "machines.desktopLatest")).toBe(false);
-      const card = screen().getByRole("region", { name: "Conectar outro computador" });
-      expect(within(card).queryByRole("link", { name: /^Baixar o app para/ })).toBeNull();
-      expect(card.querySelector(".ac-computer, .machine-pair__steps")).toBeNull();
-      expect(within(card).getByRole("button", { name: "Outras formas: servidor ou Linux" })).toBeTruthy();
-      return shownText(card);
-    };
-    // The app goes on the computer: the line alone, never a note that it isn't out.
-    const phone = await cardOn(ANDROID_UA);
-    expect(phone).toContain("Instale o app do agentes.chat no computador.");
-    expect(phone).not.toContain("ainda não está disponível");
-    expect(await cardOn(ARM_LINUX_UA)).toContain(
-      "O app ainda não está disponível. Por enquanto, use o comando abaixo.",
-    );
-  });
-
-  test("a row: state, details, live status and pause; it opens the computer's page", async () => {
-    const { socket, machines, router } = await go();
+  test("a row: its state and whose it is; it opens the computer's page", async () => {
+    const { machines, router, socket } = await go();
     const m = machines.pair({ name: "Escritório" });
     await act(async () => socket.push(orgEvent({ type: "machine.paired", machineId: m.id, name: m.name })));
     await settle(6);
-    const row = document.querySelector(".machine-row") as HTMLElement;
-    expect(row.textContent).toContain("Escritório");
-    expect(row.textContent).toContain("Online");
-    expect(row.textContent).toContain("Linux · versão 0.1.0 · conectado agora · Conectado por Walter");
-    // The folder is on the computer's page, not in the list.
-    expect(row.textContent).not.toContain("/home/runner/agentes");
-
-    // Goes offline: the chip follows the event, no refetch needed.
-    await act(async () => socket.push(orgEvent({ type: "machine.status", machineId: m.id, online: false })));
-    await settle(2);
-    expect(row.textContent).toContain("Offline");
-    // Paused on the machine (no `until`: until the owner resumes).
-    await act(async () =>
-      socket.push(orgEvent({ type: "machine.state", machineId: m.id, paused: { paused: true, until: null } })),
-    );
-    await settle(2);
-    expect(row.textContent).toContain("Pausado");
-
-    await click(within(row).getByRole("link", { name: "Abrir Escritório" }));
+    const r = row("Escritório");
+    expect(r.querySelector(".dv-status")?.textContent).toBe("Pronto");
+    expect(r.querySelector(".dv-row__owner")?.textContent).toContain("Walter");
+    await click(within(r).getByRole("link", { name: "Escritório" }));
     await settle(6);
-    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/computers/${m.id}`);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/devices/${m.id}`);
     expect(screen().getByRole("heading", { name: "Escritório" })).toBeTruthy();
   });
 
-  test("commands off and the agents using it; rename and remove (with our own confirm)", async () => {
+  test("rename and remove, with our own confirm", async () => {
     const state = seedState();
     const api = createFakeApi(state);
-    const machines = fakeMachinesOf.get(api);
-    const m = machines?.pair({
-      name: "Notebook",
-      execAllowed: false,
-      online: false,
-      lastSeenAt: null,
-      agents: [{ id: ADA_ID, name: "Ada", handle: "ada" }],
-    }) as Machine;
-    await renderApp(`/org/${ORG_ID}/settings/computers`, { api });
+    const m = fakeMachinesOf.get(api)?.pair({ name: "Notebook", online: false, lastSeenAt: null }) as Machine;
+    await renderApp(`/org/${ORG_ID}/settings/devices`, { api });
     await settle(8);
-    const row = document.querySelector(".machine-row") as HTMLElement;
-    expect(row.textContent).toContain("Comandos desligados");
-    expect(row.textContent).toContain("ainda não conectou");
-    expect(row.querySelector(".machine-row__agents [title='Usado por Ada']")).not.toBeNull();
-
-    let menu = await openMenu(within(row).getByRole("button", { name: "Ações de Notebook" }));
+    let menu = await openMenu(within(row("Notebook")).getByRole("button", { name: "Ações de Notebook" }));
     await click(within(menu).getByRole("menuitem", { name: "Renomear" }));
-    const rename = screen().getByRole("dialog", { name: "Renomear computador" });
-    await type(within(rename).getByLabelText("Nome do computador"), "Notebook do Walter");
+    const rename = screen().getByRole("dialog", { name: "Renomear o dispositivo" });
+    await type(within(rename).getByLabelText("Nome"), "Notebook do Walter");
     await click(within(rename).getByRole("button", { name: "Salvar" }));
     await settle(4);
-    expect(state.calls.find((c) => c.method === "machines.rename")?.args).toEqual([ORG_ID, m.id, "Notebook do Walter"]);
-
-    menu = await openMenu(
-      within(document.querySelector(".machine-row") as HTMLElement).getByRole("button", { name: /^Ações de / }),
-    );
+    expect(state.calls.find((c) => c.method === "devices.updateComputer")?.args).toEqual([
+      ORG_ID,
+      m.id,
+      { name: "Notebook do Walter" },
+    ]);
+    menu = await openMenu(within(row("Notebook do Walter")).getByRole("button", { name: /^Ações de / }));
     await click(within(menu).getByRole("menuitem", { name: "Remover" }));
-    const confirm = screen().getByRole("dialog", { name: "Remover “Notebook do Walter”?" });
-    expect(confirm.textContent).toContain("Os agentes que usam ele precisam de outro computador.");
+    const confirm = screen().getByRole("dialog", { name: "Remover Notebook do Walter?" });
     await click(within(confirm).getByRole("button", { name: "Remover" }));
     await settle(4);
-    expect(state.calls.find((c) => c.method === "machines.remove")?.args).toEqual([ORG_ID, m.id]);
-    expect(document.querySelector(".machine-row")).toBeNull();
+    expect(state.calls.find((c) => c.method === "devices.removeComputer")?.args).toEqual([ORG_ID, m.id]);
   });
 
-  test("this server's own computer: labelled, stopped here with its own words, and turned back on", async () => {
+  test("this server's own computer: stopped here with its own words, and turned back on", async () => {
     const state = seedState();
     const api = createFakeApi(state);
     const machines = fakeMachinesOf.get(api);
     const m = machines?.pair({ name: "srv-1", kind: "host" }) as Machine;
     machines?.setHost({ machineId: m.id, on: true });
-    await renderApp(`/org/${ORG_ID}/settings/computers`, { api });
+    await renderApp(`/org/${ORG_ID}/settings/devices`, { api });
     await settle(8);
-    const row = document.querySelector(".machine-row") as HTMLElement;
-    expect(row.textContent).toContain("srv-1");
-    expect(row.textContent).toContain("Computador deste servidor");
-
-    const menu = await openMenu(within(row).getByRole("button", { name: "Ações de srv-1" }));
+    const menu = await openMenu(within(row("srv-1")).getByRole("button", { name: "Ações de srv-1" }));
     await click(within(menu).getByRole("menuitem", { name: "Parar de usar neste workspace" }));
     const confirm = screen().getByRole("dialog", { name: "Parar de usar o computador deste servidor?" });
     expect(confirm.textContent).toContain("Dá para voltar a usar quando quiser");
     await click(within(confirm).getByRole("button", { name: "Parar de usar neste workspace" }));
     await settle(6);
     expect(state.calls.find((c) => c.method === "machines.remove")?.args).toEqual([ORG_ID, m.id]);
-
     const off = document.querySelector(".machine-row") as HTMLElement;
     expect(off.textContent).toContain("Este workspace não usa o computador deste servidor.");
     await click(within(off).getByRole("button", { name: "Usar o computador deste servidor" }));
     await settle(4);
     expect(state.calls.find((c) => c.method === "machines.hostOn")?.args).toEqual([ORG_ID]);
-    expect(document.body.textContent).toContain("Pronto. Ele conecta em até um minuto.");
   });
 
-  test("someone else's machine: no actions", async () => {
+  test("someone else's computer: no actions", async () => {
     const api = createFakeApi(seedState());
     fakeMachinesOf.get(api)?.pair({ name: "Servidor do João", canManage: false, workspace: null });
-    await renderApp(`/org/${ORG_ID}/settings/computers`, { api });
+    await renderApp(`/org/${ORG_ID}/settings/devices`, { api });
     await settle(8);
-    const row = document.querySelector(".machine-row") as HTMLElement;
-    expect(within(row).queryByRole("button", { name: /^Ações de / })).toBeNull();
-    expect(row.textContent).not.toContain("Pasta:");
+    expect(within(row("Servidor do João")).queryByRole("button", { name: /^Ações de / })).toBeNull();
   });
 });
 
@@ -693,7 +543,7 @@ describe("the computer page: pause, folders and tools (ADR 0036)", () => {
 
   test("its facts start at the card's edge, under the portrait, whatever the portrait's width", async () => {
     await open();
-    expect(document.querySelector(".ac-card > .machine-page__facts")?.textContent).toContain("macOS");
+    expect(document.querySelector(".ac-card > .dv-facts")?.textContent).toContain("macOS");
     const css = await Bun.file(new URL("../src/layout.css", import.meta.url).pathname).text();
     expect(css).toContain("\n.machine-page__facts {\n  display: flex;");
     // No indent past a portrait: a tower is half as wide as a laptop.
@@ -710,9 +560,9 @@ describe("the computer page: pause, folders and tools (ADR 0036)", () => {
       socket.push(orgEvent({ type: "machine.updated", machineId: m.id, paused: { until, timezone: null } })),
     );
     await settle(2);
-    // "Pausado até 16:24" (past midnight the date comes first).
-    expect(head.textContent).toContain("Pausado até ");
-    expect(head.textContent).toContain(time);
+    // "Pausado", "até 16:24" (past midnight the date comes first).
+    expect(head.querySelector(".dv-statusline")?.textContent).toContain("Pausado");
+    expect(head.querySelector(".dv-statusline")?.textContent).toContain(`até ${time}`);
     expect(head.textContent).toContain("Pausado no próprio computador por quem o conectou.");
     // The server says "not paused" with null.
     await act(async () => socket.push(orgEvent({ type: "machine.updated", machineId: m.id, paused: null })));
@@ -890,9 +740,9 @@ describe("the computer page: pause, folders and tools (ADR 0036)", () => {
     const api = createFakeApi(seedState());
     await renderApp(`/org/${ORG_ID}/settings/computers/nope`, { api });
     await settle(8);
-    expect(screen().getByText("Computador não encontrado")).toBeTruthy();
+    expect(screen().getByText("Este dispositivo não está mais aqui")).toBeTruthy();
     // The way back: the page's own link (the settings menu has one too).
-    expect(document.querySelector("a.machine-page__back")?.textContent).toContain("Computadores");
+    expect(document.querySelector("a.machine-page__back")?.textContent).toContain("Dispositivos");
   });
 
   test("agent page: the folders of its computer this agent may use", async () => {

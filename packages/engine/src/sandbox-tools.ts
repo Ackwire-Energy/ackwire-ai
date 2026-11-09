@@ -36,6 +36,7 @@ import {
 import { recordAudit } from "./audit";
 import { fedByRoutine, runAuthorityById } from "./authority";
 import { sniffModelImage } from "./avatars";
+import { devicesForRequester, hasOtherDevices, secretsMayGo } from "./device-resolve";
 import { publishChannelEvent } from "./events";
 import { copyToComputer } from "./file-pulls";
 import { cutText, formatBytes, textOfBytes } from "./format";
@@ -392,6 +393,7 @@ export function computerSentence(info: ComputerInfo) {
       ? `${pausedMessage(info.name, info.paused.until, info.paused.timezone)} Tell the people when they ask for work there.`
       : "",
     info.execAllowed ? "" : "Commands are turned off on it (files and uploads only).",
+    info.execAllowed && info.os === "windows" ? "Commands run in cmd.exe there: use Windows commands." : "",
     info.folders.length > 0
       ? `Besides your own folder, its owner allowed you these folders (use their absolute paths): ${info.folders.slice(0, 20).join(", ")}.`
       : "",
@@ -608,7 +610,12 @@ export function createSandboxToolSource(
       await publish();
     }
   };
-  const run = <T>(ctx: ToolContext, fn: (computer: ComputerHandle) => Promise<T>) => withSandbox(deps, ctx, fn);
+  /** On the agent's computer, or on the device the call names (`computer`, bring your own devices). */
+  const run = <T>(
+    ctx: ToolContext,
+    fn: (computer: ComputerHandle) => Promise<T>,
+    target: { computer?: unknown; label?: string } = {},
+  ) => withSandbox(deps, ctx, fn, { computer: str(target.computer), ...(target.label ? { label: target.label } : {}) });
   const skillDeps = (ctx: ToolContext): SkillDeps => ({ db: ctx.db, blobs: deps.skills.blobs });
   /** A file that holds a secret (or a folder with one) never leaves the computer through the file tools. */
   const refuseSecretPath = async (ctx: ToolContext, computer: ComputerHandle, path: string) => {
@@ -619,6 +626,18 @@ export function createSandboxToolSource(
   };
 
   const pathProp = { type: "string", minLength: 1, maxLength: 300, description: "Path inside the workspace" };
+  /** `computer` where the workspace has devices besides the agent's own (bring your own devices). */
+  const computerProp = (devices: boolean) =>
+    devices
+      ? {
+          computer: {
+            type: "string",
+            maxLength: 120,
+            description:
+              "Another device to do this on, by its name as computer_status lists it. Leave it out for your own computer.",
+          },
+        }
+      : {};
 
   /**
    * Vault keys for one command (ADR 0144): released for the person behind the run, then sealed, each bound to its
@@ -775,6 +794,7 @@ export function createSandboxToolSource(
     execTimeout: number,
     computerInfo: ComputerInfo = { kind: "none", preparing: false },
     sessionId?: string,
+    devices = false,
     maxTimeout = SANDBOX_LIMITS.machineMaxTimeoutSeconds,
   ): ToolDefinition[] => [
     {
@@ -790,6 +810,7 @@ export function createSandboxToolSource(
           language: { enum: Object.keys(RUNNERS) },
           code: { type: "string", minLength: 1, maxLength: SANDBOX_LIMITS.codeChars },
           timeout_seconds: { type: "integer", minimum: 1, maximum: maxTimeout },
+          ...computerProp(devices),
           ...(deps.vault
             ? {
                 keys: {
@@ -822,31 +843,40 @@ export function createSandboxToolSource(
           if (typeof names === "string") return { content: names, isError: true };
           const file = `.agentes/run-${Date.now()}.${runner.ext}`;
           const started = Date.now();
-          const result = await run(ctx, async (computer) => {
-            await computer.provider.writeFile(computer.id, file, new TextEncoder().encode(str(input.code)));
-            // Sealed right before the command: the computer's one-use key lives two minutes (ADR 0144).
-            const keys = names.length > 0 ? await vaultKeysFor(ctx, computer, names) : null;
-            let r: ExecResult;
-            try {
-              r = await execLive(ctx, computer, {
-                command: scriptCommand(runner.bin, file),
-                timeoutSeconds: timeout,
-                ...(ctx.approved ? { approved: true } : {}),
-                ...(keys ? { vault: keys.vault } : {}),
-              });
-            } catch (error) {
-              // The command may have run with the keys though no answer came back (the link dropped, no answer in
-              // time): their use is recorded. Not when it never reached the computer or the runner refused it before
-              // opening them (ADR 0144 §4).
-              if (keysMayHaveRun(error)) await keys?.used();
-              if (keys && runnerCode(error) === "not_found") throw new Error(VAULT_KEY_EXPIRED, { cause: error });
-              throw error;
-            }
-            // It ran, whatever its exit code, its timeout or a cancel said.
-            await keys?.used();
-            await auditMachineExec(ctx, computer, `${lang}: ${str(input.code)}`, r, names);
-            return r;
-          });
+          const result = await run(
+            ctx,
+            async (computer) => {
+              await computer.provider.writeFile(computer.id, file, new TextEncoder().encode(str(input.code)));
+              if (names.length > 0 && !(await secretsMayGo(ctx, computer.machineId)))
+                throw new VaultRefusal(
+                  "not_allowed",
+                  "Vault keys never go to someone else's device: its owner could read them. Run it without `keys` there, or on your own computer.",
+                );
+              // Sealed right before the command: the computer's one-use key lives two minutes (ADR 0144).
+              const keys = names.length > 0 ? await vaultKeysFor(ctx, computer, names) : null;
+              let r: ExecResult;
+              try {
+                r = await execLive(ctx, computer, {
+                  command: scriptCommand(runner.bin, file),
+                  timeoutSeconds: timeout,
+                  ...(ctx.approved ? { approved: true } : {}),
+                  ...(keys ? { vault: keys.vault } : {}),
+                });
+              } catch (error) {
+                // The command may have run with the keys though no answer came back (the link dropped, no answer in
+                // time): their use is recorded. Not when it never reached the computer or the runner refused it before
+                // opening them (ADR 0144 §4).
+                if (keysMayHaveRun(error)) await keys?.used();
+                if (keys && runnerCode(error) === "not_found") throw new Error(VAULT_KEY_EXPIRED, { cause: error });
+                throw error;
+              }
+              // It ran, whatever its exit code, its timeout or a cancel said.
+              await keys?.used();
+              await auditMachineExec(ctx, computer, `${lang}: ${str(input.code)}`, r, names);
+              return r;
+            },
+            { computer: input.computer, label: `Running ${lang} code` },
+          );
           return execOutput(`run_code ${lang}`, result, Math.round((Date.now() - started) / 1000), timeout);
         } catch (error) {
           return vaultRefusalOutput(error) ?? heldForApproval(error, "Not run") ?? failed(error);
@@ -863,14 +893,19 @@ export function createSandboxToolSource(
     }),
     {
       name: "computer_status",
-      description: "Which computer you work on and whether it is online.",
+      description: devices
+        ? "Which computer you work on and whether it is online, and every other device you may use for the person you work for (people's computers and the phones they reach): name, owner, system, size, tools, phones and whether each is ready. With `computer`, one of them in detail."
+        : "Which computer you work on and whether it is online.",
       scope: SANDBOX_SCOPE,
-      inputSchema: { type: "object", properties: {}, additionalProperties: false },
-      async execute(_input, ctx) {
+      inputSchema: { type: "object", properties: { ...computerProp(devices) }, additionalProperties: false },
+      async execute(input, ctx) {
         try {
+          const others = devices ? await devicesForRequester(ctx, str(input.computer)) : null;
+          if (others?.only) return others.only;
           const target = await agentComputerInfo(deps, ctx.orgId, ctx.agentId);
+          const more = others?.text ? `\n\n${others.text}` : "";
           if (target.kind !== "none") {
-            if (target.kind === "removed") return { content: computerSentence(target), isError: true };
+            if (target.kind === "removed") return { content: `${computerSentence(target)}${more}`, isError: !more };
             const os =
               target.os === "darwin"
                 ? "macOS"
@@ -883,7 +918,7 @@ export function createSandboxToolSource(
               ? `You are on "${target.name}", this workspace's own computer (${os}), always on: ${target.online ? "answering now" : "not answering right now (it usually comes back within minutes; tell the people)"}.`
               : `You are on the connected computer "${target.name}" (${os}), ${target.online ? "online" : "offline (ask its owner to start the runner)"}.`;
             return {
-              content: `${where} Paths are relative to its workspace folder. Commands: ${target.execAllowed ? "allowed" : "turned off (files and uploads only)"}. Network: the machine's own.`,
+              content: `${where} Paths are relative to its workspace folder. Commands: ${target.execAllowed ? "allowed" : "turned off (files and uploads only)"}. Network: the machine's own.${more}`,
               data: {
                 computer: {
                   kind: "machine",
@@ -896,7 +931,10 @@ export function createSandboxToolSource(
               },
             };
           }
-          return { content: target.preparing ? PREPARING_COMPUTER_MESSAGE : NO_COMPUTER_MESSAGE, isError: true };
+          return {
+            content: `${target.preparing ? PREPARING_COMPUTER_MESSAGE : NO_COMPUTER_MESSAGE}${more}`,
+            isError: !more,
+          };
         } catch (error) {
           return failed(error);
         }
@@ -908,7 +946,7 @@ export function createSandboxToolSource(
       scope: SANDBOX_SCOPE,
       inputSchema: {
         type: "object",
-        properties: { path: pathProp, content: { type: "string", maxLength: 1_000_000 } },
+        properties: { path: pathProp, content: { type: "string", maxLength: 1_000_000 }, ...computerProp(devices) },
         required: ["path", "content"],
         additionalProperties: false,
       },
@@ -917,7 +955,7 @@ export function createSandboxToolSource(
           const path = toolPath(str(input.path), computerInfo);
           if (!path) return { content: "path is required", isError: true };
           const data = new TextEncoder().encode(str(input.content));
-          await run(ctx, (c) => c.provider.writeFile(c.id, path, data));
+          await run(ctx, (c) => c.provider.writeFile(c.id, path, data), input);
           return { content: `Wrote ${path} (${data.byteLength} bytes).` };
         } catch (error) {
           return failed(error);
@@ -931,17 +969,21 @@ export function createSandboxToolSource(
       readsOutside: true,
       inputSchema: {
         type: "object",
-        properties: { path: pathProp },
+        properties: { path: pathProp, ...computerProp(devices) },
         required: ["path"],
         additionalProperties: false,
       },
       async execute(input, ctx) {
         try {
           const path = toolPath(str(input.path), computerInfo);
-          const data = await run(ctx, async (c) => {
-            await refuseSecretPath(ctx, c, path);
-            return c.provider.readFile(c.id, path);
-          });
+          const data = await run(
+            ctx,
+            async (c) => {
+              await refuseSecretPath(ctx, c, path);
+              return c.provider.readFile(c.id, path);
+            },
+            input,
+          );
           if (!data) return { content: `No file ${path}.`, isError: true };
           const text = textOfBytes(data.slice(0, SANDBOX_LIMITS.maxFileBytes));
           if (text === null) return { content: binaryFileNote(path, data) };
@@ -960,13 +1002,13 @@ export function createSandboxToolSource(
       scope: SANDBOX_SCOPE,
       inputSchema: {
         type: "object",
-        properties: { path: { type: "string", maxLength: 300 } },
+        properties: { path: { type: "string", maxLength: 300 }, ...computerProp(devices) },
         additionalProperties: false,
       },
       async execute(input, ctx) {
         try {
           const path = toolPath(str(input.path), computerInfo);
-          const files = await run(ctx, (c) => c.provider.listFiles(c.id, path, 3));
+          const files = await run(ctx, (c) => c.provider.listFiles(c.id, path, 3), input);
           const shown = files.filter((f) => !f.path.startsWith(".agentes/") && f.path !== ".agentes").slice(0, 300);
           if (shown.length === 0) return { content: `${path || "workspace"}: empty.` };
           return {
@@ -999,10 +1041,14 @@ export function createSandboxToolSource(
       async execute(input, ctx) {
         try {
           const path = toolPath(str(input.path), computerInfo);
-          const data = await run(ctx, async (c) => {
-            await refuseSecretPath(ctx, c, path);
-            return c.provider.readFile(c.id, path);
-          });
+          const data = await run(
+            ctx,
+            async (c) => {
+              await refuseSecretPath(ctx, c, path);
+              return c.provider.readFile(c.id, path);
+            },
+            input,
+          );
           if (!data) return { content: `No file ${path}.`, isError: true };
           if (data.byteLength > SANDBOX_LIMITS.maxFileBytes) {
             return { content: "The file is too large (max 5 MB).", isError: true };
@@ -1047,6 +1093,7 @@ export function createSandboxToolSource(
           artifact_id: { type: "string", minLength: 36, maxLength: 36 },
           note: { type: "string", maxLength: 500 },
           shared_drive: SHARED_DRIVE_INPUT,
+          ...computerProp(devices),
         },
         required: ["path"],
         additionalProperties: false,
@@ -1072,14 +1119,18 @@ export function createSandboxToolSource(
               };
             }
           }
-          const row = await run(ctx, async (c) => {
-            await refuseSecretPath(ctx, c, path);
-            return uploadFromComputer(deps, ctx, c, path, {
-              title: str(input.title) || null,
-              note: str(input.note) || null,
-              targetArtifactId,
-            });
-          });
+          const row = await run(
+            ctx,
+            async (c) => {
+              await refuseSecretPath(ctx, c, path);
+              return uploadFromComputer(deps, ctx, c, path, {
+                title: str(input.title) || null,
+                note: str(input.note) || null,
+                targetArtifactId,
+              });
+            },
+            input,
+          );
           const done = await uploadedFile(deps.db, row);
           if (!done) return { content: `Failed: ${row.error ?? "the upload did not finish"}`, isError: true };
           return {
@@ -1102,6 +1153,7 @@ export function createSandboxToolSource(
         properties: {
           artifact_id: { type: "string", minLength: 36, maxLength: 36 },
           path: { type: "string", maxLength: 300 },
+          ...computerProp(devices),
         },
         required: ["artifact_id"],
         additionalProperties: false,
@@ -1114,14 +1166,18 @@ export function createSandboxToolSource(
             // An uploaded file: its bytes as they are, under its original name.
             const raw = await storedFileOfArtifact(deps.artifacts, actorOf(ctx), ctx.orgId, a.id);
             const path = toolPath(str(input.path), computerInfo) || `imports/${cleanFileName(raw.name)}`;
-            await run(ctx, (c) => copyToComputer({ ...deps.artifacts, publicUrl: deps.publicUrl }, ctx, c, path, raw));
+            await run(
+              ctx,
+              (c) => copyToComputer({ ...deps.artifacts, publicUrl: deps.publicUrl }, ctx, c, path, raw),
+              input,
+            );
             return {
               content: `Copied "${a.title}" (v${raw.version}, ${raw.name}) to ${path} (${formatBytes(raw.size)}).`,
             };
           }
           const path = toolPath(str(input.path), computerInfo) || `imports/${slug(a.title)}.${file.ext}`;
           const data = new TextEncoder().encode(file.text);
-          await run(ctx, (c) => c.provider.writeFile(c.id, path, data));
+          await run(ctx, (c) => c.provider.writeFile(c.id, path, data), input);
           return { content: `Copied "${a.title}" (v${a.version}) to ${path} (${data.byteLength} bytes).` };
         } catch (error) {
           return failed(error);
@@ -1229,7 +1285,11 @@ export function createSandboxToolSource(
   const taskIdProp = { type: "string", minLength: 36, maxLength: 36, description: "The task id start_task returned" };
 
   /** Background tasks on a connected computer (ADR 0029): start, list, look at, cancel. */
-  const taskTools = (requireApproval: boolean, info: Extract<ComputerInfo, { kind: "machine" }>): ToolDefinition[] => [
+  const taskTools = (
+    requireApproval: boolean,
+    info: Extract<ComputerInfo, { kind: "machine" }>,
+    devices = false,
+  ): ToolDefinition[] => [
     {
       name: "start_task",
       description: `Start a detached command or a parallel CLI job on the computer "${info.name}" (a build, a dev server, a second Claude Code or Codex on its own task) and return at once with its id. To step out of this conversation while you keep working yourself, use work_in_background instead. With executor "claude" (the default when you give a prompt) Claude Code works on \`prompt\` in your folder, in this conversation's session (it remembers earlier turns), editing files on its own; "codex" runs Codex the same way; "shell" runs \`command\`. With \`branch\` it works in its own git worktree on that new branch; when your folder isn't a git repository, claude and codex work in their own subfolder work/<branch>/ instead (no branch; shell needs a repository). It keeps running if the connection drops. If the computer itself restarts, a "claude" task resumes where it stopped once it's back (unless resuming is turned off on that computer); "codex" and "shell" tasks stop, and you are woken to tell the people. You are woken in this conversation when it finishes, with its result: don't poll it with task_status, don't wait; tell the people it started and end your turn. Use run_code for short commands.`,
@@ -1244,6 +1304,7 @@ export function createSandboxToolSource(
           command: { type: "string", minLength: 1, maxLength: 2000, description: "With executor shell: the command" },
           executor: { enum: [...TASK_EXECUTORS] },
           branch: { type: "string", minLength: 1, maxLength: 120, description: "Work on this new git branch" },
+          ...computerProp(devices),
           ...whyAsks(requireApproval),
         },
         required: ["title"],
@@ -1271,48 +1332,57 @@ export function createSandboxToolSource(
           if (executor !== "shell" && !prompt)
             return { content: `A ${executor} task needs \`prompt\`.`, isError: true };
           const hub = hubOf();
-          const row = await run(ctx, async (computer) => {
-            const status = await hub.status(computer.machineId);
-            const agent = await getAgentCached(ctx.db, ctx.orgId, ctx.agentId);
-            // One session per conversation for Claude Code and Codex (the runner maps Codex's own thread id).
-            const session = executor === "claude" || executor === "codex" ? ctx.threadRootId : null;
-            const [before] = session
-              ? await ctx.db
-                  .select({ id: schema.machineTasks.id })
-                  .from(schema.machineTasks)
-                  .where(
-                    and(
-                      eq(schema.machineTasks.orgId, ctx.orgId),
-                      eq(schema.machineTasks.agentId, ctx.agentId),
-                      eq(schema.machineTasks.sessionId, session),
-                    ),
-                  )
-                  .limit(1)
-              : [];
-            return startMachineTask(
-              { db: ctx.db, pubsub: deps.pubsub, call: hub.call },
-              {
-                orgId: ctx.orgId,
-                agent: { id: ctx.agentId, handle: agent?.handle ?? "agent" },
-                machineId: computer.machineId,
-                protocol: status?.protocol ?? 0,
-                machineName: status?.name ?? info.name,
-                channelId: ctx.channelId,
-                threadRootId: replyThreadOf(ctx),
-                runId: ctx.runId,
-                requestedByUserId: await taskRequester(ctx),
-                title: str(input.title),
-                executor,
-                ...(executor === "shell" ? { command } : { prompt }),
-                sessionId: session,
-                resume: Boolean(before),
-                branch: str(input.branch).trim() || null,
-                // In a mission's thread the task is the mission's (its end, pause, stop and close).
-                missionId: (await missionOfRun(ctx))?.id ?? null,
-                ...(ctx.approved ? { approved: true } : {}),
-              },
-            );
-          });
+          // On another device (`computer`), a full one keeps the task in its line instead of refusing it.
+          const elsewhere = str(input.computer).trim() !== "";
+          let where = info.name;
+          const row = await run(
+            ctx,
+            async (computer) => {
+              const status = await hub.status(computer.machineId);
+              where = status?.name ?? info.name;
+              const agent = await getAgentCached(ctx.db, ctx.orgId, ctx.agentId);
+              // One session per conversation for Claude Code and Codex (the runner maps Codex's own thread id).
+              const session = executor === "claude" || executor === "codex" ? ctx.threadRootId : null;
+              const [before] = session
+                ? await ctx.db
+                    .select({ id: schema.machineTasks.id })
+                    .from(schema.machineTasks)
+                    .where(
+                      and(
+                        eq(schema.machineTasks.orgId, ctx.orgId),
+                        eq(schema.machineTasks.agentId, ctx.agentId),
+                        eq(schema.machineTasks.sessionId, session),
+                      ),
+                    )
+                    .limit(1)
+                : [];
+              return startMachineTask(
+                { db: ctx.db, pubsub: deps.pubsub, call: hub.call },
+                {
+                  orgId: ctx.orgId,
+                  agent: { id: ctx.agentId, handle: agent?.handle ?? "agent" },
+                  machineId: computer.machineId,
+                  protocol: status?.protocol ?? 0,
+                  machineName: status?.name ?? info.name,
+                  channelId: ctx.channelId,
+                  threadRootId: replyThreadOf(ctx),
+                  runId: ctx.runId,
+                  requestedByUserId: await taskRequester(ctx),
+                  title: str(input.title),
+                  executor,
+                  ...(executor === "shell" ? { command } : { prompt }),
+                  sessionId: session,
+                  resume: Boolean(before),
+                  branch: str(input.branch).trim() || null,
+                  // In a mission's thread the task is the mission's (its end, pause, stop and close).
+                  missionId: (await missionOfRun(ctx))?.id ?? null,
+                  ...(ctx.approved ? { approved: true } : {}),
+                },
+                elsewhere ? { requeue: true } : {},
+              );
+            },
+            { computer: input.computer, label: str(input.title) },
+          );
           await recordAudit(deps.db, {
             orgId: ctx.orgId,
             actor: { type: "agent", id: ctx.agentId },
@@ -1328,15 +1398,21 @@ export function createSandboxToolSource(
             },
           }).catch(() => undefined);
           // The link dropped while it started: it may run there; its computer's journal settles it.
+          if (row.status === "queued" && row.startRequest) {
+            return {
+              content: `${where} has no room for it right now: task ${row.id} ("${row.title}") waits in its line and starts by itself when there is room. You will be woken in this conversation when it finishes. Tell the people it is queued there and end your turn.`,
+              data: { task: machineTaskView(row) },
+            };
+          }
           if (row.status === "interrupted") {
             return {
-              content: `The connection to ${info.name} dropped while starting task ${row.id} ("${row.title}"): it may have started there. Its computer tells within minutes whether it did: you are woken in this conversation when it finishes, or if it didn't start. Don't start it again; tell the people.`,
+              content: `The connection to ${where} dropped while starting task ${row.id} ("${row.title}"): it may have started there. Its computer tells within minutes whether it did: you are woken in this conversation when it finishes, or if it didn't start. Don't start it again; tell the people.`,
               data: { task: machineTaskView(row) },
             };
           }
           const what = executor === "claude" ? "Claude Code" : executor === "codex" ? "Codex" : "the command";
           return {
-            content: `Started background task ${row.id} ("${row.title}") on ${info.name}: ${what} in ${row.cwd ? row.cwd : "your folder"}${row.branch ? ` on branch ${row.branch}` : ""}. It runs on its own and you will be woken in this conversation when it finishes, with its result. Don't poll it or wait for it: tell the people it started and what it is doing, then end your turn.`,
+            content: `Started background task ${row.id} ("${row.title}") on ${where}: ${what} in ${row.cwd ? row.cwd : "your folder"}${row.branch ? ` on branch ${row.branch}` : ""}. It runs on its own and you will be woken in this conversation when it finishes, with its result. Don't poll it or wait for it: tell the people it started and what it is doing, then end your turn.`,
             data: { task: machineTaskView(row) },
           };
         } catch (error) {
@@ -1545,9 +1621,12 @@ export function createSandboxToolSource(
     execTimeout: number,
     computerInfo: ComputerInfo = { kind: "none", preparing: false },
     sessionId?: string,
+    devices = false,
   ): ToolDefinition[] => [
-    ...baseTools(requireApproval, execTimeout, computerInfo, sessionId),
-    ...(computerInfo.kind === "machine" && tasksOn(computerInfo) ? taskTools(requireApproval, computerInfo) : []),
+    ...baseTools(requireApproval, execTimeout, computerInfo, sessionId, devices),
+    ...(computerInfo.kind === "machine" && tasksOn(computerInfo)
+      ? taskTools(requireApproval, computerInfo, devices)
+      : []),
     ...(computerInfo.kind === "machine" && computerInfo.protocol >= ACCESS_PROTOCOL
       ? [folderAccessTool(computerInfo)]
       : []),
@@ -1593,7 +1672,10 @@ export function createSandboxToolSource(
         ctx.agentId,
         mission ? { machineId: mission.machineId } : null,
       );
-      const tools = keep(build(settings.requireApproval, settings.execTimeoutSeconds, computer, ctx.threadRootId));
+      const devices = await hasOtherDevices(ctx.db, ctx.orgId, computer.kind === "machine" ? computer.machineId : null);
+      const tools = keep(
+        build(settings.requireApproval, settings.execTimeoutSeconds, computer, ctx.threadRootId, devices),
+      );
       if (!mission) return tools;
       return tools.map((t) => ({
         ...t,

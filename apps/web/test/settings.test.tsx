@@ -578,7 +578,7 @@ describe("Configurações do workspace", () => {
       // Their own logins, keys and contacts (ADR 0144).
       "Cofre",
       "Conectores e MCPs",
-      "Computadores",
+      "Dispositivos",
       // Their own plans' meters, in percentages (ADR 0063).
       "Orçamento e uso",
       "Contas de IA",

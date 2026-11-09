@@ -42,6 +42,7 @@ import { isGitInternalPath, touchesGitInternals } from "./git-guard";
 import { type McpTaskInfo, redactDeep } from "./mcp";
 import { missionWorktree } from "./mission-worktree";
 import { agentWorkspace, hiddenIn, isInside, resolveForAgent } from "./paths";
+import type { PhoneManager, PhoneRequest } from "./phones";
 import { pullFile } from "./pull";
 import { type FetchLike, pushPath } from "./push";
 import { openDesktopStream } from "./rfb";
@@ -122,6 +123,13 @@ export const NEW_WORK_OPS: ReadonlySet<string> = new Set([
   "desktop.apps",
   "vault.key",
   "vault.password",
+  "phone.claim",
+  "phone.install",
+  "phone.launch",
+  "phone.flow",
+  "phone.record",
+  "phone.screenshot",
+  "phone.logs",
 ]);
 
 /**
@@ -181,6 +189,15 @@ export const OP_ROUTES: Readonly<Record<MachineOp, "machine" | "agent">> = {
   "vault.key": "agent",
   // The password is made and sealed where the Vault's values open: root relays only the box.
   "vault.password": "agent",
+  // The process that sees the phones and keeps their locks (a system-mode runner reaches none).
+  "phone.claim": "machine",
+  "phone.release": "machine",
+  "phone.install": "machine",
+  "phone.launch": "machine",
+  "phone.flow": "machine",
+  "phone.record": "machine",
+  "phone.screenshot": "machine",
+  "phone.logs": "machine",
 };
 
 type AccessRequestOp = Extract<MachineRequest, { op: "access.request" }>;
@@ -287,6 +304,8 @@ export interface HandlerContext {
   desktopUse?: DesktopManager;
   /** A person takes control of the agent's desktop: what the agent's pointer and keys are doing stops. */
   desktopTaken?: (agentId: string) => void;
+  /** The phones this computer reaches (`PHONES_PROTOCOL`); without it every phone op answers `phone_missing`. */
+  phones?: PhoneManager;
 }
 
 export interface RequestScope {
@@ -630,6 +649,7 @@ async function routeRequest(ctx: HandlerContext, req: MachineRequest, scope: Req
   if (req.op === "task.start" || req.op === "task.status" || req.op === "task.cancel" || req.op === "task.output") {
     return handleTask(ctx, req);
   }
+  if (isPhoneOp(req)) return handlePhone(ctx, req, scope);
   // Each agent works in its own folder: that folder is its workspace.
   if (req.agent) ctx = { ...ctx, workspaceReal: await agentWorkspace(ctx.workspaceReal, req.agent) };
   if (req.op === "secret") {
@@ -737,6 +757,28 @@ async function routeRequest(ctx: HandlerContext, req: MachineRequest, scope: Req
     default:
       throw new RunnerError("bad_request", `Unknown op ${(req as { op: string }).op}`);
   }
+}
+
+const isPhoneOp = (req: MachineRequest): req is PhoneRequest => req.op.startsWith("phone.");
+
+/**
+ * `PHONES_PROTOCOL`: the phone ops. They run with the computer's commands off (sharing a phone grants only these);
+ * the files they make and take are the agent's: its folder and the folders it may use.
+ */
+async function handlePhone(ctx: HandlerContext, req: PhoneRequest, scope: RequestScope) {
+  const phones = ctx.phones;
+  if (!phones) throw new RunnerError("phone_missing", "This computer doesn't reach phones.");
+  const folder = req.agent ? await agentWorkspace(ctx.workspaceReal, req.agent) : null;
+  return phones.handle(req, {
+    folder,
+    resolve: async (input) => {
+      if (!folder) throw new RunnerError("bad_request", "A phone's files come from an agent's folder");
+      const target = await resolveToRead({ ...ctx, workspaceReal: folder }, input);
+      if (!target.exists) throw new RunnerError("not_found", `${input} doesn't exist`);
+      return target.abs;
+    },
+    signal: scope.signal,
+  });
 }
 
 /**
@@ -1454,6 +1496,16 @@ function describeOp(req: MachineRequest): string {
     }
     case "desktop.capture":
       return `desktop.capture${req.region ? " (a region)" : ""}`;
+    case "phone.claim":
+    case "phone.release":
+    case "phone.install":
+    case "phone.launch":
+    case "phone.flow":
+    case "phone.record":
+    case "phone.screenshot":
+    case "phone.logs":
+      // The phone and the app; never the flow's text or its variables.
+      return `${req.op} ${String(req.platform)}/${String(req.serial)}${"app" in req && req.app ? ` ${String(req.app)}` : ""}`;
     case "access.reduce":
       return `access.reduce${req.removeFolder ? ` folder ${String(req.removeFolder.path ?? "")}` : ""}${req.disableTool ? ` tool ${String(req.disableTool)}` : ""}`;
     default:
