@@ -3925,9 +3925,9 @@ export const isTerminalSize = (cols: unknown, rows: unknown) =>
 
 /** A text frame on a ready stream (either side); null when it isn't one or a size is out of bounds. */
 export function parseStreamControl(raw: string): StreamControl | null {
-  // A phone's `text` may carry a pasted line (JSON escapes take up to 6 characters each); the rest are far shorter.
+  // A phone's `text` may carry a pasted line (JSON escapes take up to 6 characters each); every other frame is short.
   const f = smallJson(raw, PHONE_VIEW.text * 6 + 100);
-  if (!isObject(f)) return null;
+  if (!isObject(f) || (f.type !== "text" && raw.length > 200)) return null;
   const share = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 1;
   if (f.type === "tap") return share(f.x) && share(f.y) ? { type: "tap", x: f.x, y: f.y } : null;
   if (f.type === "swipe") {
