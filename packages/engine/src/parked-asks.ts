@@ -531,23 +531,27 @@ async function checkRequests(deps: ParkedDeps, judge: Judge, run: AgentRun, trig
     const request = open.find((r) => r.id === moot.id);
     if (!request) continue;
     const given = request.kind === "question" ? "answered it" : "took care of it";
-    const quiet = t.passListed ? "call `pass`" : "end your turn without writing anything";
-    const text = `Not needed anymore: ${moot.who.name} already ${given} here ("${cutText(moot.said, 300)}"). Your request was withdrawn quietly and nobody waits on it. Go on with that; if nothing is left to do or say, ${quiet}.`;
+    const text = `Not needed anymore: ${moot.who.name} already ${given} here ("${cutText(moot.said, 300)}"). Your request was withdrawn quietly and nobody waits on it. Go on with that; if nothing is left to do or say, ${quietEnd(run)}.`;
     await withdrawMoot(deps, run, request, text, `${moot.who.name} already ${given}`).catch(() => false);
   }
 }
 
+/** How a run stays quiet: `pass` when it has the tool, else an empty turn (`policy.mayPass` ends it with no message). */
+export const quietEnd = (run: Pick<AgentRun, "transcript">) =>
+  transcriptOf(run).passListed ? "call `pass`" : "end your turn without writing anything";
+
 /**
- * Withdraws a request of the run's whose need was met here: its waiting call reads `text` instead of "nobody will
- * answer" (`mootRequests`), and the run may stay quiet after it (`requestMoot`). A person answering at the same moment
- * wins: their answer is what the call reads, and the run owes them one.
+ * Withdraws a request of the run's that nobody needs to answer anymore (its need was met here, or the agent withdrew it
+ * in another turn): its waiting call reads `text` instead of "nobody will answer" (`mootRequests`), and the run may
+ * stay quiet after it (`requestMoot`). A person answering at the same moment wins: their answer is what the call reads,
+ * and the run owes them one. False, with nothing withdrawn, when the run no longer waits.
  */
-async function withdrawMoot(
-  deps: ParkedDeps,
-  run: AgentRun,
+export async function withdrawMoot(
+  deps: Pick<ParkedDeps, "db" | "pubsub">,
+  run: Pick<AgentRun, "id" | "agentId">,
   request: { id: string; kind: "browser" | "desktop" | "secret" | "question" },
   text: string,
-  reason: string,
+  reason: string | null,
 ) {
   const marked = await deps.db
     .update(agentRuns)
@@ -556,7 +560,16 @@ async function withdrawMoot(
         coalesce(${agentRuns.transcript}->'mootRequests', '{}'::jsonb) || jsonb_build_object(${request.id}::text, ${text}::text)),
         '{requestMoot}', 'true'::jsonb)`,
     })
-    .where(and(eq(agentRuns.id, run.id), eq(agentRuns.status, "waiting_input")))
+    .where(
+      and(
+        eq(agentRuns.id, run.id),
+        eq(agentRuns.status, "waiting_input"),
+        // Still waiting on it: a run that stopped waiting on it and waits on something else still owes what it owed.
+        sql`exists (select 1 from jsonb_array_elements(coalesce(${agentRuns.transcript}->'pending'->'calls', '[]'::jsonb)) c
+          where jsonb_typeof(c->'result') is distinct from 'object'
+            and coalesce(c->>'questionId', c->>'secretRequestId', c->>'waitId') = ${request.id})`,
+      ),
+    )
     .returning({ id: agentRuns.id });
   if (marked.length === 0) return false;
   const d = { db: deps.db, pubsub: deps.pubsub };
