@@ -287,7 +287,6 @@ html:not([data-pointer]) .dm-side__row--link:focus-visible {
 .dm-side__sec .rh-set__acts {
   flex-wrap: wrap;
 }
-/* The header's toggle: a plate while it is open. */
 /* Under the sidebar's breakpoint one header row holds the computer, the search and the toggle: the search gives way. */
 @media (max-width: 1099px) {
   .channel__header:has(> .dm-side-toggle) {
