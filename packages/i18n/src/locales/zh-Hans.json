@@ -1349,7 +1349,7 @@
     "createdOn": "创建于 {{date}}",
     "newWorkspace": "新建工作区",
     "addWorkspace": "添加工作区",
-    "addWorkspaceHint": "在 agentes.chat 新建一个，或使用你团队的服务器",
+    "addWorkspaceHint": "加入已有的工作区、创建新的，或使用团队的服务器",
     "yourServer": "你的服务器",
     "wiki": "Wiki",
     "settings": "设置",

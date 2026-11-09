@@ -137,7 +137,9 @@
     "addTitle": "Een werkruimte toevoegen",
     "addLead": "Die je al hebt blijven hier, elk met een eigen aanmelding.",
     "addCloud": "Een werkruimte maken bij agentes.chat",
-    "addOwn": "De server van je team gebruiken"
+    "addOwn": "De server van je team gebruiken",
+    "addNew": "Wil je een nieuwe workspace?",
+    "addNewLink": "Maak er een"
   },
   "own": {
     "title": "Je eigen server",

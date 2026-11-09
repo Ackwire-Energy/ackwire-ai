@@ -137,7 +137,9 @@
     "addTitle": "Workspace hinzufügen",
     "addLead": "Die du schon hast, bleiben hier, jeder mit seiner eigenen Anmeldung.",
     "addCloud": "Workspace bei agentes.chat erstellen",
-    "addOwn": "Den Server deines Teams nutzen"
+    "addOwn": "Den Server deines Teams nutzen",
+    "addNew": "Möchtest du einen neuen Workspace?",
+    "addNewLink": "Einen erstellen"
   },
   "own": {
     "title": "Dein eigener Server",

@@ -1379,7 +1379,7 @@ export const ptBR = {
     createdOn: "Criado em {{date}}",
     newWorkspace: "Novo workspace",
     addWorkspace: "Adicionar workspace",
-    addWorkspaceHint: "Um novo no agentes.chat, ou o servidor da sua equipe",
+    addWorkspaceHint: "Entrar em um que já existe, criar um novo ou usar o servidor da equipe",
     yourServer: "Seu servidor",
     /** A server's line in "Your workspaces" in the desktop app: the one on this computer, and its state (ADR 0158). */
     serverHere: "O agentes.chat neste {{device}}",

@@ -1349,7 +1349,7 @@
     "createdOn": "{{date}}に作成",
     "newWorkspace": "新しいワークスペース",
     "addWorkspace": "ワークスペースを追加",
-    "addWorkspaceHint": "agentes.chatで新しく作るか、チームのサーバーを使う",
+    "addWorkspaceHint": "既存のワークスペースに参加、新規作成、またはチームのサーバーを使う",
     "yourServer": "自分のサーバー",
     "wiki": "Wiki",
     "settings": "設定",

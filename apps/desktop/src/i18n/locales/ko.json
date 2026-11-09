@@ -135,7 +135,9 @@
     "addTitle": "워크스페이스 추가",
     "addLead": "이미 있는 워크스페이스는 각자의 로그인으로 그대로 남습니다.",
     "addCloud": "agentes.chat에 워크스페이스 만들기",
-    "addOwn": "팀 서버 사용"
+    "addOwn": "팀 서버 사용",
+    "addNew": "새 워크스페이스가 필요하신가요?",
+    "addNewLink": "만들기"
   },
   "own": {
     "title": "내 서버",

@@ -135,7 +135,9 @@
     "addTitle": "添加工作区",
     "addLead": "你已有的工作区都保留在这里，各自保持登录。",
     "addCloud": "在 agentes.chat 创建工作区",
-    "addOwn": "使用你团队的服务器"
+    "addOwn": "使用你团队的服务器",
+    "addNew": "想要一个新的工作区？",
+    "addNewLink": "创建一个"
   },
   "own": {
     "title": "你自己的服务器",

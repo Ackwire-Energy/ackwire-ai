@@ -149,6 +149,8 @@ export const desktopPtBR = {
     addTitle: "Adicionar um workspace",
     addLead: "Os que você já tem continuam aqui, cada um com o seu login.",
     addCloud: "Criar um workspace no agentes.chat",
+    addNew: "Quer um workspace novo?",
+    addNewLink: "Criar um",
     addOwn: "Usar o servidor da sua equipe",
   },
   own: {

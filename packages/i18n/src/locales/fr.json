@@ -1421,7 +1421,7 @@
     "createdOn": "Créé le {{date}}",
     "newWorkspace": "Nouvel espace de travail",
     "addWorkspace": "Ajouter un espace de travail",
-    "addWorkspaceHint": "Un nouveau sur agentes.chat, ou le serveur de votre équipe",
+    "addWorkspaceHint": "Rejoindre un workspace existant, en créer un ou utiliser le serveur de votre équipe",
     "yourServer": "Votre serveur",
     "wiki": "Wiki",
     "settings": "Paramètres",

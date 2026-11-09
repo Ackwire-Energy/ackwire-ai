@@ -142,6 +142,9 @@ export const desktopEn = {
     addTitle: "Add a workspace",
     addLead: "The ones you have stay here, each with its own sign-in.",
     addCloud: "Create a workspace on agentes.chat",
+    /** Adding a workspace, under "Sign in to agentes.chat": a new one instead. */
+    addNew: "Want a new workspace?",
+    addNewLink: "Create one",
     addOwn: "Use your team's server",
   },
   own: {

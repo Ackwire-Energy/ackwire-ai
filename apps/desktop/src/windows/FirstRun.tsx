@@ -91,6 +91,8 @@ export function FirstRun() {
   const [screen, setScreen] = useState<FirstScreen>("choose");
   // Opened by the site's "Add a workspace" (ADR 0154): its first screen says so.
   const [adding, setAdding] = useState(false);
+  // Adding a workspace with agentes.chat already signed in here: making one is the big button, not signing in.
+  const [cloudSignedIn, setCloudSignedIn] = useState(false);
   const [trail, setTrail] = useState<FirstScreen[]>([]);
   // `typed`: the sheet confirms an address typed or picked in Connect, so Cancel goes back there with it.
   const [link, setLink] = useState<{ raw: string; parsed: ConnectLink | null; view: LinkView; typed?: boolean } | null>(
@@ -177,14 +179,16 @@ export function FirstRun() {
   );
 
   // How it opened: taken when it's made, and each time it shows again.
-  const takeMode = useCallback(
-    () =>
-      void host
-        .welcomeMode()
-        .then((mode) => setAdding(mode === "add"))
-        .catch(() => setAdding(false)),
-    [host],
-  );
+  const takeMode = useCallback(() => {
+    void host
+      .welcomeMode()
+      .then((mode) => setAdding(mode === "add"))
+      .catch(() => setAdding(false));
+    void host
+      .workspaces()
+      .then((list) => setCloudSignedIn(list.some((s) => s.server === CLOUD_SERVER && s.signedIn)))
+      .catch(() => setCloudSignedIn(false));
+  }, [host]);
   useEffect(takeMode, [takeMode]);
 
   useEffect(() => {
@@ -240,6 +244,7 @@ export function FirstRun() {
         {screen === "choose" && (
           <Choose
             adding={adding}
+            cloudSignedIn={cloudSignedIn}
             onCloud={(page) => void finish(CLOUD_SERVER, page)}
             onOwn={() => go(ownServerScreen(canRunHere))}
           />
@@ -292,11 +297,24 @@ export function FirstRun() {
 }
 
 /**
- * agentes.chat, big; your own server, small. `adding` (the site's "Add a workspace", ADR 0154): a new workspace on
- * agentes.chat is the big one, and the team's server the small one; the workspaces already there stay.
+ * agentes.chat, big; your own server, small. `adding` (the site's "Add a workspace", ADR 0154): signing in to
+ * agentes.chat (the workspaces an account already has, or was invited to) is the big one and a new workspace the
+ * line under it; with agentes.chat already signed in here, a new workspace is the big one. The team's server stays
+ * the small one; the workspaces already there stay.
  */
-function Choose({ adding, onCloud, onOwn }: { adding: boolean; onCloud: (page: string) => void; onOwn: () => void }) {
+function Choose({
+  adding,
+  cloudSignedIn,
+  onCloud,
+  onOwn,
+}: {
+  adding: boolean;
+  cloudSignedIn: boolean;
+  onCloud: (page: string) => void;
+  onOwn: () => void;
+}) {
   const { t } = useTranslation();
+  const makeFirst = adding && cloudSignedIn;
   return (
     <>
       <div className="dk-fr__hello">
@@ -309,17 +327,21 @@ function Choose({ adding, onCloud, onOwn }: { adding: boolean; onCloud: (page: s
           variant="primary"
           className="dk-btn-lg dk-fr__cloud"
           autoFocus
-          onClick={() => onCloud(adding ? "/onboarding" : "/login")}
+          onClick={() => onCloud(makeFirst ? "/onboarding" : "/login")}
         >
-          {t(adding ? "desktop.first.addCloud" : "desktop.first.cloud")}
+          {t(makeFirst ? "desktop.first.addCloud" : "desktop.first.cloud")}
           <Icon name="arrowRight" size={16} />
         </Button>
-        {/* Adding a workspace: the big button makes it, so no second way to an account. */}
-        {!adding && (
+        {/* The other way under it: an account (first run) or a new workspace (adding, signed in there or not). */}
+        {!makeFirst && (
           <span className="dk-help">
-            {t("desktop.first.create")}{" "}
-            <button type="button" className="ac-link dk-link" onClick={() => onCloud("/signup")}>
-              {t("desktop.first.createLink")}
+            {t(adding ? "desktop.first.addNew" : "desktop.first.create")}{" "}
+            <button
+              type="button"
+              className="ac-link dk-link"
+              onClick={() => onCloud(adding ? "/onboarding" : "/signup")}
+            >
+              {t(adding ? "desktop.first.addNewLink" : "desktop.first.createLink")}
             </button>
           </span>
         )}

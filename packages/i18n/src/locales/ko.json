@@ -1349,7 +1349,7 @@
     "createdOn": "{{date}}에 만듦",
     "newWorkspace": "새 워크스페이스",
     "addWorkspace": "워크스페이스 추가",
-    "addWorkspaceHint": "agentes.chat에 새로 만들거나 팀 서버 사용",
+    "addWorkspaceHint": "기존 워크스페이스에 들어가거나, 새로 만들거나, 팀 서버를 사용하세요",
     "yourServer": "내 서버",
     "wiki": "Wiki",
     "settings": "설정",

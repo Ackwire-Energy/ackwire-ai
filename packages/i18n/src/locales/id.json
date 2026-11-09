@@ -1349,7 +1349,7 @@
     "createdOn": "Dibuat pada {{date}}",
     "newWorkspace": "Ruang kerja baru",
     "addWorkspace": "Tambah ruang kerja",
-    "addWorkspaceHint": "Yang baru di agentes.chat, atau server timmu",
+    "addWorkspaceHint": "Masuk ke yang sudah ada, buat yang baru, atau pakai server tim kamu",
     "yourServer": "Servermu",
     "wiki": "Wiki",
     "settings": "Pengaturan",

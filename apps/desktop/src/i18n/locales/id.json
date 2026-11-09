@@ -135,7 +135,9 @@
     "addTitle": "Tambah ruang kerja",
     "addLead": "Yang sudah kamu punya tetap di sini, masing-masing dengan login sendiri.",
     "addCloud": "Buat ruang kerja di agentes.chat",
-    "addOwn": "Pakai server timmu"
+    "addOwn": "Pakai server timmu",
+    "addNew": "Mau workspace baru?",
+    "addNewLink": "Buat satu"
   },
   "own": {
     "title": "Servermu sendiri",

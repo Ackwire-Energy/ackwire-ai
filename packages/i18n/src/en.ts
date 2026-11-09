@@ -1381,7 +1381,7 @@ export const en = {
     newWorkspace: "New workspace",
     /** In the desktop app, in place of New workspace: the app's window to add one (ADR 0154). */
     addWorkspace: "Add workspace",
-    addWorkspaceHint: "A new one on agentes.chat, or your team's server",
+    addWorkspaceHint: "Join one you already have, create one, or use your team's server",
     /** Beside a server's name above its workspaces, when it isn't agentes.chat. */
     yourServer: "Your server",
     /** A server's line in "Your workspaces" in the desktop app: the one on this computer, and its state (ADR 0158). */

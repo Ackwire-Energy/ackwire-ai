@@ -706,3 +706,44 @@ describe("Setting it up here", () => {
     );
   });
 });
+
+describe("Add a workspace", () => {
+  /** The welcome window opened by the site's "Add workspace", with agentes.chat signed in here or not. */
+  const adding = (cloud: boolean, chosen: (string | undefined)[]) => (host: FakeHost) => {
+    host.welcomeMode = async () => "add";
+    host.workspaces = async () => [{ server: "https://app.agentes.chat", signedIn: cloud, orgs: [] }];
+    host.chooseServer = async (_server, page) => {
+      chosen.push(page);
+    };
+    host.hideWindow = async () => {};
+  };
+
+  test("not signed in to agentes.chat: signing in (the workspaces you have) is the big one, a new one the line", () => {
+    const chosen: (string | undefined)[] = [];
+    return firstRun(
+      "first",
+      async ({ press, until, button }) => {
+        await until(() => button("Want a new workspace?") || button("Create one"));
+        await press("Sign in to agentes.chat");
+        await press("Create one");
+        expect(chosen).toEqual(["/login", "/onboarding"]);
+        expect(button("Create an account")).toBeUndefined();
+      },
+      { host: adding(false, chosen) },
+    );
+  });
+
+  test("signed in to agentes.chat here already: a new workspace is the big one", () => {
+    const chosen: (string | undefined)[] = [];
+    return firstRun(
+      "first",
+      async ({ press, until, button }) => {
+        await until(() => button("Create a workspace on agentes.chat"));
+        expect(button("Create one")).toBeUndefined();
+        await press("Create a workspace on agentes.chat");
+        expect(chosen).toEqual(["/onboarding"]);
+      },
+      { host: adding(true, chosen) },
+    );
+  });
+});

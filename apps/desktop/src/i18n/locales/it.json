@@ -139,7 +139,9 @@
     "addTitle": "Aggiungi uno spazio di lavoro",
     "addLead": "Quelli che hai già restano qui, ognuno con il suo accesso.",
     "addCloud": "Crea uno spazio di lavoro su agentes.chat",
-    "addOwn": "Usa il server del tuo team"
+    "addOwn": "Usa il server del tuo team",
+    "addNew": "Vuoi un nuovo workspace?",
+    "addNewLink": "Creane uno"
   },
   "own": {
     "title": "Il tuo server",

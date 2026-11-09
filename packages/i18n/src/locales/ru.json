@@ -1457,7 +1457,7 @@
     "createdOn": "Создано {{date}}",
     "newWorkspace": "Новое рабочее пространство",
     "addWorkspace": "Добавить рабочее пространство",
-    "addWorkspaceHint": "Новое в agentes.chat или сервер вашей команды",
+    "addWorkspaceHint": "Войти в существующий, создать новый или использовать сервер своей команды",
     "yourServer": "Ваш сервер",
     "wiki": "Wiki",
     "settings": "Настройки",

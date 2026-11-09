@@ -1385,7 +1385,7 @@
     "createdOn": "{{date}} tarihinde oluşturuldu",
     "newWorkspace": "Yeni çalışma alanı",
     "addWorkspace": "Çalışma alanı ekle",
-    "addWorkspaceHint": "agentes.chat'te yeni bir tane ya da ekibinizin sunucusu",
+    "addWorkspaceHint": "Var olana katıl, yenisini oluştur ya da ekibinin sunucusunu kullan",
     "yourServer": "Sunucunuz",
     "wiki": "Wiki",
     "settings": "Ayarlar",

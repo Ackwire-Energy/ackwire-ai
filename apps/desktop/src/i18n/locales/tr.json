@@ -137,7 +137,9 @@
     "addTitle": "Çalışma alanı ekle",
     "addLead": "Zaten sahip olduklarınız, her biri kendi girişiyle burada kalır.",
     "addCloud": "agentes.chat'te çalışma alanı oluştur",
-    "addOwn": "Ekibinizin sunucusunu kullanın"
+    "addOwn": "Ekibinizin sunucusunu kullanın",
+    "addNew": "Yeni bir workspace mi istiyorsun?",
+    "addNewLink": "Bir tane oluştur"
   },
   "own": {
     "title": "Kendi sunucunuz",
