@@ -223,9 +223,18 @@ function SourceChip({
   const { t } = useTranslation();
   const source = sourceOf(t, n, channelName);
   if (!source) return null;
+  const channel = channelOf(n);
   return (
     <Chip icon={source[0]} className={className}>
-      {source[1]}
+      {/* The channel's icon is its #: the words show its bare name, a screen reader still hears the #. */}
+      {source[0] === "channel" && channel ? (
+        <>
+          <span className="ac-visually-hidden">#</span>
+          {channelName(channel)}
+        </>
+      ) : (
+        source[1]
+      )}
     </Chip>
   );
 }
@@ -731,8 +740,9 @@ function Row({
         {tags && (
           <span className="nt-tags">
             <SourceChip n={n} channelName={channelName} />
+            {/* The arrow is in its words: no icon to say it again. */}
             {statusMove && (
-              <Chip icon="arrowRight" className="nt-chip-ink">
+              <Chip className="nt-chip-ink">
                 {t("notifications.status", { from: statusName(t, l.statusFrom), to: statusName(t, l.statusTo) })}
               </Chip>
             )}

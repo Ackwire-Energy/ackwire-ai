@@ -140,6 +140,15 @@ describe("Chip", () => {
     expect(chip?.querySelector("svg")).toBeNull();
     expect(chip?.textContent).toBe("Issue: ACME-177");
   });
+
+  test("22 high with 12px words; an icon's side pads 6, its ink 2 into its box, so the ink reads 8 on both sides", async () => {
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+    expect(rule(".ac-chip")).toContain("height: 22px;");
+    expect(rule(".ac-chip")).toContain("padding: 0 var(--space-2);");
+    expect(rule(".ac-chip")).toContain("font-size: 12px;");
+    expect(rule(".ac-chip:has(> .ac-icon:first-child)")).toContain("padding-inline-start: 6px;");
+  });
 });
 
 describe("ApprovalCard", () => {

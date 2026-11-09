@@ -180,6 +180,42 @@ describe("Notificações", () => {
     expect(document.body.textContent).toContain("reagiram à sua mensagem");
   });
 
+  test("each chip says its thing once: a channel's name after its #, a task's move with its arrow in the words", async () => {
+    const items = [
+      notification({
+        id: "n-mention",
+        kind: "mention",
+        actors: [{ type: "user", id: "u-joao" }],
+        source: { channelId: ENG_ID, messageId: "m-1" },
+        latest: { text: "@walter dá uma olhada no deploy das 9h?" },
+        updatedAt: ago(3),
+      }),
+      notification({
+        id: "n-move",
+        kind: "issue_status",
+        actors: [{ type: "agent", id: ADA_ID }],
+        source: { issueId: "issue-131", issueNumber: 131 },
+        latest: { title: "Corrigir o login com Google", statusFrom: "in_progress", statusTo: "in_review" },
+        updatedAt: ago(6),
+      }),
+      ...inbox().filter((n) => n.kind === "reaction"),
+    ];
+    await go(seedState({ notifications: items }));
+    const chips = [...document.querySelectorAll<HTMLElement>(".nt-tags .ac-chip")];
+    // The channel's # is its icon: the words show the bare name, a screen reader still hears "#eng".
+    const channel = chips.find((c) => c.querySelector(".ac-chip__text")?.textContent === "#eng");
+    expect(channel?.querySelector("svg.ac-icon")).not.toBeNull();
+    expect(channel?.querySelector(".ac-chip__text > .ac-visually-hidden")?.textContent).toBe("#");
+    expect(channel?.querySelector(".ac-chip__text")?.lastChild?.textContent).toBe("eng");
+    const move = chips.find((c) => c.textContent === "Em andamento → Em revisão");
+    expect(move).toBeTruthy();
+    expect(move?.querySelector("svg")).toBeNull();
+    expect(chips.find((c) => c.textContent === "Tarefa #131")?.querySelector("svg.ac-icon")).not.toBeNull();
+    // The kit's chips as they are (22 high, words 12): the inbox sizes none of its own.
+    const sheet = await Bun.file(new URL("../src/pages/notifications.css", import.meta.url).pathname).text();
+    expect(sheet).not.toMatch(/\.nt-tags \.ac-chip[^{]*\{/);
+  });
+
   test("an approval is the conversation's card: the agent's why, the action in its well, who asked behind Ver detalhes", async () => {
     const asked = notification({
       id: "n-ap",

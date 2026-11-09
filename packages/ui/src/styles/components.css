@@ -1832,6 +1832,10 @@ html:not([data-pointer]) .ac-eventpill__action:focus-visible {
   width: 14px;
   height: 14px;
 }
+/* An icon's ink starts about 2px into its box: on its side the chip pads 6, so the ink reads 8 on both sides. */
+.ac-chip:has(> .ac-icon:first-child) {
+  padding-inline-start: 6px;
+}
 .ac-chip > :not(.ac-chip__text) {
   flex: none;
 }
