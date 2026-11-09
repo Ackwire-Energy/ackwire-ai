@@ -11728,7 +11728,7 @@ export const ptBR = {
     moreFiltersHint: "datas, só agentes, fixadas",
     clearRecentAll: "Limpar buscas recentes",
     /** A busca no topo de um canal (estilo Discord): o campo e os resultados no painel ao lado. */
-    header: { placeholder: "Buscar na {{org}}", clear: "Limpar busca" },
+    header: { placeholder: "Buscar em {{org}}", clear: "Limpar busca" },
     panel: {
       label: "Resultados da busca",
       count_one: "{{count}} resultado",
