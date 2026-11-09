@@ -95,6 +95,7 @@ import { OPERATOR_API_PREFIX, serveOperatorApi } from "./operator/app";
 import { createMachineSockets } from "./realtime/machines";
 import { createStreamSockets } from "./realtime/streams";
 import { createRealtime, type SocketData } from "./realtime/ws";
+import { workerHealth } from "./routes/health";
 import { startTelemetry } from "./telemetry";
 import { releaseOf, version } from "./version";
 import { startWorkers } from "./workers";
@@ -430,8 +431,8 @@ async function boot(
     outbox,
     log,
   });
-  // A worker (`SERVER_ROLE=worker`) runs jobs only: no HTTP, sockets or usage report. Its runs reach computers through
-  // the process that holds their socket (`machine_rpc`).
+  // A worker (`SERVER_ROLE=worker`) runs jobs only: no app, API, sockets or usage report, its health check alone. Its
+  // runs reach computers through the process that holds their socket (`machine_rpc`).
   const worker = config.SERVER_ROLE === "worker";
   const telemetry = worker ? null : startTelemetry({ db: database.db, config, log });
 
@@ -508,8 +509,19 @@ async function boot(
     const { pathname, search } = new URL(req.url);
     return Response.redirect(new URL(pathname + search, publicUrl).href, 302);
   };
+  // A worker answers its health check alone: the image's check reads it, and a deploy waits for it.
   const server = worker
-    ? null
+    ? Bun.serve({
+        hostname: config.HOST,
+        port: config.PORT,
+        fetch: workerHealth({
+          version,
+          edition,
+          modules: modules.map((m) => m.name),
+          pingDatabase: database.ping,
+          draining: () => stopping,
+        }),
+      })
     : Bun.serve<SocketData>({
         hostname: config.HOST,
         port: config.PORT,
@@ -524,8 +536,9 @@ async function boot(
           return new Response("Something went wrong on our side\n", { status: 500 });
         },
       });
-  if (server) log.info("listening", { url: `http://${config.HOST}:${config.PORT}` });
-  else log.info("running jobs only, with no HTTP (SERVER_ROLE=worker)");
+  log.info(worker ? "running jobs only, answering /api/health alone (SERVER_ROLE=worker)" : "listening", {
+    url: `http://${config.HOST}:${config.PORT}`,
+  });
   const operator = worker
     ? null
     : serveOperatorApi({
