@@ -403,8 +403,13 @@ export function buildEngine(o: EngineOptions) {
       createFollowUpToolSource({ pubsub: adapters.pubsub }),
       // The right hand sees what the team is doing, with no model call (ADR 0137 §13).
       createTeamStatusToolSource(),
-      // Background runs (routines) speak only through it.
-      createHandOffToolSource({ pubsub: adapters.pubsub, judge: context.judge, tools: () => tools }),
+      // Background runs (routines) speak only through it, with a GIF where the agent may send one (ADR 0091).
+      createHandOffToolSource({
+        pubsub: adapters.pubsub,
+        judge: context.judge,
+        tools: () => tools,
+        gif: createAgentGifPoster(adapters.gifs),
+      }),
       // Runs nobody called by name may stay quiet (reply-policy.ts): listed only for them.
       createPassToolSource(),
       createArtifactToolSource(artifacts),

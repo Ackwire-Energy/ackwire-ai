@@ -61,28 +61,34 @@ const origin = (ctx: ToolContext) => ({
 /** Posting where the run already is: a reply. */
 const SAME_CONVERSATION = "That is this conversation: just reply.";
 
-/** `post_message`'s GIF, listed only when the agent may send one (`AgentGifPoster.offered`), never to background work. */
+/** `post_message`'s GIF, listed only when the agent may send one (`AgentGifPoster.offered`). */
 const GIF_PROPERTY = {
   type: "string",
   maxLength: 100,
   description: 'What the GIF shows, in English, 1 to 6 words (e.g. "good night moon cat").',
 } as const;
 const GIF_HELP =
-  ' When someone asks for a GIF there, add one with `gif`: what it shows as a short search in English (e.g. "good night moon"), whatever language the conversation is in. It goes in the same message, with the text or alone.';
+  ' When someone (or the routine you run) asks for a GIF there, add one with `gif`: what it shows as a short search in English (e.g. "good night moon"), whatever language the conversation is in. It goes in the same message, with the text or alone. Never post a link to a GIF site instead.';
 
 /**
- * The GIF `post_message` posts for `search` in `channelId`, or what to tell the model when none goes: only for a
- * person's request (a routine sends none, as with `send_gif`), with GIFs on for the agent, found the way `send_gif`
- * finds one. Looked up before anything is posted or copied, so a failed search leaves nothing behind.
+ * The GIF `post_message` posts for `search` in `channelId`, or what to tell the model when none goes: for a person's
+ * request or a routine whose creator is still there (`routine`: its creator asked for its posts, ADR 0091 addendum
+ * 2026-11-09), never for a run nobody asked for, with GIFs on for the agent, found the way `send_gif` finds one.
+ * Looked up before anything is posted or copied, so a failed search leaves nothing behind.
  */
 async function gifToPost(
   poster: AgentGifPoster | undefined,
   ctx: ToolContext,
-  input: { search: unknown; requester: string | null; channelId: string },
+  input: { search: unknown; requester: string | null; routine: boolean; channelId: string },
 ): Promise<{ gif: GifMedia } | { error: string }> {
-  if (!input.requester || ctx.background) return { error: "Only a person's request posts a GIF: post the text alone." };
+  if (!input.requester && !input.routine) {
+    return { error: "Only a person's request or a routine posts a GIF: post the text alone." };
+  }
   const found = poster
-    ? await poster.find(ctx, input.search, `${ctx.runId}:${input.channelId}`)
+    ? await poster.find(ctx, input.search, `${ctx.runId}:${input.channelId}`, {
+        channelId: input.channelId,
+        threadId: null,
+      })
     : { none: "off" as const };
   if ("gif" in found) return found;
   switch (found.none) {
@@ -143,8 +149,8 @@ export async function findMember(
  * the way `share_artifact` does it (the same file when it's visible there, a
  * copy from a DM or a private channel the person is in). The post is an
  * agent message like any reply (same run and hop, so mentions follow the hop
- * limit). Audited. With `gif` (listed when the agent may send GIFs, called for a person), the same message carries
- * a GIF, drawn under its text by the apps (ADR 0091 addendum 2026-11-05).
+ * limit). Audited. With `gif` (listed when the agent may send GIFs, called for a person or a routine), the same
+ * message carries a GIF, drawn under its text by the apps (ADR 0091 addenda 2026-11-05 and 2026-11-09).
  */
 export function createChatToolSource(deps: {
   pubsub?: PubSub;
@@ -247,7 +253,12 @@ export function createChatToolSource(deps: {
           }
           let gif: GifMedia | null = null;
           if (gifAsked) {
-            const found = await gifToPost(deps.gif, ctx, { search: input.gif, requester, channelId: channel.id });
+            const found = await gifToPost(deps.gif, ctx, {
+              search: input.gif,
+              requester,
+              routine: routine !== null,
+              channelId: channel.id,
+            });
             if ("error" in found) return { content: found.error, isError: true };
             gif = found.gif;
           }
@@ -467,7 +478,7 @@ export function createChatToolSource(deps: {
     },
   ];
   const [postMessage, ...others] = tools as [ToolDefinition, ...ToolDefinition[]];
-  // The same tool with `gif` where the agent may send one for a person; the call checks again.
+  // The same tool with `gif` where the agent may send one (for a person or a routine); the call checks again.
   const postWithGif: ToolDefinition = {
     ...postMessage,
     description: `${postMessage.description}${GIF_HELP}`,
@@ -479,7 +490,7 @@ export function createChatToolSource(deps: {
   return {
     name: "chat",
     tools: async (ctx) => {
-      const gif = !ctx.background && ctx.runId && deps.gif ? await deps.gif.offered(ctx) : false;
+      const gif = ctx.runId && deps.gif ? await deps.gif.offered(ctx) : false;
       return [gif ? postWithGif : postMessage, ...others];
     },
   };

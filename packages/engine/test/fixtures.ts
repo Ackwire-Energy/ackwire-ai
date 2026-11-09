@@ -345,7 +345,14 @@ export async function setup(
     ...(options.followUps ? [createFollowUpToolSource({ pubsub })] : []),
     ...(options.workTools ? [createWorkToolSource({ pubsub })] : []),
     ...(options.handOff
-      ? [createHandOffToolSource({ pubsub, judge: context.judge, tools: (): ToolGateway | undefined => tools })]
+      ? [
+          createHandOffToolSource({
+            pubsub,
+            judge: context.judge,
+            tools: (): ToolGateway | undefined => tools,
+            gif: createAgentGifPoster(options.gifs),
+          }),
+        ]
       : []),
     ...(options.artifactTools ? [createArtifactToolSource(artifactDeps)] : []),
     ...(options.blockTools ? [createBlockToolSource(artifactDeps)] : []),
