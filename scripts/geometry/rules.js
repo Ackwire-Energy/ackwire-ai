@@ -994,8 +994,13 @@
           !hasSurface(style(square))
         )
           continue;
+        // What ends the row after the words (a count, "Novo") sits on the row's middle in a column of its own: between
+        // two lines, it is none of theirs.
+        const words = kids.slice(1).find((k) => visibleText(k));
+        const end = words ? words.getBoundingClientRect().right : Number.POSITIVE_INFINITY;
         const beside = [];
         for (const kid of kids.slice(1)) {
+          if (kid !== words && kid.getBoundingClientRect().left >= end - 1) continue;
           const walker = document.createTreeWalker(kid, NodeFilter.SHOW_TEXT);
           for (let n = walker.nextNode(); n; n = walker.nextNode()) {
             if (!n.textContent.trim() || !seen(n.parentElement)) continue;
