@@ -1,14 +1,14 @@
 /*
- * A request in the conversation (RequestCard), the same for every kind. On a 4px grid with 16px sides,
- * grouped by nearness: a quiet header (the kind, the state), the agent's words (what you decide), the object
- * in a well of two lines with "Ver …" at its right, and the footer in a strip of its own under a hairline,
- * always in the same place. Flat: a hairline and the cut corner, the agent's sky a thin band on top.
+ * A request in the conversation (RequestCard), the same for every kind. On a 4px grid with 16px sides, its parts 12
+ * apart: a quiet header (the kind, the state), the agent's words (what you decide), the object in a well with "Ver …"
+ * under its words, and the footer in a strip of its own under a hairline, always in the same place, its buttons 32 and
+ * 8 apart. Flat: a hairline and the cut corner, the agent's sky a thin band on top.
  */
 .rq {
   position: relative;
   display: block;
   max-width: var(--msg-card-w);
-  padding: 14px 16px 0;
+  padding: 12px 16px 0;
   box-sizing: border-box;
   background: var(--raised);
   box-shadow: 0 0 0 1px var(--line2);
@@ -20,7 +20,7 @@
 }
 /* Nothing left to decide, so no footer: the card closes on its own padding. */
 .rq:not(:has(.rq__foot)) {
-  padding-bottom: 14px;
+  padding-bottom: 12px;
 }
 .rq > :not(.ac-approval__sky),
 .rq > .ac-locked > *,
@@ -73,7 +73,7 @@
   text-overflow: ellipsis;
 }
 .rq__lead {
-  margin: 8px 0 0;
+  margin: 6px 0 0;
   font-size: 15px;
   line-height: 22px;
   color: var(--ink);
@@ -83,23 +83,20 @@
 }
 /*
  * The object's line, as an attachment's name under its cover: edge to edge under a hairline, the app's mark loose
- * (no tile), its title and values, "Ver …" on the right. Nothing with a background of its own inside the card.
+ * (no tile), its title and values, "Ver …" under them. Nothing with a background of its own inside the card.
  */
 .rq__well {
   display: flex;
   align-items: flex-start;
   gap: 10px;
   margin: 12px -16px 0;
-  padding: 10px 12px 10px 16px;
+  padding: var(--row-py) 16px;
   border-top: 1px solid var(--line);
 }
-/* The mark and "Ver …" stand on the title's line (20px), never in the middle of a tall detail. */
+/* The mark stands on the title's line (20px), never in the middle of a tall detail. */
 .rq__well > .rq__logo {
   height: 20px;
   align-items: center;
-}
-.rq__well > .rq__more {
-  margin-top: -2px;
 }
 .rq__preview + .rq__well {
   margin-top: 0;
@@ -136,14 +133,36 @@
   height: 26px;
 }
 .rq__wt {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 1px;
 }
-/* A well's words in an ActionRow take the kit's width (`.ac-actrow__text`), which a page rule would outrank. */
-.rq__wt:not(.ac-actrow__text) {
-  flex: 1;
-  min-width: 0;
+/* "Ver …" under the words, on their edge (its words start where theirs do), never a column beside them. */
+.rq__wt > .rq__more {
+  align-self: flex-start;
+  justify-self: start;
+  height: 22px;
+  margin: 2px 0 0 -6px;
+}
+/*
+ * In a narrow card (a phone, a thread beside the conversation) the mark keeps the title's line and everything under the
+ * title takes the well's whole width, instead of a column of words beside the mark.
+ */
+@container (max-width: 479px) {
+  .rq__well {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: 10px;
+    row-gap: 1px;
+  }
+  .rq__well > .rq__wt {
+    display: contents;
+  }
+  .rq__wt > :not(b) {
+    grid-column: 1 / -1;
+  }
 }
 /* What it asks and where it goes wrap: cut, they hide the meaning. */
 .rq__wt b,
@@ -205,7 +224,7 @@ html:not([data-pointer]) .rq__more:focus-visible {
   box-shadow: none;
 }
 .rq__item > .rq__details {
-  margin: 10px -12px 0 -16px;
+  margin: 10px -16px 0;
 }
 /*
  * What will happen, drawn as an attachment's cover: edge to edge between hairlines, its start fading at the foot (an
@@ -294,30 +313,37 @@ html:not([data-pointer]) .rq__more:focus-visible {
   font-size: 12.5px;
   color: var(--danger);
 }
-/* The footer: a strip of its own, edge to edge, always in the same place on every kind. */
+/* The footer: a strip of its own, edge to edge, always in the same place on every kind. Its time left ends its last row,
+   wrapping with it. */
 .rq__foot {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   row-gap: 8px;
-  margin: 16px -16px 0;
-  padding: 12px 16px;
-  min-height: 56px;
+  margin: 12px -16px 0;
+  padding: 8px 16px;
+  min-height: 48px;
   box-sizing: border-box;
   border-top: 1px solid var(--line);
 }
 .rq__foot > .ac-btn {
   height: 32px;
 }
-/* As `.ac-acts`: a ghost's words stand on the row's edge, on every line when the row wraps. */
+/* On touch every button keeps its 32 plate, its target grown to 44 above and below it (the kit's small button's). */
+@media (pointer: coarse) {
+  :is(.rq__foot, .rq__item-acts) > .ac-btn {
+    position: relative;
+  }
+  :is(.rq__foot, .rq__item-acts) > .ac-btn::after {
+    content: "";
+    position: absolute;
+    inset: calc((var(--control-h-sm) - var(--touch-target)) / 2) 0;
+  }
+}
+/* Its buttons 8 apart, a ghost too: it keeps its own padding instead of reaching into the gap. */
 .rq__foot,
 .rq__item-acts {
-  column-gap: calc(2 * var(--ghost-plate));
-}
-.rq__foot > .ac-btn--ghost,
-.rq__item-acts > .ac-btn--ghost {
-  margin-inline: calc(-1 * var(--ghost-plate));
-  padding-inline: var(--ghost-plate);
+  column-gap: var(--space-2);
 }
 /*
  * A question's choices: a list in the card's body, one a line, its number key on the left (1 to 9 answer while the
@@ -539,9 +565,9 @@ html:not([data-pointer]) .rq__choice:focus-visible {
 }
 
 /*
- * Several requests on one card: each item one row edge to edge under a hairline, its line on the left and its own
- * decision at the row's right end, centered on it; decided ones quieter with how they ended. When the card is too
- * narrow for both, the decision goes under the words, on their column.
+ * Several requests on one card: each item one row edge to edge under a hairline, an action line (`.ac-actline`): its
+ * words, then its own decision beside them while they fit on one line there, else under them; decided ones quieter
+ * with how they ended.
  */
 .rq {
   container-type: inline-size;
@@ -554,46 +580,37 @@ html:not([data-pointer]) .rq__choice:focus-visible {
   list-style: none;
 }
 .rq__item {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  column-gap: 12px;
-  padding: 10px 12px 10px 16px;
+  padding: var(--row-py) 16px;
   border-top: 1px solid var(--line);
 }
+/* Under the words, from their edge: past the mark while the words keep a column beside it. */
+.rq__item > .rq__item-acts {
+  margin-inline-start: calc(22px + 10px);
+}
+@container (max-width: 479px) {
+  .rq__item > .rq__item-acts {
+    margin-inline-start: 0;
+  }
+}
+/* What follows its line (its details, how it ended, a reason being typed, a run's items) takes a row of its own. */
 .rq__item > :not(.rq__well, .rq__item-acts) {
-  grid-column: 1 / -1;
+  flex: 1 1 100%;
 }
 .rq__items .rq__well {
   margin: 0;
   padding: 0;
   border-top: 0;
 }
-/* "Ver detalhes" of an item: a quiet link under its words (the row's end holds its decision). */
-.rq__item .rq__more {
-  height: 22px;
-  margin: 2px 0 0 -6px;
-  align-self: flex-start;
-}
 .rq__item .rq__wt {
   align-items: flex-start;
 }
-/* An item's decision: at its row's right end, every button the footer's height. */
+/* An item's decision: every button the footer's height, 8 apart, wrapping from the words' edge. */
 .rq__item-acts {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-end;
   row-gap: 8px;
-}
-@container (max-width: 520px) {
-  .rq__item {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .rq__item-acts {
-    justify-content: flex-start;
-    margin: 8px 0 0 32px;
-  }
 }
 /* The footer right under a line that already ends with a hairline of its own: no gap between them. */
 .rq__well + .ac-locked > .rq__foot:first-child,
@@ -614,7 +631,7 @@ html:not([data-pointer]) .rq__choice:focus-visible {
 }
 /* A run's requests, unfolded under its line: each a row of its own, indented on the words' column. */
 .rq__run > .rq__items {
-  margin: 10px -12px -10px 16px;
+  margin: 10px -16px calc(-1 * var(--row-py)) 16px;
 }
 /* An approval's values read whole across the card, never cut mid-sentence (the line's other kinds keep one line). */
 .rq[data-ask-kind="approval"] .rq__wt small {

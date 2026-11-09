@@ -337,7 +337,7 @@ function RunItem({
   const first = run[0];
   if (!first) return null;
   return (
-    <li className="rq__item rq__run" data-status="pending">
+    <li className="rq__item rq__run ac-actline" data-status="pending">
       <div className="rq__well">
         <span className="rq__logo">
           <ConnectorMark approval={first} />
@@ -391,7 +391,7 @@ function GroupItem({
   const runAt = approval.runAt ? nextLabel(i18n.language, approval.runAt) : "";
   const tt = t as unknown as (key: string, options?: Record<string, unknown>) => string;
   return (
-    <li className={pending ? "rq__item" : "rq__item rq__item--done"} data-status={approval.status}>
+    <li className={pending ? "rq__item ac-actline" : "rq__item rq__item--done ac-actline"} data-status={approval.status}>
       <div className="rq__well">
         <span className="rq__logo">
           <ConnectorMark approval={approval} />

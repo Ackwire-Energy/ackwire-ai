@@ -13,8 +13,15 @@ import {
   useState,
 } from "react";
 import { useTranslation } from "react-i18next";
+import { renderInline } from "@/lib/markdown";
 import { CardSky, colorOf } from "./Sky";
 import "./request-card.css";
+
+/** An agent's own words, as formatted text: code between backticks, bold, links (no address pills). */
+const said = (words: ReactNode) =>
+  typeof words === "string"
+    ? renderInline(words, "rq", undefined, undefined, undefined, false, undefined, false)
+    : words;
 
 /**
  * What an agent can ask of a person in the conversation: each says so in the card's header and in the bar.
@@ -108,8 +115,8 @@ export function useExpired(expiresAt: string | null | undefined) {
  * One card for every request an agent makes in the conversation, so each reads the same way and its decision
  * sits in the same place: a quiet header (what kind of request, and who else it waits for), the agent's own
  * words, what will happen drawn edge to edge (its preview, as an attachment's cover), the object on a line of its own between
- * hairlines with "Ver …" opening it whole, anything to fill in, and the footer strip with the decision on the left and
- * the time left on the right. One surface: nothing inside has a background of its own.
+ * hairlines with "Ver …" under its words opening it whole, anything to fill in, and the footer strip with the decision on
+ * the left and the time left on the right. One surface: nothing inside has a background of its own.
  *
  * While it waits for the viewer it registers with its conversation (`AskRegistryProvider`), so the bar above the
  * composer can say it waits while it is out of view; `data-ask-id` lets "Ver" find it and bring it back.
@@ -229,20 +236,21 @@ export function RequestCard({
         {/* Who else it waits for; waiting for me needs no words (the buttons say it). */}
         {!mine && waitingFor && <span className="rq__state rq__state--other">{waitingFor}</span>}
       </div>
-      <p className="rq__lead">{lead}</p>
+      <p className="rq__lead">{said(lead)}</p>
       {preview && !(open && details) && <div className="rq__preview">{preview}</div>}
       {object && (
-        <div className="rq__well ac-actrow">
+        <div className="rq__well">
           <span className="rq__logo">{object.logo}</span>
-          <span className="rq__wt ac-actrow__text">
+          {/* "Ver …" under the words, never a column beside them that would squeeze them. */}
+          <span className="rq__wt">
             <b>{object.title}</b>
-            {object.detail && <small>{object.detail}</small>}
+            {object.detail && <small>{said(object.detail)}</small>}
+            {object.more && (details || onOpenChange) && (
+              <RequestMore open={open} onClick={toggle}>
+                {object.more}
+              </RequestMore>
+            )}
           </span>
-          {object.more && (details || onOpenChange) && (
-            <RequestMore open={open} onClick={toggle}>
-              {object.more}
-            </RequestMore>
-          )}
         </div>
       )}
       {open && details && (
