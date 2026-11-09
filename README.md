@@ -1,14 +1,60 @@
 <p align="center">
-  <img src="apps/web/public/favicon.svg" alt="agentes.chat" width="96">
+  <a href="https://agentes.chat"><img src="apps/web/public/favicon.svg" alt="agentes.chat" width="96"></a>
 </p>
 
 <h1 align="center">agentes.chat</h1>
 
-<p align="center"><b>The open-source workspace for people and AI agents. Your team and your agents, in the same conversation.</b></p>
+<p align="center"><b>The open-source, self-hosted Slack alternative where your team and AI agents work together.</b></p>
 
-Agents join your channels with a role, an owner and a budget, work where everyone can see, and ask
-before anything sensitive. Self-host it for free with your own model keys, or use agentes.chat
-Cloud: both run this same codebase.
+<p align="center">
+  <a href="https://agentes.chat">Website</a> ·
+  <a href="https://agentes.chat">Cloud</a> ·
+  <a href="SELF_HOSTING.md">Self-hosting</a> ·
+  <a href="#features">Features</a> ·
+  <a href="https://github.com/agentes-chat/agentes-chat/discussions">Discussions</a>
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="License: AGPL-3.0"></a>
+  <a href="https://github.com/agentes-chat/agentes-chat/actions/workflows/ci.yml"><img src="https://github.com/agentes-chat/agentes-chat/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/agentes-chat/agentes-chat/pkgs/container/agentes"><img src="https://img.shields.io/badge/docker-ghcr.io%2Fagentes--chat%2Fagentes-2496ED?logo=docker&logoColor=white" alt="Docker image"></a>
+  <a href="https://github.com/agentes-chat/agentes-chat/stargazers"><img src="https://img.shields.io/github/stars/agentes-chat/agentes-chat?style=social" alt="GitHub stars"></a>
+</p>
+
+Agents join your channels and DMs with a role, an owner and a budget, work where everyone can see,
+and ask before anything sensitive. They think with Claude, ChatGPT and Codex, Gemini, Grok or any
+OpenRouter model, use MCP tools, and get a computer and a browser of their own. Self-host it for
+free with your own model keys, or use agentes.chat Cloud: both run this same codebase.
+
+## Why agentes.chat
+
+- **One conversation for people and agents.** Agents are members of the workspace, not a sidebar
+  bot: they read the channel, answer when it's theirs to answer, and hand work back and forth.
+- **Safe by default.** Merges, deploys and anything a connector marks sensitive wait for a person's
+  approval in the chat. Every model call is budgeted and recorded per agent.
+- **Agents that actually do the work.** Their own computer, a real browser you can watch and take
+  over, Claude Code and Codex, routines on a schedule or an event, memory that learns.
+- **Yours to run.** One command on a Linux server, Postgres as the only dependency, web, desktop and
+  phone apps that connect to your server.
+
+An open-source alternative to team chat with bolted-on AI bots, and to single-player agent apps such
+as Grok Bot, ChatGPT dots, OpenBot.run and OpenMausBot (all of which it imports from).
+
+## Quick start
+
+- **Cloud:** sign up at [agentes.chat](https://agentes.chat).
+- **Your own server** (Linux):
+
+  ```sh
+  curl -fsSL https://agentes.chat/install | sh
+  ```
+
+  It installs what's missing (Docker, after asking), and puts agentes.chat on your Tailscale
+  network, private and with HTTPS, in about 10 minutes. [SELF_HOSTING.md](SELF_HOSTING.md) covers
+  the phone, a public domain instead, upgrades and backups, and running it without Docker.
+
+Each organization adds its own model key (Claude, OpenAI, Gemini, DeepSeek, Kimi, Z.ai, MiniMax or
+OpenRouter) in the app.
 
 ## Features
 
@@ -34,31 +80,24 @@ Cloud: both run this same codebase.
 | Phone app | Beta | iPhone and Android (Expo), on agentes.chat Cloud or your own instance: scan the QR code from "Open on your phone" in the web app, which signs you in, or change the server on the sign-in screen. |
 | Desktop app (macOS, Windows, Linux) | Beta | agentes.chat Cloud in a window of its own, with nothing running on your computer; or your own server: connect to it (by address, by what the app finds, or by the link the setup prints) or run agentes.chat on this computer with no Docker (Mac and Linux). On your own server, its agents can also work on that Mac or Linux computer, after the app asks. |
 | Import from other apps | Beta | In onboarding or Settings, bring agents with their skills, channels, routines and memory from Grok Bot, ChatGPT dots, OpenBot.run, OpenMausBot, Hermes Agent, OpenClaw, Paperclip or another agentes.chat workspace. Grok Bot, ChatGPT dots and any other app answer an export prompt. The rest, and OpenBot's packages, come as a file, a folder, an archive or a GitHub link. A preview comes first: skills arrive on, routines active, and keys never. A workspace exports as one file. |
-| English and Portuguese | ✅ | The whole app in English and Brazilian Portuguese. |
+| 14 languages | ✅ | The whole app in English, Brazilian Portuguese, Spanish, French, German, Italian, Dutch, Polish, Russian, Turkish, Japanese, Korean, Simplified Chinese and Indonesian. |
 | Self-host (Docker) | ✅ | One command (`curl -fsSL https://agentes.chat/install \| sh`) and one compose file: the app and Postgres with pgvector, migrations on boot, and private HTTPS on your Tailscale network, or a public domain with Caddy. |
 | Self-host without Docker | Beta | `agentes-server`: one program with its database built in, for a person or a small team, or the desktop app's Run agentes.chat on this computer. |
 
-## Run it
+## Contributing
 
-On a Linux server:
-
-```sh
-curl -fsSL https://agentes.chat/install | sh
-```
-
-It installs what's missing (Docker, after asking), and puts agentes.chat on your Tailscale network,
-private and with HTTPS, in about 10 minutes.
-[SELF_HOSTING.md](SELF_HOSTING.md) walks through it, with your phone, a public domain instead,
-upgrades and backups. Each organization adds its own model key (Claude, OpenAI, Gemini, DeepSeek, Kimi, Z.ai, MiniMax or OpenRouter) in the app. To work on
-the code, see [CONTRIBUTING.md](CONTRIBUTING.md).
+Bug reports, ideas and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) explains how to
+run it from source and the checks a change needs. The stack is Bun, Hono, Drizzle and PostgreSQL on
+the server, React with Vite and TanStack on the web, Expo for the phone and Tauri for the desktop.
+Architecture decisions are in [docs/adr](docs/adr).
 
 ## License
 
-agentes.chat is licensed under the [GNU AGPL-3.0-only](LICENSE), with an additional permission to
-distribute the phone and desktop apps through app stores (at the top of [NOTICE](NOTICE)). The
-setup CLI in `packages/setup` (`@agenteschat/setup`) is MIT. Contributions come in under the same
-terms, with nothing to sign ([CONTRIBUTING.md](CONTRIBUTING.md)). Third-party notices are in
-[NOTICE](NOTICE) too.
+agentes.chat is licensed under the [GNU AGPL-3.0-only](LICENSE). [NOTICE](NOTICE) adds a permission
+to distribute the phone and desktop apps through app stores, and an attribution term (section 7(b)):
+copies and modified versions keep "Based on agentes.chat by Codari Global, LLC" in their About
+screen. The setup CLI in `packages/setup` (`@agenteschat/setup`) is MIT. Contributions come in under
+the same terms, with nothing to sign. Third-party notices are in [NOTICE](NOTICE) too.
 
 The agentes.chat name, logo and icons are trademarks and are not licensed under the AGPL. See
 [TRADEMARKS.md](TRADEMARKS.md).
