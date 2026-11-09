@@ -11362,6 +11362,11 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
   font-weight: 600;
   cursor: pointer;
 }
+/* An ⓘ beside a control of the strip: centred on it, its hit box beside the control instead of over its edge. */
+.ac-props .ac-hint {
+  margin: 0;
+  translate: none;
+}
 .ac-props__sep {
   flex: none;
   width: 1px;

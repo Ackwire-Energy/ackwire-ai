@@ -200,15 +200,20 @@ export function IssuesPage() {
           </Toolbar>
           {(issues.isLoading || viewLoading || (!columns && columnsQuery.isLoading)) &&
             (view.layout === "board" ? (
-              <div className="issues-board">
-                {BOARD.map((status) => (
-                  <section key={status} className="issues-col" aria-label={t(`issues.status.${status}`)}>
-                    <div className="issues-col__head">
-                      <h2>{t(`issues.status.${status}`)}</h2>
-                    </div>
-                    <LoadingCards count={2} className="loading-cards loading-cards--tight" />
-                  </section>
-                ))}
+              // In the board's own frame and sideways scroller, so it loads where it will stay.
+              <div className="issues-boardframe page-split">
+                <div className="issues-boardwrap">
+                  <div className="issues-board">
+                    {BOARD.map((status) => (
+                      <section key={status} className="issues-col" aria-label={t(`issues.status.${status}`)}>
+                        <div className="issues-col__head">
+                          <h2>{t(`issues.status.${status}`)}</h2>
+                        </div>
+                        <LoadingCards count={2} className="loading-cards loading-cards--tight" />
+                      </section>
+                    ))}
+                  </div>
+                </div>
               </div>
             ) : (
               <LoadingList count={5} avatar={false} trailing />

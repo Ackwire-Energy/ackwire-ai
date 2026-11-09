@@ -229,6 +229,15 @@ describe("Tarefas: a card", () => {
     // Fades in, never pops (none under reduced motion).
     expect(css).toMatch(/@starting-style \{\s*\.issue-card > \.ac-approval__sky \{\s*opacity: 0;/);
   });
+
+  test("while the tasks load, the board's columns wait in its own frame and sideways scroller", async () => {
+    const api = createFakeApi(seedState());
+    api.issues.list = () => new Promise(() => {});
+    await go(undefined, api);
+    const loading = document.querySelector(".issues-boardframe .issues-boardwrap > .issues-board") as HTMLElement;
+    expect(loading.querySelectorAll(".issues-col")).toHaveLength(4);
+    expect(loading.querySelector(".loading-cards")).toBeTruthy();
+  });
 });
 
 describe("Tarefas: + in a column's head", () => {

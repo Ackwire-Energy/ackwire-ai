@@ -517,7 +517,8 @@ describe("other conversations shown as a thread", () => {
     await act(async () => socket.open());
     await settle(4);
     const dialog = screen().getByRole("dialog", { name: "Confirmação do agendamento por WhatsApp" });
-    await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: "Conversa" })));
+    // The dialog opens its conversation from its section in the details (or its ⋯), not from a button on its bar.
+    await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: /^Conversar sobre a tarefa/ })));
     await settle(8);
     await act(async () => socket.push({ type: "subscribed", channelId: at.channelId }));
     await settle(3);
@@ -538,7 +539,6 @@ describe("other conversations shown as a thread", () => {
     await settle(5);
     expect(inView(dialog, "na tarefa")).toHaveLength(1);
     expect(dialog.querySelector(".thread-head__meta")?.textContent).toContain("1 mensagem");
-    expect(within(dialog).getByRole("button", { name: /^Conversa.*1/ })).toBeTruthy();
   });
 
   test("a board: a reply in a task's conversation moves its card's count, the conversation closed", async () => {

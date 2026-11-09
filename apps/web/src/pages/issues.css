@@ -1084,6 +1084,12 @@ html:not([data-pointer]) .issues-dest:focus-visible {
   display: flex;
   justify-content: flex-end;
 }
+/* Its Salvar's touch target reaches past its plate: the popover keeps that room instead of scrolling by a sliver. */
+@media (pointer: coarse) {
+  .issue-github__pop {
+    padding-bottom: calc((var(--touch-target) - var(--control-h-sm)) / 2);
+  }
+}
 
 /* The agent's work: live steps, or stalled. */
 .issue-work {
