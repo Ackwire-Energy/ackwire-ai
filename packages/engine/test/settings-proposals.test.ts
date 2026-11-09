@@ -129,6 +129,30 @@ describe("a change the person asked for and may make (ADR 0092 §5)", () => {
     expect((await cardRows(f, f.owner.id)).rows[0]?.status).toBe("pending");
   });
 
+  test("on a computer the model is its brain's: any name its CLI takes, with Undo", async () => {
+    f = await setup({ rightHand: true });
+    const { machineId } = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, {
+      name: "MacBook",
+      exec: true,
+    });
+    await f.db.update(schema.agents).set({ brain: "codex", machineId }).where(eq(schema.agents.id, f.agent.id));
+    const ctx = await lodiRun(f, f.owner.id, "coloca o dev no Astra", true);
+    const refused = await call(f, ctx, { changes: [{ agent: "@dev", model: "GPT-6 Astra" }], reason: "pediu" });
+    expect(refused).toMatchObject({ isError: true });
+    expect(refused.content).toContain("That isn't a model name");
+    const out = await call(f, ctx, { changes: [{ agent: "@dev", model: "gpt-6-astra" }], reason: "pediu" });
+    expect(out.content).toContain("applied at once");
+    expect(await getAgent(f.db, f.org.id, f.agent.id)).toMatchObject({
+      brain: "codex",
+      brainModel: "gpt-6-astra",
+      model: "claude-sonnet-5-5",
+    });
+    const { card } = await cardRows(f, f.owner.id);
+    const [receipt] = (await actionsFor(f.db, f.org.id, [card.id])).get(card.id) ?? [];
+    await undoAgentAction({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, receipt?.id ?? "");
+    expect((await getAgent(f.db, f.org.id, f.agent.id))?.brainModel).toBeNull();
+  });
+
   test("outside content in the conversation leaves it on the card", async () => {
     f = await setup({ rightHand: true });
     const outside = await lodiRun(f, f.owner.id, "coloca o dev no haiku");
