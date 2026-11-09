@@ -137,8 +137,8 @@ export function useWifiPairing(orgId: string, machineId: string | null, active: 
     meta: { quiet: true },
   });
   const code = useMutation({
-    mutationFn: (input: { address: string; code: string }) =>
-      api.devices.startWifiPairing(orgId, machineId ?? "", input),
+    mutationFn: ({ on, ...input }: { on: string; address: string; code: string }) =>
+      api.devices.startWifiPairing(orgId, on, input),
     meta: { silent: true },
   });
   const { reset } = code;
@@ -147,13 +147,21 @@ export function useWifiPairing(orgId: string, machineId: string | null, active: 
     setTries((n) => n + 1);
     reset();
   }, [active, reset]);
-  const pairing = useWifiPairState(orgId, machineId, active ? (way === "qr" ? qr.data : code.data) : undefined);
+  // A code sent to the computer picked before isn't this one's.
+  const sent = code.variables?.on === machineId;
+  const pairing = useWifiPairState(
+    orgId,
+    machineId,
+    active ? (way === "qr" ? qr.data : sent ? code.data : undefined) : undefined,
+  );
   return {
     way,
     pairing,
-    starting: way === "qr" ? qr.isFetching : code.isPending,
-    error: (way === "qr" ? qr.error : code.error) ?? null,
-    pairWithCode: code.mutate,
+    starting: way === "qr" ? qr.isFetching : sent && code.isPending,
+    error: (way === "qr" ? qr.error : sent ? code.error : null) ?? null,
+    pairWithCode: (input: { address: string; code: string }) => {
+      if (machineId) code.mutate({ ...input, on: machineId });
+    },
     /** A new QR (the code way's form stays, with what was typed). */
     retry: () => setTries((n) => n + 1),
     switchWay: (next: "qr" | "code") => {
