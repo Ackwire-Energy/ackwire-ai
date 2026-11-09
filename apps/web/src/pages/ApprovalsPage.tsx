@@ -1088,8 +1088,21 @@ function ReviewHead({ approval: a, channel }: { approval: Approval; channel: str
         <h2 className="ap-review__title" title={title}>
           {title}
         </h2>
+        <UndoChip approval={a} />
       </div>
     </header>
+  );
+}
+
+/** Whether what it does can be undone, as a chip after the request's title (on the page and in the dialog). */
+function UndoChip({ approval: a }: { approval: Approval }) {
+  const { t } = useTranslation();
+  const { undo } = approvalEffects(a);
+  if (!undo) return null;
+  return (
+    <Chip icon={UNDO_ICON[undo]} tone={undo === "irreversible" ? "waiting" : undefined} className="ap-review__undo">
+      {t(`approvals.trait.${undo}`)}
+    </Chip>
   );
 }
 
@@ -1109,7 +1122,7 @@ function ReviewBody({ approval: a, channel }: { approval: Approval; channel: str
   const [unfold, setUnfold] = useState(false);
   const [steps, setSteps] = useState(false);
   const [tech, setTech] = useState(false);
-  const { effect, undo } = approvalEffects(a);
+  const { effect } = approvalEffects(a);
   const target = approvalTarget(a);
   const text = approvalText(a);
   const why = approvalWords(a);
@@ -1132,17 +1145,6 @@ function ReviewBody({ approval: a, channel }: { approval: Approval; channel: str
             label: t("approvals.review.effect"),
             value: t(`approvals.review.effects.${effect}`),
             tone: effect === "production" ? ("waiting" as const) : undefined,
-          },
-        ]
-      : []),
-    ...(undo
-      ? [
-          {
-            key: "undo",
-            icon: UNDO_ICON[undo],
-            label: t("approvals.review.undo"),
-            value: t(`approvals.trait.${undo}`),
-            tone: undo === "irreversible" ? ("waiting" as const) : undefined,
           },
         ]
       : []),
@@ -1550,7 +1552,12 @@ function ApprovalDetails({
           expression={p === "done" ? "happy" : undefined}
         />
       }
-      title={approvalTitle(t, a)}
+      title={
+        <>
+          {approvalTitle(t, a)}
+          <UndoChip approval={a} />
+        </>
+      }
       subtitle={
         <span>
           <b className="ap-dialog__who">{name}</b>

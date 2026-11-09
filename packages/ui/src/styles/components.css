@@ -11104,26 +11104,30 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 
-/* ── Fact strip: short facts in one row, icon + label over a one-line value, split by hairlines ── */
+/*
+ * ── Fact strip: short facts in a row that wraps, icon + label over a one-line value, split by hairlines ──
+ * Each fact is as wide as its words: one that doesn't fit moves whole to the next line, and only a fact wider than the
+ * whole strip wraps its own words. Every fact has the hairline before it: the strip starts that far to the left and
+ * clips its first pixel, so a line never starts with one.
+ */
 .ac-facts {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   row-gap: 12px;
-  margin: 0;
+  margin: 0 0 0 -17px;
+  clip-path: inset(0 0 0 1px);
 }
 .ac-facts__item {
+  flex: 0 1 auto;
   display: grid;
-  grid-template-columns: 32px minmax(0, 1fr);
+  grid-template-columns: 32px minmax(0, max-content);
   grid-template-rows: auto auto;
   column-gap: 10px;
   align-items: center;
   min-width: 0;
+  max-width: 100%;
   padding: 0 16px;
   border-left: 1px solid var(--line);
-}
-.ac-facts__item:first-child {
-  padding-left: 0;
-  border-left: 0;
 }
 /* The icon in a pixel frame as tall as label and value: a 16×16 grid of 2px cells, one cell thick, the corners
    stepped in by one cell. The frame is a mask over the line color, so it takes the item's tone. */

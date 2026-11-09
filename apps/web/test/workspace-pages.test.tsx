@@ -55,6 +55,9 @@ describe("Aprovações", () => {
     const deploy = pane("Fazer um deploy");
     expect(within(deploy).getByRole("button", { name: "Aprovar deploy: segure para confirmar" })).toBeTruthy();
     expect(deploy.querySelector(".ac-facts")?.textContent).toContain("Vai para produção");
+    // Whether it can be undone is a chip after the title, not a fact taking a column of the strip.
+    expect(deploy.querySelector(".ap-review__title + .ap-review__undo")?.textContent).toBe("Reversível");
+    expect([...deploy.querySelectorAll(".ac-facts__label")].map((l) => l.textContent)).not.toContain("Desfazer");
 
     await click(merge);
     await settle(2);

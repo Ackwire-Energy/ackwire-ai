@@ -4,7 +4,7 @@ import { setupDom } from "../testing/dom";
 setupDom();
 
 import { cleanup, render, within } from "@testing-library/react";
-import { Button, Card, CardHeader, DetailsDialog, Dialog, DialogBody } from "../src";
+import { Button, Card, CardHeader, DetailsDialog, Dialog, DialogBody, FactStrip } from "../src";
 
 afterEach(cleanup);
 
@@ -114,5 +114,34 @@ describe("worst cases: words and their actions", () => {
       </>,
     );
     expect(container.querySelectorAll(".ac-card__head.ac-actline > .ac-card__action")).toHaveLength(2);
+  });
+});
+
+describe("worst cases: facts", () => {
+  test("a fact strip: each fact as wide as its words, a long one moved whole to a line of its own", async () => {
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+    expect(rule(".ac-facts")).toContain("flex-wrap: wrap");
+    // Every fact has its hairline; the strip starts that far left and clips its first pixel, so no line starts with one.
+    expect(rule(".ac-facts")).toContain("margin: 0 0 0 -17px");
+    expect(rule(".ac-facts")).toContain("clip-path: inset(0 0 0 1px)");
+    expect(rule(".ac-facts__item")).toContain("flex: 0 1 auto");
+    expect(rule(".ac-facts__item")).toContain("max-width: 100%");
+    const { container } = render(
+      <FactStrip
+        facts={[
+          {
+            key: "where",
+            icon: "link",
+            label: "Onde",
+            value: "GitHub · agentes-chat/integracao-de-pagamentos-recorrentes-com-checkout #4821",
+          },
+          { key: "effect", icon: "cloud", label: "Efeito", value: "Vai para produção", tone: "waiting" },
+          { key: "when", icon: "clock", label: "Prazo", value: "23 h 59 min" },
+          { key: "who", icon: "person", label: "Wer entscheidet", value: "Wartet auf die Geschäftsführung" },
+        ]}
+      />,
+    );
+    expect(container.querySelectorAll(".ac-facts > .ac-facts__item")).toHaveLength(4);
   });
 });

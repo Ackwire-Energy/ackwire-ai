@@ -786,6 +786,16 @@ html:not([data-pointer]) .ap-li:focus-visible {
   font-weight: 650;
   letter-spacing: -0.02em;
 }
+/* Whether it can be undone, after the title's last word (on the page and in the dialog's title), wrapping with it. */
+.ap-review__title:has(+ .ap-review__undo) {
+  display: inline;
+}
+.ap-review__undo.ac-chip {
+  margin-inline-start: 10px;
+  vertical-align: middle;
+  letter-spacing: 0;
+  font-weight: 500;
+}
 .ap-review__body {
   display: flex;
   flex-direction: column;
