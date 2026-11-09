@@ -10,6 +10,7 @@ import {
   ATLAS_ID,
   createFakeApi,
   type FakeState,
+  fakeAgentBrain,
   fakeMachinesOf,
   LODI_ID,
   ORG_ID,
@@ -72,10 +73,21 @@ describe("the first-run checklist", () => {
     expect(calls(state, "chat.post")).toEqual([]);
   });
 
-  test("the AI row names the AI it thinks with, never Automático", async () => {
-    await openDm(fresh());
+  test("the AI row names the AI it thinks with, never Automático: on the workspace's key, its maker", async () => {
+    const state = fresh();
+    const lodi = state.agents.find((a) => a.id === LODI_ID);
+    if (lodi) lodi.model = "auto";
+    const api = createFakeApi(state);
+    const brain = api.agents.brain;
+    const key = { provider: "anthropic", label: "Chave da Acme" };
+    api.agents.brain = async (orgId, id, scope) =>
+      id === LODI_ID
+        ? fakeAgentBrain(id, { brain: "model", workspaceAi: { brain: "model", ownerId: null, servesYou: true, key } })
+        : brain(orgId, id, scope);
+    await renderApp(`/org/${ORG_ID}/dm/agent/${LODI_ID}`, { api });
+    await settle(12);
     const ai = rows()[0]?.querySelector(".ac-mediarow__head")?.textContent ?? "";
-    expect(ai).toMatch(/penso com/i);
+    expect(ai).toContain("Penso com Claude");
     expect(ai).not.toContain("Automático");
   });
 

@@ -1,5 +1,6 @@
 import type { Agent } from "@agenteschat/client";
 import {
+  useAgentBrain,
   useAiStatus,
   useCatalog,
   useConfirmSetup,
@@ -17,13 +18,14 @@ import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { stepPermissions } from "@agenteschat/client/lib/home";
 import { aiStateOf, planHoldPhoneLine } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
-import { apiProviderOf, isAuto, providerLabel } from "@agenteschat/client/lib/providers";
+import { apiProviderOf, isAuto } from "@agenteschat/client/lib/providers";
 import type { FirstRunState } from "@agenteschat/client/lib/right-hand";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { connectorName } from "@agenteschat/client/lib/scopes";
 import {
   type FirstRunFacts,
   type FirstRunStep,
+  firstRunAiLabel,
   firstRunAsks,
   firstRunDone,
   firstRunRow,
@@ -120,6 +122,8 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
   const dir = useDirectory();
   const modelLabel = useModelLabel();
   const models = useModels();
+  // Through the API, the workspace's key it runs on names its maker, as on the web (Automático names none).
+  const keyMaker = useAgentBrain(orgId, agent.id).data?.workspaceAi?.key?.provider;
   const { steps, done, held, team, facts } = run;
   const doneHere = steps.filter((s) => done.has(s));
   // "Agora não" moves the row on and says nothing: only something done gets its line.
@@ -142,8 +146,7 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
     isAuto(agent.model) ? t("brain.auto.label") : (modelLabel(agent.model) ?? agent.model),
     { owner: ownerName ? firstName(ownerName) : undefined, agents: dir.agents },
   );
-  const maker = apiProviderOf(agent.model, models.data?.models ?? []);
-  const label = thinks.kind !== "agent" ? thinks.text : maker ? providerLabel(maker) : null;
+  const label = firstRunAiLabel(thinks, keyMaker ?? apiProviderOf(agent.model, models.data?.models ?? []));
   const stateOf = (s: FirstRunStep) => firstRunRowState(s, { done, held });
   const next = steps.find((s) => stateOf(s) === "open");
   const act: Record<FirstRunStep, () => void> = {

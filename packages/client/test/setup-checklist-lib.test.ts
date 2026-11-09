@@ -6,6 +6,7 @@ import {
   FIRST_RUN_STEPS,
   type FirstRunFacts,
   type FirstRunPowers,
+  firstRunAiLabel,
   firstRunAppList,
   firstRunApps,
   firstRunAsks,
@@ -178,6 +179,14 @@ describe("the right hand's first run (ADR 0155 §6, ADR 0158)", () => {
       desc: "agentSetup.firstRun.afterPlan",
       action: "",
     });
+  });
+
+  test("the AI it names: a plan's line, else its API's maker, the workspace key's on Automático", () => {
+    expect(firstRunAiLabel({ text: "Sonnet pelo plano do Claude", kind: "claude_code" }, "anthropic")).toBe(
+      "Sonnet pelo plano do Claude",
+    );
+    expect(firstRunAiLabel({ text: "Automático", kind: "agent" }, "anthropic")).toBe("Claude");
+    expect(firstRunAiLabel({ text: "Automático", kind: "agent" }, undefined)).toBeNull();
   });
 
   test("an invitation waiting for its answer finishes the people row, by who was invited", () => {

@@ -1,5 +1,6 @@
 import type { Agent } from "@agenteschat/client";
 import {
+  useAgentBrain,
   useAiStatus,
   useCatalog,
   useConfirmSetup,
@@ -17,12 +18,12 @@ import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { stepPermissions } from "@agenteschat/client/lib/home";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
-import { providerLabel } from "@agenteschat/client/lib/providers";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { connectorName } from "@agenteschat/client/lib/scopes";
 import {
   type FirstRunFacts,
   type FirstRunStep,
+  firstRunAiLabel,
   firstRunAppList,
   firstRunAsks,
   firstRunDone,
@@ -135,6 +136,8 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
   const confirm = useConfirmSetup(org.id, agent.id);
   const run = useFirstRun(agent, channelId);
   const thinks = useAgentThinks(agent);
+  // Through the API, the workspace's key it runs on names its maker, as the side panel does (Automático names none).
+  const keyMaker = useAgentBrain(org.id, agent.id).data?.workspaceAi?.key?.provider;
   const [open, setOpen] = useState<"apps" | null>(null);
   const burstRef = useRef<HTMLCanvasElement>(null);
   const { steps, done, held, team, facts } = run;
@@ -159,14 +162,7 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
     apps: () => setOpen("apps"),
     people: () => invite?.open(),
   };
-  // The AI it thinks with, by name: an API key's maker ("Claude"), a plan's line ("Sonnet pelo plano do Claude").
-  const label = thinks
-    ? thinks.kind !== "agent"
-      ? thinks.text
-      : thinks.mark
-        ? providerLabel(thinks.mark)
-        : null
-    : null;
+  const label = thinks ? firstRunAiLabel(thinks, keyMaker ?? thinks.mark) : null;
   const rows = steps.map((s) => {
     const state = stateOf(s);
     // People, open: an address to send at once in the row, the dialog behind "Mais opções".

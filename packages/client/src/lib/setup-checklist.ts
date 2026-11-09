@@ -2,6 +2,7 @@ import type { TFunction } from "i18next";
 import type { Agent, AgentSetupChecklist, AgentSetupStep, AudienceMode, ConnectorDef, SetupStep } from "../api/types";
 import type { Level } from "./access-levels";
 import { presetChannels, ROLE_DEFAULTS, ROLE_IDS, type RoleId } from "./new-agent";
+import { providerLabel } from "./providers";
 
 /*
  * A new agent's setup checklist (ADR 0155 §2): the top of its chat, in its voice, lists what it still needs. The
@@ -271,6 +272,13 @@ export interface FirstRunRowFacts {
   /** Who was invited and hasn't answered yet ("João e Ana"); null when nobody. */
   invited: string | null;
 }
+
+/**
+ * What the card names as the right hand's AI ("Penso com …"): a plan's line ("Sonnet pelo plano do Claude"), else the
+ * maker of the API it runs on ("Claude"), the workspace key's or its model's; null when unknown.
+ */
+export const firstRunAiLabel = (thinks: { text: string; kind: string }, maker: string | null | undefined) =>
+  thinks.kind !== "agent" ? thinks.text : maker ? providerLabel(maker) : null;
 
 /** One row's words: its title, a line under it while open, its button's word, and "Agora não" where a row skips. */
 export function firstRunRow(
