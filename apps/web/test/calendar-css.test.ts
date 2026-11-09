@@ -63,6 +63,17 @@ describe("calendar items the Google Calendar way", () => {
     // Every item is measured by its own column: a bar by its days, a month's row by its day.
     for (const box of [".cal-chip--block", ".cal-week__runs", ".cal-chip--bar", ".cal-month__cell"])
       expect(last(declarations(css, box), "container-type")).toBe("inline-size");
+    // A bar across days of such a week too: by its lane, a day's width times the days (67.5px a day).
+    expect(last(declarations(css, ".cal-week__barlane"), "container")).toBe("lane / inline-size");
+    for (const [days, px] of [
+      [7, 472],
+      [5, 337],
+    ] as const) {
+      const lane = atRule(css, `@container lane (max-width: ${px}px)`);
+      const bar = `.cal-week[data-days="${days}"] .cal-chip--bar`;
+      expect(last(declarations(lane, `${bar} :is(.cal-chip__name, .cal-chip__repeat)`), "display")).toBe("none");
+      expect(last(declarations(lane, `${bar} .cal-chip__glyph`), "display")).toBe("inline-block");
+    }
   });
 
   test("side by side, a column of runs alone gives the meeting beside it room for its name, never under a face's width", async () => {

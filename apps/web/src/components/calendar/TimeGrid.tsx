@@ -223,6 +223,7 @@ export function TimeGrid({
   return (
     <section
       className="cal-week"
+      data-days={cols}
       style={
         {
           "--hour-px": `${HOUR_PX}px`,

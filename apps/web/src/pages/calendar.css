@@ -314,6 +314,30 @@ html:not([data-pointer]) .cal-chip:focus-visible {
     display: inline;
   }
 }
+/*
+ * A week whose days are that narrow (a phone's): a bar is its face on its tint too, whatever days it spans, never a
+ * name a word a line. A query can't divide by the days, so each week length has its own: 7 or 5 days under 67.5px,
+ * where a day's own items (2px in from its edges) are under 63.5px.
+ */
+.cal-week__barlane {
+  container: lane / inline-size;
+}
+@container lane (max-width: 472px) {
+  .cal-week[data-days="7"] .cal-chip--bar :is(.cal-chip__name, .cal-chip__repeat) {
+    display: none;
+  }
+  .cal-week[data-days="7"] .cal-chip--bar .cal-chip__glyph {
+    display: inline-block;
+  }
+}
+@container lane (max-width: 337px) {
+  .cal-week[data-days="5"] .cal-chip--bar :is(.cal-chip__name, .cal-chip__repeat) {
+    display: none;
+  }
+  .cal-week[data-days="5"] .cal-chip--bar .cal-chip__glyph {
+    display: inline-block;
+  }
+}
 /* A person's face on a tinted item: the surface's own white tile, so it stands out of the tint. */
 .cal-chip:is(.cal-chip--block, .cal-chip--run, .cal-chip--bar, [data-allday]) .ac-who > .ac-avatar[data-kind="person"] {
   background: var(--raised);
@@ -328,7 +352,8 @@ html:not([data-pointer]) .cal-chip:focus-visible {
   --even: calc((100% - var(--gaps)) / var(--cols));
   --thin: max(32px, var(--even) - 60px);
   --wide: calc((100% - var(--gaps) - var(--thins) * var(--thin)) / (var(--cols) - var(--thins)));
-  left: calc(2px * (var(--col) + 1) + var(--thin-before) * var(--thin) + (var(--col) - var(--thin-before)) * var(--wide));
+  --before: calc(var(--thin-before) * var(--thin) + (var(--col) - var(--thin-before)) * var(--wide));
+  left: calc(2px * (var(--col) + 1) + var(--before));
   width: var(--wide);
 }
 .cal-week__col > .cal-week__runs[data-thin] {

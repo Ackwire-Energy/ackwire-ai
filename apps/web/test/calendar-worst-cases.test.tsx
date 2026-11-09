@@ -174,6 +174,8 @@ const col = (day: number) =>
 describe("Calendário at its worst", () => {
   test("week: seven runs at 09:00 show two and +5, beside the meeting at 09:00; the 56-character name whole", async () => {
     await go();
+    // How many days, for the CSS: a phone's week of 7 draws its bars as faces too.
+    expect(document.querySelector<HTMLElement>(".cal-week")?.dataset.days).toBe("7");
     const tuesday = col(1);
     const stack = [...tuesday.querySelectorAll<HTMLElement>(".cal-week__runs")].find((s) =>
       s.textContent?.includes("Conferência 1"),
@@ -213,6 +215,7 @@ describe("Calendário at its worst", () => {
   test("day: the owner's name after the time where the column has room", async () => {
     await go("Dia");
     expect(document.querySelectorAll(".cal-week__col")).toHaveLength(1);
+    expect(document.querySelector<HTMLElement>(".cal-week")?.dataset.days).toBe("1");
   });
 
   test("month: a day of a dozen items shows three, then +N mais; the three-day trip a bar on its days", async () => {
