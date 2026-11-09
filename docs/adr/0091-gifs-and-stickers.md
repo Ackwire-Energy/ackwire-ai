@@ -1,6 +1,6 @@
 # 0091. GIFs and stickers in chat, and agents that send them
 
-- Status: Proposed (built on the server, the web and the phone app). Addendum 2026-10-31: the GIPHY key from Settings, off agentes.chat's own servers
+- Status: Proposed (built on the server, the web and the phone app). Addendum 2026-10-31: the GIPHY key from Settings, off agentes.chat's own servers. Addendum 2026-11-09: a routine's message with a GIF
 - Date: 2026-10-31
 - Code: `packages/engine/src/media.ts`, `packages/engine/src/agent-media.ts`, `packages/engine/src/media-tools.ts`, `packages/adapters/src/gifs.ts`, `apps/server/src/routes/app/gifs.ts`, `packages/ui` (`AgentSticker`, the composer's picker, `media-grid.ts`), `packages/client/src/lib/media.ts`, `apps/mobile/src/features/chat/MediaPickerSheet.tsx`, `apps/mobile/src/agent/StickerCanvas.tsx`, `apps/mobile/src/features/settings/MediaSettingsScreen.tsx`
 
@@ -86,3 +86,15 @@ Asked in a DM for a "good night" GIF in #general, an agent had no way to send it
 - **For a person's request only:** a routine posting with `post_message` gets no GIF, as its run gets no `send_gif` (run policy: `here`).
 - **Found and kept as `send_gif` does:** the workspace's rating, one of the first results, looked up again, stored as §1 says without a URL; the answer says "with a GIF", never its title (§6). The search runs before any file is copied or anything posted, so a failed search posts nothing and the model hears why.
 - **The apps draw it as they draw any message with text and a GIF.** It isn't part of the run's answer where it works, so it doesn't count toward `MEDIA_PER_RUN_MAX`; `post_message`'s own checks (who may post where, the agent in a private channel) are unchanged. `send_gif`'s description points to `post_message` for another channel.
+
+## Addendum (2026-11-09): a routine's message with a GIF
+
+Good-morning GIF routines posted links to a GIF site's search pages instead of a GIF: a routine's run speaks only through `hand_off` (ADR 0053 §4), which took only text, and the run policy refuses it `send_gif` (nobody is in its room) and, by the addendum above, `post_message`'s `gif`. Now the routine's own message can carry one. Code: `packages/engine/src/hand-off.ts` (`handOffGif`, `deliverRoutineReport`'s `gif`), `AgentGifPoster` in `media-tools.ts`, `gifToPost` in `chat-tools.ts`.
+
+- **`hand_off` takes `gif`** (the same short English search as `send_gif`), listed where `send_gif` would be for a person: a GIF provider that is `available()`, the workspace's GIFs on and the agent's switch on (`AgentGifPoster.offered`); the call checks again. Its description says when (the routine asks for one, or the message is a light one: a greeting, a celebration; never with a report of work) and never to paste a link to a GIF site instead.
+- **One message:** the GIF goes in `meta.media` of the routine's message, under its text, next to `meta.routine`, stored as §1 says without a URL; the answer says "Posted with a GIF.", never its title (§6). The apps already draw a message with text and a GIF.
+- **Found before anything posts:** outside the delivery's transaction (the provider may take seconds and the run's row is locked there), after the resourcefulness hold (ADR 0109). A failed search posts nothing and tells the model to try other words or hand off without `gif`. Not with `wake_me`: a note to the agent itself isn't posted as-is, so a GIF with it is refused before anything is searched.
+- **Not yesterday's GIF:** the search skips the GIFs among the last messages where the routine reports (`deliverTo`), as `send_gif` does where it answers, so a daily routine's GIF changes from day to day while the search has others. `post_message`'s GIF now skips the recent ones of the channel it posts in too.
+- **`post_message` from a routine takes `gif` too:** it posts where its creator can post, as itself (ADR 0053 §2), and its creator asked for its posts. This replaces the addendum above's "for a person's request only": a run nobody asked for (no person behind it and no routine) still gets no GIF.
+- **Unchanged:** the run policy still refuses a routine `send_gif` and `send_sticker` (its room is read by nobody; the refusal now points to `hand_off`'s `gif`), and a routine has no sticker of its own in its message. A GIF in a routine's message counts toward no `MEDIA_PER_RUN_MAX`: it is the routine's one message.
+- **Eval:** `routine-good-morning-gif` (`bun run eval:behavior`) checks that the routine hands off with `gif` (`mustCall` `hand_off+gif`: a `+key` names an input the call must carry) and no link.

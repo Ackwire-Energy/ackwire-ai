@@ -438,8 +438,13 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
       ...(together && !c.schedule ? [createAskAgentToolSource({ pubsub })] : []),
       createReactToolSource({ pubsub }),
       createMediaToolSource({ pubsub, gifs: c.noGifs ? null : createFakeGifs() }),
-      // Routine cases run in the background and speak through it.
-      createHandOffToolSource({ pubsub, judge: resourceful, tools: () => tools }),
+      // Routine cases run in the background and speak through it, with a GIF as in production.
+      createHandOffToolSource({
+        pubsub,
+        judge: resourceful,
+        tools: () => tools,
+        gif: createAgentGifPoster(c.noGifs ? null : createFakeGifs()),
+      }),
       ...(c.web
         ? [createWebToolSource({ fetch: fakeWebFetch(c.web), resolveHost: async () => ["93.184.216.34"] })]
         : []),

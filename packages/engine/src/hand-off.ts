@@ -6,6 +6,8 @@ import { sameSentence } from "./context/items";
 import { deliverNotice, publishDelivery } from "./delivery";
 import { cutText, stringsOf } from "./format";
 import type { Judge } from "./judge";
+import type { GifMedia } from "./media";
+import type { AgentGifPoster } from "./media-tools";
 import { insertMessage, type Message, unreachedAgents, unreachedNote, unreachedPeople } from "./messages";
 import { runReadOutsideById } from "./outside";
 import type { RoutineBrief } from "./routine-brief";
@@ -54,9 +56,10 @@ export async function routineDeliveryBlock(tx: Executor, brief: RoutineBrief): P
  * A routine's message reaches the conversation it reports to (`brief.deliverTo`), never its room.
  * By default it is the message itself (ADR 0053 §4, amended): the agent's ordinary message there,
  * tagged with the routine (`meta.routine`), waking nobody, so a greeting or a digest reads as one
- * message. With `wake`, it is a `routine_handoff` notice for the same agent instead, which joins an
- * unattended run of the agent there or starts one that acts or decides on it (never a run working for
- * a person). Only while the routine run is still open: one stopped, replaced or given up meanwhile
+ * message, with its `gif` under the text when it has one (ADR 0091 addendum 2026-11-09). With `wake`,
+ * it is a `routine_handoff` notice for the same agent instead, which joins an unattended run of the
+ * agent there or starts one that acts or decides on it (never a run working for a person). Only
+ * while the routine run is still open: one stopped, replaced or given up meanwhile
  * tells nobody (null). The routine run is `reported`, with the text as its record and `code`
  * (`auto_report` when its final text was delivered for it). In the caller's transaction; publish
  * with `publishDelivery` after the commit.
@@ -69,6 +72,8 @@ export async function deliverRoutineReport(
     text: string;
     code?: string | null;
     wake?: boolean;
+    /** Found before the transaction (`hand_off`'s `gif`); only with the message itself, never with `wake`. */
+    gif?: GifMedia | null;
   },
 ): Promise<{ message: Message; runs: AgentRun[] } | null> {
   const { run, brief } = input;
@@ -109,6 +114,8 @@ export async function deliverRoutineReport(
       body: text,
       meta: {
         routine: { id: brief.routineId, name: brief.name, runId: brief.routineRunId },
+        // Kept as `send_gif` keeps it: no URL, and its title never reaches the model (ADR 0091 §6).
+        ...(input.gif ? { media: input.gif } : {}),
         ...(files.length > 0 ? { artifacts: files } : {}),
         ...(unreached.length > 0 ? { unreachedAgents: unreached } : {}),
         ...(missed.length > 0 ? { unreachedPeople: missed } : {}),
@@ -174,6 +181,45 @@ export interface ResourcefulDeps {
 
 export interface HandOffDeps extends ResourcefulDeps {
   pubsub?: PubSub;
+  /** `hand_off`'s GIF (`createAgentGifPoster`); absent: it has no `gif`. */
+  gif?: AgentGifPoster;
+}
+
+/** `hand_off`'s GIF (ADR 0091 addendum 2026-11-09), listed only when the agent may send one. */
+const GIF_PROPERTY = {
+  type: "string",
+  maxLength: 100,
+  description: 'What the GIF shows, in English, 1 to 6 words (e.g. "good morning coffee").',
+} as const;
+const GIF_HELP =
+  ' `gif` posts a GIF in the same message, under the text: when the routine asks for one, or the message is a light one (a greeting, a celebration); never with a report of work. Say what it shows as a short search in English (1 to 6 words, e.g. "good morning coffee"), whatever language the message is in. Never paste a link to a GIF site instead. Not with `wake_me`.';
+
+/**
+ * The GIF a routine's message goes with, or what to tell the model when none goes: found the way `send_gif` finds
+ * one, past the GIFs posted lately where the routine reports (a daily greeting's GIF isn't yesterday's), before
+ * anything is posted, so a failed search posts nothing. Null: the run has no routine (the delivery says so).
+ */
+async function handOffGif(
+  poster: AgentGifPoster | undefined,
+  ctx: ToolContext,
+  search: unknown,
+): Promise<{ gif: GifMedia | null } | { error: string }> {
+  const brief = await routineBriefOfRun(ctx.db, ctx);
+  if (!brief) return { gif: null };
+  const found = poster
+    ? await poster.find(ctx, search, `${ctx.runId}:${HAND_OFF_TOOL}`, brief.deliverTo)
+    : { none: "off" as const };
+  if ("gif" in found) return found;
+  switch (found.none) {
+    case "off":
+      return { error: "GIFs are off here: hand off the message alone, without `gif`." };
+    case "empty":
+      return { error: 'Say what the GIF shows in a few English words, e.g. "good morning".' };
+    case "down":
+      return { error: "GIF search isn't answering right now: try again, or hand off without `gif`." };
+    case "not_found":
+      return { error: `No GIF found for "${found.query}". Try other words in English, or hand off without \`gif\`.` };
+  }
 }
 
 /** The rules of this run's calls of `tool` held so far (its `continuation` steps with `held`). */
@@ -446,7 +492,8 @@ export async function holdAsk(deps: ResourcefulDeps, ctx: ToolContext, question:
  * one way such a run speaks. Its message is posted where the routine reports, or with `wake_me`
  * becomes a `routine_handoff` notice there (`deliverRoutineReport`), at once and once per run (a second call is refused),
  * after checking the routine may still speak there (`routineDeliveryBlock`); when it can't, the
- * routine run is skipped with the reason and the model is told to finish.
+ * routine run is skipped with the reason and the model is told to finish. Where the agent may send GIFs
+ * (`AgentGifPoster.offered`), it takes `gif`: the message goes with a GIF (ADR 0091 addendum 2026-11-09).
  */
 export function createHandOffToolSource(deps: HandOffDeps): ToolSource {
   const tool: ToolDefinition = {
@@ -470,8 +517,22 @@ export function createHandOffToolSource(deps: HandOffDeps): ToolSource {
     async execute(input, ctx) {
       const text = String(input.message ?? "").trim();
       if (!text) return { content: "Give the report to hand off.", isError: true };
+      const gifAsked = typeof input.gif === "string" && input.gif.trim() !== "";
+      if (gifAsked && input.wake_me === true) {
+        return {
+          content: "A GIF goes only with a message posted as-is: hand off without `gif`, or without `wake_me`.",
+          isError: true,
+        };
+      }
       const held = await holdUntried(deps, ctx, text);
       if (held) return { content: held, data: { held: true } };
+      // Searched outside the transaction below: the provider may take seconds, and the run's row stays locked there.
+      let gif: GifMedia | null = null;
+      if (gifAsked) {
+        const found = await handOffGif(deps.gif, ctx, input.gif);
+        if ("error" in found) return { content: found.error, isError: true };
+        gif = found.gif;
+      }
       const handed = await ctx.db.transaction(async (tx) => {
         // Locked: two calls in one turn hand off once.
         const [run] = await tx
@@ -498,7 +559,7 @@ export function createHandOffToolSource(deps: HandOffDeps): ToolSource {
           await blockRoutineRun(tx, brief, run.orgId, block);
           return { refused: `Nothing was delivered: ${BLOCKED[block]}. Finish now: nothing else is posted.` };
         }
-        const delivered = await deliverRoutineReport(tx, { run, brief, text, wake: input.wake_me === true });
+        const delivered = await deliverRoutineReport(tx, { run, brief, text, wake: input.wake_me === true, gif });
         if (!delivered) return { refused: `Nothing was delivered: ${BLOCKED.stopped}. Finish now.` };
         return { delivered };
       });
@@ -510,10 +571,26 @@ export function createHandOffToolSource(deps: HandOffDeps): ToolSource {
         content:
           input.wake_me === true
             ? "Handed off: you will tell the people in the conversation. Finish your work now and end with a short record of what you checked: plain notes, no title or label. Nothing else is posted."
-            : `Posted.${note ? ` ${note}` : ""} Finish your work now and end with a short record of what you checked (it is not posted): plain notes, no title or label. Nothing else is posted.`,
+            : `Posted${gif ? " with a GIF" : ""}.${note ? ` ${note}` : ""} Finish your work now and end with a short record of what you checked (it is not posted): plain notes, no title or label. Nothing else is posted.`,
         data: { handedOff: { messageId: handed.delivered.message.id } },
       };
     },
   };
-  return { name: "hand_off", tools: async (ctx) => (ctx.background ? [tool] : []) };
+  // The same tool with `gif` where the agent may send one; the call checks again.
+  const withGif: ToolDefinition = {
+    ...tool,
+    description: `${tool.description}${GIF_HELP}`,
+    inputSchema: {
+      ...tool.inputSchema,
+      properties: { ...(tool.inputSchema.properties as Record<string, unknown>), gif: GIF_PROPERTY },
+    },
+  };
+  return {
+    name: "hand_off",
+    tools: async (ctx) => {
+      if (!ctx.background) return [];
+      const gif = ctx.runId && deps.gif ? await deps.gif.offered(ctx) : false;
+      return [gif ? withGif : tool];
+    },
+  };
 }
