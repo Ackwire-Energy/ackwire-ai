@@ -93,7 +93,7 @@ export function HomePage() {
 
   // The right hand's first-run checklist (ADR 0155 §6), while a row is left: one line back to it, never a second list.
   const lodi = dir.agents.find(isRightHand);
-  const firstRun = useFirstRun(lodi, null);
+  const firstRun = useFirstRun(lodi);
   const showSteps = firstRun.ready && firstRun.state === "open";
   const loaded = waitingList.isSuccess && inbox.isSuccess && missionList.isSuccess && !runs.isLoading;
   const calm = loaded && !showSteps && waitingCount === 0 && working.length === 0 && done.length === 0;

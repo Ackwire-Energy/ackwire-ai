@@ -140,6 +140,9 @@ describe("the first-run checklist", () => {
     await click(within(people).getByRole("button", { name: "Enviar" }), 10);
     expect(calls(state, "orgs.inviteMany").map((c) => c.args[1])).toEqual([{ emails: ["joao.lima@example.com"] }]);
     expect(row("Convidei joao.lima · aguardando")).toBeTruthy();
+    // Nobody joined yet: it says the invitation went out, and celebrates nothing.
+    expect(card().querySelector(".setup-row__say")?.textContent).toBe("Convite enviado.");
+    expect(card().textContent).not.toContain("Que bom ter mais gente aqui.");
     // Done: the row's own field is gone with it.
     expect(within(row("Convidei")).queryByRole("button", { name: "Mais opções" })).toBeNull();
   });
@@ -175,6 +178,21 @@ describe("the first-run checklist", () => {
     expect(calls(state, "chat.post").map((c) => (c.args[2] as { body: string }).body)).toEqual([
       "Quem do time cuida do quê?",
     ]);
+  });
+
+  test("complete before the team answered anything: how agents talk waits, so it never stands beside the first task", async () => {
+    const state = withRightHand(seedState(), { setup: { role: null, done: ["apps"] } });
+    state.aiStatus = { any: true, agents: [{ agentId: LODI_ID, state: "ready" }] };
+    state.agentStatuses = state.agents.map((a) => ({
+      agentId: a.id,
+      presence: "online" as const,
+      status: null,
+      activeAt: null,
+    }));
+    if (state.me?.organizations[0]) state.me.organizations[0].agentStyle = null;
+    await openDm(state);
+    expect(card().getAttribute("aria-label")).toBe("Tudo pronto.");
+    expect(screen().queryByText("Como prefere que eu fale com você?")).toBeNull();
   });
 
   test("an invited person sees none of it", async () => {

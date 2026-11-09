@@ -17,7 +17,7 @@ export function FirstRunLine() {
   const dir = useDirectory();
   const openDm = useOpenDm();
   const lodi = dir.agents.find(isRightHand);
-  const run = useFirstRun(lodi, null);
+  const run = useFirstRun(lodi);
   if (!lodi || !run.ready || run.state !== "open") return null;
   const text = t("mobile.chats.firstRunLine", {
     name: lodi.name,

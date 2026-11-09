@@ -684,16 +684,18 @@ export const en = {
         name: "Hi, {{first}}. I'm {{name}}. I'll put the team together with you in about two minutes.",
         business: "With that I'll know who to bring onto the team.",
         team: "This is the team I'd put together. You can change anything later.",
-        plan: "Just this left. Then I'll show you their first work.",
+        plan: "After the plan, all that's left is connecting an AI. I'll show you where.",
       },
       preview: {
         label: "Your workspace, as you answer",
+        /** The workspace's name in the preview until one is typed. */
+        name: "Your workspace",
         ghost: "Your team shows up here",
       },
       team: { title: "Your team" },
       plan: {
         title: "Turn your team on",
-        lead: "Your team is ready. With the plan, it starts today.",
+        lead: "Your team is ready. With the plan and an AI, it starts today.",
         asleep: "Asleep until the plan",
         price: "<b>{{name}} plan</b> · {{price}} a month",
         name: "<b>{{name}} plan</b>",
@@ -1982,8 +1984,6 @@ export const en = {
     label: "your right hand",
     /** The one-time dot on its row until it is first opened. */
     newDot: "New",
-    /** Its role, wherever an agent's role shows. */
-    role: "Workspace assistant",
     /** In its DM's header, after the label. */
     actsAsYou: "acts with your permissions",
     /** After "Message to {{name}} ·" in its DM's composer. */
@@ -2005,9 +2005,6 @@ export const en = {
         question: "Want to build the team with me?",
         action: "Build the team",
         message: "Help me build the team.",
-      },
-      next: {
-        firstTask: "Give {{name}} a first task",
       },
       /** Asked once, until the person picks (ADR 0147): how every agent here talks to them. */
       style: {
@@ -5376,6 +5373,8 @@ export const en = {
         ai: "Now the team thinks.",
         apps: "Done, I can read the apps now.",
         people: "Good to have more people here.",
+        /** An invitation sent, nobody in yet: it says it went out, and celebrates nothing. */
+        invited: "Invite sent.",
       },
       /** Once the team can think: what the person may ask next. `fit` and `who` are sent to the right hand as written. */
       asks: {

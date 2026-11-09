@@ -1,5 +1,12 @@
 import type { Agent } from "@agenteschat/client";
-import { useAiStatus, useComputerSetup, useMessages, useRightHandWave, useSetAgentStyle } from "@agenteschat/client";
+import {
+  useAiStatus,
+  useComputerSetup,
+  useMessages,
+  useRightHandWave,
+  useSetAgentStyle,
+  useTeamAnswered,
+} from "@agenteschat/client";
 import { formatTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiStateOf, noAiCardOf } from "@agenteschat/client/lib/no-ai";
@@ -26,7 +33,8 @@ import { useToast } from "@/lib/toast";
  * The top of the right hand's DM (ADR 0137), drawn by the app and never stored, so it costs nothing and works before
  * any AI is connected: its greeting, then, for the workspace's owners, the first-run checklist (ADR 0155 §6), whose
  * rows hold the whole setup. Anyone else gets one card at a time (`introCards`): Connect AI while there is none, then
- * how agents talk to them (ADR 0147); the owner gets that question once the checklist is complete. With no card left,
+ * how agents talk to them (ADR 0147); the owner gets that question once the checklist is complete and the team answered
+ * them once, so it never stands beside the first task. With no card left,
  * a line to build the team with it, at any time. On the person's first visit, its waving sticker under the greeting,
  * drawn as a sticker message is and decorative (the greeting already says hello). Its face and name open the profile
  * card, as on any message.
@@ -42,7 +50,7 @@ export function RightHandIntro({ agent, channelId }: { agent: Agent; channelId: 
   const team = dir.agents.filter((a) => !isRightHand(a));
   const held = usePlanHold() !== null;
   const setup = useComputerSetup(org.id);
-  const checklist = useFirstRun(agent, channelId).state;
+  const checklist = useFirstRun(agent).state;
   // A hold is known with the edition: until then no card, so Connect doesn't flash before the checklist.
   const noAi = aiStateOf(status.data, agent.id) === "no_ai";
   const aiKnown = Boolean(status.data) && !setup.isPending;
@@ -54,6 +62,7 @@ export function RightHandIntro({ agent, channelId }: { agent: Agent; channelId: 
     held,
     noAiCard: useMessages(org.id, channelId).data?.some((m) => noAiCardOf(m.meta)),
     checklist,
+    answered: useTeamAnswered(org.id, team),
   });
   const profile = { actor: { type: "agent", id: agent.id }, label: t("profile.of", { name: agent.name }) } as const;
   return (
@@ -105,7 +114,7 @@ export function RightHandIntro({ agent, channelId }: { agent: Agent; channelId: 
           {t("rightHand.intro.connect.title")}
         </RequestOpen>
       )}
-      <FirstRunCard agent={agent} channelId={channelId} />
+      <FirstRunCard agent={agent} />
       {cards.includes("style") && <StyleCard agent={agent} />}
       {offersTeamSetup({ noAi, aiKnown, createsAgents, hasTeam: team.length > 0, cards, held, checklist }) && (
         <p className="rh-intro__again small muted">

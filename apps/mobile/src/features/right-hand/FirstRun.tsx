@@ -7,11 +7,9 @@ import {
   useConnections,
   useInvitations,
   useMembers,
-  useMessages,
   useModelLabel,
   useModels,
 } from "@agenteschat/client";
-import { teamProposalOf } from "@agenteschat/client/lib/action-cards";
 import { brainLine } from "@agenteschat/client/lib/brain";
 import { emailName, firstName, joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -23,16 +21,17 @@ import type { FirstRunState } from "@agenteschat/client/lib/right-hand";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { connectorName } from "@agenteschat/client/lib/scopes";
 import {
+  beatRow,
   type FirstRunFacts,
   type FirstRunStep,
   firstRunAiLabel,
   firstRunAsks,
+  firstRunBeats,
   firstRunDone,
   firstRunRow,
   firstRunRowState,
   firstRunSteps,
 } from "@agenteschat/client/lib/setup-checklist";
-import { firstTasks } from "@agenteschat/client/lib/team-plan";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/providers/org";
 import type { IconName } from "@/ui";
@@ -41,7 +40,6 @@ import { SetupAsks, SetupCardView, useDoneSay } from "../agents/setup/SetupCard"
 import { openSetupStep } from "../agents/setup/SetupStepScreen";
 import { openConnectAi } from "../ai/NoAiCard";
 import { usePlanHold } from "../ai/parts";
-import { useOpenDm } from "../new/useOpenDm";
 import { useDirectory, useMeId } from "../shared/hooks";
 import { tapHaptic } from "../shared/parts";
 import { useSendAnswer } from "./TeamCard";
@@ -59,8 +57,8 @@ const ROW_ICON: Record<FirstRunStep, IconName> = {
   people: "person",
 };
 
-/** Where the card stands for this person, and what its rows read; Conversas reads it with no conversation (null). */
-export function useFirstRun(agent: Agent | undefined, channelId: string | null) {
+/** Where the card stands for this person, and what its rows read (Conversas reads it too). */
+export function useFirstRun(agent: Agent | undefined) {
   const { orgId, org } = useOrg();
   const dir = useDirectory();
   const meId = useMeId();
@@ -78,7 +76,6 @@ export function useFirstRun(agent: Agent | undefined, channelId: string | null) 
   const members = useMembers(orgId);
   const invitations = useInvitations(orgId, steps.includes("people"));
   const connections = useConnections(orgId, steps.includes("apps"));
-  const messages = useMessages(orgId, channelId ?? "", channelId !== null).data;
   const held = usePlanHold(orgId, org) !== null;
   const team = dir.agents.filter((a) => !isRightHand(a));
   const aiState = agent ? aiStateOf(status.data, agent.id) : undefined;
@@ -90,10 +87,6 @@ export function useFirstRun(agent: Agent | undefined, channelId: string | null) 
     people: (members.data?.length ?? 1) > 1 || waiting.length > 0,
   };
   const done = agent?.setup && steps.length > 0 ? firstRunDone(agent.setup, facts) : new Set<FirstRunStep>();
-  const cards = (messages ?? []).flatMap((m) => {
-    const card = teamProposalOf(m.meta);
-    return card ? [card] : [];
-  });
   const left = steps.filter((s) => !done.has(s));
   const state: FirstRunState = steps.length === 0 ? "none" : left.length > 0 ? "open" : "complete";
   return {
@@ -107,17 +100,15 @@ export function useFirstRun(agent: Agent | undefined, channelId: string | null) 
     members: members.data?.length ?? 1,
     invited: waiting.map((i) => emailName(i.email)),
     connections: live,
-    created: cards.filter((c) => c.state === "created").at(-1) ?? null,
   };
 }
 
 export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: string }) {
   const { t } = useTranslation();
   const { orgId, org } = useOrg();
-  const openDm = useOpenDm();
   const send = useSendAnswer(channelId);
   const confirm = useConfirmSetup(orgId, agent.id);
-  const run = useFirstRun(agent, channelId);
+  const run = useFirstRun(agent);
   const catalog = useCatalog();
   const dir = useDirectory();
   const modelLabel = useModelLabel();
@@ -126,9 +117,17 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
   const keyMaker = useAgentBrain(orgId, agent.id).data?.workspaceAi?.key?.provider;
   const { steps, done, held, team, facts } = run;
   const doneHere = steps.filter((s) => done.has(s));
-  // "Agora não" moves the row on and says nothing: only something done gets its line.
-  const said = useDoneSay(run.ready, doneHere, (step) =>
-    facts[step] ? t(`agentSetup.firstRun.say.${step}`, agentGrammar(agent.name)) : "",
+  // "Agora não" moves the row on and says nothing: only something done gets its line. An invitation is only sent: its
+  // line says so, and someone joining gets the welcome.
+  const said = useDoneSay(
+    run.ready,
+    firstRunBeats(doneHere, { members: run.members, invited: run.invited.length }),
+    (beat) =>
+      beat === "invited"
+        ? t("agentSetup.firstRun.say.invited")
+        : facts[beat]
+          ? t(`agentSetup.firstRun.say.${beat}`, agentGrammar(agent.name))
+          : "",
   );
   if (run.state === "none") return null;
 
@@ -179,7 +178,7 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
       title: plan ? planHoldPhoneLine(t, can(org, "manage_billing")) : words.title,
       desc: plan ? undefined : words.desc,
       dim: state === "afterPlan",
-      saying: said?.step === s ? said.text : null,
+      saying: said && beatRow(said.step) === s ? said.text : null,
       ...(words.action
         ? {
             action: {
@@ -198,22 +197,12 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
     };
   });
 
-  const first = run.created ? firstTasks(run.created)[0] : undefined;
+  // What to ask it. The team's first task is offered once, by the team card ("Primeira tarefa"), never here too.
   const asks = firstRunAsks(done, held, team.length > 0)
-    ? [
-        ...(first
-          ? [
-              {
-                label: t("rightHand.intro.next.firstTask", agentGrammar(first.name)),
-                onPress: () => void openDm({ agentId: first.agentId }, { compose: true, text: first.task }),
-              },
-            ]
-          : []),
-        ...(["fit", "who"] as const).map((k) => ({
-          label: t(`agentSetup.firstRun.asks.${k}`),
-          onPress: () => send(t(`agentSetup.firstRun.asks.${k}`)),
-        })),
-      ]
+    ? (["fit", "who"] as const).map((k) => ({
+        label: t(`agentSetup.firstRun.asks.${k}`),
+        onPress: () => send(t(`agentSetup.firstRun.asks.${k}`)),
+      }))
     : [];
 
   // One question at a time, as in a conversation: the next open step with its button, and a step just done while it

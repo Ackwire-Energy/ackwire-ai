@@ -47,14 +47,22 @@ describe("the setup checklist in a new agent's DM", () => {
     const state = withSetup(seedState());
     await openDm(state);
     const who = [...(card()?.querySelectorAll<HTMLElement>(".setup-row") ?? [])].find((r) =>
-      r.textContent?.includes("Falar com todos de Acme"),
+      r.textContent?.includes("Falar com todos da Acme"),
     );
     expect(who).toBeTruthy();
     await click(within(who as HTMLElement).getByRole("button", { name: "Escolher" }));
     const dialog = screen().getByRole("dialog");
     await click(within(dialog).getByRole("button", { name: "Salvar" }));
     expect(state.calls).toContainEqual({ method: "agents.confirmSetup", args: [ORG_ID, ADA_ID, "who"] });
-    expect(card()?.textContent).toContain("Falo com todos de Acme");
+    // The workspace with the article the app gives it everywhere ("da Acme", as "o time da Acme").
+    expect(card()?.textContent).toContain("Falo com todos da Acme");
+  });
+
+  test("with nothing left, its greeting asks for no help over a card that is all done", async () => {
+    const state = withSetup(seedState(), ["apps", "who", "how"]);
+    await openDm(state);
+    expect(card()?.textContent).toContain("5 de 5");
+    expect(document.body.textContent).not.toContain("Pra eu começar");
   });
 
   test("an agent made before the checklist shows none: its empty conversation as before", async () => {

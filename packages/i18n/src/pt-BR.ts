@@ -678,16 +678,18 @@ export const ptBR = {
         name_female: "Oi, {{first}}. Eu sou a {{name}}. Vou montar o time com você em uns dois minutos.",
         business: "Com isso eu já sei quem chamar para o time.",
         team: "Esse é o time que eu montaria. Você muda tudo depois.",
-        plan: "Falta só isso. Depois eu mostro o primeiro trabalho deles.",
+        plan: "Depois do plano, falta só conectar uma IA. Eu mostro onde.",
       },
       preview: {
         label: "O seu workspace, enquanto você responde",
+        /** The workspace's name in the preview until one is typed. */
+        name: "Seu workspace",
         ghost: "O time aparece aqui",
       },
       team: { title: "Seu time" },
       plan: {
         title: "Ligue o time",
-        lead: "O time está pronto. Com o plano, ele começa hoje.",
+        lead: "O time está pronto. Com o plano e uma IA, ele começa hoje.",
         asleep: "Dormindo até o plano",
         price: "<b>Plano {{name}}</b> · {{price}} por mês",
         name: "<b>Plano {{name}}</b>",
@@ -1979,7 +1981,6 @@ export const ptBR = {
   rightHand: {
     label: "seu braço direito",
     newDot: "Novo",
-    role: "Assistente do workspace",
     actsAsYou: "age com as suas permissões",
     composerHint: "nada muda sem você",
     /** The top of its DM, drawn by the app (no model): its greeting and the first card the workspace needs. */
@@ -1999,10 +2000,6 @@ export const ptBR = {
         question: "Quer montar o time comigo?",
         action: "Montar o time",
         message: "Me ajuda a montar o time.",
-      },
-      next: {
-        firstTask: "Dar a primeira tarefa para o {{name}}",
-        firstTask_female: "Dar a primeira tarefa para a {{name}}",
       },
       /** Asked once, until the person picks (ADR 0147): how every agent here talks to them. */
       style: {
@@ -5307,7 +5304,7 @@ export const ptBR = {
       todo: "Ler {{apps}}",
       todoDesc: "Ler nunca muda nada.",
       action: "Liberar",
-      todoNone: "Usar os apps de {{org}}",
+      todoNone: "Usar os apps da {{org}}",
       todoNoneDesc: "Os que vocês já conectaram, como Gmail e Drive.",
       done: "Uso {{apps}}",
       doneNone: "Sem apps por enquanto",
@@ -5317,7 +5314,7 @@ export const ptBR = {
       ok_one: "Liberar {{count}} app",
       ok_other: "Liberar {{count}} apps",
       okNone: "Continuar sem apps",
-      empty: "Ainda não tem nenhum app conectado em {{org}}.",
+      empty: "Ainda não tem nenhum app conectado na {{org}}.",
       connectOther: "Conectar outro app",
     },
     where: {
@@ -5336,11 +5333,11 @@ export const ptBR = {
       ok_other: "Entrar em {{count}} canais",
     },
     who: {
-      todo: "Falar com todos de {{org}}",
+      todo: "Falar com todos da {{org}}",
       todoDesc: "Qualquer um pode me chamar.",
       todoPlan: "Falar só com você",
       todoPlanDesc: "O seu plano é pessoal.",
-      doneEveryone: "Falo com todos de {{org}}",
+      doneEveryone: "Falo com todos da {{org}}",
       doneYou: "Falo só com você",
       doneOwner: "Falo só com {{name}}",
       donePeople: "Falo com quem você escolheu",
@@ -5437,6 +5434,8 @@ export const ptBR = {
         ai: "Agora o time pensa.",
         apps: "Pronto, já leio os apps.",
         people: "Que bom ter mais gente aqui.",
+        /** An invitation sent, nobody in yet: it says it went out, and celebrates nothing. */
+        invited: "Convite enviado.",
       },
       /** Once the team can think: what the person may ask next. `fit` and `who` are sent to the right hand as written. */
       asks: {
@@ -11670,7 +11669,7 @@ export const ptBR = {
     moreFiltersHint: "datas, só agentes, fixadas",
     clearRecentAll: "Limpar buscas recentes",
     /** A busca no topo de um canal (estilo Discord): o campo e os resultados no painel ao lado. */
-    header: { placeholder: "Buscar em {{org}}", clear: "Limpar busca" },
+    header: { placeholder: "Buscar na {{org}}", clear: "Limpar busca" },
     panel: {
       label: "Resultados da busca",
       count_one: "{{count}} resultado",

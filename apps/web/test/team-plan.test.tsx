@@ -173,12 +173,18 @@ describe("the team card", () => {
 
   test("Criar o time makes it in one click; the receipt has Desfazer and a first task per agent", async () => {
     const state = lodiDm();
+    // Lodi's checklist above it, its asks out once the team can think.
+    const lodi = state.agents.find((a) => a.id === LODI_ID);
+    if (lodi) lodi.setup = { role: null, done: ["apps"] };
     const { router } = await openDm(state);
     await click(button("Criar o time"), 12);
     expect(calls(state, "agents.createTeam").map((c) => c.args[1])).toEqual(["m-team"]);
     expect(document.body.textContent).toContain("Time criado por você");
     expect(button("Desfazer")).toBeTruthy();
     const first = screen().getByRole("group", { name: "Primeira tarefa" });
+    // One offer of a first task, this card's: the checklist's asks above it offer none.
+    expect(screen().getByText("Agora me peça algo:")).toBeTruthy();
+    expect(screen().queryByRole("button", { name: /Dar a primeira tarefa/ })).toBeNull();
     expect(first.textContent).toContain("Responder a última mensagem que espera");
     // The task under the name at the row's full width, its button at the name's line's end or under the task.
     const task = first.querySelector(".tp-agent.ac-mediarow") as HTMLElement;

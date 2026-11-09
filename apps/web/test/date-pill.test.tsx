@@ -27,7 +27,7 @@ describe("the day at the top of the list", () => {
     return el;
   };
 
-  test("the last day line at or above the top edge; the first one while the top is still above it; none", () => {
+  test("the last day line at or above the top edge; none above the first one (the greeting and its cards) or with none", () => {
     expect(
       dayAtTop(
         list([
@@ -45,6 +45,7 @@ describe("the day at the top of the list", () => {
         ]),
       ),
     ).toBe("d2");
+    // The top above the first day: the conversation's start (its greeting, the setup card) has no day to float over it.
     expect(
       dayAtTop(
         list([
@@ -52,7 +53,7 @@ describe("the day at the top of the list", () => {
           ["d2", 900],
         ]),
       ),
-    ).toBe("d1");
+    ).toBeNull();
     expect(
       dayAtTop(
         list([
@@ -87,6 +88,26 @@ describe("the floating date while scrolling", () => {
     expect(pill.hasAttribute("data-shown")).toBe(true);
     expect(pill.textContent).toBe(dividers.at(-1)?.textContent ?? "");
     await act(() => new Promise((r) => setTimeout(r, DATE_PILL_IDLE_MS + 50)));
+    expect(pill.hasAttribute("data-shown")).toBe(false);
+  });
+
+  test("scrolled up onto the conversation's start, above its first day, the date goes at once instead of lingering", async () => {
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seedState()) });
+    await settle(8);
+    const log = screen().getByRole("region", { name: "Mensagens" });
+    const dividers = [...log.querySelectorAll<HTMLElement>("[data-day]")];
+    at(log, 0);
+    for (const d of dividers) at(d, -100);
+    const scrollUp = () =>
+      act(async () => {
+        fireEvent.wheel(log, { deltaY: -40 });
+        fireEvent.scroll(log);
+      });
+    await scrollUp();
+    const pill = document.querySelector(".channel__date") as HTMLElement;
+    expect(pill.hasAttribute("data-shown")).toBe(true);
+    for (const d of dividers) at(d, 300);
+    await scrollUp();
     expect(pill.hasAttribute("data-shown")).toBe(false);
   });
 });

@@ -8,6 +8,7 @@ import {
   introLeadKey,
   offersTeamSetup,
   rightHandOf,
+  teamAnswered,
   tellsNameStory,
 } from "@agenteschat/client/lib/right-hand";
 import { STICKER_STILL_T, WAVE_SECONDS } from "@agenteschat/ui/agent/stickers";
@@ -104,6 +105,24 @@ test("its greeting's cards beside the checklist: one question at a time (ADR 015
   const src = (f: string) => readFileSync(new URL(f, import.meta.url), "utf8");
   for (const f of ["../../src/features/right-hand/Intro.tsx", "../../../web/src/components/RightHandIntro.tsx"])
     expect(src(f)).toContain("t(introLeadKey(held, team.length > 0))");
+});
+
+test("how agents should talk waits for the team's first answer, so it never stands beside the first task", () => {
+  const base = { noAi: false, aiKnown: true, askStyle: true, checklist: "complete" as const };
+  expect(introCards({ ...base, answered: false })).toEqual([]);
+  expect(introCards({ ...base, answered: true })).toEqual(["style"]);
+  const iara = agent({ id: "a-iara", name: "Iara" });
+  const status = (agentId: string, activeAt: string | null) => ({ agentId, activeAt });
+  // The team made, nobody of it worked yet (the right hand's own runs don't count): it waits.
+  expect(teamAnswered([iara], [status("a-iara", null), status("a-lodi", at(0))])).toBe(false);
+  expect(teamAnswered([iara], undefined)).toBe(false);
+  // Iara answered the first task.
+  expect(teamAnswered([iara], [status("a-iara", at(0))])).toBe(true);
+  // No team: no first task to wait for.
+  expect(teamAnswered([], undefined)).toBe(true);
+  const src = (f: string) => readFileSync(new URL(f, import.meta.url), "utf8");
+  for (const f of ["../../src/features/right-hand/Intro.tsx", "../../../web/src/components/RightHandIntro.tsx"])
+    expect(src(f)).toContain("answered: useTeamAnswered(");
 });
 
 test("the phone's greeting draws the checklist and Conversas has one line back to it, not a second list", () => {

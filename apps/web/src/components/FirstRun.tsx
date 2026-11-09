@@ -8,10 +8,7 @@ import {
   useInvitations,
   useInviteMany,
   useMembers,
-  useMessages,
 } from "@agenteschat/client";
-import { teamProposalOf } from "@agenteschat/client/lib/action-cards";
-import { setDraftFor } from "@agenteschat/client/lib/drafts";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { emailName, joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -21,17 +18,18 @@ import { can } from "@agenteschat/client/lib/permissions";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { connectorName } from "@agenteschat/client/lib/scopes";
 import {
+  beatRow,
   type FirstRunFacts,
   type FirstRunStep,
   firstRunAiLabel,
   firstRunAppList,
   firstRunAsks,
+  firstRunBeats,
   firstRunDone,
   firstRunRow,
   firstRunRowState,
   firstRunSteps,
 } from "@agenteschat/client/lib/setup-checklist";
-import { firstTasks } from "@agenteschat/client/lib/team-plan";
 import { Button, type IconName, Input } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
 import { useRef, useState } from "react";
@@ -75,11 +73,8 @@ export function useFirstRunSteps(agent: Agent | undefined): FirstRunStep[] {
   });
 }
 
-/**
- * Where the card stands for this person: `open` while a row is left, `complete`, or `none` (not theirs). Início reads
- * it with no conversation (`channelId` null): the rows' count alone.
- */
-export function useFirstRun(agent: Agent | undefined, channelId: string | null) {
+/** Where the card stands for this person: `open` while a row is left, `complete`, or `none` (not theirs). */
+export function useFirstRun(agent: Agent | undefined) {
   const { org } = useOrg();
   const dir = useDirectory(org.id);
   const steps = useFirstRunSteps(agent);
@@ -88,7 +83,6 @@ export function useFirstRun(agent: Agent | undefined, channelId: string | null) 
   const invitations = useInvitations(org.id, steps.includes("people"));
   const connections = useConnections(org.id, steps.includes("apps"));
   const live = (connections.data ?? []).filter((c) => !c.revokedAt);
-  const messages = useMessages(org.id, channelId ?? "", channelId !== null).data;
   const held = usePlanHold() !== null;
   const team = dir.agents.filter((a) => !isRightHand(a));
   const aiState = agent ? aiStateOf(status.data, agent.id) : undefined;
@@ -104,10 +98,6 @@ export function useFirstRun(agent: Agent | undefined, channelId: string | null) 
     members.isSuccess &&
     (!steps.includes("apps") || connections.isSuccess) &&
     (!steps.includes("people") || !invitations.isPending);
-  const cards = (messages ?? []).flatMap((m) => {
-    const card = teamProposalOf(m.meta);
-    return card ? [card] : [];
-  });
   const left = steps.filter((s) => !done.has(s));
   return {
     steps,
@@ -119,22 +109,20 @@ export function useFirstRun(agent: Agent | undefined, channelId: string | null) 
     connections: live,
     members: members.data?.length ?? 1,
     invited: waiting.map((i) => emailName(i.email)),
-    created: cards.filter((c) => c.state === "created").at(-1) ?? null,
     state: steps.length === 0 ? ("none" as const) : left.length > 0 ? ("open" as const) : ("complete" as const),
   };
 }
 
 /** The card, under the right hand's greeting. */
-export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: string }) {
+export function FirstRunCard({ agent }: { agent: Agent }) {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const navigate = useNavigate();
   const connect = useConnectAi();
   const invite = useInviteDialog();
   const actions = useChannelActions();
   const catalog = useCatalog();
   const confirm = useConfirmSetup(org.id, agent.id);
-  const run = useFirstRun(agent, channelId);
+  const run = useFirstRun(agent);
   const thinks = useAgentThinks(agent);
   // Through the API, the workspace's key it runs on names its maker, as the side panel does (Automático names none).
   const keyMaker = useAgentBrain(org.id, agent.id).data?.workspaceAi?.key?.provider;
@@ -142,9 +130,21 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
   const burstRef = useRef<HTMLCanvasElement>(null);
   const { steps, done, held, team, facts } = run;
   const doneHere = steps.filter((s) => done.has(s));
-  // "Agora não" moves the row on and says nothing: only something done gets its line and its burst.
-  const said = useDoneSay(run.ready, doneHere, steps.length, agent.appearance?.color, burstRef, (step) =>
-    facts[step] ? t(`agentSetup.firstRun.say.${step}`, agentGrammar(agent.name)) : "",
+  // "Agora não" moves the row on and says nothing: only something done gets its line and its burst. An invitation is
+  // only sent: its line says so, with no burst, which waits for someone joining.
+  const said = useDoneSay(
+    run.ready,
+    firstRunBeats(doneHere, { members: run.members, invited: run.invited.length }),
+    steps.length,
+    agent.appearance?.color,
+    burstRef,
+    (beat) =>
+      beat === "invited"
+        ? t("agentSetup.firstRun.say.invited")
+        : facts[beat]
+          ? t(`agentSetup.firstRun.say.${beat}`, agentGrammar(agent.name))
+          : "",
+    (beat) => beat !== "invited",
   );
   if (run.state === "none") return null;
 
@@ -187,7 +187,7 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
       title: words.title,
       desc: words.desc,
       dim: state === "afterPlan",
-      saying: said?.step === s ? said.text : null,
+      saying: said && beatRow(said.step) === s ? said.text : null,
       ...(words.action && !inline && (s !== "ai" || connect) && (s !== "people" || invite)
         ? { action: { label: words.action, primary: s === next, onClick: act[s] } }
         : {}),
@@ -207,28 +207,12 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
     };
   });
 
-  const first = run.created ? firstTasks(run.created)[0] : undefined;
+  // What to ask it. The team's first task is offered once, by the team card ("Primeira tarefa"), never here too.
   const asks = firstRunAsks(done, held, team.length > 0)
-    ? [
-        ...(first
-          ? [
-              {
-                label: t("rightHand.intro.next.firstTask", agentGrammar(first.name)),
-                onClick: () => {
-                  setDraftFor(`agent:${first.agentId}`, first.task);
-                  void navigate({
-                    to: "/org/$orgId/dm/agent/$agentId",
-                    params: { orgId: org.id, agentId: first.agentId },
-                  });
-                },
-              },
-            ]
-          : []),
-        ...(["fit", "who"] as const).map((k) => ({
-          label: t(`agentSetup.firstRun.asks.${k}`),
-          onClick: () => actions?.resend(t(`agentSetup.firstRun.asks.${k}`)),
-        })),
-      ]
+    ? (["fit", "who"] as const).map((k) => ({
+        label: t(`agentSetup.firstRun.asks.${k}`),
+        onClick: () => actions?.resend(t(`agentSetup.firstRun.asks.${k}`)),
+      }))
     : [];
 
   return (

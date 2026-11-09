@@ -22,7 +22,7 @@ import {
 import { seesDetails } from "@agenteschat/client/lib/audience";
 import { computerName } from "@agenteschat/client/lib/computer";
 import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
-import { formatPercent, formatUsd, relativeTime } from "@agenteschat/client/lib/format";
+import { capitalize, formatPercent, formatUsd, relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { STATUS_ICON } from "@agenteschat/client/lib/issues";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -168,7 +168,8 @@ function AgentHead({ agent }: { agent: Agent }) {
   const busy = useStreams((s) => agentStateIn(s, agent.id) !== "idle");
   const line = agentLine(t, shown?.line ?? null, i18n.language);
   const word = busy ? t("team.workingNow") : shown ? t(`presence.${shown.presence}`) : null;
-  const role = isRightHand(agent) ? t("rightHand.role") : agent.role || `@${agent.handle}`;
+  // The right hand's one role name, as the sidebar and its DM's header say it.
+  const role = isRightHand(agent) ? capitalize(t("rightHand.label"), i18n.language) : agent.role || `@${agent.handle}`;
   return (
     <header className="dm-side__head">
       <div className="agp-cover dm-side__cover">

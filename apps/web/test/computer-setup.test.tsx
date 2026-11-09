@@ -112,8 +112,17 @@ describe("the workspace's computer on its way: the notice on top of the work are
     // This server sends no email: nothing is promised.
     expect(notice().textContent).not.toMatch(/avisamos/i);
 
-    await push({ state: "preparing", step: "installing", secondsLeft: 330 });
+    // Prepared before a step: the title says it all, no line saying it again ("Preparando o computador.").
+    await push({ state: "preparing", step: null });
     const line = () => notice().querySelector(".outage__text > span")?.textContent;
+    expect(title()).toBe("Preparando o computador da Acme");
+    expect(line()).toBeUndefined();
+    expect(notice().textContent).not.toContain("Preparando o computador.");
+    // With the time left alone, it starts the line.
+    await push({ state: "preparing", step: null, secondsLeft: 330 });
+    expect(line()).toBe("Faltam uns 6 min");
+
+    await push({ state: "preparing", step: "installing", secondsLeft: 330 });
     expect(title()).toBe("Preparando o computador da Acme");
     expect(line()).toBe("Passo 3 de 4 · Instalando os programas · faltam uns 6 min");
     await push({ state: "preparing", step: "starting" });

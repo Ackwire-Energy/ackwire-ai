@@ -21,13 +21,13 @@ import { listsAgent, seesDetails } from "@agenteschat/client/lib/audience";
 import { brainLine } from "@agenteschat/client/lib/brain";
 import { effortLevel } from "@agenteschat/client/lib/brain-advanced";
 import { modelUnpriced } from "@agenteschat/client/lib/endpoints";
-import { formatPercent, lowerFirst, timeLeft } from "@agenteschat/client/lib/format";
+import { capitalize, formatPercent, lowerFirst, timeLeft } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { agentPlan, aiStateOf, planLabel, planOfAccount } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { planMeterText, usageShown } from "@agenteschat/client/lib/plan-usage";
 import { memoryLine } from "@agenteschat/client/lib/proposals";
-import { AUTO, isAuto } from "@agenteschat/client/lib/providers";
+import { apiModelName, autoMakerOf, isAuto } from "@agenteschat/client/lib/providers";
 import { isRightHand, tellsNameStory } from "@agenteschat/client/lib/right-hand";
 import { planLine } from "@agenteschat/ui/plan-state";
 import { useQueryClient } from "@tanstack/react-query";
@@ -336,8 +336,9 @@ function Profile({ id }: { id: string }) {
       : owner
         ? t("mobile.intentAgents.owner", { name: owner })
         : null;
+  // The right hand's one role name, as its row in Conversas and its conversation's header say it.
   const roleLine = rightHand
-    ? `${t("rightHand.role")} · ${t("rightHand.label")}`
+    ? capitalize(t("rightHand.label"), i18n.language)
     : [roleName || null, plain ? (roleName ? lowerFirst(plain, i18n.language) : plain) : null]
         .filter(Boolean)
         .join(" · ");
@@ -358,11 +359,10 @@ function Profile({ id }: { id: string }) {
     return `${formatPercent(i18n.language, spend.percent)} ${t("mobile.agent.ofMonthBudget")}`;
   };
   const budgetLine = budgetText();
+  // On Automático, the maker of the key it runs on ("Claude"), as the right hand's panel names its key.
   const apiModel = !agent?.model
     ? null
-    : isAuto(agent.model)
-      ? t("brain.auto.label")
-      : (modelLabel(agent.model) ?? agent.model);
+    : apiModelName(t, agent.model, modelLabel(agent.model) ?? undefined, autoMakerOf(aiStatus.data, id));
   const monthLabel =
     shown.plan?.account ?? thinksPlan ?? thinks?.text ?? apiModel ?? t("usageViews.agent.title", agentGrammar(name));
   // A short value fits on the right ("week 40%", "$3.20 of $50.00"); a sentence goes under the name.
@@ -772,7 +772,7 @@ function Profile({ id }: { id: string }) {
                 {...modelRow(
                   t,
                   agent.brain,
-                  agent.model === AUTO ? t("brain.auto.label") : (modelLabel(agent.model) ?? agent.model),
+                  apiModelName(t, agent.model, modelLabel(agent.model) ?? undefined, autoMakerOf(aiStatus.data, id)),
                 )}
               />
             </GroupedList>

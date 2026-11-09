@@ -88,10 +88,8 @@ export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; ano
     refetchOnWindowFocus: "always",
   });
   const lodi = agents.data?.find(isRightHand);
-  // By name, as the lists show them: a team made at once shares one creation time, so the server's order is any.
-  const team = (agents.data ?? [])
-    .filter((a) => !isRightHand(a))
-    .sort((a, b) => a.name.localeCompare(b.name, i18n.language));
+  // In the order they were made (the server's), a template's team in its template's order: as every screen lists it.
+  const team = (agents.data ?? []).filter((a) => !isRightHand(a));
   const context = settings.data?.context?.trim() ?? "";
   const { steps, at, step, index } = railState({
     orgId,

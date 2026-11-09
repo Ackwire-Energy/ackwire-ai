@@ -42,6 +42,7 @@ export function OnboardingPreview({
   const { t } = useTranslation();
   const made = useQuery({ ...channelsQuery(useApi(), orgId ?? ""), enabled: orgId !== null }).data;
   const names = [...new Set(made ? made.map((c) => c.name) : channels)].sort((a, b) => a.localeCompare(b));
+  // The right hand stands first, the team after it.
   const team = agents.length - 1;
   return (
     <aside className="onb-preview" aria-label={t("onboarding.flow.preview.label")}>
@@ -58,7 +59,8 @@ export function OnboardingPreview({
                 <span className="sidebar__org-text">
                   <span className="sidebar__org-name">{org}</span>
                   <span className="sidebar__org-meta">
-                    {t("settings.tileState.members", { count: 1 })} · {t("sidebarAgents.count", { count: team })}
+                    {t("settings.tileState.members", { count: 1 })} ·{" "}
+                    {t("sidebarAgents.count", { count: agents.length })}
                   </span>
                 </span>
                 <Icon name="chevronDown" size={16} />

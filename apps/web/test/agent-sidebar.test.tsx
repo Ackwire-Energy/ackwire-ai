@@ -219,6 +219,24 @@ describe("what the viewer sees", () => {
     await openDm({ state, agentId: lodi?.id ?? "" });
     expect(section("Computador")).toBeNull();
     expect(section("Como pensa")).toBeTruthy();
+    // One role name, the sidebar's and its header's: never a second one in its panel.
+    expect((side() as HTMLElement).querySelector(".dm-side__role")?.textContent).toBe("Seu braço direito");
+    expect(side()?.textContent).not.toContain("Assistente do workspace");
+  });
+
+  test("on Automático it is named by the maker of the key it thinks with, in its panel and its header", async () => {
+    widthIs(DM_SIDE_WIDE_QUERY);
+    const state = seedState();
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (ada) ada.model = "auto";
+    state.aiStatus = {
+      any: true,
+      agents: state.agents.map((a) => ({ agentId: a.id, state: "ready" as const, provider: "anthropic" })),
+    };
+    await openDm({ state });
+    expect(section("Como pensa")?.textContent).toContain("Claude");
+    expect(section("Como pensa")?.textContent).not.toContain("Automático");
+    expect(document.querySelector(".channel__header .channel__brain")?.textContent).toBe("Claude");
   });
 
   test("routines: a switch for who may change one, read-only for who may not, at most three, with the count", async () => {

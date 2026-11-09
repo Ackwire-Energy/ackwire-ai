@@ -97,10 +97,8 @@ export function OnboardingPage() {
     refetchOnWindowFocus: "always",
   });
   const lodi = agents.data?.find(isRightHand);
-  // By name, as the sidebar lists them: a team made at once shares one creation time, so the server's order is any.
-  const team = (agents.data ?? [])
-    .filter((a) => !isRightHand(a))
-    .sort((a, b) => a.name.localeCompare(b.name, i18n.language));
+  // In the order they were made (the server's), a template's team in its template's order: as every screen lists it.
+  const team = (agents.data ?? []).filter((a) => !isRightHand(a));
   const context = settings.data?.context?.trim() ?? "";
   const { steps, at, reached, step, index } = railState({
     orgId,
@@ -272,10 +270,8 @@ export function OnboardingPage() {
     ...(team.length > 0
       ? team.map((a: Agent) => ({ name: a.name, role: a.role, look: lookOf(a), asleep: step === "plan" }))
       : step === "team" && template.chosen
-        ? // In the sidebar's order, the team's once made: making it moves no row.
-          [...template.chosen.team.agents]
-            .sort((a, b) => a.name.localeCompare(b.name, i18n.language))
-            .map((a) => ({ name: a.name, role: a.role, look: lookOf(a), fresh: true }))
+        ? // In the template's order, the team's once made: making it moves no row.
+          template.chosen.team.agents.map((a) => ({ name: a.name, role: a.role, look: lookOf(a), fresh: true }))
         : []),
   ];
 
@@ -613,7 +609,7 @@ export function OnboardingPage() {
           </div>
           {wide && (
             <OnboardingPreview
-              org={name || t("onboarding.workspace.namePlaceholder")}
+              org={name || t("onboarding.flow.preview.name")}
               logo={shownLogo}
               channels={[
                 "general",

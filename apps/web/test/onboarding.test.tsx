@@ -253,6 +253,54 @@ describe("the steps", () => {
     expect(document.querySelector(".onb__actions [role='alert']")).not.toBeNull();
     expect(button("Tentar de novo")).toBeTruthy();
   });
+
+  test("beside the question: a workspace named neutrally until typed, every agent counted, one team order", async () => {
+    const native = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      matches: query === "(min-width: 1200px)",
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    })) as unknown as typeof window.matchMedia;
+    try {
+      plans(PLANS);
+      await renderApp("/onboarding", { api: createFakeApi(newcomer(true)) });
+      await settle(10);
+      const preview = () => document.querySelector(".onb-preview") as HTMLElement;
+      const name = () => preview().querySelector(".sidebar__org-name")?.textContent;
+      const meta = () => preview().querySelector(".sidebar__org-meta")?.textContent;
+      const agents = () =>
+        [...(preview().querySelectorAll(".sidebar__section")[1]?.querySelectorAll(".sidebar__item-label") ?? [])].map(
+          (e) => e.textContent,
+        );
+      // Never the field's example ("Ex.: Acme"), and Lodi, listed under Agentes, is counted there.
+      expect(name()).toBe("Seu workspace");
+      expect(meta()).toBe("1 membro · 1 agente");
+      await type("Nome", "Ateliê Couto");
+      expect(name()).toBe("Ateliê Couto");
+      await click(button("Continuar"), 14);
+      await click(button("Loja online"), 4);
+      await click(button("Continuar"), 14);
+      // The template's order, the one step 3 lists, before and after the team is made.
+      expect([...document.querySelectorAll(".onb__body .tp-agent b")].map((b) => b.textContent)).toEqual([
+        "Iara",
+        "Otto",
+        "Lia",
+      ]);
+      expect(agents()).toEqual(["Lodi", "Iara", "Otto", "Lia"]);
+      expect(meta()).toBe("1 membro · 4 agentes");
+      await click(button("Criar o time"), 16);
+      expect(agents()).toEqual(["Lodi", "Iara", "Otto", "Lia"]);
+      expect([...planCard().querySelectorAll(".onb__plan-week b")].map((b) => b.textContent)).toEqual([
+        "Iara",
+        "Otto",
+        "Lia",
+      ]);
+      expect(document.querySelector(".onb__steps")?.textContent).toContain("Iara, Otto e Lia");
+    } finally {
+      window.matchMedia = native;
+    }
+  });
 });
 
 describe("the plan step (agentes.chat Cloud)", () => {

@@ -13,6 +13,7 @@ import {
   useStorage,
 } from "@agenteschat/client";
 import { computerEdition } from "@agenteschat/client/lib/computer";
+import { capitalize } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import { workspaceUsesApi } from "@agenteschat/client/lib/plan-usage";
 import { rightHandOf } from "@agenteschat/client/lib/right-hand";
@@ -46,7 +47,7 @@ const SHORT: Partial<Record<SettingsSection, string>> = {
  * here beyond the rows' press highlight and the platform's push.
  */
 export function WorkspaceScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const areas = visibleSections(org);
   const values = useAreaValues(areas);
@@ -90,7 +91,8 @@ export function WorkspaceScreen() {
                     key={s.id}
                     leading={<AgentFace agentId={rightHand.id} size={36} live={false} />}
                     label={rightHand.name}
-                    {...(rightHand.role ? { sub: rightHand.role } : {})}
+                    // Its one role name, never its stored role ("Workspace assistant", in no person's language).
+                    sub={capitalize(t("rightHand.label"), i18n.language)}
                     chevron
                     onPress={() => router.push(s.href as never)}
                   />
