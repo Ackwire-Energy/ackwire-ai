@@ -205,7 +205,7 @@ describe("Memória e propostas", () => {
     expect(document.body.textContent).toContain("Nada encontrado com “zzz”.");
   });
 
-  test("proposals: neutral diff, edit before accepting, accept", async () => {
+  test("proposals: the change drawn as Markdown, green and red, edit before accepting, accept", async () => {
     const r = await go(`proposals?agent=${ADA_ID}`);
     expect(screen().getByRole("heading", { level: 1, name: "Aprovações" })).toBeTruthy();
     expect(screen().getByRole("tab", { name: /Propostas de melhoria/, selected: true }).textContent).toContain("2");
@@ -213,11 +213,14 @@ describe("Memória e propostas", () => {
     const detail = screen().getByRole("article");
     expect(detail.textContent).toContain("Ada propõe · instruções da Ada");
     expect(detail.querySelector(".ac-chip--waiting")?.textContent).toBe("Aguardando você");
-    const added = detail.querySelectorAll(".ac-diff__line--add");
-    const removed = detail.querySelectorAll(".ac-diff__line--del");
+    const added = detail.querySelectorAll(".ac-diff__block--add");
+    const removed = detail.querySelectorAll(".ac-diff__block--del");
     expect(added.length).toBe(2);
     expect(removed.length).toBe(1);
-    expect(removed[0]?.textContent).toBe("−Removido: Pede ajuda ao João quando a mudança tocar em pagamentos.");
+    expect(removed[0]?.textContent).toBe("Removido: Pede ajuda ao João quando a mudança tocar em pagamentos.");
+    // Each block is the instructions' own Markdown, drawn as the Instructions tab draws them: no "+" or "−" column.
+    expect(removed[0]?.querySelector(".md")).not.toBeNull();
+    expect(detail.querySelector(".ac-diff__mark")).toBeNull();
     expect(detail.textContent).toContain("Recusar ensina a Ada a não propor isso de novo.");
     await click(within(detail).getByRole("button", { name: "Editar antes de aceitar" }));
     const text = within(detail).getByLabelText("Texto final das instruções");

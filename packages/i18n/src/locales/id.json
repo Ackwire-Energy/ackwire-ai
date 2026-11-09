@@ -4956,6 +4956,7 @@
     "refuseNote_female": "Menolak mengajari {{name}} agar tidak mengusulkan ini lagi.",
     "added": "Ditambahkan: ",
     "removed": "Dihapus: ",
+    "sameLines_other": "{{count}} baris tidak berubah",
     "empty": "Saat seseorang meminta perubahan ke agen, atau suatu pelajaran berulang, usulannya muncul di sini.",
     "emptyTitle": "Tidak ada yang perlu ditinjau",
     "titleInstructions": "Perbarui instruksi {{name}}",

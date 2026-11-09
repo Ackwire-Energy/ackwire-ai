@@ -24,6 +24,7 @@ import { boldRuns } from "../chat/actions";
 import { AskButtons, AskCard, AskDone, AskFoot } from "../chat/asks";
 import { markName } from "../chat/logic";
 import { useCardTop } from "../chat/look";
+import { MessageText } from "../chat/MessageText";
 import { IconTile } from "../connectors/ConnectorIcon";
 import { useFailed } from "../routines/hooks";
 import { Face } from "../shared/Face";
@@ -231,7 +232,7 @@ export function InstructionProposalCard({ ids }: { ids: string[] }) {
       </View>
       {groups.map((section) => (
         <View key={section.rows[0]?.id} style={styles.section}>
-          {section.kind === "text" && section.lines.length > 0 ? <DiffView prose lines={section.lines} /> : null}
+          {section.kind === "text" && section.lines.length > 0 ? <ProseDiff lines={section.lines} /> : null}
           {rowList(section.rows)}
         </View>
       ))}
@@ -262,9 +263,22 @@ function Diffs({ lines }: { lines: ChangedLine[][] }) {
   return (
     <>
       {lines.map((l) => (
-        <DiffView key={l.map((x) => x.text).join("\n")} prose lines={l} />
+        <ProseDiff key={l.map((x) => x.text).join("\n")} lines={l} />
       ))}
     </>
+  );
+}
+
+/** A change to instructions or the context as the web draws it: Markdown blocks, added on green, removed on red. */
+function ProseDiff({ lines }: { lines: ChangedLine[] }) {
+  const { t } = useTranslation();
+  return (
+    <DiffView
+      prose
+      lines={lines}
+      render={(text, kind) => <MessageText body={text} small muted={kind === "del"} selectable={false} />}
+      folded={(count) => t("proposals.sameLines", { count })}
+    />
   );
 }
 

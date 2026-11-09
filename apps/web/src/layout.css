@@ -2118,6 +2118,19 @@ html:not([data-pointer]) .artifact-table__sort:focus-visible {
   display: grid;
   grid-template-columns: 1fr 1fr;
 }
+/* Its corner cells follow the box's rounded corners, as a unified diff's rows do (`.ac-diff > :first-child`). */
+.artifact-split > .artifact-split__row:first-child > .ac-diff__line:first-child {
+  border-top-left-radius: calc(var(--radius-sm) - 1px);
+}
+.artifact-split > .artifact-split__row:first-child > .ac-diff__line:last-child {
+  border-top-right-radius: calc(var(--radius-sm) - 1px);
+}
+.artifact-split > .artifact-split__row:last-child > .ac-diff__line:first-child {
+  border-bottom-left-radius: calc(var(--radius-sm) - 1px);
+}
+.artifact-split > .artifact-split__row:last-child > .ac-diff__line:last-child {
+  border-bottom-right-radius: calc(var(--radius-sm) - 1px);
+}
 .artifact-split__row > .ac-diff__line:first-child {
   border-right: 1px solid var(--line);
 }

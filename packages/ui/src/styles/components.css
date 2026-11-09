@@ -3308,13 +3308,22 @@ html:not([data-pointer]) .ac-back:focus-visible {
   border-radius: var(--radius-cut);
 }
 
-/* Neutral before/after diff: no green or red. */
+/* Before and after, as GitHub shows a change: added on green with a green bar, removed on red, struck through. */
 .ac-diff {
   display: flex;
   flex-direction: column;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   overflow: hidden;
+}
+/* The rows on its rounded corners take its radius less its border, so a row's tint and bar follow the corner. */
+.ac-diff > :first-child {
+  border-top-left-radius: calc(var(--radius-sm) - 1px);
+  border-top-right-radius: calc(var(--radius-sm) - 1px);
+}
+.ac-diff > :last-child {
+  border-bottom-left-radius: calc(var(--radius-sm) - 1px);
+  border-bottom-right-radius: calc(var(--radius-sm) - 1px);
 }
 .ac-diff__line {
   display: flex;
@@ -3333,15 +3342,44 @@ html:not([data-pointer]) .ac-back:focus-visible {
   flex: 1;
   min-width: 0;
 }
-.ac-diff__line--add {
-  background: var(--surface-sunken);
+.ac-diff__line--add,
+.ac-diff__block--add {
+  background: color-mix(in srgb, var(--ok) 12%, transparent);
+  box-shadow: inset 3px 0 0 var(--ok);
 }
-.ac-diff__line--add .ac-diff__text {
-  font-weight: 600;
+.ac-diff__line--del,
+.ac-diff__block--del {
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  box-shadow: inset 3px 0 0 var(--danger);
 }
-.ac-diff__line--del .ac-diff__text {
+.ac-diff__line--add .ac-diff__mark {
+  color: var(--ok);
+}
+.ac-diff__line--del .ac-diff__mark {
+  color: var(--danger);
+}
+.ac-diff__line--del .ac-diff__text,
+.ac-diff__block--del {
   color: var(--ink-muted);
   text-decoration: line-through;
+}
+/* Words: each run rendered as one block, every block's text on the same 12px from the edge. */
+.ac-diff__block {
+  padding: 8px 12px;
+  min-width: 0;
+}
+.ac-diff__block > :not(.ac-visually-hidden) > :first-child {
+  margin-top: 0;
+}
+.ac-diff__block > :not(.ac-visually-hidden) > :last-child {
+  margin-bottom: 0;
+}
+.ac-diff__fold {
+  padding: 4px 12px;
+  font-size: 12.5px;
+  line-height: 18px;
+  color: var(--ink-muted);
+  background: var(--surface-sunken);
 }
 
 .ac-diff--code .ac-diff__line {

@@ -4981,6 +4981,7 @@
     "refuseNote": "拒绝后，{{name}} 就不会再提这条建议。",
     "added": "新增：",
     "removed": "删除：",
+    "sameLines_other": "{{count}} 行未改动",
     "empty": "有人请智能体做出改变，或某条经验反复出现时，建议会显示在这里。",
     "emptyTitle": "没有待审核的内容",
     "titleInstructions": "更新 {{name}} 的指令",

@@ -4938,6 +4938,7 @@
     "refuseNote_female": "却下すると、{{name}}は同じ提案をしないよう学習します。",
     "added": "追加:",
     "removed": "削除:",
+    "sameLines_other": "変更のない{{count}}行",
     "empty": "誰かがエージェントに変更を頼んだり、同じ学びが繰り返されたりすると、提案がここに表示されます。",
     "emptyTitle": "確認するものはありません",
     "titleInstructions": "{{name}}の指示を更新",

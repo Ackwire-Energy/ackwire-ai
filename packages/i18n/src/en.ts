@@ -5217,6 +5217,9 @@ export const en = {
     refuseNote: "Refusing teaches {{name}} not to propose this again.",
     added: "Added: ",
     removed: "Removed: ",
+    /** A run of unchanged lines folded away in a change to an agent's instructions or the context. */
+    sameLines_one: "{{count}} unchanged line",
+    sameLines_other: "{{count}} unchanged lines",
     empty: "When someone asks an agent for a change, or a lesson repeats, the proposal shows up here.",
     emptyTitle: "Nothing to review",
     titleInstructions: "Update {{name}}'s instructions",

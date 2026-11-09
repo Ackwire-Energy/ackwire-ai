@@ -5261,6 +5261,9 @@ export const ptBR = {
     refuseNote_female: "Recusar ensina a {{name}} a não propor isso de novo.",
     added: "Adicionado: ",
     removed: "Removido: ",
+    /** A run of unchanged lines folded away in a change to an agent's instructions or the context. */
+    sameLines_one: "{{count}} linha igual",
+    sameLines_other: "{{count}} linhas iguais",
     empty: "Quando alguém pedir uma mudança a um agente, ou uma lição se repetir, a proposta aparece aqui.",
     emptyTitle: "Nada para revisar",
     titleInstructions: "Atualizar as instruções do {{name}}",

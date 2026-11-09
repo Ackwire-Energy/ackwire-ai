@@ -5135,6 +5135,8 @@
     "refuseNote_female": "Wenn du ablehnst, lernt {{name}}, das nicht noch einmal vorzuschlagen.",
     "added": "Hinzugefügt: ",
     "removed": "Entfernt: ",
+    "sameLines_one": "{{count}} unveränderte Zeile",
+    "sameLines_other": "{{count}} unveränderte Zeilen",
     "empty": "Wenn jemand einen Agenten um eine Änderung bittet oder sich eine Lektion wiederholt, erscheint der Vorschlag hier.",
     "emptyTitle": "Nichts zu prüfen",
     "titleInstructions": "Anweisungen von {{name}} aktualisieren",

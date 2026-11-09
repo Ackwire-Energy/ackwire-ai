@@ -5110,6 +5110,8 @@
     "refuseNote": "Reddetmek, {{name}} ajanına bunu bir daha önermemeyi öğretir.",
     "added": "Eklendi:",
     "removed": "Kaldırıldı:",
+    "sameLines_one": "{{count}} değişmeyen satır",
+    "sameLines_other": "{{count}} değişmeyen satır",
     "empty": "Biri bir ajandan değişiklik istediğinde veya bir ders tekrarlandığında öneri burada görünür.",
     "emptyTitle": "İncelenecek bir şey yok",
     "titleInstructions": "{{name}} talimatlarını güncelle",

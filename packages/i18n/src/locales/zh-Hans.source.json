@@ -12594,6 +12594,12 @@
   "proposals.removed": {
     "value": "Removed: "
   },
+  "proposals.sameLines": {
+    "value": {
+      "one": "{{count}} unchanged line",
+      "other": "{{count}} unchanged lines"
+    }
+  },
   "proposals.empty": {
     "value": "When someone asks an agent for a change, or a lesson repeats, the proposal shows up here."
   },

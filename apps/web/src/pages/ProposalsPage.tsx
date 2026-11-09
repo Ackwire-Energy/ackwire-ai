@@ -17,7 +17,6 @@ import {
   Button,
   Card,
   Chip,
-  Diff,
   diffLines,
   EmptyState,
   Field,
@@ -33,6 +32,7 @@ import { AgentAvatar } from "@/components/AgentAvatar";
 import { ApprovalsTabs } from "@/components/ApprovalsTabs";
 import { isText, SettingChange } from "@/components/ChatCards";
 import { useOrg } from "@/components/org-context";
+import { ProseDiff } from "@/components/ProseDiff";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { useToast } from "@/lib/toast";
@@ -223,10 +223,8 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
                   </Locked>
                 </Field>
               ) : (
-                <Diff
-                  aria-label={t("proposals.changeLabel")}
-                  addedLabel={t("proposals.added")}
-                  removedLabel={t("proposals.removed")}
+                <ProseDiff
+                  label={t("proposals.changeLabel")}
                   lines={diffLines(current.before.split("\n"), (editing ? draft : current.after).split("\n"))}
                 />
               )}
