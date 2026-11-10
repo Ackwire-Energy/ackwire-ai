@@ -67,6 +67,14 @@ const event = (
   issueId: null,
   createdBy: by,
 });
+const SIX: [string, [number, number], [number, number], CalendarEvent["createdBy"]][] = [
+  ["Revisão do contrato com o fornecedor de pagamentos", [14, 0], [15, 0], { type: "person", id: "u-ale" }],
+  ["Entrevista técnica", [14, 0], [15, 30], { type: "person", id: "u-dora" }],
+  ["Conciliação bancária", [14, 15], [15, 0], { type: "agent", id: FOX_ID }],
+  ["Plantão", [14, 30], [16, 0], { type: "agent", id: ATLAS_ID }],
+  ["1:1", [14, 30], [15, 0], { type: "person", id: "u-enzo" }],
+  ["Demo para o cliente", [14, 45], [15, 45], { type: "person", id: "u-fe" }],
+];
 const runAt = (routineId: string, name: string, agentId: string, at: string): CalendarRange["routines"][number] => ({
   routineId,
   name,
@@ -110,6 +118,8 @@ const go = async (view?: "Dia" | "Mês" | "Agenda") => {
         }),
         event("ev-enzo", "Café", on(2, 15), on(2, 16), { type: "person", id: "u-enzo" }),
         event("ev-fe", "Entrevista", on(4, 10), on(4, 11), { type: "person", id: "u-fe" }),
+        // Six meetings at once on Saturday, people's and agents': six side by side.
+        ...SIX.map(([title, from, to, by], i) => event(`ev-six-${i}`, title, on(5, ...from), on(5, ...to), by)),
         event(
           "ev-trip",
           "Viagem da equipe para o encontro anual de planejamento em Florianópolis",
@@ -195,6 +205,17 @@ describe("Calendário at its worst", () => {
     const wednesday = [...col(2).querySelectorAll(".cal-week__runs")].filter((s) => s.textContent?.includes("Bom dia"));
     expect(wednesday).toHaveLength(1);
     expect(wednesday[0]?.textContent).toContain("Fila do suporte");
+  });
+
+  test("six meetings at once sit side by side, each its own column, its owner's face first", async () => {
+    await go();
+    const blocks = [...col(5).querySelectorAll<HTMLElement>(".cal-chip--block")].filter((b) =>
+      SIX.some(([title]) => b.getAttribute("aria-label")?.startsWith(title)),
+    );
+    expect(blocks).toHaveLength(6);
+    expect(new Set(blocks.map((b) => b.style.getPropertyValue("--cols")))).toEqual(new Set(["6"]));
+    expect(new Set(blocks.map((b) => b.style.getPropertyValue("--col"))).size).toBe(6);
+    for (const b of blocks) expect(b.querySelector(".cal-chip__title > .ac-who")).not.toBeNull();
   });
 
   test("week with the panel open: twelve owners in Agentes e pessoas, agents first", async () => {

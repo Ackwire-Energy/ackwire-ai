@@ -84,6 +84,20 @@ describe("calendar items the Google Calendar way", () => {
     expect(last(declarations(css, ".cal-week__col > .cal-week__runs[data-thin]"), "width")).toBe("var(--thin)");
   });
 
+  test("six meetings at once: their side room gives way to keep the faces, and narrower than a face a block is its tint", async () => {
+    const css = await sheet("apps/web/src/pages/calendar.css");
+    const room = last(declarations(css, ".cal-week__col > .cal-chip--block"), "padding-inline");
+    expect(room).toBe("clamp(2px, calc(17px - var(--cols) * 2.5px), 6px)");
+    // A 131px day (a week at 1280): six blocks of 19.5px keep 15.5 for the face (14.4, 1.15em of a block's 12.5px).
+    const padding = (cols: number) => Math.min(6, Math.max(2, 17 - cols * 2.5));
+    const content = (day: number, cols: number) => (day - 2 * (cols + 1)) / cols - 2 * padding(cols);
+    expect(content(131, 6)).toBeGreaterThanOrEqual(14.4);
+    expect(padding(3)).toBe(6);
+    expect(
+      last(declarations(atRule(css, "@container (max-width: 14.5px)"), ".cal-chip--block > .cal-chip__title"), "display"),
+    ).toBe("none");
+  });
+
   test("an all-day lane's bars share its height with their names from the top, not centred like a button's", async () => {
     const css = await sheet("apps/web/src/pages/calendar.css");
     expect(last(declarations(css, ".cal-chip--bar"), "display")).toBe("flex");

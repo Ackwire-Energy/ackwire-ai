@@ -372,6 +372,19 @@ html:not([data-pointer]) .cal-chip:focus-visible {
   touch-action: none;
   container-type: inline-size;
 }
+/*
+ * Many meetings at once (`--cols`): their side room gives way first, from 6 down to 2, so six side by side in a week's
+ * day still show their owners' faces. Narrower than a face, a block is its owner's tint alone, its name and whose it
+ * is in its label, its hover and its details.
+ */
+.cal-week__col > .cal-chip--block {
+  padding-inline: clamp(2px, calc(17px - var(--cols) * 2.5px), 6px);
+}
+@container (max-width: 14.5px) {
+  .cal-chip--block > .cal-chip__title {
+    display: none;
+  }
+}
 .cal-chip__when {
   container-type: size;
   overflow: hidden;
