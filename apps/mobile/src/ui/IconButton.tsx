@@ -2,6 +2,7 @@ import { Platform, StyleSheet, View } from "react-native";
 import { Glass } from "./Glass";
 import { Icon, type IconName } from "./Icon";
 import { PressScale } from "./PressScale";
+import { TOOL_H, TOUCH } from "./rhythm";
 import { useTheme } from "./theme";
 
 export interface IconButtonProps {
@@ -11,6 +12,8 @@ export interface IconButtonProps {
   label: string;
   /** A floating button (close, back, more over a sheet or the sky): a glass circle. */
   plate?: boolean;
+  /** In a row or a list's heading: the toolbar's 32, its target still a finger's 44. */
+  small?: boolean;
   disabled?: boolean;
 }
 
@@ -19,13 +22,15 @@ export const ICON_BUTTON_SIZE = 40;
 const SIZE = ICON_BUTTON_SIZE;
 
 /**
- * A 40-point icon button: transparent, or a floating glass circle (`plate`), round like the system's own
- * sheet and bar buttons: Liquid Glass on iOS 26, the blur before it, an opaque plate on Android (with a
+ * A 40-point icon button (32 in a row, `small`): transparent, or a floating glass circle (`plate`), round like the
+ * system's own sheet and bar buttons: Liquid Glass on iOS 26, the blur before it, an opaque plate on Android (with a
  * hairline and a short shadow, `usePlateEdge`, so it floats over the sky or the conversation as the glass does).
  */
-export function IconButton({ icon, onPress, label, plate = false, disabled = false }: IconButtonProps) {
+export function IconButton({ icon, onPress, label, plate = false, small = false, disabled = false }: IconButtonProps) {
   const { colors } = useTheme();
   const edge = usePlateEdge();
+  const side = small ? TOOL_H : SIZE;
+  const glyph = small ? 18 : 20;
   return (
     <PressScale
       to={0.9}
@@ -33,20 +38,20 @@ export function IconButton({ icon, onPress, label, plate = false, disabled = fal
       disabled={disabled}
       accessibilityRole="button"
       accessibilityLabel={label}
-      hitSlop={4}
-      style={{ width: SIZE, height: SIZE, borderRadius: SIZE / 2 }}
+      hitSlop={small ? (TOUCH - TOOL_H) / 2 : 4}
+      style={{ width: side, height: side, borderRadius: side / 2 }}
     >
       {plate ? (
         <Glass
           liquid
           intensity={40}
-          style={[{ flexGrow: 1, borderRadius: SIZE / 2, alignItems: "center", justifyContent: "center" }, edge]}
+          style={[{ flexGrow: 1, borderRadius: side / 2, alignItems: "center", justifyContent: "center" }, edge]}
         >
-          <Icon name={icon} size={20} color={colors.ink2} />
+          <Icon name={icon} size={glyph} color={colors.ink2} />
         </Glass>
       ) : (
         <View style={{ flexGrow: 1, alignItems: "center", justifyContent: "center" }}>
-          <Icon name={icon} size={20} color={colors.ink2} />
+          <Icon name={icon} size={glyph} color={colors.ink2} />
         </View>
       )}
     </PressScale>

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Text as RNText, View } from "react-native";
+import { Text as RNText, useWindowDimensions, View } from "react-native";
 import { Icon, type IconName } from "./Icon";
 import { systemText } from "./Text";
 import { useTheme } from "./theme";
@@ -11,34 +11,43 @@ export interface ChipProps {
   label: string;
   /** Anything before the label instead of an icon (a small avatar). */
   leading?: ReactNode;
-  /** Words after the label that never shrink (a state): a long label ends in "…" first. */
+  /** Words after the label that never shrink (a state): a long label wraps first. */
   trailing?: string;
 }
 
-/** A small neutral tag: a light gray pill, muted text. */
+const LABEL = systemText("caption", weights.semibold);
+const LINE = LABEL.lineHeight ?? 16;
+const HEIGHT = 24;
+
+/**
+ * A small neutral tag: a light gray pill, muted text. A label wider than its row wraps inside the chip instead of
+ * ending in "…", its icon staying on the first line; on one line it is the 24 pill.
+ */
 export function Chip({ icon, label, leading, trailing }: ChipProps) {
   const { colors } = useTheme();
+  // The label's line as the system's text size draws it (chrome stops growing at CHROME_MAX_SCALE).
+  const line = LINE * Math.min(useWindowDimensions().fontScale, CHROME_MAX_SCALE);
   return (
     <View
       style={{
         flexDirection: "row",
-        alignItems: "center",
+        alignItems: "flex-start",
         gap: 4,
-        minHeight: 24,
+        minHeight: HEIGHT,
         paddingHorizontal: 10,
-        borderRadius: 999,
+        paddingVertical: (HEIGHT - LINE) / 2,
+        borderRadius: HEIGHT / 2,
         backgroundColor: colors.chip,
         alignSelf: "flex-start",
-        // In a tight row the label ends in "…" instead of the chip leaving the row.
         maxWidth: "100%",
       }}
     >
-      {leading ?? (icon ? <Icon name={icon} size={12} color={colors.muted} /> : null)}
-      <RNText
-        numberOfLines={1}
-        maxFontSizeMultiplier={CHROME_MAX_SCALE}
-        style={[systemText("caption", weights.semibold), { color: colors.muted, flexShrink: 1 }]}
-      >
+      {leading || icon ? (
+        <View style={{ height: line, justifyContent: "center" }}>
+          {leading ?? (icon ? <Icon name={icon} size={12} color={colors.muted} /> : null)}
+        </View>
+      ) : null}
+      <RNText maxFontSizeMultiplier={CHROME_MAX_SCALE} style={[LABEL, { color: colors.muted, flexShrink: 1 }]}>
         {label}
       </RNText>
       {trailing ? (

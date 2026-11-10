@@ -45,6 +45,22 @@ test("a small button and a card's footer button are the web's 32, their targets 
   expect(sized.map((f) => relative(SRC, f))).toEqual([]);
 });
 
+test("a chip's label wraps inside it instead of ending in …, its icon on the first line; one line is the 24 pill", () => {
+  const chip = source("Chip.tsx");
+  const label = chip.slice(chip.indexOf("<RNText maxFontSizeMultiplier"), chip.indexOf("{label}"));
+  expect(label).not.toContain("numberOfLines");
+  expect(chip).toContain('alignItems: "flex-start"');
+  expect(chip).toContain("paddingVertical: (HEIGHT - LINE) / 2");
+  expect(chip).toContain("borderRadius: HEIGHT / 2");
+  expect(chip).toContain('<View style={{ height: line, justifyContent: "center" }}>');
+});
+
+test("an icon button in a row or a heading is the toolbar's 32, its target still a finger's 44", () => {
+  const button = source("IconButton.tsx");
+  expect(button).toContain("const side = small ? TOOL_H : SIZE;");
+  expect(button).toContain("hitSlop={small ? (TOUCH - TOOL_H) / 2 : 4}");
+});
+
 test("no screen keeps a 20-point side of its own: screens read SCREEN_X and cards CARD_PAD", () => {
   // A button's own padding isn't a screen's side.
   const NOT_A_SIDE = new Set(["ui/Button.tsx"]);
