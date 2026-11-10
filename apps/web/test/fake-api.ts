@@ -1872,6 +1872,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           autoModels: state.autoModels ?? {},
           ...mediaSettings(state),
           mode: personalOrg(orgId) ? "personal" : "team",
+          // As the server's answer: the same settings a read gives, money included for who sees it.
+          ...(seesCost() ? { defaultAgentBudgetUsd: state.defaultAgentBudgetUsd ?? 50 } : {}),
         };
       },
       overview: async () => ({

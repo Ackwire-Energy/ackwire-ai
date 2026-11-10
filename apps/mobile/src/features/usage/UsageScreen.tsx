@@ -160,7 +160,13 @@ export function UsageScreen() {
                   {/* Connecting one more, and the workspace's keys: the AI accounts screen. */}
                   {data.accounts.length > 0 && !hold ? (
                     <View style={styles.start}>
-                      <Button size="sm" icon="plus" label={t("aiAccounts.page.connect")} onPress={openAiAccounts} />
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        icon="plus"
+                        label={t("aiAccounts.page.connect")}
+                        onPress={openAiAccounts}
+                      />
                     </View>
                   ) : null}
                 </UsageCard>
@@ -318,7 +324,7 @@ function AccountRow({
             ) : null}
             {account.mine && account.accountId ? (
               <View style={styles.start}>
-                <Button size="sm" label={t("common.manage")} onPress={openAiAccounts} />
+                <Button variant="secondary" size="sm" label={t("mobile.ai.row")} onPress={openAiAccounts} />
               </View>
             ) : null}
           </View>

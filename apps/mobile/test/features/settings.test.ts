@@ -96,7 +96,6 @@ describe("the workspace's settings on the phone: who opens what (the web's sub-n
       "agents:skills",
       "agents:apps",
       "costs:usage",
-      "costs:keys",
       "costs:storage",
       "costs:import",
     ]);

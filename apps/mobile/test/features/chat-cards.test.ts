@@ -279,12 +279,12 @@ describe("a plan account on the phone (IA e uso › Contas): a row that opens", 
     expect(row.indexOf("{open ? (")).toBeGreaterThan(row.indexOf("</Pressable>"));
   });
 
-  test("open: bars split by agent, then one list, then when it renews and how old, then the month, then Gerenciar", () => {
+  test("open: bars split by agent, then one list, then when it renews and how old, then the month, then the way to the AI accounts screen", () => {
     const row = screen.slice(...at(screen, ["function AccountRow(", "function AgentShares("]));
     const body = row.slice(row.indexOf("{open ? ("));
     expect(
       ascending(
-        at(body, ["brandOf(account)", "usage={splitUsage(", "{list}", "usageViews.monthTokens", "common.manage"]),
+        at(body, ["brandOf(account)", "usage={splitUsage(", "{list}", "usageViews.monthTokens", "mobile.ai.row"]),
       ),
     ).toBe(true);
     // The row already says where the plan stands: the meter doesn't say it again.

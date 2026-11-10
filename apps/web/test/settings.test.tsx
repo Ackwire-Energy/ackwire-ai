@@ -500,7 +500,6 @@ describe("Configurações do workspace", () => {
       "Agentes sem orçamento próprio usam este. O de cada agente muda na página dele. Admins veem valores e membros veem porcentagens.",
     ]);
     await act(async () => fireEvent.change(field, { target: { value: "80" } }));
-    console.log("DBG", field.value, field.isConnected, (within(fallback).getByRole("button", { name: "Salvar" }) as HTMLButtonElement).disabled, fallback.isConnected, fallback.querySelector("form")?.outerHTML.slice(-900), state.calls.slice(-6).map((c) => c.method));
     await click(within(fallback).getByRole("button", { name: "Salvar" }));
     await settle(4);
     expect(state.calls.findLast((c) => c.method === "orgs.updateSettings")?.args[1]).toEqual({

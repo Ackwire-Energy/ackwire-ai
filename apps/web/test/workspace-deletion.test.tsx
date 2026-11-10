@@ -608,7 +608,7 @@ describe("deleting your account (Configurações › Sua conta)", () => {
       `/org/${BETA_ID}/settings/connectors`,
     );
     expect(within(dialog).getByRole("link", { name: "Desconectar Chave da Ana" }).getAttribute("href")).toBe(
-      `/org/${BETA_ID}/settings/keys`,
+      `/org/${BETA_ID}/settings/usage`,
     );
     // The way to delete just a workspace, for someone who only meant that.
     expect(dialog.textContent).toContain("Quer apagar só um workspace? A sua conta continua.");
