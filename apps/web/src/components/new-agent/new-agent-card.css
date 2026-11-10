@@ -351,3 +351,203 @@
     animation: none;
   }
 }
+
+/* A new agent's checklist band in its chat (ADR 0164): night until it can think, trails to what it still needs. */
+.nac-band {
+  position: relative;
+  height: 112px;
+  overflow: hidden;
+  isolation: isolate;
+  border-bottom: 1px solid var(--line);
+}
+.nac-band__stars {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transition: opacity 1.4s ease;
+}
+.nac-band__stars i {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  background: #fff;
+  opacity: 0.85;
+  animation: nac-twinkle 2.4s steps(2) infinite;
+}
+@keyframes nac-twinkle {
+  50% {
+    opacity: 0.25;
+  }
+}
+.nac-band[data-day] .nac-band__stars {
+  opacity: 0;
+}
+.nac-band__agent {
+  position: absolute;
+  left: 22px;
+  bottom: 8px;
+  width: 72px;
+  height: 72px;
+}
+.nac-band__agent .ac-avatar {
+  width: 100%;
+  height: 100%;
+}
+.nac-band__zz {
+  position: absolute;
+  left: 58px;
+  top: -12px;
+  color: #fff;
+  font-family: "Doto", var(--font-mono);
+  font-weight: 900;
+  pointer-events: none;
+}
+.nac-band__zz i {
+  position: absolute;
+  opacity: 0;
+  font-size: 16px;
+  font-style: normal;
+  animation: nac-z 2.4s linear infinite;
+}
+.nac-band__zz i:nth-child(2) {
+  animation-delay: 0.8s;
+  font-size: 20px;
+}
+.nac-band__zz i:nth-child(3) {
+  animation-delay: 1.6s;
+  font-size: 24px;
+}
+@keyframes nac-z {
+  0% {
+    opacity: 0;
+    transform: translate(0, 10px);
+  }
+  20% {
+    opacity: 0.95;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(16px, -22px);
+  }
+}
+.nac-band__path {
+  position: absolute;
+  left: 100px;
+  right: 20px;
+  bottom: 22px;
+  display: flex;
+  align-items: center;
+}
+.nac-band__step {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  max-width: 160px;
+}
+.nac-band__trail {
+  display: flex;
+  flex: 1;
+  justify-content: space-between;
+  align-items: center;
+  min-width: 28px;
+  padding: 0 6px;
+}
+.nac-band__trail i {
+  display: block;
+  width: 4px;
+  height: 4px;
+  background: color-mix(in srgb, var(--trail, #fff) 34%, transparent);
+}
+.nac-band__trail[data-lit] i {
+  background: var(--trail, #fff);
+}
+.nac-band__trail[data-fresh] i {
+  animation: nac-walk 0.9s steps(1) both;
+}
+.nac-band__trail[data-fresh] i:nth-child(2) {
+  animation-delay: 0.1s;
+}
+.nac-band__trail[data-fresh] i:nth-child(3) {
+  animation-delay: 0.2s;
+}
+.nac-band__trail[data-fresh] i:nth-child(4) {
+  animation-delay: 0.3s;
+}
+.nac-band__trail[data-fresh] i:nth-child(5) {
+  animation-delay: 0.4s;
+}
+.nac-band__trail[data-fresh] i:nth-child(6) {
+  animation-delay: 0.5s;
+}
+@keyframes nac-walk {
+  0% {
+    background: color-mix(in srgb, var(--trail, #fff) 34%, transparent);
+  }
+  100% {
+    background: var(--trail, #fff);
+  }
+}
+.nac-band__slot {
+  position: relative;
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  border-bottom-left-radius: var(--radius-cut);
+  background: color-mix(in srgb, #fff 16%, transparent);
+  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.5);
+  color: #fff;
+  transition:
+    background-color 0.4s,
+    box-shadow 0.4s,
+    transform 0.4s var(--spring);
+}
+.nac-band[data-day] .nac-band__slot:not([data-done]) {
+  background: color-mix(in srgb, #fff 55%, transparent);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--trail) 40%, transparent);
+  color: var(--trail);
+}
+.nac-band__slot .connector-icon {
+  background: none;
+  box-shadow: none;
+  opacity: 0.55;
+  filter: grayscale(0.6) brightness(1.6);
+}
+.nac-band__slot[data-done] {
+  background: var(--raised);
+  box-shadow: var(--e2);
+  transform: translateY(-2px);
+}
+.nac-band__slot[data-done] .connector-icon {
+  opacity: 1;
+  filter: none;
+}
+.nac-band__check {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 6px;
+  background: var(--ok, #1f8a4c);
+  color: #fff;
+}
+.nac-band__check .ac-icon {
+  width: 10px;
+  height: 10px;
+  stroke-width: 2.6;
+}
+@media (prefers-reduced-motion: reduce) {
+  .nac-band__zz i,
+  .nac-band__stars i,
+  .nac-band__trail[data-fresh] i {
+    animation: none;
+  }
+  .nac-band__zz i {
+    opacity: 0.8;
+  }
+}

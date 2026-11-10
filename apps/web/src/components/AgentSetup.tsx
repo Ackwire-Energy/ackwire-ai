@@ -6,6 +6,7 @@ import {
   useAgentDetail,
   useAiStatus,
   useApi,
+  useCatalog,
   useConfirmSetup,
   useCredentials,
   useModels,
@@ -35,16 +36,17 @@ import { planOf } from "@agenteschat/client/lib/plans";
 import { AUTO, modelChoices } from "@agenteschat/client/lib/providers";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { isEveryone, sortRoles } from "@agenteschat/client/lib/roles";
+import { connectorName } from "@agenteschat/client/lib/scopes";
 import {
   askedLine,
   nextStep,
+  setupApps,
   setupDone,
   setupRole,
   setupRow,
   setupSteps,
   setupTaskKeys,
   suggestedChannels,
-  suggestedLevels,
 } from "@agenteschat/client/lib/setup-checklist";
 import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
 import {
@@ -84,7 +86,10 @@ import { ModelSelect, modelOptions, NO_OWNER, OwnerSelect } from "@/components/A
 import { usePlanHold } from "@/components/ai/ConnectAiSteps";
 import { PlanReplies } from "@/components/ai/PlanReplies";
 import { useConnectAi } from "@/components/ConnectAi";
+import { ConnectFlow, type FlowState } from "@/components/ConnectFlow";
+import { ConnectorIcon } from "@/components/ConnectorCatalog";
 import { useChannelActions } from "@/components/channel-actions";
+import { SetupBand } from "@/components/new-agent/SetupBand";
 import { useOrg } from "@/components/org-context";
 import { useWidenAsk } from "@/components/ReachLines";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -116,7 +121,8 @@ export function useSetupSteps(agent: Agent | undefined): AgentSetupStep[] {
   const { org, me } = useOrg();
   const { solo } = usePersonalView();
   const steps = agent ? setupSteps(agent, { meId: me.user.id, admin: can(org, "manage_agents") }) : [];
-  return solo ? steps.filter((s) => s !== "who") : steps;
+  // Alone in a personal workspace there are no group conversations in sight either: no "where" (ADR 0164).
+  return solo ? steps.filter((s) => s !== "who" && s !== "where") : steps;
 }
 
 /**
@@ -180,7 +186,9 @@ export function AgentSetupIntro({ agent }: { agent: Agent }) {
   // A ready-made role's name, else the role it was given (a template's "Atendimento"); only an agent with neither
   // says back what it was asked.
   const own = agent.role.trim();
-  const asked = role || own ? null : askedLine(agent.instructions);
+  // Made from its card (ADR 0164): it says what it said there, in its own voice.
+  const hello = agent.setup?.hello?.trim() || null;
+  const asked = hello || role || own ? null : askedLine(agent.instructions);
   const roleName = role
     ? roleWord(t(`newAgent.roles.${role}.name`), i18n.language)
     : own
@@ -200,6 +208,7 @@ export function AgentSetupIntro({ agent }: { agent: Agent }) {
             {roleName
               ? t("agentSetup.greetingRole", { ...g, person, role: roleName })
               : t("agentSetup.greeting", { ...g, person })}
+            {hello && ` ${/[.!?…]$/.test(hello) ? hello : `${hello}.`}`}
             {asked && ` ${t("agentSetup.asked", { what: asked })}`}
             {asks && ` ${t("agentSetup.lead")}`}
           </p>
@@ -226,6 +235,7 @@ export function AgentSetupCard({ agent, place }: { agent: Agent; place: "dm" | "
   const connect = useConnectAi();
   const dir = useDirectory(org.id);
   const { steps, done, doneHere, all, ready, held, connectors, granted, inChannels, visible } = useSetupProgress(agent);
+  const catalog = useCatalog();
   const items = useConnectedById();
   const [open, setOpen] = useState<AgentSetupStep | null>(null);
   const burstRef = useRef<HTMLCanvasElement>(null);
@@ -243,7 +253,14 @@ export function AgentSetupCard({ agent, place }: { agent: Agent; place: "dm" | "
       list.map((r) => resourceName(t, r, items)),
       t,
     );
-  const suggestedApps = connectors.filter((r) => r.connector && suggestedLevels(role)[r.connector]);
+  // The apps its card chose (ADR 0164), else its role's: the connected ones by name, else the catalog's names.
+  const cardApps = setupApps(agent.setup);
+  const suggestedApps = connectors.filter((r) => r.connector && cardApps[r.connector]);
+  const unconnected = Object.keys(cardApps).filter((id) => !connectors.some((r) => r.connector === id));
+  const catalogNames = unconnected.flatMap((id) => {
+    const def = catalog.data?.connectors.find((d) => d.id === id);
+    return def ? [connectorName(t, def)] : [];
+  });
   const placeable = visible.list.filter((c) => addsAgentsTo(c, me.user.id, org));
   const firstChannel = placeable.find((c) => suggestedChannels(role, placeable).includes(c.id));
   const audience = audienceOf(agent);
@@ -256,7 +273,7 @@ export function AgentSetupCard({ agent, place }: { agent: Agent; place: "dm" | "
       org: org.name,
       role,
       granted: granted.length ? names(granted) : null,
-      suggested: suggestedApps.length ? names(suggestedApps) : null,
+      suggested: suggestedApps.length ? names(suggestedApps) : catalogNames.length ? joinNames(catalogNames, t) : null,
       channels: inChannels.length
         ? joinNames(
             inChannels.map((c) => `#${c.name}`),
@@ -278,7 +295,7 @@ export function AgentSetupCard({ agent, place }: { agent: Agent; place: "dm" | "
 
   // Its role's first tasks (a blank agent's own two); a key a language lacks is left out.
   const anyKey = t as unknown as (key: string) => string;
-  const tasks = setupTaskKeys(role)
+  const tasks = setupTaskKeys(role, agent.setup?.starter)
     .filter((key) => i18n.exists(key))
     .map((key) => anyKey(key));
   const ask = (text: string) => {
@@ -290,18 +307,48 @@ export function AgentSetupCard({ agent, place }: { agent: Agent; place: "dm" | "
     void navigate({ to: "/org/$orgId/dm/agent/$agentId", params: { orgId: org.id, agentId: agent.id } });
   };
 
+  // In its chat (ADR 0164) "how it works" starts done and stays on its page; who it talks to only informs there, not
+  // counted: a plan that makes it answer only its owner says so.
+  const inChat = place === "dm";
+  const shown = inChat ? steps.filter((s) => s !== "how") : steps;
+  const counted = inChat ? shown.filter((s) => s !== "who") : shown;
+  const allHere = counted.every((s) => done.has(s));
   const title =
-    place === "dm" ? (all ? t("agentSetup.ready", g) : t("agentSetup.title")) : t("agentSetup.titleProfile", g);
+    place === "dm" ? (allHere ? t("agentSetup.ready", g) : t("agentSetup.title")) : t("agentSetup.titleProfile", g);
+  const planOnly = onPlan && audience.mode === "owner" && ownerIsMe;
   return (
     <SetupCardView
       title={title}
-      done={doneHere.length}
-      total={steps.length}
+      done={counted.filter((s) => done.has(s)).length}
+      total={counted.length}
       place={place}
       burstRef={burstRef}
-      rows={steps.map((s) => {
+      band={
+        inChat && (
+          <SetupBand
+            agent={agent}
+            ready={ready}
+            thinks={done.has("ai")}
+            needsAi={steps.includes("ai")}
+            apps={Object.keys(cardApps)
+              .slice(0, 4)
+              .map((id) => ({ id, granted: granted.some((r) => r.connector === id) }))}
+          />
+        )
+      }
+      rows={shown.map((s) => {
         const row = rowOf(s);
         const isDone = done.has(s);
+        if (inChat && s === "who")
+          return {
+            key: s,
+            icon: STEP_ICON[s],
+            done: true,
+            info: true,
+            title: row.title,
+            desc: planOnly ? t("agentSetup.who.todoPlanDesc") : undefined,
+            action: { label: row.action, onClick: () => act(s) },
+          };
         const acts = s !== "ai" || Boolean(connect);
         // On a hold it waits for the plan, whose one button is the hold's banner.
         if (s === "ai" && held && !isDone) {
@@ -314,6 +361,7 @@ export function AgentSetupCard({ agent, place }: { agent: Agent; place: "dm" | "
             dim: true,
           };
         }
+        const connectFirst = s === "apps" && !isDone && suggestedApps.length === 0 && catalogNames.length > 0;
         return {
           key: s,
           icon: STEP_ICON[s],
@@ -321,14 +369,22 @@ export function AgentSetupCard({ agent, place }: { agent: Agent; place: "dm" | "
           title: row.title,
           desc: row.desc,
           saying: said?.step === s ? said.text : null,
-          ...(acts ? { action: { label: row.action, primary: s === next, onClick: () => act(s) } } : {}),
+          ...(acts
+            ? {
+                action: {
+                  label: connectFirst ? t("agentSetup.firstRun.apps.connect") : row.action,
+                  primary: s === next,
+                  onClick: () => act(s),
+                },
+              }
+            : {}),
         };
       })}
       foot={
         done.has("ai") &&
         tasks.length > 0 && (
           <SetupAsks
-            lead={all ? t("agentSetup.tasksAllDone") : t("agentSetup.tasksLead")}
+            lead={(inChat ? allHere : all) ? t("agentSetup.tasksAllDone") : t("agentSetup.tasksLead")}
             asks={tasks.map((task) => ({ label: task, onClick: () => ask(task) }))}
           />
         )
@@ -347,6 +403,8 @@ export function AgentSetupCard({ agent, place }: { agent: Agent; place: "dm" | "
 /** One row of a checklist card, as drawn: its button, a second one ("Agora não"), or a link once done. */
 export interface SetupCardRow {
   key: string;
+  /** Only informs (who it talks to, in its chat, ADR 0164): drawn done with its line, not counted in the meter. */
+  info?: boolean;
   icon: IconName;
   done: boolean;
   title: string;
@@ -375,6 +433,7 @@ export function SetupCardView({
   place,
   rows,
   foot,
+  band,
   burstRef,
   children,
 }: {
@@ -384,6 +443,8 @@ export function SetupCardView({
   place: "dm" | "profile";
   rows: SetupCardRow[];
   foot?: ReactNode;
+  /** On top of the card: a new agent's sky in its chat (`SetupBand`, ADR 0164). */
+  band?: ReactNode;
   burstRef?: RefObject<HTMLCanvasElement | null>;
   children?: ReactNode;
 }) {
@@ -391,14 +452,17 @@ export function SetupCardView({
   return (
     <section className="setup-cl" aria-label={title} data-place={place}>
       <canvas ref={burstRef} className="setup-cl__burst" aria-hidden="true" tabIndex={-1} />
+      {band}
       <div className="setup-cl__head">
         <b>{title}</b>
         <small>{t("agentSetup.count", { done, total })}</small>
       </div>
       <div className="setup-cl__meter" aria-hidden="true">
-        {rows.map((r, i) => (
-          <i key={r.key} data-on={i < done || undefined} />
-        ))}
+        {rows
+          .filter((r) => !r.info)
+          .map((r, i) => (
+            <i key={r.key} data-on={i < done || undefined} />
+          ))}
       </div>
       <ul className="setup-cl__rows" aria-live="polite">
         {rows.map((r) => (
@@ -426,7 +490,7 @@ export function SetupCardView({
                 </button>
               )}
             </span>
-            {(r.saying || (!r.done && r.desc)) && (
+            {(r.saying || ((!r.done || r.info) && r.desc)) && (
               <span className="ac-mediarow__body setup-row__text">
                 {r.saying ? <span className="setup-row__say">{r.saying}</span> : <span>{r.desc}</span>}
               </span>
@@ -652,7 +716,7 @@ function AppsDialog({
   const items = useConnectedById();
   const setLevels = useSetLevels();
   const g = agentGrammar(agent.name);
-  const suggested = suggestedLevels(setupRole(agent.setup));
+  const suggested = setupApps(agent.setup);
   const suggestionOf = (r: AccessResource) => (r.connector ? suggested[r.connector] : undefined);
   // The role's apps first, each at its suggestion while it has none yet; the rest as they are.
   const ordered = [...connectors.filter(suggestionOf), ...connectors.filter((r) => !suggestionOf(r))];
@@ -679,41 +743,75 @@ function AppsDialog({
     });
   const toConnectors = () =>
     void navigate({ to: "/org/$orgId/settings/$section", params: { orgId: org.id, section: "connectors" } });
+  // The card's apps not connected here yet (ADR 0164): each connects right here, then shows above at its level.
+  const catalog = useCatalog();
+  const [flow, setFlow] = useState<FlowState | null>(null);
+  const toConnect = Object.keys(suggested)
+    .filter((id) => !connectors.some((r) => r.connector === id))
+    .flatMap((id) => {
+      const def = catalog.data?.connectors.find((d) => d.id === id && d.available && !d.soon);
+      return def ? [def] : [];
+    });
   return (
-    <StepDialog
-      title={t("agentSetup.apps.title", g)}
-      description={t("agentSetup.apps.desc")}
-      wide
-      ok={count ? t("agentSetup.apps.ok", { count }) : t("agentSetup.apps.okNone")}
-      busy={busy}
-      onOk={() => void save()}
-      onClose={onClose}
-    >
-      {ordered.length === 0 ? (
-        <p className="small muted">{t(modeKey(org, "agentSetup.apps.empty"), { org: org.name })}</p>
-      ) : (
-        <ul className="level-list setup-dlg__apps" aria-label={t("access.kind.connectors")}>
-          {ordered.map((r) => {
-            const name = resourceName(t, r, items);
-            return (
-              <LevelRow
-                key={r.id}
-                icon={<ResourceIcon resource={r} items={items} name={name} />}
-                name={name}
-                asks={asksAt(r, level(r)).map((x) => toolLabel(t, r, x))}
-                levels={r.levels}
-                value={level(r)}
-                onChange={(l) => setLevelsDraft((d) => ({ ...d, [r.id]: l }))}
-                tag={suggestionOf(r) ? <span className="setup-tag">{t("agentSetup.suggested")}</span> : undefined}
-              />
-            );
-          })}
-        </ul>
-      )}
-      <Button variant="ghost" size="sm" icon="plus" className="setup-dlg__add" onClick={toConnectors}>
-        {t("agentSetup.apps.connectOther")}
-      </Button>
-    </StepDialog>
+    <>
+      <StepDialog
+        title={t("agentSetup.apps.title", g)}
+        description={t("agentSetup.apps.desc")}
+        wide
+        ok={count ? t("agentSetup.apps.ok", { count }) : t("agentSetup.apps.okNone")}
+        busy={busy}
+        onOk={() => void save()}
+        onClose={onClose}
+      >
+        {toConnect.length > 0 && (
+          <ul className="setup-apps" aria-label={t("agentSetup.suggested")}>
+            {toConnect.map((def) => (
+              <li key={def.id} className="setup-apps__row">
+                <ConnectorIcon def={def} label={connectorName(t, def)} />
+                <b>{connectorName(t, def)}</b>
+                <small>{t("agentSetup.suggested")}</small>
+                <Button size="sm" onClick={() => setFlow({ step: 0, def })}>
+                  {t("agentSetup.firstRun.apps.connect")}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {ordered.length === 0 ? (
+          toConnect.length === 0 && (
+            <p className="small muted">{t(modeKey(org, "agentSetup.apps.empty"), { org: org.name })}</p>
+          )
+        ) : (
+          <ul className="level-list setup-dlg__apps" aria-label={t("access.kind.connectors")}>
+            {ordered.map((r) => {
+              const name = resourceName(t, r, items);
+              return (
+                <LevelRow
+                  key={r.id}
+                  icon={<ResourceIcon resource={r} items={items} name={name} />}
+                  name={name}
+                  asks={asksAt(r, level(r)).map((x) => toolLabel(t, r, x))}
+                  levels={r.levels}
+                  value={level(r)}
+                  onChange={(l) => setLevelsDraft((d) => ({ ...d, [r.id]: l }))}
+                  tag={suggestionOf(r) ? <span className="setup-tag">{t("agentSetup.suggested")}</span> : undefined}
+                />
+              );
+            })}
+          </ul>
+        )}
+        <Button variant="ghost" size="sm" icon="plus" className="setup-dlg__add" onClick={toConnectors}>
+          {t("agentSetup.apps.connectOther")}
+        </Button>
+      </StepDialog>
+      {/* Signing in elsewhere comes back to this conversation. */}
+      <ConnectFlow
+        flow={flow}
+        onChange={setFlow}
+        onClose={() => setFlow(null)}
+        returnTo={typeof window === "undefined" ? undefined : window.location.pathname}
+      />
+    </>
   );
 }
 
