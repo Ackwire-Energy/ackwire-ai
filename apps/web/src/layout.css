@@ -13516,6 +13516,11 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
 .key-row {
   padding: var(--row-py) var(--space-4);
 }
+/* Their actions are small ghost buttons, 32px boxes: the name's line takes their axis, as the kit's MediaRow gives a
+   plated one's, so they keep the row's padding above as the words under them keep it below. */
+:is(.ai-accounts__row, .key-row):has(> .ac-mediarow__end .ac-btn--sm) {
+  --mediarow-axis: max(var(--mediarow-face), var(--control-h-sm));
+}
 .key-row__tail {
   gap: var(--space-3);
 }
