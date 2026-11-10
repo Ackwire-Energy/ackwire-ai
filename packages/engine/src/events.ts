@@ -9,6 +9,7 @@ import type { BlockStateView } from "./block-state";
 import type { ChoicesView, PollView } from "./blocks";
 import type { BrowserHandoffView } from "./browser/handoff";
 import type { CalendarEventView, CalendarProposalView } from "./calendar";
+import type { FeedbackOfferView } from "./feedback-offers";
 import type { IssueActivityView, IssueView } from "./issues";
 import type { MachineTaskView } from "./machine-tasks";
 import { oneLine } from "./mail/text";
@@ -720,6 +721,14 @@ export type ChannelEvent =
       threadId: string | null;
       messageId: string;
       deviceWait: Record<string, unknown>;
+    }
+  /** A report an agent offered was sent or put away (ADR 0160 §12): the message's whole `meta.feedbackOffer` now. */
+  | {
+      type: "feedback_offer.updated";
+      channelId: string;
+      threadId: string | null;
+      messageId: string;
+      offer: FeedbackOfferView;
     }
   /** The right hand looked at a card for someone (ADR 0139): its `meta.actionCard.delegate` now (null: nothing to say). */
   | {

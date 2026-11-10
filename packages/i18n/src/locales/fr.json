@@ -9856,6 +9856,193 @@
     "notImage": "Choisissez une image (JPG, PNG ou WebP).",
     "tooBig": "L'image dépasse 8 Mo."
   },
+  "portrait": {
+    "ask": {
+      "title": "Comment voulez-vous apparaître ?",
+      "build": "Créer un avatar",
+      "buildText": "Un portrait en pixels à votre façon : cheveux, vêtements, accessoires.",
+      "photo": "Envoyer une photo",
+      "photoText": "Choisissez une image sur votre ordinateur et cadrez-la."
+    },
+    "title": "Votre avatar",
+    "preview": "Votre avatar",
+    "shuffle": "Aléatoire",
+    "small": "En petit format dans le chat, seul le visage s'affiche.",
+    "photoAsk": "Vous préférez une photo ?",
+    "photoUpload": "Importer une photo",
+    "saved": "Avatar mis à jour.",
+    "failed": "Impossible d'enregistrer l'avatar. Réessayez.",
+    "showAll": "Afficher toutes les options",
+    "showFewer": "Afficher moins d'options",
+    "beardHint": "La barbe suit la couleur des cheveux.",
+    "hatsHint": "Une casquette, un bonnet, un chapeau ou un foulard couvrent les cheveux.",
+    "swatch": "{{group}} {{n}}",
+    "build": {
+      "label": "Traits",
+      "m": "Masculin",
+      "f": "Féminin"
+    },
+    "tabs": {
+      "label": "Parties de l'avatar",
+      "face": "Visage",
+      "hair": "Cheveux",
+      "beard": "Barbe",
+      "makeup": "Maquillage",
+      "marks": "Marques",
+      "accessories": "Accessoires",
+      "clothes": "Vêtements",
+      "background": "Fond"
+    },
+    "sections": {
+      "skin": "Couleur de peau",
+      "eyes": "Couleur des yeux",
+      "mood": "Expression",
+      "color": "Couleur",
+      "hairColor": "Couleur des cheveux",
+      "clothesColor": "Couleur des vêtements",
+      "cut": "Coupe",
+      "beard": "Barbe",
+      "lips": "Rouge à lèvres",
+      "shadow": "Fard à paupières",
+      "blush": "Blush",
+      "mark": "Marques",
+      "glasses": "Lunettes",
+      "ear": "Boucles d'oreilles",
+      "neck": "Autour du cou",
+      "extra": "Sur la tête",
+      "piece": "Pièce",
+      "bg": "Fond"
+    },
+    "options": {
+      "mood": {
+        "smile": "Sourire",
+        "grin": "Grand sourire",
+        "laugh": "Rire",
+        "calm": "Calme",
+        "wink": "Clin d'œil",
+        "wow": "Surprise"
+      },
+      "hair": {
+        "none": "Chauve",
+        "buzz": "Coupe rase",
+        "short": "Courts",
+        "side": "Raie sur le côté",
+        "quiff": "Houppe",
+        "curly": "Bouclés",
+        "afro": "Afro",
+        "bob": "Carré",
+        "bangs": "Frange",
+        "long": "Longs",
+        "wavy": "Ondulés",
+        "curls": "Longues boucles",
+        "bun": "Chignon",
+        "pony": "Queue de cheval",
+        "spiky": "En pics",
+        "mohawk": "Crête",
+        "braids": "Tresses",
+        "pigtails": "Couettes",
+        "crew": "Brosse",
+        "fade": "Dégradé",
+        "slick": "Plaqués en arrière",
+        "flat": "Brosse carrée",
+        "undercut": "Undercut",
+        "mullet": "Mulet",
+        "dreads": "Dreadlocks",
+        "medium": "Mi-longs",
+        "receding": "Dégarni"
+      },
+      "beard": {
+        "none": "Sans barbe",
+        "stubble": "Barbe de trois jours",
+        "mustache": "Moustache",
+        "goatee": "Bouc",
+        "strap": "En collier",
+        "full": "Complète",
+        "long": "Longue"
+      },
+      "lips": {
+        "none": "Sans rouge à lèvres",
+        "nude": "Nude",
+        "pink": "Rose",
+        "red": "Rouge",
+        "wine": "Bordeaux",
+        "purple": "Violet",
+        "black": "Noir"
+      },
+      "shadow": {
+        "none": "Sans fard",
+        "rose": "Rose",
+        "violet": "Violet",
+        "blue": "Bleu",
+        "green": "Vert",
+        "gold": "Doré",
+        "smoky": "Charbonneux"
+      },
+      "blush": {
+        "soft": "Léger",
+        "strong": "Marqué",
+        "none": "Sans blush"
+      },
+      "mark": {
+        "none": "Aucune",
+        "freckles": "Taches de rousseur",
+        "mole": "Grain de beauté",
+        "scar": "Cicatrice",
+        "bandaid": "Pansement",
+        "piercing": "Piercing"
+      },
+      "glasses": {
+        "none": "Sans lunettes",
+        "round": "Rondes",
+        "square": "Carrées",
+        "gold": "Dorées",
+        "tinted": "Teintées",
+        "shades": "Lunettes de soleil"
+      },
+      "ear": {
+        "none": "Sans boucles d'oreilles",
+        "studs": "Puces dorées",
+        "pearls": "Perles",
+        "hoops": "Créoles",
+        "drops": "Pendantes"
+      },
+      "neck": {
+        "none": "Rien",
+        "necklace": "Collier",
+        "pearls": "Perles",
+        "choker": "Ras-du-cou",
+        "bowtie": "Nœud papillon",
+        "muffler": "Écharpe"
+      },
+      "extra": {
+        "none": "Rien",
+        "headband": "Bandeau",
+        "bandana": "Bandana",
+        "bow": "Nœud",
+        "flower": "Fleur",
+        "headphones": "Casque audio",
+        "cap": "Casquette",
+        "beanie": "Bonnet",
+        "hat": "Chapeau",
+        "crown": "Couronne",
+        "scarf": "Foulard"
+      },
+      "clothes": {
+        "tee": "T-shirt",
+        "vneck": "Col en V",
+        "tank": "Débardeur",
+        "shirt": "Chemise",
+        "suit": "Costume",
+        "blazer": "Blazer",
+        "jacket": "Veste",
+        "hoodie": "Sweat à capuche",
+        "turtle": "Col roulé",
+        "overall": "Salopette",
+        "polo": "Polo",
+        "dress": "Robe"
+      }
+    }
+  },
   "orgLogo": {
     "label": "Logo",
     "add": "Importer un logo",
@@ -15352,6 +15539,7 @@
         "settingStatus": "A mis à jour son statut",
         "settingReplyStyle": "A ajusté sa façon de répondre",
         "sendingFeedback": "A demandé à envoyer un retour",
+        "offeringFeedback": "A proposé de signaler un problème",
         "deletingRoutine": "A supprimé une routine",
         "runningRoutine": "A lancé une routine maintenant",
         "proposingTeam": "A proposé une équipe",
@@ -15465,6 +15653,7 @@
       "settingStatus": "mise à jour de son statut",
       "settingReplyStyle": "réglage de sa façon de répondre",
       "sendingFeedback": "prépare un retour",
+      "offeringFeedback": "prépare un rapport",
       "deletingRoutine": "suppression d'une routine",
       "runningRoutine": "lancement d'une routine maintenant",
       "proposingTeam": "proposition d'une équipe",
@@ -18100,6 +18289,24 @@
     "send": "Envoyer",
     "thanks": "C'est remis. Merci.",
     "reply": "Tout est lu. La réponse, s'il en faut une, arrive à {{email}}.",
-    "another": "En envoyer un autre"
+    "another": "En envoyer un autre",
+    "offer": {
+      "group": "Rapport sur l'application",
+      "ready": "<b>Rapport prêt</b> : {{summary}}",
+      "goesCloud": "Part en votre nom à l'équipe d'agentes.chat",
+      "goesServer": "Part en votre nom à la personne qui gère ce serveur",
+      "see": "Voir le rapport",
+      "hide": "Fermer le rapport",
+      "send": "Envoyer",
+      "notNow": "Pas maintenant",
+      "answer": "La réponse arrive dans votre boîte e-mail.",
+      "sentCloud": "<b>Rapport envoyé</b> à l'équipe d'agentes.chat",
+      "sentServer": "<b>Rapport envoyé</b> à la personne qui gère ce serveur",
+      "sentAuto": "<b>Rapport envoyé sans demander</b> : {{summary}}",
+      "view": "Voir",
+      "always": "Toujours envoyer",
+      "alwaysOn": "Désormais, les rapports de ce type partent sans demander.",
+      "askFirst": "Demander avant d'envoyer"
+    }
   }
 }

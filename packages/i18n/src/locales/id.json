@@ -9183,6 +9183,193 @@
     "notImage": "Pilih gambar (JPG, PNG, atau WebP).",
     "tooBig": "Ukuran gambar lebih dari 8 MB."
   },
+  "portrait": {
+    "ask": {
+      "title": "Kamu mau tampil seperti apa?",
+      "build": "Buat avatar",
+      "buildText": "Potret piksel sesuai gayamu: rambut, pakaian, aksesori.",
+      "photo": "Unggah foto",
+      "photoText": "Pilih gambar dari komputermu lalu atur bingkainya."
+    },
+    "title": "Avatarmu",
+    "preview": "Avatarmu",
+    "shuffle": "Acak",
+    "small": "Pada ukuran kecil di chat, hanya wajah yang tampil.",
+    "photoAsk": "Lebih suka foto?",
+    "photoUpload": "Unggah foto",
+    "saved": "Avatar diperbarui.",
+    "failed": "Avatar tidak bisa disimpan. Coba lagi.",
+    "showAll": "Tampilkan semua opsi",
+    "showFewer": "Tampilkan lebih sedikit opsi",
+    "beardHint": "Warna janggut mengikuti warna rambut.",
+    "hatsHint": "Topi, kupluk, dan kerudung menutupi rambut.",
+    "swatch": "{{group}} {{n}}",
+    "build": {
+      "label": "Tipe",
+      "m": "Maskulin",
+      "f": "Feminin"
+    },
+    "tabs": {
+      "label": "Bagian avatar",
+      "face": "Wajah",
+      "hair": "Rambut",
+      "beard": "Janggut",
+      "makeup": "Riasan",
+      "marks": "Tanda",
+      "accessories": "Aksesori",
+      "clothes": "Pakaian",
+      "background": "Latar"
+    },
+    "sections": {
+      "skin": "Warna kulit",
+      "eyes": "Warna mata",
+      "mood": "Ekspresi",
+      "color": "Warna",
+      "hairColor": "Warna rambut",
+      "clothesColor": "Warna pakaian",
+      "cut": "Potongan",
+      "beard": "Janggut",
+      "lips": "Lipstik",
+      "shadow": "Perona mata",
+      "blush": "Perona pipi",
+      "mark": "Tanda",
+      "glasses": "Kacamata",
+      "ear": "Anting",
+      "neck": "Di leher",
+      "extra": "Di kepala",
+      "piece": "Jenis pakaian",
+      "bg": "Latar"
+    },
+    "options": {
+      "mood": {
+        "smile": "Senyum",
+        "grin": "Senyum lebar",
+        "laugh": "Tertawa",
+        "calm": "Tenang",
+        "wink": "Kedipan",
+        "wow": "Terkejut"
+      },
+      "hair": {
+        "none": "Botak",
+        "buzz": "Cepak",
+        "short": "Pendek",
+        "side": "Belah samping",
+        "quiff": "Jambul",
+        "curly": "Keriting",
+        "afro": "Afro",
+        "bob": "Bob",
+        "bangs": "Poni",
+        "long": "Panjang",
+        "wavy": "Bergelombang",
+        "curls": "Ikal panjang",
+        "bun": "Cepol",
+        "pony": "Kuncir kuda",
+        "spiky": "Jabrik",
+        "mohawk": "Mohawk",
+        "braids": "Kepang",
+        "pigtails": "Kuncir dua",
+        "crew": "Cepak",
+        "fade": "Fade",
+        "slick": "Sisir ke belakang",
+        "flat": "Flat top",
+        "undercut": "Undercut",
+        "mullet": "Mullet",
+        "dreads": "Gimbal",
+        "medium": "Sedang",
+        "receding": "Garis rambut mundur"
+      },
+      "beard": {
+        "none": "Tanpa janggut",
+        "stubble": "Brewok tipis",
+        "mustache": "Kumis",
+        "goatee": "Janggut kambing",
+        "strap": "Janggut garis rahang",
+        "full": "Lebat",
+        "long": "Panjang"
+      },
+      "lips": {
+        "none": "Tanpa lipstik",
+        "nude": "Nude",
+        "pink": "Merah muda",
+        "red": "Merah",
+        "wine": "Marun",
+        "purple": "Ungu",
+        "black": "Hitam"
+      },
+      "shadow": {
+        "none": "Tanpa perona mata",
+        "rose": "Merah muda",
+        "violet": "Ungu",
+        "blue": "Biru",
+        "green": "Hijau",
+        "gold": "Emas",
+        "smoky": "Smokey"
+      },
+      "blush": {
+        "soft": "Tipis",
+        "strong": "Tebal",
+        "none": "Tanpa perona pipi"
+      },
+      "mark": {
+        "none": "Tidak ada",
+        "freckles": "Bintik-bintik",
+        "mole": "Tahi lalat",
+        "scar": "Bekas luka",
+        "bandaid": "Plester",
+        "piercing": "Tindik"
+      },
+      "glasses": {
+        "none": "Tanpa kacamata",
+        "round": "Bulat",
+        "square": "Kotak",
+        "gold": "Emas",
+        "tinted": "Berwarna",
+        "shades": "Kacamata hitam"
+      },
+      "ear": {
+        "none": "Tanpa anting",
+        "studs": "Anting tusuk emas",
+        "pearls": "Mutiara",
+        "hoops": "Anting ring",
+        "drops": "Anting juntai"
+      },
+      "neck": {
+        "none": "Tidak ada",
+        "necklace": "Kalung",
+        "pearls": "Kalung mutiara",
+        "choker": "Choker",
+        "bowtie": "Dasi kupu-kupu",
+        "muffler": "Syal"
+      },
+      "extra": {
+        "none": "Tidak ada",
+        "headband": "Bando",
+        "bandana": "Bandana",
+        "bow": "Pita",
+        "flower": "Bunga",
+        "headphones": "Headphone",
+        "cap": "Topi",
+        "beanie": "Kupluk",
+        "hat": "Topi lebar",
+        "crown": "Mahkota",
+        "scarf": "Kerudung"
+      },
+      "clothes": {
+        "tee": "Kaus",
+        "vneck": "Kerah V",
+        "tank": "Singlet",
+        "shirt": "Kemeja",
+        "suit": "Jas",
+        "blazer": "Blazer",
+        "jacket": "Jaket",
+        "hoodie": "Hoodie",
+        "turtle": "Kerah tinggi",
+        "overall": "Overall",
+        "polo": "Kaus polo",
+        "dress": "Gaun"
+      }
+    }
+  },
   "orgLogo": {
     "label": "Logo",
     "add": "Unggah logo",
@@ -14379,6 +14566,7 @@
         "settingStatus": "Memperbarui statusnya",
         "settingReplyStyle": "Menyesuaikan cara menjawab",
         "sendingFeedback": "Meminta mengirim masukan",
+        "offeringFeedback": "Menawarkan untuk melaporkan masalah",
         "deletingRoutine": "Menghapus rutinitas",
         "runningRoutine": "Menjalankan rutinitas sekarang",
         "proposingTeam": "Mengusulkan tim",
@@ -14492,6 +14680,7 @@
       "settingStatus": "memperbarui statusnya",
       "settingReplyStyle": "menyesuaikan cara menjawab",
       "sendingFeedback": "menyiapkan masukan",
+      "offeringFeedback": "menyiapkan laporan",
       "deletingRoutine": "menghapus rutinitas",
       "runningRoutine": "menjalankan rutinitas sekarang",
       "proposingTeam": "mengusulkan tim",
@@ -16999,6 +17188,24 @@
     "send": "Kirim",
     "thanks": "Terkirim. Terima kasih.",
     "reply": "Semua dibaca. Balasan, kalau perlu, dikirim ke {{email}}.",
-    "another": "Kirim lagi"
+    "another": "Kirim lagi",
+    "offer": {
+      "group": "Laporan tentang aplikasi",
+      "ready": "<b>Laporan siap</b>: {{summary}}",
+      "goesCloud": "Dikirim atas namamu ke tim agentes.chat",
+      "goesServer": "Dikirim atas namamu ke pengelola server ini",
+      "see": "Lihat laporan",
+      "hide": "Tutup laporan",
+      "send": "Kirim",
+      "notNow": "Nanti saja",
+      "answer": "Jawabannya dikirim ke emailmu.",
+      "sentCloud": "<b>Laporan terkirim</b> ke tim agentes.chat",
+      "sentServer": "<b>Laporan terkirim</b> ke pengelola server ini",
+      "sentAuto": "<b>Laporan terkirim tanpa bertanya</b>: {{summary}}",
+      "view": "Lihat",
+      "always": "Selalu kirim",
+      "alwaysOn": "Mulai sekarang, laporan seperti ini dikirim tanpa bertanya.",
+      "askFirst": "Tanya dulu sebelum mengirim"
+    }
   }
 }

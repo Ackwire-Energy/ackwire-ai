@@ -333,6 +333,10 @@ function applyToCache(qc: QueryClient, orgId: string, channelId: string, event: 
       // An agent's event proposal was confirmed or dismissed: its card says so.
       cacheMessageMeta(qc, orgId, channelId, event.messageId, () => ({ calendarProposal: event.proposal }));
       break;
+    case "feedback_offer.updated":
+      // A report an agent offered was sent or put away (on another device of the person's): its row follows.
+      cacheMessageMeta(qc, orgId, channelId, event.messageId, () => ({ feedbackOffer: event.offer }));
+      break;
     case "action_card.updated":
       // A right hand's card of a workspace change was applied, dismissed or sent on: the whole card.
       cacheActionCard(qc, orgId, event, event.card);

@@ -134,6 +134,7 @@ import type {
   EndpointStyle,
   FeedbackFile,
   FeedbackInput,
+  FeedbackOffer,
   ForeignMailbox,
   FormerAgent,
   GifKey,
@@ -360,6 +361,11 @@ export interface ApiClient {
     /** A picture or a video for the feedback being written: kept an hour unless it is sent. */
     uploadFeedbackFile(file: File): Promise<FeedbackFile>;
     dropFeedbackFile(id: string): Promise<void>;
+    /**
+     * A report an agent offered under its reply (`meta.feedbackOffer`): I send it or put it away, once. Answers with
+     * the offer as it stands.
+     */
+    decideFeedbackOffer(orgId: string, messageId: string, decision: "send" | "dismiss"): Promise<FeedbackOffer>;
     /** `null` unless I am the installation's owner on a self-hosted server. */
     jev(): Promise<JevKey | null>;
     /** Checked with TypeSafe first: `jev_key_invalid` (422) when it refuses, `jev_key_env` (409) with an env key. */
@@ -516,7 +522,11 @@ export interface ApiClient {
     /** Replaces my sidebar view here; answers with what the server kept. */
     setSidebarView(orgId: string, view: SidebarView): Promise<SidebarView>;
     /** My profile photo: a square image (JSON only: base64), already cropped. */
-    setAvatar(orgId: string, input: { imageBase64: string; contentType: string }): Promise<{ avatarUrl: string }>;
+    /** `portrait`: the recipe of a portrait drawn in the app; it comes back on the address as a `#px=` fragment. */
+    setAvatar(
+      orgId: string,
+      input: { imageBase64: string; contentType: string; portrait?: string },
+    ): Promise<{ avatarUrl: string }>;
     removeAvatar(orgId: string): Promise<void>;
     /** The workspace logo (admins): a square image (JSON only: base64), already cropped. */
     setLogo(orgId: string, input: { imageBase64: string; contentType: string }): Promise<{ logo: string }>;

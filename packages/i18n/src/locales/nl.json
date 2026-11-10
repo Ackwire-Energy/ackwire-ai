@@ -9565,6 +9565,193 @@
     "notImage": "Kies een afbeelding (JPG, PNG of WebP).",
     "tooBig": "De afbeelding is groter dan 8 MB."
   },
+  "portrait": {
+    "ask": {
+      "title": "Hoe wil je eruitzien?",
+      "build": "Avatar maken",
+      "buildText": "Een pixelportret op jouw manier: haar, kleding, accessoires.",
+      "photo": "Foto uploaden",
+      "photoText": "Kies een afbeelding van je computer en kader die in."
+    },
+    "title": "Je avatar",
+    "preview": "Je avatar",
+    "shuffle": "Husselen",
+    "small": "In kleine formaten in de chat is alleen het gezicht te zien.",
+    "photoAsk": "Liever een foto?",
+    "photoUpload": "Foto uploaden",
+    "saved": "Avatar bijgewerkt.",
+    "failed": "De avatar kon niet worden opgeslagen. Probeer het opnieuw.",
+    "showAll": "Alle opties tonen",
+    "showFewer": "Minder opties tonen",
+    "beardHint": "De baard volgt de haarkleur.",
+    "hatsHint": "Een pet, muts, hoed en hoofddoek bedekken het haar.",
+    "swatch": "{{group}} {{n}}",
+    "build": {
+      "label": "Type",
+      "m": "Mannelijk",
+      "f": "Vrouwelijk"
+    },
+    "tabs": {
+      "label": "Onderdelen van de avatar",
+      "face": "Gezicht",
+      "hair": "Haar",
+      "beard": "Baard",
+      "makeup": "Make-up",
+      "marks": "Kenmerken",
+      "accessories": "Accessoires",
+      "clothes": "Kleding",
+      "background": "Achtergrond"
+    },
+    "sections": {
+      "skin": "Huidskleur",
+      "eyes": "Oogkleur",
+      "mood": "Uitdrukking",
+      "color": "Kleur",
+      "hairColor": "Haarkleur",
+      "clothesColor": "Kleur van kleding",
+      "cut": "Kapsel",
+      "beard": "Baard",
+      "lips": "Lippenstift",
+      "shadow": "Oogschaduw",
+      "blush": "Blush",
+      "mark": "Kenmerken",
+      "glasses": "Bril",
+      "ear": "Oorbellen",
+      "neck": "Om de hals",
+      "extra": "Op het hoofd",
+      "piece": "Kledingstuk",
+      "bg": "Achtergrond"
+    },
+    "options": {
+      "mood": {
+        "smile": "Glimlach",
+        "grin": "Brede lach",
+        "laugh": "Lachen",
+        "calm": "Rustig",
+        "wink": "Knipoog",
+        "wow": "Verrast"
+      },
+      "hair": {
+        "none": "Kaal",
+        "buzz": "Gemillimeterd",
+        "short": "Kort",
+        "side": "Zijscheiding",
+        "quiff": "Kuif",
+        "curly": "Krullend",
+        "afro": "Afro",
+        "bob": "Bob",
+        "bangs": "Pony",
+        "long": "Lang",
+        "wavy": "Golvend",
+        "curls": "Lange krullen",
+        "bun": "Knot",
+        "pony": "Paardenstaart",
+        "spiky": "Stekels",
+        "mohawk": "Hanenkam",
+        "braids": "Vlechten",
+        "pigtails": "Staartjes",
+        "crew": "Crewcut",
+        "fade": "Fade",
+        "slick": "Achterover",
+        "flat": "Flattop",
+        "undercut": "Undercut",
+        "mullet": "Matje",
+        "dreads": "Dreadlocks",
+        "medium": "Halflang",
+        "receding": "Inhammen"
+      },
+      "beard": {
+        "none": "Geen baard",
+        "stubble": "Stoppelbaard",
+        "mustache": "Snor",
+        "goatee": "Sik",
+        "strap": "Kaaklijn",
+        "full": "Volle baard",
+        "long": "Lang"
+      },
+      "lips": {
+        "none": "Geen lippenstift",
+        "nude": "Nude",
+        "pink": "Roze",
+        "red": "Rood",
+        "wine": "Wijnrood",
+        "purple": "Paars",
+        "black": "Zwart"
+      },
+      "shadow": {
+        "none": "Geen oogschaduw",
+        "rose": "Rosé",
+        "violet": "Violet",
+        "blue": "Blauw",
+        "green": "Groen",
+        "gold": "Goud",
+        "smoky": "Smokey"
+      },
+      "blush": {
+        "soft": "Zacht",
+        "strong": "Fel",
+        "none": "Geen blush"
+      },
+      "mark": {
+        "none": "Geen",
+        "freckles": "Sproeten",
+        "mole": "Moedervlek",
+        "scar": "Litteken",
+        "bandaid": "Pleister",
+        "piercing": "Piercing"
+      },
+      "glasses": {
+        "none": "Geen bril",
+        "round": "Rond",
+        "square": "Vierkant",
+        "gold": "Gouden",
+        "tinted": "Getint",
+        "shades": "Zonnebril"
+      },
+      "ear": {
+        "none": "Geen oorbellen",
+        "studs": "Gouden knopjes",
+        "pearls": "Parels",
+        "hoops": "Ringen",
+        "drops": "Hangers"
+      },
+      "neck": {
+        "none": "Niets",
+        "necklace": "Ketting",
+        "pearls": "Parels",
+        "choker": "Choker",
+        "bowtie": "Vlinderdas",
+        "muffler": "Sjaal"
+      },
+      "extra": {
+        "none": "Niets",
+        "headband": "Haarband",
+        "bandana": "Bandana",
+        "bow": "Strik",
+        "flower": "Bloem",
+        "headphones": "Koptelefoon",
+        "cap": "Pet",
+        "beanie": "Muts",
+        "hat": "Hoed",
+        "crown": "Kroon",
+        "scarf": "Hoofddoek"
+      },
+      "clothes": {
+        "tee": "T-shirt",
+        "vneck": "V-hals",
+        "tank": "Tanktop",
+        "shirt": "Overhemd",
+        "suit": "Pak",
+        "blazer": "Blazer",
+        "jacket": "Jas",
+        "hoodie": "Hoodie",
+        "turtle": "Coltrui",
+        "overall": "Tuinbroek",
+        "polo": "Polo",
+        "dress": "Jurk"
+      }
+    }
+  },
   "orgLogo": {
     "label": "Logo",
     "add": "Logo uploaden",
@@ -14918,6 +15105,7 @@
         "settingStatus": "De eigen status bijgewerkt",
         "settingReplyStyle": "Aangepast hoe er wordt geantwoord",
         "sendingFeedback": "Gevraagd om feedback te versturen",
+        "offeringFeedback": "Aangeboden om een probleem te melden",
         "deletingRoutine": "Een routine verwijderd",
         "runningRoutine": "Een routine nu uitgevoerd",
         "proposingTeam": "Een team voorgesteld",
@@ -15031,6 +15219,7 @@
       "settingStatus": "de eigen status aan het bijwerken",
       "settingReplyStyle": "aan het aanpassen hoe er wordt geantwoord",
       "sendingFeedback": "feedback aan het voorbereiden",
+      "offeringFeedback": "een melding aan het voorbereiden",
       "deletingRoutine": "een routine aan het verwijderen",
       "runningRoutine": "een routine nu aan het uitvoeren",
       "proposingTeam": "een team aan het voorstellen",
@@ -17634,6 +17823,24 @@
     "send": "Versturen",
     "thanks": "Afgeleverd. Bedankt.",
     "reply": "Alles wordt gelezen. Een antwoord, als dat nodig is, komt naar {{email}}.",
-    "another": "Nog een sturen"
+    "another": "Nog een sturen",
+    "offer": {
+      "group": "Melding over de app",
+      "ready": "<b>Melding klaar</b>: {{summary}}",
+      "goesCloud": "Gaat op jouw naam naar het team van agentes.chat",
+      "goesServer": "Gaat op jouw naam naar degene die deze server beheert",
+      "see": "Melding bekijken",
+      "hide": "Melding sluiten",
+      "send": "Versturen",
+      "notNow": "Nu niet",
+      "answer": "Het antwoord komt in je e-mail.",
+      "sentCloud": "<b>Melding verstuurd</b> naar het team van agentes.chat",
+      "sentServer": "<b>Melding verstuurd</b> naar degene die deze server beheert",
+      "sentAuto": "<b>Melding verstuurd zonder te vragen</b>: {{summary}}",
+      "view": "Bekijken",
+      "always": "Altijd versturen",
+      "alwaysOn": "Vanaf nu gaan zulke meldingen weg zonder te vragen.",
+      "askFirst": "Vragen voor het versturen"
+    }
   }
 }

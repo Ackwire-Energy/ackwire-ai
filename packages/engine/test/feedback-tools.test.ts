@@ -88,7 +88,7 @@ async function askedByBia() {
 
 test("listed only where the server takes feedback", async () => {
   expect(await source({ to: undefined }).tools({} as ToolContext)).toEqual([]);
-  expect((await source().tools({} as ToolContext)).map((t) => t.name)).toEqual(["send_feedback"]);
+  expect((await source().tools({} as ToolContext)).map((t) => t.name)).toEqual(["send_feedback", "offer_feedback"]);
 });
 
 test("a person asks: one email queued in their name, saying which agent wrote it", async () => {
