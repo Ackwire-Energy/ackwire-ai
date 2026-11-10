@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import type { SecretBox, SecretRequest, SecretTarget } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
 import { secretAad } from "@agenteschat/client/lib/secret-box";
-import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 // The computer's side, from the server code: what the card seals must open there.
 import { generateSecretKeyPair, openSecret } from "../../../packages/adapters/src/secret-box";
 import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
@@ -286,8 +286,10 @@ describe("secret requests (ADR 0027)", () => {
     const field = within(card).getByLabelText(KEY_LABEL) as HTMLInputElement;
     await type(field, "npm_live_abc123");
     await click(within(card).getByRole("button", { name: "Enviar" }));
-    await settle(4);
-    expect(card.textContent).toContain("O computador de Ada não está respondendo agora.");
+    // The value is sealed (WebCrypto, off the JS thread) before it is sent: no number of ticks waits for that.
+    await waitFor(() => expect(card.textContent).toContain("O computador de Ada não está respondendo agora."), {
+      timeout: 10_000,
+    });
     expect(card.textContent).not.toContain("respondido ou expirou");
     expect(field.value).toBe("npm_live_abc123");
     expect(within(card).getByRole("button", { name: "Enviar" })).not.toBeNull();
