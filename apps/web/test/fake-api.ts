@@ -1899,6 +1899,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           roleIds: [],
           owner: false,
           money: seesCost(),
+          estimated: false,
           renewsAt: new Date().toISOString(),
           since: new Date().toISOString(),
           until: new Date().toISOString(),

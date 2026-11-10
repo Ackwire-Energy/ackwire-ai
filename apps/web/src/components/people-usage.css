@@ -133,6 +133,11 @@ th.pu-num .pu-sort {
   text-align: left;
   cursor: pointer;
 }
+/* The face (24) beside the name's line (20) and the role's under it: on the name's capitals, as a face beside one
+   line sits (the kit's `.ac-iconline`). */
+.pu-person > .ac-avatar {
+  translate: 0 calc(10px - var(--cap-mid) - 50%);
+}
 .pu-person__text {
   display: flex;
   flex-direction: column;

@@ -7380,6 +7380,8 @@ export interface PersonUsage {
   roleIds: string[];
   owner: boolean;
   money: boolean;
+  /** Some of it was use on a plan, priced at the API's list price ("≈"). */
+  estimated: boolean;
   renewsAt: string;
   since: string;
   until: string;
