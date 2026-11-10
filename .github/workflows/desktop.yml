@@ -43,7 +43,7 @@ permissions:
 
 jobs:
   version:
-    runs-on: namespace-profile-linux-4x8
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 10
     permissions:
       contents: write
@@ -135,7 +135,7 @@ jobs:
   # packages' licenses) and shipped among each app's resources (tauri.native.conf.json), signed with the app.
   server:
     needs: version
-    runs-on: namespace-profile-linux-4x8
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -171,8 +171,8 @@ jobs:
   macos:
     needs: [version, server]
     if: ${{ contains(fromJSON('["all", "macos+linux", "macos"]'), inputs.platforms || 'all') }}
-    # Apple silicon (6 vCPU, 14 GB); the build is universal either way.
-    runs-on: nscloud-macos-sequoia-arm64-6x14
+    # Apple silicon or Intel, whichever CI_RUNNER_MACOS names: the build is universal either way.
+    runs-on: ${{ vars.CI_RUNNER_MACOS || 'macos-15' }}
     timeout-minutes: 60
     env:
       BIN_DIR: apps/desktop/src-tauri/binaries
@@ -405,7 +405,8 @@ jobs:
   windows:
     needs: [version, server]
     if: ${{ contains(fromJSON('["all", "windows"]'), inputs.platforms || 'all') }}
-    runs-on: nscloud-windows-2022-amd64-4x8
+    # GitHub's own Windows runner: the build runs what it makes (the runner, agent-browser, the server once).
+    runs-on: windows-latest
     timeout-minutes: 60
     env:
       BIN_DIR: apps/desktop/src-tauri/binaries
@@ -528,7 +529,7 @@ jobs:
     needs: [version, server]
     if: ${{ contains(fromJSON('["all", "macos+linux", "linux"]'), inputs.platforms || 'all') }}
     # 22.04: an older glibc, so the app runs on more distributions.
-    runs-on: nscloud-ubuntu-22.04-amd64-4x8
+    runs-on: ${{ vars.CI_RUNNER_UBUNTU_22 || 'ubuntu-22.04' }}
     timeout-minutes: 60
     env:
       BIN_DIR: apps/desktop/src-tauri/binaries
@@ -689,7 +690,7 @@ jobs:
     needs: [version, macos, windows, linux]
     # A system left out is skipped, and a skipped need would skip this job too.
     if: ${{ !cancelled() && !failure() && needs.version.outputs.tag != '' }}
-    runs-on: namespace-profile-linux-4x8
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 15
     permissions:
       contents: write
