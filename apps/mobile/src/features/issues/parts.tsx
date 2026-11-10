@@ -192,6 +192,8 @@ function CardFacts({ issue: i, mentions, unread }: { issue: Issue; mentions: num
   const crit = criteriaProgress(i);
   const pr = latestPr(i);
   const talk = i.conversation?.count ?? 0;
+  // A mark on the first line's middle, for a fact whose words wrap (a repository's name wider than the card).
+  const mark = mediaRowAxis(12, textLineOf("caption", useFontScale())).face;
   return (
     <View style={styles.facts}>
       <Text variant="caption" tone="muted">
@@ -236,9 +238,11 @@ function CardFacts({ issue: i, mentions, unread }: { issue: Issue; mentions: num
         </View>
       ) : null}
       {i.githubUrl ? (
-        <View style={styles.inline}>
-          <SocialMark provider="github" color={c.faint} size={12} />
-          <Text variant="caption" tone="muted">
+        <View style={[styles.inline, styles.wraps]}>
+          <View style={{ marginTop: mark }}>
+            <SocialMark provider="github" color={c.faint} size={12} />
+          </View>
+          <Text variant="caption" tone="muted" style={styles.shrink}>
             {githubLinkLabel(i.githubUrl)}
           </Text>
         </View>
@@ -324,6 +328,8 @@ const styles = StyleSheet.create({
   inline: { flexDirection: "row", alignItems: "center", gap: 4 },
   // A long state (a stopped run's reason) wraps inside the card instead of running past its edge.
   state: { flexShrink: 1, maxWidth: "100%" },
+  // A fact wider than the card (a long repository's link) wraps its words inside it, its mark on the first line.
+  wraps: { maxWidth: "100%", alignItems: "flex-start" },
   shrink: { flexShrink: 1 },
   bold: { fontWeight: "600" },
   heavy: { fontWeight: "700" },

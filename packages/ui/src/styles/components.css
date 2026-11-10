@@ -11255,8 +11255,10 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
 
 /*
  * ── Fact line: one quiet line of facts under a title (FactLine), each an icon and its words, no plates ──
- * The line wraps between facts and never inside one. A label is its one pill, and only a label alone wider than the
- * line wraps its own words. An icon centred on the 20px line sits within a third of a pixel of the capitals' middle.
+ * The line wraps between facts and never inside one: a fact is as wide as its words, so one that doesn't fit moves to
+ * the next line whole. Only a fact alone wider than the line (a long repository's link, a long label) wraps its own
+ * words, never past the line's end. An icon centred on the 20px line sits within a third of a pixel of the capitals'
+ * middle.
  */
 .ac-factline {
   display: flex;
@@ -11273,11 +11275,14 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  white-space: nowrap;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
-/* Any mark: the kit's icons, a maker's logo drawn in the text's color. */
+/* Any mark: the kit's icons, a maker's logo drawn in the text's color, 14 on the first line's middle. */
 .ac-factline__fact > svg {
   flex: none;
+  align-self: flex-start;
+  margin-block-start: 3px;
   color: var(--faint);
 }
 .ac-factline__fact[data-tone="warn"] {

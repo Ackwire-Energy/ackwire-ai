@@ -36,10 +36,18 @@ describe("FactLine", () => {
     expect(container.querySelector(".ac-factline")).toBeNull();
   });
 
-  test("the line wraps between facts and never inside one; a lone label wider than the line wraps its words", () => {
+  test("the line wraps between facts and never inside one; a lone fact wider than the line wraps its words", () => {
     expect(rule(".ac-factline")).toContain("flex-wrap: wrap");
     expect(rule(".ac-factline")).toContain("gap: 2px var(--space-3)");
-    expect(rule(".ac-factline__fact")).toContain("white-space: nowrap");
+    // As wide as its words (a flex item's own width), so it moves down whole; never past the line's end.
+    const fact = rule(".ac-factline__fact");
+    expect(fact).not.toContain("white-space: nowrap");
+    expect(fact).toContain("max-width: 100%");
+    expect(fact).toContain("overflow-wrap: anywhere");
+    // Its mark stays on the first line's middle (14 on the 20px line) when its words wrap.
+    const mark = rule(".ac-factline__fact > svg");
+    expect(mark).toContain("align-self: flex-start");
+    expect(mark).toContain("margin-block-start: 3px");
     const label = rule('.ac-factline__fact[data-tone="label"]');
     expect(label).toContain("white-space: normal");
     expect(label).toContain("overflow-wrap: anywhere");

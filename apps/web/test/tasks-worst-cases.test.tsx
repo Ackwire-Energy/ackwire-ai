@@ -14,7 +14,8 @@ afterEach(() => cleanup());
 /**
  * Tarefas with what breaks a card, a row and the details' strip (break-ui): an unbroken address in a title, twelve
  * criteria, a PR and a GitHub link at once, 1284 messages with twelve mentions, Japanese with emoji, a long name, a
- * long label, a bare "Ok", every fact at once, nobody on it, a long name with initials like another's; in the strip a
+ * long label, a bare "Ok", every fact at once, nobody on it, a long name with initials like another's, a repository's
+ * link wider than the card; in the strip a
  * long name and column, nine people (one an emoji first), three PRs, twelve labels, a long GitHub link, and German.
  * CI's geometry check lays out every screen these tests reach at 1280, 390 and 320.
  */
@@ -24,6 +25,7 @@ const LONG_PERSON = "Aleksandra Wiśniewska-Kowalczyk";
 const LONG_ASSIGNEE = "Christopher Alexander Montgomery III";
 const LONG_LABEL = "infraestrutura-e-plataforma";
 const LONG_GITHUB = "https://github.com/example-org/a-very-long-repository-name/pull/10942";
+const LONGER_REPO = "plataforma-de-pagamentos-e-assinaturas-recorrentes";
 const CODE_TITLE = "Rodar `bun test` no CI do `apps/web`";
 
 const person = (userId: string, name: string): Member => ({
@@ -153,6 +155,14 @@ function worst(base: Issue): Issue[] {
       status: "todo",
       assignee: { type: "agent", id: ADA_ID },
     }),
+    // A link to a repository whose name is wider than the card: the fact wraps its own words, inside the padding.
+    task({
+      number: 137,
+      title: "Revisar o webhook de cobrança",
+      status: "in_review",
+      githubUrl: `https://github.com/example-org/${LONGER_REPO}/issues/10942`,
+      assignee: { type: "agent", id: ATLAS_ID },
+    }),
     // A person's long name, the same initials as another's: the face's letters and the name wrapping under it.
     task({
       number: 134,
@@ -202,6 +212,7 @@ describe("Tarefas at their worst", () => {
     ]);
     expect(all.querySelector(".issue-card__state")?.textContent).toBe("Pede aprovação");
     expect(facts(cardOf(7))).toEqual(["#7"]);
+    expect(facts(cardOf(137))).toEqual(["#137", `${LONGER_REPO}#10942`]);
     expect(cardOf(7).querySelector(".issue-card__state")?.textContent).toBe("Trabalhando");
     expect(cardOf(9931).querySelector(".issue-card__state")?.textContent).toBe("Parado há 21 dias");
     expect(cardOf(455).querySelector(".issue-card__who .ac-who > b")?.textContent).toBe(LONG_PERSON);

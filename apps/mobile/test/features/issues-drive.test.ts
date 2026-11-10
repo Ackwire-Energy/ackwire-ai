@@ -654,6 +654,11 @@ describe("a task's GitHub link", () => {
     // A state longer than the card (a stopped run's reason) wraps inside it, never past the card's clipped edge.
     expect(source("parts.tsx")).toContain('state: { flexShrink: 1, maxWidth: "100%" }');
     expect(source("parts.tsx")).toContain("style={[styles.bold, styles.shrink,");
+    // A repository's link wider than the card wraps its words inside it, GitHub's mark on the first line's middle.
+    expect(source("parts.tsx")).toContain('wraps: { maxWidth: "100%", alignItems: "flex-start" }');
+    expect(source("parts.tsx")).toMatch(
+      /<View style=\{\[styles\.inline, styles\.wraps\]\}>\s*<View style=\{\{ marginTop: mark \}\}>\s*<SocialMark provider="github"[^>]*\/>\s*<\/View>\s*<Text variant="caption" tone="muted" style=\{styles\.shrink\}>\s*\{githubLinkLabel\(i\.githubUrl\)\}/,
+    );
   });
 });
 
