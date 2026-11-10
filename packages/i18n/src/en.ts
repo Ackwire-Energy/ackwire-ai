@@ -14762,6 +14762,7 @@ export const en = {
         settingStatus: "Updated its status",
         settingReplyStyle: "Adjusted how it replies",
         sendingFeedback: "Asked to send feedback",
+        offeringFeedback: "Offered to report a problem",
         deletingRoutine: "Deleted a routine",
         runningRoutine: "Ran a routine now",
         proposingTeam: "Proposed a team",
@@ -14875,6 +14876,7 @@ export const en = {
       settingStatus: "updating its status",
       settingReplyStyle: "adjusting how it replies",
       sendingFeedback: "preparing feedback",
+      offeringFeedback: "preparing a report",
       deletingRoutine: "deleting a routine",
       runningRoutine: "running a routine now",
       proposingTeam: "proposing a team",
@@ -17521,6 +17523,31 @@ export const en = {
     thanks: "Delivered. Thank you.",
     reply: "Everything is read. An answer, if one is needed, comes to {{email}}.",
     another: "Send another",
+    /**
+     * A report about the app an agent offers on its own, under its reply (ADR 0160 §12): a row only the person it
+     * goes in the name of sees, with Send and Not now; sent, a line with View and Always send.
+     */
+    offer: {
+      /** The row's name for screen readers. */
+      group: "Report about the app",
+      ready: "<b>Report ready</b>: {{summary}}",
+      goesCloud: "Goes in your name to the agentes.chat team",
+      goesServer: "Goes in your name to whoever runs this server",
+      see: "See the report",
+      hide: "Close the report",
+      send: "Send",
+      notNow: "Not now",
+      /** Under the opened report. */
+      answer: "The answer comes to your email.",
+      sentCloud: "<b>Report sent</b> to the agentes.chat team",
+      sentServer: "<b>Report sent</b> to whoever runs this server",
+      /** It went with the reply: the person chose Always send. */
+      sentAuto: "<b>Report sent without asking</b>: {{summary}}",
+      view: "View",
+      always: "Always send",
+      alwaysOn: "From now on, reports like this go without asking.",
+      askFirst: "Ask before sending",
+    },
   },
 };
 

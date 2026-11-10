@@ -14379,6 +14379,7 @@
         "settingStatus": "Memperbarui statusnya",
         "settingReplyStyle": "Menyesuaikan cara menjawab",
         "sendingFeedback": "Meminta mengirim masukan",
+        "offeringFeedback": "Menawarkan untuk melaporkan masalah",
         "deletingRoutine": "Menghapus rutinitas",
         "runningRoutine": "Menjalankan rutinitas sekarang",
         "proposingTeam": "Mengusulkan tim",
@@ -14492,6 +14493,7 @@
       "settingStatus": "memperbarui statusnya",
       "settingReplyStyle": "menyesuaikan cara menjawab",
       "sendingFeedback": "menyiapkan masukan",
+      "offeringFeedback": "menyiapkan laporan",
       "deletingRoutine": "menghapus rutinitas",
       "runningRoutine": "menjalankan rutinitas sekarang",
       "proposingTeam": "mengusulkan tim",
@@ -16999,6 +17001,24 @@
     "send": "Kirim",
     "thanks": "Terkirim. Terima kasih.",
     "reply": "Semua dibaca. Balasan, kalau perlu, dikirim ke {{email}}.",
-    "another": "Kirim lagi"
+    "another": "Kirim lagi",
+    "offer": {
+      "group": "Laporan tentang aplikasi",
+      "ready": "<b>Laporan siap</b>: {{summary}}",
+      "goesCloud": "Dikirim atas namamu ke tim agentes.chat",
+      "goesServer": "Dikirim atas namamu ke pengelola server ini",
+      "see": "Lihat laporan",
+      "hide": "Tutup laporan",
+      "send": "Kirim",
+      "notNow": "Nanti saja",
+      "answer": "Jawabannya dikirim ke emailmu.",
+      "sentCloud": "<b>Laporan terkirim</b> ke tim agentes.chat",
+      "sentServer": "<b>Laporan terkirim</b> ke pengelola server ini",
+      "sentAuto": "<b>Laporan terkirim tanpa bertanya</b>: {{summary}}",
+      "view": "Lihat",
+      "always": "Selalu kirim",
+      "alwaysOn": "Mulai sekarang, laporan seperti ini dikirim tanpa bertanya.",
+      "askFirst": "Tanya dulu sebelum mengirim"
+    }
   }
 }

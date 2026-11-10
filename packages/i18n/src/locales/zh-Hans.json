@@ -14393,6 +14393,7 @@
         "settingStatus": "更新了自己的状态",
         "settingReplyStyle": "调整了回复方式",
         "sendingFeedback": "请求发送反馈",
+        "offeringFeedback": "提出报告一个问题",
         "deletingRoutine": "删除了例行工作",
         "runningRoutine": "立即运行了例行工作",
         "proposingTeam": "提议了一个团队",
@@ -14506,6 +14507,7 @@
       "settingStatus": "更新自己的状态",
       "settingReplyStyle": "调整回复方式",
       "sendingFeedback": "准备反馈",
+      "offeringFeedback": "准备报告",
       "deletingRoutine": "删除例行工作",
       "runningRoutine": "立即运行例行工作",
       "proposingTeam": "提议团队",
@@ -17074,6 +17076,24 @@
     "send": "发送",
     "thanks": "已送达，谢谢。",
     "reply": "每条都会有人看。如需回复，会发到 {{email}}。",
-    "another": "再发一条"
+    "another": "再发一条",
+    "offer": {
+      "group": "关于应用的报告",
+      "ready": "<b>报告已备好</b>：{{summary}}",
+      "goesCloud": "会以你的名义发给 agentes.chat 团队",
+      "goesServer": "会以你的名义发给管理这台服务器的人",
+      "see": "查看报告",
+      "hide": "收起报告",
+      "send": "发送",
+      "notNow": "暂时不用",
+      "answer": "回复会发到你的邮箱。",
+      "sentCloud": "<b>报告已发送</b>给 agentes.chat 团队",
+      "sentServer": "<b>报告已发送</b>给管理这台服务器的人",
+      "sentAuto": "<b>报告已直接发送，未再询问</b>：{{summary}}",
+      "view": "查看",
+      "always": "总是发送",
+      "alwaysOn": "从现在起，这类报告会直接发送，不再询问。",
+      "askFirst": "发送前先询问"
+    }
   }
 }

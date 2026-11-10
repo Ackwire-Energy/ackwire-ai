@@ -14317,6 +14317,7 @@
         "settingStatus": "자기 상태를 업데이트했어요",
         "settingReplyStyle": "답변 방식을 조정했어요",
         "sendingFeedback": "피드백 전송을 요청했어요",
+        "offeringFeedback": "문제 보고를 제안했어요",
         "deletingRoutine": "루틴을 삭제했어요",
         "runningRoutine": "루틴을 지금 실행했어요",
         "proposingTeam": "팀을 제안했어요",
@@ -14430,6 +14431,7 @@
       "settingStatus": "자기 상태를 업데이트하는 중",
       "settingReplyStyle": "답변 방식을 조정하는 중",
       "sendingFeedback": "피드백을 준비하는 중",
+      "offeringFeedback": "보고를 준비하는 중",
       "deletingRoutine": "루틴을 삭제하는 중",
       "runningRoutine": "루틴을 지금 실행하는 중",
       "proposingTeam": "팀을 제안하는 중",
@@ -16889,6 +16891,24 @@
     "send": "보내기",
     "thanks": "전달됐어요. 감사합니다.",
     "reply": "모두 읽어요. 답변이 필요하면 {{email}}로 보내 드려요.",
-    "another": "하나 더 보내기"
+    "another": "하나 더 보내기",
+    "offer": {
+      "group": "앱에 대한 보고",
+      "ready": "<b>보고 준비 완료</b>: {{summary}}",
+      "goesCloud": "내 이름으로 agentes.chat 팀에 전달돼요",
+      "goesServer": "내 이름으로 이 서버를 운영하는 사람에게 전달돼요",
+      "see": "보고 보기",
+      "hide": "보고 닫기",
+      "send": "보내기",
+      "notNow": "나중에 하기",
+      "answer": "답변은 내 이메일로 와요.",
+      "sentCloud": "agentes.chat 팀에 <b>보고를 보냈어요</b>",
+      "sentServer": "이 서버를 운영하는 사람에게 <b>보고를 보냈어요</b>",
+      "sentAuto": "<b>묻지 않고 보고를 보냈어요</b>: {{summary}}",
+      "view": "보기",
+      "always": "항상 보내기",
+      "alwaysOn": "이제부터 이런 보고는 묻지 않고 보내요.",
+      "askFirst": "보내기 전에 묻기"
+    }
   }
 }

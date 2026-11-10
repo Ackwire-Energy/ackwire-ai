@@ -36095,6 +36095,9 @@
   "chat.work.step.sendingFeedback": {
     "value": "Asked to send feedback"
   },
+  "chat.work.step.offeringFeedback": {
+    "value": "Offered to report a problem"
+  },
   "chat.work.step.deletingRoutine": {
     "value": "Deleted a routine"
   },
@@ -36424,6 +36427,9 @@
   },
   "chat.activity.sendingFeedback": {
     "value": "preparing feedback"
+  },
+  "chat.activity.offeringFeedback": {
+    "value": "preparing a report"
   },
   "chat.activity.deletingRoutine": {
     "value": "deleting a routine"
@@ -42072,5 +42078,53 @@
   },
   "feedback.another": {
     "value": "Send another"
+  },
+  "feedback.offer.group": {
+    "value": "Report about the app"
+  },
+  "feedback.offer.ready": {
+    "value": "<b>Report ready</b>: {{summary}}"
+  },
+  "feedback.offer.goesCloud": {
+    "value": "Goes in your name to the agentes.chat team"
+  },
+  "feedback.offer.goesServer": {
+    "value": "Goes in your name to whoever runs this server"
+  },
+  "feedback.offer.see": {
+    "value": "See the report"
+  },
+  "feedback.offer.hide": {
+    "value": "Close the report"
+  },
+  "feedback.offer.send": {
+    "value": "Send"
+  },
+  "feedback.offer.notNow": {
+    "value": "Not now"
+  },
+  "feedback.offer.answer": {
+    "value": "The answer comes to your email."
+  },
+  "feedback.offer.sentCloud": {
+    "value": "<b>Report sent</b> to the agentes.chat team"
+  },
+  "feedback.offer.sentServer": {
+    "value": "<b>Report sent</b> to whoever runs this server"
+  },
+  "feedback.offer.sentAuto": {
+    "value": "<b>Report sent without asking</b>: {{summary}}"
+  },
+  "feedback.offer.view": {
+    "value": "View"
+  },
+  "feedback.offer.always": {
+    "value": "Always send"
+  },
+  "feedback.offer.alwaysOn": {
+    "value": "From now on, reports like this go without asking."
+  },
+  "feedback.offer.askFirst": {
+    "value": "Ask before sending"
   }
 }

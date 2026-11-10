@@ -10,6 +10,7 @@ import { type Config, connectorOAuthApps, githubAppConfig } from "@agenteschat/c
 import type { Database } from "@agenteschat/db";
 import {
   AntigravityBrain,
+  APP_FAULT_HINT,
   type ArtifactDeps,
   agentScopeFromDb,
   authorizeStream,
@@ -402,7 +403,8 @@ export function buildEngine(o: EngineOptions) {
       createSetStatusToolSource({ pubsub: adapters.pubsub }),
       // How the person asked agents to talk to them (ADR 0147).
       createAgentStyleToolSource(),
-      // A person's feedback, sent by the agent they asked, where the server takes feedback (ADR 0160 §11).
+      // A person's feedback, sent by the agent they asked or offered by it when the app fails, where the server takes
+      // feedback (ADR 0160 §11, §12).
       createFeedbackToolSource({
         to: config.FEEDBACK_EMAIL,
         version,
@@ -530,6 +532,8 @@ export function buildEngine(o: EngineOptions) {
     ],
     catalog: { oauthApps: connectorDeps.oauthApps, mail: adapters.mail, composio },
     pubsub: adapters.pubsub,
+    // One of our own tools broke: where the server takes feedback, the agent may offer a report (ADR 0160 §12).
+    ...(config.FEEDBACK_EMAIL ? { faultHint: APP_FAULT_HINT } : {}),
   });
   // Mission tasks' tools and computer-brain runs' tools come through the hub's MCP bridge (ADR 0032).
   // Runs waiting for a device (bring your own devices) go on when its computer is back or its phones report it free.

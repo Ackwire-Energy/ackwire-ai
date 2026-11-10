@@ -242,3 +242,74 @@ html:not([data-pointer]) .ag-rc__btn:focus-visible {
   flex: 1 1 100%;
   padding-inline: calc(16px - var(--msg-inline));
 }
+
+/*
+ * A report about the app the agent offered (ADR 0160 §12): a receipt's row with two actions at its end, on the middle
+ * of its two lines of words; where they don't fit beside the words they go under them (`.ac-actline`). Opened, the
+ * report comes down inside the row, under a hairline. One surface: nothing inside has a background of its own.
+ */
+.ag-fb {
+  flex-wrap: wrap;
+}
+.ag-fb .ag-fb__acts {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  align-self: center;
+}
+.ag-fb__send {
+  color: var(--ink);
+  font-weight: 650;
+}
+.ag-fb__no {
+  color: var(--muted);
+}
+.ag-fb__no:hover:not(:disabled) {
+  color: var(--ink);
+}
+/* "See the report", closing the second line, and "Ask before sending" under an opened report: quiet words. */
+.ag-fb__more {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ag-fb__more:hover {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+html:not([data-pointer]) .ag-fb__more:focus-visible {
+  outline: none;
+  border-radius: 4px;
+  box-shadow: var(--focus-ring);
+}
+.ag-fb__open {
+  flex: 1 0 100%;
+  margin: 4px -12px 0;
+  padding: 10px 12px 5px;
+  border-top: 1px solid var(--line);
+}
+/* The report is the agent's words, as the email carries them: its lines kept, a long word wrapped. */
+.ag-fb__text {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 20px;
+  color: var(--ink2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ag-fb__note {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  line-height: 18px;
+  color: var(--faint);
+}
+/* Under a sent report's pill, the report takes the pill's own opened box: its "Ask before sending" starts a line. */
+.rq__details > .ag-fb__more {
+  align-self: flex-start;
+  font-size: 12.5px;
+}
