@@ -52,6 +52,8 @@ import { useApi } from "@/api/context";
 import { useConnectedById } from "@/components/AccessLevels";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { LookPicker } from "@/components/AgentFields";
+import { useConnectAi } from "@/components/ConnectAi";
+import { ConnectFlow, type FlowState } from "@/components/ConnectFlow";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
 import { useOrg } from "@/components/org-context";
 import { agentCoverOptions, facePool } from "@/components/Sky";
@@ -63,7 +65,6 @@ import {
   PERSONAL_STARTERS,
   type PersonalStarter,
   presetChannels,
-  presetLevels,
   ROLE_DEFAULTS,
   ROLE_GROUPS,
   type RoleGroupId,
@@ -72,7 +73,9 @@ import {
   starterApps,
   takenHandles,
 } from "@/lib/new-agent";
+import { useScrollEdges } from "@/lib/scroll-edges";
 import { useToast } from "@/lib/toast";
+import { AppsPicker } from "./AppsPicker";
 import { useNewAgentBrain } from "./useNewAgentBrain";
 import "../team-plan.css";
 import "./new-agent-card.css";
@@ -81,8 +84,9 @@ import "./new-agent-card.css";
  * A new agent (ADR 0164): one dialog for every way in. On the left, from scratch first, then the ready-made starting
  * points (a personal workspace's starters, a team's roles by area); on the right, the agent's own card, edited in
  * place: it introduces itself in a speech bubble on its sky (its name and what it does, in its own voice), its look
- * (tried on by pointing), the apps it will use at their levels, where it works and what to ask it first. Creating it
- * flies it to its row in the sidebar and opens its chat, whose checklist asks only for what is missing.
+ * (tried on by pointing), the connected apps it will use at their levels, its skills, where it works and how it works
+ * (its instructions). Creating it flies it to its row in the sidebar and opens its chat, whose checklist asks only for
+ * what is missing (first tasks and the apps still to connect included).
  */
 
 type Look = Required<AgentAppearance>;
@@ -96,14 +100,81 @@ interface Draft {
   /** What it does, in its own voice: its bubble on the card, its first message, its setup's `hello`. */
   what: string;
   look: Look;
+  /** The connected apps it gets at once, at their levels (catalog ids). */
   apps: Record<string, CardLevel>;
   /** The skills it opens when needed (library ids); null: its starting point's suggestions, as they load. */
   skills: string[] | null;
+  /** How it works: its instructions, edited on the card. */
+  instructions: string;
 }
 
 export interface NewAgentRequest {
   /** A channel's "Criar agente": it starts in that channel too. */
   channelId?: string | null;
+  /** Back from connecting an app elsewhere (OAuth): the card as it was, and the app that just connected. */
+  resume?: { sel: Pick; drafts: Partial<Record<Pick, Draft>>; connected: string | null };
+}
+
+/**
+ * Connecting an app from the card may sign in on the provider's page, which reloads the app: the card waits here for
+ * the way back (`?newAgent=resume`, plus the server's `?connected=`), for an hour, in this tab only.
+ */
+const RESUME_KEY = "agentes:new-agent";
+const RESUME_PARAM = "newAgent";
+const RESUME_TTL = 60 * 60 * 1000;
+interface Saved {
+  org: string;
+  at: number;
+  channelId: string | null;
+  sel: Pick;
+  drafts: Partial<Record<Pick, Draft>>;
+  /** The app being connected (catalog id). */
+  pending: string;
+}
+
+function saveForReturn(saved: Omit<Saved, "at">) {
+  try {
+    sessionStorage.setItem(RESUME_KEY, JSON.stringify({ ...saved, at: Date.now() }));
+  } catch {
+    // No storage (a private window): back from the provider the card starts over.
+  }
+}
+
+function forgetReturn() {
+  try {
+    sessionStorage.removeItem(RESUME_KEY);
+  } catch {
+    // Nothing kept.
+  }
+}
+
+/** The card to reopen when this page is the way back from connecting one of its apps; takes its parameters out. */
+function takeResume(orgId: string): NewAgentRequest | null {
+  if (typeof window === "undefined") return null;
+  const url = new URL(window.location.href);
+  if (url.searchParams.get(RESUME_PARAM) !== "resume") return null;
+  const connected = url.searchParams.get("connected");
+  for (const param of [RESUME_PARAM, "connected", "outcome"]) url.searchParams.delete(param);
+  window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+  let saved: Saved | null = null;
+  try {
+    saved = JSON.parse(sessionStorage.getItem(RESUME_KEY) ?? "null") as Saved | null;
+  } catch {
+    saved = null;
+  }
+  forgetReturn();
+  if (!saved || saved.org !== orgId || Date.now() - saved.at > RESUME_TTL) return null;
+  return {
+    channelId: saved.channelId,
+    resume: { sel: saved.sel, drafts: saved.drafts, connected: connected === saved.pending ? connected : null },
+  };
+}
+
+/** The level an app comes onto the card at: write for a person's own agent, a team's at its role's (else read). */
+function cardLevelFor(personal: boolean, role: RoleId | null, appId: string): CardLevel | null {
+  if (personal) return "write";
+  const level = (ROLE_DEFAULTS[role ?? "custom"].levels as Record<string, Level>)[appId];
+  return level === "none" ? null : level === "write" ? "write" : "read";
 }
 
 interface Flight {
@@ -140,6 +211,11 @@ export function NewAgentProvider({ children }: { children: ReactNode }) {
     window.addEventListener(NEW_AGENT_EVENT, onAsk);
     return () => window.removeEventListener(NEW_AGENT_EVENT, onAsk);
   }, [open]);
+  // Back from connecting one of the card's apps on the provider's page: the card as it was.
+  useEffect(() => {
+    const back = takeResume(org.id);
+    if (back) setRequest({ ...back, n: 1 });
+  }, [org.id]);
   return (
     <NewAgentContext.Provider value={value}>
       {children}
@@ -196,14 +272,12 @@ export const NEW_AGENT_EVENT = "agentes:new-agent";
 /** The ready-made words of a starting point: a personal starter's (`teamTemplates.agents`) or a role's. */
 const isStarter = (pick: Pick): pick is PersonalStarter["id"] => PERSONAL_STARTERS.some((s) => s.id === pick);
 const starterOf = (pick: Pick) => PERSONAL_STARTERS.find((s) => s.id === pick);
+const roleOf = (pick: Pick): RoleId | null => (pick === "zero" || isStarter(pick) ? null : pick);
 const GROUP_ICON: Record<RoleGroupId, "code" | "members" | "layers"> = {
   tech: "code",
   customers: "members",
   operations: "layers",
 };
-/** The apps the card offers to add, after the ones already connected: what a person or a team most often uses. */
-const OFFER_PERSONAL = ["google-calendar", "drive", "google-docs", "google-sheets", "notion", "todoist"];
-const OFFER_TEAM = ["github", "linear", "notion", "drive", "stripe", "sentry", "google-calendar"];
 /**
  * The skills each starting point opens when needed, as the team templates name them (`teamTemplates.skills.{key}`),
  * matched in the workspace's library by name, best effort.
@@ -220,6 +294,12 @@ const SKILL_SUGGESTIONS: Partial<Record<Pick, readonly string[]>> = {
   finance: ["dunning"],
   assistant: ["schedule"],
 };
+/** The old form's helpers for instructions, reused on the card (`newAgent.tips.{tip}`). */
+const TIPS = ["do", "avoid", "help"] as const;
+/** About eight lines of instructions before they scroll. */
+const HOW_MAX_HEIGHT = 184;
+/** The server keeps at most this many apps in a new agent's setup (`SETUP_APPS_MAX`, ADR 0164). */
+const SETUP_APPS_MAX = 12;
 /** Name ideas for an agent from scratch, by what it will do (`newAgentCard.names.{theme}` and its `…Words`). */
 const NAME_THEMES = ["agenda", "money", "travel", "training", "study", "clients"] as const;
 /** A name or a title as a comparable slug ("Tom de voz" → "tom-de-voz"). */
@@ -268,16 +348,31 @@ function NewAgentDialog({
   const library = useSkills(org.id);
   const create = useCreateAgent(org.id);
   const brain = useNewAgentBrain();
+  const connectAi = useConnectAi();
 
   const picks: Pick[] = useMemo(
     () => ["zero", ...(personal ? PERSONAL_STARTERS.map((s) => s.id) : ROLE_GROUPS.flatMap((g) => [...g.roles]))],
     [personal],
   );
-  const [sel, setSel] = useState<Pick>(picks[1] ?? "zero");
-  const [drafts, setDrafts] = useState<Partial<Record<Pick, Draft>>>({});
+  const back = request.resume && picks.includes(request.resume.sel) ? request.resume : null;
+  const [sel, setSel] = useState<Pick>(back?.sel ?? picks[1] ?? "zero");
+  const [drafts, setDrafts] = useState<Partial<Record<Pick, Draft>>>(() => {
+    // Back from connecting an app: the cards as they were, that app on the one being made.
+    if (!back) return {};
+    const all = Object.fromEntries(
+      Object.entries(back.drafts).map(([k, d]) => [k, { ...d, instructions: d?.instructions ?? "" }]),
+    ) as Partial<Record<Pick, Draft>>;
+    const d = all[back.sel];
+    const level = back.connected ? (cardLevelFor(personal, roleOf(back.sel), back.connected) ?? "read") : null;
+    if (d && back.connected && level) all[back.sel] = { ...d, apps: { ...d.apps, [back.connected]: level } };
+    return all;
+  });
   const [lookOpen, setLookOpen] = useState(false);
   const [preview, setPreview] = useState<LookPatch | null>(null);
-  const [adding, setAdding] = useState(false);
+  const [picking, setPicking] = useState(false);
+  // An app being connected from the picker: it lands on the card once it shows as connected.
+  const [flow, setFlow] = useState<FlowState | null>(null);
+  const [pending, setPending] = useState<string | null>(null);
   const [appOpen, setAppOpen] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [addingSkills, setAddingSkills] = useState(false);
@@ -291,6 +386,8 @@ function NewAgentDialog({
   const list = useRef<HTMLDivElement>(null);
   const nameInput = useRef<HTMLInputElement>(null);
   const whatInput = useRef<HTMLTextAreaElement>(null);
+  const howInput = useRef<HTMLTextAreaElement>(null);
+  const body = useRef<HTMLDivElement>(null);
 
   // The catalog's apps by id, and the ones connected here (what a new agent may use at once).
   const defs = useMemo(() => new Map((catalog.data?.connectors ?? []).map((d) => [d.id, d])), [catalog.data]);
@@ -300,22 +397,22 @@ function NewAgentDialog({
     for (const item of items) if (item.def && !item.custom && !out.has(item.def.id)) out.set(item.def.id, item.id);
     return out;
   }, [items]);
-  const roleOf = (pick: Pick): RoleId | null => (pick === "zero" || isStarter(pick) ? null : pick);
 
-  /** A starting point's card as it opens: its name, its voice, its look, its apps (and the connected ones). */
+  /**
+   * A starting point's card as it opens: its name, its voice, its look, its instructions and the apps it gets at once:
+   * only the ones connected here, each at its level (who doesn't manage agents gives none). Its starting point's other
+   * apps are suggested by its chat's checklist.
+   */
   const fresh = (pick: Pick): Draft => {
     const role = roleOf(pick);
     const starter = starterOf(pick);
-    const suggested: Record<string, CardLevel> = starterApps({ role, starter: starter?.id ?? null });
-    // Who manages agents gives it the apps already connected, at its role's levels (write, else).
-    const preset = managesAgents ? presetLevels(role ?? "custom", items, personal) : {};
-    const fromConnected: Record<string, CardLevel> = {};
-    for (const item of items) {
-      const level = preset[item.id];
-      if (item.def && !item.custom && (level === "read" || level === "write")) fromConnected[item.def.id] = level;
-    }
-    const apps = { ...fromConnected, ...suggested };
-    if (pick === "zero") return { name: "", what: "", look: { ...BLANK_LOOK }, apps, skills: null };
+    const apps: Record<string, CardLevel> = {};
+    if (managesAgents)
+      for (const appId of connectedApps.keys()) {
+        const level = cardLevelFor(personal, role, appId);
+        if (level) apps[appId] = level;
+      }
+    if (pick === "zero") return { name: "", what: "", look: { ...BLANK_LOOK }, apps, skills: null, instructions: "" };
     if (starter)
       return {
         name: starter.name,
@@ -323,6 +420,7 @@ function NewAgentDialog({
         look: { ...starter.look },
         apps,
         skills: null,
+        instructions: tt(`newAgent.starters.${starter.id}.instructions`),
       };
     const id = pick as TeamRole;
     return {
@@ -331,6 +429,7 @@ function NewAgentDialog({
       look: { ...ROLE_DEFAULTS[id].look } as Look,
       apps,
       skills: null,
+      instructions: tt(`newAgent.roles.${id}.instructions`),
     };
   };
   const draft = drafts[sel] ?? fresh(sel);
@@ -424,12 +523,28 @@ function NewAgentDialog({
     const s = starterOf(pick);
     return s ? s.name : pick === "zero" ? "" : tt(`newAgent.roles.${pick}.agent`);
   };
-  const tasks =
-    role !== null
-      ? (["a", "b", "c"] as const).map((k) => tt(`newAgent.roles.${role}.tasks.${k}`))
-      : starter
-        ? (["a", "b", "c"] as const).map((k) => tt(`newAgent.starters.${starter.id}.tasks.${k}`))
-        : [t("agentSetup.tasks.a"), t("agentSetup.tasks.b")];
+  // How it works: its instructions grow with what's written, up to about eight lines, then scroll.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: on each change of the text or of the card
+  useLayoutEffect(() => {
+    const ta = howInput.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = `${Math.min(ta.scrollHeight, HOW_MAX_HEIGHT)}px`;
+  }, [draft.instructions, sel, lookOpen]);
+  /** One of the old form's helpers ("O que fazer"…): its line at the end, the cursor after it. */
+  const addTip = (tip: (typeof TIPS)[number]) => {
+    const line = t(`newAgent.tips.${tip}.text`, { name: me.user.name.split(/\s+/)[0] ?? me.user.name });
+    const text = draft.instructions;
+    update({ instructions: (text.trim() ? `${text.replace(/\s+$/, "")}\n` : "") + line });
+    setTimeout(() => {
+      const ta = howInput.current;
+      ta?.focus();
+      ta?.setSelectionRange?.(ta.value.length, ta.value.length);
+    });
+  };
+  // The list and the card's body fade at an edge only while there is more to scroll that way.
+  useScrollEdges(list, [picks.length]);
+  useScrollEdges(body, [sel, lookOpen, draft]);
 
   const ready = name !== "" && handle !== "" && (sel !== "zero" || draft.what.trim() !== "");
   const react = () => playAgentReaction(REACTION, "up");
@@ -443,7 +558,6 @@ function NewAgentDialog({
     if (next === sel) return;
     setSel(next);
     setLookOpen(false);
-    setAdding(false);
     setPreview(null);
     // Picked with the pointer, it hops from its row into its own sky.
     if (from && !prefersReducedMotion()) hopFrom.current = from.getBoundingClientRect();
@@ -513,11 +627,13 @@ function NewAgentDialog({
     setBusy(true);
     try {
       const what = draft.what.trim();
-      const instructions = role
-        ? tt(`newAgent.roles.${role}.instructions`)
-        : starter
-          ? tt(`teamTemplates.agents.${starter.id}.line`)
-          : what;
+      // How it works, as written on the card; from scratch with nothing there, what it does.
+      const instructions = draft.instructions.trim() || what;
+      // Its checklist suggests its starting point's apps not connected yet, then the card's (ADR 0164).
+      const later = Object.entries(starterApps({ role, starter: starter?.id ?? null })).filter(
+        ([id]) => !connectedApps.has(id) && !draft.apps[id],
+      );
+      const setupApps = Object.fromEntries([...later, ...Object.entries(draft.apps)].slice(0, SETUP_APPS_MAX));
       const agent = await create.mutateAsync({
         name,
         handle,
@@ -529,7 +645,7 @@ function NewAgentDialog({
           role,
           ...(starter ? { starter: starter.id } : {}),
           ...(what ? { hello: what } : {}),
-          apps: draft.apps,
+          apps: setupApps,
         },
         ownerUserId: me.user.id,
         // A personal workspace's agent answers only its owner (ADR 0159); a team's, everyone.
@@ -586,6 +702,8 @@ function NewAgentDialog({
       pick(next);
       list.current?.querySelector<HTMLElement>(`[data-pick="${next}"]`)?.focus();
     } else if (e.key === "Enter" && !e.shiftKey && !target.matches("button")) {
+      // In its instructions Enter is a new line; ⌘ or Ctrl with it still creates.
+      if (target === howInput.current && !e.metaKey && !e.ctrlKey) return;
       e.preventDefault();
       if (target === whatInput.current && !name) nameInput.current?.focus();
       else void submit();
@@ -593,18 +711,42 @@ function NewAgentDialog({
   };
 
   const appIds = Object.keys(draft.apps);
-  const offer = [...connectedApps.keys(), ...(personal ? OFFER_PERSONAL : OFFER_TEAM)]
-    .filter((id, i, all) => all.indexOf(id) === i && !draft.apps[id])
-    .map((id) => defs.get(id))
-    .filter((d): d is ConnectorDef => Boolean(d?.available && !d.soon))
-    .slice(0, 8);
+  const levelFor = (appId: string): CardLevel => cardLevelFor(personal, role, appId) ?? "read";
+  const takeApp = (appId: string) => {
+    update({ apps: { ...draft.apps, [appId]: levelFor(appId) } });
+    react();
+  };
+  // Connecting from the picker: kept for the way back if the provider's page reloads the app.
+  const connectApp = (def: ConnectorDef) => {
+    saveForReturn({
+      org: org.id,
+      channelId: request.channelId ?? null,
+      sel,
+      drafts: { ...drafts, [sel]: draft },
+      pending: def.id,
+    });
+    setPending(def.id);
+    setFlow({ step: 0, def });
+  };
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once the app being connected shows as connected
+  useEffect(() => {
+    if (!pending || !connectedApps.has(pending)) return;
+    if (managesAgents) takeApp(pending);
+    setPending(null);
+    forgetReturn();
+  }, [pending, connectedApps]);
+  const skillsLeft = lib.filter((s) => !chosenSkills.includes(s.id));
   const appName = (id: string) => {
     const def = defs.get(id);
     return def ? connectorName(t, def) : id;
   };
   const appIcon = (id: string) => <ConnectorIcon def={defs.get(id) ?? null} label={appName(id)} />;
 
-  const note = brain.hasAi ? t("newAgentCard.ready") : name ? t("newAgentCard.noAi", g) : t("newAgentCard.noAiBlank");
+  const howLabel = name ? t("newAgentCard.how", g) : t("newAgentCard.howBlank");
+  const toImport = () => {
+    onClose();
+    void navigate({ to: "/org/$orgId/settings/$section", params: { orgId: org.id, section: "import" } });
+  };
 
   return (
     <Dialog
@@ -686,22 +828,6 @@ function NewAgentDialog({
                   </div>
                 ))
               )}
-              <p className="nac__more">
-                <button
-                  type="button"
-                  className="ac-link ac-iconline"
-                  onClick={() => {
-                    onClose();
-                    void navigate({
-                      to: "/org/$orgId/settings/$section",
-                      params: { orgId: org.id, section: "import" },
-                    });
-                  }}
-                >
-                  <Icon name="download" size={16} />
-                  {t("newAgentCard.import")}
-                </button>
-              </p>
             </div>
 
             <div className="tp-gallery__preview nac__card">
@@ -820,7 +946,7 @@ function NewAgentDialog({
                 </span>
               </div>
 
-              <div className="nac__body">
+              <div className="nac__body" ref={body}>
                 {lookOpen ? (
                   <div className="nac__look">
                     <LookPicker look={draft.look} onPick={setLook} onPreview={setPreview} />
@@ -850,8 +976,23 @@ function NewAgentDialog({
                       </span>
                     )}
                     <section className="nac__sec" aria-label={t("newAgentCard.uses")}>
-                      <span className="nac__label">{t("newAgentCard.uses")}</span>
+                      <span className="nac__head">
+                        <span className="nac__label">{t("newAgentCard.uses")}</span>
+                        {managesAgents && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            icon="plus"
+                            className="nac__plus"
+                            aria-haspopup="dialog"
+                            onClick={() => setPicking(true)}
+                          >
+                            {appIds.length ? t("newAgentCard.otherApp") : t("newAgentCard.chooseApps")}
+                          </Button>
+                        )}
+                      </span>
                       <span className="nac__chips">
+                        {appIds.length === 0 && <span className="nac__none">{t("newAgentCard.usesNone")}</span>}
                         {appIds.map((id) => (
                           <button key={id} type="button" className="ac-chip nac__app" onClick={() => setAppOpen(id)}>
                             {appIcon(id)}
@@ -859,47 +1000,32 @@ function NewAgentDialog({
                             <span className="nac__level">{tt(`newAgentCard.level.${draft.apps[id] ?? "read"}`)}</span>
                           </button>
                         ))}
-                        {offer.length > 0 && (
-                          <button
-                            type="button"
-                            className="ac-chip nac__add"
-                            aria-expanded={adding}
-                            onClick={() => setAdding((a) => !a)}
-                          >
-                            <Icon name={adding ? "chevronUp" : "plus"} size={14} />
-                            <span className="ac-chip__text">
-                              {appIds.length ? t("newAgentCard.otherApp") : t("newAgentCard.chooseApps")}
-                            </span>
-                          </button>
-                        )}
-                        {adding && (
-                          <span className="nac__offer">
-                            {offer.map((d) => (
-                              <button
-                                key={d.id}
-                                type="button"
-                                className="ac-chip nac__add"
-                                onClick={() => update({ apps: { ...draft.apps, [d.id]: personal ? "write" : "read" } })}
-                              >
-                                <ConnectorIcon def={d} label={connectorName(t, d)} />
-                                <span className="ac-chip__text">{connectorName(t, d)}</span>
-                                <Icon name="plus" size={14} />
-                              </button>
-                            ))}
-                          </span>
-                        )}
                       </span>
                     </section>
                     {skillsShown && (
                       <section className="nac__sec" aria-label={t("newAgentCard.skills")}>
-                        <span className="nac__label">
-                          {t("newAgentCard.skills")}
-                          <span className="nac__help">
-                            {" · "}
-                            {name ? t("newAgent.skillsHelp", g) : t("newAgentCard.skillsHelpBlank")}
+                        <span className="nac__head">
+                          <span className="nac__label">
+                            {t("newAgentCard.skills")}
+                            <span className="nac__help">
+                              {" · "}
+                              {name ? t("newAgent.skillsHelp", g) : t("newAgentCard.skillsHelpBlank")}
+                            </span>
                           </span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            icon={addingSkills ? "chevronUp" : "plus"}
+                            className="nac__plus"
+                            aria-expanded={addingSkills}
+                            disabled={skillsLeft.length === 0 && !addingSkills}
+                            onClick={() => setAddingSkills((a) => !a)}
+                          >
+                            {chosenSkills.length ? t("newAgentCard.otherSkill") : t("newAgentCard.chooseSkills")}
+                          </Button>
                         </span>
                         <span className="nac__chips">
+                          {chosenSkills.length === 0 && <span className="nac__none">{t("newAgentCard.usesNone")}</span>}
                           {chosenSkills.map((id) => (
                             <button
                               key={id}
@@ -911,38 +1037,23 @@ function NewAgentDialog({
                               <span className="ac-chip__text">{skillName(id)}</span>
                             </button>
                           ))}
-                          {lib.length > chosenSkills.length && (
-                            <button
-                              type="button"
-                              className="ac-chip nac__add"
-                              aria-expanded={addingSkills}
-                              onClick={() => setAddingSkills((a) => !a)}
-                            >
-                              <Icon name={addingSkills ? "chevronUp" : "plus"} size={14} />
-                              <span className="ac-chip__text">
-                                {chosenSkills.length ? t("newAgentCard.otherSkill") : t("newAgentCard.chooseSkills")}
-                              </span>
-                            </button>
-                          )}
-                          {addingSkills && (
-                            <span className="nac__offer">
-                              {lib
-                                .filter((s) => !chosenSkills.includes(s.id))
-                                .map((s) => (
-                                  <button
-                                    key={s.id}
-                                    type="button"
-                                    className="ac-chip nac__add"
-                                    onClick={() => update({ skills: [...chosenSkills, s.id] })}
-                                  >
-                                    <Icon name="book" size={14} />
-                                    <span className="ac-chip__text">{s.name}</span>
-                                    <Icon name="plus" size={14} />
-                                  </button>
-                                ))}
-                            </span>
-                          )}
                         </span>
+                        {addingSkills && skillsLeft.length > 0 && (
+                          <span className="nac__offer">
+                            {skillsLeft.map((s) => (
+                              <button
+                                key={s.id}
+                                type="button"
+                                className="ac-chip nac__add"
+                                onClick={() => update({ skills: [...chosenSkills, s.id] })}
+                              >
+                                <Icon name="book" size={14} />
+                                <span className="ac-chip__text">{s.name}</span>
+                                <Icon name="plus" size={14} />
+                              </button>
+                            ))}
+                          </span>
+                        )}
                       </section>
                     )}
                     {!personal && joins.length > 0 && (
@@ -958,16 +1069,28 @@ function NewAgentDialog({
                         </span>
                       </section>
                     )}
-                    <section className="nac__sec" aria-label={t("newAgentCard.asks")}>
-                      <span className="nac__label">{t("newAgentCard.asks")}</span>
-                      <ul className="nac__asks">
-                        {tasks.map((task) => (
-                          <li key={task} className="ac-iconline">
-                            <Icon name="message" size={16} />
-                            <span>{task}</span>
-                          </li>
+                    <section className="nac__sec" aria-label={howLabel}>
+                      <span className="nac__label">{howLabel}</span>
+                      <span className="nac__how">
+                        <textarea
+                          ref={howInput}
+                          className="nac__instr"
+                          rows={3}
+                          value={draft.instructions}
+                          maxLength={50_000}
+                          placeholder={t("newAgentCard.instructionsPlaceholder")}
+                          aria-label={t("newAgent.instructions")}
+                          onChange={(e) => update({ instructions: e.target.value })}
+                        />
+                        <Icon name="edit" size={14} className="nac__pen" />
+                      </span>
+                      <span className="nac__tips">
+                        {TIPS.map((tip) => (
+                          <Button key={tip} size="sm" variant="ghost" icon="plus" onClick={() => addTip(tip)}>
+                            {t(`newAgent.tips.${tip}.title`)}
+                          </Button>
                         ))}
-                      </ul>
+                      </span>
                     </section>
                   </>
                 )}
@@ -975,11 +1098,20 @@ function NewAgentDialog({
             </div>
           </div>
         </DialogBody>
+        {/* Left: the import, and while nothing here can think, Connect AI over this dialog (the draft stays). */}
         <DialogFooter
+          className="nac__foot"
           note={
-            <span className="nac__note ac-iconline">
-              <Icon name="info" size={16} />
-              <span>{note}</span>
+            <span className="nac__foot-left">
+              <button type="button" className="ac-link ac-iconline nac__import" onClick={toImport}>
+                <Icon name="download" size={16} />
+                {t("newAgentCard.import")}
+              </button>
+              {!brain.hasAi && connectAi && (
+                <Button size="sm" icon="bolt" onClick={() => connectAi.open({ forNewAgent: true })}>
+                  {t("noAi.banner.orgAction")}
+                </Button>
+              )}
             </span>
           }
         >
@@ -1020,6 +1152,30 @@ function NewAgentDialog({
           onClose={() => setAppOpen(null)}
         />
       )}
+      {picking && (
+        <AppsPicker
+          agentName={name}
+          connectors={catalog.data?.connectors ?? []}
+          suggested={Object.keys(starterApps({ role, starter: starter?.id ?? null }))}
+          connected={new Set(connectedApps.keys())}
+          onCard={new Set(appIds)}
+          canConnect={can(org, "manage_connectors")}
+          onUse={(d) => takeApp(d.id)}
+          onConnect={connectApp}
+          onClose={() => setPicking(false)}
+        />
+      )}
+      {/* Signing in on the provider's page comes back here, to this card (`takeResume`). */}
+      <ConnectFlow
+        flow={flow}
+        onChange={setFlow}
+        onClose={() => {
+          // Closed here, nothing comes back from a provider's page; one that did connect still lands on the card.
+          setFlow(null);
+          forgetReturn();
+        }}
+        returnTo={typeof window === "undefined" ? undefined : `${window.location.pathname}?${RESUME_PARAM}=resume`}
+      />
     </Dialog>
   );
 }
@@ -1056,14 +1212,16 @@ function ListRow({
       aria-selected={on}
       tabIndex={on ? 0 : -1}
       data-pick={pick}
-      className="tp-gallery__item ac-iconline nac__item"
+      // A face beside two lines: the name's capitals start at its top (`ac-faceline`), never centred on both lines;
+      // an accessory drawn above the tile is ink, not layout, so it moves nothing.
+      className="tp-gallery__item ac-faceline nac__item"
       onClick={(e) => onPick(pick, e.detail > 0 ? e.currentTarget.querySelector<HTMLElement>(".ac-avatar") : null)}
     >
       <span className="tp-gallery__faces nac__face" aria-hidden="true">
         {face}
       </span>
       <span className="tp-gallery__text">
-        <b>{title}</b>
+        <b className="ac-captop">{title}</b>
         <small>{sub}</small>
       </span>
     </button>

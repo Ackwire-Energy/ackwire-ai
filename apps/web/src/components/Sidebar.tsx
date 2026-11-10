@@ -114,6 +114,7 @@ import { entityMenu } from "@/lib/entity-menu";
 import { useOpenParam } from "@/lib/open-param";
 import { markOpen } from "@/lib/perf";
 import { ownPlanLines, planNearLimit, planWord } from "@/lib/plan-usage";
+import { useScrollEdges } from "@/lib/scroll-edges";
 import { rightHandSeen, STORAGE_KEYS, sessionStore, storage, storedStrings } from "@/lib/storage";
 import { useToast } from "@/lib/toast";
 import type { SettingsSection } from "@/pages/settings-sections";
@@ -449,25 +450,8 @@ export function Sidebar() {
   // paints its own background (no sliding pill).
   const navRef = useRef<HTMLDivElement>(null);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  // The list fades out at an edge only while there is more to scroll past it (no hard cut).
-  // biome-ignore lint/correctness/useExhaustiveDependencies: re-check when the lists load
-  useLayoutEffect(() => {
-    const nav = navRef.current;
-    if (!nav) return;
-    const edges = () => {
-      nav.dataset.fadeTop = String(nav.scrollTop > 1);
-      nav.dataset.fadeBottom = String(nav.scrollTop + nav.clientHeight < nav.scrollHeight - 1);
-    };
-    edges();
-    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(edges);
-    ro?.observe(nav);
-    for (const child of Array.from(nav.children)) ro?.observe(child);
-    nav.addEventListener("scroll", edges, { passive: true });
-    return () => {
-      ro?.disconnect();
-      nav.removeEventListener("scroll", edges);
-    };
-  }, [channels.data, directs.length, shownAgents.length, groups.length, rail]);
+  // The list fades out at an edge only while there is more to scroll past it (no hard cut); re-checked as lists load.
+  useScrollEdges(navRef, [channels.data, directs.length, shownAgents.length, groups.length, rail]);
 
   // The open conversation stays in sight: once per navigation (as soon as its row exists), a row
   // hidden past the list's edge is brought to the middle. Later scrolling is the person's.

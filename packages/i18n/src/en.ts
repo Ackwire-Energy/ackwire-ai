@@ -6023,9 +6023,11 @@ export const en = {
       research: "I research a topic and deliver a summary with sources.",
       assistant: "I take care of the calendar, emails and reminders.",
     },
-    /** A personal starter's first tasks (ADR 0164), as a ready-made role's `tasks`. */
+    /** A personal starter's instructions and first tasks (ADR 0164), as a ready-made role's. */
     starters: {
       clara: {
+        instructions:
+          "Checks the calendar every morning and sends what's on for the day.\nReminds the day before each appointment and each bill with a date.\nNever books, cancels or accepts an invite without asking first.",
         tasks: {
           a: "What do I have tomorrow?",
           b: "Remind me to pay the rent every 5th",
@@ -6033,6 +6035,8 @@ export const en = {
         },
       },
       duda: {
+        instructions:
+          "Keeps track of bills and spending, sorted by category.\nWarns three days before anything is due and when a spend is out of the ordinary.\nNever pays, transfers or cancels anything without asking first.",
         tasks: {
           a: "How much did I spend this month?",
           b: "Which bills are due this week?",
@@ -6040,6 +6044,8 @@ export const en = {
         },
       },
       leo: {
+        instructions:
+          "Plans workouts for your level, the time you have and what you enjoy.\nAdjusts the week when you miss a day or feel tired, no lecturing.\nGives no medical advice: with pain or an injury, suggests seeing a professional.",
         tasks: {
           a: "Plan a 30-minute workout for today",
           b: "Plan my running week",
@@ -6047,6 +6053,8 @@ export const en = {
         },
       },
       mel: {
+        instructions:
+          "Plans the week's meals around your taste, time and budget.\nBuilds the shopping list for the menu, grouped by store aisle.\nRespects restrictions and allergies, and gives no diet or medical advice.",
         tasks: {
           a: "Suggest three quick dinners",
           b: "Plan this week's menu",
@@ -6054,18 +6062,32 @@ export const en = {
         },
       },
       gabi: {
+        instructions:
+          "Builds a study plan up to the exam, with what fits in each day.\nQuizzes you on what you studied and explains again what you got wrong.\nDoesn't do the homework for you: guides you to the answer.",
         tasks: {
           a: "Make a study plan for the exam",
           b: "Ask me 3 questions about what I studied",
           c: "Explain this topic simply",
         },
       },
-      lu: { tasks: { a: "Turn these notes into a short text", b: "Gather this week's ideas", c: "Edit this text" } },
+      lu: {
+        instructions:
+          "Keeps the notes and ideas you send and groups the similar ones.\nTurns notes into writing in your voice, never adding what you didn't say.\nEdits with care and shows what changed before replacing the original.",
+        tasks: { a: "Turn these notes into a short text", b: "Gather this week's ideas", c: "Edit this text" },
+      },
       rosa: {
+        instructions:
+          "Keeps the shopping list and the house chores up to date.\nNotes what needs fixing and keeps reminding until it's done.\nNever buys or hires anything without asking first.",
         tasks: { a: "Make this week's shopping list", b: "What needs fixing at home?", c: "Split up the chores" },
       },
-      vic: { tasks: { a: "Plan 3 days in Lisbon", b: "Tell me if the fare drops", c: "Gather the trip's bookings" } },
+      vic: {
+        instructions:
+          "Plans the trip with dates, prices and a day-by-day itinerary.\nCompares flights and places to stay and says why it suggests each one.\nNever books or pays for anything without asking first.",
+        tasks: { a: "Plan 3 days in Lisbon", b: "Tell me if the fare drops", c: "Gather the trip's bookings" },
+      },
       rui: {
+        instructions:
+          "Follows each client: what was agreed, what's left and who hasn't paid.\nWrites proposals and payment reminders in your voice, ready to review.\nNever sends anything to a client without your approval.",
         tasks: {
           a: "Write a short proposal for a client",
           b: "Who hasn't paid yet?",
@@ -6100,11 +6122,23 @@ export const en = {
     uses: "Will use",
     chooseApps: "Choose apps",
     otherApp: "Another app",
+    /** "Will use" or Skills with nothing on the card yet. */
+    usesNone: "Nothing yet.",
     worksIn: "Works in",
-    asks: "To start, ask",
-    noAi: "No AI yet: {{name}} starts thinking once you connect one, in the chat.",
-    noAiBlank: "No AI yet: it starts thinking once you connect one, in the chat.",
-    ready: "The rest comes ready. You can adjust it later, in the chat.",
+    /** Its instructions, edited on the card. */
+    how: "How {{name}} works",
+    howBlank: "How it works",
+    instructionsPlaceholder: "What it does, what it avoids, who it asks for help",
+    /** "Another app": the catalog as rows, its starting point's apps first. */
+    picker: {
+      title: "{{name}}'s apps",
+      titleBlank: "The agent's apps",
+      lead: "A connected app goes on the card at once. Connect any other right here.",
+      suggested: "Suggested for {{name}}",
+      suggestedBlank: "Suggested",
+      use: "Use",
+      added: "On the card",
+    },
     create: "Create {{name}}",
     createBlank: "Create agent",
     failed: "Couldn't create it: {{reason}}",

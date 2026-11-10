@@ -6084,9 +6084,11 @@ export const ptBR = {
       research: "Pesquiso um assunto e entrego um resumo com fontes.",
       assistant: "Cuido da agenda, dos e-mails e dos lembretes.",
     },
-    /** A personal starter's first tasks (ADR 0164), as a ready-made role's `tasks`. */
+    /** A personal starter's instructions and first tasks (ADR 0164), as a ready-made role's. */
     starters: {
       clara: {
+        instructions:
+          "Confere a agenda toda manhã e manda o que tem no dia.\nLembra na véspera de cada compromisso e de cada conta com data.\nNunca marca, desmarca nem aceita convite sem perguntar antes.",
         tasks: {
           a: "O que eu tenho amanhã?",
           b: "Me lembre de pagar o aluguel todo dia 5",
@@ -6094,6 +6096,8 @@ export const ptBR = {
         },
       },
       duda: {
+        instructions:
+          "Acompanha as contas e os gastos e separa por categoria.\nAvisa três dias antes de algo vencer e quando um gasto foge do normal.\nNunca paga, transfere nem cancela nada sem perguntar antes.",
         tasks: {
           a: "Quanto eu gastei este mês?",
           b: "Quais contas vencem esta semana?",
@@ -6101,6 +6105,8 @@ export const ptBR = {
         },
       },
       leo: {
+        instructions:
+          "Monta os treinos pelo seu nível, pelo tempo que você tem e pelo que você gosta.\nAjusta a semana quando você falta ou se cansa, sem sermão.\nNão dá conselho médico: com dor ou lesão, sugere procurar um profissional.",
         tasks: {
           a: "Monte um treino de 30 minutos para hoje",
           b: "Planeje a minha semana de corrida",
@@ -6108,6 +6114,8 @@ export const ptBR = {
         },
       },
       mel: {
+        instructions:
+          "Planeja as refeições da semana pelo seu gosto, tempo e orçamento.\nMonta a lista de compras do cardápio, agrupada por seção do mercado.\nRespeita restrições e alergias e não passa dieta nem conselho médico.",
         tasks: {
           a: "Sugira três jantares rápidos",
           b: "Monte o cardápio da semana",
@@ -6115,6 +6123,8 @@ export const ptBR = {
         },
       },
       gabi: {
+        instructions:
+          "Monta o plano de estudos até a prova, com o que cabe em cada dia.\nFaz perguntas sobre o que você estudou e explica de novo o que você errou.\nNão faz a lição por você: guia até você chegar na resposta.",
         tasks: {
           a: "Monte um plano de estudos para a prova",
           b: "Me faça 3 perguntas sobre o que estudei",
@@ -6122,9 +6132,13 @@ export const ptBR = {
         },
       },
       lu: {
+        instructions:
+          "Guarda as notas e ideias que você manda e junta as parecidas.\nTransforma as notas em texto no seu tom, sem inventar o que você não disse.\nRevisa com cuidado e mostra o que mudou antes de trocar o original.",
         tasks: { a: "Transforme estas notas num texto curto", b: "Junte as ideias da semana", c: "Revise este texto" },
       },
       rosa: {
+        instructions:
+          "Mantém a lista de compras e as tarefas da casa em dia.\nAnota o que precisa de conserto e lembra até resolver.\nNunca compra nem contrata nada sem perguntar antes.",
         tasks: {
           a: "Monte a lista de compras da semana",
           b: "O que precisa de conserto em casa?",
@@ -6132,9 +6146,13 @@ export const ptBR = {
         },
       },
       vic: {
+        instructions:
+          "Planeja a viagem com datas, preços e um roteiro dia a dia.\nCompara passagens e hospedagens e diz por que sugere cada uma.\nNunca reserva nem paga nada sem perguntar antes.",
         tasks: { a: "Planeje 3 dias em Lisboa", b: "Me avise se a passagem baixar", c: "Junte as reservas da viagem" },
       },
       rui: {
+        instructions:
+          "Acompanha cada cliente: o que foi combinado, o que falta e quem não pagou.\nEscreve propostas e lembretes de cobrança no seu tom, prontos para revisar.\nNunca envia nada a um cliente sem a sua aprovação.",
         tasks: {
           a: "Escreva uma proposta curta para um cliente",
           b: "Quem ainda não pagou?",
@@ -6173,12 +6191,26 @@ export const ptBR = {
     uses: "Vai usar",
     chooseApps: "Escolher apps",
     otherApp: "Outro app",
+    /** "Vai usar" or Skills with nothing on the card yet. */
+    usesNone: "Nada por enquanto.",
     worksIn: "Trabalha em",
-    asks: "Para começar, peça",
-    noAi: "Sem IA ainda: o {{name}} começa a pensar quando você conectar uma, na conversa.",
-    noAi_female: "Sem IA ainda: a {{name}} começa a pensar quando você conectar uma, na conversa.",
-    noAiBlank: "Sem IA ainda: ele começa a pensar quando você conectar uma, na conversa.",
-    ready: "O resto já vem pronto. Dá para ajustar depois, na conversa.",
+    /** Its instructions, edited on the card. */
+    how: "Como o {{name}} trabalha",
+    how_female: "Como a {{name}} trabalha",
+    howBlank: "Como ele trabalha",
+    instructionsPlaceholder: "O que ele faz, o que evita, a quem pede ajuda",
+    /** "Outro app": the catalog as rows, its starting point's apps first. */
+    picker: {
+      title: "Apps do {{name}}",
+      title_female: "Apps da {{name}}",
+      titleBlank: "Apps do agente",
+      lead: "Um app conectado entra no cartão na hora. Os outros você conecta aqui mesmo.",
+      suggested: "Sugeridos para o {{name}}",
+      suggested_female: "Sugeridos para a {{name}}",
+      suggestedBlank: "Sugeridos",
+      use: "Usar",
+      added: "No cartão",
+    },
     create: "Criar {{name}}",
     createBlank: "Criar agente",
     failed: "Não deu para criar: {{reason}}",

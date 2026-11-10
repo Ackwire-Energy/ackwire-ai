@@ -153,27 +153,28 @@ function OrgLayout() {
               {/* One invite dialog for the workspace (ADR 0090): the menu, ⌘K, Members and a channel open it. */}
               <InviteDialogProvider>
                 <RemoveMemberProvider>
-                  {/* One new agent's dialog for every way in (ADR 0164): the sidebar, the pages and the menus. */}
-                  <NewAgentProvider>
-                    <div className="shell">
-                      <RefetchBar />
-                      <CommandMenu />
-                      <LeaveChannelDialog />
-                      {!focused && (
-                        <>
-                          <NavScrim />
-                          <Sidebar />
-                          <ShellBar />
-                        </>
-                      )}
-                      {/* The work area: notices on top (agents paused, the workspace's computer on its way, a computer
+                  {/* Connect AI for every page, and over the new agent's dialog (ADR 0164), which sits under it. */}
+                  <ConnectAiProvider>
+                    {/* One new agent's dialog for every way in (ADR 0164): the sidebar, the pages and the menus. */}
+                    <NewAgentProvider>
+                      <div className="shell">
+                        <RefetchBar />
+                        <CommandMenu />
+                        <LeaveChannelDialog />
+                        {!focused && (
+                          <>
+                            <NavScrim />
+                            <Sidebar />
+                            <ShellBar />
+                          </>
+                        )}
+                        {/* The work area: notices on top (agents paused, the workspace's computer on its way, a computer
                     the agents run on went offline), then the page. */}
-                      <div className={focused ? "shell__work shell__work--bare" : "shell__work"}>
-                        {!focused && <HoldBanner />}
-                        {!focused && <ComputerSetupNotice />}
-                        {!focused && <OutageNotices />}
-                        <div className="shell__pages">
-                          <ConnectAiProvider>
+                        <div className={focused ? "shell__work shell__work--bare" : "shell__work"}>
+                          {!focused && <HoldBanner />}
+                          {!focused && <ComputerSetupNotice />}
+                          {!focused && <OutageNotices />}
+                          <div className="shell__pages">
                             <ComputerDialogProvider>
                               <DetailsHost>
                                 <PushOpens />
@@ -184,11 +185,11 @@ function OrgLayout() {
                                 <Outlet />
                               </DetailsHost>
                             </ComputerDialogProvider>
-                          </ConnectAiProvider>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </NewAgentProvider>
+                    </NewAgentProvider>
+                  </ConnectAiProvider>
                 </RemoveMemberProvider>
               </InviteDialogProvider>
             </NavDrawerProvider>
