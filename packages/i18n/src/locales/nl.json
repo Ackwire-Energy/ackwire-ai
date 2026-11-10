@@ -17483,7 +17483,7 @@
     "fileTooLarge": "{{name}} is te groot: de limiet is {{mb}} MB.",
     "fileTooMany": "Eén feedback kan maximaal {{images}} foto's en één video bevatten.",
     "send": "Versturen",
-    "thanks": "Afgeleverd. Bedankt!",
+    "thanks": "Afgeleverd. Bedankt.",
     "reply": "Alles wordt gelezen. Een antwoord, als dat nodig is, komt naar {{email}}.",
     "another": "Nog een sturen"
   }

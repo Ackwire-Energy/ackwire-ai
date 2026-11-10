@@ -9123,9 +9123,9 @@ html:not([data-pointer]) .newag__sel .ac-select__trigger:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
+/* With a tile beside its name and line it is a face line (`.ac-faceline`): the name's capitals at the tile's top. */
 .newag__sel-value {
   display: flex;
-  align-items: center;
   gap: 12px;
   min-width: 0;
   text-align: left;

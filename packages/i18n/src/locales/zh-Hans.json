@@ -16926,7 +16926,7 @@
     "fileTooLarge": "{{name}} 太大了：上限是 {{mb}} MB。",
     "fileTooMany": "一条反馈最多可带 {{images}} 张照片和一个视频。",
     "send": "发送",
-    "thanks": "已送达，谢谢！",
+    "thanks": "已送达，谢谢。",
     "reply": "每条都会有人看。如需回复，会发到 {{email}}。",
     "another": "再发一条"
   }

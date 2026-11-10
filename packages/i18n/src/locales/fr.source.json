@@ -41759,7 +41759,7 @@
     "value": "Send"
   },
   "feedback.thanks": {
-    "value": "Delivered. Thank you!"
+    "value": "Delivered. Thank you."
   },
   "feedback.reply": {
     "value": "Everything is read. An answer, if one is needed, comes to {{email}}."

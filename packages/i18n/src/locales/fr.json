@@ -17944,7 +17944,7 @@
     "fileTooLarge": "{{name}} est trop volumineux : la limite est de {{mb}} Mo.",
     "fileTooMany": "Un retour accepte jusqu'à {{images}} photos et une vidéo.",
     "send": "Envoyer",
-    "thanks": "C'est remis. Merci !",
+    "thanks": "C'est remis. Merci.",
     "reply": "Tout est lu. La réponse, s'il en faut une, arrive à {{email}}.",
     "another": "En envoyer un autre"
   }
