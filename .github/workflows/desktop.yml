@@ -42,7 +42,7 @@ permissions:
 
 jobs:
   version:
-    runs-on: ubuntu-latest
+    runs-on: namespace-profile-linux-4x8
     timeout-minutes: 10
     permissions:
       contents: write
@@ -139,7 +139,7 @@ jobs:
   # packages' licenses) and shipped among each app's resources (tauri.native.conf.json), signed with the app.
   server:
     needs: version
-    runs-on: ubuntu-latest
+    runs-on: namespace-profile-linux-4x8
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -175,8 +175,8 @@ jobs:
   macos:
     needs: [version, server]
     if: ${{ contains(fromJSON('["all", "macos"]'), inputs.platforms || 'all') }}
-    # Intel: the Apple silicon runners often sit in the queue (capacity); the build is universal either way.
-    runs-on: macos-15-intel
+    # Apple silicon (6 vCPU, 14 GB); the build is universal either way.
+    runs-on: nscloud-macos-sequoia-arm64-6x14
     timeout-minutes: 60
     env:
       BIN_DIR: apps/desktop/src-tauri/binaries
@@ -399,7 +399,7 @@ jobs:
   windows:
     needs: [version, server]
     if: ${{ contains(fromJSON('["all", "windows"]'), inputs.platforms || 'all') }}
-    runs-on: windows-latest
+    runs-on: nscloud-windows-2022-amd64-4x8
     timeout-minutes: 60
     env:
       BIN_DIR: apps/desktop/src-tauri/binaries
@@ -522,7 +522,7 @@ jobs:
     needs: [version, server]
     if: ${{ contains(fromJSON('["all", "linux"]'), inputs.platforms || 'all') }}
     # 22.04: an older glibc, so the app runs on more distributions.
-    runs-on: ubuntu-22.04
+    runs-on: nscloud-ubuntu-22.04-amd64-4x8
     timeout-minutes: 60
     env:
       BIN_DIR: apps/desktop/src-tauri/binaries
@@ -682,7 +682,7 @@ jobs:
   publish:
     needs: [version, macos, windows, linux]
     if: ${{ needs.version.outputs.tag != '' }}
-    runs-on: ubuntu-latest
+    runs-on: namespace-profile-linux-4x8
     timeout-minutes: 15
     permissions:
       contents: write

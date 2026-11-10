@@ -9,8 +9,10 @@ name: CI
 # and no secrets. Only jobs gated on a push or a tag (the images, the release assets) write anything or
 # read a secret.
 #
-# Runners are GitHub's standard hosted ones. Everything runs on x64: on ARM the backend shards took 2.5x
-# as long (603 and 667 s against 229 and 275 s, 2026-10-26). Only the arm64 image builds on ARM, natively.
+# The Linux jobs run on Namespace runners (the `linux-4x8` profile: 4 vCPU, 8 GB), which cost less a
+# minute than GitHub's hosted ones. The test jobs take 8 vCPU and 16 GB: on 8 GB a file's first test
+# ran past its 5 s limit (voice.test.ts, live-real-server.test.tsx). Everything runs on x64: on ARM the backend shards took 2.5x as long
+# (603 and 667 s against 229 and 275 s, 2026-10-26). Only the arm64 image builds on ARM, natively.
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
@@ -41,7 +43,7 @@ jobs:
   changes:
     name: What changed
     if: github.event.pull_request.draft != true
-    runs-on: ubuntu-latest
+    runs-on: namespace-profile-linux-4x8
     timeout-minutes: 5
     permissions:
       contents: read
@@ -111,7 +113,7 @@ jobs:
     name: Lint, boundaries, typecheck, build
     needs: changes
     if: needs.changes.outputs.code == 'true'
-    runs-on: ubuntu-latest
+    runs-on: namespace-profile-linux-4x8
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -240,7 +242,7 @@ jobs:
     name: Test (backend ${{ matrix.shard }}/3)
     needs: changes
     if: needs.changes.outputs.shared == 'true' || needs.changes.outputs.backend == 'true'
-    runs-on: ubuntu-latest
+    runs-on: nscloud-ubuntu-24.04-amd64-8x16
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -286,7 +288,7 @@ jobs:
     if: >-
       needs.changes.outputs.shared == 'true' || needs.changes.outputs.web == 'true' ||
       needs.changes.outputs.mobile == 'true' || needs.changes.outputs.desktop == 'true'
-    runs-on: ubuntu-latest
+    runs-on: nscloud-ubuntu-24.04-amd64-8x16
     timeout-minutes: 35
     env:
       SHARED: ${{ needs.changes.outputs.shared }}
@@ -352,7 +354,7 @@ jobs:
     name: Test (desktop, Rust)
     needs: changes
     if: needs.changes.outputs.desktop == 'true'
-    runs-on: ubuntu-latest
+    runs-on: namespace-profile-linux-4x8
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -388,7 +390,7 @@ jobs:
   secrets:
     name: Secret scan and boundaries
     if: github.event.pull_request.draft != true
-    runs-on: ubuntu-latest
+    runs-on: namespace-profile-linux-4x8
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -403,14 +405,16 @@ jobs:
 
   # System mode's isolation on real kernels, as root (apps/server/test/runner/isolation.root.test.ts): real
   # agent users, slices, the loopback table and the bind policy, then what each agent reaches, with real Gradle,
-  # Kotlin, adb and Xtigervnc as two agents at once. Ubuntu runs on GitHub's own kernel (and its Chrome); its
-  # systemd lacks BPF_FRAMEWORK, so the bind policy is left out there. Debian 13 (the Cloud's release: its own
-  # kernel and systemd, built with BPF_FRAMEWORK) boots in QEMU, with KVM where the runner has it.
+  # Kotlin, adb and Xtigervnc as two agents at once. Each leg boots a distribution's own cloud image in QEMU
+  # (scripts/isolation-vm.sh), with KVM where the runner has it: the test needs systemd as the machine's init,
+  # and on these runners a job runs in a container. Ubuntu 24.04's systemd lacks BPF_FRAMEWORK, so the bind
+  # policy is left out there, and that guest has Chrome; Debian 13 (the Cloud's release) has it.
+  # The guest takes 8 GB, so the runner has 16.
   isolation-root:
     name: Isolation as root (${{ matrix.leg }})
     needs: changes
     if: needs.changes.outputs.backend == 'true'
-    runs-on: ubuntu-24.04
+    runs-on: nscloud-ubuntu-24.04-amd64-8x16
     timeout-minutes: 50
     strategy:
       fail-fast: false
@@ -424,30 +428,18 @@ jobs:
       # What the agents' users run in the bind check, built as the image builds it.
       - name: The runner bundle
         run: bun build apps/server/runner/main.ts --target=node --banner '#!/usr/bin/env node' --outfile "$RUNNER_TEMP/agentes-runner.mjs"
-      - name: Test as root (Ubuntu)
-        if: matrix.leg == 'ubuntu'
-        timeout-minutes: 30
-        run: |
-          sudo apt-get -qq update
-          sudo apt-get -qq install -y nftables tigervnc-standalone-server xauth at > /dev/null
-          uname -r
-          systemctl --version | head -2
-          sudo -E env "PATH=$PATH" AGENTES_ROOT_TESTS=1 AGENTES_TEST_RUNNER="$RUNNER_TEMP/agentes-runner.mjs" \
-            bun test apps/server/test/runner/isolation.root.test.ts
-      - name: The Debian 13 image
-        if: matrix.leg == 'debian13'
+      - name: The guest's image
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/isolation-image
-          key: isolation-image-${{ hashFiles('scripts/isolation-vm.sh') }}
-      - name: Test as root (Debian 13 in QEMU)
-        if: matrix.leg == 'debian13'
+          key: isolation-image-${{ matrix.leg }}-${{ hashFiles('scripts/isolation-vm.sh') }}
+      - name: Test as root (in QEMU)
         timeout-minutes: 45
         run: |
           sudo apt-get -qq update
           sudo apt-get -qq install -y --no-install-recommends qemu-system-x86 qemu-utils genisoimage > /dev/null
           bun build apps/server/test/runner/isolation.root.test.ts --target=bun --outfile "$RUNNER_TEMP/isolation.root.test.js"
-          scripts/isolation-vm.sh "$RUNNER_TEMP/isolation.root.test.js" "$RUNNER_TEMP/agentes-runner.mjs" ~/isolation-image
+          scripts/isolation-vm.sh "$RUNNER_TEMP/isolation.root.test.js" "$RUNNER_TEMP/agentes-runner.mjs" ~/isolation-image "${{ matrix.leg }}"
 
   # The image as self-hosters run it: the docker-compose.yml at the repository root with this
   # commit's image, a .env with only the three values it asks for, migrations on boot, the health
@@ -466,7 +458,7 @@ jobs:
     if: >-
       needs.changes.outputs.image == 'true' &&
       (github.event_name != 'pull_request' || needs.changes.outputs.docker == 'true')
-    runs-on: ubuntu-latest
+    runs-on: namespace-profile-linux-4x8
     timeout-minutes: 20
     env:
       AGENTES_IMAGE: agentes:ci
@@ -569,10 +561,10 @@ jobs:
       matrix:
         include:
           - platform: linux/amd64
-            runner: ubuntu-latest
+            runner: namespace-profile-linux-4x8
             slug: amd64
           - platform: linux/arm64
-            runner: ubuntu-24.04-arm
+            runner: nscloud-ubuntu-24.04-arm64-4x8
             slug: arm64
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
@@ -646,7 +638,7 @@ jobs:
   publish:
     name: Publish the images
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: namespace-profile-linux-4x8
     timeout-minutes: 10
     permissions:
       contents: read
@@ -705,7 +697,7 @@ jobs:
     if: >-
       github.ref_type == 'tag' && !cancelled() &&
       !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
-    runs-on: ubuntu-latest
+    runs-on: namespace-profile-linux-4x8
     timeout-minutes: 5
     permissions:
       contents: write
@@ -730,7 +722,7 @@ jobs:
     if: >-
       github.ref_type == 'tag' && !cancelled() &&
       !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
-    runs-on: ubuntu-latest
+    runs-on: namespace-profile-linux-4x8
     timeout-minutes: 20
     permissions:
       contents: write
@@ -766,7 +758,7 @@ jobs:
     if: always() && github.event.pull_request.draft != true
     needs:
       [changes, check, test-backend, test-web, test-desktop-rust, secrets, isolation-root, compose, build, publish, release-install, release-native]
-    runs-on: ubuntu-latest
+    runs-on: namespace-profile-linux-4x8
     timeout-minutes: 2
     steps:
       - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
