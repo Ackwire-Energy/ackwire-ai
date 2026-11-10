@@ -13430,6 +13430,10 @@
         "invalidInput": "Sprawdź pola i spróbuj ponownie.",
         "tooManyItems": "Vault jest pełny. Usuń elementy, zanim zsynchronizujesz więcej."
       }
+    },
+    "feedback": {
+      "filesGone": "Dodany plik zniknął. Dodaj go ponownie.",
+      "filesPending": "Zbyt wiele plików czeka na wysłanie. Wyślij lub usuń część i spróbuj ponownie."
     }
   },
   "machines": {

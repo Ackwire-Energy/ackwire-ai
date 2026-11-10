@@ -12540,6 +12540,10 @@
         "invalidInput": "Prüf die Felder und versuch es noch einmal.",
         "tooManyItems": "Der Vault ist voll. Lösch Einträge, bevor du mehr synchronisierst."
       }
+    },
+    "feedback": {
+      "filesGone": "Eine Datei, die du hinzugefügt hast, ist weg. Füg sie noch einmal hinzu.",
+      "filesPending": "Zu viele Dateien warten darauf, gesendet zu werden. Sende oder entferne einige und versuch es noch einmal."
     }
   },
   "machines": {

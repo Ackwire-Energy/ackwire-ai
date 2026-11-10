@@ -12116,6 +12116,10 @@
         "invalidInput": "Periksa kolom-kolomnya lalu coba lagi.",
         "tooManyItems": "Vault penuh. Hapus item sebelum menyinkronkan lebih banyak."
       }
+    },
+    "feedback": {
+      "filesGone": "File yang ditambahkan sudah hilang. Tambahkan lagi.",
+      "filesPending": "Terlalu banyak file menunggu dikirim. Kirim atau hapus beberapa, lalu coba lagi."
     }
   },
   "machines": {

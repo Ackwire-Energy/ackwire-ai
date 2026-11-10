@@ -12433,6 +12433,10 @@ export const ptBR = {
         tooManyItems: "O Cofre está cheio. Apague itens antes de sincronizar mais.",
       },
     },
+    feedback: {
+      filesGone: "Um arquivo que você anexou sumiu. Anexe de novo.",
+      filesPending: "Há arquivos demais esperando para ser enviados. Envie ou tire alguns e tente de novo.",
+    },
   },
   machines: {
     reasons: {

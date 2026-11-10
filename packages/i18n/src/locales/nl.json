@@ -12603,6 +12603,10 @@
         "invalidInput": "Controleer de velden en probeer het opnieuw.",
         "tooManyItems": "De Vault is vol. Verwijder items voordat je meer synchroniseert."
       }
+    },
+    "feedback": {
+      "filesGone": "Een bestand dat je hebt toegevoegd is weg. Voeg het opnieuw toe.",
+      "filesPending": "Er wachten te veel bestanden om verstuurd te worden. Verstuur of verwijder er een paar en probeer het opnieuw."
     }
   },
   "machines": {
