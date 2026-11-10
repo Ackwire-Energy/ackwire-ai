@@ -332,7 +332,15 @@ const HAIR_SHAPES = {
     curl: true,
   },
   bun: { front: union(CAP, rows("0:14-17 1:13-18 2:12-19 3:12-19 4:12-19 10:10-11,20-21")) },
-  spiky: { front: union(CAP, rows("2:11,15,19 3:10-12,14-16,18-20 4:9-22 10:10-11,14-15,19-21")) },
+  spiky: {
+    front: union(
+      CAP,
+      rows(
+        "0:15 1:10,15-16,21 2:10-11,15-16,20-21 3:7,10-12,14-17,19-21,24 4:7-8,10-12,14-17,19-21,23-24 5:7-24 6:8-23 10:10-11,14-15,18-19,21 11:10,14,19",
+      ),
+    ),
+    spike: true,
+  },
   mohawk: { front: rows("1:14-17 2:13-18 3:13-18 4:13-18 5:13-18 6:13-18 7:13-18 8:13-18 9:14-17") },
   braids: {
     front: union(
@@ -436,6 +444,7 @@ function hairFill(color, shape, mask) {
   const lo = mixHex(color, "#000000", 0.28);
   return (x, y) => {
     if (shape.braid && y > 12 && (x < 10 || x > 21)) return y % 4 === 1 ? lo : y % 4 === 3 ? hi : color;
+    if (shape.spike && y <= 4) return (x + y * 2) % 5 === 0 ? lo : y <= 1 ? hi : color;
     if (shape.slick && y <= 9 && x % 3 === 0) return lo;
     if (shape.curl) return (x + y * 3) % 5 === 0 ? lo : (x * 2 + y) % 7 === 0 ? hi : color;
     // light at the top left, shade along the bottom edge
