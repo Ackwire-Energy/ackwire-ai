@@ -1051,7 +1051,8 @@ export type AgentGroupAction =
 
 /**
  * Every change answers with all the groups. A move shows at once, and goes back if the server refuses it. Agents I put
- * in a group leave my pins (`unpinAgents`), so they show in it; `pinnedAt` in a move's result says where one was.
+ * in a group leave my pins (`unpinAgents`), so they land where I put them; `pinnedAt` in a move's result says where one
+ * was.
  */
 export function useAgentGroupAction(orgId: string) {
   const api = useApi();

@@ -87,11 +87,12 @@ describe("Agentes: esperando você, trabalhando, livres", () => {
     expect(working.map((l) => l.agent.id)).toEqual(["nina"]);
     // No groups: Livres alone, as before.
     expect(freeSections(free, []).map((s) => [s.group, s.lines.length])).toEqual([[null, free.length]]);
-    // Pinned ("Fixar no topo", the web's pins): on top of Livres in their order, out of their groups.
+    // Pinned ("Fixar no topo", the web's pins): first in their own section, so a setor keeps every agent in it.
     const pinned = freeSections(free, groups, ["theo", "nina", "ana"]);
     expect(pinned.map((s) => [s.group?.name ?? null, s.lines.map((l) => l.agent.id), s.pinnedCount])).toEqual([
-      [null, ["theo", "ana", "iris"], 2],
-      ["Integrations", ["zoe"], 0],
+      [null, ["iris"], 0],
+      ["Integrations", ["theo", "zoe"], 1],
+      ["Lumen | Gestão e Financeiro", ["ana"], 1],
     ]);
   });
 });

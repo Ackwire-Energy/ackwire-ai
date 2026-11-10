@@ -15,8 +15,8 @@ const NO_PINS: SidebarPins = { agents: [], channels: [], people: [] };
  * Day one ("Fixar no topo" never used nor dismissed): the person's own agents on top of AGENTES, the most recently
  * active first (`lastActive`: agent id → ISO time of its DM's last message), then in the workspace's order (the
  * agents' list: as they were made, a template team in its template's order), at most the limit. Only the ones in no
- * group: a pin takes an agent out of its group, and these follow the DMs' activity, so a grouped agent pinned here
- * jumped out of its group (and back) whenever its agents talked.
+ * group: these follow the DMs' activity, so a grouped agent pinned here would move inside its group whenever its
+ * agents talked.
  */
 export function dayOnePins(
   agents: readonly Pick<Agent, "id" | "name" | "ownerUserId">[],
@@ -31,21 +31,48 @@ export function dayOnePins(
     .map((a) => a.id);
 }
 
-/** What shows pinned: the saved pins, or on day one only `dayOne` agents. */
-export const pinsOf = (view: SidebarView, dayOne: readonly string[]): SidebarPins =>
-  view.pins ?? { ...NO_PINS, agents: [...dayOne] };
+/**
+ * What shows pinned: the saved pins, or on day one only `dayOne` agents. With `known` (the ids each list holds), a pin
+ * of something gone (a deleted agent, a channel I left) is left out: it never shows, so no one could take it off, and
+ * it would hold one of the five places for good. A list not loaded yet (missing or empty) keeps its pins.
+ */
+export function pinsOf(
+  view: SidebarView,
+  dayOne: readonly string[],
+  known: { [K in PinKind]?: readonly string[] | undefined } = {},
+): SidebarPins {
+  const pins = view.pins ?? { ...NO_PINS, agents: [...dayOne] };
+  const kept = (kind: PinKind) => {
+    const ids = known[kind];
+    return ids?.length ? pins[kind].filter((id) => ids.includes(id)) : pins[kind];
+  };
+  return { agents: kept("agents"), channels: kept("channels"), people: kept("people") };
+}
 
-/** `id` pinned at the end of its section, or taken off; null when the section already holds the limit. */
+/**
+ * `id` pinned first in its section (where the person looks: at the end of the pinned rows, the row next to them
+ * hardly moved), or taken off; null when the section already holds the limit.
+ */
 export function togglePin(pins: SidebarPins, kind: PinKind, id: string): SidebarPins | null {
   const list = pins[kind];
   if (list.includes(id)) return { ...pins, [kind]: list.filter((x) => x !== id) };
   if (list.length >= SIDEBAR_PIN_LIMIT) return null;
-  return { ...pins, [kind]: [...list, id] };
+  return { ...pins, [kind]: [id, ...list] };
 }
 
 /**
- * `view` with these agents out of its pins; null when none of them is pinned. A pin takes an agent out of its group,
- * so an agent the person just put in a group leaves their pins, or it stays on top and the group looks empty.
+ * A section's rows split into its pinned ones (`top`, in the pins' order) and the rest (in theirs). A pin puts an
+ * agent on top of its own setor (or of the agents in none), never out of it: a setor holds its agents whoever put
+ * them there, and whenever.
+ */
+export function splitPinned<T>(items: readonly T[], pins: readonly string[], idOf: (item: T) => string) {
+  const top = pins.flatMap((id) => items.filter((item) => idOf(item) === id));
+  return { top, rest: items.filter((item) => !top.includes(item)) };
+}
+
+/**
+ * `view` with these agents out of its pins; null when none of them is pinned. An agent the person just put in a group
+ * by hand lands where they put it, not on top of the group as a pinned one would.
  */
 export function unpinAgents(view: SidebarView, ids: readonly string[]): SidebarView | null {
   const agents = view.pins?.agents.filter((id) => !ids.includes(id));
