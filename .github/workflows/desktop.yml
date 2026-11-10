@@ -310,6 +310,9 @@ jobs:
         if: ${{ steps.signing.outputs.apple == 'true' }}
         uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0.6.2
         env:
+          # The bundler leaves the .dmg window's Finder layout out only when CI is exactly "true", and a runner that
+          # doesn't set it (Namespace's macOS) fails there: Finder's AppleEvent times out (-1712).
+          CI: "true"
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
@@ -328,6 +331,9 @@ jobs:
         if: ${{ steps.signing.outputs.apple != 'true' }}
         uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0.6.2
         env:
+          # The bundler leaves the .dmg window's Finder layout out only when CI is exactly "true", and a runner that
+          # doesn't set it (Namespace's macOS) fails there: Finder's AppleEvent times out (-1712).
+          CI: "true"
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
