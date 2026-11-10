@@ -115,7 +115,8 @@ describe("uploaded files in the Drive", () => {
     expect(tiles).toHaveLength(2);
     const [thumb, row] = tiles as [HTMLElement, HTMLElement];
     expect(thumb.querySelector(".artifact-tile__picture img")?.getAttribute("src")).toMatch(/^blob:preview-/);
-    expect(thumb.querySelector(".artifact-tile__title")?.textContent).toBe("contato.jpg");
+    // A picture is only the picture (its name and size are in its tip and the viewer's header, below).
+    expect(thumb.querySelector(".artifact-tile__foot")).toBeNull();
     expect(row.querySelector(".artifact-tile__title")?.textContent).toBe("carrossel.zip");
     expect(row.querySelector(".artifact-tile__type")?.textContent).toBe("ZIP");
     expect(row.querySelector(".artifact-tile__meta")?.textContent).toMatch(/^ZIP · /);
@@ -127,6 +128,63 @@ describe("uploaded files in the Drive", () => {
     await click(within(thumb).getByRole("button", { name: "Abrir contato.jpg" }));
     await settle(4);
     expect(screen().getByRole("dialog", { name: "contato.jpg" })).toBeTruthy();
+  });
+
+  test("pictures side by side are only the pictures: each name and size in its tip and in the viewer (#51)", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    const long = "IMG_20250914_183022_HDR_portrait_edited_edited.HEIC";
+    const pictures = await Promise.all(
+      [long, "depoimentos-desktop-pt.png", "banner.png", "foto.png"].map((name) =>
+        api.artifacts.upload(ORG_ID, png(name)),
+      ),
+    );
+    const report = "Relatorio_Financeiro_Consolidado_Q3_2025_versao_final_revisada.zip";
+    const zip = await api.artifacts.upload(
+      ORG_ID,
+      new File([new Uint8Array([80, 75, 3, 4])], report, { type: "application/zip" }),
+    );
+    const base = state.messages[0] as (typeof state.messages)[number];
+    state.messages.push({
+      ...base,
+      id: "m-pictures",
+      threadId: null,
+      body: "As fotos do evento.",
+      mentionedAgentIds: [],
+      meta: { artifacts: [...pictures, zip].map((p) => ({ id: p.id, version: 1 })) },
+      createdAt: new Date().toISOString(),
+    });
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(10);
+    const tiles = Array.from(document.querySelectorAll<HTMLElement>(".artifact-cards > .artifact-tile[data-media]"));
+    expect(tiles).toHaveLength(4);
+    // No name or size drawn on either picture.
+    for (const tile of tiles) expect(tile.querySelector(".artifact-tile__foot")).toBeNull();
+    // A file beside them keeps its name under its cover, whole (it wraps, never ends in "…").
+    const file = document.querySelector(".artifact-cards > .artifact-tile:not([data-media])");
+    expect(file?.querySelector(".artifact-tile__title")?.textContent).toBe(report);
+    expect(file?.querySelector(".artifact-tile__title")?.getAttribute("title")).toBeNull();
+    const open = within(tiles[0] as HTMLElement).getByRole("button", { name: `Abrir ${long}` });
+    // A screen reader hears its size as the button's description.
+    expect(document.getElementById(open.getAttribute("aria-describedby") ?? "")?.textContent).toMatch(
+      /^HEIC · 7\s?(byte|B)/,
+    );
+    // The keys' focus shows the name, whole, and the size in its tip.
+    expect(document.querySelector(".ac-tip")).toBeNull();
+    await act(async () => {
+      fireEvent.keyDown(document.body, { key: "Tab" });
+      open.focus();
+    });
+    expect(document.querySelector(".ac-tip.ac-msg__tip")?.textContent).toMatch(
+      new RegExp(`^${long.replace(/\./g, "\\.")} · HEIC · 7\\s?(byte|B)`),
+    );
+    await act(async () => open.blur());
+    expect(document.querySelector(".ac-tip")).toBeNull();
+    // The viewer's header says both.
+    await click(open);
+    await settle(4);
+    const dialog = screen().getByRole("dialog", { name: long });
+    expect(dialog.querySelector(".ac-details__subtitle")?.textContent).toMatch(/7\s?(byte|B)/);
   });
 
   test("SVG and other types are download-only; small text files show their text, read-only", async () => {

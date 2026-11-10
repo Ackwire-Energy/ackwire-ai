@@ -251,6 +251,17 @@ function view(
   };
 }
 
+/** Each person and agent once, in the order first named: a list an agent wrote may name someone twice. */
+export function uniqueActors(list: CalendarActor[]): CalendarActor[] {
+  const seen = new Set<string>();
+  return list.filter((a) => {
+    const key = `${a.type}:${a.id}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 const proposalView = (p: ProposalRow): CalendarProposalView => ({
   id: p.id,
   agentId: p.agentId,
@@ -258,7 +269,8 @@ const proposalView = (p: ProposalRow): CalendarProposalView => ({
   title: p.title,
   start: p.startAt.toISOString(),
   end: p.endAt.toISOString(),
-  participants: p.participants as CalendarActor[],
+  // A stored row may still name someone twice: whoever reads it sees each once.
+  participants: uniqueActors(p.participants as CalendarActor[]),
   note: p.note,
   status: p.status as CalendarProposalView["status"],
   rule: (p.rule as EventRule | null) ?? null,
@@ -459,13 +471,7 @@ export async function createCalendarEvent(
       })
       .returning();
     if (!row) throw new Error("event insert returned nothing");
-    const seen = new Set<string>();
-    const list = [{ type: "person" as const, id: userId }, ...participants].filter((p) => {
-      const key = `${p.type}:${p.id}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
+    const list = uniqueActors([{ type: "person", id: userId }, ...participants]);
     await tx.insert(calendarAttendees).values(
       list.map((p) => ({
         orgId,
@@ -943,6 +949,8 @@ export async function calendarRange(deps: CalendarDeps, userId: string, orgId: s
       number: issues.number,
       title: issues.title,
       date: issues.dueDate,
+      assigneeType: issues.assigneeType,
+      assigneeId: issues.assigneeId,
     })
     .from(issues)
     .where(
@@ -953,8 +961,19 @@ export async function calendarRange(deps: CalendarDeps, userId: string, orgId: s
         sql`${issues.status} not in ('done', 'canceled')`,
         taskSeenSql("issues", sql`${userId}::text`),
       ),
-    );
-  const deadlines = due.map((d) => ({ issueId: d.id, number: d.number, title: d.title, date: d.date ?? "" }));
+    )
+    .orderBy(issues.dueDate, issues.number);
+  // Who has each task: the calendar opens its due date with their face.
+  const deadlines = due.map((d) => ({
+    issueId: d.id,
+    number: d.number,
+    title: d.title,
+    date: d.date ?? "",
+    assignee:
+      d.assigneeType && d.assigneeId
+        ? { type: d.assigneeType as CalendarActor["type"], id: d.assigneeId }
+        : (null as CalendarActor | null),
+  }));
 
   const proposals = (
     await db
@@ -1086,7 +1105,7 @@ export async function proposeCalendarEvent(
         description: (input.description ?? "").slice(0, 10_000),
         startAt: start,
         endAt: end,
-        participants: input.participants,
+        participants: uniqueActors(input.participants),
         rule: rule as Record<string, unknown> | null,
         note: input.note?.slice(0, 300) ?? null,
       })

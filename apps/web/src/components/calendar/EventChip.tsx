@@ -6,19 +6,26 @@ import { appearanceStyle, Button, cx, Icon, Popover } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import type { CSSProperties, ReactNode, PointerEvent as ReactPointerEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { AgentAvatar } from "@/components/AgentAvatar";
+import { ActorWho } from "@/components/AgentAvatar";
 import { useActors } from "@/components/actors";
 import { DetailsLink } from "@/components/details-link";
 import { useOrg } from "@/components/org-context";
 import { lookOf } from "@/lib/look";
+import { RunResult } from "./RunsPopover";
 
-/** The chip's left color: only by source (person, the agent's own color, routine, reminder, due date). */
+/**
+ * An agent's item takes the agent's colour: its deep end tints the block (`--cal-accent`), its light end is what the
+ * dark theme writes in (`--cal-light`). A person's and a due date's come from the CSS.
+ */
 export function useAccent(item: CalItem): CSSProperties {
   const actors = useActors();
   if (item.source === "agent" || ((item.source === "routine" || item.source === "reminder") && item.agentId)) {
     const look = lookOf(actors.dir.agentById.get(item.agentId ?? ""));
     const vars = appearanceStyle(look) as Record<string, string> | undefined;
-    return { "--cal-accent": vars?.["--av-bottom"] ?? "var(--agent)" } as CSSProperties;
+    return {
+      "--cal-accent": vars?.["--av-bottom"] ?? "var(--agent)",
+      "--cal-light": vars?.["--av-top"] ?? "var(--agent2)",
+    } as CSSProperties;
   }
   return {};
 }
@@ -45,15 +52,22 @@ export function useCadence() {
 /** "seg, 12 out". */
 export const dayLabel = shortDay;
 
+/** A moment (a routine's run, a reminder) is over once its time came; anything else once it ended. */
+const isOver = (item: CalItem, now: Date) =>
+  (item.kind === "routine" && !item.runs) || item.kind === "reminder" ? item.start <= now : item.end <= now;
+
 /**
- * One item on the calendar: a neutral card with a left color by source, the
- * recurrence icon and the agent's avatar (a routine band shows its cadence
- * instead of a time). A click opens its details in a popover.
+ * One item on the calendar, the way Google Calendar draws one: a block tinted
+ * in its owner's colour, their face opening its title, what's over lighter. A
+ * click opens its details in a popover.
  */
 export function EventChip({
   item,
   variant,
   style,
+  now,
+  day,
+  measure,
   open,
   onOpenChange,
   details,
@@ -61,9 +75,17 @@ export function EventChip({
   resizeHandle,
 }: {
   item: CalItem;
-  /** `block` in the hour grid, `bar` for all-day/multi-day, `line` in the month and lists. */
-  variant: "block" | "bar" | "line";
+  /**
+   * `block` a meeting in the hour grid (its title, then its time where there's room), `run` a moment there (a
+   * routine's run, a reminder) on one line, `bar` all day or several days, `line` a row in the month and the agenda.
+   */
+  variant: "block" | "run" | "bar" | "line";
   style?: CSSProperties;
+  now?: Date;
+  /** A frequent routine's row for one day (month, agenda): its first run then, and how many. */
+  day?: { at: Date; count: number };
+  /** The key its drawn height is measured by (`TimeGrid`). */
+  measure?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   details: ReactNode;
@@ -71,19 +93,49 @@ export function EventChip({
   resizeHandle?: ReactNode;
 }) {
   const { t, i18n } = useTranslation();
+  const actors = useActors();
   const accent = useAccent(item);
-  const cadence = useCadence();
   const band = Boolean(item.runs);
-  const time = band ? cadence(item) : item.allDay ? t("calendar.allDay") : timeRange(i18n.language, item);
-  // Where a range's start ends: all of it when `time` isn't a range.
-  const startsAt = band || item.allDay ? time.length : formatTime(i18n.language, item.start.toISOString()).length;
+  const bar = item.allDay && !band;
+  const at = (d: Date) => formatTime(i18n.language, d.toISOString());
+  const time = day ? at(day.at) : bar ? t("calendar.allDay") : timeRange(i18n.language, item);
   const title =
     item.kind === "deadline" ? t("calendar.deadline", { number: item.issueNumber, title: item.title }) : item.title;
-  const label =
-    !band && (item.allDay || item.kind === "deadline")
-      ? t("calendar.allDayAria", { title })
+  const label = bar
+    ? t("calendar.allDayAria", { title })
+    : item.kind === "routine"
+      ? t("calendar.runAria", { name: item.title, time })
       : t("calendar.eventAria", { title: item.title, time });
-  const face = variant !== "line" ? item.agentId : null;
+  const owner = item.owner;
+  const ownerName = owner ? actors.name(owner) : "";
+  // A task nobody has: its kind's glyph stands in for a face where a column has room only for that (the CSS shows it).
+  const face = owner ? (
+    <ActorWho actor={owner} name={ownerName} faceOnly />
+  ) : (
+    <Icon name="issues" size={14} inline className="cal-chip__glyph" />
+  );
+  // Who it is, after the time, where the column has room for it (the CSS shows it).
+  const who = owner && <span className="cal-chip__who">{` · ${ownerName}`}</span>;
+  const repeat = item.kind === "event" && item.recurring && (
+    <>
+      {" "}
+      <Icon name="repeat" size={14} inline className="cal-chip__repeat" />
+    </>
+  );
+  const range = (
+    <span className="cal-chip__time tabular">
+      {variant === "block" && item.kind === "event" ? (
+        <>
+          {at(item.start)}
+          <span className="cal-chip__end">{`–${at(item.end)}`}</span>
+        </>
+      ) : (
+        time
+      )}
+      {day && day.count > 1 && ` ${t("calendar.runTimes", { count: day.count })}`}
+      {variant !== "line" && who}
+    </span>
+  );
   return (
     <Popover
       open={open}
@@ -95,31 +147,38 @@ export function EventChip({
       trigger={
         <button
           type="button"
-          className={cx("cal-chip", `cal-chip--${variant}`, face && "ac-iconline")}
+          className={cx("cal-chip", `cal-chip--${variant}`)}
           data-source={item.source}
           data-kind={item.kind}
           data-recurring={item.recurring || undefined}
+          data-allday={(variant === "line" && bar) || undefined}
+          data-past={(now && isOver(item, now)) || undefined}
+          data-measure={measure}
           style={{ ...accent, ...style }}
           aria-label={label}
           aria-pressed={open}
+          title={owner ? t("calendar.runHint", { name: title, agent: ownerName, time }) : label}
           onPointerDown={onPointerDown}
         >
-          {face && <AgentAvatar agentId={face} size="xs" name="" className="cal-chip__avatar" />}
-          <span className="cal-chip__text">
-            <span className="cal-chip__title">{title}</span>
-            {variant === "block" && (
-              <span className="cal-chip__time tabular">
-                {time.slice(0, startsAt)}
-                <span className="cal-chip__end">{time.slice(startsAt)}</span>
+          {variant === "line" ? (
+            // A row: the face, the time, the name, wrapping under the face. A day's bar: the face and the name.
+            <>
+              {face}
+              {!bar && <>{range} </>}
+              <span className="cal-chip__title">{title}</span>
+              {repeat}
+            </>
+          ) : (
+            <>
+              <span className="cal-chip__title">
+                {face}
+                <span className="cal-chip__name">{title}</span>
+                {repeat}
               </span>
-            )}
-            {variant === "line" && (band || !item.allDay) && (
-              <span className="cal-chip__time tabular">
-                {band ? time : formatTime(i18n.language, item.start.toISOString())}
-              </span>
-            )}
-          </span>
-          {item.recurring && !band && <Icon name="repeat" size={14} className="cal-chip__repeat" aria-hidden="true" />}
+              {variant === "block" && <span className="cal-chip__when">{range}</span>}
+              {variant === "run" && <> {range}</>}
+            </>
+          )}
           {resizeHandle}
         </button>
       }
@@ -158,17 +217,19 @@ export function ItemDetails({
     }
     return t(tg.type === "dm" ? "routines.target.dmShort" : "routines.target.artifactShort");
   };
+  const owner = item.owner;
+  const role = owner?.type === "agent" ? actors.dir.agentById.get(owner.id)?.role : undefined;
+  // A run: how it went, or how the routine's last run went while this one is ahead.
+  const result = item.kind === "routine" && !item.runs ? (item.result ?? item.lastResult) : undefined;
   return (
     <section className="cal-details" aria-label={item.title}>
-      <span className="ac-eyebrow">
-        {t(`calendar.kind.${item.kind}`)}
-        {item.recurring && (
-          <>
-            {" · "}
-            <Icon name="repeat" size={14} aria-hidden="true" /> {t("calendar.recurring")}
-          </>
-        )}
-      </span>
+      {/* Whose it is, first: the agent of a routine or a reminder, who made an event, who has a task. */}
+      {owner && (
+        <p className="cal-details__owner">
+          <ActorWho actor={owner} name={actors.name(owner)} />
+          {role && ` · ${role}`}
+        </p>
+      )}
       <span className="cal-details__title">
         {item.kind === "deadline"
           ? t("calendar.deadline", { number: item.issueNumber, title: item.title })
@@ -181,8 +242,33 @@ export function ItemDetails({
           : item.allDay
             ? ` · ${t("calendar.allDay")}`
             : ` · ${timeRange(i18n.language, item)}`}
+        {item.kind === "event" && item.recurring && (
+          <>
+            {" · "}
+            <Icon name="repeat" size={14} inline /> {t("calendar.recurring")}
+          </>
+        )}
       </span>
       {item.runs && <span className="small">{t("calendar.runs", { count: item.runs.length })}</span>}
+      {item.kind === "routine" && item.target && (
+        <span className="small">{t("calendar.routineDetail", { target: target(item.target) })}</span>
+      )}
+      {result && (
+        <span className="cal-details__result">
+          <RunResult status={result} last={!item.result} />
+        </span>
+      )}
+      {item.kind === "reminder" && item.target && (
+        <>
+          <span className="small">{t("calendar.reminderPosted", { target: target(item.target) })}</span>
+          {item.setBy && (
+            <span className="small">
+              {t("calendar.reminderBy", { name: actors.name({ type: "person", id: item.setBy }) })}
+            </span>
+          )}
+        </>
+      )}
+      {item.kind === "deadline" && <span className="small">{t("calendar.deadlineDetail")}</span>}
       {item.location && (
         <span className="small ac-iconline cal-details__row">
           <Icon name="link" size={14} aria-hidden="true" />
@@ -196,31 +282,8 @@ export function ItemDetails({
         </span>
       )}
       {item.description && <span className="small">{item.description}</span>}
-      {item.kind === "routine" && item.target && (
-        <span className="small">
-          {t("calendar.routineDetail", {
-            agent: actors.name({ type: "agent", id: item.agentId ?? "" }),
-            target: target(item.target),
-          })}
-        </span>
-      )}
-      {item.kind === "reminder" && item.target && (
-        <>
-          {item.setBy && (
-            <span className="small">
-              {t("calendar.reminderBy", { name: actors.name({ type: "person", id: item.setBy }) })}
-            </span>
-          )}
-          <span className="small">
-            {t("calendar.reminderPosted", {
-              agent: actors.name({ type: "agent", id: item.agentId ?? "" }),
-              target: target(item.target),
-            })}
-          </span>
-        </>
-      )}
-      {item.kind === "deadline" && <span className="small">{t("calendar.deadlineDetail")}</span>}
-      {item.people.length > 0 && (
+      {/* A routine's one person is its agent, the line on top. */}
+      {item.kind !== "routine" && item.people.length > 0 && (
         <ul className="cal-details__people">
           {item.people.map((p) => {
             const answer = p.type === "person" ? rsvp?.answers.get(p.id) : undefined;

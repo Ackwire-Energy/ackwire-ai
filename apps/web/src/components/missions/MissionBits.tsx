@@ -13,7 +13,7 @@ import type { TFunction } from "i18next";
 import { createContext, type ReactNode, useContext, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
-import { MachineIcon } from "@/components/Machines";
+import { MachineIcon } from "@/components/machine-bits";
 import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
 import { useNamesComputers } from "@/components/WorkspaceComputer";

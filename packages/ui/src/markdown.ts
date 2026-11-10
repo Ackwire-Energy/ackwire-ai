@@ -230,6 +230,24 @@ export function parseMarkdown(source: string, options: ParseOptions & { ranges?:
 export const INLINE =
   /(`[^`]+`)|(\*\*[^*]+?\*\*|__[^_]+?__)|((?<![\w*])\*[^*\s][^*]*?\*(?![\w*])|(?<![\w_])_[^_\s][^_]*?_(?![\w_]))|(\[[^\]]+\]\([^)\s]+\))|(https?:\/\/[^\s<>()]*[^\s<>().,;:!?'"])|(\[\[[^[\]\n]+\]\])|(~~[^~\s](?:[^~]*?[^~\s])?~~)/;
 export const SAFE_URL = /^(https?:|mailto:)/i;
+
+/**
+ * A short line's `code` and **bold** spans in order, the rest as typed (a task's title, an option's label): only the
+ * marks such a line carries, never a link or a mention that would take the press of what it sits in.
+ */
+export function codeAndBoldParts(text: string): { text: string; mark?: "code" | "bold" }[] {
+  return text
+    .split(/(`[^`\n]+`|\*\*[^*\n]+\*\*)/g)
+    .filter(Boolean)
+    .map((part) =>
+      part.length > 2 && part.startsWith("`") && part.endsWith("`")
+        ? { text: part.slice(1, -1), mark: "code" as const }
+        : part.length > 4 && part.startsWith("**") && part.endsWith("**")
+          ? { text: part.slice(2, -2), mark: "bold" as const }
+          : { text: part },
+    );
+}
+
 /** The words for everyone outside the handles' letters (`@全員`, `@все`); the others are handles to `MENTION` already. */
 const OTHER_SCRIPT_EVERYONE = EVERYONE_WORDS.filter((w) => !/^[a-z0-9_-]+$/.test(w));
 /**

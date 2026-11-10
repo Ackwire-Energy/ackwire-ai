@@ -34,18 +34,15 @@ test("Agentes trabalhando agora on a phone: its strip runs out to the work area'
   expect(last(phone, ".issues-now__list", "scroll-padding-inline")).toBe("var(--page-x)");
 });
 
-test("the task list on a phone: the number as the title's first word, its chips and who works on it on the line under", async () => {
+test("the task list on a phone: stacked as a card, the title, its facts with the number among them, who has it", async () => {
   const css = await builtCss("src/styles.css", "src/pages/issues.css");
   const phone = atRule(css, "@media (max-width: 720px)");
   expect(last(phone, ".issue-list__row", "display")).toBe("flex");
-  expect(last(phone, ".issue-list__row", "flex-wrap")).toBe("wrap");
+  expect(last(phone, ".issue-list__row", "flex-direction")).toBe("column");
   expect(last(phone, ".issue-list__row", "grid-template-columns")).toBeUndefined();
-  // The title's own box goes: its words take a line of their own, its chips join who works on it on the next one.
-  expect(last(phone, ".issue-list__title", "display")).toBe("contents");
-  expect(last(phone, ".issue-list__title b", "flex")).toBe("1 0 100%");
-  expect(last(phone, ".issue-list__title b", "white-space")).toBe("normal");
+  // The number leaves its column and leads the facts, as on a card.
   expect(last(phone, ".issue-list__num", "display")).toBe("none");
-  expect(last(phone, ".issue-list__title b::before", "content")).toBe("attr(data-num)");
+  expect(last(phone, ".issue-list__row>.issue-card__facts>:first-child", "display")).toBe("inline-flex");
   // The list clips its rows at its rounded corners: the first and last rows take them, so a ring is drawn whole.
   const top = topLevel(css);
   expect(last(top, ".issue-list>li:first-child>.issue-list__row", "border-top-left-radius")).toBe("inherit");

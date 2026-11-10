@@ -73,7 +73,7 @@ import { FoldedBody } from "@/chat/FoldedBody";
 import { ActorAvatar, AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
 import { useChannelActions } from "@/components/channel-actions";
-import { CommandBlock, MachineIcon } from "@/components/Machines";
+import { CommandBlock, MachineIcon } from "@/components/machine-bits";
 import { useOrg } from "@/components/org-context";
 import { ShowRequestsButton, useIsThisMac } from "@/components/ThisMac";
 import { useNamesComputers } from "@/components/WorkspaceComputer";

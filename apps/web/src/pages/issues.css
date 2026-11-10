@@ -337,26 +337,34 @@ html:not([data-pointer]) .issues-layout:focus-visible {
 .issues-col.is-canceled {
   opacity: 0.8;
 }
+/* Its icon, name and count on the middle of its 32 buttons ("+", "…"); a long name wraps, its first line there too. */
 .issues-col__head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   min-height: 40px;
   padding: 2px 2px 8px 6px;
   color: var(--muted);
 }
+.issues-col__head > .ac-icon {
+  margin-block: calc((var(--control-h-sm) - 16px) / 2);
+}
+.issues-col__head > .ac-avatar {
+  margin-block: calc((var(--control-h-sm) - 18px) / 2);
+}
 .issues-col__head h2 {
   margin: 0;
   min-width: 0;
+  padding-block: calc((var(--control-h-sm) - 20px) / 2);
   font-size: 13px;
+  line-height: 20px;
   font-weight: 650;
   color: var(--ink2);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 .issues-col__head > .tabular {
   font-size: 12.5px;
+  line-height: var(--control-h-sm);
   color: var(--faint);
 }
 .issues-col__head .issues-col__grow {
@@ -392,14 +400,6 @@ html:not([data-pointer]) .issues-layout:focus-visible {
 .issues-col__drop {
   color: var(--ink2);
   font-weight: 600;
-}
-.issues-col__add.ac-btn {
-  margin-top: 6px;
-  justify-content: flex-start;
-  color: var(--faint);
-}
-.issues-col__add.ac-btn:hover {
-  color: var(--ink);
 }
 @media (min-width: 941px) and (min-height: 560px) {
   .issues-board {
@@ -463,154 +463,82 @@ html:not([data-pointer]) .issue-card:focus-visible {
   box-shadow: var(--chosen-shadow);
   transform: var(--chosen-lift);
 }
-/* The top line wraps whole pieces: a label never splits from its dot. */
-.issue-card__top {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 6px;
-  min-width: 0;
-  font-size: 12px;
-  color: var(--faint);
+/* Over the sky an agent waiting on a person paints at the top: every part sits above it, the sweep along the bottom. */
+.issue-card > :not(.ac-approval__sky, .ac-work-sweep) {
+  position: relative;
 }
-.issue-card__top > span {
-  white-space: nowrap;
+.issue-card > .ac-approval__sky {
+  height: 64px;
+  transition: opacity 0.2s var(--out);
 }
-.issue-card__grow {
-  flex: 1;
+@starting-style {
+  .issue-card > .ac-approval__sky {
+    opacity: 0;
+  }
 }
+@media (prefers-reduced-motion: reduce) {
+  .issue-card > .ac-approval__sky {
+    transition: none;
+  }
+}
+/* The title is the card: whole, never cut, a word longer than the card (a link) broken where it must. */
 .issue-card__title {
   font-weight: 600;
   font-size: 14px;
-  line-height: 1.35;
+  line-height: 19px;
   letter-spacing: -0.01em;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.issue-card__number {
-  color: var(--faint);
-  font-weight: 500;
+  overflow-wrap: anywhere;
 }
 .issue-card[data-status="done"] .issue-card__title,
 .issue-card[data-status="canceled"] .issue-card__title {
   color: var(--muted);
 }
-/* Background work on its card (ADR 0121): the blocked badge, the agent's plan and its last update. */
-.issue-card__work {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 12px;
-  line-height: 1.4;
-  color: var(--muted);
+/* The red count of mentions of me sits with the conversation's count, a step past the fact's own gap. */
+.issue-card__facts .task-talk__mentions {
+  margin-inline-start: 2px;
 }
-/* Neutral words with the tone on the icon only, as the card's other states; the icon stays on the first line. */
-.issue-card__blocked {
-  gap: 6px;
+/*
+ * Who has it and the one state, as one block of words: the face 24 on the name's capitals, the name, then the state
+ * 8 after it. A long name wraps under the face at the full width; the state moves whole to the next line.
+ */
+.issue-card__who {
+  --who-face: 24px;
+  display: block;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 20px;
   color: var(--ink2);
-  font-weight: 600;
-}
-.issue-card__blocked > .ac-icon {
-  color: var(--warn);
-}
-.issue-card__plan {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-.issue-card__plan-head {
-  font-weight: 600;
-  color: var(--faint);
-}
-.issue-card__step {
-  display: flex;
-  gap: 6px;
-  color: var(--ink2);
-}
-.issue-card__step[data-state="todo"] {
-  color: var(--muted);
-}
-.issue-card__step[data-state="done"] {
-  color: var(--faint);
-  text-decoration: line-through;
-}
-.issue-card__step-mark {
-  width: 7px;
-  height: 7px;
-  flex: none;
-  border-radius: 50%;
-  box-shadow: inset 0 0 0 1.5px var(--line-strong);
-}
-.issue-card__step[data-state="doing"] .issue-card__step-mark {
-  background: var(--agent);
-  box-shadow: none;
-}
-.issue-card__step[data-state="done"] .issue-card__step-mark {
-  background: var(--ok);
-  box-shadow: none;
-}
-.issue-card__step[data-state="blocked"] .issue-card__step-mark {
-  background: var(--warn);
-  box-shadow: none;
-}
-.issue-card__update {
-  color: var(--muted);
   overflow-wrap: anywhere;
 }
-.issue-card__update b {
+.issue-card__who > .ac-who > .ac-avatar {
+  margin-inline-end: var(--space-2);
+}
+.issue-card__who > .ac-who > b {
+  font-weight: 600;
   color: var(--ink2);
+}
+/* In the name's line of words, so they share one baseline; the space before it lets it move whole to the next line.
+   That space is 0.2em in the app's font: with it, 8 after the name. A state longer than the card (a stopped run's
+   reason) wraps inside itself on the line it then has to itself. */
+.issue-card__state {
+  display: inline-block;
+  max-width: 100%;
   font-weight: 600;
 }
-/* A narrow card wraps whole chips onto the next line: they never shrink (below), so one row ran past the card's edge. */
-.issue-card__foot {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 8px;
-  min-width: 0;
+.ac-who + .issue-card__state {
+  margin-inline-start: calc(var(--space-2) - 0.2em);
 }
-/* Nobody has it: an empty place the size of a face, before the words. */
-.issue-nobody {
-  display: inline-grid;
-  place-items: center;
-  flex: none;
-  width: 24px;
-  height: 24px;
-  border-radius: var(--radius-sm);
-  border-bottom-left-radius: var(--radius-cut);
-  box-shadow: inset 0 0 0 1.5px var(--line2);
-  color: var(--faint);
+.issue-card__state > .ac-icon {
+  margin-inline-end: var(--space-1);
 }
-.issue-card .ac-chip,
-.issue-list__row .ac-chip {
-  margin-left: 0;
-  flex: none;
+.issue-card__state[data-tone="warn"] {
+  color: var(--ink);
 }
-.issue-crit {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  color: var(--faint);
-}
-.issue-who__name {
-  min-width: 0;
-  font-size: 12.5px;
-  color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-/* State in a small element: neutral chips, the tone on the icon only. */
-.issue-due.is-late svg,
-.issue-stall svg,
-.issue-needs svg {
+.issue-card__state[data-tone="warn"] > .ac-icon {
   color: var(--warn);
 }
-.issue-due.is-late {
-  color: var(--ink);
+.issue-card__state[data-tone="agent"] {
+  color: var(--agent);
 }
 
 /* ── List ───────────────────────────────────────────────────────────────── */
@@ -661,10 +589,13 @@ html:not([data-pointer]) .issue-card:focus-visible {
 .issue-list__row {
   position: relative;
   display: grid;
-  grid-template-columns: 52px minmax(0, 1fr) 96px minmax(0, 200px) 96px;
-  align-items: center;
-  gap: 14px;
-  padding: 11px 14px;
+  /* The facts take what they need up to 40% of the row and wrap inside it: the title keeps the rest. */
+  grid-template-columns: 52px minmax(0, 1fr) fit-content(40%) minmax(0, 200px);
+  grid-template-areas: "num title facts who";
+  /* On one line of words: a part that wraps (a long title, a stopped run's reason) grows down from it. */
+  align-items: baseline;
+  gap: 4px 16px;
+  padding: 12px 14px;
   color: var(--ink);
   text-decoration: none;
   transition: background 0.12s;
@@ -680,30 +611,28 @@ html:not([data-pointer]) .issue-list__row:focus-visible {
   box-shadow: var(--focus-ring-inset);
 }
 .issue-list__num {
+  grid-area: num;
   font-size: 12.5px;
   color: var(--faint);
 }
 .issue-list__title {
+  grid-area: title;
   min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.issue-list__title b {
-  font-weight: 600;
   font-size: 14px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 20px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
 }
-.issue-list__who {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.issue-list__row > .issue-card__facts {
+  grid-area: facts;
+  justify-content: flex-end;
 }
-.issue-list__due {
-  text-align: right;
+/* Wide, the number has its own column. */
+.issue-list__row > .issue-card__facts > :first-child {
+  display: none;
+}
+.issue-list__row > .issue-card__who {
+  grid-area: who;
 }
 .issue-sr {
   position: absolute;
@@ -1100,117 +1029,45 @@ html:not([data-pointer]) .issues-dest:focus-visible {
 .issue-criterion--edit {
   background: var(--sunken);
 }
-/* In the dialog the aside stays in view while the task scrolls. */
-.ac-details .issue-aside {
-  position: sticky;
-  top: 0;
-}
-.issue-layout {
-  container: issue-layout / inline-size;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 24px;
-  align-items: flex-start;
-}
-/* Never wider than its column: a long line inside (tabs, a link) wraps or ends in "…" instead of scrolling the task
-   sideways. */
-.issue-layout__main {
-  flex: 999 1 520px;
-  min-width: 0;
-}
 /*
- * Too narrow for the fields beside the task (`NARROW_LAYOUT`: its conversation open beside it, a small window): the
- * same four fields as one line of compact buttons at its top, each its icon and value, then its pull requests and
- * labels. No labels over them and no card: the name shows on hover.
+ * The task's fields as one strip at its top (`.ac-props`): Coluna, Responsável, Prioridade, Prazo and Quem vê, each its
+ * icon or face and its value, the name on hover; then its pull requests, labels and GitHub link.
  */
 .issue-props {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  margin: 2px 0 0;
+  margin: 0;
 }
 .issue-prop {
   display: inline-flex;
   min-width: 0;
+  max-width: 100%;
 }
-.issue-prop .ac-select__trigger,
-.issue-prop .ac-date__trigger,
-.issue-prop .who-sees__button {
-  width: auto;
-  max-width: 240px;
-  height: 30px;
-  gap: 6px;
-  padding: 0 8px 0 9px;
-  border: 0;
-  border-radius: 9px 9px 9px 3px;
-  box-shadow: inset 0 0 0 1px var(--line2);
-  background: transparent;
-  font-size: 13.5px;
-  font-weight: 550;
-}
-.issue-prop .ac-select__trigger:hover,
-.issue-prop .ac-date__trigger:hover,
-.issue-prop .who-sees__button:hover {
-  background: var(--plate);
-}
-.issue-prop .ac-select__chev {
-  width: 14px;
-  height: 14px;
-  margin-left: -2px;
-  color: var(--faint);
-}
-/* The date's calendar leads, as the others' icons do. */
-.issue-prop .ac-date__trigger .ac-select__chev {
-  order: -1;
-  width: 16px;
-  height: 16px;
-  margin: 0;
-  color: var(--muted);
-}
-.issue-prop__value {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-.issue-prop__value > .ac-icon {
-  flex: none;
-  color: var(--muted);
-}
-.issue-props__sep {
-  width: 1px;
-  height: 18px;
-  margin: 0 4px;
-  background: var(--line2);
-}
-.issue-props .issue-github__chip {
-  font-size: 13.5px;
-}
+.issue-props .issue-github__chip,
 .issue-props .issue-link {
   font-size: 13.5px;
+}
+/* A label's or the link's name wraps inside its chip rather than ending in "…": it says which one it is. Lines of 18
+   with 2 above and below keep one line at the chip's 22. */
+.issue-props :is(.issue-github__chip, .issue-label) {
+  height: auto;
+  min-height: 22px;
+  padding-block: 2px;
+  line-height: 18px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+/* Wrapped, the mark stays on the first line's capitals. */
+.issue-props .issue-github__chip {
+  align-items: flex-start;
+}
+.issue-props .issue-github__chip > svg {
+  flex: none;
+  translate: 0 calc(9px - var(--cap-mid) - 50%);
+}
+.issue-props .issue-github__chip > .ac-chip__text {
+  text-overflow: clip;
+}
+.issue-props .issue-link {
   color: var(--ink2);
-}
-.issue-aside {
-  flex: 1 1 260px;
-  max-width: 320px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 16px;
-  border-radius: var(--radius-section);
-  background: var(--raised);
-  box-shadow: var(--e1), var(--top);
-}
-.issue-aside__item {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 14px;
-}
-/* "see in the calendar" under the due date field. */
-.issue-due__link {
-  align-self: flex-start;
 }
 .issue-link {
   display: inline-flex;
@@ -1228,21 +1085,11 @@ html:not([data-pointer]) .issues-dest:focus-visible {
 .issue-link:hover {
   text-decoration: underline;
 }
-
 .issue-github {
   display: flex;
   align-items: center;
   gap: 4px;
-}
-.issue-github__field {
-  margin-top: 12px;
-}
-/* In the aside, as small as the selects above it: one height down the stack. */
-.issue-aside .issue-github__field .ac-input {
-  height: var(--control-h-sm);
-  padding: 0 var(--control-px-sm);
-  border-radius: var(--control-r-sm);
-  font-size: var(--control-fs-sm);
+  min-width: 0;
 }
 .issue-github__chip {
   max-width: 100%;
@@ -1251,6 +1098,23 @@ html:not([data-pointer]) .issues-dest:focus-visible {
 }
 .issue-github__chip:hover {
   background: var(--sunken);
+}
+/* "GitHub": pasting the link, a field and its button in the popover. The menu's room, the field further in, Salvar on
+   the room in its corner: the room also holds Salvar's grown touch target, so nothing scrolls by a sliver. */
+.issue-github__pop.ac-popover {
+  --menu-pad: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: min(360px, calc(100vw - 32px));
+  padding: var(--menu-pad);
+}
+.issue-github__field {
+  margin: var(--popover-in) var(--popover-in) 0;
+}
+.issue-github__acts {
+  display: flex;
+  justify-content: flex-end;
 }
 
 /* The agent's work: live steps, or stalled. */
@@ -1422,14 +1286,6 @@ html:not([data-pointer]) .issue-ask__other:focus-visible {
 }
 
 /* ── Responsive ─────────────────────────────────────────────────────────── */
-@media (max-width: 980px) {
-  .issue-list__row {
-    grid-template-columns: 48px minmax(0, 1fr) minmax(0, 160px) 80px;
-  }
-  .issue-list__crit {
-    display: none;
-  }
-}
 @media (max-width: 720px) {
   .issues-board {
     --cw: 78vw;
@@ -1455,45 +1311,21 @@ html:not([data-pointer]) .issue-ask__other:focus-visible {
   .issues-now__list::-webkit-scrollbar {
     display: none;
   }
-  /* No number column: the number reads as the title's first word, so a long title wraps under it, and the title's
-     chips and who works on it share the line under, from the row's start. */
+  /* Stacked as a card: the title, its facts with the number among them, who has it. */
   .issue-list__row {
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 6px 8px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
   }
   .issue-list__num {
     display: none;
   }
-  .issue-list__title {
-    display: contents;
+  .issue-list__row > .issue-card__facts {
+    justify-content: flex-start;
   }
-  .issue-list__title b {
-    flex: 1 0 100%;
-    white-space: normal;
-    overflow-wrap: anywhere;
-  }
-  .issue-list__title b::before {
-    content: attr(data-num);
-    margin-right: 6px;
-    font-size: 12.5px;
-    font-weight: 400;
-    font-variant-numeric: tabular-nums;
-    color: var(--faint);
-  }
-  .issue-list__who:empty,
-  .issue-list__due {
-    display: none;
-  }
-  /* Who works on it wraps whole chips too (the title's are the row's own items): side by side they ran past the row's
-     edge. */
-  .issue-list__who {
-    flex-wrap: wrap;
-    row-gap: 4px;
-  }
-  .issue-aside {
-    max-width: none;
+  .issue-list__row > .issue-card__facts > :first-child {
+    display: inline-flex;
   }
 }
 
@@ -1549,38 +1381,17 @@ html:not([data-pointer]) .issue-ask__other:focus-visible {
   gap: 6px;
   margin: 0;
 }
-/* Nova tarefa's chips: 8 apart, each 32 in the field look (fill and hairline), the date one of them. */
-.issue-new__props {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
+/* Nova tarefa's strip (`.ac-props`): in the quick form, under the text and its files, after a hairline. Its date reads
+   as the buttons beside it do, their ink and weight. */
+.issue-new__quick > .issue-new__props {
   padding-top: 12px;
   border-top: 1px solid var(--line);
 }
-.issue-new__props .ac-btn .ac-avatar {
-  margin-left: -2px;
-}
-.issue-new__props > :is(.ac-btn, .ac-date__trigger),
-.issue-new__props > * > .ac-btn {
-  height: var(--control-h-sm);
-  min-height: var(--control-h-sm);
-  border: 0;
-  background: var(--field-bg);
-  box-shadow: inset 0 0 0 1px var(--field-line);
-}
-/* The due date is one more chip in the row, as wide as its words, not a field taking a line of its own: its glyph
-   first, its name in the chips' ink and weight. */
-.issue-new__props > .ac-date__trigger {
-  width: auto;
-  gap: 6px;
+.issue-new__props .ac-date__trigger {
   font-weight: 600;
   color: var(--ink);
 }
-.issue-new__props > .ac-date__trigger .ac-icon {
-  order: -1;
-}
-.issue-new__props > .ac-date__trigger .ac-date__placeholder {
+.issue-new__props .ac-date__placeholder {
   color: inherit;
 }
 .issue-new__grow {
@@ -1618,29 +1429,16 @@ html:not([data-pointer]) .issue-ask__other:focus-visible {
   font-size: 15px;
   color: var(--ink);
 }
+/* The full form: one column, its fields as the strip under the title. */
 .issue-new__wide {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 280px;
-  gap: 0;
   padding: 0;
 }
-/* The dialog's room on every side, so the hairline between the form and its fields has the same air on both. */
 .issue-new__main {
   display: flex;
   flex-direction: column;
   gap: 16px;
   min-width: 0;
   padding: 0 var(--dialog-pad) var(--dialog-pad);
-}
-.issue-new__side {
-  position: sticky;
-  top: 0;
-  align-self: start;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  padding: 4px var(--dialog-pad) var(--dialog-pad);
-  border-left: 1px solid var(--line);
 }
 .issue-new__editor {
   display: flex;
@@ -1735,15 +1533,6 @@ html:not([data-pointer]) .issue-ask__other:focus-visible {
   box-shadow: inset 0 0 0 1.5px var(--line-strong);
 }
 /* The face on the sentence's first line (`.ac-iconline`). */
-.issue-new__who {
-  gap: 10px;
-  padding: 12px;
-  border-radius: var(--radius-lg);
-  background: var(--sunken);
-  font-size: 13.5px;
-  line-height: 19px;
-  color: var(--ink-muted);
-}
 
 /* ── A tarefa: abas, arquivos sob a descrição, Anexos, Histórico ───────── */
 .issue-details .ac-tabpanel {
@@ -1973,15 +1762,6 @@ html:not([data-pointer]) .issue-files__open:focus-visible {
   background: var(--sunken);
 }
 @media (max-width: 640px) {
-  .issue-new__wide {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .issue-new__side {
-    position: static;
-    border-left: 0;
-    border-top: 1px solid var(--line);
-    padding-top: 16px;
-  }
   .issue-files__row {
     grid-template-columns: minmax(0, 1fr) auto;
   }
@@ -1991,24 +1771,7 @@ html:not([data-pointer]) .issue-files__open:focus-visible {
   }
 }
 
-/*
- * A task's conversation (ADR 0145). The card's last line is the chat's thread line, quiet inside the card (the card
- * opens; the line isn't a button of its own).
- */
-/* A narrow card wraps the line between its parts (faces, count, state, time), never inside one. Doubled: over the
-   thread line's own gap (threads.css), a sheet in another chunk. */
-.issue-card__talk.issue-card__talk {
-  flex-wrap: wrap;
-  row-gap: 2px;
-  margin: 2px 0 0 -6px;
-  pointer-events: none;
-}
-.issue-card {
-  --stack-ring: var(--raised);
-}
-.issue-card.is-on {
-  --stack-ring: var(--chosen-bg);
-}
+/* A task's conversation (ADR 0145): its count on the card and the row, its line and its panel in the details. */
 /* Where "Discussão" was: one line that opens the conversation. */
 .task-talk__summary {
   display: flex;
@@ -2067,9 +1830,6 @@ html:not([data-pointer]) .task-talk__summary:focus-visible {
   font-size: 11.5px;
   font-weight: 700;
   font-variant-numeric: normal;
-}
-.issue-card__title > .task-talk__mentions {
-  margin-left: 6px;
 }
 /* The task's own page with its conversation: the details and the thread panel side by side. */
 .issue-page__bar {

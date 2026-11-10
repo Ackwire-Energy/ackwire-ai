@@ -36,6 +36,7 @@ import {
   type PeopleChip,
   type PeopleSort,
   type PersonRow,
+  personAmount,
   sortPeople,
   USAGE_PERIODS,
   type UsagePeriodKind,
@@ -176,10 +177,9 @@ function placeLine(t: TFunction, place: UsagePlace, agent: string) {
 }
 
 /** A month's use against a limit: the amount, of the limit, the bar amber from 80% and red at it. */
-function UseMeter({ p, plansOnly }: { p: PersonRow; plansOnly: boolean }) {
+function UseMeter({ p }: { p: PersonRow }) {
   const { t, i18n } = useTranslation();
-  const amount = formatUsd(i18n.language, p.monthUsd);
-  const shown = plansOnly ? t("peopleUsage.meter.approx", { amount }) : amount;
+  const shown = personAmount(t, i18n.language, p.estimated, p.monthUsd);
   return (
     <div className="pu-meter" data-state={p.state}>
       <span className="pu-meter__line">
@@ -233,8 +233,8 @@ function PeopleView({ switcher, person, onLimits }: { switcher: ReactNode; perso
     i18n.language,
   );
   const month = capitalize(formatMonth(i18n.language, new Date(`${data.month}-15T12:00:00`)), i18n.language);
-  const head = (by: PeopleSort, label: string, className?: string) => (
-    <th className={className} aria-sort={sort.by === by ? (sort.desc ? "descending" : "ascending") : undefined}>
+  const head = (by: PeopleSort, label: string, className?: string, hint?: ReactNode) => {
+    const sorter = (
       <button
         type="button"
         className="pu-sort"
@@ -243,8 +243,20 @@ function PeopleView({ switcher, person, onLimits }: { switcher: ReactNode; perso
         {label}
         {sort.by === by && <Icon name={sort.desc ? "chevronDown" : "chevronUp"} size={14} />}
       </button>
-    </th>
-  );
+    );
+    return (
+      <th className={className} aria-sort={sort.by === by ? (sort.desc ? "descending" : "ascending") : undefined}>
+        {hint ? (
+          <span className="ac-hintline">
+            {sorter}
+            {hint}
+          </span>
+        ) : (
+          sorter
+        )}
+      </th>
+    );
+  };
   const nobody = data.people.every((p) => p.runs === 0);
   return (
     <>
@@ -375,7 +387,17 @@ function PeopleView({ switcher, person, onLimits }: { switcher: ReactNode; perso
                 <th>{t("peopleUsage.columns.now")}</th>
                 {head("runs", t("peopleUsage.columns.runs"), "pu-num")}
                 <th>{t("peopleUsage.columns.agents")}</th>
-                {head("usage", t("peopleUsage.columns.usage"))}
+                {head(
+                  "usage",
+                  t("peopleUsage.columns.usage"),
+                  undefined,
+                  // A ≈ in any row: what an estimate is, beside the column's name.
+                  rows.some((p) => p.estimated) && (
+                    <InfoHint name={t("common.about", { label: t("usageViews.apiPrice") })}>
+                      {t("usageViews.apiPriceHint")}
+                    </InfoHint>
+                  ),
+                )}
                 <th>{t("peopleUsage.columns.caresFor")}</th>
                 {head("created", t("peopleUsage.columns.created"), "pu-num")}
               </tr>
@@ -419,7 +441,7 @@ function PeopleView({ switcher, person, onLimits }: { switcher: ReactNode; perso
                       />
                     </td>
                     <td className="pu-use">
-                      <UseMeter p={p} plansOnly={data.plansOnly} />
+                      <UseMeter p={p} />
                     </td>
                     <td>
                       <Faces ids={p.caresFor} />
@@ -693,10 +715,10 @@ function PersonDrawer({ userId, onClose }: { userId: string | null; onClose: () 
                 {l.reachedAt
                   ? t("peopleUsage.drawer.reached", {
                       date: formatShortDate(i18n.language, l.reachedAt),
-                      used: formatUsd(i18n.language, l.monthUsd ?? 0),
+                      used: personAmount(t, i18n.language, data.estimated, l.monthUsd ?? 0),
                     })
                   : t("peopleUsage.drawer.used", {
-                      used: formatUsd(i18n.language, l.monthUsd ?? 0),
+                      used: personAmount(t, i18n.language, data.estimated, l.monthUsd ?? 0),
                       percent: Math.round(l.percent ?? 0),
                     })}
               </span>

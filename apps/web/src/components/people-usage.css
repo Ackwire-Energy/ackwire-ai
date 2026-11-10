@@ -133,6 +133,11 @@ th.pu-num .pu-sort {
   text-align: left;
   cursor: pointer;
 }
+/* The face (24) beside the name's line (20) and the role's under it: on the name's capitals, as a face beside one
+   line sits (the kit's `.ac-iconline`). */
+.pu-person > .ac-avatar {
+  translate: 0 calc(10px - var(--cap-mid) - 50%);
+}
 .pu-person__text {
   display: flex;
   flex-direction: column;
@@ -405,12 +410,12 @@ th.pu-num .pu-sort {
 }
 
 /* A request for more in the inbox: its two answers and the person's month. */
-/* Its answers and "see the month" are wider than a phone's inbox column: they wrap. */
-/* Its column gap is the kit's line of actions' (`.ac-acts`): the answers 8 apart, the link 16 after them. */
+/* Its answers and "see the month" are wider than a phone's inbox column: they wrap. Across, the kit's row of
+   actions spaces them (the two plated buttons 8 apart, the link 16 from them): a gap of its own would close that up. */
 .pu-asks {
   flex-wrap: wrap;
   row-gap: var(--space-2);
-  margin-top: 8px;
+  margin-top: var(--space-2);
 }
 .pu-asks__see {
   font-size: 14px;
