@@ -2611,19 +2611,6 @@ export interface CustomTool {
   firstSeenAt: string;
 }
 
-/**
- * ADR 0117: an approved MCP tool whose server changed its description or input. Agents keep `before` until a
- * connector admin accepts the change.
- */
-export interface ToolChange {
-  connectionId: string;
-  connectionLabel: string;
-  toolName: string;
-  before: { description: string; inputSchema: Record<string, unknown> };
-  after: { description: string; inputSchema: Record<string, unknown> };
-  changedAt: string;
-}
-
 export interface CustomServer {
   id: string;
   serverUrl: string;
@@ -6172,11 +6159,6 @@ export type NotificationKind =
    * `source.agentId` and its name in `source.label`. Opens the agent's page.
    */
   | "browser_profile_request"
-  /**
-   * ADR 0117: a connected MCP server changed tools an admin approved (connector admins). Waiting; `source.label` the
-   * connection's name, `latest.title` the tools. Opens Conectores, where it is accepted.
-   */
-  | "connector_tool_changed"
   /** ADR 0115: a computer's disk passed 85% in use (admins). `source.machineId`; `latest.diskUse`, `latest.diskFreeGb`. */
   | "computer_disk_full"
   /** ADR 0133: a computer has no Google Chrome for its agents' browsers (who connected it). `source.machineId`. */
@@ -6357,8 +6339,6 @@ export interface NotificationSource {
   dashboardId?: string;
   /** `widget_alert`, `widget_failed`: the widget. */
   widgetId?: string;
-  /** `connector_tool_changed`: the connected server whose approved tools changed (ADR 0117). */
-  connectionId?: string;
   /** Channel name, thread title, issue title, topic title, mission or routine name (or the computer's name). */
   label?: string;
 }

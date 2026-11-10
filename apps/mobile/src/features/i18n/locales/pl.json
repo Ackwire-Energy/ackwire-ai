@@ -1123,10 +1123,6 @@
       "plan_model_dropped_few": "{{model}} zniknął z {{plan}}. {{names}} na razie używa {{runs}}",
       "plan_model_dropped_many": "{{model}} zniknął z {{plan}}. {{names}} na razie używa {{runs}}",
       "plan_model_dropped_other": "{{model}} zniknął z {{plan}}. {{names}} na razie używa {{runs}}",
-      "connector_tool_changed_one": "Podłączony serwer zmienił zatwierdzone przez ciebie narzędzia",
-      "connector_tool_changed_few": "Podłączone serwery zmieniły zatwierdzone przez ciebie narzędzia",
-      "connector_tool_changed_many": "Podłączone serwery zmieniły zatwierdzone przez ciebie narzędzia",
-      "connector_tool_changed_other": "Podłączone serwery zmieniły zatwierdzone przez ciebie narzędzia",
       "computer_disk_full_one": "Dysk komputera jest prawie pełny",
       "computer_disk_full_few": "Dyski komputerów są prawie pełne",
       "computer_disk_full_many": "Dyski komputerów są prawie pełne",
@@ -1635,15 +1631,11 @@
       "browser": "Przeglądarka",
       "secret": "Sekret",
       "join": "Członkowie",
-      "tools": "Narzędzia",
       "limit": "Limit"
     },
     "review": "Sprawdź",
     "answer": "Odpowiedz",
     "open": "Otwórz",
-    "toolsTitle": "Zmienił narzędzia, które zatwierdziłeś",
-    "toolsWhy": "Agenci używają zatwierdzonej wersji, dopóki nie zaakceptujesz nowej.",
-    "reviewChanges": "Przejrzyj zmiany",
     "clear": {
       "title": "Nic na ciebie nie czeka",
       "text": "Gdy agent będzie cię potrzebował, najpierw zobaczysz to tutaj."

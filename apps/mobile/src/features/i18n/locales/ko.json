@@ -922,7 +922,6 @@
       "plan_lent_other": "{{names}} 님이 내 {{plan}} 플랜을 {{agent}}에 연결했어요",
       "plan_lent_female_other": "{{names}} 님이 내 {{plan}} 플랜을 {{agent}}에 연결했어요",
       "plan_model_dropped_other": "{{model}} 모델이 {{plan}}에서 빠졌어요. {{names}}은(는) 당분간 {{runs}}을(를) 써요",
-      "connector_tool_changed_other": "연결된 서버가 내가 승인한 도구를 바꿨어요",
       "computer_disk_full_other": "컴퓨터 디스크가 거의 찼어요",
       "computer_no_chrome_other": "컴퓨터에 Google Chrome이 필요해요. google.com/chrome에서 받으세요",
       "app_created_other": "AI 앱이 나를 위해 항목을 만들었어요"
@@ -1377,15 +1376,11 @@
       "browser": "브라우저",
       "secret": "비밀 정보",
       "join": "멤버",
-      "tools": "도구",
       "limit": "한도"
     },
     "review": "검토",
     "answer": "답장",
     "open": "열기",
-    "toolsTitle": "승인한 도구가 바뀌었어요",
-    "toolsWhy": "새 버전을 수락할 때까지 에이전트는 승인된 버전을 계속 사용해요.",
-    "reviewChanges": "변경 사항 보기",
     "clear": {
       "title": "나를 기다리는 일이 없어요",
       "text": "에이전트가 나를 찾으면 여기에 먼저 나타나요."

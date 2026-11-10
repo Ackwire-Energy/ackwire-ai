@@ -922,7 +922,6 @@
       "plan_lent_other": "{{names}} 把你的 {{plan}} 套餐连接到了 {{agent}}",
       "plan_lent_female_other": "{{names}} 把你的 {{plan}} 套餐连接到了 {{agent}}",
       "plan_model_dropped_other": "{{model}} 已从 {{plan}} 下架。{{names}} 暂时使用 {{runs}}",
-      "connector_tool_changed_other": "一个已连接的服务器更改了你批准过的工具",
       "computer_disk_full_other": "一台电脑的磁盘快满了",
       "computer_no_chrome_other": "电脑需要 Google Chrome。请在 google.com/chrome 下载",
       "app_created_other": "一个 AI 应用为你创建了内容"
@@ -1377,15 +1376,11 @@
       "browser": "浏览器",
       "secret": "密钥",
       "join": "成员",
-      "tools": "工具",
       "limit": "额度"
     },
     "review": "审阅",
     "answer": "回复",
     "open": "打开",
-    "toolsTitle": "更改了你批准的工具",
-    "toolsWhy": "在你接受新版本之前，智能体会继续使用已批准的版本。",
-    "reviewChanges": "查看更改",
     "clear": {
       "title": "没有等你处理的事",
       "text": "智能体需要你时，会先出现在这里。"

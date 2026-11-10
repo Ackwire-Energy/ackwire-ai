@@ -223,7 +223,6 @@ import type {
   ThreadFollow,
   ThreadInfo,
   ThreadPage,
-  ToolChange,
   TrashedArtifact,
   UndoAllResult,
   UnreadTask,
@@ -1726,16 +1725,6 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         }),
       disconnect: (orgId, serverId) =>
         request<void>(`${org(orgId)}/connectors/custom/${enc(serverId)}`, { method: "DELETE" }),
-      toolChanges: async (orgId) =>
-        (await request<{ changes: ToolChange[] }>(`${org(orgId)}/connectors/tool-changes`)).changes,
-      acceptToolChange: (orgId, connectionId, toolName) =>
-        request<void>(`${org(orgId)}/connectors/${enc(connectionId)}/tools/${enc(toolName)}/accept-change`, {
-          json: {},
-        }),
-      acceptConnectionToolChanges: (orgId, connectionId) =>
-        request<{ accepted: number }>(`${org(orgId)}/connectors/${enc(connectionId)}/tool-changes/accept`, {
-          json: {},
-        }),
     },
     questions: {
       answer: (orgId, questionId, input) =>

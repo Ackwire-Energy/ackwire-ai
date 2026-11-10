@@ -4,10 +4,9 @@ import { ActionSheetIOS, Alert, Platform, ScrollView, StyleSheet, View } from "r
 import { LayoutAnimationConfig } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GroupedList, GroupedRow, Locked, Text, useToast } from "@/ui";
-import { BottomBar } from "../connectors/ToolChanges";
 import { useColors } from "../shared/hooks";
 import { showActionSheet } from "../shared/PickerSheet";
-import { copyText, type HeaderWordAction, MONO, PushedHeader, successHaptic } from "../shared/parts";
+import { BottomBar, copyText, type HeaderWordAction, MONO, PushedHeader, successHaptic } from "../shared/parts";
 
 /**
  * What the workspace's settings screens share (each one a screen pushed with the platform's push, as Você's): the

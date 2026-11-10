@@ -450,7 +450,7 @@ export function buildEngine(o: EngineOptions) {
         ...connectorDeps,
         artifacts,
         log: o.log,
-        pubsub: adapters.pubsub,
+        judge: context.judge,
         githubApp: githubAppAccess,
       }),
       // People's mailboxes (ADR 0038): only when the server has a mail path (Composio, IMAP).

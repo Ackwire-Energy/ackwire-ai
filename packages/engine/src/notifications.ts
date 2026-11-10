@@ -131,9 +131,8 @@ export const NOTIFICATION_KINDS = [
    */
   "browser_profile_request",
   /**
-   * A connected MCP server changed the description or input of tools an admin approved (ADR 0117): who manages
-   * connectors, once per change, `source.label` the connection's name and `latest.title` the tools. Agents keep the
-   * approved text until it is accepted in Settings › Conectores, which resolves it. Waiting.
+   * A connected MCP server changed a tool's description or input. Never created: a changed tool applies itself
+   * (ADR 0117, addendum), and rows of this kind are never listed or counted (`listed`).
    */
   "connector_tool_changed",
   /**
@@ -303,8 +302,6 @@ export interface NotificationSource {
   skillId?: string;
   /** A plan's account (`plan_lent`). */
   accountId?: string;
-  /** The connected MCP server whose approved tools changed (`connector_tool_changed`, ADR 0117). */
-  connectionId?: string;
   /**
    * `device.join_request`: the computer asking to join (`POST …/devices/requests/{id}/approve`);
    * `device.access_request`: the agent's request to use a device (`POST …/devices/access-requests/{id}/decide`).
@@ -1004,9 +1001,13 @@ function stillDecides(orgId: string, userId: string): SQL {
   ) as SQL;
 }
 
+/** Rows the inbox may show: a `connector_tool_changed` row asks for a review that no longer exists. */
+const listed = ne(notifications.kind, "connector_tool_changed");
+
 /** Not done, not snoozed into the future, and still the person's to see. */
 function visible(orgId: string, userId: string, now: Date): SQL {
   return and(
+    listed,
     eq(notifications.orgId, orgId),
     eq(notifications.userId, userId),
     isNull(notifications.doneAt),
@@ -1035,6 +1036,7 @@ function filterSql(filter: NotificationFilter): SQL | undefined {
 /** Marked done by the person, recently enough to list. */
 function doneByMe(orgId: string, userId: string, now: Date): SQL {
   return and(
+    listed,
     eq(notifications.orgId, orgId),
     eq(notifications.userId, userId),
     eq(notifications.doneByUser, true),

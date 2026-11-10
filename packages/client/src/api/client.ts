@@ -309,7 +309,6 @@ import type {
   ThreadInfo,
   ThreadPage,
   ThreadPatch,
-  ToolChange,
   ToolDecision,
   TrashedArtifact,
   UndoAllResult,
@@ -1189,12 +1188,6 @@ export interface ApiClient {
       input: { label: string; tools: { name: string; access: ToolDecision; label: string; confirmed?: boolean }[] },
     ): Promise<CustomServer>;
     disconnect(orgId: string, serverId: string): Promise<void>;
-    /** Approved tools whose server changed them (ADR 0117), for connector admins. */
-    toolChanges(orgId: string): Promise<ToolChange[]>;
-    /** Accepts a tool's new description and input: agents get them now. */
-    acceptToolChange(orgId: string, connectionId: string, toolName: string): Promise<void>;
-    /** "Aceitar todas": every change waiting on one connection's tools, at once. */
-    acceptConnectionToolChanges(orgId: string, connectionId: string): Promise<{ accepted: number }>;
   };
   dms: {
     /** My direct conversations, with unread counts. */

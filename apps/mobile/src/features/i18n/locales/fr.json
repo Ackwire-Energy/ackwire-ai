@@ -1056,9 +1056,6 @@
       "plan_model_dropped_one": "{{model}} a quitté {{plan}}. {{names}} utilise {{runs}} pour l’instant",
       "plan_model_dropped_many": "{{model}} a quitté {{plan}}. {{names}} utilise {{runs}} pour l’instant",
       "plan_model_dropped_other": "{{model}} a quitté {{plan}}. {{names}} utilise {{runs}} pour l’instant",
-      "connector_tool_changed_one": "Un serveur connecté a modifié des outils que vous aviez approuvés",
-      "connector_tool_changed_many": "Un serveur connecté a modifié des outils que vous aviez approuvés",
-      "connector_tool_changed_other": "Un serveur connecté a modifié des outils que vous aviez approuvés",
       "computer_disk_full_one": "Le disque d'un ordinateur est presque plein",
       "computer_disk_full_many": "Le disque d'un ordinateur est presque plein",
       "computer_disk_full_other": "Le disque d'un ordinateur est presque plein",
@@ -1544,15 +1541,11 @@
       "browser": "Navigateur",
       "secret": "Secret",
       "join": "Membres",
-      "tools": "Outils",
       "limit": "Limite"
     },
     "review": "Examiner",
     "answer": "Répondre",
     "open": "Ouvrir",
-    "toolsTitle": "A modifié des outils que tu as approuvés",
-    "toolsWhy": "Les agents gardent la version approuvée jusqu'à ce que tu acceptes la nouvelle.",
-    "reviewChanges": "Revoir les changements",
     "clear": {
       "title": "Rien ne vous attend",
       "text": "Quand un agent a besoin de vous, ça apparaît d'abord ici."

@@ -3964,7 +3964,6 @@
       "browser": "브라우저",
       "members": "멤버",
       "usage": "사용량",
-      "connectors": "커넥터",
       "dashboard": "대시보드"
     },
     "reactions_other": "반응 {{count}}개",
@@ -10663,32 +10662,6 @@
       "usageNoLimit": "Composio: {{month}} 호출 {{calls}}회",
       "limitNotice": "이 워크스페이스는 이번 달 Composio 호출을 모두 사용했어요",
       "disconnectNote": "Composio는 계정을 잊어요. {{name}}에서도 접근 권한을 없애려면 그곳 계정 설정에서 Composio를 삭제하세요."
-    },
-    "toolChanges": {
-      "title": "변경된 도구",
-      "intro": "이 서버들이 도구의 설명이나 요청 내용을 바꿨어요. 새 버전을 수락하기 전까지 에이전트는 승인한 버전을 계속 사용해요.",
-      "count_other": "도구 {{count}}개가 바뀌었습니다",
-      "acceptAll": "모두 수락",
-      "acceptedAll": "{{name}} 도구를 업데이트했습니다.",
-      "show": "변경 보기",
-      "hide": "숨기기",
-      "showAll": "모두 보기 ({{total}})",
-      "textChanged": "설명이 바뀌었습니다",
-      "fieldsChanged_other": "필드 {{count}}개가 바뀌었습니다",
-      "inputChanged": "입력이 바뀌었습니다",
-      "description": "설명",
-      "input": "입력",
-      "field": {
-        "added": "새 필드",
-        "removed": "삭제됨",
-        "changed": "변경됨"
-      },
-      "added": "추가됨",
-      "removed": "삭제됨",
-      "accept": "수락",
-      "acceptOne": "{{tool}} 수락",
-      "accepted": "{{tool}}을(를) 업데이트했어요.",
-      "notice": "{{name}}이(가) 승인한 도구를 변경했어요"
     },
     "names": {
       "atlassian": "Atlassian(Jira와 Confluence)",

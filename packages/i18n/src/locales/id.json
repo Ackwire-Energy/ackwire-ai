@@ -3980,7 +3980,6 @@
       "browser": "Browser",
       "members": "Anggota",
       "usage": "Penggunaan",
-      "connectors": "Konektor",
       "dashboard": "Dasbor"
     },
     "reactions_other": "{{count}} reaksi",
@@ -10723,32 +10722,6 @@
       "usageNoLimit": "Composio: {{calls}} panggilan di {{month}}",
       "limitNotice": "Ruang kerja ini sudah menghabiskan panggilan Composio bulan ini",
       "disconnectNote": "Composio melupakan akun ini. Untuk mencabut aksesnya di {{name}} juga, hapus Composio di pengaturan akunmu di sana."
-    },
-    "toolChanges": {
-      "title": "Alat yang berubah",
-      "intro": "Server ini mengubah apa yang dikatakan atau diminta sebuah alat. Agen tetap memakai versi yang kamu setujui sampai kamu menerima yang baru.",
-      "count_other": "{{count}} alat berubah",
-      "acceptAll": "Terima semua",
-      "acceptedAll": "Alat {{name}} diperbarui.",
-      "show": "Lihat perubahan",
-      "hide": "Sembunyikan",
-      "showAll": "Tampilkan semua ({{total}})",
-      "textChanged": "Teksnya berubah",
-      "fieldsChanged_other": "{{count}} kolom berubah",
-      "inputChanged": "Inputnya berubah",
-      "description": "Teks",
-      "input": "Masukan",
-      "field": {
-        "added": "baru",
-        "removed": "dihapus",
-        "changed": "berubah"
-      },
-      "added": "Ditambahkan",
-      "removed": "Dihapus",
-      "accept": "Terima",
-      "acceptOne": "Terima {{tool}}",
-      "accepted": "{{tool}} diperbarui.",
-      "notice": "{{name}} mengubah alat yang kamu setujui"
     },
     "names": {
       "atlassian": "Atlassian (Jira dan Confluence)",
