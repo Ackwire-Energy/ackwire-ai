@@ -36050,6 +36050,9 @@
   "chat.work.step.settingReplyStyle": {
     "value": "Adjusted how it replies"
   },
+  "chat.work.step.sendingFeedback": {
+    "value": "Asked to send feedback"
+  },
   "chat.work.step.deletingRoutine": {
     "value": "Deleted a routine"
   },
@@ -36376,6 +36379,9 @@
   },
   "chat.activity.settingReplyStyle": {
     "value": "adjusting how it replies"
+  },
+  "chat.activity.sendingFeedback": {
+    "value": "preparing feedback"
   },
   "chat.activity.deletingRoutine": {
     "value": "deleting a routine"

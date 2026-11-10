@@ -107,6 +107,7 @@ export type ActivityKind =
   | "sendingDm"
   | "settingStatus"
   | "settingReplyStyle"
+  | "sendingFeedback"
   | "deletingRoutine"
   | "runningRoutine"
   | "proposingTeam"
@@ -265,6 +266,7 @@ const BUILTIN: Record<string, ActivityKind> = {
   send_dm: "sendingDm",
   set_status: "settingStatus",
   set_reply_style: "settingReplyStyle",
+  send_feedback: "sendingFeedback",
   delete_routine: "deletingRoutine",
   run_routine_now: "runningRoutine",
   propose_team: "proposingTeam",
