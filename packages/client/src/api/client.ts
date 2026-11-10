@@ -331,6 +331,12 @@ import type {
  * wires the HTTP implementation (./http-client.ts); tests pass a fake
  * (test/fake-api.ts). Components never call `fetch` directly.
  */
+/** Where a workspace whose onboarding just ended opens (its right hand's DM) and `/me` as it is now. */
+export interface OpenedWorkspace {
+  rightHandId?: string | null;
+  me?: Me;
+}
+
 export interface ApiClient {
   system: {
     health(): Promise<Health>;
@@ -428,18 +434,25 @@ export interface ApiClient {
     stale(ids: string[]): Promise<string[]>;
   };
   orgs: {
+    /**
+     * `timezone`: the workspace's; `memberTimezone`: the owner's own in it; `finished`: its onboarding over at once.
+     * The answer says where it opens (`rightHandId`) and carries `/me` as it is now; neither from an older server.
+     */
     create(input: {
       name: string;
       context?: string;
-    }): Promise<{ organization: Organization; generalChannelId: string }>;
+      timezone?: string;
+      memberTimezone?: string;
+      finished?: true;
+    }): Promise<{ organization: Organization; generalChannelId: string } & OpenedWorkspace>;
     /**
-     * Its owner's progress in setting it up: the furthest step reached (it only moves forward), or `finished`. Null
-     * from a server that doesn't keep it.
+     * Its owner's progress in setting it up: the furthest step reached (it only moves forward), or `finished`, whose
+     * answer says where it opens and carries `/me`. Null from a server that doesn't keep it.
      */
     saveOnboarding(
       orgId: string,
       input: { step: OnboardingStepId } | { finished: true },
-    ): Promise<{ step: OnboardingStepId; finished: boolean } | null>;
+    ): Promise<({ step: OnboardingStepId; finished: boolean } & OpenedWorkspace) | null>;
     get(orgId: string): Promise<Organization>;
     update(orgId: string, input: { name?: string; context?: string }): Promise<void>;
     /** Owners: emails me the code that deleting this workspace takes (as `account.deletionCode`). */
@@ -1145,8 +1158,11 @@ export interface ApiClient {
   dms: {
     /** My direct conversations, with unread counts. */
     list(orgId: string): Promise<DirectMessage[]>;
-    /** The DM channel with a person or an agent, created on first use. */
-    open(orgId: string, target: DmTarget): Promise<{ channelId: string }>;
+    /**
+     * The DM channel with a person or an agent, created on first use; `dm`: it as the list has it (none from an older
+     * server, or while it isn't in the list yet).
+     */
+    open(orgId: string, target: DmTarget): Promise<{ channelId: string; dm?: DirectMessage }>;
     /** Marks a channel or DM read up to now. */
     markRead(orgId: string, channelId: string): Promise<void>;
     /** Where the other people of a DM stopped reading ("Visto"); empty for any other channel. */

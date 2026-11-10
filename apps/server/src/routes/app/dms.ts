@@ -53,6 +53,14 @@ const Dm = z
   })
   .openapi("DirectMessage");
 
+/** A DM as the list has it, its dates as strings. */
+const dmView = (d: Awaited<ReturnType<typeof listDms>>[number]) => ({
+  ...d,
+  lastReadAt: iso(d.lastReadAt),
+  openedAt: d.openedAt.toISOString(),
+  lastMessage: d.lastMessage ? { ...d.lastMessage, createdAt: d.lastMessage.createdAt.toISOString() } : null,
+});
+
 /** Direct conversations (person↔person, person↔agent). In an agent DM the agent answers every message. */
 export function dmRoutes(deps: AppDeps) {
   const { db, adapters } = deps;
@@ -71,17 +79,7 @@ export function dmRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const dms = await listDms(db, c.get("user").id, c.req.valid("param").orgId);
-      return c.json(
-        {
-          dms: dms.map((d) => ({
-            ...d,
-            lastReadAt: iso(d.lastReadAt),
-            openedAt: d.openedAt.toISOString(),
-            lastMessage: d.lastMessage ? { ...d.lastMessage, createdAt: d.lastMessage.createdAt.toISOString() } : null,
-          })),
-        },
-        200,
-      );
+      return c.json({ dms: dms.map(dmView) }, 200);
     },
   );
 
@@ -92,17 +90,20 @@ export function dmRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "Open (or create) a direct conversation with a person or an agent",
+      description:
+        "`dm`: the conversation as `GET …/dms` lists it, so an app shows it there without asking again; none while it isn't in that list yet (an empty one the other person opened).",
       request: {
         params: OrgParams,
         body: body(z.union([z.object({ userId: z.string() }), z.object({ agentId: z.uuid() })])),
       },
-      responses: { 200: json(z.object({ channelId: z.uuid() })), ...errors },
+      responses: { 200: json(z.object({ channelId: z.uuid(), dm: Dm.optional() })), ...errors },
     }),
     async (c) => {
-      const channel = await openDm(db, c.get("user").id, c.req.valid("param").orgId, c.req.valid("json"), {
-        pubsub: adapters.pubsub,
-      });
-      return c.json({ channelId: channel.id }, 200);
+      const userId = c.get("user").id;
+      const { orgId } = c.req.valid("param");
+      const channel = await openDm(db, userId, orgId, c.req.valid("json"), { pubsub: adapters.pubsub });
+      const [dm] = await listDms(db, userId, orgId, channel.id);
+      return c.json({ channelId: channel.id, ...(dm ? { dm: dmView(dm) } : {}) }, 200);
     },
   );
 

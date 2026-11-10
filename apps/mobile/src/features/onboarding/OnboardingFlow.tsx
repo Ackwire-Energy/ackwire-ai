@@ -1,6 +1,6 @@
-import { keys, useApi, useMe } from "@agenteschat/client";
+import { addDm, keys, useApi, useMe } from "@agenteschat/client";
 import { settingUp } from "@agenteschat/client/lib/guards";
-import { finishOnboarding } from "@agenteschat/client/lib/right-hand";
+import { createWorkspace, finishOnboarding, type OpenedAt } from "@agenteschat/client/lib/right-hand";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -59,15 +59,18 @@ export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; ano
   const unconfirmed =
     email !== "" && confirmationSentTo() === email.toLowerCase() && me.data?.user.emailVerified !== true;
 
-  /** Finishes it and opens its right hand's DM (the workspace's home when there is none), pushed over the tabs. */
-  const open = async (orgId: string) => {
-    const at = await finishOnboarding(api, orgId);
-    const dm = at.agentId ? await api.dms.open(orgId, { agentId: at.agentId }).catch(() => null) : null;
+  /**
+   * Opens a workspace whose onboarding just ended in its right hand's DM (the workspace's home when there is none),
+   * pushed over the tabs; `/me` from the answer that finished it, so nothing is asked again.
+   */
+  const open = async ({ orgId, agentId, me: now }: OpenedAt) => {
+    const dm = agentId ? await api.dms.open(orgId, { agentId }).catch(() => null) : null;
     forgetConfirmationSent();
-    await qc.invalidateQueries({ queryKey: keys.me });
+    if (now) qc.setQueryData(keys.me, now);
+    else await qc.invalidateQueries({ queryKey: keys.me });
     gate.choose(orgId);
-    // The conversation finds its DM in the lists for its header.
-    await qc.invalidateQueries({ queryKey: keys.dms(orgId), refetchType: "all" }).catch(() => {});
+    // The conversation finds its DM in the lists for its header, from the open's own answer.
+    if (dm?.dm) addDm(qc, orgId, dm.dm);
     if (dm) router.push(chatHref(dm.channelId));
   };
 
@@ -83,21 +86,19 @@ export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; ano
     }
   };
 
+  // One call makes it with its zone (the owner's too), finished, and says where it opens.
   const save = () =>
     run(async () => {
-      let orgId = created;
-      if (!orgId) {
-        const res = await api.orgs.create({ name: orgName });
-        orgId = res.organization.id;
-        setCreated(orgId);
-        await Promise.all([
-          zone ? api.orgs.updateSettings(orgId, { timezone: zone }) : null,
-          zone ? api.orgs.updateMe(orgId, { timezone: zone }) : null,
-        ]).catch(() => undefined);
-      } else {
-        await api.orgs.updateSettings(orgId, { name: orgName });
+      if (created) {
+        await api.orgs.updateSettings(created, { name: orgName });
+        return open(await finishOnboarding(api, created));
       }
-      await open(orgId);
+      const at = await createWorkspace(api, {
+        name: orgName,
+        ...(zone ? { timezone: zone, memberTimezone: zone } : {}),
+      });
+      setCreated(at.orgId);
+      await open(at);
     });
 
   // One being set up already (an older onboarding cut short, here or on the web): finished and opened, once.
@@ -106,7 +107,7 @@ export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; ano
   useEffect(() => {
     if (!unfinished || opening.current === unfinished.id) return;
     opening.current = unfinished.id;
-    void run(() => open(unfinished.id));
+    void run(async () => open(await finishOnboarding(api, unfinished.id)));
   });
 
   if (unfinished)

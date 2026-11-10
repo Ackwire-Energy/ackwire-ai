@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
-import { readdirSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { ApiError } from "@agenteschat/client";
 import { knownErrorText } from "@agenteschat/client/lib/errors";
 import { isInviteToken } from "../../src/features/auth/links";
@@ -69,4 +70,14 @@ test("a step that failed says why the server refused it, else that it didn't sav
   expect(stepFailedText(await translator("en"), inviteOnly)).toBe("New workspaces need an invitation for now.");
   expect(stepFailedText(pt, new ApiError(500, "internal", "x"))).toBe(pt("mobile.onb.failed"));
   expect(stepFailedText(pt, new TypeError("Network request failed"))).toBe(pt("mobile.onb.failed"));
+});
+
+test("Continuar is one call: the workspace with its zones, finished, then its right hand's DM from the open's answer (#1)", () => {
+  const flow = readFileSync(join(import.meta.dir, "../../src/features/onboarding/OnboardingFlow.tsx"), "utf8");
+  expect(flow).toContain("createWorkspace(api, {");
+  expect(flow).toContain("timezone: zone, memberTimezone: zone");
+  // Nothing after it asks the server again: no zone, finish or agents of their own, no lists read before the DM opens.
+  expect(flow).not.toMatch(/orgs\.(updateMe|saveOnboarding)|agents\.list|refetchType/);
+  expect(flow).toContain("if (now) qc.setQueryData(keys.me, now);");
+  expect(flow).toContain("if (dm?.dm) addDm(qc, orgId, dm.dm);");
 });

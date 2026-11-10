@@ -3,7 +3,12 @@ import { accountOutOfReach } from "@agenteschat/client/lib/deletion";
 import { errorCode, errorText } from "@agenteschat/client/lib/errors";
 import { settingUp } from "@agenteschat/client/lib/guards";
 import { sendsEmail } from "@agenteschat/client/lib/join-requests";
-import { finishOnboarding, RIGHT_HAND_DEFAULT } from "@agenteschat/client/lib/right-hand";
+import {
+  createWorkspace,
+  finishOnboarding,
+  type OpenedAt,
+  RIGHT_HAND_DEFAULT,
+} from "@agenteschat/client/lib/right-hand";
 import { browserTimezone, timezoneName } from "@agenteschat/client/lib/routines";
 import { Button, Field, Icon, Input, Locked, Logo } from "@agenteschat/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -72,11 +77,12 @@ export function OnboardingPage() {
   const others = (me.data?.organizations ?? []).filter((o) => o.id !== created?.orgId && !settingUp(o));
   const leaveTo = others.find((o) => o.id === storage.get(STORAGE_KEYS.lastOrg)) ?? others[0];
 
-  const openWorkspace = async (orgId: string) => {
-    const at = await finishOnboarding(api, orgId);
+  // The answer that finished it says who the person is now: it opens without asking the server again.
+  const openWorkspace = async ({ orgId, agentId, me: now }: OpenedAt) => {
     sessionStore.remove(STORAGE_KEYS.confirmationSent);
-    await qc.invalidateQueries({ queryKey: keys.me });
-    if (at.agentId) await navigate({ to: "/org/$orgId/dm/agent/$agentId", params: { orgId, agentId: at.agentId } });
+    if (now) qc.setQueryData(keys.me, now);
+    else await qc.invalidateQueries({ queryKey: keys.me });
+    if (agentId) await navigate({ to: "/org/$orgId/dm/agent/$agentId", params: { orgId, agentId } });
     else await navigate({ to: "/org/$orgId", params: { orgId } });
   };
 
@@ -87,17 +93,19 @@ export function OnboardingPage() {
       if (errorCode(e) !== "org.create_unpaid") toast.show(errorText(t, e), "error");
     },
     mutationFn: async () => {
+      const name = org.trim();
+      // The person's own zone, detected here: agents read the local time from it (the language is `useServerLocale`'s).
+      const memberTimezone = browserTimezone() ?? undefined;
+      // Nothing to send after it: one call makes it, finished, and says where it opens.
+      if (!created && !logoDirty)
+        return openWorkspace(await createWorkspace(api, { name, timezone: zone, memberTimezone }));
       let target = created;
       if (!target) {
-        const res = await api.orgs.create({ name: org.trim() });
+        const res = await api.orgs.create({ name, timezone: zone, memberTimezone });
         target = { orgId: res.organization.id };
         setCreated(target);
-        await api.orgs.updateSettings(target.orgId, { timezone: zone });
-        // The person's own zone, detected here: agents read the local time from it (the language is `useServerLocale`'s).
-        const mine = browserTimezone();
-        if (mine) await api.orgs.updateMe(target.orgId, { timezone: mine }).catch(() => undefined);
       } else {
-        await api.orgs.updateSettings(target.orgId, { name: org.trim(), timezone: zone });
+        await api.orgs.updateSettings(target.orgId, { name, timezone: zone });
       }
       // The logo needs the workspace: picked before it existed, sent now.
       if (logoDirty) {
@@ -105,7 +113,7 @@ export function OnboardingPage() {
         else await api.orgs.removeLogo(target.orgId);
         setLogoDirty(false);
       }
-      await openWorkspace(target.orgId);
+      await openWorkspace(await finishOnboarding(api, target.orgId));
     },
   });
 
@@ -117,7 +125,10 @@ export function OnboardingPage() {
     if (!unfinished || opening.current === unfinished.id) return;
     opening.current = unfinished.id;
     if (deleting !== null) setCreated({ orgId: unfinished.id });
-    else void openWorkspace(unfinished.id).catch((e) => toast.show(errorText(t, e), "error"));
+    else
+      void finishOnboarding(api, unfinished.id)
+        .then(openWorkspace)
+        .catch((e) => toast.show(errorText(t, e), "error"));
   });
 
   const refused = save.error;

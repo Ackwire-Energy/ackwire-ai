@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next";
 import type { ApiClient } from "../api/client";
-import type { Agent, AgentBrain, BrainScope, Credential, DirectMessage, Model } from "../api/types";
+import type { Agent, AgentBrain, BrainScope, Credential, DirectMessage, Me, Model } from "../api/types";
 import { agentGrammar } from "./grammar";
 import { AUTO, keyRuns } from "./providers";
 
@@ -122,14 +122,39 @@ export const RIGHT_HAND_DEFAULT = {
 export const tellsNameStory = (agent: Pick<Agent, "builtin" | "name"> | null | undefined) =>
   isRightHand(agent) && agent?.name === RIGHT_HAND_DEFAULT.name;
 
+/** Where a workspace whose onboarding just ended opens, and `/me` as it is now (null: ask for it). */
+export interface OpenedAt {
+  orgId: string;
+  agentId: string | null;
+  me: Me | null;
+}
+
 /**
- * Ends a workspace's onboarding, for good, and says where it opens: its right hand's DM (ADR 0137), which takes the
- * setup on from there; the workspace itself (`agentId` null) when there is none to open.
+ * Ends a workspace's onboarding, for good, in one call, and says where it opens: its right hand's DM (ADR 0137), which
+ * takes the setup on from there; the workspace itself (`agentId` null) when there is none to open. An older server
+ * doesn't say: its agents do.
  */
-export async function finishOnboarding(api: ApiClient, orgId: string) {
-  await api.orgs.saveOnboarding(orgId, { finished: true });
-  const rightHand = rightHandOf(await api.agents.list(orgId).catch(() => []));
-  return { orgId, agentId: rightHand?.id ?? null };
+export async function finishOnboarding(api: ApiClient, orgId: string): Promise<OpenedAt> {
+  const done = await api.orgs.saveOnboarding(orgId, { finished: true });
+  const agentId =
+    done?.rightHandId !== undefined
+      ? done.rightHandId
+      : (rightHandOf(await api.agents.list(orgId).catch(() => []))?.id ?? null);
+  return { orgId, agentId, me: done?.me ?? null };
+}
+
+/**
+ * A new workspace with its onboarding over, in one call (its zone, the owner's own in it), and where it opens. An older
+ * server ignores `finished`: a second call finishes it.
+ */
+export async function createWorkspace(
+  api: ApiClient,
+  input: { name: string; timezone?: string; memberTimezone?: string },
+): Promise<OpenedAt> {
+  const res = await api.orgs.create({ ...input, finished: true });
+  const orgId = res.organization.id;
+  if (res.rightHandId === undefined) return finishOnboarding(api, orgId);
+  return { orgId, agentId: res.rightHandId, me: res.me ?? null };
 }
 
 /**

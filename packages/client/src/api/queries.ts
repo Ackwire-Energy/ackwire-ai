@@ -5797,6 +5797,22 @@ export function useRightHandWave(orgId: string, agentId: string): boolean {
   return wave === true;
 }
 
+/**
+ * A DM just opened, from `dms.open`'s answer, in the cached DM list: its header and the search find it without the
+ * list being read again. A list not loaded yet loads whole by itself.
+ */
+export function addDm(qc: QueryClient, orgId: string, dm: DirectMessage) {
+  const key = keys.dms(orgId);
+  const add = () =>
+    qc.setQueryData<DirectMessage[]>(key, (list) =>
+      list && !list.some((d) => d.channelId === dm.channelId) ? [...list, dm] : list,
+    );
+  add();
+  // A read of the list already on its way (the sidebar's, started with the page) may have left before this DM
+  // existed, and its answer would replace the list: once it lands, the DM goes in again, with no read of its own.
+  void qc.refetchQueries({ queryKey: key, exact: true, fetchStatus: "fetching" }, { cancelRefetch: false }).then(add);
+}
+
 /** A conversation shows nothing unread in the cached lists (read here or on another device). */
 function clearUnread(qc: QueryClient, orgId: string, channelId: string) {
   qc.setQueryData<Channel[]>(keys.channels(orgId), (list) =>

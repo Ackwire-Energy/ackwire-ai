@@ -158,6 +158,17 @@ export async function ensureRightHand(db: Executor, orgId: string): Promise<stri
   return made.id;
 }
 
+/** The workspace's right hand, where it opens after its onboarding: null once archived or deleted. */
+export async function rightHandId(db: Executor, orgId: string): Promise<string | null> {
+  const [row] = await db
+    .select({ id: agents.id })
+    .from(agents)
+    .where(
+      and(eq(agents.orgId, orgId), eq(agents.builtin, RIGHT_HAND), isNull(agents.archivedAt), isNull(agents.deletedAt)),
+    );
+  return row?.id ?? null;
+}
+
 /**
  * Every workspace without a right hand gets one (boot): one query finds none once they all have it. Not one being
  * deleted, which nobody uses again.
