@@ -129,8 +129,11 @@ export interface WorkerDeps {
   desktops?: Pick<DesktopControl, "keepAlive">;
   /** The daily stall-and-noise report (`OPS_REPORT_EMAIL`); absent: none. */
   opsReport?: { to: string[]; publicUrl: string };
-  /** Job slots (`OUTBOX_MAX_IN_FLIGHT`, `OUTBOX_QUICK_SLOTS`) and how far they grow (`laneLimits`); absent: the pump's own. */
-  outbox?: { maxInFlight: number; quickSlots: number; limits?: LaneLimits; memoryBytes?: number };
+  /**
+   * Job slots (`OUTBOX_MAX_IN_FLIGHT`, `OUTBOX_QUICK_SLOTS`), how far they grow (`laneLimits`) and the kinds left to
+   * the app (a worker process: `APP_JOB_KINDS`); absent: the pump's own.
+   */
+  outbox?: { maxInFlight: number; quickSlots: number; limits?: LaneLimits; memoryBytes?: number; skipKinds?: string[] };
   /** The database is the built-in one (one process): the alarms advise what fits it. */
   builtInDatabase?: boolean;
   log: Logger;

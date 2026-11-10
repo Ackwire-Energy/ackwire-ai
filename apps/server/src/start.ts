@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { totalmem } from "node:os";
+import { freemem, totalmem } from "node:os";
 import { join, resolve } from "node:path";
 import {
   type Adapters,
@@ -51,6 +51,7 @@ import {
   MigrationMismatchError,
 } from "@agenteschat/db";
 import {
+  APP_JOB_KINDS,
   adoptRestoredOperatorEvents,
   allowsPrivateEndpoints,
   composioUsageHook,
@@ -68,6 +69,7 @@ import {
   isAgentesCloud,
   isBlockedAddress,
   laneLimits,
+  memoryBudget,
   meterComposio,
   moveIssueComments,
   publicHttpsFetch,
@@ -396,11 +398,19 @@ async function boot(
       if (moved > 0) log.info("files moved out of agent rooms", { moved });
     })
     .catch((error: unknown) => log.warn("files move out of agent rooms failed", { error: String(error) }));
+  // A worker (`SERVER_ROLE=worker`) runs jobs only: no app, API, sockets or usage report, its health check alone. Its
+  // runs reach computers through the process that holds their socket (`machine_rpc`).
+  const worker = config.SERVER_ROLE === "worker";
   const slots = { quick: config.OUTBOX_QUICK_SLOTS, long: config.OUTBOX_MAX_IN_FLIGHT - config.OUTBOX_QUICK_SLOTS };
-  const memoryBytes = process.constrainedMemory() || totalmem();
+  const memoryBytes = memoryBudget({
+    limitBytes: process.constrainedMemory() || totalmem(),
+    rssBytes: process.memoryUsage().rss,
+    freeBytes: freemem(),
+  });
   const outbox = {
     maxInFlight: config.OUTBOX_MAX_IN_FLIGHT,
     quickSlots: config.OUTBOX_QUICK_SLOTS,
+    ...(worker && { skipKinds: APP_JOB_KINDS }),
     // The built-in database is one process's, on one computer: its slots stay where they start.
     ...(database.client && {
       limits: laneLimits(
@@ -411,7 +421,7 @@ async function boot(
       memoryBytes,
     }),
   };
-  log.info("job slots", { start: slots, upTo: outbox.limits ?? "fixed", role: config.SERVER_ROLE });
+  log.info("job slots", { start: slots, upTo: outbox.limits ?? "fixed", memoryBytes, role: config.SERVER_ROLE });
   const workers = startWorkers({
     db: database.db,
     handlers: engine.handlers,
@@ -431,9 +441,6 @@ async function boot(
     builtInDatabase: !database.client,
     log,
   });
-  // A worker (`SERVER_ROLE=worker`) runs jobs only: no app, API, sockets or usage report, its health check alone. Its
-  // runs reach computers through the process that holds their socket (`machine_rpc`).
-  const worker = config.SERVER_ROLE === "worker";
   const telemetry = worker ? null : startTelemetry({ db: database.db, config, log });
 
   const auth = createAuth({

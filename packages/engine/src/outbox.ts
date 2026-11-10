@@ -67,6 +67,8 @@ export interface ClaimOptions {
   now?: Date;
   /** At most this many quick jobs in this claim: the pump's room for them (`LaneLimits`). Undefined: no cap. */
   maxQuick?: number;
+  /** Kinds this process leaves to the others: a worker process leaves `APP_JOB_KINDS` to the app. */
+  skipKinds?: string[];
   /**
    * At most this many long jobs in this claim (`LONG_JOB_KINDS`), background ones included: the pump's
    * free long slots. Undefined: no cap (batches, tests).
@@ -110,6 +112,12 @@ export const LONG_JOB_KINDS = [
 
 const longJobSql = inArray(outbox.kind, LONG_JOB_KINDS);
 
+/**
+ * Kinds only a process serving the app runs (`SERVER_ROLE=all`), never a worker: a push waits while its person has the
+ * app open, and in core only the process holding their socket knows that (`Presence`, in memory).
+ */
+export const APP_JOB_KINDS = ["push.send"];
+
 /** The run an `agent_run.execute` job executes (null for a malformed payload). */
 const runOfJob = sql`case when ${outbox.payload}->>'runId' ~ '^[0-9a-fA-F-]{36}$' then (${outbox.payload}->>'runId')::uuid end`;
 
@@ -131,6 +139,16 @@ const orphanedRunJobSql = sql`(${outbox.kind} = 'agent_run.execute' and exists (
 
 const LEASE_LOST = "lease expired on the final attempt";
 
+/** Each lane's jobs, less the kinds this process leaves to the others (`ClaimOptions.skipKinds`). */
+function laneJobs(skipKinds: string[] = []): Record<Lane, SQL> {
+  const mine = skipKinds.length > 0 ? sql` and not ${inArray(outbox.kind, skipKinds)}` : sql``;
+  return {
+    quick: sql`not ${longJobSql}${mine}`,
+    long: sql`${longJobSql} and not ${backgroundJobSql}${mine}`,
+    background: sql`${backgroundJobSql}${mine}`,
+  };
+}
+
 /**
  * Claims due jobs: pending ones whose time has come, and processing ones whose lease expired (except a dead
  * worker's agent run, `orphanedRunJobSql`). Quick jobs first, then long ones up to `maxLong` in the slots left,
@@ -139,13 +157,13 @@ const LEASE_LOST = "lease expired on the final attempt";
 export async function claimJobs(db: Database, options: ProcessOptions): Promise<ClaimedJob[]> {
   const now = options.now ?? new Date();
   const batch = options.batchSize ?? 20;
+  const lanes = laneJobs(options.skipKinds);
   const quickRoom = Math.min(batch, options.maxQuick ?? batch);
-  const quick = quickRoom > 0 ? await claimWhere(db, options, now, sql`not ${longJobSql}`, quickRoom) : [];
+  const quick = quickRoom > 0 ? await claimWhere(db, options, now, lanes.quick, quickRoom) : [];
   const longRoom = Math.min(batch - quick.length, options.maxLong ?? batch);
-  const long =
-    longRoom > 0 ? await claimWhere(db, options, now, sql`${longJobSql} and not ${backgroundJobSql}`, longRoom) : [];
+  const long = longRoom > 0 ? await claimWhere(db, options, now, lanes.long, longRoom) : [];
   const room = Math.min(longRoom - long.length, options.maxBackground ?? batch);
-  const background = room > 0 ? await claimWhere(db, options, now, backgroundJobSql, room) : [];
+  const background = room > 0 ? await claimWhere(db, options, now, lanes.background, room) : [];
   const claimed: ClaimedJob[] = [
     ...quick.map((job) => ({ ...job, long: false, background: false })),
     ...long.map((job) => ({ ...job, long: true, background: false })),
@@ -176,22 +194,20 @@ export async function claimJobs(db: Database, options: ProcessOptions): Promise<
   return runnable;
 }
 
-/** Whose turn a job takes: its workspace's, or its own for a job of no workspace (an email to an address). */
-const orgKey = sql`coalesce(${outbox.orgId}, ${outbox.id})`;
-
 /**
- * How many of a lane's oldest due jobs take turns by workspace in one claim. Past that, a backlog is more than the
- * workers can run, which the lane's alarm tells (`laneAlarm`), and the jobs beyond wait in order.
+ * Whose turn a job takes: its workspace's. Jobs of no workspace (an email to an address, an account's contact) take
+ * theirs by kind, so a backfill of one kind waits on itself alone. Bytewise ("C"), not the database's collation: every
+ * claim sorts the lane's due jobs by it.
  */
-export const FAIR_SCAN = 10_000;
+const turnKey = sql`coalesce(${outbox.orgId}::text, ${outbox.kind}) collate "C"`;
 
 /**
  * One statement (no transaction round trips): lock due rows matching `filter`, skipping locked ones; lease them.
  * Workspaces take turns (ADR 0163): each one's due jobs are ranked oldest first, after the jobs of the lane it
  * already runs on any worker, so a workspace that holds more than another one waiting claims after it, and one
- * workspace's burst queues only that workspace. Ranked without locks (a window can't take `FOR UPDATE`), then
- * locked and checked again: only the first turns, twice the claim and some, so the lock looks each one up by its id
- * instead of reading every due job again, with room for the ones another worker is taking.
+ * workspace's burst, however long, queues only that workspace. Ranked without locks (a window can't take
+ * `FOR UPDATE`), then locked and checked again: only the first turns, twice the claim and some, so the lock looks each
+ * one up by its id, with room for the ones another worker is taking.
  */
 function claimWhere(db: Database, options: ClaimOptions, now: Date, filter: SQL, limit: number) {
   const leaseUntil = new Date(now.getTime() + (options.leaseMs ?? DEFAULT_LEASE_MS));
@@ -199,6 +215,10 @@ function claimWhere(db: Database, options: ClaimOptions, now: Date, filter: SQL,
   const due = sql`((${outbox.status} = 'pending' and ${outbox.nextAttemptAt} <= ${at})
       or (${outbox.status} = 'processing' and ${outbox.lockedUntil} < ${at} and not ${orphanedRunJobSql}))
     and ${filter}`;
+  // ponytail: every due job of the lane is read and sorted by workspace (the claim read them all before turns too: the
+  // due condition's two states can't come in order from the partial indexes); about 60 ms for 100,000 on PGlite. Past
+  // backlogs like that, an index on (workspace, due) and a lateral per workspace.
+  const room = limit * 2 + 64;
   return db
     .update(outbox)
     .set({
@@ -209,19 +229,20 @@ function claimWhere(db: Database, options: ClaimOptions, now: Date, filter: SQL,
     })
     .where(
       sql`${outbox.id} in (
-        with candidates as materialized (
-          select ${outbox.id} as id, ${orgKey} as org_key, ${outbox.nextAttemptAt} as due_at from ${outbox}
-          where ${due} order by ${outbox.nextAttemptAt} limit ${FAIR_SCAN}
-        ), busy as materialized (
-          select ${orgKey} as org_key, count(*)::int as n from ${outbox}
+        with busy as materialized (
+          select ${turnKey} as key, count(*)::int as n from ${outbox}
           where ${outbox.status} = 'processing' and ${outbox.lockedUntil} >= ${at} and ${filter}
           group by 1
         ), turns as materialized (
-          select c.id, c.due_at,
-            coalesce(b.n, 0) + row_number() over (partition by c.org_key order by c.due_at, c.id) as turn
-          from candidates c left join busy b on b.org_key = c.org_key
+          select c.id, c.due_at, coalesce(b.n, 0) + c.nth as turn
+          from (
+            select ${outbox.id} as id, ${turnKey} as key, ${outbox.nextAttemptAt} as due_at,
+              row_number() over (partition by ${turnKey} order by ${outbox.nextAttemptAt}, ${outbox.id}) as nth
+            from ${outbox} where ${due}
+          ) c left join busy b on b.key = c.key
+          where c.nth <= ${room}
           order by turn, c.due_at
-          limit ${limit * 2 + 64}
+          limit ${room}
         )
         select ${outbox.id} from ${outbox} join turns t on t.id = ${outbox.id}
         where ${due}
@@ -482,6 +503,14 @@ export const RUNS_MEMORY_SHARE = 0.5;
 export const backgroundSlotsOf = (longSlots: number) => Math.max(1, Math.floor(longSlots / 2));
 
 /**
+ * The memory a process may count on (`laneLimits`' `memoryBytes`, the memory brake): its container's limit, and on a
+ * computer it shares with others (the database, the speech server) no more than it holds plus what is free there as it
+ * starts.
+ */
+export const memoryBudget = (host: { limitBytes: number; rssBytes: number; freeBytes: number }) =>
+  Math.min(host.limitBytes, host.rssBytes + host.freeBytes);
+
+/**
  * How far a pump's lanes may grow from `base`: the quick lane to `QUICK_JOBS_PER_DB_CONNECTION` per connection, the
  * long one to the runs the memory left holds (`RUN_MEMORY_BYTES` each, in `RUNS_MEMORY_SHARE` of `memoryBytes` less
  * what the process holds now), and both together to `cap` when one is set. Never below the base.
@@ -565,17 +594,13 @@ export async function claimLaneAlarm(db: Database, lane: Lane, now: Date): Promi
   return rows.length > 0;
 }
 
-/** How long the oldest job still due in each lane has waited (0: none waits). */
-async function oldestDueMs(db: Database, now: Date): Promise<Record<Lane, number>> {
+/** How long the oldest job still due in each lane (`laneJobs`) has waited (0: none waits). */
+async function oldestDueMs(db: Database, now: Date, lanes: Record<Lane, SQL>): Promise<Record<Lane, number>> {
   const at = sql`${now.toISOString()}::timestamptz`;
   const age = (lane: SQL) =>
     sql<number | null>`1000 * extract(epoch from ${at} - min(${outbox.nextAttemptAt}) filter (where ${lane}))::float8`;
   const [row] = await db
-    .select({
-      quick: age(sql`not ${longJobSql}`),
-      long: age(sql`${longJobSql} and not ${backgroundJobSql}`),
-      background: age(backgroundJobSql),
-    })
+    .select({ quick: age(lanes.quick), long: age(lanes.long), background: age(lanes.background) })
     .from(outbox)
     .where(sql`${outbox.status} = 'pending' and ${outbox.nextAttemptAt} <= ${at}`);
   return { quick: Number(row?.quick ?? 0), long: Number(row?.long ?? 0), background: Number(row?.background ?? 0) };
@@ -630,13 +655,15 @@ export function createOutboxPump(
   };
   return {
     async pump() {
-      const free = slots.quick + slots.long - running.size;
+      const quickRunning = running.size - longRunning;
+      // Runs the long lane shed while they ran (`MEMORY_SHED_AT`) hold none of the quick lane's slots.
+      const free = slots.quick + slots.long - quickRunning - Math.min(longRunning, slots.long);
       if (free <= 0) return 0;
       const jobs = await claimJobs(db, {
         ...options,
         onTiming,
         batchSize: free,
-        maxQuick: Math.max(0, limits.lanes.quick - (running.size - longRunning)),
+        maxQuick: Math.max(0, limits.lanes.quick - quickRunning),
         maxLong: Math.max(0, slots.long - longRunning),
         maxBackground: Math.max(0, backgroundSlotsOf(slots.long) - backgroundRunning),
       });
@@ -660,7 +687,7 @@ export function createOutboxPump(
       while (running.size > 0) await Promise.all(running);
     },
     async tune({ now = new Date(), lateBeats = 0, rssBytes = process.memoryUsage().rss } = {}) {
-      const [due, dbMs] = [await oldestDueMs(db, now), await poolMs(db)];
+      const [due, dbMs] = [await oldestDueMs(db, now, laneJobs(options.skipKinds)), await poolMs(db)];
       const waited = (lane: Lane) => Math.max(percentile(waits[lane], 0.9), due[lane]);
       const w = { quick: waited("quick"), long: waited("long"), background: waited("background") };
       // Background work waiting for its share waits for the long lane to grow too.

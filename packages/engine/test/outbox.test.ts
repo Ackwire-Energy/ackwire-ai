@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { type Database, eq, inArray, schema } from "@agenteschat/db";
 import { createTestDatabase } from "@agenteschat/db/testing";
 import {
+  APP_JOB_KINDS,
   claimJobs,
   claimLaneAlarm,
   clearOldOutboxPayloads,
@@ -15,6 +16,7 @@ import {
   laneAlarm,
   laneLimits,
   MissingCredentialError,
+  memoryBudget,
   PermanentJobError,
   POOL_SLOW_MS,
   processOutbox,
@@ -536,6 +538,17 @@ test("laneLimits: runs as far as half the memory holds them, quick jobs 4 per co
   });
 });
 
+test("memoryBudget: a container's limit; on a computer it shares, what the process holds and what is free there", () => {
+  const gb = 1024 ** 3;
+  // 8 GB, the database and the speech server beside it holding 5: 0.5 held and 2.5 free, not the whole computer.
+  const shared = memoryBudget({ limitBytes: 8 * gb, rssBytes: 0.5 * gb, freeBytes: 2.5 * gb });
+  expect(shared).toBe(3 * gb);
+  expect(
+    laneLimits({ quick: 12, long: 36 }, { memoryBytes: shared, rssBytes: 0.5 * gb, dbConnections: 20 }).lanes.long,
+  ).toBe(256);
+  expect(memoryBudget({ limitBytes: 2 * gb, rssBytes: 0.5 * gb, freeBytes: 30 * gb })).toBe(2 * gb);
+});
+
 test("createOutboxPump.tune: jobs left waiting grow their lane up to its limit; once idle, it halves back", async () => {
   const limits = { lanes: { quick: 8, long: 24 }, total: 32 };
   const pump = createOutboxPump(db, {}, { workerId: "w", maxInFlight: 8, quickSlots: 2, limits });
@@ -615,14 +628,43 @@ test("a workspace running jobs on another worker claims after one that runs none
   expect(claimed.map((j) => j.orgId)).toEqual([waitingOrg, waitingOrg]);
 });
 
-test("jobs of no workspace each take a turn of their own", async () => {
-  for (let i = 0; i < 3; i++)
-    await enqueue(db, { orgId: null, kind: "email.send", payload: { i }, runAt: at(-60_000) });
+test("jobs of no workspace take turns by kind: a backfill of one kind holds back neither workspaces nor a sign-in email", async () => {
+  for (let i = 0; i < 50; i++)
+    await enqueue(db, { orgId: null, kind: "account.contact", payload: { i }, runAt: at(-60_000) });
+  await enqueue(db, { orgId: null, kind: "email.send", payload: { code: 1 } });
   for (let i = 0; i < 2; i++) await enqueue(db, job("message.posted", { payload: { i } }));
-  const claimed = await claimJobs(db, { workerId: "w", batchSize: 4 });
-  // Each email is a first turn, like the workspace's first job; its second job waits.
-  expect(claimed.filter((j) => j.orgId === null)).toHaveLength(3);
-  expect(claimed.filter((j) => j.orgId === orgId)).toHaveLength(1);
+  const claimed = await claimJobs(db, { workerId: "w", batchSize: 3 });
+  expect(claimed.map((j) => j.kind).sort()).toEqual(["account.contact", "email.send", "message.posted"]);
+});
+
+test("workspaces take turns however long one workspace's backlog is", async () => {
+  const [other] = await db.insert(schema.organizations).values({ name: "Globex" }).returning();
+  const older = Date.now() - 3600_000;
+  const burst = Array.from({ length: 10_050 }, (_, i) => ({
+    orgId,
+    kind: "search.index",
+    payload: { i },
+    nextAttemptAt: new Date(older + i),
+  }));
+  for (let i = 0; i < burst.length; i += 2000) await db.insert(schema.outbox).values(burst.slice(i, i + 2000));
+  await enqueue(db, { orgId: other?.id ?? "", kind: "message.posted", payload: {} });
+  const claimed = await claimJobs(db, { workerId: "w", batchSize: 2 });
+  expect(claimed.map((j) => j.orgId).sort()).toEqual([orgId, other?.id].sort());
+}, 30_000);
+
+test("a worker process leaves a push to the app, the one process that knows who has the app open", async () => {
+  await enqueue(db, job("push.send", { runAt: at(-60_000) }));
+  await enqueue(db, job("message.posted"));
+  const worker = createOutboxPump(
+    db,
+    { "message.posted": async () => {} },
+    { workerId: "worker", skipKinds: APP_JOB_KINDS },
+  );
+  expect(await worker.pump()).toBe(1);
+  await worker.idle();
+  // Its quick lane doesn't count the push it leaves, due a minute ago, as waiting.
+  expect((await worker.tune()).waits.quick).toBeLessThan(30_000);
+  expect((await claimJobs(db, { workerId: "app" })).map((j) => j.kind)).toEqual(["push.send"]);
 });
 
 // Locks between connections: a real server only (`TEST_DATABASE_URL`); PGlite is one connection.
@@ -687,6 +729,29 @@ test("createOutboxPump.tune: nothing grows while the processor, the database or 
   expect(await step({})).toEqual([8, 24, []]);
   // Past 85% of its memory the process gives back half its long slots, though jobs still wait.
   expect(await step({ rssBytes: 900 })).toEqual([8, 12, ["memory"]]);
+});
+
+test("createOutboxPump: runs left running past a memory shed keep no quick job waiting", async () => {
+  let release: () => void = () => {};
+  const held = new Promise<void>((r) => {
+    release = r;
+  });
+  const limits = { lanes: { quick: 8, long: 24 }, total: 32 };
+  const pump = createOutboxPump(
+    db,
+    { "agent_run.execute": () => held, "message.posted": async () => {} },
+    { workerId: "w", maxInFlight: 8, quickSlots: 2, limits, memoryBytes: 1000 },
+  );
+  for (let i = 0; i < 24; i++) await enqueue(db, job("agent_run.execute", { runAt: at(-60_000), payload: { i } }));
+  expect((await pump.tune({ rssBytes: 100 })).long).toBe(12);
+  expect((await pump.tune({ rssBytes: 100 })).long).toBe(24);
+  expect(await pump.pump()).toBe(24);
+  // Memory runs out with 24 runs going: the long lane halves to 12 under them.
+  expect((await pump.tune({ rssBytes: 900 })).long).toBe(12);
+  await enqueue(db, job("message.posted"));
+  expect(await pump.pump()).toBe(1);
+  release();
+  await pump.idle();
 });
 
 test("claimLaneAlarm: one process tells about a lane each hour, the first to record it", async () => {
