@@ -13063,7 +13063,8 @@
       "draining": "La red está cambiando. Las sesiones abiertas de la computadora se reiniciarán a las {{when}}.",
       "restart": "Las sesiones de la computadora se están reiniciando para aplicar la red. El trabajo nuevo espera hasta que terminen.",
       "line": "IP de salida {{ip}}",
-      "hint": "La dirección que ven los sitios web cuando los agentes navegan. Se actualiza cuando cambia la red de la computadora."
+      "hint": "La dirección que ven los sitios web cuando los agentes navegan. Se actualiza cuando cambia la red de la computadora.",
+      "waiting": "Reconectando la conexión a internet de los agentes. Sus conexiones esperan hasta que vuelva."
     },
     "online": "En línea",
     "offline": "Sin conexión",

@@ -796,6 +796,15 @@
         },
         "required": ["standby"]
       },
+      "OperatorEgressWaiting": {
+        "type": "object",
+        "properties": {
+          "waiting": {
+            "type": "boolean"
+          }
+        },
+        "required": ["waiting"]
+      },
       "OperatorSignup": {
         "type": "object",
         "properties": {
@@ -4053,6 +4062,91 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/OperatorStandby"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orgs/{orgId}/machines/{machineId}/egress-waiting": {
+      "put": {
+        "tags": ["Operator"],
+        "summary": "Say the workspace's computer's agents wait for their way out, or no longer",
+        "description": "Say it (`true`) when the computer's network sends its agents out only through a proxy and none works now, so their connections are refused for a while; `false` once one works. Its people see a line saying so on the computer, never an error, while it is online. `true` again keeps the first time it was said; removing the computer ends it. A change comes as `machine.updated`. 404 when the workspace has no such managed computer.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "machineId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "waiting": {
+                    "type": "boolean"
+                  }
+                },
+                "required": ["waiting"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorEgressWaiting"
                 }
               }
             }

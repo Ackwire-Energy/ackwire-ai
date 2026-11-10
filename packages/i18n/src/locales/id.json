@@ -12260,7 +12260,8 @@
       "draining": "Jaringan sedang berubah. Sesi komputer yang terbuka akan dimulai ulang pukul {{when}}.",
       "restart": "Sesi komputer sedang dimulai ulang untuk menerapkan jaringan. Pekerjaan baru menunggu sampai selesai.",
       "line": "IP keluar {{ip}}",
-      "hint": "Alamat yang dilihat situs saat agen menjelajah. Alamat ini ikut berubah saat jaringan komputer berubah."
+      "hint": "Alamat yang dilihat situs saat agen menjelajah. Alamat ini ikut berubah saat jaringan komputer berubah.",
+      "waiting": "Menyambungkan ulang internet agen. Koneksi mereka menunggu sampai kembali."
     },
     "online": "Online",
     "offline": "Offline",
