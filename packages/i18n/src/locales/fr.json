@@ -6103,6 +6103,7 @@
     },
     "starters": {
       "clara": {
+        "instructions": "Consulte l'agenda chaque matin et envoie le programme du jour.\nRappelle la veille chaque rendez-vous et chaque facture datée.\nNe prend, n'annule ni n'accepte jamais une invitation sans demander d'abord.",
         "tasks": {
           "a": "Qu'est-ce que j'ai demain ?",
           "b": "Rappelle-moi de payer le loyer chaque 5 du mois",
@@ -6110,6 +6111,7 @@
         }
       },
       "duda": {
+        "instructions": "Suit les factures et les dépenses, triées par catégorie.\nPrévient trois jours avant une échéance et quand une dépense sort de l'ordinaire.\nNe paie, ne vire ni ne résilie jamais rien sans demander d'abord.",
         "tasks": {
           "a": "Combien j'ai dépensé ce mois-ci ?",
           "b": "Quelles factures arrivent à échéance cette semaine ?",
@@ -6117,6 +6119,7 @@
         }
       },
       "leo": {
+        "instructions": "Prépare les entraînements selon ton niveau, ton temps et ce que tu aimes.\nAjuste la semaine quand tu manques une séance ou as besoin de repos, sans sermon.\nNe donne aucun avis médical : en cas de douleur ou de blessure, il conseille un professionnel.",
         "tasks": {
           "a": "Prépare un entraînement de 30 minutes pour aujourd'hui",
           "b": "Planifie ma semaine de course",
@@ -6124,6 +6127,7 @@
         }
       },
       "mel": {
+        "instructions": "Planifie les repas de la semaine selon tes goûts, ton temps et ton budget.\nPrépare la liste de courses du menu, regroupée par rayon.\nRespecte restrictions et allergies, et ne donne ni régime ni avis médical.",
         "tasks": {
           "a": "Propose trois dîners rapides",
           "b": "Prépare le menu de la semaine",
@@ -6131,6 +6135,7 @@
         }
       },
       "gabi": {
+        "instructions": "Prépare le plan de révision jusqu'à l'examen, avec ce qui tient dans chaque journée.\nT'interroge sur ce que tu as étudié et réexplique ce que tu as raté.\nNe fait pas les devoirs à ta place : il te guide jusqu'à la réponse.",
         "tasks": {
           "a": "Prépare un plan d'études pour l'examen",
           "b": "Pose-moi 3 questions sur ce que j'ai étudié",
@@ -6138,6 +6143,7 @@
         }
       },
       "lu": {
+        "instructions": "Garde les notes et les idées que tu envoies et regroupe celles qui se ressemblent.\nTransforme les notes en texte dans ton ton, sans rien ajouter que tu n'as pas dit.\nRelit avec soin et montre ce qui a changé avant de remplacer l'original.",
         "tasks": {
           "a": "Transforme ces notes en un texte court",
           "b": "Rassemble les idées de la semaine",
@@ -6145,6 +6151,7 @@
         }
       },
       "rosa": {
+        "instructions": "Tient à jour la liste de courses et les tâches de la maison.\nNote ce qui doit être réparé et le rappelle jusqu'à ce que ce soit fait.\nN'achète ni ne fait appel à personne sans demander d'abord.",
         "tasks": {
           "a": "Fais la liste de courses de la semaine",
           "b": "Qu'est-ce qu'il faut réparer à la maison ?",
@@ -6152,6 +6159,7 @@
         }
       },
       "vic": {
+        "instructions": "Planifie le voyage avec les dates, les prix et un programme jour par jour.\nCompare vols et hébergements et dit pourquoi il propose chacun.\nNe réserve ni ne paie jamais rien sans demander d'abord.",
         "tasks": {
           "a": "Planifie 3 jours à Lisbonne",
           "b": "Préviens-moi si le billet baisse",
@@ -6159,6 +6167,7 @@
         }
       },
       "rui": {
+        "instructions": "Suit chaque client : ce qui a été convenu, ce qui reste et qui n'a pas payé.\nRédige devis et relances de paiement dans ton ton, prêts à relire.\nN'envoie jamais rien à un client sans ton accord.",
         "tasks": {
           "a": "Rédige un devis court pour un client",
           "b": "Qui n'a pas encore payé ?",
@@ -6194,11 +6203,20 @@
     "uses": "Va utiliser",
     "chooseApps": "Choisir des apps",
     "otherApp": "Autre app",
+    "usesNone": "Rien pour l'instant.",
     "worksIn": "Travaille dans",
-    "asks": "Pour commencer, demande-lui",
-    "noAi": "Pas encore d'IA : {{name}} commence à réfléchir dès que tu en connectes une, dans la conversation.",
-    "noAiBlank": "Pas encore d'IA : il commence à réfléchir dès que tu en connectes une, dans la conversation.",
-    "ready": "Le reste est déjà prêt. Tu pourras l'ajuster ensuite, dans la conversation.",
+    "how": "Comment {{name}} travaille",
+    "howBlank": "Comment il travaille",
+    "instructionsPlaceholder": "Ce qu'il fait, ce qu'il évite, à qui il demande de l'aide",
+    "picker": {
+      "title": "Apps de {{name}}",
+      "titleBlank": "Apps de l'agent",
+      "lead": "Une app connectée arrive tout de suite sur la carte. Les autres, tu les connectes ici même.",
+      "suggested": "Suggérées pour {{name}}",
+      "suggestedBlank": "Suggérées",
+      "use": "Utiliser",
+      "added": "Sur la carte"
+    },
     "create": "Créer {{name}}",
     "createBlank": "Créer l'agent",
     "failed": "Impossible de le créer : {{reason}}",

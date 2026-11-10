@@ -6109,6 +6109,7 @@
     },
     "starters": {
       "clara": {
+        "instructions": "Controlla l'agenda ogni mattina e manda gli impegni del giorno.\nRicorda il giorno prima ogni appuntamento e ogni bolletta con scadenza.\nNon fissa, non annulla e non accetta inviti senza chiedere prima.",
         "tasks": {
           "a": "Cosa ho domani?",
           "b": "Ricordami di pagare l'affitto ogni 5 del mese",
@@ -6116,6 +6117,7 @@
         }
       },
       "duda": {
+        "instructions": "Tiene traccia di bollette e spese, divise per categoria.\nAvvisa tre giorni prima di una scadenza e quando una spesa esce dal normale.\nNon paga, non trasferisce e non disdice nulla senza chiedere prima.",
         "tasks": {
           "a": "Quanto ho speso questo mese?",
           "b": "Quali conti scadono questa settimana?",
@@ -6123,6 +6125,7 @@
         }
       },
       "leo": {
+        "instructions": "Prepara gli allenamenti in base al tuo livello, al tuo tempo e a ciò che ti piace.\nAdatta la settimana quando salti o hai bisogno di riposo, senza prediche.\nNon dà consigli medici: con dolore o infortunio, suggerisce un professionista.",
         "tasks": {
           "a": "Prepara un allenamento di 30 minuti per oggi",
           "b": "Pianifica la mia settimana di corsa",
@@ -6130,6 +6133,7 @@
         }
       },
       "mel": {
+        "instructions": "Pianifica i pasti della settimana secondo i tuoi gusti, il tuo tempo e il tuo budget.\nPrepara la lista della spesa del menù, divisa per reparto.\nRispetta restrizioni e allergie, e non dà diete né consigli medici.",
         "tasks": {
           "a": "Suggerisci tre cene veloci",
           "b": "Prepara il menù della settimana",
@@ -6137,6 +6141,7 @@
         }
       },
       "gabi": {
+        "instructions": "Prepara il piano di studio fino all'esame, con ciò che sta in ogni giorno.\nTi fa domande su ciò che hai studiato e rispiega ciò che hai sbagliato.\nNon fa i compiti al posto tuo: ti guida fino alla risposta.",
         "tasks": {
           "a": "Prepara un piano di studio per l'esame",
           "b": "Fammi 3 domande su ciò che ho studiato",
@@ -6144,6 +6149,7 @@
         }
       },
       "lu": {
+        "instructions": "Conserva le note e le idee che mandi e raggruppa quelle simili.\nTrasforma le note in testo con il tuo tono, senza inventare ciò che non hai detto.\nRivede con cura e mostra cosa è cambiato prima di sostituire l'originale.",
         "tasks": {
           "a": "Trasforma queste note in un testo breve",
           "b": "Raccogli le idee della settimana",
@@ -6151,6 +6157,7 @@
         }
       },
       "rosa": {
+        "instructions": "Tiene aggiornate la lista della spesa e le faccende di casa.\nAnnota cosa va riparato e lo ricorda finché non è fatto.\nNon compra e non incarica nessuno senza chiedere prima.",
         "tasks": {
           "a": "Prepara la lista della spesa della settimana",
           "b": "Cosa va riparato in casa?",
@@ -6158,6 +6165,7 @@
         }
       },
       "vic": {
+        "instructions": "Pianifica il viaggio con date, prezzi e un itinerario giorno per giorno.\nConfronta voli e alloggi e spiega perché suggerisce ciascuno.\nNon prenota e non paga nulla senza chiedere prima.",
         "tasks": {
           "a": "Pianifica 3 giorni a Lisbona",
           "b": "Avvisami se il biglietto scende",
@@ -6165,6 +6173,7 @@
         }
       },
       "rui": {
+        "instructions": "Segue ogni cliente: cosa è stato concordato, cosa manca e chi non ha pagato.\nScrive preventivi e solleciti di pagamento con il tuo tono, pronti da rivedere.\nNon manda mai nulla a un cliente senza la tua approvazione.",
         "tasks": {
           "a": "Scrivi un preventivo breve per un cliente",
           "b": "Chi non ha ancora pagato?",
@@ -6200,11 +6209,20 @@
     "uses": "Userà",
     "chooseApps": "Scegli app",
     "otherApp": "Altra app",
+    "usesNone": "Niente per ora.",
     "worksIn": "Lavora in",
-    "asks": "Per iniziare, chiedigli",
-    "noAi": "Ancora nessuna IA: {{name}} inizia a pensare quando ne colleghi una, nella conversazione.",
-    "noAiBlank": "Ancora nessuna IA: inizia a pensare quando ne colleghi una, nella conversazione.",
-    "ready": "Il resto è già pronto. Puoi sistemarlo dopo, nella conversazione.",
+    "how": "Come lavora {{name}}",
+    "howBlank": "Come lavora",
+    "instructionsPlaceholder": "Cosa fa, cosa evita, a chi chiede aiuto",
+    "picker": {
+      "title": "App di {{name}}",
+      "titleBlank": "App dell'agente",
+      "lead": "Un'app collegata entra subito nella scheda. Le altre le colleghi qui.",
+      "suggested": "Suggerite per {{name}}",
+      "suggestedBlank": "Suggerite",
+      "use": "Usa",
+      "added": "Nella scheda"
+    },
     "create": "Crea {{name}}",
     "createBlank": "Crea agente",
     "failed": "Non è stato possibile crearlo: {{reason}}",

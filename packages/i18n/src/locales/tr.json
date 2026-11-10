@@ -5858,6 +5858,7 @@
     },
     "starters": {
       "clara": {
+        "instructions": "Her sabah takvime bakar ve günün programını gönderir.\nHer randevuyu ve tarihi olan her faturayı bir gün önceden hatırlatır.\nSormadan asla randevu almaz, iptal etmez ya da davet kabul etmez.",
         "tasks": {
           "a": "Yarın neyim var?",
           "b": "Her ayın 5'inde kirayı ödememi hatırlat",
@@ -5865,6 +5866,7 @@
         }
       },
       "duda": {
+        "instructions": "Faturaları ve harcamaları kategoriye göre takip eder.\nBir şeyin vadesinden üç gün önce ve olağan dışı bir harcamada uyarır.\nSormadan asla ödeme yapmaz, para göndermez ya da bir şeyi iptal etmez.",
         "tasks": {
           "a": "Bu ay ne kadar harcadım?",
           "b": "Bu hafta hangi faturaların vadesi geliyor?",
@@ -5872,6 +5874,7 @@
         }
       },
       "leo": {
+        "instructions": "Antrenmanları seviyene, zamanına ve sevdiklerine göre hazırlar.\nBir günü kaçırdığında ya da yorulduğunda haftayı nutuk atmadan ayarlar.\nTıbbi tavsiye vermez: ağrı ya da sakatlıkta bir uzmana gitmeni önerir.",
         "tasks": {
           "a": "Bugün için 30 dakikalık bir antrenman hazırla",
           "b": "Koşu haftamı planla",
@@ -5879,6 +5882,7 @@
         }
       },
       "mel": {
+        "instructions": "Haftanın öğünlerini zevkine, zamanına ve bütçene göre planlar.\nMenünün alışveriş listesini market reyonlarına göre hazırlar.\nKısıtlamalara ve alerjilere uyar, diyet ya da tıbbi tavsiye vermez.",
         "tasks": {
           "a": "Üç hızlı akşam yemeği öner",
           "b": "Haftanın menüsünü hazırla",
@@ -5886,6 +5890,7 @@
         }
       },
       "gabi": {
+        "instructions": "Sınava kadar her güne sığanla bir çalışma planı hazırlar.\nÇalıştıklarından sorular sorar ve yanlış yaptığını yeniden anlatır.\nÖdevini senin yerine yapmaz: cevaba ulaşman için yol gösterir.",
         "tasks": {
           "a": "Sınav için bir çalışma planı hazırla",
           "b": "Çalıştığım konudan bana 3 soru sor",
@@ -5893,6 +5898,7 @@
         }
       },
       "lu": {
+        "instructions": "Gönderdiğin notları ve fikirleri saklar, benzerlerini bir araya getirir.\nNotları senin üslubunla metne dönüştürür, söylemediğin bir şey eklemez.\nÖzenle düzenler ve orijinalin yerine koymadan önce neyin değiştiğini gösterir.",
         "tasks": {
           "a": "Bu notları kısa bir metne dönüştür",
           "b": "Haftanın fikirlerini topla",
@@ -5900,6 +5906,7 @@
         }
       },
       "rosa": {
+        "instructions": "Alışveriş listesini ve ev işlerini güncel tutar.\nTamir edilmesi gerekeni not eder ve halledilene kadar hatırlatır.\nSormadan asla bir şey satın almaz ya da kimseyi tutmaz.",
         "tasks": {
           "a": "Haftanın alışveriş listesini hazırla",
           "b": "Evde neyin tamire ihtiyacı var?",
@@ -5907,6 +5914,7 @@
         }
       },
       "vic": {
+        "instructions": "Seyahati tarihler, fiyatlar ve gün gün bir programla planlar.\nUçuşları ve konaklamaları karşılaştırır, her birini neden önerdiğini söyler.\nSormadan asla rezervasyon yapmaz ya da ödeme yapmaz.",
         "tasks": {
           "a": "Lizbon'da 3 gün planla",
           "b": "Bilet ucuzlarsa haber ver",
@@ -5914,6 +5922,7 @@
         }
       },
       "rui": {
+        "instructions": "Her müşteriyi takip eder: ne kararlaştırıldı, ne kaldı ve kim ödemedi.\nTeklifleri ve ödeme hatırlatmalarını senin üslubunla, gözden geçirmeye hazır yazar.\nOnayın olmadan bir müşteriye asla bir şey göndermez.",
         "tasks": {
           "a": "Bir müşteri için kısa bir teklif yaz",
           "b": "Kim henüz ödemedi?",
@@ -5947,11 +5956,20 @@
     "uses": "Kullanacakları",
     "chooseApps": "Uygulama seç",
     "otherApp": "Başka uygulama",
+    "usesNone": "Şimdilik bir şey yok.",
     "worksIn": "Çalıştığı yer",
-    "asks": "Başlamak için iste",
-    "noAi": "Henüz yapay zekâ yok: {{name}}, sohbette bir yapay zekâ bağladığında düşünmeye başlar.",
-    "noAiBlank": "Henüz yapay zekâ yok: sohbette bir yapay zekâ bağladığında düşünmeye başlar.",
-    "ready": "Gerisi hazır geliyor. Sonra sohbette ayarlayabilirsin.",
+    "how": "{{name}} nasıl çalışır",
+    "howBlank": "Nasıl çalışır",
+    "instructionsPlaceholder": "Ne yapar, neden kaçınır, kimden yardım ister",
+    "picker": {
+      "title": "{{name}} uygulamaları",
+      "titleBlank": "Ajanın uygulamaları",
+      "lead": "Bağlı bir uygulama hemen karta eklenir. Diğerlerini burada bağlarsın.",
+      "suggested": "{{name}} için önerilenler",
+      "suggestedBlank": "Önerilenler",
+      "use": "Kullan",
+      "added": "Kartta"
+    },
     "create": "{{name}} oluştur",
     "createBlank": "Ajan oluştur",
     "failed": "Oluşturulamadı: {{reason}}",

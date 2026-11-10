@@ -5708,6 +5708,7 @@
     },
     "starters": {
       "clara": {
+        "instructions": "Mengecek kalender setiap pagi dan mengirim jadwal hari itu.\nMengingatkan sehari sebelum setiap janji dan setiap tagihan yang ada tanggalnya.\nTidak pernah membuat, membatalkan, atau menerima undangan tanpa bertanya dulu.",
         "tasks": {
           "a": "Apa jadwalku besok?",
           "b": "Ingatkan aku bayar sewa setiap tanggal 5",
@@ -5715,6 +5716,7 @@
         }
       },
       "duda": {
+        "instructions": "Mencatat tagihan dan pengeluaran per kategori.\nMemberi tahu tiga hari sebelum jatuh tempo dan saat ada pengeluaran yang tidak biasa.\nTidak pernah membayar, mentransfer, atau membatalkan apa pun tanpa bertanya dulu.",
         "tasks": {
           "a": "Berapa pengeluaranku bulan ini?",
           "b": "Tagihan apa yang jatuh tempo minggu ini?",
@@ -5722,6 +5724,7 @@
         }
       },
       "leo": {
+        "instructions": "Menyusun latihan sesuai levelmu, waktumu, dan yang kamu suka.\nMenyesuaikan minggu saat kamu absen atau lelah, tanpa ceramah.\nTidak memberi saran medis: kalau sakit atau cedera, menyarankan ke tenaga profesional.",
         "tasks": {
           "a": "Susun latihan 30 menit untuk hari ini",
           "b": "Rencanakan minggu lariku",
@@ -5729,6 +5732,7 @@
         }
       },
       "mel": {
+        "instructions": "Merencanakan makanan seminggu sesuai selera, waktu, dan anggaranmu.\nMembuat daftar belanja dari menu, dikelompokkan per bagian toko.\nMenghormati pantangan dan alergi, dan tidak memberi diet atau saran medis.",
         "tasks": {
           "a": "Sarankan tiga makan malam cepat",
           "b": "Susun menu minggu ini",
@@ -5736,6 +5740,7 @@
         }
       },
       "gabi": {
+        "instructions": "Menyusun rencana belajar sampai ujian, dengan yang muat di tiap hari.\nMemberi pertanyaan tentang yang kamu pelajari dan menjelaskan lagi yang salah.\nTidak mengerjakan tugasmu: membimbing sampai kamu menemukan jawabannya.",
         "tasks": {
           "a": "Susun rencana belajar untuk ujian",
           "b": "Beri aku 3 pertanyaan tentang yang kupelajari",
@@ -5743,6 +5748,7 @@
         }
       },
       "lu": {
+        "instructions": "Menyimpan catatan dan ide yang kamu kirim dan menggabungkan yang mirip.\nMengubah catatan jadi tulisan dengan gayamu, tanpa menambahkan yang tidak kamu katakan.\nMenyunting dengan cermat dan menunjukkan perubahannya sebelum mengganti aslinya.",
         "tasks": {
           "a": "Ubah catatan ini jadi teks pendek",
           "b": "Kumpulkan ide minggu ini",
@@ -5750,6 +5756,7 @@
         }
       },
       "rosa": {
+        "instructions": "Menjaga daftar belanja dan pekerjaan rumah tetap terkini.\nMencatat apa yang perlu diperbaiki dan mengingatkan sampai beres.\nTidak pernah membeli atau menyewa jasa apa pun tanpa bertanya dulu.",
         "tasks": {
           "a": "Buat daftar belanja minggu ini",
           "b": "Apa yang perlu diperbaiki di rumah?",
@@ -5757,6 +5764,7 @@
         }
       },
       "vic": {
+        "instructions": "Merencanakan perjalanan dengan tanggal, harga, dan rencana per hari.\nMembandingkan penerbangan dan penginapan dan menjelaskan alasan tiap saran.\nTidak pernah memesan atau membayar apa pun tanpa bertanya dulu.",
         "tasks": {
           "a": "Rencanakan 3 hari di Lisbon",
           "b": "Kabari aku kalau tiketnya turun",
@@ -5764,6 +5772,7 @@
         }
       },
       "rui": {
+        "instructions": "Memantau setiap klien: apa yang disepakati, apa yang kurang, dan siapa yang belum bayar.\nMenulis penawaran dan pengingat pembayaran dengan gayamu, siap ditinjau.\nTidak pernah mengirim apa pun ke klien tanpa persetujuanmu.",
         "tasks": {
           "a": "Tulis penawaran singkat untuk klien",
           "b": "Siapa yang belum bayar?",
@@ -5797,11 +5806,20 @@
     "uses": "Akan memakai",
     "chooseApps": "Pilih aplikasi",
     "otherApp": "Aplikasi lain",
+    "usesNone": "Belum ada.",
     "worksIn": "Bekerja di",
-    "asks": "Untuk mulai, minta",
-    "noAi": "Belum ada AI: {{name}} mulai berpikir saat kamu menghubungkan AI, di percakapan.",
-    "noAiBlank": "Belum ada AI: ia mulai berpikir saat kamu menghubungkan AI, di percakapan.",
-    "ready": "Sisanya sudah siap. Bisa disesuaikan nanti, di percakapan.",
+    "how": "Cara kerja {{name}}",
+    "howBlank": "Cara kerjanya",
+    "instructionsPlaceholder": "Apa yang ia lakukan, apa yang ia hindari, kepada siapa ia minta bantuan",
+    "picker": {
+      "title": "Aplikasi {{name}}",
+      "titleBlank": "Aplikasi agen",
+      "lead": "Aplikasi yang terhubung langsung masuk ke kartu. Yang lain bisa kamu hubungkan di sini.",
+      "suggested": "Disarankan untuk {{name}}",
+      "suggestedBlank": "Disarankan",
+      "use": "Pakai",
+      "added": "Di kartu"
+    },
     "create": "Buat {{name}}",
     "createBlank": "Buat agen",
     "failed": "Gagal membuat: {{reason}}",

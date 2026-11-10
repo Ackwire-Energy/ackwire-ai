@@ -6051,6 +6051,7 @@
     },
     "starters": {
       "clara": {
+        "instructions": "Revisa la agenda cada mañana y envía lo que hay en el día.\nRecuerda la víspera de cada cita y de cada cuenta con fecha.\nNunca agenda, cancela ni acepta invitaciones sin preguntar antes.",
         "tasks": {
           "a": "¿Qué tengo mañana?",
           "b": "Recuérdame pagar el alquiler cada día 5",
@@ -6058,6 +6059,7 @@
         }
       },
       "duda": {
+        "instructions": "Lleva las cuentas y los gastos, separados por categoría.\nAvisa tres días antes de que algo venza y cuando un gasto se sale de lo normal.\nNunca paga, transfiere ni cancela nada sin preguntar antes.",
         "tasks": {
           "a": "¿Cuánto gasté este mes?",
           "b": "¿Qué cuentas vencen esta semana?",
@@ -6065,6 +6067,7 @@
         }
       },
       "leo": {
+        "instructions": "Arma los entrenamientos según tu nivel, el tiempo que tienes y lo que te gusta.\nAjusta la semana cuando faltas o necesitas descansar, sin sermones.\nNo da consejos médicos: con dolor o lesión, sugiere ver a un profesional.",
         "tasks": {
           "a": "Arma un entrenamiento de 30 minutos para hoy",
           "b": "Planea mi semana de carrera",
@@ -6072,6 +6075,7 @@
         }
       },
       "mel": {
+        "instructions": "Planifica las comidas de la semana según tu gusto, tu tiempo y tu presupuesto.\nArma la lista de la compra del menú, agrupada por sección del súper.\nRespeta restricciones y alergias, y no da dietas ni consejos médicos.",
         "tasks": {
           "a": "Sugiere tres cenas rápidas",
           "b": "Arma el menú de la semana",
@@ -6079,6 +6083,7 @@
         }
       },
       "gabi": {
+        "instructions": "Arma el plan de estudio hasta el examen, con lo que cabe en cada día.\nTe hace preguntas sobre lo que estudiaste y vuelve a explicar lo que fallaste.\nNo hace la tarea por ti: te guía hasta la respuesta.",
         "tasks": {
           "a": "Arma un plan de estudios para el examen",
           "b": "Hazme 3 preguntas sobre lo que estudié",
@@ -6086,6 +6091,7 @@
         }
       },
       "lu": {
+        "instructions": "Guarda las notas e ideas que le mandas y junta las parecidas.\nConvierte las notas en texto con tu tono, sin inventar lo que no dijiste.\nRevisa con cuidado y muestra lo que cambió antes de reemplazar el original.",
         "tasks": {
           "a": "Convierte estas notas en un texto corto",
           "b": "Junta las ideas de la semana",
@@ -6093,6 +6099,7 @@
         }
       },
       "rosa": {
+        "instructions": "Mantiene al día la lista de la compra y las tareas de casa.\nAnota lo que hay que arreglar y lo recuerda hasta que se resuelva.\nNunca compra ni contrata nada sin preguntar antes.",
         "tasks": {
           "a": "Arma la lista de la compra de la semana",
           "b": "¿Qué hay que arreglar en casa?",
@@ -6100,6 +6107,7 @@
         }
       },
       "vic": {
+        "instructions": "Planifica el viaje con fechas, precios y un itinerario día a día.\nCompara vuelos y alojamientos y dice por qué sugiere cada uno.\nNunca reserva ni paga nada sin preguntar antes.",
         "tasks": {
           "a": "Planea 3 días en Lisboa",
           "b": "Avísame si baja el pasaje",
@@ -6107,6 +6115,7 @@
         }
       },
       "rui": {
+        "instructions": "Sigue a cada cliente: lo acordado, lo que falta y quién no ha pagado.\nEscribe propuestas y recordatorios de cobro con tu tono, listos para revisar.\nNunca envía nada a un cliente sin tu aprobación.",
         "tasks": {
           "a": "Escribe una propuesta corta para un cliente",
           "b": "¿Quién no ha pagado todavía?",
@@ -6142,11 +6151,20 @@
     "uses": "Va a usar",
     "chooseApps": "Elegir apps",
     "otherApp": "Otra app",
+    "usesNone": "Nada por ahora.",
     "worksIn": "Trabaja en",
-    "asks": "Para empezar, pídele",
-    "noAi": "Sin IA todavía: {{name}} empieza a pensar cuando conectes una, en la conversación.",
-    "noAiBlank": "Sin IA todavía: empieza a pensar cuando conectes una, en la conversación.",
-    "ready": "Lo demás ya viene listo. Puedes ajustarlo después, en la conversación.",
+    "how": "Cómo trabaja {{name}}",
+    "howBlank": "Cómo trabaja",
+    "instructionsPlaceholder": "Qué hace, qué evita, a quién pide ayuda",
+    "picker": {
+      "title": "Apps de {{name}}",
+      "titleBlank": "Apps del agente",
+      "lead": "Una app conectada entra en la tarjeta al momento. Las demás las conectas aquí mismo.",
+      "suggested": "Sugeridas para {{name}}",
+      "suggestedBlank": "Sugeridas",
+      "use": "Usar",
+      "added": "En la tarjeta"
+    },
     "create": "Crear a {{name}}",
     "createBlank": "Crear agente",
     "failed": "No se pudo crear: {{reason}}",

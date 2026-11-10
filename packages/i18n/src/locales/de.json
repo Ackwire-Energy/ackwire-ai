@@ -5896,6 +5896,7 @@
     },
     "starters": {
       "clara": {
+        "instructions": "Schaut jeden Morgen in den Kalender und schickt, was am Tag ansteht.\nErinnert am Vortag an jeden Termin und jede Rechnung mit Datum.\nBucht, sagt ab oder nimmt Einladungen nie an, ohne vorher zu fragen.",
         "tasks": {
           "a": "Was habe ich morgen?",
           "b": "Erinnere mich jeden 5. an die Miete",
@@ -5903,6 +5904,7 @@
         }
       },
       "duda": {
+        "instructions": "Behält Rechnungen und Ausgaben im Blick, nach Kategorien sortiert.\nWarnt drei Tage, bevor etwas fällig wird, und wenn eine Ausgabe aus dem Rahmen fällt.\nZahlt, überweist oder kündigt nie etwas, ohne vorher zu fragen.",
         "tasks": {
           "a": "Wie viel habe ich diesen Monat ausgegeben?",
           "b": "Welche Rechnungen sind diese Woche fällig?",
@@ -5910,6 +5912,7 @@
         }
       },
       "leo": {
+        "instructions": "Plant Trainings nach deinem Niveau, deiner Zeit und dem, was dir Spaß macht.\nPasst die Woche an, wenn du aussetzt oder müde bist, ohne Predigt.\nGibt keinen medizinischen Rat: bei Schmerzen oder Verletzungen empfiehlt er Fachleute.",
         "tasks": {
           "a": "Plane ein 30-Minuten-Training für heute",
           "b": "Plane meine Laufwoche",
@@ -5917,6 +5920,7 @@
         }
       },
       "mel": {
+        "instructions": "Plant die Mahlzeiten der Woche nach deinem Geschmack, deiner Zeit und deinem Budget.\nErstellt die Einkaufsliste zum Speiseplan, nach Abteilungen im Laden sortiert.\nAchtet auf Unverträglichkeiten und Allergien und gibt keine Diät- oder medizinischen Ratschläge.",
         "tasks": {
           "a": "Schlag drei schnelle Abendessen vor",
           "b": "Plane den Speiseplan der Woche",
@@ -5924,6 +5928,7 @@
         }
       },
       "gabi": {
+        "instructions": "Erstellt den Lernplan bis zur Prüfung, mit dem, was an jedem Tag passt.\nFragt dich ab und erklärt noch einmal, was du falsch hattest.\nMacht die Hausaufgaben nicht für dich: führt dich zur Antwort.",
         "tasks": {
           "a": "Erstelle einen Lernplan für die Prüfung",
           "b": "Stell mir 3 Fragen zu dem, was ich gelernt habe",
@@ -5931,6 +5936,7 @@
         }
       },
       "lu": {
+        "instructions": "Bewahrt die Notizen und Ideen auf, die du schickst, und fasst ähnliche zusammen.\nMacht aus Notizen Text in deinem Ton, ohne etwas hinzuzufügen, das du nicht gesagt hast.\nÜberarbeitet sorgfältig und zeigt, was sich geändert hat, bevor er das Original ersetzt.",
         "tasks": {
           "a": "Mach aus diesen Notizen einen kurzen Text",
           "b": "Sammle die Ideen der Woche",
@@ -5938,6 +5944,7 @@
         }
       },
       "rosa": {
+        "instructions": "Hält die Einkaufsliste und die Hausarbeit auf dem Laufenden.\nNotiert, was repariert werden muss, und erinnert daran, bis es erledigt ist.\nKauft oder beauftragt nie etwas, ohne vorher zu fragen.",
         "tasks": {
           "a": "Erstelle die Einkaufsliste der Woche",
           "b": "Was muss im Haus repariert werden?",
@@ -5945,6 +5952,7 @@
         }
       },
       "vic": {
+        "instructions": "Plant die Reise mit Daten, Preisen und einem Plan für jeden Tag.\nVergleicht Flüge und Unterkünfte und sagt, warum er welche vorschlägt.\nBucht oder bezahlt nie etwas, ohne vorher zu fragen.",
         "tasks": {
           "a": "Plane 3 Tage in Lissabon",
           "b": "Sag mir, wenn der Flugpreis sinkt",
@@ -5952,6 +5960,7 @@
         }
       },
       "rui": {
+        "instructions": "Begleitet jeden Kunden: was vereinbart wurde, was noch fehlt und wer nicht bezahlt hat.\nSchreibt Angebote und Zahlungserinnerungen in deinem Ton, bereit zur Durchsicht.\nSchickt einem Kunden nie etwas ohne deine Zustimmung.",
         "tasks": {
           "a": "Schreib ein kurzes Angebot für einen Kunden",
           "b": "Wer hat noch nicht bezahlt?",
@@ -5985,11 +5994,20 @@
     "uses": "Nutzt",
     "chooseApps": "Apps wählen",
     "otherApp": "Andere App",
+    "usesNone": "Noch nichts.",
     "worksIn": "Arbeitet in",
-    "asks": "Bitte zum Start um",
-    "noAi": "Noch keine KI: {{name}} fängt an zu denken, sobald du eine verbindest, im Chat.",
-    "noAiBlank": "Noch keine KI: er fängt an zu denken, sobald du eine verbindest, im Chat.",
-    "ready": "Der Rest ist schon fertig. Du kannst ihn später im Chat anpassen.",
+    "how": "Wie {{name}} arbeitet",
+    "howBlank": "Wie er arbeitet",
+    "instructionsPlaceholder": "Was er tut, was er vermeidet, wen er um Hilfe bittet",
+    "picker": {
+      "title": "Apps von {{name}}",
+      "titleBlank": "Apps des Agenten",
+      "lead": "Eine verbundene App kommt sofort auf die Karte. Jede andere verbindest du gleich hier.",
+      "suggested": "Vorschläge für {{name}}",
+      "suggestedBlank": "Vorschläge",
+      "use": "Verwenden",
+      "added": "Auf der Karte"
+    },
     "create": "{{name}} erstellen",
     "createBlank": "Agent erstellen",
     "failed": "Erstellen hat nicht geklappt: {{reason}}",
