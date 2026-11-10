@@ -468,6 +468,12 @@ function ConnectAiDialog({
     const ready = !(dir.loading || status.isPending);
     const lead = rightHandOf(dir.agents);
     const stepping = chosen && !connected;
+    const without = (
+      <span className="ac-iconline">
+        <Icon name="info" />
+        <span>{t("arrival.connect.without")}</span>
+      </span>
+    );
     return (
       <Dialog
         open
@@ -568,14 +574,7 @@ function ConnectAiDialog({
             </DialogFooter>
           ) : (
             !chosen && (
-              <DialogFooter
-                note={
-                  <>
-                    <Icon name="info" />
-                    <span>{t("arrival.connect.without")}</span>
-                  </>
-                }
-              >
+              <DialogFooter note={without}>
                 <Button variant="ghost" onClick={onClose}>
                   {t("arrival.connect.later")}
                 </Button>

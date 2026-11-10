@@ -12939,6 +12939,10 @@
         "invalidInput": "Revisa los campos e inténtalo de nuevo.",
         "tooManyItems": "El Vault está lleno. Elimina elementos antes de sincronizar más."
       }
+    },
+    "feedback": {
+      "filesGone": "Un archivo que añadiste ya no está. Añádelo de nuevo.",
+      "filesPending": "Hay demasiados archivos esperando para enviarse. Envía o quita algunos e inténtalo de nuevo."
     }
   },
   "machines": {
