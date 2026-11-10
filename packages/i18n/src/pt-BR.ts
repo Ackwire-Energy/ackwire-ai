@@ -6205,6 +6205,41 @@ export const ptBR = {
       ai: "Uma IA para pensar",
       asleep: "Dormindo até ter uma IA",
     },
+    skills: "Skills",
+    skillsHelpBlank: "Manuais que ele abre quando precisa.",
+    chooseSkills: "Escolher skills",
+    otherSkill: "Outra skill",
+    namesLead: "Que tal",
+    namesRoll: "Outros nomes",
+    /** One skill on the card. */
+    skill: {
+      opens: "O {{name}} abre este manual quando o assunto aparece. Você edita em Skills.",
+      opens_female: "A {{name}} abre este manual quando o assunto aparece. Você edita em Skills.",
+      opensBlank: "Ele abre este manual quando o assunto aparece. Você edita em Skills.",
+      remove: "Tirar do {{name}}",
+      remove_female: "Tirar da {{name}}",
+      removeBlank: "Tirar do agente",
+      done: "Pronto",
+    },
+    /**
+     * Name ideas for an agent from scratch, by what it will do: names (comma-separated, fit for this language) and
+     * the word beginnings that pick each theme; `any` when none fits.
+     */
+    names: {
+      agenda: "Lia, Hora, Teca, Dora, Tito, Ema",
+      agendaWords: "agenda, compromiss, consult, lembr, horári, reuni",
+      money: "Cida, Nico, Duda, Ciro, Lara, Tadeu",
+      moneyWords: "conta, gasto, dinheiro, finan, boleto, pagar",
+      travel: "Rota, Malu, Ravi, Vic, Nara, Tom",
+      travelWords: "viag, passag, hotel, roteiro, férias, voo",
+      training: "Léo, Bia, Raio, Kai, Nina, Davi",
+      trainingWords: "treino, corr, academia, exerc",
+      study: "Gabi, Nilo, Sofia, Teo, Íris, Benji",
+      studyWords: "estud, prova, curso, aprend",
+      clients: "Rui, Ana, Bento, Lis, Otto, Clô",
+      clientsWords: "client, venda, proposta, cobran",
+      any: "Sol, Lia, Teo, Bia, Nino, Iara, Caio, Luma, Gil, Rafa, Nara, Tom",
+    },
   },
   members: {
     /** The channel's members column (and its sheet on a phone). */

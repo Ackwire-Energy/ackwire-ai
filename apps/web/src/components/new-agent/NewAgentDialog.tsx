@@ -1,5 +1,14 @@
 import type { ConnectorDef } from "@agenteschat/client";
-import { useAgents, useCatalog, useChannels, useCreateAgent, useDms, useMembers, useSkills } from "@agenteschat/client";
+import {
+  useAgents,
+  useCatalog,
+  useChannels,
+  useCreateAgent,
+  useDms,
+  useMembers,
+  useSkill,
+  useSkills,
+} from "@agenteschat/client";
 import { type Level, saveLevels } from "@agenteschat/client/lib/access-levels";
 import { errorText as failureText } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -22,6 +31,7 @@ import {
   prefersReducedMotion,
   randomAppearance,
   setGaze,
+  spriteTone,
 } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
 import {
@@ -87,6 +97,8 @@ interface Draft {
   what: string;
   look: Look;
   apps: Record<string, CardLevel>;
+  /** The skills it opens when needed (library ids); null: its starting point's suggestions, as they load. */
+  skills: string[] | null;
 }
 
 export interface NewAgentRequest {
@@ -192,6 +204,32 @@ const GROUP_ICON: Record<RoleGroupId, "code" | "members" | "layers"> = {
 /** The apps the card offers to add, after the ones already connected: what a person or a team most often uses. */
 const OFFER_PERSONAL = ["google-calendar", "drive", "google-docs", "google-sheets", "notion", "todoist"];
 const OFFER_TEAM = ["github", "linear", "notion", "drive", "stripe", "sentry", "google-calendar"];
+/**
+ * The skills each starting point opens when needed, as the team templates name them (`teamTemplates.skills.{key}`),
+ * matched in the workspace's library by name, best effort.
+ */
+const SKILL_SUGGESTIONS: Partial<Record<Pick, readonly string[]>> = {
+  clara: ["schedule"],
+  rui: ["proposal", "dunning"],
+  dev: ["review"],
+  qa: ["review"],
+  support: ["voice", "answers"],
+  sales: ["proposal", "voice"],
+  marketing: ["voice"],
+  content: ["voice"],
+  finance: ["dunning"],
+  assistant: ["schedule"],
+};
+/** Name ideas for an agent from scratch, by what it will do (`newAgentCard.names.{theme}` and its `…Words`). */
+const NAME_THEMES = ["agenda", "money", "travel", "training", "study", "clients"] as const;
+/** A name or a title as a comparable slug ("Tom de voz" → "tom-de-voz"). */
+const norm = (text: string) =>
+  text
+    .toLocaleLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
 /** The words a text shares with another, by their first five letters (a rough "parecido"). */
 const stems = (text: string) =>
   new Set(
@@ -242,6 +280,11 @@ function NewAgentDialog({
   const [adding, setAdding] = useState(false);
   const [appOpen, setAppOpen] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [addingSkills, setAddingSkills] = useState(false);
+  const [skillOpen, setSkillOpen] = useState<string | null>(null);
+  // Name ideas for an agent from scratch: which three show, and the one pointed at (tried on in the bubble).
+  const [nameRoll, setNameRoll] = useState(0);
+  const [tryName, setTryName] = useState<string | null>(null);
   const cover = useRef<HTMLDivElement>(null);
   const hero = useRef<HTMLSpanElement>(null);
   const bubble = useRef<HTMLDivElement>(null);
@@ -272,15 +315,22 @@ function NewAgentDialog({
       if (item.def && !item.custom && (level === "read" || level === "write")) fromConnected[item.def.id] = level;
     }
     const apps = { ...fromConnected, ...suggested };
-    if (pick === "zero") return { name: "", what: "", look: { ...BLANK_LOOK }, apps };
+    if (pick === "zero") return { name: "", what: "", look: { ...BLANK_LOOK }, apps, skills: null };
     if (starter)
-      return { name: starter.name, what: tt(`newAgent.hello.${starter.id}`), look: { ...starter.look }, apps };
+      return {
+        name: starter.name,
+        what: tt(`newAgent.hello.${starter.id}`),
+        look: { ...starter.look },
+        apps,
+        skills: null,
+      };
     const id = pick as TeamRole;
     return {
       name: tt(`newAgent.roles.${id}.agent`),
       what: tt(`newAgent.hello.${id}`),
       look: { ...ROLE_DEFAULTS[id].look } as Look,
       apps,
+      skills: null,
     };
   };
   const draft = drafts[sel] ?? fresh(sel);
@@ -295,6 +345,43 @@ function NewAgentDialog({
     : starter
       ? tt(`teamTemplates.agents.${starter.id}.role`)
       : "";
+
+  // Its skills: what its starting point suggests that the library has, and the ones on for new agents; hidden where
+  // the library is empty or this server has none.
+  const lib = library.data ?? [];
+  const skillsShown = library.isSuccess && lib.length > 0;
+  const suggestedSkills = (pick: Pick) => {
+    const titles = (SKILL_SUGGESTIONS[pick] ?? []).flatMap((k) => [k, norm(tt(`teamTemplates.skills.${k}.name`))]);
+    return lib
+      .filter((s) => s.defaultForNewAgents || titles.some((x) => x && (norm(s.name) === x || norm(s.name).includes(x))))
+      .map((s) => s.id);
+  };
+  const chosenSkills = (draft.skills ?? suggestedSkills(sel)).filter((id) => lib.some((s) => s.id === id));
+  const skillName = (id: string) => lib.find((s) => s.id === id)?.name ?? "";
+
+  // Name ideas while an agent from scratch has none: a pool that fits what it will do, else the usual one.
+  const takenNames = useMemo(
+    () => new Set((agents.data ?? []).map((a) => a.name.trim().toLocaleLowerCase())),
+    [agents.data],
+  );
+  const ideas = useMemo(() => {
+    if (sel !== "zero" || draft.name.trim()) return [];
+    const list = (key: string) =>
+      tt(key)
+        .split(",")
+        .map((n) => n.trim())
+        .filter(Boolean);
+    const words = draft.what.toLocaleLowerCase().split(/[^\p{L}0-9]+/u);
+    const theme = NAME_THEMES.find((th) =>
+      list(`newAgentCard.names.${th}Words`).some((k) => words.some((w) => w.startsWith(k.toLocaleLowerCase()))),
+    );
+    const pool = list(theme ? `newAgentCard.names.${theme}` : "newAgentCard.names.any").filter(
+      (n) => !takenNames.has(n.toLocaleLowerCase()),
+    );
+    if (pool.length === 0) return [];
+    const at = (nameRoll * 3) % pool.length;
+    return [0, 1, 2].map((i) => pool[(at + i) % pool.length] ?? "").filter((n, i, all) => n && all.indexOf(n) === i);
+  }, [sel, draft.name, draft.what, nameRoll, takenNames, tt]);
 
   // Its @: from the name; a taken one gets the next free one, and the card says so.
   const taken = useMemo(() => takenHandles(agents.data ?? [], members.data ?? []), [agents.data, members.data]);
@@ -390,6 +477,19 @@ function NewAgentDialog({
     setPreview(null);
     react();
   };
+  // The names' dice: a few names flash in the bubble like a slot machine, then three new ideas, and a hop.
+  const rollNames = async () => {
+    if (!prefersReducedMotion()) {
+      for (let i = 0; i < 6; i++) {
+        setTryName(ideas[i % Math.max(1, ideas.length)] ?? null);
+        setNameRoll((r) => r + 1);
+        await new Promise((r) => setTimeout(r, 55 + i * 16));
+      }
+    }
+    setTryName(null);
+    setNameRoll((r) => r + 1);
+    react();
+  };
   // Sortear: a few quick looks, then the one it keeps, with a hop and a burst.
   const shuffle = async () => {
     const spins = prefersReducedMotion() ? 1 : 7;
@@ -462,7 +562,7 @@ function NewAgentDialog({
           api.skills.setForAgent(
             org.id,
             agent.id,
-            skills.map((s) => ({ skillId: s.id, enabled: s.defaultForNewAgents })),
+            skills.map((s) => ({ skillId: s.id, enabled: chosenSkills.includes(s.id) })),
           ),
         );
       if (failures.length > 0)
@@ -625,13 +725,19 @@ function NewAgentDialog({
                 {!lookOpen && (
                   <div className="nac__bubble" ref={bubble}>
                     <p className="nac__hi">
-                      <span>{name ? t("newAgentCard.hi", g) : t("newAgentCard.hiBlank")}</span>
+                      <span>
+                        {name
+                          ? t("newAgentCard.hi", g)
+                          : tryName
+                            ? t("newAgentCard.hi", agentGrammar(tryName))
+                            : t("newAgentCard.hiBlank")}
+                      </span>
                       <input
                         ref={nameInput}
                         className="nac__name"
                         value={draft.name}
                         maxLength={40}
-                        placeholder={t("newAgentCard.namePlaceholder")}
+                        placeholder={tryName ?? (sel === "zero" ? "…" : t("newAgentCard.namePlaceholder"))}
                         aria-label={t("newAgentCard.name")}
                         autoComplete="off"
                         spellCheck={false}
@@ -644,6 +750,37 @@ function NewAgentDialog({
                       />
                       <span aria-hidden="true">.</span>
                     </p>
+                    {ideas.length > 0 && (
+                      <span className="nac__names">
+                        <span>{t("newAgentCard.namesLead")}</span>
+                        {ideas.map((idea) => (
+                          <button
+                            key={idea}
+                            type="button"
+                            className="nac__idea"
+                            onPointerEnter={() => setTryName(idea)}
+                            onPointerLeave={() => setTryName(null)}
+                            onClick={() => {
+                              setTryName(null);
+                              update({ name: idea });
+                              react();
+                              burst(hero.current, look.color);
+                            }}
+                          >
+                            {idea}
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          className="nac__dice"
+                          aria-label={t("newAgentCard.namesRoll")}
+                          title={t("newAgentCard.namesRoll")}
+                          onClick={() => void rollNames()}
+                        >
+                          <Icon name="shuffle" size={14} />
+                        </button>
+                      </span>
+                    )}
                     <textarea
                       ref={whatInput}
                       className="nac__what"
@@ -753,6 +890,61 @@ function NewAgentDialog({
                         )}
                       </span>
                     </section>
+                    {skillsShown && (
+                      <section className="nac__sec" aria-label={t("newAgentCard.skills")}>
+                        <span className="nac__label">
+                          {t("newAgentCard.skills")}
+                          <span className="nac__help">
+                            {" · "}
+                            {name ? t("newAgent.skillsHelp", g) : t("newAgentCard.skillsHelpBlank")}
+                          </span>
+                        </span>
+                        <span className="nac__chips">
+                          {chosenSkills.map((id) => (
+                            <button
+                              key={id}
+                              type="button"
+                              className="ac-chip nac__app"
+                              onClick={() => setSkillOpen(id)}
+                            >
+                              <Icon name="book" size={14} />
+                              <span className="ac-chip__text">{skillName(id)}</span>
+                            </button>
+                          ))}
+                          {lib.length > chosenSkills.length && (
+                            <button
+                              type="button"
+                              className="ac-chip nac__add"
+                              aria-expanded={addingSkills}
+                              onClick={() => setAddingSkills((a) => !a)}
+                            >
+                              <Icon name={addingSkills ? "chevronUp" : "plus"} size={14} />
+                              <span className="ac-chip__text">
+                                {chosenSkills.length ? t("newAgentCard.otherSkill") : t("newAgentCard.chooseSkills")}
+                              </span>
+                            </button>
+                          )}
+                          {addingSkills && (
+                            <span className="nac__offer">
+                              {lib
+                                .filter((s) => !chosenSkills.includes(s.id))
+                                .map((s) => (
+                                  <button
+                                    key={s.id}
+                                    type="button"
+                                    className="ac-chip nac__add"
+                                    onClick={() => update({ skills: [...chosenSkills, s.id] })}
+                                  >
+                                    <Icon name="book" size={14} />
+                                    <span className="ac-chip__text">{s.name}</span>
+                                    <Icon name="plus" size={14} />
+                                  </button>
+                                ))}
+                            </span>
+                          )}
+                        </span>
+                      </section>
+                    )}
                     {!personal && joins.length > 0 && (
                       <section className="nac__sec" aria-label={t("newAgentCard.worksIn")}>
                         <span className="nac__label">{t("newAgentCard.worksIn")}</span>
@@ -799,6 +991,17 @@ function NewAgentDialog({
           </Button>
         </DialogFooter>
       </div>
+      {skillOpen && (
+        <SkillDialog
+          skillId={skillOpen}
+          agentName={name}
+          onRemove={() => {
+            update({ skills: chosenSkills.filter((id) => id !== skillOpen) });
+            setSkillOpen(null);
+          }}
+          onClose={() => setSkillOpen(null)}
+        />
+      )}
       {appOpen && (
         <AppLevelDialog
           def={defs.get(appOpen) ?? null}
@@ -827,7 +1030,8 @@ const REACTION = "new-agent-card";
 const burst = (el: Element | null | undefined, color: string) => {
   if (!el || prefersReducedMotion()) return;
   const r = el.getBoundingClientRect();
-  pixelBurst({ x: r.left + r.width / 2, y: r.top + r.height / 2 }, agentTones(color as AgentColor), document.body);
+  const c = color as AgentColor;
+  pixelBurst({ x: r.left + r.width / 2, y: r.top + r.height / 2 }, agentTones(c), spriteTone(c));
 };
 
 function ListRow({
@@ -863,6 +1067,62 @@ function ListRow({
         <small>{sub}</small>
       </span>
     </button>
+  );
+}
+
+/** One skill on the card: what it is, the start of its manual, and taking it off. */
+function SkillDialog({
+  skillId,
+  agentName,
+  onRemove,
+  onClose,
+}: {
+  skillId: string;
+  agentName: string;
+  onRemove: () => void;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const skill = useSkill(org.id, skillId);
+  const g = agentGrammar(agentName);
+  const body = skill.data?.body.trim() ?? "";
+  return (
+    <Dialog
+      open
+      onOpenChange={(o) => !o && onClose()}
+      title={skill.data?.name ?? ""}
+      leading={
+        <span className="nac-skill__lead">
+          <Icon name="book" size={18} />
+        </span>
+      }
+      closeLabel={t("common.close")}
+      width={460}
+      className="nac-app"
+    >
+      <DialogBody>
+        {skill.data?.description && <p className="nac-skill__line">{skill.data.description}</p>}
+        {body && (
+          <blockquote className="nac-skill__body">{body.length > 280 ? `${body.slice(0, 280)}…` : body}</blockquote>
+        )}
+        <p className="nac-app__asks ac-iconline">
+          <Icon name="info" size={16} />
+          <span>{agentName ? t("newAgentCard.skill.opens", g) : t("newAgentCard.skill.opensBlank")}</span>
+        </p>
+      </DialogBody>
+      <DialogFooter
+        note={
+          <button type="button" className="ac-link" onClick={onRemove}>
+            {agentName ? t("newAgentCard.skill.remove", g) : t("newAgentCard.skill.removeBlank")}
+          </button>
+        }
+      >
+        <Button variant="primary" onClick={onClose}>
+          {t("newAgentCard.skill.done")}
+        </Button>
+      </DialogFooter>
+    </Dialog>
   );
 }
 

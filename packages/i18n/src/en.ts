@@ -6129,6 +6129,39 @@ export const en = {
       ai: "An AI to think",
       asleep: "Asleep until it has an AI",
     },
+    skills: "Skills",
+    skillsHelpBlank: "Manuals it opens when needed.",
+    chooseSkills: "Choose skills",
+    otherSkill: "Another skill",
+    namesLead: "How about",
+    namesRoll: "Other names",
+    /** One skill on the card. */
+    skill: {
+      opens: "{{name}} opens this manual when the topic comes up. You edit it in Skills.",
+      opensBlank: "It opens this manual when the topic comes up. You edit it in Skills.",
+      remove: "Remove from {{name}}",
+      removeBlank: "Remove from the agent",
+      done: "Done",
+    },
+    /**
+     * Name ideas for an agent from scratch, by what it will do: names (comma-separated, fit for this language) and
+     * the word beginnings that pick each theme; `any` when none fits.
+     */
+    names: {
+      agenda: "Ivy, June, Nora, Milo, Tess, Cal",
+      agendaWords: "calendar, schedul, appointment, remind, meeting, agenda",
+      money: "Penny, Nick, Mona, Rex, Lou, Cass",
+      moneyWords: "bill, spend, money, financ, budget, pay",
+      travel: "Atlas, Skye, Ravi, Vic, Nara, Tom",
+      travelWords: "trip, travel, flight, hotel, itinerar, vacation",
+      training: "Leo, Bea, Bolt, Kai, Nina, Dave",
+      trainingWords: "workout, run, gym, exercis, train",
+      study: "Gabi, Nils, Sophie, Theo, Iris, Benji",
+      studyWords: "stud, exam, course, learn, class",
+      clients: "Rui, Anna, Ben, Liz, Otto, Cleo",
+      clientsWords: "client, sale, proposal, invoic, customer",
+      any: "Sol, Lia, Theo, Bea, Nino, Iris, Kai, Luma, Gil, Rafa, Nara, Tom",
+    },
   },
   members: {
     /** The channel's members column (and its sheet on a phone). */

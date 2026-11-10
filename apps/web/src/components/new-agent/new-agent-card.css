@@ -551,3 +551,89 @@
     opacity: 0.8;
   }
 }
+
+/* From scratch, while it has no name: "Oi! Eu sou …" with no closing period, and three ideas with a dice. */
+.nac__name:placeholder-shown + span {
+  display: none;
+}
+.nac__names {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.nac__idea,
+.nac__dice {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+.nac__idea {
+  padding: 2px 9px;
+  border-radius: 9px 9px 9px var(--radius-cut);
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 20px;
+  transition:
+    background-color 0.12s,
+    transform 0.18s var(--spring);
+}
+.nac__idea:hover {
+  background: color-mix(in srgb, var(--ink) 11%, transparent);
+  transform: translateY(-1px);
+}
+.nac__dice {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px 8px 8px var(--radius-cut);
+  color: var(--muted);
+}
+.nac__dice:hover {
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  color: var(--ink);
+}
+html:not([data-pointer]) .nac__idea:focus-visible,
+html:not([data-pointer]) .nac__dice:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+
+/* Skills: manuals it opens when needed. */
+.nac__help {
+  color: var(--faint);
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.nac-skill__lead {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  border-bottom-left-radius: var(--radius-cut);
+  background: var(--plate);
+  color: var(--ink2);
+}
+.nac-skill__line {
+  margin: 0 0 10px;
+  color: var(--ink2);
+  font-size: 14.5px;
+}
+.nac-skill__body {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+  color: var(--ink2);
+  font-size: 14px;
+  line-height: 20px;
+  white-space: pre-wrap;
+}
