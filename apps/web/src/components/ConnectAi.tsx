@@ -248,12 +248,7 @@ function ConnectAiDialog({
   const asked = request.chat && request.agentId ? dir.agentById.get(request.agentId) : undefined;
   const asleep = (id: string) => (aiStateOf(status.data, id) ?? "no_ai") === "no_ai";
   const chatNow = {
-    on:
-      asked !== undefined &&
-      asked.ownerUserId === me.user.id &&
-      !isRightHand(asked) &&
-      agentPlan(asked) === null &&
-      asleep(asked.id),
+    on: asked !== undefined && asked.ownerUserId === me.user.id && !isRightHand(asked) && asleep(asked.id),
     others: mine.some((a) => a.id !== asked?.id && asleep(a.id)),
   };
   const [chatKept, setChatKept] = useState<typeof chatNow>();
