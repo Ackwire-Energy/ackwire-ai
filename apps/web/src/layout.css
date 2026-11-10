@@ -6343,8 +6343,10 @@ html:not([data-pointer]) .photo-drop:focus-visible {
   border-radius: 30%;
   box-shadow: var(--e2);
 }
-.avatar-builder__stage[data-pop] {
-  animation: avatar-builder-pop 0.22s var(--out, ease-out);
+@media (prefers-reduced-motion: no-preference) {
+  .avatar-builder__stage[data-pop] {
+    animation: avatar-builder-pop 0.22s var(--out, ease-out);
+  }
 }
 @keyframes avatar-builder-pop {
   0% {
@@ -6381,10 +6383,21 @@ html:not([data-pointer]) .photo-drop:focus-visible {
   min-width: 0;
   min-height: 0;
 }
+/* The tabs are a strip: on a narrow dialog they scroll sideways by swipe, with no scrollbar. */
 .avatar-builder__main .ac-tabs {
   flex: none;
-  margin-left: -12px;
   overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.avatar-builder__main .ac-tabs::-webkit-scrollbar {
+  display: none;
+}
+/* Inside the sideways strip the tab and its underline stay within it (1px past the edge made it scroll up and down). */
+.avatar-builder__main .ac-tab {
+  flex: none;
+  margin-bottom: 0;
+  white-space: nowrap;
 }
 .avatar-builder__main .ac-tabpanel {
   flex: 1;
@@ -6453,10 +6466,11 @@ html:not([data-pointer]) .photo-drop:focus-visible {
     0 0 0 2px var(--raised),
     0 0 0 4px var(--ink);
 }
-.avatar-builder__option:focus-visible {
+/* From the keyboard the ring goes around the face, not the tile and its name. */
+html:not([data-pointer]) .avatar-builder__option:focus-visible {
   outline: none;
 }
-.avatar-builder__option:focus-visible .avatar-builder__face {
+html:not([data-pointer]) .avatar-builder__option:focus-visible .avatar-builder__face {
   box-shadow:
     0 0 0 2px var(--raised),
     var(--focus-ring);
@@ -6485,16 +6499,13 @@ html:not([data-pointer]) .photo-drop:focus-visible {
     0 0 0 2px var(--raised),
     0 0 0 4px var(--ink);
 }
-.avatar-builder__swatch:focus-visible {
+html:not([data-pointer]) .avatar-builder__swatch:focus-visible {
   outline: none;
   box-shadow:
     0 0 0 2px var(--raised),
     var(--focus-ring);
 }
 @media (prefers-reduced-motion: reduce) {
-  .avatar-builder__stage[data-pop] {
-    animation: none;
-  }
   .avatar-builder__face,
   .avatar-builder__swatch {
     transition: none;
