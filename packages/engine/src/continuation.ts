@@ -46,7 +46,7 @@ export interface ContinuationState {
   secretNudged?: boolean;
 }
 
-export type ContinuationVerdict = "done" | "continue" | "ask" | "untried" | "secret";
+export type ContinuationVerdict = "done" | "continue" | "ask" | "untried" | "secret" | "unbacked";
 
 /**
  * What a run reads when it ended saying it couldn't while it still had ways to try (ADR 0109): its means and what it
@@ -120,9 +120,16 @@ export const ASK_NUDGE =
 export const SECRET_NUDGE =
   "Not posted: never ask for a secret (a key, a token, a password) in the chat, where it stays in plain text. If you have request_secret, call it: the person types it into a secure card. Otherwise say which key is needed and where it is set up, without asking for it here.";
 
+/**
+ * What a run reads, once, when its reply says something was made, sent or done that none of its calls did (ADR 0167):
+ * its reply is not posted, since it claims a result nobody gets.
+ */
+export const UNBACKED_NUDGE =
+  "Not posted: your reply says something was made, sent or done, but no call of yours in this run did it. Do it now with your tools, or say plainly that you couldn't and why. Never say a result is done, attached or sent when no call produced it.";
+
 /** The run's last judged turn, kept for the mission's keep-going check (`keepGoingBlocker` reads `waiting`). */
 export const verdictRecord = (v: ContinuationVerdict) =>
-  v === "continue" || v === "untried" ? "unkept" : v === "ask" || v === "secret" ? "waiting" : v;
+  v === "continue" || v === "untried" || v === "unbacked" ? "unkept" : v === "ask" || v === "secret" ? "waiting" : v;
 
 /**
  * One judge call on a turn's end (kind `follow_through`, recorded on the agent's and the workspace's usage like
@@ -187,6 +194,8 @@ export async function continuationVerdict(
             ask: "To go on it needs something only a person can give (a decision, a test, access) that its `means` can't find, but it described the need or listed what's missing instead of asking one direct question. Not when it says it needs nothing from them, or what's missing only blocks optional extra work the request doesn't need, or `request` asked what is missing or left to do and the list answers it: that is done. A way to do the request itself, even worded 'only if you want', is never optional extra work.",
             secret:
               "It asks a person to type or paste a secret into the chat (a password, an API key, a token, a private key), or it needs one from a person and hasn't asked for it through a secure request (`tried` has no request_secret call).",
+            unbacked:
+              "Its reply says it made, sent, created, posted, saved or did something (an image, a file, a message or an email sent, a task opened, a change made, 'done', 'here it is') that no call in `tried` did. Not when the reply only plans, offers or asks, says plainly it couldn't, or reports what someone did before and says so.",
           },
         },
         ...(learn ? { learn: input.personal ? LEARN_QUESTION_PERSONAL : LEARN_QUESTION } : {}),
@@ -211,15 +220,17 @@ export async function continuationVerdict(
   const a = answers.verdict;
   const p = (k: ContinuationVerdict) => a?.probabilities?.[k] ?? (a?.choice === k ? 1 : 0);
   const verdict: ContinuationVerdict =
-    p("secret") >= 0.45 && (["untried", "continue", "ask"] as const).every((k) => p("secret") >= p(k))
+    p("secret") >= 0.45 && (["untried", "continue", "ask", "unbacked"] as const).every((k) => p("secret") >= p(k))
       ? "secret"
-      : p("untried") >= 0.45 && p("untried") >= p("continue") && p("untried") >= p("ask")
-        ? "untried"
-        : p("continue") >= 0.45 && p("continue") >= p("ask")
-          ? "continue"
-          : p("ask") >= 0.45
-            ? "ask"
-            : "done";
+      : p("unbacked") >= 0.45 && (["untried", "continue", "ask"] as const).every((k) => p("unbacked") >= p(k))
+        ? "unbacked"
+        : p("untried") >= 0.45 && p("untried") >= p("continue") && p("untried") >= p("ask")
+          ? "untried"
+          : p("continue") >= 0.45 && p("continue") >= p("ask")
+            ? "continue"
+            : p("ask") >= 0.45
+              ? "ask"
+              : "done";
   // What failed was only refused for safety: no way is left to try for that data. Work it said it will still do
   // (`continue`) goes on.
   return verdict === "untried" && onlySafetyRefusals(input.tried) ? "done" : verdict;
@@ -409,6 +420,11 @@ export async function decideTurnEnd(t: TurnEnd): Promise<TurnEndDecision> {
     return t.state.secretNudged
       ? { outcome: "done", rule: "secret_cap", verdict }
       : { outcome: "continue", rule: "secret", verdict, nudge: SECRET_NUDGE };
+  // A result it claims that no call produced (ADR 0167): never posted; once more to do it or say it can't.
+  if (verdict === "unbacked")
+    return canNudge
+      ? { outcome: "continue", rule: "unbacked", verdict, nudge: UNBACKED_NUDGE }
+      : { outcome: "done", rule: "unbacked_cap", verdict };
   // A hand-off by mention to an agent that isn't here is an unkept hand-off: it goes on and hands it over.
   if (verdict === "continue" && t.unreached && canNudge)
     return { outcome: "continue", rule: "unreached", verdict, nudge: t.unreached };

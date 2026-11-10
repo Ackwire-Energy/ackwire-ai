@@ -4777,12 +4777,17 @@ async function executeRunInner(
         later(() =>
           addRunStep(db, run, "context", {
             continuation: recorded,
-            ...(decision.outcome === "continue" ? { nudged: decision.rule === "untried" ? "untried" : "promise" } : {}),
+            ...(decision.outcome === "continue"
+              ? { nudged: decision.rule === "untried" || decision.rule === "unbacked" ? decision.rule : "promise" }
+              : {}),
           }),
         );
         // After the verdict's own step, so the run's steps keep their order.
         if (decision.outcome === "done") learnLater(decision);
-        const kept = [transcript.routineRecord, record].filter(Boolean).join("\n\n");
+        // A result it claimed that no call produced stays out of its record (ADR 0167).
+        const kept = [transcript.routineRecord, decision.rule === "unbacked" ? "" : record]
+          .filter(Boolean)
+          .join("\n\n");
         if (decision.outcome === "continue" && nudge) {
           transcript.routineRecord = kept;
           appendUserText(transcript, nudge);
@@ -4960,6 +4965,7 @@ async function executeRunInner(
         unreached: "unreached",
         untried: "untried",
         secret: "secret",
+        unbacked: "unbacked",
         open_request: "open_request",
       }[decision.rule];
       const { nudge: _, ...recorded } = { ...decision, count: t.continuation.count };
@@ -4978,11 +4984,13 @@ async function executeRunInner(
         // Nothing to post first: it simply goes on. A give-up judged untried isn't posted either: it would send people
         // after something the next turn may do itself.
         // Nor a secret asked in the chat (ADR 0109 addendum).
+        // Nor a result it claims that no call produced (ADR 0167).
         if (
           decision.rule === "decision" ||
           decision.rule === "answer" ||
           decision.rule === "untried" ||
-          decision.rule === "secret"
+          decision.rule === "secret" ||
+          decision.rule === "unbacked"
         ) {
           await saveTranscript(db, t);
           continue;
