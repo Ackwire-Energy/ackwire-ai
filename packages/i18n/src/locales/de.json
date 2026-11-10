@@ -9239,22 +9239,6 @@
       "foot": "Aus dem Aussehen jedes Agenten gemacht"
     }
   },
-  "memoryMark": {
-    "label": "{{name}} hat das im Gedächtnis gespeichert: {{text}}",
-    "saved": "{{name}} hat das gespeichert:",
-    "title": "{{name}} hat im Gedächtnis gespeichert",
-    "subtitle": "Merkt es sich für die nächsten Unterhaltungen",
-    "from": "Aus der Nachricht von {{name}} · {{time}}",
-    "view": "Im Gedächtnis ansehen",
-    "fix": "Korrigieren",
-    "fixLabel": "Gespeichertes korrigieren",
-    "save": "Speichern",
-    "forget": "Vergessen",
-    "forgot": "{{name}} hat das vergessen",
-    "undo": "Rückgängig",
-    "fixed": "Erinnerung korrigiert",
-    "fixedDetail": "{{name}} nutzt ab jetzt die neue Version."
-  },
   "correctionAsk": {
     "title": "Soll {{name}} es noch einmal machen oder erklären, was gefehlt hat?",
     "label": "Was gefehlt hat",

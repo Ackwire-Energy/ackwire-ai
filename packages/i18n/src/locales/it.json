@@ -9606,22 +9606,6 @@
       "foot": "Creati dall'aspetto di ogni agente"
     }
   },
-  "memoryMark": {
-    "label": "{{name}} ha salvato questo in memoria: {{text}}",
-    "saved": "{{name}} ha salvato questo:",
-    "title": "{{name}} ha salvato in memoria",
-    "subtitle": "Lo ricorderà nelle prossime conversazioni",
-    "from": "Dal messaggio di {{name}} · {{time}}",
-    "view": "Vedi in memoria",
-    "fix": "Correggi",
-    "fixLabel": "Correggi ciò che è stato salvato",
-    "save": "Salva",
-    "forget": "Dimentica",
-    "forgot": "{{name}} ha dimenticato questo",
-    "undo": "Annulla",
-    "fixed": "Memoria corretta",
-    "fixedDetail": "D'ora in poi {{name}} userà la nuova versione."
-  },
   "correctionAsk": {
     "title": "Vuoi che {{name}} lo rifaccia o spieghi cosa mancava?",
     "label": "Cosa mancava",

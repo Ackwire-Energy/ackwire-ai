@@ -8929,22 +8929,6 @@
       "foot": "Dibuat dari tampilan tiap agen"
     }
   },
-  "memoryMark": {
-    "label": "{{name}} menyimpan ini ke memori: {{text}}",
-    "saved": "{{name}} menyimpan ini:",
-    "title": "{{name}} menyimpan ke memori",
-    "subtitle": "Akan mengingatnya di percakapan berikutnya",
-    "from": "Dari pesan {{name}} · {{time}}",
-    "view": "Lihat di memori",
-    "fix": "Perbaiki",
-    "fixLabel": "Perbaiki yang disimpan",
-    "save": "Simpan",
-    "forget": "Lupakan",
-    "forgot": "{{name}} melupakan ini",
-    "undo": "Urungkan",
-    "fixed": "Memori diperbaiki",
-    "fixedDetail": "{{name}} akan memakai versi baru mulai sekarang."
-  },
   "correctionAsk": {
     "title": "Mau {{name}} mengulanginya atau menjelaskan apa yang kurang?",
     "label": "Apa yang kurang",

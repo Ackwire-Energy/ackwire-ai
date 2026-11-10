@@ -9902,22 +9902,6 @@
       "foot": "Stworzone z wyglądu każdego agenta"
     }
   },
-  "memoryMark": {
-    "label": "{{name}} zapisuje to w pamięci: {{text}}",
-    "saved": "{{name}} zapisuje to:",
-    "title": "{{name}} zapisuje w pamięci",
-    "subtitle": "Zapamięta to na kolejne rozmowy",
-    "from": "Z wiadomości {{name}} · {{time}}",
-    "view": "Zobacz w pamięci",
-    "fix": "Popraw",
-    "fixLabel": "Popraw to, co zapisano",
-    "save": "Zapisz",
-    "forget": "Zapomnij",
-    "forgot": "{{name}} zapomina to",
-    "undo": "Cofnij",
-    "fixed": "Poprawiono pamięć",
-    "fixedDetail": "{{name}} będzie od teraz używać nowej wersji."
-  },
   "correctionAsk": {
     "title": "Chcesz, żeby {{name}} poprawił(a) odpowiedź albo wyjaśnił(a), czego zabrakło?",
     "label": "Czego zabrakło",

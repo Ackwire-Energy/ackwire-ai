@@ -9589,22 +9589,6 @@
       "foot": "Créés à partir du look de chaque agent"
     }
   },
-  "memoryMark": {
-    "label": "{{name}} a enregistré ceci en mémoire : {{text}}",
-    "saved": "{{name}} a enregistré ceci :",
-    "title": "{{name}} a enregistré en mémoire",
-    "subtitle": "S'en souviendra dans les prochaines conversations",
-    "from": "Du message de {{name}} · {{time}}",
-    "view": "Voir dans la mémoire",
-    "fix": "Corriger",
-    "fixLabel": "Corriger ce qui a été enregistré",
-    "save": "Enregistrer",
-    "forget": "Oublier",
-    "forgot": "{{name}} a oublié ceci",
-    "undo": "Annuler",
-    "fixed": "Mémoire corrigée",
-    "fixedDetail": "{{name}} utilisera la nouvelle version désormais."
-  },
   "correctionAsk": {
     "title": "Voulez-vous que {{name}} recommence ou explique ce qui manquait ?",
     "label": "Ce qui manquait",

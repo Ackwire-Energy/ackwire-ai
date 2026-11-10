@@ -9306,22 +9306,6 @@
       "foot": "Gemaakt van het uiterlijk van elke agent"
     }
   },
-  "memoryMark": {
-    "label": "{{name}} heeft dit in het geheugen opgeslagen: {{text}}",
-    "saved": "{{name}} heeft dit opgeslagen:",
-    "title": "{{name}} heeft in het geheugen opgeslagen",
-    "subtitle": "Onthoudt het in de volgende gesprekken",
-    "from": "Uit het bericht van {{name}} · {{time}}",
-    "view": "Bekijken in het geheugen",
-    "fix": "Corrigeren",
-    "fixLabel": "Corrigeer wat is opgeslagen",
-    "save": "Opslaan",
-    "forget": "Vergeten",
-    "forgot": "{{name}} is dit vergeten",
-    "undo": "Ongedaan maken",
-    "fixed": "Geheugen gecorrigeerd",
-    "fixedDetail": "{{name}} gebruikt vanaf nu de nieuwe versie."
-  },
   "correctionAsk": {
     "title": "Wil je dat {{name}} het opnieuw doet of uitlegt wat er ontbrak?",
     "label": "Wat er ontbrak",

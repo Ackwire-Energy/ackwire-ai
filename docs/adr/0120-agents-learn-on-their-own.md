@@ -155,3 +155,7 @@ An agent signed in to a store's console in its own browser and said so in the ch
 - Looking before saying it's blocked (ADR 0109): "the workspace (`search_context`)" is one of the means, the prompt says to ask the teammate who holds it, and the follow-through judge counts "nobody has access, someone please…" without a search_context, find_agent or ask_agent in the run as untried.
 
 Skipped: writing access facts from code when a connector, a Vault login or a mailbox is given (connectors already show in `find_agent`'s "Can:"; the rest is learned from the turn that gave it); a browser's signed-in sites (the browser doesn't track them).
+
+## Addendum: no memory mark
+
+The mark under a person's message is gone on web and phone. The agent's reply and its receipt already say what was saved, and the receipt opens the item, where it can be corrected or forgotten. The message list still carries `memories` and the `message.memories` event still fires, for phone builds that draw the mark.

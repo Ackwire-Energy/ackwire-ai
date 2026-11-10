@@ -295,7 +295,6 @@ import { ErrorState, LoadingConversation } from "@/components/Loading";
 import { AwayPill, WaitingCard } from "@/components/MachineOutages";
 import { useMediaTabs } from "@/components/MediaPicker";
 import { MemberPickerRows, memberOf, type PickKey, useMemberRows } from "@/components/MemberPicker";
-import { MemoryMarks } from "@/components/MemoryMark";
 import { MessageFeedback } from "@/components/MessageFeedback";
 import { MessageMoreMenu, PersonMessageActions, ReplyButton, useMessageMenu } from "@/components/MessageMore";
 import { MessageReceipts, SeenMark } from "@/components/MessageReceipts";
@@ -4647,14 +4646,7 @@ export const TimelineMessage = memo(function TimelineMessage({
             {missionCommand && <MissionCommandCard command={missionCommand} />}
             {missionSuggestion && <MissionSuggestionBar message={m} suggestion={missionSuggestion} />}
             {/* Everyone's reactions (👍/👎 on an agent's reply are its feedback, in the same pills). */}
-            {!m.local && !readOnly && (
-              <MessageReactions
-                messageId={m.id}
-                initial={m.reactions}
-                feedback={feedback}
-                extra={m.memories?.length ? <MemoryMarks message={m} /> : undefined}
-              />
-            )}
+            {!m.local && !readOnly && <MessageReactions messageId={m.id} initial={m.reactions} feedback={feedback} />}
             {/* Long work (ADR 0121): how it stands, under the agent's "Vou cuidar disso". */}
             {m.longWork && !m.local && (
               <MessageWorkLine

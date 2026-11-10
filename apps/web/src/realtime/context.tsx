@@ -44,7 +44,6 @@ import {
   cacheDmRead,
   cacheMessage,
   cacheMessageActions,
-  cacheMessageMemories,
   cacheMessageMeta,
   cacheMessageWork,
   cachePinned,
@@ -859,9 +858,6 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
       // Someone reacted: the pills under that message change for everyone.
       if (event.type === "message.reactions")
         applyReactions(qc, orgId, event.messageId, event.reactions, playAgentReaction);
-      // An agent saved something from a person's message: the memory mark appears (or goes) live.
-      if (event.type === "message.memories")
-        cacheMessageMemories(qc, orgId, event.channelId, event.messageId, event.memories);
       // Someone pinned or unpinned a message: its "Fixar" / "Desafixar" and the pins list follow.
       if (event.type === "message.pinned" || event.type === "message.unpinned") {
         cachePinned(qc, orgId, channelId, event.messageId, event.type === "message.pinned");

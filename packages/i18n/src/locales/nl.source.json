@@ -22329,48 +22329,6 @@
   "media.stickers.foot": {
     "value": "Made from each agent's look"
   },
-  "memoryMark.label": {
-    "value": "{{name}} saved this to memory: {{text}}"
-  },
-  "memoryMark.saved": {
-    "value": "{{name}} saved this:"
-  },
-  "memoryMark.title": {
-    "value": "{{name}} saved to memory"
-  },
-  "memoryMark.subtitle": {
-    "value": "Will remember it in the next conversations"
-  },
-  "memoryMark.from": {
-    "value": "From {{name}}'s message · {{time}}"
-  },
-  "memoryMark.view": {
-    "value": "See in memory"
-  },
-  "memoryMark.fix": {
-    "value": "Fix"
-  },
-  "memoryMark.fixLabel": {
-    "value": "Fix what was saved"
-  },
-  "memoryMark.save": {
-    "value": "Save"
-  },
-  "memoryMark.forget": {
-    "value": "Forget"
-  },
-  "memoryMark.forgot": {
-    "value": "{{name}} forgot this"
-  },
-  "memoryMark.undo": {
-    "value": "Undo"
-  },
-  "memoryMark.fixed": {
-    "value": "Memory fixed"
-  },
-  "memoryMark.fixedDetail": {
-    "value": "{{name}} will use the new version from now on."
-  },
   "correctionAsk.title": {
     "value": "Want {{name}} to redo it or explain what was missing?"
   },

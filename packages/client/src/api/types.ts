@@ -1250,8 +1250,6 @@ export interface Message {
   receipts?: MessageReceipts;
   /** Reaction counts (expected from the backend in the message list; else loaded on hover). */
   reactions?: ReactionCount[];
-  /** People's messages: what agents saved to memory from them (the memory mark); live via `message.memories`. */
-  memories?: MessageMemory[];
   /** In lists: true when pinned in its channel (absent: not pinned); live via `message.pinned` / `message.unpinned`. */
   pinned?: boolean;
   /** Agents' messages: what the agent changed with it, as receipts with Undo; live via `message.actions`. */
@@ -1488,7 +1486,6 @@ export type ChannelEvent =
   | { type: "block.state"; channelId: string; block: BlockState }
   /** A choice card was answered (ADR 0124). */
   | { type: "choices.updated"; channelId: string; choices: Choices }
-  | { type: "message.memories"; channelId: string; messageId: string; memories: MessageMemory[] }
   /** A long work changed (ADR 0121): moved, updated, waiting, queued or ended. Its anchor's line redraws. */
   | {
       type: "agent.work";
@@ -3046,15 +3043,6 @@ export interface UndoAllResult {
   actions: AgentAction[];
   /** Changes that could not be undone, with the error code (`action.changed_since`, …). */
   failed: { id: string; code: string; message: string }[];
-}
-
-/** Something an agent saved to its memory from a person's message (the memory mark). */
-export interface MessageMemory {
-  id: string;
-  agentId: string;
-  kind: "fact" | "preference" | "decision" | "note" | "lesson";
-  text: string;
-  createdAt: string;
 }
 
 export interface ReactionCount {
