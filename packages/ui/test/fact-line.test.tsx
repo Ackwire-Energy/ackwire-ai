@@ -74,6 +74,11 @@ describe("the props strip", () => {
     const shown = rule(".ac-props :is(.ac-select__value, .ac-select__text)");
     expect(shown).toContain("overflow: visible");
     expect(shown).toContain("text-overflow: clip");
+    // Wrapped, the icon or face stays on the first line's capitals ("Quem vê" at 390 sat 10.6px under them).
+    expect(rule(".ac-props .ac-select__value > span:has(> .ac-select__lead)")).toContain("align-items: flex-start");
+    expect(css).toMatch(
+      /@supports \(top: 1lh\) \{\s*\.ac-props \.ac-select__lead \{\s*translate: 0 calc\(0\.5lh - var\(--cap-mid\) - 50%\);/,
+    );
   });
 
   test("on a phone the hairline before the links is a line break", () => {

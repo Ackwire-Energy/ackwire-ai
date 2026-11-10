@@ -11341,6 +11341,18 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
   overflow: visible;
   text-overflow: clip;
 }
+/* Wrapped, its icon or face stays on the first line's capitals (`.ac-iconline`'s rule), never between the lines. */
+.ac-props .ac-select__value > span:has(> .ac-select__lead) {
+  align-items: flex-start;
+}
+.ac-props .ac-select__lead {
+  translate: 0 calc(8px - var(--cap-mid) - 50%);
+}
+@supports (top: 1lh) {
+  .ac-props .ac-select__lead {
+    translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
+  }
+}
 /* A button opening a menu (who, priority) is a control of the strip: the field look; a face in it starts near its edge. */
 .ac-props > .ac-btn:not(.ac-btn--ghost),
 .ac-props > * > .ac-btn:not(.ac-btn--ghost) {
