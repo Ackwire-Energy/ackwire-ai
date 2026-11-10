@@ -69,7 +69,7 @@ export function NoAiBanner({ agentIds, dmAgentId }: { agentIds: string[]; dmAgen
           <b>{t(noAiStatusKey(status.data, dmAgentId), agentGrammar(name))}</b>
         </span>
         {mayConnectAi(agent, me.user.id, org) && (
-          <Button size="sm" onClick={() => connect.open({ agentId: dmAgentId })}>
+          <Button size="sm" onClick={() => connect.open({ agentId: dmAgentId, chat: true })}>
             {t("noAi.action")}
           </Button>
         )}

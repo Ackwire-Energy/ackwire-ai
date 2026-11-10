@@ -1,4 +1,4 @@
-import type { ConnectIntent } from "@agenteschat/client";
+import type { ConnectIntent, MachineAccount } from "@agenteschat/client";
 import {
   keys,
   useAddCredential,
@@ -9,14 +9,16 @@ import {
   useMachines,
   useModels,
 } from "@agenteschat/client";
-import { listsExisting } from "@agenteschat/client/lib/ai-accounts";
+import { accountTitle, groupPlans, listsExisting } from "@agenteschat/client/lib/ai-accounts";
 import { CUSTOM_PROVIDER } from "@agenteschat/client/lib/endpoints";
 import { errorCode, errorText, keyRefusal } from "@agenteschat/client/lib/errors";
+import { NAMES_SHOWN, namesText } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { stepPermissions } from "@agenteschat/client/lib/home";
 import {
   type AgentAi,
   type AiChoice,
+  ALL_AGENTS,
   agentAi,
   agentPlan,
   aiStateOf,
@@ -30,13 +32,14 @@ import {
   type PlanChoice,
   type PlanGate,
   planMark,
+  planOfAccount,
   planTitle,
   signsInOnce,
 } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { providerGuess, providerLabel } from "@agenteschat/client/lib/providers";
 import { isRightHand, rightHandOf, rightHandOnKey, thinksWithLine } from "@agenteschat/client/lib/right-hand";
-import { Button, Dialog, DialogBody, DialogFooter, Icon, ProviderLogo, Spinner } from "@agenteschat/ui";
+import { Button, Dialog, DialogBody, DialogFooter, Icon, ProviderLogo, Select, Spinner } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
@@ -114,6 +117,12 @@ export interface ConnectAiRequest {
    * words, and wakes as the sky turns to day once an AI is connected. The plans' own steps are the same.
    */
   arrival?: boolean;
+  /**
+   * Opened from the agent's own conversation (the notice over the composer, its setup card), for an agent of the
+   * person's with no AI: the same stage, and for every agent of theirs with no AI unless they narrow it to this one
+   * (ADR 0160, addendum). One sign-in, or an account they already have, then thinks for all of them.
+   */
+  chat?: boolean;
 }
 
 /** How "Responder agora" went for a message, in this tab. */
@@ -231,7 +240,29 @@ function ConnectAiDialog({
   // An agent's card names whom to choose from. Opened for one agent, it is for that agent alone: the title names it,
   // so no For offers another. Anywhere else every agent of the viewer's stays a choice.
   const named = request.agentIds?.length ? request.agentIds : null;
-  const only = named ? (named.length === 1 ? named[0] : undefined) : request.agentId;
+  // From the agent's conversation: decided once the agents and their AI are known, and kept, since connecting changes
+  // both. `others`: more agents of the person's have no AI, so the dialog opens for all of them.
+  const loaded = !(dir.loading || status.isPending);
+  const asked = request.chat && request.agentId ? dir.agentById.get(request.agentId) : undefined;
+  const asleep = (id: string) => (aiStateOf(status.data, id) ?? "no_ai") === "no_ai";
+  const chatNow = {
+    stage:
+      asked !== undefined &&
+      asked.ownerUserId === me.user.id &&
+      !isRightHand(asked) &&
+      agentPlan(asked) === null &&
+      asleep(asked.id),
+    others: mine.some((a) => a.id !== asked?.id && asleep(a.id)),
+  };
+  const [chatKept, setChatKept] = useState<typeof chatNow>();
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once, as the agents and their AI load
+  useEffect(() => {
+    if (loaded) setChatKept((kept) => kept ?? chatNow);
+  }, [loaded]);
+  const chat = chatKept ?? (loaded ? chatNow : { stage: request.chat === true, others: false });
+  const [scope, setScope] = useState<"all" | "one">();
+  const wide = chat.stage && chat.others && scope !== "one";
+  const only = wide ? undefined : named ? (named.length === 1 ? named[0] : undefined) : request.agentId;
   const one = only ? dir.agentById.get(only) : undefined;
   const rightHand = isRightHand(one);
   const pool = request.forNewAgent ? [] : one ? [one.id] : named;
@@ -268,7 +299,13 @@ function ConnectAiDialog({
   const [pickedTarget, setPickedTarget] = useState<string>();
   // Held once a sign-in starts (`onStart`): every move it makes gives an agent an AI, which would move the default.
   const [heldReader, setHeldReader] = useState<string>();
-  const aimed = { agents, hasAi, asked: request.agentId, picked: pickedTarget };
+  // For all of them, the agent of the conversation is still the one a plan that can't be shared signs in for.
+  const aimed = {
+    agents,
+    hasAi,
+    picked: pickedTarget,
+    ...(wide ? { host: request.agentId } : { asked: request.agentId }),
+  };
   // With no set, the agent whose computer the panel reads, "All agents" too (they're on that one's computer).
   const reader = heldReader ?? defaultTarget({ ...aimed, set: [] });
   const theirs = one !== undefined && one.ownerUserId !== me.user.id && !rightHand;
@@ -308,7 +345,9 @@ function ConnectAiDialog({
   // Anything connected shows Done; only a saved key closes the key's field (after a plan, it's for the other agents).
   const [connected, setConnected] = useState(false);
   // The arrival's stage: never over a billing hold, whose notice is the whole dialog.
-  const stage = request.arrival === true && !hold;
+  const stage = (request.arrival === true || chat.stage) && !hold;
+  // An account picked on the stage's first screen: its plan's panel uses it at once.
+  const [use, setUse] = useState<MachineAccount>();
   // Its first screen is the cards; a pick moves on to that plan's steps, and Back returns to the cards.
   const [chosen, setChosen] = useState(false);
   const day = useDawn(stage && connected);
@@ -450,6 +489,7 @@ function ConnectAiDialog({
         }}
         locked={locked}
         {...(login?.choice === choice ? { login } : {})}
+        {...(use && planOfAccount(use) === choice ? { use } : {})}
         onKey={() => {
           setPicked("key");
           setLogin(null);
@@ -468,6 +508,30 @@ function ConnectAiDialog({
     const ready = !(dir.loading || status.isPending);
     const lead = rightHandOf(dir.agents);
     const stepping = chosen && !connected;
+    // From a conversation: that agent alone, or every agent of the person's (the stage draws four of them).
+    const forOne = chat.stage && !wide ? asked : undefined;
+    const title = chosen
+      ? stepTitle(t, choice)
+      : forOne
+        ? t("connectAi.titleFor", agentGrammar(forOne.name))
+        : t("arrival.connect.title");
+    const cast = forOne ? [forOne] : chat.stage ? sceneTeam(mine, asked) : sceneTeam(dir.agents, lead);
+    // What the person already has for all of their agents on that computer comes first, one click each.
+    const have =
+      chat.stage && ready
+        ? groupPlans(
+            (gates.view?.accounts ?? []).filter((a) => a.shared === true && a.mine && a.status === "active"),
+          ).flatMap((g) => g.logins.slice(0, 1))
+        : [];
+    const pick = (next: AiChoice, account?: MachineAccount) => {
+      setPicked(next);
+      setLogin(null);
+      setUse(account);
+      setChosen(true);
+      // Whom it is for stays as it was chosen, whatever connecting changes.
+      setScope(wide ? "all" : "one");
+      if (next !== choice) setHeldReader(undefined);
+    };
     const without = (
       <span className="ac-iconline">
         <Icon name="info" />
@@ -478,7 +542,7 @@ function ConnectAiDialog({
       <Dialog
         open
         onOpenChange={(o) => !o && onClose()}
-        title={chosen ? stepTitle(t, choice) : t("arrival.connect.title")}
+        title={title}
         closeLabel={t("common.close")}
         width={820}
         bare
@@ -488,8 +552,8 @@ function ConnectAiDialog({
           <TeamScene
             shape="tall"
             quiet={0.22}
-            agents={sceneTeam(dir.agents, lead)}
-            lead={lead?.id}
+            agents={cast}
+            lead={chat.stage ? asked?.id : lead?.id}
             asleep={!connected}
             day={day}
             expression={connected ? "happy" : undefined}
@@ -507,10 +571,13 @@ function ConnectAiDialog({
               </>
             )}
           </TeamScene>
-          <div className="arrival-stage__cap">
-            <b>{t(connected ? "arrival.stage.morning" : "arrival.stage.ready")}</b>
-            <span>{t(connected ? "arrival.stage.awake" : "arrival.stage.wake")}</span>
-          </div>
+          {/* The caption speaks of the team: one agent's stage goes without it. */}
+          {!forOne && (
+            <div className="arrival-stage__cap">
+              <b>{t(connected ? "arrival.stage.morning" : "arrival.stage.ready")}</b>
+              <span>{t(connected ? "arrival.stage.awake" : "arrival.stage.wake")}</span>
+            </div>
+          )}
         </div>
         <div className="arrival-main">
           {/* The kit's dialog head (Dialog.tsx), in the column beside the stage. */}
@@ -526,13 +593,14 @@ function ConnectAiDialog({
                   onClick={() => {
                     setChosen(false);
                     setLogin(null);
+                    setUse(undefined);
                   }}
                 />
               </span>
             )}
             <div className="ac-actline">
               <span className="ac-dialog__title" aria-hidden="true">
-                {chosen ? stepTitle(t, choice) : t("arrival.connect.title")}
+                {title}
               </span>
             </div>
             <span className="ac-dialog__close ac-acts">
@@ -557,16 +625,59 @@ function ConnectAiDialog({
                 {panel}
               </div>
             ) : (
-              <ConnectChoices
-                mayAddKey={mayAddKey}
-                dims={(c) => (agents.length > 0 || bare) && gateDims(gateOf(c))}
-                onPick={(next) => {
-                  setPicked(next);
-                  setLogin(null);
-                  setChosen(true);
-                  if (next !== choice) setHeldReader(undefined);
-                }}
-              />
+              <div className="arrival-main__pick">
+                {chat.stage && chat.others && asked && (
+                  <span className="ai-panel__agent">
+                    <span aria-hidden="true">{t("connectAi.for")}</span>
+                    <Select
+                      size="sm"
+                      aria-label={t("connectAi.agentAria")}
+                      value={wide ? ALL_AGENTS : asked.id}
+                      onValueChange={(next) => setScope(next === ALL_AGENTS ? "all" : "one")}
+                      options={[
+                        {
+                          value: ALL_AGENTS,
+                          label: t("connectAi.all"),
+                          description: namesText(
+                            t,
+                            [asked, ...mine.filter((a) => a.id !== asked.id && asleep(a.id))].map((a) => a.name),
+                            NAMES_SHOWN,
+                          ),
+                        },
+                        { value: asked.id, label: asked.name },
+                      ]}
+                    />
+                  </span>
+                )}
+                {have.length > 0 && (
+                  // biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset
+                  <div className="arrival-opts" role="group" aria-label={t("connectAi.have.title")}>
+                    <p className="arrival-opts__label">{t("connectAi.have.title")}</p>
+                    {have.map((a) => (
+                      <button key={a.id} type="button" className="ac-option" onClick={() => pick(planOfAccount(a), a)}>
+                        <ProviderLogo id={planMark(planOfAccount(a))} size="tile" />
+                        <span className="ac-option__text">
+                          <span className="ac-option__title">{t("connectAi.use", { label: accountTitle(a) })}</span>
+                          <span className="ac-option__desc">
+                            {a.usedBy.length > 0
+                              ? t("agentPage.work.brain.accountAlso", {
+                                  agents: namesText(t, a.usedBy, NAMES_SHOWN),
+                                })
+                              : (a.email ?? "")}
+                          </span>
+                        </span>
+                        <Icon name="chevronRight" className="arrival-opts__end" />
+                      </button>
+                    ))}
+                    <p className="arrival-opts__label">{t("connectAi.have.other")}</p>
+                  </div>
+                )}
+                <ConnectChoices
+                  mayAddKey={mayAddKey}
+                  dims={(c) => (agents.length > 0 || bare) && gateDims(gateOf(c))}
+                  onPick={(next) => pick(next)}
+                />
+              </div>
             )}
           </DialogBody>
           {connected || (chosen && freeDone) ? (

@@ -324,16 +324,22 @@ describe("no AI connected: above the composer", () => {
     expect(banner()).toBeNull();
   });
 
-  test("Connect from an agent's DM is for that agent alone: no For, though the viewer has others with no AI", async () => {
+  test("Connect from an agent's DM opens the stage: for every agent of the viewer's with no AI, or for that one alone", async () => {
     const both = () => walters(seedState({ aiStatus: aiStatus(false, ADA_ID, ATLAS_ID) }), ADA_ID, ATLAS_ID);
     await open(both(), `dm/agent/${ADA_ID}`);
     await click(within(banner() as HTMLElement).getByRole("button", { name: "Conectar" }), 6);
-    const box = dialog("Conectar uma IA para a Ada") as HTMLElement;
-    const panel = within(box).getByRole("region", { name: "Seu plano do Claude" });
-    expect(within(panel).queryByRole("combobox", { name: "Agentes que usam este plano" })).toBeNull();
-    expect(within(panel).getByRole("switch", { name: "Atende outras pessoas" }).getAttribute("aria-checked")).toBe(
-      "false",
-    );
+    // Atlas has none either: one sign-in is offered for both, and the For can narrow it to Ada.
+    const team = dialog("Conecte uma IA para o seu time pensar") as HTMLElement;
+    expect(within(team).getByRole("combobox", { name: "Agentes que usam este plano" })).toBeTruthy();
+    for (const name of ["Claude", "ChatGPT", "Outro plano", "Começar grátis"])
+      expect(within(team).getByRole("button", { name: new RegExp(`^${name}`) })).toBeTruthy();
+    cleanup();
+    // Only Ada has none: the stage is hers, and there is nobody else to choose.
+    await open(walters(seedState({ aiStatus: aiStatus(true, ADA_ID) }), ADA_ID, ATLAS_ID), `dm/agent/${ADA_ID}`);
+    await click(within(banner() as HTMLElement).getByRole("button", { name: "Conectar" }), 6);
+    const hers = dialog("Conectar uma IA para a Ada") as HTMLElement;
+    expect(within(hers).queryByRole("combobox", { name: "Agentes que usam este plano" })).toBeNull();
+    expect(within(hers).getByRole("button", { name: /^Claude/ })).toBeTruthy();
     cleanup();
     // Opened from anywhere else, every agent of the viewer's stays a choice.
     await open(both());

@@ -266,6 +266,21 @@
   flex-direction: column;
   gap: 8px;
 }
+/* From a conversation: whom it is for, what the person already has, then the choices. */
+.arrival-main__pick {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.arrival-opts__label {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+.arrival-opts .ac-option + .arrival-opts__label {
+  margin-top: 4px;
+}
 .arrival-opts .ac-option {
   width: 100%;
 }

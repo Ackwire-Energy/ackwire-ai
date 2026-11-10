@@ -596,6 +596,11 @@ export interface PlanPanelProps {
   replies?: { on: boolean; onChange: (on: boolean) => void };
   /** A row of what the person already has signs in here, for the one agent: that sign-in, never the agent's own. */
   login?: ExistingSignIn;
+  /**
+   * An account of this plan picked before the panel opened (the stage's "Use …" card): whom the panel is for moves
+   * onto it as soon as the plan is ready there, with no second click.
+   */
+  use?: MachineAccount;
   /** "Usar uma chave de API agora": the API key row. */
   onKey: () => void;
   /** Self-host with no computer for the agent: where one is connected. */
@@ -823,6 +828,7 @@ function PlanSteps({
   said = false,
   replies,
   login,
+  use,
   onKey,
   onComputer,
   onDone,
@@ -962,6 +968,14 @@ function PlanSteps({
   };
 
   const ready = gate.state === "ready";
+  // The account picked before the panel opened: used once, when the plan can run there.
+  const usedPick = useRef(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once, as the plan turns ready
+  useEffect(() => {
+    if (!use || !ready || usedPick.current) return;
+    usedPick.current = true;
+    void (everyone ? assignAll(use) : assign(agent.id, use));
+  }, [use, ready]);
   const brand = planLabel(t, choice);
   const current = view?.accounts.find(
     (a) => a.id === view.account && a.kind === kind && providerFitsChoice(a.provider, choice, coding),
@@ -1037,6 +1051,8 @@ function PlanSteps({
       </>
     );
   }
+  // The picked account is being given to each agent: nothing to choose meanwhile.
+  if (use && ready && !failed) return <Spinner />;
   const retry = failed && (
     <div className="ai-panel__row">
       <SettingNote icon="alert" live>
