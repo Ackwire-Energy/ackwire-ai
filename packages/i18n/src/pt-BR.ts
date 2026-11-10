@@ -1590,6 +1590,8 @@ export const ptBR = {
     making: "Gerando o código…",
     stepApp: "Instale o app agentes no celular (App Store ou Google Play).",
     stepTailscale: "Instale o Tailscale no celular e entre com a mesma conta do Tailscale deste servidor.",
+    appStore: "App Store",
+    googlePlay: "Google Play",
     stepScan: "Aponte a câmera do celular para o código.",
     validFor: "Vale por {{time}}",
     private: "Quem escanear este código entra na sua conta.",

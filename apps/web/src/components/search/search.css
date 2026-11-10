@@ -196,7 +196,6 @@
 .search-from__item {
   align-items: center;
   gap: 10px;
-  min-height: 40px;
 }
 .search-from__who {
   display: flex;

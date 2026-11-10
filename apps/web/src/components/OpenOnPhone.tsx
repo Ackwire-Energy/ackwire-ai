@@ -102,11 +102,11 @@ function PhoneCode() {
           <li>
             {t("openOnPhone.stepTailscale")}{" "}
             <a className="ac-link" href={TAILSCALE_STORES.appStore} target="_blank" rel="noreferrer">
-              App Store
+              {t("openOnPhone.appStore")}
             </a>
             {" · "}
             <a className="ac-link" href={TAILSCALE_STORES.googlePlay} target="_blank" rel="noreferrer">
-              Google Play
+              {t("openOnPhone.googlePlay")}
             </a>
           </li>
         )}

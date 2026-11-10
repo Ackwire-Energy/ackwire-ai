@@ -494,6 +494,18 @@
       "continue": "이 {{device}}에서 계속하기",
       "text": "이 {{device}}에서 agentes.chat을 설정했어요. 비밀번호가 필요 없어요."
     },
+    "server": {
+      "into": "<b>{{server}}</b>에 로그인",
+      "intoHere": "이 {{device}}의 <b>agentes.chat</b>에 로그인"
+    },
+    "forgotHere": {
+      "ownerTitle": "여기서는 비밀번호가 필요 없어요.",
+      "ownerLead": "이 {{device}}에 agentes.chat을 설치했어요. 여기서 들어간 다음 새 비밀번호를 만드세요.",
+      "notOwner": "설치한 사람의 계정이 아닌가요? workspace 소유자에게 새 비밀번호 링크를 요청하세요.",
+      "title": "이 서버는 이메일을 보내지 않아요.",
+      "lead": "workspace 소유자에게 새 비밀번호 링크를 요청하세요. 소유자가 멤버에서 만들고, 링크는 1시간 동안 유효해요.",
+      "back": "비밀번호로 돌아가기"
+    },
     "reset": {
       "title": "새 비밀번호를 만드세요.",
       "save": "비밀번호 저장",
@@ -513,18 +525,6 @@
       "wrongLinkLead": "이 서버용으로 만든 가장 최근 소유자 링크를 여세요.",
       "taken": "이 서버에는 이미 소유자가 있어요.",
       "takenLead": "내 계정으로 로그인하세요."
-    },
-    "server": {
-      "into": "<b>{{server}}</b>에 로그인",
-      "intoHere": "이 {{device}}의 <b>agentes.chat</b>에 로그인"
-    },
-    "forgotHere": {
-      "ownerTitle": "여기서는 비밀번호가 필요 없어요.",
-      "ownerLead": "이 {{device}}에 agentes.chat을 설치했어요. 여기서 들어간 다음 새 비밀번호를 만드세요.",
-      "notOwner": "설치한 사람의 계정이 아닌가요? workspace 소유자에게 새 비밀번호 링크를 요청하세요.",
-      "title": "이 서버는 이메일을 보내지 않아요.",
-      "lead": "workspace 소유자에게 새 비밀번호 링크를 요청하세요. 소유자가 멤버에서 만들고, 링크는 1시간 동안 유효해요.",
-      "back": "비밀번호로 돌아가기"
     }
   },
   "invite": {
@@ -1399,6 +1399,11 @@
     "addPasswordLabel": "새 비밀번호",
     "addPasswordSaved": "비밀번호를 추가했어요.",
     "addPasswordReauth": "비밀번호를 추가하려면 다시 로그인하세요.",
+    "newPassword": "새 비밀번호 만들기",
+    "newPasswordHint": "다른 세션은 종료되고, 이전 비밀번호로 연결된 AI 앱은 다시 연결해야 해요.",
+    "newPasswordRow": "다른 브라우저와 기기에서 쓰는 비밀번호를 바꾸려면",
+    "newPasswordSaved": "새 비밀번호를 저장했어요.",
+    "newPasswordReauth": "새 비밀번호를 만들려면 다시 로그인하세요.",
     "yourWorkspaces": "내 워크스페이스",
     "youAreHere": "현재 위치",
     "createdOn": "{{date}}에 만듦",
@@ -1406,6 +1411,11 @@
     "addWorkspace": "워크스페이스 추가",
     "addWorkspaceHint": "기존 워크스페이스에 들어가거나, 새로 만들거나, 팀 서버를 사용하세요",
     "yourServer": "내 서버",
+    "serverHere": "이 {{device}}의 agentes.chat",
+    "serverStopped": "중지됨",
+    "serverOffline": "{{time}}부터 오프라인",
+    "serverSignedOut": "로그인 안 됨",
+    "serverSignIn": "로그인",
     "wiki": "Wiki",
     "settings": "설정",
     "workspaceMenu": "워크스페이스 메뉴",
@@ -1476,17 +1486,7 @@
     "unreadMark": "읽지 않음",
     "unreadMentions_other": "나를 언급한 메시지 {{count}}개",
     "unreadThreads_other": "스레드: 읽지 않은 답글이 있는 스레드 {{count}}개",
-    "unreadNotifications_other": "읽지 않은 알림 {{count}}개",
-    "newPassword": "새 비밀번호 만들기",
-    "newPasswordHint": "다른 세션은 종료되고, 이전 비밀번호로 연결된 AI 앱은 다시 연결해야 해요.",
-    "newPasswordRow": "다른 브라우저와 기기에서 쓰는 비밀번호를 바꾸려면",
-    "newPasswordSaved": "새 비밀번호를 저장했어요.",
-    "newPasswordReauth": "새 비밀번호를 만들려면 다시 로그인하세요.",
-    "serverHere": "이 {{device}}의 agentes.chat",
-    "serverStopped": "중지됨",
-    "serverOffline": "{{time}}부터 오프라인",
-    "serverSignedOut": "로그인 안 됨",
-    "serverSignIn": "로그인"
+    "unreadNotifications_other": "읽지 않은 알림 {{count}}개"
   },
   "agentGroups": {
     "group": "부서",
@@ -1551,6 +1551,8 @@
     "making": "코드를 만드는 중…",
     "stepApp": "휴대폰에 agentes 앱을 설치하세요(App Store 또는 Google Play).",
     "stepTailscale": "휴대폰에 Tailscale을 설치하고 이 서버와 같은 Tailscale 계정으로 로그인하세요.",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "stepScan": "휴대폰 카메라로 코드를 비추세요.",
     "validFor": "{{time}} 동안 유효해요",
     "private": "이 코드를 스캔하는 사람은 누구나 내 계정으로 로그인해요.",
@@ -5661,6 +5663,16 @@
     "agentsOnlyYouHint": "요금제를 사용하면 각 에이전트 페이지에서 다른 사람에게도 답하도록 설정할 수 있어요.",
     "filters": "사람 필터",
     "rolesOf": "{{name}}의 역할",
+    "moreOf": "{{name}} 더 보기",
+    "passwordLink": {
+      "item": "새 비밀번호 링크 만들기",
+      "hint": "비밀번호를 잊었을 때",
+      "title": "{{name}}의 새 비밀번호 링크",
+      "lead": "한 번, 1시간 동안 쓸 수 있어요. 평소 대화하는 곳으로 보내세요.",
+      "label": "링크",
+      "making": "링크 만드는 중…",
+      "copy": "링크 복사"
+    },
     "everyoneNote": "모두는 워크스페이스의 모든 사람에게 적용돼요.",
     "everyoneNotePersonal": "역할이 없으면 에이전트를 사용해요. {{role}} 역할이 있으면 관리를 도와줘요.",
     "noRolesToGive": "부여할 수 있는 하위 역할이 없어요.",
@@ -5944,17 +5956,7 @@
     "ownerLine": "소유자: {{name}}",
     "noOwner": "소유자 없음",
     "budgetLine": "{{month}} 예산의 {{percent}}",
-    "noAgents": "아직 에이전트가 없어요.",
-    "moreOf": "{{name}} 더 보기",
-    "passwordLink": {
-      "item": "새 비밀번호 링크 만들기",
-      "hint": "비밀번호를 잊었을 때",
-      "title": "{{name}}의 새 비밀번호 링크",
-      "lead": "한 번, 1시간 동안 쓸 수 있어요. 평소 대화하는 곳으로 보내세요.",
-      "label": "링크",
-      "making": "링크 만드는 중…",
-      "copy": "링크 복사"
-    }
+    "noAgents": "아직 에이전트가 없어요."
   },
   "empty": {
     "thread": {
@@ -11661,6 +11663,11 @@
     }
   },
   "errors": {
+    "passwordLink": {
+      "email": "이 서버는 이메일을 보내요. 본인이 비밀번호 찾기에서 직접 링크를 요청해요.",
+      "serverOwner": "이 서버를 설치한 사람은 서버가 실행되는 컴퓨터에서 링크 없이 들어가요.",
+      "otherWorkspace": "이 사람은 내가 소유하지 않은 workspace에도 있어요. 링크는 그 모든 workspace의 소유자만 만들 수 있어요."
+    },
     "said": {
       "gone": "이제 여기에 없어요. 페이지를 새로고침하고 다시 시도해 주세요.",
       "alreadyDone": "이미 답변했거나 끝났어요. 새로고침해서 상태를 확인해 주세요.",
@@ -12019,11 +12026,6 @@
         "invalidInput": "입력란을 확인하고 다시 시도하세요.",
         "tooManyItems": "Vault가 가득 찼어요. 더 동기화하기 전에 항목을 삭제하세요."
       }
-    },
-    "passwordLink": {
-      "email": "이 서버는 이메일을 보내요. 본인이 비밀번호 찾기에서 직접 링크를 요청해요.",
-      "serverOwner": "이 서버를 설치한 사람은 서버가 실행되는 컴퓨터에서 링크 없이 들어가요.",
-      "otherWorkspace": "이 사람은 내가 소유하지 않은 workspace에도 있어요. 링크는 그 모든 workspace의 소유자만 만들 수 있어요."
     }
   },
   "machines": {

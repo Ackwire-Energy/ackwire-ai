@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { resources } from "@agenteschat/i18n";
+import { matchesWords } from "@agenteschat/ui/search";
 import i18next, { type TFunction } from "i18next";
 import type {
   Agent,
@@ -52,6 +53,7 @@ import {
   planMark,
   planOfAccount,
   planOfKind,
+  planPickText,
   signInAgainPlan,
   signsInOnce,
   signsInPerAgent,
@@ -529,6 +531,16 @@ describe("the agent a plan starts on, and the order of the plans", () => {
       "claude_code",
       "claude_code",
     ]);
+  });
+
+  test("a search finds a plan by the CLI it thinks through, in any case", () => {
+    const found = (q: string) => PLAN_CHOICES.filter((c) => matchesWords(planPickText(enT, c), q));
+    expect(found("codex")).toEqual(["chatgpt"]);
+    expect(found("CODEX")).toEqual(["chatgpt"]);
+    expect(found("claude code")).toEqual(["claude"]);
+    expect(found("Gemini CLI")).toEqual(["gemini"]);
+    expect(found("antigravity")).toEqual(["gemini"]);
+    expect(found("grok build")).toEqual(["grok"]);
   });
 });
 

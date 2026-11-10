@@ -500,6 +500,18 @@
       "continue": "Bu {{device}} üzerinde devam et",
       "text": "agentes.chat'i bu {{device}} üzerinde kurdunuz: şifre gerekmez."
     },
+    "server": {
+      "into": "<b>{{server}}</b> sunucusuna giriş",
+      "intoHere": "Bu {{device}} üzerindeki <b>agentes.chat</b>'e giriş"
+    },
+    "forgotHere": {
+      "ownerTitle": "Burada şifreye ihtiyacın yok.",
+      "ownerLead": "agentes.chat'i bu {{device}} üzerine sen kurdun. Buradan gir, ardından yeni bir şifre oluştur.",
+      "notOwner": "Kuran kişinin hesabı değil mi? Çalışma alanının bir sahibinden yeni şifre bağlantısı iste.",
+      "title": "Bu sunucu e-posta göndermiyor.",
+      "lead": "Çalışma alanının bir sahibinden yeni şifre bağlantısı iste. Üyeler bölümünde oluşturur ve bağlantı 1 saat geçerlidir.",
+      "back": "Şifreye dön"
+    },
     "reset": {
       "title": "Yeni bir şifre oluşturun.",
       "save": "Şifreyi kaydet",
@@ -519,18 +531,6 @@
       "wrongLinkLead": "Bu sunucu için oluşturulan en yeni sahip bağlantısını açın.",
       "taken": "Bu sunucunun zaten bir sahibi var.",
       "takenLead": "Hesabınızla giriş yapın."
-    },
-    "server": {
-      "into": "<b>{{server}}</b> sunucusuna giriş",
-      "intoHere": "Bu {{device}} üzerindeki <b>agentes.chat</b>'e giriş"
-    },
-    "forgotHere": {
-      "ownerTitle": "Burada şifreye ihtiyacın yok.",
-      "ownerLead": "agentes.chat'i bu {{device}} üzerine sen kurdun. Buradan gir, ardından yeni bir şifre oluştur.",
-      "notOwner": "Kuran kişinin hesabı değil mi? Çalışma alanının bir sahibinden yeni şifre bağlantısı iste.",
-      "title": "Bu sunucu e-posta göndermiyor.",
-      "lead": "Çalışma alanının bir sahibinden yeni şifre bağlantısı iste. Üyeler bölümünde oluşturur ve bağlantı 1 saat geçerlidir.",
-      "back": "Şifreye dön"
     }
   },
   "invite": {
@@ -1435,6 +1435,11 @@
     "addPasswordLabel": "Yeni şifre",
     "addPasswordSaved": "Şifre eklendi.",
     "addPasswordReauth": "Şifre eklemek için yeniden giriş yapın.",
+    "newPassword": "Yeni şifre oluştur",
+    "newPasswordHint": "Diğer oturumların kapanır ve eski şifreyle bağlanan yapay zekâ uygulamalarının yeniden bağlanması gerekir.",
+    "newPasswordRow": "Diğer tarayıcılarda ve cihazlarda kullandığın şifreyi değiştirmek için",
+    "newPasswordSaved": "Yeni şifre kaydedildi.",
+    "newPasswordReauth": "Yeni şifre oluşturmak için yeniden giriş yap.",
     "yourWorkspaces": "Çalışma alanlarınız",
     "youAreHere": "Buradasınız",
     "createdOn": "{{date}} tarihinde oluşturuldu",
@@ -1442,6 +1447,11 @@
     "addWorkspace": "Çalışma alanı ekle",
     "addWorkspaceHint": "Var olana katıl, yenisini oluştur ya da ekibinin sunucusunu kullan",
     "yourServer": "Sunucunuz",
+    "serverHere": "Bu {{device}} üzerindeki agentes.chat",
+    "serverStopped": "durduruldu",
+    "serverOffline": "{{time}} saatinden beri çevrim dışı",
+    "serverSignedOut": "giriş yapılmadı",
+    "serverSignIn": "Giriş yap",
     "wiki": "Wiki",
     "settings": "Ayarlar",
     "workspaceMenu": "Çalışma alanı menüsü",
@@ -1520,17 +1530,7 @@
     "unreadThreads_one": "Konular: okunmamış yanıtı olan {{count}} konu",
     "unreadThreads_other": "Konular: okunmamış yanıtı olan {{count}} konu",
     "unreadNotifications_one": "{{count}} okunmamış bildirim",
-    "unreadNotifications_other": "{{count}} okunmamış bildirim",
-    "newPassword": "Yeni şifre oluştur",
-    "newPasswordHint": "Diğer oturumların kapanır ve eski şifreyle bağlanan yapay zekâ uygulamalarının yeniden bağlanması gerekir.",
-    "newPasswordRow": "Diğer tarayıcılarda ve cihazlarda kullandığın şifreyi değiştirmek için",
-    "newPasswordSaved": "Yeni şifre kaydedildi.",
-    "newPasswordReauth": "Yeni şifre oluşturmak için yeniden giriş yap.",
-    "serverHere": "Bu {{device}} üzerindeki agentes.chat",
-    "serverStopped": "durduruldu",
-    "serverOffline": "{{time}} saatinden beri çevrim dışı",
-    "serverSignedOut": "giriş yapılmadı",
-    "serverSignIn": "Giriş yap"
+    "unreadNotifications_other": "{{count}} okunmamış bildirim"
   },
   "agentGroups": {
     "group": "Departman",
@@ -1599,6 +1599,8 @@
     "making": "Kod oluşturuluyor…",
     "stepApp": "agentes uygulamasını telefonunuza yükleyin (App Store veya Google Play).",
     "stepTailscale": "Telefonunuza Tailscale'i kurun ve bu sunucuyla aynı Tailscale hesabıyla giriş yapın.",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "stepScan": "Telefonunuzun kamerasını koda tutun.",
     "validFor": "{{time}} geçerli",
     "private": "Bu kodu tarayan herkes sizin adınıza giriş yapar.",
@@ -5838,6 +5840,16 @@
     "agentsOnlyYouHint": "Bir planla, her birinin sayfasından diğer kişilere de yanıt vermesine izin verebilirsiniz.",
     "filters": "Kişileri filtrele",
     "rolesOf": "Roller: {{name}}",
+    "moreOf": "{{name}} için daha fazlası",
+    "passwordLink": {
+      "item": "Yeni şifre bağlantısı oluştur",
+      "hint": "Şifresini unuttuğunda",
+      "title": "{{name}} için yeni şifre bağlantısı",
+      "lead": "Bir kez, 1 saat boyunca çalışır. Konuştuğunuz yerden gönder.",
+      "label": "Bağlantı",
+      "making": "Bağlantı oluşturuluyor…",
+      "copy": "Bağlantıyı kopyala"
+    },
     "everyoneNote": "Herkes, çalışma alanındaki her kişi için geçerlidir.",
     "everyoneNotePersonal": "Rolü yoksa ajanları kullanır. {{role}} rolüyle buranın yönetimine yardım eder.",
     "noRolesToGive": "Verebileceğiniz, sizinkinden düşük bir rol yok.",
@@ -6139,17 +6151,7 @@
     "ownerLine": "Sahip: {{name}}",
     "noOwner": "Sahip yok",
     "budgetLine": "{{month}} bütçesinin {{percent}} kadarı",
-    "noAgents": "Henüz ajan yok.",
-    "moreOf": "{{name}} için daha fazlası",
-    "passwordLink": {
-      "item": "Yeni şifre bağlantısı oluştur",
-      "hint": "Şifresini unuttuğunda",
-      "title": "{{name}} için yeni şifre bağlantısı",
-      "lead": "Bir kez, 1 saat boyunca çalışır. Konuştuğunuz yerden gönder.",
-      "label": "Bağlantı",
-      "making": "Bağlantı oluşturuluyor…",
-      "copy": "Bağlantıyı kopyala"
-    }
+    "noAgents": "Henüz ajan yok."
   },
   "empty": {
     "thread": {
@@ -12081,6 +12083,11 @@
     }
   },
   "errors": {
+    "passwordLink": {
+      "email": "Bu sunucu e-posta gönderiyor: kişi kendi bağlantısını Şifremi unuttum bölümünden ister.",
+      "serverOwner": "Bu sunucuyu kuran kişi, sunucunun çalıştığı bilgisayardan bağlantısız girer.",
+      "otherWorkspace": "Bu kişi senin olmayan bir çalışma alanında da var: bağlantıyı yalnızca hepsinin sahipleri oluşturabilir."
+    },
     "said": {
       "gone": "Bu artık burada değil. Sayfayı yenileyip tekrar deneyin.",
       "alreadyDone": "Bu zaten yanıtlandı veya bitti. Durumu görmek için yenileyin.",
@@ -12440,11 +12447,6 @@
         "invalidInput": "Alanları kontrol edip tekrar deneyin.",
         "tooManyItems": "Vault dolu. Daha fazlasını eşitlemeden önce öğe silin."
       }
-    },
-    "passwordLink": {
-      "email": "Bu sunucu e-posta gönderiyor: kişi kendi bağlantısını Şifremi unuttum bölümünden ister.",
-      "serverOwner": "Bu sunucuyu kuran kişi, sunucunun çalıştığı bilgisayardan bağlantısız girer.",
-      "otherWorkspace": "Bu kişi senin olmayan bir çalışma alanında da var: bağlantıyı yalnızca hepsinin sahipleri oluşturabilir."
     }
   },
   "machines": {

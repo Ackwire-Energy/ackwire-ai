@@ -340,8 +340,16 @@ test("computer sessions: the conversation's session goes on while recent and sma
   f = await setup();
   const machineId = await computerAgent(f);
   let input = 40;
+  let cacheRead = 0;
   const { brain, seen } = scriptedComputerBrain(() => [
-    { type: "usage", input, output: 5, source: "plan", model: "claude-sonnet-5-5" },
+    {
+      type: "usage",
+      input,
+      output: 5,
+      source: "plan",
+      model: "claude-sonnet-5-5",
+      ...(cacheRead ? { cacheRead } : {}),
+    },
     { type: "done", text: "ok" },
   ]);
   const handlers = createJobHandlers({
@@ -372,24 +380,37 @@ test("computer sessions: the conversation's session goes on while recent and sma
   expect(seen[3]?.session?.resume).toBe(false);
   expect(seen[3]?.session?.id).not.toBe(seen[2]?.session?.id);
 
+  // A turn that read past the limit mostly from the cache is just as big: a fresh session.
+  input = SESSION_MAX_INPUT_TOKENS;
+  cacheRead = SESSION_MAX_INPUT_TOKENS - 40;
+  await reply("@dev do cache");
+  await drainOutbox(f.db, handlers);
+  expect(seen[4]?.session).toMatchObject({ id: seen[3]?.session?.id, resume: true });
+  input = 40;
+  cacheRead = 0;
+  await reply("@dev e depois?");
+  await drainOutbox(f.db, handlers);
+  expect(seen[5]?.session?.resume).toBe(false);
+  expect(seen[5]?.session?.id).not.toBe(seen[4]?.session?.id);
+
   // Idle past the cache: a fresh one too.
   const stale = new Date(Date.now() - SESSION_IDLE_MS - 1000);
   await f.db.update(schema.agentRuns).set({ finishedAt: stale, updatedAt: stale });
   await reply("@dev voltei");
   await drainOutbox(f.db, handlers);
-  expect(seen[4]?.session?.resume).toBe(false);
-  expect(seen[4]?.session?.id).not.toBe(seen[3]?.session?.id);
+  expect(seen[6]?.session?.resume).toBe(false);
+  expect(seen[6]?.session?.id).not.toBe(seen[5]?.session?.id);
 
   // A routine run never picks up the conversation's session.
   const [agent] = await f.db.select().from(schema.agents).where(eq(schema.agents.id, f.agent.id));
   const runs = await f.db.select().from(schema.agentRuns);
-  const last = runs.find((r) => r.brainSessionId === seen[4]?.session?.id);
+  const last = runs.find((r) => r.brainSessionId === seen[6]?.session?.id);
   if (!agent || !last) throw new Error("missing rows");
   const routineRun = { ...last, id: Bun.randomUUIDv7(), brainSessionId: null };
   await f.db.insert(schema.agentRuns).values({ ...routineRun, triggerMessageId: Bun.randomUUIDv7() });
   const plan = await resolveBrain({ db: f.db }, agent, routineRun, question.id, { fresh: true });
   expect(plan.session).toMatchObject({ resume: false, machineId });
-  expect(plan.session?.id).not.toBe(seen[4]?.session?.id);
+  expect(plan.session?.id).not.toBe(seen[6]?.session?.id);
 });
 
 test("edited instructions or org context reach a kept-alive session's next turn: a fresh session with the conversation", async () => {

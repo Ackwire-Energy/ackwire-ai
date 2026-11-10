@@ -28,7 +28,11 @@ export function SaveBar({
   const problem = errors.name ?? errors.handle ?? errors.budget ?? errors.audience;
   return (
     <section className="agp-savebar" aria-label={t("edit.unsaved")}>
-      <span className="agp-savebar__hint" data-bad={problem ? true : undefined} role={problem ? "alert" : undefined}>
+      <span
+        className="agp-savebar__hint ac-iconline"
+        data-bad={problem ? true : undefined}
+        role={problem ? "alert" : undefined}
+      >
         <Icon name={problem ? "info" : "edit"} size={14} />
         {problem ?? (
           <>

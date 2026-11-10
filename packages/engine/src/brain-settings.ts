@@ -334,7 +334,8 @@ const missingCli = (machine: MachineLike): BrainUnavailable =>
  * (Missions' legacy executor tasks keep their own check, `machineExecutors`.)
  */
 export function brainOptions(machine: MachineLike | null): BrainOption[] {
-  const found = machine ? machineExecutors(machine) : null;
+  // Only which CLIs are installed: `machineExecutors` lists none with commands off, but commands are judged below.
+  const found = machine ? machineExecutors({ ...machine, execAllowed: true }) : null;
   const computer = (kind: "claude_code" | "codex", executor: "claude" | "codex"): BrainOption => {
     let reason: BrainUnavailable | undefined;
     // A runner that reports its tools (protocol 10) runs a coding CLI by that CLI's own switch, commands off or not

@@ -37,6 +37,11 @@
   .shell__main :has(.page-split) > :is(:has(.page-split), .page-split) {
     flex: 1 1 auto;
   }
+  /* The columns reach the work area's foot; a list under the split (Aprovações' missions) keeps the page's room
+     there, or its edge is cut by the sheet's. */
+  .shell__main .page-split ~ :last-child:not(:empty) {
+    margin-bottom: var(--space-8);
+  }
   .shell__main .page-split {
     min-height: 0;
     align-items: stretch;

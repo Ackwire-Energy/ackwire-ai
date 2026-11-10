@@ -4,7 +4,7 @@ import { accessInputOf, replaceableGrants, setAgentAccess } from "./access";
 import { type Agent, archiveAgent, getAgent, unarchiveAgent, updateAgent, validateAgentFields } from "./agents";
 import { setAgentAppearance, validateAppearance } from "./appearance";
 import { audienceOf, setAgentAudience } from "./audience";
-import { setAgentBrain } from "./brain-settings";
+import { normalizeBrainModel, setAgentBrain } from "./brain-settings";
 import { isComputerBrain } from "./brains/types";
 import { invalidateOrg } from "./cache";
 import { addChannelMember, removeChannelMember, setChannelAgentAutoReply } from "./channels";
@@ -85,7 +85,8 @@ export const agentApps = async (db: Executor, orgId: string, agentId: string) =>
 
 /**
  * A setting's value now. A channel line's value is the agent's seat there: null when it isn't in it, else whether it
- * answers without a mention (`autoReply`), so adding, removing and the reply mode read and write the same thing.
+ * answers without a mention (`autoReply`), so adding, removing and the reply mode read and write the same thing. The
+ * model of an agent that thinks on a computer is its brain's ("Quem pensa"), null for its CLI's default.
  */
 async function valueNow(db: Executor, agent: Agent, line: Pick<ReceiptLine, "field" | "channelId">) {
   switch (line.field) {
@@ -102,7 +103,7 @@ async function valueNow(db: Executor, agent: Agent, line: Pick<ReceiptLine, "fie
     case "reports_to":
       return agent.reportsToAgentId ?? null;
     case "model":
-      return agent.model;
+      return isComputerBrain(agent.brain) ? agent.brainModel : agent.model;
     case "budget":
       return agent.monthlyBudgetNanoUsd;
     case "owner":
@@ -180,8 +181,12 @@ async function setValue(
       return void (await setReportsTo(deps, actorId, orgId, [
         { agentId, reportsToAgentId: typeof value === "string" ? value : null },
       ]));
-    case "model":
+    case "model": {
+      const agent = await getAgent(db, orgId, agentId);
+      if (agent && isComputerBrain(agent.brain))
+        return void (await setAgentBrain(deps, actorId, orgId, agentId, { model: value }));
       return void (await updateAgent(db, actorId, orgId, agentId, { model: String(value) }, { pubsub }));
+    }
     case "budget":
       return void (await updateAgent(
         db,
@@ -317,7 +322,12 @@ export async function settingLines(
     }
     const from = await valueNow(db, agent, w);
     // As it is stored, so Undo finds what it left.
-    const to = w.field === "look" ? validateAppearance(w.to as Parameters<typeof validateAppearance>[0]) : w.to;
+    const to =
+      w.field === "look"
+        ? validateAppearance(w.to as Parameters<typeof validateAppearance>[0])
+        : w.field === "model" && isComputerBrain(agent.brain)
+          ? normalizeBrainModel(agent.brain, w.to, agent.brainModel)
+          : w.to;
     if (same(from, to)) {
       skipped.push(`${who} already has that ${w.field.replace("_", " ")}.`);
       continue;
@@ -345,9 +355,10 @@ async function refusal(db: Database, orgId: string, requesterId: string, agent: 
       }
       return null;
     case "model":
-      if (isComputerBrain(agent.brain)) return "it thinks on a computer, whose model is picked under Quem pensa.";
       try {
-        await validateAgentFields(db, orgId, { model: String(w.to) });
+        // On a computer any name its CLI may take goes, as under Quem pensa: the vendor answers for the person's plan.
+        if (isComputerBrain(agent.brain)) normalizeBrainModel(agent.brain, w.to, agent.brainModel);
+        else await validateAgentFields(db, orgId, { model: String(w.to) });
       } catch (error) {
         return error instanceof Error ? error.message : "unknown model";
       }

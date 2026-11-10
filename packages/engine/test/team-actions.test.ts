@@ -23,7 +23,11 @@ import {
 import { type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
-afterEach(() => f?.close());
+afterEach(async () => {
+  const current = f;
+  f = undefined as unknown as Fixture;
+  await current?.close();
+});
 
 describe("targets", () => {
   test("addresses, numbers, pages and code; never the text or the sender", () => {
