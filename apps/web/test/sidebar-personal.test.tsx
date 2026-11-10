@@ -4,7 +4,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ADA_ID, createFakeApi, ENG_ID, LODI_ID, ORG_ID, seedState, withRightHand } from "./fake-api";
+import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState, withRightHand } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 /* A personal workspace's sidebar (ADR 0159): the person on top, the agents with no header and New agent under them,
@@ -120,7 +120,7 @@ describe("a personal workspace's sidebar", () => {
     expect(rows).toEqual(["Aprovações"]);
   });
 
-  test("the agents have no header; New agent sits right under them and asks what it should do", async () => {
+  test("the agents have no header; New agent sits right under them and opens the new agent's card (ADR 0164)", async () => {
     const state = withRightHand(personal());
     await go(state);
     const agents = nav().querySelector('.sidebar__block[data-section="agents"]') as HTMLElement;
@@ -130,15 +130,47 @@ describe("a personal workspace's sidebar", () => {
     expect(last.classList.contains("sidebar__new-agent")).toBe(true);
     expect(last.textContent).toBe("Novo agente");
     await click(last);
-    const dialog = screen().getByRole("dialog", { name: "O que o seu novo agente vai fazer?" });
-    await click(within(dialog).getByRole("button", { name: "Agenda" }));
-    const field = within(dialog).getByRole("textbox") as HTMLTextAreaElement;
-    expect(field.value).toBe("Organizar minha agenda e me lembrar dos compromissos");
-    await click(within(dialog).getByRole("button", { name: "Criar com o Lodi" }));
-    const sent = state.calls.find((c) => c.method === "chat.post");
-    expect(sent).toBeTruthy();
-    expect(JSON.stringify(sent?.args)).toContain("Quero um agente novo: Organizar minha agenda");
-    expect(state.calls.some((c) => c.method === "dms.open" && JSON.stringify(c.args).includes(LODI_ID))).toBe(true);
+    const dialog = screen().getByRole("dialog", { name: "Novo agente" });
+    // From scratch first, then the personal starters; Clara picked, introducing herself on her card.
+    const options = within(dialog).getAllByRole("option");
+    expect(options[0]?.textContent).toContain("Do zero");
+    expect(within(dialog).getByRole("option", { name: /Clara/ }).getAttribute("aria-selected")).toBe("true");
+    expect((within(dialog).getByRole("textbox", { name: "Nome" }) as HTMLInputElement).value).toBe("Clara");
+    expect(dialog.textContent).toContain("Oi! Eu sou a");
+    await click(within(dialog).getByRole("button", { name: /Criar Clara/ }));
+    const made = state.calls.find((c) => c.method === "agents.create");
+    expect(made).toBeTruthy();
+    const input = made?.args[1] as { name: string; setup: { starter?: string; hello?: string; apps?: object } };
+    expect(input.name).toBe("Clara");
+    expect(input.setup.starter).toBe("clara");
+    expect(input.setup.hello).toContain("agenda");
+    // Its starter's apps at write, with the ones already connected here (ADR 0159 §3a).
+    expect(input.setup.apps).toMatchObject({ "google-calendar": "write", todoist: "write" });
+  });
+
+  test("from scratch, the card asks what it will do and offers names that fit it (ADR 0164)", async () => {
+    const state = withRightHand(personal());
+    await go(state);
+    const agents = nav().querySelector('.sidebar__block[data-section="agents"]') as HTMLElement;
+    await click([...agents.querySelectorAll(".sidebar__item")].at(-1) as HTMLElement);
+    const dialog = screen().getByRole("dialog", { name: "Novo agente" });
+    await click(within(dialog).getByRole("option", { name: /Do zero/ }));
+    const create = within(dialog).getByRole("button", { name: /Criar agente/ }) as HTMLButtonElement;
+    expect(create.disabled).toBe(true);
+    const what = within(dialog).getByRole("textbox", { name: "O que faz" });
+    await act(async () => fireEvent.change(what, { target: { value: "Cuidar da agenda do consultório" } }));
+    await settle(2);
+    // An agenda's names; one of them picked becomes its name.
+    const idea = within(dialog).getByRole("button", { name: "Lia" });
+    await click(idea);
+    expect((within(dialog).getByRole("textbox", { name: "Nome" }) as HTMLInputElement).value).toBe("Lia");
+    await click(within(dialog).getByRole("button", { name: /Criar Lia/ }));
+    const input = state.calls.find((c) => c.method === "agents.create")?.args[1] as {
+      instructions: string;
+      setup: { role: null; hello?: string };
+    };
+    expect(input.instructions).toBe("Cuidar da agenda do consultório");
+    expect(input.setup).toMatchObject({ role: null, hello: "Cuidar da agenda do consultório" });
   });
 
   test("the agents come first; channels are Conversas em grupo; with someone else in, people and #general show", async () => {

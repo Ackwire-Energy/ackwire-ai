@@ -535,7 +535,8 @@ describe("Equipe (ADR 0148)", () => {
     expect(count?.textContent).toBe("2 pessoas · 2 agentes · 0 setores");
     // The same action as the sidebar's, in the same words.
     const head = document.querySelector(".ac-pagehead") as HTMLElement;
-    expect(within(head).getByRole("link", { name: "Criar agente" })).toBeTruthy();
+    // It opens the new agent's dialog over the page (ADR 0164).
+    expect(within(head).getByRole("button", { name: "Criar agente" })).toBeTruthy();
     const table = screen().getByRole("table");
     const ada = within(table).getByRole("link", { name: /Ada/ }).closest("tr") as HTMLElement;
     expect(ada.textContent).toContain("Dev");

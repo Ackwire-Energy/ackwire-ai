@@ -22,7 +22,9 @@
   min-height: 0;
   margin: 0 -6px;
   padding: 2px 6px 12px;
-  mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent);
+  /* The fade spares our scrollbar (the kit's strip). */
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent), var(--scroll-strip);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent), var(--scroll-strip);
 }
 .nac__item {
   align-items: center;
