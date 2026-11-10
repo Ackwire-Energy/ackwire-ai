@@ -1,12 +1,26 @@
+import type { WorkspaceMode } from "@agenteschat/client";
 import { knownErrorText } from "@agenteschat/client/lib/errors";
 import { platformZoneName } from "@agenteschat/client/lib/routines";
 import { webmailOf } from "@agenteschat/client/lib/text";
 import type { TFunction } from "i18next";
 
 /**
- * The phone's first run: the workspace's name, asked by its right hand, then its DM (ADR 0137). Pure: no React
- * Native imports.
+ * The phone's first run: what the workspace is for (ADR 0159), then, for a company or team, its name, asked by its
+ * right hand; then its DM (ADR 0137). Pure: no React Native imports.
  */
+
+/** The two answers to "What will you use agentes.chat for?" (ADR 0159), in this order. */
+export const PURPOSES = ["personal", "team"] as const satisfies readonly WorkspaceMode[];
+
+/**
+ * The workspace an answer makes, or what one made here already is set to when a later step failed: "For me" is a
+ * personal workspace named in the person's language (renamed in Settings like any other), with no name to ask; a
+ * company or team is the name typed. The mode goes along either way (a server that doesn't know it ignores it).
+ */
+export const workspaceAnswer = (t: TFunction, purpose: WorkspaceMode, name: string) =>
+  purpose === "personal"
+    ? { name: t("onboarding.personal.name"), mode: "personal" as const }
+    : { name: name.trim(), mode: "team" as const };
 
 /** A save that failed: what the server's code says (a refused workspace, a restriction), else that it didn't save. */
 export const stepFailedText = (t: TFunction, error: unknown, locale?: string) =>

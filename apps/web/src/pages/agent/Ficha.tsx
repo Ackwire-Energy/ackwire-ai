@@ -1,6 +1,6 @@
 import type { Routine } from "@agenteschat/client";
 import { useAgentDetail, useAgentSkills, useRoutines, useUsage } from "@agenteschat/client";
-import { audienceSummary } from "@agenteschat/client/lib/audience";
+import { audienceSummary, modeOf } from "@agenteschat/client/lib/audience";
 import { formatMonth, formatPercent, formatUsd, whenAt } from "@agenteschat/client/lib/format";
 import {
   Avatar,
@@ -23,6 +23,7 @@ import { usd } from "@/components/AgentFields";
 import { LoadingLine } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
+import { usePersonalView } from "@/hooks/usePersonalView";
 import type { Field } from "@/lib/agent-edit";
 import { planMeterText, usageShown } from "@/lib/plan-usage";
 import { useRoutineControls } from "@/pages/RoutinesPage";
@@ -55,6 +56,7 @@ export function Ficha() {
   const usage = useUsage(org.id);
   const routines = useRoutines(org.id);
   const items = useConnectedById();
+  const { solo } = usePersonalView();
   const [open, setOpen] = useState<FichaDialog | null>(null);
   const shownOpen = open ?? workOpen;
 
@@ -76,6 +78,10 @@ export function Ficha() {
     : t("agentPage.numbers.budget", { percent: formatPercent(locale, used) });
 
   const owner = agent.ownerUserId ? dir.memberById.get(agent.ownerUserId) : undefined;
+  // Alone in a personal workspace, being its owner and who talks to it say nothing new while they hold what they hold
+  // there (the person's, everyone or only them): Settings keeps both, and a list of people always shows (ADR 0159).
+  const ownerShown = !(solo && agent.ownerUserId === me.user.id);
+  const audienceShown = !solo || modeOf(agent) === "people";
   const channels = (detail.data?.channels ?? []).filter((c) => saved.channels?.includes(c.id) ?? true);
   const mine = (routines.data ?? []).filter((r) => r.agentId === agent.id);
   const next = mine
@@ -160,36 +166,40 @@ export function Ficha() {
       <div className="agp-work">
         <GroupHeading id="agp-ficha-with" title={t("agentPage.ficha.with")} />
         <section className="agp-ficha__card" aria-labelledby="agp-ficha-with">
-          <Cell
-            row
-            icon={
-              owner ? (
-                <Avatar kind="person" size="xs" name={owner.name} imageUrl={owner.image} />
-              ) : (
-                <Icon name="members" size={16} />
-              )
-            }
-            label={t("newAgent.owner")}
-            value={
-              owner
-                ? owner.userId === me.user.id
-                  ? t("newAgent.you", { name: owner.name })
-                  : owner.name
-                : t("newAgent.noOwnerOption")
-            }
-            open={shownOpen === "owner"}
-            openLabel={t("newAgent.owner")}
-            onOpen={() => setOpen("owner")}
-          />
-          <Cell
-            row
-            icon={<Icon name="message" size={16} />}
-            label={t("audience.section")}
-            value={audienceSummary(t, agent, (id) => dir.memberById.get(id)?.name, dir.roleName)}
-            open={shownOpen === "audience"}
-            openLabel={t("audience.section")}
-            onOpen={() => setOpen("audience")}
-          />
+          {ownerShown && (
+            <Cell
+              row
+              icon={
+                owner ? (
+                  <Avatar kind="person" size="xs" name={owner.name} imageUrl={owner.image} />
+                ) : (
+                  <Icon name="members" size={16} />
+                )
+              }
+              label={t("newAgent.owner")}
+              value={
+                owner
+                  ? owner.userId === me.user.id
+                    ? t("newAgent.you", { name: owner.name })
+                    : owner.name
+                  : t("newAgent.noOwnerOption")
+              }
+              open={shownOpen === "owner"}
+              openLabel={t("newAgent.owner")}
+              onOpen={() => setOpen("owner")}
+            />
+          )}
+          {audienceShown && (
+            <Cell
+              row
+              icon={<Icon name="message" size={16} />}
+              label={t("audience.section")}
+              value={audienceSummary(t, agent, (id) => dir.memberById.get(id)?.name, dir.roleName, org)}
+              open={shownOpen === "audience"}
+              openLabel={t("audience.section")}
+              onOpen={() => setOpen("audience")}
+            />
+          )}
           <Cell
             row
             icon={<Icon name="channel" size={16} />}

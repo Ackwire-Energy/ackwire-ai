@@ -6,7 +6,7 @@ export const MAX_MENU_LABEL = 120;
 /**
  * Everything Rust shows in the app's language: the menu bar, the tray's own menu on Windows and Linux (the
  * server here's line in it too), the system dialog before a page pairs this computer and the server here's
- * notifications. `{org}`, `{host}` and `{version}` are left for Rust to fill in.
+ * notifications (and their Stop). `{org}`, `{host}` and `{version}` are left for Rust to fill in.
  */
 export function menuLabels(t: TFunction): Record<string, string> {
   return {
@@ -54,5 +54,7 @@ export function menuLabels(t: TFunction): Record<string, string> {
     windowPrefs: t("desktop.windowTitle.prefs"),
     workspaceNewsOne: t("desktop.servers.newsOne"),
     workspaceNewsMany: t("desktop.servers.newsMany", { n: "{count}" }),
+    // The Stop on the notification of a phone someone's agent uses (main_window.rs `show_notice`).
+    notifyStop: t("devices.stop"),
   };
 }

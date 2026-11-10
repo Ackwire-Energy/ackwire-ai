@@ -8,6 +8,7 @@ export * from "./context";
 export * from "./dashboards";
 export * from "./databases";
 export * from "./early-access";
+export * from "./feedback";
 export * from "./forum";
 export * from "./imports";
 export * from "./instance-secrets";

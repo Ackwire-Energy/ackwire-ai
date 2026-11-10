@@ -16,6 +16,7 @@ import type {
   RunnerAccountInfo,
   RunnerExecutorInfo,
   RunnerPause,
+  RunnerPhone,
   RunnerTools,
 } from "./machine-protocol";
 
@@ -101,6 +102,10 @@ export interface ControlStatus {
   access?: RunnerAccess;
   /** The agents' browsers that are open or have a person's turn (absent: older runner). */
   browsers?: ControlBrowser[];
+  /** The phones this computer reaches now, as the server hears them (absent: older runner, or no phones looked for). */
+  phones?: RunnerPhone[];
+  /** The OS user agents' commands run as here (absent: older runner). */
+  user?: string;
   /**
    * Grows by one for every status the runner reports (events and `status` replies alike), from 1
    * when the process starts; the app keeps the newest and drops anything older. Absent: older runner.
@@ -173,6 +178,24 @@ export interface ControlConfig extends Required<ControlConfigPatch> {
   managedBy?: "desktop";
 }
 
+/**
+ * What a Mac needs before agents can use an iPhone through it, as the desktop app's iPhone setup shows it: Xcode, the
+ * iOS platform Xcode builds for an iPhone with, and an Apple Account in Xcode. The iPhone's own steps (plugged in,
+ * trusted, Developer Mode, UI Automation, the test helper) are its reason in `ControlStatus.phones`.
+ */
+export interface ControlIphoneSetup {
+  /** Xcode's version ("26.3"); null: no Xcode (or only the command line tools). */
+  xcode: string | null;
+  /** The iOS platform: installed (its version), being downloaded (`iphone.download`), missing, or a download failed. */
+  platform:
+    | { state: "installed"; version: string }
+    | { state: "missing" }
+    | { state: "downloading"; percent: number | null; done?: string; total?: string }
+    | { state: "failed"; message: string };
+  /** The Apple Account in Xcode › Settings › Accounts, by its team (a free one is a Personal Team); null: none. */
+  account: { name: string; personal: boolean } | null;
+}
+
 /** App → runner requests. Every request is answered by exactly one `reply` with the same `id`. */
 export type ControlRequest =
   | { type: "status" }
@@ -231,6 +254,12 @@ export type ControlRequest =
   | { type: "account.status"; loginId: string }
   | { type: "account.cancel"; loginId: string }
   | { type: "account.remove"; kind: AccountKind; accountId: string }
+  /** The Mac's side of setting up an iPhone (macOS; elsewhere nothing is found). */
+  | { type: "iphone.setup" }
+  /** Starts downloading the iOS platform when Xcode lacks it; the reply and `iphone.setup` show its progress. */
+  | { type: "iphone.download" }
+  /** Opens Xcode (its Accounts are only there), or Xcode's page in the App Store. */
+  | { type: "iphone.open"; app: "xcode" | "appStore" }
   /** Finish what's running briefly, then exit 0 (the app quits). */
   | { type: "shutdown" };
 
@@ -267,6 +296,9 @@ export interface ControlReplies {
   "account.status": { state: AccountLoginState; account?: RunnerAccountInfo; error?: string };
   "account.cancel": { canceled: boolean };
   "account.remove": { removed: boolean };
+  "iphone.setup": ControlIphoneSetup;
+  "iphone.download": ControlIphoneSetup;
+  "iphone.open": { opened: boolean };
   shutdown: { stopping: true };
 }
 

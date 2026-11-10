@@ -7,6 +7,8 @@ import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { requireUserIn } from "@/app/guards";
 import { usePageTextSize } from "@/chat/look";
+import { Arrival } from "@/components/arrival/Arrival";
+import { FeedbackHost } from "@/components/arrival/FeedbackDialog";
 import { ArtifactViewerProvider } from "@/components/artifacts/ArtifactViewer";
 import { CommandMenu } from "@/components/CommandMenu";
 import { ConnectAiProvider } from "@/components/ConnectAi";
@@ -175,6 +177,8 @@ function OrgLayout() {
                               {/* What reaches me while I'm here, at the top of the work area (ADR 0071 §9). */}
                               {!focused && <NoticeIsland />}
                               <WebPushAsk />
+                              <Arrival />
+                              <FeedbackHost />
                               <Outlet />
                             </DetailsHost>
                           </ComputerDialogProvider>

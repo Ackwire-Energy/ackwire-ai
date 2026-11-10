@@ -1,18 +1,21 @@
 import type { SidebarSection } from "@agenteschat/client";
 import { useSetSidebarOrder, useSidebarOrder } from "@agenteschat/client";
-import { moveSection, SIDEBAR_SECTIONS, sameOrder } from "@agenteschat/client/lib/sidebar-items";
+import { moveSection, sameOrder, sidebarSections } from "@agenteschat/client/lib/sidebar-items";
 import { Icon } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
 import { type DragEvent, type ReactNode, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { type MenuEntry, openContextMenu } from "@/lib/context-menu";
 
-/** A section's name as its header (or, for the tools, the dialog) says it. */
-export const sectionName = (t: TFunction, id: SidebarSection) =>
+/**
+ * A section's name as its header (or, for the tools, the dialog) says it. A personal workspace's channels are its
+ * group conversations (ADR 0159).
+ */
+export const sectionName = (t: TFunction, id: SidebarSection, personal = false) =>
   id === "tools"
     ? t("shell.sidebarSetup.tools")
     : id === "channels"
-      ? t("shell.channels")
+      ? t(personal ? "shell.channelsPersonal" : "shell.channels")
       : id === "agents"
         ? t("shell.agents")
         : t("shell.directMessages");
@@ -20,17 +23,19 @@ export const sectionName = (t: TFunction, id: SidebarSection) =>
 const SECTION_DRAG = "application/x-agentes-section";
 
 /**
- * The order of the sidebar's sections, the person's own in this workspace (`…/me/sidebar/order`): Mover para cima /
- * para baixo and Restaurar ordem padrão for a section's menus, and dragging a section by its grip.
+ * The order of the sidebar's sections, the person's own in this workspace (`…/me/sidebar/order`): Move up / Move down
+ * and Restore default order for a section's menus, and dragging a section by its grip. The default is the workspace's
+ * mode's (`personal`: the agents first, ADR 0159).
  */
-export function useSectionOrder(orgId: string) {
+export function useSectionOrder(orgId: string, personal = false) {
   const { t } = useTranslation();
-  const order = useSidebarOrder(orgId);
-  const save = useSetSidebarOrder(orgId);
+  const order = useSidebarOrder(orgId, personal);
+  const save = useSetSidebarOrder(orgId, personal);
   const dragging = useRef<SidebarSection | null>(null);
   const [mark, setMark] = useState<{ id: SidebarSection; where: "before" | "after" } | null>(null);
+  const defaults = sidebarSections(personal);
   const put = (next: SidebarSection[]) => {
-    if (!sameOrder(next, order)) save.mutate(sameOrder(next, SIDEBAR_SECTIONS) ? null : next);
+    if (!sameOrder(next, order)) save.mutate(sameOrder(next, defaults) ? null : next);
   };
 
   const restore: MenuEntry = {
@@ -38,8 +43,8 @@ export function useSectionOrder(orgId: string) {
     id: "restore-order",
     label: t("contextMenu.restoreOrder"),
     icon: "undo",
-    disabled: sameOrder(order, SIDEBAR_SECTIONS),
-    run: () => put([...SIDEBAR_SECTIONS]),
+    disabled: sameOrder(order, defaults),
+    run: () => put([...defaults]),
   };
   const entries = (id: SidebarSection): MenuEntry[] => {
     const i = order.indexOf(id);
@@ -101,8 +106,8 @@ export function useSectionOrder(orgId: string) {
           type="button"
           className="sidebar__grip"
           draggable
-          aria-label={t("shell.sidebarSetup.moveSection", { name: sectionName(t, id) })}
-          title={t("shell.sidebarSetup.moveSection", { name: sectionName(t, id) })}
+          aria-label={t("shell.sidebarSetup.moveSection", { name: sectionName(t, id, personal) })}
+          title={t("shell.sidebarSetup.moveSection", { name: sectionName(t, id, personal) })}
           onDragStart={(e) => {
             dragging.current = id;
             e.dataTransfer.effectAllowed = "move";
@@ -120,7 +125,10 @@ export function useSectionOrder(orgId: string) {
           onDragEnd={end}
           onClick={(e) => {
             const r = e.currentTarget.getBoundingClientRect();
-            openContextMenu(r.right, r.bottom, [{ kind: "header", label: sectionName(t, id) }, ...entries(id)]);
+            openContextMenu(r.right, r.bottom, [
+              { kind: "header", label: sectionName(t, id, personal) },
+              ...entries(id),
+            ]);
           }}
         >
           <Icon name="grip" size={14} />

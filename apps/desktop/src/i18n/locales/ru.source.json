@@ -1064,6 +1064,84 @@
   "prefs.general.notchDesc": {
     "value": "On MacBooks with a notch: who is working shows around the camera."
   },
+  "prefs.thisMac.agents": {
+    "value": "Agents"
+  },
+  "prefs.thisMac.letAgents": {
+    "value": "Let agents use this {{device}}"
+  },
+  "prefs.thisMac.letAgentsDesc": {
+    "value": "Agents use this {{device}} when they need it, while the app is open."
+  },
+  "prefs.thisMac.commandsDesc": {
+    "value": "Tests, builds and other Terminal commands. They run as {{user}}, and each one shows in Activity."
+  },
+  "prefs.thisMac.who": {
+    "value": "Who can use it"
+  },
+  "prefs.thisMac.whoDesc": {
+    "value": "Only me means you, and agents working for you."
+  },
+  "prefs.thisMac.whoIn": {
+    "value": "Who can use it in {{org}}"
+  },
+  "prefs.thisMac.owner": {
+    "value": "Only me"
+  },
+  "prefs.thisMac.everyone": {
+    "value": "Everyone in {{org}}"
+  },
+  "prefs.thisMac.people": {
+    "value": "Specific people or roles"
+  },
+  "prefs.thisMac.edit": {
+    "value": "Edit"
+  },
+  "prefs.thisMac.pickTitle": {
+    "value": "Who can use this {{device}}"
+  },
+  "prefs.thisMac.search": {
+    "value": "Search people"
+  },
+  "prefs.thisMac.noMatch": {
+    "value": "Nobody matches"
+  },
+  "prefs.thisMac.ownerAlways": {
+    "value": "You can always use it, as its owner."
+  },
+  "prefs.thisMac.save": {
+    "value": "Save"
+  },
+  "prefs.thisMac.saved": {
+    "value": "Saved"
+  },
+  "prefs.thisMac.phones": {
+    "value": "Phones on this {{device}}"
+  },
+  "prefs.thisMac.phonesIn": {
+    "value": "Phones on this {{device}} in {{org}}"
+  },
+  "prefs.thisMac.plug": {
+    "value": "Plug a phone into this {{device}} to add it."
+  },
+  "prefs.thisMac.androidSteps": {
+    "value": "Android steps"
+  },
+  "prefs.thisMac.iphoneSteps": {
+    "value": "iPhone steps"
+  },
+  "prefs.thisMac.wider": {
+    "value": "Other people's agents run as {{user}} here and can read your files."
+  },
+  "prefs.thisMac.phoneWho": {
+    "value": "{{who}} can use it"
+  },
+  "prefs.thisMac.signedOut": {
+    "value": "Sign in to {{server}} in the app to see who can use this {{device}}."
+  },
+  "prefs.thisMac.unreachable": {
+    "value": "Couldn't reach {{server}}. Check the connection and try again."
+  },
   "prefs.folders.title": {
     "value": "Folders"
   },
@@ -1495,6 +1573,78 @@
   },
   "prefs.advanced.folderDesc": {
     "value": "One folder per workspace, with a folder for each agent."
+  },
+  "iphone.lead": {
+    "value": "This {{device}} does the setup. You only tap on the iPhone when a step asks."
+  },
+  "iphone.account": {
+    "value": "Apple Account in Xcode"
+  },
+  "iphone.checking": {
+    "value": "Looking at this {{device}}…"
+  },
+  "iphone.xcodeText": {
+    "value": "Install Xcode from the App Store. This step goes on by itself when it's there."
+  },
+  "iphone.xcodeOld": {
+    "value": "This iPhone needs a newer Xcode. Update it in the App Store."
+  },
+  "iphone.updateXcode": {
+    "value": "Update Xcode"
+  },
+  "iphone.toolsStarting": {
+    "value": "Starting the download…"
+  },
+  "iphone.toolsProgress": {
+    "value": "{{done}} of {{total}}"
+  },
+  "iphone.toolsPercent": {
+    "value": "{{percent}}% downloaded"
+  },
+  "iphone.toolsFailed": {
+    "value": "The download stopped: {{message}}"
+  },
+  "iphone.accountText": {
+    "value": "Add it in Xcode › Settings › Accounts. A free Apple Account is enough."
+  },
+  "iphone.openXcode": {
+    "value": "Open Xcode"
+  },
+  "iphone.personalTeam": {
+    "value": "{{name}} · Personal Team"
+  },
+  "iphone.unlockText": {
+    "value": "Unlock the iPhone and keep it unlocked for a moment."
+  },
+  "iphone.oldText": {
+    "value": "This iPhone's iOS is too old for Xcode's tools."
+  },
+  "iphone.devModeHint": {
+    "value": "It shows in Settings only after a Mac pairs with the iPhone. This {{device}} did that."
+  },
+  "iphone.helperText": {
+    "value": "This {{device}} builds it and renews it every 7 days. The first time, trust it on the iPhone."
+  },
+  "iphone.helperHint": {
+    "value": "Settings › General › VPN & Device Management, tap your Apple Account, then Trust. Renewing needs Xcode signed in."
+  },
+  "iphone.helperBuilding": {
+    "value": "Building the test helper…"
+  },
+  "iphone.qr": {
+    "value": "Scan with the iPhone to see these steps there."
+  },
+  "iphone.qrLabel": {
+    "value": "QR code that opens these steps on the iPhone"
+  },
+  "iphone.tip": {
+    "value": "Keep it ready around the clock"
+  },
+  "iphone.tipHint": {
+    "value": "For a test iPhone that stays plugged in: Auto-Lock Never, automatic updates off, no passcode, and this {{device}} on power."
+  },
+  "iphone.progress": {
+    "value": "iPhone setup"
   },
   "cover.offline": {
     "value": "No internet connection · trying again…"

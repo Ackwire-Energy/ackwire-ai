@@ -17,6 +17,7 @@ import {
   suggestedChannels,
   suggestedLevels,
 } from "@agenteschat/client/lib/setup-checklist";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
@@ -27,11 +28,12 @@ import { openConnectAi } from "../../ai/NoAiCard";
 import { usePlanHold } from "../../ai/parts";
 import { requestComposerText } from "../../chat/composer-request";
 import { useOpenDm } from "../../new/useOpenDm";
-import { resourceName, useConnectedById } from "../../settings/hooks";
+import { resourceName, useConnectedById, usePersonalView } from "../../settings/hooks";
 import { AgentFace } from "../../shared/Face";
 import { useColors, useDirectory, useMeId } from "../../shared/hooks";
 import { successHaptic, tapHaptic } from "../../shared/parts";
 import { openSetupStep } from "./SetupStepScreen";
+import { setupStepsInSight } from "./steps";
 import { useAgentChannels } from "./useAgentChannels";
 
 /*
@@ -39,7 +41,8 @@ import { useAgentChannels } from "./useAgentChannels";
  * never stored, in its voice. Five steps (think, apps, channels, who talks to it, how it works); each button opens a
  * screen of its own with the suggestion marked (managing is a pushed screen), think opens Connect AI. Only who may set
  * the agent up sees it: who manages agents all the steps, its owner the ones they may change. Its screen shows the
- * same card while something is left.
+ * same card while something is left. Alone in a personal workspace (ADR 0159), "who talks to it" isn't asked while it
+ * holds its default (`setupStepsInSight`), and the rows read the workspace's own words.
  */
 
 const STEP_ICON: Record<AgentSetupStep, IconName> = {
@@ -57,7 +60,10 @@ const ARRIVED = new Set<string>();
 export function useSetupSteps(agent: Agent | undefined): AgentSetupStep[] {
   const { org } = useOrg();
   const meId = useMeId();
-  return agent && meId ? setupSteps(agent, { meId, admin: can(org, "manage_agents") }) : [];
+  const { solo } = usePersonalView();
+  return agent && meId
+    ? setupStepsInSight(setupSteps(agent, { meId, admin: can(org, "manage_agents") }), audienceOf(agent), solo)
+    : [];
 }
 
 /** The top of a new agent's DM: its greeting and the checklist, as its first message. */
@@ -183,6 +189,7 @@ export function AgentSetupCard({
       audience: audience.mode,
       otherOwner: !ownerIsMe && owner ? firstName(owner.name) : null,
       onPlan: Boolean(agent.brain && agent.brain.kind !== "model"),
+      personal: isPersonal(org),
     });
 
   const act = (step: AgentSetupStep) => {

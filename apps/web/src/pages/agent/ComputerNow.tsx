@@ -1,6 +1,7 @@
 import { isWaitingHandoff, useBrowserHandoffMutations } from "@agenteschat/client";
 import { entryButton, entryLine, entryState } from "@agenteschat/client/lib/agent-computer";
 import { computerName } from "@agenteschat/client/lib/computer";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { Button, Icon } from "@agenteschat/ui";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
@@ -54,7 +55,7 @@ export function ComputerNow() {
   const line = entryLine(t, state, {
     edition: f.edition,
     locale: i18n.language,
-    computer: computerName(t, org.name, view.machine),
+    computer: computerName(t, org.name, view.machine, isPersonal(org)),
     lastSeenAt: view.machine?.lastSeenAt ?? null,
     person: (id) => dir.memberById.get(id)?.name ?? t("channel.unknownPerson"),
     step: last ? stepText(t, last, last.screen) : null,

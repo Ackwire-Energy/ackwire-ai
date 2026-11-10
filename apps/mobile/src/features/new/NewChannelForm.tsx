@@ -1,19 +1,26 @@
 import { keys, useApi } from "@agenteschat/client";
+import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, TextInput, View } from "react-native";
+import { useOrg } from "@/providers/org";
 import { Button, fieldText, Icon, Locked, SheetScreen, Text, useToast } from "@/ui";
 import { chatHref } from "../links/logic";
 import { useColors, useOrgId } from "../shared/hooks";
 import { useSurface } from "../shared/parts";
 import { closeSheetsAndOpen, SheetHeader } from "./parts";
 
-/** "Novo canal": only the name; people and agents are called in later, by name. */
+/**
+ * "New channel": only the name; people and agents are called in later, by name. A personal workspace's channels are
+ * its group conversations (ADR 0159).
+ */
 export function NewChannelForm() {
   const { t } = useTranslation();
   const api = useApi();
   const orgId = useOrgId();
+  const { org } = useOrg();
+  const title = isPersonal(org) ? t("shell.sidebarMenu.newChannelPersonal") : t("mobile.chats.newChannel");
   const qc = useQueryClient();
   const toast = useToast();
   const c = useColors();
@@ -35,16 +42,16 @@ export function NewChannelForm() {
   };
   return (
     <SheetScreen>
-      <SheetHeader title={t("mobile.chats.newChannel")} />
+      <SheetHeader title={title} />
       <Locked when={busy}>
         <View style={[styles.field, surface]}>
           <Icon name="hash" size={20} color={c.faint} />
           <TextInput
             value={name}
             onChangeText={setName}
-            placeholder={t("mobile.chats.channelPlaceholder")}
+            placeholder={t(modeKey(org, "mobile.chats.channelPlaceholder"))}
             placeholderTextColor={c.faint}
-            accessibilityLabel={t("mobile.chats.newChannel")}
+            accessibilityLabel={title}
             autoCapitalize="none"
             autoCorrect={false}
             autoFocus
@@ -55,12 +62,12 @@ export function NewChannelForm() {
         </View>
       </Locked>
       <Text variant="footnote" tone="faint" style={styles.fine}>
-        {t("mobile.new.channelFine")}
+        {t(modeKey(org, "mobile.new.channelFine"))}
       </Text>
       <Button
         variant="primary"
         wide
-        label={t("mobile.chats.createChannel")}
+        label={t(modeKey(org, "mobile.chats.createChannel"))}
         loading={busy}
         disabled={!clean}
         onPress={submit}

@@ -938,6 +938,13 @@ export const envVars = {
     section: "Operator",
     example: "support@example.com",
   },
+  FEEDBACK_EMAIL: {
+    schema: z.email().optional(),
+    description:
+      "Where the apps' feedback form sends what people write (the Beta mark beside their name): one email per message, with the person's name and address to answer them, the workspace's name and the app's version, never a conversation. Unset (default): the apps show no form.",
+    section: "Operator",
+    example: "feedback@example.com",
+  },
   OPS_REPORT_EMAIL: {
     schema: z
       .string()

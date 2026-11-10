@@ -928,6 +928,11 @@ export function registerMachinePublicRoutes(api: OpenAPIHono, deps: AppDeps) {
               machineId: z.uuid(),
               name: z.string(),
               org: z.object({ id: z.uuid(), name: z.string() }),
+              audience: z
+                .enum(["everyone", "people", "owner"])
+                .openapi({ description: "Who may use it, as it joined (its owner, everyone, or people and roles)." }),
+              owner: z.string().nullable().openapi({ description: "The name of the person who connected it." }),
+              url: z.url().openapi({ description: "Its page in the web app, where who may use it changes." }),
             })
             .openapi("MachineDeviceToken"),
         ),
@@ -947,7 +952,8 @@ export function registerMachinePublicRoutes(api: OpenAPIHono, deps: AppDeps) {
       const result = await pollDeviceToken({ db, pubsub: adapters.pubsub }, c.req.valid("json").deviceCode);
       if (!result.ok) return c.json({ error: result.error }, 400);
       const { ok: _ok, ...token } = result;
-      return c.json(token, 200);
+      const url = `${config.PUBLIC_URL.replace(/\/+$/, "")}/org/${token.org.id}/settings/devices/${token.machineId}`;
+      return c.json({ ...token, url }, 200);
     },
   );
 

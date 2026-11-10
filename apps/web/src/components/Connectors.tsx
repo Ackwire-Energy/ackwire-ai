@@ -33,6 +33,7 @@ import { appAccountsText, githubDisconnectNote } from "@agenteschat/client/lib/g
 import { choiceOf, newestAccount } from "@agenteschat/client/lib/mail";
 import { can } from "@agenteschat/client/lib/permissions";
 import { connectorBrand } from "@agenteschat/client/lib/scopes";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import {
   AvatarStack,
   Button,
@@ -255,7 +256,7 @@ export function ConnectorsSection({
           <EmptyState
             size="panel"
             agent={look}
-            title={t(admin ? "connectors.noneTitle" : "access.noConnectorsViewerTitle")}
+            title={t(admin ? modeKey(org, "connectors.noneTitle") : "access.noConnectorsViewerTitle")}
             actions={
               admin && (
                 <Button variant="primary" icon="plus" onClick={() => setAdding(true)}>

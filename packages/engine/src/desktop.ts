@@ -26,6 +26,7 @@ import {
 } from "./browser/handoff";
 import { HANDOFF_KEEPALIVE_MS } from "./browser/live";
 import { TtlCache } from "./cache";
+import { auditPhoneStream, authorizePhoneStream, recheckPhoneStream } from "./devices";
 import { ForbiddenError, NotFoundError } from "./errors";
 import type { MachineCaller, MachineHub } from "./machine-hub";
 import {
@@ -61,7 +62,7 @@ export async function desktopTarget(
   hub: Pick<MachineHub, "isLocal">,
   orgId: string,
   agentId: string,
-  kind: StreamRequest["kind"],
+  kind: Exclude<StreamRequest["kind"], "phone">,
 ): Promise<StreamTarget> {
   const [agent] = await db
     .select({ handle: agents.handle, name: agents.name, machineId: agents.machineId })
@@ -132,9 +133,11 @@ export interface StreamPolicyDeps {
  * at most `opensPerMinute` opens a minute per person, `streamAccess`, then the
  * computer (`desktopTarget`). A control stream opening is its holder back: the
  * grace of their control starts again. A held agent's desktop (or one in a
- * workspace on hold) may be watched while it runs; starting it is new work.
+ * workspace on hold) may be watched while it runs; starting it is new work. A phone's screen goes by its own rule
+ * (`authorizePhoneStream`).
  */
 export async function authorizeStream(deps: StreamPolicyDeps, input: StreamInput): Promise<StreamTarget> {
+  if (input.request.kind === "phone") return authorizePhoneStream(deps, input);
   const rate = await deps.rateLimiter?.consume(`stream-open:${input.userId}`, {
     limit: STREAM_LIMITS.opensPerMinute,
     windowMs: 60_000,
@@ -188,6 +191,7 @@ export async function recheckStream(db: Database, stream: Stream) {
       .where(and(eq(sessions.token, stream.sessionToken), gt(sessions.expiresAt, new Date())));
     if (!alive) return refused(STREAM_CLOSE.forbidden, "signed_out");
   }
+  if (stream.request.kind === "phone") return recheckPhoneStream(db, stream);
   const access = await streamAccess(db, stream);
   if ("refused" in access) return access;
   if (access.control) await touchControl(db, access.control, stream.userId).catch(() => {});
@@ -210,6 +214,7 @@ export async function streamClosed(db: Database, s: Stream) {
 
 /** A stream that ran, in the org's audit log (ADR 0058 §12): who, which agent and computer, how long, how many bytes. */
 export async function auditStream(db: Database, s: Stream) {
+  if (s.request.kind === "phone") return auditPhoneStream(db, s);
   const action =
     s.request.kind === "terminal"
       ? "terminal.session"

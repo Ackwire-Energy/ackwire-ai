@@ -328,6 +328,33 @@ a.dv-row__detail {
   align-items: center;
   gap: var(--space-2);
 }
+/* The six-digit way: the address and the code side by side, Pair under them; one column on a phone. */
+.dv-step__more > .ac-locked {
+  align-self: stretch;
+}
+.dv-pair-code {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 8rem);
+  gap: var(--space-4) var(--space-3);
+}
+.dv-pair-code > .ac-btn {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+@media (width <= 640px) {
+  .dv-pair-code {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .dv-pair-code > .ac-btn {
+    justify-self: stretch;
+  }
+}
+/* What only a phone-sized screen says (the Wi-Fi QR is shown on computers alone). */
+@media (width > 640px) {
+  .dv-narrow {
+    display: none;
+  }
+}
 
 .dv-step[data-state="done"] .dv-step__mark {
   color: var(--ok);
@@ -493,45 +520,6 @@ a.dv-row__detail {
 }
 
 /* A path through the phone's own Settings, when no button can open it (iPhone, a web page). */
-.dv-path {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-1);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  font-size: var(--text-sm);
-  line-height: 18px;
-}
-.dv-path > li {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-}
-/* The › ends a segment, so a path that wraps ends its line with it instead of starting the next one. */
-.dv-path > li:not(:last-child)::after {
-  content: "›";
-  color: var(--faint);
-  font-weight: 600;
-  margin-inline: var(--space-1);
-}
-.dv-path__seg {
-  display: inline-flex;
-  align-items: center;
-  min-height: 24px;
-  padding: 0 var(--space-2);
-  border-radius: var(--radius-sm);
-  background: var(--raised);
-  box-shadow: inset 0 0 0 1px var(--line);
-  color: var(--ink2);
-  font-weight: 600;
-}
-.dv-path > li:last-child > .dv-path__seg {
-  color: var(--ink);
-  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--agent) 45%, transparent);
-}
-
 /* ---------- Steps with a QR beside them (connect dialogs) ------------------------------------ */
 .dv-split {
   display: grid;
@@ -631,6 +619,14 @@ a.dv-row__detail {
 /* Already scanned: the code fades and the words say where the steps are now. */
 .dv-qr--used .dv-qr__code {
   opacity: 0.35;
+}
+/* The code still on its way from the computer. */
+.dv-qr__wait {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  background: var(--raised);
 }
 
 /* ---------- Connect options (the chooser) ---------------------------------------------
@@ -1055,5 +1051,96 @@ a.dv-chiplink:hover {
   }
   .dv-connected__text > .dv-connected__facts {
     flex-basis: 100%;
+  }
+}
+
+/* ---------- A phone's screen, live (PhoneLive) --------------------------------------
+   The phone's own shape (its pictures' size), centred, never taller than the window leaves for it. A cover says why
+   it can't show; the last picture stays dimmed under it. In control the screen takes the pointer and the keys. */
+/* A status line with no action of its own: the same room on both sides. */
+.dv-screen__banner {
+  padding-inline: var(--space-3);
+}
+.dv-screen__acts {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.dv-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--screen-bg);
+  padding: var(--space-4);
+  outline: none;
+}
+html:not([data-pointer]) .dv-screen:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+.dv-screen__frame {
+  --dv-screen-h: min(70vh, 40rem);
+  position: relative;
+  width: min(100%, calc(var(--dv-screen-h) * var(--dv-ratio)));
+  aspect-ratio: var(--dv-ratio);
+  overflow: hidden;
+  border-radius: var(--radius-xl);
+  background: var(--surface-sunken);
+}
+.dv-screen[data-full] {
+  justify-content: center;
+}
+.dv-screen[data-full] > .dv-screen__frame {
+  --dv-screen-h: calc(100vh - 2 * var(--space-4));
+}
+.dv-screen[data-full]:has(> .dv-screen__keys) > .dv-screen__frame {
+  --dv-screen-h: calc(100vh - 2 * var(--space-4) - var(--control-h-sm) - var(--space-3));
+}
+.dv-screen__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity var(--dur-base) ease;
+  touch-action: none;
+  user-select: none;
+}
+.dv-screen__canvas[data-shown] {
+  opacity: 1;
+}
+.dv-screen[data-control] .dv-screen__canvas {
+  cursor: pointer;
+}
+.dv-screen__cover {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  text-align: center;
+  color: var(--on-dark);
+  background: color-mix(in srgb, var(--screen-bg) 78%, transparent);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+.dv-screen__cover > strong {
+  font-size: var(--text-md);
+}
+.dv-screen__cover > span {
+  color: var(--on-dark-soft);
+}
+.dv-screen__keys {
+  justify-content: center;
+}
+@media (width <= 480px) {
+  .dv-screen {
+    padding: var(--space-3);
+  }
+  .dv-screen__frame {
+    --dv-screen-h: min(60vh, 35rem);
   }
 }

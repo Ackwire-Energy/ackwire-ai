@@ -55,6 +55,7 @@ const COMMANDS: &[&str] = &[
     "tailscale_status",
     "tailscale_open",
     "workspaces_get",
+    "site_fetch",
     "welcome_mode_take",
 ];
 

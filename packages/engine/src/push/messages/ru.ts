@@ -87,4 +87,12 @@ export const strings: Partial<PushStrings> = {
   deviceWaitingBody: "Начнёт, когда оно вернётся.",
   teamWeekReady: "Итоги недели команды готовы",
   teamDayReady: "Итоги дня готовы",
+  machineConnectedTitlePersonal: "Подключён новый компьютер",
+  computerReadyTitlePersonal: "Компьютер ваших агентов готов",
+  agentUnreachedBodyPersonal:
+    "Тот, кто создал регулярную задачу, пока не может говорить с этим агентом. Нажмите, чтобы разрешить.",
+  widgetFailedReasonsPersonal: { creator_left: "Того, кто его настроил, больше нет в вашем рабочем пространстве." },
+  joinRequestTitlePersonal: (name) => `${name} просит доступ в ваше рабочее пространство`,
+  joinSuggestionTitlePersonal: (by, name) => `${by} предлагает пригласить ${name}`,
+  teamWeekReadyPersonal: "Итоги вашей недели готовы",
 };

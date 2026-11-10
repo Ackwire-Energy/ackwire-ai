@@ -1,7 +1,16 @@
 import { afterEach, expect, test } from "bun:test";
-import { orgTopic, PHONES_PROTOCOL, type RunnerPhone } from "@agenteschat/adapters";
+import {
+  orgTopic,
+  PHONE_PAIRING_PROTOCOL,
+  PHONE_SCREEN_PROTOCOL,
+  PHONES_PROTOCOL,
+  type RunnerPhone,
+  STREAM_CLOSE,
+} from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import {
+  authorizePhoneStream,
+  cancelWifiPairing,
   ForbiddenError,
   forgetPhone,
   isNewWork,
@@ -11,15 +20,18 @@ import {
   type MachinePhoneRow,
   MachineRequestError,
   phoneStoppedBy,
+  recheckPhoneStream,
   removeMember,
   requestTimeoutMs,
   setAgentComputerTarget,
   setWorkspaceComputers,
+  startWifiPairing,
   stopPhone,
   syncMachinePhones,
   updateComputerDevice,
   updatePhoneDevice,
   ValidationError,
+  wifiPairingState,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
 import { fakeRunner, pairMachine, RUNNER } from "./machine-fixtures";
@@ -312,6 +324,11 @@ test("the computer's socket: phones and toolchains in hello, phones.changed, the
   await expect(refused).rejects.toBeInstanceOf(MachineRequestError);
   await expect(refused).rejects.toMatchObject({ code: "unsupported" });
   old.disconnect();
+  // Phones, but from before Wi-Fi pairing: no `phone.pair.*` reaches it.
+  const first = fakeRunner(hub);
+  await first.hello(paired.token, { protocol: PHONE_PAIRING_PROTOCOL - 1 });
+  await expect(hub.call(paired.machineId, { op: "phone.pair.start" })).rejects.toMatchObject({ code: "unsupported" });
+  first.disconnect();
 
   const target = { platform: "android" as const, serial: "x", holder };
   expect(requestTimeoutMs({ op: "phone.flow", ...target, flow: "", timeoutSeconds: 3600 })).toBe(720_000);
@@ -356,4 +373,142 @@ test("Stop: the phone's lock is let go for anyone, and the run that held it lear
   expect((await phoneRows())[0]?.holder).toBeNull();
   expect(await phoneStoppedBy(f.db, f.org.id, phone?.id as string, runId)).toEqual({ userId: rui.id, name: "rui" });
   expect(await phoneStoppedBy(f.db, f.org.id, phone?.id as string, crypto.randomUUID())).toBeNull();
+});
+
+test("a phone's screen: whoever may use it watches; control is the person's own hold, not while another's agent or person has it", async () => {
+  f = await setup();
+  const rui = await addMember(f.db, f.org.id, "member", "rui");
+  const ana = await addMember(f.db, f.org.id, "member", "ana");
+  const mac = await pair(f.owner.id, "MacBook");
+  await online(mac);
+  const [phone] = await sync(mac, [pixel]);
+  const phoneId = phone?.id as string;
+  let here = true;
+  const hub = { isLocal: (id: string) => here && id === mac };
+  const input = (userId: string, mode: "watch" | "control") => ({
+    userId,
+    orgId: f.org.id,
+    agentId: "",
+    request: { kind: "phone" as const, mode, phoneId },
+  });
+  const open = (userId: string, mode: "watch" | "control") =>
+    authorizePhoneStream({ db: f.db, hub }, input(userId, mode));
+  const holdBy = (holder: Record<string, unknown> | null) =>
+    f.db
+      .update(schema.machinePhones)
+      .set({ holder: holder as never })
+      .where(eq(schema.machinePhones.id, phoneId));
+
+  // Only its owner, by default: a daily phone's screen shows whatever is on it.
+  expect(await open(rui.id, "watch")).toEqual({ refused: STREAM_CLOSE.forbidden, reason: "forbidden" });
+  expect(await open(f.owner.id, "control")).toEqual({
+    machineId: mac,
+    phone: {
+      platform: "android",
+      serial: pixel.serial,
+      holder: expect.objectContaining({ runId: null, agentId: null, userId: f.owner.id }),
+    },
+  });
+  await updatePhoneDevice(deps(), f.owner.id, f.org.id, phoneId, {
+    audience: { mode: "everyone", userIds: [], roleIds: [] },
+  });
+  expect(await open(rui.id, "watch")).toMatchObject({ machineId: mac });
+  expect(await open(rui.id, "control")).toMatchObject({ machineId: mac });
+
+  // An agent working for Ana holds it: Rui watches, but only its owner, an admin or Ana take control.
+  await holdBy({ runId: crypto.randomUUID(), agentId: f.agent.id, userId: ana.id, since: new Date().toISOString() });
+  expect(await open(rui.id, "watch")).toMatchObject({ machineId: mac });
+  expect(await open(rui.id, "control")).toEqual({ refused: STREAM_CLOSE.controlEnded, reason: "in_use" });
+  expect(await open(ana.id, "control")).toMatchObject({ machineId: mac });
+  expect(await open(f.owner.id, "control")).toMatchObject({ machineId: mac });
+
+  // Ana in control: it's hers until she gives it back, and the recheck keeps her stream.
+  await holdBy({ runId: null, agentId: null, userId: ana.id, since: new Date().toISOString() });
+  expect(await open(f.owner.id, "control")).toEqual({
+    refused: STREAM_CLOSE.controlEnded,
+    reason: "someone_in_control",
+  });
+  const hers = { ...input(ana.id, "control"), id: "s", machineId: mac } as never;
+  expect(await recheckPhoneStream(f.db, hers)).toBeNull();
+  // Narrowed to its owner while she watched: the recheck ends it.
+  await updatePhoneDevice(deps(), f.owner.id, f.org.id, phoneId, {
+    audience: { mode: "owner", userIds: [], roleIds: [] },
+  });
+  expect(await recheckPhoneStream(f.db, hers)).toEqual({ refused: STREAM_CLOSE.forbidden, reason: "forbidden" });
+
+  // Its computer elsewhere or away; a phone that isn't there.
+  here = false;
+  expect(await open(f.owner.id, "watch")).toEqual({ refused: STREAM_CLOSE.unreachable, reason: "other_server" });
+  here = true;
+  await f.db
+    .update(schema.machines)
+    .set({ protocol: PHONE_SCREEN_PROTOCOL - 1 })
+    .where(eq(schema.machines.id, mac));
+  expect(await open(f.owner.id, "watch")).toEqual({ refused: STREAM_CLOSE.refused, reason: "runner_outdated" });
+  expect(
+    await authorizePhoneStream(
+      { db: f.db, hub },
+      { ...input(f.owner.id, "watch"), request: { kind: "phone", mode: "watch", phoneId: crypto.randomUUID() } },
+    ),
+  ).toEqual({ refused: STREAM_CLOSE.notFound, reason: "no_phone" });
+});
+
+test("Wi-Fi pairing: only who may manage the computer pairs with it; connected names the phone once its row is there", async () => {
+  f = await setup();
+  const rui = await addMember(f.db, f.org.id, "member", "rui");
+  const mac = await pair(f.owner.id, "MacBook");
+  await online(mac);
+  const id = crypto.randomUUID();
+  const expiresAt = new Date(Date.now() + 120_000).toISOString();
+  const calls: unknown[] = [];
+  let reply: Record<string, unknown> = {
+    id,
+    way: "qr",
+    state: "waiting",
+    qr: "WIFI:T:ADB;S:agentes-Qx7Kp2Mz9a;P:p4ssW0rdAbCd;;",
+    expiresAt,
+  };
+  let fail: Error | null = null;
+  const hub = {
+    call: async (machineId: string, request: unknown) => {
+      calls.push({ machineId, request });
+      if (fail) throw fail;
+      return reply;
+    },
+  } as unknown as Parameters<typeof startWifiPairing>[0]["hub"];
+  const d = { db: f.db, hub };
+
+  await expect(startWifiPairing(d, rui.id, f.org.id, mac, {})).rejects.toThrow(ForbiddenError);
+  expect(calls).toEqual([]);
+  const started = await startWifiPairing(d, f.owner.id, f.org.id, mac, {});
+  expect(started).toEqual({ id, way: "qr", state: "waiting", qr: reply.qr as string, expiresAt });
+  expect(calls.at(-1)).toEqual({ machineId: mac, request: { op: "phone.pair.start" } });
+  await startWifiPairing(d, f.owner.id, f.org.id, mac, { address: "192.168.1.20:37099", code: "123456" });
+  expect(calls.at(-1)).toEqual({
+    machineId: mac,
+    request: { op: "phone.pair.code", address: "192.168.1.20:37099", code: "123456" },
+  });
+
+  // Connected, but its phones report hasn't landed: still connecting; then the phone's id. The QR isn't said again.
+  reply = { id, way: "qr", state: "connected", serial: pixel.serial, qr: reply.qr, expiresAt };
+  expect(await wifiPairingState(d, f.owner.id, f.org.id, mac, id)).toMatchObject({ state: "connecting" });
+  const [row] = await sync(mac, [{ ...pixel, transport: "wifi" }]);
+  const done = await wifiPairingState(d, f.owner.id, f.org.id, mac, id);
+  expect(done).toEqual({ id, way: "qr", state: "connected", phoneId: row?.id as string, expiresAt });
+
+  // A failure keeps its reason; a code it doesn't know reads as failed; a runner from before Wi-Fi pairing: update.
+  reply = { id, way: "code", state: "failed", reason: "refused", expiresAt };
+  expect(await wifiPairingState(d, f.owner.id, f.org.id, mac, id)).toMatchObject({ reason: "refused" });
+  reply = { id, way: "code", state: "failed", reason: "weird", expiresAt };
+  expect(await wifiPairingState(d, f.owner.id, f.org.id, mac, id)).toMatchObject({ reason: "failed" });
+  fail = new MachineRequestError("bad_request", "A phone op names its phone (platform and serial)");
+  expect(await startWifiPairing(d, f.owner.id, f.org.id, mac, {})).toMatchObject({ state: "failed", reason: "update" });
+  fail = new MachineRequestError(
+    "unsupported",
+    "The computer MacBook needs an update before agents can use its phones.",
+  );
+  expect(await startWifiPairing(d, f.owner.id, f.org.id, mac, {})).toMatchObject({ state: "failed", reason: "update" });
+  await cancelWifiPairing(d, f.owner.id, f.org.id, mac, id);
+  expect(calls.at(-1)).toEqual({ machineId: mac, request: { op: "phone.pair.cancel", pairingId: id } });
+  expect(isNewWork({ op: "phone.pair.start" })).toBe(false);
 });

@@ -43,13 +43,17 @@ const row = (id: string) => {
   return el;
 };
 
-async function openChannel(prefs?: ChatPrefs) {
+/** #eng with João, me and Ada; `personal`: in a personal workspace (ADR 0159). */
+async function openChannel(prefs?: ChatPrefs, personal = false) {
   const messages = [
     said(ENG_ID, "j1", "u-joao", "Bom dia!", 30),
     said(ENG_ID, "w1", "u-walter", "Vi o alerta", 20),
     said(ENG_ID, "a1", ADA_ID, "Olhando.", 10),
   ];
-  await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(withChatPrefs(seedState({ messages }), prefs)) });
+  const state = withChatPrefs(seedState({ messages }), prefs);
+  const org = state.me?.organizations[0];
+  if (personal && org) org.mode = "personal";
+  await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
   await settle(10);
 }
 
@@ -74,6 +78,16 @@ describe("the defaults", () => {
     expect(mine.querySelector(".ac-msg__avatar")).not.toBeNull();
     expect(mine.querySelector(".ac-msg__head .ac-msg__author")?.textContent).toContain("Walter");
     expect(mine.querySelector(".ac-msg__own-foot")).toBeNull();
+  });
+
+  test("in a personal workspace a channel opens in bubbles too, mine on the right; a choice still wins", async () => {
+    await openChannel(undefined, true);
+    expect(row("w1").dataset.look).toBe("bubbles");
+    expect(row("w1").dataset.tone).toBe("light");
+    expect(row("w1").classList.contains("ac-msg--own")).toBe(true);
+    cleanup();
+    await openChannel({ channelStyle: "left" }, true);
+    expect(row("w1").dataset.look).toBe("left");
   });
 
   test("a DM is in bubbles with the light tone: mine on the right in the agent's color, no name, the time inside", async () => {

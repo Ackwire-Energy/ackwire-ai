@@ -39,7 +39,7 @@ export type AppHref =
   | "/settings/devices"
   | "/settings/skills"
   | "/activity"
-  | "/threads"
+  | "/conversations/threads"
   | "/join-requests"
   | "/computer-setup"
   | "/connect-ai?ready=1"
@@ -177,7 +177,9 @@ export function hrefFromUrl(url: string): AppHref | null {
     case "activity":
       return "/activity";
     case "threads":
-      return "/threads";
+      // Through Conversas' list route, which shows them where a personal workspace has no Threads tab (ADR 0159) and
+      // sends a team's to the tab.
+      return "/conversations/threads";
     case "join-requests":
       return "/join-requests";
     case "proposals":

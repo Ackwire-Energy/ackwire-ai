@@ -43,7 +43,7 @@ export function ContextMenuHost() {
       const link = e.target instanceof Element ? e.target.closest<HTMLAnchorElement>("a[href]") : null;
       const entries: MenuEntry[] = selected ? selectionEntries(selected) : link ? linkEntries(link) : pageEntries();
       e.preventDefault();
-      openContextMenu(e.clientX, e.clientY, entries);
+      openContextMenu(e.clientX, e.clientY, entries, e.target);
     };
     const selectionEntries = (text: string): MenuEntry[] => [
       {

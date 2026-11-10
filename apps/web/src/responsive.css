@@ -209,6 +209,27 @@
     margin-left: 12px;
   }
 }
+/* The narrowest phones have no room for a DM's name, its pill and its topic beside the face: the pill goes under the
+   name, which rises to the face's top as a name alone does, and the topic stays in the profile the header opens. */
+@media (max-width: 359px) {
+  .dm-who .channel__title {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .dm-who .channel__title.ac-captop {
+    margin-block-start: calc(var(--cap-top) - 11px);
+  }
+  .dm-who .channel__topic {
+    display: none;
+  }
+}
+@media (max-width: 359px) {
+  @supports (top: 1lh) {
+    .dm-who .channel__title.ac-captop {
+      margin-block-start: calc(var(--cap-top) - 0.5lh);
+    }
+  }
+}
 
 /* ── Pages ── */
 @media (max-width: 640px) {
@@ -253,6 +274,7 @@
   /* No keyboard hints on a touch screen or at phone width (the kit's own: components.css). A hint whose words only
      follow its keys goes with them. */
   .sidebar__jump .ac-kbd,
+  .sidebar__goto-keys,
   .titlebar__search .ac-kbd,
   .wiki-suggest .ac-kbd,
   .newag__hint:has(> .ac-kbd) {

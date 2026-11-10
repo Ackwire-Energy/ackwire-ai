@@ -23,7 +23,7 @@ import { caches } from "./cache";
 import { stopOrgWork } from "./cancel";
 import { type ConnectorDeps, revokeAtProvider } from "./connectors/connections";
 import { sha256 } from "./crypto";
-import { emailLocale, queueEmail } from "./email";
+import { emailLocale, modeStamp, queueEmail } from "./email";
 import {
   CODE_LIMITS,
   CODE_RESEND_SECONDS,
@@ -298,7 +298,7 @@ export async function sendDeletionCode(
         locale: emailLocale(account.locale),
         code,
         email: account.email,
-        ...(org ? { orgName: org.name } : {}),
+        ...(org ? { orgName: org.name, ...(await modeStamp(tx, org.id)) } : {}),
         support: deps.emails.support ?? null,
         url: deps.emails.publicUrl.replace(/\/$/, ""),
       },
@@ -439,6 +439,7 @@ export async function closeForDeletion(
   const by = { id: actorId, name: await nameOf(tx, actorId) };
   if (input.emails && via === "owner") {
     const url = workspaceUrl(input.emails.publicUrl, orgId);
+    const mode = await modeStamp(tx, orgId);
     for (const member of await membersToTell(tx, orgId)) {
       await queueEmail(tx, {
         orgId: null,
@@ -453,6 +454,7 @@ export async function closeForDeletion(
           timeZone: member.timeZone,
           owner: member.role === "owner",
           url,
+          ...mode,
         },
       });
     }
@@ -559,6 +561,7 @@ export async function restoreWorkspace(
     if (!deps.emails || options.account) return;
     const url = workspaceUrl(deps.emails.publicUrl, orgId);
     const byName = await nameOf(tx, actorId);
+    const mode = await modeStamp(tx, orgId);
     for (const member of await membersToTell(tx, orgId)) {
       await queueEmail(tx, {
         orgId: null,
@@ -570,6 +573,7 @@ export async function restoreWorkspace(
           orgName: org.name,
           byName,
           url,
+          ...mode,
         },
       });
     }
