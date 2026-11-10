@@ -11324,6 +11324,23 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
   width: auto;
   max-width: 100%;
 }
+/*
+ * A value wider than the strip (a long name, "Ana, Bruno e mais 5") wraps inside its control instead of ending in "…":
+ * the control is alone on its line by then (a wrapping row moves it down whole first), and grows from its 32.
+ */
+.ac-props :is(.ac-select--sm .ac-select__trigger, .ac-date__trigger--sm) {
+  height: auto;
+  min-height: var(--control-h-sm);
+  padding-block: 5px;
+}
+.ac-props .ac-select__value {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.ac-props :is(.ac-select__value, .ac-select__text) {
+  overflow: visible;
+  text-overflow: clip;
+}
 /* A button opening a menu (who, priority) is a control of the strip: the field look; a face in it starts near its edge. */
 .ac-props > .ac-btn:not(.ac-btn--ghost),
 .ac-props > * > .ac-btn:not(.ac-btn--ghost) {

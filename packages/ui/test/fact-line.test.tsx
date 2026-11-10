@@ -66,6 +66,16 @@ describe("the props strip", () => {
     expect(value).toContain("border: 1px solid var(--field-line)");
   });
 
+  test("a value wider than the strip wraps inside its control, never ends in …", () => {
+    const grows = rule(".ac-props :is(.ac-select--sm .ac-select__trigger, .ac-date__trigger--sm)");
+    expect(grows).toContain("height: auto");
+    expect(grows).toContain("min-height: var(--control-h-sm)");
+    expect(rule(".ac-props .ac-select__value")).toContain("white-space: normal");
+    const shown = rule(".ac-props :is(.ac-select__value, .ac-select__text)");
+    expect(shown).toContain("overflow: visible");
+    expect(shown).toContain("text-overflow: clip");
+  });
+
   test("on a phone the hairline before the links is a line break", () => {
     const phone = css.split("@media (max-width: 640px) {\n  .ac-props__sep {")[1]?.split("}")[0] ?? "";
     expect(phone).toContain("flex-basis: 100%");
