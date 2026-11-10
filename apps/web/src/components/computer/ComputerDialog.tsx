@@ -467,7 +467,7 @@ function ComputerStage({
         ))}
       </ol>
     );
-  } else if (machine && !machine.online) {
+  } else if (machine && !machine.online && !machine.standby) {
     const since = machine.lastSeenAt ? clockAt(i18n.language, machine.lastSeenAt) : null;
     const outage = outages.data?.outages.find((o) => o.machineId === machine.id);
     body =
@@ -511,8 +511,8 @@ function ComputerStage({
           )}
         </>
       );
-  } else if (!machine && f.edition === "cloud") {
-    // The workspace's computer is ready and this agent gets it at its first hello: a moment more.
+  } else if ((!machine && f.edition === "cloud") || (machine?.standby && !machine.online)) {
+    // The workspace's computer is ready and this agent gets it at its first hello, or it wakes: a moment more.
     body = (
       <>
         <DialogHead sub="" />
