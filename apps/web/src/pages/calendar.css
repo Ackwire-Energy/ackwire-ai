@@ -291,6 +291,13 @@ html:not([data-pointer]) .cal-chip:focus-visible {
     display: none;
   }
 }
+/* Narrower still (events side by side in a narrow day), not even its start fits: the title alone, the time in its label
+   and its dialog. */
+@container (max-width: 44px) {
+  .cal-chip__time {
+    display: none;
+  }
+}
 .cal-chip--bar {
   align-items: center;
   margin: 0 2px;
@@ -357,6 +364,10 @@ html:not([data-pointer]) .cal-chip:focus-visible {
   flex: none;
   margin-top: 2px;
   color: var(--muted);
+}
+/* In a block, on its title's 16px line: centred on the title's capitals, its time under it or not. */
+.cal-chip--block .cal-chip__repeat {
+  margin-top: calc((16px - 14px) / 2 - var(--cap-mid));
 }
 .cal-chip__resize {
   position: absolute;

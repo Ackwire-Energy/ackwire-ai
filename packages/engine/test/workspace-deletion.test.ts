@@ -1142,9 +1142,8 @@ describe("no orphans", () => {
           }
         }
       }
-      // Kept on purpose: the operator's feed (ADR 0056 §5), the join codes' counts, gone after a day (ADR 0072), and the
-      // pictures and videos sent with feedback, the person's own, whose links the email holds for thirty days (ADR 0160).
-      const kept = ["feedback_files", "operator_events", "organization_join_code_events"];
+      // Kept on purpose: the operator's feed (ADR 0056 §5), and the join codes' counts, gone after a day (ADR 0072).
+      const kept = ["operator_events", "organization_join_code_events"];
       expect(tables.filter((t) => !gone.has(t)).sort()).toEqual([...PURGED_BY_HAND, ...kept].sort());
     } finally {
       await close();
