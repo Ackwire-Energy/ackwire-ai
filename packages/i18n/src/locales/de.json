@@ -22,6 +22,7 @@
     "loadingPage": "Seite wird geladen",
     "refreshing": "Wird aktualisiert",
     "retry": "Erneut versuchen",
+    "soon": "Bald",
     "unknownError": "Etwas ist schiefgelaufen. Versuch es noch einmal.",
     "ourSide": "Bei uns ist etwas schiefgelaufen. Versuch es gleich noch einmal.",
     "signedOut": "Deine Sitzung ist abgelaufen. Melde dich erneut an, um weiterzumachen.",
@@ -1622,7 +1623,7 @@
   "openOnPhone": {
     "qr": "QR-Code zum Anmelden in der agentes-App",
     "making": "Code wird erstellt…",
-    "stepApp": "Installiere die agentes-App auf deinem Handy (App Store oder Google Play).",
+    "stepApp": "Installiere die agentes-App auf deinem Handy.",
     "stepTailscale": "Installiere Tailscale auf deinem Handy und melde dich mit demselben Tailscale-Konto an wie dieser Server.",
     "appStore": "App Store",
     "googlePlay": "Google Play",

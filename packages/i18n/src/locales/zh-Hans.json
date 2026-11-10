@@ -22,6 +22,7 @@
     "loadingPage": "正在加载页面",
     "refreshing": "正在刷新",
     "retry": "重试",
+    "soon": "即将推出",
     "unknownError": "出了点问题，请重试。",
     "ourSide": "我们这边出了点问题，请稍后再试。",
     "signedOut": "你的会话已结束，请重新登录以继续。",
@@ -1574,7 +1575,7 @@
   "openOnPhone": {
     "qr": "用于登录 agentes 应用的二维码",
     "making": "正在生成二维码…",
-    "stepApp": "在手机上安装 agentes 应用（App Store 或 Google Play）。",
+    "stepApp": "在手机上安装 agentes 应用。",
     "stepTailscale": "在手机上安装 Tailscale，并用与这台服务器相同的 Tailscale 账号登录。",
     "appStore": "App Store",
     "googlePlay": "Google Play",

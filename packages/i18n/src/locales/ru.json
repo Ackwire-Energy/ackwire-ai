@@ -22,6 +22,7 @@
     "loadingPage": "Загружаем страницу",
     "refreshing": "Обновляем",
     "retry": "Попробовать снова",
+    "soon": "Скоро",
     "unknownError": "Что-то пошло не так. Попробуйте ещё раз.",
     "ourSide": "Что-то пошло не так на нашей стороне. Попробуйте ещё раз чуть позже.",
     "signedOut": "Сеанс завершён. Войдите снова, чтобы продолжить.",
@@ -1718,7 +1719,7 @@
   "openOnPhone": {
     "qr": "QR-код для входа в приложение agentes",
     "making": "Создаём код…",
-    "stepApp": "Установите приложение agentes на телефон (App Store или Google Play).",
+    "stepApp": "Установите приложение agentes на телефон.",
     "stepTailscale": "Установите Tailscale на телефон и войдите в тот же аккаунт Tailscale, что и у этого сервера.",
     "appStore": "App Store",
     "googlePlay": "Google Play",

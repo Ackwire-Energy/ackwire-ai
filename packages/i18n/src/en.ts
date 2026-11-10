@@ -28,6 +28,8 @@ export const en = {
     loadingPage: "Loading the page",
     refreshing: "Refreshing",
     retry: "Try again",
+    /** A mark on something offered but not out yet (an app for a system, a store): it can't be pressed. */
+    soon: "Soon",
     unknownError: "Something went wrong. Try again.",
     /** A server error (a 5xx of its own): nothing the person did, and nothing they can fix. */
     ourSide: "Something went wrong on our side. Try again in a little while.",
@@ -1640,7 +1642,8 @@ export const en = {
   openOnPhone: {
     qr: "QR code to sign in to the agentes app",
     making: "Making the code…",
-    stepApp: "Install the agentes app on your phone (App Store or Google Play).",
+    /** Followed by the App Store and Google Play, each marked Soon until the app is in it. */
+    stepApp: "Install the agentes app on your phone.",
     stepTailscale: "Install Tailscale on your phone and sign in with the same Tailscale account as this server.",
     /** The links to Tailscale in each store, after the step: the store's own name. */
     appStore: "App Store",

@@ -22,6 +22,7 @@
     "loadingPage": "Ładowanie strony",
     "refreshing": "Odświeżanie",
     "retry": "Spróbuj ponownie",
+    "soon": "Wkrótce",
     "unknownError": "Coś poszło nie tak. Spróbuj ponownie.",
     "ourSide": "Coś poszło nie tak po naszej stronie. Spróbuj ponownie za chwilę.",
     "signedOut": "Twoja sesja wygasła. Zaloguj się ponownie, aby kontynuować.",
@@ -1718,7 +1719,7 @@
   "openOnPhone": {
     "qr": "Kod QR do logowania w aplikacji agentes",
     "making": "Tworzę kod…",
-    "stepApp": "Zainstaluj aplikację agentes na telefonie (App Store lub Google Play).",
+    "stepApp": "Zainstaluj aplikację agentes na telefonie.",
     "stepTailscale": "Zainstaluj Tailscale na telefonie i zaloguj się tym samym kontem Tailscale co ten serwer.",
     "appStore": "App Store",
     "googlePlay": "Google Play",

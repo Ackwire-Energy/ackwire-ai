@@ -22,6 +22,7 @@
     "loadingPage": "Chargement de la page",
     "refreshing": "Actualisation",
     "retry": "Réessayer",
+    "soon": "Bientôt",
     "unknownError": "Un problème est survenu. Réessayez.",
     "ourSide": "Un problème est survenu de notre côté. Réessayez dans un moment.",
     "signedOut": "Votre session a expiré. Reconnectez-vous pour continuer.",
@@ -1670,7 +1671,7 @@
   "openOnPhone": {
     "qr": "QR code pour vous connecter à l'app agentes",
     "making": "Création du code…",
-    "stepApp": "Installez l'app agentes sur votre téléphone (App Store ou Google Play).",
+    "stepApp": "Installez l'app agentes sur votre téléphone.",
     "stepTailscale": "Installez Tailscale sur votre téléphone et connectez-vous avec le même compte Tailscale que ce serveur.",
     "appStore": "App Store",
     "googlePlay": "Google Play",

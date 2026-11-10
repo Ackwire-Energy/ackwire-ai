@@ -22,6 +22,7 @@
     "loadingPage": "Sayfa yükleniyor",
     "refreshing": "Yenileniyor",
     "retry": "Tekrar dene",
+    "soon": "Yakında",
     "unknownError": "Bir şeyler ters gitti. Tekrar deneyin.",
     "ourSide": "Bizim tarafımızda bir şeyler ters gitti. Birazdan tekrar deneyin.",
     "signedOut": "Oturumunuz sona erdi. Devam etmek için tekrar giriş yapın.",
@@ -1622,7 +1623,7 @@
   "openOnPhone": {
     "qr": "agentes uygulamasına giriş yapmak için QR kodu",
     "making": "Kod oluşturuluyor…",
-    "stepApp": "agentes uygulamasını telefonunuza yükleyin (App Store veya Google Play).",
+    "stepApp": "agentes uygulamasını telefonunuza yükleyin.",
     "stepTailscale": "Telefonunuza Tailscale'i kurun ve bu sunucuyla aynı Tailscale hesabıyla giriş yapın.",
     "appStore": "App Store",
     "googlePlay": "Google Play",

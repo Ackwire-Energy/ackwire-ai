@@ -22,6 +22,7 @@
     "loadingPage": "Cargando la página",
     "refreshing": "Actualizando",
     "retry": "Intentar de nuevo",
+    "soon": "Pronto",
     "unknownError": "Algo salió mal. Intenta de nuevo.",
     "ourSide": "Algo salió mal de nuestro lado. Intenta de nuevo en un rato.",
     "signedOut": "Tu sesión terminó. Inicia sesión de nuevo para continuar.",
@@ -1670,7 +1671,7 @@
   "openOnPhone": {
     "qr": "Código QR para iniciar sesión en la app agentes",
     "making": "Generando el código…",
-    "stepApp": "Instala la app agentes en tu teléfono (App Store o Google Play).",
+    "stepApp": "Instala la app agentes en tu teléfono.",
     "stepTailscale": "Instala Tailscale en tu teléfono e inicia sesión con la misma cuenta de Tailscale que este servidor.",
     "appStore": "App Store",
     "googlePlay": "Google Play",

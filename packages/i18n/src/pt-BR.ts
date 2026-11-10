@@ -30,6 +30,7 @@ export const ptBR = {
     loadingPage: "Carregando a página",
     refreshing: "Atualizando",
     retry: "Tentar de novo",
+    soon: "Em breve",
     unknownError: "Algo deu errado. Tente de novo.",
     /** A server error (a 5xx of its own): nothing the person did, and nothing they can fix. */
     ourSide: "Algo deu errado do nosso lado. Tente de novo daqui a pouco.",
@@ -1622,7 +1623,7 @@ export const ptBR = {
   openOnPhone: {
     qr: "QR code para entrar no app agentes",
     making: "Gerando o código…",
-    stepApp: "Instale o app agentes no celular (App Store ou Google Play).",
+    stepApp: "Instale o app agentes no celular.",
     stepTailscale: "Instale o Tailscale no celular e entre com a mesma conta do Tailscale deste servidor.",
     appStore: "App Store",
     googlePlay: "Google Play",
