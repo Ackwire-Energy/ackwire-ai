@@ -1974,7 +1974,7 @@ export interface ScopeInfo {
   sensitive: boolean;
 }
 
-/** Catalog groups: Desenvolvimento, Produto, Docs, Pagamentos, Suporte, Marketing, Automação. */
+/** Catalog groups: Desenvolvimento, Produto, Docs, Pagamentos, Suporte, Marketing, Automação, Redes sociais. */
 export type ConnectorCategory =
   | "dev"
   | "product"
@@ -1984,7 +1984,8 @@ export type ConnectorCategory =
   | "sales"
   | "support"
   | "marketing"
-  | "automation";
+  | "automation"
+  | "social";
 
 /** A connector agentes.chat knows (`GET /connectors/catalog`: ours and the one-click MCP servers, one per service). */
 export interface ConnectorDef {

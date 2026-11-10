@@ -16,6 +16,7 @@ import {
   ConflictError,
   type CustomDeps,
   completeOAuth,
+  composioMcpTool,
   composioToolkitUrl,
   composioToolName,
   composioUsageOf,
@@ -143,24 +144,31 @@ const call = (gateway: ReturnType<typeof createToolGateway>, ctx: ToolContext, n
   gateway.invoke(ctx, { toolUseId: `call-${++seq}`, name, input: input as Record<string, unknown> });
 
 describe("the entries", () => {
-  test("15 services, each once: explicit actions under one prefix, names that never collide, no meta tool", () => {
+  test("22 services, each once: explicit actions under one prefix, names that never collide, no meta tool", () => {
     const ways = MCP_PRESETS.filter((p) => p.composio);
     expect(ways.map((p) => p.id).sort()).toEqual(
       [
         "asana",
         "drive",
         "dropbox",
+        "facebook",
         "figma",
         "google-calendar",
         "google-docs",
         "google-sheets",
         "hubspot",
+        "instagram",
         "intercom",
+        "linkedin",
         "microsoft-teams",
         "onedrive",
+        "pinterest",
+        "reddit",
         "salesforce",
         "slack",
         "square",
+        "whatsapp",
+        "youtube",
         "zendesk",
       ].sort(),
     );
@@ -181,6 +189,39 @@ describe("the entries", () => {
     // GitHub never goes through Composio: its actions would bypass the agent's repository list.
     expect(ways.some((p) => p.composio?.toolkit === "github")).toBe(false);
     expect(composioToolName({ toolkit: "googledrive" }, "GOOGLEDRIVE_FIND_FILE")).toBe("find_file");
+  });
+
+  test("social networks: posts and comments go out on their own, deletes, sends, moderation and board changes ask", () => {
+    const social = ["instagram", "facebook", "linkedin", "youtube", "pinterest", "reddit", "whatsapp"];
+    const asking = Object.fromEntries(
+      social.map((id) => {
+        const way = mcpPreset(id)?.composio;
+        if (!way) return [id, null];
+        return [id, way.actions.filter((a) => composioMcpTool(way, tool(a)).destructiveHint === true)];
+      }),
+    );
+    expect(asking).toEqual({
+      // Instagram's publish step and a LinkedIn link share ask by their words (publish, share).
+      instagram: ["INSTAGRAM_POST_IG_USER_MEDIA_PUBLISH", "INSTAGRAM_SEND_TEXT_MESSAGE"],
+      facebook: ["FACEBOOK_DELETE_POST", "FACEBOOK_DELETE_COMMENT"],
+      linkedin: ["LINKEDIN_CREATE_ARTICLE_OR_URL_SHARE", "LINKEDIN_DELETE_POST"],
+      youtube: ["YOUTUBE_CREATE_COMMENT_REPLY", "YOUTUBE_SET_COMMENT_MODERATION_STATUS", "YOUTUBE_DELETE_COMMENT"],
+      pinterest: ["PINTEREST_UPDATE_BOARD", "PINTEREST_DELETE_PIN", "PINTEREST_DELETE_BOARD"],
+      reddit: ["REDDIT_DELETE_REDDIT_POST", "REDDIT_DELETE_REDDIT_COMMENT"],
+      whatsapp: [
+        "WHATSAPP_SEND_MESSAGE",
+        "WHATSAPP_SEND_TEMPLATE_MESSAGE",
+        "WHATSAPP_SEND_MEDIA",
+        "WHATSAPP_SEND_INTERACTIVE_BUTTONS",
+        "WHATSAPP_SEND_INTERACTIVE_LIST",
+        "WHATSAPP_SEND_LOCATION",
+      ],
+    });
+    // What Composio's own apps can't do stays out: Instagram's comments, Reddit's inbox and votes.
+    const listed = (id: string, word: RegExp) => mcpPreset(id)?.composio?.actions.filter((a) => word.test(a));
+    expect(listed("instagram", /COMMENT|MENTION|TAGS/)).toEqual([]);
+    expect(listed("reddit", /INBOX|PRIVATE_MESSAGE|VOTE|WIKI|MODERAT/)).toEqual([]);
+    expect(social.map((id) => [id, mcpPreset(id)?.category])).toEqual(social.map((id) => [id, "social"]));
   });
 
   test("one way per service: the vendor's server, else Composio here, else Em breve, else unavailable", () => {

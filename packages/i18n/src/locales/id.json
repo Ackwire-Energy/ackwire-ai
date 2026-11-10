@@ -10485,6 +10485,7 @@
       "support": "Dukungan",
       "marketing": "Pemasaran",
       "automation": "Otomatisasi",
+      "social": "Media sosial",
       "email": "Email"
     },
     "emptyCategory": "Belum ada konektor di kategori ini",
@@ -10836,6 +10837,41 @@
         "1": "Melihat tagihan dan pelanggan",
         "2": "Membuat tagihan Pix"
       },
+      "instagram": {
+        "1": "Melihat postingan, story, dan statistik",
+        "2": "Membaca pesan langsung",
+        "ask": "Memublikasikan postingan dan membalas pesan selalu meminta persetujuanmu"
+      },
+      "facebook": {
+        "1": "Melihat postingan, komentar, dan statistik",
+        "2": "Memublikasikan postingan, foto, dan video serta membalas komentar",
+        "ask": "Menghapus postingan dan komentar selalu meminta persetujuanmu"
+      },
+      "linkedin": {
+        "1": "Memublikasikan postingan dan video",
+        "2": "Mengomentari postingan",
+        "ask": "Membagikan tautan dan menghapus postingan selalu meminta persetujuanmu"
+      },
+      "youtube": {
+        "1": "Melihat video, komentar, dan analitik",
+        "2": "Mengedit video dan playlist serta berkomentar",
+        "ask": "Membalas, memoderasi, dan menghapus komentar selalu meminta persetujuanmu"
+      },
+      "pinterest": {
+        "1": "Melihat pin, papan, dan analitik",
+        "2": "Membuat pin dan merapikan papan",
+        "ask": "Mengubah papan dan menghapus selalu meminta persetujuanmu"
+      },
+      "reddit": {
+        "1": "Mencari postingan dan membaca komentar",
+        "2": "Memposting, berkomentar, dan mengedit",
+        "ask": "Menghapus selalu meminta persetujuanmu"
+      },
+      "whatsapp": {
+        "1": "Melihat nomor, template, dan status pengiriman",
+        "2": "Membuat template pesan",
+        "ask": "Mengirim pesan selalu meminta persetujuanmu"
+      },
       "database": {
         "1": "Melihat tabel",
         "2": "Menjalankan query ke data untuk menjawab",
@@ -10974,7 +11010,14 @@
       "revenuecat": "Langganan dalam aplikasi, produk, penawaran, dan pendapatan.",
       "superwall": "Paywall, kampanye, dan eksperimen.",
       "paddle": "Pelanggan, langganan, transaksi, dan produk.",
-      "abacatepay": "Tagihan Pix, pelanggan, dan penarikan dana."
+      "abacatepay": "Tagihan Pix, pelanggan, dan penarikan dana.",
+      "instagram": "Akun bisnis dan kreator Instagram: postingan, story, statistik, dan pesan langsung.",
+      "facebook": "Halaman Facebook: postingan, foto, video, komentar, dan statistik.",
+      "linkedin": "Postingan, video, dan komentar LinkedIn atas nama anggota yang masuk.",
+      "youtube": "Video, komentar, playlist, dan analitik kanal YouTube.",
+      "pinterest": "Pin, papan, dan analitik Pinterest.",
+      "reddit": "Postingan, komentar, dan komunitas Reddit.",
+      "whatsapp": "Pesan dan template WhatsApp Business."
     }
   },
   "toolNames": {

@@ -11214,6 +11214,7 @@
       "support": "Soporte",
       "marketing": "Marketing",
       "automation": "Automatización",
+      "social": "Redes sociales",
       "email": "Correo"
     },
     "emptyCategory": "Todavía no hay conectores en esta categoría",
@@ -11565,6 +11566,41 @@
         "1": "Ver cobros y clientes",
         "2": "Crear cobros con Pix"
       },
+      "instagram": {
+        "1": "Ver publicaciones, historias y estadísticas",
+        "2": "Leer mensajes directos",
+        "ask": "Publicar contenido y responder mensajes siempre pide tu aprobación"
+      },
+      "facebook": {
+        "1": "Ver publicaciones, comentarios y estadísticas",
+        "2": "Publicar textos, fotos y videos y responder comentarios",
+        "ask": "Eliminar publicaciones y comentarios siempre pide tu aprobación"
+      },
+      "linkedin": {
+        "1": "Publicar textos y videos",
+        "2": "Comentar publicaciones",
+        "ask": "Compartir enlaces y eliminar publicaciones siempre pide tu aprobación"
+      },
+      "youtube": {
+        "1": "Ver videos, comentarios y estadísticas",
+        "2": "Editar videos y listas de reproducción y comentar",
+        "ask": "Responder, moderar y eliminar comentarios siempre pide tu aprobación"
+      },
+      "pinterest": {
+        "1": "Ver pines, tableros y estadísticas",
+        "2": "Crear pines y organizar tableros",
+        "ask": "Cambiar tableros y eliminar siempre pide tu aprobación"
+      },
+      "reddit": {
+        "1": "Buscar publicaciones y leer comentarios",
+        "2": "Publicar, comentar y editar",
+        "ask": "Eliminar siempre pide tu aprobación"
+      },
+      "whatsapp": {
+        "1": "Ver números, plantillas y entregas",
+        "2": "Crear plantillas de mensajes",
+        "ask": "Enviar mensajes siempre pide tu aprobación"
+      },
       "database": {
         "1": "Ver las tablas",
         "2": "Consultar los datos para responder",
@@ -11713,7 +11749,14 @@
       "revenuecat": "Suscripciones dentro de la app, productos, ofertas e ingresos.",
       "superwall": "Paywalls, campañas y experimentos.",
       "paddle": "Clientes, suscripciones, transacciones y productos.",
-      "abacatepay": "Cobros con Pix, clientes y retiros."
+      "abacatepay": "Cobros con Pix, clientes y retiros.",
+      "instagram": "Cuentas de empresa y de creador de Instagram: publicaciones, historias, estadísticas y mensajes directos.",
+      "facebook": "Páginas de Facebook: publicaciones, fotos, videos, comentarios y estadísticas.",
+      "linkedin": "Publicaciones, videos y comentarios en LinkedIn en nombre de quien se conecta.",
+      "youtube": "Videos, comentarios, listas de reproducción y estadísticas del canal de YouTube.",
+      "pinterest": "Pines, tableros y estadísticas de Pinterest.",
+      "reddit": "Publicaciones, comentarios y comunidades de Reddit.",
+      "whatsapp": "Mensajes y plantillas de WhatsApp Business."
     }
   },
   "toolNames": {

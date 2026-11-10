@@ -11698,6 +11698,7 @@
       "support": "Wsparcie",
       "marketing": "Marketing",
       "automation": "Automatyzacja",
+      "social": "Media społecznościowe",
       "email": "E-mail"
     },
     "emptyCategory": "W tej kategorii nie ma jeszcze konektorów",
@@ -12049,6 +12050,41 @@
         "1": "Podgląd obciążeń i klientów",
         "2": "Tworzenie płatności Pix"
       },
+      "instagram": {
+        "1": "Podgląd postów, relacji i statystyk",
+        "2": "Czytanie wiadomości prywatnych",
+        "ask": "Publikowanie postów i odpowiadanie na wiadomości zawsze prosi o twoje zatwierdzenie"
+      },
+      "facebook": {
+        "1": "Podgląd postów, komentarzy i statystyk",
+        "2": "Publikowanie postów, zdjęć i filmów oraz odpowiadanie na komentarze",
+        "ask": "Usuwanie postów i komentarzy zawsze prosi o twoje zatwierdzenie"
+      },
+      "linkedin": {
+        "1": "Publikowanie postów i filmów",
+        "2": "Komentowanie postów",
+        "ask": "Udostępnianie linków i usuwanie postów zawsze prosi o twoje zatwierdzenie"
+      },
+      "youtube": {
+        "1": "Podgląd filmów, komentarzy i statystyk",
+        "2": "Edycja filmów i playlist oraz komentowanie",
+        "ask": "Odpowiadanie na komentarze, ich moderowanie i usuwanie zawsze prosi o twoje zatwierdzenie"
+      },
+      "pinterest": {
+        "1": "Podgląd pinów, tablic i statystyk",
+        "2": "Tworzenie pinów i porządkowanie tablic",
+        "ask": "Zmiana tablic i usuwanie zawsze prosi o twoje zatwierdzenie"
+      },
+      "reddit": {
+        "1": "Wyszukiwanie postów i czytanie komentarzy",
+        "2": "Publikowanie, komentowanie i edycja",
+        "ask": "Usuwanie zawsze prosi o twoje zatwierdzenie"
+      },
+      "whatsapp": {
+        "1": "Podgląd numerów, szablonów i dostarczeń",
+        "2": "Tworzenie szablonów wiadomości",
+        "ask": "Wysyłanie wiadomości zawsze prosi o twoje zatwierdzenie"
+      },
       "database": {
         "1": "Podgląd tabel",
         "2": "Zapytania do danych, żeby odpowiedzieć",
@@ -12202,7 +12238,14 @@
       "revenuecat": "Subskrypcje w aplikacji, produkty, oferty i przychody.",
       "superwall": "Paywalle, kampanie i eksperymenty.",
       "paddle": "Klienci, subskrypcje, transakcje i produkty.",
-      "abacatepay": "Płatności Pix, klienci i wypłaty."
+      "abacatepay": "Płatności Pix, klienci i wypłaty.",
+      "instagram": "Konta firmowe i twórców na Instagramie: posty, relacje, statystyki i wiadomości prywatne.",
+      "facebook": "Strony na Facebooku: posty, zdjęcia, filmy, komentarze i statystyki.",
+      "linkedin": "Posty, filmy i komentarze na LinkedIn w imieniu zalogowanego członka.",
+      "youtube": "Filmy, komentarze, playlisty i statystyki kanału YouTube.",
+      "pinterest": "Piny, tablice i statystyki na Pintereście.",
+      "reddit": "Posty, komentarze i społeczności na Reddicie.",
+      "whatsapp": "Wiadomości i szablony WhatsApp Business."
     }
   },
   "toolNames": {

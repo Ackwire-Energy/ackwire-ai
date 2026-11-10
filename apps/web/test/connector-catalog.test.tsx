@@ -125,6 +125,31 @@ describe("Adicionar conector: one catalog", () => {
     expect(names(dialog)).toEqual(["Notion", "Não achou?"]);
   });
 
+  test("social networks: a category of their own, each tile in its brand's mark and color", async () => {
+    const state = seedState({ connections: [] });
+    const api = createFakeApi(state);
+    const whatsapp: ConnectorDef = {
+      ...(CATALOG.connectors.find((d) => d.id === "drive") as ConnectorDef),
+      id: "whatsapp",
+      label: "WhatsApp",
+      category: "social",
+      description: "WhatsApp Business messages and templates.",
+      serverUrl: "https://backend.composio.dev/api/v3.1/toolkits/whatsapp",
+      iconUrl: "/connectors/whatsapp.svg",
+      brandColor: "#25D366",
+    };
+    api.connectors.catalog = async () => ({ ...CATALOG, connectors: [...CATALOG.connectors, whatsapp] });
+    const { dialog } = await open(state, api);
+    const cats = within(dialog).getByRole("radiogroup", { name: "Categorias" });
+    expect(filterNames(cats).slice(-2)).toEqual(["Redes sociais", "Suporte"]);
+    await click(within(cats).getByRole("radio", { name: /^Redes sociais/ }));
+    expect(names(dialog)).toEqual(["WhatsApp", "Não achou?"]);
+    const tile = within(dialog).getByRole("button", { name: "WhatsApp" });
+    expect(tile.textContent).toContain("Mensagens e modelos do WhatsApp Business.");
+    const mark = tile.querySelector(".connector-icon__mark")?.getAttribute("style")?.toLowerCase();
+    expect([mark?.includes("/connectors/whatsapp.svg"), mark?.includes("#25d366")]).toEqual([true, true]);
+  });
+
   test("nothing found: one of our agents searching, with the way in by address", async () => {
     const { dialog } = await open();
     const search = within(dialog).getByRole("searchbox", { name: "Buscar conector" });

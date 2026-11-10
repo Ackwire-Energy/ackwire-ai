@@ -10875,6 +10875,7 @@
       "support": "Support",
       "marketing": "Marketing",
       "automation": "Automatisierung",
+      "social": "Soziale Netzwerke",
       "email": "E-Mail"
     },
     "emptyCategory": "Noch keine Konnektoren in dieser Kategorie",
@@ -11226,6 +11227,41 @@
         "1": "Zahlungsforderungen und Kunden ansehen",
         "2": "Pix-Zahlungsforderungen erstellen"
       },
+      "instagram": {
+        "1": "Beiträge, Storys und Statistiken ansehen",
+        "2": "Direktnachrichten lesen",
+        "ask": "Beiträge veröffentlichen und auf Nachrichten antworten fragt immer nach deiner Freigabe"
+      },
+      "facebook": {
+        "1": "Beiträge, Kommentare und Statistiken ansehen",
+        "2": "Beiträge, Fotos und Videos veröffentlichen und auf Kommentare antworten",
+        "ask": "Beiträge und Kommentare löschen fragt immer nach deiner Freigabe"
+      },
+      "linkedin": {
+        "1": "Beiträge und Videos veröffentlichen",
+        "2": "Beiträge kommentieren",
+        "ask": "Links teilen und Beiträge löschen fragt immer nach deiner Freigabe"
+      },
+      "youtube": {
+        "1": "Videos, Kommentare und Statistiken ansehen",
+        "2": "Videos und Playlists bearbeiten und kommentieren",
+        "ask": "Auf Kommentare antworten, sie moderieren und löschen fragt immer nach deiner Freigabe"
+      },
+      "pinterest": {
+        "1": "Pins, Pinnwände und Statistiken ansehen",
+        "2": "Pins erstellen und Pinnwände ordnen",
+        "ask": "Pinnwände ändern und etwas löschen fragt immer nach deiner Freigabe"
+      },
+      "reddit": {
+        "1": "Beiträge suchen und Kommentare lesen",
+        "2": "Posten, kommentieren und bearbeiten",
+        "ask": "Löschen fragt immer nach deiner Freigabe"
+      },
+      "whatsapp": {
+        "1": "Nummern, Vorlagen und Zustellungen ansehen",
+        "2": "Nachrichtenvorlagen erstellen",
+        "ask": "Nachrichten senden fragt immer nach deiner Freigabe"
+      },
       "database": {
         "1": "Tabellen ansehen",
         "2": "Daten abfragen, um zu antworten",
@@ -11369,7 +11405,14 @@
       "revenuecat": "In-App-Abos, Produkte, Angebote und Umsatz.",
       "superwall": "Paywalls, Kampagnen und Experimente.",
       "paddle": "Kunden, Abos, Transaktionen und Produkte.",
-      "abacatepay": "Pix-Zahlungsforderungen, Kunden und Auszahlungen."
+      "abacatepay": "Pix-Zahlungsforderungen, Kunden und Auszahlungen.",
+      "instagram": "Instagram-Business- und Creator-Konten: Beiträge, Storys, Statistiken und Direktnachrichten.",
+      "facebook": "Facebook-Seiten: Beiträge, Fotos, Videos, Kommentare und Statistiken.",
+      "linkedin": "LinkedIn-Beiträge, Videos und Kommentare im Namen des angemeldeten Mitglieds.",
+      "youtube": "Videos, Kommentare, Playlists und Statistiken des YouTube-Kanals.",
+      "pinterest": "Pins, Pinnwände und Statistiken auf Pinterest.",
+      "reddit": "Beiträge, Kommentare und Communitys auf Reddit.",
+      "whatsapp": "Nachrichten und Vorlagen von WhatsApp Business."
     }
   },
   "toolNames": {

@@ -11285,6 +11285,7 @@
       "support": "Assistance",
       "marketing": "Marketing et pub",
       "automation": "Automatisation",
+      "social": "Réseaux sociaux",
       "email": "E-mail"
     },
     "emptyCategory": "Aucun connecteur dans cette catégorie pour l'instant",
@@ -11636,6 +11637,41 @@
         "1": "Voir les paiements demandés et les clients",
         "2": "Créer des demandes de paiement Pix"
       },
+      "instagram": {
+        "1": "Voir les publications, les stories et les statistiques",
+        "2": "Lire les messages privés",
+        "ask": "La publication et les réponses aux messages demandent toujours votre approbation"
+      },
+      "facebook": {
+        "1": "Voir les publications, les commentaires et les statistiques",
+        "2": "Publier des posts, des photos et des vidéos et répondre aux commentaires",
+        "ask": "La suppression de publications et de commentaires demande toujours votre approbation"
+      },
+      "linkedin": {
+        "1": "Publier des posts et des vidéos",
+        "2": "Commenter des publications",
+        "ask": "Le partage de liens et la suppression de publications demandent toujours votre approbation"
+      },
+      "youtube": {
+        "1": "Voir les vidéos, les commentaires et les statistiques",
+        "2": "Modifier les vidéos et les playlists et commenter",
+        "ask": "Les réponses, la modération et la suppression des commentaires demandent toujours votre approbation"
+      },
+      "pinterest": {
+        "1": "Voir les épingles, les tableaux et les statistiques",
+        "2": "Créer des épingles et organiser les tableaux",
+        "ask": "La modification des tableaux et les suppressions demandent toujours votre approbation"
+      },
+      "reddit": {
+        "1": "Rechercher des publications et lire les commentaires",
+        "2": "Publier, commenter et modifier",
+        "ask": "La suppression demande toujours votre approbation"
+      },
+      "whatsapp": {
+        "1": "Voir les numéros, les modèles et l'état d'envoi",
+        "2": "Créer des modèles de message",
+        "ask": "L'envoi de messages demande toujours votre approbation"
+      },
       "database": {
         "1": "Voir les tables",
         "2": "Interroger les données pour répondre",
@@ -11784,7 +11820,14 @@
       "revenuecat": "Abonnements in-app, produits, offres et revenus.",
       "superwall": "Paywalls, campagnes et expériences.",
       "paddle": "Clients, abonnements, transactions et produits.",
-      "abacatepay": "Paiements Pix, clients et retraits."
+      "abacatepay": "Paiements Pix, clients et retraits.",
+      "instagram": "Comptes professionnels et créateur Instagram : publications, stories, statistiques et messages privés.",
+      "facebook": "Pages Facebook : publications, photos, vidéos, commentaires et statistiques.",
+      "linkedin": "Publications, vidéos et commentaires LinkedIn au nom du membre qui se connecte.",
+      "youtube": "Vidéos, commentaires, playlists et statistiques de la chaîne YouTube.",
+      "pinterest": "Épingles, tableaux et statistiques Pinterest.",
+      "reddit": "Publications, commentaires et communautés Reddit.",
+      "whatsapp": "Messages et modèles WhatsApp Business."
     }
   },
   "toolNames": {
