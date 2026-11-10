@@ -327,6 +327,7 @@ import { NewMissionDialog } from "@/components/missions/MissionDialogs";
 import { NavToggle } from "@/components/NavDrawer";
 import { CHANNEL_NAME, ChannelAccessChoice, toChannelName } from "@/components/NewChannelDialog";
 import { FailedRunFix, KeyGuardDialog, NoAiBanner, NoAiCard, useNoAiAutoOpen } from "@/components/NoAi";
+import { useNewAgent } from "@/components/new-agent/NewAgentDialog";
 import { OpensAgent } from "@/components/OpensAgent";
 import { useOrg } from "@/components/org-context";
 import { AuthorStatus } from "@/components/Presence";
@@ -5399,6 +5400,7 @@ function AddMembersDialog({
   // An address nobody here has: invite them to the workspace and this channel (ADR 0090).
   const invite = useInviteOffer(q);
   const inviteDialog = useInviteDialog();
+  const newAgent = useNewAgent();
   const navigate = useNavigate();
   const creates = can(org, "create_agents");
   const add = useMutation({
@@ -5467,11 +5469,14 @@ function AddMembersDialog({
               className="member-row member-row--add"
               onClick={() => {
                 onInvite();
-                void navigate({
-                  to: "/org/$orgId/agents/new",
-                  params: { orgId: org.id },
-                  search: { channel: channel.id },
-                });
+                // The new agent's dialog, starting it in this channel too (ADR 0164).
+                if (newAgent) newAgent.open({ channelId: channel.id });
+                else
+                  void navigate({
+                    to: "/org/$orgId/agents/new",
+                    params: { orgId: org.id },
+                    search: { channel: channel.id },
+                  });
               }}
             >
               <span className="member-row__plus" aria-hidden="true">

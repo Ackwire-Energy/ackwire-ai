@@ -1,0 +1,353 @@
+/*
+ * A new agent's dialog (ADR 0164): the starting points on the left, the agent's card on the right, the same height
+ * whatever is picked; its sky is the agent page's cover (AgentCover).
+ */
+.nac__keys {
+  display: contents;
+}
+.nac__grid {
+  display: grid;
+  grid-template-columns: 440px minmax(0, 1fr);
+  gap: 16px;
+  height: min(560px, calc(100dvh - 256px));
+  min-height: 400px;
+}
+
+/* The list: from scratch first, then the starting points. */
+.nac__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow: auto;
+  min-height: 0;
+  margin: 0 -6px;
+  padding: 2px 6px 12px;
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent);
+}
+.nac__item {
+  align-items: center;
+  padding: 8px 12px 8px 8px;
+}
+.nac__item[aria-selected="true"] {
+  box-shadow: 0 0 0 2px var(--ink);
+}
+.nac__face {
+  min-width: 0;
+}
+.nac__blank {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  border-bottom-left-radius: var(--radius-cut);
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1.5px var(--line2);
+  color: var(--muted);
+}
+.nac__group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 12px 2px 2px;
+  color: var(--faint);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.nac__groupbox {
+  display: contents;
+}
+.nac__more {
+  margin: 10px 2px 0;
+}
+.nac__more .ac-link {
+  gap: 6px;
+}
+
+/* The card. */
+.nac__card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+.nac__cover {
+  position: relative;
+  flex: none;
+  height: clamp(200px, 34dvh, 252px);
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: 16px 16px 0 0;
+  transition: height 0.4s var(--out);
+}
+.nac__cover[data-look] {
+  height: clamp(150px, 24dvh, 196px);
+}
+.nac__hero {
+  position: absolute;
+  left: 20px;
+  bottom: 8px;
+  width: 104px;
+  height: 104px;
+}
+.nac__cover[data-look] .nac__hero {
+  left: calc(50% - 56px);
+  width: 112px;
+  height: 112px;
+}
+.nac__hero .ac-avatar {
+  width: 100%;
+  height: 100%;
+}
+.nac__bubble {
+  position: absolute;
+  left: 140px;
+  right: 16px;
+  top: 52px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 34px 12px 14px;
+  border-radius: 18px 18px 18px var(--radius-cut);
+  background: var(--raised);
+  box-shadow: var(--e2), var(--top);
+  animation: nac-pop 0.42s var(--spring) both;
+}
+@keyframes nac-pop {
+  from {
+    opacity: 0;
+    transform: translate(-8px, 6px) scale(0.94);
+  }
+}
+.nac__hi {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 5px;
+  margin: 0;
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 24px;
+}
+.nac__hi > span:last-child {
+  margin-left: -5px;
+}
+.nac__name,
+.nac__what {
+  all: unset;
+  box-sizing: border-box;
+  field-sizing: content;
+  font: inherit;
+  border-radius: 6px;
+  cursor: text;
+}
+.nac__name {
+  min-width: 3.2ch;
+  margin: 0 -3px;
+  padding: 0 3px;
+  color: var(--ink);
+  box-shadow: inset 0 -1.5px 0 color-mix(in srgb, var(--ink) 22%, transparent);
+}
+.nac__name:focus {
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  box-shadow: inset 0 -2px 0 var(--ink);
+}
+.nac__what {
+  display: block;
+  width: 100%;
+  max-height: 88px;
+  overflow: auto;
+  margin: 0 -3px;
+  padding: 1px 3px;
+  color: var(--ink2);
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 21px;
+  white-space: pre-wrap;
+}
+.nac__name::placeholder,
+.nac__what::placeholder {
+  color: var(--faint);
+}
+.nac__name:hover,
+.nac__what:hover,
+.nac__what:focus {
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+}
+.nac__pen {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  color: var(--faint);
+  pointer-events: none;
+}
+.nac__bubble:focus-within .nac__pen {
+  opacity: 0;
+}
+.nac__acts {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  gap: 6px;
+}
+.nac__glass.ac-btn {
+  background: var(--sky-glass);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 0 0 1px var(--sky-line);
+  color: var(--sky-ink);
+}
+
+.nac__body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+  overflow: auto;
+  padding: 14px 18px 18px;
+}
+.nac__handle {
+  color: var(--muted);
+  font-size: 13.5px;
+}
+.nac__similar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+.nac__sec {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.nac__label {
+  color: var(--faint);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.nac__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.nac__app,
+.nac__add {
+  border: 0;
+  font-family: inherit;
+  cursor: pointer;
+}
+.nac__app:hover {
+  box-shadow: inset 0 0 0 1px var(--ink2);
+}
+.nac__level {
+  margin-left: 2px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+.nac__add.ac-chip {
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--line2);
+  color: var(--muted);
+}
+.nac__add.ac-chip:hover {
+  box-shadow: inset 0 0 0 1px var(--ink2);
+  color: var(--ink);
+}
+.nac__offer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+}
+.nac__asks {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.nac__asks li {
+  gap: 8px;
+  padding: 3px 0;
+  color: var(--ink2);
+  font-size: 14px;
+}
+.nac__asks .ac-icon {
+  color: var(--faint);
+}
+.nac__look {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.nac__look .newag__opts--acc {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+.nac__look .newag__opts--acc .newag__opt {
+  width: auto;
+}
+.nac__note {
+  align-items: flex-start;
+  gap: 6px;
+}
+.nac__note .ac-icon {
+  margin-top: 1px;
+  color: var(--faint);
+}
+
+/* One app's level. */
+.nac-app__asks {
+  align-items: flex-start;
+  gap: 8px;
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 19px;
+}
+.nac-app__asks .ac-icon {
+  flex: none;
+  margin-top: 1px;
+  color: var(--faint);
+}
+
+/* The flight to the sidebar. */
+.nac-flight {
+  position: fixed;
+  z-index: var(--z-toast);
+  pointer-events: none;
+  will-change: transform;
+}
+.nac-flight .ac-avatar {
+  width: 100%;
+  height: 100%;
+}
+
+@media (max-width: 760px) {
+  .nac__grid {
+    grid-template-columns: minmax(0, 1fr);
+    height: auto;
+  }
+  .nac__list {
+    max-height: 220px;
+  }
+  .nac__bubble {
+    left: 128px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nac__bubble {
+    animation: none;
+  }
+}

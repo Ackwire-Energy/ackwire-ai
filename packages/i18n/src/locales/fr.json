@@ -5713,42 +5713,6 @@
       }
     }
   },
-  "newAgentAsk": {
-    "title": "Que fera ton nouvel agent ?",
-    "lead": "Dis-le en une phrase. {{name}} le prépare et te le montre avant de le créer.",
-    "field": "Ce qu'il fait pour toi",
-    "placeholder": "Ex. : Organiser mon agenda et me rappeler ce qui compte",
-    "ideas": "Idées",
-    "idea": {
-      "agenda": {
-        "label": "Agenda",
-        "text": "Organiser mon agenda et me rappeler mes rendez-vous"
-      },
-      "money": {
-        "label": "Finances",
-        "text": "Suivre mes factures et me prévenir avant l'échéance"
-      },
-      "training": {
-        "label": "Sport",
-        "text": "Planifier mes entraînements de la semaine et les adapter à mon état"
-      },
-      "studies": {
-        "label": "Études",
-        "text": "Me faire un plan d'études et m'interroger sur ce que j'ai appris"
-      },
-      "home": {
-        "label": "Maison",
-        "text": "Tenir la liste de courses et les tâches de la maison"
-      },
-      "travel": {
-        "label": "Voyages",
-        "text": "Planifier mes voyages : itinéraire, réservations et documents"
-      }
-    },
-    "full": "Je préfère tout remplir",
-    "create": "Créer avec {{name}}",
-    "message": "Je veux un nouvel agent : {{what}}"
-  },
   "newAgent": {
     "title": "Créer un agent",
     "railOrg": "{{org}} · vous êtes {{role}}",

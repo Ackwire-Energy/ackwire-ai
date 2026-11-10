@@ -37,6 +37,7 @@ import { useApi } from "@/api/context";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
 import { LoadingList } from "@/components/Loading";
+import { CreateAgentButton } from "@/components/new-agent/NewAgentDialog";
 import { useOrg } from "@/components/org-context";
 import { useAgentsAccess } from "@/hooks/useAgentsAccess";
 import { useRightHandLook } from "@/hooks/useRightHandLook";
@@ -311,15 +312,7 @@ export function AccessMatrixSection() {
           size="panel"
           agent={look}
           title={t(can(org, "create_agents") ? "access.noAgentsTitle" : "team.emptyViewerTitle")}
-          actions={
-            can(org, "create_agents") && (
-              <Button asChild variant="primary" icon="plus">
-                <Link to="/org/$orgId/agents/new" params={{ orgId: org.id }}>
-                  {t("shell.createAgent")}
-                </Link>
-              </Button>
-            )
-          }
+          actions={can(org, "create_agents") && <CreateAgentButton />}
         >
           {t(can(org, "create_agents") ? "access.noAgents" : "team.emptyViewer")}
         </EmptyState>

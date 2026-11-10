@@ -5541,42 +5541,6 @@
       }
     }
   },
-  "newAgentAsk": {
-    "title": "Wat moet je nieuwe agent doen?",
-    "lead": "Zeg het in één zin. {{name}} zet hem klaar en laat hem zien voordat hij gemaakt wordt.",
-    "field": "Wat hij voor je doet",
-    "placeholder": "Bijv. Mijn agenda op orde houden en me aan belangrijke dingen herinneren",
-    "ideas": "Ideeën",
-    "idea": {
-      "agenda": {
-        "label": "Agenda",
-        "text": "Mijn agenda op orde houden en me aan afspraken herinneren"
-      },
-      "money": {
-        "label": "Financiën",
-        "text": "Mijn rekeningen bijhouden en me waarschuwen voor de vervaldatum"
-      },
-      "training": {
-        "label": "Training",
-        "text": "Mijn trainingen voor de week plannen en aanpassen aan hoe ik me voel"
-      },
-      "studies": {
-        "label": "Studie",
-        "text": "Een studieplan maken en me overhoren over wat ik leerde"
-      },
-      "home": {
-        "label": "Huis",
-        "text": "De boodschappenlijst en het huishouden bijhouden"
-      },
-      "travel": {
-        "label": "Reizen",
-        "text": "Mijn reizen plannen: route, boekingen en documenten"
-      }
-    },
-    "full": "Ik vul liever alles zelf in",
-    "create": "Maken met {{name}}",
-    "message": "Ik wil een nieuwe agent: {{what}}"
-  },
   "newAgent": {
     "title": "Agent maken",
     "railOrg": "{{org}} · je bent {{role}}",

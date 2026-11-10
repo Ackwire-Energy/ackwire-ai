@@ -5472,42 +5472,6 @@
       }
     }
   },
-  "newAgentAsk": {
-    "title": "Yeni ajanın ne yapsın?",
-    "lead": "Tek cümleyle söyle. {{name}} hazırlar ve oluşturmadan önce sana gösterir.",
-    "field": "Senin için ne yapar",
-    "placeholder": "Örn. Takvimimi düzenli tutmak ve önemli şeyleri hatırlatmak",
-    "ideas": "Fikirler",
-    "idea": {
-      "agenda": {
-        "label": "Takvim",
-        "text": "Takvimimi düzenli tutmak ve randevularımı hatırlatmak"
-      },
-      "money": {
-        "label": "Finans",
-        "text": "Faturalarımı takip etmek ve son günden önce haber vermek"
-      },
-      "training": {
-        "label": "Antrenman",
-        "text": "Haftalık antrenmanlarımı planlamak ve nasıl hissettiğime göre ayarlamak"
-      },
-      "studies": {
-        "label": "Ders",
-        "text": "Bana bir çalışma planı yapmak ve öğrendiklerimi sormak"
-      },
-      "home": {
-        "label": "Ev",
-        "text": "Alışveriş listesini ve ev işlerini düzenli tutmak"
-      },
-      "travel": {
-        "label": "Seyahat",
-        "text": "Seyahatlerimi planlamak: rota, rezervasyonlar ve belgeler"
-      }
-    },
-    "full": "Hepsini kendim doldurayım",
-    "create": "{{name}} ile oluştur",
-    "message": "Yeni bir ajan istiyorum: {{what}}"
-  },
   "newAgent": {
     "title": "Ajan oluştur",
     "railOrg": "{{org}} · rolünüz: {{role}}",

@@ -5316,42 +5316,6 @@
       }
     }
   },
-  "newAgentAsk": {
-    "title": "Apa yang akan dilakukan agen barumu?",
-    "lead": "Katakan dalam satu kalimat. {{name}} menyiapkannya dan menunjukkannya kepadamu sebelum dibuat.",
-    "field": "Apa yang dilakukannya untukmu",
-    "placeholder": "Mis.: Merapikan jadwalku dan mengingatkan hal penting",
-    "ideas": "Ide",
-    "idea": {
-      "agenda": {
-        "label": "Jadwal",
-        "text": "Merapikan jadwalku dan mengingatkan janji-janjiku"
-      },
-      "money": {
-        "label": "Keuangan",
-        "text": "Memantau tagihanku dan mengingatkan sebelum jatuh tempo"
-      },
-      "training": {
-        "label": "Latihan",
-        "text": "Menyusun latihan mingguanku dan menyesuaikannya dengan kondisiku"
-      },
-      "studies": {
-        "label": "Belajar",
-        "text": "Membuat rencana belajar dan menguji apa yang sudah kupelajari"
-      },
-      "home": {
-        "label": "Rumah",
-        "text": "Mengurus daftar belanja dan pekerjaan rumah"
-      },
-      "travel": {
-        "label": "Perjalanan",
-        "text": "Merencanakan perjalananku: rute, pemesanan, dan dokumen"
-      }
-    },
-    "full": "Aku isi semuanya sendiri",
-    "create": "Buat dengan {{name}}",
-    "message": "Aku mau agen baru: {{what}}"
-  },
   "newAgent": {
     "title": "Buat agen",
     "railOrg": "{{org}} · kamu {{role}}",

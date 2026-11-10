@@ -86,6 +86,7 @@ import { entityMenu } from "@/lib/entity-menu";
 import { planMeterText, usageShown } from "@/lib/plan-usage";
 import { TOAST_MS, useToast } from "@/lib/toast";
 import "./members.css";
+import { CreateAgentLink } from "@/components/new-agent/NewAgentDialog";
 
 /**
  * How long a cancelled invitation waits for Desfazer before it's revoked: as long as the toast that offers it stays
@@ -347,13 +348,7 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
           <GroupHeading
             id="sec-agents"
             title={t("members.agents")}
-            aside={
-              can(org, "create_agents") && (
-                <Link to="/org/$orgId/agents/new" params={{ orgId: org.id }} className="ac-link">
-                  {t("shell.createAgent")}
-                </Link>
-              )
-            }
+            aside={can(org, "create_agents") && <CreateAgentLink />}
           />
           <List>
             {dir.agents.length === 0 && <div className="ac-list__row muted">{t("members.noAgents")}</div>}

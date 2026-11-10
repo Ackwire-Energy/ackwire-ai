@@ -13494,66 +13494,6 @@
   "agentSetup.firstRun.asks.whoPersonal": {
     "value": "Which agent does what?"
   },
-  "newAgentAsk.title": {
-    "value": "What should your new agent do?"
-  },
-  "newAgentAsk.lead": {
-    "value": "Say it in one sentence. {{name}} sets it up and shows it to you before creating it."
-  },
-  "newAgentAsk.field": {
-    "value": "What it does for you"
-  },
-  "newAgentAsk.placeholder": {
-    "value": "E.g. Keep my calendar in order and remind me of what matters"
-  },
-  "newAgentAsk.ideas": {
-    "value": "Ideas"
-  },
-  "newAgentAsk.idea.agenda.label": {
-    "value": "Calendar"
-  },
-  "newAgentAsk.idea.agenda.text": {
-    "value": "Keep my calendar in order and remind me of my appointments"
-  },
-  "newAgentAsk.idea.money.label": {
-    "value": "Finances"
-  },
-  "newAgentAsk.idea.money.text": {
-    "value": "Keep track of my bills and tell me before anything is due"
-  },
-  "newAgentAsk.idea.training.label": {
-    "value": "Training"
-  },
-  "newAgentAsk.idea.training.text": {
-    "value": "Plan my workouts for the week and adjust them to how I feel"
-  },
-  "newAgentAsk.idea.studies.label": {
-    "value": "Studies"
-  },
-  "newAgentAsk.idea.studies.text": {
-    "value": "Make me a study plan and quiz me on what I learned"
-  },
-  "newAgentAsk.idea.home.label": {
-    "value": "Home"
-  },
-  "newAgentAsk.idea.home.text": {
-    "value": "Keep the shopping list and the house chores in order"
-  },
-  "newAgentAsk.idea.travel.label": {
-    "value": "Travel"
-  },
-  "newAgentAsk.idea.travel.text": {
-    "value": "Plan my trips: itinerary, bookings and documents"
-  },
-  "newAgentAsk.full": {
-    "value": "Fill everything in myself"
-  },
-  "newAgentAsk.create": {
-    "value": "Create with {{name}}"
-  },
-  "newAgentAsk.message": {
-    "value": "I want a new agent: {{what}}"
-  },
   "newAgent.title": {
     "value": "Create agent"
   },

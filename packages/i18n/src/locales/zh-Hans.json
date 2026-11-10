@@ -5338,42 +5338,6 @@
       }
     }
   },
-  "newAgentAsk": {
-    "title": "你的新智能体要做什么？",
-    "lead": "用一句话说。{{name}} 会准备好，在创建前先给你看。",
-    "field": "它为你做什么",
-    "placeholder": "例如：整理我的日程，提醒我重要的事",
-    "ideas": "想法",
-    "idea": {
-      "agenda": {
-        "label": "日程",
-        "text": "整理我的日程，提醒我的约会"
-      },
-      "money": {
-        "label": "财务",
-        "text": "跟踪我的账单，到期前提醒我"
-      },
-      "training": {
-        "label": "训练",
-        "text": "安排我一周的训练，并按我的状态调整"
-      },
-      "studies": {
-        "label": "学习",
-        "text": "给我做学习计划，并考考我学过的内容"
-      },
-      "home": {
-        "label": "家务",
-        "text": "管理购物清单和家务"
-      },
-      "travel": {
-        "label": "旅行",
-        "text": "规划我的旅行：行程、预订和证件"
-      }
-    },
-    "full": "我自己全部填写",
-    "create": "和 {{name}} 一起创建",
-    "message": "我想要一个新的智能体：{{what}}"
-  },
   "newAgent": {
     "title": "创建智能体",
     "railOrg": "{{org}} · 你的角色是{{role}}",

@@ -29,6 +29,7 @@ import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 import { useToast } from "@/lib/toast";
 import "./team.css";
+import { CreateAgentButton } from "@/components/new-agent/NewAgentDialog";
 
 const VIEWS = ["list", "chart", "map", "sectors", "usage"] as const;
 type TeamView = (typeof VIEWS)[number];
@@ -86,11 +87,7 @@ export function TeamPage() {
           {t("shell.importAgents")}
         </Link>
       </Button>
-      <Button asChild variant="primary" icon="plus">
-        <Link to="/org/$orgId/agents/new" params={{ orgId: org.id }}>
-          {t("shell.createAgent")}
-        </Link>
-      </Button>
+      <CreateAgentButton />
     </>
   );
   return (

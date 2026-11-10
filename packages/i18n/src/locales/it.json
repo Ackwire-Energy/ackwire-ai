@@ -5709,42 +5709,6 @@
       }
     }
   },
-  "newAgentAsk": {
-    "title": "Cosa farà il tuo nuovo agente?",
-    "lead": "Dillo in una frase. {{name}} lo prepara e te lo mostra prima di crearlo.",
-    "field": "Cosa fa per te",
-    "placeholder": "Es.: Tenere in ordine la mia agenda e ricordarmi le cose importanti",
-    "ideas": "Idee",
-    "idea": {
-      "agenda": {
-        "label": "Agenda",
-        "text": "Tenere in ordine la mia agenda e ricordarmi gli appuntamenti"
-      },
-      "money": {
-        "label": "Finanze",
-        "text": "Seguire le mie bollette e avvisarmi prima della scadenza"
-      },
-      "training": {
-        "label": "Allenamento",
-        "text": "Pianificare i miei allenamenti della settimana e adattarli a come sto"
-      },
-      "studies": {
-        "label": "Studio",
-        "text": "Farmi un piano di studio e interrogarmi su ciò che ho imparato"
-      },
-      "home": {
-        "label": "Casa",
-        "text": "Tenere la lista della spesa e le faccende di casa"
-      },
-      "travel": {
-        "label": "Viaggi",
-        "text": "Pianificare i miei viaggi: itinerario, prenotazioni e documenti"
-      }
-    },
-    "full": "Preferisco compilare tutto",
-    "create": "Crea con {{name}}",
-    "message": "Voglio un nuovo agente: {{what}}"
-  },
   "newAgent": {
     "title": "Crea agente",
     "railOrg": "{{org}} · sei {{role}}",
