@@ -24,10 +24,12 @@ import {
   teamColumns,
   teamCounts,
   teamFailureText,
+  teamInDms,
   teamRoutines,
   teamStatus,
   teamUndoable,
 } from "@agenteschat/client/lib/team-plan";
+import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
 import { WAVE_SECONDS } from "@agenteschat/ui/agent/stickers";
 import type { TFunction } from "i18next";
 import { useEffect, useState } from "react";
@@ -63,8 +65,45 @@ import { TextArea } from "../shared/TextArea";
 
 /**
  * The right hand's team setup on the phone (ADR 0137 §10), as on the web: answers to tap as chips (each the person's
- * own message), the team card as stacked rows with the same buttons, the templates and the map as sheets.
+ * own message), the team card as stacked rows with the same buttons, the templates and the map as sheets. In a
+ * personal workspace (ADR 0159) the words are about the person's agents, and an agent with no channel lives in its DM
+ * with the person: no channel is named for it and, when none has one, there is no map to see.
  */
+
+/** One answer to tap, as the right hand's questions draw them: the ink face with a check once picked. */
+export function ChoiceChip({
+  label,
+  on,
+  disabled = false,
+  onPress,
+}: {
+  label: string;
+  on: boolean;
+  disabled?: boolean;
+  onPress: () => void;
+}) {
+  const c = useColors();
+  return (
+    <Pressable
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityState={{ selected: on, disabled }}
+      onPress={() => {
+        tapHaptic();
+        onPress();
+      }}
+      style={({ pressed }) => [
+        styles.chip,
+        { backgroundColor: on ? c.ink : pressed ? c.sunken : c.raised, borderColor: c.line2 },
+      ]}
+    >
+      {on ? <Icon name="check" size={15} color={c.bg} /> : null}
+      <Text variant="small" style={on ? { color: c.bg } : undefined}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
 
 export function AnswerChips({
   choices,
@@ -80,7 +119,6 @@ export function AnswerChips({
   step?: { step: number; of: number };
 }) {
   const { t } = useTranslation();
-  const c = useColors();
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const answered = answer !== null;
   const shown = answered ? new Set(answerPicks(choices, answer)) : picked;
@@ -89,36 +127,23 @@ export function AnswerChips({
   return (
     <View style={styles.chips}>
       <View style={styles.chipRow}>
-        {listed.map((choice) => {
-          const on = shown.has(choice);
-          return (
-            <Pressable
-              key={choice}
-              disabled={answered}
-              accessibilityRole="button"
-              accessibilityState={{ selected: on, disabled: answered }}
-              onPress={() => {
-                tapHaptic();
-                if (!multiple) return onSend(choice);
-                setPicked((p) => {
-                  const next = new Set(p);
-                  if (next.has(choice)) next.delete(choice);
-                  else next.add(choice);
-                  return next;
-                });
-              }}
-              style={({ pressed }) => [
-                styles.chip,
-                { backgroundColor: on ? c.ink : pressed ? c.sunken : c.raised, borderColor: c.line2 },
-              ]}
-            >
-              {on ? <Icon name="check" size={15} color={c.bg} /> : null}
-              <Text variant="small" style={on ? { color: c.bg } : undefined}>
-                {choice}
-              </Text>
-            </Pressable>
-          );
-        })}
+        {listed.map((choice) => (
+          <ChoiceChip
+            key={choice}
+            label={choice}
+            on={shown.has(choice)}
+            disabled={answered}
+            onPress={() => {
+              if (!multiple) return onSend(choice);
+              setPicked((p) => {
+                const next = new Set(p);
+                if (next.has(choice)) next.delete(choice);
+                else next.add(choice);
+                return next;
+              });
+            }}
+          />
+        ))}
       </View>
       <View style={styles.chipFoot}>
         {multiple && !answered && picked.size > 0 ? (
@@ -170,18 +195,23 @@ export function ReplyChips({ message: m }: { message: Message }) {
  * (rows divided by hairlines, icons on the first line), never a plate or a box in a card. An agent's row is a MediaRow:
  * its face, name and role on one line, what it does, its channel and "Ajustar" under them at the card's width.
  * `reviewer`: the right hand's name, which keeps the weekly check (the onboarding has no workspace open to read it from).
+ * `personal` (ADR 0159): each agent is someone to talk to, not a place, so its channel shows only in a team's workspace
+ * and when it has one.
  */
 export function TeamRows({
   plan,
   reviewer,
+  personal = false,
   onAdjust,
 }: {
   plan: TeamPlan;
   reviewer: string;
+  personal?: boolean;
   onAdjust?: (a: TeamAgentDraft) => void;
 }) {
   const { t, i18n } = useTranslation();
   const c = useColors();
+  const channelOf = (a: TeamAgentDraft) => (personal ? "" : a.channel);
   return (
     <View style={styles.rows}>
       {plan.agents.map((a, i) => (
@@ -194,25 +224,32 @@ export function TeamRows({
             <Text variant="small" tone="ink2">
               {a.line}
             </Text>
-            {/* Its channel under its words, "new" on its line; "Adjust" at the right. */}
-            <View style={styles.agentFoot}>
-              <Text variant="footnote" tone="muted" style={styles.fill}>
-                #{a.channel}
-                {plan.newChannels.includes(a.channel) ? (
-                  <Text variant="footnote" style={[styles.bold, { color: c.info }]}>
-                    {` ${t("teamPlan.card.new")}`}
+            {/* Its channel under its words, "new" on its line; "Adjust" at the right. With no channel, only "Adjust",
+                still at the right; with neither, nothing under its words. */}
+            {channelOf(a) || onAdjust ? (
+              <View style={styles.agentFoot}>
+                {channelOf(a) ? (
+                  <Text variant="footnote" tone="muted" style={styles.fill}>
+                    #{a.channel}
+                    {plan.newChannels.includes(a.channel) ? (
+                      <Text variant="footnote" style={[styles.bold, { color: c.info }]}>
+                        {` ${t("teamPlan.card.new")}`}
+                      </Text>
+                    ) : null}
                   </Text>
+                ) : (
+                  <View style={styles.fill} />
+                )}
+                {onAdjust ? (
+                  <Button
+                    variant="text"
+                    size="sm"
+                    label={t("teamPlan.card.adjustName", { name: a.name })}
+                    onPress={() => onAdjust(a)}
+                  />
                 ) : null}
-              </Text>
-              {onAdjust ? (
-                <Button
-                  variant="text"
-                  size="sm"
-                  label={t("teamPlan.card.adjustName", { name: a.name })}
-                  onPress={() => onAdjust(a)}
-                />
-              ) : null}
-            </View>
+              </View>
+            ) : null}
           </MediaRow>
         </View>
       ))}
@@ -230,8 +267,8 @@ export function TeamRows({
                 </Text>{" "}
                 ·{" "}
                 {agent
-                  ? `${agent.name}, #${agent.channel}: ${routine.name}`
-                  : `${reviewer}: ${t("teamPlan.card.weekly")}`}
+                  ? `${channelOf(agent) ? `${agent.name}, #${agent.channel}` : agent.name}: ${routine.name}`
+                  : `${reviewer}: ${t(personal ? "teamPlan.card.weeklyPersonal" : "teamPlan.card.weekly")}`}
               </Text>
             </View>
           ))}
@@ -267,11 +304,12 @@ export function TeamRows({
   );
 }
 
-const countsText = (t: TFunction, plan: TeamPlan) => {
+/** "3 agents · 2 new channels · 3 routines"; a personal workspace counts no channels (ADR 0159). */
+const countsText = (t: TFunction, plan: TeamPlan, personal: boolean) => {
   const n = teamCounts(plan);
   return [
     t("teamPlan.card.agents", { count: n.agents }),
-    n.newChannels > 0 ? t("teamPlan.card.newChannels", { count: n.newChannels }) : "",
+    n.newChannels > 0 && !personal ? t("teamPlan.card.newChannels", { count: n.newChannels }) : "",
     n.routines > 0 ? t("teamPlan.card.routineCount", { count: n.routines }) : "",
   ]
     .filter(Boolean)
@@ -300,6 +338,7 @@ function TeamCardView({ message: m, card }: { message: Message; card: TeamPropos
   const [map, setMap] = useState(false);
   const plan = card.params;
   const status = teamStatus(card);
+  const personal = isPersonal(org);
   const names = joinNames(
     plan.agents.map((a) => a.name),
     t,
@@ -307,6 +346,21 @@ function TeamCardView({ message: m, card }: { message: Message; card: TeamPropos
   if (status === "open") {
     const decides = can(org, "create_agents");
     const busy = team.create.isPending || team.deny.isPending || card.state === "creating";
+    // Agents that each live in a DM with the person have no map to show (ADR 0159): the rows say it all.
+    const mapButton = teamInDms(plan) ? null : (
+      <Button variant="secondary" size="card" wide label={t("teamPlan.card.map")} onPress={() => setMap(true)} />
+    );
+    const dismissButton =
+      decides || card.forUserId === meId ? (
+        <Button
+          variant="ghost"
+          size="card"
+          wide
+          label={t("rightHand.card.dismiss")}
+          disabled={busy}
+          onPress={() => team.deny.mutate(undefined, { onError: failed })}
+        />
+      ) : null;
     return (
       <>
         <AskCard
@@ -320,6 +374,7 @@ function TeamCardView({ message: m, card }: { message: Message; card: TeamPropos
               <TeamRows
                 plan={plan}
                 reviewer={dir.agents.find(isRightHand)?.name ?? RIGHT_HAND_DEFAULT.name}
+                personal={personal}
                 onAdjust={decides ? setAdjusting : undefined}
               />
               {card.error ? (
@@ -332,14 +387,14 @@ function TeamCardView({ message: m, card }: { message: Message; card: TeamPropos
           foot={
             <AskFoot>
               <Text variant="caption" tone="muted">
-                {countsText(t, plan)}
+                {countsText(t, plan, personal)}
               </Text>
               {decides ? (
                 <Button
                   variant="primary"
                   size="card"
                   wide
-                  label={t(card.error ? "teamPlan.card.retry" : "teamPlan.card.create")}
+                  label={t(card.error ? "teamPlan.card.retry" : modeKey(org, "teamPlan.card.create"))}
                   loading={team.create.isPending || card.state === "creating"}
                   disabled={busy}
                   onPress={() =>
@@ -353,29 +408,12 @@ function TeamCardView({ message: m, card }: { message: Message; card: TeamPropos
                   }
                 />
               ) : null}
-              <AskButtons
-                primary={
-                  <Button
-                    variant="secondary"
-                    size="card"
-                    wide
-                    label={t("teamPlan.card.map")}
-                    onPress={() => setMap(true)}
-                  />
-                }
-                secondary={
-                  decides || card.forUserId === meId ? (
-                    <Button
-                      variant="ghost"
-                      size="card"
-                      wide
-                      label={t("rightHand.card.dismiss")}
-                      disabled={busy}
-                      onPress={() => team.deny.mutate(undefined, { onError: failed })}
-                    />
-                  ) : undefined
-                }
-              />
+              {mapButton || dismissButton ? (
+                <AskButtons
+                  primary={mapButton ?? dismissButton}
+                  secondary={mapButton ? (dismissButton ?? undefined) : undefined}
+                />
+              ) : null}
             </AskFoot>
           }
         />
@@ -399,11 +437,14 @@ function TeamCardView({ message: m, card }: { message: Message; card: TeamPropos
   if (status === "created") {
     const by = card.decidedByUserId === meId ? null : dir.memberById.get(card.decidedByUserId ?? "")?.name;
     const undoable = teamUndoable(card, { userId: meId ?? "", admin: can(org, "manage_agents") });
+    const madeBy = by
+      ? t(modeKey(org, "teamPlan.card.created"), { name: by })
+      : t(modeKey(org, "teamPlan.card.createdYou"));
     return (
       <>
         <AskDone
           done
-          words={`${by ? t("teamPlan.card.created", { name: by }) : t("teamPlan.card.createdYou")}: ${names}`}
+          words={`${madeBy}: ${names}`}
           time={decidedAt}
           actions={
             undoable ? (
@@ -448,9 +489,9 @@ function TeamCardView({ message: m, card }: { message: Message; card: TeamPropos
         status === "superseded"
           ? "rightHand.card.superseded"
           : status === "undone"
-            ? "teamPlan.card.undone"
+            ? modeKey(org, "teamPlan.card.undone")
             : status === "denied"
-              ? "teamPlan.card.dismissed"
+              ? modeKey(org, "teamPlan.card.dismissed")
               : "approval.expired",
       )}: ${names}`}
     />
@@ -470,7 +511,8 @@ function FirstTasks({ message: m, card, held }: { message: Message; card: TeamPr
   const thinks = useAiStatus(orgId).data?.any === true;
   const [later, setLater] = useState(false);
   const tasks = firstTasks(card).filter((f) => dir.agentById.has(f.agentId));
-  const people = card.params.invite;
+  // No "Invite …" in a personal workspace (ADR 0159): it is for one person, inviting stays in Settings.
+  const people = isPersonal(org) ? [] : card.params.invite;
   if (later || held || !thinks || (tasks.length === 0 && people.length === 0)) return null;
   return (
     <AskCard
@@ -617,7 +659,8 @@ function AdjustForm({
         {input("name", t("teamPlan.adjust.name"), 80)}
         {input("role", t("teamPlan.adjust.role"), 200)}
         {input("line", t("teamPlan.adjust.line"), 300)}
-        {input("channel", t("teamPlan.adjust.channel"), 80)}
+        {/* An agent with no channel lives in its DM with the person (ADR 0159): nothing to name. */}
+        {agent.channel ? input("channel", t("teamPlan.adjust.channel"), 80) : null}
         <View style={styles.formRow}>
           <Text variant="footnote" tone="muted">
             {t("teamPlan.adjust.instructions")}
@@ -636,34 +679,40 @@ function AdjustForm({
   );
 }
 
-/** "Ver como mapa" as a sheet: the people, a block per channel with its agents and routines, the weekly reviewer. */
+/**
+ * "See as a map" as a sheet: the people, a block per channel with its agents and routines, the weekly reviewer. An
+ * agent with no channel (it lives in its DM with the person, ADR 0159) has a block of its own, with no channel on top.
+ */
 export function TeamMapSheet({ plan, open, onClose }: { plan: TeamPlan; open: boolean; onClose: () => void }) {
   const { t, i18n } = useTranslation();
+  const { org } = useOrg();
   const c = useColors();
   const dir = useDirectory();
   const lodi = dir.agents.find(isRightHand);
   return (
     <Sheet open={open} onClose={onClose} solid>
       <ScrollView contentContainerStyle={styles.form}>
-        <Text variant="title2">{t("teamPlan.map.title")}</Text>
+        <Text variant="title2">{t(modeKey(org, "teamPlan.map.title"))}</Text>
         <Text variant="footnote" tone="muted" style={styles.bold}>
           {t("teamPlan.map.people")}
         </Text>
         <Text variant="small">{joinNames([t("agentActions.you"), ...plan.invite], t)}</Text>
         {teamColumns(plan).map((col) => (
-          <View key={col.channel} style={[styles.mapCol, { borderColor: c.line2 }]}>
-            <View style={styles.line}>
-              <LineIcon name="hash" size={17} color={c.muted} />
-              {/* "Novo" inside the name's line, on its baseline. */}
-              <Text variant="body" style={[styles.bold, styles.fill]}>
-                {col.channel}
-                {col.fresh ? (
-                  <Text variant="caption" style={[styles.bold, { color: c.info }]}>
-                    {` ${t("teamPlan.card.new")}`}
-                  </Text>
-                ) : null}
-              </Text>
-            </View>
+          <View key={col.key} style={[styles.mapCol, { borderColor: c.line2 }]}>
+            {col.channel ? (
+              <View style={styles.line}>
+                <LineIcon name="hash" size={17} color={c.muted} />
+                {/* "New" inside the name's line, on its baseline. */}
+                <Text variant="body" style={[styles.bold, styles.fill]}>
+                  {col.channel}
+                  {col.fresh ? (
+                    <Text variant="caption" style={[styles.bold, { color: c.info }]}>
+                      {` ${t("teamPlan.card.new")}`}
+                    </Text>
+                  ) : null}
+                </Text>
+              </View>
+            ) : null}
             {col.agents.map((a) => (
               <MediaRow
                 key={a.handle}
@@ -704,7 +753,10 @@ export function TeamMapSheet({ plan, open, onClose }: { plan: TeamPlan; open: bo
   );
 }
 
-/** "Ver modelos de time" as a sheet: the six templates, each opening its team; "Usar este modelo" posts it. */
+/**
+ * "Team templates" as a sheet: the templates, each opening its team; "Create the team" makes it. In a personal
+ * workspace (ADR 0159) the server lists them by area of life, and the words are about the person's agents.
+ */
 export function TeamTemplatesSheet({
   open,
   onClose,
@@ -724,6 +776,7 @@ export function TeamTemplatesSheet({
   const failed = useFailed();
   const dir = useDirectory();
   const held = usePlanHold(orgId, org) !== null;
+  const personal = isPersonal(org);
   const name = dir.agents.find(isRightHand)?.name ?? RIGHT_HAND_DEFAULT.name;
   const list = useTeamTemplates(orgId, i18n.language, open);
   const use = useApplyTeamTemplate(orgId);
@@ -737,29 +790,29 @@ export function TeamTemplatesSheet({
   return (
     <Sheet open={open} onClose={onClose} solid>
       <ScrollView contentContainerStyle={styles.form}>
-        <Text variant="title2">{chosen ? chosen.name : t("teamPlan.templates.title")}</Text>
+        <Text variant="title2">{chosen ? chosen.name : t(modeKey(org, "teamPlan.templates.title"))}</Text>
         <Text variant="small" tone="muted">
           {chosen
             ? chosen.description
             : held
-              ? t("teamPlan.templates.heldLead")
-              : t("teamPlan.templates.lead", { name })}
+              ? t(modeKey(org, "teamPlan.templates.heldLead"))
+              : t(modeKey(org, "teamPlan.templates.lead"), { name })}
         </Text>
         {chosen ? (
           <>
-            <TeamRows plan={chosen.team} reviewer={name} />
+            <TeamRows plan={chosen.team} reviewer={name} personal={personal} />
             {held ? null : (
               <Text variant="footnote" tone="muted">
-                {t("teamPlan.templates.tailor")}
+                {t(modeKey(org, "teamPlan.templates.tailor"))}
               </Text>
             )}
             <Text variant="caption" tone="muted">
-              {countsText(t, chosen.team)}
+              {countsText(t, chosen.team, personal)}
             </Text>
             <Button
               variant="primary"
               wide
-              label={t("teamPlan.templates.create")}
+              label={t(modeKey(org, "teamPlan.templates.create"))}
               loading={use.isPending}
               onPress={() =>
                 use.mutate(
@@ -770,7 +823,9 @@ export function TeamTemplatesSheet({
                       out.state === "created"
                         ? onClose()
                         : setRefused(
-                            out.error ? teamFailureText(t, out.error, i18n.language) : t("teamPlan.templates.failed"),
+                            out.error
+                              ? teamFailureText(t, out.error, i18n.language)
+                              : t(modeKey(org, "teamPlan.templates.failed")),
                           ),
                     onError: failed,
                   },
@@ -834,7 +889,7 @@ export function TeamTemplatesSheet({
                     {t("teamPlan.templates.none")}
                   </Text>
                   <Text variant="small" tone="muted">
-                    {t("teamPlan.templates.noneSub", { name })}
+                    {t(modeKey(org, "teamPlan.templates.noneSub"), { name })}
                   </Text>
                 </View>
               </Pressable>

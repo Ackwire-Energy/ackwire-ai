@@ -5,7 +5,7 @@ import { knownErrorText } from "@agenteschat/client/lib/errors";
 import { planHoldPhoneLine } from "@agenteschat/client/lib/no-ai";
 import { railState } from "@agenteschat/client/lib/onboarding";
 import { isInviteToken } from "../../src/features/auth/links";
-import { stepFailedText, zoneCity, zoneLabel } from "../../src/features/onboarding/logic";
+import { PURPOSES, stepFailedText, workspaceAnswer, zoneCity, zoneLabel } from "../../src/features/onboarding/logic";
 import { translator } from "./fixtures";
 
 test("the time zone reads as its city; invitation tokens only url-safe", () => {
@@ -138,4 +138,20 @@ test("the phone's plan step: the team asleep and where to turn it on, with no pr
     const code = src(file);
     expect({ file, found: banned.filter((b) => code.includes(b)) }).toEqual({ file, found: [] });
   }
+});
+
+test("the first question makes a personal workspace at once, named in the person's language (ADR 0159)", async () => {
+  expect(PURPOSES).toEqual(["personal", "team"]);
+  const pt = await translator("pt-BR");
+  const en = await translator("en");
+  // "For me": no name asked, the word for it; whatever was in the name field doesn't count.
+  expect(workspaceAnswer(en, "personal", "Acme")).toEqual({ name: "Personal", mode: "personal" });
+  expect(workspaceAnswer(pt, "personal", "")).toEqual({ name: pt("onboarding.personal.name"), mode: "personal" });
+  // A company or team: the name typed, trimmed.
+  expect(workspaceAnswer(pt, "team", "  Acme ")).toEqual({ name: "Acme", mode: "team" });
+  // Add workspace asks the same question; the footer stays the quiet Sign out (workspace-computer.test.ts).
+  const flow = readFileSync(new URL("../../src/features/onboarding/OnboardingFlow.tsx", import.meta.url), "utf8");
+  expect(flow).toContain('t("mobile.onb.anotherPurpose")');
+  expect(flow).toContain("PURPOSES.map((mode) => {");
+  expect(flow).toContain('workspaceAnswer(t, purpose ?? "team", orgName)');
 });

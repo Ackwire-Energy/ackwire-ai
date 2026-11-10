@@ -38,7 +38,7 @@ import { bodyCode } from "./run-tools";
 import { REPORT_SCHEMA, SCHEDULE_INPUT } from "./schedule-tools";
 import { deletes, type WantedLine } from "./settings-proposals";
 import { noAgentText } from "./team";
-import { teamTools } from "./team-proposals";
+import { OFFER_ANSWERS_TOOL, PROPOSE_TEAM_SCHEMA_PERSONAL, PROPOSE_TEAM_TOOL, teamTools } from "./team-proposals";
 import { SET_TEAM_WEEK_TOOL, setTeamWeekPrefs } from "./team-week";
 import { OFFER_CONNECT_APP_TOOL } from "./tools/connector-first";
 import { APPROVAL_TTL_MS } from "./tools/gateway";
@@ -51,6 +51,7 @@ import {
   workspaceAction,
   workspaceActionTool,
 } from "./workspace-actions";
+import { isPersonalWorkspace } from "./workspace-mode";
 
 const { agentActions, agentRuns, channels, machineAccounts, messages, orgRoles } = schema;
 
@@ -781,7 +782,7 @@ export function createSetupToolSource(deps: {
               ? "the person who asked applies it from the card."
               : "the person who asked can't apply it all: the card lets them send it to an admin.";
           return {
-            content: `Posted the card to ${field} ${who}; ${whoDecides} Nothing has changed yet.${[...left, ...skipped].length ? ` Left off: ${[...left, ...skipped].join("; ")}.` : ""} To rebuild the team, propose the new agents now with propose_agent.`,
+            content: `Posted the card to ${field} ${who}; ${whoDecides} Nothing has changed yet.${[...left, ...skipped].length ? ` Left off: ${[...left, ...skipped].join("; ")}.` : ""} To ${(await isPersonalWorkspace(ctx.db, ctx.orgId)) ? "set up new agents" : "rebuild the team"}, propose the new agents now with propose_agent.`,
             data: { actionCard: { messageId: message.id } },
           };
         } catch (error) {
@@ -968,10 +969,41 @@ export function createSetupToolSource(deps: {
   ];
   return {
     name: "setup",
-    // Only the right hand starts the rest of the app with cards (ADR 0137).
-    tools: async (ctx) => (isRightHand(await getAgentCached(ctx.db, ctx.orgId, ctx.agentId)) ? rightHand : all),
+    // Only the right hand starts the rest of the app with cards (ADR 0137). A personal workspace reads them in its own
+    // words (ADR 0159): the same tools, for one person and their agents, whose team card may leave an agent's channel
+    // out (it lives in its DM with the person). Only words and that one field: a read that fails keeps the team's.
+    tools: async (ctx) => {
+      const listed = isRightHand(await getAgentCached(ctx.db, ctx.orgId, ctx.agentId)) ? rightHand : all;
+      if (!(await isPersonalWorkspace(ctx.db, ctx.orgId).catch(() => false))) return listed;
+      return listed.map((t) => {
+        const description = SETUP_TOOLS_PERSONAL[t.name];
+        const worded = description ? { ...t, description } : t;
+        return t.name === PROPOSE_TEAM_TOOL ? { ...worded, inputSchema: PROPOSE_TEAM_SCHEMA_PERSONAL } : worded;
+      });
+    },
   };
 }
+
+/**
+ * The setup tools as a personal workspace's agents read them (ADR 0159): one person, maybe their family, and their
+ * agents. Each does what it does in a team workspace; only who it speaks of changes, and inviting is for when they ask.
+ */
+const SETUP_TOOLS_PERSONAL: Record<string, string> = {
+  [PROPOSE_AGENT_TOOL]:
+    "Propose a new agent for this person with one card in this conversation: a person creates it in one click (or reviews and edits it first), or says no. Use it when someone asks for a new agent or bot, or when work needs a role none of their agents has. Put in this one call everything the request implies, so the agent works as soon as it is created: its access to the connected apps and to the asker's own mailbox (by its address) when the job reads or sends their email, and `routine` when the job runs on a schedule ('todo dia ao meio-dia'). It lives in its DM with the person: leave `channels` out, unless they asked for it in a group conversation (a channel). It creates nothing: never say the agent exists until you are told it was created. The card suggests an AI for it by itself.",
+  [PROPOSE_REMOVE_AGENTS_TOOL]:
+    "Propose archiving agents (or deleting them for good) with one card in this conversation that lists them all: whoever may archive or delete agents applies it from the card as themselves, all at once or leaving some out, and archiving has Undo. A person who can't sends it from the card to an admin. Use it when someone asks to remove, archive, delete or start their agents over ('apaga os outros agentes'). Never you or the workspace's assistant. Nothing changes until someone clicks: never say it is done. To set up new agents after, propose them with propose_agent.",
+  [OFFER_INVITES_TOOL]:
+    "Offer to invite someone the person trusts (family, a partner, someone who helps them) to this workspace with a card in this conversation: its button opens the app's invite dialog with these addresses filled in, as members. A person who may invite sends it there (and may change roles); you send nothing. Use it when they ask to invite or add someone by email, never on your own.",
+  [SET_TEAM_WEEK_TOOL]:
+    "Stop, start again or move the card you post in this person's DM: the weekly look at how their agents did (Fridays at 17h in the workspace's time zone), or 'Resumo do dia', the same card every day at an hour ('me manda isso todo dia às 9h'). Use it when they ask you to stop it, send it again, or on another day or hour. It changes only their card.",
+  [PROPOSE_SETTINGS_TOOL]:
+    "Change agents' settings with one card in this conversation: the model, the AI account it thinks with, its monthly budget, its owner, who may talk to it, the channels it joins or leaves and whether it answers there without a mention, its name, its look, who it reports to, or archiving it. A change the person who asked may make, with nothing read from outside this turn, applies at once with Undo. Any other waits on the card for who may make it, and one they can't make they send from there. The result says which: never say it is done before it does. Instructions, a role or apps go through propose_instruction_change.",
+  [OFFER_ANSWERS_TOOL]:
+    "Ask the person one short question with answers to tap under it, in this conversation: each tap sends the answer as their own message (several at once with `multiple`), and they can always type instead. Use it for the questions that set their agents up (what they want help with, what takes most of their time, when they want to hear from their agents), one per turn, with `step` and `of` ('Pergunta 2 de 3'). The question shows as your message: write nothing else in this turn and end it. Their answer comes as their next message.",
+  [PROPOSE_TEAM_TOOL]:
+    "Propose several agents for this person with ONE card in this conversation: each agent with its face, name, role, a line on what it does, 1 to 3 routines, plus 1 or 2 skills, a line on what waits for the person's approval and your own weekly look at how their agents did. Each agent lives in its DM with the person, where its routines report: leave its `channel` out, unless they asked for a group conversation for it (a new channel is then created with them). Whoever may create agents creates them all in one click on the card, adjusts an agent first or dismisses it. Use it to set up or redo their agents (2 to 4 agents usually), never one propose_agent card per agent then. Nothing exists until they click: never say it does. A newer card here replaces the open one.",
+};
 
 /** Posts an agent's card where it goes (`cardPlace`) and announces it. */
 async function postCard(

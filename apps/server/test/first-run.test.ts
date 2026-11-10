@@ -46,3 +46,27 @@ test("a new workspace's right hand starts the checklist; only Agora não is stor
   expect(messages.messages.length).toBe(1);
   expect(messages.messages.some((m) => m.meta?.replyChips)).toBe(false);
 });
+
+test("a personal workspace (ADR 0159): made with its mode, its templates are for one person's life, made with no channel", async () => {
+  t = await createTestServer();
+  const owner = browser(t);
+  await signUp(owner, "solo@example.com");
+  const made = await owner("/api/app/organizations", { json: { name: "Personal", mode: "personal" } });
+  const created = (await made.json()) as { organization: { id: string } };
+  const api = (path: string, init?: Parameters<typeof owner>[1]) =>
+    owner(`/api/app/organizations/${created.organization.id}${path}`, init);
+  expect(((await (await api("/settings")).json()) as { mode: string }).mode).toBe("personal");
+
+  const gallery = (await (await api("/team-templates?locale=en")).json()) as {
+    templates: { id: string; team: { agents: { channel: string }[]; newChannels: string[] } }[];
+  };
+  expect(gallery.templates.map((x) => x.id)).toEqual(["life", "health", "studies", "home", "travel", "freelance"]);
+  expect(gallery.templates.every((x) => x.team.newChannels.length === 0)).toBe(true);
+  expect(gallery.templates.flatMap((x) => x.team.agents.map((a) => a.channel))).not.toContain("support");
+
+  const used = await api("/team-templates/life/use", { json: { locale: "en" } });
+  expect(used.status).toBe(200);
+  expect(await used.json()).toMatchObject({ state: "created", error: null });
+  const agents = ((await (await api("/agents")).json()) as { agents: AgentRow[] }).agents;
+  expect(agents.filter((a) => !a.builtin).map((a) => a.handle)).toEqual(expect.arrayContaining(["clara", "duda"]));
+});

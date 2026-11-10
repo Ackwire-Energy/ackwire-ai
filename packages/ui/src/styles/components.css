@@ -2389,11 +2389,19 @@ html:not([data-pointer]) .ac-menu__item:focus-visible,
   flex-direction: row;
   align-items: baseline;
   column-gap: 0.4em;
+  /* The room the face and what ends the row (the hint, the check) leave, never more: its description ends in "…"
+     instead of running under the hint (WebKit sizes a flex item by its content first). */
+  flex: 1 1 0%;
+  overflow: hidden;
+}
+:is(.ac-menu, .ac-palette__list):has(.ac-menu__leading > .ac-avatar) .ac-menu__hint {
+  flex: none;
 }
 :is(.ac-menu, .ac-palette__list):has(.ac-menu__leading > .ac-avatar) .ac-menu__label > :first-child {
   flex: none;
 }
 :is(.ac-menu, .ac-palette__list):has(.ac-menu__leading > .ac-avatar) .ac-menu__desc {
+  flex-shrink: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -10975,6 +10983,12 @@ html:not([data-pointer]) .ac-msg__note:focus-visible {
   height: 32px;
   margin: -6px;
 }
+/* A face there (a personal workspace's, ADR 0159) is the slot's size, as a workspace's mark is: a larger one would
+   reach into the gap before the name. */
+.ac-mo__leading > .ac-avatar {
+  width: 32px;
+  height: 32px;
+}
 @media (prefers-reduced-motion: no-preference) {
   .ac-mo__scrim {
     animation: ac-mo-fade var(--dur-panel) var(--out) both;
@@ -11508,4 +11522,44 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
   .ac-mediarow:has(> .ac-mediarow__end--wrap) > :is(.ac-mediarow__face, .ac-mediarow__head) {
     --mediarow-axis: var(--mediarow-face);
   }
+}
+
+/* ---------- A phone's own Settings path (`SettingsPath`) ---------- */
+.ac-setpath {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+  line-height: 18px;
+}
+.ac-setpath > li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+/* The › ends a segment, so a path that wraps ends its line with it instead of starting the next one. */
+.ac-setpath > li:not(:last-child)::after {
+  content: "›";
+  color: var(--faint);
+  font-weight: 600;
+  margin-inline: var(--space-1);
+}
+.ac-setpath__seg {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--ink2);
+  font-weight: 600;
+}
+.ac-setpath > li:last-child > .ac-setpath__seg {
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1.5px var(--line-strong);
 }

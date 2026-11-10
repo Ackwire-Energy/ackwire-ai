@@ -1186,3 +1186,22 @@ test("the inviter's notice when someone joins: their face and name, a Members ch
   await settle(6);
   expect(document.querySelector('[data-n="n-in"] .nt-what')?.textContent).toBe("Carla Dias aceitou seu convite");
 });
+
+test("in a personal workspace the inviter's notice names no workspace: its name says no place (ADR 0159)", async () => {
+  const state = seedState({
+    notifications: [
+      notification({
+        id: "n-in",
+        kind: "invitation_accepted",
+        actors: [{ type: "user", id: "u-carla" }],
+        source: { label: "Pessoal" },
+        latest: { title: "Carla Dias" },
+      }),
+    ],
+  });
+  const org = state.me?.organizations[0];
+  if (org) org.mode = "personal";
+  await renderApp(`/org/${ORG_ID}/notifications`, { api: createFakeApi(state) });
+  await settle(6);
+  expect(document.querySelector('[data-n="n-in"] .nt-what')?.textContent).toBe("Carla Dias aceitou seu convite");
+});

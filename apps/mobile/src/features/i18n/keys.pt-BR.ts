@@ -143,6 +143,7 @@ export const featureKeysPtBR = {
     refuseAsk: "Recusar o pedido?",
     /** On a high-risk request's top line, after its kind: it acts outside the workspace. */
     leaves: "sai da empresa",
+    leavesPersonal: "sai do seu workspace",
     refuseWhyF: "A {{name}} aprende com o motivo. Opcional.",
     refuseWhyM: "O {{name}} aprende com o motivo. Opcional.",
     sheet: {
@@ -178,6 +179,7 @@ export const featureKeysPtBR = {
       irreversible: "Não dá para desfazer",
       reversible: "Dá para desfazer",
       external: "Sai da empresa",
+      externalPersonal: "Sai do seu workspace",
       unsent: "Nada é enviado",
       deletable: "Dá para apagar",
     },
@@ -250,6 +252,9 @@ export const featureKeysPtBR = {
     newChannelHint: "Para um time ou assunto",
     channelPlaceholder: "Nome do canal, ex.: marketing",
     createChannel: "Criar canal",
+    newChannelHintPersonal: "Para um assunto, com vários agentes",
+    channelPlaceholderPersonal: "Nome, ex.: viagem",
+    createChannelPersonal: "Criar conversa em grupo",
     waitIn: "em {{where}}",
     workingNowLine_one: "{{count}} agente trabalhando agora",
     workingNowLine_other: "{{count}} agentes trabalhando agora",
@@ -260,6 +265,7 @@ export const featureKeysPtBR = {
     swipe: { mute: "Silenciar", unmute: "Reativar" },
     /** Conversas' one line back to the right hand's first-run checklist (ADR 0155 §6). */
     firstRunLine: "{{name}} está montando o time · {{done}} de {{total}}",
+    firstRunLinePersonal: "{{name}} está preparando os seus agentes · {{done}} de {{total}}",
     first: {
       title: "Comece pelo seu primeiro agente",
       subtitle: "Dê um nome e diga o que ele faz. Ele aparece aqui, como uma conversa.",
@@ -288,6 +294,8 @@ export const featureKeysPtBR = {
     chat: "Conversa com…",
     name: "Nome",
     channelFine: "Para um time ou assunto.",
+    channelPersonal: "Conversa em grupo",
+    channelFinePersonal: "Para um assunto, com vários agentes.",
     chatSearch: "Buscar pessoa ou agente",
     /** The field on top of the New sheet, as a new message's: whom it is for. */
     to: "Para:",
@@ -301,6 +309,7 @@ export const featureKeysPtBR = {
     routineHint: "Um agente faz sozinho, no horário",
     wikiPage: "Página na wiki",
     wikiHint: "Para a equipe e os agentes lerem",
+    wikiHintPersonal: "Para os seus agentes lerem",
     inviteHint: "Por e-mail ou link",
     agent: {
       question: "O que esse agente vai fazer?",
@@ -477,6 +486,7 @@ export const featureKeysPtBR = {
       arrived: "{{name}} chegou na equipe",
       meet: "Sua primeira conversa com {{name}}",
       roleIntro: "{{role}} na sua equipe. Peça em palavras simples.",
+      roleIntroPersonal: "{{role}}, aqui para você. Peça em palavras simples.",
       noIntro: "Peça o que precisar, em palavras simples.",
       firstTitle: "Para começar",
       sendHint: "Toque para enviar",
@@ -484,6 +494,7 @@ export const featureKeysPtBR = {
       hello: "Oi, {{person}}! Eu sou {{name}}.",
       helloNoName: "Oi! Eu sou {{name}}.",
       helloRole: "{{role}} na equipe.",
+      helloRolePersonal: "{{role}}, aqui para você.",
       helloAsk: "Por onde começamos?",
       now: "agora",
       /** The starts' short words on their buttons; a tap sends the whole request (`first.*`). */
@@ -809,6 +820,7 @@ export const featureKeysPtBR = {
     workingSection: "Trabalhando",
     /** The free agents, in no department: the team itself. */
     teamSection: "Equipe",
+    teamSectionPersonal: "Seus agentes",
     /** Under the task manager's row when nothing runs or waits. */
     managerQuiet: "Nada em andamento",
     /** A row's state, as text in the state's color (amber only for what waits on the person). */
@@ -1083,6 +1095,8 @@ export const featureKeysPtBR = {
     role: {
       owner: "dono",
       member: "membro",
+      ownerPersonal: "seu workspace pessoal",
+      memberPersonal: "um workspace pessoal compartilhado com você",
     },
     appearance: "Aparência",
     notifications: "Notificações",
@@ -1827,6 +1841,9 @@ export const featureKeysPtBR = {
       device_support: "O Mac está preparando este iPhone",
       helper_missing: "O app de testes ainda não está instalado",
       helper_expired: "O app de testes precisa ser renovado",
+      apple_account_missing: "O Xcode no Mac precisa de uma Conta Apple",
+      team_limit: "Remova deste iPhone um app que você criou",
+      helper_untrusted: "Confie no app de testes neste iPhone",
       booting: "Iniciando",
       no_driver: "O Windows precisa do driver USB deste celular",
       os_too_old: "O sistema deste celular é antigo demais",
@@ -1941,9 +1958,14 @@ export const featureKeysPtBR = {
       wifiText: "Celular e computador no mesmo Wi-Fi",
       cable: "Usar um cabo",
       wifi1: "Ative a Depuração por Wi-Fi",
-      wifi2: "Pareie pelo {{host}}",
-      wifi2Text:
-        "No Android Studio do {{host}}, abra o Device Manager e depois Pair Devices Using Wi-Fi. Escaneie o código aqui em Depuração por Wi-Fi.",
+      wifi1Text: "Marque Sempre permitir nesta rede e toque em Permitir.",
+      wifi2: "Escaneie o código num computador",
+      wifi2Text: "Em Depuração por Wi-Fi\u00a0›\u00a0Parear o dispositivo com um código QR.",
+      wifi2Hint:
+        "No agentes.chat num computador, abra Conectar um dispositivo\u00a0›\u00a0Celular Android\u00a0›\u00a0Por Wi-Fi e escolha {{host}}.",
+      codeHead: "Parear com um código de pareamento",
+      codeNote:
+        "Em Depuração por Wi-Fi\u00a0›\u00a0Parear o dispositivo com um código de pareamento. Abra as Configurações e o agentes.chat lado a lado para o código continuar na tela.",
       wifiNote: "O Wi-Fi pode cair depois de reiniciar. Um cabo é mais confiável.",
       done: "{{name}} está conectado",
       openFailed: "Este celular não abriu essa tela. Procure em Configurações.",
@@ -2016,6 +2038,7 @@ export const featureKeysPtBR = {
     loadFailed: "Não deu para carregar os conectores.",
     connectedCheck: "{{name}}, conectado",
     adminsOnly: "Só um admin da {{org}} conecta serviços. Peça para um deles.",
+    adminsOnlyPersonal: "Só quem cuida deste workspace conecta apps. Peça para essa pessoa.",
     canTitle: "Os agentes vão poder",
     asks: "{{text}} · pede sua aprovação",
     connect: "Conectar",
@@ -2170,6 +2193,7 @@ export const featureKeysPtBR = {
     zoneTitle: "Fuso horário",
     /** A second workspace from Adicionar workspace (ADR 0154): where it lives, and that nothing is left. */
     anotherTitle: "Como se chama o workspace novo?",
+    anotherPurpose: "Para que é o workspace novo?",
     anotherLead: "No agentes.chat. Você continua na {{org}} e pode trocar a qualquer hora.",
     /** O nome do primeiro uso, sugerido pelo domínio de um e-mail de trabalho. */
     suggested: "Pelo seu e-mail da {{domain}}, sugeri {{org}}.",
@@ -2582,6 +2606,10 @@ export const featureKeysPtBR = {
       text: "Cada agente assume um papel e trabalha com vocês no chat.",
       viewerTitle: "O time de agentes fica aqui",
       viewerText: "Quem cria agentes no workspace adiciona o primeiro, e ele aparece aqui.",
+      titlePersonal: "Tenha ajuda dos seus próprios agentes",
+      textPersonal: "Cada agente cuida de uma coisa para você, direto no chat.",
+      viewerTitlePersonal: "Seus agentes ficam aqui",
+      viewerTextPersonal: "Quem cria agentes aqui adiciona o primeiro, e ele aparece aqui.",
     },
     agentsForYou: {
       title: "Seus agentes aparecem aqui",
@@ -2592,12 +2620,19 @@ export const featureKeysPtBR = {
       text: "Relatórios, tabelas e arquivos de agentes e pessoas ficam aqui, fáceis de achar.",
       viewerTitle: "Encontre o que o time cria",
       viewerText: "O que agentes e pessoas criam nas conversas aparece aqui.",
+      titlePersonal: "Tudo o que seus agentes criam, num lugar só",
+      textPersonal: "Relatórios, tabelas e arquivos dos seus agentes ficam aqui, fáceis de achar.",
+      viewerTitlePersonal: "Encontre o que seus agentes criam",
+      viewerTextPersonal: "O que os agentes criam nas suas conversas aparece aqui.",
     },
     tasks: {
       title: "Passe trabalho para o time",
       text: "Crie uma tarefa para um agente ou uma pessoa e acompanhe até o fim.",
       viewerTitle: "Acompanhe o trabalho do time",
       viewerText: "As tarefas aparecem aqui assim que alguém criar a primeira.",
+      titlePersonal: "Passe seus afazeres para os agentes",
+      textPersonal: "Crie uma tarefa para um agente e acompanhe até o fim.",
+      viewerTitlePersonal: "Acompanhe o trabalho dos seus agentes",
     },
     routines: {
       title: "Deixe o trabalho repetido com os agentes",
@@ -2610,6 +2645,9 @@ export const featureKeysPtBR = {
       text: "Pessoas e agentes leem estas páginas, e todo mundo trabalha com a mesma informação.",
       viewerTitle: "Consulte o que o time sabe",
       viewerText: "Quem edita a wiki escreve a primeira página, e ela aparece aqui.",
+      titlePersonal: "Guarde notas que seus agentes leem",
+      textPersonal: "Seus agentes leem estas páginas e trabalham com o que você escreveu.",
+      viewerTitlePersonal: "Consulte o que está escrito aqui",
     },
     memory: {
       title: "Seus agentes aprendem trabalhando",
@@ -2633,12 +2671,20 @@ export const featureKeysPtBR = {
       viewerTitle: "Os canais do time ficam aqui",
       viewerText: "Quem cria canais abre o primeiro, e ele aparece aqui.",
       action: "Criar canal",
+      titlePersonal: "Converse com vários agentes de uma vez",
+      textPersonal: "Cada conversa em grupo reúne os agentes e as pessoas de um assunto.",
+      viewerTitlePersonal: "As conversas em grupo ficam aqui",
+      viewerTextPersonal: "Quem cria conversas em grupo abre a primeira, e ela aparece aqui.",
     },
     people: {
       title: "Trabalhe com o time por aqui",
       text: "Convide pessoas para conversar com elas e com os agentes num lugar só.",
       viewerTitle: "O time aparece aqui",
       viewerText: "Quem convida pessoas traz o resto do time, e elas aparecem aqui.",
+      titlePersonal: "Traga sua família ou seus amigos",
+      textPersonal: "Convide alguém para conversar com você e com seus agentes num lugar só.",
+      viewerTitlePersonal: "Família e amigos aparecem aqui",
+      viewerTextPersonal: "Quando alguém entrar, aparece aqui.",
     },
     chat: {
       title: "Tudo começa com uma mensagem",
@@ -2659,6 +2705,10 @@ export const featureKeysPtBR = {
       text: "Salve os logins e as chaves que os agentes usam pelo time.",
       viewerTitle: "Os logins do time aparecem aqui",
       viewerText: "Quando alguém compartilhar um login ou uma chave com você, aparece aqui.",
+      titlePersonal: "Guarde os logins compartilhados num lugar só",
+      textPersonal: "Salve os logins e as chaves que os agentes usam para todo mundo aqui.",
+      viewerTitlePersonal: "Os logins compartilhados aparecem aqui",
+      viewerTextPersonal: "Quando alguém daqui compartilhar um login ou uma chave com você, aparece aqui.",
     },
     skills: {
       title: "Ensine aos agentes como vocês fazem",

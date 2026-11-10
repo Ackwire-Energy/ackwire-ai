@@ -1,4 +1,4 @@
-import { keys, meQuery, useApi, useAuthConfig, useTeamTemplates } from "@agenteschat/client";
+import { keys, meQuery, useApi, useAuthConfig, useTeamTemplates, type WorkspaceMode } from "@agenteschat/client";
 import { firstName } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { settingUp } from "@agenteschat/client/lib/guards";
@@ -6,6 +6,7 @@ import { landingOf, type RailStep, railState } from "@agenteschat/client/lib/onb
 import { can } from "@agenteschat/client/lib/permissions";
 import { finishOnboarding, isRightHand, RIGHT_HAND_DEFAULT } from "@agenteschat/client/lib/right-hand";
 import { aboutOf, type BusinessType, templateFor } from "@agenteschat/client/lib/team-plan";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { useIsMutating, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -14,7 +15,7 @@ import { signOut } from "@/features/account";
 import { agentLook } from "@/features/shared/logic";
 import { authClient } from "@/lib/auth";
 import { useOrgGate } from "@/providers/org";
-import { Button, LineIcon, Locked, Text, useTheme } from "@/ui";
+import { Button, LineIcon, Locked, OptionTile, Text, useTheme } from "@/ui";
 import { AuthField } from "@/ui/auth/AuthField";
 import { AuthLink } from "@/ui/auth/AuthLink";
 import { AuthScaffold, CENTER } from "@/ui/auth/AuthScaffold";
@@ -25,16 +26,21 @@ import { chatHref } from "../links/logic";
 import { openWebPath } from "../links/open-web";
 import { ZoneList } from "../me/AccountPage";
 import { chooseAction } from "../settings/parts";
-import { orgNameFromEmail, phoneTimezone, stepFailedText, zoneLabel } from "./logic";
+import { usePersonPhoto } from "../shared/photo";
+import { orgNameFromEmail, PURPOSES, phoneTimezone, stepFailedText, workspaceAnswer, zoneLabel } from "./logic";
+import { PurposeScene } from "./PurposeScene";
 import { BusinessStep, PlanStep, TeamStep } from "./steps";
 
 /**
  * The first run on the phone, signed in with no workspace to open yet (ADR 0162), the web's steps on the sign-in's own
- * screen: the workspace's name (its time zone from the phone, said in one line; its logo later, in Configurações), the
- * keyboard's return key as the action; what it does; its team, made from a template; and, on agentes.chat Cloud, the
- * plan it waits for, in words only. Its right hand stands on the sky and says one line per step, the team joining it
- * there once picked. The step is read from the workspace's data, so one left at any step (here or on the web) resumes
- * there, never a second one. It opens in #general, or in the right hand's DM when the plan was left for the web.
+ * screen. First what the workspace is for (ADR 0159), two cards and Continue: "For me" makes a personal workspace at
+ * once, named in the person's language with the phone's time zone, and opens it in its right hand's DM, where its card
+ * holds the rest. A company or team goes on: the workspace's name (its time zone from the phone, said in one line; its
+ * logo later, in Configurações), the keyboard's return key as the action; what it does; its team, made from a
+ * template; and, on agentes.chat Cloud, the plan it waits for, in words only. Its right hand stands on the sky and says
+ * one line per step, the team joining it there once picked. The step is read from the workspace's data, so one left at
+ * any step (here or on the web) resumes there, never a second one. It opens in #general, or in the right hand's DM
+ * when the plan was left for the web.
  * Nothing destructive lives here: leaving the account is a quiet line, deleting it stays on the website. `onLeave`:
  * opened over a workspace being deleted, or from Adicionar workspace (ADR 0154), its first step goes back there;
  * `another`: the name of the workspace the person is still in meanwhile.
@@ -50,6 +56,12 @@ export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; ano
   const { colors: c } = useTheme();
   // Made here; else the one this person is setting up (a visit cut short, here or on the web), which resumes.
   const [created, setCreated] = useState<{ orgId: string; generalChannelId: string } | null>(null);
+  // What it is for (ADR 0159), asked before the workspace exists; a company or team then goes on to its name.
+  const [purpose, setPurpose] = useState<WorkspaceMode | null>(null);
+  const [forTeam, setForTeam] = useState(false);
+  // The first question's cards, side by side: each half of the row, less the gap between them.
+  const [cardsWidth, setCardsWidth] = useState(0);
+  const cardWidth = cardsWidth > 0 ? (cardsWidth - CARD_GAP) / 2 : 0;
   // A done step the person went back to, else the step the data says.
   const [picked, setPicked] = useState<RailStep | null>(null);
   // What step 2 picked in this visit, and the template picked on step 3: step 3 starts on the business's.
@@ -91,6 +103,8 @@ export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; ano
   // In the order they were made (the server's), a template's team in its template's order: as every screen lists it.
   const team = (agents.data ?? []).filter((a) => !isRightHand(a));
   const context = settings.data?.context?.trim() ?? "";
+  // Made here as "For me", or one being set up that is.
+  const personal = isPersonal(mine) || (created !== null && purpose === "personal");
   const { steps, at, step, index } = railState({
     orgId,
     standing: mine?.standing,
@@ -98,7 +112,10 @@ export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; ano
     context,
     team: team.length,
     picked,
+    personal,
   });
+  // Before the workspace exists, what it is for comes first.
+  const asking = orgId === null && !forTeam;
   // Read once is enough: a refetch that fails later keeps the step on screen with what it read.
   const known = orgId === null || (settings.data !== undefined && agents.data !== undefined && mine !== undefined);
   // Back on step 1, the workspace's own zone (saved on another visit, maybe on the web), never the phone's.
@@ -117,6 +134,9 @@ export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; ano
   // The address this sign-up was emailed a link to confirm (features/auth/confirmation.ts): the step says where it
   // went, until `me` says it's confirmed.
   const email = me.data?.user.email ?? "";
+  // You, in the first question's drawings: the account's photo (Google's), else the initial of your name.
+  const youName = me.data?.user.name || email;
+  const photo = usePersonPhoto(me.data?.user.image);
   useEffect(() => {
     if (another || orgId || name !== "" || suggested !== null || !email) return;
     const guess = orgNameFromEmail(email);
@@ -147,7 +167,7 @@ export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; ano
       if (!target) return;
       const { orgId: id, generalChannelId } = target;
       const done = await finishOnboarding(api, id);
-      const landing = how === "import" ? null : landingOf(how);
+      const landing = how === "import" ? null : landingOf(how, personal);
       const dm =
         landing === "rightHand" && done.agentId
           ? await api.dms.open(id, { agentId: done.agentId }).catch(() => null)
@@ -165,7 +185,8 @@ export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; ano
   const save = () =>
     run(async () => {
       if (!orgId) {
-        const res = await api.orgs.create({ name: orgName });
+        // "For me" asks no name: the word for it in the person's language; a company or team, the name typed.
+        const res = await api.orgs.create(workspaceAnswer(t, purpose ?? "team", orgName));
         const id = res.organization.id;
         await Promise.all([
           zone ? api.orgs.updateSettings(id, { timezone: zone }) : null,
@@ -222,6 +243,12 @@ export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; ano
   const submit = () => {
     if (orgName && !pending) void save();
   };
+  // Continue on the first question: "For me" makes the workspace now; a company or team names it first.
+  const next = () => {
+    if (!purpose || pending) return;
+    if (purpose === "team") setForTeam(true);
+    else void save();
+  };
 
   const lodiName = lodi?.name ?? RIGHT_HAND_DEFAULT.name;
   const lodiLook = { ...agentLook(lodi ?? RIGHT_HAND_DEFAULT), id: lodi?.id ?? "right-hand" };
@@ -250,7 +277,9 @@ export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; ano
           setError(null);
           setPicked(before);
         }
-      : onLeave;
+      : orgId === null && forTeam
+        ? () => setForTeam(false)
+        : onLeave;
   const failedLine = error ? (
     <Text variant="small" tone="danger" accessibilityLiveRegion="polite" style={CENTER}>
       {error}
@@ -260,30 +289,42 @@ export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; ano
   return (
     <AuthScaffold
       sky="low"
-      progress={`${t("onboarding.flow.stepOf", { n: index + 1, total: steps.length })} · ${t(`onboarding.flow.steps.${step}`)}`}
+      progress={
+        asking
+          ? undefined
+          : `${t("onboarding.flow.stepOf", { n: index + 1, total: steps.length })} · ${t(`onboarding.flow.steps.${step}`)}`
+      }
       title={
-        step === "name"
+        asking
           ? another
-            ? t("mobile.onb.anotherTitle")
-            : t("onboarding.workspace.title")
-          : step === "business"
-            ? t("agentSetup.firstRun.about.title", { org: workspace })
-            : step === "team"
-              ? t("onboarding.flow.team.title")
-              : t("onboarding.flow.plan.title")
+            ? t("mobile.onb.anotherPurpose")
+            : t("onboarding.purpose.title")
+          : step === "name"
+            ? another
+              ? t("mobile.onb.anotherTitle")
+              : t("onboarding.workspace.title")
+            : step === "business"
+              ? t("agentSetup.firstRun.about.title", { org: workspace })
+              : step === "team"
+                ? t("onboarding.flow.team.title")
+                : t("onboarding.flow.plan.title")
       }
       // The right hand's line for the step; the name's step says first what the e-mail suggested, or where this
       // workspace goes beside the one the person is in.
       subtitle={
-        step !== "name"
-          ? say
-          : another
+        asking
+          ? another
             ? t("mobile.onb.anotherLead", { org: another })
-            : suggested && name === suggested
-              ? t("mobile.onb.suggested", { domain: email.split("@")[1] ?? "", org: suggested })
-              : say
+            : t("onboarding.purpose.lead")
+          : step !== "name"
+            ? say
+            : another
+              ? t("mobile.onb.anotherLead", { org: another })
+              : suggested && name === suggested
+                ? t("mobile.onb.suggested", { domain: email.split("@")[1] ?? "", org: suggested })
+                : say
       }
-      stepKey={step}
+      stepKey={asking ? "purpose" : step}
       // The sentence of step 2 sits under the business list.
       scrollToFocus={step === "business"}
       onBack={onBack}
@@ -315,7 +356,58 @@ export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; ano
         )
       }
     >
-      {step === "name" ? (
+      {asking ? (
+        // The first question (ADR 0159): two cards side by side, as the web's, the picked one sunk with its check: on
+        // top who would be there (you amid your agents, or a small org chart), the words under it; then Continue.
+        <>
+          <Locked when={pending} style={styles.purposes}>
+            <View style={styles.cards} onLayout={(e) => setCardsWidth(e.nativeEvent.layout.width)}>
+              {PURPOSES.map((mode) => {
+                const on = purpose === mode;
+                const title = t(`onboarding.purpose.${mode}`);
+                const text = t(`onboarding.purpose.${mode}Text`);
+                return (
+                  <OptionTile
+                    key={mode}
+                    pressed={on}
+                    label={`${title}. ${text}`}
+                    style={styles.card}
+                    onPress={() => {
+                      setPurpose(mode);
+                      setError(null);
+                    }}
+                  >
+                    {cardWidth > 0 ? (
+                      <PurposeScene kind={mode} chosen={on} width={cardWidth} you={{ name: youName, photo }} />
+                    ) : null}
+                    <View style={styles.words}>
+                      <Text variant="subhead" tone="ink" style={styles.bold}>
+                        {title}
+                      </Text>
+                      <Text variant="small" tone="muted">
+                        {text}
+                      </Text>
+                      <Text variant="caption" tone="faint" style={styles.examples}>
+                        {t(`onboarding.purpose.${mode}Examples`)}
+                      </Text>
+                    </View>
+                  </OptionTile>
+                );
+              })}
+            </View>
+            <Button
+              variant="primary"
+              wide
+              label={t("onboarding.actions.continue")}
+              loading={pending}
+              disabled={!purpose}
+              onPress={next}
+            />
+          </Locked>
+          {failedLine}
+          {unconfirmed ? <ConfirmationNote email={email} /> : null}
+        </>
+      ) : step === "name" ? (
         <>
           <Locked when={pending} keepKeyboard style={{ gap: 8 }}>
             <AuthField
@@ -470,11 +562,21 @@ function ConfirmationNote({ email }: { email: string }) {
   );
 }
 
+/** Between the first question's two cards. */
+const CARD_GAP = 10;
+
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   wait: { alignItems: "center", justifyContent: "center", gap: 12, padding: 24 },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
+  // The first question's cards, then Continue under them on the same rhythm.
+  purposes: { gap: 12 },
+  cards: { flexDirection: "row", gap: CARD_GAP, alignItems: "stretch" },
+  // Edge to edge for the drawing; the words keep the card's own padding.
+  card: { flex: 1, padding: 0, overflow: "hidden" },
+  words: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 12, gap: 2 },
+  examples: { marginTop: 6 },
   note: { flexDirection: "row", alignItems: "flex-start", gap: 8, paddingTop: 8 },
   zone: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingTop: 8, maxWidth: "100%" },
   shrink: { flexShrink: 1 },

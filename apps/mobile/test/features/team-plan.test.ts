@@ -72,3 +72,41 @@ test("the chips read their answer from the conversation, as on the web", () => {
   expect(chips?.step).toBe(2);
   expect(answerPicks(chips?.choices ?? [], answerAfter(list, "q"))).toEqual(["Cobrar", "Bugs"]);
 });
+
+test("a personal workspace's row 1 asks about the person, the areas of life saved as one sentence (ADR 0159)", () => {
+  const steps = src("agents/setup/SetupStepScreen.tsx");
+  expect(steps).toContain(
+    "isPersonal(org) ? <AboutYouStep typed={text ?? null} /> : <AboutStep typed={text ?? null} />",
+  );
+  expect(steps).toContain("LIFE_AREAS.map((area) => (");
+  expect(steps).toContain('readAboutYou(t, settings.data?.context || typed || "")');
+  expect(steps).toContain("openTemplatesAfterAbout(lifeAreaTemplate(picked) ?? undefined)");
+  // On the card, the areas are answers to tap; Save keeps them, "Something else" opens the screen with them.
+  const run = src("right-hand/FirstRun.tsx");
+  expect(run).toContain('{ context: aboutYouContext(t, picked, "") }');
+  expect(run).toContain("onSaved(lifeAreaTemplate(picked))");
+});
+
+test("an agent with no channel lives in its DM: no bare #, a block of its own, no map when none has one", () => {
+  const card = src("right-hand/TeamCard.tsx");
+  // Its channel only when it has one, and never in a personal workspace (ADR 0159).
+  expect(card).toContain('const channelOf = (a: TeamAgentDraft) => (personal ? "" : a.channel);');
+  expect(card).toContain("{channelOf(a) ? (");
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: the card's own template, read as source text
+  expect(card).toContain("`${channelOf(agent) ? `${agent.name}, #${agent.channel}` : agent.name}: ${routine.name}`");
+  // The map keys its blocks by `col.key` (two agents in DMs share no channel) and names a channel only when there is
+  // one; with every agent in a DM, there is no map to see.
+  expect(card).toContain("<View key={col.key}");
+  expect(card).toContain("{col.channel ? (");
+  expect(card).toContain("const mapButton = teamInDms(plan) ? null : (");
+  // The templates and the card in the workspace's words.
+  const personalKeys = [
+    "teamPlan.templates.title",
+    "teamPlan.templates.lead",
+    "teamPlan.card.weekly",
+    "teamPlan.map.title",
+  ];
+  for (const key of personalKeys) expect(card).toContain(`modeKey(org, "${key}")`);
+  // No invitation on a personal workspace's first tasks.
+  expect(card).toContain("const people = held || isPersonal(org) ? [] : card.params.invite;");
+});

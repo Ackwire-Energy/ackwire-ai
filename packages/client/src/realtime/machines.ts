@@ -15,6 +15,7 @@ import type {
   OrgStanding,
 } from "../api/types";
 import { pacer } from "../lib/pace";
+import { isWorkspaceMode } from "../lib/workspace-mode";
 
 const MACHINE_EVENTS = new Set([
   "machine.status",
@@ -444,6 +445,20 @@ export function applyWorkspaceEvent(qc: QueryClient, orgId: string, event: { typ
       me ? { ...me, organizations: me.organizations.map((o) => (o.id === target ? { ...o, standing } : o)) } : me,
     );
     void qc.invalidateQueries({ queryKey: keys.computerSetup(target) });
+    return true;
+  }
+  if (event.type === "org.mode") {
+    // The workspace became personal or a team's (ADR 0159): its shape follows at once, in every member's apps.
+    const e = event as { orgId?: unknown; mode?: unknown };
+    const target = typeof e.orgId === "string" ? e.orgId : orgId;
+    if (isWorkspaceMode(e.mode)) {
+      const mode = e.mode;
+      qc.setQueryData<Me>(keys.me, (me) =>
+        me ? { ...me, organizations: me.organizations.map((o) => (o.id === target ? { ...o, mode } : o)) } : me,
+      );
+    }
+    void qc.invalidateQueries({ queryKey: keys.me });
+    void qc.invalidateQueries({ queryKey: keys.settings(target) });
     return true;
   }
   if (event.type === "org.deleting") {

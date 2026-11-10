@@ -71,6 +71,7 @@ import {
   providerOf,
 } from "@agenteschat/client/lib/providers";
 import { rightHandOnKey, thinksWithLine } from "@agenteschat/client/lib/right-hand";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import {
   type AgentAppearance,
   AvatarStack,
@@ -101,7 +102,7 @@ import { useDirectory } from "@/hooks/useDirectory";
 import { planWord } from "@/lib/plan-usage";
 import { useToast } from "@/lib/toast";
 import { AddAccount, OpenPage, Step, StepTitle } from "./AddAccountFlow";
-import { PlanReplies } from "./PlanReplies";
+import { PlanReplies, usePlanRepliesShown } from "./PlanReplies";
 
 /*
  * One picker wherever an AI is connected (the setup's AI step, Connect an AI, Settings › AI accounts): for one agent
@@ -396,7 +397,7 @@ export function ExistingRows({
     dimmedLine(t, dimmed.gate, {
       ...dimmed,
       edition: gates.edition,
-      computer: computerName(t, org.name, managedNamed(view.computer)),
+      computer: computerName(t, org.name, managedNamed(view.computer), isPersonal(org)),
     });
   const items = rows.map((r) => {
     if (r.kind === "key") {
@@ -489,6 +490,7 @@ export function ExistingThinks({ agent, used }: { agent: PlanAgent; used: Existi
   const toast = useToast();
   const [on, setOn] = useState(!used.onlyOwner);
   const [busy, setBusy] = useState(false);
+  const repliesShown = usePlanRepliesShown(on);
   const a = used.account;
   const reply = async (next: boolean) => {
     setOn(next);
@@ -515,7 +517,7 @@ export function ExistingThinks({ agent, used }: { agent: PlanAgent; used: Existi
       {a?.kind === "antigravity" && geminiPersonal(a) && (
         <SettingNote icon="alert">{t("connectAi.plan.gemini.warning")}</SettingNote>
       )}
-      {a && !used.personal && (
+      {a && !used.personal && repliesShown && (
         <div className="ac-card__foot ac-iconline ai-panel__replies">
           <Icon name={on ? "audienceEveryone" : "audienceOwner"} size={14} />
           <PlanReplies
@@ -665,7 +667,7 @@ export function PlanWithoutAgent({
   const has = added ?? freePlanAccount(gates.accounts, choice);
   const title = planTitle(t, choice);
   const cloud = gates.edition === "cloud";
-  const name = cloud ? computerName(t, org.name, managedOf(machines.data)) : (computer?.name ?? "");
+  const name = cloud ? computerName(t, org.name, managedOf(machines.data), isPersonal(org)) : (computer?.name ?? "");
   const steps = gate.state === "ready" || gate.state === "preparing" || (gate.state === "offline" && signingIn);
   // Only whoever connected the computers there signs a plan in on them: a computer of their own is the way on.
   const elsewhere = gate.state === "locked" && !cloud;
@@ -866,6 +868,7 @@ function PlanSteps({
   };
   const [ownReplies, setOwnReplies] = useState(() => forWhom.every((a) => onBrain(a.id) && repliesNow(a.id)));
   const replyAll = replies?.on ?? ownReplies;
+  const repliesShown = usePlanRepliesShown(replyAll);
   const setReplies = replies?.onChange ?? setOwnReplies;
   const [replying, setReplying] = useState(false);
   const toEveryone = replyAll ? { onlyOwner: false } : {};
@@ -877,7 +880,9 @@ function PlanSteps({
   }, [gate.state, markWaited]);
 
   const computer =
-    edition === "cloud" ? computerName(t, org.name, managedOf(machines.data)) : (view?.computer?.name ?? "");
+    edition === "cloud"
+      ? computerName(t, org.name, managedOf(machines.data), isPersonal(org))
+      : (view?.computer?.name ?? "");
   const refresh = (agentIds: string[]) => {
     for (const key of [
       ...agentIds.map((id) => keys.agentBrain(org.id, id)),
@@ -966,7 +971,7 @@ function PlanSteps({
   // Who the agents answer, once for the plan, as its foot: its icon says it, its switch changes it. The team's right
   // hand's own AI for the person serves them alone: no switch.
   const foot =
-    view?.scope === "mine" ? null : (
+    view?.scope === "mine" || !repliesShown ? null : (
       <div className="ac-card__foot ac-iconline ai-panel__replies">
         <Icon name={replyAll ? "audienceEveryone" : "audienceOwner"} size={14} />
         <PlanReplies

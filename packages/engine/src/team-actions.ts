@@ -19,6 +19,7 @@ import { maskCredentials } from "./tool-detail";
 import { toolKind } from "./tools/run-policy";
 import type { ToolDefinition } from "./tools/types";
 import { untrustedBlock } from "./untrusted";
+import { isPersonalWorkspace } from "./workspace-mode";
 
 const { teamActions, teamActionChecks, organizationSettings, agents, channels } = schema;
 type TeamActionMatch = schema.TeamActionMatch;
@@ -387,7 +388,7 @@ export async function checkTeamAction(
   return {
     proceed: false,
     checkId: check?.id ?? "",
-    notice: teamNoticeText(matches, names, ctx.agentId, now),
+    notice: teamNoticeText(matches, names, ctx.agentId, now, await isPersonalWorkspace(db, ctx.orgId)),
   };
 }
 
@@ -422,24 +423,31 @@ function ago(at: string, now: Date) {
   return `${Math.round(h / 24)} days ago`;
 }
 
-/** The one line the agent gets (English, like every prompt); summaries are outside text, so they go in the envelope. */
+/**
+ * The one line the agent gets (English, like every prompt); summaries are outside text, so they go in the envelope.
+ * `personal`: a personal workspace's (ADR 0159), where one person and their agents act, not a team.
+ */
 export function teamNoticeText(
   matches: TeamActionMatch[],
   names: { agents: Map<string, string>; channels: Map<string, string> },
   selfId: string,
   now = new Date(),
+  personal = false,
 ): string {
   const lines = matches.map((m) => {
     const on = m.targets.map(shownTarget).join(", ");
-    if (!m.agentId)
-      return `- Someone on the team already acted on ${on} ${ago(m.at, now)} (in a conversation you can't see).`;
-    const who = m.agentId === selfId ? "You" : (names.agents.get(m.agentId) ?? "A teammate");
+    if (!m.agentId) {
+      const someone = personal ? "Someone" : "Someone on the team";
+      return `- ${someone} already acted on ${on} ${ago(m.at, now)} (in a conversation you can't see).`;
+    }
+    const other = personal ? "Another agent" : "A teammate";
+    const who = m.agentId === selfId ? "You" : (names.agents.get(m.agentId) ?? other);
     const where = m.channelId ? ` in ${names.channels.get(m.channelId) ?? "another conversation"}` : "";
     const what = m.summary ? `: ${untrustedBlock("team action", m.summary, SUMMARY_CHARS)}` : ".";
     return `- ${who} already acted on ${on} ${ago(m.at, now)}${where}${what}`;
   });
   return [
-    "Not done: the team already did this.",
+    personal ? "Not done: this was already done." : "Not done: the team already did this.",
     ...lines,
     "Don't repeat it. If it's still needed (a follow-up, a correction, an answer to a reply), call it again with a `why` saying why. Say in your reply what you didn't do and why.",
   ].join("\n");

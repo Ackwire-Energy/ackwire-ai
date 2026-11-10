@@ -1,4 +1,5 @@
 import type {
+  BlobStore,
   EmailSender,
   GifProvider,
   MailAdapters,
@@ -58,6 +59,7 @@ import {
 import { forgetCodeEmail } from "./email-codes";
 import { type DecidedBy, publishListChanged, publishRouted } from "./events";
 import { executeRun, type RunExecutorDeps } from "./executor";
+import { FEEDBACK_FILE_PURGE_JOB, FEEDBACK_JOB, purgeFeedbackFile, sendQueuedFeedback } from "./feedback";
 import { FOLLOW_UP_JOB, wakeFollowUp } from "./follow-through";
 import { cutText } from "./format";
 import type { GitHubAppAccess } from "./git/github-call";
@@ -152,6 +154,8 @@ export interface JobDeps extends RunExecutorDeps {
   search?: SearchIndexResolver;
   /** Transactional email (job `email.send`). */
   email?: EmailSender;
+  /** Where feedback's pictures and videos are kept (jobs `feedback.send`, `feedback.file.purge`). */
+  feedbackBlobs?: BlobStore;
   /** Where emails get their pictures (`emailArtFor`); absent: from each link's own server. */
   emailArt?: EmailArt;
   /** Push to the phone app (job `push.send`); absent = push off. */
@@ -957,6 +961,14 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     // The team says hi in #general once it can work (ADR 0162).
     [TEAM_HELLO_JOB]: async (job) => {
       await sayTeamHello(deps, orgOf(job), job.payload);
+    },
+    [FEEDBACK_JOB]: async (job) => {
+      if (!deps.email) throw new PermanentJobError("no email sender configured");
+      await sendQueuedFeedback(deps.email, job.payload, deps.feedbackBlobs);
+    },
+    [FEEDBACK_FILE_PURGE_JOB]: async (job) => {
+      if (!deps.feedbackBlobs) throw new PermanentJobError("no file store configured");
+      await purgeFeedbackFile({ db: deps.db, blobs: deps.feedbackBlobs }, String(job.payload.id));
     },
     [PLAN_WAITING_JOB]: async (job) => {
       if (deps.emailArt) await sendPlanWaitingEmail(deps.db, deps.emailArt.home, orgOf(job), job.payload.step);

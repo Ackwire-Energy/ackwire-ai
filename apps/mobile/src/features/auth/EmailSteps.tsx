@@ -2,6 +2,7 @@ import { type InvitationPreview, useAuthConfig } from "@agenteschat/client";
 import { INVITATION_MAIL_HEADER, INVITATION_MAIL_PARAM, INVITATION_TOKEN_HEADER } from "@agenteschat/client/lib/guards";
 import { humanCheckHeaders, withHumanCheck } from "@agenteschat/client/lib/human-check";
 import { nameIsPassword, passwordState, webmailOf } from "@agenteschat/client/lib/text";
+import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Linking, View } from "react-native";
@@ -233,14 +234,20 @@ export function EmailSteps({
   };
 
   const first = firstName(name);
-  const calledYou = by ? t("invite.calledYou", { name: by, org }) : t("invite.calledYouNoName", { org });
+  // A personal workspace's words (ADR 0159): never its name ("Personal"), who invited instead.
+  const calledYou = by
+    ? t(modeKey(preview, "invite.calledYou"), { name: by, org })
+    : t(modeKey(preview, "invite.calledYouNoName"), { org });
   const providerNames = linked.map((p) => t(`auth.provider.${p}`)).join(" · ");
   const mailApp = webmailOf(invited);
   const bubble: Record<EmailStep, [string, string?]> = {
-    name: [by ? t("invite.hello", { name: by, org }) : t("invite.helloNoName", { org }), t("invite.nameLead")],
+    name: [
+      by ? t(modeKey(preview, "invite.hello"), { name: by, org }) : t(modeKey(preview, "invite.helloNoName"), { org }),
+      t(modeKey(preview, "invite.nameLead")),
+    ],
     newPassword: [
       first ? t("auth.flow.newPasswordNamed", { name: first }) : t("auth.flow.newPassword"),
-      t("invite.newPasswordLead", { org }),
+      t(modeKey(preview, "invite.newPasswordLead"), { org }),
     ],
     password: wrong ? [t("auth.flow.wrong")] : [calledYou, t("mobile.invite.join.passwordLead")],
     social:
@@ -252,7 +259,7 @@ export function EmailSteps({
   };
   const [title, lead] = bubble[step];
   const expression = wrong ? "cross" : wink ? "wink" : secret ? "closed" : step === "sent" ? "happy" : undefined;
-  const enterLabel = t("invite.enter", { org });
+  const enterLabel = t(modeKey(preview, "invite.enter"), { org });
   const passwordField = (fresh: boolean) => (
     <Locked when={pending} keepKeyboard>
       <PasswordField
@@ -284,7 +291,15 @@ export function EmailSteps({
           <LockedEmail email={invited} />
           <OrgLine
             agent={preview.agents?.[0]}
-            strong={preview.invitedBy ? t("invite.from", { name: preview.invitedBy }) : org}
+            strong={
+              isPersonal(preview)
+                ? preview.invitedBy
+                  ? t("invite.personalName", { name: preview.invitedBy })
+                  : t("invite.personalNameNoName")
+                : preview.invitedBy
+                  ? t("invite.from", { name: preview.invitedBy })
+                  : org
+            }
             text={crew ?? undefined}
           />
           <AuthField

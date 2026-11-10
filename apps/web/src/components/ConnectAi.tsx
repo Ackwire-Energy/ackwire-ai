@@ -29,15 +29,27 @@ import {
   mayConnectAi,
   type PlanChoice,
   type PlanGate,
+  planMark,
+  planTitle,
   signsInOnce,
 } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { providerGuess, providerLabel } from "@agenteschat/client/lib/providers";
 import { isRightHand, rightHandOf, rightHandOnKey, thinksWithLine } from "@agenteschat/client/lib/right-hand";
-import { Button, Dialog, DialogBody, DialogFooter, Spinner } from "@agenteschat/ui";
+import { Button, Dialog, DialogBody, DialogFooter, Icon, ProviderLogo, Spinner } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import type { TFunction } from "i18next";
+import {
+  type CSSProperties,
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 import {
   AiPicker,
@@ -54,6 +66,8 @@ import {
   usePlanHold,
 } from "@/components/ai/ConnectAiSteps";
 import { EndpointForm } from "@/components/ai/EndpointForm";
+import { ConnectChoices } from "@/components/arrival/ConnectChoices";
+import { sceneTeam, TeamScene, useDawn } from "@/components/arrival/TeamScene";
 import { useOrg } from "@/components/org-context";
 import { ProviderKeySelect } from "@/components/ProviderKey";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -95,6 +109,11 @@ export interface ConnectAiRequest {
    * stays).
    */
   forNewAgent?: boolean;
+  /**
+   * Opened right after the onboarding (ADR 0160): the team stands asleep beside the choices, which are cards in
+   * words, and wakes as the sky turns to day once an AI is connected. The plans' own steps are the same.
+   */
+  arrival?: boolean;
 }
 
 /** How "Responder agora" went for a message, in this tab. */
@@ -180,6 +199,10 @@ export function ConnectAiProvider({ children }: { children: ReactNode }) {
     </ConnectAiContext.Provider>
   );
 }
+
+/** A chosen plan's steps, named as its maker sells it; the key's, as the picker names it. */
+const stepTitle = (t: TFunction, choice: AiChoice) =>
+  choice === "key" ? t("connectAi.title.api_key") : planTitle(t, choice);
 
 function ConnectAiDialog({
   request,
@@ -284,6 +307,11 @@ function ConnectAiDialog({
   }));
   // Anything connected shows Done; only a saved key closes the key's field (after a plan, it's for the other agents).
   const [connected, setConnected] = useState(false);
+  // The arrival's stage: never over a billing hold, whose notice is the whole dialog.
+  const stage = request.arrival === true && !hold;
+  // Its first screen is the cards; a pick moves on to that plan's steps, and Back returns to the cards.
+  const [chosen, setChosen] = useState(false);
+  const day = useDawn(stage && connected);
   const [keySaved, setKeySaved] = useState(false);
   const [keyNote, setKeyNote] = useState<string>();
   const [refused, setRefused] = useState<ReturnType<typeof keyRefusal>>(null);
@@ -362,6 +390,202 @@ function ConnectAiDialog({
       params: { orgId: org.id, section: "devices" },
     });
   };
+  const keySelect = mayAddKey && !keySaved && (
+    <ProviderKeySelect
+      value={draft.provider}
+      disabled={add.isPending}
+      onChange={(provider) => setDraft((d) => ({ ...d, provider }))}
+    />
+  );
+  const panel =
+    choice === "key" ? (
+      <KeyPanel
+        draft={draft}
+        onDraft={setDraft}
+        locked={!mayAddKey}
+        saved={keySaved}
+        savedNote={keyNote}
+        refused={refused}
+        saving={add.isPending}
+        onSave={saveKey}
+        endpoint={
+          <EndpointForm
+            orgId={org.id}
+            onDone={() => {
+              setKeySaved(true);
+              done();
+            }}
+          />
+        }
+      />
+    ) : bare ? (
+      <PlanWithoutAgent
+        key={choice}
+        choice={choice}
+        gates={bareGates}
+        mayAddKey={mayAddKey}
+        onKey={() => setPicked("key")}
+        onComputer={toComputers}
+        onDone={() => {
+          void qc.invalidateQueries({ queryKey: keys.aiAccounts(org.id) });
+          done();
+        }}
+      />
+    ) : (
+      <PlanPanel
+        key={choice}
+        choice={choice}
+        gates={gates}
+        justReady={request.ready}
+        agents={agents}
+        all={all}
+        target={target}
+        onTarget={(next) => {
+          setPickedTarget(next);
+          setHeldReader(undefined);
+        }}
+        onStart={() => {
+          setPickedTarget(target);
+          setHeldReader(reader);
+        }}
+        locked={locked}
+        {...(login?.choice === choice ? { login } : {})}
+        onKey={() => {
+          setPicked("key");
+          setLogin(null);
+        }}
+        onComputer={toComputers}
+        onDone={(ids) => {
+          // The panel stays on whom it was for, saying it's done.
+          setPickedTarget(target);
+          setLinked((l) => ({ ...l, ...Object.fromEntries(ids.map((id) => [id, choice])) }));
+          done();
+        }}
+      />
+    );
+  const freeDone = bare && choice !== "key" && freePlanAccount(bareGates.accounts, choice);
+  if (stage) {
+    const ready = !(dir.loading || status.isPending);
+    const lead = rightHandOf(dir.agents);
+    const stepping = chosen && !connected;
+    return (
+      <Dialog
+        open
+        onOpenChange={(o) => !o && onClose()}
+        title={chosen ? stepTitle(t, choice) : t("arrival.connect.title")}
+        closeLabel={t("common.close")}
+        width={820}
+        bare
+        className="arrival arrival-connect"
+      >
+        <div className="arrival-stage">
+          <TeamScene
+            shape="tall"
+            quiet={0.22}
+            agents={sceneTeam(dir.agents, lead)}
+            lead={lead?.id}
+            asleep={!connected}
+            day={day}
+            expression={connected ? "happy" : undefined}
+          >
+            {chosen && (
+              <>
+                <span className="team-scene__trail" data-state={connected ? "done" : "walk"}>
+                  {[0, 1, 2, 3, 4].map((n) => (
+                    <i key={n} style={{ "--n": n } as CSSProperties} />
+                  ))}
+                </span>
+                <span className="team-scene__mark">
+                  {choice === "key" ? <Icon name="key" /> : <ProviderLogo id={planMark(choice)} size="tile" />}
+                </span>
+              </>
+            )}
+          </TeamScene>
+          <div className="arrival-stage__cap">
+            <b>{t(connected ? "arrival.stage.morning" : "arrival.stage.ready")}</b>
+            <span>{t(connected ? "arrival.stage.awake" : "arrival.stage.wake")}</span>
+          </div>
+        </div>
+        <div className="arrival-main">
+          <div className="ac-dialog__head ac-actrow">
+            {stepping && (
+              <span className="ac-dialog__lead">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  iconOnly
+                  icon="chevronLeft"
+                  aria-label={t("common.back")}
+                  onClick={() => {
+                    setChosen(false);
+                    setLogin(null);
+                  }}
+                />
+              </span>
+            )}
+            <span className="ac-dialog__title ac-actrow__text" aria-hidden="true">
+              {chosen ? stepTitle(t, choice) : t("arrival.connect.title")}
+            </span>
+            <span className="ac-dialog__acts ac-acts">
+              <Button
+                variant="ghost"
+                size="sm"
+                iconOnly
+                icon="close"
+                className="ac-btn--glyph"
+                aria-label={t("common.close")}
+                onClick={onClose}
+              />
+            </span>
+          </div>
+          {!chosen && <p className="ac-dialog__desc">{t("arrival.connect.text")}</p>}
+          <DialogBody>
+            {!ready ? (
+              <Spinner />
+            ) : chosen ? (
+              <div className="arrival-main__steps">
+                {choice === "key" && keySelect}
+                {panel}
+              </div>
+            ) : (
+              <ConnectChoices
+                mayAddKey={mayAddKey}
+                dims={(c) => (agents.length > 0 || bare) && gateDims(gateOf(c))}
+                onPick={(next) => {
+                  setPicked(next);
+                  setLogin(null);
+                  setChosen(true);
+                  if (next !== choice) setHeldReader(undefined);
+                }}
+              />
+            )}
+          </DialogBody>
+          {connected || (chosen && freeDone) ? (
+            <DialogFooter>
+              <Button variant="primary" onClick={onClose}>
+                {t("connectAi.done")}
+              </Button>
+            </DialogFooter>
+          ) : (
+            !chosen && (
+              <DialogFooter
+                note={
+                  <>
+                    <Icon name="info" />
+                    <span>{t("arrival.connect.without")}</span>
+                  </>
+                }
+              >
+                <Button variant="ghost" onClick={onClose}>
+                  {t("arrival.connect.later")}
+                </Button>
+              </DialogFooter>
+            )
+          )}
+        </div>
+      </Dialog>
+    );
+  }
   return (
     <Dialog
       open
@@ -429,87 +653,12 @@ function ConnectAiDialog({
             }}
             dims={(c) => (agents.length > 0 || bare) && gateDims(gateOf(c))}
             busy={add.isPending}
-            keySelect={
-              mayAddKey &&
-              !keySaved && (
-                <ProviderKeySelect
-                  value={draft.provider}
-                  disabled={add.isPending}
-                  onChange={(provider) => setDraft((d) => ({ ...d, provider }))}
-                />
-              )
-            }
-            panel={
-              choice === "key" ? (
-                <KeyPanel
-                  draft={draft}
-                  onDraft={setDraft}
-                  locked={!mayAddKey}
-                  saved={keySaved}
-                  savedNote={keyNote}
-                  refused={refused}
-                  saving={add.isPending}
-                  onSave={saveKey}
-                  endpoint={
-                    <EndpointForm
-                      orgId={org.id}
-                      onDone={() => {
-                        setKeySaved(true);
-                        done();
-                      }}
-                    />
-                  }
-                />
-              ) : bare ? (
-                <PlanWithoutAgent
-                  key={choice}
-                  choice={choice}
-                  gates={bareGates}
-                  mayAddKey={mayAddKey}
-                  onKey={() => setPicked("key")}
-                  onComputer={toComputers}
-                  onDone={() => {
-                    void qc.invalidateQueries({ queryKey: keys.aiAccounts(org.id) });
-                    done();
-                  }}
-                />
-              ) : (
-                <PlanPanel
-                  key={choice}
-                  choice={choice}
-                  gates={gates}
-                  justReady={request.ready}
-                  agents={agents}
-                  all={all}
-                  target={target}
-                  onTarget={(next) => {
-                    setPickedTarget(next);
-                    setHeldReader(undefined);
-                  }}
-                  onStart={() => {
-                    setPickedTarget(target);
-                    setHeldReader(reader);
-                  }}
-                  locked={locked}
-                  {...(login?.choice === choice ? { login } : {})}
-                  onKey={() => {
-                    setPicked("key");
-                    setLogin(null);
-                  }}
-                  onComputer={toComputers}
-                  onDone={(ids) => {
-                    // The panel stays on whom it was for, saying it's done.
-                    setPickedTarget(target);
-                    setLinked((l) => ({ ...l, ...Object.fromEntries(ids.map((id) => [id, choice])) }));
-                    done();
-                  }}
-                />
-              )
-            }
+            keySelect={keySelect}
+            panel={panel}
           />
         )}
       </DialogBody>
-      {(connected || (bare && choice !== "key" && freePlanAccount(bareGates.accounts, choice))) && (
+      {(connected || freeDone) && (
         <DialogFooter>
           <Button variant="primary" onClick={onClose}>
             {t("connectAi.done")}

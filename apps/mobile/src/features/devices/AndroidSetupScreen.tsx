@@ -1,11 +1,29 @@
 import type { PhoneDevice } from "@agenteschat/client";
 import { computerName } from "@agenteschat/client/lib/computer";
+import { wifiPairLive, wifiPairText } from "@agenteschat/client/lib/devices";
+import { errorText } from "@agenteschat/client/lib/errors";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import * as Device from "expo-device";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Linking, StyleSheet, View } from "react-native";
+import { Linking, StyleSheet, TextInput, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Button, GroupedFooter, GroupedList, GroupedRow, Icon, InkOrbit, Text, useTheme, useToast } from "@/ui";
+import {
+  Button,
+  CodeInput,
+  fieldText,
+  GroupedField,
+  GroupedFooter,
+  GroupedHeader,
+  GroupedList,
+  GroupedRow,
+  Icon,
+  InkOrbit,
+  Locked,
+  Text,
+  useTheme,
+  useToast,
+} from "@/ui";
 import { router } from "@/ui/navigation";
 import { Note, Step, StepsCard, StepText } from "../ai/parts";
 import { Gap, SettingsPage } from "../settings/parts";
@@ -14,7 +32,7 @@ import { pickOne } from "../shared/PickerSheet";
 import { goBack } from "../shared/parts";
 import { androidStage, phoneFacts, phoneHosts, reasonText, thisPhoneOn } from "./logic";
 import { ConnectedHero, DevicePortrait, PhoneNameField, useAudienceText } from "./parts";
-import { useDevices } from "./queries";
+import { useDevices, useWifiPairCode } from "./queries";
 
 /** Android's Settings screens, each with the row to light up (AOSP's `:settings:fragment_args_key`). */
 const SCREENS = {
@@ -39,7 +57,8 @@ function useHost(machineId: string | undefined) {
  * "Deixar agentes usarem este celular", on the Android phone itself: Developer options and USB debugging with buttons
  * that open those exact screens, then the cable into the computer, with a live line from what the computer reports
  * (not seen yet, waiting for Allow, ready), and Android's own prompt drawn in the app's language. Ready, it says so,
- * with the phone's name and who can use it. No cable: Wireless debugging, paired from Android Studio on the computer.
+ * with the phone's name and who can use it. No cable: Wireless debugging, then the QR agentes.chat shows on a
+ * computer, or the six-digit code typed here.
  */
 export function AndroidSetupScreen({ machineId }: { machineId?: string }) {
   const { t } = useTranslation();
@@ -48,8 +67,16 @@ export function AndroidSetupScreen({ machineId }: { machineId?: string }) {
   const { list, hosts, host, setPicked } = useHost(machineId);
   const [opened, setOpened] = useState({ about: false, usb: false, wifi: false });
   const [wifi, setWifi] = useState(false);
-  const hostName = host ? computerName(t, org?.name ?? "", { kind: host.machineKind, name: host.name }) : "";
-  const phone = host ? thisPhoneOn(host.phones, "android", Device.modelName) : null;
+  const [byCode, setByCode] = useState(false);
+  const pairing = useWifiPairCode(host?.id ?? null);
+  const hostName = host
+    ? computerName(t, org?.name ?? "", { kind: host.machineKind, name: host.name }, isPersonal(org))
+    : "";
+  const pairedId = pairing.pairing?.phoneId;
+  const phone = host
+    ? ((pairedId ? host.phones.find((p) => p.id === pairedId) : undefined) ??
+      thisPhoneOn(host.phones, "android", Device.modelName))
+    : null;
   const stage = androidStage(phone);
   if (host && phone && stage === "done") return <AndroidDone phone={phone} hostName={hostName} />;
 
@@ -175,18 +202,28 @@ export function AndroidSetupScreen({ machineId }: { machineId?: string }) {
                   onPress={() => open("wifi")}
                 />
               }
-            />
+            >
+              {seen || opened.wifi ? null : <StepText>{t("mobile.devices.android.wifi1Text")}</StepText>}
+            </Step>
             <Step
               n={2}
               divider
-              title={t("mobile.devices.android.wifi2", { host: hostName })}
+              title={t("mobile.devices.android.wifi2")}
+              hint={t("mobile.devices.android.wifi2Hint", { host: hostName })}
               state={seen ? "done" : opened.wifi ? "now" : "later"}
             >
-              <StepText>{t("mobile.devices.android.wifi2Text", { host: hostName })}</StepText>
-              {seen ? null : liveLine}
+              <StepText>{t("mobile.devices.android.wifi2Text")}</StepText>
+              {seen || byCode ? null : liveLine}
             </Step>
-            <Step n={3} divider title={t("mobile.devices.android.step4")} state={seen ? "now" : "later"} />
           </StepsCard>
+          <Gap />
+          {byCode ? (
+            <PairByCode pairing={pairing} hostName={hostName} />
+          ) : (
+            <GroupedList>
+              <GroupedRow icon="key" label={t("devices.wifiPair.useCode")} chevron onPress={() => setByCode(true)} />
+            </GroupedList>
+          )}
           <GroupedFooter>{t("mobile.devices.android.wifiNote")}</GroupedFooter>
         </View>
       ) : null}
@@ -205,6 +242,76 @@ export function AndroidSetupScreen({ machineId }: { machineId?: string }) {
         </>
       ) : null}
     </SettingsPage>
+  );
+}
+
+/**
+ * The six-digit way, typed on this phone: the address and the code Pair device with pairing code shows, sent to the
+ * computer, which pairs and connects; the line under them follows it, and a failure leaves both to fix and send again.
+ */
+function PairByCode({ pairing, hostName }: { pairing: ReturnType<typeof useWifiPairCode>; hostName: string }) {
+  const { t } = useTranslation();
+  const { colors: c } = useTheme();
+  const [address, setAddress] = useState("");
+  const [code, setCode] = useState("");
+  const p = pairing.pairing;
+  const busy = pairing.pending || wifiPairLive(p);
+  const failed = Boolean(pairing.error) || p?.state === "failed";
+  const ready = /^\S+:\d{1,5}$/.test(address.trim()) && /^\d{6}$/.test(code);
+  const line = pairing.error ? errorText(t, pairing.error) : p ? wifiPairText(t, p, hostName) : null;
+  const send = () => {
+    if (ready && !busy) pairing.pair({ address: address.trim(), code });
+  };
+  return (
+    <View style={styles.code}>
+      <Locked when={busy} style={styles.code}>
+        <View>
+          <GroupedHeader>{t("mobile.devices.android.codeHead")}</GroupedHeader>
+          <GroupedList>
+            <GroupedField label={t("devices.wifiPair.address")}>
+              <TextInput
+                value={address}
+                onChangeText={setAddress}
+                placeholder={t("devices.wifiPair.addressExample")}
+                placeholderTextColor={c.faint}
+                keyboardType="numbers-and-punctuation"
+                autoCapitalize="none"
+                autoCorrect={false}
+                spellCheck={false}
+                maxLength={80}
+                accessibilityLabel={t("devices.wifiPair.address")}
+                style={[fieldText("callout"), styles.input, { color: c.ink }]}
+              />
+            </GroupedField>
+          </GroupedList>
+        </View>
+        <View>
+          <GroupedHeader>{t("devices.wifiPair.pairingCode")}</GroupedHeader>
+          <CodeInput
+            length={6}
+            value={code}
+            onChange={setCode}
+            label={t("devices.wifiPair.pairingCode")}
+            error={failed}
+            onSubmit={send}
+          />
+          <GroupedFooter>{t("mobile.devices.android.codeNote")}</GroupedFooter>
+        </View>
+      </Locked>
+      {line ? (
+        <Note icon={failed ? "x" : <InkOrbit size={15} />} live>
+          {line}
+        </Note>
+      ) : null}
+      <Button
+        variant="primary"
+        wide
+        label={t("devices.wifiPair.pair")}
+        disabled={!ready || busy}
+        loading={busy}
+        onPress={send}
+      />
+    </View>
   );
 }
 
@@ -297,6 +404,8 @@ function AndroidDone({ phone: p, hostName }: { phone: PhoneDevice; hostName: str
 const styles = StyleSheet.create({
   block: { paddingHorizontal: 4, paddingTop: 16, gap: 12, alignItems: "flex-start" },
   steps: { paddingTop: 12 },
+  code: { gap: 16 },
+  input: { flex: 1, minWidth: 0, paddingVertical: 12, paddingHorizontal: 0 },
   dialog: { marginTop: 8, borderRadius: 20, paddingTop: 16, paddingHorizontal: 16, paddingBottom: 8, gap: 4 },
   check: {
     flexDirection: "row",

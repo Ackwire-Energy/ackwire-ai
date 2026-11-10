@@ -111,6 +111,7 @@ import {
 } from "@agenteschat/client/lib/plans";
 import { AUTO, apiProviderOf, isAuto, modelChoices, providerLabel } from "@agenteschat/client/lib/providers";
 import { cleanSite, SITE } from "@agenteschat/client/lib/sites";
+import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
 import {
   Button,
   Card,
@@ -168,6 +169,7 @@ import {
 } from "@/components/ThisMac";
 import { useComputerEdition } from "@/components/WorkspaceComputer";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useAdminsLock } from "@/hooks/usePersonalView";
 import { inDesktopApp } from "@/lib/desktop";
 import { limitOffers, modelLimitText, planMeterText, planWord } from "@/lib/plan-usage";
 import { useToast } from "@/lib/toast";
@@ -335,7 +337,7 @@ export function WorkCard({
         : ownSignInName(
             t,
             view?.ownSignIn === true && view.canUsePlans,
-            computerNameOf(t, org.name, view?.computer?.name ?? ""),
+            computerNameOf(t, org.name, view?.computer?.name ?? "", isPersonal(org)),
             kind === "model" ? undefined : kind,
           );
   // Near or at its plan's limit: said where the account is.
@@ -445,8 +447,14 @@ export function WorkCard({
       {machine && !machine.online && kind !== "model" && (
         <SettingNote icon="pause">
           {edition === "cloud"
-            ? t("agentPage.work.offlineCloud", { ...g, computer: computerNameOf(t, org.name, machine.name) })
-            : t("agentPage.work.offline", { ...g, computer: computerNameOf(t, org.name, machine.name) })}
+            ? t("agentPage.work.offlineCloud", {
+                ...g,
+                computer: computerNameOf(t, org.name, machine.name, isPersonal(org)),
+              })
+            : t("agentPage.work.offline", {
+                ...g,
+                computer: computerNameOf(t, org.name, machine.name, isPersonal(org)),
+              })}
           <ThisMacReconnect machineId={machine.machineId} />
         </SettingNote>
       )}
@@ -473,7 +481,7 @@ function DesktopUseNote({ machine: m }: { machine: Machine }) {
       <Icon name="computer" size={16} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <span style={{ display: "block" }}>
-          {t("desktop.use.agent", { ...g, computer: computerNameOf(t, org.name, m.name) })}
+          {t("desktop.use.agent", { ...g, computer: computerNameOf(t, org.name, m.name, isPersonal(org)) })}
         </span>
         <span className="small muted">{machineReasonText(t, use)}</span>
         {command && <CommandBlock command={command} />}
@@ -755,6 +763,7 @@ function BrainField({ label, children }: { label?: string; children: ReactNode }
 function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
+  const adminsOnly = useAdminsLock();
   const edition = useComputerEdition(org.id);
   const setupQ = useComputerSetup(org.id);
   const computerSetup = setupView(setupQ.data, setupQ.dataUpdatedAt);
@@ -833,7 +842,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   // Accounts live on the agent's computer: none when the brain moves elsewhere or the app there is old.
   const accountKind = kind === "model" ? null : kind;
   const accountsOn = accountKind !== null && view.accountsSupported && view.computer !== null && !moves;
-  const computerName = computerNameOf(t, org.name, view.computer?.name ?? "");
+  const computerName = computerNameOf(t, org.name, view.computer?.name ?? "", isPersonal(org));
   // What a sign-in just reported wins over the last fetch (an account signed in again shows active at once).
   const allAccounts = [
     ...view.accounts.map((v) => added.find((a) => a.id === v.id) ?? v),
@@ -1102,7 +1111,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                 ? t(owner ? "agentPage.work.saved.brainMovedOwner" : "agentPage.work.saved.brainMoved", {
                     ...g,
                     brain: brainName,
-                    computer: computerNameOf(t, org.name, moves.name),
+                    computer: computerNameOf(t, org.name, moves.name, isPersonal(org)),
                     owner,
                   })
                 : t(owner ? "agentPage.work.saved.brainOwner" : "agentPage.work.saved.brain", {
@@ -1192,14 +1201,14 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
         icon: "alert",
         text:
           edition === "cloud"
-            ? t("agentPage.work.brain.offCloud", { computer: computerNameOf(t, org.name, where.name) })
-            : t("agentPage.work.brain.off", { computer: computerNameOf(t, org.name, where.name) }),
+            ? t("agentPage.work.brain.offCloud", { computer: computerNameOf(t, org.name, where.name, isPersonal(org)) })
+            : t("agentPage.work.brain.off", { computer: computerNameOf(t, org.name, where.name, isPersonal(org)) }),
       };
     // Where the agent already works goes without saying: only a move changes something.
     if (where.machineId === work.machineId) return null;
     return {
       icon: "computer",
-      text: t("agentPage.work.brain.moves", { computer: computerNameOf(t, org.name, where.name) }),
+      text: t("agentPage.work.brain.moves", { computer: computerNameOf(t, org.name, where.name, isPersonal(org)) }),
     };
   };
   const reason = (c: AiChoice) => {
@@ -1210,7 +1219,9 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     if (!o?.reason) return null;
     // The Cloud's agent without a computer yet gets the workspace's own: the plan signs in there once it's ready.
     if (o.reason === "no_computer" && edition === "cloud")
-      return t("brain.reasons.no_computerCloud", { computer: t("computerSetup.title", { org: org.name }) });
+      return t("brain.reasons.no_computerCloud", {
+        computer: t(modeKey(org, "computerSetup.titleInSentence"), { org: org.name }),
+      });
     // The card names the plan: the line names the program on the computer that can't run it, as the plan's panel.
     return (
       gateLine(t, {
@@ -1224,7 +1235,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     );
   };
   const chosenSide = side(card);
-  const whereName = computerNameOf(t, org.name, home?.name ?? "");
+  const whereName = computerNameOf(t, org.name, home?.name ?? "", isPersonal(org));
   const keyChoices = keyOptions(
     t,
     credentials.data ?? [],
@@ -1499,7 +1510,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       {copyRow}
     </>
   ) : (
-    <SettingNote icon="lock">{t("agentPage.lock.admins")}</SettingNote>
+    <SettingNote icon="lock">{adminsOnly}</SettingNote>
   );
   return (
     <Dialog
@@ -2077,7 +2088,9 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
         chosen || workspace
           ? t("agentPage.work.saved.computer", {
               ...g,
-              computer: chosen ? computerNameOf(t, org.name, chosen.name) : noComputer.label("workspace"),
+              computer: chosen
+                ? computerNameOf(t, org.name, chosen.name, isPersonal(org))
+                : noComputer.label("workspace"),
             })
           : t("agentPage.work.saved.none", g),
       );
@@ -2173,7 +2186,9 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
         busy={busy}
         primary={
           chosen
-            ? t("agentPage.work.computer.useMachine", { computer: computerNameOf(t, org.name, chosen.name) })
+            ? t("agentPage.work.computer.useMachine", {
+                computer: computerNameOf(t, org.name, chosen.name, isPersonal(org)),
+              })
             : workspace
               ? t("agentPage.work.computer.useMachine", { computer: noComputer.label("workspace") })
               : t("agentPage.work.use")
@@ -2268,7 +2283,9 @@ function BrowserForm({ onClose }: { onClose: () => void }) {
           : on === work.granted
             ? t("agentPage.work.saved.sites")
             : where && !ready(where)
-              ? t("agentPage.work.saved.browserWaiting", { computer: computerNameOf(t, org.name, where.name) })
+              ? t("agentPage.work.saved.browserWaiting", {
+                  computer: computerNameOf(t, org.name, where.name, isPersonal(org)),
+                })
               : t("agentPage.work.saved.browserOn", g),
       );
       onClose();
@@ -2364,14 +2381,17 @@ function BrowserForm({ onClose }: { onClose: () => void }) {
             {!admin && <SettingNote icon="lock">{t("agentPage.work.browserDialog.admins")}</SettingNote>}
             {moveTo && (
               <SettingNote icon="arrowRight" live>
-                {t("agentPage.work.browserDialog.moves", { ...g, computer: computerNameOf(t, org.name, moveTo.name) })}
+                {t("agentPage.work.browserDialog.moves", {
+                  ...g,
+                  computer: computerNameOf(t, org.name, moveTo.name, isPersonal(org)),
+                })}
               </SettingNote>
             )}
             {noComputer && (
               <SettingNote icon="alert">
                 {edition === "cloud"
                   ? t("agentPage.work.browserDialog.noComputerCloud", {
-                      computer: t("computerSetup.title", { org: org.name }),
+                      computer: t(modeKey(org, "computerSetup.titleInSentence"), { org: org.name }),
                     })
                   : t("agentPage.work.browserDialog.noComputer")}
               </SettingNote>

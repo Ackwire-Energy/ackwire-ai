@@ -4,6 +4,7 @@ import {
   deviceName,
   findPhone,
   osName,
+  personInControl,
   phoneLink,
   phoneSystem,
   statusLook,
@@ -13,6 +14,7 @@ import { errorText } from "@agenteschat/client/lib/errors";
 import { clockAt } from "@agenteschat/client/lib/format";
 import { isPaused } from "@agenteschat/client/lib/machines";
 import { can } from "@agenteschat/client/lib/permissions";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import {
   Avatar,
   Button,
@@ -40,6 +42,7 @@ import { OrgMark } from "@/components/ProfilePhoto";
 import { useToast } from "@/lib/toast";
 import { ConnectDialog, type ConnectStart } from "./ConnectDialog";
 import { DeviceRemoveDialog, DeviceRenameDialog, DeviceRowView, type DeviceTarget } from "./DevicesSection";
+import { PhoneLive } from "./PhoneLive";
 import { DevicePortrait, Facts, StatusPill, useOwner } from "./parts";
 import { useDevices, useStopPhone, useUpdateComputer, useUpdatePhone } from "./queries";
 import { WhoCanUseRow } from "./WhoCanUse";
@@ -126,8 +129,9 @@ function Head({
 /** Whose it is, as a chip: a person's face and name, or the workspace's mark. */
 function OwnerChip({ userId }: { userId: string | null }) {
   const { t } = useTranslation();
-  const { org } = useOrg();
-  const owner = useOwner(userId);
+  const { org, me } = useOrg();
+  // A personal workspace names no workspace (ADR 0159): a device of nobody in particular is its person's.
+  const owner = useOwner(userId ?? (isPersonal(org) ? me.user.id : null));
   return owner ? (
     <Chip lead={<Avatar kind="person" size="xs" name={owner.name} imageUrl={owner.image} />}>{owner.name}</Chip>
   ) : (
@@ -165,7 +169,10 @@ const TOOL_ORDER = ["java", "androidSdk", "adb", "git", "xcode", "node", "maestr
 function Toolchains({ tools }: { tools: Record<string, string> }) {
   const { t } = useTranslation();
   const say = t as unknown as (key: string, options: Record<string, string>) => string;
-  const found = Object.keys(tools).sort((a, b) => TOOL_ORDER.indexOf(a) - TOOL_ORDER.indexOf(b));
+  // The Apple Account that signs the iPhone helper is no tool: the iPhone guide shows it.
+  const found = Object.keys(tools)
+    .filter((k) => k !== "appleTeam")
+    .sort((a, b) => TOOL_ORDER.indexOf(a) - TOOL_ORDER.indexOf(b));
   return (
     <span className="dv-tools">
       {found.map((k) => {
@@ -414,7 +421,11 @@ function PhonePage({ phoneId }: { phoneId: string }) {
   const { phone: p, host } = found;
   const target: DeviceTarget = { kind: "phone", device: p };
   const owner = p.ownerUserId === me.user.id;
-  const canStop = p.status.kind === "in_use" && (p.mayManage || p.status.userId === me.user.id);
+  // A person in control gives it back on its screen instead.
+  const canStop =
+    p.status.kind === "in_use" &&
+    personInControl(p.status) !== me.user.id &&
+    (p.mayManage || p.status.userId === me.user.id);
   const action =
     p.status.kind === "in_use" && canStop ? (
       <Button
@@ -494,6 +505,7 @@ function PhonePage({ phoneId }: { phoneId: string }) {
         <StatusLine status={p.status} host={host.name} action={action} />
         <Facts facts={facts} />
       </Card>
+      <PhoneLive key={p.id} phone={p} host={host.name} />
       <Card aria-label={t("devices.sharing")}>
         <div className="settings-rows">
           {p.audience ? (

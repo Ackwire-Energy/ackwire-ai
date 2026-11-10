@@ -12,6 +12,7 @@ import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiStateOf, noAiCardOf } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { introCards, introLeadKey, isRightHand, offersTeamSetup } from "@agenteschat/client/lib/right-hand";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import { AgentSticker, EventPillAction, Message, MessageText, WAVE_SECONDS } from "@agenteschat/ui";
 import { useTranslation } from "react-i18next";
 import { MESSAGE_STICKER } from "@/chat/ChatMedia";
@@ -34,10 +35,10 @@ import { useToast } from "@/lib/toast";
  * any AI is connected: its greeting, then, for the workspace's owners, the first-run checklist (ADR 0155 §6), whose
  * rows hold the whole setup. Anyone else gets one card at a time (`introCards`): Connect AI while there is none, then
  * how agents talk to them (ADR 0147); the owner gets that question once the checklist is complete and the team answered
- * them once, so it never stands beside the first task. With no card left,
- * a line to build the team with it, at any time. On the person's first visit, its waving sticker under the greeting,
- * drawn as a sticker message is and decorative (the greeting already says hello). Its face and name open the profile
- * card, as on any message.
+ * them once, so it never stands beside the first task. With no card left, a line to build the team with it, at any
+ * time; a personal workspace's words speak of one person's agents (ADR 0159). On the person's first visit, its waving
+ * sticker under the greeting, drawn as a sticker message is and decorative (the greeting already says hello). Its face
+ * and name open the profile card, as on any message.
  */
 export function RightHandIntro({ agent, channelId }: { agent: Agent; channelId: string }) {
   const { t, i18n } = useTranslation();
@@ -87,9 +88,9 @@ export function RightHandIntro({ agent, channelId }: { agent: Agent; channelId: 
         {/* The wrapper a typed message's Markdown has (MessageBody): without it, a paragraph keeps the browser's margins. */}
         <div className="md md--message">
           <p>
-            <b>{t("rightHand.intro.greeting", agentGrammar(agent.name))}</b>
+            <b>{t(modeKey(org, "rightHand.intro.greeting"), agentGrammar(agent.name))}</b>
           </p>
-          <p>{t(introLeadKey(held, team.length > 0))}</p>
+          <p>{t(modeKey(org, introLeadKey(held, team.length > 0)))}</p>
         </div>
       </MessageText>
       {wave && (
@@ -109,18 +110,18 @@ export function RightHandIntro({ agent, channelId }: { agent: Agent; channelId: 
               {t("rightHand.intro.connect.action")}
             </EventPillAction>
           }
-          below={<p>{t("rightHand.intro.connect.text")}</p>}
+          below={<p>{t(modeKey(org, "rightHand.intro.connect.text"))}</p>}
         >
-          {t("rightHand.intro.connect.title")}
+          {t(modeKey(org, "rightHand.intro.connect.title"))}
         </RequestOpen>
       )}
-      <FirstRunCard agent={agent} />
+      <FirstRunCard agent={agent} channelId={channelId} />
       {cards.includes("style") && <StyleCard agent={agent} />}
       {offersTeamSetup({ noAi, aiKnown, createsAgents, hasTeam: team.length > 0, cards, held, checklist }) && (
         <p className="rh-intro__again small muted">
-          {t("rightHand.intro.again.question")}{" "}
-          <TextAction onClick={() => actions?.resend(t("rightHand.intro.again.message"))}>
-            {t("rightHand.intro.again.action")}
+          {t(modeKey(org, "rightHand.intro.again.question"))}{" "}
+          <TextAction onClick={() => actions?.resend(t(modeKey(org, "rightHand.intro.again.message")))}>
+            {t(modeKey(org, "rightHand.intro.again.action"))}
           </TextAction>
         </p>
       )}

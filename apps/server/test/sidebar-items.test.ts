@@ -1,5 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import {
+  PERSONAL_SIDEBAR_ITEMS,
+  PERSONAL_SIDEBAR_SECTIONS,
   SIDEBAR_COUNTED,
   SIDEBAR_ITEMS,
   SIDEBAR_SECTIONS,
@@ -13,7 +15,10 @@ import {
 import {
   SIDEBAR_COUNTED as APP_COUNTED,
   SIDEBAR_ITEMS as APP_ITEMS,
+  PERSONAL_SIDEBAR_ITEMS as APP_PERSONAL_ITEMS,
+  PERSONAL_SIDEBAR_SECTIONS as APP_PERSONAL_SECTIONS,
   SIDEBAR_SECTIONS as APP_SECTIONS,
+  PERSONAL_SIDEBAR_DEFAULTS,
   SIDEBAR_DEFAULTS,
 } from "../../../packages/client/src/lib/sidebar-items";
 import { browser, createTestServer, joinByInvitation, signUp, type TestServer } from "./harness";
@@ -27,6 +32,19 @@ test("the sidebar's tools: the engine and the apps know the same ones, and the a
   expect([...APP_SECTIONS]).toEqual([...SIDEBAR_SECTIONS]);
   for (const [item, place] of Object.entries(SIDEBAR_DEFAULTS))
     expect(sidebarPlaceAllowed(item as SidebarItem, place)).toBe(true);
+});
+
+test("a personal workspace's defaults (ADR 0159): the engine and the apps agree, every tool once, places it takes", () => {
+  expect([...APP_PERSONAL_ITEMS]).toEqual([...PERSONAL_SIDEBAR_ITEMS]);
+  expect([...APP_PERSONAL_SECTIONS]).toEqual([...PERSONAL_SIDEBAR_SECTIONS]);
+  expect([...PERSONAL_SIDEBAR_ITEMS].sort()).toEqual([...SIDEBAR_ITEMS].sort());
+  expect([...PERSONAL_SIDEBAR_SECTIONS].sort()).toEqual([...SIDEBAR_SECTIONS].sort());
+  for (const [item, place] of Object.entries(PERSONAL_SIDEBAR_DEFAULTS))
+    expect(sidebarPlaceAllowed(item as SidebarItem, place)).toBe(true);
+  // A stored order still wins; nothing stored reads as the given default.
+  expect(sidebarOrderOf(undefined, PERSONAL_SIDEBAR_SECTIONS)).toEqual([...PERSONAL_SIDEBAR_SECTIONS]);
+  expect(sidebarOrderOf([...SIDEBAR_SECTIONS], PERSONAL_SIDEBAR_SECTIONS)).toEqual([...SIDEBAR_SECTIONS]);
+  expect(sidebarToolOrderOf(undefined, PERSONAL_SIDEBAR_ITEMS)).toEqual([...PERSONAL_SIDEBAR_ITEMS]);
 });
 
 test("a stored tools' order is never trusted as is: unknown tools dropped, repeats once, new tools at the end", () => {
@@ -293,4 +311,32 @@ test("the sidebar view: each person's own, per workspace, beside the tools' plac
   // Someone else keeps their own.
   const member = await joinByInvitation(t, owner, orgId, "member@example.com");
   expect(await view(member)).toEqual({ agentSort: "workspace", showAllAgents: false, pins: null });
+});
+
+test("a personal workspace reads its own default orders (ADR 0159); a saved order stays, the team's included", async () => {
+  t = await createTestServer();
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const orgId = await workspace(owner, "Acme");
+  const sidebar = `/api/app/organizations/${orgId}/me/sidebar`;
+  const read = async (path: string) => ((await (await owner(path)).json()) as { order: unknown }).order;
+  const setMode = (mode: string) =>
+    owner(`/api/app/organizations/${orgId}/settings`, { method: "PATCH", json: { mode } });
+
+  expect((await setMode("personal")).status).toBe(200);
+  expect(await read(`${sidebar}/order`)).toEqual([...PERSONAL_SIDEBAR_SECTIONS]);
+  expect(await read(`${sidebar}/tools`)).toEqual([...PERSONAL_SIDEBAR_ITEMS]);
+
+  // The agents under the channels, as a team has them, is a choice here: it stays.
+  await owner(`${sidebar}/order`, { method: "PUT", json: { order: [...SIDEBAR_SECTIONS] } });
+  expect(await read(`${sidebar}/order`)).toEqual([...SIDEBAR_SECTIONS]);
+  // Back to the default: the personal one.
+  expect(await (await owner(`${sidebar}/order`, { method: "PUT", json: { order: null } })).json()).toEqual({
+    order: [...PERSONAL_SIDEBAR_SECTIONS],
+  });
+
+  // A team again: the team's defaults, for what nobody saved.
+  expect((await setMode("team")).status).toBe(200);
+  expect(await read(`${sidebar}/order`)).toEqual([...SIDEBAR_SECTIONS]);
+  expect(await read(`${sidebar}/tools`)).toEqual([...SIDEBAR_ITEMS]);
 });

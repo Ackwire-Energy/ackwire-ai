@@ -6,7 +6,10 @@ import type {
   DeviceAudience,
   DeviceStatus,
   PhoneDevice,
+  WifiPairing,
 } from "../api/types";
+import { DESKTOP_CLOSE, type DesktopMode, type DesktopRetry } from "../desktop";
+import { type SocketBase, socketUrl } from "../realtime/connection";
 import { clockAt, firstName } from "./format";
 import { computerKind } from "./machines";
 import { norm as fold } from "./tool-review";
@@ -39,8 +42,11 @@ export const statusLook = (s: DeviceStatus): StatusLook =>
 /** The pill's words: the state only ("In use by Lia", "Busy 1/1"); the rest goes beside it (`statusDetail`). */
 export function statusPill(t: TFunction, s: DeviceStatus): string {
   switch (s.kind) {
-    case "in_use":
-      return s.agentName ? t("devices.status.inUseBy", { name: s.agentName }) : t("devices.status.inUse");
+    case "in_use": {
+      // A person in control of its screen has no agent: the pill names them.
+      const name = s.agentName ?? (s.agentId === null && s.userName ? firstName(s.userName) : null);
+      return name ? t("devices.status.inUseBy", { name }) : t("devices.status.inUse");
+    }
     case "busy":
       return t("devices.status.busy", { running: s.running, max: s.max });
     case "needs_you":
@@ -70,6 +76,9 @@ const REASONS = new Set([
   "device_support",
   "helper_missing",
   "helper_expired",
+  "apple_account_missing",
+  "team_limit",
+  "helper_untrusted",
   "booting",
   "no_driver",
   "os_too_old",
@@ -96,7 +105,7 @@ export function statusDetail(
   const now = options.now ?? new Date();
   switch (s.kind) {
     case "in_use":
-      return s.userName
+      return s.userName && s.agentId !== null
         ? t("devices.detail.forSince", { name: firstName(s.userName), time: clockAt(locale, s.since, now) })
         : t("devices.detail.since", { time: clockAt(locale, s.since, now) });
     case "needs_you":
@@ -365,11 +374,38 @@ export function androidStage(host: ComputerDevice | undefined, known: ReadonlySe
   return { kind: "looking" };
 }
 
+/** How often a Wi-Fi pairing is asked where it stands while it runs. */
+export const WIFI_PAIR_POLL_MS = 1500;
+
+/** The computer still looks for the phone, pairs or connects it. */
+export const wifiPairLive = (p: Pick<WifiPairing, "state"> | undefined) =>
+  p?.state === "waiting" || p?.state === "pairing" || p?.state === "connecting";
+
+/** Computers a person may pair a phone with over Wi-Fi: ones they may manage that run as a person (not a server). */
+export const wifiHosts = (hosts: readonly ComputerDevice[]) =>
+  hosts.filter((h) => h.machineKind === "connected" && h.mayManage && !h.systemMode);
+
+/**
+ * The line a Wi-Fi pairing shows: where it is while it runs, else why it failed (the cause and the way out). A code
+ * the phone refused reads differently from a pairing it stopped.
+ */
+export function wifiPairText(t: TFunction, p: Pick<WifiPairing, "state" | "reason" | "way">, computer: string) {
+  if (p.state === "failed") {
+    const reason = p.reason === "refused" && p.way === "code" ? "refusedCode" : (p.reason ?? "failed");
+    return say(t, `devices.wifiPair.fail.${reason}`, {
+      computer,
+      defaultValue: say(t, "devices.wifiPair.fail.failed"),
+    });
+  }
+  return say(t, `devices.wifiPair.${p.state === "connected" ? "connecting" : p.state}`);
+}
+
 export type StepState = "done" | "current" | "waiting" | "needs";
 
 export const IPHONE_STEPS = [
   "xcode",
   "tools",
+  "account",
   "connected",
   "trust",
   "developerMode",
@@ -388,6 +424,9 @@ const IPHONE_REASON: Record<string, IphoneStep> = {
   ui_automation_off: "uiAutomation",
   helper_missing: "helper",
   helper_expired: "helper",
+  apple_account_missing: "account",
+  team_limit: "helper",
+  helper_untrusted: "helper",
 };
 
 /** The iPhone a Mac reaches (a real one first), for the iPhone guide. */
@@ -396,7 +435,8 @@ export const iphoneOf = (host: ComputerDevice | undefined) =>
 
 /**
  * The iPhone guide's checklist, mirrored from what the Mac reports: steps before the phone's reason are done, that
- * one is current (amber when only the person can do it), the rest wait. No Xcode on the Mac stops at step one.
+ * one is current (amber when only the person can do it), the rest wait. No Xcode on the Mac stops at step one; with
+ * no iPhone plugged in yet, the Apple Account comes from what the Mac found in Xcode.
  */
 export function iphoneSteps(
   host: ComputerDevice | undefined,
@@ -405,18 +445,22 @@ export function iphoneSteps(
   let at: IphoneStep | null;
   let needs = false;
   if (!phone) {
-    at = host?.toolchains.xcode ? "connected" : "xcode";
-    needs = at === "xcode";
+    at = !host?.toolchains.xcode ? "xcode" : !host.toolchains.appleTeam ? "account" : "connected";
+    needs = at !== "connected";
   } else if (phone.status.kind === "needs_you" || phone.status.kind === "preparing") {
     at = IPHONE_REASON[phone.status.reason] ?? "helper";
-    needs = phone.status.kind === "needs_you" && at !== "helper";
+    // While the Mac builds or renews the test helper the phone is preparing; needs_you there means it failed.
+    needs = phone.status.kind === "needs_you";
   } else {
     at = null;
   }
   const index = at ? IPHONE_STEPS.indexOf(at) : IPHONE_STEPS.length;
-  return Object.fromEntries(
+  const states = Object.fromEntries(
     IPHONE_STEPS.map((id, i) => [id, i < index ? "done" : i > index ? "waiting" : needs ? "needs" : "current"]),
   ) as Record<IphoneStep, StepState>;
+  // The Mac looks for the Apple Account only once the iPhone is plugged in, trusted and in Developer Mode.
+  if (phone && at === "account") states.connected = states.trust = states.developerMode = "done";
+  return states;
 }
 
 // ── In the chat and the inbox ───────────────────────────────────────────────
@@ -567,6 +611,206 @@ export function waitEndedText(t: TFunction, w: DeviceWait, owner?: string | null
     default:
       return t("devices.wait.ended.left", { deviceName });
   }
+}
+
+// ── A phone's screen, live ───────────────────────────────────────────────────
+
+/** What a phone's live screen shows. */
+export type PhoneScreenState =
+  | "connecting"
+  | "live"
+  /** Its computer is offline, or it doesn't see the phone now (opens again by itself). */
+  | "offline"
+  /** As many people watch as it takes, or too many opens in a minute (opens again by itself). */
+  | "busy"
+  /** The phone needs its person first (unauthorized, replugged): opens again by itself. */
+  | "notReady"
+  | "forbidden"
+  /** The agentes.chat app on its computer is too old for this. */
+  | "outdated"
+  /** Its computer can't show it (no adb, no Xcode, an iPhone without the test helper), or it's gone. */
+  | "unavailable"
+  /** It closed for good: only Try again opens it. */
+  | "ended";
+
+/** Why control was refused, or ended: the screen opens again as a watcher and says so. */
+export type PhoneControlRefusal = "in_use" | "someone" | "unsupported" | "paused" | "held" | "lost";
+
+/** The most text one `text` frame carries (mirror of `PHONE_VIEW.text` in `@agenteschat/adapters`). */
+export const PHONE_TEXT_MAX = 2000;
+
+/** A person's socket to a phone's screen. `text`: its pictures as base64 text frames (the phone app). */
+export function phoneScreenUrl(
+  base: SocketBase,
+  v: { orgId: string; phoneId: string; mode: DesktopMode; text?: boolean },
+) {
+  const params: Record<string, string | number> = { orgId: v.orgId, phoneId: v.phoneId, mode: v.mode };
+  if (v.text) params.text = 1;
+  return socketUrl(base, "/api/phone-screen", params);
+}
+
+/** What a phone screen socket's close means (`reason`: the server's, or the computer's error code). */
+export function phoneCloseState(
+  code: number,
+  reason = "",
+): { state: PhoneScreenState; retry: DesktopRetry; control?: PhoneControlRefusal } {
+  const watchAgain = (control: PhoneControlRefusal) => ({
+    state: "connecting" as const,
+    retry: "now" as const,
+    control,
+  });
+  switch (code) {
+    case DESKTOP_CLOSE.controlEnded:
+      return watchAgain(reason === "in_use" ? "in_use" : reason === "someone_in_control" ? "someone" : "lost");
+    case DESKTOP_CLOSE.forbidden:
+      return { state: "forbidden", retry: "never" };
+    case DESKTOP_CLOSE.notFound:
+      return { state: "unavailable", retry: "never" };
+    case DESKTOP_CLOSE.tooMany:
+      return { state: "busy", retry: "later" };
+    case DESKTOP_CLOSE.unreachable:
+      return { state: "offline", retry: "later" };
+    case DESKTOP_CLOSE.normal:
+      return { state: "ended", retry: "never" };
+    case DESKTOP_CLOSE.refused:
+      if (reason === "unsupported") return watchAgain("unsupported");
+      if (reason === "machine_paused") return watchAgain("paused");
+      // The workspace is on hold: nothing new starts on its computers, control included.
+      if (reason === "held") return watchAgain("held");
+      if (reason === "phone_busy") return watchAgain("someone");
+      if (reason === "phone_missing") return { state: "offline", retry: "later" };
+      if (reason === "phone_not_ready") return { state: "notReady", retry: "later" };
+      if (reason === "runner_outdated") return { state: "outdated", retry: "never" };
+      if (reason === "tool_missing" || reason === "bad_request") return { state: "unavailable", retry: "never" };
+      return { state: "connecting", retry: "later" };
+    default:
+      return { state: "connecting", retry: "later" };
+  }
+}
+
+/** Whether the phone can't show now by its state: offline, or waiting on its person (a lock screen shows, though). */
+export const phoneScreenAway = (p: PhoneDevice) =>
+  p.status.kind === "offline" ||
+  p.status.kind === "preparing" ||
+  p.status.kind === "unsupported" ||
+  (p.status.kind === "needs_you" && p.status.reason !== "locked");
+
+/** What covers a phone's screen while it can't show live: the cause, and Try again when only the person can. */
+export interface PhoneScreenCover {
+  title: string;
+  text?: string;
+  /** It opens again by itself. */
+  spinner?: boolean;
+  retry?: boolean;
+}
+
+export function phoneScreenCover(
+  t: TFunction,
+  view: PhoneScreenState,
+  p: PhoneDevice,
+  host: string,
+): PhoneScreenCover | null {
+  const name = p.name;
+  const st = p.status;
+  const offline = { title: t("devices.screen.offline", { name }), text: t("devices.screen.offlineText", { host }) };
+  const forbidden = { title: t("devices.screen.forbidden"), text: t("devices.screen.forbiddenText", { name }) };
+  if (st.kind === "offline") return offline;
+  if (phoneScreenAway(p)) {
+    const reason = st.kind === "needs_you" || st.kind === "preparing" || st.kind === "unsupported" ? st.reason : "";
+    return { title: t("devices.screen.notReady", { name }), text: fixText(t, reason) };
+  }
+  if (!p.mayUse) return forbidden;
+  switch (view) {
+    case "live":
+      return null;
+    case "connecting":
+      return { title: t("devices.screen.opening"), spinner: true };
+    case "offline":
+      return { ...offline, spinner: true };
+    case "busy":
+      return { title: t("devices.screen.busy"), text: t("devices.screen.busyText"), spinner: true };
+    case "notReady":
+      return { title: t("devices.screen.notReady", { name }), text: t("devices.screen.notReadyText"), spinner: true };
+    case "forbidden":
+      return forbidden;
+    case "outdated":
+      return {
+        title: t("devices.screen.outdated", { host }),
+        text: t("devices.screen.outdatedText", { host }),
+        retry: true,
+      };
+    case "unavailable":
+      return {
+        title: t("devices.screen.unavailable"),
+        text:
+          p.platform === "ios" && p.phoneKind === "device"
+            ? t("devices.screen.needsHelper")
+            : t("devices.screen.unavailableText", { host }),
+        retry: true,
+      };
+    default:
+      return { title: t("devices.screen.ended"), retry: true };
+  }
+}
+
+/** The words for control refused, or ended, as `phoneCloseState` says it (`agent`: who holds the phone). */
+export function controlRefusalText(
+  t: TFunction,
+  why: PhoneControlRefusal,
+  v: { name: string; host: string; agent: string },
+): string {
+  switch (why) {
+    case "in_use":
+      return t("devices.screen.noTake", { agent: v.agent });
+    case "someone":
+      return t("devices.screen.someone", { name: v.name });
+    case "unsupported":
+      return t("devices.screen.unsupported");
+    case "paused":
+      return t("devices.screen.paused", { host: v.host });
+    case "held":
+      return t("devices.screen.held");
+    default:
+      return t("devices.screen.lost", { name: v.name });
+  }
+}
+
+/** Whether a phone's holder is a person in control of its screen (no agent, no run). */
+export const personInControl = (s: DeviceStatus) =>
+  s.kind === "in_use" && s.agentId === null && s.userId !== null ? s.userId : null;
+
+/**
+ * Who may take control of a phone's screen now, as the server decides it (`phoneStreamAccess`): one they may use,
+ * free or theirs, or held by an agent they may stop (its owner, an admin, or whom it works for). Another person in
+ * control keeps it.
+ */
+export function mayTakePhone(p: Pick<PhoneDevice, "mayUse" | "mayManage" | "status">, userId: string) {
+  if (!p.mayUse) return false;
+  const s = p.status;
+  if (s.kind !== "in_use") return true;
+  if (s.agentId === null) return s.userId === userId;
+  return p.mayManage || s.userId === userId;
+}
+
+/** A tap, or a swipe from where the finger (or the pointer) went down: a hold in place is a long press. */
+export function screenGesture(
+  from: { x: number; y: number; at: number },
+  to: { x: number; y: number; at: number },
+):
+  | { type: "tap"; x: number; y: number }
+  | { type: "swipe"; x1: number; y1: number; x2: number; y2: number; ms: number } {
+  const share = (v: number) => Math.min(1, Math.max(0, v));
+  const ms = Math.round(Math.min(5000, Math.max(1, to.at - from.at)));
+  const moved = Math.hypot(to.x - from.x, to.y - from.y) > 0.015;
+  if (!moved && ms < 500) return { type: "tap", x: share(from.x), y: share(from.y) };
+  return {
+    type: "swipe",
+    x1: share(from.x),
+    y1: share(from.y),
+    x2: share(to.x),
+    y2: share(to.y),
+    ms: Math.max(ms, 80),
+  };
 }
 
 export type DeviceNoticeKind = "device.join_request" | "device.in_use" | "device.access_request" | "device.waiting";

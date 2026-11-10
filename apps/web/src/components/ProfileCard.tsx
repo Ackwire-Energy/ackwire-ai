@@ -44,6 +44,7 @@ import { isRightHand, tellsNameStory } from "@agenteschat/client/lib/right-hand"
 import { rolesOf } from "@agenteschat/client/lib/roles";
 import { timezoneName } from "@agenteschat/client/lib/routines";
 import { picksForMe } from "@agenteschat/client/lib/routing";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import {
   Avatar,
   Button,
@@ -326,6 +327,9 @@ function PersonCard({ userId, onDone }: { userId: string; onDone: () => void }) 
   const roleIds = person?.roleIds ?? member?.roleIds ?? [];
   const held = rolesOf({ roleIds }, roles);
   const gives = can(org, "manage_members") && (!owner || org.role === "owner") && roles.some((r) => r.givable);
+  // A personal workspace's owner learns nothing from their own roles (ADR 0159): their card leaves them out; anyone
+  // else's keeps them, and the "+" to give one.
+  const ownRoles = isPersonal(org) && owner && userId === me.user.id;
   const setTo = (next: string[]) =>
     setRoles.mutate({ userId, roleIds: next }, { onError: (e) => toast.show(errorText(t, e), "error") });
   // The person's own zone (the API falls back to the workspace's).
@@ -371,7 +375,7 @@ function PersonCard({ userId, onDone }: { userId: string; onDone: () => void }) 
           </span>
         </div>
       )}
-      {(owner || held.length > 0 || gives) && (
+      {(owner || held.length > 0 || gives) && !ownRoles && (
         <section className="mcard__section" aria-label={t("profile.roles")}>
           <span className="mcard__label">{t("profile.roles")}</span>
           <div className="mcard__roles">

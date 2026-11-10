@@ -1,3 +1,4 @@
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { useCallback, useState } from "react";
 import { COMPACT_QUERY, DESKTOP_QUERY, useMediaQuery } from "@/components/NavDrawer";
 import { useOrg } from "@/components/org-context";
@@ -9,8 +10,9 @@ export const DM_SIDE_WIDE_QUERY = "(min-width: 1100px)";
 
 /**
  * A column on the right of a conversation: open by default at `openQuery`, closed below it, the person's last choice
- * in this workspace wins. At `sheetQuery` it isn't a column: it opens over the conversation, and stays only until it
- * closes.
+ * in this workspace wins. A personal workspace starts it closed at every width (ADR 0159 §3): only a choice never
+ * saved follows the mode, so a saved one (from either mode) still wins. At `sheetQuery` it isn't a column: it opens
+ * over the conversation, and stays only until it closes.
  */
 function useSideColumn(prefix: string, sheetQuery: string, openQuery: string) {
   const { org, me } = useOrg();
@@ -20,7 +22,8 @@ function useSideColumn(prefix: string, sheetQuery: string, openQuery: string) {
   // The key in the state: another workspace or person reads its own choice.
   const [saved, setSaved] = useState(() => ({ key, value: storage.get(key) }));
   const value = saved.key === key ? saved.value : storage.get(key);
-  const column = !compact && (value === null ? desktop : value === "1");
+  const byDefault = desktop && !isPersonal(org);
+  const column = !compact && (value === null ? byDefault : value === "1");
   const [sheet, setSheet] = useState(false);
   const toggle = useCallback(() => {
     if (compact) return setSheet((open) => !open);

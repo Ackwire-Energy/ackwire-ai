@@ -83,7 +83,8 @@ export function railStepAt(f: {
 /**
  * Where an onboarding stands, web and phone: its steps, the one its data reaches, how many are answered, and the step
  * to show, which is one the person went back to (`picked`) while it stays answered, else the one reached. Before the
- * workspace exists only the server's billing says whether a plan step will come.
+ * workspace exists only the server's billing says whether a plan step will come. A personal workspace (ADR 0159) has
+ * no steps once it exists: it opens, and its right hand's card holds the rest.
  */
 export function railState(f: {
   orgId: string | null;
@@ -92,15 +93,19 @@ export function railState(f: {
   context: string;
   team: number;
   picked: RailStep | null;
+  personal?: boolean;
 }) {
   const waitsForPlan = f.orgId ? billingHoldOf(f.standing) === "payment" : Boolean(f.billingUrl);
   const steps = railSteps(waitsForPlan);
-  const at = railStepAt({
-    created: f.orgId !== null,
-    context: f.context.trim() !== "",
-    team: f.team > 0,
-    waitsForPlan,
-  });
+  const at =
+    f.personal && f.orgId !== null
+      ? "open"
+      : railStepAt({
+          created: f.orgId !== null,
+          context: f.context.trim() !== "",
+          team: f.team > 0,
+          waitsForPlan,
+        });
   const reached = at === "open" ? steps.length : steps.indexOf(at);
   const back = f.picked ? steps.indexOf(f.picked) : -1;
   const step = back >= 0 && back < reached ? steps[back] : steps[Math.min(reached, steps.length - 1)];
@@ -113,5 +118,9 @@ export const firstJob = (
   routines: readonly Pick<Routine, "agentId" | "name">[] = [],
 ) => routines.find((r) => r.agentId === agent.id)?.name ?? agent.role;
 
-/** Where the workspace opens when the onboarding ends: #general, or its right hand's DM when the plan was left. */
-export const landingOf = (how: "paid" | "done" | "skipped") => (how === "skipped" ? "rightHand" : "general");
+/**
+ * Where the workspace opens when the onboarding ends: #general, or its right hand's DM when the plan was left. A
+ * personal workspace always opens in its right hand's DM, its card there (ADR 0159): its #general is out of sight.
+ */
+export const landingOf = (how: "paid" | "done" | "skipped", personal = false) =>
+  personal || how === "skipped" ? "rightHand" : "general";

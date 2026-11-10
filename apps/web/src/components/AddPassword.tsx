@@ -26,8 +26,8 @@ export function AddPasswordDialog({ open, onClose }: { open: boolean; onClose: (
   const [error, setError] = useState<string | null>(null);
   const [reauth, setReauth] = useState(false);
   const me = qc.getQueryData<Me | null>(keys.me);
-  // An account with a password: a new one in its place (ADR 0158).
-  const replaces = me?.user.hasPassword === true;
+  // An account with a password: a new one in its place (ADR 0158). Only `false` means none, as on its Sua conta row.
+  const replaces = me?.user.hasPassword !== false;
   useEffect(() => {
     if (!open) return;
     setPassword("");

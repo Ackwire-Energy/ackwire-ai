@@ -1,5 +1,5 @@
 {
-  "id": "f1090def-1856-46f9-886d-4940c2fe87d0",
+  "id": "ef0e915a-90a3-40e4-8a28-c65c6fef2a23",
   "prevId": "ddd26468-a5a4-45c7-883f-4bbf1d8f03c6",
   "version": "7",
   "dialect": "postgresql",
@@ -771,6 +771,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": true
+        },
+        "mode": {
+          "name": "mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'team'"
         },
         "updated_at": {
           "name": "updated_at",
@@ -5379,141 +5386,6 @@
           "nullsNotDistinct": false,
           "columns": [
             "installation_id"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.github_items": {
-      "name": "github_items",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "org_id": {
-          "name": "org_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "repo": {
-          "name": "repo",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "number": {
-          "name": "number",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "agent_id": {
-          "name": "agent_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "authored": {
-          "name": "authored",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "channel_id": {
-          "name": "channel_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "thread_id": {
-          "name": "thread_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "run_id": {
-          "name": "run_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "github_items_org_id_organizations_id_fk": {
-          "name": "github_items_org_id_organizations_id_fk",
-          "tableFrom": "github_items",
-          "tableTo": "organizations",
-          "columnsFrom": [
-            "org_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "github_items_channel_id_channels_id_fk": {
-          "name": "github_items_channel_id_channels_id_fk",
-          "tableFrom": "github_items",
-          "tableTo": "channels",
-          "columnsFrom": [
-            "channel_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "github_items_org_id_agent_id_agents_org_id_id_fk": {
-          "name": "github_items_org_id_agent_id_agents_org_id_id_fk",
-          "tableFrom": "github_items",
-          "tableTo": "agents",
-          "columnsFrom": [
-            "org_id",
-            "agent_id"
-          ],
-          "columnsTo": [
-            "org_id",
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "github_items_orgId_repo_number_unique": {
-          "name": "github_items_orgId_repo_number_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "org_id",
-            "repo",
-            "number"
           ]
         }
       },

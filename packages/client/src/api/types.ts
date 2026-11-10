@@ -86,6 +86,40 @@ export type PushDeviceInput =
   | { platform: "ios" | "android"; token: string; locale: string }
   | { platform: "web"; endpoint: string; keys: { p256dh: string; auth: string }; locale: string };
 
+/** What the feedback form sends (`POST /api/app/feedback`): `id` is made by the app, so a retry goes once. */
+export interface FeedbackInput {
+  id: string;
+  text: string;
+  /** The workspace the person is in. */
+  orgId?: string;
+  /** The screen they are on (a path), and the app that sends it. */
+  where?: string;
+  app?: string;
+  /** The thing the feedback is about (a right click's), and what it says, as the form showed it. */
+  about?: FeedbackAbout;
+  /** What the app knows of where the person is, label and value, as the form listed it. */
+  facts?: [string, string][];
+  /** Files added with `uploadFeedbackFile`. */
+  files?: string[];
+}
+
+export interface FeedbackAbout {
+  /** The app's own word for the thing: `message`, `card`, `button`… */
+  kind: string;
+  /** Its name on screen: an author, a title. */
+  label?: string;
+  text?: string;
+}
+
+/** A picture or a video added to the feedback being written (`POST /api/app/feedback/files`). */
+export interface FeedbackFile {
+  id: string;
+  name: string;
+  size: number;
+  kind: "image" | "video";
+  contentType: string;
+}
+
 export interface AuthConfig {
   socialProviders: { google: boolean; github: boolean; apple?: boolean };
   signupOpen: boolean;
@@ -99,6 +133,8 @@ export interface AuthConfig {
   privacyUrl?: string | null;
   /** Where people write to whoever runs this server (a workspace on hold or suspended); null: not given. */
   supportEmail?: string | null;
+  /** The server takes feedback (`POST /api/app/feedback`): the apps show the form; absent: a server too old to. */
+  feedback?: boolean;
   /** Every workspace gets a computer of its own (the Cloud); absent: a server too old to say. */
   workspaceComputer?: boolean;
   /** The billing service (ADR 0079): owners and admins open a workspace's plan there; null or absent: no billing. */
@@ -257,7 +293,16 @@ export interface OrgSummary {
   agentStyle?: AgentStyle | null;
   /** How conversations look to me here: only what I chose (`chatLookOf`); absent from an older server. */
   chatPrefs?: ChatPrefs;
+  /**
+   * Who the workspace is for (ADR 0159): `team` or `personal`. Read it with `isPersonal` (lib/workspace-mode); absent
+   * from an older server, which is a team's.
+   */
+  mode?: WorkspaceMode;
 }
+
+/** Who a workspace is for (ADR 0159): the server's `WORKSPACE_MODES`. */
+export const WORKSPACE_MODES = ["team", "personal"] as const;
+export type WorkspaceMode = (typeof WORKSPACE_MODES)[number];
 
 /** How agents talk to a person (ADR 0147): the server's `AGENT_STYLES`. */
 export const AGENT_STYLES = ["simple", "technical"] as const;
@@ -424,6 +469,11 @@ export interface InvitationPreview {
   kind?: "email" | "link";
   /** Who invited (their name), when known. */
   invitedBy?: string | null;
+  /**
+   * Who the workspace is for (ADR 0159): a personal one's page speaks of the person who invited, not of a team or of
+   * its name. Absent from an older server and on one that no longer works: a team's words.
+   */
+  mode?: WorkspaceMode;
   /**
    * The workspace's logo, served for this invitation or link only (absent without one, or while it is paused or
    * being deleted).
@@ -899,7 +949,7 @@ export interface TeamAgentDraft {
   line: string;
   instructions: string;
   appearance: Required<AgentLookInput> | null;
-  /** The channel it lives in, by name. */
+  /** The channel it lives in, by name; empty: it lives in its DM with the person (a personal template, ADR 0159). */
   channel: string;
   routines: ProposedRoutine[];
   firstTask: string | null;
@@ -2226,6 +2276,8 @@ export interface OrgSettings {
   gifsAvailable: boolean;
   /** Read only: this server can decide when agents send one (agents send none on their own without it). */
   agentMediaAvailable: boolean;
+  /** Who the workspace is for (ADR 0159); absent from an older server, which is a team's. */
+  mode?: WorkspaceMode;
 }
 
 /** `OrgSettings` the server works out itself: never in a PATCH. */
@@ -7536,6 +7588,31 @@ export interface ConnectLinkState {
   request?: DeviceJoinRequest;
   machineId?: string;
 }
+
+/** Pairing an Android phone over Wi-Fi with a computer: where it stands. */
+export interface WifiPairing {
+  id: string;
+  way: "qr" | "code";
+  state: "waiting" | "pairing" | "connecting" | "connected" | "failed";
+  /** Why it failed; `update`: the computer's agentes.chat is too old for it. */
+  reason?: WifiPairFailure;
+  /** Only when it starts: Android's QR text for Wireless debugging. */
+  qr?: string;
+  /** Connected: the phone in the devices list. */
+  phoneId?: string;
+  expiresAt: string;
+}
+
+export type WifiPairFailure =
+  | "mdns_off"
+  | "same_wifi"
+  | "refused"
+  | "timed_out"
+  | "outdated"
+  | "adb_missing"
+  | "canceled"
+  | "failed"
+  | "update";
 
 export interface ComputerDeviceInput {
   name?: string;

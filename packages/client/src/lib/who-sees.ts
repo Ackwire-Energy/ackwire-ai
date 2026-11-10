@@ -1,5 +1,7 @@
 import type { TFunction } from "i18next";
+import type { OrgSummary } from "../api/types";
 import { joinNames } from "./format";
+import { modeKey } from "./workspace-mode";
 
 /** Who something is for (ADR 0151): "only me" is a list of one, and administrators always see it. */
 export type AudienceChoice = { mode: "everyone" } | { mode: "people"; userIds: string[] };
@@ -33,15 +35,19 @@ export function wikiAudienceOf(next: AudienceChoice, roleIds: string[], kind: Au
   return { roleIds: kind === "me" ? [] : roleIds, userIds: next.userIds };
 }
 
-/** The setting in a few words: "Todos no workspace", "Só eu", "Só Ana", "Ana e Bia", "Ana, Bia e mais 2". */
+/**
+ * The setting in a few words: "Todos no workspace", "Só eu", "Só Ana", "Ana e Bia", "Ana, Bia e mais 2". `org`: a
+ * personal workspace says "everyone" its way (ADR 0159).
+ */
 export function whoSeesLabel(
   t: TFunction,
   a: { mode: "everyone" | "people"; userIds?: readonly string[] },
   myId: string,
   nameOf: (id: string) => string | undefined,
+  org?: Pick<OrgSummary, "mode"> | null,
 ) {
   const kind = audienceKind(a, myId);
-  if (kind === "everyone") return t("whoSees.everyone");
+  if (kind === "everyone") return t(modeKey(org, "whoSees.everyone"));
   if (kind === "me") return t("whoSees.me");
   const names = (a.userIds ?? []).flatMap((id) => {
     const name = nameOf(id);

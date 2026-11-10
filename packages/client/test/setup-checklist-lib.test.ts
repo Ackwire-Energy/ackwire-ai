@@ -122,6 +122,28 @@ describe("setup checklist", () => {
     expect(setupRow(t, "how", false, { ...facts, role: null }).desc).toBe("agentSetup.how.todoDescBlank");
     expect(setupRow(t, "how", true, facts)).toEqual({ title: "agentSetup.how.done", action: "agentSetup.see" });
   });
+
+  test("a personal workspace's rows say 'your apps' and 'here', never the workspace's name (ADR 0159)", () => {
+    const t = ((key: string, o?: Record<string, unknown>) =>
+      o ? `${key} ${JSON.stringify(o)}` : key) as never as TFunction;
+    const facts: SetupRowFacts = {
+      org: "Personal",
+      role: null,
+      granted: null,
+      suggested: null,
+      channels: null,
+      firstChannel: null,
+      audience: "everyone",
+      otherOwner: null,
+      onPlan: false,
+      personal: true,
+    };
+    expect(setupRow(t, "apps", false, facts).title).toBe("agentSetup.apps.todoNonePersonal");
+    expect(setupRow(t, "who", false, facts).title).toBe("agentSetup.who.todoPersonal");
+    expect(setupRow(t, "who", true, facts).title).toBe("agentSetup.who.doneEveryonePersonal");
+    // The rest reads as in a team's workspace.
+    expect(setupRow(t, "ai", false, facts).title).toBe("agentSetup.ai.todo");
+  });
 });
 
 describe("the right hand's first run (ADR 0155 §6, ADR 0162)", () => {
@@ -129,11 +151,20 @@ describe("the right hand's first run (ADR 0155 §6, ADR 0162)", () => {
     setup,
     builtin: "right_hand" as const,
   });
-  const owner: FirstRunPowers = { owner: true, connectAi: true, pay: true, connectors: true, invite: true };
-  const none: FirstRunFacts = { ai: false, apps: false, people: false };
+  const owner: FirstRunPowers = {
+    owner: true,
+    configure: true,
+    createAgents: true,
+    connectAi: true,
+    pay: true,
+    connectors: true,
+    invite: true,
+  };
+  const none: FirstRunFacts = { context: false, team: false, ai: false, apps: false, people: false };
 
   test("what the onboarding leaves, one order everywhere, for the owners, each row by what they may do", () => {
-    expect(FIRST_RUN_STEPS).toEqual(["ai", "apps", "people"]);
+    expect(FIRST_RUN_STEPS).toEqual(["about", "team", "ai", "apps", "people"]);
+    // A team's onboarding asked what it does and made its team (ADR 0162): its card has the rest.
     expect(firstRunSteps(lodi(), owner)).toEqual(["ai", "apps", "people"]);
     expect(firstRunSteps(lodi(), { ...owner, connectors: false, invite: false })).toEqual(["ai"]);
     // An invited person sees none of it, nor anyone once the right hand has no checklist; nor on another agent.
@@ -145,7 +176,8 @@ describe("the right hand's first run (ADR 0155 §6, ADR 0162)", () => {
   test("each row reads done from its data; only a skip of apps or people is stored", () => {
     const setup = { role: null, done: [] };
     expect([...firstRunDone(setup, none)]).toEqual([]);
-    expect([...firstRunDone(setup, { ai: true, apps: true, people: true })]).toEqual(["ai", "apps", "people"]);
+    expect([...firstRunDone(setup, { ...none, ai: true, apps: true, people: true })]).toEqual(["ai", "apps", "people"]);
+    expect([...firstRunDone(setup, { ...none, context: true, team: true })]).toEqual(["about", "team"]);
     expect([...firstRunDone({ role: null, done: ["apps", "people"] }, none)]).toEqual(["apps", "people"]);
     // A stored step of a new agent's checklist ticks nothing here.
     expect([...firstRunDone({ role: null, done: ["ai", "who"] }, none)]).toEqual([]);
@@ -154,8 +186,8 @@ describe("the right hand's first run (ADR 0155 §6, ADR 0162)", () => {
   test("on a hold every row waits for the plan, a skipped one stays done, and no ask shows", () => {
     const done = firstRunDone({ role: null, done: ["apps"] }, none);
     const state = (s: Parameters<typeof firstRunRowState>[0], held: boolean) => firstRunRowState(s, { done, held });
-    expect(FIRST_RUN_STEPS.map((s) => state(s, true))).toEqual(["afterPlan", "done", "afterPlan"]);
-    expect(FIRST_RUN_STEPS.map((s) => state(s, false))).toEqual(["open", "done", "open"]);
+    expect(FIRST_RUN_STEPS.map((s) => state(s, true))).toEqual(["open", "open", "afterPlan", "done", "afterPlan"]);
+    expect(FIRST_RUN_STEPS.map((s) => state(s, false))).toEqual(["open", "open", "open", "done", "open"]);
     const thinks = new Set([...done, "ai" as const]);
     expect(firstRunAsks(thinks, true, true)).toBe(false);
     expect(firstRunAsks(thinks, false, true)).toBe(true);
@@ -214,6 +246,28 @@ describe("the right hand's first run (ADR 0155 §6, ADR 0162)", () => {
     expect(beatRow("apps")).toBe("apps");
   });
 
+  test("a personal workspace (ADR 0159): no people row, and its rows in its own words", () => {
+    expect(firstRunSteps(lodi(), { ...owner, personal: true })).toEqual(["about", "team", "ai", "apps"]);
+    const t = ((key: string, o?: Record<string, unknown>) => (o ? `${key} ${JSON.stringify(o)}` : key)) as TFunction;
+    const f = { org: "Personal", agents: 2, label: "Claude", apps: null, members: 1, invited: null, personal: true };
+    expect(firstRunRow(t, "about", "open", f, false)).toEqual({
+      title: 'agentSetup.firstRun.about.todoPersonal {"org":"Personal"}',
+      desc: 'agentSetup.firstRun.about.todoDescPersonal {"org":"Personal"}',
+      action: "agentSetup.firstRun.about.action",
+    });
+    expect(firstRunRow(t, "about", "done", f, false).title).toBe(
+      'agentSetup.firstRun.about.donePersonal {"org":"Personal"}',
+    );
+    expect(firstRunRow(t, "team", "open", f, false).action).toBe("agentSetup.firstRun.team.actionPersonal");
+    expect(firstRunRow(t, "team", "done", f, false).title).toBe('agentSetup.firstRun.team.donePersonal {"count":2}');
+    expect(firstRunRow(t, "apps", "open", f, false).title).toBe(
+      'agentSetup.firstRun.apps.todoPersonal {"org":"Personal"}',
+    );
+    // Words with no personal variant stay the same.
+    expect(firstRunRow(t, "apps", "open", f, false).action).toBe("agentSetup.firstRun.apps.action");
+    expect(firstRunRow(t, "ai", "open", f, false).title).toBe('agentSetup.firstRun.ai.todo {"org":"Personal"}');
+  });
+
   test("the apps a team made from a template would use, the most suggested first", () => {
     const a = (handle: string) => ({ handle, setup: null });
     expect(teamRole(a("iara-2"))).toBe("support");
@@ -221,6 +275,10 @@ describe("the right hand's first run (ADR 0155 §6, ADR 0162)", () => {
     expect(teamRole(a("zed"))).toBeNull();
     expect(firstRunApps([a("iara"), a("bia")]).slice(0, 1)).toEqual(["intercom"]);
     expect(firstRunApps([a("zed")])).toEqual([]);
+    // A personal template's agents (ADR 0159): a person's calendar, lists and files.
+    expect(teamRole(a("clara"))).toBeNull();
+    expect(firstRunApps([a("clara"), a("leo-2")])).toEqual(["google-calendar", "todoist"]);
+    expect(firstRunApps([a("duda")])).toEqual(["google-sheets", "drive"]);
   });
 
   test("the apps row lists the apps that connect in one click here, not connected yet, the team's first", () => {

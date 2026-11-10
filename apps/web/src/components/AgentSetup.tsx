@@ -23,13 +23,14 @@ import {
   resourcesOf,
 } from "@agenteschat/client/lib/access-levels";
 import { channelsAfter, sameAudience } from "@agenteschat/client/lib/agent-edit";
-import { audienceOf, audiencePatch } from "@agenteschat/client/lib/audience";
+import { audienceModeKey, audienceModeTextKey, audienceOf, audiencePatch } from "@agenteschat/client/lib/audience";
 import { setDraftFor } from "@agenteschat/client/lib/drafts";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { formatTime, joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { addsAgentsTo, can } from "@agenteschat/client/lib/permissions";
+import { rolePicksInSight } from "@agenteschat/client/lib/personal-view";
 import { planOf } from "@agenteschat/client/lib/plans";
 import { AUTO, modelChoices } from "@agenteschat/client/lib/providers";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
@@ -45,6 +46,7 @@ import {
   suggestedChannels,
   suggestedLevels,
 } from "@agenteschat/client/lib/setup-checklist";
+import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
 import {
   AffixInput,
   Avatar,
@@ -86,6 +88,7 @@ import { useChannelActions } from "@/components/channel-actions";
 import { useOrg } from "@/components/org-context";
 import { useWidenAsk } from "@/components/ReachLines";
 import { useDirectory } from "@/hooks/useDirectory";
+import { usePersonalView } from "@/hooks/usePersonalView";
 import { useToast } from "@/lib/toast";
 import { useVisibleChannels } from "@/pages/agent/pieces";
 import "./agent-setup.css";
@@ -105,10 +108,15 @@ const STEP_ICON: Record<AgentSetupStep, IconName> = {
   how: "document",
 };
 
-/** The steps this person sees for this agent (none: the checklist isn't theirs, or the agent has none). */
+/**
+ * The steps this person sees for this agent (none: the checklist isn't theirs, or the agent has none). Alone in a
+ * personal workspace there is nobody else to talk to it: "who" waits until someone joins (ADR 0159), read live.
+ */
 export function useSetupSteps(agent: Agent | undefined): AgentSetupStep[] {
   const { org, me } = useOrg();
-  return agent ? setupSteps(agent, { meId: me.user.id, admin: can(org, "manage_agents") }) : [];
+  const { solo } = usePersonalView();
+  const steps = agent ? setupSteps(agent, { meId: me.user.id, admin: can(org, "manage_agents") }) : [];
+  return solo ? steps.filter((s) => s !== "who") : steps;
 }
 
 /**
@@ -259,6 +267,7 @@ export function AgentSetupCard({ agent, place }: { agent: Agent; place: "dm" | "
       audience: audience.mode,
       otherOwner: !ownerIsMe && owner ? (owner.name.split(" ")[0] ?? owner.name) : null,
       onPlan,
+      personal: isPersonal(org),
     });
 
   const act = (step: AgentSetupStep) => {
@@ -681,7 +690,7 @@ function AppsDialog({
       onClose={onClose}
     >
       {ordered.length === 0 ? (
-        <p className="small muted">{t("agentSetup.apps.empty", { org: org.name })}</p>
+        <p className="small muted">{t(modeKey(org, "agentSetup.apps.empty"), { org: org.name })}</p>
       ) : (
         <ul className="level-list setup-dlg__apps" aria-label={t("access.kind.connectors")}>
           {ordered.map((r) => {
@@ -816,14 +825,19 @@ function WhoDialog({ agent, onClose, onSaved }: { agent: Agent; onClose: () => v
   const ownerName = owner ? dir.memberById.get(owner)?.name : undefined;
   const pickedPeople = new Set(audience.userIds);
   const pickedRoles = new Set(audience.roleIds ?? []);
-  const roleList = sortRoles((roles.data?.roles ?? []).filter((r) => !isEveryone(r)));
+  // A personal workspace's family picks people first, and a role only when one is worth it (ADR 0159).
+  const personal = isPersonal(org);
+  const allRoles = roles.data?.roles ?? [];
+  const roleList = rolePicksInSight(org, allRoles, audience.roleIds ?? [])
+    ? sortRoles(allRoles.filter((r) => !isEveryone(r)))
+    : [];
   const people = dir.members.filter((m) => m.userId !== owner);
   const modeText = (mode: AudienceMode) =>
     mode === "owner"
       ? ownerName
         ? t("audience.modeText.owner", { ...g, owner: owner === me.user.id ? t("agentSetup.who.you") : ownerName })
         : t("audience.modeText.noOwner")
-      : t(`audience.modeText.${mode}`, g);
+      : t(audienceModeTextKey(org, mode), g);
   const valid =
     audience.mode === "everyone" ||
     (audience.mode === "owner" ? Boolean(owner) : pickedPeople.size > 0 || pickedRoles.size > 0 || Boolean(owner));
@@ -869,24 +883,23 @@ function WhoDialog({ agent, onClose, onSaved }: { agent: Agent; onClose: () => v
   };
   const remove = (kind: "userIds" | "roleIds", id: string) =>
     setAudience((a) => ({ ...a, [kind]: (a[kind] ?? []).filter((x) => x !== id) }));
-  const addOptions = [
-    ...roleList
-      .filter((r) => !pickedRoles.has(r.id))
-      .map((r) => ({
-        value: `role:${r.id}`,
-        label: r.name,
-        group: t("audience.roles"),
-        leading: <RoleMark color={r.color} icon={r.icon} size={24} />,
-      })),
-    ...people
-      .filter((m) => !pickedPeople.has(m.userId))
-      .map((m) => ({
-        value: `person:${m.userId}`,
-        label: m.name,
-        group: roleList.length ? t("audience.people") : undefined,
-        leading: <Avatar kind="person" size="sm" name={m.name} imageUrl={m.image} />,
-      })),
-  ];
+  const roleOptions = roleList
+    .filter((r) => !pickedRoles.has(r.id))
+    .map((r) => ({
+      value: `role:${r.id}`,
+      label: r.name,
+      group: t("audience.roles"),
+      leading: <RoleMark color={r.color} icon={r.icon} size={24} />,
+    }));
+  const peopleOptions = people
+    .filter((m) => !pickedPeople.has(m.userId))
+    .map((m) => ({
+      value: `person:${m.userId}`,
+      label: m.name,
+      group: roleList.length ? t("audience.people") : undefined,
+      leading: <Avatar kind="person" size="sm" name={m.name} imageUrl={m.image} />,
+    }));
+  const addOptions = personal ? [...peopleOptions, ...roleOptions] : [...roleOptions, ...peopleOptions];
   return (
     <StepDialog
       title={t("agentSetup.who.title", g)}
@@ -910,7 +923,7 @@ function WhoDialog({ agent, onClose, onSaved }: { agent: Agent; onClose: () => v
           onValueChange={(mode) => setAudience((a) => ({ ...a, mode }))}
           options={MODES.map((mode) => ({
             value: mode,
-            label: t(`audience.mode.${mode}`),
+            label: t(audienceModeKey(org, mode)),
             description: modeText(mode),
           }))}
         />
@@ -1024,7 +1037,7 @@ function HowDialog({ agent, onClose, onSaved }: { agent: Agent; onClose: () => v
   return (
     <StepDialog
       title={t("agentSetup.how.title", g)}
-      description={t("agentSetup.how.desc")}
+      description={t(modeKey(org, "agentSetup.how.desc"))}
       ok={t("common.save")}
       busy={busy}
       okDisabled={!budgetOk}

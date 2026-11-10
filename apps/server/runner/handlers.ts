@@ -52,6 +52,7 @@ import type { DataSockets } from "./streams";
 import type { TaskManager } from "./tasks";
 import type { Terminals } from "./terminal";
 import { openExecKeys, parseExecVault, runnerVault, sealMadePassword } from "./vault";
+import type { PairRequest } from "./wifi-pair";
 
 /**
  * Requests one connection runs at once, whatever they are: a bound on a flood, far above what room allows
@@ -198,6 +199,11 @@ export const OP_ROUTES: Readonly<Record<MachineOp, "machine" | "agent">> = {
   "phone.record": "machine",
   "phone.screenshot": "machine",
   "phone.logs": "machine",
+  // adb's pairing keys are the person's, like its phones.
+  "phone.pair.start": "machine",
+  "phone.pair.code": "machine",
+  "phone.pair.status": "machine",
+  "phone.pair.cancel": "machine",
 };
 
 type AccessRequestOp = Extract<MachineRequest, { op: "access.request" }>;
@@ -649,6 +655,10 @@ async function routeRequest(ctx: HandlerContext, req: MachineRequest, scope: Req
   if (req.op === "task.start" || req.op === "task.status" || req.op === "task.cancel" || req.op === "task.output") {
     return handleTask(ctx, req);
   }
+  if (isPairOp(req)) {
+    if (!ctx.phones) throw new RunnerError("phone_missing", "This computer doesn't reach phones.");
+    return ctx.phones.pair(req);
+  }
   if (isPhoneOp(req)) return handlePhone(ctx, req, scope);
   // Each agent works in its own folder: that folder is its workspace.
   if (req.agent) ctx = { ...ctx, workspaceReal: await agentWorkspace(ctx.workspaceReal, req.agent) };
@@ -760,6 +770,7 @@ async function routeRequest(ctx: HandlerContext, req: MachineRequest, scope: Req
 }
 
 const isPhoneOp = (req: MachineRequest): req is PhoneRequest => req.op.startsWith("phone.");
+const isPairOp = (req: MachineRequest): req is PairRequest => req.op.startsWith("phone.pair.");
 
 /**
  * `PHONES_PROTOCOL`: the phone ops. They run with the computer's commands off (sharing a phone grants only these);
@@ -849,9 +860,16 @@ async function handleStream(
 ): Promise<MachineReplies["stream.open"]> {
   const { agent, streamId } = req;
   const streams = ctx.streams;
-  if (!agent || !isStreamId(streamId)) throw new RunnerError("bad_request", "A stream needs an agent and its id");
+  if (!isStreamId(streamId)) throw new RunnerError("bad_request", "A stream needs its id");
   if (!streams) throw new RunnerError("bad_request", "This runner opens no streams");
   const dial = () => streams.dial(streamId, req.kind, scope.signal);
+  // A phone's screen (bring your own devices) is no agent's: it goes with the phone, commands on or off.
+  if (req.kind === "phone") {
+    if (!ctx.phones) throw new RunnerError("phone_missing", "This computer doesn't reach phones.");
+    await ctx.phones.view(req.phone, req.mode, dial);
+    return { opened: true };
+  }
+  if (!agent) throw new RunnerError("bad_request", "A stream needs an agent");
   if (req.kind === "desktop") {
     requireTool(ctx, "desktop");
     if (!ctx.desktops) throw new RunnerError("desktop_unavailable", "This runner runs no desktops");
@@ -876,7 +894,7 @@ async function handleStream(
       throw new RunnerError("bad_request", "The terminal's size is out of bounds");
     await ctx.terminals.open(agent, { cols: req.cols, rows: req.rows }, dial);
   } else {
-    throw new RunnerError("bad_request", "A stream shows a desktop or a terminal");
+    throw new RunnerError("bad_request", "A stream shows a desktop, a terminal or a phone");
   }
   return { opened: true };
 }
@@ -1485,7 +1503,7 @@ function describeOp(req: MachineRequest): string {
     case "stream.open":
       return req.kind === "terminal"
         ? `stream.open terminal ${String(req.cols)}×${String(req.rows)}`
-        : `stream.open desktop (${String(req.mode)})`;
+        : `stream.open ${req.kind === "phone" ? `phone ${String(req.phone?.platform)}/${String(req.phone?.serial)}` : "desktop"} (${String(req.mode)})`;
     case "desktop.act": {
       // The kind and where it lands, its key, app or path; never typed text.
       const a: Record<string, unknown> = isRecordLike(req.action) ? req.action : {};

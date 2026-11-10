@@ -104,6 +104,40 @@ describe("the words", () => {
       }
   });
 
+  test("a personal workspace reads its own words where the place has them, the usual ones otherwise (ADR 0159)", () => {
+    expect(firstUseCopy("agents", true, true)).toEqual({
+      title: "mobile.empty.agents.titlePersonal",
+      text: "mobile.empty.agents.textPersonal",
+    });
+    expect(firstUseCopy("people", false, true)).toEqual({
+      title: "mobile.empty.people.viewerTitlePersonal",
+      text: "mobile.empty.people.viewerTextPersonal",
+    });
+    // A word with no personal sibling keeps the team's (Tasks' viewer line fits both).
+    expect(firstUseCopy("tasks", false, true)).toEqual({
+      title: "mobile.empty.tasks.viewerTitlePersonal",
+      text: "mobile.empty.tasks.viewerText",
+    });
+    expect(firstUseCopy("routines", true, true)).toEqual(firstUseCopy("routines", true));
+    // A team's workspace never reads them.
+    expect(firstUseCopy("agents", true)).toEqual({
+      title: "mobile.empty.agents.title",
+      text: "mobile.empty.agents.text",
+    });
+    expect(source("shared/FirstUse.tsx")).toContain("firstUseCopy(place, acts, isPersonal(");
+  });
+
+  test("every personal word is in both languages", () => {
+    for (const place of places)
+      for (const acts of [true, false]) {
+        const { title, text } = firstUseCopy(place, acts, true);
+        for (const tree of [featureKeysEn, featureKeysPtBR]) {
+          expect({ key: title, has: typeof at(tree, title) }).toEqual({ key: title, has: "string" });
+          expect({ key: text, has: typeof at(tree, text) }).toEqual({ key: text, has: "string" });
+        }
+      }
+  });
+
   test("no semicolons or long dashes, and nothing about a support team", () => {
     for (const tree of [featureKeysEn.empty, featureKeysPtBR.empty])
       expect(JSON.stringify(tree)).not.toMatch(/;|—|suporte|support/i);

@@ -6,16 +6,34 @@ import {
   useCatalog,
   useConnections,
   useCustomServers,
+  useMembers,
 } from "@agenteschat/client";
 import { type AccessResource, type Level, saveLevels } from "@agenteschat/client/lib/access-levels";
 import { type ConnectedItem, connectedItems, itemName } from "@agenteschat/client/lib/connected";
+import { isSolo, othersHere } from "@agenteschat/client/lib/personal-view";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { useMutation, useQueries, useQueryClient } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
 import { useEffect, useMemo, useState } from "react";
-import { useOrgId } from "../shared/hooks";
+import { useOrg } from "@/providers/org";
+import { useMeId, useOrgId } from "../shared/hooks";
 import { stepAt } from "./logic";
 
 /** The web's settings hooks (`AccessLevels.tsx`, `useAgentsAccess`), on the phone. */
+
+/**
+ * A personal workspace's view (ADR 0159): whether it is personal, how many other people are members (undefined while
+ * the list loads) and `solo`, personal with nobody else in it yet. A control leaves the screen while solo only when it
+ * still holds its default, and while the list loads the full control shows, so nothing hides and then comes back for
+ * a family member. Read it for what is in sight, never to refuse anything.
+ */
+export function usePersonalView() {
+  const { orgId, org } = useOrg();
+  const members = useMembers(orgId).data;
+  const meId = useMeId();
+  const others = members && meId ? othersHere(members, meId) : undefined;
+  return { personal: isPersonal(org), others, solo: isSolo(org, others) };
+}
 
 type TT = (key: string, options: { defaultValue: string }) => string;
 

@@ -12,6 +12,7 @@ import {
   sortProposals,
   staleCount,
 } from "@agenteschat/client/lib/proposals";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import {
   Alert,
   Button,
@@ -77,9 +78,9 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
 
   const backAgent = agentId ? dir.agentById.get(agentId) : undefined;
   const agentName = (id: string) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent");
-  const targetLabel = (p: Proposal) => proposalTarget(t, p, agentName, org.name);
+  const targetLabel = (p: Proposal) => proposalTarget(t, p, agentName, org);
   const tt = t as unknown as (key: string, options: Record<string, string>) => string;
-  const titleOf = (p: Proposal) => proposalTitle(t, p, org.name, agentName);
+  const titleOf = (p: Proposal) => proposalTitle(t, p, org, agentName);
   const whereOf = (e: Proposal["evidence"][number]) =>
     e.type ? tt(`proposals.evidence.${e.type}`, { defaultValue: e.where }) : e.where;
   const statusText = (p: Proposal) =>
@@ -115,7 +116,7 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
           {t("memory.title", agentGrammar(backAgent.name))}
         </Link>
       )}
-      <PageHeader title={t("approvals.title")} meta={t("proposals.subtitle", { org: org.name })} />
+      <PageHeader title={t("approvals.title")} meta={t(modeKey(org, "proposals.subtitle"), { org: org.name })} />
       <ApprovalsTabs value="proposals" actions={<DecideAll proposals={list} />} />
 
       {proposals.isSuccess && list.length === 0 && (

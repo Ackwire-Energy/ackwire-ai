@@ -280,20 +280,69 @@ export const setupNoticeKey = (orgId: string, view: SetupView) =>
 export const WORKSPACE_COMPUTER_KIND = computerKind("other");
 
 /**
+ * The names the server gives the workspace's own computer (`managedMachineName`), in each language its first owner
+ * may speak: a team's names its workspace (`computerSetup.title`, `{{org}}` its name), a personal workspace's (ADR
+ * 0158) its person's agents (`computerSetup.titlePersonal`). The apps load one language at a time, so they are kept
+ * here as the translations say them, compared and never shown; a test keeps them in step with packages/i18n.
+ */
+export const GIVEN_COMPUTER_NAMES = {
+  team: [
+    "{{org}}'s computer",
+    "Computador da {{org}}",
+    "Computadora de {{org}}",
+    "Ordinateur de {{org}}",
+    "Computer von {{org}}",
+    "Computer di {{org}}",
+    "Computer van {{org}}",
+    "{{org}}のコンピューター",
+    "{{org}}의 컴퓨터",
+    "{{org}} 的电脑",
+    "Komputer {{org}}",
+    "{{org}} bilgisayarı",
+    "Komputer przestrzeni {{org}}",
+    "Компьютер {{org}}",
+  ],
+  personal: [
+    "Your agents' computer",
+    "Computador dos seus agentes",
+    "Computadora de tus agentes",
+    "Ordinateur de vos agents",
+    "Computer deiner Agenten",
+    "Computer dei tuoi agenti",
+    "Computer van je agents",
+    "エージェントのコンピューター",
+    "내 에이전트의 컴퓨터",
+    "你的智能体的电脑",
+    "Komputer agen-agenmu",
+    "Ajanlarınızın bilgisayarı",
+    "Komputer twoich agentów",
+    "Компьютер ваших агентов",
+  ],
+} as const;
+
+const givenNames = (orgName: string): string[] => [
+  ...GIVEN_COMPUTER_NAMES.team.map((name) => name.replace("{{org}}", () => orgName)),
+  ...GIVEN_COMPUTER_NAMES.personal,
+];
+
+/**
  * The agent's computer as this reader calls it. The workspace's own keeps the name it got in its first owner's
  * language (mirrors `managedMachineName` in packages/engine/src/machine-provisioning.ts) until someone renames
- * it: until then it reads in the reader's words, as before it exists. Any other computer goes by its own name, and
- * the server's own, until its runner names it, by what it is.
+ * it: until then it reads in the reader's words, as before it exists, in the workspace's mode (a name given in the
+ * other mode reads as this one's too). Any other computer goes by its own name, and the server's own, until its
+ * runner names it, by what it is. `personal`: the workspace is personal (ADR 0159), where its own computer is its
+ * person's agents' (`computerSetup.titlePersonal`), never "Personal's computer".
  */
 export function computerName(
   t: TFunction,
   orgName: string,
   machine: Pick<Machine, "kind" | "name"> | null | undefined,
+  personal = false,
 ): string {
-  const ours = t("computerSetup.title", { org: orgName });
+  const ours = personal ? t("computerSetup.titlePersonal") : t("computerSetup.title", { org: orgName });
   if (!machine) return ours;
   if (machine.kind !== "managed") return machineTitle(machine, t("machines.host.label"));
-  return [`${orgName}'s computer`, `Computador da ${orgName}`].includes(machine.name) ? ours : machine.name;
+  return givenNames(orgName).includes(machine.name) ? ours : machine.name;
 }
 
 /** A computer known only by its name, for `computerName`: the workspace's own reads in the reader's words. */
@@ -301,8 +350,8 @@ export const managedNamed = (c: { name: string } | null | undefined) =>
   c ? { kind: "managed" as const, name: c.name } : null;
 
 /** `computerName` where a list carries only a computer's name. */
-export const computerNameOf = (t: TFunction, orgName: string, name: string) =>
-  computerName(t, orgName, managedNamed({ name }));
+export const computerNameOf = (t: TFunction, orgName: string, name: string, personal = false) =>
+  computerName(t, orgName, managedNamed({ name }), personal);
 
 export type NoComputer = "workspace" | "none";
 

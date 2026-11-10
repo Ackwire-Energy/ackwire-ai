@@ -57,7 +57,7 @@ The reads live in `packages/engine/src/operator.ts` and pick every field by name
 | `user.deletion_requested` | a person deletes their account; `dueAt`: when it goes for good | `dueAt` |
 | `user.deletion_canceled` | they restore it before that date | none |
 | `user.deleted` | an account is deleted | none |
-| `organization.created` | a workspace is created | `name` |
+| `organization.created` | a workspace is created | `name`, `mode` (`team` or `personal`, ADR 0159) |
 | `organization.deletion_requested` | an owner deletes a workspace, or its only member deletes their account, and it closes for 7 days (ADR 0088); `userId` is who asked | `dueAt`, `via` (`owner` or `account`) |
 | `organization.deletion_canceled` | an owner restores a workspace being deleted; `userId` is that owner; `via: "account"` when it came back with its member's account | `via` when so |
 | `organization.deleted` | a workspace's data is deleted, at the end of its deletion's 7 days (ADR 0088); `userId` is who asked, null once their account is gone | `requestedAt`, `via` |

@@ -337,8 +337,11 @@ describe("the workspace's computer on its way, on Conversas", () => {
     const source = await Bun.file(
       new URL("../../src/features/computer/SetupWait.tsx", import.meta.url).pathname,
     ).text();
-    // Its title is the computer's name, in every state, and only where no header names it.
-    expect(source).toContain('const name = t("computerSetup.title", { org: wait.org });');
+    // Its title is the computer's name, in every state, and only where no header names it; a personal workspace's
+    // is its person's agents' computer (ADR 0159).
+    expect(source).toContain('const name = t(modeKey(wait, "computerSetup.title"), { org: wait.org });');
+    expect(source).toContain("mode: workspaceModeOf(org),");
+    expect(source).toContain('t(modeKey(org, setupNoticeTitleKey(view)), { org: org?.name ?? "" })');
     expect(source).not.toContain("computerSetup.notice.title");
     expect(source).toContain("{said ? null : (");
     // In line, or being prepared before a step: the header's word already says it.

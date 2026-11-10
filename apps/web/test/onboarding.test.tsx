@@ -12,8 +12,9 @@ import { pick } from "./new-agent-flow";
 import { renderApp, screen, settle, showIn } from "./render";
 
 /*
- * The onboarding (ADR 0162): the blue rail with Lodi, its steps read from the workspace's own data, the plan only where
- * the workspace waits for its first one, and where the workspace opens after it.
+ * The onboarding (ADR 0162): what the workspace is for first (ADR 0159), then, for a company or team, the blue rail
+ * with Lodi, its steps read from the workspace's own data, the plan only where the workspace waits for its first one,
+ * and where the workspace opens after it.
  */
 
 const realFetch = globalThis.fetch;
@@ -25,9 +26,15 @@ afterEach(() => {
 });
 
 const button = (name: string | RegExp) => screen().getByRole("button", { name });
+const answer = (name: RegExp) => screen().getByRole("radio", { name });
 const click = async (el: Element, rounds = 10) => {
   await act(async () => fireEvent.click(el));
   await settle(rounds);
+};
+/** The first question answered for a company or team: its name comes next. */
+const forATeam = async () => {
+  await click(answer(/Para minha empresa ou time/), 4);
+  await click(button("Continuar"), 4);
 };
 const type = async (label: string, value: string) => {
   await act(async () => fireEvent.change(screen().getByLabelText(label), { target: { value } }));
@@ -139,6 +146,7 @@ const PLANS = {
 async function throughTheTeam(state: FakeState) {
   const r = await renderApp("/onboarding", { api: createFakeApi(state) });
   await settle(10);
+  await forATeam();
   await type("Nome", "Ateliê Couto");
   await click(button("Continuar"), 14);
   await click(button("Loja online"), 4);
@@ -152,8 +160,9 @@ describe("the steps", () => {
     const state = newcomer(false);
     await renderApp("/onboarding", { api: createFakeApi(state) });
     await settle(10);
-    expect(eyebrow()).toBe("Passo 1 de 3");
     expect(document.querySelector(".onb__say")?.textContent).toContain("Eu sou o Lodi.");
+    await forATeam();
+    expect(eyebrow()).toBe("Passo 1 de 3");
     await type("Nome", "Ateliê Couto");
     await click(button("Continuar"), 14);
     expect(calls(state, "orgs.create")[0]?.args[0]).toEqual({ name: "Ateliê Couto" });
@@ -176,6 +185,7 @@ describe("the steps", () => {
     const state = newcomer(false);
     await renderApp("/onboarding", { api: createFakeApi(state) });
     await settle(10);
+    await forATeam();
     await type("Nome", "Ateliê Couto");
     await click(button("Continuar"), 14);
     await click(button("Clínica ou consultório"), 4);
@@ -276,6 +286,7 @@ describe("the steps", () => {
       // Never the field's example ("Ex.: Acme"), and Lodi, listed under Agentes, is counted there.
       expect(name()).toBe("Seu workspace");
       expect(meta()).toBe("1 membro · 1 agente");
+      await forATeam();
       await type("Nome", "Ateliê Couto");
       expect(name()).toBe("Ateliê Couto");
       await click(button("Continuar"), 14);
@@ -477,6 +488,7 @@ describe("the name step's other cases", () => {
     };
     await renderApp("/onboarding", { api });
     await settle(10);
+    await forATeam();
     await type("Nome", "Outra loja");
     await click(button("Continuar"), 10);
     expect(document.querySelector(".onb__status")?.textContent).toBeTruthy();
@@ -507,8 +519,40 @@ describe("the name step's other cases", () => {
     if (state.me) state.me.user = { ...state.me.user, canCreateWorkspace: false };
     await renderApp("/onboarding", { api: createFakeApi(state) });
     await settle(10);
-    await type("Nome", "Ateliê Couto");
+    await click(answer(/Para minha empresa ou time/), 4);
     expect((button("Continuar") as HTMLButtonElement).disabled).toBe(true);
+    expect(document.querySelector(".onb__note")?.textContent).toBeTruthy();
+  });
+});
+
+describe("for me (ADR 0159)", () => {
+  test("no name to ask and no rail: a personal workspace, named in the person's language, opens in Lodi's DM", async () => {
+    const state = newcomer(true);
+    const { router } = await renderApp("/onboarding", { api: createFakeApi(state) });
+    await settle(10);
+    expect(heading()).toBe("Para que você vai usar o agentes.chat?");
+    expect((button("Continuar") as HTMLButtonElement).disabled).toBe(true);
+    // "For me", not "For my company or team", whose words start the same in Portuguese.
+    await click(answer(/^Para mim(?!ha)/), 4);
+    expect(screen().queryByLabelText("Nome")).toBeNull();
+    await click(button("Continuar"), 16);
+    expect(calls(state, "orgs.create")[0]?.args[0]).toEqual({ name: "Pessoal", mode: "personal" });
+    const orgId = state.me?.organizations.at(-1)?.id;
+    expect(calls(state, "orgs.saveOnboarding").map((c) => c.args)).toEqual([[orgId, { finished: true }]]);
+    expect(router.state.location.pathname).toBe(`/org/${orgId}/dm/agent/${LODI_ID}`);
+    // Never the plan step nor a team template: its card in Lodi's DM holds the rest.
+    expect(calls(state, "agents.applyTeamTemplate")).toEqual([]);
+  });
+
+  test("back from the name, the question again; the answer can change", async () => {
+    const state = newcomer(false);
+    await renderApp("/onboarding", { api: createFakeApi(state) });
+    await settle(10);
+    await forATeam();
+    expect(screen().getByLabelText("Nome")).toBeTruthy();
+    await click(button("Voltar"), 4);
+    expect(answer(/Para minha empresa ou time/).getAttribute("aria-checked")).toBe("true");
+    expect(calls(state, "orgs.create")).toEqual([]);
   });
 });
 

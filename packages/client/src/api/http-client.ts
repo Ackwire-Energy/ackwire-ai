@@ -95,6 +95,7 @@ import type {
   DmRead,
   EndpointCheck,
   EndpointModel,
+  FeedbackFile,
   ForeignMailbox,
   FormerAgent,
   GifKey,
@@ -229,6 +230,7 @@ import type {
   UsageQueue,
   UsageReport,
   WebhookSetup,
+  WifiPairing,
   WikiGraph,
   WikiImportResult,
   WikiPage,
@@ -532,6 +534,13 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       instance: () => request<Instance>("/api/instance"),
       telemetry: () => nullOn(404, () => request<ServerTelemetry>("/api/app/telemetry")),
       setTelemetry: (enabled) => request<ServerTelemetry>("/api/app/telemetry", { method: "PUT", json: { enabled } }),
+      sendFeedback: (input) => request<void>("/api/app/feedback", { json: input }),
+      uploadFeedbackFile: (file) => {
+        const form = new FormData();
+        form.append("file", file, file.name);
+        return files.upload<FeedbackFile>("/api/app/feedback/files", form);
+      },
+      dropFeedbackFile: (id) => request<void>(`/api/app/feedback/files/${enc(id)}`, { method: "DELETE" }),
       jev: () => nullOn(404, () => request<JevKey>("/api/app/jev")),
       saveJev: (apiKey) => request<JevKey>("/api/app/jev", { method: "PUT", json: { apiKey } }),
       checkJev: () => request<JevKey>("/api/app/jev/check", { method: "POST" }),
@@ -1172,6 +1181,14 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<void>(`${org(orgId)}/devices/access-requests/${enc(requestId)}/decide`, { json: { decision } }),
       deviceWait: (orgId, runId, action) =>
         request<void>(`${org(orgId)}/runs/${enc(runId)}/device-wait`, { json: { action } }),
+      startWifiPairing: (orgId, machineId, input) =>
+        request<WifiPairing>(`${org(orgId)}/devices/computers/${enc(machineId)}/wifi-pairings`, { json: input }),
+      wifiPairing: (orgId, machineId, pairingId) =>
+        request<WifiPairing>(`${org(orgId)}/devices/computers/${enc(machineId)}/wifi-pairings/${enc(pairingId)}`),
+      cancelWifiPairing: (orgId, machineId, pairingId) =>
+        request<void>(`${org(orgId)}/devices/computers/${enc(machineId)}/wifi-pairings/${enc(pairingId)}`, {
+          method: "DELETE",
+        }),
     },
     machines: {
       list: async (orgId) => (await request<{ machines: Machine[] }>(`${org(orgId)}/machines`)).machines,

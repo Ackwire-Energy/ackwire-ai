@@ -3,11 +3,13 @@ import { canTalk } from "@agenteschat/client/lib/audience";
 import { waitingComputerByAgent } from "@agenteschat/client/lib/machine-outages";
 import { isRightHand, rightHandOf } from "@agenteschat/client/lib/right-hand";
 import { WORKING_POLL_MS } from "@agenteschat/client/lib/working";
+import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
 import { useQueryClient } from "@tanstack/react-query";
 import { useIsFocused } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { RefreshControl, StyleSheet, View } from "react-native";
+import { useOrg } from "@/providers/org";
 import { GroupedRow, LargeTitleScreen, PULL_TINT, PullOrbit, SkeletonList, SwipeRow } from "@/ui";
 import { router } from "@/ui/navigation";
 import { workByAgent } from "../agents/logic";
@@ -19,7 +21,7 @@ import { useOpenDm } from "../new/useOpenDm";
 import { OutageNotices } from "../outages/OutageNotice";
 import { useMachineOutages } from "../outages/queries";
 import { RightHandAsk } from "../right-hand/Pin";
-import { useColors, useDirectory, useOrgId, usePullRefresh } from "../shared/hooks";
+import { useColors, useDirectory, useMeId, useOrgId, usePullRefresh } from "../shared/hooks";
 import { useActiveWork, useConversations, useHiddenAgents, useWorkingNow } from "../shared/queries";
 import { SheetHostProvider } from "../shared/SheetHost";
 import { useTabHeader } from "../shared/tabHeader";
@@ -38,6 +40,7 @@ import {
   homeLayout,
   type ListKind,
   rightHandPin,
+  withoutQuietGeneral,
 } from "./logic";
 import { usePins } from "./pins";
 import { useAgentRowStates, useFinished } from "./useHomeNow";
@@ -48,6 +51,17 @@ const LIVE_ROWS = 6;
 
 /** A section's "Ver todos", pushed: a kind, or one channel category (ADR 0080). */
 export const openKindList = (kind: ListKind | `category-${string}`) => router.push(`/conversations/${kind}`);
+
+/**
+ * Whether the lists leave a quiet #general out (ADR 0159): in a personal workspace while its person is the only member
+ * (or while the members load), as the web's sidebar. With family in it, #general shows.
+ */
+export function useHidesQuietGeneral(): boolean {
+  const { org } = useOrg();
+  const meId = useMeId();
+  const { memberById } = useDirectory();
+  return isPersonal(org) && ![...memberById.keys()].some((id) => id !== meId);
+}
 
 /**
  * Conversas, the home: the
@@ -61,7 +75,8 @@ export const openKindList = (kind: ListKind | `category-${string}`) => router.pu
  * has the rest. While the list loads, rows of its own shape stand in (no spinner, nothing moves when it lands).
  * Search and Threads have their own tabs. Empty, it invites the first agent. Nothing opens over it on its own: the
  * offer to turn on notifications comes as a line in the right hand's conversation. When the server doesn't answer
- * it says so (`HomeServerError`), over the kept rows as a card, and tries again on its own.
+ * it says so (`HomeServerError`), over the kept rows as a card, and tries again on its own. A personal workspace
+ * (ADR 0159) calls its channels group conversations and, while its person is alone in it, leaves a quiet #general out.
  */
 const OTHER_CHANNELS = "otherChannels";
 
@@ -77,6 +92,9 @@ function Home() {
   const { t } = useTranslation();
   const c = useColors();
   const orgId = useOrgId();
+  const { org } = useOrg();
+  const personal = isPersonal(org);
+  const hideGeneral = useHidesQuietGeneral();
   const qc = useQueryClient();
   const focused = useIsFocused();
   // What the person chose to open when the app starts goes over Conversas, once (ADR 0108).
@@ -128,11 +146,28 @@ function Home() {
     [dir.agents, hidden],
   );
   const pins = usePins();
-  const sections = homeLayout(pinned.rows, categories.data ?? [], undefined, starters, pins.pins);
-  // A section's title: a fixed one by its key, a category by its name.
+  const sections = homeLayout(
+    withoutQuietGeneral(pinned.rows, hideGeneral),
+    categories.data ?? [],
+    undefined,
+    starters,
+    pins.pins,
+  );
+  // A section's title: a fixed one by its key (a personal workspace's channels are its group conversations), a
+  // category by its name.
   const sectionTitle = (b: HomeBlock) =>
-    b.name !== undefined ? b.name : t(`mobile.chats.section.${b.key as ListKind}`);
-  // A list that failed to load isn't an empty workspace: it says the server didn't answer.
+    b.name !== undefined
+      ? b.name
+      : personal && b.key === "channels"
+        ? t("shell.channelsPersonal")
+        : t(`mobile.chats.section.${b.key as ListKind}`);
+  // A category's, or a personal workspace's group conversations': the plain "See all" under the section's title.
+  const seeAllLabel = (b: HomeBlock) =>
+    b.categoryId || (personal && b.key === "channels")
+      ? t("mobile.categories.seeAll")
+      : t(`mobile.chats.seeAll.${b.key}`);
+  // A list that failed to load isn't an empty workspace: it says the server didn't answer. A #general left out of
+  // sight still counts: the home keeps its greeting and the right hand's field.
   const failed = list.failed && list.rows.length === 0;
   // Agents already in the team fill the home (Agentes) instead of the invitation to create the first one.
   const empty = !list.loading && !failed && pinned.rows.length === 0 && starters.length === 0;
@@ -204,14 +239,17 @@ function Home() {
           <CollapsibleSection title={t("mobile.chats.section.agents")} count={0} collapsed={false} onToggle={() => {}}>
             <SkeletonList rows={4} />
           </CollapsibleSection>
-          <CollapsibleSection
-            title={t("mobile.chats.section.channels")}
-            count={0}
-            collapsed={false}
-            onToggle={() => {}}
-          >
-            <SkeletonList rows={2} />
-          </CollapsibleSection>
+          {/* A personal workspace's person alone in it rarely has a group conversation: no rows stand in for one. */}
+          {hideGeneral ? null : (
+            <CollapsibleSection
+              title={personal ? t("shell.channelsPersonal") : t("mobile.chats.section.channels")}
+              count={0}
+              collapsed={false}
+              onToggle={() => {}}
+            >
+              <SkeletonList rows={2} />
+            </CollapsibleSection>
+          )}
         </>
       ) : (
         sections.map((s) => {
@@ -274,7 +312,7 @@ function Home() {
               {s.rows.map((r, i) => row(r, i, !off))}
               {s.more ? (
                 <SeeAllRow
-                  label={s.categoryId ? t("mobile.categories.seeAll") : t(`mobile.chats.seeAll.${s.key}`)}
+                  label={seeAllLabel(s)}
                   onPress={() => openKindList(s.categoryId ? categoryListKind(s.categoryId) : (s.key as ListKind))}
                 />
               ) : null}
@@ -284,7 +322,7 @@ function Home() {
       )}
       {others.length > 0 ? (
         <CollapsibleSection
-          title={t("shell.otherChannels")}
+          title={t(modeKey(org, "shell.otherChannels"))}
           count={others.length}
           collapsed={collapsed.includes(OTHER_CHANNELS)}
           onToggle={() => toggle(OTHER_CHANNELS)}
