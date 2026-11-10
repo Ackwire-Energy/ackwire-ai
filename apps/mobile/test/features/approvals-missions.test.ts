@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { MachineTask } from "@agenteschat/client";
 import {
   approvalCardItems,
@@ -12,6 +14,7 @@ import {
   itemOwnWords,
   runKeys,
 } from "@agenteschat/client/lib/approval-card";
+import { approvalEffects } from "@agenteschat/client/lib/approval-review";
 import { approvalRuleWords, approvalTitle } from "@agenteschat/client/lib/approval-words";
 import {
   approvalAction,
@@ -505,5 +508,40 @@ describe("several requests on one card", () => {
     expect(en("approval.all.partial", { mine: 3, count: 4, who: "Bia" })).toBe(
       "You can decide 3 of 4: Approve all covers only those. The rest wait for Bia.",
     );
+  });
+});
+
+describe("a request's sheet on the phone", () => {
+  const read = (path: string) => readFileSync(join(import.meta.dir, "../../src/features", path), "utf8");
+
+  test("whether it can be undone is a chip after the title, not a line in the foot; what it touches stays there", () => {
+    const sheet = read("approvals/ApprovalSheet.tsx");
+    const who = sheet.slice(sheet.indexOf("const who = ("), sheet.indexOf("body = refusing"));
+    // The title, then the chip on its last line while it fits (a wrapping line), never cut.
+    expect(who.indexOf("<ApprovalUndoChip approval={a} />")).toBeGreaterThan(who.indexOf("approvalTitleText(t, a)"));
+    expect(who).not.toContain("numberOfLines");
+    expect(sheet).toContain('titleLine: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 8');
+    // Where and the fuse go under the face and the title at the sheet's width: never a column beside them.
+    expect(who.indexOf("<View style={styles.whereRow}>")).toBeGreaterThan(who.indexOf("</View>\n        </View>"));
+    expect(sheet).toContain(".filter((tr) => tr !== undo)");
+    const parts = read("approvals/parts.tsx");
+    expect(parts).toContain("const { undo } = approvalEffects(a);");
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the component's own template, read as source text
+    expect(parts).toContain("label={t(`mobile.approval.trait.${undo}`)}");
+  });
+
+  test("the undo trait it shows: a merge can be undone, a delete can't, and the foot keeps what it touches", () => {
+    const merge = approval({ id: "m" });
+    expect(approvalEffects(merge).undo).toBe("reversible");
+    const drop = approval({ id: "d", tool: "github_delete_branch", scope: "github:refs.delete" });
+    expect(approvalEffects(drop).undo).toBe("irreversible");
+    const deploy = approval({ id: "p", tool: "vercel_deploy", scope: "vercel:deploy" });
+    expect(approvalTraits(deploy).filter((tr) => tr !== approvalEffects(deploy).undo)).toEqual(["production"]);
+  });
+
+  test("an approval's values in the card draw their code as code", () => {
+    const parts = read("approvals/parts.tsx");
+    const details = parts.slice(parts.indexOf("export function ApprovalDetails("));
+    expect(details).toContain("<Spans inline={parseInline(r.value)} />");
   });
 });

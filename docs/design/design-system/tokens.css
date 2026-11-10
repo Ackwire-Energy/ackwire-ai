@@ -172,6 +172,8 @@
   --control-icon-sm: 16px;
   --control-icon-md: 18px;
   --control-icon-lg: 20px;
+  /* What a finger needs: a small control's plate stays 32 on touch, its target grows to this past it. */
+  --touch-target: 44px;
   --font-sans: Onest, "Segoe UI", system-ui, sans-serif;
   --font-mono: "Martian Mono", ui-monospace, Menlo, monospace;
   /*

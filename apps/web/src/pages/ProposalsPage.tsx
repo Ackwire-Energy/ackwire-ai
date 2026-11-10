@@ -200,14 +200,14 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
             </section>
 
             <section aria-label={t("proposals.changeLabel")} className="section section--tight">
-              <div className="row ac-actrow">
-                <span className="ac-eyebrow spacer ac-actrow__text">
-                  {t("proposals.change", { target: targetLabel(current) })}
-                </span>
+              <div className="ac-actline proposal-change__head">
+                <span className="ac-eyebrow">{t("proposals.change", { target: targetLabel(current) })}</span>
                 {current.status === "pending" && current.canDecide && isText(current) && (
-                  <Button variant="ghost" size="sm" disabled={decide.isPending} onClick={() => setEditing((v) => !v)}>
-                    {editing ? t("proposals.viewDiff") : t("proposals.editFirst")}
-                  </Button>
+                  <span className="ac-acts">
+                    <Button variant="ghost" size="sm" disabled={decide.isPending} onClick={() => setEditing((v) => !v)}>
+                      {editing ? t("proposals.viewDiff") : t("proposals.editFirst")}
+                    </Button>
+                  </span>
                 )}
               </div>
               {!isText(current) && current.target.type !== "skill" ? (

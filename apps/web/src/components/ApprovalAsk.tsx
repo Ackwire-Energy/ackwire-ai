@@ -9,7 +9,7 @@ import {
   runKeys,
 } from "@agenteschat/client/lib/approval-card";
 import { aheadPhase } from "@agenteschat/client/lib/approval-kind";
-import { approvalOriginShort, approvalWhy } from "@agenteschat/client/lib/approval-origin";
+import { approvalOriginShort, approvalWords } from "@agenteschat/client/lib/approval-origin";
 import {
   approvalAskLine,
   approvalDetail,
@@ -26,6 +26,7 @@ import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AheadLine, ApproveAlways, CancelAhead } from "@/components/ApprovalItem";
 import { useOrg } from "@/components/org-context";
+import { inlineWords } from "@/lib/markdown";
 import {
   ApproveAll,
   ApproveButton,
@@ -68,7 +69,7 @@ export function ApprovalAsk({
   // It stops being decidable the moment it expires, even before the server's event says so.
   const expired = useExpired(approval.expiresAt);
   const [refusing, setRefusing] = useState(false);
-  const why = approvalWhy(approval);
+  const why = approvalWords(approval);
   const origin = approvalOriginShort(approval);
   const tt = t as unknown as (key: string, options?: Record<string, unknown>) => string;
   const span = Math.max(1, new Date(approval.expiresAt).getTime() - new Date(approval.createdAt).getTime() || DAY_MS);
@@ -200,7 +201,7 @@ export function ApprovalGroupAsk({
   const owner = members.get(first.ownerUserId ?? agent?.ownerUserId ?? "");
   const waits = approvalGroupWaitsFor(items, owner?.name);
   const leadItem = waiting[0] ?? first;
-  const why = approvalWhy(leadItem);
+  const why = approvalWords(leadItem);
   const always = approveAlwaysOn(items);
   const deadline = cardDeadline(items);
   const left = deadline ? Math.max(0, new Date(deadline).getTime() - Date.now()) / DAY_MS : 0;
@@ -337,7 +338,7 @@ function RunItem({
   const first = run[0];
   if (!first) return null;
   return (
-    <li className="rq__item rq__run" data-status="pending">
+    <li className="rq__item rq__run ac-actline" data-status="pending">
       <div className="rq__well">
         <span className="rq__logo">
           <ConnectorMark approval={first} />
@@ -391,15 +392,18 @@ function GroupItem({
   const runAt = approval.runAt ? nextLabel(i18n.language, approval.runAt) : "";
   const tt = t as unknown as (key: string, options?: Record<string, unknown>) => string;
   return (
-    <li className={pending ? "rq__item" : "rq__item rq__item--done"} data-status={approval.status}>
+    <li
+      className={pending ? "rq__item ac-actline" : "rq__item rq__item--done ac-actline"}
+      data-status={approval.status}
+    >
       <div className="rq__well">
         <span className="rq__logo">
           <ConnectorMark approval={approval} />
         </span>
         <span className="rq__wt">
           <b>{approvalTitle(t, approval)}</b>
-          {detail && <small>{detail}</small>}
-          {own.why && <small className="rq__item-why">{own.why}</small>}
+          {detail && <small>{inlineWords(detail, "it-d")}</small>}
+          {own.why && <small className="rq__item-why">{inlineWords(own.why, "it-w")}</small>}
           {own.origin && <small className="rq__item-why">{tt(own.origin.key, own.origin.values)}</small>}
           {runAt && (ahead === "asking" || ahead === "scheduled") && (
             <small className="rq__item-why">

@@ -161,7 +161,7 @@ html:not([data-pointer]) .cq__open:focus-visible {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px 16px;
+  gap: 4px var(--space-2);
   font-size: 13px;
   line-height: 18px;
 }
@@ -337,15 +337,9 @@ html:not([data-pointer]) .cq__open:focus-visible {
     flex-grow: 1;
   }
 }
-/* A title that wraps keeps the face on its first line. */
-.uq-dialog .ac-dialog__head {
-  align-items: flex-start;
-}
+/* A title that wraps keeps the face on its first line's capitals. */
 .uq-dialog .ac-dialog__lead {
-  translate: 0 calc(12px - var(--cap-mid) - 50%);
-}
-.uq-dialog .ac-dialog__acts {
-  translate: 0 calc(12px - var(--cap-mid) - 50%);
+  translate: 0 calc(var(--control-h-sm) / 2 - var(--cap-mid) - 50%);
 }
 .uq {
   display: flex;

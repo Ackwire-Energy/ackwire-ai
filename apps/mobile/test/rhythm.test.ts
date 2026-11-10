@@ -32,6 +32,19 @@ test("the kit's screens, grouped rows and toolbar controls read those numbers in
   expect(source("Row.tsx")).toContain("paddingHorizontal: CARD_PAD");
 });
 
+test("a small button and a card's footer button are the web's 32, their targets grown to 44 above and below only", () => {
+  const button = source("Button.tsx");
+  expect(button).toContain("const SMALL = { height: TOOL_H, radius: 10, padding: 12");
+  expect(button).toMatch(/card: SMALL,\s*sm: SMALL,/);
+  expect(button).toContain("const grow = (TOUCH - height) / 2;");
+  expect(button).toContain("return grow > 0 ? { top: grow, bottom: grow } : undefined;");
+  expect(button).toContain("hitSlop={slopOf(s.height)}");
+  expect(source("HoldButton.tsx")).toContain("hitSlop={slopOf(s.height)}");
+  // Nothing sizes a button of its own past the kit's sizes.
+  const sized = files(SRC).filter((f) => /<(Button|HoldButton)\b[^>]*\bminHeight/.test(readFileSync(f, "utf8")));
+  expect(sized.map((f) => relative(SRC, f))).toEqual([]);
+});
+
 test("a strip that scrolls sideways under a screen's title runs edge to edge, its first item on the title's line", () => {
   expect(source("Filters.tsx")).toContain("paddingHorizontal: SCREEN_X");
   const tasks = readFileSync(join(SRC, "features/issues/IssuesScreen.tsx"), "utf8");

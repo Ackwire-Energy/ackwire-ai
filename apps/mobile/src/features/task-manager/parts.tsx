@@ -327,5 +327,5 @@ const styles = StyleSheet.create({
   field: { borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 10, minHeight: 36 },
   input: { paddingVertical: 8 },
   confirm: { gap: 10 },
-  confirmRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  confirmRow: { flexDirection: "row", alignItems: "center", gap: 8 },
 });

@@ -984,27 +984,29 @@ function LinkRequests({ requests, onOpen }: { requests: readonly { id: string; n
   const { org } = useOrg();
   if (requests.length === 0) return null;
   return (
-    <div className="invite-waiting ac-actrow">
+    <div className="invite-waiting">
       <AvatarStack aria-hidden="true">
         {requests.slice(0, 3).map((r) => (
           <Avatar key={r.id} name={r.name} size="sm" />
         ))}
       </AvatarStack>
-      <span className="invite-waiting__text ac-actrow__text">
-        <b>{t("members.dialog.linkStep.waiting", { count: requests.length })}</b>
-        <span>
-          {namesText(
-            t,
-            requests.map((r) => r.name),
-            2,
-          )}
+      <span className="ac-actline">
+        <span className="invite-waiting__text">
+          <b>{t("members.dialog.linkStep.waiting", { count: requests.length })}</b>
+          <span>
+            {namesText(
+              t,
+              requests.map((r) => r.name),
+              2,
+            )}
+          </span>
         </span>
+        <Button size="sm" asChild>
+          <Link to="/org/$orgId/settings/$section" params={{ orgId: org.id, section: "members" }} onClick={onOpen}>
+            {t("members.dialog.linkStep.seeRequests")}
+          </Link>
+        </Button>
       </span>
-      <Button size="sm" asChild>
-        <Link to="/org/$orgId/settings/$section" params={{ orgId: org.id, section: "members" }} onClick={onOpen}>
-          {t("members.dialog.linkStep.seeRequests")}
-        </Link>
-      </Button>
     </div>
   );
 }

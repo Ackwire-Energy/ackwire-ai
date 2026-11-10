@@ -368,7 +368,7 @@ describe("the agent page's cards and the chat's", () => {
     const css = await sheet("apps/web/src/components/computer/computer.css");
     expect(value(css, ".cmp-entry__row", "align-items")).toBe("center");
     expect(declarations(css, ".cmp-entry__row>.ac-computer")).toEqual([]);
-    const lead = ".cmp-dialog .ac-dialog__lead:has(+ .ac-dialog__titles)";
+    const lead = ".cmp-dialog .ac-dialog__lead:has(+ .ac-actline > .ac-dialog__titles)";
     expect(value(css, lead, "align-self")).toBe("center");
     expect(value(css, lead, "translate")).toBe("none");
   });

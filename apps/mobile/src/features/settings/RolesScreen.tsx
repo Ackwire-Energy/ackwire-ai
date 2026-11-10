@@ -126,6 +126,7 @@ export function RolesScreen() {
       label={roleName(t, role)}
       sub={roleSummary(t, i18n.language, role, everyone)}
       subLines={2}
+      media
       value={String(peopleWith(role, people).length)}
       chevron
       onPress={() => router.push(rolePath(role.id))}
@@ -146,6 +147,7 @@ export function RolesScreen() {
           label={t("roles.owner")}
           sub={t("rolesPage.summary.owner")}
           subLines={2}
+          media
           value={String(owners.length)}
           chevron
           onPress={() => router.push(rolePath(OWNER_ROLE))}
@@ -223,6 +225,7 @@ function RolePage({ role, people }: { role: OrgRole; people: Person[] }) {
             label={t("rolesPage.administrator")}
             sub={t("rolesPage.administratorDesc")}
             subLines={2}
+            media
             toggle={admin}
             disabled={Boolean(locked)}
             onPress={() => patch({ permissions: withKey(role, "administrator", !admin) })}
@@ -235,6 +238,7 @@ function RolePage({ role, people }: { role: OrgRole; people: Person[] }) {
             label={r.label}
             sub={r.line}
             subLines={2}
+            media
             value={r.value}
             chevron
             onPress={() => openArea(r.id)}
@@ -353,6 +357,8 @@ function PersonRow({ person, mine, onPress }: { person: Person; mine: boolean; o
       leading={<Face who={{ type: "person", id: person.userId }} size={30} live={false} />}
       label={mine ? `${person.name}${t("common.youSuffix")}` : person.name}
       sub={person.email}
+      subLines={2}
+      media
       {...(onPress ? { more: true, onPress } : {})}
     />
   );
@@ -433,6 +439,7 @@ function OwnerScreen({ people }: { people: Person[] }) {
             labelLines={2}
             sub={t(`rolesPage.owner.${i.key}Desc`)}
             subLines={2}
+            media
           />
         ))}
       </GroupedList>
@@ -636,6 +643,8 @@ export function AddToRoleScreen({ roleId }: { roleId: string }) {
               leading={<Face who={{ type: "person", id: p.userId }} size={30} live={false} />}
               label={p.name}
               sub={p.email}
+              subLines={2}
+              media
               checked={picked.has(p.userId)}
               onPress={() =>
                 setPicked((now) => {

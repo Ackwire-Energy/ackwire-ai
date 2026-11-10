@@ -189,27 +189,32 @@ export function ConsultPairRow({ askerId, items }: { askerId: string; items: rea
             }
           : { "aria-expanded": open, onClick: () => setOpen((o) => !o) })}
       >
-        <AgentAvatar agentId={askerId} size="xs" name={from} state="idle" />
-        <span className="consult-pair__name">{from}</span>
-        <Icon name="swap" size={16} className="consult-pair__swap" label={t("newAgent.and")} />
-        <span className="ac-avatar-stack consult-pair__faces">
-          {pair.faces.slice(0, 3).map((f) => (
-            <AgentAvatar
-              key={f.agentId}
-              agentId={f.agentId}
-              size="xs"
-              name={nameOf(f.agentId)}
-              state={live && !f.off ? "thinking" : "idle"}
-              className={f.off ? "consult-pair__off" : undefined}
-            />
-          ))}
+        {/* One sentence that wraps at its spaces: each face keeps its name's first word, the · its name's last. */}
+        <span className="consult-pair__who">
+          <AgentAvatar agentId={askerId} size="xs" name={from} state="idle" />
+          <span className="consult-pair__name">{from}</span>
         </span>
-        <span className="consult-pair__name">{names.length === 1 ? names[0] : namesText(t, names, 1)}</span>
+        <Icon name="swap" size={16} className="consult-pair__swap" label={t("newAgent.and")} />
+        <span className="consult-pair__who">
+          <span className="ac-avatar-stack consult-pair__faces">
+            {pair.faces.slice(0, 3).map((f) => (
+              <AgentAvatar
+                key={f.agentId}
+                agentId={f.agentId}
+                size="xs"
+                name={nameOf(f.agentId)}
+                state={live && !f.off ? "thinking" : "idle"}
+                className={f.off ? "consult-pair__off" : undefined}
+              />
+            ))}
+          </span>
+          <span className="consult-pair__name">{names.length === 1 ? names[0] : namesText(t, names, 1)}</span>
+        </span>
         {(pair.word || pair.seconds !== null) && (
           <span className="consult-pair__sep" aria-hidden="true">
             ·
           </span>
-        )}
+        )}{" "}
         {pair.word && <span className="consult-pair__word">{t(pair.word.key, pair.word.values)}</span>}
         {pair.seconds !== null && (
           <span className="consult-pair__time">{consultTimeText(t, i18n.language, live, pair.seconds)}</span>

@@ -73,6 +73,7 @@ export function HostComputerOff() {
             label={label}
             sub={t("machines.host.offText")}
             subLines={2}
+            media
           />
           {admin ? (
             <GroupedRow

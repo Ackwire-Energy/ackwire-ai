@@ -8,7 +8,7 @@ import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Platform, Text as RNText, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
-import { Button, CARD_PAD, ICON_BUTTON_SIZE, IconButton, Text, ToastHost, useToast } from "@/ui";
+import { Button, CARD_PAD, IconButton, SCREEN_X, Text, ToastHost, useToast } from "@/ui";
 import { CodeText, RawToggle } from "../chat/CodeCard";
 import { MessageText } from "../chat/MessageText";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
@@ -21,8 +21,9 @@ import { VideoPlayer } from "./VideoPlayer";
 
 /**
  * A file opened from a message: Markdown and text drawn by the
- * app, PDF in a web view (iOS draws PDFs natively there), a video in our player, anything else as its card. Top: close, the
- * name and "Documento · 4 KB · Theo". Bottom: Enviar and Compartilhar; Ver no Drive in the "…".
+ * app, PDF in a web view (iOS draws PDFs natively there), a video in our player, anything else as its card. Top: close,
+ * Copiar texto and the "…", then the name and "Documento · 4 KB · Theo" on a row of their own. Bottom: Enviar and
+ * Compartilhar; Ver no Drive in the "…".
  */
 export function DocumentViewer({ id, version }: { id: string; version?: number }) {
   return (
@@ -61,16 +62,7 @@ function Viewer({ id, version }: { id: string; version?: number }) {
     <View style={[styles.screen, { backgroundColor: c.bg }]}>
       <View style={[styles.top, { paddingTop: insets.top + 8 }]}>
         <IconButton icon="x" plate label={t("mobile.common.close")} onPress={close} />
-        {/* Copiar texto's twin on this side: the title stays centred on the screen. */}
-        {textual ? <View style={styles.balance} /> : null}
-        <View style={styles.title}>
-          <Text variant="subhead" style={styles.bold} numberOfLines={1}>
-            {info?.name ?? ""}
-          </Text>
-          <Text variant="footnote" tone="faint" numberOfLines={1}>
-            {info && detail ? line(info, [dir.nameOf(detail.createdBy)]) : ""}
-          </Text>
-        </View>
+        <View style={styles.spacer} />
         {textual ? (
           <IconButton
             icon="copy"
@@ -87,6 +79,15 @@ function Viewer({ id, version }: { id: string; version?: number }) {
           onPress={() => actions.more(false)}
           disabled={!detail}
         />
+      </View>
+      {/* The name and its line under the buttons, the screen's whole width: never cut to one line beside them. */}
+      <View style={styles.heading}>
+        <Text variant="body" style={styles.bold} numberOfLines={3}>
+          {info?.name ?? ""}
+        </Text>
+        <Text variant="footnote" tone="faint">
+          {info && detail ? line(info, [dir.nameOf(detail.createdBy)]) : ""}
+        </Text>
       </View>
 
       <View style={styles.body}>
@@ -308,8 +309,8 @@ function BigCard({ info }: { info: FileInfo }) {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   top: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingBottom: 10 },
-  title: { flex: 1, minWidth: 0, alignItems: "center" },
-  balance: { width: ICON_BUTTON_SIZE },
+  spacer: { flex: 1 },
+  heading: { gap: 2, paddingHorizontal: SCREEN_X, paddingBottom: 8 },
   bold: { fontWeight: "600" },
   body: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32, gap: 6 },

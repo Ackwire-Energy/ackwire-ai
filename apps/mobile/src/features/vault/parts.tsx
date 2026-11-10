@@ -119,6 +119,7 @@ export function ScopeRows({
           label={t("mobile.vault.scope.personal")}
           sub={t("mobile.vault.scope.personalText")}
           subLines={2}
+          media
           checked={scope === "personal"}
           onPress={() => onChange("personal")}
         />
@@ -127,6 +128,7 @@ export function ScopeRows({
           label={t("mobile.vault.scope.team")}
           sub={canTeam ? t("mobile.vault.scope.teamText") : t("mobile.vault.scope.teamLocked")}
           subLines={2}
+          media
           checked={scope === "team"}
           disabled={!canTeam}
           faint={!canTeam}
@@ -170,6 +172,7 @@ export function AgentRows({
           label={t("mobile.vault.access.allAgents")}
           sub={t("mobile.vault.agents.allText")}
           subLines={2}
+          media
           toggle={access.allAgents}
           disabled={disabled}
           onPress={() => onChange({ ...access, allAgents: !access.allAgents })}

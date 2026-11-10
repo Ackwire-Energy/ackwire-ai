@@ -44,29 +44,31 @@ export function CodeBlock({
 
   return (
     <div className="code-card" ref={card}>
-      <div className="code-card__top">
+      <div className="code-card__top ac-actline">
         <span className="code-card__lang">{label}</span>
-        {action}
-        {preview && (
-          <Button variant="ghost" size="sm" aria-pressed={code} onClick={() => setCode((c) => !c)}>
-            {t("common.code")}
-          </Button>
-        )}
-        {formatted !== null && formatted !== text.trim() && (
-          <Button variant="ghost" size="sm" aria-pressed={raw} onClick={() => setRaw((r) => !r)}>
-            {t("common.raw")}
-          </Button>
-        )}
-        <CopyCode text={shown} />
-        <Button
-          variant="ghost"
-          size="sm"
-          iconOnly
-          icon="expand"
-          aria-label={t("common.fullScreen")}
-          title={t("common.fullScreen")}
-          onClick={expand}
-        />
+        <span className="ac-acts">
+          {action}
+          {preview && (
+            <Button variant="ghost" size="sm" aria-pressed={code} onClick={() => setCode((c) => !c)}>
+              {t("common.code")}
+            </Button>
+          )}
+          {formatted !== null && formatted !== text.trim() && (
+            <Button variant="ghost" size="sm" aria-pressed={raw} onClick={() => setRaw((r) => !r)}>
+              {t("common.raw")}
+            </Button>
+          )}
+          <CopyCode text={shown} />
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            icon="expand"
+            aria-label={t("common.fullScreen")}
+            title={t("common.fullScreen")}
+            onClick={expand}
+          />
+        </span>
       </div>
       {drawing ? (
         <div className="code-card__preview">{drawing}</div>

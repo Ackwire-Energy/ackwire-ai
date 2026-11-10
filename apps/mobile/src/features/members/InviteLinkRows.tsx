@@ -138,6 +138,7 @@ export function InviteLinkRows() {
                     : t("members.link.earlierNoName", { when, date })
                 }
                 subLines={3}
+                media
                 danger
                 disabled={turnOff.isPending}
                 onPress={() => confirmTurnOff(l)}

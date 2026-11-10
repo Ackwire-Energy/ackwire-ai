@@ -225,3 +225,54 @@ describe("viewer", () => {
     expect(doubleTapZoom(400, 600, 400, 800)).toBe(2.5);
   });
 });
+
+describe("a document's head", () => {
+  test("the bar keeps ×, Copiar texto and ⋯; the name and its line take a row of their own under it, never cut", () => {
+    const viewer = readFileSync(join(import.meta.dir, "../../src/features/files/DocumentViewer.tsx"), "utf8");
+    const bar = viewer.slice(
+      viewer.indexOf("<View style={[styles.top,"),
+      viewer.indexOf("<View style={styles.heading}>"),
+    );
+    expect(bar).not.toContain("info?.name");
+    expect(bar).not.toContain("styles.balance");
+    const heading = viewer.slice(
+      viewer.indexOf("<View style={styles.heading}>"),
+      viewer.indexOf("<View style={styles.body}>"),
+    );
+    expect(heading).toContain("numberOfLines={3}");
+    expect(heading).toContain("{info?.name");
+    expect(heading).not.toContain("numberOfLines={1}");
+  });
+
+  test("a picture's head too: × and ⋯ on the first row, the name and its line on the row under them", () => {
+    const viewer = readFileSync(join(import.meta.dir, "../../src/features/files/ImageViewer.tsx"), "utf8");
+    const top = viewer.slice(viewer.indexOf("style={[styles.top,"), viewer.indexOf("</Chrome>"));
+    expect(top.indexOf('icon="more"')).toBeLessThan(top.indexOf("{info?.name"));
+    expect(top).toContain("numberOfLines={3}");
+    expect(top).not.toContain("numberOfLines={1}");
+    expect(viewer).toContain('title: { flexBasis: "100%", gap: 2 }');
+  });
+
+  test("the line under a file's name breaks between its facts, never inside one", () => {
+    const files = readFileSync(join(import.meta.dir, "../../src/features/files/MessageFiles.tsx"), "utf8");
+    expect(files.slice(files.indexOf("export function useFileLine("))).toMatch(
+      /\]\s*\.map\(keepWhole\)\s*\.join\(" · "\)/,
+    );
+    const image = readFileSync(join(import.meta.dir, "../../src/features/files/ImageViewer.tsx"), "utf8");
+    expect(image).toContain('[place, author, savedWhen(savedAt(detail))].filter(Boolean).map(keepWhole).join(" · ")');
+  });
+
+  test("a chart opened whole: × alone on the bar, its title on a row of its own under it, never cut", () => {
+    const chart = readFileSync(join(import.meta.dir, "../../src/features/chat/ChartCard.tsx"), "utf8");
+    const bar = chart.slice(chart.indexOf("<View style={styles.sheetTop}>"), chart.indexOf("{chart.spec.title}"));
+    expect(bar.indexOf("</View>")).toBeLessThan(bar.indexOf("<Text"));
+    expect(bar).not.toContain("numberOfLines");
+    expect(chart).not.toContain("sheetSpacer");
+  });
+
+  test("a browser profile's sign-in screen keeps its name and line whole beside ×", () => {
+    const screen = readFileSync(join(import.meta.dir, "../../src/features/browser/ProfileLoginScreen.tsx"), "utf8");
+    const top = screen.slice(screen.indexOf("<View style={[styles.top,"), screen.indexOf("<ScrollView"));
+    expect(top).not.toContain("numberOfLines");
+  });
+});

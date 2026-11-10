@@ -1,5 +1,6 @@
 import type { ArtifactDetail } from "@agenteschat/client";
 import { formatBytes } from "@agenteschat/client/lib/files";
+import { keepWhole } from "@agenteschat/client/lib/format";
 import { Image } from "expo-image";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -240,12 +241,15 @@ function InlineVideo({
 /** The type and size line: "Documento · 4 KB". */
 export function useFileLine() {
   const { t, i18n } = useTranslation();
+  // Each fact whole: a narrow line breaks between them, never inside "4 KB" or a name.
   return (info: FileInfo, extra: string[] = []) =>
     [
       t(`mobile.files.type.${info.type}`),
       ...(info.size !== null ? [formatBytes(i18n.language || "en", info.size)] : []),
       ...extra.filter(Boolean),
-    ].join(" · ");
+    ]
+      .map(keepWhole)
+      .join(" · ");
 }
 
 /** The file type's tile: the extension in capitals on a folded page (or the file icon without one). */

@@ -473,6 +473,7 @@ function Details({ routine: r, refetch }: { routine: Routine; refetch: () => Pro
               label={r.widget?.title ?? targetLabel(r.target)}
               sub={t(`routines.panel.whereHint.${whereHint}`)}
               subLines={2}
+              media
               chevron={Boolean(whereHref)}
               {...(whereHref ? { onPress: () => router.push(whereHref) } : {})}
             />

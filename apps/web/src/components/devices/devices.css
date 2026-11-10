@@ -125,11 +125,6 @@ a.dv-row__detail {
   justify-content: flex-end;
   margin-block-start: calc((48px - var(--control-h-sm)) / 2);
 }
-@media (pointer: coarse) {
-  .dv-row__end {
-    margin-block-start: calc((48px - var(--control-h-md)) / 2);
-  }
-}
 
 /* A phone under its host: indented to the host's text column, with an elbow from the host's portrait,
    and the divider starts at the indent so host and phones read as one group. */
@@ -902,11 +897,6 @@ html:not([data-pointer]) :is(a, button).dv-option:focus-visible {
 .dv-title > .ac-btn {
   margin-block: calc((24px - var(--control-h-sm)) / 2);
 }
-@media (pointer: coarse) {
-  .dv-title > .ac-btn {
-    margin-block: calc((24px - var(--control-h-md)) / 2);
-  }
-}
 .dv-headchips {
   gap: var(--space-2);
   align-items: center;
@@ -949,11 +939,6 @@ a.dv-chiplink:hover {
 .dv-row--ask .dv-row__kind {
   grid-column: 1 / -1;
   grid-row: 2;
-}
-.dv-row__acts {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
 }
 .dv-row--ask > .dv-row__acts {
   grid-column: 3;

@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { ActivityIndicator, Text as RNText, StyleSheet, View } from "react-native";
 import type { IconName } from "./Icon";
 import { PressScale } from "./PressScale";
+import { TOOL_H, TOUCH } from "./rhythm";
 import { systemText } from "./Text";
 import { type Theme, useTheme } from "./theme";
 import { CHROME_MAX_SCALE, weights } from "./type-scale";
@@ -32,14 +33,23 @@ export interface ButtonProps {
   hint?: string;
 }
 
+/** In a card or a row: the web's small button, 32 tall, its target grown to 44 past it (`slopOf`). */
+const SMALL = { height: TOOL_H, radius: 10, padding: 12, text: "subhead", icon: 16 } as const;
+
 export const BUTTON_SIZES = {
   md: { height: 48, radius: 15, padding: 20, text: "headline", icon: 18 },
-  // A request's footer in the conversation: wide enough to hit, short enough that the card stays a message.
-  card: { height: 40, radius: 12, padding: 14, text: "subhead", icon: 16 },
-  sm: { height: 36, radius: 12, padding: 14, text: "subhead", icon: 16 },
+  // A request's footer in the conversation: the in-card small button, so the card stays a message.
+  card: SMALL,
+  sm: SMALL,
 } as const;
 
 export type ButtonSize = keyof typeof BUTTON_SIZES;
+
+/** A button shorter than a finger's target grows it above and below, never sideways: two 8 apart never share one. */
+export function slopOf(height: number) {
+  const grow = (TOUCH - height) / 2;
+  return grow > 0 ? { top: grow, bottom: grow } : undefined;
+}
 
 /** Primary's tonal gradient (ink 82% → ink) and its shadow, as on the web (`.b1`). */
 export function primaryLook(theme: Pick<Theme, "colors">) {
@@ -81,6 +91,7 @@ export function Button({
       accessibilityLabel={label}
       {...(hint ? { accessibilityHint: hint } : {})}
       accessibilityState={{ disabled: disabled || loading, busy: loading }}
+      hitSlop={slopOf(s.height)}
       style={[
         {
           borderRadius: s.radius,

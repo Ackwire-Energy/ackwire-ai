@@ -344,11 +344,13 @@ html:not([data-pointer]) .brw-site button:focus-visible {
     opacity: 0;
   }
 }
+/* Its padding keeps the box's ring and shadow inside the card, which clips them at its edge on a narrow screen. */
 .brw-dim {
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
+  padding: 12px;
   background: color-mix(in srgb, var(--bg) 55%, transparent);
   backdrop-filter: blur(2px);
   z-index: 5;
@@ -610,7 +612,7 @@ html:not([data-pointer]) .brw-ac__tt:focus-visible {
 .brw-ac__acts {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-2);
   flex: none;
 }
 .brw-ac__acts .ac-btn--icon:not(.ac-btn--ghost) {
@@ -914,6 +916,10 @@ html:not([data-pointer]) .brw-ac__stage[tabindex]:focus-visible {
   border-radius: var(--control-r-lg);
   background: var(--raised);
   box-shadow: inset 0 0 0 1px var(--line2);
+}
+/* Its buttons 8 apart, as buttons side by side are everywhere; the words keep the field's own gap to them. */
+.brw-tfield > .ac-btn + .ac-btn {
+  margin-inline-start: 4px;
 }
 .brw-tfield:focus-within {
   box-shadow: inset 0 0 0 1.5px var(--ink);
@@ -1435,6 +1441,10 @@ html:not([data-pointer]) .brw-trail__ext:focus-visible {
     clip: rect(0 0 0 0);
     white-space: nowrap;
   }
+  /* Its words gone to screen readers, the button is its icon in a 32 square. */
+  .brw-dm.ac-btn {
+    padding-inline: calc((var(--control-h-sm) - var(--control-icon-sm)) / 2);
+  }
 }
 
 .brw-dim__row > .ac-icon {
@@ -1455,7 +1465,7 @@ html:not([data-pointer]) .brw-trail__ext:focus-visible {
 }
 .brw-go__nav {
   display: flex;
-  gap: 2px;
+  gap: var(--space-2);
 }
 /* Watching: the address alone, quiet. */
 .brw-go.is-read .brw-go__field {
@@ -1639,7 +1649,7 @@ html:not([data-pointer]) .brw-mf__now:focus-visible {
 .brw-mf__acts {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
   flex: none;
 }
 /* The page and what goes under it, inside the frame. */
@@ -1756,7 +1766,7 @@ html:not([data-pointer]) .brw-mf__now:focus-visible .brw-mf__hist {
   z-index: 3;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
   padding: 4px;
   border-radius: 12px;
   background: var(--glass, var(--raised));

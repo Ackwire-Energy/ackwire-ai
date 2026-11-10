@@ -51,6 +51,26 @@ describe("who the DM is with, one button", () => {
   });
 });
 
+describe("the header's glyphs, one group after who it is with", () => {
+  test("an agent's: the face and the name, then the search and the side panel's toggle, in an action line", async () => {
+    const header = await go(seedState(), `dm/agent/${ADA_ID}`);
+    const line = header.querySelector(":scope > .ac-actline.channel__line") as HTMLElement;
+    expect(header.querySelectorAll(":scope > :not(.nav-toggle, .channel__line)")).toHaveLength(0);
+    expect(line.firstElementChild?.matches(".dm-who")).toBe(true);
+    const acts = line.querySelector(":scope > .channel__acts") as HTMLElement;
+    expect(line.lastElementChild).toBe(acts);
+    expect(within(acts).getByRole("combobox", { name: "Buscar" })).toBeTruthy();
+    expect(within(acts).getByRole("button", { name: "Detalhes" }).classList.contains("dm-side-toggle")).toBe(true);
+  });
+
+  test("a person's: the face, the name and the email, then the search", async () => {
+    const header = await go(seedState(), "dm/person/u-joao");
+    const acts = header.querySelector(":scope > .channel__line > .channel__acts") as HTMLElement;
+    expect(within(acts).getByRole("combobox", { name: "Buscar" })).toBeTruthy();
+    expect(header.querySelector(".dm-who .channel__topic")?.textContent).toBe("joao@acme.com.br");
+  });
+});
+
 describe("the DM's search is the channel's, held to the DM", () => {
   const seeded = () => {
     const state = seedState();

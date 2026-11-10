@@ -406,15 +406,13 @@ th.pu-num .pu-sort {
 
 /* A request for more in the inbox: its two answers and the person's month. */
 /* Its answers and "see the month" are wider than a phone's inbox column: they wrap. */
+/* Its column gap is the kit's line of actions' (`.ac-acts`): the answers 8 apart, the link 16 after them. */
 .pu-asks {
-  display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
+  row-gap: var(--space-2);
   margin-top: 8px;
 }
 .pu-asks__see {
-  margin-left: 4px;
   font-size: 14px;
   white-space: nowrap;
 }

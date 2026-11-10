@@ -117,18 +117,24 @@ function ReachRow({
       </div>
     );
   return (
-    <div className="ag-rc ac-actrow">
+    <div className="ag-rc">
       <span className="ag-rc__ic" aria-hidden="true">
         <Icon name={handed ? "agent" : "info"} size={16} />
       </span>
-      <span className="ag-rc__tx ac-actrow__text">
-        <span className="ag-rc__sentence">
-          <Trans i18nKey={reachKey(e) as "reach.handed"} values={values} components={{ b: <b /> }} />
+      <span className="ac-actline">
+        <span className="ag-rc__tx">
+          <span className="ag-rc__sentence">
+            <Trans i18nKey={reachKey(e) as "reach.handed"} values={values} components={{ b: <b /> }} />
+          </span>
+          {detail && <span className="ag-rc__by">{detail}</span>}
         </span>
-        {detail && <span className="ag-rc__by">{detail}</span>}
+        {(addButton || (!handed && agent && e.userId)) && (
+          <span className="ac-acts">
+            {addButton}
+            {!handed && agent && e.userId && <AllowTalkButton agent={agent} userId={e.userId} className="ag-rc__btn" />}
+          </span>
+        )}
       </span>
-      {addButton}
-      {!handed && agent && e.userId && <AllowTalkButton agent={agent} userId={e.userId} className="ag-rc__btn" />}
     </div>
   );
 }

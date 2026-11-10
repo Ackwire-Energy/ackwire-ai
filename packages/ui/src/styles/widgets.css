@@ -181,7 +181,7 @@ html:not([data-pointer]) button.wg__title:focus-visible {
 /* Update now and the menu: shown on hover and focus, always on touch. */
 .wg__acts {
   display: flex;
-  gap: 2px;
+  gap: var(--space-2);
   opacity: 0;
   transition: opacity 0.15s;
 }

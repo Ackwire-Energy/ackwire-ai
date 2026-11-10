@@ -21,12 +21,12 @@ import { joinNames } from "@agenteschat/client/lib/format";
 import { handedTasksOf } from "@agenteschat/client/lib/issues";
 import { can } from "@agenteschat/client/lib/permissions";
 import { useQueryClient } from "@tanstack/react-query";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, LayoutAnimationConfig } from "react-native-reanimated";
 import { useOrg } from "@/providers/org";
-import { ACT_ROW, LineIcon, ROW_CARD_INSET, RowAction, Text, useLivePaused, useReducedMotion, useToast } from "@/ui";
+import { LineIcon, Text, useLivePaused, useReducedMotion, useToast } from "@/ui";
 import { router } from "@/ui/navigation";
 import { agoOf } from "../agents/logic";
 import { agoText } from "../agents/work";
@@ -49,10 +49,10 @@ import { useCardTop } from "./look";
 
 /**
  * What the agent changed with this reply (ADR 0037 round 2), on the card of the reply's tools (a hairline, the cut
- * corner): one change is a row with a raised Desfazer and the time left in it (A); two or more are a group with
- * "N mudanças · há X" and Desfazer tudo (B). The sentence wraps, whole, and a button that goes keeps its room, so it
- * never rewraps. Undone rows are struck through with "Desfeito por …" and Refazer; past the window they stay as plain
- * history. Optimistic, rolled back with a toast when the server refuses.
+ * corner): one change is a row whose sentence ends in Desfazer and the time left (A); two or more are a group with
+ * "N mudanças · há X" and Desfazer tudo (B). Desfazer wraps with the sentence's words, never a column beside them, and
+ * once it goes its room stays, so nothing under it moves. Undone rows are struck through with "Desfeito por …" and
+ * Refazer; past the window they stay as plain history. Optimistic, rolled back with a toast when the server refuses.
  */
 export function Receipts({ message: m }: { message: Message }) {
   // A task the right hand handed on is its chip (`HandedTaskChips`): its agent is at work on it already.
@@ -146,16 +146,19 @@ function ReceiptList({
   if (!group) {
     const { a, v } = rows[0] as { a: AgentAction; v: ReceiptView };
     return (
-      <View style={[styles.one, ACT_ROW.row, styles.card, { backgroundColor: c.raised, borderColor: c.line2 }]}>
-        <View style={styles.oneTx}>
-          <LineIcon name={receiptIcon(a.kind)} size={15} color={c.muted} variant="small" />
-        </View>
-        <View style={[ACT_ROW.text, styles.oneTx]}>
-          <Sentence action={a} channelId={m.channelId} struck={v.struck} size="one" />
+      <View style={[styles.one, styles.card, { backgroundColor: c.raised, borderColor: c.line2 }]}>
+        <LineIcon name={receiptIcon(a.kind)} size={15} color={c.muted} variant="small" />
+        <View style={styles.grow}>
+          <Sentence
+            action={a}
+            channelId={m.channelId}
+            struck={v.struck}
+            size="one"
+            undo={{ view: v, onUndo: () => undo(a), onRedo: () => redo(a) }}
+          />
           <OwnActions action={a} />
           {a.undoneAt ? <UndoneBy action={a} /> : <HandyLines action={a} />}
         </View>
-        <RowButton view={v} big onUndo={() => undo(a)} onRedo={() => redo(a)} />
       </View>
     );
   }
@@ -185,61 +188,112 @@ function ReceiptList({
         ) : null}
       </View>
       {rows.map(({ a, v }) => (
-        <View key={a.id} style={[styles.it, ACT_ROW.row, { borderTopColor: c.line2 }]}>
+        <View key={a.id} style={[styles.it, { borderTopColor: c.line2 }]}>
           <LineIcon name={receiptIcon(a.kind)} size={13} color={c.muted} variant="footnote" />
-          <View style={ACT_ROW.text}>
-            <Sentence action={a} channelId={m.channelId} struck={v.struck} size="item" />
+          <View style={styles.grow}>
+            <Sentence
+              action={a}
+              channelId={m.channelId}
+              struck={v.struck}
+              size="item"
+              undo={{ view: v, onUndo: () => undo(a), onRedo: () => redo(a) }}
+            />
             <OwnActions action={a} />
             {a.undoneAt ? <UndoneBy action={a} /> : <HandyLines action={a} />}
           </View>
-          <RowButton view={v} onUndo={() => undo(a)} onRedo={() => redo(a)} />
         </View>
       ))}
     </View>
   );
 }
 
-/** The sentence ("Criei a issue **#23** · …"); the bold part opens the target when the phone has its screen. */
+/** Desfazer or Refazer at the end of a sentence; none for who may not use it. */
+interface UndoProps {
+  view: ReceiptView;
+  onUndo: () => void;
+  onRedo: () => void;
+}
+
+/**
+ * The sentence ("Criei a issue **#23** · …"); the bold part opens the target when the phone has its screen. `undo`
+ * ends it: Desfazer and the time left on one change, the word alone in a group, wrapping with the words. Once it had
+ * one its room stays when its time is up, unseen and untouchable, so the card never shrinks under a reader.
+ */
 function Sentence({
   action: a,
   channelId,
   struck,
   size,
+  undo,
 }: {
   action: AgentAction;
   channelId: string;
   struck: boolean;
   size: "one" | "item";
+  undo?: UndoProps;
 }) {
   const { t } = useTranslation();
+  const c = useColors();
   const href = targetHref(a.target, channelId);
   const meId = useMeId();
   const values = actionTextValues(a, t, meId ?? undefined);
   const runs = boldRuns(t(actionTextKey(a), values) as string);
   const open = href ? () => router.push(href) : undefined;
+  const variant = size === "one" ? "small" : "footnote";
+  const had = useRef<ReceiptView["button"]>(null);
+  if (undo?.view.button) had.current = undo.view.button;
+  const shown = undo ? (undo.view.button ?? had.current) : null;
+  const unseen = Boolean(shown && !undo?.view.button);
+  const redo = shown === "redo";
+  const label = redo ? t("agentActions.redo") : t("agentActions.undo");
+  // One change shows the time left; past it, its room keeps the last second's width.
+  const time = shown && !redo && size === "one" ? undo?.view.timeLeft || formatTimeLeft(0) : null;
   return (
     <Text
-      variant={size === "one" ? "small" : "footnote"}
+      variant={variant}
       tone={struck ? "faint" : "ink2"}
       style={struck && styles.struck}
       onPress={open}
       accessibilityRole={open ? "link" : undefined}
+      // Its room unseen: read the words alone.
+      accessibilityLabel={unseen ? runs.map((r) => r.text).join("") : undefined}
       suppressHighlighting
+      // Greedy breaks: what ends the sentence never moves the words before it.
+      textBreakStrategy="simple"
+      lineBreakStrategyIOS="none"
     >
       {runs.map((r, i) =>
         r.bold ? (
-          <Text
-            key={String(i)}
-            variant={size === "one" ? "small" : "footnote"}
-            tone={struck ? "faint" : "ink"}
-            style={styles.bold}
-          >
+          <Text key={String(i)} variant={variant} tone={struck ? "faint" : "ink"} style={styles.bold}>
             {r.text}
           </Text>
         ) : (
           r.text
         ),
       )}
+      {shown && undo ? (
+        <>
+          {" "}
+          <Text
+            key={shown}
+            variant={variant}
+            tone="muted"
+            onPress={unseen ? undefined : redo ? undo.onRedo : undo.onUndo}
+            accessibilityRole={unseen ? undefined : "button"}
+            accessibilityLabel={time && !unseen ? `${label}, ${time}` : label}
+            suppressHighlighting
+            style={[styles.link, size === "one" && { color: c.agent }, unseen && styles.unseen]}
+          >
+            {label}
+            {/* No-break spaces: the word and its time wrap as one. */}
+            {time ? (
+              <Text variant={variant} tone="faint" style={[styles.time, unseen && styles.unseen]}>
+                {`\u00a0·\u00a0${time}`}
+              </Text>
+            ) : null}
+          </Text>
+        </>
+      ) : null}
     </Text>
   );
 }
@@ -366,77 +420,6 @@ function UndoneBy({ action: a }: { action: AgentAction }) {
   );
 }
 
-/**
- * Desfazer or Refazer: a row action next to one change, Desfazer with the time left in it; a quiet word in a group.
- * None for who may not use it. Once it had one, its room stays when its time is up, empty: the sentence never
- * rewraps.
- */
-function RowButton({
-  view: v,
-  big = false,
-  onUndo,
-  onRedo,
-}: {
-  view: ReceiptView;
-  big?: boolean;
-  onUndo: () => void;
-  onRedo: () => void;
-}) {
-  const { t } = useTranslation();
-  const reduced = useReducedMotion();
-  const had = useRef<ReceiptView["button"]>(null);
-  if (v.button) had.current = v.button;
-  const shown = v.button ?? had.current;
-  if (!shown) return null;
-  const redo = shown === "redo";
-  const label = redo ? t("agentActions.redo") : t("agentActions.undo");
-  const button = big ? (
-    <RowAction
-      label={label}
-      detail={redo ? undefined : v.timeLeft || formatTimeLeft(0)}
-      onPress={redo ? onRedo : onUndo}
-      accessibilityLabel={!redo && v.timeLeft ? `${label}, ${v.timeLeft}` : label}
-    />
-  ) : (
-    // 8 to the finger, not more: the rows above and below have their own.
-    <Pressable
-      onPress={redo ? onRedo : onUndo}
-      accessibilityRole="button"
-      hitSlop={8}
-      style={({ pressed }) => pressed && styles.pressed}
-    >
-      <Text variant="footnote" tone="muted" style={styles.bold}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-  // Undo turning into Redo fades in.
-  const swapped = (
-    <Animated.View key={shown} entering={reduced ? undefined : FadeIn.duration(160)}>
-      {button}
-    </Animated.View>
-  );
-  return v.button ? swapped : <Room>{button}</Room>;
-}
-
-/** A button gone, its room kept: not seen, not read, not tapped. */
-function Room({ children }: { children: ReactNode }) {
-  return (
-    <View
-      pointerEvents="none"
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
-      style={styles.room}
-    >
-      {children}
-    </View>
-  );
-}
-
-/** One change's row: a list row's height, and its action (RowAction, 32) in its middle. */
-const ONE_ROW = 50;
-const ACTION = 32;
-
 const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
@@ -449,22 +432,16 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 14,
     borderBottomLeftRadius: 6,
   },
-  // The icon (as the conversation's event lines), the sentence's first line and the action share one middle; the
-  // sentence wraps under it.
-  one: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 8,
-    minHeight: ONE_ROW,
-    paddingVertical: (ONE_ROW - ACTION) / 2,
-    ...ROW_CARD_INSET,
-  },
-  // The "small" line (20) on the action's middle.
-  oneTx: { paddingTop: (ACTION - 20) / 2 },
+  // The icon on the sentence's first line (as the conversation's event lines), the sentence wrapping under it: a
+  // list row's 12 above and below, one line 44.
+  one: { flexDirection: "row", alignItems: "flex-start", gap: 8, paddingVertical: 12, paddingHorizontal: 12 },
   pressed: { opacity: 0.6 },
+  // Desfazer: the action's weight, never the strike of an undone sentence it ends.
+  link: { fontWeight: "600", textDecorationLine: "none" },
+  time: { fontVariant: ["tabular-nums"] },
+  unseen: { color: "transparent" },
   undoneBy: { marginTop: 2 },
   copyHook: { alignSelf: "flex-start", marginTop: 6, paddingVertical: 2 },
-  room: { opacity: 0 },
   group: { overflow: "hidden" },
   hd: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 10, paddingHorizontal: 12 },
   it: {

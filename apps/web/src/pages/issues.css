@@ -966,37 +966,60 @@ html:not([data-pointer]) .issues-dest:focus-visible {
   font-size: 11.5px;
   color: var(--faint);
 }
-/* The dialog's bar: "#131" and the title on one row, the buttons on its first line; a long title wraps, never cut. */
-.ac-details__bar:has(.issue-bartitle) {
-  align-items: flex-start;
-}
-/* The title in the eyebrow's place: the 24 characters it keeps beside the buttons (`.ac-actrow`) are the title's. */
+/*
+ * The dialog's bar: "#131" inline before the title, a word's gap from it, so a long title wraps under the number
+ * instead of in a column beside it, and the pencil after its last word. Its field, while edited, sits beside the
+ * number. The bar's ⋯ and × follow on the title's first line, 16 after it.
+ */
 .ac-details__eyebrow:has(> .issue-bartitle) {
   font-size: 20px;
 }
 .issue-bartitle {
   flex: 1;
   min-width: 0;
+  padding-right: 36px;
+  font-size: 20px;
+  line-height: 28px;
+  color: var(--ink);
+}
+.issue-bartitle:has(> .issue-inplace__title) {
   display: flex;
   align-items: flex-start;
   gap: var(--space-2);
-  color: var(--ink);
+  padding-right: 0;
 }
 .issue-bartitle__number {
-  flex: none;
-  font-size: 20px;
+  margin-right: 6px;
   font-weight: 500;
-  line-height: 28px;
   color: var(--faint);
 }
-/* The title's plate (on hover, and its field while editing) sits between the gaps, never on "#131" or on "Salvo":
-   its bleed to the sides, which lines its words up with the text above and below elsewhere, has nothing to line up
-   with in a row. */
-.issue-bartitle > :is(.issue-inplace, .issue-inplace__title) {
+.issue-bartitle__number:has(+ .issue-inplace__title) {
+  flex: none;
+  margin-right: 0;
+}
+/* The title's plate (on hover) on its words' lines, never on "#131" or on "Salvo". */
+.issue-bartitle > .issue-inplace {
+  display: inline;
+  position: static;
+  margin: 0;
+  padding: 2px 0;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+.issue-bartitle .issue-details__title {
+  display: inline;
+}
+/* The pencil takes no room in the line (its room is the title's end padding), so it never wraps to a line alone. */
+.issue-bartitle .issue-inplace__pen {
+  position: relative;
+  inset: auto;
+  margin: -2px -36px -2px 4px;
+  vertical-align: top;
+}
+.issue-bartitle > .issue-inplace__title {
   flex: 1;
   min-width: 0;
   margin-inline: 0;
-  padding-left: var(--space-2);
 }
 .issue-bartitle .issue-details__title,
 .issue-bartitle .issue-inplace__title {
@@ -1004,14 +1027,10 @@ html:not([data-pointer]) .issues-dest:focus-visible {
   line-height: 28px;
   letter-spacing: -0.01em;
 }
-/* "Saved" on the title's first line (28px), not centred on a title that wraps. */
+/* "Saved" on the title's last line, hung from its top, so the empty slot never moves the line. */
 .issue-bartitle__saved {
-  flex: none;
   height: 28px;
-}
-/* The bar's buttons centre on that line too (the shared titled bar does the same). */
-.ac-details__bar:has(.issue-bartitle) > .ac-details__actions {
-  height: 28px;
+  vertical-align: top;
 }
 /* "✓ Salvo" (SavedNote) at the end of the source line. */
 .issue-details__saved {
@@ -1109,7 +1128,7 @@ html:not([data-pointer]) .issues-dest:focus-visible {
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  margin: 2px 0 4px;
+  margin: 2px 0 0;
 }
 .issue-prop {
   display: inline-flex;
@@ -1530,20 +1549,39 @@ html:not([data-pointer]) .issue-ask__other:focus-visible {
   gap: 6px;
   margin: 0;
 }
+/* Nova tarefa's chips: 8 apart, each 32 in the field look (fill and hairline), the date one of them. */
 .issue-new__props {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
   padding-top: 12px;
   border-top: 1px solid var(--line);
 }
 .issue-new__props .ac-btn .ac-avatar {
   margin-left: -2px;
 }
-/* The due date is one more chip in the row, as wide as its words, not a field taking a line of its own. */
+.issue-new__props > :is(.ac-btn, .ac-date__trigger),
+.issue-new__props > * > .ac-btn {
+  height: var(--control-h-sm);
+  min-height: var(--control-h-sm);
+  border: 0;
+  background: var(--field-bg);
+  box-shadow: inset 0 0 0 1px var(--field-line);
+}
+/* The due date is one more chip in the row, as wide as its words, not a field taking a line of its own: its glyph
+   first, its name in the chips' ink and weight. */
 .issue-new__props > .ac-date__trigger {
   width: auto;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.issue-new__props > .ac-date__trigger .ac-icon {
+  order: -1;
+}
+.issue-new__props > .ac-date__trigger .ac-date__placeholder {
+  color: inherit;
 }
 .issue-new__grow {
   flex: 1;
@@ -1710,6 +1748,11 @@ html:not([data-pointer]) .issue-ask__other:focus-visible {
 /* ── A tarefa: abas, arquivos sob a descrição, Anexos, Histórico ───────── */
 .issue-details .ac-tabpanel {
   gap: 16px;
+}
+/* The labels 16 under the header's last line, as the spec's header, toolbar and content are: the strip's own 8 of top
+   room makes the rest. */
+.issue-details .ac-tabs {
+  margin-top: -8px;
 }
 .issue-description__files {
   margin-top: 4px;

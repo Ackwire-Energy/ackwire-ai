@@ -17,8 +17,9 @@ export interface Fact {
 }
 
 /**
- * A row of short facts, each an icon, a small label and a one-line value, split by hairlines ("Where ·
- * Effect · Undo · Deadline"). Values never wrap: what doesn't fit ends in an ellipsis, whole in its title.
+ * A row of short facts, each an icon, a small label and a one-line value, split by hairlines ("Onde · Efeito ·
+ * Prazo"). Each fact is as wide as its words: one that doesn't fit moves whole to the next line, and only a value wider
+ * than the whole strip wraps.
  */
 export function FactStrip({ facts, className, ...rest }: { facts: Fact[] } & HTMLAttributes<HTMLDListElement>) {
   return (

@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, View } from "react-native";
+import { ACT_LINE } from "./ActLine";
 import { Count } from "./Count";
 import { Icon } from "./Icon";
 import { SCREEN_X } from "./rhythm";
@@ -17,17 +18,24 @@ export interface SectionHeaderProps {
 }
 
 /**
- * The header over a full-width list, as Conversas' sections: 15 semibold ink, the count beside it (medium, faint),
- * and a way on at its right (medium, faint, with its chevron).
+ * The header over a full-width list, as Conversas' sections: 15 semibold ink, the count after it (medium, faint), and a
+ * way on at its right (medium, faint, with its chevron), under the title from its start once the title takes more
+ * than its line (`ACT_LINE`).
  */
 export function SectionHeader({ title, count, action }: SectionHeaderProps) {
   const { colors } = useTheme();
   return (
-    <View style={styles.h}>
-      <Text variant="small" tone="ink" accessibilityRole="header" style={styles.title}>
+    <View style={[ACT_LINE.row, styles.h]}>
+      <Text variant="small" tone="ink" accessibilityRole="header" style={[ACT_LINE.text, styles.title]}>
         {title}
+        {/* In the title's words, so a wrapped title keeps it on its last line; an en space, the row's 8. */}
+        {count !== undefined ? (
+          <>
+            {"\u2002"}
+            <Count value={count} size={15} weight={weights.medium} color={colors.faint} />
+          </>
+        ) : null}
       </Text>
-      {count !== undefined ? <Count value={count} size={15} weight={weights.medium} color={colors.faint} /> : null}
       {action ? (
         <Pressable
           onPress={action.onPress}
@@ -36,7 +44,7 @@ export function SectionHeader({ title, count, action }: SectionHeaderProps) {
           hitSlop={12}
           style={({ pressed }) => [styles.action, pressed && styles.pressed]}
         >
-          <Text variant="small" tone="faint" numberOfLines={1} style={styles.actionText}>
+          <Text variant="small" tone="faint" style={styles.actionText}>
             {action.label}
           </Text>
           {action.chevron === false ? null : <Icon name="right" size={15} color={colors.faint} />}
@@ -47,18 +55,18 @@ export function SectionHeader({ title, count, action }: SectionHeaderProps) {
 }
 
 const styles = StyleSheet.create({
-  // The count and the way on sit on the title's baseline: on its first line when a long title wraps.
-  // At the screen's sides (SCREEN_X), 24 above and 8 below: the lists' rhythm in eights.
+  // The way on sits on the title's baseline. At the screen's sides (SCREEN_X), 24 above and 8 below: the lists' rhythm
+  // in eights.
   h: {
-    flexDirection: "row",
     alignItems: "baseline",
-    gap: 8,
+    columnGap: 16,
+    rowGap: 8,
     paddingTop: 24,
     paddingHorizontal: SCREEN_X,
     paddingBottom: 8,
   },
-  title: { fontWeight: "600", flexShrink: 1 },
-  action: { marginLeft: "auto", flexDirection: "row", alignItems: "baseline", gap: 2, flexShrink: 1, minWidth: 0 },
-  actionText: { fontWeight: weights.medium, flexShrink: 1 },
+  title: { fontWeight: "600" },
+  action: { flexDirection: "row", alignItems: "baseline", gap: 2 },
+  actionText: { fontWeight: weights.medium },
   pressed: { opacity: 0.6 },
 });

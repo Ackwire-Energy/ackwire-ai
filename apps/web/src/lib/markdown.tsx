@@ -153,7 +153,11 @@ export function renderInline(
       continue;
     }
     if (m[1]) {
-      const code = <code key={k}>{tok.slice(1, -1)}</code>;
+      const code = (
+        <code key={k} className="ac-inlinecode">
+          {tok.slice(1, -1)}
+        </code>
+      );
       const id = idRef && !words ? loneIdRef(tok.slice(1, -1)) : null;
       out.push(id && idRef ? idRef(id, tok.slice(1, -1), k, code) : code);
     } else if (m[2]) out.push(<strong key={k}>{inner(tok.slice(2, -2), k)}</strong>);
@@ -180,6 +184,31 @@ export function renderInline(
     rest = rest.slice(m.index + tok.length);
   }
   return out;
+}
+
+/**
+ * An agent's own words on a card (its reason, a question, a summary, a value it wrote) as formatted text: code between
+ * backticks, bold, links, never address pills. A node passes through as it is.
+ */
+export function inlineWords(words: ReactNode, key = "w"): ReactNode {
+  return typeof words === "string"
+    ? renderInline(words, key, undefined, undefined, undefined, false, undefined, false)
+    : words;
+}
+
+/** Code between backticks and **bold**, nothing else: words inside a control (an option, a button), where no link can go. */
+export function codeAndBold(text: string, key = "cb"): ReactNode[] {
+  return text.split(/(`[^`\n]+`|\*\*[^*\n]+\*\*)/g).map((part, i) => {
+    const k = `${key}-${i}`;
+    if (part.length > 2 && part.startsWith("`") && part.endsWith("`"))
+      return (
+        <code key={k} className="ac-inlinecode">
+          {part.slice(1, -1)}
+        </code>
+      );
+    if (part.length > 4 && part.startsWith("**") && part.endsWith("**")) return <b key={k}>{part.slice(2, -2)}</b>;
+    return part;
+  });
 }
 
 export interface MarkdownProps {

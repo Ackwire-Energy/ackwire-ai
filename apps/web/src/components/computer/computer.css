@@ -98,15 +98,10 @@
   --cmp-button: var(--control-h-sm);
   --cmp-line: 22px;
 }
-@media (pointer: coarse) {
-  .ac-dialog.cmp-dialog {
-    --cmp-button: var(--control-h-md);
-  }
-}
-/* A tablet: in control the line under the screen holds the Keyboard button, a 40 px touch control, so it is that tall. */
+/* A tablet: in control the line under the screen holds the Keyboard button, a small button, so it is that tall. */
 @media (pointer: coarse) and (min-width: 721px) {
   .ac-dialog.cmp-dialog {
-    --cmp-line: var(--control-h-md);
+    --cmp-line: var(--control-h-sm);
   }
 }
 /* The desktop app: its title bar is the page's own top 40 px, so the window centres in the work area under it. */
@@ -130,7 +125,7 @@
 .cmp-body:has(> .cmp-steps-row > .cmp-steps) > .dsk:not(.is-control) > .dsk-line {
   display: none;
 }
-/* A tablet's 40 px line: the steps on its middle, as the line's words are (desktop.css). */
+/* A tablet's taller line: the steps on its middle, as the line's words are (desktop.css). */
 @media (min-width: 721px) {
   .cmp-body:has(> .dsk) > .cmp-steps-row > .cmp-steps {
     margin-top: calc((var(--cmp-line) - 22px) / 2);
@@ -173,7 +168,7 @@
  * the phone's sheet turns off.
  */
 /* The take-control head: its icon centred on the title and the line under it together. */
-.cmp-dialog .ac-dialog__lead:has(+ .ac-dialog__titles) {
+.cmp-dialog .ac-dialog__lead:has(+ .ac-actline > .ac-dialog__titles) {
   align-self: center;
   translate: none;
 }
@@ -298,12 +293,17 @@
  * and as the face before the name does, in one place however the line under the name wraps, and while it is empty.
  * Full screen's bar keeps them in its middle, beside both lines.
  */
-.cmp-dialog .ac-dialog__acts {
+.cmp-dialog :is(.ac-dialog__acts, .ac-dialog__close) {
   align-self: flex-start;
+  height: auto;
   margin-top: calc((24px - var(--cmp-button)) / 2 - var(--title-cap-mid, var(--cap-mid)));
 }
-.cmp-dialog.is-screen-only .ac-dialog__acts {
+.cmp-dialog.is-screen-only :is(.ac-dialog__acts, .ac-dialog__close) {
   margin-top: calc((24px + 18px - var(--cmp-button)) / 2);
+}
+/* Actions that went under the name (a narrow sheet) stand 8 under its line, past the rise they take beside it. */
+.cmp-dialog .ac-dialog__head > .ac-actline {
+  row-gap: calc(var(--space-2) + (var(--cmp-button) - 24px) / 2 + var(--title-cap-mid, var(--cap-mid)));
 }
 /*
  * Full screen's arrows span 14.6 of their icon's 20 units: in the head's row it reaches out by the 2.7 units of air on
@@ -494,15 +494,10 @@
   font-size: 12.5px;
 }
 /* Its button beside words that wrap (a request's whole ask): on their first line, not the middle of the lines. The
-   words start as far down as the small button (32, 40 on touch) centres a line, so their first runs through its middle. */
+   words start as far down as the small button (32) centres a line, so their first runs through its middle. */
 .cmp-banner:has(> .ac-btn) {
   --cmp-banner-btn: var(--control-h-sm);
   align-items: flex-start;
-}
-@media (pointer: coarse) {
-  .cmp-banner:has(> .ac-btn) {
-    --cmp-banner-btn: var(--control-h-md);
-  }
 }
 .cmp-banner:has(> .ac-btn) > .cmp-banner__t {
   margin-top: calc((var(--cmp-banner-btn) - 22px) / 2);
@@ -788,11 +783,6 @@
   .cmp-acts > .cmp-take {
     --lead-air: initial;
     --lead-rise: initial;
-  }
-}
-@media (max-width: 640px) and (pointer: coarse) {
-  .cmp-acts > .ac-btn:has(> .ac-icon) {
-    width: var(--control-h-md);
   }
 }
 

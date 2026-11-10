@@ -119,3 +119,16 @@ test("Outra resposta by its letter key; Cancelar closes the field and sends noth
   expect(document.querySelector(".choices__write")).toBeNull();
   expect(document.querySelector(".choices__picked")).toBeNull();
 });
+
+test("an agent's code between backticks stays code: in the question and in the summary once answered", async () => {
+  await card([
+    { question: "Rodo `bun test` antes do merge?", options: [{ label: "Sim" }, { label: "Não" }] },
+    QUESTIONS[1] as (typeof QUESTIONS)[number],
+  ]);
+  expect(document.querySelector(".choices__question code.ac-inlinecode")?.textContent).toBe("bun test");
+  await act(async () => fireEvent.click(document.querySelector(".choices__option") as HTMLElement));
+  await settle(4);
+  await act(async () => fireEvent.click(document.querySelector(".choices__option") as HTMLElement));
+  await settle(6);
+  expect(document.querySelector(".choices__asked code.ac-inlinecode")?.textContent).toBe("bun test");
+});

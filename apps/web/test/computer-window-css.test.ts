@@ -80,9 +80,13 @@ test("the window ships on a whole pixel where the browser can round: its width e
 });
 
 test("the head's controls ship on the name's capitals, full screen's bar's in its middle, the raised ones with their room", async () => {
-  const head = await ships(COMPUTER, `src/${COMPUTER}`, ".cmp-dialog .ac-dialog__acts");
+  const head = await ships(COMPUTER, `src/${COMPUTER}`, ".cmp-dialog :is(.ac-dialog__acts, .ac-dialog__close)");
   expect(head).toContain("margin-top:calc((24px-var(--cmp-button))/2-var(--title-cap-mid,var(--cap-mid)))");
-  const bar = await ships(COMPUTER, `src/${COMPUTER}`, ".cmp-dialog.is-screen-only .ac-dialog__acts");
+  const bar = await ships(
+    COMPUTER,
+    `src/${COMPUTER}`,
+    ".cmp-dialog.is-screen-only :is(.ac-dialog__acts, .ac-dialog__close)",
+  );
   expect(bar).toContain("margin-top:calc((24px+18px-var(--cmp-button))/2)");
   expect(await ships(COMPUTER, `src/${COMPUTER}`, ".cmp-acts > .cmp-take", undefined, ["--lead-rise"])).toContain(
     "margin-inline:1.5px",

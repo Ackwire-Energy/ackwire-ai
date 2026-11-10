@@ -62,7 +62,7 @@ const noneWaiting = () => {
 };
 
 describe("the bell", () => {
-  test("at the end of my row at the bottom, saying how many are unread; no longer on top", async () => {
+  test("in my card at the bottom, how many are unread in the sidebar's red count; no longer on top", async () => {
     await go(
       seedState({
         notifications: [notification({ id: "n1", kind: "mention" }), notification({ id: "n2", kind: "dm" })],
@@ -72,7 +72,16 @@ describe("the bell", () => {
     expect(bell.getAttribute("href")).toBe(`/org/${ORG_ID}/notifications`);
     expect(bell.closest(".sidebar__me")).toBeTruthy();
     expect(bell.textContent).toBe("2");
+    // Unread calls on me: red like a mention's count, not a neutral count of things.
+    expect(bell.querySelector(".ac-count")?.classList.contains("sidebar__unread")).toBe(true);
     expect(listed()).not.toContain("Notificações");
+  });
+
+  test("more than 99 unread: the count on the bell's corner says 99+, its name says how many", async () => {
+    await go(
+      seedState({ notifications: Array.from({ length: 120 }, (_, i) => notification({ id: `n${i}`, kind: "dm" })) }),
+    );
+    expect(within(nav()).getByRole("link", { name: "120 notificações não lidas" }).textContent).toBe("99+");
   });
 
   test("nothing unread: the bell alone, named Notificações", async () => {

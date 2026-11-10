@@ -606,7 +606,7 @@ html:not([data-pointer]) .cal-band:focus-visible {
   justify-content: flex-end;
   align-items: center;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--space-2);
   margin-top: 6px;
 }
 .cal-details__actions .ac-link {
@@ -778,7 +778,7 @@ html:not([data-pointer]) .cal-band:focus-visible {
 .cal-mini__head {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: var(--space-2);
 }
 .cal-mini__title {
   flex: 1;

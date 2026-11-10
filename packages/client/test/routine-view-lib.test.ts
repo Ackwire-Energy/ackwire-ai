@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
 import type { AgentAction, AppNotification, Routine, RoutineRun } from "../src/api/types";
 import { actionTextValues } from "../src/lib/actions";
-import { approvalOriginWords, approvalWhy } from "../src/lib/approval-origin";
+import { approvalOriginWords, approvalWhy, approvalWords } from "../src/lib/approval-origin";
 import { openTarget } from "../src/lib/notifications";
 import {
   busyOnComputer,
@@ -357,6 +357,10 @@ describe("approvals asked while nobody watched", () => {
     expect(approvalWhy({ why: "  O teste passou.  " })).toBe("O teste passou.");
     expect(approvalWhy({ why: "   " })).toBeNull();
     expect(approvalWhy({})).toBeNull();
+    // A card draws the agent's marks: its why on one line keeps them, where a preview's loses them.
+    expect(approvalWords({ why: "  Rodo `bun test`\n**agora**.  " })).toBe("Rodo `bun test` **agora**.");
+    expect(approvalWords({ why: "   " })).toBeNull();
+    expect(approvalWords({})).toBeNull();
   });
 });
 
