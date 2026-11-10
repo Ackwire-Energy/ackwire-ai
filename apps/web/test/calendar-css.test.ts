@@ -94,7 +94,10 @@ describe("calendar items the Google Calendar way", () => {
     expect(content(131, 6)).toBeGreaterThanOrEqual(14.4);
     expect(padding(3)).toBe(6);
     expect(
-      last(declarations(atRule(css, "@container (max-width: 14.5px)"), ".cal-chip--block > .cal-chip__title"), "display"),
+      last(
+        declarations(atRule(css, "@container (max-width: 14.5px)"), ".cal-chip--block > .cal-chip__title"),
+        "display",
+      ),
     ).toBe("none");
   });
 

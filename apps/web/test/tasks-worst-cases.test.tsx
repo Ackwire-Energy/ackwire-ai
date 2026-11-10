@@ -209,9 +209,9 @@ describe("Tarefas at their worst", () => {
     expect(cardOf(133).querySelector(".issue-card__who")).toBeNull();
     expect(facts(cardOf(133))).toEqual(["#133", "financeiro", "hoje"]);
     expect(cardOf(134).querySelector(".issue-card__who .ac-avatar__initials")?.textContent).toBe("AS");
-    expect([...cardOf(136).querySelectorAll(".issue-card__title > code.ac-inlinecode")].map((c) => c.textContent)).toEqual(
-      ["bun test", "apps/web"],
-    );
+    expect(
+      [...cardOf(136).querySelectorAll(".issue-card__title > code.ac-inlinecode")].map((c) => c.textContent),
+    ).toEqual(["bun test", "apps/web"]);
     expect(cardOf(135).querySelector(".issue-card__state")?.textContent).toBe(
       "Bloqueado · não terminou: a IA do computador não conseguiu responder. Confira o computador e peça de novo",
     );
@@ -250,7 +250,10 @@ describe("Tarefas at their worst", () => {
     await settle(8);
     const title = document.querySelector(".issue-details__title") as HTMLElement;
     expect(title.textContent).toBe("Rodar bun test no CI do apps/web");
-    expect([...title.querySelectorAll("code.ac-inlinecode")].map((c) => c.textContent)).toEqual(["bun test", "apps/web"]);
+    expect([...title.querySelectorAll("code.ac-inlinecode")].map((c) => c.textContent)).toEqual([
+      "bun test",
+      "apps/web",
+    ]);
   });
 
   test("the details' strip: a long name and column, nine people, three PRs, twelve labels, a long GitHub link, German", async () => {
