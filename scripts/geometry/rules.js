@@ -702,9 +702,10 @@
     },
     /**
      * Words squeezed to a sliver beside something that keeps its width (an action, a time): a block of text on 3 lines
-     * or more with fewer than about 12 characters a line, or, straight inside a row, fewer than 1.6 words a line. A block
-     * is what its words lay out in: a `<b>` or a link inside a sentence is the sentence's. A wide character (Chinese,
-     * Japanese, Korean) takes the room of two.
+     * or more with fewer than about 12 characters a line, or, straight inside a row, fewer than 1.6 words a line of
+     * fewer than 20 characters (an address that wraps its full lines is one word, not a squeeze). A block is what its
+     * words lay out in: a `<b>` or a link inside a sentence is the sentence's. A wide character (Chinese, Japanese,
+     * Korean) takes the room of two.
      */
     wordwrap(out) {
       const blocks = new Map();
@@ -742,7 +743,7 @@
             (ps.display.includes("grid") && ps.gridTemplateColumns.split(" ").length > 1)) &&
           flow(parent).length >= 2;
         const room = [...words].reduce((n, ch) => n + (WIDE.test(ch) ? 2 : 1), 0);
-        if (room / lines < 12 || (row && words.split(" ").length / lines < 1.6))
+        if (room / lines < 12 || (row && words.split(" ").length / lines < 1.6 && room / lines < 20))
           out.push({ rule: "wordwrap", node: el, el: sig(el), box: sig(parent), lines, text: words.slice(0, 60) });
       }
     },
