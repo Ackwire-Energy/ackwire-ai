@@ -313,6 +313,23 @@
 .arrival-chat__acts:empty {
   display: none;
 }
+/* A plan's or a key's panel is the dialog's own content here, not a card inside it: no face, no edge, its foot a
+   line across the dialog's text column. */
+.arrival-chat .ai-panel {
+  --card-pad: 0px;
+  padding: 0;
+  background: none;
+  box-shadow: none;
+  border-radius: 0;
+}
+.arrival-chat .ai-panel > .ac-card__foot {
+  padding-block: 12px 0;
+}
+/* With no footer under it, the body keeps the dialog's own edge at its foot. */
+.arrival-chat > .ac-dialog__body:last-child,
+.arrival-chat > .ac-dialog__body:has(+ .arrival-chat__acts:empty) {
+  padding-bottom: var(--dialog-pad);
+}
 .arrival-opts__label {
   margin: 0;
   color: var(--ink-muted);

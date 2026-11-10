@@ -16,6 +16,7 @@ import { accountCodeAad, sealSecret } from "@agenteschat/client/lib/secret-box";
 import { AffixInput, Button, cx, Icon, InfoHint, Locked, ProviderLogo, SettingNote, SwapLabel } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
 import { inDesktopApp } from "@/lib/desktop";
@@ -96,6 +97,11 @@ export interface AddAccountProps {
    * is offline keeps it meanwhile, so the same sign-in goes on once it's back.
    */
   onSigningIn?: (on: boolean) => void;
+  /**
+   * A dialog's footer: the buttons that start a sign-in (sign in and copy its link, sign in again or another account)
+   * go there, as the dialog's main action and the one beside it, instead of under their step.
+   */
+  actionsAt?: HTMLElement | null;
 }
 
 export function AddAccount(props: AddAccountProps) {
@@ -128,6 +134,21 @@ export function AddAccount(props: AddAccountProps) {
       {t("connectAi.another")}
     </Button>
   );
+  if (reuse && chosen === undefined && props.actionsAt)
+    return (
+      <>
+        <SettingNote icon="repeat">{t("connectAi.reuse.active", { label })}</SettingNote>
+        {createPortal(
+          <>
+            <Button onClick={() => setPick("new")}>{t("connectAi.another")}</Button>
+            <Button variant="primary" onClick={() => setPick("again")}>
+              {t("aiAccounts.page.signInAgain")}
+            </Button>
+          </>,
+          props.actionsAt,
+        )}
+      </>
+    );
   if (reuse && chosen === undefined)
     return (
       <div className="ai-panel__row">
@@ -256,6 +277,7 @@ function AddAccountFlow({
   onSent,
   onFailed,
   onSigningIn,
+  actionsAt,
   onRetry,
 }: AddAccountProps & { onRetry: () => void }) {
   const { t } = useTranslation();
@@ -645,24 +667,25 @@ function AddAccountFlow({
     </OpenPage>
   );
   /** The sign-in's button (or "Open again" once begun) with "Copy link" beside it. */
-  const signIn = (label: string) => (
-    <span className="agp-addacct__acts">
-      {login ? (
-        openAgain(login.url)
-      ) : (
-        <Button
-          size="sm"
-          variant="primary"
-          icon="external"
-          loading={(starting && !copyingLink) || loading}
-          disabled={!ready || starting}
-          onClick={start}
-        >
-          {label}
-        </Button>
-      )}
+  const signIn = (label: string) => {
+    const size = actionsAt ? undefined : "sm";
+    const main = login ? (
+      openAgain(login.url)
+    ) : (
       <Button
-        size="sm"
+        {...(size ? { size } : {})}
+        variant="primary"
+        icon="external"
+        loading={(starting && !copyingLink) || loading}
+        disabled={!ready || starting}
+        onClick={start}
+      >
+        {label}
+      </Button>
+    );
+    const copy = (
+      <Button
+        {...(size ? { size } : {})}
         loading={starting && copyingLink}
         disabled={!ready || loading || (starting && !copyingLink)}
         onClick={copyLink}
@@ -675,8 +698,23 @@ function AddAccountFlow({
           showAlt={linkCopied}
         />
       </Button>
-    </span>
-  );
+    );
+    // In a dialog's footer the main action ends the row; under its step it starts it.
+    return actionsAt && !login ? (
+      createPortal(
+        <>
+          {copy}
+          {main}
+        </>,
+        actionsAt,
+      )
+    ) : (
+      <span className="agp-addacct__acts">
+        {main}
+        {copy}
+      </span>
+    );
+  };
 
   const signInHint = t("agentPage.work.brain.add.stepOneHint", { computer, brand: t(`aiAccounts.connect.${kind}`) });
   let steps: ReactNode;

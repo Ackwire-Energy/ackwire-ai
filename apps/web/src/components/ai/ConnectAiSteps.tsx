@@ -1321,6 +1321,7 @@ function PlanSteps({
           onAdded={(a, id) => void (everyone && once ? assignAll(a) : assign(id ?? turn?.id ?? agent.id, a))}
           onUse={(a) => void (everyone && once ? assignAll(a) : assign(turn?.id ?? agent.id, a))}
           onSigningIn={setSigningIn}
+          {...(plain && actionsAt ? { actionsAt } : {})}
         />
       )}
       {(steps || ownable) && foot}
