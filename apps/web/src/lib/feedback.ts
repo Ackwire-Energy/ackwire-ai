@@ -108,8 +108,9 @@ const keep = (what: unknown) => {
 export function watchErrors() {
   if (watching || typeof window === "undefined") return;
   watching = true;
-  window.addEventListener("error", (e) => keep(e.error ?? e.message));
-  window.addEventListener("unhandledrejection", (e) => keep(e.reason));
+  // Kept for the feedback's email, never shown on screen.
+  window.addEventListener("error", (event) => keep(event.error ?? event.message));
+  window.addEventListener("unhandledrejection", (event) => keep(event.reason));
 }
 
 export const recentErrors = () => [...errors];
