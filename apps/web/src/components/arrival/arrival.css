@@ -475,12 +475,16 @@
   font-size: 13px;
   font-variant-numeric: tabular-nums;
 }
+/* The button over its line of limits, both on the form's left edge: the button's own padding is taken back, so its
+   icon starts where the field and the words under it do. */
 .arrival-feedback__attach {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px 10px;
-  align-items: center;
-  margin-left: -8px;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+}
+.arrival-feedback__attach > .ac-btn {
+  margin-left: -12px;
 }
 .arrival-feedback__limits {
   color: var(--faint);
