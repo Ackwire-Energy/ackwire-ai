@@ -4,8 +4,9 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { NewChannelDialog } from "@/components/NewChannelDialog";
 import { ADMIN_ROLE_ID, createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
-import { renderApp, screen, settle } from "./render";
+import { renderApp, renderPage, screen, settle } from "./render";
 
 afterEach(() => cleanup());
 
@@ -113,5 +114,43 @@ describe("a channel for departments or roles (ADR 0125)", () => {
     );
     await settle(3);
     expect(calls(state, "chat.update").at(-1)).toEqual({ visibility: "public" });
+  });
+});
+
+describe("a group conversation in a personal workspace (ADR 0159)", () => {
+  /** The seeded workspace as a personal one; `alone`: Walter its only member. */
+  const personal = (alone: boolean) => {
+    const state = seedState();
+    const org = state.me?.organizations[0];
+    if (org) org.mode = "personal";
+    if (alone) state.members = state.members.filter((m) => m.userId === state.me?.user.id);
+    return state;
+  };
+  const openDialog = async (alone: boolean) => {
+    await renderPage(<NewChannelDialog open onOpenChange={() => {}} />, {
+      api: createFakeApi(personal(alone)),
+      org: true,
+    });
+    await settle(4);
+    return screen().getByRole("dialog", { name: "Nova conversa em grupo" });
+  };
+
+  test("alone, who can join stays open to everyone here, out of sight; the same channel is created", async () => {
+    const dialog = await openDialog(true);
+    expect(within(dialog).queryByRole("combobox", { name: "Quem pode entrar" })).toBeNull();
+    expect(dialog.textContent).toContain("Quem participa");
+  });
+
+  test("with family, plain words and no roles to pick: Admin already sees every group conversation", async () => {
+    const dialog = await openDialog(false);
+    const trigger = within(dialog).getByRole("combobox", { name: "Quem pode entrar" });
+    trigger.focus();
+    await act(async () => fireEvent.keyDown(trigger, { key: "Enter" }));
+    const options = screen()
+      .getAllByRole("option")
+      .map((o) => o.textContent ?? "");
+    expect(options.some((o) => o.startsWith("Todos daqui podem entrar"))).toBe(true);
+    expect(options.some((o) => o.startsWith("Só quem eu adicionar"))).toBe(true);
+    expect(options.some((o) => o.includes("Departamentos ou papéis"))).toBe(false);
   });
 });

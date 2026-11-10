@@ -37,6 +37,7 @@ import { databaseRoutes } from "./routes/app/databases";
 import { desktopRoutes } from "./routes/app/desktop";
 import { deviceWaitRoutes } from "./routes/app/device-waits";
 import { dmRoutes } from "./routes/app/dms";
+import { feedbackRoutes, registerFeedbackFiles } from "./routes/app/feedback";
 import { gifKeyRoutes } from "./routes/app/gif-key";
 import { gifRoutes } from "./routes/app/gifs";
 import { inviteRoutes } from "./routes/app/invites";
@@ -167,6 +168,7 @@ export function createApp(options: AppOptions) {
     });
     const deps: AppDeps = { log, ...options.services };
     registerInstance(api, deps, version);
+    registerFeedbackFiles(api, deps);
     api.use("/app/organizations/:orgId/agents/:agentId/:part", agentDetailsGate(deps));
     api.route("/app", accountRoutes(deps));
     api.route("/app", accessRoutes(deps));
@@ -218,6 +220,7 @@ export function createApp(options: AppOptions) {
     api.route("/app", dashboardRoutes(deps));
     api.route("/app", telemetryRoutes(deps));
     api.route("/app", jevRoutes(deps));
+    api.route("/app", feedbackRoutes(deps));
     api.route("/app", gifKeyRoutes(deps));
     api.route("/app", speechKeyRoutes(deps));
     api.route("/app", voiceRoutes(deps));

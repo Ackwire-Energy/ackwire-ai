@@ -28,6 +28,7 @@ import { allItems, waitingCardOf, widgetNoticeOf } from "@agenteschat/client/lib
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { dayPart } from "@agenteschat/client/lib/welcome";
 import { WORKING_POLL_MS, type WorkItem, workByAgent, workingNow } from "@agenteschat/client/lib/working";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import { Composer, EmptyState, GroupHeading, Icon, PageHeader, Select } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { type ReactNode, type RefObject, useRef, useState } from "react";
@@ -100,7 +101,7 @@ export function HomePage() {
 
   const summary =
     waitingCount === 0 && working.length === 0
-      ? t(showSteps ? "home.summary.new" : "home.summary.calm")
+      ? t(showSteps ? modeKey(org, "home.summary.new") : "home.summary.calm")
       : [
           waitingCount > 0 ? t("home.summary.waiting", { count: waitingCount }) : "",
           working.length > 0 ? t("sky.working", { count: working.length }) : "",

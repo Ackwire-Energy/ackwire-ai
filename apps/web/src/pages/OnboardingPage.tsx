@@ -1,11 +1,11 @@
-import { ApiError, keys, meQuery, useAuthConfig } from "@agenteschat/client";
+import { ApiError, keys, meQuery, useAuthConfig, type WorkspaceMode } from "@agenteschat/client";
 import { accountOutOfReach } from "@agenteschat/client/lib/deletion";
 import { errorCode, errorText } from "@agenteschat/client/lib/errors";
 import { settingUp } from "@agenteschat/client/lib/guards";
 import { sendsEmail } from "@agenteschat/client/lib/join-requests";
 import { finishOnboarding, RIGHT_HAND_DEFAULT } from "@agenteschat/client/lib/right-hand";
 import { browserTimezone, timezoneName } from "@agenteschat/client/lib/routines";
-import { Button, Field, Icon, Input, Locked, Logo } from "@agenteschat/ui";
+import { Button, Field, Icon, Input, Locked, Logo, OptionList, setGaze } from "@agenteschat/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
@@ -17,8 +17,10 @@ import { BillingLinkButton } from "@/components/BillingLinkButton";
 import { DeleteAccountEntry } from "@/components/DeleteAccount";
 import { DeleteWorkspaceDialog } from "@/components/DeleteWorkspace";
 import { ImageCropDialog, OrgMark } from "@/components/ProfilePhoto";
+import { PurposeScene } from "@/components/PurposeScene";
 import { BootSplash } from "@/components/Sky";
 import { ZonePicker } from "@/components/ZoneSelect";
+import { ARRIVAL_PARAM } from "@/lib/arrival";
 import { sendNewLink } from "@/lib/email-confirmation";
 import { useOpenParam } from "@/lib/open-param";
 import { returnPlace } from "@/lib/return-to";
@@ -27,9 +29,10 @@ import { useToast } from "@/lib/toast";
 import "./onboarding.css";
 
 /**
- * The onboarding: one question, the workspace's name (with its logo and time zone), asked by its right hand; then the
- * right hand's DM, where the rest of the setup is cards (ADR 0137). A workspace still being set up from an older
- * onboarding, whatever step it was on, is finished and opened there.
+ * The onboarding, asked by its right hand: what the workspace is for (ADR 0159), then, for a company or team, its name
+ * (with its logo and time zone); "For me" makes a personal workspace at once, named in the person's language with the
+ * browser's time zone. Then the right hand's DM, where the rest of the setup is cards (ADR 0137). A workspace still
+ * being set up from an older onboarding, whatever step it was on, is finished and opened there.
  */
 export function OnboardingPage() {
   const { t, i18n } = useTranslation();
@@ -39,6 +42,20 @@ export function OnboardingPage() {
   const navigate = useNavigate();
   const toast = useToast();
 
+  // Who it is for (ADR 0159), then, for a team, its name: one question at a time.
+  const [purpose, setPurpose] = useState<WorkspaceMode | null>(null);
+  const [step, setStep] = useState<"purpose" | "name">("purpose");
+  // On the first question the chosen answer's agents look at the pointer (`PurposeScene`, its `data-gaze`).
+  useEffect(() => {
+    if (step !== "purpose") return;
+    const look = (e: PointerEvent) => setGaze({ x: e.clientX, y: e.clientY });
+    window.addEventListener("pointermove", look);
+    return () => {
+      window.removeEventListener("pointermove", look);
+      setGaze(null);
+    };
+  }, [step]);
+  const personal = purpose === "personal";
   const [org, setOrg] = useState("");
   const [zone, setZone] = useState(() => browserTimezone() ?? "UTC");
   const [zoneOpen, setZoneOpen] = useState(false);
@@ -56,6 +73,8 @@ export function OnboardingPage() {
   const inviteOnly = me.data?.user.canCreateWorkspace === false && created === null;
   const emails = sendsEmail(authConfig);
   const email = me.data?.user.email ?? "";
+  // Their face in the first question's drawings: the account's photo (Google's), else their initials.
+  const you = { name: me.data?.user.name || email, image: me.data?.user.image ?? null };
   // The address this tab's sign-up was emailed a link to confirm: the step says where it went. Read once and
   // forgotten once confirmed or set up, so a later onboarding (another workspace) says nothing of it.
   const [sentTo] = useState(() => sessionStore.get(STORAGE_KEYS.confirmationSent));
@@ -76,8 +95,11 @@ export function OnboardingPage() {
     const at = await finishOnboarding(api, orgId);
     sessionStore.remove(STORAGE_KEYS.confirmationSent);
     await qc.invalidateQueries({ queryKey: keys.me });
-    if (at.agentId) await navigate({ to: "/org/$orgId/dm/agent/$agentId", params: { orgId, agentId: at.agentId } });
-    else await navigate({ to: "/org/$orgId", params: { orgId } });
+    // The workspace opens on its arrival (ADR 0160): the beta notice, then Connect an AI.
+    const search = { [ARRIVAL_PARAM]: 1 } as never;
+    if (at.agentId)
+      await navigate({ to: "/org/$orgId/dm/agent/$agentId", params: { orgId, agentId: at.agentId }, search });
+    else await navigate({ to: "/org/$orgId", params: { orgId }, search });
   };
 
   const save = useMutation({
@@ -89,7 +111,10 @@ export function OnboardingPage() {
     mutationFn: async () => {
       let target = created;
       if (!target) {
-        const res = await api.orgs.create({ name: org.trim() });
+        // "For me": no name to ask, the word for it in the person's language (renamed in Settings like any other).
+        const res = await api.orgs.create(
+          personal ? { name: t("onboarding.personal.name"), mode: "personal" } : { name: org.trim() },
+        );
         target = { orgId: res.organization.id };
         setCreated(target);
         await api.orgs.updateSettings(target.orgId, { timezone: zone });
@@ -97,10 +122,14 @@ export function OnboardingPage() {
         const mine = browserTimezone();
         if (mine) await api.orgs.updateMe(target.orgId, { timezone: mine }).catch(() => undefined);
       } else {
-        await api.orgs.updateSettings(target.orgId, { name: org.trim(), timezone: zone });
+        // Made here already (a step after failed): the answer as it is now, the mode included.
+        await api.orgs.updateSettings(
+          target.orgId,
+          personal ? { timezone: zone, mode: "personal" } : { name: org.trim(), timezone: zone, mode: "team" },
+        );
       }
-      // The logo needs the workspace: picked before it existed, sent now.
-      if (logoDirty) {
+      // The logo needs the workspace: picked before it existed, sent now (a team's only: "For me" asks none).
+      if (logoDirty && !personal) {
         if (logo) await api.orgs.setLogo(target.orgId, logo);
         else await api.orgs.removeLogo(target.orgId);
         setLogoDirty(false);
@@ -125,8 +154,13 @@ export function OnboardingPage() {
     refused instanceof ApiError && refused.code === "org.create_unpaid" && typeof refused.params?.orgId === "string"
       ? refused.params.orgId
       : null;
-  const blocked = !org.trim() || inviteOnly;
+  const blocked = (step === "purpose" ? !purpose : !org.trim()) || inviteOnly;
   const busy = save.isPending;
+  // Continue: "For me" makes the workspace now; a company or team names it first.
+  const next = () => {
+    if (step === "purpose" && !personal) setStep("name");
+    else save.mutate();
+  };
   const mine = me.data?.organizations.find((o) => o.id === created?.orgId);
   const savedLogo = logoDirty ? null : mine?.logo;
 
@@ -183,24 +217,34 @@ export function OnboardingPage() {
         onKeyDown={(e) => {
           // Enter continues (the big button shows ↵), except where Enter means something else.
           const el = e.target as HTMLElement;
-          if (e.key !== "Enter" || e.defaultPrevented || e.nativeEvent.isComposing) return;
-          if (el.closest("button, a, [role='dialog'], [role='listbox'], [role='combobox']")) return;
+          if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
+          // On an answer of the first question too: a radio takes no Enter of its own (it stops it, though).
+          const answer = el.matches("[role='radio']");
+          if (!answer && e.defaultPrevented) return;
+          if (!answer && el.closest("button, a, [role='dialog'], [role='listbox'], [role='combobox']")) return;
           if (blocked || busy) return;
           e.preventDefault();
-          save.mutate();
+          next();
         }}
       >
         <div className="onb__body">
-          {leaveTo && (
-            <button
-              type="button"
-              className="onb__back"
-              onClick={() => void navigate({ href: returnPlace(leaveTo.id) })}
-              disabled={busy}
-            >
+          {step === "name" ? (
+            <button type="button" className="onb__back" onClick={() => setStep("purpose")} disabled={busy}>
               <Icon name="chevronLeft" size={16} />
-              {t("onboarding.leave", { name: leaveTo.name })}
+              {t("onboarding.back")}
             </button>
+          ) : (
+            leaveTo && (
+              <button
+                type="button"
+                className="onb__back"
+                onClick={() => void navigate({ href: returnPlace(leaveTo.id) })}
+                disabled={busy}
+              >
+                <Icon name="chevronLeft" size={16} />
+                {t("onboarding.leave", { name: leaveTo.name })}
+              </button>
+            )
           )}
 
           {/* Its right hand asks: the face the person meets again in its DM. */}
@@ -214,102 +258,119 @@ export function OnboardingPage() {
               />
               <span className="onb__host-name">{RIGHT_HAND_DEFAULT.name}</span>
             </span>
-            <div className="onb__bubble">
-              <h1 className="onb__title">{t("onboarding.workspace.title")}</h1>
-              <p className="onb__lead">{t("onboarding.workspace.lead")}</p>
-            </div>
+            {step === "purpose" ? (
+              <div className="onb__bubble" key="purpose">
+                <h1 className="onb__title">{t("onboarding.purpose.title")}</h1>
+                <p className="onb__lead">{t("onboarding.purpose.lead")}</p>
+              </div>
+            ) : (
+              <div className="onb__bubble" key="name">
+                <h1 className="onb__title">{t("onboarding.workspace.title")}</h1>
+                <p className="onb__lead">{t("onboarding.workspace.lead")}</p>
+              </div>
+            )}
           </header>
 
           <Locked when={busy}>
-            <div className="onb__answer">
-              <div className="onb__ws">
-                <button
-                  type="button"
-                  className="onb__logo"
-                  aria-label={logo ? t("onboarding.workspace.logoChange") : t("onboarding.workspace.logoPick")}
-                  title={t("onboarding.workspace.logoHelp")}
-                  onClick={() => setLogoOpen(true)}
-                >
-                  {logo ? (
-                    <OrgMark logo={`data:${logo.contentType};base64,${logo.imageBase64}`} size={56} />
-                  ) : savedLogo ? (
-                    <OrgMark logo={savedLogo} size={56} />
-                  ) : org.trim() ? (
-                    <span className="onb__logo-letter">{org.trim().charAt(0).toUpperCase()}</span>
-                  ) : (
-                    <Icon name="upload" />
-                  )}
-                </button>
-                <Input
-                  className="onb__big"
-                  aria-label={t("onboarding.workspace.name")}
-                  value={org}
-                  onChange={(e) => setOrg(e.target.value)}
-                  placeholder={t("onboarding.workspace.namePlaceholder")}
-                  spellCheck={false}
-                  autoFocus
+            {step === "purpose" ? (
+              <div className="onb__answer" key="purpose">
+                <OptionList<WorkspaceMode | "">
+                  aria-label={t("onboarding.purpose.title")}
+                  layout="cards"
+                  className="onb-purpose"
+                  value={purpose ?? ""}
+                  onValueChange={(v) => setPurpose(v || null)}
+                  options={PURPOSES.map((mode) => ({
+                    value: mode,
+                    leading: <PurposeScene kind={mode} chosen={purpose === mode} you={you} />,
+                    title: t(`onboarding.purpose.${mode}`),
+                    description: (
+                      <>
+                        <span>{t(`onboarding.purpose.${mode}Text`)}</span>
+                        <span className="onb-purpose__examples">{t(`onboarding.purpose.${mode}Examples`)}</span>
+                      </>
+                    ),
+                  }))}
                 />
+                {unpaidElsewhere && <UnpaidNote orgId={unpaidElsewhere} billing={Boolean(authConfig?.billingUrl)} />}
               </div>
-              {zoneOpen ? (
-                <Field
-                  label={t("onboarding.workspace.timezone")}
-                  id="org-zone"
-                  hint={{
-                    name: t("common.about", { label: t("onboarding.workspace.timezone") }),
-                    text: t("onboarding.workspace.timezoneHelp"),
-                  }}
-                >
-                  <ZonePicker
-                    id="org-zone"
-                    value={zone}
-                    onChange={setZone}
-                    suggested={[browserTimezone() ?? "", "UTC"].filter(Boolean)}
-                  />
-                </Field>
-              ) : (
-                <p className="onb__help">
-                  {t("onboarding.workspace.zone", { zone: timezoneName(zone, i18n.language) })} ·{" "}
-                  <button type="button" className="ac-link onb__link" onClick={() => setZoneOpen(true)}>
-                    {t("onboarding.workspace.zoneChange")}
+            ) : (
+              <div className="onb__answer" key="name">
+                <div className="onb__ws">
+                  <button
+                    type="button"
+                    className="onb__logo"
+                    aria-label={logo ? t("onboarding.workspace.logoChange") : t("onboarding.workspace.logoPick")}
+                    title={t("onboarding.workspace.logoHelp")}
+                    onClick={() => setLogoOpen(true)}
+                  >
+                    {logo ? (
+                      <OrgMark logo={`data:${logo.contentType};base64,${logo.imageBase64}`} size={56} />
+                    ) : savedLogo ? (
+                      <OrgMark logo={savedLogo} size={56} />
+                    ) : org.trim() ? (
+                      <span className="onb__logo-letter">{org.trim().charAt(0).toUpperCase()}</span>
+                    ) : (
+                      <Icon name="upload" />
+                    )}
                   </button>
-                </p>
-              )}
-              <ImageCropDialog
-                open={logoOpen}
-                onClose={() => setLogoOpen(false)}
-                title={t("orgLogo.title")}
-                help={t("orgLogo.help")}
-                placeholder={<OrgMark size={56} />}
-                hasImage={logo !== null || Boolean(savedLogo)}
-                removeLabel={t("orgLogo.remove")}
-                format="image/png"
-                save={async (image) => {
-                  setLogo(image);
-                  setLogoDirty(true);
-                }}
-                remove={async () => {
-                  setLogo(null);
-                  setLogoDirty(true);
-                }}
-                onSaved={() => setLogoOpen(false)}
-                onRemoved={() => setLogoOpen(false)}
-              />
-              {unpaidElsewhere && (
-                <>
-                  <p className="onb__status ac-iconline" role="alert">
-                    <Icon name="pause" size={14} />
-                    <span>{t("standing.createUnpaid")}</span>
+                  <Input
+                    className="onb__big"
+                    aria-label={t("onboarding.workspace.name")}
+                    value={org}
+                    onChange={(e) => setOrg(e.target.value)}
+                    placeholder={t("onboarding.workspace.namePlaceholder")}
+                    spellCheck={false}
+                    autoFocus
+                  />
+                </div>
+                {zoneOpen ? (
+                  <Field
+                    label={t("onboarding.workspace.timezone")}
+                    id="org-zone"
+                    hint={{
+                      name: t("common.about", { label: t("onboarding.workspace.timezone") }),
+                      text: t("onboarding.workspace.timezoneHelp"),
+                    }}
+                  >
+                    <ZonePicker
+                      id="org-zone"
+                      value={zone}
+                      onChange={setZone}
+                      suggested={[browserTimezone() ?? "", "UTC"].filter(Boolean)}
+                    />
+                  </Field>
+                ) : (
+                  <p className="onb__help">
+                    {t("onboarding.workspace.zone", { zone: timezoneName(zone, i18n.language) })} ·{" "}
+                    <button type="button" className="ac-link onb__link" onClick={() => setZoneOpen(true)}>
+                      {t("onboarding.workspace.zoneChange")}
+                    </button>
                   </p>
-                  {authConfig?.billingUrl && (
-                    <div className="row">
-                      <BillingLinkButton orgId={unpaidElsewhere} from="new_workspace" icon="external">
-                        {t("standing.billing.cta.payment")}
-                      </BillingLinkButton>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
+                )}
+                <ImageCropDialog
+                  open={logoOpen}
+                  onClose={() => setLogoOpen(false)}
+                  title={t("orgLogo.title")}
+                  help={t("orgLogo.help")}
+                  placeholder={<OrgMark size={56} />}
+                  hasImage={logo !== null || Boolean(savedLogo)}
+                  removeLabel={t("orgLogo.remove")}
+                  format="image/png"
+                  save={async (image) => {
+                    setLogo(image);
+                    setLogoDirty(true);
+                  }}
+                  remove={async () => {
+                    setLogo(null);
+                    setLogoDirty(true);
+                  }}
+                  onSaved={() => setLogoOpen(false)}
+                  onRemoved={() => setLogoOpen(false)}
+                />
+                {unpaidElsewhere && <UnpaidNote orgId={unpaidElsewhere} billing={Boolean(authConfig?.billingUrl)} />}
+              </div>
+            )}
           </Locked>
 
           {inviteOnly && (
@@ -346,19 +407,35 @@ export function OnboardingPage() {
           )}
 
           <div className="onb__actions">
-            <Button
-              variant="primary"
-              size="lg"
-              kbd={["↵"]}
-              onClick={() => save.mutate()}
-              disabled={blocked || busy}
-              loading={busy}
-            >
+            <Button variant="primary" size="lg" kbd={["↵"]} onClick={next} disabled={blocked || busy} loading={busy}>
               {t("onboarding.actions.continue")}
             </Button>
           </div>
         </div>
       </main>
     </div>
+  );
+}
+
+/** The two answers to "What will you use agentes.chat for?" (ADR 0159), in this order. */
+const PURPOSES = ["personal", "team"] as const satisfies readonly WorkspaceMode[];
+
+/** Owning a workspace that waits for its first plan: said in place, with the way to that plan. */
+function UnpaidNote({ orgId, billing }: { orgId: string; billing: boolean }) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <p className="onb__status ac-iconline" role="alert">
+        <Icon name="pause" size={14} />
+        <span>{t("standing.createUnpaid")}</span>
+      </p>
+      {billing && (
+        <div className="row">
+          <BillingLinkButton orgId={orgId} from="new_workspace" icon="external">
+            {t("standing.billing.cta.payment")}
+          </BillingLinkButton>
+        </div>
+      )}
+    </>
   );
 }

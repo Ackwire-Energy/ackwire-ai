@@ -1,6 +1,7 @@
 import { type Agent, useMe } from "@agenteschat/client";
 import { firstName } from "@agenteschat/client/lib/format";
 import { playSound } from "@agenteschat/client/lib/sounds";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ScrollView, StyleSheet, View } from "react-native";
@@ -13,6 +14,7 @@ import Animated, {
   withDelay,
   withTiming,
 } from "react-native-reanimated";
+import { useOrg } from "@/providers/org";
 import { Button, Text, useReducedMotion } from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors } from "../shared/hooks";
@@ -73,6 +75,7 @@ export function FirstDay({
   const { t } = useTranslation();
   const c = useColors();
   const me = useMe();
+  const { org } = useOrg();
   const reduced = useReducedMotion();
   const look = useConversationLook(true, agentLook(agent).color);
   const text = look.text ?? undefined;
@@ -87,11 +90,12 @@ export function FirstDay({
   const hello = person
     ? t("mobile.chat.intent.hello", { person, name: agent.name })
     : t("mobile.chat.intent.helloNoName", { name: agent.name });
+  // A personal workspace's agent is there for its person, not on a team (ADR 0159).
   const about =
     intro.kind === "what"
       ? intro.text
       : intro.kind === "role"
-        ? t("mobile.chat.intent.helloRole", { role: intro.role })
+        ? t(modeKey(org, "mobile.chat.intent.helloRole"), { role: intro.role })
         : null;
   const words = [hello, about, t("mobile.chat.intent.helloAsk")].filter(Boolean).join(" ");
 

@@ -32,6 +32,11 @@ import { errorText, keyRefusal } from "@agenteschat/client/lib/errors";
 import { formatPercent, formatShortDate, formatUsd, relativeTime } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
+  personalSettingsNav,
+  settingsSectionNameKey,
+  settingsSectionTextKey,
+} from "@agenteschat/client/lib/personal-view";
+import {
   keyLooksValid,
   keyNamedAfterProvider,
   type ProviderId,
@@ -41,6 +46,7 @@ import {
 } from "@agenteschat/client/lib/providers";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { parseAmount } from "@agenteschat/client/lib/text";
+import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
 import {
   Alert,
   Button,
@@ -65,7 +71,7 @@ import {
   Textarea,
 } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
-import { type ComponentProps, useEffect, useRef, useState } from "react";
+import { type ComponentProps, type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AboutSection } from "@/components/AboutSettings";
 import { AccessMatrixSection } from "@/components/AccessLevels";
@@ -101,15 +107,17 @@ import { SkillsSection } from "@/components/Skills";
 import { StorageSection } from "@/components/StorageSettings";
 import { VoiceSettingsSection } from "@/components/VoiceSettings";
 import { VaultSection } from "@/components/vault/VaultSection";
+import { WorkspaceModeDialog } from "@/components/WorkspaceModeDialog";
 import { ZoneSelect } from "@/components/ZoneSelect";
 import { useCentreCurrent } from "@/hooks/useCentreCurrent";
 import { useDirectory } from "@/hooks/useDirectory";
+import { usePersonalView } from "@/hooks/usePersonalView";
 import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { useOpenParam } from "@/lib/open-param";
 import { workspaceUsesApi } from "@/lib/plan-usage";
 import { useToast } from "@/lib/toast";
 import { MembersPage } from "./MembersPage";
-import { SETTINGS_GROUPS, SETTINGS_SECTIONS, type SettingsSection } from "./settings-sections";
+import { SETTINGS_GROUPS, SETTINGS_SECTIONS, type SettingsSection, settingsNavEntry } from "./settings-sections";
 
 /**
  * Settings: a left sub-nav and one section per URL (`/settings/connectors`, …).
@@ -169,57 +177,104 @@ function Settings({
   const refused = section && current !== section && !serverLacks ? section : null;
   const setup = useComputerSetup(org.id);
   const edition = computerEdition(setup.data);
+  // A personal workspace (ADR 0159 §3): one short list, every other section under Advanced, and AI and apps and Plan
+  // and usage holding other sections, whose own addresses mark those entries. A team's: the groups.
+  const personal = isPersonal(org);
+  const opens = (id: SettingsSection) => visible.some((s) => s.id === id);
+  // People joins the short list once someone else is a member (a family).
+  const { others } = usePersonalView();
+  const nav = personal ? personalSettingsNav(visible, others) : null;
+  const marked = settingsNavEntry(
+    org,
+    current,
+    visible.map((s) => s.id),
+  );
+  const inAdvanced = nav?.advanced.some((s) => s.id === marked) ?? false;
+  const [advanced, setAdvanced] = useState(inAdvanced);
+  // A section of Advanced opened by its address (⌘K, a card, a notice) shows in the list.
+  useEffect(() => {
+    if (inAdvanced) setAdvanced(true);
+  }, [inAdvanced]);
   const strip = useRef<HTMLDivElement>(null);
-  useCentreCurrent(strip, current);
+  useCentreCurrent(strip, marked);
   // The right hand's section goes by its name and face (admins may rename it).
   const rightHand = useDirectory(org.id).agents.find(isRightHand);
   const sectionName = (id: SettingsSection) =>
-    id === "right_hand" && rightHand ? rightHand.name : t(`settings.section.${id}`);
+    id === "right_hand" && rightHand ? rightHand.name : t(settingsSectionNameKey(org, id));
+  const link = (s: (typeof visible)[number]) => (
+    <li key={s.id}>
+      <Link
+        to="/org/$orgId/settings/$section"
+        params={{ orgId: org.id, section: s.id }}
+        className="settings__link"
+        aria-current={s.id === marked ? "page" : undefined}
+      >
+        {s.id === "account" ? (
+          <MyFace size="xs" />
+        ) : s.id === "right_hand" && rightHand ? (
+          <AgentAvatar agentId={rightHand.id} name={rightHand.name} size="xs" />
+        ) : (
+          <Icon name={s.icon} size={18} />
+        )}
+        {sectionName(s.id)}
+      </Link>
+    </li>
+  );
 
   return (
     <div className="settings page-split">
       <nav className="settings__nav" data-scroll-restoration-id="settings-nav" aria-label={t("settings.nav")}>
         <div className="settings__head">
           <h1 className="settings__title">{t("settings.title")}</h1>
-          <span className="settings__org ac-iconline">
-            <OrgMark logo={org.logo} size={18} />
-            <span>{org.name}</span>
-          </span>
+          {/* Whose settings: the workspace's, by its mark and name; a personal workspace's are the person's own and
+              name no workspace (ADR 0159). */}
+          {!personal && (
+            <span className="settings__org ac-iconline">
+              <OrgMark logo={org.logo} size={18} />
+              <span>{org.name}</span>
+            </span>
+          )}
         </div>
         <div className="settings__groups" ref={strip}>
-          {SETTINGS_GROUPS.map((g) => {
-            const items = visible.filter((s) => s.group === g);
-            if (items.length === 0) return null;
-            return (
-              // biome-ignore lint/a11y/useSemanticElements: a labelled group of links in the nav, not form fields
-              <div key={g} className="settings__group" role="group" aria-labelledby={`settings-group-${g}`}>
-                <span id={`settings-group-${g}`} className="settings__group-label">
-                  {t(`settings.group.${g}`)}
-                </span>
-                <ul>
-                  {items.map((s) => (
-                    <li key={s.id}>
-                      <Link
-                        to="/org/$orgId/settings/$section"
-                        params={{ orgId: org.id, section: s.id }}
-                        className="settings__link"
-                        aria-current={s.id === current ? "page" : undefined}
-                      >
-                        {s.id === "account" ? (
-                          <MyFace size="xs" />
-                        ) : s.id === "right_hand" && rightHand ? (
-                          <AgentAvatar agentId={rightHand.id} name={rightHand.name} size="xs" />
-                        ) : (
-                          <Icon name={s.icon} size={18} />
-                        )}
-                        {sectionName(s.id)}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
+          {nav ? (
+            <>
+              <div className="settings__group">
+                <ul>{nav.main.map(link)}</ul>
               </div>
-            );
-          })}
+              {nav.advanced.length > 0 && (
+                <div className="settings__group">
+                  <ul>
+                    <li>
+                      <button
+                        type="button"
+                        className="settings__link"
+                        aria-expanded={advanced}
+                        onClick={() => setAdvanced((open) => !open)}
+                      >
+                        <Icon name={advanced ? "chevronDown" : "chevronRight"} size={18} />
+                        {t("settings.advanced")}
+                      </button>
+                    </li>
+                    {advanced && nav.advanced.map(link)}
+                  </ul>
+                </div>
+              )}
+            </>
+          ) : (
+            SETTINGS_GROUPS.map((g) => {
+              const items = visible.filter((s) => s.group === g);
+              if (items.length === 0) return null;
+              return (
+                // biome-ignore lint/a11y/useSemanticElements: a labelled group of links in the nav, not form fields
+                <div key={g} className="settings__group" role="group" aria-labelledby={`settings-group-${g}`}>
+                  <span id={`settings-group-${g}`} className="settings__group-label">
+                    {t(`settings.group.${g}`)}
+                  </span>
+                  <ul>{items.map(link)}</ul>
+                </div>
+              );
+            })
+          )}
         </div>
       </nav>
       <div className="settings__body" data-scroll-restoration-id="settings-section">
@@ -230,7 +285,7 @@ function Settings({
             title={sectionName(current)}
             meta={
               current !== "devices" ? (
-                t(`settings.sectionText.${current}`)
+                t(settingsSectionTextKey(org, current))
               ) : edition ? (
                 t(edition === "cloud" ? "devices.leadCloud" : "devices.lead")
               ) : setup.isError ? null : (
@@ -262,16 +317,55 @@ function Settings({
             <AiAccountsSection />
             <KeysSection />
             <WhoPicksSection />
+            {personal && opens("connectors") && (
+              <SettingsPart id="connectors">
+                <ConnectorsSection />
+              </SettingsPart>
+            )}
+            {personal && opens("skills") && (
+              <SettingsPart id="skills">
+                <SkillsSection />
+              </SettingsPart>
+            )}
           </>
         )}
         {current === "storage" && <StorageSection />}
         {current === "devices" && (device ? <DevicePage path={device} /> : <DevicesSection start={connect} />)}
-        {current === "usage" && <UsageTabs person={person} summary={<UsageSection />} />}
+        {current === "usage" && (
+          <>
+            <UsageTabs person={person} summary={<UsageSection />} />
+            {personal && opens("billing") && (
+              <SettingsPart id="billing">
+                <BillingSection />
+              </SettingsPart>
+            )}
+          </>
+        )}
         {current === "import" && <ImportExportSection />}
         {current === "billing" && <BillingSection />}
         {current === "about" && <AboutSection />}
       </div>
     </div>
+  );
+}
+
+/**
+ * A section on another one's page in a personal workspace (ADR 0159 §3): Connectors and MCPs and Skills on AI and
+ * apps, Plan and billing on Plan and usage, each under its own heading.
+ */
+function SettingsPart({ id, children }: { id: "connectors" | "skills" | "billing"; children: ReactNode }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  return (
+    <section className="settings__section" aria-labelledby={`settings-part-${id}`}>
+      <PageHeader
+        level={2}
+        titleId={`settings-part-${id}`}
+        title={t(settingsSectionNameKey(org, id))}
+        meta={t(settingsSectionTextKey(org, id))}
+      />
+      {children}
+    </section>
   );
 }
 
@@ -297,7 +391,8 @@ function BillingSection() {
 /**
  * Geral: the org's rows, the context every agent reads, then a
  * tile per area with how it is now. Every change saves by itself: name on blur, zone on pick, context
- * while typing.
+ * while typing. In a personal workspace it is About you (ADR 0159 §3): the context first, in the person's words, then
+ * the time zone, name, checks and mode, and no tiles.
  */
 function GeneralSection() {
   const { t } = useTranslation();
@@ -305,10 +400,12 @@ function GeneralSection() {
   const settings = useSettings(org.id);
   const update = useUpdateSettings(org.id);
   const editable = can(org, "configure");
+  const personal = isPersonal(org);
   const [name, setName] = useState("");
   const [context, setContext] = useState("");
   const [timezone, setTimezone] = useState("");
   const [logo, setLogo] = useState(false);
+  const [switching, setSwitching] = useState(false);
   const [saved, setSaved] = useState(false);
   const loaded = useRef<string | null>(null);
   const contextTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -367,17 +464,171 @@ function GeneralSection() {
       el.setSelectionRange(value.length, value.length);
     });
   };
-  const ideas = (["who", "now", "never"] as const).map((k) => t(`settings.contextIdeas.${k}`));
+  const ideas = (["who", "now", "never"] as const).map((k) => t(modeKey(org, `settings.contextIdeas.${k}` as const)));
   const orgName = name.trim() || org.name;
-  const contextTitle = t("settings.contextTitle", { name: orgName });
+  const contextTitle = t(modeKey(org, "settings.contextTitle"), { name: orgName });
   const missing = ideas.filter((label) => !context.toLowerCase().includes(label.toLowerCase()));
+  const actionCheck = t(modeKey(org, "settings.actionCheck"));
+
+  // Personal (ADR 0159 §3): About you, the context first; the logo, which a personal workspace shows nowhere it
+  // matters, stays a team's row (switching to team brings it back).
+  const logoRow = !personal && (
+    <div className="settings-row ac-actrow">
+      <div className="settings-row__text ac-actrow__text">
+        <span className="settings-row__label">{t("orgLogo.label")}</span>
+      </div>
+      <div className="settings-row__control">
+        <OrgMark logo={org.logo} size={32} className="settings__org-logo" />
+        {editable && (
+          <Button size="sm" type="button" onClick={() => setLogo(true)}>
+            {org.logo ? t("orgLogo.change") : t("orgLogo.add")}
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+  const nameRow = (
+    <div className="settings-row ac-actrow">
+      <div className="settings-row__text ac-actrow__text">
+        <label className="settings-row__label" htmlFor="set-name">
+          {t(modeKey(org, "settings.name"))}
+        </label>
+      </div>
+      <div className="settings-row__control">
+        <Input
+          id="set-name"
+          spellCheck={false}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onBlur={saveName}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.currentTarget.blur();
+          }}
+          readOnly={!editable}
+        />
+      </div>
+    </div>
+  );
+  const zoneRow = (
+    <div className="settings-row ac-actrow">
+      <div className="settings-row__text ac-actrow__text">
+        <span className="ac-hintline">
+          <span className="settings-row__label">{t("settings.timezone")}</span>
+          <InfoHint name={t("common.about", { label: t("settings.timezone") })}>{t("settings.timezoneHelp")}</InfoHint>
+        </span>
+      </div>
+      <div className="settings-row__control">
+        <ZoneSelect
+          value={timezone || "UTC"}
+          onChange={(zone) => {
+            setTimezone(zone);
+            if (zone !== settings.data?.timezone) save({ timezone: zone });
+          }}
+          disabled={!editable}
+          aria-label={t("settings.timezone")}
+        />
+      </div>
+    </div>
+  );
+  const checkRow = (
+    <div className="settings-row ac-actrow">
+      <div className="settings-row__text ac-actrow__text">
+        <span className="ac-hintline">
+          <label className="settings-row__label" htmlFor="set-action-check">
+            {actionCheck}
+          </label>
+          <InfoHint name={t("common.about", { label: actionCheck })} id="set-action-check-hint">
+            {t(modeKey(org, "settings.actionCheckHelp"))}
+          </InfoHint>
+        </span>
+      </div>
+      <div className="settings-row__control">
+        <Switch
+          id="set-action-check"
+          checked={settings.data?.actionCheck ?? true}
+          onCheckedChange={(on) => save({ actionCheck: on })}
+          disabled={!editable || !settings.data}
+          aria-describedby="set-action-check-hint"
+        />
+      </div>
+    </div>
+  );
+  // Who the workspace is for (ADR 0159 §4): the mode it is in now and, for who configures it, the switch to the other.
+  const modeRow = (
+    <div className="settings-row ac-actrow">
+      <div className="settings-row__text ac-actrow__text">
+        <span className="ac-hintline">
+          <span className="settings-row__label">{t("settings.mode.label")}</span>
+          <InfoHint name={t("common.about", { label: t("settings.mode.label") })}>
+            {t(personal ? "settings.mode.personalHelp" : "settings.mode.teamHelp")}
+          </InfoHint>
+        </span>
+      </div>
+      <div className="settings-row__control">
+        <span className="settings-row__value">{t(personal ? "settings.mode.personal" : "settings.mode.team")}</span>
+        {editable && (
+          <Button size="sm" type="button" onClick={() => setSwitching(true)}>
+            {t(personal ? "settings.mode.toTeam" : "settings.mode.toPersonal")}
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+  const workspaceCard = (
+    <Card aria-label={t(modeKey(org, "settings.orgTitle"))}>
+      <div className="settings-rows">
+        {personal ? zoneRow : logoRow}
+        {nameRow}
+        {!personal && zoneRow}
+        {checkRow}
+        {modeRow}
+      </div>
+    </Card>
+  );
+  const contextCard = (
+    <Card aria-labelledby="sec-context">
+      <CardHeader
+        id="sec-context"
+        icon="agent"
+        title={contextTitle}
+        hint={{
+          name: t("common.about", { label: contextTitle }),
+          text: t("common.joinSentences", {
+            a: t("settings.contextSubtitle"),
+            b: t(modeKey(org, "settings.contextHelp"), { name: orgName }),
+          }),
+        }}
+      />
+      <Textarea
+        ref={contextRef}
+        rows={7}
+        maxLength={20_000}
+        value={context}
+        onChange={(e) => changeContext(e.target.value)}
+        onBlur={flushContext}
+        readOnly={!editable}
+        placeholder={t(modeKey(org, "settings.contextPlaceholder"))}
+        aria-label={t(modeKey(org, "settings.context"))}
+      />
+      {editable && missing.length > 0 && (
+        <div className="settings-ideas">
+          <span>{t("settings.contextMissing")}</span>
+          {missing.map((label) => (
+            <Button key={label} size="sm" variant="ghost" icon="plus" onClick={() => addIdea(label)}>
+              {label}
+            </Button>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
 
   return (
     <>
       <PageHeader
         level={2}
-        title={t("settings.section.general")}
-        meta={t("settings.sectionText.general")}
+        title={t(settingsSectionNameKey(org, "general"))}
+        meta={t(settingsSectionTextKey(org, "general"))}
         actions={
           <span className="settings__saved" data-on={saved || undefined} role="status">
             {saved && (
@@ -391,126 +642,20 @@ function GeneralSection() {
       />
       {!editable && <p className="page__note">{t("settings.readOnly")}</p>}
 
-      <Card aria-label={t("settings.orgTitle")}>
-        <div className="settings-rows">
-          <div className="settings-row ac-actrow">
-            <div className="settings-row__text ac-actrow__text">
-              <span className="settings-row__label">{t("orgLogo.label")}</span>
-            </div>
-            <div className="settings-row__control">
-              <OrgMark logo={org.logo} size={32} className="settings__org-logo" />
-              {editable && (
-                <Button size="sm" type="button" onClick={() => setLogo(true)}>
-                  {org.logo ? t("orgLogo.change") : t("orgLogo.add")}
-                </Button>
-              )}
-            </div>
-          </div>
-          <div className="settings-row ac-actrow">
-            <div className="settings-row__text ac-actrow__text">
-              <label className="settings-row__label" htmlFor="set-name">
-                {t("settings.name")}
-              </label>
-            </div>
-            <div className="settings-row__control">
-              <Input
-                id="set-name"
-                spellCheck={false}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                onBlur={saveName}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") e.currentTarget.blur();
-                }}
-                readOnly={!editable}
-              />
-            </div>
-          </div>
-          <div className="settings-row ac-actrow">
-            <div className="settings-row__text ac-actrow__text">
-              <span className="ac-hintline">
-                <span className="settings-row__label">{t("settings.timezone")}</span>
-                <InfoHint name={t("common.about", { label: t("settings.timezone") })}>
-                  {t("settings.timezoneHelp")}
-                </InfoHint>
-              </span>
-            </div>
-            <div className="settings-row__control">
-              <ZoneSelect
-                value={timezone || "UTC"}
-                onChange={(zone) => {
-                  setTimezone(zone);
-                  if (zone !== settings.data?.timezone) save({ timezone: zone });
-                }}
-                disabled={!editable}
-                aria-label={t("settings.timezone")}
-              />
-            </div>
-          </div>
-          <div className="settings-row ac-actrow">
-            <div className="settings-row__text ac-actrow__text">
-              <span className="ac-hintline">
-                <label className="settings-row__label" htmlFor="set-action-check">
-                  {t("settings.actionCheck")}
-                </label>
-                <InfoHint name={t("common.about", { label: t("settings.actionCheck") })} id="set-action-check-hint">
-                  {t("settings.actionCheckHelp")}
-                </InfoHint>
-              </span>
-            </div>
-            <div className="settings-row__control">
-              <Switch
-                id="set-action-check"
-                checked={settings.data?.actionCheck ?? true}
-                onCheckedChange={(on) => save({ actionCheck: on })}
-                disabled={!editable || !settings.data}
-                aria-describedby="set-action-check-hint"
-              />
-            </div>
-          </div>
-        </div>
-      </Card>
+      {personal ? contextCard : workspaceCard}
+      {personal ? workspaceCard : contextCard}
 
-      <Card aria-labelledby="sec-context">
-        <CardHeader
-          id="sec-context"
-          icon="agent"
-          title={contextTitle}
-          hint={{
-            name: t("common.about", { label: contextTitle }),
-            text: t("common.joinSentences", {
-              a: t("settings.contextSubtitle"),
-              b: t("settings.contextHelp", { name: orgName }),
-            }),
-          }}
-        />
-        <Textarea
-          ref={contextRef}
-          rows={7}
-          maxLength={20_000}
-          value={context}
-          onChange={(e) => changeContext(e.target.value)}
-          onBlur={flushContext}
-          readOnly={!editable}
-          placeholder={t("settings.contextPlaceholder")}
-          aria-label={t("settings.context")}
-        />
-        {editable && missing.length > 0 && (
-          <div className="settings-ideas">
-            <span>{t("settings.contextMissing")}</span>
-            {missing.map((label) => (
-              <Button key={label} size="sm" variant="ghost" icon="plus" onClick={() => addIdea(label)}>
-                {label}
-              </Button>
-            ))}
-          </div>
-        )}
-      </Card>
-
-      <SettingsTiles />
+      {/* A team's tiles of every area; a personal workspace's short list and Advanced already show them. */}
+      {!personal && <SettingsTiles />}
       <UsageStatisticsCard />
       {org.role === "owner" && <DeleteWorkspaceCard />}
       <OrgLogoDialog open={logo} onClose={() => setLogo(false)} />
+      <WorkspaceModeDialog
+        open={switching}
+        to={personal ? "team" : "personal"}
+        onClose={() => setSwitching(false)}
+        onSwitched={(next) => setName(next.name)}
+      />
     </>
   );
 }

@@ -28,6 +28,7 @@ import {
   type ToolSource,
   teamStatus,
   undoAgentAction,
+  updateOrgSettings,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
 
@@ -133,6 +134,20 @@ describe("what it may use", () => {
     f = await setup({ rightHand: true });
     const ctx = { ...(await lodiRun(f.owner.id)), agentId: f.agent.id };
     expect((await gateway(createTeamStatusToolSource()).granted(ctx)).map((t) => t.name)).not.toContain("team_status");
+  });
+
+  test("in a personal workspace team_status speaks of the person's agents, its title too (ADR 0159)", async () => {
+    f = await setup({ rightHand: true });
+    const ctx = await lodiRun(f.owner.id);
+    const listed = async () =>
+      (await gateway(createTeamStatusToolSource()).granted(ctx)).find((t) => t.name === "team_status");
+    expect((await listed())?.describe?.({}).title).toBe("Check on the team");
+    await updateOrgSettings(f.db, f.owner.id, f.org.id, { mode: "personal" });
+    const personal = await listed();
+    expect(personal?.description).toStartWith("What this person's agents are doing now");
+    expect(personal?.describe?.({}).title).toBe("Check on your agents");
+    // The same tool underneath: it answers as before.
+    expect((await use([createTeamStatusToolSource()], ctx, "team_status")).isError).toBeFalsy();
   });
 
   test("a task it makes is written as itself and stays with the person who asked", async () => {

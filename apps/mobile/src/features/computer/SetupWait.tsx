@@ -13,6 +13,7 @@ import {
   useEtaNow,
   WORKSPACE_COMPUTER_KIND,
 } from "@agenteschat/client/lib/computer";
+import { modeKey, workspaceModeOf } from "@agenteschat/client/lib/workspace-mode";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { ComputerIcon, ComputerPortrait } from "@/computer/ComputerPortrait";
@@ -41,7 +42,8 @@ export interface WaitWorkspace {
 /**
  * The time left now, on the clock every time line shares (`useEtaNow`), and whether "we'll email you" holds for
  * this person: only owners get the email. A workspace on hold shows neither: its provisioner waits too. `now`:
- * that clock's time, while it waits. `org`: the workspace's name.
+ * that clock's time, while it waits. `org`: the workspace's name; `mode`: its mode, whose words name the computer
+ * (a personal one's is its person's agents', ADR 0159).
  */
 export function useSetupWait(view: SetupView | null, workspace?: WaitWorkspace) {
   const chosen = useOrgMaybe();
@@ -58,6 +60,7 @@ export function useSetupWait(view: SetupView | null, workspace?: WaitWorkspace) 
     emailed: live !== null && org?.role === "owner" && promisesEmail(live, now),
     email: me?.user.email ?? "",
     org: org?.name ?? workspace?.name ?? "",
+    mode: workspaceModeOf(org),
   };
 }
 
@@ -109,7 +112,7 @@ export function SetupWait({
 }) {
   const { t } = useTranslation();
   const wait = useSetupWait(view, workspace);
-  const name = t("computerSetup.title", { org: wait.org });
+  const name = t(modeKey(wait, "computerSetup.title"), { org: wait.org });
   return (
     <View style={styles.wait}>
       <View style={styles.head}>
@@ -177,7 +180,7 @@ export function SetupNotice() {
   const view = useSetupView();
   const wait = useSetupWait(view);
   if (!setupPending(view)) return null;
-  const title = t(setupNoticeTitleKey(view), { org: org?.name ?? "" });
+  const title = t(modeKey(org, setupNoticeTitleKey(view)), { org: org?.name ?? "" });
   const line = setupNoticeLine(t, view, wait.eta, wait.emailed);
   return (
     <View style={styles.list}>

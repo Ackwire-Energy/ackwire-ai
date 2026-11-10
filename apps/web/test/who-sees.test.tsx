@@ -100,3 +100,43 @@ describe("Quem vê on a task", () => {
     expect(document.body.textContent).not.toContain("Plano secreto");
   });
 });
+
+describe("Quem vê in a personal workspace (ADR 0159)", () => {
+  /** The seeded workspace as a personal one; `alone`: Walter its only member. */
+  const personal = (alone: boolean) => {
+    const state = seedState();
+    const org = state.me?.organizations[0];
+    if (org) org.mode = "personal";
+    if (alone) state.members = state.members.filter((m) => m.userId === state.me?.user.id);
+    return state;
+  };
+
+  test("its words; with family, who runs it sees it too; alone, nothing about who else sees it", async () => {
+    for (const alone of [false, true]) {
+      const api = createFakeApi(personal(alone));
+      const issue = await api.issues.create(ORG_ID, { title: "Plano" });
+      await renderPage(<IssueWhoSeesDialog issue={issue} onClose={() => {}} />, { api, org: true });
+      await settle(3);
+      const text = document.body.textContent ?? "";
+      expect(text).toContain("Todos daqui");
+      expect(text).not.toContain("Administradores sempre veem.");
+      expect(text.includes("Quem cuida daqui também vê.")).toBe(!alone);
+      cleanup();
+    }
+  });
+
+  test("alone, a task shows Quem vê only once it says anything but everyone", async () => {
+    const api = createFakeApi(personal(true));
+    const open = await api.issues.create(ORG_ID, { title: "Plano aberto" });
+    await renderPage(<IssuePage number={open.number} />, { api, org: true });
+    await settle(5);
+    expect(document.body.textContent).toContain("Plano aberto");
+    expect(document.body.textContent).not.toContain("Quem vê");
+    cleanup();
+    const mine = await api.issues.create(ORG_ID, { title: "Plano meu" });
+    await api.issues.setAudience(ORG_ID, mine.id, { mode: "people", userIds: ["u-walter"] });
+    await renderPage(<IssuePage number={mine.number} />, { api, org: true });
+    await settle(5);
+    expect(document.body.textContent).toContain("Quem vê");
+  });
+});

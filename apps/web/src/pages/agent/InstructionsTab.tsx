@@ -1,4 +1,5 @@
 import { useProposals } from "@agenteschat/client";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import { Button, Card, Diff, diffLines, Icon, Textarea } from "@agenteschat/ui";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -37,7 +38,7 @@ export function InstructionsTab() {
               title={t("agent.howWorks", g)}
               hint={{
                 name: t("common.about", { label: t("agent.howWorks", g) }),
-                text: t("agent.instructionsHelp", { ...g, org: org.name }),
+                text: t(modeKey(org, "agent.instructionsHelp"), { ...g, org: org.name }),
               }}
               changeKeys={["instructions"]}
               lock="instructions"

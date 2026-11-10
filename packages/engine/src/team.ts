@@ -19,6 +19,7 @@ import { maySql } from "./permissions";
 import { personBehindCall, routineCreatorOfCall } from "./requester";
 import { getSandboxSettings, SANDBOX_SCOPE } from "./sandbox";
 import type { ToolContext, ToolDefinition, ToolSource } from "./tools/types";
+import { inWorkspaceWords, isPersonalWorkspace } from "./workspace-mode";
 
 const {
   agentConsultations,
@@ -278,7 +279,8 @@ export async function teammateMeans(
  * "# Your team" for the system prompt: the other agents the person
  * behind the run can talk to, one short line each, so an agent knows who
  * exists even in a DM. Details stay behind `find_agent`. Agents already
- * described in "Where you are" (channel members) are left out.
+ * described in "Where you are" (channel members) are left out. In a personal workspace (ADR 0159) they are the
+ * person's other agents, not a team.
  */
 export function teamPrompt(
   team: Teammate[],
@@ -287,14 +289,16 @@ export function teamPrompt(
   skip: Set<string>,
   /** The requester as the audience rule reads them (`speakerFor`). */
   talks: Speaker,
+  personal = false,
 ) {
   const others = teammatesFor(team, selfId, requester, skip, talks);
   if (others.length === 0) return "";
+  const where = personal ? "work for this person" : "work in this organization";
   const lines =
     others.length > TEAM_IN_PROMPT
-      ? `${others.length} other agents work in this organization.`
-      : `Other agents in this organization: ${others.map((a) => `@${a.handle}${a.role ? ` (${a.role})` : ""}`).join(", ")}.`;
-  return `# Your team\n${lines} Use \`${FIND_AGENT_TOOL}\` to see who knows or can do something and what each one can do. When you need another agent's answer for the task, ask it with \`ask_agent\`; to hand one work, use \`tell_agent\`, giving the whole job to the agent that owns it with everything it needs. Do this instead of saying you can't or sending the person to it. Either way the call returns at once and what comes of it reaches you here by itself.`;
+      ? `${others.length} other agents ${where}.`
+      : `Other agents ${personal ? "of this person" : "in this organization"}: ${others.map((a) => `@${a.handle}${a.role ? ` (${a.role})` : ""}`).join(", ")}.`;
+  return `# ${personal ? "Your fellow agents" : "Your team"}\n${lines} Use \`${FIND_AGENT_TOOL}\` to see who knows or can do something and what each one can do. When you need another agent's answer for the task, ask it with \`ask_agent\`; to hand one work, use \`tell_agent\`, giving the whole job to the agent that owns it with everything it needs. Do this instead of saying you can't or sending the person to it. Either way the call returns at once and what comes of it reaches you here by itself.`;
 }
 
 const words = (s: string) =>
@@ -304,6 +308,12 @@ const words = (s: string) =>
     .replace(/\p{M}/gu, "")
     .split(/[^\p{L}\p{N}]+/u)
     .filter((w) => w.length >= 3);
+
+/** `find_agent` as a personal workspace's agents read it (ADR 0159). */
+const FIND_AGENT_PERSONAL = {
+  [FIND_AGENT_TOOL]:
+    "Find this person's other agents: who knows or can do something (e.g. bills, travel, training), what each one can do, who is responsible for it and whether it is busy now. Leave `query` empty to list them all. To ask one, use ask_agent.",
+};
 
 /**
  * The built-in `find_agent` tool: who else works here, searchable by
@@ -378,7 +388,10 @@ export function createFindAgentToolSource(deps: { machines?: Pick<MachineCaller,
       return { content };
     },
   };
-  return { name: "team", tools: async () => [tool] };
+  return {
+    name: "team",
+    tools: async (ctx) => inWorkspaceWords(ctx.db, ctx.orgId, [tool], FIND_AGENT_PERSONAL),
+  };
 }
 
 /** "busy, on heavy work: Revisando o PR #12": what an agent is doing, its line in its own words. */
@@ -413,11 +426,12 @@ export async function teammatesNowPrompt(
 ): Promise<string> {
   const ids = listed.map((a) => a.id);
   if (ids.length === 0) return "";
-  const [ai, presence] = await Promise.all([
+  const [ai, presence, personal] = await Promise.all([
     agentAiStates(deps, orgId, ids),
     loadAgentStatuses(deps.db, orgId, new Date(), ids, {
       hasModel: (agent) => deps.gateway.hasModelCredential(agent),
     }),
+    isPersonalWorkspace(deps.db, orgId),
   ]);
   const presenceOf = new Map(presence.map((s) => [s.agentId, s]));
   const lines = listed.flatMap((a) => {
@@ -440,7 +454,7 @@ export async function teammatesNowPrompt(
     return [`- @${a.handle}: ${now}`];
   });
   if (lines.length === 0) return "";
-  return `# Your teammates now\n${lines.join("\n")}\nThis is how they are now: it outweighs what older messages here say about them (a "no AI connected" card stays in the history after the agent gets one).`;
+  return `# ${personal ? "Your fellow agents now" : "Your teammates now"}\n${lines.join("\n")}\nThis is how they are now: it outweighs what older messages here say about them (a "no AI connected" card stays in the history after the agent gets one).`;
 }
 
 /** Consultations shown on the team screen: the last day. */

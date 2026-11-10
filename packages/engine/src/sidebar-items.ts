@@ -1,14 +1,17 @@
 import { and, type Database, eq, schema, sql } from "@agenteschat/db";
 import { ValidationError } from "./errors";
 import { requirePermission } from "./organizations";
+import { isPersonalWorkspace } from "./workspace-mode";
 
 const { organizationMembers } = schema;
 
 /**
  * The tools at the top of a person's sidebar, each where they put it in this workspace
  * (`organization_members.sidebar_items`): `always` in the list, `more` only in the More menu, `auto` in the list
- * while its count is above zero and in More otherwise. An item they never moved keeps the app's default
- * (`SIDEBAR_DEFAULTS`, packages/client/src/lib/sidebar-items.ts, which mirrors these lists).
+ * while its count is above zero and in More otherwise. An item they never moved keeps the app's default for the
+ * workspace's mode (`SIDEBAR_DEFAULTS` and `PERSONAL_SIDEBAR_DEFAULTS`, packages/client/src/lib/sidebar-items.ts,
+ * which mirrors these lists): only choices are stored here, so a workspace that changes mode (ADR 0159) shows the new
+ * defaults for every tool nobody moved.
  */
 export const SIDEBAR_ITEMS = [
   "approvals",
@@ -24,6 +27,23 @@ export const SIDEBAR_ITEMS = [
   "taskManager",
 ] as const;
 export type SidebarItem = (typeof SIDEBAR_ITEMS)[number];
+/**
+ * The tools' default order in a personal workspace (ADR 0159): what waits for the person first, then Routines and
+ * Drive, then what starts in More. Mirrors `PERSONAL_SIDEBAR_ITEMS` in packages/client/src/lib/sidebar-items.ts.
+ */
+export const PERSONAL_SIDEBAR_ITEMS: readonly SidebarItem[] = [
+  "approvals",
+  "proposals",
+  "routines",
+  "drive",
+  "calendar",
+  "issues",
+  "threads",
+  "team",
+  "wiki",
+  "dashboards",
+  "taskManager",
+];
 export const SIDEBAR_PLACES = ["always", "more", "auto"] as const;
 export type SidebarPlace = (typeof SIDEBAR_PLACES)[number];
 export type SidebarItems = Partial<Record<SidebarItem, SidebarPlace>>;
@@ -117,14 +137,35 @@ export async function setMySidebarItems(
  */
 export const SIDEBAR_SECTIONS = ["tools", "channels", "agents", "people"] as const;
 export type SidebarSection = (typeof SIDEBAR_SECTIONS)[number];
+/**
+ * The default order in a personal workspace (ADR 0159): the agents before the group conversations. Mirrors
+ * `PERSONAL_SIDEBAR_SECTIONS` in packages/client/src/lib/sidebar-items.ts.
+ */
+export const PERSONAL_SIDEBAR_SECTIONS: readonly SidebarSection[] = ["tools", "agents", "channels", "people"];
 const ORDER_KEY = "order";
 
-/** Every section exactly once, else the default: a stored order is never trusted as is. */
-export function sidebarOrderOf(raw: unknown): SidebarSection[] {
+/**
+ * Every section exactly once, else `fallback` (the default of the workspace's mode): a stored order is never trusted
+ * as is.
+ */
+export function sidebarOrderOf(raw: unknown, fallback: readonly SidebarSection[] = SIDEBAR_SECTIONS): SidebarSection[] {
   const list = Array.isArray(raw) ? raw : [];
   const valid =
     list.length === SIDEBAR_SECTIONS.length && SIDEBAR_SECTIONS.every((s) => list.filter((x) => x === s).length === 1);
-  return valid ? (list as SidebarSection[]) : [...SIDEBAR_SECTIONS];
+  return valid ? (list as SidebarSection[]) : [...fallback];
+}
+
+/**
+ * The defaults of the workspace's mode: what a person who never saved an order sees. Read here and not by the apps
+ * alone: an order the person saved that matches another mode's default (the agents under the channels, in a personal
+ * workspace) is theirs, and must not read as "never saved".
+ */
+async function defaultsOf(db: Database, orgId: string) {
+  const personal = await isPersonalWorkspace(db, orgId);
+  return {
+    sections: personal ? PERSONAL_SIDEBAR_SECTIONS : SIDEBAR_SECTIONS,
+    tools: personal ? PERSONAL_SIDEBAR_ITEMS : SIDEBAR_ITEMS,
+  };
 }
 
 /** The person's section order in this workspace. */
@@ -134,7 +175,10 @@ export async function mySidebarOrder(db: Database, orgId: string, userId: string
     .select({ items: organizationMembers.sidebarItems })
     .from(organizationMembers)
     .where(mine(orgId, userId));
-  return sidebarOrderOf((row?.items as Record<string, unknown> | undefined)?.[ORDER_KEY]);
+  return sidebarOrderOf(
+    (row?.items as Record<string, unknown> | undefined)?.[ORDER_KEY],
+    (await defaultsOf(db, orgId)).sections,
+  );
 }
 
 /** Saves the person's section order in this workspace (`null`: back to the default); the tools' places stay. */
@@ -158,18 +202,22 @@ export async function setMySidebarOrder(
     })
     .where(mine(orgId, userId))
     .returning({ items });
-  return sidebarOrderOf((row?.items as Record<string, unknown> | undefined)?.[ORDER_KEY]);
+  return sidebarOrderOf(
+    (row?.items as Record<string, unknown> | undefined)?.[ORDER_KEY],
+    (await defaultsOf(db, orgId)).sections,
+  );
 }
 
 const TOOLS_KEY = "tools";
 
 /**
  * The tools in the person's order (`tools` in the same `sidebar_items` row): the known ones as stored, each once, then
- * any tool the app gained since in its default order. Where each shows (list or More) is its place, not this.
+ * any tool the app gained since in the default order (`base`, the workspace's mode's). Where each shows (list or More)
+ * is its place, not this.
  */
-export function sidebarToolOrderOf(raw: unknown): SidebarItem[] {
+export function sidebarToolOrderOf(raw: unknown, base: readonly SidebarItem[] = SIDEBAR_ITEMS): SidebarItem[] {
   const stored = Array.isArray(raw) ? raw.filter((x): x is SidebarItem => typeof x === "string" && isItem(x)) : [];
-  return [...new Set([...stored, ...SIDEBAR_ITEMS])];
+  return [...new Set([...stored, ...base])];
 }
 
 /** The person's order of the tools in this workspace. */
@@ -179,7 +227,10 @@ export async function mySidebarToolOrder(db: Database, orgId: string, userId: st
     .select({ items: organizationMembers.sidebarItems })
     .from(organizationMembers)
     .where(mine(orgId, userId));
-  return sidebarToolOrderOf((row?.items as Record<string, unknown> | undefined)?.[TOOLS_KEY]);
+  return sidebarToolOrderOf(
+    (row?.items as Record<string, unknown> | undefined)?.[TOOLS_KEY],
+    (await defaultsOf(db, orgId)).tools,
+  );
 }
 
 /**
@@ -204,7 +255,10 @@ export async function setMySidebarToolOrder(
     })
     .where(mine(orgId, userId))
     .returning({ items });
-  return sidebarToolOrderOf((row?.items as Record<string, unknown> | undefined)?.[TOOLS_KEY]);
+  return sidebarToolOrderOf(
+    (row?.items as Record<string, unknown> | undefined)?.[TOOLS_KEY],
+    (await defaultsOf(db, orgId)).tools,
+  );
 }
 
 const VIEW_KEY = "view";

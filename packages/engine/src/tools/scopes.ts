@@ -224,6 +224,12 @@ export const isBuiltinScope = (scope: string) => Object.hasOwn(BUILTIN_SCOPES, s
  * computer each still needs the switch the person at that computer turned on.
  * Admins and owners can revoke them.
  */
+/**
+ * A personal workspace's agents also start with its calendar (ADR 0159 §3a), besides every app connected there
+ * (`connector:*` per connection, as a new connection gives every agent): one person's agents work for that person.
+ */
+export const PERSONAL_AGENT_SCOPES = ["calendar:read", "calendar:write"];
+
 export const DEFAULT_AGENT_SCOPES = [
   "context:read",
   "issues:read",

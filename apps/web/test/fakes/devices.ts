@@ -6,6 +6,8 @@
  * - `GET …/devices/connect-links/{id}` → where it stands (`setLink()` moves it on: a computer asking, joined…)
  * - `POST …/devices/requests/{id}/approve` `{ name?, audience? }` → `{ machineId }`, `…/deny`
  * - `POST …/devices/access-requests/{id}/decide`, `POST …/runs/{id}/device-wait`
+ * - `POST …/computers/{id}/wifi-pairings` → a pairing waiting for the phone (the QR way with Android's QR text);
+ *   `GET …/wifi-pairings/{id}` → where it stands (`setPairing()` moves it on), `DELETE` stops it
  * Every call is recorded through `record`.
  */
 import type {
@@ -16,6 +18,7 @@ import type {
   DevicesList,
   Machine,
   PhoneDevice,
+  WifiPairing,
 } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
 import { clone } from "./context";
@@ -25,6 +28,8 @@ export interface FakeDevices {
   set(list: DevicesList): void;
   /** What the next `GET …/connect-links/{id}` answers. */
   setLink(state: ConnectLinkState): void;
+  /** What the next `GET …/wifi-pairings/{id}` answers, over the pairing it started. */
+  setPairing(state: Partial<WifiPairing>): void;
   list(): DevicesList;
 }
 
@@ -65,6 +70,8 @@ export function createFakeDevices(
   const current = (): DevicesList => own ?? { devices: machines().map(deviceOf), requests: [] };
   let link: ConnectLinkState = { status: "waiting" };
   let links = 0;
+  let pairing: WifiPairing | null = null;
+  let pairings = 0;
   const computer = (id: string): ComputerDevice => {
     own ??= current();
     const found = own.devices.find((d) => d.id === id);
@@ -147,6 +154,28 @@ export function createFakeDevices(
     deviceWait: async (orgId, runId, action) => {
       record("devices.deviceWait", orgId, runId, action);
     },
+    startWifiPairing: async (orgId, machineId, input) => {
+      record("devices.startWifiPairing", orgId, machineId, input);
+      pairings += 1;
+      const way = input.code ? "code" : "qr";
+      pairing = {
+        id: `00000000-0000-4000-8000-00000000000${pairings}`,
+        way,
+        state: way === "code" ? "pairing" : "waiting",
+        ...(way === "qr" ? { qr: `WIFI:T:ADB;S:agentes-Fake${pairings}xxxxx;P:fakepassword;;` } : {}),
+        expiresAt: new Date(now().getTime() + 120_000).toISOString(),
+      };
+      return clone(pairing);
+    },
+    wifiPairing: async (orgId, machineId, id) => {
+      record("devices.wifiPairing", orgId, machineId, id);
+      if (!pairing || pairing.id !== id) throw new ApiError(503, "machine.not_found", "No such pairing");
+      const { qr: _qr, ...rest } = pairing;
+      return clone(rest);
+    },
+    cancelWifiPairing: async (orgId, machineId, id) => {
+      record("devices.cancelWifiPairing", orgId, machineId, id);
+    },
   };
   return {
     client,
@@ -155,6 +184,9 @@ export function createFakeDevices(
     },
     setLink: (state) => {
       link = clone(state);
+    },
+    setPairing: (state) => {
+      if (pairing) pairing = { ...pairing, ...clone(state) };
     },
     list: () => clone(current()),
   };

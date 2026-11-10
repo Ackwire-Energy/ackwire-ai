@@ -28,6 +28,7 @@ import { sameServer } from "@agenteschat/client/lib/custom-tools";
 import { knownErrorText, oauthReturnText } from "@agenteschat/client/lib/errors";
 import { can } from "@agenteschat/client/lib/permissions";
 import { connectorName, scopeText } from "@agenteschat/client/lib/scopes";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import { useQueryClient } from "@tanstack/react-query";
 import * as Clipboard from "expo-clipboard";
 import * as WebBrowser from "expo-web-browser";
@@ -164,7 +165,8 @@ export function ConnectSheet({
             <Button variant="primary" wide label={t("mobile.connectors.connect")} onPress={() => setStep("connect")} />
           ) : (
             <Text variant="small" tone="muted">
-              {t("mobile.connectors.adminsOnly", { org: org?.name ?? "" })}
+              {/* A personal workspace's are whoever runs it, never "an admin of Personal" (ADR 0159). */}
+              {t(modeKey(org, "mobile.connectors.adminsOnly"), { org: org?.name ?? "" })}
             </Text>
           )}
         </>

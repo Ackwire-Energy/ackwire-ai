@@ -545,6 +545,16 @@ describe("external provisioning", () => {
     expect(await name(english.machineId)).toBe("Beta's computer");
     await updateOrganization(f.db, ana.id, beta.id, { name: "Beta Co" });
     expect(await name(english.machineId)).toBe("Beta Co's computer");
+
+    // A personal workspace's (ADR 0159): its person's agents' computer, named after no workspace, so a rename stays.
+    const bia = await addUser(f.db, "bia");
+    await f.db.update(schema.users).set({ locale: "en" }).where(eq(schema.users.id, bia.id));
+    const { organization: home } = await createOrganization(f.db, bia.id, { name: "Personal", mode: "personal" });
+    const personal = await issueManagedMachine(deps(), home.id);
+    if (!personal) throw new Error("no org");
+    expect(await name(personal.machineId)).toBe("Your agents' computer");
+    await updateOrganization(f.db, bia.id, home.id, { name: "Home" });
+    expect(await name(personal.machineId)).toBe("Your agents' computer");
   });
 
   test("an issued code that expires leaves the managed row; a new code still connects it", async () => {

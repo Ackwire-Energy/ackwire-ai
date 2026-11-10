@@ -134,7 +134,7 @@ test("each emitter writes one row, metadata only", async () => {
   const owner = f.owner.id;
   const org = f.org.id;
   expect(rows.map(({ type, orgId, userId, data }) => ({ type, orgId, userId, data }))).toEqual([
-    { type: "organization.created", orgId: org, userId: owner, data: { name: "Acme" } },
+    { type: "organization.created", orgId: org, userId: owner, data: { name: "Acme", mode: "team" } },
     { type: "agent.created", orgId: org, userId: owner, data: { agentId: f.agent.id } },
     {
       type: "invitation.created",
@@ -161,7 +161,7 @@ test("each emitter writes one row, metadata only", async () => {
       userId: null,
       data: { taskId: task.id, agentId: f.agent.id, executor: "shell", status: "done" },
     },
-    { type: "organization.created", orgId: soloOrg.id, userId: solo.id, data: { name: "Bia's" } },
+    { type: "organization.created", orgId: soloOrg.id, userId: solo.id, data: { name: "Bia's", mode: "team" } },
     { type: "user.signed_up", orgId: null, userId: solo.id, data: { email: solo.email, method: "email" } },
     {
       type: "session.created",

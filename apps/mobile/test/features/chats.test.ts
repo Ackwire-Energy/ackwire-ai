@@ -10,6 +10,7 @@ import {
   homeSections,
   isListedThread,
   isListKind,
+  isQuietGeneral,
   missionState,
   missionsWaiting,
   missionWaitingItems,
@@ -28,6 +29,7 @@ import {
   unreadConversations,
   unreadThreadCount,
   waitingTotal,
+  withoutQuietGeneral,
 } from "../../src/features/chats/logic";
 import {
   waitingChipKey,
@@ -124,6 +126,28 @@ describe("the list", () => {
     expect(rowsOfKind(rows, "channels").map((r) => r.key)).toEqual(["c:c1", "c:c2"]);
     expect(rowsOfKind(rows, "people")).toEqual([]);
     expect(unreadConversations(rows)).toBe(1);
+  });
+});
+
+describe("a personal workspace's #general (ADR 0159)", () => {
+  const rows = (general: Partial<Channel>) =>
+    buildConversations({
+      channels: [channel("c1", "general", true, general), channel("c2", "family")],
+      dms: [dm("d1", "Dev", 0, 10)],
+      threads: [],
+    });
+
+  test("while its person is alone, a quiet #general leaves the home and the list; every other row stays", () => {
+    const quiet = rows({ unreadCount: 0 });
+    expect(quiet.filter(isQuietGeneral).map((r) => r.key)).toEqual(["c:c1"]);
+    expect(withoutQuietGeneral(quiet, true).map((r) => r.key)).toEqual(["d:d1", "c:c2"]);
+    // With family in it (or in a team's workspace), it shows.
+    expect(withoutQuietGeneral(quiet, false).map((r) => r.key)).toEqual(quiet.map((r) => r.key));
+  });
+
+  test("something new there, a message or a mention of me, keeps it in sight", () => {
+    expect(withoutQuietGeneral(rows({ unreadCount: 2 }), true).some((r) => r.key === "c:c1")).toBe(true);
+    expect(withoutQuietGeneral(rows({ mentionCount: 1 }), true).some((r) => r.key === "c:c1")).toBe(true);
   });
 });
 

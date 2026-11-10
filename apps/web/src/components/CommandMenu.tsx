@@ -3,6 +3,8 @@ import { canTalk, listsAgent } from "@agenteschat/client/lib/audience";
 import { joinable } from "@agenteschat/client/lib/channel-access";
 import { setDraftFor } from "@agenteschat/client/lib/drafts";
 import { can } from "@agenteschat/client/lib/permissions";
+import { settingsSectionNameKey } from "@agenteschat/client/lib/personal-view";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import { Avatar, CommandPalette, Icon, type PaletteItem } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -62,7 +64,8 @@ export function CommandMenu() {
         key: `c:${c.id}`,
         group: goTo,
         label: `#${c.name}`,
-        sub: t("palette.channel"),
+        // A personal workspace calls its channels group conversations (ADR 0159).
+        sub: t(modeKey(org, "palette.channel")),
         mark: <Icon name="channel" size={16} />,
         onSelect: () => void navigate({ to: "/org/$orgId/c/$channelId", params: { orgId, channelId: c.id } }),
       });
@@ -139,12 +142,16 @@ export function CommandMenu() {
       });
     for (const s of SETTINGS_SECTIONS) {
       if (!s.allowed(org, server)) continue;
+      // Every section, by the name its settings list shows (a personal workspace's About you, ADR 0159), found by its
+      // usual name too.
+      const label = t(settingsSectionNameKey(org, s.id));
+      const usual = t(`settings.section.${s.id}`);
       list.push({
         key: `s:${s.id}`,
         group: goTo,
-        label: t(`settings.section.${s.id}`),
+        label,
         sub: t("palette.settings"),
-        keywords: s.id,
+        keywords: label === usual ? s.id : `${s.id} ${usual}`,
         mark: s.id === "account" ? <MyFace size="xs" /> : <Icon name={s.icon} size={16} />,
         onSelect: () => void navigate({ to: "/org/$orgId/settings/$section", params: { orgId, section: s.id } }),
       });

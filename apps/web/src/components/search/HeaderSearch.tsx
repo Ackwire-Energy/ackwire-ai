@@ -5,6 +5,7 @@ import {
   parseSearch,
   searchChipKey,
 } from "@agenteschat/client/lib/search-filters";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import { Button } from "@agenteschat/ui";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -67,10 +68,11 @@ export function HeaderSearch({ channelId, onOpen, dm }: { channelId: string; onO
       className="channel__search"
       inputRef={sheetBox ? undefined : input}
       autoFocus={sheetBox}
+      // A personal workspace's name ("Personal") says nothing here: its own words, without it (ADR 0159).
       placeholder={
         dm
           ? t(narrow ? "searchPage.label" : "searchPage.searchHere")
-          : t("searchPage.header.placeholder", { org: org.name })
+          : t(modeKey(org, "searchPage.header.placeholder"), { org: org.name })
       }
       chips={held ? held.slice(1) : ws.chips}
       onChipsChange={held && place ? (chips) => ws.setChips(inDmOnly(chips, place)) : ws.setChips}

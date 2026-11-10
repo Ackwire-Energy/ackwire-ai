@@ -1,9 +1,11 @@
 import { previewBody } from "@agenteschat/client/lib/message-body";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import { Link } from "expo-router";
 import { memo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Platform, StyleSheet, View } from "react-native";
 import { TAB_BADGE } from "@/lib/nav";
+import { useOrg } from "@/providers/org";
 import { Count, LIST_AVATAR, LIST_PREVIEW, LineIcon, ListRow, PixelOrbit, Text } from "@/ui";
 import { router } from "@/ui/navigation";
 import { workTitle } from "../agents/work";
@@ -77,13 +79,17 @@ export const ConversationRowView = memo(function ConversationRowView({
   const c = useColors();
   const when = useWhen();
   const presenceOf = usePresenceOf();
+  const { org } = useOrg();
   const lastText = (last: LastLine | null) => {
     if (!last) return { who: "", text: "" };
     const who = last.name || (last.author ? dir.nameOf(last.author) : "");
     return { who, text: previewBody(t, last.text, last.meta ?? null, last.mediaKind) };
   };
   const agentDm = r.kind === "dm" && r.with.type === "agent";
-  /** A DM with nothing in it yet: who the agent is (as its first conversation says), or a word to start. */
+  /**
+   * A DM with nothing in it yet: who the agent is (as its first conversation says), or a word to start. A personal
+   * workspace's agent is there for its person, not on a team (ADR 0159).
+   */
   const introLine = (): string => {
     if (r.kind !== "dm") return "";
     const a = agentDm ? dir.agentById.get(r.with.id) : undefined;
@@ -92,7 +98,7 @@ export const ConversationRowView = memo(function ConversationRowView({
     return intro.kind === "what"
       ? intro.text
       : intro.kind === "role"
-        ? t("mobile.chat.intent.roleIntro", { role: intro.role })
+        ? t(modeKey(org, "mobile.chat.intent.roleIntro"), { role: intro.role })
         : t("mobile.chat.intent.noIntro");
   };
   const agentState = agentDm ? (agent ?? null) : null;

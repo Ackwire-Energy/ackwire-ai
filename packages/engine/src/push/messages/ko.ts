@@ -87,4 +87,11 @@ export const strings: Partial<PushStrings> = {
   deviceWaitingBody: "돌아오면 시작해요.",
   teamWeekReady: "팀의 한 주 정리가 준비됐어요",
   teamDayReady: "오늘의 정리가 준비됐어요",
+  machineConnectedTitlePersonal: "새 컴퓨터가 연결됐어요",
+  computerReadyTitlePersonal: "내 에이전트의 컴퓨터가 준비됐어요",
+  agentUnreachedBodyPersonal: "루틴을 만든 사람은 아직 이 에이전트에게 말을 걸 수 없어요. 탭해서 허용하세요.",
+  widgetFailedReasonsPersonal: { creator_left: "설정한 사람이 더 이상 내 워크스페이스에 없어요." },
+  joinRequestTitlePersonal: (name) => `${name} 님이 내 워크스페이스에 참여를 요청했어요`,
+  joinSuggestionTitlePersonal: (by, name) => `${by} 님이 ${name} 님을 초대하자고 제안했어요`,
+  teamWeekReadyPersonal: "한 주 정리가 준비됐어요",
 };

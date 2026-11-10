@@ -1,5 +1,6 @@
 import { useAgentSkills } from "@agenteschat/client";
 import { type AccessResource, asksAt, type Level } from "@agenteschat/client/lib/access-levels";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import { Button, Card, Chip, EmptyState, Icon, SearchField, Segmented, Toolbar } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
@@ -26,8 +27,12 @@ import { MergeReposBlock, ReposBlock } from "./Repos";
 
 type AccessFilter = "all" | "on" | "ask";
 
-/** Ferramentas e acesso: one level per connector and built-in area, and the skills. Saved with the save bar. */
-export function AccessTab() {
+/**
+ * Ferramentas e acesso: one level per connector and built-in area, and the skills. Saved with the save bar. In a
+ * personal workspace (ADR 0159 §3) it comes in two parts: `basic` (its apps and mailboxes, the "Can use" tab) and
+ * `advanced` (built-in areas, databases, rules and skills, in the Advanced tab).
+ */
+export function AccessTab({ part = "all" }: { part?: "all" | "basic" | "advanced" }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const { agent, g, viewer, draft, setLevel, set, can, changeOf, resources, accessState, ownerFirst } = useAgentEdit();
@@ -106,35 +111,39 @@ export function AccessTab() {
   const library = skills.data ?? [];
   const enabled = new Set(draft.skills ?? []);
   const skillsEditable = can("skills") && draft.skills !== undefined;
+  const basic = part !== "advanced";
+  const advanced = part !== "basic";
   return (
     <>
-      <ReadOnlyNote field="levels" />
-      <Toolbar
-        size="sm"
-        search={
-          <SearchField
-            size="sm"
-            aria-label={t("agentPage.access.search")}
-            placeholder={t("agentPage.access.search")}
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            onClear={() => setQ("")}
-            clearLabel={t("filters.clearSearch")}
-          />
-        }
-      >
-        <Segmented
+      {basic && <ReadOnlyNote field="levels" />}
+      {part === "all" && (
+        <Toolbar
           size="sm"
-          label={t("agentPage.access.filter")}
-          value={filter}
-          onValueChange={setFilter}
-          options={(["all", "on", "ask"] as const).map((f) => ({
-            value: f,
-            label: t(`agentPage.access.filters.${f}`),
-            count: count[f],
-          }))}
-        />
-      </Toolbar>
+          search={
+            <SearchField
+              size="sm"
+              aria-label={t("agentPage.access.search")}
+              placeholder={t("agentPage.access.search")}
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              onClear={() => setQ("")}
+              clearLabel={t("filters.clearSearch")}
+            />
+          }
+        >
+          <Segmented
+            size="sm"
+            label={t("agentPage.access.filter")}
+            value={filter}
+            onValueChange={setFilter}
+            options={(["all", "on", "ask"] as const).map((f) => ({
+              value: f,
+              label: t(`agentPage.access.filters.${f}`),
+              count: count[f],
+            }))}
+          />
+        </Toolbar>
+      )}
       <div className="agp-cols">
         <div className="agp-col">
           {accessState === "loading" ? (
@@ -147,74 +156,78 @@ export function AccessTab() {
             </Card>
           ) : (
             <>
-              <Card as="section" className="agp-card" aria-labelledby="ac-connectors">
-                <CardHead
-                  id="ac-connectors"
-                  icon="plug"
-                  title={t("agentPage.access.connectors", { org: org.name })}
-                  action={<span className="small muted">{t("agentPage.access.oneLevel")}</span>}
-                />
-                {editable && resources.some((r) => r.kind === "connector") && (
-                  // Every connector at once acts on this card's list: over it, at the end its rows' levels keep, and
-                  // under the title, so a narrow card wraps it instead of squeezing the title.
-                  <div className="newag__list-head">
-                    <span className="newag__quick">
-                      {t("agentPage.access.allConnectors")}
-                      <Button size="sm" variant="ghost" onClick={() => allConnectors("none")}>
-                        {t("access.level.none")}
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => allConnectors("read")}>
-                        {t("agentPage.access.onlyRead")}
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => allConnectors("write")}>
-                        {t("access.level.write")}
-                      </Button>
-                    </span>
-                  </div>
-                )}
-                {noConnectors ? (
-                  <NoConnectors look={lookOf(agent) ?? true} />
-                ) : connectors.length ? (
-                  <ul className="level-list" aria-label={t("access.kind.connectors")}>
-                    {connectors.map(row)}
-                  </ul>
-                ) : (
-                  empty
-                )}
-                {viewer === "admin" && !needle && !noConnectors && (
-                  <Link
-                    className="newag__addrow"
-                    to="/org/$orgId/settings/$section"
-                    params={{ orgId: org.id, section: "connectors" }}
-                  >
-                    <Icon name="plug" />
-                    {t("newAgent.connectOther")}
-                    <span className="newag__addrow-aside">{t("newAgent.opensConnectors")}</span>
-                  </Link>
-                )}
-              </Card>
-              <MailAccessCard />
-              <DatabaseAccessCard />
-              <Card as="section" className="agp-card" aria-labelledby="ac-builtin">
-                <CardHead
-                  id="ac-builtin"
-                  icon="agent"
-                  title={t("agentPage.access.builtin")}
-                  action={<span className="small muted">{t("agentPage.access.builtinHelp")}</span>}
-                />
-                {builtins.length ? (
-                  <ul className="level-list" aria-label={t("access.kind.builtin")}>
-                    {builtins.map(row)}
-                  </ul>
-                ) : (
-                  empty
-                )}
-              </Card>
+              {basic && (
+                <Card as="section" className="agp-card" aria-labelledby="ac-connectors">
+                  <CardHead
+                    id="ac-connectors"
+                    icon="plug"
+                    title={t(modeKey(org, "agentPage.access.connectors"), { org: org.name })}
+                    action={<span className="small muted">{t("agentPage.access.oneLevel")}</span>}
+                  />
+                  {editable && resources.some((r) => r.kind === "connector") && (
+                    // Every connector at once acts on this card's list: over it, at the end its rows' levels keep, and
+                    // under the title, so a narrow card wraps it instead of squeezing the title.
+                    <div className="newag__list-head">
+                      <span className="newag__quick">
+                        {t("agentPage.access.allConnectors")}
+                        <Button size="sm" variant="ghost" onClick={() => allConnectors("none")}>
+                          {t("access.level.none")}
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => allConnectors("read")}>
+                          {t("agentPage.access.onlyRead")}
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => allConnectors("write")}>
+                          {t("access.level.write")}
+                        </Button>
+                      </span>
+                    </div>
+                  )}
+                  {noConnectors ? (
+                    <NoConnectors look={lookOf(agent) ?? true} />
+                  ) : connectors.length ? (
+                    <ul className="level-list" aria-label={t("access.kind.connectors")}>
+                      {connectors.map(row)}
+                    </ul>
+                  ) : (
+                    empty
+                  )}
+                  {viewer === "admin" && !needle && !noConnectors && (
+                    <Link
+                      className="newag__addrow"
+                      to="/org/$orgId/settings/$section"
+                      params={{ orgId: org.id, section: "connectors" }}
+                    >
+                      <Icon name="plug" />
+                      {t("newAgent.connectOther")}
+                      <span className="newag__addrow-aside">{t("newAgent.opensConnectors")}</span>
+                    </Link>
+                  )}
+                </Card>
+              )}
+              {basic && <MailAccessCard />}
+              {advanced && <DatabaseAccessCard />}
+              {advanced && (
+                <Card as="section" className="agp-card" aria-labelledby="ac-builtin">
+                  <CardHead
+                    id="ac-builtin"
+                    icon="agent"
+                    title={t("agentPage.access.builtin")}
+                    action={<span className="small muted">{t("agentPage.access.builtinHelp")}</span>}
+                  />
+                  {builtins.length ? (
+                    <ul className="level-list" aria-label={t("access.kind.builtin")}>
+                      {builtins.map(row)}
+                    </ul>
+                  ) : (
+                    empty
+                  )}
+                </Card>
+              )}
             </>
           )}
         </div>
         <div className="agp-col">
-          {resources.some(isGithub) && (
+          {advanced && resources.some(isGithub) && (
             <p className="newag__note ac-iconline">
               <Icon name="repo" size={16} />
               <span>
@@ -229,72 +242,82 @@ export function AccessTab() {
               {ownerFirst ? t("newAgent.approverOwner", { name: ownerFirst }) : t("newAgent.approverAdmins")}
             </span>
           </p>
-          <ApprovalRulesCard />
-          <Card
-            as="section"
-            className="agp-card"
-            data-changed={changeOf("skills") ? true : undefined}
-            aria-labelledby="ac-skills"
-          >
-            <CardHead id="ac-skills" icon="book" title={t("skills.agentTitle")} changeKeys={["skills"]} lock="skills" />
-            <span className="small muted">{t("newAgent.skillsHelp", g)}</span>
-            {skills.isLoading ? (
-              <LoadingLine width={200} />
-            ) : skills.isError ? (
-              <span className="muted">{t("skills.unavailable")}</span>
-            ) : library.length === 0 ? (
-              <EmptyState
-                size="panel"
-                agent={lookOf(agent) ?? true}
-                title={t("skills.emptyTitle")}
-                actions={
-                  viewer === "admin" && (
-                    <Button asChild variant="primary" icon="plus">
-                      <Link to="/org/$orgId/settings/$section" params={{ orgId: org.id, section: "skills" }}>
-                        {t("skills.install")}
-                      </Link>
-                    </Button>
-                  )
-                }
-              >
-                {t("skills.emptyText")}
-              </EmptyState>
-            ) : skillsEditable ? (
-              <SkillPicker
-                skills={library}
-                selected={enabled}
-                onChange={(next) => set("skills", [...next].sort())}
-                idPrefix="agp-skill"
+          {advanced && <ApprovalRulesCard />}
+          {advanced && (
+            <Card
+              as="section"
+              className="agp-card"
+              data-changed={changeOf("skills") ? true : undefined}
+              aria-labelledby="ac-skills"
+            >
+              <CardHead
+                id="ac-skills"
+                icon="book"
+                title={t("skills.agentTitle")}
+                changeKeys={["skills"]}
+                lock="skills"
               />
-            ) : enabled.size > 0 ? (
-              <span className="agp-chips">
-                {library
-                  .filter((s) => enabled.has(s.id))
-                  .map((s) => (
-                    <Chip key={s.id} icon="book">
-                      {s.name}
-                    </Chip>
-                  ))}
-              </span>
-            ) : (
-              <span className="small muted">{t("skills.agentEmpty", { name: agent.name })}</span>
-            )}
-            <WasLine changeKey="skills" />
-            {viewer === "admin" && library.length > 0 && (
-              <Link
-                className="agp-more"
-                to="/org/$orgId/settings/$section"
-                params={{ orgId: org.id, section: "skills" }}
-              >
-                <Icon name="book" size={14} />
-                {t("agentPage.access.library")}
-              </Link>
-            )}
-          </Card>
-          <p className="newag__note ac-iconline">
-            <Icon name="info" size={16} />
-            <span>{t("agentPage.access.fineTune")}</span>
-          </p>
+              <span className="small muted">{t("newAgent.skillsHelp", g)}</span>
+              {skills.isLoading ? (
+                <LoadingLine width={200} />
+              ) : skills.isError ? (
+                <span className="muted">{t("skills.unavailable")}</span>
+              ) : library.length === 0 ? (
+                <EmptyState
+                  size="panel"
+                  agent={lookOf(agent) ?? true}
+                  title={t("skills.emptyTitle")}
+                  actions={
+                    viewer === "admin" && (
+                      <Button asChild variant="primary" icon="plus">
+                        <Link to="/org/$orgId/settings/$section" params={{ orgId: org.id, section: "skills" }}>
+                          {t("skills.install")}
+                        </Link>
+                      </Button>
+                    )
+                  }
+                >
+                  {t("skills.emptyText")}
+                </EmptyState>
+              ) : skillsEditable ? (
+                <SkillPicker
+                  skills={library}
+                  selected={enabled}
+                  onChange={(next) => set("skills", [...next].sort())}
+                  idPrefix="agp-skill"
+                />
+              ) : enabled.size > 0 ? (
+                <span className="agp-chips">
+                  {library
+                    .filter((s) => enabled.has(s.id))
+                    .map((s) => (
+                      <Chip key={s.id} icon="book">
+                        {s.name}
+                      </Chip>
+                    ))}
+                </span>
+              ) : (
+                <span className="small muted">{t("skills.agentEmpty", { name: agent.name })}</span>
+              )}
+              <WasLine changeKey="skills" />
+              {viewer === "admin" && library.length > 0 && (
+                <Link
+                  className="agp-more"
+                  to="/org/$orgId/settings/$section"
+                  params={{ orgId: org.id, section: "skills" }}
+                >
+                  <Icon name="book" size={14} />
+                  {t("agentPage.access.library")}
+                </Link>
+              )}
+            </Card>
+          )}
+          {advanced && (
+            <p className="newag__note ac-iconline">
+              <Icon name="info" size={16} />
+              <span>{t("agentPage.access.fineTune")}</span>
+            </p>
+          )}
         </div>
       </div>
     </>
