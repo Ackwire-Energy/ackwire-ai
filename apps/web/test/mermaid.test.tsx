@@ -765,13 +765,14 @@ describe("inside the frame, mermaid-frame.js", () => {
   });
 
   // Safari, Firefox and the desktop app draw on the page's thread. Past the page's bounds each family below held WebKit
-  // or Firefox for seconds, and at them mermaid answers in a moment.
+  // or Firefox for seconds, and at them mermaid answers in a moment. The limit leaves room for a machine whose cores
+  // are all running other test files (1.09 s measured there for a source that takes a fraction of that alone).
   const repeated = (header: string, line: string, count: number) => `${header}\n${Array(count).fill(line).join("\n")}`;
   async function answersQuickly(source: string) {
     expect(mermaidDrawable(source)).toBe(true);
     const start = performance.now();
     expect(await frameScript().ask({ id: "bound", source, dark: false })).toBeDefined();
-    expect(performance.now() - start).toBeLessThan(1000);
+    expect(performance.now() - start).toBeLessThan(3000);
   }
 
   test("a source over 5,000 characters or 200 lines stays code, and one at the bounds is answered in a moment", async () => {

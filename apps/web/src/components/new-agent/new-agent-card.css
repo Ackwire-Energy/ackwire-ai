@@ -390,7 +390,10 @@
   gap: 8px 16px;
   min-width: 0;
 }
+/* A link with its icon, as the app's other links with one: the row's middle, not .ac-iconline (a link is not a row). */
 .nac__import {
+  display: inline-flex;
+  align-items: center;
   gap: 6px;
 }
 
@@ -462,8 +465,6 @@
   line-height: 19px;
 }
 .nac-app__asks .ac-icon {
-  flex: none;
-  margin-top: 1px;
   color: var(--faint);
 }
 
