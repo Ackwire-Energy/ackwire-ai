@@ -3,6 +3,8 @@ import type { Widen } from "@agenteschat/i18n/widen";
 /** The desktop app's own strings in English, the source: every other language follows this shape. */
 export const desktopEn = {
   device: { mac: "Mac", windows: "PC", linux: "computer" },
+  /** The app's own windows by name (the Dock's list, the Window menu, Mission Control). */
+  windowTitle: { welcome: "Welcome", prefs: "Preferences" },
   common: {
     cancel: "Cancel",
     close: "Close",
@@ -81,6 +83,8 @@ export const desktopEn = {
     pauseTomorrow: "Until tomorrow at 9 AM",
     pauseManual: "Until I resume",
     pauseHint: "What is already running finishes normally.",
+    /** With the agentes.chat this computer runs: pausing the agents leaves it up (ADR 0158). */
+    pauseHintServer: "What is already running finishes normally. The server stays up.",
     resume: "Resume the agents",
     open: "Open agentes.chat",
     prefs: "Preferences…",
@@ -138,6 +142,9 @@ export const desktopEn = {
     addTitle: "Add a workspace",
     addLead: "The ones you have stay here, each with its own sign-in.",
     addCloud: "Create a workspace on agentes.chat",
+    /** Adding a workspace, under "Sign in to agentes.chat": a new one instead. */
+    addNew: "Want a new workspace?",
+    addNewLink: "Create one",
     addOwn: "Use your team's server",
   },
   own: {
@@ -161,16 +168,27 @@ export const desktopEn = {
     looking: "Looking for your server…",
     foundTailnet: "On your Tailscale network",
     foundHere: "agentes.chat is running here",
+    /** A server found on this computer that still waits for its owner account (the app opens its owner page). */
+    foundNoOwner: "Waiting for its owner account",
     use: "Use",
+    setUp: "Set up",
+    noneFound: "No server found.",
+    lookAgain: "Look again",
+    tailnetOff: "Tailscale is off on this {{device}}, so servers on your Tailscale network don't show up here.",
+    /** Under the address field: what an address looks like, and what a Tailscale one ends in. */
+    addressHint: "An address with https, or its Tailscale one, which ends in .ts.net.",
+    checkUpdates: "Check for updates",
     none: "Don't have one yet? Run this on it",
     noneText: "In the terminal of a server or a Mac mini. At the end it shows a link that connects this app to it.",
     invalid: "Check the address, something like agentes.yourteam.ts.net.",
     httpRefused:
-      "{{host}} uses plain http, which only works on this {{device}}. Use its Tailscale address or one with https.",
+      "{{host}} doesn't use a secure connection (https), and only servers on this {{device}} may go without one. Use its https address or its Tailscale one.",
     noOwner:
-      "{{host}} has no owner account yet. Open its owner link (it ends in /owner#claim=…), on this {{device}} or on your phone.",
-    unreachable:
-      "We can't reach {{host}}. If it's on Tailscale, open Tailscale on this {{device}}, connect and try again.",
+      "{{host}} has no owner yet. Whoever installed the server got a link to create the owner account: open that link on this {{device}} or on your phone.",
+    unreachable: "We can't reach {{host}}. Check the address and that the server is on, then try again.",
+    /** The same, for a server on a Tailscale network (its address ends in .ts.net). */
+    unreachableTailnet:
+      "We can't reach {{host}}, which is on your Tailscale network. Open Tailscale on this {{device}}, connect and try again.",
     unreachableHere: "Nothing answers at {{host}} on this {{device}}. Start agentes.chat here, then try again.",
     certificate: "The certificate of {{host}} isn't valid. Talk to whoever runs the server.",
     notAgentes: "{{host}} isn't an agentes.chat server. Check the address.",
@@ -237,8 +255,12 @@ export const desktopEn = {
       operator: "Tailscale needs your permission first",
       stopped: "you stopped waiting for HTTPS to be turned on",
       start: "agentes.chat didn't answer again at its new address",
+      notConnected: "Tailscale isn't connected on this {{device}}",
+      /** Turning access off failed: a whole sentence (never after "didn't turn on"). */
+      back: "agentes.chat didn't answer again on this {{device}} after access from your devices was turned off.",
     },
     serveFix: "Install Tailscale from tailscale.com.",
+    connectTray: "Connect it from its icon by the clock.",
     operatorRun: "Give that permission once, in the terminal:",
     turnOn: "Turn it on",
     copyDetails: "Copy details",
@@ -246,12 +268,16 @@ export const desktopEn = {
     notifyFailed: "Setting up agentes.chat on this {{device}} didn't finish",
     notifyFailedBody: "Open agentes.chat to see what happened.",
     already: "agentes.chat is already installed on this {{device}}",
-    alreadyText: "It runs on its own, installed from the terminal, at {{url}}.",
+    alreadyText: "It runs on its own, installed from the terminal. Use it in this app.",
+    /** The same, for the Docker install answering on this computer. */
+    alreadyDocker: "It runs on its own, installed with Docker. Use it in this app.",
     useIt: "Use it",
     notRunning: "agentes.chat is installed on this {{device}}, but it isn't running",
-    notRunningText: "It was installed from the terminal, in {{path}}. Start it there, then try again.",
+    /** The command to copy follows. */
+    notRunningText:
+      "It was installed from the terminal, in {{path}}. To start it, run this in the terminal, then try again:",
     running: "agentes.chat already runs on this {{device}}",
-    runningText: "This app runs it, at {{url}}.",
+    runningText: "This app runs it. Open it to sign in.",
     openIt: "Open it",
   },
   link: {
@@ -265,6 +291,10 @@ export const desktopEn = {
     notALink: "This link isn't from an agentes.chat server.",
     chipTailnet: "Tailscale",
     chipHere: "This {{device}}",
+    /** The agentes.chat this computer runs, named in large type instead of its address. */
+    thisServer: "agentes.chat on this {{device}}",
+    /** Under a server on a Tailscale network. */
+    tailnetHelp: "It's on a Tailscale network: it only opens on devices connected to Tailscale with the same account.",
   },
   servers: {
     title: "Servers",
@@ -290,6 +320,12 @@ export const desktopEn = {
     workspaces_one: "{{count}} workspace",
     workspaces_other: "{{count}} workspaces",
     signedOut: "Not signed in",
+    /** A server's state and its ways out, in its row (ADR 0158). */
+    offline: "Offline since {{time}}",
+    signIn: "Sign in",
+    signOut: "Sign out of this server",
+    signedOutDone: "You signed out of {{host}}",
+    removeFromApp: "Remove from this app",
     /** The system's notification for a server not open in the window: "Oficina · agentes.exemplo.com.br". */
     newsOne: "1 new notification",
     newsMany: "{{n}} new notifications",
@@ -301,8 +337,10 @@ export const desktopEn = {
     stopped: "Stopped",
     updating: "Updating",
     failing: "Not starting",
+    restarting: "Restarting",
     onlyHere: "Running · only on this {{device}}",
     onTailnet: "Running · on your Tailscale network",
+    tailnetDown: "Running · Tailscale isn't connected on this {{device}}",
     address: "Address",
     data: "Data",
     phone: "On your phone",
@@ -325,14 +363,38 @@ export const desktopEn = {
     stopHereTitle: "Stop agentes.chat on this {{device}}?",
     stopHereBody: "It stops now and no longer starts with the app. Its data stays in {{path}}.",
     stopHereConfirm: "Stop it",
+    /** Stop, with how long (ADR 0158): it no longer starts with the app until Start, or for an hour. */
+    stopFor1h: "Stop for 1 hour",
+    startNow: "Start now",
+    stopUntilStart: "Stop until I start it",
+    stopForget: "Don't start it with the app…",
+    stopNote: "Stopping cuts everyone off, the phone included.",
+    stopTitle: "Stop agentes.chat on this {{device}}?",
+    stopBody: "The phone and the team lose access until it's back.",
+    stoppedUntil: "Stopped · back at {{time}}",
+    stoppedHeld: "Stopped until you start it",
+    reachRestart: "Turning it on or off restarts agentes.chat for a moment.",
+    reachOffTitle: "Turn off access from your devices?",
+    reachOffBody: "The phone and the team lose access. Only this {{device}} keeps using it.",
+    reachOffConfirm: "Turn off",
+    failingWhy: "The details say why: copy them for whoever helps you, or look at the logs.",
+    showLogs: "Show the logs",
+    help: "Help",
+    gotIt: "Got it",
     notHere: "Not running here. Its data is still in {{path}}.",
     startHere: "Start it here",
     stoppedBanner: "agentes.chat stopped on this {{device}}",
     stoppedBody: "Nobody can use it until it starts again.",
     failingBanner: "agentes.chat isn't starting on this {{device}}",
+    /** The notification's body under "isn't starting"; clicking it opens the popover. */
+    failingBody: "Open the app to see what happened and try again.",
+    /** It restarted by itself 3 times in a few minutes (a notification). */
+    restartedBanner: "agentes.chat restarted 3 times on this {{device}}",
+    restartedBody: "It comes back by itself. If it keeps happening, open the app to see why.",
     version: "Version {{version}}, updated with the app",
     updatesWithApp: "Updating the app updates agentes.chat on this {{device}} too.",
     updateBack: "The update didn't start. agentes.chat is back on {{version}}.",
+    updateBackBody: "The new version is tried again with the app's next update.",
   },
   pair: {
     title: "Let agents of {{org}} work on this {{device}}?",
@@ -416,6 +478,34 @@ export const desktopEn = {
       menuBarTitle: "Show in the menu bar",
       notchTitle: "Show the agents in the notch",
       notchDesc: "On MacBooks with a notch: who is working shows around the camera.",
+    },
+    thisMac: {
+      agents: "Agents",
+      letAgents: "Let agents use this {{device}}",
+      letAgentsDesc: "Agents use this {{device}} when they need it, while the app is open.",
+      commandsDesc: "Tests, builds and other Terminal commands. They run as {{user}}, and each one shows in Activity.",
+      who: "Who can use it",
+      whoDesc: "Only me means you, and agents working for you.",
+      whoIn: "Who can use it in {{org}}",
+      owner: "Only me",
+      everyone: "Everyone in {{org}}",
+      people: "Specific people or roles",
+      edit: "Edit",
+      pickTitle: "Who can use this {{device}}",
+      search: "Search people",
+      noMatch: "Nobody matches",
+      ownerAlways: "You can always use it, as its owner.",
+      save: "Save",
+      saved: "Saved",
+      phones: "Phones on this {{device}}",
+      phonesIn: "Phones on this {{device}} in {{org}}",
+      plug: "Plug a phone into this {{device}} to add it.",
+      androidSteps: "Android steps",
+      iphoneSteps: "iPhone steps",
+      wider: "Other people's agents run as {{user}} here and can read your files.",
+      phoneWho: "{{who}} can use it",
+      signedOut: "Sign in to {{server}} in the app to see who can use this {{device}}.",
+      unreachable: "Couldn't reach {{server}}. Check the connection and try again.",
     },
     folders: {
       title: "Folders",
@@ -580,6 +670,34 @@ export const desktopEn = {
       folderDesc: "One folder per workspace, with a folder for each agent.",
     },
   },
+  iphone: {
+    lead: "This {{device}} does the setup. You only tap on the iPhone when a step asks.",
+    account: "Apple Account in Xcode",
+    checking: "Looking at this {{device}}…",
+    xcodeText: "Install Xcode from the App Store. This step goes on by itself when it's there.",
+    xcodeOld: "This iPhone needs a newer Xcode. Update it in the App Store.",
+    updateXcode: "Update Xcode",
+    toolsStarting: "Starting the download…",
+    toolsProgress: "{{done}} of {{total}}",
+    toolsPercent: "{{percent}}% downloaded",
+    toolsFailed: "The download stopped: {{message}}",
+    accountText: "Add it in Xcode\u00a0›\u00a0Settings\u00a0›\u00a0Accounts. A free Apple Account is enough.",
+    openXcode: "Open Xcode",
+    personalTeam: "{{name}} · Personal Team",
+    unlockText: "Unlock the iPhone and keep it unlocked for a moment.",
+    oldText: "This iPhone's iOS is too old for Xcode's tools.",
+    devModeHint: "It shows in Settings only after a Mac pairs with the iPhone. This {{device}} did that.",
+    helperText: "This {{device}} builds it and renews it every 7 days. The first time, trust it on the iPhone.",
+    helperHint:
+      "Settings\u00a0›\u00a0General\u00a0›\u00a0VPN & Device Management, tap your Apple Account, then Trust. Renewing needs Xcode signed in.",
+    helperBuilding: "Building the test helper…",
+    qr: "Scan with the iPhone to see these steps there.",
+    qrLabel: "QR code that opens these steps on the iPhone",
+    tip: "Keep it ready around the clock",
+    tipHint:
+      "For a test iPhone that stays plugged in: Auto-Lock Never, automatic updates off, no passcode, and this {{device}} on power.",
+    progress: "iPhone setup",
+  },
   cover: {
     offline: "No internet connection · trying again…",
     unreachable: "Can't reach {{host}} · trying again…",
@@ -600,6 +718,15 @@ export const desktopEn = {
     otherServer: "Use another server",
     stuck: "agentes.chat didn't open. Try again, or see the page as it is.",
     showAnyway: "Show it anyway",
+    copyFailed: "Couldn't copy",
+    /** Stopped by the person to stay stopped (until Start, or until a time). */
+    held: "agentes.chat is stopped on this {{device}} until you start it.",
+    heldUntil: "agentes.chat is stopped on this {{device}}. It comes back by itself at {{time}}.",
+    startNow: "Start now",
+    /** Another server of the app's list, by its name. */
+    openOther: "Open {{server}}",
+    onlyHereWorking: "Turning off access from your devices…",
+    onlyHereFailed: "Couldn't turn off access from your devices.",
   },
   menu: {
     about: "About agentes.chat",

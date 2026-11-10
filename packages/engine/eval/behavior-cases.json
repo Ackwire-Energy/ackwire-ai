@@ -2034,6 +2034,44 @@
     }
   },
   {
+    "id": "routine-good-morning-gif",
+    "title": "Rotina 'GIF de bom dia': a mensagem vai com o GIF, nunca com link",
+    "source": "real failure 2026-11-09 (anonymized): good-morning GIF routines posted links to a GIF site's search pages",
+    "agent": {
+      "preset": "pm"
+    },
+    "org": {
+      "name": "Lumen",
+      "context": "Lumen é um app de meditação e hábitos por assinatura. O time fala português."
+    },
+    "conversation": {
+      "where": "channel",
+      "channel": "bom-dia",
+      "prior": [
+        {
+          "author": "agent",
+          "body": "Bom dia, pessoal! Que a sexta seja leve."
+        }
+      ],
+      "trigger": {
+        "author": "Marina",
+        "body": "Todo dia de manhã, mande um bom dia para o grupo com um GIF, cada dia com um tema (café, sol, bichinhos)."
+      },
+      "routine": {
+        "name": "GIF de bom dia",
+        "report": "always"
+      }
+    },
+    "expect": {
+      "noReply": false,
+      "mustCall": ["hand_off+gif"],
+      "ask": "never",
+      "behavior": "Hands off one short good-morning message with `gif` set to a short English search (e.g. \"good morning coffee\"). The message has no link to a GIF site and never says it can't send GIFs.",
+      "skipJudge": ["looked_first", "next_step", "asks_well"],
+      "rubric": ["The message is a short good morning to the group, with no link in it."]
+    }
+  },
+  {
     "id": "handoff-before-delete",
     "title": "Antes de apagar uma agente: um pedido a ela, ela passa tudo ao colega, um relato só",
     "source": "real case 2026-10-31 (anonymized): hand-offs reported as failures while a colleague was still working",

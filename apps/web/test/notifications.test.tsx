@@ -123,7 +123,7 @@ const go = async (state: FakeState = seedState({ notifications: inbox() })) => {
 };
 
 describe("Notificações", () => {
-  test("how many are unread is under the title from the first paint, before the list arrives", async () => {
+  test("how many are unread is on the title's row from the first paint, before the list arrives", async () => {
     const state = seedState({
       notifications: [notification({ id: "n-a", kind: "mention" }), notification({ id: "n-b", kind: "mention" })],
     });
@@ -133,16 +133,17 @@ describe("Notificações", () => {
     await renderApp(`/org/${ORG_ID}/notifications`, { api });
     await settle(4);
     const title = screen().getByRole("heading", { level: 1, name: "Notificações" });
-    expect(title.nextElementSibling?.className).toBe("ac-pagehead__meta");
+    expect(title.nextElementSibling?.className).toBe("ac-pagehead__count");
     expect(title.nextElementSibling?.textContent).toContain("2 não lidas");
   });
 
   test("waiting on top with the agent looking up, the rest by day, filters with counts, the badge and the tab title", async () => {
     await go();
     const title = screen().getByRole("heading", { level: 1, name: "Notificações" });
-    // How many are unread: the header's line, right under the title.
-    expect(title.nextElementSibling?.className).toBe("ac-pagehead__meta");
+    // How many are unread: on the title's row, right after it, and no line under the title.
+    expect(title.nextElementSibling?.className).toBe("ac-pagehead__count");
     expect(title.nextElementSibling?.textContent).toContain("3 não lidas");
+    expect(document.querySelector(".ac-pagehead__meta")).toBeNull();
     const waiting = screen().getByRole("region", { name: "Esperando você" });
     // The day groups' head: the title and how many, nothing else.
     expect(waiting.querySelector(".ac-grouphead")?.textContent).toBe("Esperando você1");
@@ -542,7 +543,7 @@ describe("a new computer connected (ADR 0036, admins)", () => {
     expect(row.textContent).toContain("Computador");
     await click(within(row).getByRole("button", { name: "Abrir" }));
     await settle(4);
-    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/computers/m-9`);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/devices/m-9`);
   });
 });
 
@@ -762,7 +763,7 @@ describe("its computer is ready: what comes next", () => {
     const other = await go(seedState({ notifications: [ready] }));
     await click(within(row()).getByRole("button", { name: "Abrir" }));
     await settle(4);
-    expect(other.router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/computers/m-9`);
+    expect(other.router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/devices/m-9`);
   });
 
   test("a plain click opens Connect an AI while no agent has one; then the computer's page, and on a phone it picks the row first", async () => {
@@ -788,7 +789,7 @@ describe("its computer is ready: what comes next", () => {
     const wide = await go(seedState({ notifications: [ready()] }));
     await click(row());
     await settle(4);
-    expect(wide.router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/computers/m-9`);
+    expect(wide.router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/devices/m-9`);
     cleanup();
 
     // On a phone the first tap picks the row as any row's does, so Feito and Lembrar depois (shown by that tap) stay
@@ -810,7 +811,7 @@ describe("its computer is ready: what comes next", () => {
       for (const name of ["Feito", "Lembrar depois"]) expect(within(row()).getByRole("button", { name })).toBeTruthy();
       await click(within(row()).getByRole("button", { name: "Abrir" }));
       await settle(4);
-      expect(other.router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/computers/m-9`);
+      expect(other.router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/devices/m-9`);
     } finally {
       window.matchMedia = matchMedia;
     }

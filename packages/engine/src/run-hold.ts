@@ -1,4 +1,5 @@
 import { and, type Executor, eq, inArray, schema } from "@agenteschat/db";
+import { isDeviceWaitId } from "./device-waits";
 import type { StoredTranscript } from "./run-resume";
 import type { AgentRun } from "./runs";
 
@@ -48,8 +49,9 @@ export async function holdsMessages(
       );
     if (open.length > 0 && open.every((q) => q.forUserId && q.forUserId !== from)) return true;
   }
-  // A call's `waitId` (not a question's): a browser handoff, an `ask_agent` consultation, else a mission's own wait.
-  const waitIds = calls.flatMap((c) => (!c.questionId && c.waitId ? [c.waitId] : []));
+  // A call's `waitId` (not a question's): a browser handoff, an `ask_agent` consultation, else a mission's own wait. A
+  // wait for a device takes messages: "use the other phone" moves it on (`onMessageWhileWaiting`).
+  const waitIds = calls.flatMap((c) => (!c.questionId && c.waitId && !isDeviceWaitId(c.waitId) ? [c.waitId] : []));
   if (waitIds.length === 0) return false;
   const handoffIds = waitIds.filter((id) => UUID.test(id));
   const [consulted, handoffs] = await Promise.all([

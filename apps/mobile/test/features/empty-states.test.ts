@@ -52,7 +52,7 @@ describe("who gets the first step", () => {
     ["chats/ConversationListScreen.tsx", '"people" as const', 'mayCreate(org, "invite")'],
     ["new/ChatTargets.tsx", 'place="people"', 'mayCreate(org, "invite")'],
     ["settings/AccessScreen.tsx", 'place="access"', 'acts={can(org, "manage_connectors")}'],
-    ["settings/ComputersScreen.tsx", 'firstUseCopy("computers", pairs)', 'can(org, "pair_computers")'],
+    ["devices/DevicesScreen.tsx", 'firstUseCopy("computers", pairs)', 'can(org, "pair_computers")'],
     ["connectors/ConnectorsScreen.tsx", 'firstUseCopy("connectors", acts)', "<EmptyHint acts={admin} />"],
   ])("%s gates %s on the permission", (file, place, gate) => {
     const code = source(file);
@@ -100,6 +100,40 @@ describe("the words", () => {
           expect(typeof at(tree, title)).toBe("string");
           expect(typeof at(tree, text)).toBe("string");
           expect(at(tree, title)).not.toMatch(/^(No |Nenhum|Nada ainda|Sem )/);
+        }
+      }
+  });
+
+  test("a personal workspace reads its own words where the place has them, the usual ones otherwise (ADR 0159)", () => {
+    expect(firstUseCopy("agents", true, true)).toEqual({
+      title: "mobile.empty.agents.titlePersonal",
+      text: "mobile.empty.agents.textPersonal",
+    });
+    expect(firstUseCopy("people", false, true)).toEqual({
+      title: "mobile.empty.people.viewerTitlePersonal",
+      text: "mobile.empty.people.viewerTextPersonal",
+    });
+    // A word with no personal sibling keeps the team's (Tasks' viewer line fits both).
+    expect(firstUseCopy("tasks", false, true)).toEqual({
+      title: "mobile.empty.tasks.viewerTitlePersonal",
+      text: "mobile.empty.tasks.viewerText",
+    });
+    expect(firstUseCopy("routines", true, true)).toEqual(firstUseCopy("routines", true));
+    // A team's workspace never reads them.
+    expect(firstUseCopy("agents", true)).toEqual({
+      title: "mobile.empty.agents.title",
+      text: "mobile.empty.agents.text",
+    });
+    expect(source("shared/FirstUse.tsx")).toContain("firstUseCopy(place, acts, isPersonal(");
+  });
+
+  test("every personal word is in both languages", () => {
+    for (const place of places)
+      for (const acts of [true, false]) {
+        const { title, text } = firstUseCopy(place, acts, true);
+        for (const tree of [featureKeysEn, featureKeysPtBR]) {
+          expect({ key: title, has: typeof at(tree, title) }).toEqual({ key: title, has: "string" });
+          expect({ key: text, has: typeof at(tree, text) }).toEqual({ key: text, has: "string" });
         }
       }
   });

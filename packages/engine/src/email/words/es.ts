@@ -46,6 +46,17 @@ export const words: EmailWords = {
     small: "La invitación es válida por 7 días. Acéptala con esta dirección de correo.",
     why: (org) =>
       `Recibiste este correo porque alguien de ${org} invitó a esta dirección. Si no sabes quién es, ignóralo. No pasa nada hasta que aceptes.`,
+    personal: {
+      body: (inviter, email) =>
+        inviter
+          ? [
+              { b: inviter },
+              `${email ? ` (${email})` : ""} te invitó a su espacio de trabajo personal en agentes.chat.`,
+            ]
+          : "Te invitaron a un espacio de trabajo personal en agentes.chat.",
+      why: () =>
+        "Recibiste este correo porque alguien invitó a esta dirección a su espacio de trabajo personal. Si no sabes quién es, ignóralo. No pasa nada hasta que aceptes.",
+    },
   },
   inviteRequest: {
     subject: "Alguien pidió una invitación nueva",
@@ -58,6 +69,14 @@ export const words: EmailWords = {
     next: "Si esperas a esa persona, envíale una invitación nueva desde Miembros. Si no, no tienes que hacer nada.",
     button: "Abrir Miembros",
     why: (org) => `Recibiste este correo porque creaste esta invitación o administras los miembros de ${org}.`,
+    personal: {
+      body: (email) =>
+        email
+          ? [{ b: email }, " abrió una invitación vencida a tu espacio de trabajo y pidió una nueva."]
+          : "Alguien con un enlace de invitación vencido a tu espacio de trabajo pidió una invitación nueva.",
+      why: () =>
+        "Recibiste este correo porque creaste esta invitación o te ocupas de quién está en tu espacio de trabajo.",
+    },
   },
   calendar: {
     subject: "Te invitaron a un evento",
@@ -67,6 +86,9 @@ export const words: EmailWords = {
     someone: "Alguien",
     button: "Ver el evento",
     why: (org) => `Recibiste este correo porque alguien de ${org} te invitó a un evento.`,
+    personal: {
+      why: () => "Recibiste este correo porque alguien de tu espacio de trabajo te invitó a un evento.",
+    },
   },
   waitlist: {
     subject: "Confirma tu lugar en la lista de espera de agentes.chat",
@@ -124,6 +146,12 @@ export const words: EmailWords = {
     button: "Ver el presupuesto",
     why: (org) =>
       `Recibiste este correo porque este agente es tuyo, o eres admin de ${org}. Se envía al 80 % y al 100 %, una vez al mes cada uno.`,
+    personal: {
+      warning: "Al 100 % se detiene y te avisa. Puedes cambiar el límite en la página del agente.",
+      exhausted: "No responderá hasta el próximo mes, o hasta que subas el límite en la página del agente.",
+      why: () =>
+        "Recibiste este correo porque este agente es tuyo. Se envía al 80 % y al 100 %, una vez al mes cada uno.",
+    },
   },
   digest: {
     subject: (n) =>
@@ -146,6 +174,15 @@ export const words: EmailWords = {
     button: (n) => plural("es", n, { one: "Revisar la solicitud", other: "Abrir aprobaciones" }),
     why: (org, hours) =>
       `Recibiste este correo porque puedes aprobar estas solicitudes en ${org}.${hours ? ` Se envía cuando una solicitud espera más de ${hours} horas, una vez por solicitud.` : ""}`,
+    personal: {
+      body: (n) =>
+        plural("es", n, {
+          one: "Uno de tus agentes pidió hacer algo que necesita tu aprobación.",
+          other: "Tus agentes pidieron hacer cosas que necesitan tu aprobación.",
+        }),
+      why: (_org, hours) =>
+        `Recibiste este correo porque puedes aprobar estas solicitudes.${hours ? ` Se envía cuando una solicitud espera más de ${hours} horas, una vez por solicitud.` : ""}`,
+    },
   },
   ready: {
     subject: "La computadora de tus agentes está lista",
@@ -178,6 +215,15 @@ export const words: EmailWords = {
     button: { ai: "Conectar tu IA", task: "Dar una primera tarea", create: "Crear un agente" },
     why: (org) =>
       `Recibiste este correo porque eres propietario de ${org} en agentes.chat. Es el único correo sobre esta computadora.`,
+    personal: {
+      body: () =>
+        "Gracias por esperar. La computadora de tus agentes ya está encendida y configurada, con un usuario propio para cada agente. Queda encendida día y noche, para que tus agentes puedan trabajar a cualquier hora.",
+      steps: {
+        task: ["Da una primera tarea.", "Abre una conversación con uno de tus agentes y di lo que necesitas."],
+      },
+      why: () =>
+        "Recibiste este correo porque este espacio de trabajo en agentes.chat es tuyo. Es el único correo sobre esta computadora.",
+    },
   },
   joinRequest: {
     subject: "Alguien pide unirse a tu espacio de trabajo",
@@ -190,6 +236,11 @@ export const words: EmailWords = {
     more: "Todas las solicitudes pendientes están en Miembros.",
     why: (org) =>
       `Recibiste este correo porque eres propietario o admin de ${org}. Se envía como máximo una vez por hora.`,
+    personal: {
+      body: () => "Esta persona abrió el enlace de invitación de tu espacio de trabajo y pidió unirse.",
+      why: () =>
+        "Recibiste este correo porque te ocupas de quién se une a tu espacio de trabajo. Se envía como máximo una vez por hora.",
+    },
   },
   joinAnswer: {
     someone: "Alguien",
@@ -217,6 +268,17 @@ export const words: EmailWords = {
       small: "Si crees que es un error, pídele a alguien de ahí que te invite por correo.",
     },
     why: (org) => `Recibiste este correo porque esta dirección pidió unirse a ${org} en agentes.chat.`,
+    personal: {
+      joined: { body: (who) => `${who} aprobó tu solicitud. Ya estás en su espacio de trabajo.` },
+      invited: { body: (who) => `${who} aprobó tu solicitud para unirte a su espacio de trabajo.` },
+      denied: {
+        preheader: "Esa persona la revisó y no la aprobó.",
+        body: () => "La persona a quien se lo pediste revisó tu solicitud y no la aprobó.",
+        small: "Si crees que es un error, pídele que te invite por correo.",
+      },
+      why: () =>
+        "Recibiste este correo porque esta dirección pidió unirse a un espacio de trabajo personal en agentes.chat.",
+    },
   },
   joinCode: {
     subject: (code) => `${code} es tu código de agentes.chat`,
@@ -226,6 +288,11 @@ export const words: EmailWords = {
     small: ["Es válido por 10 minutos. Si no lo pediste, ", { nobr: "ignora este correo." }],
     why: (org) =>
       `Recibiste este correo porque alguien escribió esta dirección para pedir unirse a ${org} en agentes.chat.`,
+    personal: {
+      body: () => "Escribe este código en la página para pedir unirte a este espacio de trabajo.",
+      why: () =>
+        "Recibiste este correo porque alguien escribió esta dirección para pedir unirse a un espacio de trabajo personal en agentes.chat.",
+    },
   },
   deletionCode: {
     subjectWorkspace: (code) => `${code} es tu código para eliminar un espacio de trabajo`,
@@ -251,6 +318,13 @@ export const words: EmailWords = {
       "Es válido por 10 minutos, y no se elimina nada sin él. Si no fuiste tú, no lo compartas y avisa a quienes administran este servidor.",
     whyWorkspace: (org) => `Recibiste este correo porque tu cuenta pidió eliminar ${org} en agentes.chat.`,
     whyAccount: "Recibiste este correo porque tu cuenta pidió eliminarse de agentes.chat.",
+    personal: {
+      workspace: (org) => [
+        "Escribe este código para eliminar tu espacio de trabajo ",
+        { b: org },
+        ". Se cierra al instante y se elimina para siempre 7 días después.",
+      ],
+    },
   },
   deleting: {
     subject: (day) => `Un espacio de trabajo del que formas parte se eliminará el ${day}`,
@@ -266,6 +340,10 @@ export const words: EmailWords = {
     button: "Restaurar el espacio de trabajo",
     member: "Si es un error, pídele a un propietario que lo restaure.",
     why: (org) => `Recibiste este correo porque formas parte de ${org} en agentes.chat.`,
+    personal: {
+      member: "Si es un error, pídele a quien lo eliminó que lo restaure.",
+      why: () => "Recibiste este correo porque formas parte de este espacio de trabajo en agentes.chat.",
+    },
   },
   restored: {
     subject: "Volvió un espacio de trabajo del que formas parte",
@@ -274,6 +352,9 @@ export const words: EmailWords = {
     body: (by, org) => [{ b: by }, " restauró ", { b: org }, ". Funciona de nuevo."],
     button: "Abrir el espacio de trabajo",
     why: (org) => `Recibiste este correo porque formas parte de ${org} en agentes.chat.`,
+    personal: {
+      why: () => "Recibiste este correo porque formas parte de este espacio de trabajo en agentes.chat.",
+    },
   },
   appConnected: {
     subject: "Se conectó una app a tu cuenta de agentes.chat",
@@ -283,6 +364,11 @@ export const words: EmailWords = {
     note: "¿No la conectaste tú? Desconéctala ahora y cambia tu contraseña.",
     button: "Ver apps conectadas",
     why: (org) => `Recibiste este correo porque se conectó una app a tu cuenta en ${org} en agentes.chat.`,
+    personal: {
+      body: (app) => [{ b: app }, " ahora tiene acceso a tu cuenta en tu espacio de trabajo personal."],
+      why: () =>
+        "Recibiste este correo porque se conectó una app a tu cuenta en tu espacio de trabajo personal en agentes.chat.",
+    },
   },
   accountDeleting: {
     subject: (day) => `Tu cuenta de agentes.chat se eliminará el ${day}`,
@@ -373,6 +459,10 @@ export const words: EmailWords = {
     button: "Ver quién puede hablar",
     why: (org) =>
       `Recibiste este correo porque un agente tuyo en ${org} piensa con tu plan y otra persona cambió quién puede hablar con él.`,
+    personal: {
+      why: () =>
+        "Recibiste este correo porque un agente tuyo piensa con tu plan y otra persona cambió quién puede hablar con él.",
+    },
   },
   planLent: {
     subject: (plan) => `Tu plan de ${plan} ahora piensa por otro agente`,
@@ -390,6 +480,9 @@ export const words: EmailWords = {
     note: "Recupéralo con un clic desde tus notificaciones, y el agente deja de pensar con tu plan.",
     button: "Abrir notificaciones",
     why: (org) => `Recibiste este correo porque alguien en ${org} conectó tu plan a un agente.`,
+    personal: {
+      why: () => "Recibiste este correo porque alguien de tu espacio de trabajo conectó tu plan a un agente.",
+    },
   },
   planWaiting: {
     subject: "Tu equipo está esperando",
@@ -406,5 +499,16 @@ export const words: EmailWords = {
     button: "Ver planes de agentes.chat",
     why: (org) =>
       `Recibiste este correo porque administras ${org} en agentes.chat. Solo enviamos dos avisos como este.`,
+    personal: {
+      subject: "Tus agentes están esperando",
+      headline: "Tus agentes están esperando",
+      body: (agents, _channels, routines) => {
+        const a = plural("es", agents, { one: `1 agente`, other: `${agents} agentes` });
+        const r = plural("es", routines, { one: `1 rutina`, other: `${routines} rutinas` });
+        return `Todo listo: ${routines > 0 ? `${a} y ${r}` : a}. Solo falta un plan de agentes.chat.`;
+      },
+      why: () =>
+        "Recibiste este correo porque este espacio de trabajo en agentes.chat es tuyo. Solo enviamos dos avisos como este.",
+    },
   },
 };

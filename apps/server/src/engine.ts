@@ -40,6 +40,7 @@ import {
   createDatabaseToolSource,
   createDesktopControl,
   createDesktopToolSource,
+  createDeviceToolSource,
   createFindAgentToolSource,
   createFollowUpToolSource,
   createGitHubAppSettings,
@@ -60,6 +61,7 @@ import {
   createPassToolSource,
   createPermissionToolSource,
   createReactToolSource,
+  createReleaseAsksToolSource,
   createSandboxToolSource,
   createScheduleToolSource,
   createSessionScreening,
@@ -78,6 +80,7 @@ import {
   createWithdrawRequestToolSource,
   createWorkspaceToolSource,
   createWorkToolSource,
+  deviceWaitHooks,
   type EmailArt,
   emailArtAt,
   envSpeechEngines,
@@ -104,6 +107,7 @@ import {
   type RunExecutorDeps,
   reauthorizeStream,
   recheckStream,
+  releaseRunPhones,
   resolveSummaryModel,
   type SandboxDeps,
   type ScheduleReader,
@@ -380,6 +384,8 @@ export function buildEngine(o: EngineOptions) {
       createBrowserHandoffToolSource({ pubsub: adapters.pubsub, machines: { hub: machineHub } }),
       // The agent takes back a request for a person it no longer needs (listed while it has one open).
       createWithdrawRequestToolSource({ pubsub: adapters.pubsub }),
+      // An agent that handled what another waits to answer (its plan, budget or computer) lets it go.
+      createReleaseAsksToolSource({ pubsub: adapters.pubsub }),
       // An agent with no AI connected is refused at once: its answer would never come.
       createAskAgentToolSource({
         pubsub: adapters.pubsub,
@@ -403,8 +409,13 @@ export function buildEngine(o: EngineOptions) {
       createFollowUpToolSource({ pubsub: adapters.pubsub }),
       // The right hand sees what the team is doing, with no model call (ADR 0137 §13).
       createTeamStatusToolSource(),
-      // Background runs (routines) speak only through it.
-      createHandOffToolSource({ pubsub: adapters.pubsub, judge: context.judge, tools: () => tools }),
+      // Background runs (routines) speak only through it, with a GIF where the agent may send one (ADR 0091).
+      createHandOffToolSource({
+        pubsub: adapters.pubsub,
+        judge: context.judge,
+        tools: () => tools,
+        gif: createAgentGifPoster(adapters.gifs),
+      }),
       // Runs nobody called by name may stay quiet (reply-policy.ts): listed only for them.
       createPassToolSource(),
       createArtifactToolSource(artifacts),
@@ -442,7 +453,7 @@ export function buildEngine(o: EngineOptions) {
         ...connectorDeps,
         artifacts,
         log: o.log,
-        pubsub: adapters.pubsub,
+        judge: context.judge,
         githubApp: githubAppAccess,
       }),
       // People's mailboxes (ADR 0038): only when the server has a mail path (Composio, IMAP).
@@ -469,6 +480,14 @@ export function buildEngine(o: EngineOptions) {
         pubsub: adapters.pubsub,
         // Saved keys for one command (`run_code` with `keys`, ADR 0144).
         vault,
+      }),
+      // Phones through connected computers and waiting for a device (bring your own devices).
+      createDeviceToolSource({
+        db,
+        machines: { hub: machineHub },
+        pubsub: adapters.pubsub,
+        artifacts,
+        publicUrl: config.PUBLIC_URL,
       }),
       browserTools,
       // Reading the web, for every agent and run (ADR 0109): a search service when configured, else the agent's
@@ -505,7 +524,18 @@ export function buildEngine(o: EngineOptions) {
     pubsub: adapters.pubsub,
   });
   // Mission tasks' tools and computer-brain runs' tools come through the hub's MCP bridge (ADR 0032).
-  machineHub.setMissionHooks(createMissionHooks({ db, ...missionDeps, tools }));
+  // Runs waiting for a device (bring your own devices) go on when its computer is back or its phones report it free.
+  const missionHooks = createMissionHooks({ db, ...missionDeps, tools });
+  const deviceWaits = deviceWaitHooks({ db, pubsub: adapters.pubsub });
+  const hooks = {
+    ...missionHooks,
+    online: async (machineId: string) => {
+      await missionHooks.online?.(machineId);
+      await deviceWaits.online(machineId).catch(() => undefined);
+    },
+    phonesChanged: deviceWaits.phonesChanged,
+  };
+  machineHub.setMissionHooks(hooks);
   // The agent's Chrome started ahead of its first command (ADR 0040 §11): a head start, so a refusal costs nothing.
   const warmBrowser = (at: Parameters<typeof warmAgentBrowser>[2]) =>
     void warmAgentBrowser(db, machineHub, at).catch(() => {});
@@ -685,6 +715,7 @@ export function buildEngine(o: EngineOptions) {
       : null,
   };
   const jobDeps: JobDeps = {
+    feedbackBlobs: adapters.platformBlobs,
     accountEmails: adapters.email.delivers ? { publicUrl: config.PUBLIC_URL, support: config.SUPPORT_EMAIL } : null,
     appleRevoke: o.appleRevoke ?? appleTokenRevoker(config),
     voice,
@@ -729,6 +760,7 @@ export function buildEngine(o: EngineOptions) {
     prepareCode,
     machines: machineHub,
     workspaceComputer,
+    releaseRunPhones: (run) => releaseRunPhones({ db, hub: machineHub }, run),
     maxOutputTokens: config.AGENT_MAX_OUTPUT_TOKENS,
     contextMessages: config.AGENT_CONTEXT_MESSAGES,
     blockSpec: (orgId, artifactId, version) => blockSpecAt(artifacts, orgId, artifactId, version),

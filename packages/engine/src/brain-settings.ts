@@ -75,7 +75,7 @@ import {
   releaseAgents,
   sharesSignIns,
 } from "./machine-accounts";
-import { getMachine, type MachineRow, machineOnline, publishMachineAgentsChanged } from "./machines";
+import { getMachine, type MachineRow, machineOnline, mayBeHome, publishMachineAgentsChanged } from "./machines";
 import {
   agentMissionApproval,
   type CommandApproval,
@@ -334,13 +334,16 @@ const missingCli = (machine: MachineLike): BrainUnavailable =>
  * (Missions' legacy executor tasks keep their own check, `machineExecutors`.)
  */
 export function brainOptions(machine: MachineLike | null): BrainOption[] {
-  const found = machine ? machineExecutors(machine) : null;
+  // Only which CLIs are installed: `machineExecutors` lists none with commands off, but commands are judged below.
+  const found = machine ? machineExecutors({ ...machine, execAllowed: true }) : null;
   const computer = (kind: "claude_code" | "codex", executor: "claude" | "codex"): BrainOption => {
     let reason: BrainUnavailable | undefined;
+    // A runner that reports its tools (protocol 10) runs a coding CLI by that CLI's own switch, commands off or not
+    // (`toolOff` in brains/claude-code.ts, `toolOn` on the runner); only an older one follows commands (`exec`).
     if (!machine) reason = "no_computer";
-    else if (!machine.execAllowed) reason = "exec_off";
+    else if (!machine.access?.tools && !machine.execAllowed) reason = "exec_off";
     else if (machine.protocol < BRAIN_PROTOCOL) reason = "runner_old";
-    else if (machine.access?.tools && machine.access.tools[executor] === false) reason = "tool_off";
+    else if (machine.access?.tools && machine.access.tools[executor] !== true) reason = "tool_off";
     else if (!found?.available.includes(executor))
       reason = executor === "codex" && found?.codexTooOld ? "outdated" : missingCli(machine);
     return {
@@ -370,7 +373,7 @@ function cliOption(machine: MachineLike | null, kind: "cursor" | "opencode" | "g
   const tools = machine?.access?.tools;
   let reason: BrainUnavailable | undefined;
   if (!machine) reason = "no_computer";
-  else if (!machine.execAllowed) reason = "exec_off";
+  else if (!tools && !machine.execAllowed) reason = "exec_off";
   else if (
     machine.protocol <
     {
@@ -381,7 +384,7 @@ function cliOption(machine: MachineLike | null, kind: "cursor" | "opencode" | "g
     }[kind]
   )
     reason = "runner_old";
-  else if (tools && (tools[kind] ?? tools.codex) === false) reason = "tool_off";
+  else if (tools && (tools[kind] ?? tools.codex) !== true) reason = "tool_off";
   else if (!machine.executors?.[kind]) reason = missingCli(machine);
   return {
     kind,
@@ -580,7 +583,7 @@ async function candidateMachines(
     .from(schema.machines)
     .where(and(eq(schema.machines.orgId, orgId), isNull(schema.machines.deletedAt)));
   return rows
-    .filter((m) => admin || m.pairedByUserId === userId || m.id === current)
+    .filter((m) => (admin || m.pairedByUserId === userId || m.id === current) && (mayBeHome(m) || m.id === current))
     .map((m) => ({ machineId: m.id, name: m.name, online: machineOnline(m), options: brainOptions(m) }));
 }
 
@@ -1603,6 +1606,8 @@ export interface AgentBrainSummary {
   usage?: PlanUsage;
   /** Set to Rápida where that applies to what it thinks with (ADR 0149); absent: standard speed. */
   speed?: "fast";
+  /** An API brain on Automático: the maker its models come from (`agentBrainLines`), whose logo the app shows. */
+  maker?: string;
 }
 
 /**

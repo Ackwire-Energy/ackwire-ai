@@ -1,5 +1,5 @@
-/* The right side of a DM with an agent (AgentSidebar.tsx): the members column's surface and place, wider, its sky
-   running edge to edge. Floating (narrow windows): the panels' sheet, on the same surface. Either way it scrolls in
+/* The right side of a DM with an agent (AgentSidebar.tsx): the members column's surface (the work's sheet) and place,
+   wider, its sky running edge to edge. Floating (narrow windows): the panels' sheet, on the same surface. Either way it scrolls in
    `.dm-side__scroll`, whose scrollbar's room the side takes back (threads.css), the column being its container. */
 .members-side.dm-side {
   flex-basis: 320px;
@@ -14,8 +14,8 @@
   padding-bottom: 24px;
 }
 .thread-panel.dm-side--float {
-  background: var(--side);
-  --presence-ring: var(--side);
+  background: var(--pane);
+  --presence-ring: var(--pane);
 }
 /* Under this a panel is the whole screen, as a thread's is. */
 @media (min-width: 861px) {
@@ -82,17 +82,6 @@
   gap: 6px;
   max-width: 100%;
   margin-top: 2px;
-}
-.dm-side__dot {
-  flex: none;
-  width: 8px;
-  height: 8px;
-  background: var(--ok);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ok) 25%, transparent);
-}
-.dm-side__status[data-offline] .dm-side__dot {
-  background: var(--faint);
-  box-shadow: none;
 }
 .dm-side__sec {
   padding: 12px 16px 2px;

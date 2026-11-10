@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { browserNeeded } from "@agenteschat/adapters/machine-protocol";
 import { findChrome } from "../../runner/browser";
@@ -8,12 +9,15 @@ import {
   devicePair,
   type FetchFn,
   formatUserCode,
+  LINK_INVALID,
   orgSlug,
   PairingError,
   pollDeviceToken,
   redeemIssuedCode,
+  requestDeviceCode,
   takeEnrollCode,
   uniqueWorkspace,
+  whoCanUse,
 } from "../../runner/pairing";
 import { removeDirs, tempDir } from "./helpers";
 
@@ -238,6 +242,44 @@ test("pair --enroll-file refused: why is the last line of stderr, where a provis
   expect(r.stdout).toBe("agentes.chat connect this computer\n◒  Connecting with the code issued for this computer\n");
 }, 20_000);
 
+test("pair --link: who may use the computer, its page, and the warning when other people's agents share this user", async () => {
+  const dir = tempDir("pair-link-");
+  dirs.push(dir);
+  const url = "https://app.example.com/org/o1/settings/devices/m1";
+  const server = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    fetch: (req) =>
+      new URL(req.url).pathname.endsWith("/device")
+        ? json(200, {
+            deviceCode: "dc",
+            userCode: "K7Q4ZP",
+            verificationUrl: "https://x.test/c",
+            expiresIn: 600,
+            interval: 1,
+            maker: { name: "Sam Rivera" },
+            org: { name: "Acme" },
+          })
+        : json(200, { ...GRANT, name: "Windows build PC", audience: "everyone", owner: "Sam Rivera", url }),
+  });
+  try {
+    const args = ["pair", "--server", server.url.origin, "--link", "R4TW-8HNC", "--home", path.join(dir, "home")];
+    const proc = Bun.spawn([process.execPath, RUNNER, ...args, "--dir", path.join(dir, "work")], {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const [out, exit] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
+    expect(exit).toBe(0);
+    const user = os.userInfo().username;
+    expect(out).toContain("◒  Waiting for Sam Rivera to let this computer join Acme…\n");
+    expect(out).toContain(
+      `●  Everyone in the workspace can use Windows build PC. Change it on its page:\n     ${url}\n▲  Other people's agents will run as ${user} and can read ${user}'s files.\n`,
+    );
+  } finally {
+    server.stop(true);
+  }
+}, 20_000);
+
 test("the code is shown as K7Q·4ZP; workspaces are named after the organization", () => {
   expect(formatUserCode("K7Q4ZP")).toBe("K7Q·4ZP");
   expect(formatUserCode("k7q-4zp")).toBe("K7Q·4ZP");
@@ -396,3 +438,65 @@ test("update: the new runner is a step done, and a service that won't start is t
     server.stop(true);
   }
 }, 30_000);
+
+test("a connect link: sent with the device, its maker and workspace read back; a used or expired one in words", async () => {
+  const calls: unknown[] = [];
+  const answer =
+    (res: Response): FetchFn =>
+    async (_url, init) => {
+      calls.push(JSON.parse(String(init.body)));
+      return res;
+    };
+  const code = await requestDeviceCode(
+    SERVER,
+    { os: "linux", arch: "x64", hostname: "build-box", version: "1", link: "7KQ2-M9XD" },
+    {
+      fetch: answer(
+        json(200, {
+          deviceCode: "dc_secret",
+          userCode: "K7Q4ZP",
+          verificationUrl: `${SERVER}/conectar?code=K7Q4ZP`,
+          expiresIn: 600,
+          interval: 3,
+          maker: { name: "Sam Rivera" },
+          org: { id: "o1", name: "Acme" },
+        }),
+      ),
+    },
+  );
+  expect(calls[0]).toMatchObject({ hostname: "build-box", link: "7KQ2-M9XD" });
+  expect(code).toMatchObject({ maker: "Sam Rivera", orgName: "Acme", deviceCode: "dc_secret" });
+
+  const refused = await requestDeviceCode(
+    SERVER,
+    { os: "linux", arch: "x64", hostname: "build-box", version: "1", link: "OLD1-CODE" },
+    { fetch: answer(json(400, { error: { code: "machine.link_invalid", message: "This link was used already." } })) },
+  ).catch((e: unknown) => e);
+  expect(refused).toBeInstanceOf(PairingError);
+  expect(refused).toMatchObject({ code: "link_invalid", message: "This link was used already." });
+  const bare = await requestDeviceCode(
+    SERVER,
+    { os: "linux", arch: "x64", hostname: "build-box", version: "1", link: "OLD1-CODE" },
+    { fetch: answer(json(400, { error: "machine.link_invalid" })) },
+  ).catch((e: unknown) => e);
+  expect(bare).toMatchObject({ code: "link_invalid", message: LINK_INVALID });
+});
+
+test("the grant says who may use the computer and where to change it; the connection says it in a sentence", async () => {
+  const url = `${SERVER}/org/o1/settings/devices/m1`;
+  const answer = { ...GRANT, audience: "everyone", owner: "Sam Rivera", url };
+  const code: DeviceCode = { deviceCode: "dc", userCode: "K7Q4ZP", verificationUrl: "", expiresIn: 600, interval: 1 };
+  const sleep = async () => {};
+  const grant = await pollDeviceToken(SERVER, code, { fetch: async () => json(200, answer), sleep });
+  expect(grant).toEqual({ ...GRANT, audience: "everyone", owner: "Sam Rivera", url });
+  expect(whoCanUse(grant, "build-box")).toBe("Everyone in the workspace can use build-box.");
+  expect(whoCanUse({ ...grant, audience: "owner" }, "Notebook")).toBe("Only Sam Rivera can use Notebook.");
+  expect(whoCanUse({ ...grant, audience: "people" }, "Notebook")).toBe(
+    "Only the people and roles chosen can use Notebook.",
+  );
+  // An older server says none of it; anything odd is left out.
+  const odd = { ...GRANT, audience: "anyone", owner: 7, url: "javascript:alert(1)" };
+  const older = await pollDeviceToken(SERVER, code, { fetch: async () => json(200, odd), sleep });
+  expect(older).toEqual(GRANT);
+  expect(whoCanUse(older, "Notebook")).toBeNull();
+});

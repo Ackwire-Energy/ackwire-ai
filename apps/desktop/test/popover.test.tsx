@@ -156,13 +156,13 @@ describe("the menu's banners say only what matters there", () => {
       );
     }));
 
-  test("agentes.chat not starting here: its title, Copy details and Try again", () =>
+  test("agentes.chat not starting here: its title, why and where to look, Copy details, the logs and Try again", () =>
     withMenu(
       (el) =>
         expect(banners(el)).toContainEqual({
           title: "agentes.chat isn't starting on this Mac",
-          line: null,
-          actions: ["Copy details", "Try again"],
+          line: "The details say why: copy them for whoever helps you, or look at the logs. Help",
+          actions: ["Copy details", "Show the logs", "Try again"],
         }),
       createFakeHost("popover", "here", { here: { phase: "failing" } }),
       (el) => banners(el).length > 0,
@@ -244,4 +244,21 @@ describe("the menu's banners say only what matters there", () => {
       ),
     );
   });
+});
+
+describe("the server here's Stop (ADR 0158)", () => {
+  test("in sight, with how long and what it cuts off; an hour says when it's back", () =>
+    withMenu(async (el) => {
+      const stop = [...el.querySelectorAll(".dk-ph button")].find((b) => b.textContent === "Stop") as HTMLElement;
+      await act(async () => stop.click());
+      const rows = [...el.querySelectorAll(".dk-here__more button")].map((b) => b.textContent);
+      expect(rows).toEqual(["Stop for 1 hour", "Stop until I start it", "Don't start it with the app…"]);
+      expect(el.querySelector(".dk-here__more .dk-sub__hint")?.textContent).toBe(
+        "Stopping cuts everyone off, the phone included.",
+      );
+      await act(async () => (el.querySelector(".dk-here__more button") as HTMLElement).click());
+      await until(() => el.querySelector(".dk-ph small")?.textContent?.startsWith("Stopped · back at"));
+      const start = [...el.querySelectorAll(".dk-ph button")].find((b) => b.textContent === "Start it");
+      expect(start).toBeTruthy();
+    }));
 });

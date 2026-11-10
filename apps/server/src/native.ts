@@ -34,6 +34,7 @@ import {
   pgliteUrl,
   restorePglite,
 } from "@agenteschat/db";
+import { passwordLinkByEmail } from "@agenteschat/engine";
 import { INSTALL_DOCS_URL } from "@agenteschat/i18n/help";
 import { envEntries, upsertEnv } from "@agenteschat/setup/src/lib";
 import { expandHome } from "../runner/config";
@@ -84,6 +85,9 @@ Usage:
   agentes-server telemetry [--data <folder>]
       Prints the next anonymous usage report, exactly, and sends nothing. TELEMETRY=off in the
       folder's .env turns the report off.
+  agentes-server password-link <email> [--data <folder>]
+      Prints a link that sets a new password for that account, once, within an hour, for
+      whoever forgot theirs on a server that sends no email. Stop the server first.
   agentes-server version
   agentes-server service install|uninstall|status [--data <folder>]
       Starts it with this computer: at login on macOS, and from boot on Linux.
@@ -366,6 +370,29 @@ async function telemetry(dir: string): Promise<number> {
   return EXIT.ok;
 }
 
+/**
+ * `agentes-server password-link <email>` (ADR 0158): a new-password link for that account, printed. With the server
+ * stopped: its database is the folder's, and only one process opens it.
+ */
+async function passwordLink(dir: string, email: string): Promise<number> {
+  const lock = lockFolder(dir);
+  if (!lock.ok) return fail(EXIT.locked, lockedMessage(dir, lock.holder.pid));
+  if (!folderVersion(nativeFiles(dir).db)) return fail(EXIT.error, `There is no database in ${dir} yet.`);
+  await nativeEnv(dir);
+  const config = loadConfig();
+  const database = createDatabase({ url: config.DATABASE_URL, poolMax: 1 });
+  try {
+    const link = await passwordLinkByEmail(database.db, config.PUBLIC_URL, email);
+    if (!link) return fail(EXIT.error, `No account here uses ${email}.`);
+    console.log(link.url);
+    console.error(`Works once, until ${link.expiresAt.toLocaleString()}.`);
+  } finally {
+    await database.close();
+  }
+  await new Promise((done) => process.stdout.write("", done));
+  return EXIT.ok;
+}
+
 /** The server as a background service of the person's own account (never root). */
 export function serviceDefinition(dir: string, manager: "systemd" | "launchd"): ServiceDefinition {
   return {
@@ -461,6 +488,7 @@ async function runCommand(argv: string[]): Promise<number> {
         return EXIT.ok;
       default:
         if (command[0] === "service" && command.length <= 2) return service(command[1], dir);
+        if (command[0] === "password-link" && command.length === 2) return await passwordLink(dir, command[1] ?? "");
         return fail(EXIT.error, USAGE);
     }
   } catch (error) {

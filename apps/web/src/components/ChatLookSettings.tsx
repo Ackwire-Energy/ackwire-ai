@@ -11,6 +11,7 @@ import {
   facesShown,
   textSizeOf,
 } from "@agenteschat/client/lib/chat-look";
+import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
 import {
   type AgentColor,
   Avatar,
@@ -140,12 +141,15 @@ export function ChatLookSettings() {
   const [kind, setKind] = useState<"channels" | "dms">("channels");
   const dm = kind === "dms";
   const prefs = org.chatPrefs;
-  const { style, tone } = chatLookOf(prefs, dm);
+  // What shows checked is what the conversations use: in a personal workspace, bubbles for channels too (ADR 0159).
+  const { style, tone } = chatLookOf(prefs, dm, isPersonal(org));
   const textSize = textSizeOf(prefs);
   const openAt: ChatOpenAt = prefs?.openAt ?? "latest";
   const save = (patch: Parameters<typeof set.mutate>[0]) =>
     set.mutate(patch, { onError: () => toast.show(t("settings.account.activityFailed")) });
   const mine = agentGradient(dm ? SAMPLE_AGENT.color : "sky")[1];
+  // A personal workspace calls its channels group conversations (ADR 0159).
+  const toneLabel = dm ? "settings.account.chat.toneDms" : modeKey(org, "settings.account.chat.toneChannels");
   const lookOf = (s: ChatStyle) => ({ style: s, tone, mine, names: !dm, faces: facesShown(s, dm) });
   const talk: Line[] = [
     { who: "me", text: t("settings.account.chat.sample.ask"), time: "14:30" },
@@ -195,7 +199,7 @@ export function ChatLookSettings() {
               value={kind}
               onValueChange={(v) => setKind(v as "channels" | "dms")}
               options={[
-                { value: "channels", label: t("settings.account.chat.channels") },
+                { value: "channels", label: t(modeKey(org, "settings.account.chat.channels")) },
                 { value: "dms", label: t("settings.account.chat.dms") },
               ]}
             />
@@ -221,12 +225,10 @@ export function ChatLookSettings() {
           <div className="settings-row ac-actrow">
             <span className="settings-row__text ac-actrow__text">
               <span className="ac-hintline">
-                <span className="settings-row__label">
-                  {t(dm ? "settings.account.chat.toneDms" : "settings.account.chat.toneChannels")}
-                </span>
+                <span className="settings-row__label">{t(toneLabel)}</span>
                 <InfoHint
                   name={t("common.about", {
-                    label: t(dm ? "settings.account.chat.toneDms" : "settings.account.chat.toneChannels"),
+                    label: t(toneLabel),
                   })}
                 >
                   {t(dm ? "settings.account.chat.toneDmsHelp" : "settings.account.chat.toneChannelsHelp")}
@@ -236,7 +238,7 @@ export function ChatLookSettings() {
             <div className="settings-row__end">
               <Segmented
                 size="sm"
-                label={t(dm ? "settings.account.chat.toneDms" : "settings.account.chat.toneChannels")}
+                label={t(toneLabel)}
                 value={tone}
                 onValueChange={(v) => save(dm ? { dmTone: v as ChatTone } : { channelTone: v as ChatTone })}
                 options={[

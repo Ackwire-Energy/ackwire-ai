@@ -11,20 +11,11 @@ import { canonicalResource } from "./oauth-mcp";
  * classification (read tools free, writes approved, destructive ones need
  * approval) is applied at once, and admins can change it.
  *
- * On 2026-10-31 each one was asked to register agentes.chat as the Cloud does
- * (redirect URI https://app.agentes.chat/api/app/connectors/oauth/callback,
- * client_name "agentes.chat", token_endpoint_auth_method none). The ones
- * marked `soon` refused, and stay `soon` until their vendor approves
- * agentes.chat: Asana, Square, Intercom, Mercado Pago, Semrush and Gamma
- * don't allow our redirect URI (400), Dropbox registers only its trusted
- * partners (403 registration_not_supported), Meta Ads has no dynamic
- * registration for us (400 invalid_client_metadata) and RevenueCat answers
- * 400 invalid_client. Vercel and Figma joined that day as `soon` too: Vercel
- * takes only the clients it approved through its review form, and Figma
- * answers 403 at registration. Calendly refused only the name (letters,
- * digits, hyphens and spaces): `ensureOAuthClient` registers it again
- * without the dot. Intercom's EU server (`intercom-eu`, added after that
- * check) waits on the same approval as its US one.
+ * A preset marked `soon` is one whose vendor doesn't accept the registration
+ * yet (its redirect URI or client name, or registration itself is limited to
+ * clients the vendor approved); it stays `soon` until the vendor does.
+ * Calendly accepts only letters, digits, hyphens and spaces in the client
+ * name: `ensureOAuthClient` registers it again without the dot.
  *
  * Left out as servers of their own: HubSpot (its authorization server has
  * no dynamic registration: it needs an app registered with HubSpot). Slack,

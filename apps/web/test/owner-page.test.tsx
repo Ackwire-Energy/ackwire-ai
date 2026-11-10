@@ -143,9 +143,18 @@ describe("Adicionar uma senha (Configurações › Sua conta)", () => {
     expect(screen().queryByRole("dialog", { name: "Adicionar uma senha" })).toBeNull();
   });
 
-  test("an account with a password doesn't see it", async () => {
-    await yourAccount(seedState());
+  test("an account with a password creates a new one instead (ADR 0158), and says what it ends", async () => {
+    const state = seedState();
+    await yourAccount(state);
     expect(screen().getByRole("button", { name: /^Perfil/ })).toBeTruthy();
     expect(screen().queryByRole("button", { name: /^Adicionar uma senha/ })).toBeNull();
+    await click(screen().getByRole("button", { name: /^Criar uma senha nova/ }));
+    await settle(4);
+    const dialog = screen().getByRole("dialog", { name: "Criar uma senha nova" });
+    expect(within(dialog).getByText(/As outras sessões saem/)).toBeTruthy();
+    await type(within(dialog).getByLabelText("Nova senha"), "correct horse battery");
+    await click(within(dialog).getByRole("button", { name: "Salvar senha" }));
+    await settle(4);
+    expect(state.calls.filter((c) => c.method === "account.addPassword")).toHaveLength(1);
   });
 });

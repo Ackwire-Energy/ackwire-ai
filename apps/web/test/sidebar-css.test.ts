@@ -25,13 +25,13 @@ test("a channel's # is no louder than a category's chevron, in its column, and e
   expect(value('.sidebar:not([data-rail="true"]) .sidebar__section-body', "padding-left")).toBeUndefined();
 });
 
-test("space, not lines, sets the sidebar's parts apart: 14px over each one with the list's gap", () => {
+test("space, not lines, sets the sidebar's parts apart: 16px over each one with the list's gap", () => {
   expect(declarations(css, ".sidebar__divider")).toEqual([]);
   expect(value('.sidebar:not([data-rail="true"]) .sidebar__block + .sidebar__block', "margin-top")).toBe("10px");
-  expect(value('.sidebar:not([data-rail="true"]) .sidebar__scroll', "gap")).toBe("4px");
+  expect(value('.sidebar:not([data-rail="true"]) .sidebar__scroll', "gap")).toBe("6px");
 });
 
-test("an agent's role sits under its name, one line, beside a face as tall as both, and gone in the rail", () => {
+test("an agent's role sits under its name as a tag, one line, beside a face as tall as both, and gone in the rail", () => {
   const role = ".sidebar__item-role";
   // One line ending in "…", what it is on too: the row stays two lines and everything in it shares its middle.
   expect([
@@ -39,17 +39,21 @@ test("an agent's role sits under its name, one line, beside a face as tall as bo
     value(role, "text-overflow"),
     value(".sidebar__item-work", "white-space"),
   ]).toEqual(["nowrap", "ellipsis", undefined]);
-  expect([value(role, "font-size"), value(role, "color")]).toEqual(["12px", "var(--ink-muted)"]);
+  expect([value(role, "font-size"), value(role, "color")]).toEqual(["12.5px", "var(--faint)"]);
+  // The role, the agent's fixed label, is a small tag as wide as its words; what it is on stays a plain line.
+  const tag = ".sidebar__item-role.ac-tag";
+  expect([value(tag, "font-size"), value(tag, "align-self")]).toEqual(["11.5px", "flex-start"]);
   expect([value(".sidebar__item-text", "flex-direction"), value(".sidebar__item-text", "min-width")]).toEqual([
     "column",
     "0",
   ]);
-  // A 32 face, 8 from the plate's edges: a name alone centres on it, a name over a role is a face line (the name's
-  // capitals on the face's top, `.ac-captop` on the label) with what ends the row on its middle.
+  // A message's face size (`--name-face`, 32), 8 from the plate's edges: a name alone centres on it, a name over a
+  // role is a face line (the name's capitals on the face's top, `.ac-captop` on the label) with what ends the row on
+  // its middle.
   const face = '.sidebar:not([data-rail="true"]) .sidebar__item > .ac-avatar--sm';
   // The rail's 40px tile keeps its smaller face, with room for the presence badge and the unread count.
   expect(value(".sidebar__item > .ac-avatar--sm", "height")).toBe("28px");
-  expect([value(face, "width"), value(face, "height")]).toEqual(["32px", "32px"]);
+  expect([value(face, "width"), value(face, "height")]).toEqual(["var(--name-face)", "var(--name-face)"]);
   expect(value('.sidebar:not([data-rail="true"]) .sidebar__item:has(> .ac-avatar)', "padding-block")).toBe("8px");
   const twoLines =
     '.sidebar:not([data-rail="true"]) .sidebar__item:has(> .ac-avatar + .sidebar__item-text > .sidebar__item-role)';
@@ -80,23 +84,27 @@ test("a row's hover buttons get their own room instead of covering the name and 
   expect(value('.sidebar[data-rail="true"] .sidebar__row-acts', "display")).toBe("none");
 });
 
-test("a closed group of agents keeps in sight who works, waits or wrote; pinned rows end with a thin line", () => {
+test("a closed group of agents keeps in sight who works, waits or wrote; pinned rows end with a little space, no line, and their pin shows on hover", () => {
   expect(
     value('.sidebar__section--group[data-open="false"] .sidebar__section-body > [data-live="true"]', "display"),
   ).toBe("flex");
-  expect(value(".sidebar__pins-end", "border-top")).toBe("1px solid var(--line)");
+  expect(value(".sidebar__pins-end", "border-top")).toBeUndefined();
+  // At rest the pin is hidden; it shows with the row's hover or focus, and always on a touch screen.
+  expect(declarations(css, ".sidebar__pinned").find(([p]) => p === "opacity")?.[1]).toBe("0");
+  expect(value(".sidebar__item:is(:hover, :focus-visible) .sidebar__pinned", "opacity")).toBe("1");
+  // The `@media (hover: none)` override comes last.
+  expect(value(".sidebar__pinned", "opacity")).toBe("1");
   expect(
     value('.sidebar:not([data-rail="true"]) .sidebar__section--part[data-open="false"] ~ .sidebar__see-all', "display"),
   ).toBe("none");
 });
 
-test("the right hand stays in sight in a closed AGENTES, on a soft tint of the agent blue the open row's plate replaces", () => {
+test("the right hand stays in sight in a closed Agentes, a plain row like any agent's", () => {
   expect(value('.sidebar__section[data-open="false"] .sidebar__section-body > [data-right-hand]', "display")).toBe(
     "flex",
   );
-  expect(value('.sidebar__item[data-right-hand]:not([data-status="active"])', "background")).toContain(
-    "var(--agent-soft)",
-  );
+  expect(declarations(css, '.sidebar__item[data-right-hand]:not([data-status="active"])')).toEqual([]);
+  expect(declarations(css, '.sidebar__item[data-right-hand]:not([data-status="active"]):hover')).toEqual([]);
 });
 
 test("a row's hidden hover buttons don't catch the pointer, so a drag over a row's end lands before or after it", () => {
@@ -143,9 +151,15 @@ test("a channel: gray when read, full ink and bold with the edge pill when unrea
     "var(--danger)",
     "var(--raised)",
   ]);
-  // A category's name is small and gray, quieter than any unread channel.
+  // A category's name is in normal case, 13px and muted, quieter than any unread channel; a part's title too.
   const label = ".sidebar__section--category .sidebar__section-head .sidebar__label";
-  expect([value(label, "font-size"), value(label, "color")]).toEqual(["12.5px", "var(--faint)"]);
+  expect([value(label, "font-size"), value(label, "color")]).toEqual(["13px", "var(--muted)"]);
+  const part = ".sidebar__section--part .sidebar__section-head .sidebar__label";
+  expect([value(part, "text-transform"), value(part, "font-size"), value(part, "color")]).toEqual([
+    "none",
+    "13px",
+    "var(--muted)",
+  ]);
 });
 
 test("you and the bell in one raised card, a plate each inside its curve; the bell's unread count red on its corner", async () => {

@@ -9,6 +9,7 @@ const COMMANDS: &[&str] = &[
     "servers_get",
     "server_choose",
     "server_remove",
+    "server_sign_out",
     "discover",
     "link_take",
     "tray_visible",
@@ -36,6 +37,7 @@ const COMMANDS: &[&str] = &[
     "cover_retry",
     "cover_hide",
     "cover_server",
+    "cover_details",
     "this_mac_listening",
     "dock_set",
     "local_server_status",
@@ -53,6 +55,7 @@ const COMMANDS: &[&str] = &[
     "tailscale_status",
     "tailscale_open",
     "workspaces_get",
+    "site_fetch",
     "welcome_mode_take",
 ];
 

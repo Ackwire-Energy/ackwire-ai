@@ -6,14 +6,12 @@ import {
   useNotificationAction,
   useNotifications,
   useRoutines,
-  useToolChanges,
 } from "@agenteschat/client";
 import { approvalDetail, approvalSummary, approvalTitle } from "@agenteschat/client/lib/approval-words";
 import { restrictionLine } from "@agenteschat/client/lib/errors";
 import { timeLeft, upperFirst } from "@agenteschat/client/lib/format";
 import { mediaWord } from "@agenteschat/client/lib/media";
 import { latestText } from "@agenteschat/client/lib/message-body";
-import { can } from "@agenteschat/client/lib/permissions";
 import { usageLimitLine } from "@agenteschat/client/lib/person-usage";
 import { useLocalSearchParams } from "expo-router";
 import type { TFunction } from "i18next";
@@ -21,7 +19,6 @@ import { memo, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
-import { useOrg } from "@/providers/org";
 import {
   Button,
   EmptyState,
@@ -47,8 +44,9 @@ import { approvalAction } from "../approvals/logic";
 import { ApprovalMark, ApprovalWhy, useApprovalSource, useApproveNow } from "../approvals/parts";
 import type { AskKind } from "../chat/ask-store";
 import { ASK_ICON, AskButtons } from "../chat/asks";
-import { ConnectorIcon } from "../connectors/ConnectorIcon";
 import { dashboardWaitingCard } from "../dashboards/logic";
+import { isDeviceNotice } from "../devices/logic";
+import { DeviceNoticeActions, DeviceNoticeCard } from "../devices/notices";
 import { notificationHref, notificationWebPath, routineHref } from "../links/logic";
 import { openWebPath } from "../links/open-web";
 import { ChangeRequestCard } from "../right-hand/SettingsCard";
@@ -97,20 +95,8 @@ export function ActivityScreen() {
   const list = useNotifications(orgId, filter);
   const items = list.data?.pages.flatMap((p) => p.items) ?? [];
   const counts = list.data?.pages[0]?.counts;
-  // What waits on a connector admin among changed tools: a server's card shows only while one of its tools waits.
-  const manages = can(useOrg().org, "manage_connectors");
-  const changes = useToolChanges(orgId, manages).data;
-  const pending = useMemo(
-    () =>
-      changes
-        ? { ids: new Set(changes.map((c) => c.connectionId)), labels: new Set(changes.map((c) => c.connectionLabel)) }
-        : null,
-    [changes],
-  );
-  const { waiting, days, merged, settled } = activitySections(items, filter, undefined, pending);
-  // The server counts each repeated notice of a server, and one with nothing left to review; the screen shows one
-  // card, or none.
-  const waitingCount = Math.max(waiting.length, (counts?.waiting ?? waiting.length) - merged - settled);
+  const { waiting, days } = activitySections(items, filter);
+  const waitingCount = Math.max(waiting.length, counts?.waiting ?? waiting.length);
   const pull = usePullRefresh(list.refetch);
   const header = useTabHeader();
   const reduced = useReducedMotion();
@@ -140,7 +126,11 @@ export function ActivityScreen() {
             <View style={styles.cards}>
               {waiting.map((n, i) => (
                 <Animated.View key={n.id} {...cardMotion}>
-                  <WaitingCardView item={n} first={i === 0} />
+                  {isDeviceNotice(n.kind) ? (
+                    <DeviceNoticeCard item={n} first={i === 0} />
+                  ) : (
+                    <WaitingCardView item={n} first={i === 0} />
+                  )}
                 </Animated.View>
               ))}
             </View>
@@ -190,21 +180,8 @@ export function ActivityScreen() {
  * One thing waiting on you, as the chat's request card (`WaitingCard`): who asks and the kind in the chat's words
  * and icons (amber, the waiting color), the deadline or where and when at the right, the exact request in words, why
  * in muted, what it goes through on one quiet line, and the decision on the card: an approval decided here
- * (Aprovar or Agora não), a server's changed tools opening their review, a question Responder. The whole card opens
- * it too.
+ * (Aprovar or Agora não), a question Responder. The whole card opens it too.
  */
-/**
- * Where a notice opens. A server's changed tools open its Ferramentas; a notice from before notices named their
- * server finds it by its name among the changes waiting (once the server names them all, by id alone).
- */
-function useNoticeHref(n: AppNotification, ai: Parameters<typeof notificationHref>[1]) {
-  const { org, orgId } = useOrg();
-  const unnamed = n.kind === "connector_tool_changed" && !n.source.connectionId;
-  const changes = useToolChanges(orgId, unnamed && can(org, "manage_connectors")).data;
-  const id = unnamed ? changes?.find((c) => c.connectionLabel === n.source.label)?.connectionId : undefined;
-  return id ? `/connectors/tools?id=${id}` : notificationHref(n, ai);
-}
-
 /** `first`: the page's first card carries its one primary; the others decide or open in secondary. */
 function WaitingCardView({ item: n, first = false }: { item: AppNotification; first?: boolean }) {
   const { t } = useTranslation();
@@ -235,13 +212,10 @@ function WaitingCardView({ item: n, first = false }: { item: AppNotification; fi
         ? join.text
         : card.kind === "limit"
           ? notice.title
-          : // The server is named over it, so the title says only what it did; its tools are on the line below.
-            card.kind === "tools"
-            ? t("mobile.activityNow.toolsTitle")
-            : (dash?.title ?? card.title);
+          : (dash?.title ?? card.title);
   // A routine's trouble opens the routine; the computer being ready, Connect an AI while no agent has one.
   const ai = useAiStatus(orgId, n.kind === "computer_ready").data;
-  const href = useNoticeHref(n, ai);
+  const href = notificationHref(n, ai);
   // No screen of its own in the app (the workspace's billing hold): its page on the web, so a tap is never a dead end.
   const web = href ? null : notificationWebPath(n, orgId);
   const actor = n.actors[0];
@@ -249,22 +223,17 @@ function WaitingCardView({ item: n, first = false }: { item: AppNotification; fi
   const name = dir.nameOf(who);
   const kind = dash ? { icon: "chart" as const, label: dash.kind } : kindOf(t, card.kind, n.source.screen);
   const left = card.expiresAt ? timeLeft(t, card.expiresAt, new Date(now)) : null;
-  // The server is already named over the title.
-  const place = card.kind === "tools" ? null : placeOf(n);
+  const place = placeOf(n);
   const where = [place ? t("mobile.chats.waitIn", { where: place }) : null, when.short(n.updatedAt)]
     .filter(Boolean)
     .join(" · ");
-  const button = dash
-    ? t("mobile.activityNow.open")
-    : card.kind === "tools"
-      ? t("mobile.activityNow.reviewChanges")
-      : t(`mobile.activityNow.${card.action}`);
+  const button = dash ? t("mobile.activityNow.open") : t(`mobile.activityNow.${card.action}`);
   const open = () => {
     if (n.readAt === null) act.mutate({ type: "read", item: n, read: true });
     if (href) router.push(href);
     else if (web) openWebPath(web);
   };
-  // Whoever asks leads the card: an agent (with its sky), a person, the people asking to join, or the server.
+  // Whoever asks leads the card: an agent (with its sky), a person, or the people asking to join.
   const leading =
     who && who.type !== "agent" ? (
       <Face who={who} size={36} live={false} />
@@ -277,15 +246,12 @@ function WaitingCardView({ item: n, first = false }: { item: AppNotification; fi
           </View>
         ))}
       </View>
-    ) : card.kind === "tools" ? (
-      <ConnectorIcon def={null} label={n.source.label ?? ""} size={36} />
     ) : null;
-  const tools = card.kind === "tools" ? n.latest.title : null;
   return (
     <WaitingCard
       agentId={who?.type === "agent" ? who.id : null}
       leading={leading}
-      name={name || (card.kind === "tools" ? (n.source.label ?? "") : "")}
+      name={name}
       kind={kind}
       title={title}
       onPress={href || web ? open : undefined}
@@ -304,17 +270,6 @@ function WaitingCardView({ item: n, first = false }: { item: AppNotification; fi
         <ApprovalWhy approval={{ origin: n.latest.origin ?? null, why: n.latest.text ?? null }} name={name} />
       ) : null}
       {card.kind === "approval" && request && onCard <= 1 ? <ApprovalSource approval={request} /> : null}
-      {card.kind === "tools" ? (
-        <>
-          <Text variant="small" tone="muted">
-            {t("mobile.activityNow.toolsWhy")}
-          </Text>
-          {tools ? (
-            // The server's mark already leads the card: the tools that changed, on their own.
-            <WaitingSource text={tools.split(", ").join(" · ")} />
-          ) : null}
-        </>
-      ) : null}
       {card.kind === "limit" ? (
         <>
           <Text variant="footnote" tone="muted">
@@ -329,7 +284,7 @@ function WaitingCardView({ item: n, first = false }: { item: AppNotification; fi
 
 /**
  * Each kind in the chat request card's words and icons ("Pede sua aprovação" with the shield, "Pergunta", "Precisa de
- * você no navegador" or "no computador"); what the chat never asks keeps Atividade's (Membros, Ferramentas, Limite).
+ * você no navegador" or "no computador"); what the chat never asks keeps Atividade's (Membros, Limite).
  */
 function kindOf(t: TFunction, kind: WaitingCardKind, screen?: string): { icon: IconName; label: string } {
   const ask: AskKind | null =
@@ -344,7 +299,7 @@ function kindOf(t: TFunction, kind: WaitingCardKind, screen?: string): { icon: I
   return { icon: OWN_ICON[kind as keyof typeof OWN_ICON], label: t(`mobile.activityNow.kind.${kind}`) };
 }
 
-const OWN_ICON = { join: "members", tools: "bolt", limit: "chart" } as const;
+const OWN_ICON = { join: "members", limit: "chart" } as const;
 
 /**
  * The request's decision on the card, as the chat's: Aprovar (held to approve when it is high risk; the page's
@@ -476,7 +431,7 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
   const act = useNotificationAction(orgId);
   // A routine's trouble opens the routine; the computer being ready, Connect an AI while no agent has one.
   const ai = useAiStatus(orgId, n.kind === "computer_ready").data;
-  const href = useNoticeHref(n, ai);
+  const href = notificationHref(n, ai);
   // No screen of its own in the app (the workspace's billing hold): its page on the web, so a tap is never a dead end.
   const web = href ? null : notificationWebPath(n, orgId);
   const unread = n.readAt === null;
@@ -592,6 +547,12 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
       {n.kind === "plan_model_dropped" && href && !n.doneAt ? (
         <View style={styles.change}>
           <Button variant="secondary" size="sm" label={t("mobile.activity.chooseModel")} onPress={open} />
+        </View>
+      ) : null}
+      {/* An agent holds the person's phone: Stop, right here. */}
+      {isDeviceNotice(n.kind) ? (
+        <View style={styles.change}>
+          <DeviceNoticeActions item={n} />
         </View>
       ) : null}
       {/* A person asks for more (ADR 0141): raised or refused right here. */}

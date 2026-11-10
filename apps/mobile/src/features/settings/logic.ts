@@ -20,6 +20,7 @@ import { type NoComputer, noComputerChoice, type SetupView, setupPending } from 
 import { clockAt, formatPercent, relativeTime } from "@agenteschat/client/lib/format";
 import { folderName, hostDescKey, isPaused } from "@agenteschat/client/lib/machines";
 import { can } from "@agenteschat/client/lib/permissions";
+import { type ModeSwitchLine, personalSettingsHost, personalSettingsNav } from "@agenteschat/client/lib/personal-view";
 import {
   type AreaLevel,
   areaLine,
@@ -115,8 +116,8 @@ export const SETTINGS_SECTIONS: readonly SettingsEntry[] = [
     allowed: (o) => can(o, "manage_agents"),
   },
   { id: "connectors", group: "agents", icon: "join", href: "/connectors", allowed: () => true },
-  // Every member sees the computers and connects one (ADR 0025).
-  { id: "computers", group: "agents", icon: "laptop", href: "/settings/computers", allowed: (o) => can(o, "read") },
+  // Dispositivos: every member sees the computers and the phones they reach, and connects their own (ADR 0025).
+  { id: "computers", group: "agents", icon: "laptop", href: "/settings/devices", allowed: (o) => can(o, "read") },
   // The Vault (ADR 0144): every member keeps their own logins and keys there and sees the team's shared with them.
   { id: "vault", group: "agents", icon: "key", href: "/settings/vault", allowed: (o) => can(o, "read") },
   { id: "skills", group: "agents", icon: "sparkle", href: "/settings/skills", allowed: (o) => can(o, "manage_agents") },
@@ -135,6 +136,46 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = ["org", "people", "agen
 
 /** The sections this membership opens, in order. */
 export const visibleSections = (org: OrgSummary | null | undefined) => SETTINGS_SECTIONS.filter((s) => s.allowed(org));
+
+// ── A personal workspace's settings (ADR 0159 §3) ───────────────────────────
+
+export interface PersonalSettings {
+  /** The short list, in its order (Your account comes before it: it is the person's own, not a section). */
+  main: SettingsEntry[];
+  /** Every other section this person opens, on the Advanced screen in the phone's groups. */
+  advanced: SettingsEntry[];
+}
+
+/**
+ * A personal workspace's settings on the phone (ADR 0159 §3), from the sections this person opens, as the web lists
+ * them (`personalSettingsNav`): About you, AI and apps, Plan and usage, Vault and Computers in one list, with People
+ * after About you once someone else is a member (`others`, unknown while loading: it doesn't); every other one under
+ * Advanced, but for Connectors and Skills, which AI and apps shows at its foot. Only where a section is listed
+ * changes: each opens the same screen, with the same permission, as in a team's workspace.
+ */
+export const personalSections = (org: OrgSummary | null | undefined, others: number | undefined): PersonalSettings =>
+  personalSettingsNav(visibleSections(org), others);
+
+/** What AI and apps lists at its foot in a personal workspace: Connectors and Skills, those this person opens. */
+export function personalAiParts(org: OrgSummary | null | undefined): SettingsEntry[] {
+  const open = visibleSections(org);
+  const ids = new Set<string>(open.map((s) => s.id));
+  return open.filter((s) => personalSettingsHost(s.id, ids) === "keys");
+}
+
+/** The icon a section has in a personal workspace's short list, where it differs from its usual one. */
+export const PERSONAL_ICON: Partial<Record<SettingsSection, IconName>> = { general: "pen" };
+
+/** A switch of mode's line icon, in the phone's set (`modeSwitchLines` names the web's). */
+export const MODE_LINE_ICON: Record<ModeSwitchLine["icon"], IconName> = {
+  channel: "hash",
+  personAdd: "person",
+  shield: "shield",
+  sidebar: "list",
+  message: "chat",
+  settings: "home",
+  members: "members",
+};
 
 // ── The workspace's page and Editar workspace ──────────────────────────────
 

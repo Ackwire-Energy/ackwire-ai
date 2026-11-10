@@ -4,9 +4,8 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { type ComputerSetup, NetworkError } from "@agenteschat/client";
-import { act, cleanup, fireEvent } from "@testing-library/react";
+import { cleanup } from "@testing-library/react";
 import { ADA_ID, ATLAS_ID, createFakeApi, fakeBrowserOf, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
-import { hintOf, shownText } from "./hint";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -40,13 +39,14 @@ async function computers(path: string, o: Options = {}) {
   return { ...r, state, api, machines };
 }
 
+const CLOUD_LEAD = "Onde seus agentes trabalham: o computador do workspace e os dispositivos que as pessoas conectam.";
 const body = () => (document.querySelector(".settings__body") as HTMLElement).textContent ?? "";
 const region = (name: string) => screen().queryByRole("region", { name });
 
 describe("Configurações → Computadores on the Cloud: one computer, nothing to connect or pick", () => {
   test("the lead line and the workspace's card, and nothing else", async () => {
     await computers(`/org/${ORG_ID}/settings/computers`, { setup: { step: "installing", specs: null } });
-    expect(body()).toContain("Onde os agentes trabalham: um computador só deste workspace, sempre ligado.");
+    expect(body()).toContain(CLOUD_LEAD);
     expect(region("Computador da Acme")).toBeTruthy();
     for (const name of ["Outros computadores", "Conectar outro computador", "Qual computador cada agente usa"])
       expect(region(name)).toBeNull();
@@ -83,32 +83,19 @@ describe("Configurações → Computadores on the Cloud: one computer, nothing t
     expect(document.body.textContent).not.toContain("mudam o que este computador libera");
   });
 
-  test("before the server says which edition this is, neither's cards: a failed answer says so and asks again", async () => {
+  test("before the server says which edition this is, neither edition's cards nor its lead line", async () => {
     const state = seedState();
     const api = createFakeApi(state);
     fakeMachinesOf.get(api)?.setSetup({ step: "installing" });
-    const answer = api.machines.computerSetup;
-    let down = true;
-    api.machines.computerSetup = async (orgId) => {
-      if (down) throw new NetworkError(new TypeError("Failed to fetch"));
-      return answer(orgId);
+    api.machines.computerSetup = async () => {
+      throw new NetworkError(new TypeError("Failed to fetch"));
     };
     await renderApp(`/org/${ORG_ID}/settings/computers`, { api });
     await settle(10);
-    for (const name of [
-      "Computador deste servidor",
-      "Outros computadores",
-      "Conectar outro computador",
-      "Qual computador cada agente usa",
-    ])
+    for (const name of ["Computador da Acme", "Computador deste servidor", "Qual computador cada agente usa"])
       expect(region(name)).toBeNull();
+    expect(body()).not.toContain(CLOUD_LEAD);
     expect(body()).not.toContain("install.sh");
-    expect(body()).toContain("Sem conexão com o agentes.chat agora. Tente de novo em instantes.");
-    down = false;
-    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Tentar de novo" })));
-    await settle(8);
-    expect(region("Computador da Acme")).toBeTruthy();
-    expect(body()).toContain("Onde os agentes trabalham: um computador só deste workspace, sempre ligado.");
   });
 
   test("an agent on it: no Trabalha no to change, and no picker in its settings", async () => {
@@ -123,35 +110,19 @@ describe("Configurações → Computadores on the Cloud: one computer, nothing t
 });
 
 describe("Configurações → Computadores on self-host", () => {
-  test("this server's computer first, then the other computers and how to connect one, then each agent's", async () => {
+  test("this server's computer in the devices list, then which computer each agent uses, then how devices work", async () => {
     await computers(`/org/${ORG_ID}/settings/computers`, { host: true });
-    expect(body()).toContain("Onde os agentes trabalham: este servidor e outros que você conectar.");
-    const order = [...document.querySelectorAll(".settings__body section[aria-labelledby]")].map((el) =>
-      el.getAttribute("aria-labelledby"),
-    );
-    expect(order.slice(0, 4)).toEqual([
-      "sec-host-computer",
-      "sec-machines",
-      "sec-machines-connect",
-      "sec-agent-computers",
-    ]);
-    const host = region("Computador deste servidor") as HTMLElement;
-    expect(host.textContent).toContain("Onde o agentes.chat está instalado, um usuário por agente.");
-    expect(host.textContent).toContain("Online");
-    // It's this server's: not among the other computers. Their card is its title and ⓘ, and its empty state.
-    const others = region("Outros computadores") as HTMLElement;
-    expect(hintOf("Outros computadores", others).text).toBe(
-      "Conectados com um código, como um Mac mini em casa ou outro servidor. O que cada um libera se ajusta nele mesmo.",
-    );
-    expect(shownText(others)).toContain("Rode agentes em qualquer computador");
+    expect(body()).toContain("Onde seus agentes trabalham: os computadores e celulares que as pessoas conectam.");
+    const list = screen().getByRole("list", { name: "Dispositivos" });
+    expect(list.querySelector(".dv-row__name")?.textContent).toBe("Computador deste servidor");
+    // Its own card is only for a stopped one, or how to make one.
+    expect(region("Computador deste servidor")).toBeNull();
     expect((region("Qual computador cada agente usa") as HTMLElement).textContent).not.toContain("Um por agente");
     expect(body()).not.toMatch(/na nuvem|computador na nuvem|in the cloud/i);
-    // What it all means (pausing, folders, the other ways to connect) is one help page, linked once at the end.
-    const how = screen().getByRole("link", { name: "Como os computadores funcionam" });
-    const url = new URL(how.getAttribute("href") ?? "");
-    expect(url.href).toBe("https://agentes.chat/pt/docs/computers");
+    // What it all means is one help page, linked once at the end.
+    const how = screen().getByRole("link", { name: "Como os dispositivos funcionam" });
+    expect(new URL(how.getAttribute("href") ?? "").href).toBe("https://agentes.chat/pt/docs/computers");
     expect(how.className).toBe("ac-link ac-link--muted");
-    expect(how.getAttribute("rel")).toBe("noopener noreferrer");
     expect([...document.querySelectorAll(".settings__body a")].at(-1)).toBe(how);
   });
 

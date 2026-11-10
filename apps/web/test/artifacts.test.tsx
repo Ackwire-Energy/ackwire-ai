@@ -869,6 +869,41 @@ describe("Drive", () => {
     await keyDown("Escape");
     expect(screen().queryByRole("toolbar", { name: "Seleção" })).toBeNull();
   });
+
+  test("Shift on a checkbox picks the range from the last pick; the bar's Selecionar os N takes everything shown", async () => {
+    await goDrive();
+    const boxes = () => screen().getAllByRole("checkbox", { name: /^Selecionar (?!os )/ });
+    const [first, , third] = boxes();
+    if (!first || !third) throw new Error("three items expected");
+    await click(first);
+    await act(async () => fireEvent.click(third, { shiftKey: true }));
+    const bar = () => screen().getByRole("toolbar", { name: "Seleção" });
+    expect(bar().textContent).toContain("3 selecionados");
+    expect(boxes().map((b) => b.getAttribute("aria-checked"))).toEqual(["true", "true", "true", "false", "false"]);
+    await click(within(bar()).getByRole("button", { name: "Selecionar os 5" }));
+    expect(bar().textContent).toContain("5 selecionados");
+    // Everything picked: the button goes.
+    expect(within(bar()).queryByRole("button", { name: "Selecionar os 5" })).toBeNull();
+  });
+
+  test("the list's head checkbox: all, some (a dash) and none", async () => {
+    await goDrive();
+    const view = screen().getByRole("radiogroup", { name: "Visualização" });
+    await click(within(view).getByRole("radio", { name: "Lista" }));
+    const all = screen().getByRole("checkbox", { name: "Selecionar os 5" });
+    expect(all.closest(".drive-table__head")).not.toBeNull();
+    expect(all.getAttribute("aria-checked")).toBe("false");
+    await click(all);
+    expect(screen().getByRole("toolbar", { name: "Seleção" }).textContent).toContain("5 selecionados");
+    expect(all.getAttribute("aria-checked")).toBe("true");
+    const [one] = screen().getAllByRole("checkbox", { name: /^Selecionar (?!os )/ });
+    if (!one) throw new Error("an item expected");
+    await click(one);
+    expect(all.getAttribute("aria-checked")).toBe("mixed");
+    await click(all);
+    await click(all);
+    expect(screen().queryByRole("toolbar", { name: "Seleção" })).toBeNull();
+  });
 });
 
 describe("artifact helpers", () => {

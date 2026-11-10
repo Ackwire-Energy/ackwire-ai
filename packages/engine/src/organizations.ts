@@ -59,6 +59,7 @@ import {
   workRefusal,
 } from "./standing";
 import type { Closed, DeletionDeps } from "./workspace-deletion";
+import { isWorkspaceMode, WORKSPACE_MODES, type WorkspaceMode, workspaceMode } from "./workspace-mode";
 
 const {
   organizations,
@@ -107,6 +108,8 @@ export interface Membership {
   agentStyle?: AgentStyle | null;
   /** How conversations look to the person here (listMemberships, `setChatPrefs`); only what they chose. */
   chatPrefs?: ChatPrefs;
+  /** Who the workspace is for (listMemberships, ADR 0159): `team` or `personal`. */
+  mode?: WorkspaceMode;
 }
 
 /** What opens when the app starts in a workspace (ADR 0108), the person's own. */
@@ -163,16 +166,19 @@ export async function listMemberships(db: Database, userId: string): Promise<Mem
       showActivity: organizationMembers.showActivity,
       agentStyle: organizationMembers.agentStyle,
       chatPrefs: organizationMembers.chatPrefs,
+      mode: schema.organizationSettings.mode,
       ...ROLE_COLUMNS,
     })
     .from(organizationMembers)
     .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
     .innerJoin(users, eq(users.id, organizationMembers.userId))
+    .leftJoin(schema.organizationSettings, eq(schema.organizationSettings.orgId, organizations.id))
     .where(and(eq(organizationMembers.userId, userId), accountInUse))
     .orderBy(asc(organizations.createdAt));
-  return rows.map(({ startPage, startChannelId, chatPrefs, ...row }) => ({
+  return rows.map(({ startPage, startChannelId, chatPrefs, mode, ...row }) => ({
     ...withPermissions(row),
     chatPrefs: chatPrefsOf(chatPrefs),
+    mode: isWorkspaceMode(mode) ? mode : "team",
     start: { page: startPage, channelId: startPage === "channel" ? startChannelId : null },
   }));
 }
@@ -255,9 +261,11 @@ export function assertInviting(membership: Membership) {
 export async function createOrganization(
   db: Database,
   userId: string,
-  input: { name: string; context?: string },
+  input: { name: string; context?: string; mode?: WorkspaceMode },
   options: { holdForPayment?: boolean; needsAllowance?: boolean; onboarding?: boolean } = {},
 ) {
+  if (input.mode !== undefined && !isWorkspaceMode(input.mode))
+    throw new ValidationError(`mode must be one of ${WORKSPACE_MODES.join(", ")}`);
   return db.transaction(async (tx) => {
     // One create at a time per person, checked after the lock: two at once would both start waiting for a plan. A
     // deletion of the account waits for this workspace, or this finds the account gone (a cached session cookie
@@ -304,6 +312,9 @@ export async function createOrganization(
     if (!organization) throw new Error("organization insert returned nothing");
     await recordFirstWorkspace(tx, userId, organization.id);
     await tx.insert(organizationMembers).values({ orgId: organization.id, userId, role: "owner" });
+    // A personal workspace (ADR 0159) is one from the start: its first screens are already shaped for one person.
+    if (input.mode === "personal")
+      await tx.insert(schema.organizationSettings).values({ orgId: organization.id, mode: "personal" });
     await createDefaultRoles(tx, organization.id);
     await assignHandle(tx, organization.id, userId);
     // The team's right hand comes with the workspace (ADR 0137), after the owner's handle so `@lodi` stays theirs if
@@ -319,7 +330,7 @@ export async function createOrganization(
       type: "organization.created",
       orgId: organization.id,
       userId,
-      data: { name: organization.name },
+      data: { name: organization.name, mode: input.mode ?? "team" },
     });
     return { organization, general, existing: false };
   });
@@ -1131,7 +1142,7 @@ async function offPlansNotOwners(tx: Executor, orgId: string, ids: string[]) {
 
 /**
  * Removes a member (or lets a member leave). The last owner can't leave. Their agents pass on (`heirOf`); the plans they signed in leave the agents, which go back to the API, and the computers they connected
- * here go with them (`personalMachines`). Every agent loses their mailboxes (`dropMailOfOwner`). Their messages stay.
+ * here go with them (`personalMachines`) unless marked the workspace's (`releaseLeaverDevices`). Every agent loses their mailboxes (`dropMailOfOwner`). Their messages stay.
  */
 export async function removeMember(
   db: Database,
@@ -1147,6 +1158,7 @@ export async function removeMember(
   // Loaded here: these modules build on this one.
   const { announceReleasedAccounts, forgetAgents, releaseMemberAccounts } = await import("./machine-accounts");
   const { announceRemovedMachine, detachMachine, personalMachines } = await import("./machines");
+  const { releaseLeaverDevices } = await import("./devices");
   const { cancelSecretRequestsFor, publishSecret } = await import("./secrets");
   const { cancelMailboxApprovals, publishApproval } = await import("./approvals");
   const { dropMailOfOwner } = await import("./tools/scopes");
@@ -1258,6 +1270,7 @@ export async function removeMember(
     for (const computer of await personalMachines(tx, targetUserId, [orgId])) {
       removed.push({ computer, freed: await detachMachine(tx, computer) });
     }
+    await releaseLeaverDevices(tx, orgId, targetUserId);
     const touched = [...new Set([...handed.map((a) => a.id), ...removed.flatMap((r) => r.freed)])];
     await offPlansNotOwners(tx, orgId, touched);
     const changed = [...new Set([...touched, ...released.agents.flatMap((a) => a.agentIds)])];
@@ -1280,6 +1293,13 @@ export async function removeMember(
   await announceReleasedAccounts(options.pubsub, released);
   for (const { computer, freed } of removed) {
     await announceRemovedMachine({ db, pubsub: options.pubsub }, computer, { type: "person", id: actorId }, freed);
+  }
+  // Runs waiting on a device that left with them stop waiting and say so (bring your own devices).
+  if (removed.length > 0) {
+    const { endWaitsOnLeftDevice } = await import("./device-waits");
+    for (const { computer } of removed) {
+      await endWaitsOnLeftDevice({ db, pubsub: options.pubsub }, orgId, computer.id, targetUserId).catch(() => 0);
+    }
   }
   // Their open WebSocket connections lose every subscription now, not on reconnect.
   const quiet = actorId === targetUserId ? { quiet: true as const } : {};
@@ -1896,7 +1916,8 @@ async function seatsFull(db: Executor, orgId: string) {
  * A link that was turned off, expired, or whose workspace is paused or being deleted, and an email invitation to a
  * workspace paused or being deleted, say only that (`closed`), never why. An email invitation also says how its
  * address signs in (`account`) and whether the workspace is full (`full`), before anyone makes an account
- * (ADR 0090).
+ * (ADR 0090). One that works also says who the workspace is for (`mode`): a personal one's page speaks of the
+ * person who invited, not of a team or of its name ("Personal"), ADR 0159.
  */
 /**
  * The role an invitation gives now: owner only while whoever sent it can still make owners, so removing or demoting
@@ -1955,6 +1976,7 @@ export async function previewInvitation(db: Database, token: string, now = new D
       role: link.link.role,
       kind: "link" as const,
       invitedBy: creator?.name ?? null,
+      mode: await workspaceMode(db, link.link.orgId),
       ...inviteLogo(token, link.orgLogo),
       ...(await inviteAgents(db, link.link.orgId)),
     };
@@ -1980,6 +2002,7 @@ export async function previewInvitation(db: Database, token: string, now = new D
     role,
     kind: "email" as const,
     invitedBy: inviter ? (row.invitedBy ?? null) : null,
+    mode: await workspaceMode(db, row.orgId),
     expiresAt: row.expiresAt.toISOString(),
     account: await invitedAccount(db, row.email),
     ...((await seatsFull(db, row.orgId)) ? { full: true as const } : {}),

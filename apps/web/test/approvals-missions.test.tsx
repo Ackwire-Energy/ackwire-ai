@@ -82,6 +82,10 @@ describe("Aprovações: missions", () => {
       name: /^Esperando você/,
     });
     expect(pill.textContent).toBe(`Esperando você${approvals + 1}`);
+    // Listed under the requests, the missions would sit under columns that fill the window: the page scrolls as one.
+    const split = document.querySelector(".ap-split");
+    expect(split?.compareDocumentPosition(section)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(split?.classList.contains("page-split")).toBe(false);
     await act(async () => fireEvent.click(within(section).getByRole("button", { name: "Aprovar" })));
     await settle(4);
     expect(decided).toEqual(["allow"]);

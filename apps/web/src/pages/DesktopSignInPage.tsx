@@ -1,4 +1,4 @@
-import type { SignInProvider } from "@agenteschat/client";
+import { type SignInProvider, useAuthConfig } from "@agenteschat/client";
 import { signInRefusalText } from "@agenteschat/client/lib/errors";
 import { Button } from "@agenteschat/ui";
 import { useEffect, useRef, useState } from "react";
@@ -32,6 +32,8 @@ export function DesktopSignInPage({
 }) {
   const { t } = useTranslation();
   const auth = useAuth();
+  // A refusal points to a password reset only where this server can mail its link.
+  const canReset = useAuthConfig().data?.passwordReset === true;
   const [state, setState] = useState<"opening" | "confirm" | "done" | "expired" | "refused">("opening");
   const [code, setCode] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
@@ -81,7 +83,7 @@ export function DesktopSignInPage({
         : state === "expired"
           ? [t("auth.desktop.expired"), t("auth.desktop.expiredLead", { provider: name })]
           : state === "refused" && error
-            ? [t("auth.desktop.refused"), `${signInRefusalText(t, error, true)} ${t("auth.desktop.refusedLead")}`]
+            ? [t("auth.desktop.refused"), `${signInRefusalText(t, error, canReset)} ${t("auth.desktop.refusedLead")}`]
             : [t("auth.desktop.opening", { provider: name }), ""];
 
   return (

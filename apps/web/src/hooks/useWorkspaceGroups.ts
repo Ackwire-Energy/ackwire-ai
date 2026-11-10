@@ -28,9 +28,17 @@ export function useWorkspaceGroups(input: {
     staleTime: 15_000,
     refetchInterval: 60_000,
   });
+  // Whether this page's server is the one the app runs on this computer: named so, never by its address.
+  const place = useQuery({
+    queryKey: ["desktop", "thisMac"],
+    queryFn: () => thisMac.status(),
+    enabled: on,
+    staleTime: 60_000,
+  });
   if (!on) return null;
   return workspaceGroups({
     here: window.location.origin,
+    thisComputer: place.data?.local === true,
     orgs: input.orgs,
     currentOrgId: input.currentOrgId,
     unread: unread.data?.organizations ?? null,

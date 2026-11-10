@@ -171,7 +171,8 @@ test("Connect to my server: what it finds on the Tailscale network by Tailscale'
     );
     await act(async () => button("Use your own server")?.click());
     await act(async () => button("Connect to my server")?.click());
-    for (let i = 0; i < 100 && !el.querySelector(".dk-fr__foundrow"); i++) {
+    // Each found server shows as soon as its own check answers: both, then.
+    for (let i = 0; i < 100 && el.querySelectorAll(".dk-fr__foundrow").length < 2; i++) {
       await act(() => new Promise((resolve) => setTimeout(resolve, 20)));
     }
     const rows = [...el.querySelectorAll(".dk-fr__foundrow")].map((row) => [

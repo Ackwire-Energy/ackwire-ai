@@ -1,15 +1,19 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { and, eq, isNull, schema } from "@agenteschat/db";
+import { and, eq, inArray, isNull, schema } from "@agenteschat/db";
 import {
+  BUSINESS_TEMPLATES,
+  createAgent,
   createRole,
   createSetupToolSource,
   createTeam,
   createToolGateway,
   denyTeam,
   listTeamTemplates,
+  NEW_AGENT_DEFAULTS,
   OFFER_ANSWERS_TOOL,
   OFFER_INVITES_TOOL,
   openPersonAgentDm,
+  PERSONAL_TEMPLATES,
   PROPOSE_TEAM_TOOL,
   postPersonMessage,
   RIGHT_HAND,
@@ -20,6 +24,7 @@ import {
   type TeamProposalCard,
   type ToolContext,
   undoTeam,
+  updateOrgSettings,
   useTeamTemplate,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
@@ -249,6 +254,58 @@ describe("the team card", () => {
     expect(stranger.isError).toBe(true);
   });
 
+  test("an agent like one of the team's already here: no card until the person says to make new ones", async () => {
+    f = await setup({ rightHand: true });
+    await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Bruna", handle: "bruna", role: "atendimento", instructions: "Responde os clientes." },
+      NEW_AGENT_DEFAULTS,
+    );
+    const ctx = await lodiRun(f, f.owner.id, "monta o time");
+    const teamCards = async () =>
+      (await f.db.select().from(schema.messages).where(eq(schema.messages.agentRunId, ctx.runId))).filter(
+        (m) => (m.meta.actionCard as { kind?: string } | undefined)?.kind === "team_proposal",
+      );
+    const out = await call(f, ctx, PROPOSE_TEAM_TOOL, TEAM);
+    expect(out.isError).toBeFalsy();
+    expect(out.content).toContain(
+      "Not posted: an agent like this already exists: Bruna (@bruna, atendimento) for Iara.",
+    );
+    expect(out.content).toContain("call propose_team again with also_new: true");
+    expect(await teamCards()).toHaveLength(0);
+    const again = await call(f, ctx, PROPOSE_TEAM_TOOL, { ...TEAM, also_new: true });
+    expect(again.content).toStartWith("Posted the team card");
+    expect(await teamCards()).toHaveLength(1);
+  });
+
+  test("in a personal workspace an agent may go without a channel: it lives in its DM, and the result says so", async () => {
+    f = await setup({ rightHand: true });
+    const ctx = await lodiRun(f, f.owner.id, "Casa e contas");
+    const inDm = {
+      lead: "2 agentes para você",
+      agents: [{ name: "Clara", handle: "clara", role: "Casa", line: "Cuida das tarefas de casa." }],
+    };
+    // A team's right hand still names a channel for each agent.
+    const team = await call(f, ctx, PROPOSE_TEAM_TOOL, inDm);
+    expect(team.isError).toBe(true);
+    expect(team.content).toContain("channel: required");
+    expect(await f.db.select().from(schema.messages).where(eq(schema.messages.agentRunId, ctx.runId))).toEqual([]);
+
+    await updateOrgSettings(f.db, f.owner.id, f.org.id, { mode: "personal" });
+    const listed = (await gatewayOf(f).granted(ctx)).find((t) => t.name === PROPOSE_TEAM_TOOL);
+    expect(listed?.description).toContain("Each agent lives in its DM with the person");
+    expect(JSON.stringify(listed?.inputSchema)).toContain("Leave it out: the agent lives in its DM with the person");
+    const out = await call(f, ctx, PROPOSE_TEAM_TOOL, inDm);
+    expect(out.isError).toBeFalsy();
+    expect(out.content).toStartWith("Posted the card of their agents: Clara in its DM, 0 routines, 0 skills.");
+    expect(out.content).not.toContain("#");
+    const card = await cardOf(f, (out.data as { actionCard: { messageId: string } }).actionCard.messageId);
+    expect(card.params.agents.map((a) => a.channel)).toEqual([""]);
+    expect(card.params.newChannels).toEqual([]);
+  });
+
   test("Criar o time makes it all as the clicker, Desfazer takes it back", async () => {
     f = await setup({ rightHand: true });
     const ctx = await lodiRun(f, f.owner.id, "Só o Bruno");
@@ -432,7 +489,8 @@ describe("team templates", () => {
   test("six, in the person's language, each a team its card would propose", async () => {
     f = await setup({ rightHand: true });
     const list = await listTeamTemplates({ db: f.db }, f.owner.id, f.org.id, "pt-BR");
-    expect(list.map((t) => t.id)).toEqual([...TEAM_TEMPLATES]);
+    expect(list.map((t) => t.id)).toEqual([...BUSINESS_TEMPLATES]);
+    expect(TEAM_TEMPLATES).toEqual([...BUSINESS_TEMPLATES, ...PERSONAL_TEMPLATES]);
     const software = list.find((t) => t.id === "software");
     expect(software?.name).toBe("Software e apps");
     expect(software?.team.agents.map((a) => [a.name, a.channel])).toEqual([
@@ -464,5 +522,54 @@ describe("team templates", () => {
     const rows = await f.db.select().from(schema.messages).where(eq(schema.messages.channelId, used.channelId));
     expect(rows.some((m) => m.meta.replyChips)).toBe(false);
     expect(rows.filter((m) => m.authorType === "agent")).toHaveLength(1);
+  });
+
+  test("a personal workspace lists templates for one person's life, each agent in its DM with no channel", async () => {
+    f = await setup({ rightHand: true });
+    await updateOrgSettings(f.db, f.owner.id, f.org.id, { mode: "personal" });
+    const list = await listTeamTemplates({ db: f.db }, f.owner.id, f.org.id, "pt-BR");
+    expect(list.map((t) => t.id)).toEqual([...PERSONAL_TEMPLATES]);
+    const life = list.find((t) => t.id === "life");
+    expect(life?.name).toBe("Vida em ordem");
+    expect(life?.team.agents.map((a) => [a.name, a.channel])).toEqual([
+      ["Clara", ""],
+      ["Duda", ""],
+    ]);
+    for (const t of list) {
+      expect(t.team.newChannels).toEqual([]);
+      expect(t.team.agents.every((a) => a.channel === "" && a.routines.length === 1)).toBe(true);
+      // The weekly check reports on a team's work: not one person's agents.
+      expect(t.team.weekly).toBeNull();
+    }
+  });
+
+  test("Create my agents in a personal workspace: no channel is made, routines report in each agent's DM", async () => {
+    f = await setup({ rightHand: true });
+    await updateOrgSettings(f.db, f.owner.id, f.org.id, { mode: "personal" });
+    const channelsBefore = await f.db.select().from(schema.channels).where(eq(schema.channels.orgId, f.org.id));
+    const used = await useTeamTemplate({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, "life", "pt-BR");
+    expect(used).toMatchObject({ state: "created", error: null });
+    const card = await cardOf(f, used.messageId);
+    expect(card.created?.agentIds).toHaveLength(2);
+    expect(card.created?.channelIds).toEqual([]);
+    const ids = card.created?.agentIds ?? [];
+    const channelsAfter = await f.db.select().from(schema.channels).where(eq(schema.channels.orgId, f.org.id));
+    // Only the right hand's DM with the person, where the card went, may be new.
+    const places = (rows: { kind: string }[]) => rows.filter((c) => c.kind !== "dm").length;
+    expect(places(channelsAfter)).toBe(places(channelsBefore));
+    const memberships = await f.db
+      .select()
+      .from(schema.channelMembers)
+      .where(inArray(schema.channelMembers.agentId, ids));
+    expect(memberships).toEqual([]);
+    const routines = await f.db.select().from(schema.routines).where(inArray(schema.routines.agentId, ids));
+    expect(routines.map((r) => r.target)).toEqual([{ type: "dm" }, { type: "dm" }]);
+  });
+
+  test("a personal template works in a team's workspace too: the mode only picks the gallery's list", async () => {
+    f = await setup({ rightHand: true });
+    const used = await useTeamTemplate({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, "health", "en");
+    expect(used).toMatchObject({ state: "created", error: null });
+    expect((await cardOf(f, used.messageId)).params.agents.map((a) => a.name)).toEqual(["Léo", "Mel"]);
   });
 });

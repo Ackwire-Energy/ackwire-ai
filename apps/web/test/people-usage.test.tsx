@@ -245,6 +245,26 @@ describe("Orçamento e uso › Pessoas", () => {
     expect(text(document.body)).toContain("4% do limite");
     expect(text(document.body)).not.toContain("US$");
   });
+
+  test("alone in a personal workspace: the summary without tabs; with someone else here, the tabs (ADR 0159)", async () => {
+    const personal = (alone: boolean) => {
+      const state = seedState();
+      const org = state.me?.organizations[0];
+      if (org) org.mode = "personal";
+      if (alone) state.members = state.members.filter((m) => m.userId === state.me?.user.id);
+      state.peopleUsage = people;
+      return state;
+    };
+    await renderApp(`/org/${ORG_ID}/settings/usage`, { api: createFakeApi(personal(true)) });
+    await settle(5);
+    expect(screen().queryByRole("tab", { name: "Resumo" })).toBeNull();
+    expect(screen().queryByRole("tab", { name: "Pessoas" })).toBeNull();
+    cleanup();
+    await renderApp(`/org/${ORG_ID}/settings/usage`, { api: createFakeApi(personal(false)) });
+    await settle(5);
+    expect(screen().getByRole("tablist", { name: "Plano e uso" })).toBeTruthy();
+    expect(screen().getByRole("tab", { name: "Pessoas" })).toBeTruthy();
+  });
 });
 
 describe("the agent's card at the person's limit", () => {

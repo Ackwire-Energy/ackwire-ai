@@ -1,9 +1,17 @@
 import type { Agent, AgentAudience, AudienceMode } from "@agenteschat/client";
 import { useAgents, useAiStatus, useRoles } from "@agenteschat/client";
-import { agentsReach, audienceChip, offersConsultable } from "@agenteschat/client/lib/audience";
+import {
+  agentsReach,
+  audienceChip,
+  audienceModeKey,
+  audienceModeTextKey,
+  offersConsultable,
+} from "@agenteschat/client/lib/audience";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiStateOf, onlyOwnerReplies } from "@agenteschat/client/lib/no-ai";
+import { rolePicksInSight } from "@agenteschat/client/lib/personal-view";
 import { isEveryone, sortRoles } from "@agenteschat/client/lib/roles";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import {
   Avatar,
   Checkbox,
@@ -27,6 +35,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
+import { usePersonalView } from "@/hooks/usePersonalView";
 import { RoleChecklist } from "./roles/RoleChecklist";
 
 /** A picture per choice: the whole workspace, the people you pick, only the person responsible. */
@@ -61,11 +70,16 @@ export function OnlyYouNote({ orgId, viewerId }: { orgId: string; viewerId: stri
   );
 }
 
-/** Chip "Pessoal" / "Restrito" next to the agent's name (nothing when everyone can talk to it). */
+/**
+ * Chip "Pessoal" / "Restrito" next to the agent's name (nothing when everyone can talk to it). Alone in a personal
+ * workspace, nothing either: there is nobody else it could answer (ADR 0159).
+ */
 export function AudienceChip({ agent }: { agent: Agent }) {
   const { t } = useTranslation();
-  const label = audienceChip(t, agent);
-  if (!label) return null;
+  const { org, me } = useOrg();
+  const { solo } = usePersonalView();
+  const label = audienceChip(t, agent, { org, meId: me.user.id });
+  if (!label || solo) return null;
   return (
     <Chip icon="lock" className="audience-chip">
       {label}
@@ -78,6 +92,8 @@ export function AudienceChip({ agent }: { agent: Agent }) {
  * responsável), with the roles and people picker under the second, and whether other agents may consult it for
  * the rest (ADR 0085 addendum).
  * `compact`: a segmented control and one line about the choice ("Criar agente").
+ * A personal workspace says them plainly, people before roles, and offers roles only when one is worth picking
+ * (`rolePicksInSight`) unless `everyRole` (ADR 0159); the choices themselves are the same.
  */
 export function AudienceChoice({
   value,
@@ -88,6 +104,7 @@ export function AudienceChoice({
   compact,
   layout = "cards",
   onPlan = false,
+  everyRole = false,
 }: {
   value: AgentAudience;
   onChange: (next: AgentAudience) => void;
@@ -99,35 +116,21 @@ export function AudienceChoice({
   layout?: "cards" | "rows";
   /** It thinks with a person's plan (ADR 0059 §5). */
   onPlan?: boolean;
+  /** Every role to pick, in a personal workspace too (the agent page's own "Who can talk"). */
+  everyRole?: boolean;
 }) {
   const { t } = useTranslation();
-  const { org, me } = useOrg();
+  const { org } = useOrg();
   const dir = useDirectory(org.id);
   const g = agentGrammar(agentName);
   const owner = ownerUserId ? dir.memberById.get(ownerUserId) : undefined;
-  const roles = useRoles(org.id);
-  const [query, setQuery] = useState("");
-  const picked = new Set(value.userIds);
-  const pickedRoles = new Set(value.roleIds ?? []);
-  const candidates = dir.members.filter((m) => m.userId !== ownerUserId);
-  // `everyone` ("Todos") is the first choice, not a role to pick.
-  const roleCandidates = sortRoles((roles.data?.roles ?? []).filter((r) => !isEveryone(r)));
-  const q = fold(query.trim());
-  const rows = candidates.filter((m) => !q || fold(`${m.name} ${m.email} ${m.handle}`).includes(q));
-  const roleRows = roleCandidates.filter((r) => !q || fold(r.name).includes(q));
-  const toggle = (key: "userIds" | "roleIds", id: string, on: boolean) => {
-    const next = new Set(value[key] ?? []);
-    if (on) next.add(id);
-    else next.delete(id);
-    onChange({ ...value, [key]: [...next] });
-  };
   const reach = agentsReach(value, onPlan, ownerUserId);
   const modeText = (mode: AudienceMode) =>
     mode === "owner"
       ? owner
         ? t("audience.modeText.owner", { ...g, owner: owner.name })
         : t("audience.modeText.noOwner")
-      : t(`audience.modeText.${mode}`, g);
+      : t(audienceModeTextKey(org, mode), g);
   return (
     <div className="stack-4" style={{ gap: 12 }}>
       {compact ? (
@@ -143,7 +146,7 @@ export function AudienceChoice({
                 <Icon name={AUDIENCE_ICON[mode]} size={20} />
               </span>
             ),
-            title: t(`audience.mode.${mode}`),
+            title: t(audienceModeKey(org, mode)),
             description: modeText(mode),
           }))}
         />
@@ -162,105 +165,20 @@ export function AudienceChoice({
               id={`${idPrefix}-${mode}`}
               checked={value.mode === mode}
               disabled={mode === "owner" && !ownerUserId}
-              title={t(`audience.mode.${mode}`)}
+              title={t(audienceModeKey(org, mode))}
               description={modeText(mode)}
             />
           ))}
         </RadioGroup>
       )}
       {value.mode === "people" && (
-        <div className="people-picker">
-          {owner && (
-            <span className="small muted">
-              {picked.size > 0 || pickedRoles.size > 0
-                ? t("audience.ownerAlways", { name: owner.name })
-                : ownerUserId === me.user.id
-                  ? t("audience.onlyYouForNow")
-                  : t("audience.onlyOwnerForNow", { name: owner.name })}
-            </span>
-          )}
-          {(picked.size > 0 || pickedRoles.size > 0) && (
-            <TokenList label={t("audience.picked")}>
-              {roleCandidates
-                .filter((r) => pickedRoles.has(r.id))
-                .map((r) => (
-                  <li key={r.id}>
-                    <Token
-                      leading={<RoleMark color={r.color} icon={r.icon} size={18} />}
-                      removeLabel={t("common.removeName", { name: r.name })}
-                      onRemove={() => toggle("roleIds", r.id, false)}
-                    >
-                      {r.name}
-                    </Token>
-                  </li>
-                ))}
-              {candidates
-                .filter((m) => picked.has(m.userId))
-                .map((m) => (
-                  <li key={m.userId}>
-                    <Token
-                      leading={<Avatar kind="person" size="xs" name={m.name} imageUrl={m.image} />}
-                      removeLabel={t("common.removeName", { name: m.name })}
-                      onRemove={() => toggle("userIds", m.userId, false)}
-                    >
-                      {m.name}
-                    </Token>
-                  </li>
-                ))}
-            </TokenList>
-          )}
-          <SearchField
-            size="sm"
-            aria-label={t("audience.search")}
-            placeholder={t("audience.search")}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onClear={() => setQuery("")}
-            clearLabel={t("filters.clearSearch")}
-          />
-          {/* biome-ignore lint/a11y/useSemanticElements: a scroll region, not a fieldset */}
-          <div className="people-picker__results" role="region" aria-label={t("audience.search")}>
-            {rows.length === 0 && roleRows.length === 0 ? (
-              <p className="small muted">{t("audience.noMatch")}</p>
-            ) : (
-              <>
-                {roleRows.length > 0 && (
-                  <>
-                    <PickerHeading label={t("audience.roles")} description={t("audience.rolesHint")} />
-                    <RoleChecklist
-                      roles={roleRows}
-                      picked={pickedRoles}
-                      onToggle={(id, on) => toggle("roleIds", id, on)}
-                      idPrefix={idPrefix}
-                    />
-                  </>
-                )}
-                {rows.length > 0 && (
-                  <>
-                    {roleRows.length > 0 && <PickerHeading label={t("audience.people")} />}
-                    {rows.map((m) => {
-                      const id = `${idPrefix}-p-${m.userId.replace(/[^a-zA-Z0-9]/g, "-")}`;
-                      return (
-                        <label key={m.userId} htmlFor={id} className="scope-row">
-                          <Checkbox
-                            id={id}
-                            checked={picked.has(m.userId)}
-                            onCheckedChange={(on) => toggle("userIds", m.userId, on)}
-                          />
-                          <Avatar kind="person" size="sm" name={m.name} imageUrl={m.image} />
-                          <span className="scope-row__text">
-                            <span>{m.name}</span>
-                            <span className="small muted">{m.email}</span>
-                          </span>
-                        </label>
-                      );
-                    })}
-                  </>
-                )}
-              </>
-            )}
-          </div>
-        </div>
+        <AudiencePeoplePicker
+          value={value}
+          onChange={(next) => onChange({ ...value, ...next })}
+          ownerUserId={ownerUserId}
+          idPrefix={idPrefix}
+          everyRole={everyRole}
+        />
       )}
       {reach && (
         <span className="small muted">
@@ -283,6 +201,159 @@ export function AudienceChoice({
           />
         </SettingRow>
       )}
+    </div>
+  );
+}
+
+/**
+ * The people and roles under "Only some people or roles": who always can (the owner), what's picked as tokens, and a
+ * search over the workspace's roles and people with a check each. `within`: only these may be picked (an admin
+ * narrowing someone's device takes people away, never adds them); `rolesHint` says what a role grants here.
+ */
+export function AudiencePeoplePicker({
+  value,
+  onChange,
+  ownerUserId,
+  idPrefix,
+  within,
+  rolesHint,
+  everyRole = false,
+}: {
+  value: { userIds: string[]; roleIds?: string[] };
+  onChange: (next: { userIds: string[]; roleIds: string[] }) => void;
+  ownerUserId: string | null;
+  idPrefix: string;
+  within?: { userIds: string[]; roleIds: string[] };
+  rolesHint?: string;
+  /** Every role to pick, in a personal workspace too (the agent page's own "Who can talk"). */
+  everyRole?: boolean;
+}) {
+  const { t } = useTranslation();
+  const { org, me } = useOrg();
+  const dir = useDirectory(org.id);
+  const owner = ownerUserId ? dir.memberById.get(ownerUserId) : undefined;
+  const roles = useRoles(org.id);
+  const [query, setQuery] = useState("");
+  const picked = new Set(value.userIds);
+  const pickedRoles = new Set(value.roleIds ?? []);
+  const candidates = dir.members.filter(
+    (m) => m.userId !== ownerUserId && (!within || within.userIds.includes(m.userId)),
+  );
+  // `everyone` ("Todos") is the first choice, not a role to pick. A personal workspace's family picks people, unless a
+  // role is worth it or already picked (ADR 0159).
+  const personal = isPersonal(org);
+  const allRoles = roles.data?.roles ?? [];
+  const roleCandidates =
+    everyRole || rolePicksInSight(org, allRoles, value.roleIds ?? [])
+      ? sortRoles(allRoles.filter((r) => !isEveryone(r) && (!within || within.roleIds.includes(r.id))))
+      : [];
+  const q = fold(query.trim());
+  const rows = candidates.filter((m) => !q || fold(`${m.name} ${m.email} ${m.handle}`).includes(q));
+  const roleRows = roleCandidates.filter((r) => !q || fold(r.name).includes(q));
+  const toggle = (key: "userIds" | "roleIds", id: string, on: boolean) => {
+    const next = new Set(value[key] ?? []);
+    if (on) next.add(id);
+    else next.delete(id);
+    onChange({ userIds: value.userIds, roleIds: value.roleIds ?? [], [key]: [...next] });
+  };
+  // Without a role to pick (a personal workspace's family), the search is for people only.
+  const peopleOnly = personal && roleCandidates.length === 0;
+  const searchLabel = t(peopleOnly ? "audience.searchPeople" : "audience.search");
+  const roleGroup = (
+    <>
+      <PickerHeading label={t("audience.roles")} description={rolesHint ?? t("audience.rolesHint")} />
+      <RoleChecklist
+        roles={roleRows}
+        picked={pickedRoles}
+        onToggle={(id, on) => toggle("roleIds", id, on)}
+        idPrefix={idPrefix}
+      />
+    </>
+  );
+  return (
+    <div className="people-picker">
+      {owner && (
+        <span className="small muted">
+          {picked.size > 0 || pickedRoles.size > 0
+            ? t("audience.ownerAlways", { name: owner.name })
+            : ownerUserId === me.user.id
+              ? t("audience.onlyYouForNow")
+              : t("audience.onlyOwnerForNow", { name: owner.name })}
+        </span>
+      )}
+      {(picked.size > 0 || pickedRoles.size > 0) && (
+        <TokenList label={t("audience.picked")}>
+          {roleCandidates
+            .filter((r) => pickedRoles.has(r.id))
+            .map((r) => (
+              <li key={r.id}>
+                <Token
+                  leading={<RoleMark color={r.color} icon={r.icon} size={18} />}
+                  removeLabel={t("common.removeName", { name: r.name })}
+                  onRemove={() => toggle("roleIds", r.id, false)}
+                >
+                  {r.name}
+                </Token>
+              </li>
+            ))}
+          {candidates
+            .filter((m) => picked.has(m.userId))
+            .map((m) => (
+              <li key={m.userId}>
+                <Token
+                  leading={<Avatar kind="person" size="xs" name={m.name} imageUrl={m.image} />}
+                  removeLabel={t("common.removeName", { name: m.name })}
+                  onRemove={() => toggle("userIds", m.userId, false)}
+                >
+                  {m.name}
+                </Token>
+              </li>
+            ))}
+        </TokenList>
+      )}
+      <SearchField
+        size="sm"
+        aria-label={searchLabel}
+        placeholder={searchLabel}
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        onClear={() => setQuery("")}
+        clearLabel={t("filters.clearSearch")}
+      />
+      {/* biome-ignore lint/a11y/useSemanticElements: a scroll region, not a fieldset */}
+      <div className="people-picker__results" role="region" aria-label={searchLabel}>
+        {rows.length === 0 && roleRows.length === 0 ? (
+          <p className="small muted">{t(peopleOnly ? "audience.noMatchPeople" : "audience.noMatch")}</p>
+        ) : (
+          <>
+            {roleRows.length > 0 && !personal && roleGroup}
+            {rows.length > 0 && (
+              <>
+                {roleRows.length > 0 && <PickerHeading label={t("audience.people")} />}
+                {rows.map((m) => {
+                  const id = `${idPrefix}-p-${m.userId.replace(/[^a-zA-Z0-9]/g, "-")}`;
+                  return (
+                    <label key={m.userId} htmlFor={id} className="scope-row">
+                      <Checkbox
+                        id={id}
+                        checked={picked.has(m.userId)}
+                        onCheckedChange={(on) => toggle("userIds", m.userId, on)}
+                      />
+                      <Avatar kind="person" size="sm" name={m.name} imageUrl={m.image} />
+                      <span className="scope-row__text">
+                        <span>{m.name}</span>
+                        <span className="small muted">{m.email}</span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </>
+            )}
+            {/* A personal workspace's family picks people first (ADR 0159). */}
+            {roleRows.length > 0 && personal && roleGroup}
+          </>
+        )}
+      </div>
     </div>
   );
 }

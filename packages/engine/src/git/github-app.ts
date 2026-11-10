@@ -238,6 +238,25 @@ export async function uninstallInstallation(
   return res?.status === 404 ? "gone" : "refused";
 }
 
+/**
+ * The app as GitHub has it (`GET /app`, signed as the app): its slug, the account that owns it and the events it is
+ * subscribed to. Null when GitHub didn't answer.
+ */
+export async function appRegistration(app: GitHubAppConfig, http: GitHubHttp) {
+  const res = await http.fetch(`${http.apiUrl}/app`, { headers: appHeaders(app) }).catch(() => null);
+  const body = (res?.ok ? await res.json().catch(() => null) : null) as {
+    slug?: unknown;
+    events?: unknown;
+    owner?: { login?: unknown; type?: unknown } | null;
+  } | null;
+  if (!body || !Array.isArray(body.events)) return null;
+  return {
+    slug: typeof body.slug === "string" ? body.slug : (app.slug ?? ""),
+    events: body.events.filter((e): e is string => typeof e === "string"),
+    owner: typeof body.owner?.login === "string" ? { login: body.owner.login, type: String(body.owner.type) } : null,
+  };
+}
+
 export interface InstallationFacts {
   accountLogin: string;
   accountType: string;

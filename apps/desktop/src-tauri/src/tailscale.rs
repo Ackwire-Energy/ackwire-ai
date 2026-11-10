@@ -41,12 +41,16 @@ pub enum ServeError {
     Https { url: Option<String> },
     /// This computer's user may not change what Tailscale shares (Linux, until `tailscale set --operator`).
     Operator,
-    /// Tailscale refused or isn't connected (the Mac App Store variant may never share).
+    /// Tailscale is missing, or refused (the Mac App Store variant may never share).
     Serve,
+    /// Tailscale is installed but not connected on this computer: connecting it (its app, or `tailscale up`) fixes it.
+    NotConnected { app: bool },
     /// The person stopped waiting for HTTPS to be allowed.
     Stopped,
     /// Tailscale shares it, but the server didn't answer again at its new address (not Tailscale's doing).
     Start,
+    /// Reach was turned off, and the server didn't answer again at this computer's own address.
+    Back,
 }
 
 /// Tailscale's Mac app, which "Open Tailscale" opens.
@@ -143,7 +147,11 @@ pub fn serve_error(out: &str) -> ServeError {
 /// allowed in the tailnet yet, Tailscale names its admin page and waits there until it is: `asks` gets that page
 /// at once, and `serve` goes on by itself once the person allowed it (up to `APPROVE_WAIT`), unless `stopped`.
 pub fn serve(port: u16, asks: &mut dyn FnMut(&str), stopped: &dyn Fn() -> bool) -> Result<String, ServeError> {
-    let Tailnet::On { device } = tailnet() else { return Err(ServeError::Serve) };
+    let device = match tailnet() {
+        Tailnet::On { device } => device,
+        Tailnet::Off { app } => return Err(ServeError::NotConnected { app }),
+        Tailnet::Missing => return Err(ServeError::Serve),
+    };
     let target = format!("http://127.0.0.1:{port}");
     let current = run(&["serve", "status", "--json"], STATUS_WAIT).and_then(|(_, out)| serde_json::from_str(&out).ok());
     let https = https_port(current.as_ref(), &device, &target);
@@ -220,6 +228,15 @@ pub fn tailscale_open(app: tauri::AppHandle, webview: tauri::Webview, page: Stri
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn why_it_wasnt_shared_as_the_windows_read_it() {
+        assert_eq!(
+            serde_json::to_value(ServeError::NotConnected { app: true }).unwrap(),
+            json!({ "reason": "notConnected", "app": true })
+        );
+        assert_eq!(serde_json::to_value(ServeError::Back).unwrap(), json!({ "reason": "back" }));
+    }
 
     #[test]
     fn this_device_on_the_tailnet() {

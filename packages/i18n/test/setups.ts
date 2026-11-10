@@ -116,6 +116,8 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     "computers.lead",
     "connectAi.wait.connecting",
     "errors.mission.unavailable",
+    // The feedback form's line on who reads it, where the server isn't one of agentes.chat's own (`auth-config.cloud`).
+    "feedback.goesServer",
     "machines.download.step2",
     "machines.download.title",
     "machines.host.",
@@ -131,6 +133,8 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     "onboarding.computer.otherComputer",
     // A self-hosted server on a private host, which AI apps on the internet can't reach.
     "onboarding.import.aiApp.private",
+    // A desktop app's or terminal install's server at its own computer's address (`phone.local_only`).
+    "openOnPhone.localOnly",
     "openOnPhone.stepTailscale",
     "outage.dialog.none",
     "settings.platformAvailable",
@@ -166,6 +170,10 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     "deleteAccount.serverOwner",
     // Where no email goes, which the Cloud always sends, a password proves it's you (`deletionProof`).
     "proof.addPassword",
+    // An owner's new-password link exists only where no email goes too (ADR 0158): "Forgot password" pointing to it
+    // and the link's refusals.
+    "auth.forgotHere.",
+    "errors.passwordLink.",
     // The catalog's line for a server without Composio (`composioOffText`): the Cloud always has its key.
     "connectors.composio.off_one",
     "connectors.composio.off_other",
@@ -209,6 +217,21 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     "desktop.prefs.updates.",
     "desktop.server.reveal",
     "desktop.cover.tailnetUp",
+    // An iPhone works only through a Mac, so its states and steps name the Mac; "This Mac" shows only on a Mac.
+    "devices.iphone.",
+    "devices.reason.untrusted",
+    "devices.reason.xcode_missing",
+    "devices.reason.device_support",
+    "devices.fix.device_support",
+    "devices.fix.helper_missing",
+    "devices.fix.helper_expired",
+    "devices.who.followsHint",
+    "devices.choose.thisMac",
+    "devices.screen.needsHelper",
+    "devices.screen.unsupported",
+    "mobile.devices.reason.xcode_missing",
+    "mobile.devices.reason.device_support",
+    "mobile.devices.reason.apple_account_missing",
   ],
 };
 
@@ -233,6 +256,9 @@ export const ANYWHERE: readonly string[] = [
   "desktop.servers.",
   // The desktop app's workspaces by server: the line under a server that isn't agentes.chat, whichever server this is.
   "shell.yourServer",
+  // People connect their own computers and phones in every setup, the Cloud included.
+  "devices.",
+  "mobile.devices.",
 ];
 
 /** A key's agent-gender variant (`_female`, ADR 0122) goes where its base key goes. */

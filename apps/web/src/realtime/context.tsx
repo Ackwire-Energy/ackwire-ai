@@ -44,7 +44,6 @@ import {
   cacheDmRead,
   cacheMessage,
   cacheMessageActions,
-  cacheMessageMemories,
   cacheMessageMeta,
   cacheMessageWork,
   cachePinned,
@@ -66,6 +65,7 @@ import {
   keys,
   markStopping,
   type OpenConsult,
+  openConversation,
   RealtimeConnection,
   type ReceiptsState,
   realtimeUrl,
@@ -92,6 +92,7 @@ import {
 } from "@agenteschat/client";
 import { type AgentUnavailableEvent, isAgentUnavailable } from "@agenteschat/client/lib/audience";
 import { newerBlockState } from "@agenteschat/client/lib/blocks";
+import { deviceWaitEventOf } from "@agenteschat/client/lib/devices";
 import { knownErrorText } from "@agenteschat/client/lib/errors";
 import { formatPercent } from "@agenteschat/client/lib/format";
 import { nextMonthIso, usageWhen } from "@agenteschat/client/lib/plan-usage";
@@ -271,6 +272,15 @@ export function createStreamsStore(
             }
           : state.continued;
       const streaming = event.type === "agent.delta" || event.type === ("agent.tool.output" as string);
+      let streams = applyChannelEvent(state.streams, event, now());
+      // Tentar de novo: a new run took a message whose run failed (the server deleted that one), so its failed row goes
+      // and only the new run's shows.
+      if (event.type === "message.claimed" || event.type === ("agent.run.steered" as string)) {
+        const taken = event as { messageId: string; agentId?: string; runId?: string };
+        const before = taken.agentId ? state.receipts[taken.messageId]?.runOf?.[taken.agentId] : undefined;
+        if (before && before !== taken.runId && streams.runs[before]?.status === "failed")
+          streams = dismissRun(streams, before);
+      }
       set(
         {
           ...state,
@@ -278,7 +288,7 @@ export function createStreamsStore(
           questions,
           secrets,
           memory,
-          streams: applyChannelEvent(state.streams, event, now()),
+          streams,
           consults: applyConsultEvent(state.consults, event, now()),
           receipts: applyReceiptEvent(
             event.type === "message.created" && event.message
@@ -443,37 +453,10 @@ export function RealtimeProvider({
       void checkAppVersion();
       // Reactions heard live may be stale now: the refetched message lists carry them again.
       qc.removeQueries({ queryKey: ["org", orgId, "reactions"] });
-      // Notifications that arrived while offline: the inbox and the badge catch up.
-      void qc.invalidateQueries({ queryKey: keys.notifications(orgId) });
-      // The workspace's computer on its way, its standing and its limits (a new plan) may have moved meanwhile, and so
-      // may the computers (one back online, a pause) and the agents' screens.
-      void qc.invalidateQueries({ queryKey: keys.computerSetup(orgId) });
-      void qc.invalidateQueries({ queryKey: keys.machines(orgId) });
-      void qc.invalidateQueries({ queryKey: keys.agentDesktops(orgId) });
+      // Nothing sent while the socket was down reached this tab, so everything the workspace holds may be old: what
+      // is on screen reads again now, the rest when it is shown.
+      void qc.invalidateQueries({ queryKey: keys.org(orgId) });
       void qc.invalidateQueries({ queryKey: keys.me });
-      void qc.invalidateQueries({ queryKey: keys.limits(orgId) });
-      void qc.invalidateQueries({ queryKey: ["org", orgId, "channel"] });
-      // The agents, channels and people who came, changed or left meanwhile.
-      void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
-      void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
-      void qc.invalidateQueries({ queryKey: keys.dms(orgId) });
-      void qc.invalidateQueries({ queryKey: keys.members(orgId) });
-      // Who came and went while this socket was down: their `member.status` never reached it.
-      void qc.invalidateQueries({ queryKey: keys.people(orgId) });
-      void qc.invalidateQueries({ queryKey: keys.threads(orgId) });
-      // The groups of agents someone changed meanwhile.
-      void qc.invalidateQueries({ queryKey: keys.agentGroups(orgId) });
-      // The Vault, whose `vault.changed` may have come while offline (ADR 0144).
-      void qc.invalidateQueries({ queryKey: keys.vault(orgId) });
-      // The Drive, the Wiki, the calendar, the routines and the invitations someone changed meanwhile.
-      for (const key of [
-        keys.artifacts(orgId),
-        keys.wiki(orgId),
-        keys.calendar(orgId),
-        keys.routines(orgId),
-        keys.invitations(orgId),
-      ])
-        void qc.invalidateQueries({ queryKey: key });
     });
     // The first open too, for what a return from the billing service changes: a new plan's limits, standing and
     // computer can land in core between this page's first reads and the socket's open, and that event reaches no one.
@@ -523,8 +506,17 @@ export function RealtimeProvider({
         event.alert !== false &&
         inDesktopApp()
       ) {
-        const notice = desktopNotice(tRef.current, orgId, event.notification);
-        if (notice) void thisMac.notify(notice.title, notice.body, notice.path).catch(() => {});
+        const agentName = (id: string) => qc.getQueryData<Agent[]>(keys.agents(orgId))?.find((a) => a.id === id)?.name;
+        const notice = desktopNotice(tRef.current, orgId, event.notification, agentName);
+        if (notice)
+          void thisMac
+            .notify(
+              notice.title,
+              notice.body,
+              notice.path,
+              notice.phoneId ? { orgId, phoneId: notice.phoneId } : undefined,
+            )
+            .catch(() => {});
       }
       // A mission waits for me (a decision, a review, an approval): the lists and the sidebar's count.
       if (event.type.startsWith("mission.") && "missionId" in event && typeof event.missionId === "string") {
@@ -800,7 +792,8 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
   }, [connection, enabled, orgId, channelId, qc, streams, api]);
   useEffect(() => {
     if (!connection || !enabled) return;
-    return connection.subscribe(channelId, (event) => {
+    const close = openConversation(qc, orgId, channelId);
+    const off = connection.subscribe(channelId, (event) => {
       if (handledEvents.has(event)) return;
       handledEvents.add(event);
       streams.apply(event);
@@ -835,14 +828,20 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
       if (event.type === "card.delegate") cacheCardDelegate(qc, orgId, event, event.delegate);
       // A right hand's card of a workspace change was applied, dismissed or sent on: the whole card.
       if (event.type === "action_card.updated") cacheActionCard(qc, orgId, event, event.card);
+      // An agent's wait for a device ended (or changed): its card flips to how it ended, without a reload.
+      const deviceWait = deviceWaitEventOf(event);
+      if (deviceWait) {
+        cacheMessageMeta(qc, orgId, deviceWait.channelId, deviceWait.messageId, () => ({
+          deviceWait: deviceWait.deviceWait,
+        }));
+        if (deviceWait.threadId)
+          void qc.invalidateQueries({ queryKey: keys.thread(orgId, deviceWait.channelId, deviceWait.threadId) });
+      }
       // A DM between people: the other one read it ("Visto" moves).
       if (event.type === "channel.read") cacheDmRead(qc, orgId, event);
       // Someone reacted: the pills under that message change for everyone.
       if (event.type === "message.reactions")
         applyReactions(qc, orgId, event.messageId, event.reactions, playAgentReaction);
-      // An agent saved something from a person's message: the memory mark appears (or goes) live.
-      if (event.type === "message.memories")
-        cacheMessageMemories(qc, orgId, event.channelId, event.messageId, event.memories);
       // Someone pinned or unpinned a message: its "Fixar" / "Desafixar" and the pins list follow.
       if (event.type === "message.pinned" || event.type === "message.unpinned") {
         cachePinned(qc, orgId, channelId, event.messageId, event.type === "message.pinned");
@@ -874,6 +873,10 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
         if (threadId) refreshRepliedThread(qc, orgId, threadId);
       }
     });
+    return () => {
+      off();
+      close();
+    };
   }, [connection, enabled, orgId, channelId, qc, streams, api]);
 }
 

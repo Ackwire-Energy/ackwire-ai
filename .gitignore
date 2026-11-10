@@ -1,4 +1,4 @@
-node_modules/
+node_modules
 dist/
 .data/
 .env
@@ -11,9 +11,8 @@ files-*.tar.gz
 .DS_Store
 coverage/
 __pycache__/
-# Claude Code's local state stays out; the project's rules (.claude/rules/) and skills (.claude/skills/) are tracked.
+# Coding agents' local state stays out; the project's skills (.claude/skills/) are tracked.
 .claude/*
-!.claude/rules/
 !.claude/skills/
 *.local.json
 packages/engine/eval/out/

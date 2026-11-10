@@ -49,8 +49,10 @@ const recordOf = (text: string) => {
 /** The coded reason of a run error (`budget_exceeded`, `provider_error`, `runner_outdated`…), for a failed routine run. */
 export function routineFailureCode(error: string | null | undefined): string {
   const coded = runErrorDetail(error)?.errorCode.replace(/^run\./, "");
-  // A computer's failure reads as one, whatever its brain's own code (`codex_failed`, `runner_error`, `timeout`).
+  // A computer's failure reads as one, whatever its own code (`runner_error`, `timeout`); a CLI's too, whatever its
+  // brain's (`claude_failed`, `codex_failed`) and whether it said why.
   if (coded === "computer_failed" || coded === "computer_timeout") return coded;
+  if (coded?.startsWith("cli_")) return "cli_failed";
   const plain = /^([a-z][a-z_]*)(?::|$)/.exec(error ?? "");
   if (plain?.[1]) return plain[1];
   return coded && coded !== "failed" ? coded : "error";

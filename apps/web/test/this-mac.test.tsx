@@ -38,17 +38,20 @@ function inTheApp(mac: { status: ThisMacStatus; code: string | null }) {
   return asked;
 }
 
-describe("Configurações → Computadores, in the app", () => {
+describe("Configurações → Dispositivos, in the app", () => {
   test("“Usar este Mac”: one click, the site confirms the runner's code", async () => {
     const mac = { status: { orgs: [] } as ThisMacStatus, code: "WXYZ-1234" };
     const asked = inTheApp(mac);
     const state = seedState();
     const api = createFakeApi(state);
     fakeMachinesOf.get(api)?.addDevice("WXYZ-1234");
-    await renderApp(`/org/${ORG_ID}/settings/computers`, { api });
+    await renderApp(`/org/${ORG_ID}/settings/devices`, { api });
     await settle(8);
-    const card = screen().getByRole("region", { name: "Conectar outro computador" });
-    expect(within(card).queryByRole("link", { name: /^Baixar o app para/ })).toBeNull();
+    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Conectar um dispositivo" })));
+    await settle(4);
+    const card = screen().getByRole("dialog", { name: "Conectar um dispositivo" });
+    // In the app, this computer connects in one click: no download.
+    expect(within(card).queryByRole("link", { name: /^Baixar para/ })).toBeNull();
 
     // The runner picks its token up right after the site confirms.
     const connected: ThisMacStatus = { orgs: [{ orgId: ORG_ID, machineId: "m-this", connection: "online" }] };

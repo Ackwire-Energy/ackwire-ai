@@ -52,9 +52,16 @@ test("the channel header's icons never get a plate, are 32 boxes 8 apart, and a 
   expect(last(shipped, ".channel__head-text .channel__topic", "overflow")).toBe("hidden");
   expect(last(shipped, ".channel__head-text .channel__topic>span", "white-space")).toBe("nowrap");
 
-  // The field grows while it is used.
-  expect(last(shipped, ".channel__search.search-box", "width")).toBe("248px");
-  expect(last(shipped, ".channel__search.search-box:focus-within", "width")).toBe("320px");
+  // The field: a soft plate with no line at rest, and it grows while it is used.
+  expect(last(shipped, ".channel__search.search-box", "width")).toBe("220px");
+  expect(last(shipped, ".channel__search.search-box:focus-within", "width")).toBe("300px");
+  expect(last(shipped, ".channel__search .search-box__field", "background")).toBe("var(--plate-soft)");
+  // The minifier writes `transparent` as `#0000`.
+  expect(last(shipped, ".channel__search .search-box__field", "border-color")).toBe("#0000");
+  // The topic follows the title with no line between them.
+  expect(last(shipped, ".channel__head-text .channel__topic", "border-left")).toBeUndefined();
+  expect(last(shipped, ".channel__head-text .channel__topic>span", "border-left")).toBeUndefined();
+  expect(last(shipped, ".channel__head-text .channel__topic>span", "color")).toBe("var(--muted)");
 
   // A phone: the topic, pins, settings and the field go; the search is an icon that opens a sheet.
   expect(last(phone, ".channel__head-text .channel__topic", "display")).toBe("none");

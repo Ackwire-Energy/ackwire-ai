@@ -81,11 +81,12 @@ app, a package or the Docker files also boots the image with `docker-compose.yml
 
 ## Licensing of your contribution
 
-- agentes.chat is AGPL-3.0-only ([LICENSE](LICENSE)). A package published under MIT, such as a
-  future SDK or CLI, says so in its own LICENSE, and contributions to it are MIT.
+- agentes.chat is AGPL-3.0-only ([LICENSE](LICENSE)). A package published under MIT says so in
+  its own LICENSE, and contributions to it are MIT: today that is the setup CLI, `packages/setup`
+  (`@agenteschat/setup`).
 - Inbound = outbound: your contribution is licensed under the license of the code it goes into.
   Here that is AGPL-3.0-only together with the additional permission under section 7 for app
-  stores (at the top of the [LICENSE](LICENSE)), so your code ships in the phone and desktop apps
+  stores (at the top of [NOTICE](NOTICE)), so your code ships in the phone and desktop apps
   like the rest. [GitHub's Terms of Service](https://docs.github.com/en/site-policy/github-terms/github-terms-of-service)
   (section D.6) already license contributions under the repository's license.
 - There is no contributor license agreement to sign and no DCO sign-off. You keep the copyright in

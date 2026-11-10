@@ -8,6 +8,7 @@ import {
 } from "@agenteschat/adapters/machine-protocol";
 import { TERM_SH } from "@agenteschat/setup/src/term-sh";
 import { DEFAULT_AGENT_UID_RANGE, SYSTEM_RUNNER_HOME } from "./config";
+import { WINDOWS_TASK } from "./service";
 
 /** Quotes a value for POSIX sh (single quotes; a `'` becomes `'\''`). */
 export function shQuote(value: string): string {
@@ -191,8 +192,13 @@ export const CODEX_EXE = "/usr/local/bin/codex";
  * browser (`get_chrome`; on Linux on ARM Debian's Chromium, else Ubuntu's
  * snap), the packages for their screens, and Claude Code and Codex in
  * /usr/local/bin.
+ *
+ * `--link CODE` (any mode, baked in by `/i/<code>`, so `curl -fsSL <publicUrl>/i/<code> | sh` takes no arguments)
+ * connects with a connect link's code instead (`agentes-runner pair --link`): the link's maker lets this computer
+ * join. Run as root on Linux where systemd keeps agents apart (`+BPF_FRAMEWORK`), it installs the runner for the
+ * whole computer as `--system` does; anywhere else, for the user who runs it.
  */
-export function installScript(publicUrl: string): string {
+export function installScript(publicUrl: string, options: { link?: string } = {}): string {
   const server = shQuote(publicUrl.trim().replace(/\/+$/, ""));
   const uids = DEFAULT_AGENT_UID_RANGE.join("-");
   const shaCases = Object.entries(RUNNER_BUN_SHA256)
@@ -200,12 +206,14 @@ export function installScript(publicUrl: string): string {
     .join("\n");
   return `#!/bin/sh
 # agentes.chat runner installer: connects this computer to your organization.
-# Usage: curl -fsSL <server>/api/machines/install.sh | sh -s -- [--dir DIR] [--no-exec] [--name NAME] [--no-service] [--enroll-file FILE]
+# Usage: curl -fsSL <server>/api/machines/install.sh | sh -s -- [--dir DIR] [--no-exec] [--name NAME] [--no-service] [--enroll-file FILE | --link CODE]
+# With a link made under Settings › Devices (the link's maker lets this computer join): curl -fsSL <server>/i/<code> | sh
 # On a Linux server, as root, the runner for the whole computer with each agent as its own user:
 #        curl -fsSL <server>/api/machines/install.sh | sh -s -- --system [--desktop] [--no-pair] [--no-start] [--agent-uid-range FIRST-LAST] [--enroll-file FILE]
 set -eu
 
 SERVER=${server}
+LINK=${shQuote(options.link ?? "")}
 BUN_VERSION=${shQuote(RUNNER_BUN_VERSION)}
 ISOLATION_PACKAGES=${shQuote(ISOLATION_APT_PACKAGES.join(" "))}
 DESKTOP_PACKAGES=${shQuote(DESKTOP_APT_PACKAGES.join(" "))}
@@ -256,6 +264,12 @@ die() {
   exit 1
 }
 need_value() { [ "$2" -ge 2 ] || die "$1 needs a value"; }
+# The end, with how long it took as term.ts's elapsed() writes it: "Done in 52s", "Done in 1m 04s".
+done_in() {
+  D_S=$(($(date +%s) - T_START))
+  if [ "$D_S" -ge 60 ]; then D_S="$((D_S / 60))m $((D_S % 60 / 10))$((D_S % 10))s"; else D_S="\${D_S}s"; fi
+  t_end "Done in $D_S"
+}
 quote() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\\\\\''/g")"; }
 sha256() {
   if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1"; else shasum -a 256 "$1"; fi | cut -d ' ' -f 1
@@ -274,14 +288,16 @@ usage() {
     "  --server           where this computer reaches the server, if not at $SERVER" \\
     "  --host-token-file  with --system (alone on a Mac, or on Linux as another user): this server's own computer, with HOST_COMPUTER_TOKEN from this file" \\
     "  --requirements     alone, as root on Linux: install only these for the agents (${REQUIREMENTS.join(",")}), then stop" \\
-    "  --enroll-file      connect with the code issued for this computer in FILE (removed once read), connected before or not"
+    "  --enroll-file      connect with the code issued for this computer in FILE (removed once read), connected before or not" \\
+    "  --link             connect with the code of a link made under Settings › Devices (its maker lets this computer join)"
 }
 
 download() {
+  # GitHub's release downloads answer a 504 now and then: tried again before giving up.
   if command -v curl >/dev/null 2>&1; then
-    curl -fsSL "$1" -o "$2"
+    curl -fsSL --retry 3 --retry-delay 2 "$1" -o "$2"
   elif command -v wget >/dev/null 2>&1; then
-    wget -qO "$2" "$1"
+    wget -q --tries=3 --waitretry=2 -O "$2" "$1"
   else
     echo "curl or wget is needed to download the runner" >&2
     return 1
@@ -318,15 +334,16 @@ get_runner() {
   t_step "The runner, from $SERVER"
 }
 
-# Connects this computer, unless it already is (and no code was issued for it) or --no-pair.
+# Connects this computer, unless it already is (and no code or link was issued for it) or --no-pair.
 connect() {
-  if [ -z "$ENROLL_FILE" ] && [ -f "$RUNNER_HOME/config.json" ] && grep -q '"token"' "$RUNNER_HOME/config.json" 2>/dev/null; then
+  if [ -z "$ENROLL_FILE" ] && [ -z "$LINK" ] && [ -f "$RUNNER_HOME/config.json" ] && grep -q '"token"' "$RUNNER_HOME/config.json" 2>/dev/null; then
     t_step "This computer is already connected (runner updated). To connect it again:"
     t_cmd "$LAUNCHER pair --server $SERVER"
   elif [ "$NO_PAIR" -eq 0 ]; then
     # Prints a code and a link, and waits until someone confirms it on the site (an issued code needs nobody).
     set -- pair --server "$SERVER"
     if [ -n "$ENROLL_FILE" ]; then set -- "$@" --enroll-file "$ENROLL_FILE"; fi
+    if [ -n "$LINK" ]; then set -- "$@" --link "$LINK"; fi
     if [ -n "$DIR" ]; then set -- "$@" --dir "$DIR"; fi
     if [ -n "$NAME" ]; then set -- "$@" --name "$NAME"; fi
     if [ "$NO_EXEC" -eq 1 ]; then set -- "$@" --no-exec; fi
@@ -778,7 +795,7 @@ finish() {
   t_info "The agentes-runner command is $LAUNCHER. To check this computer's connection:"
   t_cmd "$1 status"
   t_gap
-  t_end Done
+  done_in
 }
 
 install_system() {
@@ -912,10 +929,11 @@ install_user() {
   t_info "To use the agentes-runner command, add it to your PATH:"
   t_cmd "export PATH=\\"$RUNNER_HOME/bin:\\$PATH\\""
   t_gap
-  t_end Done
+  done_in
 }
 
 main() {
+  T_START=$(date +%s)
   t_init 1
   # The waits' output (t_run): kept for a failure's last lines, removed when the installer exits.
   T_LOGS=$(mktemp -d 2>/dev/null) || T_LOGS=''
@@ -942,6 +960,8 @@ main() {
       --runner-sha256=*) RUNNER_SHA256="\${1#--runner-sha256=}"; shift ;;
       --enroll-file) need_value "$1" $#; ENROLL_FILE="$2"; shift 2 ;;
       --enroll-file=*) ENROLL_FILE="\${1#--enroll-file=}"; shift ;;
+      --link) need_value "$1" $#; LINK="$2"; shift 2 ;;
+      --link=*) LINK="\${1#--link=}"; shift ;;
       --requirements) need_value "$1" $#; REQUIREMENTS="$2"; shift 2 ;;
       --requirements=*) REQUIREMENTS="\${1#--requirements=}"; shift ;;
       -h|--help) usage; exit 0 ;;
@@ -962,6 +982,20 @@ main() {
     esac
   fi
   [ -z "$HOST_TOKEN_FILE" ] || [ -r "$HOST_TOKEN_FILE" ] || die "--host-token-file: can't read $HOST_TOKEN_FILE"
+  case "$LINK" in
+    *[!ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-]*) die "--link takes the code at the end of the link (like 7KQ2-M9XD)" ;;
+  esac
+  if [ -n "$LINK" ]; then
+    [ -z "$ENROLL_FILE" ] || die "--link and --enroll-file each connect this computer: use one"
+    [ "$NO_PAIR" -eq 0 ] || die "--link connects this computer, so it doesn't go with --no-pair"
+    [ -z "$HOST_TOKEN_FILE" ] || die "--link doesn't go with --host-token-file: this server's own computer connects with its token"
+    [ -z "$REQUIREMENTS" ] || die "--requirements goes alone: it only installs what the agents need"
+    # As root on Linux, where systemd can keep agents apart, the computer is a server: the runner for all of it.
+    if [ "$SYSTEM" -eq 0 ] && [ -z "$DIR" ] && [ "$(uname -s)" = Linux ] && [ "$(id -u)" -eq 0 ] &&
+      systemctl --version 2>/dev/null | grep -q '+BPF_FRAMEWORK'; then
+      SYSTEM=1
+    fi
+  fi
   [ -z "$ENROLL_FILE" ] || [ "$NO_PAIR" -eq 0 ] || die "--enroll-file connects this computer, so it doesn't go with --no-pair"
   [ -z "$ENROLL_FILE" ] || [ -z "$HOST_TOKEN_FILE" ] ||
     die "--enroll-file doesn't go with --host-token-file: this server's own computer connects with its token"
@@ -991,5 +1025,180 @@ main() {
 }
 
 main "$@"
+`;
+}
+
+/** What `/i/<code>` serves for a link that was used, expired or never existed. */
+export const LINK_EXPIRED = "This link expired. Make a new one under Settings › Devices.";
+
+/** The shell installer for a used or expired link: one line, exit 1. */
+export function expiredLinkScript(): string {
+  return `#!/bin/sh\nprintf '%s\\n' ${shQuote(LINK_EXPIRED)} >&2\nexit 1\n`;
+}
+
+/** Quotes a value for PowerShell (single quotes; a `'` becomes `''`). */
+export function psQuote(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
+/**
+ * PowerShell's text for `text`, ASCII only: `irm` decodes a script without a charset as Latin-1, so anything else
+ * (Settings › Devices) is built from its code points.
+ */
+const psText = (text: string) =>
+  [...text]
+    .map((c) => (c.charCodeAt(0) < 128 ? psQuote(c) : `[char]0x${c.charCodeAt(0).toString(16).padStart(4, "0")}`))
+    .reduce<string[]>((parts, part) => {
+      const last = parts.at(-1);
+      // Neighbouring ASCII characters stay one quoted string.
+      if (last?.startsWith("'") && part.startsWith("'"))
+        parts[parts.length - 1] = `${last.slice(0, -1)}${part.slice(1)}`;
+      else parts.push(part);
+      return parts;
+    }, [])
+    .join(" + ");
+
+/** The PowerShell installer for a used or expired link: one line in red (no `exit`, which would close the window). */
+export function expiredLinkScriptPowerShell(): string {
+  return `Write-Host (${psText(LINK_EXPIRED)}) -ForegroundColor Red\n`;
+}
+
+/** SHA-256 (hex) of each Windows `bun-<target>.zip` of `RUNNER_BUN_VERSION` (x64: the baseline build, any CPU). */
+export const RUNNER_BUN_WINDOWS_SHA256 = {
+  "windows-x64-baseline": "0f20ce6674d4f2dbcc8c5d59fdf99f7ba45f8c3b367e0f5781cbfa30a1c78d99",
+  "windows-aarch64": "2d57a0eec0cb44d95c918c3f9734f60455a1306ae5085d76fc68f44e3ee30d09",
+} as const;
+
+/**
+ * The installer served at `GET /i/<code>/ps`, for Windows:
+ *
+ *   irm <publicUrl>/i/<code>/ps | iex
+ *
+ * The shell installer's steps for one user, in PowerShell 5.1 or 7: the pinned Bun (`RUNNER_BUN_VERSION`, checked
+ * against `RUNNER_BUN_WINDOWS_SHA256`) in `%USERPROFILE%\.agentes-runner\runtime`, kept when it is there at that
+ * version; the runner bundle from `<publicUrl>/runner/agentes-runner.mjs`; a launcher `bin\agentes-runner.cmd`;
+ * `agentes-runner pair --link <code>`, which waits for the link's maker to let this computer join; then a Scheduled
+ * Task at sign-in that keeps `agentes-runner start` running hidden (restarted every minute if it stops), or, where
+ * a user may not add tasks, a line in the Startup folder. A runner already running from that home is stopped first,
+ * so the new one takes over. A home the agentes app manages is left alone. Everything runs from the last line, so a
+ * download cut short runs nothing, and nothing calls `exit` (under `iex` it would close the window). The text is
+ * ASCII only (`psText`).
+ */
+export function installScriptPowerShell(publicUrl: string, options: { link?: string } = {}): string {
+  const server = psQuote(publicUrl.trim().replace(/\/+$/, ""));
+  const sha = RUNNER_BUN_WINDOWS_SHA256;
+  return `# agentes.chat runner installer for Windows: connects this computer to your organization.
+# Usage, with a link made under Settings > Devices: irm <server>/i/<code>/ps | iex
+
+function Install-AgentesRunner {
+  $T0 = Get-Date
+  $ErrorActionPreference = 'Stop'
+  $ProgressPreference = 'SilentlyContinue'
+  [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+  $Server = ${server}
+  $Link = ${psQuote(options.link ?? "")}
+  $BunVersion = ${psQuote(RUNNER_BUN_VERSION)}
+  $Task = ${psQuote(WINDOWS_TASK)}
+  $Devices = ${psText("Settings › Devices")}
+  $Bar = [char]0x2502
+  function Say([string]$Mark, [string]$Text, [string]$Color) { Write-Host "$Mark  $Text" -ForegroundColor $Color }
+  function Step([string]$Text) { Say ([char]0x25C7) $Text 'Green' }
+  function Info([string]$Text) { Say ([char]0x25CF) $Text 'Cyan' }
+  function Gap { Write-Host $Bar -ForegroundColor DarkGray }
+  function Cmd([string]$Text) { Write-Host "$Bar    $Text" -ForegroundColor Cyan }
+  function Q([string]$Text) { "'" + $Text.Replace("'", "''") + "'" }
+
+  if (-not $Link) { throw "This installer needs a link. Make one under $Devices." }
+  $Arch = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
+  switch ($Arch) {
+    'AMD64' { $Target = 'windows-x64-baseline'; $Sha = ${psQuote(sha["windows-x64-baseline"])} }
+    'ARM64' { $Target = 'windows-aarch64'; $Sha = ${psQuote(sha["windows-aarch64"])} }
+    default { throw "There's no runner for Windows on $Arch." }
+  }
+  $RunnerHome = if ($env:AGENTES_RUNNER_HOME) { $env:AGENTES_RUNNER_HOME } else { Join-Path $env:USERPROFILE '.agentes-runner' }
+  $Config = Join-Path $RunnerHome 'config.json'
+  if ((Test-Path $Config) -and ((Get-Content -Raw $Config) -match '"managedBy":\\s*"desktop"')) {
+    throw 'This computer is connected by the agentes app, so manage it there.'
+  }
+  Write-Host ''
+  Write-Host "$([char]0x250C)  agentes.chat: connect this computer" -ForegroundColor White
+  Gap
+  $Runtime = Join-Path $RunnerHome 'runtime'
+  $Bin = Join-Path $RunnerHome 'bin'
+  New-Item -ItemType Directory -Force -Path $Runtime, $Bin | Out-Null
+
+  # The pinned Bun, kept when it is there at that version, checked against its SHA-256 before it is installed.
+  $Bun = Join-Path $Runtime 'bun.exe'
+  $Have = try { (& $Bun --version) } catch { '' }
+  if ($Have -ne $BunVersion) {
+    $Work = Join-Path ([IO.Path]::GetTempPath()) ('agentes-' + [guid]::NewGuid())
+    New-Item -ItemType Directory -Path $Work | Out-Null
+    try {
+      Info "Downloading Bun $BunVersion"
+      $Zip = Join-Path $Work 'bun.zip'
+      Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/oven-sh/bun/releases/download/bun-v$BunVersion/bun-$Target.zip" -OutFile $Zip
+      if ((Get-FileHash -Algorithm SHA256 $Zip).Hash.ToLower() -ne $Sha) {
+        throw "The Bun download didn't match its checksum, so it was not installed."
+      }
+      Expand-Archive -Path $Zip -DestinationPath $Work -Force
+      Copy-Item -Force (Join-Path $Work "bun-$Target\\bun.exe") $Bun
+    } finally {
+      Remove-Item -Recurse -Force $Work -ErrorAction SilentlyContinue
+    }
+  }
+  Step "Bun $BunVersion (SHA-256 checked)"
+
+  $Bundle = Join-Path $RunnerHome 'agentes-runner.mjs'
+  Info "Downloading the runner from $Server"
+  Invoke-WebRequest -UseBasicParsing -Uri "$Server/runner/agentes-runner.mjs" -OutFile "$Bundle.download"
+  Move-Item -Force "$Bundle.download" $Bundle
+  $Launcher = Join-Path $Bin 'agentes-runner.cmd'
+  Set-Content -Path $Launcher -Encoding ASCII -Value @('@echo off', "set ""AGENTES_RUNNER_HOME=$RunnerHome""", """$Bun"" ""$Bundle"" %*")
+  Step "The runner, from $Server"
+  Gap
+
+  # Waits until the link's maker lets this computer join (or says no). It draws in this frame.
+  $env:AGENTES_RUNNER_HOME = $RunnerHome
+  $env:AGENTES_FRAME = '1'
+  & $Bun $Bundle pair --server $Server --link $Link
+  $Paired = $LASTEXITCODE
+  Remove-Item Env:AGENTES_FRAME -ErrorAction SilentlyContinue
+  if ($Paired -eq 130) { return }
+  if ($Paired -ne 0) { throw 'Connecting this computer failed.' }
+
+  # A runner already running from this home (an earlier install) makes way for the new one.
+  $Lock = Join-Path $RunnerHome 'runner.lock'
+  if (Test-Path $Lock) {
+    try { Stop-Process -Id ((Get-Content -Raw $Lock | ConvertFrom-Json).pid) -Force -ErrorAction SilentlyContinue } catch { }
+  }
+  $Start = Join-Path $Bin 'agentes-runner-start.ps1'
+  Set-Content -Path $Start -Encoding ASCII -Value @("\`$env:AGENTES_RUNNER_HOME = $(Q $RunnerHome)", "& $(Q $Bun) $(Q $Bundle) start")
+  $Run = '-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "' + $Start + '"'
+  try {
+    $Me = "$env:USERDOMAIN\\$env:USERNAME"
+    $Action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $Run
+    $Trigger = New-ScheduledTaskTrigger -AtLogOn -User $Me
+    $Principal = New-ScheduledTaskPrincipal -UserId $Me -LogonType Interactive -RunLevel Limited
+    $Settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1)
+    Register-ScheduledTask -TaskName $Task -Action $Action -Trigger $Trigger -Principal $Principal -Settings $Settings -Force | Out-Null
+    Start-ScheduledTask -TaskName $Task
+    Step "Runs in the background from sign-in (Task Scheduler: $Task)"
+  } catch {
+    # Some computers don't let a user add tasks: the Startup folder starts it at sign-in instead.
+    $Startup = Join-Path ([Environment]::GetFolderPath('Startup')) 'agentes-runner.cmd'
+    Set-Content -Path $Startup -Encoding ASCII -Value @('@echo off', "start """" /min powershell.exe $Run")
+    Start-Process powershell.exe -WindowStyle Hidden -ArgumentList $Run
+    Step 'Runs in the background from sign-in (Startup folder)'
+  }
+  Gap
+  Info "The agentes-runner command is $Launcher. To check this computer's connection:"
+  Cmd "& $(Q $Launcher) status"
+  Gap
+  $S = [int][math]::Floor(((Get-Date) - $T0).TotalSeconds)
+  $Took = if ($S -ge 60) { '{0}m {1:00}s' -f [math]::Floor($S / 60), ($S % 60) } else { "$($S)s" }
+  Write-Host "$([char]0x2514)  Done in $Took" -ForegroundColor Green
+}
+
+try { Install-AgentesRunner } catch { Write-Host "$([char]0x25A0)  $($_.Exception.Message)" -ForegroundColor Red }
 `;
 }

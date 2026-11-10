@@ -59,9 +59,21 @@ describe("Abrir no celular", () => {
         .map((li) => li.textContent),
     ).toEqual([
       "Instale o app agentes no celular (App Store ou Google Play).",
-      "Instale o Tailscale no celular e entre na mesma rede (tailnet) deste servidor.",
+      "Instale o Tailscale no celular e entre com a mesma conta do Tailscale deste servidor. App Store · Google Play",
       "Aponte a câmera do celular para o código.",
     ]);
+    expect(within(dialog).getByRole("link", { name: "Google Play" }).getAttribute("href")).toBe(
+      "https://play.google.com/store/apps/details?id=com.tailscale.ipn",
+    );
+  });
+
+  test("a server only its own computer answers at: how to turn on access, never a QR code that opens nothing", async () => {
+    const state = seedState();
+    state.phoneServer = "http://127.0.0.1:4310";
+    const dialog = await openPhoneDialog(state);
+    expect(within(dialog).queryByRole("img", { name: "QR code para entrar no app agentes" })).toBeNull();
+    expect(dialog.textContent).toContain("o celular não chega a ele");
+    expect(dialog.textContent).toContain("Acessar pelo celular e pela equipe");
   });
 
   test("back on the tab after the code ran low, a new one takes its place", async () => {

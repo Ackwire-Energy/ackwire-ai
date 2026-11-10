@@ -32,7 +32,7 @@ import { answerThisMac, type PrefsTab, whenHostHomeReady } from "../control/this
 import { isOnline, macStateOf, trayStateOf } from "../control/tray";
 import { agentOf, readPref, useLocalServer, useOnShown, usePending, useUpdateCheck, writePref } from "../hooks";
 import type { BadgeCounts } from "../host/types";
-import { AgentFace, Banner, BrandFace, Count, MacPortrait, MenuRow, OrgTile } from "../ui/bits";
+import { AgentFace, Banner, BrandFace, Count, HelpLink, MacPortrait, MenuRow, OrgTile } from "../ui/bits";
 import { CopyDetails } from "../ui/here";
 import { useToast } from "../ui/Toast";
 import { baseName, clock, shortPath, since } from "../ui/time";
@@ -240,6 +240,9 @@ export function Popover() {
           pauseRef.current(action === "pause1h" ? "1h" : action === "pauseTomorrow" ? "tomorrow" : "manual");
         } else if (action === "resume") {
           pauseRef.current("resume");
+        } else if (action === "hereRestart") {
+          // The Mac's Servers › this computer's server › Restart (menus.rs).
+          void host.restartLocalServer().catch(() => {});
         } else if (action === "quit" && runningJobs.current === 0 && !localRuns.current) {
           // Nothing running on this Mac: quits at once, like any Mac app.
           void host.quit().catch(() => {});
@@ -648,7 +651,9 @@ export function Popover() {
                       <MenuRow icon="pause" onClick={() => void doPause("manual")}>
                         {t("desktop.tray.pauseManual")}
                       </MenuRow>
-                      <span className="dk-help dk-sub__hint">{t("desktop.tray.pauseHint")}</span>
+                      <span className="dk-help dk-sub__hint">
+                        {t(local.run ? "desktop.tray.pauseHintServer" : "desktop.tray.pauseHint")}
+                      </span>
                     </div>
                   )}
                 </>
@@ -669,18 +674,23 @@ export function Popover() {
 }
 
 /**
- * The server here, on top: its state in a few words, `···` with Restart, Stop and Preferences (inline, as the
- * pause menu: the popover is a window of its own size), and its banners: stopped (Start it), not starting
- * (Copy details, Try again), an update that went back.
+ * The server here, on top: its state in a few words, Stop or Start in sight (Stop opens how long: an hour, until
+ * Start, or not with the app; ADR 0158), `···` with Restart and Preferences (inline, as the pause menu: the popover is
+ * a window of its own size), and its banners: stopped (Start it), not starting (why, Copy details, the logs, Try
+ * again), an update that went back (until dismissed).
  */
 function HereCard({ local, onPrefs }: { local: LocalServerStatus; onPrefs: () => void }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const host = useHost();
   const toast = useToast();
   const [more, setMore] = useState(false);
+  const [stopMenu, setStopMenu] = useState(false);
   const [busy, setBusy] = useState(false);
+  // The "went back" banner, dismissed for that version (it comes back for another one).
+  const [backSeen, setBackSeen] = useState(() => readPref(BACK_SEEN_PREF, ""));
   const act = (run: () => Promise<void>) => async () => {
     setMore(false);
+    setStopMenu(false);
     setBusy(true);
     try {
       await run();
@@ -692,6 +702,11 @@ function HereCard({ local, onPrefs }: { local: LocalServerStatus; onPrefs: () =>
   };
   const banner = hereBanner(local);
   const running = local.phase === "running" || local.phase === "starting" || local.phase === "updating";
+  const line = local.held
+    ? local.heldUntil
+      ? t("desktop.server.stoppedUntil", { time: clock(new Date(local.heldUntil).toISOString(), i18n.language) })
+      : t("desktop.server.stoppedHeld")
+    : t(hereLine(local));
   return (
     <>
       <header className="dk-ph">
@@ -700,20 +715,60 @@ function HereCard({ local, onPrefs }: { local: LocalServerStatus; onPrefs: () =>
         </span>
         <span className="dk-ph__text">
           <b>{t("desktop.server.title")}</b>
-          <small className={running && local.phase !== "running" ? "dk-shimmer" : undefined}>
-            {t(hereLine(local))}
-          </small>
+          <small className={running && local.phase !== "running" ? "dk-shimmer" : undefined}>{line}</small>
         </span>
+        {running ? (
+          <Button
+            size="sm"
+            icon="stop"
+            aria-expanded={stopMenu}
+            disabled={busy}
+            onClick={() => {
+              setMore(false);
+              setStopMenu((v) => !v);
+            }}
+          >
+            {t("desktop.server.stop")}
+          </Button>
+        ) : (
+          <Button size="sm" variant="primary" icon="play" loading={busy} onClick={act(() => host.startLocalServer())}>
+            {t("desktop.server.start")}
+          </Button>
+        )}
         <button
           type="button"
           className="dk-iconbtn"
           aria-expanded={more}
           aria-label={t("desktop.servers.more", { host: t("desktop.server.title") })}
-          onClick={() => setMore((v) => !v)}
+          onClick={() => {
+            setStopMenu(false);
+            setMore((v) => !v);
+          }}
         >
           <Icon name="more" size={16} />
         </button>
       </header>
+      {stopMenu && (
+        <div className="dk-sub dk-here__more">
+          <MenuRow icon="clock" onClick={act(() => host.stopLocalServer(false, 60))}>
+            {t("desktop.server.stopFor1h")}
+          </MenuRow>
+          <MenuRow icon="stop" onClick={act(() => host.stopLocalServer(false))}>
+            {t("desktop.server.stopUntilStart")}
+          </MenuRow>
+          {/* Not with the app any more: Preferences asks first and says where its data stays. */}
+          <MenuRow
+            icon="power"
+            onClick={() => {
+              setStopMenu(false);
+              onPrefs();
+            }}
+          >
+            {t("desktop.server.stopForget")}
+          </MenuRow>
+          <span className="dk-help dk-sub__hint">{t("desktop.server.stopNote")}</span>
+        </div>
+      )}
       {more && (
         <div className="dk-sub dk-here__more">
           {running && (
@@ -721,21 +776,13 @@ function HereCard({ local, onPrefs }: { local: LocalServerStatus; onPrefs: () =>
               {t("desktop.server.restart")}
             </MenuRow>
           )}
-          {running ? (
-            <MenuRow icon="stop" onClick={act(() => host.stopLocalServer(false))}>
-              {t("desktop.server.stop")}
-            </MenuRow>
-          ) : (
-            <MenuRow icon="play" onClick={act(() => host.startLocalServer())}>
-              {t("desktop.server.start")}
-            </MenuRow>
-          )}
           <MenuRow icon="settings" onClick={onPrefs}>
             {t("desktop.tray.prefs")}
           </MenuRow>
         </div>
       )}
-      {banner === "stopped" && (
+      {/* Stopped by the person, the header already says until when, with Start: no banner over it. */}
+      {banner === "stopped" && !local.held && (
         <Banner
           icon="alert"
           title={t("desktop.server.stoppedBanner")}
@@ -757,6 +804,13 @@ function HereCard({ local, onPrefs }: { local: LocalServerStatus; onPrefs: () =>
               <CopyDetails />
               <Button
                 size="sm"
+                variant="ghost"
+                onClick={() => void host.revealFolder(logsFolder(local.dir)).catch(() => {})}
+              >
+                {t("desktop.server.showLogs")}
+              </Button>
+              <Button
+                size="sm"
                 variant="primary"
                 icon="refresh"
                 loading={busy}
@@ -766,18 +820,41 @@ function HereCard({ local, onPrefs }: { local: LocalServerStatus; onPrefs: () =>
               </Button>
             </>
           }
-        />
+        >
+          {t("desktop.server.failingWhy")} <HelpLink slug="run-on-your-computer">{t("desktop.server.help")}</HelpLink>
+        </Banner>
       )}
-      {banner === "back" && (
+      {banner === "back" && local.backTo !== backSeen && (
         <Banner
           icon="alert"
           title={t("desktop.server.updateBack", { version: local.backTo })}
-          actions={<CopyDetails />}
-        />
+          actions={
+            <>
+              <CopyDetails />
+              <Button
+                size="sm"
+                onClick={() => {
+                  writePref(BACK_SEEN_PREF, local.backTo ?? "");
+                  setBackSeen(local.backTo ?? "");
+                }}
+              >
+                {t("desktop.server.gotIt")}
+              </Button>
+            </>
+          }
+        >
+          {t("desktop.server.updateBackBody")}
+        </Banner>
       )}
     </>
   );
 }
+
+/** The version whose "went back" banner the person dismissed (`HereCard`). */
+const BACK_SEEN_PREF = "hereBackSeen";
+
+/** Where the server here writes its log (`logs/server.log` in its folder), with the folder's own separator. */
+const logsFolder = (dir: string) => `${dir}${dir.includes("\\") ? "\\" : "/"}logs`;
 
 /** "Now": live jobs grouped by organization (each one has its own home on this computer). */
 function NowList({ homes, paused, now }: { homes: Home[]; paused: boolean; now: number }) {

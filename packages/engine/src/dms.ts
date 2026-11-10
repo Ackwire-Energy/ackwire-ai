@@ -1,11 +1,12 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, desc, type Executor, eq, gt, inArray, isNull, ne, schema, sql } from "@agenteschat/db";
+import { and, type Database, desc, type Executor, eq, inArray, isNull, ne, schema, sql } from "@agenteschat/db";
 import type { Agent } from "./agents";
 import { audienceError, canTalkTo, speakerOf } from "./audience";
 import { caches } from "./cache";
 import { sha256 } from "./crypto";
 import { NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishUserEvent } from "./events";
+import { landedAfterSql } from "./message-place";
 import { type PreviewMeta, previewMediaKind, previewMeta, readableBody } from "./message-preview";
 import { quietNoticeSql } from "./notices";
 import { resolveNotifications } from "./notifications";
@@ -364,7 +365,7 @@ export async function listDms(db: Database, actorId: string, orgId: string): Pro
             isNull(messages.deletedAt),
             sql`(${messages.authorUserId} is null or ${messages.authorUserId} <> ${actorId})`,
             sql`not ${quietNoticeSql(sql`${messages.meta}`)}`,
-            gt(messages.createdAt, readAt.get(id) ?? new Date(0)),
+            landedAfterSql(messages, readAt.get(id) ?? new Date(0)),
             // Nor one more unread (ADR 0091): it is silent.
             sql`${messages.meta}->>'mediaAfter' is null`,
           ),

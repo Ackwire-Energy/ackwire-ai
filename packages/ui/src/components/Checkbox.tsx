@@ -1,11 +1,16 @@
 import { Checkbox as RCheckbox, RadioGroup as RRadioGroup, Switch as RSwitch } from "radix-ui";
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import { cx } from "../cx";
 
 export interface CheckboxProps {
   /** `"indeterminate"`: some children checked (tri-state groups). Toggling it checks it. */
   checked: boolean | "indeterminate";
   onCheckedChange?: (checked: boolean) => void;
+  /**
+   * The click itself, before it toggles: for what a modifier key changes (Shift picks a range). `preventDefault` keeps
+   * the box as it was.
+   */
+  onClick?: (e: MouseEvent<HTMLButtonElement>) => void;
   id?: string;
   disabled?: boolean;
   "aria-label"?: string;

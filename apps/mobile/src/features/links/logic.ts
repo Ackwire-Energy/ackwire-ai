@@ -1,5 +1,6 @@
 import type { AiStatus, AppNotification, NotificationKind, NotificationSource } from "@agenteschat/client";
 import { openTarget, ROUTINE_TROUBLE, targetPath } from "@agenteschat/client/lib/notifications";
+import { deviceHref, deviceNoticeOf } from "../devices/logic";
 import { isSafeId } from "../shared/logic";
 
 /**
@@ -25,6 +26,7 @@ export type AppHref =
   | `/issues/${number}?m=${string}`
   | `/routines/${string}`
   | `/settings/computers/${string}`
+  | `/settings/devices/${string}`
   | `/settings/skills/${string}`
   | `/consultation/${string}?channel=${string}`
   | "/routines"
@@ -34,9 +36,10 @@ export type AppHref =
   | "/me/members"
   | "/me/approvals"
   | "/settings/computers"
+  | "/settings/devices"
   | "/settings/skills"
   | "/activity"
-  | "/threads"
+  | "/conversations/threads"
   | "/join-requests"
   | "/computer-setup"
   | "/connect-ai?ready=1"
@@ -99,6 +102,8 @@ export interface PushPayload {
   routineId?: unknown;
   agentId?: unknown;
   machineId?: unknown;
+  phoneId?: unknown;
+  requestId?: unknown;
   topicId?: unknown;
   issueNumber?: unknown;
   dashboardId?: unknown;
@@ -119,6 +124,9 @@ const PUSH_IDS = [
   "topicId",
   "dashboardId",
   "widgetId",
+  // A device's notifications (`device.*`): the phone, and the join or access request.
+  "phoneId",
+  "requestId",
 ] as const;
 
 /** A push as the notification it names, from the ids it carried (checked), so it opens where its inbox row opens. */
@@ -126,7 +134,8 @@ export function pushAsNotification(p: PushPayload): Pick<AppNotification, "kind"
   const source: NotificationSource = {};
   for (const key of PUSH_IDS) {
     const v = p[key];
-    if (isSafeId(v)) source[key] = v;
+    // `phoneId` and `requestId` aren't in the shared type yet: device notifications carry them.
+    if (isSafeId(v)) (source as Record<string, string>)[key] = v;
   }
   const issue = Number(p.issueNumber);
   if (Number.isSafeInteger(issue) && issue > 0) source.issueNumber = issue;
@@ -168,7 +177,9 @@ export function hrefFromUrl(url: string): AppHref | null {
     case "activity":
       return "/activity";
     case "threads":
-      return "/threads";
+      // Through Conversas' list route, which shows them where a personal workspace has no Threads tab (ADR 0159) and
+      // sends a team's to the tab.
+      return "/conversations/threads";
     case "join-requests":
       return "/join-requests";
     case "proposals":
@@ -250,14 +261,13 @@ export function notificationHref(
   if (n.kind === "invitation_accepted") return "/me/members";
   // Who approves for whom (ADR 0139): Perfil › Aprovações, where it is set and declined.
   if (n.kind === "approval_cover" || n.kind === "right_hand_paused") return "/me/approvals";
-  // A server changed approved tools: accepted on that server's Ferramentas (Conectores for notices from before they
-  // named it).
-  if (n.kind === "connector_tool_changed")
-    return isSafeId(s.connectionId) ? `/connectors/tools?id=${s.connectionId}` : "/connectors";
   // An update of a skill from its link: the skill's page, where what waits is applied.
   if (n.kind === "skill_update") return isSafeId(s.skillId) ? `/settings/skills/${s.skillId}` : "/settings/skills";
   if (n.kind === "machine_connected")
-    return isSafeId(s.machineId) ? `/settings/computers/${s.machineId}` : "/settings/computers";
+    return isSafeId(s.machineId) ? `/settings/devices/${s.machineId}` : "/settings/devices";
+  // A device's notice (someone's agent on it, asking for it, waiting for it, a computer asking to join): the device.
+  const device = deviceNoticeOf(n);
+  if (device) return deviceHref(device);
   // An agent held on agentes.chat Cloud: its page, where the hold shows. The workspace's own hold: the web's.
   if (n.kind === "org_standing") return isSafeId(s.agentId) ? `/agent/${s.agentId}` : null;
   // The month's Composio calls are counted in Uso.
@@ -269,7 +279,7 @@ export function notificationHref(
   if (n.kind === "dashboard_proposal") return boardHref(s.dashboardId);
   // A computer's disk is almost full (ADR 0115): that computer, where its shared folder's size shows.
   if (n.kind === "computer_disk_full" || n.kind === "computer_no_chrome")
-    return isSafeId(s.machineId) ? `/settings/computers/${s.machineId}` : null;
+    return isSafeId(s.machineId) ? `/settings/devices/${s.machineId}` : null;
   // An agent's browser handoff (ADR 0040): its conversation, with the request's card in control.
   if (n.kind === "browser_handoff" && isSafeId(s.handoffId)) {
     // Sent to someone who can't open its conversation (it names none): the agent's computer, the request there.

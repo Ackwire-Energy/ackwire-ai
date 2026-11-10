@@ -27,6 +27,7 @@ import {
   sha256,
   unfinishedWorkspaces,
   updateOrganization,
+  updateOrgSettings,
 } from "../src";
 import { addMember, addUser, adminRoleId, type Fixture, setup } from "./fixtures";
 
@@ -90,6 +91,7 @@ describe("permissions", () => {
         showActivity: false,
         agentStyle: null,
         chatPrefs: {},
+        mode: "team",
         orgCreatedAt: expect.any(Date),
       },
     ]);
@@ -171,6 +173,13 @@ describe("invitations", () => {
     await expect(acceptInvitation(f.db, bia, token)).rejects.toBeInstanceOf(ConflictError);
     const general = await f.db.select().from(schema.channelMembers).where(eq(schema.channelMembers.userId, bia.id));
     expect(general.map((g) => g.channelId)).toEqual([f.general.id]);
+  });
+
+  test("an invitation says who the workspace is for, so a personal one's page never names it (ADR 0159)", async () => {
+    const { token } = await createInvitation(f.db, f.owner.id, f.org.id, { email: "bia@example.com", role: "member" });
+    expect(await previewInvitation(f.db, token)).toMatchObject({ orgName: "Acme", mode: "team" });
+    await updateOrgSettings(f.db, f.owner.id, f.org.id, { mode: "personal" });
+    expect(await previewInvitation(f.db, token)).toMatchObject({ orgName: "Acme", mode: "personal" });
   });
 
   test("an invitation names the first four agents, oldest first, and counts the others", async () => {

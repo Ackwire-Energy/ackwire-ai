@@ -23,6 +23,7 @@ const KINDS = [
   "browser_handoff",
   "secret_request",
   "join_request",
+  "device.join_request",
   "widget_alert",
   "widget_failed",
   "dashboard_proposal",
@@ -35,6 +36,9 @@ test("every push kind in every language: words, within the phone's limits (ADR 0
       for (const variant of [
         { actorName: "Ana", actorType: "user" as const, text: "olha", title: "Deploy", label: "geral" },
         { actorType: "agent" as const, highRisk: true, reminder: true, screen: "desktop", suggestedBy: "Bia" },
+        // A personal workspace's words (ADR 0159), with no words of the agent's own to stand in for them.
+        { actorName: "Ana", actorType: "user" as const, title: "Deploy", reason: "creator_left", personal: true },
+        { actorType: "agent" as const, suggestedBy: "Bia", personal: true },
       ]) {
         const { title, body } = renderPush(locale, { kind, waiting: true, ...variant });
         expect({ locale, kind, title: title.length > 0 }).toEqual({ locale, kind, title: true });
@@ -42,6 +46,27 @@ test("every push kind in every language: words, within the phone's limits (ADR 0
         expect(title.length).toBeLessThanOrEqual(PUSH_TITLE_MAX);
         expect(body.length).toBeLessThanOrEqual(PUSH_BODY_MAX);
       }
+});
+
+test("a personal workspace's pushes speak of one person and their agents, never a team (ADR 0159)", () => {
+  const push = (kind: string, more: object = {}) =>
+    renderPush("en", { kind, waiting: true, actorName: "Ana", label: "Personal", personal: true, ...more });
+  expect(push("join_request", { title: "Bia" }).title).toBe("Bia asks to join your workspace");
+  expect(push("join_request", { title: "Bia", suggestedBy: "Caio" }).title).toBe("Caio suggested inviting Bia");
+  expect(push("computer_ready").title).toBe("Your agents' computer is ready");
+  expect(push("machine_connected").title).toBe("A new computer was connected");
+  expect(push("widget_failed", { label: null, reason: "creator_left" }).body).toBe(
+    "Whoever set it up is no longer in your workspace.",
+  );
+  // A reason a personal workspace reads as a team does: the team's words.
+  expect(push("widget_failed", { label: null, reason: "timeout" }).body).toBe("The update took too long.");
+  // Only the words change: a team's read as before.
+  expect(push("join_request", { title: "Bia", personal: false }).title).toBe("Bia asks to join Personal");
+  // Every language has them, so none falls back to English.
+  const keys = Object.keys(PUSH.en).filter((k) => k.endsWith("Personal"));
+  expect(keys.length).toBe(7);
+  for (const locale of LOCALE_CODES)
+    expect({ locale, missing: keys.filter((k) => !(k in PUSH[locale])) }).toEqual({ locale, missing: [] });
 });
 
 test("a language without a word says it in English", () => {

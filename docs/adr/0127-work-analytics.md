@@ -1,6 +1,6 @@
 # 0127. Agent work analytics for the operator
 
-- Status: Accepted (built: the operator API's reads, with the Cloud console's page to follow in its repository)
+- Status: Accepted (built: the operator API's reads, for an operator's console to call)
 - Date: 2026-11-02
 - Amends: ADR 0056 §4 (two analytics reads)
 - Extends: ADR 0103 (the analytics reads), ADR 0063 (the plan card's API price)

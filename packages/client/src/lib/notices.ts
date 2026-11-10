@@ -18,6 +18,7 @@ export const NOTICE_KINDS = [
   "wake_skipped",
   "work_check_in",
   "run_stopped",
+  "github_event",
 ] as const;
 export type NoticeKind = (typeof NOTICE_KINDS)[number];
 
@@ -138,7 +139,8 @@ export function followUpLine(
  * What a person reads of a notice, on the web and the phone alike: its line (`key`/`values`) and what "Ver" opens
  * (`detail`). `notice.text` and a notice message's body are written for the agent, in English: never shown. The
  * detail is the app's own words built from the refs (`words`), or what the notice carried that people wrote or asked
- * for (`content`: a routine's report, another agent's own answer); null when the line says it all.
+ * for (`content`: a routine's report, another agent's own answer, what someone wrote on GitHub); null when the line
+ * says it all.
  */
 export interface NoticeView {
   key: string;
@@ -146,6 +148,38 @@ export interface NoticeView {
   detail: { words: { key: string; values: Record<string, string> } } | { content: string } | null;
   /** A follow-up still to come: it can be canceled. */
   pending: boolean;
+  /** Someone the agent doesn't answer wrote it on GitHub: a person here may ask the agent to answer ("Pedir resposta"). */
+  answer: boolean;
+}
+
+/** A GitHub event's line (packages/engine/src/git/github-events.ts), by what happened and to which kind of item. */
+export function githubLineKey(r: Record<string, string>) {
+  const issue = r.item === "issue";
+  const discussion = r.item === "discussion";
+  switch (r.event) {
+    case "comment":
+      return issue
+        ? "chat.notice.github.commentIssue"
+        : discussion
+          ? "chat.notice.github.commentDiscussion"
+          : "chat.notice.github.comment";
+    case "opened":
+      return "chat.notice.github.opened";
+    case "review":
+      return r.state === "approved"
+        ? "chat.notice.github.approved"
+        : r.state === "changes_requested"
+          ? "chat.notice.github.changes"
+          : "chat.notice.github.reviewed";
+    case "review_requested":
+      return "chat.notice.github.reviewRequested";
+    case "merged":
+      return "chat.notice.github.merged";
+    case "closed":
+      return issue ? "chat.notice.github.closedIssue" : "chat.notice.github.closed";
+    default:
+      return "chat.notice.other";
+  }
 }
 
 export function noticeView(
@@ -161,6 +195,7 @@ export function noticeView(
     values,
     detail,
     pending: false,
+    answer: false,
   });
   const kind = notice.kind as NoticeKind;
   switch (kind) {
@@ -208,6 +243,22 @@ export function noticeView(
     }
     case "wait_result":
       return line("chat.notice.waitResult", { name: names.author });
+    // What happened on GitHub: "Ver" opens what they wrote there and the link. Once someone asked the agent to answer
+    // a stranger, the new notice says who asked.
+    case "github_event": {
+      const r = notice.refs;
+      const values = {
+        who: r.who ?? r.login ?? "",
+        number: r.number ?? "",
+        repo: r.repo ?? "",
+        name: names.author,
+        asker: r.asker ?? "",
+      };
+      const said = [notice.text.trim(), r.url ?? ""].filter(Boolean).join("\n\n");
+      const detail = said ? { content: said } : null;
+      if (r.answerFor) return line("chat.notice.github.asked", values, detail);
+      return { ...line(githubLineKey(r), values, detail), answer: r.outside === "1" && !r.answeredBy };
+    }
     case "proposal_result":
     case "poll_result":
     case "work_check_in":

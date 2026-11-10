@@ -12,6 +12,7 @@ import {
   oauthReturnText,
   sendWaits,
   signInRefusalText,
+  vaultConnectRefusal,
 } from "../src/lib/errors";
 
 const failure = new TypeError("Failed to fetch");
@@ -297,6 +298,22 @@ test("an agent that doesn't answer this person says whom it answers, in the pers
   expect(errorText(instance.t, nobody)).toBe("O Theo não está respondendo a ninguém agora.");
 });
 
+test("a password manager's refusal to connect: in its own words when the app has them, else as any refusal", () => {
+  const instance = i18next.createInstance();
+  void instance.init({ lng: "pt-BR", fallbackLng: "en", resources, initAsync: false });
+  const refusal = (code: string) => new ApiError(400, `vault.source.${code}`, "The password manager refused this.");
+  const own = ptBR.vault.source.onepassword.error;
+  expect(vaultConnectRefusal(instance.t, "onepassword", refusal("invalid_input"))).toBe(own.invalid_input);
+  expect(vaultConnectRefusal(instance.t, "onepassword", refusal("many_vaults"))).toBe(own.many_vaults);
+  expect(vaultConnectRefusal(instance.t, "onepassword", refusal("rate_limited"))).toBe(
+    ptBR.errors.vault.source.rateLimited,
+  );
+  const bitwarden = vaultConnectRefusal(instance.t, "bitwarden", refusal("auth_failed"));
+  expect(bitwarden).toBe(ptBR.errors.vault.source.authFailed);
+  const ours = new ApiError(500, "internal_error", "Something went wrong on our side");
+  expect(vaultConnectRefusal(instance.t, "onepassword", ours)).toBe(errorText(instance.t, ours));
+});
+
 test("the right hand refused a place: its own line, never ask an admin", () => {
   const t = ((key: string) => key) as unknown as TFunction;
   const refused = new ApiError(403, "agent.right_hand_permanent", "The team's right hand can't be added to a channel");
@@ -335,6 +352,15 @@ test("a provider refused this server's own OAuth app: what's wrong and who fixes
  * hit goes in `KNOWN` instead.
  */
 const PLAIN_LINE = new Set([
+  // The feedback form says a file's type and size itself before any toast, and takes no more files than it may send
+  // (FeedbackDialog).
+  "feedback.file_too_large",
+  "feedback.file_type",
+  "feedback.files_many",
+  // A phone that follows its computer's rule shows the computer's, with no control of its own; only the installer
+  // meets a bad connect code.
+  "device.follows_host",
+  "machine.link_invalid",
   "account.invalid_code",
   "account.invalid_kind",
   "account.invalid_label",

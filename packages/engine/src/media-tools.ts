@@ -1,5 +1,5 @@
 import type { GifProvider, PubSub } from "@agenteschat/adapters";
-import { and, desc, eq, gt, isNull, or, schema, sql } from "@agenteschat/db";
+import { and, desc, type Executor, eq, gt, isNull, or, schema, sql } from "@agenteschat/db";
 import { channelSkip, MEDIA_GIF_PICK_FROM, MEDIA_GIF_SEARCH_LIMIT, pickGifIndex, withTimeout } from "./agent-media";
 import { getAgentCached } from "./agents";
 import { getChannelCached } from "./context";
@@ -95,7 +95,7 @@ export interface MediaToolDeps {
 /**
  * The GIF search the calling agent may use: the server's, answering now, with the workspace's GIFs on and the agent's
  * own switch (`agents.media_replies`). Null: no GIF. Where it goes is the caller's check (`post_message` posts one in
- * another channel, ADR 0091 addendum 2026-11-05).
+ * another channel, ADR 0091 addendum 2026-11-05; a routine's `hand_off` where it reports, addendum 2026-11-09).
  */
 export async function agentGifSearch(
   gifs: GifProvider | null | undefined,
@@ -112,28 +112,38 @@ export async function agentGifSearch(
 /** What `AgentGifPoster.find` found: the GIF, or why none goes (`query`: the search as the provider got it). */
 export type GifToPost = { gif: GifMedia } | { none: "off" } | { none: "empty" | "down" | "not_found"; query: string };
 
+/** A conversation a GIF is posted in: a channel's main timeline (`threadId` null) or one thread of it. */
+export type GifConversation = { channelId: string; threadId: string | null };
+
 /**
- * `post_message`'s GIF (ADR 0091 addendum 2026-11-05), handed to the chat tools by whoever builds them, so
- * `chat-tools.ts` never imports this file (its imports would close a cycle through `context.ts`).
+ * The GIF of a message the agent posts with a tool other than `send_gif`, handed to those tools by whoever builds
+ * them, so `chat-tools.ts` and `hand-off.ts` never import this file (its imports would close a cycle through
+ * `context.ts`): `post_message`'s (ADR 0091 addendum 2026-11-05) and a routine's `hand_off`'s (addendum 2026-11-09).
  */
 export interface AgentGifPoster {
   /** Whether the calling agent may send a GIF now (`agentGifSearch`). */
   offered(ctx: ToolContext): Promise<boolean>;
-  /** A GIF for the model's `search`, found as `send_gif` finds one (the workspace's rating, fixed by `seed`). */
-  find(ctx: ToolContext, search: unknown, seed: string): Promise<GifToPost>;
+  /**
+   * A GIF for the model's `search`, found as `send_gif` finds one: the workspace's rating, fixed by `seed`, past the
+   * GIFs posted lately where it goes (`where`), so a daily routine's GIF isn't yesterday's.
+   */
+  find(ctx: ToolContext, search: unknown, seed: string, where: GifConversation): Promise<GifToPost>;
 }
 
 export function createAgentGifPoster(gifs: GifProvider | null | undefined): AgentGifPoster {
   return {
     offered: async (ctx) => (await agentGifSearch(gifs, ctx)) !== null,
-    async find(ctx, search, seed) {
+    async find(ctx, search, seed, where) {
       const provider = await agentGifSearch(gifs, ctx);
       if (!provider) return { none: "off" };
       const query = gifSearchOf(search);
       if (!query) return { none: "empty", query };
-      const { gifRating } = await mediaSettings(ctx.db, ctx.orgId);
+      const [{ gifRating }, recent] = await Promise.all([
+        mediaSettings(ctx.db, ctx.orgId),
+        recentGifIds(ctx.db, ctx.orgId, where),
+      ]);
       // Undefined: the provider didn't answer (an outage, a limit, too slow).
-      const gif = await findGif(provider, { query, rating: gifRating, seed: `${seed}:${query}` }).catch(
+      const gif = await findGif(provider, { query, rating: gifRating, seed: `${seed}:${query}`, recent }).catch(
         () => undefined,
       );
       if (gif === undefined) return { none: "down", query };
@@ -185,17 +195,17 @@ async function postMedia(deps: MediaToolDeps, ctx: ToolContext, run: RunRow, med
   return message;
 }
 
-/** GIF ids among the conversation's latest messages (anyone's), so a second GIF isn't the first again. */
-async function recentGifIds(ctx: ToolContext): Promise<Set<string>> {
+/** GIF ids among a conversation's latest messages (anyone's), so a second GIF isn't the first again. */
+async function recentGifIds(db: Executor, orgId: string, where: GifConversation): Promise<Set<string>> {
   const { messages } = schema;
-  const threadId = replyThreadOf(ctx);
-  const rows = await ctx.db
+  const { channelId, threadId } = where;
+  const rows = await db
     .select({ id: sql<string | null>`${messages.meta}->'media'->>'id'` })
     .from(messages)
     .where(
       and(
-        eq(messages.orgId, ctx.orgId),
-        eq(messages.channelId, ctx.channelId),
+        eq(messages.orgId, orgId),
+        eq(messages.channelId, channelId),
         threadId ? or(eq(messages.threadId, threadId), eq(messages.id, threadId)) : isNull(messages.threadId),
         isNull(messages.deletedAt),
         gt(messages.createdAt, new Date(Date.now() - WEEK_MS)),
@@ -270,7 +280,10 @@ function gifTool(deps: MediaToolDeps, gifs: GifProvider, options: { sticker: boo
         // Before the search: past the cap, nothing is asked of the provider.
         const sent = await runMediaCount(ctx.db, sentBy(ctx, run));
         if (sent >= MEDIA_PER_RUN_MAX) return { content: TOO_MANY, isError: true };
-        const [{ gifRating }, recent] = await Promise.all([mediaSettings(ctx.db, ctx.orgId), recentGifIds(ctx)]);
+        const [{ gifRating }, recent] = await Promise.all([
+          mediaSettings(ctx.db, ctx.orgId),
+          recentGifIds(ctx.db, ctx.orgId, { channelId: ctx.channelId, threadId: replyThreadOf(ctx) }),
+        ]);
         const seed = `${ctx.runId}:${query}`;
         // Undefined: the provider didn't answer (an outage, a limit, too slow), the same as no GIFs for now.
         const gif = await findGif(gifs, { query, rating: gifRating, seed, recent }).catch(() => undefined);

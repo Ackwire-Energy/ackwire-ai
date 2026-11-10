@@ -37,7 +37,7 @@ export function entityMenu(build: () => MenuEntry[]) {
       const entries = build();
       if (!entries.length) return;
       e.preventDefault();
-      openContextMenu(e.clientX, e.clientY, entries);
+      openContextMenu(e.clientX, e.clientY, entries, e.target);
     },
     onKeyDown: (e: KeyboardEvent<HTMLElement>) => {
       if (e.defaultPrevented || !opensMenuKey(e) || outside(e) || keepsBrowserMenu(e.target)) return;

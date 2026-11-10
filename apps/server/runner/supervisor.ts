@@ -158,6 +158,8 @@ const busctl = (args: string[]) =>
 /** What a worker must know about its computer, sent after each hello and when it changes. */
 export interface WorkerState {
   privateNetwork?: boolean;
+  /** The server's host: an agent's commit email without one in its checkout is `<handle>@agents.<host>`. */
+  commitHost?: string;
   access: RunnerAccess;
   paused: RunnerPause;
   limits: { maxConcurrentTasks: number; taskMaxSeconds: number; brainIdleMinutes: number; brainMaxProcesses: number };

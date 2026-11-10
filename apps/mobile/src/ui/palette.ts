@@ -22,6 +22,8 @@ export interface AppColors extends ThemeColors {
   bubble: string;
   /** The only color for "waits on you" (requests, questions, what expires). */
   amber: string;
+  /** Words in amber on an amber-tinted fill (a "Needs you" chip): darker in light, so they keep 4.5:1. */
+  amberInk: string;
   /** A small tag's fill (chips, states). */
   chip: string;
   /** Unread: the row's dot, the same red as the tab bar's badge (the system red). */
@@ -63,6 +65,7 @@ export function appColors(scheme: Scheme): AppColors {
       grouped: darkTokens.bg,
       bubble: darkTokens.raised,
       amber: "#e8ac4c",
+      amberInk: "#e8ac4c",
       chip: darkTokens.sunken,
       badge: "#ff453a",
       grabber: "rgba(235, 235, 245, 0.3)",
@@ -75,6 +78,7 @@ export function appColors(scheme: Scheme): AppColors {
     // The web's own bubble on white: the ink at 6%, no tint.
     bubble: "#efefee",
     amber: "#b26a00",
+    amberInk: "#8a5200",
     chip: "rgba(120, 120, 128, 0.1)",
     badge: "#ff3b30",
     grabber: "rgba(60, 60, 67, 0.3)",

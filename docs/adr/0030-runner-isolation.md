@@ -63,3 +63,72 @@ The runner builds each command's environment for the requesting agent, without t
 - With connector tokens, "merge needs approval" holds on connected machines too, not only in the cloud.
 - Level 2 trades convenience for safety (some tools break without network or home access); it stays opt-in.
 - Windows machines get level 1 only.
+
+## Addendum: browser start page and network options
+
+The agent browser opens an offline agentes.chat new tab. Its language follows the agent's responsible person
+(Portuguese or English, with English as the fallback). The clock uses the computer's time zone. No external
+font, image or page request is needed. System installs keep the extension files outside agent-owned homes,
+under `/opt/agentes-runner/browser/start/<uid>`; a regular install uses the runner's own home. Existing profiles
+and sign-ins are kept. A running browser picks up changed names and observed addresses every 30 seconds.
+
+Only a workspace’s managed computer reports its public address in settings and the screen footer. Personal
+and server-hosted computers do not measure or report it. A server-authorized managed system runner
+asks this server's `/api/machines/ip` without credentials every 30 seconds; configure `TRUSTED_PROXIES` for your
+reverse proxy as for other IP-based features. Private LAN and tailnet addresses are hidden, and three failed
+observations clear the display. A country mark appears only when the response includes a recognized country.
+
+A Linux system runner can optionally set `networkLauncher` in its root-owned `config.json` to an absolute
+executable path. The helper receives `<uid> -- <command> [arguments...]`, prepares or enters the network
+context synchronously, then executes the command. Root network diagnostics and the agent's `runuser` launch
+use the same helper. The executable and every parent must be root-owned, with no symlinks or group/other write
+permissions. A failed helper prevents the process from starting. No helper is configured by default. Apply
+changes through the root configuration; an existing process keeps its network context until it ends. The
+host loopback firewall remains active for existing processes. Helpers must preserve access to the runner's
+filesystem sockets and the read-only start-page directory. With this option, Chrome also disables non-proxied
+WebRTC UDP through its launch flag; no managed browser policy is installed.
+
+A deployment whose trusted routing hook redirects foreign traffic through loopback can set the root runner
+config's optional `networkMark` to one unsigned 32-bit packet bit. No exception is installed when it is absent.
+The mark must be distinct from the local-service ownership tag (`0x41000000`). The loopback guard exempts
+marked traffic only when it has no destination NAT and an unmarked FIB address-type lookup says the destination
+is not local. Host-owned public addresses and wildcard listeners therefore keep their normal protection.
+The deployment must filter private destinations before marking packets and prevent agent processes from gaining
+`CAP_NET_ADMIN` or `CAP_NET_RAW` (including through file capabilities). The mark never replaces those filters.
+Changes reconcile the local guard atomically. The shared guard for `managedBy: host` does not use per-runner marks.
+
+When `networkMark` is configured, `systemLauncher` runs `setpriv --no-new-privs --bounding-set=-net_admin,-net_raw` immediately before `runuser`, after the optional network launcher.
+This also covers deployments using marked routing without a namespace launcher. The kernel bind self-check
+uses the same restriction. Existing processes must be drained or restarted before relying on it.
+
+With no-new-privileges enabled, Chrome needs a working user-namespace sandbox; verify it during Linux acceptance.
+
+Without `networkDrainSeconds`, network changes do not reconnect the machine or cancel foreground work. Workers with requests, background tasks,
+secret installs, handoffs, browser streams or desktop leases finish those before they retire. Every launch for
+one UID keeps its previous network while that worker, desktop (including startup) or terminal still exists.
+Linux also retains that context while any other process runs as the UID, including daemonized services.
+Only the launch wrapper's first UID-owned worker is excluded from that process hold; an incomplete process
+scan keeps the transition pending. Once all those scopes drain, the next launch uses the new settings.
+Existing desktops and terminals keep running. The root service atomically writes `network-state.json`
+in its runner home (0600): version 1, PID and Linux `/proc` start ticks, observation time, active
+`networkLauncher`/`networkMark` (null when absent), `pendingUids` for old workers and tracked scopes, and
+`uidNetworks` pins saved before launch (only held or imminent contexts; inactive pins are removed).
+The observation is bounded to 4 MiB; an oversized new launch is refused before creating a process.
+Pins survive a daemon restart while its desktops remain. Existing processes
+without a saved pin are adopted only after proving they share the runner's host namespace; otherwise new work
+waits for those old processes to end. Every directory containing this root observation must be root controlled.
+An integrator must verify process identity, root ownership, the actual firewall rule, and live process namespace
+membership before declaring a migration complete; the file describes launch defaults, not proof that every
+process moved. External routing must preserve already established connections during a change. Keep an installed
+routing mark until connections using it have drained before removing its exception.
+
+
+For a finite transition an administrator may set `networkDrainSeconds` (30–3600). New work waits whenever its
+UID still has the prior network context. Existing sessions get a visible deadline, then the runner closes only
+its own workers, desktops and terminals. The root routing integrator must block stale host-UID egress at that
+deadline and retain the pending status until all old processes are gone; unknown processes require operator
+attention. The persisted `transitions` array in `network-state.json` exposes the per-UID deadline and state.
+Reapplying the same network settings or restarting the daemon does not extend it.
+
+An optional `networkRevision` (default 0) identifies the isolation implementation. Increase it when the
+network helper changes behavior at the same path; existing UID contexts then follow the same bounded drain.

@@ -3,7 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import { ApiError } from "@agenteschat/client";
+import { ApiError, type Issue, type IssueWork } from "@agenteschat/client";
 import { toYmd } from "@agenteschat/client/lib/format";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { mondayOf } from "@/pages/CalendarPage";
@@ -67,6 +67,50 @@ describe("Issues (board and list)", () => {
     expect(now.textContent).toContain("Atualizou uma tarefa · #129");
     const timeout = screen().getByRole("link", { name: "#129 Timeout no agendamento em horários de pico" });
     expect(within(timeout).getByRole("img", { name: "1 de 2 critérios de aceite" })).toBeTruthy();
+  });
+
+  test("ten agents at work over the board: every card shows, and the board still ends its page for the page to scroll down to", async () => {
+    const state = seedState();
+    const [ada] = state.agents;
+    if (!ada) throw new Error("no agent");
+    const names = ["Bento", "Cora", "Davi", "Elis", "Faro", "Gael", "Hana", "Iris", "Juno"];
+    state.agents.push(
+      ...names.map((name, k) => ({ ...ada, id: `agent-at-work-${k}`, name, handle: name.toLowerCase() })),
+    );
+    const states: IssueWork["state"][] = ["running", "waiting_approval", "running", "waiting_input", "running"];
+    const api = createFakeApi(state);
+    const list = api.issues.list;
+    api.issues.list = async (orgId, filters) => {
+      const all = await list(orgId, filters);
+      const at = all.find((i) => i.work);
+      const work = at?.work;
+      if (!at || !work) return all;
+      const extra = names.map(
+        (name, k): Issue => ({
+          ...at,
+          id: `iss-at-work-${k}`,
+          number: 200 + k,
+          title: `${name} revisa a integração do agendamento com o calendário da clínica, etapa ${k + 1} de ${names.length}`,
+          assignee: { type: "agent", id: `agent-at-work-${k}` },
+          pullRequests: [],
+          work: {
+            ...work,
+            agentId: `agent-at-work-${k}`,
+            state: k === names.length - 1 ? "stalled" : (states[k % states.length] ?? "running"),
+            steps: [{ tool: "update_issue", detail: `#${200 + k}`, at: work.since }],
+          },
+        }),
+      );
+      return [...all, ...extra];
+    };
+    await go("issues", api);
+    const now = screen().getByRole("region", { name: "Agentes trabalhando agora" });
+    expect(now.querySelectorAll(".issues-now__card")).toHaveLength(10);
+    // Nothing comes after the board's split, up to the work area: when the cards above squeeze it, it keeps a window's
+    // height and the page scrolls down to it (over-pages.css), with nothing for its columns to run over.
+    let el: Element | null = document.querySelector(".issues-boardframe.page-split");
+    expect(el).toBeTruthy();
+    for (; el && !el.matches(".shell__main"); el = el.parentElement) expect(el.nextElementSibling).toBeNull();
   });
 
   test("a click opens the details dialog (kept in the URL); Escape closes it", async () => {

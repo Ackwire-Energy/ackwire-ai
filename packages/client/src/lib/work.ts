@@ -432,11 +432,17 @@ const plainWhy = (text: string) => {
 /**
  * Why a line failed, under it, for people: a refusal's reason in their words (`chat.work.refusal.<code>`), else
  * nothing. What the tool said is its own text (often English, a connector's JSON): the line's open view shows it.
+ * `personal`: a personal workspace's (ADR 0159), whose reasons say no team where it has its own words for one.
  */
-export function toolWhy(t: TFunction, l: { why?: string | null; refusal?: string | null }): string | null {
+export function toolWhy(
+  t: TFunction,
+  l: { why?: string | null; refusal?: string | null },
+  personal = false,
+): string | null {
   if (!l.refusal) return null;
   const say = t as unknown as (key: string, options: { defaultValue: string }) => string;
-  return say(`chat.work.refusal.${l.refusal}`, { defaultValue: "" }) || null;
+  const key = `chat.work.refusal.${l.refusal}`;
+  return (personal && say(`${key}Personal`, { defaultValue: "" })) || say(key, { defaultValue: "" }) || null;
 }
 
 /** The Tool Gateway's own refusal of a call (`tool_result` step `data.refusal`): a word `toolWhy` says. */

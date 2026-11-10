@@ -37,7 +37,7 @@ export const NOTICE_KINDS: Record<NoticeCategory, readonly NotificationKind[]> =
     "agent_unreached",
     "routine_waiting_plan",
   ],
-  computers: ["machine_connected", "computer_ready", "plan_reset_unknown"],
+  computers: ["machine_connected", "computer_ready", "plan_reset_unknown", "device.in_use", "device.waiting"],
   reactions: ["reaction"],
 };
 

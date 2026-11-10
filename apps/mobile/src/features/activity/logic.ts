@@ -3,9 +3,10 @@ import { approvalOriginWords } from "@agenteschat/client/lib/approval-origin";
 import { namesText } from "@agenteschat/client/lib/format";
 import { upcomingRoutines } from "@agenteschat/client/lib/home";
 import { mediaKindOf } from "@agenteschat/client/lib/media";
-import { askersOf, oneToolChangePerServer, runFailedGroupOf } from "@agenteschat/client/lib/notifications";
+import { askersOf, runFailedGroupOf } from "@agenteschat/client/lib/notifications";
 import { routineNotificationWords, type Words } from "@agenteschat/client/lib/routine-view";
 import type { TFunction } from "i18next";
+import { isDeviceNotice } from "../devices/logic";
 import { daysAgo } from "../shared/logic";
 
 /**
@@ -44,57 +45,27 @@ export function dayGroupOf(iso: string, now = new Date()): DayGroup {
   return "older";
 }
 
-/**
- * The screen's sections: waiting first, then the rest by day (empty groups left out). A server's repeated "changed
- * tools" notices are one card (`merged`: how many that left out), and one with nothing left to review leaves
- * (`settled`, given `pendingTools`): the screen takes both from the server's waiting count.
- */
+/** The screen's sections: waiting first, then the rest by day (empty groups left out). */
 export function activitySections(
   items: AppNotification[],
   filter: ActivityFilter,
   now = new Date(),
-  pendingTools: PendingTools | null = null,
-): { waiting: AppNotification[]; days: [DayGroup, AppNotification[]][]; merged: number; settled: number } {
+): { waiting: AppNotification[]; days: [DayGroup, AppNotification[]][] } {
   if (filter === "done") {
     const done = items.filter((n) => n.doneAt);
-    return { waiting: [], days: byDay(done, (n) => n.doneAt ?? n.updatedAt, now), merged: 0, settled: 0 };
+    return { waiting: [], days: byDay(done, (n) => n.doneAt ?? n.updatedAt, now) };
   }
-  const { items: one, merged } = oneToolChangePerServer(items.filter((n) => isVisible(n, now.getTime())));
-  const visible = one.filter((n) => !settledToolChange(n, pendingTools));
-  const settled = one.length - visible.length;
+  const visible = items.filter((n) => isVisible(n, now.getTime()));
   const waiting = sortWaiting(visible.filter((n) => n.waiting));
-  if (filter === "waiting") return { waiting, days: [], merged, settled };
+  if (filter === "waiting") return { waiting, days: [] };
   return {
     waiting,
-    merged,
-    settled,
     days: byDay(
       visible.filter((x) => !x.waiting),
       (n) => n.updatedAt,
       now,
     ),
   };
-}
-
-/**
- * The connections whose approved tools wait for a review (`useToolChanges`, connector admins): by id, and by name for
- * notices from before they named their server.
- */
-export interface PendingTools {
-  ids: Set<string>;
-  labels: Set<string>;
-}
-
-/**
- * A server's "changed tools" notice with nothing left to review: every change was accepted (on the web, or before the
- * notice was resolved on accepting). Its card would open an empty review, so it leaves. Unknown (`null`, not loaded
- * or not an admin): it stays.
- */
-function settledToolChange(n: AppNotification, pending: PendingTools | null): boolean {
-  if (!pending || n.kind !== "connector_tool_changed" || !n.waiting) return false;
-  const { connectionId, label } = n.source;
-  if (connectionId) return !pending.ids.has(connectionId);
-  return label ? !pending.labels.has(label) : false;
 }
 
 function byDay(list: AppNotification[], at: (n: AppNotification) => string, now: Date) {
@@ -149,11 +120,13 @@ export function subtitleOf(
     return [origin ? say(origin) : "", l.title ?? l.text ?? ""].filter(Boolean).join(" · ");
   }
   if (n.kind === "issue_assigned") return l.title ?? l.text ?? "";
+  // Its title names the device and whom the agent works for (`latest.title`): only what it is doing goes under it.
+  if (isDeviceNotice(n.kind)) return l.text ?? "";
   return written(l) || word || (l.text ?? l.title ?? "");
 }
 
-/** Where it happened ("#produto", the thread's title, the mission's name). */
-export const placeOf = (n: AppNotification) => n.source.label ?? "";
+/** Where it happened ("#produto", the thread's title, the mission's name); a device's notice names it already. */
+export const placeOf = (n: AppNotification) => (isDeviceNotice(n.kind) ? "" : (n.source.label ?? ""));
 
 /** Emojis a reaction card shows (at most 5, from the server). */
 export const emojisOf = (n: AppNotification) => (n.kind === "reaction" ? (n.latest.emojis ?? []).slice(0, 5) : []);

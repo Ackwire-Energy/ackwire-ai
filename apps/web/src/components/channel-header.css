@@ -58,9 +58,8 @@
 .channel__head-text .channel__topic > span {
   flex: none;
   line-height: 30px;
-  padding-left: 12px;
-  border-left: 1px solid var(--line2);
   white-space: nowrap;
+  color: var(--muted);
 }
 /* The header's glyphs: 32 boxes 8 apart at every width, the last one's ink on the header's padding line. */
 .channel__acts {
@@ -132,21 +131,33 @@ html:not([data-pointer]) .channel__icon.ac-btn:focus-visible {
   display: none;
 }
 
-/* The header's search field: narrow at rest, wider while it is used. */
+/* The header's search field: a soft plate with no line at rest, narrow, the field's own look and wider while used. */
 .channel__search.search-box {
-  margin-left: 4px;
-  width: 248px;
-  transition: width 0.16s var(--out);
+  margin-left: 8px;
+  width: 220px;
+  transition: width 0.2s var(--out);
 }
 .channel__search.search-box:focus-within {
-  width: 320px;
+  width: 300px;
 }
 .channel__search .search-box__field {
   flex-wrap: nowrap;
   min-height: var(--control-h-sm);
   padding: 2px 8px 2px 32px;
+  border-color: transparent;
   border-radius: var(--control-r-sm);
+  background: var(--plate-soft);
+  box-shadow: none;
   overflow: hidden;
+}
+.channel__search .search-box__field:hover {
+  background: var(--plate);
+}
+.channel__search .search-box__field:focus-within {
+  background: var(--field-bg);
+  box-shadow:
+    inset 0 0 0 1px var(--field-line),
+    var(--focus-ring);
 }
 .channel__search .search-box__icon {
   left: 10px;
@@ -159,6 +170,11 @@ html:not([data-pointer]) .channel__icon.ac-btn:focus-visible {
 }
 .channel__search .ac-token {
   flex: none;
+  border: 0;
+  border-radius: 7px;
+  background: var(--raised);
+  box-shadow: 0 0 0 1px var(--line);
+  font-weight: 550;
 }
 @media (prefers-reduced-motion: reduce) {
   .channel__search.search-box {

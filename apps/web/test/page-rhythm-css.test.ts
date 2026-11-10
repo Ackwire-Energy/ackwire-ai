@@ -63,8 +63,10 @@ test("every page starts at the page's top and side: lists, Settings, the wiki, t
   const split = atRule(await read("layout.css"), "@media (min-width: 941px) and (min-height: 560px)");
   expect(last(split, ".settings", "padding")).toBe("0 0 0 max(var(--page-x), calc(50% - 532px))");
   expect(last(split, ".settings__nav", "padding")).toBe("var(--page-top) 6px 24px");
+  // Its 12px room on the left is `--bleed`, which a strip that scrolls sideways in it runs out over.
+  expect(last(split, ".settings__body", "--bleed")).toBe("12px");
   expect(last(split, ".settings__body", "padding")).toBe(
-    "var(--page-top) max(var(--page-x), calc(100% - 1064px)) 96px 12px",
+    "var(--page-top) max(var(--page-x), calc(100% - 1064px)) 96px var(--bleed)",
   );
   const wiki = await read("pages/wiki.css");
   expect(last(topLevel(wiki), ".wiki__center", "padding")).toBe("var(--page-top) var(--page-x) 96px");

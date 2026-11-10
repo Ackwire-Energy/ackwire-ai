@@ -4,10 +4,12 @@ import { readdirSync, readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { createDiskBlobStore } from "@agenteschat/adapters";
 import type { MachineRequest } from "@agenteschat/adapters/machine-protocol";
+import { testConfig } from "@agenteschat/config";
 import { schema } from "@agenteschat/db";
 import { ARTIFACT_LIMITS, createUpload, issueManagedMachine, setProvisioning } from "@agenteschat/engine";
 import { type ModelRequest, systemText } from "@agenteschat/providers";
 import { handleRequest } from "../runner/handlers";
+import { applyBootSwitches } from "../src/start";
 import { browser, createTestServer, listen, ORIGIN, pairComputer, seedOrg, signUp, type TestServer } from "./harness";
 import { removeDirs, tempDir } from "./runner/helpers";
 
@@ -114,27 +116,29 @@ test("where each workspace gets its own computer the agents read so, and one wit
   expect(runCode?.description).not.toContain("connect one");
 });
 
-test("a server that gives each workspace its own computer refuses people's pairing; that computer still enrolls", async () => {
+test("a server that gives each workspace its own computer lets people bring theirs as targets, never homes; that computer still enrolls", async () => {
   t = await createTestServer({
     env: { ALLOW_SIGNUP: "true", MACHINE_PROVISIONING: "external", OPERATOR_API_TOKEN: "o".repeat(40) },
   });
   const owner = browser(t);
   await signUp(owner, "owner@example.com");
-  const { orgId } = await seedOrg(owner);
-  const refusal = { code: "machine.pairing_off", message: expect.stringContaining("its own computer") };
+  const { orgId, agentId } = await seedOrg(owner);
+  const api = (path: string, init?: Parameters<typeof owner>[1]) =>
+    owner(`/api/app/organizations/${orgId}${path}`, init);
 
-  // `curl …/install.sh | sh` against it stops at once: no code nobody could confirm.
-  const asked = await runnerPost("/api/machines/device", { name: "Build box", ...RUNNER });
-  expect(asked.status).toBe(403);
-  expect(await asked.json()).toEqual({ error: refusal });
-  const confirm = await owner(`/api/app/organizations/${orgId}/machines/device/K7Q4ZP/confirm`, { json: {} });
-  expect(confirm.status).toBe(403);
-  expect(await confirm.json()).toEqual({
-    error: {
-      code: "machine.pairing_off",
-      message: "This workspace has its own computer: other computers can't be connected to it.",
-    },
-  });
+  // Someone's own computer connects through the usual code; booted as the Cloud boots, it can't be an agent's home.
+  const brought = await pairComputer(t, api, { ...RUNNER, exec: true }, { name: "Build box" });
+  applyBootSwitches(t.config);
+  try {
+    const home = await api(`/agents/${agentId}/computer/target`, {
+      method: "PUT",
+      json: { machineId: brought.machineId },
+    });
+    expect(home.status).toBe(403);
+    expect(((await home.json()) as { error: { code: string } }).error.code).toBe("device.not_home");
+  } finally {
+    applyBootSwitches(testConfig());
+  }
 
   // The workspace's own computer redeems the code it was issued.
   const issued = await issueManagedMachine({ db: t.db }, orgId);

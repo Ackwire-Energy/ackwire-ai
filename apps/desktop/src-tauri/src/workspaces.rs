@@ -1,5 +1,5 @@
 //! Workspaces across servers (ADR 0154): every server of the list, read with that server's own session (the
-//! cookies the main window keeps for it, `cookies_for_url`), the way the phone app asks (no `Origin`,
+//! cookies the main window keeps for it, `sent_to`), the way the phone app asks (no `Origin`,
 //! `X-Agentes-Client: mobile`): its workspaces (`GET /api/app/me`) and their unread counts (`GET /api/app/me/unread`),
 //! every minute and when the window comes to the front. The site's workspace menu lists them by server
 //! (`this_mac` `workspaces`), Preferences › Servers shows them under each server, and a server not open in the window
@@ -49,6 +49,11 @@ pub struct ServerWorkspaces {
     /// Its session in the window's cookies still answers; false lists no workspace (sign in there again).
     pub signed_in: bool,
     pub orgs: Vec<Org>,
+    /// It didn't answer (offline, an error) since this time (Unix milliseconds): what it said last stays, marked.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub offline_since: Option<u64>,
+    /// The server the app runs on this computer (at its local or its Tailscale address): named as such, never by it.
+    pub here: bool,
 }
 
 #[derive(Default)]
@@ -77,6 +82,16 @@ pub fn list(app: &AppHandle) -> Vec<ServerWorkspaces> {
 /// The last list is older than `STALE` (or there's none yet).
 pub fn stale(app: &AppHandle) -> bool {
     lock(app).checked.map_or(true, |at| at.elapsed() > STALE)
+}
+
+/// No server read yet: the loop's first pass ran before the main window existed (there were no cookies to read).
+pub fn never_read(app: &AppHandle) -> bool {
+    lock(app).checked.is_none()
+}
+
+/// Every server read now, on the caller's thread (never a command's or an event handler's: Windows deadlocks).
+pub fn refresh_now(app: &AppHandle) {
+    refresh(app);
 }
 
 /// Asks every server again now (the loop does it on its own thread).
@@ -128,14 +143,15 @@ fn refresh(app: &AppHandle) {
     let mut next = Vec::with_capacity(file.servers.len());
     for server in &file.servers {
         let Ok(url) = server.parse::<Url>() else { continue };
-        let cookies = page.cookies_for_url(url).unwrap_or_default();
+        let cookies: Vec<_> = page.cookies().unwrap_or_default().into_iter().filter(|c| sent_to(c, &url)).collect();
         let cookie = cookie_header(cookies.iter().map(|c| (c.name(), c.value())));
+        let here = crate::local_server::is_here(app, server);
         match ask(&agent, server, &cookie, &mut logos) {
-            Some(answer) => next.push(answer),
-            // Not reached (offline, an error): what it said last stays.
+            Some(answer) => next.push(ServerWorkspaces { here, ..answer }),
+            // Not reached (offline, an error): what it said last stays, marked since when.
             None => {
                 if let Some(old) = before.iter().find(|s| &s.server == server) {
-                    next.push(old.clone());
+                    next.push(ServerWorkspaces { here, ..unreachable(old, now_ms()) });
                 }
             }
         }
@@ -152,9 +168,18 @@ fn refresh(app: &AppHandle) {
     }
 }
 
+fn now_ms() -> u64 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
+}
+
+/// A server that didn't answer: its last answer, offline since the first time it didn't.
+pub fn unreachable(last: &ServerWorkspaces, now: u64) -> ServerWorkspaces {
+    ServerWorkspaces { offline_since: last.offline_since.or(Some(now)), ..last.clone() }
+}
+
 /// One server: signed out (no session, or it refused it) lists nothing; None when it couldn't be reached.
 fn ask(agent: &ureq::Agent, server: &str, cookie: &str, logos: &mut HashMap<String, Option<String>>) -> Option<ServerWorkspaces> {
-    let signed_out = ServerWorkspaces { server: server.to_string(), signed_in: false, orgs: vec![] };
+    let signed_out = ServerWorkspaces { server: server.to_string(), signed_in: false, ..Default::default() };
     if cookie.is_empty() {
         return Some(signed_out);
     }
@@ -174,7 +199,22 @@ fn ask(agent: &ureq::Agent, server: &str, cookie: &str, logos: &mut HashMap<Stri
             Org { id, name, logo, unread, waiting }
         })
         .collect();
-    Some(ServerWorkspaces { server: server.to_string(), signed_in: true, orgs })
+    Some(ServerWorkspaces { server: server.to_string(), signed_in: true, orgs, ..Default::default() })
+}
+
+/// Who the main window is signed in as on `server` (the account's id), read with its cookies there as the minute's
+/// check does; None when signed out there or it didn't answer. Not from a command or an event handler (Windows).
+pub fn window_user(app: &AppHandle, server: &str) -> Option<String> {
+    let page = app.get_webview(main_window::LABEL)?;
+    let url = server.parse::<Url>().ok()?;
+    let cookies: Vec<_> = page.cookies().ok()?.into_iter().filter(|c| sent_to(c, &url)).collect();
+    let cookie = cookie_header(cookies.iter().map(|c| (c.name(), c.value())));
+    if cookie.is_empty() {
+        return None;
+    }
+    let agent = ureq::AgentBuilder::new().timeout(TIMEOUT).redirects(0).build();
+    let me = get_json(&agent, &format!("{server}/api/app/me"), &cookie).ok()??;
+    me.pointer("/user/id").and_then(Value::as_str).map(str::to_string)
 }
 
 /// The answer as JSON; Ok(None) when the session isn't (any longer) signed in there.
@@ -225,6 +265,45 @@ fn logo_data(
     logo
 }
 
+/// Whether the window's cookie goes with a request to `url`. Not wry's `cookies_for_url`: it compares the cookie's
+/// domain with `Url::domain`, which is None for an IP address, so the server on this computer
+/// (`http://127.0.0.1:4310`) got no cookie, read as signed out and left the site's workspace menu.
+pub fn sent_to<C: CookieLike>(cookie: &C, url: &Url) -> bool {
+    cookie_for(cookie.domain_of(), cookie.secure_of(), cookie.path_of(), url)
+}
+
+/// The cookie crate's `Cookie`, as `sent_to` reads it (a trait so the rule is tested without a web view).
+pub trait CookieLike {
+    fn domain_of(&self) -> Option<&str>;
+    fn secure_of(&self) -> bool;
+    fn path_of(&self) -> Option<&str>;
+}
+
+impl CookieLike for tauri::webview::Cookie<'_> {
+    fn domain_of(&self) -> Option<&str> {
+        self.domain()
+    }
+    fn secure_of(&self) -> bool {
+        self.secure().unwrap_or(false)
+    }
+    fn path_of(&self) -> Option<&str> {
+        self.path()
+    }
+}
+
+/// The browser's rule, enough for our servers: the same host (an IP address too) or a parent domain the cookie names
+/// (".example.com"), a path the request's starts with, and a secure cookie only over https or on this computer.
+pub fn cookie_for(domain: Option<&str>, secure: bool, path: Option<&str>, url: &Url) -> bool {
+    let (Some(host), Some(domain)) = (url.host_str(), domain) else { return false };
+    let host = host.trim_start_matches('[').trim_end_matches(']').to_ascii_lowercase();
+    let domain = domain.trim_start_matches('.').to_ascii_lowercase();
+    let host_ok = host == domain || (url.domain().is_some() && host.ends_with(&format!(".{domain}")));
+    let here = host == "localhost" || host.parse::<std::net::IpAddr>().is_ok_and(|ip| ip.is_loopback());
+    let secure_ok = !secure || url.scheme() == "https" || here;
+    let path_ok = path.is_none_or(|p| p.is_empty() || url.path().starts_with(p));
+    host_ok && secure_ok && path_ok
+}
+
 /// The `Cookie` header for a server from the window's cookies for it.
 pub fn cookie_header<'a>(cookies: impl Iterator<Item = (&'a str, &'a str)>) -> String {
     cookies
@@ -235,7 +314,7 @@ pub fn cookie_header<'a>(cookies: impl Iterator<Item = (&'a str, &'a str)>) -> S
 }
 
 /// An id the app passes on (`orgId` in main_window.rs): letters, digits, `-` and `_`.
-fn good_id(id: &str) -> bool {
+pub(crate) fn good_id(id: &str) -> bool {
     !id.is_empty() && id.len() <= 64 && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
 }
 
@@ -292,26 +371,40 @@ pub fn news(before: &[ServerWorkspaces], after: &[ServerWorkspaces], open: Optio
     told
 }
 
-/// How a server is named to people: agentes.chat for the Cloud, its host otherwise.
-pub fn server_name(server: &str, cloud_name: &str) -> String {
+/// How a server is named to people: agentes.chat for the Cloud, the app's own server by what it is (never its
+/// local or Tailscale address), its host otherwise.
+pub fn server_name(server: &str, cloud_name: &str, here_name: Option<&str>) -> String {
     if server == servers::CLOUD {
         return cloud_name.to_string();
     }
-    server.parse::<Url>().ok().and_then(|u| u.host_str().map(str::to_string)).unwrap_or_else(|| server.to_string())
+    if let Some(name) = here_name {
+        return name.to_string();
+    }
+    // Host and port, as the site names it (`serverHost`): two servers on one computer stay apart.
+    let named = |u: Url| u.host_str().map(|h| u.port().map_or_else(|| h.to_string(), |p| format!("{h}:{p}")));
+    server.parse::<Url>().ok().and_then(named).unwrap_or_else(|| server.to_string())
 }
 
 /// The notification's words: "Workspace · server" and "1 new notification" / "3 new notifications" (the
-/// popover's labels, in the app's language; nothing is told before they arrived).
-pub fn notice_text(labels: &HashMap<String, String>, server: &str, org: &str, count: u64) -> Option<(String, String)> {
+/// popover's labels, in the app's language; nothing is told before they arrived). `here`: the app's own server.
+pub fn notice_text(
+    labels: &HashMap<String, String>,
+    server: &str,
+    here: bool,
+    org: &str,
+    count: u64,
+) -> Option<(String, String)> {
     let cloud = labels.get("serversCloud")?;
     let body = if count == 1 { labels.get("workspaceNewsOne")? } else { labels.get("workspaceNewsMany")? };
-    let title: String = format!("{org} · {}", server_name(server, cloud)).chars().take(80).collect();
+    let here_name = if here { Some(labels.get("serverTitle")?.as_str()) } else { None };
+    let title: String = format!("{org} · {}", server_name(server, cloud, here_name)).chars().take(80).collect();
     Some((title, body.replace("{count}", &count.to_string())))
 }
 
 fn tell(app: &AppHandle, server: &str, org: &Org, count: u64) {
     let labels = crate::menus::labels(app);
-    let Some((title, body)) = notice_text(&labels, server, &org.name, count) else { return };
+    let here = crate::local_server::is_here(app, server);
+    let Some((title, body)) = notice_text(&labels, server, here, &org.name, count) else { return };
     let Ok(url) = format!("{server}/org/{}/notifications", org.id).parse::<Url>() else { return };
     main_window::notice(app, &title, &body, url);
 }
@@ -326,6 +419,92 @@ pub fn workspaces_get(app: AppHandle, window: tauri::Window) -> Result<Vec<Serve
         trigger(&app);
     }
     Ok(list(&app))
+}
+
+/// What the app's own windows may ask a server with its session (`site_fetch`): this computer's devices and who can
+/// use them, a phone's Stop, and the workspace's people and roles for the rule's picker. Nothing else.
+pub fn site_path_allowed(method: &str, path: &str) -> bool {
+    if path.len() > 512 || path.contains(['?', '#', '%', '\\']) {
+        return false;
+    }
+    let parts: Vec<&str> = path.split('/').collect();
+    let ["", "api", "app", "organizations", org, rest @ ..] = parts.as_slice() else { return false };
+    good_id(org)
+        && match (method, rest) {
+            ("GET", ["devices" | "members" | "roles"]) => true,
+            ("PATCH", ["devices", "computers" | "phones", id]) => good_id(id),
+            ("POST", ["devices", "phones", id, "stop"]) => good_id(id),
+            _ => false,
+        }
+}
+
+/// A request body's size (a device's rule with its people).
+const SITE_BODY_MAX: usize = 64 * 1024;
+
+#[derive(Debug, Serialize)]
+pub struct SiteAnswer {
+    pub status: u16,
+    pub body: String,
+}
+
+/// One request to `server` (a server of the app's list) with the main window's session for it, the way the phone
+/// app asks. Blocking: reading the cookies waits for the web view, so never from a command's or an event's own thread.
+pub fn with_session(
+    app: &AppHandle,
+    server: &str,
+    method: &str,
+    path: &str,
+    body: Option<&str>,
+) -> Result<SiteAnswer, String> {
+    if !servers::get(app).servers.iter().any(|s| s == server) {
+        return Err("not a server of this app".into());
+    }
+    if !site_path_allowed(method, path) || body.is_some_and(|b| b.len() > SITE_BODY_MAX) {
+        return Err("not allowed".into());
+    }
+    let url: Url = format!("{server}{path}").parse().map_err(|_| "bad address")?;
+    let page = app.get_webview(main_window::LABEL).ok_or("signed_out")?;
+    let cookies = page.cookies_for_url(url.clone()).unwrap_or_default();
+    let cookie = cookie_header(cookies.iter().map(|c| (c.name(), c.value())));
+    if cookie.is_empty() {
+        return Err("signed_out".into());
+    }
+    let agent = ureq::AgentBuilder::new().timeout(TIMEOUT).redirects(0).build();
+    let request = agent
+        .request(method, url.as_str())
+        .set("Cookie", &cookie)
+        .set("X-Agentes-Client", "mobile")
+        .set("Accept", "application/json");
+    let sent = match body {
+        Some(body) => request.set("Content-Type", "application/json").send_string(body),
+        None => request.call(),
+    };
+    let response = match sent {
+        Ok(response) | Err(ureq::Error::Status(_, response)) => response,
+        Err(e) => return Err(e.to_string()),
+    };
+    let status = response.status();
+    let mut text = String::new();
+    response.into_reader().take(BODY_MAX).read_to_string(&mut text).map_err(|e| e.to_string())?;
+    Ok(SiteAnswer { status, body: text })
+}
+
+/// Preferences › This Mac reads and sets this computer's devices on its server (`with_session`).
+#[tauri::command]
+pub async fn site_fetch(
+    app: AppHandle,
+    window: tauri::Window,
+    server: String,
+    method: String,
+    path: String,
+    body: Option<String>,
+) -> Result<SiteAnswer, String> {
+    if window.label() != "prefs" {
+        return Err("only Preferences asks this".into());
+    }
+    tauri::async_runtime::spawn_blocking(move || with_session(&app, &server, &method, &path, body.as_deref()))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 /// How the welcome window opens next, taken once: `add` when the site's "Add a workspace" opened it.
@@ -349,7 +528,34 @@ mod tests {
         Org { id: id.into(), name: id.to_uppercase(), logo: None, unread, waiting: 0 }
     }
     fn server(s: &str, signed_in: bool, orgs: Vec<Org>) -> ServerWorkspaces {
-        ServerWorkspaces { server: s.into(), signed_in, orgs }
+        ServerWorkspaces { server: s.into(), signed_in, orgs, ..Default::default() }
+    }
+
+    #[test]
+    fn the_window_cookies_a_server_gets() {
+        let url = |u: &str| u.parse::<Url>().unwrap();
+        // The server on this computer, by its IP address: wry's own lookup gave it none.
+        assert!(cookie_for(Some("127.0.0.1"), false, Some("/"), &url("http://127.0.0.1:4310")));
+        assert!(cookie_for(Some("localhost"), true, Some("/"), &url("http://localhost:3000")));
+        assert!(cookie_for(Some(".exemplo.com.br"), true, Some("/"), &url("https://agentes.exemplo.com.br")));
+        assert!(cookie_for(Some("agentes.exemplo.com.br"), true, None, &url("https://agentes.exemplo.com.br/x")));
+        // Another host, a secure cookie over plain http elsewhere, another path: not sent.
+        assert!(!cookie_for(Some("agentes-1.tail1234.ts.net"), true, Some("/"), &url("https://agentes.tail1234.ts.net")));
+        assert!(!cookie_for(Some("chat.example.com"), true, Some("/"), &url("http://chat.example.com")));
+        assert!(!cookie_for(Some("127.0.0.1"), false, Some("/api/auth"), &url("http://127.0.0.1:4310/")));
+        assert!(!cookie_for(None, false, Some("/"), &url("http://127.0.0.1:4310")));
+        // An IP address never takes a parent domain's cookie.
+        assert!(!cookie_for(Some("0.0.1"), false, Some("/"), &url("http://127.0.0.1:4310")));
+    }
+
+    #[test]
+    fn a_server_that_stopped_answering() {
+        let last = server("https://agentes.exemplo.com.br", true, vec![]);
+        let first = unreachable(&last, 1_000);
+        assert_eq!(first.offline_since, Some(1_000));
+        assert!(first.signed_in, "its last answer stays");
+        // Still not answering a minute later: offline since the first time.
+        assert_eq!(unreachable(&first, 61_000).offline_since, Some(1_000));
     }
 
     #[test]
@@ -384,6 +590,30 @@ mod tests {
     }
 
     #[test]
+    fn only_the_devices_paths_go_with_the_session() {
+        let org = "/api/app/organizations/o-1";
+        assert!(site_path_allowed("GET", &format!("{org}/devices")));
+        assert!(site_path_allowed("GET", &format!("{org}/members")));
+        assert!(site_path_allowed("GET", &format!("{org}/roles")));
+        assert!(site_path_allowed("PATCH", &format!("{org}/devices/computers/m-1")));
+        assert!(site_path_allowed("PATCH", &format!("{org}/devices/phones/p-1")));
+        assert!(site_path_allowed("POST", &format!("{org}/devices/phones/p-1/stop")));
+        for (method, path) in [
+            ("DELETE", format!("{org}/devices/computers/m-1")),
+            ("POST", format!("{org}/devices/connect-links")),
+            ("GET", format!("{org}/devices?x=1")),
+            ("GET", format!("{org}/devices/")),
+            ("PATCH", format!("{org}/devices/phones/../stop")),
+            ("GET", "/api/app/organizations/../x/devices".into()),
+            ("GET", "/api/app/me".into()),
+            ("GET", format!("{org}/channels")),
+            ("POST", format!("{org}/devices/phones/p%2F1/stop")),
+        ] {
+            assert!(!site_path_allowed(method, &path), "{method} {path}");
+        }
+    }
+
+    #[test]
     fn the_cookie_header() {
         let header = cookie_header(
             [("__Secure-better-auth.session_token", "abc.def"), ("x", "a;b"), ("", "v"), ("theme", "dark")].into_iter(),
@@ -413,6 +643,7 @@ mod tests {
     fn notice_words() {
         let labels: HashMap<String, String> = [
             ("serversCloud", "agentes.chat"),
+            ("serverTitle", "O agentes.chat neste Mac"),
             ("workspaceNewsOne", "1 notificação nova"),
             ("workspaceNewsMany", "{count} notificações novas"),
         ]
@@ -420,13 +651,18 @@ mod tests {
         .map(|(k, v)| (k.to_string(), v.to_string()))
         .collect();
         assert_eq!(
-            notice_text(&labels, "https://agentes.exemplo.com.br", "Oficina", 3),
+            notice_text(&labels, "https://agentes.exemplo.com.br", false, "Oficina", 3),
             Some(("Oficina · agentes.exemplo.com.br".into(), "3 notificações novas".into()))
         );
         assert_eq!(
-            notice_text(&labels, servers::CLOUD, "Acme", 1),
+            notice_text(&labels, servers::CLOUD, false, "Acme", 1),
             Some(("Acme · agentes.chat".into(), "1 notificação nova".into()))
         );
-        assert_eq!(notice_text(&HashMap::new(), servers::CLOUD, "Acme", 1), None, "before the labels arrived");
+        // The app's own server by what it is, at its local or its Tailscale address alike.
+        assert_eq!(
+            notice_text(&labels, "https://macbook-air.tail1234.ts.net", true, "Oficina", 1),
+            Some(("Oficina · O agentes.chat neste Mac".into(), "1 notificação nova".into()))
+        );
+        assert_eq!(notice_text(&HashMap::new(), servers::CLOUD, false, "Acme", 1), None, "before the labels arrived");
     }
 }

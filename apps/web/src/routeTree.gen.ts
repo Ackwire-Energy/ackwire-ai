@@ -59,6 +59,10 @@ import { Route as OrgOrgIdAgentsAgentIdMemoryRouteImport } from './routes/org.$o
 import { Route as OrgOrgIdDmAgentAgentIdRouteImport } from './routes/org.$orgId.dm.agent.$agentId'
 import { Route as OrgOrgIdDmPersonUserIdRouteImport } from './routes/org.$orgId.dm.person.$userId'
 import { Route as OrgOrgIdSettingsComputersMachineIdRouteImport } from './routes/org.$orgId.settings_.computers.$machineId'
+import { Route as OrgOrgIdSettingsDevicesDeviceIdRouteImport } from './routes/org.$orgId.settings_.devices.$deviceId'
+import { Route as OrgOrgIdSettingsDevicesAndroidSetupRouteImport } from './routes/org.$orgId.settings_.devices.android-setup'
+import { Route as OrgOrgIdSettingsDevicesIphoneSetupRouteImport } from './routes/org.$orgId.settings_.devices.iphone-setup'
+import { Route as OrgOrgIdSettingsDevicesPhonesPhoneIdRouteImport } from './routes/org.$orgId.settings_.devices.phones.$phoneId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -314,6 +318,30 @@ const OrgOrgIdSettingsComputersMachineIdRoute =
     path: '/settings/computers/$machineId',
     getParentRoute: () => OrgOrgIdRoute,
   } as any)
+const OrgOrgIdSettingsDevicesDeviceIdRoute =
+  OrgOrgIdSettingsDevicesDeviceIdRouteImport.update({
+    id: '/settings_/devices/$deviceId',
+    path: '/settings/devices/$deviceId',
+    getParentRoute: () => OrgOrgIdRoute,
+  } as any)
+const OrgOrgIdSettingsDevicesAndroidSetupRoute =
+  OrgOrgIdSettingsDevicesAndroidSetupRouteImport.update({
+    id: '/settings_/devices/android-setup',
+    path: '/settings/devices/android-setup',
+    getParentRoute: () => OrgOrgIdRoute,
+  } as any)
+const OrgOrgIdSettingsDevicesIphoneSetupRoute =
+  OrgOrgIdSettingsDevicesIphoneSetupRouteImport.update({
+    id: '/settings_/devices/iphone-setup',
+    path: '/settings/devices/iphone-setup',
+    getParentRoute: () => OrgOrgIdRoute,
+  } as any)
+const OrgOrgIdSettingsDevicesPhonesPhoneIdRoute =
+  OrgOrgIdSettingsDevicesPhonesPhoneIdRouteImport.update({
+    id: '/settings_/devices/phones/$phoneId',
+    path: '/settings/devices/phones/$phoneId',
+    getParentRoute: () => OrgOrgIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -365,7 +393,11 @@ export interface FileRoutesByFullPath {
   '/org/$orgId/dm/agent/$agentId': typeof OrgOrgIdDmAgentAgentIdRoute
   '/org/$orgId/dm/person/$userId': typeof OrgOrgIdDmPersonUserIdRoute
   '/org/$orgId/settings/computers/$machineId': typeof OrgOrgIdSettingsComputersMachineIdRoute
+  '/org/$orgId/settings/devices/$deviceId': typeof OrgOrgIdSettingsDevicesDeviceIdRoute
+  '/org/$orgId/settings/devices/android-setup': typeof OrgOrgIdSettingsDevicesAndroidSetupRoute
+  '/org/$orgId/settings/devices/iphone-setup': typeof OrgOrgIdSettingsDevicesIphoneSetupRoute
   '/org/$orgId/agents/$agentId/': typeof OrgOrgIdAgentsAgentIdIndexRoute
+  '/org/$orgId/settings/devices/phones/$phoneId': typeof OrgOrgIdSettingsDevicesPhonesPhoneIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -416,7 +448,11 @@ export interface FileRoutesByTo {
   '/org/$orgId/dm/agent/$agentId': typeof OrgOrgIdDmAgentAgentIdRoute
   '/org/$orgId/dm/person/$userId': typeof OrgOrgIdDmPersonUserIdRoute
   '/org/$orgId/settings/computers/$machineId': typeof OrgOrgIdSettingsComputersMachineIdRoute
+  '/org/$orgId/settings/devices/$deviceId': typeof OrgOrgIdSettingsDevicesDeviceIdRoute
+  '/org/$orgId/settings/devices/android-setup': typeof OrgOrgIdSettingsDevicesAndroidSetupRoute
+  '/org/$orgId/settings/devices/iphone-setup': typeof OrgOrgIdSettingsDevicesIphoneSetupRoute
   '/org/$orgId/agents/$agentId': typeof OrgOrgIdAgentsAgentIdIndexRoute
+  '/org/$orgId/settings/devices/phones/$phoneId': typeof OrgOrgIdSettingsDevicesPhonesPhoneIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -469,7 +505,11 @@ export interface FileRoutesById {
   '/org/$orgId/dm/agent/$agentId': typeof OrgOrgIdDmAgentAgentIdRoute
   '/org/$orgId/dm/person/$userId': typeof OrgOrgIdDmPersonUserIdRoute
   '/org/$orgId/settings_/computers/$machineId': typeof OrgOrgIdSettingsComputersMachineIdRoute
+  '/org/$orgId/settings_/devices/$deviceId': typeof OrgOrgIdSettingsDevicesDeviceIdRoute
+  '/org/$orgId/settings_/devices/android-setup': typeof OrgOrgIdSettingsDevicesAndroidSetupRoute
+  '/org/$orgId/settings_/devices/iphone-setup': typeof OrgOrgIdSettingsDevicesIphoneSetupRoute
   '/org/$orgId/agents/$agentId/': typeof OrgOrgIdAgentsAgentIdIndexRoute
+  '/org/$orgId/settings_/devices/phones/$phoneId': typeof OrgOrgIdSettingsDevicesPhonesPhoneIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -523,7 +563,11 @@ export interface FileRouteTypes {
     | '/org/$orgId/dm/agent/$agentId'
     | '/org/$orgId/dm/person/$userId'
     | '/org/$orgId/settings/computers/$machineId'
+    | '/org/$orgId/settings/devices/$deviceId'
+    | '/org/$orgId/settings/devices/android-setup'
+    | '/org/$orgId/settings/devices/iphone-setup'
     | '/org/$orgId/agents/$agentId/'
+    | '/org/$orgId/settings/devices/phones/$phoneId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -574,7 +618,11 @@ export interface FileRouteTypes {
     | '/org/$orgId/dm/agent/$agentId'
     | '/org/$orgId/dm/person/$userId'
     | '/org/$orgId/settings/computers/$machineId'
+    | '/org/$orgId/settings/devices/$deviceId'
+    | '/org/$orgId/settings/devices/android-setup'
+    | '/org/$orgId/settings/devices/iphone-setup'
     | '/org/$orgId/agents/$agentId'
+    | '/org/$orgId/settings/devices/phones/$phoneId'
   id:
     | '__root__'
     | '/'
@@ -626,7 +674,11 @@ export interface FileRouteTypes {
     | '/org/$orgId/dm/agent/$agentId'
     | '/org/$orgId/dm/person/$userId'
     | '/org/$orgId/settings_/computers/$machineId'
+    | '/org/$orgId/settings_/devices/$deviceId'
+    | '/org/$orgId/settings_/devices/android-setup'
+    | '/org/$orgId/settings_/devices/iphone-setup'
     | '/org/$orgId/agents/$agentId/'
+    | '/org/$orgId/settings_/devices/phones/$phoneId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -1004,6 +1056,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OrgOrgIdSettingsComputersMachineIdRouteImport
       parentRoute: typeof OrgOrgIdRoute
     }
+    '/org/$orgId/settings_/devices/$deviceId': {
+      id: '/org/$orgId/settings_/devices/$deviceId'
+      path: '/settings/devices/$deviceId'
+      fullPath: '/org/$orgId/settings/devices/$deviceId'
+      preLoaderRoute: typeof OrgOrgIdSettingsDevicesDeviceIdRouteImport
+      parentRoute: typeof OrgOrgIdRoute
+    }
+    '/org/$orgId/settings_/devices/android-setup': {
+      id: '/org/$orgId/settings_/devices/android-setup'
+      path: '/settings/devices/android-setup'
+      fullPath: '/org/$orgId/settings/devices/android-setup'
+      preLoaderRoute: typeof OrgOrgIdSettingsDevicesAndroidSetupRouteImport
+      parentRoute: typeof OrgOrgIdRoute
+    }
+    '/org/$orgId/settings_/devices/iphone-setup': {
+      id: '/org/$orgId/settings_/devices/iphone-setup'
+      path: '/settings/devices/iphone-setup'
+      fullPath: '/org/$orgId/settings/devices/iphone-setup'
+      preLoaderRoute: typeof OrgOrgIdSettingsDevicesIphoneSetupRouteImport
+      parentRoute: typeof OrgOrgIdRoute
+    }
+    '/org/$orgId/settings_/devices/phones/$phoneId': {
+      id: '/org/$orgId/settings_/devices/phones/$phoneId'
+      path: '/settings/devices/phones/$phoneId'
+      fullPath: '/org/$orgId/settings/devices/phones/$phoneId'
+      preLoaderRoute: typeof OrgOrgIdSettingsDevicesPhonesPhoneIdRouteImport
+      parentRoute: typeof OrgOrgIdRoute
+    }
   }
 }
 
@@ -1037,7 +1117,11 @@ interface OrgOrgIdRouteChildren {
   OrgOrgIdDmAgentAgentIdRoute: typeof OrgOrgIdDmAgentAgentIdRoute
   OrgOrgIdDmPersonUserIdRoute: typeof OrgOrgIdDmPersonUserIdRoute
   OrgOrgIdSettingsComputersMachineIdRoute: typeof OrgOrgIdSettingsComputersMachineIdRoute
+  OrgOrgIdSettingsDevicesDeviceIdRoute: typeof OrgOrgIdSettingsDevicesDeviceIdRoute
+  OrgOrgIdSettingsDevicesAndroidSetupRoute: typeof OrgOrgIdSettingsDevicesAndroidSetupRoute
+  OrgOrgIdSettingsDevicesIphoneSetupRoute: typeof OrgOrgIdSettingsDevicesIphoneSetupRoute
   OrgOrgIdAgentsAgentIdIndexRoute: typeof OrgOrgIdAgentsAgentIdIndexRoute
+  OrgOrgIdSettingsDevicesPhonesPhoneIdRoute: typeof OrgOrgIdSettingsDevicesPhonesPhoneIdRoute
 }
 
 const OrgOrgIdRouteChildren: OrgOrgIdRouteChildren = {
@@ -1071,7 +1155,14 @@ const OrgOrgIdRouteChildren: OrgOrgIdRouteChildren = {
   OrgOrgIdDmPersonUserIdRoute: OrgOrgIdDmPersonUserIdRoute,
   OrgOrgIdSettingsComputersMachineIdRoute:
     OrgOrgIdSettingsComputersMachineIdRoute,
+  OrgOrgIdSettingsDevicesDeviceIdRoute: OrgOrgIdSettingsDevicesDeviceIdRoute,
+  OrgOrgIdSettingsDevicesAndroidSetupRoute:
+    OrgOrgIdSettingsDevicesAndroidSetupRoute,
+  OrgOrgIdSettingsDevicesIphoneSetupRoute:
+    OrgOrgIdSettingsDevicesIphoneSetupRoute,
   OrgOrgIdAgentsAgentIdIndexRoute: OrgOrgIdAgentsAgentIdIndexRoute,
+  OrgOrgIdSettingsDevicesPhonesPhoneIdRoute:
+    OrgOrgIdSettingsDevicesPhonesPhoneIdRoute,
 }
 
 const OrgOrgIdRouteWithChildren = OrgOrgIdRoute._addFileChildren(

@@ -13,6 +13,7 @@ import { formatPercent, formatShortDate, formatTokensShort, formatUsd } from "@a
 import { can } from "@agenteschat/client/lib/permissions";
 import { accountShares, noWindowsText, planMeterText, splitUsage } from "@agenteschat/client/lib/plan-usage";
 import { parseAmount } from "@agenteschat/client/lib/text";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { gradientOf } from "@agenteschat/ui/agent/engine";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -118,7 +119,12 @@ export function UsageScreen() {
                         <View style={styles.machineName}>
                           <Icon name="laptop" size={12} color={c.faint} />
                           <Text variant="caption" tone="faint" style={[styles.caps, styles.shrink]}>
-                            {computerNameOf(t, org?.name ?? "", list[0]?.machineName ?? "").toLocaleUpperCase()}
+                            {computerNameOf(
+                              t,
+                              org?.name ?? "",
+                              list[0]?.machineName ?? "",
+                              isPersonal(org),
+                            ).toLocaleUpperCase()}
                           </Text>
                         </View>
                         {list.map((a, i) => (

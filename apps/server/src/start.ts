@@ -75,6 +75,7 @@ import {
   retireMillionSendMailboxes,
   setMessageLinkBase,
   setRestrictionNotices,
+  setWorkspaceComputers,
   surfaceRoomFiles,
   vapidKeys,
   vapidSubject,
@@ -128,6 +129,8 @@ export function applyBootSwitches(config: Config) {
   setMessageLinkBase(config.PUBLIC_URL);
   // The operator API's events feed records only while that API is on (ADR 0056).
   enableOperatorEvents(Boolean(config.OPERATOR_API_TOKEN));
+  // Where each workspace gets its own computer, the computers people bring are targets, never agents' homes.
+  setWorkspaceComputers(config.MACHINE_PROVISIONING === "external");
 }
 
 /**
@@ -393,6 +396,7 @@ async function boot(
     pubsub: adapters.pubsub,
     context: engine.context,
     artifacts: engine.artifacts,
+    feedbackFiles: { db: database.db, blobs: adapters.platformBlobs },
     voice: engine.voice,
     approvalDigest: { publicUrl: config.PUBLIC_URL, afterHours: config.APPROVAL_REMINDER_HOURS },
     mail: { deps: engine.mail, pollSeconds: config.MAIL_POLL_SECONDS },
@@ -401,6 +405,12 @@ async function boot(
     ...(config.OPS_REPORT_EMAIL?.length
       ? { opsReport: { to: config.OPS_REPORT_EMAIL, publicUrl: config.PUBLIC_URL } }
       : {}),
+    outbox: {
+      maxInFlight: config.OUTBOX_MAX_IN_FLIGHT,
+      quickSlots: config.OUTBOX_QUICK_SLOTS,
+      ceiling: config.OUTBOX_MAX_IN_FLIGHT_CEILING,
+      dbConnections: database.client ? config.DATABASE_POOL_MAX : 1,
+    },
     log,
   });
   const telemetry = startTelemetry({ db: database.db, config, log });

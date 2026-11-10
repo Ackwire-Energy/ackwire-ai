@@ -1,15 +1,12 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { Main } from "@/components/Main";
-import { SettingsPage } from "@/pages/SettingsPage";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
-/** Configurações → Computadores → one computer: its state, folders and tools (ADR 0036). */
+/** The old address of a computer's page (links in emails and notifications): it is a device's page now. */
 export const Route = createFileRoute("/org/$orgId/settings_/computers/$machineId")({
-  component: function MachineRoute() {
-    const { machineId } = Route.useParams();
-    return (
-      <Main>
-        <SettingsPage section="computers" machineId={machineId} />
-      </Main>
-    );
+  beforeLoad: ({ params }) => {
+    throw redirect({
+      to: "/org/$orgId/settings/devices/$deviceId",
+      params: { orgId: params.orgId, deviceId: params.machineId },
+      replace: true,
+    });
   },
 });

@@ -14,6 +14,7 @@ import {
   mineOnRight,
   textSizeOf,
 } from "@agenteschat/client/lib/chat-look";
+import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
 import type { AgentColorName } from "@agenteschat/ui/agent/engine";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -477,7 +478,8 @@ export function ChatLookPage() {
   const [kind, setKind] = useState<"channels" | "dms">("channels");
   const dm = kind === "dms";
   const prefs = org?.chatPrefs;
-  const { style, tone } = chatLookOf(prefs, dm);
+  // A personal workspace's channels are its group conversations, in bubbles until the person picks (ADR 0159).
+  const { style, tone } = chatLookOf(prefs, dm, isPersonal(org));
   const textSize = textSizeOf(prefs);
   // While the slider moves the preview follows it; the size is saved when the thumb lands.
   const [sizeDraft, setSizeDraft] = useState<ChatTextSize | null>(null);
@@ -493,6 +495,7 @@ export function ChatLookPage() {
         toast({ title: t("settings.account.activityFailed"), icon: "x" });
       },
     });
+  const toneLabel = t(dm ? "settings.account.chat.toneDms" : modeKey(org, "settings.account.chat.toneChannels"));
   const names: Record<ChatStyle, string> = {
     comfortable: t("settings.account.chat.comfortable"),
     left: t("settings.account.chat.left"),
@@ -512,7 +515,7 @@ export function ChatLookPage() {
       <Segmented
         wide
         items={[
-          { key: "channels", label: t("settings.account.chat.channels") },
+          { key: "channels", label: t(modeKey(org, "settings.account.chat.channels")) },
           { key: "dms", label: t("settings.account.chat.dms") },
         ]}
         value={kind}
@@ -533,13 +536,11 @@ export function ChatLookPage() {
         <>
           <GroupedHeader
             hint={{
-              name: t("common.about", {
-                label: t(dm ? "settings.account.chat.toneDms" : "settings.account.chat.toneChannels"),
-              }),
+              name: t("common.about", { label: toneLabel }),
               text: t(dm ? "settings.account.chat.toneDmsHelp" : "settings.account.chat.toneChannelsHelp"),
             }}
           >
-            {t(dm ? "settings.account.chat.toneDms" : "settings.account.chat.toneChannels")}
+            {toneLabel}
           </GroupedHeader>
           <Segmented
             wide

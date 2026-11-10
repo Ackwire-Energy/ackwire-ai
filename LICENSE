@@ -1,38 +1,3 @@
-agentes.chat — Copyright (C) 2026 Codari Global, LLC and contributors
-
-Unless a file or package says otherwise, this repository is licensed under the
-GNU Affero General Public License version 3 only (SPDX: AGPL-3.0-only), below.
-Packages with their own LICENSE file and package.json "license" (published SDKs,
-CLIs) are licensed as stated there. Third-party components keep their licenses
-(NOTICE).
-
-ADDITIONAL PERMISSION UNDER AGPL-3.0 SECTION 7 (application stores)
-You may convey object code of the client applications in apps/mobile and
-apps/desktop, including the parts of this repository they contain, through an
-application store or marketplace whose terms restrict recipients (usage rules,
-device limits, DRM); those terms alone are not treated as further restrictions
-under section 10, provided you otherwise comply with this License, including by
-offering the Corresponding Source under this License, at no charge, through a
-means not subject to those terms.
-
-ADDITIONAL TERM UNDER AGPL-3.0 SECTION 7(b) (attribution)
-Every copy of this work, and every modified version or work based on it, that has
-an interactive user interface must keep this attribution in its Appropriate
-Legal Notices (section 0), where everyone who uses it, including remotely over a
-network, can find it from its settings or menus (such as an About screen):
-
-    Based on agentes.chat by Codari Global, LLC (https://agentes.chat)
-
-You may show your own name, product name and branding next to it, and translate
-it, but you may not remove it, hide it, change its meaning or present the work as
-made only by you. Keeping it uses the name only to say where the work comes
-from; it grants no other right to the trademarks below.
-
-TRADEMARKS: this License grants no rights to "agentes", "agentes.chat" or their
-logos (section 7(e)). See TRADEMARKS.md.
-
---------------------------------------------------------------------------------
-
 GNU AFFERO GENERAL PUBLIC LICENSE
 Version 3, 19 November 2007
 
@@ -268,3 +233,10 @@ Also add information on how to contact you by electronic and paper mail.
 If your software can interact with users remotely through a computer network, you should also make sure that it provides a way for users to get its source.  For example, if your program is a web application, its interface could display a "Source" link that leads users to an archive of the code.  There are many ways you could offer source, and different solutions will be better for different programs; see section 13 for the specific requirements.
 
 You should also get your employer (if you work as a programmer) or school, if any, to sign a "copyright disclaimer" for the program, if necessary. For more information on this, and how to apply and follow the GNU AGPL, see <http://www.gnu.org/licenses/>.
+
+--------------------------------------------------------------------------------
+
+agentes.chat — Copyright (C) 2026 Codari Global, LLC and contributors. This repository is
+licensed under the license above, with the additional permission under section 7 (application
+stores), the attribution term under section 7(b) and the trademark notice (section 7(e)) stated at
+the top of the NOTICE file.

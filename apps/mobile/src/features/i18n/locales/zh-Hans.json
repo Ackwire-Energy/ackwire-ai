@@ -126,6 +126,7 @@
     "refuseTitle": "拒绝请求",
     "refuseAsk": "拒绝请求？",
     "leaves": "会发到公司外部",
+    "leavesPersonal": "会发到你的工作区外部",
     "refuseWhyF": "{{name}} 会从原因中学习。可选。",
     "refuseWhyM": "{{name}} 会从原因中学习。可选。",
     "sheet": {
@@ -161,6 +162,7 @@
       "irreversible": "无法撤销",
       "reversible": "可以撤销",
       "external": "会发到公司外部",
+      "externalPersonal": "会发到你的工作区外部",
       "unsent": "不会发送任何内容",
       "deletable": "可以删除"
     },
@@ -229,6 +231,9 @@
     "newChannelHint": "用于团队或话题",
     "channelPlaceholder": "频道名称，例如 marketing",
     "createChannel": "创建频道",
+    "newChannelHintPersonal": "围绕一个话题，和多个智能体一起",
+    "channelPlaceholderPersonal": "名称，例如 旅行",
+    "createChannelPersonal": "创建群组对话",
     "waitIn": "在 {{where}}",
     "workingNowLine_other": "{{count}} 个智能体正在工作",
     "nobodyWorking": "目前没有智能体在工作",
@@ -238,6 +243,7 @@
       "unmute": "取消静音"
     },
     "firstRunLine": "{{name}} 正在组建团队 · {{done}}/{{total}}",
+    "firstRunLinePersonal": "{{name}} 正在准备你的智能体 · {{done}}/{{total}}",
     "first": {
       "title": "从你的第一个智能体开始",
       "subtitle": "给它起个名字，说明它做什么。它会以聊天的形式出现在这里。",
@@ -266,6 +272,8 @@
     "chat": "和…聊天",
     "name": "名称",
     "channelFine": "用于团队或话题。",
+    "channelPersonal": "群组对话",
+    "channelFinePersonal": "围绕一个话题，和多个智能体一起。",
     "chatSearch": "搜索成员或智能体",
     "to": "发给：",
     "people": "成员",
@@ -278,6 +286,7 @@
     "routineHint": "智能体按计划自行完成",
     "wikiPage": "Wiki 页面",
     "wikiHint": "供团队和智能体阅读",
+    "wikiHintPersonal": "供你的智能体阅读",
     "inviteHint": "通过邮箱或链接",
     "agent": {
       "question": "它要做什么？"
@@ -445,12 +454,14 @@
       "arrived": "{{name}} 加入了团队",
       "meet": "你和 {{name}} 的第一次对话",
       "roleIntro": "你团队的{{role}}。用平常的话提问就行。",
+      "roleIntroPersonal": "为你服务的{{role}}。用平常的话提问就行。",
       "noIntro": "用平常的话说出你需要什么。",
       "firstTitle": "从这里开始",
       "sendHint": "点按发送",
       "hello": "{{person}}，你好！我是 {{name}}。",
       "helloNoName": "你好！我是 {{name}}。",
       "helloRole": "团队的{{role}}。",
+      "helloRolePersonal": "为你服务的{{role}}。",
       "helloAsk": "我们从哪里开始？",
       "now": "刚刚",
       "start": {
@@ -764,6 +775,7 @@
     "noGroupSection": "无部门",
     "workingSection": "工作中",
     "teamSection": "团队",
+    "teamSectionPersonal": "你的智能体",
     "managerQuiet": "没有进行中的事项",
     "state": {
       "waitsYou": "等你确认",
@@ -910,7 +922,6 @@
       "plan_lent_other": "{{names}} 把你的 {{plan}} 套餐连接到了 {{agent}}",
       "plan_lent_female_other": "{{names}} 把你的 {{plan}} 套餐连接到了 {{agent}}",
       "plan_model_dropped_other": "{{model}} 已从 {{plan}} 下架。{{names}} 暂时使用 {{runs}}",
-      "connector_tool_changed_other": "一个已连接的服务器更改了你批准过的工具",
       "computer_disk_full_other": "一台电脑的磁盘快满了",
       "computer_no_chrome_other": "电脑需要 Google Chrome。请在 google.com/chrome 下载",
       "app_created_other": "一个 AI 应用为你创建了内容"
@@ -972,7 +983,9 @@
     "title": "我",
     "role": {
       "owner": "所有者",
-      "member": "成员"
+      "member": "成员",
+      "ownerPersonal": "你的个人工作区",
+      "memberPersonal": "与你共享的个人工作区"
     },
     "appearance": "外观",
     "notifications": "通知",
@@ -1363,15 +1376,11 @@
       "browser": "浏览器",
       "secret": "密钥",
       "join": "成员",
-      "tools": "工具",
       "limit": "额度"
     },
     "review": "审阅",
     "answer": "回复",
     "open": "打开",
-    "toolsTitle": "更改了你批准的工具",
-    "toolsWhy": "在你接受新版本之前，智能体会继续使用已批准的版本。",
-    "reviewChanges": "查看更改",
     "clear": {
       "title": "没有等你处理的事",
       "text": "智能体需要你时，会先出现在这里。"
@@ -1669,6 +1678,215 @@
     "pick": "选择电脑",
     "pickHelp": "从开机的电脑中选择一台。"
   },
+  "devices": {
+    "title": "设备",
+    "empty": {
+      "title": "还没有设备",
+      "text": "先连接一台电脑，再把手机插到上面。"
+    },
+    "status": {
+      "ready": "就绪",
+      "inUse": "{{name}} 正在使用",
+      "inUseFor": "自 {{time}} 起为 {{person}}",
+      "since": "自 {{time}} 起",
+      "busy": "忙碌 {{running}}/{{max}}",
+      "needsYou": "需要你处理",
+      "preparing": "正在准备",
+      "paused": "已暂停",
+      "until": "至 {{time}}",
+      "offline": "离线",
+      "seen": "上次在线 {{when}}",
+      "withHost": "与 {{host}} 一起",
+      "unsupported": "无法使用"
+    },
+    "reason": {
+      "locked": "屏幕已锁定",
+      "unauthorized": "在手机上点按“允许”",
+      "untrusted": "在 iPhone 上点按“信任”",
+      "developer_mode_off": "开发者模式已关闭",
+      "ui_automation_off": "UI 自动化已关闭",
+      "xcode_missing": "Mac 需要安装 Xcode",
+      "xcode_too_old": "Xcode 版本太旧，不支持这台 iPhone",
+      "device_support": "Mac 正在为这台 iPhone 做准备",
+      "helper_missing": "测试助手还没有设置好",
+      "helper_expired": "测试助手需要续期",
+      "apple_account_missing": "Mac 上的 Xcode 需要登录 Apple 账户",
+      "team_limit": "从这台 iPhone 上删除一个你自己构建的 App",
+      "helper_untrusted": "在这台 iPhone 上信任测试助手",
+      "booting": "正在启动",
+      "no_driver": "Windows 需要这台手机的 USB 驱动",
+      "os_too_old": "这台手机的系统太旧",
+      "adb_offline": "拔下数据线，再重新插上",
+      "other": "还没准备好"
+    },
+    "os": {
+      "android": "Android {{version}}",
+      "ios": "iOS {{version}}"
+    },
+    "onHost": "在 {{host}} 上",
+    "cpus_other": "{{count}} 个 CPU",
+    "memory": "{{gb}} GB",
+    "audience": {
+      "label": "谁可以使用",
+      "me": "仅限我",
+      "only": "仅限 {{name}}",
+      "everyone": "所有人",
+      "sameAs": "与 {{host}} 相同",
+      "mode": {
+        "owner": "仅限我",
+        "ownerOf": "仅限 {{name}}",
+        "everyone": "工作区中的所有人",
+        "people": "仅限部分成员或角色"
+      },
+      "modeText": {
+        "owner": "你，以及为你工作的智能体。",
+        "ownerOf": "{{name}}，以及为他们工作的智能体。",
+        "everyone": "工作区中任何人的智能体都可以使用它。",
+        "people": "选择哪些成员和角色的智能体可以使用它。"
+      },
+      "people": "成员和角色",
+      "pickSomeone": "至少选择一位成员或一个角色。",
+      "narrowOnly": "你只能缩小 {{name}} 的设备的使用范围，不能扩大。",
+      "runsAs": "其他人的智能体会以你的身份在上面运行，并且可以读取你的文件。",
+      "phoneOnly": "这只会共享手机，绝不会共享 {{host}}。",
+      "saved": "已保存"
+    },
+    "page": {
+      "belongs": "归工作区所有",
+      "belongsHint": "所有者离开工作区后它仍会保留，届时“仅限我”将视为所有人。",
+      "phones": "手机",
+      "ownerReads": "它的所有者可以读取你的智能体放在这里的代码、文件和构建产物。",
+      "followsHost": "iPhone 遵循它的 Mac 的规则。",
+      "shareNote": "共享手机绝不会共享 {{host}}。",
+      "showHow": "告诉我怎么做",
+      "name": "名称",
+      "renamed": "已重命名为 {{name}}",
+      "stop": "停止 {{name}}",
+      "stopped": "{{device}} 已从 {{name}} 那里收回",
+      "forget": "忘记这台手机",
+      "forgetTitle": "忘记“{{name}}”？",
+      "forgetText": "如果 {{host}} 再次发现它，它会重新出现。",
+      "forgotten": "已忘记 {{name}}",
+      "notFound": "这台设备已不在这里",
+      "notFoundText": "它已被移除，或已随所有者离开。"
+    },
+    "join": {
+      "header": "请求加入",
+      "title": "{{name}} 想加入 {{org}}",
+      "allow": "允许加入",
+      "deny": "拒绝",
+      "joined": "{{name}} 已加入",
+      "denied": "已拒绝 {{name}}"
+    },
+    "connect": {
+      "title": "连接设备",
+      "thisPhone": "这台手机",
+      "computers": "电脑",
+      "androidText": "通过它所插入的电脑",
+      "iphoneText": "通过 Mac",
+      "server": "服务器或 VPS",
+      "serverText": "在它的终端里粘贴一行命令",
+      "computer": "另一台电脑",
+      "computerText": "Mac、Windows 或 Linux",
+      "appNote": "在你使用的 Mac 或 PC 上，agentes.chat 桌面应用也可以连接它。",
+      "unix": "Linux 和 macOS",
+      "windows": "Windows",
+      "once": "只能用一次，10 分钟内有效。在电脑上运行它，然后在这里允许它加入。",
+      "copied": "命令已复制。请粘贴到电脑的终端里。",
+      "waiting": "正在等待电脑运行命令",
+      "joined": "{{name}} 已连接",
+      "denied": "你没有允许 {{name}} 加入。",
+      "expired": "这个链接已过期。",
+      "again": "生成新链接"
+    },
+    "android": {
+      "entry": "将这台手机用于智能体",
+      "title": "让智能体使用这台手机",
+      "connecting": "正在连接 {{host}}",
+      "computer": "电脑",
+      "noHost": "这台手机需要通过你的一台电脑工作。请先连接一台电脑。",
+      "hostOffline": "{{host}} 已离线。请打开它，并在上面打开 agentes.chat。",
+      "step1": "打开开发者选项",
+      "step1Text": "点按“版本号”7 次，然后输入你的 PIN 码。",
+      "openAbout": "打开“关于手机”",
+      "step2": "打开 USB 调试",
+      "openDev": "打开“开发者选项”",
+      "step3": "插到 {{host}}",
+      "step3Hint": "请使用能传输数据的数据线，不要用只能充电的线。如果手机询问 USB 的用途，请选择“文件传输”。",
+      "looking": "正在查找这台手机",
+      "step4": "在这台手机上点按“允许”",
+      "step4Text": "先勾选“一律允许使用这台计算机进行调试”。",
+      "prompt": {
+        "a11y": "Android 询问：是否允许 USB 调试？请勾选“一律允许使用这台计算机进行调试”，然后点按“允许”。",
+        "title": "是否允许 USB 调试？",
+        "fingerprint": "这台计算机的 RSA 密钥指纹如下：",
+        "always": "一律允许使用这台计算机进行调试",
+        "cancel": "取消",
+        "allow": "允许"
+      },
+      "wifi": "没有数据线？通过 Wi-Fi 配对",
+      "wifiText": "手机和电脑连接同一个 Wi-Fi",
+      "cable": "改用数据线",
+      "wifi1": "打开无线调试",
+      "wifi1Text": "勾选“一律允许通过此网络进行调试”，然后点按“允许”。",
+      "wifi2": "扫描电脑上的二维码",
+      "wifi2Text": "在 无线调试 › 使用二维码配对设备 中扫描。",
+      "wifi2Hint": "在电脑上的 agentes.chat 中打开 连接设备 › Android 手机 › 通过 Wi-Fi，然后选择 {{host}}。",
+      "codeHead": "使用配对码配对",
+      "codeNote": "在 无线调试 › 使用配对码配对设备 中查看。请分屏同时打开“设置”和 agentes.chat，让配对码一直显示在屏幕上。",
+      "wifiNote": "重启后 Wi-Fi 连接可能会断开。数据线更可靠。",
+      "done": "{{name}} 已连接",
+      "openFailed": "这台手机没有打开那个界面。请在“设置”中找到它。"
+    },
+    "iphone": {
+      "title": "连接这台 iPhone",
+      "with": "通过 {{host}}",
+      "noHost": "iPhone 需要通过你的一台 Mac 连接。请先连接一台 Mac。",
+      "step1": "插到 {{host}}",
+      "step2": "在这台 iPhone 上点按“信任”",
+      "step2Text": "然后输入你的密码。",
+      "step3": "打开开发者模式",
+      "step3Hint": "iPhone 应用无法打开其他应用的设置，所以这里给出路径。",
+      "path": {
+        "settings": "设置",
+        "privacy": "隐私与安全性",
+        "devMode": "开发者模式"
+      },
+      "pathA11y": "在这台 iPhone 上：依次前往设置、隐私与安全性、开发者模式",
+      "switchA11y": "开发者模式开关，已关闭",
+      "step3Text": "打开它并点按“重新启动”。重启后，点按“打开”并输入你的密码。",
+      "step4": "打开 UI 自动化",
+      "step4Text": "设置 › 开发者 › 启用 UI 自动化",
+      "step5": "信任测试助手",
+      "step5Hint": "这是 {{host}} 安装的应用，让智能体可以在这台 iPhone 上点按和输入。安装后它会出现在这个列表中。",
+      "step5Text": "设置 › 通用 › VPN 与设备管理。点按开发者的名称，然后点按“信任”。",
+      "waiting": "正在等待 {{host}} 发现它",
+      "footer": "其余的交给你的 Mac，它开机时每 7 天续期一次测试助手。"
+    },
+    "notice": {
+      "kind": "设备",
+      "join_request": "{{device}} 想加入 {{org}}",
+      "in_use": "{{names}} 正在使用 {{device}}",
+      "in_useFor": "{{names}} 正在为 {{person}} 使用 {{device}}",
+      "access_request": "{{names}} 请求使用 {{device}}",
+      "access_requestFor": "{{names}} 请求为 {{person}} 使用 {{device}}",
+      "waiting": "{{names}} 正在等待 {{device}}",
+      "waitingFor": "{{names}} 正在为 {{person}} 等待 {{device}}",
+      "allowOnce": "允许一次",
+      "always": "始终允许 {{name}}",
+      "no": "不允许",
+      "stop": "停止"
+    },
+    "wait": {
+      "waiting": "正在等待 {{device}}",
+      "back": "{{device}} 回来了",
+      "tryNow": "立即重试",
+      "other": "使用其他设备",
+      "stop": "停止等待",
+      "useInstead": "改用 {{name}}",
+      "none": "没有其他你可以使用的设备处于就绪状态。"
+    }
+  },
   "connectors": {
     "title": "连接器",
     "search": "搜索或粘贴地址",
@@ -1688,6 +1906,7 @@
     "loadFailed": "无法加载连接器。",
     "connectedCheck": "{{name}}，已连接",
     "adminsOnly": "只有 {{org}} 的管理员可以连接服务。请联系其中一位。",
+    "adminsOnlyPersonal": "只有管理这个工作区的人可以连接应用。请联系对方。",
     "canTitle": "智能体将能够",
     "asks": "{{text}} · 需要你审批",
     "connect": "连接",
@@ -1832,11 +2051,13 @@
     "zoneChange": "更改",
     "zoneTitle": "时区",
     "anotherTitle": "新工作区叫什么名字？",
+    "anotherPurpose": "新工作区用来做什么？",
     "anotherLead": "在 agentes.chat 上创建。你仍留在 {{org}}，随时可以切换。",
     "suggested": "根据你的 {{domain}} 邮箱，我建议用 {{org}}。",
     "create": "创建",
     "shareMessage": "在 agentes.chat 上加入 {{org}}：{{url}}",
-    "failed": "无法保存，请重试。"
+    "failed": "无法保存，请重试。",
+    "enter": "进入工作区"
   },
   "ai": {
     "yourPlan": "你的 AI 套餐",
@@ -2153,7 +2374,6 @@
   "dashboards": {
     "homeRow": "仅你自己 · 你自己的小组件",
     "loadFailed": "无法加载仪表盘。",
-    "onlyHome": "工作区或你的角色的仪表盘会显示在这里。",
     "create": "创建",
     "routineTarget": "它的小组件",
     "pin": {
@@ -2221,7 +2441,11 @@
       "title": "组建你的智能体团队",
       "text": "每个智能体承担一个角色，直接在聊天中和你一起工作。",
       "viewerTitle": "智能体团队都在这里",
-      "viewerText": "工作区里能创建智能体的人添加第一个后，它会显示在这里。"
+      "viewerText": "工作区里能创建智能体的人添加第一个后，它会显示在这里。",
+      "titlePersonal": "让你自己的智能体来帮忙",
+      "textPersonal": "每个智能体为你负责一件事，直接在聊天中完成。",
+      "viewerTitlePersonal": "你的智能体都在这里",
+      "viewerTextPersonal": "这里能创建智能体的人添加第一个后，它会显示在这里。"
     },
     "agentsForYou": {
       "title": "你的智能体会显示在这里",
@@ -2231,13 +2455,20 @@
       "title": "团队创作的一切，都在一处",
       "text": "智能体和成员的报告、表格和文件都留在这里，方便查找。",
       "viewerTitle": "查找团队创作的内容",
-      "viewerText": "智能体和成员在聊天中创建的内容会显示在这里。"
+      "viewerText": "智能体和成员在聊天中创建的内容会显示在这里。",
+      "titlePersonal": "智能体创作的一切，都在一处",
+      "textPersonal": "你的智能体的报告、表格和文件都留在这里，方便查找。",
+      "viewerTitlePersonal": "查找你的智能体创作的内容",
+      "viewerTextPersonal": "智能体在你的聊天中创建的内容会显示在这里。"
     },
     "tasks": {
       "title": "把工作交给团队",
       "text": "为智能体或成员创建任务，并跟进到底。",
       "viewerTitle": "跟进团队的工作",
-      "viewerText": "有人创建第一个任务后，它就会显示在这里。"
+      "viewerText": "有人创建第一个任务后，它就会显示在这里。",
+      "titlePersonal": "把待办交给你的智能体",
+      "textPersonal": "为智能体创建任务，一直跟进到完成。",
+      "viewerTitlePersonal": "跟进你的智能体的工作"
     },
     "routines": {
       "title": "把重复的工作交给智能体",
@@ -2249,7 +2480,10 @@
       "title": "留下团队需要知道的内容",
       "text": "成员和智能体都会阅读这些页面，大家依据同样的信息工作。",
       "viewerTitle": "查阅团队的知识",
-      "viewerText": "能编辑 Wiki 的人写下第一页后，它会显示在这里。"
+      "viewerText": "能编辑 Wiki 的人写下第一页后，它会显示在这里。",
+      "titlePersonal": "记下智能体能读的笔记",
+      "textPersonal": "你的智能体会读这些页面，按你写的内容工作。",
+      "viewerTitlePersonal": "查看这里写了什么"
     },
     "memory": {
       "title": "智能体在工作中学习",
@@ -2272,13 +2506,21 @@
       "text": "每个频道聚集负责同一主题的人。",
       "viewerTitle": "团队的频道都在这里",
       "viewerText": "能创建频道的人开设第一个频道后，它会显示在这里。",
-      "action": "创建频道"
+      "action": "创建频道",
+      "titlePersonal": "同时和多个智能体交流",
+      "textPersonal": "每个群组对话都把同一话题的智能体和成员聚在一起。",
+      "viewerTitlePersonal": "群组对话都在这里",
+      "viewerTextPersonal": "能创建群组对话的人开启第一个后，它会显示在这里。"
     },
     "people": {
       "title": "在这里和团队一起工作",
       "text": "邀请成员，在一处和他们以及智能体交流。",
       "viewerTitle": "你的团队会显示在这里",
-      "viewerText": "能邀请成员的人把其他同事带来后，他们会显示在这里。"
+      "viewerText": "能邀请成员的人把其他同事带来后，他们会显示在这里。",
+      "titlePersonal": "邀请家人或朋友加入",
+      "textPersonal": "邀请他人，在一处和你以及你的智能体交流。",
+      "viewerTitlePersonal": "家人和朋友会显示在这里",
+      "viewerTextPersonal": "有人加入后，会显示在这里。"
     },
     "chat": {
       "title": "一切从一条消息开始",
@@ -2298,7 +2540,11 @@
       "title": "共享登录信息，不用到处传密码",
       "text": "保存智能体为团队使用的登录信息和密钥。",
       "viewerTitle": "团队的登录信息会显示在这里",
-      "viewerText": "有人和你共享登录信息或密钥后，它会显示在这里。"
+      "viewerText": "有人和你共享登录信息或密钥后，它会显示在这里。",
+      "titlePersonal": "把共享的登录信息放在一处",
+      "textPersonal": "保存智能体为这里所有人使用的登录信息和密钥。",
+      "viewerTitlePersonal": "共享的登录信息会显示在这里",
+      "viewerTextPersonal": "这里有人与你共享登录信息或密钥时，会显示在这里。"
     },
     "skills": {
       "title": "教智能体你们的做事方式",

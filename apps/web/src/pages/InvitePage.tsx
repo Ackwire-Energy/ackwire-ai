@@ -21,6 +21,7 @@ import {
   passwordState,
   webmailOf,
 } from "@agenteschat/client/lib/text";
+import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
 import { Button, cx, type Expression, Field, Icon, Input, Locked, PixelSpinner, Textarea } from "@agenteschat/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
@@ -75,6 +76,8 @@ interface OrgFacts {
   by?: string | null;
   agents?: Agentish[];
   more?: number;
+  /** A personal workspace (ADR 0159): its name ("Personal") says nothing to who is invited, whose space it is does. */
+  personal?: boolean;
 }
 
 const orgOf = (preview: InvitationPreview): OrgFacts => ({
@@ -83,6 +86,7 @@ const orgOf = (preview: InvitationPreview): OrgFacts => ({
   by: preview.invitedBy,
   agents: preview.agents ?? [],
   more: preview.moreAgents ?? 0,
+  personal: isPersonal(preview),
 });
 
 /** "Ana" from "Ana Souza": the host names whoever invited as a person would. */
@@ -183,12 +187,19 @@ function OrgLine({ org }: { org: OrgFacts }) {
           ),
         })
       : null;
+  // A personal workspace goes by whose it is (ADR 0159), which already says who invited.
+  const name = !org.personal
+    ? org.name
+    : org.by
+      ? t("invite.personalName", { name: org.by })
+      : t("invite.personalNameNoName");
+  const from = org.by && !org.personal ? t("invite.from", { name: org.by }) : null;
   return (
     <div className="invite__org ac-faceline">
       <OrgMark logo={org.logo} size={32} />
       <div className="invite__org-text">
-        <b className={cx("invite__org-name", (org.by || crew) && "ac-captop")}>{org.name}</b>
-        {org.by && <span>{t("invite.from", { name: org.by })}</span>}
+        <b className={cx("invite__org-name", (from || crew) && "ac-captop")}>{name}</b>
+        {from && <span>{from}</span>}
         {crew && (
           <span className="invite__crew">
             <span className="invite__faces" aria-hidden="true">
@@ -603,23 +614,33 @@ function EmailInvitation({
   };
 
   const first = name.trim().split(/\s+/)[0] ?? "";
-  const calledYou = by ? t("invite.calledYou", { name: by, org }) : t("invite.calledYouNoName", { org });
+  const calledYou = by
+    ? t(modeKey(preview, "invite.calledYou"), { name: by, org })
+    : t(modeKey(preview, "invite.calledYouNoName"), { org });
   const providerNames = providers.map((p) => t(`auth.provider.${p}`)).join(" · ");
   const signInStep = account.password ? "password" : "social";
   const mail = webmailOf(invited);
   const bubble: Record<EmailStep, [string, string?]> = {
     accept: [calledYou, t("invite.signedInLead", { email: invited })],
-    other: [t("invite.otherTitle", { email: invited }), t("invite.otherLead", { other: otherEmail, org })],
-    name: [by ? t("invite.hello", { name: by, org }) : t("invite.helloNoName", { org }), t("invite.nameLead")],
+    other: [
+      t("invite.otherTitle", { email: invited }),
+      t(modeKey(preview, "invite.otherLead"), { other: otherEmail, org }),
+    ],
+    name: [
+      by ? t(modeKey(preview, "invite.hello"), { name: by, org }) : t(modeKey(preview, "invite.helloNoName"), { org }),
+      t(modeKey(preview, "invite.nameLead")),
+    ],
     newPassword: [
       first ? t("auth.flow.newPasswordNamed", { name: first }) : t("auth.flow.newPassword"),
-      t("invite.newPasswordLead", { org }),
+      t(modeKey(preview, "invite.newPasswordLead"), { org }),
     ],
     password: wrong
       ? [t("auth.flow.wrong")]
       : [
           t("auth.flow.password"),
-          by ? t("invite.passwordLead", { name: by, org }) : t("invite.passwordLeadNoName", { org }),
+          by
+            ? t(modeKey(preview, "invite.passwordLead"), { name: by, org })
+            : t(modeKey(preview, "invite.passwordLeadNoName"), { org }),
         ],
     social: [
       calledYou,
@@ -632,7 +653,7 @@ function EmailInvitation({
   const passwordStep = step === "password" || step === "newPassword";
   const expression = wrong ? "cross" : passwordStep ? pw.face : step === "sent" ? "happy" : undefined;
   const locked = <Who email={invited} locked />;
-  const enterLabel = t("invite.enter", { org });
+  const enterLabel = t(modeKey(preview, "invite.enter"), { org });
 
   let body: ReactNode = null;
   switch (step) {
@@ -817,7 +838,7 @@ function FullWorkspace({ preview }: { preview: InvitationPreview }) {
     <InviteScreen
       org={orgOf(preview)}
       host={preview.agents?.[0]}
-      title={t("invite.fullTitle", { org: preview.orgName })}
+      title={t(modeKey(preview, "invite.fullTitle"), { org: preview.orgName })}
       lead={t("invite.fullLead")}
       step="full"
     >
@@ -849,21 +870,23 @@ function GoneInvitation({ token }: { token: string }) {
 
   if (dead.state === "accepted") {
     const { orgId, orgName } = dead;
-    const member = me.data?.organizations.some((o) => o.id === orgId) === true;
+    // A member knows the workspace's mode: a personal one is never named by its name ("Personal"), ADR 0159.
+    const mine = me.data?.organizations.find((o) => o.id === orgId);
+    const member = mine !== undefined;
     const open = () =>
       member
         ? navigate({ to: "/org/$orgId", params: { orgId } })
         : navigate({ to: "/login", search: { redirect: `/org/${orgId}` } });
     return (
       <InviteScreen
-        org={{ name: orgName }}
+        org={{ name: orgName, personal: isPersonal(mine) }}
         expression="happy"
-        title={t("invite.usedTitle", { org: orgName })}
+        title={t(modeKey(mine, "invite.usedTitle"), { org: orgName })}
         lead={t("invite.usedLead", { date })}
         step="used"
       >
         <Button variant="primary" size="lg" block onClick={() => void open()}>
-          {t("invite.open", { org: orgName })}
+          {t(modeKey(mine, "invite.open"), { org: orgName })}
         </Button>
       </InviteScreen>
     );
@@ -1239,7 +1262,7 @@ function AskSteps({
   const fix = step === "email" ? emailTypoFix(email) : null;
   const typed = email.trim();
   const bubble: Record<AskStep, [string, string]> = {
-    email: [t("invite.ask.hello", { org }), t("invite.ask.emailLead")],
+    email: [t(modeKey(preview, "invite.ask.hello"), { org }), t("invite.ask.emailLead")],
     code: [t("invite.ask.codeTitle", { email: typed }), t("invite.ask.codeLead")],
     name: [t("invite.ask.nameTitle"), t("auth.flow.nameLead")],
     password: [
@@ -1497,11 +1520,11 @@ function Waiting({ token, preview, asked }: { token: string; preview: Invitation
         org={facts}
         host={host}
         expression="happy"
-        title={t("invite.ask.approvedIn", { org })}
+        title={t(modeKey(preview, "invite.ask.approvedIn"), { org })}
         step="in"
         header={header}
       >
-        <WaitCard host={host} title={t("invite.entering", { org })} sub={t("invite.enteringReady")} />
+        <WaitCard host={host} title={t(modeKey(preview, "invite.entering"), { org })} sub={t("invite.enteringReady")} />
       </InviteScreen>
     );
   if (answer?.state === "signIn") {
@@ -1528,7 +1551,7 @@ function Waiting({ token, preview, asked }: { token: string; preview: Invitation
         host={host}
         expression="closed"
         title={t("invite.ask.deniedTitle")}
-        lead={t("invite.ask.deniedText", { org })}
+        lead={t(modeKey(preview, "invite.ask.deniedText"), { org })}
         step="denied"
         header={header}
       >
@@ -1555,14 +1578,14 @@ function Waiting({ token, preview, asked }: { token: string; preview: Invitation
       org={facts}
       host={host}
       expression="happy"
-      title={t("invite.ask.waitTitle", { org })}
+      title={t(modeKey(preview, "invite.ask.waitTitle"), { org })}
       lead={t("invite.ask.waitLead")}
       step="wait"
       header={header}
     >
       <WaitCard
         host={host}
-        title={t("invite.ask.waitCard", { org })}
+        title={t(modeKey(preview, "invite.ask.waitCard"), { org })}
         sub={asked.name ? t("invite.ask.waitBy", { name: asked.name, email: asked.email }) : asked.email}
       />
       <span className="invite__lock ac-iconline">
@@ -1665,12 +1688,16 @@ function AskAsAccount({ token, preview }: { token: string; preview: InvitationPr
           org={facts}
           host={host}
           expression="happy"
-          title={view.already ? t("invite.ask.memberTitle", { org }) : t("invite.ask.inTitle", { org })}
+          title={
+            view.already
+              ? t(modeKey(preview, "invite.ask.memberTitle"), { org })
+              : t(modeKey(preview, "invite.ask.inTitle"), { org })
+          }
           step="in"
         >
           {orgId && (
             <Button variant="primary" size="lg" block onClick={() => void open(orgId)}>
-              {t("invite.ask.open", { org })}
+              {t(modeKey(preview, "invite.ask.open"), { org })}
             </Button>
           )}
         </InviteScreen>
@@ -1694,7 +1721,7 @@ function AskAsAccount({ token, preview }: { token: string; preview: InvitationPr
           host={host}
           expression="closed"
           title={t("invite.ask.deniedTitle")}
-          lead={t("invite.ask.deniedText", { org })}
+          lead={t(modeKey(preview, "invite.ask.deniedText"), { org })}
           step="denied"
         >
           {view.reason && <Reason text={view.reason} />}
@@ -1718,7 +1745,7 @@ function AskAsAccount({ token, preview }: { token: string; preview: InvitationPr
         >
           <WaitCard
             host={host}
-            title={t("invite.ask.waitCard", { org })}
+            title={t(modeKey(preview, "invite.ask.waitCard"), { org })}
             sub={t("invite.ask.waitBy", { name: user?.name ?? "", email: address })}
           />
         </InviteScreen>
@@ -1769,7 +1796,7 @@ function AskAsAccount({ token, preview }: { token: string; preview: InvitationPr
       org={facts}
       host={host}
       busy={pending || codes.pending}
-      title={t("invite.ask.title", { org })}
+      title={t(modeKey(preview, "invite.ask.title"), { org })}
       lead={proofNeeded ? t("invite.ask.asProof", { email }) : t("invite.ask.as", { email })}
       step="form"
       onSubmit={submit}
@@ -1839,7 +1866,7 @@ function AskForm({ token, preview }: { token: string; preview: InvitationPreview
       org={orgOf(preview)}
       host={preview.agents?.[0]}
       busy={pending}
-      title={t("invite.ask.title", { org: preview.orgName })}
+      title={t(modeKey(preview, "invite.ask.title"), { org: preview.orgName })}
       lead={t("invite.ask.leadNoName")}
       step="form"
       onSubmit={submit}

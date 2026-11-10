@@ -9,6 +9,7 @@ import {
   ONBOARDING_STEPS,
   STANDING_STATES,
   START_PAGES,
+  WORKSPACE_MODES,
 } from "@agenteschat/engine";
 import { CONTEXT_LIMITS, ENDPOINT_STYLES, MODEL_TIERS, PROVIDER_IDS } from "@agenteschat/providers";
 import { z } from "@hono/zod-openapi";
@@ -149,6 +150,10 @@ export const Organization = z
     chatPrefs: ChatPrefs.optional().openapi({
       description:
         "In `GET /me`: how conversations look to you here (`PUT …/me/chat`). Only what you chose: a key not here keeps the app's default. Absent elsewhere.",
+    }),
+    mode: z.enum(WORKSPACE_MODES).optional().openapi({
+      description:
+        "Who the workspace is for (ADR 0159): `team` or `personal`. It changes the apps' defaults and words, never what anyone may do. Changed with `PATCH …/settings`.",
     }),
   })
   .openapi("Organization");
@@ -441,6 +446,10 @@ export const Agent = z
         }),
         speed: z.literal("fast").optional().openapi({
           description: "Set to `fast` where that applies to what it thinks with (ADR 0149); absent: standard speed.",
+        }),
+        maker: z.string().optional().openapi({
+          description:
+            "An API brain on Automático: the maker its models come from (its own key's, else the workspace's), whose logo shows beside it.",
         }),
       })
       .optional()

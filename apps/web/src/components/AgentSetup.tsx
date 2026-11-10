@@ -23,15 +23,17 @@ import {
   resourcesOf,
 } from "@agenteschat/client/lib/access-levels";
 import { channelsAfter, sameAudience } from "@agenteschat/client/lib/agent-edit";
-import { audienceOf, audiencePatch } from "@agenteschat/client/lib/audience";
+import { audienceModeKey, audienceModeTextKey, audienceOf, audiencePatch } from "@agenteschat/client/lib/audience";
 import { setDraftFor } from "@agenteschat/client/lib/drafts";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { formatTime, joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { addsAgentsTo, can } from "@agenteschat/client/lib/permissions";
+import { rolePicksInSight } from "@agenteschat/client/lib/personal-view";
 import { planOf } from "@agenteschat/client/lib/plans";
 import { AUTO, modelChoices } from "@agenteschat/client/lib/providers";
+import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { isEveryone, sortRoles } from "@agenteschat/client/lib/roles";
 import {
   askedLine,
@@ -44,6 +46,7 @@ import {
   suggestedChannels,
   suggestedLevels,
 } from "@agenteschat/client/lib/setup-checklist";
+import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
 import {
   AffixInput,
   Avatar,
@@ -80,12 +83,12 @@ import { AgentAvatar } from "@/components/AgentAvatar";
 import { ModelSelect, modelOptions, NO_OWNER, OwnerSelect } from "@/components/AgentFields";
 import { usePlanHold } from "@/components/ai/ConnectAiSteps";
 import { PlanReplies } from "@/components/ai/PlanReplies";
-import { BillingLinkButton } from "@/components/BillingLinkButton";
 import { useConnectAi } from "@/components/ConnectAi";
 import { useChannelActions } from "@/components/channel-actions";
 import { useOrg } from "@/components/org-context";
 import { useWidenAsk } from "@/components/ReachLines";
 import { useDirectory } from "@/hooks/useDirectory";
+import { usePersonalView } from "@/hooks/usePersonalView";
 import { useToast } from "@/lib/toast";
 import { useVisibleChannels } from "@/pages/agent/pieces";
 import "./agent-setup.css";
@@ -105,21 +108,84 @@ const STEP_ICON: Record<AgentSetupStep, IconName> = {
   how: "document",
 };
 
-/** The steps this person sees for this agent (none: the checklist isn't theirs, or the agent has none). */
+/**
+ * The steps this person sees for this agent (none: the checklist isn't theirs, or the agent has none). Alone in a
+ * personal workspace there is nobody else to talk to it: "who" waits until someone joins (ADR 0159), read live.
+ */
 export function useSetupSteps(agent: Agent | undefined): AgentSetupStep[] {
   const { org, me } = useOrg();
-  return agent ? setupSteps(agent, { meId: me.user.id, admin: can(org, "manage_agents") }) : [];
+  const { solo } = usePersonalView();
+  const steps = agent ? setupSteps(agent, { meId: me.user.id, admin: can(org, "manage_agents") }) : [];
+  return solo ? steps.filter((s) => s !== "who") : steps;
 }
 
-/** The top of a new agent's DM: its greeting and the checklist, as its first message. */
+/**
+ * What its checklist reads for this person (ADR 0155 §2): their steps, the ones done (confirmed, or done as its data
+ * says), and whether everything it reads has loaded.
+ */
+function useSetupProgress(agent: Agent) {
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  const admin = can(org, "manage_agents");
+  const steps = useSetupSteps(agent);
+  const status = useAiStatus(org.id);
+  const access = useAgentAccess(org.id, agent.id, admin && steps.includes("apps"));
+  const detail = useAgentDetail(org.id, agent.id);
+  const visible = useVisibleChannels();
+  const connectors = access.data ? resourcesOf(access.data).filter((r) => r.kind === "connector") : [];
+  const granted = connectors.filter((r) => levelOf(r) !== "none");
+  const visibleIds = new Set(visible.list.map((c) => c.id));
+  const inChannels = (detail.data?.channels ?? []).filter((c) => visibleIds.has(c.id));
+  const aiState = aiStateOf(status.data, agent.id);
+  // On a billing hold nothing thinks, a saved key included: the AI row leads to the plan.
+  const held = usePlanHold() !== null;
+  // "Agora não" to apps on the right hand's card is for the team: its agents don't ask again.
+  const appsLater = dir.agents.find(isRightHand)?.setup?.done.includes("apps") ?? false;
+  const done = agent.setup
+    ? setupDone(agent.setup, {
+        ai: !held && (aiState === "ready" || aiState === "waiting"),
+        apps: granted.length > 0 || appsLater,
+        where: inChannels.length > 0,
+      })
+    : new Set<AgentSetupStep>();
+  const doneHere = steps.filter((s) => done.has(s));
+  return {
+    steps,
+    done,
+    doneHere,
+    all: doneHere.length === steps.length,
+    // Everything it reads has loaded: a step that turns done after this was done now (its line and the burst).
+    ready: status.isSuccess && detail.isSuccess && visible.ready && (!steps.includes("apps") || !access.isPending),
+    held,
+    connectors,
+    granted,
+    inChannels,
+    visible,
+  };
+}
+
+/**
+ * The top of a new agent's DM: its greeting and the checklist, as its first message. The greeting asks for help only
+ * when something is left as the conversation first shows its checklist loaded; done meanwhile, the ask stays as asked.
+ */
 export function AgentSetupIntro({ agent }: { agent: Agent }) {
   const { t, i18n } = useTranslation();
   const { me } = useOrg();
+  const progress = useSetupProgress(agent);
+  const [asks, setAsks] = useState<boolean | null>(null);
+  if (asks === null && progress.ready) setAsks(!progress.all);
   const g = agentGrammar(agent.name);
   const role = setupRole(agent.setup);
   const person = me.user.name.split(/\s+/)[0] ?? me.user.name;
-  const asked = role ? null : askedLine(agent.instructions);
-  const roleName = role ? roleWord(t(`newAgent.roles.${role}.name`), i18n.language) : null;
+  // A ready-made role's name, else the role it was given (a template's "Atendimento"); only an agent with neither
+  // says back what it was asked.
+  const own = agent.role.trim();
+  const asked = role || own ? null : askedLine(agent.instructions);
+  const roleName = role
+    ? roleWord(t(`newAgent.roles.${role}.name`), i18n.language)
+    : own
+      ? roleWord(own, i18n.language)
+      : null;
   return (
     <Message
       agent
@@ -134,7 +200,8 @@ export function AgentSetupIntro({ agent }: { agent: Agent }) {
             {roleName
               ? t("agentSetup.greetingRole", { ...g, person, role: roleName })
               : t("agentSetup.greeting", { ...g, person })}
-            {asked && ` ${t("agentSetup.asked", { what: asked })}`} {t("agentSetup.lead")}
+            {asked && ` ${t("agentSetup.asked", { what: asked })}`}
+            {asks && ` ${t("agentSetup.lead")}`}
           </p>
         </div>
       </MessageText>
@@ -158,37 +225,13 @@ export function AgentSetupCard({ agent, place }: { agent: Agent; place: "dm" | "
   const actions = useChannelActions();
   const connect = useConnectAi();
   const dir = useDirectory(org.id);
-  const admin = can(org, "manage_agents");
-  const steps = useSetupSteps(agent);
-  const status = useAiStatus(org.id);
-  const access = useAgentAccess(org.id, agent.id, admin && steps.includes("apps"));
-  const detail = useAgentDetail(org.id, agent.id);
-  const visible = useVisibleChannels();
+  const { steps, done, doneHere, all, ready, held, connectors, granted, inChannels, visible } = useSetupProgress(agent);
   const items = useConnectedById();
   const [open, setOpen] = useState<AgentSetupStep | null>(null);
   const burstRef = useRef<HTMLCanvasElement>(null);
   const g = agentGrammar(agent.name);
   const role = setupRole(agent.setup);
-
-  const connectors = access.data ? resourcesOf(access.data).filter((r) => r.kind === "connector") : [];
-  const granted = connectors.filter((r) => levelOf(r) !== "none");
-  const visibleIds = new Set(visible.list.map((c) => c.id));
-  const inChannels = (detail.data?.channels ?? []).filter((c) => visibleIds.has(c.id));
-  const aiState = aiStateOf(status.data, agent.id);
-  // On a billing hold nothing thinks, a saved key included: the AI row leads to the plan.
-  const held = usePlanHold() !== null;
-  const done = agent.setup
-    ? setupDone(agent.setup, {
-        ai: !held && (aiState === "ready" || aiState === "waiting"),
-        apps: granted.length > 0,
-        where: inChannels.length > 0,
-      })
-    : new Set<AgentSetupStep>();
-  const doneHere = steps.filter((s) => done.has(s));
-  const all = doneHere.length === steps.length;
   const next = nextStep(steps, done);
-  // Everything it reads has loaded: a step that turns done after this was done now (its line and the burst).
-  const ready = status.isSuccess && detail.isSuccess && visible.ready && (!steps.includes("apps") || !access.isPending);
   const said = useDoneSay(ready, doneHere, steps.length, agent.appearance?.color, burstRef, (step) =>
     t(`agentSetup.say.${step}`, agentGrammar(agent.name)),
   );
@@ -224,6 +267,7 @@ export function AgentSetupCard({ agent, place }: { agent: Agent; place: "dm" | "
       audience: audience.mode,
       otherOwner: !ownerIsMe && owner ? (owner.name.split(" ")[0] ?? owner.name) : null,
       onPlan,
+      personal: isPersonal(org),
     });
 
   const act = (step: AgentSetupStep) => {
@@ -259,26 +303,15 @@ export function AgentSetupCard({ agent, place }: { agent: Agent; place: "dm" | "
         const row = rowOf(s);
         const isDone = done.has(s);
         const acts = s !== "ai" || Boolean(connect);
+        // On a hold it waits for the plan, whose one button is the hold's banner.
         if (s === "ai" && held && !isDone) {
           return {
             key: s,
             icon: STEP_ICON[s],
             done: false,
-            title: t("agentSetup.firstRun.ai.plan"),
-            ...(can(org, "manage_billing")
-              ? {
-                  actionNode: (
-                    <BillingLinkButton
-                      orgId={org.id}
-                      from="hold"
-                      size="sm"
-                      variant={s === next ? "primary" : undefined}
-                    >
-                      {t("agentSetup.firstRun.ai.planAction")}
-                    </BillingLinkButton>
-                  ),
-                }
-              : {}),
+            title: row.title,
+            desc: t("agentSetup.firstRun.afterPlan"),
+            dim: true,
           };
         }
         return {
@@ -327,6 +360,8 @@ export interface SetupCardRow {
   skip?: { label: string; onClick: () => void; busy?: boolean };
   /** It waits for something else (the plan): drawn quieter, with no button. */
   dim?: boolean;
+  /** What the row asks for in place (an address to invite), at its full width under its text. */
+  form?: ReactNode;
 }
 
 /**
@@ -396,6 +431,7 @@ export function SetupCardView({
                 {r.saying ? <span className="setup-row__say">{r.saying}</span> : <span>{r.desc}</span>}
               </span>
             )}
+            {!r.done && r.form && <span className="ac-mediarow__body setup-row__form">{r.form}</span>}
             {!r.done && (r.action || r.actionNode || r.skip) && (
               <span className="ac-mediarow__end ac-mediarow__end--wrap setup-row__act">
                 {r.skip && (
@@ -445,7 +481,8 @@ export function SetupAsks({ lead, asks }: { lead: string; asks: { label: string;
 
 /**
  * A step done while the card is in view (after everything it reads has loaded): its line for a moment, and a burst of
- * pixels in the agent's colors, a bigger one when it was the last.
+ * pixels in the agent's colors, a bigger one when it was the last. `celebrates`: whether its line comes with the burst
+ * (an invitation only sent says so, quietly).
  */
 export function useDoneSay<S extends string>(
   ready: boolean,
@@ -454,12 +491,15 @@ export function useDoneSay<S extends string>(
   color: string | undefined,
   burstRef: RefObject<HTMLCanvasElement | null>,
   sayOf: (step: S) => string,
+  celebrates: (step: S) => boolean = () => true,
 ) {
   const [said, setSaid] = useState<{ step: S; text: string } | null>(null);
   const seen = useRef<Set<S> | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const say = useRef(sayOf);
   say.current = sayOf;
+  const party = useRef(celebrates);
+  party.current = celebrates;
   const doneKey = doneNow.join();
   useEffect(() => {
     if (!ready) return;
@@ -468,9 +508,10 @@ export function useDoneSay<S extends string>(
     seen.current = now;
     if (!before) return;
     const fresh = [...now].find((s) => !before.has(s));
-    if (!fresh) return;
-    setSaid({ step: fresh, text: say.current(fresh) });
-    burst(burstRef.current, color, now.size === total);
+    const text = fresh ? say.current(fresh) : "";
+    if (!fresh || !text) return;
+    setSaid({ step: fresh, text });
+    if (party.current(fresh)) burst(burstRef.current, color, now.size === total);
     clearTimeout(timer.current);
     timer.current = setTimeout(() => setSaid(null), 2600);
   }, [ready, doneKey, total, color, burstRef]);
@@ -649,7 +690,7 @@ function AppsDialog({
       onClose={onClose}
     >
       {ordered.length === 0 ? (
-        <p className="small muted">{t("agentSetup.apps.empty", { org: org.name })}</p>
+        <p className="small muted">{t(modeKey(org, "agentSetup.apps.empty"), { org: org.name })}</p>
       ) : (
         <ul className="level-list setup-dlg__apps" aria-label={t("access.kind.connectors")}>
           {ordered.map((r) => {
@@ -784,14 +825,19 @@ function WhoDialog({ agent, onClose, onSaved }: { agent: Agent; onClose: () => v
   const ownerName = owner ? dir.memberById.get(owner)?.name : undefined;
   const pickedPeople = new Set(audience.userIds);
   const pickedRoles = new Set(audience.roleIds ?? []);
-  const roleList = sortRoles((roles.data?.roles ?? []).filter((r) => !isEveryone(r)));
+  // A personal workspace's family picks people first, and a role only when one is worth it (ADR 0159).
+  const personal = isPersonal(org);
+  const allRoles = roles.data?.roles ?? [];
+  const roleList = rolePicksInSight(org, allRoles, audience.roleIds ?? [])
+    ? sortRoles(allRoles.filter((r) => !isEveryone(r)))
+    : [];
   const people = dir.members.filter((m) => m.userId !== owner);
   const modeText = (mode: AudienceMode) =>
     mode === "owner"
       ? ownerName
         ? t("audience.modeText.owner", { ...g, owner: owner === me.user.id ? t("agentSetup.who.you") : ownerName })
         : t("audience.modeText.noOwner")
-      : t(`audience.modeText.${mode}`, g);
+      : t(audienceModeTextKey(org, mode), g);
   const valid =
     audience.mode === "everyone" ||
     (audience.mode === "owner" ? Boolean(owner) : pickedPeople.size > 0 || pickedRoles.size > 0 || Boolean(owner));
@@ -837,24 +883,23 @@ function WhoDialog({ agent, onClose, onSaved }: { agent: Agent; onClose: () => v
   };
   const remove = (kind: "userIds" | "roleIds", id: string) =>
     setAudience((a) => ({ ...a, [kind]: (a[kind] ?? []).filter((x) => x !== id) }));
-  const addOptions = [
-    ...roleList
-      .filter((r) => !pickedRoles.has(r.id))
-      .map((r) => ({
-        value: `role:${r.id}`,
-        label: r.name,
-        group: t("audience.roles"),
-        leading: <RoleMark color={r.color} icon={r.icon} size={24} />,
-      })),
-    ...people
-      .filter((m) => !pickedPeople.has(m.userId))
-      .map((m) => ({
-        value: `person:${m.userId}`,
-        label: m.name,
-        group: roleList.length ? t("audience.people") : undefined,
-        leading: <Avatar kind="person" size="sm" name={m.name} imageUrl={m.image} />,
-      })),
-  ];
+  const roleOptions = roleList
+    .filter((r) => !pickedRoles.has(r.id))
+    .map((r) => ({
+      value: `role:${r.id}`,
+      label: r.name,
+      group: t("audience.roles"),
+      leading: <RoleMark color={r.color} icon={r.icon} size={24} />,
+    }));
+  const peopleOptions = people
+    .filter((m) => !pickedPeople.has(m.userId))
+    .map((m) => ({
+      value: `person:${m.userId}`,
+      label: m.name,
+      group: roleList.length ? t("audience.people") : undefined,
+      leading: <Avatar kind="person" size="sm" name={m.name} imageUrl={m.image} />,
+    }));
+  const addOptions = personal ? [...peopleOptions, ...roleOptions] : [...roleOptions, ...peopleOptions];
   return (
     <StepDialog
       title={t("agentSetup.who.title", g)}
@@ -878,7 +923,7 @@ function WhoDialog({ agent, onClose, onSaved }: { agent: Agent; onClose: () => v
           onValueChange={(mode) => setAudience((a) => ({ ...a, mode }))}
           options={MODES.map((mode) => ({
             value: mode,
-            label: t(`audience.mode.${mode}`),
+            label: t(audienceModeKey(org, mode)),
             description: modeText(mode),
           }))}
         />
@@ -992,7 +1037,7 @@ function HowDialog({ agent, onClose, onSaved }: { agent: Agent; onClose: () => v
   return (
     <StepDialog
       title={t("agentSetup.how.title", g)}
-      description={t("agentSetup.how.desc")}
+      description={t(modeKey(org, "agentSetup.how.desc"))}
       ok={t("common.save")}
       busy={busy}
       okDisabled={!budgetOk}

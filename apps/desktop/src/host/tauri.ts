@@ -17,6 +17,7 @@ import {
   type NotchInfo,
   type RunnerInfo,
   type RunnerStateChange,
+  type SiteAnswer,
   WINDOW_NAMES,
   type WindowName,
 } from "./types";
@@ -56,7 +57,10 @@ export function createTauriHost(): Host {
     servers: () => invoke<ServerList>("servers_get"),
     chooseServer: (server, page) => invoke<void>("server_choose", { server, page: page ?? null }),
     removeServer: (server) => invoke<void>("server_remove", { server }),
+    signOutServer: (server) => invoke<void>("server_sign_out", { server }),
     workspaces: () => invoke<ServerWorkspaces[]>("workspaces_get"),
+    siteFetch: (server, method, path, body) =>
+      invoke<SiteAnswer>("site_fetch", { server, method, path, body: body ?? null }),
     welcomeMode: () => invoke<string | null>("welcome_mode_take").then((m) => (m === "add" ? "add" : null)),
     discover: () => invoke<Candidate[]>("discover"),
     // From the web view itself: every server answers `/api/instance` to any origin (it is public).
@@ -96,7 +100,7 @@ export function createTauriHost(): Host {
     cancelLocalSetup: () => invoke<void>("local_server_cancel"),
     onSetupStep: (cb) => subscribe<StepChange>("local-server://step", cb),
     startLocalServer: () => invoke<void>("local_server_start"),
-    stopLocalServer: (forget) => invoke<void>("local_server_stop", { forget }),
+    stopLocalServer: (forget, minutes) => invoke<void>("local_server_stop", { forget, minutes: minutes ?? null }),
     restartLocalServer: () => invoke<void>("local_server_restart"),
     setLocalReach: (on) => invoke<ReachResult>("local_server_reach", { on }),
     onLocalReach: (cb) => subscribe<ReachStage>("local-server://reach", cb),

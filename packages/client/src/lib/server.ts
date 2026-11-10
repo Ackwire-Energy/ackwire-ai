@@ -46,13 +46,16 @@ export function normalizeServer(input: string, opts: { allowHttp?: boolean | "lo
   const raw = input.trim();
   // Some URL parsers (Chromium's) keep a space in a host as `%20`: never an address.
   if (/\s/.test(raw)) return null;
+  const schemed = /^[a-z][\w+.-]*:\/\//i.test(raw);
   let url: URL;
   try {
-    url = new URL(/^[a-z][\w+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`);
+    url = new URL(schemed ? raw : `https://${raw}`);
   } catch {
     return null;
   }
   if (url.username || url.password || !url.hostname) return null;
+  // "127.0.0.1:4310" or "localhost:3000" typed as shown: a server on this computer answers plain http, never https.
+  if (!schemed && opts.allowHttp && LOOPBACK_HOST.test(url.hostname)) return `http://${url.host}`;
   if (url.protocol === "https:") return url.origin;
   if (url.protocol !== "http:") return null;
   const allowed = opts.allowHttp === "loopback" ? LOOPBACK_HOST : opts.allowHttp === true ? LOCAL_HOST : null;

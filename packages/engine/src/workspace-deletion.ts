@@ -23,7 +23,7 @@ import { caches } from "./cache";
 import { stopOrgWork } from "./cancel";
 import { type ConnectorDeps, revokeAtProvider } from "./connectors/connections";
 import { sha256 } from "./crypto";
-import { emailLocale, queueEmail } from "./email";
+import { emailLocale, modeStamp, queueEmail } from "./email";
 import {
   CODE_LIMITS,
   CODE_RESEND_SECONDS,
@@ -90,6 +90,7 @@ const {
   usageRecords,
   wikiLinks,
   contextUsage,
+  feedbackFiles,
   mailAccounts,
   mailWatches,
   connectorConnections,
@@ -125,6 +126,7 @@ export const PURGED_BY_HAND = [
   "usage_records",
   "wiki_links",
   "context_usage",
+  "feedback_files",
 ] as const;
 /** How long the purge waits for a workspace's online computers to sign its AI accounts out. */
 const ACCOUNTS_WAIT_MS = 60_000;
@@ -298,7 +300,7 @@ export async function sendDeletionCode(
         locale: emailLocale(account.locale),
         code,
         email: account.email,
-        ...(org ? { orgName: org.name } : {}),
+        ...(org ? { orgName: org.name, ...(await modeStamp(tx, org.id)) } : {}),
         support: deps.emails.support ?? null,
         url: deps.emails.publicUrl.replace(/\/$/, ""),
       },
@@ -439,6 +441,7 @@ export async function closeForDeletion(
   const by = { id: actorId, name: await nameOf(tx, actorId) };
   if (input.emails && via === "owner") {
     const url = workspaceUrl(input.emails.publicUrl, orgId);
+    const mode = await modeStamp(tx, orgId);
     for (const member of await membersToTell(tx, orgId)) {
       await queueEmail(tx, {
         orgId: null,
@@ -453,6 +456,7 @@ export async function closeForDeletion(
           timeZone: member.timeZone,
           owner: member.role === "owner",
           url,
+          ...mode,
         },
       });
     }
@@ -559,6 +563,7 @@ export async function restoreWorkspace(
     if (!deps.emails || options.account) return;
     const url = workspaceUrl(deps.emails.publicUrl, orgId);
     const byName = await nameOf(tx, actorId);
+    const mode = await modeStamp(tx, orgId);
     for (const member of await membersToTell(tx, orgId)) {
       await queueEmail(tx, {
         orgId: null,
@@ -570,6 +575,7 @@ export async function restoreWorkspace(
           orgName: org.name,
           byName,
           url,
+          ...mode,
         },
       });
     }
@@ -665,6 +671,8 @@ export async function purgeWorkspace(deps: PurgeDeps, orgId: string, options: { 
     // By its org_id, not through the runs: a run deleted earlier (a restarted one) leaves its rows behind.
     // ponytail: no index on context_usage.org_id, one scan per purge; index it if purges get slow.
     await tx.delete(contextUsage).where(eq(contextUsage.orgId, orgId));
+    // Its row only: the feedback sweep removes bytes with no row left (`sweepFeedbackFiles`).
+    await tx.delete(feedbackFiles).where(eq(feedbackFiles.orgId, orgId));
     const via = await requestedVia(tx, orgId);
     await recordOperatorEvent(tx, {
       type: "organization.deleted",

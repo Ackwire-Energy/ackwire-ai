@@ -13,10 +13,10 @@ import {
 } from "../../control/server";
 import { pairedHomes } from "../../control/store";
 import { useLocalServer, useOnShown, usePending, useTailnet } from "../../hooks";
-import { ReachProblem, ReachProgress, ReachRow, ServerTile } from "../../ui/here";
+import { CopyDetails, ReachProblem, ReachProgress, ReachRow, ServerTile } from "../../ui/here";
 import { CardTitle, hintFor, PrefCard, PrefHead, PrefRow } from "../../ui/settings";
 import { useToast } from "../../ui/Toast";
-import { shortPath } from "../../ui/time";
+import { clock, shortPath } from "../../ui/time";
 
 const KIND_SUB: Record<ServerKind, string> = {
   cloud: "desktop.servers.cloudSub",
@@ -30,7 +30,7 @@ const KIND_SUB: Record<ServerKind, string> = {
  * sign-in (cookies are per origin).
  */
 export function Servers() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const host = useHost();
   const store = useStore();
   const snap = useSnapshot();
@@ -61,6 +61,16 @@ export function Servers() {
 
   const open = async (server: string) => {
     await host.chooseServer(server).catch(() => toast(t("desktop.common.error"), "alert"));
+    read();
+  };
+
+  const signOut = async (server: string) => {
+    try {
+      await host.signOutServer(server);
+      toast(t("desktop.servers.signedOutDone", { host: serverName(server) }));
+    } catch {
+      toast(t("desktop.common.error"), "alert");
+    }
     read();
   };
 
@@ -97,16 +107,39 @@ export function Servers() {
               const kind = serverKind(server);
               const now = server === list.current;
               const known = spaces.find((s) => s.server === server);
+              const offline = known?.offlineSince !== undefined;
+              const signedOut = known !== undefined && !known.signedIn && !offline;
               return (
                 <PrefRow
                   key={server}
                   lead={<ServerTile kind={kind} />}
                   title={serverName(server)}
-                  desc={[t(KIND_SUB[kind]), known && workspacesLine(t, known)].filter(Boolean).join(" · ")}
-                  under={known?.signedIn && known.orgs.length > 0 ? <WorkspaceChips orgs={known.orgs} /> : undefined}
+                  desc={
+                    <>
+                      {[t(KIND_SUB[kind]), known && !offline && workspacesLine(t, known)].filter(Boolean).join(" · ")}
+                      {/* Its state as words in its color, never a pill (ADR 0158). */}
+                      {offline && (
+                        <span className="dk-state-waiting">
+                          {" · "}
+                          {t("desktop.servers.offline", {
+                            time: clock(new Date(known?.offlineSince ?? Date.now()).toISOString(), i18n.language),
+                          })}
+                        </span>
+                      )}
+                    </>
+                  }
+                  under={
+                    known?.signedIn && known.orgs.length > 0 ? (
+                      <WorkspaceChips orgs={known.orgs} dim={offline} />
+                    ) : undefined
+                  }
                   end={
                     <>
-                      {now ? (
+                      {signedOut ? (
+                        <Button size="sm" variant="primary" onClick={() => void open(server)}>
+                          {t("desktop.servers.signIn")}
+                        </Button>
+                      ) : now ? (
                         <Chip icon="check" tone="done">
                           {t("desktop.servers.openNow")}
                         </Chip>
@@ -128,8 +161,13 @@ export function Servers() {
                           />
                         }
                       >
+                        {known?.signedIn && (
+                          <MenuItem icon="arrowRight" onSelect={() => void signOut(server)}>
+                            {t("desktop.servers.signOut")}
+                          </MenuItem>
+                        )}
                         <MenuItem icon="trash" danger onSelect={() => setRemoving(server)}>
-                          {t("desktop.servers.remove")}
+                          {t("desktop.servers.removeFromApp")}
                         </MenuItem>
                       </Menu>
                     </>
@@ -177,10 +215,10 @@ function workspacesLine(t: (key: string, o?: Record<string, unknown>) => string,
   return s.signedIn ? t("desktop.servers.workspaces", { count: s.orgs.length }) : t("desktop.servers.signedOut");
 }
 
-/** A server's workspaces under its row, each with its logo and unread count. */
-function WorkspaceChips({ orgs }: { orgs: ServerWorkspaces["orgs"] }) {
+/** A server's workspaces under its row, each with its logo and unread count; `dim` while it doesn't answer. */
+function WorkspaceChips({ orgs, dim = false }: { orgs: ServerWorkspaces["orgs"]; dim?: boolean }) {
   return (
-    <span className="dk-ws-list">
+    <span className="dk-ws-list" data-dim={dim || undefined}>
       {orgs.map((o) => (
         <Chip key={o.id}>
           {o.logo && <img className="dk-ws-logo" src={o.logo} alt="" width={16} height={16} />}
@@ -231,7 +269,7 @@ function StoppedHere({ local }: { local: LocalServerStatus }) {
  * version, data and backups, Restart and Stop, and "Stop running it here…" (its data stays).
  */
 function HereServer({ local, current }: { local: LocalServerStatus; current: string | null }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const host = useHost();
   const toast = useToast();
   const tailnet = useTailnet();
@@ -241,6 +279,9 @@ function HereServer({ local, current }: { local: LocalServerStatus; current: str
   const [reachProblem, setReachProblem] = useState<ServeProblem | null>(null);
   const [busy, run] = usePending<"restart" | "stop" | "start" | "usage" | "backup">();
   const [stopping, setStopping] = useState(false);
+  // Stop asks first (the phone and the team lose access), and how long; turning reach off asks too (ADR 0158).
+  const [stopAsk, setStopAsk] = useState(false);
+  const [reachOffAsk, setReachOffAsk] = useState(false);
   const address = local.publicUrl ?? local.url ?? "";
   const running = local.phase === "running";
   const up = running || local.phase === "starting" || local.phase === "updating";
@@ -269,7 +310,13 @@ function HereServer({ local, current }: { local: LocalServerStatus; current: str
       </Chip>
     ) : (
       <Chip icon={local.phase === "failing" || local.phase === "stopped" ? "alert" : undefined} tone="waiting">
-        {t(`desktop.server.${local.phase === "off" ? "stopped" : local.phase}`)}
+        {local.held
+          ? local.heldUntil
+            ? t("desktop.server.stoppedUntil", {
+                time: clock(new Date(local.heldUntil).toISOString(), i18n.language),
+              })
+            : t("desktop.server.stoppedHeld")
+          : t(`desktop.server.${local.phase === "off" ? "stopped" : local.phase}`)}
       </Chip>
     );
 
@@ -297,7 +344,30 @@ function HereServer({ local, current }: { local: LocalServerStatus; current: str
             )
           }
         />
-        <ReachRow tailnet={tailnet} on={local.reach} busy={reaching || !running} onChange={(on) => void reach(on)} />
+        {local.phase === "failing" && (
+          <PrefRow
+            desc={t("desktop.server.failingWhy")}
+            end={
+              <>
+                <CopyDetails />
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => void host.revealFolder(logsFolder(local.dir)).catch(() => {})}
+                >
+                  {t("desktop.server.showLogs")}
+                </Button>
+              </>
+            }
+          />
+        )}
+        <ReachRow
+          tailnet={tailnet}
+          on={local.reach}
+          busy={reaching || !running}
+          onChange={(on) => (on ? void reach(true) : setReachOffAsk(true))}
+        />
+        <PrefRow desc={t("desktop.server.reachRestart")} />
         {reaching && stage && <PrefRow desc={<ReachProgress stage={stage} />} />}
         {reachProblem && <PrefRow desc={<ReachProblem problem={reachProblem} text="prefs" />} />}
         <PrefRow
@@ -391,7 +461,7 @@ function HereServer({ local, current }: { local: LocalServerStatus; current: str
               icon="stop"
               loading={busy === "stop"}
               disabled={busy !== null}
-              onClick={() => void act("stop", () => host.stopLocalServer(false))}
+              onClick={() => setStopAsk(true)}
             >
               {t("desktop.server.stop")}
             </Button>
@@ -413,6 +483,69 @@ function HereServer({ local, current }: { local: LocalServerStatus; current: str
           </Button>
         </span>
       </div>
+      <Dialog
+        open={stopAsk}
+        onOpenChange={(o) => !o && busy !== "stop" && setStopAsk(false)}
+        title={t("desktop.server.stopTitle")}
+        description={t("desktop.server.stopBody")}
+        closeLabel={t("desktop.common.close")}
+        width={440}
+      >
+        <DialogFooter bar>
+          <Button variant="ghost" onClick={() => setStopAsk(false)} disabled={busy === "stop"}>
+            {t("desktop.common.cancel")}
+          </Button>
+          <Button
+            disabled={busy === "stop"}
+            onClick={() =>
+              void act("stop", async () => {
+                await host.stopLocalServer(false, 60);
+                setStopAsk(false);
+              })
+            }
+          >
+            {t("desktop.server.stopFor1h")}
+          </Button>
+          <Button
+            variant="danger"
+            loading={busy === "stop"}
+            onClick={() =>
+              void act("stop", async () => {
+                await host.stopLocalServer(false);
+                setStopAsk(false);
+              })
+            }
+          >
+            {t("desktop.server.stopUntilStart")}
+          </Button>
+        </DialogFooter>
+      </Dialog>
+      <Dialog
+        open={reachOffAsk}
+        onOpenChange={(o) => !o && setReachOffAsk(false)}
+        title={t("desktop.server.reachOffTitle")}
+        description={t("common.joinSentences", {
+          a: t("desktop.server.reachOffBody"),
+          b: t("desktop.server.reachRestart"),
+        })}
+        closeLabel={t("desktop.common.close")}
+        width={440}
+      >
+        <DialogFooter bar>
+          <Button variant="ghost" onClick={() => setReachOffAsk(false)}>
+            {t("desktop.common.cancel")}
+          </Button>
+          <Button
+            variant="danger"
+            onClick={() => {
+              setReachOffAsk(false);
+              void reach(false);
+            }}
+          >
+            {t("desktop.server.reachOffConfirm")}
+          </Button>
+        </DialogFooter>
+      </Dialog>
       <Dialog
         open={stopping}
         onOpenChange={(o) => !o && busy !== "stop" && setStopping(false)}
@@ -442,3 +575,6 @@ function HereServer({ local, current }: { local: LocalServerStatus; current: str
     </>
   );
 }
+
+/** Where the server here writes its log (`logs/server.log` in its folder), with the folder's own separator. */
+const logsFolder = (dir: string) => `${dir}${dir.includes("\\") ? "\\" : "/"}logs`;

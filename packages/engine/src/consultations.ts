@@ -43,6 +43,7 @@ import { noAgentText } from "./team";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 import { untrustedBlock } from "./untrusted";
 import { USAGE_WAIT_CODES } from "./usage-pause";
+import { inWorkspaceWords } from "./workspace-mode";
 
 const { agentConsultations, agentRuns, agents, channels, messages, outbox, users } = schema;
 
@@ -261,8 +262,28 @@ export function createAskAgentToolSource(
       };
     },
   };
-  return { name: "consultations", tools: async () => [tool, createTellAgentTool(deps)] };
+  return {
+    name: "consultations",
+    tools: async (ctx) => {
+      const tell = createTellAgentTool(deps);
+      // A personal workspace (ADR 0159): the same tools, about the person's own agents.
+      return inWorkspaceWords(ctx.db, ctx.orgId, [tool, tell], {
+        [ASK_AGENT_TOOL]: tool.description.replace(ASK_TEAM_EXAMPLE, ASK_PERSONAL_EXAMPLE),
+        [TELL_AGENT_TOOL]: tell.description.replace(TELL_TEAM_EXAMPLE, TELL_PERSONAL_EXAMPLE),
+      });
+    },
+  };
 }
+
+/** How `ask_agent` and `tell_agent` open, and the same in a personal workspace (ADR 0159). */
+const ASK_TEAM_EXAMPLE =
+  "Ask another agent of the organization something, e.g. a dev agent asking @infra how staging is deployed.";
+const ASK_PERSONAL_EXAMPLE =
+  "Ask another of this person's agents something, e.g. an agent planning a trip asking @finance how much is set aside for it.";
+const TELL_TEAM_EXAMPLE =
+  "Hand another agent of the organization work to do, or news it should act on, e.g. @sales to hand its client notes to @support, or @infra that a deploy finished so it watches the metrics.";
+const TELL_PERSONAL_EXAMPLE =
+  "Hand another of this person's agents work to do, or news it should act on, e.g. @inbox to hand a bill it found to @finance, or @trips that the flights are booked so it watches for changes.";
 
 /** The agents already in the chain of consultations this run answers (empty when it answers none). */
 async function chainOf(db: Executor, ctx: Pick<ToolContext, "orgId" | "runId">) {

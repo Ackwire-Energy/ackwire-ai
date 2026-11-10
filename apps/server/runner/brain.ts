@@ -36,6 +36,7 @@ import {
   type TurnContext,
   type WireBrainEvent,
 } from "@agenteschat/adapters/machine-protocol";
+import { errorLineOf } from "@agenteschat/adapters/redact";
 import {
   claudeCodeModel,
   PLAN_FORBIDDEN_TEXT,
@@ -979,6 +980,8 @@ export class ClaudeProcess {
   readonly startedAt = Date.now();
   exited = false;
   exitCode: number | null = null;
+  /** The signal that ended it, when one did (an out-of-memory kill is `SIGKILL`). */
+  exitSignal: NodeJS.Signals | null = null;
   stderr = "";
   /** Claude Code said `system` `init` (its version, when it has one, is known from then on). */
   initSeen = false;
@@ -1043,7 +1046,7 @@ export class ClaudeProcess {
       if ((err as { code?: string }).code === "ENOENT") this.stderr = `ENOENT ${this.stderr}`;
       this.markExit(null);
     });
-    events.on("exit", (code: number | null) => this.markExit(code));
+    events.on("exit", (code: number | null, signal: NodeJS.Signals | null) => this.markExit(code, signal));
     this.child.stdin?.on("error", () => {});
     if (this.child.stdout) {
       const rl = createInterface({ input: this.child.stdout, crlfDelay: Number.POSITIVE_INFINITY });
@@ -1181,15 +1184,21 @@ export class ClaudeProcess {
     for (const w of [...this.ownTurnWaiters]) w();
   }
 
-  private markExit(code: number | null) {
+  private markExit(code: number | null, signal: NodeJS.Signals | null = null) {
     if (this.exited) return;
     this.exited = true;
     this.exitCode = code;
+    this.exitSignal = signal;
     // Lines still buffered in readline arrive first.
     setImmediate(() => {
       this.wakeOwnTurnWaiters();
       for (const h of [...this.exitHandlers]) h();
     });
+  }
+
+  /** How it ended, for the error and the log: `exit 1`, `signal SIGKILL`, `exit ?` while it runs. */
+  ended() {
+    return this.exitCode === null && this.exitSignal ? `signal ${this.exitSignal}` : `exit ${this.exitCode ?? "?"}`;
   }
 
   onLine(handler: ((line: string) => void) | null) {
@@ -1692,6 +1701,12 @@ const errorEvent = (code: string, message: string, retryable: boolean): WireBrai
   retryable,
 });
 
+/** What a dead process's stderr says went wrong (`errorLineOf`), with the turn's secrets masked. */
+const redactedLine = (stderr: string, ctx: BrainTurnContext) => {
+  const line = errorLineOf(stderr).slice(0, 500);
+  return ctx.secrets?.redact ? ctx.secrets.redact(line) : line;
+};
+
 export class BrainManager {
   private readonly live = new Map<string, Live>();
   private readonly chains = new Map<string, Promise<unknown>>();
@@ -1935,10 +1950,16 @@ export class BrainManager {
       // A background turn (a routine's run): nothing stays alive for it afterwards, not even a process it found.
       if (!keepAlive) this.drop(live);
       if (out.final) return out.final;
-      // Died mid-turn: the same turn again, one-shot, resuming the session.
-      this.log(`[${ctx.agent.handle}] brain process for ${session.slice(0, 8)} died mid-turn; resuming one-shot`);
+      // Died mid-turn: the same turn again, one-shot, resuming the session. Why it died is logged, and kept for the
+      // error should the one-shot die without a word.
+      const line = redactedLine(live.proc.stderr, ctx);
+      const died = `${live.proc.ended()}${line ? `: ${line}` : ""}`;
+      this.log(
+        `[${ctx.agent.handle}] brain process for ${session.slice(0, 8)} died mid-turn (${died}); resuming one-shot`,
+      );
       if (live.proc.stderr.startsWith("ENOENT")) return this.cliMissing();
-      return this.oneShot(key, session, cwd, req, ctx, sig, this.resumeFor(cwd, session, req, ctx, true), true);
+      const resume = this.resumeFor(cwd, session, req, ctx, true);
+      return this.oneShot(key, session, cwd, req, ctx, sig, resume, true, line);
     }
     return this.oneShot(key, session, cwd, req, ctx, sig, this.resumeFor(cwd, session, req, ctx), true);
   }
@@ -2113,6 +2134,8 @@ export class BrainManager {
     sig: string,
     resume: boolean,
     mayRetryFlag: boolean,
+    /** The error line of a process that died on this turn before: said when this one dies without a word. */
+    earlier = "",
   ): Promise<WireBrainEvent> {
     const live = await this.spawn(key, session, cwd, req, ctx, sig, false, resume);
     const out = await this.onLive(live, req, ctx);
@@ -2122,16 +2145,18 @@ export class BrainManager {
     const fast = Date.now() - live.proc.startedAt <= FAST_FAIL_MS;
     // Never into `--resume` on a delegated CLI: a transcript it doesn't own is what that answer may mean.
     if (mayRetryFlag && fast && WRONG_SESSION_FLAG.test(live.proc.stderr) && (resume || !ctx.delegated)) {
-      return this.oneShot(key, session, cwd, req, ctx, sig, !resume, false);
+      return this.oneShot(key, session, cwd, req, ctx, sig, !resume, false, earlier);
     }
     const said = live.proc.stderr.trim().split("\n").slice(-3).join(" ").trim();
-    const tail = ctx.secrets?.redact ? ctx.secrets.redact(said) : said;
     if (/not logged in|\/login/i.test(said)) {
+      const tail = ctx.secrets?.redact ? ctx.secrets.redact(said) : said;
       return errorEvent("not_logged_in", tail || "Claude Code is not logged in on this computer.", true);
     }
+    // The line that says what went wrong, not the stack frames and the Node.js version a crash ends with.
+    const line = redactedLine(live.proc.stderr, ctx) || earlier;
     return errorEvent(
       "claude_failed",
-      `Claude Code ended without an answer (exit ${live.proc.exitCode ?? "?"})${tail ? `: ${tail}` : ""}`,
+      `Claude Code ended without an answer (${live.proc.ended()})${line ? `: ${line}` : ""}`,
       false,
     );
   }

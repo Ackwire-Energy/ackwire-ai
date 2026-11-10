@@ -4,15 +4,16 @@ import { answerAfter, answerPicks, BUSINESS_TYPES, replyChipsOf } from "@agentes
 
 const src = (f: string) => readFileSync(new URL(`../../src/features/${f}`, import.meta.url), "utf8");
 
-test("row 1 asks what the workspace does with the business types, then opens their template (ADR 0155 §6)", () => {
-  const about = src("agents/setup/SetupStepScreen.tsx");
-  expect(about).toContain("BUSINESS_TYPES.map((b) => (");
-  expect(about).toContain('t("agentSetup.firstRun.about.title", { org: org?.name ?? "" })');
-  expect(about).toContain("{ context: text }");
-  expect(about).toContain("openTemplatesAfterAbout(business && isTemplateBusiness(business) ? business : undefined)");
-  const run = src("right-hand/FirstRun.tsx");
-  expect(run).toContain("<TeamTemplatesSheet");
-  expect(run).toContain("initial={templates?.initial}");
+test("what the workspace does: the onboarding's step 2, the business types saved as its context (ADR 0162)", () => {
+  const step = src("onboarding/steps.tsx");
+  expect(step).toContain("BUSINESS_TYPES.map((b) => (");
+  expect(step).toContain("save.mutate({ context: text }");
+  // The type and the sentence go together and come back together, as on the web (`aboutContext`, `aboutOf`).
+  expect(step).toContain("const text = aboutContext(t, kind, line);");
+  expect(step).toContain("useState(() => aboutOf(t, context).line)");
+  expect(src("onboarding/OnboardingFlow.tsx")).toContain('t("agentSetup.firstRun.about.title", { org: workspace })');
+  // The setup card's own screen for it is gone: the onboarding asks it once.
+  expect(src("agents/setup/SetupStepScreen.tsx")).not.toContain("BUSINESS_TYPES");
   expect(BUSINESS_TYPES.at(-1)).toBe("other");
 });
 
@@ -70,4 +71,39 @@ test("the chips read their answer from the conversation, as on the web", () => {
   const chips = replyChipsOf({ replyChips: { choices: ["Cobrar", "Bugs", "Vender"], multiple: true, step: 2, of: 3 } });
   expect(chips?.step).toBe(2);
   expect(answerPicks(chips?.choices ?? [], answerAfter(list, "q"))).toEqual(["Cobrar", "Bugs"]);
+});
+
+test("a personal workspace's row 1 asks about the person, the areas of life saved as one sentence (ADR 0159)", () => {
+  const steps = src("agents/setup/SetupStepScreen.tsx");
+  // A team's onboarding asked what it does (ADR 0162): only a personal workspace's first run has this screen.
+  expect(steps).toContain('const firstRunScreen = known === "apps" || (known === "about" && isPersonal(org));');
+  expect(steps).toContain("return <AboutYouStep typed={text ?? null} />;");
+  expect(steps).toContain("LIFE_AREAS.map((area) => (");
+  expect(steps).toContain('readAboutYou(t, settings.data?.context || typed || "")');
+  expect(steps).toContain("openTemplatesAfterAbout(lifeAreaTemplate(picked) ?? undefined)");
+  // On the card, the areas are answers to tap; Save keeps them, "Something else" opens the screen with them.
+  const run = src("right-hand/FirstRun.tsx");
+  expect(run).toContain('{ context: aboutYouContext(t, picked, "") }');
+  expect(run).toContain("onSaved(lifeAreaTemplate(picked))");
+});
+
+test("an agent with no channel lives in its DM: no bare #, a block of its own, no map when none has one", () => {
+  const card = src("right-hand/TeamCard.tsx");
+  // Its channel only when it has one, and never in a personal workspace (ADR 0159).
+  expect(card).toContain('const channelOf = (a: TeamAgentDraft) => (personal ? "" : a.channel);');
+  expect(card).toContain("{channelOf(a) ? (");
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: the card's own template, read as source text
+  expect(card).toContain("`${channelOf(agent) ? `${agent.name}, #${agent.channel}` : agent.name}: ${routine.name}`");
+  // The map keys its blocks by `col.key` (two agents in DMs share no channel) and names a channel only when there is
+  // one; with every agent in a DM, there is no map to see.
+  expect(card).toContain("<View key={col.key}");
+  expect(card).toContain("{col.channel ? (");
+  expect(card).toContain("const mapButton = teamInDms(plan) ? null : (");
+  // The templates and the card in the workspace's words.
+  const personalKeys = ["teamPlan.templates.title", "teamPlan.templates.lead", "teamPlan.map.title"];
+  for (const key of personalKeys) expect(card).toContain(`modeKey(org, "${key}")`);
+  // The rows take the mode as a prop: the onboarding draws them with no workspace open.
+  expect(card).toContain('t(personal ? "teamPlan.card.weeklyPersonal" : "teamPlan.card.weekly")');
+  // No invitation on a personal workspace's first tasks.
+  expect(card).toContain("const people = isPersonal(org) ? [] : card.params.invite;");
 });

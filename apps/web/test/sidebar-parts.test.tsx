@@ -151,7 +151,7 @@ describe("the parts' headers", () => {
     expect(shown(nav().querySelector('a.sidebar__item[title="#general"]') as Element)).toBe(false);
   });
 
-  test("the footer has no Criar agente row: Agentes' + has it (always shown on touch screens)", async () => {
+  test("no Criar agente row, not even with no agents yet: Agentes' + has it (always shown on touch screens)", async () => {
     await go();
     expect(nav().querySelector(".sidebar__create")).toBeNull();
     expect(labels(await openPlus("Novo agente ou setor"))).toEqual(["Criar agente", "Novo setor"]);
@@ -160,7 +160,8 @@ describe("the parts' headers", () => {
     state.agents = [];
     await go(state);
     expect(nav().querySelector(".sidebar__create")).toBeNull();
-    expect(within(nav()).getByRole("link", { name: "Criar o primeiro agente" })).toBeTruthy();
+    expect(within(nav()).queryByRole("link", { name: "Criar o primeiro agente" })).toBeNull();
+    expect(labels(await openPlus("Novo agente ou setor"))).toEqual(["Criar agente", "Novo setor"]);
   });
 });
 

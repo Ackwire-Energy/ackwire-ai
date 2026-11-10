@@ -1,8 +1,16 @@
-import { type Agent, useAiStatus, useComputerSetup, useMessages, useSetAgentStyle } from "@agenteschat/client";
+import {
+  type Agent,
+  useAiStatus,
+  useComputerSetup,
+  useMessages,
+  useSetAgentStyle,
+  useTeamAnswered,
+} from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiStateOf, noAiCardOf } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { introCards, introLeadKey, isRightHand, offersTeamSetup } from "@agenteschat/client/lib/right-hand";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import { WAVE_SECONDS } from "@agenteschat/ui/agent/stickers";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -28,9 +36,11 @@ import { useSendAnswer } from "./TeamCard";
  * The top of the right hand's DM (ADR 0137), drawn by the app and never stored, so it costs nothing and works before
  * any AI is connected, as on the web: its greeting, then, for the workspace's owners, the first-run checklist (ADR
  * 0155 §6). Anyone else gets one card at a time (`introCards`): a waiting pill with "Connect" (tinted) while there is
- * no AI, then how agents talk to them (ADR 0147); the owner gets that question once the checklist is complete. With
- * no card left, a line to build the team with it, at any time. On the person's first visit (`waveFrom`, when its wave
- * started), its waving sticker under the greeting, drawn as a sticker message is and decorative.
+ * no AI, then how agents talk to them (ADR 0147); the owner gets that question once the checklist is complete and the
+ * team answered them once, so it never stands beside the first task. With no card left, a line to build the team with
+ * it, at any time; a personal workspace's words speak of one person's agents (ADR 0159). On the person's first visit
+ * (`waveFrom`, when its wave started), its waving sticker under the greeting, drawn as a sticker message is and
+ * decorative.
  */
 export function RightHandIntro({ agent, channelId, waveFrom }: { agent: Agent; channelId: string; waveFrom?: number }) {
   const { t } = useTranslation();
@@ -41,7 +51,7 @@ export function RightHandIntro({ agent, channelId, waveFrom }: { agent: Agent; c
   const team = dir.agents.filter((a) => !isRightHand(a));
   const held = usePlanHold(orgId, org) !== null;
   const setup = useComputerSetup(orgId);
-  const checklist = useFirstRun(agent, channelId).state;
+  const checklist = useFirstRun(agent).state;
   // A hold is known with the edition: until then no card, so Connect doesn't flash before the checklist.
   const noAi = aiStateOf(status.data, agent.id) === "no_ai";
   const aiKnown = Boolean(status.data) && !setup.isPending;
@@ -53,6 +63,7 @@ export function RightHandIntro({ agent, channelId, waveFrom }: { agent: Agent; c
     held,
     noAiCard: useMessages(orgId, channelId).data?.some((m) => noAiCardOf(m.meta)),
     checklist,
+    answered: useTeamAnswered(orgId, team),
   });
   const send = useSendAnswer(channelId);
   return (
@@ -90,10 +101,10 @@ export function RightHandIntro({ agent, channelId, waveFrom }: { agent: Agent; c
       </View>
       <View style={styles.text}>
         <Text variant="body" style={styles.bold}>
-          {t("rightHand.intro.greeting", agentGrammar(agent.name))}
+          {t(modeKey(org, "rightHand.intro.greeting"), agentGrammar(agent.name))}
         </Text>
         <Text variant="body" tone="ink2">
-          {t(introLeadKey(held, team.length > 0))}
+          {t(modeKey(org, introLeadKey(held, team.length > 0)))}
         </Text>
         {waveFrom !== undefined ? (
           <View style={styles.sticker} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
@@ -112,7 +123,7 @@ export function RightHandIntro({ agent, channelId, waveFrom }: { agent: Agent; c
           <AskWaiting
             forMe
             mark="brain"
-            words={t("rightHand.intro.connect.title")}
+            words={t(modeKey(org, "rightHand.intro.connect.title"))}
             actions={
               <EventPillAction
                 key="connect"
@@ -124,7 +135,7 @@ export function RightHandIntro({ agent, channelId, waveFrom }: { agent: Agent; c
             below={
               <EventPillText>
                 <Text variant="footnote" tone="muted">
-                  {t("rightHand.intro.connect.text")}
+                  {t(modeKey(org, "rightHand.intro.connect.text"))}
                 </Text>
               </EventPillText>
             }
@@ -135,13 +146,13 @@ export function RightHandIntro({ agent, channelId, waveFrom }: { agent: Agent; c
         {offersTeamSetup({ noAi, aiKnown, createsAgents, hasTeam: team.length > 0, cards, held, checklist }) ? (
           <View>
             <Text variant="small" tone="muted">
-              {t("rightHand.intro.again.question")}
+              {t(modeKey(org, "rightHand.intro.again.question"))}
             </Text>
             <Button
               variant="text"
               size="sm"
-              label={t("rightHand.intro.again.action")}
-              onPress={() => send(t("rightHand.intro.again.message"))}
+              label={t(modeKey(org, "rightHand.intro.again.action"))}
+              onPress={() => send(t(modeKey(org, "rightHand.intro.again.message")))}
             />
           </View>
         ) : null}

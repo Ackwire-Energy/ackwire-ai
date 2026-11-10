@@ -8,16 +8,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "@/ui";
 import { router } from "@/ui/navigation";
 import { useColors, useOrgId } from "../shared/hooks";
-import { goBack, Loaded, PushedHeader } from "../shared/parts";
-import { BottomBar, ChangedTools } from "./ToolChanges";
+import { BottomBar, goBack, Loaded, PushedHeader } from "../shared/parts";
 import { ReviewStep, type SaveBar } from "./ToolReview";
 
 /** Opens a connection's Ferramentas (from its sheet, or the gallery when its tools wait for a review). */
 export const openTools = (id: string) => router.push({ pathname: "/connectors/tools", params: { id } });
 
 /**
- * Ferramentas, a screen pushed over Conectores (the web's "Ferramentas", "Revisar" while some wait): first the tools
- * its server changed since they were approved, for an admin to accept (what Atividade's card opens); then what each
+ * Ferramentas, a screen pushed over Conectores (the web's "Ferramentas", "Revisar" while some wait): what each
  * tool may do on its own, grouped by level, under the native bar with its back button. A server's are changed here
  * and saved with Salvar, pinned at the bottom, which goes back; our catalog services' are shown as they are.
  */
@@ -54,7 +52,6 @@ export function ToolsScreen({ connectionId }: { connectionId: string }) {
           ) : (
             <Loaded>
               <View style={styles.stack}>
-                <ChangedTools connectionId={connectionId} name={name} />
                 <ReviewStep
                   connectionId={connectionId}
                   def={item?.def ?? null}

@@ -34,18 +34,7 @@ regexes = ['''^hm_[0-9a-f]{48}$''']
 [[allowlists]]
 description = "Made-up private keys read as one in a test, in one past commit"
 targetRules = ["private-key"]
-commits = ["83ad3a9449549b2461cadc91b8d146f35d63f259"]
-
-# Two more tests' made-up keys, in branches' commits the scan reads because it reads all history: a push test's PEM
-# cut short on purpose (its body isn't a key) and the closing lines of a helper that writes an OpenSSH key from one
-# the test generates. History stays; these commits only, for this rule only.
-[[allowlists]]
-description = "Made-up private keys in tests, in two branch commits"
-targetRules = ["private-key"]
-commits = [
-  "b8084b4c95b60fa5e9283e433576d38ec53a92da",
-  "ef8ecc7d44d0f9ad051d301e57214bd38cb9bcb3",
-]
+commits = ["cfab1cb463a3470c8303f3b2efac9c17959d5e2b"]
 
 # The characters the runner draws a desktop's VNC passwords from (letters and digits without look-alikes) sit
 # in a constant whose name says "password", so the generic rule reads the alphabet as a key. Only that exact
