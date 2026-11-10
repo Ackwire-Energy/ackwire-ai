@@ -1864,12 +1864,15 @@ html:not([data-pointer]) .artifact-tile__open:focus-visible {
   background: none;
   box-shadow: none;
 }
-/* On a phone: two to a row (a table's cover keeps two columns, the rest wouldn't read); alone, the whole width up to
-   its size. */
+/* On a phone: pictures two to a row; a file the whole row, since its name wraps whole and half a row would take it a
+   word a line (a table's cover keeps two columns, the rest wouldn't read); alone, the whole width up to its size. */
 @media (max-width: 640px) {
   .artifact-tile {
     --tile-w: calc(50% - 5px);
     --tile-cover: 120px;
+  }
+  .artifact-tile:not([data-media], .artifact-tile--loading) {
+    --tile-w: 100%;
   }
   .artifact-tile__table :is(th, td):nth-child(n + 3) {
     display: none;
