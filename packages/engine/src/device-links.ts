@@ -192,6 +192,9 @@ export async function startLinkedDeviceCode(
     orgName: who?.org ?? "",
     makerId: link.createdByUserId,
     facts: [OS_WORDS[request.os], request.requesterIp, request.approxLocation].filter(Boolean).join(" · "),
+    os: request.os,
+    ip: request.requesterIp,
+    location: request.approxLocation,
   }).catch(() => undefined);
   await publishDevicesChanged(deps.pubsub, link.orgId);
   return { ...started, maker: { name: who?.maker ?? "" }, org: { name: who?.org ?? "" } };

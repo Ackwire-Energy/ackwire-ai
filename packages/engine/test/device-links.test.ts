@@ -70,7 +70,14 @@ test("a connect link: a one-line install that works once, asks its maker, and jo
       userId: rui.id,
       waiting: true,
       source: { requestId, label: "build-box" },
-      latest: { title: "Acme", text: "Linux · 203.0.113.20 · Lisbon, PT" },
+      // The system as a code too: the app draws its mark from it and says its name in the person's language.
+      latest: {
+        title: "Acme",
+        text: "Linux · 203.0.113.20 · Lisbon, PT",
+        os: "linux",
+        ip: "203.0.113.20",
+        location: "Lisbon, PT",
+      },
     },
   ]);
   expect((await listDevices(f.db, f.org.id, rui.id)).requests.map((r) => r.id)).toEqual([requestId]);

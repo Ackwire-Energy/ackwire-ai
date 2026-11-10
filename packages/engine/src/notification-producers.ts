@@ -1330,7 +1330,15 @@ export async function notifyMachineConnected(
 export async function notifyDeviceJoinRequest(
   deps: NotificationDeps,
   request: { id: string; name: string },
-  to: { orgId: string; orgName: string; makerId: string; facts: string },
+  to: {
+    orgId: string;
+    orgName: string;
+    makerId: string;
+    facts: string;
+    os: string;
+    ip: string;
+    location: string | null;
+  },
 ) {
   await notify(deps, {
     orgId: to.orgId,
@@ -1340,7 +1348,14 @@ export async function notifyDeviceJoinRequest(
     waiting: true,
     source: { requestId: request.id, label: request.name },
     // The workspace's name: the push says "build-box wants to join Acme".
-    latest: { title: to.orgName, ...(to.facts ? { text: notificationSnippet(to.facts) } : {}) },
+    latest: {
+      title: to.orgName,
+      ...(to.facts ? { text: notificationSnippet(to.facts) } : {}),
+      // The app draws the system's mark and says its words in the person's language; `text` is for pushes and emails.
+      os: to.os,
+      ...(to.ip ? { ip: to.ip } : {}),
+      ...(to.location ? { location: to.location } : {}),
+    },
   });
 }
 
