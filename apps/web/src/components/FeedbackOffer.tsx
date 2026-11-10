@@ -67,10 +67,7 @@ export function FeedbackOfferRow({ message }: { message: Message }) {
         {offer.auto ? (
           <Trans i18nKey="feedback.offer.sentAuto" values={{ summary: offer.summary }} components={{ b: <b /> }} />
         ) : (
-          <Trans
-            i18nKey={cloud ? "feedback.offer.sentCloud" : "feedback.offer.sentServer"}
-            components={{ b: <b /> }}
-          />
+          <Trans i18nKey={cloud ? "feedback.offer.sentCloud" : "feedback.offer.sentServer"} components={{ b: <b /> }} />
         )}
       </RequestDone>
     );
