@@ -142,7 +142,7 @@ describe("a personal workspace's sidebar", () => {
     }
     expect(within(dialog).getByRole("option", { name: /Clara/ }).getAttribute("aria-selected")).toBe("true");
     expect((within(dialog).getByRole("textbox", { name: "Nome" }) as HTMLInputElement).value).toBe("Clara");
-    expect(dialog.textContent).toContain("Oi! Eu sou a");
+    expect(dialog.textContent).toContain("Oi, eu sou a");
     // "Vai usar" holds only what is connected here (GitHub), at write; her starter's apps wait for the chat.
     const uses = within(dialog).getByRole("region", { name: "Vai usar" });
     expect(within(uses).getByRole("button", { name: /GitHub/ }).textContent).toContain("Lê e escreve");

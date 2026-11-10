@@ -14483,10 +14483,10 @@
     "value": "Bring agents from another app"
   },
   "newAgentCard.hi": {
-    "value": "Hi! I'm"
+    "value": "Hi, I'm"
   },
   "newAgentCard.hiBlank": {
-    "value": "Hi! I'm"
+    "value": "Hi, I'm"
   },
   "newAgentCard.name": {
     "value": "Name"
