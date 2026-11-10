@@ -5,10 +5,9 @@
 - Amends: 0053 §10 (its addendum of 2026-11-09), 0005 (how the outbox claims)
 - Code: engine `outbox.ts` (`claimWhere`, `turnKey`, `laneLimits`, `memoryBudget`, `resizeLanes`, `laneAlarm`,
   `claimLaneAlarm`, `RUN_MEMORY_BYTES`, `APP_JOB_KINDS`), `cache.ts` (`shareCacheInvalidations`); db `client.ts`
-  (`MIGRATIONS_LOCK`); server
-  `start.ts` (`SERVER_ROLE`, the lanes' limits at boot), `workers.ts` (the late beats, `slowLaneMessage`),
-  `routes/health.ts` (`workerHealth`); config `OUTBOX_MAX_IN_FLIGHT_CEILING`, `SERVER_ROLE`; tests `outbox.test.ts`,
-  `run-cost.test.ts`, `cache-share.test.ts`, db `migrate-lock.test.ts`
+  (`MIGRATIONS_LOCK`); server `start.ts` (`SERVER_ROLE`, the lanes' limits at boot), `workers.ts` (the late beats,
+  `slowLaneMessage`), `routes/health.ts` (`workerHealth`); config `OUTBOX_MAX_IN_FLIGHT_CEILING`, `SERVER_ROLE`; tests
+  `outbox.test.ts`, `run-cost.test.ts`, `cache-share.test.ts`, db `migrate-lock.test.ts`
 
 ## Context
 
@@ -42,8 +41,9 @@ every other workspace's routines wait behind it.
    runs as half the process's memory holds beside what it held at boot: about 400 on a 4 GB container, about 1,900 on
    16 GB. Its memory (`memoryBudget`) is its container's limit (`process.constrainedMemory()` on Linux), and on a
    computer it shares, as with the database and the speech server of the compose file, no more than it holds plus what
-   was free there when it started. Runs that hold far more (images) meet the live brake below. `OUTBOX_MAX_IN_FLIGHT_CEILING` is now optional, a cap over both lanes. On the built-in
-   database the slots stay where they start.
+   was free there when it started. Runs that hold far more (images) meet the live brake below.
+   `OUTBOX_MAX_IN_FLIGHT_CEILING` is now optional, a cap over both lanes. On the built-in database the slots stay
+   where they start.
 4. **Growth, and what stops it.** Every 30 s, a lane whose jobs waited over 2 s doubles, within its limit and the
    total's, quick first; one that waited for nothing and used half its slots or fewer halves, never below where it
    started. Nothing grows while the processor is busy (over 30 of the step's 300 timer beats late by 100 ms or more,
@@ -75,8 +75,8 @@ every other workspace's routines wait behind it.
 ## Consequences
 
 - A claim reads every due job of its lane and sorts them by workspace: under a millisecond at everyday backlogs, about
-  60 ms for 100,000 due jobs on PGlite, where the claim before turns took about 25 ms. Past backlogs like that, the way on is an
-  index on (workspace, due) and a lateral per workspace (`ponytail:` in `claimWhere`).
+  60 ms for 100,000 due jobs on PGlite, where the claim before turns took about 25 ms. Past backlogs like that, the
+  way on is an index on (workspace, due) and a lateral per workspace (`ponytail:` in `claimWhere`).
 - Turns count jobs, not their length: a workspace keeps the slots its long runs hold, and the next free slot goes to
   whoever holds fewer.
 - One process may run hundreds of agents' runs at once. Model providers' rate limits apply to each workspace's own
