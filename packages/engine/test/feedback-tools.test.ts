@@ -139,8 +139,19 @@ test("nobody behind the call, or a person who left: nothing sent", async () => {
   expect(await queued()).toEqual([]);
 });
 
-test("a routine's run never sends feedback; a person's run may", async () => {
+test("a routine's run never sends feedback", async () => {
   const tool = await toolOf();
   expect(toolPolicy({ kind: "routine", personId: null, brief: null }, tool).action).toBe("refuse");
-  expect(toolPolicy({ kind: "person", personId: "user_x" }, tool).action).toBe("allow");
+});
+
+test("each call asks the person it speaks for, and only them, showing the text", async () => {
+  f = await setup();
+  const { bia, run } = await askedByBia();
+  const tool = await toolOf();
+  expect(tool.sensitive).toBe(true);
+  expect(tool.describe?.({ text: " Too dark. " }).detail).toBe("Too dark.");
+  const asked = await tool.approvers?.({ text: "Too dark." }, ctxOf(run), bia.id);
+  expect(asked).toMatchObject({ ok: true, approvers: { userIds: [bia.id], required: true, requestedBy: null } });
+  const nobody = { ...ctxOf(run), runId: "", triggerMessageId: "" } as ToolContext;
+  expect((await tool.approvers?.({ text: "By itself." }, nobody, null))?.ok).toBe(false);
 });

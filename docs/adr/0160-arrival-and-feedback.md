@@ -93,8 +93,9 @@ with Postgres alone, and must not need a third-party widget in the apps.
 11. **An agent sends one when a person asks it to** (added 2026-11-10). `send_feedback` takes the text and queues
     the same email, to the same address, in the name of the person behind the run: their name, their address as the
     reply-to, the workspace and their role. The email says which agent wrote it ("Written by"), and "App: agent".
-    It carries the text only: no files, no excerpt, nothing the app collects, so what leaves the conversation is
-    what the agent wrote, which the person reads in the tool's call under the reply.
+    It carries the text only: no files, no excerpt, nothing the app collects.
+    - Every call asks that person's approval first, with the whole text on the card: it leaves the workspace in
+      their name, so only they decide it, not the agent's owner nor an admin.
     - Listed only where the server takes feedback, with no scope, among the tools loaded on demand.
     - A run nobody is behind (a routine's, an agent's own) sends none: the run policy refuses a routine's, and the
       tool refuses any call with no person, or a person who is no longer a member.
