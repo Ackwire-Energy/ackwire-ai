@@ -1,4 +1,4 @@
-# 0164. Pairing a computer from the desktop app, Cloud included
+# 0165. Pairing a computer from the desktop app, Cloud included
 
 - Status: Accepted
 - Date: 2026-11-09
