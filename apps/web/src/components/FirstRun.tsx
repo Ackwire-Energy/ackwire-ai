@@ -29,8 +29,10 @@ import {
   firstRunAsks,
   firstRunBeats,
   firstRunDone,
+  firstRunFact,
   firstRunRow,
   firstRunRowState,
+  firstRunSayKey,
   firstRunSteps,
 } from "@agenteschat/client/lib/setup-checklist";
 import {
@@ -173,8 +175,8 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
     (beat) =>
       beat === "invited"
         ? t("agentSetup.firstRun.say.invited")
-        : facts[beat]
-          ? t(modeKey(org, `agentSetup.firstRun.say.${beat}`), agentGrammar(agent.name))
+        : firstRunFact(facts, beat)
+          ? t(firstRunSayKey(beat, personal), agentGrammar(agent.name))
           : "",
     (beat) => beat !== "invited",
   );

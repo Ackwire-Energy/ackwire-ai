@@ -976,12 +976,14 @@ textarea.ac-input {
 }
 /* The initials' box trimmed to their capitals, so the tile centres the letters the eye sees, not the line around them
    (a line's room above and below the capitals differs, and its baseline lands on a whole pixel). Without text-box the
-   capitals' middle sits --cap-mid above the line's. */
-.ac-avatar__initials {
+   capitals' middle sits --cap-mid above the line's. A maker's letter in its tile (`ProviderLogo` with no mark) too. */
+.ac-avatar__initials,
+.ac-brand__initial {
   text-box: trim-both cap alphabetic;
 }
 @supports not (text-box: trim-both cap alphabetic) {
-  .ac-avatar__initials {
+  .ac-avatar__initials,
+  .ac-brand__initial {
     translate: 0 var(--cap-mid);
   }
 }

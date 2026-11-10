@@ -75,9 +75,9 @@ test("the chips read their answer from the conversation, as on the web", () => {
 
 test("a personal workspace's row 1 asks about the person, the areas of life saved as one sentence (ADR 0159)", () => {
   const steps = src("agents/setup/SetupStepScreen.tsx");
-  expect(steps).toContain(
-    "isPersonal(org) ? <AboutYouStep typed={text ?? null} /> : <AboutStep typed={text ?? null} />",
-  );
+  // A team's onboarding asked what it does (ADR 0162): only a personal workspace's first run has this screen.
+  expect(steps).toContain('const firstRunScreen = known === "apps" || (known === "about" && isPersonal(org));');
+  expect(steps).toContain("return <AboutYouStep typed={text ?? null} />;");
   expect(steps).toContain("LIFE_AREAS.map((area) => (");
   expect(steps).toContain('readAboutYou(t, settings.data?.context || typed || "")');
   expect(steps).toContain("openTemplatesAfterAbout(lifeAreaTemplate(picked) ?? undefined)");
@@ -100,13 +100,10 @@ test("an agent with no channel lives in its DM: no bare #, a block of its own, n
   expect(card).toContain("{col.channel ? (");
   expect(card).toContain("const mapButton = teamInDms(plan) ? null : (");
   // The templates and the card in the workspace's words.
-  const personalKeys = [
-    "teamPlan.templates.title",
-    "teamPlan.templates.lead",
-    "teamPlan.card.weekly",
-    "teamPlan.map.title",
-  ];
+  const personalKeys = ["teamPlan.templates.title", "teamPlan.templates.lead", "teamPlan.map.title"];
   for (const key of personalKeys) expect(card).toContain(`modeKey(org, "${key}")`);
+  // The rows take the mode as a prop: the onboarding draws them with no workspace open.
+  expect(card).toContain('t(personal ? "teamPlan.card.weeklyPersonal" : "teamPlan.card.weekly")');
   // No invitation on a personal workspace's first tasks.
-  expect(card).toContain("const people = held || isPersonal(org) ? [] : card.params.invite;");
+  expect(card).toContain("const people = isPersonal(org) ? [] : card.params.invite;");
 });

@@ -144,8 +144,9 @@ test("the phone's greeting draws the checklist and Conversas has one line back t
   expect(card).toContain('apps: () => openSetupStep(agent.id, "apps")');
   expect(card).toContain("firstRunBeats(doneHere, { members: run.members, invited: run.invited.length })");
   expect(card).toContain('? t("agentSetup.firstRun.say.invited")');
-  // biome-ignore lint/suspicious/noTemplateCurlyInString: the card's own source text, placeholder included.
-  expect(card).toContain(": facts[beat]\n          ? t(`agentSetup.firstRun.say.${beat}`, agentGrammar(agent.name))");
+  expect(card).toContain(
+    ": firstRunFact(facts, beat)\n          ? t(firstRunSayKey(beat, personal), agentGrammar(agent.name))",
+  );
   // One first task, the team card's: the card's asks offer none.
   expect(card).not.toContain("firstTask");
   const steps = src("agents/setup/SetupStepScreen.tsx");

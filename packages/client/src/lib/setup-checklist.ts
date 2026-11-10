@@ -255,6 +255,18 @@ export interface FirstRunFacts {
   people: boolean;
 }
 
+/** Whether the data did a row (a skip doesn't): what a row's line and burst celebrate. */
+export const firstRunFact = (facts: FirstRunFacts, step: FirstRunStep) => facts[step === "about" ? "context" : step];
+
+/**
+ * The line a row says once done. A personal workspace's own words; its first two rows are only ever its own, so they
+ * have no other.
+ */
+export const firstRunSayKey = (step: FirstRunStep, personal: boolean) => {
+  if (step === "about" || step === "team") return `agentSetup.firstRun.say.${step}Personal` as const;
+  return personal ? (`agentSetup.firstRun.say.${step}Personal` as const) : (`agentSetup.firstRun.say.${step}` as const);
+};
+
 /** The rows done: from the data, or skipped ("Agora não", the only thing stored). */
 export function firstRunDone(setup: AgentSetupChecklist, facts: FirstRunFacts): Set<FirstRunStep> {
   const done = new Set<FirstRunStep>();

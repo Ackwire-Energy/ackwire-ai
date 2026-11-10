@@ -18466,7 +18466,7 @@
     "fileTooLarge": "{{name}} jest za duży: limit to {{mb}} MB.",
     "fileTooMany": "Jedna opinia mieści do {{images}} zdjęć i jedno wideo.",
     "send": "Wyślij",
-    "thanks": "Dostarczono. Dziękujemy!",
+    "thanks": "Dostarczono. Dziękujemy.",
     "reply": "Wszystko jest czytane. Odpowiedź, jeśli będzie potrzebna, przyjdzie na {{email}}.",
     "another": "Wyślij kolejną"
   }

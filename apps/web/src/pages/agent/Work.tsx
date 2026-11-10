@@ -1940,12 +1940,12 @@ function AdvancedRow({
     <div className="ac-select agp-brainsel agp-advrow">
       <button type="button" className="ac-select__trigger" onClick={onOpen}>
         <span className="ac-select__value">
-          <span className="newag__sel-value">
+          <span className="newag__sel-value ac-faceline">
             <span className="newag__ib">
               <Icon name={icon} size={16} />
             </span>
             <span className="newag__sel-text">
-              <b>{label}</b>
+              <b className="ac-captop">{label}</b>
               <span>{line}</span>
             </span>
           </span>

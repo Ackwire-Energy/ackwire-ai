@@ -17833,7 +17833,7 @@
     "fileTooLarge": "{{name}} es demasiado grande: el límite es {{mb}} MB.",
     "fileTooMany": "Un feedback admite hasta {{images}} fotos y un video.",
     "send": "Enviar",
-    "thanks": "Entregado. ¡Gracias!",
+    "thanks": "Entregado. Gracias.",
     "reply": "Se lee todo. La respuesta, si hace falta, llega a {{email}}.",
     "another": "Enviar otro"
   }

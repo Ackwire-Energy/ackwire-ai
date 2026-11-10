@@ -17499,7 +17499,7 @@ export const ptBR = {
     fileTooLarge: "{{name}} é grande demais: o limite é {{mb}} MB.",
     fileTooMany: "Um feedback leva até {{images}} fotos e um vídeo.",
     send: "Enviar",
-    thanks: "Recado entregue. Obrigado!",
+    thanks: "Recado entregue. Obrigado.",
     reply: "Tudo é lido. A resposta, se precisar, chega em {{email}}.",
     another: "Enviar outro",
   },

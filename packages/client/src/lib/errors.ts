@@ -511,6 +511,11 @@ const KNOWN = {
   "voice.bad_duration": "errors.said.voiceLength",
   "voice.too_large": "errors.said.voiceLength",
   "upload.expired": "errors.said.sendAgain",
+  // The feedback form (ADR 0160): an upload that went before it was sent, or more than the form takes.
+  "feedback.file_type": "feedback.fileType",
+  "feedback.files_gone": "errors.said.gone",
+  "feedback.files_many": "errors.said.tooMany",
+  "feedback.files_pending": "errors.said.tooMany",
   "upload.sha_mismatch": "errors.said.sendAgain",
   gif_key_env: "errors.said.serverKey",
   jev_key_env: "errors.said.serverKey",
