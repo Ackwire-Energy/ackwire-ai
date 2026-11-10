@@ -330,7 +330,13 @@ describe("no AI connected: above the composer", () => {
     await click(within(banner() as HTMLElement).getByRole("button", { name: "Conectar" }), 6);
     // Atlas has none either: one sign-in is offered for both, and the For can narrow it to Ada.
     const team = dialog("Conecte uma IA para o seu time pensar") as HTMLElement;
-    expect(within(team).getByRole("combobox", { name: "Agentes que usam este plano" })).toBeTruthy();
+    const whom = within(team).getByRole("group", { name: "Agentes que usam este plano" });
+    expect(
+      within(whom)
+        .getByRole("button", { name: /^Todos os agentes/ })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+    expect(within(whom).getByRole("button", { name: /^Ada/ }).getAttribute("aria-pressed")).toBe("false");
     for (const name of ["Claude", "ChatGPT", "Outro plano", "Começar grátis"])
       expect(within(team).getByRole("button", { name: new RegExp(`^${name}`) })).toBeTruthy();
     cleanup();
@@ -338,7 +344,7 @@ describe("no AI connected: above the composer", () => {
     await open(walters(seedState({ aiStatus: aiStatus(true, ADA_ID) }), ADA_ID, ATLAS_ID), `dm/agent/${ADA_ID}`);
     await click(within(banner() as HTMLElement).getByRole("button", { name: "Conectar" }), 6);
     const hers = dialog("Conectar uma IA para a Ada") as HTMLElement;
-    expect(within(hers).queryByRole("combobox", { name: "Agentes que usam este plano" })).toBeNull();
+    expect(within(hers).queryByRole("group", { name: "Agentes que usam este plano" })).toBeNull();
     cleanup();
     // Opened from anywhere else, every agent of the viewer's stays a choice.
     await open(both());

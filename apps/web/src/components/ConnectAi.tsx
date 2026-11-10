@@ -12,13 +12,12 @@ import {
 import { accountTitle, listsExisting } from "@agenteschat/client/lib/ai-accounts";
 import { CUSTOM_PROVIDER } from "@agenteschat/client/lib/endpoints";
 import { errorCode, errorText, keyRefusal } from "@agenteschat/client/lib/errors";
-import { NAMES_SHOWN, namesText } from "@agenteschat/client/lib/format";
+import { namesText } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { stepPermissions } from "@agenteschat/client/lib/home";
 import {
   type AgentAi,
   type AiChoice,
-  ALL_AGENTS,
   agentAi,
   agentPlan,
   aiStateOf,
@@ -39,7 +38,18 @@ import {
 import { can } from "@agenteschat/client/lib/permissions";
 import { providerGuess, providerLabel } from "@agenteschat/client/lib/providers";
 import { isRightHand, rightHandOf, rightHandOnKey, thinksWithLine } from "@agenteschat/client/lib/right-hand";
-import { Button, Dialog, DialogBody, DialogFooter, Icon, ProviderLogo, Select, Spinner } from "@agenteschat/ui";
+import {
+  AgentAvatar,
+  AvatarStack,
+  Button,
+  Dialog,
+  DialogBody,
+  DialogFooter,
+  Icon,
+  OptionCard,
+  ProviderLogo,
+  Spinner,
+} from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
@@ -650,32 +660,50 @@ function ConnectAiDialog({
             </div>
           ) : (
             <div className="arrival-main__pick">
-              {chat.others && (
-                <span className="ai-panel__agent">
-                  <span aria-hidden="true">{t("connectAi.for")}</span>
-                  <Select
-                    size="sm"
-                    aria-label={t("connectAi.agentAria")}
-                    value={wide ? ALL_AGENTS : asked.id}
-                    onValueChange={(next) => {
-                      setScope(next === ALL_AGENTS ? "all" : "one");
-                      setHaveSel(undefined);
-                    }}
-                    options={[
-                      {
-                        value: ALL_AGENTS,
-                        label: t("connectAi.all"),
-                        description: namesText(
-                          t,
-                          [asked, ...mine.filter((a) => a.id !== asked.id && asleep(a.id))].map((a) => a.name),
-                          NAMES_SHOWN,
-                        ),
-                      },
-                      { value: asked.id, label: asked.name },
-                    ]}
-                  />
-                </span>
-              )}
+              {chat.others &&
+                (() => {
+                  // Whom it is for, as two cards with their faces: everyone who can't think, or this agent alone. The
+                  // sky above follows the pick.
+                  const everyone = [asked, ...mine.filter((a) => a.id !== asked.id && asleep(a.id))];
+                  const face = (a: (typeof everyone)[number]) => (
+                    <AgentAvatar
+                      key={a.id}
+                      name={a.name}
+                      initials={dir.agentInitials(a.id)}
+                      appearance={lookOf(a)}
+                      size="sm"
+                    />
+                  );
+                  const choose = (next: "all" | "one") => {
+                    setScope(next);
+                    setHaveSel(undefined);
+                  };
+                  return (
+                    // biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset
+                    <div className="arrival-for" role="group" aria-label={t("connectAi.agentAria")}>
+                      <OptionCard pressed={wide} onClick={() => choose("all")}>
+                        <AvatarStack>{everyone.slice(0, 4).map(face)}</AvatarStack>
+                        <span className="ac-option__text">
+                          <span className="ac-option__title">{t("connectAi.all")}</span>
+                          <span className="ac-option__desc">
+                            {namesText(
+                              t,
+                              everyone.map((a) => a.name),
+                              2,
+                            )}
+                          </span>
+                        </span>
+                      </OptionCard>
+                      <OptionCard pressed={!wide} onClick={() => choose("one")}>
+                        {face(asked)}
+                        <span className="ac-option__text">
+                          <span className="ac-option__title">{asked.name}</span>
+                          {asked.role && <span className="ac-option__desc">{asked.role}</span>}
+                        </span>
+                      </OptionCard>
+                    </div>
+                  );
+                })()}
               {picking ? (
                 <>
                   <ConnectHave
