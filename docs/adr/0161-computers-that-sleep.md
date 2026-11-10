@@ -41,15 +41,17 @@ computer and process, `recordWakeWanted`). Other computers: nothing.
 A run that finds its computer in standby asks for it and waits up to `COMPUTER_WAKE_WAIT_MS` (60 seconds), still
 working, nothing posted or stored, however long the computer slept (`computerBackSoon`, beside the 30-second wait for a
 computer just gone): at its start, and again when it comes back from another wait (a plan's reset, the end of a drop's
-grace). A request through `callWhenBack` and a tool's computer (`withConnectedMachine`) wait the same way. Not back by
-then, something is wrong: the existing path follows (the model brain stands in, or the note and the wait for the
-computer's return).
+grace). The browser's and the desktop's tools (`callWhenBack`) and the sandbox's (`withConnectedMachine`) wait the same
+way. Not back by then, something is wrong: the existing path follows (the model brain stands in, or the note and the
+wait for the computer's return).
 
 ### 4. Nothing is wrong to its people
 
 Each computer in the apps' list carries `standby` (`GET …/machines`; a change comes as `machine.updated`). The
 computer's view (the web's dialog, the phone's screen) shows "Opening …'s computer…" while it wakes, never "not
-answering", and a computer in standby is never an outage (`…/machines/outages`).
+answering"; its status line (`entryState`, on the web and the phone) reads "Available · nobody's using it" unless a
+request, someone in control or the agent's work says more; and a computer in standby is never an outage
+(`…/machines/outages`).
 
 ### 5. What the operator decides with
 
