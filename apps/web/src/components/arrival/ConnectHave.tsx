@@ -109,15 +109,14 @@ export function ConnectHave({
               // Under its owner's name a row says only how its plan is; one's own says who else thinks with it, two
               // names and how many more (a plan for all of one's agents would name them all).
               const others = a ? [...new Set(a.usedBy)].filter((n) => n !== agentName) : [];
-              const about = !a
-                ? r.kind === "key"
+              const about =
+                r.kind === "key"
                   ? keyLine(t, r.key)
-                  : undefined
-                : !a.mine
-                  ? undefined
-                  : others.length > 0 && a.shared === true
-                    ? t("agentPage.work.brain.accountAlso", { agents: namesText(t, others, 2) })
-                    : accountAbout(t, r.choice, agentName);
+                  : !r.choice.login.mine
+                    ? undefined
+                    : others.length > 0 && r.choice.login.shared === true
+                      ? t("agentPage.work.brain.accountAlso", { agents: namesText(t, others, 2) })
+                      : accountAbout(t, r.choice, agentName);
               const word = a ? planWord(t, i18n.language, a.usage) : null;
               const used = state ? Math.min(100, Math.round(state.used)) : 0;
               return (

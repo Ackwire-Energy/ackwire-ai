@@ -39,7 +39,6 @@ import { can } from "@agenteschat/client/lib/permissions";
 import { providerGuess, providerLabel } from "@agenteschat/client/lib/providers";
 import { isRightHand, rightHandOf, rightHandOnKey, thinksWithLine } from "@agenteschat/client/lib/right-hand";
 import {
-  AgentAvatar,
   AvatarStack,
   Button,
   Dialog,
@@ -64,6 +63,7 @@ import {
   useState,
 } from "react";
 import { useTranslation } from "react-i18next";
+import { AgentAvatar } from "@/components/AgentAvatar";
 import {
   AiPicker,
   ExistingRows,
