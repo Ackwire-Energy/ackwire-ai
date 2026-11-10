@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from "bun:test";
+import { afterEach, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { type PhonePairing, pairAddress, type RunnerPhone } from "@agenteschat/adapters/machine-protocol";
@@ -35,6 +35,9 @@ import { IosHelper, WDA_VERSION } from "../../runner/wda";
 import { pairingQr, pairOutcome, parseMdnsServices, serialOfMdnsName } from "../../runner/wifi-pair";
 import { fakeUsbmuxd, freePort } from "./fake-usbmuxd";
 import { errorCode, removeDirs, tempDir } from "./helpers";
+
+// Each fake Xcode tool is a process of its own: an iPhone helper's build, check and start take seconds on a busy machine.
+setDefaultTimeout(30_000);
 
 const dirs: string[] = [];
 afterEach(() => removeDirs(dirs));
