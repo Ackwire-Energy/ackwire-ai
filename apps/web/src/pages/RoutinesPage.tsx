@@ -1226,7 +1226,6 @@ function RoutineDetails({ routine: r, now, onClose }: { routine: Routine; now: D
   const action = controls.action;
   const runs = useRoutineRuns(org.id, r.id);
   const when = useWhen();
-  const nextText = useNextText();
   const say = useSay();
   const outages = useMachineOutages(org.id, r.state === "waiting_computer");
   const [switching, setSwitching] = useState(false);
@@ -1390,7 +1389,6 @@ function RoutineDetails({ routine: r, now, onClose }: { routine: Routine; now: D
                   </div>
                 )
               )}
-              {!done && <p className="small muted">{nextText(r, now)}</p>}
               {busy && (
                 <p className="routine-note small ac-iconline">
                   <Icon name="computer" size={14} />

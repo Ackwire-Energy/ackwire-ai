@@ -1040,6 +1040,27 @@ html:not([data-pointer]) .issues-dest:focus-visible {
 .issue-props .issue-link {
   font-size: 13.5px;
 }
+/* A label's or the link's name wraps inside its chip rather than ending in "…": it says which one it is. Lines of 18
+   with 2 above and below keep one line at the chip's 22. */
+.issue-props :is(.issue-github__chip, .issue-label) {
+  height: auto;
+  min-height: 22px;
+  padding-block: 2px;
+  line-height: 18px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+/* Wrapped, the mark stays on the first line's capitals. */
+.issue-props .issue-github__chip {
+  align-items: flex-start;
+}
+.issue-props .issue-github__chip > svg {
+  flex: none;
+  translate: 0 calc(9px - var(--cap-mid) - 50%);
+}
+.issue-props .issue-github__chip > .ac-chip__text {
+  text-overflow: clip;
+}
 .issue-props .issue-link {
   color: var(--ink2);
 }

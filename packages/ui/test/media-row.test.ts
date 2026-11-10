@@ -15,6 +15,8 @@ const body = (selector: string) =>
 describe("MediaRow", () => {
   test("the face, then the name and the role on its line, the rest under them at the row's full width", () => {
     expect(body(".ac-mediarow")).toContain("grid-template-columns: auto minmax(0, 1fr) auto;");
+    // Stretched beside a taller card (Agentes trabalhando agora), its lines stay at its top.
+    expect(body(".ac-mediarow")).toContain("align-content: start;");
     expect(body(".ac-mediarow__face")).toContain("grid-area: 1 / 1;");
     expect(body(".ac-mediarow__head")).toContain("grid-area: 1 / 2;");
     expect(body(".ac-mediarow__end")).toContain("grid-area: 1 / 3;");

@@ -11542,6 +11542,8 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
   --mediarow-axis: var(--mediarow-face);
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
+  /* Stretched to a taller neighbour's height (cards side by side), its lines stay at its top, not spread apart. */
+  align-content: start;
   align-items: start;
   column-gap: var(--space-3);
   row-gap: var(--space-2);

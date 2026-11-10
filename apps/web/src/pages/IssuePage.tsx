@@ -947,7 +947,7 @@ function PropsLine({ issue: i }: { issue: Issue }) {
           className="issue-link"
           title={pr.openedBy ? t("issues.prBy", { number: pr.number, name: actors.name(pr.openedBy) }) : undefined}
         >
-          <Icon name="pullRequest" size={16} />
+          <GitHubMark />
           {t("issues.pr", { number: pr.number })}
         </a>
       ))}

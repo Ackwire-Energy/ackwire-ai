@@ -172,6 +172,20 @@ describe("Tarefas at their worst", () => {
     expect(cardOf(455).querySelector(".issue-card__who .ac-who > b")?.textContent).toBe(LONG_PERSON);
   });
 
+  test("Agentes trabalhando agora says what each agent is doing, never the cards' state words", async () => {
+    await go();
+    const now = screen().getByRole("region", { name: "Agentes trabalhando agora" });
+    const text = now.textContent ?? "";
+    for (const word of ["Pede aprovação", "Pergunta algo", "Parado há", "Trabalhando"])
+      expect(text).not.toContain(word);
+    // Waiting on a person: its last step. Stopped: no run, its last step, and a way on.
+    const waiting = now.querySelector(".issues-now__card.is-waiting") as HTMLElement;
+    expect(waiting.textContent).toContain("Último passo: Atualizou uma tarefa · #7");
+    const stalled = now.querySelector(".issues-now__card.is-stalled") as HTMLElement;
+    expect(stalled.textContent).toContain("Nenhuma execução ativa. Último passo: Atualizou uma tarefa · #7");
+    expect(stalled.textContent).toContain("Pedir para continuar");
+  });
+
   test("the list: the same parts in one row, stacked on a phone", async () => {
     await go("list");
     const row = cardOf(12873);
