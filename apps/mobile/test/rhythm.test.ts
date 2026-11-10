@@ -32,6 +32,42 @@ test("the kit's screens, grouped rows and toolbar controls read those numbers in
   expect(source("Row.tsx")).toContain("paddingHorizontal: CARD_PAD");
 });
 
+test("a small button and a card's footer button are the web's 32, their targets grown to 44 above and below only", () => {
+  const button = source("Button.tsx");
+  expect(button).toContain("const SMALL = { height: TOOL_H, radius: 10, padding: 12");
+  expect(button).toMatch(/card: SMALL,\s*sm: SMALL,/);
+  expect(button).toContain("const grow = (TOUCH - height) / 2;");
+  expect(button).toContain("return grow > 0 ? { top: grow, bottom: grow } : undefined;");
+  expect(button).toContain("hitSlop={slopOf(s.height)}");
+  expect(source("HoldButton.tsx")).toContain("hitSlop={slopOf(s.height)}");
+  // Nothing sizes a button of its own past the kit's sizes.
+  const sized = files(SRC).filter((f) => /<(Button|HoldButton)\b[^>]*\bminHeight/.test(readFileSync(f, "utf8")));
+  expect(sized.map((f) => relative(SRC, f))).toEqual([]);
+});
+
+test("a chip's label wraps inside it instead of ending in …, its icon on the first line; one line is the 24 pill", () => {
+  const chip = source("Chip.tsx");
+  const label = chip.slice(chip.indexOf("<RNText maxFontSizeMultiplier"), chip.indexOf("{label}"));
+  expect(label).not.toContain("numberOfLines");
+  expect(chip).toContain('alignItems: "flex-start"');
+  expect(chip).toContain("paddingVertical: (HEIGHT - LINE) / 2");
+  expect(chip).toContain("borderRadius: HEIGHT / 2");
+  expect(chip).toContain('<View style={{ height: line, justifyContent: "center" }}>');
+});
+
+test("an icon button in a row or a heading is the toolbar's 32, its target still a finger's 44", () => {
+  const button = source("IconButton.tsx");
+  expect(button).toContain("const side = small ? TOOL_H : SIZE;");
+  expect(button).toContain("hitSlop={small ? (TOUCH - TOOL_H) / 2 : 4}");
+});
+
+test("a strip that scrolls sideways under a screen's title runs edge to edge, its first item on the title's line", () => {
+  expect(source("Filters.tsx")).toContain("paddingHorizontal: SCREEN_X");
+  const tasks = readFileSync(join(SRC, "features/issues/IssuesScreen.tsx"), "utf8");
+  expect(tasks).toContain("paddingLeft: SCREEN_X");
+  expect(tasks).toContain("width - PEEK - SCREEN_X");
+});
+
 test("no screen keeps a 20-point side of its own: screens read SCREEN_X and cards CARD_PAD", () => {
   // A button's own padding isn't a screen's side.
   const NOT_A_SIDE = new Set(["ui/Button.tsx"]);

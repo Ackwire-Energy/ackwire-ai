@@ -125,6 +125,11 @@ export interface LiveRun {
   startedAt?: number;
   /** The message that started it (its live row goes right after it). */
   triggerMessageId?: string | null;
+  /**
+   * When the reply it writes first showed words (ISO, the server's clock, `agent.delta.shownAt`): its block draws
+   * there, with what people send meanwhile below, and its message is posted there (`blockPlaces`).
+   */
+  shownAt?: string;
   /** The model call the streaming text belongs to (`agent.delta.turn`). */
   turn?: number;
   /** Last event seen for this run (a run silent for minutes may be orphaned on the server). */
@@ -714,6 +719,8 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
       return upsert(s, event, {
         status,
         error: event.error,
+        // Its reason in words from the first event that says it failed, never its stored code until `run.finished`.
+        ...(event.errorCode ? { errorCode: event.errorCode, errorParams: event.errorParams } : {}),
         ...(event.triggerMessageId ? { triggerMessageId: event.triggerMessageId } : {}),
         ...(event.startedAt ? { startedAt: Date.parse(event.startedAt) } : {}),
       });
@@ -782,6 +789,7 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
         ...(event.at !== undefined ? { turnChars: Math.max(heard ?? 0, event.at + event.text.length) } : {}),
         ...(event.turn !== undefined ? { turn: event.turn } : {}),
         ...(event.from !== undefined ? { textFrom: event.from } : {}),
+        ...(event.shownAt ? { shownAt: event.shownAt } : {}),
       };
       // Sent before the server's copy of the turn was read, it arrived after it (`caughtUp`): only its tail is new.
       const fresh =
@@ -962,6 +970,7 @@ function caughtUp(r: LiveRun, live: NonNullable<ActiveRun["live"]>): LiveRun {
   const gap = heard > end;
   return {
     ...r,
+    ...(live.shownAt ? { shownAt: live.shownAt } : {}),
     status: "running",
     text,
     textFrom: live.at,

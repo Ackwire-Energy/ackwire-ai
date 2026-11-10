@@ -696,6 +696,42 @@
       "left_other": "Noch {{count}} Schritte",
       "done": "Alles bereit"
     },
+    "flow": {
+      "steps": {
+        "name": "Name des Workspace",
+        "business": "Was ihr macht",
+        "team": "Dein Team",
+        "plan": "Team einschalten"
+      },
+      "stepOf": "Schritt {{n}} von {{total}}",
+      "lodi": {
+        "name": "Hallo {{first}}. Ich bin {{name}}. Ich stelle das Team in etwa zwei Minuten mit dir zusammen.",
+        "business": "Damit weiß ich, wen ich ins Team hole.",
+        "team": "So würde ich das Team zusammenstellen. Du kannst später alles ändern.",
+        "plan": "Nach dem Tarif fehlt nur noch eine KI. Ich zeige dir, wo."
+      },
+      "preview": {
+        "label": "Dein Workspace, während du antwortest",
+        "name": "Dein Workspace",
+        "ghost": "Hier erscheint dein Team"
+      },
+      "team": {
+        "title": "Dein Team"
+      },
+      "plan": {
+        "title": "Schalte dein Team ein",
+        "lead": "Dein Team ist bereit. Mit dem Tarif und einer KI legt es heute los.",
+        "asleep": "Schläft bis zum Tarif",
+        "price": "<b>Tarif {{name}}</b> · {{price}} pro Monat",
+        "name": "<b>Tarif {{name}}</b>",
+        "generic": "Ein agentes.chat-Tarif",
+        "cancel": "Jederzeit kündbar",
+        "cta": "Team einschalten",
+        "all": "Alle Tarife ansehen",
+        "skip": "Ohne Einschalten in den Workspace"
+      },
+      "account": "Dein Konto"
+    },
     "railValue": {
       "context": "Geschrieben",
       "skipped": "Übersprungen",
@@ -1345,27 +1381,19 @@
     }
   },
   "webPushAsk": {
-    "title": "Erfahre, wann ein Agent dich braucht",
-    "text": "Sie arbeiten, während du etwas anderes tust. Auch bei geschlossenem Tab sagen wir dir Bescheid, wenn sie dein Okay brauchen, fertig sind mit dem, worum du gebeten hast, oder dich rufen.",
     "on": "Benachrichtigungen einschalten",
     "later": "Nicht jetzt",
     "done": "Benachrichtigungen in diesem Browser an",
     "failed": "Benachrichtigungen konnten nicht eingeschaltet werden. Versuch es noch einmal unter Einstellungen › Benachrichtigungen.",
     "someone": "Ein Agent",
-    "examples": "Beispiele für Benachrichtigungen",
     "now": "jetzt",
-    "minutes": "{{n}} Min.",
-    "approval": {
-      "title": "{{name}} braucht dein Okay",
-      "body": "Darf ich mit dem weitermachen, worum du gebeten hast?"
-    },
     "finished": {
       "title": "{{name}} ist fertig",
       "body": "Worum du gebeten hast, ist fertig."
     },
-    "mention": {
-      "title": "{{name}} hat dich gerufen",
-      "body": "Kannst du kurz draufschauen, wenn du eine Minute hast?"
+    "inline": {
+      "title": "Willst du sofort wissen, wenn {{name}} antwortet?",
+      "why": "Auch bei geschlossenem Tab. Ändern kannst du das jederzeit unter Einstellungen › Benachrichtigungen."
     }
   },
   "shell": {
@@ -1568,8 +1596,6 @@
     "organize": "Abteilungen im Team ordnen",
     "more_one": "1 weiterer Agent in Team",
     "more_other": "{{count}} weitere Agenten in Team",
-    "createFirst": "Den ersten Agenten erstellen",
-    "createFirstPersonal": "Deinen ersten Agenten erstellen",
     "newAgent": "Neuer Agent",
     "working_one": "{{count}} arbeitet",
     "working_other": "{{count}} arbeiten",
@@ -1587,7 +1613,6 @@
     "pin": "Oben anheften",
     "unpin": "Lösen",
     "pinned": "Oben angeheftet",
-    "hint": "Deine Agenten bleiben oben. Klicke mit rechts auf eine Unterhaltung, um sie anzuheften.",
     "full": {
       "agents": "Du hast schon 5 Agenten angeheftet. Löse einen, um diesen anzuheften.",
       "channels": "Du hast schon 5 Kanäle angeheftet. Löse einen, um diesen anzuheften.",
@@ -2011,6 +2036,7 @@
     "popoverTitle": "Agenten",
     "seenBy": "Gesehen von {{names}}",
     "retry": "Erneut versuchen",
+    "retrying": "Wird erneut versucht…",
     "platformCap": "Erwähne einen Agenten mit @, damit er antwortet.",
     "mentionNeeded": "Ohne @ antwortet kein Agent",
     "mentionNeededHint": "Keine KI hier konnte einen Agenten für diese Nachricht auswählen. Erwähne einen Agenten, um ihn zu rufen.",
@@ -2028,9 +2054,8 @@
   },
   "rightHand": {
     "label": "deine rechte Hand",
+    "labelCapitalized": "Deine rechte Hand",
     "newDot": "Neu",
-    "role": "Workspace-Assistent",
-    "rolePersonal": "Persönlicher Assistent",
     "actsAsYou": "handelt mit deinen Berechtigungen",
     "composerHint": "nichts ändert sich ohne dich",
     "intro": {
@@ -2054,9 +2079,6 @@
         "questionPersonal": "Willst du mit mir weitere Agenten einrichten?",
         "actionPersonal": "Agenten einrichten",
         "messagePersonal": "Hilf mir, meine Agenten einzurichten."
-      },
-      "next": {
-        "firstTask": "{{name}} eine erste Aufgabe geben"
       },
       "style": {
         "question": "Wie soll ich mit dir sprechen?",
@@ -2392,8 +2414,10 @@
     "rightHand": {
       "computer_away": "{{name}} kann gerade nicht antworten: Der Computer, auf dem das Abo angemeldet ist, ist nicht erreichbar.",
       "computer_failed": "{{name}} kann gerade nicht antworten: Der Computer des Abos hatte ein Problem.",
+      "cli_failed": "{{name}} kann gerade nicht antworten: Die KI des Abos wurde mit einem Fehler beendet.",
       "plan_limit": "{{name}} kann gerade nicht antworten: Das Abo hat sein Limit erreicht.",
       "plan_not_shared": "Verbinde dein eigenes Abo, um mit {{name}} zu sprechen: Das Abo des Workspace antwortet nur der Person, der es gehört.",
+      "plan_unattended": "{{name}} hat nicht geantwortet: Die Anfrage kam nicht von einer Person, und das Abo des Workspace antwortet nur der Person, der es gehört.",
       "runner_outdated": "{{name}} kann gerade nicht antworten: Das Programm auf dem Computer des Abos braucht ein Update.",
       "plan_tools": "{{name}} hat vor der Antwort gestoppt: Die KI des Abos ist auf diesem Computer nicht bei den Werkzeugen von agentes.chat geblieben.",
       "model_limit": "{{name}} kann gerade nicht antworten: {{model}} hat sein eigenes Limit im Abo erreicht. Die anderen Modelle des Abos funktionieren weiter.",
@@ -3631,6 +3655,14 @@
         },
         "field": {
           "token": "Token des Dienstkontos"
+        },
+        "error": {
+          "invalid_input": "Das ist kein Token eines Dienstkontos. Füge das Token ein, das mit ops_ beginnt.",
+          "auth_failed": "1Password hat dieses Token nicht akzeptiert. Leg ein neues Dienstkonto an und füge sein Token hier ein.",
+          "no_vault": "Dieses Dienstkonto hat keinen Zugriff auf einen Tresor. Leg ein neues mit Zugriff auf den Tresor deiner Agenten an.",
+          "many_vaults": "Dieses Dienstkonto hat Zugriff auf mehr als einen Tresor. Leg ein neues an, das nur auf den Tresor deiner Agenten Zugriff hat.",
+          "unreachable": "1Password ist nicht erreichbar. Versuch es in einer Minute noch einmal.",
+          "unsupported": "1Password lässt sich hier nicht verbinden. Speichere die Logins, die deine Agenten brauchen, stattdessen im Vault."
         }
       },
       "bitwarden": {
@@ -4118,7 +4150,6 @@
       "browser": "Browser",
       "members": "Mitglieder",
       "usage": "Nutzung",
-      "connectors": "Konnektoren",
       "dashboard": "Dashboard"
     },
     "reactions_one": "{{count}} Reaktion",
@@ -5017,6 +5048,9 @@
         "computer_busy": "Der Computer war mit anderen Aufgaben beschäftigt.",
         "computer_failed": "Der Computer hatte ein Problem und hat angehalten.",
         "computer_timeout": "Der Computer hat zu lange für eine Antwort gebraucht.",
+        "cli_failed": "Das Programm {{brain}} wurde mit einem Fehler beendet: {{detail}}",
+        "cli_stopped": "Das Programm {{brain}} wurde mit einem Fehler beendet.",
+        "cli_closed": "Das Programm {{brain}} wurde unerwartet beendet.",
         "account_missing": "Das für diesen Agenten gewählte Konto ist nicht mehr auf seinem Computer. Wähl in den Einstellungen des Agenten ein anderes oder füg es erneut hinzu.",
         "our_error": "Bei uns ist etwas schiefgelaufen, und die Aufgabe wurde angehalten. Frag gleich noch einmal.",
         "unknown": "Fehlgeschlagen."
@@ -5210,6 +5244,19 @@
     "include": "{{name}} einbeziehen",
     "acceptAll": "Für alle annehmen",
     "acceptSome": "Für {{count}} annehmen",
+    "all": {
+      "label": "Alle Vorschläge entscheiden",
+      "accept": "Alle annehmen",
+      "refuse": "Alle ablehnen",
+      "acceptAsk_one": "Den Vorschlag annehmen? Er gilt sofort.",
+      "acceptAsk_other": "Alle {{count}} Vorschläge annehmen? Jeder gilt sofort.",
+      "refuseAsk_one": "Den Vorschlag ablehnen? Der Agent schlägt das nicht noch einmal vor.",
+      "refuseAsk_other": "Alle {{count}} Vorschläge ablehnen? Die Agenten schlagen das nicht noch einmal vor.",
+      "acceptGo_one": "Annehmen",
+      "acceptGo_other": "{{count}} annehmen",
+      "refuseGo_one": "Ablehnen",
+      "refuseGo_other": "{{count}} ablehnen"
+    },
     "staleSome_one": "Einer wurde nicht angenommen: Sein Text hat sich nach dem Vorschlag geändert.",
     "staleSome_other": "{{count}} wurden nicht angenommen: Ihr Text hat sich nach dem Vorschlag geändert.",
     "staleSomeAgent_one": "Einer wurde nicht angenommen: Der Agent hat sich nach dem Vorschlag geändert.",
@@ -5242,6 +5289,8 @@
     "refuseNote_female": "Wenn du ablehnst, lernt {{name}}, das nicht noch einmal vorzuschlagen.",
     "added": "Hinzugefügt: ",
     "removed": "Entfernt: ",
+    "sameLines_one": "{{count}} unveränderte Zeile",
+    "sameLines_other": "{{count}} unveränderte Zeilen",
     "empty": "Wenn jemand einen Agenten um eine Änderung bittet oder sich eine Lektion wiederholt, erscheint der Vorschlag hier.",
     "emptyTitle": "Nichts zu prüfen",
     "titleInstructions": "Anweisungen von {{name}} aktualisieren",
@@ -5377,10 +5426,7 @@
       "notNow": "Jetzt nicht",
       "afterPlan": "Öffnet mit dem Tarif.",
       "about": {
-        "todo": "Erzähl mir, was {{org}} macht.",
-        "todoDesc": "Alle Agenten lesen das.",
         "action": "Erzählen",
-        "done": "Ich weiß, was {{org}} macht",
         "title": "Was macht {{org}}?",
         "desc": "Alle Agenten lesen das. Du kannst es jederzeit ändern.",
         "line": "In einem Satz",
@@ -5394,26 +5440,18 @@
         "optionalPersonal": "Optional. Ohne Satz zählen die Bereiche, die du gewählt hast."
       },
       "team": {
-        "todo": "Stell das Team zusammen.",
-        "todoDesc": "Eine Vorlage für dein Geschäft, du kannst später alles ändern.",
-        "action": "Team ansehen",
-        "done_one": "{{count}} Agent im Team",
-        "done_other": "{{count}} Agenten im Team",
         "todoPersonal": "Wähle deine Agenten.",
         "todoDescPersonal": "Ein fertiger Start, du kannst später alles ändern.",
         "actionPersonal": "Agenten ansehen",
         "donePersonal_one": "{{count}} Agent",
-        "donePersonal_other": "{{count}} Agenten",
-        "card": "Mach auf der Karte unten weiter"
+        "donePersonal_other": "{{count}} Agenten"
       },
       "ai": {
         "todo": "Verbinde eine KI.",
         "todoDesc": "Die, für die du schon zahlst, funktioniert.",
         "action": "Verbinden",
         "done": "Ich denke mit {{label}}",
-        "doneAny": "Ich denke jetzt mit einer KI",
-        "plan": "Öffnet mit dem agentes.chat-Tarif.",
-        "planAction": "agentes.chat-Tarife ansehen"
+        "doneAny": "Ich denke jetzt mit einer KI"
       },
       "apps": {
         "todo": "Verbinde deine Arbeits-Apps.",
@@ -5436,14 +5474,17 @@
         "action": "Einladen",
         "done_one": "{{count}} Person hier",
         "done_other": "{{count}} Personen hier",
-        "doneNone": "Vorerst nur du"
+        "doneNone": "Vorerst nur du",
+        "invited": "{{names}} eingeladen · ausstehend",
+        "email": "name@firma.de",
+        "send": "Senden",
+        "more": "Weitere Optionen"
       },
       "say": {
-        "about": "Notiert. Alle Agenten lesen das.",
-        "team": "Das Team ist da.",
         "ai": "Jetzt denkt das Team.",
         "apps": "Fertig, ich lese jetzt die Apps.",
         "people": "Schön, dass mehr Leute hier sind.",
+        "invited": "Einladung gesendet.",
         "aboutPersonal": "Notiert. Alle deine Agenten lesen das.",
         "teamPersonal": "Deine Agenten sind da.",
         "aiPersonal": "Jetzt können deine Agenten denken.",
@@ -5458,42 +5499,6 @@
         "whoPersonal": "Welcher Agent macht was?"
       }
     }
-  },
-  "newAgentAsk": {
-    "title": "Was soll dein neuer Agent tun?",
-    "lead": "Sag es in einem Satz. {{name}} richtet ihn ein und zeigt ihn dir, bevor er erstellt wird.",
-    "field": "Was er für dich tut",
-    "placeholder": "Z. B. Meinen Kalender ordnen und mich an Wichtiges erinnern",
-    "ideas": "Ideen",
-    "idea": {
-      "agenda": {
-        "label": "Kalender",
-        "text": "Meinen Kalender ordnen und mich an meine Termine erinnern"
-      },
-      "money": {
-        "label": "Finanzen",
-        "text": "Meine Rechnungen im Blick behalten und mich vor Fälligkeit erinnern"
-      },
-      "training": {
-        "label": "Training",
-        "text": "Mein Training für die Woche planen und an mein Befinden anpassen"
-      },
-      "studies": {
-        "label": "Lernen",
-        "text": "Mir einen Lernplan machen und mich abfragen, was ich gelernt habe"
-      },
-      "home": {
-        "label": "Zuhause",
-        "text": "Die Einkaufsliste und die Hausarbeit in Ordnung halten"
-      },
-      "travel": {
-        "label": "Reisen",
-        "text": "Meine Reisen planen: Route, Buchungen und Dokumente"
-      }
-    },
-    "full": "Lieber alles selbst ausfüllen",
-    "create": "Mit {{name}} erstellen",
-    "message": "Ich möchte einen neuen Agenten: {{what}}"
   },
   "newAgent": {
     "title": "Agent erstellen",
@@ -5864,7 +5869,197 @@
     "and": " und ",
     "routine": "Routine",
     "routineKeep": "Routine {{name}} erstellen",
-    "routineNotMade": "Die Routine wurde nicht erstellt: {{reason}}"
+    "routineNotMade": "Die Routine wurde nicht erstellt: {{reason}}",
+    "hello": {
+      "clara": "Ich kümmere mich um deinen Kalender und erinnere dich an das Wichtige, bevor es zu spät ist.",
+      "duda": "Ich behalte deine Rechnungen und Ausgaben im Blick und warne dich, bevor etwas fällig wird.",
+      "leo": "Ich plane deine Trainings und halte dich im Rhythmus, auf deine Art.",
+      "mel": "Ich plane deine Mahlzeiten und die Einkaufsliste, nach deinem Geschmack und Budget.",
+      "gabi": "Ich erstelle deinen Lernplan und frage dich ab, was du gelernt hast.",
+      "lu": "Ich bewahre deine Notizen und Ideen auf und helfe dir, daraus Texte zu machen.",
+      "rosa": "Ich kümmere mich um die Einkaufsliste, die Hausarbeit und das, was repariert werden muss.",
+      "vic": "Ich plane deine Reisen: Termine, Preise, Buchungen und den Ablauf Tag für Tag.",
+      "rui": "Ich betreue deine Kunden, schreibe Angebote und Rechnungen und merke mir, wer noch nicht bezahlt hat.",
+      "dev": "Ich programmiere, prüfe PRs und gehe Bugs nach.",
+      "ops": "Ich behalte Fehler, Warteschlangen und Deploys im Blick.",
+      "qa": "Ich teste Abläufe und reproduziere gemeldete Bugs.",
+      "pm": "Ich organisiere die Aufgaben und schreibe die Zusammenfassungen.",
+      "support": "Ich antworte Kunden und gebe weiter, was eine Person braucht.",
+      "sales": "Ich bereite Angebote vor und bleibe an Interessenten dran.",
+      "marketing": "Ich plane Kampagnen, Posts und Seiten der Website.",
+      "content": "Ich schreibe und überarbeite Texte, Artikel und Newsletter.",
+      "data": "Ich beantworte Fragen mit Zahlen und erstelle Berichte.",
+      "finance": "Ich behalte Zahlungen, Rechnungen und Ausgaben im Blick.",
+      "people": "Ich helfe bei Einstellungen, beim Onboarding und bei Fragen des Teams.",
+      "research": "Ich recherchiere ein Thema und liefere eine Zusammenfassung mit Quellen.",
+      "assistant": "Ich kümmere mich um Kalender, E-Mails und Erinnerungen."
+    },
+    "starters": {
+      "clara": {
+        "instructions": "Schaut jeden Morgen in den Kalender und schickt, was am Tag ansteht.\nErinnert am Vortag an jeden Termin und jede Rechnung mit Datum.\nBucht, sagt ab oder nimmt Einladungen nie an, ohne vorher zu fragen.",
+        "tasks": {
+          "a": "Was habe ich morgen?",
+          "b": "Erinnere mich jeden 5. an die Miete",
+          "c": "Schick mir jeden Tag um 7 Uhr meinen Kalender"
+        }
+      },
+      "duda": {
+        "instructions": "Behält Rechnungen und Ausgaben im Blick, nach Kategorien sortiert.\nWarnt drei Tage, bevor etwas fällig wird, und wenn eine Ausgabe aus dem Rahmen fällt.\nZahlt, überweist oder kündigt nie etwas, ohne vorher zu fragen.",
+        "tasks": {
+          "a": "Wie viel habe ich diesen Monat ausgegeben?",
+          "b": "Welche Rechnungen sind diese Woche fällig?",
+          "c": "Ordne diese Ausgaben nach Kategorie"
+        }
+      },
+      "leo": {
+        "instructions": "Plant Trainings nach deinem Niveau, deiner Zeit und dem, was dir Spaß macht.\nPasst die Woche an, wenn du aussetzt oder müde bist, ohne Predigt.\nGibt keinen medizinischen Rat: bei Schmerzen oder Verletzungen empfiehlt er Fachleute.",
+        "tasks": {
+          "a": "Plane ein 30-Minuten-Training für heute",
+          "b": "Plane meine Laufwoche",
+          "c": "Schick mir jeden Morgen das Training des Tages"
+        }
+      },
+      "mel": {
+        "instructions": "Plant die Mahlzeiten der Woche nach deinem Geschmack, deiner Zeit und deinem Budget.\nErstellt die Einkaufsliste zum Speiseplan, nach Abteilungen im Laden sortiert.\nAchtet auf Unverträglichkeiten und Allergien und gibt keine Diät- oder medizinischen Ratschläge.",
+        "tasks": {
+          "a": "Schlag drei schnelle Abendessen vor",
+          "b": "Plane den Speiseplan der Woche",
+          "c": "Mach die Einkaufsliste für den Speiseplan"
+        }
+      },
+      "gabi": {
+        "instructions": "Erstellt den Lernplan bis zur Prüfung, mit dem, was an jedem Tag passt.\nFragt dich ab und erklärt noch einmal, was du falsch hattest.\nMacht die Hausaufgaben nicht für dich: führt dich zur Antwort.",
+        "tasks": {
+          "a": "Erstelle einen Lernplan für die Prüfung",
+          "b": "Stell mir 3 Fragen zu dem, was ich gelernt habe",
+          "c": "Erklär dieses Thema einfach"
+        }
+      },
+      "lu": {
+        "instructions": "Bewahrt die Notizen und Ideen auf, die du schickst, und fasst ähnliche zusammen.\nMacht aus Notizen Text in deinem Ton, ohne etwas hinzuzufügen, das du nicht gesagt hast.\nÜberarbeitet sorgfältig und zeigt, was sich geändert hat, bevor er das Original ersetzt.",
+        "tasks": {
+          "a": "Mach aus diesen Notizen einen kurzen Text",
+          "b": "Sammle die Ideen der Woche",
+          "c": "Überarbeite diesen Text"
+        }
+      },
+      "rosa": {
+        "instructions": "Hält die Einkaufsliste und die Hausarbeit auf dem Laufenden.\nNotiert, was repariert werden muss, und erinnert daran, bis es erledigt ist.\nKauft oder beauftragt nie etwas, ohne vorher zu fragen.",
+        "tasks": {
+          "a": "Erstelle die Einkaufsliste der Woche",
+          "b": "Was muss im Haus repariert werden?",
+          "c": "Teile die Hausarbeit auf"
+        }
+      },
+      "vic": {
+        "instructions": "Plant die Reise mit Daten, Preisen und einem Plan für jeden Tag.\nVergleicht Flüge und Unterkünfte und sagt, warum er welche vorschlägt.\nBucht oder bezahlt nie etwas, ohne vorher zu fragen.",
+        "tasks": {
+          "a": "Plane 3 Tage in Lissabon",
+          "b": "Sag mir, wenn der Flugpreis sinkt",
+          "c": "Sammle die Buchungen der Reise"
+        }
+      },
+      "rui": {
+        "instructions": "Begleitet jeden Kunden: was vereinbart wurde, was noch fehlt und wer nicht bezahlt hat.\nSchreibt Angebote und Zahlungserinnerungen in deinem Ton, bereit zur Durchsicht.\nSchickt einem Kunden nie etwas ohne deine Zustimmung.",
+        "tasks": {
+          "a": "Schreib ein kurzes Angebot für einen Kunden",
+          "b": "Wer hat noch nicht bezahlt?",
+          "c": "Worauf wartet jeder Kunde heute?"
+        }
+      }
+    }
+  },
+  "newAgentCard": {
+    "title": "Neuer Agent",
+    "lead": "Wähle links und passe rechts an. Du kannst später alles ändern.",
+    "list": "Ausgangspunkte",
+    "zero": "Von Grund auf",
+    "zeroSub": "Du sagst, was er tut",
+    "import": "Agenten aus einer anderen App holen",
+    "hi": "Hallo, ich bin",
+    "hiBlank": "Hallo, ich bin",
+    "name": "Name",
+    "namePlaceholder": "Name",
+    "what": "Was er tut",
+    "whatPlaceholder": "Was werde ich für dich tun?",
+    "look": "Aussehen",
+    "lookDone": "Fertig",
+    "shuffle": "Würfeln",
+    "handle": "Im Chat: @{{handle}}",
+    "handleRole": "Im Chat: @{{handle}} · {{role}}",
+    "handleTaken": "Im Chat: @{{handle}} · {{name}} gibt es hier schon",
+    "handleBlank": "Das @ für den Chat kommt vom Namen",
+    "similar": "Ähnlich wie {{name}}, der fertig mitkommt.",
+    "similarAction": "Mit {{name}} anfangen",
+    "uses": "Nutzt",
+    "chooseApps": "Apps wählen",
+    "otherApp": "Andere App",
+    "usesNone": "Noch nichts.",
+    "worksIn": "Arbeitet in",
+    "how": "Wie {{name}} arbeitet",
+    "howBlank": "Wie er arbeitet",
+    "instructionsPlaceholder": "Was er tut, was er vermeidet, wen er um Hilfe bittet",
+    "picker": {
+      "title": "Apps von {{name}}",
+      "titleBlank": "Apps des Agenten",
+      "lead": "Eine verbundene App kommt sofort auf die Karte. Jede andere verbindest du gleich hier.",
+      "suggested": "Vorschläge für {{name}}",
+      "suggestedBlank": "Vorschläge",
+      "use": "Verwenden",
+      "added": "Auf der Karte"
+    },
+    "create": "{{name}} erstellen",
+    "createBlank": "Agent erstellen",
+    "failed": "Erstellen hat nicht geklappt: {{reason}}",
+    "level": {
+      "read": "Liest",
+      "write": "Liest und schreibt"
+    },
+    "app": {
+      "lead": "Wie weit {{name}} in {{app}} geht.",
+      "leadBlank": "Wie weit er in {{app}} geht.",
+      "read": "Lesen",
+      "readDesc": "Sieht, was in {{app}} ist. Ändert nichts.",
+      "write": "Lesen und schreiben",
+      "writeDesc": "Erstellt und bearbeitet auch in {{app}}.",
+      "asks": "{{actions}} fragen immer nach deiner Freigabe, auf jeder Stufe.",
+      "asksAny": "Senden, Löschen und Bezahlen fragen immer nach deiner Freigabe, auf jeder Stufe.",
+      "remove": "{{app}} entfernen",
+      "done": "Fertig"
+    },
+    "band": {
+      "label": "Was {{name}} zum Start braucht",
+      "ai": "Eine KI zum Denken",
+      "asleep": "Schläft, bis es eine KI gibt"
+    },
+    "skills": "Skills",
+    "skillsHelpBlank": "Anleitungen, die er bei Bedarf öffnet.",
+    "chooseSkills": "Skills wählen",
+    "otherSkill": "Anderer Skill",
+    "namesLead": "Wie wäre es mit",
+    "namesRoll": "Andere Namen",
+    "skill": {
+      "opens": "{{name}} öffnet diese Anleitung, wenn das Thema aufkommt. Du bearbeitest sie unter Skills.",
+      "opensBlank": "Er öffnet diese Anleitung, wenn das Thema aufkommt. Du bearbeitest sie unter Skills.",
+      "remove": "Von {{name}} entfernen",
+      "removeBlank": "Vom Agenten entfernen",
+      "done": "Fertig"
+    },
+    "names": {
+      "agenda": "Lia, Uhr, Greta, Dora, Timo, Emma",
+      "agendaWords": "kalender, termin, erinner, meeting, besprech, arzt",
+      "money": "Penny, Nico, Moni, Karl, Lara, Taler",
+      "moneyWords": "rechnung, ausgab, geld, finanz, budget, zahl",
+      "travel": "Atlas, Malu, Ravi, Vic, Nara, Tom",
+      "travelWords": "reise, flug, hotel, urlaub, route",
+      "training": "Leo, Bea, Blitz, Kai, Nina, Jonas",
+      "trainingWords": "training, lauf, fitness, sport, übung",
+      "study": "Gabi, Nils, Sophie, Theo, Iris, Ben",
+      "studyWords": "lern, prüfung, kurs, studi, schul",
+      "clients": "Rudi, Anna, Ben, Lisa, Otto, Clara",
+      "clientsWords": "kunde, angebot, verkauf, rechnung, auftrag",
+      "any": "Sol, Lia, Theo, Bea, Nino, Ida, Kai, Luma, Gil, Ole, Nara, Tom"
+    }
   },
   "members": {
     "column": {
@@ -6686,20 +6881,19 @@
     "statusLabel": "Status",
     "due": "Fälligkeitsdatum",
     "noDue": "Kein Fälligkeitsdatum",
-    "seeCalendar": "im Kalender ansehen",
+    "seeCalendar": "Im Kalender ansehen",
     "removeDue": "Fälligkeitsdatum entfernen",
     "links": "Verknüpft",
     "prBy": "PR #{{number}} · geöffnet von {{name}}",
     "artifactBy": "{{title}} ({{name}})",
-    "noLinks": "Noch nichts verknüpft.",
     "github": {
       "label": "GitHub-Link",
       "placeholder": "Issue- oder PR-Link",
       "invalid": "Das ist kein Link zu einem GitHub-Issue oder Pull Request.",
-      "remove": "GitHub-Link entfernen"
+      "remove": "GitHub-Link entfernen",
+      "add": "GitHub-Link hinzufügen"
     },
     "openConversation": "Unterhaltung ansehen",
-    "labels": "Labels",
     "tabs": {
       "label": "Bereiche der Aufgabe",
       "details": "Übersicht",
@@ -7349,6 +7543,7 @@
       "computer_busy": "Der Computer war mit anderen Aufgaben beschäftigt",
       "computer_failed": "Der Computer hatte ein Problem und hat angehalten",
       "computer_timeout": "Der Computer hat zu lange gebraucht, um zu antworten",
+      "cli_failed": "Das KI-Programm auf dem Computer wurde mit einem Fehler beendet",
       "account_missing": "Das Konto des Agenten ist nicht mehr auf seinem Computer",
       "our_error": "Bei uns ist etwas schiefgelaufen"
     },
@@ -8511,6 +8706,8 @@
     },
     "upcoming": "Demnächst",
     "upcomingEmpty": "Demnächst steht nichts an.",
+    "owners": "Agenten und Personen",
+    "showOwner": "{{name}} anzeigen",
     "viewZone": "Zeitzone des Kalenders",
     "miniMonth": "Tag wählen",
     "new": "Neuer Termin",
@@ -8536,12 +8733,6 @@
         "declined": "Du kommst nicht."
       }
     },
-    "kind": {
-      "event": "Termin",
-      "routine": "Routine",
-      "reminder": "Erinnerung",
-      "deadline": "Fälligkeit einer Aufgabe"
-    },
     "every": {
       "hour": "stündlich",
       "hours": "alle {{count}} Std.",
@@ -8550,24 +8741,20 @@
     "perDay": "{{count}}× am Tag",
     "runs_one": "{{count}} Ausführung in diesen Tagen.",
     "runs_other": "{{count}} Ausführungen in diesen Tagen.",
-    "routineDetail": "Routine von {{agent}} · liefert an {{target}}.",
+    "routineDetail": "Routine · liefert an {{target}}",
     "deadlineDetail": "Die Aufgabe ist fällig.",
     "reminderBy": "Erstellt von {{name}}",
-    "reminderPosted": "Gepostet von {{agent}} · {{target}}",
+    "reminderPosted": "Erinnerung · erscheint in {{target}}",
     "cancelReminder": "Erinnerung abbrechen",
     "reminderCancelled": "Erinnerung abgebrochen",
     "openIssue": "Aufgabe öffnen",
     "openRoutines": "In Routinen ansehen",
     "openRoutine": "Routine öffnen",
     "runAria": "Routine {{name}}, {{time}}",
-    "runsAria": "{{count}} Routinen um {{time}}: {{names}}",
     "runHint": "{{name}} · {{agent}} · {{time}}",
     "runsAt": "Routinen um {{time}}",
-    "runsOn": "Routinen · {{day}}",
-    "runsCount_one": "{{count}} Routinenausführung",
-    "runsCount_other": "{{count}} Routinenausführungen",
-    "dayRunsAria_one": "{{count}} Routinenausführung am {{day}}: {{names}}",
-    "dayRunsAria_other": "{{count}} Routinenausführungen am {{day}}: {{names}}",
+    "moreRuns_one": "+{{count}} Routine",
+    "moreRuns_other": "+{{count}} Routinen",
     "runTimes": "×{{count}}",
     "result": {
       "ok": "hat geantwortet",
@@ -9238,22 +9425,6 @@
       "empty": "Keine Sticker gefunden.",
       "foot": "Aus dem Aussehen jedes Agenten gemacht"
     }
-  },
-  "memoryMark": {
-    "label": "{{name}} hat das im Gedächtnis gespeichert: {{text}}",
-    "saved": "{{name}} hat das gespeichert:",
-    "title": "{{name}} hat im Gedächtnis gespeichert",
-    "subtitle": "Merkt es sich für die nächsten Unterhaltungen",
-    "from": "Aus der Nachricht von {{name}} · {{time}}",
-    "view": "Im Gedächtnis ansehen",
-    "fix": "Korrigieren",
-    "fixLabel": "Gespeichertes korrigieren",
-    "save": "Speichern",
-    "forget": "Vergessen",
-    "forgot": "{{name}} hat das vergessen",
-    "undo": "Rückgängig",
-    "fixed": "Erinnerung korrigiert",
-    "fixedDetail": "{{name}} nutzt ab jetzt die neue Version."
   },
   "correctionAsk": {
     "title": "Soll {{name}} es noch einmal machen oder erklären, was gefehlt hat?",
@@ -10417,6 +10588,8 @@
     "noChannel": "Kein Kanal",
     "files": "Dateien",
     "select": "{{title}} auswählen",
+    "selectAll_one": "{{count}} auswählen",
+    "selectAll_other": "Alle {{count}} auswählen",
     "selection": "Auswahl",
     "selected_one": "{{count}} ausgewählt",
     "selected_other": "{{count}} ausgewählt",
@@ -10600,8 +10773,10 @@
       },
       "line": {
         "env": "In den Einstellungen dieses Servers festgelegt (GITHUB_APP_ID).",
-        "invalid": "Dieser Server kann die gespeicherte App nicht öffnen. Entferne sie und erstelle sie neu."
+        "invalid": "Dieser Server kann die gespeicherte App nicht öffnen. Entferne sie und erstelle sie neu.",
+        "events": "Damit Agenten mitbekommen, was auf GitHub passiert, hak diese Events in der App an: {{events}}."
       },
+      "events": "Events anhaken",
       "open": "Auf GitHub öffnen",
       "remove": "App entfernen",
       "removeTitle": "GitHub-App dieses Servers entfernen?",
@@ -11114,34 +11289,6 @@
       "usageNoLimit": "Composio: {{calls}} Aufrufe im {{month}}",
       "limitNotice": "Dieser Workspace hat seine Composio-Aufrufe für diesen Monat aufgebraucht",
       "disconnectNote": "Composio vergisst das Konto. Um auch den Zugriff in {{name}} zu entfernen, entferne Composio dort in deinen Kontoeinstellungen."
-    },
-    "toolChanges": {
-      "title": "Geänderte Tools",
-      "intro": "Diese Server haben geändert, was ein Tool sagt oder verlangt. Agenten behalten die freigegebene Version, bis du die neue akzeptierst.",
-      "count_one": "{{count}} Tool geändert",
-      "count_other": "{{count}} Tools geändert",
-      "acceptAll": "Alle akzeptieren",
-      "acceptedAll": "Tools von {{name}} aktualisiert.",
-      "show": "Änderung ansehen",
-      "hide": "Ausblenden",
-      "showAll": "Alle anzeigen ({{total}})",
-      "textChanged": "Der Text hat sich geändert",
-      "fieldsChanged_one": "{{count}} Feld geändert",
-      "fieldsChanged_other": "{{count}} Felder geändert",
-      "inputChanged": "Die Eingabe hat sich geändert",
-      "description": "Text",
-      "input": "Eingabe",
-      "field": {
-        "added": "neu",
-        "removed": "entfernt",
-        "changed": "geändert"
-      },
-      "added": "Hinzugefügt",
-      "removed": "Entfernt",
-      "accept": "Akzeptieren",
-      "acceptOne": "{{tool}} akzeptieren",
-      "accepted": "{{tool}} aktualisiert.",
-      "notice": "{{name}} hat Tools geändert, die du freigegeben hast"
     },
     "names": {
       "atlassian": "Atlassian (Jira und Confluence)",
@@ -12209,6 +12356,9 @@
       "invalidSecret": "Füge das ganze Client Secret ein, ohne Leerzeichen.",
       "invalidRepo": "Schreib das Repo als besitzer/name."
     },
+    "githubEvent": {
+      "answered": "Jemand hat schon um diese Antwort gebeten. Der Agent kümmert sich darum."
+    },
     "issue": {
       "assigneeOutside": "Diese Person sieht diese Aufgabe nicht. Füge sie zuerst bei Wer es sieht hinzu.",
       "stageFull": "Eine Phase hat höchstens {{max}} Spalten. Lösch zuerst eine ihrer Spalten.",
@@ -12378,6 +12528,7 @@
       "agentBusy": "Der Agent arbeitet schon in dieser Unterhaltung. Warte, bis er fertig ist, um weiterzumachen.",
       "continueForbidden": "Nur wer gefragt hat, der Inhaber des Agenten oder ein Admin kann fortsetzen.",
       "notRestartable": "Diese Antwort hatte schon begonnen und kann nicht neu starten. Sende deine Nachricht noch einmal.",
+      "notRestartableVoice": "Diese Antwort hatte schon begonnen und kann nicht neu starten. Nimm deine Nachricht noch einmal auf.",
       "cancelForbidden": "Nur wer gefragt hat, der Inhaber des Agenten oder ein Admin kann das stoppen.",
       "answerForbidden": "Nur wer gefragt hat, der Inhaber des Agenten oder ein Admin kann das tun.",
       "stopReasonForbidden": "Nur wer gestoppt hat, kann den Grund angeben."
@@ -12511,6 +12662,10 @@
         "invalidInput": "Prüf die Felder und versuch es noch einmal.",
         "tooManyItems": "Der Vault ist voll. Lösch Einträge, bevor du mehr synchronisierst."
       }
+    },
+    "feedback": {
+      "filesGone": "Eine Datei, die du hinzugefügt hast, ist weg. Füg sie noch einmal hinzu.",
+      "filesPending": "Zu viele Dateien warten darauf, gesendet zu werden. Sende oder entferne einige und versuch es noch einmal."
     }
   },
   "machines": {
@@ -14390,6 +14545,10 @@
     "statusReplyTurn": "Ich bin mitten in einer Aufgabe ({{duration}}) und kann noch nicht antworten. Deine Nachricht ist vorgemerkt und ich lese sie, wenn diese Arbeitsrunde endet.",
     "statusReplyQueued": "Ich warte auf den Computer ({{duration}}). Ich lese deine Nachricht, sobald ich dran bin.",
     "statusReplyAway": "Ich warte darauf, dass mein Computer zurückkommt. Ich lese deine Nachricht, sobald er wieder da ist.",
+    "statusReplyPlan": "Ich warte darauf, dass mein Abo wieder verfügbar ist ({{when}}). Ich lese deine Nachricht, wenn es wieder da ist.",
+    "statusReplyPlanUnknown": "Ich warte darauf, dass mein Abo wieder verfügbar ist. Ich lese deine Nachricht, sobald es wieder da ist.",
+    "statusReplyBudget": "Ich warte darauf, dass sich mein Monatsbudget erneuert ({{when}}). Ich lese deine Nachricht dann, oder früher, wenn ein Admin das Limit erhöht.",
+    "statusReplyBudgetUnknown": "Ich warte darauf, dass sich mein Monatsbudget erneuert. Ich lese deine Nachricht dann, oder früher, wenn ein Admin das Limit erhöht.",
     "status": {
       "one": "Arbeitet an: {{subject}}",
       "oneUntitled": "Arbeitet im Hintergrund",
@@ -14524,6 +14683,21 @@
       "wakeSkippedAnon": "Die Erwähnung von {{name}} hat keinen anderen Agenten erreicht",
       "wakeSkippedAudience": "Nur bestimmte Personen dürfen {{agents}} aufrufen, und diese Arbeit von {{name}} kam von keiner von ihnen. Jemand, der {{agents}} aufrufen darf, kann die Anfrage weitergeben.",
       "wakeSkippedCallable": "Die Einstellungen von {{name}} erlauben nicht, {{agents}} aufzurufen (ein anderes Projekt oder nicht auf der Liste der aufrufbaren Agenten). Wer sich um {{name}} kümmert, kann das auf der Seite des Agenten ändern.",
+      "github": {
+        "comment": "{{who}} hat PR #{{number}} ({{repo}}) auf GitHub kommentiert",
+        "commentIssue": "{{who}} hat Issue #{{number}} ({{repo}}) auf GitHub kommentiert",
+        "commentDiscussion": "{{who}} hat Diskussion #{{number}} ({{repo}}) auf GitHub kommentiert",
+        "opened": "{{who}} hat die agentes.chat-App in #{{number}} ({{repo}}) auf GitHub gerufen",
+        "reviewed": "{{who}} hat PR #{{number}} ({{repo}}) auf GitHub geprüft",
+        "approved": "{{who}} hat PR #{{number}} ({{repo}}) auf GitHub freigegeben",
+        "changes": "{{who}} hat Änderungen an PR #{{number}} ({{repo}}) auf GitHub angefragt",
+        "reviewRequested": "{{who}} hat {{name}} gebeten, PR #{{number}} ({{repo}}) auf GitHub zu prüfen",
+        "merged": "{{who}} hat PR #{{number}} ({{repo}}) auf GitHub gemergt",
+        "closed": "{{who}} hat PR #{{number}} ({{repo}}) auf GitHub geschlossen",
+        "closedIssue": "{{who}} hat Issue #{{number}} ({{repo}}) auf GitHub geschlossen",
+        "ask": "Um Antwort bitten",
+        "asked": "{{asker}} hat {{name}} gebeten, {{who}} auf GitHub zu antworten"
+      },
       "show": "Anzeigen",
       "hide": "Ausblenden",
       "talker": "während der Arbeit",
@@ -14663,6 +14837,7 @@
         "startingWork": "Eine lange Arbeit begonnen",
         "updatingWork": "Eine lange Arbeit aktualisiert",
         "withdrawingRequest": "Eine Anfrage zurückgezogen",
+        "releasingAgent": "Einen wartenden Agenten freigegeben",
         "schedulingAction": "Eine Aktion für später vorbereitet",
         "updatingDashboard": "An einem Dashboard gearbeitet",
         "testingOnPhone": "Auf einem Handy getestet",
@@ -14674,6 +14849,7 @@
         "sendingDm": "Eine Direktnachricht gesendet",
         "settingStatus": "Den eigenen Status aktualisiert",
         "settingReplyStyle": "Die Art zu antworten angepasst",
+        "sendingFeedback": "Um das Senden von Feedback gebeten",
         "deletingRoutine": "Eine Routine gelöscht",
         "runningRoutine": "Eine Routine jetzt ausgeführt",
         "proposingTeam": "Ein Team vorgeschlagen",
@@ -14774,6 +14950,7 @@
       "startingWork": "Beginnen einer langen Arbeit",
       "updatingWork": "Aktualisieren einer langen Arbeit",
       "withdrawingRequest": "Zurückziehen einer Anfrage",
+      "releasingAgent": "Freigeben eines wartenden Agenten",
       "schedulingAction": "Vorbereiten einer Aktion für später",
       "updatingDashboard": "Arbeiten an einem Dashboard",
       "testingOnPhone": "Testen auf einem Handy",
@@ -14785,6 +14962,7 @@
       "sendingDm": "Senden einer Direktnachricht",
       "settingStatus": "Aktualisieren des eigenen Status",
       "settingReplyStyle": "Anpassen der Art zu antworten",
+      "sendingFeedback": "Feedback vorbereiten",
       "deletingRoutine": "Löschen einer Routine",
       "runningRoutine": "Ausführen einer Routine",
       "proposingTeam": "Vorschlagen eines Teams",
@@ -14913,8 +15091,10 @@
       "no_ai_not_signed_in": "Ich kann noch nicht antworten: {{brain}} ist auf meinem Computer nicht angemeldet.",
       "no_ai_computer_away": "Ich kann gerade nicht antworten: Der Computer, auf dem mein Abo angemeldet ist, ist nicht erreichbar.",
       "no_ai_computer_failed": "Ich kann gerade nicht antworten: Der Computer meines Abos hatte ein Problem.",
+      "no_ai_cli_failed": "Ich kann gerade nicht antworten: Die KI meines Abos wurde mit einem Fehler beendet.",
       "no_ai_plan_limit": "Ich kann gerade nicht antworten: Das Abo, mit dem ich denke, hat sein Limit erreicht.",
       "no_ai_plan_not_shared": "Über das Abo des Workspace kann ich dir nicht antworten: Es antwortet nur der Person, der es gehört. Verbinde dein eigenes Abo, dann antworte ich.",
+      "no_ai_plan_unattended": "Ich habe nicht geantwortet: Die Anfrage kam nicht von einer Person, und das Abo des Workspace antwortet nur der Person, der es gehört.",
       "no_ai_runner_outdated": "Ich kann gerade nicht antworten: Das Programm auf dem Computer meines Abos braucht ein Update.",
       "no_ai_plan_tools": "Ich habe vor der Antwort gestoppt: Die KI meines Abos ist auf diesem Computer nicht bei den Werkzeugen von agentes.chat geblieben.",
       "no_ai_model_limit": "Ich kann gerade nicht antworten: {{model}} hat sein eigenes Limit in meinem Abo erreicht.",
@@ -15649,6 +15829,7 @@
     "suspended": "Dieser Workspace ist vorerst nicht verfügbar.",
     "createRefused": "Du kannst gerade keinen Workspace erstellen.",
     "createUnpaid": "Du hast schon einen Workspace, der auf einen agentes.chat-Tarif wartet. Wähle seinen Tarif, bevor du einen weiteren erstellst.",
+    "createUnpaidOpen": "{{name}} öffnen",
     "createInactive": "Du hast schon einen Workspace, der noch nicht aktiv ist, daher kannst du vorerst keinen weiteren erstellen.",
     "agentPaused": "Dieser Agent ist vorerst pausiert.",
     "onHold": "Dieser Workspace ist angehalten: {{reason}}",
@@ -16635,7 +16816,11 @@
       "text": "Bitte einen Agenten um ein Widget oder pinne einen Block aus dem Chat, und es bleibt hier aktuell.",
       "viewer": "Wer dieses Dashboard bearbeitet, fügt Widgets hinzu, und sie erscheinen hier."
     },
-    "onlyHome": "Erstelle mit „Neues Dashboard“ ein Dashboard für den Workspace oder einige Rollen.",
+    "first": {
+      "title": "Erstelle das erste Dashboard des Teams",
+      "text": "Ein Dashboard bringt Zahlen und Diagramme auf eine Seite, und die Agenten halten alles aktuell.",
+      "ask": "Hilf mir, das erste Dashboard des Teams zu erstellen."
+    },
     "create": {
       "title": "Neues Dashboard",
       "subtitle": "Widgets zusammen auf einer Seite, für dich oder fürs Team.",
@@ -16835,9 +17020,8 @@
     "firstTask": {
       "suggestion": "Vorschlag",
       "lead": "Eine kurze Aufgabe pro Agent, damit du heute jeden bei der Arbeit siehst.",
-      "heldLead": "Eine kurze Aufgabe pro Agent. Ergänze den Satz und sende ihn. Sie beginnen, sobald der Workspace einen agentes.chat-Tarif hat.",
-      "example": "Beispiel dafür, was {{name}} liefert",
       "open": "Mit der Aufgabe öffnen",
+      "finish": "Vervollständige den Satz und schick ihn ab",
       "invite": "{{names}} einladen",
       "later": "Später"
     },
@@ -17039,7 +17223,7 @@
     },
     "software": {
       "name": "Software und Apps",
-      "sub": "Support, Abrechnung und Code",
+      "sub": "Kundenservice, Abrechnung und Code",
       "desc": "Für eine Firma, die Software verkauft und ihre eigenen Kunden betreut."
     },
     "support": {
@@ -17052,54 +17236,74 @@
       "sub": "Buchhaltung, Recht, Beratung",
       "desc": "Für ein Büro, das Kunden einbucht, Angebote schickt und abrechnet."
     },
+    "hello": {
+      "lodi": {
+        "starting": "Tarif aktiv. Mein Computer startet gerade. An die Arbeit.",
+        "ready": "Tarif aktiv. An die Arbeit.",
+        "created": "Das Team ist da. An die Arbeit."
+      },
+      "lodiNoAi": {
+        "starting": "Tarif aktiv. Mein Computer startet gerade. Verbinde eine KI, dann legen wir los.",
+        "ready": "Tarif aktiv. Verbinde eine KI, dann legen wir los.",
+        "created": "Das Team ist da. Verbinde eine KI, dann legen wir los."
+      }
+    },
     "agents": {
       "iara": {
         "role": "Kundenservice",
         "line": "Antwortet Kunden auf WhatsApp und per E-Mail. Ruft dich, wenn sie etwas nicht weiß.",
         "routine": "Zusammenfassen, was unbeantwortet blieb",
-        "task": "Schreib eine Antwort auf diese Kundennachricht:"
+        "task": "Schreib eine Antwort auf diese Kundennachricht:",
+        "hello": "Hallo {{first}}. Wer auf WhatsApp schreibt, übernehme ich."
       },
       "caio": {
         "role": "Abrechnung",
         "line": "Erinnert alle, die mit der Zahlung im Rückstand sind, und schickt die Mahnung nach deinem Ok.",
         "routine": "Auflisten, wer mit der Zahlung im Rückstand ist",
-        "task": "Schreib eine freundliche Zahlungserinnerung für:"
+        "task": "Schreib eine freundliche Zahlungserinnerung für:",
+        "hello": "Hallo. Ich kümmere mich um die Zahlungen und schicke Erinnerungen erst nach deinem Okay."
       },
       "ada": {
         "role": "Dev",
         "line": "Behebt die Bugs, die Kunden melden, und öffnet den PR.",
         "routine": "Die neuen Bugs auflisten",
-        "task": "Sag mir, wo ich bei diesem Bug anfangen soll:"
+        "task": "Sag mir, wo ich bei diesem Bug anfangen soll:",
+        "hello": "Hi. Schickt mir die Bugs, die reinkommen, ich untersuche sie und öffne den PR."
       },
       "lia": {
         "role": "Inhalte",
         "line": "Schreibt Posts und Skripte im Ton der Firma und plant sie nach deinem Ok.",
         "routine": "Die Posts der Woche vorschlagen",
-        "task": "Schlag drei Posts für diese Woche vor zum Thema:"
+        "task": "Schlag drei Posts für diese Woche vor zum Thema:",
+        "hello": "Hallo zusammen. Die Posts der Woche übernehme ich."
       },
       "theo": {
         "role": "Vertrieb",
         "line": "Hakt bei allen nach, die ein Angebot angefragt haben, und schreibt die Angebote.",
         "routine": "Auflisten, wer ein Angebot angefragt und keine Antwort bekommen hat",
-        "task": "Schreib ein kurzes Angebot für diese Anfrage:"
+        "task": "Schreib ein kurzes Angebot für diese Anfrage:",
+        "hello": "Hallo {{first}}. Wer ein Angebot anfragt, bleibt nicht ohne Antwort."
       },
       "nina": {
         "role": "Termine",
         "line": "Vereinbart, bestätigt und verschiebt Termine und erinnert Kunden am Vortag.",
         "routine": "Die Termine von morgen bestätigen",
-        "task": "Ordne diese Termine für morgen:"
+        "task": "Ordne diese Termine für morgen:",
+        "hello": "Hallo. Der Kalender gehört mir, und ich erinnere die Kunden am Vortag."
       },
       "otto": {
         "role": "Bestellungen",
         "line": "Verfolgt Bestellungen und Lager und warnt, was ausgeht.",
         "routine": "Warnen, was im Lager ausgeht",
-        "task": "Liste auf, was bei diesen Bestellungen noch offen ist:"
+        "task": "Liste auf, was bei diesen Bestellungen noch offen ist:",
+        "hello": "Bin da. Ich behalte die Bestellungen im Blick und sage Bescheid, wenn der Bestand knapp wird."
       },
       "bia": {
         "role": "Antwortbasis",
         "line": "Hält die Antwortbasis mit dem aktuell, was das Team antwortet.",
         "routine": "Die Basis mit den Antworten der Woche aktualisieren",
-        "task": "Schreib die Antworten auf diese Kundenfragen:"
+        "task": "Schreib die Antworten auf diese Kundenfragen:",
+        "hello": "Hi. Ich halte die Antwortbasis mit dem auf dem Laufenden, was das Team antwortet."
       },
       "clara": {
         "role": "Kalender und Erinnerungen",
@@ -17156,17 +17360,6 @@
         "task": "Schreib ein kurzes Angebot für diesen Kunden:"
       }
     },
-    "example": {
-      "iara": "Hallo Marina. Deine Bestellung ging gestern raus und kommt bis Freitag an. Die Sendungsnummer steht direkt unten. Wenn Freitag nicht passt, suche ich einen anderen Termin.",
-      "lia": "1. Drei häufige Fehler bei der Wahl einer Agentur. 2. Hinter den Kulissen eines Projekts, das fast schiefging. 3. Eine Frage an eure Follower: Was wollt ihr hier sehen?",
-      "nina": "Morgen: 9:00 Carla, 10:30 Pedro, 14:00 frei. Pedro hat noch nicht bestätigt. Soll ich ihm schreiben?",
-      "clara": "Heute: 9:00 Zahnarzt, 12:30 Mittagessen mit Paula, 18:00 Paket abholen. Morgen hat deine Mutter Geburtstag. Soll ich dich morgens daran erinnern?",
-      "leo": "Heute, 30 Minuten: 5 Minuten Aufwärmen, 3 Runden mit 12 Kniebeugen, 10 Liegestützen und 30 Sekunden Plank, danach 5 Minuten Dehnen. Sag mir, wie es lief, dann passe ich das vom Mittwoch an.",
-      "gabi": "Thema von heute: Photosynthese. Kurz gesagt machen Pflanzen aus Licht, Wasser und Kohlendioxid Zucker und Sauerstoff. Drei Fragen: Wo passiert sie, was geht hinein und was kommt heraus?",
-      "rosa": "Diese Woche: Reis, Bohnen, Eier, Bananen, Kaffee und Spülmittel. Zu Hause: am Donnerstag die Bettwäsche wechseln und jemanden wegen des Wasserhahns in der Küche anrufen.",
-      "vic": "Lissabon in 3 Tagen: Tag 1, Alfama und die Burg. Tag 2, Belém und der Fluss. Tag 3, Sintra. Die günstigsten Flüge gibt es am Dienstag, dem 12. Soll ich den Preis im Auge behalten?",
-      "rui": "Hallo Marcos, hier ist das Angebot: eine neue Website mit 5 Seiten, fertig in 3 Wochen, in zwei Raten bezahlt. Wenn es für dich passt, schicke ich dir heute den Vertrag."
-    },
     "channels": {
       "iara": "support",
       "caio": "finanzen",
@@ -17205,5 +17398,65 @@
     },
     "approvals": "Was an Kunden rausgeht, wartet auf deine Freigabe. Du kannst es später freigeben, wenn du ihnen vertraust.",
     "approvalsPersonal": "Alles, was in deinem Namen gesendet, bezahlt oder gebucht wird, wartet auf deine Freigabe. Du kannst es später freigeben, wenn du ihnen vertraust."
+  },
+  "arrival": {
+    "beta": {
+      "word": "BETA",
+      "title": "Du bist früh dran. Schön, dass du da bist.",
+      "text": "agentes.chat ist in der Beta: Du kannst schon richtig damit arbeiten, und wir feilen noch daran.",
+      "weekly": {
+        "title": "Wird jede Woche besser",
+        "text": "Neues und Korrekturen kommen laufend dazu."
+      },
+      "fails": {
+        "title": "Manchmal geht etwas schief",
+        "text": "Wenn etwas hängt oder seltsam aussieht, liegt das an uns, nicht an dir."
+      },
+      "feedback": {
+        "title": "Dein Feedback entscheidet, was als Nächstes kommt",
+        "text": "Sag uns, was gefehlt oder gestört hat. Wir lesen alles."
+      },
+      "where": "Um uns zu schreiben, nutze „Feedback senden“ unten in der Seitenleiste."
+    },
+    "stage": {
+      "ready": "Dein Team ist bereit",
+      "wake": "Zum Aufwachen fehlt ihm nur eine KI.",
+      "morning": "Guten Morgen, Team",
+      "awake": "Alle sind wach und denken schon."
+    },
+    "connect": {
+      "title": "Verbinde eine KI, damit dein Team denken kann",
+      "text": "Nutze ein Abo, das du schon hast. An deinem Abo ändert sich nichts.",
+      "others": "Anderes Abo",
+      "free": "Kostenlos starten",
+      "freeText": "Mit den kostenlosen Modellen von OpenCode",
+      "noPlan": "Ohne Abo",
+      "without": "Ohne KI antworten die Agenten nicht.",
+      "later": "Nicht jetzt"
+    }
+  },
+  "feedback": {
+    "mark": "Beta",
+    "open": "Feedback senden",
+    "ask": "Was hat gefehlt, ist kaputtgegangen oder hat gestört?",
+    "goesCloud": "Was du schreibst, geht per E-Mail an das Team von agentes.chat.",
+    "goesServer": "Was du schreibst, geht per E-Mail an die Person, die diesen Server betreibt.",
+    "placeholder": "Schreib es, wie du magst",
+    "report": "Hier ein Problem melden",
+    "aboutMessage": "Zur Nachricht von {{name}}",
+    "aboutItem": "Zu: {{name}}",
+    "aboutThis": "Zu dem, was du angeklickt hast",
+    "aboutDrop": "Diesen Ausschnitt nicht senden",
+    "attach": "Foto oder Video anhängen",
+    "filesHint": "Bis zu {{images}} Fotos mit {{imageMb}} MB und ein Video mit {{videoMb}} MB, {{days}} Tage aufbewahrt.",
+    "removeFile": "{{name}} entfernen",
+    "uploading": "{{name}} wird gesendet",
+    "fileType": "Es lassen sich nur Fotos und Videos anhängen.",
+    "fileTooLarge": "{{name}} ist zu groß: Das Limit liegt bei {{mb}} MB.",
+    "fileTooMany": "Ein Feedback fasst bis zu {{images}} Fotos und ein Video.",
+    "send": "Senden",
+    "thanks": "Zugestellt. Danke.",
+    "reply": "Alles wird gelesen. Eine Antwort, falls nötig, kommt an {{email}}.",
+    "another": "Noch eins senden"
   }
 }

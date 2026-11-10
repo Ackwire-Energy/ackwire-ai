@@ -34,7 +34,7 @@ import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { brainModelLabel } from "@/components/AgentBrain";
-import { MachineIcon } from "@/components/Machines";
+import { MachineIcon } from "@/components/machine-bits";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { lookOf } from "@/lib/look";

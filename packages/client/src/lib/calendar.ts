@@ -40,6 +40,11 @@ export interface CalItem {
   recurring: boolean;
   /** The agent behind it (agent events, routines): its avatar and color. */
   agentId?: string;
+  /**
+   * Whose it is: who made an event, the agent of a routine run or a reminder, who has a task due. The calendar opens
+   * the item with their face.
+   */
+  owner?: Actor;
   eventId?: string;
   seriesId?: string | null;
   occurrenceStart?: string | null;
@@ -161,6 +166,7 @@ export function toItems(range: CalendarRange | undefined): CalItem[] {
         allDay: e.allDay,
         recurring: Boolean(e.rule && e.rule.freq !== "once") || e.recurrence !== "none" || Boolean(e.seriesId),
         agentId: agentAuthor ? e.createdBy.id : undefined,
+        owner: e.createdBy,
         eventId: e.id,
         seriesId: e.seriesId ?? null,
         occurrenceStart: e.occurrenceStart ?? null,
@@ -181,6 +187,7 @@ export function toItems(range: CalendarRange | undefined): CalItem[] {
         allDay: false,
         recurring: true,
         agentId: r.agentId,
+        owner: { type: "agent", id: r.agentId },
         routineId: r.routineId,
         people: [{ type: "agent", id: r.agentId }],
         target: r.target,
@@ -198,6 +205,7 @@ export function toItems(range: CalendarRange | undefined): CalItem[] {
         allDay: false,
         recurring: false,
         agentId: r.agentId,
+        owner: { type: "agent", id: r.agentId },
         reminderId: r.id,
         setBy: r.createdBy,
         canCancel: r.canCancel,
@@ -219,6 +227,7 @@ export function toItems(range: CalendarRange | undefined): CalItem[] {
         recurring: false,
         issueId: d.issueId,
         issueNumber: d.number,
+        owner: d.assignee ?? undefined,
         people: [],
       };
     }),
@@ -302,36 +311,69 @@ function spacing(runs: Date[]): number | null {
 // ── Layout ──────────────────────────────────────────────────────────────────
 
 export interface Placed {
-  item: CalItem;
+  item: CalItem | RunStack;
   /** Minutes from midnight (clipped to the day). */
   top: number;
+  /** How long it is in minutes (a stack: how tall it is drawn). */
   height: number;
   /** Side by side when overlapping: column and how many share the cluster. */
   col: number;
   cols: number;
+  /**
+   * A column of routine runs alone beside a meeting is narrow, so the meeting keeps room for its name (the runs are
+   * faces at the least): how many such columns the cluster has (0: every column as wide), how many come before this
+   * one, and whether this one is.
+   */
+  thins: number;
+  thinBefore: number;
+  thin: boolean;
 }
 
+/** Pixels in the day/week grid → minutes, and back. */
+const toPx = (minutes: number) => (minutes / 60) * HOUR_PX;
+const toMinutes = (px: number) => (px / HOUR_PX) * 60;
+
 /**
- * Timed items of one day laid out side by side when they overlap: each
- * cluster of overlapping items splits the width into as many columns as it
- * needs (greedy, by start).
+ * Timed items of one day, and its stacks of routine runs, laid out side by
+ * side when they overlap: each cluster of overlapping items splits the width
+ * into as many columns as it needs (greedy, by start). `heights` (px, by key)
+ * are what the page measured: a block whose title wraps past its slot reaches
+ * as far as it is drawn, and whatever starts under it goes beside it.
  */
-export function layoutDay(items: CalItem[], day: Date): Placed[] {
+export function layoutDay(
+  items: CalItem[],
+  day: Date,
+  stacks: RunStack[] = [],
+  heights: ReadonlyMap<string, number> = new Map(),
+): Placed[] {
   const dayStart = startOfDay(day).getTime();
   const dayEnd = dayStart + 86_400_000;
-  const timed = items
-    .filter((it) => !isBarItem(it) && onDay(it, day))
-    .map((item) => {
-      const s = Math.max(item.start.getTime(), dayStart);
-      const e = Math.min(Math.max(item.end.getTime(), s + (item.kind === "reminder" ? 30 : 15) * 60_000), dayEnd);
-      return { item, s, e };
-    })
-    .sort((a, b) => a.s - b.s || b.e - a.e);
+  const timed = [
+    ...items
+      .filter((it) => !isBarItem(it) && onDay(it, day))
+      .map((item) => {
+        const s = Math.max(item.start.getTime(), dayStart);
+        const e = Math.min(Math.max(item.end.getTime(), s + (item.kind === "reminder" ? 30 : 15) * 60_000), dayEnd);
+        const drawn = s + toMinutes(heights.get(item.key) ?? 0) * 60_000;
+        return { item: item as CalItem | RunStack, s, e, reach: Math.min(Math.max(e, drawn), dayEnd) };
+      }),
+    ...stacks.map((stack) => {
+      const s = dayStart + stack.top * 60_000;
+      const e = Math.min(s + stack.height * 60_000, dayEnd);
+      return { item: stack as CalItem | RunStack, s, e, reach: e };
+    }),
+  ].sort((a, b) => a.s - b.s || b.reach - a.reach);
   const out: Placed[] = [];
-  let cluster: { item: CalItem; s: number; e: number; col: number }[] = [];
+  let cluster: ((typeof timed)[number] & { col: number })[] = [];
   let clusterEnd = -1;
   const flush = () => {
     const cols = Math.max(1, ...cluster.map((c) => c.col + 1));
+    const runsOnly = Array.from({ length: cols }, (_, i) =>
+      cluster.filter((c) => c.col === i).every((c) => c.item.kind === "runs"),
+    );
+    const thins = runsOnly.filter(Boolean).length;
+    // Narrow only beside something else: runs side by side with runs share the width evenly.
+    const mixed = thins > 0 && thins < cols;
     for (const c of cluster)
       out.push({
         item: c.item,
@@ -339,28 +381,31 @@ export function layoutDay(items: CalItem[], day: Date): Placed[] {
         height: (c.e - c.s) / 60_000,
         col: c.col,
         cols,
+        thins: mixed ? thins : 0,
+        thinBefore: mixed ? runsOnly.slice(0, c.col).filter(Boolean).length : 0,
+        thin: mixed && Boolean(runsOnly[c.col]),
       });
     cluster = [];
   };
   for (const t of timed) {
     if (cluster.length > 0 && t.s >= clusterEnd) flush();
     const colEnds: number[] = [];
-    for (const c of cluster) colEnds[c.col] = Math.max(colEnds[c.col] ?? 0, c.e);
+    for (const c of cluster) colEnds[c.col] = Math.max(colEnds[c.col] ?? 0, c.reach);
     let col = colEnds.findIndex((end) => end <= t.s);
     if (col < 0) col = colEnds.length;
     cluster.push({ ...t, col });
-    clusterEnd = Math.max(clusterEnd, t.e);
+    clusterEnd = Math.max(clusterEnd, t.reach);
   }
   if (cluster.length > 0) flush();
   return out;
 }
 
-/** A single routine run (not a band): drawn as a pixel mark in the grid, not a chip. */
+/** A single routine run (not a band): a one-line row in the grid, stacked with the runs around it. */
 export const isRunMark = (it: CalItem) => it.kind === "routine" && !it.runs && !isBarItem(it);
 
 /**
- * A routine's mark: one single run, or (in the month and agenda views) a
- * frequent routine's runs on one day, as one mark with their count.
+ * A routine's entry: one single run, or (in the month and agenda views) a
+ * frequent routine's runs on one day, as one entry with their count.
  */
 export interface RunEntry {
   key: string;
@@ -373,35 +418,68 @@ export interface RunEntry {
   status?: RunStatus;
 }
 
-export interface RunSlot {
-  key: string;
-  /** Minutes from midnight of the slot's first run. */
-  top: number;
-  runs: RunEntry[];
-}
-
 const byTime = (a: RunEntry, b: RunEntry) =>
   a.at.getTime() - b.at.getTime() || a.item.title.localeCompare(b.item.title);
 const single = (it: CalItem): RunEntry => ({ key: it.key, item: it, at: it.start, count: 1, status: it.result });
 
-/** One day's single routine runs grouped by the hour they start in (a slot per hour), earliest first. */
-export function runSlots(items: CalItem[], day: Date): RunSlot[] {
-  const byHour = new Map<number, RunEntry[]>();
-  for (const it of items) {
-    if (!isRunMark(it) || !sameDay(it.start, day)) continue;
-    const h = it.start.getHours();
-    byHour.set(h, [...(byHour.get(h) ?? []), single(it)]);
+/** A run's row in the day/week grid (px, its least: a name that wraps makes it taller), and the room between rows. */
+const RUN_ROW_PX = 20;
+const ROW_GAP_PX = 2;
+/** The "+N rotinas" line under a stack's rows (px). */
+const MORE_LINE_PX = 18;
+
+/** How tall a stack is drawn (px) with `shown` rows, and the "+N" line under them when it holds more. */
+const stackPx = (shown: number, more: number) =>
+  shown * (RUN_ROW_PX + ROW_GAP_PX) - ROW_GAP_PX + (more > 0 ? ROW_GAP_PX + MORE_LINE_PX : 0);
+
+/** Routine runs at one place in a day's column: a row each, up to `shown`, then "+N rotinas" for the `more` others. */
+export interface RunStack {
+  kind: "runs";
+  key: string;
+  /** Minutes from midnight of its first run. */
+  top: number;
+  /** How tall it is drawn, in minutes. */
+  height: number;
+  runs: RunEntry[];
+  shown: number;
+  more: number;
+}
+
+/**
+ * One day's single routine runs as stacks of one-line rows at their time:
+ * a run that would start inside the stack above joins it. A stack shows two
+ * rows at most, and only as many as fit before the next item under it (at
+ * least one); the others go behind "+N rotinas". `heights` (px, by key) are
+ * what the page measured: a name that wraps makes a row taller than a line.
+ */
+export function runStacks(items: CalItem[], day: Date, heights: ReadonlyMap<string, number> = new Map()): RunStack[] {
+  const runs = items
+    .filter((it) => isRunMark(it) && sameDay(it.start, day))
+    .map(single)
+    .sort(byTime);
+  const groups: { key: string; top: number; runs: RunEntry[] }[] = [];
+  for (const r of runs) {
+    const top = toPx(minutesOfDay(r.at));
+    const open = groups[groups.length - 1];
+    // The least it takes: its first row, and "+N" under it once it holds two.
+    const least = open && stackPx(1, open.runs.length - 1);
+    if (open && top < open.top + Math.max(least ?? 0, heights.get(open.key) ?? 0)) open.runs.push(r);
+    else groups.push({ key: `runs-${r.key}`, top, runs: [r] });
   }
-  return [...byHour.entries()]
-    .sort((a, b) => a[0] - b[0])
-    .map(([h, list]) => {
-      const runs = [...list].sort(byTime);
-      return {
-        key: `${startOfDay(day).getTime()}-${h}`,
-        top: minutesOfDay((runs[0] as RunEntry).at),
-        runs,
-      };
-    });
+  // Where each stack's room ends: the next stack, or a block (an event, a reminder) that starts under it.
+  const dayStart = startOfDay(day);
+  const starts = items
+    .filter((it) => !isRunMark(it) && !isBarItem(it) && onDay(it, day))
+    .map((it) => toPx(Math.max(0, (it.start.getTime() - dayStart.getTime()) / 60_000)));
+  return groups.map((g, i): RunStack => {
+    const below = starts.filter((s) => s > g.top);
+    const room = Math.min(groups[i + 1]?.top ?? Number.POSITIVE_INFINITY, ...below, toPx(24 * 60)) - g.top;
+    // Two rows where they fit before the next item (with "+N" under them when there are more), else one.
+    const shown = g.runs.length > 1 && stackPx(2, g.runs.length - 2) <= room ? 2 : 1;
+    const more = g.runs.length - shown;
+    const px = Math.max(stackPx(shown, more), heights.get(g.key) ?? 0);
+    return { kind: "runs", key: g.key, top: toMinutes(g.top), height: toMinutes(px), runs: g.runs, shown, more };
+  });
 }
 
 /**
@@ -428,6 +506,33 @@ export function dayRuns(items: CalItem[], day: Date): RunEntry[] {
 }
 
 const toYmdLocal = (d: Date) => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+
+/** A row of a day in the month and the agenda: an item, or a routine's runs that day. */
+export interface DayEntry {
+  key: string;
+  item: CalItem;
+  at: Date;
+  /** A routine that runs often: its first run that day, and how many. */
+  day?: { at: Date; count: number };
+}
+
+/** One day's items and routine runs as one list of rows: all day first, then by time. */
+export function dayEntries(items: CalItem[], day: Date): DayEntry[] {
+  const allDay = (it: CalItem) => it.allDay && !it.runs;
+  return [
+    ...items
+      .filter((it) => it.kind !== "routine" && onDay(it, day))
+      .map((item): DayEntry => ({ key: item.key, item, at: item.start })),
+    ...dayRuns(items, day).map(
+      (r): DayEntry => ({
+        key: r.key,
+        item: r.item,
+        at: r.at,
+        day: r.item.runs ? { at: r.at, count: r.count } : undefined,
+      }),
+    ),
+  ].sort((a, b) => Number(allDay(b.item)) - Number(allDay(a.item)) || a.at.getTime() - b.at.getTime());
+}
 
 export interface Bar {
   item: CalItem;

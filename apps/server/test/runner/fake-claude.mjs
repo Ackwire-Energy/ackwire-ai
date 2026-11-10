@@ -319,6 +319,18 @@ async function answer(line) {
     await sleep(20);
     process.exit(3);
   }
+  // "DIES": every process dies saying why on stderr, as a Node crash ends (the line, its stack, Node's version).
+  // "KILLED": the first does; the next is killed (SIGKILL) with nothing to say.
+  if (marker && (prompt.includes("DIES") || prompt.includes("KILLED"))) {
+    const killed = `${marker}-killed`;
+    if (prompt.includes("KILLED") && existsSync(killed)) process.kill(process.pid, "SIGKILL");
+    if (prompt.includes("KILLED")) writeFileSync(killed, "");
+    process.stderr.write(
+      "TypeError: Cannot read properties of undefined (reading 'x')\n    at run (/home/nina/app/cli.js:10:20)\n\nNode.js v22.11.0\n",
+    );
+    await sleep(20);
+    process.exit(3);
+  }
   if (prompt.includes("ASKCONTROL")) {
     out({
       type: "control_request",

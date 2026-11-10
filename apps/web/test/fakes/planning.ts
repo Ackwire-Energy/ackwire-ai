@@ -235,6 +235,9 @@ export function createMockPlanning(
       type: "person",
       id: members[i % Math.max(1, members.length)]?.userId ?? "me",
     });
+    /** These members, none past the last: a list of people names each one once, as the server keeps them. */
+    const people = (...at: number[]): Actor[] =>
+      at.flatMap((i) => members[i] ?? []).map((m) => ({ type: "person" as const, id: m.userId }));
     const day = (offset: number) => {
       const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
       return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -430,14 +433,20 @@ export function createMockPlanning(
         start: at(0, 10),
         end: at(0, 11),
         description: "Pauta preparada no canal.",
-        participants: [person(0), person(1), agent(3)],
+        participants: [...people(0, 1), agent(3)],
       }),
-      event({ title: "Revisão de design", start: at(1, 14), end: at(1, 15, 30), participants: [person(1), person(2)] }),
+      event({
+        title: "Revisão de design",
+        start: at(1, 14),
+        end: at(1, 15, 30),
+        participants: people(1, 0),
+        createdBy: person(1),
+      }),
       event({
         title: "Retro da sprint",
         start: at(4, 11),
         end: at(4, 12),
-        participants: [person(0), person(2), agent(0)],
+        participants: [...people(0, 2), agent(0)],
       }),
     );
     s.proposals.push({
@@ -446,7 +455,7 @@ export function createMockPlanning(
       title: "Revisão do roadmap",
       start: at(3, 15),
       end: at(3, 15, 45),
-      participants: [person(0), person(1), person(2)],
+      participants: people(0, 1, 2),
       note: "livre para todos",
       status: "pending",
     });
@@ -975,7 +984,13 @@ export function createMockPlanning(
                 day(i.dueDate) >= a &&
                 day(i.dueDate) < b,
             )
-            .map((i) => ({ issueId: i.id, number: i.number, title: i.title, date: i.dueDate as string })),
+            .map((i) => ({
+              issueId: i.id,
+              number: i.number,
+              title: i.title,
+              date: i.dueDate as string,
+              assignee: i.assignee,
+            })),
           proposals: s.proposals.filter((p) => inRange(p.start)),
         });
       },

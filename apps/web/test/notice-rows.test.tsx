@@ -40,8 +40,10 @@ test("a mention that woke nobody: the event pill and the reach row with its acti
   const row = screen()
     .getByText(/Não consegui chamar o/)
     .closest(".ag-rc") as HTMLElement;
-  expect(row.classList.contains("ac-actrow")).toBe(true);
-  expect(row.querySelector(".ac-actrow__text")?.textContent).toContain("só quem cuida dele pode");
-  expect(row.querySelector(".ag-rc__btn")?.textContent).toBe("Deixar João falar com ele");
+  // The sentence and its action in the kit's action line, after the icon: the action goes under the sentence when
+  // they don't fit side by side.
+  const line = row.querySelector(":scope > .ac-actline") as HTMLElement;
+  expect(line.firstElementChild?.textContent).toContain("só quem cuida dele pode");
+  expect(line.querySelector(".ag-rc__btn")?.textContent).toBe("Deixar João falar com ele");
   expect(screen().getByText("A menção de Ada não chamou Atlas")).toBeTruthy();
 });

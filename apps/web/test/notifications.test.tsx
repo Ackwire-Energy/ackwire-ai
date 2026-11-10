@@ -123,7 +123,7 @@ const go = async (state: FakeState = seedState({ notifications: inbox() })) => {
 };
 
 describe("Notificações", () => {
-  test("how many are unread is under the title from the first paint, before the list arrives", async () => {
+  test("how many are unread is on the title's row from the first paint, before the list arrives", async () => {
     const state = seedState({
       notifications: [notification({ id: "n-a", kind: "mention" }), notification({ id: "n-b", kind: "mention" })],
     });
@@ -133,16 +133,17 @@ describe("Notificações", () => {
     await renderApp(`/org/${ORG_ID}/notifications`, { api });
     await settle(4);
     const title = screen().getByRole("heading", { level: 1, name: "Notificações" });
-    expect(title.nextElementSibling?.className).toBe("ac-pagehead__meta");
+    expect(title.nextElementSibling?.className).toBe("ac-pagehead__count");
     expect(title.nextElementSibling?.textContent).toContain("2 não lidas");
   });
 
   test("waiting on top with the agent looking up, the rest by day, filters with counts, the badge and the tab title", async () => {
     await go();
     const title = screen().getByRole("heading", { level: 1, name: "Notificações" });
-    // How many are unread: the header's line, right under the title.
-    expect(title.nextElementSibling?.className).toBe("ac-pagehead__meta");
+    // How many are unread: on the title's row, right after it, and no line under the title.
+    expect(title.nextElementSibling?.className).toBe("ac-pagehead__count");
     expect(title.nextElementSibling?.textContent).toContain("3 não lidas");
+    expect(document.querySelector(".ac-pagehead__meta")).toBeNull();
     const waiting = screen().getByRole("region", { name: "Esperando você" });
     // The day groups' head: the title and how many, nothing else.
     expect(waiting.querySelector(".ac-grouphead")?.textContent).toBe("Esperando você1");
@@ -178,6 +179,42 @@ describe("Notificações", () => {
     await settle(4);
     expect(screen().queryByRole("region", { name: "Esperando você" })).toBeNull();
     expect(document.body.textContent).toContain("reagiram à sua mensagem");
+  });
+
+  test("each chip says its thing once: a channel's name after its #, a task's move with its arrow in the words", async () => {
+    const items = [
+      notification({
+        id: "n-mention",
+        kind: "mention",
+        actors: [{ type: "user", id: "u-joao" }],
+        source: { channelId: ENG_ID, messageId: "m-1" },
+        latest: { text: "@walter dá uma olhada no deploy das 9h?" },
+        updatedAt: ago(3),
+      }),
+      notification({
+        id: "n-move",
+        kind: "issue_status",
+        actors: [{ type: "agent", id: ADA_ID }],
+        source: { issueId: "issue-131", issueNumber: 131 },
+        latest: { title: "Corrigir o login com Google", statusFrom: "in_progress", statusTo: "in_review" },
+        updatedAt: ago(6),
+      }),
+      ...inbox().filter((n) => n.kind === "reaction"),
+    ];
+    await go(seedState({ notifications: items }));
+    const chips = [...document.querySelectorAll<HTMLElement>(".nt-tags .ac-chip")];
+    // The channel's # is its icon: the words show the bare name, a screen reader still hears "#eng".
+    const channel = chips.find((c) => c.querySelector(".ac-chip__text")?.textContent === "#eng");
+    expect(channel?.querySelector("svg.ac-icon")).not.toBeNull();
+    expect(channel?.querySelector(".ac-chip__text > .ac-visually-hidden")?.textContent).toBe("#");
+    expect(channel?.querySelector(".ac-chip__text")?.lastChild?.textContent).toBe("eng");
+    const move = chips.find((c) => c.textContent === "Em andamento → Em revisão");
+    expect(move).toBeTruthy();
+    expect(move?.querySelector("svg")).toBeNull();
+    expect(chips.find((c) => c.textContent === "Tarefa #131")?.querySelector("svg.ac-icon")).not.toBeNull();
+    // The kit's chips as they are (22 high, words 12): the inbox sizes none of its own.
+    const sheet = await Bun.file(new URL("../src/pages/notifications.css", import.meta.url).pathname).text();
+    expect(sheet).not.toMatch(/\.nt-tags \.ac-chip[^{]*\{/);
   });
 
   test("an approval is the conversation's card: the agent's why, the action in its well, who asked behind Ver detalhes", async () => {
@@ -995,11 +1032,9 @@ describe("Esperando você: what only points somewhere is a card of the requests'
     expect(px(".nt-wi > .nt-face", "top")).toBe(12);
     expect(value(".nt-wr .rq__lead.nt-what", "white-space")).toBe("normal");
     expect(value(".nt-wr__sub", "-webkit-line-clamp")).toBe("2");
-    // On a phone the tap opens: Open leaves the eye but stays a button for screen readers and the keyboard. The faces
-    // keep their size.
+    // On a phone Open stays in the card's foot, a button like the others, never hidden. The faces keep their size.
     expect(css).not.toMatch(/\.nt-wr__open[^{]*\{[^}]*display: none/);
-    expect(value(".nt-wr__open:not(:focus-visible)", "position", phone)).toBe("absolute");
-    expect(value(".nt-wr__open:not(:focus-visible)", "clip-path", phone)).toBe("inset(50%)");
+    expect(rule(".nt-wr__open:not(:focus-visible)", phone)).toBe("");
     expect(rule(".nt-av28", phone)).toBe("");
     expect(value(".nt-wi", "grid-template-columns", phone)).toBeUndefined();
     // A day's row clips: its ring goes inside. A waiting item is a face and a card, its ring around it.

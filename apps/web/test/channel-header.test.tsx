@@ -22,6 +22,10 @@ describe("the channel header, as Discord's", () => {
     const header = await open();
     expect(within(header).getByRole("heading", { level: 1, name: "eng" })).toBeTruthy();
     expect(within(header).getByText("Código, erros e deploys")).toBeTruthy();
+    // The name and the glyphs are an action line: the glyphs go under a name that can't keep its row beside them.
+    const line = header.querySelector(":scope > .ac-actline.channel__line") as HTMLElement;
+    expect(line.firstElementChild?.matches(".channel__head-text")).toBe(true);
+    expect(line.lastElementChild?.matches(".channel__acts")).toBe(true);
     const icons = [...header.querySelectorAll<HTMLElement>(".channel__acts > .channel__icon")]
       .filter((b) => !b.classList.contains("channel__search-icon"))
       .map((b) => b.getAttribute("aria-label"));

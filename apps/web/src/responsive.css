@@ -160,15 +160,14 @@
   .channel__header > .ac-acts {
     flex: none;
   }
+  /* A header's name and its line wrap whole, never cut: the header's glyphs go under them instead (`.channel__line`). */
   .channel__title {
     display: block;
     min-width: 0;
     font-size: 17px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
   }
-  /* A DM's name keeps its line, its pill 8 after it on its capitals, and under it when both don't fit. */
+  /* A DM's name, its pill 8 after it on its capitals, and under it when both don't fit. */
   .dm-who .channel__title {
     display: flex;
     flex-wrap: wrap;
@@ -178,16 +177,9 @@
   .dm-who .channel__title > .channel__name {
     min-width: 0;
     max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
   .dm-who .channel__title > .ac-chip {
     flex: none;
-  }
-  .channel__topic {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
   .channel__messages {
     padding: 12px 0 10px;
@@ -195,7 +187,7 @@
     mask-image: linear-gradient(to bottom, #000 calc(100% - 10px), transparent), var(--scroll-strip);
   }
   .channel__messages .ac-msg:not([data-look="bubbles"], [data-look="compact"]) {
-    --msg-lead: 46px;
+    --msg-lead: calc(var(--name-face) + 10px);
   }
   .channel__messages .ac-msg {
     --msg-inline: 12px;
@@ -327,8 +319,8 @@
   .agp-subnav {
     position: static;
     flex-direction: row;
-    margin: 0 -16px;
-    padding: 2px 16px 4px;
+    margin: 0 calc(-1 * var(--agp-gutter));
+    padding: 2px var(--agp-gutter) 4px;
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: none;
@@ -427,8 +419,8 @@
   .agp-subnav {
     position: static;
     flex-direction: row;
-    margin: 0 -16px;
-    padding: 2px 16px 4px;
+    margin: 0 calc(-1 * var(--agp-gutter));
+    padding: 2px var(--agp-gutter) 4px;
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: none;
@@ -584,5 +576,18 @@
   }
   .setup-notice .outage__acts > .ac-btn--ghost:first-child {
     margin-left: -12px;
+  }
+  /* Words with nothing before them (a hold's) take the lead's column too, from the padding, with no lift. */
+  .outage > .outage__text:first-child {
+    grid-column: 1 / -1;
+    translate: none;
+  }
+  /* A lone main button takes the notice's width, under the words (rule 23). */
+  .outage__acts:has(> .ac-btn:only-child:not(.ac-btn--ghost)) {
+    grid-column: 1 / -1;
+    margin-top: 6px;
+  }
+  .outage__acts > .ac-btn:only-child:not(.ac-btn--ghost) {
+    flex: 1 1 auto;
   }
 }

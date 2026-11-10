@@ -45,12 +45,21 @@ export interface RequestOptions {
 /** Headers added to every request (the phone app's session cookie and client marker). */
 export type HeadersSource = () => Record<string, string> | Promise<Record<string, string>>;
 
+/**
+ * How long a read (`GET`) waits for its whole answer. A browser can keep a request on a dead connection for minutes
+ * (after a sleep or a network change): the screen waiting on it stayed old and its loading bar never ended. Past this
+ * it fails as a `NetworkError`, which the query client tries again.
+ */
+export const READ_TIMEOUT_MS = 30_000;
+
 /** Where requests go and how. Defaults: same origin, the global `fetch`, the browser's cookie. */
 export interface TransportOptions {
   /** e.g. "https://app.agentes.chat" (no trailing slash needed); "" or absent = same origin. */
   baseUrl?: string;
   fetch?: FetchLike;
   headers?: HeadersSource;
+  /** `READ_TIMEOUT_MS` unless given. */
+  readTimeoutMs?: number;
 }
 
 interface Transport {
@@ -81,6 +90,7 @@ function transport(options: TransportOptions): Transport {
 
 export function createRequester(options: TransportOptions = {}) {
   const t = transport(options);
+  const readTimeoutMs = options.readTimeoutMs ?? READ_TIMEOUT_MS;
   return async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
     const method = options.method ?? (options.json === undefined ? "GET" : "POST");
     const headers: Record<string, string> = {
@@ -98,13 +108,25 @@ export function createRequester(options: TransportOptions = {}) {
       const qs = params.toString();
       if (qs) url += `?${qs}`;
     }
-    const res = await t.fetch(url, {
-      method,
-      headers,
-      credentials: t.credentials,
-      body: hasBody ? JSON.stringify(options.json ?? {}) : undefined,
-    });
-    return parseResponse<T>(res);
+    // Only reads: a write cut short may still have happened on the server.
+    const deadline = method === "GET" ? new AbortController() : null;
+    const timer = deadline ? setTimeout(() => deadline.abort(), readTimeoutMs) : null;
+    try {
+      const res = await t.fetch(url, {
+        method,
+        headers,
+        credentials: t.credentials,
+        body: hasBody ? JSON.stringify(options.json ?? {}) : undefined,
+        ...(deadline ? { signal: deadline.signal } : {}),
+      });
+      return await parseResponse<T>(res);
+    } catch (error) {
+      if (deadline?.signal.aborted && !(error instanceof ApiError || error instanceof NetworkError))
+        throw new NetworkError(error);
+      throw error;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
   };
 }
 

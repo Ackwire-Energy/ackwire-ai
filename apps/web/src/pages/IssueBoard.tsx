@@ -164,8 +164,8 @@ function ColumnCards({
 
 /**
  * The board. Grouped by stage: the org's columns, each in a fixed stage, with stage headers only when the board is
- * customized, each column's menu, and "Nova tarefa" under A fazer. Grouped by assignee or priority: one column each.
- * Cards move between and inside columns (`useIssueDrag`).
+ * customized, each column's menu, and "+" in the head of A fazer's columns (`onNew`, for who may create tasks).
+ * Grouped by assignee or priority: one column each. Cards move between and inside columns (`useIssueDrag`).
  */
 export function Board({
   groups,
@@ -181,11 +181,10 @@ export function Board({
   columns: IssueColumn[];
   dnd: IssueDrag<Issue>;
   renderCard: (issue: Issue, group: string, state: CardState) => ReactNode;
-  onNew: (columnId: string) => void;
+  /** "Nova tarefa" in that column of A fazer; none for who may not create tasks. */
+  onNew?: (columnId: string) => void;
 }) {
-  const { t } = useTranslation();
   const stageName = useStageName();
-  const title = useColumnTitle();
   const [renaming, setRenaming] = useState<string | null>(null);
   const [adding, setAdding] = useState<{ afterId: string | null } | null>(null);
   const [deleting, setDeleting] = useState<IssueColumn | null>(null);
@@ -193,7 +192,7 @@ export function Board({
   const byId = new Map(groups.map((g) => [g.id, g]));
   const wrap = useRef<HTMLDivElement>(null);
   useDragScroll(wrap, BOARD_SPACE);
-  const column = (g: IssueGroup, head: ReactNode, stage?: IssueStatus, foot?: ReactNode) => (
+  const column = (g: IssueGroup, head: ReactNode, stage?: IssueStatus) => (
     <section
       key={g.id}
       className={cx("issues-col", dnd.over === g.id && "is-over", stage === "canceled" && "is-canceled")}
@@ -202,14 +201,14 @@ export function Board({
     >
       {head}
       <ColumnCards group={g} dnd={dnd} renderCard={renderCard} />
-      {foot}
     </section>
   );
 
   return (
     <>
-      {/* As Trello's: the board fills the window under the page's head, its scrollbar along the window's bottom, each
-          column scrolling on its own (`.page-split`, layout.css); a press on its empty space and a drag slides it. */}
+      {/* As Trello's: the board fills the window under the page's head (under a tall one, a window's height the page
+          scrolls down to), its scrollbar along the window's bottom, each column scrolling on its own (`.page-split`,
+          over-pages.css); a press on its empty space and a drag slides it. */}
       <div className="issues-boardframe page-split">
         <div ref={wrap} className="issues-boardwrap" data-scroll-restoration-id="issues-board">
           <div className={cx("issues-board", grouped && "is-grouped")}>
@@ -246,21 +245,9 @@ export function Board({
                           onRenamed={() => setRenaming(null)}
                           onAddAfter={() => setAdding({ afterId: col.id })}
                           onDelete={() => setDeleting(col)}
+                          onNew={onNew && col.stage === "todo" ? () => onNew(col.id) : undefined}
                         />,
                         stage,
-                        col.stage === "todo" && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            icon="plus"
-                            block
-                            className="issues-col__add"
-                            aria-label={t("issues.newIn", { column: title(col) })}
-                            onClick={() => onNew(col.id)}
-                          >
-                            {t("issues.new")}
-                          </Button>
-                        ),
                       );
                     })}
                   </div>
@@ -307,7 +294,10 @@ export function Board({
   );
 }
 
-/** A column's head: its stage icon (plain board), name (or the rename field), count and "…". */
+/**
+ * A column's head: its stage icon (plain board), name (or the rename field), count, then at its end "+" (a new task in
+ * it, A fazer's columns only) and "…", 8 apart. A long name wraps, its first line on the buttons' middle.
+ */
 function ColumnHead({
   column: col,
   siblings,
@@ -319,6 +309,7 @@ function ColumnHead({
   onRenamed,
   onAddAfter,
   onDelete,
+  onNew,
 }: {
   column: IssueColumn;
   siblings: IssueColumn[];
@@ -330,6 +321,7 @@ function ColumnHead({
   onRenamed: () => void;
   onAddAfter: () => void;
   onDelete: () => void;
+  onNew?: () => void;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -390,6 +382,17 @@ function ColumnHead({
             {count}
           </span>
           <span className="issues-col__grow" />
+          {onNew && (
+            <Button
+              variant="ghost"
+              size="sm"
+              iconOnly
+              icon="plus"
+              aria-label={t("issues.newIn", { column: name })}
+              title={t("issues.newIn", { column: name })}
+              onClick={onNew}
+            />
+          )}
           {col.stage !== "canceled" && (
             <Menu
               align="end"

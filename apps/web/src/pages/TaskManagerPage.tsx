@@ -272,8 +272,9 @@ export function TaskManagerPage({
     <div className="page page--list tm">
       <PageHeader
         title={t("taskManager.title")}
-        meta={
-          working > 0 || summary.waiting > 0 ? (
+        meta={t("taskManager.subtitle")}
+        count={
+          (working > 0 || summary.waiting > 0) && (
             <span className="tm-sum">
               {working > 0 && (
                 <span className="tm-sum__item">
@@ -288,8 +289,6 @@ export function TaskManagerPage({
                 </span>
               )}
             </span>
-          ) : (
-            t("taskManager.subtitle")
           )
         }
         actions={
@@ -392,16 +391,18 @@ export function TaskManagerPage({
         <section className="tm-now" aria-label={heading}>
           <div className="tm-tools">
             <h2>{heading}</h2>
-            <Button
-              size="sm"
-              variant="ghost"
-              icon="list"
-              disabled={!selTask}
-              onClick={() => selTask && setPanel(selTask.runId)}
-            >
-              {t("taskManager.actions.steps")}
-            </Button>
-            {stopTool}
+            <span className="tm-tools__acts">
+              <Button
+                size="sm"
+                variant="ghost"
+                icon="list"
+                disabled={!selTask}
+                onClick={() => selTask && setPanel(selTask.runId)}
+              >
+                {t("taskManager.actions.steps")}
+              </Button>
+              {stopTool}
+            </span>
           </div>
           {shown.length === 0 ? (
             <EmptyState size="panel" actions={<Button onClick={() => setQ("")}>{t("filters.clearSearch")}</Button>}>

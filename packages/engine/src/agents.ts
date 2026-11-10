@@ -29,7 +29,7 @@ import type { CommandApproval } from "./missions";
 import { recordOperatorEvent } from "./operator-events";
 import { can, getMembership, type Membership, requirePermission } from "./organizations";
 import { isRightHand, RIGHT_HAND_EDITABLE, refuseRightHand, rightHandPermanent } from "./right-hand";
-import { newSetup, setupOf } from "./setup-checklist";
+import { newSetup, type SetupExtras, setupOf } from "./setup-checklist";
 import {
   CONNECTOR_ALL,
   DEFAULT_AGENT_SCOPES,
@@ -188,8 +188,11 @@ export async function createAgent(
   input: AgentInput & {
     autonomy?: CommandApproval;
     audienceMode?: Agent["audienceMode"];
-    /** The ready-made role it starts from, for its setup checklist's suggestions (ADR 0155 §2); null: none. */
-    setup?: { role: string | null };
+    /**
+     * The ready-made role it starts from, for its setup checklist's suggestions (ADR 0155 §2); null: none. From its
+     * card (ADR 0164): how it introduced itself, the personal starter it began as and the apps it was made to use.
+     */
+    setup?: { role: string | null } & SetupExtras;
   },
   defaults: { model: string },
   /** `via`: the agent whose card it was created from (the audit's "via"). */
@@ -245,9 +248,12 @@ export async function createAgent(
         orgId,
         ownerUserId,
         // Every new agent starts with its setup checklist, whichever way it was made (ADR 0155 §2).
-        setup: newSetup(setup?.role),
+        setup: newSetup(setup?.role, setup),
         ...(autonomy ? { missionCommandApproval: autonomy } : {}),
         ...(audience ? { audienceMode: audience } : {}),
+        // The moment of this insert, not its transaction's start (`now()`): agents made together (a template team)
+        // keep the order they were made in, which the agents' list and every screen after it follow.
+        createdAt: sql`clock_timestamp()`,
       })
       .returning();
     if (!agent) throw new Error("agent insert returned nothing");
@@ -554,11 +560,12 @@ export async function unarchiveAgent(
 
 export async function listAgents(db: Database, actorId: string, orgId: string): Promise<Agent[]> {
   await requirePermission(db, actorId, orgId, "read");
+  // As they were made. A team made before each insert had its own time shares one: by name among them.
   return db
     .select()
     .from(agents)
     .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt)))
-    .orderBy(asc(agents.createdAt));
+    .orderBy(asc(agents.createdAt), asc(agents.name));
 }
 
 /** An agent, archived or not; null for a deleted one (its tombstone only names what it left, `listFormerAgents`). */

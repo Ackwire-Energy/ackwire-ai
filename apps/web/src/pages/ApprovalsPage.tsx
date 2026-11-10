@@ -21,7 +21,7 @@ import {
   runKeys,
 } from "@agenteschat/client/lib/approval-card";
 import { aheadPhase, approveAlwaysOffered } from "@agenteschat/client/lib/approval-kind";
-import { approvalOriginShort, approvalWhy } from "@agenteschat/client/lib/approval-origin";
+import { approvalOriginShort, approvalWords } from "@agenteschat/client/lib/approval-origin";
 import {
   type ApprovalEffect,
   type ApprovalUndo,
@@ -101,7 +101,7 @@ import { TaskStepsBlock, useCallLogo } from "@/components/ToolCalls";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { TYPED_VALUES } from "@/i18n";
-import { Markdown } from "@/lib/markdown";
+import { inlineWords, Markdown } from "@/lib/markdown";
 import { useOpenParam } from "@/lib/open-param";
 import { useToast } from "@/lib/toast";
 import "./approvals.css";
@@ -246,6 +246,7 @@ export function ApprovalsPage() {
   const { missions } = useMissionsWaitingYou();
   const commands = pendingCommandCount(missions);
   const missionWaiting = missionsWaiting(missions).length > 0;
+  const missionsBelow = filter === "pending" && (commands > 0 || missionWaiting);
   const waitingYou = mine.length + commands;
 
   // J/K (and ↑/↓ inside the list) walk the requests, A approves the open one (high risk: focuses the hold), R
@@ -376,7 +377,8 @@ export function ApprovalsPage() {
         )}
 
         {(shownOpen.length > 0 || shownDecided.length > 0) && (
-          <div className="ap-split page-split">
+          // A split ends its page (over-pages.css): with the missions listed under it, the page scrolls as one.
+          <div className={cx("ap-split", !missionsBelow && "page-split")}>
             <nav
               className="ap-list"
               data-scroll-restoration-id="approvals-list"
@@ -612,6 +614,9 @@ export function ConnectorMark({ approval }: { approval: Approval }) {
  * with labels; a list shows a few as chips, the details every one, and the tool's own name and values
  * behind "Detalhes técnicos". An email shows as the email itself.
  */
+/** A value longer than this (a message, a command with its flags) takes a row of its own in the details, whole. */
+const LONG_VALUE = 80;
+
 export function ExactAction({
   approval,
   max,
@@ -639,9 +644,9 @@ export function ExactAction({
         (full ? (
           <dl className="ap-exact__rows">
             {values.map(([label, value]) => (
-              <div key={label}>
+              <div key={label} data-long={value.length > LONG_VALUE || undefined}>
                 <dt>{label}</dt>
-                <dd>{value}</dd>
+                <dd>{inlineWords(value)}</dd>
               </div>
             ))}
           </dl>
@@ -889,13 +894,14 @@ export function RefuseBox({ approval, agent, onCancel }: { approval: Approval; a
         </div>
         <div className="ap-refuse__row">
           <span className="ap-refuse__learn">{t("approvals.refuseLearn", { context: g.context, name: g.name })}</span>
-          <span className="ap-grow" />
-          <Button variant="ghost" size="sm" onClick={onCancel}>
-            {t("approvals.back")}
-          </Button>
-          <Button variant="danger" size="sm" kbd={["⌘", "↵"]} loading={decide.isPending} onClick={send}>
-            {t("approvals.refuseConfirm")}
-          </Button>
+          <span className="ap-refuse__acts">
+            <Button variant="ghost" size="sm" onClick={onCancel}>
+              {t("approvals.back")}
+            </Button>
+            <Button variant="danger" size="sm" kbd={["⌘", "↵"]} loading={decide.isPending} onClick={send}>
+              {t("approvals.refuseConfirm")}
+            </Button>
+          </span>
         </div>
       </Locked>
     </div>
@@ -1082,11 +1088,26 @@ function ReviewHead({ approval: a, channel }: { approval: Approval; channel: str
         <span className="ac-mediarow__meta">{by}</span>
       </p>
       <div className="ac-mediarow__body">
-        <h2 className="ap-review__title" title={title}>
-          {title}
-        </h2>
+        <div className="ap-review__titleline">
+          <h2 className="ap-review__title" title={title}>
+            {title}
+          </h2>{" "}
+          <UndoChip approval={a} />
+        </div>
       </div>
     </header>
+  );
+}
+
+/** Whether what it does can be undone, as a chip after the request's title (on the page and in the dialog). */
+function UndoChip({ approval: a }: { approval: Approval }) {
+  const { t } = useTranslation();
+  const { undo } = approvalEffects(a);
+  if (!undo) return null;
+  return (
+    <Chip icon={UNDO_ICON[undo]} tone={undo === "irreversible" ? "waiting" : undefined} className="ap-review__undo">
+      {t(`approvals.trait.${undo}`)}
+    </Chip>
   );
 }
 
@@ -1106,10 +1127,10 @@ function ReviewBody({ approval: a, channel }: { approval: Approval; channel: str
   const [unfold, setUnfold] = useState(false);
   const [steps, setSteps] = useState(false);
   const [tech, setTech] = useState(false);
-  const { effect, undo } = approvalEffects(a);
+  const { effect } = approvalEffects(a);
   const target = approvalTarget(a);
   const text = approvalText(a);
-  const why = approvalWhy(a);
+  const why = approvalWords(a);
   const pr = prLink(a);
   const leftMs = new Date(a.expiresAt).getTime() - Date.now();
   const waits = approvalWaitsFor(a, dir.memberById.get(a.ownerUserId ?? agent?.ownerUserId ?? "")?.name);
@@ -1129,17 +1150,6 @@ function ReviewBody({ approval: a, channel }: { approval: Approval; channel: str
             label: t("approvals.review.effect"),
             value: t(`approvals.review.effects.${effect}`),
             tone: effect === "production" ? ("waiting" as const) : undefined,
-          },
-        ]
-      : []),
-    ...(undo
-      ? [
-          {
-            key: "undo",
-            icon: UNDO_ICON[undo],
-            label: t("approvals.review.undo"),
-            value: t(`approvals.trait.${undo}`),
-            tone: undo === "irreversible" ? ("waiting" as const) : undefined,
           },
         ]
       : []),
@@ -1222,7 +1232,7 @@ function ReviewBody({ approval: a, channel }: { approval: Approval; channel: str
       {why && (
         <Card className="ap-review__card">
           <CardHeader icon="message" title={t("approvals.review.why", { name })} />
-          <p className="ap-review__why">{why}</p>
+          <p className="ap-review__why">{inlineWords(why)}</p>
           {a.issue && (
             <Link
               className="ap-link"
@@ -1410,7 +1420,7 @@ function DecisionBar({
       <div className="ap-bar__acts">
         <Locked when={deciding}>
           {approveAlwaysOffered(a) && <ApproveAlways approval={a} agent={agent} also={also} />}
-          <Button onClick={onRefuse}>
+          <Button size="sm" onClick={onRefuse}>
             {t("approval.refuse")}
             <Kbd>R</Kbd>
           </Button>
@@ -1547,7 +1557,11 @@ function ApprovalDetails({
           expression={p === "done" ? "happy" : undefined}
         />
       }
-      title={approvalTitle(t, a)}
+      title={
+        <>
+          {approvalTitle(t, a)} <UndoChip approval={a} />
+        </>
+      }
       subtitle={
         <span>
           <b className="ap-dialog__who">{name}</b>

@@ -1048,8 +1048,6 @@ export const featureKeysEn = {
       /** An agent's model left its plan's list (`plan_model_dropped`): `runs` the model it uses now. */
       plan_model_dropped_one: "{{model}} left {{plan}}. {{names}} is using {{runs}} for now",
       plan_model_dropped_other: "{{model}} left {{plan}}. {{names}} is using {{runs}} for now",
-      connector_tool_changed_one: "A connected server changed tools you approved",
-      connector_tool_changed_other: "A connected server changed tools you approved",
       computer_disk_full_one: "A computer's disk is almost full",
       computer_disk_full_other: "A computer's disk is almost full",
       computer_no_chrome_one: "A computer needs Google Chrome. Get it at google.com/chrome",
@@ -1541,15 +1539,11 @@ export const featureKeysEn = {
       browser: "Browser",
       secret: "Secret",
       join: "Members",
-      tools: "Tools",
       limit: "Limit",
     },
     review: "Review",
     answer: "Reply",
     open: "Open",
-    toolsTitle: "Changed tools you approved",
-    toolsWhy: "Agents keep the version you approved until you accept the new one.",
-    reviewChanges: "Review the changes",
     clear: {
       title: "Nothing waiting on you",
       text: "When an agent needs you, it shows up here first.",
@@ -2267,6 +2261,8 @@ export const featureKeysEn = {
     /** The first run's name, suggested from a work address's domain. */
     suggested: "From your {{domain}} e-mail, I suggested {{org}}.",
     create: "Create",
+    /** The onboarding's plan step on the phone, which can't take the plan: into the workspace, the team asleep. */
+    enter: "Go to the workspace",
     shareMessage: "Join {{org}} on agentes.chat: {{url}}",
     failed: "Couldn't save. Try again.",
   },
@@ -2609,8 +2605,6 @@ export const featureKeysEn = {
   dashboards: {
     homeRow: "Only you · your own widgets",
     loadFailed: "Couldn't load the dashboards.",
-    /** Under "My Home" when the person sees no other board; "+" in the bar makes one. */
-    onlyHome: "Dashboards for the workspace or your roles show up here.",
     create: "Create",
     routineTarget: "its widget",
     pin: {

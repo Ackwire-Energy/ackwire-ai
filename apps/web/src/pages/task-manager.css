@@ -21,10 +21,14 @@
 }
 .tm-sum__item {
   display: inline-flex;
-  align-items: center;
+  align-items: baseline;
   gap: 6px;
   font-weight: 600;
   color: var(--ink2);
+}
+/* The mark centres on its words, so the row's baseline is the words' and the count sits on the title's. */
+.tm-sum__item > :first-child {
+  align-self: center;
 }
 .tm-sum__item--wait {
   color: var(--warn);
@@ -139,6 +143,13 @@ html:not([data-pointer]) .tm-card:has(.tm-card__text:focus-visible) {
   font-size: 17px;
   font-weight: 650;
   letter-spacing: -0.01em;
+}
+/* Its tools are one group: after the heading while they fit, else together on the line under it. */
+.tm-tools__acts {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
 }
 .tm-tool-stop.ac-btn:not(:disabled) {
   color: var(--danger);
@@ -425,8 +436,15 @@ html:not([data-pointer]) .tm-more:focus-visible {
   .tm-card.ac-card {
     width: 156px;
   }
+  /* No arrows: a strip a finger swipes, out over the page's side room so the cards slide under the screen's edges,
+     each settling on the page's line. */
   .tm-cards .ac-carousel__arrow {
     display: none;
+  }
+  .tm-cards .ac-carousel__track {
+    margin-inline: calc(-1 * var(--page-x));
+    padding-inline: var(--page-x);
+    scroll-padding-inline: var(--page-x);
   }
 }
 

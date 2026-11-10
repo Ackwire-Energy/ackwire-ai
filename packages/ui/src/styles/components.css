@@ -274,27 +274,17 @@ html[data-pointer] :focus-visible {
 .ac-captail:has(> .ac-btn:not(.ac-btn--ghost)) {
   margin-block: calc((var(--control-h-sm) + 2 * var(--action-clear) - 22px - 2 * var(--row-py)) / 2);
 }
-@media (pointer: coarse) {
-  .ac-captail:has(> .ac-btn:not(.ac-btn--ghost)) {
-    margin-block: calc((var(--control-h-md) + 2 * var(--action-clear) - 22px - 2 * var(--row-py)) / 2);
-  }
-}
 
 /*
- * The plate around a small ghost button's icon (32px around 16px, 40px on touch): what shows only on hover. A ghost
+ * The plate around a small ghost button's icon (32px around 16px, on touch too): what shows only on hover. A ghost
  * at a row's edge reaches out by it, so its icon sits on the padding line.
  */
 :root {
   --ghost-plate: 8px;
 }
-@media (pointer: coarse) {
-  :root {
-    --ghost-plate: 12px;
-  }
-}
 
 /*
- * A row of actions: 16px between what the eye sees, 24px on touch. A ghost shows only its icon or words until
+ * A row of actions: 16px between what the eye sees, on touch too. A ghost shows only its icon or words until
  * hovered, so its plate reaches half into the gap on each side: its icon or words stand as far from the next shape
  * as two boxes do, and at either end of the row they sit on its edge. The gap is a column gap, so a row that wraps
  * starts each line on the same edge. A nested `.ac-acts` (a slot another component fills) joins the row.
@@ -317,6 +307,17 @@ html[data-pointer] :focus-visible {
 }
 .ac-acts > .ac-btn--ghost:not(.ac-btn--icon) {
   padding-inline: var(--ghost-plate);
+}
+/*
+ * Two plated buttons side by side stand 8 apart, as in a dialog's foot: the row's gap is a ghost's. Two icon buttons
+ * keep their plates 8 apart, never touching: the first reaches into the gap only by its glyph's air, past which its
+ * plate ends. By the first's end, so the one that wraps to a line of its own starts on the row's edge.
+ */
+.ac-acts > .ac-btn:not(.ac-btn--ghost):has(+ .ac-btn:not(.ac-btn--ghost)) {
+  margin-inline-end: calc(var(--space-2) - 2 * var(--ghost-plate));
+}
+.ac-acts > :is(.ac-btn--ghost.ac-btn--icon, .ac-btn--glyph):has(+ :is(.ac-btn--ghost.ac-btn--icon, .ac-btn--glyph)) {
+  margin-inline-end: calc(var(--space-2) - var(--ghost-plate) - var(--glyph-air, 0px));
 }
 /*
  * A ghost whose icon leaves air inside its box (`--glyph-air` on each side, e.g. the ×'s 5.2 of its 20 units) reaches
@@ -849,11 +850,18 @@ textarea.ac-input {
   border-radius: 4px;
   background: var(--sunken);
 }
+/* As a face's initials (`.ac-avatar__initials`): its box trimmed to its capital, so the tile centres the letter. */
 .ac-brand__initial {
   font-weight: 600;
   font-size: 18px;
   line-height: 1;
   color: var(--ink-muted);
+  text-box: trim-both cap alphabetic;
+}
+@supports not (text-box: trim-both cap alphabetic) {
+  .ac-brand__initial {
+    translate: 0 var(--cap-mid);
+  }
 }
 .ac-brand--sm .ac-brand__initial {
   font-size: 13px;
@@ -1102,8 +1110,13 @@ textarea.ac-input {
   --msg-turn-gap: 20px;
   --msg-card-gap: 12px;
   --msg-block: 4px;
+  /*
+   * A person's or an agent's face beside its name, one size wherever it sits: a message's, a row of the sidebar's and
+   * of the members column's, a MediaRow's. The faces' scale has 24 for a row's small face and 32 for this one.
+   */
+  --name-face: 32px;
   /* The avatar column and its gap: how far a body stands in from its row. */
-  --msg-lead: calc(36px + var(--space-3));
+  --msg-lead: calc(var(--name-face) + var(--space-3));
 }
 /*
  * Tamanho do texto (`textSize`, packages/client/src/lib/chat-look.ts), the same in every look: a message's words
@@ -1190,7 +1203,7 @@ textarea.ac-input {
   row-gap: 2px;
 }
 .ac-msg > .ac-msg__reply {
-  --reply-face: 36px;
+  --reply-face: var(--name-face);
   --reply-gap: var(--space-3);
   position: relative;
   flex: 0 0 100%;
@@ -1227,11 +1240,11 @@ textarea.ac-input {
   background: color-mix(in srgb, currentColor 8%, transparent);
   color: inherit;
 }
-/* The face is 36px in the feed, the sidebar's size. */
+/* The face in the feed: the sidebar's size (`--name-face`). */
 .ac-msg__avatar,
 .ac-msg__gutter {
-  flex: 0 0 36px;
-  width: 36px;
+  flex: 0 0 var(--name-face);
+  width: var(--name-face);
   display: flex;
   justify-content: center;
 }
@@ -1247,8 +1260,8 @@ textarea.ac-input {
   align-self: flex-start;
 }
 .ac-msg__avatar .ac-avatar:not(.ac-avatar--xs) {
-  width: 36px;
-  height: 36px;
+  width: var(--name-face);
+  height: var(--name-face);
 }
 /* On the words' first line, whatever their size. */
 .ac-msg__gutter-time {
@@ -1287,7 +1300,7 @@ html:not([data-pointer]) .ac-msg--grouped:focus-within .ac-msg__gutter-time {
   margin-top: var(--msg-card-gap);
 }
 /* The name stays on its words, and a line's caption on its bubble. */
-.ac-msg .ac-msg__body > .ac-msg__head + :is(.ac-msg__text, .rq-done, .rq-open) {
+.ac-msg .ac-msg__body > .ac-msg__head + :is(.ac-msg__text, .ac-msg__error-row, .rq-done, .rq-open) {
   margin-top: 2px;
 }
 .ac-msg.ac-msg .ac-msg__body > :is(.ac-msg__own-foot, .ac-msg__foot) {
@@ -1404,14 +1417,20 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
-/* Inline code on a plate (mono only for code), a step under the words: the mono face runs wide. */
-.ac-msg__text code {
+/*
+ * Text between backticks, wherever formatted words show (a message, a document, an agent's words on a card): mono a
+ * step under its words (the mono face runs wide), on the plate. Each line of one that wraps keeps its padding and
+ * corners.
+ */
+.ac-inlinecode {
   font-family: var(--font-mono);
-  font-size: 0.84em;
+  font-size: 0.86em;
+  padding: 1px 5px;
+  border-radius: 5px;
   background: var(--plate);
   color: var(--ink2);
-  padding: 2px 6px;
-  border-radius: 6px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
 }
 .ac-msg__text pre {
   margin: var(--space-2) 0;
@@ -1435,23 +1454,33 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
   line-height: 20px;
 }
 /*
- * An error line with its fix and its × after it, out of the .ac-iconline: they stay on the reason's first line, not the
- * middle of a reason that wraps. The words start as far down as a small button (32, 40 on touch) centres a line, so a
- * one-line error is as tall as before and its first line runs through the buttons' middle.
+ * A failed run's reason in its text's place, its × after it, out of the .ac-iconline: on the reason's first line, not
+ * the middle of a reason that wraps. The reason takes the text's size and reading line, so its words stand where a
+ * message's would at every text size and look. The × (32, on touch too) hangs over that line by as much as it outgrows
+ * it, so the row is as tall as its words. Its fix (a key, a model) goes on a line of its own under the reason, where
+ * the words start (after the 16px alert and its 6px gap): beside it, it squeezed a long reason to a word per line.
  */
 .ac-msg__error-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: minmax(0, max-content) max-content;
+  column-gap: 6px;
+  align-items: start;
 }
 .ac-msg__error-row > .ac-msg__error {
   min-width: 0;
-  margin: calc((var(--control-h-sm) - 20px) / 2) 0 0;
+  margin: 0;
+  font-size: var(--msg-text);
+  line-height: var(--msg-line);
 }
-@media (pointer: coarse) {
-  .ac-msg__error-row > .ac-msg__error {
-    margin-top: calc((var(--control-h-md) - 20px) / 2);
-  }
+.ac-msg__error-row > .ac-btn--icon {
+  margin-block: calc((var(--msg-line) - var(--control-h-sm)) / 2);
+}
+/* In the reason's column only: spanning the ×'s too, its width went to that column, sized by its content. */
+.ac-msg__error-row > .ac-btn:not(.ac-btn--icon) {
+  grid-area: 2 / 1;
+  justify-self: start;
+  margin-block-start: var(--space-2);
+  margin-inline-start: calc(16px + 6px);
 }
 .ac-mention {
   color: var(--ink);
@@ -1460,26 +1489,45 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
   padding: 0 4px;
   border-radius: var(--radius-sm);
 }
-/* A face before an agent's name in a line of text: text-sized, centred on the capitals. `font-size: inherit` keeps
-   `em` on the line's size, not the avatar's own 9px. A word's space plus 0.2em before it, the same 0.4em after, so
-   the face reads as a word of its own; none before it where it opens its block (`data-lead`, set by `AgentWho`). */
+/* A face before a name in a line of text: text-sized by default (`--who-face` sets another size), centred on the
+   capitals. `font-size: inherit` keeps `em` on the line's size, not the avatar's own 9px. A word's space plus 0.2em
+   before it, the same 0.4em after, so the face reads as a word of its own; none before it where it opens its block
+   (`data-lead`, set by `AgentWho` and `ActorWho`). */
 .ac-who {
   white-space: nowrap;
 }
 .ac-who > .ac-avatar {
   font-size: inherit;
   display: inline-block;
-  width: 1.15em;
-  height: 1.15em;
-  vertical-align: calc(var(--cap-top) - var(--cap-mid) - 0.575em);
+  width: var(--who-face, 1.15em);
+  height: var(--who-face, 1.15em);
+  vertical-align: calc(var(--cap-top) - var(--cap-mid) - var(--who-face, 1.15em) / 2);
   margin-inline: 0.2em 0.4em;
 }
 .ac-who[data-lead] > .ac-avatar {
   margin-inline-start: 0;
 }
+/* A person's letters and photo out of the flow, so the box's bottom is its baseline as an agent's canvas is and the
+   formula above holds. The letters keep the tile's trim to their capitals (`.ac-avatar__initials`), centred in it. */
+.ac-who > .ac-avatar > :is(img, .ac-avatar__initials) {
+  position: absolute;
+  inset: 0;
+}
+.ac-who > .ac-avatar > .ac-avatar__initials {
+  width: fit-content;
+  height: fit-content;
+  margin: auto;
+  font-size: calc(var(--who-face, 1.15em) * 0.6);
+}
+/* A face drawn at the 24 of the small avatar (a task card's who) keeps that avatar's letters, as every 24 face does. */
+.ac-who > .ac-avatar--sm > .ac-avatar__initials {
+  font-size: 11px;
+}
+/* The face stays with the name's first word; a long name (a person's full one) wraps between its words. */
 .ac-who > b {
   font-weight: inherit;
   color: var(--ink);
+  white-space: normal;
 }
 .ac-mention--me {
   color: var(--attention);
@@ -1688,13 +1736,15 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
   min-width: 0;
 }
 /* Its actions keep their one line: where they and the sentence don't fit side by side, they go under the sentence
-   instead of squeezing it to a word a line. */
+   instead of squeezing it to a word a line. There the first action's hairline, drawn 1px left of the actions, falls
+   outside the frame and is cut, so the frame's left edge stays one line. The plates stay inside its corners too. */
 .ac-eventpill__frame {
   display: inline-flex;
   flex-wrap: wrap;
   align-items: stretch;
   max-width: 100%;
   min-height: var(--control-h-sm);
+  overflow: hidden;
   border-radius: var(--control-r-sm) var(--control-r-sm) var(--control-r-sm) 3px;
   box-shadow: inset 0 0 0 1px var(--line2);
   font-size: 13.5px;
@@ -1703,13 +1753,15 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
 }
 /* The mark on the sentence's first line's capitals and the time on its baseline, however the sentence wraps: never
    floating in the middle of two lines. */
+/* One line is the control's 32px, 7 over and under its 18px line: words over actions that went under them get the
+   room above that the actions keep below. */
 .ac-eventpill__main {
   display: inline-flex;
   flex: 1 1 auto;
   align-items: flex-start;
   gap: var(--icon-gap);
   min-width: 0;
-  padding: 6px 12px;
+  padding: 7px 12px;
 }
 .ac-eventpill__mark {
   display: inline-flex;
@@ -1754,6 +1806,7 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
   align-items: stretch;
   /* Under the sentence, still the frame's height. */
   min-height: inherit;
+  margin-left: -1px;
 }
 .ac-eventpill__action {
   display: inline-flex;
@@ -1792,9 +1845,10 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
   cursor: progress;
   opacity: 0.6;
 }
+/* Inside the action: the frame cuts what passes its edges. */
 html:not([data-pointer]) .ac-eventpill__action:focus-visible {
   outline: none;
-  box-shadow: var(--focus-ring);
+  box-shadow: var(--focus-ring-inset);
 }
 @media (prefers-reduced-motion: reduce) {
   .ac-eventpill__chev {
@@ -1830,6 +1884,10 @@ html:not([data-pointer]) .ac-eventpill__action:focus-visible {
   flex: none;
   width: 14px;
   height: 14px;
+}
+/* An icon's ink starts about 2px into its box: on its side the chip pads 6, so the ink reads 8 on both sides. */
+.ac-chip:has(> .ac-icon:first-child) {
+  padding-inline-start: 6px;
 }
 .ac-chip > :not(.ac-chip__text) {
   flex: none;
@@ -2101,6 +2159,7 @@ html:not([data-pointer]) .ac-select__trigger:focus-visible,
   flex-direction: column;
   gap: 2px;
   padding: var(--menu-pad);
+  --bleed: var(--menu-pad);
   background: var(--surface-raised);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
@@ -2699,6 +2758,7 @@ html:not([data-pointer]) .ac-tab:focus-visible {
   line-height: 22px;
   /* One inset for every edge: the head's top, the sides, and the bottom under the last body item, list or footer. */
   --dialog-pad: 20px;
+  --bleed: var(--dialog-pad);
 }
 .ac-dialog:focus {
   outline: none;
@@ -2709,41 +2769,66 @@ html:not([data-pointer]) .ac-tab:focus-visible {
 .ac-dialog__foot {
   flex: none;
 }
+/*
+ * The face, the title (and the line under it) with the head's actions in an `.ac-actline`, then the close: actions that
+ * don't fit beside the title go under it, the face and the × stay on the title's line.
+ */
 .ac-dialog__head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-3);
   padding: var(--dialog-pad) var(--dialog-pad) 12px;
+}
+.ac-dialog__head > .ac-actline {
+  flex: 1 1 0%;
+}
+/* A title alone is as tall as the small buttons beside it, its 24px line in their middle: under it, actions that went
+   to a row of their own stand clear of its words. */
+.ac-actline > .ac-dialog__title {
+  padding-block: calc((var(--control-h-sm) - 24px) / 2);
 }
 .ac-dialog__lead {
   display: flex;
   flex: none;
+  translate: 0 calc(var(--control-h-sm) / 2 - 50%);
 }
-/* Before a title with a line under it, the face sits on the title's 24px line, as an `.ac-iconline` lead does. */
-.ac-dialog__lead:has(+ .ac-dialog__titles) {
-  align-self: flex-start;
+/* Before a title with a line under it, the face sits on the title's capitals, as an `.ac-iconline` lead does. */
+.ac-dialog__lead:has(+ .ac-actline > .ac-dialog__titles) {
   translate: 0 calc(12px - var(--cap-mid) - 50%);
 }
-/*
- * The head's actions and its close, in one `.ac-acts` row. The close's × spans 9.6 of its icon's 20 units, so it reaches
- * out by the 5.2 units of air on each side too (`.ac-btn--glyph`): its ink ends on the head's padding line, as far from
- * the edge as the face starts, and stands as far from the shape before it as the row's gap.
- */
-.ac-dialog__acts {
+.ac-dialog__acts,
+.ac-dialog__close {
   flex: none;
 }
-.ac-dialog__acts > .ac-btn--glyph:last-child {
+/* Under the title on a narrow head, its actions wrap rather than run past the edge. */
+.ac-dialog__acts {
+  flex-wrap: wrap;
+  row-gap: var(--space-2);
+}
+/* Beside a title with a line under it, the actions sit on the pair's middle, and so does the close (its first two
+   lines, whatever the actions under them). */
+.ac-dialog__titles + .ac-dialog__acts {
+  align-self: center;
+}
+.ac-actline:has(> .ac-dialog__titles > .ac-dialog__sub:not(:empty)) + .ac-dialog__close {
+  height: 42px;
+}
+/*
+ * The close's × spans 9.6 of its icon's 20 units, so it reaches out by the 5.2 units of air on each side too
+ * (`.ac-btn--glyph`): its ink ends on the head's padding line, as far from the edge as the face starts, and stands as
+ * far from the title as the head's gap.
+ */
+.ac-dialog__close > .ac-btn--glyph {
   --glyph-air: calc(var(--control-icon-sm) * 5.2 / 20);
 }
-/* Beside a title alone, they sit on its capitals' middle, as an `.ac-iconline` lead does (a title with a line under
-   it keeps them on the pair's middle). An app measures that middle for its title's face (`--title-cap-mid`): --cap-mid
-   here would resolve in the actions' own font. */
-.ac-dialog__title + .ac-dialog__acts {
+/* Beside a title alone, they sit on its capitals' middle, as an `.ac-iconline` lead does. An app measures that middle
+   for its title's face (`--title-cap-mid`): --cap-mid here would resolve in the actions' own font. */
+.ac-dialog__title + .ac-dialog__acts,
+.ac-actline:has(> .ac-dialog__title) + .ac-dialog__close {
   translate: 0 calc(-1 * var(--title-cap-mid, var(--cap-mid)));
 }
 .ac-dialog__title {
   margin: 0;
-  flex: 1;
   /* A long word (an address, a file's name) wraps inside the head instead of pushing the close out. */
   min-width: 0;
   overflow-wrap: anywhere;
@@ -2752,7 +2837,6 @@ html:not([data-pointer]) .ac-tab:focus-visible {
   font-weight: 650;
 }
 .ac-dialog__titles {
-  flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -2833,16 +2917,33 @@ html:not([data-pointer]) .ac-tab:focus-visible {
 .ac-form__actions {
   flex-wrap: wrap;
 }
-/* Beside the buttons while it fits on one line, on a line of its own above them when it doesn't: at its content's width,
-   the wrap gives it the line before the buttons could squeeze it word by word. */
+/* A note and its buttons are an action line: the buttons, one group 8 apart (`__foot-acts`), beside the note while it
+   keeps one line there, else on a row of their own under it at the footer's end. The note takes its content's width,
+   so the wrap gives it the line before the buttons could squeeze it word by word. */
+.ac-dialog__foot:has(> .ac-dialog__foot-acts) {
+  column-gap: var(--space-4);
+}
 .ac-dialog__foot-note {
   flex: 1 1 auto;
   min-width: 0;
   font-size: 13px;
   color: var(--ink-muted);
 }
+.ac-dialog__foot-acts {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  max-width: 100%;
+}
+.ac-dialog__foot-acts:empty {
+  display: none;
+}
 /* A ghost at the footer's start or end, or in its note: its words on the dialog's edge, as `.ac-acts` does in a row. */
 .ac-dialog__foot > .ac-btn--ghost:not(.ac-btn--icon):is(:first-child, :last-child),
+.ac-dialog__foot-acts > .ac-btn--ghost:not(.ac-btn--icon):last-child,
 .ac-dialog__foot-note > .ac-btn--ghost:not(.ac-btn--icon):first-child {
   padding-inline: var(--ghost-plate);
 }
@@ -2850,7 +2951,8 @@ html:not([data-pointer]) .ac-tab:focus-visible {
 .ac-dialog__foot-note > .ac-btn--ghost:not(.ac-btn--icon):first-child {
   margin-inline-start: calc(-1 * var(--ghost-plate));
 }
-.ac-dialog__foot > .ac-btn--ghost:not(.ac-btn--icon):last-child {
+.ac-dialog__foot > .ac-btn--ghost:not(.ac-btn--icon):last-child,
+.ac-dialog__foot-acts > .ac-btn--ghost:not(.ac-btn--icon):last-child {
   margin-inline-end: calc(-1 * var(--ghost-plate));
 }
 
@@ -3034,6 +3136,7 @@ html:not([data-pointer]) .ac-tab:focus-visible {
   gap: var(--space-3);
   /* Read by the foot to reach the card's edges; pages that change the padding set this instead. */
   --card-pad: var(--space-4);
+  --bleed: var(--card-pad);
   padding: var(--card-pad);
   background: var(--surface-raised);
   border: 1px solid var(--line);
@@ -3087,10 +3190,11 @@ html:not([data-pointer]) a.ac-list__row:focus-visible {
   box-shadow: var(--focus-ring-inset);
 }
 
-/* A neutral clickable row for side lists (ListRow): lead, title, meta. */
+/* A neutral clickable row for side lists (ListRow): lead, title, meta. The lead sits on the title's first line
+   (`.ac-iconline`, the row's line its own), and a long title wraps whole under it. */
 .ac-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-2);
   width: 100%;
   min-width: 0;
@@ -3100,6 +3204,8 @@ html:not([data-pointer]) a.ac-list__row:focus-visible {
   background: transparent;
   color: var(--ink);
   font: inherit;
+  font-size: 13px;
+  line-height: 18px;
   text-align: left;
   cursor: pointer;
 }
@@ -3126,17 +3232,14 @@ html:not([data-pointer]) .ac-row:focus-visible {
   gap: 1px;
 }
 .ac-row__title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 13px;
   font-weight: 600;
+  overflow-wrap: anywhere;
 }
 .ac-row__meta {
   font-size: 12px;
+  line-height: 16px;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
 }
 
 /* Empty state */
@@ -3189,12 +3292,6 @@ html:not([data-pointer]) .ac-row:focus-visible {
 .ac-empty__actions .ac-btn--sm {
   min-height: var(--control-h-sm);
   padding-block: 6px;
-}
-/* Touch keeps the 40px target every small button grows to (the rule above outranks that one). */
-@media (pointer: coarse) {
-  .ac-empty__actions .ac-btn--sm {
-    min-height: var(--control-h-md);
-  }
 }
 
 /* Inline alert (an `.ac-iconline`) */
@@ -3318,13 +3415,22 @@ html:not([data-pointer]) .ac-back:focus-visible {
   border-radius: var(--radius-cut);
 }
 
-/* Neutral before/after diff: no green or red. */
+/* Before and after, as GitHub shows a change: added on green with a green bar, removed on red, struck through. */
 .ac-diff {
   display: flex;
   flex-direction: column;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   overflow: hidden;
+}
+/* The rows on its rounded corners take its radius less its border, so a row's tint and bar follow the corner. */
+.ac-diff > :first-child {
+  border-top-left-radius: calc(var(--radius-sm) - 1px);
+  border-top-right-radius: calc(var(--radius-sm) - 1px);
+}
+.ac-diff > :last-child {
+  border-bottom-left-radius: calc(var(--radius-sm) - 1px);
+  border-bottom-right-radius: calc(var(--radius-sm) - 1px);
 }
 .ac-diff__line {
   display: flex;
@@ -3343,15 +3449,44 @@ html:not([data-pointer]) .ac-back:focus-visible {
   flex: 1;
   min-width: 0;
 }
-.ac-diff__line--add {
-  background: var(--surface-sunken);
+.ac-diff__line--add,
+.ac-diff__block--add {
+  background: color-mix(in srgb, var(--ok) 12%, transparent);
+  box-shadow: inset 3px 0 0 var(--ok);
 }
-.ac-diff__line--add .ac-diff__text {
-  font-weight: 600;
+.ac-diff__line--del,
+.ac-diff__block--del {
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  box-shadow: inset 3px 0 0 var(--danger);
 }
-.ac-diff__line--del .ac-diff__text {
+.ac-diff__line--add .ac-diff__mark {
+  color: var(--ok);
+}
+.ac-diff__line--del .ac-diff__mark {
+  color: var(--danger);
+}
+.ac-diff__line--del .ac-diff__text,
+.ac-diff__block--del {
   color: var(--ink-muted);
   text-decoration: line-through;
+}
+/* Words: each run rendered as one block, every block's text on the same 12px from the edge. */
+.ac-diff__block {
+  padding: 8px 12px;
+  min-width: 0;
+}
+.ac-diff__block > :not(.ac-visually-hidden) > :first-child {
+  margin-top: 0;
+}
+.ac-diff__block > :not(.ac-visually-hidden) > :last-child {
+  margin-bottom: 0;
+}
+.ac-diff__fold {
+  padding: 4px 12px;
+  font-size: 12.5px;
+  line-height: 18px;
+  color: var(--ink-muted);
+  background: var(--surface-sunken);
 }
 
 .ac-diff--code .ac-diff__line {
@@ -3395,6 +3530,7 @@ html:not([data-pointer]) .ac-back:focus-visible {
   line-height: 22px;
   /* One inset for every edge, as in `.ac-dialog`. */
   --details-pad: 24px;
+  --bleed: var(--details-pad);
 }
 .ac-details--lg {
   width: min(960px, calc(100% - 48px));
@@ -3464,17 +3600,23 @@ html:not([data-pointer]) .ac-back:focus-visible {
   flex-direction: column;
   gap: 4px;
   padding: var(--details-pad) var(--details-pad) 0;
-  container: ac-details-head / inline-size;
 }
+/*
+ * The bar: the words (the title, or the eyebrow over it) and the head's buttons in an action line (`.ac-details__lead`),
+ * then the close and the ⋯ beside it (`.ac-details__close`). Buttons that don't fit beside the words go under them,
+ * from their edge; the close stays on the title's first line. Every button 32 on the bar's 28px line.
+ */
 .ac-details__bar {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  align-items: flex-start;
+  column-gap: var(--space-4);
   min-height: 28px;
 }
+.ac-details__lead {
+  flex: 1 1 0%;
+}
 .ac-details__eyebrow {
-  flex: 1;
-  min-width: 0;
+  min-height: 28px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -3483,53 +3625,38 @@ html:not([data-pointer]) .ac-back:focus-visible {
   color: var(--ink-muted);
   font-variant-numeric: tabular-nums;
 }
-/* An `.ac-acts` row: the close's icon on the head's padding line. */
+/* `.ac-acts` rows centred on the 28px line, wrapping under each other rather than past the sheet's edge. */
 .ac-details__actions {
+  flex-wrap: wrap;
+  row-gap: var(--space-2);
+  margin-block: calc((28px - var(--control-h-sm)) / 2);
+}
+/* Its ink on the head's padding line, the ⋯ and the × 8 apart (`.ac-acts`). */
+.ac-details__close {
   flex: none;
-}
-/* The heading in the bar: the buttons on its title's first line, the title wrapping in what is left. */
-.ac-details__bar--titled {
-  align-items: flex-start;
-}
-.ac-details__bar--titled > .ac-details__heading {
-  flex: 1;
-  min-width: 0;
-}
-/* The buttons (32px, 40px on touch) centred on that first line (28px), not hung from its top. */
-.ac-details__bar--titled > .ac-details__actions {
   height: 28px;
-}
-/*
- * A head too narrow for both (a phone, a narrow pane): the buttons keep their line at the top right and the title takes
- * the whole line under them, instead of wrapping a letter or two at a time beside them. A title the caller puts in the
- * eyebrow (a heading, or its field while edited in place, as a task's) is a title too.
- */
-@container ac-details-head (max-width: 520px) {
-  .ac-details__bar--titled,
-  .ac-details__bar:has(> .ac-details__eyebrow :is(h1, h2, [data-inplace])) {
-    flex-wrap: wrap;
-    row-gap: 8px;
-  }
-  .ac-details__bar--titled > .ac-details__actions,
-  .ac-details__bar:has(> .ac-details__eyebrow :is(h1, h2, [data-inplace])) > .ac-details__actions {
-    order: -1;
-    margin-left: auto;
-  }
-  /* Over `.ac-actrow`'s width and cap at the words' length, later in the file, which would keep a short title on the
-     buttons' line, after them. */
-  .ac-details__bar--titled > .ac-details__heading.ac-actrow__text,
-  .ac-details__bar > .ac-details__eyebrow.ac-actrow__text:has(:is(h1, h2, [data-inplace])) {
-    flex: 1 1 100%;
-    max-width: none;
-  }
 }
 .ac-details__heading {
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  /* The title's size (its lines set their own): the 24 characters it keeps beside the buttons (`.ac-actrow`) are the
-     title's. */
-  font-size: 20px;
+}
+/*
+ * The kind's tile (or a face) at the title's start: the lines as tall as it go beside it, every later one (a title's
+ * second line, the line under it) under it at the head's width, so it never keeps a column beside three lines.
+ */
+.ac-details__heading:has(> .ac-details__icon) {
+  display: flow-root;
+}
+.ac-details__heading > .ac-details__icon {
+  float: left;
+  margin: 0 12px 4px 0;
+}
+.ac-details__heading:has(> .ac-details__icon) > .ac-details__titles {
+  display: block;
+}
+.ac-details__heading:has(> .ac-details__icon) > .ac-details__titles > .ac-details__subtitle {
+  margin-top: 4px;
 }
 .ac-details__icon {
   flex: none;
@@ -3544,6 +3671,13 @@ html:not([data-pointer]) .ac-back:focus-visible {
 /* An avatar is its own shape: no box behind it. */
 .ac-details__icon:has(.ac-avatar) {
   background: transparent;
+}
+/* On a phone the kind's tile goes (the line under the title says the kind), so the title takes the row's width
+   instead of a square column beside its lines. A face (a person, an agent) stays. */
+@media (max-width: 640px) {
+  .ac-details__icon:not(:has(.ac-avatar)) {
+    display: none;
+  }
 }
 .ac-details__titles {
   flex: 1;
@@ -3714,6 +3848,8 @@ html:not([data-pointer]) .ac-msg:focus-within .ac-msg__actions,
 .ac-receipt__words {
   min-width: 0;
   text-wrap: balance;
+  /* A failure's reason can hold an address with nowhere to break. */
+  overflow-wrap: anywhere;
 }
 /* The dot and its action are one piece that wraps whole, the dot 4px from each. The room before the dot is the
    words', so a line the dot starts starts on the column. */
@@ -3749,6 +3885,15 @@ html:not([data-pointer]) .ac-msg:focus-within .ac-msg__actions,
   color: var(--ink);
   text-decoration: underline;
   cursor: pointer;
+}
+/* On its way (a retry, opening the plans): muted words, and its spinner (which sits on the capitals) before them. */
+.ac-receipt__action:disabled {
+  color: var(--ink-muted);
+  text-decoration: none;
+  cursor: default;
+}
+.ac-receipt__action > .ac-pixspin {
+  margin-inline-end: 4px;
 }
 html:not([data-pointer]) .ac-receipt__action:focus-visible {
   outline: none;
@@ -4115,9 +4260,17 @@ html:not([data-pointer]) .ac-receipt__check:focus-visible {
 }
 .ac-date__foot {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
+  gap: var(--space-2);
   padding-top: var(--menu-pad);
   border-top: 1px solid var(--line);
+}
+/* A way on from the date ("Ver no calendário") starts the row, the clear action ends it. */
+.ac-date__extra {
+  margin-inline-end: auto;
+  padding-inline-start: var(--space-1);
+  font-size: var(--control-fs-sm);
 }
 /* Its room is the menu's (`.ac-menu` sets the padding and the corner from it), so the head's buttons and the corner
    days are concentric with the box; the hairline over the foot has that room on both sides. */
@@ -4429,7 +4582,7 @@ html:not([data-pointer]) .ac-switch:focus-visible {
 }
 .ac-skeleton-msg__gutter {
   flex: none;
-  width: 36px;
+  width: var(--name-face);
 }
 .ac-skeleton-msg__body {
   flex: 1;
@@ -5507,8 +5660,8 @@ html:not([data-pointer]) .ac-seg__item:focus-visible {
 }
 /*
  * Its words can wrap and can carry a second line: the icon and the buttons stay on the first line, not the middle of
- * the toast. The icon and the words keep the room a small button takes (32, 40 on touch), so a one-line toast is as
- * tall as before and its first line runs through the buttons' middle.
+ * the toast. The icon and the words keep the room a small button takes (32), so a one-line toast is as tall as before
+ * and its first line runs through the buttons' middle.
  */
 .ac-toast {
   --toast-button: var(--control-h-sm);
@@ -5517,23 +5670,20 @@ html:not([data-pointer]) .ac-seg__item:focus-visible {
   gap: var(--icon-gap);
   padding: 12px;
 }
-@media (pointer: coarse) {
-  .ac-toast {
-    --toast-button: var(--control-h-md);
-  }
+/* The words and their actions in an `.ac-actline`: actions that don't fit beside the words go under them, from their
+   edge. The × stays beside the first line. */
+.ac-toast > .ac-actline {
+  flex: 1 1 auto;
 }
-/* Its action and its × as one item after the words, which `.ac-actrow` moves under them together. */
-.ac-toast__acts {
+.ac-toast__close {
   flex: none;
-  display: flex;
-  align-items: flex-start;
-  gap: var(--icon-gap);
 }
 /* The close's × stands as far from the right edge as the tone's icon from the left: it reaches out by its air. */
-.ac-toast__acts > .ac-btn--icon:last-child {
+.ac-toast > .ac-toast__close {
   margin-inline-end: calc((var(--control-icon-sm) - var(--toast-button)) / 2);
 }
-.ac-toast > :is(.ac-icon, .ac-toast__text) {
+.ac-toast > .ac-icon,
+.ac-toast > .ac-actline > .ac-toast__text {
   margin-block: var(--toast-line-pad);
 }
 /* Each tone's soft glow from the right edge over the glass, as the sidebar's chosen row has (layout.css,
@@ -5665,6 +5815,10 @@ html:not([data-pointer]) .ac-seg__item:focus-visible {
   align-items: center;
   gap: 6px;
   margin-left: auto;
+}
+/* Under a title too long to share its line, the action starts where the title's words do, past the key and its gap. */
+.ac-card__head:has(> .ac-card__lead > .ac-card__key) > .ac-card__action {
+  margin-inline-start: calc(22px + 10px);
 }
 /* Foot: help text in a well pressed into the bottom of the card (8px from its edges), its icon an `.ac-iconline`
    lead. */
@@ -5890,6 +6044,18 @@ html:not([data-pointer]) .ac-hint:focus-visible {
   height: 2px;
   border-radius: 2px;
   background: var(--ink);
+}
+/* The first label on the content's edge, as the title and the words above and under the strip are, not 12 in. */
+.ac-tabs > .ac-tab:first-child {
+  padding-inline-start: 0;
+}
+.ac-tabs > .ac-tab:first-child[data-state="active"]::after {
+  left: 0;
+}
+/* The strip's line already parts the first section from the tabs: no hairline of its own under it. */
+.ac-tabpanel > .ac-details__section:first-child {
+  padding-top: 0;
+  border-top: 0;
 }
 
 /* A role's mark (RoleMark, ADR 0085): the role's color in the agents' dither in a full circle, its icon in white. */
@@ -8172,10 +8338,12 @@ html:not([data-pointer]) .ac-msg:focus-within .ac-react--add,
   max-height: min(420px, 60vh);
   overflow-y: auto;
 }
+/* An option row's height (OptionRow) whatever the query finds, faces or none: the rows keep one height as it's typed. */
 .ac-palette__item {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-height: var(--option-h);
   padding: 0 10px;
   border-radius: calc(var(--radius-section) - var(--palette-pad));
   cursor: pointer;
@@ -8796,11 +8964,15 @@ html:not([data-pointer]) .ac-recur__day:focus-visible {
 /*
  * Every page's room, Settings, the wiki and the calendar included: the first line starts `--page-top` under the work
  * area's top and `--page-x` in from its side. From 761px the title's line centres on the sidebar's workspace row,
- * whose middle is 38px from the top (the sidebar's 16 above its 44px row).
+ * whose middle is 38px from the top (the sidebar's 16 above its 44px row). A strip that scrolls sideways runs out over
+ * the side room of what holds it, `--bleed`, to its edge, so what scrolls slides under that edge instead of being cut
+ * on a line inside the room. A box with a room of its own (a dialog, a card, a menu) sets it to that room: running out
+ * past the box's edge would scroll the box sideways.
  */
 :root {
   --page-top: calc(38px - var(--control-h-md) / 2);
   --page-x: 24px;
+  --bleed: var(--page-x);
 }
 @media (max-width: 760px) {
   :root {
@@ -8814,9 +8986,8 @@ html:not([data-pointer]) .ac-recur__day:focus-visible {
 }
 /*
  * Every inner page's header (PageHeader): the title, 28px on a line as tall as the page's buttons (so they centre on
- * it), the page's line under it (always there, always one line), the buttons at the end of the title's line, then the
- * page's bar. One shape and one height on every page, so a title and what follows start at the same place wherever
- * you go.
+ * it), the page's line under it (always one line) or its count beside it, the buttons at the end of the title's line,
+ * then the page's bar. One shape on every page, so a title and what follows start at the same place wherever you go.
  */
 .ac-pagehead {
   display: flex;
@@ -8856,6 +9027,22 @@ html:not([data-pointer]) .ac-recur__day:focus-visible {
 .ac-pagehead__meta {
   min-height: 20px;
   margin: -2px 0 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--muted);
+}
+/* The page's count on the title's row: on the title's baseline, 12 after it; under it only when the row has no room. */
+.ac-pagehead__titleline:has(> .ac-pagehead__count) {
+  flex-wrap: wrap;
+  column-gap: var(--space-3);
+  row-gap: 0;
+}
+.ac-pagehead__titleline > .ac-pagehead__title:has(+ .ac-pagehead__count),
+.ac-pagehead__count {
+  align-self: baseline;
+}
+.ac-pagehead__count {
+  margin: 0;
   font-size: 14px;
   line-height: 20px;
   color: var(--muted);
@@ -8962,6 +9149,10 @@ html:not([data-pointer]) .ac-grouphead__title > button:focus-visible {
 .ac-grouphead__aside {
   margin-left: auto;
 }
+/* An aside that shares the title's line stays on its middle (a select is taller than the line). */
+.ac-grouphead.ac-actline {
+  align-items: center;
+}
 .ac-groups {
   display: flex;
   flex-direction: column;
@@ -9038,6 +9229,19 @@ html:not([data-pointer]) .ac-grouphead__title > button:focus-visible {
   width: var(--tool-h);
   padding: 0;
 }
+/*
+ * A raised button there takes the field look of the search and the toggles beside it (a fill and an inset hairline):
+ * a row that scrolls has no ring or shadow outside a control to cut.
+ */
+.ac-toolbar .ac-btn:not(.ac-btn--primary, .ac-btn--ghost, .ac-btn--agent, .ac-btn--danger, [aria-pressed="true"]) {
+  background: var(--field-bg);
+  box-shadow: inset 0 0 0 1px var(--field-line);
+}
+.ac-toolbar
+  .ac-btn:not(.ac-btn--primary, .ac-btn--ghost, .ac-btn--agent, .ac-btn--danger, [aria-pressed="true"]):hover {
+  background: var(--plate-soft);
+  box-shadow: inset 0 0 0 1px var(--field-line);
+}
 .ac-toolbar .ac-select__trigger {
   height: var(--tool-h);
   padding-left: var(--control-px-sm);
@@ -9074,9 +9278,11 @@ html:not([data-pointer]) .ac-grouphead__title > button:focus-visible {
 }
 /*
  * Two rows, on a phone and when one doesn't fit: the search and the actions on top, the tabs and filters under them in
- * one row that scrolls sideways. That row is the only scroller (the filter bar inside it doesn't scroll on its own),
- * and its 4px of room keep the controls' rings whole. Its basis counts the room its margins give back, so it never
- * fits beside a search that has no actions to share its row, which would squeeze that search to nothing.
+ * one row that scrolls sideways. That row is the only scroller (the filter bar inside it doesn't scroll on its own).
+ * It runs out over the page's side room (`--bleed`) to the edge, its first control on the page's line, and its 4px up
+ * and down keep the controls' rings whole. Where something shares its row (the actions before it, or after it in a
+ * toolbar without a search), that side keeps only those 4px. Its basis counts the room its margins give back, so it
+ * never fits beside a search that has no actions to share its row, which would squeeze that search to nothing.
  */
 @media (max-width: 760px) {
   .ac-toolbar > .ac-toolbar__search {
@@ -9088,19 +9294,23 @@ html:not([data-pointer]) .ac-grouphead__title > button:focus-visible {
   }
   .ac-toolbar:has(> .ac-toolbar__search) > .ac-toolbar__filters {
     order: 2;
-    flex: 1 1 calc(100% + 8px);
+    flex: 1 1 calc(100% + 2 * var(--bleed));
   }
   .ac-toolbar__filters,
   .ac-toolbar__filters > .ac-filterbar {
     flex-wrap: nowrap;
   }
   .ac-toolbar__filters {
-    max-width: calc(100% + 8px);
-    margin: -2px -4px;
-    padding: 4px;
+    max-width: calc(100% + 2 * var(--bleed));
+    margin: -2px calc(-1 * var(--bleed));
+    padding: 4px var(--bleed);
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: none;
+  }
+  .ac-toolbar:not(:has(> .ac-toolbar__search)):has(> .ac-toolbar__actions) > .ac-toolbar__filters {
+    margin-right: -4px;
+    padding-right: 4px;
   }
   .ac-toolbar__filters::-webkit-scrollbar {
     display: none;
@@ -9119,11 +9329,11 @@ html:not([data-pointer]) .ac-grouphead__title > button:focus-visible {
 }
 .ac-toolbar[data-stack] > .ac-toolbar__filters {
   order: 2;
-  flex: 1 1 calc(100% + 8px);
+  flex: 1 1 calc(100% + 2 * var(--bleed));
   flex-wrap: nowrap;
-  max-width: calc(100% + 8px);
-  margin: -2px -4px;
-  padding: 4px;
+  max-width: calc(100% + 2 * var(--bleed));
+  margin: -2px calc(-1 * var(--bleed));
+  padding: 4px var(--bleed);
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
@@ -9145,6 +9355,8 @@ html:not([data-pointer]) .ac-grouphead__title > button:focus-visible {
 }
 .ac-toolbar[data-stack="split"] > .ac-toolbar__filters {
   flex: 1 1 0;
+  margin-left: -4px;
+  padding-left: 4px;
 }
 .ac-toolbar[data-stack="split"]:not(:has(> .ac-toolbar__filters)) > .ac-toolbar__actions {
   flex: 1 1 100%;
@@ -9691,6 +9903,23 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
 .ac-empty--page .ac-empty__actions {
   margin-top: var(--space-6);
 }
+/*
+ * On a phone a lone button takes the width of what holds it, at its own height (rule 23): a card's line of buttons and
+ * a MediaRow's end under its row (a plated one), a dialog's foot and an empty state's actions (their one button, on a
+ * line of its own under the foot's note).
+ */
+@media (max-width: 640px) {
+  .ac-card > .ac-acts > .ac-btn:only-child:not(.ac-btn--ghost) {
+    flex: 1 1 auto;
+  }
+  :is(.ac-dialog__foot, .ac-empty__actions):not(:has(> .ac-btn ~ .ac-btn)) > .ac-btn {
+    flex: 1 1 100%;
+  }
+  .ac-dialog__foot-acts:not(:has(> .ac-btn ~ .ac-btn)),
+  .ac-dialog__foot-acts:not(:has(> .ac-btn ~ .ac-btn)) > .ac-btn {
+    flex: 1 1 100%;
+  }
+}
 /* A phone's page head takes half the screen: the button stays in reach. */
 @media (max-width: 640px) {
   .ac-empty--page {
@@ -9764,30 +9993,36 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
     transform: none;
   }
 }
-/* Touch: compact controls grow to the default step of the ruler (40, r12). */
+/*
+ * Touch: a small button keeps its 32 plate, as on a desktop, and its target grows to 44 past it. One with words grows
+ * up and down only, so two buttons 8 apart never share a target; an icon alone grows 4 to each side too. Positioned
+ * at no weight: a button a component places absolutely keeps its place.
+ */
 @media (pointer: coarse) {
-  .ac-btn--sm {
-    min-height: var(--control-h-md);
-    border-radius: var(--control-r-md);
+  :where(.ac-btn--sm) {
+    position: relative;
   }
-  .ac-btn--sm.ac-btn--icon {
-    min-width: var(--control-h-md);
+  .ac-btn--sm::after {
+    content: "";
+    position: absolute;
+    inset: calc((var(--control-h-sm) - var(--touch-target)) / 2) 0;
   }
-  /* Except the message bar's: at 40px the bar (46px) would cover the lines around a grouped message's text, 38.35px
-     apart. Its plates stay 32px and their targets grow to 40px past them, 8px apart so they never overlap. */
+  .ac-btn--sm.ac-btn--icon::after {
+    inset: calc((var(--control-h-sm) - var(--touch-target)) / 2) calc(-1 * var(--space-1));
+  }
+  /* A dialog's scroll area ends past that target too: a small button at its end would make it scroll by a sliver. */
+  :is(.ac-dialog__body, .ac-dialog__list) {
+    padding-bottom: calc((var(--touch-target) - var(--control-h-sm)) / 2);
+  }
+  /* The message bar's 26px plates grow to the 32 of every small one here, 8px apart: their targets touch, never
+     overlap. */
   .ac-msg__actions {
     gap: 8px;
   }
   .ac-msg__actions .ac-btn--sm {
-    position: relative;
     min-width: var(--control-h-sm);
     min-height: var(--control-h-sm);
     border-radius: calc(var(--bar-r) - var(--bar-pad));
-  }
-  .ac-msg__actions .ac-btn--sm::after {
-    content: "";
-    position: absolute;
-    inset: -4px;
   }
   .ac-composer__format-btn {
     width: var(--control-h-md);
@@ -9892,13 +10127,6 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
   }
   .ac-details__body {
     padding-top: 12px;
-  }
-  /* Its head's buttons wrap under each other rather than run past the sheet's edge. */
-  .ac-details__actions {
-    flex: 0 1 auto;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    min-width: 0;
   }
 }
 /* Their entrance on phones: up from the bottom edge (the centered one would jump sideways). */
@@ -10881,6 +11109,12 @@ html:not([data-pointer]) .ac-msg__note:focus-visible {
   height: 32px;
   margin: -6px;
 }
+/* A face there (a personal workspace's, ADR 0159) is the slot's size, as a workspace's mark is: a larger one would
+   reach into the gap before the name. */
+.ac-mo__leading > .ac-avatar {
+  width: 32px;
+  height: 32px;
+}
 @media (prefers-reduced-motion: no-preference) {
   .ac-mo__scrim {
     animation: ac-mo-fade var(--dur-panel) var(--out) both;
@@ -10942,11 +11176,14 @@ html:not([data-pointer]) .ac-msg__note:focus-visible {
   position: relative;
   min-width: 0;
 }
+/* Its padding is the room its cards' ring and shadow keep inside the scroller, and a card snaps to that room, not to
+   the scroller's edge, where the ring would be cut. */
 .ac-carousel__track {
   display: flex;
   gap: 6px;
   min-width: 0;
   padding: 2px;
+  scroll-padding-inline: 2px;
   overflow-x: auto;
   overflow-y: hidden;
   scroll-snap-type: x mandatory;
@@ -11064,9 +11301,6 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
   justify-content: center;
   width: 32px;
 }
-.ac-access__start {
-  margin-right: auto;
-}
 
 /*
  * A card's horizon (`CardHorizon`): the sky's light tones in a low dither at the foot of a card with room to spare.
@@ -11115,26 +11349,30 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 
-/* ── Fact strip: short facts in one row, icon + label over a one-line value, split by hairlines ── */
+/*
+ * ── Fact strip: short facts in a row that wraps, icon + label over a one-line value, split by hairlines ──
+ * Each fact is as wide as its words: one that doesn't fit moves whole to the next line, and only a fact wider than the
+ * whole strip wraps its own words. Every fact has the hairline before it: the strip starts that far to the left and
+ * clips its first pixel, so a line never starts with one.
+ */
 .ac-facts {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   row-gap: 12px;
-  margin: 0;
+  margin: 0 0 0 -17px;
+  clip-path: inset(0 0 0 1px);
 }
 .ac-facts__item {
+  flex: 0 1 auto;
   display: grid;
-  grid-template-columns: 32px minmax(0, 1fr);
+  grid-template-columns: 32px minmax(0, max-content);
   grid-template-rows: auto auto;
   column-gap: 10px;
   align-items: center;
   min-width: 0;
+  max-width: 100%;
   padding: 0 16px;
   border-left: 1px solid var(--line);
-}
-.ac-facts__item:first-child {
-  padding-left: 0;
-  border-left: 0;
 }
 /* The icon in a pixel frame as tall as label and value: a 16×16 grid of 2px cells, one cell thick, the corners
    stepped in by one cell. The frame is a mask over the line color, so it takes the item's tone. */
@@ -11186,6 +11424,169 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
 }
 .ac-facts__item--done .ac-facts__icon {
   --fact-frame: color-mix(in srgb, var(--success) 45%, transparent);
+}
+
+/*
+ * ── Fact line: one quiet line of facts under a title (FactLine), each an icon and its words, no plates ──
+ * The line wraps between facts and never inside one: a fact is as wide as its words, so one that doesn't fit moves to
+ * the next line whole. Only a fact alone wider than the line (a long repository's link, a long label) wraps its own
+ * words, never past the line's end. An icon centred on the 20px line sits within a third of a pixel of the capitals'
+ * middle.
+ */
+.ac-factline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px var(--space-3);
+  min-width: 0;
+  font-size: 12.5px;
+  line-height: 20px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.ac-factline__fact {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+/* Any mark: the kit's icons, a maker's logo drawn in the text's color, 14 on the first line's middle. */
+.ac-factline__fact > svg {
+  flex: none;
+  align-self: flex-start;
+  margin-block-start: 3px;
+  color: var(--faint);
+}
+.ac-factline__fact[data-tone="warn"] {
+  color: var(--ink);
+  font-weight: 600;
+}
+.ac-factline__fact:is([data-tone="warn"], [data-tone="warn-icon"]) > svg {
+  color: var(--warn);
+}
+.ac-factline__fact[data-tone="ok"] > svg {
+  color: var(--ok);
+}
+.ac-factline__fact[data-tone="bold"] {
+  color: var(--ink);
+  font-weight: 700;
+}
+.ac-factline__fact[data-tone="label"] {
+  display: inline-block;
+  max-width: 100%;
+  padding: 0 7px;
+  border-radius: 10px;
+  background: var(--plate);
+  color: var(--ink2);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/*
+ * ── Props strip: a thing's properties as one row of controls (a task's Coluna, Responsável, Prioridade, Prazo, Quem
+ * vê; a routine's) ── Each control 32 high in the field look and as wide as its value, 8 apart. A value nobody here
+ * may change and a switch with its word wear the same look. A hairline sets the links and labels after them apart; on
+ * a phone it is a line break, so they start a line of their own instead of hanging after a divider at a line's end.
+ */
+.ac-props {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.ac-props .ac-select__trigger {
+  width: auto;
+  max-width: 100%;
+}
+/*
+ * A value wider than the strip (a long name, "Ana, Bruno e mais 5") wraps inside its control instead of ending in "…":
+ * the control is alone on its line by then (a wrapping row moves it down whole first), and grows from its 32.
+ */
+.ac-props :is(.ac-select--sm .ac-select__trigger, .ac-date__trigger--sm) {
+  height: auto;
+  min-height: var(--control-h-sm);
+  padding-block: 5px;
+}
+.ac-props .ac-select__value {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.ac-props :is(.ac-select__value, .ac-select__text) {
+  overflow: visible;
+  text-overflow: clip;
+}
+/* Wrapped, its icon or face stays on the first line's capitals (`.ac-iconline`'s rule), never between the lines. */
+.ac-props .ac-select__value > span:has(> .ac-select__lead) {
+  align-items: flex-start;
+}
+.ac-props .ac-select__lead {
+  translate: 0 calc(8px - var(--cap-mid) - 50%);
+}
+@supports (top: 1lh) {
+  .ac-props .ac-select__lead {
+    translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
+  }
+}
+/* A button opening a menu (who, priority) is a control of the strip: the field look; a face in it starts near its edge. */
+.ac-props > .ac-btn:not(.ac-btn--ghost),
+.ac-props > * > .ac-btn:not(.ac-btn--ghost) {
+  border: 0;
+  background: var(--field-bg);
+  box-shadow: inset 0 0 0 1px var(--field-line);
+}
+.ac-props .ac-btn .ac-avatar {
+  margin-inline-start: -2px;
+}
+/* The date is one more control as wide as its words: its calendar leads, as the others' icons and faces do. */
+.ac-props .ac-date__trigger > .ac-select__chev {
+  order: -1;
+}
+.ac-props__value,
+.ac-props__switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 100%;
+  min-height: var(--control-h-sm);
+  box-sizing: border-box;
+  padding: 0 var(--space-3) 0 10px;
+  border: 1px solid var(--field-line);
+  border-radius: var(--control-r-sm);
+  background: var(--field-bg);
+  font-size: var(--control-fs-sm);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.ac-props__value > .ac-icon {
+  flex: none;
+  color: var(--ink-muted);
+}
+.ac-props__switch {
+  font-weight: 600;
+  cursor: pointer;
+}
+/* An ⓘ beside a control of the strip: centred on it, its hit box beside the control instead of over its edge. */
+.ac-props .ac-hint {
+  margin: 0;
+  translate: none;
+}
+.ac-props__sep {
+  flex: none;
+  width: 1px;
+  height: 18px;
+  background: var(--line2);
+}
+@media (max-width: 640px) {
+  .ac-props__sep {
+    flex-basis: 100%;
+    width: auto;
+    height: 0;
+    background: none;
+  }
 }
 
 /* ── Step track: a run's steps in one row, nodes joined by a line, a short label and the time under each ── */
@@ -11275,12 +11676,12 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
 }
 
 /*
- * A row of words and the action that ends it (a notice and "Deixar Ana falar com ela", a toast and "Desfazer", a banner
- * and "Ver em português"): side by side while the words keep a line of 24 characters (or all of them, when shorter),
- * else the action goes under them, at the row's end. The words never wrap a word a line. The row is `.ac-actrow`, its
- * words `.ac-actrow__text`, what follows them its action; a lead icon before them stays on their first line. Mirrored
- * by the phone app's `ACT_ROW` and the landing's copy of this file. After every component's rules but MediaRow's, so
- * it wins over a component's own rules for the same boxes.
+ * A row of words and the one small control that ends it and keeps its place (a setting's switch, its one select, a
+ * chevron): side by side while the words keep a line of 24 characters (or all of them, when shorter), else the control
+ * goes under them, at the row's end. Words with actions (buttons, links) are an `.ac-actline` (below). The row is
+ * `.ac-actrow`, its words `.ac-actrow__text`, what follows them its control; a lead icon before them stays on their
+ * first line. Mirrored by the landing's copy of this file. After every component's rules but MediaRow's, so it wins
+ * over a component's own rules for the same boxes.
  */
 .ac-actrow {
   display: flex;
@@ -11299,6 +11700,37 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
 }
 
 /*
+ * Words and their actions (a title and its buttons, a notice and its fix, a toast and Desfazer): one row that wraps.
+ * The words (its first child) take their one-line width as their basis, so the actions sit beside them only while the
+ * words fit on one line there; else the actions take a row of their own under the words, from the words' edge, 8
+ * below, and the words get the whole width. A close × is never in it: it stays beside the title, after the line. A
+ * toggle that opens more of the words (Ver detalhes) goes under them, never here. In a row (a lead before it, a × after
+ * it) the row gives it the room (`flex: 1 1 0%`): never set here, where a column would stretch it. Mirrored by the
+ * phone app's `ACT_LINE` and the landing's copy of this file.
+ */
+.ac-actline {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-2) var(--space-4);
+}
+.ac-actline > :first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+/* The words grow, so an action needs no auto margin to reach the row's end: under the words it starts at their edge. */
+.ac-actline > :not(:first-child) {
+  flex: none;
+  max-width: 100%;
+  margin-inline-start: 0;
+}
+/* A slot with nothing to offer (an action its viewer may not take) takes no room, not even a gap or a row. */
+.ac-actline > :is(span, div):empty {
+  display: none;
+}
+
+/*
  * MediaRow: the face (32, or 24 in a list row with `--row`), then the name and the role on its line, everything else
  * (the text, chips, actions) under them at the row's full width, never in a column beside the face. Classes, not a
  * component: the row is whatever its markup is (a button, a link, an `li`, a label).
@@ -11312,11 +11744,13 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
    name's first line sits on the line's axis however many lines the head wraps to, and what ends that line on it too
    (a box as tall as the axis, anything taller reaching as far above as below): never the wrapped head's middle. */
 .ac-mediarow {
-  --mediarow-face: 32px;
+  --mediarow-face: var(--name-face);
   /* The first line's axis: the face's middle, or a control's that ends the line and is taller than the face. */
   --mediarow-axis: var(--mediarow-face);
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
+  /* Stretched to a taller neighbour's height (cards side by side), its lines stay at its top, not spread apart. */
+  align-content: start;
   align-items: start;
   column-gap: var(--space-3);
   row-gap: var(--space-2);
@@ -11326,17 +11760,12 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
   column-gap: var(--space-2);
 }
 /* A button with its plate, a select or a segmented control ending the name's line: the line's axis is its middle, so it
-   keeps the row's padding above and below (a small button grows to 40 on touch). */
+   keeps the row's padding above and below. */
 .ac-mediarow:has(> .ac-mediarow__end :is(.ac-btn--sm:not(.ac-btn--ghost), .ac-select, .ac-seg)) {
   --mediarow-axis: max(var(--mediarow-face), var(--control-h-sm));
 }
 .ac-mediarow:has(> .ac-mediarow__end .ac-btn:not(.ac-btn--sm, .ac-btn--ghost)) {
   --mediarow-axis: max(var(--mediarow-face), var(--control-h-md));
-}
-@media (pointer: coarse) {
-  .ac-mediarow:has(> .ac-mediarow__end .ac-btn--sm:not(.ac-btn--ghost)) {
-    --mediarow-axis: max(var(--mediarow-face), var(--control-h-md));
-  }
 }
 /* As wide and tall as a face at least, so a glyph in a face's place (a check, an icon) keeps the names in line. */
 .ac-mediarow__face {
@@ -11413,6 +11842,13 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
   /* Its control left the name's line: the face's middle is that line's axis again. */
   .ac-mediarow:has(> .ac-mediarow__end--wrap) > :is(.ac-mediarow__face, .ac-mediarow__head) {
     --mediarow-axis: var(--mediarow-face);
+  }
+  /* A lone plated button there takes the row's width (rule 23). */
+  .ac-mediarow__end--wrap:has(> .ac-btn:only-child:not(.ac-btn--ghost)) {
+    justify-self: stretch;
+  }
+  .ac-mediarow__end--wrap > .ac-btn:only-child:not(.ac-btn--ghost) {
+    flex: 1 1 auto;
   }
 }
 

@@ -6,6 +6,7 @@ import {
   useAgentDetail,
   useAiStatus,
   useApi,
+  useCatalog,
   useConfirmSetup,
   useCredentials,
   useModels,
@@ -33,17 +34,19 @@ import { addsAgentsTo, can } from "@agenteschat/client/lib/permissions";
 import { rolePicksInSight } from "@agenteschat/client/lib/personal-view";
 import { planOf } from "@agenteschat/client/lib/plans";
 import { AUTO, modelChoices } from "@agenteschat/client/lib/providers";
+import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { isEveryone, sortRoles } from "@agenteschat/client/lib/roles";
+import { connectorName } from "@agenteschat/client/lib/scopes";
 import {
   askedLine,
   nextStep,
+  setupApps,
   setupDone,
   setupRole,
   setupRow,
   setupSteps,
   setupTaskKeys,
   suggestedChannels,
-  suggestedLevels,
 } from "@agenteschat/client/lib/setup-checklist";
 import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
 import {
@@ -82,9 +85,11 @@ import { AgentAvatar } from "@/components/AgentAvatar";
 import { ModelSelect, modelOptions, NO_OWNER, OwnerSelect } from "@/components/AgentFields";
 import { usePlanHold } from "@/components/ai/ConnectAiSteps";
 import { PlanReplies } from "@/components/ai/PlanReplies";
-import { BillingLinkButton } from "@/components/BillingLinkButton";
 import { useConnectAi } from "@/components/ConnectAi";
+import { ConnectFlow, type FlowState } from "@/components/ConnectFlow";
+import { ConnectorIcon } from "@/components/ConnectorCatalog";
 import { useChannelActions } from "@/components/channel-actions";
+import { SetupBand } from "@/components/new-agent/SetupBand";
 import { useOrg } from "@/components/org-context";
 import { useWidenAsk } from "@/components/ReachLines";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -116,18 +121,79 @@ export function useSetupSteps(agent: Agent | undefined): AgentSetupStep[] {
   const { org, me } = useOrg();
   const { solo } = usePersonalView();
   const steps = agent ? setupSteps(agent, { meId: me.user.id, admin: can(org, "manage_agents") }) : [];
-  return solo ? steps.filter((s) => s !== "who") : steps;
+  // Alone in a personal workspace there are no group conversations in sight either: no "where" (ADR 0164).
+  return solo ? steps.filter((s) => s !== "who" && s !== "where") : steps;
 }
 
-/** The top of a new agent's DM: its greeting and the checklist, as its first message. */
+/**
+ * What its checklist reads for this person (ADR 0155 §2): their steps, the ones done (confirmed, or done as its data
+ * says), and whether everything it reads has loaded.
+ */
+function useSetupProgress(agent: Agent) {
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  const admin = can(org, "manage_agents");
+  const steps = useSetupSteps(agent);
+  const status = useAiStatus(org.id);
+  const access = useAgentAccess(org.id, agent.id, admin && steps.includes("apps"));
+  const detail = useAgentDetail(org.id, agent.id);
+  const visible = useVisibleChannels();
+  const connectors = access.data ? resourcesOf(access.data).filter((r) => r.kind === "connector") : [];
+  const granted = connectors.filter((r) => levelOf(r) !== "none");
+  const visibleIds = new Set(visible.list.map((c) => c.id));
+  const inChannels = (detail.data?.channels ?? []).filter((c) => visibleIds.has(c.id));
+  const aiState = aiStateOf(status.data, agent.id);
+  // On a billing hold nothing thinks, a saved key included: the AI row leads to the plan.
+  const held = usePlanHold() !== null;
+  // "Agora não" to apps on the right hand's card is for the team: its agents don't ask again.
+  const appsLater = dir.agents.find(isRightHand)?.setup?.done.includes("apps") ?? false;
+  const done = agent.setup
+    ? setupDone(agent.setup, {
+        ai: !held && (aiState === "ready" || aiState === "waiting"),
+        apps: granted.length > 0 || appsLater,
+        where: inChannels.length > 0,
+      })
+    : new Set<AgentSetupStep>();
+  const doneHere = steps.filter((s) => done.has(s));
+  return {
+    steps,
+    done,
+    doneHere,
+    all: doneHere.length === steps.length,
+    // Everything it reads has loaded: a step that turns done after this was done now (its line and the burst).
+    ready: status.isSuccess && detail.isSuccess && visible.ready && (!steps.includes("apps") || !access.isPending),
+    held,
+    connectors,
+    granted,
+    inChannels,
+    visible,
+  };
+}
+
+/**
+ * The top of a new agent's DM: its greeting and the checklist, as its first message. The greeting asks for help only
+ * when something is left as the conversation first shows its checklist loaded; done meanwhile, the ask stays as asked.
+ */
 export function AgentSetupIntro({ agent }: { agent: Agent }) {
   const { t, i18n } = useTranslation();
   const { me } = useOrg();
+  const progress = useSetupProgress(agent);
+  const [asks, setAsks] = useState<boolean | null>(null);
+  if (asks === null && progress.ready) setAsks(!progress.all);
   const g = agentGrammar(agent.name);
   const role = setupRole(agent.setup);
   const person = me.user.name.split(/\s+/)[0] ?? me.user.name;
-  const asked = role ? null : askedLine(agent.instructions);
-  const roleName = role ? roleWord(t(`newAgent.roles.${role}.name`), i18n.language) : null;
+  // A ready-made role's name, else the role it was given (a template's "Atendimento"); only an agent with neither
+  // says back what it was asked.
+  const own = agent.role.trim();
+  // Made from its card (ADR 0164): it says what it said there, in its own voice.
+  const hello = agent.setup?.hello?.trim() || null;
+  const asked = hello || role || own ? null : askedLine(agent.instructions);
+  const roleName = role
+    ? roleWord(t(`newAgent.roles.${role}.name`), i18n.language)
+    : own
+      ? roleWord(own, i18n.language)
+      : null;
   return (
     <Message
       agent
@@ -142,7 +208,9 @@ export function AgentSetupIntro({ agent }: { agent: Agent }) {
             {roleName
               ? t("agentSetup.greetingRole", { ...g, person, role: roleName })
               : t("agentSetup.greeting", { ...g, person })}
-            {asked && ` ${t("agentSetup.asked", { what: asked })}`} {t("agentSetup.lead")}
+            {hello && ` ${/[.!?…]$/.test(hello) ? hello : `${hello}.`}`}
+            {asked && ` ${t("agentSetup.asked", { what: asked })}`}
+            {asks && ` ${t("agentSetup.lead")}`}
           </p>
         </div>
       </MessageText>
@@ -166,37 +234,14 @@ export function AgentSetupCard({ agent, place }: { agent: Agent; place: "dm" | "
   const actions = useChannelActions();
   const connect = useConnectAi();
   const dir = useDirectory(org.id);
-  const admin = can(org, "manage_agents");
-  const steps = useSetupSteps(agent);
-  const status = useAiStatus(org.id);
-  const access = useAgentAccess(org.id, agent.id, admin && steps.includes("apps"));
-  const detail = useAgentDetail(org.id, agent.id);
-  const visible = useVisibleChannels();
+  const { steps, done, doneHere, all, ready, held, connectors, granted, inChannels, visible } = useSetupProgress(agent);
+  const catalog = useCatalog();
   const items = useConnectedById();
   const [open, setOpen] = useState<AgentSetupStep | null>(null);
   const burstRef = useRef<HTMLCanvasElement>(null);
   const g = agentGrammar(agent.name);
   const role = setupRole(agent.setup);
-
-  const connectors = access.data ? resourcesOf(access.data).filter((r) => r.kind === "connector") : [];
-  const granted = connectors.filter((r) => levelOf(r) !== "none");
-  const visibleIds = new Set(visible.list.map((c) => c.id));
-  const inChannels = (detail.data?.channels ?? []).filter((c) => visibleIds.has(c.id));
-  const aiState = aiStateOf(status.data, agent.id);
-  // On a billing hold nothing thinks, a saved key included: the AI row leads to the plan.
-  const held = usePlanHold() !== null;
-  const done = agent.setup
-    ? setupDone(agent.setup, {
-        ai: !held && (aiState === "ready" || aiState === "waiting"),
-        apps: granted.length > 0,
-        where: inChannels.length > 0,
-      })
-    : new Set<AgentSetupStep>();
-  const doneHere = steps.filter((s) => done.has(s));
-  const all = doneHere.length === steps.length;
   const next = nextStep(steps, done);
-  // Everything it reads has loaded: a step that turns done after this was done now (its line and the burst).
-  const ready = status.isSuccess && detail.isSuccess && visible.ready && (!steps.includes("apps") || !access.isPending);
   const said = useDoneSay(ready, doneHere, steps.length, agent.appearance?.color, burstRef, (step) =>
     t(`agentSetup.say.${step}`, agentGrammar(agent.name)),
   );
@@ -208,7 +253,14 @@ export function AgentSetupCard({ agent, place }: { agent: Agent; place: "dm" | "
       list.map((r) => resourceName(t, r, items)),
       t,
     );
-  const suggestedApps = connectors.filter((r) => r.connector && suggestedLevels(role)[r.connector]);
+  // The apps its card chose (ADR 0164), else its role's: the connected ones by name, else the catalog's names.
+  const cardApps = setupApps(agent.setup);
+  const suggestedApps = connectors.filter((r) => r.connector && cardApps[r.connector]);
+  const unconnected = Object.keys(cardApps).filter((id) => !connectors.some((r) => r.connector === id));
+  const catalogNames = unconnected.flatMap((id) => {
+    const def = catalog.data?.connectors.find((d) => d.id === id);
+    return def ? [connectorName(t, def)] : [];
+  });
   const placeable = visible.list.filter((c) => addsAgentsTo(c, me.user.id, org));
   const firstChannel = placeable.find((c) => suggestedChannels(role, placeable).includes(c.id));
   const audience = audienceOf(agent);
@@ -221,7 +273,7 @@ export function AgentSetupCard({ agent, place }: { agent: Agent; place: "dm" | "
       org: org.name,
       role,
       granted: granted.length ? names(granted) : null,
-      suggested: suggestedApps.length ? names(suggestedApps) : null,
+      suggested: suggestedApps.length ? names(suggestedApps) : catalogNames.length ? joinNames(catalogNames, t) : null,
       channels: inChannels.length
         ? joinNames(
             inChannels.map((c) => `#${c.name}`),
@@ -243,7 +295,7 @@ export function AgentSetupCard({ agent, place }: { agent: Agent; place: "dm" | "
 
   // Its role's first tasks (a blank agent's own two); a key a language lacks is left out.
   const anyKey = t as unknown as (key: string) => string;
-  const tasks = setupTaskKeys(role)
+  const tasks = setupTaskKeys(role, agent.setup?.starter)
     .filter((key) => i18n.exists(key))
     .map((key) => anyKey(key));
   const ask = (text: string) => {
@@ -255,41 +307,61 @@ export function AgentSetupCard({ agent, place }: { agent: Agent; place: "dm" | "
     void navigate({ to: "/org/$orgId/dm/agent/$agentId", params: { orgId: org.id, agentId: agent.id } });
   };
 
+  // In its chat (ADR 0164) "how it works" starts done and stays on its page; who it talks to only informs there, not
+  // counted: a plan that makes it answer only its owner says so.
+  const inChat = place === "dm";
+  const shown = inChat ? steps.filter((s) => s !== "how") : steps;
+  const counted = inChat ? shown.filter((s) => s !== "who") : shown;
+  const allHere = counted.every((s) => done.has(s));
   const title =
-    place === "dm" ? (all ? t("agentSetup.ready", g) : t("agentSetup.title")) : t("agentSetup.titleProfile", g);
+    place === "dm" ? (allHere ? t("agentSetup.ready", g) : t("agentSetup.title")) : t("agentSetup.titleProfile", g);
+  const planOnly = onPlan && audience.mode === "owner" && ownerIsMe;
   return (
     <SetupCardView
       title={title}
-      done={doneHere.length}
-      total={steps.length}
+      done={counted.filter((s) => done.has(s)).length}
+      total={counted.length}
       place={place}
       burstRef={burstRef}
-      rows={steps.map((s) => {
+      band={
+        inChat && (
+          <SetupBand
+            agent={agent}
+            ready={ready}
+            thinks={done.has("ai")}
+            needsAi={steps.includes("ai")}
+            apps={Object.keys(cardApps)
+              .slice(0, 4)
+              .map((id) => ({ id, granted: granted.some((r) => r.connector === id) }))}
+          />
+        )
+      }
+      rows={shown.map((s) => {
         const row = rowOf(s);
         const isDone = done.has(s);
+        if (inChat && s === "who")
+          return {
+            key: s,
+            icon: STEP_ICON[s],
+            done: true,
+            info: true,
+            title: row.title,
+            desc: planOnly ? t("agentSetup.who.todoPlanDesc") : undefined,
+            action: { label: row.action, onClick: () => act(s) },
+          };
         const acts = s !== "ai" || Boolean(connect);
+        // On a hold it waits for the plan, whose one button is the hold's banner.
         if (s === "ai" && held && !isDone) {
           return {
             key: s,
             icon: STEP_ICON[s],
             done: false,
-            title: t("agentSetup.firstRun.ai.plan"),
-            ...(can(org, "manage_billing")
-              ? {
-                  actionNode: (
-                    <BillingLinkButton
-                      orgId={org.id}
-                      from="hold"
-                      size="sm"
-                      variant={s === next ? "primary" : undefined}
-                    >
-                      {t("agentSetup.firstRun.ai.planAction")}
-                    </BillingLinkButton>
-                  ),
-                }
-              : {}),
+            title: row.title,
+            desc: t("agentSetup.firstRun.afterPlan"),
+            dim: true,
           };
         }
+        const connectFirst = s === "apps" && !isDone && suggestedApps.length === 0 && catalogNames.length > 0;
         return {
           key: s,
           icon: STEP_ICON[s],
@@ -297,14 +369,22 @@ export function AgentSetupCard({ agent, place }: { agent: Agent; place: "dm" | "
           title: row.title,
           desc: row.desc,
           saying: said?.step === s ? said.text : null,
-          ...(acts ? { action: { label: row.action, primary: s === next, onClick: () => act(s) } } : {}),
+          ...(acts
+            ? {
+                action: {
+                  label: connectFirst ? t("agentSetup.firstRun.apps.connect") : row.action,
+                  primary: s === next,
+                  onClick: () => act(s),
+                },
+              }
+            : {}),
         };
       })}
       foot={
         done.has("ai") &&
         tasks.length > 0 && (
           <SetupAsks
-            lead={all ? t("agentSetup.tasksAllDone") : t("agentSetup.tasksLead")}
+            lead={(inChat ? allHere : all) ? t("agentSetup.tasksAllDone") : t("agentSetup.tasksLead")}
             asks={tasks.map((task) => ({ label: task, onClick: () => ask(task) }))}
           />
         )
@@ -323,6 +403,8 @@ export function AgentSetupCard({ agent, place }: { agent: Agent; place: "dm" | "
 /** One row of a checklist card, as drawn: its button, a second one ("Agora não"), or a link once done. */
 export interface SetupCardRow {
   key: string;
+  /** Only informs (who it talks to, in its chat, ADR 0164): drawn done with its line, not counted in the meter. */
+  info?: boolean;
   icon: IconName;
   done: boolean;
   title: string;
@@ -336,6 +418,8 @@ export interface SetupCardRow {
   skip?: { label: string; onClick: () => void; busy?: boolean };
   /** It waits for something else (the plan): drawn quieter, with no button. */
   dim?: boolean;
+  /** What the row asks for in place (an address to invite), at its full width under its text. */
+  form?: ReactNode;
 }
 
 /**
@@ -349,6 +433,7 @@ export function SetupCardView({
   place,
   rows,
   foot,
+  band,
   burstRef,
   children,
 }: {
@@ -358,6 +443,8 @@ export function SetupCardView({
   place: "dm" | "profile";
   rows: SetupCardRow[];
   foot?: ReactNode;
+  /** On top of the card: a new agent's sky in its chat (`SetupBand`, ADR 0164). */
+  band?: ReactNode;
   burstRef?: RefObject<HTMLCanvasElement | null>;
   children?: ReactNode;
 }) {
@@ -365,14 +452,17 @@ export function SetupCardView({
   return (
     <section className="setup-cl" aria-label={title} data-place={place}>
       <canvas ref={burstRef} className="setup-cl__burst" aria-hidden="true" tabIndex={-1} />
+      {band}
       <div className="setup-cl__head">
         <b>{title}</b>
         <small>{t("agentSetup.count", { done, total })}</small>
       </div>
       <div className="setup-cl__meter" aria-hidden="true">
-        {rows.map((r, i) => (
-          <i key={r.key} data-on={i < done || undefined} />
-        ))}
+        {rows
+          .filter((r) => !r.info)
+          .map((r, i) => (
+            <i key={r.key} data-on={i < done || undefined} />
+          ))}
       </div>
       <ul className="setup-cl__rows" aria-live="polite">
         {rows.map((r) => (
@@ -400,11 +490,12 @@ export function SetupCardView({
                 </button>
               )}
             </span>
-            {(r.saying || (!r.done && r.desc)) && (
+            {(r.saying || ((!r.done || r.info) && r.desc)) && (
               <span className="ac-mediarow__body setup-row__text">
                 {r.saying ? <span className="setup-row__say">{r.saying}</span> : <span>{r.desc}</span>}
               </span>
             )}
+            {!r.done && r.form && <span className="ac-mediarow__body setup-row__form">{r.form}</span>}
             {!r.done && (r.action || r.actionNode || r.skip) && (
               <span className="ac-mediarow__end ac-mediarow__end--wrap setup-row__act">
                 {r.skip && (
@@ -454,7 +545,8 @@ export function SetupAsks({ lead, asks }: { lead: string; asks: { label: string;
 
 /**
  * A step done while the card is in view (after everything it reads has loaded): its line for a moment, and a burst of
- * pixels in the agent's colors, a bigger one when it was the last.
+ * pixels in the agent's colors, a bigger one when it was the last. `celebrates`: whether its line comes with the burst
+ * (an invitation only sent says so, quietly).
  */
 export function useDoneSay<S extends string>(
   ready: boolean,
@@ -463,12 +555,15 @@ export function useDoneSay<S extends string>(
   color: string | undefined,
   burstRef: RefObject<HTMLCanvasElement | null>,
   sayOf: (step: S) => string,
+  celebrates: (step: S) => boolean = () => true,
 ) {
   const [said, setSaid] = useState<{ step: S; text: string } | null>(null);
   const seen = useRef<Set<S> | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const say = useRef(sayOf);
   say.current = sayOf;
+  const party = useRef(celebrates);
+  party.current = celebrates;
   const doneKey = doneNow.join();
   useEffect(() => {
     if (!ready) return;
@@ -477,9 +572,10 @@ export function useDoneSay<S extends string>(
     seen.current = now;
     if (!before) return;
     const fresh = [...now].find((s) => !before.has(s));
-    if (!fresh) return;
-    setSaid({ step: fresh, text: say.current(fresh) });
-    burst(burstRef.current, color, now.size === total);
+    const text = fresh ? say.current(fresh) : "";
+    if (!fresh || !text) return;
+    setSaid({ step: fresh, text });
+    if (party.current(fresh)) burst(burstRef.current, color, now.size === total);
     clearTimeout(timer.current);
     timer.current = setTimeout(() => setSaid(null), 2600);
   }, [ready, doneKey, total, color, burstRef]);
@@ -620,7 +716,7 @@ function AppsDialog({
   const items = useConnectedById();
   const setLevels = useSetLevels();
   const g = agentGrammar(agent.name);
-  const suggested = suggestedLevels(setupRole(agent.setup));
+  const suggested = setupApps(agent.setup);
   const suggestionOf = (r: AccessResource) => (r.connector ? suggested[r.connector] : undefined);
   // The role's apps first, each at its suggestion while it has none yet; the rest as they are.
   const ordered = [...connectors.filter(suggestionOf), ...connectors.filter((r) => !suggestionOf(r))];
@@ -647,41 +743,75 @@ function AppsDialog({
     });
   const toConnectors = () =>
     void navigate({ to: "/org/$orgId/settings/$section", params: { orgId: org.id, section: "connectors" } });
+  // The card's apps not connected here yet (ADR 0164): each connects right here, then shows above at its level.
+  const catalog = useCatalog();
+  const [flow, setFlow] = useState<FlowState | null>(null);
+  const toConnect = Object.keys(suggested)
+    .filter((id) => !connectors.some((r) => r.connector === id))
+    .flatMap((id) => {
+      const def = catalog.data?.connectors.find((d) => d.id === id && d.available && !d.soon);
+      return def ? [def] : [];
+    });
   return (
-    <StepDialog
-      title={t("agentSetup.apps.title", g)}
-      description={t("agentSetup.apps.desc")}
-      wide
-      ok={count ? t("agentSetup.apps.ok", { count }) : t("agentSetup.apps.okNone")}
-      busy={busy}
-      onOk={() => void save()}
-      onClose={onClose}
-    >
-      {ordered.length === 0 ? (
-        <p className="small muted">{t(modeKey(org, "agentSetup.apps.empty"), { org: org.name })}</p>
-      ) : (
-        <ul className="level-list setup-dlg__apps" aria-label={t("access.kind.connectors")}>
-          {ordered.map((r) => {
-            const name = resourceName(t, r, items);
-            return (
-              <LevelRow
-                key={r.id}
-                icon={<ResourceIcon resource={r} items={items} name={name} />}
-                name={name}
-                asks={asksAt(r, level(r)).map((x) => toolLabel(t, r, x))}
-                levels={r.levels}
-                value={level(r)}
-                onChange={(l) => setLevelsDraft((d) => ({ ...d, [r.id]: l }))}
-                tag={suggestionOf(r) ? <span className="setup-tag">{t("agentSetup.suggested")}</span> : undefined}
-              />
-            );
-          })}
-        </ul>
-      )}
-      <Button variant="ghost" size="sm" icon="plus" className="setup-dlg__add" onClick={toConnectors}>
-        {t("agentSetup.apps.connectOther")}
-      </Button>
-    </StepDialog>
+    <>
+      <StepDialog
+        title={t("agentSetup.apps.title", g)}
+        description={t("agentSetup.apps.desc")}
+        wide
+        ok={count ? t("agentSetup.apps.ok", { count }) : t("agentSetup.apps.okNone")}
+        busy={busy}
+        onOk={() => void save()}
+        onClose={onClose}
+      >
+        {toConnect.length > 0 && (
+          <ul className="setup-apps" aria-label={t("agentSetup.suggested")}>
+            {toConnect.map((def) => (
+              <li key={def.id} className="setup-apps__row">
+                <ConnectorIcon def={def} label={connectorName(t, def)} />
+                <b>{connectorName(t, def)}</b>
+                <small>{t("agentSetup.suggested")}</small>
+                <Button size="sm" onClick={() => setFlow({ step: 0, def })}>
+                  {t("agentSetup.firstRun.apps.connect")}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {ordered.length === 0 ? (
+          toConnect.length === 0 && (
+            <p className="small muted">{t(modeKey(org, "agentSetup.apps.empty"), { org: org.name })}</p>
+          )
+        ) : (
+          <ul className="level-list setup-dlg__apps" aria-label={t("access.kind.connectors")}>
+            {ordered.map((r) => {
+              const name = resourceName(t, r, items);
+              return (
+                <LevelRow
+                  key={r.id}
+                  icon={<ResourceIcon resource={r} items={items} name={name} />}
+                  name={name}
+                  asks={asksAt(r, level(r)).map((x) => toolLabel(t, r, x))}
+                  levels={r.levels}
+                  value={level(r)}
+                  onChange={(l) => setLevelsDraft((d) => ({ ...d, [r.id]: l }))}
+                  tag={suggestionOf(r) ? <span className="setup-tag">{t("agentSetup.suggested")}</span> : undefined}
+                />
+              );
+            })}
+          </ul>
+        )}
+        <Button variant="ghost" size="sm" icon="plus" className="setup-dlg__add" onClick={toConnectors}>
+          {t("agentSetup.apps.connectOther")}
+        </Button>
+      </StepDialog>
+      {/* Signing in elsewhere comes back to this conversation. */}
+      <ConnectFlow
+        flow={flow}
+        onChange={setFlow}
+        onClose={() => setFlow(null)}
+        returnTo={typeof window === "undefined" ? undefined : window.location.pathname}
+      />
+    </>
   );
 }
 

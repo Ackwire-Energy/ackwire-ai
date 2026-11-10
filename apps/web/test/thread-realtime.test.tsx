@@ -503,7 +503,7 @@ describe("other conversations shown as a thread", () => {
     expect(inView(side, "no dm")).toHaveLength(1);
   });
 
-  test("a task's conversation: a live reply lands, its header counts it", async () => {
+  test("a task's conversation: a live reply lands, its header and the task's line count it", async () => {
     const state = seedState();
     const api = createFakeApi(state);
     const at = await api.issues.conversation(ORG_ID, (await api.issues.get(ORG_ID, 131)).id);
@@ -517,7 +517,14 @@ describe("other conversations shown as a thread", () => {
     await act(async () => socket.open());
     await settle(4);
     const dialog = screen().getByRole("dialog", { name: "Confirmação do agendamento por WhatsApp" });
-    await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: "Conversa" })));
+    // Conversa is in the bar's ⋯, beside the ×.
+    const more = within(dialog).getByRole("button", { name: "Mais opções" });
+    more.focus();
+    await act(async () => fireEvent.keyDown(more, { key: "Enter" }));
+    await settle(2);
+    await act(async () =>
+      fireEvent.click(within(screen().getByRole("menu")).getByRole("menuitem", { name: "Conversa" })),
+    );
     await settle(8);
     await act(async () => socket.push({ type: "subscribed", channelId: at.channelId }));
     await settle(3);
@@ -538,7 +545,7 @@ describe("other conversations shown as a thread", () => {
     await settle(5);
     expect(inView(dialog, "na tarefa")).toHaveLength(1);
     expect(dialog.querySelector(".thread-head__meta")?.textContent).toContain("1 mensagem");
-    expect(within(dialog).getByRole("button", { name: /^Conversa.*1/ })).toBeTruthy();
+    expect(dialog.querySelector(".task-talk__summary")?.textContent).toContain("1 mensagem");
   });
 
   test("a board: a reply in a task's conversation moves its card's count, the conversation closed", async () => {
@@ -559,13 +566,14 @@ describe("other conversations shown as a thread", () => {
     const socket = r.sockets.last();
     await act(async () => socket.open());
     await settle(4);
-    const talking = () => document.querySelector('[data-card="131"] .issue-card__talk')?.textContent;
-    expect(talking()).toContain("3 mensagens");
+    const talking = () =>
+      document.querySelector('[data-card="131"] .ac-factline__fact[title$="mensagens"]')?.textContent;
+    expect(talking()).toBe("3");
     conversation.count = 4;
     await act(async () => socket.push({ type: "event", scope: "org", event: { type: "issue.updated" } }));
     await act(() => new Promise((done) => setTimeout(done, UNREAD_REFRESH_MS + 100)));
     await settle(5);
-    expect(talking()).toContain("4 mensagens");
+    expect(talking()).toBe("4");
   });
 
   test("a mission's thread: a live reply lands", async () => {

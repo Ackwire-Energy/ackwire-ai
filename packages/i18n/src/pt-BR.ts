@@ -703,6 +703,43 @@ export const ptBR = {
       left_other: "Faltam {{count}} etapas",
       done: "Tudo certo",
     },
+    /** The blue rail with Lodi (ADR 0162): its steps, Lodi's line on each, the preview and the plan step. */
+    flow: {
+      steps: {
+        name: "Nome do workspace",
+        business: "O que vocês fazem",
+        team: "Seu time",
+        plan: "Ligar o time",
+      },
+      stepOf: "Passo {{n}} de {{total}}",
+      lodi: {
+        name: "Oi, {{first}}. Eu sou o {{name}}. Vou montar o time com você em uns dois minutos.",
+        name_female: "Oi, {{first}}. Eu sou a {{name}}. Vou montar o time com você em uns dois minutos.",
+        business: "Com isso eu já sei quem chamar para o time.",
+        team: "Esse é o time que eu montaria. Você muda tudo depois.",
+        plan: "Depois do plano, falta só conectar uma IA. Eu mostro onde.",
+      },
+      preview: {
+        label: "O seu workspace, enquanto você responde",
+        /** The workspace's name in the preview until one is typed. */
+        name: "Seu workspace",
+        ghost: "O time aparece aqui",
+      },
+      team: { title: "Seu time" },
+      plan: {
+        title: "Ligue o time",
+        lead: "O time está pronto. Com o plano e uma IA, ele começa hoje.",
+        asleep: "Dormindo até o plano",
+        price: "<b>Plano {{name}}</b> · {{price}} por mês",
+        name: "<b>Plano {{name}}</b>",
+        generic: "Um plano do agentes.chat",
+        cancel: "Cancele quando quiser",
+        cta: "Ligar o time",
+        all: "Ver todos os planos",
+        skip: "Entrar no workspace sem ligar",
+      },
+      account: "Sua conta",
+    },
     railValue: {
       context: "Escrito",
       skipped: "Pulado",
@@ -1342,19 +1379,19 @@ export const ptBR = {
     },
   },
   webPushAsk: {
-    title: "Saiba quando um agente precisar de você",
-    text: "Eles trabalham enquanto você faz outra coisa. Mesmo com a aba fechada, avisamos quando pedem seu ok, terminam o que você pediu ou chamam você.",
     on: "Ativar avisos",
     later: "Agora não",
     done: "Avisos ativados neste navegador",
     failed: "Não deu para ativar os avisos. Tente de novo em Configurações\u00a0›\u00a0Notificações.",
     someone: "Um agente",
-    examples: "Exemplos de avisos",
     now: "agora",
-    minutes: "{{n}} min",
-    approval: { title: "{{name}} pede seu ok", body: "Posso seguir com o que você pediu?" },
     finished: { title: "{{name}} terminou", body: "Está pronto o que você pediu." },
-    mention: { title: "{{name}} chamou você", body: "Dá uma olhada quando puder?" },
+    /** Under an agent's first answer to the person (ADR 0071): never on arrival. */
+    inline: {
+      title: "Quer saber na hora quando o {{name}} responder?",
+      title_female: "Quer saber na hora quando a {{name}} responder?",
+      why: "Mesmo com a aba fechada. Você muda quando quiser em Configurações\u00a0›\u00a0Notificações.",
+    },
   },
   shell: {
     otherChannels: "Outros canais",
@@ -1558,8 +1595,6 @@ export const ptBR = {
     /** Under the agents, only when some aren't listed (they don't talk to me): it opens Equipe, where all are. */
     more_one: "Mais 1 agente na Equipe",
     more_other: "Mais {{count}} agentes na Equipe",
-    createFirst: "Criar o primeiro agente",
-    createFirstPersonal: "Criar seu primeiro agente",
     newAgent: "Novo agente",
     working_one: "{{count}} trabalhando",
     working_other: "{{count}} trabalhando",
@@ -1578,7 +1613,6 @@ export const ptBR = {
     pin: "Fixar no topo",
     unpin: "Tirar do topo",
     pinned: "Fixado no topo",
-    hint: "Seus agentes ficam no topo. Clique com o direito em qualquer conversa para fixar.",
     full: {
       agents: "Você já fixou 5 agentes. Tire um do topo para fixar este.",
       channels: "Você já fixou 5 canais. Tire um do topo para fixar este.",
@@ -2010,6 +2044,8 @@ export const ptBR = {
     popoverTitle: "Agentes",
     seenBy: "Vista por {{names}}",
     retry: "Tentar de novo",
+    /** On its way (`receipts.retry` pressed): the line says so until the server answers. */
+    retrying: "Tentando de novo…",
     platformCap: "Mencione um agente com @ para ele responder.",
     mentionNeeded: "Nenhum agente vai responder sem @",
     mentionNeededHint:
@@ -2032,9 +2068,8 @@ export const ptBR = {
    */
   rightHand: {
     label: "seu braço direito",
+    labelCapitalized: "Seu braço direito",
     newDot: "Novo",
-    role: "Assistente do workspace",
-    rolePersonal: "Assistente pessoal",
     actsAsYou: "age com as suas permissões",
     composerHint: "nada muda sem você",
     /** The top of its DM, drawn by the app (no model): its greeting and the first card the workspace needs. */
@@ -2065,10 +2100,6 @@ export const ptBR = {
         questionPersonal: "Quer montar mais agentes comigo?",
         actionPersonal: "Montar agentes",
         messagePersonal: "Me ajuda a montar os meus agentes.",
-      },
-      next: {
-        firstTask: "Dar a primeira tarefa para o {{name}}",
-        firstTask_female: "Dar a primeira tarefa para a {{name}}",
       },
       /** Asked once, until the person picks (ADR 0147): how every agent here talks to them. */
       style: {
@@ -2440,9 +2471,14 @@ export const ptBR = {
     rightHand: {
       computer_away: "{{name}} não consegue responder agora: o computador do plano está fora do ar.",
       computer_failed: "{{name}} não consegue responder agora: o computador do plano teve um problema.",
+      /** The plan's CLI on that computer failed, not the computer. */
+      cli_failed: "{{name}} não consegue responder agora: a IA do plano parou com um erro.",
       plan_limit: "{{name}} não consegue responder agora: o plano chegou ao limite.",
       plan_not_shared:
         "Conecte o seu plano para conversar com {{name}}: o plano do workspace só atende o próprio dono.",
+      /** Um pedido que não veio de uma pessoa (de outro agente, de uma rotina): o plano de ninguém responderia a ele. */
+      plan_unattended:
+        "{{name}} não respondeu: o pedido não veio de uma pessoa, e o plano do workspace só atende o próprio dono.",
       runner_outdated:
         "{{name}} não consegue responder agora: o programa no computador do plano precisa ser atualizado.",
       plan_tools:
@@ -3703,6 +3739,17 @@ export const ptBR = {
         field: {
           token: "Token da conta de serviço",
         },
+        error: {
+          invalid_input: "Isso não é um token de conta de serviço. Cole o token que começa com ops_.",
+          auth_failed: "O 1Password não aceitou este token. Crie uma nova conta de serviço e cole o token dela aqui.",
+          no_vault:
+            "Esta conta de serviço não tem acesso a nenhum cofre. Crie outra com acesso ao cofre dos seus agentes.",
+          many_vaults:
+            "Esta conta de serviço tem acesso a mais de um cofre. Crie outra com acesso só ao cofre dos seus agentes.",
+          unreachable: "Não deu para falar com o 1Password. Tente de novo em um minuto.",
+          unsupported:
+            "O 1Password não pode ser conectado aqui. Salve no Cofre os logins de que seus agentes precisam.",
+        },
       },
       bitwarden: {
         warning:
@@ -4211,7 +4258,6 @@ export const ptBR = {
       browser: "Navegador",
       members: "Membros",
       usage: "Uso",
-      connectors: "Conectores",
       dashboard: "Painel",
     },
     reactions_one: "{{count}} reação",
@@ -5163,9 +5209,15 @@ export const ptBR = {
         org_deleting: "O workspace está sendo apagado.",
         agent_paused: "O agente está pausado.",
         computer_busy: "O computador continuou ocupado com outras tarefas.",
-        /** A computer brain (Claude Code, Codex) stopped with an error code; the code shows only on hover. */
+        /** The computer's own program (the one that runs the agent's CLI there) failed; its code shows only on hover. */
         computer_failed: "O computador teve um problema e parou.",
         computer_timeout: "O computador demorou demais para responder.",
+        /** The agent's CLI on its computer (`brain`: Claude Code, Codex…) stopped on an error; `detail`: what it said. */
+        cli_failed: "O {{brain}} parou com um erro: {{detail}}",
+        /** The same, when it said nothing about it. */
+        cli_stopped: "O {{brain}} parou com um erro.",
+        /** The agent's CLI ended without its answer and without a word (it crashed or was killed). */
+        cli_closed: "O {{brain}} fechou de repente.",
         account_missing:
           "A conta escolhida para este agente não está mais no computador dele. Escolha outra nas configurações do agente ou adicione de novo.",
         our_error: "Algo deu errado do nosso lado e a tarefa parou. Peça de novo daqui a pouco.",
@@ -5358,6 +5410,20 @@ export const ptBR = {
     include: "Incluir {{name}}",
     acceptAll: "Aceitar para todos",
     acceptSome: "Aceitar para {{count}}",
+    /** At the tabs' right on Propostas de melhoria: the waiting proposals the person may decide (two or more), asked once. */
+    all: {
+      label: "Decidir todas as propostas",
+      accept: "Aceitar todas",
+      refuse: "Recusar todas",
+      acceptAsk_one: "Aceitar a proposta? Ela muda na hora.",
+      acceptAsk_other: "Aceitar as {{count}} propostas? Cada uma muda na hora.",
+      refuseAsk_one: "Recusar a proposta? O agente não propõe isso de novo.",
+      refuseAsk_other: "Recusar as {{count}} propostas? Os agentes não propõem isso de novo.",
+      acceptGo_one: "Aceitar",
+      acceptGo_other: "Aceitar as {{count}}",
+      refuseGo_one: "Recusar",
+      refuseGo_other: "Recusar as {{count}}",
+    },
     staleSome_one: "Uma não foi aceita: o texto mudou desde a proposta.",
     staleSome_other: "{{count}} não foram aceitas: o texto mudou desde a proposta.",
     staleSomeAgent_one: "Uma não foi aceita: o agente mudou desde a proposta.",
@@ -5390,6 +5456,9 @@ export const ptBR = {
     refuseNote_female: "Recusar ensina a {{name}} a não propor isso de novo.",
     added: "Adicionado: ",
     removed: "Removido: ",
+    /** A run of unchanged lines folded away in a change to an agent's instructions or the context. */
+    sameLines_one: "{{count}} linha igual",
+    sameLines_other: "{{count}} linhas iguais",
     empty: "Quando alguém pedir uma mudança a um agente, ou uma lição se repetir, a proposta aparece aqui.",
     emptyTitle: "Nada para revisar",
     titleInstructions: "Atualizar as instruções do {{name}}",
@@ -5537,10 +5606,8 @@ export const ptBR = {
       /** Apps and people on a billing hold: no button, they open with the plan. */
       afterPlan: "Abre com o plano.",
       about: {
-        todo: "Me conte o que a {{org}} faz.",
-        todoDesc: "Todos os agentes leem isso.",
+        /** A personal workspace's row 1, its button (ADR 0159). */
         action: "Contar",
-        done: "Já sei o que a {{org}} faz",
         title: "O que a {{org}} faz?",
         desc: "Todos os agentes leem isso. Você muda quando quiser.",
         line: "Em uma frase",
@@ -5554,18 +5621,11 @@ export const ptBR = {
         optionalPersonal: "Opcional. Sem frase, valem as áreas que você marcou.",
       },
       team: {
-        todo: "Monte o time.",
-        todoDesc: "Um modelo para o seu negócio, você muda tudo depois.",
-        action: "Ver o time",
-        done_one: "{{count}} agente no time",
-        done_other: "{{count}} agentes no time",
         todoPersonal: "Escolha os seus agentes.",
         todoDescPersonal: "Um começo pronto, você muda tudo depois.",
         actionPersonal: "Ver agentes",
         donePersonal_one: "{{count}} agente",
         donePersonal_other: "{{count}} agentes",
-        /** While a team card the right hand proposed waits in the chat. */
-        card: "Continue no card abaixo",
       },
       ai: {
         todo: "Conecte uma IA.",
@@ -5573,8 +5633,6 @@ export const ptBR = {
         action: "Conectar",
         done: "Penso com {{label}}",
         doneAny: "Já penso com uma IA",
-        plan: "Abre com o plano do agentes.chat.",
-        planAction: "Ver planos do agentes.chat",
       },
       apps: {
         todo: "Conecte os apps do trabalho.",
@@ -5599,14 +5657,19 @@ export const ptBR = {
         done_one: "{{count}} pessoa aqui",
         done_other: "{{count}} pessoas aqui",
         doneNone: "Só você por enquanto",
+        /** Invited, not in yet: the row is done, saying who. */
+        invited: "Convidei {{names}} · aguardando",
+        email: "nome@empresa.com",
+        send: "Enviar",
+        more: "Mais opções",
       },
-      /** Its line for a moment once a row is done. */
+      /** Its line for a moment once a row is done (a skip says nothing). */
       say: {
-        about: "Anotado. Todos os agentes leem isso.",
-        team: "O time chegou.",
         ai: "Agora o time pensa.",
         apps: "Pronto, já leio os apps.",
         people: "Que bom ter mais gente aqui.",
+        /** An invitation sent, nobody in yet: it says it went out, and celebrates nothing. */
+        invited: "Convite enviado.",
         aboutPersonal: "Anotado. Todos os seus agentes leem isso.",
         teamPersonal: "Os seus agentes chegaram.",
         aiPersonal: "Agora os seus agentes pensam.",
@@ -5622,26 +5685,6 @@ export const ptBR = {
         whoPersonal: "Qual agente cuida do quê?",
       },
     },
-  },
-  newAgentAsk: {
-    title: "O que o seu novo agente vai fazer?",
-    lead: "Diga numa frase. O {{name}} monta e te mostra antes de criar.",
-    lead_female: "Diga numa frase. A {{name}} monta e te mostra antes de criar.",
-    field: "O que ele faz por você",
-    placeholder: "Ex.: Organizar minha agenda e me lembrar do que importa",
-    ideas: "Ideias",
-    idea: {
-      agenda: { label: "Agenda", text: "Organizar minha agenda e me lembrar dos compromissos" },
-      money: { label: "Finanças", text: "Acompanhar minhas contas e me avisar antes de vencer" },
-      training: { label: "Treino", text: "Montar meus treinos da semana e ajustar pelo que eu sentir" },
-      studies: { label: "Estudos", text: "Montar um plano de estudo e me fazer perguntas sobre o que aprendi" },
-      home: { label: "Casa", text: "Cuidar da lista de compras e das tarefas da casa" },
-      travel: { label: "Viagens", text: "Planejar minhas viagens: roteiro, reservas e documentos" },
-    },
-    full: "Prefiro preencher tudo",
-    create: "Criar com o {{name}}",
-    create_female: "Criar com a {{name}}",
-    message: "Quero um agente novo: {{what}}",
   },
   newAgent: {
     title: "Criar agente",
@@ -6016,6 +6059,219 @@ export const ptBR = {
     routine: "Rotina",
     routineKeep: "Criar a rotina {{name}}",
     routineNotMade: "A rotina não foi criada: {{reason}}",
+    /** How each personal starter and ready-made role introduces itself on its card, in its own voice (ADR 0164). */
+    hello: {
+      clara: "Vou cuidar da sua agenda e te lembrar do que importa antes que seja tarde.",
+      duda: "Vou acompanhar as suas contas e gastos e te avisar antes de algo vencer.",
+      leo: "Vou montar os seus treinos e te manter no ritmo, do seu jeito.",
+      mel: "Vou planejar as suas refeições e a lista de compras, do seu gosto e no seu bolso.",
+      gabi: "Vou montar o seu plano de estudos e te perguntar sobre o que você aprendeu.",
+      lu: "Vou guardar as suas notas e ideias e te ajudar a transformar tudo em texto.",
+      rosa: "Vou cuidar da lista de compras, das tarefas da casa e do que precisa de conserto.",
+      vic: "Vou planejar as suas viagens: datas, preços, reservas e roteiro dia a dia.",
+      rui: "Vou acompanhar os seus clientes, escrever propostas e cobranças e lembrar quem não pagou.",
+      dev: "Programo, reviso PRs e investigo bugs.",
+      ops: "Fico de olho nos erros, nas filas e nos deploys.",
+      qa: "Testo os fluxos e reproduzo os bugs relatados.",
+      pm: "Organizo as tarefas e faço os resumos.",
+      support: "Respondo os clientes e encaminho o que precisa de alguém.",
+      sales: "Preparo propostas e acompanho os interessados.",
+      marketing: "Planejo campanhas, posts e páginas do site.",
+      content: "Escrevo e reviso textos, artigos e newsletters.",
+      data: "Respondo perguntas com números e monto relatórios.",
+      finance: "Acompanho pagamentos, cobranças e gastos.",
+      people: "Ajudo com contratação, boas-vindas e dúvidas do time.",
+      research: "Pesquiso um assunto e entrego um resumo com fontes.",
+      assistant: "Cuido da agenda, dos e-mails e dos lembretes.",
+    },
+    /** A personal starter's instructions and first tasks (ADR 0164), as a ready-made role's. */
+    starters: {
+      clara: {
+        instructions:
+          "Confere a agenda toda manhã e manda o que tem no dia.\nLembra na véspera de cada compromisso e de cada conta com data.\nNunca marca, desmarca nem aceita convite sem perguntar antes.",
+        tasks: {
+          a: "O que eu tenho amanhã?",
+          b: "Me lembre de pagar o aluguel todo dia 5",
+          c: "Mande a minha agenda todo dia às 7h",
+        },
+      },
+      duda: {
+        instructions:
+          "Acompanha as contas e os gastos e separa por categoria.\nAvisa três dias antes de algo vencer e quando um gasto foge do normal.\nNunca paga, transfere nem cancela nada sem perguntar antes.",
+        tasks: {
+          a: "Quanto eu gastei este mês?",
+          b: "Quais contas vencem esta semana?",
+          c: "Organize estes gastos por categoria",
+        },
+      },
+      leo: {
+        instructions:
+          "Monta os treinos pelo seu nível, pelo tempo que você tem e pelo que você gosta.\nAjusta a semana quando você falta ou se cansa, sem sermão.\nNão dá conselho médico: com dor ou lesão, sugere procurar um profissional.",
+        tasks: {
+          a: "Monte um treino de 30 minutos para hoje",
+          b: "Planeje a minha semana de corrida",
+          c: "Mande o treino do dia toda manhã",
+        },
+      },
+      mel: {
+        instructions:
+          "Planeja as refeições da semana pelo seu gosto, tempo e orçamento.\nMonta a lista de compras do cardápio, agrupada por seção do mercado.\nRespeita restrições e alergias e não passa dieta nem conselho médico.",
+        tasks: {
+          a: "Sugira três jantares rápidos",
+          b: "Monte o cardápio da semana",
+          c: "Faça a lista de compras do cardápio",
+        },
+      },
+      gabi: {
+        instructions:
+          "Monta o plano de estudos até a prova, com o que cabe em cada dia.\nFaz perguntas sobre o que você estudou e explica de novo o que você errou.\nNão faz a lição por você: guia até você chegar na resposta.",
+        tasks: {
+          a: "Monte um plano de estudos para a prova",
+          b: "Me faça 3 perguntas sobre o que estudei",
+          c: "Explique este assunto de um jeito simples",
+        },
+      },
+      lu: {
+        instructions:
+          "Guarda as notas e ideias que você manda e junta as parecidas.\nTransforma as notas em texto no seu tom, sem inventar o que você não disse.\nRevisa com cuidado e mostra o que mudou antes de trocar o original.",
+        tasks: { a: "Transforme estas notas num texto curto", b: "Junte as ideias da semana", c: "Revise este texto" },
+      },
+      rosa: {
+        instructions:
+          "Mantém a lista de compras e as tarefas da casa em dia.\nAnota o que precisa de conserto e lembra até resolver.\nNunca compra nem contrata nada sem perguntar antes.",
+        tasks: {
+          a: "Monte a lista de compras da semana",
+          b: "O que precisa de conserto em casa?",
+          c: "Divida as tarefas da casa",
+        },
+      },
+      vic: {
+        instructions:
+          "Planeja a viagem com datas, preços e um roteiro dia a dia.\nCompara passagens e hospedagens e diz por que sugere cada uma.\nNunca reserva nem paga nada sem perguntar antes.",
+        tasks: { a: "Planeje 3 dias em Lisboa", b: "Me avise se a passagem baixar", c: "Junte as reservas da viagem" },
+      },
+      rui: {
+        instructions:
+          "Acompanha cada cliente: o que foi combinado, o que falta e quem não pagou.\nEscreve propostas e lembretes de cobrança no seu tom, prontos para revisar.\nNunca envia nada a um cliente sem a sua aprovação.",
+        tasks: {
+          a: "Escreva uma proposta curta para um cliente",
+          b: "Quem ainda não pagou?",
+          c: "O que cada cliente espera hoje?",
+        },
+      },
+    },
+  },
+  /** A new agent's dialog (ADR 0164): pick on the left, its card edited in place on the right; its chat's band. */
+  newAgentCard: {
+    title: "Novo agente",
+    lead: "Escolha à esquerda e ajuste à direita. Dá para mudar tudo depois.",
+    list: "Pontos de partida",
+    zero: "Do zero",
+    zeroSub: "Você diz o que ele faz",
+    import: "Trazer agentes de outro app",
+    hi: "Oi, eu sou o",
+    hi_female: "Oi, eu sou a",
+    hiBlank: "Oi, eu sou",
+    name: "Nome",
+    namePlaceholder: "nome",
+    what: "O que faz",
+    whatPlaceholder: "O que eu vou fazer por você?",
+    look: "Aparência",
+    lookDone: "Pronto",
+    shuffle: "Sortear",
+    handle: "No chat: @{{handle}}",
+    handleRole: "No chat: @{{handle}} · {{role}}",
+    handleTaken: "No chat: @{{handle}} · já tem um {{name}} aqui",
+    handleTaken_female: "No chat: @{{handle}} · já tem uma {{name}} aqui",
+    handleBlank: "O @ para chamar no chat vem do nome",
+    similar: "Parecido com o {{name}}, que já vem pronto.",
+    similar_female: "Parecido com a {{name}}, que já vem pronta.",
+    similarAction: "Começar pelo {{name}}",
+    similarAction_female: "Começar pela {{name}}",
+    uses: "Vai usar",
+    chooseApps: "Escolher apps",
+    otherApp: "Outro app",
+    /** "Vai usar" or Skills with nothing on the card yet. */
+    usesNone: "Nada por enquanto.",
+    worksIn: "Trabalha em",
+    /** Its instructions, edited on the card. */
+    how: "Como o {{name}} trabalha",
+    how_female: "Como a {{name}} trabalha",
+    howBlank: "Como ele trabalha",
+    instructionsPlaceholder: "O que ele faz, o que evita, a quem pede ajuda",
+    /** "Outro app": the catalog as rows, its starting point's apps first. */
+    picker: {
+      title: "Apps do {{name}}",
+      title_female: "Apps da {{name}}",
+      titleBlank: "Apps do agente",
+      lead: "Um app conectado entra no cartão na hora. Os outros você conecta aqui mesmo.",
+      suggested: "Sugeridos para o {{name}}",
+      suggested_female: "Sugeridos para a {{name}}",
+      suggestedBlank: "Sugeridos",
+      use: "Usar",
+      added: "No cartão",
+    },
+    create: "Criar {{name}}",
+    createBlank: "Criar agente",
+    failed: "Não deu para criar: {{reason}}",
+    level: {
+      read: "Lê",
+      write: "Lê e escreve",
+    },
+    app: {
+      lead: "Até onde o {{name}} vai em {{app}}.",
+      lead_female: "Até onde a {{name}} vai em {{app}}.",
+      leadBlank: "Até onde ele vai em {{app}}.",
+      read: "Ler",
+      readDesc: "Vê o que tem em {{app}}. Não muda nada.",
+      write: "Ler e escrever",
+      writeDesc: "Também cria e edita em {{app}}.",
+      asks: "{{actions}} sempre pedem a sua aprovação, em qualquer nível.",
+      asksAny: "Enviar, apagar e pagar sempre pedem a sua aprovação, em qualquer nível.",
+      remove: "Tirar {{app}}",
+      done: "Pronto",
+    },
+    band: {
+      label: "O que o {{name}} precisa para começar",
+      label_female: "O que a {{name}} precisa para começar",
+      ai: "Uma IA para pensar",
+      asleep: "Dormindo até ter uma IA",
+    },
+    skills: "Skills",
+    skillsHelpBlank: "Manuais que ele abre quando precisa.",
+    chooseSkills: "Escolher skills",
+    otherSkill: "Outra skill",
+    namesLead: "Que tal",
+    namesRoll: "Outros nomes",
+    /** One skill on the card. */
+    skill: {
+      opens: "O {{name}} abre este manual quando o assunto aparece. Você edita em Skills.",
+      opens_female: "A {{name}} abre este manual quando o assunto aparece. Você edita em Skills.",
+      opensBlank: "Ele abre este manual quando o assunto aparece. Você edita em Skills.",
+      remove: "Tirar do {{name}}",
+      remove_female: "Tirar da {{name}}",
+      removeBlank: "Tirar do agente",
+      done: "Pronto",
+    },
+    /**
+     * Name ideas for an agent from scratch, by what it will do: names (comma-separated, fit for this language) and
+     * the word beginnings that pick each theme; `any` when none fits.
+     */
+    names: {
+      agenda: "Lia, Hora, Teca, Dora, Tito, Ema",
+      agendaWords: "agenda, compromiss, consult, lembr, horári, reuni",
+      money: "Cida, Nico, Duda, Ciro, Lara, Tadeu",
+      moneyWords: "conta, gasto, dinheiro, finan, boleto, pagar",
+      travel: "Rota, Malu, Ravi, Vic, Nara, Tom",
+      travelWords: "viag, passag, hotel, roteiro, férias, voo",
+      training: "Léo, Bia, Raio, Kai, Nina, Davi",
+      trainingWords: "treino, corr, academia, exerc",
+      study: "Gabi, Nilo, Sofia, Teo, Íris, Benji",
+      studyWords: "estud, prova, curso, aprend",
+      clients: "Rui, Ana, Bento, Lis, Otto, Clô",
+      clientsWords: "client, venda, proposta, cobran",
+      any: "Sol, Lia, Teo, Bia, Nino, Iara, Caio, Luma, Gil, Rafa, Nara, Tom",
+    },
   },
   members: {
     /** The channel's members column (and its sheet on a phone). */
@@ -6812,20 +7068,19 @@ export const ptBR = {
     statusLabel: "Status",
     due: "Prazo",
     noDue: "Sem prazo",
-    seeCalendar: "ver no calendário",
+    seeCalendar: "Ver no calendário",
     removeDue: "Tirar o prazo",
     links: "Ligados",
     prBy: "PR #{{number}} · aberto por {{name}}",
     artifactBy: "{{title}} ({{name}})",
-    noLinks: "Nada ligado ainda.",
     github: {
       label: "Link do GitHub",
       placeholder: "Link da issue ou PR",
       invalid: "Esse não é o link de uma issue ou pull request do GitHub.",
       remove: "Remover o link do GitHub",
+      add: "Adicionar link do GitHub",
     },
     openConversation: "Ver conversa",
-    labels: "Etiquetas",
     tabs: { label: "Partes da tarefa", details: "Detalhes", files: "Anexos", history: "Histórico" },
     files: {
       title: "Anexos",
@@ -7467,6 +7722,8 @@ export const ptBR = {
       computer_busy: "O computador continuou ocupado com outras tarefas",
       computer_failed: "O computador teve um problema e parou",
       computer_timeout: "O computador demorou demais para responder",
+      /** The agent's CLI on its computer (Claude Code, Codex…) stopped on an error of its own. */
+      cli_failed: "A IA do computador parou com um erro",
       account_missing: "A conta do agente não está mais no computador dele",
       our_error: "Algo deu errado do nosso lado",
     },
@@ -8565,6 +8822,9 @@ export const ptBR = {
     },
     upcoming: "Próximos",
     upcomingEmpty: "Nada marcado pela frente.",
+    /** The side panel's list of whose items are in view, each with a box that shows or hides them. */
+    owners: "Agentes e pessoas",
+    showOwner: "Mostrar {{name}}",
     viewZone: "Fuso do calendário",
     miniMonth: "Escolher dia",
     new: "Novo evento",
@@ -8590,29 +8850,28 @@ export const ptBR = {
         declined: "Você não vai.",
       },
     },
-    kind: { event: "Evento", routine: "Rotina", reminder: "Lembrete", deadline: "Prazo de tarefa" },
     every: { hour: "a cada hora", hours: "a cada {{count}} h", minutes: "a cada {{count}} min" },
     perDay: "{{count}}× por dia",
     runs_one: "{{count}} execução nestes dias.",
     runs_other: "{{count}} execuções nestes dias.",
-    routineDetail: "Rotina de {{agent}} · entrega em {{target}}.",
+    /** Under a run's title in its details; the agent's name and face are the line above. */
+    routineDetail: "Rotina · entrega em {{target}}",
     deadlineDetail: "Prazo da tarefa.",
     reminderBy: "Criado por {{name}}",
-    reminderPosted: "Postado por {{agent}} · {{target}}",
+    /** Under a reminder's title in its details; the agent that posts it is the line above. */
+    reminderPosted: "Lembrete · postado em {{target}}",
     cancelReminder: "Cancelar lembrete",
     reminderCancelled: "Lembrete cancelado",
     openIssue: "Abrir tarefa",
     openRoutines: "Ver em Rotinas",
     openRoutine: "Abrir rotina",
     runAria: "Rotina {{name}}, {{time}}",
-    runsAria: "{{count}} rotinas às {{time}}: {{names}}",
+    /** An item's hover: its name, whose it is, when. */
     runHint: "{{name}} · {{agent}} · {{time}}",
     runsAt: "Rotinas às {{time}}",
-    runsOn: "Rotinas · {{day}}",
-    runsCount_one: "{{count}} execução de rotina",
-    runsCount_other: "{{count}} execuções de rotinas",
-    dayRunsAria_one: "{{count}} execução de rotina em {{day}}: {{names}}",
-    dayRunsAria_other: "{{count}} execuções de rotinas em {{day}}: {{names}}",
+    /** Under a stack of routine runs in the week: the runs it doesn't show, which it opens. */
+    moreRuns_one: "+{{count}} rotina",
+    moreRuns_other: "+{{count}} rotinas",
     runTimes: "×{{count}}",
     result: { ok: "respondeu", silent: "nada novo", failed: "falhou", skipped: "não rodou" },
     lastResult: "última: {{result}}",
@@ -9324,22 +9583,6 @@ export const ptBR = {
       empty: "Nenhuma figurinha encontrada.",
       foot: "Feitas do visual de cada agente",
     },
-  },
-  memoryMark: {
-    label: "{{name}} guardou isso na memória: {{text}}",
-    saved: "{{name}} guardou isso:",
-    title: "{{name}} guardou na memória",
-    subtitle: "Vai lembrar disso nas próximas conversas",
-    from: "Da mensagem de {{name}} · {{time}}",
-    view: "Ver na memória",
-    fix: "Corrigir",
-    fixLabel: "Corrigir o que foi guardado",
-    save: "Salvar",
-    forget: "Esquecer",
-    forgot: "{{name}} esqueceu isso",
-    undo: "Desfazer",
-    fixed: "Memória corrigida",
-    fixedDetail: "{{name}} vai usar a versão nova daqui em diante.",
   },
   correctionAsk: {
     title: "Quer que {{name}} refaça ou explique o que faltou?",
@@ -10490,6 +10733,9 @@ export const ptBR = {
     noChannel: "Sem canal",
     files: "Arquivos",
     select: "Selecionar {{title}}",
+    /** The list's head checkbox and the selection bar's button: everything the Drive shows now. */
+    selectAll_one: "Selecionar {{count}}",
+    selectAll_other: "Selecionar os {{count}}",
     selection: "Seleção",
     selected_one: "{{count}} selecionado",
     selected_other: "{{count}} selecionados",
@@ -10700,7 +10946,11 @@ export const ptBR = {
       line: {
         env: "Definido nas configurações deste servidor (GITHUB_APP_ID).",
         invalid: "Este servidor não consegue abrir o app salvo. Remova e crie de novo.",
+        /** O app não assina o que os agentes ouvem no GitHub: `events` são os nomes que o próprio GitHub dá a eles. */
+        events: "Para os agentes ouvirem o que acontece no GitHub, marque estes eventos no app: {{events}}.",
       },
+      /** Abre a página Permissions & events do app no GitHub. */
+      events: "Marcar os eventos",
       open: "Abrir no GitHub",
       remove: "Remover o app",
       removeTitle: "Remover o app do GitHub deste servidor?",
@@ -11035,35 +11285,6 @@ export const ptBR = {
       limitNotice: "As chamadas da Composio deste mês acabaram",
       disconnectNote:
         "A Composio esquece a conta. Para tirar o acesso também no {{name}}, remova a Composio nas configurações da sua conta de lá.",
-    },
-    toolChanges: {
-      title: "Ferramentas que mudaram",
-      intro:
-        "Estes servidores mudaram o que uma ferramenta diz ou pede. Os agentes seguem com a versão aprovada até você aceitar a nova.",
-      count_one: "{{count}} ferramenta mudou",
-      count_other: "{{count}} ferramentas mudaram",
-      acceptAll: "Aceitar todas",
-      acceptedAll: "Ferramentas do {{name}} atualizadas.",
-      show: "Ver a mudança",
-      hide: "Esconder",
-      showAll: "Mostrar todas ({{total}})",
-      textChanged: "O texto mudou",
-      fieldsChanged_one: "{{count}} campo mudou",
-      fieldsChanged_other: "{{count}} campos mudaram",
-      inputChanged: "A entrada mudou",
-      description: "Texto",
-      input: "Entrada",
-      field: {
-        added: "novo",
-        removed: "removido",
-        changed: "mudou",
-      },
-      added: "Adicionado",
-      removed: "Removido",
-      accept: "Aceitar",
-      acceptOne: "Aceitar {{tool}}",
-      accepted: "{{tool}} atualizada.",
-      notice: "{{name}} mudou ferramentas que você aprovou",
     },
     names: {
       atlassian: "Atlassian (Jira e Confluence)",
@@ -12061,6 +12282,10 @@ export const ptBR = {
       invalidSecret: "Cole o Client Secret inteiro, sem espaços.",
       invalidRepo: "Escreva o repositório como dono/nome.",
     },
+    /** "Pedir resposta" num aviso do GitHub que outra pessoa já pediu (a linha muda logo depois). */
+    githubEvent: {
+      answered: "Alguém já pediu essa resposta. O agente já foi chamado.",
+    },
     issue: {
       assigneeOutside: "Essa pessoa não vê esta tarefa. Inclua ela em Quem vê primeiro.",
       stageFull: "Uma etapa tem no máximo {{max}} colunas. Exclua uma das colunas dela antes.",
@@ -12244,6 +12469,8 @@ export const ptBR = {
       agentBusy: "O agente já está trabalhando nesta conversa. Espere ele terminar para continuar.",
       continueForbidden: "Só quem pediu, o dono do agente ou um admin pode continuar.",
       notRestartable: "Esta resposta já tinha começado, então não dá para recomeçar. Mande a mensagem de novo.",
+      /** The same refusal for a voice message: its words are never sent again as text. */
+      notRestartableVoice: "Esta resposta já tinha começado, então não dá para recomeçar. Grave a mensagem de novo.",
       cancelForbidden: "Só quem pediu, o dono do agente ou um admin pode parar.",
       answerForbidden: "Só quem pediu, o dono do agente ou um admin pode fazer isso.",
       stopReasonForbidden: "Só quem parou pode dizer o motivo.",
@@ -12381,6 +12608,10 @@ export const ptBR = {
         invalidInput: "Confira os campos e tente de novo.",
         tooManyItems: "O Cofre está cheio. Apague itens antes de sincronizar mais.",
       },
+    },
+    feedback: {
+      filesGone: "Um arquivo que você anexou sumiu. Anexe de novo.",
+      filesPending: "Há arquivos demais esperando para ser enviados. Envie ou tire alguns e tente de novo.",
     },
   },
   machines: {
@@ -14253,6 +14484,14 @@ export const ptBR = {
       "Estou no meio de uma tarefa ({{duration}}) e ainda não consigo responder. Sua mensagem está na fila e eu leio quando esta rodada de trabalho terminar.",
     statusReplyQueued: "Aguardando o computador ({{duration}}). Leio sua mensagem quando chegar minha vez.",
     statusReplyAway: "Aguardando meu computador voltar. Leio sua mensagem assim que ele voltar.",
+    /** A mesma linha para um agente esperando o plano renovar: {{when}} é quando ele volta ("quarta às 14:00"). */
+    statusReplyPlan: "Estou esperando o plano voltar ({{when}}). Leio sua mensagem quando ele voltar.",
+    statusReplyPlanUnknown: "Estou esperando o plano voltar. Leio sua mensagem assim que ele voltar.",
+    /** A mesma linha para um agente cujo orçamento do mês acabou. */
+    statusReplyBudget:
+      "Estou esperando meu orçamento do mês renovar ({{when}}). Leio sua mensagem quando ele renovar, ou antes se um admin aumentar o limite.",
+    statusReplyBudgetUnknown:
+      "Estou esperando meu orçamento do mês renovar. Leio sua mensagem quando ele renovar, ou antes se um admin aumentar o limite.",
     status: {
       one: "Trabalhando em: {{subject}}",
       oneUntitled: "Trabalhando em segundo plano",
@@ -14429,6 +14668,28 @@ export const ptBR = {
         "Só algumas pessoas podem chamar {{agents}}, e este trabalho de {{name}} não veio de nenhuma delas. Alguém que pode chamar {{agents}} passa o pedido adiante.",
       wakeSkippedCallable:
         "As configurações de {{name}} não deixam chamar {{agents}} (outro projeto, ou fora da lista de agentes que pode chamar). Quem cuida de {{name}} muda isso na página do agente.",
+      /**
+       * O que aconteceu no GitHub num item em que um agente trabalhou, ou que chamou o app: `who` é o nome do membro
+       * ou o login no GitHub, `name` o do agente. "Ver" abre o que a pessoa escreveu lá e o link.
+       */
+      github: {
+        comment: "{{who}} comentou no PR #{{number}} ({{repo}}) no GitHub",
+        commentIssue: "{{who}} comentou na issue #{{number}} ({{repo}}) no GitHub",
+        commentDiscussion: "{{who}} comentou na discussão #{{number}} ({{repo}}) no GitHub",
+        /** Um PR, issue ou discussão novo que menciona o app. */
+        opened: "{{who}} chamou o app agentes.chat em #{{number}} ({{repo}}) no GitHub",
+        reviewed: "{{who}} revisou o PR #{{number}} ({{repo}}) no GitHub",
+        approved: "{{who}} aprovou o PR #{{number}} ({{repo}}) no GitHub",
+        changes: "{{who}} pediu mudanças no PR #{{number}} ({{repo}}) no GitHub",
+        reviewRequested: "{{who}} pediu a revisão de {{name}} no PR #{{number}} ({{repo}}) no GitHub",
+        merged: "{{who}} fez o merge do PR #{{number}} ({{repo}}) no GitHub",
+        closed: "{{who}} fechou o PR #{{number}} ({{repo}}) no GitHub",
+        closedIssue: "{{who}} fechou a issue #{{number}} ({{repo}}) no GitHub",
+        /** Na linha de alguém a quem o agente não responde: uma pessoa daqui pede para o agente responder lá. */
+        ask: "Pedir resposta",
+        /** A linha depois que alguém pediu (`asker`), no lugar do botão. */
+        asked: "{{asker}} pediu para {{name}} responder a {{who}} no GitHub",
+      },
       show: "Ver",
       hide: "Ocultar",
       talker: "enquanto trabalha",
@@ -14573,6 +14834,7 @@ export const ptBR = {
         startingWork: "Começou um trabalho longo",
         updatingWork: "Atualizou um trabalho longo",
         withdrawingRequest: "Retirou um pedido",
+        releasingAgent: "Liberou um agente que esperava",
         schedulingAction: "Preparou uma ação para depois",
         updatingDashboard: "Mexeu num painel",
         testingOnPhone: "Testou num celular",
@@ -14584,6 +14846,7 @@ export const ptBR = {
         sendingDm: "Enviou uma mensagem direta",
         settingStatus: "Atualizou o próprio status",
         settingReplyStyle: "Ajustou como responde",
+        sendingFeedback: "Pediu para enviar um feedback",
         deletingRoutine: "Apagou uma rotina",
         runningRoutine: "Rodou uma rotina agora",
         proposingTeam: "Propôs um time",
@@ -14684,6 +14947,7 @@ export const ptBR = {
       startingWork: "começando um trabalho longo",
       updatingWork: "atualizando um trabalho longo",
       withdrawingRequest: "retirando um pedido",
+      releasingAgent: "liberando um agente que esperava",
       schedulingAction: "preparando uma ação para depois",
       updatingDashboard: "mexendo num painel",
       testingOnPhone: "testando num celular",
@@ -14695,6 +14959,7 @@ export const ptBR = {
       sendingDm: "enviando uma mensagem direta",
       settingStatus: "atualizando o próprio status",
       settingReplyStyle: "ajustando como responde",
+      sendingFeedback: "preparando um feedback",
       deletingRoutine: "apagando uma rotina",
       runningRoutine: "rodando uma rotina agora",
       proposingTeam: "propondo um time",
@@ -14846,9 +15111,12 @@ export const ptBR = {
       no_ai_not_signed_in: "Ainda não consigo responder: o {{brain}} está sem login no meu computador.",
       no_ai_computer_away: "Agora não consigo responder: o computador do meu plano está fora do ar.",
       no_ai_computer_failed: "Agora não consigo responder: o computador do meu plano teve um problema.",
+      no_ai_cli_failed: "Agora não consigo responder: a IA do meu plano parou com um erro.",
       no_ai_plan_limit: "Agora não consigo responder: o plano com que eu penso chegou ao limite.",
       no_ai_plan_not_shared:
         "Não consigo te responder pelo plano do workspace: ele só atende o próprio dono. Conecte o seu plano e eu respondo.",
+      no_ai_plan_unattended:
+        "Não respondi: o pedido não veio de uma pessoa, e o plano do workspace só atende o próprio dono.",
       no_ai_runner_outdated:
         "Agora não consigo responder: o programa no computador do meu plano precisa ser atualizado.",
       no_ai_plan_tools:
@@ -15649,6 +15917,8 @@ export const ptBR = {
     createRefused: "Você não pode criar um workspace agora.",
     createUnpaid:
       "Você já tem um workspace esperando um plano do agentes.chat. Escolha o plano dele antes de criar outro.",
+    /** The button under it: into the workspace they already have. */
+    createUnpaidOpen: "Abrir {{name}}",
     /** The same refusal with no call to pay, for the phone app: the stores allow paying only in their own flow. */
     createInactive: "Você já tem um workspace que ainda não está ativo, então não dá para criar outro por enquanto.",
     agentPaused: "Este agente está pausado por enquanto.",
@@ -16745,7 +17015,12 @@ export const ptBR = {
       text: "Peça um widget a um agente ou fixe um bloco do chat, e ele se atualiza aqui.",
       viewer: "Quem edita este painel adiciona os widgets, e eles aparecem aqui.",
     },
-    onlyHome: "Crie um painel para o workspace ou para alguns papéis em “Novo painel”.",
+    /** With only Meu Início: what a dashboard is, with Novo painel and an ask to the right hand (`ask`, its draft). */
+    first: {
+      title: "Monte o primeiro painel do time",
+      text: "Um painel junta números e gráficos numa página, e os agentes mantêm tudo em dia.",
+      ask: "Me ajuda a montar o primeiro painel do time.",
+    },
     create: {
       title: "Novo painel",
       subtitle: "Widgets juntos numa página, para você ou para o time.",
@@ -16948,10 +17223,8 @@ export const ptBR = {
     firstTask: {
       suggestion: "sugestão",
       lead: "Uma tarefa curta por agente, para você ver cada um trabalhando hoje.",
-      heldLead:
-        "Uma tarefa curta por agente. Complete a frase e envie. Eles começam quando o workspace tiver um plano do agentes.chat.",
-      example: "Exemplo do que {{name}} entrega",
       open: "Abrir com a tarefa",
+      finish: "Complete a frase e envie",
       invite: "Convidar {{names}}",
       later: "Depois",
     },
@@ -17162,11 +17435,11 @@ export const ptBR = {
     },
     software: {
       name: "Software e apps",
-      sub: "Suporte, cobrança e código",
+      sub: "Atendimento, cobrança e código",
       desc: "Para quem vende um sistema e cuida dos próprios clientes.",
     },
     support: {
-      name: "Atendimento e suporte",
+      name: "Atendimento ao cliente",
       sub: "Fila de clientes e base de respostas",
       desc: "Para um time que atende muitos clientes todo dia.",
     },
@@ -17175,54 +17448,76 @@ export const ptBR = {
       sub: "Contabilidade, advocacia, consultoria",
       desc: "Para um escritório que agenda clientes, manda propostas e cobra.",
     },
+    /** The team's hello in #general once it can work (ADR 0162): Lodi's line, then each agent's. */
+    hello: {
+      lodi: {
+        starting: "Plano ativo. Meu computador já está iniciando. Vamos começar o trabalho.",
+        ready: "Plano ativo. Vamos começar o trabalho.",
+        created: "Time montado. Vamos começar o trabalho.",
+      },
+      /** The same, while no AI is connected: the plan brings none, and the bar under the lines connects one. */
+      lodiNoAi: {
+        starting: "Plano ativo. Meu computador já está iniciando. Conecte uma IA e a gente começa o trabalho.",
+        ready: "Plano ativo. Conecte uma IA e a gente começa o trabalho.",
+        created: "Time montado. Conecte uma IA e a gente começa o trabalho.",
+      },
+    },
     agents: {
       iara: {
         role: "Atendimento",
         line: "Responde os clientes no WhatsApp e no e-mail. Chama você quando não sabe.",
         routine: "Resumir o que ficou sem resposta",
         task: "Escreva uma resposta para esta mensagem de cliente:",
+        hello: "Oi, {{first}}. Deixa comigo quem escrever no WhatsApp.",
       },
       caio: {
         role: "Cobrança",
         line: "Lembra quem atrasou o pagamento e manda a cobrança depois do seu ok.",
         routine: "Listar quem está com o pagamento atrasado",
         task: "Escreva um lembrete gentil de pagamento para:",
+        hello: "Olá. Cuido das cobranças e só mando lembrete depois do seu ok.",
       },
       ada: {
         role: "Dev",
         line: "Corrige os bugs que os clientes reportam e abre o PR.",
         routine: "Listar os bugs novos",
         task: "Me diga por onde começar a investigar este bug:",
+        hello: "Oi. Me passem os bugs que chegarem, eu investigo e abro o PR.",
       },
       lia: {
         role: "Conteúdo",
         line: "Escreve posts e roteiros no tom da empresa e agenda depois do seu ok.",
         routine: "Propor os posts da semana",
         task: "Proponha três posts para esta semana sobre:",
+        hello: "Oi, pessoal. Os posts da semana ficam comigo.",
       },
       theo: {
         role: "Vendas",
         line: "Segue quem pediu orçamento e escreve as propostas.",
         routine: "Listar quem pediu orçamento e ficou sem resposta",
         task: "Escreva um orçamento curto para este pedido:",
+        hello: "Oi, {{first}}. Ninguém que pedir orçamento vai ficar sem resposta.",
       },
       nina: {
         role: "Agenda",
         line: "Marca, confirma e remarca horários, e lembra os clientes na véspera.",
         routine: "Confirmar os horários de amanhã",
         task: "Organize estes horários de amanhã:",
+        hello: "Olá. A agenda fica comigo, e lembro os clientes na véspera.",
       },
       otto: {
         role: "Pedidos",
         line: "Acompanha pedidos e estoque e avisa o que está acabando.",
         routine: "Avisar o que está acabando no estoque",
         task: "Liste o que falta fazer nestes pedidos:",
+        hello: "Cheguei. Fico de olho nos pedidos e aviso se faltar algo no estoque.",
       },
       bia: {
         role: "Base de respostas",
         line: "Mantém a base de respostas em dia com o que o time responde.",
         routine: "Atualizar a base com as respostas da semana",
         task: "Escreva as respostas para estas perguntas de clientes:",
+        hello: "Oi. Vou manter a base de respostas em dia com o que o time responder.",
       },
       clara: {
         role: "Agenda e lembretes",
@@ -17279,18 +17574,6 @@ export const ptBR = {
         task: "Escreva uma proposta curta para este cliente:",
       },
     },
-    example: {
-      iara: "Oi, Marina. Seu pedido saiu ontem e chega até sexta. O código de rastreio está aqui embaixo. Se sexta não for bom, eu vejo outra data.",
-      lia: "1. Três erros comuns ao contratar uma agência. 2. Os bastidores de um projeto que quase deu errado. 3. Uma pergunta para quem segue vocês: o que querem ver aqui?",
-      nina: "Amanhã: 9h Carla, 10h30 Pedro, 14h livre. O Pedro ainda não confirmou. Quer que eu escreva para ele?",
-      clara:
-        "Hoje: 9h dentista, 12h30 almoço com a Paula, 18h buscar a encomenda. Amanhã é aniversário da sua mãe. Quer que eu lembre você de manhã?",
-      leo: "Hoje, 30 minutos: 5 de aquecimento, 3 rodadas de 12 agachamentos, 10 flexões e 30 segundos de prancha, depois 5 de alongamento. Me conte como foi que eu ajusto o de quarta.",
-      gabi: "Assunto de hoje: fotossíntese. Em resumo, as plantas transformam luz, água e gás carbônico em açúcar e oxigênio. Três perguntas: onde acontece, o que entra e o que sai?",
-      rosa: "Nesta semana: arroz, feijão, ovos, banana, café e detergente. Em casa: trocar os lençóis na quinta e chamar alguém para a torneira da cozinha.",
-      vic: "Lisboa em 3 dias: dia 1, Alfama e o castelo. Dia 2, Belém e a beira do rio. Dia 3, Sintra. Os voos mais baratos são na terça, dia 12. Quer que eu fique de olho no preço?",
-      rui: "Oi, Marcos, segue a proposta: um site novo com 5 páginas, entregue em 3 semanas, pago em duas vezes. Se estiver bom para você, mando o contrato hoje.",
-    },
     channels: {
       iara: "atendimento",
       caio: "financeiro",
@@ -17330,5 +17613,67 @@ export const ptBR = {
     approvals: "O que sai para os clientes espera a sua aprovação. Dá para liberar depois, quando você confiar neles.",
     approvalsPersonal:
       "O que for enviado, pago ou reservado em seu nome espera a sua aprovação. Dá para liberar depois, quando você confiar neles.",
+  },
+  /** Right after the onboarding (ADR 0160): the beta notice, then Connect an AI with the team beside it. */
+  arrival: {
+    beta: {
+      word: "BETA",
+      title: "Você chegou cedo. Que bom.",
+      text: "O agentes.chat está em beta: já dá para trabalhar de verdade com ele, e ainda estamos lapidando.",
+      weekly: {
+        title: "Melhora toda semana",
+        text: "Novidades e correções saem o tempo todo.",
+      },
+      fails: {
+        title: "Às vezes algo falha",
+        text: "Se travar ou ficar estranho, o problema é nosso, não seu.",
+      },
+      feedback: {
+        title: "O seu feedback decide o que vem",
+        text: "Conte o que faltou ou incomodou. A gente lê tudo.",
+      },
+      where: "Para escrever para a gente, use Enviar feedback, no fim da barra lateral.",
+    },
+    stage: {
+      ready: "O seu time está pronto",
+      wake: "Só falta uma IA para ele acordar.",
+      morning: "Bom dia, time",
+      awake: "Todo mundo acordou e já pensa.",
+    },
+    connect: {
+      title: "Conecte uma IA para o seu time pensar",
+      text: "Use uma assinatura que você já tem. Nada muda no seu plano.",
+      others: "Outro plano",
+      free: "Começar grátis",
+      freeText: "Com os modelos grátis do OpenCode",
+      noPlan: "Sem assinatura",
+      without: "Sem uma IA, os agentes não respondem.",
+      later: "Agora não",
+    },
+  },
+  /** The feedback form behind the Beta mark (ADR 0160): what the person writes goes by email. */
+  feedback: {
+    mark: "Beta",
+    open: "Enviar feedback",
+    ask: "O que faltou, quebrou ou incomodou?",
+    goesCloud: "O que você escrever vai por e-mail para o time do agentes.chat.",
+    goesServer: "O que você escrever vai por e-mail para quem administra este servidor.",
+    placeholder: "Escreva do seu jeito",
+    report: "Reportar um problema aqui",
+    aboutMessage: "Sobre a mensagem de {{name}}",
+    aboutItem: "Sobre: {{name}}",
+    aboutThis: "Sobre o que você clicou",
+    aboutDrop: "Não enviar este trecho",
+    attach: "Anexar foto ou vídeo",
+    filesHint: "Até {{images}} fotos de {{imageMb}} MB e um vídeo de {{videoMb}} MB, guardados por {{days}} dias.",
+    removeFile: "Tirar {{name}}",
+    uploading: "Enviando {{name}}",
+    fileType: "Só dá para anexar foto ou vídeo.",
+    fileTooLarge: "{{name}} é grande demais: o limite é {{mb}} MB.",
+    fileTooMany: "Um feedback leva até {{images}} fotos e um vídeo.",
+    send: "Enviar",
+    thanks: "Recado entregue. Obrigado.",
+    reply: "Tudo é lido. A resposta, se precisar, chega em {{email}}.",
+    another: "Enviar outro",
   },
 } satisfies LocaleStrings;

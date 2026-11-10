@@ -114,6 +114,7 @@ import { entityMenu } from "@/lib/entity-menu";
 import { useOpenParam } from "@/lib/open-param";
 import { markOpen } from "@/lib/perf";
 import { ownPlanLines, planNearLimit, planWord } from "@/lib/plan-usage";
+import { useScrollEdges } from "@/lib/scroll-edges";
 import { rightHandSeen, STORAGE_KEYS, sessionStore, storage, storedStrings } from "@/lib/storage";
 import { useToast } from "@/lib/toast";
 import type { SettingsSection } from "@/pages/settings-sections";
@@ -123,6 +124,7 @@ import { AddPasswordDialog } from "./AddPassword";
 import { AgentAvatar } from "./AgentAvatar";
 import { type GroupDialogFor, GroupNameDialog, useAgentDrag, useMoveAgent } from "./AgentGroups";
 import { ArchivedChannelsDialog } from "./ArchivedChannelsDialog";
+import { FeedbackMark } from "./arrival/FeedbackDialog";
 import { MoveChannelDialog, NewCategoryDialog, RenameCategoryDialog } from "./ChannelCategoryDialogs";
 import { openPalette } from "./CommandMenu";
 import { DeleteAccountDialog } from "./DeleteAccount";
@@ -131,8 +133,8 @@ import { useAgentMenu, useChannelMenu, usePersonMenu } from "./entity-menus";
 import { useInviteDialog } from "./invite/InviteDialog";
 import { useNow } from "./missions/MissionBits";
 import { COMPACT_QUERY, useMediaQuery, useNavDrawer } from "./NavDrawer";
-import { NewAgentAsk } from "./NewAgentAsk";
 import { NewChannelDialog } from "./NewChannelDialog";
+import { useNewAgent } from "./new-agent/NewAgentDialog";
 import { OpenOnPhoneDialog } from "./OpenOnPhone";
 import { useOrg } from "./org-context";
 import { StatusLine } from "./Presence";
@@ -329,14 +331,13 @@ export function Sidebar() {
   const rightHand = dir.agents.find((a) => isRightHand(a) && a.canTalk !== false);
   const dmOf = new Map((dms.data ?? []).map((d) => [d.with.id, d]));
   const rightHandDm = rightHand ? dmOf.get(rightHand.id) : undefined;
-  // New agent in a personal workspace (ADR 0159): one question, what it should do, and the right hand proposes it.
-  const [askingAgent, setAskingAgent] = useState(false);
+  // New agent: one dialog for every way in (ADR 0164); outside the shell (a test's page), the full form.
+  const newAgentDialog = useNewAgent();
   const newAgent = () =>
-    rightHand ? setAskingAgent(true) : void navigate({ to: "/org/$orgId/agents/new", params: { orgId } });
+    newAgentDialog ? newAgentDialog.open() : void navigate({ to: "/org/$orgId/agents/new", params: { orgId } });
   const sections = useSidebarSections(me.user.id, orgId);
   // "Fixar no topo": pinned rows sit on top of their own section, above a thin line.
-  const pinned = useSidebarPins();
-  const { view, setView, pins } = pinned;
+  const { view, setView, pins } = useSidebarPins();
   // "Mensagens diretas": the people I talked to or just opened a DM with, latest first (an agent's row in AGENTES is its DM), pinned ones on top.
   const pinnedPeople = pins.people.flatMap((id) => {
     const m = id === me.user.id ? undefined : dir.memberById.get(id);
@@ -449,25 +450,8 @@ export function Sidebar() {
   // paints its own background (no sliding pill).
   const navRef = useRef<HTMLDivElement>(null);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  // The list fades out at an edge only while there is more to scroll past it (no hard cut).
-  // biome-ignore lint/correctness/useExhaustiveDependencies: re-check when the lists load
-  useLayoutEffect(() => {
-    const nav = navRef.current;
-    if (!nav) return;
-    const edges = () => {
-      nav.dataset.fadeTop = String(nav.scrollTop > 1);
-      nav.dataset.fadeBottom = String(nav.scrollTop + nav.clientHeight < nav.scrollHeight - 1);
-    };
-    edges();
-    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(edges);
-    ro?.observe(nav);
-    for (const child of Array.from(nav.children)) ro?.observe(child);
-    nav.addEventListener("scroll", edges, { passive: true });
-    return () => {
-      ro?.disconnect();
-      nav.removeEventListener("scroll", edges);
-    };
-  }, [channels.data, directs.length, shownAgents.length, groups.length, rail]);
+  // The list fades out at an edge only while there is more to scroll past it (no hard cut); re-checked as lists load.
+  useScrollEdges(navRef, [channels.data, directs.length, shownAgents.length, groups.length, rail]);
 
   // The open conversation stays in sight: once per navigation (as soon as its row exists), a row
   // hidden past the list's edge is brought to the middle. Later scrolling is the person's.
@@ -506,14 +490,7 @@ export function Sidebar() {
       ? [item("archived-channels", t("channel.archivedTitle"), "archive", () => setShowArchived(true))]
       : [];
   const createAgentItem = can(org, "create_agents")
-    ? [
-        item(
-          "create-agent",
-          t("shell.createAgent"),
-          "plus",
-          () => void navigate({ to: "/org/$orgId/agents/new", params: { orgId } }),
-        ),
-      ]
+    ? [item("create-agent", t("shell.createAgent"), "plus", newAgent)]
     : [];
   const newGroupItem = manages
     ? [item("new-group", t("agentGroups.newGroup"), "layers", () => setGroupDialog({ mode: "create" }))]
@@ -555,30 +532,10 @@ export function Sidebar() {
       )}
       {dir.loading && team.length === 0 && <SidebarSkeleton count={2} avatar label={t("common.loadingList")} />}
       {pinnedAgents.map(agentRow)}
-      {pinned.hint && (
-        <div className="sidebar__pins-hint" role="note">
-          <span>{t("sidebarPins.hint")}</span>
-          <Button
-            variant="ghost"
-            size="sm"
-            iconOnly
-            icon="close"
-            aria-label={t("common.close")}
-            title={t("common.close")}
-            onClick={pinned.dismissHint}
-          />
-        </div>
-      )}
       {pinnedAgents.length > 0 && (byGroup.ungrouped.length > 0 || agentGroups.length > 0) && (
         <hr className="sidebar__pins-end" />
       )}
       {ordered(byGroup.ungrouped).map(agentRow)}
-      {!personal && !dir.loading && team.length === 0 && createAgentItem.length > 0 && (
-        <Link to="/org/$orgId/agents/new" params={{ orgId }} className="sidebar__item sidebar__item--quiet">
-          <Icon name="plus" />
-          <span className="sidebar__item-label">{t(modeKey(org, "sidebarAgents.createFirst"))}</span>
-        </Link>
-      )}
     </>
   );
   const blocks: Record<SectionKey, ReactNode> = {
@@ -739,8 +696,10 @@ export function Sidebar() {
             </span>
           </Link>
         )}
-        {/* A personal workspace (ADR 0159): New agent right under its agents (the rail's tile, with no headers there). */}
-        {personal && createAgentItem.length > 0 && (rail ? <CreateAgentTile /> : <NewAgentRow onOpen={newAgent} />)}
+        {/* New agent right under the agents, in a personal workspace (ADR 0159) and a team's (ADR 0164); the rail's
+            tile, with no headers there (a team's rail has its own in the foot). */}
+        {createAgentItem.length > 0 &&
+          (rail ? personal && <CreateAgentTile onOpen={newAgent} /> : <NewAgentRow onOpen={newAgent} />)}
       </>
     ),
     // A personal workspace lists people only once someone else is a member (a family, ADR 0159).
@@ -818,8 +777,8 @@ export function Sidebar() {
     >
       <Icon name="bell" />
       {unreadNotifications > 0 && (
-        <CountBadge key={bumps} className={bumps > 0 ? "sidebar__bump" : undefined}>
-          {unreadNotifications}
+        <CountBadge key={bumps} className={cx("sidebar__unread", bumps > 0 && "sidebar__bump")}>
+          {badgeCount(unreadNotifications)}
         </CountBadge>
       )}
     </Link>
@@ -836,7 +795,14 @@ export function Sidebar() {
     : null;
 
   return (
-    <nav className="sidebar" aria-label={t("shell.nav")} data-rail={rail} {...drawer?.navProps}>
+    <nav
+      className="sidebar"
+      aria-label={t("shell.nav")}
+      data-rail={rail}
+      // Its faces' sizes follow the mode (the agents' and New agent's, ADR 0164).
+      data-personal={personal || undefined}
+      {...drawer?.navProps}
+    >
       <div className="sidebar__top">
         <WorkspaceSky part="side" rail={rail} />
         {personal ? (
@@ -921,18 +887,18 @@ export function Sidebar() {
         withChannel={newCategory?.withChannel}
       />
       <SidebarSetupDialog open={customizing} onClose={() => setCustomizing(false)} />
-      {personal && rightHand && (
-        <NewAgentAsk open={askingAgent} onClose={() => setAskingAgent(false)} rightHand={rightHand} />
-      )}
       {groupDialog && <GroupNameDialog purpose={groupDialog} onClose={() => setGroupDialog(null)} />}
 
+      {/* Beta: the way to the feedback form, a row of its own at the bottom, where this server takes it. Not beside
+          the person's name, which it would leave no room for; the rail has no room for a row's words. */}
+      {!rail && <FeedbackMark />}
       {/* No foot in a personal workspace (ADR 0159): the person, the bell and the collapse are on top. */}
       {!personal && (
         <div className="sidebar__foot">
           <SidebarHorizon working={working} total={dir.agents.length} />
           {/* The full sidebar creates from the Agentes header's + (always shown on touch screens); the rail has no
               headers. */}
-          {rail && can(org, "create_agents") && <CreateAgentTile />}
+          {rail && can(org, "create_agents") && <CreateAgentTile onOpen={newAgent} />}
           <div className="sidebar__me">
             <AccountMenu />
             {bell}
@@ -945,8 +911,8 @@ export function Sidebar() {
 
 /** Create agent as one of the rail's tiles (the full sidebar creates from the Agents header's +). */
 /**
- * New agent under a personal workspace's agents (ADR 0159): a row like theirs, an empty face with a plus where a face
- * would be, so it reads as the next one.
+ * New agent under the agents (ADR 0159, ADR 0164): a row like theirs, an empty face with a plus where a face would be,
+ * so it reads as the next one.
  */
 function NewAgentRow({ onOpen }: { onOpen: () => void }) {
   const { t } = useTranslation();
@@ -960,15 +926,12 @@ function NewAgentRow({ onOpen }: { onOpen: () => void }) {
   );
 }
 
-function CreateAgentTile() {
+function CreateAgentTile({ onOpen }: { onOpen: () => void }) {
   const { t } = useTranslation();
-  const { org } = useOrg();
   return (
-    <Button asChild block variant="ghost" className="sidebar__create">
-      <Link to="/org/$orgId/agents/new" params={{ orgId: org.id }} title={t("shell.createAgent")}>
-        <Icon name="plus" />
-        <span className="sidebar__item-label">{t("shell.createAgent")}</span>
-      </Link>
+    <Button block variant="ghost" className="sidebar__create" title={t("shell.createAgent")} onClick={onOpen}>
+      <Icon name="plus" />
+      <span className="sidebar__item-label">{t("shell.createAgent")}</span>
     </Button>
   );
 }

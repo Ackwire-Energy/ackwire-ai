@@ -10,6 +10,7 @@ import {
   CONTINUE_THE_CONVERSATION,
   createAgent,
   createAgentStyleToolSource,
+  createFeedbackToolSource,
   createSetStatusToolSource,
   createSetupToolSource,
   createUsageToolSource,
@@ -154,6 +155,15 @@ export const TURNS: ScriptedTurn[] = [
     reachable: [{ tool: "create_issue", query: "criar tarefa no backlog" }],
     wants: ["create_issue", "find_tools", "use_tool"],
   },
+  {
+    id: "feedback",
+    title: "Feedback about the app, sent for the person",
+    where: "dm",
+    body: "manda um feedback pra quem cuida do app: o céu fica escuro demais à noite",
+    listed: ["find_tools", "use_tool"],
+    reachable: [{ tool: "send_feedback", query: "send feedback about the app" }],
+    wants: ["send_feedback", "find_tools", "use_tool"],
+  },
 ];
 
 /** A made-up deploy connector: one read, one action that asks a person's approval. */
@@ -216,6 +226,7 @@ export async function turnsWorld(
       createUsageToolSource(),
       createSetStatusToolSource({}),
       createAgentStyleToolSource(),
+      createFeedbackToolSource({ to: "feedback@example.com", version: "0.0.0" }),
       createWorkspaceToolSource({}),
       createSetupToolSource({}),
       createWebToolSource({}),

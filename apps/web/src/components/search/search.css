@@ -193,10 +193,6 @@
   font-size: 14px;
   color: var(--ink2);
 }
-.search-from__item {
-  align-items: center;
-  gap: 10px;
-}
 .search-from__who {
   display: flex;
   align-items: baseline;
@@ -239,9 +235,6 @@ html:not([data-pointer]) .search-box__x:focus-visible {
 [data-theme="dark"] {
   --search-hit: color-mix(in srgb, var(--info) 22%, transparent);
   --search-hit-line: color-mix(in srgb, var(--info) 70%, transparent);
-}
-.search-panel__head {
-  gap: 6px;
 }
 .search-panel__list {
   flex: 1;
@@ -311,6 +304,16 @@ html:not([data-pointer]) .search-box__x:focus-visible {
 @media (hover: none) {
   .search-result__jump.ac-btn {
     opacity: 1;
+  }
+}
+/* On a phone "Ir para" goes under the message, from its words' edge (past the face), never a column beside them. */
+@media (max-width: 640px) {
+  .search-result {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .search-result__jump.ac-btn {
+    justify-self: start;
+    margin: 0 12px 8px calc(12px + 36px + var(--space-3));
   }
 }
 .search-hit__mark {

@@ -17,11 +17,12 @@
   container: threads / inline-size;
 }
 
+/* Out over the page's side room: where the tabs scroll, they slide under the work area's edges. */
 .threads-tabs {
   overflow-x: auto;
   scrollbar-width: none;
-  margin: 0 -4px;
-  padding: 2px 4px;
+  margin: 0 calc(-1 * var(--page-x));
+  padding: 2px var(--page-x);
 }
 .threads-tabs::-webkit-scrollbar {
   display: none;
@@ -223,7 +224,7 @@ html:not([data-pointer]) .thread-row__resolved:focus-visible {
   top: 50%;
   transform: translateY(-50%);
   display: none;
-  gap: 1px;
+  gap: var(--space-2);
   padding-left: 6px;
   background: color-mix(in srgb, var(--sunken) 45%, var(--raised));
 }

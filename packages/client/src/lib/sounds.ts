@@ -33,7 +33,6 @@ const BY_KIND: Partial<Record<NotificationKind, SoundName>> = {
   proposal_waiting: "attention",
   usage_limit: "attention",
   browser_profile_request: "attention",
-  connector_tool_changed: "attention",
   skill_update: "done",
   invitation_accepted: "done",
   approval_cover: "done",

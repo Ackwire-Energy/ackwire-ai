@@ -604,6 +604,7 @@ const LABELS: Record<string, readonly [en: string, ptBR: string]> = {
   vault_delete: ["Delete password", "Apagar senha"],
   vault_make_password: ["Make a password", "Criar senha"],
   get_my_usage: ["See my usage", "Ver meu uso"],
+  send_feedback: ["Send feedback", "Enviar feedback"],
 };
 
 /**

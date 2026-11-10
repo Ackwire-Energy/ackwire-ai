@@ -13,7 +13,8 @@ name: Desktop
 # Every app carries the runner and agent-browser (ADR 0040), and the server's own files, built once from the
 # same commit (the `server` job: JavaScript and WebAssembly, the same on every system), for "Run agentes.chat
 # on this computer" (ADR 0066; tauri.native.conf.json adds them to the resources). `none` only builds the
-# current version as artifacts, and `platforms` can build just one system then. macOS runners cost about 10x
+# current version as artifacts. `platforms` can leave systems out, also from a release: the server gives each
+# system the newest release that has its download. macOS runners cost about 10x
 # Linux minutes: this runs only by hand, never per PR; pushing a tag starts nothing.
 on:
   workflow_dispatch:
@@ -28,9 +29,9 @@ on:
         type: string
         required: false
       platforms:
-        description: "Which builds (a release needs all)"
+        description: "Which builds"
         type: choice
-        options: [all, macos, windows, linux]
+        options: [all, macos+linux, macos, windows, linux]
         default: all
 
 concurrency:
@@ -42,7 +43,7 @@ permissions:
 
 jobs:
   version:
-    runs-on: ubuntu-latest
+    runs-on: namespace-profile-linux-4x8
     timeout-minutes: 10
     permissions:
       contents: write
@@ -64,7 +65,6 @@ jobs:
         env:
           RELEASE: ${{ inputs.release }}
           NOTES: ${{ inputs.notes }}
-          PLATFORMS: ${{ inputs.platforms || 'all' }}
           HAS_KEY: ${{ secrets.RELEASE_DEPLOY_KEY != '' }}
         run: |
           if [ "$HAS_KEY" != "true" ]; then
@@ -73,10 +73,6 @@ jobs:
           fi
           if [ "$GITHUB_REF" != "refs/heads/main" ]; then
             echo "::error::Releases are cut from main (this run is on $GITHUB_REF); pick release = none for a test build"
-            exit 1
-          fi
-          if [ "$PLATFORMS" != "all" ]; then
-            echo "::error::A release builds every system; pick platforms = all, or release = none for a test build"
             exit 1
           fi
           CURRENT=$(jq -r .version apps/desktop/src-tauri/tauri.conf.json)
@@ -139,7 +135,7 @@ jobs:
   # packages' licenses) and shipped among each app's resources (tauri.native.conf.json), signed with the app.
   server:
     needs: version
-    runs-on: ubuntu-latest
+    runs-on: namespace-profile-linux-4x8
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -174,9 +170,9 @@ jobs:
 
   macos:
     needs: [version, server]
-    if: ${{ contains(fromJSON('["all", "macos"]'), inputs.platforms || 'all') }}
-    # Intel: the Apple silicon runners often sit in the queue (capacity); the build is universal either way.
-    runs-on: macos-15-intel
+    if: ${{ contains(fromJSON('["all", "macos+linux", "macos"]'), inputs.platforms || 'all') }}
+    # Apple silicon (6 vCPU, 14 GB); the build is universal either way.
+    runs-on: nscloud-macos-sequoia-arm64-6x14
     timeout-minutes: 60
     env:
       BIN_DIR: apps/desktop/src-tauri/binaries
@@ -310,6 +306,11 @@ jobs:
         if: ${{ steps.signing.outputs.apple == 'true' }}
         uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0.6.2
         env:
+          # No Finder layout for the .dmg window: Namespace's macOS runners time Finder's AppleEvents out (-1712).
+          # tauri-action turns the bundler's CI skip off by default (TAURI_BUNDLER_DMG_IGNORE_CI=true), and the bundler
+          # skips only when CI is exactly "true".
+          CI: "true"
+          TAURI_BUNDLER_DMG_IGNORE_CI: "false"
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
@@ -328,6 +329,11 @@ jobs:
         if: ${{ steps.signing.outputs.apple != 'true' }}
         uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0.6.2
         env:
+          # No Finder layout for the .dmg window: Namespace's macOS runners time Finder's AppleEvents out (-1712).
+          # tauri-action turns the bundler's CI skip off by default (TAURI_BUNDLER_DMG_IGNORE_CI=true), and the bundler
+          # skips only when CI is exactly "true".
+          CI: "true"
+          TAURI_BUNDLER_DMG_IGNORE_CI: "false"
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
@@ -399,7 +405,7 @@ jobs:
   windows:
     needs: [version, server]
     if: ${{ contains(fromJSON('["all", "windows"]'), inputs.platforms || 'all') }}
-    runs-on: windows-latest
+    runs-on: nscloud-windows-2022-amd64-4x8
     timeout-minutes: 60
     env:
       BIN_DIR: apps/desktop/src-tauri/binaries
@@ -520,9 +526,9 @@ jobs:
 
   linux:
     needs: [version, server]
-    if: ${{ contains(fromJSON('["all", "linux"]'), inputs.platforms || 'all') }}
+    if: ${{ contains(fromJSON('["all", "macos+linux", "linux"]'), inputs.platforms || 'all') }}
     # 22.04: an older glibc, so the app runs on more distributions.
-    runs-on: ubuntu-22.04
+    runs-on: nscloud-ubuntu-22.04-amd64-4x8
     timeout-minutes: 60
     env:
       BIN_DIR: apps/desktop/src-tauri/binaries
@@ -681,8 +687,9 @@ jobs:
   # Release notes = the annotated tag's message (`git tag -a desktop-v0.2.0 -m "- Folders…"`).
   publish:
     needs: [version, macos, windows, linux]
-    if: ${{ needs.version.outputs.tag != '' }}
-    runs-on: ubuntu-latest
+    # A system left out is skipped, and a skipped need would skip this job too.
+    if: ${{ !cancelled() && !failure() && needs.version.outputs.tag != '' }}
+    runs-on: namespace-profile-linux-4x8
     timeout-minutes: 15
     permissions:
       contents: write

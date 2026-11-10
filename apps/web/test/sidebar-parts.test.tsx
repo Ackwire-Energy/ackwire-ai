@@ -151,7 +151,7 @@ describe("the parts' headers", () => {
     expect(shown(nav().querySelector('a.sidebar__item[title="#general"]') as Element)).toBe(false);
   });
 
-  test("the footer has no Criar agente row: Agentes' + has it (always shown on touch screens)", async () => {
+  test("no Criar agente row, not even with no agents yet: Agentes' + has it (always shown on touch screens)", async () => {
     await go();
     expect(nav().querySelector(".sidebar__create")).toBeNull();
     expect(labels(await openPlus("Novo agente ou setor"))).toEqual(["Criar agente", "Novo setor"]);
@@ -160,7 +160,8 @@ describe("the parts' headers", () => {
     state.agents = [];
     await go(state);
     expect(nav().querySelector(".sidebar__create")).toBeNull();
-    expect(within(nav()).getByRole("link", { name: "Criar o primeiro agente" })).toBeTruthy();
+    expect(within(nav()).queryByRole("link", { name: "Criar o primeiro agente" })).toBeNull();
+    expect(labels(await openPlus("Novo agente ou setor"))).toEqual(["Criar agente", "Novo setor"]);
   });
 });
 
@@ -184,14 +185,16 @@ describe("one + per part", () => {
     expect(labels(await openPlus("Novo canal ou categoria"))).toEqual(["Novo canal"]);
   });
 
-  test("Agentes: Criar agente opens the flow; Equipe is a tool row of its own", async () => {
+  test("Agentes: Criar agente opens the new agent's dialog over the page (ADR 0164); Equipe is a tool row of its own", async () => {
     const { router } = await go();
     expect(
       within(nav().querySelector(".sidebar__tools") as HTMLElement).getByRole("link", { name: "Equipe" }),
     ).toBeTruthy();
+    const before = router.state.location.pathname;
     const menu = await openPlus("Novo agente ou setor");
     await click(within(menu).getByRole("menuitem", { name: "Criar agente" }));
-    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/agents/new`);
+    expect(screen().getByRole("dialog", { name: "Novo agente" })).toBeTruthy();
+    expect(router.state.location.pathname).toBe(before);
   });
 
   test("Mensagens diretas' + is Nova mensagem, opening Ir para…; a member who may not create agents has no Agentes +", async () => {

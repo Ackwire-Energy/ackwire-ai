@@ -1056,9 +1056,6 @@
       "plan_model_dropped_one": "{{model}} è uscito da {{plan}}. {{names}} usa {{runs}} per ora",
       "plan_model_dropped_many": "{{model}} è uscito da {{plan}}. {{names}} usa {{runs}} per ora",
       "plan_model_dropped_other": "{{model}} è uscito da {{plan}}. {{names}} usa {{runs}} per ora",
-      "connector_tool_changed_one": "Un server connesso ha cambiato strumenti che avevi approvato",
-      "connector_tool_changed_many": "Un server connesso ha cambiato strumenti che avevi approvato",
-      "connector_tool_changed_other": "Un server connesso ha cambiato strumenti che avevi approvato",
       "computer_disk_full_one": "Il disco di un computer è quasi pieno",
       "computer_disk_full_many": "Il disco di un computer è quasi pieno",
       "computer_disk_full_other": "Il disco di un computer è quasi pieno",
@@ -1544,15 +1541,11 @@
       "browser": "Browser",
       "secret": "Segreto",
       "join": "Membri",
-      "tools": "Strumenti",
       "limit": "Limite"
     },
     "review": "Rivedi",
     "answer": "Rispondi",
     "open": "Apri",
-    "toolsTitle": "Ha cambiato strumenti che hai approvato",
-    "toolsWhy": "Gli agenti usano la versione approvata finché non accetti quella nuova.",
-    "reviewChanges": "Rivedi le modifiche",
     "clear": {
       "title": "Niente ti aspetta",
       "text": "Quando un agente ha bisogno di te, compare prima qui."
@@ -2265,7 +2258,8 @@
     "suggested": "In base alla tua email di {{domain}}, ho suggerito {{org}}.",
     "create": "Crea",
     "shareMessage": "Entra in {{org}} su agentes.chat: {{url}}",
-    "failed": "Non è stato possibile salvare. Riprova."
+    "failed": "Non è stato possibile salvare. Riprova.",
+    "enter": "Entra nello spazio di lavoro"
   },
   "ai": {
     "yourPlan": "Il tuo piano di IA",
@@ -2592,7 +2586,6 @@
   "dashboards": {
     "homeRow": "Solo tu · i tuoi widget",
     "loadFailed": "Impossibile caricare le dashboard.",
-    "onlyHome": "Le dashboard dello spazio di lavoro o dei tuoi ruoli compaiono qui.",
     "create": "Crea",
     "routineTarget": "il suo widget",
     "pin": {

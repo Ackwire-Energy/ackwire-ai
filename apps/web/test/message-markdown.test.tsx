@@ -10,7 +10,7 @@ import { Glob } from "bun";
 import { MessageBody } from "@/chat/MessageBody";
 import { setMermaidRenderer } from "@/components/artifacts/Mermaid";
 import { createI18n } from "@/i18n";
-import { Markdown, renderInline } from "@/lib/markdown";
+import { codeAndBold, inlineWords, Markdown, renderInline } from "@/lib/markdown";
 import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
@@ -566,5 +566,26 @@ describe("```mermaid fences", () => {
       /\bimport\b[^;]*?["']mermaid(?:\/[^"'?]*)?["']/.test(readFileSync(join(src, f), "utf8")),
     );
     expect(imported).toEqual([]);
+  });
+});
+
+describe("an agent's words on a card", () => {
+  test("code between backticks is one inline code look, bold stays bold; inside a control no link is drawn", () => {
+    const { container } = render(
+      <div>
+        <p>{inlineWords("Rodei `bun test` e **passou**, veja https://example.com/run")}</p>
+        <button type="button">{codeAndBold("Usar `pnpm` **agora** em https://example.com")}</button>
+      </div>,
+    );
+    const [said, option] = [container.querySelector("p"), container.querySelector("button")] as HTMLElement[];
+    expect(said?.querySelector("code.ac-inlinecode")?.textContent).toBe("bun test");
+    expect(said?.querySelector("strong")?.textContent).toBe("passou");
+    expect(said?.querySelector("a")?.getAttribute("href")).toBe("https://example.com/run");
+    expect(option?.querySelector("code.ac-inlinecode")?.textContent).toBe("pnpm");
+    expect(option?.querySelector("b")?.textContent).toBe("agora");
+    expect(option?.querySelector("a")).toBeNull();
+    expect(option?.textContent).toBe("Usar pnpm agora em https://example.com");
+    // Words already drawn pass through as they are.
+    expect(inlineWords(<i>já</i>)).toEqual(<i>já</i>);
   });
 });

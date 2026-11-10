@@ -4,6 +4,7 @@ import { MenuAt, MenuHeading, MenuItem, MenuReactions, MenuSeparator } from "@ag
 import { useRouter } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { NEW_AGENT_EVENT } from "@/components/new-agent/NewAgentDialog";
 import {
   copyText,
   keepsSystemMenu,
@@ -43,7 +44,7 @@ export function ContextMenuHost() {
       const link = e.target instanceof Element ? e.target.closest<HTMLAnchorElement>("a[href]") : null;
       const entries: MenuEntry[] = selected ? selectionEntries(selected) : link ? linkEntries(link) : pageEntries();
       e.preventDefault();
-      openContextMenu(e.clientX, e.clientY, entries);
+      openContextMenu(e.clientX, e.clientY, entries, e.target);
     };
     const selectionEntries = (text: string): MenuEntry[] => [
       {
@@ -166,7 +167,8 @@ export function MenuBarActions({ orgId }: { orgId: string }) {
     const org = `/org/${orgId}`;
     const actions: Record<string, () => void> = {
       newChannel: () => window.dispatchEvent(new Event(NEW_CHANNEL_EVENT)),
-      newAgent: to(`${org}/agents/new`),
+      // The new agent's dialog, over whatever is open (ADR 0164).
+      newAgent: () => window.dispatchEvent(new Event(NEW_AGENT_EVENT)),
       search: openPalette,
       back: () => router.history.back(),
       forward: () => router.history.forward(),

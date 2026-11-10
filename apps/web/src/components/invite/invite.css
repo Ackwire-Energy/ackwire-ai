@@ -471,15 +471,24 @@ html:not([data-pointer]) .invite-each:focus-visible {
   font-weight: 700;
   color: var(--ink2);
 }
+/* The faces, then the words and Ver pedidos in an `.ac-actline`: under the words when it doesn't fit beside them, from
+   their edge. The faces stay on the words' middle. */
 .invite-waiting {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
   padding: 12px 14px;
   border-radius: var(--radius-lg);
   box-shadow: inset 0 0 0 1px var(--line);
 }
-/* No width of its own: the kit's ActionRow (`.ac-actrow__text`) sets it, and a page rule would outrank the kit. */
+.invite-waiting > .ac-avatar-stack {
+  flex: none;
+  margin-block: calc((2 * 19px - 24px) / 2);
+}
+.invite-waiting > .ac-actline {
+  flex: 1 1 0%;
+  align-items: center;
+}
 .invite-waiting__text {
   display: flex;
   flex-direction: column;

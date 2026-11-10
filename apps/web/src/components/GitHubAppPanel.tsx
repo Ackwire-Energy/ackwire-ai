@@ -11,6 +11,7 @@ import { GITHUB_APP_AUTH } from "@agenteschat/client/lib/connected";
 import {
   githubAppPanel,
   installationReach,
+  missingEventsText,
   removedText,
   removeInstallationText,
 } from "@agenteschat/client/lib/github-app";
@@ -216,6 +217,7 @@ export function GitHubAppServerCard() {
       : setup.state === "invalid"
         ? t("githubApp.server.line.invalid")
         : null;
+  const events = missingEventsText(t, setup);
   return (
     <Card aria-labelledby="sec-github-app-server">
       <CardHeader
@@ -253,12 +255,23 @@ export function GitHubAppServerCard() {
                 </a>
               )}
               {note && <SettingNote icon={setup.state === "ok" ? "info" : "alert"}>{note}</SettingNote>}
+              {events && <SettingNote icon="alert">{events}</SettingNote>}
             </span>
-            {setup.source === "settings" && (
+            {(setup.events || setup.source === "settings") && (
               <span className="ac-acts">
-                <Button size="sm" variant="ghost" className="ac-btn--danger" onClick={() => setRemoving(true)}>
-                  {t("githubApp.server.remove")}
-                </Button>
+                {setup.events && (
+                  <Button asChild size="sm">
+                    <a href={setup.events.url} target="_blank" rel="noopener noreferrer">
+                      <Icon name="external" size={14} />
+                      {t("githubApp.server.events")}
+                    </a>
+                  </Button>
+                )}
+                {setup.source === "settings" && (
+                  <Button size="sm" variant="ghost" className="ac-btn--danger" onClick={() => setRemoving(true)}>
+                    {t("githubApp.server.remove")}
+                  </Button>
+                )}
               </span>
             )}
           </div>

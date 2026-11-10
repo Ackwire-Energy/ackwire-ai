@@ -7,6 +7,7 @@ import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
+import { inlineWords } from "@/lib/markdown";
 import { useToast } from "@/lib/toast";
 import { roleNames, useCustomRoles } from "./parts";
 
@@ -59,7 +60,7 @@ export function ProposalBanner({ board }: { board: Dashboard }) {
             ? t("dashboards.proposal.workspace")
             : t("dashboards.proposal.roles", { roles: names })}
         </span>
-        {proposal.why && <span className="db-proposal__why">{proposal.why}</span>}
+        {proposal.why && <span className="db-proposal__why">{inlineWords(proposal.why)}</span>}
       </div>
       {proposal.canDecide && (
         <div className="db-proposal__acts ac-mediarow__end ac-mediarow__end--wrap">

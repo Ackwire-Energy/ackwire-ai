@@ -14,7 +14,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { type BrainChoice, changedKeys, type Saved, sameBrain } from "@/lib/agent-edit";
 import { aiSelect, brainTitle, chooseBrain, closeAiSelect, openAiSelect } from "./ai-picker";
 import {
@@ -1171,10 +1171,17 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     const { api, block, paste } = await codeField();
     const real = api.machines.sendAccountCode;
     let answer = (_ok: boolean) => {};
+    let sends = 0;
     api.machines.sendAccountCode = (...args) =>
       new Promise<void>((resolve, reject) => {
+        sends++;
         answer = (ok) => (ok ? resolve(real(...args)) : reject(new Error("offline")));
       });
+    /**
+     * The `n`th send has reached the API, so `answer` is its own: the code is sealed first, and sealing is WebCrypto,
+     * which runs off the JS thread, so on a loaded machine it can outlast any number of ticks.
+     */
+    const reached = (n: number) => waitFor(() => expect(sends).toBe(n), { timeout: 10_000 });
     const code = () => within(block).getByRole("textbox", { name: "Código do Claude" }) as HTMLInputElement;
     /** The line, alone in the step with the product's spinner: no field, Colar, Enviar or Esperando beside it. */
     const busy = () => {
@@ -1192,6 +1199,7 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     // The focus the field had goes to the line, not to the page.
     expect(document.activeElement === going).toBe(true);
     // The send fails: the field is back with the code in it, the error under it, and the focus.
+    await reached(1);
     await act(async () => answer(false));
     await settle(4);
     expect(code().value).toBe("c0de-from-claude#st4te");
@@ -1201,6 +1209,7 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     // Sent again: the line says the computer is signing in, until the sign-in ends.
     await click(within(block).getByRole("button", { name: "Enviar ao MacBook" }));
     expect(busy().textContent).toBe("Enviando o código ao MacBook…");
+    await reached(2);
     await act(async () => answer(true));
     await settle(6);
     expect(busy().textContent).toBe("Código enviado. O MacBook está terminando de entrar.");
@@ -1268,8 +1277,11 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     api.machines.sendAccountCode = async () => {
       throw new ApiError(502, "http_502", "Bad Gateway");
     };
+    // The code is sealed before it is sent, and sealing (WebCrypto) runs off the JS thread: no number of ticks waits
+    // for it on a busy machine.
+    const shows = (text: string) => waitFor(() => expect(shownText(block)).toContain(text), { timeout: 10_000 });
     await paste("c0de-from-claude#st4te");
-    expect(shownText(block)).toContain("O MacBook não respondeu. Tente de novo em instantes.");
+    await shows("O MacBook não respondeu. Tente de novo em instantes.");
     expect(shownText(block)).not.toContain("Confira");
     // The computer refusing it is still about the code.
     api.machines.sendAccountCode = async () => {
@@ -1278,14 +1290,12 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     // A line stands in for the field and its buttons while the code goes: Enviar is a new button after each send.
     const send = () => within(block).getByRole("button", { name: "Enviar ao MacBook" });
     await click(send());
-    await settle(6);
-    expect(shownText(block)).toContain("Não deu para enviar o código. Confira e tente de novo.");
+    await shows("Não deu para enviar o código. Confira e tente de novo.");
     expect(shownText(block)).not.toContain("não respondeu");
     api.machines.sendAccountCode = sendCode;
     await click(send());
-    await settle(6);
+    await shows("Código enviado. O MacBook está terminando de entrar.");
     expect(sealed()).not.toBeNull();
-    expect(shownText(block)).toContain("Código enviado. O MacBook está terminando de entrar.");
   });
 
   test("Adicionar conta (ChatGPT): its settings first, then the sign-in on its button; the account is chosen", async () => {
@@ -1868,6 +1878,11 @@ describe("Onde trabalha and the browser (their dialogs)", () => {
     await click(within(d).getByRole("radio", { name: /^Qualquer site/ }));
     expect(d.textContent).toContain("A Ada passa para o MacBook, que tem navegador.");
     const steps = within(d).getByRole("region", { name: "Falta 1 passo, no próprio MacBook" });
+    // Esperando starts with its loader, never an empty spot where the loader goes.
+    const wait = steps.querySelector(".brw-steps__head .brw-steps__wait") as HTMLElement;
+    expect(wait.getAttribute("role")).toBe("status");
+    expect(wait.firstElementChild?.classList.contains("ac-pixspin")).toBe(true);
+    expect(wait.textContent).toBe("Esperando");
     // The app's icon sits by the clock: at the top on a Mac, at the bottom on a PC.
     expect(steps.textContent).toContain("Clique no ícone do agentes.chat perto do relógio");
     expect(steps.querySelector(".machine-command__code")).toBeNull();

@@ -9,7 +9,16 @@ import { accountInUse, isBillingHold, orgStanding } from "./standing";
 import { agentBudgetsThisMonth } from "./usage";
 import { isPersonalWorkspace } from "./workspace-mode";
 
-const { agents, channelMembers, connectorConnections, machines, organizationMembers, organizations, users } = schema;
+const {
+  agents,
+  channelMembers,
+  connectorConnections,
+  machines,
+  organizationInvitations,
+  organizationMembers,
+  organizations,
+  users,
+} = schema;
 
 /**
  * How it builds a team (ADR 0137 §10) when someone asks it to: three questions with answers to tap, then one team card.
@@ -226,23 +235,31 @@ export async function rightHandPrompt(
       ? "An agent used 80% or more of its monthly budget: say so to someone who may raise it."
       : "",
   ].filter(Boolean);
-  // The first-run checklist at the top of an owner's DM (ADR 0155 §6) shows the setup rows: while one is open, this
-  // names none of them (mirror of `firstRunDone` in packages/client/src/lib/setup-checklist.ts).
+  // The first-run checklist at the top of an owner's DM (ADR 0155 §6, ADR 0162) shows the setup rows the onboarding
+  // left: while one is open, this names none of them (mirror of `firstRunDone` in packages/client/src/lib/setup-checklist.ts).
   const skipped = new Set(self[0]?.setup?.done ?? []);
-  // A personal workspace's card has no people row (`PERSONAL_FIRST_RUN_STEPS`; the client's `personal` power).
+  const invited =
+    owner && self[0]?.setup != null && !personal && people.length <= 1 && !skipped.has("people")
+      ? await db
+          .select({ id: organizationInvitations.id })
+          .from(organizationInvitations)
+          .where(and(eq(organizationInvitations.orgId, orgId), isNull(organizationInvitations.acceptedAt)))
+          .limit(1)
+      : [];
+  // A personal workspace's card keeps what the person wants help with and their agents, which only a team's
+  // onboarding asks (ADR 0162), and has no people row (`PERSONAL_FIRST_RUN_STEPS`; the client's `personal` power).
   const cardOpen =
     owner &&
     self[0]?.setup != null &&
-    (!workspace[0]?.context.trim() ||
-      team.length === 0 ||
-      anyAi === false ||
+    (anyAi === false ||
       (apps.length === 0 && !skipped.has("apps")) ||
-      (!personal && people.length <= 1 && !skipped.has("people")));
+      (!personal && people.length <= 1 && invited.length === 0 && !skipped.has("people")) ||
+      (personal && (!workspace[0]?.context.trim() || team.length === 0)));
   const checklist = cardOpen
     ? [
         personal
           ? "The checklist card at the top of your DM shows what is left to set up (what they want help with, their agents, an AI, apps). Offer none of it unless they ask; at most point to its next row once."
-          : "The checklist card at the top of your DM shows what is left to set up (what the workspace does, the team, an AI, apps, people). Offer none of it unless they ask; at most point to its next row once.",
+          : "The checklist card at the top of your DM shows what is left to set up (an AI, apps, people). Offer none of it unless they ask; at most point to its next row once.",
         ...teamThings,
       ]
     : team.length === 0

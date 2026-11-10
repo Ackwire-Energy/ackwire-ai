@@ -56,6 +56,16 @@ describe("one page top and side", () => {
     expect(body(".ac-pagehead__title")).toContain("line-height: var(--control-h-md);");
     expect(body(".ac-pagehead__actions")).toContain("min-height: var(--control-h-md);");
   });
+
+  test("a page's count is on the title's row, on its baseline, 12 after it, under it only without room", () => {
+    const line = body(".ac-pagehead__titleline:has(> .ac-pagehead__count)");
+    expect(line).toContain("flex-wrap: wrap;");
+    expect(line).toContain("column-gap: var(--space-3);");
+    expect(body(".ac-pagehead__titleline > .ac-pagehead__title:has(+ .ac-pagehead__count)")).toContain(
+      "align-self: baseline;",
+    );
+    expect(body(".ac-pagehead__count")).toContain("align-self: baseline;");
+  });
 });
 
 describe("cards and rows", () => {
@@ -150,18 +160,37 @@ describe("the toolbar", () => {
     // the search's, which it would squeeze to nothing.
     const row = body(".ac-toolbar:has(> .ac-toolbar__search) > .ac-toolbar__filters", phone);
     expect(row).toContain("order: 2;");
-    expect(row).toContain("flex: 1 1 calc(100% + 8px);");
+    expect(row).toContain("flex: 1 1 calc(100% + 2 * var(--bleed));");
     expect(body(".ac-toolbar[data-stack] > .ac-toolbar__actions")).toContain("order: 1;");
     const stacked = body(".ac-toolbar[data-stack] > .ac-toolbar__filters");
     expect(stacked).toContain("order: 2;");
-    expect(stacked).toContain("flex: 1 1 calc(100% + 8px);");
+    expect(stacked).toContain("flex: 1 1 calc(100% + 2 * var(--bleed));");
     expect(stacked).toContain("overflow-x: auto;");
-    // The filter bar inside the row doesn't scroll on its own, so the row's 4px on every side keep its controls'
-    // rings whole (an active filter's ring too), pulled back by as much so the row keeps its place.
+    // The filter bar inside the row doesn't scroll on its own, so the row's 4px up and down keep its controls' rings
+    // whole (an active filter's ring too); at its sides it runs out over the page's room (`--bleed`) to the edge, its
+    // first control on the page's line, pulled back by as much so the row keeps its place.
     expect(kit).not.toMatch(/\.ac-filterbar[^{}]*\{[^}]*overflow-x: auto/);
-    expect(body(".ac-toolbar__filters", phone)).toContain("padding: 4px;");
-    expect(body(".ac-toolbar__filters", phone)).toContain("margin: -2px -4px;");
-    expect(stacked).toContain("padding: 4px;");
+    for (const strip of [body(".ac-toolbar__filters", phone), stacked]) {
+      expect(strip).toContain("padding: 4px var(--bleed);");
+      expect(strip).toContain("margin: -2px calc(-1 * var(--bleed));");
+      expect(strip).toContain("max-width: calc(100% + 2 * var(--bleed));");
+    }
+    // A side another part shares keeps only the rings' 4px: after the actions (split), before them (no search).
+    const split = body('.ac-toolbar[data-stack="split"] > .ac-toolbar__filters');
+    expect(split).toContain("margin-left: -4px;");
+    expect(split).toContain("padding-left: 4px;");
+    const beforeActions = body(
+      ".ac-toolbar:not(:has(> .ac-toolbar__search)):has(> .ac-toolbar__actions) > .ac-toolbar__filters",
+      phone,
+    );
+    expect(beforeActions).toContain("margin-right: -4px;");
+    expect(beforeActions).toContain("padding-right: 4px;");
+    // The room is the page's, or that of the box a toolbar sits in: running past its edge would scroll it sideways.
+    expect(body(":root")).toContain("--bleed: var(--page-x);");
+    expect(body(".ac-dialog")).toContain("--bleed: var(--dialog-pad);");
+    expect(body(".ac-details")).toContain("--bleed: var(--details-pad);");
+    expect(body(".ac-card")).toContain("--bleed: var(--card-pad);");
+    expect(body(".ac-menu")).toContain("--bleed: var(--menu-pad);");
   });
 
   test("stacked, a search that can't keep its floor beside the actions takes the top row alone, the actions leading the next", () => {
@@ -236,5 +265,14 @@ describe("a pill on a name's first line", () => {
       ".ac-captail.ac-captop:has(> .ac-chip)",
     ])
       expect(body(selector)).toContain("margin-block-start: 0;");
+  });
+});
+
+describe("a tab strip", () => {
+  test("starts its first label on the content's edge, its underline too, and the first section under it has no hairline", () => {
+    expect(body(".ac-tabs > .ac-tab:first-child")).toContain("padding-inline-start: 0;");
+    expect(body('.ac-tabs > .ac-tab:first-child[data-state="active"]::after')).toContain("left: 0;");
+    expect(body(".ac-tabpanel > .ac-details__section:first-child")).toContain("border-top: 0;");
+    expect(body(".ac-tabpanel > .ac-details__section:first-child")).toContain("padding-top: 0;");
   });
 });

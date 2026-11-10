@@ -1056,9 +1056,6 @@
       "plan_model_dropped_one": "{{model}} salió de {{plan}}. {{names}} usa {{runs}} por ahora",
       "plan_model_dropped_many": "{{model}} salió de {{plan}}. {{names}} usa {{runs}} por ahora",
       "plan_model_dropped_other": "{{model}} salió de {{plan}}. {{names}} usa {{runs}} por ahora",
-      "connector_tool_changed_one": "Un servidor conectado cambió herramientas que aprobaste",
-      "connector_tool_changed_many": "Un servidor conectado cambió herramientas que aprobaste",
-      "connector_tool_changed_other": "Un servidor conectado cambió herramientas que aprobaste",
       "computer_disk_full_one": "El disco de una computadora está casi lleno",
       "computer_disk_full_many": "El disco de una computadora está casi lleno",
       "computer_disk_full_other": "El disco de una computadora está casi lleno",
@@ -1544,15 +1541,11 @@
       "browser": "Navegador",
       "secret": "Secreto",
       "join": "Miembros",
-      "tools": "Herramientas",
       "limit": "Límite"
     },
     "review": "Revisar",
     "answer": "Responder",
     "open": "Abrir",
-    "toolsTitle": "Cambió herramientas que aprobaste",
-    "toolsWhy": "Los agentes siguen con la versión aprobada hasta que aceptes la nueva.",
-    "reviewChanges": "Revisar los cambios",
     "clear": {
       "title": "Nada te espera",
       "text": "Cuando un agente te necesite, aparece aquí primero."
@@ -2265,7 +2258,8 @@
     "suggested": "Por tu correo de {{domain}}, sugerí {{org}}.",
     "create": "Crear",
     "shareMessage": "Únete a {{org}} en agentes.chat: {{url}}",
-    "failed": "No se pudo guardar. Inténtalo de nuevo."
+    "failed": "No se pudo guardar. Inténtalo de nuevo.",
+    "enter": "Entrar al espacio de trabajo"
   },
   "ai": {
     "yourPlan": "Tu plan de IA",
@@ -2592,7 +2586,6 @@
   "dashboards": {
     "homeRow": "Solo tú · tus propios widgets",
     "loadFailed": "No se pudieron cargar los paneles.",
-    "onlyHome": "Los paneles del espacio de trabajo o de tus roles aparecen aquí.",
     "create": "Crear",
     "routineTarget": "su widget",
     "pin": {

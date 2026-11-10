@@ -75,6 +75,7 @@ import {
   turnRuns,
   turnShows,
   turnSignature,
+  turnsInPlace,
   withContinued,
   withOpacity,
 } from "../../src/features/chat/turn";
@@ -179,6 +180,13 @@ describe("timeline", () => {
     const row = await source("features/chat/MessageRow.tsx");
     expect(row).toContain("BUBBLE_RUN[run]");
     expect(row).toContain('(run === "end" || run === "solo")');
+  });
+
+  test("reading marks read up to the message posted last, wherever its place, and counts a reply placed above as new", async () => {
+    const screen = await source("features/chat/ChatScreen.tsx");
+    expect(screen).toContain("const postedNow = useMemo(() => lastPostedId(list), [list]);");
+    expect(screen).toContain("if (peeking || !member || !postedNow) return;");
+    expect(screen).toContain("unseenBelow(scrollRows, seenKey, seenPostedId)");
   });
 
   test("hidden messages leave no row", () => {
@@ -1087,6 +1095,31 @@ describe("an agent's turn as one block", () => {
     expect(turnOrder(runs).map((r) => r.runId)).toEqual(["b", "c", "a", "d"]);
   });
 
+  test("a block sits where its words first showed: what was sent meanwhile is below it and shows its name again", () => {
+    // Two messages of one person, the second grouped under the first; the agent's words showed between them.
+    const rows = buildRows([message({ id: "ask", createdAt: at(10) }), message({ id: "meanwhile", createdAt: at(8) })]);
+    const writing = run({ runId: "w", agentId: "ada", text: "O login cai depois do refresh.", shownAt: at(9) });
+    const thinking = run({ runId: "t", agentId: "ada" });
+    const placed = turnsInPlace(rows, [thinking, writing], (r) => ({
+      kind: "run" as const,
+      key: `turn-${r.runId}`,
+      run: r,
+    }));
+    const shown = (r: (typeof placed.rows)[number]) =>
+      r.kind === "run"
+        ? `run ${r.run.runId}`
+        : r.kind === "message"
+          ? `${r.message.id} ${r.grouped} ${r.continued}`
+          : r.kind;
+    expect(placed.rows.map(shown)).toEqual(["day", "ask false false", "run w", "meanwhile false undefined"]);
+    // No words yet: at the end, as before.
+    expect(placed.last.map((r) => r.run.runId)).toEqual(["t"]);
+    // Nothing came after its words: nothing moves.
+    const alone = turnsInPlace(rows, [run({ runId: "late", agentId: "ada", text: "Oi", shownAt: at(1) })], (r) => r);
+    expect(alone.rows).toEqual(rows);
+    expect(alone.last.map((r) => r.runId)).toEqual(["late"]);
+  });
+
   test("a stopped run's call that was running shows as stopped", () => {
     const items = turnItems(run({ runId: "r", status: "canceled", work: [call("1", "sentry_list_issues", true)] }));
     expect(items[0]).toMatchObject({ kind: "call", line: { state: "stop" } });
@@ -1218,6 +1251,7 @@ describe("automatic lines (notices) and fast replies", () => {
       values: { routine: "Sentry diário" },
       detail: { content: "3 erros novos" },
       pending: false,
+      answer: false,
     });
     const fromOnly = eventLineOf(
       agentMsg("n2", { notice: { kind: "routine_handoff", text: "x", from: "Rotina «Bom dia»" } }),
@@ -1226,6 +1260,26 @@ describe("automatic lines (notices) and fast replies", () => {
     expect(fromOnly?.values).toEqual({ routine: "Bom dia" });
     const anon = eventLineOf(agentMsg("n3", { notice: { kind: "routine_handoff", text: "x" } }), names);
     expect(anon?.key).toBe("chat.notice.routineHandoffAnon");
+  });
+
+  test("what someone wrote on GitHub: its line, their words and the link, and a way to ask for a reply", () => {
+    const refs = { event: "comment", item: "issue", who: "drive-by", number: "5", repo: "acme/app" };
+    const line = eventLineOf(
+      agentMsg("n4", {
+        notice: {
+          kind: "github_event",
+          text: "Pode revisar?",
+          refs: { ...refs, url: "https://github.com/acme/app/issues/5", outside: "1" },
+        },
+      }),
+      names,
+    );
+    expect(line).toMatchObject({
+      key: "chat.notice.github.commentIssue",
+      values: { who: "drive-by", number: "5", repo: "acme/app" },
+      detail: { content: "Pode revisar?\n\nhttps://github.com/acme/app/issues/5" },
+      answer: true,
+    });
   });
 
   test("another agent's answer and note say its name, not the agent-facing handle (no @)", () => {
@@ -1273,6 +1327,7 @@ describe("automatic lines (notices) and fast replies", () => {
       // Its note to itself is the agent's: nothing to open.
       detail: null,
       pending: true,
+      answer: false,
     });
     const canceled = eventLineOf(
       agentMsg("n2", { notice: { kind: "follow_up", text: "x", refs: { ...refs, state: "canceled" } } }),

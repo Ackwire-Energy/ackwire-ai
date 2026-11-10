@@ -95,6 +95,7 @@ export type ActivityKind =
   | "startingWork"
   | "updatingWork"
   | "withdrawingRequest"
+  | "releasingAgent"
   | "schedulingAction"
   | "updatingDashboard"
   | "testingOnPhone"
@@ -106,6 +107,7 @@ export type ActivityKind =
   | "sendingDm"
   | "settingStatus"
   | "settingReplyStyle"
+  | "sendingFeedback"
   | "deletingRoutine"
   | "runningRoutine"
   | "proposingTeam"
@@ -251,6 +253,7 @@ const BUILTIN: Record<string, ActivityKind> = {
   stop_work: "updatingWork",
   post_update: "updatingWork",
   withdraw_request: "withdrawingRequest",
+  release_waiting_agent: "releasingAgent",
   schedule_action: "schedulingAction",
   create_dashboard: "updatingDashboard",
   create_widget: "updatingDashboard",
@@ -263,6 +266,7 @@ const BUILTIN: Record<string, ActivityKind> = {
   send_dm: "sendingDm",
   set_status: "settingStatus",
   set_reply_style: "settingReplyStyle",
+  send_feedback: "sendingFeedback",
   delete_routine: "deletingRoutine",
   run_routine_now: "runningRoutine",
   propose_team: "proposingTeam",

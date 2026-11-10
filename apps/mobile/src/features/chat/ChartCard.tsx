@@ -146,11 +146,11 @@ export function ChartSheet() {
     <View style={styles.sheet}>
       <View style={styles.sheetTop}>
         <IconButton icon="x" plate label={t("mobile.common.close")} onPress={() => router.back()} />
-        <Text variant="title" style={styles.sheetTitle} numberOfLines={2}>
-          {chart.spec.title}
-        </Text>
-        <View style={styles.sheetSpacer} />
       </View>
+      {/* The title on a row of its own under the bar, the sheet's whole width: never cut beside its buttons. */}
+      <Text variant="title" style={styles.sheetTitle}>
+        {chart.spec.title}
+      </Text>
       <ScrollView contentContainerStyle={[styles.sheetBody, { paddingBottom: 24 + insets.bottom }]}>
         {chart.spec.subtitle ? (
           <Text variant="footnote" tone="faint">
@@ -595,7 +595,6 @@ const styles = StyleSheet.create({
   sheet: { flex: 1, paddingTop: 14 },
   gone: { alignItems: "center", justifyContent: "center", padding: 24 },
   sheetTop: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14 },
-  sheetTitle: { flex: 1, textAlign: "center" },
-  sheetSpacer: { width: 40 },
+  sheetTitle: { paddingHorizontal: 16, paddingTop: 8 },
   sheetBody: { paddingHorizontal: 16, paddingTop: 14, gap: 20 },
 });

@@ -114,9 +114,10 @@ export function RightHandMineRow({ agent }: { agent: Agent }) {
   const qc = useQueryClient();
   const toast = useToast();
   const connect = useConnectAi();
+  const held = usePlanHold() !== null;
   const view = useAgentBrain(org.id, agent.id).data;
   const platform = usePlatformKey(org.id).data === true;
-  const status = mineStatus(view, me.user.id, platform);
+  const status = mineStatus(view, me.user.id, platform, agent.brain?.maker);
   if (!status) return null;
   const first = (id: string) => dir.memberById.get(id)?.name.split(" ")[0] ?? "";
   const back = () =>
@@ -172,7 +173,9 @@ export function RightHandMineRow({ agent }: { agent: Agent }) {
   } else {
     face = <Icon name="bulb" size={16} className="muted" />;
     name = t("rightHand.settings.mineNobody");
-    acts = connectTo(t("rightHand.settings.connectMine"), true);
+    // On a billing hold nothing connects before the plan, whose one way in is the hold's banner (ADR 0162).
+    if (held) what = t("agentSetup.firstRun.afterPlan");
+    else acts = connectTo(t("rightHand.settings.connectMine"), true);
   }
   return (
     <div className="rh-mine ac-mediarow ac-mediarow--row">
@@ -488,7 +491,7 @@ function TeamWeekPref({ name }: { name: string }) {
       icon="calendar"
       label={t(admin ? "teamWeek.settings.label" : "teamWeek.settings.dayLabel")}
       hint={t(admin ? "teamWeek.settings.help" : "teamWeek.settings.dayHelp", agentGrammar(name))}
-      control={
+      actions={
         <span className="rh-set__week">
           <TeamWeekSchedule
             prefs={prefs}

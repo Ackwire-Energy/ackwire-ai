@@ -201,7 +201,6 @@
       "timezone.group.Oceania",
       "toolReview.ok",
       "usageViews.tokens",
-      "webPushAsk.minutes",
       "wiki.editor.link",
       "wiki.form.tags",
       "wiki.import.stat.links",
@@ -226,6 +225,7 @@
       "endpoint.styles.openai",
       "endpoint.styles.anthropic",
       "teamPlan.card.skills",
+      "newAgentCard.skills",
       "teamTemplates.agents.ada.role",
       "teamTemplates.channels.ada",
       "team.chart.workspace",
@@ -268,7 +268,9 @@
       "devices.iphone.connectedDone",
       "members.passwordLink.label",
       "openOnPhone.appStore",
-      "openOnPhone.googlePlay"
+      "openOnPhone.googlePlay",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "es": [
       "devices.iphone.path.general",
@@ -451,7 +453,6 @@
       "timezone.group.Asia",
       "toolReview.ok",
       "usageViews.tokens",
-      "webPushAsk.minutes",
       "wiki.audienceRoles",
       "wiki.legend.obsidian",
       "wiki.markdown",
@@ -472,6 +473,7 @@
       "endpoint.styles.openai",
       "endpoint.styles.anthropic",
       "teamPlan.card.skills",
+      "newAgentCard.skills",
       "teamTemplates.agents.ada.role",
       "teamTemplates.channels.ada",
       "team.list.col.roles",
@@ -488,11 +490,13 @@
       "share.groupRoles",
       "settings.mode.personal",
       "onboarding.personal.name",
-      "newAgentAsk.ideas",
       "openOnPhone.appStore",
-      "openOnPhone.googlePlay"
+      "openOnPhone.googlePlay",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "fr": [
+      "calendar.moreRuns",
       "devices.cpus",
       "devices.system.android",
       "devices.system.ios",
@@ -580,9 +584,7 @@
       "calendar.filter.routine",
       "calendar.form.description",
       "calendar.form.participants",
-      "calendar.kind.routine",
       "calendar.runAria",
-      "calendar.runsOn",
       "channel.emoji",
       "channel.membersAgents",
       "channel.messages",
@@ -796,7 +798,6 @@
       "threads.tabs.missions",
       "timezone.group.Europe",
       "toolReview.ok",
-      "webPushAsk.minutes",
       "wiki.ask.agent",
       "wiki.audienceAgentDetail",
       "wiki.audienceAgents",
@@ -845,6 +846,7 @@
       "endpoint.styles.anthropic",
       "teamPlan.card.routines",
       "teamPlan.card.skills",
+      "newAgentCard.skills",
       "teamPlan.card.agents",
       "teamPlan.card.routineCount",
       "teamPlan.firstTask.suggestion",
@@ -874,10 +876,11 @@
       "share.agent",
       "teamPlan.lifeArea.money",
       "teamTemplates.agents.rui.role",
-      "newAgentAsk.idea.money.label",
       "agentSetup.firstRun.team.donePersonal",
       "openOnPhone.appStore",
-      "openOnPhone.googlePlay"
+      "openOnPhone.googlePlay",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "de": [
       "devices.iphone.steps.account",
@@ -980,7 +983,6 @@
       "browser.profiles.name",
       "browser.title",
       "browser.watch.live",
-      "calendar.kind.routine",
       "calendar.runAria",
       "calendar.views.agenda",
       "channel.emoji",
@@ -1007,7 +1009,6 @@
       "connectors.category.support",
       "connectors.names.cloudflare_bindings",
       "connectors.names.intercom_eu",
-      "connectors.toolChanges.description",
       "connectors.tools",
       "contextMenu.lookSystem",
       "database.host",
@@ -1032,7 +1033,6 @@
       "issues.columns.createdDetail",
       "issues.columns.name",
       "issues.display.field.label",
-      "issues.labels",
       "issues.moved",
       "issues.pr",
       "issues.priority.normal",
@@ -1256,6 +1256,8 @@
       "endpoint.styles.anthropic",
       "endpoint.name",
       "teamPlan.card.skills",
+      "newAgentCard.name",
+      "newAgentCard.skills",
       "teamPlan.adjust.name",
       "teamTemplates.agents.ada.role",
       "teamTemplates.channels.iara",
@@ -1279,12 +1281,14 @@
       "share.agent",
       "settings.mode.team",
       "teamTemplates.agents.leo.role",
-      "newAgentAsk.idea.training.label",
       "members.passwordLink.label",
       "openOnPhone.appStore",
-      "openOnPhone.googlePlay"
+      "openOnPhone.googlePlay",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "it": [
+      "calendar.moreRuns",
       "devices.iphone.steps.account",
       "devices.cpus",
       "devices.memory",
@@ -1371,7 +1375,6 @@
       "browser.live.secure",
       "browser.title",
       "browser.watch.no",
-      "calendar.kind.routine",
       "calendar.runAria",
       "calendar.views.agenda",
       "channel.emoji",
@@ -1389,7 +1392,6 @@
       "connectors.category.email",
       "connectors.category.marketing",
       "connectors.names.cloudflare_bindings",
-      "connectors.toolChanges.input",
       "database.count",
       "database.database",
       "database.host",
@@ -1560,7 +1562,6 @@
       "toolReview.ok",
       "usageQueue.routine",
       "usageQueue.thread",
-      "webPushAsk.minutes",
       "wiki.editor.link",
       "wiki.home",
       "wiki.import.stat.links",
@@ -1611,9 +1612,12 @@
       "settings.mode.team",
       "members.passwordLink.label",
       "openOnPhone.appStore",
-      "openOnPhone.googlePlay"
+      "openOnPhone.googlePlay",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "nl": [
+      "calendar.moreRuns",
       "devices.iphone.steps.account",
       "devices.filter.computers",
       "devices.cpus",
@@ -1753,9 +1757,7 @@
       "calendar.filter.agent",
       "calendar.filter.routine",
       "calendar.filters",
-      "calendar.kind.routine",
       "calendar.runAria",
-      "calendar.runsOn",
       "calendar.views.week",
       "channel.emoji",
       "channel.membersAgents",
@@ -1822,7 +1824,6 @@
       "issues.columns.createdDetail",
       "issues.display.field.label",
       "issues.display.field.pullRequest",
-      "issues.labels",
       "issues.moved",
       "issues.pr",
       "issues.statusLabel",
@@ -1913,7 +1914,6 @@
       "noticePrefs.category.computers.title",
       "notifications.composer.escKey",
       "notifications.source.browser",
-      "notifications.source.connectors",
       "notifications.source.machine",
       "notifications.source.routine",
       "notifications.source.thread",
@@ -2065,7 +2065,6 @@
       "toolReview.ok",
       "toolReview.subjectCount",
       "usageViews.tokens",
-      "webPushAsk.minutes",
       "wiki.ask.agent",
       "wiki.audienceAgentDetail",
       "wiki.audienceAgents",
@@ -2122,6 +2121,7 @@
       "endpoint.styles.anthropic",
       "teamPlan.card.routines",
       "teamPlan.card.skills",
+      "newAgentCard.skills",
       "teamPlan.card.agents",
       "teamPlan.card.routineCount",
       "teamPlan.firstTask.later",
@@ -2158,11 +2158,12 @@
       "share.agent",
       "settings.mode.team",
       "teamTemplates.agents.leo.role",
-      "newAgentAsk.idea.training.label",
       "agentSetup.firstRun.team.donePersonal",
       "members.passwordLink.label",
       "openOnPhone.appStore",
-      "openOnPhone.googlePlay"
+      "openOnPhone.googlePlay",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "ja": [
       "devices.system.android",
@@ -2310,8 +2311,11 @@
       "routines.setup.github.type",
       "routines.setup.github.url",
       "routines.setup.sentry.url",
+      "agentSetup.firstRun.people.email",
       "openOnPhone.appStore",
-      "openOnPhone.googlePlay"
+      "openOnPhone.googlePlay",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "ko": [
       "devices.system.android",
@@ -2455,8 +2459,11 @@
       "routines.setup.github.type",
       "routines.setup.github.url",
       "routines.setup.sentry.url",
+      "agentSetup.firstRun.people.email",
       "openOnPhone.appStore",
-      "openOnPhone.googlePlay"
+      "openOnPhone.googlePlay",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "zh-Hans": [
       "devices.system.android",
@@ -2592,8 +2599,11 @@
       "routines.setup.github.type",
       "routines.setup.github.url",
       "routines.setup.sentry.url",
+      "agentSetup.firstRun.people.email",
       "openOnPhone.appStore",
-      "openOnPhone.googlePlay"
+      "openOnPhone.googlePlay",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "id": [
       "devices.cpus",
@@ -2858,7 +2868,9 @@
       "agentSetup.how.model",
       "share.fileRef",
       "openOnPhone.appStore",
-      "openOnPhone.googlePlay"
+      "openOnPhone.googlePlay",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "tr": [
       "devices.cpus",
@@ -3021,7 +3033,9 @@
       "browser.live.emulated.tablet",
       "agentSetup.how.model",
       "openOnPhone.appStore",
-      "openOnPhone.googlePlay"
+      "openOnPhone.googlePlay",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "pl": [
       "devices.cpus",
@@ -3234,7 +3248,6 @@
       "threads.panel.agent",
       "timezone.group.Oceania",
       "toolReview.ok",
-      "webPushAsk.minutes",
       "wiki.ask.agent",
       "wiki.audienceAgentDetail",
       "wiki.editor.link",
@@ -3283,7 +3296,9 @@
       "agentSetup.firstRun.team.donePersonal",
       "members.passwordLink.label",
       "openOnPhone.appStore",
-      "openOnPhone.googlePlay"
+      "openOnPhone.googlePlay",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "ru": [
       "devices.system.android",
@@ -3417,8 +3432,11 @@
       "routines.setup.github.type",
       "routines.setup.github.url",
       "routines.setup.sentry.url",
+      "agentSetup.firstRun.people.email",
       "openOnPhone.appStore",
-      "openOnPhone.googlePlay"
+      "openOnPhone.googlePlay",
+      "arrival.beta.word",
+      "feedback.mark"
     ]
   },
   "mobile-base": {
@@ -3595,7 +3613,6 @@
       "activityNow.kind.browser",
       "activityNow.kind.limit",
       "activityNow.kind.secret",
-      "activityNow.kind.tools",
       "activityNow.next.routine",
       "agent.talk",
       "browser.live.key.Escape",
@@ -3724,7 +3741,6 @@
       "devices.connect.windows",
       "devices.memory",
       "activityNow.kind.browser",
-      "activityNow.kind.tools",
       "activityNow.next.routine",
       "agents.title",
       "blocks.thousand",

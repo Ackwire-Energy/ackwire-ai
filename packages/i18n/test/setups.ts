@@ -116,6 +116,8 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     "computers.lead",
     "connectAi.wait.connecting",
     "errors.mission.unavailable",
+    // The feedback form's line on who reads it, where the server isn't one of agentes.chat's own (`auth-config.cloud`).
+    "feedback.goesServer",
     "machines.download.step2",
     "machines.download.title",
     "machines.host.",

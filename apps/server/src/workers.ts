@@ -23,9 +23,15 @@ import {
   expireConsultations,
   expireQuestions,
   expireSecretRequests,
+  type FeedbackFileDeps,
   fireDueRoutines,
   isHandback,
   type JobHandlers,
+  LANE_SLOW_FOR_MS,
+  LANE_SLOW_MS,
+  type Lane,
+  type LaneLimits,
+  LOOP_LATE_MS,
   listenForRunCancels,
   type MailDeps,
   type OutboxJob,
@@ -39,8 +45,6 @@ import {
   purgeApps,
   purgeDeletedArtifacts,
   purgeDeletedWikiPages,
-  QUICK_SLOW_FOR_MS,
-  QUICK_SLOW_MS,
   queueApprovalDigests,
   reapRoutineRuns,
   reconcileComposioAccounts,
@@ -51,12 +55,33 @@ import {
   releaseJobs,
   sweepEndedInboxes,
   sweepExpiredVoice,
+  sweepFeedbackFiles,
   sweepWidgetDrafts,
   type VoiceDeps,
   wakeSnoozedNotifications,
 } from "@agenteschat/engine";
 import { isExpectedError } from "./http/errors";
 import type { Logger } from "./logger";
+
+/** What each lane's jobs are, as an alarm says it. */
+const LANE_WORDS: Record<Lane, string> = {
+  quick: "Quick jobs (messages' routing, notifications, emails)",
+  long: "Agents' runs",
+  background: "Routines",
+};
+
+/**
+ * The alarm of a lane whose jobs kept waiting for a slot (`laneAlarm`): which lane, and what to do. A worker process
+ * shares a PostgreSQL database; the built-in one belongs to one process.
+ */
+export function slowLaneMessage(lane: Lane, builtInDatabase = false) {
+  const ms = LANE_SLOW_MS[lane];
+  const wait = ms >= 60_000 ? `${ms / 60_000} minutes` : `${ms / 1000} s`;
+  const what = builtInDatabase
+    ? "raise OUTBOX_MAX_IN_FLIGHT, or move to PostgreSQL to add worker processes"
+    : "add a worker process (SERVER_ROLE=worker) on the same database";
+  return `${LANE_WORDS[lane]} waited over ${wait} for a slot for ${LANE_SLOW_FOR_MS / 60_000} minutes: ${what}`;
+}
 
 /** An id from a job's payload, never the rest of it (it can hold people's text). */
 const idOf = (value: unknown) => (typeof value === "string" ? value : undefined);
@@ -90,6 +115,8 @@ export interface WorkerDeps {
   context?: ContextDeps;
   /** Drive files (purging deleted ones after 30 days). */
   artifacts?: ArtifactDeps;
+  /** Feedback's pictures and videos (ADR 0160): the sweep under their purge jobs. */
+  feedbackFiles?: FeedbackFileDeps;
   /** Voice recordings (deleting them past their retention, ADR 0100). */
   voice?: VoiceDeps;
   /** Approval reminder emails. */
@@ -103,10 +130,12 @@ export interface WorkerDeps {
   /** The daily stall-and-noise report (`OPS_REPORT_EMAIL`); absent: none. */
   opsReport?: { to: string[]; publicUrl: string };
   /**
-   * Job slots (`OUTBOX_MAX_IN_FLIGHT`, `OUTBOX_QUICK_SLOTS`, `OUTBOX_MAX_IN_FLIGHT_CEILING`) and the database
-   * connections the jobs share; absent: the pump's own.
+   * Job slots (`OUTBOX_MAX_IN_FLIGHT`, `OUTBOX_QUICK_SLOTS`), how far they grow (`laneLimits`) and the kinds left to
+   * the app (a worker process: `APP_JOB_KINDS`); absent: the pump's own.
    */
-  outbox?: { maxInFlight: number; quickSlots: number; ceiling: number; dbConnections: number };
+  outbox?: { maxInFlight: number; quickSlots: number; limits?: LaneLimits; memoryBytes?: number; skipKinds?: string[] };
+  /** The database is the built-in one (one process): the alarms advise what fits it. */
+  builtInDatabase?: boolean;
   log: Logger;
   workerId?: string;
 }
@@ -119,6 +148,8 @@ export const WORKER_INTERVALS_MS = {
   outbox: 1_000,
   /** The job slots follow what each lane waited since the last look (`OutboxPump.tune`). */
   outboxTune: 30_000,
+  /** The beat that counts how often the process's timers fire late (`OutboxPump.tune`'s `lateBeats`). */
+  loopBeat: 100,
   partitions: 24 * 3600_000,
   approvals: 60_000,
   approvalDigest: 15 * 60_000,
@@ -134,6 +165,8 @@ export const WORKER_INTERVALS_MS = {
   inboxes: 30_000,
   /** Deleted files past 30 days lose their contents. */
   artifactPurge: 6 * 3600_000,
+  /** Feedback files their purge job missed (it failed for good, or its row went first). */
+  feedbackFiles: 6 * 3600_000,
   /** Wiki pages in the trash past 30 days are removed with their history. */
   wikiPurge: 6 * 3600_000,
   voiceExpiry: 24 * 3600_000,
@@ -215,21 +248,29 @@ export function startWorkers(deps: WorkerDeps) {
   every("outbox", WORKER_INTERVALS_MS.outbox, async () => {
     while (!stopped && (await outboxPump.pump()) > 0) {}
   });
+  // Beats that fired late since the last look at the slots, each beat a long block swallowed included: a busy
+  // processor keeps them from growing. A count, so one pause (a full collection) doesn't hold them for a step.
+  let lateBeats = 0;
+  let beat = performance.now();
+  timers.push(
+    setInterval(() => {
+      const now = performance.now();
+      lateBeats += Math.floor(Math.max(0, now - beat - WORKER_INTERVALS_MS.loopBeat) / LOOP_LATE_MS);
+      beat = now;
+    }, WORKER_INTERVALS_MS.loopBeat),
+  );
   every("outboxTune", WORKER_INTERVALS_MS.outboxTune, async () => {
-    const t = await outboxPump.tune();
-    const lanes = { quick: t.quick, long: t.long, quickWaitMs: t.quickWaitMs, longWaitMs: t.longWaitMs };
+    const t = await outboxPump.tune({ lateBeats });
+    const lanes = { quick: t.quick, long: t.long, waits: t.waits, braked: t.braked, lateBeats };
+    lateBeats = 0;
     if (t.resized) {
       log.info("job slots resized", lanes);
       void ticks.get("outbox")?.();
     }
-    if (t.slow)
-      log.error("quick jobs kept waiting for a slot", {
-        job: "outbox",
-        ...lanes,
-        error: new Error(
-          `quick jobs waited over ${QUICK_SLOW_MS / 1000} s for a slot for ${QUICK_SLOW_FOR_MS / 60_000} minutes`,
-        ),
-      });
+    for (const lane of t.slow) {
+      const message = slowLaneMessage(lane, deps.builtInDatabase);
+      log.error(message, { job: "outbox", lane, ...lanes, error: new Error(message) });
+    }
   });
 
   every("apps", WORKER_INTERVALS_MS.apps, () => purgeApps(db));
@@ -318,6 +359,14 @@ export function startWorkers(deps: WorkerDeps) {
     every("artifactPurge", WORKER_INTERVALS_MS.artifactPurge, async () => {
       const purged = await purgeDeletedArtifacts(files);
       if (purged > 0) log.info("deleted files purged", { versions: purged });
+    });
+  }
+
+  const feedbackFiles = deps.feedbackFiles;
+  if (feedbackFiles) {
+    every("feedbackFiles", WORKER_INTERVALS_MS.feedbackFiles, async () => {
+      const swept = await sweepFeedbackFiles(feedbackFiles);
+      if (swept > 0) log.info("feedback files past their time swept", { files: swept });
     });
   }
 

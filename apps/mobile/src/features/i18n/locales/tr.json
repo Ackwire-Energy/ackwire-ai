@@ -989,8 +989,6 @@
       "plan_lent_female_other": "{{names}}, {{plan}} planını {{agent}} ajanına bağladı",
       "plan_model_dropped_one": "{{model}}, {{plan}} listesinden çıktı. {{names}} şimdilik {{runs}} kullanıyor",
       "plan_model_dropped_other": "{{model}}, {{plan}} listesinden çıktı. {{names}} şimdilik {{runs}} kullanıyor",
-      "connector_tool_changed_one": "Bağlı bir sunucu, onayladığınız araçları değiştirdi",
-      "connector_tool_changed_other": "Bağlı bir sunucu, onayladığınız araçları değiştirdi",
       "computer_disk_full_one": "Bir bilgisayarın diski neredeyse dolu",
       "computer_disk_full_other": "Bir bilgisayarın diski neredeyse dolu",
       "computer_no_chrome_one": "Bir bilgisayarın Google Chrome'a ihtiyacı var. google.com/chrome adresinden indirin",
@@ -1463,15 +1461,11 @@
       "browser": "Tarayıcı",
       "secret": "Gizli bilgi",
       "join": "Üyeler",
-      "tools": "Araçlar",
       "limit": "Limit"
     },
     "review": "İncele",
     "answer": "Yanıtla",
     "open": "Aç",
-    "toolsTitle": "Onayladığın araçları değiştirdi",
-    "toolsWhy": "Yenisini kabul edene kadar ajanlar onaylanan sürümü kullanır.",
-    "reviewChanges": "Değişiklikleri incele",
     "clear": {
       "title": "Sizi bekleyen bir şey yok",
       "text": "Bir ajanın size ihtiyacı olduğunda önce burada görünür."
@@ -2170,7 +2164,8 @@
     "suggested": "{{domain}} alan adlı e-postanıza bakarak {{org}} adını önerdim.",
     "create": "Oluştur",
     "shareMessage": "agentes.chat üzerinde {{org}} çalışma alanına katılın: {{url}}",
-    "failed": "Kaydedilemedi. Tekrar deneyin."
+    "failed": "Kaydedilemedi. Tekrar deneyin.",
+    "enter": "Çalışma alanına gir"
   },
   "ai": {
     "yourPlan": "Yapay zeka planınız",
@@ -2495,7 +2490,6 @@
   "dashboards": {
     "homeRow": "Yalnızca siz · kendi widget'larınız",
     "loadFailed": "Panolar yüklenemedi.",
-    "onlyHome": "Çalışma alanının ya da rollerinizin panoları burada görünür.",
     "create": "Oluştur",
     "routineTarget": "widget'ı",
     "pin": {

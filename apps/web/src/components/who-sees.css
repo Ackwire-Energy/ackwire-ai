@@ -96,9 +96,6 @@
   margin: 0;
 }
 /* The warning sits on its own line above Copiar link and Concluir, its way out at the end of the words. */
-.share__foot.ac-dialog__foot {
-  justify-content: space-between;
-}
 .share__foot .ac-dialog__foot-note {
   flex: 1 1 100%;
 }

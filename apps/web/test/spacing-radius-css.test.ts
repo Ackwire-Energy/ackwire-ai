@@ -95,7 +95,7 @@ test("a popover with words and controls of its own has the menu's room, its word
     ["tasks", ".tm-confirm.ac-popover"],
     ["dashboards", ".nw-alert.ac-popover"],
     ["issues", ".issues-display.ac-popover"],
-    ["layout", ".msg-mem__pop"],
+    ["issues", ".issue-github__pop.ac-popover"],
     ["layout", ".profile-card"],
     ["card", ".mcard-audience.ac-popover"],
   ];
@@ -116,11 +116,10 @@ test("a popover with words and controls of its own has the menu's room, its word
   expect(last(sheets.dashboards, ".nw-alert__row", "padding")).toBe("var(--popover-in) var(--popover-in) 0");
   expect(last(sheets.issues, ".issues-display__row", "padding-inline")).toBe("var(--popover-in)");
   expect(last(sheets.issues, ".issues-display__foot", "padding")).toBe("14px var(--popover-in) var(--popover-in)");
+  expect(last(sheets.issues, ".issue-github__field", "margin")).toBe("var(--popover-in) var(--popover-in) 0");
   expect(last(sheets.issues, ".issues-layout", "border-radius")).toBe(
     "var(--radius-item) var(--radius-item) var(--radius-item) 4px",
   );
-  expect(last(sheets.layout, ".msg-mem__card", "padding")).toBe("var(--popover-in)");
-  expect(last(sheets.layout, ".msg-mem__card .msg-mem__actions", "margin-bottom")).toBe(neg);
   expect(last(sheets.layout, ".channel-card>div", "padding")).toBe("var(--popover-in)");
   expect(last(sheets.layout, ".channel-card .profile-card__actions", "margin-bottom")).toBe(neg);
   expect(last(sheets.card, ".mcard-audience.ac-popover>:not(.mcard-audience__acts)", "margin-inline")).toBe(

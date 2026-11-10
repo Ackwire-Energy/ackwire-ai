@@ -1,0 +1,528 @@
+/*
+ * What a person meets right after the onboarding (ADR 0160): the beta notice, Connect an AI with the team on its
+ * stage, and the feedback form. One pixel sky for the three, with the workspace's own agents on it.
+ */
+
+/* ---------- the team on its sky ---------- */
+.team-scene {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  /* Before the first frame, and without a canvas: the night's own blue. */
+  background: #0b1330;
+}
+.team-scene > .ac-sky {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+.team-scene__row {
+  position: absolute;
+  inset: auto 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+.team-scene--tall .team-scene__row {
+  flex-direction: column-reverse;
+  gap: 16px;
+}
+.team-scene__cast {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 8px;
+}
+.team-scene__agent {
+  display: block;
+  flex: none;
+}
+.team-scene .team-scene__agent .ac-avatar {
+  width: 42px;
+  height: 42px;
+}
+.team-scene .team-scene__agent[data-lead] .ac-avatar {
+  width: 56px;
+  height: 56px;
+}
+.team-scene--tall .team-scene__agent .ac-avatar {
+  width: 52px;
+  height: 52px;
+}
+.team-scene--tall .team-scene__agent[data-lead] .ac-avatar {
+  width: 72px;
+  height: 72px;
+}
+/* Up: each one hops once, one after the other. */
+.team-scene__cast[data-awake] .team-scene__agent {
+  animation: team-hop 0.52s var(--spring) both;
+  animation-delay: calc(var(--i) * 0.12s + var(--wake, 0s));
+}
+@keyframes team-hop {
+  40% {
+    transform: translateY(-14px);
+  }
+}
+/* A plan's mark on the sky, and the pixels between it and the team: still, walking while it connects, lit once done. */
+.team-scene__mark {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  flex: none;
+  border-radius: var(--radius-agent);
+  background: #fff;
+  color: #151514;
+  box-shadow:
+    0 0 0 1px #0000001a,
+    0 6px 18px -6px #00000059;
+  animation: arrival-in 0.3s var(--out) both;
+}
+.team-scene__mark .ac-brand {
+  background: none;
+  box-shadow: none;
+}
+.team-scene__trail {
+  display: flex;
+  gap: 5px;
+}
+.team-scene--tall .team-scene__trail {
+  flex-direction: column-reverse;
+}
+.team-scene__trail i {
+  width: 6px;
+  height: 6px;
+  background: #ffffff40;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .team-scene__trail[data-state="walk"] i {
+    animation: team-walk 1.1s steps(1) infinite;
+    animation-delay: calc(var(--n) * 0.14s);
+  }
+}
+.team-scene__trail[data-state="done"] i {
+  background: #fff;
+}
+@keyframes team-walk {
+  0% {
+    background: #fff;
+  }
+  14% {
+    background: #ffffff99;
+  }
+  28%,
+  100% {
+    background: #ffffff40;
+  }
+}
+
+/* ---------- the dialogs ---------- */
+.ac-dialog.arrival {
+  overflow: hidden;
+}
+@keyframes arrival-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.arrival-hero {
+  position: relative;
+  flex: none;
+  height: 172px;
+}
+/* On the sky: white, whatever the theme. */
+.arrival-hero__close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 1;
+  color: #fff;
+}
+.arrival-hero__close:hover {
+  background: #ffffff2e;
+  color: #fff;
+}
+.arrival-lede {
+  padding: 20px var(--dialog-pad) 8px;
+}
+.arrival-lede__title {
+  margin: 0 0 6px;
+  font-size: 22px;
+  font-weight: 650;
+  line-height: 28px;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+.arrival-lede__text {
+  margin: 0;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 22px;
+  text-wrap: pretty;
+}
+.arrival .ac-dialog__foot-note {
+  line-height: 18px;
+}
+.arrival .ac-dialog__foot-note .ac-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--faint);
+}
+
+/* ---------- the beta notice ---------- */
+/* The word in the dot font: an occasion of its own, like a big number. */
+.arrival-beta__word {
+  position: absolute;
+  inset: 20px 0 auto;
+  font-family: var(--font-dot);
+  font-size: 46px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0.14em;
+  text-indent: 0.14em;
+  text-align: center;
+  color: #fff;
+  pointer-events: none;
+}
+.arrival-points {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0;
+  padding: 6px 0 4px;
+  list-style: none;
+}
+/* An `.ac-iconline`: the icon on the title's line, never centered against the two lines. */
+.arrival-points li {
+  gap: 12px;
+}
+.arrival-points .ac-icon {
+  color: var(--muted);
+}
+.arrival-points b {
+  display: block;
+  font-weight: 600;
+}
+.arrival-points span {
+  display: block;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 20px;
+  text-wrap: pretty;
+}
+
+/* ---------- Connect an AI, with the team on its stage ---------- */
+.ac-dialog.arrival-connect {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  min-height: 548px;
+}
+.arrival-stage {
+  position: relative;
+  min-height: 0;
+}
+.arrival-stage__cap {
+  position: absolute;
+  inset: 22px 22px auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: #fff;
+  pointer-events: none;
+}
+.arrival-stage__cap b {
+  font-size: 19px;
+  font-weight: 650;
+  line-height: 25px;
+  text-wrap: balance;
+}
+.arrival-stage__cap span {
+  font-size: 14px;
+  line-height: 20px;
+  opacity: 0.86;
+  text-wrap: pretty;
+}
+.arrival-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.arrival-main > .ac-dialog__body {
+  flex: 1 1 auto;
+}
+.arrival-main__steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--form-gap);
+}
+.arrival-opts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.arrival-opts .ac-option {
+  width: 100%;
+}
+/* A tile beside a title and its line, as a face line: the title's capitals start at the tile's top (`.ac-captop`). */
+.arrival-opts .ac-option > :is(.ac-brand, .arrival-opts__tile):first-child + .ac-option__text > .ac-option__title {
+  /* Browsers without the lh unit: the page's 22px line. */
+  margin-block-start: calc(var(--cap-top) - 11px);
+}
+@supports (top: 1lh) {
+  .arrival-opts .ac-option > :is(.ac-brand, .arrival-opts__tile):first-child + .ac-option__text > .ac-option__title {
+    margin-block-start: calc(var(--cap-top) - 0.5lh);
+  }
+}
+.arrival-opts .ac-option > .ac-option__text {
+  flex: 1;
+}
+/* One line under each title, so every card is the same height: a long list of plans ends in an ellipsis. */
+.arrival-opts .ac-option__text {
+  min-width: 0;
+}
+.arrival-opts .ac-option__desc {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* What ends a card stays on its middle, beside both lines. */
+.arrival-opts__end {
+  flex: none;
+  align-self: center;
+  color: var(--faint);
+}
+.arrival-opts__tag {
+  flex: none;
+  align-self: center;
+  color: var(--ok);
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.arrival-opts__tile {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 48px;
+  height: 48px;
+  box-sizing: border-box;
+  border-radius: 14px 14px 14px 4px;
+  background: var(--raised);
+  box-shadow:
+    inset 0 0 0 1px var(--line),
+    var(--top);
+}
+/* Four marks in one tile: the other plans. */
+.arrival-opts__tile--four {
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+  padding: 8px;
+}
+@media (max-width: 760px) {
+  .ac-dialog.arrival-connect {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 150px minmax(0, 1fr);
+    min-height: 0;
+  }
+  .arrival-stage__cap {
+    display: none;
+  }
+  .arrival-connect .team-scene--tall .team-scene__row {
+    flex-direction: row;
+  }
+  .arrival-connect .team-scene--tall .team-scene__trail {
+    flex-direction: row;
+  }
+  .arrival-connect .team-scene--tall .team-scene__agent .ac-avatar {
+    width: 42px;
+    height: 42px;
+  }
+  .arrival-connect .team-scene--tall .team-scene__agent[data-lead] .ac-avatar {
+    width: 56px;
+    height: 56px;
+  }
+}
+
+/* ---------- feedback ---------- */
+.arrival-feedback .arrival-hero {
+  height: 132px;
+}
+.arrival-feedback .team-scene__row {
+  bottom: 14px;
+  gap: 10px;
+  align-items: flex-end;
+}
+.arrival-feedback .team-scene__agent .ac-avatar,
+.arrival-feedback .team-scene__agent[data-lead] .ac-avatar {
+  width: 64px;
+  height: 64px;
+}
+.arrival-envelope {
+  flex: none;
+  width: 44px;
+  height: 32px;
+  margin-bottom: 6px;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 4px 0 #0000001f);
+  animation: arrival-bob 2.4s ease-in-out infinite;
+}
+@keyframes arrival-bob {
+  50% {
+    transform: translateY(-4px);
+  }
+}
+/* Sent: it flies off from where it stood. */
+.arrival-envelope[data-sent] {
+  position: absolute;
+  bottom: 20px;
+  left: calc(50% + 42px);
+  margin: 0;
+  animation: arrival-fly 1s cubic-bezier(0.4, 0, 0.7, 0.4) both;
+}
+@keyframes arrival-fly {
+  to {
+    opacity: 0;
+    transform: translate(190px, -120px) rotate(-14deg) scale(0.7);
+  }
+}
+.arrival-feedback__text {
+  min-height: 112px;
+  resize: vertical;
+}
+
+/* What the feedback is about: its name, then its words behind a rule, as a quote. No box inside the dialog. */
+.arrival-about {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.arrival-about__title {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+.arrival-about__text {
+  display: -webkit-box;
+  overflow: hidden;
+  max-width: 100%;
+  margin: 0;
+  padding-left: 12px;
+  border-left: 2px solid var(--line2);
+  color: var(--ink2);
+  font-size: 14px;
+  line-height: 20px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  -webkit-box-orient: vertical;
+}
+.arrival-about__drop {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  text-decoration: underline;
+  text-decoration-color: var(--line2);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.arrival-about__drop:hover {
+  color: var(--ink);
+  text-decoration-color: var(--ink);
+}
+/* The files added: a small picture, the name, the size, and the way to take each out. Rows, no tiles. */
+.arrival-files {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.arrival-files li {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 4px 0;
+}
+.arrival-files li + li {
+  border-top: 1px solid var(--line);
+}
+.arrival-files__thumb {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  color: var(--muted);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.arrival-files__name {
+  overflow: hidden;
+  font-size: 14px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.arrival-files__size {
+  display: inline-flex;
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+/* The button over its line of limits, both on the form's left edge: the button's own padding is taken back, so its
+   icon starts where the field and the words under it do. */
+.arrival-feedback__attach {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+}
+.arrival-feedback__attach > .ac-btn {
+  margin-left: -12px;
+}
+.arrival-feedback__limits {
+  color: var(--faint);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+/* The way to the feedback form: a quiet row at the sidebar's bottom, over its foot when it has one. */
+.sidebar__feedback {
+  flex: none;
+  margin-top: auto;
+}
+.sidebar__feedback + .sidebar__foot {
+  margin-top: 0;
+}
+.sidebar__feedback > .sidebar__item {
+  color: var(--muted);
+}
+.sidebar__feedback > .sidebar__item > .ac-icon {
+  color: inherit;
+}
+.sidebar__feedback .ac-chip {
+  margin-left: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .team-scene__cast[data-awake] .team-scene__agent,
+  .team-scene__trail i,
+  .team-scene__mark,
+  .arrival-envelope {
+    animation: none;
+  }
+  .arrival-envelope[data-sent] {
+    display: none;
+  }
+}

@@ -18,7 +18,6 @@ import {
   cacheDmRead,
   cacheMessage,
   cacheMessageActions,
-  cacheMessageMemories,
   cacheMessageMeta,
   cacheMessageWork,
   cachePinned,
@@ -40,6 +39,7 @@ import {
   type Message,
   markStopping,
   type OpenConsult,
+  openConversation,
   type ReactionCount,
   type ReceiptsState,
   reconcileConsults,
@@ -288,10 +288,6 @@ function applyToCache(qc: QueryClient, orgId: string, channelId: string, event: 
     case "choices.updated":
       qc.setQueryData(keys.choices(orgId, event.choices.id), event.choices);
       break;
-    case "message.memories":
-      // What an agent saved from a person's message: the memory mark under it.
-      cacheMessageMemories(qc, orgId, channelId, event.messageId, event.memories);
-      break;
     case "message.actions":
       // An agent's receipts changed (undone, redone, a new one): replace the list.
       cacheMessageActions(qc, orgId, channelId, event.messageId, event.actions);
@@ -465,7 +461,8 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
 
   useEffect(() => {
     if (!connection || !enabled) return;
-    return connection.subscribe(channelId, (event) => {
+    const close = openConversation(qc, orgId, channelId);
+    const off = connection.subscribe(channelId, (event) => {
       // The server sends my own typing back to me too: never shown, so it never redraws.
       if (event.type === "user.typing" && event.userId === meRef.current) return;
       dispatch({ type: "event", event, at: Date.now() });
@@ -474,6 +471,11 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
       // A file's cards (a deleted one says so) and an agent's memory list, as on the web.
       applyConversationEvent(qc, orgId, event);
     });
+    // Left, or the app went to the background: shown again, it reads what it missed, as on the web.
+    return () => {
+      off();
+      close();
+    };
   }, [connection, enabled, orgId, channelId, qc]);
 
   // Safety net, as on the web: a "pensando…" the server never confirmed doesn't spin forever; the

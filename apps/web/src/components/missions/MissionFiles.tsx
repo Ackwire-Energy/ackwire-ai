@@ -4,11 +4,12 @@ import { formatTime, relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { editDiff, executorName, type MdLine, mdLines, newLineIndexes } from "@agenteschat/client/lib/missions";
 import { DetailsDialog, Diff, Icon, Segmented, Skeleton } from "@agenteschat/ui";
-import { Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ErrorState } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
+import { codeAndBold } from "@/lib/markdown";
 
 /**
  * "Arquivos da missão": mission.md (plan and
@@ -148,18 +149,6 @@ export function MissionFilesPanel({
   );
 }
 
-/** `code` and **bold** inside a line. */
-function inline(text: string): ReactNode[] {
-  return text.split(/(`[^`]+`|\*\*[^*]+\*\*)/g).map((part, i) => {
-    // biome-ignore lint/suspicious/noArrayIndexKey: parts of one line, in order
-    if (part.startsWith("`") && part.endsWith("`") && part.length > 2) return <code key={i}>{part.slice(1, -1)}</code>;
-    // biome-ignore lint/suspicious/noArrayIndexKey: parts of one line, in order
-    if (part.startsWith("**") && part.endsWith("**") && part.length > 4) return <b key={i}>{part.slice(2, -2)}</b>;
-    // biome-ignore lint/suspicious/noArrayIndexKey: parts of one line, in order
-    return <Fragment key={i}>{part}</Fragment>;
-  });
-}
-
 /** The `.agentes/` files' Markdown: headings, checklists, bullets, quotes, paragraphs. */
 export function MissionMarkdown({
   content,
@@ -189,14 +178,14 @@ function MdRow({ line, fresh, at }: { line: MdLine; fresh: boolean; at: string }
   if (line.kind === "h1")
     return (
       <div className="mi-md__l mi-md__h1" {...mark}>
-        {inline(line.text)}
+        {codeAndBold(line.text)}
         {time}
       </div>
     );
   if (line.kind === "h2")
     return (
       <div className="mi-md__l mi-md__h2" {...mark}>
-        {inline(line.text)}
+        {codeAndBold(line.text)}
         {time}
       </div>
     );
@@ -207,7 +196,7 @@ function MdRow({ line, fresh, at }: { line: MdLine; fresh: boolean; at: string }
           {line.state === "done" && <Icon name="check" size={14} />}
         </span>
         <span>
-          {inline(line.text)}
+          {codeAndBold(line.text)}
           {line.state !== "done" && line.state !== "todo" && <small>{t(`missions.files.check.${line.state}`)}</small>}
           {line.note && <small>{line.note}</small>}
           {time}
@@ -217,7 +206,7 @@ function MdRow({ line, fresh, at }: { line: MdLine; fresh: boolean; at: string }
   const cls = line.kind === "li" ? "mi-md__li" : line.kind === "quote" ? "mi-md__p mi-md__quote" : "mi-md__p";
   return (
     <div className={`mi-md__l ${cls}`} {...mark}>
-      {inline(line.text)}
+      {codeAndBold(line.text)}
       {time}
     </div>
   );

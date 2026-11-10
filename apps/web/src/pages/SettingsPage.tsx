@@ -23,7 +23,7 @@ import {
   useUpdateSettings,
   useUsageReport,
 } from "@agenteschat/client";
-import { showsAbout } from "@agenteschat/client/lib/about";
+import { selfHosted, showsAbout } from "@agenteschat/client/lib/about";
 import { keyRemovalText } from "@agenteschat/client/lib/ai-accounts";
 import { composioUsageText, showsComposioUsage } from "@agenteschat/client/lib/composio";
 import { computerEdition } from "@agenteschat/client/lib/computer";
@@ -169,11 +169,14 @@ function Settings({
   const server = useAuthConfig().data;
   const visible = SETTINGS_SECTIONS.filter((s) => s.allowed(org, server));
   // A section a link names that this person can't open: their first one, their account, saying why. Opening the
-  // settings with no section named has nothing to explain. Billing where no billing service runs, or Sobre on
+  // settings with no section named has nothing to explain. Billing where no billing service runs, or Sobre and Voz on
   // agentes.chat Cloud, isn't about their role.
   const wanted = section ?? "general";
   const current = visible.some((s) => s.id === wanted) ? wanted : (visible[0]?.id ?? "account");
-  const serverLacks = (section === "billing" && !server?.billingUrl) || (section === "about" && !showsAbout(server));
+  const serverLacks =
+    (section === "billing" && !server?.billingUrl) ||
+    (section === "about" && !showsAbout(server)) ||
+    (section === "voice" && !selfHosted(server));
   const refused = section && current !== section && !serverLacks ? section : null;
   const setup = useComputerSetup(org.id);
   const edition = computerEdition(setup.data);
@@ -379,7 +382,7 @@ function BillingSection() {
   return (
     <Card aria-label={t("settings.section.billing")}>
       <BillingMeters />
-      <div className="row">
+      <div className="ac-acts">
         <BillingLinkButton orgId={org.id} from="settings" variant="primary" icon="external">
           {t("billing.open")}
         </BillingLinkButton>

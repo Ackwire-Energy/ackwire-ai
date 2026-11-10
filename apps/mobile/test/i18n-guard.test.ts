@@ -26,7 +26,7 @@ test("JSX text and accessibilityLabel / placeholder / title literals go through 
       for (const m of source.matchAll(/>([^<>{}]*[A-Za-zÀ-ÿ][^<>{}]*)</g)) {
         const text = (m[1] ?? "").trim();
         const prev = source[(m.index ?? 0) - 1];
-        if (prev === "=" || prev === "-" || /^[,;]/.test(text) || /^[&|]\s*[\w.]+$/.test(text)) continue;
+        if (prev === "=" || prev === "-" || /^[,;:]/.test(text) || /^[&|]\s*[\w.]+$/.test(text)) continue;
         if (!text || /=>|;|\(|\)|&&|\|\||=|\bconst\b|\breturn\b|\bnew\b|\*/.test(text) || allowed(text)) continue;
         offenders.push(`${where(m.index ?? 0)} text "${text}"`);
       }

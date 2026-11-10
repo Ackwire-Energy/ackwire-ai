@@ -34,20 +34,20 @@
   --msg-bubble: var(--own-bubble);
   --msg-mine-mix: 30%;
 }
-/* Quiet rows (an event pill, a thread's line) on the text's column: the messages' side padding, 36px face and gap. */
+/* Quiet rows (an event pill, a thread's line) on the text's column: the messages' side padding, the face and gap. */
 .channel__messages {
-  --thread-indent: 64px;
+  --thread-indent: calc(16px + var(--name-face) + var(--space-3));
 }
-/* Where the messages' side padding narrows to 12px (`responsive.css`). */
+/* Where the messages' side padding narrows to 12px and their gap to 10px (`responsive.css`). */
 @media (max-width: 760px) {
   .channel__messages {
-    --thread-indent: 58px;
+    --thread-indent: calc(12px + var(--name-face) + 10px);
   }
 }
 .channel__messages[data-look="bubbles"] {
   padding-inline: 12px;
-  /* Quiet rows (an event pill, a thread's line) on the bubbles' column: the row's 8px, the 32px face, the 8px gap. */
-  --thread-indent: 48px;
+  /* Quiet rows (an event pill, a thread's line) on the bubbles' column: the row's 8px, the face, the 8px gap. */
+  --thread-indent: calc(8px + var(--name-face) + 8px);
 }
 .ac-msg[data-look="bubbles"] {
   --msg-inline: 8px;
@@ -73,21 +73,13 @@
 [data-theme="dark"] .ac-msg[data-look="bubbles"]:is(:hover, [data-menu-open="true"]) .ac-msg__text {
   filter: brightness(1.14);
 }
-.ac-msg[data-look="bubbles"] :is(.ac-msg__avatar, .ac-msg__gutter) {
-  flex-basis: 32px;
-  width: 32px;
-}
-.ac-msg[data-look="bubbles"] .ac-msg__avatar .ac-avatar:not(.ac-avatar--xs) {
-  width: 32px;
-  height: 32px;
-}
 .ac-msg[data-look="bubbles"] .ac-msg__gutter-time {
   display: none;
 }
-/* The pair row before a reply ("Theo ⇄ Iris"): its first face centred over the bubbles' 32px face (the row's 8px +
-   7px, less the button's own 10px). A reach line's pair row keeps its place in the line. */
+/* The pair row before a reply ("Theo ⇄ Iris"): its 18px first face centred over the bubbles' face (the row's 8px and
+   half of what the face has over 18, less the button's own 10px). A reach line's pair row keeps its place in the line. */
 .channel__messages[data-look="bubbles"] .consult-pair:not(.ag-rc--talk > .consult-pair) {
-  padding-left: 5px;
+  padding-left: calc(8px + (var(--name-face) - 18px) / 2 - 10px);
 }
 /* Everyone's words in a bubble, as wide as what they say, up to 76% of the column; cards stay out, on its left edge. */
 .ac-msg[data-look="bubbles"] .ac-msg__text {
@@ -180,7 +172,6 @@
   color: var(--stamp-ink);
 }
 .ac-msg[data-look="bubbles"] > .ac-msg__reply {
-  --reply-face: 32px;
   --reply-gap: 8px;
 }
 /* Name inside the bubble, in its color, a step under the words; a DM's two speakers leave it to screen readers. */
@@ -218,7 +209,7 @@
 }
 /*
  * The time inside the bubble, in its bottom right corner. The last line keeps room for it (`--stamp-room`), and when it
- * has none the room wraps to a line of its own, as after a table or a block of code.
+ * has none it takes a line of its own (below), as after a table or a block of code.
  */
 .ac-msg__stamp {
   position: absolute;
@@ -253,18 +244,47 @@
   width: var(--stamp-room);
   height: 1px;
 }
+/*
+ * A time on a line of its own (after a table or code, with no words, while a reply streams, with what the row is
+ * doing, a stop button and all, or a send that takes long) is in the bubble's flow, at its right: the bubble is at
+ * least as wide as it, so a stamp wider than the words never hangs past the bubble's left edge.
+ */
 .ac-msg[data-look="bubbles"] .ac-msg__text:has(> .md > :not(p, ul, ol):last-child),
 .ac-msg[data-look="bubbles"] .ac-msg__text:not(:has(> .md)):has(> .ac-msg__stamp),
-.ac-msg--streaming[data-look="bubbles"] .ac-msg__text:has(> .ac-msg__stamp) {
-  padding-bottom: 22px;
-}
-/* What it is doing follows the time, a stop button and all: a line of its own. */
-.ac-msg[data-look="bubbles"]:not(.ac-msg--own) .ac-msg__text:has(> .ac-msg__stamp .ac-msg__status:not(:empty)) {
-  padding-bottom: 30px;
-}
-/* A send that takes long says so there too; most sends never show these words. */
+.ac-msg--streaming[data-look="bubbles"] .ac-msg__text:has(> .ac-msg__stamp),
+.ac-msg[data-look="bubbles"]:not(.ac-msg--own) .ac-msg__text:has(> .ac-msg__stamp .ac-msg__status:not(:empty)),
 .ac-msg--own[data-look="bubbles"] .ac-msg__text:has(> .ac-msg__stamp .ac-msg__status > :not(.ac-visually-hidden)) {
-  padding-bottom: 22px;
+  padding-bottom: 4px;
+}
+.ac-msg[data-look="bubbles"] .ac-msg__text:has(> .md > :not(p, ul, ol):last-child) > .ac-msg__stamp,
+.ac-msg[data-look="bubbles"] .ac-msg__text:not(:has(> .md)) > .ac-msg__stamp,
+.ac-msg--streaming[data-look="bubbles"] .ac-msg__text > .ac-msg__stamp,
+.ac-msg[data-look="bubbles"]:not(.ac-msg--own) .ac-msg__text > .ac-msg__stamp:has(.ac-msg__status:not(:empty)),
+.ac-msg--own[data-look="bubbles"] .ac-msg__text > .ac-msg__stamp:has(.ac-msg__status > :not(.ac-visually-hidden)) {
+  position: static;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin: 4px -4px 0 0;
+  white-space: normal;
+  overflow-wrap: normal;
+}
+.ac-msg[data-look="bubbles"]:not(.ac-msg--own) .ac-msg__text > .ac-msg__stamp:has(.ac-msg__status:not(:empty)) {
+  margin-top: 10px;
+}
+/* A status too long for the widest bubble wraps inside it, its mark on its first line. */
+.ac-msg[data-look="bubbles"] .ac-msg__text > .ac-msg__stamp .ac-msg__status {
+  align-items: flex-start;
+}
+.ac-msg[data-look="bubbles"] .ac-msg__text > .ac-msg__stamp .ac-msg__status > :is(svg, canvas):first-child {
+  flex: none;
+  /* Browsers without the lh unit: the status's 16px line. */
+  translate: 0 calc(8px - var(--cap-mid) - 50%);
+}
+@supports (top: 1lh) {
+  .ac-msg[data-look="bubbles"] .ac-msg__text > .ac-msg__stamp .ac-msg__status > :is(svg, canvas):first-child {
+    translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
+  }
 }
 .ac-msg--streaming[data-look="bubbles"] .ac-msg__text > .md:has(+ .ac-msg__stamp) > :last-child::after {
   content: "";
@@ -522,10 +542,9 @@
   padding: 14px var(--card-pad) 18px;
   border-top: 1px solid var(--line);
 }
+/* The setting's name and its Canais | DMs in an `.ac-actline`: under the name when they don't fit beside it. */
 .chat-look__top {
-  display: flex;
   align-items: center;
-  gap: 20px;
 }
 .chat-look__cards {
   display: grid;

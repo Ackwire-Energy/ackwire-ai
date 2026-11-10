@@ -12,6 +12,7 @@ import {
   drainOutbox,
   grantScopes,
   listMessages,
+  loadReplyPolicy,
   type MachineCaller,
   type MachineStatus,
   NEW_AGENT_DEFAULTS,
@@ -258,6 +259,56 @@ describe("withdraw_request", () => {
       "You withdrew this question",
     );
     expect(await source.tools(ctx)).toEqual([]);
+  });
+
+  test("withdrawn in another turn while a run asked by name waits on it: that run owes nobody for it, stays quiet and posts no 'nobody answered'", async () => {
+    f = await setup({
+      askUser: true,
+      toolSources: [createWithdrawRequestToolSource()],
+      reply: (req) => {
+        if (JSON.stringify(req.messages.at(-1)?.content).includes("You withdrew this question yourself"))
+          return { chunks: [] };
+        return {
+          chunks: [],
+          toolUses: [
+            {
+              name: "ask_user",
+              input: {
+                why: "I need a person's answer before I go on: it decides the deploy.",
+                question: "Qual ambiente?",
+              },
+            },
+          ],
+        };
+      },
+    });
+    const ask = await post("@dev deploy it");
+    await drainOutbox(f.db, f.handlers);
+    const [q] = await f.db.select().from(schema.agentQuestions);
+    const [asking] = await f.db.select().from(schema.agentRuns);
+    expect(asking?.status).toBe("waiting_input");
+    const ctx: ToolContext = {
+      db: f.db,
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      runId: crypto.randomUUID(),
+      channelId: f.general.id,
+      threadRootId: ask.id,
+      triggerMessageId: ask.id,
+    };
+    const [tool] = await createWithdrawRequestToolSource().tools(ctx);
+    expect((await tool?.execute({ id: q?.id ?? "", reason: "staging already has it" }, ctx))?.content).toContain(
+      "Withdrawn",
+    );
+    await drainOutbox(f.db, f.handlers);
+    const read = JSON.stringify(f.provider.calls.at(-1)?.request.messages.at(-1)?.content);
+    expect(read).toContain("You withdrew this question yourself (staging already has it)");
+    expect(read).toContain("end your turn without writing anything");
+    expect((await f.db.select().from(schema.agentRuns))[0]?.status).toBe("done");
+    expect(await loadReplyPolicy(f.db, f.org.id, asking?.id ?? "")).toMatchObject({ mayPass: true });
+    // Only its question card.
+    const lines = await f.db.select().from(schema.messages).where(eq(schema.messages.authorAgentId, f.agent.id));
+    expect(lines.filter((m) => !m.meta.questionId && !m.meta.notice)).toEqual([]);
   });
 
   test("another conversation's run neither reads nor withdraws the request; a routine's run isn't offered the tool", async () => {

@@ -7,6 +7,8 @@ import {
   agentTones,
   cloudAt,
   cx,
+  drawSprite,
+  EYE,
   HEADER_AREA,
   headerField,
   Icon,
@@ -14,6 +16,7 @@ import {
   Logo,
   mix,
   PixelSky,
+  parseColor,
   pixelBurst,
   pixelOf,
   SKY_TONES,
@@ -173,44 +176,85 @@ export function AgentCover({
   clear?: Clear;
 }) {
   const host = useRef<HTMLDivElement>(null);
-  /** Where the face is, in shares of the cover (its upper quarter, which sits on the sky). */
-  const pool = (): [number, number] => {
+  return (
+    <div className="agp-cover__sky" data-busy={busy || undefined} aria-hidden="true" ref={host}>
+      <PixelSky options={agentCoverOptions(color, { busy, clear, pool: facePool(host, clear, at) })} />
+    </div>
+  );
+}
+
+/** A deep navy the cover's tones are pulled toward at night (a new agent waiting for its AI, ADR 0164). */
+const NIGHT_NAVY = "#040818";
+
+/**
+ * Where a cover's face is, in shares of its box (the face's upper quarter, which sits on the sky): the first element
+ * `clear` gives; without one, `at` across near the bottom.
+ */
+export function facePool(
+  host: { current: HTMLElement | null },
+  clear: Clear | undefined,
+  at = 0.1,
+): () => [number, number] {
+  return () => {
     const face = clear?.()[0];
     const box = host.current?.getBoundingClientRect();
     if (!face || !box?.width || !box.height) return [at, 0.83];
     const f = face.getBoundingClientRect();
     return [(f.left + f.width / 2 - box.left) / box.width, (f.top + f.height / 4 - box.top) / box.height];
   };
-  return (
-    <div className="agp-cover__sky" data-busy={busy || undefined} aria-hidden="true" ref={host}>
-      <PixelSky
-        options={{
-          pixel: 2,
-          surface: "--bg",
-          // Mid to near white, then most of the way to the page: no deep tones on the cover.
-          palette: (surface) => {
-            const tones = agentTones(color);
-            const light = tones.slice(3);
-            return [...light, mix(light[light.length - 1] ?? surface, surface, 0.6)];
-          },
-          body: spriteTone(color),
-          speed: busy ? 2.6 : 1,
-          rise: busy ? 2.4 : 1,
-          near: 0,
-          faint: 1,
-          sprites: busy ? { area: 5300, max: 14 } : { area: 10560, max: 8 },
-          clear,
-          light: 0,
-          // Lighter toward the bottom and the right, where the page's text starts.
-          base: (u, v, tt) => 0.28 + 0.3 * u + 0.62 * v * v + 0.05 * S(u * 4 + tt * 0.5),
-          blobs: () => {
-            const [x, y] = pool();
-            return [[x, y, 0.3, 0.75]];
-          },
-        }}
-      />
-    </div>
-  );
+}
+
+/**
+ * The agent page's cover sky (AgentCover), as options: only the light tones of its color, fading into the page at the
+ * bottom, a pool of light behind its face so the face's own dither never melts into the sky's, 2 px pixels and a few
+ * faint pixel agents. The new agent's card and its conversation's band use it too (ADR 0164): `night` (0..1, read on
+ * every frame) pulls the tones toward a deep navy while the agent has no AI, and back as it gets one.
+ *
+ * `surface` is the token of what the sky sits on (the page by default; the card's well, the chat card's face), so its
+ * last tone is that color and it ends with no seam. On a dark surface it is the window's surface rising into its
+ * color, as the app's other skies are there (`softTones`): the color near the top and as a glow behind the face, the
+ * rest melting into the dark below. The light theme's sky is the same as before.
+ */
+export function agentCoverOptions(
+  color: AgentColor,
+  o: { busy?: boolean; clear?: Clear; pool: () => [number, number]; night?: () => number; surface?: string },
+): SkyOptions {
+  const busy = o.busy ?? false;
+  // Read with the tones on each frame (the theme can change), before the field is drawn.
+  let dark = false;
+  return {
+    pixel: 2,
+    surface: o.surface ?? "--bg",
+    palette: (surface) => {
+      dark = isDarkSurface(surface);
+      const night = o.night?.() ?? 0;
+      const toNight = (tones: string[]) =>
+        night <= 0.001 ? tones : tones.map((tone, i) => mix(tone, NIGHT_NAVY, night * (0.9 - i * 0.07)));
+      // Dark: from the surface (0) up to the color (last); the field puts the color on top and behind the face.
+      if (dark) return toNight(softTones(color, surface));
+      // Light: mid to near white, then most of the way to the surface: no deep tones on the cover.
+      const light = agentTones(color).slice(3);
+      return toNight([...light, mix(light[light.length - 1] ?? surface, surface, 0.6)]);
+    },
+    body: spriteTone(color),
+    speed: busy ? 2.6 : 1,
+    rise: busy ? 2.4 : 1,
+    near: 0,
+    faint: 1,
+    sprites: busy ? { area: 5300, max: 14 } : { area: 10560, max: 8 },
+    clear: o.clear,
+    light: 0,
+    // Light: lighter toward the bottom and the right, where the page's text starts. Dark: the color at the top, the
+    // surface at the bottom (the pool lifts the face's glow back toward the color).
+    base: (u, v, tt) =>
+      dark
+        ? 0.86 - 0.16 * u - 0.82 * v + 0.05 * S(u * 4 + tt * 0.5)
+        : 0.28 + 0.3 * u + 0.62 * v * v + 0.05 * S(u * 4 + tt * 0.5),
+    blobs: () => {
+      const [x, y] = o.pool();
+      return [[x, y, 0.3, dark ? 0.55 : 0.75]];
+    },
+  };
 }
 
 /**
@@ -597,9 +641,9 @@ export function MenuHorizon() {
 
 /**
  * The onboarding rail's horizon: soft tones rising from the rail's surface into
- * the sky (no edge), a little higher with each step done; the guide sits on it.
+ * the sky (no edge), a little higher with each step done; the guide sits on it, its sprites kept off it (`clear`).
  */
-export function OnboardingHorizon({ progress }: { progress: number }) {
+export function OnboardingHorizon({ progress, clear }: { progress: number; clear?: Clear }) {
   const target = 0.45 + 0.4 * Math.max(0, Math.min(1, progress));
   const reduced = usePrefersReducedMotion();
   const level = useRef({ now: target, target });
@@ -615,6 +659,7 @@ export function OnboardingHorizon({ progress }: { progress: number }) {
     light: 0.06,
     // Three on a full horizon, fewer on the short one under the steps of a short window.
     sprites: { area: 2000, max: 3 },
+    clear,
     base: (u, v, tt) => {
       const s = Math.max(0, (v - 0.08) / 0.92);
       const e = s * s * (3 - 2 * s);
@@ -632,6 +677,71 @@ export function OnboardingHorizon({ progress }: { progress: number }) {
   return (
     <span className="onb__horizon" aria-hidden="true">
       <PixelSky options={opts} />
+    </span>
+  );
+}
+
+/**
+ * The onboarding's progress at the top of the rail: a strip of pixel sky that fills as steps get done, with a pixel
+ * agent walking at its front. `progress` is 0..1.
+ */
+export function OnboardingProgress({ progress }: { progress: number }) {
+  const target = Math.max(0, Math.min(1, progress));
+  const reduced = usePrefersReducedMotion();
+  const level = useRef({ now: target, target });
+  level.current.target = target;
+  if (reduced) level.current.now = target;
+  const body = pixelOf(spriteTone("sky"));
+  const eye = pixelOf(EYE);
+  const opts: SkyOptions = {
+    pixel: 3,
+    surface: "--sunken",
+    light: 0,
+    palette: (bg) => {
+      const [r, g, b] = parseColor(bg);
+      const dark = r * 0.3 + g * 0.59 + b * 0.11 < 128;
+      const sky = dark ? ["#0f56c4", "#2b74e6", "#4b93ff", "#78b4ff"] : ["#a6cfff", "#78b4ff", "#4b93ff", "#2b74e6"];
+      return [bg, mix(bg, "#78b4ff", dark ? 0.1 : 0.14), ...sky];
+    },
+    // Called once per frame, before the field: eases the fill toward the target.
+    blobs: () => {
+      const l = level.current;
+      l.now += (l.target - l.now) * 0.06;
+      return [];
+    },
+    base: (u, v, t) => {
+      const now = level.current.now;
+      if (u > now) return 0.12;
+      const head = Math.max(0, 1 - (now - u) * 12);
+      return Math.min(1, 0.45 + 0.4 * v + 0.08 * S(u * 22 + t * 1.2) + 0.2 * head);
+    },
+    after: (f) => {
+      const now = level.current.now;
+      if (now < 0.01) return;
+      const x = Math.max(0, Math.min(f.w - 9, Math.round(now * f.w) - 6));
+      drawSprite(f, x, Math.round((f.h - 9) / 2), 1, body, eye, f.t % 3.6 > 3.46);
+    },
+  };
+  return (
+    <span className="onb__progress-sky" aria-hidden="true">
+      <PixelSky options={opts} />
+    </span>
+  );
+}
+
+/** Behind the team asleep until its plan (the onboarding's last step): the agents' sky, rising from the card. */
+export function TeamAsleepSky() {
+  return (
+    <span className="onb__plan-sky" aria-hidden="true">
+      <PixelSky
+        options={{
+          pixel: 4,
+          surface: "--raised",
+          palette: (bg) => softTones("sky", bg),
+          light: 0,
+          base: (u, v, tt) => 0.18 + 0.62 * v + 0.04 * S(u * 5 + tt * 0.4),
+        }}
+      />
     </span>
   );
 }

@@ -1,22 +1,36 @@
 import type { Issue, IssueColumn } from "@agenteschat/client";
 import { useTaskUnread } from "@agenteschat/client";
-import { dueLabel } from "@agenteschat/client/lib/format";
+import { dueLabel, dueTone } from "@agenteschat/client/lib/format";
 import { githubLinkLabel } from "@agenteschat/client/lib/github-link";
-import { conversationLine, isWorking } from "@agenteschat/client/lib/issues";
-import { blockedText, workPlanProgress } from "@agenteschat/client/lib/long-work";
+import { type CardState, cardState, cardStateText, cardWaits, isOpen } from "@agenteschat/client/lib/issues";
+import { codeAndBoldParts } from "@agenteschat/client/lib/markdown";
 import { stepPhrase } from "@agenteschat/client/lib/work";
-import { type AgentColorName, gradientOf } from "@agenteschat/ui/agent/engine";
 import { memo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, StyleSheet, View } from "react-native";
-import { Chip, Icon, type IconName, LineIcon, PixelOrbit, Text } from "@/ui";
+import { Pressable, Text as RNText, StyleSheet, View } from "react-native";
+import Animated, { FadeIn } from "react-native-reanimated";
+import {
+  Chip,
+  Icon,
+  IconButton,
+  type IconName,
+  PixelOrbit,
+  Sky,
+  Text,
+  type TextProps,
+  TOOL_H,
+  textLineOf,
+  useFontScale,
+  useReducedMotion,
+} from "@/ui";
 import { SocialMark } from "@/ui/auth/SocialMarks";
+import { mediaRowAxis } from "@/ui/media-row";
 import { router } from "@/ui/navigation";
 import { Face } from "../shared/Face";
-import { useColors, useDirectory, useOrgId, useWhen } from "../shared/hooks";
+import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
-import { MentionCount, Tile, useSurface } from "../shared/parts";
-import { criteriaProgress, currentStep, type IssueState, isLate, issueState, latestPr, listState } from "./logic";
+import { MentionCount, MONO, Tile, useSurface } from "../shared/parts";
+import { criteriaProgress, type IssueState, issueState, latestPr } from "./logic";
 
 /** An agent's step in the person's words ("Mexeu nos arquivos do PC · trips.service.ts"), as the web says it. */
 export function useStepText() {
@@ -33,17 +47,51 @@ export function useColumnLabel() {
   return useCallback((c: Pick<IssueColumn, "name" | "stage">) => c.name ?? t(`issues.status.${c.stage}`), [t]);
 }
 
-/** A board column inside a stage of the list (only where the board is customized): its name and count. */
-export function ColumnHeader({ label, count }: { label: string; count: number }) {
+/**
+ * A board column inside a stage (only where the board is customized): its name, whole, and count. In A fazer, for who
+ * may create tasks, "+" at its end opens Nova tarefa in that column (the web's column head); a long name's first line
+ * sits on the button's middle.
+ */
+export function ColumnHeader({ label, count, onNew }: { label: string; count: number; onNew?: () => void }) {
+  const { t } = useTranslation();
+  const line = textLineOf("small", useFontScale()).height;
+  const onButton = onNew ? { paddingTop: Math.max(0, (TOOL_H - line) / 2) } : null;
   return (
-    <View style={styles.column} accessibilityRole="header">
-      <Text variant="small" tone="muted" numberOfLines={1} style={styles.columnName}>
+    <View style={[styles.column, onNew && styles.columnActs]} accessibilityRole="header">
+      <Text variant="small" tone="muted" style={[styles.columnName, onButton]}>
         {label}
       </Text>
-      <Text variant="small" tone="faint">
+      <Text variant="small" tone="faint" style={onButton}>
         {count}
       </Text>
+      {onNew ? (
+        <View style={styles.columnEnd}>
+          <IconButton small icon="plus" label={t("issues.newIn", { column: label })} onPress={onNew} />
+        </View>
+      ) : null}
     </View>
+  );
+}
+
+/** A task's title, whole, with its `code` as the inline code pill and its **bold** (the web card's); no links. */
+export function TaskTitle({ title, ...text }: { title: string } & Omit<TextProps, "children">) {
+  const c = useColors();
+  return (
+    <Text {...text}>
+      {codeAndBoldParts(title).map((part, k) =>
+        part.mark ? (
+          <RNText
+            // biome-ignore lint/suspicious/noArrayIndexKey: the pieces of one title, in order
+            key={k}
+            style={part.mark === "code" ? [styles.code, { backgroundColor: c.sunken, color: c.ink2 }] : styles.heavy}
+          >
+            {part.text}
+          </RNText>
+        ) : (
+          part.text
+        ),
+      )}
+    </Text>
   );
 }
 
@@ -74,56 +122,6 @@ export function StateChip({ issue }: { issue: Issue }) {
   return <Chip label={label} icon={STATE_ICON[state]} />;
 }
 
-/** "Alta" with the flag (only high priority stands out). */
-export function PriorityMark({ issue }: { issue: Pick<Issue, "priority"> }) {
-  const { t } = useTranslation();
-  const c = useColors();
-  if (issue.priority !== "high") return null;
-  return (
-    <View style={styles.inline}>
-      <Icon name="flag" size={12} color={c.warn} />
-      <Text variant="caption" style={[styles.bold, { color: c.warn }]}>
-        {t("issues.priority.high")}
-      </Text>
-    </View>
-  );
-}
-
-/** The criteria as a pixel track in the agent's colors, with "2/4": the one being worked on blinks. */
-export function CriteriaTrack({ issue, color, going }: { issue: Issue; color: AgentColorName; going: boolean }) {
-  const { t } = useTranslation();
-  const c = useColors();
-  const p = criteriaProgress(issue);
-  if (!p) return null;
-  const [top, bottom] = gradientOf(color);
-  return (
-    <View
-      style={styles.track}
-      accessible
-      accessibilityLabel={t("issues.criteriaLabel", { done: p.done, total: p.total })}
-    >
-      <View style={styles.cells}>
-        {Array.from({ length: p.total }, (_, k) => (
-          <View
-            // biome-ignore lint/suspicious/noArrayIndexKey: the cells have no identity, only a position
-            key={`cell-${k + 1}`}
-            style={[
-              styles.cell,
-              {
-                backgroundColor:
-                  k < p.done ? (k === p.done - 1 ? top : bottom) : going && k === p.done ? `${top}66` : c.sunken,
-              },
-            ]}
-          />
-        ))}
-      </View>
-      <Text variant="caption" tone="faint">
-        {p.done}/{p.total}
-      </Text>
-    </View>
-  );
-}
-
 /** Who has it: the agent's living body (moving while it works) or the person's face; nobody: an empty tile. */
 export function AssigneeFace({ issue, size, live }: { issue: Issue; size: number; live: boolean }) {
   if (!issue.assignee) return <Tile icon="circle" size={size} />;
@@ -144,155 +142,210 @@ export function GithubChip({ url }: { url: string }) {
   return <Chip label={githubLinkLabel(url)} leading={<SocialMark provider="github" color={c.muted} size={12} />} />;
 }
 
-/** A row's state, only when the section doesn't say it already: icon and words, no pill, on the text's edge. */
-function StateLine({ issue }: { issue: Issue }) {
+/** A state's mark: the agent's orbit while it works; what calls on a person, or stopped, in the attention color. */
+const CARD_STATE_ICON: Record<Exclude<CardState["kind"], "running">, IconName> = {
+  approval: "shield",
+  question: "help",
+  stalled: "pause",
+  blocked: "wait",
+};
+
+/** The one state of a task in words, as the web's card says it: "Pergunta algo", "Parado há 2 dias". */
+export function useCardState(i: Issue) {
   const { t } = useTranslation();
+  const state = cardState(i, Boolean(i.conversation?.working));
+  return { state, words: state ? cardStateText(t, state) : null };
+}
+
+/** A state's mark and words, beside who has it on a card, after the name in a row. */
+export function StateWords({ issue, state, words }: { issue: Issue; state: CardState; words: string }) {
   const c = useColors();
   const dir = useDirectory();
-  const state = listState(issue);
-  if (!state) return null;
-  const pr = latestPr(issue);
-  const label =
-    state === "review" && pr
-      ? t("mobile.issues.state.reviewPr", { number: pr.number })
-      : t(`mobile.issues.state.${state}`);
-  const tone = state === "waiting" ? c.warn : c.muted;
   const agent = issue.assignee?.type === "agent" ? dir.agentById.get(issue.assignee.id) : undefined;
   return (
-    <View style={styles.inline}>
-      {state === "running" ? (
+    <View style={[styles.inline, styles.state]}>
+      {state.kind === "running" ? (
         <PixelOrbit color={agentLook(agent).color} size={10} />
       ) : (
-        <Icon name={STATE_ICON[state]} size={12} color={tone} />
+        <Icon
+          name={state.kind === "blocked" && state.blocked.reason === "failed" ? "info" : CARD_STATE_ICON[state.kind]}
+          size={14}
+          color={c.warn}
+        />
       )}
-      <Text variant="caption" style={[styles.bold, { color: tone }]}>
-        {label}
+      <Text variant="small" style={[styles.bold, styles.shrink, { color: state.kind === "running" ? c.agent : c.ink }]}>
+        {words}
       </Text>
     </View>
   );
 }
 
 /**
- * One task on the board: why it stands out, "#N" and the title on one row, the agent's current step while it works,
- * its criteria, then priority and date with who has it on the far side, and last its conversation (as the web's).
+ * A card's one row of facts, wrapping between facts: the number, the label, the priority, the date in words (in the
+ * attention color today, tomorrow and once late), the criteria, GitHub, the conversation's count with my mentions.
  */
-export const BoardCard = memo(function BoardCard({ issue: i, live }: { issue: Issue; live: boolean }) {
+function CardFacts({ issue: i, mentions, unread }: { issue: Issue; mentions: number; unread: boolean }) {
   const { t, i18n } = useTranslation();
   const c = useColors();
+  const [label, ...labels] = i.labels;
+  const due = i.dueDate && isOpen(i) ? { text: dueLabel(t, i18n.language, i.dueDate), tone: dueTone(i.dueDate) } : null;
+  const crit = criteriaProgress(i);
+  const pr = latestPr(i);
+  const talk = i.conversation?.count ?? 0;
+  // A mark on the first line's middle, for a fact whose words wrap (a repository's name wider than the card).
+  const mark = mediaRowAxis(12, textLineOf("caption", useFontScale())).face;
+  return (
+    <View style={styles.facts}>
+      <Text variant="caption" tone="muted">
+        #{i.number}
+      </Text>
+      {label ? <Chip label={label} /> : null}
+      {labels.length > 0 ? (
+        <Text variant="caption" tone="muted" accessibilityLabel={labels.join(", ")}>
+          +{labels.length}
+        </Text>
+      ) : null}
+      {i.priority !== "normal" ? (
+        <View style={styles.inline}>
+          <Icon name="flag" size={12} color={i.priority === "high" ? c.warn : c.faint} />
+          <Text variant="caption" tone="muted">
+            {t(`issues.priority.${i.priority}`)}
+          </Text>
+        </View>
+      ) : null}
+      {due ? (
+        <View style={styles.inline}>
+          <Icon name="clock" size={12} color={due.tone ? c.warn : c.faint} />
+          <Text variant="caption" style={due.tone ? [styles.bold, { color: c.warn }] : { color: c.muted }}>
+            {t("mobile.issues.until", { date: due.text })}
+          </Text>
+        </View>
+      ) : null}
+      {crit ? (
+        <View style={styles.inline}>
+          <Icon name="checkc" size={12} color={crit.done === crit.total ? c.ok : c.faint} />
+          <Text variant="caption" tone="muted">
+            {crit.done}/{crit.total}
+          </Text>
+        </View>
+      ) : null}
+      {pr ? (
+        <View style={styles.inline}>
+          <SocialMark provider="github" color={c.faint} size={12} />
+          <Text variant="caption" tone="muted">
+            {t("issues.pr", { number: pr.number })}
+          </Text>
+        </View>
+      ) : null}
+      {i.githubUrl ? (
+        <View style={[styles.inline, styles.wraps]}>
+          <View style={{ marginTop: mark }}>
+            <SocialMark provider="github" color={c.faint} size={12} />
+          </View>
+          <Text variant="caption" tone="muted" style={styles.shrink}>
+            {githubLinkLabel(i.githubUrl)}
+          </Text>
+        </View>
+      ) : null}
+      {talk > 0 || mentions > 0 ? (
+        <View style={styles.inline}>
+          <Icon name="chat" size={12} color={c.faint} />
+          {talk > 0 ? (
+            <Text variant="caption" tone={unread ? "ink" : "muted"} style={unread ? styles.heavy : undefined}>
+              {talk}
+            </Text>
+          ) : null}
+          <MentionCount count={mentions} />
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/**
+ * One task on the board, in the web card's three parts: the title, whole; one row of facts; who has it (the face 24,
+ * moving while its agent works) and its one state. An agent waiting on a person puts its sky at the card's top, faded
+ * in. A long name wraps beside the face, on the face's line first; a state that doesn't fit goes under, whole.
+ */
+export const BoardCard = memo(function BoardCard({ issue: i, live }: { issue: Issue; live: boolean }) {
+  const { t } = useTranslation();
   const dir = useDirectory();
   const surface = useSurface();
-  const stepText = useStepText();
-  const state = issueState(i);
+  const reduced = useReducedMotion();
+  const axis = mediaRowAxis(24, textLineOf("small", useFontScale()));
+  const { state, words } = useCardState(i);
   const agent = i.assignee?.type === "agent" ? dir.agentById.get(i.assignee.id) : undefined;
-  const color = agentLook(agent).color;
-  const step = state === "running" ? stepText(currentStep(i.work)) : "";
-  const late = isLate(i);
-  const due = i.dueDate && i.status !== "done" && i.status !== "canceled";
   // Mentions of me not read in its conversation (ADR 0145), red as on the web's card.
-  const { mentions } = useTaskUnread(useOrgId(), i.id);
+  const { mentions, unread } = useTaskUnread(useOrgId(), i.id);
   return (
     <Pressable
       onPress={() => router.push(`/issues/${i.number}`)}
       accessibilityRole="button"
       accessibilityLabel={[
         t("issues.open", { number: i.number, title: i.title }),
+        words,
         mentions > 0 ? t("shell.unreadMentions", { count: mentions }) : null,
       ]
         .filter(Boolean)
         .join(", ")}
       style={({ pressed }) => [styles.card, surface, pressed && styles.pressed]}
     >
-      <StateLine issue={i} />
-      <View style={styles.head}>
-        <Text variant="callout" numberOfLines={3} style={[styles.title, styles.step]}>
-          <Text variant="callout" tone="faint" style={styles.number}>
-            #{i.number}
-          </Text>{" "}
-          {i.title}
-        </Text>
-        <MentionCount count={mentions} />
-      </View>
-      {state === "running" ? (
-        <View style={styles.inline}>
-          <PixelOrbit color={color} size={12} />
-          <Text variant="small" tone="muted" numberOfLines={1} style={styles.step}>
-            {step || t("mobile.issues.state.running")}
-          </Text>
+      {cardWaits(state) ? (
+        <Animated.View entering={reduced ? undefined : FadeIn.duration(200)} style={styles.sky}>
+          <Sky
+            color={agentLook(agent).color}
+            surface="raised"
+            depth={0.55}
+            fade={0.15}
+            style={StyleSheet.absoluteFill}
+          />
+        </Animated.View>
+      ) : null}
+      <TaskTitle title={i.title} variant="callout" style={styles.title} />
+      <CardFacts issue={i} mentions={mentions} unread={unread > 0} />
+      {i.assignee || state ? (
+        <View style={styles.who}>
+          {i.assignee ? (
+            <View style={styles.person}>
+              <View style={[styles.face, { marginTop: axis.face }]}>
+                <AssigneeFace issue={i} size={24} live={live} />
+              </View>
+              <Text variant="small" tone="ink2" style={[styles.bold, styles.name, { paddingTop: axis.words }]}>
+                {dir.nameOf(i.assignee)}
+              </Text>
+            </View>
+          ) : null}
+          {state && words ? <StateWords issue={i} state={state} words={words} /> : null}
         </View>
       ) : null}
-      <CriteriaTrack issue={i} color={color} going={state === "running"} />
-      <BoardWork issue={i} />
-      <View style={styles.meta}>
-        <PriorityMark issue={i} />
-        {due ? (
-          <Text variant="caption" style={{ color: late ? c.warn : c.faint }}>
-            {t("mobile.issues.until", { date: dueLabel(t, i18n.language, i.dueDate as string) })}
-          </Text>
-        ) : null}
-        {i.githubUrl ? <GithubChip url={i.githubUrl} /> : null}
-        <View style={styles.step} />
-        <AssigneeFace issue={i} size={26} live={live} />
-      </View>
-      <CardConversation issue={i} />
     </Pressable>
   );
 });
 
-/**
- * Under a card's fields, its conversation as the web's thread line: faces, "N mensagens", then "Trabalhando" while an
- * agent works on it, else when the last one came. Part of the card's press (it opens the task).
- */
-function CardConversation({ issue }: { issue: Issue }) {
-  const { t } = useTranslation();
-  const c = useColors();
-  const when = useWhen();
-  const line = conversationLine(issue);
-  if (!line) return null;
-  const working = line.working || isWorking(issue);
-  return (
-    <View style={styles.talk}>
-      <View style={styles.inline}>
-        {line.people.map((p, k) => (
-          <View key={`${p.type}:${p.id}`} style={k > 0 ? styles.overlap : undefined}>
-            <Face who={p} size={18} live={false} />
-          </View>
-        ))}
-      </View>
-      <Text variant="small" tone="ink2" style={styles.bold}>
-        {t("threads.messages", { count: line.count })}
-      </Text>
-      {working ? (
-        <View style={styles.inline}>
-          <Icon name="bolt" size={15} color={c.agent} />
-          <Text variant="small" style={[styles.bold, { color: c.agent }]}>
-            {t("threads.status.working")}
-          </Text>
-        </View>
-      ) : line.lastAt ? (
-        <Text variant="small" tone="faint" numberOfLines={1}>
-          · {when.short(line.lastAt)}
-        </Text>
-      ) : null}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  card: { borderRadius: 20, paddingHorizontal: 12, paddingVertical: 12, gap: 8 },
+  card: { borderRadius: 20, paddingHorizontal: 12, paddingVertical: 12, gap: 8, overflow: "hidden" },
   pressed: { opacity: 0.85 },
-  inline: { flexDirection: "row", alignItems: "center", gap: 6 },
-  head: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
+  inline: { flexDirection: "row", alignItems: "center", gap: 4 },
+  // A long state (a stopped run's reason) wraps inside the card instead of running past its edge.
+  state: { flexShrink: 1, maxWidth: "100%" },
+  // A fact wider than the card (a long repository's link) wraps its words inside it, its mark on the first line.
+  wraps: { maxWidth: "100%", alignItems: "flex-start" },
+  shrink: { flexShrink: 1 },
   bold: { fontWeight: "600" },
+  heavy: { fontWeight: "700" },
   title: { fontWeight: "600" },
-  number: { fontWeight: "500" },
-  // A narrow card wraps between the parts, never inside one.
-  talk: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 8, rowGap: 4 },
-  overlap: { marginLeft: -4 },
-  step: { flex: 1, minWidth: 0 },
-  meta: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 8, rowGap: 6 },
-  track: { flexDirection: "row", alignItems: "center", gap: 8 },
-  cells: { flex: 1, flexDirection: "row", gap: 2 },
-  cell: { flex: 1, height: 7 },
+  // The approval card's sky at the top, fading into the card (the web's 64px).
+  sky: { position: "absolute", top: 0, left: 0, right: 0, height: 64 },
+  // A narrow card wraps between the facts, never inside one.
+  facts: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 12, rowGap: 2 },
+  // The face with the name, then the state; a state that doesn't fit goes to the next line whole.
+  who: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 8, rowGap: 4 },
+  // Never the face alone on a line: the name wraps beside it.
+  person: { flexDirection: "row", alignItems: "flex-start", gap: 8, flexShrink: 1 },
+  // A person's photo is 20 (an agent's body 24): either sits in the 24 box, on the name's first line.
+  face: { width: 24, height: 24, alignItems: "center", justifyContent: "center" },
+  name: { flexShrink: 1 },
+  code: { fontFamily: MONO },
   column: {
     flexDirection: "row",
     alignItems: "center",
@@ -302,47 +355,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   columnName: { fontWeight: "600", flexShrink: 1 },
-});
-
-/** Background work on a board card (ADR 0121): the blocked badge, the plan's progress, the last update. */
-function BoardWork({ issue: i }: { issue: Issue }) {
-  const { t } = useTranslation();
-  const c = useColors();
-  const work = i.backgroundWork;
-  const blocked = blockedText(t, i.blocked);
-  const live = work && (work.status === "live" || work.status === "queued");
-  const progress = live ? workPlanProgress(work) : null;
-  if (!blocked && !live) return null;
-  const doing = live ? work.plan.find((p) => p.state === "doing") : undefined;
-  return (
-    <View style={boardWork.box}>
-      {/* Icon and words in the warning color, as the card's state line: a tinted pill was a second surface. */}
-      {blocked ? (
-        <View style={boardWork.blocked}>
-          <LineIcon name="wait" size={12} color={c.warn} variant="caption" />
-          <Text variant="caption" numberOfLines={2} style={[boardWork.blockedText, { color: c.warn }]}>
-            {blocked}
-          </Text>
-        </View>
-      ) : null}
-      {progress ? (
-        <Text variant="caption" tone="muted" numberOfLines={2}>
-          {t("work.plan")} · {t("work.planProgress", progress)}
-          {doing ? ` · ${doing.text}` : ""}
-        </Text>
-      ) : null}
-      {live && work.lastUpdate ? (
-        <Text variant="caption" tone="muted" numberOfLines={2}>
-          {t("work.lastUpdate")}: {work.lastUpdate.text}
-        </Text>
-      ) : null}
-    </View>
-  );
-}
-
-const boardWork = StyleSheet.create({
-  box: { gap: 4 },
-  // Top-aligned: the icon stays on the first line when the words wrap.
-  blocked: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
-  blockedText: { flexShrink: 1, fontWeight: "600" },
+  // With "+": the row as tall as the button, the words on its first line's middle.
+  columnActs: { alignItems: "flex-start", paddingTop: 2 },
+  columnEnd: { marginLeft: "auto" },
 });

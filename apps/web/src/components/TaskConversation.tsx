@@ -13,11 +13,11 @@ import "@/components/threads/threads.css";
 
 /*
  * A task's conversation (ADR 0145): the app's own thread panel, as a column of the task's dialog or page. Its
- * messages, composer, runs, receipts and stop are the chat's; the task's card and dialog read its line.
+ * messages, composer, runs, receipts and stop are the chat's; the task's dialog reads its line, its card its count.
  */
 
-/** Someone's turn is live in it now (the card's `working` lags until it refetches). */
-function useWorking(issue: Pick<Issue, "conversation">) {
+/** Someone's turn is live in its conversation now (the card's `working` lags until it refetches). */
+export function useTaskLive(issue: Pick<Issue, "conversation">) {
   const channelId = issue.conversation?.channelId;
   const live = useStreams((s) => (channelId ? runsInChannel(s, channelId).length > 0 : false));
   return Boolean(issue.conversation?.working) || live;
@@ -78,7 +78,7 @@ export function TaskConversationButton({
 export function TaskConversationSummary({ issue, onOpen }: { issue: Issue; onOpen: () => void }) {
   const { t } = useTranslation();
   const line = conversationLine(issue);
-  const working = useWorking(issue);
+  const working = useTaskLive(issue);
   return (
     <button type="button" className="task-talk__summary" onClick={onOpen}>
       <Icon name="message" size={16} />
@@ -92,18 +92,6 @@ export function TaskConversationSummary({ issue, onOpen }: { issue: Issue; onOpe
       )}
       <Icon name="chevronRight" size={16} className="task-talk__chev" />
     </button>
-  );
-}
-
-/** A board card's last line: the chat's thread line (who, "6 mensagens", "Trabalhando", when). None: nothing. */
-export function TaskCardConversation({ issue }: { issue: Issue }) {
-  const line = conversationLine(issue);
-  const working = useWorking(issue);
-  if (!line) return null;
-  return (
-    <span className="thread-line issue-card__talk">
-      <ConversationLineBody line={line} working={working} />
-    </span>
   );
 }
 

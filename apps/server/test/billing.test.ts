@@ -29,6 +29,19 @@ describe("the billing link", () => {
     expect(await res.json()).toMatchObject({ error: { code: "billing.off" } });
   });
 
+  test("the plan picked in the app rides along; a malformed one is refused", async () => {
+    t = await createTestServer({ env: BILLING });
+    const { owner, orgId } = await ownerWithWorkspace(t);
+    const link = (plan: string) =>
+      owner(`/api/app/organizations/${orgId}/billing-link`, { json: { from: "onboarding", plan } });
+    const ok = await link("team");
+    expect(ok.status).toBe(200);
+    const { url } = (await ok.json()) as { url: string };
+    const payload = new URL(url).searchParams.get("t")?.split(".")[1] ?? "";
+    expect(JSON.parse(Buffer.from(payload, "base64url").toString())).toMatchObject({ plan: "team" });
+    expect((await link("Team plan")).status).toBe(400);
+  });
+
   test("owners and admins get a signed link for 5 minutes; members get 403", async () => {
     t = await createTestServer({ env: BILLING });
     expect(await (await browser(t)("/api/app/auth-config")).json()).toMatchObject({

@@ -57,6 +57,7 @@ import Animated, { FadeIn, useAnimatedStyle, useSharedValue, withSequence, withS
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
 import {
+  ACT_LINE,
   AgentAvatar,
   Button,
   fieldText,
@@ -765,8 +766,8 @@ function NewAgentForm({
           />
         </GroupedList>
         {role && role !== "custom" && instructions !== t(`newAgent.roles.${role}.instructions`) ? (
-          <View style={styles.restore}>
-            <Text variant="footnote" tone="faint" style={styles.fill}>
+          <View style={[ACT_LINE.row, styles.restore]}>
+            <Text variant="footnote" tone="faint" style={ACT_LINE.text}>
               {t("newAgent.startedFrom", { role: t(`newAgent.roles.${role}.name`) })}
             </Text>
             <Button
@@ -1120,7 +1121,7 @@ const styles = StyleSheet.create({
     paddingVertical: GROUPED_ROW.tallPadY,
   },
   bare: { borderWidth: 0, borderRadius: 0, backgroundColor: "transparent" },
-  restore: { flexDirection: "row", alignItems: "center", gap: 10, paddingTop: 7, paddingLeft: 16 },
+  restore: { alignItems: "center", columnGap: 16, rowGap: 8, paddingTop: 7, paddingLeft: 16 },
   refuse: { marginTop: 24 },
   // Back as a word at the left, 16 from the primary that takes the rest.
   footer: { flexDirection: "row", alignItems: "center", gap: 16, paddingHorizontal: 16, paddingTop: 12 },

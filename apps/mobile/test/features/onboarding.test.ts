@@ -2,6 +2,8 @@ import { expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { ApiError } from "@agenteschat/client";
 import { knownErrorText } from "@agenteschat/client/lib/errors";
+import { planHoldPhoneLine } from "@agenteschat/client/lib/no-ai";
+import { railState } from "@agenteschat/client/lib/onboarding";
 import { isInviteToken } from "../../src/features/auth/links";
 import { PURPOSES, stepFailedText, workspaceAnswer, zoneCity, zoneLabel } from "../../src/features/onboarding/logic";
 import { translator } from "./fixtures";
@@ -71,6 +73,73 @@ test("a step that failed says why the server refused it, else that it didn't sav
   expect(stepFailedText(pt, new TypeError("Network request failed"))).toBe(pt("mobile.onb.failed"));
 });
 
+const src = (f: string) => readFileSync(new URL(`../../src/features/${f}`, import.meta.url), "utf8");
+
+test("the phone's steps are the web's, read from the workspace's data (ADR 0162)", () => {
+  const base = { orgId: "o1", standing: undefined, billingUrl: null, context: "", team: 0, picked: null };
+  // agentes.chat Cloud, before the workspace exists: its billing service is there, so the plan step will come.
+  expect(railState({ ...base, orgId: null, billingUrl: "https://billing.example.com" }).steps).toEqual([
+    "name",
+    "business",
+    "team",
+    "plan",
+  ]);
+  // A server of one's own: no plan step, and the team made opens the workspace.
+  expect(railState({ ...base, orgId: null }).steps).toEqual(["name", "business", "team"]);
+  expect(railState({ ...base, context: "Loja online", team: 3 }).at).toBe("open");
+  // Waiting for its plan with its team made: the plan step, resumed there from any visit.
+  const held = { ...base, standing: { state: "hold" as const, reason: "payment" }, context: "Loja online", team: 3 };
+  expect(railState(held)).toMatchObject({ step: "plan", index: 3 });
+  const flow = src("onboarding/OnboardingFlow.tsx");
+  expect(flow).toContain("railState({");
+  // Nothing is finished behind the person's back: only an answered workspace with no plan to wait for opens by itself.
+  expect(flow).toContain('if (!known || at !== "open" || opening.current) return;');
+  expect(flow).toContain('void open("done");');
+  expect(flow).toContain('onEnter={() => void open("skipped")}');
+  // A step answered on the web meanwhile moves this one on as the app comes back, so it never makes a second team.
+  expect(flow.match(/refetchOnWindowFocus: "always"/g)).toHaveLength(3);
+  // Another business on step 2 starts the team step on its template again; the same one keeps the template picked.
+  expect(flow).toContain("if (picked !== kind) setTemplate(null);");
+  // Back on step 1, the workspace's own zone, sent again only when picked here.
+  expect(flow).toContain("const zone = pickedZone ?? settings.data?.timezone ?? phoneTimezone();");
+  expect(flow).toContain("...(pickedZone ? { timezone: pickedZone } : {})");
+});
+
+test("the phone's plan step: the team asleep and where to turn it on, with no price, no plan's name and no link", async () => {
+  const step = src("onboarding/steps.tsx");
+  expect(step).toContain('planHoldPhoneLine(t, mayPay, "team")');
+  expect(step).toContain('t("mobile.onb.enter")');
+  expect(src("onboarding/OnboardingFlow.tsx")).toContain('mode: "sleep" as const');
+  for (const lng of ["pt-BR", "en"] as const) {
+    const t = await translator(lng);
+    const said = [
+      t("onboarding.flow.plan.title"),
+      t("onboarding.flow.lodi.plan"),
+      planHoldPhoneLine(t, true, "team"),
+      planHoldPhoneLine(t, false, "team"),
+      t("mobile.onb.enter"),
+    ];
+    for (const line of said) {
+      expect(line).not.toMatch(/[$€£¥]|\d|https?:|\//);
+      expect(line).not.toMatch(/Pessoal|Equipe|Empresa|Personal plan|Team plan|Business plan/);
+    }
+  }
+  // No way to pay from the phone: no billing link, no plan list, no price, no web page opened for it.
+  const banned = [
+    "billingLink",
+    "BillingLink",
+    "planOffer",
+    "plans.json",
+    "onboarding.flow.plan.price",
+    "onboarding.flow.plan.cta",
+    "onboarding.flow.plan.all",
+  ];
+  for (const file of ["onboarding/steps.tsx", "onboarding/OnboardingFlow.tsx"]) {
+    const code = src(file);
+    expect({ file, found: banned.filter((b) => code.includes(b)) }).toEqual({ file, found: [] });
+  }
+});
+
 test("the first question makes a personal workspace at once, named in the person's language (ADR 0159)", async () => {
   expect(PURPOSES).toEqual(["personal", "team"]);
   const pt = await translator("pt-BR");
@@ -84,5 +153,17 @@ test("the first question makes a personal workspace at once, named in the person
   const flow = readFileSync(new URL("../../src/features/onboarding/OnboardingFlow.tsx", import.meta.url), "utf8");
   expect(flow).toContain('t("mobile.onb.anotherPurpose")');
   expect(flow).toContain("PURPOSES.map((mode) => {");
-  expect(flow).toContain('const answer = workspaceAnswer(t, purpose ?? "team", orgName);');
+  expect(flow).toContain('workspaceAnswer(t, purpose ?? "team", orgName)');
+});
+
+test("step 1 is one call, the workspace with its zones; the finish and the DM it opens say the rest themselves (#1)", () => {
+  const flow = src("onboarding/OnboardingFlow.tsx");
+  expect(flow).toContain("...(zone ? { timezone: zone, memberTimezone: zone } : {})");
+  // Nothing after them asks the server again: no zone of the person's own, no lists read before the DM opens.
+  expect(flow).not.toMatch(/orgs\.updateMe|refetchType/);
+  expect(flow).toContain("if (res.me) qc.setQueryData(keys.me, res.me);");
+  expect(flow).toContain("if (done.me) qc.setQueryData(keys.me, done.me);");
+  expect(flow).toContain("if (dm?.dm) addDm(qc, id, dm.dm);");
+  // An older self-hosted server's open says no DM: its list is read again, never waited for.
+  expect(flow).toContain("else if (dm) void qc.invalidateQueries({ queryKey: keys.dms(id) });");
 });

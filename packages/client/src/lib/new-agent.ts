@@ -162,6 +162,40 @@ export const PERSONAL_STARTERS = [
 ] as const satisfies readonly { id: string; name: string; look: RoleLook }[];
 export type PersonalStarter = (typeof PERSONAL_STARTERS)[number];
 
+/**
+ * The apps (catalog connector ids) each personal starter uses (ADR 0159; mirror of the personal `MEMBERS` in
+ * packages/engine/src/team-templates.ts): a person's calendar, files and lists rather than a team's tools.
+ */
+export const PERSONAL_STARTER_APPS: Record<string, readonly string[]> = {
+  clara: ["google-calendar", "todoist"],
+  duda: ["google-sheets", "drive"],
+  leo: ["google-calendar"],
+  mel: ["todoist", "google-docs"],
+  gabi: ["notion", "google-docs"],
+  lu: ["google-docs", "notion"],
+  rosa: ["todoist", "google-calendar"],
+  vic: ["google-calendar", "drive"],
+  rui: ["google-calendar", "google-docs", "google-sheets"],
+};
+
+/** An app's level on a new agent's card (ADR 0164): it reads, or reads and writes. */
+export type CardLevel = "read" | "write";
+
+/**
+ * The apps a new agent's card starts with (ADR 0164), at their levels: a personal starter's at write (one person's
+ * agent starts with broad access, ADR 0159 §3a), a team role's at its preset levels; none from scratch.
+ */
+export function starterApps(pick: { role?: RoleId | null; starter?: string | null }): Record<string, CardLevel> {
+  if (pick.starter) return Object.fromEntries((PERSONAL_STARTER_APPS[pick.starter] ?? []).map((id) => [id, "write"]));
+  if (!pick.role || pick.role === "custom") return {};
+  return Object.fromEntries(
+    Object.entries(ROLE_DEFAULTS[pick.role].levels).filter((e): e is [string, CardLevel] => e[1] !== "none"),
+  );
+}
+
+/** How a starter or a ready-made role introduces itself, in its own voice (`newAgent.hello.{id}`, ADR 0164). */
+export const helloKey = (id: PersonalStarter["id"] | Exclude<RoleId, "custom">) => `newAgent.hello.${id}` as const;
+
 /** The look a draft starts with (before a role is picked). */
 export const BLANK_LOOK = { color: "sky", eyes: "round", accessory: "none" } as const satisfies RoleLook;
 

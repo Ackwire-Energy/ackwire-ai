@@ -57,3 +57,42 @@ test("a second tap while the first is on its way asks nothing and sends nothing"
   await Promise.all([retryAnswer(api, "o", message, () => resent++), retryAnswer(api, "o", message, () => resent++)]);
   expect({ calls, resent }).toEqual({ calls: 1, resent: 1 });
 });
+
+test("the second tap settles when the first does, so its line says it is trying until then; only the first says why it failed", async () => {
+  let fail: (e: unknown) => void = () => {};
+  const api = apiWith(
+    () =>
+      new Promise((_, reject) => {
+        fail = reject;
+      }),
+  );
+  const order: string[] = [];
+  const first = retryAnswer(api, "o", message, () => {}).catch(() => order.push("first refused"));
+  const second = retryAnswer(api, "o", message, () => {}).then(() => order.push("second settled"));
+  await Promise.resolve();
+  expect(order).toEqual([]);
+  fail(new ApiError(403, "run.answer_forbidden", "no"));
+  await Promise.all([first, second]);
+  expect(order).toEqual(["first refused", "second settled"]);
+});
+
+test("a voice message that can't start over is never sent again as text, nor dropped in silence: it says to record it", async () => {
+  const voice = { ...message, id: "m-voice", meta: { voice: { clipId: "clip-1", durationMs: 4000, peaks: [] } } };
+  let resent = 0;
+  for (const answer of [
+    async () => ({ runs: [] }),
+    () => Promise.reject(new ApiError(409, "run.not_restartable", "already started")),
+  ]) {
+    const refused = await retryAnswer(apiWith(answer), "o", voice as Message, () => resent++).catch((e) => e);
+    expect(refused).toMatchObject({ name: "ApiError", code: "run.not_restartable_voice" });
+  }
+  expect(resent).toBe(0);
+  // Started again: nothing to say.
+  await retryAnswer(
+    apiWith(async () => ({ runs: [{ agentId: "a", runId: "r2" }] })),
+    "o",
+    voice as Message,
+    () => resent++,
+  );
+  expect(resent).toBe(0);
+});

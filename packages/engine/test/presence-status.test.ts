@@ -136,7 +136,9 @@ const presenceOf = async (fx: Fixture, now = new Date()) =>
 
 test("an agent's presence follows its work: busy on long or background work, away idle, offline held", async () => {
   f = await setup();
-  expect(await presenceOf(f)).toMatchObject({ presence: "away", working: false });
+  // Just made, it never worked: online from its making, away once that is a while ago.
+  expect(await presenceOf(f)).toMatchObject({ presence: "online", working: false, activeAt: null });
+  expect((await presenceOf(f, new Date(Date.now() + AGENT_AWAY_AFTER_MS + 1000)))?.presence).toBe("away");
 
   const run = await runOf(f);
   // At work: the apps draw it so whatever its AI reads as for the one looking (the right hand's is each person's own).
@@ -413,4 +415,26 @@ test("an agent idle for weeks reads as idle since then; only one with no finishe
     .set({ status: "done", createdAt: longAgo, finishedAt: longAgo })
     .where(eq(schema.agentRuns.id, run.id));
   expect((await presenceOf(f))?.activeAt).toBe(longAgo.toISOString());
+  // Its last run long ago, not its making, says it is away.
+  expect((await presenceOf(f))?.presence).toBe("away");
+});
+
+test("the right hand never idles away: it is where the workspace's people come to talk to it", async () => {
+  f = await setup({ rightHand: true });
+  const [lodi] = await f.db
+    .select({ id: schema.agents.id })
+    .from(schema.agents)
+    .where(eq(schema.agents.builtin, "right_hand"));
+  const later = new Date(Date.now() + 5 * AGENT_AWAY_AFTER_MS);
+  const all = await loadAgentStatuses(f.db, f.org.id, later);
+  expect(all.find((s) => s.agentId === lodi?.id)?.presence).toBe("online");
+  expect(all.find((s) => s.agentId === f.agent.id)?.presence).toBe("away");
+  // Held by the operators, it is offline as any agent.
+  await f.db
+    .update(schema.agents)
+    .set({ operatorHoldAt: new Date() })
+    .where(eq(schema.agents.id, lodi?.id ?? ""));
+  expect((await loadAgentStatuses(f.db, f.org.id, later)).find((s) => s.agentId === lodi?.id)?.presence).toBe(
+    "offline",
+  );
 });

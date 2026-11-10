@@ -60,7 +60,7 @@
  * Under the screen (and a cover it opens from), in the steps' line's place and as tall (13px text on a 22px line): what
  * programs there can see. A phone's Keyboard button leads it with no baseline to share (a
  * button's is its icon's bottom edge, about 4 px under its label's), so the words' first line is centred on the button,
- * a touch control as tall as `--control-h-md`.
+ * a small button as tall as `--control-h-sm`.
  */
 .dsk-line {
   flex: none;
@@ -72,7 +72,7 @@
   line-height: 22px;
 }
 .dsk-line > .ac-btn ~ * {
-  margin-top: calc((var(--control-h-md) - 22px) / 2);
+  margin-top: calc((var(--control-h-sm) - 22px) / 2);
 }
 /*
  * The window keeps one line's room for it (the phone's sheet and full screen don't, and let it wrap): its words stay

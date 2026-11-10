@@ -23,6 +23,7 @@ import { colorOf } from "@/components/Sky";
 import { TaskStepsBlock } from "@/components/ToolCalls";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useEscClose } from "@/hooks/useEscClose";
+import { inlineWords } from "@/lib/markdown";
 import { SayWhy, StopTaskButton, TaskStateChip, taskAge, UsingNow, useOpenTask } from "./TaskBits";
 import "@/components/threads/threads.css";
 
@@ -138,7 +139,7 @@ export function TaskPanel({
           <p className="tm-panel__now" aria-live="polite">
             <AgentSpinner agentId={source.agentId} size={14} />
             <b className="ac-tools__shimmer">{capitalize(activityVerb(t, doing), i18n.language)}…</b>
-            {task?.now?.detail && <small>{task.now.detail}</small>}
+            {task?.now?.detail && <small>{inlineWords(task.now.detail)}</small>}
           </p>
         )}
         {end === "stopped" && (

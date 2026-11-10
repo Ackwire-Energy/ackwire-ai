@@ -96,7 +96,7 @@ describe("a skill proposed in the chat", () => {
     expect(card.textContent).toContain("relatorios");
     expect(card.querySelector(".rq__wt")?.textContent).toContain("Conferir os totais.");
     await click(within(card).getByRole("button", { name: "Ver a mudança" }));
-    expect(card.querySelector(".ac-diff__line--add")?.textContent).toContain("Conferir os totais.");
+    expect(card.querySelector(".ac-diff__block--add")?.textContent).toContain("Conferir os totais.");
     expect(within(card).queryByRole("button", { name: "Editar" })).toBeNull();
     await click(within(card).getByRole("button", { name: "Aceitar mudança" }));
     await settle(4);
@@ -120,7 +120,9 @@ describe("a change proposed for several agents in the chat", () => {
     expect(card.querySelector(".rq__wt")?.textContent).toContain("Responder em português.");
     await click(within(card).getByRole("button", { name: "Ver a mudança" }));
     expect(card.querySelectorAll(".ac-diff")).toHaveLength(1);
-    expect(card.querySelector(".ac-diff__line--add:last-child")?.textContent).toContain("- Responder em português.");
+    // The added lines as Markdown: a list item, not its "- ".
+    const added = card.querySelector(".ac-diff__block--add:last-child");
+    expect(added?.querySelector("li")?.textContent).toBe("Responder em português.");
     expect(within(card).getByRole("switch", { name: "Incluir Ada" })).toBeTruthy();
     expect(within(card).getByRole("switch", { name: "Incluir Atlas" })).toBeTruthy();
     await click(within(card).getByRole("button", { name: "Aceitar para todos" }));

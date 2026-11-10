@@ -2,7 +2,7 @@ import {
   type AgentBrainSummary,
   type Agent as AgentRow,
   adjustTeamAgent,
-  agentBrainSummaries,
+  agentBrainLines,
   agentBudgetsThisMonth,
   agentStatuses,
   agentView,
@@ -621,7 +621,7 @@ export function agentRoutes(deps: AppDeps) {
       const [seesCost, budgets, brains, viewer, old] = await Promise.all([
         canViewCost(db, actor, orgId),
         agentBudgetsThisMonth(db, orgId),
-        agentBrainSummaries(db, actor, orgId, list),
+        agentBrainLines(db, actor, orgId, list),
         getMembership(db, actor, orgId),
         oldHandlesByAgent(db, orgId),
       ]);
@@ -683,6 +683,7 @@ export function agentRoutes(deps: AppDeps) {
                     "cli_missing",
                     "computer_away",
                     "computer_failed",
+                    "cli_failed",
                     "plan_limit",
                     "model_limit",
                     "model_region",
@@ -695,6 +696,9 @@ export function agentRoutes(deps: AppDeps) {
                   ])
                   .optional(),
                 own: z.enum(["claude_code", "codex", "cursor", "opencode", "grok", "antigravity"]).optional(),
+                provider: z.string().optional().openapi({
+                  description: "Ready on an API key with Automático: the maker of the key it thinks with.",
+                }),
               }),
             ),
             routing: z.object({
@@ -730,7 +734,7 @@ export function agentRoutes(deps: AppDeps) {
       security,
       summary: "Each agent's presence (online, busy, away, out of office, offline) and what it says it is doing",
       description:
-        "From its work (ADR 0084): `busy` on a routine, a task, a run going for over 2 minutes or one rated heavy, or when it said so; `online` while answering, waiting on an answer or active in the last 30 minutes; `away` after that; `out` (out of office, §12) while its plan is at its limit with no model to fall back on or its monthly budget is spent, with an `out_of_plan`/`out_of_budget` line whose `until` says when it is back, and the router leaves it out of messages nobody mentioned it in; `offline` when held. An agent with no AI is drawn offline by the apps (`ai-status`). `status`: its own words (`set_status`), a line picked for its run (`kind` + `subject`), or what its run waits on; gone when the run ends unless it set `until`. Refreshed on `agent.status` events and every 30 seconds while open.",
+        "From its work (ADR 0084): `busy` on a routine, a task, a run going for over 2 minutes or one rated heavy, or when it said so; `online` while answering, waiting on an answer or active in the last 30 minutes (one never active, in the 30 minutes since it was made; the right hand always); `away` after that; `out` (out of office, §12) while its plan is at its limit with no model to fall back on or its monthly budget is spent, with an `out_of_plan`/`out_of_budget` line whose `until` says when it is back, and the router leaves it out of messages nobody mentioned it in; `offline` when held. An agent with no AI is drawn offline by the apps (`ai-status`). `status`: its own words (`set_status`), a line picked for its run (`kind` + `subject`), or what its run waits on; gone when the run ends unless it set `until`. Refreshed on `agent.status` events and every 30 seconds while open.",
       request: { params: OrgParams },
       responses: {
         200: json(
@@ -928,11 +932,27 @@ export function agentRoutes(deps: AppDeps) {
                   .string()
                   .regex(/^[a-z][a-z_-]{0,31}$/)
                   .nullable(),
+                hello: z.string().max(500).optional().openapi({
+                  description: "How it introduced itself on its card, in its own voice (ADR 0164): its first message.",
+                }),
+                starter: z
+                  .string()
+                  .regex(/^[a-z][a-z_-]{0,31}$/)
+                  .optional()
+                  .openapi({ description: "The personal starter it began as (`clara`, ADR 0159 §3)." }),
+                apps: z
+                  .record(z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/), z.enum(["read", "write"]))
+                  .refine((apps) => Object.keys(apps).length <= 12, { message: "At most 12 apps" })
+                  .optional()
+                  .openapi({
+                    description:
+                      "The apps it was made to use (catalog connector ids) at their levels (ADR 0164): its checklist suggests them; the levels of the ones already connected are set by the app.",
+                  }),
               })
               .optional()
               .openapi({
                 description:
-                  "The ready-made role it starts from (`support`), for its setup checklist's suggestions (ADR 0155 §2). Every new agent gets the checklist; without it, no role.",
+                  "The ready-made role it starts from (`support`), for its setup checklist's suggestions (ADR 0155 §2), and what its card said (ADR 0164). Every new agent gets the checklist; without it, no role.",
               }),
           }),
         ),
@@ -1488,7 +1508,7 @@ export function agentRoutes(deps: AppDeps) {
       }
       const [seesCost, brains, viewer, old] = await Promise.all([
         canViewCost(db, actor, orgId),
-        agentBrainSummaries(db, actor, orgId, [agent]),
+        agentBrainLines(db, actor, orgId, [agent]),
         getMembership(db, actor, orgId),
         oldHandlesByAgent(db, orgId),
       ]);
@@ -1524,7 +1544,7 @@ export function agentRoutes(deps: AppDeps) {
       if (!agent) throw new NotFoundError("Agent not found");
       const [seesCost, brains, viewer, old] = await Promise.all([
         canViewCost(db, actor, orgId),
-        agentBrainSummaries(db, actor, orgId, [agent]),
+        agentBrainLines(db, actor, orgId, [agent]),
         getMembership(db, actor, orgId),
         oldHandlesByAgent(db, orgId),
       ]);

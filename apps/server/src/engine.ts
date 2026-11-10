@@ -41,6 +41,7 @@ import {
   createDesktopControl,
   createDesktopToolSource,
   createDeviceToolSource,
+  createFeedbackToolSource,
   createFindAgentToolSource,
   createFollowUpToolSource,
   createGitHubAppSettings,
@@ -61,6 +62,7 @@ import {
   createPassToolSource,
   createPermissionToolSource,
   createReactToolSource,
+  createReleaseAsksToolSource,
   createSandboxToolSource,
   createScheduleToolSource,
   createSessionScreening,
@@ -126,6 +128,7 @@ import {
 import { createVoyageEmbeddings, type EmbeddingProvider, type ModelProvider } from "@agenteschat/providers";
 import { type AppleTokenRevoker, appleTokenRevoker } from "./auth";
 import { hookConfig } from "./routes/app/context";
+import { version } from "./version";
 
 /** Why `/api/terminal` closes (with 4404) where sessions are screened (ADR 0076 §7). */
 export const NO_TERMINAL = "no_terminal";
@@ -383,6 +386,8 @@ export function buildEngine(o: EngineOptions) {
       createBrowserHandoffToolSource({ pubsub: adapters.pubsub, machines: { hub: machineHub } }),
       // The agent takes back a request for a person it no longer needs (listed while it has one open).
       createWithdrawRequestToolSource({ pubsub: adapters.pubsub }),
+      // An agent that handled what another waits to answer (its plan, budget or computer) lets it go.
+      createReleaseAsksToolSource({ pubsub: adapters.pubsub }),
       // An agent with no AI connected is refused at once: its answer would never come.
       createAskAgentToolSource({
         pubsub: adapters.pubsub,
@@ -397,6 +402,12 @@ export function buildEngine(o: EngineOptions) {
       createSetStatusToolSource({ pubsub: adapters.pubsub }),
       // How the person asked agents to talk to them (ADR 0147).
       createAgentStyleToolSource(),
+      // A person's feedback, sent by the agent they asked, where the server takes feedback (ADR 0160 §11).
+      createFeedbackToolSource({
+        to: config.FEEDBACK_EMAIL,
+        version,
+        rateLimiter: adapters.rateLimiter,
+      }),
       createReactToolSource({ pubsub: adapters.pubsub }),
       // A GIF or the agent's sticker when asked (ADR 0091): listed by the workspace's switches and the agent's.
       createMediaToolSource({ pubsub: adapters.pubsub, gifs: adapters.gifs ?? null }),
@@ -450,7 +461,7 @@ export function buildEngine(o: EngineOptions) {
         ...connectorDeps,
         artifacts,
         log: o.log,
-        pubsub: adapters.pubsub,
+        judge: context.judge,
         githubApp: githubAppAccess,
       }),
       // People's mailboxes (ADR 0038): only when the server has a mail path (Composio, IMAP).
@@ -712,6 +723,7 @@ export function buildEngine(o: EngineOptions) {
       : null,
   };
   const jobDeps: JobDeps = {
+    feedbackBlobs: adapters.platformBlobs,
     accountEmails: adapters.email.delivers ? { publicUrl: config.PUBLIC_URL, support: config.SUPPORT_EMAIL } : null,
     appleRevoke: o.appleRevoke ?? appleTokenRevoker(config),
     voice,

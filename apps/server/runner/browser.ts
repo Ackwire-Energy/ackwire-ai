@@ -2494,7 +2494,8 @@ export class BrowserManager {
    * (`asked`: a person's own click, `show`, moves it anyway, and never runs it
    * headless: the desktop's own refusal, or Chrome's, is the answer). Starting
    * the desktop and Chrome are timed into `setup`. `restart`: one running starts
-   * again where it is, on the page it showed (a new version on disk).
+   * again where it is, on the page it showed (a new version on disk); what it runs
+   * for that isn't a use, so a sweep meanwhile still sees how long it was idle.
    */
   private async ensureOwnChrome(
     agent: AgentScope,
@@ -2520,12 +2521,12 @@ export class BrowserManager {
     let page: string | undefined;
     if (running) {
       if (!restart && (running.display !== undefined) === (where !== null)) return running;
-      const url = await this.pageUrl(session).catch(() => null);
+      const url = await this.pageUrl(session, undefined, restart).catch(() => null);
       if (url && isWebPage(url) && domainAllowed(url, allowed)) page = new URL(url).href;
       this.opts.log(
         `the browser of ${agent.handle} ${restart ? "restarts on a new Chrome" : where ? "moves to its desktop" : "moves off its desktop"}`,
       );
-      await this.run(session, ["close"], { timeoutMs: QUICK_TIMEOUT_MS }).catch(() => undefined);
+      await this.run(session, ["close"], { timeoutMs: QUICK_TIMEOUT_MS, notUse: restart }).catch(() => undefined);
       await this.stopChrome(session);
     }
     const profile = path.join(session.folder, AGENT_BROWSER_PROFILE);
@@ -2878,13 +2879,11 @@ export class BrowserManager {
       return;
     }
     if (!s.chrome || this.closed) return;
-    const lastUsed = s.lastUsed;
     const exe = this.chrome();
     this.opts.log(
       `the browser of ${s.name} restarts on ${exe ? chromeName(exe) : "Chrome"} ${version} (was ${s.version ?? "unknown"})`,
     );
     await this.ensureOwnChrome(s.agent, s, s.chrome.display !== undefined, s.allowed ?? [], false, undefined, true);
-    s.lastUsed = lastUsed;
   }
 
   private readPids(): Promise<ChromeEntry[]> {
@@ -3068,9 +3067,10 @@ export class BrowserManager {
   }
 
   /** The active tab's address, or null when the browser can't say. */
-  private async pageUrl(session: Session, signal?: AbortSignal): Promise<string | null> {
+  private async pageUrl(session: Session, signal?: AbortSignal, notUse = false): Promise<string | null> {
     const got = await this.run(session, ["get", "url"], {
       timeoutMs: QUICK_TIMEOUT_MS,
+      notUse,
       ...(signal ? { signal } : {}),
     });
     return isRecord(got.data) && typeof got.data.url === "string" ? got.data.url : null;

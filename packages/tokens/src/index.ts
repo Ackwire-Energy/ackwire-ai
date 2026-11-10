@@ -13,8 +13,6 @@ export interface ThemeColors {
   /** The app shell: the sidebar's paper and the work area beside it. */
   side: string;
   pane: string;
-  bookPage: string;
-  bookLine: string;
   glass: string;
   glassSolid: string;
   line: string;
@@ -59,8 +57,6 @@ export const light: ThemeColors = {
   sunken: "#f3f3f0",
   side: "#f6f9fd",
   pane: "#ffffff",
-  bookPage: "#fffdf6",
-  bookLine: "#cfc8b6",
   glass: "rgba(255, 255, 255, 0.88)",
   glassSolid: "#fbfbf9",
   line: "rgba(23, 23, 22, 0.07)",
@@ -103,8 +99,6 @@ export const dark: ThemeColors = {
   sunken: "#0a0a09",
   side: "#0b0d11",
   pane: "#181817",
-  bookPage: "#ebe6d8",
-  bookLine: "#a59e8c",
   glass: "rgba(30, 30, 28, 0.86)",
   glassSolid: "#1e1e1c",
   line: "rgba(255, 255, 255, 0.1)",

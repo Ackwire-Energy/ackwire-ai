@@ -105,6 +105,22 @@ test("two askers close only on the product: 0.9 each closes (0.81), 0.85 each do
   expect(closedNoteOf(s, catchUpDecision(both(0.95), s, 0.8), now).reason).toBe("mixed");
 });
 
+test("an asker the run owes an answer is never closed and keeps it running; one who joined after still clears", () => {
+  const two = snapshot({}, true);
+  const s = { ...two, askers: two.askers.map((a, i) => (i === 0 ? { ...a, owed: true as const } : a)) };
+  const v = catchUpDecision(
+    { status_a1: status({ solved: 0.97 }), who_a1: who("p3"), status_a2: status({ solved: 0.95 }), who_a2: who("p4") },
+    s,
+    CATCH_UP_CLOSE_AT,
+  );
+  expect(v.outcome).toBe("run");
+  expect(v.askers[0]?.reason).toBeUndefined();
+  expect(v.askers[1]).toMatchObject({ reason: "solved", who: "p4", sure: 0.95 });
+  expect(triageBrief(s, v)).toBe(
+    "A quick check judged Ana's ask still open and Bruno's handled by Ada. It can be wrong, so read below.",
+  );
+});
+
 test("the strict bar is 0.9", () => {
   expect(CATCH_UP_CLOSE_AT_STRICT).toBe(0.9);
   const s = snapshot();
@@ -190,7 +206,6 @@ test("the gates: when no call is made", () => {
     triageGate({
       snapshot: s,
       prior: undefined,
-      owed: false,
       mission: false,
       overruled: false,
       noJev: false,
@@ -198,9 +213,16 @@ test("the gates: when no call is made", () => {
       ...over,
     });
   expect(gate()).toBeNull();
-  for (const over of [{ owed: true }, { mission: true }, { overruled: true }, { noJev: true }])
+  for (const over of [{ mission: true }, { overruled: true }, { noJev: true }])
     expect(gate(over)).toEqual({ skip: "skipped_rule" });
   expect(gate({ snapshot: { ...s, notPeople: true } })).toEqual({ skip: "skipped_rule" });
+  // Owing its only asker an answer: nobody to check. Someone else who joined still is.
+  const owed = (x: TriageSnapshot) => ({
+    ...x,
+    askers: x.askers.map((a, i) => (i === 0 ? { ...a, owed: true as const } : a)),
+  });
+  expect(gate({ snapshot: owed(s) })).toEqual({ skip: "skipped_rule" });
+  expect(gate({ snapshot: owed(snapshot({}, true)) })).toBeNull();
   const five = Array.from({ length: 5 }, (_, i) => ({
     ...s.askers[0],
     key: `a${i + 1}`,

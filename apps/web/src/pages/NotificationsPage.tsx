@@ -181,7 +181,6 @@ function sourceOf(t: TFunction, n: AppNotification, channelName: (id: string) =>
   else if (n.kind === "join_request" || n.kind === "invitation_accepted")
     [icon, label] = ["members", t("notifications.source.members")];
   else if (n.kind === "composio_limit") [icon, label] = ["wallet", t("notifications.source.usage")];
-  else if (n.kind === "connector_tool_changed") [icon, label] = ["plug", t("notifications.source.connectors")];
   else if (n.kind === "skill_update") [icon, label] = ["book", t("skills.title")];
   else if (
     n.kind === "machine_connected" ||
@@ -227,9 +226,18 @@ function SourceChip({
   const { t } = useTranslation();
   const source = sourceOf(t, n, channelName);
   if (!source) return null;
+  const channel = channelOf(n);
   return (
     <Chip icon={source[0]} className={className}>
-      {source[1]}
+      {/* The channel's icon is its #: the words show its bare name, a screen reader still hears the #. */}
+      {source[0] === "channel" && channel ? (
+        <>
+          <span className="ac-visually-hidden">#</span>
+          {channelName(channel)}
+        </>
+      ) : (
+        source[1]
+      )}
     </Chip>
   );
 }
@@ -735,8 +743,9 @@ function Row({
         {tags && (
           <span className="nt-tags">
             <SourceChip n={n} channelName={channelName} />
+            {/* The arrow is in its words: no icon to say it again. */}
             {statusMove && (
-              <Chip icon="arrowRight" className="nt-chip-ink">
+              <Chip className="nt-chip-ink">
                 {t("notifications.status", { from: statusName(t, l.statusFrom), to: statusName(t, l.statusTo) })}
               </Chip>
             )}
@@ -1641,8 +1650,8 @@ export function NotificationsPage() {
     <div className="page page--list nt">
       <PageHeader
         title={t("notifications.title")}
-        // The counts the sidebar already has show at once; the list's own replace them when it arrives.
-        meta={(list.isSuccess || badge.isSuccess) && summary}
+        // On the title's row: the counts the sidebar already has show at once, the list's own replace them.
+        count={(list.isSuccess || badge.isSuccess) && summary}
         actions={
           <>
             <Menu

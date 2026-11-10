@@ -1764,7 +1764,7 @@ test.if(posix)(
     t.manager.setHandoff(ops.id, { status: "pending" });
     now += 11 * 60_000;
     await t.manager.sweep();
-    await waitFor(() => (of(dev)[1]?.killed || of(dev)[1]?.closed) === true);
+    expect(of(dev)[1]?.killed || of(dev)[1]?.closed).toBe(true);
     expect(of(dev)).toHaveLength(2);
     expect(of(ops)).toHaveLength(1);
     // Their turn just over: the agent may carry on where they left it, so it doesn't restart then.

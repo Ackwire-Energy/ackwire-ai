@@ -94,7 +94,7 @@ export function SystemFace({ n, className = "nt-av24" }: { n: AppNotification; c
         <ComputerIcon kind={WORKSPACE_COMPUTER_KIND} size={16} />
       </span>
     );
-  if (n.kind === "composio_limit" || n.kind === "connector_tool_changed")
+  if (n.kind === "composio_limit")
     return (
       <span className={cx("nt-sys", className)} aria-hidden="true">
         <Icon name="plug" size={16} />

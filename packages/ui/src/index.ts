@@ -158,7 +158,7 @@ export {
   DialogSearchList,
   useUnsavedInDialog,
 } from "./components/Dialog";
-export { Diff, type DiffKind, type DiffLine, diffLines } from "./components/Diff";
+export { Diff, type DiffBlock, type DiffKind, type DiffLine, diffBlocks, diffLines } from "./components/Diff";
 export { drawEffort, EffortPixels, type EffortStep } from "./components/EffortPixels";
 export {
   EMOJI_COLUMNS,
@@ -176,6 +176,7 @@ export {
   EventPillMore,
   type EventPillProps,
 } from "./components/EventPill";
+export { FactLine, type LineFact, type LineFactTone } from "./components/FactLine";
 export { type Fact, FactStrip, type FactTone } from "./components/FactStrip";
 export {
   AffixInput,
@@ -213,7 +214,6 @@ export {
   type StickerPickerLabels,
   stickerMoodsFor,
 } from "./components/MediaPicker";
-export { AgentReadingBook } from "./components/MemoryPixels";
 export { Mention } from "./components/Mention";
 export {
   Menu,

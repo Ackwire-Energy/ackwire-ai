@@ -12,6 +12,7 @@ import { knownErrorText, oauthReturnText } from "@agenteschat/client/lib/errors"
 import {
   githubAppPanel,
   installationReach,
+  missingEventsText,
   removedText,
   removeInstallationText,
 } from "@agenteschat/client/lib/github-app";
@@ -133,15 +134,18 @@ export function GitHubAppGroup({ onConnectAccount }: { onConnectAccount: () => v
       t("common.cancel"),
     );
   const state = setup ? (setup.state === "ok" ? "on" : setup.state) : null;
+  const eventsUrl = setup?.events?.url;
+  // What the owner still ticks on GitHub for agents to hear it comes first: it is the one thing to do here.
   const serverNote = !setup
     ? null
-    : setup.canCreate
-      ? t("githubApp.server.without")
-      : setup.source === "env"
-        ? t("githubApp.server.line.env")
-        : setup.state === "invalid"
-          ? t("githubApp.server.line.invalid")
-          : t("githubApp.server.lead");
+    : (missingEventsText(t, setup) ??
+      (setup.canCreate
+        ? t("githubApp.server.without")
+        : setup.source === "env"
+          ? t("githubApp.server.line.env")
+          : setup.state === "invalid"
+            ? t("githubApp.server.line.invalid")
+            : t("githubApp.server.lead")));
 
   return (
     <>
@@ -200,6 +204,9 @@ export function GitHubAppGroup({ onConnectAccount }: { onConnectAccount: () => v
                 label={t("mobile.connectors.githubApp.createInBrowser")}
                 onPress={() => openPage(`${serverUrl()}/org/${orgId}/settings/connectors`)}
               />
+            ) : null}
+            {eventsUrl ? (
+              <GroupedRow icon="globe" label={t("githubApp.server.events")} onPress={() => openPage(eventsUrl)} />
             ) : null}
           </GroupedList>
           {serverNote ? <GroupedFooter>{serverNote}</GroupedFooter> : null}

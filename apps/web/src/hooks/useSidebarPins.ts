@@ -9,8 +9,8 @@ import { useToast } from "@/lib/toast";
 import { useDirectory } from "./useDirectory";
 
 /**
- * "Fixar no topo" (pins inside each sidebar section): what is pinned (on day one the person's own agents), whether the
- * one-time line about it shows, and the menu item that pins or unpins a row. Saved per person (`…/me/sidebar/view`).
+ * "Fixar no topo" (pins inside each sidebar section): what is pinned (on day one the person's own agents) and the menu
+ * item that pins or unpins a row. Saved per person (`…/me/sidebar/view`).
  */
 export function useSidebarPins() {
   const { t } = useTranslation();
@@ -48,9 +48,6 @@ export function useSidebarPins() {
     pins,
     isPinned: (kind: PinKind, id: string) => pins[kind].includes(id),
     toggle,
-    /** The one-time line under the day-one pins, until the person pins, unpins or closes it. */
-    hint: view.pins === null && dayOne.length > 0,
-    dismissHint: () => setView((now) => ({ ...now, pins: pinsOf(now, dayOne) })),
     /** "Fixar no topo" / "Tirar do topo" for a row's menus. */
     entry: (kind: PinKind, id: string): MenuEntry => ({
       kind: "item",

@@ -155,7 +155,7 @@ import { accountOption, PlanHold, usePlanHold } from "@/components/ai/ConnectAiS
 import { PlanReplies } from "@/components/ai/PlanReplies";
 import { useConnectAi } from "@/components/ConnectAi";
 import { LoadingLine } from "@/components/Loading";
-import { CommandBlock } from "@/components/Machines";
+import { CommandBlock } from "@/components/machine-bits";
 import { useOrg } from "@/components/org-context";
 import { ProviderSelect } from "@/components/ProviderKey";
 import { useWidenAsk } from "@/components/ReachLines";
@@ -309,7 +309,8 @@ export function WorkCard({
     : kind === "model"
       ? "key"
       : planOfAccount({ kind, provider: agent.brain?.provider ?? null });
-  const keyProvider = apiProviderOf(saved.model, models.data?.models ?? []);
+  // The model's maker; on Automático, the maker the server says its models come from.
+  const keyProvider = apiProviderOf(saved.model, models.data?.models ?? []) ?? agent.brain?.maker;
   const orgModel = isAuto(saved.model)
     ? t("brain.auto.label")
     : (models.data?.models.find((m) => m.id === saved.model)?.label ?? saved.model);
@@ -482,7 +483,7 @@ function DesktopUseNote({ machine: m }: { machine: Machine }) {
         <span style={{ display: "block" }}>
           {t("desktop.use.agent", { ...g, computer: computerNameOf(t, org.name, m.name, isPersonal(org)) })}
         </span>
-        <span className="small muted">{machineReasonText(t, use)}</span>
+        <span className="small muted">{machineReasonText(t, use, "desktop_use_install")}</span>
         {command && <CommandBlock command={command} />}
       </div>
     </div>
@@ -501,6 +502,26 @@ function ThisMacReconnect({ machineId }: { machineId: string }) {
 }
 
 /**
+ * The steps card's head: the computer on the title's first line, then Esperando with its loader, under the title from
+ * its words' edge when the row has no room for both.
+ */
+function StepsHead({ title }: { title: string }) {
+  const { t } = useTranslation();
+  return (
+    <div className="brw-steps__head ac-iconline">
+      <Icon name="computer" size={16} />
+      <span className="brw-steps__headline">
+        <b>{title}</b>
+        <span className="brw-steps__wait" role="status">
+          <Icon name="spinner" size={14} />
+          {t("agentPage.work.steps.waiting")}
+        </span>
+      </span>
+    </div>
+  );
+}
+
+/**
  * What turns the computer's browser on, there; the page notices by itself. The app's three clicks, drawn small; on a
  * Linux computer, which may be a server without the app, the command too. In agentes for Mac on this very Mac: one
  * button to Preferences → Ferramentas instead (ADR 0036). Nothing once its switch is on, or on the workspace's own
@@ -515,11 +536,7 @@ export function BrowserSteps({ computer, machineId }: { computer: string; machin
   if (here) {
     return (
       <section className="brw-steps" aria-label={t("machines.thisMac.browserTitle")}>
-        <div className="brw-steps__head">
-          <Icon name="computer" size={16} />
-          <b>{t("machines.thisMac.browserTitle")}</b>
-          <span className="brw-steps__wait">{t("agentPage.work.steps.waiting")}</span>
-        </div>
+        <StepsHead title={t("machines.thisMac.browserTitle")} />
         <div className="row" style={{ gap: 12, alignItems: "center", flexWrap: "wrap" }}>
           <span className="small muted" style={{ flex: 1, minWidth: 200 }}>
             {t("machines.thisMac.browserText")}
@@ -552,11 +569,7 @@ export function BrowserSteps({ computer, machineId }: { computer: string; machin
   );
   return (
     <section className="brw-steps" aria-label={t("agentPage.work.steps.title", { computer })}>
-      <div className="brw-steps__head">
-        <Icon name="computer" size={16} />
-        <b>{t("agentPage.work.steps.title", { computer })}</b>
-        <span className="brw-steps__wait">{t("agentPage.work.steps.waiting")}</span>
-      </div>
+      <StepsHead title={t("agentPage.work.steps.title", { computer })} />
       {row && !allowsInApp(row.os) ? (
         <div className="stack-4" style={{ gap: 6 }}>
           <span className="small">{t("browser.machine.offHelp")}</span>
@@ -1398,6 +1411,11 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const modelLine = (m: BrainModelChoice) => brainModelLine(t, kind, plan, m, cursorPlanSays);
   const planModelOptionsShown: SelectOption[] = [
     { value: AUTO, label: t("brain.auto.label"), description: t("brain.auto.hint"), leading: autoMark },
+    // The model it has stays a choice when its plan's list doesn't have it, as the key's picker keeps one: the picker
+    // never shows empty.
+    ...(!shownModel || isAuto(shownModel) || modelOptions.some((m) => m.value === shownModel)
+      ? []
+      : [{ value: shownModel, label: shownModel, leading: planLogo }]),
     ...modelOptions.map((m) => {
       const line = modelLine(m);
       return {
@@ -1927,12 +1945,12 @@ function AdvancedRow({
     <div className="ac-select agp-brainsel agp-advrow">
       <button type="button" className="ac-select__trigger" onClick={onOpen}>
         <span className="ac-select__value">
-          <span className="newag__sel-value">
+          <span className="newag__sel-value ac-faceline">
             <span className="newag__ib">
               <Icon name={icon} size={16} />
             </span>
             <span className="newag__sel-text">
-              <b>{label}</b>
+              <b className="ac-captop">{label}</b>
               <span>{line}</span>
             </span>
           </span>

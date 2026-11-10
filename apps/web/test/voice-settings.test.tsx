@@ -40,6 +40,21 @@ describe("voice messages in Configurações (ADR 0100)", () => {
     expect(screen().getByRole("switch", { name: "Mensagens de voz" }).hasAttribute("disabled")).toBe(false);
   });
 
+  test("only on a self-hosted server: agentes.chat Cloud lists no Voz, and its link opens Sua conta", async () => {
+    const nav = () => within(screen().getByRole("navigation", { name: "Seções das configurações" }));
+    await go({ authConfig: { cloud: false }, media: { voiceAvailable: true } });
+    expect(nav().getByRole("link", { name: "Voz" }).getAttribute("aria-current")).toBe("page");
+    expect(card()).toBeTruthy();
+    cleanup();
+
+    await go({ authConfig: { cloud: true }, media: { voiceAvailable: true } });
+    expect(nav().queryByRole("link", { name: "Voz" })).toBeNull();
+    expect(screen().queryByRole("region", { name: "Mensagens de voz" })).toBeNull();
+    expect(screen().getByRole("heading", { level: 2, name: "Sua conta" })).toBeTruthy();
+    // Nothing about the person's role: no one has Voz on the Cloud.
+    expect(screen().queryByText(/não abre com o seu papel/)).toBeNull();
+  });
+
   test("a key the provider refuses: said under the field, nothing kept", async () => {
     const state = await go({ speechKey: OFF, speechKeyRefused: ["wrong_key_0000"], media: { voiceAvailable: false } });
     await act(async () => fireEvent.change(field(), { target: { value: "wrong_key_0000" } }));

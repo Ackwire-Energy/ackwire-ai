@@ -86,6 +86,40 @@ export type PushDeviceInput =
   | { platform: "ios" | "android"; token: string; locale: string }
   | { platform: "web"; endpoint: string; keys: { p256dh: string; auth: string }; locale: string };
 
+/** What the feedback form sends (`POST /api/app/feedback`): `id` is made by the app, so a retry goes once. */
+export interface FeedbackInput {
+  id: string;
+  text: string;
+  /** The workspace the person is in. */
+  orgId?: string;
+  /** The screen they are on (a path), and the app that sends it. */
+  where?: string;
+  app?: string;
+  /** The thing the feedback is about (a right click's), and what it says, as the form showed it. */
+  about?: FeedbackAbout;
+  /** What the app knows of where the person is, label and value, as the form listed it. */
+  facts?: [string, string][];
+  /** Files added with `uploadFeedbackFile`. */
+  files?: string[];
+}
+
+export interface FeedbackAbout {
+  /** The app's own word for the thing: `message`, `card`, `button`… */
+  kind: string;
+  /** Its name on screen: an author, a title. */
+  label?: string;
+  text?: string;
+}
+
+/** A picture or a video added to the feedback being written (`POST /api/app/feedback/files`). */
+export interface FeedbackFile {
+  id: string;
+  name: string;
+  size: number;
+  kind: "image" | "video";
+  contentType: string;
+}
+
 export interface AuthConfig {
   socialProviders: { google: boolean; github: boolean; apple?: boolean };
   signupOpen: boolean;
@@ -99,6 +133,8 @@ export interface AuthConfig {
   privacyUrl?: string | null;
   /** Where people write to whoever runs this server (a workspace on hold or suspended); null: not given. */
   supportEmail?: string | null;
+  /** The server takes feedback (`POST /api/app/feedback`): the apps show the form; absent: a server too old to. */
+  feedback?: boolean;
   /** Every workspace gets a computer of its own (the Cloud); absent: a server too old to say. */
   workspaceComputer?: boolean;
   /** The billing service (ADR 0079): owners and admins open a workspace's plan there; null or absent: no billing. */
@@ -681,6 +717,12 @@ export interface AgentSetupChecklist {
   role: string | null;
   /** The steps a person confirmed (chose in its dialog, or skipped). */
   done: SetupStep[];
+  /** How it introduced itself on its card, in its own voice (ADR 0164): its first message says it. */
+  hello?: string;
+  /** The personal starter it began as ("clara", ADR 0159 §3): its first tasks. */
+  starter?: string;
+  /** The apps it was made to use (catalog connector ids) at their levels (ADR 0164): its checklist suggests them. */
+  apps?: Record<string, "read" | "write">;
 }
 
 /** A costly step unrequested work needs a person's go for (ADR 0131 §3). */
@@ -809,6 +851,8 @@ export interface AgentBrainLine {
   usage?: PlanUsage;
   /** Set to Rápida where that applies to what it thinks with; absent: standard speed. */
   speed?: "fast";
+  /** An API brain on Automático: the maker its models come from, whose logo shows beside it. */
+  maker?: string;
 }
 
 /** `appearance` as stored: the UI only draws known values. */
@@ -839,8 +883,11 @@ export interface AgentInput {
   autonomy?: CommandApproval;
   /** Editing only: its autonomy brakes (ADR 0131); the fields given change. */
   brakes?: Partial<AgentBrakes>;
-  /** Creating only: the ready-made role it starts from, for its setup checklist (ADR 0155 §2). */
-  setup?: { role: RoleId | null };
+  /**
+   * Creating only: the ready-made role it starts from, for its setup checklist (ADR 0155 §2), and what its card said
+   * (ADR 0164): how it introduced itself, the personal starter it began as, the apps it will use at their levels.
+   */
+  setup?: { role: RoleId | null; hello?: string; starter?: string; apps?: Record<string, "read" | "write"> };
 }
 
 /** A person's answer to an agent's proposal of costly work nobody asked for (ADR 0131 §3). */
@@ -938,8 +985,6 @@ export interface TeamPlan {
   /** People named as working there, invited after. */
   invite: string[];
   template?: string;
-  /** On a billing hold, from a template: what its first agent delivers, shown labelled and never posted. */
-  example?: string;
 }
 
 /** The right hand's team card (`meta.actionCard`): several agents created in one click ("Criar o time"). */
@@ -1214,8 +1259,6 @@ export interface Message {
   receipts?: MessageReceipts;
   /** Reaction counts (expected from the backend in the message list; else loaded on hover). */
   reactions?: ReactionCount[];
-  /** People's messages: what agents saved to memory from them (the memory mark); live via `message.memories`. */
-  memories?: MessageMemory[];
   /** In lists: true when pinned in its channel (absent: not pinned); live via `message.pinned` / `message.unpinned`. */
   pinned?: boolean;
   /** Agents' messages: what the agent changed with it, as receipts with Undo; live via `message.actions`. */
@@ -1331,6 +1374,7 @@ export interface AiStatus {
       | "cli_missing"
       | "computer_away"
       | "computer_failed"
+      | "cli_failed"
       | "plan_limit"
       | "model_limit"
       | "model_region"
@@ -1340,6 +1384,8 @@ export interface AiStatus {
       | "plan_not_shared"
       | "runner_outdated"
       | "plan_tools";
+    /** Ready on an API key with Automático: the maker of the key it thinks with (`autoMakerOf`). */
+    provider?: string;
   }[];
 }
 
@@ -1422,9 +1468,9 @@ export interface ActiveRun {
   background?: boolean;
   /**
    * What its current model call streamed so far past its last tool: `text` starts at `at` of the call's text, so an
-   * app opened mid-answer goes on from `at` plus its length.
+   * app opened mid-answer goes on from `at` plus its length. `shownAt`: as `agent.delta.shownAt`.
    */
-  live?: { turn: number; at: number; text: string };
+  live?: { turn: number; at: number; text: string; shownAt?: string };
 }
 
 /** Real-time channel events (packages/engine/src/events.ts, docs/adr/0010-realtime.md). */
@@ -1452,7 +1498,6 @@ export type ChannelEvent =
   | { type: "block.state"; channelId: string; block: BlockState }
   /** A choice card was answered (ADR 0124). */
   | { type: "choices.updated"; channelId: string; choices: Choices }
-  | { type: "message.memories"; channelId: string; messageId: string; memories: MessageMemory[] }
   /** A long work changed (ADR 0121): moved, updated, waiting, queued or ended. Its anchor's line redraws. */
   | {
       type: "agent.work";
@@ -1506,6 +1551,8 @@ export type ChannelEvent =
       at?: number;
       /** Where its stretch starts in the turn's text (a stretch: the text between two calls of a computer brain). */
       from?: number;
+      /** When its reply first showed words (ISO, the server's clock): its message is posted there (`LiveRun.shownAt`). */
+      shownAt?: string;
     }
   | {
       type: "agent.run";
@@ -1515,6 +1562,9 @@ export type ChannelEvent =
       agentId: string;
       status: RunStatus;
       error?: string;
+      /** A failed run's reason by its code, as `run.finished` says it (`runErrorDetail`). */
+      errorCode?: string;
+      errorParams?: Record<string, string>;
       /** The message that started the run (anchors its live row). */
       triggerMessageId?: string | null;
       startedAt?: string | null;
@@ -2014,6 +2064,11 @@ export interface GitHubAppSetup {
   state: "off" | "ok" | "invalid";
   /** No app yet: the manifest flow makes one. */
   canCreate: boolean;
+  /**
+   * The events agents hear that the app isn't subscribed to on GitHub (by GitHub's names), and its page there where
+   * they're ticked. Absent when it has them all, or GitHub didn't answer.
+   */
+  events?: { missing: string[]; url: string };
 }
 
 /** `GET …/github-app`: whether the app can be installed here, the organization's installations, the server's app. */
@@ -2575,19 +2630,6 @@ export interface CustomTool {
   firstSeenAt: string;
 }
 
-/**
- * ADR 0117: an approved MCP tool whose server changed its description or input. Agents keep `before` until a
- * connector admin accepts the change.
- */
-export interface ToolChange {
-  connectionId: string;
-  connectionLabel: string;
-  toolName: string;
-  before: { description: string; inputSchema: Record<string, unknown> };
-  after: { description: string; inputSchema: Record<string, unknown> };
-  changedAt: string;
-}
-
 export interface CustomServer {
   id: string;
   serverUrl: string;
@@ -3010,15 +3052,6 @@ export interface UndoAllResult {
   actions: AgentAction[];
   /** Changes that could not be undone, with the error code (`action.changed_since`, …). */
   failed: { id: string; code: string; message: string }[];
-}
-
-/** Something an agent saved to its memory from a person's message (the memory mark). */
-export interface MessageMemory {
-  id: string;
-  agentId: string;
-  kind: "fact" | "preference" | "decision" | "note" | "lesson";
-  text: string;
-  createdAt: string;
 }
 
 export interface ReactionCount {
@@ -4024,8 +4057,8 @@ export interface CalendarRange {
   routines: { routineId: string; name: string; agentId: string; at: string; target: RoutineTarget }[];
   /** Pending reminders the viewer may see (absent on an older server). */
   reminders?: CalendarReminder[];
-  /** Issues due in the range (all-day). */
-  deadlines: { issueId: string; number: number; title: string; date: string }[];
+  /** Issues due in the range (all-day), with who has each (absent on an older server). */
+  deadlines: { issueId: string; number: number; title: string; date: string; assignee?: Actor | null }[];
   proposals: CalendarProposal[];
 }
 
@@ -4329,6 +4362,11 @@ export interface Machine {
   kind?: MachineKind;
   /** Runner connected now (`machine.status` events). */
   online: boolean;
+  /**
+   * ADR 0161: the workspace's own computer is asleep in standby, offline by design: it wakes when something wants it,
+   * and opens as it does. Absent from an older server: not in standby.
+   */
+  standby?: boolean;
   lastSeenAt: string | null;
   hostname: string;
   /** `linux`, `darwin`, `windows` or `other` (`MachineOs`). */
@@ -6136,11 +6174,6 @@ export type NotificationKind =
    * `source.agentId` and its name in `source.label`. Opens the agent's page.
    */
   | "browser_profile_request"
-  /**
-   * ADR 0117: a connected MCP server changed tools an admin approved (connector admins). Waiting; `source.label` the
-   * connection's name, `latest.title` the tools. Opens Conectores, where it is accepted.
-   */
-  | "connector_tool_changed"
   /** ADR 0115: a computer's disk passed 85% in use (admins). `source.machineId`; `latest.diskUse`, `latest.diskFreeGb`. */
   | "computer_disk_full"
   /** ADR 0133: a computer has no Google Chrome for its agents' browsers (who connected it). `source.machineId`. */
@@ -6321,8 +6354,6 @@ export interface NotificationSource {
   dashboardId?: string;
   /** `widget_alert`, `widget_failed`: the widget. */
   widgetId?: string;
-  /** `connector_tool_changed`: the connected server whose approved tools changed (ADR 0117). */
-  connectionId?: string;
   /** Channel name, thread title, issue title, topic title, mission or routine name (or the computer's name). */
   label?: string;
 }
@@ -7407,6 +7438,8 @@ export interface PersonUsage {
   roleIds: string[];
   owner: boolean;
   money: boolean;
+  /** Some of it was use on a plan, priced at the API's list price ("≈"). */
+  estimated: boolean;
   renewsAt: string;
   since: string;
   until: string;

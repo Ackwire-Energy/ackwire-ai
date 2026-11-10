@@ -21,6 +21,9 @@ test("the members column: 264px on the work's sheet, group titles in normal case
   // Each group's title in normal case, as the sidebar's.
   expect(last(shipped, ".members-side__head", "text-transform")).toBe("none");
   expect(last(shipped, ".members-side__head", "font-size")).toBe("13px");
+  // A face the size of a message's and the sidebar's (`--name-face`).
+  expect(last(shipped, ".members-side__inner > .ac-avatar", "width")).toBe("var(--name-face)");
+  expect(last(shipped, ".members-side__inner > .ac-avatar", "height")).toBe("var(--name-face)");
   // An agent's role is a tag, as in the sidebar.
   expect(last(shipped, ".members-side__line.ac-tag", "display")).toBe("inline-block");
   expect(last(shipped, ".members-side__line.ac-tag", "align-self")).toBe("flex-start");

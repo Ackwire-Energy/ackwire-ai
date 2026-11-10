@@ -1,11 +1,15 @@
 import { useOverview } from "@agenteschat/client";
 import { Tabs } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "./org-context";
 
-/** Aprovações' two kinds of what waits on you: what agents ask to do now, and what they propose to change. */
-export function ApprovalsTabs({ value }: { value: "requests" | "proposals" }) {
+/**
+ * Aprovações' two kinds of what waits on you: what agents ask to do now, and what they propose to change. `actions`
+ * sit at the tabs' right, as a toolbar's do.
+ */
+export function ApprovalsTabs({ value, actions }: { value: "requests" | "proposals"; actions?: ReactNode }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const navigate = useNavigate();
@@ -30,7 +34,7 @@ export function ApprovalsTabs({ value }: { value: "requests" | "proposals" }) {
           { value: "proposals", label: t("proposals.title"), count: overview?.proposalsWaitingForMe || undefined },
         ]}
       >
-        {null}
+        {actions ?? null}
       </Tabs>
     </div>
   );

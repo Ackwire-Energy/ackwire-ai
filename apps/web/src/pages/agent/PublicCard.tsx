@@ -118,7 +118,7 @@ export function AgentPublicCard({
             <Card as="section" className="agp-card" aria-labelledby="pub-hidden">
               <CardHeader id="pub-hidden" icon="lock" title={t("profile.detailsHiddenTitle")} />
               <p className="small muted">{t("profile.detailsHidden", agentGrammar(agent.name))}</p>
-              <div className="row">
+              <div className="ac-acts">
                 <AskAccessButton agent={agent} />
               </div>
             </Card>

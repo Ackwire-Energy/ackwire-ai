@@ -13,9 +13,6 @@
   /* A sidebar row under the pointer, and the open one: one plate each, a step of ink into the paper. */
   --side-hover: color-mix(in srgb, var(--ink) 5%, var(--side));
   --side-chosen: color-mix(in srgb, var(--ink) 10%, var(--side));
-  /* The open book of the memory mark. */
-  --book-page: #fffdf6;
-  --book-line: #cfc8b6;
   --glass: rgba(255, 255, 255, 0.88);
   --glass-solid: #fbfbf9;
   --line: rgba(23, 23, 22, 0.07);
@@ -56,8 +53,6 @@
   --pane: #181817;
   --side-hover: color-mix(in srgb, var(--ink) 6%, var(--side));
   --side-chosen: color-mix(in srgb, var(--ink) 14%, var(--side));
-  --book-page: #ebe6d8;
-  --book-line: #a59e8c;
   --glass: rgba(30, 30, 28, 0.86);
   --glass-solid: #1e1e1c;
   --line: rgba(255, 255, 255, 0.1);
@@ -178,6 +173,8 @@
   --control-icon-sm: 16px;
   --control-icon-md: 18px;
   --control-icon-lg: 20px;
+  /* What a finger needs: a small control's plate stays 32 on touch, its target grows to this past it. */
+  --touch-target: 44px;
   --font-sans: Onest, "Segoe UI", system-ui, sans-serif;
   --font-mono: "Martian Mono", ui-monospace, Menlo, monospace;
   /*

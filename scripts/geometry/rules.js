@@ -232,9 +232,14 @@
     if (hasSurface(style(el))) return el.getBoundingClientRect();
     return contentRect(el);
   };
-  /** Pills, chips, tokens and buttons with words: the `pad` rule's family. */
+  /** An East Asian wide character (Chinese, Japanese kana, Korean, full-width forms): about two Latin ones wide. */
+  const WIDE = /[\u1100-\u115f\u2e80-\ua4cf\uac00-\ud7a3\uf900-\ufaff\ufe30-\ufe4f\uff00-\uff60\uffe0-\uffe6]/;
+  /**
+   * Pills, chips, tokens and buttons with words: the `pad` rule's family. A calendar item is no pill: a block across its
+   * column, Google's, its words from its start and the room after them the column's.
+   */
   const PILLS =
-    ".ac-btn:not(.ac-btn--icon,.ac-btn--glyph,.ac-btn--loading),.ac-token,.ac-chip,.ac-countchip,[class*='pill'],[class*='chip'],[class*='__tag'],[class*='-tag']";
+    ".ac-btn:not(.ac-btn--icon,.ac-btn--glyph,.ac-btn--loading),.ac-token,.ac-chip,.ac-countchip,[class*='pill'],[class*='chip']:not(.cal-chip),[class*='__tag'],[class*='-tag']";
   /**
    * A card: a row with a surface of its own that starts with an icon and ends with what can be done about it (a button,
    * a link) or another icon. Pills are the `pad` rule's.
@@ -697,8 +702,10 @@
     },
     /**
      * Words squeezed to a sliver beside something that keeps its width (an action, a time): a block of text on 3 lines
-     * or more with fewer than about 12 characters a line, or, straight inside a row, fewer than 1.6 words a line. A block
-     * is what its words lay out in: a `<b>` or a link inside a sentence is the sentence's.
+     * or more with fewer than about 12 characters a line, or, straight inside a row, fewer than 1.6 words a line of
+     * fewer than 20 characters (an address that wraps its full lines is one word, not a squeeze). A block is what its
+     * words lay out in: a `<b>` or a link inside a sentence is the sentence's. A wide character (Chinese, Japanese,
+     * Korean) takes the room of two.
      */
     wordwrap(out) {
       const blocks = new Map();
@@ -735,7 +742,8 @@
           ((ps.display.includes("flex") && !ps.flexDirection.startsWith("column")) ||
             (ps.display.includes("grid") && ps.gridTemplateColumns.split(" ").length > 1)) &&
           flow(parent).length >= 2;
-        if (words.length / lines < 12 || (row && words.split(" ").length / lines < 1.6))
+        const room = [...words].reduce((n, ch) => n + (WIDE.test(ch) ? 2 : 1), 0);
+        if (room / lines < 12 || (row && words.split(" ").length / lines < 1.6 && room / lines < 20))
           out.push({ rule: "wordwrap", node: el, el: sig(el), box: sig(parent), lines, text: words.slice(0, 60) });
       }
     },
@@ -952,6 +960,28 @@
       }
     },
     /**
+     * A bubble's time (`.ac-msg__stamp`, with what the row is doing and its stop button) inside its bubble: one wider
+     * than the words widens the bubble, it never hangs past the bubble's edge.
+     */
+    stampout(out) {
+      for (const stamp of document.querySelectorAll(".ac-msg__text > .ac-msg__stamp")) {
+        const bubble = stamp.parentElement;
+        if (!seen(stamp) || !painted(style(bubble).backgroundColor)) continue;
+        const s = stamp.getBoundingClientRect();
+        const b = bubble.getBoundingClientRect();
+        const px = Math.max(b.left - s.left, s.right - b.right);
+        if (px > 0.5)
+          out.push({
+            rule: "stampout",
+            node: stamp,
+            el: sig(stamp),
+            box: sig(bubble),
+            px: +px.toFixed(1),
+            text: words(stamp),
+          });
+      }
+    },
+    /**
      * A box that scrolls for a few px: margins, a border or rounding past its edge show a scrollbar (and let the wheel
      * nudge it) over content that, to the eye, fits. The check keeps one only if it stays in a taller window
      * (`lasting` in check.ts). A box with no class of its own is named by the nearest one with a class around it, so
@@ -994,8 +1024,13 @@
           !hasSurface(style(square))
         )
           continue;
+        // What ends the row after the words (a count, "Novo") sits on the row's middle in a column of its own: between
+        // two lines, it is none of theirs.
+        const words = kids.slice(1).find((k) => visibleText(k));
+        const end = words ? words.getBoundingClientRect().right : Number.POSITIVE_INFINITY;
         const beside = [];
         for (const kid of kids.slice(1)) {
+          if (kid !== words && kid.getBoundingClientRect().left >= end - 1) continue;
           const walker = document.createTreeWalker(kid, NodeFilter.SHOW_TEXT);
           for (let n = walker.nextNode(); n; n = walker.nextNode()) {
             if (!n.textContent.trim() || !seen(n.parentElement)) continue;
@@ -1116,8 +1151,8 @@
     /**
      * A glyph's middle on its line's capitals' middle, within 1px, where the eye centres a sign beside words: a row's
      * lead (a glyph, or a face no taller than 1.25 lines) on its first line, and a glyph inside or after words (an svg, or
-     * a wordless box around one: a hint's ⓘ, a mark) on those words, in a line of text or in a row. A person's initials
-     * sit within 0.5px of their tile's middle.
+     * a wordless box around one: a hint's ⓘ, a mark) on those words, in a line of text or in a row, and a face that is a
+     * word of its line (`.ac-who`) on that line. A person's initials sit within 0.5px of their tile's middle.
      */
     iconmid(out) {
       const push = (node, part, px, row) =>
@@ -1204,6 +1239,12 @@
         if (!caps) continue;
         const px = (box.top + box.bottom) / 2 - caps.mid;
         if (Math.abs(px) > 1) push(glyph, "inline", px);
+      }
+      for (const face of document.querySelectorAll(".ac-who > .ac-avatar")) {
+        if (!seen(face) || leads.has(face)) continue;
+        const r = face.getBoundingClientRect();
+        const px = (r.top + r.bottom) / 2 - capsAfter(face).mid;
+        if (Math.abs(px) > 1) push(face, "word", px);
       }
       for (const face of document.querySelectorAll(".ac-avatar")) {
         if (!seen(face) || face.querySelector("img,canvas")) continue;
@@ -1349,7 +1390,15 @@
           left: b.left + parseFloat(cs.borderLeftWidth),
           right: b.right - parseFloat(cs.borderRightWidth),
         };
-        // A side of the clip on the window's own edge cuts nothing the window wouldn't.
+        // A side of the clip on the window's own edge cuts nothing the window wouldn't. Nor does a scroller's side with
+        // more to scroll to: what it cuts there shows whole once scrolled (the work's sheet ends above the window's edge).
+        const more = {
+          top: clip.scrollTop > 0.5,
+          bottom: clip.scrollHeight - clip.clientHeight - clip.scrollTop > 0.5,
+          left: clip.scrollLeft > 0.5,
+          right: clip.scrollWidth - clip.clientWidth - clip.scrollLeft > 0.5,
+        };
+        const scrolls = (overflow) => overflow === "auto" || overflow === "scroll";
         const cut = [
           ["top", cs.overflowY, pad.top > 0.5 && a.top >= pad.top - 0.5 && a.top - reach.top < pad.top - 0.5],
           [
@@ -1365,7 +1414,7 @@
             cs.overflowX,
             pad.right < innerWidth - 0.5 && a.right <= pad.right + 0.5 && a.right + reach.right > pad.right + 0.5,
           ],
-        ].find(([, overflow, hit]) => hit && overflow !== "visible");
+        ].find(([side, overflow, hit]) => hit && overflow !== "visible" && !(scrolls(overflow) && more[side]));
         if (cut) out.push({ rule: "clip", node: el, el: sig(el), box: sig(clip), side: cut[0] });
       }
     },
@@ -1509,9 +1558,11 @@
           (el) => seen(el) && !el.closest(OWN) && !el.parentElement.closest(ITEM),
         );
         if (!items.length) continue;
-        const faces = items.some((el) =>
-          el.querySelector(":scope > .ac-menu__leading > .ac-avatar, :scope > .ac-avatar"),
-        );
+        // The palette (⌘K) finds people and agents among the rest: its rows are option rows whatever a query found,
+        // one height as it's typed.
+        const faces =
+          menu.matches(".ac-palette__list") ||
+          items.some((el) => el.querySelector(":scope > .ac-menu__leading > .ac-avatar, :scope > .ac-avatar"));
         // The workspace menu (MenuOverlay) fills the screen in 15px type: its rows are the touch ones everywhere.
         const roomy = touch || menu.matches(".ac-mo__group");
         const own = [...menu.querySelectorAll(OWN)].filter((x) => style(x).display !== "none");
@@ -1829,6 +1880,401 @@
         }
       }
     },
+    /**
+     * Words squeezed beside their actions: in a row (a flex row, or a grid of 2+ columns), words of 12 or more
+     * characters outside any control take 3 or more lines beside a group of actions on their line, the actions hold
+     * 20% or more of the row, and the same words would take fewer lines with the actions' width added. A lone × is no
+     * action: it stays beside its title. The fix is the kit's `.ac-actline`, which puts the actions under the words.
+     */
+    squeeze(out) {
+      const ACT =
+        "button,[role=button],a.ac-btn,a[class*='btn'],select,[role=switch],[role=combobox],[role=menuitem],[role=tab],input[type=checkbox],input[type=radio]";
+      // A close, and the ⋯ the kit keeps beside it (`.ac-details__close`), stay beside the title by design.
+      const isClose = (c) =>
+        /^(fechar|close|dispensar|dismiss)\b/i.test(c.getAttribute("aria-label") ?? c.getAttribute("title") ?? "") ||
+        /(^|[\s_-])close\b/.test(typeof c.className === "string" ? c.className : "") ||
+        Boolean(c.closest(".ac-details__close,.ac-dialog__close"));
+      /** Words `el` shows outside any control: its text nodes laid out wider than a pixel. */
+      const loose = (el) => {
+        const found = [];
+        const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+        for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+          const box = n.parentElement;
+          if (!n.textContent.trim() || !box || box.closest(ACT) || box.closest("svg,pre,code,textarea") || !seen(box))
+            continue;
+          const rects = textRects(n);
+          if (rects.length) found.push({ node: n, rects });
+        }
+        return found;
+      };
+      const controlsOf = (el) =>
+        (el.matches(ACT) ? [el] : [...el.querySelectorAll(ACT)]).filter(
+          (c) => seen(c) && !c.parentElement.closest(ACT) && !isClose(c),
+        );
+      const isActions = (el) =>
+        !el.matches("[class*='chip'],[class*='pill'],[class*='badge'],.ac-chip,.ac-token") &&
+        (el.matches(ACT) || Boolean(el.querySelector(ACT))) &&
+        loose(el).length === 0;
+      for (const row of document.body.querySelectorAll("*")) {
+        if (row.closest("svg,pre,code,table,[data-radix-popper-content-wrapper]") || !seen(row)) continue;
+        const s = style(row);
+        if (!isRow(s)) continue;
+        const kids = flow(row);
+        if (kids.length < 2) continue;
+        const acts = kids.filter((k) => isActions(k) && controlsOf(k).length);
+        if (!acts.length) continue;
+        for (const t of kids) {
+          if (acts.includes(t) || t.matches(ACT)) continue;
+          const texts = loose(t);
+          // The text node that wraps most, and its one-line length.
+          let lines = 0;
+          let length = 0;
+          let node = null;
+          for (const x of texts) {
+            const n = new Set(x.rects.map((r) => Math.round(r.top))).size;
+            const l = x.rects.reduce((sum, r) => sum + r.width, 0);
+            if (n > lines || (n === lines && l > length)) [lines, length, node] = [n, l, x.node];
+          }
+          if (!node || node.textContent.trim().length < 12 || lines < 3) continue;
+          const tr = t.getBoundingClientRect();
+          // A wide block that tall is a layout's column (a page beside its sidebar), not words beside their actions.
+          if (tr.height > 800 && tr.width > 320) continue;
+          // Actions after the words, on their lines: a face or a check before the words is the row's lead.
+          const beside = acts.filter((a) => {
+            const ar = a.getBoundingClientRect();
+            return Math.min(ar.bottom, tr.bottom) - Math.max(ar.top, tr.top) > 4 && ar.left >= tr.right - 2;
+          });
+          const ctrls = beside.flatMap(controlsOf);
+          if (!ctrls.length) continue;
+          const rs = ctrls.map((c) => c.getBoundingClientRect());
+          const actsW = Math.max(...rs.map((r) => r.right)) - Math.min(...rs.map((r) => r.left));
+          const share = actsW / row.getBoundingClientRect().width;
+          const room = tr.width + actsW + (parseFloat(s.columnGap) || 0);
+          const wouldBe = Math.max(1, Math.ceil((length * 1.08) / room));
+          if (share >= 0.2 && wouldBe < lines)
+            out.push({
+              rule: "squeeze",
+              node: t,
+              el: sig(t),
+              box: sig(row),
+              lines,
+              share: +share.toFixed(2),
+              text: words(t),
+            });
+        }
+      }
+    },
+    /**
+     * On a phone, a lone main button fills what holds it (rule 23): the only button in a card, a request's foot, a
+     * notice, a dialog's foot, an empty state or a MediaRow's end that went under the row, and a primary, at 90% or
+     * more of that box's width inside its padding. One beside a ghost (Cancelar, Ver) is a pair, not lone. Phone
+     * widths only (`PHONE_ONLY` in check.ts).
+     */
+    loneprimary(out) {
+      if (innerWidth >= 640) return;
+      const HOLDS = ".ac-card,.rq__foot,.outage,.ac-dialog__foot,.ac-empty__actions,.ac-mediarow__end--wrap";
+      for (const box of document.querySelectorAll(HOLDS)) {
+        if (!seen(box)) continue;
+        const buttons = [...box.querySelectorAll(".ac-btn")].filter(
+          (b) => seen(b) && b.parentElement.closest(HOLDS) === box,
+        );
+        const [only] = buttons;
+        if (buttons.length !== 1 || !only.matches(".ac-btn--primary")) continue;
+        const s = style(box);
+        const inside =
+          box.getBoundingClientRect().width -
+          parseFloat(s.paddingLeft) -
+          parseFloat(s.paddingRight) -
+          parseFloat(s.borderLeftWidth) -
+          parseFloat(s.borderRightWidth);
+        const width = only.getBoundingClientRect().width;
+        if (width < 0.9 * inside - 0.5)
+          out.push({
+            rule: "loneprimary",
+            node: only,
+            el: sig(only),
+            box: sig(box),
+            share: +(width / inside).toFixed(2),
+            text: words(only),
+          });
+      }
+    },
+    /**
+     * Buttons side by side stand 8 apart (rule 8): two plated ones, or two icon buttons' plates (a glyph's plate is its
+     * box less its air, `.ac-btn--glyph`). A ghost with words reads by its words (`.ac-acts`), and the parts of one
+     * control (a split button, a segmented control, a token's ×, an event pill's actions, a message's bar) are drawn
+     * as one, and so are the strips of format toggles: the composer's and the wiki editor's.
+     */
+    btngap(out) {
+      const kind = (el) => {
+        if (!el.matches(".ac-btn")) return null;
+        if (!el.matches(".ac-btn--ghost")) return "plate";
+        return el.matches(".ac-btn--icon,.ac-btn--glyph") ? "icon" : null;
+      };
+      const plateOf = (el) => {
+        const r = el.getBoundingClientRect();
+        if (!el.matches(".ac-btn--glyph")) return r;
+        const air = parseFloat(getComputedStyle(el, "::before").left) || 0;
+        return { left: r.left + air, right: r.right - air, top: r.top + air, bottom: r.bottom - air };
+      };
+      const ONE =
+        ".ac-split,.ac-seg,.ac-token,.ac-eventpill,.ac-msg__actions,.ac-composer__tools--format,.wiki-bar,[role=menu],[role=menubar],svg";
+      for (const row of document.body.querySelectorAll("*")) {
+        if (!seen(row) || row.closest(ONE) || !isRow(style(row))) continue;
+        const kids = flow(row);
+        for (let i = 1; i < kids.length; i++) {
+          const [a, b] = [kids[i - 1], kids[i]];
+          const k = kind(a);
+          if (!k || k !== kind(b)) continue;
+          const [ra, rb] = [plateOf(a), plateOf(b)];
+          if (!sameLine(ra, rb)) continue;
+          const gap = rb.left - ra.right;
+          if (Math.abs(gap - 8) > 0.5)
+            out.push({
+              rule: "btngap",
+              node: b,
+              el: `${sig(a)} + ${sig(b)}`,
+              box: sig(row),
+              px: +gap.toFixed(1),
+              text: words(b),
+            });
+        }
+      }
+    },
+    /**
+     * A footer's buttons (a dialog's, a viewer's) never split one over the other while they fit side by side there:
+     * words before them (the footer's note) took the first row's room. They are one group, beside the words or on a
+     * row of their own under them (rule 17).
+     */
+    btnsplit(out) {
+      for (const row of document.body.querySelectorAll(".ac-dialog__foot,.ac-dialog__foot-acts,.ac-details__foot")) {
+        if (!seen(row)) continue;
+        const s = style(row);
+        if (!isRow(s) || !s.flexWrap.startsWith("wrap")) continue;
+        const buttons = flow(row).filter((k) => k.matches(".ac-btn"));
+        if (buttons.length < 2) continue;
+        const rects = buttons.map((b) => b.getBoundingClientRect());
+        if (rects.every((r) => sameLine(rects[0], r))) continue;
+        const outer = (b, r) =>
+          r.width + (parseFloat(style(b).marginLeft) || 0) + (parseFloat(style(b).marginRight) || 0);
+        const need =
+          buttons.reduce((sum, b, i) => sum + outer(b, rects[i]), 0) +
+          (parseFloat(s.columnGap) || 0) * (buttons.length - 1);
+        const room = row.clientWidth - parseFloat(s.paddingLeft) - parseFloat(s.paddingRight);
+        if (need <= room + 0.5)
+          out.push({
+            rule: "btnsplit",
+            node: row,
+            el: sig(row),
+            px: +(room - need).toFixed(1),
+            text: words(buttons[0]),
+          });
+      }
+    },
+    /**
+     * Controls side by side share one height (rule 7): in a toolbar or a page head, and in any row of the kit's
+     * controls (a plated button, a select, a field, a date, a filter, a search field, a segmented control), two on one
+     * line are as tall as each other.
+     */
+    toolheight(out) {
+      const KIT =
+        ".ac-btn:not(.ac-btn--ghost),.ac-select__trigger,.ac-input,.ac-date__trigger,.ac-filtertoggle,.ac-filter,.ac-searchfield,.ac-seg";
+      const pairs = new Map();
+      const check = (list, box) => {
+        for (let i = 1; i < list.length; i++) {
+          const [a, b] = [list[i - 1], list[i]];
+          const [ra, rb] = [a.getBoundingClientRect(), b.getBoundingClientRect()];
+          if (!sameLine(ra, rb) || Math.abs(ra.height - rb.height) <= 0.5) continue;
+          pairs.set(`${sig(a)} + ${sig(b)} ${sig(box)}`, {
+            rule: "toolheight",
+            node: b,
+            el: `${sig(a)} + ${sig(b)}`,
+            box: sig(box),
+            px: +(rb.height - ra.height).toFixed(1),
+          });
+        }
+      };
+      // By line, then from the start: a line's controls come together, whatever their heights.
+      const order = (els) =>
+        els
+          .map((el) => [el, el.getBoundingClientRect()])
+          .sort(([, x], [, y]) => Math.round(x.top) - Math.round(y.top) || x.left - y.left)
+          .map(([el]) => el);
+      for (const bar of document.querySelectorAll(".ac-toolbar,.ac-pagehead__bar,.ac-pagehead__actions")) {
+        if (!seen(bar)) continue;
+        const all = [...bar.querySelectorAll(KIT)].filter((el) => seen(el));
+        check(
+          order(
+            all.filter((el) => !all.some((o) => o !== el && o.contains(el))).filter((el) => !el.closest(".ac-menu")),
+          ),
+          bar,
+        );
+      }
+      for (const row of document.body.querySelectorAll("*")) {
+        if (!seen(row) || row.closest(".ac-toolbar,.ac-pagehead__bar,.ac-pagehead__actions,svg")) continue;
+        const s = style(row);
+        if (!s.display.includes("flex") || s.flexDirection.startsWith("column")) continue;
+        const controls = flow(row).filter((k) => k.matches(KIT));
+        if (controls.length > 1) check(controls, row);
+      }
+      out.push(...pairs.values());
+    },
+    /**
+     * A fact keeps its value on one line (rule 17): a value that wraps is a finding, unless its fact is alone on its
+     * line and as wide as the strip, which only a value longer than the strip is. A line of facts (`.ac-factline`,
+     * a task card's) is held the same: it wraps between facts, never inside one.
+     */
+    factwrap(out) {
+      for (const value of document.querySelectorAll(".ac-facts__value, .ac-factline__fact")) {
+        if (!seen(value)) continue;
+        const rects = [];
+        const walker = document.createTreeWalker(value, NodeFilter.SHOW_TEXT);
+        for (let n = walker.nextNode(); n; n = walker.nextNode()) if (n.textContent.trim()) rects.push(...textRects(n));
+        if (lineCount(rects) < 2) continue;
+        const item = value.closest(".ac-facts__item, .ac-factline__fact") ?? value;
+        const strip = value.closest(".ac-facts, .ac-factline") ?? item;
+        const r = item.getBoundingClientRect();
+        const alone = [...strip.querySelectorAll(".ac-facts__item, .ac-factline__fact")].every(
+          (o) => o === item || !seen(o) || !sameLine(o.getBoundingClientRect(), r),
+        );
+        if (alone && r.width >= strip.clientWidth - 1) continue;
+        out.push({ rule: "factwrap", node: value, el: sig(value), box: sig(strip), text: words(value) });
+      }
+    },
+    /**
+     * Desfazer goes at the end of its sentence (rule 18): an undo (`[data-undo]`, or a control reading Desfazer, Refazer,
+     * Undo or Redo in a receipt) flows inline in its sentence's block, never a flex or grid item beside the sentence.
+     */
+    undoinline(out) {
+      // One undo of its sentence: a group's own Desfazer tudo stays in its head.
+      const UNDO = /^(desfazer|refazer|undo|redo)\b(?!\s+(tudo|all)\b)/i;
+      const found = new Set([
+        ...document.querySelectorAll("[data-undo]"),
+        ...[...document.querySelectorAll("[class*='ag-rc'] :is(button,a,[role=button])")].filter((el) =>
+          UNDO.test(words(el)),
+        ),
+      ]);
+      for (const el of found) {
+        if (!seen(el)) continue;
+        const parent = layoutParent(el);
+        if (parent && /flex|grid/.test(style(parent).display))
+          out.push({ rule: "undoinline", node: el, el: sig(el), box: sig(parent), text: words(el) });
+      }
+    },
+    /**
+     * A count that calls on someone (an unread or waiting count: the sidebar's, the bell's) shows against what is
+     * behind it, its fill at least 3:1 (rule 19). A neutral count (`--quiet`) is a fact, not a call.
+     */
+    countfill(out) {
+      const paint = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
+      const rgba = (color) => {
+        paint.clearRect(0, 0, 1, 1);
+        paint.fillStyle = "#000";
+        paint.fillStyle = color;
+        paint.fillRect(0, 0, 1, 1);
+        const [r, g, b, a] = paint.getImageData(0, 0, 1, 1).data;
+        return { r, g, b, a: a / 255 };
+      };
+      const over = (top, under) => ({
+        r: top.r * top.a + under.r * (1 - top.a),
+        g: top.g * top.a + under.g * (1 - top.a),
+        b: top.b * top.a + under.b * (1 - top.a),
+        a: 1,
+      });
+      const luminance = ({ r, g, b }) =>
+        [r, g, b]
+          .map((v) => v / 255)
+          .map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
+          .reduce((sum, v, i) => sum + v * [0.2126, 0.7152, 0.0722][i], 0);
+      /** What shows behind `el`: its ancestors' fills laid over each other, down to the page's white. */
+      const behind = (el) => {
+        const layers = [];
+        for (let p = el.parentElement; p; p = p.parentElement) {
+          const c = rgba(style(p).backgroundColor);
+          if (c.a > 0) layers.push(c);
+          if (c.a >= 1) break;
+        }
+        return layers.reduceRight((under, top) => over(top, under), { r: 255, g: 255, b: 255, a: 1 });
+      };
+      for (const count of document.querySelectorAll(".sidebar__unread:not(.sidebar__unread--quiet)")) {
+        if (!seen(count) || !visibleText(count)) continue;
+        const back = behind(count);
+        const fill = over(rgba(style(count).backgroundColor), back);
+        const [hi, lo] = [luminance(fill), luminance(back)].sort((x, y) => y - x);
+        const ratio = (hi + 0.05) / (lo + 0.05);
+        if (ratio < 3)
+          out.push({ rule: "countfill", node: count, el: sig(count), box: placeOf(count), ratio: +ratio.toFixed(2) });
+      }
+    },
+    /**
+     * A day's column of the calendar: no item covers another. A stack of routine runs and a meeting that meet sit side
+     * by side, and a stack stops before the next item (`runStacks`, `layoutDay`). A meeting reaches down its slot (its
+     * `min-height`): what a wrapped title draws past it, the page measures and lays out again (`TimeGrid`'s heights),
+     * which a captured screen never ran, so only the slots are held here.
+     */
+    calstack(out) {
+      const slot = (el) => {
+        const r = el.getBoundingClientRect();
+        const planned = parseFloat(el.style.minHeight);
+        return { left: r.left, right: r.right, top: r.top, bottom: planned > 0 ? r.top + planned : r.bottom };
+      };
+      for (const col of document.body.querySelectorAll(".cal-week__col")) {
+        const items = [...col.querySelectorAll(":scope > .cal-chip--block, :scope > .cal-week__runs")].filter(seen);
+        for (const [i, a] of items.entries()) {
+          const ra = slot(a);
+          for (const b of items.slice(i + 1)) {
+            const rb = slot(b);
+            const across = Math.min(ra.right, rb.right) - Math.max(ra.left, rb.left);
+            const down = Math.min(ra.bottom, rb.bottom) - Math.max(ra.top, rb.top);
+            if (across > 1 && down > 1)
+              out.push({ rule: "calstack", node: b, el: sig(b), box: sig(a), px: +Math.min(across, down).toFixed(1) });
+          }
+        }
+      }
+    },
+    /**
+     * A strip that scrolls sideways on a page (the task board, a row of chips or tabs) runs out over the page's side
+     * room (`--page-x`) to the work area's edge, its own padding putting its first item on the page's line: what
+     * scrolls slides under the work area's edge. One that stops in that room, on the page's padding line or a ring's
+     * width past it, cuts its items in mid-air. Only on a side where the box that frames it (the nearest that clips or
+     * shows a surface: the work area, a split's column, a card) meets the work area's edge: in a card or a field it
+     * stops at that box's edge, which shows.
+     */
+    bleed(out) {
+      const room = lengthOf("--page-x");
+      for (const strip of document.querySelectorAll(".shell__main *")) {
+        const s = style(strip);
+        if (!/^(auto|scroll)$/.test(s.overflowX) || strip.scrollWidth <= strip.clientWidth + 1) continue;
+        if (strip.matches("textarea,input,select") || !seen(strip) || hasSurface(s)) continue;
+        const main = strip.parentElement.closest(".shell__main");
+        let frame = strip.parentElement;
+        while (frame !== main && !hasSurface(style(frame)) && style(frame).overflowX === "visible")
+          frame = frame.parentElement;
+        const edges = (el) => {
+          const left = el.getBoundingClientRect().left + el.clientLeft;
+          return { left, right: left + el.clientWidth };
+        };
+        const area = edges(main);
+        const box = edges(frame);
+        const r = strip.getBoundingClientRect();
+        const short = { left: r.left - box.left, right: box.right - r.right };
+        const sides = ["left", "right"].filter(
+          (side) => Math.abs(box[side] - area[side]) <= 0.5 && short[side] > 0.5 && short[side] <= room + 0.5,
+        );
+        if (!sides.length) continue;
+        let page = strip;
+        while (page.parentElement !== main) page = page.parentElement;
+        const px = Math.max(...sides.map((side) => short[side]));
+        out.push({
+          rule: "bleed",
+          node: strip,
+          el: sig(strip),
+          box: sig(page),
+          side: sides.join(" "),
+          px: +px.toFixed(1),
+        });
+      }
+    },
   };
 
   /**
@@ -1908,6 +2354,52 @@
           };
         });
       });
+    },
+    /**
+     * What opens from another layer stacks above it: a profile card (a popover), a popover from it, a confirm dialog from
+     * that, a list from the dialog, put in the page in that order as Radix portals them, each over the whole window.
+     * The ones that aren't the topmost thing at their center when they open.
+     */
+    layers() {
+      document.body.innerHTML = "";
+      const box = (className) => {
+        const el = document.createElement("div");
+        el.className = className;
+        return el;
+      };
+      // Radix's popper: the content in a fixed wrapper that takes the content's own z-index.
+      const floating = (className) => {
+        const wrapper = document.createElement("div");
+        wrapper.setAttribute("data-radix-popper-content-wrapper", "");
+        wrapper.style.cssText = "position: fixed; inset: 0";
+        const content = box(className);
+        content.style.cssText = "width: 100%; height: 100%; max-width: none; max-height: none";
+        wrapper.append(content);
+        document.body.append(wrapper);
+        wrapper.style.zIndex = getComputedStyle(content).zIndex;
+        return content;
+      };
+      const dialog = () => {
+        const panel = box("ac-dialog");
+        panel.style.height = "240px";
+        document.body.append(box("ac-dialog__scrim"), panel);
+        return panel;
+      };
+      const onTop = (el) => {
+        const r = el.getBoundingClientRect();
+        const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        return hit !== null && el.contains(hit);
+      };
+      const under = [];
+      for (const [name, open] of [
+        ["a card", () => floating("ac-menu ac-popover profile-card")],
+        ["a popover from the card", () => floating("ac-menu ac-popover")],
+        ["a dialog from the popover", dialog],
+        ["a list from the dialog", () => floating("ac-menu ac-menu--select")],
+      ])
+        if (!onTop(open())) under.push(name);
+      document.body.innerHTML = "";
+      return under;
     },
   };
 })();

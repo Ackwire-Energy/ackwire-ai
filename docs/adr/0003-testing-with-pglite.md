@@ -14,5 +14,5 @@
 ## Consequences
 
 - PGlite versions are pinned exactly (`@electric-sql/pglite` 0.5.8 with `pglite-pgvector` 0.0.9, whose peer dependency requires that exact version). Upgrade them together.
-- Each test file creates fresh databases; the suite takes about a minute. Shared fixtures (`packages/engine/test/fixtures.ts`, `apps/server/test/harness.ts`) keep tests short.
+- Each test file creates fresh databases, loaded from a template migrated once and kept in a temporary file named after the migrations (so test files running in separate processes share it). Shared fixtures (`packages/engine/test/fixtures.ts`, `apps/server/test/harness.ts`) keep tests short.
 - Raw SQL results differ by driver (array vs `{ rows }`); use `rowsOf()` from `@agenteschat/db`.

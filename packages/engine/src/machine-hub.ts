@@ -53,11 +53,13 @@ import {
   TASK_OFFLINE_GRACE_MS,
   type TaskCall,
 } from "./machine-tasks";
+import { type WakeWhy, wantMachine } from "./machine-wake";
 import {
   assertNotPaused,
   authenticateMachine,
   deletedAgentIds,
   getMachineById,
+  inStandby,
   MACHINE_CONTROL_TOPIC,
   MachineDroppedError,
   MachineOfflineError,
@@ -162,6 +164,8 @@ export interface MachineStatus {
   paused?: { until: string | null; timezone: string | null } | null;
   /** Folders and tools the machine allows (protocol 10); null when it doesn't report them. */
   access?: RunnerAccess | null;
+  /** The operator put the workspace's own computer in standby (ADR 0161): asleep, it is woken when wanted. */
+  standby?: boolean;
 }
 
 /** What the machine provider needs from the hub. */
@@ -172,38 +176,56 @@ export interface MachineCaller {
     options?: MachineCallOptions,
   ): Promise<MachineReplies[Op]>;
   status(machineId: string): Promise<MachineStatus | null>;
+  /** Something wants the computer now (`wantMachine`): one in standby is asked to wake. */
+  wake?(machineId: string, why: WakeWhy): Promise<void>;
 }
 
 /** How long a run waits, still working, for a computer just gone: a runner dialing again is back within seconds. */
 export const COMPUTER_BLIP_WAIT_MS = 30_000;
+/** How long a run waits, still working, for a computer in standby it asked to wake. */
+export const COMPUTER_WAKE_WAIT_MS = 60_000;
 
 /**
- * Waits for a computer gone less than the outage grace (`TASK_OFFLINE_GRACE_MS`: its runner dialing again, our
- * own restart) to come back, up to `waitMs`. The run stays `running` meanwhile (its heartbeat and its job's lease
- * go on) and nothing is posted or stored. True: it is back. Null: `canceled` said so.
+ * Waits for a computer to come back: one gone less than the outage grace (`TASK_OFFLINE_GRACE_MS`: its runner dialing
+ * again, our own restart) up to `waitMs`, unless `justGone` is false; one in standby, asked to wake, up to `wakeWaitMs`
+ * however long it has slept. The run stays `running` meanwhile (its heartbeat and its job's lease go on) and nothing is
+ * posted or stored. True: it is back. Null: `canceled` said so.
  */
 export async function computerBackSoon(
-  machines: Pick<MachineCaller, "status"> | undefined,
+  machines: Pick<MachineCaller, "status" | "wake"> | undefined,
   machineId: string,
-  options: { waitMs?: number; signal?: AbortSignal; canceled?: () => boolean | Promise<boolean> } = {},
+  options: {
+    waitMs?: number;
+    wakeWaitMs?: number;
+    justGone?: boolean;
+    signal?: AbortSignal;
+    canceled?: () => boolean | Promise<boolean>;
+  } = {},
 ): Promise<boolean | null> {
-  const until = Date.now() + (options.waitMs ?? COMPUTER_BLIP_WAIT_MS);
+  let until = Date.now() + (options.waitMs ?? COMPUTER_BLIP_WAIT_MS);
+  let waking = false;
   for (;;) {
     const status = await machines?.status(machineId).catch(() => null);
     if (status?.online) return true;
+    if (status?.standby && !waking) {
+      waking = true;
+      until = Date.now() + (options.wakeWaitMs ?? COMPUTER_WAKE_WAIT_MS);
+      void machines?.wake?.(machineId, "run").catch(() => {});
+    }
     const gone = status?.lastSeenAt ? Date.now() - Date.parse(status.lastSeenAt) : Number.POSITIVE_INFINITY;
-    if (gone >= TASK_OFFLINE_GRACE_MS || Date.now() >= until) return false;
+    if (!waking && (options.justGone === false || gone >= TASK_OFFLINE_GRACE_MS)) return false;
+    if (Date.now() >= until) return false;
     await sleep(Math.min(1_000, until - Date.now()), undefined, { signal: options.signal }).catch(() => {});
     if (await options.canceled?.()) return null;
   }
 }
 
 /**
- * `send`, and once more when it found the computer just gone (`computerBackSoon`): that request never left. One
- * cut midway (`MachineDroppedError`) may have run, so it is never sent again.
+ * `send`, and once more when it found the computer just gone or asleep (`computerBackSoon`): that request never left.
+ * One cut midway (`MachineDroppedError`) may have run, so it is never sent again.
  */
 export async function callWhenBack<T>(
-  machines: Pick<MachineCaller, "status">,
+  machines: Pick<MachineCaller, "status" | "wake">,
   machineId: string,
   send: () => Promise<T>,
   signal?: AbortSignal,
@@ -604,6 +626,8 @@ export function createMachineHub(deps: MachineHubDeps) {
         egress: null,
         connectedReplica: replicaId,
         lastSeenAt: now,
+        // Awake: whatever put it in standby is over (ADR 0161).
+        standbyAt: null,
         hostname: frame.hostname,
         os: frame.os,
         arch: frame.arch,
@@ -1456,6 +1480,8 @@ export function createMachineHub(deps: MachineHubDeps) {
       const row = await getMachineById(db, machineId);
       if (!row || row.deletedAt) throw new MachineOfflineError(row?.name ?? "computer", row?.kind);
       if (!machineOnline(row) || !row.connectedReplica || row.connectedReplica === replicaId) {
+        // Asleep by design: whatever asks for it wakes it (`callWhenBack` waits for that).
+        if (inStandby(row)) void wantMachine(db, machineId, "call").catch(() => {});
         throw new MachineOfflineError(row.name, row.kind);
       }
       if (phoneOp && row.protocol < phonesNeed) throw phonesTooOld(row.name);
@@ -1487,8 +1513,12 @@ export function createMachineHub(deps: MachineHubDeps) {
         executors: row.executors ?? {},
         paused: pause ? { until: pause.until, timezone: await machineOwnerTimezone(db, row).catch(() => null) } : null,
         access: row.access ?? null,
+        standby: inStandby(row),
       };
     },
+
+    /** Something wants the computer now: the workspace's own one keeps when, and asks to wake from standby. */
+    wake: (machineId: string, why: WakeWhy) => wantMachine(db, machineId, why),
 
     /** Missions plug in their MCP tools and their reconnect follow-up (set once the engine is built). */
     setMissionHooks(next: MachineMissionHooks) {

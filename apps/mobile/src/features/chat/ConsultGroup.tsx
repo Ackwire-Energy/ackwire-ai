@@ -168,7 +168,7 @@ export function ConsultPairRow({
         style={({ pressed }) => [styles.row, pressed && { backgroundColor: c.plate }]}
       >
         <AgentFace agentId={askerId} size={FACE} live={false} />
-        <Text variant="footnote" tone="ink2" style={styles.name} numberOfLines={1} ellipsizeMode="clip">
+        <Text variant="footnote" tone="ink2" style={styles.name}>
           {from}
         </Text>
         <Icon name="swap" size={13} color={pair.tone === "live" ? c.agent : c.faint} />
@@ -179,7 +179,7 @@ export function ConsultPairRow({
             </View>
           ))}
         </View>
-        <Text variant="footnote" tone="ink2" style={styles.name} numberOfLines={1} ellipsizeMode="clip">
+        <Text variant="footnote" tone="ink2" style={styles.name}>
           {to}
         </Text>
         {pair.word || pair.seconds !== null ? (
@@ -188,12 +188,7 @@ export function ConsultPairRow({
           </Text>
         ) : null}
         {pair.word ? (
-          <Text
-            variant="footnote"
-            style={[styles.word, { color: pair.tone === "bad" ? c.warn : c.agent }]}
-            numberOfLines={1}
-            ellipsizeMode="clip"
-          >
+          <Text variant="footnote" style={[styles.word, { color: pair.tone === "bad" ? c.warn : c.agent }]}>
             {t(pair.word.key, pair.word.values)}
           </Text>
         ) : null}
@@ -219,10 +214,14 @@ const styles = StyleSheet.create({
   // Across the conversation, the two agents on its middle: a line, as the day and "Novas" are.
   line: { flexDirection: "row", alignItems: "center" },
   rule: { flex: 1, minWidth: 16, height: StyleSheet.hairlineWidth },
+  // Names never cut: what doesn't fit wraps onto a second line, on the row's middle.
   row: {
     flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
     alignItems: "center",
-    gap: 6,
+    columnGap: 6,
+    rowGap: 2,
     minHeight: 28,
     paddingHorizontal: ROW_INSET,
     borderRadius: 10,

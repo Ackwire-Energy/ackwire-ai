@@ -344,11 +344,13 @@ html:not([data-pointer]) .brw-site button:focus-visible {
     opacity: 0;
   }
 }
+/* Its padding keeps the box's ring and shadow inside the card, which clips them at its edge on a narrow screen. */
 .brw-dim {
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
+  padding: 12px;
   background: color-mix(in srgb, var(--bg) 55%, transparent);
   backdrop-filter: blur(2px);
   z-index: 5;
@@ -596,7 +598,7 @@ html:not([data-pointer]) .brw-ac__tt:focus-visible {
 }
 .brw-ac__tx small {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   min-width: 0;
   color: var(--muted);
@@ -607,10 +609,23 @@ html:not([data-pointer]) .brw-ac__tt:focus-visible {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* An agent's long name wraps its line (`.ac-who`): the spinner stays on the first line's capitals' middle, as an
+   `.ac-iconline` lead does. */
+.brw-ac__tx small > .ac-pixspin,
+.brw-mf__now > .ac-pixspin {
+  /* Browsers without the lh unit: the page's 22px line. */
+  translate: 0 calc(11px - var(--cap-mid) - 50%);
+}
+@supports (top: 1lh) {
+  .brw-ac__tx small > .ac-pixspin,
+  .brw-mf__now > .ac-pixspin {
+    translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
+  }
+}
 .brw-ac__acts {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-2);
   flex: none;
 }
 .brw-ac__acts .ac-btn--icon:not(.ac-btn--ghost) {
@@ -830,7 +845,7 @@ html:not([data-pointer]) .brw-ac__page.is-control:focus-visible {
     animation: none;
   }
 }
-/* The question's buttons: take control, and Cancelar under it, as stacked prompts space theirs (`.web-push-ask__acts`). */
+/* The question's buttons: take control, and Cancelar under it, stacked 4 apart. */
 .brw-dim__acts {
   display: flex;
   flex-direction: column;
@@ -914,6 +929,10 @@ html:not([data-pointer]) .brw-ac__stage[tabindex]:focus-visible {
   border-radius: var(--control-r-lg);
   background: var(--raised);
   box-shadow: inset 0 0 0 1px var(--line2);
+}
+/* Its buttons 8 apart, as buttons side by side are everywhere; the words keep the field's own gap to them. */
+.brw-tfield > .ac-btn + .ac-btn {
+  margin-inline-start: 4px;
 }
 .brw-tfield:focus-within {
   box-shadow: inset 0 0 0 1.5px var(--ink);
@@ -1021,17 +1040,28 @@ html:not([data-pointer]) .brw-kc:focus-visible {
   box-shadow: var(--card-well-shadow, inset 0 0 0 1px var(--line));
 }
 .brw-steps__head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  font-size: 14px;
+  line-height: 20px;
   color: var(--ink2);
 }
-.brw-steps__head b {
-  font-size: 14px;
+/* The title takes the row's room, so Esperando ends it, or starts the next line on the title's edge when both don't
+   fit. */
+.brw-steps__headline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  flex: 1;
+  min-width: 0;
+}
+.brw-steps__headline > b {
+  flex: 1 1 auto;
   font-weight: 650;
 }
 .brw-steps__wait {
-  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   color: var(--faint);
   font-size: 12px;
   font-weight: 600;
@@ -1424,6 +1454,10 @@ html:not([data-pointer]) .brw-trail__ext:focus-visible {
     clip: rect(0 0 0 0);
     white-space: nowrap;
   }
+  /* Its words gone to screen readers, the button is its icon in a 32 square. */
+  .brw-dm.ac-btn {
+    padding-inline: calc((var(--control-h-sm) - var(--control-icon-sm)) / 2);
+  }
 }
 
 .brw-dim__row > .ac-icon {
@@ -1444,7 +1478,7 @@ html:not([data-pointer]) .brw-trail__ext:focus-visible {
 }
 .brw-go__nav {
   display: flex;
-  gap: 2px;
+  gap: var(--space-2);
 }
 /* Watching: the address alone, quiet. */
 .brw-go.is-read .brw-go__field {
@@ -1608,7 +1642,7 @@ html:not([data-pointer]) .brw-trail__ext:focus-visible {
 .brw-mf__now {
   position: relative;
   display: inline-flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 7px;
   min-width: 0;
   max-width: 55%;
@@ -1628,7 +1662,7 @@ html:not([data-pointer]) .brw-mf__now:focus-visible {
 .brw-mf__acts {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
   flex: none;
 }
 /* The page and what goes under it, inside the frame. */
@@ -1745,7 +1779,7 @@ html:not([data-pointer]) .brw-mf__now:focus-visible .brw-mf__hist {
   z-index: 3;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
   padding: 4px;
   border-radius: 12px;
   background: var(--glass, var(--raised));

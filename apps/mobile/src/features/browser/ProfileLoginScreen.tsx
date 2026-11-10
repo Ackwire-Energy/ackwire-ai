@@ -25,10 +25,10 @@ export function ProfileLoginScreen({ profileId }: { profileId: string }) {
         <View style={[styles.top, { paddingTop: insets.top + 8 }]}>
           <IconButton icon="x" plate label={t("mobile.common.close")} onPress={goBack} />
           <View style={styles.title}>
-            <Text variant="subhead" style={styles.bold} numberOfLines={1} accessibilityRole="header">
+            <Text variant="subhead" style={styles.bold} accessibilityRole="header">
               {profile?.name ?? t("browser.profiles.title")}
             </Text>
-            <Text variant="footnote" tone="faint" numberOfLines={1}>
+            <Text variant="footnote" tone="faint">
               {t("browser.profiles.controlSub")}
             </Text>
           </View>

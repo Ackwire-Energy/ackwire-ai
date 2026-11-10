@@ -308,6 +308,20 @@ test("the status note of an agent waiting for its computer says that, never that
   );
 });
 
+test("the status note of an agent parked on its plan or budget says that wait and when it is back", () => {
+  const until = new Date(Date.now() + 2 * 24 * 3600_000).toISOString();
+  const day = new Intl.DateTimeFormat("pt-BR", { weekday: "long" }).format(new Date(until)).replace(/-feira$/, "");
+  const text = talkerStatusText(pt, { minutes: "0", steps: "0", wait: "plan", until }, "pt-BR");
+  expect(text).toStartWith(`Estou esperando o plano voltar (${day} às `);
+  expect(text).toEndWith("). Leio sua mensagem quando ele voltar.");
+  expect(talkerStatusText(pt, { minutes: "0", steps: "0", wait: "plan" }, "pt-BR")).toBe(
+    "Estou esperando o plano voltar. Leio sua mensagem assim que ele voltar.",
+  );
+  expect(talkerStatusText(en, { minutes: "0", steps: "0", wait: "budget" }, "en")).toBe(
+    "I'm waiting for my monthly budget to renew. I'll read your message then, or sooner if an admin raises the limit.",
+  );
+});
+
 test("a working agent's status note says when it really reads the message: its next step, or when its turn ends", () => {
   const pt = tFor("pt-BR");
   expect(talkerStatusText(pt, { minutes: "7", steps: "0", reads: "turn", kind: "browsing" })).toBe(

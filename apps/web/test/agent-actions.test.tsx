@@ -127,7 +127,11 @@ describe("receipts under the agent's reply", () => {
     );
     const row = receipts().querySelector(".ag-rc") as HTMLElement;
     const sentence = row.querySelector(".ag-rc__sentence") as HTMLElement;
-    expect(sentence.textContent).toBe("Mudei o pedido da rotina Resumo da semana");
+    // Desfazer ends the sentence, inside its words.
+    expect(sentence.lastElementChild?.matches(".ag-rc__act")).toBe(true);
+    const words = sentence.cloneNode(true) as HTMLElement;
+    words.querySelector(".ag-rc__act")?.remove();
+    expect(words.textContent?.trim()).toBe("Mudei o pedido da rotina Resumo da semana");
     expect(sentence.querySelector(".ag-rc__target")?.previousSibling?.textContent).toEndWith("rotina ");
     expect((row.querySelector(".ag-rc__ic svg") as SVGElement).style.width).toBe("16px");
   });

@@ -46,7 +46,10 @@ test("Uso › Pessoas: admins see each person's use, its CSV and the limits; mem
   expect((await w.member("/usage/people.csv")).status).toBe(403);
   const mine = await w.member(`/usage/people/${w.memberId}`);
   expect(mine.status).toBe(200);
-  expect(await mine.text()).not.toMatch(/usd/i);
+  // Field names only: a random id in the answer may contain "usd" by chance.
+  const keys = (value: unknown): string[] =>
+    value && typeof value === "object" ? Object.entries(value).flatMap(([key, inner]) => [key, ...keys(inner)]) : [];
+  expect(keys(await mine.json()).filter((key) => /usd/i.test(key))).toEqual([]);
 
   // Limits: off until set; only who configures sets them.
   const off = (await (await w.owner("/usage/limits")).json()) as { defaultUsd: number | null; onLimit: string };

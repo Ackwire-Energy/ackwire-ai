@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { Easing, FadeInUp } from "react-native-reanimated";
 import { agentLook } from "@/features/shared/logic";
 import { useSession } from "@/providers/session";
-import { AgentAvatar, Button, Icon, LineIcon, Text, useTheme } from "@/ui";
+import { AgentAvatar, type AgentMode, Button, Icon, LineIcon, Text, useTheme } from "@/ui";
 import { CENTER } from "@/ui/auth/AuthScaffold";
 import { router } from "@/ui/navigation";
 import { Terms } from "./AuthFlow";
@@ -78,9 +78,15 @@ const CREW_MAX = 4;
  * An invitation's team standing on the sky's edge, before any field (`AuthScaffold`'s `hero`): its first agents,
  * alive, in their own colors. The first time a screen shows them they rise onto the horizon as one wave (the lead
  * first, each next one a little sooner and from less far), once; with reduced motion they are simply there.
- * `happy`: the face they make when you're let in.
+ * `happy`: the face they make when you're let in. A face's `mode`: the first run's team asleep until its plan.
  */
-export function InviteCrew({ agents, happy = false }: { agents: InvitedAgents; happy?: boolean }) {
+export function InviteCrew({
+  agents,
+  happy = false,
+}: {
+  agents: readonly { id: string; appearance?: unknown; mode?: AgentMode }[];
+  happy?: boolean;
+}) {
   const { reducedMotion } = useTheme();
   const shown = agents.slice(0, CREW_MAX);
   if (shown.length === 0) return null;
@@ -102,6 +108,7 @@ export function InviteCrew({ agents, happy = false }: { agents: InvitedAgents; h
             agent={{ ...agentLook(a), id: a.id }}
             size={CREW_FACE}
             framed
+            {...(a.mode ? { mode: a.mode } : {})}
             {...(happy ? { expression: "happy" as const } : {})}
           />
         </Animated.View>

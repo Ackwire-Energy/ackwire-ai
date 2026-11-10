@@ -696,6 +696,42 @@
       "left_other": "Nog {{count}} stappen",
       "done": "Alles klaar"
     },
+    "flow": {
+      "steps": {
+        "name": "Naam van de werkruimte",
+        "business": "Wat jullie doen",
+        "team": "Je team",
+        "plan": "Team aanzetten"
+      },
+      "stepOf": "Stap {{n}} van {{total}}",
+      "lodi": {
+        "name": "Hoi {{first}}. Ik ben {{name}}. Ik stel het team in zo'n twee minuten met je samen.",
+        "business": "Daarmee weet ik wie ik bij het team haal.",
+        "team": "Dit is het team dat ik zou samenstellen. Je kunt later alles veranderen.",
+        "plan": "Na het abonnement hoef je alleen nog een AI te koppelen. Ik laat je zien waar."
+      },
+      "preview": {
+        "label": "Je werkruimte, terwijl je antwoordt",
+        "name": "Je werkruimte",
+        "ghost": "Hier verschijnt je team"
+      },
+      "team": {
+        "title": "Je team"
+      },
+      "plan": {
+        "title": "Zet je team aan",
+        "lead": "Je team is klaar. Met het abonnement en een AI begint het vandaag.",
+        "asleep": "Slaapt tot het abonnement",
+        "price": "<b>Abonnement {{name}}</b> · {{price}} per maand",
+        "name": "<b>Abonnement {{name}}</b>",
+        "generic": "Een agentes.chat-abonnement",
+        "cancel": "Altijd opzegbaar",
+        "cta": "Team aanzetten",
+        "all": "Alle abonnementen bekijken",
+        "skip": "Naar de werkruimte zonder aanzetten"
+      },
+      "account": "Je account"
+    },
     "railValue": {
       "context": "Geschreven",
       "skipped": "Overgeslagen",
@@ -1345,27 +1381,19 @@
     }
   },
   "webPushAsk": {
-    "title": "Weet wanneer een agent je nodig heeft",
-    "text": "Ze werken terwijl jij iets anders doet. Ook met het tabblad dicht laten we je weten wanneer ze je akkoord nodig hebben, klaar zijn met wat je vroeg of je roepen.",
     "on": "Meldingen aanzetten",
     "later": "Niet nu",
     "done": "Meldingen aan in deze browser",
     "failed": "Kon meldingen niet aanzetten. Probeer het opnieuw via Instellingen › Meldingen.",
     "someone": "Een agent",
-    "examples": "Voorbeelden van meldingen",
     "now": "nu",
-    "minutes": "{{n}} min",
-    "approval": {
-      "title": "{{name}} heeft je akkoord nodig",
-      "body": "Mag ik doorgaan met wat je vroeg?"
-    },
     "finished": {
       "title": "{{name}} is klaar",
       "body": "Wat je vroeg, is klaar."
     },
-    "mention": {
-      "title": "{{name}} riep je",
-      "body": "Kun je even kijken als je een minuutje hebt?"
+    "inline": {
+      "title": "Wil je meteen weten wanneer {{name}} antwoordt?",
+      "why": "Ook met het tabblad dicht. Pas het aan wanneer je wilt via Instellingen › Meldingen."
     }
   },
   "shell": {
@@ -1568,8 +1596,6 @@
     "organize": "Afdelingen ordenen in Team",
     "more_one": "Nog 1 agent in Team",
     "more_other": "Nog {{count}} agents in Team",
-    "createFirst": "De eerste agent maken",
-    "createFirstPersonal": "Je eerste agent maken",
     "newAgent": "Nieuwe agent",
     "working_one": "{{count}} aan het werk",
     "working_other": "{{count}} aan het werk",
@@ -1587,7 +1613,6 @@
     "pin": "Bovenaan vastzetten",
     "unpin": "Losmaken",
     "pinned": "Bovenaan vastgezet",
-    "hint": "Je agents blijven bovenaan. Klik met rechts op een gesprek om het vast te zetten.",
     "full": {
       "agents": "Je hebt al 5 agents vastgezet. Maak er een los om deze vast te zetten.",
       "channels": "Je hebt al 5 kanalen vastgezet. Maak er een los om dit vast te zetten.",
@@ -2014,6 +2039,7 @@
     "popoverTitle": "Agents",
     "seenBy": "Gezien door {{names}}",
     "retry": "Opnieuw proberen",
+    "retrying": "Opnieuw proberen…",
     "platformCap": "Noem een agent met @ om hem te laten antwoorden.",
     "mentionNeeded": "Zonder @ antwoordt geen agent",
     "mentionNeededHint": "Geen AI hier kon een agent voor dit bericht kiezen. Noem een agent om hem te roepen.",
@@ -2027,9 +2053,8 @@
   },
   "rightHand": {
     "label": "je rechterhand",
+    "labelCapitalized": "Je rechterhand",
     "newDot": "Nieuw",
-    "role": "Workspace-assistent",
-    "rolePersonal": "Persoonlijke assistent",
     "actsAsYou": "handelt met jouw rechten",
     "composerHint": "niets verandert zonder jou",
     "intro": {
@@ -2053,9 +2078,6 @@
         "questionPersonal": "Wil je samen met mij meer agents inrichten?",
         "actionPersonal": "Agents inrichten",
         "messagePersonal": "Help me mijn agents in te richten."
-      },
-      "next": {
-        "firstTask": "{{name}} een eerste taak geven"
       },
       "style": {
         "question": "Hoe wil je dat ik met je praat?",
@@ -2391,8 +2413,10 @@
     "rightHand": {
       "computer_away": "{{name}} kan nu niet antwoorden: de computer van het abonnement is niet bereikbaar.",
       "computer_failed": "{{name}} kan nu niet antwoorden: de computer van het abonnement had een probleem.",
+      "cli_failed": "{{name}} kan nu niet antwoorden: de AI van het abonnement is gestopt met een fout.",
       "plan_limit": "{{name}} kan nu niet antwoorden: het abonnement heeft zijn limiet bereikt.",
       "plan_not_shared": "Koppel je eigen abonnement om met {{name}} te praten: het abonnement van de workspace antwoordt alleen de eigenaar.",
+      "plan_unattended": "{{name}} heeft niet geantwoord: het verzoek kwam niet van een persoon, en het abonnement van de workspace antwoordt alleen de eigenaar.",
       "runner_outdated": "{{name}} kan nu niet antwoorden: het programma op de computer van het abonnement heeft een update nodig.",
       "plan_tools": "{{name}} stopte voordat het antwoordde: de AI van het abonnement op die computer bleef niet binnen de tools van agentes.chat.",
       "model_limit": "{{name}} kan nu niet antwoorden: {{model}} heeft zijn eigen limiet in het abonnement bereikt. De andere modellen van het abonnement werken nog.",
@@ -3632,6 +3656,14 @@
         },
         "field": {
           "token": "Token van het serviceaccount"
+        },
+        "error": {
+          "invalid_input": "Dit is geen token van een serviceaccount. Plak het token dat begint met ops_.",
+          "auth_failed": "1Password heeft dit token niet geaccepteerd. Maak een nieuw serviceaccount en plak hier het token ervan.",
+          "no_vault": "Dit serviceaccount heeft geen toegang tot een kluis. Maak een nieuw serviceaccount met toegang tot de kluis van je agenten.",
+          "many_vaults": "Dit serviceaccount heeft toegang tot meer dan één kluis. Maak een nieuw serviceaccount met alleen toegang tot de kluis van je agenten.",
+          "unreachable": "Kon 1Password niet bereiken. Probeer het over een minuut opnieuw.",
+          "unsupported": "1Password kan hier niet koppelen. Bewaar de logins die je agenten nodig hebben dan in de Vault."
         }
       },
       "bitwarden": {
@@ -4121,7 +4153,6 @@
       "browser": "Browser",
       "members": "Leden",
       "usage": "Gebruik",
-      "connectors": "Connectors",
       "dashboard": "Dashboard"
     },
     "reactions_one": "{{count}} reactie",
@@ -5053,6 +5084,9 @@
         "computer_busy": "De computer bleef bezig met andere taken.",
         "computer_failed": "De computer liep tegen een probleem aan en stopte.",
         "computer_timeout": "De computer deed er te lang over om te antwoorden.",
+        "cli_failed": "Het programma {{brain}} is gestopt met een fout: {{detail}}",
+        "cli_stopped": "Het programma {{brain}} is gestopt met een fout.",
+        "cli_closed": "Het programma {{brain}} werd onverwacht afgesloten.",
         "account_missing": "Het account dat voor deze agent gekozen is staat niet meer op zijn computer. Kies een ander in de instellingen van de agent of voeg het opnieuw toe.",
         "our_error": "Er ging iets mis aan onze kant en de taak is gestopt. Vraag het over een poosje opnieuw.",
         "unknown": "Mislukt."
@@ -5255,6 +5289,19 @@
     "include": "{{name}} meenemen",
     "acceptAll": "Voor iedereen accepteren",
     "acceptSome": "Voor {{count}} accepteren",
+    "all": {
+      "label": "Over alle voorstellen beslissen",
+      "accept": "Alles accepteren",
+      "refuse": "Alles weigeren",
+      "acceptAsk_one": "Het voorstel accepteren? Het geldt meteen.",
+      "acceptAsk_other": "Alle {{count}} voorstellen accepteren? Elk geldt meteen.",
+      "refuseAsk_one": "Het voorstel weigeren? De agent stelt het niet nog eens voor.",
+      "refuseAsk_other": "Alle {{count}} voorstellen weigeren? De agents stellen ze niet nog eens voor.",
+      "acceptGo_one": "Accepteren",
+      "acceptGo_other": "{{count}} accepteren",
+      "refuseGo_one": "Weigeren",
+      "refuseGo_other": "{{count}} weigeren"
+    },
     "staleSome_one": "Eén is niet geaccepteerd: de tekst is na het voorstel gewijzigd.",
     "staleSome_other": "{{count}} zijn niet geaccepteerd: de tekst is na het voorstel gewijzigd.",
     "staleSomeAgent_one": "Eén is niet geaccepteerd: de agent is na het voorstel gewijzigd.",
@@ -5286,6 +5333,8 @@
     "refuseNote": "Door te weigeren leert {{name}} dit niet nog eens voor te stellen.",
     "added": "Toegevoegd: ",
     "removed": "Verwijderd: ",
+    "sameLines_one": "{{count}} ongewijzigde regel",
+    "sameLines_other": "{{count}} ongewijzigde regels",
     "empty": "Als iemand een agent om een wijziging vraagt, of een les zich herhaalt, verschijnt het voorstel hier.",
     "emptyTitle": "Niets te beoordelen",
     "titleInstructions": "Instructies van {{name}} bijwerken",
@@ -5418,10 +5467,7 @@
       "notNow": "Niet nu",
       "afterPlan": "Opent met het abonnement.",
       "about": {
-        "todo": "Vertel me wat {{org}} doet.",
-        "todoDesc": "Alle agenten lezen dit.",
         "action": "Vertellen",
-        "done": "Ik weet wat {{org}} doet",
         "title": "Wat doet {{org}}?",
         "desc": "Alle agenten lezen dit. Je wijzigt het wanneer je wilt.",
         "line": "In één zin",
@@ -5435,26 +5481,18 @@
         "optionalPersonal": "Optioneel. Zonder zin tellen de gebieden die je koos."
       },
       "team": {
-        "todo": "Stel het team samen.",
-        "todoDesc": "Een sjabloon voor je bedrijf, je kunt later alles wijzigen.",
-        "action": "Team bekijken",
-        "done_one": "{{count}} agent in het team",
-        "done_other": "{{count}} agenten in het team",
         "todoPersonal": "Kies je agents.",
         "todoDescPersonal": "Een kant-en-klaar begin, je kunt later alles wijzigen.",
         "actionPersonal": "Agents bekijken",
         "donePersonal_one": "{{count}} agent",
-        "donePersonal_other": "{{count}} agents",
-        "card": "Ga verder op de kaart hieronder"
+        "donePersonal_other": "{{count}} agents"
       },
       "ai": {
         "todo": "Koppel een AI.",
         "todoDesc": "Die waar je al voor betaalt werkt.",
         "action": "Koppelen",
         "done": "Ik denk met {{label}}",
-        "doneAny": "Ik denk nu met een AI",
-        "plan": "Opent met het agentes.chat-abonnement.",
-        "planAction": "agentes.chat-abonnementen bekijken"
+        "doneAny": "Ik denk nu met een AI"
       },
       "apps": {
         "todo": "Koppel je werk-apps.",
@@ -5477,14 +5515,17 @@
         "action": "Uitnodigen",
         "done_one": "{{count}} persoon hier",
         "done_other": "{{count}} mensen hier",
-        "doneNone": "Voorlopig alleen jij"
+        "doneNone": "Voorlopig alleen jij",
+        "invited": "{{names}} uitgenodigd · wacht",
+        "email": "naam@bedrijf.nl",
+        "send": "Versturen",
+        "more": "Meer opties"
       },
       "say": {
-        "about": "Genoteerd. Alle agenten lezen dit.",
-        "team": "Het team is er.",
         "ai": "Nu denkt het team.",
         "apps": "Klaar, ik lees de apps nu.",
         "people": "Fijn dat er meer mensen zijn.",
+        "invited": "Uitnodiging verstuurd.",
         "aboutPersonal": "Genoteerd. Al je agents lezen dit.",
         "teamPersonal": "Je agents zijn er.",
         "aiPersonal": "Nu kunnen je agents denken.",
@@ -5499,42 +5540,6 @@
         "whoPersonal": "Welke agent doet wat?"
       }
     }
-  },
-  "newAgentAsk": {
-    "title": "Wat moet je nieuwe agent doen?",
-    "lead": "Zeg het in één zin. {{name}} zet hem klaar en laat hem zien voordat hij gemaakt wordt.",
-    "field": "Wat hij voor je doet",
-    "placeholder": "Bijv. Mijn agenda op orde houden en me aan belangrijke dingen herinneren",
-    "ideas": "Ideeën",
-    "idea": {
-      "agenda": {
-        "label": "Agenda",
-        "text": "Mijn agenda op orde houden en me aan afspraken herinneren"
-      },
-      "money": {
-        "label": "Financiën",
-        "text": "Mijn rekeningen bijhouden en me waarschuwen voor de vervaldatum"
-      },
-      "training": {
-        "label": "Training",
-        "text": "Mijn trainingen voor de week plannen en aanpassen aan hoe ik me voel"
-      },
-      "studies": {
-        "label": "Studie",
-        "text": "Een studieplan maken en me overhoren over wat ik leerde"
-      },
-      "home": {
-        "label": "Huis",
-        "text": "De boodschappenlijst en het huishouden bijhouden"
-      },
-      "travel": {
-        "label": "Reizen",
-        "text": "Mijn reizen plannen: route, boekingen en documenten"
-      }
-    },
-    "full": "Ik vul liever alles zelf in",
-    "create": "Maken met {{name}}",
-    "message": "Ik wil een nieuwe agent: {{what}}"
   },
   "newAgent": {
     "title": "Agent maken",
@@ -5905,7 +5910,197 @@
     "and": " en ",
     "routine": "Routine",
     "routineKeep": "De routine {{name}} maken",
-    "routineNotMade": "De routine is niet gemaakt: {{reason}}"
+    "routineNotMade": "De routine is niet gemaakt: {{reason}}",
+    "hello": {
+      "clara": "Ik let op je agenda en herinner je aan wat belangrijk is voordat het te laat is.",
+      "duda": "Ik houd je rekeningen en uitgaven bij en waarschuw je voordat er iets vervalt.",
+      "leo": "Ik stel je trainingen samen en houd je in het ritme, op jouw manier.",
+      "mel": "Ik plan je maaltijden en boodschappenlijst, naar jouw smaak en budget.",
+      "gabi": "Ik maak je studieplan en overhoor je over wat je hebt geleerd.",
+      "lu": "Ik bewaar je notities en ideeën en help je er tekst van te maken.",
+      "rosa": "Ik zorg voor de boodschappenlijst, het huishouden en wat er gerepareerd moet worden.",
+      "vic": "Ik plan je reizen: data, prijzen, boekingen en een dag-voor-dag-schema.",
+      "rui": "Ik volg je klanten, schrijf offertes en herinneringen en onthoud wie nog niet heeft betaald.",
+      "dev": "Ik programmeer, review PR's en zoek bugs uit.",
+      "ops": "Ik houd fouten, wachtrijen en deploys in de gaten.",
+      "qa": "Ik test flows en reproduceer gemelde bugs.",
+      "pm": "Ik organiseer de taken en maak de samenvattingen.",
+      "support": "Ik beantwoord klanten en geef door wat een mens nodig heeft.",
+      "sales": "Ik bereid offertes voor en volg geïnteresseerden op.",
+      "marketing": "Ik plan campagnes, posts en pagina's van de site.",
+      "content": "Ik schrijf en redigeer teksten, artikelen en nieuwsbrieven.",
+      "data": "Ik beantwoord vragen met cijfers en maak rapporten.",
+      "finance": "Ik houd betalingen, facturen en uitgaven bij.",
+      "people": "Ik help met werving, onboarding en vragen van het team.",
+      "research": "Ik onderzoek een onderwerp en lever een samenvatting met bronnen.",
+      "assistant": "Ik zorg voor de agenda, de e-mails en de herinneringen."
+    },
+    "starters": {
+      "clara": {
+        "instructions": "Kijkt elke ochtend in de agenda en stuurt wat er die dag is.\nHerinnert de dag ervoor aan elke afspraak en elke rekening met een datum.\nPlant, annuleert of accepteert nooit een uitnodiging zonder eerst te vragen.",
+        "tasks": {
+          "a": "Wat heb ik morgen?",
+          "b": "Herinner me elke 5e aan de huur",
+          "c": "Stuur me elke dag om 7 uur mijn agenda"
+        }
+      },
+      "duda": {
+        "instructions": "Houdt rekeningen en uitgaven bij, per categorie.\nWaarschuwt drie dagen voordat iets vervalt en als een uitgave uit de toon valt.\nBetaalt, maakt over of zegt nooit iets op zonder eerst te vragen.",
+        "tasks": {
+          "a": "Hoeveel heb ik deze maand uitgegeven?",
+          "b": "Welke rekeningen vervallen deze week?",
+          "c": "Sorteer deze uitgaven per categorie"
+        }
+      },
+      "leo": {
+        "instructions": "Stelt trainingen samen op jouw niveau, met jouw tijd en wat je leuk vindt.\nPast de week aan als je een dag overslaat of moe bent, zonder preek.\nGeeft geen medisch advies: bij pijn of een blessure raadt hij een professional aan.",
+        "tasks": {
+          "a": "Stel een training van 30 minuten voor vandaag samen",
+          "b": "Plan mijn hardloopweek",
+          "c": "Stuur me elke ochtend de training van de dag"
+        }
+      },
+      "mel": {
+        "instructions": "Plant de maaltijden van de week naar jouw smaak, tijd en budget.\nMaakt de boodschappenlijst bij het menu, per afdeling van de winkel.\nHoudt rekening met beperkingen en allergieën en geeft geen dieet- of medisch advies.",
+        "tasks": {
+          "a": "Stel drie snelle avondmaaltijden voor",
+          "b": "Maak het weekmenu",
+          "c": "Maak de boodschappenlijst voor het menu"
+        }
+      },
+      "gabi": {
+        "instructions": "Maakt het studieplan tot het examen, met wat er per dag past.\nOverhoort je over wat je hebt geleerd en legt opnieuw uit wat je fout had.\nMaakt je huiswerk niet voor je: helpt je naar het antwoord.",
+        "tasks": {
+          "a": "Maak een studieplan voor het examen",
+          "b": "Stel me 3 vragen over wat ik heb geleerd",
+          "c": "Leg dit onderwerp eenvoudig uit"
+        }
+      },
+      "lu": {
+        "instructions": "Bewaart de notities en ideeën die je stuurt en voegt vergelijkbare samen.\nMaakt van notities tekst in jouw toon, zonder iets toe te voegen wat je niet zei.\nRedigeert zorgvuldig en laat zien wat er veranderd is voordat hij het origineel vervangt.",
+        "tasks": {
+          "a": "Maak van deze notities een korte tekst",
+          "b": "Verzamel de ideeën van de week",
+          "c": "Redigeer deze tekst"
+        }
+      },
+      "rosa": {
+        "instructions": "Houdt de boodschappenlijst en het huishouden bij.\nNoteert wat er gerepareerd moet worden en herinnert eraan tot het gedaan is.\nKoopt of huurt nooit iets in zonder eerst te vragen.",
+        "tasks": {
+          "a": "Maak de boodschappenlijst van de week",
+          "b": "Wat moet er in huis gerepareerd worden?",
+          "c": "Verdeel de huishoudtaken"
+        }
+      },
+      "vic": {
+        "instructions": "Plant de reis met data, prijzen en een dag-voor-dag-schema.\nVergelijkt vluchten en verblijven en zegt waarom hij welke voorstelt.\nBoekt of betaalt nooit iets zonder eerst te vragen.",
+        "tasks": {
+          "a": "Plan 3 dagen Lissabon",
+          "b": "Laat het weten als het ticket goedkoper wordt",
+          "c": "Verzamel de boekingen van de reis"
+        }
+      },
+      "rui": {
+        "instructions": "Volgt elke klant: wat is afgesproken, wat nog openstaat en wie niet heeft betaald.\nSchrijft offertes en betalingsherinneringen in jouw toon, klaar om na te lezen.\nStuurt een klant nooit iets zonder jouw goedkeuring.",
+        "tasks": {
+          "a": "Schrijf een korte offerte voor een klant",
+          "b": "Wie heeft nog niet betaald?",
+          "c": "Waar wacht elke klant vandaag op?"
+        }
+      }
+    }
+  },
+  "newAgentCard": {
+    "title": "Nieuwe agent",
+    "lead": "Kies links en pas rechts aan. Je kunt later alles wijzigen.",
+    "list": "Startpunten",
+    "zero": "Vanaf nul",
+    "zeroSub": "Jij zegt wat hij doet",
+    "import": "Agents uit een andere app halen",
+    "hi": "Hoi, ik ben",
+    "hiBlank": "Hoi, ik ben",
+    "name": "Naam",
+    "namePlaceholder": "naam",
+    "what": "Wat hij doet",
+    "whatPlaceholder": "Wat ga ik voor je doen?",
+    "look": "Uiterlijk",
+    "lookDone": "Klaar",
+    "shuffle": "Loten",
+    "handle": "In de chat: @{{handle}}",
+    "handleRole": "In de chat: @{{handle}} · {{role}}",
+    "handleTaken": "In de chat: @{{handle}} · er is hier al een {{name}}",
+    "handleBlank": "De @ voor de chat komt van de naam",
+    "similar": "Lijkt op {{name}}, die al klaarstaat.",
+    "similarAction": "Beginnen met {{name}}",
+    "uses": "Gaat gebruiken",
+    "chooseApps": "Apps kiezen",
+    "otherApp": "Andere app",
+    "usesNone": "Nog niets.",
+    "worksIn": "Werkt in",
+    "how": "Hoe {{name}} werkt",
+    "howBlank": "Hoe hij werkt",
+    "instructionsPlaceholder": "Wat hij doet, wat hij vermijdt, wie hij om hulp vraagt",
+    "picker": {
+      "title": "Apps van {{name}}",
+      "titleBlank": "Apps van de agent",
+      "lead": "Een gekoppelde app komt meteen op de kaart. Andere koppel je hier.",
+      "suggested": "Voorgesteld voor {{name}}",
+      "suggestedBlank": "Voorgesteld",
+      "use": "Gebruiken",
+      "added": "Op de kaart"
+    },
+    "create": "{{name}} maken",
+    "createBlank": "Agent maken",
+    "failed": "Maken is niet gelukt: {{reason}}",
+    "level": {
+      "read": "Leest",
+      "write": "Leest en schrijft"
+    },
+    "app": {
+      "lead": "Hoe ver {{name}} gaat in {{app}}.",
+      "leadBlank": "Hoe ver hij gaat in {{app}}.",
+      "read": "Lezen",
+      "readDesc": "Ziet wat er in {{app}} staat. Verandert niets.",
+      "write": "Lezen en schrijven",
+      "writeDesc": "Maakt en bewerkt ook in {{app}}.",
+      "asks": "{{actions}} vragen altijd om je goedkeuring, op elk niveau.",
+      "asksAny": "Versturen, verwijderen en betalen vragen altijd om je goedkeuring, op elk niveau.",
+      "remove": "{{app}} weghalen",
+      "done": "Klaar"
+    },
+    "band": {
+      "label": "Wat {{name}} nodig heeft om te beginnen",
+      "ai": "Een AI om mee te denken",
+      "asleep": "Slaapt tot er een AI is"
+    },
+    "skills": "Skills",
+    "skillsHelpBlank": "Handleidingen die hij opent als dat nodig is.",
+    "chooseSkills": "Skills kiezen",
+    "otherSkill": "Andere skill",
+    "namesLead": "Wat dacht je van",
+    "namesRoll": "Andere namen",
+    "skill": {
+      "opens": "{{name}} opent deze handleiding als het onderwerp opduikt. Je bewerkt hem bij Skills.",
+      "opensBlank": "Hij opent deze handleiding als het onderwerp opduikt. Je bewerkt hem bij Skills.",
+      "remove": "Weghalen bij {{name}}",
+      "removeBlank": "Weghalen bij de agent",
+      "done": "Klaar"
+    },
+    "names": {
+      "agenda": "Lia, Uur, Tess, Dora, Tijs, Emma",
+      "agendaWords": "agenda, afspra, herinner, vergader, rooster",
+      "money": "Penny, Nico, Mona, Kees, Lara, Daan",
+      "moneyWords": "rekening, uitgav, geld, financ, budget, betal",
+      "travel": "Route, Malou, Ravi, Vic, Nara, Tom",
+      "travelWords": "reis, ticket, vlucht, hotel, vakantie",
+      "training": "Leo, Bea, Bliksem, Kai, Nina, Daaf",
+      "trainingWords": "train, hardloop, sport, oefen, gym",
+      "study": "Gabi, Nils, Sophie, Teun, Iris, Ben",
+      "studyWords": "studie, studer, examen, cursus, leer",
+      "clients": "Ruud, Anna, Bram, Lies, Otto, Cleo",
+      "clientsWords": "klant, verkoop, offerte, factur",
+      "any": "Sol, Lia, Teun, Bea, Nino, Iris, Kai, Luma, Gijs, Roos, Nara, Tom"
+    }
   },
   "members": {
     "column": {
@@ -6736,20 +6931,19 @@
     "statusLabel": "Status",
     "due": "Deadline",
     "noDue": "Geen deadline",
-    "seeCalendar": "bekijk in de agenda",
+    "seeCalendar": "Bekijk in de agenda",
     "removeDue": "De deadline verwijderen",
     "links": "Gekoppeld",
     "prBy": "PR #{{number}} · geopend door {{name}}",
     "artifactBy": "{{title}} ({{name}})",
-    "noLinks": "Nog niets gekoppeld.",
     "github": {
       "label": "GitHub-link",
       "placeholder": "Link van issue of PR",
       "invalid": "Dat is geen link van een GitHub-issue of pull request.",
-      "remove": "GitHub-link verwijderen"
+      "remove": "GitHub-link verwijderen",
+      "add": "GitHub-link toevoegen"
     },
     "openConversation": "Gesprek bekijken",
-    "labels": "Labels",
     "tabs": {
       "label": "Onderdelen van de taak",
       "details": "Gegevens",
@@ -7396,6 +7590,7 @@
       "computer_busy": "De computer bleef bezig met andere taken",
       "computer_failed": "De computer liep tegen een probleem aan en stopte",
       "computer_timeout": "De computer deed er te lang over om te antwoorden",
+      "cli_failed": "Het AI-programma op de computer is gestopt met een fout",
       "account_missing": "Het account van de agent staat niet meer op zijn computer",
       "our_error": "Er ging iets mis aan onze kant"
     },
@@ -8558,6 +8753,8 @@
     },
     "upcoming": "Binnenkort",
     "upcomingEmpty": "Er komt niets aan.",
+    "owners": "Agents en mensen",
+    "showOwner": "{{name}} tonen",
     "viewZone": "Tijdzone van de agenda",
     "miniMonth": "Kies een dag",
     "new": "Nieuwe afspraak",
@@ -8583,12 +8780,6 @@
         "declined": "Je komt niet."
       }
     },
-    "kind": {
-      "event": "Afspraak",
-      "routine": "Routine",
-      "reminder": "Herinnering",
-      "deadline": "Deadline van taak"
-    },
     "every": {
       "hour": "elk uur",
       "hours": "elke {{count}} u",
@@ -8597,24 +8788,20 @@
     "perDay": "{{count}}× per dag",
     "runs_one": "{{count}} run in deze dagen.",
     "runs_other": "{{count}} runs in deze dagen.",
-    "routineDetail": "Routine van {{agent}} · levert aan {{target}}.",
+    "routineDetail": "Routine · levert aan {{target}}",
     "deadlineDetail": "De deadline van de taak.",
     "reminderBy": "Ingesteld door {{name}}",
-    "reminderPosted": "Geplaatst door {{agent}} · {{target}}",
+    "reminderPosted": "Herinnering · verschijnt in {{target}}",
     "cancelReminder": "Herinnering annuleren",
     "reminderCancelled": "Herinnering geannuleerd",
     "openIssue": "Taak openen",
     "openRoutines": "Bekijken in Routines",
     "openRoutine": "Routine openen",
     "runAria": "Routine {{name}}, {{time}}",
-    "runsAria": "{{count}} routines om {{time}}: {{names}}",
     "runHint": "{{name}} · {{agent}} · {{time}}",
     "runsAt": "Routines om {{time}}",
-    "runsOn": "Routines · {{day}}",
-    "runsCount_one": "{{count}} routinerun",
-    "runsCount_other": "{{count}} routineruns",
-    "dayRunsAria_one": "{{count}} routinerun op {{day}}: {{names}}",
-    "dayRunsAria_other": "{{count}} routineruns op {{day}}: {{names}}",
+    "moreRuns_one": "+{{count}} routine",
+    "moreRuns_other": "+{{count}} routines",
     "runTimes": "×{{count}}",
     "result": {
       "ok": "geantwoord",
@@ -9305,22 +9492,6 @@
       "empty": "Geen stickers gevonden.",
       "foot": "Gemaakt van het uiterlijk van elke agent"
     }
-  },
-  "memoryMark": {
-    "label": "{{name}} heeft dit in het geheugen opgeslagen: {{text}}",
-    "saved": "{{name}} heeft dit opgeslagen:",
-    "title": "{{name}} heeft in het geheugen opgeslagen",
-    "subtitle": "Onthoudt het in de volgende gesprekken",
-    "from": "Uit het bericht van {{name}} · {{time}}",
-    "view": "Bekijken in het geheugen",
-    "fix": "Corrigeren",
-    "fixLabel": "Corrigeer wat is opgeslagen",
-    "save": "Opslaan",
-    "forget": "Vergeten",
-    "forgot": "{{name}} is dit vergeten",
-    "undo": "Ongedaan maken",
-    "fixed": "Geheugen gecorrigeerd",
-    "fixedDetail": "{{name}} gebruikt vanaf nu de nieuwe versie."
   },
   "correctionAsk": {
     "title": "Wil je dat {{name}} het opnieuw doet of uitlegt wat er ontbrak?",
@@ -10484,6 +10655,8 @@
     "noChannel": "Geen kanaal",
     "files": "Bestanden",
     "select": "{{title}} selecteren",
+    "selectAll_one": "{{count}} selecteren",
+    "selectAll_other": "Alle {{count}} selecteren",
     "selection": "Selectie",
     "selected_one": "{{count}} geselecteerd",
     "selected_other": "{{count}} geselecteerd",
@@ -10667,8 +10840,10 @@
       },
       "line": {
         "env": "Ingesteld in de instellingen van deze server (GITHUB_APP_ID).",
-        "invalid": "Deze server kan de opgeslagen app niet openen. Verwijder hem en maak hem opnieuw."
+        "invalid": "Deze server kan de opgeslagen app niet openen. Verwijder hem en maak hem opnieuw.",
+        "events": "Vink deze events aan in de app, zodat agents horen wat er op GitHub gebeurt: {{events}}."
       },
+      "events": "Events aanvinken",
       "open": "Openen op GitHub",
       "remove": "De app verwijderen",
       "removeTitle": "De GitHub-app van deze server verwijderen?",
@@ -11177,34 +11352,6 @@
       "usageNoLimit": "Composio: {{calls}} aanroepen in {{month}}",
       "limitNotice": "Deze werkruimte heeft de Composio-aanroepen van deze maand opgebruikt",
       "disconnectNote": "Composio vergeet het account. Wil je ook de toegang in {{name}} intrekken, verwijder Composio dan daar in je accountinstellingen."
-    },
-    "toolChanges": {
-      "title": "Gewijzigde tools",
-      "intro": "Deze servers hebben veranderd wat een tool zegt of vraagt. Agents houden de versie die jij hebt goedgekeurd tot je de nieuwe accepteert.",
-      "count_one": "{{count}} tool gewijzigd",
-      "count_other": "{{count}} tools gewijzigd",
-      "acceptAll": "Alles accepteren",
-      "acceptedAll": "Tools van {{name}} bijgewerkt.",
-      "show": "Wijziging bekijken",
-      "hide": "Verbergen",
-      "showAll": "Alles tonen ({{total}})",
-      "textChanged": "De tekst is gewijzigd",
-      "fieldsChanged_one": "{{count}} veld gewijzigd",
-      "fieldsChanged_other": "{{count}} velden gewijzigd",
-      "inputChanged": "De invoer is gewijzigd",
-      "description": "Tekst",
-      "input": "Invoer",
-      "field": {
-        "added": "nieuw",
-        "removed": "verwijderd",
-        "changed": "gewijzigd"
-      },
-      "added": "Toegevoegd",
-      "removed": "Verwijderd",
-      "accept": "Accepteren",
-      "acceptOne": "{{tool}} accepteren",
-      "accepted": "{{tool}} bijgewerkt.",
-      "notice": "{{name}} heeft tools gewijzigd die jij hebt goedgekeurd"
     },
     "names": {
       "atlassian": "Atlassian (Jira en Confluence)",
@@ -12272,6 +12419,9 @@
       "invalidSecret": "Plak het hele Client Secret, zonder spaties.",
       "invalidRepo": "Schrijf de repository als eigenaar/naam."
     },
+    "githubEvent": {
+      "answered": "Iemand heeft al om dit antwoord gevraagd. De agent is ermee bezig."
+    },
     "issue": {
       "assigneeOutside": "Deze persoon ziet deze taak niet. Voeg die eerst toe bij Wie het ziet.",
       "stageFull": "Een fase heeft hoogstens {{max}} kolommen. Verwijder eerst een van de kolommen.",
@@ -12441,6 +12591,7 @@
       "agentBusy": "De agent is al bezig in dit gesprek. Wacht tot hij klaar is om door te gaan.",
       "continueForbidden": "Alleen wie het vroeg, de eigenaar van de agent of een beheerder kan het voortzetten.",
       "notRestartable": "Dit antwoord was al begonnen, dus het kan niet opnieuw beginnen. Stuur je bericht opnieuw.",
+      "notRestartableVoice": "Dit antwoord was al begonnen, dus het kan niet opnieuw beginnen. Neem je bericht opnieuw op.",
       "cancelForbidden": "Alleen wie het vroeg, de eigenaar van de agent of een beheerder kan het stoppen.",
       "answerForbidden": "Alleen wie het vroeg, de eigenaar van de agent of een beheerder kan dit doen.",
       "stopReasonForbidden": "Alleen wie het stopte, kan zeggen waarom."
@@ -12574,6 +12725,10 @@
         "invalidInput": "Controleer de velden en probeer het opnieuw.",
         "tooManyItems": "De Vault is vol. Verwijder items voordat je meer synchroniseert."
       }
+    },
+    "feedback": {
+      "filesGone": "Een bestand dat je hebt toegevoegd is weg. Voeg het opnieuw toe.",
+      "filesPending": "Er wachten te veel bestanden om verstuurd te worden. Verstuur of verwijder er een paar en probeer het opnieuw."
     }
   },
   "machines": {
@@ -14447,6 +14602,10 @@
     "statusReplyTurn": "Ik zit midden in een taak ({{duration}}) en kan nog niet antwoorden. Je bericht staat in de wachtrij en ik lees het als deze werkronde klaar is.",
     "statusReplyQueued": "Ik wacht op de computer ({{duration}}). Ik lees je bericht zodra ik aan de beurt ben.",
     "statusReplyAway": "Ik wacht tot mijn computer terug is. Ik lees je bericht zodra hij terug is.",
+    "statusReplyPlan": "Ik wacht tot mijn abonnement terug is ({{when}}). Ik lees je bericht als het terug is.",
+    "statusReplyPlanUnknown": "Ik wacht tot mijn abonnement terug is. Ik lees je bericht zodra het terug is.",
+    "statusReplyBudget": "Ik wacht tot mijn budget voor deze maand wordt vernieuwd ({{when}}). Ik lees je bericht dan, of eerder als een beheerder de limiet verhoogt.",
+    "statusReplyBudgetUnknown": "Ik wacht tot mijn budget voor deze maand wordt vernieuwd. Ik lees je bericht dan, of eerder als een beheerder de limiet verhoogt.",
     "status": {
       "one": "Bezig met: {{subject}}",
       "oneUntitled": "Bezig op de achtergrond",
@@ -14592,6 +14751,21 @@
       "wakeSkippedAnon": "De vermelding van {{name}} bereikte geen andere agent",
       "wakeSkippedAudience": "Alleen bepaalde mensen mogen {{agents}} aanroepen, en dit werk van {{name}} kwam van geen van hen. Iemand die {{agents}} mag aanroepen, kan het verzoek doorgeven.",
       "wakeSkippedCallable": "De instellingen van {{name}} staan niet toe dat het {{agents}} aanroept (een ander project, of niet op de lijst van agents die het mag aanroepen). Wie voor {{name}} zorgt, kan dat aanpassen op de pagina van de agent.",
+      "github": {
+        "comment": "{{who}} reageerde op PR #{{number}} ({{repo}}) op GitHub",
+        "commentIssue": "{{who}} reageerde op issue #{{number}} ({{repo}}) op GitHub",
+        "commentDiscussion": "{{who}} reageerde op discussie #{{number}} ({{repo}}) op GitHub",
+        "opened": "{{who}} riep de agentes.chat-app aan in #{{number}} ({{repo}}) op GitHub",
+        "reviewed": "{{who}} reviewde PR #{{number}} ({{repo}}) op GitHub",
+        "approved": "{{who}} keurde PR #{{number}} ({{repo}}) goed op GitHub",
+        "changes": "{{who}} vroeg om wijzigingen in PR #{{number}} ({{repo}}) op GitHub",
+        "reviewRequested": "{{who}} vroeg {{name}} om PR #{{number}} ({{repo}}) te reviewen op GitHub",
+        "merged": "{{who}} heeft PR #{{number}} ({{repo}}) gemerged op GitHub",
+        "closed": "{{who}} sloot PR #{{number}} ({{repo}}) op GitHub",
+        "closedIssue": "{{who}} sloot issue #{{number}} ({{repo}}) op GitHub",
+        "ask": "Vraag om antwoord",
+        "asked": "{{asker}} vroeg {{name}} om {{who}} op GitHub te antwoorden"
+      },
       "show": "Tonen",
       "hide": "Verbergen",
       "talker": "tijdens het werk",
@@ -14731,6 +14905,7 @@
         "startingWork": "Een lang werk begonnen",
         "updatingWork": "Een lang werk bijgewerkt",
         "withdrawingRequest": "Een verzoek ingetrokken",
+        "releasingAgent": "Een wachtende agent vrijgegeven",
         "schedulingAction": "Een actie voor later voorbereid",
         "updatingDashboard": "Aan een dashboard gewerkt",
         "testingOnPhone": "Op een telefoon getest",
@@ -14742,6 +14917,7 @@
         "sendingDm": "Een direct bericht verstuurd",
         "settingStatus": "De eigen status bijgewerkt",
         "settingReplyStyle": "Aangepast hoe er wordt geantwoord",
+        "sendingFeedback": "Gevraagd om feedback te versturen",
         "deletingRoutine": "Een routine verwijderd",
         "runningRoutine": "Een routine nu uitgevoerd",
         "proposingTeam": "Een team voorgesteld",
@@ -14842,6 +15018,7 @@
       "startingWork": "een lang werk aan het beginnen",
       "updatingWork": "een lang werk aan het bijwerken",
       "withdrawingRequest": "een verzoek aan het intrekken",
+      "releasingAgent": "een wachtende agent aan het vrijgeven",
       "schedulingAction": "een actie voor later aan het voorbereiden",
       "updatingDashboard": "aan een dashboard aan het werken",
       "testingOnPhone": "op een telefoon aan het testen",
@@ -14853,6 +15030,7 @@
       "sendingDm": "een direct bericht aan het versturen",
       "settingStatus": "de eigen status aan het bijwerken",
       "settingReplyStyle": "aan het aanpassen hoe er wordt geantwoord",
+      "sendingFeedback": "feedback aan het voorbereiden",
       "deletingRoutine": "een routine aan het verwijderen",
       "runningRoutine": "een routine nu aan het uitvoeren",
       "proposingTeam": "een team aan het voorstellen",
@@ -14982,8 +15160,10 @@
       "no_ai_not_signed_in": "Ik kan nog niet antwoorden: {{brain}} is niet ingelogd op mijn computer.",
       "no_ai_computer_away": "Ik kan nu niet antwoorden: de computer van mijn abonnement is niet bereikbaar.",
       "no_ai_computer_failed": "Ik kan nu niet antwoorden: de computer van mijn abonnement had een probleem.",
+      "no_ai_cli_failed": "Ik kan nu niet antwoorden: de AI van mijn abonnement is gestopt met een fout.",
       "no_ai_plan_limit": "Ik kan nu niet antwoorden: het abonnement waarmee ik denk heeft zijn limiet bereikt.",
       "no_ai_plan_not_shared": "Ik kan je niet antwoorden via het abonnement van de workspace: het antwoordt alleen de eigenaar. Koppel je eigen abonnement, dan antwoord ik.",
+      "no_ai_plan_unattended": "Ik heb niet geantwoord: het verzoek kwam niet van een persoon, en het abonnement van de workspace antwoordt alleen de eigenaar.",
       "no_ai_runner_outdated": "Ik kan nu niet antwoorden: het programma op de computer van mijn abonnement heeft een update nodig.",
       "no_ai_plan_tools": "Ik stopte voordat ik antwoordde: de AI van mijn abonnement op die computer bleef niet binnen de tools van agentes.chat.",
       "no_ai_model_limit": "Ik kan nu niet antwoorden: {{model}} heeft zijn eigen limiet in mijn abonnement bereikt.",
@@ -15764,6 +15944,7 @@
     "suspended": "Deze werkruimte is voorlopig niet beschikbaar.",
     "createRefused": "Je kunt nu geen werkruimte maken.",
     "createUnpaid": "Je hebt al een werkruimte die wacht op een agentes.chat-abonnement. Kies daar een abonnement voordat je er nog een maakt.",
+    "createUnpaidOpen": "{{name}} openen",
     "createInactive": "Je hebt al een werkruimte die nog niet actief is, dus je kunt voorlopig geen nieuwe maken.",
     "agentPaused": "Deze agent is voorlopig gepauzeerd.",
     "onHold": "Deze werkruimte staat in de wacht: {{reason}}",
@@ -16812,7 +16993,11 @@
       "text": "Vraag een agent om een widget of maak een blok uit de chat vast, en het blijft hier actueel.",
       "viewer": "Wie dit dashboard bewerkt, voegt widgets toe, en ze verschijnen hier."
     },
-    "onlyHome": "Maak met “Nieuw dashboard” een dashboard voor de werkruimte of voor sommige rollen.",
+    "first": {
+      "title": "Maak het eerste dashboard van het team",
+      "text": "Een dashboard brengt getallen en grafieken samen op één pagina, en de agents houden alles actueel.",
+      "ask": "Help me het eerste dashboard van het team te maken."
+    },
     "create": {
       "title": "Nieuw dashboard",
       "subtitle": "Widgets samen op één pagina, voor jou of voor het team.",
@@ -17012,9 +17197,8 @@
     "firstTask": {
       "suggestion": "suggestie",
       "lead": "Eén korte taak per agent, zodat je ze vandaag allemaal aan het werk ziet.",
-      "heldLead": "Eén korte taak per agent. Maak de zin af en verstuur hem. Ze beginnen zodra de workspace een agentes.chat-abonnement heeft.",
-      "example": "Voorbeeld van wat {{name}} oplevert",
       "open": "Openen met de taak",
+      "finish": "Maak de zin af en verstuur hem",
       "invite": "{{names}} uitnodigen",
       "later": "Later"
     },
@@ -17216,7 +17400,7 @@
     },
     "software": {
       "name": "Software en apps",
-      "sub": "Support, facturen en code",
+      "sub": "Klantenservice, betalingen en code",
       "desc": "Voor een bedrijf dat software verkoopt en zijn eigen klanten helpt."
     },
     "support": {
@@ -17229,54 +17413,74 @@
       "sub": "Boekhouding, advocatuur, advies",
       "desc": "Voor een kantoor dat klanten inplant, voorstellen stuurt en factureert."
     },
+    "hello": {
+      "lodi": {
+        "starting": "Abonnement actief. Mijn computer start op. Aan de slag.",
+        "ready": "Abonnement actief. Aan de slag.",
+        "created": "Het team is er. Aan de slag."
+      },
+      "lodiNoAi": {
+        "starting": "Abonnement actief. Mijn computer start op. Koppel een AI en we gaan aan de slag.",
+        "ready": "Abonnement actief. Koppel een AI en we gaan aan de slag.",
+        "created": "Het team is er. Koppel een AI en we gaan aan de slag."
+      }
+    },
     "agents": {
       "iara": {
         "role": "Klantenservice",
         "line": "Beantwoordt klanten via WhatsApp en e-mail. Roept je als ze het niet weet.",
         "routine": "Samenvatten wat onbeantwoord bleef",
-        "task": "Schrijf een antwoord op dit klantbericht:"
+        "task": "Schrijf een antwoord op dit klantbericht:",
+        "hello": "Hoi {{first}}. Wie via WhatsApp schrijft, laat je aan mij over."
       },
       "caio": {
         "role": "Facturen",
         "line": "Herinnert wie te laat betaalt en stuurt de herinnering na jouw ok.",
         "routine": "Opsommen wie te laat betaalt",
-        "task": "Schrijf een vriendelijke betalingsherinnering voor:"
+        "task": "Schrijf een vriendelijke betalingsherinnering voor:",
+        "hello": "Hallo. Ik doe de betalingen en stuur pas een herinnering na jouw oké."
       },
       "ada": {
         "role": "Dev",
         "line": "Lost de bugs op die klanten melden en opent de PR.",
         "routine": "De nieuwe bugs opsommen",
-        "task": "Vertel me waar ik moet beginnen met deze bug:"
+        "task": "Vertel me waar ik moet beginnen met deze bug:",
+        "hello": "Hoi. Stuur me de bugs die binnenkomen, ik zoek het uit en open de PR."
       },
       "lia": {
         "role": "Content",
         "line": "Schrijft posts en scripts in de toon van het bedrijf en plant ze na jouw ok.",
         "routine": "De posts van de week voorstellen",
-        "task": "Stel drie posts voor deze week voor over:"
+        "task": "Stel drie posts voor deze week voor over:",
+        "hello": "Hoi allemaal. De posts van deze week zijn voor mij."
       },
       "theo": {
         "role": "Verkoop",
         "line": "Volgt iedereen op die een offerte vroeg en schrijft de voorstellen.",
         "routine": "Opsommen wie een offerte vroeg en geen antwoord kreeg",
-        "task": "Schrijf een korte offerte voor deze aanvraag:"
+        "task": "Schrijf een korte offerte voor deze aanvraag:",
+        "hello": "Hoi {{first}}. Niemand die om een offerte vraagt, blijft zonder antwoord."
       },
       "nina": {
         "role": "Agenda",
         "line": "Plant, bevestigt en verzet afspraken en herinnert klanten de dag ervoor.",
         "routine": "De afspraken van morgen bevestigen",
-        "task": "Orden deze tijden van morgen:"
+        "task": "Orden deze tijden van morgen:",
+        "hello": "Hallo. De agenda is van mij, en ik herinner klanten de dag ervoor."
       },
       "otto": {
         "role": "Bestellingen",
         "line": "Volgt bestellingen en voorraad en waarschuwt wat opraakt.",
         "routine": "Waarschuwen wat opraakt in de voorraad",
-        "task": "Noem wat er nog moet gebeuren bij deze bestellingen:"
+        "task": "Noem wat er nog moet gebeuren bij deze bestellingen:",
+        "hello": "Ik ben er. Ik hou de bestellingen in de gaten en meld het als de voorraad opraakt."
       },
       "bia": {
         "role": "Antwoordenbank",
         "line": "Houdt de antwoordenbank bij met wat het team antwoordt.",
         "routine": "De bank bijwerken met de antwoorden van de week",
-        "task": "Schrijf de antwoorden op deze klantvragen:"
+        "task": "Schrijf de antwoorden op deze klantvragen:",
+        "hello": "Hoi. Ik hou de antwoordbank bij met wat het team antwoordt."
       },
       "clara": {
         "role": "Agenda en herinneringen",
@@ -17333,17 +17537,6 @@
         "task": "Schrijf een kort voorstel voor deze klant:"
       }
     },
-    "example": {
-      "iara": "Hoi Marina. Je bestelling is gisteren verstuurd en komt uiterlijk vrijdag aan. De trackingcode staat hieronder. Komt vrijdag niet uit, dan zoek ik een andere datum.",
-      "lia": "1. Drie veelgemaakte fouten bij het kiezen van een bureau. 2. Achter de schermen van een project dat bijna misging. 3. Een vraag aan je volgers: wat willen jullie hier zien?",
-      "nina": "Morgen: 9:00 Carla, 10:30 Pedro, 14:00 vrij. Pedro heeft nog niet bevestigd. Zal ik hem schrijven?",
-      "clara": "Vandaag: 9:00 tandarts, 12:30 lunch met Paula, 18:00 het pakket ophalen. Morgen is je moeder jarig. Zal ik je er 's ochtends aan herinneren?",
-      "leo": "Vandaag, 30 minuten: 5 minuten warming-up, 3 rondes van 12 squats, 10 push-ups en 30 seconden plank, daarna 5 minuten stretchen. Vertel me hoe het ging, dan pas ik die van woensdag aan.",
-      "gabi": "Onderwerp van vandaag: fotosynthese. Kort gezegd zetten planten licht, water en koolstofdioxide om in suiker en zuurstof. Drie vragen: waar gebeurt het, wat gaat erin en wat komt eruit?",
-      "rosa": "Deze week: rijst, bonen, eieren, bananen, koffie en afwasmiddel. Thuis: donderdag de lakens verschonen en iemand bellen voor de keukenkraan.",
-      "vic": "Lissabon in 3 dagen: dag 1, Alfama en het kasteel. Dag 2, Belém en de rivier. Dag 3, Sintra. De goedkoopste vluchten zijn op dinsdag de 12e. Zal ik de prijs in de gaten houden?",
-      "rui": "Hoi Marcos, hier is het voorstel: een nieuwe site met 5 pagina's, opgeleverd in 3 weken, betaald in twee delen. Als het je goed lijkt, stuur ik vandaag het contract."
-    },
     "channels": {
       "iara": "support",
       "caio": "financien",
@@ -17382,5 +17575,65 @@
     },
     "approvals": "Wat naar klanten gaat, wacht op je goedkeuring. Je kunt het later vrijgeven, als je ze vertrouwt.",
     "approvalsPersonal": "Alles wat in jouw naam wordt verstuurd, betaald of geboekt, wacht op je goedkeuring. Je kunt het later vrijgeven, als je ze vertrouwt."
+  },
+  "arrival": {
+    "beta": {
+      "word": "BETA",
+      "title": "Je bent er vroeg bij. Fijn dat je er bent.",
+      "text": "agentes.chat is in bèta: je kunt er al echt mee werken, en we schaven er nog aan.",
+      "weekly": {
+        "title": "Het wordt elke week beter",
+        "text": "Nieuwe dingen en verbeteringen komen voortdurend uit."
+      },
+      "fails": {
+        "title": "Soms gaat er iets mis",
+        "text": "Als het vastloopt of er vreemd uitziet, ligt dat aan ons, niet aan jou."
+      },
+      "feedback": {
+        "title": "Jouw feedback bepaalt wat er komt",
+        "text": "Vertel ons wat er ontbrak of in de weg zat. We lezen alles."
+      },
+      "where": "Gebruik Feedback sturen, onderaan de zijbalk, om ons te schrijven."
+    },
+    "stage": {
+      "ready": "Je team staat klaar",
+      "wake": "Het heeft alleen nog een AI nodig om wakker te worden.",
+      "morning": "Goedemorgen, team",
+      "awake": "Iedereen is wakker en denkt al mee."
+    },
+    "connect": {
+      "title": "Koppel een AI zodat je team kan denken",
+      "text": "Gebruik een abonnement dat je al hebt. Aan je abonnement verandert niets.",
+      "others": "Ander abonnement",
+      "free": "Gratis beginnen",
+      "freeText": "Met de gratis modellen van OpenCode",
+      "noPlan": "Zonder abonnement",
+      "without": "Zonder AI antwoorden de agents niet.",
+      "later": "Niet nu"
+    }
+  },
+  "feedback": {
+    "mark": "Beta",
+    "open": "Feedback sturen",
+    "ask": "Wat ontbrak er, ging er stuk of zat in de weg?",
+    "goesCloud": "Wat je schrijft gaat per e-mail naar het team van agentes.chat.",
+    "goesServer": "Wat je schrijft gaat per e-mail naar degene die deze server beheert.",
+    "placeholder": "Schrijf het op jouw manier",
+    "report": "Hier een probleem melden",
+    "aboutMessage": "Over het bericht van {{name}}",
+    "aboutItem": "Over: {{name}}",
+    "aboutThis": "Over waar je op klikte",
+    "aboutDrop": "Dit fragment niet versturen",
+    "attach": "Foto of video toevoegen",
+    "filesHint": "Maximaal {{images}} foto's van {{imageMb}} MB en één video van {{videoMb}} MB, {{days}} dagen bewaard.",
+    "removeFile": "{{name}} verwijderen",
+    "uploading": "{{name}} wordt verstuurd",
+    "fileType": "Je kunt alleen foto's en video's toevoegen.",
+    "fileTooLarge": "{{name}} is te groot: de limiet is {{mb}} MB.",
+    "fileTooMany": "Eén feedback kan maximaal {{images}} foto's en één video bevatten.",
+    "send": "Versturen",
+    "thanks": "Afgeleverd. Bedankt.",
+    "reply": "Alles wordt gelezen. Een antwoord, als dat nodig is, komt naar {{email}}.",
+    "another": "Nog een sturen"
   }
 }

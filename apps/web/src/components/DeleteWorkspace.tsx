@@ -23,8 +23,8 @@ import { useMutation } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { AddPasswordDialog } from "@/components/AddPassword";
-import { saveExport } from "@/components/ImportFlow";
 import { useNow } from "@/hooks/useNow";
+import { saveExport } from "@/lib/workspace-export";
 import "./deletion.css";
 
 /**

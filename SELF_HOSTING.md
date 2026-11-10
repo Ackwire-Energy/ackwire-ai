@@ -672,8 +672,9 @@ internet instead, and need it public:
 
 - Routines started by a GitHub or Sentry webhook (the address the routine shows, `/api/webhooks/…`).
 - Routines started by a webhook of their own (the address on the routine's page, `/api/hooks/…`).
-- A GitHub App's events (`/api/github-app/webhook`). Optional: without them, the GitHub panel in
-  **Settings → Connectors** checks the installations with GitHub when it opens.
+- A GitHub App's events (`/api/github-app/webhook`): what people write on the pull requests, issues and discussions
+  agents worked on, or that name the app, wakes the agent. Without them agents don't hear GitHub, and the GitHub
+  panel in **Settings → Connectors** checks the installations with GitHub when it opens.
 - Composio's events (`/api/webhooks/composio`, with `COMPOSIO_API_KEY`): new mail for routines, and connector
   accounts that expired.
 - AI apps that call from their own servers (Apps de IA, below): claude.ai, the Claude apps and ChatGPT reach
@@ -989,8 +990,11 @@ There are two ways to set the app up:
   `GITHUB_APP_CLIENT_SECRET` and, with a webhook, `GITHUB_APP_WEBHOOK_SECRET`. Register it with:
   - Callback URL `{PUBLIC_URL}/api/app/github-app/callback`, with **Request user authorization (OAuth) during
     installation** on.
-  - Webhook URL `{PUBLIC_URL}/api/github-app/webhook`, optional: without it, the GitHub panel checks the
-    installations with GitHub when it opens.
+  - Webhook URL `{PUBLIC_URL}/api/github-app/webhook`, optional: without it, agents don't hear what happens on
+    GitHub, and the GitHub panel checks the installations with GitHub when it opens. Subscribe it to Issues, Issue
+    comment, Pull request, Pull request review, Pull request review comment, Pull request review thread, Discussion
+    and Discussion comment (an app made from Settings has them; one made before shows its owner which to tick, with
+    its page on GitHub).
   - Repository permissions, read and write: Actions, Administration, Attestations, Checks, Code scanning alerts, Commit
     statuses, Contents, Custom properties, Dependabot alerts, Dependabot secrets, Deployments, Discussions,
     Environments, Issues, Merge queues, Packages, Pages, Projects (classic), Pull requests, Repository security
@@ -1469,6 +1473,66 @@ docker compose up -d
 An uptime check from outside the server on `https://<your address>/api/health` is worth having: it
 answers 200 only while the app and its database are up, so it tells you when the server doesn't come
 back. On Tailscale, run it from another device in your tailnet.
+
+</details>
+
+<details>
+<summary><b>More at once: worker processes</b></summary>
+
+The app runs its jobs (agents' runs, routines, messages' routing, notifications, emails) in its own
+process: 48 at once to start with, 12 of them kept for the quick ones. While jobs wait for a slot, it
+gives itself more, every 30 seconds: agents' runs as far as half of its memory holds them, about 4 MB
+each while they wait on their model or their computer, and quick jobs up to 4 per database connection
+(`DATABASE_POOL_MAX`), never while its processor, its database or its memory is what jobs wait on. Its
+memory is its container's limit when it has one; beside Postgres and the speech server on one computer,
+it counts only what it holds and what was free there when it started.
+Workspaces take turns, so one workspace's burst of routines makes only that workspace wait. When jobs
+keep waiting anyway, the log says so, with `add a worker process`, and so do the error reports when
+they are on (`SENTRY_DSN`).
+
+A worker process runs jobs only: it answers its health check and nothing else over HTTP, and leaves
+pushes to the app, the process that knows who has the app open. Add one next to `agentes` in the
+compose file, with the same image and settings. It leaves the migrations to the app and starts once the
+app is up:
+
+```yaml
+  agentes-worker:
+    image: "${AGENTES_IMAGE:-ghcr.io/agentes-chat/agentes:latest}"
+    env_file: .env
+    environment:
+      DATABASE_URL: "postgres://agentes:${POSTGRES_PASSWORD}@postgres:5432/agentes"
+      FILES_DIR: /data/files
+      SERVER_ROLE: worker
+      RUN_MIGRATIONS_ON_BOOT: "false"
+    volumes:
+      - files:/data/files
+    depends_on:
+      postgres:
+        condition: service_healthy
+      agentes:
+        condition: service_healthy
+    networks: [default, speech]
+    restart: unless-stopped
+    stop_grace_period: 40s
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+```
+
+Then `docker compose up -d`. Every process takes jobs from the same queue in Postgres, each job on one
+process at a time (a job whose process stopped mid-way runs again once its lease ends, which jobs are
+written for), so each worker adds as many jobs at once as the app runs. Each process keeps up to
+`DATABASE_POOL_MAX` connections (20), plus one it listens on: keep their sum under Postgres's
+`max_connections` (100 in the compose file's Postgres). Before a reboot, stop the worker with the app
+(`docker compose stop agentes agentes-worker`). A worker on another computer needs the app's files
+where it can reach them (`S3_*`, or Postgres without `FILES_DIR`), and one on the app's computer
+outside Docker a `PORT` of its own. The built-in database (on this computer, without Docker) belongs
+to one process and takes no worker.
 
 </details>
 

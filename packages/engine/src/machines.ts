@@ -148,6 +148,10 @@ export function machineOnline(row: Pick<MachineRow, "online" | "lastSeenAt" | "d
   return now.getTime() - row.lastSeenAt.getTime() <= MACHINE_STALE_MS;
 }
 
+/** The operator put the workspace's own computer in standby (ADR 0161): offline by design until something wants it. */
+export const inStandby = (row: Pick<MachineRow, "kind" | "standbyAt">) =>
+  row.kind === "managed" && row.standbyAt !== null;
+
 /** The pause in force now (a past `until` is over); null when not paused. */
 export function machinePause(
   row: Pick<MachineRow, "paused" | "pausedUntil">,
@@ -420,6 +424,8 @@ async function machineViews(db: Database, actorId: string, orgId: string, only?:
       /** `connected` (a person paired it), `host` (the server's own) or `managed` (the workspace's, never removed here). */
       kind: m.kind,
       online: machineOnline(m, now),
+      /** The workspace's own computer is asleep in standby (ADR 0161): it wakes when wanted, nothing is wrong. */
+      standby: inStandby(m),
       networkTransition: managed ? m.networkTransition : null,
       egress: managed && machineOnline(m, now) && m.egress?.ip ? { ...m.egress, ip: m.egress.ip } : null,
       lastSeenAt: m.lastSeenAt?.toISOString() ?? null,
@@ -692,6 +698,8 @@ export async function detachMachine(tx: Executor, machine: Pick<MachineRow, "id"
       ...(machine.kind === "connected" ? {} : { tokenHash: null }),
       online: false,
       connectedReplica: null,
+      // A managed computer issued again comes back on this row, not asleep (ADR 0161).
+      standbyAt: null,
       previousAgentIds: ids,
       updatedAt: now,
     })

@@ -18,7 +18,7 @@ import { agentSections } from "@agenteschat/client/lib/agent-groups";
 import { planLabel, planOfAccount } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { isOutOfOffice } from "@agenteschat/client/lib/presence";
-import { isAuto } from "@agenteschat/client/lib/providers";
+import { isAuto, providerLabel } from "@agenteschat/client/lib/providers";
 import { type WorkItem, workByAgent } from "@agenteschat/client/lib/working";
 import type { TFunction } from "i18next";
 import { daysAgo, previewOf } from "../shared/logic";
@@ -459,9 +459,14 @@ export function usesOf(access: AgentAccess | null | undefined): { lines: UseLine
 
 /**
  * A profile's Modelo row as the web's fact sheet says it: the model it thinks with, and how after it on the value's
- * line ("Pela API", or the plan whose model it is).
+ * line ("Pela API", or the plan whose model it is). On Automático through the API, the maker its models come from,
+ * then Automático.
  */
 export function modelRow(t: TFunction, brain: AgentBrainLine | undefined, apiModel: string) {
+  // Only Automático carries a maker. `apiModel` may already be that maker's name (`apiModelName`): the note says
+  // Automático itself, never "Claude · Claude".
+  if (brain?.kind === "model" && brain.maker)
+    return { value: providerLabel(brain.maker), valueNote: t("brain.auto.label") };
   if (!brain || brain.kind === "model") return { value: apiModel, valueNote: t("brain.foot.api") };
   return {
     value: isAuto(brain.model) ? t("brain.auto.label") : (brain.model ?? apiModel),

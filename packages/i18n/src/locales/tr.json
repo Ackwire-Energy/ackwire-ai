@@ -696,6 +696,42 @@
       "left_other": "{{count}} adım kaldı",
       "done": "Her şey hazır"
     },
+    "flow": {
+      "steps": {
+        "name": "Çalışma alanı adı",
+        "business": "Ne yapıyorsunuz",
+        "team": "Ekibin",
+        "plan": "Ekibi başlat"
+      },
+      "stepOf": "Adım {{n}}/{{total}}",
+      "lodi": {
+        "name": "Merhaba {{first}}. Ben {{name}}. Ekibi seninle yaklaşık iki dakikada kuracağım.",
+        "business": "Bununla ekibe kimi çağıracağımı biliyorum.",
+        "team": "Ben olsam bu ekibi kurardım. Her şeyi sonra değiştirebilirsin.",
+        "plan": "Plandan sonra sadece bir yapay zeka bağlamak kalıyor. Nerede olduğunu gösteririm."
+      },
+      "preview": {
+        "label": "Sen cevapladıkça çalışma alanın",
+        "name": "Çalışma alanın",
+        "ghost": "Ekibin burada görünecek"
+      },
+      "team": {
+        "title": "Ekibin"
+      },
+      "plan": {
+        "title": "Ekibini başlat",
+        "lead": "Ekibin hazır. Plan ve bir yapay zekayla bugün başlıyor.",
+        "asleep": "Plana kadar uykuda",
+        "price": "<b>{{name}} planı</b> · ayda {{price}}",
+        "name": "<b>{{name}} planı</b>",
+        "generic": "Bir agentes.chat planı",
+        "cancel": "İstediğin zaman iptal et",
+        "cta": "Ekibi başlat",
+        "all": "Tüm planları gör",
+        "skip": "Başlatmadan çalışma alanına gir"
+      },
+      "account": "Hesabın"
+    },
     "railValue": {
       "context": "Yazıldı",
       "skipped": "Atlandı",
@@ -1345,27 +1381,19 @@
     }
   },
   "webPushAsk": {
-    "title": "Bir ajan size ihtiyaç duyduğunda haberiniz olsun",
-    "text": "Siz başka bir şey yaparken onlar çalışır. Sekme kapalıyken bile onayınıza ihtiyaç duyduklarında, istediğinizi bitirdiklerinde ya da sizi çağırdıklarında size haber veririz.",
     "on": "Bildirimleri aç",
     "later": "Şimdi değil",
     "done": "Bu tarayıcıda bildirimler açık",
     "failed": "Bildirimler açılamadı. Ayarlar › Bildirimler bölümünden yeniden deneyin.",
     "someone": "Bir ajan",
-    "examples": "Bildirim örnekleri",
     "now": "şimdi",
-    "minutes": "{{n}} dk",
-    "approval": {
-      "title": "{{name}} onayınızı bekliyor",
-      "body": "İstediğiniz şeye devam edebilir miyim?"
-    },
     "finished": {
       "title": "{{name}} bitirdi",
       "body": "İstediğiniz şey hazır."
     },
-    "mention": {
-      "title": "{{name}} sizi çağırdı",
-      "body": "Bir dakikanız olduğunda bakabilir misiniz?"
+    "inline": {
+      "title": "{{name}} cevap verdiği anda haberin olsun mu?",
+      "why": "Sekme kapalıyken bile. İstediğin zaman Ayarlar › Bildirimler bölümünden değiştir."
     }
   },
   "shell": {
@@ -1568,8 +1596,6 @@
     "organize": "Departmanları Ekip'te düzenle",
     "more_one": "Ekip'te 1 ajan daha",
     "more_other": "Ekip'te {{count}} ajan daha",
-    "createFirst": "İlk ajanı oluştur",
-    "createFirstPersonal": "İlk ajanınızı oluşturun",
     "newAgent": "Yeni ajan",
     "working_one": "{{count}} çalışıyor",
     "working_other": "{{count}} çalışıyor",
@@ -1587,7 +1613,6 @@
     "pin": "En üste sabitle",
     "unpin": "Sabitlemeyi kaldır",
     "pinned": "En üste sabitlendi",
-    "hint": "Ajanlarınız en üstte kalır. Sabitlemek için herhangi bir konuşmaya sağ tıklayın.",
     "full": {
       "agents": "Zaten 5 ajan sabitlediniz. Bunu sabitlemek için birini kaldırın.",
       "channels": "Zaten 5 kanal sabitlediniz. Bunu sabitlemek için birini kaldırın.",
@@ -2011,6 +2036,7 @@
     "popoverTitle": "Ajanlar",
     "seenBy": "{{names}} gördü",
     "retry": "Yeniden dene",
+    "retrying": "Yeniden deneniyor…",
     "platformCap": "Yanıt vermesi için bir ajandan @ ile bahsedin.",
     "mentionNeeded": "@ olmadan hiçbir ajan yanıtlamaz",
     "mentionNeededHint": "Buradaki hiçbir yapay zeka bu mesaj için bir ajan seçemedi. Çağırmak için bir ajandan bahsedin.",
@@ -2024,9 +2050,8 @@
   },
   "rightHand": {
     "label": "sağ kolun",
+    "labelCapitalized": "Sağ kolun",
     "newDot": "Yeni",
-    "role": "Çalışma alanı asistanı",
-    "rolePersonal": "Kişisel asistan",
     "actsAsYou": "senin izinlerinle çalışır",
     "composerHint": "sen olmadan hiçbir şey değişmez",
     "intro": {
@@ -2050,9 +2075,6 @@
         "questionPersonal": "Benimle daha fazla ajan kurmak ister misin?",
         "actionPersonal": "Ajanları kur",
         "messagePersonal": "Ajanlarımı kurmama yardım et."
-      },
-      "next": {
-        "firstTask": "{{name}} için ilk görevi ver"
       },
       "style": {
         "question": "Sizinle nasıl konuşmamı istersiniz?",
@@ -2382,8 +2404,10 @@
     "rightHand": {
       "computer_away": "{{name}} şu an yanıt veremiyor: planın bilgisayarına ulaşılamıyor.",
       "computer_failed": "{{name}} şu an yanıt veremiyor: planın bilgisayarında bir sorun oldu.",
+      "cli_failed": "{{name}} şu an yanıt veremiyor: planın yapay zekası bir hatayla durdu.",
       "plan_limit": "{{name}} şu an yanıt veremiyor: plan sınırına ulaştı.",
       "plan_not_shared": "{{name}} ile konuşmak için kendi planını bağla: çalışma alanının planı yalnızca sahibine yanıt verir.",
+      "plan_unattended": "{{name}} yanıt vermedi: istek bir kişiden gelmedi ve çalışma alanının planı yalnızca sahibine yanıt verir.",
       "runner_outdated": "{{name}} şu an yanıt veremiyor: planın bilgisayarındaki programın güncellenmesi gerekiyor.",
       "plan_tools": "{{name}} yanıt vermeden durdu: o bilgisayardaki planın yapay zekâsı agentes.chat araçlarıyla sınırlı kalmadı.",
       "model_limit": "{{name}} şu an yanıt veremiyor: {{model}} plandaki kendi sınırına ulaştı. Planın diğer modelleri çalışmaya devam ediyor.",
@@ -3618,6 +3642,14 @@
         },
         "field": {
           "token": "Hizmet hesabı token'ı"
+        },
+        "error": {
+          "invalid_input": "Bu bir hizmet hesabı token'ı değil. ops_ ile başlayan token'ı yapıştırın.",
+          "auth_failed": "1Password bu token'ı kabul etmedi. Yeni bir hizmet hesabı oluşturup token'ını buraya yapıştırın.",
+          "no_vault": "Bu hizmet hesabının hiçbir kasaya erişimi yok. Ajanlarınızın kasasına erişimi olan yeni bir hizmet hesabı oluşturun.",
+          "many_vaults": "Bu hizmet hesabının birden fazla kasaya erişimi var. Yalnızca ajanlarınızın kasasına erişimi olan yeni bir hizmet hesabı oluşturun.",
+          "unreachable": "1Password'e ulaşılamadı. Bir dakika sonra tekrar deneyin.",
+          "unsupported": "1Password burada bağlanamıyor. Bunun yerine ajanlarınızın ihtiyaç duyduğu giriş bilgilerini Vault'a kaydedin."
         }
       },
       "bitwarden": {
@@ -4103,7 +4135,6 @@
       "browser": "Tarayıcı",
       "members": "Üyeler",
       "usage": "Kullanım",
-      "connectors": "Bağlayıcılar",
       "dashboard": "Pano"
     },
     "reactions_one": "{{count}} tepki",
@@ -5001,6 +5032,9 @@
         "computer_busy": "Bilgisayar başka görevlerle meşgul kaldı.",
         "computer_failed": "Bilgisayar bir sorunla karşılaştı ve durdu.",
         "computer_timeout": "Bilgisayarın yanıt vermesi çok uzun sürdü.",
+        "cli_failed": "Bir hata {{brain}} programını durdurdu: {{detail}}",
+        "cli_stopped": "Bir hata {{brain}} programını durdurdu.",
+        "cli_closed": "Beklenmedik şekilde {{brain}} programı kapandı.",
         "account_missing": "Bu ajan için seçilen hesap artık bilgisayarında değil. Ajanın ayarlarından başka bir hesap seçin ya da yeniden ekleyin.",
         "our_error": "Bizim tarafımızda bir şeyler ters gitti ve görev durdu. Birazdan yeniden isteyin.",
         "unknown": "Başarısız oldu."
@@ -5186,6 +5220,19 @@
     "include": "{{name}} dahil et",
     "acceptAll": "Hepsi için kabul et",
     "acceptSome": "{{count}} tanesi için kabul et",
+    "all": {
+      "label": "Tüm önerilere karar ver",
+      "accept": "Tümünü kabul et",
+      "refuse": "Tümünü reddet",
+      "acceptAsk_one": "Öneri kabul edilsin mi? Hemen geçerli olur.",
+      "acceptAsk_other": "{{count}} önerinin tümü kabul edilsin mi? Her biri hemen geçerli olur.",
+      "refuseAsk_one": "Öneri reddedilsin mi? Ajan bunu bir daha önermez.",
+      "refuseAsk_other": "{{count}} önerinin tümü reddedilsin mi? Ajanlar bunları bir daha önermez.",
+      "acceptGo_one": "Kabul et",
+      "acceptGo_other": "{{count}} öneriyi kabul et",
+      "refuseGo_one": "Reddet",
+      "refuseGo_other": "{{count}} öneriyi reddet"
+    },
     "staleSome_one": "Biri kabul edilmedi: metni öneriden sonra değişti.",
     "staleSome_other": "{{count}} tanesi kabul edilmedi: metinleri öneriden sonra değişti.",
     "staleSomeAgent_one": "Biri kabul edilmedi: ajan öneriden sonra değişti.",
@@ -5217,6 +5264,8 @@
     "refuseNote": "Reddetmek, {{name}} ajanına bunu bir daha önermemeyi öğretir.",
     "added": "Eklendi:",
     "removed": "Kaldırıldı:",
+    "sameLines_one": "{{count}} değişmeyen satır",
+    "sameLines_other": "{{count}} değişmeyen satır",
     "empty": "Biri bir ajandan değişiklik istediğinde veya bir ders tekrarlandığında öneri burada görünür.",
     "emptyTitle": "İncelenecek bir şey yok",
     "titleInstructions": "{{name}} talimatlarını güncelle",
@@ -5349,10 +5398,7 @@
       "notNow": "Şimdi değil",
       "afterPlan": "Planla açılır.",
       "about": {
-        "todo": "{{org}} ne yapıyor, anlat.",
-        "todoDesc": "Bunu tüm ajanlar okur.",
         "action": "Anlat",
-        "done": "{{org}} ne yapıyor biliyorum",
         "title": "{{org}} ne yapıyor?",
         "desc": "Bunu tüm ajanlar okur. İstediğin zaman değiştirebilirsin.",
         "line": "Tek cümleyle",
@@ -5366,26 +5412,18 @@
         "optionalPersonal": "İsteğe bağlı. Cümle yoksa seçtiğin alanlar geçerli."
       },
       "team": {
-        "todo": "Ekibi kur.",
-        "todoDesc": "İşin için bir şablon, sonra her şeyi değiştirebilirsin.",
-        "action": "Ekibi gör",
-        "done_one": "Ekipte {{count}} ajan",
-        "done_other": "Ekipte {{count}} ajan",
         "todoPersonal": "Ajanlarını seç.",
         "todoDescPersonal": "Hazır bir başlangıç, sonra her şeyi değiştirebilirsin.",
         "actionPersonal": "Ajanları gör",
         "donePersonal_one": "{{count}} ajan",
-        "donePersonal_other": "{{count}} ajan",
-        "card": "Aşağıdaki kartta devam et"
+        "donePersonal_other": "{{count}} ajan"
       },
       "ai": {
         "todo": "Bir yapay zekâ bağla.",
         "todoDesc": "Zaten ödediğin olur.",
         "action": "Bağla",
         "done": "{{label}} ile düşünüyorum",
-        "doneAny": "Artık bir yapay zekâ ile düşünüyorum",
-        "plan": "agentes.chat planıyla açılır.",
-        "planAction": "agentes.chat planlarını gör"
+        "doneAny": "Artık bir yapay zekâ ile düşünüyorum"
       },
       "apps": {
         "todo": "İş uygulamalarını bağla.",
@@ -5408,14 +5446,17 @@
         "action": "Davet et",
         "done_one": "Burada {{count}} kişi",
         "done_other": "Burada {{count}} kişi",
-        "doneNone": "Şimdilik sadece sen"
+        "doneNone": "Şimdilik sadece sen",
+        "invited": "{{names}} davet edildi · bekleniyor",
+        "email": "ad@sirket.com",
+        "send": "Gönder",
+        "more": "Diğer seçenekler"
       },
       "say": {
-        "about": "Not aldım. Bunu tüm ajanlar okur.",
-        "team": "Ekip geldi.",
         "ai": "Artık ekip düşünüyor.",
         "apps": "Tamam, artık uygulamaları okuyorum.",
         "people": "Burada daha çok insan olması güzel.",
+        "invited": "Davet gönderildi.",
         "aboutPersonal": "Not aldım. Bunu tüm ajanların okur.",
         "teamPersonal": "Ajanların geldi.",
         "aiPersonal": "Artık ajanların düşünebilir.",
@@ -5430,42 +5471,6 @@
         "whoPersonal": "Hangi ajan ne yapıyor?"
       }
     }
-  },
-  "newAgentAsk": {
-    "title": "Yeni ajanın ne yapsın?",
-    "lead": "Tek cümleyle söyle. {{name}} hazırlar ve oluşturmadan önce sana gösterir.",
-    "field": "Senin için ne yapar",
-    "placeholder": "Örn. Takvimimi düzenli tutmak ve önemli şeyleri hatırlatmak",
-    "ideas": "Fikirler",
-    "idea": {
-      "agenda": {
-        "label": "Takvim",
-        "text": "Takvimimi düzenli tutmak ve randevularımı hatırlatmak"
-      },
-      "money": {
-        "label": "Finans",
-        "text": "Faturalarımı takip etmek ve son günden önce haber vermek"
-      },
-      "training": {
-        "label": "Antrenman",
-        "text": "Haftalık antrenmanlarımı planlamak ve nasıl hissettiğime göre ayarlamak"
-      },
-      "studies": {
-        "label": "Ders",
-        "text": "Bana bir çalışma planı yapmak ve öğrendiklerimi sormak"
-      },
-      "home": {
-        "label": "Ev",
-        "text": "Alışveriş listesini ve ev işlerini düzenli tutmak"
-      },
-      "travel": {
-        "label": "Seyahat",
-        "text": "Seyahatlerimi planlamak: rota, rezervasyonlar ve belgeler"
-      }
-    },
-    "full": "Hepsini kendim doldurayım",
-    "create": "{{name}} ile oluştur",
-    "message": "Yeni bir ajan istiyorum: {{what}}"
   },
   "newAgent": {
     "title": "Ajan oluştur",
@@ -5826,7 +5831,197 @@
     "and": " ve ",
     "routine": "Rutin",
     "routineKeep": "{{name}} rutinini oluştur",
-    "routineNotMade": "Rutin oluşturulmadı: {{reason}}"
+    "routineNotMade": "Rutin oluşturulmadı: {{reason}}",
+    "hello": {
+      "clara": "Takviminle ilgilenip önemli olanı geç olmadan sana hatırlatacağım.",
+      "duda": "Faturalarını ve harcamalarını takip edip bir şeyin vadesi gelmeden seni uyaracağım.",
+      "leo": "Antrenmanlarını hazırlayıp seni kendi tarzınla ritimde tutacağım.",
+      "mel": "Öğünlerini ve alışveriş listeni damak tadına ve bütçene göre planlayacağım.",
+      "gabi": "Çalışma planını hazırlayıp öğrendiklerin hakkında sana sorular soracağım.",
+      "lu": "Notlarını ve fikirlerini saklayıp hepsini metne dönüştürmene yardım edeceğim.",
+      "rosa": "Alışveriş listesiyle, ev işleriyle ve tamir edilmesi gerekenlerle ilgileneceğim.",
+      "vic": "Seyahatlerini planlayacağım: tarihler, fiyatlar, rezervasyonlar ve gün gün program.",
+      "rui": "Müşterilerini takip edip teklif ve ödeme hatırlatmaları yazacak, kimin ödemediğini aklımda tutacağım.",
+      "dev": "Kod yazarım, PR'ları incelerim ve hataları araştırırım.",
+      "ops": "Hataları, kuyrukları ve dağıtımları takip ederim.",
+      "qa": "Akışları test eder, bildirilen hataları yeniden üretirim.",
+      "pm": "Görevleri düzenler, özetleri hazırlarım.",
+      "support": "Müşterilere yanıt verir, bir insan gerektireni iletirim.",
+      "sales": "Teklif hazırlar, ilgilenenleri takip ederim.",
+      "marketing": "Kampanyaları, gönderileri ve site sayfalarını planlarım.",
+      "content": "Metin, makale ve bülten yazar, düzenlerim.",
+      "data": "Soruları rakamlarla yanıtlar, raporlar hazırlarım.",
+      "finance": "Ödemeleri, tahsilatları ve harcamaları takip ederim.",
+      "people": "İşe alım, oryantasyon ve ekibin sorularında yardım ederim.",
+      "research": "Bir konuyu araştırır, kaynaklarıyla bir özet sunarım.",
+      "assistant": "Takvim, e-postalar ve hatırlatıcılarla ilgilenirim."
+    },
+    "starters": {
+      "clara": {
+        "instructions": "Her sabah takvime bakar ve günün programını gönderir.\nHer randevuyu ve tarihi olan her faturayı bir gün önceden hatırlatır.\nSormadan asla randevu almaz, iptal etmez ya da davet kabul etmez.",
+        "tasks": {
+          "a": "Yarın neyim var?",
+          "b": "Her ayın 5'inde kirayı ödememi hatırlat",
+          "c": "Takvimimi her gün saat 7'de gönder"
+        }
+      },
+      "duda": {
+        "instructions": "Faturaları ve harcamaları kategoriye göre takip eder.\nBir şeyin vadesinden üç gün önce ve olağan dışı bir harcamada uyarır.\nSormadan asla ödeme yapmaz, para göndermez ya da bir şeyi iptal etmez.",
+        "tasks": {
+          "a": "Bu ay ne kadar harcadım?",
+          "b": "Bu hafta hangi faturaların vadesi geliyor?",
+          "c": "Bu harcamaları kategoriye göre ayır"
+        }
+      },
+      "leo": {
+        "instructions": "Antrenmanları seviyene, zamanına ve sevdiklerine göre hazırlar.\nBir günü kaçırdığında ya da yorulduğunda haftayı nutuk atmadan ayarlar.\nTıbbi tavsiye vermez: ağrı ya da sakatlıkta bir uzmana gitmeni önerir.",
+        "tasks": {
+          "a": "Bugün için 30 dakikalık bir antrenman hazırla",
+          "b": "Koşu haftamı planla",
+          "c": "Her sabah günün antrenmanını gönder"
+        }
+      },
+      "mel": {
+        "instructions": "Haftanın öğünlerini zevkine, zamanına ve bütçene göre planlar.\nMenünün alışveriş listesini market reyonlarına göre hazırlar.\nKısıtlamalara ve alerjilere uyar, diyet ya da tıbbi tavsiye vermez.",
+        "tasks": {
+          "a": "Üç hızlı akşam yemeği öner",
+          "b": "Haftanın menüsünü hazırla",
+          "c": "Menü için alışveriş listesi yap"
+        }
+      },
+      "gabi": {
+        "instructions": "Sınava kadar her güne sığanla bir çalışma planı hazırlar.\nÇalıştıklarından sorular sorar ve yanlış yaptığını yeniden anlatır.\nÖdevini senin yerine yapmaz: cevaba ulaşman için yol gösterir.",
+        "tasks": {
+          "a": "Sınav için bir çalışma planı hazırla",
+          "b": "Çalıştığım konudan bana 3 soru sor",
+          "c": "Bu konuyu basitçe anlat"
+        }
+      },
+      "lu": {
+        "instructions": "Gönderdiğin notları ve fikirleri saklar, benzerlerini bir araya getirir.\nNotları senin üslubunla metne dönüştürür, söylemediğin bir şey eklemez.\nÖzenle düzenler ve orijinalin yerine koymadan önce neyin değiştiğini gösterir.",
+        "tasks": {
+          "a": "Bu notları kısa bir metne dönüştür",
+          "b": "Haftanın fikirlerini topla",
+          "c": "Bu metni düzenle"
+        }
+      },
+      "rosa": {
+        "instructions": "Alışveriş listesini ve ev işlerini güncel tutar.\nTamir edilmesi gerekeni not eder ve halledilene kadar hatırlatır.\nSormadan asla bir şey satın almaz ya da kimseyi tutmaz.",
+        "tasks": {
+          "a": "Haftanın alışveriş listesini hazırla",
+          "b": "Evde neyin tamire ihtiyacı var?",
+          "c": "Ev işlerini paylaştır"
+        }
+      },
+      "vic": {
+        "instructions": "Seyahati tarihler, fiyatlar ve gün gün bir programla planlar.\nUçuşları ve konaklamaları karşılaştırır, her birini neden önerdiğini söyler.\nSormadan asla rezervasyon yapmaz ya da ödeme yapmaz.",
+        "tasks": {
+          "a": "Lizbon'da 3 gün planla",
+          "b": "Bilet ucuzlarsa haber ver",
+          "c": "Seyahatin rezervasyonlarını topla"
+        }
+      },
+      "rui": {
+        "instructions": "Her müşteriyi takip eder: ne kararlaştırıldı, ne kaldı ve kim ödemedi.\nTeklifleri ve ödeme hatırlatmalarını senin üslubunla, gözden geçirmeye hazır yazar.\nOnayın olmadan bir müşteriye asla bir şey göndermez.",
+        "tasks": {
+          "a": "Bir müşteri için kısa bir teklif yaz",
+          "b": "Kim henüz ödemedi?",
+          "c": "Bugün her müşteri ne bekliyor?"
+        }
+      }
+    }
+  },
+  "newAgentCard": {
+    "title": "Yeni ajan",
+    "lead": "Solda seç, sağda ayarla. Her şeyi sonra değiştirebilirsin.",
+    "list": "Başlangıç noktaları",
+    "zero": "Sıfırdan",
+    "zeroSub": "Ne yapacağını sen söylersin",
+    "import": "Başka bir uygulamadan ajan getir",
+    "hi": "Merhaba, ben",
+    "hiBlank": "Merhaba, ben",
+    "name": "Ad",
+    "namePlaceholder": "ad",
+    "what": "Ne yapar",
+    "whatPlaceholder": "Senin için ne yapacağım?",
+    "look": "Görünüm",
+    "lookDone": "Tamam",
+    "shuffle": "Rastgele",
+    "handle": "Sohbette: @{{handle}}",
+    "handleRole": "Sohbette: @{{handle}} · {{role}}",
+    "handleTaken": "Sohbette: @{{handle}} · burada zaten bir {{name}} var",
+    "handleBlank": "Sohbetteki @ addan gelir",
+    "similar": "{{name}} gibi, o hazır geliyor.",
+    "similarAction": "{{name}} ile başla",
+    "uses": "Kullanacakları",
+    "chooseApps": "Uygulama seç",
+    "otherApp": "Başka uygulama",
+    "usesNone": "Şimdilik bir şey yok.",
+    "worksIn": "Çalıştığı yer",
+    "how": "{{name}} nasıl çalışır",
+    "howBlank": "Nasıl çalışır",
+    "instructionsPlaceholder": "Ne yapar, neden kaçınır, kimden yardım ister",
+    "picker": {
+      "title": "{{name}} uygulamaları",
+      "titleBlank": "Ajanın uygulamaları",
+      "lead": "Bağlı bir uygulama hemen karta eklenir. Diğerlerini burada bağlarsın.",
+      "suggested": "{{name}} için önerilenler",
+      "suggestedBlank": "Önerilenler",
+      "use": "Kullan",
+      "added": "Kartta"
+    },
+    "create": "{{name}} oluştur",
+    "createBlank": "Ajan oluştur",
+    "failed": "Oluşturulamadı: {{reason}}",
+    "level": {
+      "read": "Okur",
+      "write": "Okur ve yazar"
+    },
+    "app": {
+      "lead": "{{name}}, {{app}} içinde nereye kadar gider.",
+      "leadBlank": "{{app}} içinde nereye kadar gider.",
+      "read": "Okuma",
+      "readDesc": "{{app}} içinde olanı görür. Hiçbir şeyi değiştirmez.",
+      "write": "Okuma ve yazma",
+      "writeDesc": "{{app}} içinde oluşturur ve düzenler de.",
+      "asks": "{{actions}} her seviyede her zaman onayını ister.",
+      "asksAny": "Göndermek, silmek ve ödemek her seviyede her zaman onayını ister.",
+      "remove": "{{app}} kaldır",
+      "done": "Tamam"
+    },
+    "band": {
+      "label": "{{name}} başlamak için neye ihtiyaç duyuyor",
+      "ai": "Düşünmek için bir yapay zekâ",
+      "asleep": "Yapay zekâ olana kadar uyuyor"
+    },
+    "skills": "Beceriler",
+    "skillsHelpBlank": "Gerektiğinde açtığı kılavuzlar.",
+    "chooseSkills": "Beceri seç",
+    "otherSkill": "Başka beceri",
+    "namesLead": "Şuna ne dersin",
+    "namesRoll": "Başka adlar",
+    "skill": {
+      "opens": "{{name}}, konu açıldığında bu kılavuzu açar. Beceriler'de düzenlersin.",
+      "opensBlank": "Konu açıldığında bu kılavuzu açar. Beceriler'de düzenlersin.",
+      "remove": "{{name}} için kaldır",
+      "removeBlank": "Ajandan kaldır",
+      "done": "Tamam"
+    },
+    "names": {
+      "agenda": "Lale, Saat, Tuna, Dora, Timur, Ece",
+      "agendaWords": "takvim, randevu, hatırlat, toplantı, ajanda",
+      "money": "Kuruş, Nil, Mina, Cem, Lara, Akçe",
+      "moneyWords": "fatura, harcama, para, finans, bütçe, ödeme",
+      "travel": "Rota, Melis, Ravi, Vika, Nara, Tolga",
+      "travelWords": "seyahat, gezi, bilet, uçuş, otel, tatil",
+      "training": "Leo, Bade, Şimşek, Kaya, Nina, Deniz",
+      "trainingWords": "antrenman, koşu, spor, egzersiz, salon",
+      "study": "Gabi, Nilo, Sofya, Teo, İris, Barış",
+      "studyWords": "ders, sınav, kurs, öğren, çalış",
+      "clients": "Rüzgar, Ayla, Bora, Lina, Oktay, Ceren",
+      "clientsWords": "müşteri, satış, teklif, tahsil",
+      "any": "Sol, Lale, Teo, Bade, Nino, İpek, Kaan, Luma, Gül, Rafa, Nara, Tuna"
+    }
   },
   "members": {
     "column": {
@@ -6647,20 +6842,19 @@
     "statusLabel": "Durum",
     "due": "Son tarih",
     "noDue": "Son tarih yok",
-    "seeCalendar": "takvimde gör",
+    "seeCalendar": "Takvimde gör",
     "removeDue": "Son tarihi kaldır",
     "links": "Bağlantılı",
     "prBy": "PR #{{number}} · açan: {{name}}",
     "artifactBy": "{{title}} ({{name}})",
-    "noLinks": "Henüz bağlantılı bir şey yok.",
     "github": {
       "label": "GitHub bağlantısı",
       "placeholder": "Issue veya PR bağlantısı",
       "invalid": "Bu bir GitHub issue veya pull request bağlantısı değil.",
-      "remove": "GitHub bağlantısını kaldır"
+      "remove": "GitHub bağlantısını kaldır",
+      "add": "GitHub bağlantısı ekle"
     },
     "openConversation": "Konuşmayı gör",
-    "labels": "Etiketler",
     "tabs": {
       "label": "Görevin bölümleri",
       "details": "Ayrıntılar",
@@ -7307,6 +7501,7 @@
       "computer_busy": "Bilgisayar başka görevlerle meşgul kaldı",
       "computer_failed": "Bilgisayar bir sorunla karşılaştı ve durdu",
       "computer_timeout": "Bilgisayarın yanıt vermesi çok uzun sürdü",
+      "cli_failed": "Bilgisayardaki yapay zeka programı bir hatayla durdu",
       "account_missing": "Ajanın hesabı artık bilgisayarında değil",
       "our_error": "Bizim tarafımızda bir şeyler ters gitti"
     },
@@ -8457,6 +8652,8 @@
     },
     "upcoming": "Yaklaşanlar",
     "upcomingEmpty": "Yaklaşan bir şey yok.",
+    "owners": "Ajanlar ve kişiler",
+    "showOwner": "{{name}} göster",
     "viewZone": "Takvim saat dilimi",
     "miniMonth": "Bir gün seçin",
     "new": "Yeni etkinlik",
@@ -8482,12 +8679,6 @@
         "declined": "Katılmayacaksınız."
       }
     },
-    "kind": {
-      "event": "Etkinlik",
-      "routine": "Rutin",
-      "reminder": "Hatırlatıcı",
-      "deadline": "Görev bitiş tarihi"
-    },
     "every": {
       "hour": "her saat",
       "hours": "{{count}} saatte bir",
@@ -8496,24 +8687,20 @@
     "perDay": "günde {{count}} kez",
     "runs_one": "Bu günlerde {{count}} çalıştırma.",
     "runs_other": "Bu günlerde {{count}} çalıştırma.",
-    "routineDetail": "{{agent}} ajanının rutini · {{target}} hedefine teslim eder.",
+    "routineDetail": "Rutin · {{target}} hedefine teslim eder",
     "deadlineDetail": "Görevin bitiş tarihi.",
     "reminderBy": "Oluşturan: {{name}}",
-    "reminderPosted": "Paylaşan: {{agent}} · {{target}}",
+    "reminderPosted": "Hatırlatıcı · {{target}} içinde paylaşılır",
     "cancelReminder": "Hatırlatıcıyı iptal et",
     "reminderCancelled": "Hatırlatıcı iptal edildi",
     "openIssue": "Görevi aç",
     "openRoutines": "Rutinlerde gör",
     "openRoutine": "Rutini aç",
     "runAria": "{{name}} rutini, {{time}}",
-    "runsAria": "{{time}} saatinde {{count}} rutin: {{names}}",
     "runHint": "{{name}} · {{agent}} · {{time}}",
     "runsAt": "{{time}} rutinleri",
-    "runsOn": "Rutinler · {{day}}",
-    "runsCount_one": "{{count}} rutin çalıştırması",
-    "runsCount_other": "{{count}} rutin çalıştırması",
-    "dayRunsAria_one": "{{day}} günü {{count}} rutin çalıştırması: {{names}}",
-    "dayRunsAria_other": "{{day}} günü {{count}} rutin çalıştırması: {{names}}",
+    "moreRuns_one": "+{{count}} rutin",
+    "moreRuns_other": "+{{count}} rutin",
     "runTimes": "×{{count}}",
     "result": {
       "ok": "yanıt verdi",
@@ -9182,22 +9369,6 @@
       "empty": "Çıkartma bulunamadı.",
       "foot": "Her ajanın görünümünden yapıldı"
     }
-  },
-  "memoryMark": {
-    "label": "{{name}} bunu belleğe kaydetti: {{text}}",
-    "saved": "{{name}} bunu kaydetti:",
-    "title": "{{name}} belleğe kaydetti",
-    "subtitle": "Sonraki sohbetlerde hatırlayacak",
-    "from": "{{name}} mesajından · {{time}}",
-    "view": "Bellekte gör",
-    "fix": "Düzelt",
-    "fixLabel": "Kaydedileni düzelt",
-    "save": "Kaydet",
-    "forget": "Unut",
-    "forgot": "{{name}} bunu unuttu",
-    "undo": "Geri al",
-    "fixed": "Bellek düzeltildi",
-    "fixedDetail": "{{name}} bundan sonra yeni sürümü kullanacak."
   },
   "correctionAsk": {
     "title": "{{name}} yeniden yapsın mı, yoksa neyin eksik olduğunu mu açıklasın?",
@@ -10357,6 +10528,8 @@
     "noChannel": "Kanal yok",
     "files": "Dosyalar",
     "select": "Seç: {{title}}",
+    "selectAll_one": "{{count}} öğeyi seç",
+    "selectAll_other": "{{count}} öğenin tümünü seç",
     "selection": "Seçim",
     "selected_one": "{{count}} seçildi",
     "selected_other": "{{count}} seçildi",
@@ -10540,8 +10713,10 @@
       },
       "line": {
         "env": "Bu sunucunun ayarlarında tanımlı (GITHUB_APP_ID).",
-        "invalid": "Bu sunucu kayıtlı uygulamayı açamıyor. Kaldırıp yeniden oluşturun."
+        "invalid": "Bu sunucu kayıtlı uygulamayı açamıyor. Kaldırıp yeniden oluşturun.",
+        "events": "Ajanların GitHub'da olanları duyması için uygulamada şu olayları işaretleyin: {{events}}."
       },
+      "events": "Olayları işaretleyin",
       "open": "GitHub'da aç",
       "remove": "Uygulamayı kaldır",
       "removeTitle": "Bu sunucunun GitHub uygulaması kaldırılsın mı?",
@@ -11050,34 +11225,6 @@
       "usageNoLimit": "Composio: {{month}} içinde {{calls}} çağrı",
       "limitNotice": "Bu çalışma alanı bu ayki Composio çağrılarını kullandı",
       "disconnectNote": "Composio hesabı unutur. {{name}} içindeki erişimini de kaldırmak için oradaki hesap ayarlarınızdan Composio'yu kaldırın."
-    },
-    "toolChanges": {
-      "title": "Değişen araçlar",
-      "intro": "Bu sunucular bir aracın söylediğini veya istediğini değiştirdi. Siz yenisini kabul edene kadar ajanlar onayladığınız sürümü kullanır.",
-      "count_one": "{{count}} araç değişti",
-      "count_other": "{{count}} araç değişti",
-      "acceptAll": "Tümünü kabul et",
-      "acceptedAll": "{{name}} araçları güncellendi.",
-      "show": "Değişikliği gör",
-      "hide": "Gizle",
-      "showAll": "Tümünü göster ({{total}})",
-      "textChanged": "Metin değişti",
-      "fieldsChanged_one": "{{count}} alan değişti",
-      "fieldsChanged_other": "{{count}} alan değişti",
-      "inputChanged": "Girdi değişti",
-      "description": "Metin",
-      "input": "Girdi",
-      "field": {
-        "added": "yeni",
-        "removed": "kaldırıldı",
-        "changed": "değişti"
-      },
-      "added": "Eklendi",
-      "removed": "Kaldırıldı",
-      "accept": "Kabul et",
-      "acceptOne": "{{tool}} aracını kabul et",
-      "accepted": "{{tool}} güncellendi.",
-      "notice": "{{name}} onayladığınız araçları değiştirdi"
     },
     "names": {
       "atlassian": "Atlassian (Jira ve Confluence)",
@@ -12145,6 +12292,9 @@
       "invalidSecret": "Client Secret'ın tamamını boşluksuz yapıştır.",
       "invalidRepo": "Depoyu sahip/ad biçiminde yaz."
     },
+    "githubEvent": {
+      "answered": "Bu yanıtı zaten biri istedi. Ajan bununla ilgileniyor."
+    },
     "issue": {
       "assigneeOutside": "Bu kişi bu görevi göremiyor. Önce onu Kimler görüyor listesine ekleyin.",
       "stageFull": "Bir aşama en fazla {{max}} sütun alır. Önce sütunlarından birini silin.",
@@ -12314,6 +12464,7 @@
       "agentBusy": "Ajan bu konuşmada zaten çalışıyor. Devam etmek için bitirmesini bekleyin.",
       "continueForbidden": "Buna yalnızca isteyen kişi, ajanın sahibi veya bir yönetici devam ettirebilir.",
       "notRestartable": "Bu yanıt zaten başlamıştı, yeniden başlayamaz. Mesajınızı tekrar gönderin.",
+      "notRestartableVoice": "Bu yanıt zaten başlamıştı, yeniden başlayamaz. Mesajınızı tekrar kaydedin.",
       "cancelForbidden": "Bunu yalnızca isteyen kişi, ajanın sahibi veya bir yönetici durdurabilir.",
       "answerForbidden": "Bunu yalnızca isteyen kişi, ajanın sahibi veya bir yönetici yapabilir.",
       "stopReasonForbidden": "Nedenini yalnızca durduran kişi söyleyebilir."
@@ -12447,6 +12598,10 @@
         "invalidInput": "Alanları kontrol edip tekrar deneyin.",
         "tooManyItems": "Vault dolu. Daha fazlasını eşitlemeden önce öğe silin."
       }
+    },
+    "feedback": {
+      "filesGone": "Eklediğiniz bir dosya artık yok. Yeniden ekleyin.",
+      "filesPending": "Gönderilmeyi bekleyen çok fazla dosya var. Bazılarını gönderip ya da kaldırıp tekrar deneyin."
     }
   },
   "machines": {
@@ -14320,6 +14475,10 @@
     "statusReplyTurn": "Bir görevin ortasındayım ({{duration}}) ve henüz yanıt veremiyorum. Mesajın sırada, bu çalışma turu bitince okuyacağım.",
     "statusReplyQueued": "Bilgisayarı bekliyorum ({{duration}}). Sıram gelince mesajını okuyacağım.",
     "statusReplyAway": "Bilgisayarımın geri gelmesini bekliyorum. Geri gelir gelmez mesajını okuyacağım.",
+    "statusReplyPlan": "Planımın geri gelmesini bekliyorum ({{when}}). Geri geldiğinde mesajını okuyacağım.",
+    "statusReplyPlanUnknown": "Planımın geri gelmesini bekliyorum. Geri gelir gelmez mesajını okuyacağım.",
+    "statusReplyBudget": "Aylık bütçemin yenilenmesini bekliyorum ({{when}}). Mesajını o zaman okuyacağım, bir yönetici sınırı artırırsa daha erken.",
+    "statusReplyBudgetUnknown": "Aylık bütçemin yenilenmesini bekliyorum. Mesajını o zaman okuyacağım, bir yönetici sınırı artırırsa daha erken.",
     "status": {
       "one": "Üzerinde çalışıyor: {{subject}}",
       "oneUntitled": "Arka planda çalışıyor",
@@ -14454,6 +14613,21 @@
       "wakeSkippedAnon": "{{name}} adlı ajanın bahsetmesi başka bir ajana ulaşmadı",
       "wakeSkippedAudience": "{{agents}} ajanını yalnızca bazı kişiler çağırabilir ve {{name}} adlı ajanın bu işi onlardan birinden gelmedi. {{agents}} ajanını çağırabilen biri isteği iletebilir.",
       "wakeSkippedCallable": "{{name}} adlı ajanın ayarları {{agents}} ajanını çağırmasına izin vermiyor (başka bir proje ya da çağırabileceği ajanlar listesinde değil). {{name}} ile ilgilenen kişi bunu ajanın sayfasından değiştirebilir.",
+      "github": {
+        "comment": "{{who}}, GitHub'da bir PR'a yorum yaptı: #{{number}} ({{repo}})",
+        "commentIssue": "{{who}}, GitHub'da bir sorun kaydına yorum yaptı: #{{number}} ({{repo}})",
+        "commentDiscussion": "{{who}}, GitHub'da bir tartışmaya yorum yaptı: #{{number}} ({{repo}})",
+        "opened": "{{who}}, GitHub'da agentes.chat uygulamasını çağırdı: #{{number}} ({{repo}})",
+        "reviewed": "{{who}}, GitHub'da bir PR'ı inceledi: #{{number}} ({{repo}})",
+        "approved": "{{who}}, GitHub'da bir PR'ı onayladı: #{{number}} ({{repo}})",
+        "changes": "{{who}}, GitHub'da bir PR'da değişiklik istedi: #{{number}} ({{repo}})",
+        "reviewRequested": "{{who}}, GitHub'da {{name}} ajanından bir PR'ı incelemesini istedi: #{{number}} ({{repo}})",
+        "merged": "{{who}}, GitHub'da bir PR'ı birleştirdi: #{{number}} ({{repo}})",
+        "closed": "{{who}}, GitHub'da bir PR'ı kapattı: #{{number}} ({{repo}})",
+        "closedIssue": "{{who}}, GitHub'da bir sorun kaydını kapattı: #{{number}} ({{repo}})",
+        "ask": "Yanıt iste",
+        "asked": "{{asker}}, {{name}} ajanından GitHub'da {{who}} adlı kişiye yanıt vermesini istedi"
+      },
       "show": "Göster",
       "hide": "Gizle",
       "talker": "çalışırken",
@@ -14593,6 +14767,7 @@
         "startingWork": "Uzun bir işe başladı",
         "updatingWork": "Uzun bir işi güncelledi",
         "withdrawingRequest": "Bir isteği geri çekti",
+        "releasingAgent": "Bekleyen bir ajanı serbest bıraktı",
         "schedulingAction": "Sonrası için bir işlem hazırladı",
         "updatingDashboard": "Bir pano üzerinde çalıştı",
         "testingOnPhone": "Telefonda test etti",
@@ -14604,6 +14779,7 @@
         "sendingDm": "Doğrudan mesaj gönderdi",
         "settingStatus": "Kendi durumunu güncelledi",
         "settingReplyStyle": "Yanıtlama biçimini ayarladı",
+        "sendingFeedback": "Geri bildirim göndermeyi istedi",
         "deletingRoutine": "Bir rutini sildi",
         "runningRoutine": "Bir rutini şimdi çalıştırdı",
         "proposingTeam": "Bir ekip önerdi",
@@ -14704,6 +14880,7 @@
       "startingWork": "uzun bir işe başlıyor",
       "updatingWork": "uzun bir işi güncelliyor",
       "withdrawingRequest": "bir isteği geri çekiyor",
+      "releasingAgent": "bekleyen bir ajanı serbest bırakıyor",
       "schedulingAction": "sonrası için bir işlem hazırlıyor",
       "updatingDashboard": "bir pano üzerinde çalışıyor",
       "testingOnPhone": "telefonda test ediyor",
@@ -14715,6 +14892,7 @@
       "sendingDm": "doğrudan mesaj gönderiyor",
       "settingStatus": "kendi durumunu güncelliyor",
       "settingReplyStyle": "yanıtlama biçimini ayarlıyor",
+      "sendingFeedback": "geri bildirim hazırlıyor",
       "deletingRoutine": "bir rutini siliyor",
       "runningRoutine": "bir rutini şimdi çalıştırıyor",
       "proposingTeam": "bir ekip öneriyor",
@@ -14843,8 +15021,10 @@
       "no_ai_not_signed_in": "Henüz yanıt veremiyorum: bilgisayarımda {{brain}} oturumu açık değil.",
       "no_ai_computer_away": "Şu an yanıt veremiyorum: planımın bilgisayarına ulaşılamıyor.",
       "no_ai_computer_failed": "Şu an yanıt veremiyorum: planımın bilgisayarında bir sorun oldu.",
+      "no_ai_cli_failed": "Şu an yanıt veremiyorum: planımın yapay zekası bir hatayla durdu.",
       "no_ai_plan_limit": "Şu an yanıt veremiyorum: düşündüğüm plan sınırına ulaştı.",
       "no_ai_plan_not_shared": "Sana çalışma alanının planı üzerinden yanıt veremiyorum: yalnızca sahibine yanıt veriyor. Kendi planını bağlarsan yanıt veririm.",
+      "no_ai_plan_unattended": "Yanıt vermedim: istek bir kişiden gelmedi ve çalışma alanının planı yalnızca sahibine yanıt verir.",
       "no_ai_runner_outdated": "Şu an yanıt veremiyorum: planımın bilgisayarındaki programın güncellenmesi gerekiyor.",
       "no_ai_plan_tools": "Yanıt vermeden durdum: o bilgisayardaki planımın yapay zekâsı agentes.chat araçlarıyla sınırlı kalmadı.",
       "no_ai_model_limit": "Şu an yanıt veremiyorum: {{model}} planımdaki kendi sınırına ulaştı.",
@@ -15579,6 +15759,7 @@
     "suspended": "Bu çalışma alanı şimdilik kullanılamıyor.",
     "createRefused": "Şu anda çalışma alanı oluşturamazsınız.",
     "createUnpaid": "agentes.chat planı bekleyen bir çalışma alanınız zaten var. Başka bir tane oluşturmadan önce onun planını seçin.",
+    "createUnpaidOpen": "{{name}} çalışma alanını aç",
     "createInactive": "Henüz etkin olmayan bir çalışma alanınız zaten var, bu yüzden şimdilik başka bir tane oluşturamazsınız.",
     "agentPaused": "Bu ajan şimdilik duraklatıldı.",
     "onHold": "Bu çalışma alanı beklemede: {{reason}}",
@@ -16565,7 +16746,11 @@
       "text": "Bir ajandan widget isteyin veya sohbetten bir bloğu sabitleyin, burada güncel kalsın.",
       "viewer": "Bu panoyu düzenleyen kişi widget ekler ve burada görünürler."
     },
-    "onlyHome": "“Yeni pano” ile çalışma alanı ya da bazı roller için bir pano oluşturun.",
+    "first": {
+      "title": "Ekibin ilk panosunu oluşturun",
+      "text": "Pano, sayıları ve grafikleri tek bir sayfada toplar, ajanlar da hepsini güncel tutar.",
+      "ask": "Ekibin ilk panosunu oluşturmama yardım edin."
+    },
     "create": {
       "title": "Yeni pano",
       "subtitle": "Widget'lar tek sayfada bir arada. Sizin için ya da ekip için.",
@@ -16765,9 +16950,8 @@
     "firstTask": {
       "suggestion": "öneri",
       "lead": "Her ajan için kısa bir görev, bugün her birini çalışırken gör.",
-      "heldLead": "Her ajan için kısa bir görev. Cümleyi tamamlayıp gönder. Çalışma alanının agentes.chat planı olunca başlarlar.",
-      "example": "{{name}} tarafından sunulanlara örnek",
       "open": "Görevle aç",
+      "finish": "Cümleyi tamamla ve gönder",
       "invite": "{{names}} davet et",
       "later": "Sonra"
     },
@@ -16969,7 +17153,7 @@
     },
     "software": {
       "name": "Yazılım ve uygulamalar",
-      "sub": "Destek, ödeme ve kod",
+      "sub": "Müşteri hizmetleri, ödemeler ve kod",
       "desc": "Yazılım satan ve kendi müşterileriyle ilgilenen bir şirket için."
     },
     "support": {
@@ -16982,54 +17166,74 @@
       "sub": "Muhasebe, hukuk, danışmanlık",
       "desc": "Müşterilere randevu veren, teklif gönderen ve fatura kesen bir ofis için."
     },
+    "hello": {
+      "lodi": {
+        "starting": "Plan aktif. Bilgisayarım açılıyor. Hadi işe başlayalım.",
+        "ready": "Plan aktif. Hadi işe başlayalım.",
+        "created": "Ekip hazır. Hadi işe başlayalım."
+      },
+      "lodiNoAi": {
+        "starting": "Plan aktif. Bilgisayarım açılıyor. Bir yapay zeka bağla, işe başlayalım.",
+        "ready": "Plan aktif. Bir yapay zeka bağla, işe başlayalım.",
+        "created": "Ekip hazır. Bir yapay zeka bağla, işe başlayalım."
+      }
+    },
     "agents": {
       "iara": {
         "role": "Müşteri hizmetleri",
         "line": "Müşterilere WhatsApp ve e-postadan yanıt verir. Bilmediğinde seni çağırır.",
         "routine": "Yanıtsız kalanları özetle",
-        "task": "Bu müşteri mesajına bir yanıt yaz:"
+        "task": "Bu müşteri mesajına bir yanıt yaz:",
+        "hello": "Merhaba {{first}}. WhatsApp'tan yazanları bana bırak."
       },
       "caio": {
         "role": "Tahsilat",
         "line": "Ödemesi gecikenlere hatırlatır ve onayından sonra ödeme hatırlatmasını gönderir.",
         "routine": "Ödemesi gecikenleri listele",
-        "task": "Şu kişi için nazik bir ödeme hatırlatması yaz:"
+        "task": "Şu kişi için nazik bir ödeme hatırlatması yaz:",
+        "hello": "Merhaba. Ödemeleri ben takip ederim ve hatırlatmayı yalnızca senin onayından sonra gönderirim."
       },
       "ada": {
         "role": "Dev",
         "line": "Müşterilerin bildirdiği hataları düzeltir ve PR açar.",
         "routine": "Yeni hataları listele",
-        "task": "Bu hatayı araştırmaya nereden başlayacağımı söyle:"
+        "task": "Bu hatayı araştırmaya nereden başlayacağımı söyle:",
+        "hello": "Selam. Gelen hataları bana gönderin, inceleyip PR'ı açarım."
       },
       "lia": {
         "role": "İçerik",
         "line": "Şirketin üslubuyla gönderi ve senaryo yazar, onayından sonra planlar.",
         "routine": "Haftanın gönderilerini öner",
-        "task": "Şu konuda bu hafta için üç gönderi öner:"
+        "task": "Şu konuda bu hafta için üç gönderi öner:",
+        "hello": "Herkese merhaba. Bu haftanın gönderileri bende."
       },
       "theo": {
         "role": "Satış",
         "line": "Teklif isteyen herkesi takip eder ve teklifleri yazar.",
         "routine": "Teklif isteyip yanıt alamayanları listele",
-        "task": "Bu talep için kısa bir teklif yaz:"
+        "task": "Bu talep için kısa bir teklif yaz:",
+        "hello": "Merhaba {{first}}. Teklif isteyen kimse cevapsız kalmayacak."
       },
       "nina": {
         "role": "Randevu",
         "line": "Randevu verir, onaylar, değiştirir ve müşterilere bir gün önce hatırlatır.",
         "routine": "Yarının randevularını onayla",
-        "task": "Yarının şu saatlerini düzenle:"
+        "task": "Yarının şu saatlerini düzenle:",
+        "hello": "Merhaba. Ajanda bende, müşterilere bir gün önceden hatırlatırım."
       },
       "otto": {
         "role": "Siparişler",
         "line": "Siparişleri ve stoku takip eder, biten şeyleri haber verir.",
         "routine": "Stokta bitmek üzere olanları haber ver",
-        "task": "Bu siparişlerde yapılacak işleri listele:"
+        "task": "Bu siparişlerde yapılacak işleri listele:",
+        "hello": "Geldim. Siparişleri takip eder, stok azalınca haber veririm."
       },
       "bia": {
         "role": "Yanıt tabanı",
         "line": "Yanıt tabanını ekibin verdiği yanıtlarla güncel tutar.",
         "routine": "Tabanı haftanın yanıtlarıyla güncelle",
-        "task": "Bu müşteri sorularının yanıtlarını yaz:"
+        "task": "Bu müşteri sorularının yanıtlarını yaz:",
+        "hello": "Selam. Cevap tabanını ekibin verdiği cevaplarla güncel tutacağım."
       },
       "clara": {
         "role": "Takvim ve hatırlatmalar",
@@ -17086,17 +17290,6 @@
         "task": "Bu müşteri için kısa bir teklif yaz:"
       }
     },
-    "example": {
-      "iara": "Merhaba Marina. Siparişin dün yola çıktı ve cumaya kadar ulaşacak. Takip kodu hemen aşağıda. Cuma uymazsa başka bir tarih bulurum.",
-      "lia": "1. Ajans seçerken yapılan üç yaygın hata. 2. Neredeyse ters giden bir projenin perde arkası. 3. Takipçilerinize bir soru: burada ne görmek istersiniz?",
-      "nina": "Yarın: 9:00 Carla, 10:30 Pedro, 14:00 boş. Pedro henüz onaylamadı. Ona yazayım mı?",
-      "clara": "Bugün: 9:00 diş hekimi, 12:30 Paula ile öğle yemeği, 18:00 paketi al. Yarın annenin doğum günü. Sabah sana hatırlatayım mı?",
-      "leo": "Bugün, 30 dakika: 5 dakika ısınma, 3 tur 12 squat, 10 şınav ve 30 saniye plank, ardından 5 dakika esneme. Nasıl geçtiğini anlat, çarşamba antrenmanını ona göre ayarlayayım.",
-      "gabi": "Bugünün konusu: fotosentez. Kısacası bitkiler ışığı, suyu ve karbondioksiti şekere ve oksijene dönüştürür. Üç soru: nerede gerçekleşir, ne girer ve ne çıkar?",
-      "rosa": "Bu hafta: pirinç, fasulye, yumurta, muz, kahve ve bulaşık deterjanı. Evde: perşembe çarşafları değiştirmek ve mutfak musluğu için birini çağırmak.",
-      "vic": "3 günde Lizbon: 1. gün Alfama ve kale. 2. gün Belém ve nehir. 3. gün Sintra. En ucuz uçuşlar 12'sinde, salı günü. Fiyatı takip edeyim mi?",
-      "rui": "Merhaba Marcos, teklif şöyle: 5 sayfalık yeni bir site, 3 haftada teslim, iki taksitte ödeme. Uygunsa sözleşmeyi bugün gönderirim."
-    },
     "channels": {
       "iara": "destek",
       "caio": "finans",
@@ -17135,5 +17328,65 @@
     },
     "approvals": "Müşterilere gidenler onayını bekler. Onlara güvendiğinde daha sonra serbest bırakabilirsin.",
     "approvalsPersonal": "Senin adına gönderilen, ödenen veya rezerve edilen her şey onayını bekler. Onlara güvendiğinde daha sonra serbest bırakabilirsin."
+  },
+  "arrival": {
+    "beta": {
+      "word": "BETA",
+      "title": "Erken geldiniz. Çok sevindik.",
+      "text": "agentes.chat beta aşamasında: onunla şimdiden gerçek iş yapabilirsiniz, biz de hâlâ cilalıyoruz.",
+      "weekly": {
+        "title": "Her hafta daha iyi oluyor",
+        "text": "Yenilikler ve düzeltmeler sürekli çıkıyor."
+      },
+      "fails": {
+        "title": "Bazen bir şeyler ters gider",
+        "text": "Takılırsa ya da tuhaf görünürse sorun bizde, sizde değil."
+      },
+      "feedback": {
+        "title": "Sıradakini sizin geri bildiriminiz belirler",
+        "text": "Neyin eksik kaldığını ya da rahatsız ettiğini anlatın. Hepsini okuyoruz."
+      },
+      "where": "Bize yazmak için kenar çubuğunun altındaki Geri bildirim gönder seçeneğini kullanın."
+    },
+    "stage": {
+      "ready": "Ekibiniz hazır",
+      "wake": "Uyanması için tek eksiği bir yapay zeka.",
+      "morning": "Günaydın ekip",
+      "awake": "Herkes uyandı ve düşünmeye başladı."
+    },
+    "connect": {
+      "title": "Ekibiniz düşünebilsin diye bir yapay zeka bağlayın",
+      "text": "Zaten sahip olduğunuz bir aboneliği kullanın. Planınızda hiçbir şey değişmez.",
+      "others": "Başka bir plan",
+      "free": "Ücretsiz başlayın",
+      "freeText": "OpenCode'un ücretsiz modelleriyle",
+      "noPlan": "Abonelik yok",
+      "without": "Yapay zeka olmadan ajanlar yanıt vermez.",
+      "later": "Şimdi değil"
+    }
+  },
+  "feedback": {
+    "mark": "Beta",
+    "open": "Geri bildirim gönder",
+    "ask": "Ne eksikti, ne bozuldu ya da ne rahatsız etti?",
+    "goesCloud": "Yazdıklarınız e-postayla agentes.chat ekibine gider.",
+    "goesServer": "Yazdıklarınız e-postayla bu sunucuyu yöneten kişiye gider.",
+    "placeholder": "İçinizden geldiği gibi yazın",
+    "report": "Burada bir sorun bildir",
+    "aboutMessage": "{{name}} adlı kişinin mesajı hakkında",
+    "aboutItem": "Konu: {{name}}",
+    "aboutThis": "Tıkladığınız şey hakkında",
+    "aboutDrop": "Bu alıntıyı gönderme",
+    "attach": "Fotoğraf veya video ekle",
+    "filesHint": "En fazla {{images}} fotoğraf ({{imageMb}} MB) ve bir video ({{videoMb}} MB), {{days}} gün saklanır.",
+    "removeFile": "{{name}} dosyasını kaldır",
+    "uploading": "{{name}} gönderiliyor",
+    "fileType": "Yalnızca fotoğraf ve video eklenebilir.",
+    "fileTooLarge": "{{name}} çok büyük: sınır {{mb}} MB.",
+    "fileTooMany": "Bir geri bildirime en fazla {{images}} fotoğraf ve bir video eklenebilir.",
+    "send": "Gönder",
+    "thanks": "Ulaştı. Teşekkürler.",
+    "reply": "Hepsi okunur. Gerekirse yanıt {{email}} adresine gelir.",
+    "another": "Bir tane daha gönder"
   }
 }

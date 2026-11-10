@@ -1027,8 +1027,6 @@ export const featureKeysPtBR = {
       /** An agent's model left its plan's list (`plan_model_dropped`): `runs` the model it uses now. */
       plan_model_dropped_one: "O {{model}} saiu do {{plan}}. {{names}} está usando o {{runs}} por enquanto",
       plan_model_dropped_other: "O {{model}} saiu do {{plan}}. {{names}} está usando o {{runs}} por enquanto",
-      connector_tool_changed_one: "Um servidor conectado mudou ferramentas que você aprovou",
-      connector_tool_changed_other: "Um servidor conectado mudou ferramentas que você aprovou",
       computer_disk_full_one: "O disco de um computador está quase cheio",
       computer_disk_full_other: "O disco de um computador está quase cheio",
       computer_no_chrome_one: "Um computador precisa do Google Chrome. Baixe em google.com/chrome",
@@ -1496,15 +1494,11 @@ export const featureKeysPtBR = {
       browser: "Navegador",
       secret: "Segredo",
       join: "Membros",
-      tools: "Ferramentas",
       limit: "Limite",
     },
     review: "Revisar",
     answer: "Responder",
     open: "Abrir",
-    toolsTitle: "Mudou ferramentas que você aprovou",
-    toolsWhy: "Os agentes seguem com a versão aprovada até você aceitar a nova.",
-    reviewChanges: "Rever as mudanças",
     clear: {
       title: "Nada esperando você",
       text: "Quando um agente precisar de você, aparece aqui primeiro.",
@@ -2205,6 +2199,8 @@ export const featureKeysPtBR = {
     /** O nome do primeiro uso, sugerido pelo domínio de um e-mail de trabalho. */
     suggested: "Pelo seu e-mail da {{domain}}, sugeri {{org}}.",
     create: "Criar",
+    /** O passo do plano no celular, que não vende o plano: entra no workspace, o time dormindo. */
+    enter: "Entrar no workspace",
     shareMessage: "Entre na {{org}} no agentes.chat: {{url}}",
     failed: "Não deu para salvar. Tente de novo.",
   },
@@ -2538,7 +2534,6 @@ export const featureKeysPtBR = {
   dashboards: {
     homeRow: "Só você · seus próprios widgets",
     loadFailed: "Não deu para carregar os painéis.",
-    onlyHome: "Os painéis do workspace ou dos seus papéis aparecem aqui.",
     create: "Criar",
     routineTarget: "o widget dela",
     pin: {
