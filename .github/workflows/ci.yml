@@ -10,7 +10,8 @@ name: CI
 # read a secret.
 #
 # The Linux jobs run on Namespace runners (the `linux-4x8` profile: 4 vCPU, 8 GB), which cost less a
-# minute than GitHub's hosted ones. Everything runs on x64: on ARM the backend shards took 2.5x as long
+# minute than GitHub's hosted ones. The test jobs take 8 vCPU and 16 GB: on 8 GB a file's first test
+# ran past its 5 s limit (voice.test.ts, live-real-server.test.tsx). Everything runs on x64: on ARM the backend shards took 2.5x as long
 # (603 and 667 s against 229 and 275 s, 2026-10-26). Only the arm64 image builds on ARM, natively.
 on:
   pull_request:
@@ -241,7 +242,7 @@ jobs:
     name: Test (backend ${{ matrix.shard }}/3)
     needs: changes
     if: needs.changes.outputs.shared == 'true' || needs.changes.outputs.backend == 'true'
-    runs-on: namespace-profile-linux-4x8
+    runs-on: nscloud-ubuntu-24.04-amd64-8x16
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -287,7 +288,7 @@ jobs:
     if: >-
       needs.changes.outputs.shared == 'true' || needs.changes.outputs.web == 'true' ||
       needs.changes.outputs.mobile == 'true' || needs.changes.outputs.desktop == 'true'
-    runs-on: namespace-profile-linux-4x8
+    runs-on: nscloud-ubuntu-24.04-amd64-8x16
     timeout-minutes: 35
     env:
       SHARED: ${{ needs.changes.outputs.shared }}
