@@ -118,8 +118,8 @@ describe("Tarefas: how I left it", () => {
 
 describe("Tarefas: a card", () => {
   /** The fake's tasks with some changed (a work state, a conversation, labels), as the server would send them. */
-  const withTasks = (change: Record<number, Partial<Issue>>) => {
-    const api = createFakeApi(seedState());
+  const withTasks = (change: Record<number, Partial<Issue>>, state = seedState()) => {
+    const api = createFakeApi(state);
     const list = api.issues.list;
     api.issues.list = async (orgId, filters) =>
       (await list(orgId, filters)).map((i) => (change[i.number] ? { ...i, ...change[i.number] } : i));
@@ -209,9 +209,13 @@ describe("Tarefas: a card", () => {
 
   test("each fact goes with its toggle in Exibição; the number and the conversation always show", async () => {
     const fields = { assignee: false, priority: false, due: false, criteria: false, pullRequest: false, label: false };
-    await go(seedState({ issuesView: view({ fields }) }));
+    const state = seedState({ issuesView: view({ fields }) });
+    await go(state, withTasks({ 129: { work: work("waiting_input") } }, state));
     expect(facts(cardOf(128))).toEqual(["#128"]);
     expect(cardOf(128).querySelector(".issue-card__who")).toBeNull();
+    // Responsável off hides who has it, never what the task asks of the person.
+    expect(cardOf(129).querySelector(".issue-card__who .ac-who")).toBeNull();
+    expect(cardOf(129).querySelector(".issue-card__state")?.textContent).toBe("Pergunta algo");
   });
 
   test("nobody on it and nothing going on: no third part, no placeholder", async () => {

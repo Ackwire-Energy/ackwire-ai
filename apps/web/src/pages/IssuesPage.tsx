@@ -582,17 +582,19 @@ function StateWords({ state }: { state: TaskState }) {
 /**
  * Who has it and the one thing it needs or does now, as one block of words: the face (moving while its agent works),
  * the name, the state. A long name wraps under the face at the card's full width. Nobody and nothing going on: none.
+ * With Responsável off in Exibição, the state still shows: it is what the card asks of the person.
  */
-function CardWho({ issue: i, state }: { issue: Issue; state: TaskState | null }) {
+function CardWho({ issue: i, state, assignee }: { issue: Issue; state: TaskState | null; assignee: boolean }) {
   const actors = useActors();
-  if (!i.assignee && !state) return null;
+  const who = assignee ? i.assignee : null;
+  if (!who && !state) return null;
   const work = state?.kind === "running" ? "running" : state?.kind === "stalled" ? "stalled" : undefined;
   return (
     <span className="issue-card__who">
-      {i.assignee && <ActorWho actor={i.assignee} name={actors.name(i.assignee)} size="sm" work={work} />}
+      {who && <ActorWho actor={who} name={actors.name(who)} size="sm" work={work} />}
       {state && (
         <>
-          {i.assignee && " "}
+          {who && " "}
           <StateWords state={state} />
         </>
       )}
@@ -789,7 +791,7 @@ function IssueCard({
       {cardWaits(state) && <CardSky color={color(i) ?? "sky"} />}
       <span className="issue-card__title">{codeAndBold(i.title)}</span>
       <CardFacts issue={i} fields={fields} />
-      {fields.assignee && <CardWho issue={i} state={state} />}
+      <CardWho issue={i} state={state} assignee={fields.assignee} />
       {state?.kind === "running" && <WorkSweep color={color(i) ?? "sky"} />}
       {who}
     </Link>
@@ -999,7 +1001,7 @@ function IssueRow({
       </span>
       <span className="issue-list__title">{codeAndBold(i.title)}</span>
       <CardFacts issue={i} fields={fields} />
-      {fields.assignee && <CardWho issue={i} state={state} />}
+      <CardWho issue={i} state={state} assignee={fields.assignee} />
       <span className="issue-sr">{t(`issues.status.${i.status}`)}</span>
       {state?.kind === "running" && <WorkSweep color={color(i) ?? "sky"} />}
       {who}
