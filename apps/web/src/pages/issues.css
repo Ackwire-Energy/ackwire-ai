@@ -590,7 +590,8 @@ html:not([data-pointer]) .issue-card:focus-visible {
   /* The facts take what they need up to 40% of the row and wrap inside it: the title keeps the rest. */
   grid-template-columns: 52px minmax(0, 1fr) fit-content(40%) minmax(0, 200px);
   grid-template-areas: "num title facts who";
-  align-items: center;
+  /* On one line of words: a part that wraps (a long title, a stopped run's reason) grows down from it. */
+  align-items: baseline;
   gap: 4px 16px;
   padding: 12px 14px;
   color: var(--ink);

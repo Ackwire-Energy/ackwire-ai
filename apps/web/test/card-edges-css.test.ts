@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import path from "node:path";
-import { atRule, declarations } from "./built-css";
+import { atRule, declarations, topLevel } from "./built-css";
 
 const ROOT = path.join(import.meta.dir, "../../..");
 const sheet = (file: string) => Bun.file(path.join(ROOT, file)).text();
@@ -26,6 +26,12 @@ test("a task's state moves whole under the name, and one longer than the card wr
   expect(last(state, "display")).toBe("inline-block");
   expect(last(state, "max-width")).toBe("100%");
   expect(last(state, "white-space")).toBeUndefined();
+});
+
+test("a wide task row's parts share their first line: what wraps grows down from it, never floats to the middle", async () => {
+  const issues = await sheet("apps/web/src/pages/issues.css");
+  // A stopped run's reason five lines tall beside the title centred "#135 Gerar o relatório" against its third line.
+  expect(last(declarations(topLevel(issues), ".issue-list__row"), "align-items")).toBe("baseline");
 });
 
 test("on a phone a task row is stacked as a card: its facts wrap under its title, from the row's start", async () => {
