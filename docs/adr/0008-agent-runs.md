@@ -96,7 +96,8 @@ on the way jumped to minutes, as if it had been thinking all along.
   clock. The app turns it into its own clock at the middle of the read, so a device whose clock is minutes off still
   counts right.
 - **A row already on screen keeps its count** (`reconcileRuns`, `LiveRun.workingSince`). A read of the server never
-  moves it back. It takes the server's only when that is more than 5 s later than its own (`WORK_MISSED_MS`): a new
-  stretch began while the device wasn't listening. A row made from the read counts from `workingMs`; a server from
+  moves it back. It takes the server's only when that is more than 5 s later than its own (`WORK_MISSED_MS`) and it
+  heard nothing from the run since that moment: a new stretch began while the device wasn't listening (an app
+  listens to a conversation only while it is open). A row made from the read counts from `workingMs`; a server from
   before it gives only the first start, as before.
 - `startedAt` on a live row still places it in the timeline, and a read of the server still corrects it.

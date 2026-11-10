@@ -915,7 +915,8 @@ export const isActiveStatus = (status: string) => ACTIVE.has(status);
  * "Thinking for …" (`workingSince`) never goes back for a row already here: the server's `startedAt` is the run's
  * first start, minutes before the work it is doing now when it posted or waited on the way, so taking it made the
  * count jump on every return to the conversation. A row keeps its own count, unless the server says the work began
- * well after it (`WORK_MISSED_MS`): a new stretch began while this device wasn't listening. A row made here counts
+ * well after it (`WORK_MISSED_MS`) and nothing was heard from the run since then: a new stretch began while this
+ * device wasn't listening (a conversation is listened to only while it is open). A row made here counts
  * from the server's length of the work (`workingMs`), turned into this device's clock at the middle of the read.
  */
 export function reconcileRuns(
@@ -949,7 +950,10 @@ export function reconcileRuns(
     const r = s.runs[a.runId];
     if (r) {
       const mine = workingSinceOf(r);
-      const missed = served !== undefined && (mine === undefined || served - mine > WORK_MISSED_MS);
+      // Heard from the run after the moment the server counts from: this device was listening when that stretch
+      // began and chose its own count (a message it took for one posted on the way), so it keeps it.
+      const heardSince = served !== undefined && (r.lastEventAt ?? 0) >= served;
+      const missed = served !== undefined && (mine === undefined || (served - mine > WORK_MISSED_MS && !heardSince));
       const workingSince = missed ? served : mine;
       // What the server knows better: where it started, and that it's alive.
       const lastEventAt = Math.max(r.lastEventAt ?? 0, heartbeat ?? 0) || r.lastEventAt;

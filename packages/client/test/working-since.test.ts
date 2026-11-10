@@ -75,6 +75,16 @@ describe("a row already here keeps its count when the server is read again", () 
     s = reconcileRuns(s, "c1", [active({ workingMs: 3000 })], T0 + 60_000);
     expect(since(s)).toBe(57_000);
   });
+
+  test("a later count from the server changes nothing for a row that heard from the run since", () => {
+    let s = seenAtT0();
+    // The run posted with a call still running: this device took it for a message on the way and kept counting,
+    // the server counts from the post. Its events kept coming, so nothing was missed.
+    at(58_000);
+    s = applyChannelEvent(s, running);
+    s = reconcileRuns(s, "c1", [active({ workingMs: 3000 })], T0 + 60_000);
+    expect(since(s)).toBe(0);
+  });
 });
 
 describe("a row made from the server's read", () => {
