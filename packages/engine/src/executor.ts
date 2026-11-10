@@ -218,7 +218,7 @@ import {
   publishAccountsChanged,
   touchMachineAccount,
 } from "./machine-accounts";
-import { computerBackSoon, type MachineStatus } from "./machine-hub";
+import { computerBackSoon, type MachineCaller } from "./machine-hub";
 import { TASK_OFFLINE_GRACE_MS } from "./machine-tasks";
 import { MEDIA_TOOLS } from "./media";
 import {
@@ -472,13 +472,15 @@ export interface EngineDeps {
    */
   prepareCode?(turn: BrainTurn, signal: AbortSignal): Promise<CodeSetup | null>;
   /** Computers' status (machine hub): a computer brain's availability is checked before its turn. */
-  machines?: { status(machineId: string): Promise<MachineStatus | null> };
+  machines?: Pick<MachineCaller, "status" | "wake">;
   /** Each workspace gets its own computer here (`workspaceComputerText`); absent: people connect theirs. */
   workspaceComputer?: WorkspaceComputer;
   /** How long a run whose computer dropped mid-turn waits quietly for it (default `COMPUTER_DROP_GRACE_MS`). */
   computerDropGraceMs?: number;
   /** How long a run waits, still working, for a computer just gone (default `COMPUTER_BLIP_WAIT_MS`). */
   computerBlipWaitMs?: number;
+  /** How long a run waits, still working, for a computer in standby it asked to wake (`COMPUTER_WAKE_WAIT_MS`). */
+  computerWakeWaitMs?: number;
   /** How long a computer turn is still read after its plan's `limit` event (default `PLAN_LIMIT_GRACE_MS`). */
   planLimitGraceMs?: number;
   /**
@@ -2883,22 +2885,24 @@ async function executeRunInner(
   };
 
   /**
-   * The computer brain can't answer. On the run's first look (`firstLook`), a computer just gone is waited for
-   * first (`computerBackSoon`). Still away: the model brain stands in with a quiet note, or the run waits for the
-   * computer, or (nothing to think with) it fails with `no_ai`. A computer with no room for the turn (`busy`)
-   * is asked again every `COMPUTER_BUSY_RETRY_MS` until it runs.
+   * The computer brain can't answer. At the run's start (`look`), a computer in standby is woken and waited for, and on
+   * its first look one just gone too (`computerBackSoon`). Still away: the model brain stands in with a quiet note, or
+   * the run waits for the computer, or (nothing to think with) it fails with `no_ai`. A computer with no room for the
+   * turn (`busy`) is asked again every `COMPUTER_BUSY_RETRY_MS` until it runs.
    */
   const brainUnavailable = async (
     u: BrainUnavailability & { queued?: boolean; retryAt?: number },
-    firstLook = false,
+    look?: "first" | "again",
   ): Promise<"fallback" | "waited" | "failed" | "no" | "back" | "canceled"> => {
     const from = plan.kind;
     if (from === "model") return "no";
     const t = transcript as Transcript;
     const machineId = plan.session?.machineId ?? agent.machineId ?? null;
-    if (firstLook && machineId && u.code === "machine_offline") {
+    if (look && machineId && u.code === "machine_offline") {
       const back = await computerBackSoon(deps.machines, machineId, {
         waitMs: deps.computerBlipWaitMs,
+        wakeWaitMs: deps.computerWakeWaitMs,
+        justGone: look === "first",
         signal,
         canceled: isCanceled,
       });
@@ -3594,8 +3598,8 @@ async function executeRunInner(
   };
 
   if (plan.unavailable) {
-    // A run back from waiting for its computer has waited for it already.
-    const handled = await brainUnavailable(plan.unavailable, !backFromComputerWait);
+    // A run back from waiting for its computer has waited for it already, unless the computer fell asleep since.
+    const handled = await brainUnavailable(plan.unavailable, backFromComputerWait ? "again" : "first");
     if (handled === "canceled") return stopCanceled("");
     if (handled === "waited" || handled === "failed") return;
     if (handled === "no") {
@@ -3912,6 +3916,8 @@ async function executeRunInner(
        */
       let admitted: { machineId: string; fromLine: boolean } | null = null;
       if (roomMachine && computerTurns === 0) {
+        // A computer in standby wakes while the run lines up (ADR 0161).
+        void deps.machines?.wake?.(roomMachine, "run").catch(() => {});
         // Background work is asked work, never a person's turn: it neither holds their reserved slot nor goes ahead of
         // their reply turn in the line, whatever its first turn was before it moved (ADR 0032).
         if (run.workId) {
