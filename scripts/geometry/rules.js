@@ -2140,15 +2140,22 @@
     },
     /**
      * A day's column of the calendar: no item covers another. A stack of routine runs and a meeting that meet sit side
-     * by side, and a stack stops before the next item (`runStacks`, `layoutDay`).
+     * by side, and a stack stops before the next item (`runStacks`, `layoutDay`). A meeting reaches down its slot (its
+     * `min-height`): what a wrapped title draws past it, the page measures and lays out again (`TimeGrid`'s heights),
+     * which a captured screen never ran, so only the slots are held here.
      */
     calstack(out) {
+      const slot = (el) => {
+        const r = el.getBoundingClientRect();
+        const planned = parseFloat(el.style.minHeight);
+        return { left: r.left, right: r.right, top: r.top, bottom: planned > 0 ? r.top + planned : r.bottom };
+      };
       for (const col of document.body.querySelectorAll(".cal-week__col")) {
         const items = [...col.querySelectorAll(":scope > .cal-chip--block, :scope > .cal-week__runs")].filter(seen);
         for (const [i, a] of items.entries()) {
-          const ra = a.getBoundingClientRect();
+          const ra = slot(a);
           for (const b of items.slice(i + 1)) {
-            const rb = b.getBoundingClientRect();
+            const rb = slot(b);
             const across = Math.min(ra.right, rb.right) - Math.max(ra.left, rb.left);
             const down = Math.min(ra.bottom, rb.bottom) - Math.max(ra.top, rb.top);
             if (across > 1 && down > 1)
