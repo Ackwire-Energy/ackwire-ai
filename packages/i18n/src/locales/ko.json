@@ -9124,6 +9124,179 @@
     "notImage": "JPG, PNG, WebP 이미지를 선택하세요.",
     "tooBig": "이미지가 8MB를 넘어요."
   },
+  "portrait": {
+    "label": "아바타",
+    "change": "아바타 변경",
+    "title": "내 아바타",
+    "preview": "내 아바타",
+    "shuffle": "랜덤",
+    "small": "채팅의 작은 크기에서는 얼굴만 보여요.",
+    "photoAsk": "사진이 더 좋으세요?",
+    "photoUpload": "사진 업로드",
+    "saved": "아바타를 업데이트했어요.",
+    "failed": "아바타를 저장하지 못했어요. 다시 시도해 주세요.",
+    "showAll": "모든 옵션 보기",
+    "showFewer": "옵션 줄이기",
+    "beardHint": "수염은 머리 색을 따라가요.",
+    "hatsHint": "야구모자, 비니, 모자, 머리 스카프는 머리를 가려요.",
+    "swatch": "{{group}} {{n}}",
+    "build": {
+      "label": "타입",
+      "m": "남성형",
+      "f": "여성형"
+    },
+    "tabs": {
+      "label": "아바타 부위",
+      "face": "얼굴",
+      "hair": "머리",
+      "beard": "수염",
+      "makeup": "메이크업",
+      "marks": "특징",
+      "accessories": "액세서리",
+      "clothes": "옷",
+      "background": "배경"
+    },
+    "sections": {
+      "skin": "피부 톤",
+      "eyes": "눈 색",
+      "mood": "표정",
+      "color": "색",
+      "hairColor": "머리 색",
+      "clothesColor": "옷 색",
+      "cut": "헤어스타일",
+      "beard": "수염",
+      "lips": "립스틱",
+      "shadow": "아이섀도",
+      "blush": "블러셔",
+      "mark": "특징",
+      "glasses": "안경",
+      "ear": "귀걸이",
+      "neck": "목",
+      "extra": "머리 위",
+      "piece": "아이템",
+      "bg": "배경"
+    },
+    "options": {
+      "mood": {
+        "smile": "미소",
+        "grin": "활짝 웃음",
+        "laugh": "웃음",
+        "calm": "차분함",
+        "wink": "윙크",
+        "wow": "놀람"
+      },
+      "hair": {
+        "none": "민머리",
+        "buzz": "반삭",
+        "short": "짧은 머리",
+        "side": "옆 가르마",
+        "quiff": "리젠트",
+        "curly": "곱슬머리",
+        "afro": "아프로",
+        "bob": "단발",
+        "bangs": "앞머리",
+        "long": "긴 머리",
+        "wavy": "웨이브",
+        "curls": "긴 곱슬",
+        "bun": "올림머리",
+        "pony": "포니테일",
+        "spiky": "스파이크",
+        "mohawk": "모히칸",
+        "braids": "땋은 머리",
+        "pigtails": "양갈래"
+      },
+      "beard": {
+        "none": "수염 없음",
+        "stubble": "짧은 수염",
+        "mustache": "콧수염",
+        "goatee": "염소수염",
+        "strap": "턱선 수염",
+        "full": "풍성한 수염",
+        "long": "긴 수염"
+      },
+      "lips": {
+        "none": "립스틱 없음",
+        "nude": "누드",
+        "pink": "핑크",
+        "red": "레드",
+        "wine": "와인",
+        "purple": "퍼플",
+        "black": "블랙"
+      },
+      "shadow": {
+        "none": "아이섀도 없음",
+        "rose": "로즈",
+        "violet": "바이올렛",
+        "blue": "블루",
+        "green": "그린",
+        "gold": "골드",
+        "smoky": "스모키"
+      },
+      "blush": {
+        "soft": "연하게",
+        "strong": "진하게",
+        "none": "블러셔 없음"
+      },
+      "mark": {
+        "none": "없음",
+        "freckles": "주근깨",
+        "mole": "점",
+        "scar": "흉터",
+        "bandaid": "반창고",
+        "piercing": "피어싱"
+      },
+      "glasses": {
+        "none": "안경 없음",
+        "round": "둥근 테",
+        "square": "사각 테",
+        "gold": "금테",
+        "tinted": "틴트 렌즈",
+        "shades": "선글라스"
+      },
+      "ear": {
+        "none": "귀걸이 없음",
+        "studs": "금 스터드",
+        "pearls": "진주",
+        "hoops": "링",
+        "drops": "드롭"
+      },
+      "neck": {
+        "none": "없음",
+        "necklace": "목걸이",
+        "pearls": "진주",
+        "choker": "초커",
+        "bowtie": "나비넥타이",
+        "muffler": "목도리"
+      },
+      "extra": {
+        "none": "없음",
+        "headband": "헤어밴드",
+        "bandana": "반다나",
+        "bow": "리본",
+        "flower": "꽃",
+        "headphones": "헤드폰",
+        "cap": "야구모자",
+        "beanie": "비니",
+        "hat": "모자",
+        "crown": "왕관",
+        "scarf": "머리 스카프"
+      },
+      "clothes": {
+        "tee": "티셔츠",
+        "vneck": "브이넥",
+        "tank": "민소매",
+        "shirt": "셔츠",
+        "suit": "정장",
+        "blazer": "블레이저",
+        "jacket": "재킷",
+        "hoodie": "후드티",
+        "turtle": "터틀넥",
+        "overall": "멜빵바지",
+        "polo": "폴로 셔츠",
+        "dress": "원피스"
+      }
+    }
+  },
   "orgLogo": {
     "label": "로고",
     "add": "로고 업로드",

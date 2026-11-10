@@ -270,7 +270,14 @@
       "openOnPhone.appStore",
       "openOnPhone.googlePlay",
       "arrival.beta.word",
-      "feedback.mark"
+      "feedback.mark",
+      "portrait.label",
+      "portrait.sections.blush",
+      "portrait.options.lips.nude",
+      "portrait.options.mark.piercing",
+      "portrait.options.extra.bandana",
+      "portrait.options.clothes.blazer",
+      "portrait.options.clothes.polo"
     ],
     "es": [
       "devices.iphone.path.general",
@@ -493,7 +500,16 @@
       "openOnPhone.appStore",
       "openOnPhone.googlePlay",
       "arrival.beta.word",
-      "feedback.mark"
+      "feedback.mark",
+      "portrait.label",
+      "portrait.sections.color",
+      "portrait.options.hair.afro",
+      "portrait.options.hair.bob",
+      "portrait.options.lips.nude",
+      "portrait.options.mark.piercing",
+      "portrait.options.extra.bandana",
+      "portrait.options.clothes.blazer",
+      "portrait.options.clothes.polo"
     ],
     "fr": [
       "calendar.moreRuns",
@@ -880,7 +896,19 @@
       "openOnPhone.appStore",
       "openOnPhone.googlePlay",
       "arrival.beta.word",
-      "feedback.mark"
+      "feedback.mark",
+      "portrait.label",
+      "portrait.sections.mood",
+      "portrait.sections.blush",
+      "portrait.options.hair.afro",
+      "portrait.options.lips.nude",
+      "portrait.options.shadow.rose",
+      "portrait.options.shadow.violet",
+      "portrait.options.mark.piercing",
+      "portrait.options.extra.bandana",
+      "portrait.options.clothes.tee",
+      "portrait.options.clothes.blazer",
+      "portrait.options.clothes.polo"
     ],
     "de": [
       "devices.iphone.steps.account",
@@ -1285,7 +1313,16 @@
       "openOnPhone.appStore",
       "openOnPhone.googlePlay",
       "arrival.beta.word",
-      "feedback.mark"
+      "feedback.mark",
+      "portrait.label",
+      "portrait.options.hair.afro",
+      "portrait.options.hair.bob",
+      "portrait.options.lips.nude",
+      "portrait.options.shadow.gold",
+      "portrait.options.mark.piercing",
+      "portrait.options.neck.choker",
+      "portrait.options.extra.bandana",
+      "portrait.options.clothes.blazer"
     ],
     "it": [
       "calendar.moreRuns",
@@ -1614,7 +1651,15 @@
       "openOnPhone.appStore",
       "openOnPhone.googlePlay",
       "arrival.beta.word",
-      "feedback.mark"
+      "feedback.mark",
+      "portrait.label",
+      "portrait.sections.blush",
+      "portrait.options.hair.afro",
+      "portrait.options.lips.nude",
+      "portrait.options.mark.piercing",
+      "portrait.options.extra.bandana",
+      "portrait.options.clothes.blazer",
+      "portrait.options.clothes.polo"
     ],
     "nl": [
       "calendar.moreRuns",
@@ -2163,7 +2208,20 @@
       "openOnPhone.appStore",
       "openOnPhone.googlePlay",
       "arrival.beta.word",
-      "feedback.mark"
+      "feedback.mark",
+      "portrait.label",
+      "portrait.sections.blush",
+      "portrait.options.hair.afro",
+      "portrait.options.hair.bob",
+      "portrait.options.lips.nude",
+      "portrait.options.shadow.violet",
+      "portrait.options.mark.piercing",
+      "portrait.options.neck.choker",
+      "portrait.options.extra.bandana",
+      "portrait.options.clothes.tee",
+      "portrait.options.clothes.blazer",
+      "portrait.options.clothes.hoodie",
+      "portrait.options.clothes.polo"
     ],
     "ja": [
       "devices.system.android",
@@ -2870,7 +2928,16 @@
       "openOnPhone.appStore",
       "openOnPhone.googlePlay",
       "arrival.beta.word",
-      "feedback.mark"
+      "feedback.mark",
+      "portrait.label",
+      "portrait.options.hair.afro",
+      "portrait.options.hair.bob",
+      "portrait.options.hair.mohawk",
+      "portrait.options.lips.nude",
+      "portrait.options.neck.choker",
+      "portrait.options.extra.bandana",
+      "portrait.options.clothes.blazer",
+      "portrait.options.clothes.hoodie"
     ],
     "tr": [
       "devices.cpus",
@@ -3035,7 +3102,14 @@
       "openOnPhone.appStore",
       "openOnPhone.googlePlay",
       "arrival.beta.word",
-      "feedback.mark"
+      "feedback.mark",
+      "portrait.label",
+      "portrait.options.hair.afro",
+      "portrait.options.hair.mohawk",
+      "portrait.options.lips.nude",
+      "portrait.options.mark.piercing",
+      "portrait.options.extra.bandana",
+      "portrait.options.clothes.blazer"
     ],
     "pl": [
       "devices.cpus",
@@ -3298,7 +3372,13 @@
       "openOnPhone.appStore",
       "openOnPhone.googlePlay",
       "arrival.beta.word",
-      "feedback.mark"
+      "feedback.mark",
+      "portrait.options.hair.afro",
+      "portrait.options.hair.bob",
+      "portrait.options.lips.nude",
+      "portrait.options.mark.piercing",
+      "portrait.options.neck.choker",
+      "portrait.options.extra.bandana"
     ],
     "ru": [
       "devices.system.android",

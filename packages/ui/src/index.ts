@@ -441,6 +441,25 @@ export { type ScrollSides, useScrollSides } from "./hooks/useScrollSides";
 export { Icon, type IconName, type IconProps, iconNames, icons } from "./icons/Icon";
 export { driveFolder, initialsOf, isIdHandle } from "./names";
 export {
+  BGS as PERSON_BACKGROUNDS,
+  CATALOG as PERSON_CATALOG,
+  cleanRecipe,
+  cropFor as personCropFor,
+  DEFAULT as PERSON_DEFAULT,
+  decodeRecipe,
+  encodeRecipe,
+  FIELDS as PERSON_FIELDS,
+  type PersonBuild,
+  type PersonField,
+  type PersonRecipe,
+  PORTRAIT_MARK,
+  randomPerson,
+  recipeOfUrl,
+  renderPerson,
+  swatchOf as personSwatchOf,
+} from "./person/engine.js";
+export { PersonPortrait } from "./person/PersonPortrait";
+export {
   BUSINESS_DAYS,
   nextOccurrences,
   type RecurrenceFreq,

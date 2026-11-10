@@ -940,6 +940,10 @@ export function accountRoutes(deps: AppDeps) {
               .max(3_000_000)
               .openapi({ description: "The image bytes in base64 (a data: URL prefix is accepted)." }),
             contentType: z.enum(["image/jpeg", "image/png", "image/webp"]),
+            portrait: z.string().max(400).optional().openapi({
+              description:
+                'For a portrait drawn in the app: the recipe it was drawn from ("1." and its values between dots). It is kept on the photo\'s address as a `#px=` fragment.',
+            }),
           }),
         ),
       },

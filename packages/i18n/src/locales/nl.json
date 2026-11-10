@@ -9565,6 +9565,179 @@
     "notImage": "Kies een afbeelding (JPG, PNG of WebP).",
     "tooBig": "De afbeelding is groter dan 8 MB."
   },
+  "portrait": {
+    "label": "Avatar",
+    "change": "Avatar wijzigen",
+    "title": "Je avatar",
+    "preview": "Je avatar",
+    "shuffle": "Husselen",
+    "small": "In kleine formaten in de chat is alleen het gezicht te zien.",
+    "photoAsk": "Liever een foto?",
+    "photoUpload": "Foto uploaden",
+    "saved": "Avatar bijgewerkt.",
+    "failed": "De avatar kon niet worden opgeslagen. Probeer het opnieuw.",
+    "showAll": "Alle opties tonen",
+    "showFewer": "Minder opties tonen",
+    "beardHint": "De baard volgt de haarkleur.",
+    "hatsHint": "Een pet, muts, hoed en hoofddoek bedekken het haar.",
+    "swatch": "{{group}} {{n}}",
+    "build": {
+      "label": "Type",
+      "m": "Mannelijk",
+      "f": "Vrouwelijk"
+    },
+    "tabs": {
+      "label": "Onderdelen van de avatar",
+      "face": "Gezicht",
+      "hair": "Haar",
+      "beard": "Baard",
+      "makeup": "Make-up",
+      "marks": "Kenmerken",
+      "accessories": "Accessoires",
+      "clothes": "Kleding",
+      "background": "Achtergrond"
+    },
+    "sections": {
+      "skin": "Huidskleur",
+      "eyes": "Oogkleur",
+      "mood": "Uitdrukking",
+      "color": "Kleur",
+      "hairColor": "Haarkleur",
+      "clothesColor": "Kleur van kleding",
+      "cut": "Kapsel",
+      "beard": "Baard",
+      "lips": "Lippenstift",
+      "shadow": "Oogschaduw",
+      "blush": "Blush",
+      "mark": "Kenmerken",
+      "glasses": "Bril",
+      "ear": "Oorbellen",
+      "neck": "Om de hals",
+      "extra": "Op het hoofd",
+      "piece": "Kledingstuk",
+      "bg": "Achtergrond"
+    },
+    "options": {
+      "mood": {
+        "smile": "Glimlach",
+        "grin": "Brede lach",
+        "laugh": "Lachen",
+        "calm": "Rustig",
+        "wink": "Knipoog",
+        "wow": "Verrast"
+      },
+      "hair": {
+        "none": "Kaal",
+        "buzz": "Gemillimeterd",
+        "short": "Kort",
+        "side": "Zijscheiding",
+        "quiff": "Kuif",
+        "curly": "Krullend",
+        "afro": "Afro",
+        "bob": "Bob",
+        "bangs": "Pony",
+        "long": "Lang",
+        "wavy": "Golvend",
+        "curls": "Lange krullen",
+        "bun": "Knot",
+        "pony": "Paardenstaart",
+        "spiky": "Stekels",
+        "mohawk": "Hanenkam",
+        "braids": "Vlechten",
+        "pigtails": "Staartjes"
+      },
+      "beard": {
+        "none": "Geen baard",
+        "stubble": "Stoppelbaard",
+        "mustache": "Snor",
+        "goatee": "Sik",
+        "strap": "Kaaklijn",
+        "full": "Volle baard",
+        "long": "Lang"
+      },
+      "lips": {
+        "none": "Geen lippenstift",
+        "nude": "Nude",
+        "pink": "Roze",
+        "red": "Rood",
+        "wine": "Wijnrood",
+        "purple": "Paars",
+        "black": "Zwart"
+      },
+      "shadow": {
+        "none": "Geen oogschaduw",
+        "rose": "Rosé",
+        "violet": "Violet",
+        "blue": "Blauw",
+        "green": "Groen",
+        "gold": "Goud",
+        "smoky": "Smokey"
+      },
+      "blush": {
+        "soft": "Zacht",
+        "strong": "Fel",
+        "none": "Geen blush"
+      },
+      "mark": {
+        "none": "Geen",
+        "freckles": "Sproeten",
+        "mole": "Moedervlek",
+        "scar": "Litteken",
+        "bandaid": "Pleister",
+        "piercing": "Piercing"
+      },
+      "glasses": {
+        "none": "Geen bril",
+        "round": "Rond",
+        "square": "Vierkant",
+        "gold": "Gouden",
+        "tinted": "Getint",
+        "shades": "Zonnebril"
+      },
+      "ear": {
+        "none": "Geen oorbellen",
+        "studs": "Gouden knopjes",
+        "pearls": "Parels",
+        "hoops": "Ringen",
+        "drops": "Hangers"
+      },
+      "neck": {
+        "none": "Niets",
+        "necklace": "Ketting",
+        "pearls": "Parels",
+        "choker": "Choker",
+        "bowtie": "Vlinderdas",
+        "muffler": "Sjaal"
+      },
+      "extra": {
+        "none": "Niets",
+        "headband": "Haarband",
+        "bandana": "Bandana",
+        "bow": "Strik",
+        "flower": "Bloem",
+        "headphones": "Koptelefoon",
+        "cap": "Pet",
+        "beanie": "Muts",
+        "hat": "Hoed",
+        "crown": "Kroon",
+        "scarf": "Hoofddoek"
+      },
+      "clothes": {
+        "tee": "T-shirt",
+        "vneck": "V-hals",
+        "tank": "Tanktop",
+        "shirt": "Overhemd",
+        "suit": "Pak",
+        "blazer": "Blazer",
+        "jacket": "Jas",
+        "hoodie": "Hoodie",
+        "turtle": "Coltrui",
+        "overall": "Tuinbroek",
+        "polo": "Polo",
+        "dress": "Jurk"
+      }
+    }
+  },
   "orgLogo": {
     "label": "Logo",
     "add": "Logo uploaden",

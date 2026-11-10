@@ -9198,6 +9198,179 @@
     "notImage": "请选择图片（JPG、PNG 或 WebP）。",
     "tooBig": "图片超过 8 MB。"
   },
+  "portrait": {
+    "label": "头像",
+    "change": "更换头像",
+    "title": "你的头像",
+    "preview": "你的头像",
+    "shuffle": "随机",
+    "small": "聊天中的小尺寸只显示脸部。",
+    "photoAsk": "更想用照片？",
+    "photoUpload": "上传照片",
+    "saved": "头像已更新。",
+    "failed": "头像保存失败，请重试。",
+    "showAll": "显示全部选项",
+    "showFewer": "显示较少选项",
+    "beardHint": "胡子的颜色跟随发色。",
+    "hatsHint": "鸭舌帽、毛线帽、帽子和包头巾会遮住头发。",
+    "swatch": "{{group}} {{n}}",
+    "build": {
+      "label": "类型",
+      "m": "男性化",
+      "f": "女性化"
+    },
+    "tabs": {
+      "label": "头像的组成部分",
+      "face": "脸部",
+      "hair": "头发",
+      "beard": "胡子",
+      "makeup": "妆容",
+      "marks": "特征",
+      "accessories": "配饰",
+      "clothes": "服装",
+      "background": "背景"
+    },
+    "sections": {
+      "skin": "肤色",
+      "eyes": "眼睛颜色",
+      "mood": "表情",
+      "color": "颜色",
+      "hairColor": "发色",
+      "clothesColor": "服装颜色",
+      "cut": "发型",
+      "beard": "胡子",
+      "lips": "口红",
+      "shadow": "眼影",
+      "blush": "腮红",
+      "mark": "特征",
+      "glasses": "眼镜",
+      "ear": "耳环",
+      "neck": "颈部",
+      "extra": "头部",
+      "piece": "款式",
+      "bg": "背景"
+    },
+    "options": {
+      "mood": {
+        "smile": "微笑",
+        "grin": "咧嘴笑",
+        "laugh": "大笑",
+        "calm": "平静",
+        "wink": "眨眼",
+        "wow": "惊讶"
+      },
+      "hair": {
+        "none": "光头",
+        "buzz": "寸头",
+        "short": "短发",
+        "side": "侧分",
+        "quiff": "飞机头",
+        "curly": "卷发",
+        "afro": "爆炸头",
+        "bob": "波波头",
+        "bangs": "刘海",
+        "long": "长发",
+        "wavy": "波浪",
+        "curls": "长卷发",
+        "bun": "丸子头",
+        "pony": "马尾",
+        "spiky": "刺猬头",
+        "mohawk": "莫西干",
+        "braids": "辫子",
+        "pigtails": "双马尾"
+      },
+      "beard": {
+        "none": "无胡子",
+        "stubble": "胡茬",
+        "mustache": "小胡子",
+        "goatee": "山羊胡",
+        "strap": "下颌线胡",
+        "full": "络腮胡",
+        "long": "长胡子"
+      },
+      "lips": {
+        "none": "无口红",
+        "nude": "裸色",
+        "pink": "粉色",
+        "red": "红色",
+        "wine": "酒红",
+        "purple": "紫色",
+        "black": "黑色"
+      },
+      "shadow": {
+        "none": "无眼影",
+        "rose": "玫瑰色",
+        "violet": "紫罗兰",
+        "blue": "蓝色",
+        "green": "绿色",
+        "gold": "金色",
+        "smoky": "烟熏"
+      },
+      "blush": {
+        "soft": "淡",
+        "strong": "浓",
+        "none": "无腮红"
+      },
+      "mark": {
+        "none": "无",
+        "freckles": "雀斑",
+        "mole": "痣",
+        "scar": "疤痕",
+        "bandaid": "创可贴",
+        "piercing": "穿环"
+      },
+      "glasses": {
+        "none": "无眼镜",
+        "round": "圆框",
+        "square": "方框",
+        "gold": "金框",
+        "tinted": "有色镜片",
+        "shades": "墨镜"
+      },
+      "ear": {
+        "none": "无耳环",
+        "studs": "金耳钉",
+        "pearls": "珍珠",
+        "hoops": "耳圈",
+        "drops": "耳坠"
+      },
+      "neck": {
+        "none": "无",
+        "necklace": "项链",
+        "pearls": "珍珠",
+        "choker": "颈链",
+        "bowtie": "领结",
+        "muffler": "围巾"
+      },
+      "extra": {
+        "none": "无",
+        "headband": "发带",
+        "bandana": "印花头巾",
+        "bow": "蝴蝶结",
+        "flower": "花朵",
+        "headphones": "耳机",
+        "cap": "鸭舌帽",
+        "beanie": "毛线帽",
+        "hat": "帽子",
+        "crown": "皇冠",
+        "scarf": "包头巾"
+      },
+      "clothes": {
+        "tee": "T恤",
+        "vneck": "V领",
+        "tank": "背心",
+        "shirt": "衬衫",
+        "suit": "西装",
+        "blazer": "休闲西装",
+        "jacket": "夹克",
+        "hoodie": "卫衣",
+        "turtle": "高领",
+        "overall": "背带裤",
+        "polo": "Polo衫",
+        "dress": "连衣裙"
+      }
+    }
+  },
   "orgLogo": {
     "label": "徽标",
     "add": "上传徽标",

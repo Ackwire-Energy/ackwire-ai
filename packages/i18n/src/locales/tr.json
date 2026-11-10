@@ -9441,6 +9441,179 @@
     "notImage": "Bir görsel seçin (JPG, PNG veya WebP).",
     "tooBig": "Görsel 8 MB'tan büyük."
   },
+  "portrait": {
+    "label": "Avatar",
+    "change": "Avatarı değiştir",
+    "title": "Avatarınız",
+    "preview": "Avatarınız",
+    "shuffle": "Karıştır",
+    "small": "Sohbetteki küçük boyutlarda yalnızca yüz görünür.",
+    "photoAsk": "Fotoğraf mı tercih edersiniz?",
+    "photoUpload": "Fotoğraf yükle",
+    "saved": "Avatar güncellendi.",
+    "failed": "Avatar kaydedilemedi. Tekrar deneyin.",
+    "showAll": "Tüm seçenekleri göster",
+    "showFewer": "Daha az seçenek göster",
+    "beardHint": "Sakal, saç rengini takip eder.",
+    "hatsHint": "Kasket, bere, şapka ve başörtüsü saçı örter.",
+    "swatch": "{{group}} {{n}}",
+    "build": {
+      "label": "Tip",
+      "m": "Maskülen",
+      "f": "Feminen"
+    },
+    "tabs": {
+      "label": "Avatarın bölümleri",
+      "face": "Yüz",
+      "hair": "Saç",
+      "beard": "Sakal",
+      "makeup": "Makyaj",
+      "marks": "İzler",
+      "accessories": "Aksesuarlar",
+      "clothes": "Kıyafet",
+      "background": "Arka plan"
+    },
+    "sections": {
+      "skin": "Ten rengi",
+      "eyes": "Göz rengi",
+      "mood": "İfade",
+      "color": "Renk",
+      "hairColor": "Saç rengi",
+      "clothesColor": "Kıyafet rengi",
+      "cut": "Kesim",
+      "beard": "Sakal",
+      "lips": "Ruj",
+      "shadow": "Göz farı",
+      "blush": "Allık",
+      "mark": "İzler",
+      "glasses": "Gözlük",
+      "ear": "Küpe",
+      "neck": "Boyunda",
+      "extra": "Başta",
+      "piece": "Parça",
+      "bg": "Arka plan"
+    },
+    "options": {
+      "mood": {
+        "smile": "Gülümseme",
+        "grin": "Kocaman gülümseme",
+        "laugh": "Kahkaha",
+        "calm": "Sakin",
+        "wink": "Göz kırpma",
+        "wow": "Şaşkın"
+      },
+      "hair": {
+        "none": "Kel",
+        "buzz": "Asker tıraşı",
+        "short": "Kısa",
+        "side": "Yandan ayrık",
+        "quiff": "Kabarık",
+        "curly": "Kıvırcık",
+        "afro": "Afro",
+        "bob": "Küt",
+        "bangs": "Kâkül",
+        "long": "Uzun",
+        "wavy": "Dalgalı",
+        "curls": "Uzun bukleler",
+        "bun": "Topuz",
+        "pony": "At kuyruğu",
+        "spiky": "Dikenli",
+        "mohawk": "Mohawk",
+        "braids": "Örgü",
+        "pigtails": "Çift kuyruk"
+      },
+      "beard": {
+        "none": "Sakalsız",
+        "stubble": "Kirli sakal",
+        "mustache": "Bıyık",
+        "goatee": "Keçi sakalı",
+        "strap": "İnce sakal",
+        "full": "Gür",
+        "long": "Uzun"
+      },
+      "lips": {
+        "none": "Rujsuz",
+        "nude": "Nude",
+        "pink": "Pembe",
+        "red": "Kırmızı",
+        "wine": "Bordo",
+        "purple": "Mor",
+        "black": "Siyah"
+      },
+      "shadow": {
+        "none": "Farsız",
+        "rose": "Pembe",
+        "violet": "Mor",
+        "blue": "Mavi",
+        "green": "Yeşil",
+        "gold": "Altın",
+        "smoky": "Dumanlı"
+      },
+      "blush": {
+        "soft": "Hafif",
+        "strong": "Belirgin",
+        "none": "Allıksız"
+      },
+      "mark": {
+        "none": "Yok",
+        "freckles": "Çiller",
+        "mole": "Ben",
+        "scar": "Yara izi",
+        "bandaid": "Yara bandı",
+        "piercing": "Piercing"
+      },
+      "glasses": {
+        "none": "Gözlüksüz",
+        "round": "Yuvarlak",
+        "square": "Kare",
+        "gold": "Altın",
+        "tinted": "Renkli cam",
+        "shades": "Güneş gözlüğü"
+      },
+      "ear": {
+        "none": "Küpesiz",
+        "studs": "Altın çivi küpe",
+        "pearls": "İnci",
+        "hoops": "Halka",
+        "drops": "Sallantılı"
+      },
+      "neck": {
+        "none": "Yok",
+        "necklace": "Kolye",
+        "pearls": "İnci",
+        "choker": "Tasma kolye",
+        "bowtie": "Papyon",
+        "muffler": "Atkı"
+      },
+      "extra": {
+        "none": "Yok",
+        "headband": "Saç bandı",
+        "bandana": "Bandana",
+        "bow": "Fiyonk",
+        "flower": "Çiçek",
+        "headphones": "Kulaklık",
+        "cap": "Kasket",
+        "beanie": "Bere",
+        "hat": "Şapka",
+        "crown": "Taç",
+        "scarf": "Başörtüsü"
+      },
+      "clothes": {
+        "tee": "Tişört",
+        "vneck": "V yaka",
+        "tank": "Atlet",
+        "shirt": "Gömlek",
+        "suit": "Takım elbise",
+        "blazer": "Blazer",
+        "jacket": "Ceket",
+        "hoodie": "Kapüşonlu",
+        "turtle": "Boğazlı kazak",
+        "overall": "Tulum",
+        "polo": "Polo yaka",
+        "dress": "Elbise"
+      }
+    }
+  },
   "orgLogo": {
     "label": "Logo",
     "add": "Logo yükle",

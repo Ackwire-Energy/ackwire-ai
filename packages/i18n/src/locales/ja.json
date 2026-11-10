@@ -9130,6 +9130,179 @@
     "notImage": "画像を選んでください（JPG、PNG、WebP）。",
     "tooBig": "画像が8 MBを超えています。"
   },
+  "portrait": {
+    "label": "アバター",
+    "change": "アバターを変更",
+    "title": "あなたのアバター",
+    "preview": "あなたのアバター",
+    "shuffle": "シャッフル",
+    "small": "チャット内の小さい表示では顔だけが表示されます。",
+    "photoAsk": "写真のほうがいいですか？",
+    "photoUpload": "写真をアップロード",
+    "saved": "アバターを更新しました。",
+    "failed": "アバターを保存できませんでした。もう一度お試しください。",
+    "showAll": "すべてのオプションを表示",
+    "showFewer": "オプションを減らす",
+    "beardHint": "ひげは髪の色に合わせられます。",
+    "hatsHint": "キャップ、ニット帽、ハット、ヘッドスカーフは髪を覆います。",
+    "swatch": "{{group}} {{n}}",
+    "build": {
+      "label": "顔立ち",
+      "m": "男性的",
+      "f": "女性的"
+    },
+    "tabs": {
+      "label": "アバターのパーツ",
+      "face": "顔",
+      "hair": "髪",
+      "beard": "ひげ",
+      "makeup": "メイク",
+      "marks": "特徴",
+      "accessories": "アクセサリー",
+      "clothes": "服",
+      "background": "背景"
+    },
+    "sections": {
+      "skin": "肌の色",
+      "eyes": "目の色",
+      "mood": "表情",
+      "color": "色",
+      "hairColor": "髪の色",
+      "clothesColor": "服の色",
+      "cut": "髪型",
+      "beard": "ひげ",
+      "lips": "口紅",
+      "shadow": "アイシャドウ",
+      "blush": "チーク",
+      "mark": "特徴",
+      "glasses": "メガネ",
+      "ear": "イヤリング",
+      "neck": "首まわり",
+      "extra": "頭につけるもの",
+      "piece": "アイテム",
+      "bg": "背景"
+    },
+    "options": {
+      "mood": {
+        "smile": "笑顔",
+        "grin": "満面の笑み",
+        "laugh": "大笑い",
+        "calm": "穏やか",
+        "wink": "ウインク",
+        "wow": "びっくり"
+      },
+      "hair": {
+        "none": "スキンヘッド",
+        "buzz": "丸刈り",
+        "short": "ショート",
+        "side": "横分け",
+        "quiff": "リーゼント",
+        "curly": "カーリー",
+        "afro": "アフロ",
+        "bob": "ボブ",
+        "bangs": "前髪",
+        "long": "ロング",
+        "wavy": "ウェーブ",
+        "curls": "ロングカール",
+        "bun": "お団子",
+        "pony": "ポニーテール",
+        "spiky": "ツンツン",
+        "mohawk": "モヒカン",
+        "braids": "三つ編み",
+        "pigtails": "ツインテール"
+      },
+      "beard": {
+        "none": "ひげなし",
+        "stubble": "無精ひげ",
+        "mustache": "口ひげ",
+        "goatee": "あごひげ",
+        "strap": "ラインひげ",
+        "full": "フル",
+        "long": "ロング"
+      },
+      "lips": {
+        "none": "口紅なし",
+        "nude": "ヌード",
+        "pink": "ピンク",
+        "red": "レッド",
+        "wine": "ワイン",
+        "purple": "パープル",
+        "black": "ブラック"
+      },
+      "shadow": {
+        "none": "アイシャドウなし",
+        "rose": "ローズ",
+        "violet": "バイオレット",
+        "blue": "ブルー",
+        "green": "グリーン",
+        "gold": "ゴールド",
+        "smoky": "スモーキー"
+      },
+      "blush": {
+        "soft": "ほんのり",
+        "strong": "しっかり",
+        "none": "チークなし"
+      },
+      "mark": {
+        "none": "なし",
+        "freckles": "そばかす",
+        "mole": "ほくろ",
+        "scar": "傷あと",
+        "bandaid": "ばんそうこう",
+        "piercing": "ピアス"
+      },
+      "glasses": {
+        "none": "メガネなし",
+        "round": "丸型",
+        "square": "スクエア",
+        "gold": "ゴールド",
+        "tinted": "カラーレンズ",
+        "shades": "サングラス"
+      },
+      "ear": {
+        "none": "イヤリングなし",
+        "studs": "ゴールドスタッド",
+        "pearls": "パール",
+        "hoops": "フープ",
+        "drops": "ドロップ"
+      },
+      "neck": {
+        "none": "なし",
+        "necklace": "ネックレス",
+        "pearls": "パール",
+        "choker": "チョーカー",
+        "bowtie": "蝶ネクタイ",
+        "muffler": "マフラー"
+      },
+      "extra": {
+        "none": "なし",
+        "headband": "ヘアバンド",
+        "bandana": "バンダナ",
+        "bow": "リボン",
+        "flower": "花",
+        "headphones": "ヘッドホン",
+        "cap": "キャップ",
+        "beanie": "ニット帽",
+        "hat": "ハット",
+        "crown": "王冠",
+        "scarf": "ヘッドスカーフ"
+      },
+      "clothes": {
+        "tee": "Tシャツ",
+        "vneck": "Vネック",
+        "tank": "タンクトップ",
+        "shirt": "シャツ",
+        "suit": "スーツ",
+        "blazer": "ブレザー",
+        "jacket": "ジャケット",
+        "hoodie": "パーカー",
+        "turtle": "タートルネック",
+        "overall": "オーバーオール",
+        "polo": "ポロシャツ",
+        "dress": "ワンピース"
+      }
+    }
+  },
   "orgLogo": {
     "label": "ロゴ",
     "add": "ロゴをアップロード",
