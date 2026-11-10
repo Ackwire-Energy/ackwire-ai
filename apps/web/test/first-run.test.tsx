@@ -218,7 +218,7 @@ describe("in a personal workspace (ADR 0159)", () => {
     expect(rows().map((r) => r.querySelector(".ac-mediarow__head")?.textContent)).toEqual([
       "Me conte um pouco sobre você.",
       "Escolha os seus agentes.",
-      "Penso com AutomáticoTrocar",
+      "Já penso com uma IATrocar",
       "Conecte os seus apps.",
     ]);
     expect(card().querySelector(".setup-cl__head small")?.textContent).toBe("1 de 4");
