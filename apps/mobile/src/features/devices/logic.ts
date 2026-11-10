@@ -137,6 +137,11 @@ export type DeviceJoin = DevicesList["requests"][number];
 export const joinFacts = (t: TFunction, r: Pick<DeviceJoin, "os" | "ip" | "location">) =>
   [t(`machines.os.${osOf(r.os)}`), r.ip, r.location].filter(Boolean).join(" · ");
 
+/** "Conectar um dispositivo"'s `?kind=`: another computer through its app, or a one-line link for a server or one. */
+export type ConnectKind = "app" | "server" | "computer";
+export const connectKindOf = (kind: string | undefined): ConnectKind | null =>
+  kind === "app" || kind === "server" || kind === "computer" ? kind : null;
+
 /** Who may point their agents at a device, said short: "Only me", "Only Sam", "Everyone", "Rui and Mobile team". */
 export function audienceText(
   t: TFunction,

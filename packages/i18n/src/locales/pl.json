@@ -14009,10 +14009,26 @@
     },
     "computer": {
       "title": "Podłącz inny komputer",
-      "step1": "Pobierz na nim aplikację:",
-      "step2": "Otwórz ją i zaloguj się do {{org}}.",
-      "step3": "Włącz opcję Pozwól agentom używać tego komputera.",
-      "orLine": "Albo wklej jedno polecenie w jego terminalu"
+      "step1": "Zainstaluj na nim aplikację agentes.chat:",
+      "step2": "Otwórz ją i zaloguj się na swoje konto.",
+      "step3": "Kliknij Zezwól, gdy zapyta, czy agenci {{org}} mogą go używać.",
+      "shows": "Pojawi się tu sam, widoczny tylko dla ciebie, dopóki go nie udostępnisz.",
+      "waiting": "Czekam na twój komputer…",
+      "connected": "Połączono: {{name}}",
+      "orLine": "Albo wklej jedno polecenie w jego terminalu",
+      "noApp": "Nie możesz zainstalować na nim aplikacji? Użyj polecenia w terminalu"
+    },
+    "thisApp": {
+      "text": "Aplikacja agentes.chat połączy go jednym kliknięciem i najpierw zapyta.",
+      "open": "Otwórz aplikację agentes.chat",
+      "browserAsks": "Przeglądarka zapyta, czy może ją otworzyć: wybierz Otwórz, a jeśli zaproponuje, także Zawsze zezwalaj.",
+      "noApp": "Nie masz aplikacji?",
+      "afterInstall": "Po instalacji kliknij jeszcze raz Otwórz aplikację agentes.chat. Link działa raz, przez 10 minut.",
+      "waiting": "Czekam na aplikację na tym komputerze…",
+      "expired": "Ten link wygasł.",
+      "again": "Utwórz nowy link",
+      "failed": "Nie udało się utworzyć linku. Spróbuj ponownie za chwilę.",
+      "server": "Serwer? Użyj polecenia w terminalu"
     },
     "link": {
       "serverTitle": "Podłącz serwer",

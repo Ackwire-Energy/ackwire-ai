@@ -4,6 +4,7 @@ import { placeOf, subtitleOf } from "../../src/features/activity/logic";
 import {
   androidStage,
   audienceText,
+  connectKindOf,
   deviceHref,
   deviceNoticeOf,
   deviceNoticeTitle,
@@ -190,5 +191,19 @@ describe("notices, waits and facts", async () => {
       "Permitir",
     ]);
     expect(en("mobile.devices.android.prompt.title")).toBe("Allow USB debugging?");
+  });
+
+  test("connecting another computer: through its app, or one line; the app's Allow named as the app names it", () => {
+    expect(["app", "server", "computer", "phone", undefined].map(connectKindOf)).toEqual([
+      "app",
+      "server",
+      "computer",
+      null,
+      null,
+    ]);
+    expect(en("mobile.devices.connect.appStep3", { org: "Acme" })).toBe(
+      "Click Allow when it asks to let Acme's agents use it",
+    );
+    expect(pt("mobile.devices.connect.appConnected", { name: "Mac mini da Ana" })).toBe("Conectado: Mac mini da Ana");
   });
 });

@@ -13,7 +13,7 @@ import {
 } from "@agenteschat/client/lib/server";
 import { appServer, serverName } from "./server";
 
-export type FirstScreen = "choose" | "own" | "connect" | "here" | "link";
+export type FirstScreen = "choose" | "own" | "connect" | "here" | "link" | "pair";
 
 /**
  * Esc in the first run: back a screen, or the window closes (when a server is open already); never while

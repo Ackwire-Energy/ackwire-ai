@@ -120,6 +120,30 @@ export async function openConnectLink(db: Database, code: string, now = new Date
   return row ?? null;
 }
 
+export interface ConnectLinkInfo {
+  org: { name: string };
+  by: { name: string };
+  kind: ConnectLinkKind;
+  expiresAt: string;
+}
+
+/**
+ * `GET /api/machines/connect-links/{code}` (no session): what the desktop app shows before it asks to join with a
+ * link, the workspace and who made it. Null for a code that is unknown, used or expired alike, so a guess learns
+ * nothing about which.
+ */
+export async function connectLinkInfo(db: Database, code: string, now = new Date()): Promise<ConnectLinkInfo | null> {
+  const link = await openConnectLink(db, code, now);
+  if (!link) return null;
+  const [who] = await db
+    .select({ by: users.name, org: organizations.name })
+    .from(users)
+    .innerJoin(organizations, eq(organizations.id, link.orgId))
+    .where(eq(users.id, link.createdByUserId));
+  if (!who) return null;
+  return { org: { name: who.org }, by: { name: who.by }, kind: link.kind, expiresAt: link.expiresAt.toISOString() };
+}
+
 const OS_WORDS: Record<string, string> = { darwin: "macOS", windows: "Windows", linux: "Linux" };
 
 /**
@@ -168,6 +192,9 @@ export async function startLinkedDeviceCode(
     orgName: who?.org ?? "",
     makerId: link.createdByUserId,
     facts: [OS_WORDS[request.os], request.requesterIp, request.approxLocation].filter(Boolean).join(" · "),
+    os: request.os,
+    ip: request.requesterIp,
+    location: request.approxLocation,
   }).catch(() => undefined);
   await publishDevicesChanged(deps.pubsub, link.orgId);
   return { ...started, maker: { name: who?.maker ?? "" }, org: { name: who?.org ?? "" } };

@@ -13564,10 +13564,26 @@
     },
     "computer": {
       "title": "Collega un altro computer",
-      "step1": "Scarica l'app lì:",
-      "step2": "Aprila e accedi a {{org}}.",
-      "step3": "Attiva Fai usare questo computer agli agenti.",
-      "orLine": "Oppure incolla una riga nel suo terminale"
+      "step1": "Installa lì l'app agentes.chat:",
+      "step2": "Aprila e accedi con il tuo account.",
+      "step3": "Fai clic su Consenti quando chiede di far usare il computer agli agenti di {{org}}.",
+      "shows": "Compare qui da solo, solo per te finché non lo condividi.",
+      "waiting": "In attesa di un tuo computer…",
+      "connected": "Collegato: {{name}}",
+      "orLine": "Oppure incolla una riga nel suo terminale",
+      "noApp": "Non puoi installare l'app lì? Usa una riga nel terminale"
+    },
+    "thisApp": {
+      "text": "L'app agentes.chat lo collega con un clic, e prima te lo chiede.",
+      "open": "Apri l'app agentes.chat",
+      "browserAsks": "Il browser chiede se può aprirla: scegli Apri, e Consenti sempre se lo propone.",
+      "noApp": "Non hai l'app?",
+      "afterInstall": "Dopo l'installazione, premi di nuovo Apri l'app agentes.chat. Il link funziona una volta, per 10 minuti.",
+      "waiting": "In attesa dell'app su questo computer…",
+      "expired": "Questo link è scaduto.",
+      "again": "Crea un nuovo link",
+      "failed": "Non è stato possibile creare il link. Riprova tra poco.",
+      "server": "Un server? Usa una riga nel terminale"
     },
     "link": {
       "serverTitle": "Collega un server",

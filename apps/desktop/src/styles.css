@@ -1006,6 +1006,12 @@ body[data-window="popover"] {
   display: flex;
   gap: 8px;
 }
+/* Pairing this computer (Pair.tsx): its facts and choices in a card as wide as the words around it. */
+.dk-pair .dk-card {
+  width: 100%;
+  max-width: 60ch;
+  text-align: start;
+}
 /* Run agentes.chat here. The window is 600 px tall: a smaller title on one line (the Portuguese one is
    longer), and two fields side by side. */
 .dk-fr__body h1.dk-fr__h1sm {
