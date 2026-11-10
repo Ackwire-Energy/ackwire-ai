@@ -73,6 +73,7 @@ const SIDEWAYS: Record<string, "strip" | "content"> = {
   ".ac-carousel__track": "strip",
   ".dk-orgpick": "strip",
   ".wiki-doc .wiki-editor__bar": "strip",
+  ".nac-band__path": "strip",
   ".code-card__code": "content",
   ".code-card__preview": "content",
   ".level-matrix": "content",

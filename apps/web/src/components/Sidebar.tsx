@@ -795,7 +795,14 @@ export function Sidebar() {
     : null;
 
   return (
-    <nav className="sidebar" aria-label={t("shell.nav")} data-rail={rail} {...drawer?.navProps}>
+    <nav
+      className="sidebar"
+      aria-label={t("shell.nav")}
+      data-rail={rail}
+      // Its faces' sizes follow the mode (the agents' and New agent's, ADR 0164).
+      data-personal={personal || undefined}
+      {...drawer?.navProps}
+    >
       <div className="sidebar__top">
         <WorkspaceSky part="side" rail={rail} />
         {personal ? (

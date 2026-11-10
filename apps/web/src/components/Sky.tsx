@@ -209,22 +209,32 @@ export function facePool(
  * bottom, a pool of light behind its face so the face's own dither never melts into the sky's, 2 px pixels and a few
  * faint pixel agents. The new agent's card and its conversation's band use it too (ADR 0164): `night` (0..1, read on
  * every frame) pulls the tones toward a deep navy while the agent has no AI, and back as it gets one.
+ *
+ * `surface` is the token of what the sky sits on (the page by default; the card's well, the chat card's face), so its
+ * last tone is that color and it ends with no seam. On a dark surface it is the window's surface rising into its
+ * color, as the app's other skies are there (`softTones`): the color near the top and as a glow behind the face, the
+ * rest melting into the dark below. The light theme's sky is the same as before.
  */
 export function agentCoverOptions(
   color: AgentColor,
-  o: { busy?: boolean; clear?: Clear; pool: () => [number, number]; night?: () => number },
+  o: { busy?: boolean; clear?: Clear; pool: () => [number, number]; night?: () => number; surface?: string },
 ): SkyOptions {
   const busy = o.busy ?? false;
+  // Read with the tones on each frame (the theme can change), before the field is drawn.
+  let dark = false;
   return {
     pixel: 2,
-    surface: "--bg",
-    // Mid to near white, then most of the way to the page: no deep tones on the cover.
+    surface: o.surface ?? "--bg",
     palette: (surface) => {
-      const tones = agentTones(color);
-      const light = tones.slice(3);
-      const day = [...light, mix(light[light.length - 1] ?? surface, surface, 0.6)];
+      dark = isDarkSurface(surface);
       const night = o.night?.() ?? 0;
-      return night <= 0.001 ? day : day.map((tone, i) => mix(tone, NIGHT_NAVY, night * (0.9 - i * 0.07)));
+      const toNight = (tones: string[]) =>
+        night <= 0.001 ? tones : tones.map((tone, i) => mix(tone, NIGHT_NAVY, night * (0.9 - i * 0.07)));
+      // Dark: from the surface (0) up to the color (last); the field puts the color on top and behind the face.
+      if (dark) return toNight(softTones(color, surface));
+      // Light: mid to near white, then most of the way to the surface: no deep tones on the cover.
+      const light = agentTones(color).slice(3);
+      return toNight([...light, mix(light[light.length - 1] ?? surface, surface, 0.6)]);
     },
     body: spriteTone(color),
     speed: busy ? 2.6 : 1,
@@ -234,11 +244,15 @@ export function agentCoverOptions(
     sprites: busy ? { area: 5300, max: 14 } : { area: 10560, max: 8 },
     clear: o.clear,
     light: 0,
-    // Lighter toward the bottom and the right, where the page's text starts.
-    base: (u, v, tt) => 0.28 + 0.3 * u + 0.62 * v * v + 0.05 * S(u * 4 + tt * 0.5),
+    // Light: lighter toward the bottom and the right, where the page's text starts. Dark: the color at the top, the
+    // surface at the bottom (the pool lifts the face's glow back toward the color).
+    base: (u, v, tt) =>
+      dark
+        ? 0.86 - 0.16 * u - 0.82 * v + 0.05 * S(u * 4 + tt * 0.5)
+        : 0.28 + 0.3 * u + 0.62 * v * v + 0.05 * S(u * 4 + tt * 0.5),
     blobs: () => {
       const [x, y] = o.pool();
-      return [[x, y, 0.3, 0.75]];
+      return [[x, y, 0.3, dark ? 0.55 : 0.75]];
     },
   };
 }

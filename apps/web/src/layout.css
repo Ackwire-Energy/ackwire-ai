@@ -11858,10 +11858,23 @@ html[data-menu-overlay] .shell {
   margin: 0 1px;
   color: var(--faint);
 }
-/* Faces on the rail: a step up from the kit's small (24px), inside the rail's 40px tile with room for its badges. */
+/*
+ * The sidebar's faces as tokens, so New agent's empty face is always the agents' own (ADR 0164): on the rail a step up
+ * from the kit's small (24px), inside the rail's 40px tile with room for its badges; in the full list an agent's row
+ * has a message's face (`--name-face`), 40 in a personal workspace's plain list (ADR 0159), 12px from its words.
+ */
+.sidebar {
+  --sidebar-rail-face: 28px;
+  --sidebar-agent-face: var(--name-face);
+  --sidebar-agent-gap: 12px;
+}
+.sidebar[data-personal] {
+  --sidebar-agent-face: 40px;
+}
+/* Faces on the rail. */
 .sidebar__item > .ac-avatar--sm {
-  width: 28px;
-  height: 28px;
+  width: var(--sidebar-rail-face);
+  height: var(--sidebar-rail-face);
   font-size: 12px;
 }
 /*
@@ -11880,7 +11893,13 @@ html[data-menu-overlay] .shell {
 /* An agent's row breathes: the face 12px from its words, a little air between the name and its line. Its face keeps
    the 8px from the plate's edges every face row has. */
 .sidebar:not([data-rail="true"]) :is([data-agent-row] > .sidebar__item, .sidebar__item[data-right-hand]) {
-  gap: 12px;
+  gap: var(--sidebar-agent-gap);
+}
+.sidebar:not([data-rail="true"])
+  :is([data-agent-row] > .sidebar__item, .sidebar__item[data-right-hand])
+  > .ac-avatar--sm {
+  width: var(--sidebar-agent-face);
+  height: var(--sidebar-agent-face);
 }
 .sidebar:not([data-rail="true"])
   :is([data-agent-row] > .sidebar__item, .sidebar__item[data-right-hand])
@@ -12754,21 +12773,22 @@ html:not([data-pointer]) .sidebar__bell:focus-visible {
   .sidebar__agents-plain
   :is([data-agent-row] > .sidebar__item, .sidebar__item[data-right-hand])
   > .ac-avatar--sm {
-  width: 40px;
-  height: 40px;
+  width: var(--sidebar-agent-face);
+  height: var(--sidebar-agent-face);
   font-size: 15px;
 }
 /*
- * New agent under a personal workspace's agents: an empty face the exact box of the agents' (40 in the list, 28 on the
- * rail, radius 30% of the side, the tile's hairline), so the row lines up with theirs; its name centres on it like a
- * name alone.
+ * New agent under the agents (ADR 0159, ADR 0164): an empty face the exact box of the agents' faces in this sidebar
+ * (its tokens: a team's message-size face, a personal list's 40, the rail's 28), radius 30% of the side as their framed
+ * tile (`.ac-avatar--framed`), the tile's hairline, as far from its name as theirs; its name centres on it like a name
+ * alone.
  */
 .sidebar__new-agent-face {
   display: grid;
   flex: none;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: var(--sidebar-rail-face);
+  height: var(--sidebar-rail-face);
   border-radius: 30%;
   background: var(--plate-soft, var(--plate));
   /* The tile's own edge (`.ac-avatar--framed::before`): the hairline and the faint top highlight. */
@@ -12783,10 +12803,11 @@ html:not([data-pointer]) .sidebar__bell:focus-visible {
     inset 0 1px 0 rgba(255, 255, 255, 0.07);
 }
 .sidebar:not([data-rail="true"]) .sidebar__new-agent-face {
-  width: 40px;
-  height: 40px;
+  width: var(--sidebar-agent-face);
+  height: var(--sidebar-agent-face);
 }
 .sidebar:not([data-rail="true"]) .sidebar__new-agent {
+  gap: var(--sidebar-agent-gap);
   padding-block: 8px;
   color: var(--muted);
 }
