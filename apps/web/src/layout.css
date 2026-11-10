@@ -1490,8 +1490,9 @@ html:not([data-pointer]) .member-row--add:focus-visible {
 /* Cards take the full row; file tiles (images, files) sit side by side and wrap. */
 /* ── Attachments on a message: tiles of one size, side by side ─────────────
    Each a cover on top (what it holds, drawn small: a document's start, a table's first rows, a change's files, a
-   diagram, a page, a picture) and its name with its kind and size under it. One surface: a hairline and the cut
-   corner, nothing raised inside. Alone on its message a tile is wider; a picture alone shows whole. */
+   diagram, a page) and its name with its kind and size under it. One surface: a hairline and the cut corner, nothing
+   raised inside. A picture is only its cover, its name and size in its tip. Alone on its message a tile is wider; a
+   picture alone shows whole. */
 .artifact-cards {
   display: flex;
   flex-wrap: wrap;
@@ -1567,13 +1568,13 @@ html:not([data-pointer]) .artifact-tile__open:focus-visible {
   border-bottom: 1px solid var(--line);
   pointer-events: none;
 }
+/* `.ac-iconline`: its icon on the title's capitals, the title's line its line. */
 .artifact-tile__foot {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   min-height: 52px;
   box-sizing: border-box;
   padding: 9px 12px 10px;
+  font-size: 13.5px;
+  line-height: 18px;
   color: var(--faint);
 }
 .artifact-tile__name {
@@ -1582,22 +1583,19 @@ html:not([data-pointer]) .artifact-tile__open:focus-visible {
   display: flex;
   flex-direction: column;
 }
+/* A file's name whole, wrapping (a tile beside it keeps its own height), never cut with "…". */
 .artifact-tile__title {
-  overflow: hidden;
   font-size: 13.5px;
   font-weight: 650;
   line-height: 18px;
   color: var(--ink);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 .artifact-tile__meta {
-  overflow: hidden;
   font-size: 12px;
   line-height: 16px;
   color: var(--faint);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 /* Download and More over the cover's corner on hover (always shown on touch). */
 .artifact-tile__acts {
@@ -1822,7 +1820,21 @@ html:not([data-pointer]) .artifact-tile__open:focus-visible {
 .artifact-tile[data-media] .artifact-tile__open {
   cursor: zoom-in;
 }
-/* A picture alone on its message: whole, at its own proportions, no name under it (Download and More stay). */
+.artifact-tile[data-media] .artifact-tile__cover {
+  border-bottom: 0;
+}
+/* The tip (a picture's or a video's name and size) hangs from the whole tile: over a picture it is the open button's
+   box, around a video its player. */
+.artifact-tile__tip {
+  display: block;
+}
+.artifact-tile[data-media] > .artifact-tile__tip {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+}
+/* A picture alone on its message: whole, at its own proportions (Download and More stay). */
 .artifact-cards > .artifact-tile[data-media]:only-child {
   --tile-w: fit-content;
   max-width: 420px;
@@ -1830,9 +1842,6 @@ html:not([data-pointer]) .artifact-tile__open:focus-visible {
 .artifact-cards > .artifact-tile[data-media]:only-child .artifact-tile__cover {
   height: auto;
   border-bottom: 0;
-}
-.artifact-cards > .artifact-tile[data-media]:only-child .artifact-tile__foot {
-  display: none;
 }
 .artifact-cards > .artifact-tile[data-media]:only-child .artifact-tile__picture img {
   width: auto;

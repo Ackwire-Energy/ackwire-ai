@@ -8,7 +8,7 @@ import {
   previewKind,
   previewType,
 } from "@agenteschat/client/lib/files";
-import { Icon, Spinner, VideoPlayer, type VideoPlayerLabels } from "@agenteschat/ui";
+import { Icon, Spinner, Tip, VideoPlayer, type VideoPlayerLabels } from "@agenteschat/ui";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
@@ -88,8 +88,9 @@ export function usePreviewUrl(artifactId: string, version: number, contentType: 
 
 /**
  * A video on a chat message: our player at its own proportions, played right there in parts (it starts at once,
- * whatever its size); its corner group opens the viewer, then the caller's actions. One this browser can't play (a
- * codec it lacks) shows `fallback` instead, the file's tile.
+ * whatever its size); its corner group opens the viewer, then the caller's actions; `tip`, its name and size, on hover
+ * or the keys' focus, as a picture's. One this browser can't play (a codec it lacks) shows `fallback` instead, the
+ * file's tile.
  */
 export function FileVideo({
   content,
@@ -98,6 +99,7 @@ export function FileVideo({
   onOpen,
   actions,
   fallback,
+  tip,
 }: {
   content: ArtifactFileContent;
   artifactId: string;
@@ -105,6 +107,7 @@ export function FileVideo({
   onOpen: () => void;
   actions?: ReactNode;
   fallback: ReactNode;
+  tip?: string;
 }) {
   const { org } = useOrg();
   const api = useApi();
@@ -113,14 +116,16 @@ export function FileVideo({
   if (failed) return <>{fallback}</>;
   return (
     <div className="artifact-tile" data-kind="video">
-      <VideoPlayer
-        src={api.artifacts.fileUrl(org.id, artifactId, { version })}
-        name={content.name}
-        labels={labels}
-        onOpen={onOpen}
-        actions={actions}
-        onFailed={() => setFailed(true)}
-      />
+      <Tip className="artifact-tile__tip" tip={tip} look="ac-msg__tip">
+        <VideoPlayer
+          src={api.artifacts.fileUrl(org.id, artifactId, { version })}
+          name={content.name}
+          labels={labels}
+          onOpen={onOpen}
+          actions={actions}
+          onFailed={() => setFailed(true)}
+        />
+      </Tip>
     </div>
   );
 }
