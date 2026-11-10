@@ -27,8 +27,10 @@ scratch" link and the desktop app's menu (through the `agentes:new-agent` window
 outside the provider). Someone who may not create agents still gets the page's own words about it.
 
 On the left, the starting points: "Start from scratch" first, then the ready-made agents (a personal workspace's
-starters, or a team's roles by area), then "Bring agents from another app" (Settings › Import). Arrow keys move through
-the list. On the right, the agent's own card, edited in place.
+starters, or a team's roles by area). Each row is a face line: the name's capitals at the face's top, never the face
+centred on both lines, and an accessory drawn above the tile moves nothing. Arrow keys move through the list. On the
+right, the agent's own card, edited in place. The list and the card's body fade at an edge only while there is more to
+scroll that way (`useScrollEdges`, the sidebar's flags and mask).
 
 ### 2. The card
 
@@ -39,23 +41,36 @@ the list. On the right, the agent's own card, edited in place.
   machine. The agent looks at what the pointer is on.
 - **Name ideas** (from scratch): a few names that fit what it does (themes found by words in the sentence, per
   language), each tried on when hovered and taken on a click; a die rolls more.
-- **Apps it will use:** the starting point's suggestions, each with its level (reads, or reads and writes). The level
-  dialog says that sending, deleting and paying always ask the person, at every level. "Other app" adds one from the
-  workspace's connections or the catalog's plug-and-play apps; an app not connected yet is connected later, from the
-  chat.
-- **Skills:** the workspace's skills the role suggests come ticked, the others one click away, each opening a short
-  view of what it is. The section shows only when the workspace has skills.
-- **Where it works** (a team's workspace) and **what to ask first**: three tasks for the starting point.
-- **No AI yet:** one line says it starts thinking once an AI is connected, in its chat. The card never blocks on it.
+- **Apps it will use:** only what the workspace has connected, which is what it gets when it is made, each at its
+  level (a person's own agent writes; a team's at its role's level, else reads). A starting point's suggestion that
+  isn't connected is never on the card; its chat's checklist suggests it. With none, "Nothing yet". The level dialog
+  says that sending, deleting and paying always ask the person, at every level. "Another app", at the end of the
+  section's label so it is always in sight, opens the catalog as rows (`AppsPicker`): the starting point's apps on top,
+  then the connected ones, then the rest, with a search. A connected app is used at once; another runs the usual
+  connect flow over the card and lands on it at its level when it connects. Signing in on a provider's page reloads
+  the app, so the card waits in the tab (`sessionStorage`, an hour) and opens again as it was on the way back
+  (`?newAgent=resume` and the server's `?connected=`).
+- **Skills:** the workspace's skills the role suggests come ticked, the others one click away ("Another skill", also
+  at the end of its label), each opening a short view of what it is. The section shows only when the workspace has
+  skills.
+- **Where it works** (a team's workspace).
+- **How it works:** its instructions, edited in place as the bubble is (text that becomes a field, up to about eight
+  lines before it scrolls): a role's instructions, a personal starter's own, or empty from scratch. The old form's
+  helpers ("What to do", "What to avoid", "Who to ask for help") add their line at the end. Enter there is a new line.
+  The first tasks are only in the chat's checklist.
+- **The footer:** "Bring agents from another app" on its start, and while nothing here can think, "Connect an AI",
+  which opens Connect AI for agents still being made over the card (the draft stays; the button goes once an AI is
+  there). Connect AI's provider sits above the dialog's in the workspace's layout for that.
 
-"Create" makes the agent (Automatic as its model, the AI `newAgentStart` picks: the person's plan account or the
-workspace's default), then each part on its own so a failure is said without losing the agent: its AI, channels, app
-levels and skills. The agent's face flies from the card to its row in the sidebar and its chat opens.
+"Create" makes the agent with the card's instructions (from scratch with none, what it does), Automatic as its model
+and the AI `newAgentStart` picks (the person's plan account or the workspace's default), then each part on its own so
+a failure is said without losing the agent: its AI, channels, app levels and skills. The agent's face flies from the card to its row in the sidebar and its chat opens.
 
 ### 3. What the card hands to the checklist
 
 `agents.setup` (jsonb, ADR 0155 §2) gains three optional fields: `hello` (the sentence, at most 500 characters),
-`starter` (the personal starter it came from) and `apps` (connector ids to levels, at most 12). The create route
+`starter` (the personal starter it came from) and `apps` (connector ids to levels, at most 12): its starting point's
+apps not connected yet, then the card's. The create route
 validates them and `setupOf` keeps them. No migration: older rows read as before.
 
 ### 4. The agent's chat
