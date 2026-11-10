@@ -32,6 +32,41 @@ import { useToast } from "@/lib/toast";
 /** The side of the image kept as the person's photo: 16 pixels per cell of the 32-cell portrait. */
 export const PORTRAIT_PX = 512;
 
+/** The groups a tab is made of, as their headings are keyed. */
+type Section =
+  | "skin"
+  | "eyes"
+  | "mood"
+  | "color"
+  | "cut"
+  | "beard"
+  | "lips"
+  | "shadow"
+  | "blush"
+  | "mark"
+  | "glasses"
+  | "ear"
+  | "neck"
+  | "extra"
+  | "piece"
+  | "bg";
+
+/** The fields whose options have a name under their tile (`portrait.options.<field>.<value>`); colors have none. */
+export const NAMED_FIELDS = [
+  "mood",
+  "hair",
+  "beard",
+  "lips",
+  "shadow",
+  "blush",
+  "mark",
+  "glasses",
+  "ear",
+  "neck",
+  "extra",
+  "clothes",
+] as const satisfies readonly PersonField[];
+
 type TabId = "face" | "hair" | "beard" | "makeup" | "accessories" | "clothes" | "background";
 
 /** The pieces each build starts from the first time it is chosen: nothing on, so every extra is the person's choice. */
@@ -174,7 +209,7 @@ export function AvatarBuilderDialog({
   const makeup = draft.build === "f" || all;
   const shown = trying ? { ...draft, ...trying } : draft;
 
-  const group = (field: PersonField | "color" | "cut" | "piece", body: ReactNode) => (
+  const group = (field: Section, body: ReactNode) => (
     <section className="avatar-builder__group">
       <h3 className="avatar-builder__label">{t(`portrait.sections.${field}`)}</h3>
       {body}
@@ -192,14 +227,15 @@ export function AvatarBuilderDialog({
           type="button"
           className="avatar-builder__option"
           aria-pressed={draft[field] === value}
-          aria-label={named ? undefined : t("portrait.swatch", { group: t(`portrait.sections.${field}`), n: i + 1 })}
+          aria-label={named ? undefined : t("portrait.swatch", { group: t("portrait.sections.bg"), n: i + 1 })}
           onClick={() => set(field, value)}
           {...tryOn(field, value)}
         >
           <span className="avatar-builder__face">
             <PersonPortrait recipe={{ ...draft, [field]: value }} crop="full" />
           </span>
-          {named && <span>{t(`portrait.options.${field}.${value}`)}</span>}
+          {/* The value comes from the engine's lists; a test holds a name for each. */}
+          {named && <span>{t(`portrait.options.${field}.${value}` as never)}</span>}
         </button>
       ))}
     </div>

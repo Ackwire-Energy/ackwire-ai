@@ -1,10 +1,19 @@
 import { describe, expect, test } from "bun:test";
+import { en, ptBR } from "@agenteschat/i18n";
 import { PERSON_DEFAULT, PERSON_FIELDS, type PersonRecipe } from "@agenteschat/ui";
-import { optionsOf, switchBuild, tabsOf } from "@/components/AvatarBuilder";
+import { NAMED_FIELDS, optionsOf, switchBuild, tabsOf } from "@/components/AvatarBuilder";
 
 const she: PersonRecipe = { ...PERSON_DEFAULT, build: "f", hair: "wavy", skin: "s4", eyes: "green", bg: "rose" };
 
 describe("avatar builder", () => {
+  test("every option shown with a name has one, in English and pt-BR", () => {
+    for (const strings of [en, ptBR]) {
+      const names = strings.portrait.options as Record<string, Record<string, string>>;
+      for (const field of NAMED_FIELDS)
+        expect(Object.keys(names[field] ?? {}).sort()).toEqual([...PERSON_FIELDS[field]].sort());
+    }
+  });
+
   test("each build has its own tabs: Beard on the masculine one only, unless every option is shown", () => {
     expect(tabsOf("m", false)).toContain("beard");
     expect(tabsOf("f", false)).not.toContain("beard");
