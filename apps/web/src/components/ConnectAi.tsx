@@ -254,7 +254,9 @@ function ConnectAiDialog({
   const named = request.agentIds?.length ? request.agentIds : null;
   // From the agent's conversation: decided once the agents and their AI are known, and kept, since connecting changes
   // both. `others`: more agents of the person's have no AI, so the dialog opens for all of them.
-  const loaded = !(dir.loading || status.isPending);
+  const machines = useMachines(org.id);
+  const loaded = !(dir.loading || status.isPending || machines.isPending);
+  const machineOf = (id: string) => machines.data?.find((m) => m.agents.some((a) => a.id === id))?.id;
   // Any way in that names one agent and no step (a key, a plan to sign in to again) is that agent's dialog.
   const plain =
     request.agentIds !== undefined ||
@@ -264,9 +266,26 @@ function ConnectAiDialog({
     request.intent === "api_key";
   const asked = request.agentId && (request.chat || !plain) ? dir.agentById.get(request.agentId) : undefined;
   const asleep = (id: string) => (aiStateOf(status.data, id) ?? "no_ai") === "no_ai";
+  // "All agents" from a conversation: its agent first, then the person's other agents that can't think either, on
+  // the same computer (a plan signs in on one computer). The right hand has its own Connect.
+  const chatOn = asked !== undefined && asked.ownerUserId === me.user.id && !isRightHand(asked);
   const chatNow = {
-    on: asked !== undefined && asked.ownerUserId === me.user.id && !isRightHand(asked),
-    others: mine.some((a) => a.id !== asked?.id && asleep(a.id)),
+    on: chatOn,
+    set:
+      chatOn && asked
+        ? [
+            asked.id,
+            ...mine
+              .filter(
+                (a) =>
+                  a.id !== asked.id &&
+                  !isRightHand(a) &&
+                  asleep(a.id) &&
+                  (machineOf(a.id) ?? null) === (machineOf(asked.id) ?? null),
+              )
+              .map((a) => a.id),
+          ]
+        : [],
   };
   const [chatKept, setChatKept] = useState<typeof chatNow>();
   // biome-ignore lint/correctness/useExhaustiveDependencies: once, as the agents and their AI load
@@ -275,18 +294,25 @@ function ConnectAiDialog({
   }, [loaded]);
   const chat = chatKept ?? chatNow;
   const [scope, setScope] = useState<"all" | "one">();
-  const wide = chat.on && chat.others && scope !== "one";
+  const several = chat.set.length >= 2;
+  const wide = chat.on && several && scope !== "one";
   const only = wide ? undefined : named ? (named.length === 1 ? named[0] : undefined) : request.agentId;
   const one = only ? dir.agentById.get(only) : undefined;
   const rightHand = isRightHand(one);
-  const pool = request.forNewAgent ? [] : one ? [one.id] : named;
-  const agents = (pool ? mine.filter((a) => pool.includes(a.id)) : mine).map((a) => ({
+  const pool = request.forNewAgent ? [] : one ? [one.id] : wide ? chat.set : named;
+  // In the order asked for: the conversation's agent leads "All agents", so its computer is the one a plan signs in on.
+  const pooled = pool
+    ? pool.flatMap((id) => {
+        const a = mine.find((x) => x.id === id);
+        return a ? [a] : [];
+      })
+    : mine;
+  const agents = pooled.map((a) => ({
     id: a.id,
     name: a.name,
     appearance: lookOf(a),
     initials: dir.agentInitials(a.id),
   }));
-  const machines = useMachines(org.id);
   // The agents a plan or a key was connected for here: they think with it before the AI status says so.
   const [linked, setLinked] = useState<Record<string, AiChoice>>({});
   // From a conversation an agent that can't think has no AI, whatever it is set to (a plan nobody is signed in to):
@@ -296,7 +322,6 @@ function ConnectAiDialog({
   const hasAi = (id: string) => aiOf(id) !== null;
   // By the AI status, as its "Sem IA" chip: an agent on a plan whose sign-in is gone has none either.
   const noAi = (id: string) => !linked[id] && (aiStateOf(status.data, id) ?? "no_ai") === "no_ai";
-  const machineOf = (id: string) => machines.data?.find((m) => m.agents.some((a) => a.id === id))?.id;
   const accounts = useAiAccounts(org.id);
   const setOf = (c: AiChoice) =>
     c === "key"
@@ -597,7 +622,14 @@ function ConnectAiDialog({
       >
         <div className="arrival-hero">
           <TeamScene
-            agents={wide ? sceneTeam(mine, asked) : [asked]}
+            agents={
+              wide
+                ? sceneTeam(
+                    mine.filter((a) => chat.set.includes(a.id)),
+                    asked,
+                  )
+                : [asked]
+            }
             lead={asked.id}
             asleep={!connected}
             day={day}
@@ -660,11 +692,14 @@ function ConnectAiDialog({
             </div>
           ) : (
             <div className="arrival-main__pick">
-              {chat.others &&
+              {several &&
                 (() => {
                   // Whom it is for, as two cards with their faces: everyone who can't think, or this agent alone. The
                   // sky above follows the pick.
-                  const everyone = [asked, ...mine.filter((a) => a.id !== asked.id && asleep(a.id))];
+                  const everyone = chat.set.flatMap((id) => {
+                    const a = dir.agentById.get(id);
+                    return a ? [a] : [];
+                  });
                   const face = (a: (typeof everyone)[number]) => (
                     <AgentAvatar
                       key={a.id}

@@ -8,7 +8,17 @@ import { ApiError } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { loadLocale } from "@/i18n";
 import { aiSelect, chooseAi, closeAiSelect, openAiSelect, payWith } from "./ai-picker";
-import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, fakeMachinesOf, NOW, ORG_ID, seedState } from "./fake-api";
+import {
+  ADA_ID,
+  ATLAS_ID,
+  createFakeApi,
+  ENG_ID,
+  fakeMachinesOf,
+  NOW,
+  ORG_ID,
+  seedState,
+  withRightHand,
+} from "./fake-api";
 import { hintOf, shownText } from "./hint";
 import { renderApp, screen, settle } from "./render";
 
@@ -351,6 +361,41 @@ describe("no AI connected: above the composer", () => {
     await click(within(banner() as HTMLElement).getByRole("button", { name: "Conectar uma IA" }), 6);
     const any = dialog("Conectar uma IA") as HTMLElement;
     expect(within(any).getByRole("combobox", { name: "Agentes que usam este plano" })).toBeTruthy();
+  });
+
+  test("All agents from a DM are the same agents on the first screen and in the plan's panel, the right hand aside", async () => {
+    // As a workspace is after its agents were made: the right hand first, on no computer, then two agents on one.
+    const state = walters(seedState({ aiStatus: aiStatus(false, ADA_ID, ATLAS_ID) }), ADA_ID, ATLAS_ID);
+    withRightHand(state);
+    state.agents.unshift(state.agents.pop() as (typeof state.agents)[number]);
+    state.aiStatus?.agents.push({ agentId: state.agents[0]?.id ?? "", state: "no_ai", reason: "no_key" });
+    const api = createFakeApi(state);
+    fakeMachinesOf.get(api)?.pair({
+      id: "machine_1",
+      name: "MacBook",
+      agents: [
+        { id: ADA_ID, name: "Ada", handle: "ada" },
+        { id: ATLAS_ID, name: "Atlas", handle: "atlas" },
+      ],
+    });
+    const r = await renderApp(`/org/${ORG_ID}/dm/agent/${ATLAS_ID}`, { api });
+    await settle(5);
+    await act(async () => r.sockets.last().open());
+    await settle(2);
+    await click(within(banner() as HTMLElement).getByRole("button", { name: "Conectar" }), 8);
+    const box = screen().getByRole("dialog");
+    const whom = within(box).getByRole("group", { name: "Agentes que usam este plano" });
+    // The conversation's agent leads, the right hand isn't one of them.
+    expect(within(whom).getByRole("button", { name: /^Todos os agentes/ }).textContent).toContain("Atlas e Ada");
+    await click(within(box).getByRole("button", { name: /^Claude/ }), 8);
+    const panel = within(screen().getByRole("dialog")).getByRole("region", { name: "Seu plano do Claude" });
+    expect(within(panel).getByRole("combobox", { name: "Agentes que usam este plano" }).textContent).toBe(
+      "Todos os agentes",
+    );
+    const names = [...panel.querySelectorAll(".ai-panel__who li > span:not(.ac-visually-hidden)")].map(
+      (name) => name.textContent,
+    );
+    expect(names).toEqual(["Atlas", "Ada"]);
   });
 
   test("the agent's page: 'Sem IA' by its name opens Connect for that agent", async () => {
