@@ -693,7 +693,7 @@ function NewAgentDialog({
     }
   };
 
-  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+  const onKeyDown = (e: KeyboardEvent<HTMLFormElement>) => {
     const target = e.target as HTMLElement;
     const typing = target.matches("input, textarea");
     if ((e.key === "ArrowDown" || e.key === "ArrowUp") && !typing && list.current?.contains(target)) {
