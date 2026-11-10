@@ -310,9 +310,10 @@
   text-overflow: ellipsis;
 }
 /* A plan's panel under the conversation's Connect: the account to use and another sign-in, as two buttons. */
-.arrival-chat .ai-panel__use {
+.ai-panel__use {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
 }
 .arrival-opts__label {

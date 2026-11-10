@@ -792,7 +792,7 @@ export function PlanWithoutAgent({
 /** A plan's panel: what it covers and for whom, its steps or what they wait for, then who the agents answer. */
 export function PlanPanel(props: PlanPanelProps) {
   const { t } = useTranslation();
-  const { choice, gates, agents, all, target, onTarget, own, locked } = props;
+  const { choice, gates, agents, all, target, onTarget, own, locked, plain } = props;
   const title = planTitle(t, choice);
   // The computer's own sign-in covers every agent: no agent to choose then.
   const everyAgent =
@@ -801,16 +801,19 @@ export function PlanPanel(props: PlanPanelProps) {
   const [agent] = forWhom;
   return (
     <Card as="section" className="ai-panel ai-panel--plan" aria-label={title}>
-      <PanelHead
-        lead={<ProviderLogo id={planMark(choice)} size="sm" />}
-        title={title}
-        sub={t(`connectAi.plan.${choice}.tiers`)}
-        aside={
-          agents.length > 1 &&
-          forWhom.length > 0 &&
-          !everyAgent && <ForSelect agents={agents} all={all} target={target} onTarget={onTarget} />
-        }
-      />
+      {/* Under the conversation's Connect the dialog already names the plan and whom it is for. */}
+      {!plain && (
+        <PanelHead
+          lead={<ProviderLogo id={planMark(choice)} size="sm" />}
+          title={title}
+          sub={t(`connectAi.plan.${choice}.tiers`)}
+          aside={
+            agents.length > 1 &&
+            forWhom.length > 0 &&
+            !everyAgent && <ForSelect agents={agents} all={all} target={target} onTarget={onTarget} />
+          }
+        />
+      )}
       {locked ? (
         <SettingNote icon="lock">{locked}</SettingNote>
       ) : agent ? (
@@ -1226,7 +1229,7 @@ function PlanSteps({
         <SettingNote icon="alert">{t("connectAi.plan.gemini.warning")}</SettingNote>
       )}
       {choosing && plain && !ownable && !otherChosen && (
-        <div className="ai-panel__row ai-panel__use">
+        <div className="ai-panel__use">
           {existing.map((a) => (
             <Button key={a.id} variant="primary" onClick={() => void (everyone ? assignAll(a) : assign(agent.id, a))}>
               {t("connectAi.use", { label: accountTitle(a) })}
