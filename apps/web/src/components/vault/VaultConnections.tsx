@@ -6,6 +6,7 @@ import type {
   VaultSourceInfo,
 } from "@agenteschat/client";
 import { relativeTime } from "@agenteschat/client/lib/format";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import {
   Alert,
   Button,
@@ -196,14 +197,14 @@ function ConnectForm({
                 disabled={!canManageTeam}
                 onValueChange={setScope}
                 options={[
-                  { value: "team", label: t("vault.scope.team") },
+                  { value: "team", label: t(modeKey(org, "vault.scope.team")) },
                   { value: "personal", label: t("vault.scope.personal") },
                 ]}
               />
               <span className="ac-field__example">
                 {canManageTeam
-                  ? t(scope === "team" ? "vault.connections.forTeam" : "vault.connections.forPersonal")
-                  : t("vault.connections.teamLocked")}
+                  ? t(scope === "team" ? modeKey(org, "vault.connections.forTeam") : "vault.connections.forPersonal")
+                  : t(modeKey(org, "vault.connections.teamLocked"))}
               </span>
             </div>
           )}

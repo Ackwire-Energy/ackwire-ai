@@ -356,9 +356,25 @@ export function phoneReasonText(
         byItself: false,
       };
     case "helper_missing":
-    case "helper_expired":
       return {
-        text: `The test helper on ${phone} isn't ready${reason === "helper_expired" ? " (its free signature ran out)" : ""}. Ask the person to open Xcode on ${host} and check it is signed in to their Apple Account (Xcode → Settings → Accounts).`,
+        text: `${host} is still setting up the test helper on ${phone} (a few minutes the first time).`,
+        byItself: true,
+      };
+    case "helper_expired":
+      return { text: `${host} is renewing the test helper on ${phone} (its free signature ran out).`, byItself: true };
+    case "apple_account_missing":
+      return {
+        text: `I couldn't set up the test helper on ${phone}: Xcode on ${host} isn't signed in to an Apple Account. Ask the person to sign in under Xcode → Settings → Accounts (a free one is enough).`,
+        byItself: false,
+      };
+    case "team_limit":
+      return {
+        text: `The free Apple Account on ${host} has reached its limit of apps on ${phone}. Ask the person to remove an app they built themselves from it.`,
+        byItself: false,
+      };
+    case "helper_untrusted":
+      return {
+        text: `${phone} doesn't trust the test helper yet. Ask the person to trust the developer on it: Settings → General → VPN & Device Management.`,
         byItself: false,
       };
     case "no_driver":

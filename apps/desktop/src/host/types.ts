@@ -47,6 +47,12 @@ export interface AppInfo {
   arch: string;
 }
 
+/** A server's answer to `siteFetch`: its status and body as text. */
+export interface SiteAnswer {
+  status: number;
+  body: string;
+}
+
 /** What the site last put on the Dock's badge (`this_mac` `badge`). */
 export interface BadgeCounts {
   waiting: number;
@@ -87,6 +93,11 @@ export interface Host {
   chooseServer(server: string, page?: string): Promise<void>;
   /** Every server's workspaces, as the app last read them with each one's session (ADR 0154). */
   workspaces(): Promise<ServerWorkspaces[]>;
+  /**
+   * One request to a server of the app's list with the main window's session there (Preferences only): this
+   * computer's devices, who can use them and a phone's Stop (`site_fetch` in workspaces.rs allows only those).
+   */
+  siteFetch(server: string, method: string, path: string, body?: string): Promise<SiteAnswer>;
   /** How the welcome window opens, taken once: `add` from the site's "Add a workspace", else null. */
   welcomeMode(): Promise<"add" | null>;
   /** Takes `server` out of the list (the server and the account there stay as they are). */

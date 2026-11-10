@@ -17,6 +17,8 @@ export const SETUP_STEPS = ["ai", "apps", "where", "who", "how"] as const;
  * done from the workspace's data; only "Agora não" on apps and people is stored.
  */
 export const FIRST_RUN_STEPS = ["about", "team", "ai", "apps", "people"] as const;
+/** A personal workspace's first run (ADR 0159): the same rows but people, since it is for one person. */
+export const PERSONAL_FIRST_RUN_STEPS = FIRST_RUN_STEPS.filter((s) => s !== "people");
 const FIRST_RUN_SKIPS = new Set<string>(["apps", "people"]);
 export type SetupStep = (typeof SETUP_STEPS)[number] | (typeof FIRST_RUN_STEPS)[number];
 export const isSetupStep = (v: unknown): v is SetupStep =>

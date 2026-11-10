@@ -21,7 +21,8 @@ tauri-plugin-autostart = "2"
 # A second launch (a link on Windows and Linux arrives as one) reaches the running app.
 tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
 tauri-plugin-deep-link = "2"
-tauri-plugin-notification = "2"
+# 2.8 shows a notification's buttons on desktop too (`on_action`): the Stop of a phone someone's agent uses.
+tauri-plugin-notification = "2.8"
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
 # 2.10 names the bundle the app came in (`{{bundle_type}}` in the update address): a Linux deb isn't sent the AppImage.

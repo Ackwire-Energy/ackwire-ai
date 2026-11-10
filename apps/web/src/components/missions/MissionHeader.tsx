@@ -19,6 +19,7 @@ import {
   planCells,
   planCellTitles,
 } from "@agenteschat/client/lib/missions";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import { AvatarStack, Button, Icon, Menu, MenuItem, MenuSeparator } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
@@ -382,7 +383,9 @@ function PickComputer({ mission }: { mission: Mission }) {
       {mine.length === 0 && (
         <MenuItem icon="info" disabled onSelect={() => {}}>
           {cloud
-            ? t("missions.waitingCloud", { computer: t("computerSetup.title", { org: org.name }) })
+            ? t("missions.waitingCloud", {
+                computer: t(modeKey(org, "computerSetup.titleInSentence"), { org: org.name }),
+              })
             : t("missions.pinned.noComputers")}
         </MenuItem>
       )}

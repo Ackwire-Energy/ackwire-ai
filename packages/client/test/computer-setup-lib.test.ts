@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { serverText } from "@agenteschat/i18n";
+import { LOCALE_CODES } from "@agenteschat/i18n/locale";
 import { QueryClient } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
 import { ApiError } from "../src/api/http";
@@ -8,6 +10,7 @@ import {
   agentsWaitingForComputer,
   computerName,
   computerNameOf,
+  GIVEN_COMPUTER_NAMES,
   newerSetup,
   noComputerChoice,
   SETUP_STAGES,
@@ -248,6 +251,38 @@ describe("the workspace's own computer (ADR 0056 §10)", () => {
     // A list that carries only the name reads the same.
     expect(computerNameOf(t, "Oficina", "Oficina's computer")).toBe(ours);
     expect(computerNameOf(t, "Oficina", "MacBook Air")).toBe("MacBook Air");
+  });
+
+  test("a personal workspace's own computer is its person's agents', under either mode's given name (ADR 0159)", () => {
+    const managed = (name: string) => ({ kind: "managed" as const, name });
+    const mine = t("computerSetup.titlePersonal");
+    const team = t("computerSetup.title", { org: "Oficina" });
+    // Before it exists: never "Personal's computer".
+    expect(computerName(t, "Personal", null, true)).toBe(mine);
+    // The name the server gives it in a personal workspace, in English or Portuguese.
+    expect(computerName(t, "Personal", managed("Your agents' computer"), true)).toBe(mine);
+    expect(computerName(t, "Personal", managed("Computador dos seus agentes"), true)).toBe(mine);
+    // Made while the workspace was a team's: its name follows the mode, both ways.
+    expect(computerName(t, "Oficina", managed("Oficina's computer"), true)).toBe(mine);
+    expect(computerName(t, "Oficina", managed("Your agents' computer"))).toBe(team);
+    // Renamed, or any other computer: its own name.
+    expect(computerName(t, "Personal", managed("Servidor de casa"), true)).toBe("Servidor de casa");
+    expect(computerName(t, "Personal", { kind: "connected", name: "MacBook Air" }, true)).toBe("MacBook Air");
+    expect(computerNameOf(t, "Personal", "Your agents' computer", true)).toBe(mine);
+    expect(computerNameOf(t, "Personal", "MacBook Air", true)).toBe("MacBook Air");
+    // Given in another language (its first owner's): still the reader's words.
+    expect(computerName(t, "Persönlich", managed("Computer deiner Agenten"), true)).toBe(mine);
+    expect(computerName(t, "Oficina", managed("Computer von Oficina"))).toBe(team);
+    expect(computerName(t, "Oficina", managed("オフィスのコンピューター"))).toBe("オフィスのコンピューター");
+  });
+
+  test("the names the server gives it are the ones it recognises, in every language (ADR 0159)", () => {
+    const team = GIVEN_COMPUTER_NAMES.team as readonly string[];
+    const personal = GIVEN_COMPUTER_NAMES.personal as readonly string[];
+    for (const code of LOCALE_CODES) {
+      expect(team).toContain(serverText(code, "computerSetup.title"));
+      expect(personal).toContain(serverText(code, "computerSetup.titlePersonal"));
+    }
   });
 
   test("drawn as a server before and after it exists", () => {

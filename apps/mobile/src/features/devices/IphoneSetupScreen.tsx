@@ -1,5 +1,6 @@
 import type { ComputerDevice, PhoneDevice } from "@agenteschat/client";
 import { computerName } from "@agenteschat/client/lib/computer";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import * as Device from "expo-device";
 import { Fragment, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -39,7 +40,9 @@ export function IphoneSetupScreen({ machineId }: { machineId?: string }) {
   const macs = phoneHosts(devices, meId, "ios");
   const seeing = devices.find((d) => thisPhoneOn(d.phones, "ios", Device.modelName));
   const host = devices.find((d) => d.id === picked) ?? seeing ?? (macs.length === 1 ? macs[0] : undefined);
-  const hostName = host ? computerName(t, org?.name ?? "", { kind: host.machineKind, name: host.name }) : "";
+  const hostName = host
+    ? computerName(t, org?.name ?? "", { kind: host.machineKind, name: host.name }, isPersonal(org))
+    : "";
   const phone = host ? thisPhoneOn(host.phones, "ios", Device.modelName) : null;
   const step = iphoneStep(phone);
   if (host && phone && step === IPHONE_STEPS.length)
@@ -129,6 +132,9 @@ export function IphoneSetupScreen({ machineId }: { machineId?: string }) {
                 state={state(4)}
               >
                 <StepText>{t("mobile.devices.iphone.step5Text")}</StepText>
+                {step === 4 && reason && !IPHONE_STEP_REASONS.has(reason) ? (
+                  <Note icon="info">{reasonText(t, reason)}</Note>
+                ) : null}
               </Step>
             </StepsCard>
           </View>

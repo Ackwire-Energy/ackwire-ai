@@ -8,6 +8,7 @@ import {
 import { entryLine, entryState, pictureWhen } from "@agenteschat/client/lib/agent-computer";
 import { computerName } from "@agenteschat/client/lib/computer";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { Image } from "expo-image";
 import { useIsFocused } from "expo-router";
 import { useTranslation } from "react-i18next";
@@ -47,7 +48,7 @@ export function AgentComputerButton({ agentId }: { agentId: string }) {
   const line = entryLine(t, state, {
     edition: f.edition,
     locale: i18n.language,
-    computer: computerName(t, org?.name ?? "", view.machine),
+    computer: computerName(t, org?.name ?? "", view.machine, isPersonal(org)),
     lastSeenAt: view.machine?.lastSeenAt ?? null,
     person: (id) => dir.nameOf({ type: "person", id }) || t("channel.unknownPerson"),
     step: null,

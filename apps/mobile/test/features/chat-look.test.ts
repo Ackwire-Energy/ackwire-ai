@@ -53,6 +53,19 @@ describe("the rows follow the same choice as the web", () => {
     expect(mineOnRight("left")).toBe(false);
   });
 
+  test("a personal workspace opens every conversation in bubbles; the person's choice wins (ADR 0159)", async () => {
+    expect(chatLookOf(undefined, false, true).style).toBe("bubbles");
+    expect(chatLookOf(undefined, true, true).style).toBe("bubbles");
+    expect(chatLookOf({ channelStyle: "compact" }, false, true).style).toBe("compact");
+    // Every conversation and the preview read the workspace's mode.
+    expect(await read("chat/look.ts")).toContain("chatLookOf(org?.chatPrefs, dm, isPersonal(org))");
+    const page = await read("me/ChatLookPage.tsx");
+    expect(page).toContain("chatLookOf(prefs, dm, isPersonal(org))");
+    // Its channels are its group conversations: the tab and the tone's header say so.
+    expect(page).toContain('label: t(modeKey(org, "settings.account.chat.channels"))');
+    expect(page).toContain('modeKey(org, "settings.account.chat.toneChannels")');
+  });
+
   test("my row and the live row read the conversation's look", async () => {
     const row = await read("chat/MessageRow.tsx");
     expect(row).toContain("const onRight = mine && mineOnRight(look.style);");

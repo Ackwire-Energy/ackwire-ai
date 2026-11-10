@@ -46,8 +46,10 @@ import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { choiceOf, defaultPolicy, MAIL_ACTIONS, toMailLevel } from "@agenteschat/client/lib/mail";
 import { type PlanChoice as AiPlan, planOfKind } from "@agenteschat/client/lib/no-ai";
 import { addsAgentsTo, can } from "@agenteschat/client/lib/permissions";
+import { keeperKey } from "@agenteschat/client/lib/personal-view";
 import { AUTO, apiProviderOf, isAuto, modelChoices, usableModels } from "@agenteschat/client/lib/providers";
 import { scopeText } from "@agenteschat/client/lib/scopes";
+import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
 import {
   AffixInput,
   type AgentAppearance,
@@ -108,6 +110,7 @@ import { SkillPicker } from "@/components/Skills";
 import { AgentBornSky, AgentPreviewSky, OnboardingHorizon } from "@/components/Sky";
 import { StepRail } from "@/components/StepRail";
 import { useFlowExit } from "@/hooks/useFlowExit";
+import { useKeeperName, usePersonalView } from "@/hooks/usePersonalView";
 import {
   BLANK_LOOK,
   cleanHandle,
@@ -119,6 +122,9 @@ import {
   handleProblem,
   NEW_AGENT_STEPS,
   type NewAgentStep,
+  PERSONAL_SKIPPED_STEPS,
+  PERSONAL_STARTERS,
+  type PersonalStarter,
   presetChannels,
   presetLevels,
   ROLE_GROUPS,
@@ -127,6 +133,7 @@ import {
   type RoleId,
   readBudget,
   savePart,
+  stepAfter,
   stepErrors,
   takenHandles,
 } from "@/lib/new-agent";
@@ -177,6 +184,9 @@ interface Created {
   channels: { id: string; name: string }[];
 }
 
+/** No step passed over (a team's workspace). */
+const NO_SKIP: readonly NewAgentStep[] = [];
+
 /**
  * "Criar agente": the steps on a rail, a live preview of the agent on the right. With `proposalId` (an agent's
  * proposal card, ADR 0081) it opens filled in with the draft, on its last step, while the proposal is open. With
@@ -202,6 +212,7 @@ export function NewAgentPage({
   const from = opened.current?.messageId === proposalId ? opened.current : null;
   const allowed = can(org, "create_agents");
   const closed = proposalId !== null && !from;
+  const keeper = useKeeperName();
   if (!allowed || closed) {
     return (
       <main className="shell__main">
@@ -210,7 +221,9 @@ export function NewAgentPage({
             <h1 className="page-title">{t("newAgent.title")}</h1>
           </header>
           {!allowed ? (
-            <EmptyState icon="agent">{t("newAgent.adminsOnly", { org: org.name })}</EmptyState>
+            <EmptyState icon="agent">
+              {t(keeperKey(org, keeper, "newAgent.adminsOnly"), { org: org.name, keeper })}
+            </EmptyState>
           ) : proposal.isPending ? (
             <Spinner />
           ) : (
@@ -315,6 +328,8 @@ function NewAgentFlow({
   const importFlow = useImportFlow(org.id);
   // The draft
   const [role, setRole] = useState<RoleId | null>(draft ? "custom" : null);
+  // A personal workspace's starting point (one of its template agents), on top of "custom" (ADR 0159 §3).
+  const [starter, setStarter] = useState<PersonalStarter["id"] | null>(null);
   const [roleText, setRoleText] = useState(draft?.role ?? "");
   const [name, setName] = useState(draft?.name ?? "");
   const [handle, setHandle] = useState(draft?.handle ?? "");
@@ -333,7 +348,16 @@ function NewAgentFlow({
   const asked = channelId ? [channelId] : [];
   const [channelIds, setChannelIds] = useState<Set<string>>(new Set(draft?.channelIds ?? asked));
   const [owner, setOwner] = useState(me.user.id);
-  const [audience, setAudience] = useState<AgentAudience>({ mode: "everyone", userIds: [] });
+  // A personal workspace's new agent answers only its owner until they say otherwise (ADR 0159), as the server makes
+  // its agents; a team's answers everyone.
+  // A personal workspace's agent starts with every app at write, custom ones too (ADR 0159 §3a).
+  const personal = isPersonal(org);
+  const audienceAtFirst = (): AgentAudience => ({ mode: personal ? "owner" : "everyone", userIds: [] });
+  const [audience, setAudience] = useState<AgentAudience>(audienceAtFirst);
+  // Alone in a personal workspace there is nobody else to own it or talk to it: its owner and who talks to it leave
+  // the screen while they hold that default (ADR 0159). Its page's Settings still has both.
+  const { solo } = usePersonalView();
+  const keeper = useKeeperName();
   // "Automático" for every new agent: each task gets its model and effort; a fixed model is one click away.
   const [model, setModel] = useState<string>(AUTO);
   // Or a plan (Claude Code, Codex) on a computer: saved as its "Quem pensa" once the agent exists. A proposal
@@ -351,6 +375,9 @@ function NewAgentFlow({
 
   const step = NEW_AGENT_STEPS[index] ?? "role";
   const total = NEW_AGENT_STEPS.length;
+  // A personal workspace passes over the technical steps, filled in; Revisar still opens them (ADR 0159 §3).
+  const skipped = personal ? PERSONAL_SKIPPED_STEPS : NO_SKIP;
+  const walked = NEW_AGENT_STEPS.filter((s) => !skipped.includes(s));
   const dmChannels = useMemo(() => new Set((dms.data ?? []).map((d) => d.channelId)), [dms.data]);
   // Mine, and the ones a proposal names: only where I may put an agent (in it and posting, or managing it).
   const myChannels = useMemo(
@@ -430,11 +457,14 @@ function NewAgentFlow({
     setLevels((prev) => {
       const missing = connectedList.filter((i) => prev[i.id] === undefined);
       if (missing.length === 0) return prev;
-      return { ...prev, ...presetLevels(role ?? "custom", missing) };
+      return { ...prev, ...presetLevels(role ?? "custom", missing, personal) };
     });
-  }, [connectedList, role, managesAgents]);
+  }, [connectedList, role, managesAgents, personal]);
 
   const ownerId = owner === NO_OWNER ? null : owner;
+  // Alone, both are the person's and leave the screen while they hold that: mine, answering only me.
+  const ownerHidden = solo && ownerId === me.user.id;
+  const audienceHidden = ownerHidden && audience.mode === "owner";
   const ownerMember = (members.data ?? []).find((m) => m.userId === ownerId);
   const ownerFirst = ownerMember?.name.split(/\s+/)[0] ?? null;
   const displayName = name.trim() || t("newAgent.defaultName");
@@ -710,7 +740,7 @@ function NewAgentFlow({
       return;
     }
     mood.react("happy", 900);
-    goTo(index + 1);
+    goTo(stepAfter(index, 1, skipped));
   };
   const back = () => {
     if (importing) {
@@ -718,7 +748,7 @@ function NewAgentFlow({
       return;
     }
     if (created || index === 0) return;
-    goTo(index - 1);
+    goTo(stepAfter(index, -1, skipped));
   };
   const reset = () => {
     setCreated(null);
@@ -731,11 +761,11 @@ function NewAgentFlow({
     setHandleTouched(false);
     setLook(BLANK_LOOK);
     setInstructions("");
-    setLevels(presetLevels("custom", connectedList));
+    setLevels(presetLevels("custom", connectedList, personal));
     setSkillIds(library.data ? new Set(library.data.filter((s) => s.defaultForNewAgents).map((s) => s.id)) : null);
     setChannelIds(new Set(asked));
     setOwner(me.user.id);
-    setAudience({ mode: "everyone", userIds: [] });
+    setAudience(audienceAtFirst());
     startWith(startOf(me.user.id));
     setAiPicked(false);
     setWithAutonomy(true);
@@ -778,7 +808,8 @@ function NewAgentFlow({
 
   const pickRole = (id: RoleId) => {
     // The role it already has: filling it in again would drop what was typed.
-    if (id === role) return;
+    if (id === role && !starter) return;
+    setStarter(null);
     setRole(id);
     setTried((prev) => {
       const nextTried = new Set(prev);
@@ -797,8 +828,30 @@ function NewAgentFlow({
     setHandleTouched(false);
     setLook({ ...preset.look });
     setInstructions(t(`newAgent.roles.${id}.instructions`));
-    if (managesAgents) setLevels(presetLevels(id, connectedList));
+    if (managesAgents) setLevels(presetLevels(id, connectedList, personal));
     setChannelIds(new Set([...asked, ...presetChannels(id, myChannels)]));
+    startWith(startOf(ownerId));
+    setAiPicked(false);
+  };
+  /** A personal workspace's starting point: from scratch, with its template agent's name, look, role and line. */
+  const pickStarter = (s: PersonalStarter) => {
+    if (starter === s.id) return;
+    setStarter(s.id);
+    setRole("custom");
+    setTried((prev) => {
+      const nextTried = new Set(prev);
+      nextTried.delete("role");
+      return nextTried;
+    });
+    mood.react("happy", 1400);
+    setRoleText(t(`teamTemplates.agents.${s.id}.role`));
+    setName(s.name);
+    setHandle(handleForName(s.name));
+    setHandleTouched(false);
+    setLook({ ...s.look });
+    setInstructions(t(`teamTemplates.agents.${s.id}.line`));
+    if (managesAgents) setLevels(presetLevels("custom", connectedList, personal));
+    setChannelIds(new Set(asked));
     startWith(startOf(ownerId));
     setAiPicked(false);
   };
@@ -830,7 +883,12 @@ function NewAgentFlow({
     );
     return (
       <header className="onb__head">
-        <p className="onb__eyebrow">{t("newAgent.stepOf", { n: index + 1, total })}</p>
+        <p className="onb__eyebrow">
+          {t("newAgent.stepOf", {
+            n: NEW_AGENT_STEPS.filter((s, i) => i <= index && !skipped.includes(s)).length,
+            total: walked.length,
+          })}
+        </p>
         {hint ? (
           <div className="ac-hintline">
             {h1}
@@ -875,7 +933,7 @@ function NewAgentFlow({
     </span>
   );
   const audienceText = () => {
-    if (audience.mode === "everyone") return t("audience.summary.everyone");
+    if (audience.mode === "everyone") return t(modeKey(org, "audience.summary.everyone"));
     if (audience.mode === "owner")
       return ownerFirst ? t("audience.summary.owner", { name: ownerFirst }) : t("audience.summary.nobody");
     if (audience.userIds.length === 0 && ownerFirst)
@@ -933,7 +991,7 @@ function NewAgentFlow({
               <button
                 type="button"
                 className="newag__role newag__role--blank"
-                aria-pressed={role === "custom"}
+                aria-pressed={role === "custom" && !starter}
                 onClick={() => pickRole("custom")}
               >
                 <span className="newag__check" aria-hidden="true">
@@ -947,9 +1005,9 @@ function NewAgentFlow({
                   t("newAgent.roles.custom.desc"),
                 )}
               </button>
-              {role === "custom" && (
+              {role === "custom" && !starter && (
                 <Card as="div" className="newag__card">
-                  <Field label={t("agent.roleLabel")} id="ag-role" example={t("agent.roleHelp")}>
+                  <Field label={t("agent.roleLabel")} id="ag-role" example={t(modeKey(org, "agent.roleHelp"))}>
                     <Input
                       value={roleText}
                       maxLength={200}
@@ -963,7 +1021,41 @@ function NewAgentFlow({
                 </Card>
               )}
             </div>
-            {ROLE_GROUPS.map((group) => (
+            {personal && (
+              // One person's agents (ADR 0159 §3): the right hand's personal ones, not a company's roles.
+              <section className="newag__section" aria-labelledby="ag-roles-personal">
+                <div className="newag__sect">
+                  <h2 id="ag-roles-personal">
+                    <Icon name="person" />
+                    {t("newAgent.roleGroups.personal")}
+                  </h2>
+                </div>
+                <div className="newag__roles">
+                  {PERSONAL_STARTERS.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      className="newag__role"
+                      aria-pressed={starter === s.id}
+                      onClick={() => pickStarter(s)}
+                    >
+                      <span className="newag__check" aria-hidden="true">
+                        <Icon name="check" size={14} />
+                      </span>
+                      {/* Its name on top and what it does under it, as an agent shows everywhere: a role in a
+                          sentence ("Agenda e lembretes") is too long for the cards' big title. */}
+                      {roleHead(
+                        <AgentAvatar name={s.name} appearance={s.look} size="lg" className="newag__role-agent" />,
+                        s.name,
+                        t(`teamTemplates.agents.${s.id}.role`),
+                      )}
+                      <span className="newag__role-desc">{t(`teamTemplates.agents.${s.id}.line`)}</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
+            {(personal ? [] : ROLE_GROUPS).map((group) => (
               <section key={group.id} className="newag__section" aria-labelledby={`ag-roles-${group.id}`}>
                 <div className="newag__sect">
                   <h2 id={`ag-roles-${group.id}`}>
@@ -1026,7 +1118,7 @@ function NewAgentFlow({
     },
     identity: () => (
       <>
-        {head(t("newAgent.steps.identity.title"), t("newAgent.steps.identity.lead"))}
+        {head(t("newAgent.steps.identity.title"), t(modeKey(org, "newAgent.steps.identity.lead")))}
         <Card as="div" className="newag__card">
           <div className="newag__grid2">
             <Field
@@ -1104,7 +1196,7 @@ function NewAgentFlow({
           {head(
             t("newAgent.steps.instructions.title", g),
             t("newAgent.steps.instructions.lead"),
-            t("agent.instructionsHelp", { ...g, org: org.name }),
+            t(modeKey(org, "agent.instructionsHelp"), { ...g, org: org.name }),
           )}
           <Textarea
             className="newag__textarea"
@@ -1164,7 +1256,7 @@ function NewAgentFlow({
           managesAgents
             ? t("newAgent.steps.tools.lead", { ...g, org: org.name })
             : t("newAgent.steps.tools.leadNoAccess", g),
-          managesAgents ? undefined : t("newAgent.accessAdmins"),
+          managesAgents ? undefined : t(keeperKey(org, keeper, "newAgent.accessAdmins"), { keeper }),
         )}
         <Card as="div" className="newag__card">
           {connectedList.length + mailboxes.length > 0 ? (
@@ -1180,7 +1272,7 @@ function NewAgentFlow({
                       size="sm"
                       variant="ghost"
                       onClick={() => {
-                        setLevels(presetLevels("custom", connectedList));
+                        setLevels(presetLevels("custom", connectedList, personal));
                         setMailLevels({});
                       }}
                     >
@@ -1283,7 +1375,7 @@ function NewAgentFlow({
     ),
     where: () => (
       <>
-        {head(t("newAgent.steps.where.title"), t("newAgent.steps.where.lead", g))}
+        {head(t("newAgent.steps.where.title"), t(modeKey(org, "newAgent.steps.where.lead"), g))}
         <div className="newag__sect newag__sect--first">
           <h2>
             <Icon name="channel" />
@@ -1310,50 +1402,60 @@ function NewAgentFlow({
         ) : (
           <p className="small muted">{t("newAgent.noChannels")}</p>
         )}
-        <div className="newag__sect">
-          {managesAgents ? (
-            ownerTitle
-          ) : (
-            <div className="ac-hintline">
-              {ownerTitle}
-              <InfoHint name={t("common.about", { label: t("newAgent.owner") })}>{t("newAgent.ownerYours")}</InfoHint>
+        {!ownerHidden && (
+          <>
+            <div className="newag__sect">
+              {managesAgents ? (
+                ownerTitle
+              ) : (
+                <div className="ac-hintline">
+                  {ownerTitle}
+                  <InfoHint name={t("common.about", { label: t("newAgent.owner") })}>
+                    {t("newAgent.ownerYours")}
+                  </InfoHint>
+                </div>
+              )}
             </div>
-          )}
-        </div>
-        <Card as="div" className="newag__card">
-          {managesAgents ? (
-            <OwnerSelect
-              value={owner}
-              members={members.data ?? []}
-              meId={me.user.id}
-              onChange={(v) => {
-                setOwner(v);
-                if (!aiPicked) startWith(startOf(v === NO_OWNER ? null : v));
-                if (v !== NO_OWNER) setAudience((a) => ({ ...a, userIds: a.userIds.filter((id) => id !== v) }));
-              }}
-            />
-          ) : (
-            <OwnerValue member={ownerMember} meId={me.user.id} />
-          )}
-          <span className="small muted">{ownerId ? t("newAgent.ownerHelp") : t("newAgent.noOwnerHelp")}</span>
-        </Card>
-        <div className="newag__sect">
-          <h2>
-            <Icon name="message" />
-            {t("audience.title", g)}
-          </h2>
-        </div>
-        <Card as="div" className="newag__card">
-          <AudienceChoice
-            compact
-            value={audience}
-            onChange={setAudience}
-            ownerUserId={ownerId}
-            agentName={displayName}
-            idPrefix="ag-audience"
-          />
-          {errorLine(errorOf("audience"))}
-        </Card>
+            <Card as="div" className="newag__card">
+              {managesAgents ? (
+                <OwnerSelect
+                  value={owner}
+                  members={members.data ?? []}
+                  meId={me.user.id}
+                  onChange={(v) => {
+                    setOwner(v);
+                    if (!aiPicked) startWith(startOf(v === NO_OWNER ? null : v));
+                    if (v !== NO_OWNER) setAudience((a) => ({ ...a, userIds: a.userIds.filter((id) => id !== v) }));
+                  }}
+                />
+              ) : (
+                <OwnerValue member={ownerMember} meId={me.user.id} />
+              )}
+              <span className="small muted">{ownerId ? t("newAgent.ownerHelp") : t("newAgent.noOwnerHelp")}</span>
+            </Card>
+          </>
+        )}
+        {!audienceHidden && (
+          <>
+            <div className="newag__sect">
+              <h2>
+                <Icon name="message" />
+                {t("audience.title", g)}
+              </h2>
+            </div>
+            <Card as="div" className="newag__card">
+              <AudienceChoice
+                compact
+                value={audience}
+                onChange={setAudience}
+                ownerUserId={ownerId}
+                agentName={displayName}
+                idPrefix="ag-audience"
+              />
+              {errorLine(errorOf("audience"))}
+            </Card>
+          </>
+        )}
       </>
     ),
     model: () => {
@@ -1550,13 +1652,14 @@ function NewAgentFlow({
                 t("newAgent.noChannelsReview"),
               ),
             )}
-            {row(
-              "where",
-              "members",
-              t("newAgent.owner"),
-              <span>{ownerMember?.name ?? t("newAgent.noOwnerAdmins")}</span>,
-            )}
-            {row("where", "message", t("audience.section"), <span>{audienceText()}</span>)}
+            {!ownerHidden &&
+              row(
+                "where",
+                "members",
+                t("newAgent.owner"),
+                <span>{ownerMember?.name ?? t("newAgent.noOwnerAdmins")}</span>,
+              )}
+            {!audienceHidden && row("where", "message", t("audience.section"), <span>{audienceText()}</span>)}
             {draft?.routine && (
               <div className="newag__rv">
                 <span className="newag__rv-k">
@@ -1655,7 +1758,15 @@ function NewAgentFlow({
 
   return (
     <div className="onb newag" ref={root}>
-      <NewAgentRail index={index} reached={reached} total={total} onGo={goTo} done={false} onLeave={onClose} />
+      <NewAgentRail
+        index={index}
+        reached={reached}
+        total={total}
+        onGo={goTo}
+        done={false}
+        onLeave={onClose}
+        skipped={skipped}
+      />
       <div className="newag__work">
         <main className="newag__main">
           <Locked when={create.isPending || deny.isPending}>
@@ -1807,12 +1918,16 @@ function NewAgentFlow({
                     <span className="newag__empty">{t("newAgent.noChannelsYet")}</span>
                   )}
                 </PreviewSection>
-                <PreviewSection label={t("newAgent.owner")}>
-                  <span className="newag__chips">{chip("person", ownerFirst ?? t("newAgent.noOwnerOption"))}</span>
-                </PreviewSection>
-                <PreviewSection label={t("audience.section")}>
-                  <span className="newag__chips">{chip("message", audienceText())}</span>
-                </PreviewSection>
+                {!ownerHidden && (
+                  <PreviewSection label={t("newAgent.owner")}>
+                    <span className="newag__chips">{chip("person", ownerFirst ?? t("newAgent.noOwnerOption"))}</span>
+                  </PreviewSection>
+                )}
+                {!audienceHidden && (
+                  <PreviewSection label={t("audience.section")}>
+                    <span className="newag__chips">{chip("message", audienceText())}</span>
+                  </PreviewSection>
+                )}
                 <PreviewSection label={t("newAgent.modelAndCost")}>
                   <span className="newag__chips">
                     {modelLabel && chip("bolt", modelLabel, "model")}
@@ -1848,6 +1963,7 @@ function NewAgentRail({
   onGo,
   done,
   onLeave,
+  skipped = NO_SKIP,
 }: {
   index: number;
   reached: number;
@@ -1856,10 +1972,13 @@ function NewAgentRail({
   done: boolean;
   /** Over the conversation: × closes the review there. */
   onLeave?: () => void;
+  /** Steps passed over (a personal workspace's technical ones): not in the rail. */
+  skipped?: readonly NewAgentStep[];
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const exit = useFlowExit(org.id);
+  const rail = NEW_AGENT_STEPS.map((s, i) => ({ s, i })).filter(({ s }) => !skipped.includes(s));
   return (
     <aside className="onb__rail newag__rail">
       <div className="newag__rail-head">
@@ -1882,10 +2001,10 @@ function NewAgentRail({
       </div>
       <StepRail
         label={t("newAgent.stepsLabel")}
-        current={done ? -1 : index}
-        onGo={onGo}
+        current={done ? -1 : rail.findIndex((r) => r.i === index)}
+        onGo={(n) => onGo(rail[n]?.i ?? 0)}
         doneLabel={t("onboarding.stepDone")}
-        steps={NEW_AGENT_STEPS.map((s, i) => ({
+        steps={rail.map(({ s, i }) => ({
           id: s,
           name: t(`newAgent.steps.${s}.name`),
           done: done || i < reached,
@@ -1933,14 +2052,14 @@ function CreatedMoment({
         <AgentAvatar name={agent.name} appearance={created.look} size="xl" expression={face} />
       </span>
       <div className="newag__born-text" ref={text}>
-        <p className="onb__eyebrow onb__eyebrow--sky">{t("newAgent.newOnTeam")}</p>
+        <p className="onb__eyebrow onb__eyebrow--sky">{t(modeKey(org, "newAgent.newOnTeam"))}</p>
         <h1 id="ag-born" className="newag__born-title" ref={heading} tabIndex={-1}>
-          {t("newAgent.createdTitle", { name: agent.name })}
+          {t(modeKey(org, "newAgent.createdTitle"), { name: agent.name })}
         </h1>
         <p className="newag__born-lead">
           {channels.length > 0
             ? t("newAgent.createdText", { channels: names, handle: agent.handle })
-            : t("newAgent.createdTextNoChannels", { name: agent.name, handle: agent.handle })}
+            : t(modeKey(org, "newAgent.createdTextNoChannels"), { name: agent.name, handle: agent.handle })}
         </p>
         <div className="newag__born-actions">
           {first && (

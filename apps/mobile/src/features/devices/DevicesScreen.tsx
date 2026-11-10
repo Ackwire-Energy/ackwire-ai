@@ -3,6 +3,7 @@ import { useComputerSetup, useMachines } from "@agenteschat/client";
 import { computerName, setupPending, setupView } from "@agenteschat/client/lib/computer";
 import { can } from "@agenteschat/client/lib/permissions";
 import { helpUrl } from "@agenteschat/client/lib/server";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Platform, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
@@ -132,7 +133,7 @@ function DeviceList({ devices, pairs }: { devices: ComputerDevice[]; pairs: bool
   return (
     <GroupedList>
       {devices.flatMap((d) => {
-        const name = computerName(t, org?.name ?? "", { kind: d.machineKind, name: d.name });
+        const name = computerName(t, org?.name ?? "", { kind: d.machineKind, name: d.name }, isPersonal(org));
         return [
           <GroupedRow
             key={d.id}

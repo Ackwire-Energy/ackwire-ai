@@ -108,6 +108,7 @@ function AppStack() {
       <Stack.Screen name="agent-ai/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent-model/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent-advanced/[id]" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="agent-more/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent-setup/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent-step/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent-edit" options={{ ...pushed, ...scrollUnder }} />
@@ -201,6 +202,8 @@ function AppStack() {
       {/* The workspace's settings: its page under the sky (from Você), then each section on the grouped gray. */}
       <Stack.Screen name="settings/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/general" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/advanced" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/mode" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/delete" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/right-hand" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/zone" options={{ ...pushed, ...scrollUnder }} />

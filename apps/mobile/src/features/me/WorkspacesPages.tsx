@@ -1,6 +1,7 @@
-import { type Me, useApi } from "@agenteschat/client";
+import { type Me, type OrgSummary, useApi } from "@agenteschat/client";
 import { workspaceNotes } from "@agenteschat/client/lib/deletion";
 import { CLOUD_SERVER, checkServer, normalizeServer, serverHost } from "@agenteschat/client/lib/server";
+import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
 import { useQueries } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -11,7 +12,17 @@ import { askNewWorkspace } from "@/lib/new-workspace";
 import { openOrgs } from "@/lib/org-choice";
 import { ALLOW_HTTP, serverUrl, signedInServers, useServer, useSignedInServers } from "@/lib/server";
 import { useOrg, useOrgMaybe } from "@/providers/org";
-import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, haptics, Locked, SheetScreen, useToast } from "@/ui";
+import {
+  GroupedFooter,
+  GroupedHeader,
+  GroupedList,
+  GroupedRow,
+  haptics,
+  Locked,
+  PersonAvatar,
+  SheetScreen,
+  useToast,
+} from "@/ui";
 import { AuthField } from "@/ui/auth/AuthField";
 import { AuthScaffold } from "@/ui/auth/AuthScaffold";
 import { Button } from "@/ui/Button";
@@ -20,6 +31,7 @@ import { Text } from "@/ui/Text";
 import { SheetHeader } from "../new/parts";
 import { OrgAvatar } from "../shared/OrgAvatar";
 import { goBack } from "../shared/parts";
+import { useMyFace } from "../shared/tabHeader";
 import { Page } from "./parts";
 import { orderedServers, type ServerWorkspaces, unreadElsewhere, workspacesOf } from "./workspaces-logic";
 
@@ -90,10 +102,32 @@ export function useOpenWorkspaceRow() {
 }
 
 /**
+ * A workspace's mark in a list: its logo (or the agent mark); a personal workspace of yours (ADR 0159) is you, so
+ * your own photo, as the tabs' bar shows it. One shared with you keeps its logo: that face would be someone else's.
+ */
+export function WorkspaceMark({
+  org,
+  server,
+  size = 30,
+}: {
+  org: Pick<OrgSummary, "mode" | "role" | "logo">;
+  /** The server it is on, when it isn't the current one (ADR 0154). */
+  server?: string;
+  size?: number;
+}) {
+  const face = useMyFace();
+  if (isPersonal(org) && org.role === "owner")
+    return <PersonAvatar name={face.name || "?"} size={size} photo={face.photo} />;
+  return <OrgAvatar logo={org.logo} size={size} {...(server ? { server } : {})} />;
+}
+
+/**
  * The groups of workspaces, one per server (its host as the small header), each workspace with its own mark (logo,
  * or its initial), its role, the check on the current one and the unread count on the others; a server that didn't
  * answer this time keeps its workspaces in their place, faded ("Sem resposta agora" when none is known). Shared by the
- * page and the sheet.
+ * page and the sheet. A personal workspace of yours (ADR 0159) is you: your face and your name, and whose it is
+ * instead of a role; with more than one, your face and each one's own name (the same name on each would tell them
+ * apart by nothing).
  */
 export function WorkspaceGroups({
   groups,
@@ -104,10 +138,13 @@ export function WorkspaceGroups({
 }) {
   const { t, i18n } = useTranslation();
   const org = useOrg();
+  const face = useMyFace();
+  const mine = (o: Pick<OrgSummary, "mode" | "role">) => isPersonal(o) && o.role === "owner";
   return (
     <>
       {groups.map((g) => {
         const notes = workspaceNotes(t, i18n.language, g.orgs);
+        const several = g.orgs.filter(mine).length > 1;
         return (
           <View key={g.server}>
             <GroupedHeader>{g.host}</GroupedHeader>
@@ -120,9 +157,9 @@ export function WorkspaceGroups({
                   return (
                     <GroupedRow
                       key={o.id}
-                      leading={<OrgAvatar logo={o.logo} server={g.server} />}
-                      label={o.name}
-                      sub={notes.get(o.id) ?? t(`mobile.me.role.${o.role}`)}
+                      leading={<WorkspaceMark org={o} server={g.server} />}
+                      label={mine(o) && !several && face.name ? face.name : o.name}
+                      sub={notes.get(o.id) ?? t(modeKey(o, `mobile.me.role.${o.role}`))}
                       checked={here}
                       faint={g.quiet}
                       {...(!here && o.unread > 0 ? { value: String(o.unread) } : {})}

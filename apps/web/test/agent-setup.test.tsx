@@ -62,4 +62,19 @@ describe("the setup checklist in a new agent's DM", () => {
     await openDm(state);
     expect(card()).toBeNull();
   });
+
+  test("alone in a personal workspace nobody else could talk to it: no who step, back once someone joins (ADR 0159)", async () => {
+    const personal = (alone: boolean) => {
+      const state = withSetup(seedState());
+      const org = state.me?.organizations[0];
+      if (org) org.mode = "personal";
+      if (alone) state.members = state.members.filter((m) => m.userId === state.me?.user.id);
+      return state;
+    };
+    await openDm(personal(true));
+    expect(card()?.querySelectorAll(".setup-row")).toHaveLength(4);
+    cleanup();
+    await openDm(personal(false));
+    expect(card()?.querySelectorAll(".setup-row")).toHaveLength(5);
+  });
 });

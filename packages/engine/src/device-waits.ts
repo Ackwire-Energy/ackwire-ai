@@ -341,17 +341,21 @@ export async function resumeComputerWaits(deps: DeviceWaitDeps, machineId: strin
   return resumed;
 }
 
-/** A host's phones changed: runs waiting on a phone now ready and free go on. */
+/**
+ * A host's phones changed: runs waiting on a phone now ready and free go on, and so does a run a person gave its phone
+ * back to (it holds it again).
+ */
 export async function resumePhoneWaits(
   deps: DeviceWaitDeps,
   machine: { id: string; orgId: string },
   phones: Pick<MachinePhoneRow, "id" | "state" | "holder" | "machineId">[],
 ): Promise<string[]> {
-  const free = new Set(phones.filter((p) => p.state === "ready" && !p.holder).map((p) => p.id));
-  if (free.size === 0) return [];
+  const ready = phones.filter((p) => p.state === "ready");
+  if (ready.length === 0) return [];
   const resumed: string[] = [];
   for (const w of await openDeviceWaits(deps.db, machine.orgId, { machineId: machine.id })) {
-    if (!w.phoneId || !free.has(w.phoneId)) continue;
+    const p = ready.find((x) => x.id === w.phoneId);
+    if (!p || (p.holder && p.holder.runId !== w.run.id)) continue;
     const ok = await endWait(
       deps,
       w,

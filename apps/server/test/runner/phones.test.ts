@@ -1,7 +1,7 @@
-import { afterEach, expect, test } from "bun:test";
+import { afterEach, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import type { RunnerPhone } from "@agenteschat/adapters/machine-protocol";
+import { type PhonePairing, pairAddress, type RunnerPhone } from "@agenteschat/adapters/machine-protocol";
 import {
   adbStateOf,
   androidKind,
@@ -16,14 +16,34 @@ import {
 import { appleNeedsYou, parseDevicectl, parseSimctl } from "../../runner/apple-devices";
 import type { RunnerError } from "../../runner/errors";
 import { type HandlerContext, handleRequest, OP_ROUTES, type RequestScope } from "../../runner/handlers";
-import { type PhoneIo, PhoneManager, type PhoneRequest } from "../../runner/phones";
+import { acquireLock } from "../../runner/lock";
+import {
+  androidText,
+  applyInput,
+  type IosScreenDriverFactory,
+  NO_IOS_CONTROL,
+  OPENING_LATE,
+  type PhoneIo,
+  PhoneManager,
+  type PhoneRequest,
+  type PhoneScreenDriver,
+  SimulatorScreen,
+  screenDriverFor,
+} from "../../runner/phones";
+import type { DataListener, DataSocket, DataSockets } from "../../runner/streams";
+import { IosHelper, WDA_VERSION } from "../../runner/wda";
+import { pairingQr, pairOutcome, parseMdnsServices, serialOfMdnsName } from "../../runner/wifi-pair";
+import { fakeUsbmuxd, freePort } from "./fake-usbmuxd";
 import { errorCode, removeDirs, tempDir } from "./helpers";
+
+// Each fake Xcode tool is a process of its own: an iPhone helper's build, check and start take seconds on a busy machine.
+setDefaultTimeout(30_000);
 
 const dirs: string[] = [];
 afterEach(() => removeDirs(dirs));
 
 const FAKE = path.join(import.meta.dir, "fake-phone-tools.mjs");
-const TOOLS = ["adb", "xcrun", "xcode-select", "maestro", "scrcpy", "bundletool", "plutil", "idevicesyslog"];
+const TOOLS = ["adb", "xcrun", "xcode-select", "maestro", "scrcpy", "bundletool", "plutil", "idevicesyslog", "ffmpeg"];
 
 const PIXEL = "38021FDH2000AB";
 const EMU = "emulator-5554";
@@ -248,7 +268,18 @@ test("iPhones: only ones plugged in now, with trust and Developer Mode; booted i
 });
 
 /** A computer with fake phone tools on its PATH, and a manager watching it. */
-function rig(state: Record<string, unknown>, opts: { tools?: string[]; platform?: NodeJS.Platform } = {}) {
+function rig(
+  state: Record<string, unknown>,
+  opts: {
+    tools?: string[];
+    platform?: NodeJS.Platform;
+    readOnly?: boolean;
+    /** The iPhone test helper (none by default: a real iPhone is ready to the Mac alone). */
+    ios?: (env: NodeJS.ProcessEnv, root: string, now: () => number) => IosHelper;
+    iosScreen?: IosScreenDriverFactory;
+    openMs?: number;
+  } = {},
+) {
   const root = tempDir("phones-");
   dirs.push(root);
   const bin = path.join(root, "bin");
@@ -266,11 +297,13 @@ function rig(state: Record<string, unknown>, opts: { tools?: string[]; platform?
   setState(state);
   const sent: RunnerPhone[][] = [];
   let now = Date.parse("2026-11-09T04:00:00Z");
+  const env = { PATH: bin, HOME: root, FAKE_PHONE_STATE: stateFile, FAKE_PHONE_LOG: logFile };
   const manager = new PhoneManager({
     log: () => {},
     onChange: (phones) => sent.push(phones),
     lockDir: path.join(root, "locks"),
-    env: { PATH: bin, HOME: root, FAKE_PHONE_STATE: stateFile, FAKE_PHONE_LOG: logFile },
+    env,
+    ios: opts.ios ? opts.ios(env, root, () => now) : null,
     platform: opts.platform ?? "darwin",
     home: root,
     dirs: [],
@@ -279,6 +312,10 @@ function rig(state: Record<string, unknown>, opts: { tools?: string[]; platform?
     settleMs: 0,
     caffeinate: false,
     liveLogMs: 2000,
+    ...(opts.readOnly ? { readOnly: true } : {}),
+    ...(opts.iosScreen ? { iosScreen: opts.iosScreen } : {}),
+    ...(opts.openMs ? { openMs: opts.openMs } : {}),
+    pairPollMs: 5,
   });
   const calls = () =>
     existsSync(logFile)
@@ -608,51 +645,131 @@ test("iOS simulator: install with its bundle id, launch, screenshot, record, flo
   expect(show.slice(-2)).toEqual(["--predicate", 'process == "Acme"']);
 });
 
-test("a real iPhone: install and launch through devicectl, what needs the person in words, the rest tool_missing", async () => {
-  const r = rig(ANDROID_STATE, { tools: ["adb", "xcrun", "xcode-select", "maestro", "plutil"] });
-  const t = { platform: "ios", serial: IPHONE, holder: r.holder("run-1") };
-  writeFileSync(path.join(r.folder, "Acme.ipa"), "IPA");
-  expect(await r.op({ op: "phone.install", ...t, path: "Acme.ipa" })).toEqual({
-    app: "com.acme.app",
-    output: "Installed",
-  });
-  const install = r.calls().find((c) => c[1] === "devicectl" && c[2] === "device") as string[];
-  expect(install.slice(1, 8)).toEqual([
-    "devicectl",
-    "device",
-    "install",
-    "app",
-    "--device",
-    IPHONE,
-    path.join(r.folder, "Acme.ipa"),
-  ]);
-  await r.op({ op: "phone.launch", ...t, app: "com.acme.app" });
-  r.setState({
-    ...ANDROID_STATE,
-    launchFail:
-      "ERROR: The application could not be launched because its profile has not been explicitly trusted by the user.\n",
-  });
-  const untrusted = await r.op({ op: "phone.launch", ...t, app: "com.acme.app" }).catch((e: Error) => e);
-  expect(untrusted).toMatchObject({ code: "phone_not_ready" });
-  for (const op of [
-    { op: "phone.screenshot" },
-    { op: "phone.record", seconds: 5 },
-    { op: "phone.flow", flow: "appId: x\n---\n- launchApp\n", timeoutSeconds: 60 },
-    { op: "phone.logs", lines: 10 },
-  ]) {
-    expect(await errorCode(() => r.op({ ...op, ...t }))).toBe("tool_missing");
+test("a real iPhone: install and launch through devicectl, the rest through its test helper once it's set up", async () => {
+  const [wda, mjpeg] = [await freePort(), await freePort()];
+  const muxDir = tempDir("mux-");
+  dirs.push(muxDir);
+  const mux = await fakeUsbmuxd(muxDir, [{ id: 5, serial: IPHONE }], { 8100: wda, 9100: mjpeg });
+  let helper: IosHelper | null = null;
+  const r = rig(
+    {
+      ...ANDROID_STATE,
+      wdaTree: {
+        type: "Application",
+        children: [{ type: "Button", label: "Sign in", rect: { x: 0, y: 100, width: 390, height: 44 } }],
+      },
+    },
+    {
+      tools: ["adb", "xcrun", "xcode-select", "maestro", "plutil", "ffmpeg"],
+      ios: (env, root, now) => {
+        mkdirSync(
+          path.join(root, ".agentes-runner", "wda", "src", `WebDriverAgent-${WDA_VERSION}`, "WebDriverAgent.xcodeproj"),
+          {
+            recursive: true,
+          },
+        );
+        helper = new IosHelper({
+          home: root,
+          env: { ...env, FAKE_WDA_PORT: String(wda), FAKE_MJPEG_PORT: String(mjpeg) },
+          log: () => {},
+          now,
+          usbmuxSocket: mux.file,
+          teams: async () => [{ id: "A1B2C3D4E5", name: "Sam Rivera", free: true }],
+        });
+        return helper;
+      },
+    },
+  );
+  try {
+    const t = { platform: "ios", serial: IPHONE, holder: r.holder("run-1") };
+    await r.manager.poll();
+    // Plugged in: the Mac builds the helper by itself, and says so on the phone.
+    expect(r.manager.list().find((p) => p.serial === IPHONE)).toMatchObject({
+      state: "preparing",
+      reason: "helper_missing",
+    });
+    // Meanwhile it installs and opens apps, but takes no screenshot yet.
+    writeFileSync(path.join(r.folder, "Acme.ipa"), "IPA");
+    expect(await r.op({ op: "phone.install", ...t, path: "Acme.ipa" })).toEqual({
+      app: "com.acme.app",
+      output: "Installed",
+    });
+    const install = r.calls().find((c) => c[1] === "devicectl" && c[2] === "device") as string[];
+    expect(install.slice(1, 8)).toEqual([
+      "devicectl",
+      "device",
+      "install",
+      "app",
+      "--device",
+      IPHONE,
+      path.join(r.folder, "Acme.ipa"),
+    ]);
+    await r.op({ op: "phone.launch", ...t, app: "com.acme.app" });
+    expect(await errorCode(() => r.op({ op: "phone.screenshot", ...t }))).toBe("phone_not_ready");
+    for (let i = 0; i < 200 && r.manager.list().find((p) => p.serial === IPHONE)?.state !== "ready"; i++) {
+      await Bun.sleep(50);
+      await r.manager.poll();
+    }
+    expect(r.manager.list().find((p) => p.serial === IPHONE)?.state).toBe("ready");
+    const shot = (await r.op({ op: "phone.screenshot", ...t })) as { path: string; width: number };
+    expect(shot.width).toBe(1080);
+    expect(readFileSync(path.join(r.folder, shot.path)).subarray(1, 4).toString()).toBe("PNG");
+    const rec = (await r.op({ op: "phone.record", ...t, seconds: 1 })) as { path: string; bytes: number };
+    expect(rec).toMatchObject({ path: expect.stringMatching(/recording\.mp4$/), bytes: 7 });
+    const ffmpeg = r.calls().find((c) => c[0] === "ffmpeg" && c.includes("pipe:0")) as string[];
+    expect(ffmpeg).toContain("h264_videotoolbox");
+    // Maestro dropped real iPhones: the flow runs through the helper.
+    const flow = (await r.op({
+      op: "phone.flow",
+      ...t,
+      flow: "appId: com.acme.app\n---\n- launchApp\n- tapOn: Sign in\n- takeScreenshot: signed in\n",
+      record: true,
+      timeoutSeconds: 60,
+    })) as { passed: boolean; output: string; video?: string; log: string };
+    expect(flow.passed).toBe(true);
+    expect(flow.video).toMatch(/flow\.mp4$/);
+    expect(flow.output).toContain("OK      tapOn Sign in");
+    expect(flow.output).toMatch(/Screenshot: \.agentes\/phone\/.+-signed-in\.png/);
+    expect(r.calls().some((c) => c[0] === "maestro")).toBe(false);
+    const wdaCalls = r
+      .calls()
+      .filter((c) => c[0] === "wda")
+      .map((c) => `${c[1]} ${c[2]}`);
+    expect(wdaCalls).toContain("POST /session/s1/wda/apps/launch");
+    expect(wdaCalls).toContain("POST /session/s1/wda/tap");
+    // A flow that isn't YAML is refused before a recording starts.
+    const recordings = r.calls().filter((c) => c[0] === "ffmpeg").length;
+    expect(
+      await errorCode(() =>
+        r.op({ op: "phone.flow", ...t, flow: "- tapOn: [unclosed\n", record: true, timeoutSeconds: 60 }),
+      ),
+    ).toBe("bad_request");
+    expect(r.calls().filter((c) => c[0] === "ffmpeg")).toHaveLength(recordings);
+    // What needs the person, in words: the developer not trusted.
+    r.setState({
+      ...ANDROID_STATE,
+      launchFail:
+        "ERROR: The application could not be launched because its profile has not been explicitly trusted by the user.\n",
+    });
+    const untrusted = await r.op({ op: "phone.launch", ...t, app: "com.acme.app" }).catch((e: Error) => e);
+    expect(untrusted).toMatchObject({ code: "phone_not_ready" });
+    // No libimobiledevice: its log can't be read.
+    expect(await errorCode(() => r.op({ op: "phone.logs", ...t, lines: 10 }))).toBe("tool_missing");
+    const withSyslog = rig(ANDROID_STATE);
+    const live = (await withSyslog.op({
+      op: "phone.logs",
+      ...t,
+      holder: withSyslog.holder("run-1"),
+      app: "com.acme.app",
+      lines: 10,
+    })) as {
+      text: string;
+    };
+    expect(live.text).toContain("com.acme.app hello");
+  } finally {
+    (helper as IosHelper | null)?.stopAll();
+    mux.close();
   }
-  const withSyslog = rig(ANDROID_STATE);
-  const live = (await withSyslog.op({
-    op: "phone.logs",
-    ...t,
-    holder: withSyslog.holder("run-1"),
-    app: "com.acme.app",
-    lines: 10,
-  })) as {
-    text: string;
-  };
-  expect(live.text).toContain("com.acme.app hello");
 });
 
 test("the runner routes phone ops with commands off, refuses them paused, and hands them the agent's folder", async () => {
@@ -710,4 +827,552 @@ test("the runner routes phone ops with commands off, refuses them paused, and ha
   // The process that holds the phones' locks answers them, in either mode.
   for (const op of ["phone.claim", "phone.release", "phone.flow", "phone.logs"] as const)
     expect(OP_ROUTES[op]).toBe("machine");
+});
+
+test("a manager that only looks (doctor) changes no setting, and sees a phone another runner holds", async () => {
+  const r = rig(ANDROID_STATE, { readOnly: true });
+  // The setting is written without waiting for it: a few looks give it time to land.
+  for (let i = 0; i < 3; i++) await r.manager.poll();
+  expect(r.manager.list().find((p) => p.serial === PIXEL)?.state).toBe("ready");
+  expect(r.calls().some((c) => c.join(" ").includes("settings put"))).toBe(false);
+  const pixel = { platform: "android", serial: PIXEL };
+  expect(r.manager.heldElsewhere(pixel)).toBeNull();
+  // Another live process of this user (here the test's parent) holds it, in the lock file the phone ops take.
+  const held = acquireLock(path.join(r.root, "locks"), "phone", { file: `android_${PIXEL}.lock`, pid: process.ppid });
+  if (!held.ok) throw new Error("no lock");
+  expect(r.manager.heldElsewhere(pixel)).toMatch(/^\d{4}-\d\d-\d\dT/);
+  held.release();
+});
+
+test("a manager that only looks (doctor) builds no iPhone test helper and runs nothing on the iPhone", async () => {
+  const r = rig(ANDROID_STATE, {
+    tools: ["adb", "xcrun", "xcode-select", "plutil"],
+    readOnly: true,
+    ios: (env, root, now) =>
+      new IosHelper({
+        home: root,
+        env,
+        log: () => {},
+        now,
+        teams: async () => [{ id: "A1B2C3D4E5", name: "Sam Rivera", free: true }],
+      }),
+  });
+  for (let i = 0; i < 3; i++) await r.manager.poll();
+  await Bun.sleep(100);
+  expect(r.manager.list().find((p) => p.serial === IPHONE)).toMatchObject({
+    state: "preparing",
+    reason: "helper_missing",
+  });
+  expect(r.calls().some((c) => c[0] === "xcrun" && c[1] === "xcodebuild")).toBe(false);
+});
+
+/** A viewer's data socket in memory: what the runner sent, how it closed, and its listener to play the viewer. */
+function viewerSocket() {
+  const sent: (string | Uint8Array)[] = [];
+  let listener: DataListener | null = null;
+  const closed: { code?: number; reason?: string }[] = [];
+  const socket: DataSocket = {
+    send: (d) => {
+      sent.push(d);
+    },
+    close: (code, reason) => {
+      closed.push({ code, reason });
+      listener?.closed();
+    },
+    bufferedAmount: 0,
+    listen: (on) => {
+      listener = on;
+    },
+  };
+  return { socket, sent, closed, viewer: () => listener as DataListener };
+}
+
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+async function until(check: () => boolean, what: string, ms = 5000) {
+  const end = Date.now() + ms;
+  while (!check()) {
+    if (Date.now() > end) throw new Error(`timed out waiting for ${what}`);
+    await wait(20);
+  }
+}
+
+test("a phone's screen live: pictures until the viewer stops acknowledging, an unchanged screen sent once", async () => {
+  const r = rig({ ...ANDROID_STATE, changing: true });
+  const v = viewerSocket();
+  const person = { runId: null, agentId: null, userId: "user-sam", since: "" };
+  await r.manager.view({ platform: "android", serial: PIXEL, holder: person }, "watch", async () => v.socket);
+  // The first picture is taken before the socket opens, so a phone that can't show refuses the stream instead.
+  await until(() => v.sent.length >= 2, "two pictures");
+  await wait(600);
+  // Two on their way and none acknowledged: it waits.
+  expect(v.sent).toHaveLength(2);
+  expect(pngSize(Buffer.from(v.sent[0] as Uint8Array))).toEqual({ width: 1080, height: 2400 });
+  v.viewer().control?.({ type: "ack" });
+  await until(() => v.sent.length === 3, "a third picture once one was drawn");
+  // Watching never takes the phone, and input from a watcher goes nowhere.
+  v.viewer().control?.({ type: "tap", x: 0.5, y: 0.5 });
+  await wait(200);
+  expect(r.calls().some((c) => c.join(" ").includes("input tap"))).toBe(false);
+  expect(r.manager.list()[0]?.holder).toBeUndefined();
+  v.viewer().closed();
+  const shots = r.calls().filter((c) => c.includes("screencap")).length;
+  await wait(600);
+  expect(r.calls().filter((c) => c.includes("screencap")).length).toBe(shots);
+
+  // An unchanged screen: one picture, however long it shows.
+  r.setState(ANDROID_STATE);
+  const still = viewerSocket();
+  await r.manager.view({ platform: "android", serial: PIXEL, holder: person }, "watch", async () => still.socket);
+  for (let i = 0; i < 3; i++) {
+    await wait(450);
+    still.viewer().control?.({ type: "ack" });
+  }
+  expect(still.sent).toHaveLength(1);
+  still.viewer().closed();
+});
+
+test("control: the person's input goes to the phone, an agent holding it waits, and gets it back after", async () => {
+  const r = rig(ANDROID_STATE);
+  const target = { platform: "android", serial: PIXEL };
+  await r.op({ op: "phone.claim", ...target, holder: r.holder("run-1", "Testing checkout") });
+  const v = viewerSocket();
+  const sam = { runId: null, agentId: null, userId: "user-sam", since: "" };
+  await r.manager.view({ platform: "android", serial: PIXEL, holder: sam }, "control", async () => v.socket);
+  // The person holds it now; the agent's calls wait until they give it back.
+  expect(r.manager.list()[0]?.holder).toMatchObject({ runId: null, userId: "user-sam" });
+  expect(await errorCode(() => r.op({ op: "phone.screenshot", ...target, holder: r.holder("run-1") }))).toBe(
+    "phone_busy",
+  );
+  // Taking control lights the screen up.
+  expect(r.calls()).toContainEqual(["adb", "-s", PIXEL, "shell", "input keyevent KEYCODE_WAKEUP; wm dismiss-keyguard"]);
+  const viewer = v.viewer();
+  viewer.control?.({ type: "tap", x: 0.5, y: 0.25 });
+  viewer.control?.({ type: "swipe", x1: 0.5, y1: 0.8, x2: 0.5, y2: 0.2, ms: 300 });
+  viewer.control?.({ type: "text", text: "it's 5" });
+  viewer.control?.({ type: "text", text: " o'clock" });
+  viewer.control?.({ type: "key", key: "home" });
+  const input = () =>
+    r.calls().filter((c) => c[3] === "shell" && /^input (tap|swipe|text|keyevent \d)/.test(String(c[4])));
+  await until(() => input().length >= 4, "the input");
+  expect(input().map((c) => c[4])).toEqual([
+    "input tap 540 600",
+    "input swipe 540 1920 540 480 300",
+    // Typed while the tap and the swipe went in: one call.
+    "input text 'it'\\''s%s5%so'\\''clock'",
+    "input keyevent 3",
+  ]);
+  // Given back: the agent holds it again.
+  viewer.closed();
+  await until(() => r.manager.list()[0]?.holder?.runId === "run-1", "the agent's hold back");
+  await r.op({ op: "phone.screenshot", ...target, holder: r.holder("run-1") });
+
+  // The run ends while the person controls it: the phone goes free when they give it back.
+  const again = viewerSocket();
+  await r.manager.view({ platform: "android", serial: PIXEL, holder: sam }, "control", async () => again.socket);
+  expect(await r.op({ op: "phone.release", ...target, holder: r.holder("run-1") })).toEqual({ released: true });
+  again.viewer().closed();
+  await until(() => r.manager.list()[0]?.holder === undefined, "the phone free");
+
+  // Stop (its owner, by force) ends a person's control too: their view closes as control ended.
+  const third = viewerSocket();
+  await r.manager.view({ platform: "android", serial: PIXEL, holder: sam }, "control", async () => third.socket);
+  // Someone else can't take it meanwhile.
+  const ana = { runId: null, agentId: null, userId: "user-ana", since: "" };
+  expect(
+    await errorCode(() =>
+      r.manager.view({ platform: "android", serial: PIXEL, holder: ana }, "control", async () => viewerSocket().socket),
+    ),
+  ).toBe("phone_busy");
+  await r.op({ op: "phone.release", ...target, holder: r.holder("run-9"), force: true });
+  expect(third.closed).toEqual([{ code: 4410, reason: "control ended" }]);
+});
+
+test("an agent's op running when a person takes control stops, and says why", async () => {
+  const r = rig({ ...ANDROID_STATE, wait: true }, {});
+  const target = { platform: "android", serial: PIXEL };
+  const recording = r.op({ op: "phone.record", ...target, holder: r.holder("run-1"), seconds: 30 }).catch((e) => e);
+  await until(() => r.calls().some((c) => c[0] === "scrcpy"), "the recording");
+  const v = viewerSocket();
+  const sam = { runId: null, agentId: null, userId: "user-sam", since: "" };
+  await r.manager.view({ platform: "android", serial: PIXEL, holder: sam }, "control", async () => v.socket);
+  const error = (await recording) as RunnerError;
+  expect(error.code).toBe("phone_busy");
+  expect(error.message).toContain("took control");
+  v.viewer().closed();
+});
+
+test("Stop while the screen opens in control ends it as soon as it's open; big pictures go one at a time", async () => {
+  const r = rig(ANDROID_STATE);
+  const target = { platform: "android", serial: PIXEL } as const;
+  const sam = { runId: null, agentId: null, userId: "user-sam", since: "" };
+  const v = viewerSocket();
+  await r.manager.view({ ...target, holder: sam }, "control", async () => {
+    await r.op({ op: "phone.release", ...target, holder: r.holder("run-9"), force: true });
+    return v.socket;
+  });
+  expect(v.closed).toEqual([{ code: 4410, reason: "control ended" }]);
+  v.viewer().control?.({ type: "tap", x: 0.5, y: 0.5 });
+  await wait(100);
+  expect(r.calls().some((c) => c.join(" ").includes("input tap"))).toBe(false);
+
+  // Two of Sam's views taking control at once share it: the phone goes free once both closed.
+  const a = viewerSocket();
+  const b = viewerSocket();
+  await Promise.all([
+    r.manager.view({ ...target, holder: sam }, "control", async () => a.socket),
+    r.manager.view({ ...target, holder: sam }, "control", async () => b.socket),
+  ]);
+  a.viewer().closed();
+  expect(r.manager.list()[0]?.holder).toMatchObject({ userId: "user-sam" });
+  b.viewer().closed();
+  await until(() => r.manager.list()[0]?.holder === undefined, "the phone free");
+
+  r.setState({ ...ANDROID_STATE, changing: true, big: true });
+  const big = viewerSocket();
+  await r.manager.view({ ...target, holder: sam }, "watch", async () => big.socket);
+  await wait(600);
+  expect(big.sent).toHaveLength(1);
+  big.viewer().control?.({ type: "ack" });
+  await until(() => big.sent.length === 2, "the next picture once the big one was drawn");
+  big.viewer().closed();
+});
+
+test("iPhones: a simulator shows its pictures but takes no control, a real one needs the helper, the helper's driver wins", async () => {
+  let iosScreen: IosScreenDriverFactory | null = null;
+  const r = rig(ANDROID_STATE, { iosScreen: (phone, tools) => iosScreen?.(phone, tools) ?? null });
+  const v = viewerSocket();
+  const sam = { runId: null, agentId: null, userId: "user-sam", since: "" };
+  await r.manager.view({ platform: "ios", serial: SIM, holder: sam }, "watch", async () => v.socket);
+  await until(() => v.sent.length === 1, "the simulator's picture");
+  expect(r.calls()).toContainEqual(["xcrun", "simctl", "io", SIM, "screenshot", "--type=jpeg", "-"]);
+  v.viewer().closed();
+  const control = await r.manager
+    .view({ platform: "ios", serial: SIM, holder: sam }, "control", async () => viewerSocket().socket)
+    .catch((e: RunnerError) => e);
+  expect(control).toMatchObject({ code: "unsupported", message: NO_IOS_CONTROL });
+  expect(
+    await errorCode(() =>
+      r.manager.view({ platform: "ios", serial: IPHONE, holder: sam }, "watch", async () => viewerSocket().socket),
+    ),
+  ).toBe("tool_missing");
+
+  const taps: number[][] = [];
+  const helper: PhoneScreenDriver = {
+    frame: async () => ({ jpeg: new Uint8Array([0xff, 0xd8, 1]), width: 402, height: 874 }),
+    tap: async (x, y) => {
+      taps.push([x, y]);
+    },
+    swipe: async () => {},
+    text: async () => {},
+    key: async () => {},
+  };
+  iosScreen = (phone) => (phone.kind === "device" ? helper : null);
+  const real = viewerSocket();
+  await r.manager.view({ platform: "ios", serial: IPHONE, holder: sam }, "control", async () => real.socket);
+  real.viewer().control?.({ type: "tap", x: 0.5, y: 0.5 });
+  await until(() => taps.length === 1, "the helper's tap");
+  // In the helper's own space: the size its pictures said.
+  expect(taps).toEqual([[201, 437]]);
+  real.viewer().closed();
+  // A simulator the helper leaves alone keeps the built-in pictures.
+  const sim = { platform: "ios", serial: SIM, kind: "simulator", model: "", osVersion: "", state: "ready" } as const;
+  const tools = { adb: null, xcrun: "/x", env: {} };
+  expect(screenDriverFor(sim, tools, "control", iosScreen)).toBeInstanceOf(SimulatorScreen);
+  // Watching a simulator never waits for the helper's first build, even when the helper drives it.
+  expect(screenDriverFor(sim, tools, "watch", () => helper)).toBeInstanceOf(SimulatorScreen);
+  expect(screenDriverFor(sim, tools, "control", () => helper)).toBe(helper);
+});
+
+test("a screen that doesn't open in the server's wait (a first helper build) gives the phone back and says why", async () => {
+  const building: PhoneScreenDriver = {
+    frame: () => new Promise(() => {}),
+    tap: async () => {},
+    swipe: async () => {},
+    text: async () => {},
+    key: async () => {},
+  };
+  const r = rig(ANDROID_STATE, { iosScreen: () => building, openMs: 100 });
+  const sam = { runId: null, agentId: null, userId: "user-sam", since: "" };
+  let dialed = 0;
+  const opened = await r.manager
+    .view({ platform: "ios", serial: SIM, holder: sam }, "control", async () => {
+      dialed++;
+      return viewerSocket().socket;
+    })
+    .catch((e: RunnerError) => e);
+  expect(opened).toMatchObject({ code: "phone_not_ready", message: OPENING_LATE });
+  expect(dialed).toBe(0);
+  expect(r.manager.list().find((p) => p.serial === SIM)?.holder).toBeUndefined();
+});
+
+test("input lands where the person pressed, in the picture's own size; text is one quoted word for the phone's shell", async () => {
+  const seen: unknown[] = [];
+  const driver = {
+    tap: async (...a: number[]) => void seen.push(["tap", ...a]),
+    swipe: async (...a: number[]) => void seen.push(["swipe", ...a]),
+    text: async (t: string) => void seen.push(["text", t]),
+    key: async (k: string) => void seen.push(["key", k]),
+  } as unknown as PhoneScreenDriver;
+  const size = { width: 1080, height: 2400 };
+  await applyInput(driver, { type: "tap", x: 1, y: 0 }, size);
+  await applyInput(driver, { type: "swipe", x1: 0, y1: 0.5, x2: 0.25, y2: 0.5, ms: 120 }, size);
+  expect(seen).toEqual([
+    ["tap", 1079, 0],
+    ["swipe", 0, 1200, 270, 1200, 120],
+  ]);
+  expect(androidText(`a b'c"; rm -rf $HOME \\`)).toBe(`'a%sb'\\''c";%srm%s-rf%s$HOME%s\\'`);
+});
+
+test("stream.open for a phone's screen needs no agent, goes to the phones, and control waits on a paused computer", async () => {
+  const views: unknown[] = [];
+  const dialed: string[] = [];
+  const phones = {
+    view: async (target: unknown, mode: string, dial: () => Promise<DataSocket>) => {
+      views.push({ target, mode });
+      await dial();
+    },
+  } as unknown as PhoneManager;
+  const streams = {
+    dial: async (_id: string, kind: string) => {
+      dialed.push(kind);
+      return viewerSocket().socket;
+    },
+  } as unknown as DataSockets;
+  let paused = false;
+  const ctx: HandlerContext = {
+    workspaceReal: "/tmp",
+    exec: false,
+    token: "agm_x",
+    phones,
+    streams,
+    paused: () => paused,
+  };
+  const scope: RequestScope = { signal: new AbortController().signal, output: () => {} };
+  const phone = {
+    platform: "android" as const,
+    serial: PIXEL,
+    holder: { runId: null, agentId: null, userId: "user-sam", since: "" },
+  };
+  const open = (mode: "watch" | "control") =>
+    ({ op: "stream.open", kind: "phone", mode, phoneId: "p1", streamId: "A".repeat(43), phone }) as const;
+  expect(await handleRequest(ctx, open("control"), scope)).toEqual({ opened: true });
+  expect(views).toEqual([{ target: phone, mode: "control" }]);
+  expect(dialed).toEqual(["phone"]);
+  paused = true;
+  expect(await errorCode(() => handleRequest(ctx, open("control"), scope))).toBe("paused");
+  expect(await handleRequest(ctx, open("watch"), scope)).toEqual({ opened: true });
+});
+
+// ── Wi-Fi pairing ─────────────────────────────────────────────────────────────
+
+/** `adb mdns services` as adb 36.0.2 prints it on a Mac (tab-separated), and as adb before 34 did (a trailing dot). */
+const MDNS_36 = `List of discovered mdns services
+adb-${PIXEL}-AbCdEf\t_adb-tls-connect._tcp\t192.168.1.20:41235
+agentes-Qx7Kp2Mz9a\t_adb-tls-pairing._tcp\t192.168.1.20:37099
+
+`;
+
+test("adb's mDNS listing, the phone's own serial in its service name, the QR, adb pair's answers, an address", () => {
+  expect(parseMdnsServices(MDNS_36)).toEqual([
+    { name: `adb-${PIXEL}-AbCdEf`, kind: "connect", address: "192.168.1.20:41235" },
+    { name: "agentes-Qx7Kp2Mz9a", kind: "pairing", address: "192.168.1.20:37099" },
+  ]);
+  expect(parseMdnsServices("adb-R5CT12-Zz9yX1\t_adb-tls-connect._tcp.\t10.0.0.7:5555\nnoise\n")).toEqual([
+    { name: "adb-R5CT12-Zz9yX1", kind: "connect", address: "10.0.0.7:5555" },
+  ]);
+  expect(serialOfMdnsName(`adb-${PIXEL}-AbCdEf`)).toBe(PIXEL);
+  expect(serialOfMdnsName(`adb-${PIXEL}-AbCdEf._adb-tls-connect._tcp`)).toBe(PIXEL);
+  expect(serialOfMdnsName("192.168.1.20:41235")).toBeNull();
+  expect(pairingQr("agentes-Qx7Kp2Mz9a", "p4ssW0rd")).toBe("WIFI:T:ADB;S:agentes-Qx7Kp2Mz9a;P:p4ssW0rd;;");
+  const said = (text: string, timedOut = false) => pairOutcome({ text, code: 0, timedOut });
+  expect(said("Successfully paired to 192.168.1.20:37099 [guid=adb-38021FDH2000AB-AbCdEf]\n")).toEqual({
+    ok: true,
+    guid: "adb-38021FDH2000AB-AbCdEf",
+  });
+  expect(said("Failed: Wrong password or connection was dropped.\n")).toEqual({ ok: false, reason: "refused" });
+  expect(said("Failed: Unable to start pairing client.\n")).toEqual({ ok: false, reason: "same_wifi" });
+  // What adb 36.0.2 printed on a Mac for an address nothing listened on.
+  expect(said("error: protocol fault (couldn't read status message): Undefined error: 0\n")).toEqual({
+    ok: false,
+    reason: "same_wifi",
+  });
+  expect(said("", true)).toEqual({ ok: false, reason: "same_wifi" });
+  expect(said("Failed: something new\n")).toEqual({ ok: false, reason: "failed" });
+  expect(pairAddress(" 192.168.1.20:37099 ")).toBe("192.168.1.20:37099");
+  expect(pairAddress("[fe80::1%wlan0]:37099")).toBe("[fe80::1%wlan0]:37099");
+  for (const bad of ["192.168.1.20", "192.168.1.300:37099", "192.168.1.20:70000", "-s:1", "host:22", 42])
+    expect(pairAddress(bad)).toBeNull();
+});
+
+const WIFI_FACTS = `${PIXEL_FACTS}serialno=${PIXEL}\npatch=2026-06-05\n`;
+const WIFI_AT = "192.168.1.20:41235";
+
+/** A Pixel 8 with Wireless debugging on, on the same Wi-Fi: its pairing service shows once the QR is scanned. */
+const wifiState = (service: string, over: Record<string, unknown> = {}) => ({
+  adbDevices: "List of devices attached\n",
+  mdns: `adb-${PIXEL}-AbCdEf\t_adb-tls-connect._tcp\t${WIFI_AT}\n${service}\t_adb-tls-pairing._tcp\t192.168.1.20:37099\n`,
+  pair: `Successfully paired to 192.168.1.20:37099 [guid=adb-${PIXEL}-AbCdEf]\n`,
+  connectable: { [WIFI_AT]: `${WIFI_AT} device product:shiba model:Pixel_8 device:shiba transport_id:9` },
+  facts: { [WIFI_AT]: WIFI_FACTS, "192.168.1.20:40001": WIFI_FACTS },
+  ...over,
+});
+
+/** Asks where the pairing is until it ends. */
+async function settle(r: ReturnType<typeof rig>, id: string) {
+  for (let i = 0; i < 400; i++) {
+    const s = (await r.manager.pair({ op: "phone.pair.status", pairingId: id })) as PhonePairing;
+    if (s.state === "connected" || s.state === "failed") return s;
+    await new Promise((done) => setTimeout(done, 5));
+  }
+  throw new Error("the pairing never ended");
+}
+
+test("the QR way: the phone scans, the computer pairs and connects it, and it keeps its own serial on a new port", async () => {
+  const r = rig({ adbDevices: "List of devices attached\n" }, { tools: ["adb"] });
+  const started = (await r.manager.pair({ op: "phone.pair.start" })) as PhonePairing;
+  expect(started).toMatchObject({ way: "qr", state: "waiting" });
+  const qr = /^WIFI:T:ADB;S:(agentes-\w{10});P:(\w{12});;$/.exec(started.qr ?? "");
+  expect(qr).not.toBeNull();
+  const [, service = "", password = ""] = qr ?? [];
+  r.setState(wifiState(service));
+  const done = await settle(r, started.id);
+  expect(done).toMatchObject({ state: "connected", serial: PIXEL });
+  expect(done.qr).toBeUndefined();
+  expect(r.calls()).toContainEqual(["adb", "pair", "192.168.1.20:37099", password]);
+  expect(r.calls()).toContainEqual(["adb", "connect", WIFI_AT]);
+  // The list already has it, by its own serial, over Wi-Fi; ops reach it at adb's serial for it.
+  expect(r.manager.list().map((p) => [p.serial, p.transport, p.state])).toEqual([[PIXEL, "wifi", "ready"]]);
+  await r.op({ op: "phone.screenshot", platform: "android", serial: PIXEL, holder: r.holder("run-1") });
+  expect(r.calls()).toContainEqual(["adb", "-s", WIFI_AT, "exec-out", "screencap", "-p"]);
+  // Its screen live too.
+  const v = viewerSocket();
+  const sam = { runId: null, agentId: null, userId: "user-sam", since: "" };
+  await r.manager.view({ platform: "android", serial: PIXEL, holder: sam }, "control", async () => v.socket);
+  v.viewer().control?.({ type: "key", key: "home" });
+  await until(() => r.calls().some((c) => c[4] === "input keyevent 3"), "the key");
+  v.viewer().closed();
+  expect(r.calls().filter((c) => c[1] === "-s" && c[2] === PIXEL)).toEqual([]);
+  expect(JSON.parse(readFileSync(path.join(r.root, "wifi-phones.json"), "utf8"))).toEqual([PIXEL]);
+  // Wireless debugging back on after a restart: a new port, the same phone (its row, its rule, its lock).
+  r.setState({
+    ...wifiState(service),
+    adbDevices: "List of devices attached\n192.168.1.20:40001 device product:shiba model:Pixel_8 transport_id:12\n",
+  });
+  await r.manager.poll();
+  expect(r.manager.list().map((p) => [p.serial, p.transport])).toEqual([[PIXEL, "wifi"]]);
+  await r.op({ op: "phone.screenshot", platform: "android", serial: PIXEL, holder: r.holder("run-1") });
+  expect(r.calls().at(-1)).toEqual(["adb", "-s", "192.168.1.20:40001", "exec-out", "screencap", "-p"]);
+  // Over a cable and Wi-Fi at once it is one phone, by the cable.
+  r.setState({
+    ...wifiState(service),
+    adbDevices: `List of devices attached\n192.168.1.20:40001 device model:Pixel_8\n${PIXEL} device usb:1-1 model:Pixel_8\n`,
+    facts: { "192.168.1.20:40001": WIFI_FACTS, [PIXEL]: PIXEL_FACTS },
+  });
+  await r.manager.poll();
+  expect(r.manager.list().map((p) => [p.serial, p.transport])).toEqual([[PIXEL, "usb"]]);
+});
+
+test("a Wi-Fi phone seen before is connected again when it shows up on the network, even after a restart", async () => {
+  const root = tempDir("phones-known-");
+  dirs.push(root);
+  const r = rig(
+    {
+      adbDevices: "List of devices attached\n",
+      mdns: `adb-${PIXEL}-AbCdEf\t_adb-tls-connect._tcp\t192.168.1.20:40001\nadb-OTHER123-Zz9yX1\t_adb-tls-connect._tcp\t192.168.1.31:5555\n`,
+      connectable: { "192.168.1.20:40001": "192.168.1.20:40001 device model:Pixel_8" },
+      facts: { "192.168.1.20:40001": WIFI_FACTS },
+    },
+    { tools: ["adb"] },
+  );
+  writeFileSync(path.join(r.root, "wifi-phones.json"), JSON.stringify([PIXEL]));
+  // A new runner reads who it knows.
+  const manager = new PhoneManager({
+    log: () => {},
+    onChange: () => {},
+    lockDir: path.join(r.root, "locks"),
+    env: (r.manager as unknown as { env: NodeJS.ProcessEnv }).env,
+    platform: "darwin",
+    home: r.root,
+    dirs: [],
+    adbServer: async () => null,
+    caffeinate: false,
+  });
+  await manager.poll();
+  for (let i = 0; i < 200 && !r.calls().some((c) => c[1] === "connect"); i++)
+    await new Promise((done) => setTimeout(done, 5));
+  // Only the phone it knows: a stranger's phone with Wireless debugging on is left alone.
+  expect(r.calls().filter((c) => c[1] === "connect")).toEqual([["adb", "connect", "192.168.1.20:40001"]]);
+  for (let i = 0; i < 200 && manager.list().length === 0; i++) {
+    await new Promise((done) => setTimeout(done, 5));
+    await manager.poll();
+  }
+  expect(manager.list().map((p) => [p.serial, p.transport, p.state])).toEqual([[PIXEL, "wifi", "ready"]]);
+  await manager.stop();
+});
+
+test("pairing failures say why: mDNS off, a code the phone refused, nothing in 2 minutes, an unpatched phone", async () => {
+  const off = rig({ mdnsOff: true }, { tools: ["adb"] });
+  expect(await off.manager.pair({ op: "phone.pair.start" })).toMatchObject({ state: "failed", reason: "mdns_off" });
+
+  const none = rig({}, { tools: [] });
+  expect(await none.manager.pair({ op: "phone.pair.start" })).toMatchObject({ state: "failed", reason: "adb_missing" });
+
+  const refused = rig({}, { tools: ["adb"] });
+  const s1 = (await refused.manager.pair({ op: "phone.pair.start" })) as PhonePairing;
+  const service = /S:([\w-]+);/.exec(s1.qr ?? "")?.[1] ?? "";
+  refused.setState(wifiState(service, { pair: "", pairFail: "Failed: Wrong password or connection was dropped.\n" }));
+  expect(await settle(refused, s1.id)).toMatchObject({ state: "failed", reason: "refused" });
+
+  const late = rig({ adbDevices: "List of devices attached\n" }, { tools: ["adb"] });
+  const s2 = (await late.manager.pair({ op: "phone.pair.start" })) as PhonePairing;
+  late.tick(2 * 60_000);
+  expect(await settle(late, s2.id)).toMatchObject({ state: "failed", reason: "timed_out" });
+
+  const old = rig({}, { tools: ["adb"] });
+  const s3 = (await old.manager.pair({ op: "phone.pair.start" })) as PhonePairing;
+  const oldFacts = WIFI_FACTS.replace("sdk=36", "sdk=33").replace("release=16", "release=13");
+  const service3 = /S:([\w-]+);/.exec(s3.qr ?? "")?.[1] ?? "";
+  old.setState(wifiState(service3, { facts: { [WIFI_AT]: oldFacts } }));
+  expect(await settle(old, s3.id)).toMatchObject({ state: "failed", reason: "outdated" });
+  expect(old.calls()).toContainEqual(["adb", "disconnect", WIFI_AT]);
+  expect(existsSync(path.join(old.root, "wifi-phones.json"))).toBe(false);
+  // It keeps this computer's key, so adb's own mDNS may connect it again: still unpatched, it stays off the list.
+  await old.manager.poll();
+  expect(old.manager.list()).toEqual([]);
+  // Updated, it's a phone like any other.
+  old.setState(wifiState(service3, { adbDevices: `List of devices attached\n${WIFI_AT} device model:Pixel_8\n` }));
+  old.tick(6 * 60_000);
+  await old.manager.poll();
+  expect(old.manager.list().map((p) => [p.serial, p.state])).toEqual([[PIXEL, "ready"]]);
+
+  // A new pairing ends the one before; cancel ends it; an unknown one is gone.
+  const two = rig({ adbDevices: "List of devices attached\n" }, { tools: ["adb"] });
+  const first = (await two.manager.pair({ op: "phone.pair.start" })) as PhonePairing;
+  const second = (await two.manager.pair({ op: "phone.pair.start" })) as PhonePairing;
+  expect(await errorCode(() => two.manager.pair({ op: "phone.pair.status", pairingId: first.id }))).toBe("not_found");
+  expect(await two.manager.pair({ op: "phone.pair.cancel", pairingId: second.id })).toEqual({ canceled: true });
+  expect(await two.manager.pair({ op: "phone.pair.status", pairingId: second.id })).toMatchObject({
+    state: "failed",
+    reason: "canceled",
+  });
+});
+
+test("the six-digit way pairs with what the phone shows, and refuses an address or a code it can't be", async () => {
+  const r = rig({}, { tools: ["adb"] });
+  r.setState(wifiState("unused"));
+  expect(await errorCode(() => r.manager.pair({ op: "phone.pair.code", address: "-s 1", code: "123456" }))).toBe(
+    "bad_request",
+  );
+  expect(
+    await errorCode(() => r.manager.pair({ op: "phone.pair.code", address: "192.168.1.20:37099", code: "12345" })),
+  ).toBe("bad_request");
+  const started = (await r.manager.pair({
+    op: "phone.pair.code",
+    address: "192.168.1.20:37099",
+    code: "123 456",
+  })) as PhonePairing;
+  expect(started).toMatchObject({ way: "code" });
+  expect(started.qr).toBeUndefined();
+  expect(await settle(r, started.id)).toMatchObject({ state: "connected", serial: PIXEL });
+  expect(r.calls()).toContainEqual(["adb", "pair", "192.168.1.20:37099", "123456"]);
 });

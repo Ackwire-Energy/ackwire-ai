@@ -1,4 +1,5 @@
 import type { VaultImportResult, VaultScope } from "@agenteschat/client";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import { Button, Dialog, DialogBody, DialogFooter, Icon, Locked, Segmented, SettingNote } from "@agenteschat/ui";
 import { type DragEvent, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -192,7 +193,7 @@ export function VaultImportDialog({
                     onValueChange={pickScope}
                     options={[
                       { value: "personal", label: t("vault.scope.personal") },
-                      { value: "team", label: t("vault.scope.team") },
+                      { value: "team", label: t(modeKey(org, "vault.scope.team")) },
                     ]}
                   />
                   <span className="ac-field__example">
