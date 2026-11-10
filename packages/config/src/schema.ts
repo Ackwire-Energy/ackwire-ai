@@ -108,6 +108,24 @@ export const envVars = {
       "On SIGTERM, how long the server keeps serving while `/api/health` answers 503, before it stops taking requests. Behind a reverse proxy with an active health check (and a retry window), set it above the check's interval so the proxy stops sending requests here first and holds them for the next instance instead of failing them (2000 for a check every second). 0 (default): stop taking requests at once.",
     section: "Server",
   },
+  OUTBOX_MAX_IN_FLIGHT: {
+    schema: z.coerce.number().int().min(1).default(48),
+    description:
+      "How many jobs one server process runs at once besides its requests: agents' runs, routines, a message's routing, notifications, emails. Agents' runs spend most of their time waiting for their model or their computer, so this can be far above the number of CPUs. A job holds a database connection only while it reads or writes (`DATABASE_POOL_MAX`).",
+    section: "Server",
+  },
+  OUTBOX_QUICK_SLOTS: {
+    schema: z.coerce.number().int().min(0).default(12),
+    description:
+      "Of `OUTBOX_MAX_IN_FLIGHT`, the slots only quick jobs may take (a message's routing, notifications, push, emails, search indexing), so they never wait behind agents' runs and routines, which hold the rest at most. Must be below `OUTBOX_MAX_IN_FLIGHT`. 0: no slots of their own.",
+    section: "Server",
+  },
+  OUTBOX_MAX_IN_FLIGHT_CEILING: {
+    schema: z.coerce.number().int().min(1).default(64),
+    description:
+      "How far the job slots grow on their own while jobs wait for one (a burst of routines, a busy hour), from `OUTBOX_MAX_IN_FLIGHT`; they shrink back once nothing waits. Never more than 4 jobs per database connection (`DATABASE_POOL_MAX`; the built-in database has one, so there they never grow). Set it to `OUTBOX_MAX_IN_FLIGHT` to keep them fixed.",
+    section: "Server",
+  },
   DATABASE_URL: {
     schema: z
       .string()
@@ -122,8 +140,9 @@ export const envVars = {
     secret: true,
   },
   DATABASE_POOL_MAX: {
-    schema: z.coerce.number().int().min(1).default(10),
-    description: "Maximum number of open connections per agentes.chat process.",
+    schema: z.coerce.number().int().min(1).default(20),
+    description:
+      "Maximum number of open connections per agentes.chat process, shared by its HTTP requests and its jobs (`OUTBOX_MAX_IN_FLIGHT`). Keep it, times the number of processes, under the database's `max_connections`.",
     section: "Database",
   },
   RUN_MIGRATIONS_ON_BOOT: {

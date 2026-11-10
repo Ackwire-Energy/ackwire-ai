@@ -524,7 +524,10 @@ function HereServer({ local, current }: { local: LocalServerStatus; current: str
         open={reachOffAsk}
         onOpenChange={(o) => !o && setReachOffAsk(false)}
         title={t("desktop.server.reachOffTitle")}
-        description={`${t("desktop.server.reachOffBody")} ${t("desktop.server.reachRestart")}`}
+        description={t("common.joinSentences", {
+          a: t("desktop.server.reachOffBody"),
+          b: t("desktop.server.reachRestart"),
+        })}
         closeLabel={t("desktop.common.close")}
         width={440}
       >

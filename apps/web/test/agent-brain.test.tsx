@@ -1559,7 +1559,7 @@ describe("Quem pensa: a coding plan's models", () => {
     const options = screen()
       .getAllByRole("option")
       .map((o) => o.textContent);
-    expect(options).toHaveLength(31);
+    expect(options).toHaveLength(32);
     expect(options.slice(0, 4)).toEqual([
       "AutomáticoEscolhe o modelo e o esforço para cada tarefa",
       "MiniMax M3",
@@ -1587,7 +1587,7 @@ describe("Quem pensa: a coding plan's models", () => {
       "Reflection",
       "OpenCode",
     ]);
-    expect(list.querySelectorAll(".ac-menu__leading")).toHaveLength(31);
+    expect(list.querySelectorAll(".ac-menu__leading")).toHaveLength(32);
     // Every maker's own mark, never its initial.
     expect(list.querySelectorAll(".ac-brand__initial")).toHaveLength(0);
     expect(

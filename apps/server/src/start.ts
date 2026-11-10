@@ -404,6 +404,12 @@ async function boot(
     ...(config.OPS_REPORT_EMAIL?.length
       ? { opsReport: { to: config.OPS_REPORT_EMAIL, publicUrl: config.PUBLIC_URL } }
       : {}),
+    outbox: {
+      maxInFlight: config.OUTBOX_MAX_IN_FLIGHT,
+      quickSlots: config.OUTBOX_QUICK_SLOTS,
+      ceiling: config.OUTBOX_MAX_IN_FLIGHT_CEILING,
+      dbConnections: database.client ? config.DATABASE_POOL_MAX : 1,
+    },
     log,
   });
   const telemetry = startTelemetry({ db: database.db, config, log });

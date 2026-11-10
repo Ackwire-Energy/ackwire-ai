@@ -3,9 +3,10 @@ import type { ModelUsage } from "./types";
 /**
  * Prices in nano-USD per token (1e-9 USD), i.e. USD per million tokens × 1000,
  * so every cost is an exact integer. First-party Anthropic API list prices,
- * checked on Anthropic's pricing page (2026-10-20); cache reads are listed per
- * model (Opus 5.5: $0.20/MTok, Sonnet 5.5: $0.10/MTok), cache writes use the
- * 5-minute rate (1.25 × input); 1-hour writes cost `LONG_CACHE_WRITE` × input.
+ * checked on Anthropic's pricing page (2026-10-20, Fable 5.1 2026-11-09); cache
+ * reads are listed per model (Fable 5.1: $0.25/MTok, Opus 5.5: $0.20/MTok,
+ * Sonnet 5.5: $0.10/MTok), cache writes use the 5-minute rate (1.25 × input);
+ * 1-hour writes cost `LONG_CACHE_WRITE` × input.
  * Update this table when prices change: usage records store the computed cost,
  * so history is never repriced.
  */
@@ -134,6 +135,15 @@ export const isAutoModel = (model: string | null | undefined) => model === AUTO_
 export const DEFAULT_CONTEXT_WINDOW = 200_000;
 
 export const MODEL_CATALOG: Record<string, ModelInfo> = {
+  // Its 1M-token window from platform.claude.com/docs/en/about-claude/models/overview, all of it at these prices
+  // (2026-11-09). No tier and no pick for routing or system tasks: "Automático" never chooses it, people do.
+  "claude-fable-5-1": {
+    provider: "anthropic",
+    label: "Claude Fable 5.1",
+    prices: { input: 10000, output: 50000, cacheRead: 250, cacheWrite: 12500 },
+    contextWindow: 1_000_000,
+    serverSideFallback: true,
+  },
   "claude-opus-5-5": {
     provider: "anthropic",
     label: "Claude Opus 5.5",
@@ -164,8 +174,23 @@ export const MODEL_CATALOG: Record<string, ModelInfo> = {
     tier: "small",
   },
   // OpenAI, Standard tier, checked on developers.openai.com/api/docs/pricing (2026-10-20, GPT-6.1 Terra
-  // 2026-10-31); cache writes at the 30-minute rate. Above 272K prompt tokens, input, cached input and cache
-  // writes cost 2×, output 1.5×. Context windows from each model's page (2026-10-26, Terra's 2026-10-31).
+  // 2026-10-31, GPT-6 Astra 2026-11-09); cache writes at the 30-minute rate. Above 272K prompt tokens, input,
+  // cached input and cache writes cost 2×, output 1.5×. Context windows from each model's page (2026-10-26,
+  // Terra's 2026-10-31, Astra's 2026-11-09).
+  // OpenAI's flagship, 5× GPT-6.1 Sol's prices: no tier and no pick for routing or system tasks, so "Automático"
+  // never chooses it, people do.
+  "gpt-6-astra": {
+    provider: "openai",
+    label: "GPT-6 Astra",
+    prices: { input: 10000, output: 50000, cacheRead: 1000, cacheWrite: 12500 },
+    longContext: {
+      aboveInputTokens: 272_000,
+      prices: { input: 20000, output: 75000, cacheRead: 2000, cacheWrite: 25000 },
+    },
+    contextWindow: 1_050_000,
+    serverSideFallback: false,
+    reasoning: true,
+  },
   "gpt-6.1-sol": {
     provider: "openai",
     label: "GPT-6.1 Sol",

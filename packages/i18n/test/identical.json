@@ -266,6 +266,9 @@
       "devices.iphone.mac",
       "devices.iphone.steps.xcode",
       "devices.iphone.connectedDone",
+      "members.passwordLink.label",
+      "openOnPhone.appStore",
+      "openOnPhone.googlePlay",
       "arrival.beta.word",
       "feedback.mark"
     ],
@@ -487,6 +490,8 @@
       "settings.mode.personal",
       "onboarding.personal.name",
       "newAgentAsk.ideas",
+      "openOnPhone.appStore",
+      "openOnPhone.googlePlay",
       "arrival.beta.word",
       "feedback.mark"
     ],
@@ -874,6 +879,8 @@
       "teamTemplates.agents.rui.role",
       "newAgentAsk.idea.money.label",
       "agentSetup.firstRun.team.donePersonal",
+      "openOnPhone.appStore",
+      "openOnPhone.googlePlay",
       "arrival.beta.word",
       "feedback.mark"
     ],
@@ -1277,6 +1284,9 @@
       "settings.mode.team",
       "teamTemplates.agents.leo.role",
       "newAgentAsk.idea.training.label",
+      "members.passwordLink.label",
+      "openOnPhone.appStore",
+      "openOnPhone.googlePlay",
       "arrival.beta.word",
       "feedback.mark"
     ],
@@ -1604,6 +1614,9 @@
       "artifacts.files",
       "share.fileRef",
       "settings.mode.team",
+      "members.passwordLink.label",
+      "openOnPhone.appStore",
+      "openOnPhone.googlePlay",
       "arrival.beta.word",
       "feedback.mark"
     ],
@@ -2153,6 +2166,9 @@
       "teamTemplates.agents.leo.role",
       "newAgentAsk.idea.training.label",
       "agentSetup.firstRun.team.donePersonal",
+      "members.passwordLink.label",
+      "openOnPhone.appStore",
+      "openOnPhone.googlePlay",
       "arrival.beta.word",
       "feedback.mark"
     ],
@@ -2302,6 +2318,8 @@
       "routines.setup.github.type",
       "routines.setup.github.url",
       "routines.setup.sentry.url",
+      "openOnPhone.appStore",
+      "openOnPhone.googlePlay",
       "arrival.beta.word",
       "feedback.mark"
     ],
@@ -2447,6 +2465,8 @@
       "routines.setup.github.type",
       "routines.setup.github.url",
       "routines.setup.sentry.url",
+      "openOnPhone.appStore",
+      "openOnPhone.googlePlay",
       "arrival.beta.word",
       "feedback.mark"
     ],
@@ -2584,6 +2604,8 @@
       "routines.setup.github.type",
       "routines.setup.github.url",
       "routines.setup.sentry.url",
+      "openOnPhone.appStore",
+      "openOnPhone.googlePlay",
       "arrival.beta.word",
       "feedback.mark"
     ],
@@ -2849,6 +2871,8 @@
       "team.sectors.supervisor",
       "agentSetup.how.model",
       "share.fileRef",
+      "openOnPhone.appStore",
+      "openOnPhone.googlePlay",
       "arrival.beta.word",
       "feedback.mark"
     ],
@@ -3012,6 +3036,8 @@
       "routines.setup.sentry.url",
       "browser.live.emulated.tablet",
       "agentSetup.how.model",
+      "openOnPhone.appStore",
+      "openOnPhone.googlePlay",
       "arrival.beta.word",
       "feedback.mark"
     ],
@@ -3273,6 +3299,9 @@
       "agentSetup.how.model",
       "share.agent",
       "agentSetup.firstRun.team.donePersonal",
+      "members.passwordLink.label",
+      "openOnPhone.appStore",
+      "openOnPhone.googlePlay",
       "arrival.beta.word",
       "feedback.mark"
     ],
@@ -3408,6 +3437,8 @@
       "routines.setup.github.type",
       "routines.setup.github.url",
       "routines.setup.sentry.url",
+      "openOnPhone.appStore",
+      "openOnPhone.googlePlay",
       "arrival.beta.word",
       "feedback.mark"
     ]

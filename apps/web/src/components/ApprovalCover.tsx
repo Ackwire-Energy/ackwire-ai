@@ -73,6 +73,8 @@ export function ApprovalsSection() {
   const people = dir.members
     .filter((m) => m.userId !== meId)
     .map((m) => ({ value: m.userId, label: m.name, leading: face(m.userId) }));
+  // A cover goes with its person's membership: one still read after they left shows Ninguém, never an empty box.
+  const coverPerson = cover && people.some((p) => p.value === cover.userId) ? cover.userId : NOBODY;
 
   return (
     <>
@@ -91,7 +93,7 @@ export function ApprovalsSection() {
               label={t("approvalCover.person")}
               control={
                 <Select
-                  value={cover?.userId ?? NOBODY}
+                  value={coverPerson}
                   onValueChange={(userId) => save({ userId: userId === NOBODY ? "" : userId })}
                   aria-label={t("approvalCover.person")}
                   align="end"

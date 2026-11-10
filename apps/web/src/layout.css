@@ -438,6 +438,8 @@ html:not([data-pointer]) .consult-pair__row:focus-visible {
   width: 15px;
   height: 15px;
   margin: 0 1px;
+  /* On the names' capitals' middle, which in this 13px line sits 1px above the row's middle (measured). */
+  translate: 0 -1px;
 }
 .consult-pair__faces {
   flex: none;
@@ -8840,6 +8842,25 @@ html:not([data-pointer]) .newag__addrow:focus-visible {
   font-size: 13.5px;
   text-wrap: pretty;
 }
+/* In a narrow card its line goes under the icon and the name, at the card's width: the icon never owns a column
+   beside a line that wraps. */
+.newag__role--blank {
+  container-type: inline-size;
+}
+@container (max-width: 520px) {
+  .newag__role--blank .newag__role-head {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 8px 12px;
+  }
+  .newag__role--blank .newag__role-name {
+    display: contents;
+  }
+  .newag__role--blank .newag__role-name span {
+    grid-column: 1 / -1;
+  }
+}
 .newag__blank-icon {
   display: grid;
   place-items: center;
@@ -11081,7 +11102,6 @@ html:not([data-pointer]) .agp-subnav__item:focus-visible {
 .agp-savebar__hint {
   display: flex;
   flex: 1 1 auto;
-  align-items: center;
   gap: 8px;
   min-width: 0;
   margin-right: auto;
@@ -11850,7 +11870,6 @@ html[data-menu-overlay] .shell {
 }
 /* An agent's row breathes: the face 12px from its words, a little air between the name and its line. */
 .sidebar:not([data-rail="true"]) :is([data-agent-row] > .sidebar__item, .sidebar__item[data-right-hand]) {
-  padding-block: 7px;
   gap: 12px;
 }
 .sidebar:not([data-rail="true"])

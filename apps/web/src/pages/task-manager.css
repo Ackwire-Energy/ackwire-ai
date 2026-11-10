@@ -436,11 +436,12 @@ html:not([data-pointer]) .tm-more:focus-visible {
   .tm-row--head {
     display: none;
   }
+  /* 12 above the name and below the last line: the name's cell gives up the room it keeps beside the columns. */
   .tm-row,
   .tm-row--ended {
     grid-template-columns: minmax(0, 1fr) auto;
     row-gap: 4px;
-    padding: 8px 0;
+    padding: 12px 0;
   }
   .tm-row[data-look="grouped"] {
     --tm-indent: 26px;
@@ -448,6 +449,7 @@ html:not([data-pointer]) .tm-more:focus-visible {
   .tm-cell--name {
     grid-row: 1;
     grid-column: 1;
+    padding-block: 0;
   }
   .tm-cell--state {
     grid-row: 2;
