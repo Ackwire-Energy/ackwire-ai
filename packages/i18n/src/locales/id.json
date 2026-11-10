@@ -16826,7 +16826,7 @@
     "fileTooLarge": "{{name}} terlalu besar: batasnya {{mb}} MB.",
     "fileTooMany": "Satu masukan memuat hingga {{images}} foto dan satu video.",
     "send": "Kirim",
-    "thanks": "Terkirim. Terima kasih!",
+    "thanks": "Terkirim. Terima kasih.",
     "reply": "Semua dibaca. Balasan, kalau perlu, dikirim ke {{email}}.",
     "another": "Kirim lagi"
   }

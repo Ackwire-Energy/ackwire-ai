@@ -17282,7 +17282,7 @@
     "fileTooLarge": "{{name}} ist zu groß: Das Limit liegt bei {{mb}} MB.",
     "fileTooMany": "Ein Feedback fasst bis zu {{images}} Fotos und ein Video.",
     "send": "Senden",
-    "thanks": "Zugestellt. Danke!",
+    "thanks": "Zugestellt. Danke.",
     "reply": "Alles wird gelesen. Eine Antwort, falls nötig, kommt an {{email}}.",
     "another": "Noch eins senden"
   }

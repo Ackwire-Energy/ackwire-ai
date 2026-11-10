@@ -17212,7 +17212,7 @@
     "fileTooLarge": "{{name}} çok büyük: sınır {{mb}} MB.",
     "fileTooMany": "Bir geri bildirime en fazla {{images}} fotoğraf ve bir video eklenebilir.",
     "send": "Gönder",
-    "thanks": "Ulaştı. Teşekkürler!",
+    "thanks": "Ulaştı. Teşekkürler.",
     "reply": "Hepsi okunur. Gerekirse yanıt {{email}} adresine gelir.",
     "another": "Bir tane daha gönder"
   }

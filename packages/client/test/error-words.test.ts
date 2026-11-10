@@ -335,6 +335,8 @@ test("a provider refused this server's own OAuth app: what's wrong and who fixes
  * hit goes in `KNOWN` instead.
  */
 const PLAIN_LINE = new Set([
+  // The feedback form names the file and its limit itself before any toast (FeedbackDialog).
+  "feedback.file_too_large",
   // A phone that follows its computer's rule shows the computer's, with no control of its own; only the installer
   // meets a bad connect code.
   "device.follows_host",

@@ -85,7 +85,7 @@ describe("feedback", () => {
     await settle(4);
     const sent = state.calls.find((c) => c.method === "system.sendFeedback")?.args[0];
     expect(sent).toMatchObject({ text: "O botão de anexar sumiu", orgId: ORG_ID, app: "web" });
-    expect(screen().getByRole("dialog", { name: "Recado entregue. Obrigado!" })).toBeTruthy();
+    expect(screen().getByRole("dialog", { name: "Recado entregue. Obrigado." })).toBeTruthy();
     await click(screen().getByRole("button", { name: "Enviar outro" }));
     const again = screen().getByRole("dialog", { name: "O que faltou, quebrou ou incomodou?" });
     expect(within(again).getByRole("textbox")).toHaveProperty("value", "");

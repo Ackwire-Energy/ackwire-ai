@@ -17295,7 +17295,7 @@ export const en = {
     fileTooLarge: "{{name}} is too large: the limit is {{mb}} MB.",
     fileTooMany: "One feedback takes up to {{images}} photos and one video.",
     send: "Send",
-    thanks: "Delivered. Thank you!",
+    thanks: "Delivered. Thank you.",
     reply: "Everything is read. An answer, if one is needed, comes to {{email}}.",
     another: "Send another",
   },
