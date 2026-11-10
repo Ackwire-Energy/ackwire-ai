@@ -57,9 +57,8 @@ judgment marked it done.
    and the team's lessons come only when they match. A use counts, and raises relevance, only when an item matched or
    was opened with `expand`; what is sent anyway only stays fresh, and what a person said no longer decays away.
 5. **Matching across languages.** Each item's English key is indexed with it (`keywords`, on the title's hidden
-   second line, never shown) and embedded with it. Embeddings stay env-gated: the Cloud turns them on with
-   `EMBEDDINGS_PROVIDER=voyage` and `VOYAGE_API_KEY`, then `search.reindex`; self-host stays on full text unless
-   configured.
+   second line, never shown) and embedded with it. Embeddings stay env-gated (the addendum below: any
+   OpenAI-compatible server, with the reindex queued at boot); self-host stays on full text unless configured.
 6. **Proven how-tos become skills with one click.** The weekly card (ADR 0137 §9) offers its person the how-tos of
    their own agents reused at least three times that nobody vouched for: "Ada aprendeu: … Usado 3×. Virar skill?".
    It confirms the how-to; the day's pass (`promoteHowTos`) makes it the agent's skill.
