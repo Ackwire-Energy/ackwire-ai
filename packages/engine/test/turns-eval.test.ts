@@ -105,10 +105,11 @@ const size = (r: ModelRequest) =>
  * with `request_permission` down to one reason (`why`) and the task board on by default, 45,803 with `ask_user`'s
  * `person` and the rule that what is said in a DM stays there, 45,216 with the `ask_user` rule leaving to its
  * description what that says already, 45,437 with each choice question's written answer (`ask_choices`, its
- * other words tightened for it), and 45,482 with feedback named in the rarer tools' label (ADR 0160 §11); the ceiling
+ * other words tightened for it), 45,482 with feedback named in the rarer tools' label (ADR 0160 §11), and 45,804 with
+ * team memory (`remember`'s `for: "team"`) and a result claimed only when a call made it (ADR 0167); the ceiling
  * leaves a little room. Where each workspace gets its own computer, `workspaceComputerText` adds its 441 to that.
  */
-const OI_CEILING_CHARS = 46_000;
+const OI_CEILING_CHARS = 46_300;
 
 test("a DM 'oi' stays under the size ceiling", async () => {
   const [request] = await play(TURNS.find((t) => t.id === "greet-dm") as ScriptedTurn);

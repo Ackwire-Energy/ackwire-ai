@@ -591,7 +591,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
     {
       name: "remember",
       description:
-        'Save, on your own, what you learn: a person correcting you or saying how they want things done (even in passing), a lasting fact about the company or its people. How its systems work (where code lives, how a tool behaves) is a note for yourself. Cite what grounds it (basis: person_said when a person here said it, found when you found it), write it as a fact ("Ana wants reports in Portuguese"), not as an order to yourself, and skip one-off requests. A person telling you not to do something again, or to always do it another way ("don\'t forward this to other agents", "não faça mais isso"), is a preference: save it in your own words, saying what to do instead, with everywhere: true to follow it everywhere (word it without private details from this one). A person\'s lasting rule for your work (no need to ask before each send, where to send things): kind rule, kept under their name everywhere, routines too. When people ask all of you to keep something ("pessoal, lembrem…", "everyone, remember…"), save it once with for: "team" (every agent reads it; everywhere: false keeps it to this conversation); never ask teammates to save copies. Never credentials or where secrets are kept.',
+        'Save, on your own, what you learn: a person correcting you or saying how they want things done (even in passing), a lasting fact about the company or its people. How its systems work (where code lives, how a tool behaves) is a note for yourself. Cite what grounds it (basis: person_said when a person here said it, found when you found it), write it as a fact ("Ana wants reports in Portuguese"), not as an order to yourself, and skip one-off requests. A person telling you not to do something again, or to always do it another way ("don\'t forward this to other agents", "não faça mais isso"), is a preference: save it in your own words, saying what to do instead, with everywhere: true to follow it everywhere (word it without private details from this one). A person\'s lasting rule for your work (no need to ask before each send, where to send things): kind rule, kept under their name everywhere, routines too. Asked to keep something for all of you ("everyone, remember…", "pessoal, lembrem…"): save it once with for: "team" (everywhere: false keeps it to this conversation); never ask other agents for copies. Never credentials or where secrets are kept.',
       scope: "memory:write",
       inputSchema: {
         type: "object",
@@ -1385,16 +1385,7 @@ export async function retrieveForRun(
   },
 ): Promise<{ text: string; itemIds: string[]; matchedIds: string[] }> {
   const { db } = deps;
-  // An org with no memory yet (most early ones) costs one cached lookup, not five queries.
-  const hasAny = (await caches.contextPresence.getOrLoad(`${input.orgId}:`, async () => {
-    const [row] = await db
-      .select({ id: contextItems.id })
-      .from(contextItems)
-      .where(and(eq(contextItems.orgId, input.orgId), eq(contextItems.status, "active")))
-      .limit(1);
-    return Boolean(row);
-  })) as boolean;
-  if (!hasAny) return { text: "", itemIds: [], matchedIds: [] };
+  if (!(await orgHasMemory(db, input.orgId))) return { text: "", itemIds: [], matchedIds: [] };
   const allowed = await injectableChannels(db, input.orgId, input.agentId, input.channelId);
   const people = [...new Set(input.personIds ?? [])];
   // In the agents' DM nobody writes in their own name: the one person a run there is for is the one behind it.
@@ -1549,12 +1540,24 @@ export async function retrieveForRun(
   return { text: lines.join("\n"), itemIds: [...seen], matchedIds: [...seen].filter((id) => matched.has(id)) };
 }
 
+/** An org with no memory yet (most early ones) costs every run one cached lookup, not memory's queries. */
+const orgHasMemory = async (db: Database, orgId: string) =>
+  (await caches.contextPresence.getOrLoad(`${orgId}:`, async () => {
+    const [row] = await db
+      .select({ id: contextItems.id })
+      .from(contextItems)
+      .where(and(eq(contextItems.orgId, orgId), eq(contextItems.status, "active")))
+      .limit(1);
+    return Boolean(row);
+  })) as boolean;
+
 /**
  * "# Team memory" for every run's cached prompt, under the org's context (ADR 0167): the team's rules and preferences
  * for the whole workspace, in their givers' words with who and when, the oldest first so a new one only adds to the
  * end; past `TEAM_PROMPT_CHARS` the rest by title. "" when the team keeps none.
  */
 export async function teamMemoryForPrompt(db: Database, orgId: string): Promise<string> {
+  if (!(await orgHasMemory(db, orgId))) return "";
   const items = await db
     .select()
     .from(contextItems)
