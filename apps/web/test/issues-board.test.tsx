@@ -3,7 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { IssuesView } from "@agenteschat/client";
+import type { Issue, IssuesView } from "@agenteschat/client";
 import { ISSUES_VIEW_DEFAULT } from "@agenteschat/client/lib/issues-view";
 import { box, place } from "@agenteschat/ui/testing";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
@@ -14,8 +14,7 @@ afterEach(() => cleanup());
 
 const click = (el: Element) => act(async () => fireEvent.click(el));
 const view = (over: Partial<IssuesView>): IssuesView => ({ ...structuredClone(ISSUES_VIEW_DEFAULT), ...over });
-const go = async (state = seedState()) => {
-  const api = createFakeApi(state);
+const go = async (state = seedState(), api = createFakeApi(state)) => {
   const r = await renderApp(`/org/${ORG_ID}/issues`, { api });
   await settle(8);
   return { ...r, api, state };
@@ -82,7 +81,7 @@ describe("Tarefas: how I left it", () => {
     // Grouped by priority in the list, without the due dates.
     expect(screen().getByRole("region", { name: "Alta" }).textContent).toContain("#131");
     expect(screen().getByRole("region", { name: "Normal" }).textContent).toContain("#132");
-    expect(document.querySelector(".issue-due")).toBeNull();
+    expect(document.querySelector('.ac-factline__fact[title="Prazo"]')).toBeNull();
     await act(async () =>
       fireEvent.change(screen().getByRole("searchbox", { name: "Buscar tarefas" }), { target: { value: "#128" } }),
     );
@@ -118,15 +117,172 @@ describe("Tarefas: how I left it", () => {
 });
 
 describe("Tarefas: a card", () => {
-  test("'#N' and the title on one row, its fields under it", async () => {
+  /** The fake's tasks with some changed (a work state, a conversation, labels), as the server would send them. */
+  const withTasks = (change: Record<number, Partial<Issue>>, state = seedState()) => {
+    const api = createFakeApi(state);
+    const list = api.issues.list;
+    api.issues.list = async (orgId, filters) =>
+      (await list(orgId, filters)).map((i) => (change[i.number] ? { ...i, ...change[i.number] } : i));
+    return api;
+  };
+  const facts = (card: HTMLElement) =>
+    [...card.querySelectorAll(".issue-card__facts > .ac-factline__fact")].map((f) => f.textContent);
+  const work = (state: NonNullable<Issue["work"]>["state"]): Issue["work"] => ({
+    agentId: ADA_ID,
+    runId: "run-1",
+    state,
+    since: new Date(Date.now() - 2 * 86_400_000).toISOString(),
+    steps: [],
+  });
+
+  test("three parts on its left edge: the title whole, one line of facts starting with its number, who has it", async () => {
     await go();
     const card = cardOf(128);
-    const title = card.querySelector(".issue-card__title") as HTMLElement;
-    expect(title.querySelector(".issue-card__number")?.textContent).toBe("#128");
-    expect(title.textContent).toBe("#128 Login devolve 401 depois do deploy das 9h");
-    // The fields after the title, the label without its old dot.
-    expect(title.nextElementSibling?.classList.contains("issue-card__top")).toBe(true);
-    expect(card.querySelector(".issue-card__top")?.textContent).toMatch(/^bug/);
+    const parts = [...card.children].filter((c) => !(c as HTMLElement).hidden).map((c) => c.className.split(" ")[0]);
+    expect(parts).toEqual(["issue-card__title", "ac-factline", "issue-card__who"]);
+    // The title is the title: no number in front of it, never cut.
+    expect((card.querySelector(".issue-card__title") as HTMLElement).textContent).toBe(
+      "Login devolve 401 depois do deploy das 9h",
+    );
+    expect(facts(card)).toEqual(["#128", "bug", "Alta", "hoje", "PR #42"]);
+    // The label is the line's one pill; today's date in the attention tone.
+    expect(card.querySelector('.ac-factline__fact[data-tone="label"]')?.textContent).toBe("bug");
+    expect(card.querySelector('.ac-factline__fact[title="Prazo"]')?.getAttribute("data-tone")).toBe("warn");
+    // Who has it: the face as the first word, the name.
+    const who = card.querySelector(".issue-card__who") as HTMLElement;
+    expect(who.querySelector(".ac-who > .ac-avatar")).toBeTruthy();
+    expect(who.querySelector(".ac-who > b")?.textContent).toBe("Ada");
+    expect(who.querySelector(".issue-card__state")).toBeNull();
+  });
+
+  test("a second label is +1 after the pill; the criteria say how many are done, green when all are", async () => {
+    await go();
+    expect(facts(cardOf(131))).toEqual(["#131", "produto", "+1", "Alta", expect.any(String), "0/4"]);
+    expect(cardOf(131).querySelector('.ac-factline__fact[title="agendamento"]')?.textContent).toBe("+1");
+    expect(cardOf(129).querySelector('.ac-factline__fact[title="1 de 2 critérios de aceite"]')?.textContent).toBe(
+      "1/2",
+    );
+  });
+
+  test("one state from one place: an agent's question wins over a turn live in its conversation", async () => {
+    const conversation = {
+      channelId: "task_c",
+      rootId: "root_r",
+      count: 22,
+      lastAt: new Date().toISOString(),
+      participants: [],
+      working: true,
+    };
+    await go(undefined, withTasks({ 129: { work: work("waiting_input"), conversation } }));
+    const card = cardOf(129);
+    expect(card.querySelector(".issue-card__state")?.textContent).toBe("Pergunta algo");
+    expect(card.textContent).not.toContain("Trabalhando");
+    expect(card.getAttribute("aria-label")).toBe("#129 Timeout no agendamento em horários de pico, Pergunta algo");
+    // Who has it, for a screen reader: the link's description, before how to move it.
+    const [whoId, helpId] = card.getAttribute("aria-describedby")?.split(" ") ?? [];
+    expect(document.getElementById(whoId ?? "")?.textContent).toBe("Responsável: Ada");
+    expect(helpId).toBeTruthy();
+    // Waiting on a person: the approval card's sky at its top, and no sweep, which is for an agent at work.
+    expect(card.firstElementChild?.className).toBe("ac-approval__sky");
+    expect(card.querySelector(".ac-work-sweep")).toBeNull();
+    expect(facts(card)).toContain("22");
+  });
+
+  test("an agent at work: its face moves, Trabalhando in its color, the sweep along the bottom, no sky", async () => {
+    await go();
+    const card = cardOf(129);
+    expect(card.querySelector(".issue-card__state")?.getAttribute("data-tone")).toBe("agent");
+    expect(card.querySelector(".issue-card__state")?.textContent).toBe("Trabalhando");
+    // Its mark is the kit's inline glyph, on the capitals of the words it sits in.
+    expect(card.querySelector(".issue-card__state > svg")?.getAttribute("class")).toBe("ac-icon ac-icon--inline");
+    expect(card.querySelector(".ac-work-sweep")).toBeTruthy();
+    expect(card.querySelector(".ac-approval__sky")).toBeNull();
+  });
+
+  test("stopped for two days, and approval asked", async () => {
+    await go(undefined, withTasks({ 129: { work: work("stalled") }, 128: { work: work("waiting_approval") } }));
+    expect(cardOf(129).querySelector(".issue-card__state")?.textContent).toBe("Parado há 2 dias");
+    expect(cardOf(129).querySelector(".ac-approval__sky")).toBeNull();
+    expect(cardOf(128).querySelector(".issue-card__state")?.textContent).toBe("Pede aprovação");
+    expect(cardOf(128).querySelector(".ac-approval__sky")).toBeTruthy();
+  });
+
+  test("each fact goes with its toggle in Exibição; the number and the conversation always show", async () => {
+    const fields = { assignee: false, priority: false, due: false, criteria: false, pullRequest: false, label: false };
+    const state = seedState({ issuesView: view({ fields }) });
+    await go(state, withTasks({ 129: { work: work("waiting_input") } }, state));
+    expect(facts(cardOf(128))).toEqual(["#128"]);
+    expect(cardOf(128).querySelector(".issue-card__who")).toBeNull();
+    // Responsável off hides who has it, never what the task asks of the person.
+    expect(cardOf(129).querySelector(".issue-card__who .ac-who")).toBeNull();
+    expect(cardOf(129).querySelector(".issue-card__state")?.textContent).toBe("Pergunta algo");
+  });
+
+  test("nobody on it and nothing going on: no third part, no placeholder", async () => {
+    await go(undefined, withTasks({ 132: { assignee: null } }));
+    expect(cardOf(132).querySelector(".issue-card__who")).toBeNull();
+    expect(cardOf(132).textContent).not.toContain("Sem responsável");
+    expect(cardOf(131).querySelector(".issue-card__who .ac-who > b")?.textContent).toBe("João");
+  });
+
+  test("the card's CSS: the title wraps whole, a long name wraps under the face, the state moves whole", async () => {
+    const css = await Bun.file(new URL("../src/pages/issues.css", import.meta.url).pathname).text();
+    const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+    expect(rule(".issue-card__title")).toContain("overflow-wrap: anywhere");
+    expect(rule(".issue-card__title")).not.toContain("line-clamp");
+    expect(rule(".issue-card__who")).toContain("--who-face: 24px");
+    expect(rule(".issue-card__who")).toContain("display: block");
+    // The state moves whole to the next line, and one longer than the card wraps inside itself.
+    expect(rule(".issue-card__state")).toContain("display: inline-block");
+    expect(rule(".issue-card__state")).toContain("max-width: 100%");
+    expect(rule(".issue-card__state")).not.toContain("white-space: nowrap");
+    expect(rule(".issue-card > .ac-approval__sky")).toContain("height: 64px");
+    // Fades in, never pops (none under reduced motion).
+    expect(css).toMatch(/@starting-style \{\s*\.issue-card > \.ac-approval__sky \{\s*opacity: 0;/);
+  });
+
+  test("while the tasks load, the board's columns wait in its own frame and sideways scroller", async () => {
+    const api = createFakeApi(seedState());
+    api.issues.list = () => new Promise(() => {});
+    await go(undefined, api);
+    const loading = document.querySelector(".issues-boardframe .issues-boardwrap > .issues-board") as HTMLElement;
+    expect(loading.querySelectorAll(".issues-col")).toHaveLength(4);
+    expect(loading.querySelector(".loading-cards")).toBeTruthy();
+  });
+});
+
+describe("Tarefas: + in a column's head", () => {
+  test("A fazer's head has + left of its ⋯, 8 apart; it opens Nova tarefa in that column; no button under the cards", async () => {
+    await go();
+    const head = column("A fazer").querySelector(".issues-col__head") as HTMLElement;
+    const buttons = [...head.querySelectorAll("button")];
+    expect(buttons.map((b) => b.getAttribute("aria-label"))).toEqual([
+      "Nova tarefa em A fazer",
+      "Opções da coluna A fazer",
+    ]);
+    expect(column("A fazer").querySelector(".issues-col__add")).toBeNull();
+    expect(within(column("A fazer")).queryByText("Nova tarefa")).toBeNull();
+    // Only A fazer's columns take one.
+    expect(within(column("Em andamento")).queryByRole("button", { name: /^Nova tarefa/ })).toBeNull();
+    await click(buttons[0] as HTMLElement);
+    await settle(3);
+    expect(screen().getByRole("dialog", { name: "Nova tarefa" })).toBeTruthy();
+    const css = await Bun.file(new URL("../src/pages/issues.css", import.meta.url).pathname).text();
+    expect(css.split("\n.issues-col__head {")[1]?.split("}")[0]).toContain("gap: 8px");
+  });
+
+  test("a custom column of A fazer gets its own +; who may not create tasks sees none", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    await api.issues.addColumn(ORG_ID, { name: "Benachrichtigungseinstellungen", stage: "todo" });
+    await go(state, api);
+    expect(screen().getByRole("button", { name: "Nova tarefa em Benachrichtigungseinstellungen" })).toBeTruthy();
+    cleanup();
+    const viewer = seedState();
+    const org = viewer.me?.organizations[0];
+    if (org) org.permissions = ["read"];
+    await go(viewer);
+    expect(screen().queryByRole("button", { name: /^Nova tarefa em/ })).toBeNull();
   });
 });
 
@@ -164,8 +320,8 @@ describe("Tarefas: moving a card", () => {
     await drop(900, 300);
     expect((await api.issues.get(ORG_ID, 130)).assignee).toBeNull();
     expect(toast()).toContain("#130 ficou sem responsável.");
-    // The card without anyone: an empty face before the words.
-    expect(cardOf(130).querySelector(".issue-nobody")).toBeTruthy();
+    // The card without anyone: no third part, no placeholder.
+    expect(cardOf(130).querySelector(".issue-card__who")).toBeNull();
   });
 
   test("a press and a release without moving is a click: the task opens", async () => {

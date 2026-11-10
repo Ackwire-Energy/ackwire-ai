@@ -495,6 +495,7 @@
       "feedback.mark"
     ],
     "fr": [
+      "calendar.moreRuns",
       "devices.cpus",
       "devices.system.android",
       "devices.system.ios",
@@ -582,9 +583,7 @@
       "calendar.filter.routine",
       "calendar.form.description",
       "calendar.form.participants",
-      "calendar.kind.routine",
       "calendar.runAria",
-      "calendar.runsOn",
       "channel.emoji",
       "channel.membersAgents",
       "channel.messages",
@@ -983,7 +982,6 @@
       "browser.profiles.name",
       "browser.title",
       "browser.watch.live",
-      "calendar.kind.routine",
       "calendar.runAria",
       "calendar.views.agenda",
       "channel.emoji",
@@ -1034,7 +1032,6 @@
       "issues.columns.createdDetail",
       "issues.columns.name",
       "issues.display.field.label",
-      "issues.labels",
       "issues.moved",
       "issues.pr",
       "issues.priority.normal",
@@ -1289,6 +1286,7 @@
       "feedback.mark"
     ],
     "it": [
+      "calendar.moreRuns",
       "devices.iphone.steps.account",
       "devices.cpus",
       "devices.memory",
@@ -1375,7 +1373,6 @@
       "browser.live.secure",
       "browser.title",
       "browser.watch.no",
-      "calendar.kind.routine",
       "calendar.runAria",
       "calendar.views.agenda",
       "channel.emoji",
@@ -1618,6 +1615,7 @@
       "feedback.mark"
     ],
     "nl": [
+      "calendar.moreRuns",
       "devices.iphone.steps.account",
       "devices.filter.computers",
       "devices.cpus",
@@ -1757,9 +1755,7 @@
       "calendar.filter.agent",
       "calendar.filter.routine",
       "calendar.filters",
-      "calendar.kind.routine",
       "calendar.runAria",
-      "calendar.runsOn",
       "calendar.views.week",
       "channel.emoji",
       "channel.membersAgents",
@@ -1826,7 +1822,6 @@
       "issues.columns.createdDetail",
       "issues.display.field.label",
       "issues.display.field.pullRequest",
-      "issues.labels",
       "issues.moved",
       "issues.pr",
       "issues.statusLabel",

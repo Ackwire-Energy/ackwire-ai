@@ -2,9 +2,9 @@ import type { Artifact, ArtifactContent, ArtifactFileContent, ArtifactRef } from
 import { useArtifact } from "@agenteschat/client";
 import { documentStart, KIND_ICON, parseDelimited, patchCounts } from "@agenteschat/client/lib/artifacts";
 import { fileIcon, formatBytes, previewKind } from "@agenteschat/client/lib/files";
-import { Button, Icon, type IconName, Menu } from "@agenteschat/ui";
+import { Button, Icon, type IconName, Menu, Tip } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
-import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from "react";
+import { type CSSProperties, type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ChoicesCard } from "@/components/blocks/ChoicesCard";
 import { LiveBlockCard } from "@/components/blocks/LiveBlock";
@@ -30,10 +30,11 @@ const COVER_CHARS = 1200;
 
 /**
  * An attachment on a message as a tile of one size, so several sit side by side: what it holds drawn small on top
- * (its cover: the start of a document, a table's first rows, a change's files, a diagram, a page, a picture) and its
- * name with its kind and size under it. A click opens the viewer; Download and More show over the cover on hover,
- * and the desktop app's right click has the same actions. A picture alone on its message shows whole, with no name
- * under it (CSS: `.artifact-cards > :only-child`); a video is its player.
+ * (its cover: the start of a document, a table's first rows, a change's files, a diagram, a page) and its name with
+ * its kind and size under it. A click opens the viewer; Download and More show over the cover on hover, and the
+ * desktop app's right click has the same actions. A picture is only the picture, as is a video its player: their name
+ * and size are in their tip and in the viewer's header. A picture alone on its message shows whole (CSS:
+ * `.artifact-cards > :only-child`).
  */
 export function ArtifactCard({ artifact: ref }: { artifact: ArtifactRef }) {
   const { t, i18n } = useTranslation();
@@ -123,6 +124,7 @@ export function ArtifactCard({ artifact: ref }: { artifact: ArtifactRef }) {
           artifactId={a.id}
           version={a.shownVersion}
           onOpen={open}
+          tip={`${a.title} · ${meta}`}
           actions={<TileActions title={a.title} actions={actions} onDownload={save} />}
           // A video this browser can't play is a file's tile.
           fallback={
@@ -184,7 +186,7 @@ interface TileProps {
   icon: IconName;
   meta: string;
   cover: ReactNode;
-  /** A picture: alone on its message it shows whole, with no name under it. */
+  /** A picture: only the picture, its name and size in its tip; alone on its message it shows whole. */
   media?: boolean;
   actions: () => MenuEntry[];
   onOpen: () => void;
@@ -193,6 +195,17 @@ interface TileProps {
 
 function Tile({ artifact: a, icon, meta, cover, media, actions, onOpen, onDownload }: TileProps) {
   const { t } = useTranslation();
+  const sizeId = useId();
+  // The whole tile opens the viewer; the actions sit above it.
+  const open = (
+    <button
+      type="button"
+      className="artifact-tile__open"
+      aria-label={t("artifacts.open", { title: a.title })}
+      aria-describedby={media ? sizeId : undefined}
+      onClick={onOpen}
+    />
+  );
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: right click only; the open button inside is the accessible way
     <div
@@ -201,23 +214,26 @@ function Tile({ artifact: a, icon, meta, cover, media, actions, onOpen, onDownlo
       data-media={media || undefined}
       onContextMenu={contextMenuHandler(() => [{ kind: "header", label: a.title }, ...actions()])}
     >
-      {/* The whole tile opens the viewer (its ::after covers the tile); the actions sit above it. */}
-      <button
-        type="button"
-        className="artifact-tile__open"
-        aria-label={t("artifacts.open", { title: a.title })}
-        onClick={onOpen}
-      />
-      <div className="artifact-tile__cover">{cover}</div>
-      <div className="artifact-tile__foot" aria-hidden="true">
-        <Icon name={icon} size={16} />
-        <span className="artifact-tile__name">
-          <span className="artifact-tile__title" title={a.title}>
-            {a.title}
+      {media ? (
+        <Tip className="artifact-tile__tip" tip={`${a.title} · ${meta}`} look="ac-msg__tip">
+          {open}
+          <span id={sizeId} hidden>
+            {meta}
           </span>
-          <span className="artifact-tile__meta tabular">{meta}</span>
-        </span>
-      </div>
+        </Tip>
+      ) : (
+        open
+      )}
+      <div className="artifact-tile__cover">{cover}</div>
+      {!media && (
+        <div className="artifact-tile__foot ac-iconline" aria-hidden="true">
+          <Icon name={icon} size={16} />
+          <span className="artifact-tile__name">
+            <span className="artifact-tile__title">{a.title}</span>
+            <span className="artifact-tile__meta tabular">{meta}</span>
+          </span>
+        </div>
+      )}
       <span className="artifact-tile__acts">
         <TileActions title={a.title} actions={actions} onDownload={onDownload} />
       </span>

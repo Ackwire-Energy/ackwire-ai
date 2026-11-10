@@ -99,6 +99,13 @@ describe("geometry check", () => {
       "countfill",
     ])
       expect(SELF_TESTED).toContain(rule);
+    // A calendar item never covers another: what meets sits beside it.
+    expect(SELF_TESTED).toContain("calstack");
+    // A task card's line of facts wraps between facts, never inside one.
+    for (const twin of ["bad-factwrap--line", "good-factwrap--line"]) expect(fixture).toContain(twin);
+    // A title in a row that wraps a word a line is squeezed; one long address wrapping its full lines is not.
+    for (const twin of ["bad-wordwrap--row", "good-wordwrap--url"]) expect(fixture).toContain(twin);
+    expect(rules).toContain('".ac-facts__value, .ac-factline__fact"');
     for (const rule of SELF_TESTED) {
       expect(fixture).toContain(`bad-${rule}`);
       expect(fixture).toContain(`good-${rule}`);

@@ -171,6 +171,15 @@ export function relativeTime(t: TFunction, locale: string, iso: string, now = ne
   return formatShortDate(locale, iso);
 }
 
+/** How long since: "há 12 min", "há 3 h", "há 2 dias"; "agora" under a minute (a computer offline, a task stopped). */
+export function timeAgo(t: TFunction, iso: string, now = Date.now()): string {
+  const diff = now - Date.parse(iso);
+  if (!Number.isFinite(diff) || diff < 60_000) return t("common.now");
+  if (diff < 3_600_000) return t("format.minutesAgo", { count: Math.floor(diff / 60_000) });
+  if (diff < 86_400_000) return t("format.hoursAgo", { count: Math.floor(diff / 3_600_000) });
+  return t("format.daysAgo", { count: Math.floor(diff / 86_400_000) });
+}
+
 /** "hoje 10:44", "ontem 18:02", "12 out" (run history, decisions). */
 export function whenAt(t: TFunction, locale: string, iso: string, now = new Date()) {
   const days = daysBetween(iso, now);
@@ -250,10 +259,17 @@ export const endOfDay = (ymd: string) => {
 export const toYmd = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
-/** Due date: "hoje", "24 out". */
+/** Due date: "hoje", "amanhã", "24 out". */
 export function dueLabel(_t: TFunction, locale: string, ymd: string, now = new Date()) {
   const iso = dateOnly(ymd).toISOString();
-  return daysBetween(iso, now) === 0 ? relativeDay(locale, 0) : formatShortDate(locale, iso);
+  const days = daysBetween(iso, now);
+  return days === 0 || days === -1 ? relativeDay(locale, days === 0 ? 0 : 1) : formatShortDate(locale, iso);
+}
+
+/** How close a due date is: past (`late`), today or tomorrow (`soon`), else null (an open task's date in its tone). */
+export function dueTone(ymd: string, now = new Date()): "late" | "soon" | null {
+  const days = daysBetween(dateOnly(ymd).toISOString(), now);
+  return days > 0 ? "late" : days >= -1 ? "soon" : null;
 }
 
 /**

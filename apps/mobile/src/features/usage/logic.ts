@@ -22,7 +22,3 @@ export function peopleMonthLine(
       })
     : t("peopleUsage.sub", { month, count: data.people.length, amount: total });
 }
-
-/** A person's month on Uso por pessoa: on plans only an estimate at the API's price, which the month's line names. */
-export const personAmount = (t: TFunction, locale: string, plansOnly: boolean, usd: number) =>
-  plansOnly ? t("peopleUsage.meter.approx", { amount: formatUsd(locale, usd) }) : formatUsd(locale, usd);

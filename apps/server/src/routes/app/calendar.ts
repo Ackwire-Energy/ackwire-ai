@@ -144,7 +144,13 @@ export function calendarRoutes(deps: AppDeps) {
               }),
             ),
             deadlines: z.array(
-              z.object({ issueId: z.uuid(), number: z.number(), title: z.string(), date: z.string() }),
+              z.object({
+                issueId: z.uuid(),
+                number: z.number(),
+                title: z.string(),
+                date: z.string(),
+                assignee: Actor.nullable().openapi({ description: "Who has the task; null: nobody." }),
+              }),
             ),
             proposals: z.array(Proposal),
           }),

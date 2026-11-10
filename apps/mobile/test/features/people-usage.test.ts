@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { waitingCardOf } from "@agenteschat/client/lib/notifications";
-import { usageLimitLine } from "@agenteschat/client/lib/person-usage";
+import { personAmount, usageLimitLine } from "@agenteschat/client/lib/person-usage";
 import { notificationHref } from "../../src/features/links/logic";
-import { peopleMonthLine, personAmount } from "../../src/features/usage/logic";
+import { peopleMonthLine } from "../../src/features/usage/logic";
 import { notification, translator } from "./fixtures";
 
 // The words as keys with their values, so the line's pieces show without the strings loaded.
@@ -68,5 +70,12 @@ describe("Uso por pessoa's amounts on plans (#24)", () => {
       "Novembro · 2 pessoas · US$ 12,51 de IA",
     );
     expect(plain(personAmount(pt, "pt-BR", false, 3.1))).toBe("US$ 3,10");
+  });
+
+  test("with plans and API keys in one month, each person's amount is marked by their own use, the ⓘ by anyone's", () => {
+    const list = readFileSync(join(import.meta.dir, "../../src/features/usage/people.tsx"), "utf8");
+    expect(list).toContain("personAmount(t, i18n.language, p.estimated, p.monthUsd)");
+    expect(list).toContain("data.people.some((p) => p.estimated) ? (");
+    expect(list).not.toContain("data.plansOnly");
   });
 });

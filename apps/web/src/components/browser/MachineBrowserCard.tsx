@@ -23,7 +23,7 @@ import { useTranslation } from "react-i18next";
 import { useToast } from "@/lib/toast";
 import { useStreams } from "@/realtime/context";
 import { AgentAvatar } from "../AgentAvatar";
-import { CommandBlock } from "../Machines";
+import { CommandBlock } from "../machine-bits";
 import { useOrg } from "../org-context";
 import { OpenPrefsButton, useIsThisMac } from "../ThisMac";
 import { BrowserCard } from "./BrowserCard";

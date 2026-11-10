@@ -1,5 +1,5 @@
 import type { DmTarget } from "@agenteschat/client";
-import { keys } from "@agenteschat/client";
+import { addDm } from "@agenteschat/client";
 import { audienceNotice, canTalk, seesDetails } from "@agenteschat/client/lib/audience";
 import { greetingSuggestions } from "@agenteschat/client/lib/chat";
 import { isGone } from "@agenteschat/client/lib/errors";
@@ -41,11 +41,8 @@ export function DmPage({ target, focusMessageId }: { target: DmTarget; focusMess
     queryKey: ["org", org.id, "dm", kind, id],
     queryFn: async () => {
       const res = await api.dms.open(org.id, target);
-      // A DM opened for the first time is in the DM list before its header shows: its search holds to it.
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: keys.channels(org.id) }),
-        qc.invalidateQueries({ queryKey: keys.dms(org.id) }),
-      ]);
+      // A DM opened for the first time is in the DM list from its own answer: its search holds to it.
+      if (res.dm) addDm(qc, org.id, res.dm);
       return res;
     },
     staleTime: Number.POSITIVE_INFINITY,

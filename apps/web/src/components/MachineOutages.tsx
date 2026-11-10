@@ -2,13 +2,12 @@ import type { ComputerBrain, MachineOutage, MachineOutages, OutageTarget } from 
 import { useMachineOutages, useMachines, useMoveAgents } from "@agenteschat/client";
 import { awayText } from "@agenteschat/client/lib/computer-queue";
 import { errorText } from "@agenteschat/client/lib/errors";
-import { joinNames } from "@agenteschat/client/lib/format";
+import { joinNames, timeAgo } from "@agenteschat/client/lib/format";
 import { computerKind } from "@agenteschat/client/lib/machines";
 import {
   type BrainUnavailable,
   brainName,
   brainsOf,
-  offlineFor,
   outageKey,
   outageOf,
   targetBlock,
@@ -126,10 +125,10 @@ function OutageNotice({
       <span className="outage__text">
         <b>
           {here
-            ? t("machines.thisMac.outageTitle", { ago: offlineFor(t, o.offlineSince, now) })
+            ? t("machines.thisMac.outageTitle", { ago: timeAgo(t, o.offlineSince, now) })
             : cloud
-              ? t("outage.titleCloud", { name: o.name, ago: offlineFor(t, o.offlineSince, now) })
-              : t("outage.title", { name: o.name, ago: offlineFor(t, o.offlineSince, now) })}
+              ? t("outage.titleCloud", { name: o.name, ago: timeAgo(t, o.offlineSince, now) })
+              : t("outage.title", { name: o.name, ago: timeAgo(t, o.offlineSince, now) })}
         </b>
         <span>{sub}</span>
       </span>

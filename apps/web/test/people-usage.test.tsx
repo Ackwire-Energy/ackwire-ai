@@ -99,6 +99,7 @@ const joaoMonth = (money: boolean): PersonUsage => ({
   roleIds: [],
   owner: false,
   money,
+  estimated: false,
   renewsAt: NOW,
   since: NOW,
   until: NOW,
@@ -156,6 +157,62 @@ describe("Orçamento e uso › Pessoas", () => {
     expect(text(drawer)).toContain("Conversa privada com Atlas");
     expect(text(drawer)).toContain("6 pedidos");
     expect(within(drawer).getByRole("button", { name: /^Aumentar para US\$\s45,00 este mês$/ })).toBeTruthy();
+  });
+
+  test("plans and API keys in one month: each amount is an estimate by its own use, the column's ⓘ says so (#24)", async () => {
+    const state = seedState();
+    const [joao, walter] = people.people as [PeopleUsage["people"][number], PeopleUsage["people"][number]];
+    state.peopleUsage = {
+      ...people,
+      people: [
+        { ...joao, estimated: true },
+        // The worst case: a long name, an amount in the millions and runs in the thousands, on the API.
+        {
+          ...walter,
+          name: "Aleksandra Wiśniewska-Kowalczyk",
+          runs: 1284,
+          costUsd: 12_345_678.9,
+          monthUsd: 12_345_678.9,
+        },
+      ],
+    };
+    state.personUsage = { "u-joao": { ...joaoMonth(true), estimated: true } };
+    await renderApp(`/org/${ORG_ID}/settings/usage`, { api: createFakeApi(state) });
+    await settle(5);
+    await tab("Pessoas");
+    const table = screen().getByRole("table");
+    const row = (name: string) => within(table).getByText(name).closest("tr") as HTMLElement;
+    expect(text(row("João"))).toContain("≈ US$ 30,00");
+    const aleksandra = row("Aleksandra Wiśniewska-Kowalczyk");
+    expect(text(aleksandra)).toContain("US$ 12.345.678,90");
+    expect(text(aleksandra)).toContain("1.284");
+    expect(text(aleksandra)).not.toContain("≈");
+    const head = within(table).getByRole("columnheader", { name: /Uso do mês/ });
+    const hint = within(head).getByRole("button", { name: "Sobre o preço da API" });
+    const words =
+      "Quando os agentes usam planos, ninguém paga por uso. Este valor é o que o mesmo uso custaria pela API.";
+    expect(document.getElementById(hint.getAttribute("aria-describedby") ?? "")?.textContent).toBe(words);
+    // A press shows the words beside the column's name, and keeps them until the next one.
+    await click(hint, 3);
+    expect(screen().getByRole("tooltip").textContent).toBe(words);
+    await click(hint, 3);
+    expect(screen().queryByRole("tooltip")).toBeNull();
+    expect(text(document.body)).not.toContain("pela API de IA");
+
+    await click(row("João"));
+    expect(text(screen().getByRole("dialog", { name: "João" }))).toContain("≈ US$ 30,00 usados");
+  });
+
+  test("only API keys: amounts as they are, no ⓘ on the column", async () => {
+    const state = seedState();
+    state.peopleUsage = people;
+    await renderApp(`/org/${ORG_ID}/settings/usage`, { api: createFakeApi(state) });
+    await settle(5);
+    await tab("Pessoas");
+    const table = screen().getByRole("table");
+    const head = within(table).getByRole("columnheader", { name: /Uso do mês/ });
+    expect(within(head).queryByRole("button", { name: "Sobre o preço da API" })).toBeNull();
+    expect(text(table)).not.toContain("≈");
   });
 
   test("Limites: off by default; a default and an exception are saved", async () => {

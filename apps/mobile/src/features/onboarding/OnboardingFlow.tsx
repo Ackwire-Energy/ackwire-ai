@@ -1,4 +1,4 @@
-import { keys, meQuery, useApi, useAuthConfig, useTeamTemplates, type WorkspaceMode } from "@agenteschat/client";
+import { addDm, keys, meQuery, useApi, useAuthConfig, useTeamTemplates, type WorkspaceMode } from "@agenteschat/client";
 import { firstName } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { settingUp } from "@agenteschat/client/lib/guards";
@@ -173,10 +173,14 @@ export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; ano
           ? await api.dms.open(id, { agentId: done.agentId }).catch(() => null)
           : null;
       forgetConfirmationSent();
-      await qc.invalidateQueries({ queryKey: keys.me });
+      // The answer that finished it says who the person is now: nothing is asked again.
+      if (done.me) qc.setQueryData(keys.me, done.me);
+      else await qc.invalidateQueries({ queryKey: keys.me });
       gate.choose(id);
-      // The conversation finds its DM in the lists for its header.
-      await qc.invalidateQueries({ queryKey: keys.dms(id), refetchType: "all" }).catch(() => {});
+      // The conversation finds its DM in the lists for its header, from the open's own answer. An older self-hosted
+      // server doesn't send it: the list is read again, without waiting for it.
+      if (dm?.dm) addDm(qc, id, dm.dm);
+      else if (dm) void qc.invalidateQueries({ queryKey: keys.dms(id) });
       if (how === "import") router.push("/settings/import");
       else router.push(chatHref(dm?.channelId ?? generalChannelId));
     });
@@ -186,18 +190,19 @@ export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; ano
     run(async () => {
       if (!orgId) {
         // "For me" asks no name: the word for it in the person's language; a company or team, the name typed.
-        const res = await api.orgs.create(workspaceAnswer(t, purpose ?? "team", orgName));
+        // Its zone, the owner's own too, in the same call.
+        const res = await api.orgs.create({
+          ...workspaceAnswer(t, purpose ?? "team", orgName),
+          ...(zone ? { timezone: zone, memberTimezone: zone } : {}),
+        });
         const id = res.organization.id;
-        await Promise.all([
-          zone ? api.orgs.updateSettings(id, { timezone: zone }) : null,
-          zone ? api.orgs.updateMe(id, { timezone: zone }) : null,
-        ]).catch(() => undefined);
         // The next step's data first, then the workspace among mine: it shows at once, with no wait between.
         await Promise.all([
           qc.prefetchQuery({ queryKey: keys.settings(id), queryFn: () => api.orgs.settings(id) }),
           qc.prefetchQuery({ queryKey: keys.agents(id), queryFn: () => api.agents.list(id) }),
         ]);
-        await qc.invalidateQueries({ queryKey: keys.me });
+        if (res.me) qc.setQueryData(keys.me, res.me);
+        else await qc.invalidateQueries({ queryKey: keys.me });
         setCreated({ orgId: id, generalChannelId: res.generalChannelId });
       } else {
         await api.orgs.updateSettings(orgId, { name: orgName, ...(pickedZone ? { timezone: pickedZone } : {}) });

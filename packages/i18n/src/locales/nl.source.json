@@ -16205,7 +16205,7 @@
     "value": "No due date"
   },
   "issues.seeCalendar": {
-    "value": "see in the calendar"
+    "value": "See in the calendar"
   },
   "issues.removeDue": {
     "value": "Remove the due date"
@@ -16219,9 +16219,6 @@
   "issues.artifactBy": {
     "value": "{{title}} ({{name}})"
   },
-  "issues.noLinks": {
-    "value": "Nothing linked yet."
-  },
   "issues.github.label": {
     "value": "GitHub link"
   },
@@ -16234,11 +16231,11 @@
   "issues.github.remove": {
     "value": "Remove the GitHub link"
   },
+  "issues.github.add": {
+    "value": "Add a GitHub link"
+  },
   "issues.openConversation": {
     "value": "View conversation"
-  },
-  "issues.labels": {
-    "value": "Labels"
   },
   "issues.tabs.label": {
     "value": "Task sections"
@@ -20627,6 +20624,12 @@
   "calendar.upcomingEmpty": {
     "value": "Nothing coming up."
   },
+  "calendar.owners": {
+    "value": "Agents and people"
+  },
+  "calendar.showOwner": {
+    "value": "Show {{name}}"
+  },
   "calendar.viewZone": {
     "value": "Calendar time zone"
   },
@@ -20690,18 +20693,6 @@
   "calendar.rsvp.mine.declined": {
     "value": "You're not going."
   },
-  "calendar.kind.event": {
-    "value": "Event"
-  },
-  "calendar.kind.routine": {
-    "value": "Routine"
-  },
-  "calendar.kind.reminder": {
-    "value": "Reminder"
-  },
-  "calendar.kind.deadline": {
-    "value": "Task due date"
-  },
   "calendar.every.hour": {
     "value": "every hour"
   },
@@ -20721,7 +20712,7 @@
     }
   },
   "calendar.routineDetail": {
-    "value": "{{agent}}'s routine · delivers to {{target}}."
+    "value": "Routine · delivers to {{target}}"
   },
   "calendar.deadlineDetail": {
     "value": "The task is due."
@@ -20730,7 +20721,7 @@
     "value": "Set by {{name}}"
   },
   "calendar.reminderPosted": {
-    "value": "Posted by {{agent}} · {{target}}"
+    "value": "Reminder · posts in {{target}}"
   },
   "calendar.cancelReminder": {
     "value": "Cancel reminder"
@@ -20750,28 +20741,16 @@
   "calendar.runAria": {
     "value": "Routine {{name}}, {{time}}"
   },
-  "calendar.runsAria": {
-    "value": "{{count}} routines at {{time}}: {{names}}"
-  },
   "calendar.runHint": {
     "value": "{{name}} · {{agent}} · {{time}}"
   },
   "calendar.runsAt": {
     "value": "Routines at {{time}}"
   },
-  "calendar.runsOn": {
-    "value": "Routines · {{day}}"
-  },
-  "calendar.runsCount": {
+  "calendar.moreRuns": {
     "value": {
-      "one": "{{count}} routine run",
-      "other": "{{count}} routine runs"
-    }
-  },
-  "calendar.dayRunsAria": {
-    "value": {
-      "one": "{{count}} routine run on {{day}}: {{names}}",
-      "other": "{{count}} routine runs on {{day}}: {{names}}"
+      "one": "+{{count}} routine",
+      "other": "+{{count}} routines"
     }
   },
   "calendar.runTimes": {

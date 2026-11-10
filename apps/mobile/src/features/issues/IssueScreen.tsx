@@ -15,7 +15,7 @@ import {
   useTaskUnread,
 } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
-import { capitalize, relativeTime } from "@agenteschat/client/lib/format";
+import { capitalize, dueLabel, relativeTime } from "@agenteschat/client/lib/format";
 import { githubLinkLabel, isGithubLink } from "@agenteschat/client/lib/github-link";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { webUrl } from "@agenteschat/client/lib/guards";
@@ -45,7 +45,6 @@ import Animated, { FadeIn, LayoutAnimationConfig, LinearTransition } from "react
 import { useOrg } from "@/providers/org";
 import {
   Button,
-  Chip,
   GroupedHeader,
   Icon,
   IconButton,
@@ -56,6 +55,10 @@ import {
   PixelOrbit,
   SCREEN_X,
   Text,
+  TOOL_H,
+  TOUCH,
+  textLineOf,
+  useFontScale,
   useReducedMotion,
   useToast,
 } from "@/ui";
@@ -89,13 +92,15 @@ import {
   columnChoices,
   columnOfIssue,
   criteriaProgress,
+  DUE_CHOICES,
+  dueDateOf,
   issueState,
   minutesSince,
   stageCustomized,
   taskConversationHref,
   workLines,
 } from "./logic";
-import { GithubChip, StateChip, useColumnLabel, useStepText } from "./parts";
+import { GithubChip, useColumnLabel, useStepText } from "./parts";
 import { useStartAgent } from "./useStartAgent";
 
 /**
@@ -268,7 +273,10 @@ function ConversationRow({ issue, onOpen }: { issue: Issue; onOpen: () => void }
   );
 }
 
-/** "#134" and the title on one row, "Criada pelo Atlas a partir do Sentry · #tech" under it, the chips. */
+/**
+ * "#134" and the title on one row, "Criada pelo Atlas a partir do Sentry · #tech" under it, then its fields as the
+ * web's strip, in its order: Coluna, Responsável, Prioridade, Prazo, Quem vê, each opening its picker; its GitHub link.
+ */
 function Head({ issue: i }: { issue: Issue }) {
   const { t, i18n } = useTranslation();
   const dir = useDirectory();
@@ -296,6 +304,8 @@ function Head({ issue: i }: { issue: Issue }) {
   );
   const assignee = i.assignee;
   const whoSees = useWhoSeesLabel();
+  const pickers = useIssuePickers(i);
+  const audience = i.audience ?? { mode: "everyone" as const };
   return (
     <View style={styles.head}>
       <Text variant="display2" accessibilityRole="header" style={styles.bigTitle} maxFontSizeMultiplier={1.4}>
@@ -310,14 +320,36 @@ function Head({ issue: i }: { issue: Issue }) {
         </Text>
       ) : null}
       <View style={styles.chips}>
-        <StateChip issue={i} />
-        {i.priority === "high" ? <Chip icon="flag" label={t("issues.priority.high")} /> : null}
-        {i.audience?.mode === "people" ? <Chip icon="lock" label={whoSees(i.audience)} /> : null}
-        {assignee ? (
-          <Chip label={dir.nameOf(assignee)} leading={<Face who={assignee} size={14} live={false} />} />
-        ) : (
-          <Chip icon="circle" label={t("issues.noAssignee")} />
-        )}
+        <PropChip
+          label={t("issues.column")}
+          value={pickers.column ? pickers.columnLabel(pickers.column) : t(`issues.status.${i.status}`)}
+          icon={STAGE_ICON[i.status]}
+          onPress={pickers.pickColumn}
+        />
+        <PropChip
+          label={t("issues.form.assignee")}
+          value={assignee ? dir.nameOf(assignee) : t("issues.noAssignee")}
+          {...(assignee ? { leading: <Face who={assignee} size={20} live={false} /> } : { icon: "person" as const })}
+          onPress={pickers.pickAssignee}
+        />
+        <PropChip
+          label={t("issues.form.priority")}
+          value={t(`issues.priority.${i.priority}`)}
+          icon="flag"
+          onPress={pickers.pickPriority}
+        />
+        <PropChip
+          label={t("issues.due")}
+          value={i.dueDate ? dueLabel(t, i18n.language, i.dueDate) : t("issues.noDue")}
+          icon="clock"
+          onPress={pickers.pickDue}
+        />
+        <PropChip
+          label={t("whoSees.label")}
+          value={whoSees(audience)}
+          icon={audience.mode === "people" ? "lock" : "globe"}
+          onPress={pickers.pickWhoSees}
+        />
         {i.githubUrl ? (
           <Pressable
             accessibilityRole="link"
@@ -332,6 +364,59 @@ function Head({ issue: i }: { issue: Issue }) {
         ) : null}
       </View>
     </View>
+  );
+}
+
+/** The stage's mark on the strip's Coluna. */
+const STAGE_ICON: Record<IssueStatus, IconName> = {
+  todo: "circle",
+  in_progress: "clock",
+  in_review: "code",
+  done: "checkc",
+  canceled: "x",
+};
+
+/** The strip's value line at the default text size: one line makes the 32 control. */
+const PROP_LINE = textLineOf("subhead", 1).height;
+
+/**
+ * A field on the head's strip: 32 high in the field look, its icon or face and its value; a press opens its picker. A
+ * value wider than the screen wraps inside it, never cut, its icon or face on the first line.
+ */
+function PropChip({
+  label,
+  value,
+  icon,
+  leading,
+  onPress,
+}: {
+  label: string;
+  value: string;
+  icon?: IconName;
+  leading?: ReactNode;
+  onPress: () => void;
+}) {
+  const c = useColors();
+  const line = textLineOf("subhead", useFontScale()).height;
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${label}: ${value}`}
+      hitSlop={{ top: (TOUCH - TOOL_H) / 2, bottom: (TOUCH - TOOL_H) / 2 }}
+      style={({ pressed }) => [
+        styles.prop,
+        { backgroundColor: c.sunken, borderColor: c.line2 },
+        pressed && styles.pressed,
+      ]}
+    >
+      <View style={{ height: line, justifyContent: "center" }}>
+        {leading ?? (icon ? <Icon name={icon} size={16} color={c.muted} /> : null)}
+      </View>
+      <Text variant="subhead" style={styles.propText}>
+        {value}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -795,28 +880,21 @@ function ColumnPicker({
   );
 }
 
-/** "…": its column, priority, who does it (an agent is asked and starts), stop the agent, cancel. */
-function IssueMenu({ issue: i }: { issue: Issue }) {
+/**
+ * What changes a task's fields, one sheet each: its column (or its stage while the board's columns load), who does
+ * it (an agent is asked and starts), its priority, its due date and who sees it. The head's strip and "…" share them.
+ */
+function useIssuePickers(i: Issue) {
   const { t } = useTranslation();
-  const c = useColors();
   const sheet = useSheet();
   const orgId = useOrgId();
-  const api = useApi();
-  const qc = useQueryClient();
   const dir = useDirectory();
   const meId = useMeId();
-  const { org } = useOrg();
   const action = useIssueAction(orgId);
   const start = useStartAgent();
   const columns = useIssueColumns(orgId);
   const columnLabel = useColumnLabel();
   const toast = useToast();
-  const openConversation = useOpenConversation();
-  const shareWork = useShareWork(i);
-  const stop = useMutation({
-    mutationFn: (runId: string) => api.agents.cancelRun(orgId, runId),
-    onSettled: () => void qc.invalidateQueries({ queryKey: keys.issues(orgId) }),
-  });
   const failed = () => toast({ title: t("mobile.app.failed"), icon: "x" });
   const update = (patch: Parameters<typeof action.mutate>[0], done?: string) => {
     sheet.close();
@@ -831,61 +909,112 @@ function IssueMenu({ issue: i }: { issue: Issue }) {
       start.run(i, who.id, { done: t("mobile.issues.changed") });
     } else update({ type: "update", id: i.id, patch: { assignee: who } });
   };
-  const whoSees = useWhoSeesLabel();
   const same = (a: Actor | null, b: Actor | null) => (a?.type ?? null) === (b?.type ?? null) && a?.id === b?.id;
   const pick = (items: ActionItem[]) => sheet.open(<ActionList items={items} />);
+  const checked = (on: boolean) => (on ? { trailing: <Icon name="check" size={18} /> } : {});
   const statusItems = (): ActionItem[] =>
     STATUSES.map((s) => ({
       key: s,
       label: t(`issues.status.${s}`),
-      ...(s === i.status ? { trailing: <Icon name="check" size={18} /> } : {}),
+      ...checked(s === i.status),
       onPress: () => update({ type: "update", id: i.id, patch: { status: s } }),
-    }));
-  const priorityItems = (): ActionItem[] =>
-    PRIORITIES.map((p: IssuePriority) => ({
-      key: p,
-      label: t(`issues.priority.${p}`),
-      ...(p === i.priority ? { trailing: <Icon name="check" size={18} /> } : {}),
-      onPress: () => update({ type: "update", id: i.id, patch: { priority: p } }),
     }));
   const people: Actor[] = [
     ...dir.agents.filter((a) => a.canTalk !== false).map((a) => ({ type: "agent" as const, id: a.id })),
     ...(meId ? [{ type: "person" as const, id: meId }] : []),
   ];
-  const assigneeItems = (): ActionItem[] => [
-    ...people.map((who) => ({
-      key: `${who.type}:${who.id}`,
-      label: who.type === "person" && who.id === meId ? t("mobile.issues.you") : dir.nameOf(who),
-      leading: <Face who={who} size={OPTION_ROW.face} live={false} />,
-      ...(same(who, i.assignee) ? { trailing: <Icon name="check" size={18} /> } : {}),
-      onPress: () => assign(who),
-    })),
-    {
-      key: "nobody",
-      icon: "circle" as const,
-      label: t("mobile.issues.nobody"),
-      ...(i.assignee === null ? { trailing: <Icon name="check" size={18} /> } : {}),
-      onPress: () => assign(null),
-    },
-  ];
   const board = columns.data ?? [];
   const column = columnOfIssue(i, board);
-  // Columns not loaded (or failed): the stages, as before the board had columns.
-  const openColumns = () =>
-    board.length > 0
-      ? sheet.open(
-          <ColumnPicker
-            issue={i}
-            columns={board}
-            onPick={(c) =>
-              update(
-                { type: "update", id: i.id, patch: { columnId: c.id } },
-                t("mobile.issues.moved", { number: i.number, column: columnLabel(c) }),
-              )
-            }
-          />,
-        )
-      : pick(statusItems());
+  return {
+    column,
+    columnLabel,
+    // Columns not loaded (or failed): the stages, as before the board had columns.
+    pickColumn: () =>
+      board.length > 0
+        ? sheet.open(
+            <ColumnPicker
+              issue={i}
+              columns={board}
+              onPick={(c) =>
+                update(
+                  { type: "update", id: i.id, patch: { columnId: c.id } },
+                  t("mobile.issues.moved", { number: i.number, column: columnLabel(c) }),
+                )
+              }
+            />,
+          )
+        : pick(statusItems()),
+    pickAssignee: () =>
+      pick([
+        ...people.map((who) => ({
+          key: `${who.type}:${who.id}`,
+          label: who.type === "person" && who.id === meId ? t("mobile.issues.you") : dir.nameOf(who),
+          leading: <Face who={who} size={OPTION_ROW.face} live={false} />,
+          ...checked(same(who, i.assignee)),
+          onPress: () => assign(who),
+        })),
+        {
+          key: "nobody",
+          icon: "circle" as const,
+          label: t("mobile.issues.nobody"),
+          ...checked(i.assignee === null),
+          onPress: () => assign(null),
+        },
+      ]),
+    pickPriority: () =>
+      pick(
+        PRIORITIES.map((p: IssuePriority) => ({
+          key: p,
+          label: t(`issues.priority.${p}`),
+          ...checked(p === i.priority),
+          onPress: () => update({ type: "update", id: i.id, patch: { priority: p } }),
+        })),
+      ),
+    pickDue: () =>
+      pick(
+        DUE_CHOICES.map((d) => ({
+          key: d,
+          label: t(`mobile.issues.form.dueChoice.${d}`),
+          ...checked(dueDateOf(d) === i.dueDate),
+          onPress: () => update({ type: "update", id: i.id, patch: { dueDate: dueDateOf(d) } }),
+        })),
+      ),
+    pickWhoSees: () => {
+      sheet.close();
+      router.push({ pathname: "/who-sees", params: { number: i.number } });
+    },
+  };
+}
+
+/** "…": its column, priority, who does it (an agent is asked and starts), stop the agent, cancel. */
+function IssueMenu({ issue: i }: { issue: Issue }) {
+  const { t } = useTranslation();
+  const c = useColors();
+  const sheet = useSheet();
+  const orgId = useOrgId();
+  const api = useApi();
+  const qc = useQueryClient();
+  const dir = useDirectory();
+  const meId = useMeId();
+  const { org } = useOrg();
+  const action = useIssueAction(orgId);
+  const toast = useToast();
+  const openConversation = useOpenConversation();
+  const shareWork = useShareWork(i);
+  const pickers = useIssuePickers(i);
+  const stop = useMutation({
+    mutationFn: (runId: string) => api.agents.cancelRun(orgId, runId),
+    onSettled: () => void qc.invalidateQueries({ queryKey: keys.issues(orgId) }),
+  });
+  const failed = () => toast({ title: t("mobile.app.failed"), icon: "x" });
+  const update = (patch: Parameters<typeof action.mutate>[0], done?: string) => {
+    sheet.close();
+    action.mutate(patch, {
+      onSuccess: () => toast({ title: done ?? t("mobile.issues.changed") }),
+      onError: failed,
+    });
+  };
+  const whoSees = useWhoSeesLabel();
   const w = i.work;
   const items: ActionItem[] = [
     {
@@ -901,15 +1030,15 @@ function IssueMenu({ issue: i }: { issue: Issue }) {
       key: "column",
       icon: "circle",
       label: t("mobile.issues.actions.status"),
-      hint: column ? columnLabel(column) : t(`issues.status.${i.status}`),
-      onPress: openColumns,
+      hint: pickers.column ? pickers.columnLabel(pickers.column) : t(`issues.status.${i.status}`),
+      onPress: pickers.pickColumn,
     },
     {
       key: "priority",
       icon: "flag",
       label: t("mobile.issues.actions.priority"),
       hint: t(`issues.priority.${i.priority}`),
-      onPress: () => pick(priorityItems()),
+      onPress: pickers.pickPriority,
     },
     {
       key: "assignee",
@@ -919,7 +1048,7 @@ function IssueMenu({ issue: i }: { issue: Issue }) {
         : { icon: "agent" as const }),
       label: t("mobile.issues.actions.assignee"),
       hint: i.assignee ? dir.nameOf(i.assignee) : t("mobile.issues.nobody"),
-      onPress: () => pick(assigneeItems()),
+      onPress: pickers.pickAssignee,
     },
     {
       key: "github",
@@ -933,10 +1062,7 @@ function IssueMenu({ issue: i }: { issue: Issue }) {
       icon: i.audience?.mode === "people" ? "lock" : "globe",
       label: t("whoSees.label"),
       hint: whoSees(i.audience ?? { mode: "everyone" }),
-      onPress: () => {
-        sheet.close();
-        router.push({ pathname: "/who-sees", params: { number: i.number } });
-      },
+      onPress: pickers.pickWhoSees,
     },
   ];
   // Mostrar para todos lives here, not as a fourth action on the work's card (one row of actions there).
@@ -1017,7 +1143,20 @@ const styles = StyleSheet.create({
   head: { paddingHorizontal: SCREEN_X, paddingTop: 6, gap: 6, marginBottom: 14 },
   bigTitle: { marginVertical: 4 },
   number: { fontWeight: "500" },
-  chips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  chips: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 },
+  prop: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 6,
+    minHeight: TOOL_H,
+    maxWidth: "100%",
+    paddingLeft: 10,
+    paddingRight: 12,
+    paddingVertical: (TOOL_H - PROP_LINE) / 2,
+    borderRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  propText: { fontWeight: "600", flexShrink: 1 },
   // The screen's cards: on the 16 margin, 12 apart (the conversation's card gap, CHAT_RHYTHM.card), radius 20 with the
   // cut corner. Measured: work card 16 → 16 from the edges, text at 16 + 14 + 24 face + 8 = 62; the work line's card on
   // the same 16 edges, its text at 16 + 40 = 56.

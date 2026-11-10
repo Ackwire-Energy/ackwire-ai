@@ -253,6 +253,21 @@ describe("a document's head", () => {
     expect(viewer).toContain('title: { flexBasis: "100%", gap: 2 }');
   });
 
+  test("among files a picture is only the picture, two to a row; a file takes the row, its name whole", () => {
+    const tile = src("features/files/AttachmentTile.tsx");
+    // The foot (icon, name, kind and size) only under a file; a picture's name and size are what VoiceOver says.
+    expect(tile).toMatch(/\{picture \? null : \(\s*<View style=\{styles\.foot\}>/);
+    expect(tile).toMatch(/accessibilityLabel=\{`\$\{name\}, \$\{meta\}`\}/);
+    // Known to be a picture by its name before it loads, so it never sheds a foot once it does.
+    expect(tile).toContain('const picture = info ? info.view === "image" : seen;');
+    const foot = tile.slice(tile.indexOf("<View style={styles.foot}>"), tile.indexOf("function fileIconOf("));
+    expect(foot).not.toContain("numberOfLines");
+    expect(foot).toContain('<LineIcon name={icon} size={14} color={c.faint} variant="footnote" />');
+    const files = src("features/files/MessageFiles.tsx");
+    expect(files).toContain("width={picture ? halfWidth : blockWidth}");
+    expect(files).toContain("...images.map((i) => ({ ...i, failed: false, picture: true }))");
+  });
+
   test("the line under a file's name breaks between its facts, never inside one", () => {
     const files = readFileSync(join(import.meta.dir, "../../src/features/files/MessageFiles.tsx"), "utf8");
     expect(files.slice(files.indexOf("export function useFileLine("))).toMatch(

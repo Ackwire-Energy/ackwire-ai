@@ -346,7 +346,7 @@ html:not([data-pointer]) .routine-row__title:focus-visible {
   opacity: 0.5;
 }
 
-/* ── Details: the routine's page in the details dialog, laid out as a task's (`issue-layout`, `issue-aside`) ── */
+/* ── Details: the routine's page in the details dialog, laid out as a task's (`issue-details`, `.ac-props`) ── */
 /* "Rotina" on the bar, with "✓ Salvo" (SavedNote) after a change. */
 .routine-details .ac-details__eyebrow {
   display: inline-flex;
@@ -420,65 +420,28 @@ html:not([data-pointer]) .routine-row__title:focus-visible {
   border-radius: 2px;
   background: color-mix(in srgb, var(--ink) 8%, transparent);
 }
-/* "No ar": its state and what it means, the switch at the end. */
-/* The switch sits on the state's line (20px, its height): a line under it that wraps doesn't move it. */
-.issue-aside__item.routine-onair {
-  flex-direction: row;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 14px;
-  background: var(--card-well, var(--sunken));
-}
-.routine-onair__text {
+/* Its fields as one strip under the head (`.ac-props`): "Quando posta" with its ⓘ, then its next run and this week's
+   use on a quiet line, close under them. */
+.routine-strip {
   display: flex;
   flex-direction: column;
+  gap: var(--space-2);
   min-width: 0;
 }
-label.routine-onair__text {
-  cursor: pointer;
-}
-.routine-onair__text b {
-  font-size: 14px;
-  line-height: 20px;
-  font-weight: 600;
-}
-.routine-onair__text small {
-  font-size: 12.5px;
-  color: var(--ink-muted);
-}
-/* A field of the aside: its value with a short line under it, on a picker's trigger or read only. */
-.ac-select.routine-sel .ac-select__trigger {
-  height: auto;
-  min-height: 44px;
-  padding-top: 6px;
-  padding-bottom: 6px;
-}
-.routine-sel__value {
-  display: flex;
+.routine-props__report {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-1);
   min-width: 0;
-  text-align: left;
+  max-width: 100%;
 }
-.routine-sel__text {
-  flex: 1;
+.routine-props__line {
   display: flex;
-  flex-direction: column;
-  min-width: 0;
+  flex-wrap: wrap;
+  gap: 2px var(--space-4);
+  margin: 0;
+  font-size: 12.5px;
   line-height: 18px;
-}
-.routine-sel__text b,
-.routine-sel__text small {
-  overflow-wrap: anywhere;
-}
-.routine-sel__text b {
-  font-size: 14px;
-  font-weight: 600;
-}
-.routine-sel__text small {
-  font-size: 12px;
   color: var(--ink-muted);
 }
 /* What it does, being edited: the box is as tall as the text, from a few lines. Doubled: over the task text's own

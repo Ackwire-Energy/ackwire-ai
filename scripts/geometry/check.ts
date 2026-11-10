@@ -303,6 +303,7 @@ export const SELF_TESTED = [
   "factwrap",
   "undoinline",
   "countfill",
+  "calstack",
   "bleed",
   "stampout",
 ];

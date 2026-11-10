@@ -11,7 +11,7 @@ import { Button, Field, Icon, Input, SearchSelect, Spinner } from "@agenteschat/
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
-import { CommandBlock } from "@/components/Machines";
+import { CommandBlock } from "@/components/machine-bits";
 import { useOrg } from "@/components/org-context";
 import { useToast } from "@/lib/toast";
 

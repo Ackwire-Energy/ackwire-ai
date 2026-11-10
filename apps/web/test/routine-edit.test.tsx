@@ -27,9 +27,9 @@ const open = async (prepare?: (api: ReturnType<typeof createFakeApi>) => Promise
   return { state, api };
 };
 const card = (name: string) => screen().getByRole("article", { name });
-/** The aside's "Quando": the creation form's schedule and triggers, in a dialog of their own. */
+/** The strip's "Quando": the creation form's schedule and triggers, in a dialog of their own. */
 const quando = async (page: HTMLElement) => {
-  await click(within(page).getByRole("button", { name: "Quando" }));
+  await click(within(page).getByRole("button", { name: /^Quando: / }));
   await settle(4);
 };
 const pick = async (combobox: HTMLElement, option: string | RegExp) => {
@@ -90,7 +90,7 @@ describe("Rotinas: editar, duplicar, apagar", () => {
     });
     expect(screen().getByText(/Rotina salva\. Próxima: /)).toBeTruthy();
     expect(screen().queryByRole("dialog", { name: "Quando" })).toBeNull();
-    // The page under it says the new schedule, beside the agent and in the aside.
+    // The page under it says the new schedule, beside the agent and in the strip.
     expect(page.textContent).toContain("De segunda a sexta, às 08:30");
   });
 
@@ -201,11 +201,12 @@ describe("Rotinas: the routine's page, edited where it is", () => {
     await settle(4);
     return screen().getByRole("dialog", { name: "Resumo da semana" });
   };
-  const aside = (dialog: HTMLElement) => within(dialog).getByRole("complementary", { name: /^Detalhes: / });
+  /** Its fields as one strip under its head, no side column. */
+  const aside = (dialog: HTMLElement) => within(dialog).getByRole("group", { name: /^Detalhes: / });
   const lastPatch = (state: ReturnType<typeof seedState>) =>
     state.calls.filter((c) => c.method === "routines.update").at(-1)?.args[1];
 
-  test("full height: Rodar agora on the bar, Detalhes and Execuções, the aside; no Editar or Pausar", async () => {
+  test("full height: Rodar agora on the bar, Detalhes and Execuções, the strip; no Editar or Pausar", async () => {
     await open();
     const dialog = await page();
     expect(dialog.className).toContain("ac-details--fill");
@@ -215,7 +216,19 @@ describe("Rotinas: the routine's page, edited where it is", () => {
     expect(within(dialog).queryByRole("button", { name: "Pausar" })).toBeNull();
     expect(within(dialog).getByRole("tab", { name: "Detalhes" }).getAttribute("aria-selected")).toBe("true");
     expect(within(dialog).getByRole("tab", { name: /^Execuções/ })).toBeTruthy();
-    expect(aside(dialog).textContent).toContain("Quem faz");
+    expect(within(aside(dialog)).getByRole("combobox", { name: "Quem faz" })).toBeTruthy();
+    expect(within(dialog).queryByRole("complementary", { name: /^Detalhes: / })).toBeNull();
+    // Its controls in the order of the old side column, under the head and over the tabs.
+    const strip = aside(dialog);
+    expect(strip.classList.contains("ac-props")).toBe(true);
+    expect(strip.parentElement?.previousElementSibling?.classList.contains("issue-details__head")).toBe(true);
+    // Its next run and this week's use on a quiet line under it.
+    expect(strip.nextElementSibling?.classList.contains("routine-props__line")).toBe(true);
+    expect(
+      [...strip.querySelectorAll('[role="switch"], [role="combobox"], button[aria-haspopup="dialog"]')].map((c) =>
+        c.getAttribute("aria-label")?.replace(/:.*$/, ""),
+      ),
+    ).toEqual(["No ar", "Quem faz", "Quando", "Onde entrega", "Quando posta"]);
   });
 
   test("renaming in place: Enter saves it and Salvo shows by Rotina", async () => {
@@ -259,7 +272,7 @@ describe("Rotinas: the routine's page, edited where it is", () => {
     expect(dialog.textContent).toContain("Resuma a semana em cinco linhas.");
   });
 
-  test("No ar is a switch in the aside: off pauses it and says what that means", async () => {
+  test("No ar is a switch in the strip: off pauses it and says what that means", async () => {
     const { state } = await open();
     const dialog = await page();
     expect(aside(dialog).textContent).toContain("Roda sozinha quando chega a hora");
@@ -271,7 +284,7 @@ describe("Rotinas: the routine's page, edited where it is", () => {
     expect(screen().getByText(/Rotina pausada\./)).toBeTruthy();
   });
 
-  test("Onde entrega changes at once from the aside, with who sees it under the value", async () => {
+  test("Onde entrega changes at once from the strip, with who sees it as its meaning", async () => {
     const { state } = await open();
     const dialog = await page();
     expect(aside(dialog).textContent).toContain("Todo mundo do canal vê");
