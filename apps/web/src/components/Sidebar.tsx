@@ -123,6 +123,7 @@ import { AddPasswordDialog } from "./AddPassword";
 import { AgentAvatar } from "./AgentAvatar";
 import { type GroupDialogFor, GroupNameDialog, useAgentDrag, useMoveAgent } from "./AgentGroups";
 import { ArchivedChannelsDialog } from "./ArchivedChannelsDialog";
+import { FeedbackMark } from "./arrival/FeedbackDialog";
 import { MoveChannelDialog, NewCategoryDialog, RenameCategoryDialog } from "./ChannelCategoryDialogs";
 import { openPalette } from "./CommandMenu";
 import { DeleteAccountDialog } from "./DeleteAccount";
@@ -926,6 +927,9 @@ export function Sidebar() {
       )}
       {groupDialog && <GroupNameDialog purpose={groupDialog} onClose={() => setGroupDialog(null)} />}
 
+      {/* Beta: the way to the feedback form, a row of its own at the bottom, where this server takes it. Not beside
+          the person's name, which it would leave no room for; the rail has no room for a row's words. */}
+      {!rail && <FeedbackMark />}
       {/* No foot in a personal workspace (ADR 0159): the person, the bell and the collapse are on top. */}
       {!personal && (
         <div className="sidebar__foot">

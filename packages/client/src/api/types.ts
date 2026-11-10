@@ -86,6 +86,40 @@ export type PushDeviceInput =
   | { platform: "ios" | "android"; token: string; locale: string }
   | { platform: "web"; endpoint: string; keys: { p256dh: string; auth: string }; locale: string };
 
+/** What the feedback form sends (`POST /api/app/feedback`): `id` is made by the app, so a retry goes once. */
+export interface FeedbackInput {
+  id: string;
+  text: string;
+  /** The workspace the person is in. */
+  orgId?: string;
+  /** The screen they are on (a path), and the app that sends it. */
+  where?: string;
+  app?: string;
+  /** The thing the feedback is about (a right click's), and what it says, as the form showed it. */
+  about?: FeedbackAbout;
+  /** What the app knows of where the person is, label and value, as the form listed it. */
+  facts?: [string, string][];
+  /** Files added with `uploadFeedbackFile`. */
+  files?: string[];
+}
+
+export interface FeedbackAbout {
+  /** The app's own word for the thing: `message`, `card`, `button`… */
+  kind: string;
+  /** Its name on screen: an author, a title. */
+  label?: string;
+  text?: string;
+}
+
+/** A picture or a video added to the feedback being written (`POST /api/app/feedback/files`). */
+export interface FeedbackFile {
+  id: string;
+  name: string;
+  size: number;
+  kind: "image" | "video";
+  contentType: string;
+}
+
 export interface AuthConfig {
   socialProviders: { google: boolean; github: boolean; apple?: boolean };
   signupOpen: boolean;
@@ -99,6 +133,8 @@ export interface AuthConfig {
   privacyUrl?: string | null;
   /** Where people write to whoever runs this server (a workspace on hold or suspended); null: not given. */
   supportEmail?: string | null;
+  /** The server takes feedback (`POST /api/app/feedback`): the apps show the form; absent: a server too old to. */
+  feedback?: boolean;
   /** Every workspace gets a computer of its own (the Cloud); absent: a server too old to say. */
   workspaceComputer?: boolean;
   /** The billing service (ADR 0079): owners and admins open a workspace's plan there; null or absent: no billing. */

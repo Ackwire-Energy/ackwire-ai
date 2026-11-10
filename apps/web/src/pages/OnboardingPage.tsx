@@ -20,6 +20,7 @@ import { ImageCropDialog, OrgMark } from "@/components/ProfilePhoto";
 import { PurposeScene } from "@/components/PurposeScene";
 import { BootSplash } from "@/components/Sky";
 import { ZonePicker } from "@/components/ZoneSelect";
+import { ARRIVAL_PARAM } from "@/lib/arrival";
 import { sendNewLink } from "@/lib/email-confirmation";
 import { useOpenParam } from "@/lib/open-param";
 import { returnPlace } from "@/lib/return-to";
@@ -94,8 +95,11 @@ export function OnboardingPage() {
     const at = await finishOnboarding(api, orgId);
     sessionStore.remove(STORAGE_KEYS.confirmationSent);
     await qc.invalidateQueries({ queryKey: keys.me });
-    if (at.agentId) await navigate({ to: "/org/$orgId/dm/agent/$agentId", params: { orgId, agentId: at.agentId } });
-    else await navigate({ to: "/org/$orgId", params: { orgId } });
+    // The workspace opens on its arrival (ADR 0160): the beta notice, then Connect an AI.
+    const search = { [ARRIVAL_PARAM]: 1 } as never;
+    if (at.agentId)
+      await navigate({ to: "/org/$orgId/dm/agent/$agentId", params: { orgId, agentId: at.agentId }, search });
+    else await navigate({ to: "/org/$orgId", params: { orgId }, search });
   };
 
   const save = useMutation({

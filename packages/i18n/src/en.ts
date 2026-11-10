@@ -17077,6 +17077,78 @@ export const en = {
     approvalsPersonal:
       "Anything sent, paid or booked in your name waits for your approval. You can let it go later, once you trust them.",
   },
+  /** Right after the onboarding (ADR 0160): the beta notice, then Connect an AI with the team beside it. */
+  arrival: {
+    beta: {
+      /** Drawn large over the sky: the word itself, in capitals. */
+      word: "BETA",
+      title: "You're early. We're glad.",
+      text: "agentes.chat is in beta: you can already do real work with it, and we're still polishing.",
+      weekly: {
+        title: "It gets better every week",
+        text: "New things and fixes come out all the time.",
+      },
+      fails: {
+        title: "Sometimes something fails",
+        text: "If it gets stuck or looks odd, the problem is ours, not yours.",
+      },
+      /** Only where the feedback form exists. */
+      feedback: {
+        title: "Your feedback decides what comes next",
+        text: "Tell us what was missing or got in your way. We read everything.",
+      },
+      /** "Send feedback" is the row at the bottom of the sidebar (`feedback.open`): the same words. */
+      where: "To write to us, use Send feedback, at the bottom of the sidebar.",
+    },
+    /** Over the sky where the workspace's agents stand: asleep at night, then awake by day. */
+    stage: {
+      ready: "Your team is ready",
+      wake: "All it needs to wake up is an AI.",
+      morning: "Good morning, team",
+      awake: "Everyone is awake and thinking.",
+    },
+    connect: {
+      title: "Connect an AI for your team to think",
+      text: "Use a subscription you already have. Nothing changes in your plan.",
+      others: "Another plan",
+      free: "Start free",
+      freeText: "With OpenCode's free models",
+      /** A short label at the end of the free option's card. */
+      noPlan: "No subscription",
+      without: "Without an AI, agents don't answer.",
+      later: "Not now",
+    },
+  },
+  /** The feedback form behind the Beta mark (ADR 0160): what the person writes goes by email. */
+  feedback: {
+    /** The small label at the end of the Send feedback row. */
+    mark: "Beta",
+    open: "Send feedback",
+    ask: "What was missing, broke or got in your way?",
+    goesCloud: "What you write goes by email to the agentes.chat team.",
+    goesServer: "What you write goes by email to whoever runs this server.",
+    placeholder: "Write it your way",
+    /** The last entry of a right-click menu: it opens this form about what was clicked. */
+    report: "Report a problem here",
+    /** Over the excerpt of the thing the feedback is about. */
+    aboutMessage: "About {{name}}'s message",
+    aboutItem: "About: {{name}}",
+    aboutThis: "About what you clicked",
+    aboutDrop: "Don't send this excerpt",
+    attach: "Add a photo or video",
+    /** Beside Add a photo or video. */
+    filesHint: "Up to {{images}} photos of {{imageMb}} MB and one video of {{videoMb}} MB, kept for {{days}} days.",
+    removeFile: "Remove {{name}}",
+    /** A file being uploaded: read by screen readers only. */
+    uploading: "Sending {{name}}",
+    fileType: "Only photos and videos can be attached.",
+    fileTooLarge: "{{name}} is too large: the limit is {{mb}} MB.",
+    fileTooMany: "One feedback takes up to {{images}} photos and one video.",
+    send: "Send",
+    thanks: "Delivered. Thank you!",
+    reply: "Everything is read. An answer, if one is needed, comes to {{email}}.",
+    another: "Send another",
+  },
 };
 
 export type Translations = Widen<typeof en>;

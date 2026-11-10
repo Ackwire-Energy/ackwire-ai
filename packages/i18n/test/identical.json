@@ -268,7 +268,9 @@
       "devices.iphone.connectedDone",
       "members.passwordLink.label",
       "openOnPhone.appStore",
-      "openOnPhone.googlePlay"
+      "openOnPhone.googlePlay",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "es": [
       "devices.cpus",
@@ -489,7 +491,9 @@
       "onboarding.personal.name",
       "newAgentAsk.ideas",
       "openOnPhone.appStore",
-      "openOnPhone.googlePlay"
+      "openOnPhone.googlePlay",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "fr": [
       "devices.cpus",
@@ -876,7 +880,9 @@
       "newAgentAsk.idea.money.label",
       "agentSetup.firstRun.team.donePersonal",
       "openOnPhone.appStore",
-      "openOnPhone.googlePlay"
+      "openOnPhone.googlePlay",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "de": [
       "devices.workspace",
@@ -1280,7 +1286,9 @@
       "newAgentAsk.idea.training.label",
       "members.passwordLink.label",
       "openOnPhone.appStore",
-      "openOnPhone.googlePlay"
+      "openOnPhone.googlePlay",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "it": [
       "devices.cpus",
@@ -1608,7 +1616,9 @@
       "settings.mode.team",
       "members.passwordLink.label",
       "openOnPhone.appStore",
-      "openOnPhone.googlePlay"
+      "openOnPhone.googlePlay",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "nl": [
       "devices.filter.computers",
@@ -2158,7 +2168,9 @@
       "agentSetup.firstRun.team.donePersonal",
       "members.passwordLink.label",
       "openOnPhone.appStore",
-      "openOnPhone.googlePlay"
+      "openOnPhone.googlePlay",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "ja": [
       "devices.system.android",
@@ -2307,7 +2319,9 @@
       "routines.setup.github.url",
       "routines.setup.sentry.url",
       "openOnPhone.appStore",
-      "openOnPhone.googlePlay"
+      "openOnPhone.googlePlay",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "ko": [
       "devices.system.android",
@@ -2452,7 +2466,9 @@
       "routines.setup.github.url",
       "routines.setup.sentry.url",
       "openOnPhone.appStore",
-      "openOnPhone.googlePlay"
+      "openOnPhone.googlePlay",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "zh-Hans": [
       "devices.system.android",
@@ -2589,7 +2605,9 @@
       "routines.setup.github.url",
       "routines.setup.sentry.url",
       "openOnPhone.appStore",
-      "openOnPhone.googlePlay"
+      "openOnPhone.googlePlay",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "id": [
       "devices.cpus",
@@ -2854,7 +2872,9 @@
       "agentSetup.how.model",
       "share.fileRef",
       "openOnPhone.appStore",
-      "openOnPhone.googlePlay"
+      "openOnPhone.googlePlay",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "tr": [
       "devices.cpus",
@@ -3017,7 +3037,9 @@
       "browser.live.emulated.tablet",
       "agentSetup.how.model",
       "openOnPhone.appStore",
-      "openOnPhone.googlePlay"
+      "openOnPhone.googlePlay",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "pl": [
       "devices.cpus",
@@ -3279,7 +3301,9 @@
       "agentSetup.firstRun.team.donePersonal",
       "members.passwordLink.label",
       "openOnPhone.appStore",
-      "openOnPhone.googlePlay"
+      "openOnPhone.googlePlay",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "ru": [
       "devices.system.android",
@@ -3414,7 +3438,9 @@
       "routines.setup.github.url",
       "routines.setup.sentry.url",
       "openOnPhone.appStore",
-      "openOnPhone.googlePlay"
+      "openOnPhone.googlePlay",
+      "arrival.beta.word",
+      "feedback.mark"
     ]
   },
   "mobile-base": {

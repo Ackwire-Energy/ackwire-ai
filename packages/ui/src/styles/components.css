@@ -10881,6 +10881,12 @@ html:not([data-pointer]) .ac-msg__note:focus-visible {
   height: 32px;
   margin: -6px;
 }
+/* A face there (a personal workspace's, ADR 0159) is the slot's size, as a workspace's mark is: a larger one would
+   reach into the gap before the name. */
+.ac-mo__leading > .ac-avatar {
+  width: 32px;
+  height: 32px;
+}
 @media (prefers-reduced-motion: no-preference) {
   .ac-mo__scrim {
     animation: ac-mo-fade var(--dur-panel) var(--out) both;

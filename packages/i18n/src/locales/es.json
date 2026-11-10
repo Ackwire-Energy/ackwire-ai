@@ -17600,5 +17600,65 @@
     },
     "approvals": "Lo que sale para los clientes espera tu aprobación. Puedes liberarlo después, cuando confíes en ellos.",
     "approvalsPersonal": "Todo lo que se envíe, se pague o se reserve a tu nombre espera tu aprobación. Puedes liberarlo después, cuando confíes en ellos."
+  },
+  "arrival": {
+    "beta": {
+      "word": "BETA",
+      "title": "Llegaste pronto. Qué bien.",
+      "text": "agentes.chat está en beta: ya puedes trabajar de verdad con él, y todavía lo estamos puliendo.",
+      "weekly": {
+        "title": "Mejora cada semana",
+        "text": "Las novedades y las correcciones salen todo el tiempo."
+      },
+      "fails": {
+        "title": "A veces algo falla",
+        "text": "Si se traba o se ve raro, el problema es nuestro, no tuyo."
+      },
+      "feedback": {
+        "title": "Tu feedback decide lo que viene",
+        "text": "Cuéntanos qué faltó o qué molestó. Lo leemos todo."
+      },
+      "where": "Para escribirnos, usa Enviar feedback, al final de la barra lateral."
+    },
+    "stage": {
+      "ready": "Tu equipo está listo",
+      "wake": "Solo le falta una IA para despertar.",
+      "morning": "Buenos días, equipo",
+      "awake": "Todos despertaron y ya piensan."
+    },
+    "connect": {
+      "title": "Conecta una IA para que tu equipo piense",
+      "text": "Usa una suscripción que ya tienes. Nada cambia en tu plan.",
+      "others": "Otro plan",
+      "free": "Empezar gratis",
+      "freeText": "Con los modelos gratis de OpenCode",
+      "noPlan": "Sin suscripción",
+      "without": "Sin una IA, los agentes no responden.",
+      "later": "Ahora no"
+    }
+  },
+  "feedback": {
+    "mark": "Beta",
+    "open": "Enviar feedback",
+    "ask": "¿Qué faltó, se rompió o molestó?",
+    "goesCloud": "Lo que escribas va por correo al equipo de agentes.chat.",
+    "goesServer": "Lo que escribas va por correo a quien administra este servidor.",
+    "placeholder": "Escríbelo a tu manera",
+    "report": "Reportar un problema aquí",
+    "aboutMessage": "Sobre el mensaje de {{name}}",
+    "aboutItem": "Sobre: {{name}}",
+    "aboutThis": "Sobre lo que pulsaste",
+    "aboutDrop": "No enviar este fragmento",
+    "attach": "Adjuntar foto o video",
+    "filesHint": "Hasta {{images}} fotos de {{imageMb}} MB y un video de {{videoMb}} MB, guardados durante {{days}} días.",
+    "removeFile": "Quitar {{name}}",
+    "uploading": "Enviando {{name}}",
+    "fileType": "Solo se pueden adjuntar fotos y videos.",
+    "fileTooLarge": "{{name}} es demasiado grande: el límite es {{mb}} MB.",
+    "fileTooMany": "Un feedback admite hasta {{images}} fotos y un video.",
+    "send": "Enviar",
+    "thanks": "Entregado. ¡Gracias!",
+    "reply": "Se lee todo. La respuesta, si hace falta, llega a {{email}}.",
+    "another": "Enviar otro"
   }
 }

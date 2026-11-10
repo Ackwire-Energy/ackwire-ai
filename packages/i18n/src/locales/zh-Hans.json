@@ -16724,5 +16724,65 @@
     },
     "approvals": "发给客户的内容需要你批准。等你信任它们后，可以再放开。",
     "approvalsPersonal": "凡是以你的名义发送、付款或预订的内容，都要等你批准。等你信任它们后，可以再放开。"
+  },
+  "arrival": {
+    "beta": {
+      "word": "BETA",
+      "title": "你来得很早，真好。",
+      "text": "agentes.chat 还在测试阶段：已经可以用它做真正的工作，我们也还在继续打磨。",
+      "weekly": {
+        "title": "每周都在变好",
+        "text": "新功能和修复会不断推出。"
+      },
+      "fails": {
+        "title": "有时会出问题",
+        "text": "如果卡住或看起来不对，那是我们的问题，不是你的。"
+      },
+      "feedback": {
+        "title": "你的反馈决定接下来做什么",
+        "text": "告诉我们缺了什么、哪里让你不顺手。我们每条都看。"
+      },
+      "where": "想给我们留言，请点侧边栏底部的“发送反馈”。"
+    },
+    "stage": {
+      "ready": "你的团队准备好了",
+      "wake": "只差一个 AI 就能醒来。",
+      "morning": "早上好，团队",
+      "awake": "大家都醒了，已经开始思考。"
+    },
+    "connect": {
+      "title": "连接一个 AI，让你的团队开始思考",
+      "text": "用你已有的订阅即可，你的套餐不会有任何变化。",
+      "others": "其他套餐",
+      "free": "免费开始",
+      "freeText": "使用 OpenCode 的免费模型",
+      "noPlan": "无需订阅",
+      "without": "没有 AI，智能体不会回复。",
+      "later": "暂时不用"
+    }
+  },
+  "feedback": {
+    "mark": "Beta",
+    "open": "发送反馈",
+    "ask": "缺了什么、哪里坏了，或者哪里让你不顺手？",
+    "goesCloud": "你写的内容会通过邮件发给 agentes.chat 团队。",
+    "goesServer": "你写的内容会通过邮件发给管理这台服务器的人。",
+    "placeholder": "随意写就好",
+    "report": "在这里报告问题",
+    "aboutMessage": "关于 {{name}} 的消息",
+    "aboutItem": "关于：{{name}}",
+    "aboutThis": "关于你点击的内容",
+    "aboutDrop": "不发送这段摘录",
+    "attach": "添加照片或视频",
+    "filesHint": "最多 {{images}} 张照片（每张 {{imageMb}} MB）和一个视频（{{videoMb}} MB），保留 {{days}} 天。",
+    "removeFile": "移除 {{name}}",
+    "uploading": "正在发送 {{name}}",
+    "fileType": "只能添加照片和视频。",
+    "fileTooLarge": "{{name}} 太大了：上限是 {{mb}} MB。",
+    "fileTooMany": "一条反馈最多可带 {{images}} 张照片和一个视频。",
+    "send": "发送",
+    "thanks": "已送达，谢谢！",
+    "reply": "每条都会有人看。如需回复，会发到 {{email}}。",
+    "another": "再发一条"
   }
 }

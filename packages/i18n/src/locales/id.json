@@ -16649,5 +16649,65 @@
     },
     "approvals": "Yang dikirim ke pelanggan menunggu persetujuanmu. Kamu bisa melepasnya nanti, saat sudah percaya pada mereka.",
     "approvalsPersonal": "Apa pun yang dikirim, dibayar, atau dipesan atas namamu menunggu persetujuanmu. Kamu bisa melepasnya nanti, saat sudah percaya pada mereka."
+  },
+  "arrival": {
+    "beta": {
+      "word": "BETA",
+      "title": "Kamu datang lebih awal. Senang kamu di sini.",
+      "text": "agentes.chat masih beta: kamu sudah bisa benar-benar bekerja dengannya, dan kami masih memolesnya.",
+      "weekly": {
+        "title": "Makin baik tiap minggu",
+        "text": "Hal baru dan perbaikan terus keluar."
+      },
+      "fails": {
+        "title": "Kadang ada yang gagal",
+        "text": "Kalau macet atau terlihat aneh, itu salah kami, bukan kamu."
+      },
+      "feedback": {
+        "title": "Masukanmu menentukan yang berikutnya",
+        "text": "Ceritakan apa yang kurang atau mengganggu. Kami baca semuanya."
+      },
+      "where": "Untuk menulis ke kami, pakai Kirim masukan, di bagian bawah bilah sisi."
+    },
+    "stage": {
+      "ready": "Timmu sudah siap",
+      "wake": "Tinggal butuh AI supaya bangun.",
+      "morning": "Selamat pagi, tim",
+      "awake": "Semua sudah bangun dan mulai berpikir."
+    },
+    "connect": {
+      "title": "Hubungkan AI supaya timmu bisa berpikir",
+      "text": "Pakai langganan yang sudah kamu punya. Tidak ada yang berubah di paketmu.",
+      "others": "Paket lain",
+      "free": "Mulai gratis",
+      "freeText": "Dengan model gratis OpenCode",
+      "noPlan": "Tanpa langganan",
+      "without": "Tanpa AI, agen tidak menjawab.",
+      "later": "Nanti saja"
+    }
+  },
+  "feedback": {
+    "mark": "Beta",
+    "open": "Kirim masukan",
+    "ask": "Apa yang kurang, rusak, atau mengganggu?",
+    "goesCloud": "Yang kamu tulis dikirim lewat email ke tim agentes.chat.",
+    "goesServer": "Yang kamu tulis dikirim lewat email ke pengelola server ini.",
+    "placeholder": "Tulis dengan caramu",
+    "report": "Laporkan masalah di sini",
+    "aboutMessage": "Tentang pesan {{name}}",
+    "aboutItem": "Tentang: {{name}}",
+    "aboutThis": "Tentang yang kamu klik",
+    "aboutDrop": "Jangan kirim kutipan ini",
+    "attach": "Lampirkan foto atau video",
+    "filesHint": "Hingga {{images}} foto berukuran {{imageMb}} MB dan satu video {{videoMb}} MB, disimpan selama {{days}} hari.",
+    "removeFile": "Hapus {{name}}",
+    "uploading": "Mengirim {{name}}",
+    "fileType": "Hanya foto dan video yang bisa dilampirkan.",
+    "fileTooLarge": "{{name}} terlalu besar: batasnya {{mb}} MB.",
+    "fileTooMany": "Satu masukan memuat hingga {{images}} foto dan satu video.",
+    "send": "Kirim",
+    "thanks": "Terkirim. Terima kasih!",
+    "reply": "Semua dibaca. Balasan, kalau perlu, dikirim ke {{email}}.",
+    "another": "Kirim lagi"
   }
 }

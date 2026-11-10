@@ -17282,5 +17282,65 @@
     },
     "approvals": "Wat naar klanten gaat, wacht op je goedkeuring. Je kunt het later vrijgeven, als je ze vertrouwt.",
     "approvalsPersonal": "Alles wat in jouw naam wordt verstuurd, betaald of geboekt, wacht op je goedkeuring. Je kunt het later vrijgeven, als je ze vertrouwt."
+  },
+  "arrival": {
+    "beta": {
+      "word": "BETA",
+      "title": "Je bent er vroeg bij. Fijn dat je er bent.",
+      "text": "agentes.chat is in bèta: je kunt er al echt mee werken, en we schaven er nog aan.",
+      "weekly": {
+        "title": "Het wordt elke week beter",
+        "text": "Nieuwe dingen en verbeteringen komen voortdurend uit."
+      },
+      "fails": {
+        "title": "Soms gaat er iets mis",
+        "text": "Als het vastloopt of er vreemd uitziet, ligt dat aan ons, niet aan jou."
+      },
+      "feedback": {
+        "title": "Jouw feedback bepaalt wat er komt",
+        "text": "Vertel ons wat er ontbrak of in de weg zat. We lezen alles."
+      },
+      "where": "Gebruik Feedback sturen, onderaan de zijbalk, om ons te schrijven."
+    },
+    "stage": {
+      "ready": "Je team staat klaar",
+      "wake": "Het heeft alleen nog een AI nodig om wakker te worden.",
+      "morning": "Goedemorgen, team",
+      "awake": "Iedereen is wakker en denkt al mee."
+    },
+    "connect": {
+      "title": "Koppel een AI zodat je team kan denken",
+      "text": "Gebruik een abonnement dat je al hebt. Aan je abonnement verandert niets.",
+      "others": "Ander abonnement",
+      "free": "Gratis beginnen",
+      "freeText": "Met de gratis modellen van OpenCode",
+      "noPlan": "Zonder abonnement",
+      "without": "Zonder AI antwoorden de agents niet.",
+      "later": "Niet nu"
+    }
+  },
+  "feedback": {
+    "mark": "Beta",
+    "open": "Feedback sturen",
+    "ask": "Wat ontbrak er, ging er stuk of zat in de weg?",
+    "goesCloud": "Wat je schrijft gaat per e-mail naar het team van agentes.chat.",
+    "goesServer": "Wat je schrijft gaat per e-mail naar degene die deze server beheert.",
+    "placeholder": "Schrijf het op jouw manier",
+    "report": "Hier een probleem melden",
+    "aboutMessage": "Over het bericht van {{name}}",
+    "aboutItem": "Over: {{name}}",
+    "aboutThis": "Over waar je op klikte",
+    "aboutDrop": "Dit fragment niet versturen",
+    "attach": "Foto of video toevoegen",
+    "filesHint": "Maximaal {{images}} foto's van {{imageMb}} MB en één video van {{videoMb}} MB, {{days}} dagen bewaard.",
+    "removeFile": "{{name}} verwijderen",
+    "uploading": "{{name}} wordt verstuurd",
+    "fileType": "Je kunt alleen foto's en video's toevoegen.",
+    "fileTooLarge": "{{name}} is te groot: de limiet is {{mb}} MB.",
+    "fileTooMany": "Eén feedback kan maximaal {{images}} foto's en één video bevatten.",
+    "send": "Versturen",
+    "thanks": "Afgeleverd. Bedankt!",
+    "reply": "Alles wordt gelezen. Een antwoord, als dat nodig is, komt naar {{email}}.",
+    "another": "Nog een sturen"
   }
 }
