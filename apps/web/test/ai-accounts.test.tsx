@@ -104,7 +104,7 @@ describe("IA e uso: the viewer's own accounts", () => {
     const [work, mm] = rows();
     // Closed: its name, plan and owner, and one meter for its fullest window.
     const head = work?.querySelector(".plan-row__head") as HTMLElement;
-    expect(head.textContent).toContain("TrabalhoTeamde Walter");
+    expect(head.textContent).toContain("Trabalho\u2002Team\u2002de Walter");
     expect(head.querySelector(".ac-planmeter__line")?.textContent).toBe("5h 84%");
     expect(within(head).getAllByRole("meter")).toHaveLength(1);
     // Near its limit: what matters then on one line under them, and the row starts open.

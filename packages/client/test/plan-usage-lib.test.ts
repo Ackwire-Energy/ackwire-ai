@@ -2,11 +2,13 @@ import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
 import type { AgentBrainLine, AiAccounts, AiComputer, AiStatus, PlanAccountUsage, PlanUsage } from "../src/api/types";
 import {
+  accountOwner,
   accountShares,
   groupUsageAccounts,
   ownPlanLines,
   planMeterText,
   SHARES_SHOWN,
+  shareFacts,
   splitUsage,
   usageShown,
   workspaceUsesApi,
@@ -331,6 +333,22 @@ describe("a plan account's agents in one list, its bar split by agent (Contas do
     const segments = split.windows[0]?.segments ?? [];
     expect(segments).toHaveLength(SHARES_SHOWN);
     expect(segments.reduce((sum, g) => sum + g.value, 0)).toBeLessThanOrEqual(3);
+  });
+});
+
+describe("an agent's line under an account's bars, and whose the account is", () => {
+  const t = ((key: string, o?: Record<string, string>) =>
+    `${key}${o ? `(${Object.values(o).join(",")})` : ""}`) as unknown as TFunction;
+
+  test("the share only while a window has parts; tokens, else that it is on it now, else nothing", () => {
+    expect(shareFacts(t, "en", "week", { share: 48, tokens: 1200 })).toMatch(/^ · week 48\s?% · usageViews\.tokens\(/);
+    expect(shareFacts(t, "en", null, { share: 0, tokens: 0, now: true })).toBe(" · usageViews.usesNow");
+    expect(shareFacts(t, "en", null, { share: 0, tokens: 0 })).toBe("");
+  });
+
+  test("the owner by first name; no owner named, no words", () => {
+    expect(accountOwner(t, { ownerName: "Ana  Souza Lima" })).toBe("usageViews.whose(Ana)");
+    expect(accountOwner(t, { ownerName: null })).toBeNull();
   });
 });
 

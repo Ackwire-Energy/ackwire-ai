@@ -212,7 +212,7 @@ describe("IA e uso › Contas with many accounts and long names", () => {
     const heads = rows.map((r) => r.querySelector(".plan-row__head") as HTMLElement);
     // Names wrap whole, never cut: the words are all there, the plan and whose it is after them.
     expect(heads.map((h) => h.querySelector(".plan-acct__name")?.textContent)).toEqual(
-      MANY.map((a) => `${a.label}Teamde Maximiliano`),
+      MANY.map((a) => `${a.label}\u2002Team\u2002de Maximiliano`),
     );
     // One meter each, none while nothing is known: never 0%.
     expect(heads.map((h) => within(h).queryAllByRole("meter").length)).toEqual([...Array(11).fill(1), 0]);

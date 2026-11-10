@@ -466,7 +466,7 @@ describe("Configurações do workspace", () => {
     const plans = screen().getByRole("region", { name: "Contas" });
     const head = within(plans).getByRole("button", { name: /^A conta que os seus agentes dividem/ });
     // Closed: its name, plan and owner, and one meter, the fullest window. One computer: it isn't named.
-    expect(head.textContent).toBe("A conta que os seus agentes dividemMaxde Walter5h 62%");
+    expect(head.textContent).toBe("A conta que os seus agentes dividem\u2002Max\u2002de Walter5h 62%");
     expect(head.getAttribute("aria-expanded")).toBe("false");
     expect(within(plans).getAllByRole("meter")).toHaveLength(1);
     expect(plans.textContent).not.toContain("MacBook");

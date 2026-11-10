@@ -147,15 +147,15 @@ export interface PersonalSettings {
  * A personal workspace's settings on the phone (ADR 0159 §3), from the sections this person opens, as the web lists
  * them (`personalSettingsNav`): About you, AI and usage, Connectors, Vault and Computers in one list, with People
  * after About you once someone else is a member (`others`, unknown while loading: it doesn't); every other one under
- * Advanced. Only where a section is listed
- * changes: each opens the same screen, with the same permission, as in a team's workspace.
+ * Advanced. Only where a section is listed changes: each opens the same screen, with the same permission, as in a
+ * team's workspace.
  */
 export const personalSections = (org: OrgSummary | null | undefined, others: number | undefined): PersonalSettings =>
   personalSettingsNav(visibleSections(org), others);
 
 /**
  * What the AI accounts screen lists at its foot in a personal workspace: the sections it holds (`personalSettingsHost`),
- * those this person opens. None now that Connectors has its own row.
+ * those this person opens. No section is held there: Connectors and Skills have rows of their own.
  */
 export function personalAiParts(org: OrgSummary | null | undefined): SettingsEntry[] {
   const open = visibleSections(org);

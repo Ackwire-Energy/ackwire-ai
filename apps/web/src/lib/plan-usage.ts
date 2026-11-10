@@ -6,6 +6,7 @@ import type { TFunction } from "i18next";
 // The words of the usage views live in the client, shared with the phone (ADR 0063).
 export {
   accountName,
+  accountOwner,
   accountShares,
   brandOf,
   groupUsageAccounts,
@@ -14,6 +15,7 @@ export {
   ownPlanLines,
   partedUsage,
   planMeterText,
+  shareFacts,
   splitUsage,
   usageShown,
   usageSourceName,

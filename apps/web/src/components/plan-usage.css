@@ -82,24 +82,32 @@ html:not([data-pointer]) .plan-row__head:focus-visible {
   grid-column: 2;
   margin-block: var(--space-1);
   overflow-wrap: anywhere;
+  text-wrap: wrap;
+}
+/* The plan and whose it is follow the name as words, a wide space apart in the markup: a margin would indent the one
+   that starts a line. */
+.plan-row__head .plan-acct__chip {
+  margin-left: 0;
 }
 .plan-row__meter {
   grid-column: 3;
   min-height: var(--line);
   align-content: center;
 }
-/* Whose it is follows the name and its plan as words, wrapping with them. */
+/* "de Ana" moves to the next line whole. */
 .plan-row__owner {
-  margin-left: var(--space-2);
+  white-space: nowrap;
   font-size: 13.5px;
   font-weight: 400;
   color: var(--muted);
 }
-/* Its own column, also on a row with no meter. An icon as tall as the line stays 16 wide, drawn on its middle. */
+/* Its own column, also on a row with no meter, on the middle of the first line: `--glyph` is the size the icon is
+   drawn at, which its own style sets and a height here could not change. */
 .plan-row__chevron {
+  --glyph: 16px;
   grid-column: 4;
   grid-row: 1;
-  height: var(--line);
+  margin-block: calc((var(--line) - var(--glyph)) / 2);
   color: var(--faint);
   transition: rotate var(--dur-base) ease;
 }
@@ -243,7 +251,7 @@ html:not([data-pointer]) .plan-row__head:focus-visible {
   grid-template-columns: 28px minmax(0, 150px) minmax(0, 1fr) 170px;
   align-items: center;
   gap: 12px;
-  /* The plans' rows' depth (`.plan-block`), so the page's two lists keep one rhythm. */
+  /* The accounts' rows' depth (`.plan-row__head`), so the page's two lists keep one rhythm. */
   padding: var(--row-py) 0;
   color: inherit;
   text-decoration: none;

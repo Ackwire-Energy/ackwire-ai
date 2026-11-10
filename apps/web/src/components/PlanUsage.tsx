@@ -35,11 +35,13 @@ import { useDirectory } from "@/hooks/useDirectory";
 import { useRightHandLook } from "@/hooks/useRightHandLook";
 import {
   accountName,
+  accountOwner,
   accountShares,
   brandOf,
   groupUsageAccounts,
   noWindowsText,
   planMeterText,
+  shareFacts,
   splitUsage,
 } from "@/lib/plan-usage";
 import "./plan-usage.css";
@@ -51,11 +53,13 @@ import "./plan-usage.css";
  * only where the server sent it (`view_usage`).
  */
 
+/** An en space between a row's name, its plan and whose it is: it ends a line unseen where a margin would indent the next. */
+const WIDE_SPACE = "\u2002";
+
 /** An account's head: the maker's mark, its name and plan, its maker and whose it is. */
 export function AccountHead({ account, extra }: { account: PlanAccountInfo; extra?: string | null }) {
   const { t } = useTranslation();
-  const whose =
-    account.email ?? (account.ownerName ? t("usageViews.whose", { name: account.ownerName.split(" ")[0] }) : null);
+  const whose = account.email ?? accountOwner(t, account);
   return (
     <div className="plan-acct ac-mediarow ac-mediarow--row">
       <span className="ac-mediarow__face">
@@ -191,7 +195,7 @@ function AccountRow({
   const list = shares.shown.length > 0 && (
     <AgentShares shares={shares} window={shares.window ? text.short(shares.window) : null} />
   );
-  const owner = account.ownerName ? t("usageViews.whose", { name: account.ownerName.split(" ")[0] }) : null;
+  const owner = accountOwner(t, account);
   return (
     <div className="plan-row" data-open={open || undefined}>
       <button
@@ -207,11 +211,24 @@ function AccountRow({
         <ProviderLogo id={account.provider ?? account.kind} size="sm" off={account.signedOut} />
         <span className="plan-acct__name">
           {accountName(t, account)}
-          {account.plan && <span className="plan-acct__chip">{planName(account.plan)}</span>}
-          {account.signedOut && (
-            <span className="plan-acct__chip plan-acct__chip--out">{t("usageViews.signedOut")}</span>
+          {account.plan && (
+            <>
+              {WIDE_SPACE}
+              <span className="plan-acct__chip">{planName(account.plan)}</span>
+            </>
           )}
-          {owner && <span className="plan-row__owner">{owner}</span>}
+          {account.signedOut && (
+            <>
+              {WIDE_SPACE}
+              <span className="plan-acct__chip plan-acct__chip--out">{t("usageViews.signedOut")}</span>
+            </>
+          )}
+          {owner && (
+            <>
+              {WIDE_SPACE}
+              <span className="plan-row__owner">{owner}</span>
+            </>
+          )}
         </span>
         {line?.top && (
           <span
@@ -260,7 +277,7 @@ function AccountRow({
                   {list}
                 </>
               )}
-              {account.agents.length > 0 && (
+              {account.monthTokens > 0 && (
                 <span className="plan-block__month">
                   {t("usageViews.monthTokens", { tokens: formatTokensShort(t, i18n.language, account.monthTokens) })}
                   {money && typeof account.equivalentUsd === "number" && (
@@ -298,18 +315,6 @@ function AgentShares({ shares, window }: { shares: ReturnType<typeof accountShar
   const { org } = useOrg();
   const dir = useDirectory(org.id);
   const [open, setOpen] = useState(false);
-  const facts = (share: number, n: number, now = false) =>
-    [
-      window ? `${window} ${formatPercent(i18n.language, share)}` : null,
-      n > 0
-        ? t("usageViews.tokens", { tokens: formatTokensShort(t, i18n.language, n) })
-        : now
-          ? t("usageViews.usesNow")
-          : null,
-    ]
-      .filter(Boolean)
-      .map((fact) => ` · ${fact}`)
-      .join("");
   return (
     <div className="plan-shares">
       {(open ? [...shares.shown, ...shares.rest] : shares.shown).map((a) => {
@@ -325,7 +330,7 @@ function AgentShares({ shares, window }: { shares: ReturnType<typeof accountShar
             <AgentAvatar agentId={a.agentId} size="xs" name={name} />
             <span>
               <b>{name}</b>
-              {facts(a.share, a.tokens, a.now)}
+              {shareFacts(t, i18n.language, window, a)}
             </span>
           </Link>
         );
@@ -335,7 +340,7 @@ function AgentShares({ shares, window }: { shares: ReturnType<typeof accountShar
           <span />
           <span>
             <b>{t("usageViews.moreAgents", { count: shares.rest.length })}</b>
-            {facts(shares.restShare, shares.restTokens)}
+            {shareFacts(t, i18n.language, window, { share: shares.restShare, tokens: shares.restTokens })}
           </span>
         </button>
       )}

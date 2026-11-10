@@ -15,11 +15,13 @@ import { formatPercent, formatShortDate, formatTokensShort, formatUsd } from "@a
 import { can } from "@agenteschat/client/lib/permissions";
 import {
   accountName,
+  accountOwner,
   accountShares,
   brandOf,
   groupUsageAccounts,
   noWindowsText,
   planMeterText,
+  shareFacts,
   splitUsage,
 } from "@agenteschat/client/lib/plan-usage";
 import { planName } from "@agenteschat/client/lib/plans";
@@ -47,6 +49,7 @@ import {
   useToast,
 } from "@/ui";
 import { router } from "@/ui/navigation";
+import { LOGO_SIZES } from "@/ui/provider-marks";
 import { PlanHoldNote, usePlanHold } from "../ai/parts";
 import { AgentFace } from "../shared/Face";
 import { FirstUse } from "../shared/FirstUse";
@@ -64,6 +67,9 @@ import { MyUsageCard, PeopleList } from "./people";
  */
 
 const openAiAccounts = () => router.push("/ai-accounts");
+
+/** An account row's mark (`ProviderLogo` at `sm`): what stands beside it centres on this. */
+const ROW_MARK = LOGO_SIZES.sm[0];
 
 export const openAgentUsage = (agentId: string) => router.push(`/agent-usage/${agentId}` as never);
 
@@ -242,7 +248,7 @@ function AccountRow({
     shares.shown.length > 0 ? (
       <AgentShares shares={shares} window={shares.window ? text.short(shares.window) : null} />
     ) : null;
-  const owner = account.ownerName ? t("usageViews.whose", { name: account.ownerName.split(" ")[0] }) : null;
+  const owner = accountOwner(t, account);
   return (
     <View>
       <Pressable
@@ -265,7 +271,7 @@ function AccountRow({
               </Text>
             ) : null}
           </View>
-          <View style={open ? styles.turned : undefined}>
+          <View style={[styles.chevron, open && styles.turned]}>
             <Icon name="right" size={14} color={c.faint} />
           </View>
         </View>
@@ -304,7 +310,7 @@ function AccountRow({
                 {list}
               </>
             )}
-            {account.agents.length > 0 ? (
+            {account.monthTokens > 0 ? (
               money && typeof account.equivalentUsd === "number" ? (
                 <InfoHint
                   name={t("common.about", { label: t("usageViews.apiPrice") })}
@@ -343,18 +349,6 @@ function AgentShares({ shares, window }: { shares: ReturnType<typeof accountShar
   const dir = useDirectory();
   const c = useColors();
   const [open, setOpen] = useState(false);
-  const facts = (share: number, n: number, now = false) =>
-    [
-      window ? `${window} ${formatPercent(i18n.language, share)}` : null,
-      n > 0
-        ? t("usageViews.tokens", { tokens: formatTokensShort(t, i18n.language, n) })
-        : now
-          ? t("usageViews.usesNow")
-          : null,
-    ]
-      .filter(Boolean)
-      .map((fact) => ` · ${fact}`)
-      .join("");
   const divided = { borderTopColor: c.line, borderTopWidth: StyleSheet.hairlineWidth };
   return (
     <View>
@@ -370,7 +364,7 @@ function AgentShares({ shares, window }: { shares: ReturnType<typeof accountShar
             <Text variant="small" tone="ink" style={styles.bold}>
               {dir.agentById.get(a.agentId)?.name ?? a.name}
             </Text>
-            {facts(a.share, a.tokens, a.now)}
+            {shareFacts(t, i18n.language, window, a)}
           </Text>
         </Pressable>
       ))}
@@ -386,7 +380,7 @@ function AgentShares({ shares, window }: { shares: ReturnType<typeof accountShar
             <Text variant="small" tone="ink" style={styles.bold}>
               {t("usageViews.moreAgents", { count: shares.rest.length })}
             </Text>
-            {facts(shares.restShare, shares.restTokens)}
+            {shareFacts(t, i18n.language, window, { share: shares.restShare, tokens: shares.restTokens })}
           </Text>
         </Pressable>
       ) : null}
@@ -513,17 +507,22 @@ const styles = StyleSheet.create({
   divided: { borderTopWidth: StyleSheet.hairlineWidth },
   // An account's row: one step (12) between everything in it, a finger's 44 points at least to open it.
   row: { gap: 12, paddingVertical: 12, minHeight: 44, justifyContent: "center" },
-  rowHead: { flexDirection: "row", alignItems: "center", gap: 12 },
-  // The name wraps instead of losing its end, its plan and whose it is after it, on the next line with no room.
+  // A name that wraps keeps the mark and the chevron on its first line, never at the middle of a tall row.
+  rowHead: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
+  // The name wraps instead of losing its end, its plan and whose it is after it, on the next line with no room. One
+  // line sits on the mark's middle.
   rowName: {
     flex: 1,
     minWidth: 0,
+    minHeight: ROW_MARK,
     flexDirection: "row",
     flexWrap: "wrap",
     alignItems: "center",
+    alignContent: "center",
     columnGap: 7,
     rowGap: 4,
   },
+  chevron: { height: ROW_MARK, justifyContent: "center" },
   rowMeter: { gap: 4 },
   turned: { transform: [{ rotate: "90deg" }] },
   rowBody: { gap: 12, paddingBottom: 12 },

@@ -11,7 +11,15 @@ import type {
   PlanWindowParts,
 } from "../api/types";
 import { accountTitle, groupPlans, ownSignInName, ownSignIns, ownSignInTitle } from "./ai-accounts";
-import { daysBetween, formatPercent, formatShortDate, formatTime, relativeTime } from "./format";
+import {
+  daysBetween,
+  firstName,
+  formatPercent,
+  formatShortDate,
+  formatTime,
+  formatTokensShort,
+  relativeTime,
+} from "./format";
 import { brainName } from "./outages";
 import { modelLimitOf, ownLimitsModel, planOf } from "./plans";
 
@@ -328,6 +336,33 @@ export function accountShares(account: Pick<PlanAccountUsage, "usage" | "agents"
     restTokens: rest.reduce((sum, r) => sum + r.tokens, 0),
   };
 }
+
+/**
+ * What follows an agent's name on its line under an account's bars: " · semana 48% · 4,8 mi tokens". The share only
+ * while a window has parts (`window`, its short name); with no tokens yet, "usa agora" for an agent on it right now.
+ */
+export function shareFacts(
+  t: TFunction,
+  lang: string,
+  window: string | null,
+  row: { share: number; tokens: number; now?: boolean },
+) {
+  return [
+    window ? `${window} ${formatPercent(lang, row.share)}` : null,
+    row.tokens > 0
+      ? t("usageViews.tokens", { tokens: formatTokensShort(t, lang, row.tokens) })
+      : row.now
+        ? t("usageViews.usesNow")
+        : null,
+  ]
+    .filter(Boolean)
+    .map((fact) => ` · ${fact}`)
+    .join("");
+}
+
+/** Whose a plan account is, in words: "de Ana" (the first name); null where the server names no owner. */
+export const accountOwner = (t: TFunction, a: Pick<PlanAccountInfo, "ownerName">) =>
+  a.ownerName ? t("usageViews.whose", { name: firstName(a.ownerName) }) : null;
 
 type AccountWindows = NonNullable<PlanAccountUsage["usage"]>;
 
