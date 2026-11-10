@@ -20,6 +20,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useNow } from "@/hooks/useNow";
+import { inlineWords } from "@/lib/markdown";
 import { useToast } from "@/lib/toast";
 import { AgentAvatar } from "../AgentAvatar";
 import { useOpenComputer } from "../computer/open";
@@ -239,7 +240,7 @@ export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
                 <Icon name="close" size={16} />
                 {t("browser.card.failed")}
               </div>
-              {current.note && <div className="brw-rq__why">“{current.note}”</div>}
+              {current.note && <div className="brw-rq__why">“{inlineWords(current.note)}”</div>}
             </>
           )}
           {status === "expired" && settled && (

@@ -110,8 +110,20 @@ test("a card's rows start under its title: a row's hover never covers it", () =>
 });
 
 test("two agents talking is one pair row; on a reach line it ends where the list's own line ends", () => {
-  expect(value(".consult-pair__row", "display")).toBe("inline-flex");
+  // Long names wrap whole, never cut: the row is one centred sentence, each face kept with its name's first word, the
+  // faces and the ⇄ on the capitals of the words beside them.
   expect(value(".consult-pair__name", "text-overflow")).toBeUndefined();
+  expect(value(".consult-pair__name", "overflow")).toBeUndefined();
+  expect(value(".consult-pair__row", "white-space")).toBeUndefined();
+  expect(value(".consult-pair__row", "display")).toBe("inline-block");
+  expect(value(".consult-pair__row", "text-align")).toBe("center");
+  expect(value(".consult-pair__row", "line-height")).toBe("18px");
+  expect(value(".consult-pair__who", "white-space")).toBe("nowrap");
+  expect(value(".consult-pair__who>.consult-pair__name", "white-space")).toBe("normal");
+  expect(value(".consult-pair__faces", "vertical-align")).toContain("var(--cap-mid)");
+  expect(value(".consult-pair__faces", "display")).toBe("inline-flex");
+  expect(value(".consult-pair__word", "white-space")).toBe("nowrap");
+  expect(value(".consult-pair__swap", "vertical-align")).toContain("var(--cap-mid)");
   expect(value(".ag-rcs .ag-rc--talk>.consult-pair", "padding-inline")).toBe("calc(16px - var(--msg-inline))");
 });
 

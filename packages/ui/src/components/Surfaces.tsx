@@ -51,8 +51,8 @@ export function CardHeader({
 }) {
   const heading = <h2 id={id}>{title}</h2>;
   return (
-    <div className="ac-card__head ac-actrow">
-      <div className={cx("ac-card__lead ac-actrow__text", (icon || mark) && "ac-iconline")}>
+    <div className="ac-card__head ac-actline">
+      <div className={cx("ac-card__lead", (icon || mark) && "ac-iconline")}>
         {(icon || mark) && (
           <span className="ac-card__key" aria-hidden="true">
             {mark ? <ProviderLogo id={mark} size="xs" /> : icon && <Icon name={icon} size={16} />}

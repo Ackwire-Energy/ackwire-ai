@@ -69,6 +69,15 @@ describe("the event pill", () => {
     expect(src("ui/index.ts")).toContain('} from "./EventPill";');
   });
 
+  test("actions under the sentence keep the room the sentence has over it: 7 from the frame's edge (#8)", () => {
+    const pill = src("ui/EventPill.tsx");
+    expect(pill).toMatch(/main: \{[^}]*paddingVertical: 6,/);
+    expect(pill).toMatch(/under: \{[^}]*paddingBottom: 1,/);
+    expect(pill).toContain("actionUnder: { paddingHorizontal: 0, minHeight: 28,");
+    // No hairline before an action under the sentence, so the frame's edge is never doubled.
+    expect(pill).toContain("{stacked ? null : <View style={[styles.rule, { backgroundColor: c.line }]} />}");
+  });
+
   test("a sentence that wraps keeps its mark and its time on its first line, not between two lines (#8)", () => {
     const pill = src("ui/EventPill.tsx");
     // The row tops its parts; the mark sits where the eye reads the words' first line, the time is one such line.

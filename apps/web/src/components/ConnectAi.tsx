@@ -513,7 +513,8 @@ function ConnectAiDialog({
           </div>
         </div>
         <div className="arrival-main">
-          <div className="ac-dialog__head ac-actrow">
+          {/* The kit's dialog head (Dialog.tsx), in the column beside the stage. */}
+          <div className="ac-dialog__head">
             {stepping && (
               <span className="ac-dialog__lead">
                 <Button
@@ -529,10 +530,12 @@ function ConnectAiDialog({
                 />
               </span>
             )}
-            <span className="ac-dialog__title ac-actrow__text" aria-hidden="true">
-              {chosen ? stepTitle(t, choice) : t("arrival.connect.title")}
-            </span>
-            <span className="ac-dialog__acts ac-acts">
+            <div className="ac-actline">
+              <span className="ac-dialog__title" aria-hidden="true">
+                {chosen ? stepTitle(t, choice) : t("arrival.connect.title")}
+              </span>
+            </div>
+            <span className="ac-dialog__close ac-acts">
               <Button
                 variant="ghost"
                 size="sm"

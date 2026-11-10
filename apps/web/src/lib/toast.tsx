@@ -135,47 +135,51 @@ export function ToastProvider({
           {toasts.map((toast) => (
             <div
               key={toast.id}
-              className={`ac-toast ac-actrow ac-toast--${toast.tone}`}
+              className={`ac-toast ac-toast--${toast.tone}`}
               role={toast.tone === "error" ? "alert" : "status"}
               data-leaving={toast.leaving || undefined}
             >
               <Icon name={toast.tone === "error" || toast.tone === "warning" ? "alert" : "check"} />
-              <span className="ac-toast__text ac-actrow__text">
-                {toast.detail ? (
-                  <>
-                    <b className="ac-toast__title">
-                      <ToastWords toast={toast} />
-                    </b>
-                    <small className="ac-toast__detail">{toast.detail}</small>
-                  </>
-                ) : (
-                  <ToastWords toast={toast} />
-                )}
+              {/* Actions that don't fit beside the words go under them, the × stays beside the first line. */}
+              <span className="ac-actline">
+                <span className="ac-toast__text">
+                  {toast.detail ? (
+                    <>
+                      <b className="ac-toast__title">
+                        <ToastWords toast={toast} />
+                      </b>
+                      <small className="ac-toast__detail">{toast.detail}</small>
+                    </>
+                  ) : (
+                    <ToastWords toast={toast} />
+                  )}
+                </span>
+                {toast.actions?.length ? (
+                  <span className="ac-toast__acts ac-acts">
+                    {toast.actions.map((action) => (
+                      <button
+                        key={action.label}
+                        type="button"
+                        className="ac-btn ac-btn--ghost ac-btn--sm"
+                        onClick={() => {
+                          action.run();
+                          store.dismiss(toast.id);
+                        }}
+                      >
+                        {action.label}
+                      </button>
+                    ))}
+                  </span>
+                ) : null}
               </span>
-              {/* One item after the words (`.ac-actrow`): the action and the × go under them together, never the × alone. */}
-              <span className="ac-toast__acts">
-                {toast.actions?.map((action) => (
-                  <button
-                    key={action.label}
-                    type="button"
-                    className="ac-btn ac-btn--ghost ac-btn--sm"
-                    onClick={() => {
-                      action.run();
-                      store.dismiss(toast.id);
-                    }}
-                  >
-                    {action.label}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  className="ac-btn ac-btn--ghost ac-btn--sm ac-btn--icon"
-                  aria-label={closeLabel}
-                  onClick={() => store.dismiss(toast.id)}
-                >
-                  <Icon name="close" size={16} />
-                </button>
-              </span>
+              <button
+                type="button"
+                className="ac-btn ac-btn--ghost ac-btn--sm ac-btn--icon ac-toast__close"
+                aria-label={closeLabel}
+                onClick={() => store.dismiss(toast.id)}
+              >
+                <Icon name="close" size={16} />
+              </button>
             </div>
           ))}
         </div>,

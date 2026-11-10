@@ -37,9 +37,10 @@
   .ac-card.apps-server {
     grid-template-columns: minmax(0, 1fr);
   }
+  /* Its lone main button takes the card's width (rule 23). */
   .apps-server__connect {
     grid-area: 3 / 1;
-    justify-self: start;
+    justify-self: stretch;
   }
 }
 

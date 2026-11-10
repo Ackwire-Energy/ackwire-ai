@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { atRule, builtCss, declarations, topLevel } from "./built-css";
 
-test("what ships wraps a hold from its top, its lead and its button on the first line; the other notices are one-line strips, and on phones all share the hold's top line and end their buttons at the right edge", async () => {
+test("what ships wraps a hold from its top, its lead and its button on the first line; the other notices are one-line strips, and on phones all share the hold's top line, end their buttons at the right edge and a lone main button takes the row", async () => {
   const css = await builtCss();
   const shipped = topLevel(css);
   const phone = atRule(css, "@media (max-width: 640px)");
@@ -47,10 +47,22 @@ test("what ships wraps a hold from its top, its lead and its button on the first
     "calc(11px - var(--cap-mid) - var(--control-h-sm) / 2) -12px 0 0",
   );
   // The buttons end the notice at its right edge, under the ×, a ghost's words on the padding line; the setup
-  // notice's faces end that row, so its button stays under the words. No button stretches.
+  // notice's faces end that row, so its button stays under the words. Of several, none stretches.
   expect(last(phone, ".outage__acts", "justify-content")).toBe("flex-end");
   expect(last(phone, ".outage__acts>.ac-btn--ghost:last-child", "margin-right")).toBe("-12px");
   expect(last(phone, ".setup-notice .outage__acts", "justify-content")).toBe("flex-start");
   expect(last(phone, ".setup-notice .outage__acts>.ac-btn--ghost:first-child", "margin-left")).toBe("-12px");
   expect(phone).not.toContain(".outage__acts>.ac-btn:not(.ac-btn--icon)");
+  // A lone main button takes the notice's width under the words (rule 23); words with no lead before them start on
+  // the padding, with no lift.
+  expect(last(phone, ".outage__acts:has(>.ac-btn:only-child:not(.ac-btn--ghost))", "grid-column")).toBe("1/-1");
+  expect(last(phone, ".outage__acts>.ac-btn:only-child:not(.ac-btn--ghost)", "flex")).toMatch(/^(1 1 auto|auto)$/);
+  expect(last(phone, ".outage>.outage__text:first-child", "grid-column")).toBe("1/-1");
+  expect(last(phone, ".outage>.outage__text:first-child", "translate")).toBe("none");
+  expect(last(shipped, ".hold-banner>.outage__text:first-child", "translate")).toBe("none");
+  // On a wider screen a hold with a plated button keeps the notice's room above and below it.
+  const wide = atRule(css, "@media (min-width: 641px)");
+  expect(last(wide, ".outage.hold-banner:has(>.outage__acts>.ac-btn:not(.ac-btn--ghost))", "padding-block")).toBe(
+    "calc(var(--action-clear) + var(--control-h-sm) / 2 - 11px)",
+  );
 });

@@ -323,7 +323,7 @@ html:not([data-pointer]) .routine-row__title:focus-visible {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 4px;
+  gap: var(--space-2);
 }
 .routine-row__actions .ac-switch {
   margin-right: 6px;
@@ -555,7 +555,6 @@ label.routine-onair__text {
 .routine-own li .ac-btn {
   width: 20px;
   height: 20px;
-  /* Touch grows small buttons to 40px; this one stays inside its 26px label. */
   min-width: 20px;
   min-height: 20px;
   margin-right: -6px;
@@ -611,6 +610,29 @@ label.routine-onair__text {
   flex: 1;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+/* On a phone the icon and the title share a line, when it runs and Cancelar go under them at the row's width. */
+@media (max-width: 640px) {
+  .routine-ahead__item {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr);
+    align-items: center;
+    gap: 2px 10px;
+  }
+  .routine-ahead__item > .routine-ahead__text {
+    display: contents;
+  }
+  .routine-ahead__item .routine-ahead__title {
+    margin-block-start: 0;
+  }
+  .routine-ahead__item small,
+  .routine-ahead__item > .ac-acts {
+    grid-column: 1 / -1;
+  }
+  .routine-ahead__item > .ac-acts {
+    height: auto;
+    margin: 4px 0 0;
+  }
 }
 .routine-ahead__title {
   display: block;
@@ -736,21 +758,16 @@ label.routine-onair__text {
   margin-top: 2px;
   color: var(--ink2);
 }
+/* The apps' logos lead its sentence on the first line, its later lines under them: never a column beside its words. */
 .routine-needs {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 6px;
   color: var(--ink2);
 }
 .routine-needs > .connector-icon {
   width: 24px;
   height: 24px;
+  margin-right: 6px;
+  vertical-align: middle;
   border-radius: var(--radius-sm);
-}
-.routine-needs > span:last-child {
-  flex: 1 1 200px;
-  min-width: 0;
 }
 .routine-needs__connect {
   display: block;
@@ -788,6 +805,17 @@ label.routine-onair__text {
   }
   .routines-horizon {
     padding: 12px 12px 0;
+  }
+}
+/* On a narrow phone the title, its line and when it runs keep the row's width: the switch and the ⋯ go under them. */
+@media (max-width: 480px) {
+  .routine-row__main {
+    grid-column: 2 / 4;
+  }
+  .routine-row__actions {
+    grid-column: 2 / 4;
+    grid-row: 3;
+    justify-content: flex-start;
   }
 }
 

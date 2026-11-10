@@ -224,7 +224,7 @@ html:not([data-pointer]) .thread-row__resolved:focus-visible {
   top: 50%;
   transform: translateY(-50%);
   display: none;
-  gap: 1px;
+  gap: var(--space-2);
   padding-left: 6px;
   background: color-mix(in srgb, var(--sunken) 45%, var(--raised));
 }

@@ -162,14 +162,50 @@ test("a channel: gray when read, full ink and bold with the edge pill when unrea
   ]);
 });
 
+test("you and the bell in one raised card, a plate each inside its curve; the bell's unread count red on its corner", async () => {
+  // Raised, e1, its corner 14 and its padding 4: each plate's corner is 14 less 4, so it follows the card's curve.
+  const card = ".sidebar__me";
+  expect(["padding", "border-radius", "background", "box-shadow"].map((p) => value(card, p))).toEqual([
+    "4px",
+    "14px",
+    "var(--raised)",
+    "var(--e1)",
+  ]);
+  expect([value(".sidebar__me > .sidebar__user", "border-radius"), value(".sidebar__bell", "border-radius")]).toEqual([
+    "10px",
+    "10px",
+  ]);
+  // 40 wide and the card's inside tall on every pointer: no touch size of its own.
+  expect([value(".sidebar__bell", "width"), value(".sidebar__bell", "align-self")]).toEqual([
+    "var(--control-h-md)",
+    "stretch",
+  ]);
+  expect(declarations(css, '.sidebar:not([data-rail="true"]) .sidebar__bell')).toEqual([]);
+  // The count on the glyph's corner, where the rail's tiles put theirs, cut from it by a ring in the card's color.
+  const count = '.sidebar:not([data-rail="true"]) .sidebar__bell > .sidebar__unread';
+  const corner = ["position", "top", "right"];
+  expect(corner.map((p) => value(count, p))).toEqual(["absolute", "2px", "0"]);
+  expect(corner.map((p) => value('.sidebar[data-rail="true"] .sidebar__unread', p))).toEqual(["absolute", "2px", "0"]);
+  expect(value(count, "box-shadow")).toBe("0 0 0 2px var(--raised)");
+  // The rail keeps two of its 40px tiles on the sidebar's paper, and the face's presence ring in the paper's color.
+  const rail = '.sidebar[data-rail="true"] .sidebar__me';
+  expect(["background", "box-shadow", "padding"].map((p) => value(rail, p))).toEqual(["transparent", "none", "0"]);
+  expect(value('.sidebar[data-rail="true"] .sidebar__user', "border-radius")).toBe("var(--control-r-md)");
+  const presence = await Bun.file(join(import.meta.dir, "../src/components/presence.css")).text();
+  expect(declarations(presence, '.sidebar:not([data-rail="true"]) .sidebar__me')).toEqual([
+    ["--presence-ring", "var(--raised)"],
+  ]);
+});
+
 test("every role mark is a full circle", async () => {
   const ui = await Bun.file(join(import.meta.dir, "../../../packages/ui/src/styles/components.css")).text();
   expect(declarations(ui, ".ac-rolemark").findLast(([p]) => p === "border-radius")?.[1]).toBe("50%");
 });
 
-test("Personalizar: the five parts of a tool's line have five columns, and on a phone the arrows stay on its first line", () => {
-  expect(value(".sidebar-setup", "grid-template-columns")).toBe("auto 1fr auto auto");
+test("Personalizar: a tool's line has four columns, its arrows one group 8 apart, on a phone on its first line", () => {
+  expect(value(".sidebar-setup", "grid-template-columns")).toBe("auto 1fr auto");
   const first = declarations(css, ".sidebar-setup").find(([p]) => p === "grid-template-columns")?.[1];
-  expect(first?.split(/ (?![^(]*\))/)).toHaveLength(5);
+  expect(first?.split(/ (?![^(]*\))/)).toHaveLength(4);
+  expect(value(".sidebar-setup__moves", "gap")).toBe("var(--space-2)");
   expect(value(".sidebar-setup__row > .ac-seg", "grid-column")).toBe("2 / -1");
 });

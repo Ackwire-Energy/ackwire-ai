@@ -30,7 +30,7 @@ test("the setup rail's horizon ships in the rail's column, under its steps, neve
 });
 
 test("a service's × ships in the full ink on its sky, its ink as far from the top as from the side", async () => {
-  const selector = ".catalog-svc .ac-dialog__acts > .ac-btn--glyph";
+  const selector = ".catalog-svc .ac-dialog__close > .ac-btn--glyph";
   const glyph = await ships("layout.css", "src/styles.css", selector);
   expect(glyph).toContain("color:var(--ink)");
   // It reaches up and down as far as the kit's row makes it reach sideways, so its row is its ink, placed evenly.
@@ -43,7 +43,7 @@ test("a service's × ships in the full ink on its sky, its ink as far from the t
   const sideways = kit.find((d) => d.startsWith("margin-inline:"))?.slice("margin-inline:".length);
   expect(sideways).toBeTruthy();
   expect(glyph).toContain(`margin-block:${sideways}`);
-  const row = await ships("layout.css", "src/styles.css", ".catalog-svc .ac-dialog__acts");
+  const row = await ships("layout.css", "src/styles.css", ".catalog-svc .ac-dialog__close");
   expect(row).toEqual(expect.arrayContaining(["top:var(--dialog-pad)", "right:var(--dialog-pad)"]));
   // The sheet's own inset, where its icon and words start, under the sky's densest top rows.
   expect(await ships("layout.css", "src/styles.css", ".ac-dialog.catalog-svc")).toContain("--dialog-pad:24px");

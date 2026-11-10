@@ -723,16 +723,25 @@ export function ChannelSkeleton({
             ))}
           </header>
         ) : (
+          // `ChannelHeader`'s rows: the # and the name on its line, the glyphs after them.
           <header className="channel__header">
             <NavToggle />
-            <div className="channel__head-text">
-              <Skeleton shape="block" width={20} height={20} />
-              <Skeleton width={140} height={14} />
-            </div>
-            <div className="channel__acts">
-              {[0, 1, 2].map((i) => (
-                <Skeleton key={i} shape="block" width={20} height={20} />
-              ))}
+            <div className="ac-actline channel__line">
+              <div className="channel__head-text">
+                <span className="channel__title">
+                  <span className="channel__skeleton-title">
+                    <Skeleton shape="block" width={20} height={20} />
+                  </span>
+                  <span className="channel__skeleton-title">
+                    <Skeleton width={140} height={14} />
+                  </span>
+                </span>
+              </div>
+              <div className="channel__acts">
+                {[0, 1, 2].map((i) => (
+                  <Skeleton key={i} shape="block" width={20} height={20} />
+                ))}
+              </div>
             </div>
           </header>
         )}

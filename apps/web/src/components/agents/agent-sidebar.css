@@ -169,7 +169,7 @@ html:not([data-pointer]) .dm-side__screen:focus-visible {
 }
 .dm-side__acts {
   display: flex;
-  gap: 6px;
+  gap: var(--space-2);
   margin: 8px 0 10px;
 }
 .dm-side__acts:empty {
@@ -276,23 +276,10 @@ html:not([data-pointer]) .dm-side__row--link:focus-visible {
 .dm-side__sec .rh-set__acts {
   flex-wrap: wrap;
 }
-/* The header's toggle: a plate while it is open. */
-.dm-side-toggle.ac-btn[aria-pressed="true"] {
-  background: color-mix(in srgb, var(--ink) 9%, transparent);
-  color: var(--ink);
-}
-/* Under the sidebar's breakpoint one header row holds the computer, the search and the toggle: the search gives way. */
+/* Under the sidebar's breakpoint the header's glyphs hold the computer, the search and the toggle: the search gives
+   way, leaving the name its room beside them. */
 @media (max-width: 1099px) {
-  .channel__header:has(> .dm-side-toggle) {
-    flex-wrap: nowrap;
-  }
-  .channel__header:has(> .dm-side-toggle) > .dm-who {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
-  .channel__header:has(> .dm-side-toggle) > search {
-    flex: 0 1 130px;
-    width: auto;
-    min-width: 0;
+  .channel__acts:has(> .dm-side-toggle) > .channel__search.search-box {
+    width: 130px;
   }
 }

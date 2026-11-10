@@ -92,32 +92,16 @@ html:not([data-pointer]) .roles-row:focus-visible {
   margin: 0;
   padding-inline: 20px;
 }
+/* The hint and "Mudar ordem" in an `.ac-actline`: under the hint when it doesn't fit beside it, its words at the
+   hint's start. */
 .roles-foot {
   flex: 1;
-  display: flex;
   align-items: center;
-  gap: 8px;
-}
-.roles-foot > span {
-  flex: 1;
 }
 /* "Reordenar" stays on the foot's one 17px line (negative margins, as the ⓘ of a hint does), so the foot's own ⓘ,
    placed from the line's top, keeps level with the text. */
-.roles-foot > .ac-btn {
+.roles-foot .ac-btn {
   margin-block: -5.5px;
-}
-/* An ActionRow: in a card under 480px the action goes under the hint, its words at the hint's start. */
-@container (max-width: 479px) {
-  .roles-foot {
-    flex-wrap: wrap;
-    row-gap: 8px;
-  }
-  .roles-foot > span {
-    flex-basis: 100%;
-  }
-  .roles-foot > .ac-btn--ghost {
-    margin-left: calc(-1 * var(--ghost-plate));
-  }
 }
 
 /* A role's page: its mark, name and how many hold it, on one axis with the actions. */

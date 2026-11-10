@@ -483,7 +483,7 @@ function DesktopUseNote({ machine: m }: { machine: Machine }) {
         <span style={{ display: "block" }}>
           {t("desktop.use.agent", { ...g, computer: computerNameOf(t, org.name, m.name, isPersonal(org)) })}
         </span>
-        <span className="small muted">{machineReasonText(t, use)}</span>
+        <span className="small muted">{machineReasonText(t, use, "desktop_use_install")}</span>
         {command && <CommandBlock command={command} />}
       </div>
     </div>
@@ -1411,6 +1411,11 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const modelLine = (m: BrainModelChoice) => brainModelLine(t, kind, plan, m, cursorPlanSays);
   const planModelOptionsShown: SelectOption[] = [
     { value: AUTO, label: t("brain.auto.label"), description: t("brain.auto.hint"), leading: autoMark },
+    // The model it has stays a choice when its plan's list doesn't have it, as the key's picker keeps one: the picker
+    // never shows empty.
+    ...(!shownModel || isAuto(shownModel) || modelOptions.some((m) => m.value === shownModel)
+      ? []
+      : [{ value: shownModel, label: shownModel, leading: planLogo }]),
     ...modelOptions.map((m) => {
       const line = modelLine(m);
       return {

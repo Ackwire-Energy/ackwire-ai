@@ -268,19 +268,34 @@ describe("a picture beside lines, a bubble beside a face, a row of actions", () 
     );
   });
 
-  test("a row of actions: 16px between what shows, 24px on touch, ghosts reaching into the gap by their plate", async () => {
+  test("a row of actions: 16px between what shows, on touch too, ghosts reaching into the gap by their plate", async () => {
     const css = (await Bun.file(join(ROOT, "packages/ui/src/styles/components.css")).text()).replace(
       /\/\*[\s\S]*?\*\//g,
       "",
     );
     expect(css).toMatch(/:root \{\s*--ghost-plate: 8px;\s*\}/);
-    expect(css).toMatch(/@media \(pointer: coarse\) \{\s*:root \{\s*--ghost-plate: 12px;\s*\}\s*\}/);
+    // A small plate stays 32 on touch, so its ghost's plate does too.
+    expect(css).not.toMatch(/@media \(pointer: coarse\) \{\s*:root \{\s*--ghost-plate:/);
     expect(await kitRule(".ac-acts")).toContain("column-gap: calc(2 * var(--ghost-plate))");
     expect(await kitRule(".ac-acts > .ac-acts")).toContain("display: contents");
     expect(await kitRule(".ac-acts > .ac-btn--ghost")).toContain("margin-inline: calc(-1 * var(--ghost-plate))");
     expect(await kitRule(".ac-acts > .ac-btn--ghost:not(.ac-btn--icon)")).toContain(
       "padding-inline: var(--ghost-plate)",
     );
+  });
+
+  test("buttons side by side stand 8 apart: two plates, and two icons' plates, by the first's end so a wrapped one starts on the edge", async () => {
+    // The row's gap is two ghost plates (16): a pair of plates gives back 8 of it, a pair of icons the 8 their plates
+    // reach into it, less the first's glyph air.
+    const plates = await kitRule(".ac-acts > .ac-btn:not(.ac-btn--ghost):has(+ .ac-btn:not(.ac-btn--ghost))");
+    expect(plates).toContain("margin-inline-end: calc(var(--space-2) - 2 * var(--ghost-plate))");
+    // Its selector holds a comma inside `:is()`, which the rule list splits on: read from the sheet itself.
+    const css = await Bun.file(join(ROOT, "packages/ui/src/styles/components.css")).text();
+    expect(css).toContain(
+      ".ac-acts > :is(.ac-btn--ghost.ac-btn--icon, .ac-btn--glyph):has(+ :is(.ac-btn--ghost.ac-btn--icon, .ac-btn--glyph)) {\n  margin-inline-end: calc(var(--space-2) - var(--ghost-plate) - var(--glyph-air, 0px));\n}",
+    );
+    // Never by the second's start: on a line of its own it would stick out of the row.
+    expect(css).not.toMatch(/\.ac-acts > [^{]*\+ [^{]*\{\s*margin-inline-start/);
   });
 
   test("the pixel marks in a line of text centre on its capitals, never on the x-height's middle", async () => {

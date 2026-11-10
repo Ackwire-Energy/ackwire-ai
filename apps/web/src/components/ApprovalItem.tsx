@@ -297,7 +297,8 @@ export function InlineApproval({
                 : "approval.groupRefused",
         )}
         more={details.length ? { label: t("approval.seeDetails"), content: details.join("\n") } : undefined}
-        time={aheadText || (ended ? whenAt(t, i18n.language, ended) : undefined)}
+        time={ended ? whenAt(t, i18n.language, ended) : undefined}
+        note={aheadText || undefined}
         action={ahead === "scheduled" && approval.canCancel && <CancelAhead id={approval.id} pill />}
       >
         {decisionOutcome(t, approval, me.user.id, (id) => members.get(id)?.name)}: <b>{approvalTitle(t, approval)}</b>

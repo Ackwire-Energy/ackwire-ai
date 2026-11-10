@@ -295,12 +295,22 @@ export const SELF_TESTED = [
   "captop",
   "timeedge",
   "panefill",
+  "squeeze",
+  "loneprimary",
+  "btngap",
+  "btnsplit",
+  "toolheight",
+  "factwrap",
+  "undoinline",
+  "countfill",
   "bleed",
   "stampout",
 ];
 
 /** Rules about a desktop layout only (panes floating beside the conversation, a toolbar's one row): a phone has none. */
 export const DESKTOP_ONLY = ["floating", "toolorder"];
+/** Rules about a phone's layout only (a lone main button as wide as its card): a desktop keeps its own width. */
+export const PHONE_ONLY = ["loneprimary"];
 
 type Tab = Awaited<ReturnType<typeof openTab>>;
 
@@ -355,7 +365,8 @@ async function selfTest(tab: Tab, reverse: Tab) {
     const found = [...(await orderFindings(tab, reverse)), ...(await findingsAt(tab, width))];
     const hit = (rule: string, cls: string) =>
       found.some((f) => f.rule === rule && `${f.el} ${f.box ?? ""} ${f.at ?? ""}`.split(/[.\s]/).includes(cls));
-    for (const rule of SELF_TESTED.filter((r) => width >= 640 || !DESKTOP_ONLY.includes(r))) {
+    const here = (r: string) => (width >= 640 ? !PHONE_ONLY.includes(r) : !DESKTOP_ONLY.includes(r));
+    for (const rule of SELF_TESTED.filter(here)) {
       for (const cls of twins.filter((c) => c.replace(/^(bad|good)-|--.*$/g, "") === rule)) {
         if (cls.startsWith("bad-") && !hit(rule, cls)) wrong.push(`${rule}@${width} missed ${cls}`);
         if (cls.startsWith("good-") && hit(rule, cls)) wrong.push(`${rule}@${width} flagged ${cls}`);

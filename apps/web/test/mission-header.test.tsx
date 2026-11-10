@@ -122,6 +122,19 @@ describe("a mission's thread: the header is the mission's", () => {
     expect(document.querySelector(".mi-pinned")).toBeNull();
   });
 
+  test("a long title wraps whole: its state after its words, the header's buttons under them as one group", async () => {
+    const long = "Migrar o checkout para o novo provedor de pagamentos com reembolso automático";
+    await missionThread({ title: long });
+    const header = theHeader();
+    expect(within(header).getByRole("heading", { level: 1, name: long })).toBeTruthy();
+    const line = header.querySelector(".mh__row > .mh__main.ac-actline") as HTMLElement;
+    expect(line).not.toBeNull();
+    expect(line.firstElementChild?.matches(".mh__text")).toBe(true);
+    expect(line.lastElementChild?.matches(".mh__end")).toBe(true);
+    // The title is the heading's whole name: no tooltip stands in for words cut short.
+    expect(header.querySelector(".mh__title")?.hasAttribute("title")).toBe(false);
+  });
+
   test("nothing running: no 'nada rodando' pill (it read as paused), no orbit", async () => {
     await missionThread({ runningTasks: 0 }, ["done"]);
     const header = theHeader();

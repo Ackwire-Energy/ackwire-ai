@@ -8,7 +8,7 @@ import {
   View,
   type ViewStyle,
 } from "react-native";
-import { ACT_TEXT_MIN } from "./ActRow";
+import { ACT_TEXT_MIN } from "./ActLine";
 import { haptics } from "./haptics";
 import { Icon, type IconName } from "./Icon";
 import { LineIcon } from "./LineIcon";
@@ -239,8 +239,9 @@ const styles = StyleSheet.create({
   words: { flexShrink: 1, minWidth: 0 },
   time: { lineHeight: WORDS_LINE, fontVariant: ["tabular-nums"] },
   beside: { flexShrink: 0, flexDirection: "row" },
-  // Under the sentence: on its column (the frame's 12, the mark, the 8 after it), no hairline, 4 to the frame's edge.
-  under: { alignItems: "flex-start", paddingLeft: 12 + MARK + 8, paddingBottom: 4, marginTop: -2 },
+  // Under the sentence: on its column (the frame's 12, the mark, the 8 after it), no hairline. Its label's line ends 7
+  // from the frame's outer edge (1 + 5 of the 28 + the border), as the sentence's line starts 7 from the top (6 + 1).
+  under: { alignItems: "flex-start", paddingLeft: 12 + MARK + 8, paddingBottom: 1, marginTop: -2 },
   actions: { flexDirection: "row", alignItems: "stretch", minHeight: 30 },
   actionsWrap: { flexWrap: "wrap" },
   // An action with the hairline before it: one piece, so a wrap never leaves a hairline alone at a line's end.

@@ -24,8 +24,10 @@ export interface TipProps extends HTMLAttributes<HTMLSpanElement> {
  * Words about the element they hang from (a message's time: its date, model and tokens) on the floating layer: in
  * <body>, fixed to the window at `--z-floating`, so no list, pane or dialog that scrolls or clips cuts them, no bar of
  * the row covers them, and `placeTip` keeps them `EDGE_ROOM` inside the window. A mouse or a pen resting on the element
- * opens them, the keys' focus or a tap at once (a touch screen has no hover); leaving it, its blur, a scroll or a resize
- * closes them. For the eye only: screen readers get the words from the element (`aria-describedby`).
+ * opens them, the keys' focus or a tap at once (a touch screen has no hover); leaving it, its blur, a scroll, a resize
+ * or Escape closes them. One held open stays closed after Escape until its element is left or `open` changes, so it
+ * can be dismissed without moving the pointer or the focus (WCAG 1.4.13). For the eye only: screen readers get the
+ * words from the element (`aria-describedby`).
  */
 export function Tip({
   tip,
@@ -40,9 +42,23 @@ export function Tip({
   const bubble = useRef<HTMLSpanElement>(null);
   const wait = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [open, setOpen] = useState(false);
-  const shown = Boolean(tip) && (open || held);
+  const [dismissed, setDismissed] = useState(false);
+  const shown = Boolean(tip) && (open || held) && !dismissed;
   useEffect(() => trackInput(), []);
   useEffect(() => () => clearTimeout(wait.current), []);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a held tip Escape closed shows again when `open` changes
+  useEffect(() => setDismissed(false), [held]);
+  useEffect(() => {
+    if (!shown) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      clearTimeout(wait.current);
+      setOpen(false);
+      setDismissed(true);
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [shown]);
   useLayoutEffect(() => {
     if (!shown) return;
     const place = () => {
@@ -67,6 +83,7 @@ export function Tip({
   const close = () => {
     clearTimeout(wait.current);
     setOpen(false);
+    setDismissed(false);
   };
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: hover and focus only show its tip, the element does nothing

@@ -62,6 +62,7 @@ export function ArchivedChannelsScreen() {
                 label={`#${ch.name}`}
                 labelLines={3}
                 sub={t("channel.archivedOn", { date: formatShortDate(i18n.language, ch.archivedAt) })}
+                media
                 disabled={restore.isPending}
                 onPress={() => ask(ch)}
               />

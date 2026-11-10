@@ -222,12 +222,14 @@ function RoleList({ roles, people, onOpen }: { roles: OrgRole[]; people: Person[
         {custom.map(row)}
         {everyone && row(everyone)}
         <CardFooter>
-          <span className="roles-foot">
+          <span className="roles-foot ac-actline">
             <span>{t("rolesPage.orderHint")}</span>
             {manages && custom.length > 1 && (
-              <Button size="sm" variant="ghost" onClick={() => setOrdering((v) => !v)}>
-                {ordering ? t("rolesPage.reorderDone") : t("rolesPage.reorder")}
-              </Button>
+              <span className="ac-acts">
+                <Button size="sm" variant="ghost" onClick={() => setOrdering((v) => !v)}>
+                  {ordering ? t("rolesPage.reorderDone") : t("rolesPage.reorder")}
+                </Button>
+              </span>
             )}
           </span>
         </CardFooter>

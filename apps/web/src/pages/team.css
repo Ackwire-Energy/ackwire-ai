@@ -172,11 +172,12 @@
   align-items: center;
   gap: 12px;
 }
-/* Out over the page's side room: a chart wider than the page slides under the page's edges as it scrolls. */
+/* A scroller out over the page's side room: a chart wider than the page slides under the page's edges as it scrolls,
+   and the room above it keeps the top node's ring and shadow inside it, where they'd be cut at its edge. */
 .team-tree {
   overflow-x: auto;
-  margin-inline: calc(-1 * var(--page-x));
-  padding: 0 var(--page-x) 8px;
+  margin: -4px calc(-1 * var(--page-x)) 0;
+  padding: 4px var(--page-x) 8px;
 }
 .team-tree__top {
   position: relative;

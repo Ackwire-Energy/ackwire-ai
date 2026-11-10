@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next";
 import type { CatchUpClosed, UsageQueue, UsageQueueRow } from "../api/types";
-import { joinNames, relativeTime } from "./format";
+import { joinNames, keepWhole, relativeTime } from "./format";
 import { usageWhen } from "./plan-usage";
 
 /**
@@ -56,7 +56,7 @@ export function usageQueueWho(
   now = new Date(),
 ) {
   // "há 40 min" never breaks across lines: a long name before it wraps instead.
-  const ago = relativeTime(t, locale, row.since, now).replace(/ /g, "\u00a0");
+  const ago = keepWhole(relativeTime(t, locale, row.since, now));
   if (row.channelKind === "dm" || row.askers.length === 0) return ago;
   return `${joinNames(row.askers.map(person), t)} · ${ago}`;
 }

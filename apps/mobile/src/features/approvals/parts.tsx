@@ -8,6 +8,7 @@ import {
 } from "@agenteschat/client";
 import { aheadPhase } from "@agenteschat/client/lib/approval-kind";
 import { approvalOriginShort, approvalOriginWords } from "@agenteschat/client/lib/approval-origin";
+import { approvalEffects } from "@agenteschat/client/lib/approval-review";
 import { alwaysRoutineName, approvalDoing, approvalTitle } from "@agenteschat/client/lib/approval-words";
 import { fromServer, itemName } from "@agenteschat/client/lib/connected";
 import { nextLabel } from "@agenteschat/client/lib/format";
@@ -20,6 +21,8 @@ import { Alert, Platform, Pressable, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { Button, Chip, Fuse, haptics, LineIcon, Text, useToast } from "@/ui";
 import { router } from "@/ui/navigation";
+import { parseInline } from "../chat/logic";
+import { Spans } from "../chat/MessageSpans";
 import { ConnectorIcon, IconTile } from "../connectors/ConnectorIcon";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useNow, useOrgId } from "../shared/hooks";
@@ -415,6 +418,13 @@ export function ApprovalTraits({ approval: a }: { approval: Approval }) {
   );
 }
 
+/** Whether the request can be undone, as a chip after its title ("Não dá para desfazer"); none when it doesn't say. */
+export function ApprovalUndoChip({ approval: a }: { approval: Approval }) {
+  const { t } = useTranslation();
+  const { undo } = approvalEffects(a);
+  return undo ? <Chip icon={TRAIT_ICON[undo]} label={t(`mobile.approval.trait.${undo}`)} /> : null;
+}
+
 /**
  * Por onde, then the exact values (at most `max` rows; `long`: whole, every one), on a sunken plate.
  * `stacked`: each label above its value and no plate, for a request card where a label column squeezes the values.
@@ -460,7 +470,7 @@ export function ApprovalDetails({
             style={stacked ? styles.wrapAnywhere : styles.grow}
             numberOfLines={long ? undefined : stacked ? 4 : 2}
           >
-            {r.value}
+            <Spans inline={parseInline(r.value)} />
           </Text>
         </View>
       ))}

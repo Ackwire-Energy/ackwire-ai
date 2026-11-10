@@ -202,6 +202,7 @@ function Items({ data, tab, onNew }: { data: VaultOverview; tab: "team" | "perso
           label={t("mobile.vault.import.title")}
           sub={t("mobile.vault.import.text")}
           subLines={4}
+          media
         />
       </GroupedList>
     </>
@@ -230,6 +231,7 @@ function ItemRow({ icon, item, now }: { icon: IconName; item: VaultItem; now: nu
       label={item.title}
       {...(line ? { sub: line } : {})}
       belowText={facts}
+      media
       below={
         <>
           {item.kind === "key" && item.keyName ? (
@@ -308,6 +310,7 @@ function ConnectionRow({ icon, conn, now }: { icon: IconName; conn: VaultConnect
       label={conn.name}
       sub={connectionLine(t, i18n.language, conn, new Date(now))}
       subLines={2}
+      media
       below={
         <View style={styles.chips}>
           <Chip icon={state.icon} label={t(state.key)} />

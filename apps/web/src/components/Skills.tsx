@@ -86,7 +86,7 @@ import { LoadingLine, LoadingList, useStepText } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useEdited } from "@/hooks/useEdited";
 import { useRightHandLook } from "@/hooks/useRightHandLook";
-import { Markdown } from "@/lib/markdown";
+import { inlineWords, Markdown } from "@/lib/markdown";
 import { useToast } from "@/lib/toast";
 
 /** How many skills show without a search: past it, the settings card gets "Ver todas" and an agent's picker a search. */
@@ -154,7 +154,7 @@ function SkillRow({ skill, users, onOpen }: { skill: Skill; users: number | null
           {users !== null && <> · {t("skills.usedBy", { count: users })}</>}
         </span>
       </span>
-      <span className="small muted">{skill.description}</span>
+      <span className="small muted">{inlineWords(skill.description)}</span>
     </div>
   );
 }
