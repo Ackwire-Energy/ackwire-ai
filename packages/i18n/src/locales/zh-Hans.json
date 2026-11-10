@@ -15396,6 +15396,7 @@
     "suspended": "此工作区暂时不可用。",
     "createRefused": "你现在无法创建工作区。",
     "createUnpaid": "你已有一个工作区在等待选择 agentes.chat 套餐。请先为它选择套餐，再创建新的工作区。",
+    "createUnpaidOpen": "打开 {{name}}",
     "createInactive": "你已有一个尚未激活的工作区，所以暂时无法创建新的工作区。",
     "agentPaused": "这个智能体暂时已暂停。",
     "onHold": "此工作区已暂停：{{reason}}",

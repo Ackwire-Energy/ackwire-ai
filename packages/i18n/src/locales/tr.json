@@ -15743,6 +15743,7 @@
     "suspended": "Bu çalışma alanı şimdilik kullanılamıyor.",
     "createRefused": "Şu anda çalışma alanı oluşturamazsınız.",
     "createUnpaid": "agentes.chat planı bekleyen bir çalışma alanınız zaten var. Başka bir tane oluşturmadan önce onun planını seçin.",
+    "createUnpaidOpen": "{{name}} çalışma alanını aç",
     "createInactive": "Henüz etkin olmayan bir çalışma alanınız zaten var, bu yüzden şimdilik başka bir tane oluşturamazsınız.",
     "agentPaused": "Bu ajan şimdilik duraklatıldı.",
     "onHold": "Bu çalışma alanı beklemede: {{reason}}",

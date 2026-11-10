@@ -16865,6 +16865,7 @@
     "suspended": "Ta przestrzeń robocza jest na razie niedostępna.",
     "createRefused": "Nie możesz teraz utworzyć przestrzeni roboczej.",
     "createUnpaid": "Masz już przestrzeń roboczą, która czeka na plan agentes.chat. Wybierz dla niej plan, zanim utworzysz kolejną.",
+    "createUnpaidOpen": "Otwórz {{name}}",
     "createInactive": "Masz już przestrzeń roboczą, która nie jest jeszcze aktywna, więc na razie nie możesz utworzyć kolejnej.",
     "agentPaused": "Ten agent jest na razie wstrzymany.",
     "onHold": "Ta przestrzeń robocza jest wstrzymana: {{reason}}",

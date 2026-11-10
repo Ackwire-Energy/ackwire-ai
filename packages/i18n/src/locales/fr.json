@@ -16369,6 +16369,7 @@
     "suspended": "Cet espace de travail est indisponible pour le moment.",
     "createRefused": "Vous ne pouvez pas créer d'espace de travail pour le moment.",
     "createUnpaid": "Vous avez déjà un espace de travail en attente d'un abonnement agentes.chat. Choisissez son abonnement avant d'en créer un autre.",
+    "createUnpaidOpen": "Ouvrir {{name}}",
     "createInactive": "Vous avez déjà un espace de travail qui n'est pas encore actif, vous ne pouvez donc pas en créer un autre pour le moment.",
     "agentPaused": "Cet agent est en pause pour le moment.",
     "onHold": "Cet espace de travail est suspendu temporairement : {{reason}}",

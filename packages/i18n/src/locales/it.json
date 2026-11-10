@@ -16372,6 +16372,7 @@
     "suspended": "Questo spazio di lavoro per ora non è disponibile.",
     "createRefused": "Al momento non puoi creare uno spazio di lavoro.",
     "createUnpaid": "Hai già uno spazio di lavoro in attesa di un piano agentes.chat. Scegli il suo piano prima di crearne un altro.",
+    "createUnpaidOpen": "Apri {{name}}",
     "createInactive": "Hai già uno spazio di lavoro non ancora attivo, quindi per ora non puoi crearne un altro.",
     "agentPaused": "Questo agente per ora è in pausa.",
     "onHold": "Questo spazio di lavoro è sospeso temporaneamente: {{reason}}",
