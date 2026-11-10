@@ -113,14 +113,17 @@ function PhoneCode() {
         </li>
         {isTailnet(server) && (
           <li>
-            {t("openOnPhone.stepTailscale")}{" "}
-            <a className="ac-link" href={TAILSCALE_STORES.appStore} target="_blank" rel="noreferrer">
-              {t("openOnPhone.appStore")}
-            </a>
-            {" · "}
-            <a className="ac-link" href={TAILSCALE_STORES.googlePlay} target="_blank" rel="noreferrer">
-              {t("openOnPhone.googlePlay")}
-            </a>
+            {/* One grid cell: loose, each link would take the next cell, the number's narrow column. */}
+            <span>
+              {t("openOnPhone.stepTailscale")}{" "}
+              <a className="ac-link" href={TAILSCALE_STORES.appStore} target="_blank" rel="noreferrer">
+                {t("openOnPhone.appStore")}
+              </a>
+              {" · "}
+              <a className="ac-link" href={TAILSCALE_STORES.googlePlay} target="_blank" rel="noreferrer">
+                {t("openOnPhone.googlePlay")}
+              </a>
+            </span>
           </li>
         )}
         <li>{t("openOnPhone.stepScan")}</li>
