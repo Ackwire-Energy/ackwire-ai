@@ -1,3 +1,4 @@
+import { initialsOf } from "@agenteschat/tokens/names";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useState } from "react";
 import { Image, Text as RNText, StyleSheet } from "react-native";
@@ -19,7 +20,8 @@ export interface PersonAvatarProps {
 export function PersonAvatar({ name, size, photo }: PersonAvatarProps) {
   const { scheme } = useTheme();
   const dark = scheme === "dark";
-  const initial = (name.trim()[0] ?? "?").toUpperCase();
+  // The first of the web's initials: an emoji before the name gives way to it, and no character is cut in half.
+  const initial = Array.from(initialsOf(name))[0] ?? "?";
   const [failed, setFailed] = useState(false);
   const uri = photo?.uri;
   // A new photo gets a new chance.

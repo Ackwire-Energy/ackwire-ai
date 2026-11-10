@@ -118,6 +118,10 @@ describe("Avatar", () => {
     expect(initialsOf("Ada")).toBe("A");
     expect(initialsOf("Marina Souza Lima")).toBe("ML");
     expect(initialsOf("  ")).toBe("?");
+    // An emoji before the name gives way to the words; an emoji alone stays whole, never half a character.
+    expect(initialsOf("🌴 Ana Souza")).toBe("AS");
+    expect(initialsOf("🦊")).toBe("🦊");
+    expect(initialsOf("Ólafur Darri Ólafsson")).toBe("ÓÓ");
   });
 });
 

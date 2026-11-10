@@ -4,12 +4,18 @@
  */
 export const isIdHandle = (handle: string) => /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}/i.test(handle);
 
-/** 1–2 letters: "Ada" → "A"; "Marina Souza" → "MS". */
+/**
+ * 1–2 letters: "Ada" → "A"; "Marina Souza" → "MS". A word that starts with no letter ("🌴 Ana Souza") gives way to
+ * those that do, and a first character is taken whole: an emoji is two UTF-16 units, and half of one draws as "�".
+ */
 export function initialsOf(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  const lettered = words.filter((w) => /^[\p{L}\p{N}]/u.test(w));
+  const parts = lettered.length > 0 ? lettered : words;
+  const first = (w: string | undefined) => Array.from(w ?? "")[0] ?? "";
   if (parts.length === 0) return "?";
-  if (parts.length === 1) return (parts[0]?.[0] ?? "?").toUpperCase();
-  return `${parts[0]?.[0] ?? ""}${parts[parts.length - 1]?.[0] ?? ""}`.toUpperCase();
+  if (parts.length === 1) return first(parts[0]).toUpperCase() || "?";
+  return `${first(parts[0])}${first(parts[parts.length - 1])}`.toUpperCase();
 }
 
 /**
