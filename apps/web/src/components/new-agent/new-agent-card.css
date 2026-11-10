@@ -107,13 +107,14 @@
   display: contents;
 }
 
-/* The card. */
+/* The card. Its cover and fitting room follow the card's own width (`nac-card`), whatever the window. */
 .nac__card {
   display: flex;
   flex-direction: column;
   min-height: 0;
   padding: 0;
   overflow: hidden;
+  container: nac-card / inline-size;
 }
 .nac__cover {
   position: relative;
@@ -308,8 +309,10 @@
   font-family: inherit;
   cursor: pointer;
 }
-.nac__app:hover {
-  box-shadow: inset 0 0 0 1px var(--ink2);
+@media (hover: hover) {
+  .nac__app:hover {
+    box-shadow: inset 0 0 0 1px var(--ink2);
+  }
 }
 .nac__level {
   margin-left: 2px;
@@ -322,9 +325,11 @@
   box-shadow: inset 0 0 0 1px var(--line2);
   color: var(--muted);
 }
-.nac__add.ac-chip:hover {
-  box-shadow: inset 0 0 0 1px var(--ink2);
-  color: var(--ink);
+@media (hover: hover) {
+  .nac__add.ac-chip:hover {
+    box-shadow: inset 0 0 0 1px var(--ink2);
+    color: var(--ink);
+  }
 }
 .nac__offer {
   display: flex;
@@ -439,8 +444,9 @@
   flex-direction: column;
   gap: 12px;
 }
+/* What it wears: as many columns as fit, each a comfortable tap (six across on a desktop's card). */
 .nac__look .newag__opts--acc {
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
 }
 .nac__look .newag__opts--acc .newag__opt {
   width: auto;
@@ -473,16 +479,78 @@
   height: 100%;
 }
 
-@media (max-width: 760px) {
-  .nac__grid {
-    grid-template-columns: minmax(0, 1fr);
-    height: auto;
+/*
+ * Narrow screens (ADR 0164): two steps, one pane at a time (`NEW_AGENT_STEPS_QUERY` sets the flags on the form). The
+ * dialog keeps one height across them: most of the window, and on a phone the kit's sheet at its full height. The
+ * list fills it and scrolls with its fades; the card scrolls as one column, cover first, in the dialog's body.
+ */
+.ac-dialog.nac:has(> .nac__keys[data-steps]) {
+  height: min(760px, calc(100dvh - 48px));
+}
+@media (max-width: 640px) {
+  .ac-dialog.nac:has(> .nac__keys[data-steps]) {
+    height: calc(100dvh - 12px - env(safe-area-inset-top, 0px));
   }
-  .nac__list {
-    max-height: 220px;
+}
+.nac__keys[data-steps] .ac-dialog__body {
+  flex: 1 1 auto;
+}
+.nac__keys[data-steps] .nac__grid {
+  grid-template-columns: minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+}
+.nac__keys[data-step="card"] .nac__grid {
+  height: auto;
+}
+.nac__keys[data-step="card"] .nac__card {
+  overflow: visible;
+}
+.nac__keys[data-step="card"] .nac__body {
+  overflow: visible;
+}
+/* Create on the card's step: the sheet's width, as a phone's main action is. */
+.nac__foot--create > .ac-btn {
+  flex: 1 1 auto;
+}
+
+/*
+ * A card under about 480px (a phone, a narrow window): the cover stacks, the buttons on top, the agent under them and
+ * its bubble under the agent at the card's width, so its words never squeeze into a column beside it.
+ */
+@container nac-card (max-width: 480px) {
+  .nac__cover {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    height: auto;
+    padding: 60px 12px 14px;
+  }
+  .nac__cover[data-look] {
+    align-items: center;
+    height: auto;
+    padding-bottom: 12px;
+  }
+  .nac__hero,
+  .nac__cover[data-look] .nac__hero {
+    position: relative;
+    left: auto;
+    bottom: auto;
+    width: 88px;
+    height: 88px;
   }
   .nac__bubble {
-    left: 128px;
+    position: relative;
+    left: auto;
+    right: auto;
+    top: auto;
+    align-self: stretch;
+    /* The tail points up at the agent above it. */
+    border-radius: var(--radius-cut) 18px 18px 18px;
+  }
+  .nac__body {
+    padding-inline: 14px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -498,6 +566,8 @@
   overflow: hidden;
   isolation: isolate;
   border-bottom: 1px solid var(--line);
+  /* Its agent, slots and trails follow the band's own width (a phone's chat, a side panel). */
+  container: nac-band / inline-size;
 }
 .nac-band__stars {
   position: absolute;
@@ -684,6 +754,101 @@
   height: 10px;
   stroke-width: 2.6;
 }
+/*
+ * A narrow band (a phone's chat): a smaller agent, shorter trails and smaller slots, so an AI and four apps fit from
+ * about 300px; narrower still, the path scrolls sideways and fades at the edge that has more (`useScrollEdges`).
+ */
+@container nac-band (max-width: 520px) {
+  .nac-band__agent {
+    left: 12px;
+    bottom: 10px;
+    width: 56px;
+    height: 56px;
+  }
+  .nac-band__zz {
+    left: 42px;
+    top: -14px;
+  }
+  .nac-band__path {
+    left: 74px;
+    right: 12px;
+    bottom: 18px;
+    padding-block: 6px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    --nac-band-fade-start: 0px;
+    --nac-band-fade-end: 0px;
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      #000 var(--nac-band-fade-start),
+      #000 calc(100% - var(--nac-band-fade-end)),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      #000 var(--nac-band-fade-start),
+      #000 calc(100% - var(--nac-band-fade-end)),
+      transparent 100%
+    );
+  }
+  .nac-band__path::-webkit-scrollbar {
+    display: none;
+  }
+  .nac-band__path[data-fade-start="true"] {
+    --nac-band-fade-start: 20px;
+  }
+  .nac-band__path[data-fade-end="true"] {
+    --nac-band-fade-end: 24px;
+  }
+  .nac-band__step {
+    flex: none;
+  }
+  .nac-band__trail {
+    flex: none;
+    width: 22px;
+    min-width: 0;
+    padding: 0 3px;
+  }
+  .nac-band__trail i {
+    width: 3px;
+    height: 3px;
+  }
+  .nac-band__trail i:nth-child(n + 5) {
+    display: none;
+  }
+  .nac-band__slot {
+    width: 32px;
+    height: 32px;
+  }
+}
+@container nac-band (max-width: 400px) {
+  .nac-band__agent {
+    left: 10px;
+    width: 48px;
+    height: 48px;
+  }
+  .nac-band__zz {
+    left: 36px;
+  }
+  .nac-band__path {
+    left: 64px;
+    right: 10px;
+  }
+  .nac-band__trail {
+    width: 16px;
+    padding: 0 2px;
+  }
+  .nac-band__trail i:nth-child(n + 4) {
+    display: none;
+  }
+  .nac-band__slot {
+    width: 28px;
+    height: 28px;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .nac-band__zz i,
   .nac-band__stars i,
@@ -726,9 +891,11 @@
     background-color 0.12s,
     transform 0.18s var(--spring);
 }
-.nac__idea:hover {
-  background: color-mix(in srgb, var(--ink) 11%, transparent);
-  transform: translateY(-1px);
+@media (hover: hover) {
+  .nac__idea:hover {
+    background: color-mix(in srgb, var(--ink) 11%, transparent);
+    transform: translateY(-1px);
+  }
 }
 .nac__dice {
   display: grid;
@@ -738,9 +905,29 @@
   border-radius: 8px 8px 8px var(--radius-cut);
   color: var(--muted);
 }
-.nac__dice:hover {
-  background: color-mix(in srgb, var(--ink) 7%, transparent);
-  color: var(--ink);
+@media (hover: hover) {
+  .nac__dice:hover {
+    background: color-mix(in srgb, var(--ink) 7%, transparent);
+    color: var(--ink);
+  }
+}
+/* Touch: a tap picks a name, a color or what it wears, each a 40px target at least. */
+@media (pointer: coarse) {
+  .nac__idea {
+    padding: 10px 12px;
+  }
+  .nac__dice {
+    width: 40px;
+    height: 40px;
+  }
+  .nac__look .newag__swatch {
+    width: 40px;
+    height: 40px;
+  }
+  .nac__look .newag__opt {
+    min-width: 40px;
+    min-height: 40px;
+  }
 }
 html:not([data-pointer]) .nac__idea:focus-visible,
 html:not([data-pointer]) .nac__dice:focus-visible {

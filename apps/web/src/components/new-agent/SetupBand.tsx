@@ -17,6 +17,7 @@ import { AgentAvatar } from "@/components/AgentAvatar";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
 import { agentCoverOptions, facePool } from "@/components/Sky";
 import { useAgentThinks } from "@/hooks/useAgentThinks";
+import { useScrollEdges } from "@/lib/scroll-edges";
 import "./new-agent-card.css";
 
 /** How long its sky takes to go from night to day once it can think. */
@@ -55,6 +56,7 @@ export function SetupBand({
   const mark = useAgentThinks(agent)?.mark ?? null;
   const host = useRef<HTMLDivElement>(null);
   const face = useRef<HTMLSpanElement>(null);
+  const path = useRef<HTMLSpanElement>(null);
   const color = (agent.appearance?.color ?? "sky") as AgentColor;
   // Night until it can think; a dawn when it starts to while the band is in sight (never one on first load).
   const seen = useRef<boolean | null>(null);
@@ -84,6 +86,8 @@ export function SetupBand({
     if (prefersReducedMotion()) return 0;
     return Math.max(0, 1 - (performance.now() - (dawnAt.current ?? 0)) / DAWN_MS);
   };
+  // On a phone too narrow for every slot, the path scrolls sideways and fades where more is past its edge.
+  useScrollEdges(path, [apps.length, needsAi], "x");
   const def = (id: string) => (catalog.data?.connectors ?? []).find((d) => d.id === id) ?? null;
   const slots = [
     ...(needsAi
@@ -114,6 +118,8 @@ export function SetupBand({
       <PixelSky
         options={agentCoverOptions(color, {
           night,
+          // The top of the chat's setup card, whose face is the raised surface.
+          surface: "--surface-raised",
           clear: () => [face.current, ...Array.from(host.current?.querySelectorAll(".nac-band__slot") ?? [])],
           pool: facePool(host, () => [face.current]),
         })}
@@ -143,7 +149,7 @@ export function SetupBand({
           </span>
         )}
       </span>
-      <span className="nac-band__path" aria-hidden="true">
+      <span className="nac-band__path" aria-hidden="true" ref={path}>
         {slots.map((s) => (
           <span key={s.key} className="nac-band__step">
             <span

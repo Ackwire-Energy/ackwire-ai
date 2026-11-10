@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
@@ -10,7 +10,23 @@ import { renderApp, screen, settle } from "./render";
 /* A personal workspace's sidebar (ADR 0159): the person on top, the agents with no header and New agent under them,
    group conversations and people only when there are some, one More at the end with Início, Go to… and every tool. */
 
+/** A narrow screen (the new agent's two steps, NEW_AGENT_STEPS_QUERY): only that query matches. */
+let media: { mockRestore: () => void } | null = null;
+const narrowScreen = () => {
+  media = spyOn(window, "matchMedia").mockImplementation(
+    (q: string) =>
+      ({
+        matches: q === "(max-width: 959px)",
+        media: q,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      }) as unknown as MediaQueryList,
+  );
+};
+
 afterEach(() => {
+  media?.mockRestore();
+  media = null;
   cleanup();
   localStorage.clear();
   sessionStorage.clear();
@@ -217,6 +233,48 @@ describe("a personal workspace's sidebar", () => {
     expect(screen().getByRole("dialog", { name: /Notion/ })).toBeTruthy();
     const saved = JSON.parse(sessionStorage.getItem("agentes:new-agent") ?? "null") as { sel: string; pending: string };
     expect(saved).toMatchObject({ sel: "gabi", pending: "notion" });
+  });
+
+  test("on a narrow screen, two steps: a row opens its card, Back keeps every edit, Create is the card's (ADR 0164)", async () => {
+    narrowScreen();
+    const state = withRightHand(personal());
+    await go(state);
+    const agents = nav().querySelector('.sidebar__block[data-section="agents"]') as HTMLElement;
+    await click([...agents.querySelectorAll(".sidebar__item")].at(-1) as HTMLElement);
+    // Step 1, the list: no card and no Create; the import stays at the footer's start.
+    let dialog = screen().getByRole("dialog", { name: "Novo agente" });
+    expect(within(dialog).getAllByRole("option")[0]?.textContent).toContain("Do zero");
+    expect(within(dialog).queryByRole("textbox", { name: "Nome" })).toBeNull();
+    expect(within(dialog).queryByRole("button", { name: /Criar/ })).toBeNull();
+    expect(within(dialog).getByRole("button", { name: /Trazer agentes de outro app/ })).toBeTruthy();
+    // A row leads to its card, titled with its name, a back arrow before it.
+    await click(within(dialog).getByRole("option", { name: /Gabi/ }));
+    dialog = screen().getByRole("dialog", { name: "Gabi" });
+    expect(within(dialog).queryAllByRole("option")).toHaveLength(0);
+    const nameField = within(dialog).getByRole("textbox", { name: "Nome" }) as HTMLInputElement;
+    expect(nameField.value).toBe("Gabi");
+    await act(async () => fireEvent.change(nameField, { target: { value: "Gabriela" } }));
+    const how = within(dialog).getByRole("textbox", { name: "Instruções" }) as HTMLTextAreaElement;
+    await act(async () => fireEvent.change(how, { target: { value: "Só perguntas." } }));
+    // Back: the list, with the pick and the edits kept.
+    await click(within(dialog).getByRole("button", { name: "Voltar" }));
+    dialog = screen().getByRole("dialog", { name: "Novo agente" });
+    const row = within(dialog).getByRole("option", { name: /Gabriela/ });
+    expect(row.getAttribute("aria-selected")).toBe("true");
+    await click(row);
+    dialog = screen().getByRole("dialog", { name: "Gabriela" });
+    expect((within(dialog).getByRole("textbox", { name: "Instruções" }) as HTMLTextAreaElement).value).toBe(
+      "Só perguntas.",
+    );
+    // Create: the card's one button, at the sheet's width.
+    const create = within(dialog).getByRole("button", { name: /Criar Gabriela/ });
+    expect(within(dialog).queryByRole("button", { name: "Cancelar" })).toBeNull();
+    await click(create);
+    const input = state.calls.find((c) => c.method === "agents.create")?.args[1] as {
+      name: string;
+      instructions: string;
+    };
+    expect(input).toMatchObject({ name: "Gabriela", instructions: "Só perguntas." });
   });
 
   test("back from connecting an app on the provider's page, the card opens as it was, the app on it", async () => {

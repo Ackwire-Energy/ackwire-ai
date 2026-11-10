@@ -56,6 +56,7 @@ import { LookPicker } from "@/components/AgentFields";
 import { useConnectAi } from "@/components/ConnectAi";
 import { ConnectFlow, type FlowState } from "@/components/ConnectFlow";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
+import { useMediaQuery } from "@/components/NavDrawer";
 import { useOrg } from "@/components/org-context";
 import { agentCoverOptions, facePool } from "@/components/Sky";
 import {
@@ -295,6 +296,12 @@ const SKILL_SUGGESTIONS: Partial<Record<Pick, readonly string[]>> = {
   finance: ["dunning"],
   assistant: ["schedule"],
 };
+/**
+ * Where the list and the card don't fit side by side, the dialog takes two steps (ADR 0164, narrow screens): the
+ * dialog is the viewport less 32px (a sheet from 640 down), and side by side needs the list's 440, the gap and a card
+ * of about 420, inside the dialog's 20px insets.
+ */
+export const NEW_AGENT_STEPS_QUERY = "(max-width: 959px)";
 /** The old form's helpers for instructions, reused on the card (`newAgent.tips.{tip}`). */
 const TIPS = ["do", "avoid", "help"] as const;
 /** About eight lines of instructions before they scroll. */
@@ -369,6 +376,11 @@ function NewAgentDialog({
     return all;
   });
   const [lookOpen, setLookOpen] = useState(false);
+  // Narrow: the list, then the card (back keeps the pick and every card's edits). Back from a provider's page, the card.
+  const steps = useMediaQuery(NEW_AGENT_STEPS_QUERY);
+  const [step, setStep] = useState<"list" | "card">(back ? "card" : "list");
+  const onCard = !steps || step === "card";
+  const onList = !steps || step === "list";
   const [preview, setPreview] = useState<LookPatch | null>(null);
   const [picking, setPicking] = useState(false);
   // An app being connected from the picker: it lands on the card once it shows as connected.
@@ -388,6 +400,7 @@ function NewAgentDialog({
   const nameInput = useRef<HTMLInputElement>(null);
   const whatInput = useRef<HTMLTextAreaElement>(null);
   const howInput = useRef<HTMLTextAreaElement>(null);
+  const backButton = useRef<HTMLButtonElement>(null);
   const body = useRef<HTMLDivElement>(null);
 
   // The catalog's apps by id, and the ones connected here (what a new agent may use at once).
@@ -544,8 +557,8 @@ function NewAgentDialog({
     });
   };
   // The list and the card's body fade at an edge only while there is more to scroll that way.
-  useScrollEdges(list, [picks.length]);
-  useScrollEdges(body, [sel, lookOpen, draft]);
+  useScrollEdges(list, [picks.length, step, steps]);
+  useScrollEdges(body, [sel, lookOpen, draft, step, steps]);
 
   const ready = name !== "" && handle !== "" && (sel !== "zero" || draft.what.trim() !== "");
   const react = () => playAgentReaction(REACTION, "up");
@@ -562,6 +575,24 @@ function NewAgentDialog({
     setPreview(null);
     // Picked with the pointer, it hops from its row into its own sky.
     if (from && !prefersReducedMotion()) hopFrom.current = from.getBoundingClientRect();
+  };
+  // Narrow, each step starts where the other left off: the card on its back arrow (no keyboard pops up on a phone,
+  // unless from scratch its words come first), the list on the row it had, in sight.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: on each step change
+  useLayoutEffect(() => {
+    if (!steps) return;
+    if (step === "card") {
+      if (!(sel === "zero" && !drafts.zero?.what)) backButton.current?.focus();
+      return;
+    }
+    const row = list.current?.querySelector<HTMLElement>('[aria-selected="true"]');
+    row?.scrollIntoView?.({ block: "nearest" });
+    row?.focus();
+  }, [step, steps]);
+  /** A row chosen (a tap, a click, Enter on it): picked, and on a narrow screen its card comes next. */
+  const choose = (next: Pick, from?: HTMLElement | null) => {
+    pick(next, from);
+    if (steps) setStep("card");
   };
   // biome-ignore lint/correctness/useExhaustiveDependencies: after each pick
   useLayoutEffect(() => {
@@ -581,11 +612,12 @@ function NewAgentDialog({
       ],
       { duration: 440, easing: "cubic-bezier(.3,.7,.2,1)" },
     ).finished.then(react, () => {});
-  }, [sel]);
-  // From scratch, the words come first.
+  }, [sel, step]);
+  // From scratch, the words come first (on a narrow screen, once its card is shown).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: again when the card comes into view
   useEffect(() => {
     if (sel === "zero" && !drafts.zero?.what) whatInput.current?.focus();
-  }, [sel, drafts.zero?.what]);
+  }, [sel, drafts.zero?.what, step]);
 
   const setLook = (patch: LookPatch) => {
     update({ look: { ...draft.look, ...patch } });
@@ -706,7 +738,8 @@ function NewAgentDialog({
       // In its instructions Enter is a new line; ⌘ or Ctrl with it still creates.
       if (target === howInput.current && !e.metaKey && !e.ctrlKey) return;
       e.preventDefault();
-      if (target === whatInput.current && !name) nameInput.current?.focus();
+      if (!onCard) setStep("card");
+      else if (target === whatInput.current && !name) nameInput.current?.focus();
       else void submit();
     }
   };
@@ -753,8 +786,26 @@ function NewAgentDialog({
     <Dialog
       open
       onOpenChange={(o) => !o && !busy && onClose()}
-      title={t("newAgentCard.title")}
-      description={t("newAgentCard.lead")}
+      // Narrow, the card's step is titled with its name, a back arrow before it; the list's needs no lead.
+      title={steps && step === "card" && name ? name : t("newAgentCard.title")}
+      description={steps ? undefined : t("newAgentCard.lead")}
+      leading={
+        steps && step === "card" ? (
+          <Button
+            ref={backButton}
+            variant="ghost"
+            size="sm"
+            iconOnly
+            icon="chevronLeft"
+            aria-label={t("common.back")}
+            onClick={() => {
+              setLookOpen(false);
+              setPreview(null);
+              setStep("list");
+            }}
+          />
+        ) : undefined
+      }
       closeLabel={t("common.close")}
       width={1000}
       className="nac"
@@ -768,361 +819,389 @@ function NewAgentDialog({
       }}
     >
       {/* The dialog's keys (arrows move the list, Enter creates) on a form: it holds the sections. */}
-      <form className="nac__keys" onKeyDown={onKeyDown} onSubmit={(e) => e.preventDefault()}>
+      <form
+        className="nac__keys"
+        data-steps={steps || undefined}
+        data-step={steps ? step : undefined}
+        onKeyDown={onKeyDown}
+        onSubmit={(e) => e.preventDefault()}
+      >
         <DialogBody>
           <div className="nac__grid">
-            <div className="nac__list" role="listbox" aria-label={t("newAgentCard.list")} ref={list}>
-              <ListRow
-                pick="zero"
-                on={sel === "zero"}
-                face={
-                  drafts.zero?.name.trim() || drafts.zero?.what.trim() ? (
-                    <AgentAvatar appearance={drafts.zero.look} name={nameOf("zero")} />
-                  ) : (
-                    <span className="nac__blank">
-                      <Icon name="plus" size={16} />
-                    </span>
-                  )
-                }
-                title={drafts.zero?.name.trim() || t("newAgentCard.zero")}
-                sub={drafts.zero?.what.trim() || t("newAgentCard.zeroSub")}
-                onPick={pick}
-              />
-              {personal ? (
-                <>
-                  <p className="nac__group">{t("newAgent.roleGroups.personal")}</p>
-                  {PERSONAL_STARTERS.map((s) => (
-                    <ListRow
-                      key={s.id}
-                      pick={s.id}
-                      on={sel === s.id}
-                      face={<AgentAvatar appearance={drafts[s.id]?.look ?? s.look} name={nameOf(s.id)} />}
-                      title={nameOf(s.id)}
-                      sub={tt(`teamTemplates.agents.${s.id}.role`)}
-                      onPick={pick}
-                    />
-                  ))}
-                </>
-              ) : (
-                ROLE_GROUPS.map((group) => (
-                  <div key={group.id} className="nac__groupbox">
-                    <p className="nac__group">
-                      <Icon name={GROUP_ICON[group.id]} size={14} />
-                      {tt(`newAgent.roleGroups.${group.id}`)}
-                    </p>
-                    {group.roles.map((id) => (
+            {onList && (
+              <div className="nac__list" role="listbox" aria-label={t("newAgentCard.list")} ref={list}>
+                <ListRow
+                  pick="zero"
+                  on={sel === "zero"}
+                  face={
+                    drafts.zero?.name.trim() || drafts.zero?.what.trim() ? (
+                      <AgentAvatar appearance={drafts.zero.look} name={nameOf("zero")} />
+                    ) : (
+                      <span className="nac__blank">
+                        <Icon name="plus" size={16} />
+                      </span>
+                    )
+                  }
+                  title={drafts.zero?.name.trim() || t("newAgentCard.zero")}
+                  sub={drafts.zero?.what.trim() || t("newAgentCard.zeroSub")}
+                  onPick={choose}
+                />
+                {personal ? (
+                  <>
+                    <p className="nac__group">{t("newAgent.roleGroups.personal")}</p>
+                    {PERSONAL_STARTERS.map((s) => (
                       <ListRow
-                        key={id}
-                        pick={id}
-                        on={sel === id}
-                        face={
-                          <AgentAvatar
-                            appearance={(drafts[id]?.look ?? ROLE_DEFAULTS[id].look) as Look}
-                            name={nameOf(id)}
-                          />
-                        }
-                        title={nameOf(id)}
-                        sub={tt(`newAgent.roles.${id}.name`)}
-                        onPick={pick}
+                        key={s.id}
+                        pick={s.id}
+                        on={sel === s.id}
+                        face={<AgentAvatar appearance={drafts[s.id]?.look ?? s.look} name={nameOf(s.id)} />}
+                        title={nameOf(s.id)}
+                        sub={tt(`teamTemplates.agents.${s.id}.role`)}
+                        onPick={choose}
                       />
                     ))}
-                  </div>
-                ))
-              )}
-            </div>
-
-            <div className="tp-gallery__preview nac__card">
-              <div className="nac__cover" ref={cover} data-look={lookOpen || undefined}>
-                <PixelSky
-                  className="nac__sky"
-                  options={agentCoverOptions(look.color as AgentColor, {
-                    clear: () => [hero.current, bubble.current, cover.current?.querySelector(".nac__acts") ?? null],
-                    pool: facePool(cover, () => [hero.current]),
-                  })}
-                />
-                <span className="nac__hero" ref={hero}>
-                  <AgentAvatar
-                    appearance={look}
-                    name={name || t("newAgentCard.zero")}
-                    size="xl"
-                    framed={false}
-                    reactionKey={REACTION}
-                  />
-                </span>
-                {!lookOpen && (
-                  <div className="nac__bubble" ref={bubble}>
-                    <p className="nac__hi">
-                      <span>
-                        {name
-                          ? t("newAgentCard.hi", g)
-                          : tryName
-                            ? t("newAgentCard.hi", agentGrammar(tryName))
-                            : t("newAgentCard.hiBlank")}
-                      </span>
-                      <input
-                        ref={nameInput}
-                        className="nac__name"
-                        value={draft.name}
-                        maxLength={40}
-                        placeholder={tryName ?? (sel === "zero" ? "…" : t("newAgentCard.namePlaceholder"))}
-                        aria-label={t("newAgentCard.name")}
-                        autoComplete="off"
-                        spellCheck={false}
-                        onChange={(e) => update({ name: e.target.value })}
-                        onFocus={() => gazeAt(bubble.current)}
-                        onBlur={() => {
-                          setGaze(null);
-                          if (name) react();
-                        }}
-                      />
-                      <span aria-hidden="true">.</span>
-                    </p>
-                    {ideas.length > 0 && (
-                      <span className="nac__names">
-                        <span>{t("newAgentCard.namesLead")}</span>
-                        {ideas.map((idea) => (
-                          <button
-                            key={idea}
-                            type="button"
-                            className="nac__idea"
-                            onPointerEnter={() => setTryName(idea)}
-                            onPointerLeave={() => setTryName(null)}
-                            onClick={() => {
-                              setTryName(null);
-                              update({ name: idea });
-                              react();
-                              burst(hero.current, look.color);
-                            }}
-                          >
-                            {idea}
-                          </button>
-                        ))}
-                        <button
-                          type="button"
-                          className="nac__dice"
-                          aria-label={t("newAgentCard.namesRoll")}
-                          title={t("newAgentCard.namesRoll")}
-                          onClick={() => void rollNames()}
-                        >
-                          <Icon name="shuffle" size={14} />
-                        </button>
-                      </span>
-                    )}
-                    <textarea
-                      ref={whatInput}
-                      className="nac__what"
-                      rows={1}
-                      value={draft.what}
-                      maxLength={500}
-                      placeholder={t("newAgentCard.whatPlaceholder")}
-                      aria-label={t("newAgentCard.what")}
-                      onChange={(e) => update({ what: e.target.value })}
-                      onFocus={() => gazeAt(bubble.current)}
-                      onBlur={() => setGaze(null)}
-                    />
-                    <Icon name="edit" size={14} className="nac__pen" />
-                  </div>
-                )}
-                <span className="nac__acts">
-                  <Button
-                    size="sm"
-                    icon={lookOpen ? "check" : "smile"}
-                    className="nac__glass"
-                    onClick={() => {
-                      setLookOpen((o) => !o);
-                      setPreview(null);
-                    }}
-                  >
-                    {lookOpen ? t("newAgentCard.lookDone") : t("newAgentCard.look")}
-                  </Button>
-                  <Button
-                    size="sm"
-                    iconOnly
-                    icon="shuffle"
-                    className="nac__glass"
-                    aria-label={t("newAgentCard.shuffle")}
-                    title={t("newAgentCard.shuffle")}
-                    onClick={() => void shuffle()}
-                  />
-                </span>
-              </div>
-
-              <div className="nac__body" ref={body}>
-                {lookOpen ? (
-                  <div className="nac__look">
-                    <LookPicker look={draft.look} onPick={setLook} onPreview={setPreview} />
-                  </div>
+                  </>
                 ) : (
-                  <>
-                    <span className="nac__handle">
-                      {!name
-                        ? roleName || t("newAgentCard.handleBlank")
-                        : isTaken
-                          ? t("newAgentCard.handleTaken", { ...g, handle })
-                          : roleName
-                            ? t("newAgentCard.handleRole", { handle, role: roleName })
-                            : t("newAgentCard.handle", { handle })}
-                    </span>
-                    {similar && (
-                      <span className="nac__similar">
-                        <AgentAvatar
-                          size="xs"
-                          name={nameOf(similar)}
-                          appearance={(starterOf(similar)?.look ?? ROLE_DEFAULTS[similar as TeamRole]?.look) as Look}
+                  ROLE_GROUPS.map((group) => (
+                    <div key={group.id} className="nac__groupbox">
+                      <p className="nac__group">
+                        <Icon name={GROUP_ICON[group.id]} size={14} />
+                        {tt(`newAgent.roleGroups.${group.id}`)}
+                      </p>
+                      {group.roles.map((id) => (
+                        <ListRow
+                          key={id}
+                          pick={id}
+                          on={sel === id}
+                          face={
+                            <AgentAvatar
+                              appearance={(drafts[id]?.look ?? ROLE_DEFAULTS[id].look) as Look}
+                              name={nameOf(id)}
+                            />
+                          }
+                          title={nameOf(id)}
+                          sub={tt(`newAgent.roles.${id}.name`)}
+                          onPick={choose}
                         />
-                        <span>{t("newAgentCard.similar", agentGrammar(nameOf(similar)))}</span>
-                        <button type="button" className="ac-link" onClick={() => pick(similar)}>
-                          {t("newAgentCard.similarAction", agentGrammar(nameOf(similar)))}
-                        </button>
-                      </span>
-                    )}
-                    <section className="nac__sec" aria-label={t("newAgentCard.uses")}>
-                      <span className="nac__head">
-                        <span className="nac__label">{t("newAgentCard.uses")}</span>
-                        {managesAgents && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            icon="plus"
-                            className="nac__plus"
-                            aria-haspopup="dialog"
-                            onClick={() => setPicking(true)}
+                      ))}
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {onCard && (
+              <div className="tp-gallery__preview nac__card">
+                <div className="nac__cover" ref={cover} data-look={lookOpen || undefined}>
+                  <PixelSky
+                    className="nac__sky"
+                    options={agentCoverOptions(look.color as AgentColor, {
+                      // It sits on the card's well: its last tone is the well's, in either theme.
+                      surface: "--card-well",
+                      clear: () => [hero.current, bubble.current, cover.current?.querySelector(".nac__acts") ?? null],
+                      pool: facePool(cover, () => [hero.current]),
+                    })}
+                  />
+                  <span className="nac__hero" ref={hero}>
+                    <AgentAvatar
+                      appearance={look}
+                      name={name || t("newAgentCard.zero")}
+                      size="xl"
+                      framed={false}
+                      reactionKey={REACTION}
+                    />
+                  </span>
+                  {!lookOpen && (
+                    <div className="nac__bubble" ref={bubble}>
+                      <p className="nac__hi">
+                        <span>
+                          {name
+                            ? t("newAgentCard.hi", g)
+                            : tryName
+                              ? t("newAgentCard.hi", agentGrammar(tryName))
+                              : t("newAgentCard.hiBlank")}
+                        </span>
+                        <input
+                          ref={nameInput}
+                          className="nac__name"
+                          value={draft.name}
+                          maxLength={40}
+                          placeholder={tryName ?? (sel === "zero" ? "…" : t("newAgentCard.namePlaceholder"))}
+                          aria-label={t("newAgentCard.name")}
+                          autoComplete="off"
+                          spellCheck={false}
+                          onChange={(e) => update({ name: e.target.value })}
+                          onFocus={() => gazeAt(bubble.current)}
+                          onBlur={() => {
+                            setGaze(null);
+                            if (name) react();
+                          }}
+                        />
+                        <span aria-hidden="true">.</span>
+                      </p>
+                      {ideas.length > 0 && (
+                        <span className="nac__names">
+                          <span>{t("newAgentCard.namesLead")}</span>
+                          {ideas.map((idea) => (
+                            <button
+                              key={idea}
+                              type="button"
+                              className="nac__idea"
+                              onPointerEnter={() => setTryName(idea)}
+                              onPointerLeave={() => setTryName(null)}
+                              onClick={() => {
+                                setTryName(null);
+                                update({ name: idea });
+                                react();
+                                burst(hero.current, look.color);
+                              }}
+                            >
+                              {idea}
+                            </button>
+                          ))}
+                          <button
+                            type="button"
+                            className="nac__dice"
+                            aria-label={t("newAgentCard.namesRoll")}
+                            title={t("newAgentCard.namesRoll")}
+                            onClick={() => void rollNames()}
                           >
-                            {appIds.length ? t("newAgentCard.otherApp") : t("newAgentCard.chooseApps")}
-                          </Button>
-                        )}
-                      </span>
-                      <span className="nac__chips">
-                        {appIds.length === 0 && <span className="nac__none">{t("newAgentCard.usesNone")}</span>}
-                        {appIds.map((id) => (
-                          <button key={id} type="button" className="ac-chip nac__app" onClick={() => setAppOpen(id)}>
-                            {appIcon(id)}
-                            <span className="ac-chip__text">{appName(id)}</span>
-                            <span className="nac__level">{tt(`newAgentCard.level.${draft.apps[id] ?? "read"}`)}</span>
+                            <Icon name="shuffle" size={14} />
                           </button>
-                        ))}
+                        </span>
+                      )}
+                      <textarea
+                        ref={whatInput}
+                        className="nac__what"
+                        rows={1}
+                        value={draft.what}
+                        maxLength={500}
+                        placeholder={t("newAgentCard.whatPlaceholder")}
+                        aria-label={t("newAgentCard.what")}
+                        onChange={(e) => update({ what: e.target.value })}
+                        onFocus={() => gazeAt(bubble.current)}
+                        onBlur={() => setGaze(null)}
+                      />
+                      <Icon name="edit" size={14} className="nac__pen" />
+                    </div>
+                  )}
+                  <span className="nac__acts">
+                    <Button
+                      size="sm"
+                      icon={lookOpen ? "check" : "smile"}
+                      className="nac__glass"
+                      onClick={() => {
+                        setLookOpen((o) => !o);
+                        setPreview(null);
+                      }}
+                    >
+                      {lookOpen ? t("newAgentCard.lookDone") : t("newAgentCard.look")}
+                    </Button>
+                    <Button
+                      size="sm"
+                      iconOnly
+                      icon="shuffle"
+                      className="nac__glass"
+                      aria-label={t("newAgentCard.shuffle")}
+                      title={t("newAgentCard.shuffle")}
+                      onClick={() => void shuffle()}
+                    />
+                  </span>
+                </div>
+
+                <div className="nac__body" ref={body}>
+                  {lookOpen ? (
+                    <div className="nac__look">
+                      <LookPicker look={draft.look} onPick={setLook} onPreview={setPreview} />
+                    </div>
+                  ) : (
+                    <>
+                      <span className="nac__handle">
+                        {!name
+                          ? roleName || t("newAgentCard.handleBlank")
+                          : isTaken
+                            ? t("newAgentCard.handleTaken", { ...g, handle })
+                            : roleName
+                              ? t("newAgentCard.handleRole", { handle, role: roleName })
+                              : t("newAgentCard.handle", { handle })}
                       </span>
-                    </section>
-                    {skillsShown && (
-                      <section className="nac__sec" aria-label={t("newAgentCard.skills")}>
+                      {similar && (
+                        <span className="nac__similar">
+                          <AgentAvatar
+                            size="xs"
+                            name={nameOf(similar)}
+                            appearance={(starterOf(similar)?.look ?? ROLE_DEFAULTS[similar as TeamRole]?.look) as Look}
+                          />
+                          <span>{t("newAgentCard.similar", agentGrammar(nameOf(similar)))}</span>
+                          <button type="button" className="ac-link" onClick={() => pick(similar)}>
+                            {t("newAgentCard.similarAction", agentGrammar(nameOf(similar)))}
+                          </button>
+                        </span>
+                      )}
+                      <section className="nac__sec" aria-label={t("newAgentCard.uses")}>
                         <span className="nac__head">
-                          <span className="nac__label">
-                            {t("newAgentCard.skills")}
-                            <span className="nac__help">
-                              {" · "}
-                              {name ? t("newAgent.skillsHelp", g) : t("newAgentCard.skillsHelpBlank")}
-                            </span>
-                          </span>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            icon={addingSkills ? "chevronUp" : "plus"}
-                            className="nac__plus"
-                            aria-expanded={addingSkills}
-                            disabled={skillsLeft.length === 0 && !addingSkills}
-                            onClick={() => setAddingSkills((a) => !a)}
-                          >
-                            {chosenSkills.length ? t("newAgentCard.otherSkill") : t("newAgentCard.chooseSkills")}
-                          </Button>
+                          <span className="nac__label">{t("newAgentCard.uses")}</span>
+                          {managesAgents && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              icon="plus"
+                              className="nac__plus"
+                              aria-haspopup="dialog"
+                              onClick={() => setPicking(true)}
+                            >
+                              {appIds.length ? t("newAgentCard.otherApp") : t("newAgentCard.chooseApps")}
+                            </Button>
+                          )}
                         </span>
                         <span className="nac__chips">
-                          {chosenSkills.length === 0 && <span className="nac__none">{t("newAgentCard.usesNone")}</span>}
-                          {chosenSkills.map((id) => (
-                            <button
-                              key={id}
-                              type="button"
-                              className="ac-chip nac__app"
-                              onClick={() => setSkillOpen(id)}
-                            >
-                              <Icon name="book" size={14} />
-                              <span className="ac-chip__text">{skillName(id)}</span>
+                          {appIds.length === 0 && <span className="nac__none">{t("newAgentCard.usesNone")}</span>}
+                          {appIds.map((id) => (
+                            <button key={id} type="button" className="ac-chip nac__app" onClick={() => setAppOpen(id)}>
+                              {appIcon(id)}
+                              <span className="ac-chip__text">{appName(id)}</span>
+                              <span className="nac__level">{tt(`newAgentCard.level.${draft.apps[id] ?? "read"}`)}</span>
                             </button>
                           ))}
                         </span>
-                        {addingSkills && skillsLeft.length > 0 && (
-                          <span className="nac__offer">
-                            {skillsLeft.map((s) => (
+                      </section>
+                      {skillsShown && (
+                        <section className="nac__sec" aria-label={t("newAgentCard.skills")}>
+                          <span className="nac__head">
+                            <span className="nac__label">
+                              {t("newAgentCard.skills")}
+                              <span className="nac__help">
+                                {" · "}
+                                {name ? t("newAgent.skillsHelp", g) : t("newAgentCard.skillsHelpBlank")}
+                              </span>
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              icon={addingSkills ? "chevronUp" : "plus"}
+                              className="nac__plus"
+                              aria-expanded={addingSkills}
+                              disabled={skillsLeft.length === 0 && !addingSkills}
+                              onClick={() => setAddingSkills((a) => !a)}
+                            >
+                              {chosenSkills.length ? t("newAgentCard.otherSkill") : t("newAgentCard.chooseSkills")}
+                            </Button>
+                          </span>
+                          <span className="nac__chips">
+                            {chosenSkills.length === 0 && (
+                              <span className="nac__none">{t("newAgentCard.usesNone")}</span>
+                            )}
+                            {chosenSkills.map((id) => (
                               <button
-                                key={s.id}
+                                key={id}
                                 type="button"
-                                className="ac-chip nac__add"
-                                onClick={() => update({ skills: [...chosenSkills, s.id] })}
+                                className="ac-chip nac__app"
+                                onClick={() => setSkillOpen(id)}
                               >
                                 <Icon name="book" size={14} />
-                                <span className="ac-chip__text">{s.name}</span>
-                                <Icon name="plus" size={14} />
+                                <span className="ac-chip__text">{skillName(id)}</span>
                               </button>
                             ))}
                           </span>
-                        )}
-                      </section>
-                    )}
-                    {!personal && joins.length > 0 && (
-                      <section className="nac__sec" aria-label={t("newAgentCard.worksIn")}>
-                        <span className="nac__label">{t("newAgentCard.worksIn")}</span>
-                        <span className="nac__chips">
-                          {joins.map((c) => (
-                            <span key={c.id} className="ac-chip">
-                              <Icon name="channel" size={14} />
-                              <span className="ac-chip__text">#{c.name}</span>
+                          {addingSkills && skillsLeft.length > 0 && (
+                            <span className="nac__offer">
+                              {skillsLeft.map((s) => (
+                                <button
+                                  key={s.id}
+                                  type="button"
+                                  className="ac-chip nac__add"
+                                  onClick={() => update({ skills: [...chosenSkills, s.id] })}
+                                >
+                                  <Icon name="book" size={14} />
+                                  <span className="ac-chip__text">{s.name}</span>
+                                  <Icon name="plus" size={14} />
+                                </button>
+                              ))}
                             </span>
+                          )}
+                        </section>
+                      )}
+                      {!personal && joins.length > 0 && (
+                        <section className="nac__sec" aria-label={t("newAgentCard.worksIn")}>
+                          <span className="nac__label">{t("newAgentCard.worksIn")}</span>
+                          <span className="nac__chips">
+                            {joins.map((c) => (
+                              <span key={c.id} className="ac-chip">
+                                <Icon name="channel" size={14} />
+                                <span className="ac-chip__text">#{c.name}</span>
+                              </span>
+                            ))}
+                          </span>
+                        </section>
+                      )}
+                      <section className="nac__sec" aria-label={howLabel}>
+                        <span className="nac__label">{howLabel}</span>
+                        <span className="nac__how">
+                          <textarea
+                            ref={howInput}
+                            className="nac__instr"
+                            rows={3}
+                            value={draft.instructions}
+                            maxLength={50_000}
+                            placeholder={t("newAgentCard.instructionsPlaceholder")}
+                            aria-label={t("newAgent.instructions")}
+                            onChange={(e) => update({ instructions: e.target.value })}
+                          />
+                          <Icon name="edit" size={14} className="nac__pen" />
+                        </span>
+                        <span className="nac__tips">
+                          {TIPS.map((tip) => (
+                            <Button key={tip} size="sm" variant="ghost" icon="plus" onClick={() => addTip(tip)}>
+                              {t(`newAgent.tips.${tip}.title`)}
+                            </Button>
                           ))}
                         </span>
                       </section>
-                    )}
-                    <section className="nac__sec" aria-label={howLabel}>
-                      <span className="nac__label">{howLabel}</span>
-                      <span className="nac__how">
-                        <textarea
-                          ref={howInput}
-                          className="nac__instr"
-                          rows={3}
-                          value={draft.instructions}
-                          maxLength={50_000}
-                          placeholder={t("newAgentCard.instructionsPlaceholder")}
-                          aria-label={t("newAgent.instructions")}
-                          onChange={(e) => update({ instructions: e.target.value })}
-                        />
-                        <Icon name="edit" size={14} className="nac__pen" />
-                      </span>
-                      <span className="nac__tips">
-                        {TIPS.map((tip) => (
-                          <Button key={tip} size="sm" variant="ghost" icon="plus" onClick={() => addTip(tip)}>
-                            {t(`newAgent.tips.${tip}.title`)}
-                          </Button>
-                        ))}
-                      </span>
-                    </section>
-                  </>
-                )}
+                    </>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </DialogBody>
-        {/* Left: the import, and while nothing here can think, Connect AI over this dialog (the draft stays). */}
-        <DialogFooter
-          className="nac__foot"
-          note={
-            <span className="nac__foot-left">
-              <button type="button" className="ac-link ac-iconline nac__import" onClick={toImport}>
-                <Icon name="download" size={16} />
-                {t("newAgentCard.import")}
-              </button>
-              {!brain.hasAi && connectAi && (
-                <Button size="sm" icon="bolt" onClick={() => connectAi.open({ forNewAgent: true })}>
-                  {t("noAi.banner.orgAction")}
+        {steps && step === "card" ? (
+          // Narrow, the card's step ends on Create alone, the width of the sheet.
+          <DialogFooter className="nac__foot nac__foot--create">
+            <Button variant="primary" block loading={busy} disabled={!ready} onClick={() => void submit()}>
+              {name ? t("newAgentCard.create", { name }) : t("newAgentCard.createBlank")}
+            </Button>
+          </DialogFooter>
+        ) : (
+          // Left: the import, and while nothing here can think, Connect AI over this dialog (the draft stays). Narrow,
+          // the list's step has no Create: a row leads to its card.
+          <DialogFooter
+            className="nac__foot"
+            note={
+              <span className="nac__foot-left">
+                <button type="button" className="ac-link ac-iconline nac__import" onClick={toImport}>
+                  <Icon name="download" size={16} />
+                  {t("newAgentCard.import")}
+                </button>
+                {!brain.hasAi && connectAi && (
+                  <Button size="sm" icon="bolt" onClick={() => connectAi.open({ forNewAgent: true })}>
+                    {t("noAi.banner.orgAction")}
+                  </Button>
+                )}
+              </span>
+            }
+          >
+            {!steps && (
+              <>
+                <Button onClick={onClose} disabled={busy}>
+                  {t("common.cancel")}
                 </Button>
-              )}
-            </span>
-          }
-        >
-          <Button onClick={onClose} disabled={busy}>
-            {t("common.cancel")}
-          </Button>
-          <Button variant="primary" kbd={["↵"]} loading={busy} disabled={!ready} onClick={() => void submit()}>
-            {name ? t("newAgentCard.create", { name }) : t("newAgentCard.createBlank")}
-          </Button>
-        </DialogFooter>
+                <Button variant="primary" kbd={["↵"]} loading={busy} disabled={!ready} onClick={() => void submit()}>
+                  {name ? t("newAgentCard.create", { name }) : t("newAgentCard.createBlank")}
+                </Button>
+              </>
+            )}
+          </DialogFooter>
+        )}
       </form>
       {skillOpen && (
         <SkillDialog
