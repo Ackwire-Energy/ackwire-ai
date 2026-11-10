@@ -154,7 +154,7 @@ import { accountOption, PlanHold, usePlanHold } from "@/components/ai/ConnectAiS
 import { PlanReplies } from "@/components/ai/PlanReplies";
 import { useConnectAi } from "@/components/ConnectAi";
 import { LoadingLine } from "@/components/Loading";
-import { CommandBlock } from "@/components/Machines";
+import { CommandBlock } from "@/components/machine-bits";
 import { useOrg } from "@/components/org-context";
 import { ProviderSelect } from "@/components/ProviderKey";
 import { useWidenAsk } from "@/components/ReachLines";
