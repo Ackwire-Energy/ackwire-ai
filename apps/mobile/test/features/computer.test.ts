@@ -260,6 +260,13 @@ describe("the profile's Computador entry on the phone", () => {
     };
     const offline = facts({ machine: { ...ACME, online: false } });
     expect(entryLine(t, entryState(offline, NOW), words)).toBe("Sem resposta · já estamos cuidando");
+    // Asleep in standby, nothing is wrong: it wakes when wanted.
+    const asleep = facts({
+      machine: { ...ACME, online: false, standby: true },
+      desktop: { available: false, reason: "offline" },
+      browser: false,
+    });
+    expect(entryLine(t, entryState(asleep, NOW), words)).toBe("Disponível · ninguém usando agora");
     expect(entryLine(t, entryState({ ...offline, edition: "selfhost" }, NOW), { ...words, edition: "selfhost" })).toBe(
       `Offline desde ${clockAt("pt-BR", ACME.lastSeenAt, new Date(NOW))}`,
     );
