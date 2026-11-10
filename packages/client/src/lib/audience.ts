@@ -14,6 +14,20 @@ import { joinNames } from "./format";
 import { agentGrammar } from "./grammar";
 import { can } from "./permissions";
 import { isEveryone, sortRoles } from "./roles";
+import { isPersonal, modeKey } from "./workspace-mode";
+
+type ModeOrg = Pick<OrgSummary, "mode"> | null | undefined;
+
+/**
+ * The i18n key of an audience choice's name (`audience.mode.*`): a personal workspace says it plainly ("Everyone
+ * here", "Only some people", ADR 0159); "Only the owner" reads the same in both.
+ */
+export const audienceModeKey = (org: ModeOrg, mode: AudienceMode) =>
+  mode === "owner" ? ("audience.mode.owner" as const) : modeKey(org, `audience.mode.${mode}` as const);
+
+/** The line under the choice "everyone" or "people" (`audience.modeText.*`), a personal workspace's in its words. */
+export const audienceModeTextKey = (org: ModeOrg, mode: Exclude<AudienceMode, "owner">) =>
+  modeKey(org, `audience.modeText.${mode}` as const);
 
 /** The agent's audience; absent = everyone (older servers). */
 export function audienceOf(agent: Agent): Required<AgentAudience> {
@@ -273,10 +287,18 @@ export function audienceLines<P extends { userId: string }>(
   return [...picked.map((role) => ({ kind: "role" as const, role })), ...people];
 }
 
-/** "Pessoal" (only the owner) or "Restrito" (some people); nothing for everyone. */
-export function audienceChip(t: TFunction, agent: Agent): string | null {
+/**
+ * "Pessoal" (only the owner) or "Restrito" (some people); nothing for everyone. `viewer`: a personal workspace tells
+ * its owner "Only you" on their own agent (ADR 0159).
+ */
+export function audienceChip(t: TFunction, agent: Agent, viewer?: { org: ModeOrg; meId: string }): string | null {
   const mode = modeOf(agent);
-  if (mode === "owner") return t("audience.chip.owner");
+  if (mode === "owner")
+    return t(
+      viewer && isPersonal(viewer.org) && agent.ownerUserId === viewer.meId
+        ? "audience.chip.ownerPersonal"
+        : "audience.chip.owner",
+    );
   if (mode === "people") return t("audience.chip.people");
   return null;
 }
@@ -351,11 +373,20 @@ export function unavailableNotice(
     : t("audience.notice.nobody", g);
 }
 
-/** The profile summary: "Todos do workspace", "Suporte, Tecnologia e mais 2 pessoas", "Só Walter". */
-export function audienceSummary(t: TFunction, agent: Agent, nameOf: NameOf, roleName: NameOf = () => undefined) {
+/**
+ * The profile summary: "Todos do workspace", "Suporte, Tecnologia e mais 2 pessoas", "Só Walter". `org`: a personal
+ * workspace says "everyone" its way (ADR 0159).
+ */
+export function audienceSummary(
+  t: TFunction,
+  agent: Agent,
+  nameOf: NameOf,
+  roleName: NameOf = () => undefined,
+  org?: ModeOrg,
+) {
   const a = audienceOf(agent);
   const owner = agent.ownerUserId ? nameOf(agent.ownerUserId) : undefined;
-  if (a.mode === "everyone") return t("audience.summary.everyone");
+  if (a.mode === "everyone") return t(modeKey(org, "audience.summary.everyone"));
   if (a.mode === "owner") return owner ? t("audience.summary.owner", { name: owner }) : t("audience.summary.nobody");
   const { roles, people } = answered(agent, nameOf, roleName);
   const names = [...roles, ...people];

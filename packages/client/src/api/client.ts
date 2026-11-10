@@ -333,6 +333,7 @@ import type {
   WorkspaceActionCard,
   WorkspaceActionCardView,
   WorkspaceLimits,
+  WorkspaceMode,
 } from "./types";
 
 /**
@@ -440,6 +441,8 @@ export interface ApiClient {
     create(input: {
       name: string;
       context?: string;
+      /** Who it is for (ADR 0159); a team's when left out. */
+      mode?: WorkspaceMode;
     }): Promise<{ organization: Organization; generalChannelId: string }>;
     /**
      * Its owner's progress in setting it up: the furthest step reached (it only moves forward), or `finished`. Null

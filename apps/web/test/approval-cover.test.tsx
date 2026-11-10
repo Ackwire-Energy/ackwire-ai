@@ -70,6 +70,30 @@ describe("Configurações › Você › Aprovações (ADR 0139)", () => {
     expect(section().queryByRole("region", { name: "Você aprova por" })).toBeNull();
   });
 
+  test("alone in a personal workspace nobody can approve for you: no Quem aprova por mim, unless one is set (ADR 0159)", async () => {
+    const personal = (alone: boolean) => {
+      const state = seedState();
+      const org = state.me?.organizations[0];
+      if (org) org.mode = "personal";
+      if (alone) state.members = state.members.filter((m) => m.userId === state.me?.user.id);
+      return state;
+    };
+    await go(personal(true));
+    expect(section().queryByRole("region", { name: "Quem aprova por mim" })).toBeNull();
+    cleanup();
+    // A cover set before stays in sight, to change or end it.
+    const set = personal(true);
+    set.approvalCovers = {
+      cover: { userId: "u-joao", mode: "always", risky: false, endsAt: null, active: true },
+      covering: [],
+    };
+    await go(set);
+    expect(section().getByRole("region", { name: "Quem aprova por mim" })).toBeTruthy();
+    cleanup();
+    await go(personal(false));
+    expect(section().getByRole("region", { name: "Quem aprova por mim" })).toBeTruthy();
+  });
+
   test("a decided card says who decided, covering whom", () => {
     const i18n = i18next.createInstance();
     void i18n.init({ lng: "pt-BR", fallbackLng: "en", resources, initAsync: false });

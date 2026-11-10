@@ -61,7 +61,7 @@ export function InstructionProposalCard({ ids }: { ids: string[] }) {
   if (!first) return null;
   const agentName = (id: string) => dir.anyAgent(id)?.name || t("channel.unknownAgent");
   const orgName = org?.name ?? "";
-  const head = cardHead(t, rows, agentName(proposerOf(first)), agentName, orgName);
+  const head = cardHead(t, rows, agentName(proposerOf(first)), agentName, org ?? orgName);
   const runs = boldRuns(t(head.key, head.values) as string);
   const { chosen, all } = chosenRows(rows, off);
   const many = rows.length > 1;
@@ -154,12 +154,12 @@ export function InstructionProposalCard({ ids }: { ids: string[] }) {
         kind="proposal"
         agentId={proposerOf(first)}
         waitsFor="you"
-        lead={only ? proposalTitle(t, only, orgName, agentName) : runs.map((r) => r.text).join("")}
+        lead={only ? proposalTitle(t, only, org ?? orgName, agentName) : runs.map((r) => r.text).join("")}
         well={
           only
             ? {
                 tile: <IconTile name={only.target.type === "agent_access" ? "bolt" : "file"} size={20} bare />,
-                title: proposalTarget(t, only, agentName, orgName),
+                title: proposalTarget(t, only, agentName, org ?? orgName),
                 detail:
                   only.target.type === "agent_role"
                     ? t("proposals.roleLine", { from: only.before, to: only.after })
@@ -246,7 +246,7 @@ export function InstructionProposalCard({ ids }: { ids: string[] }) {
   );
   const what = many
     ? runs.map((r) => (r.bold ? markName(r.text) : r.text)).join("")
-    : markName(proposalTitle(t, first, orgName, agentName));
+    : markName(proposalTitle(t, first, org ?? orgName, agentName));
   return (
     <AskDone
       done={outcome.accepted}

@@ -44,6 +44,14 @@ export const words: EmailWords = {
     small: "Undangan berlaku 7 hari. Terima dengan alamat email ini.",
     why: (org) =>
       `Kamu menerima email ini karena seseorang di ${org} mengundang alamat ini. Kalau kamu tidak mengenal mereka, abaikan saja. Tidak ada yang terjadi sampai kamu menerimanya.`,
+    personal: {
+      body: (inviter, email) =>
+        inviter
+          ? [{ b: inviter }, `${email ? ` (${email})` : ""} mengundangmu ke ruang kerja pribadinya di agentes.chat.`]
+          : "Kamu diundang ke ruang kerja pribadi di agentes.chat.",
+      why: () =>
+        "Kamu menerima email ini karena seseorang mengundang alamat ini ke ruang kerja pribadinya. Kalau kamu tidak mengenalnya, abaikan saja. Tidak ada yang terjadi sampai kamu menerimanya.",
+    },
   },
   inviteRequest: {
     subject: "Seseorang meminta undangan baru",
@@ -56,6 +64,14 @@ export const words: EmailWords = {
     next: "Kalau kamu memang menunggunya, kirim undangan baru dari Anggota. Kalau tidak, tidak perlu melakukan apa-apa.",
     button: "Buka Anggota",
     why: (org) => `Kamu menerima email ini karena kamu membuat undangan ini, atau mengelola anggota ${org}.`,
+    personal: {
+      body: (email) =>
+        email
+          ? [{ b: email }, " membuka undangan kedaluwarsa ke ruang kerjamu dan meminta yang baru."]
+          : "Seseorang dengan tautan undangan kedaluwarsa ke ruang kerjamu meminta yang baru.",
+      why: () =>
+        "Kamu menerima email ini karena kamu membuat undangan ini, atau mengurus siapa saja yang ada di ruang kerjamu.",
+    },
   },
   calendar: {
     subject: "Kamu diundang ke sebuah acara",
@@ -65,6 +81,9 @@ export const words: EmailWords = {
     someone: "Seseorang",
     button: "Lihat acaranya",
     why: (org) => `Kamu menerima email ini karena seseorang di ${org} mengundangmu ke sebuah acara.`,
+    personal: {
+      why: () => "Kamu menerima email ini karena seseorang di ruang kerjamu mengundangmu ke sebuah acara.",
+    },
   },
   waitlist: {
     subject: "Konfirmasi tempatmu di daftar tunggu agentes.chat",
@@ -119,6 +138,13 @@ export const words: EmailWords = {
     button: "Lihat anggaran",
     why: (org) =>
       `Kamu menerima email ini karena kamu pemilik agen ini, atau admin di ${org}. Email ini dikirim di 80% dan di 100%, masing-masing sebulan sekali.`,
+    personal: {
+      warning: "Di 100% agen ini berhenti dan memberi tahumu. Kamu bisa mengubah batasnya di halaman agen.",
+      exhausted:
+        "Agen ini tidak akan menjawab sampai bulan berganti, atau sampai kamu menaikkan batasnya di halaman agen.",
+      why: () =>
+        "Kamu menerima email ini karena agen ini milikmu. Email ini dikirim di 80% dan di 100%, masing-masing sebulan sekali.",
+    },
   },
   digest: {
     subject: (n) => (n === 1 ? "Ada permintaan yang menunggu persetujuanmu" : `${n} permintaan menunggu persetujuanmu`),
@@ -136,6 +162,11 @@ export const words: EmailWords = {
     button: (n) => (n === 1 ? "Tinjau permintaannya" : "Buka persetujuan"),
     why: (org, hours) =>
       `Kamu menerima email ini karena kamu bisa menyetujui permintaan ini di ${org}.${hours ? ` Email ini dikirim saat permintaan menunggu lebih dari ${hours} jam, sekali per permintaan.` : ""}`,
+    personal: {
+      body: () => "Agenmu meminta izin melakukan sesuatu yang perlu persetujuanmu.",
+      why: (_org, hours) =>
+        `Kamu menerima email ini karena kamu bisa menyetujui permintaan ini.${hours ? ` Email ini dikirim saat permintaan menunggu lebih dari ${hours} jam, sekali per permintaan.` : ""}`,
+    },
   },
   ready: {
     subject: "Komputer agen-agenmu sudah siap",
@@ -168,6 +199,15 @@ export const words: EmailWords = {
     button: { ai: "Hubungkan AI kamu", task: "Beri tugas pertama", create: "Buat agen" },
     why: (org) =>
       `Kamu menerima email ini karena kamu pemilik ${org} di agentes.chat. Ini satu-satunya email tentang komputer ini.`,
+    personal: {
+      body: () =>
+        "Terima kasih sudah menunggu. Komputer agen-agenmu sudah menyala dan siap, dengan pengguna tersendiri untuk tiap agen. Komputer ini menyala siang dan malam, jadi agen-agenmu bisa bekerja kapan saja.",
+      steps: {
+        task: ["Beri tugas pertama.", "Buka percakapan dengan salah satu agenmu dan sebutkan apa yang kamu butuhkan."],
+      },
+      why: () =>
+        "Kamu menerima email ini karena ruang kerja ini di agentes.chat adalah milikmu. Ini satu-satunya email tentang komputer ini.",
+    },
   },
   joinRequest: {
     subject: "Seseorang minta bergabung ke ruang kerjamu",
@@ -180,6 +220,11 @@ export const words: EmailWords = {
     more: ["Semua permintaan yang menunggu ", { nobr: "ada di Anggota." }],
     why: (org) =>
       `Kamu menerima email ini karena kamu pemilik atau admin di ${org}. Email ini dikirim paling sering sejam sekali.`,
+    personal: {
+      body: () => "Orang ini membuka tautan undangan ruang kerjamu dan minta bergabung.",
+      why: () =>
+        "Kamu menerima email ini karena kamu mengurus siapa yang bergabung ke ruang kerjamu. Email ini dikirim paling sering sejam sekali.",
+    },
   },
   joinAnswer: {
     someone: "Seseorang",
@@ -207,6 +252,16 @@ export const words: EmailWords = {
       small: "Kalau menurutmu ini keliru, minta seseorang di sana mengundangmu lewat email.",
     },
     why: (org) => `Kamu menerima email ini karena alamat ini minta bergabung ke ${org} di agentes.chat.`,
+    personal: {
+      joined: { body: (who) => `${who} menyetujui permintaanmu. Sekarang kamu sudah ada di ruang kerjanya.` },
+      invited: { body: (who) => `${who} menyetujui permintaanmu untuk bergabung ke ruang kerjanya.` },
+      denied: {
+        preheader: "Orang itu sudah melihatnya dan tidak menyetujuinya.",
+        body: () => "Orang yang kamu mintai sudah melihat permintaanmu dan tidak menyetujuinya.",
+        small: "Kalau menurutmu ini keliru, minta dia mengundangmu lewat email.",
+      },
+      why: () => "Kamu menerima email ini karena alamat ini minta bergabung ke ruang kerja pribadi di agentes.chat.",
+    },
   },
   joinCode: {
     subject: (code) => `${code} adalah kode agentes.chat kamu`,
@@ -216,6 +271,11 @@ export const words: EmailWords = {
     small: ["Berlaku 10 menit. Kalau kamu tidak memintanya, ", { nobr: "abaikan email ini." }],
     why: (org) =>
       `Kamu menerima email ini karena seseorang mengetik alamat ini untuk minta bergabung ke ${org} di agentes.chat.`,
+    personal: {
+      body: () => "Ketik kode ini di halaman itu untuk minta bergabung ke ruang kerja ini.",
+      why: () =>
+        "Kamu menerima email ini karena seseorang mengetik alamat ini untuk minta bergabung ke ruang kerja pribadi di agentes.chat.",
+    },
   },
   deletionCode: {
     subjectWorkspace: (code) => `${code} adalah kodemu untuk menghapus ruang kerja`,
@@ -241,6 +301,13 @@ export const words: EmailWords = {
       "Berlaku 10 menit, dan tidak ada yang dihapus tanpa kode ini. Kalau ini bukan kamu, jangan bagikan kodenya dan beri tahu pengelola server ini.",
     whyWorkspace: (org) => `Kamu menerima email ini karena akunmu meminta penghapusan ${org} di agentes.chat.`,
     whyAccount: "Kamu menerima email ini karena akunmu meminta untuk dihapus dari agentes.chat.",
+    personal: {
+      workspace: (org) => [
+        "Ketik kode ini untuk menghapus ruang kerjamu ",
+        { b: org },
+        ". Ruang kerja ini langsung ditutup dan dihapus permanen 7 hari kemudian.",
+      ],
+    },
   },
   deleting: {
     subject: (day) => `Ruang kerja yang kamu ikuti akan dihapus pada ${day}`,
@@ -256,6 +323,10 @@ export const words: EmailWords = {
     button: "Pulihkan ruang kerja",
     member: "Kalau ini keliru, minta pemilik untuk memulihkannya.",
     why: (org) => `Kamu menerima email ini karena kamu ada di ${org} di agentes.chat.`,
+    personal: {
+      member: "Kalau ini keliru, minta orang yang menghapusnya untuk memulihkannya.",
+      why: () => "Kamu menerima email ini karena kamu ada di ruang kerja ini di agentes.chat.",
+    },
   },
   restored: {
     subject: "Ruang kerja yang kamu ikuti sudah kembali",
@@ -264,6 +335,9 @@ export const words: EmailWords = {
     body: (by, org) => [{ b: by }, " memulihkan ", { b: org }, ". Ruang kerja ini bisa dipakai lagi."],
     button: "Buka ruang kerja",
     why: (org) => `Kamu menerima email ini karena kamu ada di ${org} di agentes.chat.`,
+    personal: {
+      why: () => "Kamu menerima email ini karena kamu ada di ruang kerja ini di agentes.chat.",
+    },
   },
   appConnected: {
     subject: "Sebuah aplikasi terhubung ke akun agentes.chat kamu",
@@ -273,6 +347,11 @@ export const words: EmailWords = {
     note: "Bukan kamu yang menghubungkannya? Putuskan sekarang dan ganti kata sandimu.",
     button: "Lihat aplikasi yang terhubung",
     why: (org) => `Kamu menerima email ini karena sebuah aplikasi terhubung ke akunmu di ${org} di agentes.chat.`,
+    personal: {
+      body: (app) => [{ b: app }, " sekarang punya akses ke akunmu di ruang kerja pribadimu."],
+      why: () =>
+        "Kamu menerima email ini karena sebuah aplikasi terhubung ke akunmu di ruang kerja pribadimu di agentes.chat.",
+    },
   },
   accountDeleting: {
     subject: (day) => `Akun agentes.chat kamu akan dihapus pada ${day}`,
@@ -357,6 +436,10 @@ export const words: EmailWords = {
     button: "Lihat siapa yang bisa bicara",
     why: (org) =>
       `Kamu menerima email ini karena agenmu di ${org} berpikir dengan paketmu dan orang lain mengubah siapa yang bisa bicara dengannya.`,
+    personal: {
+      why: () =>
+        "Kamu menerima email ini karena agenmu berpikir dengan paketmu dan orang lain mengubah siapa yang bisa bicara dengannya.",
+    },
   },
   planLent: {
     subject: (plan) => `Paket ${plan} kamu sekarang berpikir untuk agen lain`,
@@ -374,6 +457,9 @@ export const words: EmailWords = {
     note: "Tarik kembali dengan satu klik dari notifikasimu, dan agen itu berhenti berpikir dengan paketmu.",
     button: "Buka notifikasi",
     why: (org) => `Kamu menerima email ini karena seseorang di ${org} menghubungkan paketmu ke sebuah agen.`,
+    personal: {
+      why: () => "Kamu menerima email ini karena seseorang di ruang kerjamu menghubungkan paketmu ke sebuah agen.",
+    },
   },
   planWaiting: {
     subject: "Timmu sedang menunggu",
@@ -390,5 +476,16 @@ export const words: EmailWords = {
     button: "Lihat paket agentes.chat",
     why: (org) =>
       `Kamu menerima email ini karena kamu mengelola ${org} di agentes.chat. Kami hanya mengirim dua pemberitahuan seperti ini.`,
+    personal: {
+      subject: "Agen-agenmu sedang menunggu",
+      headline: "Agen-agenmu sedang menunggu",
+      body: (agents, _channels, routines) => {
+        const a = `${agents} agen`;
+        const r = `${routines} rutinitas`;
+        return `Siap jalan: ${routines > 0 ? `${a} dan ${r}` : a}. Tinggal perlu paket agentes.chat.`;
+      },
+      why: () =>
+        "Kamu menerima email ini karena ruang kerja ini di agentes.chat adalah milikmu. Kami hanya mengirim dua pemberitahuan seperti ini.",
+    },
   },
 };

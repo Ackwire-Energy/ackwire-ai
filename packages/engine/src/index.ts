@@ -312,5 +312,6 @@ export * from "./working";
 export * from "./works";
 export * from "./workspace-actions";
 export * from "./workspace-deletion";
+export * from "./workspace-mode";
 export * from "./workspace-tools";
 export * from "./zip";

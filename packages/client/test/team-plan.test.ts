@@ -3,14 +3,20 @@ import type { TFunction } from "i18next";
 import type { TeamProposalCard } from "../src/api/types";
 import { actionCardOf } from "../src/lib/action-cards";
 import {
+  aboutYouContext,
   answerAfter,
   answerPicks,
   answerText,
   firstTasks,
+  LIFE_AREA_TEMPLATE,
+  LIFE_AREAS,
+  lifeAreaTemplate,
+  readAboutYou,
   replyChipsOf,
   teamColumns,
   teamCounts,
   teamFailureText,
+  teamInDms,
   teamStatus,
   teamUndoable,
 } from "../src/lib/team-plan";
@@ -143,4 +149,46 @@ test("a failed try names its step, with a known reason in the reader's words and
   expect(teamFailureText(t, taken)).toContain('"step":"Caio"');
   expect(teamFailureText(t, taken)).toContain("newAgent.errors.handleTaken");
   expect(teamFailureText(t, { step: "#eng", reason: "Something went wrong", status: 500 })).toContain("common.ourSide");
+});
+
+test("a personal workspace's areas of life (ADR 0159): the template each opens, and the context they make", () => {
+  // Every area but "Something else" opens one of the server's personal templates.
+  const personal = ["life", "health", "studies", "home", "travel", "freelance"];
+  for (const a of LIFE_AREAS) {
+    if (a === "other") expect(LIFE_AREA_TEMPLATE[a]).toBeNull();
+    else expect(personal).toContain(LIFE_AREA_TEMPLATE[a] as string);
+  }
+  // The first picked in the list's order, whatever order they were tapped in.
+  expect(lifeAreaTemplate(["travel", "health"])).toBe("health");
+  expect(lifeAreaTemplate(["other"])).toBeNull();
+  expect(lifeAreaTemplate([])).toBeNull();
+
+  const words: Record<string, string> = {
+    "teamPlan.lifeArea.routine": "Calendar and routine",
+    "teamPlan.lifeArea.money": "Finances",
+    "teamPlan.lifeArea.health": "Health and training",
+  };
+  const t = ((key: string, o?: Record<string, unknown>) =>
+    key === "teamPlan.lifeAreaContext" ? `I want help with: ${o?.areas}.` : (words[key] ?? key)) as never as TFunction;
+  const saved = aboutYouContext(t, ["money", "routine", "other"], " I run twice a week. ");
+  expect(saved).toBe("I want help with: Calendar and routine, Finances. I run twice a week.");
+  expect(aboutYouContext(t, ["other"], "")).toBe("");
+  expect(aboutYouContext(t, [], "Just me.")).toBe("Just me.");
+  // Opened again, it reads back into the same answers, so saving doesn't repeat them.
+  expect(readAboutYou(t, saved)).toEqual({ areas: ["routine", "money"], line: "I run twice a week." });
+  expect(readAboutYou(t, "We sell shoes.")).toEqual({ areas: [], line: "We sell shoes." });
+  expect(readAboutYou(t, "I want help with: Gardening.")).toEqual({ areas: [], line: "I want help with: Gardening." });
+});
+
+test("agents with no channel live in their DM: a map column each, no channel counted", () => {
+  const c = card();
+  const dm = (handle: string) => ({ ...c.params.agents[0], handle, name: handle, channel: "" }) as never;
+  const plan = { ...c.params, agents: [dm("clara"), dm("duda")], newChannels: [] };
+  expect(teamInDms(plan)).toBe(true);
+  expect(teamInDms(c.params)).toBe(false);
+  expect(teamCounts(plan).newChannels).toBe(0);
+  expect(teamColumns(plan).map((col) => [col.key, col.channel, col.fresh])).toEqual([
+    ["@clara", "", false],
+    ["@duda", "", false],
+  ]);
 });

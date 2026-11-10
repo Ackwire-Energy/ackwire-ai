@@ -2,6 +2,7 @@ import type { PhoneDevice } from "@agenteschat/client";
 import { computerName } from "@agenteschat/client/lib/computer";
 import { wifiPairLive, wifiPairText } from "@agenteschat/client/lib/devices";
 import { errorText } from "@agenteschat/client/lib/errors";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import * as Device from "expo-device";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -68,7 +69,9 @@ export function AndroidSetupScreen({ machineId }: { machineId?: string }) {
   const [wifi, setWifi] = useState(false);
   const [byCode, setByCode] = useState(false);
   const pairing = useWifiPairCode(host?.id ?? null);
-  const hostName = host ? computerName(t, org?.name ?? "", { kind: host.machineKind, name: host.name }) : "";
+  const hostName = host
+    ? computerName(t, org?.name ?? "", { kind: host.machineKind, name: host.name }, isPersonal(org))
+    : "";
   const pairedId = pairing.pairing?.phoneId;
   const phone = host
     ? ((pairedId ? host.phones.find((p) => p.id === pairedId) : undefined) ??

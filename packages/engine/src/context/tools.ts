@@ -40,6 +40,7 @@ import { noAgentText } from "../team";
 import type { ToolContext, ToolDefinition, ToolSource } from "../tools/types";
 import { neutralizeUntrusted, untrustedBlock } from "../untrusted";
 import { wikiHitsForAgent } from "../wiki";
+import { inWorkspaceWords } from "../workspace-mode";
 import {
   accessSql,
   type ConsolidateResult,
@@ -864,7 +865,8 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
       },
     },
   ];
-  return { name: "context", tools: async () => tools };
+  // A personal workspace (ADR 0159): the same memory, about one person and their life rather than a company.
+  return { name: "context", tools: async (ctx) => inWorkspaceWords(ctx.db, ctx.orgId, tools, personalWords(tools)) };
 }
 
 /** Who accepts a row the person who asked can't, for the agent to tell them (`deciders` in proposals.ts). */
@@ -1394,4 +1396,28 @@ async function ownPastSteps(
       (r) =>
         `[your earlier step] (${new Date(r.created_at).toISOString().slice(0, 10)}) ${r.data.name ?? "?"} ${cutText(JSON.stringify(r.data.input ?? {}), 300)} (${r.failed ? "error" : "ok"})`,
     );
+}
+
+/** What `search_context` and `remember` say about a team, and the same for one person (ADR 0159). */
+const PERSONAL_MEMORY_WORDS: readonly (readonly [string, string])[] = [
+  ["Search this organization's messages", "Search this workspace's messages"],
+  ["what the team did outside (emails sent", "what the agents here did outside (emails sent"],
+  ["a task you or a teammate may have done before.", "a task you or another agent may have done before."],
+  [
+    "a lasting fact about the company or its people. How its systems work (where code lives, how a tool behaves) is a note for yourself.",
+    "a lasting fact about the person, their life or the people in it. How their things work (where files live, how a tool or an account behaves) is a note for yourself.",
+  ],
+];
+
+/** The memory tools' descriptions in a personal workspace's words, by tool name. */
+function personalWords(tools: readonly ToolDefinition[]): Record<string, string> {
+  const words: Record<string, string> = {};
+  for (const t of tools) {
+    if (t.name !== "search_context" && t.name !== "remember") continue;
+    words[t.name] = PERSONAL_MEMORY_WORDS.reduce(
+      (text, [team, personal]) => text.replace(team, personal),
+      t.description,
+    );
+  }
+  return words;
 }

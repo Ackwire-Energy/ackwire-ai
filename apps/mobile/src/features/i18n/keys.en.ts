@@ -139,6 +139,8 @@ export const featureKeysEn = {
     refuseAsk: "Decline the request?",
     /** On a high-risk request's top line, after its kind: it acts outside the workspace. */
     leaves: "goes outside the company",
+    /** The same in a personal workspace (ADR 0159): one person's, not a company's. */
+    leavesPersonal: "goes outside your workspace",
     refuseWhyF: "{{name}} learns from the reason. Optional.",
     refuseWhyM: "{{name}} learns from the reason. Optional.",
     /** The request's sheet: its title, its groups and the switch for next time. */
@@ -175,6 +177,7 @@ export const featureKeysEn = {
       irreversible: "Can't be undone",
       reversible: "Can be undone",
       external: "Leaves the company",
+      externalPersonal: "Leaves your workspace",
       unsent: "Nothing is sent",
       deletable: "Can be deleted",
     },
@@ -245,6 +248,10 @@ export const featureKeysEn = {
     newChannelHint: "For a team or a topic",
     channelPlaceholder: "Channel name, e.g. marketing",
     createChannel: "Create channel",
+    /** A personal workspace's channels are its group conversations (ADR 0159). */
+    newChannelHintPersonal: "For one subject, with several agents",
+    channelPlaceholderPersonal: "Name, e.g. travel",
+    createChannelPersonal: "Create group conversation",
     waitIn: "in {{where}}",
     workingNowLine_one: "{{count}} agent working now",
     workingNowLine_other: "{{count}} agents working now",
@@ -255,6 +262,8 @@ export const featureKeysEn = {
     swipe: { mute: "Mute", unmute: "Unmute" },
     /** Conversas' one line back to the right hand's first-run checklist (ADR 0155 §6). */
     firstRunLine: "{{name}} is setting up the team · {{done}} of {{total}}",
+    /** The same line in a personal workspace (ADR 0159): one person's agents, no team. */
+    firstRunLinePersonal: "{{name}} is setting up your agents · {{done}} of {{total}}",
     first: {
       title: "Start with your first agent",
       subtitle: "Give it a name and say what it does. It shows up here, as a chat.",
@@ -283,6 +292,9 @@ export const featureKeysEn = {
     chat: "Chat with…",
     name: "Name",
     channelFine: "For a team or a topic.",
+    /** A personal workspace's (ADR 0159): the New sheet's row and the line under the name. */
+    channelPersonal: "Group conversation",
+    channelFinePersonal: "For one subject, with several agents.",
     chatSearch: "Search for a person or an agent",
     /** The field on top of the New sheet, as a new message's: whom it is for. */
     to: "To:",
@@ -296,6 +308,7 @@ export const featureKeysEn = {
     routineHint: "An agent does it on its own, on schedule",
     wikiPage: "Wiki page",
     wikiHint: "For the team and the agents to read",
+    wikiHintPersonal: "For your agents to read",
     inviteHint: "By email or link",
     agent: {
       question: "What will it do?",
@@ -487,6 +500,8 @@ export const featureKeysEn = {
       arrived: "{{name}} joined the team",
       meet: "Your first conversation with {{name}}",
       roleIntro: "{{role}} on your team. Ask in plain words.",
+      /** In a personal workspace (ADR 0159): one person's agent, no team. */
+      roleIntroPersonal: "{{role}}, here for you. Ask in plain words.",
       noIntro: "Ask for what you need, in plain words.",
       firstTitle: "To start",
       sendHint: "Tap to send",
@@ -494,6 +509,7 @@ export const featureKeysEn = {
       hello: "Hi, {{person}}! I'm {{name}}.",
       helloNoName: "Hi! I'm {{name}}.",
       helloRole: "{{role}} on the team.",
+      helloRolePersonal: "{{role}}, here for you.",
       helloAsk: "Where do we start?",
       now: "now",
       /** The starts' short words on their buttons; a tap sends the whole request (`first.*`). */
@@ -820,6 +836,8 @@ export const featureKeysEn = {
     workingSection: "Working",
     /** The free agents, in no department: the team itself. */
     teamSection: "Team",
+    /** The same section in a personal workspace (ADR 0159). */
+    teamSectionPersonal: "Your agents",
     /** Under the task manager's row when nothing runs or waits. */
     managerQuiet: "Nothing in progress",
     /** A row's state, as text in the state's color (amber only for what waits on the person). */
@@ -1098,6 +1116,9 @@ export const featureKeysEn = {
     role: {
       owner: "owner",
       member: "member",
+      /** Under a personal workspace's name (ADR 0159): whose it is, never a role. */
+      ownerPersonal: "your personal workspace",
+      memberPersonal: "a personal workspace shared with you",
     },
     appearance: "Appearance",
     notifications: "Notifications",
@@ -2078,6 +2099,8 @@ export const featureKeysEn = {
     loadFailed: "Couldn't load the connectors.",
     connectedCheck: "{{name}}, connected",
     adminsOnly: "Only an admin of {{org}} connects services. Ask one of them.",
+    /** In a personal workspace (ADR 0159): its owner and whoever helps run it, never "an admin of Personal". */
+    adminsOnlyPersonal: "Only whoever runs this workspace connects apps. Ask them.",
     canTitle: "Agents will be able to",
     asks: "{{text}} · asks for your approval",
     connect: "Connect",
@@ -2231,6 +2254,8 @@ export const featureKeysEn = {
     zoneTitle: "Time zone",
     /** A second workspace from Adicionar workspace (ADR 0154): where it lives, and that nothing is left. */
     anotherTitle: "What's the new workspace called?",
+    /** Its first question (ADR 0159), before the name: "For me" or "For my company or team". */
+    anotherPurpose: "What's the new workspace for?",
     anotherLead: "On agentes.chat. You stay in {{org}} and can switch any time.",
     /** The first run's name, suggested from a work address's domain. */
     suggested: "From your {{domain}} e-mail, I suggested {{org}}.",
@@ -2653,6 +2678,11 @@ export const featureKeysEn = {
       text: "Each agent takes on a role and works with you right in the chat.",
       viewerTitle: "Your team of agents lives here",
       viewerText: "Whoever creates agents in this workspace adds the first one, and it shows up here.",
+      /** A personal workspace's words (ADR 0159), for one person: `firstUseCopy`'s `…Personal` siblings. */
+      titlePersonal: "Get help from your own agents",
+      textPersonal: "Each agent takes care of one thing for you, right in the chat.",
+      viewerTitlePersonal: "Your agents live here",
+      viewerTextPersonal: "Whoever creates agents here adds the first one, and it shows up here.",
     },
     agentsForYou: {
       title: "Your agents show up here",
@@ -2663,12 +2693,19 @@ export const featureKeysEn = {
       text: "Reports, tables and files from agents and people stay here, easy to find.",
       viewerTitle: "Find what the team makes",
       viewerText: "What agents and people create in the chats shows up here.",
+      titlePersonal: "Everything your agents make, in one place",
+      textPersonal: "Reports, tables and files from your agents stay here, easy to find.",
+      viewerTitlePersonal: "Find what your agents make",
+      viewerTextPersonal: "What agents create in your chats shows up here.",
     },
     tasks: {
       title: "Hand work to the team",
       text: "Create a task for an agent or a person and follow it to the end.",
       viewerTitle: "Follow the team's work",
       viewerText: "Tasks show up here as soon as someone creates the first one.",
+      titlePersonal: "Hand your to-dos to your agents",
+      textPersonal: "Create a task for an agent and follow it to the end.",
+      viewerTitlePersonal: "Follow your agents' work",
     },
     routines: {
       title: "Leave repeated work to your agents",
@@ -2681,6 +2718,9 @@ export const featureKeysEn = {
       text: "People and agents read these pages, so everyone works from the same facts.",
       viewerTitle: "Look up what the team knows",
       viewerText: "Whoever edits the wiki writes the first page, and it shows up here.",
+      titlePersonal: "Keep notes your agents can read",
+      textPersonal: "Your agents read these pages, so they work from what you wrote.",
+      viewerTitlePersonal: "Look up what's written here",
     },
     memory: {
       title: "Your agents learn as they work",
@@ -2704,12 +2744,20 @@ export const featureKeysEn = {
       viewerTitle: "The team's channels live here",
       viewerText: "Whoever creates channels opens the first one, and it shows up here.",
       action: "Create channel",
+      titlePersonal: "Talk to several agents at once",
+      textPersonal: "Each group conversation gathers the agents and people for one subject.",
+      viewerTitlePersonal: "Group conversations live here",
+      viewerTextPersonal: "Whoever creates group conversations opens the first one, and it shows up here.",
     },
     people: {
       title: "Work with your team here",
       text: "Invite people to talk to them and to your agents in one place.",
       viewerTitle: "Your team shows up here",
       viewerText: "Whoever invites people brings the rest of the team, and they show up here.",
+      titlePersonal: "Bring your family or friends in",
+      textPersonal: "Invite someone to talk to you and to your agents in one place.",
+      viewerTitlePersonal: "Family and friends show up here",
+      viewerTextPersonal: "When someone joins, they show up here.",
     },
     chat: {
       title: "It all starts with a message",
@@ -2730,6 +2778,10 @@ export const featureKeysEn = {
       text: "Save the logins and keys your agents use for the team.",
       viewerTitle: "The team's logins show up here",
       viewerText: "When someone shares a login or a key with you, it shows up here.",
+      titlePersonal: "Keep shared logins in one place",
+      textPersonal: "Save the logins and keys your agents use for everyone here.",
+      viewerTitlePersonal: "Shared logins show up here",
+      viewerTextPersonal: "When someone here shares a login or a key with you, it shows up here.",
     },
     skills: {
       title: "Teach your agents how you do things",

@@ -12,11 +12,13 @@ import {
   workspaceHeadline,
 } from "@agenteschat/client/lib/notifications";
 import type { Words } from "@agenteschat/client/lib/routine-view";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { Avatar, ComputerIcon, cx, Icon } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
 import { Trans, useTranslation } from "react-i18next";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { DeviceFace, DeviceHeadline } from "@/components/devices/DeviceNotice";
+import { useOrg } from "@/components/org-context";
 import type { useDirectory } from "@/hooks/useDirectory";
 import { TYPED_VALUES } from "@/i18n";
 
@@ -210,6 +212,8 @@ export function Headline({
   channelName: (id: string) => string;
 }) {
   const { t, i18n } = useTranslation();
+  // A personal workspace (ADR 0159): its computer is its person's agents', and its name ("Personal") says no place.
+  const personal = isPersonal(useOrg().org);
   const name = nameOf(t, dir, n.actors[0]);
   const names = namesText(
     t,
@@ -225,6 +229,7 @@ export function Headline({
     <Trans i18nKey={`notifications.what.${key}`} values={values} components={{ b: <b /> }} {...TYPED_VALUES} />
   );
   const own = workspaceHeadline(n);
+  if (own === "computerSetup.notification.ready" && personal) return t("computerSetup.notification.readyPersonal");
   if (own) return t(own, { name: n.source.label });
   if (n.kind === "app_created") return appCreatedLine(t, n);
   if (deviceNoticeOf(n)) return <DeviceHeadline n={n} dir={dir} />;
@@ -333,7 +338,7 @@ export function Headline({
         : k("joinRequest", { name: asked.names[0] });
     }
     case "invitation_accepted":
-      return n.source.label
+      return n.source.label && !personal
         ? k("invitationAccepted", { name: joinerOf(t, dir, n), org: n.source.label })
         : k("invitationAcceptedAny", { name: joinerOf(t, dir, n) });
     case "reaction":

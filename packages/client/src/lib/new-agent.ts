@@ -12,6 +12,20 @@ import { handleFrom, parseAmount } from "./text";
 export const NEW_AGENT_STEPS = ["role", "identity", "instructions", "tools", "where", "model", "review"] as const;
 export type NewAgentStep = (typeof NEW_AGENT_STEPS)[number];
 
+/**
+ * A personal workspace's walk through Criar agente (ADR 0159 §3): the technical steps start filled in (every app it
+ * can use, only its owner, Automático) and are passed over; Revisar still opens each one.
+ */
+export const PERSONAL_SKIPPED_STEPS: readonly NewAgentStep[] = ["tools", "where", "model"];
+
+/** The step after (`dir` 1) or before (-1) `index`, past the skipped ones; never past the first or the last. */
+export function stepAfter(index: number, dir: 1 | -1, skipped: readonly NewAgentStep[]): number {
+  const last = NEW_AGENT_STEPS.length - 1;
+  let i = index + dir;
+  while (i > 0 && i < last && skipped.includes(NEW_AGENT_STEPS[i] ?? "review")) i += dir;
+  return Math.max(0, Math.min(last, i));
+}
+
 export const ROLE_IDS = [
   "dev",
   "ops",
@@ -130,16 +144,36 @@ export const ROLE_DEFAULTS = {
   custom: starts({ look: { color: "sky", eyes: "round", accessory: "none" }, levels: {}, channels: [] }),
 } satisfies Record<RoleId, RoleDefaults>;
 
+/**
+ * A personal workspace's starting points in Criar agente (ADR 0159 §3), in place of a team's roles: the agents of the
+ * right hand's personal templates (the server's `MEMBERS` in team-templates.ts), their words in
+ * `teamTemplates.agents.{id}` (`role`, `line`). One starts from scratch with its name, look, role and line filled in.
+ */
+export const PERSONAL_STARTERS = [
+  { id: "clara", name: "Clara", look: { color: "violet", eyes: "happy", accessory: "bow" } },
+  { id: "duda", name: "Duda", look: { color: "green", eyes: "round", accessory: "cap" } },
+  { id: "leo", name: "Léo", look: { color: "amber", eyes: "wide", accessory: "headphones" } },
+  { id: "mel", name: "Mel", look: { color: "rose", eyes: "dots", accessory: "scarf" } },
+  { id: "gabi", name: "Gabi", look: { color: "indigo", eyes: "wide", accessory: "antenna" } },
+  { id: "lu", name: "Lu", look: { color: "violet", eyes: "sleepy", accessory: "beanie" } },
+  { id: "rosa", name: "Rosa", look: { color: "teal", eyes: "happy", accessory: "flower" } },
+  { id: "vic", name: "Vic", look: { color: "sky", eyes: "dots", accessory: "hat" } },
+  { id: "rui", name: "Rui", look: { color: "graphite", eyes: "round", accessory: "headset" } },
+] as const satisfies readonly { id: string; name: string; look: RoleLook }[];
+export type PersonalStarter = (typeof PERSONAL_STARTERS)[number];
+
 /** The look a draft starts with (before a role is picked). */
 export const BLANK_LOOK = { color: "sky", eyes: "round", accessory: "none" } as const satisfies RoleLook;
 
 /**
  * Each connection's level for a role: the preset's level for its catalog connector, else write, as every agent already
- * has it (`grantToEveryAgent`). A custom server's account starts with none: only its first one is everyone's.
+ * has it (`grantToEveryAgent`). A custom server's account starts with none: only its first one is everyone's. In a
+ * personal workspace (`broad`) it starts at write too: one person's agents start with everything (ADR 0159 §3a).
  */
-export function presetLevels(role: RoleId, items: { id: string; def: { id: string } | null }[]) {
+export function presetLevels(role: RoleId, items: { id: string; def: { id: string } | null }[], broad = false) {
   const levels: Record<string, Level> = ROLE_DEFAULTS[role].levels;
-  const level = (i: (typeof items)[number]): Level => (i.def ? (levels[i.def.id] ?? "write") : "none");
+  const level = (i: (typeof items)[number]): Level =>
+    i.def ? (levels[i.def.id] ?? "write") : broad ? "write" : "none";
   return Object.fromEntries(items.map((i) => [i.id, level(i)])) as Record<string, Level>;
 }
 

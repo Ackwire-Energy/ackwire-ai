@@ -62,6 +62,15 @@ export const en = {
     small: "The invitation works for 7 days. Accept it with this email address.",
     why: (org: string) =>
       `You got this email because someone at ${org} invited this address. If you don't know them, ignore it. Nothing happens until you accept.`,
+    /** A personal workspace's (ADR 0159): someone's family or friends, with no workspace name nor role to read. */
+    personal: {
+      body: (inviter: string, email: string | null): Text =>
+        inviter
+          ? [{ b: inviter }, `${email ? ` (${email})` : ""} invited you to their personal workspace on agentes.chat.`]
+          : "You're invited to a personal workspace on agentes.chat.",
+      why: () =>
+        "You got this email because someone invited this address to their personal workspace. If you don't know them, ignore it. Nothing happens until you accept.",
+    },
   },
   inviteRequest: {
     subject: "Someone asked for a new invitation",
@@ -74,6 +83,13 @@ export const en = {
     next: "If you expect them, send a new invitation from Members. If not, there's nothing to do.",
     button: "Open Members",
     why: (org: string) => `You got this email because you created this invitation, or manage the members of ${org}.`,
+    personal: {
+      body: (email: string): Text =>
+        email
+          ? [{ b: email }, " opened an expired invitation to your workspace and asked for a new one."]
+          : "Someone with an expired invitation link to your workspace asked for a new one.",
+      why: () => "You got this email because you created this invitation, or look after who is in your workspace.",
+    },
   },
   calendar: {
     subject: "You're invited to an event",
@@ -83,6 +99,9 @@ export const en = {
     someone: "Someone",
     button: "See the event",
     why: (org: string) => `You got this email because someone at ${org} invited you to an event.`,
+    personal: {
+      why: () => "You got this email because someone in your workspace invited you to an event.",
+    },
   },
   waitlist: {
     subject: "Confirm your spot on the agentes.chat waiting list",
@@ -137,6 +156,13 @@ export const en = {
     button: "See the budget",
     why: (org: string) =>
       `You got this email because you own this agent, or are an admin of ${org}. It goes out at 80% and at 100%, once a month each.`,
+    /** A personal workspace's (ADR 0159): one person and their own agents, no admin to ask. */
+    personal: {
+      warning: "At 100% it stops and tells you. You can change the limit on the agent's page.",
+      exhausted: "It won't answer until the month turns, or until you raise the limit on the agent's page.",
+      why: () =>
+        "You got this email because this agent is one of yours. It goes out at 80% and at 100%, once a month each.",
+    },
   },
   digest: {
     subject: (n: number) =>
@@ -160,6 +186,15 @@ export const en = {
     button: (n: number): string => plural("en", n, { one: "Review the request", other: "Open approvals" }),
     why: (org: string, hours: number | undefined) =>
       `You got this email because you can approve these requests in ${org}.${hours ? ` It goes out when a request waits more than ${hours} hours, once per request.` : ""}`,
+    personal: {
+      body: (n: number): Text =>
+        plural("en", n, {
+          one: "One of your agents asked to do something that needs your approval.",
+          other: "Your agents asked to do things that need your approval.",
+        }),
+      why: (_org: string, hours: number | undefined) =>
+        `You got this email because you can approve these requests.${hours ? ` It goes out when a request waits more than ${hours} hours, once per request.` : ""}`,
+    },
   },
   ready: {
     subject: "Your agents' computer is ready",
@@ -193,6 +228,16 @@ export const en = {
     button: { ai: "Connect your AI", task: "Give a first task", create: "Create an agent" },
     why: (org: string) =>
       `You got this email because you own ${org} on agentes.chat. It's the only email about this computer.`,
+    /** A personal workspace's (ADR 0159): the person's computer for their agents, who they talk to directly. */
+    personal: {
+      body: (): Text =>
+        "Thanks for waiting. Your agents' computer is on and set up, with a user of its own for each agent. It stays on day and night, so your agents can work any time.",
+      steps: {
+        task: ["Give a first task.", "Open a conversation with one of your agents and say what you need."] as Step,
+      },
+      why: () =>
+        "You got this email because this workspace on agentes.chat is yours. It's the only email about this computer.",
+    },
   },
   joinRequest: {
     subject: "Someone asks to join your workspace",
@@ -205,6 +250,11 @@ export const en = {
     more: "All waiting requests are in Members." as Text,
     why: (org: string) =>
       `You got this email because you're an owner or admin of ${org}. It goes out at most once an hour.`,
+    personal: {
+      body: (): Text => "They opened your workspace's invitation link and asked to join.",
+      why: () =>
+        "You got this email because you look after who joins your workspace. It goes out at most once an hour.",
+    },
   },
   joinAnswer: {
     someone: "Someone",
@@ -236,6 +286,17 @@ export const en = {
       small: "If you think it's a mistake, ask someone there to invite you by email.",
     },
     why: (org: string) => `You got this email because this address asked to join ${org} on agentes.chat.`,
+    /** Joining someone's personal workspace (ADR 0159): the person who answered, not a company. */
+    personal: {
+      joined: { body: (who: string): Text => `${who} approved your request. You're in their workspace now.` },
+      invited: { body: (who: string): Text => `${who} approved your request to join their workspace.` },
+      denied: {
+        preheader: "They looked at it and didn't approve it.",
+        body: (): Text => "The person you asked looked at your request and didn't approve it.",
+        small: "If you think it's a mistake, ask them to invite you by email.",
+      },
+      why: () => "You got this email because this address asked to join a personal workspace on agentes.chat.",
+    },
   },
   joinCode: {
     subject: (code: string) => `${code} is your agentes.chat code`,
@@ -245,6 +306,11 @@ export const en = {
     small: ["It works for 10 minutes. If you didn't ask, ", { nobr: "ignore this email." }] as Text,
     why: (org: string) =>
       `You got this email because someone typed this address to ask to join ${org} on agentes.chat.`,
+    personal: {
+      body: (): Text => "Type this code on the page to ask to join this workspace.",
+      why: () =>
+        "You got this email because someone typed this address to ask to join a personal workspace on agentes.chat.",
+    },
   },
   deletionCode: {
     subjectWorkspace: (code: string) => `${code} is your code to delete a workspace`,
@@ -270,6 +336,13 @@ export const en = {
       "It works for 10 minutes, and nothing is deleted without it. If it wasn't you, don't share it and tell the people who run this server." as Text,
     whyWorkspace: (org: string) => `You got this email because your account asked to delete ${org} on agentes.chat.`,
     whyAccount: "You got this email because your account asked to be deleted on agentes.chat.",
+    personal: {
+      workspace: (org: string): Text => [
+        "Type this code to delete your workspace ",
+        { b: org },
+        ". It closes at once and is deleted for good 7 days later.",
+      ],
+    },
   },
   deleting: {
     subject: (day: string) => `A workspace you're in will be deleted on ${day}`,
@@ -285,6 +358,10 @@ export const en = {
     button: "Restore the workspace",
     member: "If it's a mistake, ask an owner to restore it." as Text,
     why: (org: string) => `You got this email because you're in ${org} on agentes.chat.`,
+    personal: {
+      member: "If it's a mistake, ask whoever deleted it to restore it." as Text,
+      why: () => "You got this email because you're in this workspace on agentes.chat.",
+    },
   },
   restored: {
     subject: "A workspace you're in is back",
@@ -293,6 +370,9 @@ export const en = {
     body: (by: string, org: string): Text => [{ b: by }, " restored ", { b: org }, ". It works again."],
     button: "Open the workspace",
     why: (org: string) => `You got this email because you're in ${org} on agentes.chat.`,
+    personal: {
+      why: () => "You got this email because you're in this workspace on agentes.chat.",
+    },
   },
   appConnected: {
     subject: "An app was connected to your agentes.chat account",
@@ -302,6 +382,11 @@ export const en = {
     note: "Didn't connect it? Disconnect it now and change your password.",
     button: "See connected apps",
     why: (org: string) => `You got this email because an app was connected to your account in ${org} on agentes.chat.`,
+    personal: {
+      body: (app: string): Text => [{ b: app }, " now has access to your account in your personal workspace."],
+      why: () =>
+        "You got this email because an app was connected to your account in your personal workspace on agentes.chat.",
+    },
   },
   accountDeleting: {
     subject: (day: string) => `Your agentes.chat account will be deleted on ${day}`,
@@ -392,6 +477,10 @@ export const en = {
     button: "See who can talk",
     why: (org: string) =>
       `You got this email because an agent of yours in ${org} thinks with your plan and someone else changed who can talk to it.`,
+    personal: {
+      why: () =>
+        "You got this email because an agent of yours thinks with your plan and someone else changed who can talk to it.",
+    },
   },
   planLent: {
     subject: (plan: string) => `Your ${plan} plan now thinks for another agent`,
@@ -409,6 +498,9 @@ export const en = {
     note: "Take it back in one click from your notifications, and the agent stops thinking with your plan.",
     button: "Open notifications",
     why: (org: string) => `You got this email because someone in ${org} connected your plan to an agent.`,
+    personal: {
+      why: () => "You got this email because someone in your workspace connected your plan to an agent.",
+    },
   },
   planWaiting: {
     subject: "Your team is waiting",
@@ -422,6 +514,17 @@ export const en = {
     },
     button: "See agentes.chat plans",
     why: (org: string) => `You got this email because you run ${org} on agentes.chat. We send two of these, then stop.`,
+    /** A personal workspace's (ADR 0159): the person's agents and routines, no team nor channels. */
+    personal: {
+      subject: "Your agents are waiting",
+      headline: "Your agents are waiting",
+      body: (agents: number, _channels: number, routines: number): Text => {
+        const a = plural("en", agents, { one: "1 agent", other: `${agents} agents` });
+        const r = plural("en", routines, { one: "1 routine", other: `${routines} routines` });
+        return `Ready to go: ${routines > 0 ? `${a} and ${r}` : a}. All that's missing is an agentes.chat plan.`;
+      },
+      why: () => "You got this email because this workspace on agentes.chat is yours. We send two of these, then stop.",
+    },
   },
 };
 

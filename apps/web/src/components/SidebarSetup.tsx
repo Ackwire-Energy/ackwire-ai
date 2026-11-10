@@ -5,11 +5,12 @@ import {
   moveShownTool,
   placeTool,
   SIDEBAR_COUNTED,
-  SIDEBAR_ITEMS,
-  SIDEBAR_SECTIONS,
   sameOrder,
+  sidebarItemOrder,
   sidebarPlace,
+  sidebarSections,
 } from "@agenteschat/client/lib/sidebar-items";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import {
   Button,
   Dialog,
@@ -51,13 +52,14 @@ export const SIDEBAR_TOOLS = {
 } as const satisfies Record<SidebarItem, { to: string; icon: IconName }>;
 
 /**
- * The person's order of the tools in this workspace (`…/me/sidebar/tools`), saved as `null` when it is the default.
- * `put(next, from)` keeps the focus on `from` (or, once it is disabled at an end, its row's other arrow): React moves a
- * row down by re-inserting its node, which blurs whatever was focused inside it.
+ * The person's order of the tools in this workspace (`…/me/sidebar/tools`), saved as `null` when it is the default of
+ * the workspace's mode (`personal`, ADR 0159). `put(next, from)` keeps the focus on `from` (or, once it is disabled at
+ * an end, its row's other arrow): React moves a row down by re-inserting its node, which blurs whatever was focused
+ * inside it.
  */
-function useToolOrder(orgId: string) {
-  const order = useSidebarToolOrder(orgId);
-  const save = useSetSidebarToolOrder(orgId);
+function useToolOrder(orgId: string, personal = false) {
+  const order = useSidebarToolOrder(orgId, personal);
+  const save = useSetSidebarToolOrder(orgId, personal);
   const focused = useRef<HTMLElement | null>(null);
   const key = order.join();
   useLayoutEffect(() => {
@@ -72,7 +74,7 @@ function useToolOrder(orgId: string) {
   const put = (next: SidebarItem[], from?: Element) => {
     if (sameOrder(next, order)) return;
     if (from instanceof HTMLElement) focused.current = from;
-    save.mutate(sameOrder(next, SIDEBAR_ITEMS) ? null : next);
+    save.mutate(sameOrder(next, sidebarItemOrder(personal)) ? null : next);
   };
   return { order, put };
 }
@@ -89,7 +91,7 @@ const MOVE_KEYS = "Alt+Shift+ArrowUp Alt+Shift+ArrowDown";
 export function ToolList({ items, row }: { items: SidebarItem[]; row: (id: SidebarItem) => ReactElement }) {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const { order, put } = useToolOrder(org.id);
+  const { order, put } = useToolOrder(org.id, isPersonal(org));
   const dragging = useRef<SidebarItem | null>(null);
   const [mark, setMark] = useState<{ id: SidebarItem; where: "before" | "after" } | null>(null);
   const shown = order.filter((id) => items.includes(id));
@@ -151,15 +153,17 @@ export function ToolList({ items, row }: { items: SidebarItem[]; row: (id: Sideb
 /**
  * "Personalizar a barra lateral", from More: one line per tool and where it goes, Sempre, Em Mais or, for a tool with
  * a count, Quando tiver algo. A choice applies at once (no Save) and is kept on the server for this person in this
- * workspace, so their other devices and the desktop app show the same sidebar.
+ * workspace, so their other devices and the desktop app show the same sidebar. What shows before any choice, and what
+ * Reset to default goes back to, is the workspace's mode's (ADR 0159).
  */
 export function SidebarSetupDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { t } = useTranslation();
   const { org } = useOrg();
+  const personal = isPersonal(org);
   const { data: items, refetch } = useSidebarItems(org.id);
-  const save = useSetSidebarItem(org.id);
-  const sections = useSectionOrder(org.id);
-  const tools = useToolOrder(org.id);
+  const save = useSetSidebarItem(org.id, personal);
+  const sections = useSectionOrder(org.id, personal);
+  const tools = useToolOrder(org.id, personal);
   // What another device changed since this one loaded shows as the dialog opens.
   useEffect(() => {
     if (open) void refetch();
@@ -192,7 +196,7 @@ export function SidebarSetupDialog({ open, onClose }: { open: boolean; onClose: 
                 block
                 size="sm"
                 label={t(`shell.${id}`)}
-                value={sidebarPlace(items, id)}
+                value={sidebarPlace(items, id, personal)}
                 onValueChange={(place) => save.mutate({ item: id, place })}
                 options={options(id)}
               />
@@ -224,8 +228,8 @@ export function SidebarSetupDialog({ open, onClose }: { open: boolean; onClose: 
           <button
             type="button"
             className="ac-link ac-link--muted small"
-            disabled={sameOrder(sections.order, SIDEBAR_SECTIONS)}
-            onClick={() => sections.put([...SIDEBAR_SECTIONS])}
+            disabled={sameOrder(sections.order, sidebarSections(personal))}
+            onClick={() => sections.put([...sidebarSections(personal)])}
           >
             {t("contextMenu.restoreOrder")}
           </button>
@@ -237,13 +241,13 @@ export function SidebarSetupDialog({ open, onClose }: { open: boolean; onClose: 
               <span className="settings-row__icon ac-num" aria-hidden="true">
                 {i + 1}
               </span>
-              <span className="sidebar-setup__name">{sectionName(t, id)}</span>
+              <span className="sidebar-setup__name">{sectionName(t, id, personal)}</span>
               <Button
                 size="sm"
                 variant="ghost"
                 iconOnly
                 icon="chevronUp"
-                aria-label={`${t("contextMenu.moveUp")}: ${sectionName(t, id)}`}
+                aria-label={`${t("contextMenu.moveUp")}: ${sectionName(t, id, personal)}`}
                 disabled={i === 0}
                 onClick={() => sections.put(moveSection(sections.order, id, -1))}
               />
@@ -252,7 +256,7 @@ export function SidebarSetupDialog({ open, onClose }: { open: boolean; onClose: 
                 variant="ghost"
                 iconOnly
                 icon="chevronDown"
-                aria-label={`${t("contextMenu.moveDown")}: ${sectionName(t, id)}`}
+                aria-label={`${t("contextMenu.moveDown")}: ${sectionName(t, id, personal)}`}
                 disabled={i === sections.order.length - 1}
                 onClick={() => sections.put(moveSection(sections.order, id, 1))}
               />
@@ -264,10 +268,10 @@ export function SidebarSetupDialog({ open, onClose }: { open: boolean; onClose: 
         <Button
           variant="ghost"
           icon="undo"
-          disabled={Object.keys(items ?? {}).length === 0 && sameOrder(tools.order, SIDEBAR_ITEMS)}
+          disabled={Object.keys(items ?? {}).length === 0 && sameOrder(tools.order, sidebarItemOrder(personal))}
           onClick={() => {
             save.mutate(null);
-            tools.put([...SIDEBAR_ITEMS]);
+            tools.put([...sidebarItemOrder(personal)]);
           }}
         >
           {t("shell.sidebarSetup.reset")}

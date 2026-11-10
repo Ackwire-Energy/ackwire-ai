@@ -575,6 +575,22 @@
     "goneLead": "キャンセルされた可能性があります。招待してくれた人に相談してください。",
     "entering": "{{org}}に参加中",
     "enteringReady": "アカウントの準備ができました。",
+    "personalName": "{{name}}さんのワークスペース",
+    "personalNameNoName": "個人用ワークスペース",
+    "helloPersonal": "こんにちは。{{name}}さんから招待されました。",
+    "helloNoNamePersonal": "こんにちは。個人用ワークスペースに招待されました。",
+    "nameLeadPersonal": "まず、エージェントからは何と呼ばれたいですか？",
+    "newPasswordLeadPersonal": "今回もこれからも、入るときに使います。",
+    "enterPersonal": "参加",
+    "calledYouPersonal": "{{name}}さんから招待されました。",
+    "calledYouNoNamePersonal": "個人用ワークスペースに招待されました。",
+    "passwordLeadPersonal": "{{name}}さんから招待されました。パスワードを入れれば参加できます。",
+    "passwordLeadNoNamePersonal": "招待されています。パスワードを入れれば参加できます。",
+    "otherLeadPersonal": "{{other}}としてログインしています。招待されたメールアドレスでログインすると入れます。",
+    "fullTitlePersonal": "このワークスペースには現在空きがありません。",
+    "enteringPersonal": "参加中",
+    "usedTitlePersonal": "すでに参加しています。",
+    "openPersonal": "開く",
     "ask": {
       "title": "{{org}}への参加をリクエスト",
       "lead": "{{name}}さんがこのリンクを共有しました。新しいメンバーは管理者が1人ずつ承認します。",
@@ -633,7 +649,16 @@
       "signInTitle": "承認されました。あとはログインするだけです。",
       "signInLead": "選んだメールアドレスとパスワードを使ってください。",
       "endedTitle": "リクエストは終了しました。",
-      "endedLead": "承認された場合は、自分のアカウントでログインしてください。"
+      "endedLead": "承認された場合は、自分のアカウントでログインしてください。",
+      "titlePersonal": "このワークスペースへの参加をリクエスト",
+      "helloPersonal": "こんにちは。個人用ワークスペースへの招待です。",
+      "waitTitlePersonal": "完了です。リクエストを送信しました。",
+      "waitCardPersonal": "返事を待っています",
+      "inTitlePersonal": "参加しました",
+      "memberTitlePersonal": "すでに参加しています",
+      "openPersonal": "開く",
+      "approvedInPersonal": "承認されました。参加しました。",
+      "deniedTextPersonal": "間違いだと思う場合は、リンクを送ってくれた人に招待を頼んでください。"
     }
   },
   "onboarding": {
@@ -676,6 +701,19 @@
       "invite_other": "{{count}}人を招待"
     },
     "yourCompany": "あなたの会社",
+    "purpose": {
+      "title": "agentes.chatを何に使いますか？",
+      "lead": "あとで変更できます。何も失われません。",
+      "personal": "自分用",
+      "personalText": "あなたの一日を支えるエージェント。",
+      "team": "会社やチーム用",
+      "teamText": "人とエージェントが、チャンネル、ロール、承認を使って一緒に働きます。",
+      "personalExamples": "朝7時の一日 · 支払い · トレーニング",
+      "teamExamples": "カスタマーサポート · 経理 · レポート"
+    },
+    "personal": {
+      "name": "個人"
+    },
     "workspace": {
       "title": "ワークスペースの名前は？",
       "lead": "チームとエージェントが会話する場所です。",
@@ -1296,6 +1334,7 @@
   },
   "shell": {
     "otherChannels": "その他のチャンネル",
+    "otherChannelsPersonal": "その他のグループ会話",
     "titleBar": {
       "back": "戻る",
       "forward": "進む"
@@ -1313,13 +1352,25 @@
       "calendar": "会議と締め切り",
       "team": "誰が誰か：メンバー、エージェント、そのグループ",
       "dashboards": "エージェントが最新に保つ数値やグラフ",
-      "taskManager": "各エージェントが今していることと、必要なものの停止"
+      "taskManager": "各エージェントが今していることと、必要なものの停止",
+      "approvalsPersonal": "あなたのエージェントからの許可のお願い",
+      "proposalsPersonal": "あなたのエージェントが変更を提案している内容",
+      "threadsPersonal": "別の流れの会話とミッション",
+      "issuesPersonal": "あなたとエージェントのタスク",
+      "wikiPersonal": "エージェントが読めるメモ",
+      "calendarPersonal": "予定と締め切り",
+      "teamPersonal": "あなたのエージェントと、ここにいるほかの人",
+      "dashboardsPersonal": "あなたのエージェントが最新に保つ数値やグラフ",
+      "taskManagerPersonal": "あなたのエージェントが今していることと、必要なものの停止",
+      "homePersonal": "あなたの一日：待っていることとエージェントが今していること"
     },
     "customizeSidebar": "サイドバーをカスタマイズ",
     "sidebarMenu": {
       "title": "サイドバー",
       "newChannel": "新しいチャンネル",
+      "newChannelPersonal": "新しいグループ会話",
       "addToChannels": "新しいチャンネルまたはカテゴリ",
+      "addToChannelsPersonal": "新しいグループ会話またはカテゴリ",
       "newMessage": "新しいメッセージ",
       "addMembers": "人またはエージェントを追加",
       "channelSettings": "チャンネルの設定",
@@ -1391,6 +1442,7 @@
     "drive": "Drive",
     "members": "メンバー",
     "channels": "チャンネル",
+    "channelsPersonal": "グループ会話",
     "agents": "エージェント",
     "directMessages": "ダイレクトメッセージ",
     "createAgent": "エージェントを作成",
@@ -1472,6 +1524,8 @@
     "organize": "チームで部署を整理",
     "more_other": "チームにエージェントがあと {{count}} 体",
     "createFirst": "最初のエージェントを作成",
+    "createFirstPersonal": "あなたの最初のエージェントを作成",
+    "newAgent": "新しいエージェント",
     "working_other": "{{count}} 件が作業中",
     "count_other": "エージェント {{count}} 件",
     "workingIn": "#{{channel}} で作業中",
@@ -1895,21 +1949,30 @@
     "label": "あなたの右腕",
     "newDot": "新規",
     "role": "ワークスペースのアシスタント",
+    "rolePersonal": "パーソナルアシスタント",
     "actsAsYou": "あなたの権限で動きます",
     "composerHint": "あなたなしでは何も変わりません",
     "intro": {
       "greeting": "こんにちは、{{name}}です。あなたと一緒にチームを作ります。",
+      "greetingPersonal": "こんにちは、{{name}}です。あなたと一緒にエージェントを用意します。",
       "lead": "エージェントを作り、アプリを接続し、メンバーを招待します。あなたが頼まない限り何も変わらず、あなたにできることだけを行います。",
+      "leadPersonal": "エージェントを作り、アプリを接続します。あなたが頼まない限り何も変わりません。",
       "heldLead": "事業の内容を選ぶと、ここにチームが表示されます。ワークスペースにagentes.chatのプランがあると、エージェントが作業を始めます。",
+      "heldLeadPersonal": "手伝ってほしいことを選ぶと、ここにエージェントが表示されます。agentes.chatのプランに入ると、エージェントが作業を始めます。",
       "connect": {
         "title": "チームのAIを接続",
+        "titlePersonal": "エージェントのAIを接続",
         "text": "エージェントはワークスペースのAIで考えます。ClaudeまたはChatGPTのプランでログインできます。APIキーは不要です。",
+        "textPersonal": "エージェントはこのAIで考えます。ClaudeまたはChatGPTのプランでログインできます。APIキーは不要です。",
         "action": "接続"
       },
       "again": {
         "question": "一緒にチームを作りますか？",
         "action": "チームを作る",
-        "message": "チーム作りを手伝ってください。"
+        "message": "チーム作りを手伝ってください。",
+        "questionPersonal": "一緒にもっとエージェントを用意しますか？",
+        "actionPersonal": "エージェントを用意する",
+        "messagePersonal": "私のエージェントの準備を手伝ってください。"
       },
       "next": {
         "firstTask": "{{name}}に最初のタスクを渡す"
@@ -2638,6 +2701,7 @@
     "teammate": "繰り返しませんでした: <b>{{who}}</b>が{{when}}に{{target}}に対してすでに行っています",
     "self": "繰り返しませんでした: 私が{{when}}に{{target}}に対してすでに行っています",
     "someone": "繰り返しませんでした: チームの誰かが{{when}}に{{target}}に対してすでに行っています",
+    "someonePersonal": "繰り返しませんでした: {{when}}に{{target}}に対してすでに行われています",
     "inChannel": "#{{channel}}",
     "open": "見る"
   },
@@ -2780,18 +2844,25 @@
   "newChannel": {
     "open": "チャンネルを作成",
     "title": "チャンネルを作成",
+    "titlePersonal": "新しいグループ会話",
     "name": "名前",
     "namePlaceholder": "例: marketing",
+    "namePlaceholderPersonal": "例: trip",
     "nameHelp": "小文字、数字、ハイフンを使えます。#{{name}}と表示されます。",
     "nameInvalid": "小文字、数字、ハイフンを使い、文字か数字で始めてください。",
     "nameTaken": "#{{name}}というチャンネルはすでにあります。",
+    "nameTakenPersonal": "#{{name}}というグループ会話はすでにあります。",
     "topic": "説明",
     "topicPlaceholder": "ここで話す内容",
     "visibility": "参加できる人",
     "public": "公開",
+    "publicPersonal": "ここにいる全員が参加できる",
     "publicDesc": "ワークスペースの誰でも見られて、参加できます。",
+    "publicDescPersonal": "ここにいる人なら誰でも見て参加できます。",
     "private": "非公開",
+    "privatePersonal": "自分が追加した人だけ",
     "privateDesc": "追加された人だけ。",
+    "privateDescPersonal": "あなたが追加した人だけが見られます。",
     "roles": "部署またはロール",
     "rolesDesc": "選んだロールを持つ人がチャンネルを見て参加できます。あとからロールを得た人も含みます。",
     "rolesPick": "チャンネルが見えるロール",
@@ -2805,6 +2876,7 @@
     "publicBody": "ワークスペースの全員が参加でき、過去のものも含めてすべてのメッセージを読めるようになります。",
     "publicConfirm": "公開する",
     "members": "最初のメンバー",
+    "membersPersonal": "参加する人",
     "membersSearch": "人またはエージェントを検索",
     "membersEmpty": "「{{q}}」に一致する人は見つかりませんでした。",
     "selected_other": "{{count}}件選択中",
@@ -2863,6 +2935,8 @@
     "addRow": "人またはエージェントを追加",
     "invite": "{{email}}を{{org}}と#{{channel}}に招待",
     "inviteOrg": "{{email}}を{{org}}に招待",
+    "invitePersonal": "{{email}}をあなたのワークスペースと#{{channel}}に招待",
+    "inviteOrgPersonal": "{{email}}をあなたのワークスペースに招待",
     "addTitle": "#{{channel}}に追加",
     "addSearch": "人またはエージェントを検索",
     "addEmpty": "チャンネル外に「{{q}}」に一致する人はいません。",
@@ -3122,6 +3196,7 @@
     "tab": {
       "label": "表示する内容",
       "team": "チーム",
+      "teamPersonal": "共有",
       "personal": "個人",
       "connections": "接続"
     },
@@ -3136,9 +3211,11 @@
       "personalEmpty": "ログイン情報やキーを安全に保管",
       "personalEmptyText": "これらの項目はあなただけに表示されます。エージェントは、あなたが頼んだときだけ使います。",
       "teamEmpty": "パスワードを回さずにログインを共有",
+      "teamEmptyPersonal": "共有ログインを一か所にまとめましょう",
       "teamEmptyText": "ログイン、キー、連絡先を一度保存し、使えるエージェントを選びましょう。",
       "sharedEmpty": "あなたと共有されたものはまだありません",
-      "sharedEmptyText": "誰かがチームのログインやキーをあなたと共有すると、ここに表示されます。"
+      "sharedEmptyText": "誰かがチームのログインやキーをあなたと共有すると、ここに表示されます。",
+      "sharedEmptyTextPersonal": "ここにいる誰かがログインやキーをあなたと共有すると、ここに表示されます。"
     },
     "row": {
       "agents_other": "エージェント{{count}}体",
@@ -3164,13 +3241,16 @@
     "scope": {
       "personal": "個人",
       "team": "チーム",
+      "teamPersonal": "共有",
       "personalText": "あなただけに表示",
-      "teamText": "ワークスペースで共有"
+      "teamText": "ワークスペースで共有",
+      "teamTextPersonal": "ここにいる全員と共有"
     },
     "field": {
       "title": "名前",
       "contactTitle": "Vaultでの名前",
       "loginPlaceholder": "会社のメール",
+      "loginPlaceholderPersonal": "個人のメール",
       "keyPlaceholder": "決済のキー",
       "contactPlaceholder": "請求先情報",
       "website": "Webサイト",
@@ -3307,6 +3387,7 @@
       "what": "何を保存しますか？",
       "who": "使える人",
       "teamLocked": "チームの項目を保存できるのはVaultを管理する人だけです。この項目はあなた個人のものになります。",
+      "teamLockedPersonal": "共有の項目を保存できるのはVaultを管理する人だけです。この項目はあなた個人のものになります。",
       "save": "保存",
       "saved": "Vaultに保存しました"
     },
@@ -3356,8 +3437,10 @@
       "required": "入力してください。",
       "for": "接続先",
       "forTeam": "項目はチームのものです。誰が使うかはVaultを管理する人が決めます。",
+      "forTeamPersonal": "項目は共有されます。誰が使うかはVaultを管理する人が決めます。",
       "forPersonal": "項目はあなただけのものです。",
       "teamLocked": "項目はあなただけのものになります。チーム用に接続できるのはVaultを管理する人だけです。",
+      "teamLockedPersonal": "項目はあなただけのものになります。共有用に接続できるのはVaultを管理する人だけです。",
       "sealed": "ここに入力した内容は暗号化され、二度と表示されません。",
       "connected_other": "{{name}}を接続しました。{{count}}件の項目が届きました。",
       "ready": "接続済み",
@@ -3444,7 +3527,9 @@
       "scope": "保存先",
       "personalText": "あなただけに表示",
       "teamText": "ワークスペースに表示",
+      "teamTextPersonal": "ここにいる全員が見られます",
       "teamLocked": "チーム用に保存できるのはVaultを管理する人だけです",
+      "teamLockedPersonal": "共有の項目を保存できるのはVaultを管理する人だけです",
       "agents": "使用するエージェント",
       "choose": "選ぶ",
       "saved": "Vaultに保存しました",
@@ -3678,7 +3763,8 @@
     "summary": {
       "waiting_other": "あなたの対応待ちが{{count}}件あります",
       "calm": "今、あなたの対応待ちはありません。",
-      "new": "ワークスペースの準備ができました。ここから始めましょう。"
+      "new": "ワークスペースの準備ができました。ここから始めましょう。",
+      "newPersonal": "準備ができました。ここから始めましょう。"
     },
     "start": {
       "label": "アプリを開いたとき",
@@ -4120,6 +4206,7 @@
     "nameLabel": "名前",
     "roleLabel": "役割",
     "roleHelp": "チームのために何をするか。例: メールとカレンダーのアシスタント",
+    "roleHelpPersonal": "あなたのために何をするか。例: メールとカレンダーのアシスタント",
     "editName": "名前を編集: {{name}}",
     "editHandle": "メンションを編集: @{{handle}}",
     "editRole": "役割を編集: {{role}}",
@@ -4149,6 +4236,7 @@
     "instructions": "指示",
     "howWorks": "{{name}}の働き方",
     "instructionsHelp": "すべての会話で、{{org}}のコンテキスト（会社の事業内容や社内ルール）がこの指示の前に入ります。ここには{{name}}固有のことだけを書いてください。",
+    "instructionsHelpPersonal": "すべての会話で、あなたが自分について伝えたことがこの指示の前に入ります。ここには{{name}}固有のことだけを書いてください。",
     "budgetUsed": "使用済みの予算",
     "runsCount_other": "{{count}}回の実行",
     "tokensCount": "{{tokens}}トークン",
@@ -4455,7 +4543,14 @@
       "usage": "使用量",
       "activity": "アクティビティ",
       "settings": "設定",
-      "more": "その他"
+      "more": "その他",
+      "accessPersonal": "使えるもの",
+      "settingsPersonal": "設定",
+      "advanced": "詳細"
+    },
+    "advanced": {
+      "elsewhere": "アクティビティ、ファイル、使用量",
+      "tools": "ツールとルール"
     },
     "ficha": {
       "with": "一緒に働く人",
@@ -4504,14 +4599,26 @@
     },
     "lock": {
       "admins": "変更できるのは管理者だけです",
-      "adminsAndOwner": "変更できるのは管理者と{{name}}です"
+      "adminsKeeper": "変更できるのは{{keeper}}だけです",
+      "adminsPersonal": "変更できるのはここを管理している人だけです",
+      "adminsAndOwner": "変更できるのは管理者と{{name}}です",
+      "adminsAndOwnerPersonal": "変更できるのは{{name}}とここを管理している人です"
     },
     "readOnly": {
       "member": "{{name}}の働き方を確認できます。編集できるのは管理者だけです。",
+      "memberKeeper": "{{name}}の働き方を確認できます。編集できるのは{{keeper}}だけです。",
+      "memberPersonal": "{{name}}の働き方を確認できます。編集できるのはここを管理している人だけです。",
       "memberOwner": "{{name}}の働き方を確認できます。編集できるのは管理者と{{owner}}（オーナー）です。",
+      "memberOwnerPersonal": "{{name}}の働き方を確認できます。編集できるのは{{owner}}（オーナー）とここを管理している人です。",
       "owner": "あなたは{{name}}のオーナーです。見た目、話せる人、チャンネル、コンピューターを変更できます。それ以外は管理者だけが変更できます。",
+      "ownerKeeper": "あなたは{{name}}のオーナーです。見た目、話せる人、グループ会話、コンピューターを変更できます。それ以外は{{keeper}}だけが変更できます。",
+      "ownerPersonal": "あなたは{{name}}のオーナーです。見た目、話せる人、グループ会話、コンピューターを変更できます。それ以外はここを管理している人だけが変更できます。",
       "ownerInstructions": "指示を編集できるのは管理者だけです。オーナーとして、提案された変更を承認できます。",
-      "ownerAccess": "アクセスとリポジトリの付与・削除ができるのは管理者だけです。"
+      "ownerInstructionsKeeper": "指示を編集できるのは{{keeper}}だけです。オーナーとして、提案された変更を承認できます。",
+      "ownerInstructionsPersonal": "指示を編集できるのはここを管理している人だけです。オーナーとして、提案された変更を承認できます。",
+      "ownerAccess": "アクセスとリポジトリの付与・削除ができるのは管理者だけです。",
+      "ownerAccessKeeper": "アクセスとリポジトリの付与・削除ができるのは{{keeper}}だけです。",
+      "ownerAccessPersonal": "アクセスとリポジトリの付与・削除ができるのはここを管理している人だけです。"
     },
     "status": {
       "idle": "対応可能",
@@ -4592,6 +4699,7 @@
       "allConnectors": "コネクタ:",
       "onlyRead": "読み取りのみ",
       "connectors": "{{org}}のコネクタ",
+      "connectorsPersonal": "あなたのコネクタ",
       "oneLevel": "アプリごとに1つのレベル",
       "builtin": "agentesに組み込み",
       "builtinHelp": "Drive、タスク、メモリなど",
@@ -4816,6 +4924,7 @@
     "back": "{{name}}",
     "title": "{{name}}が知っていること",
     "subtitle": "{{name}}が会話やチームの訂正から学んだことです。",
+    "subtitlePersonal": "{{name}}があなたとの会話や訂正から学んだことです。",
     "proposals_other": "改善提案{{count}}件",
     "tabsLabel": "種類",
     "tabs": {
@@ -4858,6 +4967,7 @@
     "emptyTab": "今は何もありません。",
     "emptyTitle": "{{name}}のメモリはここから始まります",
     "emptyText": "会話のたびに、チームの働き方について新しいことを学びます。",
+    "emptyTextPersonal": "会話のたびに、あなたの好みのやり方について新しいことを学びます。",
     "how": "メモリのしくみ",
     "editTitle": "{{kind}}を編集",
     "text": "テキスト",
@@ -4884,6 +4994,7 @@
       "noChannel": "どのチャンネルにも入っていません。"
     },
     "subtitle": "エージェントが提案する変更。誰かが承認するまで何も変わりません。",
+    "subtitlePersonal": "エージェントが提案する変更。あなたが承認するまで何も変わりません。",
     "list": "提案",
     "proposes": "<b>{{agent}}</b>からの提案 · {{target}}",
     "proposesMany": "<b>{{agent}}</b>からの提案 · {{count}}体のエージェントの指示",
@@ -4899,6 +5010,7 @@
     "targetChanges": "{{name}}の変更",
     "targetChanges_female": "{{name}}の変更",
     "targetContext": "{{org}}のコンテキスト",
+    "targetContextPersonal": "エージェントが知っているあなたのこと",
     "roleLine": "ロール: {{from}} → {{to}}",
     "accessOn": "オンにする: {{app}}",
     "accessOff": "オフにする: {{app}}",
@@ -4946,6 +5058,7 @@
     "titleSettings": "{{name}}の設定を変える",
     "titleSkill": "スキル「{{skill}}」を修正",
     "titleContext": "{{org}}のコンテキストを更新",
+    "titleContextPersonal": "エージェントが知っているあなたのことを更新",
     "evidence": {
       "outcome": "確認された結果",
       "human": "人",
@@ -4983,6 +5096,7 @@
       "todoDesc": "読み取りでは何も変更されません。",
       "action": "許可",
       "todoNone": "{{org}}のアプリを使う",
+      "todoNonePersonal": "あなたのアプリを使う",
       "todoNoneDesc": "Gmail や Drive など、すでに接続したアプリです。",
       "done": "{{apps}}を使います",
       "doneNone": "今はアプリを使いません",
@@ -4992,6 +5106,7 @@
       "ok_other": "{{count}}個のアプリを許可",
       "okNone": "アプリなしで続ける",
       "empty": "{{org}}にはまだ接続されたアプリがありません。",
+      "emptyPersonal": "まだ接続されたアプリがありません。",
       "connectOther": "別のアプリを接続"
     },
     "where": {
@@ -5010,10 +5125,12 @@
     },
     "who": {
       "todo": "{{org}}の全員と話す",
+      "todoPersonal": "ここにいる全員と話す",
       "todoDesc": "誰でも私を呼べます。",
       "todoPlan": "あなただけと話す",
       "todoPlanDesc": "あなたのプランは個人用です。",
       "doneEveryone": "{{org}}の全員と話します",
+      "doneEveryonePersonal": "ここにいる全員と話します",
       "doneYou": "あなただけと話します",
       "doneOwner": "{{name}}さんだけと話します",
       "donePeople": "選んだ人たちと話します",
@@ -5035,6 +5152,7 @@
       "title": "{{name}}の働き方",
       "title_female": "{{name}}の働き方",
       "desc": "新しくチームに入った人に書くつもりで書いてください。",
+      "descPersonal": "初めて手伝ってくれる人に書くつもりで書いてください。",
       "instructions": "指示",
       "budget": "月間上限",
       "budgetHelp": "80%に達したらお知らせします。上限に達すると一時停止してお知らせします。",
@@ -5057,6 +5175,7 @@
     },
     "firstRun": {
       "title": "{{org}}のチームが動き出すために",
+      "titlePersonal": "エージェントが動き出すために",
       "complete": "準備完了です。",
       "notNow": "今はしない",
       "afterPlan": "プランで使えるようになります。",
@@ -5068,13 +5187,24 @@
         "title": "{{org}}は何をしていますか？",
         "desc": "すべてのエージェントがこれを読みます。いつでも変更できます。",
         "line": "一文で",
-        "optional": "任意です。文がなければ選んだ種類が使われます。"
+        "optional": "任意です。文がなければ選んだ種類が使われます。",
+        "todoPersonal": "あなたのことを少し教えてください。",
+        "todoDescPersonal": "すべてのエージェントがこれを読みます。",
+        "donePersonal": "あなたのことを少し知っています",
+        "titlePersonal": "何を手伝ってほしいですか？",
+        "descPersonal": "すべてのエージェントがこれを読みます。いつでも変更できます。",
+        "linePersonal": "あなたについて一文で",
+        "optionalPersonal": "任意です。文がなければ選んだ分野が使われます。"
       },
       "team": {
         "todo": "チームを作りましょう。",
         "todoDesc": "あなたのビジネス向けのテンプレートです。あとで何でも変えられます。",
         "action": "チームを見る",
         "done_other": "チームに{{count}}人のエージェント",
+        "todoPersonal": "エージェントを選びましょう。",
+        "todoDescPersonal": "すぐ使える始め方です。あとで何でも変えられます。",
+        "actionPersonal": "エージェントを見る",
+        "donePersonal_other": "エージェント{{count}}体",
         "card": "下のカードで続けてください"
       },
       "ai": {
@@ -5095,7 +5225,11 @@
         "title": "仕事のアプリ",
         "desc": "作ったばかりのチームが使うものが先に並びます。読むだけでは何も変わらず、送信・削除・支払いにはあなたの承認が必要です。",
         "connect": "接続",
-        "all": "すべてのアプリを見る"
+        "all": "すべてのアプリを見る",
+        "todoPersonal": "アプリを接続しましょう。",
+        "todoDescPersonal": "メール、カレンダー、ファイル。読むだけでは何も変わりません。",
+        "titlePersonal": "あなたのアプリ",
+        "descPersonal": "エージェントが使いそうなものが先に並びます。読むだけでは何も変わらず、送信・削除・支払いにはあなたの承認が必要です。"
       },
       "people": {
         "todo": "一緒に働く人を呼びましょう。",
@@ -5109,14 +5243,57 @@
         "team": "チームが来ました。",
         "ai": "これでチームが考えられます。",
         "apps": "完了です。アプリを読めるようになりました。",
-        "people": "人が増えてうれしいです。"
+        "people": "人が増えてうれしいです。",
+        "aboutPersonal": "メモしました。すべてのエージェントがこれを読みます。",
+        "teamPersonal": "エージェントが来ました。",
+        "aiPersonal": "これでエージェントが考えられます。",
+        "appsPersonal": "完了です。あなたのアプリを読めるようになりました。",
+        "peoplePersonal": "身近な人たちが加わってうれしいです。"
       },
       "asks": {
         "lead": "では、何か頼んでください：",
         "fit": "チームを私のビジネスに合わせて",
-        "who": "チームの誰が何を担当している？"
+        "who": "チームの誰が何を担当している？",
+        "fitPersonal": "エージェントを私の生活リズムに合わせて",
+        "whoPersonal": "どのエージェントが何を担当している？"
       }
     }
+  },
+  "newAgentAsk": {
+    "title": "新しいエージェントに何をしてほしいですか？",
+    "lead": "一文で伝えてください。{{name}}が準備して、作る前に見せます。",
+    "field": "あなたのためにすること",
+    "placeholder": "例：予定を整理して大事なことを知らせる",
+    "ideas": "アイデア",
+    "idea": {
+      "agenda": {
+        "label": "予定",
+        "text": "予定を整理して約束を知らせる"
+      },
+      "money": {
+        "label": "お金",
+        "text": "支払いを管理して期限の前に知らせる"
+      },
+      "training": {
+        "label": "トレーニング",
+        "text": "1週間のトレーニングを組んで体調に合わせて調整する"
+      },
+      "studies": {
+        "label": "勉強",
+        "text": "学習計画を作って覚えたことを確認する"
+      },
+      "home": {
+        "label": "家",
+        "text": "買い物リストと家事を整理する"
+      },
+      "travel": {
+        "label": "旅行",
+        "text": "旅行を計画する：行程、予約、書類"
+      }
+    },
+    "full": "自分で全部入力する",
+    "create": "{{name}}と作る",
+    "message": "新しいエージェントがほしい：{{what}}"
   },
   "newAgent": {
     "title": "エージェントを作成",
@@ -5133,7 +5310,8 @@
       "identity": {
         "name": "アイデンティティ",
         "title": "どんなエージェントか",
-        "lead": "チャットでチームがどう呼び、どう見分けるか。"
+        "lead": "チャットでチームがどう呼び、どう見分けるか。",
+        "leadPersonal": "チャットであなたがどう呼び、どう見分けるか。"
       },
       "instructions": {
         "name": "指示",
@@ -5149,7 +5327,8 @@
       "where": {
         "name": "場所と担当者",
         "title": "どこで誰と働くか",
-        "lead": "{{name}}はチェックしたチャンネルに参加し、チーム内にオーナーを持ちます。"
+        "lead": "{{name}}はチェックしたチャンネルに参加し、チーム内にオーナーを持ちます。",
+        "leadPersonal": "{{name}}は専用のチャットであなたと話し、チェックしたグループの会話に参加します。"
       },
       "model": {
         "name": "モデルと予算",
@@ -5312,6 +5491,7 @@
       }
     },
     "roleGroups": {
+      "personal": "あなたの毎日に",
       "tech": "製品と技術",
       "customers": "顧客",
       "operations": "オペレーション"
@@ -5378,6 +5558,8 @@
     "ownerHelp": "予算のアラートを受け取り、重要な操作を承認します。",
     "ownerYours": "エージェントを作成した人がオーナーになります。あとで管理者がほかの人に引き継げます。",
     "accessAdmins": "エージェントにアプリやメールボックスへのアクセスを与えられるのは管理者だけです。作成後に管理者に頼んでください。",
+    "accessAdminsKeeper": "エージェントにアプリやメールボックスへのアクセスを与えられるのは{{keeper}}だけです。作成後に{{keeper}}に頼んでください。",
+    "accessAdminsPersonal": "エージェントにアプリやメールボックスへのアクセスを与えられるのはここを管理している人だけです。作成後に頼んでください。",
     "modelAndCost": "モデルとコスト",
     "model": "モデル",
     "modelDesc": {
@@ -5451,12 +5633,17 @@
     "defaultName": "エージェント",
     "newOnTeam": "チームの新メンバー",
     "createdTitle": "{{name}}がチームに加わりました",
+    "newOnTeamPersonal": "新しいエージェント",
+    "createdTitlePersonal": "{{name}}が来ました",
     "createdText": "すでに{{channels}}にいます。会話で@{{handle}}とメンションして始めましょう。",
     "createdTextNoChannels": "{{name}}をチャンネルに追加し、会話で@{{handle}}とメンションして始めましょう。",
+    "createdTextNoChannelsPersonal": "{{name}}とのチャットを開いて、何か頼んで始めましょう。",
     "goTo": "#{{channel}}へ",
     "openProfile": "プロフィールを開く",
     "createAnother": "別のエージェントを作成",
     "adminsOnly": "エージェントを作成できるのは管理者とオーナーだけです。{{org}}の管理者に頼んでください。",
+    "adminsOnlyKeeper": "エージェントを作成できるよう{{keeper}}に頼んでください。",
+    "adminsOnlyPersonal": "エージェントを作成できるよう、ここを管理している人に頼んでください。",
     "proposalClosed": "この提案はすでに決定済みか、期限が切れています。",
     "proposalNoAccess": "この提案を見られるのは、その会話にいる人だけです。",
     "backToChat": "会話に戻る",
@@ -5478,11 +5665,13 @@
     "filters": "人を絞り込む",
     "rolesOf": "{{name}}のロール",
     "everyoneNote": "「全員」はワークスペースのすべての人に適用されます。",
+    "everyoneNotePersonal": "ロールなしでは、エージェントを使います。{{role}}があると、管理を手伝います。",
     "noRolesToGive": "付与できる、あなたより下のロールはありません。",
     "roleFilter": "ロール",
     "rolesCount_other": "ロール{{count}}件",
     "title": "メンバー",
     "subtitle_other": "{{org}}のメンバー: {{people}}人とエージェント{{agents}}体。",
+    "subtitlePersonal_other": "ここにいるのは: {{people}}人とエージェント{{agents}}体。",
     "inviteTitle": "人を招待",
     "copyInviteLink": "招待リンクをコピー",
     "emailsPlaceholder": "name@company.com",
@@ -5525,10 +5714,12 @@
       "roleOf": "{{email}}のロール",
       "memberHint": "全員ができること",
       "member": "{{org}}に参加済み",
+      "memberPersonal": "参加済み",
       "invited": "招待済み"
     },
     "dialog": {
       "title": "{{org}}に招待",
+      "titlePersonal": "ワークスペースに誰かを招待",
       "stepOf": "ステップ {{n}}/{{total}} · {{step}}",
       "steps": {
         "who": "招待する人",
@@ -5547,6 +5738,7 @@
       "note": "メールに添えるメッセージ",
       "optional": "（任意）",
       "notePlaceholder": "こんにちは。{{org}}に参加しませんか。チームもエージェントもみんなここにいます。",
+      "notePlaceholderPersonal": "こんにちは。ここに来てね。私のエージェントがあなたも手伝ってくれます。",
       "or": "またはリンクを送信",
       "continueWith": "{{count}}人で続ける",
       "send_other": "{{count}}人を招待",
@@ -5567,13 +5759,28 @@
         "titleMany": "この人たちのロールはどれにしますか？",
         "lead": "ロールで、それぞれができることが決まります。あとで変更できます。",
         "each": "一人ずつロールを選ぶ",
-        "same": "全員に同じロール"
+        "same": "全員に同じロール",
+        "titleOnePersonal": "{{name}}さんはここで何ができますか？",
+        "titleManyPersonal": "この人たちはここで何ができますか？",
+        "leadPersonal": "あとで変更できます。",
+        "eachPersonal": "一人ずつ選ぶ",
+        "samePersonal": "全員同じにする",
+        "uses": "エージェントを使う",
+        "usesText": "エージェントと話し、共有されたものを使えます。",
+        "helps": "管理を手伝う",
+        "helpsText": "あなたと同じように、エージェント、設定、メンバーを変更できます。あなたのダイレクトメッセージ以外、ここで共有されているものはすべて見られます。"
+      },
+      "reach": {
+        "line_other": "<agents/>は、参加した人にも返信します。"
       },
       "where": {
         "titleOne": "{{name}}さんが最初から参加するチャンネルは？",
         "titleMany": "この人たちが最初から参加するチャンネルは？",
+        "titleOnePersonal": "{{name}}さんがすぐに参加するグループ会話は？",
+        "titleManyPersonal": "この人たちがすぐに参加するグループ会話は？",
         "lead": "全員が#{{channel}}から始まります。ほかのチャンネルはあなたが選びます。",
         "label": "チャンネル",
+        "labelPersonal": "グループ会話",
         "everyone": "全員が参加",
         "private": "プライベート · あなたも参加中",
         "people_other": "{{count}}人",
@@ -5605,6 +5812,7 @@
       "result": {
         "invited": "送信済み",
         "already_member": "{{org}}に参加済み",
+        "already_memberPersonal": "参加済み",
         "already_invited": "招待済み",
         "invalid_email": "無効なメールアドレス"
       },
@@ -5612,6 +5820,7 @@
       "finish": "完了",
       "linkStep": {
         "title": "{{org}}の招待リンクです。",
+        "titlePersonal": "あなたのワークスペースの招待リンクです。",
         "lead": "開いた人は参加をリクエストします。リクエストはひとつずつお見せするので、承認してください。",
         "how1": "相手がリンクを開いて、だれなのかを伝えます。",
         "how2": "リクエストは、招待できる人にここと携帯電話で届きます。",
@@ -8448,13 +8657,17 @@
     "mode": {
       "everyone": "ワークスペースの全員",
       "people": "一部の人またはロールのみ",
-      "owner": "オーナーのみ"
+      "owner": "オーナーのみ",
+      "everyonePersonal": "ここにいる全員",
+      "peoplePersonal": "一部の人のみ"
     },
     "modeText": {
       "everyone": "ワークスペースの誰でも{{name}}を呼べます。",
       "people": "{{name}}と話せる人とロールを選んでください。",
       "owner": "{{name}}と話せるのは{{owner}}だけです。",
-      "noOwner": "このオプションを使うにはオーナーを設定してください。"
+      "noOwner": "このオプションを使うにはオーナーを設定してください。",
+      "everyonePersonal": "ここにいる誰でも{{name}}を呼べます。",
+      "peoplePersonal": "{{name}}と話せる人を選んでください。"
     },
     "people": "人",
     "roles": "ロール",
@@ -8465,14 +8678,18 @@
     "onlyYouForNow": "今のところあなただけ",
     "onlyOwnerForNow": "今のところ{{name}}だけ",
     "search": "ロールと人を検索",
+    "searchPeople": "人を検索",
     "noMatch": "その名前のロールや人はいません。",
+    "noMatchPeople": "その名前の人はいません。",
     "pickSomeone": "少なくとも1人または1つのロールを選んでください。",
     "chip": {
       "owner": "個人用",
-      "people": "制限付き"
+      "people": "制限付き",
+      "ownerPersonal": "あなただけ"
     },
     "summary": {
       "everyone": "ワークスペースの全員",
+      "everyonePersonal": "ここにいる全員",
       "owner": "{{name}}のみ",
       "nobody": "今のところ誰もいません",
       "someone": "一部の人",
@@ -8703,6 +8920,7 @@
     "goTo": "移動",
     "ask": "エージェントに質問",
     "channel": "チャンネル",
+    "channelPersonal": "グループ会話",
     "agent": "エージェント",
     "agentRole": "エージェント · {{role}}",
     "person": "ダイレクトメッセージ",
@@ -10055,8 +10273,10 @@
     "emptyText": "アドレスで、どのサービスでも接続できます。",
     "none": "エージェントが、あなたの許可した範囲だけでツールを使って働きます。",
     "noneTitle": "チームのアプリを接続しましょう",
+    "noneTitlePersonal": "アプリを接続しましょう",
     "connectedFilter": "接続済み",
     "suggested": "{{org}}へのおすすめ",
+    "suggestedPersonal": "あなたへのおすすめ",
     "more": "その他のサービス",
     "tileConnected": "{{name}}、接続済み",
     "tileSoon": "{{name}}、近日公開",
@@ -11387,6 +11607,7 @@
     "clearRecentAll": "最近の検索を消去",
     "header": {
       "placeholder": "{{org}}を検索",
+      "placeholderPersonal": "すべてを検索",
       "clear": "検索をクリア"
     },
     "panel": {
@@ -13035,8 +13256,13 @@
       "voice": "音声",
       "apps": "AIアプリ",
       "approvals": "承認",
-      "about": "agentes.chat について"
+      "about": "agentes.chat について",
+      "generalPersonal": "あなたについて",
+      "keysPersonal": "AIとアプリ",
+      "usagePersonal": "プランと使用量",
+      "membersPersonal": "メンバー"
     },
+    "advanced": "詳細設定",
     "sectionText": {
       "account": "あなたのプロフィールと、アプリの表示設定。",
       "notifications": "ここで通知として届くもの。受信トレイにはすべてが残ります。",
@@ -13058,7 +13284,13 @@
       "voice": "会話でのボイスメッセージと、音声をテキストにするサービス。",
       "apps": "Claude、Cursor などのアプリからエージェントにタスクを頼めます。",
       "approvals": "エージェントがあなたの承認を求めたとき、代わりに決める人。",
-      "about": "開発元、ライセンス、ソースコードの場所。"
+      "about": "開発元、ライセンス、ソースコードの場所。",
+      "generalPersonal": "エージェントがあなたについて知っていることと、このワークスペースの使い方。",
+      "keysPersonal": "エージェントが考えるのに使うAIと、使うアプリやスキル。",
+      "usagePersonal": "エージェントが使うAIの量と、あなたのプラン。",
+      "connectorsPersonal": "あなたのアプリとMCPサーバー。一度接続すればエージェントが使えます。",
+      "membersPersonal": "ここに一緒にいる人と招待。",
+      "rolesPersonal": "ここで各メンバーができること。オーナーはすべてできます。"
     },
     "about": {
       "basedOn": "Codari Global, LLC の <site>agentes.chat</site> をもとにしています",
@@ -13080,6 +13312,7 @@
         "densityHelp": "あなただけに反映され、すべてのデバイスで同じになります",
         "where": "適用先",
         "channels": "チャンネル",
+        "channelsPersonal": "グループ",
         "dms": "ダイレクトメッセージ",
         "comfortable": "ゆったり",
         "left": "すべて左",
@@ -13088,6 +13321,7 @@
         "toneDms": "ダイレクトメッセージの自分のメッセージ",
         "toneDmsHelp": "話しているエージェントの色",
         "toneChannels": "チャンネルの自分のメッセージ",
+        "toneChannelsPersonal": "グループの自分のメッセージ",
         "toneChannelsHelp": "青色で",
         "toneLight": "淡い",
         "toneStrong": "濃い",
@@ -13121,23 +13355,43 @@
       "agentStyleTechnical": "技術的"
     },
     "orgTitle": "ワークスペース",
+    "orgTitlePersonal": "このワークスペース",
     "name": "名前",
+    "namePersonal": "ワークスペース名",
     "savedShort": "保存しました",
     "context": "ワークスペースのコンテキスト",
+    "contextPersonal": "あなたについて",
     "contextTitle": "エージェントが{{name}}について知っていること",
+    "contextTitlePersonal": "エージェントがあなたについて知っていること",
     "contextSubtitle": "すべてのエージェントが会話の前にこれを読みます。",
     "contextPlaceholder": "例: 私たちは家族向けの旅行代理店です。お客様にはWhatsAppで対応しています…",
+    "contextPlaceholderPersonal": "例：教師をしていて、妻と子ども2人と暮らしています。支払い、子どもの学校、ランニングを手伝ってほしい…",
     "contextMissing": "まだ書かれていないこと:",
     "contextIdeas": {
       "who": "誰のためのものか",
       "now": "今大切なこと",
-      "never": "絶対にしないこと"
+      "never": "絶対にしないこと",
+      "whoPersonal": "一緒に暮らしている人",
+      "nowPersonal": "今大切なこと",
+      "neverPersonal": "絶対にしないこと"
     },
     "contextHelp": "今日入ったばかりの人に{{name}}を説明するつもりで書いてください。",
+    "contextHelpPersonal": "毎日あなたを手伝ってくれる人に自己紹介するつもりで書いてください。",
     "timezone": "タイムゾーン",
     "timezoneHelp": "ルーティンと要約はこのタイムゾーンを使います。",
     "actionCheck": "エージェントがチームの過去の対応を確認する",
+    "actionCheckPersonal": "エージェントがすでに済んだことを確認する",
     "actionCheckHelp": "メール、メッセージ、プルリクエストの前に、過去30日以内にチームの誰かが同じ相手や場所に同じことをしていないかを確認し、重複を避けます。",
+    "actionCheckHelpPersonal": "メールやメッセージを送る前に、過去30日以内にあなたやほかのエージェントが同じ相手や場所にすでに送っていないかを確認し、重複して送りません。",
+    "mode": {
+      "label": "ワークスペースのモード",
+      "team": "チーム",
+      "personal": "個人",
+      "teamHelp": "チャンネル、メンバー、ロールでいっしょに働くためのモード。切り替えても変わるのは表示だけです。",
+      "personalHelp": "あなたと、招待した家族のためのシンプルなモード。切り替えても変わるのは表示だけです。",
+      "toTeam": "チームに切り替え…",
+      "toPersonal": "個人に切り替え…"
+    },
     "telemetry": {
       "title": "利用統計",
       "label": "匿名の利用統計をagentes.chatに送信する",
@@ -13295,6 +13549,40 @@
         "jev": "エージェントが自分からステッカーを送るのは、Jevを使っている場合だけです。",
         "jevLink": "Jevを設定"
       }
+    }
+  },
+  "personalMode": {
+    "toTeam": {
+      "title": "チームのワークスペースに切り替える",
+      "lead": "ほかの人と働くためのモードです。チャンネルとメンバーが表示されます。",
+      "channels": "サイドバーのチャンネルとメンバー",
+      "roles": "メンバーの招待と、それぞれができることを決めるロール",
+      "admin": "ほかの人の代わりの承認と監査ログが、設定に戻ります",
+      "stays": "エージェント、会話、ルーティン、ファイルはそのまま残ります。",
+      "name": "ワークスペース名",
+      "confirm": "チームに切り替える",
+      "done": "{{name}}はチームのワークスペースになりました。"
+    },
+    "toPersonal": {
+      "title": "個人のワークスペースに切り替える",
+      "lead": "同じワークスペースを、ひとりでもっとシンプルに使えます。",
+      "sidebar": "サイドバーにはよく使うものだけが表示され、ほかは「その他」に入ります",
+      "channels": "チャンネルはグループ会話として表示されます",
+      "settings": "設定が短くなり、ほかの項目は「詳細設定」に入ります",
+      "bubbles": "会話は吹き出しで開きます",
+      "others_other": "ここにいるほかの{{count}}人にも同じように表示されます",
+      "stays": "何も失われません。エージェント、会話、ルーティン、ファイル、各メンバーのアクセスはそのままです。",
+      "confirm": "個人に切り替える",
+      "done": "このワークスペースは個人用になりました。"
+    },
+    "invite": {
+      "title": "誰を招待しますか？",
+      "lead": "このワークスペースは個人用です。",
+      "family": "家族や友だち",
+      "familyText": "ここに参加してもらい、ワークスペースは個人用のままです。",
+      "work": "一緒に働く人",
+      "workText": "先にチームのワークスペースに切り替えます。チャンネル、メンバー、ロールが表示されます。",
+      "workLocked": "チームに切り替えられるのは、このワークスペースを管理する人だけです。"
     }
   },
   "peopleUsage": {
@@ -13729,6 +14017,7 @@
         "tooMany": "連続で承認するには多すぎます",
         "off": "このエージェントはコマンドの実行がオフです",
         "team": "チームがすでに行いました",
+        "teamPersonal": "すでに行われました",
         "unclear": "内容をはっきり読み取れません",
         "outside": "エージェントのフォルダ外のファイルを変更します",
         "upload": "データを送信するか、エージェントのフォルダ外に保存します",
@@ -15004,9 +15293,13 @@
     "managedNotRemovable": "これはワークスペース専用のコンピューターです。削除できません。",
     "managedAccess": "これはワークスペース専用のコンピューターです。ツールとフォルダはそのまま変わりません。",
     "notification": {
-      "ready": "ワークスペースのコンピューターの準備ができました"
+      "ready": "ワークスペースのコンピューターの準備ができました",
+      "readyPersonal": "エージェントのコンピューターの準備ができました"
     },
     "title": "{{org}}のコンピューター",
+    "titlePersonal": "エージェントのコンピューター",
+    "titleInSentence": "{{org}}のコンピューター",
+    "titleInSentencePersonal": "エージェントのコンピューター",
     "users": "エージェントごとに1ユーザー。それぞれ専用のフォルダがあります。",
     "specs": "CPU {{cpus}}個 · メモリ {{memoryGb}} GB · ディスク {{diskGb}} GB",
     "chip": {
@@ -15099,6 +15392,7 @@
     "notice": {
       "label": "ワークスペースのコンピューター",
       "title": "{{org}}のコンピューターを準備中",
+      "titlePersonal": "エージェントのコンピューターを準備中",
       "see": "表示",
       "hide": "隠す"
     },
@@ -15909,7 +16203,8 @@
   },
   "teamPlan": {
     "start": {
-      "templates": "チームのテンプレートを見る"
+      "templates": "チームのテンプレートを見る",
+      "templatesPersonal": "用意されたエージェントを見る"
     },
     "business": {
       "agency": "代理店",
@@ -15921,6 +16216,18 @@
       "other": "その他"
     },
     "step": "質問 {{step}}/{{of}}",
+    "lifeArea": {
+      "routine": "予定と日課",
+      "money": "お金",
+      "health": "健康とトレーニング",
+      "studies": "勉強",
+      "home": "家と買い物",
+      "travel": "旅行",
+      "work": "仕事とプロジェクト",
+      "writing": "文章とアイデア",
+      "other": "その他"
+    },
+    "lifeAreaContext": "手伝ってほしいこと: {{areas}}。",
     "send": "{{count}}件を送信",
     "card": {
       "new": "新規",
@@ -15928,21 +16235,27 @@
       "skills": "スキル",
       "create": "チームを作成",
       "adjust": "調整",
+      "createPersonal": "エージェントを作成",
       "adjustName": "{{name}}を調整",
       "map": "マップで見る",
       "agents_other": "エージェント{{count}}体",
       "newChannels_other": "新しいチャンネル{{count}}件",
       "routineCount_other": "ルーティン{{count}}件",
       "weekly": "チームの1週間をここで報告します",
+      "weeklyPersonal": "エージェントの1週間をここで報告します",
       "failed": "チームは作成されませんでした。{{step}}で失敗しました（{{reason}}）。何も作成されていないので、もう一度試せます。",
       "retry": "もう一度試す",
       "onlyCreators": "チームを作成できるのはエージェントを作成できる人だけです。",
       "created": "{{name}}がチームを作成",
       "createdYou": "あなたがチームを作成",
+      "createdPersonal": "{{name}}がエージェントを作成",
+      "createdYouPersonal": "あなたがエージェントを作成",
       "skillsWait": "スキルは管理者を待っています。",
       "weeklyWait": "私の週次レビューは、私のルーティンを管理する人を待っています。",
       "undone": "チームを取り消しました",
-      "dismissed": "チームを破棄しました"
+      "dismissed": "チームを破棄しました",
+      "undonePersonal": "エージェントを取り消しました",
+      "dismissedPersonal": "エージェントを破棄しました"
     },
     "firstTask": {
       "suggestion": "提案",
@@ -15964,6 +16277,7 @@
     },
     "map": {
       "title": "マップで見るチーム",
+      "titlePersonal": "マップで見るエージェント",
       "people": "メンバー",
       "reviewer": "{{name}}がチームの1週間を振り返ります",
       "waits": "あなたの承認待ち"
@@ -15978,15 +16292,24 @@
       "failed": "チームは作成されませんでした。理由は会話のカードにあります。",
       "none": "どれも違う",
       "noneSub": "していることを伝えれば{{name}}が組みます",
-      "tailor": "あとは、ビジネスに合わせるよう頼むだけです。"
+      "tailor": "あとは、ビジネスに合わせるよう頼むだけです。",
+      "titlePersonal": "あなたのエージェント",
+      "leadPersonal": "手伝ってほしいことに合わせた、すぐ使えるエージェント。そのあと{{name}}があなたに合わせて調整します。",
+      "heldLeadPersonal": "必要なものに一番近いものを選んでください。あとで何でも変えられます。",
+      "createPersonal": "自分のエージェントを作成",
+      "failedPersonal": "エージェントは作成されませんでした。理由は会話のカードにあります。",
+      "noneSubPersonal": "必要なことを伝えれば{{name}}が用意します",
+      "tailorPersonal": "あとは、生活リズムに合わせるよう頼むだけです。"
     },
     "weekly": {
-      "name": "チームの1週間"
+      "name": "チームの1週間",
+      "namePersonal": "あなたの1週間"
     }
   },
   "whoSees": {
     "label": "閲覧できる人",
     "everyone": "ワークスペース全体",
+    "everyonePersonal": "ここにいる全員",
     "me": "自分のみ",
     "people": "特定の人",
     "only": "{{name}}のみ",
@@ -15995,6 +16318,7 @@
     "taskTitle": "このタスクを閲覧できる人",
     "pageTitle": "このページを閲覧できる人",
     "admins": "管理者は常に閲覧できます。",
+    "adminsPersonal": "ここを管理している人にも見えます。",
     "tied": "変更するまで、会話の参加者に合わせて変わります。",
     "search": "人を検索",
     "noMatch": "その名前の人はいません",
@@ -16008,13 +16332,17 @@
     "title": "{{name}}を共有",
     "conversation": "会話のみ",
     "people": "選んだ人とロール",
+    "peoplePersonal": "選んだ人",
     "everyone": "ワークスペース全体",
+    "everyonePersonal": "ここにいる全員",
     "whereDm": "{{name}}とのダイレクトメッセージ",
     "whereDmGone": "ダイレクトメッセージ",
     "whereDmBetween": "{{names}}の間のダイレクトメッセージ",
     "whereChannel": "#{{name}}のメンバー",
     "add": "人またはロールを追加",
+    "addPersonal": "人を追加",
     "addSearch": "人とロールを検索",
+    "addSearchPersonal": "人を検索",
     "noResults": "その名前の人はいません",
     "groupPeople": "人",
     "groupRoles": "ロール",
@@ -16024,6 +16352,7 @@
     "role": "ロール",
     "remove": "{{name}}を外す",
     "admins": "管理者は常に閲覧できます。",
+    "adminsPersonal": "ここを管理している人にも見えます。",
     "copyLink": "リンクをコピー",
     "copied": "リンクをコピーしました。",
     "done": "完了",
@@ -16031,7 +16360,9 @@
     "choosePeople": "人を選ぶ",
     "readOnly": "閲覧できる人を変えられるのは、会話にいる人だけです。",
     "open": "ワークスペース全体がこのファイルを見られます。",
+    "openPersonal": "ここにいる全員がこのファイルを見られます。",
     "savedEveryone": "ワークスペース全体がファイルを見られるようになりました。",
+    "savedEveryonePersonal": "ここにいる全員がファイルを見られるようになりました。",
     "savedPeople": "選んだ人がファイルを見られるようになりました。",
     "savedConversation": "会話にいる人だけがファイルを見られるようになりました。",
     "undo": "元に戻す",
@@ -16084,6 +16415,37 @@
   },
   "teamTemplates": {
     "lead": "{{org}}のチーム。エージェントはそれぞれ自分のチャンネルにいます。作成前に調整できます。",
+    "leadPersonal": "あなたのエージェント。それぞれが専用のチャットであなたと話します。作成前に調整できます。",
+    "life": {
+      "name": "暮らしを整える",
+      "sub": "予定、リマインダー、支払い",
+      "desc": "毎日の予定とお金を整えるために。"
+    },
+    "health": {
+      "name": "健康",
+      "sub": "トレーニングと食事",
+      "desc": "定期的に運動して、食生活をよくするために。"
+    },
+    "studies": {
+      "name": "勉強とアイデア",
+      "sub": "学習計画、復習、文章",
+      "desc": "新しいことを学び、アイデアを言葉にするために。"
+    },
+    "home": {
+      "name": "家のこと",
+      "sub": "買い物、家事、支払い",
+      "desc": "何も忘れずに家のことを回すために。"
+    },
+    "travel": {
+      "name": "旅行",
+      "sub": "細部まで計画した旅",
+      "desc": "料金から毎日の行程まで、旅を計画するために。"
+    },
+    "freelance": {
+      "name": "フリーランス",
+      "sub": "クライアント、請求、予定",
+      "desc": "自分でクライアントとお金を管理するフリーランスのために。"
+    },
     "agency": {
       "name": "マーケティング代理店",
       "sub": "コンテンツ、広告、サポート",
@@ -16162,12 +16524,72 @@
         "line": "チームの回答をもとに回答集を最新に保ちます。",
         "routine": "今週の回答で回答集を更新する",
         "task": "これらのお客様の質問への回答を書いてください:"
+      },
+      "clara": {
+        "role": "予定とリマインダー",
+        "line": "予定を管理し、大事なことを手遅れになる前に知らせます。",
+        "routine": "今日の予定を送る",
+        "task": "これを予定に入れて、前日にリマインドしてください:"
+      },
+      "duda": {
+        "role": "支払いと出費",
+        "line": "支払いと出費を記録し、期限の前に知らせます。",
+        "routine": "今月の支払いと、まだ払っていないものを一覧にする",
+        "task": "これらの出費をカテゴリ別に分けてください:"
+      },
+      "leo": {
+        "role": "トレーニング",
+        "line": "あなたのペースでワークアウトを組み、続けられるよう支えます。",
+        "routine": "今日のワークアウトを送る",
+        "task": "次を使って、今日の30分のワークアウトを作ってください:"
+      },
+      "mel": {
+        "role": "食事",
+        "line": "好みと予算に合わせて、献立と買い物リストを考えます。",
+        "routine": "今週の献立と買い物リストを考える",
+        "task": "次の材料で手早くできる夕食を3つ提案してください:"
+      },
+      "gabi": {
+        "role": "勉強",
+        "line": "学習計画を立て、学んだことをクイズで確認します。",
+        "routine": "今日のテーマを3つの質問で復習する",
+        "task": "このテーマをやさしく説明して、3つ質問してください:"
+      },
+      "lu": {
+        "role": "文章とアイデア",
+        "line": "メモやアイデアをまとめ、文章にするのを手伝います。",
+        "routine": "今週のアイデアとメモを集める",
+        "task": "このメモを短い文章にしてください:"
+      },
+      "rosa": {
+        "role": "家と買い物",
+        "line": "買い物リスト、家事、直すべきものを管理します。",
+        "routine": "今週の買い物リストと家事をまとめる",
+        "task": "次の条件で1週間分の買い物リストを作ってください:"
+      },
+      "vic": {
+        "role": "旅行",
+        "line": "日程、料金、予約、毎日の行程まで、旅を計画します。",
+        "routine": "計画中の旅の料金をチェックする",
+        "task": "次の場所への3日間の旅を計画してください:"
+      },
+      "rui": {
+        "role": "クライアント",
+        "line": "クライアントをフォローし、提案書や請求書を書き、未払いの人にリマインドします。",
+        "routine": "各クライアントが今日待っていることを一覧にする",
+        "task": "このクライアント向けの短い提案書を書いてください:"
       }
     },
     "example": {
       "iara": "マリナさん、こんにちは。ご注文は昨日発送され、金曜日までに届きます。追跡番号はこの下にあります。金曜日のご都合が悪ければ、別の日を探します。",
       "lia": "1. 代理店選びでよくある3つの失敗。2. 失敗しかけたプロジェクトの舞台裏。3. フォロワーへの質問: ここで何を見たいですか?",
-      "nina": "明日: 9:00 Carla、10:30 Pedro、14:00 空き。Pedroはまだ確認していません。連絡しましょうか?"
+      "nina": "明日: 9:00 Carla、10:30 Pedro、14:00 空き。Pedroはまだ確認していません。連絡しましょうか?",
+      "clara": "今日: 9:00 歯医者、12:30 Paulaとランチ、18:00 荷物の受け取り。明日はお母さんの誕生日です。明日の朝にリマインドしましょうか？",
+      "leo": "今日は30分: ウォームアップ5分、スクワット12回・腕立て伏せ10回・プランク30秒を3セット、最後にストレッチ5分。どうだったか教えてくれたら、水曜日のメニューを調整します。",
+      "gabi": "今日のテーマ: 光合成。簡単に言うと、植物は光と水と二酸化炭素から糖と酸素を作ります。3つの質問: どこで起きる？何が入って、何が出る？",
+      "rosa": "今週: 米、豆、卵、バナナ、コーヒー、洗剤。家のこと: 木曜日にシーツを替えて、キッチンの蛇口の修理を誰かに頼む。",
+      "vic": "リスボン3日間: 1日目はアルファマと城、2日目はベレンと川沿い、3日目はシントラ。いちばん安い便は12日（火）です。値段を見張っておきましょうか？",
+      "rui": "マルコスさん、こんにちは。提案書をお送りします: 5ページの新しいサイト、3週間で納品、支払いは2回に分けて。よろしければ、今日中に契約書を送ります。"
     },
     "channels": {
       "iara": "support",
@@ -16205,6 +16627,7 @@
         "line": "PRを作る前に確認すること"
       }
     },
-    "approvals": "顧客に送るものはあなたの承認を待ちます。信頼できるようになったら、あとで任せられます。"
+    "approvals": "顧客に送るものはあなたの承認を待ちます。信頼できるようになったら、あとで任せられます。",
+    "approvalsPersonal": "あなたの名前で送るもの、支払うもの、予約するものはすべて、あなたの承認を待ちます。信頼できるようになったら、あとで任せられます。"
   }
 }

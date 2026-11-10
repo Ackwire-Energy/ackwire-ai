@@ -257,7 +257,16 @@ export interface OrgSummary {
   agentStyle?: AgentStyle | null;
   /** How conversations look to me here: only what I chose (`chatLookOf`); absent from an older server. */
   chatPrefs?: ChatPrefs;
+  /**
+   * Who the workspace is for (ADR 0159): `team` or `personal`. Read it with `isPersonal` (lib/workspace-mode); absent
+   * from an older server, which is a team's.
+   */
+  mode?: WorkspaceMode;
 }
+
+/** Who a workspace is for (ADR 0159): the server's `WORKSPACE_MODES`. */
+export const WORKSPACE_MODES = ["team", "personal"] as const;
+export type WorkspaceMode = (typeof WORKSPACE_MODES)[number];
 
 /** How agents talk to a person (ADR 0147): the server's `AGENT_STYLES`. */
 export const AGENT_STYLES = ["simple", "technical"] as const;
@@ -424,6 +433,11 @@ export interface InvitationPreview {
   kind?: "email" | "link";
   /** Who invited (their name), when known. */
   invitedBy?: string | null;
+  /**
+   * Who the workspace is for (ADR 0159): a personal one's page speaks of the person who invited, not of a team or of
+   * its name. Absent from an older server and on one that no longer works: a team's words.
+   */
+  mode?: WorkspaceMode;
   /**
    * The workspace's logo, served for this invitation or link only (absent without one, or while it is paused or
    * being deleted).
@@ -897,7 +911,7 @@ export interface TeamAgentDraft {
   line: string;
   instructions: string;
   appearance: Required<AgentLookInput> | null;
-  /** The channel it lives in, by name. */
+  /** The channel it lives in, by name; empty: it lives in its DM with the person (a personal template, ADR 0159). */
   channel: string;
   routines: ProposedRoutine[];
   firstTask: string | null;
@@ -2213,6 +2227,8 @@ export interface OrgSettings {
   gifsAvailable: boolean;
   /** Read only: this server can decide when agents send one (agents send none on their own without it). */
   agentMediaAvailable: boolean;
+  /** Who the workspace is for (ADR 0159); absent from an older server, which is a team's. */
+  mode?: WorkspaceMode;
 }
 
 /** `OrgSettings` the server works out itself: never in a PATCH. */

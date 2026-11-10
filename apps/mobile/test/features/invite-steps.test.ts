@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { ApiError } from "@agenteschat/client";
 import {
   ASK_STEPS,
@@ -131,5 +133,22 @@ describe("waiting for the answer", () => {
     expect(resumesAsk(`/invite/${TOKEN}`)).toBe(false);
     expect(resumesAsk("/reset-password")).toBe(false);
     expect(resumesAsk("/connect")).toBe(false);
+  });
+});
+
+describe("an invitation to a personal workspace (ADR 0159): never its name, who invited instead", () => {
+  const src = (file: string) =>
+    readFileSync(join(import.meta.dir, "..", "..", "src", "features", "auth", file), "utf8");
+
+  test("each screen of the way in reads the invitation's mode", () => {
+    const screen = src("InviteScreen.tsx");
+    expect(screen).toContain('? t("invite.calledYouPersonal", { name: by })');
+    expect(screen).toContain('label={personal ? t("invite.enterPersonal") : t("mobile.invite.accept", { org })}');
+    expect(screen).toContain('title = t(modeKey(preview, "invite.ask.title"), { org });');
+    const email = src("EmailSteps.tsx");
+    expect(email).toContain('const enterLabel = t(modeKey(preview, "invite.enter"), { org });');
+    expect(email).toContain('t("invite.personalName", { name: preview.invitedBy })');
+    expect(src("LinkSteps.tsx")).toContain("email: isPersonal(preview)");
+    expect(src("AskWaiting.tsx")).toContain('t(modeKey(words, "invite.ask.waitTitle"), { org })');
   });
 });

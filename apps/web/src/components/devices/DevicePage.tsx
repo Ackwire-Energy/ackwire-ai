@@ -14,6 +14,7 @@ import { errorText } from "@agenteschat/client/lib/errors";
 import { clockAt } from "@agenteschat/client/lib/format";
 import { isPaused } from "@agenteschat/client/lib/machines";
 import { can } from "@agenteschat/client/lib/permissions";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import {
   Avatar,
   Button,
@@ -128,8 +129,9 @@ function Head({
 /** Whose it is, as a chip: a person's face and name, or the workspace's mark. */
 function OwnerChip({ userId }: { userId: string | null }) {
   const { t } = useTranslation();
-  const { org } = useOrg();
-  const owner = useOwner(userId);
+  const { org, me } = useOrg();
+  // A personal workspace names no workspace (ADR 0159): a device of nobody in particular is its person's.
+  const owner = useOwner(userId ?? (isPersonal(org) ? me.user.id : null));
   return owner ? (
     <Chip lead={<Avatar kind="person" size="xs" name={owner.name} imageUrl={owner.image} />}>{owner.name}</Chip>
   ) : (

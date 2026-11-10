@@ -37,6 +37,7 @@ import {
   setMemberRoles,
   speakerFor,
   updateAgent,
+  updateOrgSettings,
   ValidationError,
 } from "../src";
 import { addMember, addUser, type Fixture, makeAdmin, SECRET, setup } from "./fixtures";
@@ -142,6 +143,72 @@ describe("who can talk to the agent", () => {
     await expect(
       setAgentAudience(f.db, zed.id, organization.id, f.agent.id, { mode: "everyone", userIds: [] }),
     ).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  test("a personal workspace's new agent answers only its owner; one given an audience, or none, and those there keep theirs", async () => {
+    const { bia } = await world();
+    const model = { model: "claude-sonnet-5-5" };
+    await updateOrgSettings(f.db, f.owner.id, f.org.id, { mode: "personal" });
+    const mine = await createAgent(f.db, f.owner.id, f.org.id, { name: "Casa", handle: "casa" }, model);
+    // Made while the person was alone: whoever joins later isn't answered until its owner says so (ADR 0159).
+    expect(mine).toMatchObject({ audienceMode: "owner", audienceUserIds: [], ownerUserId: f.owner.id });
+    expect(canTalkTo(mine, f.owner.id, NO_PERSON)).toBe(true);
+    expect(canTalkTo(mine, bia.id, NO_PERSON)).toBe(false);
+    // Only a default: an audience given wins, and with no owner it answers everyone, as in a team's.
+    const open = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Aberto", handle: "aberto", audienceMode: "everyone" },
+      model,
+    );
+    expect(open.audienceMode).toBe("everyone");
+    const nobodys = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Geral", handle: "geral", ownerUserId: null },
+      model,
+    );
+    expect(nobodys.audienceMode).toBe("everyone");
+    // The agent already there keeps its own.
+    const [before] = await f.db.select().from(schema.agents).where(eq(schema.agents.id, f.agent.id));
+    expect(before?.audienceMode).toBe("everyone");
+    // Back to a team's: a new agent answers everyone again.
+    await updateOrgSettings(f.db, f.owner.id, f.org.id, { mode: "team" });
+    const team = await createAgent(f.db, f.owner.id, f.org.id, { name: "Time", handle: "time" }, model);
+    expect(team.audienceMode).toBe("everyone");
+  });
+
+  test("a personal workspace's new agent starts with every connected app and the calendar; a team's does not", async () => {
+    await world();
+    const model = { model: "claude-sonnet-5-5" };
+    const [app] = await f.db
+      .insert(schema.connectorConnections)
+      .values({
+        orgId: f.org.id,
+        connector: "linear",
+        toolPrefix: "linear",
+        label: "Linear",
+        serverUrl: "https://linear.example.com/mcp",
+        authType: "none",
+      })
+      .returning();
+    const grantsOf = async (agentId: string) =>
+      (await f.db.select().from(schema.agentScopes).where(eq(schema.agentScopes.agentId, agentId))).map(
+        (g) => `${g.connectionId ?? "-"} ${g.scope}`,
+      );
+    await updateOrgSettings(f.db, f.owner.id, f.org.id, { mode: "personal" });
+    const mine = await createAgent(f.db, f.owner.id, f.org.id, { name: "Casa", handle: "casa" }, model);
+    // ADR 0159 §3a: broad by default; sensitive tools still ask on every call.
+    expect(await grantsOf(mine.id)).toEqual(
+      expect.arrayContaining([`${app?.id} connector:*`, "- calendar:read", "- calendar:write"]),
+    );
+    await updateOrgSettings(f.db, f.owner.id, f.org.id, { mode: "team" });
+    const team = await createAgent(f.db, f.owner.id, f.org.id, { name: "Time", handle: "time" }, model);
+    const teamGrants = await grantsOf(team.id);
+    expect(teamGrants).not.toContain(`${app?.id} connector:*`);
+    expect(teamGrants).not.toContain("- calendar:write");
   });
 
   test("removing the last person keeps it restricted: only its owner, never everyone", async () => {

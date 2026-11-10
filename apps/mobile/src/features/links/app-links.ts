@@ -100,7 +100,7 @@ function workspaceScreen(rest: string[], q: Record<string, string>): Record<stri
       if (!isSafeId(sub)) return null;
       return id === "agent" ? { agent: sub, m } : id === "person" ? { person: sub, m } : null;
     case "threads":
-      if (id === undefined) return open ? { thread: open } : "/threads";
+      if (id === undefined) return open ? { thread: open } : "/conversations/threads";
       return isSafeId(id) ? { thread: id, m } : null;
     case "agents":
       if (id === "new") return "/new-agent";

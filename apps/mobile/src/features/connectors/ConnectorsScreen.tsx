@@ -11,6 +11,7 @@ import { type ConnectedItem, connectedItems, isMcpItem, itemName } from "@agente
 import { choiceOf, MAIL_BRANDS } from "@agenteschat/client/lib/mail";
 import { can } from "@agenteschat/client/lib/permissions";
 import { connectorDescription, connectorName } from "@agenteschat/client/lib/scopes";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { useLocalSearchParams } from "expo-router";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -260,7 +261,14 @@ function Gallery() {
           )}
           {!searching && suggestions.length > 0 ? (
             <>
-              <SectionHeader title={t("mobile.connectors.suggested", { org: org?.name ?? "" })} />
+              {/* A personal workspace's are suggested for its person, never "for Personal" (ADR 0159). */}
+              <SectionHeader
+                title={
+                  isPersonal(org)
+                    ? t("connectors.suggestedPersonal")
+                    : t("mobile.connectors.suggested", { org: org?.name ?? "" })
+                }
+              />
               <View style={styles.suggestions}>
                 {suggestions.map((d) => (
                   <Suggestion

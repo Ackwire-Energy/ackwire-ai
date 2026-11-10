@@ -436,3 +436,39 @@ export const EMAIL_SAMPLES: Record<string, EmailTemplate> = {
     url: APP,
   },
 };
+
+/**
+ * A personal workspace's emails (ADR 0159): the samples whose words differ there, stamped as their jobs are, in a
+ * workspace named as onboarding names it. Apart from `EMAIL_SAMPLES` (each of which keeps a snapshot); the preview
+ * shows them too.
+ */
+export const PERSONAL_EMAIL_SAMPLES: Record<string, EmailTemplate> = Object.fromEntries(
+  [
+    "invitation.en",
+    "invite_request.en",
+    "invite_request-link.en",
+    "calendar_invite.en",
+    "budget-warning.en",
+    "budget-exhausted.pt-BR",
+    "approval_digest-one.en",
+    "approval_digest-many.pt-BR",
+    "computer_ready-task.en",
+    "computer_ready-ai.pt-BR",
+    "join_request.en",
+    "join_answer-joined.en",
+    "join_answer-invited.en",
+    "join_answer-denied.pt-BR",
+    "join_code.en",
+    "deletion_code-workspace.en",
+    "workspace_deleting-member.pt-BR",
+    "workspace_restored.en",
+    "app_connected.en",
+    "plan_opened.en",
+    "plan_lent.pt-BR",
+    "plan_waiting.pt-BR",
+  ].map((id) => {
+    const sample = EMAIL_SAMPLES[id] as EmailTemplate;
+    const orgName = sample.locale === "pt-BR" ? "Pessoal" : "Personal";
+    return [id.replace(".", "-personal."), { ...sample, orgName, personal: true } as EmailTemplate];
+  }),
+);

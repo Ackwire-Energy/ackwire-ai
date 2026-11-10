@@ -87,4 +87,11 @@ export const strings: Partial<PushStrings> = {
   deviceWaitingBody: "戻ったら始まります。",
   teamWeekReady: "チームの1週間のまとめができました",
   teamDayReady: "今日のまとめができました",
+  machineConnectedTitlePersonal: "新しいコンピューターが接続されました",
+  computerReadyTitlePersonal: "エージェントのコンピューターの準備ができました",
+  agentUnreachedBodyPersonal: "ルーティンを作成した人は、まだこのエージェントと話せません。タップして許可できます。",
+  widgetFailedReasonsPersonal: { creator_left: "設定した人がもうワークスペースにいません。" },
+  joinRequestTitlePersonal: (name) => `${name} があなたのワークスペースへの参加をリクエストしています`,
+  joinSuggestionTitlePersonal: (by, name) => `${by} が ${name} の招待を提案しました`,
+  teamWeekReadyPersonal: "1週間のまとめができました",
 };

@@ -42,9 +42,9 @@ import { usagePauseRefetchMs } from "../lib/routine-view";
 import { withRead } from "../lib/seen";
 import {
   knownToolOrder,
-  SIDEBAR_DEFAULTS,
-  SIDEBAR_ITEMS,
-  SIDEBAR_SECTIONS,
+  sidebarDefaults,
+  sidebarItemOrder,
+  sidebarSections,
   withSidebarPlace,
 } from "../lib/sidebar-items";
 import { repinAgent, SIDEBAR_VIEW_DEFAULT, unpinAgents } from "../lib/sidebar-view";
@@ -5375,9 +5375,10 @@ export const useSidebarItems = (orgId: string) => {
  * Moves one tool, or with `null` puts every tool back on its default: the sidebar changes at once and goes back if the
  * server refuses. The server keeps my other choices as it has them, so one made on another device stays, and answers
  * with every choice it keeps. The requests go one at a time, so the last answer is what stays (`onMutate` still runs
- * at once for one that waits its turn).
+ * at once for one that waits its turn). A tool put where the workspace's mode has it by default (`personal`, ADR
+ * 0158) is no choice: it is dropped, and follows the mode from then on.
  */
-export function useSetSidebarItem(orgId: string) {
+export function useSetSidebarItem(orgId: string, personal = false) {
   const api = useApi();
   const qc = useQueryClient();
   const mutationKey = ["sidebar-items", orgId];
@@ -5386,13 +5387,17 @@ export function useSetSidebarItem(orgId: string) {
     scope: { id: `sidebar-items:${orgId}` },
     mutationFn: (move: { item: SidebarItem; place: SidebarPlace } | null) =>
       move
-        ? api.orgs.setSidebarItem(orgId, move.item, move.place === SIDEBAR_DEFAULTS[move.item] ? null : move.place)
+        ? api.orgs.setSidebarItem(
+            orgId,
+            move.item,
+            move.place === sidebarDefaults(personal)[move.item] ? null : move.place,
+          )
         : api.orgs.setSidebarItems(orgId, {}),
     onMutate: async (move) => {
       await qc.cancelQueries({ queryKey: keys.sidebarItems(orgId) });
       const before = qc.getQueryData<SidebarItems>(keys.sidebarItems(orgId));
       qc.setQueryData<SidebarItems>(keys.sidebarItems(orgId), (items) =>
-        move ? withSidebarPlace(items, move.item, move.place) : {},
+        move ? withSidebarPlace(items, move.item, move.place, personal) : {},
       );
       return { before };
     },
@@ -5410,33 +5415,43 @@ export function useSetSidebarItem(orgId: string) {
   });
 }
 
-/** The sidebar's sections in my order in this workspace (the default until it loads). */
-export const useSidebarOrder = (orgId: string): SidebarSection[] => {
+/**
+ * A sidebar order's cache, per mode: the server answers an order never saved with the default of the workspace's mode
+ * (ADR 0159), so a workspace that changes mode reads it again at once.
+ */
+const sidebarOrderKey = (orgId: string, personal: boolean) =>
+  [...keys.sidebarOrder(orgId), personal ? "personal" : "team"] as const;
+const sidebarToolOrderKey = (orgId: string, personal: boolean) =>
+  [...keys.sidebarToolOrder(orgId), personal ? "personal" : "team"] as const;
+
+/** The sidebar's sections in my order in this workspace (the default of its mode until it loads). */
+export const useSidebarOrder = (orgId: string, personal = false): SidebarSection[] => {
   const api = useApi();
   return (
     useQuery({
-      queryKey: keys.sidebarOrder(orgId),
+      queryKey: sidebarOrderKey(orgId, personal),
       queryFn: () => api.orgs.sidebarOrder(orgId),
       staleTime: 60_000,
-    }).data ?? [...SIDEBAR_SECTIONS]
+    }).data ?? [...sidebarSections(personal)]
   );
 };
 
 /** Saves my section order (`null`: the default): the sidebar changes at once and goes back if the server refuses. */
-export function useSetSidebarOrder(orgId: string) {
+export function useSetSidebarOrder(orgId: string, personal = false) {
   const api = useApi();
   const qc = useQueryClient();
+  const key = sidebarOrderKey(orgId, personal);
   return useMutation({
     scope: { id: `sidebar-order:${orgId}` },
     mutationFn: (order: SidebarSection[] | null) => api.orgs.setSidebarOrder(orgId, order),
     onMutate: async (order) => {
-      await qc.cancelQueries({ queryKey: keys.sidebarOrder(orgId) });
-      const before = qc.getQueryData<SidebarSection[]>(keys.sidebarOrder(orgId));
-      qc.setQueryData<SidebarSection[]>(keys.sidebarOrder(orgId), order ?? [...SIDEBAR_SECTIONS]);
+      await qc.cancelQueries({ queryKey: key });
+      const before = qc.getQueryData<SidebarSection[]>(key);
+      qc.setQueryData<SidebarSection[]>(key, order ?? [...sidebarSections(personal)]);
       return { before };
     },
-    onError: (_error, _order, context) => qc.setQueryData(keys.sidebarOrder(orgId), context?.before),
-    onSuccess: (order) => qc.setQueryData(keys.sidebarOrder(orgId), order),
+    onError: (_error, _order, context) => qc.setQueryData(key, context?.before),
+    onSuccess: (order) => qc.setQueryData(key, order),
   });
 }
 
@@ -5525,34 +5540,35 @@ export function useSetIssuesView(orgId: string) {
 }
 
 /**
- * The sidebar's tools in my order in this workspace (the default until it loads); a tool the app gained since the
- * order was saved goes at its end, as the server's `sidebarToolOrderOf` does.
+ * The sidebar's tools in my order in this workspace (the default of its mode until it loads); a tool the app gained
+ * since the order was saved goes at its end, as the server's `sidebarToolOrderOf` does.
  */
-export const useSidebarToolOrder = (orgId: string): SidebarItem[] => {
+export const useSidebarToolOrder = (orgId: string, personal = false): SidebarItem[] => {
   const api = useApi();
   const saved = useQuery({
-    queryKey: keys.sidebarToolOrder(orgId),
+    queryKey: sidebarToolOrderKey(orgId, personal),
     queryFn: () => api.orgs.sidebarToolOrder(orgId),
     staleTime: 60_000,
   }).data;
-  return knownToolOrder(saved ?? []);
+  return knownToolOrder(saved ?? [], personal);
 };
 
 /** Saves my order of the tools (`null`: the default): the sidebar changes at once and goes back if the server refuses. */
-export function useSetSidebarToolOrder(orgId: string) {
+export function useSetSidebarToolOrder(orgId: string, personal = false) {
   const api = useApi();
   const qc = useQueryClient();
+  const key = sidebarToolOrderKey(orgId, personal);
   return useMutation({
     scope: { id: `sidebar-tool-order:${orgId}` },
     mutationFn: (order: SidebarItem[] | null) => api.orgs.setSidebarToolOrder(orgId, order),
     onMutate: async (order) => {
-      await qc.cancelQueries({ queryKey: keys.sidebarToolOrder(orgId) });
-      const before = qc.getQueryData<SidebarItem[]>(keys.sidebarToolOrder(orgId));
-      qc.setQueryData<SidebarItem[]>(keys.sidebarToolOrder(orgId), order ?? [...SIDEBAR_ITEMS]);
+      await qc.cancelQueries({ queryKey: key });
+      const before = qc.getQueryData<SidebarItem[]>(key);
+      qc.setQueryData<SidebarItem[]>(key, order ?? [...sidebarItemOrder(personal)]);
       return { before };
     },
-    onError: (_error, _order, context) => qc.setQueryData(keys.sidebarToolOrder(orgId), context?.before),
-    onSuccess: (order) => qc.setQueryData(keys.sidebarToolOrder(orgId), order),
+    onError: (_error, _order, context) => qc.setQueryData(key, context?.before),
+    onSuccess: (order) => qc.setQueryData(key, order),
   });
 }
 
