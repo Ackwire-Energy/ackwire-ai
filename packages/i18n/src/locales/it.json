@@ -12017,6 +12017,9 @@
       "title": "{{name}} connesso",
       "everyone": "Ogni agente può usarlo.",
       "waiting": "Gli agenti ricevono gli strumenti solo quando continui, ai livelli che suggeriamo.",
+      "asks_one": "{{count}} azione chiede l'approvazione in chat.",
+      "asks_many": "{{count}} azioni chiedono l'approvazione in chat.",
+      "asks_other": "{{count}} azioni chiedono l'approvazione in chat.",
       "adjust": "Regola",
       "ok": "Fatto"
     }

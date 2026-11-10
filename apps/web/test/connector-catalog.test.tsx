@@ -411,7 +411,7 @@ describe("the connect flow: conectar → conectado; Ajustar → o que faz → qu
     // The confirmation: no steps, one sentence. No one gave this server's tools a level yet, and it says so.
     expect(screen().getByRole("dialog", { name: "Linear conectado" })).toBe(flow());
     expect(within(flow()).queryByRole("list", { name: "Passos" })).toBeNull();
-    expect(flow().querySelector(".cflow__text")?.textContent).toBe(`${WAITING} 1 ação sempre pede aprovação no chat.`);
+    expect(flow().querySelector(".cflow__text")?.textContent).toBe(`${WAITING} 1 ação pede aprovação no chat.`);
     expect(document.body.textContent).not.toContain("Linear conectado.");
     await adjust();
 
@@ -1050,7 +1050,7 @@ describe("the confirmation that ends connecting", () => {
     await click(within(flow()).getByRole("button", { name: "Conectar com a chave" }));
     await settle(4);
     expect(screen().getByRole("dialog", { name: "GitHub conectado" })).toBe(flow());
-    expect(sentence()).toBe("Todos os agentes podem usar. 1 ação sempre pede aprovação no chat.");
+    expect(sentence()).toBe("Todos os agentes podem usar. 1 ação pede aprovação no chat.");
     expect(buttons()).toEqual(["Ajustar", "Pronto"]);
     await click(within(flow()).getByRole("button", { name: "Pronto" }));
     await settle(4);
@@ -1079,7 +1079,7 @@ describe("the confirmation that ends connecting", () => {
     await type(within(flow()).getByLabelText("Nome"), "Suporte");
     await click(within(flow()).getByRole("button", { name: "Conectar" }));
     await settle(4);
-    expect(sentence()).toBe(`${WAITING} 1 ação sempre pede aprovação no chat.`);
+    expect(sentence()).toBe(`${WAITING} 1 ação pede aprovação no chat.`);
     expect(buttons()).toEqual(["Ajustar", "Continuar"]);
     await click(within(flow()).getByRole("button", { name: "Continuar" }));
     await settle(6);
@@ -1117,7 +1117,7 @@ describe("the confirmation that ends connecting", () => {
     });
     await renderApp(`/org/${ORG_ID}/settings/connectors?connected=custom:${res.server.id}`, { api });
     await settle(8);
-    expect(sentence()).toBe("Todos os agentes podem usar. 3 ações sempre pedem aprovação no chat.");
+    expect(sentence()).toBe("Todos os agentes podem usar. 3 ações pedem aprovação no chat.");
     expect(buttons()).toEqual(["Ajustar", "Pronto"]);
   });
 
@@ -1151,13 +1151,13 @@ describe("the confirmation that ends connecting", () => {
       });
     expect([0, 1, 2].map((n) => of("pt-BR", n))).toEqual([
       "Todos os agentes podem usar.",
-      "Todos os agentes podem usar. 1 ação sempre pede aprovação no chat.",
-      "Todos os agentes podem usar. 2 ações sempre pedem aprovação no chat.",
+      "Todos os agentes podem usar. 1 ação pede aprovação no chat.",
+      "Todos os agentes podem usar. 2 ações pedem aprovação no chat.",
     ]);
     expect([0, 1, 2].map((n) => of("en", n))).toEqual([
       "Every agent can use it.",
-      "Every agent can use it. 1 action always asks for approval in the chat.",
-      "Every agent can use it. 2 actions always ask for approval in the chat.",
+      "Every agent can use it. 1 action asks for approval in the chat.",
+      "Every agent can use it. 2 actions ask for approval in the chat.",
     ]);
   });
 });

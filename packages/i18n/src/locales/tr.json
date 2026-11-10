@@ -11512,6 +11512,8 @@
       "title": "{{name}} bağlandı",
       "everyone": "Her ajan kullanabilir.",
       "waiting": "Ajanlar araçları ancak siz devam ettiğinizde, önerdiğimiz seviyelerle alır.",
+      "asks_one": "{{count}} işlem sohbette onay ister.",
+      "asks_other": "{{count}} işlem sohbette onay ister.",
       "adjust": "Ayarla",
       "ok": "Tamam"
     }

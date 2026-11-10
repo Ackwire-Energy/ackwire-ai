@@ -198,14 +198,14 @@ export function asksCount(t: TFunction, item: Pick<ConnectedItem, "server" | "de
 
 /**
  * What a connection just made is, in a sentence or two: every agent has it and how many actions ask ("Todos os
- * agentes podem usar. 4 ações sempre pedem aprovação no chat."). A server whose tools no one gave a level yet says
+ * agentes podem usar. 4 ações pedem aprovação no chat."). A server whose tools no one gave a level yet says
  * that instead: agents get none of them until someone does (`pending`). Nothing asking adds no second sentence.
  */
 export function connectedSummary(t: TFunction, item: Pick<ConnectedItem, "server" | "def" | "pending">) {
   const lead =
     item.pending > 0 ? t("connectFlow.done.waiting", { count: item.pending }) : t("connectFlow.done.everyone");
   const asks = asksCount(t, item);
-  return asks > 0 ? t("common.joinSentences", { a: lead, b: t("connectFlow.asksCount", { count: asks }) }) : lead;
+  return asks > 0 ? t("common.joinSentences", { a: lead, b: t("connectFlow.done.asks", { count: asks }) }) : lead;
 }
 
 /** What changed in the GitHub organizations we reach since `before`, in a sentence; it says so when nothing did. */

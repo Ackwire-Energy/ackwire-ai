@@ -11162,6 +11162,7 @@
       "title": "{{name}} terhubung",
       "everyone": "Semua agen bisa memakainya.",
       "waiting": "Agen baru mendapat alat-alatnya setelah kamu melanjutkan, dengan level yang kami sarankan.",
+      "asks_other": "{{count}} tindakan meminta persetujuan di chat.",
       "adjust": "Sesuaikan",
       "ok": "Selesai"
     }

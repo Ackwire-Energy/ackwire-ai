@@ -11576,6 +11576,8 @@
       "title": "{{name}} verbunden",
       "everyone": "Jeder Agent kann ihn nutzen.",
       "waiting": "Agenten bekommen die Tools erst, wenn du fortfährst, mit den Stufen, die wir vorschlagen.",
+      "asks_one": "{{count}} Aktion fragt im Chat nach Freigabe.",
+      "asks_other": "{{count}} Aktionen fragen im Chat nach Freigabe.",
       "adjust": "Anpassen",
       "ok": "Fertig"
     }

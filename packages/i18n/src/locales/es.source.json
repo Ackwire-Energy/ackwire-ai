@@ -28054,6 +28054,12 @@
   "connectFlow.done.waiting": {
     "value": "Agents get the tools only when you continue, at the levels we suggest."
   },
+  "connectFlow.done.asks": {
+    "value": {
+      "one": "{{count}} action asks for approval in the chat.",
+      "other": "{{count}} actions ask for approval in the chat."
+    }
+  },
   "connectFlow.done.adjust": {
     "value": "Adjust"
   },

@@ -12446,6 +12446,10 @@
       "title": "Połączono z {{name}}",
       "everyone": "Każdy agent może z niego korzystać.",
       "waiting": "Agenci dostaną narzędzia dopiero, gdy przejdziesz dalej, na poziomach, które sugerujemy.",
+      "asks_one": "{{count}} akcja prosi o zatwierdzenie na czacie.",
+      "asks_few": "{{count}} akcje proszą o zatwierdzenie na czacie.",
+      "asks_many": "{{count}} akcji prosi o zatwierdzenie na czacie.",
+      "asks_other": "{{count}} akcji prosi o zatwierdzenie na czacie.",
       "adjust": "Dostosuj",
       "ok": "Gotowe"
     }

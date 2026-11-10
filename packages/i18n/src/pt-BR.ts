@@ -11510,6 +11510,8 @@ export const ptBR = {
       everyone: "Todos os agentes podem usar.",
       /** A server by address whose tools no one gave a level yet: "Continuar" saves the ones we suggest. */
       waiting: "Os agentes só recebem as ferramentas quando você continuar, nos níveis que sugerimos.",
+      asks_one: "{{count}} ação pede aprovação no chat.",
+      asks_other: "{{count}} ações pedem aprovação no chat.",
       adjust: "Ajustar",
       ok: "Pronto",
     },

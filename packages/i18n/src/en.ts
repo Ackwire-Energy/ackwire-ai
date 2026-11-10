@@ -11431,6 +11431,8 @@ export const en = {
       everyone: "Every agent can use it.",
       /** A server by address whose tools no one gave a level yet: "Continue" saves the ones we suggest. */
       waiting: "Agents get the tools only when you continue, at the levels we suggest.",
+      asks_one: "{{count}} action asks for approval in the chat.",
+      asks_other: "{{count}} actions ask for approval in the chat.",
       adjust: "Adjust",
       ok: "Done",
     },

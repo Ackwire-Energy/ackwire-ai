@@ -11639,6 +11639,8 @@
       "title": "{{name}} gekoppeld",
       "everyone": "Elke agent kan het gebruiken.",
       "waiting": "Agents krijgen de tools pas als je doorgaat, op de niveaus die wij voorstellen.",
+      "asks_one": "{{count}} actie vraagt om goedkeuring in de chat.",
+      "asks_other": "{{count}} acties vragen om goedkeuring in de chat.",
       "adjust": "Aanpassen",
       "ok": "Klaar"
     }

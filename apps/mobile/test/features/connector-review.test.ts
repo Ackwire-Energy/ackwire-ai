@@ -106,21 +106,21 @@ describe("where the sheet is", () => {
       });
     expect([0, 1, 2].map((n) => ours(n)?.text)).toEqual([
       "Todos os agentes podem usar.",
-      "Todos os agentes podem usar. 1 ação sempre pede aprovação no chat.",
-      "Todos os agentes podem usar. 2 ações sempre pedem aprovação no chat.",
+      "Todos os agentes podem usar. 1 ação pede aprovação no chat.",
+      "Todos os agentes podem usar. 2 ações pedem aprovação no chat.",
     ]);
     expect(ours(1)?.waiting).toBeNull();
     // A server by address no one gave levels yet: Continuar is what gives agents its tools.
     const fresh = server(TOOLS);
     expect(doneSummary(t, { kind: "server", server: fresh })).toEqual({
-      text: "Os agentes só recebem as ferramentas quando você continuar, nos níveis que sugerimos. 1 ação sempre pede aprovação no chat.",
+      text: "Os agentes só recebem as ferramentas quando você continuar, nos níveis que sugerimos. 1 ação pede aprovação no chat.",
       waiting: fresh,
       unreadable: null,
     });
     // Its levels saved (a one-click server comes so): nothing waits.
     const saved = server(TOOLS.map((x) => ({ ...x, access: x.level ?? "approval" })));
     expect(doneSummary(t, { kind: "server", server: saved })).toEqual({
-      text: "Todos os agentes podem usar. 1 ação sempre pede aprovação no chat.",
+      text: "Todos os agentes podem usar. 1 ação pede aprovação no chat.",
       waiting: null,
       unreadable: null,
     });

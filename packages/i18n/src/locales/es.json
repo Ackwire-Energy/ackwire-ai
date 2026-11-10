@@ -11937,6 +11937,9 @@
       "title": "{{name}} conectado",
       "everyone": "Todos los agentes pueden usarlo.",
       "waiting": "Los agentes solo reciben las herramientas cuando continúes, con los niveles que sugerimos.",
+      "asks_one": "{{count}} acción pide aprobación en el chat.",
+      "asks_many": "{{count}} acciones piden aprobación en el chat.",
+      "asks_other": "{{count}} acciones piden aprobación en el chat.",
       "adjust": "Ajustar",
       "ok": "Listo"
     }
