@@ -30289,6 +30289,12 @@
   "errors.vault.source.tooManyItems": {
     "value": "The Vault is full. Remove items before syncing more."
   },
+  "errors.feedback.filesGone": {
+    "value": "A file you added is gone. Add it again."
+  },
+  "errors.feedback.filesPending": {
+    "value": "Too many files are waiting to be sent. Send or remove some, then try again."
+  },
   "machines.reasons.browser_unsupported": {
     "value": "The agent browser doesn't run on this computer's system."
   },

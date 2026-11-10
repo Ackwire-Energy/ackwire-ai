@@ -12102,6 +12102,10 @@
         "invalidInput": "请检查各字段后重试。",
         "tooManyItems": "Vault 已满。请先删除项目，再同步更多。"
       }
+    },
+    "feedback": {
+      "filesGone": "你添加的文件已经不在了。请重新添加。",
+      "filesPending": "等待发送的文件太多。请先发送或移除一些，然后重试。"
     }
   },
   "machines": {
