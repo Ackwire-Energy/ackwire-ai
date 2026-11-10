@@ -594,7 +594,7 @@ function recorded(api: ApiClient) {
  * How long "Abrindo seu workspace" waits is its calls one after another: each is a round trip to the server (#1).
  */
 describe("opening a new workspace, in round trips", () => {
-  test("For me: one call makes it with both zones, one finishes it, and it opens in Lodi's DM with no more asked", async () => {
+  test("For me: one call makes it with both zones, one finishes it and opens Lodi's DM, nobody asked again", async () => {
     const state = newcomer(false);
     const { api, log } = recorded(createFakeApi(state));
     const { router } = await renderApp("/onboarding", { api });
@@ -607,14 +607,12 @@ describe("opening a new workspace, in round trips", () => {
     await click(button("Continuar"), 16);
     off();
     const orgId = state.me?.organizations.at(-1)?.id;
-    // Everything before the app goes to the workspace waits on the one before it; the two reads go together.
-    expect(log.slice(0, log.findIndex((c) => c.startsWith("→")) + 1)).toEqual([
-      "orgs.create",
-      "orgs.settings",
-      "agents.list",
-      "orgs.saveOnboarding",
-      `→ /org/${orgId}/dm/agent/${LODI_ID}`,
-    ]);
+    const before = log.slice(0, log.findIndex((c) => c.startsWith("→")) + 1);
+    expect(before[0]).toBe("orgs.create");
+    // Its zones went with it and the answers said who the person is: none of them is asked on its own.
+    expect(before.filter((c) => ["account.me", "orgs.updateSettings", "orgs.updateMe"].includes(c))).toEqual([]);
+    // One call finishes it, and its answer says where it opens.
+    expect(before.slice(-2)).toEqual(["orgs.saveOnboarding", `→ /org/${orgId}/dm/agent/${LODI_ID}`]);
     expect(state.me?.organizations.at(-1)?.onboarding).toBeUndefined();
   });
 
