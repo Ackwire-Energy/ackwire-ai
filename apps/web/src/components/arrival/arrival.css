@@ -98,9 +98,11 @@
   height: 6px;
   background: #ffffff40;
 }
-.team-scene__trail[data-state="walk"] i {
-  animation: team-walk 1.1s steps(1) infinite;
-  animation-delay: calc(var(--n) * 0.14s);
+@media (prefers-reduced-motion: no-preference) {
+  .team-scene__trail[data-state="walk"] i {
+    animation: team-walk 1.1s steps(1) infinite;
+    animation-delay: calc(var(--n) * 0.14s);
+  }
 }
 .team-scene__trail[data-state="done"] i {
   background: #fff;
@@ -164,16 +166,11 @@
   text-wrap: pretty;
 }
 .arrival .ac-dialog__foot-note {
-  display: flex;
-  gap: 6px;
-  align-items: flex-start;
   line-height: 18px;
 }
-.arrival .ac-dialog__foot-note > .ac-icon {
-  flex: none;
+.arrival .ac-dialog__foot-note .ac-icon {
   width: 16px;
   height: 16px;
-  margin-top: 1px;
   color: var(--faint);
 }
 
@@ -200,15 +197,11 @@
   padding: 6px 0 4px;
   list-style: none;
 }
+/* An `.ac-iconline`: the icon on the title's line, never centered against the two lines. */
 .arrival-points li {
-  display: grid;
-  grid-template-columns: 20px minmax(0, 1fr);
   gap: 12px;
-  align-items: start;
 }
-/* The icon on the title's line, never centered against the two lines. */
 .arrival-points .ac-icon {
-  margin-top: 1px;
   color: var(--muted);
 }
 .arrival-points b {
