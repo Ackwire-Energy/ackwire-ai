@@ -215,9 +215,10 @@ export const customTools = pgTable(
 );
 
 /**
- * An MCP tool's description and input schema as first listed (ADR 0117): the model sees these, not what the server
- * says later, until an admin accepts a change. `pending_*`: the server's newer version, kept from its first listing
- * (`changed_at`) and replaced if it changes again. Composio's tools and the ones we serve are never pinned.
+ * An MCP tool's description and input schema as last listed (ADR 0117): a listing that differs is a change, which
+ * applies itself, moves the pin and goes to the audit log. `pending_*` and `changed_at` are no longer written: a
+ * row that still has them is settled by its connection's next listing. Composio's tools and the ones we serve are
+ * never pinned.
  */
 export const connectorToolPins = pgTable(
   "connector_tool_pins",

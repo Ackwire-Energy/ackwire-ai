@@ -356,7 +356,18 @@ export function Loaded({ children }: { children: ReactNode }) {
   return <Animated.View entering={reducedMotion ? undefined : LOADED_IN}>{children}</Animated.View>;
 }
 
+/** A screen's one action, pinned under its scroll over the home indicator: always at hand, however long the list. */
+export function BottomBar({ bottom, children }: { bottom: number; children: ReactNode }) {
+  const c = useColors();
+  return (
+    <View style={[styles.bar, { paddingBottom: bottom + 10, backgroundColor: c.grouped, borderTopColor: c.line2 }]}>
+      {children}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  bar: { paddingHorizontal: 16, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth },
   tile: { alignItems: "center", justifyContent: "center" },
   action: {
     flexDirection: "row",

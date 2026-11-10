@@ -263,7 +263,7 @@ function ComputerView({ agentId, onLeave }: { agentId: string; onLeave: (held: B
       );
     }
   } else if (stage === "joining") {
-    // The workspace's computer is ready and this agent gets it at its first hello: a moment more.
+    // The workspace's computer is ready and this agent gets it at its first hello, or it wakes: a moment more.
     body = <Cover sky spinner color={agentLook(agent).color} text={t("agentComputer.state.opening", g)} />;
   } else if (stage === "noComputer") {
     sub = t("agentComputer.status.noComputer");

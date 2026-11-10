@@ -922,7 +922,6 @@
       "plan_lent_other": "{{names}} menghubungkan paket {{plan}} kamu ke {{agent}}",
       "plan_lent_female_other": "{{names}} menghubungkan paket {{plan}} kamu ke {{agent}}",
       "plan_model_dropped_other": "{{model}} keluar dari {{plan}}. {{names}} memakai {{runs}} untuk sementara",
-      "connector_tool_changed_other": "Server yang terhubung mengubah alat yang kamu setujui",
       "computer_disk_full_other": "Disk komputer hampir penuh",
       "computer_no_chrome_other": "Komputer memerlukan Google Chrome. Unduh di google.com/chrome",
       "app_created_other": "Aplikasi AI membuat sesuatu untukmu"
@@ -1377,15 +1376,11 @@
       "browser": "Browser",
       "secret": "Rahasia",
       "join": "Anggota",
-      "tools": "Alat",
       "limit": "Batas"
     },
     "review": "Tinjau",
     "answer": "Balas",
     "open": "Buka",
-    "toolsTitle": "Mengubah alat yang kamu setujui",
-    "toolsWhy": "Agen tetap memakai versi yang disetujui sampai kamu menerima yang baru.",
-    "reviewChanges": "Tinjau perubahannya",
     "clear": {
       "title": "Tidak ada yang menunggumu",
       "text": "Saat agen membutuhkanmu, itu muncul di sini lebih dulu."

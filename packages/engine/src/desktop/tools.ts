@@ -12,7 +12,7 @@ import { handedBackSince, markPageRead, requirePageRead, waitIfPersonInControl }
 import { agentFolderPath, MAX_PAGE_TEXT, MAX_PLAN_STEPS } from "../browser/tools";
 import { DESKTOP_SCOPE, DESKTOP_TOOL_INFO } from "../browser/types";
 import type { Judge } from "../judge";
-import { type MachineCaller, MachineRequestError } from "../machine-hub";
+import { callWhenBack, type MachineCaller, MachineRequestError } from "../machine-hub";
 import { MachineOfflineError, MachinePausedError } from "../machines";
 import { getSandboxSettings, SANDBOX_SCOPE } from "../sandbox";
 import {
@@ -298,9 +298,10 @@ export function createDesktopToolSource(deps: DesktopToolDeps): ToolSource {
     };
     const { machineId, machineName } = status;
     const options = { signal: ctx.signal };
+    // A computer just gone or asleep in standby is waited for, as the browser's and the sandbox's calls do (ADR 0161).
     const told = async <T>(call: () => Promise<T>) => {
       try {
-        return await call();
+        return await callWhenBack(caller, machineId, call, ctx.signal);
       } catch (error) {
         throw new Error(explain(error, machineName));
       }

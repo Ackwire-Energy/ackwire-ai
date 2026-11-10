@@ -29,7 +29,7 @@ export interface AgentComputerFacts {
   /** The workspace's own computer (the Cloud's), else null. */
   setup: SetupView | null;
   /** The computer the agent works on, from the computers list; null: none. */
-  machine: Pick<Machine, "name" | "online" | "lastSeenAt" | "paused" | "desktopUse"> | null;
+  machine: Pick<Machine, "name" | "online" | "standby" | "lastSeenAt" | "paused" | "desktopUse"> | null;
   /** Its screen as `GET …/desktop` says it; null while unknown. */
   desktop:
     | (Pick<DesktopStatus, "available" | "reason"> & Partial<Pick<DesktopStatus, "canControl" | "handoff">>)
@@ -110,7 +110,8 @@ export const asksMe = (h: BrowserHandoff, userId: string) =>
 /**
  * The entry's state. A hold wins over everything: a workspace on hold isn't listed to its provisioner, so a
  * countdown would freeze, then read late. Then the wait, the computer's own trouble, the people on it, the
- * agent at work, and why nothing can be shown.
+ * agent at work, and why nothing can be shown. Asleep in standby (ADR 0161) is no trouble: it shows nothing until
+ * it wakes, and reads as available.
  */
 export function entryState(f: AgentComputerFacts, nowMs = Date.now()): EntryState {
   if (f.held) return { kind: "held" };
@@ -119,7 +120,8 @@ export function entryState(f: AgentComputerFacts, nowMs = Date.now()): EntryStat
     if (f.setup.phase === "problem") return { kind: "problem" };
     return { kind: "preparing", eta: setupEta(f.setup, nowMs) };
   }
-  if (f.machine && !f.machine.online) return { kind: "offline" };
+  const asleep = f.machine !== null && !f.machine.online && f.machine.standby === true;
+  if (f.machine && !f.machine.online && !asleep) return { kind: "offline" };
   if (f.edition === "selfhost" && f.machine && isPaused(f.machine, nowMs)) {
     return { kind: "paused", until: f.machine.paused?.until ?? null };
   }
@@ -135,7 +137,9 @@ export function entryState(f: AgentComputerFacts, nowMs = Date.now()): EntryStat
   if (f.working) return { kind: "working" };
   const neither = f.desktop?.reason === "no_desktop" && !f.browserGranted;
   const shown = f.desktop?.available === true || f.browser;
-  if (!shown && !neither && (f.machine || f.edition === "cloud")) return { kind: "unavailable", cause: cantShow(f) };
+  if (!shown && !neither && !asleep && (f.machine || f.edition === "cloud")) {
+    return { kind: "unavailable", cause: cantShow(f) };
+  }
   if (neither) {
     const screens = f.edition === "cloud" || f.machine?.desktopUse?.available !== false;
     return { kind: screens ? "noScreen" : "noBrowser" };

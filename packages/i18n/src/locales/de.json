@@ -4150,7 +4150,6 @@
       "browser": "Browser",
       "members": "Mitglieder",
       "usage": "Nutzung",
-      "connectors": "Konnektoren",
       "dashboard": "Dashboard"
     },
     "reactions_one": "{{count}} Reaktion",
@@ -11145,34 +11144,6 @@
       "usageNoLimit": "Composio: {{calls}} Aufrufe im {{month}}",
       "limitNotice": "Dieser Workspace hat seine Composio-Aufrufe für diesen Monat aufgebraucht",
       "disconnectNote": "Composio vergisst das Konto. Um auch den Zugriff in {{name}} zu entfernen, entferne Composio dort in deinen Kontoeinstellungen."
-    },
-    "toolChanges": {
-      "title": "Geänderte Tools",
-      "intro": "Diese Server haben geändert, was ein Tool sagt oder verlangt. Agenten behalten die freigegebene Version, bis du die neue akzeptierst.",
-      "count_one": "{{count}} Tool geändert",
-      "count_other": "{{count}} Tools geändert",
-      "acceptAll": "Alle akzeptieren",
-      "acceptedAll": "Tools von {{name}} aktualisiert.",
-      "show": "Änderung ansehen",
-      "hide": "Ausblenden",
-      "showAll": "Alle anzeigen ({{total}})",
-      "textChanged": "Der Text hat sich geändert",
-      "fieldsChanged_one": "{{count}} Feld geändert",
-      "fieldsChanged_other": "{{count}} Felder geändert",
-      "inputChanged": "Die Eingabe hat sich geändert",
-      "description": "Text",
-      "input": "Eingabe",
-      "field": {
-        "added": "neu",
-        "removed": "entfernt",
-        "changed": "geändert"
-      },
-      "added": "Hinzugefügt",
-      "removed": "Entfernt",
-      "accept": "Akzeptieren",
-      "acceptOne": "{{tool}} akzeptieren",
-      "accepted": "{{tool}} aktualisiert.",
-      "notice": "{{name}} hat Tools geändert, die du freigegeben hast"
     },
     "names": {
       "atlassian": "Atlassian (Jira und Confluence)",
