@@ -74,6 +74,7 @@ import {
   meterComposio,
   moveIssueComments,
   publicHttpsFetch,
+  queueEmbeddingBackfill,
   relayCredentials,
   resolveHostDns,
   retireHostTokens,
@@ -397,6 +398,21 @@ async function boot(
       if (widened > 0) log.info("how-tos out of agents' DMs", { widened });
     })
     .catch((error: unknown) => log.warn("memory backfill failed", { error: String(error) }));
+  // Off the boot path (ADR 0167): what this model hasn't embedded yet gets its vectors, a reindex per workspace.
+  const vectors = engine.embeddings;
+  if (config.EMBEDDINGS_PROVIDER !== "none" && !vectors) {
+    const missing = config.EMBEDDINGS_PROVIDER === "voyage" ? "VOYAGE_API_KEY" : "EMBEDDINGS_URL";
+    log.warn("search goes on words alone", {
+      because: `EMBEDDINGS_PROVIDER=${config.EMBEDDINGS_PROVIDER} needs ${missing}`,
+    });
+  }
+  if (vectors?.kinds) {
+    void queueEmbeddingBackfill(database.db, { model: vectors.provider.model, kinds: vectors.kinds })
+      .then((queued) => {
+        if (queued > 0) log.info("embeddings backfill queued", { workspaces: queued, model: vectors.provider.model });
+      })
+      .catch((error: unknown) => log.warn("embeddings backfill failed", { error: String(error) }));
+  }
   // Off the boot path: tasks' comments from before their conversations move into them once (ADR 0145).
   void moveIssueComments(database.db)
     .then((moved) => {
