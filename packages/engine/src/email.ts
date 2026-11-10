@@ -16,6 +16,7 @@ import {
 } from "@agenteschat/db";
 import { formatMoneyUsd } from "@agenteschat/i18n/format";
 import { appLocale, localeInfo } from "@agenteschat/i18n/locale";
+import { deepMerge } from "@agenteschat/i18n/tree";
 import { nanoUsdToUsd } from "@agenteschat/providers";
 import { z } from "zod";
 import { notifiedIds } from "./approvals";
@@ -43,6 +44,7 @@ import { enqueue, PermanentJobError } from "./outbox";
 import { billingHold } from "./standing";
 import { isAgentesCloud } from "./telemetry";
 import { budgetPercent } from "./usage";
+import { isPersonalWorkspace } from "./workspace-mode";
 
 export { EMAIL_DARK_HEAD, EMAIL_PICTURES, type EmailArt, type EmailLocale } from "./email/layout";
 
@@ -82,6 +84,8 @@ export type EmailTemplate =
       role: string;
       /** The inviter's words (ADR 0090), made inert in the body. */
       note?: string | null;
+      /** A personal workspace's email (ADR 0159), stamped when queued (`modeStamp`); absent: a team's. */
+      personal?: true;
     }
   | { kind: "password_reset"; locale?: EmailLocale; url: string }
   /** Someone invited you to an event (in-app too). `when` is already formatted in your time zone and language. */
@@ -94,12 +98,13 @@ export type EmailTemplate =
       title: string;
       when: string;
       url: string;
+      personal?: true;
     }
   /**
    * Someone opened an expired email invitation and asked for a new one. `email` is empty only in jobs queued
    * from an invitation link before links asked to join instead.
    */
-  | { kind: "invite_request"; locale?: EmailLocale; orgName: string; email: string; url: string }
+  | { kind: "invite_request"; locale?: EmailLocale; orgName: string; email: string; url: string; personal?: true }
   /**
    * Someone asks to join through the workspace's invitation link (ADR 0068), to its owners and admins at most
    * once an hour. Approve and Deny open the request in the app: a link in an email never acts by itself, because
@@ -113,6 +118,7 @@ export type EmailTemplate =
       email: string;
       url: string;
       denyUrl: string;
+      personal?: true;
     }
   /**
    * The answer to a request to join (ADR 0068), to the address that asked: in (`url` the workspace), approved
@@ -130,6 +136,7 @@ export type EmailTemplate =
       reason?: string | null;
       /** In or invited: the workspace's agents, pictured over the headline (`emailCrew`); none: the onboarding's own. */
       crew?: Look[];
+      personal?: true;
     }
   | { kind: "verify_email"; locale?: EmailLocale; url: string }
   /**
@@ -137,7 +144,7 @@ export type EmailTemplate =
    * button: the page is already open. `url` is the server's own address, for the pictures. Its outbox row is
    * deleted once it can't be sent again (`email.send`), since it holds the code and the address.
    */
-  | { kind: "join_code"; locale?: EmailLocale; orgName: string; code: string; url: string }
+  | { kind: "join_code"; locale?: EmailLocale; orgName: string; code: string; url: string; personal?: true }
   /**
    * A code to type before deleting (ADR 0088 §2): the workspace `orgName`, or without it the account `email`. No
    * button: the dialog is already open. `support`: whom to write to if it wasn't them, as `account_deleted`'s. Its
@@ -151,6 +158,8 @@ export type EmailTemplate =
       orgName?: string;
       support: string | null;
       url: string;
+      /** With `orgName`: a personal workspace's (ADR 0159). */
+      personal?: true;
     }
   /**
    * Double opt-in for the landing page's waiting list, in the language they
@@ -176,6 +185,7 @@ export type EmailTemplate =
       /** Share of the budget used (owners who aren't admins never see money). */
       percent: number;
       url: string;
+      personal?: true;
     }
   | {
       kind: "approval_digest";
@@ -186,6 +196,7 @@ export type EmailTemplate =
       url: string;
       /** `APPROVAL_REMINDER_HOURS` when it was queued: the footer says how often it comes. */
       afterHours?: number;
+      personal?: true;
     }
   /**
    * An owner deleted a workspace the reader is in, one email per member: it's closed now and goes for good at `dueAt`
@@ -201,9 +212,10 @@ export type EmailTemplate =
       timeZone: string;
       owner: boolean;
       url: string;
+      personal?: true;
     }
   /** An owner restored a workspace that was being deleted, one email per member. */
-  | { kind: "workspace_restored"; locale: EmailLocale; orgName: string; byName: string; url: string }
+  | { kind: "workspace_restored"; locale: EmailLocale; orgName: string; byName: string; url: string; personal?: true }
   /**
    * Someone else let more people talk to an agent that thinks with the reader's plan (ADR 0059 §5), to the plan's
    * owner. `plan`: its maker's name ("Claude"). `was`/`now`: who could talk to it, names resolved (the reader aside).
@@ -219,6 +231,7 @@ export type EmailTemplate =
       was: PlanAudience;
       now: PlanAudience;
       url: string;
+      personal?: true;
     }
   /**
    * Someone gave an agent the reader's plan though it isn't theirs (`use_others_plans`, ADR 0059 §3), to the plan's
@@ -232,6 +245,7 @@ export type EmailTemplate =
       agentName: string;
       plan: string;
       url: string;
+      personal?: true;
     }
   /** A team or a kept message waits for the workspace's first plan (ADR 0079 §6), to whoever can pay. */
   | {
@@ -243,9 +257,10 @@ export type EmailTemplate =
       routines: number;
       crew?: Look[];
       url: string;
+      personal?: true;
     }
   /** An AI app or a personal token got access to the person's account in a workspace (ADR 0119), to that person. */
-  | { kind: "app_connected"; locale: EmailLocale; appName: string; orgName: string; url: string }
+  | { kind: "app_connected"; locale: EmailLocale; appName: string; orgName: string; url: string; personal?: true }
   /**
    * The account `email` was deleted. `orgNames`: the workspaces only they were in, which closed with it and go for
    * good at `dueAt` (ISO, shown in `timeZone`). `support`: whom to write to if it wasn't them (`SUPPORT_EMAIL`), else
@@ -291,6 +306,7 @@ export type EmailTemplate =
       url: string;
       /** A message kept on a billing hold: the conversation it waits in, which the AI step opens instead. */
       keptUrl?: string;
+      personal?: true;
     }
   /**
    * The daily stall-and-noise report to the people who run the server (`OPS_REPORT_EMAIL`, `autonomy-report.ts`):
@@ -382,6 +398,21 @@ const JOIN_NAME_SHOWN = 60;
 const JOIN_REASON_SHOWN = 300;
 
 /**
+ * The template's stamp for a personal workspace (ADR 0159), spread into it where it is queued: the mode it had then
+ * decides the words, since a job may run after the workspace is gone (or queued with no `orgId`). Only the words
+ * change: the same emails go to the same people at the same moments.
+ */
+export const modeStamp = async (db: Executor, orgId: string): Promise<{ personal?: true }> =>
+  (await isPersonalWorkspace(db, orgId)) ? { personal: true } : {};
+
+/**
+ * A word group as the email says it: a personal workspace's own words (its `personal`) over the team's. A job with no
+ * stamp, every one queued before the mode existed among them, reads as a team's.
+ */
+const inMode = <G extends { personal: object }>(group: G, personal: boolean | undefined): G =>
+  personal ? deepMerge(group, group.personal) : group;
+
+/**
  * One email's content: our words in the subject, preheader, headline and buttons; what people typed or
  * agents wrote only in the body, made inert. `sender`: the self-hosted server's host, or null on agentes.chat.
  */
@@ -427,7 +458,7 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
       );
     }
     case "invitation": {
-      const c = w.invitation;
+      const c = inMode(w.invitation, t.personal);
       const org = inertText(t.orgName);
       const role = w.role[t.role] ?? inertText(t.role);
       return doc(
@@ -449,7 +480,7 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
       );
     }
     case "invite_request": {
-      const c = w.inviteRequest;
+      const c = inMode(w.inviteRequest, t.personal);
       const org = inertText(t.orgName);
       return doc(
         c.subject,
@@ -460,7 +491,7 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
       );
     }
     case "calendar_invite": {
-      const c = w.calendar;
+      const c = inMode(w.calendar, t.personal);
       const org = inertText(t.orgName);
       return doc(
         c.subject,
@@ -525,7 +556,7 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
       );
     }
     case "budget": {
-      const c = w.budget;
+      const c = inMode(w.budget, t.personal);
       const org = inertText(t.orgName);
       return doc(
         c.subject[t.level],
@@ -548,7 +579,7 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
       );
     }
     case "approval_digest": {
-      const c = w.digest;
+      const c = inMode(w.digest, t.personal);
       const org = inertText(t.orgName);
       const n = t.items.length;
       const shown = t.items.slice(0, 10);
@@ -572,7 +603,7 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
       );
     }
     case "computer_ready": {
-      const c = w.ready;
+      const c = inMode(w.ready, t.personal);
       const org = inertText(t.orgName);
       // A plan signs in for an agent, so with no agent the first step is making one.
       const first = !t.hasAgents ? "create" : t.needsAi ? "ai" : "task";
@@ -611,7 +642,7 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
       );
     }
     case "join_request": {
-      const c = w.joinRequest;
+      const c = inMode(w.joinRequest, t.personal);
       const org = inertText(t.orgName);
       // The address proved itself with a code (ADR 0072), so it is a mailto link, which copies whole. Only an address
       // the ask route would accept (`z.email()`): its characters stand as they are in a mailto URL. Anything else
@@ -632,7 +663,7 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
       );
     }
     case "join_answer": {
-      const a = w.joinAnswer;
+      const a = inMode(w.joinAnswer, t.personal);
       const org = inertText(t.orgName);
       const who = inertText(t.approverName ?? "") || a.someone;
       const url = t.url ?? "";
@@ -673,7 +704,7 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
       );
     }
     case "join_code": {
-      const c = w.joinCode;
+      const c = inMode(w.joinCode, t.personal);
       const org = inertText(t.orgName);
       return doc(
         c.subject(t.code),
@@ -684,7 +715,7 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
       );
     }
     case "deletion_code": {
-      const c = w.deletionCode;
+      const c = inMode(w.deletionCode, t.personal);
       const org = t.orgName === undefined ? null : inertText(t.orgName);
       return doc(
         org === null ? c.subjectAccount(t.code) : c.subjectWorkspace(t.code),
@@ -742,7 +773,7 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
       );
     }
     case "workspace_deleting": {
-      const c = w.deleting;
+      const c = inMode(w.deleting, t.personal);
       const org = inertText(t.orgName);
       const { day, time } = dayAndTime(new Date(t.dueAt), t.timeZone, lang);
       return doc(
@@ -757,7 +788,7 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
       );
     }
     case "workspace_restored": {
-      const c = w.restored;
+      const c = inMode(w.restored, t.personal);
       const org = inertText(t.orgName);
       return doc(
         c.subject,
@@ -768,7 +799,7 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
       );
     }
     case "app_connected": {
-      const c = w.appConnected;
+      const c = inMode(w.appConnected, t.personal);
       const org = inertText(t.orgName);
       return doc(
         c.subject,
@@ -779,7 +810,7 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
       );
     }
     case "plan_opened": {
-      const c = w.planOpened;
+      const c = inMode(w.planOpened, t.personal);
       const who = (a: PlanAudience): Text =>
         a.mode === "everyone"
           ? c.everyone
@@ -807,7 +838,7 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
       );
     }
     case "plan_lent": {
-      const c = w.planLent;
+      const c = inMode(w.planLent, t.personal);
       const by = inertText(t.byName) || w.someone;
       return doc(
         c.subject(t.plan),
@@ -829,7 +860,7 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
       );
     }
     case "plan_waiting": {
-      const c = w.planWaiting;
+      const c = inMode(w.planWaiting, t.personal);
       const org = inertText(t.orgName);
       return doc(
         c.subject,
@@ -1009,6 +1040,7 @@ export async function sendPlanWaitingEmail(db: Database, publicUrl: string, orgI
       .where(and(eq(schema.routines.orgId, orgId), isNull(schema.routines.deletedAt))),
     emailCrew(db, orgId),
   ]);
+  const mode = await modeStamp(db, orgId);
   const groups = emailsByLocale(
     people.map((p) => ({ email: p.email, locale: emailLocale(p.locale) })),
     `plan-waiting:${orgId}:${String(step)}`,
@@ -1027,6 +1059,7 @@ export async function sendPlanWaitingEmail(db: Database, publicUrl: string, orgI
         routines: routineCount?.n ?? 0,
         crew,
         url: `${publicUrl.replace(/\/$/, "")}/org/${orgId}/settings/billing`,
+        ...mode,
       },
     });
   }
@@ -1081,6 +1114,7 @@ export async function queueBudgetEmail(
   if (recipients.length === 0 || !org) return;
   const [look] = await db.select({ appearance: agents.appearance }).from(agents).where(eq(agents.id, e.agent.id));
   const month = new Date().toISOString().slice(0, 7);
+  const mode = await modeStamp(db, e.agent.orgId);
   const groups = emailsByLocale(
     recipients.map((r) => ({ email: r.email, locale: emailLocale(r.locale) })),
     `budget:${e.agent.id}:${month}:${e.level}`,
@@ -1099,6 +1133,7 @@ export async function queueBudgetEmail(
         orgName: org.name,
         percent: budgetPercent(e.spentNanoUsd, e.budgetNanoUsd),
         url: `${publicUrl.replace(/\/$/, "")}/org/${e.agent.orgId}/agents/${e.agent.id}?tab=settings&sec=budget`,
+        ...mode,
       },
     });
   }
@@ -1196,6 +1231,7 @@ export async function queuePlanOpenedEmail(
       was: audience(from),
       now: audience(to),
       url: `${publicUrl.replace(/\/$/, "")}/org/${orgId}/agents/${agentId}?tab=settings&sec=audience`,
+      ...(await modeStamp(db, orgId)),
     },
   });
 }
@@ -1273,6 +1309,7 @@ export async function queuePlanLent(
       agentName: row.name,
       plan,
       url: `${publicUrl.replace(/\/$/, "")}/org/${orgId}/notifications`,
+      ...(await modeStamp(db, orgId)),
     },
   });
 }
@@ -1304,6 +1341,7 @@ export async function queueApprovalDigests(db: Database, publicUrl: string, afte
   for (const orgId of new Set(due.map((a) => a.orgId))) {
     const mine = due.filter((a) => a.orgId === orgId);
     const [org] = await db.select({ name: organizations.name }).from(organizations).where(eq(organizations.id, orgId));
+    const mode = await modeStamp(db, orgId);
     const byUser = new Map<string, typeof mine>();
     for (const a of mine) for (const u of await notifiedIds(db, a)) byUser.set(u, [...(byUser.get(u) ?? []), a]);
     const people = new Map(
@@ -1340,6 +1378,7 @@ export async function queueApprovalDigests(db: Database, publicUrl: string, afte
             // One request: the button opens it.
             url: `${publicUrl.replace(/\/$/, "")}/org/${orgId}/approvals${items.length === 1 ? `?open=${items[0]?.id}` : ""}`,
             afterHours,
+            ...mode,
           },
         });
         queued++;
@@ -1418,6 +1457,7 @@ export async function queueInvitationEmail(
       url: input.secret ? invitationMailLink(input.secret, input.invitationId, input.url) : input.url,
       role: input.role,
       note: invitation?.note ?? null,
+      ...(await modeStamp(db, input.orgId)),
     },
   });
 }

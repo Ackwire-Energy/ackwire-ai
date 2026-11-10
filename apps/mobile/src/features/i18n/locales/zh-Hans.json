@@ -126,6 +126,7 @@
     "refuseTitle": "拒绝请求",
     "refuseAsk": "拒绝请求？",
     "leaves": "会发到公司外部",
+    "leavesPersonal": "会发到你的工作区外部",
     "refuseWhyF": "{{name}} 会从原因中学习。可选。",
     "refuseWhyM": "{{name}} 会从原因中学习。可选。",
     "sheet": {
@@ -161,6 +162,7 @@
       "irreversible": "无法撤销",
       "reversible": "可以撤销",
       "external": "会发到公司外部",
+      "externalPersonal": "会发到你的工作区外部",
       "unsent": "不会发送任何内容",
       "deletable": "可以删除"
     },
@@ -229,6 +231,9 @@
     "newChannelHint": "用于团队或话题",
     "channelPlaceholder": "频道名称，例如 marketing",
     "createChannel": "创建频道",
+    "newChannelHintPersonal": "围绕一个话题，和多个智能体一起",
+    "channelPlaceholderPersonal": "名称，例如 旅行",
+    "createChannelPersonal": "创建群组对话",
     "waitIn": "在 {{where}}",
     "workingNowLine_other": "{{count}} 个智能体正在工作",
     "nobodyWorking": "目前没有智能体在工作",
@@ -238,6 +243,7 @@
       "unmute": "取消静音"
     },
     "firstRunLine": "{{name}} 正在组建团队 · {{done}}/{{total}}",
+    "firstRunLinePersonal": "{{name}} 正在准备你的智能体 · {{done}}/{{total}}",
     "first": {
       "title": "从你的第一个智能体开始",
       "subtitle": "给它起个名字，说明它做什么。它会以聊天的形式出现在这里。",
@@ -266,6 +272,8 @@
     "chat": "和…聊天",
     "name": "名称",
     "channelFine": "用于团队或话题。",
+    "channelPersonal": "群组对话",
+    "channelFinePersonal": "围绕一个话题，和多个智能体一起。",
     "chatSearch": "搜索成员或智能体",
     "to": "发给：",
     "people": "成员",
@@ -278,6 +286,7 @@
     "routineHint": "智能体按计划自行完成",
     "wikiPage": "Wiki 页面",
     "wikiHint": "供团队和智能体阅读",
+    "wikiHintPersonal": "供你的智能体阅读",
     "inviteHint": "通过邮箱或链接",
     "agent": {
       "question": "它要做什么？"
@@ -445,12 +454,14 @@
       "arrived": "{{name}} 加入了团队",
       "meet": "你和 {{name}} 的第一次对话",
       "roleIntro": "你团队的{{role}}。用平常的话提问就行。",
+      "roleIntroPersonal": "为你服务的{{role}}。用平常的话提问就行。",
       "noIntro": "用平常的话说出你需要什么。",
       "firstTitle": "从这里开始",
       "sendHint": "点按发送",
       "hello": "{{person}}，你好！我是 {{name}}。",
       "helloNoName": "你好！我是 {{name}}。",
       "helloRole": "团队的{{role}}。",
+      "helloRolePersonal": "为你服务的{{role}}。",
       "helloAsk": "我们从哪里开始？",
       "now": "刚刚",
       "start": {
@@ -764,6 +775,7 @@
     "noGroupSection": "无部门",
     "workingSection": "工作中",
     "teamSection": "团队",
+    "teamSectionPersonal": "你的智能体",
     "managerQuiet": "没有进行中的事项",
     "state": {
       "waitsYou": "等你确认",
@@ -972,7 +984,9 @@
     "title": "我",
     "role": {
       "owner": "所有者",
-      "member": "成员"
+      "member": "成员",
+      "ownerPersonal": "你的个人工作区",
+      "memberPersonal": "与你共享的个人工作区"
     },
     "appearance": "外观",
     "notifications": "通知",
@@ -1701,6 +1715,9 @@
       "device_support": "Mac 正在为这台 iPhone 做准备",
       "helper_missing": "测试助手还没有设置好",
       "helper_expired": "测试助手需要续期",
+      "apple_account_missing": "Mac 上的 Xcode 需要登录 Apple 账户",
+      "team_limit": "从这台 iPhone 上删除一个你自己构建的 App",
+      "helper_untrusted": "在这台 iPhone 上信任测试助手",
       "booting": "正在启动",
       "no_driver": "Windows 需要这台手机的 USB 驱动",
       "os_too_old": "这台手机的系统太旧",
@@ -1816,8 +1833,12 @@
       "wifiText": "手机和电脑连接同一个 Wi-Fi",
       "cable": "改用数据线",
       "wifi1": "打开无线调试",
-      "wifi2": "从 {{host}} 配对",
-      "wifi2Text": "在 {{host}} 上的 Android Studio 中打开 Device Manager，然后选择 Pair Devices Using Wi-Fi。在这里的“无线调试”中扫描它显示的二维码。",
+      "wifi1Text": "勾选“一律允许通过此网络进行调试”，然后点按“允许”。",
+      "wifi2": "扫描电脑上的二维码",
+      "wifi2Text": "在 无线调试 › 使用二维码配对设备 中扫描。",
+      "wifi2Hint": "在电脑上的 agentes.chat 中打开 连接设备 › Android 手机 › 通过 Wi-Fi，然后选择 {{host}}。",
+      "codeHead": "使用配对码配对",
+      "codeNote": "在 无线调试 › 使用配对码配对设备 中查看。请分屏同时打开“设置”和 agentes.chat，让配对码一直显示在屏幕上。",
       "wifiNote": "重启后 Wi-Fi 连接可能会断开。数据线更可靠。",
       "done": "{{name}} 已连接",
       "openFailed": "这台手机没有打开那个界面。请在“设置”中找到它。"
@@ -1890,6 +1911,7 @@
     "loadFailed": "无法加载连接器。",
     "connectedCheck": "{{name}}，已连接",
     "adminsOnly": "只有 {{org}} 的管理员可以连接服务。请联系其中一位。",
+    "adminsOnlyPersonal": "只有管理这个工作区的人可以连接应用。请联系对方。",
     "canTitle": "智能体将能够",
     "asks": "{{text}} · 需要你审批",
     "connect": "连接",
@@ -2034,6 +2056,7 @@
     "zoneChange": "更改",
     "zoneTitle": "时区",
     "anotherTitle": "新工作区叫什么名字？",
+    "anotherPurpose": "新工作区用来做什么？",
     "anotherLead": "在 agentes.chat 上创建。你仍留在 {{org}}，随时可以切换。",
     "suggested": "根据你的 {{domain}} 邮箱，我建议用 {{org}}。",
     "create": "创建",
@@ -2424,7 +2447,11 @@
       "title": "组建你的智能体团队",
       "text": "每个智能体承担一个角色，直接在聊天中和你一起工作。",
       "viewerTitle": "智能体团队都在这里",
-      "viewerText": "工作区里能创建智能体的人添加第一个后，它会显示在这里。"
+      "viewerText": "工作区里能创建智能体的人添加第一个后，它会显示在这里。",
+      "titlePersonal": "让你自己的智能体来帮忙",
+      "textPersonal": "每个智能体为你负责一件事，直接在聊天中完成。",
+      "viewerTitlePersonal": "你的智能体都在这里",
+      "viewerTextPersonal": "这里能创建智能体的人添加第一个后，它会显示在这里。"
     },
     "agentsForYou": {
       "title": "你的智能体会显示在这里",
@@ -2434,13 +2461,20 @@
       "title": "团队创作的一切，都在一处",
       "text": "智能体和成员的报告、表格和文件都留在这里，方便查找。",
       "viewerTitle": "查找团队创作的内容",
-      "viewerText": "智能体和成员在聊天中创建的内容会显示在这里。"
+      "viewerText": "智能体和成员在聊天中创建的内容会显示在这里。",
+      "titlePersonal": "智能体创作的一切，都在一处",
+      "textPersonal": "你的智能体的报告、表格和文件都留在这里，方便查找。",
+      "viewerTitlePersonal": "查找你的智能体创作的内容",
+      "viewerTextPersonal": "智能体在你的聊天中创建的内容会显示在这里。"
     },
     "tasks": {
       "title": "把工作交给团队",
       "text": "为智能体或成员创建任务，并跟进到底。",
       "viewerTitle": "跟进团队的工作",
-      "viewerText": "有人创建第一个任务后，它就会显示在这里。"
+      "viewerText": "有人创建第一个任务后，它就会显示在这里。",
+      "titlePersonal": "把待办交给你的智能体",
+      "textPersonal": "为智能体创建任务，一直跟进到完成。",
+      "viewerTitlePersonal": "跟进你的智能体的工作"
     },
     "routines": {
       "title": "把重复的工作交给智能体",
@@ -2452,7 +2486,10 @@
       "title": "留下团队需要知道的内容",
       "text": "成员和智能体都会阅读这些页面，大家依据同样的信息工作。",
       "viewerTitle": "查阅团队的知识",
-      "viewerText": "能编辑 Wiki 的人写下第一页后，它会显示在这里。"
+      "viewerText": "能编辑 Wiki 的人写下第一页后，它会显示在这里。",
+      "titlePersonal": "记下智能体能读的笔记",
+      "textPersonal": "你的智能体会读这些页面，按你写的内容工作。",
+      "viewerTitlePersonal": "查看这里写了什么"
     },
     "memory": {
       "title": "智能体在工作中学习",
@@ -2475,13 +2512,21 @@
       "text": "每个频道聚集负责同一主题的人。",
       "viewerTitle": "团队的频道都在这里",
       "viewerText": "能创建频道的人开设第一个频道后，它会显示在这里。",
-      "action": "创建频道"
+      "action": "创建频道",
+      "titlePersonal": "同时和多个智能体交流",
+      "textPersonal": "每个群组对话都把同一话题的智能体和成员聚在一起。",
+      "viewerTitlePersonal": "群组对话都在这里",
+      "viewerTextPersonal": "能创建群组对话的人开启第一个后，它会显示在这里。"
     },
     "people": {
       "title": "在这里和团队一起工作",
       "text": "邀请成员，在一处和他们以及智能体交流。",
       "viewerTitle": "你的团队会显示在这里",
-      "viewerText": "能邀请成员的人把其他同事带来后，他们会显示在这里。"
+      "viewerText": "能邀请成员的人把其他同事带来后，他们会显示在这里。",
+      "titlePersonal": "邀请家人或朋友加入",
+      "textPersonal": "邀请他人，在一处和你以及你的智能体交流。",
+      "viewerTitlePersonal": "家人和朋友会显示在这里",
+      "viewerTextPersonal": "有人加入后，会显示在这里。"
     },
     "chat": {
       "title": "一切从一条消息开始",
@@ -2501,7 +2546,11 @@
       "title": "共享登录信息，不用到处传密码",
       "text": "保存智能体为团队使用的登录信息和密钥。",
       "viewerTitle": "团队的登录信息会显示在这里",
-      "viewerText": "有人和你共享登录信息或密钥后，它会显示在这里。"
+      "viewerText": "有人和你共享登录信息或密钥后，它会显示在这里。",
+      "titlePersonal": "把共享的登录信息放在一处",
+      "textPersonal": "保存智能体为这里所有人使用的登录信息和密钥。",
+      "viewerTitlePersonal": "共享的登录信息会显示在这里",
+      "viewerTextPersonal": "这里有人与你共享登录信息或密钥时，会显示在这里。"
     },
     "skills": {
       "title": "教智能体你们的做事方式",

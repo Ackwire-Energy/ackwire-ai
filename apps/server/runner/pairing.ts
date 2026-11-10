@@ -28,6 +28,10 @@ export interface DeviceGrant {
   machineId: string;
   name: string;
   org: { id: string; name: string };
+  /** Who may use it as it joined, whoever connected it, and its page (servers before bring your own devices: none). */
+  audience?: "everyone" | "people" | "owner";
+  owner?: string;
+  url?: string;
 }
 
 export type PairingFailure = "expired" | "denied" | "network" | "internal" | "canceled" | "link_invalid";
@@ -66,6 +70,20 @@ export interface DeviceInfo {
    * link's maker to let this computer in, instead of anyone confirming a code.
    */
   link?: string;
+}
+
+/** Who may use the computer it just connected, in a sentence; null from a server that doesn't say. */
+export function whoCanUse(grant: DeviceGrant, name: string): string | null {
+  switch (grant.audience) {
+    case "everyone":
+      return `Everyone in the workspace can use ${name}.`;
+    case "people":
+      return `Only the people and roles chosen can use ${name}.`;
+    case "owner":
+      return `Only ${grant.owner ?? "the person who connected it"} can use ${name}.`;
+    default:
+      return null;
+  }
 }
 
 /** `K7Q4ZP` → `K7Q·4ZP`. */
@@ -232,7 +250,16 @@ export async function pollDeviceToken(
       }
       const org =
         g.org && typeof g.org.id === "string" ? { id: g.org.id, name: String(g.org.name ?? "") } : { id: "", name: "" };
-      return { token: g.token, machineId: g.machineId, name: typeof g.name === "string" ? g.name : "", org };
+      const audience = ["everyone", "people", "owner"].find((a) => a === g.audience) as DeviceGrant["audience"];
+      return {
+        token: g.token,
+        machineId: g.machineId,
+        name: typeof g.name === "string" ? g.name : "",
+        org,
+        ...(audience ? { audience } : {}),
+        ...(typeof g.owner === "string" && g.owner ? { owner: g.owner } : {}),
+        ...(typeof g.url === "string" && /^https?:\/\//.test(g.url) ? { url: g.url } : {}),
+      };
     }
     const word = errorWord(res.json);
     if (word === "authorization_pending") {

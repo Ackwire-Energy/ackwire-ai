@@ -10,7 +10,9 @@ import {
 import { knownErrorText } from "@agenteschat/client/lib/errors";
 import { formatShortDate } from "@agenteschat/client/lib/format";
 import { sendsEmail } from "@agenteschat/client/lib/join-requests";
+import { personalHelperRole } from "@agenteschat/client/lib/personal-view";
 import { everyoneOf, isEveryone, roleSummary, sortRoles } from "@agenteschat/client/lib/roles";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, Share } from "react-native";
@@ -38,7 +40,9 @@ function useRoleRows(roles: readonly OrgRole[]) {
 
 /**
  * An address on Convidar pessoas: its role, one pick that closes the sheet (Membro plus what the person may give, as
- * the web's role menu), or, for one that won't be sent, why; either way it can leave the list.
+ * the web's role menu), or, for one that won't be sent, why; either way it can leave the list. A personal workspace
+ * asks it plainly (ADR 0159 §4): "Uses the agents" (no role) and "Helps you run it" (`personalHelperRole`) first, then
+ * any other role this person may give by its own name; the roles given are the same.
  */
 export function AddressSheet({
   email,
@@ -60,9 +64,22 @@ export function AddressSheet({
   onRemove: () => void;
 }) {
   const { t } = useTranslation();
+  const { org } = useOrg();
   const c = useColors();
   const sheet = useSheet();
-  const rows = useRoleRows(roles);
+  const personal = isPersonal(org);
+  const helper = personal ? personalHelperRole(roles) : null;
+  const givable = useRoleRows(roles);
+  const rows = helper
+    ? [
+        { key: helper.id, label: t("members.dialog.role.helps"), hint: t("members.dialog.role.helpsText") },
+        ...givable.filter((r) => r.key !== helper.id),
+      ]
+    : givable;
+  const title = personal
+    ? t("members.dialog.role.titleOnePersonal", { name: email })
+    : t("members.chips.roleOf", { email });
+  const help = personal ? t("members.dialog.role.leadPersonal") : t("mobile.invitePeople.roleHelp");
   const check = <Icon name="check" size={18} color={c.ink} />;
   const pick = (id: string | null) => {
     onPick(id);
@@ -71,8 +88,8 @@ export function AddressSheet({
   const options: ActionItem[] = [
     {
       key: "member",
-      label: t("roles.member"),
-      hint: t("members.chips.memberHint"),
+      label: personal ? t("members.dialog.role.uses") : t("roles.member"),
+      hint: personal ? t("members.dialog.role.usesText") : t("members.chips.memberHint"),
       ...(roleId === null ? { trailing: check } : {}),
       onPress: () => pick(null),
     },
@@ -84,10 +101,7 @@ export function AddressSheet({
   ];
   return (
     <>
-      <SheetTitle
-        title={sendable ? t("members.chips.roleOf", { email }) : email}
-        subtitle={sendable ? t("mobile.invitePeople.roleHelp") : (note ?? "")}
-      />
+      <SheetTitle title={sendable ? title : email} subtitle={sendable ? help : (note ?? "")} />
       {sendable ? <ActionList items={options} /> : null}
       <ActionList
         items={[
@@ -234,11 +248,13 @@ export function InvitationSheet({
  */
 function InvitationRolesSheet({ invitation: inv }: { invitation: InvitationWithStatus }) {
   const { t, i18n } = useTranslation();
-  const { orgId } = useOrg();
+  const { orgId, org } = useOrg();
   const sheet = useSheet();
   const toast = useToast();
   const roles = useRoles(orgId).data?.roles ?? [];
   const rows = useRoleRows(roles);
+  // A personal workspace's note ties its roles to the invitation's plain words (ADR 0159 §4).
+  const helper = isPersonal(org) ? personalHelperRole(roles) : null;
   const save = useSetInvitationRoles(orgId);
   const [value, setValue] = useState<string[]>(inv.roleIds ?? []);
   const flip = (id: string) => setValue((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
@@ -267,7 +283,11 @@ function InvitationRolesSheet({ invitation: inv }: { invitation: InvitationWithS
         <ActionList items={rows.map((r) => ({ ...r, checked: value.includes(r.key), onPress: () => flip(r.key) }))} />
       </Locked>
       <Text variant="footnote" tone="faint">
-        {rows.length > 0 ? t("members.everyoneNote") : t("members.noRolesToGive")}
+        {rows.length === 0
+          ? t("members.noRolesToGive")
+          : helper
+            ? t("members.everyoneNotePersonal", { role: helper.name })
+            : t("members.everyoneNote")}
       </Text>
       {rows.length > 0 ? (
         <Button

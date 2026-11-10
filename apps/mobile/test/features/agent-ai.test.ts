@@ -577,7 +577,7 @@ describe("the agent's AI", () => {
     };
     const view = (effectiveModel: string) => ({ brain: "claude_code" as const, effectiveModel, options: [claude] });
     const go = modelRows(t, view("deepseek-v4.1-flash"), planOf("opencode"));
-    expect(go).toHaveLength(31);
+    expect(go).toHaveLength(32);
     expect(go[0]).toEqual({
       value: "auto",
       label: "Automático",
@@ -677,7 +677,7 @@ describe("the agent's AI", () => {
       maker: "deepseek",
       needs: "globalRegion",
     });
-    expect(keyed).toHaveLength(3 + 30);
+    expect(keyed).toHaveLength(3 + 31);
   });
 
   test("picking a model saves as the web does: Automático picks the effort too, a fixed one after it starts at Médio", () => {

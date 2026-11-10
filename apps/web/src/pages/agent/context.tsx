@@ -2,9 +2,12 @@ import type { Agent, AgentAudience } from "@agenteschat/client";
 import type { AccessResource, Level, LevelState } from "@agenteschat/client/lib/access-levels";
 import type { agentGrammar } from "@agenteschat/client/lib/grammar";
 import type { RepoChoice } from "@agenteschat/client/lib/repos";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import { Button, CardHeader, Icon, type IconName } from "@agenteschat/ui";
 import { createContext, type ReactNode, useContext } from "react";
 import { useTranslation } from "react-i18next";
+import { useOrg } from "@/components/org-context";
+import { useAdminsLock } from "@/hooks/usePersonalView";
 import type { AgentSection, AgentTab, Edits, Field, Look, Saved, Viewer } from "@/lib/agent-edit";
 
 /** One unsaved change, as the save bar and the cards say it. */
@@ -127,6 +130,8 @@ export function WasLine({ changeKey }: { changeKey: string }) {
 /** "Só admins mudam" (or "Admins e João mudam") where the viewer can't edit. */
 export function LockNote({ field }: { field: Field }) {
   const { t } = useTranslation();
+  const { org } = useOrg();
+  const adminsOnly = useAdminsLock();
   const { viewer, ownerFirst } = useAgentEdit();
   const ownerToo =
     field === "look" ||
@@ -140,8 +145,8 @@ export function LockNote({ field }: { field: Field }) {
     <span className="agp-lock">
       <Icon name="lock" size={14} />
       {ownerToo && ownerFirst && viewer === "member"
-        ? t("agentPage.lock.adminsAndOwner", { name: ownerFirst })
-        : t("agentPage.lock.admins")}
+        ? t(modeKey(org, "agentPage.lock.adminsAndOwner"), { name: ownerFirst })
+        : adminsOnly}
     </span>
   );
 }

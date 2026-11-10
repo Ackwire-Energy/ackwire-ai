@@ -20,7 +20,15 @@ import {
 } from "@agenteschat/db";
 import { recordAudit } from "./audit";
 import { inviteLinkToken, safeEqual, sha256 } from "./crypto";
-import { emailCrew, emailLocale, emailsByLocale, invitationMailLink, queueEmail, queueInvitationEmail } from "./email";
+import {
+  emailCrew,
+  emailLocale,
+  emailsByLocale,
+  invitationMailLink,
+  modeStamp,
+  queueEmail,
+  queueInvitationEmail,
+} from "./email";
 import {
   CODE_EMAILS,
   CODE_LIMITS,
@@ -291,7 +299,14 @@ export async function sendJoinCode(deps: Deps, publicUrl: string, input: JoinCod
       orgId,
       key: `join-code:${orgId}:${sha256(email)}:${now.getTime()}`,
       to: [email],
-      template: { kind: "join_code", locale, orgName: found.orgName, code, url: base(publicUrl) },
+      template: {
+        kind: "join_code",
+        locale,
+        orgName: found.orgName,
+        code,
+        url: base(publicUrl),
+        ...(await modeStamp(tx, orgId)),
+      },
       maxAttempts: 3,
       runAt: now,
     });
@@ -635,6 +650,7 @@ async function file(
           email: ask.email,
           url: answerUrl(publicUrl, orgId, row.id, "approve"),
           denyUrl: answerUrl(publicUrl, orgId, row.id, "deny"),
+          ...(await modeStamp(tx, orgId)),
         },
       });
     }
@@ -915,6 +931,7 @@ export async function approveJoinRequest(
               : deps.secret && invitationId
                 ? invitationMailLink(deps.secret, invitationId, approval.url)
                 : approval.url,
+          ...(await modeStamp(tx, orgId)),
         },
       });
     }
@@ -968,6 +985,7 @@ export async function denyJoinRequest(
         orgName: context.orgName,
         approverName: context.approverName,
         reason: why,
+        ...(await modeStamp(tx, orgId)),
       },
     });
   });
@@ -1381,6 +1399,7 @@ export async function requestNewInvitation(db: Database, publicUrl: string, toke
         orgName: org.name,
         email: invitation.email,
         url: `${base(publicUrl)}/org/${invitation.orgId}/settings/members`,
+        ...(await modeStamp(db, invitation.orgId)),
       },
     });
   }

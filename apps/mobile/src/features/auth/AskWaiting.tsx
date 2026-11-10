@@ -1,5 +1,6 @@
 import { invitationQuery, keys, useApi } from "@agenteschat/client";
 import { ANSWER_POLL_MS } from "@agenteschat/client/lib/join-requests";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useIsFocused } from "expo-router";
 import { useEffect, useRef, useState } from "react";
@@ -52,6 +53,8 @@ export function AskWaiting({ asked }: { asked: Asked }) {
   // it, they rise in when it comes.
   const preview = useQuery({ ...invitationQuery(api, token), retry: false });
   const agents = preview.data?.agents ?? [];
+  // A personal workspace's words once its invitation is read (ADR 0159): never its name ("Personal").
+  const words = preview.data ?? null;
   const crew = (happy: boolean) => (agents.length > 0 ? <InviteCrew agents={agents} happy={happy} /> : undefined);
   const claim = useQuery({
     // The key stays out of the query's key, and its answer out of the cache once read: one signs in, for now.
@@ -129,8 +132,13 @@ export function AskWaiting({ asked }: { asked: Asked }) {
 
   if (answer?.state === "in")
     return (
-      <AuthScaffold title={t("invite.ask.approvedIn", { org })} stepKey="in" expression="happy" hero={crew(true)}>
-        <WaitCard title={t("invite.entering", { org })} sub={t("invite.enteringReady")} />
+      <AuthScaffold
+        title={t(modeKey(words, "invite.ask.approvedIn"), { org })}
+        stepKey="in"
+        expression="happy"
+        hero={crew(true)}
+      >
+        <WaitCard title={t(modeKey(words, "invite.entering"), { org })} sub={t("invite.enteringReady")} />
       </AuthScaffold>
     );
   if (answer?.state === "signIn")
@@ -143,7 +151,7 @@ export function AskWaiting({ asked }: { asked: Asked }) {
     return (
       <AuthScaffold
         title={t("invite.ask.deniedTitle")}
-        subtitle={t("invite.ask.deniedText", { org })}
+        subtitle={t(modeKey(words, "invite.ask.deniedText"), { org })}
         stepKey="denied"
         expression="closed"
         onBack={leave}
@@ -164,7 +172,7 @@ export function AskWaiting({ asked }: { asked: Asked }) {
     );
   return (
     <AuthScaffold
-      title={t("invite.ask.waitTitle", { org })}
+      title={t(modeKey(words, "invite.ask.waitTitle"), { org })}
       subtitle={t("mobile.invite.join.waitLeadOpen")}
       stepKey="wait"
       expression="happy"
@@ -172,7 +180,7 @@ export function AskWaiting({ asked }: { asked: Asked }) {
       hero={crew(false)}
     >
       <WaitCard
-        title={t("invite.ask.waitCard", { org })}
+        title={t(modeKey(words, "invite.ask.waitCard"), { org })}
         sub={asked.name ? t("invite.ask.waitBy", { name: asked.name, email: asked.email }) : asked.email}
       />
       <LockLine text={t("invite.ask.waitLock")} />

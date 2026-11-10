@@ -2,9 +2,11 @@ import { keys, meQuery, useMe } from "@agenteschat/client";
 import { isPaidReturn } from "@agenteschat/client/lib/billing";
 import { settingUp } from "@agenteschat/client/lib/guards";
 import { finishOnboarding } from "@agenteschat/client/lib/right-hand";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { requireUser } from "@/app/guards";
 import { useServerLocale } from "@/i18n";
+import { ARRIVAL_PARAM } from "@/lib/arrival";
 import { OnboardingPage } from "@/pages/OnboardingPage";
 
 export const Route = createFileRoute("/onboarding")({
@@ -31,8 +33,10 @@ export const Route = createFileRoute("/onboarding")({
     const general = org?.onboarding?.generalChannelId;
     const at = await finishOnboarding(context.api, resume).catch(() => null);
     await context.queryClient.refetchQueries({ queryKey: keys.me });
-    const search = { paid: true as const };
-    if (general)
+    // As the onboarding's own last step: the workspace opens on its arrival (ADR 0160). A personal one's #general is
+    // out of sight (ADR 0159): its right hand's DM.
+    const search = { paid: true as const, [ARRIVAL_PARAM]: 1 } as never;
+    if (general && !isPersonal(org))
       throw redirect({ to: "/org/$orgId/c/$channelId", params: { orgId: resume, channelId: general }, search });
     if (at?.agentId)
       throw redirect({ to: "/org/$orgId/dm/agent/$agentId", params: { orgId: resume, agentId: at.agentId }, search });

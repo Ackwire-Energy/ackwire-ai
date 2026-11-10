@@ -447,6 +447,11 @@ test("a system-mode runner (root) without workers does no agent work; machine-le
     "phone.record",
     "phone.screenshot",
     "phone.logs",
+    // Pairing over Wi-Fi puts the phone on the person's adb, like the rest.
+    "phone.pair.start",
+    "phone.pair.code",
+    "phone.pair.status",
+    "phone.pair.cancel",
   ]);
 
   if (posix) {
@@ -608,7 +613,8 @@ test.if(posix)(
   () => {
     const fake = home();
     const tools = home();
-    for (const tool of ["sed", "grep", "dirname"]) symlinkSync(Bun.which(tool) as string, path.join(tools, tool));
+    for (const tool of ["sed", "grep", "dirname", "date"])
+      symlinkSync(Bun.which(tool) as string, path.join(tools, tool));
     // Root on Linux, as far as the script can tell, with Debian's systemd.
     writeFileSync(path.join(tools, "id"), "#!/bin/sh\necho 0\n", { mode: 0o755 });
     writeFileSync(path.join(tools, "uname"), "#!/bin/sh\necho Linux\n", { mode: 0o755 });

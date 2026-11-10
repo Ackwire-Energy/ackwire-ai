@@ -264,6 +264,12 @@ die() {
   exit 1
 }
 need_value() { [ "$2" -ge 2 ] || die "$1 needs a value"; }
+# The end, with how long it took as term.ts's elapsed() writes it: "Done in 52s", "Done in 1m 04s".
+done_in() {
+  D_S=$(($(date +%s) - T_START))
+  if [ "$D_S" -ge 60 ]; then D_S="$((D_S / 60))m $((D_S % 60 / 10))$((D_S % 10))s"; else D_S="\${D_S}s"; fi
+  t_end "Done in $D_S"
+}
 quote() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\\\\\''/g")"; }
 sha256() {
   if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1"; else shasum -a 256 "$1"; fi | cut -d ' ' -f 1
@@ -789,7 +795,7 @@ finish() {
   t_info "The agentes-runner command is $LAUNCHER. To check this computer's connection:"
   t_cmd "$1 status"
   t_gap
-  t_end Done
+  done_in
 }
 
 install_system() {
@@ -923,10 +929,11 @@ install_user() {
   t_info "To use the agentes-runner command, add it to your PATH:"
   t_cmd "export PATH=\\"$RUNNER_HOME/bin:\\$PATH\\""
   t_gap
-  t_end Done
+  done_in
 }
 
 main() {
+  T_START=$(date +%s)
   t_init 1
   # The waits' output (t_run): kept for a failure's last lines, removed when the installer exits.
   T_LOGS=$(mktemp -d 2>/dev/null) || T_LOGS=''
@@ -1084,6 +1091,7 @@ export function installScriptPowerShell(publicUrl: string, options: { link?: str
 # Usage, with a link made under Settings > Devices: irm <server>/i/<code>/ps | iex
 
 function Install-AgentesRunner {
+  $T0 = Get-Date
   $ErrorActionPreference = 'Stop'
   $ProgressPreference = 'SilentlyContinue'
   [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
@@ -1186,7 +1194,9 @@ function Install-AgentesRunner {
   Info "The agentes-runner command is $Launcher. To check this computer's connection:"
   Cmd "& $(Q $Launcher) status"
   Gap
-  Write-Host "$([char]0x2514)  Done" -ForegroundColor Green
+  $S = [int][math]::Floor(((Get-Date) - $T0).TotalSeconds)
+  $Took = if ($S -ge 60) { '{0}m {1:00}s' -f [math]::Floor($S / 60), ($S % 60) } else { "$($S)s" }
+  Write-Host "$([char]0x2514)  Done in $Took" -ForegroundColor Green
 }
 
 try { Install-AgentesRunner } catch { Write-Host "$([char]0x25A0)  $($_.Exception.Message)" -ForegroundColor Red }

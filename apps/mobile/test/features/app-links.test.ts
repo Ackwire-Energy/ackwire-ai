@@ -57,7 +57,7 @@ describe("web addresses → the app's screens", () => {
     const to = (path: string) => (linkOf(`${W}/org/${O}${path}`) as { to?: string }).to;
     expect(to("")).toBe("/");
     expect(to("/home")).toBe("/");
-    expect(to("/threads")).toBe("/threads");
+    expect(to("/threads")).toBe("/conversations/threads");
     expect(to("/agents/a1")).toBe("/agent/a1");
     expect(to("/agents/a1/memory")).toBe("/memory?agent=a1");
     expect(to("/agents/new")).toBe("/new-agent");
@@ -89,6 +89,7 @@ describe("web addresses → the app's screens", () => {
     // The web's QR code opens this phone's guide for the computer it plugs into.
     expect(to("/settings/devices/android-setup?machine=k1")).toBe("/settings/devices/android-setup?machine=k1");
     expect(to("/settings/devices/iphone-setup")).toBe("/settings/devices/iphone-setup");
+    expect(to("/settings/devices/iphone-setup?computer=k1")).toBe("/settings/devices/iphone-setup?machine=k1");
     expect(to("/settings/account")).toBe("/me/account");
     expect(to("/settings/approvals")).toBe("/me/approvals");
     expect(to("/settings/right_hand")).toBe("/settings/right-hand");
