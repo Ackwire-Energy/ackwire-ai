@@ -127,7 +127,6 @@ import type {
   MailImapInput,
   Me,
   Message,
-  MessageMemory,
   MoveAgentsInput,
   NoticeCategory,
   NoticePrefs,
@@ -3343,22 +3342,6 @@ export function applyReactions(
       onAgentReaction(messageId, kind);
   }
   qc.setQueryData(keys.reactions(orgId, messageId), next);
-}
-
-/** `message.memories`: the memory marks of one message, in every cached list of that channel. */
-export function cacheMessageMemories(
-  qc: ReturnType<typeof useQueryClient>,
-  orgId: string,
-  channelId: string,
-  messageId: string,
-  memories: MessageMemory[],
-) {
-  qc.setQueriesData({ queryKey: ["org", orgId, "channel", channelId] }, (data: unknown) => {
-    if (!Array.isArray(data)) return data;
-    const list = data as Message[];
-    if (!list.some((m) => m && m.id === messageId)) return data;
-    return list.map((m) => (m.id === messageId ? { ...m, memories } : m));
-  });
 }
 
 /**

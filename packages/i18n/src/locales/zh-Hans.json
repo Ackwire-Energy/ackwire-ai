@@ -8983,22 +8983,6 @@
       "foot": "根据每个智能体的形象制作"
     }
   },
-  "memoryMark": {
-    "label": "{{name}} 把这条存入了记忆：{{text}}",
-    "saved": "{{name}} 记下了这条：",
-    "title": "{{name}} 存入了记忆",
-    "subtitle": "之后的对话中会记得",
-    "from": "来自 {{name}} 的消息 · {{time}}",
-    "view": "在记忆中查看",
-    "fix": "修正",
-    "fixLabel": "修正已保存的内容",
-    "save": "保存",
-    "forget": "忘记",
-    "forgot": "{{name}} 忘记了这条",
-    "undo": "撤销",
-    "fixed": "记忆已修正",
-    "fixedDetail": "{{name}} 之后会使用新版本。"
-  },
   "correctionAsk": {
     "title": "想让 {{name}} 重做，还是说明缺了什么？",
     "label": "缺了什么",

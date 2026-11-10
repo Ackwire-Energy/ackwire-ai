@@ -213,7 +213,6 @@ export {
   type StickerPickerLabels,
   stickerMoodsFor,
 } from "./components/MediaPicker";
-export { AgentReadingBook } from "./components/MemoryPixels";
 export { Mention } from "./components/Mention";
 export {
   Menu,

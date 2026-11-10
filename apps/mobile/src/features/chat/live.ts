@@ -18,7 +18,6 @@ import {
   cacheDmRead,
   cacheMessage,
   cacheMessageActions,
-  cacheMessageMemories,
   cacheMessageMeta,
   cacheMessageWork,
   cachePinned,
@@ -288,10 +287,6 @@ function applyToCache(qc: QueryClient, orgId: string, channelId: string, event: 
       break;
     case "choices.updated":
       qc.setQueryData(keys.choices(orgId, event.choices.id), event.choices);
-      break;
-    case "message.memories":
-      // What an agent saved from a person's message: the memory mark under it.
-      cacheMessageMemories(qc, orgId, channelId, event.messageId, event.memories);
       break;
     case "message.actions":
       // An agent's receipts changed (undone, redone, a new one): replace the list.

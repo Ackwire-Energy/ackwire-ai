@@ -9226,22 +9226,6 @@
       "foot": "Her ajanın görünümünden yapıldı"
     }
   },
-  "memoryMark": {
-    "label": "{{name}} bunu belleğe kaydetti: {{text}}",
-    "saved": "{{name}} bunu kaydetti:",
-    "title": "{{name}} belleğe kaydetti",
-    "subtitle": "Sonraki sohbetlerde hatırlayacak",
-    "from": "{{name}} mesajından · {{time}}",
-    "view": "Bellekte gör",
-    "fix": "Düzelt",
-    "fixLabel": "Kaydedileni düzelt",
-    "save": "Kaydet",
-    "forget": "Unut",
-    "forgot": "{{name}} bunu unuttu",
-    "undo": "Geri al",
-    "fixed": "Bellek düzeltildi",
-    "fixedDetail": "{{name}} bundan sonra yeni sürümü kullanacak."
-  },
   "correctionAsk": {
     "title": "{{name}} yeniden yapsın mı, yoksa neyin eksik olduğunu mu açıklasın?",
     "label": "Eksik olan",
