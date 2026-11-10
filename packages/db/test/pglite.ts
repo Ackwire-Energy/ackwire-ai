@@ -1,4 +1,6 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import { vector } from "@electric-sql/pglite-pgvector";
@@ -31,20 +33,49 @@ export async function createTestDatabase(): Promise<{ db: Database; close: () =>
 }
 
 /**
- * Migrations run once per test process into a template database whose data
- * directory is then loaded by every fresh database (much faster than
- * migrating each time).
+ * Migrations run into a template database whose data directory is then loaded by every fresh database (much
+ * faster than migrating each time). The template is kept in this process and in a file in the system's
+ * temporary folder, named after the migrations and the PGlite version: `bun test --parallel` gives every test
+ * file modules of its own, so without the file each one would migrate again.
  */
 let template: Promise<Blob> | undefined;
 function migratedTemplate(): Promise<Blob> {
-  template ??= (async () => {
-    const client = new PGlite({ extensions: { vector } });
-    await migratePglite(drizzlePglite(client, { schema, casing: "snake_case" }), { migrationsFolder });
-    const dump = await client.dumpDataDir("none");
-    await client.close();
-    return dump;
-  })();
+  template ??= loadTemplate().catch((error) => {
+    // A failed build is not kept: the next database tries again.
+    template = undefined;
+    throw error;
+  });
   return template;
+}
+
+async function loadTemplate(): Promise<Blob> {
+  const file = join(tmpdir(), `agenteschat-test-template-${templateKey()}.tar`);
+  if (existsSync(file)) return new Blob([readFileSync(file)]);
+
+  const client = new PGlite({ extensions: { vector } });
+  await migratePglite(drizzlePglite(client, { schema, casing: "snake_case" }), { migrationsFolder });
+  const dump = await client.dumpDataDir("none");
+  await client.close();
+  // Written beside its final name and moved there: a process starting meanwhile never reads half a file.
+  const partial = `${file}.${process.pid}.${crypto.randomUUID()}`;
+  writeFileSync(partial, Buffer.from(await dump.arrayBuffer()));
+  renameSync(partial, file);
+  return dump;
+}
+
+/** What the template depends on: every migration, their journal and the PGlite version this package pins. */
+function templateKey(): string {
+  const hash = createHash("sha256");
+  const pins = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as {
+    dependencies?: Record<string, string>;
+    devDependencies?: Record<string, string>;
+  };
+  hash.update(JSON.stringify([pins.dependencies, pins.devDependencies]));
+  hash.update(readFileSync(join(migrationsFolder, "meta", "_journal.json")));
+  for (const name of readdirSync(migrationsFolder).sort()) {
+    if (name.endsWith(".sql")) hash.update(name).update(readFileSync(join(migrationsFolder, name)));
+  }
+  return hash.digest("hex").slice(0, 32);
 }
 
 /**

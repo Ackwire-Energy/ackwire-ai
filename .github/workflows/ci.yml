@@ -1,21 +1,18 @@
 name: CI
 
-# All verification runs here: on every pull request (a draft once it is marked ready), every push to
-# main, every `v*` release tag, and on demand (`gh workflow run CI --ref <branch>` or "Run workflow" in
-# Actions). The `changes` job narrows a pull request or a push to the jobs its files touch; a manual run
-# or a release tag checks everything.
+# All verification runs here: on every push to main, every `v*` release tag, and on demand
+# (`gh workflow run CI --ref <branch>` or "Run workflow" in Actions). A pull request starts nothing by
+# itself, to keep runner minutes for the runs someone asks for: before it merges, run this by hand on its
+# branch, and that run's "CI result" is the check main requires. The `changes` job narrows a push to
+# the jobs its files touch; a manual run or a release tag checks everything.
 #
-# Pull requests run as `pull_request`, never `pull_request_target`: a fork's code gets a read-only token
-# and no secrets. Only jobs gated on a push or a tag (the images, the release assets) write anything or
-# read a secret.
+# Only jobs gated on a push or a tag (the images, the release assets) write anything or read a secret.
 #
 # The Linux jobs run on Namespace runners (the `linux-4x8` profile: 4 vCPU, 8 GB), which cost less a
 # minute than GitHub's hosted ones. The test jobs take 8 vCPU and 16 GB: on 8 GB a file's first test
 # ran past its 5 s limit (voice.test.ts, live-real-server.test.tsx). Everything runs on x64: on ARM the backend shards took 2.5x as long
 # (603 and 667 s against 229 and 275 s, 2026-10-26). Only the arm64 image builds on ARM, natively.
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
     tags: ["v*"]
@@ -42,12 +39,10 @@ defaults:
 jobs:
   changes:
     name: What changed
-    if: github.event.pull_request.draft != true
     runs-on: namespace-profile-linux-4x8
     timeout-minutes: 5
     permissions:
       contents: read
-      pull-requests: read # paths-filter reads a pull request's files from the API
     outputs:
       code: ${{ steps.groups.outputs.code }}
       shared: ${{ steps.groups.outputs.shared }}
@@ -235,9 +230,9 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-  # The backend suite (PGlite, servers) on three runners at once: packages/engine split by file name, and
-  # apps/server on its own. Together they ran past the step's 20 minutes on one runner (2026-11-01: 683 s for
-  # 70 of engine's 82 files from n, 529 s for 97 of apps/server's 147). The groups preserve the existing selected test files.
+  # The backend suite (PGlite, servers) on three runners at once. One file after another, a third of it took
+  # 13 to 20 minutes on a runner whose other cores sat idle (2026-11-10), so each runner now spreads its files
+  # over its cores and Bun does the split in three. The paths select the same test files as before.
   test-backend:
     name: Test (backend ${{ matrix.shard }}/3)
     needs: changes
@@ -247,23 +242,40 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - shard: 1
-            paths: packages/engine/test/[a-m]*.test.ts
-          - shard: 2
-            paths: >-
-              packages/engine/test/[!a-m]*.test.ts packages/adapters packages/config packages/db
-              packages/modules packages/providers packages/client packages/i18n packages/tokens packages/setup
-          - shard: 3
-            paths: apps/server
+        shard: [1, 2, 3]
+    env:
+      # The engine's own folder only: the suites in its subfolders are not part of this job.
+      PATHS: >-
+        packages/engine/test/*.test.ts packages/adapters packages/config packages/db packages/modules
+        packages/providers packages/client packages/i18n packages/tokens packages/setup apps/server
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - *setup-bun
       - *cache-bun
       - *install
+      # Test files run on every core, each in a process and with modules of its own (--parallel). Bun
+      # splits the files in three by the time each took (scripts/test-timings: one file per shard, all
+      # three read by every shard, so the shards add up to the whole suite; a file with no time there
+      # counts as the median). A shard writes the times it measured over its own file, kept as an
+      # artifact: committing the three files of a run on main brings the split up to date.
       - name: Test
         timeout-minutes: 25
-        run: bun test ${{ matrix.paths }} 2>&1 | tee test.log
+        run: |
+          mkdir -p scripts/test-timings
+          timings=(--timings="scripts/test-timings/backend-${{ matrix.shard }}.json")
+          for other in 1 2 3; do
+            [ "$other" = "${{ matrix.shard }}" ] || timings+=(--timings="scripts/test-timings/backend-$other.json")
+          done
+          # shellcheck disable=SC2086 # PATHS is a list, and its glob expands here
+          bun test --parallel --shard=${{ matrix.shard }}/3 "${timings[@]}" --update-timings $PATHS 2>&1 | tee test.log
+      - name: Keep the measured times
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-timings-backend-${{ matrix.shard }}
+          path: scripts/test-timings/backend-${{ matrix.shard }}.json
+          if-no-files-found: ignore
+          retention-days: 7
       - &keep-test-errors
         name: Keep errors
         if: always()
@@ -308,7 +320,9 @@ jobs:
         # The preload saves every screen the tests reach, for the geometry check below. It costs a few percent.
         env:
           GEOMETRY_OUT: ${{ runner.temp }}/geometry
-        run: bun test --preload ./scripts/geometry/capture.ts apps/web packages/ui 2>&1 | tee test.log
+        # Six workers on the runner's eight cores: with all eight busy, tests that wait on a timer or on work off
+        # the JS thread (a 30 ms limit, WebCrypto, a socket's retry) failed now and then, a different one each run.
+        run: bun test --parallel=6 --preload ./scripts/geometry/capture.ts apps/web packages/ui 2>&1 | tee test.log
       # Lays those screens out in the runner's Chrome at 1280, 320 and 390 px and fails on an offender that isn't in
       # scripts/geometry/baseline.json: an action on its row's edge, uneven padding in a chip, a row wrapping word by word.
       # A screen with messages also at the smallest and largest Tamanho do texto. Each screen is laid out twice, in the
@@ -316,6 +330,8 @@ jobs:
       - name: Geometry (the layout rules on every screen the tests reach)
         if: (success() || failure()) && (env.SHARED == 'true' || env.WEB == 'true')
         timeout-minutes: 12
+        env:
+          GEOMETRY_BROWSERS: "8" # the runner's cores
         run: bun run check:geometry "$RUNNER_TEMP/geometry" --report geometry-report.md --text-size xs,xl
       # The "Novo evento" dialog tests once aborted the whole DOM process (exit 134), so the main run
       # skips them (RUN_NEW_EVENT) and they run alone here. Alone they pass, so a failure is real.
@@ -389,7 +405,6 @@ jobs:
   # --verbose with --redact names each finding's file, line, commit and rule, never its value.
   secrets:
     name: Secret scan and boundaries
-    if: github.event.pull_request.draft != true
     runs-on: namespace-profile-linux-4x8
     timeout-minutes: 5
     steps:
@@ -448,16 +463,12 @@ jobs:
   # then an upgrade's steps on the same volumes, the usage report the image prints (`agentes telemetry`),
   # and the backup profile: a dump and its restore.
   # amd64 only, nothing pushed.
-  # A pull request runs it only when the image's own files changed (Dockerfile, compose files, the
-  # backup image): code changes are the tests' job, and every push to main still runs it.
-  # Only pushes write the layer cache, which the image build below then reuses: PR-scoped entries
-  # would crowd main's out of the repository's cache quota.
+  # Only pushes write the layer cache, which the image build below then reuses: entries scoped to a
+  # branch would crowd main's out of the repository's cache quota.
   compose:
     name: Image boots with docker compose
     needs: changes
-    if: >-
-      needs.changes.outputs.image == 'true' &&
-      (github.event_name != 'pull_request' || needs.changes.outputs.docker == 'true')
+    if: needs.changes.outputs.image == 'true'
     runs-on: namespace-profile-linux-4x8
     timeout-minutes: 20
     env:
@@ -752,10 +763,10 @@ jobs:
           gh release upload "$TAG" agentes-native-*.tar.gz native.json native.json.sig --clobber --repo "$GITHUB_REPOSITORY"
 
   # The one check to require once branch protection is on: red when any job failed or was
-  # cancelled; a skipped job is fine (nothing it covers changed). A draft gets no result at all.
+  # cancelled; a skipped job is fine (nothing it covers changed).
   done:
     name: CI result
-    if: always() && github.event.pull_request.draft != true
+    if: always()
     needs:
       [changes, check, test-backend, test-web, test-desktop-rust, secrets, isolation-root, compose, build, publish, release-install, release-native]
     runs-on: namespace-profile-linux-4x8
