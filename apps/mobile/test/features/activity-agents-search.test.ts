@@ -65,40 +65,6 @@ describe("Atividade", () => {
     ]);
   });
 
-  test("a server's repeated changed-tools notices are one card, the newest; the count drops by the rest", () => {
-    const tools = (id: string, hours: number, source: AppNotification["source"]) =>
-      notification({ id, kind: "connector_tool_changed", waiting: true, updatedAt: ago(hours), source });
-    const repeated = [
-      tools("tiktok-old", 30, { label: "TikTok" }),
-      tools("tiktok-new", 26, { label: "TikTok" }),
-      tools("tiktok-older", 40, { label: "TikTok" }),
-      tools("notes", 28, { label: "Notes", connectionId: "c2" }),
-    ];
-    const s = activitySections([...items, ...repeated], "all", NOW);
-    expect(s.waiting.map((n) => n.id)).toEqual(["tiktok-new", "notes", "question", "approval"]);
-    expect(s.merged).toBe(2);
-    expect(activitySections(items, "all", NOW).merged).toBe(0);
-  });
-
-  test("a server's changed-tools card leaves once nothing of it waits for a review; unknown, it stays", () => {
-    const tools = (id: string, source: AppNotification["source"]) =>
-      notification({ id, kind: "connector_tool_changed", waiting: true, updatedAt: ago(2), source });
-    const list = [
-      tools("tiktok", { label: "TikTok" }),
-      tools("notes", { label: "Notes", connectionId: "c2" }),
-      tools("linear", { label: "Linear", connectionId: "c3" }),
-    ];
-    // Only Notes (by id) and an old notice of TikTok (by name, it named no server) still wait.
-    const pending = { ids: new Set(["c2"]), labels: new Set(["TikTok", "Notes"]) };
-    const s = activitySections([...items, ...list], "all", NOW, pending);
-    expect(s.waiting.map((n) => n.id)).toEqual(["tiktok", "notes", "question", "approval"]);
-    expect(s.settled).toBe(1);
-    // Not loaded yet, or not an admin: every card stays.
-    const unknown = activitySections([...items, ...list], "all", NOW);
-    expect(unknown.waiting).toHaveLength(5);
-    expect(unknown.settled).toBe(0);
-  });
-
   test("waiting cards speak the chat card's words, decide an approval on the card, count once", () => {
     const screen = readFileSync(join(import.meta.dir, "../../src/features/activity/ActivityScreen.tsx"), "utf8");
     // The kinds the chat asks keep the chat's words and icons ("Pede sua aprovação" with the shield).

@@ -144,13 +144,6 @@ describe("inbox items", () => {
     const joined = notification({ id: "n", kind: "invitation_accepted", source: { label: "Acme" } });
     expect(notificationHref(joined)).toBe("/me/members");
     expect(notificationHref(notification({ id: "n", kind: "approval_cover", source: {} }))).toBe("/me/approvals");
-    expect(notificationHref(notification({ id: "n", kind: "connector_tool_changed", source: {} }))).toBe("/connectors");
-    const tools = notification({
-      id: "n",
-      kind: "connector_tool_changed",
-      source: { connectionId: "c1", label: "TikTok" },
-    });
-    expect(notificationHref(tools)).toBe("/connectors/tools?id=c1");
     expect(notificationHref(notification({ id: "n", kind: "skill_update", source: { skillId: "s1" } }))).toBe(
       "/settings/skills/s1",
     );

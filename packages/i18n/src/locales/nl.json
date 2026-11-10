@@ -4153,7 +4153,6 @@
       "browser": "Browser",
       "members": "Leden",
       "usage": "Gebruik",
-      "connectors": "Connectors",
       "dashboard": "Dashboard"
     },
     "reactions_one": "{{count}} reactie",
@@ -11208,34 +11207,6 @@
       "usageNoLimit": "Composio: {{calls}} aanroepen in {{month}}",
       "limitNotice": "Deze werkruimte heeft de Composio-aanroepen van deze maand opgebruikt",
       "disconnectNote": "Composio vergeet het account. Wil je ook de toegang in {{name}} intrekken, verwijder Composio dan daar in je accountinstellingen."
-    },
-    "toolChanges": {
-      "title": "Gewijzigde tools",
-      "intro": "Deze servers hebben veranderd wat een tool zegt of vraagt. Agents houden de versie die jij hebt goedgekeurd tot je de nieuwe accepteert.",
-      "count_one": "{{count}} tool gewijzigd",
-      "count_other": "{{count}} tools gewijzigd",
-      "acceptAll": "Alles accepteren",
-      "acceptedAll": "Tools van {{name}} bijgewerkt.",
-      "show": "Wijziging bekijken",
-      "hide": "Verbergen",
-      "showAll": "Alles tonen ({{total}})",
-      "textChanged": "De tekst is gewijzigd",
-      "fieldsChanged_one": "{{count}} veld gewijzigd",
-      "fieldsChanged_other": "{{count}} velden gewijzigd",
-      "inputChanged": "De invoer is gewijzigd",
-      "description": "Tekst",
-      "input": "Invoer",
-      "field": {
-        "added": "nieuw",
-        "removed": "verwijderd",
-        "changed": "gewijzigd"
-      },
-      "added": "Toegevoegd",
-      "removed": "Verwijderd",
-      "accept": "Accepteren",
-      "acceptOne": "{{tool}} accepteren",
-      "accepted": "{{tool}} bijgewerkt.",
-      "notice": "{{name}} heeft tools gewijzigd die jij hebt goedgekeurd"
     },
     "names": {
       "atlassian": "Atlassian (Jira en Confluence)",

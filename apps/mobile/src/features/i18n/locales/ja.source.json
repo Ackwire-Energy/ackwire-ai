@@ -2396,12 +2396,6 @@
       "other": "{{model}} left {{plan}}. {{names}} is using {{runs}} for now"
     }
   },
-  "activity.kind.connector_tool_changed": {
-    "value": {
-      "one": "A connected server changed tools you approved",
-      "other": "A connected server changed tools you approved"
-    }
-  },
   "activity.kind.computer_disk_full": {
     "value": {
       "one": "A computer's disk is almost full",
@@ -3591,9 +3585,6 @@
   "activityNow.kind.join": {
     "value": "Members"
   },
-  "activityNow.kind.tools": {
-    "value": "Tools"
-  },
   "activityNow.kind.limit": {
     "value": "Limit"
   },
@@ -3605,15 +3596,6 @@
   },
   "activityNow.open": {
     "value": "Open"
-  },
-  "activityNow.toolsTitle": {
-    "value": "Changed tools you approved"
-  },
-  "activityNow.toolsWhy": {
-    "value": "Agents keep the version you approved until you accept the new one."
-  },
-  "activityNow.reviewChanges": {
-    "value": "Review the changes"
   },
   "activityNow.clear.title": {
     "value": "Nothing waiting on you"
