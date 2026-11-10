@@ -6690,15 +6690,14 @@
     "links": "关联内容",
     "prBy": "PR #{{number}} · 由 {{name}} 创建",
     "artifactBy": "{{title}}（{{name}}）",
-    "noLinks": "还没有关联内容。",
     "github": {
       "label": "GitHub 链接",
       "placeholder": "Issue 或 PR 链接",
       "invalid": "这不是 GitHub issue 或 pull request 的链接。",
-      "remove": "移除 GitHub 链接"
+      "remove": "移除 GitHub 链接",
+      "add": "添加 GitHub 链接"
     },
     "openConversation": "查看对话",
-    "labels": "标签",
     "tabs": {
       "label": "任务内容",
       "details": "详情",
@@ -8405,6 +8404,8 @@
     },
     "upcoming": "即将到来",
     "upcomingEmpty": "近期没有安排。",
+    "owners": "智能体和成员",
+    "showOwner": "显示 {{name}}",
     "viewZone": "日历时区",
     "miniMonth": "选择日期",
     "new": "新建日程",
@@ -8430,12 +8431,6 @@
         "declined": "你不参加。"
       }
     },
-    "kind": {
-      "event": "日程",
-      "routine": "例行工作",
-      "reminder": "提醒",
-      "deadline": "任务截止日期"
-    },
     "every": {
       "hour": "每小时",
       "hours": "每 {{count}} 小时",
@@ -8443,22 +8438,19 @@
     },
     "perDay": "每天 {{count}} 次",
     "runs_other": "这几天共运行 {{count}} 次。",
-    "routineDetail": "{{agent}} 的例行工作 · 发送到 {{target}}。",
+    "routineDetail": "例行工作 · 发送到 {{target}}",
     "deadlineDetail": "任务到期了。",
     "reminderBy": "由 {{name}} 设置",
-    "reminderPosted": "由 {{agent}} 发布 · {{target}}",
+    "reminderPosted": "提醒 · 发布在 {{target}}",
     "cancelReminder": "取消提醒",
     "reminderCancelled": "提醒已取消",
     "openIssue": "打开任务",
     "openRoutines": "在“例行工作”中查看",
     "openRoutine": "打开例行工作",
     "runAria": "例行工作 {{name}}，{{time}}",
-    "runsAria": "{{time}} 有 {{count}} 项例行工作：{{names}}",
     "runHint": "{{name}} · {{agent}} · {{time}}",
     "runsAt": "{{time}} 的例行工作",
-    "runsOn": "例行工作 · {{day}}",
-    "runsCount_other": "例行工作运行 {{count}} 次",
-    "dayRunsAria_other": "{{day}} 例行工作运行 {{count}} 次：{{names}}",
+    "moreRuns_other": "还有 {{count}} 项例行工作",
     "runTimes": "×{{count}}",
     "result": {
       "ok": "已回复",

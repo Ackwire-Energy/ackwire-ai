@@ -6641,15 +6641,14 @@
     "links": "リンク",
     "prBy": "PR #{{number}} · 作成者: {{name}}",
     "artifactBy": "{{title}}（{{name}}）",
-    "noLinks": "リンクされたものはまだありません。",
     "github": {
       "label": "GitHub リンク",
       "placeholder": "Issue または PR のリンク",
       "invalid": "GitHub の Issue または Pull Request のリンクではありません。",
-      "remove": "GitHub リンクを削除"
+      "remove": "GitHub リンクを削除",
+      "add": "GitHub リンクを追加"
     },
     "openConversation": "会話を見る",
-    "labels": "ラベル",
     "tabs": {
       "label": "タスクのセクション",
       "details": "詳細",
@@ -8359,6 +8358,8 @@
     },
     "upcoming": "今後の予定",
     "upcomingEmpty": "今後の予定はありません。",
+    "owners": "エージェントと人",
+    "showOwner": "{{name}}を表示",
     "viewZone": "カレンダーのタイムゾーン",
     "miniMonth": "日付を選択",
     "new": "新しい予定",
@@ -8384,12 +8385,6 @@
         "declined": "参加しません。"
       }
     },
-    "kind": {
-      "event": "予定",
-      "routine": "ルーティン",
-      "reminder": "リマインダー",
-      "deadline": "タスクの期日"
-    },
     "every": {
       "hour": "1時間ごと",
       "hours": "{{count}}時間ごと",
@@ -8397,22 +8392,19 @@
     },
     "perDay": "1日{{count}}回",
     "runs_other": "この期間の実行 {{count}}回。",
-    "routineDetail": "{{agent}}のルーティン · {{target}}に届けます。",
+    "routineDetail": "ルーティン · {{target}}に届けます",
     "deadlineDetail": "タスクの期日です。",
     "reminderBy": "{{name}}が設定",
-    "reminderPosted": "{{agent}}が投稿 · {{target}}",
+    "reminderPosted": "リマインダー · {{target}}に投稿",
     "cancelReminder": "リマインダーをキャンセル",
     "reminderCancelled": "リマインダーをキャンセルしました",
     "openIssue": "タスクを開く",
     "openRoutines": "「ルーティン」で見る",
     "openRoutine": "ルーティンを開く",
     "runAria": "ルーティン{{name}}、{{time}}",
-    "runsAria": "{{time}}のルーティン{{count}}件: {{names}}",
     "runHint": "{{name}} · {{agent}} · {{time}}",
     "runsAt": "{{time}}のルーティン",
-    "runsOn": "ルーティン · {{day}}",
-    "runsCount_other": "ルーティンの実行 {{count}}回",
-    "dayRunsAria_other": "{{day}}のルーティンの実行 {{count}}回: {{names}}",
+    "moreRuns_other": "ほか{{count}}件のルーティン",
     "runTimes": "×{{count}}",
     "result": {
       "ok": "返信あり",

@@ -176,21 +176,33 @@ export interface BoardColumn {
   groups: IssueColumnGroup<Issue>[];
 }
 
-/** The board: each stage with its tasks, canceled ones in "Feito"; a stage with nothing stays as an empty column. */
+/**
+ * The board: each stage with its tasks, canceled ones in "Feito"; a stage with nothing stays as an empty column. A
+ * customized A fazer shows each of its columns, empty ones too, since each takes a new task from its "+".
+ */
 export function issueBoard(list: Issue[], columns: IssueColumn[] = []): BoardColumn[] {
   const sections = [...issueSections(list, "open", null, columns), ...issueSections(list, "done", null, columns)];
+  const todo = stageColumns(columns, "todo");
   return BOARD_STAGES.map((stage) => {
     const here = sections.filter((s) => s.key === stage || (stage === "done" && s.key === "canceled"));
+    const count = here.reduce((n, s) => n + s.count, 0);
+    const groups = here.flatMap((s) =>
+      s.groups.map((g) => ({
+        ...g,
+        items: [...g.items].sort((x, y) => urgency(x) - urgency(y)),
+      })),
+    );
+    if (stage !== "todo" || !stageCustomized(todo))
+      return { stage, count, showColumns: here.some((s) => s.showColumns), groups };
+    const byColumn = new Map(groups.map((g) => [g.column?.id ?? null, g]));
     return {
       stage,
-      count: here.reduce((n, s) => n + s.count, 0),
-      showColumns: here.some((s) => s.showColumns),
-      groups: here.flatMap((s) =>
-        s.groups.map((g) => ({
-          ...g,
-          items: [...g.items].sort((x, y) => urgency(x) - urgency(y)),
-        })),
-      ),
+      count,
+      showColumns: true,
+      groups: [
+        ...groups.filter((g) => g.column === null),
+        ...todo.map((c) => byColumn.get(c.id) ?? { key: c.id, column: c, items: [] }),
+      ],
     };
   });
 }

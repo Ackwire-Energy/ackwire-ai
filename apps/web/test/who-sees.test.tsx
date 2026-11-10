@@ -126,17 +126,19 @@ describe("Quem vê in a personal workspace (ADR 0159)", () => {
   });
 
   test("alone, a task shows Quem vê only once it says anything but everyone", async () => {
+    // The task's strip names each control in its label: "Quem vê: Só eu".
+    const whoSees = () => document.querySelector('[aria-label^="Quem vê"]');
     const api = createFakeApi(personal(true));
     const open = await api.issues.create(ORG_ID, { title: "Plano aberto" });
     await renderPage(<IssuePage number={open.number} />, { api, org: true });
     await settle(5);
     expect(document.body.textContent).toContain("Plano aberto");
-    expect(document.body.textContent).not.toContain("Quem vê");
+    expect(whoSees()).toBeNull();
     cleanup();
     const mine = await api.issues.create(ORG_ID, { title: "Plano meu" });
     await api.issues.setAudience(ORG_ID, mine.id, { mode: "people", userIds: ["u-walter"] });
     await renderPage(<IssuePage number={mine.number} />, { api, org: true });
     await settle(5);
-    expect(document.body.textContent).toContain("Quem vê");
+    expect(whoSees()).not.toBeNull();
   });
 });

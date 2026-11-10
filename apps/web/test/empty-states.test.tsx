@@ -250,7 +250,11 @@ describe("the right words for the right empty", () => {
     await click(screen().getByRole("radio", { name: "Agenda" }));
     expect(title()).toBe("Agenda livre nos próximos 30 dias");
     expect(screen().getAllByRole("button", { name: /Novo evento/ })).toHaveLength(1);
+    // Under 1440 the side panel starts closed, so the sources are in the Filtros popover.
+    await click(screen().getByRole("button", { name: "Filtros" }));
     await click(screen().getByRole("button", { name: /^Pessoas/ }));
+    await act(async () => fireEvent.keyDown(document.activeElement ?? window, { key: "Escape" }));
+    await settle(2);
     expect(empty().querySelector(".ac-empty__agent")).toBeNull();
     await click(within(empty()).getByRole("button", { name: "Limpar filtros" }));
     expect(title()).toBe("Agenda livre nos próximos 30 dias");

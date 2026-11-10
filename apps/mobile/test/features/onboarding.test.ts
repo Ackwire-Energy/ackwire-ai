@@ -155,3 +155,15 @@ test("the first question makes a personal workspace at once, named in the person
   expect(flow).toContain("PURPOSES.map((mode) => {");
   expect(flow).toContain('workspaceAnswer(t, purpose ?? "team", orgName)');
 });
+
+test("step 1 is one call, the workspace with its zones; the finish and the DM it opens say the rest themselves (#1)", () => {
+  const flow = src("onboarding/OnboardingFlow.tsx");
+  expect(flow).toContain("...(zone ? { timezone: zone, memberTimezone: zone } : {})");
+  // Nothing after them asks the server again: no zone of the person's own, no lists read before the DM opens.
+  expect(flow).not.toMatch(/orgs\.updateMe|refetchType/);
+  expect(flow).toContain("if (res.me) qc.setQueryData(keys.me, res.me);");
+  expect(flow).toContain("if (done.me) qc.setQueryData(keys.me, done.me);");
+  expect(flow).toContain("if (dm?.dm) addDm(qc, id, dm.dm);");
+  // An older self-hosted server's open says no DM: its list is read again, never waited for.
+  expect(flow).toContain("else if (dm) void qc.invalidateQueries({ queryKey: keys.dms(id) });");
+});

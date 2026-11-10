@@ -7,6 +7,7 @@ import {
   DEFAULT_LOCALE,
   isAppLocale,
   LOCALE_CODES,
+  localeInfo,
   readyLocales,
 } from "@agenteschat/i18n/locale";
 import i18n, { type i18n as I18n, type InitOptions } from "i18next";
@@ -165,9 +166,12 @@ const options = (lng: LocaleCode): InitOptions => ({
   returnNull: false,
 });
 
-/** The app's instance, with only `lng` and English (every key's fallback) downloaded. */
+/**
+ * The app's instance with only `lng` downloaded (index.html preloads it): a ready language holds every key (ADR 0122),
+ * so English, every key's fallback, comes only with one that isn't ready.
+ */
 export async function loadI18n(lng: LocaleCode): Promise<I18n> {
-  const codes = [...new Set<LocaleCode>([lng, DEFAULT_LOCALE])];
+  const codes = [...new Set<LocaleCode>(localeInfo(lng).ready ? [lng] : [lng, DEFAULT_LOCALE])];
   const strings = await Promise.all(codes.map((code) => retryOnce(loadStrings[code])));
   const instance = i18n.createInstance();
   void instance.use(initReactI18next).init({

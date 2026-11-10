@@ -7,7 +7,7 @@ import { Button } from "@agenteschat/ui";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Cover } from "../browser/Cover";
-import { CommandBlock } from "../Machines";
+import { CommandBlock } from "../machine-bits";
 import { Egress } from "./Egress";
 
 /** The stage with nothing live on it: the screen's shape, and the cover that says why. */

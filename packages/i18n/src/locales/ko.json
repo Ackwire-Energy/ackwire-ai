@@ -6638,15 +6638,14 @@
     "links": "연결됨",
     "prBy": "PR #{{number}} · {{name}}이(가) 엶",
     "artifactBy": "{{title}}({{name}})",
-    "noLinks": "아직 연결된 항목이 없어요.",
     "github": {
       "label": "GitHub 링크",
       "placeholder": "이슈 또는 PR 링크",
       "invalid": "GitHub 이슈나 풀 리퀘스트 링크가 아니에요.",
-      "remove": "GitHub 링크 삭제"
+      "remove": "GitHub 링크 삭제",
+      "add": "GitHub 링크 추가"
     },
     "openConversation": "대화 보기",
-    "labels": "라벨",
     "tabs": {
       "label": "작업 구성",
       "details": "세부 정보",
@@ -8353,6 +8352,8 @@
     },
     "upcoming": "다가오는 일정",
     "upcomingEmpty": "다가오는 일정이 없어요.",
+    "owners": "에이전트와 사람",
+    "showOwner": "{{name}} 표시",
     "viewZone": "캘린더 시간대",
     "miniMonth": "날짜 선택",
     "new": "새 일정",
@@ -8378,12 +8379,6 @@
         "declined": "참석하지 않아요."
       }
     },
-    "kind": {
-      "event": "일정",
-      "routine": "루틴",
-      "reminder": "리마인더",
-      "deadline": "작업 마감일"
-    },
     "every": {
       "hour": "매시간",
       "hours": "{{count}}시간마다",
@@ -8391,22 +8386,19 @@
     },
     "perDay": "하루 {{count}}회",
     "runs_other": "이 기간에 실행 {{count}}회.",
-    "routineDetail": "{{agent}}의 루틴 · {{target}}에 전달해요.",
+    "routineDetail": "루틴 · {{target}}에 전달",
     "deadlineDetail": "작업 마감일이에요.",
     "reminderBy": "{{name}} 님이 설정",
-    "reminderPosted": "{{agent}} 게시 · {{target}}",
+    "reminderPosted": "리마인더 · {{target}}에 게시",
     "cancelReminder": "리마인더 취소",
     "reminderCancelled": "리마인더를 취소했습니다",
     "openIssue": "작업 열기",
     "openRoutines": "루틴에서 보기",
     "openRoutine": "루틴 열기",
     "runAria": "루틴 {{name}}, {{time}}",
-    "runsAria": "{{time}}에 루틴 {{count}}개: {{names}}",
     "runHint": "{{name}} · {{agent}} · {{time}}",
     "runsAt": "{{time}}의 루틴",
-    "runsOn": "루틴 · {{day}}",
-    "runsCount_other": "루틴 실행 {{count}}회",
-    "dayRunsAria_other": "{{day}}에 루틴 실행 {{count}}회: {{names}}",
+    "moreRuns_other": "+{{count}}개 루틴",
     "runTimes": "×{{count}}",
     "result": {
       "ok": "답함",

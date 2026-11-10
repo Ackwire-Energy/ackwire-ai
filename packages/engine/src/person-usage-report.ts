@@ -589,6 +589,7 @@ export async function personUsageDetail(
     roleIds: member.roleIds ?? [],
     owner: member.owner,
     money,
+    estimated: daily.some((r) => r.plan === true),
     renewsAt: nextMonth(at).toISOString(),
     since: since.toISOString(),
     until: until.toISOString(),

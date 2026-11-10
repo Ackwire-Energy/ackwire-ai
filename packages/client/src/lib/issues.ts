@@ -1,5 +1,7 @@
 import type { TFunction } from "i18next";
 import type { Issue, IssueActivity, IssuePriority, IssueStatus } from "../api/types";
+import { timeAgo } from "./format";
+import { blockedText } from "./long-work";
 import { can } from "./permissions";
 
 export const BOARD: IssueStatus[] = ["todo", "in_progress", "in_review", "done"];
@@ -79,6 +81,49 @@ export const isWorking = (i: Pick<Issue, "work">) => Boolean(i.work && i.work.st
 /** In progress with an agent and no run alive: the agent took it but nobody is working. */
 export const isStalled = (i: Pick<Issue, "work">) => i.work?.state === "stalled";
 export const isOpen = (i: Pick<Issue, "status">) => i.status !== "done" && i.status !== "canceled";
+
+/** The one state a task's card, row and list say, beside who has it ("Pergunta algo", "Parado há 2 dias"). */
+export type CardState =
+  | { kind: "approval" }
+  | { kind: "question" }
+  | { kind: "running" }
+  | { kind: "stalled"; since: string }
+  | { kind: "blocked"; blocked: NonNullable<Issue["blocked"]> };
+
+/**
+ * What a task's card says it needs or does now, from one place: its agent's work first, then background work stopped
+ * on something, then a turn live in its conversation (`live`). A closed task says nothing. So a card never says
+ * "Pergunta algo" and "Trabalhando" at once, as it did while the conversation's line read the live turn on its own.
+ */
+export function cardState(i: Pick<Issue, "status" | "work" | "blocked">, live = false): CardState | null {
+  if (!isOpen(i)) return null;
+  const w = i.work;
+  if (w?.state === "waiting_approval") return { kind: "approval" };
+  if (w?.state === "waiting_input") return { kind: "question" };
+  if (w?.state === "running") return { kind: "running" };
+  if (w?.state === "stalled") return { kind: "stalled", since: w.since };
+  if (i.blocked) return { kind: "blocked", blocked: i.blocked };
+  return live ? { kind: "running" } : null;
+}
+
+/** A waiting state calls on a person: the card wears its agent's sky. */
+export const cardWaits = (s: CardState | null) => s?.kind === "approval" || s?.kind === "question";
+
+/** The state in words: "Pede aprovação", "Pergunta algo", "Trabalhando", "Parado há 2 dias", the blocked reason. */
+export function cardStateText(t: TFunction, s: CardState, now = new Date()): string {
+  switch (s.kind) {
+    case "approval":
+      return t("issues.work.waitingApproval");
+    case "question":
+      return t("issues.work.waitingInput");
+    case "running":
+      return t("threads.status.working");
+    case "stalled":
+      return t("issues.work.stalled", { when: timeAgo(t, s.since, now.getTime()) });
+    case "blocked":
+      return blockedText(t, s.blocked) ?? "";
+  }
+}
 
 /** An issue someone asked an agent to implement, as a message carries it. */
 export interface IssueWorkRef {

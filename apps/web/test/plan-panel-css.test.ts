@@ -90,7 +90,7 @@ test("what ships rests a chosen control's neighbours on its pressed face, and a 
   const chosen = shipped
     .filter((r) => sets(r, "var(--chosen-bg)"))
     .flatMap((r) => r.selectors.filter((s) => STATE.test(s)).map((s) => s.replace(STATE, "")));
-  expect(chosen).toEqual(expect.arrayContaining([".ac-recur__day", ".newag__opt", ".cal-chip", ".ac-optrow"]));
+  expect(chosen).toEqual(expect.arrayContaining([".ac-recur__day", ".newag__opt", ".cal-mini__day", ".ac-optrow"]));
   const sunken = shipped
     .filter((r) => sets(r, "var(--sunken)") || sets(r, "var(--surface-sunken)"))
     .flatMap((r) => r.selectors);

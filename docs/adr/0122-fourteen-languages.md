@@ -38,8 +38,11 @@ AGPL and self-hostable) waits for human translators.
    left in English unless listed in `identical.json`, the glossary's keep-as-is names, no semicolons, the no-break
    spaces of menu paths and closing words (not for ja and zh-Hans). `fillPluralGaps` copies `_other` into `_many`
    (es, fr, it, pt-BR: round millions) and pt-BR's `_zero`.
-3. **Loading.** The web and every desktop window load one language and English (`loadStrings`, one chunk each;
-   `loadDesktopI18n`), and the next on a switch. The phone requires the shared strings lazily (Metro runs a module on
+3. **Loading.** Every desktop window loads one language and English (`loadStrings`, one chunk each;
+   `loadDesktopI18n`), and the next on a switch. The web loads only the person's language when it is ready (§2: it
+   holds every key), English too only with one that isn't, and that file comes with the app instead of after it: the
+   build gives index.html each language's file (`vite-locale-preload.ts`) and its inline script preloads the one
+   `savedLocale()` picks (`test/locale-preload.test.ts` keeps the two picks one). The phone requires the shared strings lazily (Metro runs a module on
    first `require`); its own and the desktop's small files (about 25 KB a language) are in the bundle. Native lists
    (expo `locales`, `supportedLocales`, the Mac's `CFBundleLocalizations`) name only ready languages, since the stores
    show them; a test keeps them equal to the ready set. i18next: `fallbackLng: "en"`, `supportedLngs: LOCALE_CODES`, `load: "currentOnly"`.

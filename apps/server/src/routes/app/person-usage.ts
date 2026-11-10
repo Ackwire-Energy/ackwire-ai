@@ -125,6 +125,10 @@ const PersonUsage = z
     roleIds: z.array(z.string()),
     owner: z.boolean(),
     money: z.boolean().openapi({ description: "Amounts are US$; false: percentages of the person's limit." }),
+    estimated: z.boolean().openapi({
+      description:
+        "Some of the period's use was on a plan: that part is priced at the API's list price, which nobody pays.",
+    }),
     renewsAt: z.string(),
     since: z.string(),
     until: z.string(),

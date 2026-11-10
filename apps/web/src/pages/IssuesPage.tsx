@@ -1,18 +1,20 @@
 import type { Actor, Issue, IssueColumn, IssuePriority, IssueStatus, IssuesView } from "@agenteschat/client";
-import { useIssueColumns, useIssues, useIssuesView, useSetIssuesView } from "@agenteschat/client";
-import { dueLabel, relativeTime, toYmd } from "@agenteschat/client/lib/format";
+import { useIssueColumns, useIssues, useIssuesView, useSetIssuesView, useTaskUnread } from "@agenteschat/client";
+import { dueLabel, dueTone, relativeTime } from "@agenteschat/client/lib/format";
 import { githubLinkLabel } from "@agenteschat/client/lib/github-link";
 import { ISSUES_VIEW_DEFAULT, PRIORITY_ORDER, sortIssues } from "@agenteschat/client/lib/issues-view";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
   Button,
   Chip,
-  CriteriaPixels,
   cx,
   EmptyState,
+  FactLine,
   GroupHeading,
   Icon,
+  type IconName,
   Kbd,
+  type LineFact,
   Menu,
   MenuItem,
   PageHeader,
@@ -23,21 +25,24 @@ import {
 import { Link, useNavigate } from "@tanstack/react-router";
 import { type ReactNode, useDeferredValue, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
+import { ActorAvatar, ActorWho, AgentAvatar } from "@/components/AgentAvatar";
 import { AskAgentButton } from "@/components/AskAgentButton";
 import { actorFromKey, actorKey, NO_ACTOR, useActors } from "@/components/actors";
-import { IssueCardWork } from "@/components/BackgroundWork";
 import { useFilterCopy } from "@/components/filters";
 import { GitHubMark } from "@/components/GitHubMark";
 import { ErrorState, LoadingCards, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
-import { TaskCardConversation, TaskMentions } from "@/components/TaskConversation";
+import { CardSky } from "@/components/Sky";
+import { TaskMentions, useTaskLive } from "@/components/TaskConversation";
 import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { copyText } from "@/lib/context-menu";
 import { entityMenu } from "@/lib/entity-menu";
 import {
   BOARD,
   boardStages,
+  cardState,
+  cardStateText,
+  cardWaits,
   groupByColumn,
   isCustomBoard,
   isOpen,
@@ -45,12 +50,14 @@ import {
   isWorking,
   rankAt,
   STATUS_ICON,
+  type CardState as TaskState,
   useAssigneeColor,
   useColumnTitle,
   useStageName,
   useStepText,
 } from "@/lib/issues";
 import { lookOf } from "@/lib/look";
+import { codeAndBold } from "@/lib/markdown";
 import { inPlaceClick } from "@/lib/navigate";
 import { useOpenParam } from "@/lib/open-param";
 import { type ToastText, useToast } from "@/lib/toast";
@@ -193,15 +200,20 @@ export function IssuesPage() {
           </Toolbar>
           {(issues.isLoading || viewLoading || (!columns && columnsQuery.isLoading)) &&
             (view.layout === "board" ? (
-              <div className="issues-board">
-                {BOARD.map((status) => (
-                  <section key={status} className="issues-col" aria-label={t(`issues.status.${status}`)}>
-                    <div className="issues-col__head">
-                      <h2>{t(`issues.status.${status}`)}</h2>
-                    </div>
-                    <LoadingCards count={2} className="loading-cards loading-cards--tight" />
-                  </section>
-                ))}
+              // In the board's own frame and sideways scroller, so it loads where it will stay.
+              <div className="issues-boardframe page-split">
+                <div className="issues-boardwrap">
+                  <div className="issues-board">
+                    {BOARD.map((status) => (
+                      <section key={status} className="issues-col" aria-label={t(`issues.status.${status}`)}>
+                        <div className="issues-col__head">
+                          <h2>{t(`issues.status.${status}`)}</h2>
+                        </div>
+                        <LoadingCards count={2} className="loading-cards loading-cards--tight" />
+                      </section>
+                    ))}
+                  </div>
+                </div>
               </div>
             ) : (
               <LoadingList count={5} avatar={false} trailing />
@@ -254,7 +266,7 @@ export function IssuesPage() {
               all={all}
               openNumber={openNumber}
               onOpen={toggle}
-              onNew={(columnId) => setCreating({ columnId })}
+              onNew={posts ? (columnId) => setCreating({ columnId }) : undefined}
             />
           )}
         </div>
@@ -302,7 +314,8 @@ function IssuesBody({
   all: Issue[];
   openNumber: number | null;
   onOpen: (n: number) => void;
-  onNew: (columnId: string) => void;
+  /** Who may create tasks: "+" in A fazer's columns. */
+  onNew?: (columnId: string) => void;
 }) {
   const { t, i18n } = useTranslation();
   const actors = useActors();
@@ -469,7 +482,10 @@ function IssuesBody({
   );
 }
 
-/** The agents on issues right now (live runs), then the stalled ones (in progress, no run alive). */
+/**
+ * The agents on issues right now (live runs), then the stalled ones (in progress, no run alive): the live step, or the
+ * last one, and "Pedir para continuar". What each needs is on its card, so the strip never says it again.
+ */
 function WorkingNow({ issues, onOpen }: { issues: Issue[]; onOpen: (n: number) => void }) {
   const { t, i18n } = useTranslation();
   const actors = useActors();
@@ -493,6 +509,13 @@ function WorkingNow({ issues, onOpen }: { issues: Issue[]; onOpen: (n: number) =
           const stall = w.state === "stalled";
           const waiting = w.state === "waiting_approval" || w.state === "waiting_input";
           const step = stepText(w.steps.at(-1));
+          const body = stall
+            ? step
+              ? t("issues.work.noRunStep", { step })
+              : t("issues.work.noRun")
+            : waiting
+              ? step && t("issues.work.lastStep", { step })
+              : step || t("issues.work.starting");
           return (
             <button
               key={i.id}
@@ -513,23 +536,12 @@ function WorkingNow({ issues, onOpen }: { issues: Issue[]; onOpen: (n: number) =
               <span className="ac-mediarow__head">
                 <b>{name}</b>
                 <span className="ac-mediarow__meta">
-                  #{i.number} ·{" "}
-                  {stall
-                    ? t("issues.work.stalled", { when: relativeTime(t, i18n.language, w.since) })
-                    : relativeTime(t, i18n.language, w.since)}
+                  #{i.number} · {relativeTime(t, i18n.language, w.since)}
                 </span>
               </span>
               <span className="ac-mediarow__body">
-                <span className="issues-now__task">{i.title}</span>
-                <span className={cx("issues-now__step", !stall && !waiting && "is-live")}>
-                  {stall
-                    ? step
-                      ? t("issues.work.noRunStep", { step })
-                      : t("issues.work.noRun")
-                    : waiting
-                      ? t(w.state === "waiting_approval" ? "issues.work.waitingApproval" : "issues.work.waitingInput")
-                      : step || t("issues.work.starting")}
-                </span>
+                <span className="issues-now__task">{codeAndBold(i.title)}</span>
+                {body && <span className={cx("issues-now__step", !stall && !waiting && "is-live")}>{body}</span>}
                 {stall && (
                   <span className="issues-now__go">
                     <Icon name="play" size={14} />
@@ -546,95 +558,135 @@ function WorkingNow({ issues, onOpen }: { issues: Issue[]; onOpen: (n: number) =
   );
 }
 
-/** A due date as a chip: late ones carry the attention tone (on an open issue). */
-function DueChip({ issue: i }: { issue: Issue }) {
-  const { t, i18n } = useTranslation();
-  if (!i.dueDate || !isOpen(i)) return null;
-  const late = i.dueDate < toYmd(new Date());
-  return (
-    <Chip icon="calendar" className={cx("issue-due", late && "is-late")}>
-      {dueLabel(t, i18n.language, i.dueDate)}
-    </Chip>
-  );
-}
+/** A state's mark: an agent at work in its color; what calls on a person, or stopped, in the attention one. */
+const STATE_ICON: Record<TaskState["kind"], IconName> = {
+  approval: "shield",
+  question: "question",
+  running: "bolt",
+  stalled: "pause",
+  blocked: "waiting",
+};
 
-function PriorityChip({ issue: i }: { issue: Issue }) {
+/** The one state a task's card and row say beside who has it ("Pergunta algo", "Parado há 2 dias"). */
+function StateWords({ state }: { state: TaskState }) {
   const { t } = useTranslation();
-  if (i.priority === "normal") return null;
-  return <Chip icon={i.priority === "high" ? "arrowUp" : "dash"}>{t(`issues.priority.${i.priority}`)}</Chip>;
-}
-
-function Criteria({ issue: i }: { issue: Issue }) {
-  const { t } = useTranslation();
-  const color = useAssigneeColor();
-  if (i.criteria.length === 0) return null;
-  const done = i.criteria.filter((c) => c.done).length;
+  const failed = state.kind === "blocked" && state.blocked.reason === "failed";
   return (
-    <span className="issue-crit" role="img" aria-label={t("issues.criteriaLabel", { done, total: i.criteria.length })}>
-      <CriteriaPixels done={i.criteria.map((c) => c.done)} color={color(i)} />
-      <span aria-hidden="true">
-        {done}/{i.criteria.length}
-      </span>
+    <span className="issue-card__state" data-tone={state.kind === "running" ? "agent" : "warn"}>
+      <Icon name={failed ? "alert" : STATE_ICON[state.kind]} size={14} inline />
+      {cardStateText(t, state)}
     </span>
   );
 }
 
 /**
- * Who has it, or what the agent is doing (the step, "Pede aprovação", "Parado há 2 dias"). Nobody: an empty place the
- * size of a face, so the name lines up with the cards that have one.
+ * Who has it and the one thing it needs or does now, as one block of words: the face (moving while its agent works),
+ * the name, the state. A long name wraps under the face at the card's full width. Nobody and nothing going on: none.
+ * With Responsável off in Exibição, the state still shows: it is what the card asks of the person.
  */
-function WhoLine({ issue: i }: { issue: Issue }) {
-  const { t, i18n } = useTranslation();
+function CardWho({ issue: i, state, assignee }: { issue: Issue; state: TaskState | null; assignee: boolean }) {
   const actors = useActors();
-  const stepText = useStepText();
-  if (!i.assignee)
-    return (
-      <>
-        <span className="issue-nobody" aria-hidden="true">
-          <Icon name="person" size={14} />
-        </span>
-        <span className="issue-who__name muted">{t("issues.noAssignee")}</span>
-      </>
-    );
-  const w = i.work;
-  const name = actors.name(i.assignee);
-  const avatar =
-    i.assignee.type === "agent" ? (
-      <AgentAvatar
-        agentId={i.assignee.id}
-        name={name}
-        size="sm"
-        running={w?.state === "running"}
-        state={w?.state === "running" ? "writing" : undefined}
-        expression={isStalled(i) ? "closed" : undefined}
-      />
-    ) : (
-      <ActorAvatar actor={i.assignee} name={name} size="sm" />
-    );
-  if (w?.state === "stalled")
-    return (
-      <>
-        {avatar}
-        <Chip icon="waiting" className="issue-stall">
-          {t("issues.work.stalled", { when: relativeTime(t, i18n.language, w.since) })}
-        </Chip>
-      </>
-    );
-  if (w?.state === "waiting_approval" || w?.state === "waiting_input")
-    return (
-      <>
-        {avatar}
-        <Chip icon="shield" className="issue-needs">
-          {t(w.state === "waiting_approval" ? "issues.work.waitingApproval" : "issues.work.waitingInput")}
-        </Chip>
-      </>
-    );
+  const who = assignee ? i.assignee : null;
+  if (!who && !state) return null;
+  const work = state?.kind === "running" ? "running" : state?.kind === "stalled" ? "stalled" : undefined;
   return (
-    <>
-      {avatar}
-      <span className="issue-who__name">{w ? stepText(w.steps.at(-1)) || t("issues.work.starting") : name}</span>
-    </>
+    <span className="issue-card__who">
+      {who && <ActorWho actor={who} name={actors.name(who)} size="sm" work={work} />}
+      {state && (
+        <>
+          {who && " "}
+          <StateWords state={state} />
+        </>
+      )}
+    </span>
   );
+}
+
+/**
+ * A card's and a row's one line of facts, each under its view toggle: the number, the label (the line's one pill),
+ * the priority, the due date (in the attention tone today, tomorrow and once late), the criteria, GitHub, and the
+ * conversation's count (bold while unread, with the red count of mentions of me).
+ */
+function CardFacts({ issue: i, fields }: { issue: Issue; fields: IssuesView["fields"] }) {
+  const { t, i18n } = useTranslation();
+  const { org } = useOrg();
+  const { unread, mentions } = useTaskUnread(org.id, i.id);
+  const facts: LineFact[] = [{ key: "number", text: `#${i.number}` }];
+  const [label, ...labels] = i.labels;
+  if (fields.label && label) {
+    facts.push({ key: "label", text: label, tone: "label" });
+    if (labels.length > 0) facts.push({ key: "labels", text: `+${labels.length}`, title: labels.join(", ") });
+  }
+  if (fields.priority && i.priority !== "normal")
+    facts.push({
+      key: "priority",
+      icon: i.priority === "high" ? "arrowUp" : "arrowDown",
+      text: t(`issues.priority.${i.priority}`),
+      tone: i.priority === "high" ? "warn-icon" : undefined,
+    });
+  if (fields.due && i.dueDate && isOpen(i)) {
+    const tone = dueTone(i.dueDate);
+    facts.push({
+      key: "due",
+      icon: tone === "late" ? "alert" : "calendar",
+      text: dueLabel(t, i18n.language, i.dueDate),
+      tone: tone ? "warn" : undefined,
+      title: t("issues.due"),
+    });
+  }
+  if (fields.criteria && i.criteria.length > 0) {
+    const done = i.criteria.filter((c) => c.done).length;
+    const total = i.criteria.length;
+    facts.push({
+      key: "criteria",
+      icon: "approve",
+      text: `${done}/${total}`,
+      tone: done === total ? "ok" : undefined,
+      title: t("issues.criteriaLabel", { done, total }),
+    });
+  }
+  const pr = fields.pullRequest ? i.pullRequests.at(-1) : undefined;
+  if (pr) facts.push({ key: "pr", icon: <GitHubMark />, text: t("issues.pr", { number: pr.number }) });
+  if (fields.pullRequest && i.githubUrl)
+    facts.push({ key: "github", icon: <GitHubMark />, text: githubLinkLabel(i.githubUrl), title: i.githubUrl });
+  const talk = i.conversation?.count ?? 0;
+  if (talk > 0 || mentions > 0)
+    facts.push({
+      key: "talk",
+      icon: "thread",
+      text: (
+        <>
+          {talk > 0 && talk}
+          <TaskMentions issue={i} />
+        </>
+      ),
+      tone: unread > 0 ? "bold" : undefined,
+      title: talk > 0 ? t("issues.conversation.messages", { count: talk }) : undefined,
+    });
+  return <FactLine className="issue-card__facts" facts={facts} />;
+}
+
+/**
+ * What a card and a row say of a task: its one state (from its agent's work or a live turn), their link's name, and
+ * who has it as the link's description (`who`, rendered inside it; `describedBy` adds the drag help).
+ */
+function useTaskCard(i: Issue) {
+  const { t } = useTranslation();
+  const actors = useActors();
+  const whoId = useId();
+  const state = cardState(i, useTaskLive(i));
+  const name = t("issues.open", { number: i.number, title: i.title });
+  const who = i.assignee && (
+    <span id={whoId} hidden>
+      {`${t("issues.form.assignee")}: ${actors.name(i.assignee)}`}
+    </span>
+  );
+  return {
+    state,
+    label: state ? `${name}, ${cardStateText(t, state)}` : name,
+    who,
+    describedBy: (help: string) => (who ? `${whoId} ${help}` : help),
+  };
 }
 
 /** An issue's right click (board card, list row): open beside the list, open its page, copy its link, delete it. */
@@ -694,15 +746,10 @@ function withMenuKeys(menu: ReturnType<ReturnType<typeof useIssueMenu>>, drag: C
   };
 }
 
-/** The task's GitHub link on its row: the row opens the task, the page opens the link. */
-function GithubChip({ url }: { url: string }) {
-  return (
-    <Chip lead={<GitHubMark />} className="issue-card__pr" title={url}>
-      {githubLinkLabel(url)}
-    </Chip>
-  );
-}
-
+/**
+ * A task on the board, in three parts on the card's left edge: the title, whole; one line of facts; who has it and
+ * the one thing it needs or does now. An agent waiting on a person gives the card its sky; while it works, its sweep.
+ */
 function IssueCard({
   issue: i,
   selected,
@@ -721,18 +768,17 @@ function IssueCard({
   const { t } = useTranslation();
   const { org } = useOrg();
   const color = useAssigneeColor();
-  const pr = fields.pullRequest ? i.pullRequests.at(-1) : undefined;
-  const github = fields.pullRequest ? i.githubUrl : null;
+  const { state, label, who, describedBy } = useTaskCard(i);
   const menu = useIssueMenu()(i, () => !selected && onOpen());
   return (
     <Link
       to="/org/$orgId/issues/$number"
       params={{ orgId: org.id, number: String(i.number) }}
       className={cx("issue-card", selected && "is-on", picked && "is-picked")}
-      aria-label={t("issues.open", { number: i.number, title: i.title })}
+      aria-label={label}
       aria-current={selected || undefined}
       aria-roledescription={t("issues.drag.role")}
-      aria-describedby={drag.help}
+      aria-describedby={describedBy(drag.help)}
       draggable={drag.draggable}
       onDragStart={drag.onDragStart}
       onPointerDown={drag.onPointerDown}
@@ -742,36 +788,12 @@ function IssueCard({
       data-status={i.status}
       data-card={i.number}
     >
-      <span className="issue-card__title">
-        <span className="issue-card__number tabular">#{i.number}</span> {i.title}
-        <TaskMentions issue={i} />
-      </span>
-      {((fields.label && i.labels[0]) ||
-        (fields.priority && i.priority !== "normal") ||
-        (fields.due && i.dueDate && isOpen(i))) && (
-        <span className="issue-card__top tabular">
-          {fields.label && i.labels[0] && <span>{i.labels[0]}</span>}
-          <span className="issue-card__grow" />
-          {fields.priority && <PriorityChip issue={i} />}
-          {fields.due && <DueChip issue={i} />}
-        </span>
-      )}
-      {fields.criteria && <Criteria issue={i} />}
-      <IssueCardWork issue={i} />
-      {(fields.assignee || pr || github) && (
-        <span className="issue-card__foot">
-          {fields.assignee && <WhoLine issue={i} />}
-          <span className="issue-card__grow" />
-          {github && <GithubChip url={github} />}
-          {pr && (
-            <Chip icon="pullRequest" className="issue-card__pr">
-              {t("issues.pr", { number: pr.number })}
-            </Chip>
-          )}
-        </span>
-      )}
-      <TaskCardConversation issue={i} />
-      {isWorking(i) && <WorkSweep color={color(i) ?? "sky"} waiting={i.work?.state !== "running"} />}
+      {cardWaits(state) && <CardSky color={color(i) ?? "sky"} />}
+      <span className="issue-card__title">{codeAndBold(i.title)}</span>
+      <CardFacts issue={i} fields={fields} />
+      <CardWho issue={i} state={state} assignee={fields.assignee} />
+      {state?.kind === "running" && <WorkSweep color={color(i) ?? "sky"} />}
+      {who}
     </Link>
   );
 }
@@ -896,9 +918,6 @@ function IssueRows({
   fields: IssuesView["fields"];
   helpId: string;
 }) {
-  const { t } = useTranslation();
-  const { org } = useOrg();
-  const color = useAssigneeColor();
   const menuOf = useIssueMenu();
   const entries = dnd.entries(g.id);
   const shown = entries.some((e) => e.kind === "spot" || e.state !== "hidden");
@@ -908,8 +927,6 @@ function IssueRows({
         if (e.kind === "spot")
           return <li key={e.key} className="issue-spot issue-spot--row" data-spot style={e.style} aria-hidden="true" />;
         const i = e.item;
-        const menu = menuOf(i, () => i.number !== openNumber && onOpen(i.number));
-        const drag = { ...dnd.card(i, g.id), help: helpId };
         return (
           <li
             key={i.id}
@@ -917,33 +934,15 @@ function IssueRows({
             hidden={e.state === "hidden" || undefined}
             data-landing={e.state === "landing" || undefined}
           >
-            <Link
-              to="/org/$orgId/issues/$number"
-              params={{ orgId: org.id, number: String(i.number) }}
-              className={cx("issue-list__row", i.number === openNumber && "is-on", e.state === "picked" && "is-picked")}
-              aria-roledescription={t("issues.drag.role")}
-              aria-describedby={drag.help}
-              draggable={drag.draggable}
-              onDragStart={drag.onDragStart}
-              onPointerDown={drag.onPointerDown}
-              onClick={(ev) => inPlaceClick(ev, () => onOpen(i.number))}
-              onContextMenu={menu.onContextMenu}
-              onKeyDown={withMenuKeys(menu, drag)}
-              data-card={i.number}
-            >
-              <span className="issue-list__num tabular">#{i.number}</span>
-              <span className="issue-list__title">
-                <b data-num={`#${i.number}`}>{i.title}</b>
-                <TaskMentions issue={i} />
-                {fields.priority && <PriorityChip issue={i} />}
-                {fields.pullRequest && i.githubUrl && <GithubChip url={i.githubUrl} />}
-              </span>
-              <span className="issue-list__crit">{fields.criteria && <Criteria issue={i} />}</span>
-              <span className="issue-list__who">{fields.assignee && <WhoLine issue={i} />}</span>
-              <span className="issue-list__due">{fields.due && <DueChip issue={i} />}</span>
-              <span className="issue-sr">{t(`issues.status.${i.status}`)}</span>
-              {isWorking(i) && <WorkSweep color={color(i) ?? "sky"} waiting={i.work?.state !== "running"} />}
-            </Link>
+            <IssueRow
+              issue={i}
+              selected={i.number === openNumber}
+              picked={e.state === "picked"}
+              menu={menuOf(i, () => i.number !== openNumber && onOpen(i.number))}
+              drag={{ ...dnd.card(i, g.id), help: helpId }}
+              onOpen={() => onOpen(i.number)}
+              fields={fields}
+            />
           </li>
         );
       })}
@@ -953,5 +952,59 @@ function IssueRows({
         </li>
       )}
     </ul>
+  );
+}
+
+/**
+ * A task in the list, from the card's parts: wide, its number, its title whole, its facts at its end (up to 40% of the
+ * row, ending on one right edge) and who has it; narrow, stacked as a card, the number among the facts.
+ */
+function IssueRow({
+  issue: i,
+  selected,
+  picked,
+  menu,
+  drag,
+  onOpen,
+  fields,
+}: {
+  issue: Issue;
+  selected: boolean;
+  picked: boolean;
+  menu: ReturnType<ReturnType<typeof useIssueMenu>>;
+  drag: CardDrag;
+  onOpen: () => void;
+  fields: IssuesView["fields"];
+}) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const color = useAssigneeColor();
+  const { state, label, who, describedBy } = useTaskCard(i);
+  return (
+    <Link
+      to="/org/$orgId/issues/$number"
+      params={{ orgId: org.id, number: String(i.number) }}
+      className={cx("issue-list__row", selected && "is-on", picked && "is-picked")}
+      aria-label={label}
+      aria-roledescription={t("issues.drag.role")}
+      aria-describedby={describedBy(drag.help)}
+      draggable={drag.draggable}
+      onDragStart={drag.onDragStart}
+      onPointerDown={drag.onPointerDown}
+      onClick={(ev) => inPlaceClick(ev, onOpen)}
+      onContextMenu={menu.onContextMenu}
+      onKeyDown={withMenuKeys(menu, drag)}
+      data-card={i.number}
+    >
+      <span className="issue-list__num tabular" aria-hidden="true">
+        #{i.number}
+      </span>
+      <span className="issue-list__title">{codeAndBold(i.title)}</span>
+      <CardFacts issue={i} fields={fields} />
+      <CardWho issue={i} state={state} assignee={fields.assignee} />
+      <span className="issue-sr">{t(`issues.status.${i.status}`)}</span>
+      {state?.kind === "running" && <WorkSweep color={color(i) ?? "sky"} />}
+      {who}
+    </Link>
   );
 }

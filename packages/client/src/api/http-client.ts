@@ -7,7 +7,7 @@ import type { TeamWeekPrefs } from "../lib/team-week";
 import { consultSeeds } from "../realtime/consults";
 import { steerStore } from "../realtime/steer";
 import type { VaultConnection, VaultImportResult, VaultItem, VaultItemDetail, VaultOverview } from "../vault/types";
-import type { HttpApi } from "./client";
+import type { HttpApi, OpenedWorkspace } from "./client";
 import { ApiError, createFileRequester, createRequester, enc, type TransportOptions } from "./http";
 import type {
   AccountDeletionPlan,
@@ -577,10 +577,12 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
     },
     orgs: {
       create: (input) =>
-        request<{ organization: Organization; generalChannelId: string }>("/api/app/organizations", { json: input }),
+        request<{ organization: Organization; generalChannelId: string } & OpenedWorkspace>("/api/app/organizations", {
+          json: input,
+        }),
       saveOnboarding: (orgId, input) =>
         nullOn(404, () =>
-          request<{ step: OnboardingStepId; finished: boolean }>(`${org(orgId)}/onboarding`, {
+          request<{ step: OnboardingStepId; finished: boolean } & OpenedWorkspace>(`${org(orgId)}/onboarding`, {
             method: "PATCH",
             json: input,
           }),
@@ -1143,7 +1145,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
     },
     dms: {
       list: async (orgId) => (await request<{ dms: DirectMessage[] }>(`${org(orgId)}/dms`)).dms,
-      open: (orgId, target) => request<{ channelId: string }>(`${org(orgId)}/dms`, { json: target }),
+      open: (orgId, target) =>
+        request<{ channelId: string; dm?: DirectMessage }>(`${org(orgId)}/dms`, { json: target }),
       markRead: (orgId, channelId) => request<void>(`${org(orgId)}/channels/${enc(channelId)}/read`, { json: {} }),
       reads: async (orgId, channelId) =>
         (await request<{ reads: DmRead[] }>(`${org(orgId)}/channels/${enc(channelId)}/reads`)).reads,

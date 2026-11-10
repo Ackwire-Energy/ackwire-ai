@@ -42,13 +42,14 @@ import {
 } from "@agenteschat/ui";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import { AgentAvatar } from "@/components/AgentAvatar";
-import { useActors } from "@/components/actors";
+import { ActorAvatar } from "@/components/AgentAvatar";
+import { actorKey, useActors } from "@/components/actors";
 import { AgendaView } from "@/components/calendar/AgendaView";
 import { dayLabel, ItemDetails } from "@/components/calendar/EventChip";
 import { EventDialog, type EventDraft, type EventSave } from "@/components/calendar/EventDialog";
 import { MiniMonth } from "@/components/calendar/MiniMonth";
 import { MonthView } from "@/components/calendar/MonthView";
+import { Owners } from "@/components/calendar/Owners";
 import { SeriesPrompt } from "@/components/calendar/SeriesPrompt";
 import { TimeGrid } from "@/components/calendar/TimeGrid";
 import { ErrorState, LoadingList } from "@/components/Loading";
@@ -93,7 +94,7 @@ const shortcutsFree = (e: KeyboardEvent) => {
 
 /**
  * Calendário (v2): Dia / Semana / Mês / Agenda, a collapsible side panel
- * (mini month, Próximos, filters by source, the agents note), drag to create
+ * (mini month, Agentes e pessoas, Próximos, filters by source), drag to create
  * and to move, recurring events with "Só este / Este e os próximos / Todos".
  * Keys: ←/→ move the day, N creates, T goes to today.
  */
@@ -101,6 +102,7 @@ export function CalendarPage({ today: todayProp, day }: { today?: Date; day?: st
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
   const toast = useToast();
+  const actors = useActors();
   const action = useCalendarAction(org.id);
   const reminders = useReminderAction(org.id);
   const [today] = useState(() => todayProp ?? new Date());
@@ -111,8 +113,11 @@ export function CalendarPage({ today: todayProp, day }: { today?: Date; day?: st
   const [linked, setLinked] = useOpenParam("open", WITH_OPEN);
   const [focus, setFocus] = useState(() => startOfDay(day ? dateOnly(day) : today));
   const [businessOnly, setBusinessOnly] = useState(false);
-  const [panel, setPanel] = useState(() => typeof window === "undefined" || window.innerWidth >= 1180);
+  // Beside a week only from 1440: under it the panel would leave the week columns too narrow for a name.
+  const [panel, setPanel] = useState(() => typeof window === "undefined" || window.innerWidth >= 1440);
   const [filters, setFilters] = useState<Filters>(ALL_SOURCES);
+  // Whose items are hidden (Agentes e pessoas), by `actorKey`.
+  const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set());
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [dialog, setDialog] = useState<{ draft: EventDraft | null; event: CalendarEvent | null } | null>(null);
   const [ask, setAsk] = useState<SeriesAsk | null>(null);
@@ -138,10 +143,12 @@ export function CalendarPage({ today: todayProp, day }: { today?: Date; day?: st
   // A routine that runs often is one band, not a chip per run; its lane shows how the recent runs went.
   const routines = useRoutines(org.id);
   const routineById = useMemo(() => new Map((routines.data ?? []).map((r) => [r.id, r])), [routines.data]);
-  const items = collapseRoutines(
+  const sourced = collapseRoutines(
     all.filter((it) => filters[it.source]),
     days,
-  ).map((it) => {
+  );
+  const ownerShown = (it: CalItem) => !it.owner || !hidden.has(actorKey(it.owner));
+  const items = sourced.filter(ownerShown).map((it) => {
     const r = it.routineId ? routineById.get(it.routineId) : undefined;
     if (!r) return it;
     if (!it.runs) {
@@ -163,7 +170,7 @@ export function CalendarPage({ today: todayProp, day }: { today?: Date; day?: st
   );
   const events = useMemo(() => eventsByKey(range.data), [range.data]);
   const upcoming = upcomingItems(
-    shiftItems(toItems(soon.data)).filter((it) => filters[it.source]),
+    shiftItems(toItems(soon.data)).filter((it) => filters[it.source] && ownerShown(it)),
     now,
   );
   // Once the linked event has loaded, its details open; closing them drops the link.
@@ -308,7 +315,24 @@ export function CalendarPage({ today: todayProp, day }: { today?: Date; day?: st
   );
   const inGrid = items.filter((it) => days.some((d) => onDay(it, d)));
   const posts = can(org, "post");
-  const filtersOff = Object.values(filters).includes(false);
+  const filtersOff = Object.values(filters).includes(false) || hidden.size > 0;
+  const clearFilters = () => {
+    setFilters(ALL_SOURCES);
+    setHidden(new Set());
+  };
+  const owners = (
+    <Owners
+      items={sourced.filter((it) => days.some((d) => onDay(it, d)))}
+      hidden={hidden}
+      onToggle={(key) =>
+        setHidden((h) => {
+          const next = new Set(h);
+          if (!next.delete(key)) next.add(key);
+          return next;
+        })
+      }
+    />
+  );
   // The last range stays on screen while the next one loads: its items say nothing about these days.
   const agendaWaits = range.isLoading || range.isPlaceholderData;
   const agendaEmpty = view === "agenda" && range.isSuccess && !agendaWaits && inGrid.length === 0 && !filtersOff;
@@ -402,7 +426,10 @@ export function CalendarPage({ today: todayProp, day }: { today?: Date; day?: st
               </Button>
             }
           >
-            {filterChips}
+            <div className="cal-filters">
+              {filterChips}
+              {owners}
+            </div>
           </Popover>
         )}
       </PageHeader>
@@ -434,6 +461,7 @@ export function CalendarPage({ today: todayProp, day }: { today?: Date; day?: st
               month={focus.getMonth()}
               items={items}
               today={today}
+              now={toView(now)}
               focusDay={focus}
               openKey={openKey}
               onOpenKey={onOpenKey}
@@ -447,11 +475,12 @@ export function CalendarPage({ today: todayProp, day }: { today?: Date; day?: st
               days={days}
               items={items}
               today={today}
+              now={toView(now)}
               openKey={openKey}
               onOpenKey={onOpenKey}
               details={details}
               onNew={posts ? () => newAt(focus) : undefined}
-              onClearFilters={filtersOff ? () => setFilters(ALL_SOURCES) : undefined}
+              onClearFilters={filtersOff ? clearFilters : undefined}
             />
           )}
         </div>
@@ -467,6 +496,7 @@ export function CalendarPage({ today: todayProp, day }: { today?: Date; day?: st
                 if (view === "agenda") setView("day");
               }}
             />
+            {owners}
             <section className="cal-side__section" aria-label={t("calendar.upcoming")}>
               <h2 className="cal-side__title">{t("calendar.upcoming")}</h2>
               {upcoming.length === 0 ? (
@@ -479,8 +509,8 @@ export function CalendarPage({ today: todayProp, day }: { today?: Date; day?: st
                       <li key={it.key}>
                         <ListRow
                           lead={
-                            it.agentId ? (
-                              <AgentAvatar agentId={it.agentId} size="xs" name="" />
+                            it.owner ? (
+                              <ActorAvatar actor={it.owner} size="xs" name={actors.name(it.owner)} />
                             ) : (
                               <Icon name="calendar" size={16} aria-hidden="true" />
                             )

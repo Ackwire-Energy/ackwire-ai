@@ -108,14 +108,5 @@ export function waitingText(t: TFunction, waiting: OutageAgent["waiting"]): stri
   return t("outage.count.waiting", { what: joinNames(parts, t) });
 }
 
-/** "há 12 min" since it went offline; "agora" under a minute. */
-export function offlineFor(t: TFunction, iso: string, now = Date.now()): string {
-  const diff = now - Date.parse(iso);
-  if (!Number.isFinite(diff) || diff < 60_000) return t("common.now");
-  if (diff < 3_600_000) return t("format.minutesAgo", { count: Math.floor(diff / 60_000) });
-  if (diff < 86_400_000) return t("format.hoursAgo", { count: Math.floor(diff / 3_600_000) });
-  return t("format.daysAgo", { count: Math.floor(diff / 86_400_000) });
-}
-
 /** The key that keeps one outage's notice dismissed until that computer comes back (a new outage shows again). */
 export const outageKey = (o: Pick<MachineOutage, "machineId" | "offlineSince">) => `${o.machineId}@${o.offlineSince}`;

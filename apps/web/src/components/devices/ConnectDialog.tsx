@@ -20,7 +20,7 @@ import { Link } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { HelpLink } from "@/components/HelpLink";
-import { CommandBlock } from "@/components/Machines";
+import { CommandBlock } from "@/components/machine-bits";
 import { useOrg } from "@/components/org-context";
 import { ThisMacButton, useAgentsHere } from "@/components/ThisMac";
 import { inDesktopApp } from "@/lib/desktop";

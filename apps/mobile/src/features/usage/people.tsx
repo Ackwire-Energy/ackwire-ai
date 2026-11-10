@@ -9,7 +9,7 @@ import {
 } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { formatDecimal, formatShortDate, formatUsd, relativeTime } from "@agenteschat/client/lib/format";
-import type { PersonRow } from "@agenteschat/client/lib/person-usage";
+import { type PersonRow, personAmount } from "@agenteschat/client/lib/person-usage";
 import { useQueryClient } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
 import { useState } from "react";
@@ -21,7 +21,7 @@ import { router } from "@/ui/navigation";
 import { AskDone, AskWaiting } from "../chat/asks";
 import { Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
-import { peopleMonthLine, personAmount } from "./logic";
+import { peopleMonthLine } from "./logic";
 import { Meter, UsageCard } from "./parts";
 
 /*
@@ -69,7 +69,8 @@ export function PeopleList() {
   );
   return (
     <UsageCard icon="members" title={t("peopleUsage.title")}>
-      {data.plansOnly ? (
+      {/* Any person's amount an estimate (≈): what that means is behind the month line's ⓘ. */}
+      {data.people.some((p) => p.estimated) ? (
         <InfoHint
           name={t("common.about", { label: t("usageViews.apiPrice") })}
           text={t("usageViews.apiPriceHint")}
@@ -92,7 +93,7 @@ export function PeopleList() {
                 {p.name}
               </Text>
               <Text variant="footnote" tone="ink2" style={styles.tabular}>
-                {personAmount(t, i18n.language, data.plansOnly, p.monthUsd)}
+                {personAmount(t, i18n.language, p.estimated, p.monthUsd)}
                 {p.limitUsd === null
                   ? ` ${t("peopleUsage.meter.noLimit")}`
                   : ` ${t("peopleUsage.meter.of", { limit: formatDecimal(i18n.language, p.limitUsd) })}`}

@@ -35,7 +35,7 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { LoadingLine } from "@/components/Loading";
-import { MachineChip } from "@/components/Machines";
+import { MachineChip } from "@/components/machine-bits";
 import { useOrg } from "@/components/org-context";
 import { ReconnectThisMacButton, useIsThisMac } from "@/components/ThisMac";
 import { SetupProgress } from "@/components/WorkspaceComputer";

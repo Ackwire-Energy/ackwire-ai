@@ -17,6 +17,7 @@ import {
   occurrences,
   postPersonMessage,
   respondToEvent,
+  uniqueActors,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
 
@@ -123,6 +124,8 @@ describe("calendar", () => {
     const range = await calendarRange(deps, bia.id, f.org.id, "2026-10-19T00:00:00Z", "2026-10-23T00:00:00Z");
     expect(range.events.map((e) => e.title)).toEqual(["Planejamento"]);
     expect(range.deadlines.map((d) => [d.number, d.date])).toEqual([[1, "2026-10-21"]]);
+    // Nobody has it yet: the calendar draws its due date without a face.
+    expect(range.deadlines[0]?.assignee).toBeNull();
     // One a day, counted in a week that is always ahead (today's 9:00 may already be past).
     const ahead = await calendarRange(deps, bia.id, f.org.id, "2099-01-05T00:00:00Z", "2099-01-09T00:00:00Z");
     expect(ahead.routines.length).toBe(4);
@@ -171,6 +174,60 @@ describe("calendar", () => {
       { durationMinutes: 60, from: at("2026-10-19T09:00:00Z"), days: 1, timezone: "UTC", limit: 2 },
     );
     expect(slots.map((s) => s.start)).toEqual(["2026-10-19T09:00:00.000Z", "2026-10-19T11:00:00.000Z"]);
+  });
+
+  test("a due date says who has the task, so the calendar opens it with their face", async () => {
+    f = await setup();
+    const deps = { db: f.db, pubsub: f.pubsub };
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    const owner = { type: "person" as const, userId: f.owner.id };
+    await createIssue(deps, owner, f.org.id, {
+      title: "Login",
+      dueDate: "2026-10-21",
+      assignee: { type: "agent", id: f.agent.id },
+    });
+    await createIssue(deps, owner, f.org.id, {
+      title: "Textos",
+      dueDate: "2026-10-22",
+      assignee: { type: "person", id: bia.id },
+    });
+    const range = await calendarRange(deps, f.owner.id, f.org.id, "2026-10-19T00:00:00Z", "2026-10-23T00:00:00Z");
+    expect(range.deadlines.map((d) => [d.title, d.assignee])).toEqual([
+      ["Login", { type: "agent", id: f.agent.id }],
+      ["Textos", { type: "person", id: bia.id }],
+    ]);
+  });
+
+  test("a proposal names each person once, even one saved naming someone twice", async () => {
+    f = await setup();
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    const twice = [
+      { type: "person" as const, id: bia.id },
+      { type: "agent" as const, id: f.agent.id },
+      { type: "person" as const, id: bia.id },
+    ];
+    expect(uniqueActors(twice)).toEqual(twice.slice(0, 2));
+    await f.db.insert(schema.calendarProposals).values({
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      requesterUserId: f.owner.id,
+      channelId: f.general.id,
+      title: "Revisão do roadmap",
+      startAt: at("2026-10-20T15:00:00Z"),
+      endAt: at("2026-10-20T15:45:00Z"),
+      participants: twice,
+    });
+    const range = await calendarRange(
+      { db: f.db, pubsub: f.pubsub },
+      f.owner.id,
+      f.org.id,
+      "2026-10-19T00:00:00Z",
+      "2026-10-23T00:00:00Z",
+    );
+    expect(range.proposals[0]?.participants).toEqual([
+      { type: "person", id: bia.id },
+      { type: "agent", id: f.agent.id },
+    ]);
   });
 
   test("an agent proposes an event; nothing exists until the person who asked confirms", async () => {
