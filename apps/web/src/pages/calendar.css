@@ -297,12 +297,21 @@ html:not([data-pointer]) .cal-chip:focus-visible {
   display: none;
 }
 /*
+ * A column narrower than a long word (a week beside the side panel, meetings side by side): the word breaks at a
+ * syllable with its hyphen, in the app's language, never between two letters ("agendament" over "o").
+ */
+@container (max-width: 110px) {
+  .cal-chip__title {
+    hyphens: auto;
+  }
+}
+/*
  * A column too narrow for a word beside the face (a week or a month on a phone): an item is its owner's face on its
  * tint, as Google draws a short event as its colour alone. Its name and time are in its label, its hover and its
  * details. A task nobody has shows its kind's glyph there.
  */
 @container (max-width: 63.5px) {
-  .cal-chip :is(.cal-chip__name, .cal-chip__time, .cal-chip__repeat),
+  .cal-chip:not(.cal-chip--block) :is(.cal-chip__name, .cal-chip__time, .cal-chip__repeat),
   .cal-chip--line > .cal-chip__title,
   .cal-more-words {
     display: none;
@@ -312,6 +321,16 @@ html:not([data-pointer]) .cal-chip:focus-visible {
   }
   .cal-more-count {
     display: inline;
+  }
+}
+/*
+ * A meeting keeps its name in half a week's day at 1280 (two at once) and beside a run at 1440 with the side panel
+ * open: it wraps there, a long word at its syllables. Narrower (a phone's week, three at once, two beside the panel at
+ * 1280) a word a line would be all it says: it is its face, its name in its label, hover and details.
+ */
+@container (max-width: 45.5px) {
+  .cal-chip--block :is(.cal-chip__name, .cal-chip__time, .cal-chip__repeat) {
+    display: none;
   }
 }
 /*

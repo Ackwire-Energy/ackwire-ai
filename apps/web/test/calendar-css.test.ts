@@ -25,6 +25,10 @@ describe("calendar items the Google Calendar way", () => {
     expect(css).not.toContain("text-overflow");
     expect(last(declarations(css, ".cal-chip"), "overflow-wrap")).toBe("anywhere");
     expect(last(declarations(css, ".cal-chip__title"), "white-space")).toBeUndefined();
+    // Narrower than a long word, it breaks at a syllable with its hyphen, never between two letters.
+    expect(last(declarations(atRule(css, "@container (max-width: 110px)"), ".cal-chip__title"), "hyphens")).toBe(
+      "auto",
+    );
   });
 
   test("a meeting's time takes no room of its own, so a block grows for its title alone", async () => {
@@ -54,7 +58,22 @@ describe("calendar items the Google Calendar way", () => {
     const css = await sheet("apps/web/src/pages/calendar.css");
     const narrow = atRule(css, "@container (max-width: 63.5px)");
     expect(
-      last(declarations(narrow, ".cal-chip :is(.cal-chip__name, .cal-chip__time, .cal-chip__repeat)"), "display"),
+      last(
+        declarations(
+          narrow,
+          ".cal-chip:not(.cal-chip--block) :is(.cal-chip__name, .cal-chip__time, .cal-chip__repeat)",
+        ),
+        "display",
+      ),
+    ).toBe("none");
+    // Two meetings at once in a week's day at 1280 (50px each inside) said only "J" and "W": a meeting keeps its name
+    // down to 45.5px inside, a word a line under it.
+    const meeting = atRule(css, "@container (max-width: 45.5px)");
+    expect(
+      last(
+        declarations(meeting, ".cal-chip--block :is(.cal-chip__name, .cal-chip__time, .cal-chip__repeat)"),
+        "display",
+      ),
     ).toBe("none");
     expect(last(declarations(narrow, ".cal-chip--line > .cal-chip__title"), "display")).toBe("none");
     // A task nobody has: its kind's glyph there, hidden where its name has room.
