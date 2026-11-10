@@ -279,7 +279,10 @@ function ConnectAiDialog({
   const machines = useMachines(org.id);
   // The agents a plan or a key was connected for here: they think with it before the AI status says so.
   const [linked, setLinked] = useState<Record<string, AiChoice>>({});
-  const aiOf = (id: string): AgentAi => linked[id] ?? agentAi(dir.agentById.get(id), aiStateOf(status.data, id));
+  // From a conversation an agent that can't think has no AI, whatever it is set to (a plan nobody is signed in to):
+  // "All agents" on the first screen and in a plan's panel are then the same agents.
+  const aiOf = (id: string): AgentAi =>
+    linked[id] ?? (chat.on && asleep(id) ? null : agentAi(dir.agentById.get(id), aiStateOf(status.data, id)));
   const hasAi = (id: string) => aiOf(id) !== null;
   // By the AI status, as its "Sem IA" chip: an agent on a plan whose sign-in is gone has none either.
   const noAi = (id: string) => !linked[id] && (aiStateOf(status.data, id) ?? "no_ai") === "no_ai";
