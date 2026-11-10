@@ -2577,8 +2577,6 @@
     "was": "Sebelumnya: {{text}}",
     "open": "Yang diketahui {{name}}",
     "open_female": "Yang diketahui {{name}}",
-    "undo": "Urungkan",
-    "undone": "Diurungkan",
     "group": "Memori diperbarui oleh {{name}}"
   },
   "reach": {
@@ -2732,17 +2730,9 @@
     "someone": "seseorang",
     "you": "kamu",
     "undo": "Urungkan",
-    "redo": "Ulangi",
-    "undoAll": "Urungkan semua",
     "changes_other": "{{count}} perubahan",
     "undoneBy": "Diurungkan oleh {{name}}",
-    "ago": "{{time}} lalu",
-    "timeLeft": "{{time}} lagi untuk mengurungkan",
     "group": "Perubahan oleh {{name}}",
-    "undone": "Diurungkan.",
-    "redone": "Diulangi.",
-    "undoneAll_other": "{{count}} perubahan diurungkan.",
-    "partial_other": "{{count}} perubahan tidak bisa diurungkan.",
     "errors": {
       "changed_since": "Seseorang mengubah ini sejak itu. Mengurungkan sekarang akan menghilangkan perubahan tersebut.",
       "expired": "Waktu untuk mengurungkan sudah habis.",

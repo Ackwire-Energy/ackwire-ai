@@ -2569,8 +2569,6 @@
     "chip": "记忆已更新",
     "was": "之前：{{text}}",
     "open": "{{name}} 知道的事",
-    "undo": "撤销",
-    "undone": "已撤销",
     "group": "{{name}} 更新的记忆"
   },
   "reach": {
@@ -2722,17 +2720,9 @@
     "someone": "某人",
     "you": "你",
     "undo": "撤销",
-    "redo": "重做",
-    "undoAll": "全部撤销",
     "changes_other": "{{count}} 项更改",
     "undoneBy": "已由 {{name}} 撤销",
-    "ago": "{{time}}前",
-    "timeLeft": "还剩 {{time}} 可撤销",
     "group": "{{name}} 的更改",
-    "undone": "已撤销。",
-    "redone": "已重做。",
-    "undoneAll_other": "已撤销 {{count}} 项更改。",
-    "partial_other": "有 {{count}} 项更改无法撤销。",
     "errors": {
       "changed_since": "此后有人修改过这里。现在撤销会丢失那次修改。",
       "expired": "撤销时间已过。",

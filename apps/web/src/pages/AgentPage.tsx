@@ -110,6 +110,8 @@ export interface AgentPageProps {
   agentId: string;
   tab: AgentTab;
   section?: AgentSection;
+  /** The memory or skill a link opened Memória at. */
+  item?: string;
   /** Changes the tab (and section) in the URL. */
   onNavigate: (tab: AgentTab, section?: AgentSection) => void;
   /** Shown in the panel beside its DM (like a thread's), not as a page: closes the panel. */
@@ -179,7 +181,15 @@ function RightHandMineCard({ agent }: { agent: Agent }) {
   );
 }
 
-function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }: AgentPageProps & { agent: Agent }) {
+function AgentProfile({
+  agent,
+  tab,
+  section,
+  item,
+  onNavigate,
+  onClose,
+  closeRequest,
+}: AgentPageProps & { agent: Agent }) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
   const api = useApi();
@@ -778,7 +788,7 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
                 {tab === "overview" && <OverviewTab />}
                 {tab === "instructions" && <InstructionsTab />}
                 {tab === "access" && <AccessTab />}
-                {tab === "memory" && <MemoryTab />}
+                {tab === "memory" && <MemoryTab item={item} />}
                 {tab === "files" && <FilesTab />}
                 {tab === "usage" && <UsageTab />}
                 {tab === "activity" && <ActivityTab />}

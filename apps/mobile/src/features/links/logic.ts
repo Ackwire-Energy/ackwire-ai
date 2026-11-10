@@ -26,6 +26,7 @@ export type AppHref =
   | `/routines/${string}`
   | `/settings/computers/${string}`
   | `/settings/skills/${string}`
+  | `/memory/${string}`
   | `/consultation/${string}?channel=${string}`
   | "/routines"
   | "/issues"

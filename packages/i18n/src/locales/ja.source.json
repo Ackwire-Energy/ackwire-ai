@@ -6488,12 +6488,6 @@
   "memoryCard.open": {
     "value": "What {{name}} knows"
   },
-  "memoryCard.undo": {
-    "value": "Undo"
-  },
-  "memoryCard.undone": {
-    "value": "Undone"
-  },
   "memoryCard.group": {
     "value": "Memory updated by {{name}}"
   },
@@ -6841,12 +6835,6 @@
   "agentActions.undo": {
     "value": "Undo"
   },
-  "agentActions.redo": {
-    "value": "Redo"
-  },
-  "agentActions.undoAll": {
-    "value": "Undo all"
-  },
   "agentActions.changes": {
     "value": {
       "one": "{{count}} change",
@@ -6856,32 +6844,8 @@
   "agentActions.undoneBy": {
     "value": "Undone by {{name}}"
   },
-  "agentActions.ago": {
-    "value": "{{time}} ago"
-  },
-  "agentActions.timeLeft": {
-    "value": "{{time}} left to undo"
-  },
   "agentActions.group": {
     "value": "Changes by {{name}}"
-  },
-  "agentActions.undone": {
-    "value": "Undone."
-  },
-  "agentActions.redone": {
-    "value": "Redone."
-  },
-  "agentActions.undoneAll": {
-    "value": {
-      "one": "{{count}} change undone.",
-      "other": "{{count}} changes undone."
-    }
-  },
-  "agentActions.partial": {
-    "value": {
-      "one": "{{count}} change could not be undone.",
-      "other": "{{count}} changes could not be undone."
-    }
   },
   "agentActions.errors.changed_since": {
     "value": "Someone changed this since. Undoing now would lose that change."
