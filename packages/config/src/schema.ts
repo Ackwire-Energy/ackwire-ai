@@ -121,9 +121,15 @@ export const envVars = {
     section: "Server",
   },
   OUTBOX_MAX_IN_FLIGHT_CEILING: {
-    schema: z.coerce.number().int().min(1).default(64),
+    schema: z.coerce.number().int().min(1).optional(),
     description:
-      "How far the job slots grow on their own while jobs wait for one (a burst of routines, a busy hour), from `OUTBOX_MAX_IN_FLIGHT`; they shrink back once nothing waits. Never more than 4 jobs per database connection (`DATABASE_POOL_MAX`; the built-in database has one, so there they never grow). Set it to `OUTBOX_MAX_IN_FLIGHT` to keep them fixed.",
+      "At most this many jobs at once in one process, however far the slots could grow. While jobs wait for a slot (a burst of routines, a busy hour), the slots double every 30 seconds from `OUTBOX_MAX_IN_FLIGHT`: agents' runs as far as half the process's memory holds them (about 4 MB each while they wait), quick jobs to 4 per database connection (`DATABASE_POOL_MAX`); they shrink back once nothing waits. Unset (default): only those limits. Set it to `OUTBOX_MAX_IN_FLIGHT` to keep the slots fixed. With the built-in database they never grow.",
+    section: "Server",
+  },
+  SERVER_ROLE: {
+    schema: z.enum(["all", "worker"]).default("all"),
+    description:
+      "What this process does. `all` (default): serves the app and its API, and runs jobs. `worker`: only runs jobs (agents' runs, routines, notifications, emails; pushes stay with the app, which knows who has it open), and answers nothing over HTTP but its health check (`/api/health` on `PORT`). When jobs keep waiting for a slot (the log says so), start one more process with `SERVER_ROLE=worker` and the same settings: jobs share out across every process on the database, each workspace taking its turn. Processes booting together take turns on the migrations; a worker may leave them to the app (`RUN_MIGRATIONS_ON_BOOT=false`). Needs a PostgreSQL database, not the built-in one.",
     section: "Server",
   },
   DATABASE_URL: {

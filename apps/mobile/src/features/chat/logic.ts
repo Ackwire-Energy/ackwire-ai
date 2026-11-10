@@ -609,7 +609,6 @@ export const hangsUnder = (
   thread ||
   Boolean(m.meta?.missionStart) ||
   reactionPills(reactions ?? m.reactions, meId).length > 0 ||
-  (m.memories?.length ?? 0) > 0 ||
   artifactsOf(m.meta).length > 0 ||
   Boolean(messageMediaOf(m.meta)) ||
   Boolean(issueWorkOf(m.meta));

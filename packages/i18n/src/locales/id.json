@@ -4012,7 +4012,6 @@
       "browser": "Browser",
       "members": "Anggota",
       "usage": "Penggunaan",
-      "connectors": "Konektor",
       "dashboard": "Dasbor"
     },
     "reactions_other": "{{count}} reaksi",
@@ -8968,22 +8967,6 @@
       "foot": "Dibuat dari tampilan tiap agen"
     }
   },
-  "memoryMark": {
-    "label": "{{name}} menyimpan ini ke memori: {{text}}",
-    "saved": "{{name}} menyimpan ini:",
-    "title": "{{name}} menyimpan ke memori",
-    "subtitle": "Akan mengingatnya di percakapan berikutnya",
-    "from": "Dari pesan {{name}} · {{time}}",
-    "view": "Lihat di memori",
-    "fix": "Perbaiki",
-    "fixLabel": "Perbaiki yang disimpan",
-    "save": "Simpan",
-    "forget": "Lupakan",
-    "forgot": "{{name}} melupakan ini",
-    "undo": "Urungkan",
-    "fixed": "Memori diperbaiki",
-    "fixedDetail": "{{name}} akan memakai versi baru mulai sekarang."
-  },
   "correctionAsk": {
     "title": "Mau {{name}} mengulanginya atau menjelaskan apa yang kurang?",
     "label": "Apa yang kurang",
@@ -10765,32 +10748,6 @@
       "usageNoLimit": "Composio: {{calls}} panggilan di {{month}}",
       "limitNotice": "Ruang kerja ini sudah menghabiskan panggilan Composio bulan ini",
       "disconnectNote": "Composio melupakan akun ini. Untuk mencabut aksesnya di {{name}} juga, hapus Composio di pengaturan akunmu di sana."
-    },
-    "toolChanges": {
-      "title": "Alat yang berubah",
-      "intro": "Server ini mengubah apa yang dikatakan atau diminta sebuah alat. Agen tetap memakai versi yang kamu setujui sampai kamu menerima yang baru.",
-      "count_other": "{{count}} alat berubah",
-      "acceptAll": "Terima semua",
-      "acceptedAll": "Alat {{name}} diperbarui.",
-      "show": "Lihat perubahan",
-      "hide": "Sembunyikan",
-      "showAll": "Tampilkan semua ({{total}})",
-      "textChanged": "Teksnya berubah",
-      "fieldsChanged_other": "{{count}} kolom berubah",
-      "inputChanged": "Inputnya berubah",
-      "description": "Teks",
-      "input": "Masukan",
-      "field": {
-        "added": "baru",
-        "removed": "dihapus",
-        "changed": "berubah"
-      },
-      "added": "Ditambahkan",
-      "removed": "Dihapus",
-      "accept": "Terima",
-      "acceptOne": "Terima {{tool}}",
-      "accepted": "{{tool}} diperbarui.",
-      "notice": "{{name}} mengubah alat yang kamu setujui"
     },
     "names": {
       "atlassian": "Atlassian (Jira dan Confluence)",

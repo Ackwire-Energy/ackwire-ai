@@ -4272,7 +4272,6 @@
       "browser": "Navegador",
       "members": "Miembros",
       "usage": "Uso",
-      "connectors": "Conectores",
       "dashboard": "Panel"
     },
     "reactions_one": "{{count}} reacción",
@@ -9568,22 +9567,6 @@
       "foot": "Hechos con el aspecto de cada agente"
     }
   },
-  "memoryMark": {
-    "label": "{{name}} guardó esto en la memoria: {{text}}",
-    "saved": "{{name}} guardó esto:",
-    "title": "{{name}} lo guardó en la memoria",
-    "subtitle": "Lo recordará en las próximas conversaciones",
-    "from": "Del mensaje de {{name}} · {{time}}",
-    "view": "Ver en la memoria",
-    "fix": "Corregir",
-    "fixLabel": "Corregir lo que se guardó",
-    "save": "Guardar",
-    "forget": "Olvidar",
-    "forgot": "{{name}} olvidó esto",
-    "undo": "Deshacer",
-    "fixed": "Memoria corregida",
-    "fixedDetail": "{{name}} usará la nueva versión de ahora en adelante."
-  },
   "correctionAsk": {
     "title": "¿Quieres que {{name}} lo rehaga o explique qué faltó?",
     "label": "Qué faltó",
@@ -11504,36 +11487,6 @@
       "usageNoLimit": "Composio: {{calls}} llamadas en {{month}}",
       "limitNotice": "Este espacio de trabajo usó sus llamadas de Composio del mes",
       "disconnectNote": "Composio olvida la cuenta. Para quitarle también el acceso en {{name}}, quita Composio en la configuración de tu cuenta allí."
-    },
-    "toolChanges": {
-      "title": "Herramientas que cambiaron",
-      "intro": "Estos servidores cambiaron lo que dice o pide una herramienta. Los agentes siguen con la versión que aprobaste hasta que aceptes la nueva.",
-      "count_one": "{{count}} herramienta cambió",
-      "count_many": "{{count}} herramientas cambiaron",
-      "count_other": "{{count}} herramientas cambiaron",
-      "acceptAll": "Aceptar todas",
-      "acceptedAll": "Herramientas de {{name}} actualizadas.",
-      "show": "Ver el cambio",
-      "hide": "Ocultar",
-      "showAll": "Mostrar todas ({{total}})",
-      "textChanged": "El texto cambió",
-      "fieldsChanged_one": "{{count}} campo cambió",
-      "fieldsChanged_many": "{{count}} campos cambiaron",
-      "fieldsChanged_other": "{{count}} campos cambiaron",
-      "inputChanged": "La entrada cambió",
-      "description": "Texto",
-      "input": "Entrada",
-      "field": {
-        "added": "nuevo",
-        "removed": "eliminado",
-        "changed": "cambió"
-      },
-      "added": "Añadido",
-      "removed": "Eliminado",
-      "accept": "Aceptar",
-      "acceptOne": "Aceptar {{tool}}",
-      "accepted": "{{tool}} actualizada.",
-      "notice": "{{name}} cambió herramientas que aprobaste"
     },
     "names": {
       "atlassian": "Atlassian (Jira y Confluence)",

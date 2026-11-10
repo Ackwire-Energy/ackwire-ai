@@ -3998,7 +3998,6 @@
       "browser": "ブラウザ",
       "members": "メンバー",
       "usage": "使用量",
-      "connectors": "コネクタ",
       "dashboard": "ダッシュボード"
     },
     "reactions_other": "リアクション{{count}}件",
@@ -8916,22 +8915,6 @@
       "foot": "各エージェントの見た目から作られています"
     }
   },
-  "memoryMark": {
-    "label": "{{name}}がメモリに保存しました: {{text}}",
-    "saved": "{{name}}が保存しました:",
-    "title": "{{name}}がメモリに保存しました",
-    "subtitle": "次回以降の会話で覚えています",
-    "from": "{{name}}のメッセージより · {{time}}",
-    "view": "メモリで見る",
-    "fix": "修正",
-    "fixLabel": "保存された内容を修正",
-    "save": "保存",
-    "forget": "忘れる",
-    "forgot": "{{name}}はこれを忘れました",
-    "undo": "元に戻す",
-    "fixed": "メモリを修正しました",
-    "fixedDetail": "これから{{name}}は新しい内容を使います。"
-  },
   "correctionAsk": {
     "title": "{{name}}にやり直してもらうか、足りなかった点を伝えますか？",
     "label": "足りなかった点",
@@ -10711,32 +10694,6 @@
       "usageNoLimit": "Composio: {{month}}は{{calls}}回を使用",
       "limitNotice": "このワークスペースは今月のComposioの呼び出し回数を使い切りました",
       "disconnectNote": "Composioはこのアカウントを削除します。{{name}}側のアクセスも消すには、{{name}}のアカウント設定でComposioを削除してください。"
-    },
-    "toolChanges": {
-      "title": "変更されたツール",
-      "intro": "これらのサーバーで、ツールの説明や求める入力が変わりました。新しいものを承認するまで、エージェントはあなたが承認したバージョンを使い続けます。",
-      "count_other": "{{count}}個のツールが変更されました",
-      "acceptAll": "すべて承認",
-      "acceptedAll": "{{name}}のツールを更新しました。",
-      "show": "変更を見る",
-      "hide": "隠す",
-      "showAll": "すべて表示（{{total}}）",
-      "textChanged": "説明文が変わりました",
-      "fieldsChanged_other": "{{count}}個の項目が変わりました",
-      "inputChanged": "入力が変わりました",
-      "description": "説明文",
-      "input": "入力",
-      "field": {
-        "added": "新規",
-        "removed": "削除",
-        "changed": "変更"
-      },
-      "added": "追加",
-      "removed": "削除",
-      "accept": "承認",
-      "acceptOne": "{{tool}}を承認",
-      "accepted": "{{tool}}を更新しました。",
-      "notice": "{{name}}で、承認済みのツールが変更されました"
     },
     "names": {
       "atlassian": "Atlassian（JiraとConfluence）",

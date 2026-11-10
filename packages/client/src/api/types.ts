@@ -1250,8 +1250,6 @@ export interface Message {
   receipts?: MessageReceipts;
   /** Reaction counts (expected from the backend in the message list; else loaded on hover). */
   reactions?: ReactionCount[];
-  /** People's messages: what agents saved to memory from them (the memory mark); live via `message.memories`. */
-  memories?: MessageMemory[];
   /** In lists: true when pinned in its channel (absent: not pinned); live via `message.pinned` / `message.unpinned`. */
   pinned?: boolean;
   /** Agents' messages: what the agent changed with it, as receipts with Undo; live via `message.actions`. */
@@ -1491,7 +1489,6 @@ export type ChannelEvent =
   | { type: "block.state"; channelId: string; block: BlockState }
   /** A choice card was answered (ADR 0124). */
   | { type: "choices.updated"; channelId: string; choices: Choices }
-  | { type: "message.memories"; channelId: string; messageId: string; memories: MessageMemory[] }
   /** A long work changed (ADR 0121): moved, updated, waiting, queued or ended. Its anchor's line redraws. */
   | {
       type: "agent.work";
@@ -2624,19 +2621,6 @@ export interface CustomTool {
   firstSeenAt: string;
 }
 
-/**
- * ADR 0117: an approved MCP tool whose server changed its description or input. Agents keep `before` until a
- * connector admin accepts the change.
- */
-export interface ToolChange {
-  connectionId: string;
-  connectionLabel: string;
-  toolName: string;
-  before: { description: string; inputSchema: Record<string, unknown> };
-  after: { description: string; inputSchema: Record<string, unknown> };
-  changedAt: string;
-}
-
 export interface CustomServer {
   id: string;
   serverUrl: string;
@@ -3059,15 +3043,6 @@ export interface UndoAllResult {
   actions: AgentAction[];
   /** Changes that could not be undone, with the error code (`action.changed_since`, …). */
   failed: { id: string; code: string; message: string }[];
-}
-
-/** Something an agent saved to its memory from a person's message (the memory mark). */
-export interface MessageMemory {
-  id: string;
-  agentId: string;
-  kind: "fact" | "preference" | "decision" | "note" | "lesson";
-  text: string;
-  createdAt: string;
 }
 
 export interface ReactionCount {
@@ -4378,6 +4353,11 @@ export interface Machine {
   kind?: MachineKind;
   /** Runner connected now (`machine.status` events). */
   online: boolean;
+  /**
+   * ADR 0161: the workspace's own computer is asleep in standby, offline by design: it wakes when something wants it,
+   * and opens as it does. Absent from an older server: not in standby.
+   */
+  standby?: boolean;
   lastSeenAt: string | null;
   hostname: string;
   /** `linux`, `darwin`, `windows` or `other` (`MachineOs`). */
@@ -6185,11 +6165,6 @@ export type NotificationKind =
    * `source.agentId` and its name in `source.label`. Opens the agent's page.
    */
   | "browser_profile_request"
-  /**
-   * ADR 0117: a connected MCP server changed tools an admin approved (connector admins). Waiting; `source.label` the
-   * connection's name, `latest.title` the tools. Opens Conectores, where it is accepted.
-   */
-  | "connector_tool_changed"
   /** ADR 0115: a computer's disk passed 85% in use (admins). `source.machineId`; `latest.diskUse`, `latest.diskFreeGb`. */
   | "computer_disk_full"
   /** ADR 0133: a computer has no Google Chrome for its agents' browsers (who connected it). `source.machineId`. */
@@ -6370,8 +6345,6 @@ export interface NotificationSource {
   dashboardId?: string;
   /** `widget_alert`, `widget_failed`: the widget. */
   widgetId?: string;
-  /** `connector_tool_changed`: the connected server whose approved tools changed (ADR 0117). */
-  connectionId?: string;
   /** Channel name, thread title, issue title, topic title, mission or routine name (or the computer's name). */
   label?: string;
 }

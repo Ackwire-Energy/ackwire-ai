@@ -4001,7 +4001,6 @@
       "browser": "浏览器",
       "members": "成员",
       "usage": "用量",
-      "connectors": "连接器",
       "dashboard": "仪表盘"
     },
     "reactions_other": "{{count}} 个表情回应",
@@ -8983,22 +8982,6 @@
       "foot": "根据每个智能体的形象制作"
     }
   },
-  "memoryMark": {
-    "label": "{{name}} 把这条存入了记忆：{{text}}",
-    "saved": "{{name}} 记下了这条：",
-    "title": "{{name}} 存入了记忆",
-    "subtitle": "之后的对话中会记得",
-    "from": "来自 {{name}} 的消息 · {{time}}",
-    "view": "在记忆中查看",
-    "fix": "修正",
-    "fixLabel": "修正已保存的内容",
-    "save": "保存",
-    "forget": "忘记",
-    "forgot": "{{name}} 忘记了这条",
-    "undo": "撤销",
-    "fixed": "记忆已修正",
-    "fixedDetail": "{{name}} 之后会使用新版本。"
-  },
   "correctionAsk": {
     "title": "想让 {{name}} 重做，还是说明缺了什么？",
     "label": "缺了什么",
@@ -10774,32 +10757,6 @@
       "usageNoLimit": "Composio：{{month}} 已调用 {{calls}} 次",
       "limitNotice": "本工作区本月的 Composio 调用次数已用完",
       "disconnectNote": "Composio 会忘记这个账号。要同时移除它在 {{name}} 中的访问权限，请在那里的账号设置中移除 Composio。"
-    },
-    "toolChanges": {
-      "title": "有变化的工具",
-      "intro": "这些服务器修改了某个工具的说明或所需参数。在你接受新版本之前，智能体会继续使用你批准过的版本。",
-      "count_other": "{{count}} 个工具有变化",
-      "acceptAll": "全部接受",
-      "acceptedAll": "{{name}} 的工具已更新。",
-      "show": "查看变化",
-      "hide": "隐藏",
-      "showAll": "显示全部（{{total}}）",
-      "textChanged": "说明文字有变化",
-      "fieldsChanged_other": "{{count}} 个字段有变化",
-      "inputChanged": "输入有变化",
-      "description": "说明",
-      "input": "输入",
-      "field": {
-        "added": "新增",
-        "removed": "已删除",
-        "changed": "已更改"
-      },
-      "added": "已添加",
-      "removed": "已删除",
-      "accept": "接受",
-      "acceptOne": "接受 {{tool}}",
-      "accepted": "{{tool}} 已更新。",
-      "notice": "{{name}} 更改了你批准过的工具"
     },
     "names": {
       "atlassian": "Atlassian（Jira 和 Confluence）",

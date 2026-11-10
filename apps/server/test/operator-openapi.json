@@ -759,9 +759,42 @@
           },
           "protocol": {
             "type": "integer"
+          },
+          "standby": {
+            "type": "boolean",
+            "description": "You put the workspace's computer in standby (`PUT …/standby`) and it hasn't connected since. False for every other computer."
+          },
+          "busy": {
+            "type": "boolean",
+            "description": "The workspace's computer is in use now: a run of the workspace queued or running, a run waiting for this computer, a task running on it, someone in control of one of its agents' screens, or someone wanting it in the last 2 minutes (an open view of it asks every few seconds). Busy in standby: something waits for it. False for every other computer."
+          },
+          "lastUsedAt": {
+            "type": ["string", "null"],
+            "description": "When the workspace's computer was last used: the latest of the workspace's runs and this computer's tasks of the last 7 days, the last time something wanted it, and its people's last visit. Null for every other computer, or when nothing says."
           }
         },
-        "required": ["id", "kind", "managed", "name", "online", "lastSeenAt", "runnerVersion", "protocol"]
+        "required": [
+          "id",
+          "kind",
+          "managed",
+          "name",
+          "online",
+          "lastSeenAt",
+          "runnerVersion",
+          "protocol",
+          "standby",
+          "busy",
+          "lastUsedAt"
+        ]
+      },
+      "OperatorStandby": {
+        "type": "object",
+        "properties": {
+          "standby": {
+            "type": "boolean"
+          }
+        },
+        "required": ["standby"]
       },
       "OperatorSignup": {
         "type": "object",
@@ -3935,6 +3968,91 @@
                     }
                   },
                   "required": ["machines"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orgs/{orgId}/machines/{machineId}/standby": {
+      "put": {
+        "tags": ["Operator"],
+        "summary": "Say the workspace's computer is in standby, or no longer",
+        "description": "Say it when you put the computer to sleep (`true`), or that it no longer is (`false`; its first hello clears it too). In standby nothing is wrong to its people: it opens as it wakes, and it is never listed as disconnected. Whatever wants it meanwhile (a run, a person opening it, a request to it) records `machine.wake_wanted` in the events feed, at most every 10 seconds per computer: wake it then. A run waits up to a minute for it before it tells its people the computer isn't answering. `true` again keeps the first time it was said. 404 when the workspace has no such managed computer.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "machineId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "standby": {
+                    "type": "boolean"
+                  }
+                },
+                "required": ["standby"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorStandby"
                 }
               }
             }

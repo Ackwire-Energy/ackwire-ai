@@ -247,6 +247,29 @@ describe("the entry's status line, first match wins", () => {
     });
   });
 
+  test("asleep in standby is nothing wrong: available, unless a request, someone in control or its work says more", () => {
+    // Its screen shows nothing until it wakes: the server says it's offline.
+    const asleep = {
+      edition: "cloud" as const,
+      machine: { ...MAC, online: false, standby: true },
+      desktop: { available: false, reason: "offline" },
+      browser: false,
+    };
+    expect(entryState(facts(asleep), NOW)).toEqual({ kind: "available" });
+    expect(entryPortrait(entryState(facts(asleep), NOW), null)).toBe("online");
+    expect(entryState(facts({ ...asleep, handoff: request() }), NOW)).toMatchObject({ kind: "needsYou" });
+    const active = request({ status: "active", controllerUserId: "ana", expiresAt: null });
+    expect(entryState(facts({ ...asleep, handoff: active }), NOW)).toEqual({ kind: "other", userId: "ana" });
+    expect(entryState(facts({ ...asleep, working: true }), NOW)).toEqual({ kind: "working" });
+    // An agent that uses neither its screen nor its browser says so, asleep or not.
+    const neither = { desktop: { available: false, reason: "no_desktop" }, browserGranted: false };
+    expect(entryState(facts({ ...asleep, ...neither }), NOW)).toEqual({ kind: "noScreen" });
+    // Out of standby and still away: it isn't answering.
+    expect(entryState(facts({ ...asleep, machine: { ...MAC, online: false, standby: false } }), NOW)).toEqual({
+      kind: "offline",
+    });
+  });
+
   test("a request for this person, or for nobody in particular, needs them; one for someone else names them", () => {
     expect(entryState(facts({ handoff: request() }), NOW)).toMatchObject({ kind: "needsYou" });
     expect(entryState(facts({ handoff: request({ requestedForUserId: "me" }) }), NOW)).toMatchObject({

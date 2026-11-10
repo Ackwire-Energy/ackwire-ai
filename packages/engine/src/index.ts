@@ -164,6 +164,7 @@ export * from "./machine-outages";
 export * from "./machine-provider";
 export * from "./machine-provisioning";
 export * from "./machine-tasks";
+export * from "./machine-wake";
 export * from "./machines";
 export * from "./mail/accounts";
 export * from "./mail/inbound";

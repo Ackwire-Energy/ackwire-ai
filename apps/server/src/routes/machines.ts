@@ -108,6 +108,10 @@ export const Machine = z
         "`connected`: a person paired it; `host`: this server's own computer (`HOST_COMPUTER_TOKEN`); `managed`: the workspace's own computer (ADR 0056 §10), which people can't remove and whose hostname, OS and arch aren't shown.",
     }),
     online: z.boolean().openapi({ description: "Runner connected now. Changes come as `machine.status` events." }),
+    standby: z.boolean().openapi({
+      description:
+        "The workspace's own computer is asleep in standby (ADR 0161): offline by design, it wakes when something wants it. A change comes as `machine.updated`.",
+    }),
     lastSeenAt: z.string().nullable(),
     hostname: z.string(),
     os: z.string().openapi({ description: "`linux`, `darwin`, `windows` or `other`." }),

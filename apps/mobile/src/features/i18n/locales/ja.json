@@ -922,7 +922,6 @@
       "plan_lent_other": "{{names}}があなたの {{plan}} プランを{{agent}}に接続しました",
       "plan_lent_female_other": "{{names}}があなたの {{plan}} プランを{{agent}}に接続しました",
       "plan_model_dropped_other": "{{model}}が{{plan}}から外れました。{{names}}は当面{{runs}}を使います",
-      "connector_tool_changed_other": "接続中のサーバーが、承認済みのツールを変更しました",
       "computer_disk_full_other": "コンピューターのディスクがほぼいっぱいです",
       "computer_no_chrome_other": "コンピューターにGoogle Chromeが必要です。google.com/chromeからダウンロードしてください",
       "app_created_other": "AIアプリがあなたのために作成しました"
@@ -1377,15 +1376,11 @@
       "browser": "ブラウザ",
       "secret": "シークレット",
       "join": "メンバー",
-      "tools": "ツール",
       "limit": "上限"
     },
     "review": "レビュー",
     "answer": "返信",
     "open": "開く",
-    "toolsTitle": "承認したツールが変更されました",
-    "toolsWhy": "新しいものを承認するまで、エージェントは承認済みのバージョンを使います。",
-    "reviewChanges": "変更を確認",
     "clear": {
       "title": "あなたの対応待ちはありません",
       "text": "エージェントがあなたを必要とすると、まずここに表示されます。"

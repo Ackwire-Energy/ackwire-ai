@@ -127,7 +127,6 @@ import type {
   MailImapInput,
   Me,
   Message,
-  MessageMemory,
   MoveAgentsInput,
   NoticeCategory,
   NoticePrefs,
@@ -3345,22 +3344,6 @@ export function applyReactions(
   qc.setQueryData(keys.reactions(orgId, messageId), next);
 }
 
-/** `message.memories`: the memory marks of one message, in every cached list of that channel. */
-export function cacheMessageMemories(
-  qc: ReturnType<typeof useQueryClient>,
-  orgId: string,
-  channelId: string,
-  messageId: string,
-  memories: MessageMemory[],
-) {
-  qc.setQueriesData({ queryKey: ["org", orgId, "channel", channelId] }, (data: unknown) => {
-    if (!Array.isArray(data)) return data;
-    const list = data as Message[];
-    if (!list.some((m) => m && m.id === messageId)) return data;
-    return list.map((m) => (m.id === messageId ? { ...m, memories } : m));
-  });
-}
-
 /**
  * `message.pinned` / `message.unpinned` (and "Fixar" / "Desafixar" optimistically): the message's pin mark in every
  * cached list of that channel (timeline and threads).
@@ -3470,44 +3453,6 @@ export const useCustomServers = (orgId: string, enabled = true) => {
   const api = useApi();
   return useQuery({ queryKey: keys.customServers(orgId), queryFn: () => api.customConnectors.list(orgId), enabled });
 };
-
-/** Approved MCP tools whose server changed them (ADR 0117): connector admins only (`enabled`). */
-export const useToolChanges = (orgId: string, enabled = true) => {
-  const api = useApi();
-  return useQuery({
-    queryKey: keys.toolChanges(orgId),
-    queryFn: () => api.customConnectors.toolChanges(orgId),
-    enabled,
-  });
-};
-
-export function useAcceptToolChange(orgId: string) {
-  const api = useApi();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (c: { connectionId: string; toolName: string }) =>
-      api.customConnectors.acceptToolChange(orgId, c.connectionId, c.toolName),
-    onSuccess: () =>
-      Promise.all([
-        qc.invalidateQueries({ queryKey: keys.toolChanges(orgId) }),
-        qc.invalidateQueries({ queryKey: keys.customServers(orgId) }),
-      ]),
-  });
-}
-
-/** "Aceitar todas" on one connection's changed tools (ADR 0117). */
-export function useAcceptConnectionToolChanges(orgId: string) {
-  const api = useApi();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (connectionId: string) => api.customConnectors.acceptConnectionToolChanges(orgId, connectionId),
-    onSuccess: () =>
-      Promise.all([
-        qc.invalidateQueries({ queryKey: keys.toolChanges(orgId) }),
-        qc.invalidateQueries({ queryKey: keys.customServers(orgId) }),
-      ]),
-  });
-}
 
 export function useCustomServerAction(orgId: string) {
   const api = useApi();

@@ -72,30 +72,6 @@ export function sortWaiting(list: AppNotification[]) {
   );
 }
 
-/**
- * One waiting card per connected server whose approved tools changed (ADR 0117). A server now keeps one open notice,
- * but rows from before that, or from a server not updated yet, repeat the same card; the newest stands for them all,
- * since its review lists every pending change. `merged` is how many were left out, to take from the server's counts.
- */
-export function oneToolChangePerServer<T extends Pick<AppNotification, "kind" | "waiting" | "source" | "updatedAt">>(
-  items: T[],
-): { items: T[]; merged: number } {
-  const keyOf = (n: T) =>
-    n.kind === "connector_tool_changed" && n.waiting ? (n.source.connectionId ?? n.source.label ?? "") : null;
-  const newest = new Map<string, T>();
-  for (const n of items) {
-    const key = keyOf(n);
-    if (key === null) continue;
-    const kept = newest.get(key);
-    if (!kept || n.updatedAt > kept.updatedAt) newest.set(key, n);
-  }
-  const kept = items.filter((n) => {
-    const key = keyOf(n);
-    return key === null || newest.get(key) === n;
-  });
-  return { items: kept, merged: items.length - kept.length };
-}
-
 /** How the counts move when one item changes from `before` to `after` (either may be missing). */
 export function countsDelta(
   counts: NotificationCounts,
@@ -218,7 +194,6 @@ export const askersOf = (n: Pick<AppNotification, "count" | "latest">) => ({
 export function workspaceHeadline(n: Pick<AppNotification, "kind" | "latest">) {
   if (n.kind === "computer_ready") return "computerSetup.notification.ready" as const;
   if (n.kind === "composio_limit") return "connectors.composio.limitNotice" as const;
-  if (n.kind === "connector_tool_changed") return "connectors.toolChanges.notice" as const;
   if (n.kind === "computer_disk_full") return "machines.shared.diskFullNotice" as const;
   if (n.kind === "computer_no_chrome") return "machines.chromeMissingNotice" as const;
   if (n.kind === "skill_update") {
@@ -439,9 +414,6 @@ export function openTarget(n: AppNotification): OpenTarget | null {
     return { to: "/org/$orgId/agents/$agentId", params: { agentId: s.agentId }, search: { sec: "brain" } };
   // Someone gave an agent the person's plan: Contas de IA, where their plans and the agents on them are.
   if (n.kind === "plan_lent") return { to: "/org/$orgId/settings/$section", params: { section: "keys" } };
-  // A server changed approved tools: accepted in Conectores.
-  if (n.kind === "connector_tool_changed")
-    return { to: "/org/$orgId/settings/$section", params: { section: "connectors" } };
   // An update of a skill from its link: the skill, in Skills.
   if (n.kind === "skill_update")
     return {
@@ -574,7 +546,7 @@ export function snoozeTimes(now = new Date()) {
  * What a waiting item asks of you: approve, answer an agent, help in a browser, give
  * a secret, let someone in, or review tools a connected server changed.
  */
-export type WaitingCardKind = "approval" | "question" | "browser" | "secret" | "join" | "tools" | "limit";
+export type WaitingCardKind = "approval" | "question" | "browser" | "secret" | "join" | "limit";
 
 export interface WaitingCard {
   kind: WaitingCardKind;
@@ -605,9 +577,6 @@ export function waitingCardOf(n: Pick<AppNotification, "kind" | "count" | "lates
   // A board's notice (ADR 0135) has nobody to answer: it opens the widget or the board, where it is decided.
   if (WIDGET_NOTICES.has(n.kind))
     return { kind: "question", title: l.text ?? l.title ?? "", expiresAt: null, action: "open" };
-  // A connected server changed approved tools (ADR 0117): reviewed in Connectors, never answered like a question.
-  if (n.kind === "connector_tool_changed")
-    return { kind: "tools", title: l.title ?? "", expiresAt: null, action: "review" };
   // A person at their limit asks for more (ADR 0141): raised or refused on the card itself.
   if (n.kind === "usage_limit") return { kind: "limit", title: "", expiresAt: null, action: "review" };
   return { kind: "question", title: l.text ?? l.title ?? "", expiresAt: null, action: "answer" };

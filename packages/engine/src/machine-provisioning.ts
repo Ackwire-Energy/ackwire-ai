@@ -9,7 +9,8 @@ import { type EmailLocale, emailCrew, emailLocale, emailsByLocale, modeStamp, qu
 import { ConflictError } from "./errors";
 import { publishOrgEvent } from "./events";
 import { DEVICE_CODE_TTL_MS, generateUserCode } from "./machine-device";
-import { cleanMachineName, type MachineRow, machineOnline, removeMachine, sha256Hex } from "./machines";
+import { machineActivity } from "./machine-wake";
+import { cleanMachineName, inStandby, type MachineRow, machineOnline, removeMachine, sha256Hex } from "./machines";
 import { notifyComputerReady } from "./notification-producers";
 import { OrgCursor, orgCreatedAtMs } from "./operator";
 import { requirePermission, USER_LOCALES } from "./organizations";
@@ -431,7 +432,8 @@ export async function issueManagedMachine(
 
 /**
  * The workspace's computers as the provisioner sees them: every machine still in it, with no secret and
- * nothing of what is on them. Null: no such workspace.
+ * nothing of what is on them; its own one with whether it sleeps, is in use and when it last was (ADR 0161).
+ * Null: no such workspace.
  */
 export async function operatorMachines(db: Database, orgId: string) {
   const [org] = await db.select({ id: organizations.id }).from(organizations).where(eq(organizations.id, orgId));
@@ -441,6 +443,8 @@ export async function operatorMachines(db: Database, orgId: string) {
     .from(machines)
     .where(and(eq(machines.orgId, orgId), isNull(machines.deletedAt)))
     .orderBy(asc(machines.createdAt));
+  const managed = rows.find((m) => m.kind === "managed");
+  const activity = managed ? await machineActivity(db, managed) : null;
   return rows.map((m) => ({
     id: m.id,
     kind: m.kind,
@@ -450,6 +454,8 @@ export async function operatorMachines(db: Database, orgId: string) {
     lastSeenAt: m.lastSeenAt,
     runnerVersion: m.runnerVersion,
     protocol: m.protocol,
+    standby: inStandby(m),
+    ...(m === managed && activity ? activity : { busy: false, lastUsedAt: null }),
   }));
 }
 

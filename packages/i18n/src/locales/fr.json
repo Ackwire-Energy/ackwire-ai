@@ -4277,7 +4277,6 @@
       "browser": "Navigateur",
       "members": "Membres",
       "usage": "Utilisation",
-      "connectors": "Connecteurs",
       "dashboard": "Tableau de bord"
     },
     "reactions_one": "{{count}} réaction",
@@ -9637,22 +9636,6 @@
       "foot": "Créés à partir du look de chaque agent"
     }
   },
-  "memoryMark": {
-    "label": "{{name}} a enregistré ceci en mémoire : {{text}}",
-    "saved": "{{name}} a enregistré ceci :",
-    "title": "{{name}} a enregistré en mémoire",
-    "subtitle": "S'en souviendra dans les prochaines conversations",
-    "from": "Du message de {{name}} · {{time}}",
-    "view": "Voir dans la mémoire",
-    "fix": "Corriger",
-    "fixLabel": "Corriger ce qui a été enregistré",
-    "save": "Enregistrer",
-    "forget": "Oublier",
-    "forgot": "{{name}} a oublié ceci",
-    "undo": "Annuler",
-    "fixed": "Mémoire corrigée",
-    "fixedDetail": "{{name}} utilisera la nouvelle version désormais."
-  },
   "correctionAsk": {
     "title": "Voulez-vous que {{name}} recommence ou explique ce qui manquait ?",
     "label": "Ce qui manquait",
@@ -11575,36 +11558,6 @@
       "usageNoLimit": "Composio : {{calls}} appels en {{month}}",
       "limitNotice": "Cet espace de travail a épuisé ses appels Composio du mois",
       "disconnectNote": "Composio oublie le compte. Pour retirer aussi son accès dans {{name}}, supprimez Composio dans les paramètres de votre compte là-bas."
-    },
-    "toolChanges": {
-      "title": "Outils modifiés",
-      "intro": "Ces serveurs ont changé ce qu'un outil dit ou demande. Les agents gardent la version que vous avez approuvée jusqu'à ce que vous acceptiez la nouvelle.",
-      "count_one": "{{count}} outil a changé",
-      "count_many": "{{count}} outils ont changé",
-      "count_other": "{{count}} outils ont changé",
-      "acceptAll": "Tout accepter",
-      "acceptedAll": "Outils de {{name}} mis à jour.",
-      "show": "Voir le changement",
-      "hide": "Masquer",
-      "showAll": "Tout afficher ({{total}})",
-      "textChanged": "Le texte a changé",
-      "fieldsChanged_one": "{{count}} champ a changé",
-      "fieldsChanged_many": "{{count}} champs ont changé",
-      "fieldsChanged_other": "{{count}} champs ont changé",
-      "inputChanged": "L’entrée a changé",
-      "description": "Texte",
-      "input": "Entrée",
-      "field": {
-        "added": "nouveau",
-        "removed": "supprimé",
-        "changed": "modifié"
-      },
-      "added": "Ajouté",
-      "removed": "Supprimé",
-      "accept": "Accepter",
-      "acceptOne": "Accepter {{tool}}",
-      "accepted": "{{tool}} mis à jour.",
-      "notice": "{{name}} a modifié des outils que vous aviez approuvés"
     },
     "names": {
       "atlassian": "Atlassian (Jira et Confluence)",

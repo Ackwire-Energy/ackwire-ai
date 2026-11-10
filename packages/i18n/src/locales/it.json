@@ -4277,7 +4277,6 @@
       "browser": "Browser",
       "members": "Membri",
       "usage": "Utilizzo",
-      "connectors": "Connettori",
       "dashboard": "Dashboard"
     },
     "reactions_one": "{{count}} reazione",
@@ -9654,22 +9653,6 @@
       "foot": "Creati dall'aspetto di ogni agente"
     }
   },
-  "memoryMark": {
-    "label": "{{name}} ha salvato questo in memoria: {{text}}",
-    "saved": "{{name}} ha salvato questo:",
-    "title": "{{name}} ha salvato in memoria",
-    "subtitle": "Lo ricorderà nelle prossime conversazioni",
-    "from": "Dal messaggio di {{name}} · {{time}}",
-    "view": "Vedi in memoria",
-    "fix": "Correggi",
-    "fixLabel": "Correggi ciò che è stato salvato",
-    "save": "Salva",
-    "forget": "Dimentica",
-    "forgot": "{{name}} ha dimenticato questo",
-    "undo": "Annulla",
-    "fixed": "Memoria corretta",
-    "fixedDetail": "D'ora in poi {{name}} userà la nuova versione."
-  },
   "correctionAsk": {
     "title": "Vuoi che {{name}} lo rifaccia o spieghi cosa mancava?",
     "label": "Cosa mancava",
@@ -11584,36 +11567,6 @@
       "usageNoLimit": "Composio: {{calls}} chiamate a {{month}}",
       "limitNotice": "Questo spazio di lavoro ha esaurito le chiamate Composio del mese",
       "disconnectNote": "Composio dimentica l'account. Per rimuovere anche il suo accesso in {{name}}, rimuovi Composio dalle impostazioni del tuo account lì."
-    },
-    "toolChanges": {
-      "title": "Strumenti cambiati",
-      "intro": "Questi server hanno cambiato quello che uno strumento dice o chiede. Gli agenti mantengono la versione che hai approvato finché non accetti quella nuova.",
-      "count_one": "{{count}} strumento è cambiato",
-      "count_many": "{{count}} strumenti sono cambiati",
-      "count_other": "{{count}} strumenti sono cambiati",
-      "acceptAll": "Accetta tutti",
-      "acceptedAll": "Strumenti di {{name}} aggiornati.",
-      "show": "Vedi la modifica",
-      "hide": "Nascondi",
-      "showAll": "Mostra tutti ({{total}})",
-      "textChanged": "Il testo è cambiato",
-      "fieldsChanged_one": "{{count}} campo è cambiato",
-      "fieldsChanged_many": "{{count}} campi sono cambiati",
-      "fieldsChanged_other": "{{count}} campi sono cambiati",
-      "inputChanged": "L’input è cambiato",
-      "description": "Testo",
-      "input": "Input",
-      "field": {
-        "added": "nuovo",
-        "removed": "rimosso",
-        "changed": "cambiato"
-      },
-      "added": "Aggiunto",
-      "removed": "Rimosso",
-      "accept": "Accetta",
-      "acceptOne": "Accetta {{tool}}",
-      "accepted": "{{tool}} aggiornato.",
-      "notice": "{{name}} ha cambiato strumenti che avevi approvato"
     },
     "names": {
       "atlassian": "Atlassian (Jira e Confluence)",
