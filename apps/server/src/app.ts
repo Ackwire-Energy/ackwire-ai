@@ -72,7 +72,7 @@ import {
   registerDesktopRoutes,
   registerNativeRoutes,
 } from "./routes/desktop";
-import { deviceAppRoutes, registerConnectScripts } from "./routes/devices";
+import { deviceAppRoutes, registerConnectLinkInfo, registerConnectScripts } from "./routes/devices";
 import { registerGitProxy } from "./routes/git";
 import { githubAppRoutes, registerGitHubAppWebhook } from "./routes/github-app";
 import { registerHealth } from "./routes/health";
@@ -115,7 +115,7 @@ export interface AppOptions {
  * - `/api/webhooks/*`     incoming webhooks (GitHub, Sentry), signature-checked
  * - `/api/github-app/webhook` our GitHub App's events (installs, suspensions), signature-checked
  * - `/api/git/*`          git proxy for agents' computers (their own credential, ADR 0024)
- * - `/api/machines/*`     connected computers' runner: device-code connection, uploads, install.sh (ADR 0025, 0036)
+ * - `/api/machines/*`     connected computers' runner: device-code connection, uploads, install.sh, a connect link's info (ADR 0025, 0036)
  * - `/api/desktop/*`      public: the desktop app's latest build and its download (ADR 0036)
  * - `/api/native/*`       public: the packages that run agentes.chat without Docker, for the installer (ADR 0060)
  * - `/api/hooks/*`        public: a webhook routine's own address (its chosen methods, ADR 0106)
@@ -231,6 +231,7 @@ export function createApp(options: AppOptions) {
     registerRoutineHooks(api, deps);
     registerGitHubAppWebhook(api, deps);
     registerMachinePublicRoutes(api, deps);
+    registerConnectLinkInfo(api, deps);
     registerDesktopRoutes(
       api,
       deps,

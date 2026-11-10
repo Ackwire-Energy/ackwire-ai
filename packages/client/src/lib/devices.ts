@@ -350,6 +350,16 @@ export function joinFacts(
   return [osName(t, r.os), r.arch || null, r.ip || null, r.location].filter(Boolean).join(" · ");
 }
 
+/**
+ * Another computer, connected from the desktop app on it: the first computer of `userId`'s that wasn't in the list
+ * when the screen opened (`known`). The app pairs it with the person's own session, so it shows up as theirs.
+ */
+export const newComputerOf = (
+  list: readonly ComputerDevice[] | undefined,
+  known: ReadonlySet<string>,
+  userId: string | undefined,
+) => (userId ? list?.find((d) => d.ownerUserId === userId && !known.has(d.id)) : undefined);
+
 // ── Connect a phone ─────────────────────────────────────────────────────────
 
 /**

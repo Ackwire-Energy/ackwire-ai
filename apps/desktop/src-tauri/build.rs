@@ -57,6 +57,8 @@ const COMMANDS: &[&str] = &[
     "workspaces_get",
     "site_fetch",
     "welcome_mode_take",
+    "pair_link_info",
+    "pair_ask",
 ];
 
 fn main() {

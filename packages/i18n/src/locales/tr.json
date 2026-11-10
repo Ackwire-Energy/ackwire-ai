@@ -13040,10 +13040,26 @@
     },
     "computer": {
       "title": "Başka bir bilgisayar bağlayın",
-      "step1": "Uygulamayı ona indirin:",
-      "step2": "Açın ve {{org}} çalışma alanında oturum açın.",
-      "step3": "Ajanlar bu bilgisayarı kullanabilsin seçeneğini açın.",
-      "orLine": "Ya da terminaline tek bir satır yapıştırın"
+      "step1": "agentes.chat uygulamasını ona yükleyin:",
+      "step2": "Açın ve kendi hesabınızla oturum açın.",
+      "step3": "{{org}} ajanlarının onu kullanıp kullanamayacağını sorduğunda İzin ver'e tıklayın.",
+      "shows": "Burada kendiliğinden görünür, paylaşana kadar yalnızca sizin içindir.",
+      "waiting": "Bilgisayarlarınızdan biri bekleniyor…",
+      "connected": "Bağlandı: {{name}}",
+      "orLine": "Ya da terminaline tek bir satır yapıştırın",
+      "noApp": "Uygulamayı ona yükleyemiyor musunuz? Terminalde bir satır kullanın"
+    },
+    "thisApp": {
+      "text": "agentes.chat uygulaması onu tek tıkla bağlar ve önce size sorar.",
+      "open": "agentes.chat uygulamasını aç",
+      "browserAsks": "Tarayıcınız açmak için izin ister: Aç'ı seçin, sunarsa Her zaman izin ver'i de seçin.",
+      "noApp": "Uygulama sizde yok mu?",
+      "afterInstall": "Yükledikten sonra agentes.chat uygulamasını aç düğmesine yeniden basın. Bağlantı bir kez, 10 dakika boyunca çalışır.",
+      "waiting": "Bu bilgisayardaki uygulama bekleniyor…",
+      "expired": "Bu bağlantının süresi doldu.",
+      "again": "Yeni bağlantı oluştur",
+      "failed": "Bağlantı oluşturulamadı. Birazdan tekrar deneyin.",
+      "server": "Sunucu mu? Terminalde bir satır kullanın"
     },
     "link": {
       "serverTitle": "Sunucu bağlayın",

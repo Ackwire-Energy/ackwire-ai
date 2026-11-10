@@ -6,7 +6,9 @@
  * Scenarios (`?scenario=`): `first` (a Mac, nothing chosen yet), `windows` and `linux` (the same there),
  * `cloud` (agentes.chat, nothing on this computer), `selfhost` (the default: a server on Tailscale with two
  * organizations whose agents work here), `link` (a claim link waiting) and `here` (agentes.chat runs on this
- * computer, its organization's agents too); `?link=` makes any scenario start with that link waiting.
+ * computer, its organization's agents too); `?link=` makes any scenario start with that link waiting. A pair link
+ * (`agenteschat://pair?server=…&link=ABCDEFGH`) joins Estúdio Norte once its maker lets it in, `HGFEDCBA`'s maker
+ * says no, and any other code expired.
  * Servers answer by host: agentes.tail1234.ts.net, agentes.chat and http://127.0.0.1:4310 are servers;
  * noowner.tail1234.ts.net waits for its owner; old.example.com is too old; chat.example.com doesn't answer;
  * anything else isn't agentes.chat. `?found=0` makes discovery find nothing.
@@ -17,7 +19,7 @@
  * (setting up stops there). Cancel ends a setup at once, held or not (it rejects with "cancelled", as the app's
  * does). An update downloads in about 1.5 s with its progress, and Cancel drops it.
  */
-import { CLOUD_SERVER, readInstance, type ServerCheck } from "@agenteschat/client/lib/server";
+import { CLOUD_SERVER, isLoopback, readInstance, type ServerCheck } from "@agenteschat/client/lib/server";
 import type { Candidate } from "../control/first-run";
 import {
   type LocalPhase,
@@ -30,10 +32,11 @@ import {
   setupSteps,
   type Tailnet,
 } from "../control/local-server";
+import type { LinkInfo } from "../control/pair";
 import type { Platform } from "../control/platform";
-import type { ServerList, ServerWorkspaces } from "../control/server";
+import type { ServerList, ServerWorkspace, ServerWorkspaces } from "../control/server";
 import type { TrayState } from "../control/tray";
-import { acmeSeed, FAKE_SERVER, FakeRunner, horizonteSeed } from "../dev/fake-runner";
+import { acmeSeed, FAKE_LINKS, FAKE_SERVER, FakeRunner, horizonteSeed } from "../dev/fake-runner";
 import { createFakeSite, type FakeSite } from "../dev/fake-site";
 import type { AppInfo, Host, RunnerInfo, RunnerStateChange, WindowName } from "./types";
 
@@ -72,6 +75,16 @@ export interface FakeHost extends Host {
   onDev(cb: () => void): () => void;
   setVersion(version: string): void;
 }
+
+/**
+ * The first server's workspaces: the two this computer works for in `selfhost`, and Estúdio Norte, which it doesn't
+ * yet. Every other server has Oficina.
+ */
+const FIRST_ORGS: ServerWorkspace[] = [
+  { id: "org_acme", name: "Acme", logo: null, unread: 0, waiting: 0, pair: true },
+  { id: "org_horizonte", name: "Horizonte", logo: null, unread: 0, waiting: 0, pair: true },
+  { id: "o-norte", name: "Estúdio Norte", logo: null, unread: 3, waiting: 0, pair: true },
+];
 
 /** A 14" MacBook Pro's notch. */
 const FAKE_NOTCH = { width: 186, height: 32 };
@@ -218,10 +231,19 @@ export function createFakeHost(
     signIns = 1;
   }
 
-  const site = createFakeSite((orgId) => {
-    const ids = [...runners.values()].map((r) => r.ids()).find((i) => i?.orgId === orgId);
-    return ids ? { machineId: ids.machineId, name: ids.name } : null;
-  });
+  const orgsOf = (i: number): ServerWorkspace[] =>
+    i === 0 ? FIRST_ORGS : [{ id: `o-${i}`, name: "Oficina", logo: null, unread: 1, waiting: 0, pair: true }];
+  const site = createFakeSite(
+    (orgId) => {
+      const ids = [...runners.values()].map((r) => r.ids()).find((i) => i?.orgId === orgId);
+      return ids ? { machineId: ids.machineId, name: ids.name } : null;
+    },
+    (orgId, userCode) => {
+      const org = list.servers.flatMap((_, i) => orgsOf(i)).find((o) => o.id === orgId);
+      const runner = [...runners.values()].find((r) => r.pendingCode === userCode);
+      return org && runner ? runner.confirm({ id: org.id, name: org.name }) : null;
+    },
+  );
 
   const host: FakeHost = {
     window: initial,
@@ -287,15 +309,23 @@ export function createFakeHost(
       list.servers.map((server, i) => ({
         server,
         signedIn: !signedOut.has(server),
-        orgs: signedOut.has(server)
-          ? []
-          : i === 0
-            ? [
-                { id: "o-acme", name: "Acme", logo: null, unread: 0, waiting: 0 },
-                { id: "o-norte", name: "Estúdio Norte", logo: null, unread: 3, waiting: 0 },
-              ]
-            : [{ id: `o-${i}`, name: "Oficina", logo: null, unread: 1, waiting: 0 }],
+        agentsHere: !isLoopback(server),
+        orgs: signedOut.has(server) ? [] : orgsOf(i),
       })),
+    // The fake reads nothing again by itself: an offer never takes the one window over while designing.
+    onWorkspaces: () => () => {},
+    pairLinkInfo: async (_server, code): Promise<LinkInfo> => {
+      await wait(300);
+      if (code !== FAKE_LINKS.live && code !== FAKE_LINKS.denied) throw "link_expired";
+      return {
+        org: "Estúdio Norte",
+        by: "Sam Rivera",
+        kind: "computer",
+        expiresAt: new Date(Date.now() + 600_000).toISOString(),
+        computer: "Sam's MacBook Pro",
+      };
+    },
+    askToPair: async () => true,
     welcomeMode: async () => (options.welcomeAdd ? "add" : null),
     siteFetch: async (server, method, path, body) => {
       if (!list.servers.includes(server)) throw "not a server of this app";

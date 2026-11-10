@@ -13555,10 +13555,26 @@
     },
     "computer": {
       "title": "Connecter un autre ordinateur",
-      "step1": "Téléchargez l'app dessus :",
-      "step2": "Ouvrez-la et connectez-vous à {{org}}.",
-      "step3": "Activez Laisser les agents utiliser cet ordinateur.",
-      "orLine": "Ou collez une ligne dans son terminal"
+      "step1": "Installez l'app agentes.chat dessus :",
+      "step2": "Ouvrez-la et connectez-vous avec votre compte.",
+      "step3": "Cliquez sur Autoriser quand elle demande de laisser les agents de {{org}} l'utiliser.",
+      "shows": "Il apparaît ici tout seul, pour vous seul jusqu'à ce que vous le partagiez.",
+      "waiting": "En attente d'un de vos ordinateurs…",
+      "connected": "Connecté : {{name}}",
+      "orLine": "Ou collez une ligne dans son terminal",
+      "noApp": "Impossible d'y installer l'app ? Utilisez une ligne de terminal"
+    },
+    "thisApp": {
+      "text": "L'app agentes.chat le connecte en un clic, et vous demande d'abord.",
+      "open": "Ouvrir l'app agentes.chat",
+      "browserAsks": "Votre navigateur demande s'il peut l'ouvrir : choisissez Ouvrir, et Toujours autoriser s'il le propose.",
+      "noApp": "Vous n'avez pas l'app ?",
+      "afterInstall": "Après l'installation, cliquez de nouveau sur Ouvrir l'app agentes.chat. Le lien fonctionne une fois, pendant 10 minutes.",
+      "waiting": "En attente de l'app sur cet ordinateur…",
+      "expired": "Ce lien a expiré.",
+      "again": "Créer un nouveau lien",
+      "failed": "Impossible de créer le lien. Réessayez dans un instant.",
+      "server": "Un serveur ? Utilisez une ligne de terminal"
     },
     "link": {
       "serverTitle": "Connecter un serveur",

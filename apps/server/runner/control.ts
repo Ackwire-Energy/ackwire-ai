@@ -83,7 +83,13 @@ export class ControlServer {
       case "config.set":
         return d.configSet(m.patch);
       case "pair.start":
-        return d.pairStart(str(m.server), typeof m.name === "string" ? m.name : undefined, m.tools);
+        return d.pairStart(
+          str(m.server),
+          typeof m.name === "string" ? m.name : undefined,
+          m.tools,
+          // A link that isn't a string is refused, never dropped: without it the pairing waits for a confirm instead.
+          m.link === undefined ? undefined : str(m.link),
+        );
       case "pair.cancel":
         return d.pairCancel();
       case "unpair":

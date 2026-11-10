@@ -7,10 +7,11 @@ import { BROWSER_NOTIFY_PREF } from "../../control/browser";
 import { DOCK_PREF, MENU_BAR_PREF, menuBarShown } from "../../control/dock";
 import { NOTCH_PREF } from "../../control/notch";
 import { SITE_NOTIFY_PREF } from "../../control/notify";
+import { unpairedWorkspaces } from "../../control/pair";
 import { homeServer } from "../../control/server";
 import { type Home, orgName, pairedHomes } from "../../control/store";
 import { macStateOf } from "../../control/tray";
-import { useLocalServer, usePref } from "../../hooks";
+import { useLocalServer, usePref, useWorkspaces } from "../../hooks";
 import { detectedLocale, LOCALE_PREF, locales, switchDesktopLocale } from "../../i18n";
 import { AgentFace, ConnectionChip, MacPortrait, OrgTile } from "../../ui/bits";
 import { CardTitle, hintFor, PrefCard, PrefHead, PrefRow } from "../../ui/settings";
@@ -26,6 +27,9 @@ export function General() {
   const toast = useToast();
   const homes = pairedHomes(snap);
   const works = homes.length > 0;
+  // Every workspace the person is signed in to where agents may work here: those this computer works for, and these.
+  const offers = unpairedWorkspaces(useWorkspaces(), snap);
+  const agentsCard = works || offers.length > 0;
   const mac = host.platform === "mac";
   const local = useLocalServer();
   const current = homes.find((h) => h.status?.machine)?.status?.machine?.name ?? "";
@@ -53,12 +57,14 @@ export function General() {
     if (current) setName((n) => n || current);
   }, [current]);
 
+  // Pairing turns it on: read again when a workspace joins.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the count is the trigger
   useEffect(() => {
     host
       .autostart()
       .then(setLaunch)
       .catch(() => setLaunch(false));
-  }, [host]);
+  }, [host, homes.length]);
 
   const saveName = async () => {
     const clean = name.trim();
@@ -106,6 +112,28 @@ export function General() {
   };
   // Open at login has an ⓘ only where it changes something: agentes.chat running here, or agents working here.
   const launchHint = local.run ? "desktop.prefs.general.launchHere" : works ? "desktop.prefs.general.launchDesc" : null;
+  const launchRow = (
+    <PrefRow
+      title={t("desktop.prefs.general.launchTitle")}
+      hint={launchHint ? hintFor(t, t("desktop.prefs.general.launchTitle"), t(launchHint)) : undefined}
+      htmlFor="launch"
+      end={
+        <Switch
+          id="launch"
+          aria-describedby={launchHint ? "launch-hint" : undefined}
+          checked={launch === true}
+          disabled={launch === null}
+          onCheckedChange={(on) => {
+            setLaunch(on);
+            host.setAutostart(on).catch(() => {
+              setLaunch(!on);
+              toast(t("desktop.common.error"), "alert");
+            });
+          }}
+        />
+      }
+    />
+  );
 
   return (
     <>
@@ -143,9 +171,13 @@ export function General() {
               }
             />
           </PrefCard>
+        </>
+      )}
 
-          <ThisMacCards homes={homes} />
+      {agentsCard && <ThisMacCards homes={homes} offers={offers} bottom={launchRow} />}
 
+      {works && (
+        <>
           <CardTitle>{t("desktop.prefs.general.orgs")}</CardTitle>
           <PrefCard>
             {homes.map((h) => {
@@ -227,26 +259,7 @@ export function General() {
             />
           }
         />
-        <PrefRow
-          title={t("desktop.prefs.general.launchTitle")}
-          hint={launchHint ? hintFor(t, t("desktop.prefs.general.launchTitle"), t(launchHint)) : undefined}
-          htmlFor="launch"
-          end={
-            <Switch
-              id="launch"
-              aria-describedby={launchHint ? "launch-hint" : undefined}
-              checked={launch === true}
-              disabled={launch === null}
-              onCheckedChange={(on) => {
-                setLaunch(on);
-                host.setAutostart(on).catch(() => {
-                  setLaunch(!on);
-                  toast(t("desktop.common.error"), "alert");
-                });
-              }}
-            />
-          }
-        />
+        {!agentsCard && launchRow}
         <PrefRow
           title={t("desktop.prefs.general.notifySiteTitle")}
           hint={hintFor(t, t("desktop.prefs.general.notifySiteTitle"), t("desktop.prefs.general.notifySiteDesc"))}

@@ -38,6 +38,8 @@ export interface Snapshot {
 /** The runner speaks a control protocol this app doesn't know (development builds only). */
 export const isIncompatible = (h: Home) => !!h.hello && h.hello.control !== CONTROL_PROTOCOL_VERSION;
 export const isPairedHome = (h: Home) => h.status?.paired === true;
+/** A home whose runner said it is paired with nothing: one still starting is neither (it may be paired). */
+export const isUnpairedHome = (h: Home) => h.status?.paired === false;
 export const orgName = (h: Home) => h.status?.org?.name ?? "";
 
 /**
