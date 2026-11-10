@@ -9788,8 +9788,13 @@
     "tooBig": "La imagen pesa más de 8 MB."
   },
   "portrait": {
-    "label": "Avatar",
-    "change": "Cambiar avatar",
+    "ask": {
+      "title": "¿Cómo quieres aparecer?",
+      "build": "Crear un avatar",
+      "buildText": "Un retrato en píxeles a tu manera: cabello, ropa, accesorios.",
+      "photo": "Subir una foto",
+      "photoText": "Elige una imagen de tu computadora y encuádrala."
+    },
     "title": "Tu avatar",
     "preview": "Tu avatar",
     "shuffle": "Aleatorio",

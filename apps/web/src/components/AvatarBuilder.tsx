@@ -1,10 +1,12 @@
 import { keys } from "@agenteschat/client";
 import {
+  Avatar,
   Button,
   Dialog,
   DialogBody,
   DialogFooter,
   encodeRecipe,
+  Icon,
   Locked,
   PERSON_CATALOG,
   PERSON_DEFAULT,
@@ -116,10 +118,88 @@ export function portraitPng(recipe: PersonRecipe): string | null {
   }
 }
 
+/** The faces on the "Build an avatar" door: one of each build and one of either, one changing at a time. */
+const doorFaces = (): PersonRecipe[] => [
+  randomPerson(Math.random(), "m"),
+  randomPerson(Math.random(), "f"),
+  randomPerson(),
+];
+
+/**
+ * "How do you want to appear?": what "Change photo" opens first (ADR 0166 §3). Two doors side by side: build an
+ * avatar, with pixel faces taking turns on it, or upload a photo, with the person's own tile.
+ */
+export function AvatarChoiceDialog({
+  open,
+  onClose,
+  onBuild,
+  onPhoto,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onBuild: () => void;
+  onPhoto: () => void;
+}) {
+  const { t } = useTranslation();
+  const { me } = useOrg();
+  const [faces, setFaces] = useState(doorFaces);
+  useEffect(() => {
+    if (!open || calm()) return;
+    let n = 0;
+    const timer = setInterval(() => {
+      n += 1;
+      const at = n % 3;
+      setFaces((now) =>
+        now.map((face, i) => (i === at ? randomPerson(Math.random(), i === 2 ? undefined : face.build) : face)),
+      );
+    }, 1300);
+    return () => clearInterval(timer);
+  }, [open]);
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => !o && onClose()}
+      title={t("portrait.ask.title")}
+      closeLabel={t("common.close")}
+      width={600}
+    >
+      <DialogBody>
+        <div className="avatar-ask">
+          <button type="button" className="avatar-ask__door" onClick={onBuild}>
+            <span className="avatar-ask__art avatar-ask__art--sky" aria-hidden="true">
+              <span className="avatar-ask__fan">
+                {[0, 1, 2].map((i) => (
+                  <span key={i}>
+                    <PersonPortrait recipe={faces[i] ?? PERSON_DEFAULT} crop="full" />
+                  </span>
+                ))}
+              </span>
+            </span>
+            <span className="avatar-ask__title">{t("portrait.ask.build")}</span>
+            <span className="avatar-ask__text">{t("portrait.ask.buildText")}</span>
+          </button>
+          <button type="button" className="avatar-ask__door" onClick={onPhoto}>
+            <span className="avatar-ask__art" aria-hidden="true">
+              <span className="avatar-ask__photo">
+                <Avatar name={me.user.name} size="lg" imageUrl={undefined} />
+                <span className="avatar-ask__badge">
+                  <Icon name="image" size={16} />
+                </span>
+              </span>
+            </span>
+            <span className="avatar-ask__title">{t("portrait.ask.photo")}</span>
+            <span className="avatar-ask__text">{t("portrait.ask.photoText")}</span>
+          </button>
+        </div>
+      </DialogBody>
+    </Dialog>
+  );
+}
+
 const calm = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /**
- * "Your avatar": the person builds a pixel portrait (ADR 0166). Masculine or Feminine picks what is offered (cuts,
+ * "Your avatar", from the question's "Build an avatar": the person builds a pixel portrait (ADR 0166). Masculine or Feminine picks what is offered (cuts,
  * clothes, earrings, what goes around the neck and on the head; Beard on one, makeup on the other), each option is the
  * person's own portrait wearing it, and pointing at one tries it on the large portrait. A photo is one link away.
  */

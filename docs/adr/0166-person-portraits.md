@@ -40,8 +40,10 @@ Someone who never built a portrait keeps their initials: no portrait is made up 
 
 ### 3. The builder
 
-`AvatarBuilderDialog` (`apps/web/src/components/AvatarBuilder.tsx`) opens from "Change avatar" in the profile; the
-photo is one link away in its footer. The portrait stands on the left with a Masculine / Feminine switch, Shuffle and
+"Change photo" in the profile first asks how the person wants to appear (`AvatarChoiceDialog`): two doors side by
+side, "Build an avatar" with pixel faces taking turns on it and "Upload a photo" with the person's own tile.
+`AvatarBuilderDialog` (`apps/web/src/components/AvatarBuilder.tsx`) opens from the first; the photo is still one link
+away in its footer. The portrait stands on the left with a Masculine / Feminine switch, Shuffle and
 the small sizes; the pieces are in tabs on the right. Every option is a tile showing the person's own portrait wearing
 it, and pointing at one tries it on the large portrait.
 

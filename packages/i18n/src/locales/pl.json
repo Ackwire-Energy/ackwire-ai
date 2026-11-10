@@ -10173,8 +10173,13 @@
     "tooBig": "Obraz ma ponad 8 MB."
   },
   "portrait": {
-    "label": "Awatar",
-    "change": "Zmień awatar",
+    "ask": {
+      "title": "Jak chcesz się pokazywać?",
+      "build": "Stwórz awatar",
+      "buildText": "Pikselowy portret po swojemu: włosy, ubranie, dodatki.",
+      "photo": "Prześlij zdjęcie",
+      "photoText": "Wybierz obraz z komputera i go wykadruj."
+    },
     "title": "Twój awatar",
     "preview": "Twój awatar",
     "shuffle": "Losuj",

@@ -9874,8 +9874,13 @@
     "tooBig": "L'immagine supera gli 8 MB."
   },
   "portrait": {
-    "label": "Avatar",
-    "change": "Cambia avatar",
+    "ask": {
+      "title": "Come vuoi apparire?",
+      "build": "Crea un avatar",
+      "buildText": "Un ritratto in pixel a modo tuo: capelli, vestiti, accessori.",
+      "photo": "Carica una foto",
+      "photoText": "Scegli un'immagine dal computer e inquadrala."
+    },
     "title": "Il tuo avatar",
     "preview": "Il tuo avatar",
     "shuffle": "Casuale",

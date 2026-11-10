@@ -6318,6 +6318,117 @@ html:not([data-pointer]) .photo-drop:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
+/* "How do you want to appear?" (ADR 0166): two doors side by side, each a picture over its name and a line. */
+.avatar-ask {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  padding-bottom: 4px;
+}
+.avatar-ask__door {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 0 16px;
+  border: 0;
+  border-radius: 18px;
+  background: var(--raised);
+  box-shadow: var(--e1);
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  transition:
+    transform 0.16s var(--out, ease-out),
+    box-shadow 0.16s;
+}
+.avatar-ask__door:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--e2);
+}
+.avatar-ask__door:active {
+  transform: scale(0.985);
+}
+.avatar-ask__art {
+  display: grid;
+  place-items: center;
+  height: 150px;
+  margin-bottom: 10px;
+  background: var(--sunken);
+}
+.avatar-ask__art--sky {
+  background: linear-gradient(180deg, var(--agent-soft), color-mix(in srgb, var(--agent2) 55%, var(--agent-soft)));
+}
+.avatar-ask__fan {
+  display: flex;
+  align-items: flex-end;
+}
+.avatar-ask__fan > span {
+  display: block;
+  width: 64px;
+  height: 64px;
+  border-radius: 30%;
+  box-shadow: var(--e2);
+}
+.avatar-ask__fan > span:nth-child(1) {
+  transform: translateX(14px) rotate(-8deg);
+}
+.avatar-ask__fan > span:nth-child(2) {
+  position: relative;
+  z-index: var(--z-lifted);
+  width: 96px;
+  height: 96px;
+}
+.avatar-ask__fan > span:nth-child(3) {
+  transform: translateX(-14px) rotate(8deg);
+}
+.avatar-ask__photo {
+  position: relative;
+  display: block;
+}
+.avatar-ask__photo .ac-avatar {
+  width: 96px;
+  height: 96px;
+  font-size: 34px;
+  box-shadow: var(--e2);
+}
+.avatar-ask__badge {
+  position: absolute;
+  right: -8px;
+  bottom: -8px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--bg);
+  box-shadow: 0 0 0 3px var(--sunken);
+}
+.avatar-ask__title {
+  padding: 0 16px;
+  font-size: 16px;
+  font-weight: 650;
+  line-height: 22px;
+}
+.avatar-ask__text {
+  padding: 0 16px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 20px;
+  text-wrap: pretty;
+}
+@media (prefers-reduced-motion: reduce) {
+  .avatar-ask__door {
+    transition: none;
+  }
+}
+@media (max-width: 560px) {
+  .avatar-ask {
+    grid-template-columns: 1fr;
+  }
+}
 /* The avatar builder (ADR 0166): the portrait on the left, its pieces in tabs on the right; every option is a tile
    showing the person's own portrait wearing it. */
 .avatar-builder {

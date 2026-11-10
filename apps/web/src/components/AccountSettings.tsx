@@ -27,7 +27,7 @@ import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import type { AuthResult } from "@/auth/client";
 import { useAuth } from "@/auth/context";
-import { AvatarBuilderDialog } from "@/components/AvatarBuilder";
+import { AvatarBuilderDialog, AvatarChoiceDialog } from "@/components/AvatarBuilder";
 import { ChatLookSettings } from "@/components/ChatLookSettings";
 import { PrefRow } from "@/components/NoticePrefs";
 import { OpenOnPhoneDialog } from "@/components/OpenOnPhone";
@@ -298,6 +298,7 @@ export function ProfileDialog({ focus, onClose }: { focus: "name" | "timezone" |
   const [error, setError] = useState<string | null>(null);
   const [photo, setPhoto] = useState(false);
   const [builder, setBuilder] = useState(false);
+  const [ask, setAsk] = useState(false);
   useEffect(() => {
     if (!focus) return;
     setName(me.user.name);
@@ -348,9 +349,9 @@ export function ProfileDialog({ focus, onClose }: { focus: "name" | "timezone" |
           <DialogBody>
             <div className="row" style={{ gap: 12, alignItems: "center" }}>
               <Avatar name={me.user.name} size="lg" imageUrl={mine?.image ?? me.user.image} />
-              <span style={{ fontWeight: 600, flex: 1 }}>{t("portrait.label")}</span>
-              <Button size="sm" type="button" onClick={() => setBuilder(true)}>
-                {t("portrait.change")}
+              <span style={{ fontWeight: 600, flex: 1 }}>{t("photo.label")}</span>
+              <Button size="sm" type="button" onClick={() => setAsk(true)}>
+                {t("photo.change")}
               </Button>
             </div>
             <Field label={t("auth.yourName")} id="me-name" error={nameOk ? undefined : t("shell.nameEmpty")}>
@@ -393,6 +394,18 @@ export function ProfileDialog({ focus, onClose }: { focus: "name" | "timezone" |
           </Button>
         </DialogFooter>
       </form>
+      <AvatarChoiceDialog
+        open={ask}
+        onClose={() => setAsk(false)}
+        onBuild={() => {
+          setAsk(false);
+          setBuilder(true);
+        }}
+        onPhoto={() => {
+          setAsk(false);
+          setPhoto(true);
+        }}
+      />
       <AvatarBuilderDialog
         open={builder}
         onClose={() => setBuilder(false)}

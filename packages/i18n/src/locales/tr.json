@@ -9442,8 +9442,13 @@
     "tooBig": "Görsel 8 MB'tan büyük."
   },
   "portrait": {
-    "label": "Avatar",
-    "change": "Avatarı değiştir",
+    "ask": {
+      "title": "Nasıl görünmek istersiniz?",
+      "build": "Avatar oluştur",
+      "buildText": "Size göre bir piksel portre: saç, kıyafet, aksesuar.",
+      "photo": "Fotoğraf yükle",
+      "photoText": "Bilgisayarınızdan bir görsel seçin ve çerçeveleyin."
+    },
     "title": "Avatarınız",
     "preview": "Avatarınız",
     "shuffle": "Karıştır",

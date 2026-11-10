@@ -9498,8 +9498,13 @@
     "tooBig": "Das Bild ist größer als 8 MB."
   },
   "portrait": {
-    "label": "Avatar",
-    "change": "Avatar ändern",
+    "ask": {
+      "title": "Wie möchtest du erscheinen?",
+      "build": "Avatar erstellen",
+      "buildText": "Ein Pixelporträt nach deinem Geschmack: Haare, Kleidung, Accessoires.",
+      "photo": "Foto hochladen",
+      "photoText": "Wähle ein Bild von deinem Computer und richte es aus."
+    },
     "title": "Dein Avatar",
     "preview": "Dein Avatar",
     "shuffle": "Zufällig",

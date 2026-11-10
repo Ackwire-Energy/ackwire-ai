@@ -9184,8 +9184,13 @@
     "tooBig": "Ukuran gambar lebih dari 8 MB."
   },
   "portrait": {
-    "label": "Avatar",
-    "change": "Ganti avatar",
+    "ask": {
+      "title": "Kamu mau tampil seperti apa?",
+      "build": "Buat avatar",
+      "buildText": "Potret piksel sesuai gayamu: rambut, pakaian, aksesori.",
+      "photo": "Unggah foto",
+      "photoText": "Pilih gambar dari komputermu lalu atur bingkainya."
+    },
     "title": "Avatarmu",
     "preview": "Avatarmu",
     "shuffle": "Acak",

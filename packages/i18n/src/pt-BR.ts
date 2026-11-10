@@ -9658,8 +9658,14 @@ export const ptBR = {
   },
   /** The avatar builder: a person builds a pixel portrait of themselves instead of sending a photo. */
   portrait: {
-    label: "Avatar",
-    change: "Trocar avatar",
+    /** What "Change photo" opens first: build an avatar or upload a photo. */
+    ask: {
+      title: "Como você quer aparecer?",
+      build: "Criar um avatar",
+      buildText: "Monte um retrato em pixel do seu jeito: cabelo, roupa, acessórios.",
+      photo: "Enviar uma foto",
+      photoText: "Escolha uma imagem do seu computador e enquadre.",
+    },
     title: "Seu avatar",
     preview: "Seu avatar",
     shuffle: "Sortear",

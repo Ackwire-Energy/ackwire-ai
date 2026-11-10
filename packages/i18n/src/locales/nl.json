@@ -9566,8 +9566,13 @@
     "tooBig": "De afbeelding is groter dan 8 MB."
   },
   "portrait": {
-    "label": "Avatar",
-    "change": "Avatar wijzigen",
+    "ask": {
+      "title": "Hoe wil je eruitzien?",
+      "build": "Avatar maken",
+      "buildText": "Een pixelportret op jouw manier: haar, kleding, accessoires.",
+      "photo": "Foto uploaden",
+      "photoText": "Kies een afbeelding van je computer en kader die in."
+    },
     "title": "Je avatar",
     "preview": "Je avatar",
     "shuffle": "Husselen",

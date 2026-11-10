@@ -9199,8 +9199,13 @@
     "tooBig": "图片超过 8 MB。"
   },
   "portrait": {
-    "label": "头像",
-    "change": "更换头像",
+    "ask": {
+      "title": "你想以什么形象出现?",
+      "build": "创建头像",
+      "buildText": "按你的喜好拼一幅像素肖像:发型、衣服、配饰。",
+      "photo": "上传照片",
+      "photoText": "从电脑中选择一张图片并调整取景。"
+    },
     "title": "你的头像",
     "preview": "你的头像",
     "shuffle": "随机",

@@ -9541,8 +9541,14 @@ export const en = {
   },
   /** The avatar builder: a person builds a pixel portrait of themselves instead of sending a photo. */
   portrait: {
-    label: "Avatar",
-    change: "Change avatar",
+    /** What "Change photo" opens first: build an avatar or upload a photo. */
+    ask: {
+      title: "How do you want to appear?",
+      build: "Build an avatar",
+      buildText: "A pixel portrait made your way: hair, clothes, accessories.",
+      photo: "Upload a photo",
+      photoText: "Choose an image from your computer and frame it.",
+    },
     title: "Your avatar",
     preview: "Your avatar",
     shuffle: "Shuffle",

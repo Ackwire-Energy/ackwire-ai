@@ -22929,11 +22929,20 @@
   "photo.tooBig": {
     "value": "The image is over 8 MB."
   },
-  "portrait.label": {
-    "value": "Avatar"
+  "portrait.ask.title": {
+    "value": "How do you want to appear?"
   },
-  "portrait.change": {
-    "value": "Change avatar"
+  "portrait.ask.build": {
+    "value": "Build an avatar"
+  },
+  "portrait.ask.buildText": {
+    "value": "A pixel portrait made your way: hair, clothes, accessories."
+  },
+  "portrait.ask.photo": {
+    "value": "Upload a photo"
+  },
+  "portrait.ask.photoText": {
+    "value": "Choose an image from your computer and frame it."
   },
   "portrait.title": {
     "value": "Your avatar"
