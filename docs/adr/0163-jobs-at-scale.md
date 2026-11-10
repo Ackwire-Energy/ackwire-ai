@@ -22,12 +22,12 @@ every other workspace's routines wait behind it.
    that lane the workspace already runs on any process (`processing`, lease live), and takes the lowest ranks: round
    robin, with credit for what each one holds. One workspace's burst queues only that workspace; a workspace alone
    uses every slot. Jobs of no workspace (an email to an address, an account's contact) take turns by kind
-   (`coalesce(org_id::text, kind)`, bytewise), so a backfill of one kind holds back neither the workspaces nor a
-   sign-in email. The ranking runs in materialized CTEs without locks (a window function can't take `FOR UPDATE`); the
-   outer select locks with `FOR UPDATE … SKIP LOCKED` and checks the due condition again. It ranks every due job of
-   the lane, however long one workspace's backlog is: the claim read them all before too, since the due condition's
-   two states (pending, and a lease run out) can't come in order from the partial indexes, and it now sorts them by
-   workspace as well.
+   (`coalesce(org_id::text, kind)`, bytewise), so a backfill of one kind holds back neither the workspaces nor the
+   other kinds: a sync of every account's contact, say, and the sign-in emails. The ranking runs in materialized
+   CTEs without locks (a window function can't take `FOR UPDATE`); the outer select locks with
+   `FOR UPDATE … SKIP LOCKED` and checks the due condition again. It ranks every due job of the lane, however long
+   one workspace's backlog is: the claim read them all before too, since the due condition's two states (pending, and
+   a lease run out) can't come in order from the partial indexes, and it now sorts them by workspace as well.
 2. **Runs hold no database connection while they wait.** Every transaction in the engine and the server (350 sites)
    was scanned for anything awaited besides the database, and the flagged ones read: none waits on a model, a tool
    or a computer. The gateway reserves the budget, streams outside any transaction, then settles; a call to a computer
