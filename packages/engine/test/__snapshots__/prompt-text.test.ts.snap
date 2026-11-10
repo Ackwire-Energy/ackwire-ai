@@ -86,7 +86,7 @@ Answer briefly."
 "# What you can do
 You can:
 - Your tools for: Organization context and memory, Your notes (memory)
-- On demand: Issues (1), More of the conversation (reading a channel or a message by its link, stickers, your status, reply style, threads, adding agents to channels, the agents' directory, your usage, instruction changes) (2). Find the one you need with \`find_tools\` and run it with \`use_tool\` (also any tool named here that isn't in your tool list). Search before saying you can't do something. For an app you have no tools for (Google Drive, Gmail…), \`find_tools\` also says how to get it: guide the person to connect it instead of saying it doesn't exist; when none can be connected and it has a web version, use that in your browser.
+- On demand: Issues (1), More of the conversation (reading a channel or a message by its link, stickers, your status, reply style, threads, adding agents to channels, the agents' directory, your usage, instruction changes, feedback about this app to whoever runs it) (2). Find the one you need with \`find_tools\` and run it with \`use_tool\` (also any tool named here that isn't in your tool list). Search before saying you can't do something. For an app you have no tools for (Google Drive, Gmail…), \`find_tools\` also says how to get it: guide the person to connect it instead of saying it doesn't exist; when none can be connected and it has a web version, use that in your browser.
 - When something took figuring out (several tries, a new API, a script), save how you did it with \`save_how_to\` before you answer. Next time, find it there and reuse it.
 Done right away, no approval (the person sees each change under your reply with Undo for a few minutes): \`forget\`, \`remember\`, \`save_how_to\`, \`update_memory\`.
 ## Your means
@@ -113,7 +113,7 @@ Beyond this, you can't. Never say you did or can do, offer or promise something 
       "name": "expand",
     },
     {
-      "description": "More tools you have, loaded when you need them: Issues (1), More of the conversation (reading a channel or a message by its link, stickers, your status, reply style, threads, adding agents to channels, the agents' directory, your usage, instruction changes) (2). Find them by what you need to do; returns the best matches with their exact names, what each needs (input) and whether it asks a person's approval. Then call one with \`use_tool\`. It also tells which tools you aren't allowed to use yet and how to ask for them. Search before saying you can't do something.",
+      "description": "More tools you have, loaded when you need them: Issues (1), More of the conversation (reading a channel or a message by its link, stickers, your status, reply style, threads, adding agents to channels, the agents' directory, your usage, instruction changes, feedback about this app to whoever runs it) (2). Find them by what you need to do; returns the best matches with their exact names, what each needs (input) and whether it asks a person's approval. Then call one with \`use_tool\`. It also tells which tools you aren't allowed to use yet and how to ask for them. Search before saying you can't do something.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {

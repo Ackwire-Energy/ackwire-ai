@@ -21,6 +21,8 @@ export const FEEDBACK_ABOUT_MAX = 4000;
 /** Facts the app adds about where the person was: how many, and how long each. */
 export const FEEDBACK_FACTS = 40;
 export const FEEDBACK_FACT_MAX = 300;
+/** A person's feedbacks in an hour, by the form or by an agent they asked: more than anyone writes, too few to flood. */
+export const FEEDBACK_PER_HOUR = { limit: 10, windowMs: 60 * 60_000 } as const;
 
 const MB = 1024 * 1024;
 /** What one feedback takes: pictures a phone's screenshot fits in, one short screen recording. */
@@ -71,7 +73,7 @@ export interface Feedback {
   /** The workspace they were in, when they were in one. */
   orgName?: string;
   text: string;
-  /** The screen they were on (a path), and the app that sent it ("web", "desktop 0.6.1"). */
+  /** The screen they were on (a path), and the app that sent it ("web", "desktop 0.6.1"; "agent" for `send_feedback`). */
   where?: string;
   app?: string;
   about?: FeedbackAbout;
