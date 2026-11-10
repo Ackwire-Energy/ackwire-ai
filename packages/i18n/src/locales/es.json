@@ -6024,7 +6024,181 @@
     "and": " y",
     "routine": "Rutina",
     "routineKeep": "Crear la rutina {{name}}",
-    "routineNotMade": "La rutina no se creó: {{reason}}"
+    "routineNotMade": "La rutina no se creó: {{reason}}",
+    "hello": {
+      "clara": "Voy a cuidar tu agenda y recordarte lo importante antes de que sea tarde.",
+      "duda": "Voy a seguir tus cuentas y gastos y avisarte antes de que algo venza.",
+      "leo": "Voy a armar tus entrenamientos y mantenerte en ritmo, a tu manera.",
+      "mel": "Voy a planear tus comidas y la lista de la compra, a tu gusto y a tu bolsillo.",
+      "gabi": "Voy a armar tu plan de estudios y preguntarte sobre lo que aprendiste.",
+      "lu": "Voy a guardar tus notas e ideas y ayudarte a convertirlo todo en texto.",
+      "rosa": "Voy a cuidar la lista de la compra, las tareas de la casa y lo que haya que arreglar.",
+      "vic": "Voy a planear tus viajes: fechas, precios, reservas y el itinerario día a día.",
+      "rui": "Voy a seguir a tus clientes, escribir propuestas y cobros y recordar quién no pagó.",
+      "dev": "Programo, reviso PRs e investigo bugs.",
+      "ops": "Vigilo los errores, las colas y los deploys.",
+      "qa": "Pruebo los flujos y reproduzco los bugs reportados.",
+      "pm": "Organizo las tareas y hago los resúmenes.",
+      "support": "Respondo a los clientes y paso lo que necesita a una persona.",
+      "sales": "Preparo propuestas y doy seguimiento a los interesados.",
+      "marketing": "Planeo campañas, posts y páginas del sitio.",
+      "content": "Escribo y reviso textos, artículos y newsletters.",
+      "data": "Respondo preguntas con números y armo informes.",
+      "finance": "Sigo los pagos, los cobros y los gastos.",
+      "people": "Ayudo con contrataciones, bienvenidas y dudas del equipo.",
+      "research": "Investigo un tema y entrego un resumen con fuentes.",
+      "assistant": "Me encargo de la agenda, los correos y los recordatorios."
+    },
+    "starters": {
+      "clara": {
+        "tasks": {
+          "a": "¿Qué tengo mañana?",
+          "b": "Recuérdame pagar el alquiler cada día 5",
+          "c": "Mándame mi agenda todos los días a las 7"
+        }
+      },
+      "duda": {
+        "tasks": {
+          "a": "¿Cuánto gasté este mes?",
+          "b": "¿Qué cuentas vencen esta semana?",
+          "c": "Ordena estos gastos por categoría"
+        }
+      },
+      "leo": {
+        "tasks": {
+          "a": "Arma un entrenamiento de 30 minutos para hoy",
+          "b": "Planea mi semana de carrera",
+          "c": "Mándame el entrenamiento del día cada mañana"
+        }
+      },
+      "mel": {
+        "tasks": {
+          "a": "Sugiere tres cenas rápidas",
+          "b": "Arma el menú de la semana",
+          "c": "Haz la lista de la compra del menú"
+        }
+      },
+      "gabi": {
+        "tasks": {
+          "a": "Arma un plan de estudios para el examen",
+          "b": "Hazme 3 preguntas sobre lo que estudié",
+          "c": "Explica este tema de forma sencilla"
+        }
+      },
+      "lu": {
+        "tasks": {
+          "a": "Convierte estas notas en un texto corto",
+          "b": "Junta las ideas de la semana",
+          "c": "Revisa este texto"
+        }
+      },
+      "rosa": {
+        "tasks": {
+          "a": "Arma la lista de la compra de la semana",
+          "b": "¿Qué hay que arreglar en casa?",
+          "c": "Reparte las tareas de la casa"
+        }
+      },
+      "vic": {
+        "tasks": {
+          "a": "Planea 3 días en Lisboa",
+          "b": "Avísame si baja el pasaje",
+          "c": "Junta las reservas del viaje"
+        }
+      },
+      "rui": {
+        "tasks": {
+          "a": "Escribe una propuesta corta para un cliente",
+          "b": "¿Quién no ha pagado todavía?",
+          "c": "¿Qué espera hoy cada cliente?"
+        }
+      }
+    }
+  },
+  "newAgentCard": {
+    "title": "Nuevo agente",
+    "lead": "Elige a la izquierda y ajusta a la derecha. Puedes cambiarlo todo después.",
+    "list": "Puntos de partida",
+    "zero": "Desde cero",
+    "zeroSub": "Tú dices lo que hace",
+    "import": "Traer agentes de otra app",
+    "hi": "¡Hola! Soy",
+    "hiBlank": "¡Hola! Soy",
+    "name": "Nombre",
+    "namePlaceholder": "nombre",
+    "what": "Lo que hace",
+    "whatPlaceholder": "¿Qué voy a hacer por ti?",
+    "look": "Apariencia",
+    "lookDone": "Listo",
+    "shuffle": "Sortear",
+    "handle": "En el chat: @{{handle}}",
+    "handleRole": "En el chat: @{{handle}} · {{role}}",
+    "handleTaken": "En el chat: @{{handle}} · ya hay un {{name}} aquí",
+    "handleTaken_female": "En el chat: @{{handle}} · ya hay una {{name}} aquí",
+    "handleBlank": "La @ para llamarlo en el chat viene del nombre",
+    "similar": "Parecido a {{name}}, que ya viene listo.",
+    "similar_female": "Parecida a {{name}}, que ya viene lista.",
+    "similarAction": "Empezar con {{name}}",
+    "uses": "Va a usar",
+    "chooseApps": "Elegir apps",
+    "otherApp": "Otra app",
+    "worksIn": "Trabaja en",
+    "asks": "Para empezar, pídele",
+    "noAi": "Sin IA todavía: {{name}} empieza a pensar cuando conectes una, en la conversación.",
+    "noAiBlank": "Sin IA todavía: empieza a pensar cuando conectes una, en la conversación.",
+    "ready": "Lo demás ya viene listo. Puedes ajustarlo después, en la conversación.",
+    "create": "Crear a {{name}}",
+    "createBlank": "Crear agente",
+    "failed": "No se pudo crear: {{reason}}",
+    "level": {
+      "read": "Lee",
+      "write": "Lee y escribe"
+    },
+    "app": {
+      "lead": "Hasta dónde llega {{name}} en {{app}}.",
+      "leadBlank": "Hasta dónde llega en {{app}}.",
+      "read": "Leer",
+      "readDesc": "Ve lo que hay en {{app}}. No cambia nada.",
+      "write": "Leer y escribir",
+      "writeDesc": "También crea y edita en {{app}}.",
+      "asks": "{{actions}} siempre piden tu aprobación, en cualquier nivel.",
+      "asksAny": "Enviar, borrar y pagar siempre piden tu aprobación, en cualquier nivel.",
+      "remove": "Quitar {{app}}",
+      "done": "Listo"
+    },
+    "band": {
+      "label": "Lo que {{name}} necesita para empezar",
+      "ai": "Una IA para pensar",
+      "asleep": "Duerme hasta tener una IA"
+    },
+    "skills": "Skills",
+    "skillsHelpBlank": "Manuales que abre cuando los necesita.",
+    "chooseSkills": "Elegir skills",
+    "otherSkill": "Otra skill",
+    "namesLead": "Qué tal",
+    "namesRoll": "Otros nombres",
+    "skill": {
+      "opens": "{{name}} abre este manual cuando aparece el tema. Lo editas en Skills.",
+      "opensBlank": "Abre este manual cuando aparece el tema. Lo editas en Skills.",
+      "remove": "Quitar a {{name}}",
+      "removeBlank": "Quitar del agente",
+      "done": "Listo"
+    },
+    "names": {
+      "agenda": "Lía, Hora, Tere, Dora, Tito, Ema",
+      "agendaWords": "agenda, cita, recorda, reunion, reunión, horario, consulta",
+      "money": "Cuca, Nico, Moni, Ciro, Lara, Peso",
+      "moneyWords": "cuenta, gasto, dinero, finanz, factura, pagar",
+      "travel": "Ruta, Malú, Ravi, Vic, Nara, Tom",
+      "travelWords": "viaj, pasaje, vuelo, hotel, itinerario, vacacion",
+      "training": "Leo, Bea, Rayo, Kai, Nina, Davi",
+      "trainingWords": "entren, corr, gimnasio, ejercicio",
+      "study": "Gabi, Nilo, Sofía, Teo, Iris, Benji",
+      "studyWords": "estudi, examen, curso, aprend",
+      "clients": "Rui, Ana, Beto, Lis, Otto, Cleo",
+      "clientsWords": "client, venta, propuesta, cobro",
+      "any": "Sol, Lía, Teo, Bea, Nino, Iara, Caio, Luma, Gil, Rafa, Nara, Tom"
+    }
   },
   "members": {
     "column": {

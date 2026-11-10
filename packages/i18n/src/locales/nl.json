@@ -5910,7 +5910,179 @@
     "and": " en ",
     "routine": "Routine",
     "routineKeep": "De routine {{name}} maken",
-    "routineNotMade": "De routine is niet gemaakt: {{reason}}"
+    "routineNotMade": "De routine is niet gemaakt: {{reason}}",
+    "hello": {
+      "clara": "Ik let op je agenda en herinner je aan wat belangrijk is voordat het te laat is.",
+      "duda": "Ik houd je rekeningen en uitgaven bij en waarschuw je voordat er iets vervalt.",
+      "leo": "Ik stel je trainingen samen en houd je in het ritme, op jouw manier.",
+      "mel": "Ik plan je maaltijden en boodschappenlijst, naar jouw smaak en budget.",
+      "gabi": "Ik maak je studieplan en overhoor je over wat je hebt geleerd.",
+      "lu": "Ik bewaar je notities en ideeën en help je er tekst van te maken.",
+      "rosa": "Ik zorg voor de boodschappenlijst, het huishouden en wat er gerepareerd moet worden.",
+      "vic": "Ik plan je reizen: data, prijzen, boekingen en een dag-voor-dag-schema.",
+      "rui": "Ik volg je klanten, schrijf offertes en herinneringen en onthoud wie nog niet heeft betaald.",
+      "dev": "Ik programmeer, review PR's en zoek bugs uit.",
+      "ops": "Ik houd fouten, wachtrijen en deploys in de gaten.",
+      "qa": "Ik test flows en reproduceer gemelde bugs.",
+      "pm": "Ik organiseer de taken en maak de samenvattingen.",
+      "support": "Ik beantwoord klanten en geef door wat een mens nodig heeft.",
+      "sales": "Ik bereid offertes voor en volg geïnteresseerden op.",
+      "marketing": "Ik plan campagnes, posts en pagina's van de site.",
+      "content": "Ik schrijf en redigeer teksten, artikelen en nieuwsbrieven.",
+      "data": "Ik beantwoord vragen met cijfers en maak rapporten.",
+      "finance": "Ik houd betalingen, facturen en uitgaven bij.",
+      "people": "Ik help met werving, onboarding en vragen van het team.",
+      "research": "Ik onderzoek een onderwerp en lever een samenvatting met bronnen.",
+      "assistant": "Ik zorg voor de agenda, de e-mails en de herinneringen."
+    },
+    "starters": {
+      "clara": {
+        "tasks": {
+          "a": "Wat heb ik morgen?",
+          "b": "Herinner me elke 5e aan de huur",
+          "c": "Stuur me elke dag om 7 uur mijn agenda"
+        }
+      },
+      "duda": {
+        "tasks": {
+          "a": "Hoeveel heb ik deze maand uitgegeven?",
+          "b": "Welke rekeningen vervallen deze week?",
+          "c": "Sorteer deze uitgaven per categorie"
+        }
+      },
+      "leo": {
+        "tasks": {
+          "a": "Stel een training van 30 minuten voor vandaag samen",
+          "b": "Plan mijn hardloopweek",
+          "c": "Stuur me elke ochtend de training van de dag"
+        }
+      },
+      "mel": {
+        "tasks": {
+          "a": "Stel drie snelle avondmaaltijden voor",
+          "b": "Maak het weekmenu",
+          "c": "Maak de boodschappenlijst voor het menu"
+        }
+      },
+      "gabi": {
+        "tasks": {
+          "a": "Maak een studieplan voor het examen",
+          "b": "Stel me 3 vragen over wat ik heb geleerd",
+          "c": "Leg dit onderwerp eenvoudig uit"
+        }
+      },
+      "lu": {
+        "tasks": {
+          "a": "Maak van deze notities een korte tekst",
+          "b": "Verzamel de ideeën van de week",
+          "c": "Redigeer deze tekst"
+        }
+      },
+      "rosa": {
+        "tasks": {
+          "a": "Maak de boodschappenlijst van de week",
+          "b": "Wat moet er in huis gerepareerd worden?",
+          "c": "Verdeel de huishoudtaken"
+        }
+      },
+      "vic": {
+        "tasks": {
+          "a": "Plan 3 dagen Lissabon",
+          "b": "Laat het weten als het ticket goedkoper wordt",
+          "c": "Verzamel de boekingen van de reis"
+        }
+      },
+      "rui": {
+        "tasks": {
+          "a": "Schrijf een korte offerte voor een klant",
+          "b": "Wie heeft nog niet betaald?",
+          "c": "Waar wacht elke klant vandaag op?"
+        }
+      }
+    }
+  },
+  "newAgentCard": {
+    "title": "Nieuwe agent",
+    "lead": "Kies links en pas rechts aan. Je kunt later alles wijzigen.",
+    "list": "Startpunten",
+    "zero": "Vanaf nul",
+    "zeroSub": "Jij zegt wat hij doet",
+    "import": "Agents uit een andere app halen",
+    "hi": "Hoi! Ik ben",
+    "hiBlank": "Hoi! Ik ben",
+    "name": "Naam",
+    "namePlaceholder": "naam",
+    "what": "Wat hij doet",
+    "whatPlaceholder": "Wat ga ik voor je doen?",
+    "look": "Uiterlijk",
+    "lookDone": "Klaar",
+    "shuffle": "Loten",
+    "handle": "In de chat: @{{handle}}",
+    "handleRole": "In de chat: @{{handle}} · {{role}}",
+    "handleTaken": "In de chat: @{{handle}} · er is hier al een {{name}}",
+    "handleBlank": "De @ voor de chat komt van de naam",
+    "similar": "Lijkt op {{name}}, die al klaarstaat.",
+    "similarAction": "Beginnen met {{name}}",
+    "uses": "Gaat gebruiken",
+    "chooseApps": "Apps kiezen",
+    "otherApp": "Andere app",
+    "worksIn": "Werkt in",
+    "asks": "Vraag om te beginnen",
+    "noAi": "Nog geen AI: {{name}} begint te denken zodra je er een koppelt, in het gesprek.",
+    "noAiBlank": "Nog geen AI: hij begint te denken zodra je er een koppelt, in het gesprek.",
+    "ready": "De rest staat al klaar. Je kunt het later aanpassen, in het gesprek.",
+    "create": "{{name}} maken",
+    "createBlank": "Agent maken",
+    "failed": "Maken is niet gelukt: {{reason}}",
+    "level": {
+      "read": "Leest",
+      "write": "Leest en schrijft"
+    },
+    "app": {
+      "lead": "Hoe ver {{name}} gaat in {{app}}.",
+      "leadBlank": "Hoe ver hij gaat in {{app}}.",
+      "read": "Lezen",
+      "readDesc": "Ziet wat er in {{app}} staat. Verandert niets.",
+      "write": "Lezen en schrijven",
+      "writeDesc": "Maakt en bewerkt ook in {{app}}.",
+      "asks": "{{actions}} vragen altijd om je goedkeuring, op elk niveau.",
+      "asksAny": "Versturen, verwijderen en betalen vragen altijd om je goedkeuring, op elk niveau.",
+      "remove": "{{app}} weghalen",
+      "done": "Klaar"
+    },
+    "band": {
+      "label": "Wat {{name}} nodig heeft om te beginnen",
+      "ai": "Een AI om mee te denken",
+      "asleep": "Slaapt tot er een AI is"
+    },
+    "skills": "Skills",
+    "skillsHelpBlank": "Handleidingen die hij opent als dat nodig is.",
+    "chooseSkills": "Skills kiezen",
+    "otherSkill": "Andere skill",
+    "namesLead": "Wat dacht je van",
+    "namesRoll": "Andere namen",
+    "skill": {
+      "opens": "{{name}} opent deze handleiding als het onderwerp opduikt. Je bewerkt hem bij Skills.",
+      "opensBlank": "Hij opent deze handleiding als het onderwerp opduikt. Je bewerkt hem bij Skills.",
+      "remove": "Weghalen bij {{name}}",
+      "removeBlank": "Weghalen bij de agent",
+      "done": "Klaar"
+    },
+    "names": {
+      "agenda": "Lia, Uur, Tess, Dora, Tijs, Emma",
+      "agendaWords": "agenda, afspra, herinner, vergader, rooster",
+      "money": "Penny, Nico, Mona, Kees, Lara, Daan",
+      "moneyWords": "rekening, uitgav, geld, financ, budget, betal",
+      "travel": "Route, Malou, Ravi, Vic, Nara, Tom",
+      "travelWords": "reis, ticket, vlucht, hotel, vakantie",
+      "training": "Leo, Bea, Bliksem, Kai, Nina, Daaf",
+      "trainingWords": "train, hardloop, sport, oefen, gym",
+      "study": "Gabi, Nils, Sophie, Teun, Iris, Ben",
+      "studyWords": "studie, studer, examen, cursus, leer",
+      "clients": "Ruud, Anna, Bram, Lies, Otto, Cleo",
+      "clientsWords": "klant, verkoop, offerte, factur",
+      "any": "Sol, Lia, Teun, Bea, Nino, Iris, Kai, Luma, Gijs, Roos, Nara, Tom"
+    }
   },
   "members": {
     "column": {

@@ -5831,7 +5831,179 @@
     "and": " ve ",
     "routine": "Rutin",
     "routineKeep": "{{name}} rutinini oluştur",
-    "routineNotMade": "Rutin oluşturulmadı: {{reason}}"
+    "routineNotMade": "Rutin oluşturulmadı: {{reason}}",
+    "hello": {
+      "clara": "Takviminle ilgilenip önemli olanı geç olmadan sana hatırlatacağım.",
+      "duda": "Faturalarını ve harcamalarını takip edip bir şeyin vadesi gelmeden seni uyaracağım.",
+      "leo": "Antrenmanlarını hazırlayıp seni kendi tarzınla ritimde tutacağım.",
+      "mel": "Öğünlerini ve alışveriş listeni damak tadına ve bütçene göre planlayacağım.",
+      "gabi": "Çalışma planını hazırlayıp öğrendiklerin hakkında sana sorular soracağım.",
+      "lu": "Notlarını ve fikirlerini saklayıp hepsini metne dönüştürmene yardım edeceğim.",
+      "rosa": "Alışveriş listesiyle, ev işleriyle ve tamir edilmesi gerekenlerle ilgileneceğim.",
+      "vic": "Seyahatlerini planlayacağım: tarihler, fiyatlar, rezervasyonlar ve gün gün program.",
+      "rui": "Müşterilerini takip edip teklif ve ödeme hatırlatmaları yazacak, kimin ödemediğini aklımda tutacağım.",
+      "dev": "Kod yazarım, PR'ları incelerim ve hataları araştırırım.",
+      "ops": "Hataları, kuyrukları ve dağıtımları takip ederim.",
+      "qa": "Akışları test eder, bildirilen hataları yeniden üretirim.",
+      "pm": "Görevleri düzenler, özetleri hazırlarım.",
+      "support": "Müşterilere yanıt verir, bir insan gerektireni iletirim.",
+      "sales": "Teklif hazırlar, ilgilenenleri takip ederim.",
+      "marketing": "Kampanyaları, gönderileri ve site sayfalarını planlarım.",
+      "content": "Metin, makale ve bülten yazar, düzenlerim.",
+      "data": "Soruları rakamlarla yanıtlar, raporlar hazırlarım.",
+      "finance": "Ödemeleri, tahsilatları ve harcamaları takip ederim.",
+      "people": "İşe alım, oryantasyon ve ekibin sorularında yardım ederim.",
+      "research": "Bir konuyu araştırır, kaynaklarıyla bir özet sunarım.",
+      "assistant": "Takvim, e-postalar ve hatırlatıcılarla ilgilenirim."
+    },
+    "starters": {
+      "clara": {
+        "tasks": {
+          "a": "Yarın neyim var?",
+          "b": "Her ayın 5'inde kirayı ödememi hatırlat",
+          "c": "Takvimimi her gün saat 7'de gönder"
+        }
+      },
+      "duda": {
+        "tasks": {
+          "a": "Bu ay ne kadar harcadım?",
+          "b": "Bu hafta hangi faturaların vadesi geliyor?",
+          "c": "Bu harcamaları kategoriye göre ayır"
+        }
+      },
+      "leo": {
+        "tasks": {
+          "a": "Bugün için 30 dakikalık bir antrenman hazırla",
+          "b": "Koşu haftamı planla",
+          "c": "Her sabah günün antrenmanını gönder"
+        }
+      },
+      "mel": {
+        "tasks": {
+          "a": "Üç hızlı akşam yemeği öner",
+          "b": "Haftanın menüsünü hazırla",
+          "c": "Menü için alışveriş listesi yap"
+        }
+      },
+      "gabi": {
+        "tasks": {
+          "a": "Sınav için bir çalışma planı hazırla",
+          "b": "Çalıştığım konudan bana 3 soru sor",
+          "c": "Bu konuyu basitçe anlat"
+        }
+      },
+      "lu": {
+        "tasks": {
+          "a": "Bu notları kısa bir metne dönüştür",
+          "b": "Haftanın fikirlerini topla",
+          "c": "Bu metni düzenle"
+        }
+      },
+      "rosa": {
+        "tasks": {
+          "a": "Haftanın alışveriş listesini hazırla",
+          "b": "Evde neyin tamire ihtiyacı var?",
+          "c": "Ev işlerini paylaştır"
+        }
+      },
+      "vic": {
+        "tasks": {
+          "a": "Lizbon'da 3 gün planla",
+          "b": "Bilet ucuzlarsa haber ver",
+          "c": "Seyahatin rezervasyonlarını topla"
+        }
+      },
+      "rui": {
+        "tasks": {
+          "a": "Bir müşteri için kısa bir teklif yaz",
+          "b": "Kim henüz ödemedi?",
+          "c": "Bugün her müşteri ne bekliyor?"
+        }
+      }
+    }
+  },
+  "newAgentCard": {
+    "title": "Yeni ajan",
+    "lead": "Solda seç, sağda ayarla. Her şeyi sonra değiştirebilirsin.",
+    "list": "Başlangıç noktaları",
+    "zero": "Sıfırdan",
+    "zeroSub": "Ne yapacağını sen söylersin",
+    "import": "Başka bir uygulamadan ajan getir",
+    "hi": "Merhaba! Ben",
+    "hiBlank": "Merhaba! Ben",
+    "name": "Ad",
+    "namePlaceholder": "ad",
+    "what": "Ne yapar",
+    "whatPlaceholder": "Senin için ne yapacağım?",
+    "look": "Görünüm",
+    "lookDone": "Tamam",
+    "shuffle": "Rastgele",
+    "handle": "Sohbette: @{{handle}}",
+    "handleRole": "Sohbette: @{{handle}} · {{role}}",
+    "handleTaken": "Sohbette: @{{handle}} · burada zaten bir {{name}} var",
+    "handleBlank": "Sohbetteki @ addan gelir",
+    "similar": "{{name}} gibi, o hazır geliyor.",
+    "similarAction": "{{name}} ile başla",
+    "uses": "Kullanacakları",
+    "chooseApps": "Uygulama seç",
+    "otherApp": "Başka uygulama",
+    "worksIn": "Çalıştığı yer",
+    "asks": "Başlamak için iste",
+    "noAi": "Henüz yapay zekâ yok: {{name}}, sohbette bir yapay zekâ bağladığında düşünmeye başlar.",
+    "noAiBlank": "Henüz yapay zekâ yok: sohbette bir yapay zekâ bağladığında düşünmeye başlar.",
+    "ready": "Gerisi hazır geliyor. Sonra sohbette ayarlayabilirsin.",
+    "create": "{{name}} oluştur",
+    "createBlank": "Ajan oluştur",
+    "failed": "Oluşturulamadı: {{reason}}",
+    "level": {
+      "read": "Okur",
+      "write": "Okur ve yazar"
+    },
+    "app": {
+      "lead": "{{name}}, {{app}} içinde nereye kadar gider.",
+      "leadBlank": "{{app}} içinde nereye kadar gider.",
+      "read": "Okuma",
+      "readDesc": "{{app}} içinde olanı görür. Hiçbir şeyi değiştirmez.",
+      "write": "Okuma ve yazma",
+      "writeDesc": "{{app}} içinde oluşturur ve düzenler de.",
+      "asks": "{{actions}} her seviyede her zaman onayını ister.",
+      "asksAny": "Göndermek, silmek ve ödemek her seviyede her zaman onayını ister.",
+      "remove": "{{app}} kaldır",
+      "done": "Tamam"
+    },
+    "band": {
+      "label": "{{name}} başlamak için neye ihtiyaç duyuyor",
+      "ai": "Düşünmek için bir yapay zekâ",
+      "asleep": "Yapay zekâ olana kadar uyuyor"
+    },
+    "skills": "Beceriler",
+    "skillsHelpBlank": "Gerektiğinde açtığı kılavuzlar.",
+    "chooseSkills": "Beceri seç",
+    "otherSkill": "Başka beceri",
+    "namesLead": "Şuna ne dersin",
+    "namesRoll": "Başka adlar",
+    "skill": {
+      "opens": "{{name}}, konu açıldığında bu kılavuzu açar. Beceriler'de düzenlersin.",
+      "opensBlank": "Konu açıldığında bu kılavuzu açar. Beceriler'de düzenlersin.",
+      "remove": "{{name}} için kaldır",
+      "removeBlank": "Ajandan kaldır",
+      "done": "Tamam"
+    },
+    "names": {
+      "agenda": "Lale, Saat, Tuna, Dora, Timur, Ece",
+      "agendaWords": "takvim, randevu, hatırlat, toplantı, ajanda",
+      "money": "Kuruş, Nil, Mina, Cem, Lara, Akçe",
+      "moneyWords": "fatura, harcama, para, finans, bütçe, ödeme",
+      "travel": "Rota, Melis, Ravi, Vika, Nara, Tolga",
+      "travelWords": "seyahat, gezi, bilet, uçuş, otel, tatil",
+      "training": "Leo, Bade, Şimşek, Kaya, Nina, Deniz",
+      "trainingWords": "antrenman, koşu, spor, egzersiz, salon",
+      "study": "Gabi, Nilo, Sofya, Teo, İris, Barış",
+      "studyWords": "ders, sınav, kurs, öğren, çalış",
+      "clients": "Rüzgar, Ayla, Bora, Lina, Oktay, Ceren",
+      "clientsWords": "müşteri, satış, teklif, tahsil",
+      "any": "Sol, Lale, Teo, Bade, Nino, İpek, Kaan, Luma, Gül, Rafa, Nara, Tuna"
+    }
   },
   "members": {
     "column": {

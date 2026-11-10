@@ -6076,7 +6076,181 @@
     "and": " et ",
     "routine": "Routine",
     "routineKeep": "Créer la routine {{name}}",
-    "routineNotMade": "La routine n'a pas été créée : {{reason}}"
+    "routineNotMade": "La routine n'a pas été créée : {{reason}}",
+    "hello": {
+      "clara": "Je vais m'occuper de ton agenda et te rappeler ce qui compte avant qu'il soit trop tard.",
+      "duda": "Je vais suivre tes factures et tes dépenses et te prévenir avant une échéance.",
+      "leo": "Je vais préparer tes entraînements et te garder dans le rythme, à ta façon.",
+      "mel": "Je vais planifier tes repas et la liste de courses, selon tes goûts et ton budget.",
+      "gabi": "Je vais préparer ton plan d'études et t'interroger sur ce que tu as appris.",
+      "lu": "Je vais garder tes notes et tes idées et t'aider à tout transformer en texte.",
+      "rosa": "Je vais m'occuper de la liste de courses, des tâches de la maison et de ce qu'il faut réparer.",
+      "vic": "Je vais planifier tes voyages : dates, prix, réservations et programme jour par jour.",
+      "rui": "Je vais suivre tes clients, rédiger devis et relances et me souvenir de qui n'a pas payé.",
+      "dev": "Je code, je relis les PR et j'enquête sur les bugs.",
+      "ops": "Je garde un œil sur les erreurs, les files et les déploiements.",
+      "qa": "Je teste les parcours et je reproduis les bugs signalés.",
+      "pm": "J'organise les tâches et je fais les résumés.",
+      "support": "Je réponds aux clients et je transmets ce qui demande une personne.",
+      "sales": "Je prépare les devis et je relance les prospects.",
+      "marketing": "Je planifie les campagnes, les posts et les pages du site.",
+      "content": "J'écris et je relis textes, articles et newsletters.",
+      "data": "Je réponds aux questions avec des chiffres et je prépare des rapports.",
+      "finance": "Je suis les paiements, les factures et les dépenses.",
+      "people": "J'aide pour les recrutements, l'accueil et les questions de l'équipe.",
+      "research": "Je fais des recherches sur un sujet et je livre un résumé avec les sources.",
+      "assistant": "Je m'occupe de l'agenda, des e-mails et des rappels."
+    },
+    "starters": {
+      "clara": {
+        "tasks": {
+          "a": "Qu'est-ce que j'ai demain ?",
+          "b": "Rappelle-moi de payer le loyer chaque 5 du mois",
+          "c": "Envoie-moi mon agenda tous les jours à 7 h"
+        }
+      },
+      "duda": {
+        "tasks": {
+          "a": "Combien j'ai dépensé ce mois-ci ?",
+          "b": "Quelles factures arrivent à échéance cette semaine ?",
+          "c": "Classe ces dépenses par catégorie"
+        }
+      },
+      "leo": {
+        "tasks": {
+          "a": "Prépare un entraînement de 30 minutes pour aujourd'hui",
+          "b": "Planifie ma semaine de course",
+          "c": "Envoie-moi l'entraînement du jour chaque matin"
+        }
+      },
+      "mel": {
+        "tasks": {
+          "a": "Propose trois dîners rapides",
+          "b": "Prépare le menu de la semaine",
+          "c": "Fais la liste de courses du menu"
+        }
+      },
+      "gabi": {
+        "tasks": {
+          "a": "Prépare un plan d'études pour l'examen",
+          "b": "Pose-moi 3 questions sur ce que j'ai étudié",
+          "c": "Explique ce sujet simplement"
+        }
+      },
+      "lu": {
+        "tasks": {
+          "a": "Transforme ces notes en un texte court",
+          "b": "Rassemble les idées de la semaine",
+          "c": "Relis ce texte"
+        }
+      },
+      "rosa": {
+        "tasks": {
+          "a": "Fais la liste de courses de la semaine",
+          "b": "Qu'est-ce qu'il faut réparer à la maison ?",
+          "c": "Répartis les tâches de la maison"
+        }
+      },
+      "vic": {
+        "tasks": {
+          "a": "Planifie 3 jours à Lisbonne",
+          "b": "Préviens-moi si le billet baisse",
+          "c": "Rassemble les réservations du voyage"
+        }
+      },
+      "rui": {
+        "tasks": {
+          "a": "Rédige un devis court pour un client",
+          "b": "Qui n'a pas encore payé ?",
+          "c": "Qu'attend chaque client aujourd'hui ?"
+        }
+      }
+    }
+  },
+  "newAgentCard": {
+    "title": "Nouvel agent",
+    "lead": "Choisis à gauche et ajuste à droite. Tu pourras tout changer ensuite.",
+    "list": "Points de départ",
+    "zero": "De zéro",
+    "zeroSub": "Tu dis ce qu'il fait",
+    "import": "Importer des agents d'une autre app",
+    "hi": "Salut ! Je suis",
+    "hiBlank": "Salut ! Je suis",
+    "name": "Nom",
+    "namePlaceholder": "nom",
+    "what": "Ce qu'il fait",
+    "whatPlaceholder": "Qu'est-ce que je vais faire pour toi ?",
+    "look": "Apparence",
+    "lookDone": "Terminé",
+    "shuffle": "Tirer au sort",
+    "handle": "Dans le chat : @{{handle}}",
+    "handleRole": "Dans le chat : @{{handle}} · {{role}}",
+    "handleTaken": "Dans le chat : @{{handle}} · il y a déjà un {{name}} ici",
+    "handleTaken_female": "Dans le chat : @{{handle}} · il y a déjà une {{name}} ici",
+    "handleBlank": "Le @ pour l'appeler dans le chat vient du nom",
+    "similar": "Proche de {{name}}, qui est déjà prêt.",
+    "similar_female": "Proche de {{name}}, qui est déjà prête.",
+    "similarAction": "Commencer avec {{name}}",
+    "uses": "Va utiliser",
+    "chooseApps": "Choisir des apps",
+    "otherApp": "Autre app",
+    "worksIn": "Travaille dans",
+    "asks": "Pour commencer, demande-lui",
+    "noAi": "Pas encore d'IA : {{name}} commence à réfléchir dès que tu en connectes une, dans la conversation.",
+    "noAiBlank": "Pas encore d'IA : il commence à réfléchir dès que tu en connectes une, dans la conversation.",
+    "ready": "Le reste est déjà prêt. Tu pourras l'ajuster ensuite, dans la conversation.",
+    "create": "Créer {{name}}",
+    "createBlank": "Créer l'agent",
+    "failed": "Impossible de le créer : {{reason}}",
+    "level": {
+      "read": "Lit",
+      "write": "Lit et écrit"
+    },
+    "app": {
+      "lead": "Jusqu'où {{name}} va dans {{app}}.",
+      "leadBlank": "Jusqu'où il va dans {{app}}.",
+      "read": "Lire",
+      "readDesc": "Voit ce qu'il y a dans {{app}}. Ne change rien.",
+      "write": "Lire et écrire",
+      "writeDesc": "Crée et modifie aussi dans {{app}}.",
+      "asks": "{{actions}} demandent toujours ton accord, à tout niveau.",
+      "asksAny": "Envoyer, supprimer et payer demandent toujours ton accord, à tout niveau.",
+      "remove": "Retirer {{app}}",
+      "done": "Terminé"
+    },
+    "band": {
+      "label": "Ce dont {{name}} a besoin pour commencer",
+      "ai": "Une IA pour réfléchir",
+      "asleep": "Endormi jusqu'à avoir une IA"
+    },
+    "skills": "Skills",
+    "skillsHelpBlank": "Des manuels qu'il ouvre quand il en a besoin.",
+    "chooseSkills": "Choisir des skills",
+    "otherSkill": "Autre skill",
+    "namesLead": "Et si c'était",
+    "namesRoll": "Autres noms",
+    "skill": {
+      "opens": "{{name}} ouvre ce manuel quand le sujet se présente. Tu le modifies dans Skills.",
+      "opensBlank": "Il ouvre ce manuel quand le sujet se présente. Tu le modifies dans Skills.",
+      "remove": "Retirer de {{name}}",
+      "removeBlank": "Retirer de l'agent",
+      "done": "Terminé"
+    },
+    "names": {
+      "agenda": "Lia, Heure, Tess, Dora, Titou, Emma",
+      "agendaWords": "agenda, rendez, rappel, réunion, reunion, horaire, consult",
+      "money": "Sou, Nico, Monique, Cyril, Lara, Écu",
+      "moneyWords": "facture, dépense, depense, argent, financ, budget, payer",
+      "travel": "Route, Malou, Ravi, Vic, Nara, Tom",
+      "travelWords": "voyag, billet, vol, hôtel, hotel, itinéraire, vacance",
+      "training": "Léo, Béa, Éclair, Kai, Nina, David",
+      "trainingWords": "entraîn, entrain, course, courir, sport, exercice",
+      "study": "Gabi, Nils, Sophie, Théo, Iris, Benji",
+      "studyWords": "étud, etud, examen, cours, apprend, révis",
+      "clients": "Rémi, Anne, Benoît, Lise, Otto, Cléo",
+      "clientsWords": "client, vente, devis, relance, factur",
+      "any": "Sol, Lia, Théo, Béa, Nino, Iris, Kai, Luma, Gil, Rafa, Nara, Tom"
+    }
   },
   "members": {
     "column": {

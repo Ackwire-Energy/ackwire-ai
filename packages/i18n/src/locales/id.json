@@ -5681,7 +5681,179 @@
     "and": " dan ",
     "routine": "Rutinitas",
     "routineKeep": "Buat rutinitas {{name}}",
-    "routineNotMade": "Rutinitas tidak dibuat: {{reason}}"
+    "routineNotMade": "Rutinitas tidak dibuat: {{reason}}",
+    "hello": {
+      "clara": "Aku akan mengurus kalendermu dan mengingatkan hal penting sebelum terlambat.",
+      "duda": "Aku akan memantau tagihan dan pengeluaranmu dan memberi tahu sebelum ada yang jatuh tempo.",
+      "leo": "Aku akan menyusun latihanmu dan menjagamu tetap di ritme, dengan caramu.",
+      "mel": "Aku akan merencanakan makanan dan daftar belanjamu, sesuai selera dan dompetmu.",
+      "gabi": "Aku akan menyusun rencana belajarmu dan menanyakan apa yang sudah kamu pelajari.",
+      "lu": "Aku akan menyimpan catatan dan idemu dan membantu mengubah semuanya jadi tulisan.",
+      "rosa": "Aku akan mengurus daftar belanja, pekerjaan rumah, dan apa yang perlu diperbaiki.",
+      "vic": "Aku akan merencanakan perjalananmu: tanggal, harga, pemesanan, dan rencana per hari.",
+      "rui": "Aku akan memantau klienmu, menulis penawaran dan tagihan, dan mengingat siapa yang belum bayar.",
+      "dev": "Aku menulis kode, meninjau PR, dan menelusuri bug.",
+      "ops": "Aku memantau error, antrean, dan deploy.",
+      "qa": "Aku menguji alur dan mereproduksi bug yang dilaporkan.",
+      "pm": "Aku mengatur tugas dan membuat ringkasan.",
+      "support": "Aku menjawab pelanggan dan meneruskan yang butuh orang.",
+      "sales": "Aku menyiapkan penawaran dan menindaklanjuti calon pelanggan.",
+      "marketing": "Aku merencanakan kampanye, postingan, dan halaman situs.",
+      "content": "Aku menulis dan menyunting teks, artikel, dan newsletter.",
+      "data": "Aku menjawab pertanyaan dengan angka dan menyusun laporan.",
+      "finance": "Aku memantau pembayaran, tagihan, dan pengeluaran.",
+      "people": "Aku membantu rekrutmen, orientasi, dan pertanyaan tim.",
+      "research": "Aku meriset sebuah topik dan memberikan ringkasan dengan sumber.",
+      "assistant": "Aku mengurus kalender, email, dan pengingat."
+    },
+    "starters": {
+      "clara": {
+        "tasks": {
+          "a": "Apa jadwalku besok?",
+          "b": "Ingatkan aku bayar sewa setiap tanggal 5",
+          "c": "Kirim jadwalku setiap hari jam 7"
+        }
+      },
+      "duda": {
+        "tasks": {
+          "a": "Berapa pengeluaranku bulan ini?",
+          "b": "Tagihan apa yang jatuh tempo minggu ini?",
+          "c": "Kelompokkan pengeluaran ini per kategori"
+        }
+      },
+      "leo": {
+        "tasks": {
+          "a": "Susun latihan 30 menit untuk hari ini",
+          "b": "Rencanakan minggu lariku",
+          "c": "Kirim latihan hari ini setiap pagi"
+        }
+      },
+      "mel": {
+        "tasks": {
+          "a": "Sarankan tiga makan malam cepat",
+          "b": "Susun menu minggu ini",
+          "c": "Buat daftar belanja untuk menu itu"
+        }
+      },
+      "gabi": {
+        "tasks": {
+          "a": "Susun rencana belajar untuk ujian",
+          "b": "Beri aku 3 pertanyaan tentang yang kupelajari",
+          "c": "Jelaskan topik ini dengan sederhana"
+        }
+      },
+      "lu": {
+        "tasks": {
+          "a": "Ubah catatan ini jadi teks pendek",
+          "b": "Kumpulkan ide minggu ini",
+          "c": "Sunting teks ini"
+        }
+      },
+      "rosa": {
+        "tasks": {
+          "a": "Buat daftar belanja minggu ini",
+          "b": "Apa yang perlu diperbaiki di rumah?",
+          "c": "Bagi pekerjaan rumah"
+        }
+      },
+      "vic": {
+        "tasks": {
+          "a": "Rencanakan 3 hari di Lisbon",
+          "b": "Kabari aku kalau tiketnya turun",
+          "c": "Kumpulkan pemesanan perjalanan"
+        }
+      },
+      "rui": {
+        "tasks": {
+          "a": "Tulis penawaran singkat untuk klien",
+          "b": "Siapa yang belum bayar?",
+          "c": "Apa yang ditunggu tiap klien hari ini?"
+        }
+      }
+    }
+  },
+  "newAgentCard": {
+    "title": "Agen baru",
+    "lead": "Pilih di kiri dan sesuaikan di kanan. Semua bisa diubah nanti.",
+    "list": "Titik awal",
+    "zero": "Dari nol",
+    "zeroSub": "Kamu yang bilang apa tugasnya",
+    "import": "Bawa agen dari aplikasi lain",
+    "hi": "Hai! Aku",
+    "hiBlank": "Hai! Aku",
+    "name": "Nama",
+    "namePlaceholder": "nama",
+    "what": "Apa tugasnya",
+    "whatPlaceholder": "Apa yang akan kulakukan untukmu?",
+    "look": "Tampilan",
+    "lookDone": "Selesai",
+    "shuffle": "Acak",
+    "handle": "Di chat: @{{handle}}",
+    "handleRole": "Di chat: @{{handle}} · {{role}}",
+    "handleTaken": "Di chat: @{{handle}} · sudah ada {{name}} di sini",
+    "handleBlank": "@ untuk chat diambil dari nama",
+    "similar": "Mirip {{name}}, yang sudah siap pakai.",
+    "similarAction": "Mulai dengan {{name}}",
+    "uses": "Akan memakai",
+    "chooseApps": "Pilih aplikasi",
+    "otherApp": "Aplikasi lain",
+    "worksIn": "Bekerja di",
+    "asks": "Untuk mulai, minta",
+    "noAi": "Belum ada AI: {{name}} mulai berpikir saat kamu menghubungkan AI, di percakapan.",
+    "noAiBlank": "Belum ada AI: ia mulai berpikir saat kamu menghubungkan AI, di percakapan.",
+    "ready": "Sisanya sudah siap. Bisa disesuaikan nanti, di percakapan.",
+    "create": "Buat {{name}}",
+    "createBlank": "Buat agen",
+    "failed": "Gagal membuat: {{reason}}",
+    "level": {
+      "read": "Membaca",
+      "write": "Membaca dan menulis"
+    },
+    "app": {
+      "lead": "Sejauh mana {{name}} bekerja di {{app}}.",
+      "leadBlank": "Sejauh mana ia bekerja di {{app}}.",
+      "read": "Baca",
+      "readDesc": "Melihat isi {{app}}. Tidak mengubah apa pun.",
+      "write": "Baca dan tulis",
+      "writeDesc": "Juga membuat dan mengedit di {{app}}.",
+      "asks": "{{actions}} selalu meminta persetujuanmu, di level apa pun.",
+      "asksAny": "Mengirim, menghapus, dan membayar selalu meminta persetujuanmu, di level apa pun.",
+      "remove": "Hapus {{app}}",
+      "done": "Selesai"
+    },
+    "band": {
+      "label": "Yang dibutuhkan {{name}} untuk mulai",
+      "ai": "AI untuk berpikir",
+      "asleep": "Tidur sampai ada AI"
+    },
+    "skills": "Skill",
+    "skillsHelpBlank": "Panduan yang dibukanya saat perlu.",
+    "chooseSkills": "Pilih skill",
+    "otherSkill": "Skill lain",
+    "namesLead": "Bagaimana kalau",
+    "namesRoll": "Nama lain",
+    "skill": {
+      "opens": "{{name}} membuka panduan ini saat topiknya muncul. Kamu mengeditnya di Skill.",
+      "opensBlank": "Ia membuka panduan ini saat topiknya muncul. Kamu mengeditnya di Skill.",
+      "remove": "Hapus dari {{name}}",
+      "removeBlank": "Hapus dari agen",
+      "done": "Selesai"
+    },
+    "names": {
+      "agenda": "Lia, Jam, Tika, Dora, Tito, Ema",
+      "agendaWords": "jadwal, kalender, janji, ingat, rapat, temu",
+      "money": "Rupi, Niko, Mona, Ciko, Lara, Sen",
+      "moneyWords": "tagihan, pengeluaran, uang, keuangan, anggaran, bayar",
+      "travel": "Rute, Malu, Ravi, Vika, Nara, Tomi",
+      "travelWords": "perjalanan, jalan, tiket, terbang, hotel, liburan",
+      "training": "Leo, Bia, Kilat, Kai, Nina, Dimas",
+      "trainingWords": "latihan, lari, gym, olahraga",
+      "study": "Gabi, Nilo, Sofi, Teo, Iris, Beni",
+      "studyWords": "belajar, ujian, kursus, pelajar, kuliah",
+      "clients": "Rudi, Ani, Bento, Lisa, Oto, Cleo",
+      "clientsWords": "klien, jual, penawaran, tagih, pelanggan",
+      "any": "Sol, Lia, Teo, Bia, Nino, Iara, Kai, Luma, Gilang, Rafa, Nara, Tomi"
+    }
   },
   "members": {
     "column": {
