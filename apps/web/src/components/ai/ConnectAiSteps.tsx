@@ -281,42 +281,24 @@ export interface ExistingUsed {
 }
 
 /**
- * What the person already has for one agent with no AI (`existingAi`), as the picker's first rows, under a line that
- * says so: an account on its computer used in one click, no sign-in (taken from the agent on it where it may think
- * for one agent only), or signed in once more for this agent in its plan's panel (`onSignIn`, the panel right under
- * its row); a workspace key in one click on the workspace's model, with the budget line; someone else's account shown,
- * locked. A plan that can't run on that computer dims its rows, as its tile.
+ * What the person already has for one agent (`existingAi`) and what using a row does: an account moves the agent onto
+ * it, a workspace key puts it on the workspace's model with that key. Shared by the picker's rows (`ExistingRows`) and
+ * the conversation's Connect, which picks one and then confirms it.
  */
-export function ExistingRows({
+export function useExistingAi({
   gates,
   agent,
   credentials,
-  named = false,
-  signIn,
-  panel,
   toEveryone = false,
-  onSignIn,
   onUsed,
-  onManageKeys,
 }: {
-  /** The agent's own (`usePlanGates`): its accounts, and what each plan can do there. */
   gates: PlanGates;
   agent: PlanAgent;
-  /** The workspace's keys the person may give it (none for someone who may not). */
   credentials: readonly Credential[];
-  /** The line says for whom (the title doesn't). */
-  named?: boolean;
-  signIn?: ExistingSignIn | null;
-  /** That sign-in's plan panel, from `AiPicker`. */
-  panel?: ReactNode;
-  /** A plan picked here lets everyone talk to it ("Responde a todos" on where the caller keeps it). */
   toEveryone?: boolean;
-  onSignIn: (signIn: ExistingSignIn) => void;
   onUsed: (agentId: string, used: ExistingUsed) => void;
-  /** Where a key shown here is removed: Settings › AI accounts. */
-  onManageKeys?: () => void;
 }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { org } = useOrg();
   const api = useApi();
   const qc = useQueryClient();
@@ -325,10 +307,8 @@ export function ExistingRows({
   const models = useModels();
   const [busy, setBusy] = useState(false);
   const [refused, setRefused] = useState<ReturnType<typeof keyRefusal>>(null);
-  const view = gates.view;
-  if (!view || view.agentId !== agent.id) return null;
-  const rows = existingAi(view, credentials);
-  if (rows.length === 0 && !panel) return null;
+  const view = gates.view?.agentId === agent.id ? gates.view : undefined;
+  const rows = view ? existingAi(view, credentials) : null;
   const save = async (run: () => Promise<ExistingUsed>) => {
     setBusy(true);
     setRefused(null);
@@ -376,15 +356,74 @@ export function ExistingRows({
         toast.show(t("connectAi.key.savedUnchecked", { provider: providerLabel(key.provider) }), "info");
       const row = dir.agentById.get(agent.id);
       // The team's right hand: a key is the workspace's AI, so everyone without their own thinks with it.
-      if (view.scope === "mine" && row) {
+      if (view?.scope === "mine" && row) {
         await rightHandOnKey(api, org.id, row, key, models.data?.models ?? []);
         return { label: key.label, choice: "key", onlyOwner: false, scope: "workspace" };
       }
       const fits = keyRuns(key, row?.model, models.data?.models ?? []);
-      if (view.brain !== "model") await api.agents.setBrain(org.id, agent.id, { brain: "model" });
+      if (view?.brain !== "model") await api.agents.setBrain(org.id, agent.id, { brain: "model" });
       await api.agents.update(org.id, agent.id, { credentialId: key.id, ...(fits ? {} : { model: AUTO }) });
       return { label: key.label, choice: "key", onlyOwner: false };
     });
+  return { rows, busy, refused, pickAccount, pickKey };
+}
+
+/**
+ * What the person already has for one agent with no AI (`existingAi`), as the picker's first rows, under a line that
+ * says so: an account on its computer used in one click, no sign-in (taken from the agent on it where it may think
+ * for one agent only), or signed in once more for this agent in its plan's panel (`onSignIn`, the panel right under
+ * its row); a workspace key in one click on the workspace's model, with the budget line; someone else's account shown,
+ * locked. A plan that can't run on that computer dims its rows, as its tile.
+ */
+export function ExistingRows({
+  gates,
+  agent,
+  credentials,
+  named = false,
+  signIn,
+  panel,
+  toEveryone = false,
+  onSignIn,
+  onUsed,
+  onManageKeys,
+}: {
+  /** The agent's own (`usePlanGates`): its accounts, and what each plan can do there. */
+  gates: PlanGates;
+  agent: PlanAgent;
+  /** The workspace's keys the person may give it (none for someone who may not). */
+  credentials: readonly Credential[];
+  /** The line says for whom (the title doesn't). */
+  named?: boolean;
+  signIn?: ExistingSignIn | null;
+  /** That sign-in's plan panel, from `AiPicker`. */
+  panel?: ReactNode;
+  /** A plan picked here lets everyone talk to it ("Responde a todos" on where the caller keeps it). */
+  toEveryone?: boolean;
+  onSignIn: (signIn: ExistingSignIn) => void;
+  onUsed: (agentId: string, used: ExistingUsed) => void;
+  /** Where a key shown here is removed: Settings › AI accounts. */
+  onManageKeys?: () => void;
+}) {
+  const { t, i18n } = useTranslation();
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  const {
+    rows: found,
+    busy,
+    refused,
+    pickAccount,
+    pickKey,
+  } = useExistingAi({
+    gates,
+    agent,
+    credentials,
+    toEveryone,
+    onUsed,
+  });
+  const view = gates.view;
+  if (!view || !found) return null;
+  const rows = found;
+  if (rows.length === 0 && !panel) return null;
   const g = agentGrammar(agent.name);
   // A row a plan's gate dims is off for a reason the panel under the picker may not be showing: said once, under them.
   const dimmed = rows.flatMap((r) => {

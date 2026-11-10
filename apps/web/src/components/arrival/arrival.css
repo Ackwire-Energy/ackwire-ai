@@ -266,7 +266,22 @@
   flex-direction: column;
   gap: 8px;
 }
-/* From a conversation: whom it is for, what the person already has, then the choices. */
+/* From a conversation (ADR 0160, addendum): the sky as a band over a narrow dialog, then whom it is for, what the
+   person already has to pick from, or the choices of a new one. */
+.arrival-chat .arrival-hero {
+  height: 148px;
+}
+.arrival-lede--row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+.arrival-lede--row > .ac-btn {
+  margin-inline-start: -6px;
+}
+.arrival-lede--row .arrival-lede__title {
+  margin-bottom: 0;
+}
 .arrival-main__pick {
   display: flex;
   flex-direction: column;
@@ -278,8 +293,59 @@
   font-size: 13px;
   font-weight: 600;
 }
-.arrival-opts .ac-option + .arrival-opts__label {
-  margin-top: 4px;
+.arrival-have {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.arrival-have > .arrival-opts__label:not(:first-child) {
+  margin-top: 6px;
+}
+.arrival-have__row {
+  align-items: center;
+  width: 100%;
+}
+.arrival-have__row > .ac-option__text {
+  flex: 1;
+  min-width: 0;
+}
+/* How near its limit the plan is, in the words' colour: the state is the words, the colour only follows them. */
+.arrival-have__row .ac-option__desc[data-plan="almost"] {
+  color: var(--attention);
+}
+.arrival-have__row[data-disabled] {
+  opacity: 0.6;
+}
+.arrival-have__meter {
+  flex: none;
+  width: 88px;
+  height: 4px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--ink) 9%, transparent);
+  overflow: hidden;
+}
+.arrival-have__meter i {
+  display: block;
+  width: var(--used);
+  height: 100%;
+  background: var(--ok);
+}
+.arrival-have__meter[data-plan="almost"] i {
+  background: var(--attention);
+}
+.arrival-have__meter[data-plan="limited"] i {
+  background: var(--faint);
+}
+.arrival-have__more {
+  align-self: flex-start;
+  font-size: 13px;
+}
+.arrival-have__other {
+  align-items: center;
+  width: 100%;
+}
+.arrival-have__other > .ac-option__text {
+  flex: 1;
 }
 .arrival-opts .ac-option {
   width: 100%;

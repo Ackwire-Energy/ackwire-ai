@@ -111,13 +111,14 @@ with Postgres alone, and must not need a third-party widget in the apps.
 - The arrival's choice cards and the picker (ADR 0061) are two views of the same choices: a plan added to
   `PLAN_CHOICES` shows in both.
 
-## Addendum (2026-11-10): the stage opens from an agent's conversation, for every agent with no AI
+## Addendum (2026-11-10): Connect from an agent's conversation, for every agent with no AI
 
-Someone who brought eight agents from another app had to open Connect in each one's conversation: there it was the plain dialog, for that agent alone (ADR 0059 §2), and the stage only opened once, after the onboarding.
+Someone who brought eight agents from another app had to open Connect in each one's conversation: there it was the plain dialog, for that agent alone (ADR 0059 §2), listing what they already had above a second picker that offered the same account again.
 
-- Connect opened from an agent's own conversation (the notice over the composer and the setup card: `ConnectAiRequest.chat`) is the stage, when the agent is the person's own, has no AI and is on no plan. Anything else (someone else's agent, the right hand, a plan whose sign-in ended, a key asked for by a message) keeps the plain dialog, as do the other ways in.
-- When more agents of the person's have no AI, it opens for all of them ("Para: Todos os agentes"), and the same select narrows it to the agent of the conversation. This supersedes "opened for one agent, it is for that agent alone" for this way in. What is decided when the dialog opens is kept while it is open, since connecting changes who has an AI.
-- What the person already has for all of their agents on that computer (a shared, active account) comes before the choices, one card each: picking one opens its plan's panel, which moves whom it is for onto that account at once (`PlanPanel`'s `use`), with no second click.
+- Connect opened from an agent's own conversation (the notice over the composer and the setup card: `ConnectAiRequest.chat`) is a narrow dialog under the arrival's sky, with the agent asleep on it, when the agent is the person's own, has no AI and is on no plan. Anything else (someone else's agent, the right hand, a plan whose sign-in ended, a key asked for by a message) keeps the plain dialog, as do the other ways in.
+- What the person already has comes first, to pick and then confirm at the foot ("Usar Claude · Max"): their own accounts, the workspace's keys, then other people's plans under each owner's name (`ConnectHave`, over the same rows and actions as the picker's: `useExistingAi`). A row says how near its limit the plan is, in words and as a bar; the one with most room is picked, one at its limit goes last. Someone else's plan shows that its owner hears of it only when it is the one picked. Past four rows each group shows its best one.
+- A new AI is a row under them ("Ou conecte outra") that opens the arrival's choices; with nothing connected yet the dialog opens on them.
+- When more agents of the person's have no AI, it opens for all of them ("Para: Todos os agentes"), and the same select narrows it to the agent of the conversation. This supersedes "opened for one agent, it is for that agent alone" for this way in. For all, the list keeps only the accounts that think for all of their owner's agents there, and picking one moves each agent onto it (`PlanPanel`'s `use`). What is decided when the dialog opens is kept while it is open, since connecting changes who has an AI.
 - A new sign-in follows the plan's own rule (ADR 0059 §2): one for all where the computer shares it, else one per agent in turn.
-- No new strings: the select, the cards and the titles reuse the picker's and the arrival's.
-- Not here yet: the phone app, and an account that thinks for one agent only ("Mover para cá"), which stays on the plain dialog's list (the agent's page, Contas de IA).
+- No new strings: the select, the rows, the button and the titles reuse the picker's and the arrival's.
+- Not here yet: the phone app.
