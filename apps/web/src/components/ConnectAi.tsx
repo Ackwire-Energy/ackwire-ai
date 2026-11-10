@@ -397,6 +397,8 @@ function ConnectAiDialog({
   // What the person already has: the row picked (the best one until they pick), or the choices of a new one instead.
   const [haveSel, setHaveSel] = useState<string>();
   const [adding, setAdding] = useState(false);
+  // Where a plan's panel puts its own two actions (an account to use, another sign-in): the dialog's footer.
+  const [footAt, setFootAt] = useState<HTMLElement | null>(null);
   const day = useDawn((stage || band) && connected);
   const [keySaved, setKeySaved] = useState(false);
   const [keyNote, setKeyNote] = useState<string>();
@@ -538,6 +540,7 @@ function ConnectAiDialog({
         {...(login?.choice === choice ? { login } : {})}
         {...(use && planOfAccount(use) === choice ? { use } : {})}
         plain={band}
+        actionsAt={footAt}
         onKey={() => {
           setPicked("key");
           setLogin(null);
@@ -767,6 +770,8 @@ function ConnectAiDialog({
             </div>
           )}
         </DialogBody>
+        {/* A plan's own actions, when it has any: the footer shows only while it holds them. */}
+        {stepping && <div className="ac-dialog__foot arrival-chat__acts" ref={setFootAt} />}
         {connected || (chosen && freeDone) ? (
           <DialogFooter>
             <Button variant="primary" onClick={onClose}>

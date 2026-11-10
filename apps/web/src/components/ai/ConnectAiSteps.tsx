@@ -92,6 +92,7 @@ import { matchesWords } from "@agenteschat/ui/search";
 import { useQueryClient } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
 import { Fragment, type ReactNode, useCallback, useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { BillingLinkButton } from "@/components/BillingLinkButton";
@@ -648,6 +649,11 @@ export interface PlanPanelProps {
    * person already has is a button to use it, with another sign-in as the quiet one beside it.
    */
   plain?: boolean;
+  /**
+   * With `plain`: where the dialog keeps its footer. The account to use and another sign-in go there, as the dialog's
+   * main action and the one beside it.
+   */
+  actionsAt?: HTMLElement | null;
   /** "Usar uma chave de API agora": the API key row. */
   onKey: () => void;
   /** Self-host with no computer for the agent: where one is connected. */
@@ -880,6 +886,7 @@ function PlanSteps({
   login,
   use,
   plain = false,
+  actionsAt,
   onKey,
   onComputer,
   onDone,
@@ -1228,18 +1235,22 @@ function PlanSteps({
       {choice === "gemini" && choosing && !otherChosen && existing.some(geminiPersonal) && (
         <SettingNote icon="alert">{t("connectAi.plan.gemini.warning")}</SettingNote>
       )}
-      {choosing && plain && !ownable && !otherChosen && (
-        <div className="ai-panel__use">
-          {existing.map((a) => (
-            <Button key={a.id} variant="primary" onClick={() => void (everyone ? assignAll(a) : assign(agent.id, a))}>
-              {t("connectAi.use", { label: accountTitle(a) })}
-            </Button>
-          ))}
-          <Button variant="ghost" onClick={() => setOther(true)}>
-            {t("connectAi.another")}
-          </Button>
-        </div>
-      )}
+      {choosing &&
+        plain &&
+        !ownable &&
+        !otherChosen &&
+        actionsAt &&
+        createPortal(
+          <>
+            <Button onClick={() => setOther(true)}>{t("connectAi.another")}</Button>
+            {existing.map((a) => (
+              <Button key={a.id} variant="primary" onClick={() => void (everyone ? assignAll(a) : assign(agent.id, a))}>
+                {t("connectAi.use", { label: accountTitle(a) })}
+              </Button>
+            ))}
+          </>,
+          actionsAt,
+        )}
       {choosing && !(plain && !ownable) && (
         // Who shares the sign-in: the computer's own, which any of its pairer's agents there thinks with, an account
         // of this plan the person already has there for all of their agents, or another sign-in (ADR 0059 §2). Small
