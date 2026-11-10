@@ -12332,6 +12332,11 @@ export const en = {
         tooManyItems: "The Vault is full. Remove items before syncing more.",
       },
     },
+    /** The feedback form's files (ADR 0160): one gone before the feedback was sent, or too many waiting to be sent. */
+    feedback: {
+      filesGone: "A file you added is gone. Add it again.",
+      filesPending: "Too many files are waiting to be sent. Send or remove some, then try again.",
+    },
   },
   machines: {
     /** Why a computer can't run the agent browser or desktop use yet, by the runner's code; a command may follow. */

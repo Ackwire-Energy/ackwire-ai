@@ -12460,6 +12460,10 @@
         "invalidInput": "Alanları kontrol edip tekrar deneyin.",
         "tooManyItems": "Vault dolu. Daha fazlasını eşitlemeden önce öğe silin."
       }
+    },
+    "feedback": {
+      "filesGone": "Eklediğiniz bir dosya artık yok. Yeniden ekleyin.",
+      "filesPending": "Gönderilmeyi bekleyen çok fazla dosya var. Bazılarını gönderip ya da kaldırıp tekrar deneyin."
     }
   },
   "machines": {
