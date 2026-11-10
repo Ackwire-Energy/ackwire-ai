@@ -61,6 +61,7 @@ import { useWikiLinkRenderer } from "@/components/WikiLinks";
 import {
   columnIdOf,
   columnsOf,
+  isCustomBoard,
   isOpen,
   PRIORITIES,
   STATUS_ICON,
@@ -819,16 +820,18 @@ function useIssueFields(i: Issue) {
   const columns = useIssueColumns(org.id).data ?? [];
   const title = useColumnTitle();
   const stageName = useStageName();
+  const custom = isCustomBoard(columns);
   const update = (patch: IssuePatch) => action.mutate({ type: "update", id: i.id, patch });
   return {
     column: {
       value: columnIdOf(i, columns) ?? undefined,
-      // Every column, grouped by stage (also the keyboard way to move a card).
+      // Every column (also the keyboard way to move a card), under its stage's name only on a customized board: on
+      // the plain one each column is its stage, and the name over it said it twice.
       options: STATUSES.flatMap((s) =>
         columnsOf(columns, s).map((c) => ({
           value: c.id,
           label: title(c),
-          group: stageName(s),
+          ...(custom ? { group: stageName(s) } : {}),
           leading: <Icon name={STATUS_ICON[s]} size={16} />,
         })),
       ),

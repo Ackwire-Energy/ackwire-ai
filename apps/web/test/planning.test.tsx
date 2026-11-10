@@ -475,6 +475,18 @@ describe("Issue detail", () => {
     expect(coluna().hasAttribute("data-placeholder")).toBe(false);
   });
 
+  test("on the plain board Coluna lists the columns alone: each is its stage, never its stage's name over it again", async () => {
+    await go("issues/131");
+    const coluna = within(screen().getByRole("group", { name: "Detalhes da tarefa" })).getByRole("combobox", {
+      name: "Coluna",
+    });
+    coluna.focus();
+    await key(coluna, "Enter");
+    const list = screen().getByRole("listbox");
+    expect(within(list).getByRole("option", { name: "Em andamento" })).toBeTruthy();
+    expect(list.querySelector(".ac-menu__heading")).toBeNull();
+  });
+
   test("title, description and criteria are edited where they are; leaving the field saves (Salvo)", async () => {
     const { api } = await go("issues/131");
     await click(screen().getByRole("heading", { level: 1, name: "Confirmação do agendamento por WhatsApp" }));
