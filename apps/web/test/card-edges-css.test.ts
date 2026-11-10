@@ -10,8 +10,12 @@ test("a narrow task card wraps its facts between facts, never inside one or past
   const kit = await sheet("packages/ui/src/styles/components.css");
   // "Pergunta algo" and "PR #109" side by side ran off a board card's right edge: no plates now, one line of facts.
   expect(last(declarations(kit, ".ac-factline"), "flex-wrap")).toBe("wrap");
-  expect(last(declarations(kit, ".ac-factline__fact"), "white-space")).toBe("nowrap");
-  // Only a label alone wider than the card wraps its own words.
+  // A fact is as wide as its words, so it moves down whole. Only one alone wider than the card (a long repository's
+  // link, a long label) wraps its own words, never past the card's padding.
+  const fact = declarations(kit, ".ac-factline__fact");
+  expect(last(fact, "white-space")).toBeUndefined();
+  expect(last(fact, "max-width")).toBe("100%");
+  expect(last(fact, "overflow-wrap")).toBe("anywhere");
   expect(last(declarations(kit, '.ac-factline__fact[data-tone="label"]'), "overflow-wrap")).toBe("anywhere");
 });
 
