@@ -202,9 +202,10 @@ test("every role mark is a full circle", async () => {
   expect(declarations(ui, ".ac-rolemark").findLast(([p]) => p === "border-radius")?.[1]).toBe("50%");
 });
 
-test("Personalizar: the five parts of a tool's line have five columns, and on a phone the arrows stay on its first line", () => {
-  expect(value(".sidebar-setup", "grid-template-columns")).toBe("auto 1fr auto auto");
+test("Personalizar: a tool's line has four columns, its arrows one group 8 apart, on a phone on its first line", () => {
+  expect(value(".sidebar-setup", "grid-template-columns")).toBe("auto 1fr auto");
   const first = declarations(css, ".sidebar-setup").find(([p]) => p === "grid-template-columns")?.[1];
-  expect(first?.split(/ (?![^(]*\))/)).toHaveLength(5);
+  expect(first?.split(/ (?![^(]*\))/)).toHaveLength(4);
+  expect(value(".sidebar-setup__moves", "gap")).toBe("var(--space-2)");
   expect(value(".sidebar-setup__row > .ac-seg", "grid-column")).toBe("2 / -1");
 });

@@ -844,19 +844,22 @@ function NewWidgetBody({
           </div>
         </div>
       </Locked>
-      <DialogFooter className="nw-foot">
-        {/* Only when there is a choice: with My Home alone, nothing to pick. */}
-        {destOptions.length > 1 ? (
-          <span className="nw-dest">
-            <Icon name="grid" size={16} />
-            <label htmlFor={`${id}-dest`}>{t("dashboards.newWidget.destination")}</label>
-            <Locked when={busy}>
-              <Select id={`${id}-dest`} size="sm" value={dest} onValueChange={setDest} options={destOptions} />
-            </Locked>
-          </span>
-        ) : (
-          <span className="nw-dest" aria-hidden="true" />
-        )}
+      {/* Where it goes is the footer's note, only when there is a choice (with My Home alone, nothing to pick):
+          Cancelar and the main button stay one group, never split by it. */}
+      <DialogFooter
+        className="nw-foot"
+        note={
+          destOptions.length > 1 ? (
+            <span className="nw-dest">
+              <Icon name="grid" size={16} />
+              <label htmlFor={`${id}-dest`}>{t("dashboards.newWidget.destination")}</label>
+              <Locked when={busy}>
+                <Select id={`${id}-dest`} size="sm" value={dest} onValueChange={setDest} options={destOptions} />
+              </Locked>
+            </span>
+          ) : undefined
+        }
+      >
         <Button onClick={onClose}>{t("common.cancel")}</Button>
         {primary}
       </DialogFooter>

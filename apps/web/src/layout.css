@@ -1229,6 +1229,18 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
 .archived-channels__row {
   padding-block: var(--row-py);
 }
+/* On a phone Restaurar goes under the date, from the row's start, as the kit's `.ac-mediarow__end--wrap` does in a
+   narrow box: a long name keeps the row's width instead of wrapping beside it. */
+@media (max-width: 640px) {
+  .archived-channels__row > .ac-mediarow__end {
+    grid-area: auto / 1 / auto / -1;
+    order: 1;
+    justify-self: start;
+  }
+  .archived-channels__row > :is(.ac-mediarow__face, .ac-mediarow__head) {
+    --mediarow-axis: var(--mediarow-face);
+  }
+}
 .member-row__you {
   display: inline-flex;
   align-items: center;
@@ -12027,6 +12039,10 @@ html:not([data-pointer]) .sidebar__section-toggle:focus-visible {
 .sidebar__section-add[data-state="open"] {
   opacity: 1;
 }
+/* Two of them side by side (Agentes' ⋯ and +) stand 8 apart, as every pair of icon buttons: the head's gap is 2. */
+.sidebar__section-add.ac-btn + .sidebar__section-add.ac-btn {
+  margin-inline-start: calc(var(--space-2) - 2px);
+}
 /*
  * Channel categories (ADR 0080). Closed, a category also keeps its unread channels in sight, not only the open
  * one (the rule above hides the rest).
@@ -12624,7 +12640,7 @@ html:not([data-pointer]) .sidebar__grip:focus-visible {
   margin: calc(var(--field-gap) - var(--form-gap)) 0 calc(var(--space-1) - var(--form-gap));
 }
 .sidebar-setup.sidebar-setup--order {
-  grid-template-columns: auto 1fr auto auto;
+  grid-template-columns: auto 1fr auto;
 }
 .sidebar-setup--order .settings-row__icon {
   font-size: 12px;
@@ -12784,8 +12800,8 @@ html:not([data-pointer]) .sidebar__bell:focus-visible {
 /* "Personalizar a barra lateral": a line per tool, the choices of every line starting in one column. */
 .sidebar-setup {
   display: grid;
-  /* Icon, name, choices, the two arrows. A long name wraps before the row does. */
-  grid-template-columns: auto minmax(0, max-content) 1fr auto auto;
+  /* Icon, name, choices, the two arrows (one group, 8 apart). A long name wraps before the row does. */
+  grid-template-columns: auto minmax(0, max-content) 1fr auto;
   column-gap: 12px;
   margin: 0;
   padding: 0;
@@ -12806,10 +12822,14 @@ html:not([data-pointer]) .sidebar__bell:focus-visible {
   font-size: 14px;
   font-weight: 600;
 }
+.sidebar-setup__moves {
+  display: flex;
+  gap: var(--space-2);
+}
 /* No room beside the name on a phone: the arrows stay on its line, the choices go under it. */
 @media (max-width: 680px) {
   .sidebar-setup {
-    grid-template-columns: auto 1fr auto auto;
+    grid-template-columns: auto 1fr auto;
     row-gap: 8px;
   }
   .sidebar-setup__row > .ac-seg {
@@ -13518,6 +13538,12 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
 }
 .jev__body > .ac-btn {
   align-self: flex-start;
+}
+/* On a phone its lone main button takes the card's width (rule 23). */
+@media (max-width: 640px) {
+  .jev__body > .ac-btn:not(.ac-btn--ghost) {
+    align-self: stretch;
+  }
 }
 /* Why Jev helps: an icon, the reason in bold and its few words, a line each. */
 .jev-why {

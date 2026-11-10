@@ -11274,9 +11274,6 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
   justify-content: center;
   width: 32px;
 }
-.ac-access__start {
-  margin-right: auto;
-}
 
 /*
  * A card's horizon (`CardHorizon`): the sky's light tones in a low dither at the foot of a card with room to spare.

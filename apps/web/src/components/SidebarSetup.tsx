@@ -200,26 +200,28 @@ export function SidebarSetupDialog({ open, onClose }: { open: boolean; onClose: 
                 onValueChange={(place) => save.mutate({ item: id, place })}
                 options={options(id)}
               />
-              <Button
-                size="sm"
-                variant="ghost"
-                iconOnly
-                icon="chevronUp"
-                aria-label={`${t("contextMenu.moveUp")}: ${t(`shell.${id}`)}`}
-                data-move
-                disabled={i === 0}
-                onClick={(e) => tools.put(moveSection(tools.order, id, -1), e.currentTarget)}
-              />
-              <Button
-                size="sm"
-                variant="ghost"
-                iconOnly
-                icon="chevronDown"
-                aria-label={`${t("contextMenu.moveDown")}: ${t(`shell.${id}`)}`}
-                data-move
-                disabled={i === tools.order.length - 1}
-                onClick={(e) => tools.put(moveSection(tools.order, id, 1), e.currentTarget)}
-              />
+              <span className="sidebar-setup__moves">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  iconOnly
+                  icon="chevronUp"
+                  aria-label={`${t("contextMenu.moveUp")}: ${t(`shell.${id}`)}`}
+                  data-move
+                  disabled={i === 0}
+                  onClick={(e) => tools.put(moveSection(tools.order, id, -1), e.currentTarget)}
+                />
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  iconOnly
+                  icon="chevronDown"
+                  aria-label={`${t("contextMenu.moveDown")}: ${t(`shell.${id}`)}`}
+                  data-move
+                  disabled={i === tools.order.length - 1}
+                  onClick={(e) => tools.put(moveSection(tools.order, id, 1), e.currentTarget)}
+                />
+              </span>
             </li>
           ))}
         </ul>
@@ -242,24 +244,26 @@ export function SidebarSetupDialog({ open, onClose }: { open: boolean; onClose: 
                 {i + 1}
               </span>
               <span className="sidebar-setup__name">{sectionName(t, id, personal)}</span>
-              <Button
-                size="sm"
-                variant="ghost"
-                iconOnly
-                icon="chevronUp"
-                aria-label={`${t("contextMenu.moveUp")}: ${sectionName(t, id, personal)}`}
-                disabled={i === 0}
-                onClick={() => sections.put(moveSection(sections.order, id, -1))}
-              />
-              <Button
-                size="sm"
-                variant="ghost"
-                iconOnly
-                icon="chevronDown"
-                aria-label={`${t("contextMenu.moveDown")}: ${sectionName(t, id, personal)}`}
-                disabled={i === sections.order.length - 1}
-                onClick={() => sections.put(moveSection(sections.order, id, 1))}
-              />
+              <span className="sidebar-setup__moves">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  iconOnly
+                  icon="chevronUp"
+                  aria-label={`${t("contextMenu.moveUp")}: ${sectionName(t, id, personal)}`}
+                  disabled={i === 0}
+                  onClick={() => sections.put(moveSection(sections.order, id, -1))}
+                />
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  iconOnly
+                  icon="chevronDown"
+                  aria-label={`${t("contextMenu.moveDown")}: ${sectionName(t, id, personal)}`}
+                  disabled={i === sections.order.length - 1}
+                  onClick={() => sections.put(moveSection(sections.order, id, 1))}
+                />
+              </span>
             </li>
           ))}
         </ol>

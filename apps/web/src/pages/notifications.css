@@ -474,6 +474,10 @@ html:not([data-pointer]) .nt-more:focus-visible {
   font-size: 12.5px;
   color: var(--muted);
 }
+/* A device notice's decisions on that line: the kit's line of actions keeps its own column gap, plated pairs 8 apart. */
+.nt-steprow.ac-acts {
+  column-gap: calc(2 * var(--ghost-plate));
+}
 
 /* ── Inline actions: on hover / focus (a floating bar), a row on phones ──── */
 .nt-acts {

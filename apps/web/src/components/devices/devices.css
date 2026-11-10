@@ -940,11 +940,6 @@ a.dv-chiplink:hover {
   grid-column: 1 / -1;
   grid-row: 2;
 }
-.dv-row__acts {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
 .dv-row--ask > .dv-row__acts {
   grid-column: 3;
   grid-row: 1;

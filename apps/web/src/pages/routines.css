@@ -807,6 +807,19 @@ label.routine-onair__text {
     padding: 12px 12px 0;
   }
 }
+/* On a narrow phone the title and its line keep the row's width: the switch and the ⋯ go to the line of when it runs. */
+@media (max-width: 480px) {
+  .routine-row__main {
+    grid-column: 2 / 4;
+  }
+  .routine-row__when {
+    grid-column: 2;
+  }
+  .routine-row__actions {
+    grid-column: 3;
+    grid-row: 2;
+  }
+}
 
 /* "Quando chegar um email": mailbox and folder, then the optional filters. */
 .routine-email {

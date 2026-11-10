@@ -236,9 +236,6 @@ html:not([data-pointer]) .search-box__x:focus-visible {
   --search-hit: color-mix(in srgb, var(--info) 22%, transparent);
   --search-hit-line: color-mix(in srgb, var(--info) 70%, transparent);
 }
-.search-panel__head {
-  gap: 6px;
-}
 .search-panel__list {
   flex: 1;
   min-height: 0;
