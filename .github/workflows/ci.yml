@@ -1,21 +1,18 @@
 name: CI
 
-# All verification runs here: on every pull request (a draft once it is marked ready), every push to
-# main, every `v*` release tag, and on demand (`gh workflow run CI --ref <branch>` or "Run workflow" in
-# Actions). The `changes` job narrows a pull request or a push to the jobs its files touch; a manual run
-# or a release tag checks everything.
+# All verification runs here: on every push to main, every `v*` release tag, and on demand
+# (`gh workflow run CI --ref <branch>` or "Run workflow" in Actions). A pull request starts nothing by
+# itself, to keep runner minutes for the runs someone asks for: before it merges, run this by hand on its
+# branch, and that run's "CI result" is the check main requires. The `changes` job narrows a push to
+# the jobs its files touch; a manual run or a release tag checks everything.
 #
-# Pull requests run as `pull_request`, never `pull_request_target`: a fork's code gets a read-only token
-# and no secrets. Only jobs gated on a push or a tag (the images, the release assets) write anything or
-# read a secret.
+# Only jobs gated on a push or a tag (the images, the release assets) write anything or read a secret.
 #
 # The Linux jobs run on Namespace runners (the `linux-4x8` profile: 4 vCPU, 8 GB), which cost less a
 # minute than GitHub's hosted ones. The test jobs take 8 vCPU and 16 GB: on 8 GB a file's first test
 # ran past its 5 s limit (voice.test.ts, live-real-server.test.tsx). Everything runs on x64: on ARM the backend shards took 2.5x as long
 # (603 and 667 s against 229 and 275 s, 2026-10-26). Only the arm64 image builds on ARM, natively.
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
     tags: ["v*"]
@@ -42,12 +39,10 @@ defaults:
 jobs:
   changes:
     name: What changed
-    if: github.event.pull_request.draft != true
     runs-on: namespace-profile-linux-4x8
     timeout-minutes: 5
     permissions:
       contents: read
-      pull-requests: read # paths-filter reads a pull request's files from the API
     outputs:
       code: ${{ steps.groups.outputs.code }}
       shared: ${{ steps.groups.outputs.shared }}
@@ -406,7 +401,6 @@ jobs:
   # --verbose with --redact names each finding's file, line, commit and rule, never its value.
   secrets:
     name: Secret scan and boundaries
-    if: github.event.pull_request.draft != true
     runs-on: namespace-profile-linux-4x8
     timeout-minutes: 5
     steps:
@@ -465,16 +459,12 @@ jobs:
   # then an upgrade's steps on the same volumes, the usage report the image prints (`agentes telemetry`),
   # and the backup profile: a dump and its restore.
   # amd64 only, nothing pushed.
-  # A pull request runs it only when the image's own files changed (Dockerfile, compose files, the
-  # backup image): code changes are the tests' job, and every push to main still runs it.
-  # Only pushes write the layer cache, which the image build below then reuses: PR-scoped entries
-  # would crowd main's out of the repository's cache quota.
+  # Only pushes write the layer cache, which the image build below then reuses: entries scoped to a
+  # branch would crowd main's out of the repository's cache quota.
   compose:
     name: Image boots with docker compose
     needs: changes
-    if: >-
-      needs.changes.outputs.image == 'true' &&
-      (github.event_name != 'pull_request' || needs.changes.outputs.docker == 'true')
+    if: needs.changes.outputs.image == 'true'
     runs-on: namespace-profile-linux-4x8
     timeout-minutes: 20
     env:
@@ -769,10 +759,10 @@ jobs:
           gh release upload "$TAG" agentes-native-*.tar.gz native.json native.json.sig --clobber --repo "$GITHUB_REPOSITORY"
 
   # The one check to require once branch protection is on: red when any job failed or was
-  # cancelled; a skipped job is fine (nothing it covers changed). A draft gets no result at all.
+  # cancelled; a skipped job is fine (nothing it covers changed).
   done:
     name: CI result
-    if: always() && github.event.pull_request.draft != true
+    if: always()
     needs:
       [changes, check, test-backend, test-web, test-desktop-rust, secrets, isolation-root, compose, build, publish, release-install, release-native]
     runs-on: namespace-profile-linux-4x8
