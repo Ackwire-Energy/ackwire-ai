@@ -75,15 +75,20 @@ with Postgres alone, and must not need a third-party widget in the apps.
 
 11. **What keeps it from being abused.**
     - A file is what its first bytes say (PNG, JPEG, GIF, WebP, HEIC, MP4, MOV, WebM), never what the upload calls
-      itself; nothing a browser would run is among them.
+      itself; nothing a browser would run is among them, nor sound alone in a video's container. Only the start is
+      read, so a file that begins as a picture and holds something else is kept as that picture: it is why a file
+      is only ever a download of its sniffed type.
     - Sizes are refused by the declared length before a byte is read, and checked again once read.
     - A person adds thirty files an hour, four of them videos, holds six not sent yet, and sends ten feedbacks an
       hour. Only their own files, not sent yet, attach to their feedback.
     - The link answers only as a download (`content-disposition: attachment`, `nosniff`, a sandboxing policy,
       `no-store`), so this origin never shows the file; an address opens sixty a minute.
     - Everything typed or collected is inert in the email: escaped in its HTML, one line per fact, each capped.
+    - The hour's limit and the declared size are answered before a byte of the upload is read, and the body is
+      read only up to the largest file.
     - A purge job per deadline removes the row and the bytes; an account's deletion removes its rows at once and
-      the same job its bytes.
+      the same job its bytes. A sweep every six hours takes what a job missed: a file an hour past its time, and
+      bytes with no row.
 
 ## Consequences
 

@@ -10,11 +10,14 @@ import {
   getMembership,
   NotFoundError,
   queueFeedback,
+  sniffFeedbackFile,
   storeFeedbackFile,
   TooManyError,
   ValidationError,
 } from "@agenteschat/engine";
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
+import type { Context } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { requestLimitIp } from "../../http/client-ip";
 import { apiError, errorResponse } from "../../http/errors";
 import { version } from "../../version";
@@ -62,6 +65,19 @@ export function feedbackRoutes(deps: AppDeps) {
   app.use("/feedback", requireSession(deps.auth));
   app.use("/feedback/*", requireSession(deps.auth));
   const files = { db, blobs: adapters.platformBlobs };
+  // Before a byte of an upload is read: is there a form at all, is this person within their hour, and does the body
+  // say it is too large. Then the body is read only up to the largest file, whatever its length claimed.
+  const uploadMax = FEEDBACK_FILES.videoBytes + MULTIPART_SLACK_BYTES;
+  const tooLarge = (c: Context) => apiError(c, 413, "feedback.file_too_large", "The file is too large");
+  app.use("/feedback/files", async (c, next) => {
+    if (c.req.method !== "POST") return next();
+    if (!config.FEEDBACK_EMAIL) return apiError(c, 404, "not_found", "Not found");
+    if (Number(c.req.header("content-length") ?? 0) > uploadMax) return tooLarge(c);
+    if (!(await adapters.rateLimiter.consume(`feedback-file:${c.get("user").id}`, FILES_PER_HOUR)).allowed)
+      return apiError(c, 429, "rate_limited", "Too many files for now");
+    return next();
+  });
+  app.use("/feedback/files", bodyLimit({ maxSize: uploadMax, onError: tooLarge }));
   const address = () => {
     if (!config.FEEDBACK_EMAIL) throw new NotFoundError("Not found");
     return config.FEEDBACK_EMAIL;
@@ -97,19 +113,13 @@ export function feedbackRoutes(deps: AppDeps) {
       },
     }),
     async (c) => {
-      address();
       const user = c.get("user");
-      // Refused by its declared size before a byte is read; the real size is checked once read.
-      if (Number(c.req.header("content-length") ?? 0) > FEEDBACK_FILES.videoBytes + MULTIPART_SLACK_BYTES)
-        return apiError(c, 413, "feedback.file_too_large", "The file is too large");
-      if (!(await adapters.rateLimiter.consume(`feedback-file:${user.id}`, FILES_PER_HOUR)).allowed)
-        throw new TooManyError("Too many files for now");
       const file: unknown = c.req.valid("form").file;
       if (!(file instanceof File)) throw new ValidationError("send the file in the field file", "feedback.file_type");
-      if (file.size > FEEDBACK_FILES.videoBytes)
-        return apiError(c, 413, "feedback.file_too_large", "The file is too large");
+      if (file.size > FEEDBACK_FILES.videoBytes) return tooLarge(c);
       const bytes = new Uint8Array(await file.arrayBuffer());
-      const video = file.size > FEEDBACK_FILES.imageBytes;
+      // A video by what it is, whatever its size: the heavy kind has its own, smaller, hour.
+      const video = sniffFeedbackFile(bytes)?.kind === "video";
       if (video && !(await adapters.rateLimiter.consume(`feedback-video:${user.id}`, VIDEOS_PER_HOUR)).allowed)
         throw new TooManyError("Too many videos for now");
       try {

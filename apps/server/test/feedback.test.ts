@@ -138,3 +138,20 @@ test("feedback: a picture is added, sent as a link good for a month, and opens o
   expect((await browser(t)("/api/feedback-files/not-a-real-token-at-all-0000")).status).toBe(404);
   expect((await ana(`/api/app/feedback/files/${file.id}`, { method: "DELETE" })).status).toBe(404);
 });
+
+test("feedback files: the hour's limit and the size are answered before the file is read", async () => {
+  t = await createTestServer({ env: { FEEDBACK_EMAIL: "feedback@example.com" } });
+  const ana = browser(t);
+  await signUp(ana, "ana@example.com");
+  // A body that says it is past the largest file is refused by that alone.
+  const claimed = await ana("/api/app/feedback/files", {
+    method: "POST",
+    body: new FormData(),
+    headers: { "content-length": String(60 * 1024 * 1024) },
+  });
+  expect(claimed.status).toBe(413);
+  // Thirty an hour, tried or kept: the thirty-first is refused whatever it holds.
+  const junk = new TextEncoder().encode("not a picture at all");
+  for (let n = 0; n < 30; n++) expect((await upload(ana, junk, `${n}.png`)).status).toBe(400);
+  expect((await upload(ana, PNG, "real.png")).status).toBe(429);
+});

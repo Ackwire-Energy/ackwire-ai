@@ -17,6 +17,7 @@ import {
   sendQueuedFeedback,
   sniffFeedbackFile,
   storeFeedbackFile,
+  sweepFeedbackFiles,
   TooManyError,
 } from "../src";
 import { addUser, type Fixture, setup } from "./fixtures";
@@ -112,6 +113,13 @@ test("a file is what its bytes say: pictures and videos, never markup or a claim
   expect(sniffFeedbackFile(text("<svg xmlns='http://www.w3.org/2000/svg'>"))).toBeNull();
   expect(sniffFeedbackFile(text("<!doctype html><script>"))).toBeNull();
   expect(sniffFeedbackFile(new Uint8Array(4))).toBeNull();
+  // The same container as a video's, holding sound alone or anything unknown: not taken.
+  const boxed = (brand: string) =>
+    new Uint8Array([0, 0, 0, 24, ...[...`ftyp${brand}`].map((c) => c.charCodeAt(0)), 0, 0, 0, 0]);
+  expect(sniffFeedbackFile(boxed("M4A "))).toBeNull();
+  expect(sniffFeedbackFile(boxed("zzzz"))).toBeNull();
+  expect(sniffFeedbackFile(boxed("qt  "))).toMatchObject({ kind: "video", contentType: "video/quicktime" });
+  expect(sniffFeedbackFile(boxed("heic"))).toMatchObject({ kind: "image", contentType: "image/heic" });
 });
 
 describe("feedback files", () => {
@@ -208,5 +216,20 @@ describe("feedback files", () => {
     await sendQueuedFeedback(sender, { key: "k", feedback: { ...feedback, files } }, blobs);
     expect(sender.sent[0]?.inline).toMatchObject([{ cid: "feedback-1", filename: "s.png", contentType: "image/png" }]);
     expect(sender.sent[0]?.html).toContain("cid:feedback-1");
+  });
+
+  test("the sweep takes what a purge job missed: a file long past its time, and bytes with no row", async () => {
+    f = await setup();
+    const blobs = createMemoryBlobStore();
+    const deps = { db: f.db, blobs };
+    const ana = await addUser(f.db, "ana");
+    const old = await storeFeedbackFile(deps, ana.id, { name: "old.png", bytes: PNG }, NOW);
+    const fresh = await storeFeedbackFile(deps, ana.id, { name: "fresh.png", bytes: PNG }, later(FEEDBACK_UNSENT_MS));
+    await blobs.put(feedbackBlobKey("00000000-0000-4000-8000-00000000dead"), PNG, { contentType: "image/png" });
+    // Just past its hour it is still its own job's to remove; an hour later, the sweep's.
+    expect(await sweepFeedbackFiles(deps, later(FEEDBACK_UNSENT_MS + 60_000))).toBe(1);
+    expect(blobs.objects.has(feedbackBlobKey(old.id))).toBe(true);
+    expect(await sweepFeedbackFiles(deps, later(2 * FEEDBACK_UNSENT_MS + 60_000))).toBe(1);
+    expect([...blobs.objects.keys()]).toEqual([feedbackBlobKey(fresh.id)]);
   });
 });

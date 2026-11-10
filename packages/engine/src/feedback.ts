@@ -1,5 +1,5 @@
 import type { BlobStore, EmailSender } from "@agenteschat/adapters";
-import { and, count, type Database, type Executor, eq, gt, inArray, isNull, schema } from "@agenteschat/db";
+import { and, count, type Database, type Executor, eq, gt, inArray, isNull, lt, schema } from "@agenteschat/db";
 import { randomToken, sha256 } from "./crypto";
 import { rethrowEmailError } from "./email";
 import { NotFoundError, TooManyError, ValidationError } from "./errors";
@@ -222,10 +222,33 @@ export const feedbackBlobKey = (id: string) => `feedback/${id}`;
 const ascii = (bytes: Uint8Array, from: number, to: number) => String.fromCharCode(...bytes.subarray(from, to));
 /** ISO base media brands that are still pictures (an iPhone's HEIC). */
 const HEIC = new Set(["heic", "heix", "hevc", "hevx", "mif1", "msf1"]);
+/**
+ * The brands a video says it is: what phones, screen recorders and browsers write. The same container also holds
+ * sound alone (`M4A `), books and other things, which are not taken.
+ */
+const MP4 = new Set([
+  "isom",
+  "iso2",
+  "iso3",
+  "iso4",
+  "iso5",
+  "iso6",
+  "mp41",
+  "mp42",
+  "avc1",
+  "M4V ",
+  "MSNV",
+  "dash",
+  "mmp4",
+  "3gp4",
+  "3gp5",
+]);
 
 /**
  * What a file is by its first bytes: a picture or a video the email's reader can open, else null. What the upload
- * calls itself is never trusted, and nothing a browser would run (SVG, HTML) is among them.
+ * calls itself is never trusted, and nothing a browser would run (SVG, HTML) is among them. Only the start is read:
+ * a file that begins as a picture and holds something else after it is kept as that picture, which is why a file is
+ * only ever handed out as a download of its sniffed type, never shown by this origin.
  */
 export function sniffFeedbackFile(
   bytes: Uint8Array,
@@ -241,9 +264,8 @@ export function sniffFeedbackFile(
   if (ascii(bytes, 4, 8) === "ftyp") {
     const brand = ascii(bytes, 8, 12);
     if (HEIC.has(brand)) return { kind: "image", contentType: "image/heic", ext: "heic" };
-    return brand.startsWith("qt")
-      ? { kind: "video", contentType: "video/quicktime", ext: "mov" }
-      : { kind: "video", contentType: "video/mp4", ext: "mp4" };
+    if (brand === "qt  ") return { kind: "video", contentType: "video/quicktime", ext: "mov" };
+    return MP4.has(brand) ? { kind: "video", contentType: "video/mp4", ext: "mp4" } : null;
   }
   if (a === 0x1a && b === 0x45 && c === 0xdf && d === 0xa3)
     return { kind: "video", contentType: "video/webm", ext: "webm" };
@@ -421,4 +443,37 @@ export async function purgeFeedbackFile(deps: FeedbackFileDeps, id: string, now 
   if (row && row.expiresAt.getTime() > now.getTime()) return;
   await deps.blobs.delete(feedbackBlobKey(id));
   if (row) await deps.db.delete(schema.feedbackFiles).where(eq(schema.feedbackFiles.id, id));
+}
+
+/** How long past its time a file may sit before the sweep takes it: its own purge job runs a minute after. */
+const SWEEP_AFTER_MS = 60 * 60_000;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * The net under the purge jobs, run every few hours: a file an hour past its time (its job failed for good) goes,
+ * and so do bytes with no row left (a job lost after its row went). Returns how many it removed.
+ */
+export async function sweepFeedbackFiles(deps: FeedbackFileDeps, now = new Date()) {
+  const late = await deps.db
+    .select({ id: schema.feedbackFiles.id })
+    .from(schema.feedbackFiles)
+    .where(lt(schema.feedbackFiles.expiresAt, new Date(now.getTime() - SWEEP_AFTER_MS)))
+    .limit(500);
+  for (const { id } of late) {
+    await deps.blobs.delete(feedbackBlobKey(id));
+    await deps.db.delete(schema.feedbackFiles).where(eq(schema.feedbackFiles.id, id));
+  }
+  const prefix = feedbackBlobKey("");
+  const stored = (await deps.blobs.list(prefix, 1000)).map((key) => key.slice(prefix.length));
+  const ids = stored.filter((id) => UUID.test(id));
+  const kept = ids.length
+    ? await deps.db
+        .select({ id: schema.feedbackFiles.id })
+        .from(schema.feedbackFiles)
+        .where(inArray(schema.feedbackFiles.id, ids))
+    : [];
+  const have = new Set(kept.map((r) => r.id));
+  const orphans = ids.filter((id) => !have.has(id));
+  for (const id of orphans) await deps.blobs.delete(feedbackBlobKey(id));
+  return late.length + orphans.length;
 }
