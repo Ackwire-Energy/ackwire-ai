@@ -2734,7 +2734,9 @@ function ChannelView({
                                   search: mentionSearch,
                                   listLabel: t("mentions.list"),
                                   onPick: (item) => {
-                                    if (item.note && item.key.startsWith("agent:")) setOffer(item.key.slice(6));
+                                    // A DM takes no new member, so there is nothing to offer there.
+                                    const dm = Boolean(chrome?.dmAgentId || chrome?.dmPersonId);
+                                    if (item.note && !dm && item.key.startsWith("agent:")) setOffer(item.key.slice(6));
                                   },
                                 }}
                               />
