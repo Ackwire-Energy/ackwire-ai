@@ -105,6 +105,8 @@ export interface SetupRowFacts {
   otherOwner: string | null;
   /** It thinks with someone's plan (whose terms say who it may answer). */
   onPlan: boolean;
+  /** A personal workspace (ADR 0159): the rows that name the workspace speak of "your apps" and "here" instead. */
+  personal?: boolean;
 }
 
 /** One row of the checklist, in the agent's voice: what it says, a line under it while left, its button's word. */
@@ -135,7 +137,7 @@ export function setupRow(t: TFunction, step: AgentSetupStep, done: boolean, f: S
             action: t("agentSetup.apps.action"),
           }
         : {
-            title: t("agentSetup.apps.todoNone", { org: f.org }),
+            title: f.personal ? t("agentSetup.apps.todoNonePersonal") : t("agentSetup.apps.todoNone", { org: f.org }),
             desc: t("agentSetup.apps.todoNoneDesc"),
             action: t("agentSetup.choose"),
           };
@@ -161,7 +163,9 @@ export function setupRow(t: TFunction, step: AgentSetupStep, done: boolean, f: S
       if (done) {
         const title =
           f.audience === "everyone"
-            ? t("agentSetup.who.doneEveryone", { org: f.org })
+            ? f.personal
+              ? t("agentSetup.who.doneEveryonePersonal")
+              : t("agentSetup.who.doneEveryone", { org: f.org })
             : f.audience === "owner"
               ? f.otherOwner
                 ? t("agentSetup.who.doneOwner", { name: f.otherOwner })
@@ -176,7 +180,7 @@ export function setupRow(t: TFunction, step: AgentSetupStep, done: boolean, f: S
             action: t("agentSetup.choose"),
           }
         : {
-            title: t("agentSetup.who.todo", { org: f.org }),
+            title: f.personal ? t("agentSetup.who.todoPersonal") : t("agentSetup.who.todo", { org: f.org }),
             desc: t("agentSetup.who.todoDesc"),
             action: t("agentSetup.choose"),
           };
@@ -208,6 +212,8 @@ export interface FirstRunPowers {
   pay: boolean;
   connectors: boolean;
   invite: boolean;
+  /** A personal workspace (ADR 0159): its first run has no people row, it is for one person. */
+  personal?: boolean;
 }
 
 /**
@@ -222,7 +228,7 @@ export function firstRunSteps(agent: Pick<Agent, "setup" | "builtin">, may: Firs
     team: may.createAgents,
     ai: may.connectAi || may.pay,
     apps: may.connectors,
-    people: may.invite,
+    people: may.invite && !may.personal,
   };
   return FIRST_RUN_STEPS.filter((s) => row[s]);
 }
@@ -281,7 +287,19 @@ export interface FirstRunRowFacts {
   /** The apps connected ("o Gmail e o Drive"); null when none. */
   apps: string | null;
   members: number;
+  /** A personal workspace (ADR 0159): rows in its words (`PERSONAL_ROW_WORDS`). */
+  personal?: boolean;
 }
+
+/**
+ * The words a personal workspace's rows say differently (ADR 0159), each a `<key>Personal` sibling of the row's key:
+ * about the person instead of the company, their agents instead of a team, their apps instead of work apps.
+ */
+export const PERSONAL_ROW_WORDS: Partial<Record<FirstRunStep, readonly string[]>> = {
+  about: ["todo", "todoDesc", "done"],
+  team: ["todo", "todoDesc", "action", "done"],
+  apps: ["todo", "todoDesc"],
+};
 
 /** One row's words: its title, a line under it while open, its button's word, and "Agora não" where a row skips. */
 export function firstRunRow(
@@ -293,7 +311,8 @@ export function firstRunRow(
 ): SetupRow & { skip?: string } {
   // Keys built from the row's id, so read through an untyped `t`.
   const t = tr as unknown as (key: string, o?: Record<string, unknown>) => string;
-  const k = (key: string) => `agentSetup.firstRun.${step}.${key}`;
+  const k = (key: string) =>
+    `agentSetup.firstRun.${step}.${key}${f.personal && PERSONAL_ROW_WORDS[step]?.includes(key) ? "Personal" : ""}`;
   if (state === "plan")
     return { title: t("agentSetup.firstRun.ai.plan"), action: t("agentSetup.firstRun.ai.planAction") };
   if (state === "afterPlan")
@@ -339,16 +358,38 @@ const TEMPLATE_ROLES: Record<string, RoleId> = {
   bia: "support",
 };
 
+/**
+ * The apps (catalog connector ids) a personal template's agents use (ADR 0159; mirror of the personal `MEMBERS` in
+ * packages/engine/src/team-templates.ts), by handle: a person's calendar, files and lists rather than a team's tools.
+ */
+const PERSONAL_TEMPLATE_APPS: Record<string, readonly string[]> = {
+  clara: ["google-calendar", "todoist"],
+  duda: ["google-sheets", "drive"],
+  leo: ["google-calendar"],
+  mel: ["todoist", "google-docs"],
+  gabi: ["notion", "google-docs"],
+  lu: ["google-docs", "notion"],
+  rosa: ["todoist", "google-calendar"],
+  vic: ["google-calendar", "drive"],
+  rui: ["google-calendar", "google-docs", "google-sheets"],
+};
+
+/** A template handle without its taken-name suffix (`iara-2` is Iara's). */
+const templateHandle = (handle: string) => handle.replace(/-\d+$/, "");
+
 /** A team agent's role, by its own role or its template handle (`iara-2` is Iara's). */
 export const teamRole = (a: Pick<Agent, "handle" | "setup">): RoleId | null =>
-  setupRole(a.setup) ?? TEMPLATE_ROLES[a.handle.replace(/-\d+$/, "")] ?? null;
+  setupRole(a.setup) ?? TEMPLATE_ROLES[templateHandle(a.handle)] ?? null;
 
 /** The apps (catalog connector ids) the team's roles suggest, the most suggested first. */
 export function firstRunApps(team: readonly Pick<Agent, "handle" | "setup">[]): string[] {
   const count = new Map<string, number>();
   for (const a of team) {
     const role = teamRole(a);
-    if (role) for (const id of Object.keys(ROLE_DEFAULTS[role].levels)) count.set(id, (count.get(id) ?? 0) + 1);
+    const apps = role
+      ? Object.keys(ROLE_DEFAULTS[role].levels)
+      : (PERSONAL_TEMPLATE_APPS[templateHandle(a.handle)] ?? []);
+    for (const id of apps) count.set(id, (count.get(id) ?? 0) + 1);
   }
   return [...count.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);
 }

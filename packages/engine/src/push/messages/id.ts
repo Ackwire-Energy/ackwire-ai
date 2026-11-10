@@ -87,4 +87,12 @@ export const strings: Partial<PushStrings> = {
   deviceWaitingBody: "Mulai begitu perangkatnya kembali.",
   teamWeekReady: "Ringkasan minggu timmu sudah siap",
   teamDayReady: "Ringkasan harimu sudah siap",
+  machineConnectedTitlePersonal: "Komputer baru sudah terhubung",
+  computerReadyTitlePersonal: "Komputer agen-agenmu sudah siap",
+  agentUnreachedBodyPersonal:
+    "Orang yang membuat rutinitas ini belum bisa bicara dengan agen ini. Ketuk untuk mengizinkan.",
+  widgetFailedReasonsPersonal: { creator_left: "Orang yang menyiapkannya sudah tidak ada di ruang kerjamu." },
+  joinRequestTitlePersonal: (name) => `${name} minta bergabung ke ruang kerjamu`,
+  joinSuggestionTitlePersonal: (by, name) => `${by} menyarankan untuk mengundang ${name}`,
+  teamWeekReadyPersonal: "Ringkasan minggumu sudah siap",
 };

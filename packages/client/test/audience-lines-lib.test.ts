@@ -3,8 +3,12 @@ import type { TFunction } from "i18next";
 import type { Agent, AgentSetupResult, ForeignMailbox, OrgRole, OrgSummary } from "../src/api/types";
 import {
   agentsReach,
+  audienceChip,
   audienceLines,
+  audienceModeKey,
+  audienceModeTextKey,
   audiencePatch,
+  audienceSummary,
   audienceWithMe,
   opensDetails,
   opensOthersPlan,
@@ -218,5 +222,45 @@ describe("unavailableNotice (an agent I named won't answer me)", () => {
     expect(
       unavailableNotice(t, { code: "audience.nobody", params: { agentName: "Theo", names: [] } }, undefined, nobody),
     ).toBe('audience.notice.nobody{"name":"Theo"}');
+  });
+});
+
+describe("a personal workspace's audience words (ADR 0159)", () => {
+  const t = ((key: string) => key) as unknown as TFunction;
+  const personal = { mode: "personal" } as Pick<OrgSummary, "mode">;
+  const team = { mode: "team" } as Pick<OrgSummary, "mode">;
+
+  test("the choices' names and lines: plain in a personal one; the owner's reads the same; a team's as always", () => {
+    expect(audienceModeKey(personal, "everyone")).toBe("audience.mode.everyonePersonal");
+    expect(audienceModeKey(personal, "people")).toBe("audience.mode.peoplePersonal");
+    expect(audienceModeKey(personal, "owner")).toBe("audience.mode.owner");
+    expect(audienceModeKey(team, "everyone")).toBe("audience.mode.everyone");
+    expect(audienceModeKey(undefined, "people")).toBe("audience.mode.people");
+    expect(audienceModeTextKey(personal, "people")).toBe("audience.modeText.peoplePersonal");
+    expect(audienceModeTextKey(team, "everyone")).toBe("audience.modeText.everyone");
+  });
+
+  test("the chip says Only you to its owner in a personal one; anyone else, and a team's, read Personal", () => {
+    const mine = agent({ audience: { mode: "owner", userIds: [] } });
+    expect(audienceChip(t, mine, { org: personal, meId: "u-heitor" })).toBe("audience.chip.ownerPersonal");
+    expect(audienceChip(t, mine, { org: personal, meId: "u-bia" })).toBe("audience.chip.owner");
+    expect(audienceChip(t, mine, { org: team, meId: "u-heitor" })).toBe("audience.chip.owner");
+    expect(audienceChip(t, mine)).toBe("audience.chip.owner");
+    const open = agent({ audience: { mode: "everyone", userIds: [] } });
+    expect(audienceChip(t, open, { org: personal, meId: "u-heitor" })).toBeNull();
+  });
+
+  test("the summary of everyone in its words", () => {
+    const open = agent({ audience: { mode: "everyone", userIds: [] } });
+    expect(
+      audienceSummary(
+        t,
+        open,
+        () => undefined,
+        () => undefined,
+        personal,
+      ),
+    ).toBe("audience.summary.everyonePersonal");
+    expect(audienceSummary(t, open, () => undefined)).toBe("audience.summary.everyone");
   });
 });

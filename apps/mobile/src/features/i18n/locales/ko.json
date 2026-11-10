@@ -126,6 +126,7 @@
     "refuseTitle": "요청 거절",
     "refuseAsk": "요청을 거절할까요?",
     "leaves": "회사 밖으로 나가요",
+    "leavesPersonal": "워크스페이스 밖으로 나가요",
     "refuseWhyF": "{{name}}이(가) 이유를 보고 배워요. 선택 사항이에요.",
     "refuseWhyM": "{{name}}이(가) 이유를 보고 배워요. 선택 사항이에요.",
     "sheet": {
@@ -161,6 +162,7 @@
       "irreversible": "되돌릴 수 없음",
       "reversible": "되돌릴 수 있음",
       "external": "회사 밖으로 나가요",
+      "externalPersonal": "워크스페이스 밖으로 나가요",
       "unsent": "아무것도 보내지 않아요",
       "deletable": "삭제할 수 있음"
     },
@@ -229,6 +231,9 @@
     "newChannelHint": "팀이나 주제별로",
     "channelPlaceholder": "채널 이름, 예: 마케팅",
     "createChannel": "채널 만들기",
+    "newChannelHintPersonal": "한 주제를 여러 에이전트와 함께",
+    "channelPlaceholderPersonal": "이름, 예: 여행",
+    "createChannelPersonal": "그룹 대화 만들기",
     "waitIn": "{{where}}에서",
     "workingNowLine_other": "지금 에이전트 {{count}}명이 작업 중",
     "nobodyWorking": "지금 작업 중인 에이전트가 없어요",
@@ -238,6 +243,7 @@
       "unmute": "알림 켜기"
     },
     "firstRunLine": "{{name}}이(가) 팀을 꾸리는 중 · {{done}}/{{total}}",
+    "firstRunLinePersonal": "{{name}}이(가) 에이전트를 준비하는 중 · {{done}}/{{total}}",
     "first": {
       "title": "첫 에이전트부터 시작해 보세요",
       "subtitle": "이름을 지어 주고 무슨 일을 할지 알려 주세요. 여기에 채팅으로 나타나요.",
@@ -266,6 +272,8 @@
     "chat": "채팅할 상대…",
     "name": "이름",
     "channelFine": "팀이나 주제별로.",
+    "channelPersonal": "그룹 대화",
+    "channelFinePersonal": "한 주제를 여러 에이전트와 함께 이야기해요.",
     "chatSearch": "사람이나 에이전트 검색",
     "to": "받는 사람:",
     "people": "사람",
@@ -278,6 +286,7 @@
     "routineHint": "에이전트가 일정에 맞춰 알아서 해요",
     "wikiPage": "Wiki 페이지",
     "wikiHint": "팀과 에이전트가 읽을 수 있도록",
+    "wikiHintPersonal": "내 에이전트가 읽을 수 있도록",
     "inviteHint": "이메일 또는 링크로",
     "agent": {
       "question": "어떤 일을 하나요?"
@@ -445,12 +454,14 @@
       "arrived": "{{name}}이(가) 팀에 합류했어요",
       "meet": "{{name}}와(과)의 첫 대화",
       "roleIntro": "팀의 {{role}}이에요. 편하게 말로 요청하세요.",
+      "roleIntroPersonal": "{{role}} 담당으로 도와드려요. 편하게 말로 요청하세요.",
       "noIntro": "필요한 걸 편하게 말로 요청하세요.",
       "firstTitle": "이렇게 시작해 보세요",
       "sendHint": "탭해서 보내기",
       "hello": "안녕하세요, {{person}}님! 저는 {{name}}예요.",
       "helloNoName": "안녕하세요! 저는 {{name}}예요.",
       "helloRole": "팀의 {{role}} 담당이에요.",
+      "helloRolePersonal": "{{role}} 담당으로 도와드려요.",
       "helloAsk": "어디서부터 시작할까요?",
       "now": "지금",
       "start": {
@@ -764,6 +775,7 @@
     "noGroupSection": "부서 없음",
     "workingSection": "작업 중",
     "teamSection": "팀",
+    "teamSectionPersonal": "내 에이전트",
     "managerQuiet": "진행 중인 작업이 없어요",
     "state": {
       "waitsYou": "승인을 기다려요",
@@ -972,7 +984,9 @@
     "title": "나",
     "role": {
       "owner": "소유자",
-      "member": "멤버"
+      "member": "멤버",
+      "ownerPersonal": "내 개인 워크스페이스",
+      "memberPersonal": "나와 공유된 개인 워크스페이스"
     },
     "appearance": "화면 모드",
     "notifications": "알림",
@@ -1701,6 +1715,9 @@
       "device_support": "Mac이 이 iPhone을 준비하는 중이에요",
       "helper_missing": "테스트 도우미가 아직 설정되지 않았어요",
       "helper_expired": "테스트 도우미를 갱신해야 해요",
+      "apple_account_missing": "Mac의 Xcode에 Apple 계정이 필요해요",
+      "team_limit": "직접 만든 앱을 이 iPhone에서 삭제하세요",
+      "helper_untrusted": "이 iPhone에서 테스트 도우미를 신뢰하세요",
       "booting": "시작하는 중",
       "no_driver": "Windows에 이 휴대폰의 USB 드라이버가 필요해요",
       "os_too_old": "이 휴대폰의 시스템이 너무 오래됐어요",
@@ -1816,8 +1833,12 @@
       "wifiText": "휴대폰과 컴퓨터가 같은 Wi-Fi에 있어야 해요",
       "cable": "대신 케이블 사용",
       "wifi1": "무선 디버깅 켜기",
-      "wifi2": "{{host}}에서 페어링",
-      "wifi2Text": "{{host}}의 Android Studio에서 Device Manager를 열고 Pair Devices Using Wi-Fi를 선택하세요. 그 코드를 여기 무선 디버깅의 QR 코드로 기기 페어링에서 스캔하세요.",
+      "wifi1Text": "이 네트워크에서 항상 허용을 체크하고 허용을 탭하세요.",
+      "wifi2": "컴퓨터에 표시된 코드 스캔",
+      "wifi2Text": "무선 디버깅 › QR 코드로 기기 페어링에서 스캔하세요.",
+      "wifi2Hint": "컴퓨터의 agentes.chat에서 기기 연결 › Android 휴대폰 › Wi-Fi로를 열고 {{host}}을(를) 고르세요.",
+      "codeHead": "페어링 코드로 페어링",
+      "codeNote": "무선 디버깅 › 페어링 코드로 기기 페어링에서 확인하세요. 코드가 화면에 남도록 설정과 agentes.chat을 화면 분할로 나란히 여세요.",
       "wifiNote": "다시 시작하면 Wi-Fi 연결이 끊길 수 있어요. 케이블이 더 안정적이에요.",
       "done": "{{name}}이(가) 연결됐어요",
       "openFailed": "이 휴대폰에서 그 화면이 열리지 않았어요. 설정에서 찾아보세요."
@@ -1890,6 +1911,7 @@
     "loadFailed": "커넥터를 불러오지 못했어요.",
     "connectedCheck": "{{name}}, 연결됨",
     "adminsOnly": "{{org}}의 관리자만 서비스를 연결할 수 있어요. 관리자에게 요청하세요.",
+    "adminsOnlyPersonal": "이 워크스페이스를 관리하는 사람만 앱을 연결할 수 있어요. 그 사람에게 요청하세요.",
     "canTitle": "에이전트가 할 수 있는 일",
     "asks": "{{text}} · 승인을 요청해요",
     "connect": "연결",
@@ -2034,6 +2056,7 @@
     "zoneChange": "변경",
     "zoneTitle": "시간대",
     "anotherTitle": "새 워크스페이스 이름은 무엇인가요?",
+    "anotherPurpose": "새 워크스페이스는 어디에 쓸 건가요?",
     "anotherLead": "agentes.chat에 만들어요. {{org}}에는 그대로 남고 언제든 전환할 수 있어요.",
     "suggested": "{{domain}} 이메일을 보고 {{org}}을(를) 제안했어요.",
     "create": "만들기",
@@ -2423,7 +2446,11 @@
       "title": "에이전트 팀을 꾸려 보세요",
       "text": "각 에이전트가 역할을 맡아 채팅에서 함께 일해요.",
       "viewerTitle": "에이전트 팀은 여기에 있어요",
-      "viewerText": "이 워크스페이스에서 에이전트를 만드는 사람이 첫 에이전트를 추가하면 여기에 나타나요."
+      "viewerText": "이 워크스페이스에서 에이전트를 만드는 사람이 첫 에이전트를 추가하면 여기에 나타나요.",
+      "titlePersonal": "나만의 에이전트에게 도움을 받아 보세요",
+      "textPersonal": "각 에이전트가 채팅에서 바로 나를 위해 한 가지 일을 맡아요.",
+      "viewerTitlePersonal": "내 에이전트는 여기에 있어요",
+      "viewerTextPersonal": "여기서 에이전트를 만드는 사람이 첫 에이전트를 추가하면 여기에 나타나요."
     },
     "agentsForYou": {
       "title": "내 에이전트가 여기에 나타나요",
@@ -2433,13 +2460,20 @@
       "title": "팀이 만든 모든 것을 한곳에",
       "text": "에이전트와 사람의 보고서, 표, 파일이 여기에 남아 찾기 쉬워요.",
       "viewerTitle": "팀이 만든 것을 찾아보세요",
-      "viewerText": "에이전트와 사람이 채팅에서 만든 것이 여기에 나타나요."
+      "viewerText": "에이전트와 사람이 채팅에서 만든 것이 여기에 나타나요.",
+      "titlePersonal": "에이전트가 만든 모든 것을 한곳에",
+      "textPersonal": "에이전트의 보고서, 표, 파일이 여기에 남아 찾기 쉬워요.",
+      "viewerTitlePersonal": "에이전트가 만든 것을 찾아보세요",
+      "viewerTextPersonal": "에이전트가 내 채팅에서 만든 것이 여기에 나타나요."
     },
     "tasks": {
       "title": "일을 팀에 맡겨 보세요",
       "text": "에이전트나 사람에게 줄 작업을 만들고 끝까지 지켜보세요.",
       "viewerTitle": "팀의 일을 따라가 보세요",
-      "viewerText": "누군가 첫 작업을 만들면 바로 여기에 나타나요."
+      "viewerText": "누군가 첫 작업을 만들면 바로 여기에 나타나요.",
+      "titlePersonal": "할 일을 에이전트에게 맡기세요",
+      "textPersonal": "에이전트에게 작업을 만들어 주고 끝까지 지켜보세요.",
+      "viewerTitlePersonal": "에이전트의 일을 지켜보세요"
     },
     "routines": {
       "title": "반복되는 일은 에이전트에게 맡기세요",
@@ -2451,7 +2485,10 @@
       "title": "팀이 알아야 할 것을 남겨 두세요",
       "text": "사람과 에이전트가 이 페이지를 읽어서 모두 같은 정보로 일해요.",
       "viewerTitle": "팀이 아는 것을 찾아보세요",
-      "viewerText": "Wiki를 편집하는 사람이 첫 페이지를 쓰면 여기에 나타나요."
+      "viewerText": "Wiki를 편집하는 사람이 첫 페이지를 쓰면 여기에 나타나요.",
+      "titlePersonal": "에이전트가 읽을 수 있는 메모를 남기세요",
+      "textPersonal": "에이전트가 이 페이지를 읽고 내가 쓴 내용을 바탕으로 일해요.",
+      "viewerTitlePersonal": "여기에 적힌 내용을 찾아보세요"
     },
     "memory": {
       "title": "에이전트는 일하면서 배워요",
@@ -2474,13 +2511,21 @@
       "text": "채널마다 한 주제를 맡은 사람들이 모여요.",
       "viewerTitle": "팀의 채널은 여기에 있어요",
       "viewerText": "채널을 만드는 사람이 첫 채널을 열면 여기에 나타나요.",
-      "action": "채널 만들기"
+      "action": "채널 만들기",
+      "titlePersonal": "여러 에이전트와 한 번에 대화하세요",
+      "textPersonal": "그룹 대화마다 한 주제의 에이전트와 사람이 모여요.",
+      "viewerTitlePersonal": "그룹 대화는 여기에 있어요",
+      "viewerTextPersonal": "그룹 대화를 만드는 사람이 첫 대화를 열면 여기에 나타나요."
     },
     "people": {
       "title": "여기서 팀과 함께 일하세요",
       "text": "사람을 초대해 그 사람들, 에이전트와 한곳에서 대화하세요.",
       "viewerTitle": "팀이 여기에 나타나요",
-      "viewerText": "사람을 초대하는 사람이 나머지 팀원을 데려오면 여기에 나타나요."
+      "viewerText": "사람을 초대하는 사람이 나머지 팀원을 데려오면 여기에 나타나요.",
+      "titlePersonal": "가족이나 친구를 초대하세요",
+      "textPersonal": "누군가를 초대해 나, 에이전트와 한곳에서 대화하세요.",
+      "viewerTitlePersonal": "가족과 친구가 여기에 나타나요",
+      "viewerTextPersonal": "누군가 참여하면 여기에 나타나요."
     },
     "chat": {
       "title": "모든 일은 메시지 하나로 시작돼요",
@@ -2500,7 +2545,11 @@
       "title": "비밀번호를 돌리지 않고 로그인을 공유하세요",
       "text": "에이전트가 팀을 위해 쓰는 로그인과 키를 저장하세요.",
       "viewerTitle": "팀의 로그인이 여기에 나타나요",
-      "viewerText": "누군가 로그인이나 키를 공유하면 여기에 나타나요."
+      "viewerText": "누군가 로그인이나 키를 공유하면 여기에 나타나요.",
+      "titlePersonal": "공유 로그인을 한곳에 보관하세요",
+      "textPersonal": "에이전트가 여기 있는 모두를 위해 쓰는 로그인과 키를 저장하세요.",
+      "viewerTitlePersonal": "공유 로그인이 여기에 나타나요",
+      "viewerTextPersonal": "여기 있는 누군가 로그인이나 키를 나와 공유하면 여기에 나타나요."
     },
     "skills": {
       "title": "일하는 방식을 에이전트에게 가르치세요",

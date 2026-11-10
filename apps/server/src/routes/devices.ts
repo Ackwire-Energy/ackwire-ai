@@ -1,5 +1,7 @@
+import { pairAddress } from "@agenteschat/adapters";
 import {
   approveDeviceJoin,
+  cancelWifiPairing,
   connectLinkState,
   createConnectLink,
   deleteMachine,
@@ -8,10 +10,12 @@ import {
   listDevices,
   normalizeUserCode,
   openConnectLink,
+  startWifiPairing,
   stopPhone,
   updateComputerDevice,
   updatePhoneDevice,
   ValidationError,
+  wifiPairingState,
 } from "@agenteschat/engine";
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 import type { Context } from "hono";
@@ -146,13 +150,43 @@ const ConnectLinkState = z
   })
   .openapi("ConnectLinkState");
 
+const WifiPairing = z
+  .object({
+    id: z.string(),
+    way: z.enum(["qr", "code"]),
+    state: z.enum(["waiting", "pairing", "connecting", "connected", "failed"]),
+    reason: z
+      .enum([
+        "mdns_off",
+        "same_wifi",
+        "refused",
+        "timed_out",
+        "outdated",
+        "adb_missing",
+        "canceled",
+        "failed",
+        "update",
+      ])
+      .optional(),
+    qr: z
+      .string()
+      .optional()
+      .openapi({ description: "Only when it starts: Android's `WIFI:T:ADB;S:…;P:…;;` QR text." }),
+    phoneId: z.uuid().optional().openapi({ description: "Connected: the phone in `GET …/devices`." }),
+    expiresAt: z.string(),
+  })
+  .openapi("WifiPairing");
+
 const MachineParams = OrgParams.extend({ machineId: z.uuid() });
+const PairingParams = MachineParams.extend({ pairingId: z.uuid() });
 const PhoneParams = OrgParams.extend({ phoneId: z.uuid() });
 const LinkParams = OrgParams.extend({ linkId: z.uuid() });
 const RequestParams = OrgParams.extend({ requestId: z.uuid() });
 
 /** New connect links per person: a few tries while setting up a server, never a stream. */
 const LINK_LIMIT = { limit: 20, windowMs: 10 * 60_000 };
+/** Wi-Fi pairings per person: each runs adb on the computer for up to 2 minutes. */
+const PAIR_LIMIT = { limit: 30, windowMs: 10 * 60_000 };
 /** Installer fetches per address (`/i/{code}`): a person retrying, not someone guessing codes. */
 const SCRIPT_LIMIT = { limit: 30, windowMs: 60_000 };
 
@@ -295,6 +329,77 @@ export function deviceAppRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId, phoneId } = c.req.valid("param");
       await stopPhone({ db, pubsub, hub: hub() }, c.get("user").id, orgId, phoneId);
+      return c.body(null, 204);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/devices/computers/{machineId}/wifi-pairings",
+      tags,
+      security,
+      summary: "Pair an Android phone with this computer over Wi-Fi (its owner or an admin)",
+      description:
+        "Without a body: Android's QR for Wireless debugging › Pair device with QR code. With `address` and `code`: the six digits and the address Pair device with pairing code shows. The computer finds the phone, pairs and connects it, for up to 2 minutes; one at a time. Ask `GET` for where it stands.",
+      request: {
+        params: MachineParams,
+        body: body(
+          z
+            .object({
+              address: z
+                .string()
+                .max(80)
+                .regex(/^(\d{1,3}(\.\d{1,3}){3}|\[[0-9a-fA-F:%.\w]{2,60}\]):\d{1,5}$/)
+                .refine((a) => pairAddress(a) !== null, "Not an IP address and port")
+                .openapi({ example: "192.168.1.20:37099" }),
+              code: z.string().regex(/^\d{6}$/),
+            })
+            .partial()
+            .refine((v) => (v.address === undefined) === (v.code === undefined), "address and code go together"),
+        ),
+      },
+      responses: { 201: json(WifiPairing, "Started"), 429: errorResponse("Too many pairings"), ...errors },
+    }),
+    async (c) => {
+      const { orgId, machineId } = c.req.valid("param");
+      const userId = c.get("user").id;
+      const limit = await deps.adapters.rateLimiter.consume(`device-pair:user:${userId}`, PAIR_LIMIT);
+      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many pairings. Try again in a few minutes.");
+      const started = await startWifiPairing({ db, hub: hub() }, userId, orgId, machineId, c.req.valid("json"));
+      return c.json(started, 201);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/devices/computers/{machineId}/wifi-pairings/{pairingId}",
+      tags,
+      security,
+      summary: "Where a Wi-Fi pairing stands: waiting for the phone, pairing, connecting, connected or failed",
+      request: { params: PairingParams },
+      responses: { 200: json(WifiPairing), ...errors },
+    }),
+    async (c) => {
+      const { orgId, machineId, pairingId } = c.req.valid("param");
+      return c.json(await wifiPairingState({ db, hub: hub() }, c.get("user").id, orgId, machineId, pairingId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "delete",
+      path: "/organizations/{orgId}/devices/computers/{machineId}/wifi-pairings/{pairingId}",
+      tags,
+      security,
+      summary: "Stop a Wi-Fi pairing (the dialog closed)",
+      request: { params: PairingParams },
+      responses: { 204: noContent[204], ...errors },
+    }),
+    async (c) => {
+      const { orgId, machineId, pairingId } = c.req.valid("param");
+      await cancelWifiPairing({ db, hub: hub() }, c.get("user").id, orgId, machineId, pairingId);
       return c.body(null, 204);
     },
   );

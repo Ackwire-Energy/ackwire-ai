@@ -26,7 +26,10 @@ test("an owner makes the link for a member and copies it; their own row has none
   state.authConfig = { passwordReset: false };
   await members(state);
   expect(screen().queryByRole("button", { name: "Mais de Wesley" })).toBeNull();
-  await click(screen().getByRole("button", { name: "Mais de João" }));
+  // Radix opens the menu as the pointer goes down, never on the click.
+  await act(async () =>
+    fireEvent.pointerDown(screen().getByRole("button", { name: "Mais de João" }), { button: 0, ctrlKey: false }),
+  );
   await settle(2);
   await click(screen().getByRole("menuitem", { name: /Gerar link de senha nova/ }));
   await settle(4);

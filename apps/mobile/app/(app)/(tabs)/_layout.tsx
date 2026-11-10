@@ -1,3 +1,4 @@
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { NativeTabs } from "expo-router/native-tabs";
 import { useTranslation } from "react-i18next";
 import { Platform } from "react-native";
@@ -6,13 +7,15 @@ import { useNow } from "@/features/shared/hooks";
 import { useActiveWork, useUnreadConversations, useUnreadThreads, useWaitingCount } from "@/features/shared/queries";
 import { alongWork, WorkAlongLine, workAlong } from "@/features/work-along/WorkAlong";
 import { TAB_BADGE, tabBadge } from "@/lib/nav";
+import { useOrg } from "@/providers/org";
 import { haptics, useTheme } from "@/ui";
 import { type TabGlyph, tabGlyphKey } from "@/ui/tabGlyphs";
 import { tabGlyphFamily } from "@/ui/tabIcons";
 
-const TABS: { name: string; glyph: TabGlyph; label: string; role?: "search" }[] = [
+const TABS: { name: string; glyph: TabGlyph; label: string; role?: "search"; teamOnly?: true }[] = [
   { name: "(chats)", glyph: "chats", label: "mobile.tabs.chats" },
-  { name: "threads", glyph: "threads", label: "mobile.tabs.threads" },
+  // A conversation that branches is rare for one person: a personal workspace (ADR 0159) opens Threads from You › Work.
+  { name: "threads", glyph: "threads", label: "mobile.tabs.threads", teamOnly: true },
   { name: "agents", glyph: "agents", label: "mobile.tabs.agents" },
   { name: "activity", glyph: "activity", label: "mobile.tabs.activity" },
   // The search role: on iOS 26 the round button apart at the bar's end (like Music); a plain tab on Android.
@@ -23,11 +26,14 @@ const TABS: { name: string; glyph: TabGlyph; label: string; role?: "search" }[] 
  * Conversas (the home), Threads (threads and missions), Agentes, Atividade and Buscar in the system tab bar
  * (UITabBarController on iOS, Liquid Glass on iOS 26; Material bottom navigation on Android). Our own glyphs on both platforms (outline, filled when
  * selected), drawn as template images the bar tints. Badges for unread conversations (Conversas: channels
- * and DMs; Threads: its rows, never both) and what waits on you. Every tab holds a stack with a native header.
+ * and DMs; Threads: its rows, never both) and what waits on you. Every tab holds a stack with a native header. A
+ * personal workspace (ADR 0159) leaves Threads out of the bar (`hidden`, the system bar's own way: changing it redraws
+ * the tabs from Conversas); its row in You › Work opens the same list, pushed.
  */
 export default function TabsLayout() {
   const { t } = useTranslation();
   const { colors } = useTheme();
+  const personal = isPersonal(useOrg().org);
   const unread = useUnreadConversations();
   const unreadThreads = useUnreadThreads();
   const waiting = useWaitingCount();
@@ -68,6 +74,7 @@ export default function TabsLayout() {
           <NativeTabs.Trigger
             key={tab.name}
             name={tab.name}
+            hidden={personal && tab.teamOnly === true}
             {...(tab.role ? { role: tab.role } : {})}
             accessibilityLabel={badge ? t("mobile.tabs.withCount", { label, count }) : label}
             contentStyle={{ backgroundColor: colors.bg }}

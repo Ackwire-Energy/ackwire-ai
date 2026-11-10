@@ -651,6 +651,7 @@ export function authUiConfig(config: Config) {
     termsUrl: config.TERMS_URL ?? null,
     privacyUrl: config.PRIVACY_URL ?? null,
     supportEmail: config.SUPPORT_EMAIL ?? null,
+    feedback: Boolean(config.FEEDBACK_EMAIL),
   };
 }
 

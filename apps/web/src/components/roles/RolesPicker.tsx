@@ -1,8 +1,11 @@
 import type { OrgRole } from "@agenteschat/client";
+import { personalHelperRole } from "@agenteschat/client/lib/personal-view";
 import { isEveryone, sortRoles } from "@agenteschat/client/lib/roles";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { Button, Icon, Menu, MenuCheckboxItem, MenuHeading, MenuNote, RoleMark } from "@agenteschat/ui";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { useOrg } from "@/components/org-context";
 import "./roles.css";
 
 /**
@@ -32,7 +35,10 @@ export function RolesPicker({
   align?: "start" | "end";
 }) {
   const { t } = useTranslation();
+  const { org } = useOrg();
   const givable = sortRoles(roles.filter((r) => !isEveryone(r) && r.givable));
+  // A personal workspace says it in the invitation's plain words (ADR 0159), naming its helper role as it's called.
+  const helper = isPersonal(org) ? personalHelperRole(roles) : null;
   const picked = sortRoles(roles.filter((r) => value.includes(r.id)));
   const toggle = (id: string, on: boolean) =>
     onChange(on ? [...new Set([...value, id])] : value.filter((v) => v !== id));
@@ -61,7 +67,13 @@ export function RolesPicker({
           </span>
         </MenuCheckboxItem>
       ))}
-      <MenuNote>{givable.length ? t("members.everyoneNote") : t("members.noRolesToGive")}</MenuNote>
+      <MenuNote>
+        {!givable.length
+          ? t("members.noRolesToGive")
+          : helper
+            ? t("members.everyoneNotePersonal", { role: helper.name })
+            : t("members.everyoneNote")}
+      </MenuNote>
     </Menu>
   );
 }

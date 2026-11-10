@@ -212,6 +212,15 @@ export function androidStage(phone: Pick<PhoneDevice, "status"> | null | undefin
   return "allow";
 }
 
+/** What the Mac reports while it sets up the test helper (the last step). */
+const HELPER_STEP = new Set([
+  "helper_missing",
+  "helper_expired",
+  "helper_untrusted",
+  "team_limit",
+  "apple_account_missing",
+]);
+
 /** The iPhone guide's steps, in order; `iphoneStep` is the index of the one to do now (5: all done). */
 export const IPHONE_STEPS = ["plug", "trust", "devmode", "automation", "helper"] as const;
 
@@ -222,7 +231,7 @@ export function iphoneStep(phone: Pick<PhoneDevice, "status"> | null | undefined
   const reason = "reason" in s ? s.reason : "";
   if (reason === "untrusted" || reason === "locked") return 1;
   if (reason === "ui_automation_off") return 3;
-  if (reason === "helper_missing" || reason === "helper_expired") return 4;
+  if (HELPER_STEP.has(reason)) return 4;
   return 2;
 }
 
@@ -234,6 +243,7 @@ export const IPHONE_STEP_REASONS = new Set([
   "ui_automation_off",
   "helper_missing",
   "helper_expired",
+  "helper_untrusted",
 ]);
 
 // ── Notifications and waits ─────────────────────────────────────────────────

@@ -8,7 +8,9 @@ import {
 } from "@agenteschat/client/lib/drive";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
+import { rolePicksInSight } from "@agenteschat/client/lib/personal-view";
 import { isEveryone, sortRoles } from "@agenteschat/client/lib/roles";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import {
   Avatar,
   Button,
@@ -29,6 +31,7 @@ import { useApi } from "@/api/context";
 import { ActorAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
+import { usePersonalView } from "@/hooks/usePersonalView";
 import { copyText } from "@/lib/context-menu";
 import { useToast } from "@/lib/toast";
 import { artifactLink, useAuthorName } from "./ArtifactViewer";
@@ -36,10 +39,10 @@ import "../who-sees.css";
 
 type Mode = ArtifactSharing["mode"];
 
-const MODES: { mode: Mode; icon: IconName; label: string }[] = [
-  { mode: "conversation", icon: "lock", label: "share.conversation" },
-  { mode: "people", icon: "personAdd", label: "share.people" },
-  { mode: "everyone", icon: "audienceEveryone", label: "share.everyone" },
+const MODES: { mode: Mode; icon: IconName }[] = [
+  { mode: "conversation", icon: "lock" },
+  { mode: "people", icon: "personAdd" },
+  { mode: "everyone", icon: "audienceEveryone" },
 ];
 
 const SAVED = {
@@ -101,7 +104,8 @@ export function ShareDialog({ artifact, onClose }: { artifact: Artifact; onClose
         onSuccess: (saved) => {
           setFile(saved);
           setMode(saved.sharing?.mode ?? "conversation");
-          toast.show(t(SAVED[saved.sharing?.mode ?? "conversation"]), "success", {
+          const savedMode = saved.sharing?.mode ?? "conversation";
+          toast.show(t(savedMode === "everyone" ? modeKey(org, SAVED.everyone) : SAVED[savedMode]), "success", {
             label: t("share.undo"),
             // Through the API itself: the dialog may be closed by then (and shows it if it's still open).
             run: () =>
@@ -135,6 +139,19 @@ export function ShareDialog({ artifact, onClose }: { artifact: Artifact; onClose
   };
 
   const roleList = sortRoles((roles.data?.roles ?? []).filter((r) => !isEveryone(r)));
+  // A personal workspace's family picks people: roles to add only when one is worth it or already listed, and alone,
+  // no word on who else sees it (ADR 0159).
+  const offersRoles = rolePicksInSight(org, roles.data?.roles ?? [], listed.roleIds);
+  const { solo } = usePersonalView();
+  const everyoneText = t(modeKey(org, "share.everyone"));
+  const modeLabel = (m: Mode) =>
+    m === "everyone"
+      ? everyoneText
+      : m === "people"
+        ? t(offersRoles ? "share.people" : "share.peoplePersonal")
+        : t("share.conversation");
+  const addText = t(offersRoles ? "share.add" : "share.addPersonal");
+  const addSearchText = t(offersRoles ? "share.addSearch" : "share.addSearchPersonal");
   // Who sees it where it lives (I do, to be here) has nothing to gain from the list.
   const addable = [
     ...dir.members
@@ -146,7 +163,7 @@ export function ShareDialog({ artifact, onClose }: { artifact: Artifact; onClose
         group: t("share.groupPeople"),
         leading: <Avatar kind="person" size="sm" name={m.name} imageUrl={m.image} />,
       })),
-    ...roleList
+    ...(offersRoles ? roleList : [])
       .filter((r) => !listed.roleIds.includes(r.id))
       .map((r) => ({
         value: `r:${r.id}`,
@@ -166,7 +183,7 @@ export function ShareDialog({ artifact, onClose }: { artifact: Artifact; onClose
           : t("share.whereDmGone")
       : aud.kind === "channel"
         ? t("share.whereChannel", { name: aud.name })
-        : t("share.everyone");
+        : everyoneText;
 
   return (
     <Dialog
@@ -197,7 +214,7 @@ export function ShareDialog({ artifact, onClose }: { artifact: Artifact; onClose
                       <Icon name={m.icon} size={16} />
                     </span>
                     <span className="ac-mediarow__head">
-                      <span className="ac-option__title">{t(m.label as "share.people")}</span>
+                      <span className="ac-option__title">{modeLabel(m.mode)}</span>
                     </span>
                   </OptionCard>
                 ))}
@@ -208,13 +225,13 @@ export function ShareDialog({ artifact, onClose }: { artifact: Artifact; onClose
                   <SearchSelect
                     className="share__add"
                     value={undefined}
-                    placeholder={t("share.add")}
-                    aria-label={t("share.add")}
+                    placeholder={addText}
+                    aria-label={addText}
                     labels={{
-                      search: t("share.addSearch"),
-                      searchPlaceholder: t("share.addSearch"),
+                      search: addSearchText,
+                      searchPlaceholder: addSearchText,
                       noResults: t("share.noResults"),
-                      list: t("share.add"),
+                      list: addText,
                     }}
                     options={() => addable}
                     onValueChange={(v) => toggle(v.startsWith("u:") ? "user" : "role", v.slice(2))}
@@ -225,7 +242,7 @@ export function ShareDialog({ artifact, onClose }: { artifact: Artifact; onClose
           ) : (
             <p className="share__open ac-iconline">
               <Icon name="audienceEveryone" size={16} />
-              <span>{t("share.open")}</span>
+              <span>{t(modeKey(org, "share.open"))}</span>
             </p>
           )}
           {closed && (
@@ -233,7 +250,7 @@ export function ShareDialog({ artifact, onClose }: { artifact: Artifact; onClose
               <h3 className="ac-eyebrow">{t("share.access")}</h3>
               <ul className="share__list">
                 {sharing.mode === "everyone" ? (
-                  <Row lead={<Icon name="audienceEveryone" size={16} />} name={t("share.everyone")} />
+                  <Row lead={<Icon name="audienceEveryone" size={16} />} name={everyoneText} />
                 ) : (
                   <Row
                     lead={
@@ -274,7 +291,9 @@ export function ShareDialog({ artifact, onClose }: { artifact: Artifact; onClose
                   );
                 })}
               </ul>
-              {sharing.mode === "people" && <p className="small muted share__note">{t("share.admins")}</p>}
+              {sharing.mode === "people" && !solo && (
+                <p className="small muted share__note">{t(modeKey(org, "share.admins"))}</p>
+              )}
             </section>
           )}
         </Locked>

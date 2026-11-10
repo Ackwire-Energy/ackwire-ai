@@ -40,7 +40,7 @@ describe("route guards", () => {
     if (state.me) state.me.organizations = [];
     const { router } = await renderApp("/", { api: createFakeApi(state) });
     expect(router.state.location.pathname).toBe("/onboarding");
-    expect(screen().getByRole("heading", { name: "Como se chama o seu workspace?" })).toBeTruthy();
+    expect(screen().getByRole("heading", { name: "Para que você vai usar o agentes.chat?" })).toBeTruthy();
   });
 
   test("a workspace still being set up is finished for its owner and opens in its right hand's DM; never for someone invited", async () => {
@@ -56,7 +56,7 @@ describe("route guards", () => {
       await settle(10);
       expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/dm/agent/${LODI_ID}`);
       // Never the form that would make another workspace.
-      expect(screen().queryByRole("heading", { name: "Como se chama o seu workspace?" })).toBeNull();
+      expect(screen().queryByRole("heading", { name: "Para que você vai usar o agentes.chat?" })).toBeNull();
       cleanup();
     }
     const { router } = await renderApp(`/org/${ORG_ID}/drive`, { api: as("member") });

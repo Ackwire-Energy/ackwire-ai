@@ -17,6 +17,7 @@ import {
   type NotchInfo,
   type RunnerInfo,
   type RunnerStateChange,
+  type SiteAnswer,
   WINDOW_NAMES,
   type WindowName,
 } from "./types";
@@ -58,6 +59,8 @@ export function createTauriHost(): Host {
     removeServer: (server) => invoke<void>("server_remove", { server }),
     signOutServer: (server) => invoke<void>("server_sign_out", { server }),
     workspaces: () => invoke<ServerWorkspaces[]>("workspaces_get"),
+    siteFetch: (server, method, path, body) =>
+      invoke<SiteAnswer>("site_fetch", { server, method, path, body: body ?? null }),
     welcomeMode: () => invoke<string | null>("welcome_mode_take").then((m) => (m === "add" ? "add" : null)),
     discover: () => invoke<Candidate[]>("discover"),
     // From the web view itself: every server answers `/api/instance` to any origin (it is public).

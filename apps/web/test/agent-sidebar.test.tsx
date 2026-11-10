@@ -113,6 +113,37 @@ describe("the toggle", () => {
     expect(side()).toBeNull();
   });
 
+  /** The seeded workspace as a personal one (ADR 0159). */
+  const personalState = () => {
+    const state = seedState();
+    const org = state.me?.organizations[0];
+    if (org) org.mode = "personal";
+    return state;
+  };
+
+  test("a personal workspace starts it closed on a wide window; opening it is remembered", async () => {
+    widthIs(DM_SIDE_WIDE_QUERY);
+    await openDm({ state: personalState() });
+    expect(side()).toBeNull();
+    expect(toggle()?.getAttribute("aria-pressed")).toBe("false");
+    // With the column closed, Computador is back in the header.
+    expect(screen().getByRole("button", { name: "Computador" })).toBeTruthy();
+    await act(async () => fireEvent.click(toggle() as HTMLElement));
+    expect(side()).toBeTruthy();
+    expect(localStorage.getItem(KEY)).toBe("1");
+    cleanup();
+    await openDm({ state: personalState() });
+    expect(side()).toBeTruthy();
+    expect(toggle()?.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  test("in a personal workspace a choice saved before still wins", async () => {
+    widthIs(DM_SIDE_WIDE_QUERY);
+    localStorage.setItem(KEY, "1");
+    await openDm({ state: personalState() });
+    expect(side()).toBeTruthy();
+  });
+
   test("a narrow window: closed at first, it floats over the chat with its scrim, and nothing is saved", async () => {
     widthIs(DM_SIDE_NARROW_QUERY);
     await openDm();

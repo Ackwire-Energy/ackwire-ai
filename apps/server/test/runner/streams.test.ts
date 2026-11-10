@@ -251,5 +251,7 @@ test("stream.open: each kind behind its switch; a desktop that isn't running sta
   tools = { desktop: true, terminal: true };
   expect(await open({ ...terminal, cols: 5 })).toBe("bad_request");
   expect(await open({ ...watch, streamId: "short" })).toBe("bad_request");
-  expect(await open({ kind: "phone" })).toBe("bad_request");
+  expect(await open({ kind: "printer" })).toBe("bad_request");
+  // A phone's screen goes to the phones, which a computer without them doesn't reach.
+  expect(await open({ kind: "phone", mode: "watch" })).toBe("phone_missing");
 });

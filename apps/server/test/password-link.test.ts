@@ -7,7 +7,8 @@ import { type Browser, browser, createTestServer, joinByInvitation, seedOrg, sig
 
 let t: TestServer;
 beforeEach(async () => {
-  t = await createTestServer();
+  // Sign-up otherwise closes after the first account, and one test needs a second owner with a workspace of their own.
+  t = await createTestServer({ env: { ALLOW_SIGNUP: "true" } });
   Object.assign(t.email, { delivers: false });
 });
 afterEach(async () => {

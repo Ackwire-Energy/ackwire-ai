@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { and, type Database, type Executor, eq, gt, inArray, isNull, ne, schema } from "@agenteschat/db";
 import { recordAudit } from "../audit";
 import { sha256 } from "../crypto";
-import { emailLocale, queueEmail } from "../email";
+import { emailLocale, modeStamp, queueEmail } from "../email";
 import { ConflictError, ForbiddenError, NotFoundError } from "../errors";
 import { getMembership, listMemberships } from "../organizations";
 import { accountClosed, workRefusal } from "../standing";
@@ -292,6 +292,7 @@ export async function queueReceipt(
       appName,
       orgName,
       url: `${appsUrls(publicUrl).issuer}/org/${orgId}/settings/apps`,
+      ...(await modeStamp(tx, orgId)),
     },
   });
 }

@@ -157,6 +157,8 @@ export const FACTS_SHELL = [
   "qemu=ro.boot.qemu",
   "qemu2=ro.kernel.qemu",
   "avd=ro.boot.qemu.avd_name",
+  "serialno=ro.serialno",
+  "patch=ro.build.version.security_patch",
 ]
   .map((p) => {
     const [k, prop] = p.split("=");
@@ -174,6 +176,10 @@ export interface AndroidFacts {
   emulator: boolean;
   /** The phone's own name (Settings › About phone › Device name), or the emulator's AVD. */
   name?: string;
+  /** Its own serial (what a cable shows as adb's serial), which an adb serial over Wi-Fi isn't. */
+  serialno?: string;
+  /** Its security patch level, `2026-05-01`. */
+  patch?: string;
   screen?: { width: number; height: number };
   power?: "ac" | "battery";
   battery?: number;
@@ -204,6 +210,8 @@ export function parseAndroidFacts(out: string): AndroidFacts {
     booted: val("boot") === "1",
     emulator,
     ...(name && !emulator ? { name } : {}),
+    ...(/^[\w.-]{1,100}$/.test(val("serialno")) ? { serialno: val("serialno") } : {}),
+    ...(/^\d{4}-\d{2}-\d{2}$/.test(val("patch")) ? { patch: val("patch") } : {}),
     ...(screen ? { screen } : {}),
     ...(powered.length > 0 ? { power: powered.includes("true") ? ("ac" as const) : ("battery" as const) } : {}),
     ...(level !== undefined ? { battery: Number(level) } : {}),

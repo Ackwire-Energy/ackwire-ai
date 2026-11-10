@@ -562,9 +562,12 @@ describe("the computer page: pause, folders and tools (ADR 0036)", () => {
       socket.push(orgEvent({ type: "machine.updated", machineId: m.id, paused: { until, timezone: null } })),
     );
     await settle(2);
-    // "Pausado", "até 16:24" (past midnight the date comes first).
-    expect(head.querySelector(".dv-statusline")?.textContent).toContain("Pausado");
-    expect(head.querySelector(".dv-statusline")?.textContent).toContain(`até ${time}`);
+    // "Pausado", "até 16:24" (past midnight the date comes first: "até 10 nov 00:08").
+    const sameDay = new Date(until).toDateString() === new Date().toDateString();
+    const line = head.querySelector(".dv-statusline")?.textContent ?? "";
+    expect(line).toContain("Pausado");
+    expect(line).toContain(sameDay ? `até ${time}` : "até ");
+    expect(line).toContain(time);
     expect(head.textContent).toContain("Pausado no próprio computador por quem o conectou.");
     // The server says "not paused" with null.
     await act(async () => socket.push(orgEvent({ type: "machine.updated", machineId: m.id, paused: null })));

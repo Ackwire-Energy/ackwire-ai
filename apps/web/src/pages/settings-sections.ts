@@ -1,6 +1,8 @@
 import type { AuthConfig, OrgSummary } from "@agenteschat/client";
 import { showsAbout } from "@agenteschat/client/lib/about";
 import { can } from "@agenteschat/client/lib/permissions";
+import { personalSettingsHost } from "@agenteschat/client/lib/personal-view";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import type { IconName } from "@agenteschat/ui";
 
 // Apart from the settings page so the shell (⌘K, the sidebar) and the settings routes' guards can read
@@ -89,6 +91,19 @@ export const SETTINGS_SECTIONS: {
 export const SETTINGS_GROUPS: SettingsGroup[] = ["you", "org", "agents", "costs"];
 
 export const isSettingsSection = (v: unknown): v is SettingsSection => SETTINGS_SECTIONS.some((s) => s.id === v);
+
+/**
+ * The nav entry that stands for the open section: in a personal workspace (ADR 0159 §3) connectors and skills open on
+ * AI and apps' entry, billing on Plan and usage's, when the person may open those; else the section itself.
+ */
+export function settingsNavEntry(
+  org: Pick<OrgSummary, "mode">,
+  current: SettingsSection,
+  open: readonly SettingsSection[],
+): SettingsSection {
+  const host = isPersonal(org) ? personalSettingsHost(current, new Set(open)) : null;
+  return host !== null && isSettingsSection(host) ? host : current;
+}
 
 /**
  * `?connected=github` (back from OAuth), `?review=1` (a custom MCP server to

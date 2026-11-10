@@ -77,6 +77,18 @@ export interface PushStrings {
   teamWeekReady: string;
   /** Lodi's daily card ("Resumo do dia") came. */
   teamDayReady: string;
+  /**
+   * A personal workspace's words (ADR 0159), where the team's would speak of a workspace, a team or its admins: one
+   * person and their agents (and maybe their family) read these. `renderPush` picks them for `personal`.
+   */
+  machineConnectedTitlePersonal: string;
+  computerReadyTitlePersonal: string;
+  agentUnreachedBodyPersonal: string;
+  /** Over `widgetFailedReasons`, by the same codes: only those that would read wrong. */
+  widgetFailedReasonsPersonal: Record<string, string>;
+  joinRequestTitlePersonal: (name: string) => string;
+  joinSuggestionTitlePersonal: (by: string, name: string) => string;
+  teamWeekReadyPersonal: string;
 }
 
 export const en: PushStrings = {
@@ -163,4 +175,11 @@ export const en: PushStrings = {
   deviceWaitingBody: "It starts when it's back.",
   teamWeekReady: "Your team's week is ready",
   teamDayReady: "Your day's summary is ready",
+  machineConnectedTitlePersonal: "A new computer was connected",
+  computerReadyTitlePersonal: "Your agents' computer is ready",
+  agentUnreachedBodyPersonal: "Whoever made the routine can't talk to this agent yet. Tap to let them.",
+  widgetFailedReasonsPersonal: { creator_left: "Whoever set it up is no longer in your workspace." },
+  joinRequestTitlePersonal: (name) => `${name} asks to join your workspace`,
+  joinSuggestionTitlePersonal: (by, name) => `${by} suggested inviting ${name}`,
+  teamWeekReadyPersonal: "Your week is ready",
 };

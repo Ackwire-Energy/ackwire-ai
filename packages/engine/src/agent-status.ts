@@ -10,6 +10,7 @@ import { outageParkedSql } from "./runs";
 import { toolGroupKey } from "./tools/directory";
 import type { ToolContext, ToolDefinition, ToolSource } from "./tools/types";
 import { liveWorksByAgent, type WorkView } from "./works";
+import { inWorkspaceWords } from "./workspace-mode";
 
 const { agents, agentRuns, channels, issues, messages, missions } = schema;
 type AgentRunRow = typeof agentRuns.$inferSelect;
@@ -880,5 +881,15 @@ export function createSetStatusToolSource(deps: { pubsub?: PubSub } = {}): ToolS
       return { content: text ? "Status set." : "Status cleared." };
     },
   };
-  return { name: "status", tools: async () => [tool] };
+  // A personal workspace (ADR 0159): the person sees the line, not a team.
+  return {
+    name: "status",
+    tools: async (ctx) =>
+      inWorkspaceWords(ctx.db, ctx.orgId, [tool], {
+        [SET_STATUS_TOOL]: tool.description.replace(
+          "Show the team what you are doing",
+          "Show the person what you are doing",
+        ),
+      }),
+  };
 }

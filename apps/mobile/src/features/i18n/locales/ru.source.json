@@ -317,6 +317,9 @@
   "approval.leaves": {
     "value": "goes outside the company"
   },
+  "approval.leavesPersonal": {
+    "value": "goes outside your workspace"
+  },
   "approval.refuseWhyF": {
     "value": "{{name}} learns from the reason. Optional."
   },
@@ -412,6 +415,9 @@
   },
   "approval.trait.external": {
     "value": "Leaves the company"
+  },
+  "approval.trait.externalPersonal": {
+    "value": "Leaves your workspace"
   },
   "approval.trait.unsent": {
     "value": "Nothing is sent"
@@ -566,6 +572,15 @@
   "chats.createChannel": {
     "value": "Create channel"
   },
+  "chats.newChannelHintPersonal": {
+    "value": "For one subject, with several agents"
+  },
+  "chats.channelPlaceholderPersonal": {
+    "value": "Name, e.g. travel"
+  },
+  "chats.createChannelPersonal": {
+    "value": "Create group conversation"
+  },
   "chats.waitIn": {
     "value": "in {{where}}"
   },
@@ -589,6 +604,9 @@
   },
   "chats.firstRunLine": {
     "value": "{{name}} is setting up the team · {{done}} of {{total}}"
+  },
+  "chats.firstRunLinePersonal": {
+    "value": "{{name}} is setting up your agents · {{done}} of {{total}}"
   },
   "chats.first.title": {
     "value": "Start with your first agent"
@@ -638,6 +656,12 @@
   "new.channelFine": {
     "value": "For a team or a topic."
   },
+  "new.channelPersonal": {
+    "value": "Group conversation"
+  },
+  "new.channelFinePersonal": {
+    "value": "For one subject, with several agents."
+  },
   "new.chatSearch": {
     "value": "Search for a person or an agent"
   },
@@ -673,6 +697,9 @@
   },
   "new.wikiHint": {
     "value": "For the team and the agents to read"
+  },
+  "new.wikiHintPersonal": {
+    "value": "For your agents to read"
   },
   "new.inviteHint": {
     "value": "By email or link"
@@ -1106,6 +1133,9 @@
   "chat.intent.roleIntro": {
     "value": "{{role}} on your team. Ask in plain words."
   },
+  "chat.intent.roleIntroPersonal": {
+    "value": "{{role}}, here for you. Ask in plain words."
+  },
   "chat.intent.noIntro": {
     "value": "Ask for what you need, in plain words."
   },
@@ -1123,6 +1153,9 @@
   },
   "chat.intent.helloRole": {
     "value": "{{role}} on the team."
+  },
+  "chat.intent.helloRolePersonal": {
+    "value": "{{role}}, here for you."
   },
   "chat.intent.helloAsk": {
     "value": "Where do we start?"
@@ -1856,6 +1889,9 @@
   "agents.teamSection": {
     "value": "Team"
   },
+  "agents.teamSectionPersonal": {
+    "value": "Your agents"
+  },
   "agents.managerQuiet": {
     "value": "Nothing in progress"
   },
@@ -2512,6 +2548,12 @@
   },
   "me.role.member": {
     "value": "member"
+  },
+  "me.role.ownerPersonal": {
+    "value": "your personal workspace"
+  },
+  "me.role.memberPersonal": {
+    "value": "a personal workspace shared with you"
   },
   "me.appearance": {
     "value": "Appearance"
@@ -4400,6 +4442,15 @@
   "devices.reason.helper_expired": {
     "value": "The test helper needs renewing"
   },
+  "devices.reason.apple_account_missing": {
+    "value": "Xcode on the Mac needs an Apple Account"
+  },
+  "devices.reason.team_limit": {
+    "value": "Remove an app you built from this iPhone"
+  },
+  "devices.reason.helper_untrusted": {
+    "value": "Trust the test helper on this iPhone"
+  },
   "devices.reason.booting": {
     "value": "Starting up"
   },
@@ -4694,11 +4745,23 @@
   "devices.android.wifi1": {
     "value": "Turn on Wireless debugging"
   },
+  "devices.android.wifi1Text": {
+    "value": "Check Always allow on this network, then tap Allow."
+  },
   "devices.android.wifi2": {
-    "value": "Pair it from {{host}}"
+    "value": "Scan the code on a computer"
   },
   "devices.android.wifi2Text": {
-    "value": "In Android Studio on {{host}}, open Device Manager, then Pair Devices Using Wi-Fi. Scan its code here in Wireless debugging."
+    "value": "From Wireless debugging › Pair device with QR code."
+  },
+  "devices.android.wifi2Hint": {
+    "value": "In agentes.chat on a computer, open Connect a device › Android phone › Over Wi-Fi and pick {{host}}."
+  },
+  "devices.android.codeHead": {
+    "value": "Pair with a pairing code"
+  },
+  "devices.android.codeNote": {
+    "value": "From Wireless debugging › Pair device with pairing code. Open Settings and agentes.chat side by side so the code stays on screen."
   },
   "devices.android.wifiNote": {
     "value": "Wi-Fi can drop after a restart. A cable is more reliable."
@@ -4888,6 +4951,9 @@
   },
   "connectors.adminsOnly": {
     "value": "Only an admin of {{org}} connects services. Ask one of them."
+  },
+  "connectors.adminsOnlyPersonal": {
+    "value": "Only whoever runs this workspace connects apps. Ask them."
   },
   "connectors.canTitle": {
     "value": "Agents will be able to"
@@ -5237,6 +5303,9 @@
   },
   "onb.anotherTitle": {
     "value": "What's the new workspace called?"
+  },
+  "onb.anotherPurpose": {
+    "value": "What's the new workspace for?"
   },
   "onb.anotherLead": {
     "value": "On agentes.chat. You stay in {{org}} and can switch any time."
@@ -6173,6 +6242,18 @@
   "empty.agents.viewerText": {
     "value": "Whoever creates agents in this workspace adds the first one, and it shows up here."
   },
+  "empty.agents.titlePersonal": {
+    "value": "Get help from your own agents"
+  },
+  "empty.agents.textPersonal": {
+    "value": "Each agent takes care of one thing for you, right in the chat."
+  },
+  "empty.agents.viewerTitlePersonal": {
+    "value": "Your agents live here"
+  },
+  "empty.agents.viewerTextPersonal": {
+    "value": "Whoever creates agents here adds the first one, and it shows up here."
+  },
   "empty.agentsForYou.title": {
     "value": "Your agents show up here"
   },
@@ -6191,6 +6272,18 @@
   "empty.drive.viewerText": {
     "value": "What agents and people create in the chats shows up here."
   },
+  "empty.drive.titlePersonal": {
+    "value": "Everything your agents make, in one place"
+  },
+  "empty.drive.textPersonal": {
+    "value": "Reports, tables and files from your agents stay here, easy to find."
+  },
+  "empty.drive.viewerTitlePersonal": {
+    "value": "Find what your agents make"
+  },
+  "empty.drive.viewerTextPersonal": {
+    "value": "What agents create in your chats shows up here."
+  },
   "empty.tasks.title": {
     "value": "Hand work to the team"
   },
@@ -6202,6 +6295,15 @@
   },
   "empty.tasks.viewerText": {
     "value": "Tasks show up here as soon as someone creates the first one."
+  },
+  "empty.tasks.titlePersonal": {
+    "value": "Hand your to-dos to your agents"
+  },
+  "empty.tasks.textPersonal": {
+    "value": "Create a task for an agent and follow it to the end."
+  },
+  "empty.tasks.viewerTitlePersonal": {
+    "value": "Follow your agents' work"
   },
   "empty.routines.title": {
     "value": "Leave repeated work to your agents"
@@ -6226,6 +6328,15 @@
   },
   "empty.wiki.viewerText": {
     "value": "Whoever edits the wiki writes the first page, and it shows up here."
+  },
+  "empty.wiki.titlePersonal": {
+    "value": "Keep notes your agents can read"
+  },
+  "empty.wiki.textPersonal": {
+    "value": "Your agents read these pages, so they work from what you wrote."
+  },
+  "empty.wiki.viewerTitlePersonal": {
+    "value": "Look up what's written here"
   },
   "empty.memory.title": {
     "value": "Your agents learn as they work"
@@ -6272,6 +6383,18 @@
   "empty.channels.action": {
     "value": "Create channel"
   },
+  "empty.channels.titlePersonal": {
+    "value": "Talk to several agents at once"
+  },
+  "empty.channels.textPersonal": {
+    "value": "Each group conversation gathers the agents and people for one subject."
+  },
+  "empty.channels.viewerTitlePersonal": {
+    "value": "Group conversations live here"
+  },
+  "empty.channels.viewerTextPersonal": {
+    "value": "Whoever creates group conversations opens the first one, and it shows up here."
+  },
   "empty.people.title": {
     "value": "Work with your team here"
   },
@@ -6283,6 +6406,18 @@
   },
   "empty.people.viewerText": {
     "value": "Whoever invites people brings the rest of the team, and they show up here."
+  },
+  "empty.people.titlePersonal": {
+    "value": "Bring your family or friends in"
+  },
+  "empty.people.textPersonal": {
+    "value": "Invite someone to talk to you and to your agents in one place."
+  },
+  "empty.people.viewerTitlePersonal": {
+    "value": "Family and friends show up here"
+  },
+  "empty.people.viewerTextPersonal": {
+    "value": "When someone joins, they show up here."
   },
   "empty.chat.title": {
     "value": "It all starts with a message"
@@ -6319,6 +6454,18 @@
   },
   "empty.vaultTeam.viewerText": {
     "value": "When someone shares a login or a key with you, it shows up here."
+  },
+  "empty.vaultTeam.titlePersonal": {
+    "value": "Keep shared logins in one place"
+  },
+  "empty.vaultTeam.textPersonal": {
+    "value": "Save the logins and keys your agents use for everyone here."
+  },
+  "empty.vaultTeam.viewerTitlePersonal": {
+    "value": "Shared logins show up here"
+  },
+  "empty.vaultTeam.viewerTextPersonal": {
+    "value": "When someone here shares a login or a key with you, it shows up here."
   },
   "empty.skills.title": {
     "value": "Teach your agents how you do things"

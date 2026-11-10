@@ -30,13 +30,18 @@ import {
   firstRunSteps,
 } from "@agenteschat/client/lib/setup-checklist";
 import {
+  aboutYouContext,
   answerAfter,
   BUSINESS_TYPES,
   type BusinessType,
   firstTasks,
   isTemplateBusiness,
+  LIFE_AREAS,
+  type LifeArea,
+  lifeAreaTemplate,
   teamStatus,
 } from "@agenteschat/client/lib/team-plan";
+import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
@@ -51,12 +56,14 @@ import { useOpenDm } from "../new/useOpenDm";
 import { useFailed } from "../routines/hooks";
 import { useDirectory, useMeId } from "../shared/hooks";
 import { successHaptic, tapHaptic } from "../shared/parts";
-import { TeamTemplatesSheet, useSendAnswer } from "./TeamCard";
+import { ChoiceChip, TeamTemplatesSheet, useSendAnswer } from "./TeamCard";
 
 /*
  * The right hand's first run on the phone (ADR 0155 §6), as on the web: one checklist card inside its greeting for
  * the workspace's owners, five rows, each a pushed screen (what the workspace does, the apps), a sheet (the team's
- * templates), Connect AI or the invite screen. On a billing hold the AI row says so in words (App Store 3.1.1).
+ * templates), Connect AI or the invite screen. On a billing hold the AI row says so in words (App Store 3.1.1). A
+ * personal workspace (ADR 0159) has four, in its words: what the person wants help with (areas of life), their agents,
+ * an AI, their apps.
  */
 
 const ROW_ICON: Record<FirstRunStep, IconName> = {
@@ -66,6 +73,9 @@ const ROW_ICON: Record<FirstRunStep, IconName> = {
   apps: "bolt",
   people: "person",
 };
+
+/** A personal workspace's rows are about the person and their agents. */
+const PERSONAL_ROW_ICON: Partial<Record<FirstRunStep, IconName>> = { about: "person", team: "agent" };
 
 /** Row 1's screen saved a business with a template: the card opens that template once it is back in view. */
 let templatesAfterAbout: ((template: string | undefined) => void) | null = null;
@@ -87,6 +97,7 @@ export function useFirstRun(agent: Agent | undefined, channelId: string | null) 
         pay: may.pay,
         connectors: can(org, "manage_connectors"),
         invite: may.invite,
+        personal: isPersonal(org),
       });
   const status = useAiStatus(orgId);
   const members = useMembers(orgId);
@@ -152,8 +163,9 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
     };
   }, []);
   const doneHere = steps.filter((s) => done.has(s));
+  const personal = isPersonal(org);
   const said = useDoneSay(run.ready, doneHere, (step) =>
-    t(`agentSetup.firstRun.say.${step}`, agentGrammar(agent.name)),
+    t(modeKey(org, `agentSetup.firstRun.say.${step}`), agentGrammar(agent.name)),
   );
   if (run.state === "none") return null;
 
@@ -187,12 +199,12 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
       t,
       s,
       state,
-      { org: org?.name ?? "", agents: team.length, label, apps: appNames, members: run.members },
+      { org: org?.name ?? "", agents: team.length, label, apps: appNames, members: run.members, personal },
       agent.setup?.done.includes(s) ?? false,
     );
     return {
       key: s,
-      icon: ROW_ICON[s],
+      icon: (personal && PERSONAL_ROW_ICON[s]) || ROW_ICON[s],
       done: state === "done",
       // On a hold, the AI row says where the plan is chosen, in words only (App Store 3.1.1).
       title: state === "plan" ? planHoldPhoneLine(t, can(org, "manage_billing")) : words.title,
@@ -230,8 +242,8 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
             ]
           : []),
         ...(["fit", "who"] as const).map((k) => ({
-          label: t(`agentSetup.firstRun.asks.${k}`),
-          onPress: () => send(t(`agentSetup.firstRun.asks.${k}`)),
+          label: t(modeKey(org, `agentSetup.firstRun.asks.${k}`)),
+          onPress: () => send(t(modeKey(org, `agentSetup.firstRun.asks.${k}`))),
         })),
       ]
     : [];
@@ -247,19 +259,29 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
         title={
           run.state === "complete"
             ? t("agentSetup.firstRun.complete")
-            : t("agentSetup.firstRun.title", { org: org?.name ?? "" })
+            : t(modeKey(org, "agentSetup.firstRun.title"), { org: org?.name ?? "" })
         }
         done={doneHere.length}
         total={steps.length}
         rows={shown.length > 0 ? shown : rows}
         foot={
           next === "about" && !done.has("about") && run.state !== "complete" ? (
-            <AboutAnswers
-              onOther={act.about}
-              onSaved={(business) => {
-                if (teamOpen.current) setTemplates(isTemplateBusiness(business) ? { initial: business } : {});
-              }}
-            />
+            personal ? (
+              <AboutYouAnswers
+                // The areas already tapped go along, so the screen opens with them picked.
+                onOther={(areas) => (areas ? openSetupStep(agent.id, "about", areas) : act.about())}
+                onSaved={(template) => {
+                  if (teamOpen.current) setTemplates(template ? { initial: template } : {});
+                }}
+              />
+            ) : (
+              <AboutAnswers
+                onOther={act.about}
+                onSaved={(business) => {
+                  if (teamOpen.current) setTemplates(isTemplateBusiness(business) ? { initial: business } : {});
+                }}
+              />
+            )
           ) : asks.length > 0 ? (
             <SetupAsks lead={t("agentSetup.firstRun.asks.lead")} asks={asks} />
           ) : null
@@ -327,8 +349,73 @@ function AboutAnswers({ onOther, onSaved }: { onOther: () => void; onSaved: (bus
   );
 }
 
+/**
+ * A personal workspace's first question (ADR 0159), answered in place: the areas of life as answers to tap, several at
+ * once, as the right hand's other questions; Save keeps them as the workspace's context in one sentence
+ * (`aboutYouContext`, the same save as the step's own screen) and the agents' templates open with the first area's
+ * picked. "Something else" opens the screen to write a sentence about the person, with the areas tapped so far
+ * (`onOther`: them as that sentence would start, empty for none).
+ */
+function AboutYouAnswers({
+  onOther,
+  onSaved,
+}: {
+  onOther: (areas: string) => void;
+  onSaved: (template: string | null) => void;
+}) {
+  const { t } = useTranslation();
+  const { orgId } = useOrg();
+  const save = useUpdateSettings(orgId);
+  const failed = useFailed();
+  const [picked, setPicked] = useState<ReadonlySet<LifeArea>>(() => new Set());
+  const toggle = (area: LifeArea) =>
+    setPicked((now) => {
+      const next = new Set(now);
+      if (next.has(area)) next.delete(area);
+      else next.add(area);
+      return next;
+    });
+  const keep = () => {
+    if (save.isPending || picked.size === 0) return;
+    save.mutate(
+      { context: aboutYouContext(t, picked, "") },
+      {
+        onSuccess: () => {
+          successHaptic();
+          onSaved(lifeAreaTemplate(picked));
+        },
+        onError: failed,
+      },
+    );
+  };
+  return (
+    <View style={styles.areas}>
+      <View style={styles.chips}>
+        {LIFE_AREAS.map((area) => (
+          <ChoiceChip
+            key={area}
+            label={t(`teamPlan.lifeArea.${area}`)}
+            on={picked.has(area)}
+            disabled={save.isPending}
+            onPress={() => (area === "other" ? onOther(aboutYouContext(t, picked, "")) : toggle(area))}
+          />
+        ))}
+      </View>
+      {picked.size > 0 ? (
+        <View style={styles.keep}>
+          <Button variant="primary" size="sm" label={t("common.save")} loading={save.isPending} onPress={keep} />
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   // Two columns of equal buttons, 8 apart, as ready answers under a question.
   answers: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   answer: { flexBasis: "47%", flexGrow: 1 },
+  // The areas as the right hand's answers to tap: chips that wrap, 8 apart, Save under them at their start.
+  areas: { gap: 8 },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  keep: { flexDirection: "row" },
 });

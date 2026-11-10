@@ -3,6 +3,7 @@ import {
   BROWSER_WARM_PROTOCOL,
   DESKTOP_PROTOCOL,
   DESKTOP_SWITCH_PROTOCOL,
+  PHONE_SCREEN_PROTOCOL,
   type RunnerAccess,
   type RunnerInfo,
   STREAM_CLOSE,
@@ -295,6 +296,67 @@ test("bytes go both ways through the computer's data socket; the audit keeps who
     targetId: org.agentId,
     details: { machineId: machine.machineId, bytesIn: 2, bytesOut: 3 },
   });
+  runner.ws.close();
+});
+
+test("a phone's screen through the server: its pictures to the person (base64 for the phone app), their input back in control", async () => {
+  const { owner, org, machine, invite } = await seeded();
+  const pixel = {
+    platform: "android",
+    serial: "emulator-5554",
+    kind: "emulator",
+    model: "Pixel 8",
+    osVersion: "16",
+    state: "ready",
+  } as const;
+  const runner = await connectRunner(machine.token, { hello: { protocol: PHONE_SCREEN_PROTOCOL, phones: [pixel] } });
+  let phoneId = "";
+  await until(async () => {
+    const [row] = await t.db.select().from(schema.machinePhones).where(eq(schema.machinePhones.orgId, org.orgId));
+    phoneId = row?.id ?? "";
+    return phoneId !== "";
+  }, "the phone's row");
+  const url = (mode: string, text = false) =>
+    `${base()}/api/phone-screen?orgId=${org.orgId}&phoneId=${phoneId}&mode=${mode}${text ? "&text=1" : ""}`;
+  const [user] = await t.db.select().from(schema.users).where(eq(schema.users.email, "owner@example.com"));
+
+  const viewer = openViewer(url("control"), owner);
+  await until(() => runner.data[0]?.ready === true, "the data socket");
+  expect(runner.opened[0]).toMatchObject({
+    op: "stream.open",
+    kind: "phone",
+    mode: "control",
+    phoneId,
+    phone: { platform: "android", serial: "emulator-5554", holder: { runId: null, agentId: null, userId: user?.id } },
+  });
+  expect(runner.opened[0]?.agent).toBeUndefined();
+  const link = runner.data[0] as (typeof runner.data)[number];
+  link.socket.send(new Uint8Array([0x89, 0x50, 0x4e, 0x47]));
+  await until(() => viewer.got.length === 1, "the picture");
+  expect(new Uint8Array(viewer.got[0] as ArrayBuffer)).toEqual(new Uint8Array([0x89, 0x50, 0x4e, 0x47]));
+  viewer.socket.send(JSON.stringify({ type: "ack" }));
+  viewer.socket.send(JSON.stringify({ type: "tap", x: 0.5, y: 0.25 }));
+  await until(() => link.got.length === 2, "the ack and the tap");
+  expect(link.got).toEqual(['{"type":"ack"}', '{"type":"tap","x":0.5,"y":0.25}']);
+  viewer.socket.close();
+  await until(() => link.closed !== null, "the data socket's close");
+  const audit = () => t.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "device.phone_controlled"));
+  await until(async () => (await audit()).length === 1, "the audit");
+  expect((await audit())[0]).toMatchObject({ targetType: "phone", targetId: phoneId });
+
+  // The phone app watches: pictures as base64 text.
+  const app = openViewer(url("watch", true), owner);
+  await until(() => runner.data[1]?.ready === true, "the watcher's data socket");
+  (runner.data[1] as (typeof runner.data)[number]).socket.send(new Uint8Array([0xff, 0xd8, 0xff]));
+  await until(() => app.got.length === 1, "the watcher's picture");
+  expect(app.got).toEqual(["/9j/"]);
+  app.socket.close();
+
+  // A member the phone isn't shared with (Only its owner, by default): refused after the upgrade.
+  const ana = await invite("ana@example.com", "member");
+  const refused = openViewer(url("watch"), ana);
+  await until(() => refused.closed !== null, "the refusal");
+  expect(refused.closed?.code).toBe(STREAM_CLOSE.forbidden);
   runner.ws.close();
 });
 

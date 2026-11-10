@@ -15,6 +15,7 @@ import { loadTeam } from "./team";
 import type { ToolDefinition, ToolSource } from "./tools/types";
 import { cleanOutside } from "./untrusted";
 import { liveWorksByAgent } from "./works";
+import { isPersonalWorkspace } from "./workspace-mode";
 
 const { agentQuestions, agentRuns, agents, channels } = schema;
 
@@ -233,6 +234,16 @@ export function reportsUnder(team: readonly { id: string; reportsToAgentId: stri
 }
 
 /**
+ * `team_status` as a personal workspace's right hand reads it (ADR 0159): its description, and its title in the audit
+ * (the call's own words, as every other call's), speak of the person's agents instead of a team.
+ */
+const TEAM_STATUS_PERSONAL = {
+  description:
+    "What this person's agents are doing now: each agent's work, open and stuck tasks, what finished or failed today, what waits for them.",
+  title: "Check on your agents",
+};
+
+/**
  * `team_status`: the tool of "what's going on". The right hand's, in the core group so it is there on the first turn
  * of any brain, and only in the person's own DM with it: in a channel, others read the reply. A supervisor's (an agent
  * others report to) covers its reports, as the person behind the run sees them; with nobody behind it, none.
@@ -271,11 +282,19 @@ export function createTeamStatusToolSource(): ToolSource {
       return { content: await teamStatus(ctx.db, ctx.orgId, person, new Date(), scope) };
     },
   };
+  const personalTool: ToolDefinition = {
+    ...tool,
+    description: TEAM_STATUS_PERSONAL.description,
+    describe: () => ({ title: TEAM_STATUS_PERSONAL.title }),
+  };
   return {
     name: "team-status",
     tools: async (ctx) => {
       const [row] = await ctx.db.select({ builtin: agents.builtin }).from(agents).where(eq(agents.id, ctx.agentId));
-      if (isRightHand(row)) return [tool];
+      // A personal workspace (ADR 0159): the person's agents, not a team. Only words: a read that fails keeps a team's.
+      if (isRightHand(row)) {
+        return [(await isPersonalWorkspace(ctx.db, ctx.orgId).catch(() => false)) ? personalTool : tool];
+      }
       const team = await loadTeam(ctx.db as Database, ctx.orgId);
       return team.some((a) => a.reportsToAgentId === ctx.agentId) ? [supervisorTool] : [];
     },

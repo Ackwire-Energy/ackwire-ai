@@ -3,6 +3,7 @@ import type {
   Memory,
   MemoryUpdate,
   OrgRole,
+  OrgSummary,
   Person,
   Proposal,
   ProposalAccessLine,
@@ -12,6 +13,18 @@ import { formatTime, formatUsd, joinNames } from "./format";
 import { agentGrammar } from "./grammar";
 import { holdersOf } from "./roles";
 import { scopeText } from "./scopes";
+import { modeKey } from "./workspace-mode";
+
+/**
+ * The workspace a proposal is in, for its context's words: its name, or the workspace itself, whose mode says them. A
+ * personal workspace's context is what its person's agents know about them (ADR 0159), never "Personal context".
+ */
+export type ProposalWorkspace = string | Pick<OrgSummary, "name" | "mode">;
+
+/** The key of the context's words and the name they carry, for `ws`. */
+function contextWords<K extends string>(ws: ProposalWorkspace, key: K) {
+  return typeof ws === "string" ? { key, org: ws } : { key: modeKey(ws, key), org: ws.name };
+}
 
 /*
  * A card of proposed changes in the chat (`memory.updated`, `proposed`, ADR 0092): an agent asked to change its own
@@ -153,8 +166,16 @@ export const appLabel = (t: TFunction, line: ProposalAccessLine) =>
     : scopeText(t, { id: line.id, label: line.label, description: "", sensitive: false }).label;
 
 /** What one proposal changes, after "propõe ·": "instruções da Ada", "papel do Theo", "contexto da Acme". */
-export function proposalTarget(t: TFunction, p: Proposal, agentName: (id: string) => string, orgName: string) {
-  if (p.target.type === "org_context") return t("proposals.targetContext", { org: orgName });
+export function proposalTarget(
+  t: TFunction,
+  p: Proposal,
+  agentName: (id: string) => string,
+  orgName: ProposalWorkspace,
+) {
+  if (p.target.type === "org_context") {
+    const { key, org } = contextWords(orgName, "proposals.targetContext");
+    return t(key, { org });
+  }
   const g = agentGrammar(agentName(p.target.agentId));
   if (p.target.type === "agent_role") return t("proposals.targetRole", g);
   if (p.target.type === "agent_access") return t("proposals.targetAccess", g);
@@ -172,7 +193,7 @@ export function cardHead(
   rows: Proposal[],
   proposer: string,
   agentName: (id: string) => string,
-  orgName: string,
+  orgName: ProposalWorkspace,
 ): {
   key: "proposals.proposes" | "proposals.proposesMany" | "proposals.proposesManyChanges";
   values: Record<string, string | number>;
@@ -232,9 +253,17 @@ const TITLE_KEY = {
 } as const;
 
 /** Its title in the person's language (the server's is English). */
-export function proposalTitle(t: TFunction, p: Proposal, orgName: string, agentName: (id: string) => string) {
+export function proposalTitle(
+  t: TFunction,
+  p: Proposal,
+  orgName: ProposalWorkspace,
+  agentName: (id: string) => string,
+) {
   const tt = t as unknown as (key: string, options: Record<string, string | undefined>) => string;
-  if (p.target.type === "org_context") return tt("proposals.titleContext", { org: orgName, defaultValue: p.title });
+  if (p.target.type === "org_context") {
+    const { key, org } = contextWords(orgName, "proposals.titleContext");
+    return tt(key, { org, defaultValue: p.title });
+  }
   return tt(TITLE_KEY[p.target.type], {
     ...agentGrammar(agentName(p.target.agentId)),
     skill: p.target.type === "skill" ? p.target.name : "",

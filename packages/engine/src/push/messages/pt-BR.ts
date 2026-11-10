@@ -84,4 +84,11 @@ export const ptBR: PushStrings = {
   deviceWaitingBody: "Começa quando ele voltar.",
   teamWeekReady: "Sua semana da equipe está pronta",
   teamDayReady: "Seu resumo do dia está pronto",
+  machineConnectedTitlePersonal: "Um computador novo foi conectado",
+  computerReadyTitlePersonal: "O computador dos seus agentes está pronto",
+  agentUnreachedBodyPersonal: "Quem criou a rotina ainda não pode falar com este agente. Toque para deixar.",
+  widgetFailedReasonsPersonal: { creator_left: "Quem configurou não está mais no seu workspace." },
+  joinRequestTitlePersonal: (name) => `${name} pede para entrar no seu workspace`,
+  joinSuggestionTitlePersonal: (by, name) => `${by} sugeriu convidar ${name}`,
+  teamWeekReadyPersonal: "Sua semana está pronta",
 };
