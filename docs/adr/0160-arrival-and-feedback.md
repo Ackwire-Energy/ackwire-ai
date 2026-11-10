@@ -5,7 +5,7 @@
 - Code: web `components/arrival/*` (`Arrival`, `BetaDialog`, `TeamScene`, `ConnectChoices`, `FeedbackDialog`,
   `FeedbackMark`), `components/ConnectAi.tsx` (`ConnectAiRequest.arrival`), `pages/OnboardingPage.tsx`
   (`?arrival=1`); server `routes/app/feedback.ts` (`POST /api/app/feedback`, `…/feedback/files`, `GET /api/feedback-files/{token}`), `auth.ts` (`auth-config.feedback`);
-  engine `feedback.ts` (jobs `feedback.send`, `feedback.file.purge`); config `FEEDBACK_EMAIL`; web
+  engine `feedback.ts` (jobs `feedback.send`, `feedback.file.purge`), `feedback-tools.ts` (`send_feedback`); config `FEEDBACK_EMAIL`; web
   `lib/feedback.ts`, `lib/context-menu.ts` (`setMenuReporter`); table `feedback_files` (migration 0246)
 
 ## Context
@@ -58,7 +58,7 @@ with Postgres alone, and must not need a third-party widget in the apps.
    where the server takes feedback. It is not beside the person's name: a personal workspace has the person, the bell
    and the collapse on one line, with no room for a fourth thing. On the form the right hand stands with an
    envelope, takes notes while the person types and the envelope flies once it is sent. It only illustrates: no
-   agent reads or sends the feedback, and the form's words say who does.
+   agent reads or sends what the form sends, and the form's words say who does.
 
 9. **Report a problem here, on every right click.** Every menu a right click opens ends in that entry
    (`openContextMenu` with the click's target; a button's menu has none). It opens the form about the thing clicked:
@@ -89,6 +89,17 @@ with Postgres alone, and must not need a third-party widget in the apps.
     - A purge job per deadline removes the row and the bytes; an account's deletion removes its rows at once and
       the same job its bytes. A sweep every six hours takes what a job missed: a file an hour past its time, and
       bytes with no row.
+
+11. **An agent sends one when a person asks it to** (added 2026-11-10). `send_feedback` takes the text and queues
+    the same email, to the same address, in the name of the person behind the run: their name, their address as the
+    reply-to, the workspace and their role. The email says which agent wrote it ("Written by"), and "App: agent".
+    It carries the text only: no files, no excerpt, nothing the app collects.
+    - Every call asks that person's approval first, with the whole text on the card: it leaves the workspace in
+      their name, so only they decide it, not the agent's owner nor an admin.
+    - Listed only where the server takes feedback, with no scope, among the tools loaded on demand.
+    - A run nobody is behind (a routine's, an agent's own) sends none: the run policy refuses a routine's, and the
+      tool refuses any call with no person, or a person who is no longer a member.
+    - It counts toward the same ten an hour as the person's form, and one call sends once however often it runs.
 
 ## Consequences
 

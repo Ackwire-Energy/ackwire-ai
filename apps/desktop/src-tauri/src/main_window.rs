@@ -59,12 +59,12 @@ pub const PLATFORM: &str = if cfg!(target_os = "macos") {
     "linux"
 };
 
-/// Whether agents may work on this computer for `origin`: never for agentes.chat (each workspace has a
-/// computer of its own) or a server on this computer itself, the server here included at its Tailscale address
-/// (`server_here`: its own computer is set up with it).
+/// Whether agents may work on this computer for `origin`: any server elsewhere, agentes.chat included (people bring
+/// their own computers there too), never a server on this computer itself, the server here included at its
+/// Tailscale address (`server_here`: its own computer is set up with it).
 /// Another server on this computer at its address for people is `discover::served_here`, which asks it.
 pub fn agents_here(origin: &str, server_here: bool) -> bool {
-    origin != servers::CLOUD && !servers::is_loopback(origin) && !server_here
+    !servers::is_loopback(origin) && !server_here
 }
 
 /// What a navigation in the window does.
@@ -1014,6 +1014,21 @@ fn ask_to_pair(app: &AppHandle, org: &str, host: &str) -> bool {
         .blocking_show()
 }
 
+/// Preferences › This Mac's switch for a workspace this computer doesn't work for yet: the same system dialog as the
+/// site's "This Mac", for a server of the app's list. False when declined.
+#[tauri::command]
+pub async fn pair_ask(app: AppHandle, window: tauri::Window, server: String, org: String) -> Result<bool, String> {
+    if window.label() != "prefs" {
+        return Err("only Preferences asks this".into());
+    }
+    if !servers::get(&app).servers.contains(&server) {
+        return Err("not a server of this app".into());
+    }
+    let org = display_name(Some(&json!(org))).ok_or("bad organization name")?;
+    let host = server.parse::<Url>().ok().and_then(|u| u.host_str().map(str::to_string)).unwrap_or_default();
+    tauri::async_runtime::spawn_blocking(move || ask_to_pair(&app, &org, &host)).await.map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub async fn this_mac(app: AppHandle, webview: tauri::Webview, request: Value) -> Result<Value, String> {
     // The site itself, not the cover that shares its window.
@@ -1044,9 +1059,13 @@ pub async fn this_mac(app: AppHandle, webview: tauri::Webview, request: Value) -
             return Ok(json!({}));
         }
         Some("orgs") => {
-            // A new organization on the server here: this computer works for it within seconds.
-            if crate::menus::set_orgs(&app, &request["orgs"]) && server_here {
-                crate::host_sync::trigger(&app);
+            // A new organization on the server here: this computer works for it within seconds. Signed in or a new
+            // workspace anywhere: the workspaces are read again, so the app offers this computer to it at once.
+            if crate::menus::set_orgs(&app, &request["orgs"]) {
+                if server_here {
+                    crate::host_sync::trigger(&app);
+                }
+                crate::workspaces::trigger(&app);
             }
             return Ok(json!({}));
         }
@@ -1293,7 +1312,7 @@ mod tests {
 
     #[test]
     fn agents_work_here_only_for_a_server_elsewhere() {
-        assert!(!agents_here("https://app.agentes.chat", false));
+        assert!(agents_here("https://app.agentes.chat", false), "agentes.chat too");
         assert!(!agents_here("http://127.0.0.1:4310", false));
         assert!(!agents_here("http://localhost:3000", false));
         assert!(agents_here("https://agentes.tail1234.ts.net", false));

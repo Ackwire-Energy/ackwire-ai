@@ -1469,6 +1469,25 @@ describe("Onboarding: the workspace's name", () => {
     expect(left).toEqual(["https://billing.example.com/link?t=new_workspace"]);
   });
 
+  test("back on the question with a workspace that waits for its plan: the refusal opens that workspace", async () => {
+    const state = seedState();
+    const mine = state.me?.organizations[0];
+    if (!mine) throw new Error("no workspace");
+    const api = createFakeApi(state);
+    api.orgs.create = async () => {
+      throw new ApiError(403, "org.create_unpaid", "You already have a workspace waiting for a plan", {
+        orgId: mine.id,
+      });
+    };
+    const { router } = await renderApp("/onboarding", { api });
+    await settle(4);
+    await click(screen().getByRole("radio", { name: /Para mim/ }), 8);
+    await next();
+    expect(screen().getByRole("alert")).toBeTruthy();
+    await click(button(`Abrir ${mine.name}`), 8);
+    expect(router.state.location.pathname.startsWith(`/org/${mine.id}`)).toBe(true);
+  });
+
   test("the confirmation email: where it went, a new link, and once it's confirmed no line", async () => {
     const state = seedState();
     if (!state.me) throw new Error("no me");

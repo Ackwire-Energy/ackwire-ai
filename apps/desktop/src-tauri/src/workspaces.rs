@@ -13,7 +13,7 @@ use std::time::{Duration, Instant};
 use base64::Engine;
 use serde::Serialize;
 use serde_json::Value;
-use tauri::{AppHandle, Manager, Url};
+use tauri::{AppHandle, Emitter, Manager, Url};
 
 use crate::{main_window, servers};
 
@@ -40,6 +40,8 @@ pub struct Org {
     pub logo: Option<String>,
     pub unread: u64,
     pub waiting: u64,
+    /// The person may pair a computer with it (`pair_computers`): Preferences and the sign-in's card offer this one.
+    pub pair: bool,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize)]
@@ -54,6 +56,8 @@ pub struct ServerWorkspaces {
     pub offline_since: Option<u64>,
     /// The server the app runs on this computer (at its local or its Tailscale address): named as such, never by it.
     pub here: bool,
+    /// Agents of its workspaces may work on this computer (`main_window::agents_here`, and no server here answers as it).
+    pub agents_here: bool,
 }
 
 #[derive(Default)]
@@ -113,6 +117,9 @@ pub fn on_focus(app: &AppHandle) {
     trigger(app);
 }
 
+/// The windows hear that the list changed (the popover offers this computer to a workspace it doesn't work for yet).
+pub const CHANGED_EVENT: &str = "workspaces://changed";
+
 /// The loop: every minute, or when woken. Reading cookies needs a thread of its own (it waits for the web view,
 /// and deadlocks on Windows from a command or an event handler).
 pub fn start(app: &AppHandle) {
@@ -138,6 +145,7 @@ fn refresh(app: &AppHandle) {
     let open = page.url().ok().map(|u| u.origin().ascii_serialization());
     let file = servers::get(app);
     let agent = ureq::AgentBuilder::new().timeout(TIMEOUT).redirects(0).build();
+    let home = app.path().home_dir().ok();
     let mut logos = lock(app).logos.clone();
     let before = list(app);
     let mut next = Vec::with_capacity(file.servers.len());
@@ -146,16 +154,19 @@ fn refresh(app: &AppHandle) {
         let cookies: Vec<_> = page.cookies().unwrap_or_default().into_iter().filter(|c| sent_to(c, &url)).collect();
         let cookie = cookie_header(cookies.iter().map(|c| (c.name(), c.value())));
         let here = crate::local_server::is_here(app, server);
+        let agents_here = main_window::agents_here(server, here)
+            && home.as_ref().is_some_and(|h| !crate::discover::served_here(h, server));
         match ask(&agent, server, &cookie, &mut logos) {
-            Some(answer) => next.push(ServerWorkspaces { here, ..answer }),
+            Some(answer) => next.push(ServerWorkspaces { here, agents_here, ..answer }),
             // Not reached (offline, an error): what it said last stays, marked since when.
             None => {
                 if let Some(old) = before.iter().find(|s| &s.server == server) {
-                    next.push(ServerWorkspaces { here, ..unreachable(old, now_ms()) });
+                    next.push(ServerWorkspaces { here, agents_here, ..unreachable(old, now_ms()) });
                 }
             }
         }
     }
+    let changed = next != before;
     let told = news(&before, &next, open.as_deref());
     {
         let mut state = lock(app);
@@ -165,6 +176,9 @@ fn refresh(app: &AppHandle) {
     }
     for (server, org, count) in told {
         tell(app, &server, &org, count);
+    }
+    if changed {
+        let _ = app.emit(CHANGED_EVENT, ());
     }
 }
 
@@ -193,10 +207,10 @@ fn ask(agent: &ureq::Agent, server: &str, cookie: &str, logos: &mut HashMap<Stri
     let counts = unread.as_ref().map(parse_unread).unwrap_or_default();
     let orgs = parse_me(&me)
         .into_iter()
-        .map(|(id, name, logo)| {
+        .map(|(id, name, logo, pair)| {
             let (unread, waiting) = counts.get(&id).copied().unwrap_or((0, 0));
             let logo = logo.and_then(|path| logo_data(agent, server, &path, cookie, logos));
-            Org { id, name, logo, unread, waiting }
+            Org { id, name, logo, unread, waiting, pair }
         })
         .collect();
     Some(ServerWorkspaces { server: server.to_string(), signed_in: true, orgs, ..Default::default() })
@@ -318,8 +332,9 @@ pub(crate) fn good_id(id: &str) -> bool {
     !id.is_empty() && id.len() <= 64 && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
 }
 
-/// The workspaces of `GET /api/app/me`: id, name and logo address, those still being set up left out.
-pub fn parse_me(me: &Value) -> Vec<(String, String, Option<String>)> {
+/// The workspaces of `GET /api/app/me`: id, name, logo address and whether the person may pair a computer with it,
+/// those still being set up left out.
+pub fn parse_me(me: &Value) -> Vec<(String, String, Option<String>, bool)> {
     let Some(orgs) = me.get("organizations").and_then(Value::as_array) else { return vec![] };
     orgs.iter()
         .filter(|o| o.get("onboarding").map_or(true, Value::is_null))
@@ -330,7 +345,11 @@ pub fn parse_me(me: &Value) -> Vec<(String, String, Option<String>)> {
                 return None;
             }
             let logo = o.get("logo").and_then(Value::as_str).filter(|l| l.len() <= 1024).map(str::to_string);
-            Some((id.to_string(), name, logo))
+            let pair = o
+                .get("permissions")
+                .and_then(Value::as_array)
+                .is_some_and(|keys| keys.iter().any(|k| k == "pair_computers"));
+            Some((id.to_string(), name, logo, pair))
         })
         .take(MAX_ORGS)
         .collect()
@@ -422,7 +441,8 @@ pub fn workspaces_get(app: AppHandle, window: tauri::Window) -> Result<Vec<Serve
 }
 
 /// What the app's own windows may ask a server with its session (`site_fetch`): this computer's devices and who can
-/// use them, a phone's Stop, and the workspace's people and roles for the rule's picker. Nothing else.
+/// use them, a phone's Stop, the workspace's people and roles for the rule's picker, and confirming the code of this
+/// computer's own runner (the person allowed it in the app's card or the system's dialog). Nothing else.
 pub fn site_path_allowed(method: &str, path: &str) -> bool {
     if path.len() > 512 || path.contains(['?', '#', '%', '\\']) {
         return false;
@@ -434,6 +454,9 @@ pub fn site_path_allowed(method: &str, path: &str) -> bool {
             ("GET", ["devices" | "members" | "roles"]) => true,
             ("PATCH", ["devices", "computers" | "phones", id]) => good_id(id),
             ("POST", ["devices", "phones", id, "stop"]) => good_id(id),
+            ("POST", ["machines", "device", code, "confirm"]) => {
+                (4..=16).contains(&code.len()) && code.chars().all(|c| c.is_ascii_alphanumeric())
+            }
             _ => false,
         }
 }
@@ -489,7 +512,8 @@ pub fn with_session(
     Ok(SiteAnswer { status, body: text })
 }
 
-/// Preferences › This Mac reads and sets this computer's devices on its server (`with_session`).
+/// Preferences › This Mac and the welcome window's pairing card read and set this computer's devices on its server
+/// (`with_session`).
 #[tauri::command]
 pub async fn site_fetch(
     app: AppHandle,
@@ -499,8 +523,8 @@ pub async fn site_fetch(
     path: String,
     body: Option<String>,
 ) -> Result<SiteAnswer, String> {
-    if window.label() != "prefs" {
-        return Err("only Preferences asks this".into());
+    if !matches!(window.label(), "prefs" | "welcome") {
+        return Err("only Preferences and the welcome window ask this".into());
     }
     tauri::async_runtime::spawn_blocking(move || with_session(&app, &server, &method, &path, body.as_deref()))
         .await
@@ -525,7 +549,7 @@ mod tests {
     use serde_json::json;
 
     fn org(id: &str, unread: u64) -> Org {
-        Org { id: id.into(), name: id.to_uppercase(), logo: None, unread, waiting: 0 }
+        Org { id: id.into(), name: id.to_uppercase(), logo: None, unread, waiting: 0, pair: false }
     }
     fn server(s: &str, signed_in: bool, orgs: Vec<Org>) -> ServerWorkspaces {
         ServerWorkspaces { server: s.into(), signed_in, orgs, ..Default::default() }
@@ -561,8 +585,8 @@ mod tests {
     #[test]
     fn workspaces_from_me() {
         let me = json!({ "organizations": [
-            { "id": "o-1", "name": "  Acme ", "logo": "/api/app/org-logos/o-1/a.png" },
-            { "id": "o-2", "name": "Norte", "logo": null },
+            { "id": "o-1", "name": "  Acme ", "logo": "/api/app/org-logos/o-1/a.png", "permissions": ["post", "pair_computers"] },
+            { "id": "o-2", "name": "Norte", "logo": null, "permissions": ["post"] },
             { "id": "o-3", "name": "Setting up", "onboarding": { "step": 1 } },
             { "id": "../x", "name": "Bad" },
             { "id": "o-4", "name": "" },
@@ -570,8 +594,8 @@ mod tests {
         assert_eq!(
             parse_me(&me),
             vec![
-                ("o-1".into(), "Acme".into(), Some("/api/app/org-logos/o-1/a.png".into())),
-                ("o-2".into(), "Norte".into(), None),
+                ("o-1".into(), "Acme".into(), Some("/api/app/org-logos/o-1/a.png".into()), true),
+                ("o-2".into(), "Norte".into(), None, false),
             ]
         );
         assert!(parse_me(&json!({})).is_empty());
@@ -598,7 +622,11 @@ mod tests {
         assert!(site_path_allowed("PATCH", &format!("{org}/devices/computers/m-1")));
         assert!(site_path_allowed("PATCH", &format!("{org}/devices/phones/p-1")));
         assert!(site_path_allowed("POST", &format!("{org}/devices/phones/p-1/stop")));
+        assert!(site_path_allowed("POST", &format!("{org}/machines/device/K7Q4ZP/confirm")));
         for (method, path) in [
+            ("POST", format!("{org}/machines/device/K7Q-4ZP/confirm")),
+            ("POST", format!("{org}/machines/device/K7Q4ZP/deny")),
+            ("GET", format!("{org}/machines/device/K7Q4ZP/confirm")),
             ("DELETE", format!("{org}/devices/computers/m-1")),
             ("POST", format!("{org}/devices/connect-links")),
             ("GET", format!("{org}/devices?x=1")),

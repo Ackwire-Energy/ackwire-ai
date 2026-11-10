@@ -6,6 +6,7 @@ import {
   FEEDBACK_FACTS,
   FEEDBACK_FILES,
   FEEDBACK_MAX,
+  FEEDBACK_PER_HOUR,
   feedbackFileByToken,
   getMembership,
   NotFoundError,
@@ -36,8 +37,6 @@ import {
 const tags = ["System"];
 
 const HOUR = 60 * 60_000;
-/** More than anyone writes by hand in an hour, too few to flood whoever reads them. */
-const FEEDBACK_PER_HOUR = { limit: 10, windowMs: HOUR };
 /** Files a person adds in an hour, tried or kept: a few feedbacks' worth. Videos, the heavy ones, far fewer. */
 const FILES_PER_HOUR = { limit: 30, windowMs: HOUR };
 const VIDEOS_PER_HOUR = { limit: 4, windowMs: HOUR };

@@ -1,7 +1,8 @@
-import type { DeviceJoinRequest } from "@agenteschat/client";
-import { joinFacts, linkPhase } from "@agenteschat/client/lib/devices";
-import { computerKind, platformOf } from "@agenteschat/client/lib/machines";
+import { type DeviceJoinRequest, useMe } from "@agenteschat/client";
+import { joinFacts, linkPhase, newComputerOf } from "@agenteschat/client/lib/devices";
+import { computerKind, isHandheld, platformOf } from "@agenteschat/client/lib/machines";
 import { can } from "@agenteschat/client/lib/permissions";
+import { appPairsWith, pairLink } from "@agenteschat/client/lib/server";
 import {
   Button,
   ComputerPortrait,
@@ -17,7 +18,7 @@ import {
   useNow,
 } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { HelpLink } from "@/components/HelpLink";
 import { CommandBlock } from "@/components/machine-bits";
@@ -30,7 +31,7 @@ import { FlowFooter, type FlowProps } from "./flow";
 import { DownloadButtons, StatusPill } from "./parts";
 import { useConnectLink, useDevices, useLinkState } from "./queries";
 
-export type ConnectStep = "choose" | "server" | "computer" | "link" | "android" | "iphone";
+export type ConnectStep = "choose" | "this" | "server" | "computer" | "link" | "android" | "iphone";
 /** Which flow the dialog opens on, and the computer a phone flow starts with. */
 export interface ConnectStart {
   step: ConnectStep;
@@ -39,6 +40,7 @@ export interface ConnectStart {
 
 const WIDTH: Record<ConnectStep, number> = {
   choose: 560,
+  this: 560,
   server: 560,
   computer: 560,
   link: 560,
@@ -47,7 +49,7 @@ const WIDTH: Record<ConnectStep, number> = {
 };
 
 /**
- * "Connect a device": a chooser (this computer, a server, another computer, an Android phone, an iPhone), then each
+ * "Connect a device": a chooser (this computer, another computer, a server, an Android phone, an iPhone), then each
  * flow in place. Back goes to the chooser when the dialog started there; the × and Cancel always close it.
  */
 export function ConnectDialog({ start, onClose }: { start: ConnectStart | null; onClose: () => void }) {
@@ -62,6 +64,10 @@ export function ConnectDialog({ start, onClose }: { start: ConnectStart | null; 
   const fromChooser = start?.step === "choose";
   const back = fromChooser ? () => setStep("choose") : undefined;
   const flowProps = { onClose, onBack: back, setTitle };
+  const toLine = (shell?: "unix" | "windows") => {
+    setLineShell(shell);
+    setStep("link");
+  };
   return (
     <Dialog
       open={start !== null}
@@ -74,16 +80,20 @@ export function ConnectDialog({ start, onClose }: { start: ConnectStart | null; 
       {start !== null &&
         (step === "choose" ? (
           <Chooser onPick={setStep} onClose={onClose} />
-        ) : step === "server" || step === "link" ? (
-          <LinkFlow kind={step === "server" ? "server" : "computer"} shell={lineShell} {...flowProps} />
-        ) : step === "computer" ? (
-          <ComputerFlow
+        ) : step === "this" ? (
+          <LinkFlow
+            key={step}
+            kind="computer"
+            viaApp
+            onLine={toLine}
+            onServer={() => setStep("server")}
             {...flowProps}
-            onLine={(shell) => {
-              setLineShell(shell);
-              setStep("link");
-            }}
           />
+        ) : step === "server" || step === "link" ? (
+          // Its own instance per step: a line's system tab starts from where it came from.
+          <LinkFlow key={step} kind={step === "server" ? "server" : "computer"} shell={lineShell} {...flowProps} />
+        ) : step === "computer" ? (
+          <ComputerFlow {...flowProps} onLine={toLine} />
         ) : step === "android" ? (
           <AndroidFlow {...flowProps} hostId={start.hostId ?? null} onConnectComputer={() => setStep("choose")} />
         ) : (
@@ -93,7 +103,11 @@ export function ConnectDialog({ start, onClose }: { start: ConnectStart | null; 
   );
 }
 
+const systemMark = (platform: ReturnType<typeof platformOf>) => (platform === "mac" ? "apple" : platform);
+
 function FlowMark({ step }: { step: ConnectStep }) {
+  if (step === "this")
+    return <ProviderLogo id={systemMark(platformOf(navigator.userAgent))} size="sm" className="dv-tile" />;
   if (step === "computer" || step === "link")
     return (
       <span className="ac-brand ac-brand--sm ac-brand--mono" aria-hidden="true">
@@ -127,17 +141,26 @@ function Chooser({ onPick, onClose }: { onPick: (step: ConnectStep) => void; onC
       <Icon name="chevronRight" size={16} className="dv-option__arrow" />
     </button>
   );
+  const thisMark = <ProviderLogo id={systemMark(platform)} size="sm" className="dv-tile" />;
+  // Inside the desktop app that may host agents, one click (below). In a browser, the app on this computer through
+  // a link, where the app takes one; a phone's browser has no computer to connect. Elsewhere (an app that runs this
+  // server, plain http, a server on this computer) only the one line.
+  const thisStep: ConnectStep | null = inDesktopApp()
+    ? "link"
+    : isHandheld(navigator.userAgent)
+      ? null
+      : appPairsWith(window.location.origin)
+        ? "this"
+        : "link";
   return (
     <>
       <DialogBody>
         <section aria-labelledby="dv-ch-computers">
           <GroupHeading level={3} id="dv-ch-computers" title={t("devices.choose.computers")} />
           <div className="dv-options">
-            {/* Inside the desktop app that can host agents, one click; elsewhere this computer's one line, which
-                works on a Mac, a PC or Linux today (the app's own switch is for self-hosted servers). */}
             {inDesktopApp() && agentsHere ? (
               <div className="dv-option dv-wide">
-                <ProviderLogo id={platform === "mac" ? "apple" : platform} size="sm" className="dv-tile" />
+                {thisMark}
                 <span className="dv-option__text">
                   <span className="dv-option__title ac-captop">{t(thisLabel(platform))}</span>
                   <span className="dv-option__line">{t("devices.choose.thisLine")}</span>
@@ -147,18 +170,13 @@ function Chooser({ onPick, onClose }: { onPick: (step: ConnectStep) => void; onC
                 </span>
               </div>
             ) : (
+              thisStep &&
               option(
-                "link",
-                <ProviderLogo id={platform === "mac" ? "apple" : platform} size="sm" className="dv-tile" />,
+                thisStep,
+                thisMark,
                 t(thisLabel(platform)),
-                t("devices.choose.serverLine"),
+                t(thisStep === "this" ? "devices.choose.thisLine" : "devices.choose.serverLine"),
               )
-            )}
-            {option(
-              "server",
-              <ProviderLogo id="linux" size="sm" className="dv-tile" />,
-              t("devices.choose.server"),
-              t("devices.choose.serverLine"),
             )}
             {option(
               "computer",
@@ -174,6 +192,12 @@ function Chooser({ onPick, onClose }: { onPick: (step: ConnectStep) => void; onC
                 </span>
                 {t("devices.choose.otherLine")}
               </>,
+            )}
+            {option(
+              "server",
+              <ProviderLogo id="linux" size="sm" className="dv-tile" />,
+              t("devices.choose.server"),
+              t("devices.choose.serverLine"),
             )}
           </div>
         </section>
@@ -203,8 +227,8 @@ function Chooser({ onPick, onClose }: { onPick: (step: ConnectStep) => void; onC
 }
 
 /**
- * Another computer: the app for the system this page is open on (and the other two in a menu), signed in to this
- * workspace; or one line to paste in its terminal.
+ * Another computer: the desktop app on it, signed in as the person, asks before it connects, and the computer shows
+ * up here as theirs by itself (the devices list, refreshed by the computer events). Or one line for its terminal.
  */
 function ComputerFlow({
   onClose,
@@ -214,6 +238,13 @@ function ComputerFlow({
 }: FlowProps & { onLine: (shell?: "unix" | "windows") => void }) {
   const { t } = useTranslation();
   const { org } = useOrg();
+  const myId = useMe().data?.user.id;
+  const devices = useDevices(org.id);
+  const known = useRef<Set<string> | null>(null);
+  // From a list read now, not the cache: a computer that joined while nothing watched isn't the new one.
+  if (!known.current && devices.data && !devices.isFetching)
+    known.current = new Set(devices.data.devices.map((d) => d.id));
+  const found = known.current ? newComputerOf(devices.data?.devices, known.current, myId) : undefined;
   useEffect(() => setTitle(t("devices.computer.title")), [setTitle, t]);
   return (
     <>
@@ -229,37 +260,78 @@ function ComputerFlow({
           </li>
           <li>
             <span className="apps-step">
-              <span>{t("devices.computer.step2", { org: org.name })}</span>
+              <span>{t("devices.computer.step2")}</span>
             </span>
           </li>
           <li>
             <span className="apps-step">
-              <span>{t("devices.computer.step3")}</span>
+              <span>{t("devices.computer.step3", { org: org.name })}</span>
             </span>
           </li>
         </ol>
-        <p className="small muted">
-          <button type="button" className="ac-link" onClick={() => onLine()}>
-            {t("devices.computer.orLine")}
-          </button>
-        </p>
+        <p className="small muted">{t("devices.computer.shows")}</p>
+        {found ? (
+          <p className="setup-progress setup-progress--line ac-iconline" role="status">
+            <Icon name="check" size={14} />
+            <span>
+              {t("devices.computer.connected", { name: found.name })}{" "}
+              <Link
+                to="/org/$orgId/settings/devices/$deviceId"
+                params={{ orgId: org.id, deviceId: found.id }}
+                className="ac-link"
+                onClick={onClose}
+              >
+                {t("devices.link.openPage")}
+              </Link>
+            </span>
+          </p>
+        ) : (
+          <p className="setup-progress setup-progress--line ac-iconline" role="status">
+            <PixelSpinner size={14} />
+            <span>{t("devices.computer.waiting")}</span>
+          </p>
+        )}
       </DialogBody>
-      <FlowFooter onClose={onClose} onBack={onBack} />
+      <FlowFooter
+        onClose={onClose}
+        onBack={onBack}
+        note={
+          <button type="button" className="ac-link ac-link--muted" onClick={() => onLine()}>
+            {t("devices.computer.noApp")}
+          </button>
+        }
+      >
+        {found ? (
+          <Button variant="primary" onClick={onClose}>
+            {t("devices.done")}
+          </Button>
+        ) : undefined}
+      </FlowFooter>
     </>
   );
 }
 
 /**
- * One line to paste in a computer's terminal, holding a code that works once for 10 minutes. The computer that runs it
- * only asks to join: it shows up here, live, with its name and address, for Let it join or Deny, then as connected.
+ * A connect link, which works once for 10 minutes: one line to paste in a computer's terminal, or (`viaApp`, this
+ * computer from a browser) the desktop app here opening it, which asks the person first. Either way the computer only
+ * asks to join: it shows up here, live, with its name and address, for Let it join or Deny, then as connected.
  */
 function LinkFlow({
   kind,
   shell,
+  viaApp = false,
+  onLine,
+  onServer,
   onClose,
   onBack,
   setTitle,
-}: FlowProps & { kind: "server" | "computer"; shell?: "unix" | "windows" }) {
+}: FlowProps & {
+  kind: "server" | "computer";
+  shell?: "unix" | "windows";
+  viaApp?: boolean;
+  onLine?: (shell?: "unix" | "windows") => void;
+  onServer?: () => void;
+}) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const link = useConnectLink(org.id, kind, true);
@@ -274,8 +346,9 @@ function LinkFlow({
   useEffect(() => {
     if (joined) setTitle(t("devices.link.joinedTitle", { name: joined.name }));
     else if (phase === "asking" && request) setTitle(t("devices.request.title", { name: request.name, org: org.name }));
+    else if (viaApp) setTitle(t(thisLabel(platformOf(navigator.userAgent))));
     else setTitle(t(kind === "server" ? "devices.link.serverTitle" : "devices.link.computerTitle"));
-  }, [joined, phase, request, kind, org.name, setTitle, t]);
+  }, [joined, phase, request, kind, viaApp, org.name, setTitle, t]);
 
   if (joined) return <Joined joined={joined} onClose={onClose} />;
   if (phase === "asking" && request)
@@ -294,8 +367,14 @@ function LinkFlow({
         {link.isError ? (
           <p className="setup-progress setup-progress--line ac-iconline" role="alert">
             <Icon name="alert" size={14} />
-            <span>{t("devices.link.failed")}</span>
+            <span>{t(viaApp ? "devices.thisApp.failed" : "devices.link.failed")}</span>
           </p>
+        ) : viaApp ? (
+          <OpenInApp
+            href={link.data && phase === "waiting" ? pairLink(origin, link.data.code) : null}
+            making={!link.data}
+            onLine={onLine}
+          />
         ) : (
           <ol className="machine-pair__steps apps-steps small">
             <li>
@@ -348,16 +427,30 @@ function LinkFlow({
         {link.data && phase === "waiting" && (
           <p className="setup-progress setup-progress--line ac-iconline" role="status">
             <PixelSpinner size={14} />
-            <span>{t(kind === "server" ? "devices.link.waitingServer" : "devices.link.waitingComputer")}</span>
+            <span>
+              {t(
+                viaApp
+                  ? "devices.thisApp.waiting"
+                  : kind === "server"
+                    ? "devices.link.waitingServer"
+                    : "devices.link.waitingComputer",
+              )}
+            </span>
           </p>
         )}
         {(phase === "expired" || phase === "denied") && (
           <p className="setup-progress setup-progress--line ac-iconline" role="status">
             <Icon name="clock" size={14} />
             <span>
-              {t(phase === "expired" ? "devices.link.expired" : "devices.link.denied")}{" "}
+              {t(
+                phase === "denied"
+                  ? "devices.link.denied"
+                  : viaApp
+                    ? "devices.thisApp.expired"
+                    : "devices.link.expired",
+              )}{" "}
               <button type="button" className="ac-link" onClick={() => void link.refetch()}>
-                {t("devices.link.again")}
+                {t(viaApp ? "devices.thisApp.again" : "devices.link.again")}
               </button>
             </span>
           </p>
@@ -367,7 +460,11 @@ function LinkFlow({
         onClose={onClose}
         onBack={onBack}
         note={
-          link.data ? (
+          viaApp ? (
+            <button type="button" className="ac-link ac-link--muted" onClick={onServer}>
+              {t("devices.thisApp.server")}
+            </button>
+          ) : link.data ? (
             <a
               className="ac-link ac-link--muted"
               href={`${origin}/i/${link.data.code}${tab === "windows" ? "/ps" : ""}`}
@@ -379,6 +476,52 @@ function LinkFlow({
           ) : undefined
         }
       />
+    </>
+  );
+}
+
+/**
+ * "Open the agentes.chat app": the link to the app on this computer (`href`; null while the link is made, or once it
+ * ended), offered for as long as the dialog waits, since the person may install the app first. The browser asks
+ * before it opens an app, so the words say what to choose.
+ */
+function OpenInApp({
+  href,
+  making,
+  onLine,
+}: {
+  href: string | null;
+  making: boolean;
+  onLine?: (shell?: "unix" | "windows") => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <div className="dv-app">
+        <p>{t("devices.thisApp.text")}</p>
+        {href ? (
+          <Button asChild size="lg" variant="primary" block>
+            <a href={href}>{t("devices.thisApp.open")}</a>
+          </Button>
+        ) : (
+          <Button size="lg" variant="primary" block loading={making} disabled>
+            {t("devices.thisApp.open")}
+          </Button>
+        )}
+        <p className="small muted">{t("devices.thisApp.browserAsks")}</p>
+      </div>
+      <section className="dv-app dv-app--get" aria-labelledby="dv-app-get">
+        <GroupHeading level={3} id="dv-app-get" title={t("devices.thisApp.noApp")} />
+        <span className="dv-step__acts">
+          <DownloadButtons onLine={onLine} />
+        </span>
+        <p className="small muted">{t("devices.thisApp.afterInstall")}</p>
+        <p className="small muted">
+          <button type="button" className="ac-link" onClick={() => onLine?.()}>
+            {t("devices.computer.orLine")}
+          </button>
+        </p>
+      </section>
     </>
   );
 }

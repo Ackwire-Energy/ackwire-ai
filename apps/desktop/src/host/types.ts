@@ -9,6 +9,7 @@ import type {
   StepChange,
   Tailnet,
 } from "../control/local-server";
+import type { LinkInfo } from "../control/pair";
 import type { Platform } from "../control/platform";
 import type { ServerList, ServerWorkspaces } from "../control/server";
 import type { ThisMacRequest } from "../control/this-mac";
@@ -93,9 +94,19 @@ export interface Host {
   chooseServer(server: string, page?: string): Promise<void>;
   /** Every server's workspaces, as the app last read them with each one's session (ADR 0154). */
   workspaces(): Promise<ServerWorkspaces[]>;
+  /** The app read the workspaces again and something changed. */
+  onWorkspaces(cb: () => void): () => void;
   /**
-   * One request to a server of the app's list with the main window's session there (Preferences only): this
-   * computer's devices, who can use them and a phone's Stop (`site_fetch` in workspaces.rs allows only those).
+   * A pair link's workspace and maker, asked of its server by the app without a session (the welcome window only);
+   * rejects with `link_expired` (unknown, used or expired) or `unreachable`.
+   */
+  pairLinkInfo(server: string, code: string): Promise<LinkInfo>;
+  /** The system's own dialog before Preferences pairs this computer with `org` on `server`: false when declined. */
+  askToPair(server: string, org: string): Promise<boolean>;
+  /**
+   * One request to a server of the app's list with the main window's session there (Preferences and the welcome
+   * window): this computer's devices, who can use them, a phone's Stop and confirming this computer's own pairing
+   * code (`site_fetch` in workspaces.rs allows only those).
    */
   siteFetch(server: string, method: string, path: string, body?: string): Promise<SiteAnswer>;
   /** How the welcome window opens, taken once: `add` from the site's "Add a workspace", else null. */

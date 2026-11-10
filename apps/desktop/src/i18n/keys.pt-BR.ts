@@ -404,6 +404,22 @@ export const desktopPtBR = {
     body: "{{host}} pediu. Eles começam sem pastas suas e com comandos desligados.",
     allow: "Permitir",
     notNow: "Agora não",
+    offerTitle: "Deixar os agentes de {{org}} usarem este {{device}}?",
+    offerBody:
+      "Eles começam sem pastas suas e com comandos desligados. Você escolhe o que eles recebem nas Preferências e pode pará-los quando quiser.",
+    keepReady: "Deixar pronto: abrir o agentes.chat ao iniciar a sessão",
+    linkTitle: "Conectar este {{device}} a {{org}}?",
+    askedBy: "Pedido por",
+    from: "De",
+    linkBody:
+      "Os agentes de {{org}} começam sem pastas suas e com comandos desligados. Se não foi você que pediu, escolha Agora não.",
+    waiting: "Esperando {{by}} deixar entrar…",
+    done: "Conectado a {{org}}",
+    expired: "Este link expirou. Crie outro em Configurações\u00a0›\u00a0Dispositivos.",
+    denied: "{{by}} não deixou entrar. Nada mudou.",
+    letOrg: "Deixar os agentes de {{org}} usarem este {{device}}",
+    canUse: "Os agentes podem usá-lo",
+    notUsing: "Os agentes de lá não usam este {{device}}",
   },
   tools: {
     claudeName: "Claude Code",
@@ -484,7 +500,6 @@ export const desktopPtBR = {
     },
     thisMac: {
       agents: "Agentes",
-      letAgents: "Deixar agentes usarem este {{device}}",
       letAgentsDesc: "Os agentes usam este {{device}} quando precisam, com o app aberto.",
       commandsDesc:
         "Testes, builds e outros comandos do Terminal. Rodam como {{user}}, e cada um aparece em Atividade.",

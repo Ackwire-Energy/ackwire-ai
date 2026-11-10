@@ -41,6 +41,7 @@ import {
   createDesktopControl,
   createDesktopToolSource,
   createDeviceToolSource,
+  createFeedbackToolSource,
   createFindAgentToolSource,
   createFollowUpToolSource,
   createGitHubAppSettings,
@@ -127,6 +128,7 @@ import {
 import { createVoyageEmbeddings, type EmbeddingProvider, type ModelProvider } from "@agenteschat/providers";
 import { type AppleTokenRevoker, appleTokenRevoker } from "./auth";
 import { hookConfig } from "./routes/app/context";
+import { version } from "./version";
 
 /** Why `/api/terminal` closes (with 4404) where sessions are screened (ADR 0076 §7). */
 export const NO_TERMINAL = "no_terminal";
@@ -400,6 +402,12 @@ export function buildEngine(o: EngineOptions) {
       createSetStatusToolSource({ pubsub: adapters.pubsub }),
       // How the person asked agents to talk to them (ADR 0147).
       createAgentStyleToolSource(),
+      // A person's feedback, sent by the agent they asked, where the server takes feedback (ADR 0160 §11).
+      createFeedbackToolSource({
+        to: config.FEEDBACK_EMAIL,
+        version,
+        rateLimiter: adapters.rateLimiter,
+      }),
       createReactToolSource({ pubsub: adapters.pubsub }),
       // A GIF or the agent's sticker when asked (ADR 0091): listed by the workspace's switches and the agent's.
       createMediaToolSource({ pubsub: adapters.pubsub, gifs: adapters.gifs ?? null }),

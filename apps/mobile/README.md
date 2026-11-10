@@ -14,7 +14,7 @@ live in GitHub's secrets or the stores.
 Run **Android build** (Actions → Run workflow) with `preview` (an arm64 APK to install directly, kept as the run's
 artifact) or `production` (an app bundle with every architecture; with `PLAY_SERVICE_ACCOUNT_JSON` set it also goes
 to the Play Store's internal track as a draft). It runs `expo prebuild --platform android --clean` and Gradle on a
-Blacksmith runner; `plugins/with-android-release-signing.js` signs the release with the upload key from the
+CI runner; `plugins/with-android-release-signing.js` signs the release with the upload key from the
 environment. Nothing goes through EAS.
 
 One time, in GitHub → Settings → Secrets and variables → Actions:

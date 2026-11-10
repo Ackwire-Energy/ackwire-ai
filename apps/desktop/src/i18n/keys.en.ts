@@ -401,6 +401,25 @@ export const desktopEn = {
     body: "{{host}} asked. They start with no folders of yours and commands off.",
     allow: "Allow",
     notNow: "Not now",
+    /** Shown once after sign-in, for a workspace this computer doesn't work for yet. */
+    offerTitle: "Let {{org}}'s agents use this {{device}}?",
+    offerBody:
+      "They start with no folders of yours and commands off. You pick what they get in Preferences, and you can stop them any time.",
+    keepReady: "Keep it ready: open agentes.chat at login",
+    /** A link from the web asks to connect this computer: who asked, from which server. */
+    linkTitle: "Connect this {{device}} to {{org}}?",
+    askedBy: "Asked by",
+    from: "From",
+    linkBody:
+      "{{org}}'s agents start with no folders of yours and commands off. If you didn't ask for this, choose Not now.",
+    waiting: "Waiting for {{by}} to let it in…",
+    done: "Connected to {{org}}",
+    expired: "This link expired. Make a new one under Settings\u00a0›\u00a0Devices.",
+    denied: "{{by}} didn't let it in. Nothing changed.",
+    /** Preferences › General › This Mac: one switch per workspace. */
+    letOrg: "Let {{org}}'s agents use this {{device}}",
+    canUse: "Agents can use it",
+    notUsing: "Its agents don't use this {{device}}",
   },
   tools: {
     claudeName: "Claude Code",
@@ -481,7 +500,6 @@ export const desktopEn = {
     },
     thisMac: {
       agents: "Agents",
-      letAgents: "Let agents use this {{device}}",
       letAgentsDesc: "Agents use this {{device}} when they need it, while the app is open.",
       commandsDesc: "Tests, builds and other Terminal commands. They run as {{user}}, and each one shows in Activity.",
       who: "Who can use it",

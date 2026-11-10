@@ -31723,16 +31723,58 @@
     "value": "Connect another computer"
   },
   "devices.computer.step1": {
-    "value": "Download the app on it:"
+    "value": "Get the agentes.chat app on it:"
   },
   "devices.computer.step2": {
-    "value": "Open it and sign in to {{org}}."
+    "value": "Open it and sign in as yourself."
   },
   "devices.computer.step3": {
-    "value": "Turn on Let agents use this computer."
+    "value": "Click Allow when it asks to let {{org}}'s agents use it."
+  },
+  "devices.computer.shows": {
+    "value": "It shows up here by itself, only for you until you share it."
+  },
+  "devices.computer.waiting": {
+    "value": "Waiting for a computer of yours…"
+  },
+  "devices.computer.connected": {
+    "value": "Connected: {{name}}"
   },
   "devices.computer.orLine": {
     "value": "Or paste one line in its terminal"
+  },
+  "devices.computer.noApp": {
+    "value": "Can't install the app on it? Use a terminal line"
+  },
+  "devices.thisApp.text": {
+    "value": "The agentes.chat app connects it in one click, and asks you first."
+  },
+  "devices.thisApp.open": {
+    "value": "Open the agentes.chat app"
+  },
+  "devices.thisApp.browserAsks": {
+    "value": "Your browser asks to open it: choose Open, and Always allow if it offers."
+  },
+  "devices.thisApp.noApp": {
+    "value": "Don't have the app?"
+  },
+  "devices.thisApp.afterInstall": {
+    "value": "After installing, press Open the agentes.chat app again. The link works once, for 10 minutes."
+  },
+  "devices.thisApp.waiting": {
+    "value": "Waiting for the app on this computer…"
+  },
+  "devices.thisApp.expired": {
+    "value": "This link expired."
+  },
+  "devices.thisApp.again": {
+    "value": "Make a new link"
+  },
+  "devices.thisApp.failed": {
+    "value": "Couldn't make the link. Try again in a moment."
+  },
+  "devices.thisApp.server": {
+    "value": "A server? Use a terminal line"
   },
   "devices.link.serverTitle": {
     "value": "Connect a server"
@@ -36053,6 +36095,9 @@
   "chat.work.step.settingReplyStyle": {
     "value": "Adjusted how it replies"
   },
+  "chat.work.step.sendingFeedback": {
+    "value": "Asked to send feedback"
+  },
   "chat.work.step.deletingRoutine": {
     "value": "Deleted a routine"
   },
@@ -36379,6 +36424,9 @@
   },
   "chat.activity.settingReplyStyle": {
     "value": "adjusting how it replies"
+  },
+  "chat.activity.sendingFeedback": {
+    "value": "preparing feedback"
   },
   "chat.activity.deletingRoutine": {
     "value": "deleting a routine"
@@ -38312,6 +38360,9 @@
   },
   "standing.createUnpaid": {
     "value": "You already have a workspace waiting for an agentes.chat plan. Choose its plan before creating another."
+  },
+  "standing.createUnpaidOpen": {
+    "value": "Open {{name}}"
   },
   "standing.createInactive": {
     "value": "You already have a workspace that isn't active yet, so you can't create another for now."

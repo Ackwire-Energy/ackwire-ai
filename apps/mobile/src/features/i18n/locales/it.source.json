@@ -4617,10 +4617,31 @@
     "value": "Another computer"
   },
   "devices.connect.computerText": {
-    "value": "Mac, Windows or Linux"
+    "value": "Install the app on it"
   },
   "devices.connect.appNote": {
     "value": "On a Mac or a PC you use, the agentes.chat desktop app connects it too."
+  },
+  "devices.connect.appStep1": {
+    "value": "Get the agentes.chat app on it"
+  },
+  "devices.connect.appStep2": {
+    "value": "Open it and sign in as yourself"
+  },
+  "devices.connect.appStep3": {
+    "value": "Click Allow when it asks to let {{org}}'s agents use it"
+  },
+  "devices.connect.appShows": {
+    "value": "It shows up here by itself, only for you until you share it."
+  },
+  "devices.connect.appWaiting": {
+    "value": "Waiting for a computer of yours…"
+  },
+  "devices.connect.appConnected": {
+    "value": "Connected: {{name}}"
+  },
+  "devices.connect.appLine": {
+    "value": "Can't install the app on it? Use a terminal line"
   },
   "devices.connect.unix": {
     "value": "Linux and macOS"

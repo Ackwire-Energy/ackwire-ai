@@ -12950,10 +12950,27 @@ export const en = {
     },
     computer: {
       title: "Connect another computer",
-      step1: "Download the app on it:",
-      step2: "Open it and sign in to {{org}}.",
-      step3: "Turn on Let agents use this computer.",
+      step1: "Get the agentes.chat app on it:",
+      step2: "Open it and sign in as yourself.",
+      step3: "Click Allow when it asks to let {{org}}'s agents use it.",
+      shows: "It shows up here by itself, only for you until you share it.",
+      waiting: "Waiting for a computer of yours…",
+      connected: "Connected: {{name}}",
       orLine: "Or paste one line in its terminal",
+      noApp: "Can't install the app on it? Use a terminal line",
+    },
+    /** This computer, from a browser: the desktop app on it opens a link, asks the person, then asks to join. */
+    thisApp: {
+      text: "The agentes.chat app connects it in one click, and asks you first.",
+      open: "Open the agentes.chat app",
+      browserAsks: "Your browser asks to open it: choose Open, and Always allow if it offers.",
+      noApp: "Don't have the app?",
+      afterInstall: "After installing, press Open the agentes.chat app again. The link works once, for 10 minutes.",
+      waiting: "Waiting for the app on this computer…",
+      expired: "This link expired.",
+      again: "Make a new link",
+      failed: "Couldn't make the link. Try again in a moment.",
+      server: "A server? Use a terminal line",
     },
     link: {
       serverTitle: "Connect a server",
@@ -14745,6 +14762,7 @@ export const en = {
         sendingDm: "Sent a direct message",
         settingStatus: "Updated its status",
         settingReplyStyle: "Adjusted how it replies",
+        sendingFeedback: "Asked to send feedback",
         deletingRoutine: "Deleted a routine",
         runningRoutine: "Ran a routine now",
         proposingTeam: "Proposed a team",
@@ -14857,6 +14875,7 @@ export const en = {
       sendingDm: "sending a direct message",
       settingStatus: "updating its status",
       settingReplyStyle: "adjusting how it replies",
+      sendingFeedback: "preparing feedback",
       deletingRoutine: "deleting a routine",
       runningRoutine: "running a routine now",
       proposingTeam: "proposing a team",
@@ -15769,6 +15788,8 @@ export const en = {
     createRefused: "You can't create a workspace right now.",
     createUnpaid:
       "You already have a workspace waiting for an agentes.chat plan. Choose its plan before creating another.",
+    /** The button under it: into the workspace they already have. */
+    createUnpaidOpen: "Open {{name}}",
     /** The same refusal with no call to pay, for the phone app: the stores allow paying only in their own flow. */
     createInactive: "You already have a workspace that isn't active yet, so you can't create another for now.",
     agentPaused: "This agent is paused for now.",

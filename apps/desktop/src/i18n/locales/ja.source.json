@@ -869,6 +869,48 @@
   "pair.notNow": {
     "value": "Not now"
   },
+  "pair.offerTitle": {
+    "value": "Let {{org}}'s agents use this {{device}}?"
+  },
+  "pair.offerBody": {
+    "value": "They start with no folders of yours and commands off. You pick what they get in Preferences, and you can stop them any time."
+  },
+  "pair.keepReady": {
+    "value": "Keep it ready: open agentes.chat at login"
+  },
+  "pair.linkTitle": {
+    "value": "Connect this {{device}} to {{org}}?"
+  },
+  "pair.askedBy": {
+    "value": "Asked by"
+  },
+  "pair.from": {
+    "value": "From"
+  },
+  "pair.linkBody": {
+    "value": "{{org}}'s agents start with no folders of yours and commands off. If you didn't ask for this, choose Not now."
+  },
+  "pair.waiting": {
+    "value": "Waiting for {{by}} to let it in…"
+  },
+  "pair.done": {
+    "value": "Connected to {{org}}"
+  },
+  "pair.expired": {
+    "value": "This link expired. Make a new one under Settings › Devices."
+  },
+  "pair.denied": {
+    "value": "{{by}} didn't let it in. Nothing changed."
+  },
+  "pair.letOrg": {
+    "value": "Let {{org}}'s agents use this {{device}}"
+  },
+  "pair.canUse": {
+    "value": "Agents can use it"
+  },
+  "pair.notUsing": {
+    "value": "Its agents don't use this {{device}}"
+  },
   "tools.claudeName": {
     "value": "Claude Code"
   },
@@ -1066,9 +1108,6 @@
   },
   "prefs.thisMac.agents": {
     "value": "Agents"
-  },
-  "prefs.thisMac.letAgents": {
-    "value": "Let agents use this {{device}}"
   },
   "prefs.thisMac.letAgentsDesc": {
     "value": "Agents use this {{device}} when they need it, while the app is open."

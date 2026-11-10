@@ -72,13 +72,15 @@
       --nac-fade-bottom 0.2s var(--out);
   }
 }
-.nac__item {
+/* The item, its faces and the card below borrow the gallery's classes (team-plan.css). Each rule that changes what the
+   gallery sets names both classes, so it wins whichever sheet the build links first. */
+.tp-gallery__item.nac__item {
   padding: 8px 12px 8px 8px;
 }
 .nac__item[aria-selected="true"] {
   box-shadow: 0 0 0 2px var(--ink);
 }
-.nac__face {
+.tp-gallery__faces.nac__face {
   min-width: 0;
 }
 .nac__blank {
@@ -108,7 +110,7 @@
 }
 
 /* The card. Its cover and fitting room follow the card's own width (`nac-card`), whatever the window. */
-.nac__card {
+.tp-gallery__preview.nac__card {
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -235,7 +237,7 @@
   top: 10px;
   right: 10px;
   display: flex;
-  gap: 6px;
+  gap: 8px;
 }
 .nac__glass.ac-btn {
   background: var(--sky-glass);
@@ -390,7 +392,10 @@
   gap: 8px 16px;
   min-width: 0;
 }
+/* A link with its icon, as the app's other links with one: the row's middle, not .ac-iconline (a link is not a row). */
 .nac__import {
+  display: inline-flex;
+  align-items: center;
   gap: 6px;
 }
 
@@ -456,14 +461,12 @@
 .nac-app__asks {
   align-items: flex-start;
   gap: 8px;
-  margin: 12px 0 0;
+  margin: 0;
   color: var(--muted);
   font-size: 13.5px;
   line-height: 19px;
 }
 .nac-app__asks .ac-icon {
-  flex: none;
-  margin-top: 1px;
   color: var(--faint);
 }
 

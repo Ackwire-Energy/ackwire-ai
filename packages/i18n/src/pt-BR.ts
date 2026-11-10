@@ -13038,10 +13038,27 @@ export const ptBR = {
     },
     computer: {
       title: "Conectar outro computador",
-      step1: "Baixe o app nele:",
-      step2: "Abra e entre em {{org}}.",
-      step3: "Ative Deixar os agentes usarem este computador.",
+      step1: "Instale o app do agentes.chat nele:",
+      step2: "Abra e entre com a sua conta.",
+      step3: "Clique em Permitir quando ele perguntar se os agentes de {{org}} podem usá-lo.",
+      shows: "Ele aparece aqui sozinho, só para você até você compartilhar.",
+      waiting: "Esperando um computador seu…",
+      connected: "Conectado: {{name}}",
       orLine: "Ou cole uma linha no terminal dele",
+      noApp: "Não dá para instalar o app nele? Use uma linha no terminal",
+    },
+    thisApp: {
+      text: "O app do agentes.chat conecta com um clique, e pergunta a você antes.",
+      open: "Abrir o app do agentes.chat",
+      browserAsks: "O navegador pergunta se pode abrir: escolha Abrir, e Sempre permitir se ele oferecer.",
+      noApp: "Não tem o app?",
+      afterInstall:
+        "Depois de instalar, clique de novo em Abrir o app do agentes.chat. O link funciona uma vez, por 10 minutos.",
+      waiting: "Esperando o app neste computador…",
+      expired: "Este link expirou.",
+      again: "Criar um novo link",
+      failed: "Não deu para criar o link. Tente de novo em instantes.",
+      server: "Um servidor? Use uma linha no terminal",
     },
     link: {
       serverTitle: "Conectar um servidor",
@@ -14830,6 +14847,7 @@ export const ptBR = {
         sendingDm: "Enviou uma mensagem direta",
         settingStatus: "Atualizou o próprio status",
         settingReplyStyle: "Ajustou como responde",
+        sendingFeedback: "Pediu para enviar um feedback",
         deletingRoutine: "Apagou uma rotina",
         runningRoutine: "Rodou uma rotina agora",
         proposingTeam: "Propôs um time",
@@ -14942,6 +14960,7 @@ export const ptBR = {
       sendingDm: "enviando uma mensagem direta",
       settingStatus: "atualizando o próprio status",
       settingReplyStyle: "ajustando como responde",
+      sendingFeedback: "preparando um feedback",
       deletingRoutine: "apagando uma rotina",
       runningRoutine: "rodando uma rotina agora",
       proposingTeam: "propondo um time",
@@ -15899,6 +15918,8 @@ export const ptBR = {
     createRefused: "Você não pode criar um workspace agora.",
     createUnpaid:
       "Você já tem um workspace esperando um plano do agentes.chat. Escolha o plano dele antes de criar outro.",
+    /** The button under it: into the workspace they already have. */
+    createUnpaidOpen: "Abrir {{name}}",
     /** The same refusal with no call to pay, for the phone app: the stores allow paying only in their own flow. */
     createInactive: "Você já tem um workspace que ainda não está ativo, então não dá para criar outro por enquanto.",
     agentPaused: "Este agente está pausado por enquanto.",

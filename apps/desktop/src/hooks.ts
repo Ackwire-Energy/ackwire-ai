@@ -2,6 +2,7 @@ import type { ControlAgent } from "@agenteschat/adapters/runner-control";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useHost } from "./app";
 import { type LocalServerStatus, NO_SERVER, type Tailnet } from "./control/local-server";
+import type { ServerWorkspaces } from "./control/server";
 import type { Home } from "./control/store";
 import {
   CHECK_EVERY_MS,
@@ -104,6 +105,27 @@ export function useLocalServer(): LocalServerStatus {
     };
   }, [host]);
   return local;
+}
+
+/** Every server's workspaces as the app last read them, again whenever they change. */
+export function useWorkspaces(): ServerWorkspaces[] {
+  const host = useHost();
+  const [list, setList] = useState<ServerWorkspaces[]>([]);
+  useEffect(() => {
+    let live = true;
+    const read = () =>
+      void host
+        .workspaces()
+        .then((l) => live && setList(l))
+        .catch(() => {});
+    read();
+    const off = host.onWorkspaces(read);
+    return () => {
+      live = false;
+      off();
+    };
+  }, [host]);
+  return list;
 }
 
 /**
