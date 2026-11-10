@@ -598,7 +598,7 @@ html:not([data-pointer]) .brw-ac__tt:focus-visible {
 }
 .brw-ac__tx small {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   min-width: 0;
   color: var(--muted);
@@ -608,6 +608,19 @@ html:not([data-pointer]) .brw-ac__tt:focus-visible {
 .brw-ac__tx small span {
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* An agent's long name wraps its line (`.ac-who`): the spinner stays on the first line's capitals' middle, as an
+   `.ac-iconline` lead does. */
+.brw-ac__tx small > .ac-pixspin,
+.brw-mf__now > .ac-pixspin {
+  /* Browsers without the lh unit: the page's 22px line. */
+  translate: 0 calc(11px - var(--cap-mid) - 50%);
+}
+@supports (top: 1lh) {
+  .brw-ac__tx small > .ac-pixspin,
+  .brw-mf__now > .ac-pixspin {
+    translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
+  }
 }
 .brw-ac__acts {
   display: flex;
@@ -1629,7 +1642,7 @@ html:not([data-pointer]) .brw-trail__ext:focus-visible {
 .brw-mf__now {
   position: relative;
   display: inline-flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 7px;
   min-width: 0;
   max-width: 55%;
