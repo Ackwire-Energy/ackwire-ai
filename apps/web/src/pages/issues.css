@@ -1094,22 +1094,22 @@ html:not([data-pointer]) .issues-dest:focus-visible {
 .issue-github__chip:hover {
   background: var(--sunken);
 }
-/* "GitHub": pasting the link, a field and its button in the popover. */
-.issue-github__pop {
+/* "GitHub": pasting the link, a field and its button in the popover. The menu's room, the field further in, Salvar on
+   the room in its corner: the room also holds Salvar's grown touch target, so nothing scrolls by a sliver. */
+.issue-github__pop.ac-popover {
+  --menu-pad: var(--space-2);
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
   width: min(360px, calc(100vw - 32px));
+  padding: var(--menu-pad);
+}
+.issue-github__field {
+  margin: var(--popover-in) var(--popover-in) 0;
 }
 .issue-github__acts {
   display: flex;
   justify-content: flex-end;
-}
-/* Its Salvar's touch target reaches past its plate: the popover keeps that room instead of scrolling by a sliver. */
-@media (pointer: coarse) {
-  .issue-github__pop {
-    padding-bottom: calc((var(--touch-target) - var(--control-h-sm)) / 2);
-  }
 }
 
 /* The agent's work: live steps, or stalled. */
