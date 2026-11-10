@@ -982,6 +982,13 @@ textarea.ac-input {
   object-fit: cover;
   border-radius: inherit;
 }
+/* A person's pixel portrait: drawn a little larger than its box (whole pixels per cell) and scaled down to it. */
+.ac-portrait {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+}
 /* The initials' box trimmed to their capitals, so the tile centres the letters the eye sees, not the line around them
    (a line's room above and below the capitals differs, and its baseline lands on a whole pixel). Without text-box the
    capitals' middle sits --cap-mid above the line's. */

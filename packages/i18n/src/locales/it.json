@@ -9873,6 +9873,193 @@
     "notImage": "Scegli un'immagine (JPG, PNG o WebP).",
     "tooBig": "L'immagine supera gli 8 MB."
   },
+  "portrait": {
+    "ask": {
+      "title": "Come vuoi apparire?",
+      "build": "Crea un avatar",
+      "buildText": "Un ritratto in pixel a modo tuo: capelli, vestiti, accessori.",
+      "photo": "Carica una foto",
+      "photoText": "Scegli un'immagine dal computer e inquadrala."
+    },
+    "title": "Il tuo avatar",
+    "preview": "Il tuo avatar",
+    "shuffle": "Casuale",
+    "small": "Nelle dimensioni piccole in chat si vede solo il viso.",
+    "photoAsk": "Preferisci una foto?",
+    "photoUpload": "Carica foto",
+    "saved": "Avatar aggiornato.",
+    "failed": "Non è stato possibile salvare l'avatar. Riprova.",
+    "showAll": "Mostra tutte le opzioni",
+    "showFewer": "Mostra meno opzioni",
+    "beardHint": "La barba segue il colore dei capelli.",
+    "hatsHint": "Berretto, berretta, cappello e foulard coprono i capelli.",
+    "swatch": "{{group}} {{n}}",
+    "build": {
+      "label": "Tratti",
+      "m": "Maschile",
+      "f": "Femminile"
+    },
+    "tabs": {
+      "label": "Parti dell'avatar",
+      "face": "Viso",
+      "hair": "Capelli",
+      "beard": "Barba",
+      "makeup": "Trucco",
+      "marks": "Segni",
+      "accessories": "Accessori",
+      "clothes": "Abbigliamento",
+      "background": "Sfondo"
+    },
+    "sections": {
+      "skin": "Carnagione",
+      "eyes": "Colore degli occhi",
+      "mood": "Espressione",
+      "color": "Colore",
+      "hairColor": "Colore dei capelli",
+      "clothesColor": "Colore dei vestiti",
+      "cut": "Taglio",
+      "beard": "Barba",
+      "lips": "Rossetto",
+      "shadow": "Ombretto",
+      "blush": "Blush",
+      "mark": "Segni",
+      "glasses": "Occhiali",
+      "ear": "Orecchini",
+      "neck": "Al collo",
+      "extra": "In testa",
+      "piece": "Capo",
+      "bg": "Sfondo"
+    },
+    "options": {
+      "mood": {
+        "smile": "Sorriso",
+        "grin": "Gran sorriso",
+        "laugh": "Risata",
+        "calm": "Sereno",
+        "wink": "Occhiolino",
+        "wow": "Sorpresa"
+      },
+      "hair": {
+        "none": "Senza capelli",
+        "buzz": "Rasato",
+        "short": "Corti",
+        "side": "Riga laterale",
+        "quiff": "Ciuffo",
+        "curly": "Ricci",
+        "afro": "Afro",
+        "bob": "Caschetto",
+        "bangs": "Frangia",
+        "long": "Lunghi",
+        "wavy": "Mossi",
+        "curls": "Ricci lunghi",
+        "bun": "Chignon",
+        "pony": "Coda di cavallo",
+        "spiky": "A punte",
+        "mohawk": "Cresta",
+        "braids": "Trecce",
+        "pigtails": "Codini",
+        "crew": "A spazzola",
+        "fade": "Sfumato",
+        "slick": "All'indietro",
+        "flat": "Flat top",
+        "undercut": "Undercut",
+        "mullet": "Mullet",
+        "dreads": "Dreadlock",
+        "medium": "Medi",
+        "receding": "Stempiato"
+      },
+      "beard": {
+        "none": "Senza barba",
+        "stubble": "Barba corta",
+        "mustache": "Baffi",
+        "goatee": "Pizzetto",
+        "strap": "Barba a filo",
+        "full": "Folta",
+        "long": "Lunga"
+      },
+      "lips": {
+        "none": "Senza rossetto",
+        "nude": "Nude",
+        "pink": "Rosa",
+        "red": "Rosso",
+        "wine": "Bordeaux",
+        "purple": "Viola",
+        "black": "Nero"
+      },
+      "shadow": {
+        "none": "Senza ombretto",
+        "rose": "Rosa",
+        "violet": "Viola",
+        "blue": "Blu",
+        "green": "Verde",
+        "gold": "Oro",
+        "smoky": "Fumé"
+      },
+      "blush": {
+        "soft": "Leggero",
+        "strong": "Intenso",
+        "none": "Senza blush"
+      },
+      "mark": {
+        "none": "Nessuno",
+        "freckles": "Lentiggini",
+        "mole": "Neo",
+        "scar": "Cicatrice",
+        "bandaid": "Cerotto",
+        "piercing": "Piercing"
+      },
+      "glasses": {
+        "none": "Senza occhiali",
+        "round": "Rotondi",
+        "square": "Squadrati",
+        "gold": "Dorati",
+        "tinted": "Colorati",
+        "shades": "Occhiali da sole"
+      },
+      "ear": {
+        "none": "Senza orecchini",
+        "studs": "Bottoncini dorati",
+        "pearls": "Perle",
+        "hoops": "Cerchi",
+        "drops": "Pendenti"
+      },
+      "neck": {
+        "none": "Niente",
+        "necklace": "Collana",
+        "pearls": "Perle",
+        "choker": "Girocollo",
+        "bowtie": "Papillon",
+        "muffler": "Sciarpa"
+      },
+      "extra": {
+        "none": "Niente",
+        "headband": "Fascia",
+        "bandana": "Bandana",
+        "bow": "Fiocco",
+        "flower": "Fiore",
+        "headphones": "Cuffie",
+        "cap": "Berretto",
+        "beanie": "Berretta",
+        "hat": "Cappello",
+        "crown": "Corona",
+        "scarf": "Foulard"
+      },
+      "clothes": {
+        "tee": "Maglietta",
+        "vneck": "Scollo a V",
+        "tank": "Canotta",
+        "shirt": "Camicia",
+        "suit": "Completo",
+        "blazer": "Blazer",
+        "jacket": "Giacca",
+        "hoodie": "Felpa",
+        "turtle": "Dolcevita",
+        "overall": "Salopette",
+        "polo": "Polo",
+        "dress": "Vestito"
+      }
+    }
+  },
   "orgLogo": {
     "label": "Logo",
     "add": "Carica logo",

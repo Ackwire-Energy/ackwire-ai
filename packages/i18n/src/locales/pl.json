@@ -10172,6 +10172,193 @@
     "notImage": "Wybierz obraz (JPG, PNG lub WebP).",
     "tooBig": "Obraz ma ponad 8 MB."
   },
+  "portrait": {
+    "ask": {
+      "title": "Jak chcesz się pokazywać?",
+      "build": "Stwórz awatar",
+      "buildText": "Pikselowy portret po swojemu: włosy, ubranie, dodatki.",
+      "photo": "Prześlij zdjęcie",
+      "photoText": "Wybierz obraz z komputera i go wykadruj."
+    },
+    "title": "Twój awatar",
+    "preview": "Twój awatar",
+    "shuffle": "Losuj",
+    "small": "W małych rozmiarach na czacie widać samą twarz.",
+    "photoAsk": "Wolisz zdjęcie?",
+    "photoUpload": "Prześlij zdjęcie",
+    "saved": "Awatar zaktualizowany.",
+    "failed": "Nie udało się zapisać awatara. Spróbuj ponownie.",
+    "showAll": "Pokaż wszystkie opcje",
+    "showFewer": "Pokaż mniej opcji",
+    "beardHint": "Broda ma kolor włosów.",
+    "hatsHint": "Czapka z daszkiem, czapka zimowa, kapelusz i chusta zakrywają włosy.",
+    "swatch": "{{group}} {{n}}",
+    "build": {
+      "label": "Typ",
+      "m": "Męski",
+      "f": "Kobiecy"
+    },
+    "tabs": {
+      "label": "Części awatara",
+      "face": "Twarz",
+      "hair": "Włosy",
+      "beard": "Broda",
+      "makeup": "Makijaż",
+      "marks": "Znaki",
+      "accessories": "Akcesoria",
+      "clothes": "Ubranie",
+      "background": "Tło"
+    },
+    "sections": {
+      "skin": "Odcień skóry",
+      "eyes": "Kolor oczu",
+      "mood": "Wyraz twarzy",
+      "color": "Kolor",
+      "hairColor": "Kolor włosów",
+      "clothesColor": "Kolor ubrania",
+      "cut": "Fryzura",
+      "beard": "Broda",
+      "lips": "Szminka",
+      "shadow": "Cień do powiek",
+      "blush": "Róż",
+      "mark": "Znaki szczególne",
+      "glasses": "Okulary",
+      "ear": "Kolczyki",
+      "neck": "Na szyi",
+      "extra": "Na głowie",
+      "piece": "Strój",
+      "bg": "Tło"
+    },
+    "options": {
+      "mood": {
+        "smile": "Uśmiech",
+        "grin": "Szeroki uśmiech",
+        "laugh": "Śmiech",
+        "calm": "Spokój",
+        "wink": "Mrugnięcie",
+        "wow": "Zaskoczenie"
+      },
+      "hair": {
+        "none": "Bez włosów",
+        "buzz": "Na zapałkę",
+        "short": "Krótkie",
+        "side": "Z przedziałkiem",
+        "quiff": "Czub",
+        "curly": "Kręcone",
+        "afro": "Afro",
+        "bob": "Bob",
+        "bangs": "Grzywka",
+        "long": "Długie",
+        "wavy": "Falowane",
+        "curls": "Długie loki",
+        "bun": "Kok",
+        "pony": "Kucyk",
+        "spiky": "Na jeża",
+        "mohawk": "Irokez",
+        "braids": "Warkocze",
+        "pigtails": "Kitki",
+        "crew": "Na jeża",
+        "fade": "Fade",
+        "slick": "Zaczesane do tyłu",
+        "flat": "Flat top",
+        "undercut": "Undercut",
+        "mullet": "Mullet",
+        "dreads": "Dredy",
+        "medium": "Średnie",
+        "receding": "Zakola"
+      },
+      "beard": {
+        "none": "Bez brody",
+        "stubble": "Zarost",
+        "mustache": "Wąsy",
+        "goatee": "Kozia bródka",
+        "strap": "Wąska broda",
+        "full": "Pełna",
+        "long": "Długa"
+      },
+      "lips": {
+        "none": "Bez szminki",
+        "nude": "Nude",
+        "pink": "Róż",
+        "red": "Czerwień",
+        "wine": "Bordo",
+        "purple": "Fiolet",
+        "black": "Czerń"
+      },
+      "shadow": {
+        "none": "Bez cieni",
+        "rose": "Róż",
+        "violet": "Fiolet",
+        "blue": "Błękit",
+        "green": "Zieleń",
+        "gold": "Złoto",
+        "smoky": "Przydymiony"
+      },
+      "blush": {
+        "soft": "Delikatny",
+        "strong": "Mocny",
+        "none": "Bez różu"
+      },
+      "mark": {
+        "none": "Brak",
+        "freckles": "Piegi",
+        "mole": "Pieprzyk",
+        "scar": "Blizna",
+        "bandaid": "Plaster",
+        "piercing": "Piercing"
+      },
+      "glasses": {
+        "none": "Bez okularów",
+        "round": "Okrągłe",
+        "square": "Kwadratowe",
+        "gold": "Złote",
+        "tinted": "Barwione",
+        "shades": "Przeciwsłoneczne"
+      },
+      "ear": {
+        "none": "Bez kolczyków",
+        "studs": "Złote sztyfty",
+        "pearls": "Perły",
+        "hoops": "Koła",
+        "drops": "Wiszące"
+      },
+      "neck": {
+        "none": "Nic",
+        "necklace": "Naszyjnik",
+        "pearls": "Perły",
+        "choker": "Choker",
+        "bowtie": "Muszka",
+        "muffler": "Szalik"
+      },
+      "extra": {
+        "none": "Nic",
+        "headband": "Opaska",
+        "bandana": "Bandana",
+        "bow": "Kokarda",
+        "flower": "Kwiatek",
+        "headphones": "Słuchawki",
+        "cap": "Czapka z daszkiem",
+        "beanie": "Czapka zimowa",
+        "hat": "Kapelusz",
+        "crown": "Korona",
+        "scarf": "Chusta"
+      },
+      "clothes": {
+        "tee": "Koszulka",
+        "vneck": "Dekolt w serek",
+        "tank": "Bokserka",
+        "shirt": "Koszula",
+        "suit": "Garnitur",
+        "blazer": "Marynarka",
+        "jacket": "Kurtka",
+        "hoodie": "Bluza z kapturem",
+        "turtle": "Golf",
+        "overall": "Ogrodniczki",
+        "polo": "Koszulka polo",
+        "dress": "Sukienka"
+      }
+    }
+  },
   "orgLogo": {
     "label": "Logo",
     "add": "Prześlij logo",

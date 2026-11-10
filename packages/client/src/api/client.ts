@@ -522,7 +522,11 @@ export interface ApiClient {
     /** Replaces my sidebar view here; answers with what the server kept. */
     setSidebarView(orgId: string, view: SidebarView): Promise<SidebarView>;
     /** My profile photo: a square image (JSON only: base64), already cropped. */
-    setAvatar(orgId: string, input: { imageBase64: string; contentType: string }): Promise<{ avatarUrl: string }>;
+    /** `portrait`: the recipe of a portrait drawn in the app; it comes back on the address as a `#px=` fragment. */
+    setAvatar(
+      orgId: string,
+      input: { imageBase64: string; contentType: string; portrait?: string },
+    ): Promise<{ avatarUrl: string }>;
     removeAvatar(orgId: string): Promise<void>;
     /** The workspace logo (admins): a square image (JSON only: base64), already cropped. */
     setLogo(orgId: string, input: { imageBase64: string; contentType: string }): Promise<{ logo: string }>;
