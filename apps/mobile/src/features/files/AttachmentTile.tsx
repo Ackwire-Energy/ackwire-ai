@@ -7,7 +7,7 @@ import type { TFunction } from "i18next";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, Text as RNText, StyleSheet, View } from "react-native";
-import { Icon, type IconName, Text } from "@/ui";
+import { Icon, type IconName, LineIcon, Text } from "@/ui";
 import { router } from "@/ui/navigation";
 import { MessageText } from "../chat/MessageText";
 import { useColors, useOrgId } from "../shared/hooks";
@@ -16,10 +16,10 @@ import { encodeFileList, extensionOf, fileInfo } from "./logic";
 import { useRemoteFile } from "./source";
 
 /**
- * An attachment as a tile of one size, so several sit two to a row (as on the web): what it holds drawn small on top
- * (its cover: a document's start, a table's first rows, a change's files, a picture, a text file's first lines, else
- * its type) and its name with its kind and size under it. A tap opens it: a picture in the picture viewer, the rest
- * in the file screen.
+ * An attachment as a tile (as on the web): what it holds drawn small on top (its cover: a document's start, a table's
+ * first rows, a change's files, a text file's first lines, else its type) and its name, whole, with its kind and size
+ * under it. A picture is only the picture: its name and size are what a screen reader hears and what the picture
+ * viewer's header says. A tap opens it: a picture in the picture viewer, the rest in the file screen.
  */
 
 /** What a cover shows of a table, a code change or a text file: the rest is in the file screen. */
@@ -61,12 +61,15 @@ export function AttachmentTile({
   file,
   detail,
   failed = false,
+  picture: seen = false,
   width,
   single = false,
 }: {
   file: TileFile;
   detail: ArtifactDetail | undefined;
   failed?: boolean;
+  /** Known to be a picture before it loads (by its name), so its tile never sheds a foot once it does. */
+  picture?: boolean;
   width: number;
   /** Alone on its message: a taller cover. */
   single?: boolean;
@@ -76,7 +79,7 @@ export function AttachmentTile({
   const info = detail ? fileInfo(detail) : null;
   const content = detail?.content;
   const name = detail?.kind === "file" ? info?.name || file.title : detail?.title || file.title;
-  const picture = info?.view === "image";
+  const picture = info ? info.view === "image" : seen;
   const meta = !detail
     ? failed
       ? t("mobile.files.loadFailed")
@@ -111,7 +114,11 @@ export function AttachmentTile({
       ]}
     >
       <View
-        style={[styles.cover, { height: single ? 150 : 104, borderBottomColor: c.line }]}
+        style={[
+          styles.cover,
+          !picture && styles.coverOverFoot,
+          { height: single ? 150 : 104, borderBottomColor: c.line },
+        ]}
         accessible={false}
         importantForAccessibility="no-hide-descendants"
       >
@@ -123,17 +130,19 @@ export function AttachmentTile({
           <Cover detail={detail} fileId={file.id} />
         )}
       </View>
-      <View style={styles.foot}>
-        <Icon name={icon} size={14} color={c.faint} />
-        <View style={styles.grow}>
-          <Text variant="footnote" style={styles.title} numberOfLines={1}>
-            {name}
-          </Text>
-          <Text variant="caption" tone="faint" numberOfLines={1}>
-            {meta}
-          </Text>
+      {picture ? null : (
+        <View style={styles.foot}>
+          <LineIcon name={icon} size={14} color={c.faint} variant="footnote" />
+          <View style={styles.grow}>
+            <Text variant="footnote" style={styles.title}>
+              {name}
+            </Text>
+            <Text variant="caption" tone="faint">
+              {meta}
+            </Text>
+          </View>
         </View>
-      </View>
+      )}
     </Pressable>
   );
 }
@@ -336,8 +345,10 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   pressed: { opacity: 0.85 },
-  cover: { overflow: "hidden", borderBottomWidth: StyleSheet.hairlineWidth },
-  foot: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 10, paddingVertical: 8 },
+  cover: { overflow: "hidden" },
+  coverOverFoot: { borderBottomWidth: StyleSheet.hairlineWidth },
+  // The icon on the name's first line, however many lines the name wraps to.
+  foot: { flexDirection: "row", alignItems: "flex-start", gap: 8, paddingHorizontal: 10, paddingVertical: 8 },
   grow: { flex: 1, minWidth: 0 },
   title: { fontWeight: "600" },
   pad: { flex: 1, paddingHorizontal: 10, paddingTop: 8, overflow: "hidden" },
