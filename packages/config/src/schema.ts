@@ -366,9 +366,9 @@ export const envVars = {
     section: "Agents",
   },
   ROUTER_MENTION_THRESHOLD: {
-    schema: z.coerce.number().min(0).max(1).default(0.2),
+    schema: z.coerce.number().min(0).max(1).default(0.6),
     description:
-      "When an agent @mentions another, minimum probability (0–1) that the message needs something from that agent for it to answer. Low on purpose: only a judge sure the message needs nothing (a thanks, an ok, a quote) leaves the agent asleep.",
+      "When an agent @mentions another, minimum probability (0–1) that the message plainly asks that agent to do something for it to answer. A mention is credit or a reference unless it asks: agents ask each other with ask_agent and tell_agent.",
     section: "Agents",
   },
   AGENT_MAX_OUTPUT_TOKENS: {

@@ -481,6 +481,134 @@ describe("routeMessage", () => {
     expect(threads[0]?.[0]).toBe(report.body);
   });
 
+  /** Dev and Ops in #general with Ana and Bia; by default the step hears a short yes as an ok, for nobody. */
+  async function room(heard: Partial<RoutingResult> = {}) {
+    f = await setup();
+    const ops = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "ops", handle: "ops" },
+      { model: "claude-sonnet-5-5" },
+    );
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    // A handle, so "@bia" mentions her.
+    await f.db
+      .update(schema.organizationMembers)
+      .set({ handle: "bia" })
+      .where(eq(schema.organizationMembers.userId, bia.id));
+    await f.db.insert(schema.channelMembers).values([
+      { orgId: f.org.id, channelId: f.general.id, agentId: ops.id },
+      { orgId: f.org.id, channelId: f.general.id, userId: bia.id },
+    ]);
+    const [me] = await f.db
+      .select({ handle: schema.organizationMembers.handle })
+      .from(schema.organizationMembers)
+      .where(eq(schema.organizationMembers.userId, f.owner.id));
+    const strategy: RouterStrategy = {
+      name: "fixed",
+      decide: async (input) => ({
+        agents: input.candidates.map((c) => ({ agentId: c.agentId, score: c.agentId === f.agent.id ? 0.4 : 0.1 })),
+        needsAgent: 0.2,
+        ...heard,
+      }),
+    };
+    /** Dev's message `minutesAgo`, top level or in a thread. */
+    const says = (body: string, minutesAgo: number, threadId?: string) =>
+      insertMessage(f.db, {
+        orgId: f.org.id,
+        channelId: f.general.id,
+        threadId: threadId ?? null,
+        author: { type: "agent", agentId: f.agent.id, runId: null, hop: 1, stretchId: null },
+        body,
+        createdAt: new Date(Date.now() - minutesAgo * 60_000),
+      });
+    const ask = (minutesAgo: number, threadId?: string) =>
+      says(`The release notes are ready. Can I send them to the customers list, @${me?.handle}?`, minutesAgo, threadId);
+    const decide = (messageId: string) => routeMessage({ db: f.db, strategy, policy }, { orgId: f.org.id, messageId });
+    const route = async (messageId: string) => (await decide(messageId)).selected;
+    return { bia, ask, says, decide, route };
+  }
+
+  describe("a person's answer to an agent's question to them", () => {
+    test("goes to that agent, however low it scores, 20 minutes later", async () => {
+      const { ask, route } = await room();
+      const question = await ask(20);
+      expect(question.mentionedUserIds).toEqual([f.owner.id]);
+      const yes = await post("pode sim");
+      expect(await route(yes.id)).toEqual([f.agent.id]);
+      const [decision] = await f.db
+        .select()
+        .from(schema.routingDecisions)
+        .where(eq(schema.routingDecisions.messageId, yes.id));
+      // Addressed: the run it starts answers (reply-policy.ts), it can't pass on the yes.
+      expect(decision?.reason).toStartWith("follow-up");
+    });
+
+    test("in a thread, the answer under the agent's question goes to it too", async () => {
+      const { ask, route } = await room();
+      const root = await insertMessage(f.db, {
+        orgId: f.org.id,
+        channelId: f.general.id,
+        author: { type: "person", userId: f.owner.id },
+        body: "look at the release",
+        createdAt: new Date(Date.now() - 25 * 60_000),
+      });
+      await ask(20, root.id);
+      const yes = await post("pode sim", root.id);
+      expect(await route(yes.id)).toEqual([f.agent.id]);
+    });
+
+    test("not once someone else spoke since", async () => {
+      const { bia, ask, route } = await room();
+      await ask(20);
+      await postPersonMessage({ db: f.db, pubsub: f.pubsub }, bia.id, f.org.id, f.general.id, { body: "almoço?" });
+      expect(await route((await post("pode sim")).id)).toEqual([]);
+    });
+
+    test("not hours later", async () => {
+      const { ask, route } = await room();
+      await ask(3 * 60);
+      expect(await route((await post("pode sim")).id)).toEqual([]);
+    });
+
+    test("an answer that also names someone with @ still reaches the agent; only the @ alone is for that person", async () => {
+      const { ask, route } = await room();
+      await ask(20);
+      expect(await route((await post("pode sim, @bia confere depois")).id)).toEqual([f.agent.id]);
+      expect(await route((await post("@bia")).id)).toEqual([]);
+    });
+  });
+
+  describe("a rule never answers for the step", () => {
+    test("a message that only @mentions a person is for them, though the agent spoke last in its thread", async () => {
+      const { says, route } = await room({ needsAgent: 0.07 });
+      const report = await says("Deploy done: 12 services up, no errors since.", 5);
+      expect(await route((await post("@bia", report.id)).id)).toEqual([]);
+      const [decision] = await f.db.select().from(schema.routingDecisions);
+      expect(decision?.reason).toBe("for people");
+    });
+
+    test("a thread reply the step needs no agent for gets nobody; one it hears as a question to the agent still does", async () => {
+      const { says, route } = await room({ needsAgent: 0.05, social: { react: false, emoji: "" } });
+      const report = await says("Deploy done: 12 services up, no errors since.", 5);
+      expect(await route((await post("vou almoçar agora, volto em uma hora", report.id)).id)).toEqual([]);
+      const asked = await says("Deploy done. Want me to watch the error rate tonight?", 4);
+      expect(await route((await post("vou almoçar agora, volto em uma hora", asked.id)).id)).toEqual([f.agent.id]);
+    });
+
+    test("an ok or an 'I'll wait' to the agent's update gets its reaction, not a run; after its question, an answer", async () => {
+      const { says, decide } = await room({ needsAgent: 0.1, social: { react: true, emoji: "👍" } });
+      const update = await says("The migration is still running; I'll post the totals when it ends.", 5);
+      const waits = await decide((await post("beleza, aguardo", update.id)).id);
+      expect(waits.selected).toEqual([]);
+      expect(waits.reacted).toEqual({ agentId: f.agent.id, reaction: "+1" });
+      expect(await f.db.select().from(schema.agentRuns)).toEqual([]);
+      const question = await says("The migration is still running. Should I post the totals here?", 4);
+      expect((await decide((await post("ok", question.id)).id)).selected).toEqual([f.agent.id]);
+    });
+  });
+
   test("no candidates: no strategy call", async () => {
     f = await setup();
     await f.db

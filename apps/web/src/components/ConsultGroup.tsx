@@ -7,6 +7,7 @@ import {
   useConsultations,
 } from "@agenteschat/client";
 import {
+  asExchanges,
   type ConsultLineState,
   type ConsultNoticeFold,
   type ConsultPairItem,
@@ -38,7 +39,10 @@ import { useDirectory } from "@/hooks/useDirectory";
 import { useChannelEvents } from "@/realtime/context";
 
 export interface ConsultGroups {
+  /** By the run whose reply draws the row: an exchange's first asking run (`asExchanges`). */
   byRun: Map<string, RunConsultation[]>;
+  /** Every question the list has: a reply's `meta.consulted` adds only those it doesn't. */
+  listed: ReadonlySet<string>;
   /** How each answer's notice draws: hidden under a reply close by, one line to a reply farther up, its card. */
   folds: ReadonlyMap<string, ConsultNoticeFold>;
   /** Runs whose block shows their questions near the end: the working line doesn't say them again. */
@@ -53,6 +57,7 @@ export interface ConsultGroups {
 
 const EMPTY: ConsultGroups = {
   byRun: new Map(),
+  listed: new Set(),
   folds: new Map(),
   nearEnd: new Set(),
   live: new Set(),
@@ -91,11 +96,12 @@ export function useConsultGroups(
     return out;
   }, [list.data]);
   return useMemo(() => {
-    const all = list.data ?? [];
+    const all = asExchanges(list.data ?? []);
     // A reply's `meta.consulted` row still shows pressed while its question is open beside the conversation.
     if (all.length === 0) return open === null && live.size === 0 ? EMPTY : { ...EMPTY, live, open };
     return {
       byRun: groupsByRun(all),
+      listed: new Set(all.map((c) => c.id)),
       folds: consultNoticeFolds(rows, all, live),
       nearEnd: consultBlocksNearEnd(rows, all, live),
       live,
@@ -131,9 +137,9 @@ export function useReplyConsults(
     if (saved && runId && groups.live.has(runId)) return NO_ITEMS;
     const all = (runId && groups.byRun.get(runId)) || NO_ITEMS;
     const run = reached.size === 0 ? all : all.filter((c) => !reached.has(c.id));
-    const extra = consulted.filter((c) => !all.some((r) => r.id === c.consultationId)).map(pairItemOf);
+    const extra = consulted.filter((c) => !groups.listed.has(c.consultationId)).map(pairItemOf);
     return extra.length === 0 ? run : [...run, ...extra];
-  }, [groups.byRun, groups.live, runId, consulted, saved, reached]);
+  }, [groups.byRun, groups.listed, groups.live, runId, consulted, saved, reached]);
 }
 
 /**
@@ -165,7 +171,7 @@ export function ConsultPairRow({ askerId, items }: { askerId: string; items: rea
   const [open, setOpen] = useState(false);
   const live = items.some((c) => c.status === "open");
   const now = useNow(live);
-  const pair = consultPair(items, now);
+  const pair = consultPair(items, now, askerId);
   if (!pair) return null;
   // An old reply's question with no id of its own has no conversation to open: it opens in place.
   const openConsultation = openableConsultation(pair.opens) ? panel : undefined;
@@ -245,12 +251,14 @@ function ConsultInPlace({
   const { t } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
-  const from = agentGrammar(dir.agentById.get(askerId)?.name ?? t("channel.unknownAgent"));
+  // In an exchange the other agent may be the one who asked this part.
+  const askedBy = c.agentId ?? askerId;
+  const from = agentGrammar(dir.agentById.get(askedBy)?.name ?? t("channel.unknownAgent"));
   const to = agentGrammar(dir.agentById.get(c.consultedAgentId)?.name ?? t("channel.unknownAgent"));
   const state = consultLineState(c, now);
   return (
     <div className="ac-consult__body ac-consult__body--inline">
-      <small>{withAgentFace(t(consultAskedKey(c), { name: from.name }), from.name, askerId)}</small>
+      <small>{withAgentFace(t(consultAskedKey(c), { name: from.name }), from.name, askedBy)}</small>
       <div className="ac-consult__text ac-consult__text--q">
         <MessageBody
           body={withoutRelayLine(c.question)}

@@ -129,6 +129,15 @@ describe("agents it asked first: one pair row right before the reply, never insi
   });
 });
 
+describe("an exchange between the same two agents", () => {
+  test("is one row on its first asking run's reply, and one conversation when opened", () => {
+    expect(source("ConsultGroup.tsx")).toContain("groupsByRun(asExchanges(list.data ?? []))");
+    expect(source("ConsultGroup.tsx")).toContain("consultPair(items, now, askerId)");
+    expect(source("ChatScreen.tsx")).toContain("asExchanges(consultData)");
+    expect(source("ConsultationScreen.tsx")).toContain("useExchangeConversation(");
+  });
+});
+
 describe("one call is its own line", () => {
   test("live, kept and saved replies and a single question to a teammate draw the line, not the block", () => {
     const tools = source("ToolCalls.tsx");
