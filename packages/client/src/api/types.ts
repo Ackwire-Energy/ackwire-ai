@@ -717,6 +717,12 @@ export interface AgentSetupChecklist {
   role: string | null;
   /** The steps a person confirmed (chose in its dialog, or skipped). */
   done: SetupStep[];
+  /** How it introduced itself on its card, in its own voice (ADR 0164): its first message says it. */
+  hello?: string;
+  /** The personal starter it began as ("clara", ADR 0159 §3): its first tasks. */
+  starter?: string;
+  /** The apps it was made to use (catalog connector ids) at their levels (ADR 0164): its checklist suggests them. */
+  apps?: Record<string, "read" | "write">;
 }
 
 /** A costly step unrequested work needs a person's go for (ADR 0131 §3). */
@@ -877,8 +883,11 @@ export interface AgentInput {
   autonomy?: CommandApproval;
   /** Editing only: its autonomy brakes (ADR 0131); the fields given change. */
   brakes?: Partial<AgentBrakes>;
-  /** Creating only: the ready-made role it starts from, for its setup checklist (ADR 0155 §2). */
-  setup?: { role: RoleId | null };
+  /**
+   * Creating only: the ready-made role it starts from, for its setup checklist (ADR 0155 §2), and what its card said
+   * (ADR 0164): how it introduced itself, the personal starter it began as, the apps it will use at their levels.
+   */
+  setup?: { role: RoleId | null; hello?: string; starter?: string; apps?: Record<string, "read" | "write"> };
 }
 
 /** A person's answer to an agent's proposal of costly work nobody asked for (ADR 0131 §3). */

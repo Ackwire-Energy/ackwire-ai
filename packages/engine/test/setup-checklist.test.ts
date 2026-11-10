@@ -141,4 +141,60 @@ describe("setup checklist", () => {
     expect(setupOf({ role: 7, done: "ai" })).toEqual({ role: null, done: [] });
     expect(newSetup(undefined)).toEqual({ role: null, done: ["who", "how"] });
   });
+
+  test("its card's hello, starter and apps are kept, trimmed and capped (ADR 0164); odd ones dropped", () => {
+    expect(
+      newSetup(null, {
+        hello: "  Vou cuidar da sua agenda.  ",
+        starter: "clara",
+        apps: { "google-calendar": "write", todoist: "read", "Bad Id": "write", notion: "admin" },
+      }),
+    ).toEqual({
+      role: null,
+      done: ["who", "how"],
+      hello: "Vou cuidar da sua agenda.",
+      starter: "clara",
+      apps: { "google-calendar": "write", todoist: "read" },
+    });
+    // Nothing to keep: no key at all, as an agent made before the card reads.
+    expect(Object.keys(newSetup("dev", { hello: "   ", starter: "Clara!", apps: {} }))).toEqual(["role", "done"]);
+    expect(newSetup(null, { hello: "x".repeat(900) }).hello).toHaveLength(500);
+    const many = Object.fromEntries(Array.from({ length: 20 }, (_, i) => [`app-${i}`, "read"]));
+    expect(Object.keys(newSetup(null, { apps: many }).apps ?? {})).toHaveLength(12);
+    // Read back from the database the same way.
+    expect(setupOf({ role: "dev", done: ["ai"], hello: "Oi", apps: { github: "write", x: 3 } })).toEqual({
+      role: "dev",
+      done: ["ai"],
+      hello: "Oi",
+      apps: { github: "write" },
+    });
+  });
+
+  test("a new agent made from its card keeps what the card said", async () => {
+    const w = await workspace();
+    const clara = await createAgent(
+      w.db,
+      w.owner.id,
+      w.org.id,
+      {
+        name: "Clara",
+        handle: "clara",
+        setup: {
+          role: null,
+          hello: "Vou cuidar da sua agenda.",
+          starter: "clara",
+          apps: { "google-calendar": "write" },
+        },
+      },
+      MODEL,
+    );
+    expect(agentView(clara).setup).toEqual({
+      role: null,
+      done: ["who", "how"],
+      hello: "Vou cuidar da sua agenda.",
+      starter: "clara",
+      apps: { "google-calendar": "write" },
+    });
+    expect(await stored(w.db, clara.id)).toMatchObject({ starter: "clara", apps: { "google-calendar": "write" } });
+  });
 });
