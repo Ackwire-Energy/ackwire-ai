@@ -12,7 +12,7 @@ import { ConnectorIcon, searchCatalog } from "@/components/ConnectorCatalog";
  * app is used at once ("Usar"); another runs the usual connect flow (the card's own `ConnectFlow`), then lands on the
  * card. Nothing here leaves the card for Settings.
  */
-export function AppsPicker({
+export function AppsPickerDialog({
   agentName,
   connectors,
   suggested,

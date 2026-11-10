@@ -137,9 +137,9 @@ export function SetupBand({
         />
         {!thinks && (
           <span className="nac-band__zz" aria-hidden="true">
-            <i>z</i>
-            <i>z</i>
-            <i>z</i>
+            <i />
+            <i />
+            <i />
           </span>
         )}
       </span>

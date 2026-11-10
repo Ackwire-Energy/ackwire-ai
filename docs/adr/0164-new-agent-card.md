@@ -45,7 +45,7 @@ scroll that way (`useScrollEdges`, the sidebar's flags and mask).
   level (a person's own agent writes; a team's at its role's level, else reads). A starting point's suggestion that
   isn't connected is never on the card; its chat's checklist suggests it. With none, "Nothing yet". The level dialog
   says that sending, deleting and paying always ask the person, at every level. "Another app", at the end of the
-  section's label so it is always in sight, opens the catalog as rows (`AppsPicker`): the starting point's apps on top,
+  section's label so it is always in sight, opens the catalog as rows (`AppsPickerDialog`): the starting point's apps on top,
   then the connected ones, then the rest, with a search. A connected app is used at once; another runs the usual
   connect flow over the card and lands on it at its level when it connects. Signing in on a provider's page reloads
   the app, so the card waits in the tab (`sessionStorage`, an hour) and opens again as it was on the way back

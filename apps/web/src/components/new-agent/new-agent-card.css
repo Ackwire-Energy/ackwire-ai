@@ -389,7 +389,7 @@
   gap: 6px;
 }
 
-/* "Outro app": the catalog as rows, its starting point's apps on top (AppsPicker). */
+/* "Outro app": the catalog as rows, its starting point's apps on top (AppsPickerDialog). */
 .nac-pick .ac-dialog__body {
   display: flex;
   flex-direction: column;
@@ -541,6 +541,10 @@
   font-weight: 900;
   pointer-events: none;
 }
+/* The sleeping z is a drawing, not a word: the stylesheet's, never text in the page. */
+.nac-band__zz i::before {
+  content: "z";
+}
 .nac-band__zz i {
   position: absolute;
   opacity: 0;
@@ -691,7 +695,7 @@
   }
 }
 
-/* From scratch, while it has no name: "Oi! Eu sou …" with no closing period, and three ideas with a dice. */
+/* From scratch, while it has no name: "Oi, eu sou …" with no closing period, and three ideas with a dice. */
 .nac__name:placeholder-shown + span {
   display: none;
 }

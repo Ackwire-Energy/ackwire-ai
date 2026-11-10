@@ -37,6 +37,7 @@ import { useNavigate } from "@tanstack/react-router";
 import {
   createContext,
   type KeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
   type ReactNode,
   useCallback,
   useContext,
@@ -75,7 +76,7 @@ import {
 } from "@/lib/new-agent";
 import { useScrollEdges } from "@/lib/scroll-edges";
 import { useToast } from "@/lib/toast";
-import { AppsPicker } from "./AppsPicker";
+import { AppsPickerDialog } from "./AppsPicker";
 import { useNewAgentBrain } from "./useNewAgentBrain";
 import "../team-plan.css";
 import "./new-agent-card.css";
@@ -766,8 +767,8 @@ function NewAgentDialog({
         }
       }}
     >
-      {/* biome-ignore lint/a11y/noStaticElementInteractions: the dialog's keys (arrows move the list, Enter creates) */}
-      <div className="nac__keys" onKeyDown={onKeyDown}>
+      {/* The dialog's keys (arrows move the list, Enter creates) on a form: it holds the sections. */}
+      <form className="nac__keys" onKeyDown={onKeyDown} onSubmit={(e) => e.preventDefault()}>
         <DialogBody>
           <div className="nac__grid">
             <div className="nac__list" role="listbox" aria-label={t("newAgentCard.list")} ref={list}>
@@ -1122,7 +1123,7 @@ function NewAgentDialog({
             {name ? t("newAgentCard.create", { name }) : t("newAgentCard.createBlank")}
           </Button>
         </DialogFooter>
-      </div>
+      </form>
       {skillOpen && (
         <SkillDialog
           skillId={skillOpen}
@@ -1153,7 +1154,7 @@ function NewAgentDialog({
         />
       )}
       {picking && (
-        <AppsPicker
+        <AppsPickerDialog
           agentName={name}
           connectors={catalog.data?.connectors ?? []}
           suggested={Object.keys(starterApps({ role, starter: starter?.id ?? null }))}
@@ -1190,6 +1191,10 @@ const burst = (el: Element | null | undefined, color: string) => {
   pixelBurst({ x: r.left + r.width / 2, y: r.top + r.height / 2 }, agentTones(c), spriteTone(c));
 };
 
+/** The row's face when it was picked with the pointer (its hop starts there); none from the keyboard. */
+const pointerFace = (e: ReactMouseEvent<HTMLButtonElement>) =>
+  e.detail === 0 ? null : e.currentTarget.querySelector<HTMLElement>(".ac-avatar");
+
 function ListRow({
   pick,
   on,
@@ -1215,7 +1220,7 @@ function ListRow({
       // A face beside two lines: the name's capitals start at its top (`ac-faceline`), never centred on both lines;
       // an accessory drawn above the tile is ink, not layout, so it moves nothing.
       className="tp-gallery__item ac-faceline nac__item"
-      onClick={(e) => onPick(pick, e.detail > 0 ? e.currentTarget.querySelector<HTMLElement>(".ac-avatar") : null)}
+      onClick={(e) => onPick(pick, pointerFace(e))}
     >
       <span className="tp-gallery__faces nac__face" aria-hidden="true">
         {face}
