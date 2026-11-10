@@ -1,4 +1,11 @@
-import { type SidebarPins, useAgentGroups, useDms, useSetSidebarView, useSidebarView } from "@agenteschat/client";
+import {
+  type SidebarPins,
+  useAgentGroups,
+  useChannels,
+  useDms,
+  useSetSidebarView,
+  useSidebarView,
+} from "@agenteschat/client";
 import { listsAgent } from "@agenteschat/client/lib/audience";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { dayOnePins, type PinKind, pinsOf, togglePin } from "@agenteschat/client/lib/sidebar-view";
@@ -26,20 +33,28 @@ export function usePins(): {
   const dir = useDirectory();
   const dms = useDms(orgId).data;
   const groups = useAgentGroups(orgId).data;
+  const channels = useChannels(orgId).data;
   const view = useSidebarView(orgId);
   const setView = useSetSidebarView(orgId);
   const lastActive = new Map<string, string>();
   for (const d of dms ?? [])
     if (d.with.type === "agent" && d.lastMessage) lastActive.set(d.with.id, d.lastMessage.createdAt);
+  const listed = dir.agents.filter((a) => listsAgent(org, a));
   const dayOne = meId
     ? dayOnePins(
-        dir.agents.filter((a) => !isRightHand(a) && listsAgent(org, a)),
+        listed.filter((a) => !isRightHand(a)),
         meId,
         lastActive,
         groups,
       )
     : [];
-  const pins = pinsOf(view, dayOne);
+  // A pin of something no longer in these lists holds no place.
+  const known = {
+    agents: listed.map((a) => a.id),
+    channels: channels?.filter((c) => c.isMember).map((c) => c.id),
+    people: [...dir.memberById.keys()],
+  };
+  const pins = pinsOf(view, dayOne, known);
   return {
     pins,
     chosen: view.pins != null,
@@ -50,12 +65,8 @@ export function usePins(): {
         return;
       }
       setView((now) => {
-        const from = pinsOf(now, dayOne);
-        const next = togglePin(from, kind, id) ?? from;
-        // What the person pins goes on top of its section, so the pin shows where it lands (it went last, among the
-        // agents pinned by default, and nothing seemed to change).
-        const pinning = !from[kind].includes(id) && next[kind].includes(id);
-        return { ...now, pins: pinning ? { ...next, [kind]: [id, ...next[kind].filter((x) => x !== id)] } : next };
+        const from = pinsOf(now, dayOne, known);
+        return { ...now, pins: togglePin(from, kind, id) ?? from };
       });
     },
   };

@@ -307,7 +307,9 @@ function Home() {
               onToggle={() => toggle(s.key)}
               // A closed category keeps its unread channels in sight, as on the web.
               {...(s.categoryId && s.unread.length > 0 ? { kept: s.unread.map((r, i) => row(r, i, true)) } : {})}
-              {...(hold ? { onLongPress: hold, holdLabel: t("mobile.categories.title") } : {})}
+              {...(hold
+                ? { menu: { label: t("channelCategories.options", { name: s.name ?? "" }), onPress: hold } }
+                : {})}
             >
               {s.rows.map((r, i) => row(r, i, !off))}
               {s.more ? (

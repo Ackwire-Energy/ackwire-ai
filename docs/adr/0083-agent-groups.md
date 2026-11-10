@@ -1,6 +1,6 @@
 # 0083. Groups of agents
 
-- Status: Accepted. Amended 2026-10-30: §4 and §5 (a person's lists show only the agents that answer them, unless they manage agents). Amended 2026-11-03: §4 and §5 (the sidebar's AGENTES part comes back with the groups, "Fixar no topo" in every section, §7). Amended 2026-11-04: groups are shown as setores with a color, an icon, a lead and a substitute, managed on Equipe › Setores (ADR 0148)
+- Status: Accepted. Amended 2026-10-30: §4 and §5 (a person's lists show only the agents that answer them, unless they manage agents). Amended 2026-11-03: §4 and §5 (the sidebar's AGENTES part comes back with the groups, "Fixar no topo" in every section, §7). Amended 2026-11-04: groups are shown as setores with a color, an icon, a lead and a substitute, managed on Equipe › Setores (ADR 0148). Amended 2026-11-10: §5 and §7 (a pin keeps an agent in its setor, a setor's menu on its header, stale pins hold no place)
 - Date: 2026-10-30
 - Code: `packages/db/src/schema/agents.ts` (`agent_groups`, `agents.group_id`, `agents.group_position`), `packages/engine/src/agent-groups.ts`, `apps/server/src/routes/app/agents.ts`, `packages/client/src/lib/agent-groups.ts`, `apps/web/src/components/AgentGroups.tsx`, `apps/web/src/components/team/TeamSectors.tsx`, `apps/mobile/src/features/agents/AgentsScreen.tsx`; sidebar view and pins: `packages/engine/src/sidebar-items.ts` (`SidebarView`), `packages/client/src/lib/sidebar-view.ts`, `apps/web/src/components/Sidebar.tsx`, `apps/web/src/hooks/useSidebarPins.ts`, `apps/mobile/src/features/chats/pins.ts`
 
@@ -40,3 +40,17 @@ A workspace with many agents (an import brings twenty or more, for several compa
 ## Amendment (2026-11-04): groups are setores (ADR 0148)
 
 The groups are shown as setores ("departments" in English): the same rows, the same moves and the same permissions. Each one gains a color and an icon (the roles' sets, never sky), a lead and a substitute (`agent_groups.color`, `icon`, `lead_user_id`, `backup_user_id`, migration 0219, set with `PATCH …/agent-groups/{groupId}`). Equipe's "Grupos de agentes" card became Equipe › Setores, one card per setor. The sidebar's headers carry the setor's mark.
+
+## Amendment (2026-11-10): a pin keeps an agent in its setor, a setor's menu on its header
+
+### Context
+
+People said the setores didn't stay organized in the sidebar, that pinning an agent didn't work right, and that they couldn't find how to rename or delete a setor. A pin took an agent out of its setor: an agent put in a setor any other way than by the person's own move (by another admin, the agent's page, the right hand) kept its old pin, so it stayed on top and its setor looked empty or short, unlike Equipe. A new pin went to the end of the pinned rows, where the row next to them barely moved. A pin of something gone (a deleted agent, a channel left) still held one of the five places, and nothing showed it to take off. Renaming and deleting were only on Equipe › Setores, and the sidebar's "Organizar setores na Equipe" opens Equipe on its last view.
+
+### Decision
+
+- **A pin never takes an agent out of its setor.** Pinned rows lead their own section: the pinned agents in no setor on top of AGENTES, a pinned agent in a setor on top of that setor (`splitPinned`), on the web and in the phone's Livres. A setor shows every agent in it, whoever put it there and whenever. Putting an agent in a setor by hand still takes off the person's pin, so it lands where it was dropped.
+- **Fixar no topo puts the row first** among its section's pins (`togglePin`), on the web as the phone already did.
+- **A pin of something gone holds no place.** The apps leave out the pins of agents, channels and people no longer in their lists before counting the five and when they save (`pinsOf` with `known`); a list not loaded yet keeps its pins. This replaces the consequence above that a stale pin costs a place until it is unpinned.
+- **A setor's menu on its header.** Who manages agents gets a "…" on each setor's header in the sidebar, and the same choices on the header's right click: Editar (name, color and icon), Mover para cima or para baixo, Excluir setor after a question. It is Equipe › Setores' menu (`useGroupEntries`). On the phone, each setor's header in Agentes has a "…" and a long press with Editar, which opens the setor's page, where who manages agents now renames it, and Excluir setor. The phone's channel category headers show the same "…" for their long press menu. "Organizar setores na Equipe" in AGENTES' "…" opens Equipe on Setores.
+
