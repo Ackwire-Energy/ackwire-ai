@@ -647,9 +647,10 @@ test("workspaces take turns however long one workspace's backlog is", async () =
     nextAttemptAt: new Date(older + i),
   }));
   for (let i = 0; i < burst.length; i += 2000) await db.insert(schema.outbox).values(burst.slice(i, i + 2000));
-  await enqueue(db, { orgId: other?.id ?? "", kind: "message.posted", payload: {} });
+  const otherOrg = other?.id ?? "";
+  await enqueue(db, { orgId: otherOrg, kind: "message.posted", payload: {} });
   const claimed = await claimJobs(db, { workerId: "w", batchSize: 2 });
-  expect(claimed.map((j) => j.orgId).sort()).toEqual([orgId, other?.id].sort());
+  expect(claimed.map((j) => j.orgId).sort()).toEqual([orgId, otherOrg].sort());
 }, 30_000);
 
 test("a worker process leaves a push to the app, the one process that knows who has the app open", async () => {
