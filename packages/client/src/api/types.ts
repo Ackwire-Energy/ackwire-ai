@@ -4353,6 +4353,11 @@ export interface Machine {
   kind?: MachineKind;
   /** Runner connected now (`machine.status` events). */
   online: boolean;
+  /**
+   * ADR 0161: the workspace's own computer is asleep in standby, offline by design: it wakes when something wants it,
+   * and opens as it does. Absent from an older server: not in standby.
+   */
+  standby?: boolean;
   lastSeenAt: string | null;
   hostname: string;
   /** `linux`, `darwin`, `windows` or `other` (`MachineOs`). */

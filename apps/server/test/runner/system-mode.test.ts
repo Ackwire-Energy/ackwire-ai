@@ -123,6 +123,29 @@ test("config: Claude's own login for all agents is off unless its switch is whol
   expect(paired.claudeSharedLogin).toEqual(on as never);
 });
 
+test("pairing the same machine again keeps its allowed services and pause; another machine starts without them", () => {
+  const prev = {
+    mode: "system",
+    server: "https://app.example.com",
+    machineId: "m",
+    services: ["tcp/11434"],
+    paused: { until: null },
+  } as never;
+  const input = (machineId: string) => ({
+    server: "https://app.example.com",
+    grant: { machineId, token: "t", name: "n", org: { id: "o", name: "O" } } as never,
+    workspace: "/w",
+    tools: { commands: true } as never,
+    desktop: false,
+  });
+  const again = configFromGrant(prev, input("m"));
+  expect(again.services).toEqual(["tcp/11434"]);
+  expect(again.paused).toEqual({ until: null });
+  const other = configFromGrant(prev, input("m2"));
+  expect(other.services).toBeUndefined();
+  expect(other.paused).toBeUndefined();
+});
+
 test("config: the auth route is only ever the guard's true, and a new pairing keeps it", () => {
   expect(normalizeStored({ networkAuthRoute: true }).networkAuthRoute).toBe(true);
   expect(normalizeStored({ networkAuthRoute: "true" })).toEqual({});

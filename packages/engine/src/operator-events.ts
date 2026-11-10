@@ -2,6 +2,7 @@ import { and, asc, type Database, type Executor, eq, lt, rowsOf, type SQL, schem
 import { z } from "zod";
 import { decodeCursor, encodeCursor } from "./cursor";
 import { ValidationError } from "./errors";
+import type { WakeWhy } from "./machine-wake";
 
 /**
  * The operator API's events feed (ADR 0056 §5): what happened on this instance, for the operator's own
@@ -38,7 +39,8 @@ export type OperatorEventType =
   | "desktop_control.ended"
   | "content.viewed"
   | "platform_ai.threshold"
-  | "account.failure";
+  | "account.failure"
+  | "machine.wake_wanted";
 
 export interface OperatorEvent {
   type: OperatorEventType;
@@ -172,6 +174,29 @@ export async function recordAccountFailure(
 
 /** Tests: forgets which account failures were already told. */
 export const resetAccountFailures = () => accountFailureAt.clear();
+
+/** One `machine.wake_wanted` per computer in this long. */
+export const WAKE_WANTED_EVERY_MS = 10_000;
+// ponytail: per process; each replica tells at most every 10 seconds. A shared table if that ever matters.
+const wakeWantedAt = new Map<string, number>();
+
+/**
+ * `machine.wake_wanted`: a run, a person looking at it or a request to it (`why`) wants the workspace's own computer
+ * the operator put in standby (ADR 0161), at most once per computer every `WAKE_WANTED_EVERY_MS`.
+ */
+export async function recordWakeWanted(
+  db: Executor,
+  wake: { orgId: string; machineId: string; why: WakeWhy },
+  now = Date.now(),
+) {
+  if (!enabled) return;
+  const last = wakeWantedAt.get(wake.machineId);
+  if (last !== undefined && now - last < WAKE_WANTED_EVERY_MS) return;
+  if (wakeWantedAt.size >= 10_000) wakeWantedAt.clear();
+  wakeWantedAt.set(wake.machineId, now);
+  const { orgId, ...data } = wake;
+  await recordOperatorEvent(db, { type: "machine.wake_wanted", orgId, data });
+}
 
 /** `task.finished`: a task on a computer ended (done, failed, canceled, or interrupted for good). */
 export const recordTaskFinished = (

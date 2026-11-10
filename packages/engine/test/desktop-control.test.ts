@@ -926,6 +926,30 @@ describe("the desktop's REST and keep-alive", () => {
     });
   });
 
+  test("asked while a view of the computer is open: the computer is wanted, and wakes from standby (ADR 0161)", async () => {
+    const { hub, machine } = await start();
+    const wanted: string[] = [];
+    const wake = async (machineId: string, why: string) => {
+      wanted.push(`${machineId}:${why}`);
+    };
+    const asleep = {
+      ...hub,
+      status: async (id: string) => ({ ...(await toolHub.status(id)), kind: "managed", online: false, standby: true }),
+      wake,
+    } as unknown as MachineCaller;
+    expect(await desktopStatus({ db: f.db, hub: asleep }, f.owner.id, f.org.id, f.agent.id)).toMatchObject({
+      available: false,
+      reason: "offline",
+    });
+    expect(wanted).toEqual([`${machine.machineId}:view`]);
+    // Awake and watched, it stays wanted.
+    const awake = { ...hub, wake } as unknown as MachineCaller;
+    expect(await desktopStatus({ db: f.db, hub: awake }, f.owner.id, f.org.id, f.agent.id)).toMatchObject({
+      available: true,
+    });
+    expect(wanted).toEqual([`${machine.machineId}:view`, `${machine.machineId}:view`]);
+  });
+
   test("a browser card's view of the screen is audited as watching, marked as the card's", async () => {
     const { machine } = await start();
     const viewer = fakeSocket();

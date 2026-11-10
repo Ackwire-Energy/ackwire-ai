@@ -235,6 +235,13 @@ export const machines = pgTable(
     /** The server process holding its socket. */
     connectedReplica: text(),
     lastSeenAt: timestamp({ withTimezone: true }),
+    /**
+     * The operator put the workspace's own computer (`managed`) in standby (ADR 0161): asleep by design, it is woken
+     * when something wants it. Its runner's next hello clears it.
+     */
+    standbyAt: timestamp({ withTimezone: true }),
+    /** Last time a run or a person wanted this computer (written at most every 30 s per server process). */
+    wantedAt: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp({ withTimezone: true }),
