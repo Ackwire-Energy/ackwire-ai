@@ -52,7 +52,8 @@ test("an agent's role sits under its name as a tag, one line, beside a face as t
   // its middle.
   const face = '.sidebar:not([data-rail="true"]) .sidebar__item > .ac-avatar--sm';
   // The rail's 40px tile keeps its smaller face, with room for the presence badge and the unread count.
-  expect(value(".sidebar__item > .ac-avatar--sm", "height")).toBe("28px");
+  expect(value(".sidebar__item > .ac-avatar--sm", "height")).toBe("var(--sidebar-rail-face)");
+  expect(value(".sidebar", "--sidebar-rail-face")).toBe("28px");
   expect([value(face, "width"), value(face, "height")]).toEqual(["var(--name-face)", "var(--name-face)"]);
   expect(value('.sidebar:not([data-rail="true"]) .sidebar__item:has(> .ac-avatar)', "padding-block")).toBe("8px");
   const twoLines =
@@ -208,4 +209,42 @@ test("Personalizar: a tool's line has four columns, its arrows one group 8 apart
   expect(first?.split(/ (?![^(]*\))/)).toHaveLength(4);
   expect(value(".sidebar-setup__moves", "gap")).toBe("var(--space-2)");
   expect(value(".sidebar-setup__row > .ac-seg", "grid-column")).toBe("2 / -1");
+});
+
+test("New agent's empty face is the agents' own: their size token in each mode and on the rail, their radius and gap (ADR 0164)", async () => {
+  // The tokens: a team's agents have a message's face, a personal workspace's plain list 40, the rail 28.
+  expect(value(".sidebar", "--sidebar-agent-face")).toBe("var(--name-face)");
+  expect(value(".sidebar[data-personal]", "--sidebar-agent-face")).toBe("40px");
+  // The agents' faces read the token: a team's rows and a personal workspace's plain list.
+  const agentFace =
+    '.sidebar:not([data-rail="true"]) :is([data-agent-row] > .sidebar__item, .sidebar__item[data-right-hand]) > .ac-avatar--sm';
+  const plainFace =
+    '.sidebar:not([data-rail="true"]) .sidebar__agents-plain :is([data-agent-row] > .sidebar__item, .sidebar__item[data-right-hand]) > .ac-avatar--sm';
+  for (const face of [agentFace, plainFace])
+    expect([value(face, "width"), value(face, "height")]).toEqual([
+      "var(--sidebar-agent-face)",
+      "var(--sidebar-agent-face)",
+    ]);
+  // New agent's tile reads the same tokens, never a number of its own.
+  const tile = ".sidebar__new-agent-face";
+  const fullTile = '.sidebar:not([data-rail="true"]) .sidebar__new-agent-face';
+  expect([value(tile, "width"), value(tile, "height")]).toEqual([
+    "var(--sidebar-rail-face)",
+    "var(--sidebar-rail-face)",
+  ]);
+  expect([value(fullTile, "width"), value(fullTile, "height")]).toEqual([
+    "var(--sidebar-agent-face)",
+    "var(--sidebar-agent-face)",
+  ]);
+  // The framed tile's shape (radius 30% of the side), and as far from its name as an agent's face is from theirs.
+  const kit = await Bun.file(join(import.meta.dir, "../../../packages/ui/src/styles/components.css")).text();
+  const framed = declarations(kit, ".ac-avatar.ac-avatar--framed").findLast(([p]) => p === "border-radius")?.[1];
+  expect(value(tile, "border-radius")).toBe(framed);
+  expect(value('.sidebar:not([data-rail="true"]) .sidebar__new-agent', "gap")).toBe("var(--sidebar-agent-gap)");
+  expect(
+    value(
+      '.sidebar:not([data-rail="true"]) :is([data-agent-row] > .sidebar__item, .sidebar__item[data-right-hand])',
+      "gap",
+    ),
+  ).toBe("var(--sidebar-agent-gap)");
 });
