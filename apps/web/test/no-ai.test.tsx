@@ -392,10 +392,8 @@ describe("no AI connected: above the composer", () => {
     expect(within(panel).getByRole("combobox", { name: "Agentes que usam este plano" }).textContent).toBe(
       "Todos os agentes",
     );
-    const names = [...panel.querySelectorAll(".ai-panel__who li > span:not(.ac-visually-hidden)")].map(
-      (name) => name.textContent,
-    );
-    expect(names).toEqual(["Atlas", "Ada"]);
+    // The first screen already said who: the panel doesn't list them again.
+    expect(panel.querySelector(".ai-panel__who")).toBeNull();
   });
 
   test("the agent's page: 'Sem IA' by its name opens Connect for that agent", async () => {

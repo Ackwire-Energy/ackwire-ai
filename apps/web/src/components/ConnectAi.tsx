@@ -537,6 +537,7 @@ function ConnectAiDialog({
         locked={locked}
         {...(login?.choice === choice ? { login } : {})}
         {...(use && planOfAccount(use) === choice ? { use } : {})}
+        plain={band}
         onKey={() => {
           setPicked("key");
           setLogin(null);

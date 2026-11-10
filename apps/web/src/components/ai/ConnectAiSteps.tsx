@@ -643,6 +643,11 @@ export interface PlanPanelProps {
    * onto it as soon as the plan is ready there, with no second click.
    */
   use?: MachineAccount;
+  /**
+   * Under the conversation's Connect, which already says whom it is for: no list of the agents, and an account the
+   * person already has is a button to use it, with another sign-in as the quiet one beside it.
+   */
+  plain?: boolean;
   /** "Usar uma chave de API agora": the API key row. */
   onKey: () => void;
   /** Self-host with no computer for the agent: where one is connected. */
@@ -871,6 +876,7 @@ function PlanSteps({
   replies,
   login,
   use,
+  plain = false,
   onKey,
   onComputer,
   onDone,
@@ -1185,7 +1191,7 @@ function PlanSteps({
             {t("connectAi.wait.ready")}
           </SettingNote>
         ))}
-      {everyone && steps && (
+      {everyone && steps && !plain && (
         <ul className="ai-panel__who" aria-label={t("connectAi.agentAria")}>
           {forWhom.map((a) => {
             const state = stateOf(a);
@@ -1219,7 +1225,19 @@ function PlanSteps({
       {choice === "gemini" && choosing && !otherChosen && existing.some(geminiPersonal) && (
         <SettingNote icon="alert">{t("connectAi.plan.gemini.warning")}</SettingNote>
       )}
-      {choosing && (
+      {choosing && plain && !ownable && !otherChosen && (
+        <div className="ai-panel__row ai-panel__use">
+          {existing.map((a) => (
+            <Button key={a.id} variant="primary" onClick={() => void (everyone ? assignAll(a) : assign(agent.id, a))}>
+              {t("connectAi.use", { label: accountTitle(a) })}
+            </Button>
+          ))}
+          <Button variant="ghost" onClick={() => setOther(true)}>
+            {t("connectAi.another")}
+          </Button>
+        </div>
+      )}
+      {choosing && !(plain && !ownable) && (
         // Who shares the sign-in: the computer's own, which any of its pairer's agents there thinks with, an account
         // of this plan the person already has there for all of their agents, or another sign-in (ADR 0059 §2). Small
         // columns: indented to the panel's text column, two still fit side by side in the setup's column.
