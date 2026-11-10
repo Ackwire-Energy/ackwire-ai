@@ -276,6 +276,7 @@
   "rowpad@1280 article.thread-row in div.list-card",
   "rowpad@1280 div.ac-access__row",
   "rowpad@1280 div.ac-list__row.ai-accounts__row.ac-mediarow in div.ac-list.ac-list--stagger.ai-accounts__list",
+  "rowpad@1280 div.ac-list__row.ai-accounts__row.ac-mediarow in div.ac-list.ai-accounts__list",
   "rowpad@1280 div.ac-list__row.app-row.ac-mediarow in div.settings__body",
   "rowpad@1280 div.ac-list__row.jev__key in section.jev",
   "rowpad@1280 div.ac-list__row.key-row.ac-mediarow in div.ac-list.ac-list--stagger.key-list",
