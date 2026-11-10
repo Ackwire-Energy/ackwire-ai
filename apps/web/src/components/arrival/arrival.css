@@ -276,10 +276,10 @@
   align-items: flex-start;
   gap: 6px;
 }
-/* The arrow on the title's line, as tall as it; a hair up, where the title's capitals have their middle. */
+/* The arrow on the title's line: the small button is taller than the title's 28px line, so it is pulled over it. */
 .arrival-lede--row > .ac-btn {
   flex: none;
-  margin-top: -1px;
+  margin-block: calc((28px - var(--control-h-sm)) / 2);
   margin-inline-start: -6px;
 }
 .arrival-lede--row .arrival-lede__title {
