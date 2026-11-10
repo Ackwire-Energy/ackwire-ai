@@ -849,11 +849,18 @@ textarea.ac-input {
   border-radius: 4px;
   background: var(--sunken);
 }
+/* As a face's initials (`.ac-avatar__initials`): its box trimmed to its capital, so the tile centres the letter. */
 .ac-brand__initial {
   font-weight: 600;
   font-size: 18px;
   line-height: 1;
   color: var(--ink-muted);
+  text-box: trim-both cap alphabetic;
+}
+@supports not (text-box: trim-both cap alphabetic) {
+  .ac-brand__initial {
+    translate: 0 var(--cap-mid);
+  }
 }
 .ac-brand--sm .ac-brand__initial {
   font-size: 13px;
@@ -976,14 +983,12 @@ textarea.ac-input {
 }
 /* The initials' box trimmed to their capitals, so the tile centres the letters the eye sees, not the line around them
    (a line's room above and below the capitals differs, and its baseline lands on a whole pixel). Without text-box the
-   capitals' middle sits --cap-mid above the line's. A maker's letter in its tile (`ProviderLogo` with no mark) too. */
-.ac-avatar__initials,
-.ac-brand__initial {
+   capitals' middle sits --cap-mid above the line's. */
+.ac-avatar__initials {
   text-box: trim-both cap alphabetic;
 }
 @supports not (text-box: trim-both cap alphabetic) {
-  .ac-avatar__initials,
-  .ac-brand__initial {
+  .ac-avatar__initials {
     translate: 0 var(--cap-mid);
   }
 }
