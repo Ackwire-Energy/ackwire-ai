@@ -17125,8 +17125,6 @@ export const en = {
     goesCloud: "What you write goes by email to the agentes.chat team.",
     goesServer: "What you write goes by email to whoever runs this server.",
     placeholder: "Write it your way",
-    goesWith:
-      "Sent along: your email ({{email}}), the screen you are on and what is open on it, your browser and the app's latest errors. No conversation is sent.",
     /** The last entry of a right-click menu: it opens this form about what was clicked. */
     report: "Report a problem here",
     /** Over the excerpt of the thing the feedback is about. */
@@ -17143,8 +17141,6 @@ export const en = {
     fileType: "Only photos and videos can be attached.",
     fileTooLarge: "{{name}} is too large: the limit is {{mb}} MB.",
     fileTooMany: "One feedback takes up to {{images}} photos and one video.",
-    goesWithAbout:
-      "Sent along: your email ({{email}}), the screen you are on and what is open on it, your browser and the app's latest errors. From your conversations, only the excerpt above.",
     send: "Send",
     thanks: "Delivered. Thank you!",
     reply: "Everything is read. An answer, if one is needed, comes to {{email}}.",

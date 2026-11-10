@@ -5,7 +5,7 @@ import { desktopPlatform } from "./desktop";
 /*
  * What a feedback knows before the person types (ADR 0160): the thing they right-clicked, where the app is and what
  * went wrong in it lately. All of it is for whoever reads the email, so its labels are plain English and never shown
- * as they are: the form says in the person's language what goes along.
+ * on screen.
  */
 
 /** As the server takes it (`FEEDBACK_ABOUT_MAX`, `FEEDBACK_FACT_MAX`). */
@@ -56,7 +56,8 @@ const nameOf = (el: Element) => {
  */
 export function describeElement(target: EventTarget | null, selected = ""): Reported | null {
   if (!(target instanceof Element)) return null;
-  const message = target.closest<HTMLElement>("[data-message-id]");
+  // The row that carries the id first: a message drawn inside it would be found before it.
+  const message = target.closest<HTMLElement>("[data-message-id]") ?? target.closest<HTMLElement>(".ac-msg");
   if (message) {
     const author = textOf(message.querySelector(".ac-msg__author"));
     const byAgent = message.matches(".ac-msg--agent") || message.querySelector(".ac-msg--agent") !== null;
@@ -68,7 +69,8 @@ export function describeElement(target: EventTarget | null, selected = ""): Repo
         text: (selected || textOf(message.querySelector(".ac-msg__body") ?? message)).slice(0, ABOUT_MAX),
       },
       facts: [
-        ["Message id", message.dataset.messageId ?? ""],
+        // A message the app draws by itself (a greeting) has no id.
+        ...(message.dataset.messageId ? ([["Message id", message.dataset.messageId]] as [string, string][]) : []),
         ["Element", pathOf(target)],
       ],
     };
@@ -82,6 +84,12 @@ export function describeElement(target: EventTarget | null, selected = ""): Repo
     facts: [["Element", pathOf(target)]],
   };
 }
+
+/**
+ * What a right click can report where nothing has a menu of its own: a message, a card, a dialog. Elsewhere (the
+ * page's empty space, the sidebar) the browser keeps its menu.
+ */
+export const REPORTABLE = "[data-message-id], .ac-msg, .ac-card, [role='dialog'], article";
 
 /* ---------- what went wrong lately ---------- */
 

@@ -41326,9 +41326,6 @@
   "feedback.placeholder": {
     "value": "Write it your way"
   },
-  "feedback.goesWith": {
-    "value": "Sent along: your email ({{email}}), the screen you are on and what is open on it, your browser and the app's latest errors. No conversation is sent."
-  },
   "feedback.report": {
     "value": "Report a problem here"
   },
@@ -41364,9 +41361,6 @@
   },
   "feedback.fileTooMany": {
     "value": "One feedback takes up to {{images}} photos and one video."
-  },
-  "feedback.goesWithAbout": {
-    "value": "Sent along: your email ({{email}}), the screen you are on and what is open on it, your browser and the app's latest errors. From your conversations, only the excerpt above."
   },
   "feedback.send": {
     "value": "Send"

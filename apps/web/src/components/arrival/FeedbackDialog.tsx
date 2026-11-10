@@ -13,7 +13,6 @@ import {
   Icon,
   modKey,
   PixelSpinner,
-  SettingNote,
   Textarea,
 } from "@agenteschat/ui";
 import { useMutation } from "@tanstack/react-query";
@@ -22,7 +21,8 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
-import { setMenuReporter } from "@/lib/context-menu";
+import { matchesNow, TOUCH } from "@/hooks/useMatchMedia";
+import { contextMenusOn, keepsSystemMenu, openContextMenu, selectedTextAt, setMenuReporter } from "@/lib/context-menu";
 import {
   closeFeedback,
   describeElement,
@@ -31,6 +31,7 @@ import {
   feedbackOpen,
   onFeedbackOpen,
   openFeedback,
+  REPORTABLE,
   type Reported,
   watchErrors,
 } from "@/lib/feedback";
@@ -408,9 +409,6 @@ export function FeedbackDialog({ reported, onClose }: { reported: Reported | nul
                 })}
               </span>
             </div>
-            <SettingNote icon="mail">
-              {t(quote ? "feedback.goesWithAbout" : "feedback.goesWith", { email: me.user.email })}
-            </SettingNote>
           </DialogBody>
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={onClose}>
@@ -448,7 +446,20 @@ export function FeedbackHost() {
       label: t("feedback.report"),
       run: (target, selected) => openFeedback(describeElement(target, selected)),
     });
-    return () => setMenuReporter(null);
+    // A message or a card with no menu of its own gets one, with that entry alone. Selected text, links, pictures
+    // and fields keep the browser's menu, as everywhere; so does a long press on a touch screen.
+    const onContextMenu = (e: MouseEvent) => {
+      if (e.defaultPrevented || !contextMenusOn() || keepsSystemMenu(e.target)) return;
+      if ((e as PointerEvent).pointerType === "touch" || matchesNow(TOUCH)) return;
+      if (!(e.target instanceof Element) || !e.target.closest(REPORTABLE) || selectedTextAt(e.target)) return;
+      e.preventDefault();
+      openContextMenu(e.clientX, e.clientY, [], e.target);
+    };
+    document.addEventListener("contextmenu", onContextMenu);
+    return () => {
+      document.removeEventListener("contextmenu", onContextMenu);
+      setMenuReporter(null);
+    };
   }, [on, t]);
   // Leaving the workspace leaves the form: it never opens by itself in the next one.
   useEffect(() => closeFeedback, []);

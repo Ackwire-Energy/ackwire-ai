@@ -17267,8 +17267,6 @@ export const ptBR = {
     goesCloud: "O que você escrever vai por e-mail para o time do agentes.chat.",
     goesServer: "O que você escrever vai por e-mail para quem administra este servidor.",
     placeholder: "Escreva do seu jeito",
-    goesWith:
-      "Vai junto: o seu e-mail ({{email}}), a tela em que você está e o que está aberto nela, o seu navegador e os últimos erros do app. Nenhuma conversa é enviada.",
     report: "Reportar um problema aqui",
     aboutMessage: "Sobre a mensagem de {{name}}",
     aboutItem: "Sobre: {{name}}",
@@ -17281,8 +17279,6 @@ export const ptBR = {
     fileType: "Só dá para anexar foto ou vídeo.",
     fileTooLarge: "{{name}} é grande demais: o limite é {{mb}} MB.",
     fileTooMany: "Um feedback leva até {{images}} fotos e um vídeo.",
-    goesWithAbout:
-      "Vai junto: o seu e-mail ({{email}}), a tela em que você está e o que está aberto nela, o seu navegador e os últimos erros do app. Das suas conversas, só o trecho acima.",
     send: "Enviar",
     thanks: "Recado entregue. Obrigado!",
     reply: "Tudo é lido. A resposta, se precisar, chega em {{email}}.",

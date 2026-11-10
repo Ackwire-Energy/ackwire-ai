@@ -8,8 +8,8 @@ import { enqueue, PermanentJobError } from "./outbox";
 /*
  * Feedback from the apps (ADR 0160): what a person writes in the form goes, as one plain email, to the address
  * whoever runs the server set (`FEEDBACK_EMAIL`). With it go what the person chose to show (the thing they reported,
- * pictures, a video) and what the app knows of where they were, all of it listed on the form before it is sent.
- * Nothing is stored beyond the outbox job and the files, which expire.
+ * pictures, a video) and what the app knows of where they were. Nothing is stored beyond the outbox job and the
+ * files, which expire.
  */
 
 export const FEEDBACK_JOB = "feedback.send";

@@ -47,8 +47,8 @@ with Postgres alone, and must not need a third-party widget in the apps.
    answer goes to them); the workspace's name and their role when they are a member of the one the app named; what
    the app knows of where they are (the route's pattern and its ids, the agent open and what it thinks with, the
    connection, the language, the browser, the window, the build and the app's last errors); and what they chose to
-   show: the thing they right-clicked, and files. The form says in their language what goes along, before sending.
-   No conversation is sent except the excerpt the form shows, which the person can take out.
+   show: the thing they right-clicked, and files. No conversation is sent except the excerpt the form shows, which
+   the person can take out. The form doesn't list the rest: it says only who reads the feedback.
 
 7. **Through the outbox, as every email.** The route only queues job `feedback.send`; the job sends one plain email,
    outside the branded templates, since its reader is the operator. The app makes an id per message, so a request
@@ -64,7 +64,8 @@ with Postgres alone, and must not need a third-party widget in the apps.
    (`openContextMenu` with the click's target; a button's menu has none). It opens the form about the thing clicked:
    a message says who wrote it and what it says, anything else its role, its name and its words (`describeElement`),
    or only the text the person had selected there. Where it sits in the page goes along as a fact, for whoever has
-   the code.
+   the code. A message, a card or a dialog with no menu of its own gets one with that entry alone; the page's empty
+   space, links, pictures, fields and selected text keep the browser's menu.
 
 10. **Pictures and a video, kept for a while.** A feedback takes up to three pictures of 5 MB and one video of
     50 MB. Each is uploaded as it is added (`POST /api/app/feedback/files`), into the platform's blob store, with a
