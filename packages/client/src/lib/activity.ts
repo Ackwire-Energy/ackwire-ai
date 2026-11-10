@@ -95,6 +95,7 @@ export type ActivityKind =
   | "startingWork"
   | "updatingWork"
   | "withdrawingRequest"
+  | "releasingAgent"
   | "schedulingAction"
   | "updatingDashboard"
   | "testingOnPhone"
@@ -251,6 +252,7 @@ const BUILTIN: Record<string, ActivityKind> = {
   stop_work: "updatingWork",
   post_update: "updatingWork",
   withdraw_request: "withdrawingRequest",
+  release_waiting_agent: "releasingAgent",
   schedule_action: "schedulingAction",
   create_dashboard: "updatingDashboard",
   create_widget: "updatingDashboard",

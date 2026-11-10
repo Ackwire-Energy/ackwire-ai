@@ -84,7 +84,8 @@ export function DmPage({ target, focusMessageId }: { target: DmTarget; focusMess
 
   const owner = agent?.ownerUserId ? dir.memberById.get(agent.ownerUserId) : undefined;
   const role = agent ? agent.role || `@${agent.handle}` : "";
-  // The right hand (ADR 0137) says what it is and whose permissions it acts with, never an owner.
+  // The right hand (ADR 0137) says what it is and whose permissions it acts with, never an owner, nor a model: each
+  // person's DM with it thinks with their own AI, shown with its maker's logo in the side panel's Como pensa.
   const header = ({ onSearch, side }: { onSearch: () => void; side: DmSideControl | null }) => (
     <header className="channel__header">
       <NavToggle />
@@ -102,7 +103,7 @@ export function DmPage({ target, focusMessageId }: { target: DmTarget; focusMess
                 : owner
                   ? t("dm.subtitle", { role, owner: owner.name })
                   : t("dm.subtitleNoOwner", { role })}
-              {thinks?.text && (
+              {thinks?.text && !rightHand && (
                 <>
                   {" · "}
                   <span className="channel__brain ac-iconline">

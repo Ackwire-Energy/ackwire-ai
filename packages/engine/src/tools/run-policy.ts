@@ -137,6 +137,8 @@ const HERE = new Set([
   "offer_answers",
   "follow_up",
   "cancel_follow_up",
+  // Lets another agent's wait here go, with a note here (`parked-asks.ts`).
+  "release_waiting_agent",
 ]);
 
 /** Reads under a scope that also writes, by name. */

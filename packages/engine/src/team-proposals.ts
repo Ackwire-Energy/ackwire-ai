@@ -2,7 +2,15 @@ import { holdEvents, type PubSub } from "@agenteschat/adapters";
 import { and, type Database, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { serverText } from "@agenteschat/i18n";
 import { type AppLocale, appLocale } from "@agenteschat/i18n/locale";
-import { checkRoutine, type DraftPlace, giveApps, type ProposedRoutine, suggestAgentAi } from "./agent-proposals";
+import {
+  agentsLike,
+  agentsLikeText,
+  checkRoutine,
+  type DraftPlace,
+  giveApps,
+  type ProposedRoutine,
+  suggestAgentAi,
+} from "./agent-proposals";
 import {
   type Agent,
   archiveAgent,
@@ -122,8 +130,6 @@ export interface TeamParams {
   invite: string[];
   /** From "Usar este modelo": the template's id. */
   template?: string;
-  /** On a billing hold, from a template: what its first agent delivers, shown labelled and never posted. */
-  example?: string;
 }
 
 /** `failed` is never stored: a failure leaves it `pending` with `error`. */
@@ -354,7 +360,6 @@ export async function checkTeam(
     approvals: str(input.approvals).slice(0, 300),
     invite: [...new Set(list(input.invite).map(str).filter(Boolean))].slice(0, 10),
     ...(str(input.template) ? { template: str(input.template) } : {}),
-    ...(str(input.example) ? { example: str(input.example) } : {}),
   };
 }
 
@@ -989,6 +994,11 @@ function teamSchema(personal: boolean): JsonSchema {
           ? "Add your own weekly look at how their agents did (Fridays at 17h, here). Yes for new agents."
           : "Add your own weekly check of the team (Fridays at 17h, here). Yes for a new team.",
       },
+      also_new: {
+        type: "boolean",
+        description:
+          "Only once the person said to make them although agents like them already exist (this tool names them).",
+      },
     },
     required: ["lead", "agents"],
     additionalProperties: false,
@@ -1082,6 +1092,9 @@ export function teamTools(deps: {
           const full = await deps.cardsLeft(ctx, true);
           if (full) return full;
           const forUserId = await personBehindCall(ctx);
+          const drafts = list(input.agents).map(obj);
+          const like = input.also_new === true ? [] : await agentsLike(ctx.db, ctx.orgId, drafts, forUserId);
+          if (like.length > 0) return { content: agentsLikeText(like, PROPOSE_TEAM_TOOL) };
           const locale = await personLocale(ctx.db, forUserId);
           const params = await checkTeam(
             { db: ctx.db, context: deps.context },

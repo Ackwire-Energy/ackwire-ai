@@ -67,6 +67,7 @@ import type {
   NewAgentSetup,
   OrgRole,
   OrgSettings,
+  OrgStanding,
   PeopleUsage,
   Person,
   PersonLimits,
@@ -351,6 +352,8 @@ export interface FakeState {
   holdPosts?: Promise<void>;
   /** What `orgs.billingLink` throws (default: a link on billing.example.com). */
   billingLinkError?: ApiError;
+  /** A new workspace's standing (`orgs.create`): agentes.chat Cloud starts it waiting for its first plan. */
+  newWorkspaceStanding?: OrgStanding;
   /** `orgs.limits` (ADR 0079); unset = no limits, the members counted from `members`. */
   limits?: WorkspaceLimits;
   /** `agents.aiStatus`; unset = every agent ready. */
@@ -1552,6 +1555,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           name: input.name,
           role: "owner",
           onboarding: { step: "context", generalChannelId: general },
+          ...(state.newWorkspaceStanding ? { standing: state.newWorkspaceStanding } : {}),
           // Who it is for (ADR 0159), as the server keeps it.
           ...(input.mode ? { mode: input.mode } : {}),
         });
@@ -1744,8 +1748,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("orgs.removeLogo", orgId);
         setOrgLogo(orgId, null);
       },
-      billingLink: async (orgId, from) => {
-        log("orgs.billingLink", orgId, from);
+      billingLink: async (orgId, from, _returnTo, plan) => {
+        log("orgs.billingLink", orgId, from, ...(plan ? [plan] : []));
         if (state.billingLinkError) throw state.billingLinkError;
         return { url: `https://billing.example.com/link?t=${from}`, expiresAt: NOW.toISOString() };
       },
@@ -3046,6 +3050,12 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         const line = state.messages.find((m) => m.id === messageId);
         const notice = line?.meta?.notice as { refs?: Record<string, string> } | undefined;
         if (notice?.refs) notice.refs = { ...notice.refs, state: "canceled" };
+      },
+      answerGitHub: async (orgId, messageId) => {
+        log("chat.answerGitHub", orgId, messageId);
+        const line = state.messages.find((m) => m.id === messageId);
+        const notice = line?.meta?.notice as { refs?: Record<string, string> } | undefined;
+        if (notice?.refs) notice.refs = { ...notice.refs, answeredBy: "me" };
       },
       roster: async (_orgId, channelId) =>
         (state.channelMembers[channelId] ?? []).map((m) =>

@@ -1703,6 +1703,78 @@
   "onboarding.progress.done": {
     "value": "All set"
   },
+  "onboarding.flow.steps.name": {
+    "value": "Workspace name"
+  },
+  "onboarding.flow.steps.business": {
+    "value": "What you do"
+  },
+  "onboarding.flow.steps.team": {
+    "value": "Your team"
+  },
+  "onboarding.flow.steps.plan": {
+    "value": "Turn the team on"
+  },
+  "onboarding.flow.stepOf": {
+    "value": "Step {{n}} of {{total}}"
+  },
+  "onboarding.flow.lodi.name": {
+    "value": "Hi, {{first}}. I'm {{name}}. I'll put the team together with you in about two minutes."
+  },
+  "onboarding.flow.lodi.business": {
+    "value": "With that I'll know who to bring onto the team."
+  },
+  "onboarding.flow.lodi.team": {
+    "value": "This is the team I'd put together. You can change anything later."
+  },
+  "onboarding.flow.lodi.plan": {
+    "value": "After the plan, all that's left is connecting an AI. I'll show you where."
+  },
+  "onboarding.flow.preview.label": {
+    "value": "Your workspace, as you answer"
+  },
+  "onboarding.flow.preview.name": {
+    "value": "Your workspace"
+  },
+  "onboarding.flow.preview.ghost": {
+    "value": "Your team shows up here"
+  },
+  "onboarding.flow.team.title": {
+    "value": "Your team"
+  },
+  "onboarding.flow.plan.title": {
+    "value": "Turn your team on"
+  },
+  "onboarding.flow.plan.lead": {
+    "value": "Your team is ready. With the plan and an AI, it starts today."
+  },
+  "onboarding.flow.plan.asleep": {
+    "value": "Asleep until the plan"
+  },
+  "onboarding.flow.plan.price": {
+    "value": "<b>{{name}} plan</b> · {{price}} a month"
+  },
+  "onboarding.flow.plan.name": {
+    "value": "<b>{{name}} plan</b>"
+  },
+  "onboarding.flow.plan.generic": {
+    "value": "An agentes.chat plan"
+  },
+  "onboarding.flow.plan.cancel": {
+    "value": "Cancel anytime"
+  },
+  "onboarding.flow.plan.cta": {
+    "value": "Turn the team on"
+  },
+  "onboarding.flow.plan.all": {
+    "value": "See all plans"
+  },
+  "onboarding.flow.plan.skip": {
+    "value": "Go to the workspace without it"
+  },
+  "onboarding.flow.account": {
+    "value": "Your account"
+  },
   "onboarding.railValue.context": {
     "value": "Written"
   },
@@ -3248,12 +3320,6 @@
   "noticePrefs.category.reactions.help": {
     "value": "When someone reacts to a message of yours"
   },
-  "webPushAsk.title": {
-    "value": "Know when an agent needs you"
-  },
-  "webPushAsk.text": {
-    "value": "They work while you do something else. Even with the tab closed, we'll tell you when they need your ok, finish what you asked or call you."
-  },
   "webPushAsk.on": {
     "value": "Turn on notifications"
   },
@@ -3269,20 +3335,8 @@
   "webPushAsk.someone": {
     "value": "An agent"
   },
-  "webPushAsk.examples": {
-    "value": "Examples of notifications"
-  },
   "webPushAsk.now": {
     "value": "now"
-  },
-  "webPushAsk.minutes": {
-    "value": "{{n}} min"
-  },
-  "webPushAsk.approval.title": {
-    "value": "{{name}} needs your ok"
-  },
-  "webPushAsk.approval.body": {
-    "value": "Can I go ahead with what you asked?"
   },
   "webPushAsk.finished.title": {
     "value": "{{name}} is done"
@@ -3290,11 +3344,11 @@
   "webPushAsk.finished.body": {
     "value": "What you asked for is ready."
   },
-  "webPushAsk.mention.title": {
-    "value": "{{name}} called you"
+  "webPushAsk.inline.title": {
+    "value": "Want to know the moment {{name}} answers?"
   },
-  "webPushAsk.mention.body": {
-    "value": "Can you take a look when you have a minute?"
+  "webPushAsk.inline.why": {
+    "value": "Even with the tab closed. Change it anytime in Settings › Notifications."
   },
   "shell.otherChannels": {
     "value": "Other channels"
@@ -3821,12 +3875,6 @@
       "other": "{{count}} more agents in Team"
     }
   },
-  "sidebarAgents.createFirst": {
-    "value": "Create the first agent"
-  },
-  "sidebarAgents.createFirstPersonal": {
-    "value": "Create your first agent"
-  },
   "sidebarAgents.newAgent": {
     "value": "New agent"
   },
@@ -3871,9 +3919,6 @@
   },
   "sidebarPins.pinned": {
     "value": "Pinned"
-  },
-  "sidebarPins.hint": {
-    "value": "Your agents stay on top. Right-click any conversation to pin it."
   },
   "sidebarPins.full.agents": {
     "value": "You already pinned 5 agents. Unpin one to pin this one."
@@ -4946,6 +4991,9 @@
   "receipts.retry": {
     "value": "Try again"
   },
+  "receipts.retrying": {
+    "value": "Trying again…"
+  },
   "receipts.platformCap": {
     "value": "Mention an agent with @ to have it answer."
   },
@@ -4973,11 +5021,11 @@
   "rightHand.label": {
     "value": "your right hand"
   },
+  "rightHand.labelCapitalized": {
+    "value": "Your right hand"
+  },
   "rightHand.newDot": {
     "value": "New"
-  },
-  "rightHand.role": {
-    "value": "Workspace assistant"
   },
   "rightHand.rolePersonal": {
     "value": "Personal assistant"
@@ -5038,9 +5086,6 @@
   },
   "rightHand.intro.again.messagePersonal": {
     "value": "Help me set up my agents."
-  },
-  "rightHand.intro.next.firstTask": {
-    "value": "Give {{name}} a first task"
   },
   "rightHand.intro.style.question": {
     "value": "How should I talk to you?"
@@ -5836,11 +5881,17 @@
   "noAi.rightHand.computer_failed": {
     "value": "{{name}} can't answer now: the computer the plan is signed in on had a problem."
   },
+  "noAi.rightHand.cli_failed": {
+    "value": "{{name}} can't answer now: the plan's AI stopped with an error."
+  },
   "noAi.rightHand.plan_limit": {
     "value": "{{name}} can't answer now: the plan reached its limit."
   },
   "noAi.rightHand.plan_not_shared": {
     "value": "Connect your own plan to talk to {{name}}: the workspace's plan serves only its owner."
+  },
+  "noAi.rightHand.plan_unattended": {
+    "value": "{{name}} didn't answer: the request didn't come from a person, and the workspace's plan serves only its owner."
   },
   "noAi.rightHand.runner_outdated": {
     "value": "{{name}} can't answer now: the program on the plan's computer needs an update."
@@ -8873,6 +8924,24 @@
   },
   "vault.source.onepassword.field.token": {
     "value": "Service account token"
+  },
+  "vault.source.onepassword.error.invalid_input": {
+    "value": "This isn't a service account token. Paste the token that starts with ops_."
+  },
+  "vault.source.onepassword.error.auth_failed": {
+    "value": "1Password didn't accept this token. Create a new service account and paste its token here."
+  },
+  "vault.source.onepassword.error.no_vault": {
+    "value": "This service account has no access to any vault. Create a new one with access to your agents' vault."
+  },
+  "vault.source.onepassword.error.many_vaults": {
+    "value": "This service account has access to more than one vault. Create a new one with access to your agents' vault only."
+  },
+  "vault.source.onepassword.error.unreachable": {
+    "value": "Couldn't reach 1Password. Try again in a minute."
+  },
+  "vault.source.onepassword.error.unsupported": {
+    "value": "1Password can't be connected here. Save the logins your agents need in the Vault instead."
   },
   "vault.source.bitwarden.warning": {
     "value": "Use an account only for your agents. Its master password opens the whole account, so nothing personal should be in it."
@@ -12351,6 +12420,15 @@
   "agentPage.activity.errors.computer_timeout": {
     "value": "The computer took too long to answer."
   },
+  "agentPage.activity.errors.cli_failed": {
+    "value": "The {{brain}} program stopped with an error: {{detail}}"
+  },
+  "agentPage.activity.errors.cli_stopped": {
+    "value": "The {{brain}} program stopped with an error."
+  },
+  "agentPage.activity.errors.cli_closed": {
+    "value": "The {{brain}} program closed unexpectedly."
+  },
   "agentPage.activity.errors.account_missing": {
     "value": "The account chosen for this agent isn't on its computer anymore. Choose another one in the agent's settings, or add it again."
   },
@@ -12807,6 +12885,39 @@
   "proposals.acceptSome": {
     "value": "Accept for {{count}}"
   },
+  "proposals.all.label": {
+    "value": "Decide every proposal"
+  },
+  "proposals.all.accept": {
+    "value": "Accept all"
+  },
+  "proposals.all.refuse": {
+    "value": "Refuse all"
+  },
+  "proposals.all.acceptAsk": {
+    "value": {
+      "one": "Accept the proposal? It applies right away.",
+      "other": "Accept all {{count}} proposals? Each one applies right away."
+    }
+  },
+  "proposals.all.refuseAsk": {
+    "value": {
+      "one": "Refuse the proposal? The agent won't propose it again.",
+      "other": "Refuse all {{count}} proposals? The agents won't propose them again."
+    }
+  },
+  "proposals.all.acceptGo": {
+    "value": {
+      "one": "Accept",
+      "other": "Accept {{count}}"
+    }
+  },
+  "proposals.all.refuseGo": {
+    "value": {
+      "one": "Refuse",
+      "other": "Refuse {{count}}"
+    }
+  },
   "proposals.staleSome": {
     "value": {
       "one": "One wasn't accepted: its text changed after the proposal.",
@@ -12899,6 +13010,12 @@
   },
   "proposals.removed": {
     "value": "Removed: "
+  },
+  "proposals.sameLines": {
+    "value": {
+      "one": "{{count}} unchanged line",
+      "other": "{{count}} unchanged lines"
+    }
   },
   "proposals.empty": {
     "value": "When someone asks an agent for a change, or a lesson repeats, the proposal shows up here."
@@ -13206,17 +13323,8 @@
   "agentSetup.firstRun.afterPlan": {
     "value": "Opens with the plan."
   },
-  "agentSetup.firstRun.about.todo": {
-    "value": "Tell me what {{org}} does."
-  },
-  "agentSetup.firstRun.about.todoDesc": {
-    "value": "Every agent reads this."
-  },
   "agentSetup.firstRun.about.action": {
     "value": "Tell"
-  },
-  "agentSetup.firstRun.about.done": {
-    "value": "I know what {{org}} does"
   },
   "agentSetup.firstRun.about.title": {
     "value": "What does {{org}} do?"
@@ -13251,21 +13359,6 @@
   "agentSetup.firstRun.about.optionalPersonal": {
     "value": "Optional. Without one, the areas you picked count."
   },
-  "agentSetup.firstRun.team.todo": {
-    "value": "Build the team."
-  },
-  "agentSetup.firstRun.team.todoDesc": {
-    "value": "A template for your business, you can change everything later."
-  },
-  "agentSetup.firstRun.team.action": {
-    "value": "See the team"
-  },
-  "agentSetup.firstRun.team.done": {
-    "value": {
-      "one": "{{count}} agent on the team",
-      "other": "{{count}} agents on the team"
-    }
-  },
   "agentSetup.firstRun.team.todoPersonal": {
     "value": "Pick your agents."
   },
@@ -13274,9 +13367,6 @@
   },
   "agentSetup.firstRun.team.actionPersonal": {
     "value": "See agents"
-  },
-  "agentSetup.firstRun.team.card": {
-    "value": "Continue on the card below"
   },
   "agentSetup.firstRun.ai.todo": {
     "value": "Connect an AI."
@@ -13292,12 +13382,6 @@
   },
   "agentSetup.firstRun.ai.doneAny": {
     "value": "I think with an AI now"
-  },
-  "agentSetup.firstRun.ai.plan": {
-    "value": "Opens with the agentes.chat plan."
-  },
-  "agentSetup.firstRun.ai.planAction": {
-    "value": "See agentes.chat plans"
   },
   "agentSetup.firstRun.apps.todo": {
     "value": "Connect your work apps."
@@ -13356,11 +13440,17 @@
   "agentSetup.firstRun.people.doneNone": {
     "value": "Just you for now"
   },
-  "agentSetup.firstRun.say.about": {
-    "value": "Noted. Every agent reads this."
+  "agentSetup.firstRun.people.invited": {
+    "value": "Invited {{names}} · waiting"
   },
-  "agentSetup.firstRun.say.team": {
-    "value": "The team is here."
+  "agentSetup.firstRun.people.email": {
+    "value": "name@company.com"
+  },
+  "agentSetup.firstRun.people.send": {
+    "value": "Send"
+  },
+  "agentSetup.firstRun.people.more": {
+    "value": "More options"
   },
   "agentSetup.firstRun.say.ai": {
     "value": "Now the team thinks."
@@ -13370,6 +13460,9 @@
   },
   "agentSetup.firstRun.say.people": {
     "value": "Good to have more people here."
+  },
+  "agentSetup.firstRun.say.invited": {
+    "value": "Invite sent."
   },
   "agentSetup.firstRun.say.aboutPersonal": {
     "value": "Noted. All your agents read this."
@@ -17665,6 +17758,9 @@
   },
   "routines.code.computer_timeout": {
     "value": "The computer took too long to answer"
+  },
+  "routines.code.cli_failed": {
+    "value": "The AI program on the computer stopped with an error"
   },
   "routines.code.account_missing": {
     "value": "The agent's account isn't on its computer anymore"
@@ -25335,6 +25431,12 @@
   "drive.select": {
     "value": "Select {{title}}"
   },
+  "drive.selectAll": {
+    "value": {
+      "one": "Select {{count}}",
+      "other": "Select all {{count}}"
+    }
+  },
   "drive.selection": {
     "value": "Selection"
   },
@@ -25820,6 +25922,12 @@
   },
   "githubApp.server.line.invalid": {
     "value": "This server can't open the saved app. Remove it and create it again."
+  },
+  "githubApp.server.line.events": {
+    "value": "For agents to hear what happens on GitHub, tick these events on the app: {{events}}."
+  },
+  "githubApp.server.events": {
+    "value": "Tick the events"
   },
   "githubApp.server.open": {
     "value": "Open on GitHub"
@@ -29470,6 +29578,9 @@
   "errors.webhook.invalidRepo": {
     "value": "Write the repository as owner/name."
   },
+  "errors.githubEvent.answered": {
+    "value": "Someone already asked for this reply. The agent is on it."
+  },
   "errors.issue.assigneeOutside": {
     "value": "This person can't see this task. Add them to who sees it first."
   },
@@ -29872,6 +29983,9 @@
   "errors.run.notRestartable": {
     "value": "This answer had already started, so it can't start over. Send your message again."
   },
+  "errors.run.notRestartableVoice": {
+    "value": "This answer had already started, so it can't start over. Record your message again."
+  },
   "errors.run.cancelForbidden": {
     "value": "Only who asked, the agent's owner or an admin can stop it."
   },
@@ -30192,6 +30306,12 @@
   },
   "errors.vault.source.tooManyItems": {
     "value": "The Vault is full. Remove items before syncing more."
+  },
+  "errors.feedback.filesGone": {
+    "value": "A file you added is gone. Add it again."
+  },
+  "errors.feedback.filesPending": {
+    "value": "Too many files are waiting to be sent. Send or remove some, then try again."
   },
   "machines.reasons.browser_unsupported": {
     "value": "The agent browser doesn't run on this computer's system."
@@ -34848,6 +34968,18 @@
   "work.statusReplyAway": {
     "value": "Waiting for my computer to come back. I'll read your message as soon as it's back."
   },
+  "work.statusReplyPlan": {
+    "value": "I'm waiting for my plan to come back ({{when}}). I'll read your message when it's back."
+  },
+  "work.statusReplyPlanUnknown": {
+    "value": "I'm waiting for my plan to come back. I'll read your message as soon as it's back."
+  },
+  "work.statusReplyBudget": {
+    "value": "I'm waiting for my monthly budget to renew ({{when}}). I'll read your message then, or sooner if an admin raises the limit."
+  },
+  "work.statusReplyBudgetUnknown": {
+    "value": "I'm waiting for my monthly budget to renew. I'll read your message then, or sooner if an admin raises the limit."
+  },
   "work.status.one": {
     "value": "Working on: {{subject}}"
   },
@@ -35168,6 +35300,45 @@
   },
   "chat.notice.wakeSkippedCallable": {
     "value": "{{name}}'s settings don't let it call {{agents}} (another project, or not on its list of agents to call). Whoever looks after {{name}} can change that on the agent's page."
+  },
+  "chat.notice.github.comment": {
+    "value": "{{who}} commented on PR #{{number}} ({{repo}}) on GitHub"
+  },
+  "chat.notice.github.commentIssue": {
+    "value": "{{who}} commented on issue #{{number}} ({{repo}}) on GitHub"
+  },
+  "chat.notice.github.commentDiscussion": {
+    "value": "{{who}} commented on discussion #{{number}} ({{repo}}) on GitHub"
+  },
+  "chat.notice.github.opened": {
+    "value": "{{who}} called the agentes.chat app in #{{number}} ({{repo}}) on GitHub"
+  },
+  "chat.notice.github.reviewed": {
+    "value": "{{who}} reviewed PR #{{number}} ({{repo}}) on GitHub"
+  },
+  "chat.notice.github.approved": {
+    "value": "{{who}} approved PR #{{number}} ({{repo}}) on GitHub"
+  },
+  "chat.notice.github.changes": {
+    "value": "{{who}} asked for changes on PR #{{number}} ({{repo}}) on GitHub"
+  },
+  "chat.notice.github.reviewRequested": {
+    "value": "{{who}} asked {{name}} to review PR #{{number}} ({{repo}}) on GitHub"
+  },
+  "chat.notice.github.merged": {
+    "value": "{{who}} merged PR #{{number}} ({{repo}}) on GitHub"
+  },
+  "chat.notice.github.closed": {
+    "value": "{{who}} closed PR #{{number}} ({{repo}}) on GitHub"
+  },
+  "chat.notice.github.closedIssue": {
+    "value": "{{who}} closed issue #{{number}} ({{repo}}) on GitHub"
+  },
+  "chat.notice.github.ask": {
+    "value": "Ask for a reply"
+  },
+  "chat.notice.github.asked": {
+    "value": "{{asker}} asked {{name}} to reply to {{who}} on GitHub"
   },
   "chat.notice.show": {
     "value": "Show"
@@ -35561,6 +35732,9 @@
   "chat.work.step.withdrawingRequest": {
     "value": "Withdrew a request"
   },
+  "chat.work.step.releasingAgent": {
+    "value": "Released a waiting agent"
+  },
   "chat.work.step.schedulingAction": {
     "value": "Prepared an action for later"
   },
@@ -35884,6 +36058,9 @@
   },
   "chat.activity.withdrawingRequest": {
     "value": "withdrawing a request"
+  },
+  "chat.activity.releasingAgent": {
+    "value": "releasing a waiting agent"
   },
   "chat.activity.schedulingAction": {
     "value": "preparing an action for later"
@@ -36278,11 +36455,17 @@
   "chat.body.no_ai_computer_failed": {
     "value": "I can't answer now: the computer my plan is signed in on had a problem."
   },
+  "chat.body.no_ai_cli_failed": {
+    "value": "I can't answer now: my plan's AI stopped with an error."
+  },
   "chat.body.no_ai_plan_limit": {
     "value": "I can't answer now: the plan I think with reached its limit."
   },
   "chat.body.no_ai_plan_not_shared": {
     "value": "I can't answer you on the workspace's plan: it serves only its owner. Connect your own plan and I will."
+  },
+  "chat.body.no_ai_plan_unattended": {
+    "value": "I didn't answer: the request didn't come from a person, and the workspace's plan serves only its owner."
   },
   "chat.body.no_ai_runner_outdated": {
     "value": "I can't answer now: the program on my plan's computer needs an update."
@@ -40111,8 +40294,14 @@
   "dashboards.empty.viewer": {
     "value": "Whoever edits this dashboard adds widgets, and they show up here."
   },
-  "dashboards.onlyHome": {
-    "value": "Make a dashboard for the workspace or some roles with “New dashboard”."
+  "dashboards.first.title": {
+    "value": "Build the team's first dashboard"
+  },
+  "dashboards.first.text": {
+    "value": "A dashboard puts numbers and charts on one page, and the agents keep them up to date."
+  },
+  "dashboards.first.ask": {
+    "value": "Help me build the team's first dashboard."
   },
   "dashboards.create.title": {
     "value": "New dashboard"
@@ -40636,14 +40825,11 @@
   "teamPlan.firstTask.lead": {
     "value": "One short task per agent, so you see each one working today."
   },
-  "teamPlan.firstTask.heldLead": {
-    "value": "One short task per agent. Finish the sentence and send it. They start once the workspace has an agentes.chat plan."
-  },
-  "teamPlan.firstTask.example": {
-    "value": "Example of what {{name}} delivers"
-  },
   "teamPlan.firstTask.open": {
     "value": "Open with the task"
+  },
+  "teamPlan.firstTask.finish": {
+    "value": "Finish the sentence and send it"
   },
   "teamPlan.firstTask.invite": {
     "value": "Invite {{names}}"
@@ -41087,7 +41273,7 @@
     "value": "Software and apps"
   },
   "teamTemplates.software.sub": {
-    "value": "Support, billing and code"
+    "value": "Customer care, billing and code"
   },
   "teamTemplates.software.desc": {
     "value": "For a company that sells software and looks after its own customers."
@@ -41110,6 +41296,24 @@
   "teamTemplates.services.desc": {
     "value": "For an office that books clients, sends proposals and bills them."
   },
+  "teamTemplates.hello.lodi.starting": {
+    "value": "Plan active. My computer is starting up. Let's get to work."
+  },
+  "teamTemplates.hello.lodi.ready": {
+    "value": "Plan active. Let's get to work."
+  },
+  "teamTemplates.hello.lodi.created": {
+    "value": "The team is here. Let's get to work."
+  },
+  "teamTemplates.hello.lodiNoAi.starting": {
+    "value": "Plan active. My computer is starting up. Connect an AI and we'll get to work."
+  },
+  "teamTemplates.hello.lodiNoAi.ready": {
+    "value": "Plan active. Connect an AI and we'll get to work."
+  },
+  "teamTemplates.hello.lodiNoAi.created": {
+    "value": "The team is here. Connect an AI and we'll get to work."
+  },
   "teamTemplates.agents.iara.role": {
     "value": "Customer service"
   },
@@ -41121,6 +41325,9 @@
   },
   "teamTemplates.agents.iara.task": {
     "value": "Write a reply to this customer message:"
+  },
+  "teamTemplates.agents.iara.hello": {
+    "value": "Hi, {{first}}. Leave whoever writes on WhatsApp to me."
   },
   "teamTemplates.agents.caio.role": {
     "value": "Billing"
@@ -41134,6 +41341,9 @@
   "teamTemplates.agents.caio.task": {
     "value": "Write a friendly payment reminder for:"
   },
+  "teamTemplates.agents.caio.hello": {
+    "value": "Hello. I'll handle billing and only send reminders after your ok."
+  },
   "teamTemplates.agents.ada.role": {
     "value": "Dev"
   },
@@ -41145,6 +41355,9 @@
   },
   "teamTemplates.agents.ada.task": {
     "value": "Tell me where to start looking at this bug:"
+  },
+  "teamTemplates.agents.ada.hello": {
+    "value": "Hi. Send me the bugs that come in, I'll dig in and open the PR."
   },
   "teamTemplates.agents.lia.role": {
     "value": "Content"
@@ -41158,6 +41371,9 @@
   "teamTemplates.agents.lia.task": {
     "value": "Suggest three posts for this week about:"
   },
+  "teamTemplates.agents.lia.hello": {
+    "value": "Hi, everyone. This week's posts are on me."
+  },
   "teamTemplates.agents.theo.role": {
     "value": "Sales"
   },
@@ -41169,6 +41385,9 @@
   },
   "teamTemplates.agents.theo.task": {
     "value": "Write a short quote for this request:"
+  },
+  "teamTemplates.agents.theo.hello": {
+    "value": "Hi, {{first}}. Nobody who asks for a quote will go unanswered."
   },
   "teamTemplates.agents.nina.role": {
     "value": "Scheduling"
@@ -41182,6 +41401,9 @@
   "teamTemplates.agents.nina.task": {
     "value": "Organize tomorrow's schedule:"
   },
+  "teamTemplates.agents.nina.hello": {
+    "value": "Hello. The calendar is mine, and I'll remind clients the day before."
+  },
   "teamTemplates.agents.otto.role": {
     "value": "Orders"
   },
@@ -41194,6 +41416,9 @@
   "teamTemplates.agents.otto.task": {
     "value": "List what's left to do on these orders:"
   },
+  "teamTemplates.agents.otto.hello": {
+    "value": "I'm here. I'll watch the orders and tell you if stock runs low."
+  },
   "teamTemplates.agents.bia.role": {
     "value": "Answer base"
   },
@@ -41205,6 +41430,9 @@
   },
   "teamTemplates.agents.bia.task": {
     "value": "Write answers to these customer questions:"
+  },
+  "teamTemplates.agents.bia.hello": {
+    "value": "Hi. I'll keep the answer base up to date with what the team says."
   },
   "teamTemplates.agents.clara.role": {
     "value": "Calendar and reminders"
@@ -41313,15 +41541,6 @@
   },
   "teamTemplates.agents.rui.task": {
     "value": "Write a short proposal for this client:"
-  },
-  "teamTemplates.example.iara": {
-    "value": "Hi Marina. Your order left yesterday and arrives by Friday. The tracking code is right below. If Friday doesn't work, I'll find another date."
-  },
-  "teamTemplates.example.lia": {
-    "value": "1. Three common mistakes when hiring an agency. 2. Behind the scenes of a project that almost went wrong. 3. A question for your followers: what do you want to see here?"
-  },
-  "teamTemplates.example.nina": {
-    "value": "Tomorrow: 9:00 Carla, 10:30 Pedro, 14:00 open. Pedro hasn't confirmed yet. Want me to write to him?"
   },
   "teamTemplates.example.clara": {
     "value": "Today: 9:00 dentist, 12:30 lunch with Paula, 18:00 pick up the package. Tomorrow is your mother's birthday. Want me to remind you in the morning?"
@@ -41531,7 +41750,7 @@
     "value": "Send"
   },
   "feedback.thanks": {
-    "value": "Delivered. Thank you!"
+    "value": "Delivered. Thank you."
   },
   "feedback.reply": {
     "value": "Everything is read. An answer, if one is needed, comes to {{email}}."

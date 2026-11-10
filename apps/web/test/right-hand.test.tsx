@@ -141,7 +141,10 @@ describe("the right hand elsewhere", () => {
     const header = document.querySelector(".channel__header") as HTMLElement;
     // As the language writes it; the line's first letter goes up in CSS (no case change on translated text).
     const topic = header.querySelector(".channel__topic[data-right-hand]");
-    expect(topic?.textContent).toContain("seu braço direito · age com as suas permissões");
+    expect(topic?.textContent).toBe("seu braço direito · age com as suas permissões");
+    // Nothing about models: each person's DM with it thinks with their own AI, in the side panel's Como pensa.
+    expect(header.querySelector(".channel__brain")).toBeNull();
+    expect(header.textContent).not.toContain("Automático");
     expect(header.textContent).not.toContain("Computador");
     expect(screen().getByRole("combobox", { name: "Mensagem para Lodi · nada muda sem você" })).toBeTruthy();
   });

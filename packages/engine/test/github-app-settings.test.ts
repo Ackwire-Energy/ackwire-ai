@@ -10,6 +10,7 @@ import {
   type GitHubAppConfig,
   githubAppManifest,
   issueManifestState,
+  missingGitHubAppEvents,
   readManifestState,
   startGitHubAppInstall,
 } from "../src";
@@ -190,9 +191,41 @@ describe("GitHub's manifest flow", () => {
       members: "read",
       organization_projects: "write",
     });
+    // What agents hear on GitHub: comments, reviews and items on what they worked on, or naming the app.
+    expect(manifest.default_events).toEqual([
+      "issues",
+      "issue_comment",
+      "pull_request",
+      "pull_request_review",
+      "pull_request_review_comment",
+      "pull_request_review_thread",
+      "discussion",
+      "discussion_comment",
+    ]);
     // GitHub can't deliver to plain http; a long host keeps the name within GitHub's 34 characters.
     expect(githubAppManifest("http://192.168.0.10:3000").hook_attributes.active).toBe(false);
     expect(githubAppManifest("https://agents.a-very-long-company-name.example").name.length).toBeLessThanOrEqual(34);
+  });
+
+  test("an app made without the events agents hear says which to tick, and where on GitHub", async () => {
+    const answers = (events: string[], owner = { login: "acme", type: "Organization" }) => ({
+      fetch: (async () => Response.json({ slug: SLUG, events, owner })) as unknown as typeof fetch,
+      apiUrl: API,
+    });
+    const all = githubAppManifest("https://chat.example.com").default_events;
+    expect(await missingGitHubAppEvents(MADE, answers([]))).toEqual({
+      missing: all,
+      url: `https://github.com/organizations/acme/settings/apps/${SLUG}/permissions`,
+    });
+    expect(await missingGitHubAppEvents(MADE, answers([...all, "push"]))).toBeNull();
+    const personal = await missingGitHubAppEvents(MADE, answers(["issues"], { login: "ana-gh", type: "User" }));
+    expect(personal).toEqual({
+      missing: all.filter((e) => e !== "issues"),
+      url: `https://github.com/settings/apps/${SLUG}/permissions`,
+    });
+    // GitHub didn't answer: nothing to say.
+    const down = { fetch: (async () => new Response("down", { status: 502 })) as unknown as typeof fetch, apiUrl: API };
+    expect(await missingGitHubAppEvents(MADE, down)).toBeNull();
   });
 
   test("its state: the person and the landing, signed, for an hour", () => {

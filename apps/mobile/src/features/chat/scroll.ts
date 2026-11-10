@@ -41,6 +41,8 @@ export interface ScrollRow {
   key: string;
   /** A message or an agent at work (day dividers and markers never count). */
   kind: "message" | "run" | "other";
+  /** A message row's message id, in the order the server posted them (its key can be its block's, `turnKeys`). */
+  id?: string;
   /** Written by the person reading (never counts as new for them). */
   mine?: boolean;
   /** Who wrote it or is working ("agent:<id>", "person:<id>"): the pill's faces and names. */
@@ -73,15 +75,21 @@ export interface Unseen {
   mentionsMe: boolean;
 }
 
-/** What arrived below the last row the person saw, theirs left out ("↓ 2 novas · Marina e Ada · Theo escrevendo"). */
-export function unseenBelow(rows: readonly ScrollRow[], seenKey: string | null): Unseen {
+/**
+ * What arrived below the last row the person saw, theirs left out ("↓ 2 novas · Marina e Ada · Atlas escrevendo"), and
+ * the messages posted after `seenPostedId` (the one posted last when they were at the end, `lastPostedId`) in a place
+ * above that row: a reply keeps the place where its first words showed, so it can land there and still be new.
+ */
+export function unseenBelow(rows: readonly ScrollRow[], seenKey: string | null, seenPostedId?: string): Unseen {
   const none: Unseen = { messages: 0, firstKey: null, authors: [], working: [], mentionsMe: false };
   if (!seenKey) return none;
   const at = rows.findIndex((r) => r.key === seenKey);
   if (at < 0) return none;
   const out: Unseen = { ...none, authors: [], working: [] };
-  for (let i = at + 1; i < rows.length; i++) {
+  for (let i = 0; i < rows.length; i++) {
     const r = rows[i] as ScrollRow;
+    const postedSince = seenPostedId !== undefined && r.id !== undefined && r.id > seenPostedId;
+    if (i <= at && !(r.kind === "message" && postedSince)) continue;
     if ((r.kind !== "message" && r.kind !== "run") || r.mine || r.silent) continue;
     out.firstKey ??= r.key;
     if (r.kind === "message") out.messages++;

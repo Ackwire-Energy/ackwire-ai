@@ -1,5 +1,5 @@
 import type { AuthConfig, OrgSummary } from "@agenteschat/client";
-import { showsAbout } from "@agenteschat/client/lib/about";
+import { selfHosted, showsAbout } from "@agenteschat/client/lib/about";
 import { can } from "@agenteschat/client/lib/permissions";
 import { personalSettingsHost } from "@agenteschat/client/lib/personal-view";
 import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
@@ -65,8 +65,9 @@ export const SETTINGS_SECTIONS: {
   { id: "audit", icon: "shield", group: "org", allowed: (o) => can(o, "view_audit") },
   // GIFs and stickers in chat (ADR 0091): who configures the workspace.
   { id: "media", icon: "sticker", group: "org", allowed: (o) => can(o, "configure") },
-  // Voice messages (ADR 0100): who configures the workspace.
-  { id: "voice", icon: "mic", group: "org", allowed: (o) => can(o, "configure") },
+  // Voice messages (ADR 0100): who configures the workspace, on a self-hosted server only. agentes.chat Cloud runs its
+  // own speech engine, so the section has nothing to offer there (product decision).
+  { id: "voice", icon: "mic", group: "org", allowed: (o, server) => selfHosted(server) && can(o, "configure") },
   { id: "access", icon: "agent", group: "agents", allowed: (o) => can(o, "manage_agents") },
   { id: "connectors", icon: "plug", group: "agents", allowed: () => true },
   { id: "skills", icon: "bulb", group: "agents", allowed: (o) => can(o, "manage_agents") },

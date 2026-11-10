@@ -2359,7 +2359,8 @@
     "suggested": "Na podstawie twojego adresu w domenie {{domain}} proponuję {{org}}.",
     "create": "Utwórz",
     "shareMessage": "Dołącz do {{org}} w agentes.chat: {{url}}",
-    "failed": "Nie udało się zapisać. Spróbuj ponownie."
+    "failed": "Nie udało się zapisać. Spróbuj ponownie.",
+    "enter": "Wejdź do przestrzeni roboczej"
   },
   "ai": {
     "yourPlan": "Twój plan AI",
@@ -2700,7 +2701,6 @@
   "dashboards": {
     "homeRow": "Tylko ty · twoje własne widżety",
     "loadFailed": "Nie udało się wczytać dashboardów.",
-    "onlyHome": "Tu pojawią się dashboardy przestrzeni roboczej albo twoich ról.",
     "create": "Utwórz",
     "routineTarget": "jego widżet",
     "pin": {

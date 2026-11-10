@@ -1448,6 +1448,21 @@ html:not([data-pointer]) .member-row--add:focus-visible {
     max-width: none;
   }
 }
+/* Aceitar todas and Recusar todas at the tabs' right, small and 8 apart, as the tabs bar's toolbar sits; asked again in
+   the same spot. Under the tabs, at the right, when the row has no room. */
+.proposals-all {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2) auto;
+}
+.proposals-all__ask {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--muted);
+}
 .proposals__actions {
   display: flex;
   flex-wrap: wrap;
@@ -2104,6 +2119,19 @@ html:not([data-pointer]) .artifact-table__sort:focus-visible {
 .artifact-split__row {
   display: grid;
   grid-template-columns: 1fr 1fr;
+}
+/* Its corner cells follow the box's rounded corners, as a unified diff's rows do (`.ac-diff > :first-child`). */
+.artifact-split > .artifact-split__row:first-child > .ac-diff__line:first-child {
+  border-top-left-radius: calc(var(--radius-sm) - 1px);
+}
+.artifact-split > .artifact-split__row:first-child > .ac-diff__line:last-child {
+  border-top-right-radius: calc(var(--radius-sm) - 1px);
+}
+.artifact-split > .artifact-split__row:last-child > .ac-diff__line:first-child {
+  border-bottom-left-radius: calc(var(--radius-sm) - 1px);
+}
+.artifact-split > .artifact-split__row:last-child > .ac-diff__line:last-child {
+  border-bottom-right-radius: calc(var(--radius-sm) - 1px);
 }
 .artifact-split__row > .ac-diff__line:first-child {
   border-right: 1px solid var(--line);
@@ -3242,6 +3270,8 @@ html:not([data-pointer]) .artifact-table__sort:focus-visible {
   background: none;
   font: inherit;
   color: inherit;
+  /* A name that wraps (an agent's may be 80 characters) reads from the start, not centred as a button's label. */
+  text-align: start;
   cursor: pointer;
   border-radius: var(--radius-sm);
 }
@@ -4125,7 +4155,8 @@ html:not([data-pointer]) .settings__link:focus-visible {
  * to the work area's right edge, so the wheel scrolls it there too, and its text keeps the old width: the page's
  * centred 1120px, its side room every page's (`--page-x`, or half of what the window has past 1120px). The page's top
  * room moves into the columns, so they scroll up to the window's top. Both keep room for the shadows and focus rings
- * at their edges, which their scroll would cut.
+ * at their edges, which their scroll would cut. A strip in the section runs out over the section's own room on the
+ * left, beside the nav, and no further (`--bleed`): past it the column would scroll sideways.
  */
 @media (min-width: 941px) and (min-height: 560px) {
   .settings {
@@ -4139,8 +4170,9 @@ html:not([data-pointer]) .settings__link:focus-visible {
     padding: var(--page-top) 6px 24px;
   }
   .settings__body {
-    margin-left: -12px;
-    padding: var(--page-top) max(var(--page-x), calc(100% - 1064px)) 96px 12px;
+    --bleed: 12px;
+    margin-left: calc(-1 * var(--bleed));
+    padding: var(--page-top) max(var(--page-x), calc(100% - 1064px)) 96px var(--bleed);
   }
 }
 .settings__section {
@@ -4191,7 +4223,9 @@ html:not([data-pointer]) .settings__link:focus-visible {
   padding: var(--row-py) var(--card-pad);
   border-top: 1px solid var(--line);
 }
-.settings-row :is(.ac-select__trigger, .ac-input, .ac-input-affix, .ac-btn:not(.ac-btn--glyph, .ac-btn--icon)) {
+/* A text field of several lines (the right hand's guidance) keeps its rows: the kit's `textarea.ac-input` sizes it. */
+.settings-row
+:is(.ac-select__trigger, .ac-input:not(textarea), .ac-input-affix, .ac-btn:not(.ac-btn--glyph, .ac-btn--icon)) {
   height: var(--control-h-sm);
 }
 .settings-row:first-child {
@@ -4356,11 +4390,14 @@ html:not([data-pointer]) .settings-tile:focus-visible {
     white-space: nowrap;
   }
 }
+/* On a phone the control goes under the words, as wide as the row. The row wraps to put it there, never turns into a
+   column: there the words' 24-character basis (`.ac-actrow`) would be their height. */
 @media (max-width: 760px) {
   .settings-row {
-    flex-direction: column;
-    align-items: stretch;
     gap: 10px;
+  }
+  .settings-row:not(.settings-row--lead) > .ac-actrow__text + * {
+    flex-basis: 100%;
   }
   .settings-row__control {
     flex: none;
@@ -4674,12 +4711,15 @@ html:not([data-pointer]) .catalog-tile:focus-visible {
   height: 112px;
   margin: 0;
 }
+/* The icon on a line of its own over the name: the head wraps, never turns into a column, where the name's 24-character
+   basis (`.ac-actrow`) would be its height. */
 .catalog-svc .ac-dialog__head {
-  flex-direction: column;
-  align-items: flex-start;
   gap: 14px;
   margin-top: -36px;
   padding: 0 var(--dialog-pad) 4px;
+}
+.catalog-svc .ac-dialog__lead {
+  flex-basis: 100%;
 }
 /*
  * The × in the corner, its ink as far from the top as from the side: the button reaches past its row by its plate and
@@ -6611,6 +6651,15 @@ html:not([data-pointer]) .msg-quote:focus-visible {
   gap: 8px;
   flex-wrap: wrap;
 }
+/* "Atualizar" hangs over its 16px line as the failed run's buttons do over theirs: the line keeps its own height. */
+.run-quiet > .ac-btn {
+  margin-block: calc((16px - var(--control-h-sm)) / 2);
+}
+@media (pointer: coarse) {
+  .run-quiet > .ac-btn {
+    margin-block: calc((16px - var(--control-h-md)) / 2);
+  }
+}
 .stop-run-wrap {
   position: relative;
   display: inline-flex;
@@ -7054,6 +7103,15 @@ html:not([data-pointer]) .run-continue:focus-visible {
   --sky-ink2: rgba(4, 32, 63, 0.78);
   --sky-glass: rgba(241, 248, 255, 0.74);
   --sky-line: rgba(4, 32, 63, 0.12);
+}
+/* A label on a sky (a name, a state): the kit's chip in the sky's glass and ink, readable on every tone of the sky's
+   dither in both themes. */
+.ac-chip.sky-chip {
+  background: var(--sky-glass);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 0 0 1px var(--sky-line);
+  color: var(--sky-ink);
 }
 
 /* Channel: the greeting of a new day */
@@ -8386,13 +8444,12 @@ html:not([data-pointer]) .onb__step:focus-visible {
 .onb__step[aria-current="step"] .onb__step-name {
   font-weight: 650;
 }
+/* What a done step answered wraps whole (a long workspace or agent name keeps every word). */
 .onb__step-sub {
-  overflow: hidden;
   font-size: 12.5px;
   font-weight: 450;
   color: var(--faint);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 /* Progress, each step's column, the import and the welcome: pages/onboarding.css. */
 .onb__head {
@@ -9096,9 +9153,9 @@ html:not([data-pointer]) .newag__sel .ac-select__trigger:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
+/* With a tile beside its name and line it is a face line (`.ac-faceline`): the name's capitals at the tile's top. */
 .newag__sel-value {
   display: flex;
-  align-items: center;
   gap: 12px;
   min-width: 0;
   text-align: left;
@@ -9390,6 +9447,7 @@ html:not([data-pointer]) .newag__sel .ac-select__trigger:focus-visible {
 .agp {
   /* Open sky: the page is the cover's width; what is under it keeps every page's side room. */
   --agp-gutter: var(--page-x);
+  --bleed: var(--agp-gutter);
   max-width: none;
   gap: 0;
   padding: 0 0 24px;
@@ -11099,10 +11157,9 @@ html:not([data-pointer]) .agp-subnav__item:focus-visible {
 .agp-savebar:has(> .agp-savebar__hint) {
   flex-wrap: wrap;
 }
+/* An `.ac-iconline`: a problem that wraps keeps its icon on its first line. */
 .agp-savebar__hint {
-  display: flex;
   flex: 1 1 auto;
-  gap: 8px;
   min-width: 0;
   margin-right: auto;
   font-size: 13.5px;
@@ -11856,19 +11913,20 @@ html[data-menu-overlay] .shell {
   font-size: 12px;
 }
 /*
- * Faces in the full list: 32, 8 from the plate's edges (48 rows). A name alone centres on its face; a name over a role
- * is a face line: the name's capitals on the face's top (`.ac-captop`), the role under it, what ends the row on its
- * middle.
+ * Faces in the full list: a message's size (`--name-face`), 8 from the plate's edges (48 rows). A name alone centres on
+ * its face; a name over a role is a face line: the name's capitals on the face's top (`.ac-captop`), the role under
+ * it, what ends the row on its middle.
  */
 .sidebar:not([data-rail="true"]) .sidebar__item > .ac-avatar--sm {
-  width: 32px;
-  height: 32px;
+  width: var(--name-face);
+  height: var(--name-face);
   font-size: 13px;
 }
 .sidebar:not([data-rail="true"]) .sidebar__item:has(> .ac-avatar) {
   padding-block: 8px;
 }
-/* An agent's row breathes: the face 12px from its words, a little air between the name and its line. */
+/* An agent's row breathes: the face 12px from its words, a little air between the name and its line. Its face keeps
+   the 8px from the plate's edges every face row has. */
 .sidebar:not([data-rail="true"]) :is([data-agent-row] > .sidebar__item, .sidebar__item[data-right-hand]) {
   gap: 12px;
 }
@@ -12456,24 +12514,6 @@ html:not([data-pointer]) .channel-perms__target:focus-visible {
   margin: 3px 8px 3px 36px;
   border: 0;
 }
-/* Day one: the line about the pins, once, with its ✕. */
-.sidebar__pins-hint {
-  display: flex;
-  align-items: flex-start;
-  gap: 4px;
-  margin: 2px 0;
-  padding: 8px 4px 8px 12px;
-  border-radius: var(--control-r-sm);
-  background: var(--plate-soft);
-  font-size: 12.5px;
-  line-height: 17px;
-  color: var(--ink-muted);
-}
-.sidebar__pins-hint > span {
-  flex: 1;
-  min-width: 0;
-  padding-top: 3px;
-}
 .sidebar__see-all {
   color: var(--ink-muted);
 }
@@ -12489,7 +12529,7 @@ html:not([data-pointer]) .channel-perms__target:focus-visible {
   line-height: 17px;
   color: var(--faint);
 }
-.sidebar[data-rail="true"] :is(.sidebar__see-all, .sidebar__pins-hint, .sidebar__pins-end, .sidebar__section-count) {
+.sidebar[data-rail="true"] :is(.sidebar__see-all, .sidebar__pins-end, .sidebar__section-count) {
   display: none;
 }
 /* More: the other tools in a panel beside the sidebar, each with a line on what it is for. */
@@ -13602,68 +13642,68 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
   border-top: 0;
 }
 
-/* The notifications dialog (WebPush.tsx `WebPushAsk`, ADR 0071): three notifications as the computer shows them,
-   stacked like the phone's sheet, then "Ativar avisos" and "Agora não" full width. */
-.web-push-ask {
-  gap: 16px;
-}
-.web-push-ask__examples {
-  list-style: none;
-  margin: 0;
-  padding: 4px 0 0;
+/* Our notifications ask (WebPush.tsx `PushAskInline`, ADR 0071), under an agent's answer: the question, a
+   notification as the computer shows it, why, "Ativar avisos" and "Agora não". One card width with the other cards. */
+.push-ask {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-3);
+  max-width: var(--msg-card-w);
+  margin-top: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--raised);
+  box-shadow: var(--e1);
+  transition:
+    opacity 0.3s var(--out),
+    transform 0.3s var(--out);
 }
-.web-push-ask__example {
+/* It comes under an answer that just arrived: it rises in, never pops. */
+@starting-style {
+  .push-ask {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  @starting-style {
+    .push-ask {
+      transform: none;
+    }
+  }
+}
+.push-ask__title {
+  gap: var(--space-2);
+  margin: 0;
+  font-size: 14.5px;
+  overflow-wrap: anywhere;
+}
+.push-ask__why {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.push-ask__acts {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 14px;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+/* A notification as the computer shows it: a MediaRow (the face and the title on one line, the words full width). */
+.web-push-ask__example {
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
   background: var(--raised);
   box-shadow: var(--e2);
-}
-.web-push-ask__example img {
-  flex: none;
-  border-radius: 8px;
-}
-.web-push-ask__text {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-.web-push-ask__top {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-.web-push-ask__top strong {
-  flex: 1;
-  min-width: 0;
-  font-size: 13.5px;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.web-push-ask__top span {
-  font-size: 12px;
-  color: var(--faint);
 }
 .web-push-ask__body {
   font-size: 13px;
   line-height: 18px;
   color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
-.web-push-ask__acts {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+@media (max-width: 640px) {
+  .push-ask__acts > .ac-btn--primary {
+    flex: 1;
+  }
 }
 
 /* The person's own settings, Sua conta and Notificações (PrefRow in NoticePrefs.tsx): settings rows with an icon
@@ -13716,10 +13756,12 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
 .rh-money .ac-input-affix {
   width: 120px;
 }
+/* The guidance under its label, as wide as the row: a wrap, not a column (`.ac-actrow`). */
 .settings-row.rh-guidance {
-  flex-direction: column;
-  align-items: stretch;
   gap: 10px;
+}
+.rh-guidance > .ac-actrow__text + * {
+  flex-basis: 100%;
 }
 /* Configurações › Sua conta: a line that opens something is a button, its chevron at the end. Its hover stays inside
    the card's corners. */
@@ -13780,9 +13822,7 @@ html:not([data-pointer]) .settings-row--open:focus-visible {
    one card start their controls on one edge. */
 @media (max-width: 760px) {
   .settings-row--lead {
-    flex-direction: row;
     flex-wrap: wrap;
-    align-items: center;
     gap: var(--space-2) var(--space-3);
   }
   .settings-row--lead > .settings-row__text {
@@ -13986,9 +14026,10 @@ html:not([data-pointer]) .rh-set__face-edit:focus-visible {
    keeps the icon and the words on one line, and what ends it goes under them from their edge, where it falls. */
 @container agp-side (max-width: 479px) {
   .agp-card .settings-row:not(.settings-row--lead) {
-    flex-direction: column;
-    align-items: stretch;
     gap: 10px;
+  }
+  .agp-card .settings-row:not(.settings-row--lead) > .ac-actrow__text + * {
+    flex-basis: 100%;
   }
   .agp-card .settings-row__control {
     flex: none;

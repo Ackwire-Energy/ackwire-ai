@@ -2056,7 +2056,8 @@
     "suggested": "{{domain}}のメールアドレスから、{{org}}を提案しました。",
     "create": "作成",
     "shareMessage": "agentes.chatで{{org}}に参加しましょう: {{url}}",
-    "failed": "保存できませんでした。もう一度お試しください。"
+    "failed": "保存できませんでした。もう一度お試しください。",
+    "enter": "ワークスペースへ"
   },
   "ai": {
     "yourPlan": "あなたのAIプラン",
@@ -2373,7 +2374,6 @@
   "dashboards": {
     "homeRow": "あなただけ · 自分のウィジェット",
     "loadFailed": "ダッシュボードを読み込めませんでした。",
-    "onlyHome": "ワークスペースやあなたのロールのダッシュボードがここに表示されます。",
     "create": "作成",
     "routineTarget": "そのウィジェット",
     "pin": {

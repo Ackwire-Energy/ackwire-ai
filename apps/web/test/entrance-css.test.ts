@@ -9,7 +9,7 @@ test.each([
     ["src/components/auth.css", "src/components/invite/invite.css"],
     [".auth__bubble", ".auth__step", ".auth__fix"],
   ],
-  [["src/pages/onboarding.css"], [".onb__body", ".onb__bubble", ".onb__answer", ".onb__actions"]],
+  [["src/pages/onboarding.css"], [".onb__body", ".onb__say", ".onb__answer", ".onb__actions"]],
 ])(
   "%p: each step's entrance plays once, from its starting style, never as a keyframe animation",
   async (files, selectors) => {

@@ -192,14 +192,15 @@ describe("InfoHint", () => {
     await press(within(dialog).getByRole("button", { name: "Sobre Orçamento" }));
     const bubble = tip();
     expect(bubble?.textContent).toBe("No limite, o agente para e avisa.");
-    // Above the dialog, outside it.
+    // Above the dialog: outside it, after it in the page.
     expect(dialog.contains(bubble)).toBe(false);
+    expect(bubble && dialog.compareDocumentPosition(bubble) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     await act(async () => fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" }));
     expect(tip()).toBeNull();
     expect(body().getByRole("dialog", { name: "Novo agente" })).toBeTruthy();
   });
 
-  test("the bubble floats above dialogs: its layer is above the dialog's", async () => {
+  test("the bubble floats above dialogs: it shares their layer, where what opens later stacks above", async () => {
     const css = (file: string) => Bun.file(new URL(`../src/styles/${file}`, import.meta.url).pathname).text();
     const [components, layers] = await Promise.all([css("components.css"), css("layers.css")]);
     const layer = (selector: string) => {
@@ -209,7 +210,7 @@ describe("InfoHint", () => {
         ?.match(/z-index: var\(--z-([\w-]+)\)/)?.[1];
       return Number(layers.match(new RegExp(`--z-${name}:\\s*(\\d+)`))?.[1]);
     };
-    expect(layer(".ac-hint__bubble")).toBeGreaterThan(layer(".ac-dialog"));
+    expect(layer(".ac-hint__bubble")).toBe(layer(".ac-dialog"));
   });
 
   test("the keyboard focus ring stays clear of the label: inside the target, past the part that reaches into it", async () => {

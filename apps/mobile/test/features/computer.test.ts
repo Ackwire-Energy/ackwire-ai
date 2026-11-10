@@ -10,6 +10,7 @@ import {
 import {
   type SetupView,
   setupEta,
+  setupNoticeStatusKey,
   setupNoticeTitleKey,
   setupView,
   statusRestatesChip,
@@ -307,6 +308,16 @@ describe("the workspace's computer on its way, on Conversas", () => {
     );
     // On hold no time is said: where it is instead.
     expect(setupNoticeLine(t, view, null, false)).toBe("Instalando os programas");
+    // Before a step, "Preparando o computador." would only say the title again: no line.
+    const early = viewOf({ state: "preparing", step: null, secondsLeft: null });
+    expect(t(setupNoticeTitleKey(early), { org: "Acme" })).toBe("Preparando o computador da Acme");
+    expect(setupNoticeLine(t, early, null, true)).toBeNull();
+    expect(setupNoticeStatusKey(early)).toBeNull();
+    expect(setupNoticeStatusKey(wait)).toBe("computerSetup.status.capacity");
+    const source = await Bun.file(
+      new URL("../../src/features/computer/SetupWait.tsx", import.meta.url).pathname,
+    ).text();
+    expect(source).toContain("{line ? (");
   });
 
   test("the full screen's header says the chip's word: being prepared, in line or a problem", async () => {

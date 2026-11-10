@@ -6071,9 +6071,6 @@
   "dashboards.loadFailed": {
     "value": "Couldn't load the dashboards."
   },
-  "dashboards.onlyHome": {
-    "value": "Dashboards for the workspace or your roles show up here."
-  },
   "dashboards.create": {
     "value": "Create"
   },
@@ -6517,5 +6514,8 @@
   },
   "empty.audit.text": {
     "value": "When an agent does something outside the conversation, it shows up here."
+  },
+  "onb.enter": {
+    "value": "Go to the workspace"
   }
 }

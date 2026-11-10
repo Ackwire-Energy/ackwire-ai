@@ -3,6 +3,7 @@ import type { AgentStatusLine, WorkView } from "../api/types";
 import { runErrorText } from "./errors";
 import { formatTime, lowerFirst } from "./format";
 import { plainLines } from "./markdown";
+import { usageWhen } from "./plan-usage";
 
 /**
  * Long work (ADR 0121), the same on every app: the line under the agent's "Vou cuidar disso" (WorkLine on web, its
@@ -214,11 +215,16 @@ export function autoUpdateText(t: TFunction, params: Record<string, unknown>): s
 /**
  * The server's own status line for a working agent a person wrote to (ADR 0131 §2, `talker_status`): that it can't
  * answer yet, how long it has worked, when it reads them (its next step, or `reads: "turn"`: when its computer's turn
- * ends) and what it does now.
+ * ends) and what it does now. Parked on its plan or budget (`wait`), it says that and when it is back (`until`).
  */
-export function talkerStatusText(t: TFunction, params: Record<string, unknown>): string {
+export function talkerStatusText(t: TFunction, params: Record<string, unknown>, locale?: string): string {
   const say = loose(t);
   const minutes = Number(params.minutes ?? 0);
+  const back = typeof params.until === "string" && params.until ? usageWhen(t, locale, params.until) : null;
+  if (params.wait === "budget")
+    return back ? say("work.statusReplyBudget", { when: back }) : say("work.statusReplyBudgetUnknown");
+  if (params.wait === "plan")
+    return back ? say("work.statusReplyPlan", { when: back }) : say("work.statusReplyPlanUnknown");
   // Waiting for its computer it isn't working: the minutes are the wait's, and away there is no telling how long.
   if (params.wait === "away") return say("work.statusReplyAway");
   if (params.wait === "queued") return say("work.statusReplyQueued", { duration: workDuration(t, minutes * 60_000) });

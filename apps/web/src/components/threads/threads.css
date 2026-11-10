@@ -241,7 +241,7 @@ html:not([data-pointer]) .pins-pop__item:has(> .thread-pop__row:focus-visible) {
 }
 /* The answer on its own, when the consulted agent's words in the DM are left out: under the messages, at their text. */
 .consult-answer {
-  margin: 4px 12px 8px var(--thread-indent, 64px);
+  margin: 4px 12px 8px var(--thread-indent, calc(16px + var(--name-face) + var(--space-3)));
 }
 /* Who is in it, in front of the title (the generic thread mark only when nobody is known). Its 24px faces are no
    taller than the title's line, so they centre on that first line, not on the title and its meta together. */

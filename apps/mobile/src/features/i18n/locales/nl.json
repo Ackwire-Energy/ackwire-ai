@@ -2157,7 +2157,8 @@
     "suggested": "Op basis van je e-mail bij {{domain}} stelde ik {{org}} voor.",
     "create": "Aanmaken",
     "shareMessage": "Kom bij {{org}} op agentes.chat: {{url}}",
-    "failed": "Opslaan lukte niet. Probeer het opnieuw."
+    "failed": "Opslaan lukte niet. Probeer het opnieuw.",
+    "enter": "Naar de werkruimte"
   },
   "ai": {
     "yourPlan": "Je AI-abonnement",
@@ -2482,7 +2483,6 @@
   "dashboards": {
     "homeRow": "Alleen jij · je eigen widgets",
     "loadFailed": "De dashboards konden niet worden geladen.",
-    "onlyHome": "Dashboards van de werkruimte of jouw rollen verschijnen hier.",
     "create": "Maken",
     "routineTarget": "zijn widget",
     "pin": {

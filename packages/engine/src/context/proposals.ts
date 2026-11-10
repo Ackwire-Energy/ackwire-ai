@@ -1017,7 +1017,8 @@ async function tellProposer(deps: { db: Database; pubsub?: PubSub }, p: Proposal
       kind: "proposal_result",
       from: "Your proposed change",
       text: await cardResult(tx, run.agentId, rows, via),
-      refs: { proposalCardId: key },
+      // `runId`: the run that proposed it, so what comes next is that run's work, for whoever is behind it.
+      refs: { proposalCardId: key, runId },
     });
   });
   if (delivered) await publishDelivery(deps.pubsub, delivered).catch(() => {});

@@ -7,6 +7,7 @@ import { recordAudit } from "../audit";
 import { connectorKeyOf } from "../connector-usage";
 import { cutText } from "../format";
 import { type GitHubAppAccess, githubCallAuth, githubListingHeaders } from "../git/github-call";
+import { githubItemOfCall, recordGitHubItem } from "../git/github-events";
 import { creditedMessage, runCoAuthor, signatureLine, signedBody } from "../git/signature";
 import type { Judge } from "../judge";
 import { assertPublicHttpsUrl, type ResolveHost } from "../net-guard";
@@ -495,6 +496,12 @@ export function createConnectorToolSource(
                 args = await signed(input, mapped.sign, { ...ctx, token: how.token });
               }
               const result = await withSession(connection, (s) => s.callTool(tool.name, args), auth);
+              // Where the agent's words went on GitHub: what people answer there comes back to it here.
+              const item =
+                def.id === "github" && mapped.sign?.field === "body" && !result.isError
+                  ? githubItemOfCall(tool.name, input, result.content)
+                  : null;
+              if (item) await recordGitHubItem(ctx, item).catch(() => {});
               return {
                 content: result.content,
                 isError: result.isError,

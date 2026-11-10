@@ -2192,6 +2192,8 @@ export const featureKeysPtBR = {
     /** O nome do primeiro uso, sugerido pelo domínio de um e-mail de trabalho. */
     suggested: "Pelo seu e-mail da {{domain}}, sugeri {{org}}.",
     create: "Criar",
+    /** O passo do plano no celular, que não vende o plano: entra no workspace, o time dormindo. */
+    enter: "Entrar no workspace",
     shareMessage: "Entre na {{org}} no agentes.chat: {{url}}",
     failed: "Não deu para salvar. Tente de novo.",
   },
@@ -2525,7 +2527,6 @@ export const featureKeysPtBR = {
   dashboards: {
     homeRow: "Só você · seus próprios widgets",
     loadFailed: "Não deu para carregar os painéis.",
-    onlyHome: "Os painéis do workspace ou dos seus papéis aparecem aqui.",
     create: "Criar",
     routineTarget: "o widget dela",
     pin: {

@@ -11,7 +11,7 @@ import {
 
 const agent = (id: string, name: string, ownerUserId: string | null = null) => ({ id, name, ownerUserId });
 
-test("day one pins my own agents, the most recently active first, then by name, five at most", () => {
+test("day one pins my own agents, the most recently active first, then in the workspace's order, five at most", () => {
   const agents = [
     agent("a", "Ada", "me"),
     agent("b", "Bia", "me"),
@@ -20,6 +20,9 @@ test("day one pins my own agents, the most recently active first, then by name, 
   ];
   expect(dayOnePins(agents, "me", new Map([["b", "2026-11-03T10:00:00Z"]]))).toEqual(["b", "a", "d", "e", "f"]);
   expect(dayOnePins(agents, "nobody")).toEqual([]);
+  // A template team as it was made: its template's order, the one the onboarding and the team's hello show.
+  const team = [agent("iara", "Iara", "me"), agent("otto", "Otto", "me"), agent("lia", "Lia", "me")];
+  expect(dayOnePins(team, "me")).toEqual(["iara", "otto", "lia"]);
 });
 
 test("day one never pins an agent in a group: its group keeps it whatever its DM's activity", () => {
