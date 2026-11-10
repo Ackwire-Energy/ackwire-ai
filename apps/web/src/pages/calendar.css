@@ -786,10 +786,14 @@ html:not([data-pointer]) .cal-band:focus-visible {
 .cal-month__more:hover {
   background: var(--plate-soft);
 }
-/* Its chips on the menu's concentric rule: the box is their corner plus its room (`.ac-menu`). */
+/*
+ * Its chips on the menu's concentric rule: the box is their corner plus its room (`.ac-menu`). A day's whole list, up
+ * to the room under its trigger: the menu's 280 cut a dozen rows by a sliver they scrolled for.
+ */
 .cal-more.ac-popover {
   --menu-pad: var(--space-2);
   width: 260px;
+  max-height: min(480px, var(--radix-popover-content-available-height, 480px));
   padding: var(--menu-pad);
 }
 .cal-more__title {
