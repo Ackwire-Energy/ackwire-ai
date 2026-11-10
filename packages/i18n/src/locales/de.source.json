@@ -5027,9 +5027,6 @@
   "rightHand.newDot": {
     "value": "New"
   },
-  "rightHand.rolePersonal": {
-    "value": "Personal assistant"
-  },
   "rightHand.actsAsYou": {
     "value": "acts with your permissions"
   },
@@ -26222,7 +26219,7 @@
     "value": "No agent uses it until you choose."
   },
   "connectors.detail.allText": {
-    "value": "Once connected, every agent can use it. Next, you choose each agent's access."
+    "value": "Once connected, every agent can use it. You can adjust that later."
   },
   "connectors.detail.addAccount": {
     "value": "Add another account"
@@ -27968,10 +27965,7 @@
     "value": "Nothing is available to agents until step 3."
   },
   "connectFlow.allCanUse": {
-    "value": "Once connected, every agent can use it. You can change that in step 3."
-  },
-  "connectFlow.newAccount": {
-    "value": "The new account starts with no agents, except those with access to everything. You choose in step 3."
+    "value": "Once connected, every agent can use it. You can adjust that later."
   },
   "connectFlow.replace": {
     "value": "Replaces the current sign-in. Who uses it stays the same."
@@ -27980,7 +27974,7 @@
     "value": "Sign in to the same account as before. We can't check which one it is, and who uses it stays the same."
   },
   "connectFlow.newAccountUnchecked": {
-    "value": "Sign in to an account that isn't connected yet, we can't check. It starts with no agents, except those with access to everything."
+    "value": "Sign in to an account that isn't connected yet, we can't check."
   },
   "connectFlow.addTitle": {
     "value": "Another {{name}} account"
@@ -28050,6 +28044,21 @@
       "one": "{{name}}: {{count}} agent can use it.",
       "other": "{{name}}: {{count}} agents can use it."
     }
+  },
+  "connectFlow.done.title": {
+    "value": "{{name}} connected"
+  },
+  "connectFlow.done.everyone": {
+    "value": "Every agent can use it."
+  },
+  "connectFlow.done.waiting": {
+    "value": "Agents get the tools only when you continue, at the levels we suggest."
+  },
+  "connectFlow.done.adjust": {
+    "value": "Adjust"
+  },
+  "connectFlow.done.ok": {
+    "value": "Done"
   },
   "database.name": {
     "value": "Database"
@@ -41499,24 +41508,6 @@
   },
   "teamTemplates.agents.rui.task": {
     "value": "Write a short proposal for this client:"
-  },
-  "teamTemplates.example.clara": {
-    "value": "Today: 9:00 dentist, 12:30 lunch with Paula, 18:00 pick up the package. Tomorrow is your mother's birthday. Want me to remind you in the morning?"
-  },
-  "teamTemplates.example.leo": {
-    "value": "Today, 30 minutes: 5 minutes of warm-up, 3 rounds of 12 squats, 10 push-ups and a 30-second plank, then 5 minutes of stretching. Tell me how it went and I'll adjust Wednesday's."
-  },
-  "teamTemplates.example.gabi": {
-    "value": "Today's topic: photosynthesis. In short, plants turn light, water and carbon dioxide into sugar and oxygen. Three questions: where does it happen, what goes in and what comes out?"
-  },
-  "teamTemplates.example.rosa": {
-    "value": "This week: rice, beans, eggs, bananas, coffee and detergent. At home: change the sheets on Thursday and call someone about the kitchen tap."
-  },
-  "teamTemplates.example.vic": {
-    "value": "Lisbon in 3 days: day 1, Alfama and the castle. Day 2, Belém and the river. Day 3, Sintra. The cheapest flights are on Tuesday the 12th. Want me to keep an eye on the price?"
-  },
-  "teamTemplates.example.rui": {
-    "value": "Hi Marcos, here's the proposal: a new site with 5 pages, delivered in 3 weeks, paid in two parts. If it works for you, I'll send the contract today."
   },
   "teamTemplates.channels.iara": {
     "value": "support"

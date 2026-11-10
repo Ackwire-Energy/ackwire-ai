@@ -10700,7 +10700,7 @@
       "close": "Ayrıntıları kapat",
       "can": "Ajanların yapabilecekleri",
       "afterText": "Siz seçene kadar hiçbir ajan kullanmaz.",
-      "allText": "Bağlandıktan sonra her ajan kullanabilir. Ardından her ajanın erişimini seçersiniz.",
+      "allText": "Bağlandıktan sonra her ajan kullanabilir. Bunu daha sonra ayarlayabilirsiniz.",
       "addAccount": "Başka bir hesap ekle",
       "accountsText": "Her hesabın kendi ajanları ve seviyeleri vardır.",
       "reconnect": "Yeniden bağla",
@@ -11481,11 +11481,10 @@
     "notApproved": "{{name}} yalnızca onayladığı uygulamaların giriş yapmasına izin veriyor ve agentes.chat henüz onaylanmadı. Size bir API anahtarı veriyorsa onunla bağlanabilirsiniz.",
     "serverSaid": "Sunucunun yanıtı: {{detail}}",
     "nothingYet": "3. adıma kadar ajanlar hiçbir şey kullanamaz.",
-    "allCanUse": "Bağlandıktan sonra her ajan kullanabilir. Bunu 3. adımda değiştirebilirsiniz.",
-    "newAccount": "Yeni hesap, her şeye erişimi olanlar dışında ajansız başlar. 3. adımda siz seçersiniz.",
+    "allCanUse": "Bağlandıktan sonra her ajan kullanabilir. Bunu daha sonra ayarlayabilirsiniz.",
     "replace": "Mevcut girişin yerini alır. Kimin kullandığı aynı kalır.",
     "replaceUnchecked": "Öncekiyle aynı hesaba giriş yapın. Hangisi olduğunu kontrol edemiyoruz ve kimin kullandığı aynı kalır.",
-    "newAccountUnchecked": "Henüz bağlı olmayan bir hesaba giriş yapın, bunu kontrol edemiyoruz. Her şeye erişimi olanlar dışında ajansız başlar.",
+    "newAccountUnchecked": "Henüz bağlı olmayan bir hesaba giriş yapın, bunu kontrol edemiyoruz.",
     "addTitle": "Başka bir {{name}} hesabı",
     "reconnectTitle": "{{name}} yeniden bağla",
     "accountName": "Bu hesabın adı",
@@ -11508,7 +11507,14 @@
     "asksDefault": "Hassas işlemler sohbette her zaman onay ister.",
     "grant": "Erişim ver",
     "saved_one": "{{name}}: {{count}} ajan kullanabilir.",
-    "saved_other": "{{name}}: {{count}} ajan kullanabilir."
+    "saved_other": "{{name}}: {{count}} ajan kullanabilir.",
+    "done": {
+      "title": "{{name}} bağlandı",
+      "everyone": "Her ajan kullanabilir.",
+      "waiting": "Ajanlar araçları ancak siz devam ettiğinizde, önerdiğimiz seviyelerle alır.",
+      "adjust": "Ayarla",
+      "ok": "Tamam"
+    }
   },
   "database": {
     "name": "Veritabanı",

@@ -2117,7 +2117,6 @@
     "failed": "Collegamento non riuscito. Riprova.",
     "refused": "{{name}} non ha dato l'autorizzazione. Non è stato connesso nulla.",
     "connectedTitle": "{{name}} connesso",
-    "connectedSub": "Ora controlla cosa possono fare gli agenti da soli.",
     "connectedDone": "Servizio connesso.",
     "levelFailed": "Non è stato possibile cambiare l'accesso di {{name}}. Riprova.",
     "everyoneFailed": "Non è stato possibile cambiare l'accesso di tutti. Riprova.",

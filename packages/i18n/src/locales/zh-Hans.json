@@ -10382,7 +10382,7 @@
       "close": "关闭详情",
       "can": "智能体将能做什么",
       "afterText": "在你选择之前，没有智能体会使用它。",
-      "allText": "连接后，所有智能体都可以使用。接下来，你可以选择每个智能体的访问权限。",
+      "allText": "连接后，所有智能体都可以使用。之后可以调整。",
       "addAccount": "添加另一个账号",
       "accountsText": "每个账号都有自己的智能体和权限级别。",
       "reconnect": "重新连接",
@@ -11143,11 +11143,10 @@
     "notApproved": "{{name}} 只允许它批准过的应用登录，而 agentes.chat 还未获批。如果它提供 API 密钥，你可以用密钥连接。",
     "serverSaid": "服务器返回：{{detail}}",
     "nothingYet": "到第 3 步之前，智能体都用不了任何功能。",
-    "allCanUse": "连接后，所有智能体都可以使用。你可以在第 3 步中修改。",
-    "newAccount": "新账号一开始没有智能体，可以访问全部内容的智能体除外。你在第 3 步中选择。",
+    "allCanUse": "连接后，所有智能体都可以使用。之后可以调整。",
     "replace": "替换当前的登录，使用者保持不变。",
     "replaceUnchecked": "请登录与之前相同的账号。我们无法核实是哪个账号，使用者保持不变。",
-    "newAccountUnchecked": "请登录一个尚未连接的账号，我们无法核实。它一开始没有智能体，可以访问全部内容的智能体除外。",
+    "newAccountUnchecked": "请登录一个尚未连接的账号，我们无法核实。",
     "addTitle": "另一个 {{name}} 账号",
     "reconnectTitle": "重新连接 {{name}}",
     "accountName": "此账号的名称",
@@ -11167,7 +11166,14 @@
     "asksCount_other": "{{count}} 项操作始终会在聊天中请求审批。",
     "asksDefault": "敏感操作始终会在聊天中请求审批。",
     "grant": "授予",
-    "saved_other": "{{name}}：{{count}} 个智能体可以使用。"
+    "saved_other": "{{name}}：{{count}} 个智能体可以使用。",
+    "done": {
+      "title": "{{name}} 已连接",
+      "everyone": "所有智能体都可以使用。",
+      "waiting": "继续后，智能体才会按我们建议的权限级别获得这些工具。",
+      "adjust": "调整",
+      "ok": "完成"
+    }
   },
   "database": {
     "name": "数据库",

@@ -2052,7 +2052,6 @@ export const featureKeysPtBR = {
     failed: "Não deu para conectar. Tente de novo.",
     refused: "O {{name}} não autorizou. Nada foi conectado.",
     connectedTitle: "{{name}} conectado",
-    connectedSub: "Agora confira o que os agentes podem fazer sozinhos.",
     connectedDone: "Serviço conectado.",
     levelFailed: "Não deu para mudar o acesso de {{name}}. Tente de novo.",
     everyoneFailed: "Não deu para mudar o acesso de todos. Tente de novo.",

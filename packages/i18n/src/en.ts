@@ -10800,7 +10800,7 @@ export const en = {
       close: "Close details",
       can: "What agents will be able to do",
       afterText: "No agent uses it until you choose.",
-      allText: "Once connected, every agent can use it. Next, you choose each agent's access.",
+      allText: "Once connected, every agent can use it. You can adjust that later.",
       addAccount: "Add another account",
       accountsText: "Each account has its own agents and levels.",
       reconnect: "Reconnect",
@@ -11397,13 +11397,11 @@ export const en = {
       "{{name}} only lets apps it approved sign in, and agentes.chat isn't approved yet. If it gives you an API key, you can connect with that.",
     serverSaid: "The server answered: {{detail}}",
     nothingYet: "Nothing is available to agents until step 3.",
-    allCanUse: "Once connected, every agent can use it. You can change that in step 3.",
-    newAccount: "The new account starts with no agents, except those with access to everything. You choose in step 3.",
+    allCanUse: "Once connected, every agent can use it. You can adjust that later.",
     replace: "Replaces the current sign-in. Who uses it stays the same.",
     replaceUnchecked:
       "Sign in to the same account as before. We can't check which one it is, and who uses it stays the same.",
-    newAccountUnchecked:
-      "Sign in to an account that isn't connected yet, we can't check. It starts with no agents, except those with access to everything.",
+    newAccountUnchecked: "Sign in to an account that isn't connected yet, we can't check.",
     addTitle: "Another {{name}} account",
     reconnectTitle: "Reconnect {{name}}",
     accountName: "Name of this account",
@@ -11427,6 +11425,15 @@ export const en = {
     grant: "Grant",
     saved_one: "{{name}}: {{count}} agent can use it.",
     saved_other: "{{name}}: {{count}} agents can use it.",
+    /** The end of connecting: a short confirmation. "Adjust" opens the detail (tools, then who uses it). */
+    done: {
+      title: "{{name}} connected",
+      everyone: "Every agent can use it.",
+      /** A server by address whose tools no one gave a level yet: "Continue" saves the ones we suggest. */
+      waiting: "Agents get the tools only when you continue, at the levels we suggest.",
+      adjust: "Adjust",
+      ok: "Done",
+    },
   },
   database: {
     name: "Database",

@@ -11102,7 +11102,7 @@
       "close": "Cerrar detalles",
       "can": "Lo que podrán hacer los agentes",
       "afterText": "Ningún agente lo usa hasta que tú elijas.",
-      "allText": "Una vez conectado, todos los agentes pueden usarlo. Después eliges el acceso de cada agente.",
+      "allText": "Una vez conectado, todos los agentes pueden usarlo. Puedes ajustarlo después.",
       "addAccount": "Agregar otra cuenta",
       "accountsText": "Cada cuenta tiene sus propios agentes y niveles.",
       "reconnect": "Volver a conectar",
@@ -11903,11 +11903,10 @@
     "notApproved": "{{name}} solo deja iniciar sesión a las apps que aprobó, y agentes.chat todavía no está aprobado. Si te da una clave de API, puedes conectarlo con ella.",
     "serverSaid": "El servidor respondió: {{detail}}",
     "nothingYet": "Nada queda disponible para los agentes hasta el paso 3.",
-    "allCanUse": "Una vez conectado, todos los agentes pueden usarlo. Puedes cambiarlo en el paso 3.",
-    "newAccount": "La cuenta nueva empieza sin agentes, salvo los que tienen acceso a todo. Tú eliges en el paso 3.",
+    "allCanUse": "Una vez conectado, todos los agentes pueden usarlo. Puedes ajustarlo después.",
     "replace": "Reemplaza el inicio de sesión actual. Quién lo usa sigue igual.",
     "replaceUnchecked": "Inicia sesión en la misma cuenta que antes. No podemos comprobar cuál es, y quién la usa sigue igual.",
-    "newAccountUnchecked": "Inicia sesión en una cuenta que todavía no esté conectada, no podemos comprobarlo. Empieza sin agentes, salvo los que tienen acceso a todo.",
+    "newAccountUnchecked": "Inicia sesión en una cuenta que todavía no esté conectada, no podemos comprobarlo.",
     "addTitle": "Otra cuenta de {{name}}",
     "reconnectTitle": "Volver a conectar {{name}}",
     "accountName": "Nombre de esta cuenta",
@@ -11933,7 +11932,14 @@
     "grant": "Dar acceso",
     "saved_one": "{{name}}: {{count}} agente puede usarlo.",
     "saved_many": "{{name}}: {{count}} agentes pueden usarlo.",
-    "saved_other": "{{name}}: {{count}} agentes pueden usarlo."
+    "saved_other": "{{name}}: {{count}} agentes pueden usarlo.",
+    "done": {
+      "title": "{{name}} conectado",
+      "everyone": "Todos los agentes pueden usarlo.",
+      "waiting": "Los agentes solo reciben las herramientas cuando continúes, con los niveles que sugerimos.",
+      "adjust": "Ajustar",
+      "ok": "Listo"
+    }
   },
   "database": {
     "name": "Base de datos",

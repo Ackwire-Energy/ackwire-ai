@@ -1926,7 +1926,6 @@
     "failed": "Tidak bisa menghubungkan. Coba lagi.",
     "refused": "{{name}} tidak memberi izin. Tidak ada yang terhubung.",
     "connectedTitle": "{{name}} terhubung",
-    "connectedSub": "Sekarang periksa apa yang bisa dilakukan agen sendiri.",
     "connectedDone": "Layanan terhubung.",
     "levelFailed": "Tidak bisa mengubah akses {{name}}. Coba lagi.",
     "everyoneFailed": "Tidak bisa mengubah akses semua orang. Coba lagi.",
