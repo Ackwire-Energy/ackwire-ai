@@ -5541,42 +5541,6 @@
       }
     }
   },
-  "newAgentAsk": {
-    "title": "Wat moet je nieuwe agent doen?",
-    "lead": "Zeg het in één zin. {{name}} zet hem klaar en laat hem zien voordat hij gemaakt wordt.",
-    "field": "Wat hij voor je doet",
-    "placeholder": "Bijv. Mijn agenda op orde houden en me aan belangrijke dingen herinneren",
-    "ideas": "Ideeën",
-    "idea": {
-      "agenda": {
-        "label": "Agenda",
-        "text": "Mijn agenda op orde houden en me aan afspraken herinneren"
-      },
-      "money": {
-        "label": "Financiën",
-        "text": "Mijn rekeningen bijhouden en me waarschuwen voor de vervaldatum"
-      },
-      "training": {
-        "label": "Training",
-        "text": "Mijn trainingen voor de week plannen en aanpassen aan hoe ik me voel"
-      },
-      "studies": {
-        "label": "Studie",
-        "text": "Een studieplan maken en me overhoren over wat ik leerde"
-      },
-      "home": {
-        "label": "Huis",
-        "text": "De boodschappenlijst en het huishouden bijhouden"
-      },
-      "travel": {
-        "label": "Reizen",
-        "text": "Mijn reizen plannen: route, boekingen en documenten"
-      }
-    },
-    "full": "Ik vul liever alles zelf in",
-    "create": "Maken met {{name}}",
-    "message": "Ik wil een nieuwe agent: {{what}}"
-  },
   "newAgent": {
     "title": "Agent maken",
     "railOrg": "{{org}} · je bent {{role}}",
@@ -5946,7 +5910,197 @@
     "and": " en ",
     "routine": "Routine",
     "routineKeep": "De routine {{name}} maken",
-    "routineNotMade": "De routine is niet gemaakt: {{reason}}"
+    "routineNotMade": "De routine is niet gemaakt: {{reason}}",
+    "hello": {
+      "clara": "Ik let op je agenda en herinner je aan wat belangrijk is voordat het te laat is.",
+      "duda": "Ik houd je rekeningen en uitgaven bij en waarschuw je voordat er iets vervalt.",
+      "leo": "Ik stel je trainingen samen en houd je in het ritme, op jouw manier.",
+      "mel": "Ik plan je maaltijden en boodschappenlijst, naar jouw smaak en budget.",
+      "gabi": "Ik maak je studieplan en overhoor je over wat je hebt geleerd.",
+      "lu": "Ik bewaar je notities en ideeën en help je er tekst van te maken.",
+      "rosa": "Ik zorg voor de boodschappenlijst, het huishouden en wat er gerepareerd moet worden.",
+      "vic": "Ik plan je reizen: data, prijzen, boekingen en een dag-voor-dag-schema.",
+      "rui": "Ik volg je klanten, schrijf offertes en herinneringen en onthoud wie nog niet heeft betaald.",
+      "dev": "Ik programmeer, review PR's en zoek bugs uit.",
+      "ops": "Ik houd fouten, wachtrijen en deploys in de gaten.",
+      "qa": "Ik test flows en reproduceer gemelde bugs.",
+      "pm": "Ik organiseer de taken en maak de samenvattingen.",
+      "support": "Ik beantwoord klanten en geef door wat een mens nodig heeft.",
+      "sales": "Ik bereid offertes voor en volg geïnteresseerden op.",
+      "marketing": "Ik plan campagnes, posts en pagina's van de site.",
+      "content": "Ik schrijf en redigeer teksten, artikelen en nieuwsbrieven.",
+      "data": "Ik beantwoord vragen met cijfers en maak rapporten.",
+      "finance": "Ik houd betalingen, facturen en uitgaven bij.",
+      "people": "Ik help met werving, onboarding en vragen van het team.",
+      "research": "Ik onderzoek een onderwerp en lever een samenvatting met bronnen.",
+      "assistant": "Ik zorg voor de agenda, de e-mails en de herinneringen."
+    },
+    "starters": {
+      "clara": {
+        "instructions": "Kijkt elke ochtend in de agenda en stuurt wat er die dag is.\nHerinnert de dag ervoor aan elke afspraak en elke rekening met een datum.\nPlant, annuleert of accepteert nooit een uitnodiging zonder eerst te vragen.",
+        "tasks": {
+          "a": "Wat heb ik morgen?",
+          "b": "Herinner me elke 5e aan de huur",
+          "c": "Stuur me elke dag om 7 uur mijn agenda"
+        }
+      },
+      "duda": {
+        "instructions": "Houdt rekeningen en uitgaven bij, per categorie.\nWaarschuwt drie dagen voordat iets vervalt en als een uitgave uit de toon valt.\nBetaalt, maakt over of zegt nooit iets op zonder eerst te vragen.",
+        "tasks": {
+          "a": "Hoeveel heb ik deze maand uitgegeven?",
+          "b": "Welke rekeningen vervallen deze week?",
+          "c": "Sorteer deze uitgaven per categorie"
+        }
+      },
+      "leo": {
+        "instructions": "Stelt trainingen samen op jouw niveau, met jouw tijd en wat je leuk vindt.\nPast de week aan als je een dag overslaat of moe bent, zonder preek.\nGeeft geen medisch advies: bij pijn of een blessure raadt hij een professional aan.",
+        "tasks": {
+          "a": "Stel een training van 30 minuten voor vandaag samen",
+          "b": "Plan mijn hardloopweek",
+          "c": "Stuur me elke ochtend de training van de dag"
+        }
+      },
+      "mel": {
+        "instructions": "Plant de maaltijden van de week naar jouw smaak, tijd en budget.\nMaakt de boodschappenlijst bij het menu, per afdeling van de winkel.\nHoudt rekening met beperkingen en allergieën en geeft geen dieet- of medisch advies.",
+        "tasks": {
+          "a": "Stel drie snelle avondmaaltijden voor",
+          "b": "Maak het weekmenu",
+          "c": "Maak de boodschappenlijst voor het menu"
+        }
+      },
+      "gabi": {
+        "instructions": "Maakt het studieplan tot het examen, met wat er per dag past.\nOverhoort je over wat je hebt geleerd en legt opnieuw uit wat je fout had.\nMaakt je huiswerk niet voor je: helpt je naar het antwoord.",
+        "tasks": {
+          "a": "Maak een studieplan voor het examen",
+          "b": "Stel me 3 vragen over wat ik heb geleerd",
+          "c": "Leg dit onderwerp eenvoudig uit"
+        }
+      },
+      "lu": {
+        "instructions": "Bewaart de notities en ideeën die je stuurt en voegt vergelijkbare samen.\nMaakt van notities tekst in jouw toon, zonder iets toe te voegen wat je niet zei.\nRedigeert zorgvuldig en laat zien wat er veranderd is voordat hij het origineel vervangt.",
+        "tasks": {
+          "a": "Maak van deze notities een korte tekst",
+          "b": "Verzamel de ideeën van de week",
+          "c": "Redigeer deze tekst"
+        }
+      },
+      "rosa": {
+        "instructions": "Houdt de boodschappenlijst en het huishouden bij.\nNoteert wat er gerepareerd moet worden en herinnert eraan tot het gedaan is.\nKoopt of huurt nooit iets in zonder eerst te vragen.",
+        "tasks": {
+          "a": "Maak de boodschappenlijst van de week",
+          "b": "Wat moet er in huis gerepareerd worden?",
+          "c": "Verdeel de huishoudtaken"
+        }
+      },
+      "vic": {
+        "instructions": "Plant de reis met data, prijzen en een dag-voor-dag-schema.\nVergelijkt vluchten en verblijven en zegt waarom hij welke voorstelt.\nBoekt of betaalt nooit iets zonder eerst te vragen.",
+        "tasks": {
+          "a": "Plan 3 dagen Lissabon",
+          "b": "Laat het weten als het ticket goedkoper wordt",
+          "c": "Verzamel de boekingen van de reis"
+        }
+      },
+      "rui": {
+        "instructions": "Volgt elke klant: wat is afgesproken, wat nog openstaat en wie niet heeft betaald.\nSchrijft offertes en betalingsherinneringen in jouw toon, klaar om na te lezen.\nStuurt een klant nooit iets zonder jouw goedkeuring.",
+        "tasks": {
+          "a": "Schrijf een korte offerte voor een klant",
+          "b": "Wie heeft nog niet betaald?",
+          "c": "Waar wacht elke klant vandaag op?"
+        }
+      }
+    }
+  },
+  "newAgentCard": {
+    "title": "Nieuwe agent",
+    "lead": "Kies links en pas rechts aan. Je kunt later alles wijzigen.",
+    "list": "Startpunten",
+    "zero": "Vanaf nul",
+    "zeroSub": "Jij zegt wat hij doet",
+    "import": "Agents uit een andere app halen",
+    "hi": "Hoi, ik ben",
+    "hiBlank": "Hoi, ik ben",
+    "name": "Naam",
+    "namePlaceholder": "naam",
+    "what": "Wat hij doet",
+    "whatPlaceholder": "Wat ga ik voor je doen?",
+    "look": "Uiterlijk",
+    "lookDone": "Klaar",
+    "shuffle": "Loten",
+    "handle": "In de chat: @{{handle}}",
+    "handleRole": "In de chat: @{{handle}} · {{role}}",
+    "handleTaken": "In de chat: @{{handle}} · er is hier al een {{name}}",
+    "handleBlank": "De @ voor de chat komt van de naam",
+    "similar": "Lijkt op {{name}}, die al klaarstaat.",
+    "similarAction": "Beginnen met {{name}}",
+    "uses": "Gaat gebruiken",
+    "chooseApps": "Apps kiezen",
+    "otherApp": "Andere app",
+    "usesNone": "Nog niets.",
+    "worksIn": "Werkt in",
+    "how": "Hoe {{name}} werkt",
+    "howBlank": "Hoe hij werkt",
+    "instructionsPlaceholder": "Wat hij doet, wat hij vermijdt, wie hij om hulp vraagt",
+    "picker": {
+      "title": "Apps van {{name}}",
+      "titleBlank": "Apps van de agent",
+      "lead": "Een gekoppelde app komt meteen op de kaart. Andere koppel je hier.",
+      "suggested": "Voorgesteld voor {{name}}",
+      "suggestedBlank": "Voorgesteld",
+      "use": "Gebruiken",
+      "added": "Op de kaart"
+    },
+    "create": "{{name}} maken",
+    "createBlank": "Agent maken",
+    "failed": "Maken is niet gelukt: {{reason}}",
+    "level": {
+      "read": "Leest",
+      "write": "Leest en schrijft"
+    },
+    "app": {
+      "lead": "Hoe ver {{name}} gaat in {{app}}.",
+      "leadBlank": "Hoe ver hij gaat in {{app}}.",
+      "read": "Lezen",
+      "readDesc": "Ziet wat er in {{app}} staat. Verandert niets.",
+      "write": "Lezen en schrijven",
+      "writeDesc": "Maakt en bewerkt ook in {{app}}.",
+      "asks": "{{actions}} vragen altijd om je goedkeuring, op elk niveau.",
+      "asksAny": "Versturen, verwijderen en betalen vragen altijd om je goedkeuring, op elk niveau.",
+      "remove": "{{app}} weghalen",
+      "done": "Klaar"
+    },
+    "band": {
+      "label": "Wat {{name}} nodig heeft om te beginnen",
+      "ai": "Een AI om mee te denken",
+      "asleep": "Slaapt tot er een AI is"
+    },
+    "skills": "Skills",
+    "skillsHelpBlank": "Handleidingen die hij opent als dat nodig is.",
+    "chooseSkills": "Skills kiezen",
+    "otherSkill": "Andere skill",
+    "namesLead": "Wat dacht je van",
+    "namesRoll": "Andere namen",
+    "skill": {
+      "opens": "{{name}} opent deze handleiding als het onderwerp opduikt. Je bewerkt hem bij Skills.",
+      "opensBlank": "Hij opent deze handleiding als het onderwerp opduikt. Je bewerkt hem bij Skills.",
+      "remove": "Weghalen bij {{name}}",
+      "removeBlank": "Weghalen bij de agent",
+      "done": "Klaar"
+    },
+    "names": {
+      "agenda": "Lia, Uur, Tess, Dora, Tijs, Emma",
+      "agendaWords": "agenda, afspra, herinner, vergader, rooster",
+      "money": "Penny, Nico, Mona, Kees, Lara, Daan",
+      "moneyWords": "rekening, uitgav, geld, financ, budget, betal",
+      "travel": "Route, Malou, Ravi, Vic, Nara, Tom",
+      "travelWords": "reis, ticket, vlucht, hotel, vakantie",
+      "training": "Leo, Bea, Bliksem, Kai, Nina, Daaf",
+      "trainingWords": "train, hardloop, sport, oefen, gym",
+      "study": "Gabi, Nils, Sophie, Teun, Iris, Ben",
+      "studyWords": "studie, studer, examen, cursus, leer",
+      "clients": "Ruud, Anna, Bram, Lies, Otto, Cleo",
+      "clientsWords": "klant, verkoop, offerte, factur",
+      "any": "Sol, Lia, Teun, Bea, Nino, Iris, Kai, Luma, Gijs, Roos, Nara, Tom"
+    }
   },
   "members": {
     "column": {

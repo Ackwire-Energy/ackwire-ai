@@ -18,6 +18,7 @@ import {
   firstRunSteps,
   nextStep,
   type SetupRowFacts,
+  setupApps,
   setupDone,
   setupRole,
   setupRow,
@@ -85,6 +86,29 @@ describe("setup checklist", () => {
       "newAgent.roles.support.tasks.c",
     ]);
     expect(setupTaskKeys(null)).toEqual(["agentSetup.tasks.a", "agentSetup.tasks.b"]);
+    // A personal starter's own three (ADR 0164); an unknown one is a blank agent's.
+    expect(setupTaskKeys(null, "clara")).toEqual([
+      "newAgent.starters.clara.tasks.a",
+      "newAgent.starters.clara.tasks.b",
+      "newAgent.starters.clara.tasks.c",
+    ]);
+    expect(setupTaskKeys(null, "nobody")).toEqual(["agentSetup.tasks.a", "agentSetup.tasks.b"]);
+  });
+
+  test("the apps it suggests: its card's (ADR 0164), else its role's, else its personal starter's at write", () => {
+    expect(setupApps({ role: "dev", done: [], apps: { github: "read" } })).toEqual({ github: "read" });
+    expect(setupApps(fresh("pm"))).toEqual(suggestedLevels("pm"));
+    expect(setupApps({ role: null, done: [], starter: "clara" })).toEqual({
+      "google-calendar": "write",
+      todoist: "write",
+    });
+    expect(setupApps({ role: null, done: [] })).toEqual({});
+    expect(setupApps(null)).toEqual({});
+  });
+
+  test("a line said back keeps no trailing period inside the quotes", () => {
+    expect(askedLine("Cuida da sua agenda antes que seja tarde. ")).toBe("Cuida da sua agenda antes que seja tarde");
+    expect(askedLine("Cuida da agenda…")).toBe("Cuida da agenda");
   });
 
   test("a row's words, the same on the web and the phone: the suggestion while left, what it has once done", () => {

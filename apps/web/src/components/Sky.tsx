@@ -176,44 +176,71 @@ export function AgentCover({
   clear?: Clear;
 }) {
   const host = useRef<HTMLDivElement>(null);
-  /** Where the face is, in shares of the cover (its upper quarter, which sits on the sky). */
-  const pool = (): [number, number] => {
+  return (
+    <div className="agp-cover__sky" data-busy={busy || undefined} aria-hidden="true" ref={host}>
+      <PixelSky options={agentCoverOptions(color, { busy, clear, pool: facePool(host, clear, at) })} />
+    </div>
+  );
+}
+
+/** A deep navy the cover's tones are pulled toward at night (a new agent waiting for its AI, ADR 0164). */
+const NIGHT_NAVY = "#040818";
+
+/**
+ * Where a cover's face is, in shares of its box (the face's upper quarter, which sits on the sky): the first element
+ * `clear` gives; without one, `at` across near the bottom.
+ */
+export function facePool(
+  host: { current: HTMLElement | null },
+  clear: Clear | undefined,
+  at = 0.1,
+): () => [number, number] {
+  return () => {
     const face = clear?.()[0];
     const box = host.current?.getBoundingClientRect();
     if (!face || !box?.width || !box.height) return [at, 0.83];
     const f = face.getBoundingClientRect();
     return [(f.left + f.width / 2 - box.left) / box.width, (f.top + f.height / 4 - box.top) / box.height];
   };
-  return (
-    <div className="agp-cover__sky" data-busy={busy || undefined} aria-hidden="true" ref={host}>
-      <PixelSky
-        options={{
-          pixel: 2,
-          surface: "--bg",
-          // Mid to near white, then most of the way to the page: no deep tones on the cover.
-          palette: (surface) => {
-            const tones = agentTones(color);
-            const light = tones.slice(3);
-            return [...light, mix(light[light.length - 1] ?? surface, surface, 0.6)];
-          },
-          body: spriteTone(color),
-          speed: busy ? 2.6 : 1,
-          rise: busy ? 2.4 : 1,
-          near: 0,
-          faint: 1,
-          sprites: busy ? { area: 5300, max: 14 } : { area: 10560, max: 8 },
-          clear,
-          light: 0,
-          // Lighter toward the bottom and the right, where the page's text starts.
-          base: (u, v, tt) => 0.28 + 0.3 * u + 0.62 * v * v + 0.05 * S(u * 4 + tt * 0.5),
-          blobs: () => {
-            const [x, y] = pool();
-            return [[x, y, 0.3, 0.75]];
-          },
-        }}
-      />
-    </div>
-  );
+}
+
+/**
+ * The agent page's cover sky (AgentCover), as options: only the light tones of its color, fading into the page at the
+ * bottom, a pool of light behind its face so the face's own dither never melts into the sky's, 2 px pixels and a few
+ * faint pixel agents. The new agent's card and its conversation's band use it too (ADR 0164): `night` (0..1, read on
+ * every frame) pulls the tones toward a deep navy while the agent has no AI, and back as it gets one.
+ */
+export function agentCoverOptions(
+  color: AgentColor,
+  o: { busy?: boolean; clear?: Clear; pool: () => [number, number]; night?: () => number },
+): SkyOptions {
+  const busy = o.busy ?? false;
+  return {
+    pixel: 2,
+    surface: "--bg",
+    // Mid to near white, then most of the way to the page: no deep tones on the cover.
+    palette: (surface) => {
+      const tones = agentTones(color);
+      const light = tones.slice(3);
+      const day = [...light, mix(light[light.length - 1] ?? surface, surface, 0.6)];
+      const night = o.night?.() ?? 0;
+      return night <= 0.001 ? day : day.map((tone, i) => mix(tone, NIGHT_NAVY, night * (0.9 - i * 0.07)));
+    },
+    body: spriteTone(color),
+    speed: busy ? 2.6 : 1,
+    rise: busy ? 2.4 : 1,
+    near: 0,
+    faint: 1,
+    sprites: busy ? { area: 5300, max: 14 } : { area: 10560, max: 8 },
+    clear: o.clear,
+    light: 0,
+    // Lighter toward the bottom and the right, where the page's text starts.
+    base: (u, v, tt) => 0.28 + 0.3 * u + 0.62 * v * v + 0.05 * S(u * 4 + tt * 0.5),
+    blobs: () => {
+      const [x, y] = o.pool();
+      return [[x, y, 0.3, 0.75]];
+    },
+  };
 }
 
 /**

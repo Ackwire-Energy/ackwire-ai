@@ -53,6 +53,7 @@ import { lookOf } from "@/lib/look";
 import { proposedRoutineWhen } from "@/lib/recurrence";
 import { useToast } from "@/lib/toast";
 import "./team-plan.css";
+import { useNewAgent } from "@/components/new-agent/NewAgentDialog";
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -725,6 +726,7 @@ export function TeamTemplatesDialog({
   const personal = isPersonal(org);
   const list = useTeamTemplates(org.id, i18n.language, open);
   const use = useApplyTeamTemplate(org.id);
+  const newAgent = useNewAgent();
   const [picked, setPicked] = useState<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const templates = list.data ?? [];
@@ -819,7 +821,9 @@ export function TeamTemplatesDialog({
               className="ac-link"
               onClick={() => {
                 onClose();
-                void navigate({ to: "/org/$orgId/agents/new", params: { orgId: org.id } });
+                // One agent from scratch: the new agent's dialog (ADR 0164).
+                if (newAgent) newAgent.open();
+                else void navigate({ to: "/org/$orgId/agents/new", params: { orgId: org.id } });
               }}
             >
               {t("teamPlan.templates.scratch")}

@@ -5644,26 +5644,6 @@ export const en = {
       },
     },
   },
-  /** New agent in a personal workspace (ADR 0159): one question, sent to the right hand, which proposes it. */
-  newAgentAsk: {
-    title: "What should your new agent do?",
-    lead: "Say it in one sentence. {{name}} sets it up and shows it to you before creating it.",
-    field: "What it does for you",
-    placeholder: "E.g. Keep my calendar in order and remind me of what matters",
-    ideas: "Ideas",
-    idea: {
-      agenda: { label: "Calendar", text: "Keep my calendar in order and remind me of my appointments" },
-      money: { label: "Finances", text: "Keep track of my bills and tell me before anything is due" },
-      training: { label: "Training", text: "Plan my workouts for the week and adjust them to how I feel" },
-      studies: { label: "Studies", text: "Make me a study plan and quiz me on what I learned" },
-      home: { label: "Home", text: "Keep the shopping list and the house chores in order" },
-      travel: { label: "Travel", text: "Plan my trips: itinerary, bookings and documents" },
-    },
-    full: "Fill everything in myself",
-    create: "Create with {{name}}",
-    /** Sent to the right hand as the person's own message. */
-    message: "I want a new agent: {{what}}",
-  },
   newAgent: {
     title: "Create agent",
     railOrg: "{{org}} · you are {{role}}",
@@ -6018,6 +5998,204 @@ export const en = {
     routine: "Routine",
     routineKeep: "Create the routine {{name}}",
     routineNotMade: "The routine wasn't created: {{reason}}",
+    /** How each personal starter and ready-made role introduces itself on its card, in its own voice (ADR 0164). */
+    hello: {
+      clara: "I'll look after your calendar and remind you of what matters before it's too late.",
+      duda: "I'll keep track of your bills and spending and warn you before anything is due.",
+      leo: "I'll plan your workouts and keep you on pace, your way.",
+      mel: "I'll plan your meals and shopping list, to your taste and your budget.",
+      gabi: "I'll build your study plan and quiz you on what you learned.",
+      lu: "I'll keep your notes and ideas and help you turn them into writing.",
+      rosa: "I'll take care of the shopping list, the chores and what needs fixing.",
+      vic: "I'll plan your trips: dates, prices, bookings and a day-by-day itinerary.",
+      rui: "I'll follow up with your clients, write proposals and invoices and remember who hasn't paid.",
+      dev: "I write code, review PRs and dig into bugs.",
+      ops: "I keep an eye on errors, queues and deploys.",
+      qa: "I test flows and reproduce reported bugs.",
+      pm: "I organize tasks and write the summaries.",
+      support: "I answer customers and pass on what needs a person.",
+      sales: "I prepare proposals and follow up with leads.",
+      marketing: "I plan campaigns, posts and site pages.",
+      content: "I write and edit copy, articles and newsletters.",
+      data: "I answer questions with numbers and build reports.",
+      finance: "I keep track of payments, invoices and spending.",
+      people: "I help with hiring, onboarding and the team's questions.",
+      research: "I research a topic and deliver a summary with sources.",
+      assistant: "I take care of the calendar, emails and reminders.",
+    },
+    /** A personal starter's instructions and first tasks (ADR 0164), as a ready-made role's. */
+    starters: {
+      clara: {
+        instructions:
+          "Checks the calendar every morning and sends what's on for the day.\nReminds the day before each appointment and each bill with a date.\nNever books, cancels or accepts an invite without asking first.",
+        tasks: {
+          a: "What do I have tomorrow?",
+          b: "Remind me to pay the rent every 5th",
+          c: "Send me my agenda every day at 7am",
+        },
+      },
+      duda: {
+        instructions:
+          "Keeps track of bills and spending, sorted by category.\nWarns three days before anything is due and when a spend is out of the ordinary.\nNever pays, transfers or cancels anything without asking first.",
+        tasks: {
+          a: "How much did I spend this month?",
+          b: "Which bills are due this week?",
+          c: "Sort these expenses by category",
+        },
+      },
+      leo: {
+        instructions:
+          "Plans workouts for your level, the time you have and what you enjoy.\nAdjusts the week when you miss a day or feel tired, no lecturing.\nGives no medical advice: with pain or an injury, suggests seeing a professional.",
+        tasks: {
+          a: "Plan a 30-minute workout for today",
+          b: "Plan my running week",
+          c: "Send me the day's workout every morning",
+        },
+      },
+      mel: {
+        instructions:
+          "Plans the week's meals around your taste, time and budget.\nBuilds the shopping list for the menu, grouped by store aisle.\nRespects restrictions and allergies, and gives no diet or medical advice.",
+        tasks: {
+          a: "Suggest three quick dinners",
+          b: "Plan this week's menu",
+          c: "Make the shopping list for the menu",
+        },
+      },
+      gabi: {
+        instructions:
+          "Builds a study plan up to the exam, with what fits in each day.\nQuizzes you on what you studied and explains again what you got wrong.\nDoesn't do the homework for you: guides you to the answer.",
+        tasks: {
+          a: "Make a study plan for the exam",
+          b: "Ask me 3 questions about what I studied",
+          c: "Explain this topic simply",
+        },
+      },
+      lu: {
+        instructions:
+          "Keeps the notes and ideas you send and groups the similar ones.\nTurns notes into writing in your voice, never adding what you didn't say.\nEdits with care and shows what changed before replacing the original.",
+        tasks: { a: "Turn these notes into a short text", b: "Gather this week's ideas", c: "Edit this text" },
+      },
+      rosa: {
+        instructions:
+          "Keeps the shopping list and the house chores up to date.\nNotes what needs fixing and keeps reminding until it's done.\nNever buys or hires anything without asking first.",
+        tasks: { a: "Make this week's shopping list", b: "What needs fixing at home?", c: "Split up the chores" },
+      },
+      vic: {
+        instructions:
+          "Plans the trip with dates, prices and a day-by-day itinerary.\nCompares flights and places to stay and says why it suggests each one.\nNever books or pays for anything without asking first.",
+        tasks: { a: "Plan 3 days in Lisbon", b: "Tell me if the fare drops", c: "Gather the trip's bookings" },
+      },
+      rui: {
+        instructions:
+          "Follows each client: what was agreed, what's left and who hasn't paid.\nWrites proposals and payment reminders in your voice, ready to review.\nNever sends anything to a client without your approval.",
+        tasks: {
+          a: "Write a short proposal for a client",
+          b: "Who hasn't paid yet?",
+          c: "What is each client waiting for today?",
+        },
+      },
+    },
+  },
+  /** A new agent's dialog (ADR 0164): pick on the left, its card edited in place on the right; its chat's band. */
+  newAgentCard: {
+    title: "New agent",
+    lead: "Pick on the left and adjust on the right. You can change everything later.",
+    list: "Starting points",
+    zero: "From scratch",
+    zeroSub: "You say what it does",
+    import: "Bring agents from another app",
+    hi: "Hi, I'm",
+    hiBlank: "Hi, I'm",
+    name: "Name",
+    namePlaceholder: "name",
+    what: "What it does",
+    whatPlaceholder: "What will I do for you?",
+    look: "Look",
+    lookDone: "Done",
+    shuffle: "Shuffle",
+    handle: "In the chat: @{{handle}}",
+    handleRole: "In the chat: @{{handle}} · {{role}}",
+    handleTaken: "In the chat: @{{handle}} · there's already a {{name}} here",
+    handleBlank: "Its @ for the chat comes from the name",
+    similar: "Like {{name}}, who comes ready-made.",
+    similarAction: "Start with {{name}}",
+    uses: "Will use",
+    chooseApps: "Choose apps",
+    otherApp: "Another app",
+    /** "Will use" or Skills with nothing on the card yet. */
+    usesNone: "Nothing yet.",
+    worksIn: "Works in",
+    /** Its instructions, edited on the card. */
+    how: "How {{name}} works",
+    howBlank: "How it works",
+    instructionsPlaceholder: "What it does, what it avoids, who it asks for help",
+    /** "Another app": the catalog as rows, its starting point's apps first. */
+    picker: {
+      title: "{{name}}'s apps",
+      titleBlank: "The agent's apps",
+      lead: "A connected app goes on the card at once. Connect any other right here.",
+      suggested: "Suggested for {{name}}",
+      suggestedBlank: "Suggested",
+      use: "Use",
+      added: "On the card",
+    },
+    create: "Create {{name}}",
+    createBlank: "Create agent",
+    failed: "Couldn't create it: {{reason}}",
+    level: {
+      read: "Reads",
+      write: "Reads and writes",
+    },
+    app: {
+      lead: "How far {{name}} goes in {{app}}.",
+      leadBlank: "How far it goes in {{app}}.",
+      read: "Read",
+      readDesc: "Sees what's in {{app}}. Changes nothing.",
+      write: "Read and write",
+      writeDesc: "Also creates and edits in {{app}}.",
+      asks: "{{actions}} always ask for your approval, at any level.",
+      asksAny: "Sending, deleting and paying always ask for your approval, at any level.",
+      remove: "Remove {{app}}",
+      done: "Done",
+    },
+    band: {
+      label: "What {{name}} needs to start",
+      ai: "An AI to think",
+      asleep: "Asleep until it has an AI",
+    },
+    skills: "Skills",
+    skillsHelpBlank: "Manuals it opens when needed.",
+    chooseSkills: "Choose skills",
+    otherSkill: "Another skill",
+    namesLead: "How about",
+    namesRoll: "Other names",
+    /** One skill on the card. */
+    skill: {
+      opens: "{{name}} opens this manual when the topic comes up. You edit it in Skills.",
+      opensBlank: "It opens this manual when the topic comes up. You edit it in Skills.",
+      remove: "Remove from {{name}}",
+      removeBlank: "Remove from the agent",
+      done: "Done",
+    },
+    /**
+     * Name ideas for an agent from scratch, by what it will do: names (comma-separated, fit for this language) and
+     * the word beginnings that pick each theme; `any` when none fits.
+     */
+    names: {
+      agenda: "Ivy, June, Nora, Milo, Tess, Cal",
+      agendaWords: "calendar, schedul, appointment, remind, meeting, agenda",
+      money: "Penny, Nick, Mona, Rex, Lou, Cass",
+      moneyWords: "bill, spend, money, financ, budget, pay",
+      travel: "Atlas, Skye, Ravi, Vic, Nara, Tom",
+      travelWords: "trip, travel, flight, hotel, itinerar, vacation",
+      training: "Leo, Bea, Bolt, Kai, Nina, Dave",
+      trainingWords: "workout, run, gym, exercis, train",
+      study: "Gabi, Nils, Sophie, Theo, Iris, Benji",
+      studyWords: "stud, exam, course, learn, class",
+      clients: "Rui, Anna, Ben, Liz, Otto, Cleo",
+      clientsWords: "client, sale, proposal, invoic, customer",
+      any: "Sol, Lia, Theo, Bea, Nino, Iris, Kai, Luma, Gil, Rafa, Nara, Tom",
+    },
   },
   members: {
     /** The channel's members column (and its sheet on a phone). */

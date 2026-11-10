@@ -213,7 +213,18 @@ export function keyOptions(
 
 type LookPatch = Partial<Required<AgentAppearance>>;
 
-type LookPickProps = { look: Required<AgentAppearance>; onPick: (patch: LookPatch) => void };
+type LookPickProps = {
+  look: Required<AgentAppearance>;
+  onPick: (patch: LookPatch) => void;
+  /** Pointing at an option tries it on the agent; null takes it off again (a new agent's card, ADR 0164). */
+  onPreview?: (patch: LookPatch | null) => void;
+};
+
+/** Pointing at an option previews it, leaving takes it off (only when the picker asks for previews). */
+const tryOn = (onPreview: LookPickProps["onPreview"], patch: LookPatch) =>
+  onPreview
+    ? { onPointerEnter: () => onPreview(patch), onPointerLeave: () => onPreview(null) }
+    : ({} as Record<string, never>);
 
 /** The choices of a look row: wrapping ("Criar agente") or one sliding row (the agent's settings). */
 function ChoiceRow({
@@ -243,7 +254,7 @@ function ChoiceRow({
 }
 
 /** Color swatches, eyes and an accessory, each a live symbol. `onPick` gets what changed. */
-export function LookPicker({ look, onPick }: LookPickProps) {
+export function LookPicker({ look, onPick, onPreview }: LookPickProps) {
   const { t } = useTranslation();
   return (
     <>
@@ -251,23 +262,23 @@ export function LookPicker({ look, onPick }: LookPickProps) {
         <span className="newag__label">
           {t("look.color")} <span className="newag__opt-label">{t(`look.colors.${colorKey(look.color)}`)}</span>
         </span>
-        <ColorChoices look={look} onPick={onPick} />
+        <ColorChoices look={look} onPick={onPick} onPreview={onPreview} />
       </div>
       <div className="newag__look-row">
         <span className="newag__label">{t("look.eyes")}</span>
-        <EyesChoices look={look} onPick={onPick} />
+        <EyesChoices look={look} onPick={onPick} onPreview={onPreview} />
       </div>
       <div className="newag__look-row">
         <span className="newag__label">
           {t("look.accessory")} <span className="newag__opt-label">{t("newAgent.optional")}</span>
         </span>
-        <AccessoryChoices look={look} onPick={onPick} />
+        <AccessoryChoices look={look} onPick={onPick} onPreview={onPreview} />
       </div>
     </>
   );
 }
 
-function ColorChoices({ look, onPick }: LookPickProps) {
+function ColorChoices({ look, onPick, onPreview }: LookPickProps) {
   const { t } = useTranslation();
   return (
     // biome-ignore lint/a11y/useSemanticElements: pressable swatches, not a native fieldset
@@ -284,6 +295,7 @@ function ColorChoices({ look, onPick }: LookPickProps) {
             aria-pressed={look.color === c}
             style={{ "--a": top, "--b": bottom } as CSSProperties}
             onClick={() => onPick({ color: c })}
+            {...tryOn(onPreview, { color: c })}
           />
         );
       })}
@@ -325,7 +337,7 @@ function CustomColor({ look, onPick }: LookPickProps) {
   );
 }
 
-function EyesChoices({ look, onPick, carousel }: LookPickProps & { carousel?: boolean }) {
+function EyesChoices({ look, onPick, onPreview, carousel }: LookPickProps & { carousel?: boolean }) {
   const { t } = useTranslation();
   return (
     <ChoiceRow label={t("look.eyes")} carousel={carousel}>
@@ -336,6 +348,7 @@ function EyesChoices({ look, onPick, carousel }: LookPickProps & { carousel?: bo
           className="newag__opt"
           aria-pressed={look.eyes === e}
           onClick={() => onPick({ eyes: e })}
+          {...tryOn(onPreview, { eyes: e })}
         >
           <span className="newag__stage">
             <AgentAvatar
@@ -351,7 +364,7 @@ function EyesChoices({ look, onPick, carousel }: LookPickProps & { carousel?: bo
   );
 }
 
-function AccessoryChoices({ look, onPick, carousel }: LookPickProps & { carousel?: boolean }) {
+function AccessoryChoices({ look, onPick, onPreview, carousel }: LookPickProps & { carousel?: boolean }) {
   const { t } = useTranslation();
   return (
     <ChoiceRow label={t("look.accessory")} carousel={carousel} acc>
@@ -362,6 +375,7 @@ function AccessoryChoices({ look, onPick, carousel }: LookPickProps & { carousel
           className="newag__opt"
           aria-pressed={look.accessory === a}
           onClick={() => onPick({ accessory: a })}
+          {...tryOn(onPreview, { accessory: a })}
         >
           <span className="newag__stage">
             {a === "none" ? (

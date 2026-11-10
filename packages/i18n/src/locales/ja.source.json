@@ -5027,9 +5027,6 @@
   "rightHand.newDot": {
     "value": "New"
   },
-  "rightHand.rolePersonal": {
-    "value": "Personal assistant"
-  },
   "rightHand.actsAsYou": {
     "value": "acts with your permissions"
   },
@@ -13494,66 +13491,6 @@
   "agentSetup.firstRun.asks.whoPersonal": {
     "value": "Which agent does what?"
   },
-  "newAgentAsk.title": {
-    "value": "What should your new agent do?"
-  },
-  "newAgentAsk.lead": {
-    "value": "Say it in one sentence. {{name}} sets it up and shows it to you before creating it."
-  },
-  "newAgentAsk.field": {
-    "value": "What it does for you"
-  },
-  "newAgentAsk.placeholder": {
-    "value": "E.g. Keep my calendar in order and remind me of what matters"
-  },
-  "newAgentAsk.ideas": {
-    "value": "Ideas"
-  },
-  "newAgentAsk.idea.agenda.label": {
-    "value": "Calendar"
-  },
-  "newAgentAsk.idea.agenda.text": {
-    "value": "Keep my calendar in order and remind me of my appointments"
-  },
-  "newAgentAsk.idea.money.label": {
-    "value": "Finances"
-  },
-  "newAgentAsk.idea.money.text": {
-    "value": "Keep track of my bills and tell me before anything is due"
-  },
-  "newAgentAsk.idea.training.label": {
-    "value": "Training"
-  },
-  "newAgentAsk.idea.training.text": {
-    "value": "Plan my workouts for the week and adjust them to how I feel"
-  },
-  "newAgentAsk.idea.studies.label": {
-    "value": "Studies"
-  },
-  "newAgentAsk.idea.studies.text": {
-    "value": "Make me a study plan and quiz me on what I learned"
-  },
-  "newAgentAsk.idea.home.label": {
-    "value": "Home"
-  },
-  "newAgentAsk.idea.home.text": {
-    "value": "Keep the shopping list and the house chores in order"
-  },
-  "newAgentAsk.idea.travel.label": {
-    "value": "Travel"
-  },
-  "newAgentAsk.idea.travel.text": {
-    "value": "Plan my trips: itinerary, bookings and documents"
-  },
-  "newAgentAsk.full": {
-    "value": "Fill everything in myself"
-  },
-  "newAgentAsk.create": {
-    "value": "Create with {{name}}"
-  },
-  "newAgentAsk.message": {
-    "value": "I want a new agent: {{what}}"
-  },
   "newAgent.title": {
     "value": "Create agent"
   },
@@ -14352,6 +14289,414 @@
   },
   "newAgent.routineNotMade": {
     "value": "The routine wasn't created: {{reason}}"
+  },
+  "newAgent.hello.clara": {
+    "value": "I'll look after your calendar and remind you of what matters before it's too late."
+  },
+  "newAgent.hello.duda": {
+    "value": "I'll keep track of your bills and spending and warn you before anything is due."
+  },
+  "newAgent.hello.leo": {
+    "value": "I'll plan your workouts and keep you on pace, your way."
+  },
+  "newAgent.hello.mel": {
+    "value": "I'll plan your meals and shopping list, to your taste and your budget."
+  },
+  "newAgent.hello.gabi": {
+    "value": "I'll build your study plan and quiz you on what you learned."
+  },
+  "newAgent.hello.lu": {
+    "value": "I'll keep your notes and ideas and help you turn them into writing."
+  },
+  "newAgent.hello.rosa": {
+    "value": "I'll take care of the shopping list, the chores and what needs fixing."
+  },
+  "newAgent.hello.vic": {
+    "value": "I'll plan your trips: dates, prices, bookings and a day-by-day itinerary."
+  },
+  "newAgent.hello.rui": {
+    "value": "I'll follow up with your clients, write proposals and invoices and remember who hasn't paid."
+  },
+  "newAgent.hello.dev": {
+    "value": "I write code, review PRs and dig into bugs."
+  },
+  "newAgent.hello.ops": {
+    "value": "I keep an eye on errors, queues and deploys."
+  },
+  "newAgent.hello.qa": {
+    "value": "I test flows and reproduce reported bugs."
+  },
+  "newAgent.hello.pm": {
+    "value": "I organize tasks and write the summaries."
+  },
+  "newAgent.hello.support": {
+    "value": "I answer customers and pass on what needs a person."
+  },
+  "newAgent.hello.sales": {
+    "value": "I prepare proposals and follow up with leads."
+  },
+  "newAgent.hello.marketing": {
+    "value": "I plan campaigns, posts and site pages."
+  },
+  "newAgent.hello.content": {
+    "value": "I write and edit copy, articles and newsletters."
+  },
+  "newAgent.hello.data": {
+    "value": "I answer questions with numbers and build reports."
+  },
+  "newAgent.hello.finance": {
+    "value": "I keep track of payments, invoices and spending."
+  },
+  "newAgent.hello.people": {
+    "value": "I help with hiring, onboarding and the team's questions."
+  },
+  "newAgent.hello.research": {
+    "value": "I research a topic and deliver a summary with sources."
+  },
+  "newAgent.hello.assistant": {
+    "value": "I take care of the calendar, emails and reminders."
+  },
+  "newAgent.starters.clara.instructions": {
+    "value": "Checks the calendar every morning and sends what's on for the day.\nReminds the day before each appointment and each bill with a date.\nNever books, cancels or accepts an invite without asking first."
+  },
+  "newAgent.starters.clara.tasks.a": {
+    "value": "What do I have tomorrow?"
+  },
+  "newAgent.starters.clara.tasks.b": {
+    "value": "Remind me to pay the rent every 5th"
+  },
+  "newAgent.starters.clara.tasks.c": {
+    "value": "Send me my agenda every day at 7am"
+  },
+  "newAgent.starters.duda.instructions": {
+    "value": "Keeps track of bills and spending, sorted by category.\nWarns three days before anything is due and when a spend is out of the ordinary.\nNever pays, transfers or cancels anything without asking first."
+  },
+  "newAgent.starters.duda.tasks.a": {
+    "value": "How much did I spend this month?"
+  },
+  "newAgent.starters.duda.tasks.b": {
+    "value": "Which bills are due this week?"
+  },
+  "newAgent.starters.duda.tasks.c": {
+    "value": "Sort these expenses by category"
+  },
+  "newAgent.starters.leo.instructions": {
+    "value": "Plans workouts for your level, the time you have and what you enjoy.\nAdjusts the week when you miss a day or feel tired, no lecturing.\nGives no medical advice: with pain or an injury, suggests seeing a professional."
+  },
+  "newAgent.starters.leo.tasks.a": {
+    "value": "Plan a 30-minute workout for today"
+  },
+  "newAgent.starters.leo.tasks.b": {
+    "value": "Plan my running week"
+  },
+  "newAgent.starters.leo.tasks.c": {
+    "value": "Send me the day's workout every morning"
+  },
+  "newAgent.starters.mel.instructions": {
+    "value": "Plans the week's meals around your taste, time and budget.\nBuilds the shopping list for the menu, grouped by store aisle.\nRespects restrictions and allergies; gives no diet or medical advice."
+  },
+  "newAgent.starters.mel.tasks.a": {
+    "value": "Suggest three quick dinners"
+  },
+  "newAgent.starters.mel.tasks.b": {
+    "value": "Plan this week's menu"
+  },
+  "newAgent.starters.mel.tasks.c": {
+    "value": "Make the shopping list for the menu"
+  },
+  "newAgent.starters.gabi.instructions": {
+    "value": "Builds a study plan up to the exam, with what fits in each day.\nQuizzes you on what you studied and explains again what you got wrong.\nDoesn't do the homework for you: guides you to the answer."
+  },
+  "newAgent.starters.gabi.tasks.a": {
+    "value": "Make a study plan for the exam"
+  },
+  "newAgent.starters.gabi.tasks.b": {
+    "value": "Ask me 3 questions about what I studied"
+  },
+  "newAgent.starters.gabi.tasks.c": {
+    "value": "Explain this topic simply"
+  },
+  "newAgent.starters.lu.instructions": {
+    "value": "Keeps the notes and ideas you send and groups the similar ones.\nTurns notes into writing in your voice, never adding what you didn't say.\nEdits with care and shows what changed before replacing the original."
+  },
+  "newAgent.starters.lu.tasks.a": {
+    "value": "Turn these notes into a short text"
+  },
+  "newAgent.starters.lu.tasks.b": {
+    "value": "Gather this week's ideas"
+  },
+  "newAgent.starters.lu.tasks.c": {
+    "value": "Edit this text"
+  },
+  "newAgent.starters.rosa.instructions": {
+    "value": "Keeps the shopping list and the house chores up to date.\nNotes what needs fixing and keeps reminding until it's done.\nNever buys or hires anything without asking first."
+  },
+  "newAgent.starters.rosa.tasks.a": {
+    "value": "Make this week's shopping list"
+  },
+  "newAgent.starters.rosa.tasks.b": {
+    "value": "What needs fixing at home?"
+  },
+  "newAgent.starters.rosa.tasks.c": {
+    "value": "Split up the chores"
+  },
+  "newAgent.starters.vic.instructions": {
+    "value": "Plans the trip with dates, prices and a day-by-day itinerary.\nCompares flights and places to stay and says why it suggests each one.\nNever books or pays for anything without asking first."
+  },
+  "newAgent.starters.vic.tasks.a": {
+    "value": "Plan 3 days in Lisbon"
+  },
+  "newAgent.starters.vic.tasks.b": {
+    "value": "Tell me if the fare drops"
+  },
+  "newAgent.starters.vic.tasks.c": {
+    "value": "Gather the trip's bookings"
+  },
+  "newAgent.starters.rui.instructions": {
+    "value": "Follows each client: what was agreed, what's left and who hasn't paid.\nWrites proposals and payment reminders in your voice, ready to review.\nNever sends anything to a client without your approval."
+  },
+  "newAgent.starters.rui.tasks.a": {
+    "value": "Write a short proposal for a client"
+  },
+  "newAgent.starters.rui.tasks.b": {
+    "value": "Who hasn't paid yet?"
+  },
+  "newAgent.starters.rui.tasks.c": {
+    "value": "What is each client waiting for today?"
+  },
+  "newAgentCard.title": {
+    "value": "New agent"
+  },
+  "newAgentCard.lead": {
+    "value": "Pick on the left and adjust on the right. You can change everything later."
+  },
+  "newAgentCard.list": {
+    "value": "Starting points"
+  },
+  "newAgentCard.zero": {
+    "value": "From scratch"
+  },
+  "newAgentCard.zeroSub": {
+    "value": "You say what it does"
+  },
+  "newAgentCard.import": {
+    "value": "Bring agents from another app"
+  },
+  "newAgentCard.hi": {
+    "value": "Hi, I'm"
+  },
+  "newAgentCard.hiBlank": {
+    "value": "Hi, I'm"
+  },
+  "newAgentCard.name": {
+    "value": "Name"
+  },
+  "newAgentCard.namePlaceholder": {
+    "value": "name"
+  },
+  "newAgentCard.what": {
+    "value": "What it does"
+  },
+  "newAgentCard.whatPlaceholder": {
+    "value": "What will I do for you?"
+  },
+  "newAgentCard.look": {
+    "value": "Look"
+  },
+  "newAgentCard.lookDone": {
+    "value": "Done"
+  },
+  "newAgentCard.shuffle": {
+    "value": "Shuffle"
+  },
+  "newAgentCard.handle": {
+    "value": "In the chat: @{{handle}}"
+  },
+  "newAgentCard.handleRole": {
+    "value": "In the chat: @{{handle}} · {{role}}"
+  },
+  "newAgentCard.handleTaken": {
+    "value": "In the chat: @{{handle}} · there's already a {{name}} here"
+  },
+  "newAgentCard.handleBlank": {
+    "value": "Its @ for the chat comes from the name"
+  },
+  "newAgentCard.similar": {
+    "value": "Like {{name}}, who comes ready-made."
+  },
+  "newAgentCard.similarAction": {
+    "value": "Start with {{name}}"
+  },
+  "newAgentCard.uses": {
+    "value": "Will use"
+  },
+  "newAgentCard.chooseApps": {
+    "value": "Choose apps"
+  },
+  "newAgentCard.otherApp": {
+    "value": "Another app"
+  },
+  "newAgentCard.usesNone": {
+    "value": "Nothing yet."
+  },
+  "newAgentCard.worksIn": {
+    "value": "Works in"
+  },
+  "newAgentCard.how": {
+    "value": "How {{name}} works"
+  },
+  "newAgentCard.howBlank": {
+    "value": "How it works"
+  },
+  "newAgentCard.instructionsPlaceholder": {
+    "value": "What it does, what it avoids, who it asks for help"
+  },
+  "newAgentCard.picker.title": {
+    "value": "{{name}}'s apps"
+  },
+  "newAgentCard.picker.titleBlank": {
+    "value": "The agent's apps"
+  },
+  "newAgentCard.picker.lead": {
+    "value": "A connected app goes on the card at once. Connect any other right here."
+  },
+  "newAgentCard.picker.suggested": {
+    "value": "Suggested for {{name}}"
+  },
+  "newAgentCard.picker.suggestedBlank": {
+    "value": "Suggested"
+  },
+  "newAgentCard.picker.use": {
+    "value": "Use"
+  },
+  "newAgentCard.picker.added": {
+    "value": "On the card"
+  },
+  "newAgentCard.create": {
+    "value": "Create {{name}}"
+  },
+  "newAgentCard.createBlank": {
+    "value": "Create agent"
+  },
+  "newAgentCard.failed": {
+    "value": "Couldn't create it: {{reason}}"
+  },
+  "newAgentCard.level.read": {
+    "value": "Reads"
+  },
+  "newAgentCard.level.write": {
+    "value": "Reads and writes"
+  },
+  "newAgentCard.app.lead": {
+    "value": "How far {{name}} goes in {{app}}."
+  },
+  "newAgentCard.app.leadBlank": {
+    "value": "How far it goes in {{app}}."
+  },
+  "newAgentCard.app.read": {
+    "value": "Read"
+  },
+  "newAgentCard.app.readDesc": {
+    "value": "Sees what's in {{app}}. Changes nothing."
+  },
+  "newAgentCard.app.write": {
+    "value": "Read and write"
+  },
+  "newAgentCard.app.writeDesc": {
+    "value": "Also creates and edits in {{app}}."
+  },
+  "newAgentCard.app.asks": {
+    "value": "{{actions}} always ask for your approval, at any level."
+  },
+  "newAgentCard.app.asksAny": {
+    "value": "Sending, deleting and paying always ask for your approval, at any level."
+  },
+  "newAgentCard.app.remove": {
+    "value": "Remove {{app}}"
+  },
+  "newAgentCard.app.done": {
+    "value": "Done"
+  },
+  "newAgentCard.band.label": {
+    "value": "What {{name}} needs to start"
+  },
+  "newAgentCard.band.ai": {
+    "value": "An AI to think"
+  },
+  "newAgentCard.band.asleep": {
+    "value": "Asleep until it has an AI"
+  },
+  "newAgentCard.skills": {
+    "value": "Skills"
+  },
+  "newAgentCard.skillsHelpBlank": {
+    "value": "Manuals it opens when needed."
+  },
+  "newAgentCard.chooseSkills": {
+    "value": "Choose skills"
+  },
+  "newAgentCard.otherSkill": {
+    "value": "Another skill"
+  },
+  "newAgentCard.namesLead": {
+    "value": "How about"
+  },
+  "newAgentCard.namesRoll": {
+    "value": "Other names"
+  },
+  "newAgentCard.skill.opens": {
+    "value": "{{name}} opens this manual when the topic comes up. You edit it in Skills."
+  },
+  "newAgentCard.skill.opensBlank": {
+    "value": "It opens this manual when the topic comes up. You edit it in Skills."
+  },
+  "newAgentCard.skill.remove": {
+    "value": "Remove from {{name}}"
+  },
+  "newAgentCard.skill.removeBlank": {
+    "value": "Remove from the agent"
+  },
+  "newAgentCard.skill.done": {
+    "value": "Done"
+  },
+  "newAgentCard.names.agenda": {
+    "value": "Ivy, June, Nora, Milo, Tess, Cal"
+  },
+  "newAgentCard.names.agendaWords": {
+    "value": "calendar, schedul, appointment, remind, meeting, agenda"
+  },
+  "newAgentCard.names.money": {
+    "value": "Penny, Nick, Mona, Rex, Lou, Cass"
+  },
+  "newAgentCard.names.moneyWords": {
+    "value": "bill, spend, money, financ, budget, pay"
+  },
+  "newAgentCard.names.travel": {
+    "value": "Atlas, Skye, Ravi, Vic, Nara, Tom"
+  },
+  "newAgentCard.names.travelWords": {
+    "value": "trip, travel, flight, hotel, itinerar, vacation"
+  },
+  "newAgentCard.names.training": {
+    "value": "Leo, Bea, Bolt, Kai, Nina, Dave"
+  },
+  "newAgentCard.names.trainingWords": {
+    "value": "workout, run, gym, exercis, train"
+  },
+  "newAgentCard.names.study": {
+    "value": "Gabi, Nils, Sophie, Theo, Iris, Benji"
+  },
+  "newAgentCard.names.studyWords": {
+    "value": "stud, exam, course, learn, class"
+  },
+  "newAgentCard.names.clients": {
+    "value": "Rui, Anna, Ben, Liz, Otto, Cleo"
+  },
+  "newAgentCard.names.clientsWords": {
+    "value": "client, sale, proposal, invoic, customer"
+  },
+  "newAgentCard.names.any": {
+    "value": "Sol, Lia, Theo, Bea, Nino, Iris, Kai, Luma, Gil, Rafa, Nara, Tom"
   },
   "members.column.label": {
     "value": "Members of #{{channel}}"
@@ -41478,24 +41823,6 @@
   },
   "teamTemplates.agents.rui.task": {
     "value": "Write a short proposal for this client:"
-  },
-  "teamTemplates.example.clara": {
-    "value": "Today: 9:00 dentist, 12:30 lunch with Paula, 18:00 pick up the package. Tomorrow is your mother's birthday. Want me to remind you in the morning?"
-  },
-  "teamTemplates.example.leo": {
-    "value": "Today, 30 minutes: 5 minutes of warm-up, 3 rounds of 12 squats, 10 push-ups and a 30-second plank, then 5 minutes of stretching. Tell me how it went and I'll adjust Wednesday's."
-  },
-  "teamTemplates.example.gabi": {
-    "value": "Today's topic: photosynthesis. In short, plants turn light, water and carbon dioxide into sugar and oxygen. Three questions: where does it happen, what goes in and what comes out?"
-  },
-  "teamTemplates.example.rosa": {
-    "value": "This week: rice, beans, eggs, bananas, coffee and detergent. At home: change the sheets on Thursday and call someone about the kitchen tap."
-  },
-  "teamTemplates.example.vic": {
-    "value": "Lisbon in 3 days: day 1, Alfama and the castle. Day 2, Belém and the river. Day 3, Sintra. The cheapest flights are on Tuesday the 12th. Want me to keep an eye on the price?"
-  },
-  "teamTemplates.example.rui": {
-    "value": "Hi Marcos, here's the proposal: a new site with 5 pages, delivered in 3 weeks, paid in two parts. If it works for you, I'll send the contract today."
   },
   "teamTemplates.channels.iara": {
     "value": "support"

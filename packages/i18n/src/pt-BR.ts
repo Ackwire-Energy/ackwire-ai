@@ -5686,26 +5686,6 @@ export const ptBR = {
       },
     },
   },
-  newAgentAsk: {
-    title: "O que o seu novo agente vai fazer?",
-    lead: "Diga numa frase. O {{name}} monta e te mostra antes de criar.",
-    lead_female: "Diga numa frase. A {{name}} monta e te mostra antes de criar.",
-    field: "O que ele faz por você",
-    placeholder: "Ex.: Organizar minha agenda e me lembrar do que importa",
-    ideas: "Ideias",
-    idea: {
-      agenda: { label: "Agenda", text: "Organizar minha agenda e me lembrar dos compromissos" },
-      money: { label: "Finanças", text: "Acompanhar minhas contas e me avisar antes de vencer" },
-      training: { label: "Treino", text: "Montar meus treinos da semana e ajustar pelo que eu sentir" },
-      studies: { label: "Estudos", text: "Montar um plano de estudo e me fazer perguntas sobre o que aprendi" },
-      home: { label: "Casa", text: "Cuidar da lista de compras e das tarefas da casa" },
-      travel: { label: "Viagens", text: "Planejar minhas viagens: roteiro, reservas e documentos" },
-    },
-    full: "Prefiro preencher tudo",
-    create: "Criar com o {{name}}",
-    create_female: "Criar com a {{name}}",
-    message: "Quero um agente novo: {{what}}",
-  },
   newAgent: {
     title: "Criar agente",
     railOrg: "{{org}} · você é {{role}}",
@@ -6079,6 +6059,219 @@ export const ptBR = {
     routine: "Rotina",
     routineKeep: "Criar a rotina {{name}}",
     routineNotMade: "A rotina não foi criada: {{reason}}",
+    /** How each personal starter and ready-made role introduces itself on its card, in its own voice (ADR 0164). */
+    hello: {
+      clara: "Vou cuidar da sua agenda e te lembrar do que importa antes que seja tarde.",
+      duda: "Vou acompanhar as suas contas e gastos e te avisar antes de algo vencer.",
+      leo: "Vou montar os seus treinos e te manter no ritmo, do seu jeito.",
+      mel: "Vou planejar as suas refeições e a lista de compras, do seu gosto e no seu bolso.",
+      gabi: "Vou montar o seu plano de estudos e te perguntar sobre o que você aprendeu.",
+      lu: "Vou guardar as suas notas e ideias e te ajudar a transformar tudo em texto.",
+      rosa: "Vou cuidar da lista de compras, das tarefas da casa e do que precisa de conserto.",
+      vic: "Vou planejar as suas viagens: datas, preços, reservas e roteiro dia a dia.",
+      rui: "Vou acompanhar os seus clientes, escrever propostas e cobranças e lembrar quem não pagou.",
+      dev: "Programo, reviso PRs e investigo bugs.",
+      ops: "Fico de olho nos erros, nas filas e nos deploys.",
+      qa: "Testo os fluxos e reproduzo os bugs relatados.",
+      pm: "Organizo as tarefas e faço os resumos.",
+      support: "Respondo os clientes e encaminho o que precisa de alguém.",
+      sales: "Preparo propostas e acompanho os interessados.",
+      marketing: "Planejo campanhas, posts e páginas do site.",
+      content: "Escrevo e reviso textos, artigos e newsletters.",
+      data: "Respondo perguntas com números e monto relatórios.",
+      finance: "Acompanho pagamentos, cobranças e gastos.",
+      people: "Ajudo com contratação, boas-vindas e dúvidas do time.",
+      research: "Pesquiso um assunto e entrego um resumo com fontes.",
+      assistant: "Cuido da agenda, dos e-mails e dos lembretes.",
+    },
+    /** A personal starter's instructions and first tasks (ADR 0164), as a ready-made role's. */
+    starters: {
+      clara: {
+        instructions:
+          "Confere a agenda toda manhã e manda o que tem no dia.\nLembra na véspera de cada compromisso e de cada conta com data.\nNunca marca, desmarca nem aceita convite sem perguntar antes.",
+        tasks: {
+          a: "O que eu tenho amanhã?",
+          b: "Me lembre de pagar o aluguel todo dia 5",
+          c: "Mande a minha agenda todo dia às 7h",
+        },
+      },
+      duda: {
+        instructions:
+          "Acompanha as contas e os gastos e separa por categoria.\nAvisa três dias antes de algo vencer e quando um gasto foge do normal.\nNunca paga, transfere nem cancela nada sem perguntar antes.",
+        tasks: {
+          a: "Quanto eu gastei este mês?",
+          b: "Quais contas vencem esta semana?",
+          c: "Organize estes gastos por categoria",
+        },
+      },
+      leo: {
+        instructions:
+          "Monta os treinos pelo seu nível, pelo tempo que você tem e pelo que você gosta.\nAjusta a semana quando você falta ou se cansa, sem sermão.\nNão dá conselho médico: com dor ou lesão, sugere procurar um profissional.",
+        tasks: {
+          a: "Monte um treino de 30 minutos para hoje",
+          b: "Planeje a minha semana de corrida",
+          c: "Mande o treino do dia toda manhã",
+        },
+      },
+      mel: {
+        instructions:
+          "Planeja as refeições da semana pelo seu gosto, tempo e orçamento.\nMonta a lista de compras do cardápio, agrupada por seção do mercado.\nRespeita restrições e alergias e não passa dieta nem conselho médico.",
+        tasks: {
+          a: "Sugira três jantares rápidos",
+          b: "Monte o cardápio da semana",
+          c: "Faça a lista de compras do cardápio",
+        },
+      },
+      gabi: {
+        instructions:
+          "Monta o plano de estudos até a prova, com o que cabe em cada dia.\nFaz perguntas sobre o que você estudou e explica de novo o que você errou.\nNão faz a lição por você: guia até você chegar na resposta.",
+        tasks: {
+          a: "Monte um plano de estudos para a prova",
+          b: "Me faça 3 perguntas sobre o que estudei",
+          c: "Explique este assunto de um jeito simples",
+        },
+      },
+      lu: {
+        instructions:
+          "Guarda as notas e ideias que você manda e junta as parecidas.\nTransforma as notas em texto no seu tom, sem inventar o que você não disse.\nRevisa com cuidado e mostra o que mudou antes de trocar o original.",
+        tasks: { a: "Transforme estas notas num texto curto", b: "Junte as ideias da semana", c: "Revise este texto" },
+      },
+      rosa: {
+        instructions:
+          "Mantém a lista de compras e as tarefas da casa em dia.\nAnota o que precisa de conserto e lembra até resolver.\nNunca compra nem contrata nada sem perguntar antes.",
+        tasks: {
+          a: "Monte a lista de compras da semana",
+          b: "O que precisa de conserto em casa?",
+          c: "Divida as tarefas da casa",
+        },
+      },
+      vic: {
+        instructions:
+          "Planeja a viagem com datas, preços e um roteiro dia a dia.\nCompara passagens e hospedagens e diz por que sugere cada uma.\nNunca reserva nem paga nada sem perguntar antes.",
+        tasks: { a: "Planeje 3 dias em Lisboa", b: "Me avise se a passagem baixar", c: "Junte as reservas da viagem" },
+      },
+      rui: {
+        instructions:
+          "Acompanha cada cliente: o que foi combinado, o que falta e quem não pagou.\nEscreve propostas e lembretes de cobrança no seu tom, prontos para revisar.\nNunca envia nada a um cliente sem a sua aprovação.",
+        tasks: {
+          a: "Escreva uma proposta curta para um cliente",
+          b: "Quem ainda não pagou?",
+          c: "O que cada cliente espera hoje?",
+        },
+      },
+    },
+  },
+  /** A new agent's dialog (ADR 0164): pick on the left, its card edited in place on the right; its chat's band. */
+  newAgentCard: {
+    title: "Novo agente",
+    lead: "Escolha à esquerda e ajuste à direita. Dá para mudar tudo depois.",
+    list: "Pontos de partida",
+    zero: "Do zero",
+    zeroSub: "Você diz o que ele faz",
+    import: "Trazer agentes de outro app",
+    hi: "Oi, eu sou o",
+    hi_female: "Oi, eu sou a",
+    hiBlank: "Oi, eu sou",
+    name: "Nome",
+    namePlaceholder: "nome",
+    what: "O que faz",
+    whatPlaceholder: "O que eu vou fazer por você?",
+    look: "Aparência",
+    lookDone: "Pronto",
+    shuffle: "Sortear",
+    handle: "No chat: @{{handle}}",
+    handleRole: "No chat: @{{handle}} · {{role}}",
+    handleTaken: "No chat: @{{handle}} · já tem um {{name}} aqui",
+    handleTaken_female: "No chat: @{{handle}} · já tem uma {{name}} aqui",
+    handleBlank: "O @ para chamar no chat vem do nome",
+    similar: "Parecido com o {{name}}, que já vem pronto.",
+    similar_female: "Parecido com a {{name}}, que já vem pronta.",
+    similarAction: "Começar pelo {{name}}",
+    similarAction_female: "Começar pela {{name}}",
+    uses: "Vai usar",
+    chooseApps: "Escolher apps",
+    otherApp: "Outro app",
+    /** "Vai usar" or Skills with nothing on the card yet. */
+    usesNone: "Nada por enquanto.",
+    worksIn: "Trabalha em",
+    /** Its instructions, edited on the card. */
+    how: "Como o {{name}} trabalha",
+    how_female: "Como a {{name}} trabalha",
+    howBlank: "Como ele trabalha",
+    instructionsPlaceholder: "O que ele faz, o que evita, a quem pede ajuda",
+    /** "Outro app": the catalog as rows, its starting point's apps first. */
+    picker: {
+      title: "Apps do {{name}}",
+      title_female: "Apps da {{name}}",
+      titleBlank: "Apps do agente",
+      lead: "Um app conectado entra no cartão na hora. Os outros você conecta aqui mesmo.",
+      suggested: "Sugeridos para o {{name}}",
+      suggested_female: "Sugeridos para a {{name}}",
+      suggestedBlank: "Sugeridos",
+      use: "Usar",
+      added: "No cartão",
+    },
+    create: "Criar {{name}}",
+    createBlank: "Criar agente",
+    failed: "Não deu para criar: {{reason}}",
+    level: {
+      read: "Lê",
+      write: "Lê e escreve",
+    },
+    app: {
+      lead: "Até onde o {{name}} vai em {{app}}.",
+      lead_female: "Até onde a {{name}} vai em {{app}}.",
+      leadBlank: "Até onde ele vai em {{app}}.",
+      read: "Ler",
+      readDesc: "Vê o que tem em {{app}}. Não muda nada.",
+      write: "Ler e escrever",
+      writeDesc: "Também cria e edita em {{app}}.",
+      asks: "{{actions}} sempre pedem a sua aprovação, em qualquer nível.",
+      asksAny: "Enviar, apagar e pagar sempre pedem a sua aprovação, em qualquer nível.",
+      remove: "Tirar {{app}}",
+      done: "Pronto",
+    },
+    band: {
+      label: "O que o {{name}} precisa para começar",
+      label_female: "O que a {{name}} precisa para começar",
+      ai: "Uma IA para pensar",
+      asleep: "Dormindo até ter uma IA",
+    },
+    skills: "Skills",
+    skillsHelpBlank: "Manuais que ele abre quando precisa.",
+    chooseSkills: "Escolher skills",
+    otherSkill: "Outra skill",
+    namesLead: "Que tal",
+    namesRoll: "Outros nomes",
+    /** One skill on the card. */
+    skill: {
+      opens: "O {{name}} abre este manual quando o assunto aparece. Você edita em Skills.",
+      opens_female: "A {{name}} abre este manual quando o assunto aparece. Você edita em Skills.",
+      opensBlank: "Ele abre este manual quando o assunto aparece. Você edita em Skills.",
+      remove: "Tirar do {{name}}",
+      remove_female: "Tirar da {{name}}",
+      removeBlank: "Tirar do agente",
+      done: "Pronto",
+    },
+    /**
+     * Name ideas for an agent from scratch, by what it will do: names (comma-separated, fit for this language) and
+     * the word beginnings that pick each theme; `any` when none fits.
+     */
+    names: {
+      agenda: "Lia, Hora, Teca, Dora, Tito, Ema",
+      agendaWords: "agenda, compromiss, consult, lembr, horári, reuni",
+      money: "Cida, Nico, Duda, Ciro, Lara, Tadeu",
+      moneyWords: "conta, gasto, dinheiro, finan, boleto, pagar",
+      travel: "Rota, Malu, Ravi, Vic, Nara, Tom",
+      travelWords: "viag, passag, hotel, roteiro, férias, voo",
+      training: "Léo, Bia, Raio, Kai, Nina, Davi",
+      trainingWords: "treino, corr, academia, exerc",
+      study: "Gabi, Nilo, Sofia, Teo, Íris, Benji",
+      studyWords: "estud, prova, curso, aprend",
+      clients: "Rui, Ana, Bento, Lis, Otto, Clô",
+      clientsWords: "client, venda, proposta, cobran",
+      any: "Sol, Lia, Teo, Bia, Nino, Iara, Caio, Luma, Gil, Rafa, Nara, Tom",
+    },
   },
   members: {
     /** The channel's members column (and its sheet on a phone). */

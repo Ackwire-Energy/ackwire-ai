@@ -5500,42 +5500,6 @@
       }
     }
   },
-  "newAgentAsk": {
-    "title": "Was soll dein neuer Agent tun?",
-    "lead": "Sag es in einem Satz. {{name}} richtet ihn ein und zeigt ihn dir, bevor er erstellt wird.",
-    "field": "Was er für dich tut",
-    "placeholder": "Z. B. Meinen Kalender ordnen und mich an Wichtiges erinnern",
-    "ideas": "Ideen",
-    "idea": {
-      "agenda": {
-        "label": "Kalender",
-        "text": "Meinen Kalender ordnen und mich an meine Termine erinnern"
-      },
-      "money": {
-        "label": "Finanzen",
-        "text": "Meine Rechnungen im Blick behalten und mich vor Fälligkeit erinnern"
-      },
-      "training": {
-        "label": "Training",
-        "text": "Mein Training für die Woche planen und an mein Befinden anpassen"
-      },
-      "studies": {
-        "label": "Lernen",
-        "text": "Mir einen Lernplan machen und mich abfragen, was ich gelernt habe"
-      },
-      "home": {
-        "label": "Zuhause",
-        "text": "Die Einkaufsliste und die Hausarbeit in Ordnung halten"
-      },
-      "travel": {
-        "label": "Reisen",
-        "text": "Meine Reisen planen: Route, Buchungen und Dokumente"
-      }
-    },
-    "full": "Lieber alles selbst ausfüllen",
-    "create": "Mit {{name}} erstellen",
-    "message": "Ich möchte einen neuen Agenten: {{what}}"
-  },
   "newAgent": {
     "title": "Agent erstellen",
     "railOrg": "{{org}} · du bist {{role}}",
@@ -5905,7 +5869,197 @@
     "and": " und ",
     "routine": "Routine",
     "routineKeep": "Routine {{name}} erstellen",
-    "routineNotMade": "Die Routine wurde nicht erstellt: {{reason}}"
+    "routineNotMade": "Die Routine wurde nicht erstellt: {{reason}}",
+    "hello": {
+      "clara": "Ich kümmere mich um deinen Kalender und erinnere dich an das Wichtige, bevor es zu spät ist.",
+      "duda": "Ich behalte deine Rechnungen und Ausgaben im Blick und warne dich, bevor etwas fällig wird.",
+      "leo": "Ich plane deine Trainings und halte dich im Rhythmus, auf deine Art.",
+      "mel": "Ich plane deine Mahlzeiten und die Einkaufsliste, nach deinem Geschmack und Budget.",
+      "gabi": "Ich erstelle deinen Lernplan und frage dich ab, was du gelernt hast.",
+      "lu": "Ich bewahre deine Notizen und Ideen auf und helfe dir, daraus Texte zu machen.",
+      "rosa": "Ich kümmere mich um die Einkaufsliste, die Hausarbeit und das, was repariert werden muss.",
+      "vic": "Ich plane deine Reisen: Termine, Preise, Buchungen und den Ablauf Tag für Tag.",
+      "rui": "Ich betreue deine Kunden, schreibe Angebote und Rechnungen und merke mir, wer noch nicht bezahlt hat.",
+      "dev": "Ich programmiere, prüfe PRs und gehe Bugs nach.",
+      "ops": "Ich behalte Fehler, Warteschlangen und Deploys im Blick.",
+      "qa": "Ich teste Abläufe und reproduziere gemeldete Bugs.",
+      "pm": "Ich organisiere die Aufgaben und schreibe die Zusammenfassungen.",
+      "support": "Ich antworte Kunden und gebe weiter, was eine Person braucht.",
+      "sales": "Ich bereite Angebote vor und bleibe an Interessenten dran.",
+      "marketing": "Ich plane Kampagnen, Posts und Seiten der Website.",
+      "content": "Ich schreibe und überarbeite Texte, Artikel und Newsletter.",
+      "data": "Ich beantworte Fragen mit Zahlen und erstelle Berichte.",
+      "finance": "Ich behalte Zahlungen, Rechnungen und Ausgaben im Blick.",
+      "people": "Ich helfe bei Einstellungen, beim Onboarding und bei Fragen des Teams.",
+      "research": "Ich recherchiere ein Thema und liefere eine Zusammenfassung mit Quellen.",
+      "assistant": "Ich kümmere mich um Kalender, E-Mails und Erinnerungen."
+    },
+    "starters": {
+      "clara": {
+        "instructions": "Schaut jeden Morgen in den Kalender und schickt, was am Tag ansteht.\nErinnert am Vortag an jeden Termin und jede Rechnung mit Datum.\nBucht, sagt ab oder nimmt Einladungen nie an, ohne vorher zu fragen.",
+        "tasks": {
+          "a": "Was habe ich morgen?",
+          "b": "Erinnere mich jeden 5. an die Miete",
+          "c": "Schick mir jeden Tag um 7 Uhr meinen Kalender"
+        }
+      },
+      "duda": {
+        "instructions": "Behält Rechnungen und Ausgaben im Blick, nach Kategorien sortiert.\nWarnt drei Tage, bevor etwas fällig wird, und wenn eine Ausgabe aus dem Rahmen fällt.\nZahlt, überweist oder kündigt nie etwas, ohne vorher zu fragen.",
+        "tasks": {
+          "a": "Wie viel habe ich diesen Monat ausgegeben?",
+          "b": "Welche Rechnungen sind diese Woche fällig?",
+          "c": "Ordne diese Ausgaben nach Kategorie"
+        }
+      },
+      "leo": {
+        "instructions": "Plant Trainings nach deinem Niveau, deiner Zeit und dem, was dir Spaß macht.\nPasst die Woche an, wenn du aussetzt oder müde bist, ohne Predigt.\nGibt keinen medizinischen Rat: bei Schmerzen oder Verletzungen empfiehlt er Fachleute.",
+        "tasks": {
+          "a": "Plane ein 30-Minuten-Training für heute",
+          "b": "Plane meine Laufwoche",
+          "c": "Schick mir jeden Morgen das Training des Tages"
+        }
+      },
+      "mel": {
+        "instructions": "Plant die Mahlzeiten der Woche nach deinem Geschmack, deiner Zeit und deinem Budget.\nErstellt die Einkaufsliste zum Speiseplan, nach Abteilungen im Laden sortiert.\nAchtet auf Unverträglichkeiten und Allergien und gibt keine Diät- oder medizinischen Ratschläge.",
+        "tasks": {
+          "a": "Schlag drei schnelle Abendessen vor",
+          "b": "Plane den Speiseplan der Woche",
+          "c": "Mach die Einkaufsliste für den Speiseplan"
+        }
+      },
+      "gabi": {
+        "instructions": "Erstellt den Lernplan bis zur Prüfung, mit dem, was an jedem Tag passt.\nFragt dich ab und erklärt noch einmal, was du falsch hattest.\nMacht die Hausaufgaben nicht für dich: führt dich zur Antwort.",
+        "tasks": {
+          "a": "Erstelle einen Lernplan für die Prüfung",
+          "b": "Stell mir 3 Fragen zu dem, was ich gelernt habe",
+          "c": "Erklär dieses Thema einfach"
+        }
+      },
+      "lu": {
+        "instructions": "Bewahrt die Notizen und Ideen auf, die du schickst, und fasst ähnliche zusammen.\nMacht aus Notizen Text in deinem Ton, ohne etwas hinzuzufügen, das du nicht gesagt hast.\nÜberarbeitet sorgfältig und zeigt, was sich geändert hat, bevor er das Original ersetzt.",
+        "tasks": {
+          "a": "Mach aus diesen Notizen einen kurzen Text",
+          "b": "Sammle die Ideen der Woche",
+          "c": "Überarbeite diesen Text"
+        }
+      },
+      "rosa": {
+        "instructions": "Hält die Einkaufsliste und die Hausarbeit auf dem Laufenden.\nNotiert, was repariert werden muss, und erinnert daran, bis es erledigt ist.\nKauft oder beauftragt nie etwas, ohne vorher zu fragen.",
+        "tasks": {
+          "a": "Erstelle die Einkaufsliste der Woche",
+          "b": "Was muss im Haus repariert werden?",
+          "c": "Teile die Hausarbeit auf"
+        }
+      },
+      "vic": {
+        "instructions": "Plant die Reise mit Daten, Preisen und einem Plan für jeden Tag.\nVergleicht Flüge und Unterkünfte und sagt, warum er welche vorschlägt.\nBucht oder bezahlt nie etwas, ohne vorher zu fragen.",
+        "tasks": {
+          "a": "Plane 3 Tage in Lissabon",
+          "b": "Sag mir, wenn der Flugpreis sinkt",
+          "c": "Sammle die Buchungen der Reise"
+        }
+      },
+      "rui": {
+        "instructions": "Begleitet jeden Kunden: was vereinbart wurde, was noch fehlt und wer nicht bezahlt hat.\nSchreibt Angebote und Zahlungserinnerungen in deinem Ton, bereit zur Durchsicht.\nSchickt einem Kunden nie etwas ohne deine Zustimmung.",
+        "tasks": {
+          "a": "Schreib ein kurzes Angebot für einen Kunden",
+          "b": "Wer hat noch nicht bezahlt?",
+          "c": "Worauf wartet jeder Kunde heute?"
+        }
+      }
+    }
+  },
+  "newAgentCard": {
+    "title": "Neuer Agent",
+    "lead": "Wähle links und passe rechts an. Du kannst später alles ändern.",
+    "list": "Ausgangspunkte",
+    "zero": "Von Grund auf",
+    "zeroSub": "Du sagst, was er tut",
+    "import": "Agenten aus einer anderen App holen",
+    "hi": "Hallo, ich bin",
+    "hiBlank": "Hallo, ich bin",
+    "name": "Name",
+    "namePlaceholder": "Name",
+    "what": "Was er tut",
+    "whatPlaceholder": "Was werde ich für dich tun?",
+    "look": "Aussehen",
+    "lookDone": "Fertig",
+    "shuffle": "Würfeln",
+    "handle": "Im Chat: @{{handle}}",
+    "handleRole": "Im Chat: @{{handle}} · {{role}}",
+    "handleTaken": "Im Chat: @{{handle}} · {{name}} gibt es hier schon",
+    "handleBlank": "Das @ für den Chat kommt vom Namen",
+    "similar": "Ähnlich wie {{name}}, der fertig mitkommt.",
+    "similarAction": "Mit {{name}} anfangen",
+    "uses": "Nutzt",
+    "chooseApps": "Apps wählen",
+    "otherApp": "Andere App",
+    "usesNone": "Noch nichts.",
+    "worksIn": "Arbeitet in",
+    "how": "Wie {{name}} arbeitet",
+    "howBlank": "Wie er arbeitet",
+    "instructionsPlaceholder": "Was er tut, was er vermeidet, wen er um Hilfe bittet",
+    "picker": {
+      "title": "Apps von {{name}}",
+      "titleBlank": "Apps des Agenten",
+      "lead": "Eine verbundene App kommt sofort auf die Karte. Jede andere verbindest du gleich hier.",
+      "suggested": "Vorschläge für {{name}}",
+      "suggestedBlank": "Vorschläge",
+      "use": "Verwenden",
+      "added": "Auf der Karte"
+    },
+    "create": "{{name}} erstellen",
+    "createBlank": "Agent erstellen",
+    "failed": "Erstellen hat nicht geklappt: {{reason}}",
+    "level": {
+      "read": "Liest",
+      "write": "Liest und schreibt"
+    },
+    "app": {
+      "lead": "Wie weit {{name}} in {{app}} geht.",
+      "leadBlank": "Wie weit er in {{app}} geht.",
+      "read": "Lesen",
+      "readDesc": "Sieht, was in {{app}} ist. Ändert nichts.",
+      "write": "Lesen und schreiben",
+      "writeDesc": "Erstellt und bearbeitet auch in {{app}}.",
+      "asks": "{{actions}} fragen immer nach deiner Freigabe, auf jeder Stufe.",
+      "asksAny": "Senden, Löschen und Bezahlen fragen immer nach deiner Freigabe, auf jeder Stufe.",
+      "remove": "{{app}} entfernen",
+      "done": "Fertig"
+    },
+    "band": {
+      "label": "Was {{name}} zum Start braucht",
+      "ai": "Eine KI zum Denken",
+      "asleep": "Schläft, bis es eine KI gibt"
+    },
+    "skills": "Skills",
+    "skillsHelpBlank": "Anleitungen, die er bei Bedarf öffnet.",
+    "chooseSkills": "Skills wählen",
+    "otherSkill": "Anderer Skill",
+    "namesLead": "Wie wäre es mit",
+    "namesRoll": "Andere Namen",
+    "skill": {
+      "opens": "{{name}} öffnet diese Anleitung, wenn das Thema aufkommt. Du bearbeitest sie unter Skills.",
+      "opensBlank": "Er öffnet diese Anleitung, wenn das Thema aufkommt. Du bearbeitest sie unter Skills.",
+      "remove": "Von {{name}} entfernen",
+      "removeBlank": "Vom Agenten entfernen",
+      "done": "Fertig"
+    },
+    "names": {
+      "agenda": "Lia, Uhr, Greta, Dora, Timo, Emma",
+      "agendaWords": "kalender, termin, erinner, meeting, besprech, arzt",
+      "money": "Penny, Nico, Moni, Karl, Lara, Taler",
+      "moneyWords": "rechnung, ausgab, geld, finanz, budget, zahl",
+      "travel": "Atlas, Malu, Ravi, Vic, Nara, Tom",
+      "travelWords": "reise, flug, hotel, urlaub, route",
+      "training": "Leo, Bea, Blitz, Kai, Nina, Jonas",
+      "trainingWords": "training, lauf, fitness, sport, übung",
+      "study": "Gabi, Nils, Sophie, Theo, Iris, Ben",
+      "studyWords": "lern, prüfung, kurs, studi, schul",
+      "clients": "Rudi, Anna, Ben, Lisa, Otto, Clara",
+      "clientsWords": "kunde, angebot, verkauf, rechnung, auftrag",
+      "any": "Sol, Lia, Theo, Bea, Nino, Ida, Kai, Luma, Gil, Ole, Nara, Tom"
+    }
   },
   "members": {
     "column": {

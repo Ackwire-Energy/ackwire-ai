@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { NEW_AGENT_STEPS, PERSONAL_SKIPPED_STEPS, presetLevels, stepAfter } from "../src/lib/new-agent";
+import { NEW_AGENT_STEPS, PERSONAL_SKIPPED_STEPS, presetLevels, starterApps, stepAfter } from "../src/lib/new-agent";
 
 describe("presetLevels", () => {
   const items = [
@@ -31,5 +31,14 @@ describe("stepAfter", () => {
     expect(stepAfter(at("tools"), 1, PERSONAL_SKIPPED_STEPS)).toBe(at("review"));
     expect(stepAfter(at("role"), -1, PERSONAL_SKIPPED_STEPS)).toBe(at("role"));
     expect(stepAfter(at("review"), 1, PERSONAL_SKIPPED_STEPS)).toBe(at("review"));
+  });
+});
+
+describe("starterApps (ADR 0164)", () => {
+  test("a personal starter's apps at write, a team role's at its preset levels, none from scratch", () => {
+    expect(starterApps({ starter: "vic" })).toEqual({ "google-calendar": "write", drive: "write" });
+    expect(starterApps({ role: "dev" })).toEqual({ github: "write", sentry: "read", linear: "read" });
+    expect(starterApps({ role: "custom" })).toEqual({});
+    expect(starterApps({})).toEqual({});
   });
 });

@@ -23,3 +23,26 @@ test("on a narrow screen, where the preview sits above the form, it waits for th
   const narrow = atRule(await sheet("pages/new-agent.css"), "@media (max-width: 1100px)");
   expect(declarations(narrow, '.newag__aside[data-step="role"]')).toEqual([["display", "none"]]);
 });
+
+test("the new agent's list rows are face lines: no rule centres a face against its two lines (ADR 0164)", async () => {
+  const card = await sheet("components/new-agent/new-agent-card.css");
+  const centred = rules(card).filter(
+    (r) => r.selectors.some((s) => s.includes(".nac__item")) && r.declarations.some(([p]) => p === "align-items"),
+  );
+  expect(centred).toEqual([]);
+});
+
+test("the card's list and body fade at an edge only while there is more to scroll that way (ADR 0164)", async () => {
+  const card = topLevel(await sheet("components/new-agent/new-agent-card.css"));
+  for (const box of [".nac__list", ".nac__body"]) {
+    const own = declarations(card, box);
+    // No fade until the flags say so, and the scrollbar's strip stays clear.
+    expect(own).toContainEqual(["--nac-fade-top", "0px"]);
+    expect(own).toContainEqual(["--nac-fade-bottom", "0px"]);
+    expect(own.find(([p]) => p === "mask-image")?.[1]).toContain("var(--scroll-strip)");
+  }
+  expect(declarations(card, ':is(.nac__list, .nac__body)[data-fade-top="true"]')).toEqual([["--nac-fade-top", "20px"]]);
+  expect(declarations(card, ':is(.nac__list, .nac__body)[data-fade-bottom="true"]')).toEqual([
+    ["--nac-fade-bottom", "28px"],
+  ]);
+});

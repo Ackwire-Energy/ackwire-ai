@@ -29,29 +29,66 @@ export interface SetupChecklist {
   role: string | null;
   /** The steps a person confirmed, in the order they did. */
   done: SetupStep[];
+  /** How it introduced itself on its card, in its own voice (ADR 0164): its first message says it back. */
+  hello?: string;
+  /** The personal starter it began as ("clara", ADR 0159 §3): its first tasks. */
+  starter?: string;
+  /** The apps it was made to use (catalog connector ids) at their levels (ADR 0164): its checklist suggests them. */
+  apps?: Record<string, SetupAppLevel>;
+}
+
+export type SetupAppLevel = "read" | "write";
+
+/** What a new agent's card may add to its checklist (ADR 0164). */
+export interface SetupExtras {
+  hello?: string | null;
+  starter?: string | null;
+  apps?: Record<string, string> | null;
 }
 
 /** The role ids the apps offer are short lower-case words; anything else is no role. */
 const ROLE_ID = /^[a-z][a-z_-]{0,31}$/;
+/** A catalog connector's id ("google-calendar"). */
+const CONNECTOR_ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
+export const SETUP_HELLO_MAX = 500;
+export const SETUP_APPS_MAX = 12;
+
+/** The card's extras as kept: a short hello, a starter id, at most twelve apps at read or write; the rest dropped. */
+function setupExtras(extra: { hello?: unknown; starter?: unknown; apps?: unknown } | null | undefined) {
+  const out: Pick<SetupChecklist, "hello" | "starter" | "apps"> = {};
+  const hello = typeof extra?.hello === "string" ? extra.hello.trim().slice(0, SETUP_HELLO_MAX) : "";
+  if (hello) out.hello = hello;
+  if (typeof extra?.starter === "string" && ROLE_ID.test(extra.starter)) out.starter = extra.starter;
+  if (extra?.apps && typeof extra.apps === "object" && !Array.isArray(extra.apps)) {
+    const apps = Object.entries(extra.apps as Record<string, unknown>)
+      .filter((e): e is [string, SetupAppLevel] => CONNECTOR_ID.test(e[0]) && (e[1] === "read" || e[1] === "write"))
+      .slice(0, SETUP_APPS_MAX);
+    if (apps.length > 0) out.apps = Object.fromEntries(apps);
+  }
+  return out;
+}
 
 /**
  * What a new agent's checklist starts with: who talks to it and how it works have good defaults, so they start done
  * (their rows keep Mudar) and a new agent asks only for its AI, apps and channels.
  */
-export const newSetup = (role: string | null | undefined): SetupChecklist => ({
+export const newSetup = (role: string | null | undefined, extra?: SetupExtras | null): SetupChecklist => ({
   role: role && ROLE_ID.test(role) ? role : null,
   done: ["who", "how"],
+  ...setupExtras(extra),
 });
 
 /** The right hand's first-run checklist, for a workspace with no agent besides it. */
 export const FIRST_RUN_SETUP: SetupChecklist = { role: null, done: [] };
 
 /** The stored checklist as the apps read it (unknown steps dropped); null for an agent made before it. */
-export function setupOf(stored: { role?: unknown; done?: unknown } | null | undefined): SetupChecklist | null {
+export function setupOf(
+  stored: { role?: unknown; done?: unknown; hello?: unknown; starter?: unknown; apps?: unknown } | null | undefined,
+): SetupChecklist | null {
   if (!stored) return null;
   const role = typeof stored.role === "string" && ROLE_ID.test(stored.role) ? stored.role : null;
   const done = Array.isArray(stored.done) ? stored.done.filter(isSetupStep) : [];
-  return { role, done: [...new Set(done)] };
+  return { role, done: [...new Set(done)], ...setupExtras(stored) };
 }
 
 /**
