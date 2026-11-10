@@ -201,10 +201,13 @@ export function DownloadButtons({
             </a>
           </Button>
         ) : (
-          <Button size="sm" variant={variant} icon="download" disabled loading={builds[mine.target].isPending}>
-            {t("devices.downloadFor", { system: name(mine) })}
+          // Beside the button, not in it: on a narrow screen the mark goes under it instead of past the edge.
+          <span className="row">
+            <Button size="sm" variant={variant} icon="download" disabled loading={builds[mine.target].isPending}>
+              {t("devices.downloadFor", { system: name(mine) })}
+            </Button>
             {soon(mine) && soonChip}
-          </Button>
+          </span>
         ))}
       {others.length > 0 && (
         <Menu
@@ -221,7 +224,7 @@ export function DownloadButtons({
             return (
               <MenuItem
                 key={s.target}
-                leading={<ProviderLogo id={s.target === "darwin" ? "apple" : s.target} size="xs" />}
+                leading={<ProviderLogo id={s.target === "darwin" ? "apple" : s.target} size="xs" off={!href} />}
                 disabled={!href}
                 hint={soon(s) ? soonChip : undefined}
                 onSelect={href ? () => window.location.assign(href) : undefined}

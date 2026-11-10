@@ -435,6 +435,7 @@ describe("Configurações → Dispositivos (self-host)", () => {
   });
 
   const WINDOWS_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0";
+  const IPHONE_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148";
   /** Another computer's flow, on a browser on `ua`, with builds for Mac and Linux only. */
   const computerFlow = async (ua: string, api = createFakeApi(seedState())) => {
     fakeMachinesOf.get(api)?.setRelease(
@@ -474,8 +475,8 @@ describe("Configurações → Dispositivos (self-host)", () => {
 
   test("download: on a system with no build yet, its button stays, disabled and marked Em breve", async () => {
     const dialog = await computerFlow(WINDOWS_UA);
-    const mine = within(dialog).getByRole("button", { name: /^Baixar para Windows/ }) as HTMLButtonElement;
-    expect([mine.textContent, mine.disabled]).toEqual(["Baixar para WindowsEm breve", true]);
+    const mine = within(dialog).getByRole("button", { name: "Baixar para Windows" }) as HTMLButtonElement;
+    expect([mine.disabled, mine.nextElementSibling?.textContent]).toEqual([true, "Em breve"]);
     const menu = await openMenu(within(dialog).getByRole("button", { name: "Outros sistemas" }));
     expect(menuItems(menu)).toEqual([
       ["Baixar para macOS", false],
@@ -500,11 +501,23 @@ describe("Configurações → Dispositivos (self-host)", () => {
   test("download: the longest words (Dutch) for the button, its mark and the menu, for the layout check", async () => {
     const dialog = await computerFlow(WINDOWS_UA);
     await showIn(dialog.app.services, "nl");
-    const mine = within(dialog).getByRole("button", { name: /^Downloaden voor Windows/ });
-    expect(mine.textContent).toBe("Downloaden voor WindowsBinnenkort");
+    const mine = within(dialog).getByRole("button", { name: "Downloaden voor Windows" });
+    expect(mine.nextElementSibling?.textContent).toBe("Binnenkort");
     const menu = await openMenu(within(dialog).getByRole("button", { name: "Andere systemen" }));
     expect(menuItems(menu)).toEqual([
       ["Downloaden voor macOS", false],
+      ["Downloaden voor Linux", false],
+    ]);
+  });
+
+  test("download: on a phone, the menu alone, Windows marked, in the longest words (Dutch) for the layout check", async () => {
+    const dialog = await computerFlow(IPHONE_UA);
+    await showIn(dialog.app.services, "nl");
+    expect(within(dialog).queryByRole("button", { name: /^Downloaden voor/ })).toBeNull();
+    const menu = await openMenu(within(dialog).getByRole("button", { name: "De app downloaden" }));
+    expect(menuItems(menu)).toEqual([
+      ["Downloaden voor macOS", false],
+      ["Downloaden voor WindowsBinnenkort", true],
       ["Downloaden voor Linux", false],
     ]);
   });

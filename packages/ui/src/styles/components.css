@@ -1892,6 +1892,12 @@ html:not([data-pointer]) .ac-eventpill__action:focus-visible {
   width: 14px;
   height: 14px;
 }
+/* A chip inside a button or a menu row ("Em breve") keeps its own icon, not their bigger, lower-set one. */
+:is(.ac-btn, .ac-menu__item) .ac-chip .ac-icon {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+}
 /* An icon's ink starts about 2px into its box: on its side the chip pads 6, so the ink reads 8 on both sides. */
 .ac-chip:has(> .ac-icon:first-child) {
   padding-inline-start: 6px;
@@ -10260,6 +10266,14 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
 }
 .ac-menu__hint + .ac-menu__check {
   margin-left: 0;
+}
+/* A chip there ("Em breve") sets the hint's height, not a text line under it, and reaches 1px into the row's padding
+   on each side, so the row keeps its kind's height. */
+.ac-menu__hint:has(> .ac-chip) {
+  display: flex;
+}
+.ac-menu__hint > .ac-chip {
+  margin-block: -1px;
 }
 
 /* ---------- Choice rows (OptionList.tsx): full width, one left edge, neutral selection ---------- */
