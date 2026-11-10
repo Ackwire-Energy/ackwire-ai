@@ -80,4 +80,6 @@ test("Continuar is one call: the workspace with its zones, finished, then its ri
   expect(flow).not.toMatch(/orgs\.(updateMe|saveOnboarding)|agents\.list|refetchType/);
   expect(flow).toContain("if (now) qc.setQueryData(keys.me, now);");
   expect(flow).toContain("if (dm?.dm) addDm(qc, orgId, dm.dm);");
+  // An older self-hosted server's open says no DM: its list is read again, never waited for.
+  expect(flow).toContain("else if (dm) void qc.invalidateQueries({ queryKey: keys.dms(orgId) });");
 });

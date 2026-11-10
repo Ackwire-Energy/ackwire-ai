@@ -69,8 +69,10 @@ export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; ano
     if (now) qc.setQueryData(keys.me, now);
     else await qc.invalidateQueries({ queryKey: keys.me });
     gate.choose(orgId);
-    // The conversation finds its DM in the lists for its header, from the open's own answer.
+    // The conversation finds its DM in the lists for its header, from the open's own answer. An older self-hosted
+    // server doesn't send it: the list is read again, without waiting for it.
     if (dm?.dm) addDm(qc, orgId, dm.dm);
+    else if (dm) void qc.invalidateQueries({ queryKey: keys.dms(orgId) });
     if (dm) router.push(chatHref(dm.channelId));
   };
 
