@@ -218,6 +218,30 @@ describe("issue filters and sections", () => {
     ]);
   });
 
+  test('on the board a customized A fazer shows each of its columns, empty ones too, for their "+"', () => {
+    const board = [
+      col("backlog", "todo", 0, "Backlog"),
+      col("week", "todo", 1, "Esta semana"),
+      col("doing", "in_progress", 2),
+      col("later", "in_progress", 3, "Depois"),
+    ];
+    const tasks = [
+      issue({ number: 1, columnId: "week" }),
+      issue({ number: 2, status: "in_progress", columnId: "doing" }),
+    ];
+    const stages = issueBoard(tasks, board);
+    const todo = stages.find((b) => b.stage === "todo");
+    expect(todo?.showColumns).toBe(true);
+    expect(todo?.groups.map((g) => [g.column?.id, g.items.map((i) => i.number)])).toEqual([
+      ["backlog", []],
+      ["week", [1]],
+    ]);
+    // Only A fazer takes a new task in a column: elsewhere an empty column stays out, as in the list.
+    expect(stages.find((b) => b.stage === "in_progress")?.groups.map((g) => g.column?.id)).toEqual(["doing"]);
+    // The default board: no column names, nothing added.
+    expect(issueBoard([], plain).find((b) => b.stage === "todo")).toMatchObject({ showColumns: false, groups: [] });
+  });
+
   test("a single column with its own name counts as customized", () => {
     const board = [col("triage", "todo", 0, "Triagem")];
     expect(issueSections([issue({ number: 1, columnId: "triage" })], "open", null, board)[0]?.showColumns).toBe(true);
@@ -478,9 +502,12 @@ describe("a task's number and title on one row; its conversation on the card", (
       parts.indexOf("export const BoardCard"),
       parts.indexOf("const styles = StyleSheet.create("),
     );
-    // The title whole: no number in it, never cut.
-    expect(card).toMatch(/<Text variant="callout" style=\{styles\.title\}>\s*\{i\.title\}\s*<\/Text>/);
+    // The title whole: no number in it, never cut, its `code` as the inline code pill (as the web's card).
+    expect(card).toContain('<TaskTitle title={i.title} variant="callout" style={styles.title} />');
     expect(card).not.toContain("numberOfLines");
+    const title = parts.slice(parts.indexOf("export function TaskTitle("), parts.indexOf("const STATE_ICON"));
+    expect(title).toContain("codeAndBoldParts(title)");
+    expect(title).not.toContain("numberOfLines");
     // Then its facts, then who has it with its state.
     expect(card.indexOf("<CardFacts")).toBeGreaterThan(card.indexOf("{i.title}"));
     expect(card.indexOf("<AssigneeFace issue={i} size={24}")).toBeGreaterThan(card.indexOf("<CardFacts"));
@@ -494,11 +521,18 @@ describe("a task's number and title on one row; its conversation on the card", (
     for (const gone of ["StateLine", "CriteriaTrack", "BoardWork", "CardConversation"])
       expect(parts).not.toContain(gone);
     const facts = parts.slice(parts.indexOf("function CardFacts("), parts.indexOf("export const BoardCard"));
-    // The number first, the label as a chip, the date in words, the mentions beside the conversation's count.
-    expect(facts.indexOf("#{i.number}")).toBeLessThan(facts.indexOf("<Chip label="));
-    expect(facts).toContain('t("mobile.issues.until", { date: due.text })');
+    // The number first, the label the only pill (+N after it in words), the date in words with its mark, GitHub's
+    // mark with the PR and with the linked item, the mentions beside the conversation's count.
+    expect(facts.indexOf("#{i.number}")).toBeLessThan(facts.indexOf("<Chip label={label} />"));
+    expect(facts.match(/<Chip\b/g)).toHaveLength(1);
+    expect(facts).toContain("+{labels.length}");
+    expect(facts).toMatch(
+      /<Icon name="clock" size=\{12\}[^>]*\/>\s*<Text[^>]*>\s*\{t\("mobile\.issues\.until", \{ date: due\.text \}\)\}/,
+    );
     expect(facts).toContain("<MentionCount count={mentions} />");
-    expect(facts).toContain('provider="github"');
+    expect(facts.match(/provider="github"/g)).toHaveLength(2);
+    expect(facts).toContain("{githubLinkLabel(i.githubUrl)}");
+    expect(facts).not.toContain("GithubChip");
     const screen = await read("issues/IssueScreen.tsx");
     const head = screen.slice(screen.indexOf("function Head("), screen.indexOf("function WorkCard("));
     expect(head).toMatch(
@@ -509,12 +543,59 @@ describe("a task's number and title on one row; its conversation on the card", (
     expect(head).not.toMatch(/`#\$\{i\.number\}`,/);
   });
 
-  test("a row in the list says the card's one state in its words, else its due date", async () => {
+  test("who has it: the face never alone on a line, on the name's first line; the sky fades in", async () => {
+    const parts = await read("issues/parts.tsx");
+    const card = parts.slice(
+      parts.indexOf("export const BoardCard"),
+      parts.indexOf("const styles = StyleSheet.create("),
+    );
+    // The face and the name in one group that doesn't wrap (the name wraps beside the face), the state after it.
+    expect(card).toMatch(
+      /<View style=\{styles\.person\}>\s*<View style=\{\[styles\.face, \{ marginTop: axis\.face \}\]\}>\s*<AssigneeFace/,
+    );
+    expect(card).toContain("paddingTop: axis.words");
+    expect(card).toContain('mediaRowAxis(24, textLineOf("small", useFontScale()))');
+    expect(parts).toMatch(/person: \{ flexDirection: "row", alignItems: "flex-start", gap: 8, flexShrink: 1 \}/);
+    // An agent waiting on a person: its sky fades in over 200 ms, at once under reduced motion.
+    expect(card).toContain("entering={reduced ? undefined : FadeIn.duration(200)}");
+  });
+
+  test("a row in the list says the card's one state in its words, else its due date; its title and name whole", async () => {
     const screen = await read("issues/IssuesScreen.tsx");
     const row = screen.slice(screen.indexOf("function TaskRow("), screen.indexOf("function Board("));
     expect(row).toContain("useCardState(i)");
     expect(row).toContain("<StateWords issue={i} state={state} words={words} />");
     expect(row).not.toContain("mobile.issues.waitsYou");
+    expect(row).toContain('title={<TaskTitle title={i.title} variant="title" />}');
+    expect(row).not.toContain("numberOfLines");
+    expect(screen).toMatch(/subLine: \{ flexDirection: "row", flexWrap: "wrap",/);
+  });
+
+  test('A fazer\'s columns on the board take "+" for a task in them, for who may create tasks', async () => {
+    const parts = await read("issues/parts.tsx");
+    const header = parts.slice(
+      parts.indexOf("export function ColumnHeader("),
+      parts.indexOf("export function TaskTitle("),
+    );
+    expect(header).toContain(
+      '<IconButton small icon="plus" label={t("issues.newIn", { column: label })} onPress={onNew} />',
+    );
+    // The name whole, its first line on the button's middle.
+    expect(header).not.toContain("numberOfLines");
+    expect(header).toContain("paddingTop: Math.max(0, (TOOL_H - line) / 2)");
+    const screen = await read("issues/IssuesScreen.tsx");
+    expect(screen).toContain('{...(mayNew && g.column.stage === "todo" ? { onNew: newIn(g.column.id) } : {})}');
+    expect(screen).toContain('router.push({ pathname: "/issues/new", params: { column } })');
+    expect(screen).toContain("<Board right={right} views={views} mayNew={mayNew} />");
+    // Nova tarefa says the column and puts the task there (an agent picked starts it and moves it on).
+    const form = await read("issues/NewIssueForm.tsx");
+    expect(form).toContain("useLocalSearchParams<{ column?: string }>()");
+    expect(form).toContain(
+      '<GroupedRow icon="circle" label={t("issues.column")} sub={columnLabel(column)} subLines={0} />',
+    );
+    expect(form).toMatch(
+      /if \(column && who\?\.type !== "agent" && columnOfIssue\(issue, columns\.data \?\? \[\]\)\?\.id !== column\.id\)\s*action\.mutate\(\{ type: "update", id: issue\.id, patch: \{ columnId: column\.id \} \}\);/,
+    );
   });
 
   test("the task's head: its fields as the web's strip, in its order, each 32 high and opening its picker", async () => {
@@ -532,6 +613,11 @@ describe("a task's number and title on one row; its conversation on the card", (
     ]);
     // A control, not a pill: 32 high (the toolbar's), the web's control radius, its target grown to a finger's.
     expect(screen).toMatch(/prop: \{[^}]*minHeight: TOOL_H,[^}]*borderRadius: 10,/);
+    // A long value (a column's name, seven people) wraps inside it, never cut, its mark on the first line.
+    const chip = screen.slice(screen.indexOf("function PropChip("), screen.indexOf("/** Pastes, changes or removes"));
+    expect(chip).not.toContain("numberOfLines");
+    expect(chip).toContain('<View style={{ height: line, justifyContent: "center" }}>');
+    expect(screen).toMatch(/prop: \{[^}]*alignItems: "flex-start",[^}]*paddingVertical: \(TOOL_H - PROP_LINE\) \/ 2,/);
     expect(head).toContain("hitSlop={{ top: (TOUCH - TOOL_H) / 2, bottom: (TOUCH - TOOL_H) / 2 }}");
     // The head and "…" open the same pickers.
     const menu = screen.slice(screen.indexOf("function IssueMenu("));
@@ -551,8 +637,10 @@ describe("a task's GitHub link", () => {
 
   const source = (file: string) => readFileSync(join(import.meta.dir, "../../src/features/issues", file), "utf8");
 
-  test("the card and the task show the chip, the task's opens the link, and the menu edits it locked while saving", () => {
-    expect(source("parts.tsx")).toContain("<GithubChip url={i.githubUrl} />");
+  test("the card says the link with GitHub's mark, the task shows the chip and opens it, the menu edits it locked", () => {
+    const parts = source("parts.tsx");
+    const card = parts.slice(parts.indexOf("function CardFacts("), parts.indexOf("export const BoardCard"));
+    expect(card).toContain("{githubLinkLabel(i.githubUrl)}");
     const screen = source("IssueScreen.tsx");
     expect(screen).toContain("<GithubChip url={i.githubUrl} />");
     expect(screen).toContain("webUrl(i.githubUrl)");

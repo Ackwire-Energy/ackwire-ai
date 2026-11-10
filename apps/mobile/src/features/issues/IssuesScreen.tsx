@@ -27,8 +27,11 @@ import {
   Segmented,
   SkeletonList,
   Text,
+  textLineOf,
+  useFontScale,
   useReducedMotion,
 } from "@/ui";
+import { mediaRowAxis } from "@/ui/media-row";
 import { router } from "@/ui/navigation";
 import { mayCreate } from "../new/logic";
 import { Face } from "../shared/Face";
@@ -37,7 +40,7 @@ import { useColors, useDirectory, useMeId, useOrgId, usePullRefresh } from "../s
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { FocusLive, PushedHeader } from "../shared/parts";
 import { type BoardColumn, issueBoard, taskListSections } from "./logic";
-import { BoardCard, ColumnHeader, StateWords, useCardState, useColumnLabel } from "./parts";
+import { BoardCard, ColumnHeader, StateWords, TaskTitle, useCardState, useColumnLabel } from "./parts";
 
 /** Cards and rows whose agent moves (a long list stays light). */
 const LIVE_CARDS = 8;
@@ -54,8 +57,9 @@ type TaskView = "list" | "board";
  * title and the search of the system, then one list by state, "Para você" first; each row the check in the face's
  * column of 52, the title, who has it (an agent alive while it works) and its state or due date in words; done is the
  * green check. Quadro: the stages side by side, swiped one at a time with the next one showing at the edge, the tabs
- * on top with their counts; custom board columns show as headers. "+" in the bar opens "Nova tarefa"; columns are
- * edited on the web only. Switching views is a choice made often: it doesn't animate beyond the control's own slide.
+ * on top with their counts; custom board columns show as headers, each of A fazer's with "+" for a task in it. "+" in
+ * the bar opens "Nova tarefa"; columns are edited on the web only. Switching views is a choice made often: it doesn't
+ * animate beyond the control's own slide.
  */
 export function IssuesScreen() {
   const { t } = useTranslation();
@@ -79,7 +83,7 @@ export function IssuesScreen() {
       />
     </View>
   );
-  if (view === "board" && !empty) return <Board right={right} views={views} />;
+  if (view === "board" && !empty) return <Board right={right} views={views} mayNew={mayNew} />;
   return <TaskList right={right} views={views} empty={empty} mayNew={mayNew} onNew={openNew} />;
 }
 
@@ -168,9 +172,9 @@ function TaskList({
 }
 
 /**
- * A task in the list: the check (green once done, faint before), its title, then who has it (the agent's face, moving
- * while it works) and its one state in the board card's words ("Pergunta algo" in the attention color), else its due
- * date in words.
+ * A task in the list: the check (green once done, faint before), its title whole, then who has it (the agent's face,
+ * moving while it works) and its one state in the board card's words ("Pergunta algo" in the attention color), else
+ * its due date in words. A long name wraps beside its face, and a state that doesn't fit goes under it, whole.
  */
 function TaskRow({ issue: i, divider, live }: { issue: Issue; divider: boolean; live: boolean }) {
   const { t, i18n } = useTranslation();
@@ -181,6 +185,7 @@ function TaskRow({ issue: i, divider, live }: { issue: Issue; divider: boolean; 
   const running = state?.kind === "running";
   const who = i.assignee ? dir.nameOf(i.assignee) : t("mobile.issues.nobody");
   const due = i.dueDate && !done ? dueLabel(t, i18n.language, i.dueDate) : null;
+  const axis = mediaRowAxis(16, textLineOf("subhead", useFontScale()));
   return (
     <ListRow
       divider={divider}
@@ -189,15 +194,20 @@ function TaskRow({ issue: i, divider, live }: { issue: Issue; divider: boolean; 
           <Icon name={done ? "checkc" : "circle"} size={24} color={done ? c.ok : c.faint} />
         </View>
       }
-      title={i.title}
+      title={<TaskTitle title={i.title} variant="title" />}
       sub={
         <View style={styles.subLine}>
-          {i.assignee ? <Face who={i.assignee} size={16} live={live} mode={running ? "run" : "idle"} /> : null}
-          <Text variant="subhead" tone="muted" numberOfLines={1} style={styles.shrink}>
-            {who}
-            {state || due ? " · " : ""}
-            {!state && due ? due : null}
-          </Text>
+          <View style={styles.person}>
+            {i.assignee ? (
+              <View style={{ marginTop: axis.face }}>
+                <Face who={i.assignee} size={16} live={live} mode={running ? "run" : "idle"} />
+              </View>
+            ) : null}
+            <Text variant="subhead" tone="muted" style={[styles.shrink, { paddingTop: axis.words }]}>
+              {who}
+              {!state && due ? ` · ${due}` : ""}
+            </Text>
+          </View>
           {state && words ? <StateWords issue={i} state={state} words={words} /> : null}
         </View>
       }
@@ -208,7 +218,7 @@ function TaskRow({ issue: i, divider, live }: { issue: Issue; divider: boolean; 
 }
 
 /** Quadro: the stages side by side, as before, under the title and the views. */
-function Board({ right, views }: { right: ReactNode; views: ReactNode }) {
+function Board({ right, views, mayNew }: { right: ReactNode; views: ReactNode; mayNew: boolean }) {
   const { t } = useTranslation();
   const c = useColors();
   const orgId = useOrgId();
@@ -267,7 +277,7 @@ function Board({ right, views }: { right: ReactNode; views: ReactNode }) {
           onScroll={(e) => onPagerScroll(e.nativeEvent.contentOffset.x)}
         >
           {board.map((b) => (
-            <Column key={b.stage} column={b} width={columnWidth} pull={pull} />
+            <Column key={b.stage} column={b} width={columnWidth} pull={pull} mayNew={mayNew} />
           ))}
         </ScrollView>
       </FocusLive>
@@ -279,10 +289,12 @@ function Column({
   column: b,
   width,
   pull,
+  mayNew,
 }: {
   column: BoardColumn;
   width: number;
   pull: ReturnType<typeof usePullRefresh>;
+  mayNew: boolean;
 }) {
   const { t } = useTranslation();
   const c = useColors();
@@ -293,6 +305,7 @@ function Column({
   const reduced = useReducedMotion();
   const fade = reduced ? {} : { entering: FadeIn.duration(160), exiting: FadeOut.duration(120) };
   const layout = reduced ? undefined : LinearTransition.duration(220);
+  const newIn = (column: string) => () => router.push({ pathname: "/issues/new", params: { column } });
   let card = 0;
   return (
     <ScrollView
@@ -302,7 +315,7 @@ function Column({
       refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
     >
       <LayoutAnimationConfig skipEntering>
-        {b.count === 0 ? (
+        {b.groups.length === 0 ? (
           <Animated.View {...fade}>
             <Text variant="subhead" tone="faint" style={styles.none}>
               {t("mobile.issues.columnEmpty")}
@@ -311,7 +324,13 @@ function Column({
         ) : null}
         {b.groups.map((g) => (
           <Fragment key={g.key}>
-            {b.showColumns && g.column ? <ColumnHeader label={columnLabel(g.column)} count={g.items.length} /> : null}
+            {b.showColumns && g.column ? (
+              <ColumnHeader
+                label={columnLabel(g.column)}
+                count={g.items.length}
+                {...(mayNew && g.column.stage === "todo" ? { onNew: newIn(g.column.id) } : {})}
+              />
+            ) : null}
             {g.items.map((i) => {
               card += 1;
               return (
@@ -335,9 +354,10 @@ const styles = StyleSheet.create({
   search: { paddingHorizontal: SCREEN_X, paddingBottom: 8 },
   views: { paddingHorizontal: SCREEN_X, paddingTop: 8, paddingBottom: 8 },
   check: { width: CHECK_BOX, height: CHECK_BOX, alignItems: "center", justifyContent: "center" },
-  subLine: { flexDirection: "row", alignItems: "center", gap: 4, minWidth: 0 },
+  // Who has it with the date, then the state, wrapping between them, never the face alone on a line.
+  subLine: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 8, rowGap: 2, minWidth: 0 },
+  person: { flexDirection: "row", alignItems: "flex-start", gap: 4, flexShrink: 1 },
   shrink: { flexShrink: 1, minWidth: 0 },
-  bold: { fontWeight: "600" },
   pager: { paddingLeft: 16, paddingRight: PEEK - COLUMN_GAP, paddingTop: 8, gap: COLUMN_GAP },
   column: { borderTopLeftRadius: 20, borderTopRightRadius: 20 },
   columnBody: { padding: 10, gap: 10 },

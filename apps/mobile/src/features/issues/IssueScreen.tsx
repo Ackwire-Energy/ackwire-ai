@@ -57,6 +57,8 @@ import {
   Text,
   TOOL_H,
   TOUCH,
+  textLineOf,
+  useFontScale,
   useReducedMotion,
   useToast,
 } from "@/ui";
@@ -374,7 +376,13 @@ const STAGE_ICON: Record<IssueStatus, IconName> = {
   canceled: "x",
 };
 
-/** A field on the head's strip: 32 high in the field look, its icon or face and its value; a press opens its picker. */
+/** The strip's value line at the default text size: one line makes the 32 control. */
+const PROP_LINE = textLineOf("subhead", 1).height;
+
+/**
+ * A field on the head's strip: 32 high in the field look, its icon or face and its value; a press opens its picker. A
+ * value wider than the screen wraps inside it, never cut, its icon or face on the first line.
+ */
 function PropChip({
   label,
   value,
@@ -389,6 +397,7 @@ function PropChip({
   onPress: () => void;
 }) {
   const c = useColors();
+  const line = textLineOf("subhead", useFontScale()).height;
   return (
     <Pressable
       onPress={onPress}
@@ -401,8 +410,10 @@ function PropChip({
         pressed && styles.pressed,
       ]}
     >
-      {leading ?? (icon ? <Icon name={icon} size={16} color={c.muted} /> : null)}
-      <Text variant="subhead" numberOfLines={1} style={styles.propText}>
+      <View style={{ height: line, justifyContent: "center" }}>
+        {leading ?? (icon ? <Icon name={icon} size={16} color={c.muted} /> : null)}
+      </View>
+      <Text variant="subhead" style={styles.propText}>
         {value}
       </Text>
     </Pressable>
@@ -1135,12 +1146,13 @@ const styles = StyleSheet.create({
   chips: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 },
   prop: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 6,
     minHeight: TOOL_H,
     maxWidth: "100%",
     paddingLeft: 10,
     paddingRight: 12,
+    paddingVertical: (TOOL_H - PROP_LINE) / 2,
     borderRadius: 10,
     borderWidth: StyleSheet.hairlineWidth,
   },

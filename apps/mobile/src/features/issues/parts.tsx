@@ -3,17 +3,33 @@ import { useTaskUnread } from "@agenteschat/client";
 import { dueLabel, dueTone } from "@agenteschat/client/lib/format";
 import { githubLinkLabel } from "@agenteschat/client/lib/github-link";
 import { type CardState, cardState, cardStateText, cardWaits, isOpen } from "@agenteschat/client/lib/issues";
+import { codeAndBoldParts } from "@agenteschat/client/lib/markdown";
 import { stepPhrase } from "@agenteschat/client/lib/work";
 import { memo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, StyleSheet, View } from "react-native";
-import { Chip, Icon, type IconName, PixelOrbit, Sky, Text } from "@/ui";
+import { Pressable, Text as RNText, StyleSheet, View } from "react-native";
+import Animated, { FadeIn } from "react-native-reanimated";
+import {
+  Chip,
+  Icon,
+  IconButton,
+  type IconName,
+  PixelOrbit,
+  Sky,
+  Text,
+  type TextProps,
+  TOOL_H,
+  textLineOf,
+  useFontScale,
+  useReducedMotion,
+} from "@/ui";
 import { SocialMark } from "@/ui/auth/SocialMarks";
+import { mediaRowAxis } from "@/ui/media-row";
 import { router } from "@/ui/navigation";
 import { Face } from "../shared/Face";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
-import { MentionCount, Tile, useSurface } from "../shared/parts";
+import { MentionCount, MONO, Tile, useSurface } from "../shared/parts";
 import { criteriaProgress, type IssueState, issueState, latestPr } from "./logic";
 
 /** An agent's step in the person's words ("Mexeu nos arquivos do PC · trips.service.ts"), as the web says it. */
@@ -31,17 +47,51 @@ export function useColumnLabel() {
   return useCallback((c: Pick<IssueColumn, "name" | "stage">) => c.name ?? t(`issues.status.${c.stage}`), [t]);
 }
 
-/** A board column inside a stage of the list (only where the board is customized): its name and count. */
-export function ColumnHeader({ label, count }: { label: string; count: number }) {
+/**
+ * A board column inside a stage (only where the board is customized): its name, whole, and count. In A fazer, for who
+ * may create tasks, "+" at its end opens Nova tarefa in that column (the web's column head); a long name's first line
+ * sits on the button's middle.
+ */
+export function ColumnHeader({ label, count, onNew }: { label: string; count: number; onNew?: () => void }) {
+  const { t } = useTranslation();
+  const line = textLineOf("small", useFontScale()).height;
+  const onButton = onNew ? { paddingTop: Math.max(0, (TOOL_H - line) / 2) } : null;
   return (
-    <View style={styles.column} accessibilityRole="header">
-      <Text variant="small" tone="muted" numberOfLines={1} style={styles.columnName}>
+    <View style={[styles.column, onNew && styles.columnActs]} accessibilityRole="header">
+      <Text variant="small" tone="muted" style={[styles.columnName, onButton]}>
         {label}
       </Text>
-      <Text variant="small" tone="faint">
+      <Text variant="small" tone="faint" style={onButton}>
         {count}
       </Text>
+      {onNew ? (
+        <View style={styles.columnEnd}>
+          <IconButton small icon="plus" label={t("issues.newIn", { column: label })} onPress={onNew} />
+        </View>
+      ) : null}
     </View>
+  );
+}
+
+/** A task's title, whole, with its `code` as the inline code pill and its **bold** (the web card's); no links. */
+export function TaskTitle({ title, ...text }: { title: string } & Omit<TextProps, "children">) {
+  const c = useColors();
+  return (
+    <Text {...text}>
+      {codeAndBoldParts(title).map((part, k) =>
+        part.mark ? (
+          <RNText
+            // biome-ignore lint/suspicious/noArrayIndexKey: the pieces of one title, in order
+            key={k}
+            style={part.mark === "code" ? [styles.code, { backgroundColor: c.sunken, color: c.ink2 }] : styles.heavy}
+          >
+            {part.text}
+          </RNText>
+        ) : (
+          part.text
+        ),
+      )}
+    </Text>
   );
 }
 
@@ -147,7 +197,12 @@ function CardFacts({ issue: i, mentions, unread }: { issue: Issue; mentions: num
       <Text variant="caption" tone="muted">
         #{i.number}
       </Text>
-      {label ? <Chip label={labels.length > 0 ? `${label} +${labels.length}` : label} /> : null}
+      {label ? <Chip label={label} /> : null}
+      {labels.length > 0 ? (
+        <Text variant="caption" tone="muted" accessibilityLabel={labels.join(", ")}>
+          +{labels.length}
+        </Text>
+      ) : null}
       {i.priority !== "normal" ? (
         <View style={styles.inline}>
           <Icon name="flag" size={12} color={i.priority === "high" ? c.warn : c.faint} />
@@ -157,9 +212,12 @@ function CardFacts({ issue: i, mentions, unread }: { issue: Issue; mentions: num
         </View>
       ) : null}
       {due ? (
-        <Text variant="caption" style={due.tone ? [styles.bold, { color: c.warn }] : { color: c.muted }}>
-          {t("mobile.issues.until", { date: due.text })}
-        </Text>
+        <View style={styles.inline}>
+          <Icon name="clock" size={12} color={due.tone ? c.warn : c.faint} />
+          <Text variant="caption" style={due.tone ? [styles.bold, { color: c.warn }] : { color: c.muted }}>
+            {t("mobile.issues.until", { date: due.text })}
+          </Text>
+        </View>
       ) : null}
       {crit ? (
         <View style={styles.inline}>
@@ -177,7 +235,14 @@ function CardFacts({ issue: i, mentions, unread }: { issue: Issue; mentions: num
           </Text>
         </View>
       ) : null}
-      {i.githubUrl ? <GithubChip url={i.githubUrl} /> : null}
+      {i.githubUrl ? (
+        <View style={styles.inline}>
+          <SocialMark provider="github" color={c.faint} size={12} />
+          <Text variant="caption" tone="muted">
+            {githubLinkLabel(i.githubUrl)}
+          </Text>
+        </View>
+      ) : null}
       {talk > 0 || mentions > 0 ? (
         <View style={styles.inline}>
           <Icon name="chat" size={12} color={c.faint} />
@@ -195,12 +260,15 @@ function CardFacts({ issue: i, mentions, unread }: { issue: Issue; mentions: num
 
 /**
  * One task on the board, in the web card's three parts: the title, whole; one row of facts; who has it (the face 24,
- * moving while its agent works) and its one state. An agent waiting on a person puts its sky at the card's top.
+ * moving while its agent works) and its one state. An agent waiting on a person puts its sky at the card's top, faded
+ * in. A long name wraps beside the face, on the face's line first; a state that doesn't fit goes under, whole.
  */
 export const BoardCard = memo(function BoardCard({ issue: i, live }: { issue: Issue; live: boolean }) {
   const { t } = useTranslation();
   const dir = useDirectory();
   const surface = useSurface();
+  const reduced = useReducedMotion();
+  const axis = mediaRowAxis(24, textLineOf("small", useFontScale()));
   const { state, words } = useCardState(i);
   const agent = i.assignee?.type === "agent" ? dir.agentById.get(i.assignee.id) : undefined;
   // Mentions of me not read in its conversation (ADR 0145), red as on the web's card.
@@ -219,19 +287,29 @@ export const BoardCard = memo(function BoardCard({ issue: i, live }: { issue: Is
       style={({ pressed }) => [styles.card, surface, pressed && styles.pressed]}
     >
       {cardWaits(state) ? (
-        <Sky color={agentLook(agent).color} surface="raised" depth={0.55} fade={0.15} style={styles.sky} />
+        <Animated.View entering={reduced ? undefined : FadeIn.duration(200)} style={styles.sky}>
+          <Sky
+            color={agentLook(agent).color}
+            surface="raised"
+            depth={0.55}
+            fade={0.15}
+            style={StyleSheet.absoluteFill}
+          />
+        </Animated.View>
       ) : null}
-      <Text variant="callout" style={styles.title}>
-        {i.title}
-      </Text>
+      <TaskTitle title={i.title} variant="callout" style={styles.title} />
       <CardFacts issue={i} mentions={mentions} unread={unread > 0} />
       {i.assignee || state ? (
         <View style={styles.who}>
-          {i.assignee ? <AssigneeFace issue={i} size={24} live={live} /> : null}
           {i.assignee ? (
-            <Text variant="small" tone="ink2" style={[styles.bold, styles.name]}>
-              {dir.nameOf(i.assignee)}
-            </Text>
+            <View style={styles.person}>
+              <View style={[styles.face, { marginTop: axis.face }]}>
+                <AssigneeFace issue={i} size={24} live={live} />
+              </View>
+              <Text variant="small" tone="ink2" style={[styles.bold, styles.name, { paddingTop: axis.words }]}>
+                {dir.nameOf(i.assignee)}
+              </Text>
+            </View>
           ) : null}
           {state && words ? <StateWords issue={i} state={state} words={words} /> : null}
         </View>
@@ -251,9 +329,14 @@ const styles = StyleSheet.create({
   sky: { position: "absolute", top: 0, left: 0, right: 0, height: 64 },
   // A narrow card wraps between the facts, never inside one.
   facts: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 12, rowGap: 2 },
-  // The face, the name and the state; a state that doesn't fit goes to the next line whole.
+  // The face with the name, then the state; a state that doesn't fit goes to the next line whole.
   who: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 8, rowGap: 4 },
+  // Never the face alone on a line: the name wraps beside it.
+  person: { flexDirection: "row", alignItems: "flex-start", gap: 8, flexShrink: 1 },
+  // A person's photo is 20 (an agent's body 24): either sits in the 24 box, on the name's first line.
+  face: { width: 24, height: 24, alignItems: "center", justifyContent: "center" },
   name: { flexShrink: 1 },
+  code: { fontFamily: MONO },
   column: {
     flexDirection: "row",
     alignItems: "center",
@@ -263,4 +346,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   columnName: { fontWeight: "600", flexShrink: 1 },
+  // With "+": the row as tall as the button, the words on its first line's middle.
+  columnActs: { alignItems: "flex-start", paddingTop: 2 },
+  columnEnd: { marginLeft: "auto" },
 });

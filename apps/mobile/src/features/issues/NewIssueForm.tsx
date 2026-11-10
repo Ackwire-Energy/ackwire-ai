@@ -1,8 +1,15 @@
-import { type Actor, type Issue, type IssuePriority, useAiStatus, useIssueAction } from "@agenteschat/client";
+import {
+  type Actor,
+  type Issue,
+  type IssuePriority,
+  useAiStatus,
+  useIssueAction,
+  useIssueColumns,
+} from "@agenteschat/client";
 import { PRIORITIES } from "@agenteschat/client/lib/issues";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { EVERYONE } from "@agenteschat/client/lib/who-sees";
-import { usePreventRemove } from "expo-router";
+import { useLocalSearchParams, usePreventRemove } from "expo-router";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, ScrollView, StyleSheet, View } from "react-native";
@@ -13,7 +20,8 @@ import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { goBack, PushedHeader, successHaptic } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
 import { useWhoSeesDraft, useWhoSeesLabel, WhoSeesRows } from "../shared/WhoSees";
-import { DUE_CHOICES, type DueChoice, dueDateOf } from "./logic";
+import { columnOfIssue, DUE_CHOICES, type DueChoice, dueDateOf } from "./logic";
+import { useColumnLabel } from "./parts";
 import { useStartAgent } from "./useStartAgent";
 
 type Open = "who" | "priority" | "due" | "sees" | null;
@@ -23,7 +31,7 @@ const close = () => goBack("/issues");
 /**
  * "Nova tarefa", a screen pushed over Tarefas (the native bar: back, the title, "Criar"): the title, a
  * description, who does it (an agent picked here is asked right away, as on the web: it starts and the status
- * moves on its own), the priority and the due date.
+ * moves on its own), the priority and the due date. From a board column's "+" (`column`), it goes in that column.
  */
 export function NewIssueForm() {
   const { t } = useTranslation();
@@ -36,6 +44,10 @@ export function NewIssueForm() {
   const action = useIssueAction(orgId);
   const start = useStartAgent();
   const ai = useAiStatus(orgId);
+  const columns = useIssueColumns(orgId);
+  const columnLabel = useColumnLabel();
+  const { column: columnId } = useLocalSearchParams<{ column?: string }>();
+  const column = columnId ? columns.data?.find((c) => c.id === columnId) : undefined;
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
   const [who, setWho] = useState<Actor | null>(null);
@@ -77,6 +89,9 @@ export function NewIssueForm() {
       {
         onSuccess: (created) => {
           const issue = created as Issue;
+          // New tasks land in A fazer's first column; another one was picked by its "+" (an agent's moves on).
+          if (column && who?.type !== "agent" && columnOfIssue(issue, columns.data ?? [])?.id !== column.id)
+            action.mutate({ type: "update", id: issue.id, patch: { columnId: column.id } });
           // An agent picked here starts right away: assigned, its run linked, in progress (as on the web).
           if (who?.type === "agent") start.run(issue, who.id, { created: true });
           successHaptic();
@@ -172,6 +187,9 @@ export function NewIssueForm() {
           <View>
             <GroupedHeader>{t("mobile.issues.form.details")}</GroupedHeader>
             <GroupedList>
+              {column ? (
+                <GroupedRow icon="circle" label={t("issues.column")} sub={columnLabel(column)} subLines={0} />
+              ) : null}
               <GroupedRow
                 icon="flag"
                 label={t("issues.form.priority")}
