@@ -278,7 +278,13 @@
 }
 .ac-msg[data-look="bubbles"] .ac-msg__text > .ac-msg__stamp .ac-msg__status > :is(svg, canvas):first-child {
   flex: none;
-  translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
+  /* Browsers without the lh unit: the status's 16px line. */
+  translate: 0 calc(8px - var(--cap-mid) - 50%);
+}
+@supports (top: 1lh) {
+  .ac-msg[data-look="bubbles"] .ac-msg__text > .ac-msg__stamp .ac-msg__status > :is(svg, canvas):first-child {
+    translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
+  }
 }
 .ac-msg--streaming[data-look="bubbles"] .ac-msg__text > .md:has(+ .ac-msg__stamp) > :last-child::after {
   content: "";
