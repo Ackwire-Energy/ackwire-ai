@@ -16,11 +16,21 @@ const room = (r: ExistingAi) => (r.kind === "account" && r.choice.login.usage ? 
 const offOf = (r: ExistingAi, dims: (choice: PlanChoice) => boolean) =>
   r.kind === "account" && (r.act === "locked" || dims(planOfAccount(r.choice.login)));
 
-/** Usable first, the one with most room on top, one at its limit last. */
+/**
+ * A plan that is used in one click first, the one with most room on top (one that doesn't say counts as half used);
+ * then one that asks for a sign-in, the workspace's keys, a plan at its limit, and last what can't be picked.
+ */
 function sorted(rows: readonly ExistingAi[], dims: (choice: PlanChoice) => boolean) {
   const rank = (r: ExistingAi) => {
     const s = room(r);
-    return (offOf(r, dims) ? 2000 : 0) + (s?.state === "limited" ? 1000 : 0) + (s?.used ?? 0);
+    const signIn = r.kind === "account" && r.act !== "use" && r.act !== "move";
+    return (
+      (offOf(r, dims) ? 8000 : 0) +
+      (s?.state === "limited" ? 4000 : 0) +
+      (r.kind === "key" ? 2000 : 0) +
+      (signIn ? 1000 : 0) +
+      (s?.used ?? 50)
+    );
   };
   return [...rows].sort((a, b) => rank(a) - rank(b));
 }

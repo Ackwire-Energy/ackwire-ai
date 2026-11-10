@@ -245,10 +245,17 @@ function ConnectAiDialog({
   // From the agent's conversation: decided once the agents and their AI are known, and kept, since connecting changes
   // both. `others`: more agents of the person's have no AI, so the dialog opens for all of them.
   const loaded = !(dir.loading || status.isPending);
-  const asked = request.chat && request.agentId ? dir.agentById.get(request.agentId) : undefined;
+  // Any way in that names one agent and no step (a key, a plan to sign in to again) is that agent's dialog.
+  const plain =
+    request.agentIds !== undefined ||
+    request.plan !== undefined ||
+    request.apiKey !== undefined ||
+    request.forNewAgent === true ||
+    request.intent === "api_key";
+  const asked = request.agentId && (request.chat || !plain) ? dir.agentById.get(request.agentId) : undefined;
   const asleep = (id: string) => (aiStateOf(status.data, id) ?? "no_ai") === "no_ai";
   const chatNow = {
-    on: asked !== undefined && asked.ownerUserId === me.user.id && !isRightHand(asked) && asleep(asked.id),
+    on: asked !== undefined && asked.ownerUserId === me.user.id && !isRightHand(asked),
     others: mine.some((a) => a.id !== asked?.id && asleep(a.id)),
   };
   const [chatKept, setChatKept] = useState<typeof chatNow>();
@@ -256,7 +263,7 @@ function ConnectAiDialog({
   useEffect(() => {
     if (loaded) setChatKept((kept) => kept ?? chatNow);
   }, [loaded]);
-  const chat = chatKept ?? (loaded ? chatNow : { on: request.chat === true, others: false });
+  const chat = chatKept ?? chatNow;
   const [scope, setScope] = useState<"all" | "one">();
   const wide = chat.on && chat.others && scope !== "one";
   const only = wide ? undefined : named ? (named.length === 1 ? named[0] : undefined) : request.agentId;
