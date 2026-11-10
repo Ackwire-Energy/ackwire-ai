@@ -171,8 +171,10 @@ jobs:
   macos:
     needs: [version, server]
     if: ${{ contains(fromJSON('["all", "macos+linux", "macos"]'), inputs.platforms || 'all') }}
-    # Apple silicon or Intel, whichever CI_RUNNER_MACOS names: the build is universal either way.
-    runs-on: ${{ vars.CI_RUNNER_MACOS || 'macos-15' }}
+    # GitHub's own macOS runner: the .dmg's window (its background, the icons' places) is laid out through Finder,
+    # which needs a desktop session. On a runner without one Finder's AppleEvents time out (-1712) and the .dmg
+    # comes out with a plain window.
+    runs-on: macos-15
     timeout-minutes: 60
     env:
       BIN_DIR: apps/desktop/src-tauri/binaries
@@ -306,11 +308,6 @@ jobs:
         if: ${{ steps.signing.outputs.apple == 'true' }}
         uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0.6.2
         env:
-          # No Finder layout for the .dmg window: Namespace's macOS runners time Finder's AppleEvents out (-1712).
-          # tauri-action turns the bundler's CI skip off by default (TAURI_BUNDLER_DMG_IGNORE_CI=true), and the bundler
-          # skips only when CI is exactly "true".
-          CI: "true"
-          TAURI_BUNDLER_DMG_IGNORE_CI: "false"
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
@@ -329,11 +326,6 @@ jobs:
         if: ${{ steps.signing.outputs.apple != 'true' }}
         uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0.6.2
         env:
-          # No Finder layout for the .dmg window: Namespace's macOS runners time Finder's AppleEvents out (-1712).
-          # tauri-action turns the bundler's CI skip off by default (TAURI_BUNDLER_DMG_IGNORE_CI=true), and the bundler
-          # skips only when CI is exactly "true".
-          CI: "true"
-          TAURI_BUNDLER_DMG_IGNORE_CI: "false"
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
