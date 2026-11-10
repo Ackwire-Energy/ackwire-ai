@@ -2,12 +2,14 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { and, eq, inArray, isNull, schema } from "@agenteschat/db";
 import {
   BUSINESS_TEMPLATES,
+  createAgent,
   createRole,
   createSetupToolSource,
   createTeam,
   createToolGateway,
   denyTeam,
   listTeamTemplates,
+  NEW_AGENT_DEFAULTS,
   OFFER_ANSWERS_TOOL,
   OFFER_INVITES_TOOL,
   openPersonAgentDm,
@@ -250,6 +252,32 @@ describe("the team card", () => {
       skills: [{ title: "Voz", line: "como fala", agents: ["zeca"] }],
     });
     expect(stranger.isError).toBe(true);
+  });
+
+  test("an agent like one of the team's already here: no card until the person says to make new ones", async () => {
+    f = await setup({ rightHand: true });
+    await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Bruna", handle: "bruna", role: "atendimento", instructions: "Responde os clientes." },
+      NEW_AGENT_DEFAULTS,
+    );
+    const ctx = await lodiRun(f, f.owner.id, "monta o time");
+    const teamCards = async () =>
+      (await f.db.select().from(schema.messages).where(eq(schema.messages.agentRunId, ctx.runId))).filter(
+        (m) => (m.meta.actionCard as { kind?: string } | undefined)?.kind === "team_proposal",
+      );
+    const out = await call(f, ctx, PROPOSE_TEAM_TOOL, TEAM);
+    expect(out.isError).toBeFalsy();
+    expect(out.content).toContain(
+      "Not posted: an agent like this already exists: Bruna (@bruna, atendimento) for Iara.",
+    );
+    expect(out.content).toContain("call propose_team again with also_new: true");
+    expect(await teamCards()).toHaveLength(0);
+    const again = await call(f, ctx, PROPOSE_TEAM_TOOL, { ...TEAM, also_new: true });
+    expect(again.content).toStartWith("Posted the team card");
+    expect(await teamCards()).toHaveLength(1);
   });
 
   test("in a personal workspace an agent may go without a channel: it lives in its DM, and the result says so", async () => {

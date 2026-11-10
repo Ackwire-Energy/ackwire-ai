@@ -2258,7 +2258,8 @@
     "suggested": "D'après votre e-mail {{domain}}, j'ai suggéré {{org}}.",
     "create": "Créer",
     "shareMessage": "Rejoignez {{org}} sur agentes.chat : {{url}}",
-    "failed": "Impossible d'enregistrer. Réessayez."
+    "failed": "Impossible d'enregistrer. Réessayez.",
+    "enter": "Entrer dans l'espace de travail"
   },
   "ai": {
     "yourPlan": "Votre abonnement IA",
@@ -2585,7 +2586,6 @@
   "dashboards": {
     "homeRow": "Vous seul · vos propres widgets",
     "loadFailed": "Impossible de charger les tableaux de bord.",
-    "onlyHome": "Les tableaux de bord de l'espace de travail ou de vos rôles apparaissent ici.",
     "create": "Créer",
     "routineTarget": "son widget",
     "pin": {

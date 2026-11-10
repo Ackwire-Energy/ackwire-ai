@@ -489,6 +489,11 @@ test("Tentar de novo on a person's message whose run failed: the same message, o
   // The failed run is gone (its line clears in the apps once the new one thinks), the new one on the same message.
   expect(await runs()).toMatchObject([{ id: runId, triggerMessageId: asked.id, status: "queued" }]);
   expect(events).toContainEqual(expect.objectContaining({ type: "agent.thinking", runId }));
+  // The message's receipt follows the new run at once (the apps take a new run's claim as the news), so its line
+  // stops saying the old run failed before any worker claims it.
+  expect(events).toContainEqual(
+    expect.objectContaining({ type: "message.claimed", messageId: asked.id, agentId: f.agent.id, runId }),
+  );
   expect((await f.db.select().from(schema.messages)).length).toBe(before);
   await drainOutbox(f.db, f.handlers);
   expect(await runs()).toMatchObject([{ id: runId, status: "done" }]);

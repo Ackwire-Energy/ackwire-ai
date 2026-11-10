@@ -423,10 +423,21 @@ export function chatRoutes(deps: AppDeps) {
                   description:
                     "Work in the background (a routine's, or long work, ADR 0121): not the conversation's working row.",
                 }),
-                live: z.object({ turn: z.number().int(), at: z.number().int(), text: z.string() }).optional().openapi({
-                  description:
-                    "What its current model call has streamed so far (`agent.delta`) past its last tool, when this server runs it: `text` starts at `at` of the call's text, so the next delta's `at` is `at` plus its length.",
-                }),
+                live: z
+                  .object({
+                    turn: z.number().int(),
+                    at: z.number().int(),
+                    text: z.string(),
+                    shownAt: z.string().optional().openapi({
+                      description:
+                        "When the reply it writes first showed words (`agent.delta.shownAt`): its live row, and its message once posted, go there.",
+                    }),
+                  })
+                  .optional()
+                  .openapi({
+                    description:
+                      "What its current model call has streamed so far (`agent.delta`) past its last tool, when this server runs it: `text` starts at `at` of the call's text, so the next delta's `at` is `at` plus its length.",
+                  }),
               }),
             ),
             consults: z

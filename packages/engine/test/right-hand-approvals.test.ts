@@ -231,10 +231,12 @@ describe("the right hand approves for a person (ADR 0139 §2)", () => {
     await on();
     const states: (string | undefined)[] = [];
     for (const handle of ["um", "dois", "tres"]) {
+      // Alike on purpose: the person asked for more of the same, which the cap still counts.
       const { delegate } = await proposeAndDecide(await runFor({ userId: f.owner.id }), {
         ...TRIAGEM,
         name: handle,
         handle,
+        also_new: true,
       });
       states.push(delegate?.state);
     }
@@ -342,7 +344,9 @@ describe("the right hand approves for a person (ADR 0139 §2)", () => {
     const { card } = await proposeAndDecide(await runFor({ userId: f.owner.id }));
     const child = await proposeAndDecide(await runFor({ userId: f.owner.id }, card.agentId ?? ""), {
       ...TRIAGEM,
+      name: "Neta",
       handle: "neta",
+      role: "Prazos",
     });
     expect(child.delegate?.state).toBe("outside");
   });

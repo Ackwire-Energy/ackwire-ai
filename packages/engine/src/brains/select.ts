@@ -472,6 +472,7 @@ export const UNAVAILABLE_CODES: ReadonlySet<string> = new Set([
   "plan_limit",
   "plan_not_owner",
   "plan_not_shared",
+  "plan_unattended",
   "tools_not_locked",
 ]);
 

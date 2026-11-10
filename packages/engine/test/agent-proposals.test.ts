@@ -22,6 +22,7 @@ import {
   insertMessage,
   NEW_AGENT_DEFAULTS,
   openPersonAgentDm,
+  PROPOSE_REMOVE_AGENTS_TOOL,
   setMemberRoles,
   suggestAgentAi,
   type ToolContext,
@@ -195,6 +196,70 @@ describe("propose_agent", () => {
     await refused({ look: { color: "gold", eyes: "round" } }, "color");
     await refused({ why: "  " }, "why");
     expect(await proposals(f)).toHaveLength(0);
+  });
+
+  test("an agent like it already on the team: no card until the person says to make another", async () => {
+    f = await setup();
+    const ada = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Ada", handle: "ada", role: "Designer", instructions: "Desenha." },
+      NEW_AGENT_DEFAULTS,
+    );
+    const ctx = await runFor(f, f.owner.id, "cria um agente de design");
+    // Its name in other case and accents, or its role under another name.
+    for (const input of [
+      { ...ADA, name: "ÁDA", handle: "ada-2", role: "Revisora" },
+      { ...ADA, name: "Bruna", handle: "bruna", role: "designer " },
+    ]) {
+      const out = await propose(f, ctx, input);
+      expect(out.isError).toBeUndefined();
+      expect(out.content).toContain("Not posted: an agent like this already exists: Ada (@ada, Designer)");
+      expect(out.content).toContain("call propose_agent again with also_new: true");
+    }
+    expect(await proposals(f)).toHaveLength(0);
+    // The person said to make another one.
+    const out = await propose(f, ctx, { ...ADA, name: "Bruna", handle: "bruna", also_new: true });
+    expect(out.isError).toBeUndefined();
+    expect(await proposals(f)).toHaveLength(1);
+    // An archived agent isn't on the team.
+    await f.db.update(schema.agents).set({ archivedAt: new Date() }).where(eq(schema.agents.id, ada.id));
+    expect((await propose(f, ctx, { ...ADA, handle: "ada-3" })).content).toStartWith("Posted the proposal of Ada");
+    // A role of only punctuation is none: a draft with no role isn't like it.
+    const caio = { name: "Caio", handle: "caio", role: "…", instructions: "Ajuda." };
+    await createAgent(f.db, f.owner.id, f.org.id, caio, NEW_AGENT_DEFAULTS);
+    const { role: _role, ...noRole } = ADA;
+    const fresh = await runFor(f, f.owner.id, "cria um agente");
+    expect((await propose(f, fresh, { ...noRole, name: "Dora", handle: "dora" })).content).toStartWith(
+      "Posted the proposal of Dora",
+    );
+  });
+
+  test("starting over: an agent the person asked to remove doesn't stop the one that replaces it", async () => {
+    f = await setup();
+    await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Ada", handle: "ada", role: "Designer", instructions: "Desenha." },
+      NEW_AGENT_DEFAULTS,
+    );
+    const ctx = await runFor(f, f.owner.id, "apaga os agentes e monta o time de novo");
+    const tools = createToolGateway({ sources: [createSetupToolSource({ pubsub: f.pubsub })] });
+    const removal = await tools.invoke(ctx, {
+      toolUseId: `tu_${crypto.randomUUID()}`,
+      name: PROPOSE_REMOVE_AGENTS_TOOL,
+      input: { agents: ["@ada"], reason: "recomeçar" },
+    });
+    expect(removal.type === "result" && removal.output.content).toContain("propose the new agents now");
+    expect((await propose(f, ctx, { ...ADA, handle: "ada-2" })).content).toStartWith("Posted the proposal of Ada");
+    // Someone else's ask to remove her keeps her on the team for another person.
+    const bia = await addMember(f.db, f.org.id, "member", "Bia Rocha");
+    const other = await runFor(f, bia.id, "cria um agente de design");
+    expect((await propose(f, other, { ...ADA, handle: "ada-3" })).content).toContain(
+      "Not posted: an agent like this already exists: Ada (@ada, Designer)",
+    );
   });
 
   test("apps by name or by service: a Stripe account is 'stripe'; with two, its name says which", async () => {
@@ -664,6 +729,7 @@ describe("one request, one card: channels, mailboxes and a routine", () => {
     const github = await connect(f, "github", "GitHub");
     await mailbox(f, f.owner.id, "ana@acme.com");
     const ctx = await runFor(f, f.owner.id, "cria um agente que lê meus emails");
+    // The same agent on each card, on purpose: each is decided by someone else.
     const card = async () => {
       const out = await propose(f, ctx, {
         ...CAIO,
@@ -673,6 +739,7 @@ describe("one request, one card: channels, mailboxes and a routine", () => {
           { connector: "ana@acme.com", level: "read" },
           { connector: "github", level: "write" },
         ],
+        also_new: true,
       });
       return (out.data as { agentProposal: { messageId: string } }).agentProposal.messageId;
     };

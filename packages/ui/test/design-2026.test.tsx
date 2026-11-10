@@ -315,7 +315,9 @@ describe("list toolbars", () => {
     expect(rule(".ac-filter--active")).toContain("background: var(--ink)");
     // A phone's toolbar: the search fills its row beside the actions, the filters under them scroll sideways.
     expect(css).toMatch(/\.ac-toolbar > \.ac-toolbar__search \{\s*flex: 1 1 0;/);
-    expect(css).toMatch(/\.ac-toolbar__filters \{\s*max-width: calc\(100% \+ 8px\);[^}]*overflow-x: auto;/);
+    expect(css).toMatch(
+      /\.ac-toolbar__filters \{\s*max-width: calc\(100% \+ 2 \* var\(--bleed\)\);[^}]*overflow-x: auto;/,
+    );
   });
 
   test("one height: the search, the toggles and the chips all read --tool-h, so a row lines up", async () => {

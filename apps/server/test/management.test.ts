@@ -29,7 +29,8 @@ test("management API: settings, overview, people, invitations, credentials, agen
   await t.drain();
 
   const overview = (await (await api("/overview")).json()) as Record<string, number>;
-  expect(overview).toMatchObject({ people: 1, agents: 1, approvalsWaitingForMe: 0 });
+  // Dev and the workspace's right hand, which the sidebar lists under this count too.
+  expect(overview).toMatchObject({ people: 1, agents: 2, approvalsWaitingForMe: 0 });
   // A percentage of the budgets (dev has US$ 50), never money.
   expect(overview.budgetUsedPercent).toBe(0);
   expect(overview).not.toHaveProperty("myAgentsSpendUsd");

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { orgTopic } from "@agenteschat/adapters";
+import { listenResumedTopic, orgTopic } from "@agenteschat/adapters";
 import { createLogger } from "../src/logger";
 import {
   authorizeSubscription,
@@ -536,4 +536,37 @@ test("a socket subscribed to no channel hears of the agents and channels the wor
     event: { type: "channels.changed" },
   });
   c.ws.close();
+});
+
+test("the server's LISTEN back after a gap: every app socket closes as a restart, so the app reconnects and reads again", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, channelId } = await seedOrg(owner);
+  const c = connect(wsUrl(orgId), { origin: ORIGIN, cookie: owner.cookie() });
+  await c.opened;
+  c.send({ type: "subscribe", channelId });
+  await c.next((f) => f.type === "subscribed" && f.channelId === channelId);
+  const closed = new Promise<number>((resolve) => c.ws.addEventListener("close", (e) => resolve(e.code)));
+  await t.adapters.pubsub.publish(listenResumedTopic, { type: "pubsub.resumed" });
+  expect(await Promise.race([closed, Bun.sleep(5000).then(() => -1)])).toBe(1012);
+});
+
+test("an event Bun drops past its backpressure limit closes the socket, so the app reconnects and reads what it missed", async () => {
+  const realtime = createRealtime({
+    db: t.db,
+    auth: t.auth,
+    config: t.config,
+    log: createLogger("error"),
+    ...t.adapters,
+  });
+  const closed: number[] = [];
+  // A frozen tab: Bun's buffer for it is full, so every send is dropped (0).
+  const frozen = {
+    readyState: 1,
+    data: { kind: "browser", connectionId: "frozen-tab", sessionValidatedAt: Date.now(), sessionCheckInFlight: null },
+    send: () => 0,
+    close: (code: number) => closed.push(code),
+  };
+  await realtime.websocket.message(frozen as unknown as Bun.ServerWebSocket<SocketData>, '{"type":"ping"}');
+  expect(closed).toEqual([1013]);
 });

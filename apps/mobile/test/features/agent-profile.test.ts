@@ -548,5 +548,12 @@ describe("Perfil: the Modelo row says how it thinks on the value's line (#44)", 
       valueNote: "Claude",
     });
     expect(modelRow(pt, { kind: "claude_code", model: "auto" }, "Claude Sonnet 4.5").value).toBe("Automático");
+    // Automático through the API: the maker its models come from, then Automático.
+    expect(modelRow(pt, { kind: "model", model: null, maker: "anthropic" }, "Automático")).toEqual({
+      value: "Claude",
+      valueNote: "Automático",
+    });
+    // The profile names Automático by its key's maker already (`apiModelName`): the note still says Automático.
+    expect(modelRow(pt, { kind: "model", model: null, maker: "anthropic" }, "Claude").valueNote).toBe("Automático");
   });
 });

@@ -82,7 +82,7 @@ export function RightHandMine({ agent }: { agent: Agent }) {
   const meId = useMeId();
   const view = useAgentBrain(orgId, agent.id).data;
   const platform = usePlatformKey(orgId).data === true;
-  const status = mineStatus(view, meId ?? "", platform);
+  const status = mineStatus(view, meId ?? "", platform, agent.brain?.maker);
   const first = (id: string) => dir.memberById.get(id)?.name.split(" ")[0] ?? "";
   const back = () =>
     void api.agents

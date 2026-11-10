@@ -1283,13 +1283,12 @@ describe("Onboarding: the workspace's name", () => {
   const next = () => click(button("Continuar"), 8);
   const calls = (state: ReturnType<typeof seedState>, method: string) => state.calls.filter((c) => c.method === method);
 
-  test("one question, asked by the right hand, not a guide among the presets; no steps to count", async () => {
+  test("the name, step 1 on the rail, Lodi's line on its horizon, never a guide among the presets", async () => {
     await start();
     expect(screen().getByRole("heading", { name: "Como se chama o seu workspace?" })).toBeTruthy();
-    expect(document.querySelector(".onb__host-name")?.textContent).toBe("Lodi");
+    expect(screen().getByRole("navigation", { name: "Passos para começar" })).toBeTruthy();
+    expect(document.querySelector(".onb__say")?.textContent).toContain("Eu sou o Lodi.");
     expect(document.body.textContent).not.toContain("Oi, eu sou a Ada");
-    expect(screen().queryByRole("navigation", { name: "Passos para começar" })).toBeNull();
-    expect(document.querySelector(".onb__progress")).toBeNull();
     // A name is no misspelling.
     expect(screen().getByLabelText("Nome").getAttribute("spellcheck")).toBe("false");
     expect(button("Continuar").hasAttribute("disabled")).toBe(true);
@@ -1306,16 +1305,17 @@ describe("Onboarding: the workspace's name", () => {
     expect(bar.contains(note)).toBe(false);
     expect(note.compareDocumentPosition(bar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect([...bar.children].map((b) => b.textContent)).toEqual([expect.stringMatching(/^Continuar/)]);
-    // It holds the screen's bottom, clear of a phone's home bar, and a field being typed in scrolls clear of it.
+    // Right under the step, it holds the screen's bottom only while the step is taller than the screen, clear of a
+    // phone's home bar, and a field being typed in scrolls clear of it.
     const css = readFileSync(join(import.meta.dir, "../src/pages/onboarding.css"), "utf8");
     const rule = (selector: string, from = 0) => css.slice(css.indexOf(`${selector} {`, from)).split("}")[0] ?? "";
     expect(rule("\n.onb__actions")).toContain("position: sticky");
     expect(rule("\n.onb__actions")).toContain("bottom: 0");
     expect(rule("\n.onb__body")).not.toMatch(/(^|\n)\s*margin:/);
-    expect(rule("\n.onb__actions")).toContain("margin: auto calc(-1 * var(--onb-gutter)) 0");
-    expect(rule("\n.onb__body")).toContain("--onb-gutter: clamp(16px, 4vw, 32px)");
+    expect(rule("\n.onb__actions")).toContain("margin: 0 calc(-1 * var(--onb-gutter))");
+    expect(rule("\n.onb__cols")).toContain("--onb-gutter: clamp(16px, 4vw, 32px)");
     expect(rule("\n.onb__actions")).toContain(
-      "padding: 0 var(--onb-gutter) calc(env(safe-area-inset-bottom, 0px) + 24px)",
+      "padding: var(--space-1) var(--onb-gutter) calc(env(safe-area-inset-bottom, 0px) + var(--space-6))",
     );
     expect(rule("\n.onb__actions")).toContain("background: var(--pane)");
     expect(rule("\nhtml:has(.onb)")).toContain("scroll-padding-bottom: 104px");
@@ -1332,7 +1332,15 @@ describe("Onboarding: the workspace's name", () => {
     };
     const { router } = await renderApp("/onboarding", { api: createFakeApi(state), auth });
     await settle(4);
-    await click(button("Sair"), 6);
+    // In the account menu on the rail (Radix: keyboard).
+    const me = button("Sua conta");
+    me.focus();
+    await act(async () => {
+      fireEvent.keyDown(me, { key: "Enter" });
+      fireEvent.keyUp(me, { key: "Enter" });
+    });
+    await settle(2);
+    await click(screen().getByRole("menuitem", { name: "Sair" }), 6);
     expect(authCalls.map((c) => c.method)).toEqual(["signOut"]);
     expect(router.state.location.pathname).toBe("/login");
   });
@@ -1403,7 +1411,14 @@ describe("Onboarding: the workspace's name", () => {
     const css = sheet("pages/onboarding.css");
     const desktop = sheet("desktop.css");
     const rule = (from: string, selector: string) => from.slice(from.indexOf(`${selector} {`)).split("}")[0] ?? "";
-    const px = (decls: string, prop: string) => Number(decls.match(new RegExp(`\\n\\s*${prop}: (-?[\\d.]+)px`))?.[1]);
+    const tokens = readFileSync(join(import.meta.dir, "../../../packages/ui/src/styles/tokens.css"), "utf8");
+    // A length in px, through the kit's token where the rule names one (`var(--control-h-sm)`).
+    const px = (decls: string, prop: string) => {
+      const value = decls.match(new RegExp(`\\n\\s*${prop}: ([^;\\s]+)`))?.[1] ?? "";
+      const token = value.match(/^var\((--[\w-]+)\)$/)?.[1];
+      const raw = token ? tokens.match(new RegExp(`${token}: (-?[\\d.]+)px`))?.[1] : value.match(/^(-?[\d.]+)px/)?.[1];
+      return Number(raw);
+    };
     // No room above the step that follows what's in it, centring it or pinned as it opens.
     const rows = css.match(/\.onb__body[^{]*::before \{[^}]*\}/g) ?? [];
     expect(rows.filter((r) => /auto|--onb-lead/.test(r))).toEqual([]);

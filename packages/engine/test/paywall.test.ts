@@ -307,19 +307,14 @@ describe("the team before paying", () => {
     expect(f.provider.calls).toHaveLength(0);
     const team = await f.db.select({ name: schema.agents.name }).from(schema.agents);
     expect(team.map((a) => a.name)).toEqual(expect.arrayContaining(["Iara", "Lia", "Otto"]));
-    // On a hold the card shows what its first agent delivers.
-    const card = rows.find((m) => m.id === used.messageId)?.meta.actionCard as { params: { example?: string } };
-    expect(card.params.example).toContain("Marina");
   });
 
-  test("with a plan in force the same template is made at once and shows no example", async () => {
+  test("with a plan in force the same template is made at once", async () => {
     f = await setup({ rightHand: true });
     const used = await useTeamTemplate({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, "store", "pt-BR");
     expect(used.state).toBe("created");
     const rows = await lodiDm(used.channelId);
     expect(rows.some((m) => m.meta.replyChips)).toBe(false);
-    const card = rows.find((m) => m.id === used.messageId)?.meta.actionCard as { params: { example?: string } };
-    expect(card.params.example).toBeUndefined();
   });
 
   test("making the team on a hold queues the two reminders", async () => {

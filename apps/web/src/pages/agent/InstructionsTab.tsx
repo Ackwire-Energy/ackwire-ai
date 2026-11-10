@@ -1,10 +1,11 @@
 import { useProposals } from "@agenteschat/client";
 import { modeKey } from "@agenteschat/client/lib/workspace-mode";
-import { Button, Card, Diff, diffLines, Icon, Textarea } from "@agenteschat/ui";
+import { Button, Card, diffLines, Icon, Textarea } from "@agenteschat/ui";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { InstructionTips } from "@/components/AgentFields";
 import { useOrg } from "@/components/org-context";
+import { ProseDiff } from "@/components/ProseDiff";
 import { useDirectory } from "@/hooks/useDirectory";
 import { Markdown } from "@/lib/markdown";
 import { CardHead, useAgentEdit } from "./context";
@@ -74,10 +75,8 @@ export function InstructionsTab() {
                       {showDiff ? t("agentPage.instructions.hideDiff") : t("agentPage.instructions.showDiff")}
                     </Button>
                     {showDiff && (
-                      <Diff
-                        aria-label={t("agentPage.instructions.diff")}
-                        addedLabel={t("proposals.added")}
-                        removedLabel={t("proposals.removed")}
+                      <ProseDiff
+                        label={t("agentPage.instructions.diff")}
                         lines={diffLines(saved.instructions.split("\n"), draft.instructions.split("\n"))}
                       />
                     )}

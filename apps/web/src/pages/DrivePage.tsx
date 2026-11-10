@@ -19,6 +19,7 @@ import { joinNames } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
   Button,
+  Checkbox,
   cx,
   EmptyState,
   FilterBar,
@@ -176,6 +177,7 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
   };
   const openItem = rows.find((a) => a.id === openId);
   const picked = shown.filter((a) => selected.has(a.id));
+  const selectAll = () => setSelected(new Set(shown.map((a) => a.id)));
 
   const toggle = (a: Artifact) => {
     anchor.current = a.id;
@@ -207,8 +209,8 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
   const openViewer = (a: Artifact) => viewer.open(a.id);
 
   // "/" searches, ⌘A selects what's shown, Esc clears the selection.
-  const keys = useRef({ shown, selected, openId, trashOpen });
-  keys.current = { shown, selected, openId, trashOpen };
+  const keys = useRef({ shown, selected, openId, trashOpen, selectAll });
+  keys.current = { shown, selected, openId, trashOpen, selectAll };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const s = keys.current;
@@ -226,7 +228,7 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
         searchRef.current?.focus();
       } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "a" && s.shown.length > 0) {
         e.preventDefault();
-        setSelected(new Set(s.shown.map((a) => a.id)));
+        s.selectAll();
       }
     };
     document.addEventListener("keydown", onKey);
@@ -634,12 +636,19 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
             )}
             {rows.length > 0 && view === "list" && (
               <div className={cx("drive-table", selected.size > 0 && "drive--selecting")}>
-                <div className="drive-table__head" aria-hidden="true">
-                  <span />
-                  <span>{t("drive.name")}</span>
-                  <span>{t("drive.by")}</span>
-                  <span className="drive-row__where">{t("drive.where")}</span>
-                  <span>{t("drive.when")}</span>
+                <div className="drive-table__head">
+                  <Checkbox
+                    className="drive-check"
+                    checked={picked.length === shown.length ? true : picked.length > 0 ? "indeterminate" : false}
+                    onCheckedChange={(on) => (on ? selectAll() : setSelected(new Set()))}
+                    aria-label={t("drive.selectAll", { count: shown.length })}
+                  />
+                  <span aria-hidden="true">{t("drive.name")}</span>
+                  <span aria-hidden="true">{t("drive.by")}</span>
+                  <span className="drive-row__where" aria-hidden="true">
+                    {t("drive.where")}
+                  </span>
+                  <span aria-hidden="true">{t("drive.when")}</span>
                   <span />
                 </div>
                 {sections.map((s) => (
@@ -666,6 +675,11 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
             {picked.length > 0 && (
               <SelectionBar label={t("drive.selection")}>
                 <span className="drive-selbar__count">{t("drive.selected", { count: picked.length })}</span>
+                {picked.length < shown.length && (
+                  <Button size="sm" variant="ghost" icon="checks" onClick={selectAll}>
+                    <span className="drive-selbar__label">{t("drive.selectAll", { count: shown.length })}</span>
+                  </Button>
+                )}
                 <Button size="sm" variant="ghost" icon="download" onClick={() => void downloadPicked()}>
                   <span className="drive-selbar__label">{t("artifacts.download")}</span>
                 </Button>

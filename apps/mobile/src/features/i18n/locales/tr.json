@@ -2163,7 +2163,8 @@
     "suggested": "{{domain}} alan adlı e-postanıza bakarak {{org}} adını önerdim.",
     "create": "Oluştur",
     "shareMessage": "agentes.chat üzerinde {{org}} çalışma alanına katılın: {{url}}",
-    "failed": "Kaydedilemedi. Tekrar deneyin."
+    "failed": "Kaydedilemedi. Tekrar deneyin.",
+    "enter": "Çalışma alanına gir"
   },
   "ai": {
     "yourPlan": "Yapay zeka planınız",
@@ -2488,7 +2489,6 @@
   "dashboards": {
     "homeRow": "Yalnızca siz · kendi widget'larınız",
     "loadFailed": "Panolar yüklenemedi.",
-    "onlyHome": "Çalışma alanının ya da rollerinizin panoları burada görünür.",
     "create": "Oluştur",
     "routineTarget": "widget'ı",
     "pin": {

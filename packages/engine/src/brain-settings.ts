@@ -1606,6 +1606,8 @@ export interface AgentBrainSummary {
   usage?: PlanUsage;
   /** Set to Rápida where that applies to what it thinks with (ADR 0149); absent: standard speed. */
   speed?: "fast";
+  /** An API brain on Automático: the maker its models come from (`agentBrainLines`), whose logo the app shows. */
+  maker?: string;
 }
 
 /**

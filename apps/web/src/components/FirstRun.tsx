@@ -1,18 +1,19 @@
 import type { Agent } from "@agenteschat/client";
 import {
+  useAgentBrain,
   useAiStatus,
   useCatalog,
   useConfirmSetup,
   useConnections,
+  useInvitations,
+  useInviteMany,
   useMembers,
   useMessages,
   useSettings,
   useUpdateSettings,
 } from "@agenteschat/client";
-import { teamProposalOf } from "@agenteschat/client/lib/action-cards";
-import { setDraftFor } from "@agenteschat/client/lib/drafts";
 import { errorText } from "@agenteschat/client/lib/errors";
-import { joinNames } from "@agenteschat/client/lib/format";
+import { emailName, joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { stepPermissions } from "@agenteschat/client/lib/home";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
@@ -20,26 +21,27 @@ import { can } from "@agenteschat/client/lib/permissions";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { connectorName } from "@agenteschat/client/lib/scopes";
 import {
+  beatRow,
+  type FirstRunFacts,
   type FirstRunStep,
+  firstRunAiLabel,
   firstRunAppList,
   firstRunAsks,
+  firstRunBeats,
   firstRunDone,
+  firstRunFact,
   firstRunRow,
   firstRunRowState,
+  firstRunSayKey,
   firstRunSteps,
 } from "@agenteschat/client/lib/setup-checklist";
 import {
   aboutYouContext,
   answerAfter,
-  BUSINESS_TYPES,
-  type BusinessType,
-  firstTasks,
-  isTemplateBusiness,
   LIFE_AREAS,
   type LifeArea,
   lifeAreaTemplate,
   readAboutYou,
-  teamStatus,
 } from "@agenteschat/client/lib/team-plan";
 import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
 import { Button, Field, Icon, type IconName, Input, Locked } from "@agenteschat/ui";
@@ -48,7 +50,6 @@ import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { SetupAsks, SetupCardView, StepDialog, useDoneSay } from "@/components/AgentSetup";
 import { usePlanHold } from "@/components/ai/ConnectAiSteps";
-import { BillingLinkButton } from "@/components/BillingLinkButton";
 import { useConnectAi } from "@/components/ConnectAi";
 import { ConnectFlow, type FlowState } from "@/components/ConnectFlow";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
@@ -60,23 +61,21 @@ import { useAgentThinks } from "@/hooks/useAgentThinks";
 import { useDirectory } from "@/hooks/useDirectory";
 
 /*
- * The right hand's first run (ADR 0155 §6): one checklist card inside its greeting, drawn by the app and never stored,
- * for the workspace's owners. Five rows, each opening a dialog in place, none needing a model: what the workspace
- * does, the team (a template, made in one click), an AI, apps, people. A row reads done from the data; only "Not now"
- * is kept. On a billing hold the AI row leads to the plan and apps and people wait for it. A personal workspace (ADR
- * 0158) has four, in its words: what the person wants help with (areas of life), their agents, an AI, their apps.
+ * The right hand's first run (ADR 0155 §6, ADR 0162): one checklist card inside its greeting, drawn by the app and
+ * never stored, for the workspace's owners, with what the onboarding didn't do: an AI, apps, people. A personal
+ * workspace (ADR 0159), which the onboarding opens at once, has four in its words: what the person wants help with
+ * (areas of life), their agents, an AI, their apps. Each row opens in place, none needing a model, and reads done
+ * from the data; only "Agora não" is kept. On a billing hold every row waits for the plan, whose one button is the
+ * hold's banner.
  */
 
 const ROW_ICON: Record<FirstRunStep, IconName> = {
-  about: "document",
-  team: "members",
+  about: "person",
+  team: "agent",
   ai: "bolt",
   apps: "plug",
   people: "personAdd",
 };
-
-/** A personal workspace's rows are about the person and their agents. */
-const PERSONAL_ROW_ICON: Partial<Record<FirstRunStep, IconName>> = { about: "person", team: "agent" };
 
 /** The rows this person sees on the right hand's card (none: the card isn't theirs). */
 export function useFirstRunSteps(agent: Agent | undefined): FirstRunStep[] {
@@ -96,76 +95,90 @@ export function useFirstRunSteps(agent: Agent | undefined): FirstRunStep[] {
   });
 }
 
-/**
- * Where the card stands for this person: `open` while a row is left, `complete`, or `none` (not theirs). Início reads
- * it with no conversation (`channelId` null): the rows' count alone.
- */
-export function useFirstRun(agent: Agent | undefined, channelId: string | null) {
+/** Where the card stands for this person: `open` while a row is left, `complete`, or `none` (not theirs). */
+export function useFirstRun(agent: Agent | undefined) {
   const { org } = useOrg();
   const dir = useDirectory(org.id);
   const steps = useFirstRunSteps(agent);
   const status = useAiStatus(org.id);
   const members = useMembers(org.id);
   const detail = useSettings(org.id);
+  const invitations = useInvitations(org.id, steps.includes("people"));
   const connections = useConnections(org.id, steps.includes("apps"));
   const live = (connections.data ?? []).filter((c) => !c.revokedAt);
-  const messages = useMessages(org.id, channelId ?? "", channelId !== null).data;
   const held = usePlanHold() !== null;
   const team = dir.agents.filter((a) => !isRightHand(a));
   const aiState = agent ? aiStateOf(status.data, agent.id) : undefined;
-  const done =
-    agent?.setup && steps.length > 0
-      ? firstRunDone(agent.setup, {
-          context: Boolean(detail.data?.context?.trim()),
-          team: team.length > 0,
-          ai: !held && (aiState === "ready" || aiState === "waiting"),
-          apps: live.length > 0,
-          people: (members.data?.length ?? 1) > 1,
-        })
-      : new Set<FirstRunStep>();
+  const waiting = invitations.data ?? [];
+  const facts: FirstRunFacts = {
+    context: Boolean(detail.data?.context?.trim()),
+    team: team.length > 0,
+    ai: !held && (aiState === "ready" || aiState === "waiting"),
+    apps: live.length > 0,
+    people: (members.data?.length ?? 1) > 1 || waiting.length > 0,
+  };
+  const done = agent?.setup && steps.length > 0 ? firstRunDone(agent.setup, facts) : new Set<FirstRunStep>();
   const ready =
-    status.isSuccess && members.isSuccess && detail.isSuccess && (!steps.includes("apps") || connections.isSuccess);
-  const cards = (messages ?? []).flatMap((m) => {
-    const card = teamProposalOf(m.meta);
-    return card ? [card] : [];
-  });
+    status.isSuccess &&
+    members.isSuccess &&
+    (!steps.includes("about") || detail.isSuccess) &&
+    (!steps.includes("apps") || connections.isSuccess) &&
+    (!steps.includes("people") || !invitations.isPending);
   const left = steps.filter((s) => !done.has(s));
   return {
     steps,
     done,
+    facts,
     ready,
     held,
     team,
     connections: live,
     members: members.data?.length ?? 1,
     context: detail.data?.context ?? "",
-    teamCard: cards.some((c) => teamStatus(c) === "open"),
-    created: cards.filter((c) => c.state === "created").at(-1) ?? null,
-    typed: answerAfter(messages, null),
+    invited: waiting.map((i) => emailName(i.email)),
     state: steps.length === 0 ? ("none" as const) : left.length > 0 ? ("open" as const) : ("complete" as const),
   };
 }
 
-/** The card, under the right hand's greeting. */
+/**
+ * The card, under the right hand's greeting. `channelId`: its DM, where what the person already typed to it fills in a
+ * personal workspace's row 1.
+ */
 export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: string }) {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const navigate = useNavigate();
   const connect = useConnectAi();
   const invite = useInviteDialog();
   const actions = useChannelActions();
   const catalog = useCatalog();
   const confirm = useConfirmSetup(org.id, agent.id);
-  const run = useFirstRun(agent, channelId);
+  const run = useFirstRun(agent);
+  const messages = useMessages(org.id, channelId, run.steps.includes("about")).data;
   const thinks = useAgentThinks(agent);
+  // Through the API, the workspace's key it runs on names its maker, as the side panel does (Automático names none).
+  const keyMaker = useAgentBrain(org.id, agent.id).data?.workspaceAi?.key?.provider;
+  const navigate = useNavigate();
   const [open, setOpen] = useState<"about" | "apps" | null>(null);
   const [templates, setTemplates] = useState<{ initial?: string } | null>(null);
   const burstRef = useRef<HTMLCanvasElement>(null);
-  const { steps, done, held, team } = run;
+  const { steps, done, held, team, facts } = run;
   const doneHere = steps.filter((s) => done.has(s));
   const personal = isPersonal(org);
-  const said = useDoneSay(run.ready, doneHere, steps.length, agent.appearance?.color, burstRef, (step) =>
-    t(modeKey(org, `agentSetup.firstRun.say.${step}`), agentGrammar(agent.name)),
+  // "Agora não" moves the row on and says nothing: only something done gets its line and its burst. An invitation is
+  // only sent: its line says so, with no burst, which waits for someone joining.
+  const said = useDoneSay(
+    run.ready,
+    firstRunBeats(doneHere, { members: run.members, invited: run.invited.length }),
+    steps.length,
+    agent.appearance?.color,
+    burstRef,
+    (beat) =>
+      beat === "invited"
+        ? t("agentSetup.firstRun.say.invited")
+        : firstRunFact(facts, beat)
+          ? t(firstRunSayKey(beat, personal), agentGrammar(agent.name))
+          : "",
+    (beat) => beat !== "invited",
   );
   if (run.state === "none") return null;
 
@@ -174,19 +187,23 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
     const def = defs.find((d) => d.id === c.connector);
     return def ? [connectorName(t, def)] : [];
   });
-  const stateOf = (s: FirstRunStep) => firstRunRowState(s, { done, held, teamCard: run.teamCard });
-  const next = steps.find((s) => ["open", "plan"].includes(stateOf(s)));
+  const stateOf = (s: FirstRunStep) => firstRunRowState(s, { done, held });
+  const next = steps.find((s) => stateOf(s) === "open");
   const skip = (step: "apps" | "people") => confirm.mutate(step);
   const act: Record<FirstRunStep, () => void> = {
     about: () => setOpen("about"),
     team: () =>
       done.has("team") ? void navigate({ to: "/org/$orgId/team", params: { orgId: org.id } }) : setTemplates({}),
-    ai: () => connect?.open({ agentId: agent.id, agentIds: [agent.id, ...team.map((a) => a.id)] }),
+    // For the whole team: no one agent named, so the dialog offers them all.
+    ai: () => connect?.open({ agentIds: [agent.id, ...team.map((a) => a.id)] }),
     apps: () => setOpen("apps"),
     people: () => invite?.open(),
   };
+  const label = thinks ? firstRunAiLabel(thinks, keyMaker ?? thinks.mark) : null;
   const rows = steps.map((s) => {
     const state = stateOf(s);
+    // People, open: an address to send at once in the row, the dialog behind "Mais opções".
+    const inline = s === "people" && state === "open" && invite !== null && can(org, "invite_people");
     const words = firstRunRow(
       t,
       s,
@@ -194,67 +211,53 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
       {
         org: org.name,
         agents: team.length,
-        label: thinks?.text ?? null,
+        label,
         apps: appNames.length ? joinNames(appNames, t) : null,
         members: run.members,
+        invited: run.invited.length ? joinNames(run.invited, t) : null,
         personal,
       },
       agent.setup?.done.includes(s) ?? false,
     );
-    const pay = state === "plan" && can(org, "manage_billing");
     return {
       key: s,
-      icon: (personal && PERSONAL_ROW_ICON[s]) || ROW_ICON[s],
+      icon: ROW_ICON[s],
       done: state === "done",
       title: words.title,
       desc: words.desc,
-      dim: state === "afterPlan" || state === "card",
-      saying: said?.step === s ? said.text : null,
-      ...(pay
+      dim: state === "afterPlan",
+      saying: said && beatRow(said.step) === s ? said.text : null,
+      ...(words.action && !inline && (s !== "ai" || connect) && (s !== "people" || invite)
+        ? { action: { label: words.action, primary: s === next, onClick: act[s] } }
+        : {}),
+      ...(words.skip && (s === "apps" || s === "people") && !inline
+        ? { skip: { label: words.skip, busy: confirm.isPending, onClick: () => skip(s) } }
+        : {}),
+      ...(inline
         ? {
-            actionNode: (
-              <BillingLinkButton orgId={org.id} from="hold" size="sm" variant={s === next ? "primary" : undefined}>
-                {words.action}
-              </BillingLinkButton>
+            form: (
+              <InviteLine
+                onMore={() => invite?.open()}
+                skip={words.skip ? { label: words.skip, busy: confirm.isPending, onClick: () => skip("people") } : null}
+              />
             ),
           }
-        : words.action && state !== "plan" && (s !== "ai" || connect) && (s !== "people" || invite)
-          ? { action: { label: words.action, primary: s === next, onClick: act[s] } }
-          : {}),
-      ...(words.skip && (s === "apps" || s === "people")
-        ? { skip: { label: words.skip, busy: confirm.isPending, onClick: () => skip(s) } }
         : {}),
     };
   });
 
-  // Row 1 saved: straight into the agents, once, with the template that fits the answer picked.
+  // A personal workspace's row 1 saved: straight into the agents, once, with the template that fits the areas picked.
   const aboutSaved = (initial: string | null) => {
     setOpen(null);
     if (!done.has("team") && steps.includes("team")) setTemplates(initial ? { initial } : {});
   };
 
-  const first = run.created ? firstTasks(run.created)[0] : undefined;
-  const asks = firstRunAsks(done, held)
-    ? [
-        ...(first
-          ? [
-              {
-                label: t("rightHand.intro.next.firstTask", agentGrammar(first.name)),
-                onClick: () => {
-                  setDraftFor(`agent:${first.agentId}`, first.task);
-                  void navigate({
-                    to: "/org/$orgId/dm/agent/$agentId",
-                    params: { orgId: org.id, agentId: first.agentId },
-                  });
-                },
-              },
-            ]
-          : []),
-        ...(["fit", "who"] as const).map((k) => ({
-          label: t(modeKey(org, `agentSetup.firstRun.asks.${k}`)),
-          onClick: () => actions?.resend(t(modeKey(org, `agentSetup.firstRun.asks.${k}`))),
-        })),
-      ]
+  // What to ask it. The team's first task is offered once, by the team card ("Primeira tarefa"), never here too.
+  const asks = firstRunAsks(done, held, team.length > 0)
+    ? (["fit", "who"] as const).map((k) => ({
+        label: t(modeKey(org, `agentSetup.firstRun.asks.${k}`)),
+        onClick: () => actions?.resend(t(modeKey(org, `agentSetup.firstRun.asks.${k}`))),
+      }))
     : [];
 
   return (
@@ -271,90 +274,107 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
       rows={rows}
       foot={asks.length > 0 && <SetupAsks lead={t("agentSetup.firstRun.asks.lead")} asks={asks} />}
     >
-      {open === "about" &&
-        (personal ? (
-          <AboutYouDialog context={run.context} typed={run.typed} onClose={() => setOpen(null)} onSaved={aboutSaved} />
-        ) : (
-          <AboutDialog context={run.context} typed={run.typed} onClose={() => setOpen(null)} onSaved={aboutSaved} />
-        ))}
+      {open === "about" && (
+        <AboutYouDialog
+          context={run.context}
+          typed={answerAfter(messages, null)}
+          onClose={() => setOpen(null)}
+          onSaved={aboutSaved}
+        />
+      )}
       {open === "apps" && <AppsDialog team={team} onClose={() => setOpen(null)} />}
       <TeamTemplatesDialog open={templates !== null} initial={templates?.initial} onClose={() => setTemplates(null)} />
     </SetupCardView>
   );
 }
 
-/** Row 1's dialog: the workspace's context as it is, what the person typed to the right hand, and what to open next. */
-interface AboutProps {
-  context: string;
-  typed: string | null;
-  onClose: () => void;
-  /** Saved: the team template that fits the answer, if any. */
-  onSaved: (template: string | null) => void;
-}
-
 /**
- * Row 1: "What does Acme do?", the business types to tap and one optional sentence; saved as the workspace's context,
- * which every agent reads. "Something else" asks for the sentence. What the person already typed to the right hand
- * comes filled in.
+ * The people row's own line: one address and Enviar invites at once with the invite dialog's defaults, the dialog
+ * itself behind "Mais opções" (several people, roles, channels, a note), and "Agora não" beside it, under the field.
  */
-function AboutDialog({ context, typed, onClose, onSaved }: AboutProps) {
+function InviteLine({
+  onMore,
+  skip,
+}: {
+  onMore: () => void;
+  skip: { label: string; busy: boolean; onClick: () => void } | null;
+}) {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const save = useUpdateSettings(org.id);
-  const [business, setBusiness] = useState<BusinessType | null>(null);
-  const [line, setLine] = useState(context || typed || "");
-  const other = business === "other";
-  const text = line.trim() || (business && !other ? t(`teamPlan.business.${business}`) : "");
+  const send = useInviteMany(org.id);
+  const [email, setEmail] = useState("");
+  const [refused, setRefused] = useState<string | null>(null);
+  const address = email.trim();
+  const submit = () =>
+    send.mutate(
+      { emails: [address] },
+      {
+        onSuccess: ([out]) => {
+          if (out?.status === "invalid_email") return setRefused(t("members.batch.invalid_email", { email: address }));
+          setRefused(null);
+          setEmail("");
+        },
+        onError: (e) => setRefused(errorText(t, e)),
+      },
+    );
   return (
-    <StepDialog
-      title={t("agentSetup.firstRun.about.title", { org: org.name })}
-      description={t("agentSetup.firstRun.about.desc")}
-      ok={t("common.save")}
-      okDisabled={!text}
-      busy={save.isPending}
-      onClose={onClose}
-      onOk={() =>
-        save.mutate(
-          { context: text },
-          { onSuccess: () => onSaved(business && isTemplateBusiness(business) ? business : null) },
-        )
-      }
-      note={save.isError ? <span className="setup-dlg__error">{errorText(t, save.error)}</span> : undefined}
+    <form
+      className="setup-invite"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (address && !send.isPending) submit();
+      }}
     >
-      <Locked when={save.isPending}>
-        <div className="tp-chips__row">
-          {BUSINESS_TYPES.map((b) => (
-            <button
-              key={b}
-              type="button"
-              className="tp-chip"
-              aria-pressed={b === business}
-              onClick={() => setBusiness(b === business ? null : b)}
-            >
-              {t(`teamPlan.business.${b}`)}
-            </button>
-          ))}
-        </div>
-        <Field
-          label={t("agentSetup.firstRun.about.line")}
-          hint={{
-            name: t("common.about", { label: t("agentSetup.firstRun.about.line") }),
-            text: other ? undefined : t("agentSetup.firstRun.about.optional"),
-          }}
-        >
-          <Input value={line} onChange={(e) => setLine(e.target.value)} maxLength={500} required={other} />
-        </Field>
-      </Locked>
-    </StepDialog>
+      <span className="setup-invite__line">
+        <Input
+          type="email"
+          className="setup-invite__email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder={t("agentSetup.firstRun.people.email")}
+          aria-label={t("auth.email")}
+          disabled={send.isPending}
+        />
+        <Button type="submit" size="sm" variant="primary" disabled={!address} loading={send.isPending}>
+          {t("agentSetup.firstRun.people.send")}
+        </Button>
+      </span>
+      {refused && (
+        <span className="setup-invite__error" role="alert">
+          {refused}
+        </span>
+      )}
+      <span className="setup-invite__more">
+        <button type="button" className="ac-link" onClick={onMore}>
+          {t("agentSetup.firstRun.people.more")}
+        </button>
+        {skip && (
+          <button type="button" className="ac-link" disabled={skip.busy} onClick={skip.onClick}>
+            {skip.label}
+          </button>
+        )}
+      </span>
+    </form>
   );
 }
 
 /**
  * A personal workspace's row 1 (ADR 0159): the areas of life the person wants help with, several at once, and one
  * optional sentence about them; saved as the workspace's context (`aboutYouContext`), which every agent reads, and
- * read back into the same answers when opened again. "Something else" asks for the sentence.
+ * read back into the same answers when opened again. "Something else" asks for the sentence. What the person already
+ * typed to the right hand comes filled in. Saved, the template that fits the areas picked.
  */
-function AboutYouDialog({ context, typed, onClose, onSaved }: AboutProps) {
+function AboutYouDialog({
+  context,
+  typed,
+  onClose,
+  onSaved,
+}: {
+  context: string;
+  typed: string | null;
+  onClose: () => void;
+  onSaved: (template: string | null) => void;
+}) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const save = useUpdateSettings(org.id);
@@ -405,7 +425,7 @@ function AboutYouDialog({ context, typed, onClose, onSaved }: AboutProps) {
 }
 
 /**
- * Row 4: the apps the team just made would use (its roles' suggestions), plug-and-play ones only, each with Conectar
+ * The apps row: the apps the team just made would use (its roles' suggestions), plug-and-play ones only, each with Conectar
  * (the same connect dialog as Settings, whose last step says which agents use it: all of them, by default).
  */
 function AppsDialog({ team, onClose }: { team: Agent[]; onClose: () => void }) {

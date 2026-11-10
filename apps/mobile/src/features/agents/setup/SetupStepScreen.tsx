@@ -43,9 +43,6 @@ import {
 } from "@agenteschat/client/lib/setup-checklist";
 import {
   aboutYouContext,
-  BUSINESS_TYPES,
-  type BusinessType,
-  isTemplateBusiness,
   LIFE_AREAS,
   type LifeArea,
   lifeAreaTemplate,
@@ -88,9 +85,6 @@ export const openSetupStep = (agentId: string, step: SetupStep, text?: string | 
     params: { id: agentId, step, ...(text ? { text: text.slice(0, 500) } : {}) },
   });
 
-/** The right hand's first run has its own screens for these (ADR 0155 §6); a new agent's checklist, the rest. */
-const FIRST_RUN_SCREENS: ReadonlySet<SetupStep> = new Set<SetupStep>(["about", "apps"]);
-
 export function SetupStepScreen({
   agentId,
   step,
@@ -107,7 +101,10 @@ export function SetupStepScreen({
   const agent = dir.agentById.get(agentId);
   const known = STEPS.find((s) => s === step);
   const firstRun = isRightHand(agent);
-  if (!agent?.setup || !known || (firstRun ? !FIRST_RUN_SCREENS.has(known) : known === "about")) {
+  // The right hand's first run has its own screens for apps, and in a personal workspace (ADR 0159) for what the person
+  // wants help with (ADR 0155 §6); a new agent's checklist, the other four.
+  const firstRunScreen = known === "apps" || (known === "about" && isPersonal(org));
+  if (!agent?.setup || !known || (firstRun ? !firstRunScreen : known === "about")) {
     return (
       <View style={[styles.fill, { backgroundColor: c.bg }]}>
         <PushedHeader title={t("agentSetup.title")} solid={false} />
@@ -117,7 +114,7 @@ export function SetupStepScreen({
   }
   switch (known) {
     case "about":
-      return isPersonal(org) ? <AboutYouStep typed={text ?? null} /> : <AboutStep typed={text ?? null} />;
+      return <AboutYouStep typed={text ?? null} />;
     case "apps":
       return firstRun ? <FirstRunAppsStep /> : <AppsStep agent={agent} />;
     case "where":
@@ -127,82 +124,6 @@ export function SetupStepScreen({
     default:
       return <HowStep agent={agent} />;
   }
-}
-
-/**
- * The first run's row 1: "O que a Acme faz?", the business types to pick one and a sentence, saved as the workspace's
- * context, which every agent reads ("Outra coisa" asks for the sentence). Saved, it goes back and the card opens the
- * team's templates with that business's picked.
- */
-function AboutStep({ typed }: { typed: string | null }) {
-  const { t } = useTranslation();
-  const { orgId, org } = useOrg();
-  const settings = useSettings(orgId);
-  const save = useUpdateSettings(orgId);
-  const failed = useFailed();
-  const [business, setBusiness] = useState<BusinessType | null>(null);
-  const [line, setLine] = useState<string | null>(null);
-  const shown = line ?? (settings.data?.context || typed || "");
-  const other = business === "other";
-  const text = shown.trim() || (business && !other ? t(`teamPlan.business.${business}`) : "");
-  return (
-    <SettingsPage
-      title={t("agentSetup.firstRun.about.title", { org: org?.name ?? "" })}
-      locked={save.isPending}
-      action={{
-        label: t("common.save"),
-        disabled: !text || save.isPending || !settings.isSuccess,
-        onPress: () =>
-          save.mutate(
-            { context: text },
-            {
-              onSuccess: () => {
-                successHaptic();
-                goBack();
-                openTemplatesAfterAbout(business && isTemplateBusiness(business) ? business : undefined);
-              },
-              onError: failed,
-            },
-          ),
-      }}
-    >
-      <GroupedFooter>{t("agentSetup.firstRun.about.desc")}</GroupedFooter>
-      <GroupedList>
-        {BUSINESS_TYPES.map((b) => (
-          <GroupedRow
-            key={b}
-            label={t(`teamPlan.business.${b}`)}
-            checked={b === business}
-            disabled={save.isPending}
-            onPress={() => {
-              tapHaptic();
-              setBusiness(b === business ? null : b);
-            }}
-          />
-        ))}
-      </GroupedList>
-      <GroupedHeader
-        {...(other
-          ? {}
-          : {
-              hint: {
-                name: t("common.about", { label: t("agentSetup.firstRun.about.line") }),
-                text: t("agentSetup.firstRun.about.optional"),
-              },
-            })}
-      >
-        {t("agentSetup.firstRun.about.line")}
-      </GroupedHeader>
-      <TextArea
-        value={shown}
-        onChangeText={setLine}
-        accessibilityLabel={t("agentSetup.firstRun.about.line")}
-        minHeight={88}
-        scrollEnabled={false}
-        editable={!save.isPending}
-      />
-    </SettingsPage>
-  );
 }
 
 /**

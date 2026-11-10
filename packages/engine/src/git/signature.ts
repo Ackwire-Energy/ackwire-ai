@@ -35,6 +35,10 @@ export function signedBody(body: string, line: string) {
   return `${text ? `${text}\n\n` : ""}${SIGNATURE_MARK}\n<sub>${escapeLine(line)}</sub>`;
 }
 
+/** One of our agents wrote this body (its line ends it): through an account's connection it isn't the app's bot. */
+export const signedByAgent = (body: string) =>
+  /(?:^|\n)[ \t]*<!-- agentes\.chat -->[ \t]*\r?\n<sub>[^<\r\n]*<\/sub>$/.test(body.trimEnd());
+
 /** `message` with the trailer on its last line, inside its trailer block when it ends with one; once. */
 export function creditedMessage(message: string, trailer: string) {
   if (message.includes(trailer)) return message;

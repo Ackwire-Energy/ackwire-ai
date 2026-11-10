@@ -2258,7 +2258,8 @@
     "suggested": "In base alla tua email di {{domain}}, ho suggerito {{org}}.",
     "create": "Crea",
     "shareMessage": "Entra in {{org}} su agentes.chat: {{url}}",
-    "failed": "Non è stato possibile salvare. Riprova."
+    "failed": "Non è stato possibile salvare. Riprova.",
+    "enter": "Entra nello spazio di lavoro"
   },
   "ai": {
     "yourPlan": "Il tuo piano di IA",
@@ -2585,7 +2586,6 @@
   "dashboards": {
     "homeRow": "Solo tu · i tuoi widget",
     "loadFailed": "Impossibile caricare le dashboard.",
-    "onlyHome": "Le dashboard dello spazio di lavoro o dei tuoi ruoli compaiono qui.",
     "create": "Crea",
     "routineTarget": "il suo widget",
     "pin": {

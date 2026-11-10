@@ -19,6 +19,7 @@ import {
   Icon,
   type IconName,
   InfoHint,
+  InkOrbit,
   LineIcon,
   ProviderLogo,
   Text,
@@ -40,7 +41,9 @@ export const usePlanHold = (orgId: string, org: OrgSummary | null | undefined) =
 /** A plan this workspace's billing hold stops, said where it would sign in (`planHoldPhoneLine`). */
 export function PlanHoldNote({ org, keys }: { org: OrgSummary | null | undefined; keys?: boolean }) {
   const { t } = useTranslation();
-  return <Note icon="pause">{planHoldPhoneLine(t, org ? can(org, "manage_billing") : false, keys)}</Note>;
+  return (
+    <Note icon="pause">{planHoldPhoneLine(t, org ? can(org, "manage_billing") : false, keys ? "keys" : "plan")}</Note>
+  );
 }
 
 /**
@@ -361,12 +364,12 @@ export function PasteField({
   );
 }
 
-/** "Esperando…" beside a step that waits on the computer. */
+/** "Esperando…" beside a step that waits on the computer, after the pixel loader as on the web. */
 export function Waiting({ label }: { label: string }) {
   const c = useColors();
   return (
     <View style={styles.wait} accessibilityLiveRegion="polite">
-      <Icon name="clock" size={13} color={c.faint} />
+      <InkOrbit size={13} color={c.faint} />
       <Text variant="caption" tone="faint" style={styles.bold}>
         {label}
       </Text>

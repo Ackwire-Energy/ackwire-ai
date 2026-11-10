@@ -42,7 +42,6 @@ import {
   Button,
   Chip,
   CodeInput,
-  Diff,
   diffLines,
   EventPillAction,
   Field,
@@ -66,6 +65,7 @@ import { AgentAvatar } from "./AgentAvatar";
 import { useOpenAgentPanel } from "./agent-panel-context";
 import { SiteIcon } from "./browser/SiteIcon";
 import { useOrg } from "./org-context";
+import { ProseDiff } from "./ProseDiff";
 import {
   RequestCard,
   RequestChoices,
@@ -237,12 +237,7 @@ export function InlineProposal({ proposalId }: { proposalId: string }) {
     );
   const edited = draft !== null && draft !== p.after;
   const diff = (
-    <Diff
-      aria-label={t("proposals.changeLabel")}
-      addedLabel={t("proposals.added")}
-      removedLabel={t("proposals.removed")}
-      lines={diffLines(p.before.split("\n"), text.split("\n"))}
-    />
+    <ProseDiff label={t("proposals.changeLabel")} lines={diffLines(p.before.split("\n"), text.split("\n"))} />
   );
 
   // Waiting: a request card, the change behind "Ver a mudança" (a text is edited there before accepting).
@@ -508,13 +503,7 @@ export function ProposalGroup({ proposalIds }: { proposalIds: string[] }) {
           texts.length > 0 ? (
             <>
               {texts.map((g) => (
-                <Diff
-                  key={g.rows[0]?.id}
-                  aria-label={t("proposals.changeLabel")}
-                  addedLabel={t("proposals.added")}
-                  removedLabel={t("proposals.removed")}
-                  lines={g.lines}
-                />
+                <ProseDiff key={g.rows[0]?.id} label={t("proposals.changeLabel")} lines={g.lines} />
               ))}
               <div className="ac-acts">
                 <ProposalsLink agentId={first.agentId} />
@@ -558,12 +547,7 @@ export function ProposalGroup({ proposalIds }: { proposalIds: string[] }) {
       {groups.map((section) => (
         <div key={section.rows[0]?.id} className="proposal-section">
           {section.kind === "text" && section.lines.length > 0 && (
-            <Diff
-              aria-label={t("proposals.changeLabel")}
-              addedLabel={t("proposals.added")}
-              removedLabel={t("proposals.removed")}
-              lines={section.lines}
-            />
+            <ProseDiff label={t("proposals.changeLabel")} lines={section.lines} />
           )}
           {rowList(section.rows)}
         </div>

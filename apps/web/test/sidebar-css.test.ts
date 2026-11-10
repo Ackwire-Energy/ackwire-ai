@@ -47,12 +47,13 @@ test("an agent's role sits under its name as a tag, one line, beside a face as t
     "column",
     "0",
   ]);
-  // A 32 face, 8 from the plate's edges: a name alone centres on it, a name over a role is a face line (the name's
-  // capitals on the face's top, `.ac-captop` on the label) with what ends the row on its middle.
+  // A message's face size (`--name-face`, 32), 8 from the plate's edges: a name alone centres on it, a name over a
+  // role is a face line (the name's capitals on the face's top, `.ac-captop` on the label) with what ends the row on
+  // its middle.
   const face = '.sidebar:not([data-rail="true"]) .sidebar__item > .ac-avatar--sm';
   // The rail's 40px tile keeps its smaller face, with room for the presence badge and the unread count.
   expect(value(".sidebar__item > .ac-avatar--sm", "height")).toBe("28px");
-  expect([value(face, "width"), value(face, "height")]).toEqual(["32px", "32px"]);
+  expect([value(face, "width"), value(face, "height")]).toEqual(["var(--name-face)", "var(--name-face)"]);
   expect(value('.sidebar:not([data-rail="true"]) .sidebar__item:has(> .ac-avatar)', "padding-block")).toBe("8px");
   const twoLines =
     '.sidebar:not([data-rail="true"]) .sidebar__item:has(> .ac-avatar + .sidebar__item-text > .sidebar__item-role)';

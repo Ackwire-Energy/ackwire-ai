@@ -90,7 +90,12 @@ export function fakeGithubMcp(options: { issueWrite?: boolean; writes?: boolean 
       for (const [name, inputSchema] of Object.entries(tools)) {
         server.registerTool(name, { description: name, inputSchema }, async (args) => {
           calls.push({ tool: name, args });
-          return { content: [{ type: "text", text: `${name} done` }] };
+          // GitHub's server answers a new pull request with its id and link only.
+          const text =
+            name === "create_pull_request"
+              ? JSON.stringify({ id: "1", url: `https://github.com/${args.owner}/${args.repo}/pull/12` })
+              : `${name} done`;
+          return { content: [{ type: "text", text }] };
         });
       }
     }

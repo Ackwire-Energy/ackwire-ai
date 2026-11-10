@@ -27,3 +27,31 @@ export const standingActive = (standing: Pick<OrgStanding, "state"> | null | und
  */
 export const isPaidReturn = (search: Record<string, unknown>) =>
   search.paid === 1 || search.paid === true || search.paid === "1";
+
+/** The plan the onboarding offers: its key for the billing link, its name, and its price as the billing service writes it. */
+export interface PlanOffer {
+  key: string;
+  name: string;
+  price?: string;
+}
+
+const PLAN_KEY = /^[a-z][a-z0-9_]{0,31}$/;
+const shortText = (v: unknown, max: number) =>
+  typeof v === "string" && v.trim() && v.length <= max ? v.trim() : undefined;
+
+/**
+ * The recommended plan from the billing service's public plan list (`GET {billingUrl}/plans.json`), or null when the
+ * list isn't one: the onboarding then names no plan. The core server never names a plan nor a price (ADR 0079 §6).
+ */
+export function planOfferOf(json: unknown): PlanOffer | null {
+  if (!json || typeof json !== "object") return null;
+  const { recommended, plans } = json as { recommended?: unknown; plans?: unknown };
+  if (typeof recommended !== "string" || !Array.isArray(plans)) return null;
+  const plan = plans.find((p) => (p as { key?: unknown } | null)?.key === recommended) as
+    | Record<string, unknown>
+    | undefined;
+  const name = shortText(plan?.name, 40);
+  if (!plan || !PLAN_KEY.test(recommended) || !name) return null;
+  const price = shortText(plan.price, 24);
+  return { key: recommended, name, ...(price ? { price } : {}) };
+}
