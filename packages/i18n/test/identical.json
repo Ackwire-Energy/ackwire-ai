@@ -771,7 +771,6 @@
       "searchPage.pickDate",
       "searchPage.words.author.agent",
       "searchPage.words.has.image",
-      "settings.group.agents",
       "settings.kinds.agent",
       "settings.media.agentsTitle",
       "settings.section.notifications",
@@ -1993,7 +1992,6 @@
       "searchPage.words.author.agent",
       "searchPage.words.has.link",
       "searchPage.words.ops.in",
-      "settings.group.agents",
       "settings.kinds.agent",
       "settings.kinds.router",
       "settings.media.agentsTitle",
@@ -3600,8 +3598,7 @@
       "approval.sheet.service",
       "plus.media",
       "find.filterWord.date",
-      "invite.ask.step.code",
-      "settings.group.agents"
+      "invite.ask.step.code"
     ],
     "de": [
       "devices.status.offline",
@@ -3809,7 +3806,6 @@
       "me.dashboards",
       "wiki.links",
       "invite.ask.step.code",
-      "settings.group.agents",
       "settings.section.connectors",
       "threads.title",
       "connectors.accountTitle"

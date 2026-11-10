@@ -2413,9 +2413,7 @@
     "editSub": "Nazwa, logo, strefa czasowa i to, co wiedzą agenci",
     "group": {
       "org": "Przestrzeń robocza",
-      "people": "Osoby",
-      "agents": "Agenci",
-      "costs": "Koszty i dane"
+      "people": "Osoby"
     },
     "section": {
       "members": "Członkowie",

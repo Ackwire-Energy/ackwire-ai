@@ -98,15 +98,6 @@ const plansCard = () => screen().queryByRole("region", { name: "Limites dos seus
 const refreshes = (state: State) =>
   state.calls.filter((c) => c.method === "machines.refreshAccountUsage").map((c) => c.args);
 
-/** The Uso tile on Settings: its line and whether it draws the budget's meter. */
-const usageTile = () => {
-  const tile = document.querySelector('a.settings-tile[href$="/settings/usage"]');
-  return {
-    line: tile?.querySelector(".settings-tile__state")?.textContent,
-    meter: Boolean(tile?.querySelector('[role="meter"]')),
-  };
-};
-
 describe("Sua conta: your plans' limits", () => {
   test("each plan your agents think with: its mark, its name and its compact line, opening Uso", async () => {
     const { router } = await go("settings/account", onPlans());
@@ -137,24 +128,6 @@ describe("Sua conta: your plans' limits", () => {
     const state = onPlans();
     await go("settings/account", state);
     expect(refreshes(state)).toEqual([[ORG_ID]]);
-  });
-});
-
-describe("the Uso tile: the workspace's budget only where it uses the API", () => {
-  test("on plans alone: no budget line and no meter", async () => {
-    await go("settings", onPlans());
-    expect(usageTile()).toEqual({ line: "\u00a0", meter: false });
-  });
-
-  test("an agent on the API with a key: the budget, even at 0%", async () => {
-    const state = seedState();
-    state.spentUsd = { [ADA_ID]: 0, [ATLAS_ID]: 0 };
-    // Ada stays on the API (her key is the workspace's); Atlas thinks with Claude Team.
-    const atlas = state.agents.find((a) => a.id === ATLAS_ID);
-    if (atlas) atlas.brain = { kind: "claude_code", model: "Sonnet", account: "Claude Team", usage: used(12, 40) };
-    await go("settings", state, []);
-    expect(usageTile().line).toBe("0% do orçamento usado este mês");
-    expect(usageTile().meter).toBe(true);
   });
 });
 

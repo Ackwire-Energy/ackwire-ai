@@ -5423,12 +5423,6 @@
   "settings.group.people": {
     "value": "People"
   },
-  "settings.group.agents": {
-    "value": "Agents"
-  },
-  "settings.group.costs": {
-    "value": "Costs and data"
-  },
   "settings.section.members": {
     "value": "Members"
   },

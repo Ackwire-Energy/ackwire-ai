@@ -227,7 +227,7 @@ describe("the other places a plan is chosen", () => {
 
   test("Lodi's settings: why and the way on in place of the plan row", async () => {
     await open("owner", `/org/${ORG_ID}/settings/right_hand`);
-    const body = document.querySelector(".settings__body") as HTMLElement;
+    const body = document.querySelector(".page") as HTMLElement;
     expect(shownText(body)).toContain(WHY);
     expect(buttonNamed(body, PAY)).not.toBeNull();
     expect(buttonNamed(body, KEY)).toBeNull();

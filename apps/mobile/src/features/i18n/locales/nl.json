@@ -2207,9 +2207,7 @@
     "editSub": "Naam, logo, tijdzone en wat de agents weten",
     "group": {
       "org": "Werkruimte",
-      "people": "Mensen",
-      "agents": "Agents",
-      "costs": "Kosten en gegevens"
+      "people": "Mensen"
     },
     "section": {
       "members": "Leden",

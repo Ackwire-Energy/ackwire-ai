@@ -10,6 +10,7 @@ import {
   useSetTeamWeekPrefs,
   useTeamWeekPrefs,
   useUpdateAgent,
+  useWorkspaceUsesApi,
 } from "@agenteschat/client";
 import { agentsReach, audienceOf, audiencePatch } from "@agenteschat/client/lib/audience";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -41,21 +42,25 @@ import { openAgentAi } from "../ai/AgentAiScreen";
 import { openConnectAi } from "../ai/NoAiCard";
 import { PlanHoldNote, usePlanHold } from "../ai/parts";
 import { useFailed } from "../routines/hooks";
+import { usePersonalView } from "../settings/hooks";
 import { Gap, SettingsPage } from "../settings/parts";
 import { AgentFace } from "../shared/Face";
 import { type Directory, useColors, useDirectory, useMeId } from "../shared/hooks";
+import { RightHandApprovalsGroup } from "./Approvals";
 
 /** Opens Configurações › the right hand (ADR 0137). */
 export const openRightHandSettings = () => router.push("/settings/right-hand" as never);
 
 /**
- * Configurações › Lodi (ADR 0137), as on the web: only what admins set for the team's right hand. Its name and look,
- * its AI and model or the plan it thinks with ("Atende outras pessoas" under it), its own monthly budget and who may use
- * it (everyone, or the roles picked); one line says it can't be archived or deleted, and its audit log is a tap away.
- * Its instructions are the product's.
+ * The right hand's settings (ADR 0137), as on the web, in two groups. "Só para você": the AI the person's own
+ * conversation thinks with, when its weekly card comes, and what it creates and adjusts for them without asking. "Para
+ * todo o workspace", only for who manages agents: its name and look, the AI of people with no plan of their own and
+ * the switch that lends it, its monthly budget where something bills per use, and who may use it; one line says it
+ * can't be archived or deleted, and its audit log is a tap away. Its instructions are the product's.
  */
 export function RightHandSettingsScreen() {
   const { t } = useTranslation();
+  const { org } = useOrg();
   const agent = rightHandOf(useDirectory().agents);
   if (!agent)
     return (
@@ -63,7 +68,35 @@ export function RightHandSettingsScreen() {
         <EmptyState icon="agent" title={t("mobile.agentEdit.missing")} />
       </SettingsPage>
     );
-  return <Form agent={agent} />;
+  return (
+    <SettingsPage title={agent.name} subtitle={t("rightHand.label")}>
+      <GroupTitle>{t("rightHand.settings.groupMine")}</GroupTitle>
+      <GroupedHeader>{t("rightHand.settings.mine")}</GroupedHeader>
+      <RightHandMine agent={agent} />
+      <TeamWeekRows name={agent.name} />
+      <RightHandApprovalsGroup />
+      {can(org, "manage_agents") ? (
+        <>
+          <GroupTitle note={t("rightHand.settings.groupAdmins")}>{t("rightHand.settings.groupWorkspace")}</GroupTitle>
+          <Form agent={agent} />
+        </>
+      ) : null}
+    </SettingsPage>
+  );
+}
+
+/** A group of the screen by its name, over its lists' own headers; `note`: quiet words after it (who sees it). */
+function GroupTitle({ children, note }: { children: string; note?: string }) {
+  return (
+    <Text variant="title" accessibilityRole="header" style={styles.groupTitle}>
+      {children}
+      {note ? (
+        <Text variant="subhead" tone="muted">
+          {` · ${note}`}
+        </Text>
+      ) : null}
+    </Text>
+  );
 }
 
 /**
@@ -172,14 +205,22 @@ function PlanRows({
   const view = useAgentBrain(orgId, agent.id, true, false, "workspace").data;
   const signIn = view?.accounts.find((a) => a.id === view.account);
   const owner = signIn?.ownerId ? dir.memberById.get(signIn.ownerId)?.name.split(" ")[0] : undefined;
-  const set = (input: AgentBrainInput) =>
+  const { solo } = usePersonalView();
+  const [busy, setBusy] = useState(false);
+  const set = (input: AgentBrainInput) => {
+    setBusy(true);
     void api.agents
       .setBrain(orgId, agent.id, { scope: "workspace", ...input })
-      .then(() => {
-        for (const key of [keys.agentBrain(orgId, agent.id), keys.agents(orgId), keys.aiStatus(orgId)])
-          void qc.invalidateQueries({ queryKey: key });
-      })
-      .catch(failed);
+      .then(() =>
+        Promise.all(
+          [keys.agentBrain(orgId, agent.id), keys.agents(orgId), keys.aiStatus(orgId)].map((queryKey) =>
+            qc.invalidateQueries({ queryKey }),
+          ),
+        ),
+      )
+      .catch(failed)
+      .finally(() => setBusy(false));
+  };
   const on = view ? !view.onlyOwner : false;
   const g = agentGrammar(agent.name);
   return (
@@ -187,35 +228,33 @@ function PlanRows({
       <GroupedList>
         <GroupedRow
           leading={<ProviderLogo id={kind} size="sm" />}
-          label={signIn?.label ?? t(`aiAccounts.connect.${kind}`)}
+          label={t("rightHand.settings.planName", { name: signIn?.label ?? t(`aiAccounts.connect.${kind}`) })}
           {...(owner && signIn?.ownerId !== meId ? { sub: t("rightHand.settings.planOwner", { owner }) } : {})}
         />
         {held ? null : (
-          <GroupedRow icon="brain" label={t("noAi.rightHand.useKey")} onPress={() => set({ brain: "model" })} />
+          <GroupedRow
+            icon="brain"
+            label={t("noAi.rightHand.useKey")}
+            chevron
+            disabled={busy}
+            onPress={() => set({ brain: "model" })}
+          />
         )}
       </GroupedList>
-      {view ? (
+      {view && !solo ? (
         <>
           <Gap />
           <GroupedList>
             <GroupedRow
               icon="members"
-              label={t("aiAccounts.share.switch")}
+              label={t("rightHand.settings.lend")}
+              labelLines={2}
               toggle={on}
-              disabled={!view.canEdit}
+              disabled={!view.canEdit || busy}
               onPress={() => set({ onlyOwner: on })}
             />
           </GroupedList>
-          <GroupedFooter>
-            {t(
-              on
-                ? "rightHand.settings.sharesOn"
-                : signIn?.ownerId === meId
-                  ? "rightHand.settings.sharesOffYou"
-                  : "rightHand.settings.sharesOff",
-              { ...g, owner: owner ?? "" },
-            )}
-          </GroupedFooter>
+          <GroupedFooter>{t("rightHand.settings.sharesOn", g)}</GroupedFooter>
         </>
       ) : null}
     </>
@@ -275,7 +314,7 @@ function WorkspacePlanRows({ agent, dir }: { agent: Agent; dir: Directory }) {
               <GroupedRow
                 key={a.id}
                 leading={<ProviderLogo id={a.kind} size="sm" />}
-                label={a.label}
+                label={t("rightHand.settings.planName", { name: a.label })}
                 {...(owner ? { sub: t("rightHand.settings.planOwner", { owner }) } : {})}
                 chevron
                 onPress={() => pick(a)}
@@ -295,6 +334,8 @@ function Form({ agent }: { agent: Agent }) {
   const c = useColors();
   const toast = useToast();
   const failed = useFailed();
+  const usesApi = useWorkspaceUsesApi(orgId);
+  const { solo } = usePersonalView();
   const modelLabel = useModelLabel();
   const dir = useDirectory();
   const planKind = agent.brain && agent.brain.kind !== "model" ? agent.brain.kind : null;
@@ -327,7 +368,7 @@ function Form({ agent }: { agent: Agent }) {
   // Whether the narrowed audience holds for other agents too, as the web says under it.
   const reach = agentsReach(audience, false, agent.ownerUserId);
   return (
-    <SettingsPage title={agent.name} subtitle={t("rightHand.label")}>
+    <>
       <GroupedHeader
         hint={{
           name: t("common.about", { label: t("rightHand.settings.name") }),
@@ -371,53 +412,59 @@ function Form({ agent }: { agent: Agent }) {
         </>
       )}
 
-      <GroupedHeader
-        hint={{
-          name: t("common.about", { label: t("rightHand.settings.budget") }),
-          text: t("rightHand.settings.budgetHelp", g),
-        }}
-      >
-        {t("rightHand.settings.budget")}
-      </GroupedHeader>
-      <GroupedList>
-        <View style={styles.budget}>
-          <Text variant="body" tone="muted">
-            US$
-          </Text>
-          <TextInput
-            value={budget}
-            onChangeText={setBudget}
-            onEndEditing={saveBudget}
-            keyboardType="decimal-pad"
-            placeholder={t("rightHand.value.budgetDefault")}
-            placeholderTextColor={c.faint}
-            accessibilityLabel={t("rightHand.settings.budget")}
-            style={[styles.amount, fieldText("body"), { color: c.ink }]}
-          />
-          <Text variant="body" tone="muted">
-            {t("rightHand.settings.perMonth")}
-          </Text>
-        </View>
-      </GroupedList>
+      {usesApi ? (
+        <>
+          <GroupedHeader
+            hint={{
+              name: t("common.about", { label: t("rightHand.settings.budget") }),
+              text: t("rightHand.settings.budgetHelp", g),
+            }}
+          >
+            {t("rightHand.settings.budget")}
+          </GroupedHeader>
+          <GroupedList>
+            <View style={styles.budget}>
+              <Text variant="body" tone="muted">
+                US$
+              </Text>
+              <TextInput
+                value={budget}
+                onChangeText={setBudget}
+                onEndEditing={saveBudget}
+                keyboardType="decimal-pad"
+                placeholder={t("rightHand.value.budgetDefault")}
+                placeholderTextColor={c.faint}
+                accessibilityLabel={t("rightHand.settings.budget")}
+                style={[styles.amount, fieldText("body"), { color: c.ink }]}
+              />
+              <Text variant="body" tone="muted">
+                {t("rightHand.settings.perMonth")}
+              </Text>
+            </View>
+          </GroupedList>
+        </>
+      ) : null}
 
-      <TeamWeekRows name={agent.name} />
-
-      <GroupedHeader>{t("rightHand.settings.audience")}</GroupedHeader>
-      <GroupedList>
-        <GroupedRow
-          icon="members"
-          label={t("audience.mode.everyone")}
-          checked={everyone}
-          onPress={() => !everyone && save({ audience: audiencePatch({ ...audience, mode: "everyone" }) })}
-        />
-        {roles.map((r) => (
-          <GroupedRow key={r.id} label={r.name} checked={picked.includes(r.id)} onPress={() => toggleRole(r.id)} />
-        ))}
-      </GroupedList>
-      <GroupedFooter>
-        {t("common.joinSentences", { a: t("rightHand.settings.audienceHelp", g), b: t("audience.rolesHint") })}
-        {reach ? ` ${t(`audience.agents.${reach}`, g)}` : ""}
-      </GroupedFooter>
+      {solo ? null : (
+        <>
+          <GroupedHeader>{t("rightHand.settings.audience")}</GroupedHeader>
+          <GroupedList>
+            <GroupedRow
+              icon="members"
+              label={t("audience.mode.everyone")}
+              checked={everyone}
+              onPress={() => !everyone && save({ audience: audiencePatch({ ...audience, mode: "everyone" }) })}
+            />
+            {roles.map((r) => (
+              <GroupedRow key={r.id} label={r.name} checked={picked.includes(r.id)} onPress={() => toggleRole(r.id)} />
+            ))}
+          </GroupedList>
+          <GroupedFooter>
+            {t("common.joinSentences", { a: t("rightHand.settings.audienceHelp", g), b: t("audience.rolesHint") })}
+            {reach ? ` ${t(`audience.agents.${reach}`, g)}` : ""}
+          </GroupedFooter>
+        </>
+      )}
 
       <Gap />
       <GroupedList>
@@ -429,7 +476,7 @@ function Form({ agent }: { agent: Agent }) {
         />
       </GroupedList>
       <GroupedFooter>{t("rightHand.settings.lock", g)}</GroupedFooter>
-    </SettingsPage>
+    </>
   );
 }
 
@@ -534,6 +581,8 @@ function Pills({
 }
 
 const styles = StyleSheet.create({
+  // Over a list's own header: the lists' 16 sides, a section's room above.
+  groupTitle: { paddingTop: 24, paddingHorizontal: 16 },
   // Inside a group: its rows' 14 sides.
   pills: { paddingHorizontal: 14, paddingVertical: 12, gap: 8 },
   pillsLabel: { fontWeight: "600" },

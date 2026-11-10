@@ -2104,9 +2104,7 @@
     "editSub": "名称、标志、时区和智能体知道的内容",
     "group": {
       "org": "工作区",
-      "people": "人员",
-      "agents": "智能体",
-      "costs": "费用和数据"
+      "people": "人员"
     },
     "section": {
       "members": "成员",

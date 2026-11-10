@@ -2104,9 +2104,7 @@
     "editSub": "Nama, logo, zona waktu, dan yang diketahui agen",
     "group": {
       "org": "Ruang kerja",
-      "people": "Orang",
-      "agents": "Agen",
-      "costs": "Biaya dan data"
+      "people": "Orang"
     },
     "section": {
       "members": "Anggota",

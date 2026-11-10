@@ -1324,8 +1324,7 @@
     "noDate": "Sin fecha",
     "clearDate": "Quitar la fecha",
     "risky": "Merge, deploy y otras acciones de riesgo",
-    "riskyOff": "Apagado, estas siguen solo contigo.",
-    "riskyOn": "Encendido, esta persona también decide estas.",
+    "riskyOn": "Esta persona también decide estas.",
     "lock": "Siempre tuyo: dinero, personas y roles, claves de IA, tu buzón y eliminar.",
     "coveringTitle": "Apruebas por",
     "coveringSubtitle": "Lo que les piden a estas personas te llega también, y decides en su nombre. Nunca lo que pediste tú.",
@@ -1336,7 +1335,7 @@
     "failed": "No se pudo guardar. Inténtalo de nuevo."
   },
   "rightHandApprovals": {
-    "title": "{{name}} aprueba por ti",
+    "title": "{{name}} crea y ajusta agentes por ti",
     "subtitle": "Solo lo que vino de un pedido tuyo. Lo que no aprobaría, te lo pasa.",
     "newAgents": "Crear agentes que proponen otros agentes",
     "newAgentsHelp": "Sin apps, solo en canales abiertos. Puedes deshacerlo durante 24 h.",
@@ -2192,7 +2191,8 @@
       "change": "Cambiar",
       "planHelp": "Paga quien es dueño del plan. Si su computadora no está disponible, la conversación lo dice y ofrece una clave de API.",
       "lookEdit": "Cambiar el aspecto de {{name}}",
-      "planOwner": "de {{owner}}",
+      "planOwner": "cuenta de {{owner}}",
+      "planName": "Plan {{name}}",
       "mine": "Tu IA",
       "mineHelp": "Tu conversación con {{name}} piensa con tu plan o uno compartido contigo, y solo la tuya.",
       "connectMine": "Conectar mi plan",
@@ -2210,15 +2210,17 @@
       "fallbackPlan": "Sin plan propio, usa el plan de {{owner}}, que atiende a todos.",
       "fallbackYours": "Sin otro plan, usa el del workspace, que es tuyo.",
       "fallbackNone": "Sin plan propio, {{name}} no puede responderte: el plan del workspace solo atiende a {{owner}}.",
-      "workspace": "IA del workspace",
+      "workspace": "IA de quien no tiene plan propio",
       "workspaceHelp": "Quien no tiene plan propio habla con {{name}} a través de esta IA.",
       "workspacePlan": "Plan del workspace",
       "workspacePlanHelp": "Un plan en lugar de la clave. Solo atiende a otras personas cuando su dueño lo permite.",
       "noPlans": "Conecta un plan en IA y uso para usarlo aquí.",
       "pickPlan": "Elegir un plan",
-      "sharesOn": "Activado: quien no tiene plan propio habla con {{name}} a través de este plan.",
-      "sharesOff": "Desactivado: solo {{owner}} habla a través de él. Quien no tiene plan propio se queda sin respuesta.",
-      "sharesOffYou": "Desactivado: solo tú hablas a través de él. Quien no tiene plan propio se queda sin respuesta."
+      "sharesOn": "Quien no tiene plan propio habla con {{name}} a través de este plan.",
+      "lend": "Prestar este plan a quien no tiene uno",
+      "groupMine": "Solo para ti",
+      "groupWorkspace": "Para todo el workspace",
+      "groupAdmins": "solo admins"
     },
     "card": {
       "settings": "{{name}} · Configuración",
@@ -14129,10 +14131,7 @@
     "notOpen": "Tu rol en este espacio de trabajo no abre {{section}}. Quien administra los roles puede habilitarlo para ti.",
     "nav": "Secciones de la configuración",
     "group": {
-      "you": "Tú",
-      "org": "Espacio de trabajo",
-      "agents": "Agentes",
-      "costs": "Costos y datos"
+      "org": "Espacio de trabajo"
     },
     "section": {
       "account": "Tu cuenta",
@@ -14461,6 +14460,9 @@
         "jev": "Los agentes envían stickers por su cuenta solo con Jev.",
         "jevLink": "Configurar Jev"
       }
+    },
+    "tab": {
+      "account": "Perfil"
     }
   },
   "personalMode": {

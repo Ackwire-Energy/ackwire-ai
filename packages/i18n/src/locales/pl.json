@@ -1360,8 +1360,7 @@
     "noDate": "Bez daty",
     "clearDate": "Usuń datę",
     "risky": "Merge, deploy i inne ryzykowne działania",
-    "riskyOff": "Wyłączone, te zostają tylko u ciebie.",
-    "riskyOn": "Włączone, ta osoba decyduje też o nich.",
+    "riskyOn": "Ta osoba decyduje też o nich.",
     "lock": "Zawsze u ciebie: pieniądze, osoby i role, klucze AI, twoja skrzynka i usuwanie.",
     "coveringTitle": "Zatwierdzasz za",
     "coveringSubtitle": "To, o co proszą te osoby, trafia też do ciebie, a ty decydujesz w ich imieniu. Nigdy o tym, o co sam(a) prosisz.",
@@ -1372,7 +1371,7 @@
     "failed": "Nie udało się zapisać. Spróbuj ponownie."
   },
   "rightHandApprovals": {
-    "title": "{{name}} zatwierdza za ciebie",
+    "title": "{{name}} tworzy i dostosowuje agentów za ciebie",
     "subtitle": "Tylko to, co wyszło z twojej prośby. Czego by nie zatwierdził, przekazuje tobie.",
     "newAgents": "Tworzenie agentów proponowanych przez inne agenty",
     "newAgentsHelp": "Bez aplikacji, tylko w otwartych kanałach. Możesz to cofnąć przez 24 h.",
@@ -2274,7 +2273,8 @@
       "change": "Zmień",
       "planHelp": "Płaci właściciel planu. Gdy jego komputer jest niedostępny, rozmowa o tym mówi i proponuje klucz API.",
       "lookEdit": "Zmień wygląd: {{name}}",
-      "planOwner": "od: {{owner}}",
+      "planOwner": "konto: {{owner}}",
+      "planName": "Plan {{name}}",
       "mine": "Twoja AI",
       "mineHelp": "Twoja rozmowa z {{name}} myśli z Twoim planem lub udostępnionym Ci planem, i tylko Twoja.",
       "connectMine": "Połącz mój plan",
@@ -2292,15 +2292,17 @@
       "fallbackPlan": "Bez własnego planu korzysta z planu użytkownika {{owner}}, który odpowiada wszystkim.",
       "fallbackYours": "Bez innego planu korzysta z planu workspace'u, który jest Twój.",
       "fallbackNone": "Bez własnego planu {{name}} nie może Ci odpowiedzieć: plan workspace'u odpowiada tylko użytkownikowi {{owner}}.",
-      "workspace": "AI workspace'u",
+      "workspace": "AI dla osób bez własnego planu",
       "workspaceHelp": "Osoby bez własnego planu rozmawiają z {{name}} przez tę AI.",
       "workspacePlan": "Plan workspace'u",
       "workspacePlanHelp": "Plan zamiast klucza. Odpowiada innym tylko wtedy, gdy pozwala na to jego właściciel.",
       "noPlans": "Połącz plan w sekcji AI i zużycie, aby użyć go tutaj.",
       "pickPlan": "Wybierz plan",
-      "sharesOn": "Włączone: osoby bez własnego planu rozmawiają z {{name}} przez ten plan.",
-      "sharesOff": "Wyłączone: tylko {{owner}} rozmawia przez ten plan. Osoby bez własnego planu nie dostaną odpowiedzi.",
-      "sharesOffYou": "Wyłączone: tylko Ty rozmawiasz przez ten plan. Osoby bez własnego planu nie dostaną odpowiedzi."
+      "sharesOn": "Osoby bez własnego planu rozmawiają z {{name}} przez ten plan.",
+      "lend": "Użycz tego planu osobom, które go nie mają",
+      "groupMine": "Tylko dla ciebie",
+      "groupWorkspace": "Dla całej przestrzeni roboczej",
+      "groupAdmins": "tylko admini"
     },
     "card": {
       "settings": "{{name}} · Ustawienia",
@@ -14671,10 +14673,7 @@
     "notOpen": "Twoja rola w tej przestrzeni roboczej nie otwiera sekcji {{section}}. Osoba zarządzająca rolami może ją dla ciebie otworzyć.",
     "nav": "Sekcje ustawień",
     "group": {
-      "you": "Ty",
-      "org": "Przestrzeń robocza",
-      "agents": "Agenci",
-      "costs": "Koszty i dane"
+      "org": "Przestrzeń robocza"
     },
     "section": {
       "account": "Twoje konto",
@@ -15013,6 +15012,9 @@
         "jev": "Agenci wysyłają naklejki sami tylko z Jev.",
         "jevLink": "Skonfiguruj Jev"
       }
+    },
+    "tab": {
+      "account": "Profil"
     }
   },
   "personalMode": {

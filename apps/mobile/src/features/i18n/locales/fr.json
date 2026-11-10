@@ -2303,9 +2303,7 @@
     "editSub": "Nom, logo, fuseau horaire et ce que savent les agents",
     "group": {
       "org": "Espace de travail",
-      "people": "Personnes",
-      "agents": "Agents",
-      "costs": "Coûts et données"
+      "people": "Personnes"
     },
     "section": {
       "members": "Membres",

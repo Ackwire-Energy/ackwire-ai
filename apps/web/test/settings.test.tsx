@@ -65,10 +65,6 @@ describe("Configurações do workspace", () => {
       "Todo agente lê isto antes de cada conversa. Escreva como se explicasse a Acme para alguém que começou hoje.",
     );
     expect(context.querySelector(".ac-card__sub, .ac-card__foot")).toBeNull();
-    // Each tile: the area's name and how it is now, nothing more.
-    const tiles = screen().getByRole("region", { name: "Tudo do workspace" });
-    expect(tiles.querySelectorAll(".settings-tile").length).toBeGreaterThan(0);
-    expect(tiles.querySelector(".ac-card__sub")).toBeNull();
   });
 
   test("agents check what the team already did: on by default, one switch turns it off", async () => {

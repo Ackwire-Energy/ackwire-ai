@@ -22,7 +22,7 @@ test("Connect for it offers every plan the phone offers, ChatGPT's too, and its 
   expect(steps).toContain("options={PLAN_CHOICES.map((c) => ({");
 });
 
-test("Sua IA is one status: what answers me, by its logo and what it is to me, and its action; Lodi's settings drop it", () => {
+test("Sua IA is one status: what answers me, by its logo and what it is to me, and its action; Lodi's settings open with it", () => {
   const screen = readFileSync(join(import.meta.dir, "../../src/features/right-hand/SettingsScreen.tsx"), "utf8");
   const profile = readFileSync(join(import.meta.dir, "../../src/features/agents/AgentProfileScreen.tsx"), "utf8");
   // The four states come from the client's rule, as on the web (ADR 0137 §11).
@@ -41,21 +41,42 @@ test("Sua IA is one status: what answers me, by its logo and what it is to me, a
   expect(screen).toContain('text: t("rightHand.settings.mineHelp", agentGrammar(agent.name)),');
   expect(screen).not.toContain("rightHandFallback");
   expect(screen).toContain("openConnectAi({ agentId: agent.id })");
-  // On the right hand's profile; Configurações › Lodi is the team's settings and drops it.
+  // On the right hand's profile, and first in its settings, under "Só para você".
   expect(profile).toContain("<RightHandMine agent={agent} />");
-  expect(screen.match(/<RightHandMine/g)).toBeNull();
+  const mine = screen.indexOf('<GroupTitle>{t("rightHand.settings.groupMine")}</GroupTitle>');
+  const workspace = screen.indexOf('{t("rightHand.settings.groupWorkspace")}</GroupTitle>');
+  expect(mine).toBeGreaterThan(-1);
+  expect(screen.indexOf("<RightHandMine agent={agent} />")).toBeGreaterThan(mine);
+  expect(screen.indexOf("<RightHandApprovalsGroup />")).toBeGreaterThan(mine);
+  expect(screen.indexOf("<RightHandApprovalsGroup />")).toBeLessThan(workspace);
+  // The workspace's group is only for who manages agents, and the settings open for everyone from the profile.
+  expect(screen.slice(mine, workspace)).toContain('{can(org, "manage_agents") ? (');
+  expect(profile).toContain(
+    '? { action: { label: t("rightHand.profile.configure"), onPress: openRightHandSettings } }',
+  );
+  expect(profile).not.toContain(
+    '? can(org, "manage_agents")\n              ? { action: { label: t("rightHand.profile.configure")',
+  );
 });
 
-test("Settings › Lodi: the workspace's plan keeps Atende outras pessoas for whoever sets its AI", () => {
+test("Lodi's settings: the workspace's plan is lent by a switch for whoever sets its AI, saying what it does once", () => {
   const screen = readFileSync(join(import.meta.dir, "../../src/features/right-hand/SettingsScreen.tsx"), "utf8");
   // The workspace's AI is read and saved as such; the look opens from the row, with no "Mudar visual" on it.
   expect(screen).toContain('useAgentBrain(orgId, agent.id, true, false, "workspace")');
   expect(screen).toContain('{ scope: "workspace", ...input }');
   expect(screen).not.toContain("rightHand.settings.changeLook");
   // As for any agent on its owner's plan: an admin may override (the plan's owner hears it by email).
-  expect(screen).toContain('label={t("aiAccounts.share.switch")}');
+  expect(screen).toContain('label={t("rightHand.settings.lend")}');
   expect(screen).toContain("set({ onlyOwner: on })");
-  expect(screen).toContain("disabled={!view.canEdit}");
+  expect(screen).toContain("disabled={!view.canEdit || busy}");
+  // One line under the switch whatever its state, and the plan by its name and whose account it is.
+  expect(screen).toContain('<GroupedFooter>{t("rightHand.settings.sharesOn", g)}</GroupedFooter>');
+  expect(screen).not.toContain("sharesOff");
+  expect(screen).toContain('t("rightHand.settings.planName", { name: a.label })');
+  // The budget only where something bills per use, lending and the audience only with someone else here.
+  expect(screen).toContain("{usesApi ? (");
+  expect(screen).toContain("{view && !solo ? (");
+  expect(screen).toContain("{solo ? null : (");
   // Any plan's CLI: Claude Code's, Codex's, Cursor's, OpenCode's, Grok Build's or the Antigravity CLI's.
   expect(screen).toContain('agent.brain && agent.brain.kind !== "model" ? agent.brain.kind : null');
   expect(screen).toContain("t(`aiAccounts.connect.$" + "{kind}`)");

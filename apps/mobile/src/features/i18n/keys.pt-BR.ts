@@ -2247,8 +2247,6 @@ export const featureKeysPtBR = {
     group: {
       org: "Workspace",
       people: "Pessoas",
-      agents: "Agentes",
-      costs: "Custos e dados",
     },
     section: {
       members: "Membros",

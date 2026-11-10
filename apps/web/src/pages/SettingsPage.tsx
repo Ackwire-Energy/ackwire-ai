@@ -4,19 +4,13 @@ import {
   useAuthConfig,
   useComposioUsage,
   useComputerSetup,
-  useConnections,
   useCredentials,
-  useInvitations,
-  useMachines,
-  useOverview,
   usePlatformKey,
   useRemoveCredential,
   useRotateCredential,
   useServerTelemetry,
   useSetServerTelemetry,
   useSettings,
-  useSkills,
-  useStorage,
   useUpdateSettings,
   useUsageReport,
   useWorkspaceUsesApi,
@@ -27,13 +21,9 @@ import { composioUsageText, showsComposioUsage } from "@agenteschat/client/lib/c
 import { computerEdition } from "@agenteschat/client/lib/computer";
 import { CUSTOM_PROVIDER } from "@agenteschat/client/lib/endpoints";
 import { errorText, keyRefusal } from "@agenteschat/client/lib/errors";
-import { formatPercent, formatShortDate, formatUsd, relativeTime } from "@agenteschat/client/lib/format";
+import { formatShortDate, formatUsd, relativeTime } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
-import {
-  personalSettingsNav,
-  settingsSectionNameKey,
-  settingsSectionTextKey,
-} from "@agenteschat/client/lib/personal-view";
+import { settingsSectionNameKey, settingsSectionTextKey } from "@agenteschat/client/lib/personal-view";
 import {
   keyLooksValid,
   keyNamedAfterProvider,
@@ -42,7 +32,7 @@ import {
   providerLabel,
   providerOf,
 } from "@agenteschat/client/lib/providers";
-import { isRightHand } from "@agenteschat/client/lib/right-hand";
+import { settingsNav, settingsTabs } from "@agenteschat/client/lib/settings-nav";
 import { parseAmount } from "@agenteschat/client/lib/text";
 import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
 import {
@@ -61,20 +51,20 @@ import {
   Input,
   List,
   Locked,
-  Meter,
   PageHeader,
   ProviderLogo,
   SettingNote,
   Switch,
+  TabPanel,
+  Tabs,
   Textarea,
 } from "@agenteschat/ui";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { type ComponentProps, type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AboutSection } from "@/components/AboutSettings";
 import { AccessMatrixSection } from "@/components/AccessLevels";
 import { AccountSection } from "@/components/AccountSettings";
-import { AgentAvatar } from "@/components/AgentAvatar";
 import { AiAppsSection } from "@/components/AiApps";
 import { ApprovalsSection } from "@/components/ApprovalCover";
 import { AuditSection } from "@/components/Audit";
@@ -98,7 +88,6 @@ import { UsageTabs } from "@/components/PeopleUsage";
 import { ApiCard, PlanUsageCards } from "@/components/PlanUsage";
 import { MyFace, OrgLogoDialog, OrgMark } from "@/components/ProfilePhoto";
 import { KeyMismatch, KeyRefused, KeySite, ProviderKeySelect } from "@/components/ProviderKey";
-import { RightHandSettingsSection } from "@/components/RightHandSettings";
 import { RolesSection } from "@/components/roles/RolesSection";
 import { SkillsSection } from "@/components/Skills";
 import { StorageSection } from "@/components/StorageSettings";
@@ -107,13 +96,18 @@ import { VaultSection } from "@/components/vault/VaultSection";
 import { WorkspaceModeDialog } from "@/components/WorkspaceModeDialog";
 import { ZoneSelect } from "@/components/ZoneSelect";
 import { useCentreCurrent } from "@/hooks/useCentreCurrent";
-import { useDirectory } from "@/hooks/useDirectory";
 import { usePersonalView } from "@/hooks/usePersonalView";
 import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { useOpenParam } from "@/lib/open-param";
 import { useToast } from "@/lib/toast";
 import { MembersPage } from "./MembersPage";
-import { SETTINGS_GROUPS, SETTINGS_SECTIONS, type SettingsSection, settingsNavEntry } from "./settings-sections";
+import {
+  isSettingsSection,
+  SETTINGS_SECTIONS,
+  type SettingsSection,
+  settingsNavEntry,
+  settingsShort,
+} from "./settings-sections";
 
 /**
  * Settings: a left sub-nav and one section per URL (`/settings/connectors`, …).
@@ -176,19 +170,18 @@ function Settings({
   const refused = section && current !== section && !serverLacks ? section : null;
   const setup = useComputerSetup(org.id);
   const edition = computerEdition(setup.data);
-  // A personal workspace (ADR 0159 §3): one short list, every other section under Advanced, and AI and apps and Plan
-  // and usage holding other sections, whose own addresses mark those entries. A team's: the groups.
+  // One short list of entries, each a page whose tabs are the sections it holds, every other section under Advanced
+  // (a personal workspace's own short list, ADR 0159 §3). A section's own address marks its entry.
   const personal = isPersonal(org);
   const opens = (id: SettingsSection) => visible.some((s) => s.id === id);
-  // People joins the short list once someone else is a member (a family).
+  // People joins a personal workspace's short list once someone else is a member (a family).
   const { others } = usePersonalView();
-  const nav = personal ? personalSettingsNav(visible, others) : null;
-  const marked = settingsNavEntry(
-    org,
-    current,
-    visible.map((s) => s.id),
-  );
-  const inAdvanced = nav?.advanced.some((s) => s.id === marked) ?? false;
+  const short = settingsShort(org, server, others);
+  const nav = settingsNav(visible, short);
+  const open = visible.map((s) => s.id);
+  const marked = settingsNavEntry(current, open, short);
+  const tabs = settingsTabs(marked, open, short).filter(isSettingsSection);
+  const inAdvanced = nav.advanced.some((s) => s.id === marked);
   const [advanced, setAdvanced] = useState(inAdvanced);
   // A section of Advanced opened by its address (⌘K, a card, a notice) shows in the list.
   useEffect(() => {
@@ -196,10 +189,17 @@ function Settings({
   }, [inAdvanced]);
   const strip = useRef<HTMLDivElement>(null);
   useCentreCurrent(strip, marked);
-  // The right hand's section goes by its name and face (admins may rename it).
-  const rightHand = useDirectory(org.id).agents.find(isRightHand);
-  const sectionName = (id: SettingsSection) =>
-    id === "right_hand" && rightHand ? rightHand.name : t(settingsSectionNameKey(org, id));
+  const sectionName = (id: SettingsSection) => t(settingsSectionNameKey(org, id));
+  // An entry's name in the list: a team's Workspace, People and Connectors hold more than the section they open on.
+  const entryName = (id: SettingsSection) =>
+    !personal && id === "general"
+      ? t("settings.group.org")
+      : !personal && id === "members"
+        ? t("settings.section.membersPersonal")
+        : !personal && id === "connectors"
+          ? t("access.kind.connectors")
+          : sectionName(id);
+  const navigate = useNavigate();
   const link = (s: (typeof visible)[number]) => (
     <li key={s.id}>
       <Link
@@ -208,16 +208,62 @@ function Settings({
         className="settings__link"
         aria-current={s.id === marked ? "page" : undefined}
       >
-        {s.id === "account" ? (
-          <MyFace size="xs" />
-        ) : s.id === "right_hand" && rightHand ? (
-          <AgentAvatar agentId={rightHand.id} name={rightHand.name} size="xs" />
-        ) : (
-          <Icon name={s.icon} size={18} />
-        )}
-        {sectionName(s.id)}
+        {s.id === "account" ? <MyFace size="xs" /> : <Icon name={s.icon} size={18} />}
+        {entryName(s.id)}
       </Link>
     </li>
+  );
+
+  const body = (
+    <>
+      {current !== "members" && current !== "general" && current !== "roles" && current !== "vault" && (
+        <PageHeader
+          level={2}
+          title={sectionName(current)}
+          meta={
+            current !== "devices" ? (
+              t(settingsSectionTextKey(org, current))
+            ) : edition ? (
+              t(edition === "cloud" ? "devices.leadCloud" : "devices.lead")
+            ) : setup.isError ? null : (
+              // Never one edition's words before the server says which this is (the section says if it couldn't).
+              <LoadingLine width={320} />
+            )
+          }
+        />
+      )}
+      {current === "account" && <AccountSection />}
+      {current === "notifications" && <NoticePrefsSection />}
+      {current === "approvals" && <ApprovalsSection />}
+      {current === "apps" && <AiAppsSection />}
+      {current === "general" && <GeneralSection />}
+      {current === "members" && <MembersPage embedded />}
+      {current === "roles" && <RolesSection />}
+      {current === "vault" && <VaultSection />}
+      {current === "audit" && <AuditSection agent={agent} />}
+      {current === "media" && <MediaSettingsSection />}
+      {current === "voice" && <VoiceSettingsSection />}
+      {current === "access" && <AccessMatrixSection />}
+      {current === "connectors" && (
+        <ConnectorsSection connected={connected} outcome={outcome} review={review} mail={mail} account={account} />
+      )}
+      {current === "skills" && <SkillsSection install={install} connected={connected} skill={skill} />}
+      {current === "storage" && <StorageSection />}
+      {current === "devices" && (device ? <DevicePage path={device} /> : <DevicesSection start={connect} />)}
+      {current === "usage" && (
+        <>
+          <UsageTabs person={person} summary={<UsageSection />} />
+          {opens("billing") && (
+            <SettingsPart id="billing">
+              <BillingSection />
+            </SettingsPart>
+          )}
+        </>
+      )}
+      {current === "import" && <ImportExportSection />}
+      {current === "billing" && <BillingSection />}
+      {current === "about" && <AboutSection />}
+    </>
   );
 
   return (
@@ -235,106 +281,54 @@ function Settings({
           )}
         </div>
         <div className="settings__groups" ref={strip}>
-          {nav ? (
-            <>
-              <div className="settings__group">
-                <ul>{nav.main.map(link)}</ul>
-              </div>
-              {nav.advanced.length > 0 && (
-                <div className="settings__group">
-                  <ul>
-                    <li>
-                      <button
-                        type="button"
-                        className="settings__link"
-                        aria-expanded={advanced}
-                        onClick={() => setAdvanced((open) => !open)}
-                      >
-                        <Icon name={advanced ? "chevronDown" : "chevronRight"} size={18} />
-                        {t("settings.advanced")}
-                      </button>
-                    </li>
-                    {advanced && nav.advanced.map(link)}
-                  </ul>
-                </div>
-              )}
-            </>
-          ) : (
-            SETTINGS_GROUPS.map((g) => {
-              const items = visible.filter((s) => s.group === g);
-              if (items.length === 0) return null;
-              return (
-                // biome-ignore lint/a11y/useSemanticElements: a labelled group of links in the nav, not form fields
-                <div key={g} className="settings__group" role="group" aria-labelledby={`settings-group-${g}`}>
-                  <span id={`settings-group-${g}`} className="settings__group-label">
-                    {t(`settings.group.${g}`)}
-                  </span>
-                  <ul>{items.map(link)}</ul>
-                </div>
-              );
-            })
+          <div className="settings__group">
+            <ul>{nav.main.map(link)}</ul>
+          </div>
+          {nav.advanced.length > 0 && (
+            <div className="settings__group">
+              <ul>
+                <li>
+                  <button
+                    type="button"
+                    className="settings__link"
+                    aria-expanded={advanced}
+                    onClick={() => setAdvanced((open) => !open)}
+                  >
+                    <Icon name={advanced ? "chevronDown" : "chevronRight"} size={18} />
+                    {t("settings.advanced")}
+                  </button>
+                </li>
+                {advanced && nav.advanced.map(link)}
+              </ul>
+            </div>
           )}
         </div>
       </nav>
       <div className="settings__body" data-scroll-restoration-id="settings-section">
         {refused && <Alert tone="neutral">{t("settings.notOpen", { section: sectionName(refused) })}</Alert>}
-        {current !== "members" && current !== "general" && current !== "roles" && current !== "vault" && (
-          <PageHeader
-            level={2}
-            title={sectionName(current)}
-            meta={
-              current !== "devices" ? (
-                t(settingsSectionTextKey(org, current))
-              ) : edition ? (
-                t(edition === "cloud" ? "devices.leadCloud" : "devices.lead")
-              ) : setup.isError ? null : (
-                // Never one edition's words before the server says which this is (the section says if it couldn't).
-                <LoadingLine width={320} />
-              )
+        {tabs.length > 0 ? (
+          <Tabs
+            value={current}
+            onValueChange={(section) =>
+              void navigate({ to: "/org/$orgId/settings/$section", params: { orgId: org.id, section } })
             }
-          />
+            label={entryName(marked)}
+            items={tabs.map((id) => ({
+              value: id,
+              label: id === "account" ? t("settings.tab.account") : sectionName(id),
+            }))}
+          >
+            <TabPanel value={current}>{body}</TabPanel>
+          </Tabs>
+        ) : (
+          body
         )}
-        {current === "account" && <AccountSection />}
-        {current === "notifications" && <NoticePrefsSection />}
-        {current === "approvals" && <ApprovalsSection />}
-        {current === "apps" && <AiAppsSection />}
-        {current === "general" && <GeneralSection />}
-        {current === "members" && <MembersPage embedded />}
-        {current === "roles" && <RolesSection />}
-        {current === "vault" && <VaultSection />}
-        {current === "right_hand" && <RightHandSettingsSection />}
-        {current === "audit" && <AuditSection agent={agent} />}
-        {current === "media" && <MediaSettingsSection />}
-        {current === "voice" && <VoiceSettingsSection />}
-        {current === "access" && <AccessMatrixSection />}
-        {current === "connectors" && (
-          <ConnectorsSection connected={connected} outcome={outcome} review={review} mail={mail} account={account} />
-        )}
-        {current === "skills" && <SkillsSection install={install} connected={connected} skill={skill} />}
-        {current === "storage" && <StorageSection />}
-        {current === "devices" && (device ? <DevicePage path={device} /> : <DevicesSection start={connect} />)}
-        {current === "usage" && (
-          <>
-            <UsageTabs person={person} summary={<UsageSection />} />
-            {personal && opens("billing") && (
-              <SettingsPart id="billing">
-                <BillingSection />
-              </SettingsPart>
-            )}
-          </>
-        )}
-        {current === "import" && <ImportExportSection />}
-        {current === "billing" && <BillingSection />}
-        {current === "about" && <AboutSection />}
       </div>
     </div>
   );
 }
 
-/**
- * A section on another one's page in a personal workspace (ADR 0159 §3): Plan and billing on AI and usage, under its
- * own heading.
- */
+/** A section that stands on another one's page under its own heading: Plan and billing on AI and usage. */
 function SettingsPart({ id, children }: { id: "billing"; children: ReactNode }) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -627,8 +621,6 @@ function GeneralSection() {
       {personal ? contextCard : workspaceCard}
       {personal ? workspaceCard : contextCard}
 
-      {/* A team's tiles of every area; a personal workspace's short list and Advanced already show them. */}
-      {!personal && <SettingsTiles />}
       <UsageStatisticsCard />
       {org.role === "owner" && <DeleteWorkspaceCard />}
       <OrgLogoDialog open={logo} onClose={() => setLogo(false)} />
@@ -743,98 +735,6 @@ function UsageStatisticsCard() {
         </DialogBody>
       </Dialog>
     </Card>
-  );
-}
-
-/** "Tudo da organização": a tile per area the person can open, with how it is now. */
-function SettingsTiles() {
-  const { t, i18n } = useTranslation();
-  const { org } = useOrg();
-  const server = useAuthConfig().data;
-  const shown = (id: SettingsSection) => SETTINGS_SECTIONS.some((s) => s.id === id && s.allowed(org, server));
-  const overview = useOverview(org.id);
-  const invitations = useInvitations(org.id, can(org, "invite_people"));
-  const connections = useConnections(org.id);
-  const skills = useSkills(org.id, shown("skills"));
-  const machines = useMachines(org.id, shown("devices"));
-  const storage = useStorage(org.id, shown("storage"));
-  const edition = computerEdition(useComputerSetup(org.id, shown("storage")).data);
-  const usesApi = useWorkspaceUsesApi(org.id);
-  // The budget's share only where the workspace uses the API: on plans alone no 0% budget (ADR 0063 §5).
-  const budget = overview.data && usesApi ? overview.data.budgetUsedPercent : null;
-
-  const live = (connections.data ?? []).filter((c) => !c.revokedAt);
-  const online = (machines.data ?? []).filter((m) => m.online).length;
-  const pending = invitations.data?.length ?? 0;
-  const state: Partial<Record<SettingsSection, string | undefined>> = {
-    members:
-      overview.data &&
-      [
-        t("settings.tileState.members", { count: overview.data.people }),
-        pending > 0 ? t("settings.tileState.invitations", { count: pending }) : null,
-      ]
-        .filter(Boolean)
-        .join(" · "),
-    access: overview.data && t("settings.tileState.agents", { count: overview.data.agents }),
-    connectors:
-      connections.data &&
-      (live.length === 0
-        ? t("settings.tileState.noConnectors")
-        : [
-            t("settings.tileState.connectors", { count: live.length }),
-            live
-              .slice(0, 3)
-              .map((c) => c.label)
-              .join(", "),
-          ].join(" · ")),
-    skills: skills.data && t("settings.tileState.skills", { count: skills.data.length }),
-    devices:
-      machines.data &&
-      (machines.data.length === 0
-        ? t("settings.tileState.noDevices")
-        : t("settings.tileState.devices", { count: machines.data.length, online })),
-    usage:
-      budget !== null ? t("settings.tileState.usage", { percent: formatPercent(i18n.language, budget) }) : undefined,
-    storage:
-      storage.data && edition
-        ? t(storage.data.kind === "s3" ? "storage.s3" : edition === "cloud" ? "storage.agentes" : "storage.server")
-        : undefined,
-  };
-  type Tile = (typeof SETTINGS_SECTIONS)[number] & { id: Exclude<SettingsSection, "general"> };
-  // The workspace's areas: "Você" is the person's own.
-  const tiles = SETTINGS_SECTIONS.filter(
-    (s): s is Tile => s.id !== "general" && s.group !== "you" && s.allowed(org, server),
-  );
-  return (
-    <section className="settings-tiles" aria-labelledby="sec-tiles">
-      <h2 id="sec-tiles" className="settings-tiles__title">
-        {t("settings.tilesTitle")}
-      </h2>
-      <div className="settings-tiles__grid">
-        {tiles.map((s) => (
-          <Link
-            key={s.id}
-            to="/org/$orgId/settings/$section"
-            params={{ orgId: org.id, section: s.id }}
-            className="ac-card ac-card--interactive settings-tile"
-          >
-            <div className="ac-card__head">
-              <span className="ac-card__key" aria-hidden="true">
-                <Icon name={s.icon} size={16} />
-              </span>
-              <div className="ac-card__heading">
-                <h3>{t(`settings.section.${s.id}`)}</h3>
-              </div>
-              <Icon name="chevronRight" size={16} className="settings-tile__chevron" />
-            </div>
-            {s.id === "usage" && budget !== null && (
-              <Meter value={Math.min(100, budget)} max={100} label={t("settings.section.usage")} />
-            )}
-            <span className="settings-tile__state">{state[s.id] ?? "\u00a0"}</span>
-          </Link>
-        ))}
-      </div>
-    </section>
   );
 }
 

@@ -1324,8 +1324,7 @@
     "noDate": "Sans date",
     "clearDate": "Retirer la date",
     "risky": "Merge, déploiement et autres actions à risque",
-    "riskyOff": "Désactivé, elles restent avec vous seul.",
-    "riskyOn": "Activé, cette personne décide aussi celles-ci.",
+    "riskyOn": "Cette personne décide aussi celles-ci.",
     "lock": "Toujours à vous : argent, personnes et rôles, clés d’IA, votre boîte mail et la suppression.",
     "coveringTitle": "Vous approuvez pour",
     "coveringSubtitle": "Ce qu’on demande à ces personnes vous arrive aussi, et vous décidez en leur nom. Jamais ce que vous avez demandé.",
@@ -1336,7 +1335,7 @@
     "failed": "Impossible d’enregistrer. Réessayez."
   },
   "rightHandApprovals": {
-    "title": "{{name}} approuve pour vous",
+    "title": "{{name}} crée et ajuste des agents pour vous",
     "subtitle": "Seulement ce qui vient d'une de vos demandes. Ce qu'il n'approuverait pas, il vous le passe.",
     "newAgents": "Créer les agents que d'autres agents proposent",
     "newAgentsHelp": "Sans apps, seulement dans des canaux ouverts. Vous pouvez annuler pendant 24 h.",
@@ -2196,7 +2195,8 @@
       "change": "Changer",
       "planHelp": "C'est le titulaire de l'abonnement qui paie. Si son ordinateur n'est pas disponible, la conversation le signale et propose une clé API.",
       "lookEdit": "Changer l'apparence de {{name}}",
-      "planOwner": "de {{owner}}",
+      "planOwner": "compte de {{owner}}",
+      "planName": "Forfait {{name}}",
       "mine": "Votre IA",
       "mineHelp": "Votre conversation avec {{name}} pense avec votre forfait ou un forfait partagé avec vous, et seulement la vôtre.",
       "connectMine": "Connecter mon forfait",
@@ -2214,15 +2214,17 @@
       "fallbackPlan": "Sans forfait à vous, elle utilise le forfait de {{owner}}, qui répond à tout le monde.",
       "fallbackYours": "Sans autre forfait, elle utilise celui du workspace, qui est le vôtre.",
       "fallbackNone": "Sans forfait à vous, {{name}} ne peut pas vous répondre : le forfait du workspace ne répond qu'à {{owner}}.",
-      "workspace": "IA du workspace",
+      "workspace": "IA des personnes sans forfait à elles",
       "workspaceHelp": "Les personnes sans forfait à elles parlent à {{name}} par cette IA.",
       "workspacePlan": "Forfait du workspace",
       "workspacePlanHelp": "Un forfait à la place de la clé. Il ne répond aux autres que si son propriétaire le permet.",
       "noPlans": "Connectez un forfait dans IA et utilisation pour l'utiliser ici.",
       "pickPlan": "Choisir un forfait",
-      "sharesOn": "Activé : les personnes sans forfait à elles parlent à {{name}} par ce forfait.",
-      "sharesOff": "Désactivé : seul·e {{owner}} parle par ce forfait. Les personnes sans forfait à elles n'ont pas de réponse.",
-      "sharesOffYou": "Désactivé : vous seul·e parlez par ce forfait. Les personnes sans forfait à elles n'ont pas de réponse."
+      "sharesOn": "Les personnes sans forfait à elles parlent à {{name}} par ce forfait.",
+      "lend": "Prêter ce forfait à ceux qui n’en ont pas",
+      "groupMine": "Rien que pour vous",
+      "groupWorkspace": "Pour tout le workspace",
+      "groupAdmins": "admins uniquement"
     },
     "card": {
       "settings": "{{name}} · Réglages",
@@ -14200,10 +14202,7 @@
     "notOpen": "Votre rôle dans cet espace de travail n'ouvre pas {{section}}. Les personnes qui gèrent les rôles peuvent vous l'ouvrir.",
     "nav": "Sections des paramètres",
     "group": {
-      "you": "Vous",
-      "org": "Espace de travail",
-      "agents": "Agents",
-      "costs": "Coûts et données"
+      "org": "Espace de travail"
     },
     "section": {
       "account": "Votre compte",
@@ -14532,6 +14531,9 @@
         "jev": "Les agents n'envoient de stickers d'eux-mêmes qu'avec Jev.",
         "jevLink": "Configurer Jev"
       }
+    },
+    "tab": {
+      "account": "Profil"
     }
   },
   "personalMode": {

@@ -824,14 +824,13 @@ function Profile({ id }: { id: string }) {
         )}
       </Animated.ScrollView>
       <View style={styles.bar} pointerEvents="box-none">
-        {/* Its person changes its look; admins, everything ("Editar", as the web's Configurações). */}
+        {/* Its person changes its look; admins, everything ("Editar", as the web's Configurações). The right hand's
+            settings open for everyone: each person has their own there. */}
         <PushedHeader
           plate
           solid={false}
           {...(rightHand
-            ? can(org, "manage_agents")
-              ? { action: { label: t("rightHand.profile.configure"), onPress: openRightHandSettings } }
-              : {}
+            ? { action: { label: t("rightHand.profile.configure"), onPress: openRightHandSettings } }
             : decides && agent
               ? { action: { label: t("agent.edit"), onPress: () => openAgentEdit(id) } }
               : {})}

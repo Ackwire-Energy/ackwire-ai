@@ -1252,8 +1252,7 @@
     "noDate": "Tanpa tanggal",
     "clearDate": "Hapus tanggal",
     "risky": "Merge, deploy, dan tindakan berisiko lainnya",
-    "riskyOff": "Mati, ini tetap hanya kamu yang memutuskan.",
-    "riskyOn": "Nyala, orang ini juga memutuskan ini.",
+    "riskyOn": "Orang ini juga memutuskan ini.",
     "lock": "Selalu di tanganmu: uang, orang dan peran, kunci AI, kotak suratmu, dan menghapus.",
     "coveringTitle": "Kamu menyetujui untuk",
     "coveringSubtitle": "Yang diminta dari orang-orang ini juga sampai padamu, dan kamu memutuskan atas nama mereka. Tidak pernah yang kamu minta sendiri.",
@@ -1264,7 +1263,7 @@
     "failed": "Tidak bisa menyimpan. Coba lagi."
   },
   "rightHandApprovals": {
-    "title": "{{name}} menyetujui untukmu",
+    "title": "{{name}} membuat dan menyesuaikan agen untukmu",
     "subtitle": "Hanya yang berasal dari permintaanmu. Yang tidak akan disetujui, diteruskan kepadamu.",
     "newAgents": "Membuat agen yang diusulkan agen lain",
     "newAgentsHelp": "Tanpa aplikasi, hanya di kanal terbuka. Kamu bisa membatalkannya selama 24 jam.",
@@ -2036,7 +2035,8 @@
       "change": "Ubah",
       "planHelp": "Yang membayar adalah pemilik paket. Saat komputernya tidak tersedia, percakapan memberi tahu dan menawarkan kunci API.",
       "lookEdit": "Ubah tampilan {{name}}",
-      "planOwner": "dari {{owner}}",
+      "planOwner": "akun {{owner}}",
+      "planName": "Paket {{name}}",
       "mine": "AI kamu",
       "mineHelp": "Percakapanmu dengan {{name}} berpikir dengan paketmu atau paket yang dibagikan kepadamu, dan hanya percakapanmu.",
       "connectMine": "Hubungkan paket saya",
@@ -2054,15 +2054,17 @@
       "fallbackPlan": "Tanpa paket sendiri, ia memakai paket {{owner}}, yang menjawab semua orang.",
       "fallbackYours": "Tanpa paket lain, ia memakai paket workspace, yang milikmu.",
       "fallbackNone": "Tanpa paket sendiri, {{name}} tidak bisa menjawabmu: paket workspace hanya menjawab {{owner}}.",
-      "workspace": "AI workspace",
+      "workspace": "AI bagi yang tidak punya paket sendiri",
       "workspaceHelp": "Yang tidak punya paket sendiri berbicara dengan {{name}} lewat AI ini.",
       "workspacePlan": "Paket workspace",
       "workspacePlanHelp": "Paket sebagai pengganti kunci. Paket ini menjawab orang lain hanya kalau pemiliknya mengizinkan.",
       "noPlans": "Hubungkan paket di AI dan pemakaian untuk memakainya di sini.",
       "pickPlan": "Pilih paket",
-      "sharesOn": "Aktif: yang tidak punya paket sendiri berbicara dengan {{name}} lewat paket ini.",
-      "sharesOff": "Nonaktif: hanya {{owner}} yang berbicara lewat paket ini. Yang tidak punya paket sendiri tidak mendapat jawaban.",
-      "sharesOffYou": "Nonaktif: hanya kamu yang berbicara lewat paket ini. Yang tidak punya paket sendiri tidak mendapat jawaban."
+      "sharesOn": "Yang tidak punya paket sendiri berbicara dengan {{name}} lewat paket ini.",
+      "lend": "Pinjamkan paket ini ke yang tidak punya",
+      "groupMine": "Hanya untukmu",
+      "groupWorkspace": "Untuk seluruh workspace",
+      "groupAdmins": "khusus admin"
     },
     "card": {
       "settings": "{{name}} · Pengaturan",
@@ -13290,10 +13292,7 @@
     "notOpen": "Peranmu di ruang kerja ini tidak membuka {{section}}. Orang yang mengelola peran bisa membukanya untukmu.",
     "nav": "Bagian pengaturan",
     "group": {
-      "you": "Kamu",
-      "org": "Ruang kerja",
-      "agents": "Agen",
-      "costs": "Biaya dan data"
+      "org": "Ruang kerja"
     },
     "section": {
       "account": "Akunmu",
@@ -13602,6 +13601,9 @@
         "jev": "Agen mengirim stiker sendiri hanya dengan Jev.",
         "jevLink": "Siapkan Jev"
       }
+    },
+    "tab": {
+      "account": "Profil"
     }
   },
   "personalMode": {

@@ -1288,8 +1288,7 @@
     "noDate": "Tarih yok",
     "clearDate": "Tarihi kaldırın",
     "risky": "Merge, deploy ve diğer riskli işlemler",
-    "riskyOff": "Kapalı, bunlar yalnızca sizde kalır.",
-    "riskyOn": "Açık, bunlara da bu kişi karar verir.",
+    "riskyOn": "Bunlara da bu kişi karar verir.",
     "lock": "Her zaman sizde: para, kişiler ve roller, yapay zeka anahtarları, posta kutunuz ve silme.",
     "coveringTitle": "Yerine onayladığınız kişiler",
     "coveringSubtitle": "Bu kişilerden istenenler size de gelir ve onların adına karar verirsiniz. Kendi isteklerinize asla.",
@@ -1300,7 +1299,7 @@
     "failed": "Kaydedilemedi. Tekrar deneyin."
   },
   "rightHandApprovals": {
-    "title": "{{name}} sizin yerinize onaylar",
+    "title": "{{name}} sizin yerinize ajan oluşturur ve ayarlar",
     "subtitle": "Yalnızca sizin bir isteğinizden gelenler. Onaylamayacaklarını size iletir.",
     "newAgents": "Diğer ajanların önerdiği ajanları oluşturmak",
     "newAgentsHelp": "Uygulama yok, yalnızca açık kanallar. 24 saat boyunca geri alabilirsiniz.",
@@ -2111,7 +2110,8 @@
       "change": "Değiştir",
       "planHelp": "Ücreti planın sahibi öder. Planın bilgisayarına ulaşılamadığında konuşma bunu söyler ve bir API anahtarı önerir.",
       "lookEdit": "{{name}} görünümünü değiştir",
-      "planOwner": "sahibi: {{owner}}",
+      "planOwner": "{{owner}} kişisinin hesabı",
+      "planName": "{{name}} planı",
       "mine": "Yapay zekân",
       "mineHelp": "{{name}} ile konuşman, kendi planınla ya da seninle paylaşılan bir planla düşünür, yalnızca seninki.",
       "connectMine": "Planımı bağla",
@@ -2129,15 +2129,17 @@
       "fallbackPlan": "Kendi planın yoksa herkese yanıt veren {{owner}} planını kullanır.",
       "fallbackYours": "Başka plan yoksa senin olan çalışma alanı planını kullanır.",
       "fallbackNone": "Kendi planın yoksa {{name}} sana yanıt veremez: çalışma alanının planı yalnızca {{owner}} için yanıt verir.",
-      "workspace": "Çalışma alanı yapay zekâsı",
+      "workspace": "Kendi planı olmayanların yapay zekâsı",
       "workspaceHelp": "Kendi planı olmayanlar {{name}} ile bu yapay zekâ üzerinden konuşur.",
       "workspacePlan": "Çalışma alanı planı",
       "workspacePlanHelp": "Anahtarın yerine bir plan. Başkalarına yalnızca sahibi izin verirse yanıt verir.",
       "noPlans": "Burada kullanmak için Yapay zeka ve kullanım bölümünden bir plan bağla.",
       "pickPlan": "Plan seç",
-      "sharesOn": "Açık: kendi planı olmayanlar {{name}} ile bu plan üzerinden konuşur.",
-      "sharesOff": "Kapalı: bu plan üzerinden yalnızca {{owner}} konuşur. Kendi planı olmayanlar yanıt alamaz.",
-      "sharesOffYou": "Kapalı: bu plan üzerinden yalnızca sen konuşursun. Kendi planı olmayanlar yanıt alamaz."
+      "sharesOn": "Kendi planı olmayanlar {{name}} ile bu plan üzerinden konuşur.",
+      "lend": "Bu planı, planı olmayanlara ödünç ver",
+      "groupMine": "Yalnızca sizin için",
+      "groupWorkspace": "Tüm çalışma alanı için",
+      "groupAdmins": "yalnızca yöneticiler"
     },
     "card": {
       "settings": "{{name}} · Ayarlar",
@@ -13672,10 +13674,7 @@
     "notOpen": "Bu çalışma alanındaki rolünüz {{section}} bölümünü açmıyor. Rolleri yöneten kişi sizin için açabilir.",
     "nav": "Ayarlar bölümleri",
     "group": {
-      "you": "Siz",
-      "org": "Çalışma alanı",
-      "agents": "Ajanlar",
-      "costs": "Maliyetler ve veriler"
+      "org": "Çalışma alanı"
     },
     "section": {
       "account": "Hesabınız",
@@ -13994,6 +13993,9 @@
         "jev": "Ajanlar kendiliğinden çıkartmayı yalnızca Jev ile gönderir.",
         "jevLink": "Jev'i kur"
       }
+    },
+    "tab": {
+      "account": "Profil"
     }
   },
   "personalMode": {

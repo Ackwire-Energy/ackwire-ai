@@ -273,9 +273,6 @@ html:not([data-pointer]) .dm-side__row--link:focus-visible {
   padding-left: 42px;
   translate: none;
 }
-.dm-side__sec .rh-set__acts {
-  flex-wrap: wrap;
-}
 /* Under the sidebar's breakpoint the header's glyphs hold the computer, the search and the toggle: the search gives
    way, leaving the name its room beside them. */
 @media (max-width: 1099px) {

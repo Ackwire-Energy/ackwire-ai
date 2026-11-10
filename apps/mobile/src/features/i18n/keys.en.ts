@@ -2311,8 +2311,6 @@ export const featureKeysEn = {
     group: {
       org: "Workspace",
       people: "People",
-      agents: "Agents",
-      costs: "Costs and data",
     },
     /** Shorter names for the rows whose group already says the rest (the web's are `settings.section.*`). */
     section: {

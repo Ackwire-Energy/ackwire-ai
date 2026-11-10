@@ -10,6 +10,7 @@ import {
   agentComputerPick,
   areaValues,
   exportFileName,
+  GROUP_LABEL,
   grantCommand,
   isGithubSkillLink,
   MODE_LINE_ICON,
@@ -25,6 +26,7 @@ import {
   platformText,
   reduceTexts,
   type S3Form,
+  SETTINGS_GROUPS,
   SETTINGS_SECTIONS,
   s3FormOf,
   s3Missing,
@@ -81,24 +83,32 @@ const preparing = (): SetupView =>
   ) as SetupView;
 
 describe("the workspace's settings on the phone: who opens what (the web's sub-nav)", () => {
-  test("in the phone's four groups, each thing once", () => {
+  test("in the web's entries as groups, each thing once, and no section for the right hand", () => {
     expect(SETTINGS_SECTIONS.map((s) => `${s.group}:${s.id}`)).toEqual([
       "org:general",
-      "org:right_hand",
       "org:media",
       "people:members",
       "people:roles",
-      "people:audit",
-      "agents:access",
-      "agents:connectors",
-      "agents:computers",
-      "agents:vault",
-      "agents:skills",
-      "agents:apps",
-      "costs:usage",
-      "costs:storage",
-      "costs:import",
+      "ai:usage",
+      "connectors:connectors",
+      "connectors:skills",
+      "connectors:vault",
+      "connectors:access",
+      "connectors:apps",
+      "advanced:computers",
+      "advanced:storage",
+      "advanced:import",
+      "advanced:audit",
     ]);
+    expect(SETTINGS_GROUPS).toEqual(["org", "people", "ai", "connectors", "advanced"]);
+    // A group goes by the words the web's list shows for that entry.
+    expect(GROUP_LABEL).toEqual({
+      org: "mobile.settings.group.org",
+      people: "mobile.settings.group.people",
+      ai: "settings.section.usage",
+      connectors: "access.kind.connectors",
+      advanced: "settings.advanced",
+    });
   });
 
   test("each section opens with its permission (ADR 0085); a member keeps only their own and what they use", () => {
@@ -118,22 +128,21 @@ describe("the workspace's settings on the phone: who opens what (the web's sub-n
     // No Geral (what the agents know of the workspace) or GIFs: those are the workspace's, for admins. Uso stays:
     // their own plans' meters, in percentages (ADR 0063).
     // The Vault is every member's (ADR 0144): their own items, and the team's shared with them.
-    expect(ids(["read", "post"])).toEqual(["members", "connectors", "computers", "vault", "apps", "usage"]);
+    expect(ids(["read", "post"])).toEqual(["members", "usage", "connectors", "vault", "apps", "computers"]);
     expect(ids(["read", "manage_agents"])).toEqual([
-      "right_hand",
       "members",
-      "access",
-      "connectors",
-      "computers",
-      "vault",
-      "skills",
-      "apps",
       "usage",
+      "connectors",
+      "skills",
+      "vault",
+      "access",
+      "apps",
+      "computers",
     ]);
     expect(ids(["read", "configure"])).toEqual(expect.arrayContaining(["general", "media", "storage"]));
     expect(ids(["read", "view_audit"])).toContain("audit");
     expect(ids(["read", "create_agents"])).toContain("import");
-    expect(visibleSections(undefined).map((s) => s.id)).toEqual(["connectors", "apps", "usage"]);
+    expect(visibleSections(undefined).map((s) => s.id)).toEqual(["usage", "connectors", "apps"]);
   });
 
   test("each section opens a screen the app has", () => {
@@ -170,16 +179,15 @@ describe("a personal workspace's settings on the phone (ADR 0159 §3): one short
     const { main, advanced } = personalSections(owner("personal"), 0);
     expect(ids(main)).toEqual(["general", "usage", "connectors", "vault", "computers"]);
     expect(ids(advanced)).toEqual([
-      "right_hand",
       "media",
       "members",
       "roles",
-      "audit",
-      "access",
       "skills",
+      "access",
       "apps",
       "storage",
       "import",
+      "audit",
     ]);
     // Every section is in one list or the other: the AI accounts screen holds none.
     expect([...main, ...advanced].length).toBe(visibleSections(owner("personal")).length);

@@ -49,7 +49,6 @@ import type { IconName } from "@/ui";
 export type SettingsSection =
   | "apps"
   | "general"
-  | "right_hand"
   | "members"
   | "roles"
   | "audit"
@@ -63,8 +62,20 @@ export type SettingsSection =
   | "import"
   | "vault";
 
-/** The phone's groups: the workspace itself, its people, its agents, costs and data (`mobile.settings.group.*`). */
-export type SettingsGroup = "org" | "people" | "agents" | "costs";
+/**
+ * The phone's groups, the web's settings entries (`TEAM_SETTINGS`; Your account is the phone's own tab): Workspace,
+ * People, AI and usage, Connectors, then Advanced.
+ */
+export type SettingsGroup = "org" | "people" | "ai" | "connectors" | "advanced";
+
+/** Each group's name: the words the web's list shows for the same entry. */
+export const GROUP_LABEL = {
+  org: "mobile.settings.group.org",
+  people: "mobile.settings.group.people",
+  ai: "settings.section.usage",
+  connectors: "access.kind.connectors",
+  advanced: "settings.advanced",
+} as const satisfies Record<SettingsGroup, string>;
 
 export interface SettingsEntry {
   id: SettingsSection;
@@ -77,59 +88,51 @@ export interface SettingsEntry {
 }
 
 /**
- * The web's settings (`settings.section.*`) in the phone's four groups, each thing once: the workspace itself (what
- * it is, its right hand, its GIFs), its people (members, roles, the audit), its agents (their access, connectors,
- * computers, the Vault, skills, the AI apps that reach them) and costs and data. Each with the phone's screen and a
- * neutral icon (the color stays on faces).
+ * The web's settings (`settings.section.*`) in the phone's groups, each thing once, a screen each: the workspace
+ * itself (what it is, its GIFs), its people (members, roles), AI and usage, connectors (with skills, the Vault, the
+ * agents' access and the AI apps that reach them) and Advanced (devices, storage, import and export, the audit). The
+ * right hand's settings are on its own profile. Each with a neutral icon (the color stays on faces).
  */
 export const SETTINGS_SECTIONS: readonly SettingsEntry[] = [
   // The workspace itself (its name, logo, zone, what every agent knows of it): who configures it.
-  {
-    id: "general",
-    group: "org",
-    icon: "home",
-    href: "/settings/general",
-    allowed: (o) => can(o, "configure"),
-  },
-  // The team's right hand (ADR 0137): its name, AI, budget and audience, for who manages agents.
-  {
-    id: "right_hand",
-    group: "org",
-    icon: "agent",
-    href: "/settings/right-hand",
-    allowed: (o) => can(o, "manage_agents"),
-  },
+  { id: "general", group: "org", icon: "home", href: "/settings/general", allowed: (o) => can(o, "configure") },
   // GIFs and stickers in chat (ADR 0091): who configures the workspace.
   { id: "media", group: "org", icon: "sticker", href: "/settings/media", allowed: (o) => can(o, "configure") },
   // Everyone, as on the web: who invites finds the requests there, a member who may not suggests someone (ADR 0090).
   { id: "members", group: "people", icon: "members", href: "/me/members", allowed: (o) => can(o, "read") },
   // Papéis e permissões (ADR 0085): who manages roles, as on the web.
   { id: "roles", group: "people", icon: "lock", href: "/settings/roles", allowed: (o) => can(o, "manage_roles") },
-  // What agents did and people changed: who may see the audit (it shows everyone's work).
-  { id: "audit", group: "people", icon: "list", href: "/settings/audit", allowed: (o) => can(o, "view_audit") },
+  // "IA e uso", for everyone (ADR 0063): the workspace's AI accounts with their meters and the agents whose details
+  // they see, in tokens and percentages; money only for who has `view_usage`. It leads to the AI accounts screen.
+  { id: "usage", group: "ai", icon: "chart", href: "/usage", allowed: () => true },
+  { id: "connectors", group: "connectors", icon: "join", href: "/connectors", allowed: () => true },
+  {
+    id: "skills",
+    group: "connectors",
+    icon: "sparkle",
+    href: "/settings/skills",
+    allowed: (o) => can(o, "manage_agents"),
+  },
+  // The Vault (ADR 0144): every member keeps their own logins and keys there and sees the team's shared with them.
+  { id: "vault", group: "connectors", icon: "key", href: "/settings/vault", allowed: (o) => can(o, "read") },
   {
     id: "access",
-    group: "agents",
+    group: "connectors",
     icon: "shield",
     href: "/settings/access",
     allowed: (o) => can(o, "manage_agents"),
   },
-  { id: "connectors", group: "agents", icon: "join", href: "/connectors", allowed: () => true },
-  // Dispositivos: every member sees the computers and the phones they reach, and connects their own (ADR 0025).
-  { id: "computers", group: "agents", icon: "laptop", href: "/settings/devices", allowed: (o) => can(o, "read") },
-  // The Vault (ADR 0144): every member keeps their own logins and keys there and sees the team's shared with them.
-  { id: "vault", group: "agents", icon: "key", href: "/settings/vault", allowed: (o) => can(o, "read") },
-  { id: "skills", group: "agents", icon: "sparkle", href: "/settings/skills", allowed: (o) => can(o, "manage_agents") },
   // AI apps (ADR 0119): each person's own connections in this workspace; connecting one happens on the web.
-  { id: "apps", group: "agents", icon: "share", href: "/settings/apps", allowed: () => true },
-  // "IA e uso", for everyone (ADR 0063): the workspace's AI accounts with their meters and the agents whose details
-  // they see, in tokens and percentages; money only for who has `view_usage`. It leads to the AI accounts screen.
-  { id: "usage", group: "costs", icon: "chart", href: "/usage", allowed: () => true },
-  { id: "storage", group: "costs", icon: "archive", href: "/settings/storage", allowed: (o) => can(o, "configure") },
-  { id: "import", group: "costs", icon: "out", href: "/settings/import", allowed: (o) => can(o, "create_agents") },
+  { id: "apps", group: "connectors", icon: "share", href: "/settings/apps", allowed: () => true },
+  // Dispositivos: every member sees the computers and the phones they reach, and connects their own (ADR 0025).
+  { id: "computers", group: "advanced", icon: "laptop", href: "/settings/devices", allowed: (o) => can(o, "read") },
+  { id: "storage", group: "advanced", icon: "archive", href: "/settings/storage", allowed: (o) => can(o, "configure") },
+  { id: "import", group: "advanced", icon: "out", href: "/settings/import", allowed: (o) => can(o, "create_agents") },
+  // What agents did and people changed: who may see the audit (it shows everyone's work).
+  { id: "audit", group: "advanced", icon: "list", href: "/settings/audit", allowed: (o) => can(o, "view_audit") },
 ];
 
-export const SETTINGS_GROUPS: readonly SettingsGroup[] = ["org", "people", "agents", "costs"];
+export const SETTINGS_GROUPS: readonly SettingsGroup[] = ["org", "people", "ai", "connectors", "advanced"];
 
 /** The sections this membership opens, in order. */
 export const visibleSections = (org: OrgSummary | null | undefined) => SETTINGS_SECTIONS.filter((s) => s.allowed(org));

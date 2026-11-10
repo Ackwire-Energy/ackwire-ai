@@ -2104,9 +2104,7 @@
     "editSub": "이름, 로고, 시간대, 에이전트가 아는 내용",
     "group": {
       "org": "워크스페이스",
-      "people": "사람",
-      "agents": "에이전트",
-      "costs": "비용과 데이터"
+      "people": "사람"
     },
     "section": {
       "members": "멤버",

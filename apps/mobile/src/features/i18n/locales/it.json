@@ -2303,9 +2303,7 @@
     "editSub": "Nome, logo, fuso orario e cosa sanno gli agenti",
     "group": {
       "org": "Spazio di lavoro",
-      "people": "Persone",
-      "agents": "Agenti",
-      "costs": "Costi e dati"
+      "people": "Persone"
     },
     "section": {
       "members": "Membri",

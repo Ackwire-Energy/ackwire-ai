@@ -53,6 +53,10 @@ const PERSONAL_SETTINGS_SHARED = [
   "computers",
 ] as const;
 
+/** A personal workspace's short list: with other people here (`others`), the one People is on. */
+export const personalSettingsShort = (others?: number): readonly string[] =>
+  others !== undefined && others > 0 ? PERSONAL_SETTINGS_SHARED : PERSONAL_SETTINGS;
+
 /**
  * A personal workspace's settings list from the sections the person may open (`open`, in their usual order): the
  * short list, then Advanced with every other one (a section already on another's page isn't listed again). `others`:
@@ -63,7 +67,7 @@ export function personalSettingsNav<T extends { id: string }>(
   others?: number,
 ): { main: T[]; advanced: T[] } {
   const ids = new Set(open.map((s) => s.id));
-  const short: readonly string[] = others !== undefined && others > 0 ? PERSONAL_SETTINGS_SHARED : PERSONAL_SETTINGS;
+  const short = personalSettingsShort(others);
   return {
     main: short.flatMap((id) => open.filter((s) => s.id === id)),
     advanced: open.filter((s) => !short.includes(s.id) && personalSettingsHost(s.id, ids) === null),

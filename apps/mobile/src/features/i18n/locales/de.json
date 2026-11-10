@@ -2207,9 +2207,7 @@
     "editSub": "Name, Logo, Zeitzone und was die Agenten wissen",
     "group": {
       "org": "Workspace",
-      "people": "Personen",
-      "agents": "Agenten",
-      "costs": "Kosten und Daten"
+      "people": "Personen"
     },
     "section": {
       "members": "Mitglieder",

@@ -76,23 +76,35 @@ describe("a personal workspace's settings list", () => {
     ]);
   });
 
-  test("Advanced shows every other section the person may open, Skills among them; connectors are in the list", async () => {
+  test("Advanced shows every other section no entry holds; what an entry holds is a tab of its page", async () => {
     await go(alone());
     await click(within(nav()).getByRole("button", { name: "Avançado" }));
     expect(within(nav()).getByRole("button", { name: "Avançado" }).getAttribute("aria-expanded")).toBe("true");
     const all = rows();
-    for (const name of ["Notificações", "Pessoas", "Papéis e permissões", "Auditoria", "Armazenamento", "Skills"])
+    for (const name of ["Pessoas", "Auditoria", "Armazenamento"]) {
       expect(all).toContain(name);
+      expect(all.indexOf(name)).toBeGreaterThan(all.indexOf("Avançado"));
+    }
     expect(all.filter((name) => name === "Conectores e MCPs")).toHaveLength(1);
     expect(all.indexOf("Conectores e MCPs")).toBeLessThan(all.indexOf("Avançado"));
-    expect(all.indexOf("Skills")).toBeGreaterThan(all.indexOf("Avançado"));
-    expect(all.indexOf("Notificações")).toBeGreaterThan(all.indexOf("Avançado"));
+    // Notifications are a tab of Your account, Skills of Connectors, Roles of People: not listed again.
+    for (const name of ["Notificações", "Skills", "Papéis e permissões"]) expect(all).not.toContain(name);
+    cleanup();
+    await go(alone(), "settings/skills");
+    expect(marked()).toBe("Conectores e MCPs");
+    expect(screen().getByRole("tab", { name: "Skills" }).getAttribute("aria-selected")).toBe("true");
+    // The Vault has its own line in a personal workspace's list, so it is no tab here.
+    expect(screen().queryByRole("tab", { name: "Cofre" })).toBeNull();
   });
 
   test("a section of Advanced opened by its address shows open in the list, marked", async () => {
-    await go(personal(), "settings/roles");
+    await go(personal(), "settings/audit");
     expect(within(nav()).getByRole("button", { name: "Avançado" }).getAttribute("aria-expanded")).toBe("true");
-    expect(marked()).toBe("Papéis e permissões");
+    expect(marked()).toBe("Auditoria");
+    cleanup();
+    // Roles is on People's page, alone under Advanced or in the list with someone else here.
+    await go(personal(), "settings/roles");
+    expect(marked()).toBe("Pessoas");
   });
 
   test("the old address of AI accounts opens AI and usage, where the accounts and the keys are", async () => {
@@ -115,11 +127,12 @@ describe("a personal workspace's settings list", () => {
     expect(rows()).not.toContain("Plano e cobrança");
   });
 
-  test("a team's settings keep their groups, and no Advanced", async () => {
+  test("a team's settings are a short list too, in a team's words", async () => {
     await go(seedState());
-    expect(nav().querySelectorAll(".settings__group-label").length).toBeGreaterThan(1);
-    expect(within(nav()).queryByRole("button", { name: "Avançado" })).toBeNull();
-    expect(rows()).toContain("Geral");
+    expect(nav().querySelector(".settings__group-label")).toBeNull();
+    expect(within(nav()).getByRole("button", { name: "Avançado" })).toBeTruthy();
+    expect(rows()).toContain("Workspace");
+    expect(rows()).not.toContain("Sobre você");
   });
 
   test("⌘K lists About you, found by General too", async () => {

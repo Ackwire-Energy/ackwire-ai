@@ -1558,7 +1558,7 @@ describe("Criar agente with Criar agentes alone: an agent of my own, without app
     expect(within(apps).queryByRole("radiogroup")).toBeNull();
     expect(apps.textContent).toContain("GitHub");
     expect(apps.textContent).toContain("Sem acesso");
-    expect(screen().queryByRole("button", { name: "Ler" })).toBeNull();
+    expect(document.querySelector(".newag__quick")).toBeNull();
     expect(screen().queryByRole("link", { name: /Conectar outro app/ })).toBeNull();
     await proceed(3);
     await click(screen().getByRole("button", { name: "Criar Iris" }));

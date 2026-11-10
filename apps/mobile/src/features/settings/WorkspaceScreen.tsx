@@ -11,19 +11,17 @@ import {
 import { computerEdition } from "@agenteschat/client/lib/computer";
 import { can } from "@agenteschat/client/lib/permissions";
 import { settingsSectionNameKey } from "@agenteschat/client/lib/personal-view";
-import { rightHandOf } from "@agenteschat/client/lib/right-hand";
 import { Fragment, type ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert } from "react-native";
 import { useOrg } from "@/providers/org";
 import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, haptics } from "@/ui";
 import { router } from "@/ui/navigation";
-import { AgentFace } from "../shared/Face";
-import { useDirectory } from "../shared/hooks";
 import { OrgAvatar } from "../shared/OrgAvatar";
 import { usePersonalView } from "./hooks";
 import {
   areaValues,
+  GROUP_LABEL,
   PERSONAL_ICON,
   personalSections,
   SETTINGS_GROUPS,
@@ -44,10 +42,10 @@ const SHORT: Partial<Record<SettingsSection, string>> = {
 };
 
 /**
- * The workspace's settings, a screen pushed from Você on the grouped gray, as the phone's own settings: four groups,
- * each thing once. Workspace: the workspace itself (its mark, its name, what Geral holds), its right hand by its
- * face and name, GIFs. Pessoas, Agentes, Custos e dados: one neutral tile and one short value per row (a count or
- * a state), the area's own screen says the rest. Owners get "Apagar <nome>" alone in red at the end, behind the
+ * The workspace's settings, a screen pushed from Você on the grouped gray, as the phone's own settings: the web's
+ * entries as groups, each thing once. Workspace: the workspace itself (its mark, its name, what Geral holds) and GIFs.
+ * Pessoas, IA e uso, Conectores, Avançado: one neutral tile and one short value per row (a count or a state), the
+ * area's own screen says the rest. Owners get "Apagar <nome>" alone in red at the end, behind the
  * system's alert (one firm haptic as it confirms), then the proof and the hold. Opened often, so nothing animates
  * here beyond the rows' press highlight and the platform's push. A personal workspace gets its short list instead
  * (ADR 0159 §3, `PersonalSettingsList`).
@@ -57,7 +55,7 @@ export function WorkspaceScreen() {
   return personal ? <PersonalSettingsList others={others} /> : <TeamSettingsList />;
 }
 
-/** A team's workspace settings: every section this person opens, in the phone's four groups, then deleting it. */
+/** A team's workspace settings: every section this person opens, in the phone's groups, then deleting it. */
 function TeamSettingsList() {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -117,8 +115,8 @@ function PersonalSettingsList({ others }: { others: number | undefined }) {
 }
 
 /**
- * Sections in the phone's groups, each with its header: the workspace itself by its mark and name, its right hand by
- * its face and name, the rest by a neutral tile, a short name and one value. `extra`: rows a group ends with (a
+ * Sections in the phone's groups, each with its header: the workspace itself by its mark and name, the rest by a
+ * neutral tile, a short name and one value. `extra`: rows a group ends with (a
  * personal workspace's delegated approvals under People); a group with none of either draws nothing.
  */
 export function SectionGroups({
@@ -131,8 +129,6 @@ export function SectionGroups({
   const { t } = useTranslation();
   const { org } = useOrg();
   const values = useAreaValues(areas);
-  // The right hand's row goes by its name and face (admins may rename it).
-  const rightHand = rightHandOf(useDirectory().agents);
   const name = org?.name ?? "";
   return (
     <>
@@ -142,7 +138,7 @@ export function SectionGroups({
         if (rows.length === 0 && !more) return null;
         return (
           <Fragment key={group}>
-            <GroupedHeader>{t(`mobile.settings.group.${group}`)}</GroupedHeader>
+            <GroupedHeader>{t(GROUP_LABEL[group])}</GroupedHeader>
             <GroupedList>
               {rows.map((s) =>
                 s.id === "general" ? (
@@ -151,16 +147,6 @@ export function SectionGroups({
                     leading={<OrgAvatar logo={org?.logo} size={36} />}
                     label={name}
                     sub={t("mobile.settings.editSub")}
-                    chevron
-                    onPress={() => router.push(s.href as never)}
-                  />
-                ) : s.id === "right_hand" && rightHand ? (
-                  <GroupedRow
-                    key={s.id}
-                    leading={<AgentFace agentId={rightHand.id} size={36} live={false} />}
-                    label={rightHand.name}
-                    // Its one role name, never its stored role ("Workspace assistant", in no person's language).
-                    sub={t("rightHand.labelCapitalized")}
                     chevron
                     onPress={() => router.push(s.href as never)}
                   />

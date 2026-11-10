@@ -3119,11 +3119,8 @@
   "approvalCover.risky": {
     "value": "Merge, deploy and other risky actions"
   },
-  "approvalCover.riskyOff": {
-    "value": "Off, these stay with you only."
-  },
   "approvalCover.riskyOn": {
-    "value": "On, this person decides these too."
+    "value": "This person decides these too."
   },
   "approvalCover.lock": {
     "value": "Always yours: money, people and roles, AI keys, your mailbox and deleting."
@@ -3150,7 +3147,7 @@
     "value": "Couldn't save. Try again."
   },
   "rightHandApprovals.title": {
-    "value": "{{name}} approves for you"
+    "value": "{{name}} creates and adjusts agents for you"
   },
   "rightHandApprovals.subtitle": {
     "value": "Only what came from a request of yours. What it wouldn't approve, it passes to you."
@@ -5169,7 +5166,10 @@
     "value": "Change {{name}}'s look"
   },
   "rightHand.settings.planOwner": {
-    "value": "from {{owner}}"
+    "value": "{{owner}}'s account"
+  },
+  "rightHand.settings.planName": {
+    "value": "{{name}} plan"
   },
   "rightHand.settings.mine": {
     "value": "Your AI"
@@ -5223,7 +5223,7 @@
     "value": "Without your own plan, {{name}} can't answer you: the workspace's plan serves only {{owner}}."
   },
   "rightHand.settings.workspace": {
-    "value": "Workspace AI"
+    "value": "AI for people without their own plan"
   },
   "rightHand.settings.workspaceHelp": {
     "value": "People without their own plan talk to {{name}} through this AI."
@@ -5241,13 +5241,19 @@
     "value": "Choose a plan"
   },
   "rightHand.settings.sharesOn": {
-    "value": "On: people without their own plan talk to {{name}} through this plan."
+    "value": "People without their own plan talk to {{name}} through this plan."
   },
-  "rightHand.settings.sharesOff": {
-    "value": "Off: only {{owner}} talks through it. People without their own plan get no answer."
+  "rightHand.settings.lend": {
+    "value": "Lend this plan to people without one"
   },
-  "rightHand.settings.sharesOffYou": {
-    "value": "Off: only you talk through it. People without their own plan get no answer."
+  "rightHand.settings.groupMine": {
+    "value": "Just for you"
+  },
+  "rightHand.settings.groupWorkspace": {
+    "value": "For the whole workspace"
+  },
+  "rightHand.settings.groupAdmins": {
+    "value": "admins only"
   },
   "rightHand.card.settings": {
     "value": "{{name}} · Settings"
@@ -33315,17 +33321,8 @@
   "settings.nav": {
     "value": "Settings sections"
   },
-  "settings.group.you": {
-    "value": "You"
-  },
   "settings.group.org": {
     "value": "Workspace"
-  },
-  "settings.group.agents": {
-    "value": "Agents"
-  },
-  "settings.group.costs": {
-    "value": "Costs and data"
   },
   "settings.section.account": {
     "value": "Your account"
@@ -41676,5 +41673,8 @@
   },
   "feedback.another": {
     "value": "Send another"
+  },
+  "settings.tab.account": {
+    "value": "Profile"
   }
 }

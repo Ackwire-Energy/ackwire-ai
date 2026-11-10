@@ -1316,8 +1316,7 @@ export const en = {
     noDate: "No end date",
     clearDate: "Remove the date",
     risky: "Merge, deploy and other risky actions",
-    riskyOff: "Off, these stay with you only.",
-    riskyOn: "On, this person decides these too.",
+    riskyOn: "This person decides these too.",
     lock: "Always yours: money, people and roles, AI keys, your mailbox and deleting.",
     coveringTitle: "You approve for",
     coveringSubtitle:
@@ -1328,9 +1327,9 @@ export const en = {
     decline: "Stop covering",
     failed: "Couldn't save. Try again.",
   },
-  /** Configurações › Você › Aprovações: what the right hand approves for me (ADR 0139 §2). */
+  /** The right hand's page: what it creates and adjusts for me without asking (ADR 0139 §2). */
   rightHandApprovals: {
-    title: "{{name}} approves for you",
+    title: "{{name}} creates and adjusts agents for you",
     subtitle: "Only what came from a request of yours. What it wouldn't approve, it passes to you.",
     newAgents: "Create agents other agents propose",
     newAgentsHelp: "No apps, open channels only. You can undo it for 24 h.",
@@ -2162,7 +2161,9 @@ export const en = {
       /** The face that opens the look's dialog, read aloud and on hover. */
       lookEdit: "Change {{name}}'s look",
       /** After a plan's name when it is someone else's. */
-      planOwner: "from {{owner}}",
+      planOwner: "{{owner}}'s account",
+      /** A plan by its account's name ("Claude plan"). */
+      planName: "{{name}} plan",
       /** Each person's own AI for their conversation with the right hand (ADR 0137 §11). */
       mine: "Your AI",
       mineHelp: "Your conversation with {{name}} thinks with your plan or one shared with you, and only yours does.",
@@ -2185,16 +2186,19 @@ export const en = {
       fallbackYours: "Without another plan, it uses the workspace's, which is yours.",
       fallbackNone: "Without your own plan, {{name}} can't answer you: the workspace's plan serves only {{owner}}.",
       /** What admins set for people with no plan of their own. */
-      workspace: "Workspace AI",
+      workspace: "AI for people without their own plan",
       workspaceHelp: "People without their own plan talk to {{name}} through this AI.",
       workspacePlan: "Workspace plan",
       workspacePlanHelp: "A plan in place of the key. It serves other people only when its owner lets it.",
       noPlans: "Connect a plan in AI and usage to use it here.",
       pickPlan: "Choose a plan",
-      /** "Atende outras pessoas" on the workspace's plan. */
-      sharesOn: "On: people without their own plan talk to {{name}} through this plan.",
-      sharesOff: "Off: only {{owner}} talks through it. People without their own plan get no answer.",
-      sharesOffYou: "Off: only you talk through it. People without their own plan get no answer.",
+      /** Under the switch that lends the workspace's plan: what it does, whatever its state. */
+      sharesOn: "People without their own plan talk to {{name}} through this plan.",
+      lend: "Lend this plan to people without one",
+      /** The right hand's page, its two groups: what is the viewer's alone, and what admins set for everyone. */
+      groupMine: "Just for you",
+      groupWorkspace: "For the whole workspace",
+      groupAdmins: "admins only",
     },
     card: {
       settings: "{{name}} · Settings",
@@ -13564,10 +13568,7 @@ export const en = {
     notOpen: "Your role in this workspace doesn't open {{section}}. Whoever manages roles can open it for you.",
     nav: "Settings sections",
     group: {
-      you: "You",
       org: "Workspace",
-      agents: "Agents",
-      costs: "Costs and data",
     },
     section: {
       account: "Your account",
@@ -13602,6 +13603,8 @@ export const en = {
     },
     /** A personal workspace's settings list ends with this row, which shows or hides every other section. */
     advanced: "Advanced",
+    /** An entry's own tab, beside the sections its page holds. */
+    tab: { account: "Profile" },
     sectionText: {
       account: "Your profile and how the app looks for you.",
       notifications: "What reaches you as an alert here. The inbox keeps everything.",

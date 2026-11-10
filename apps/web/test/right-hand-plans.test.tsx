@@ -107,10 +107,13 @@ test("Settings › Lodi on someone else's OpenCode plan: an admin may still let 
     });
   await renderApp(`/org/${ORG_ID}/settings/right_hand`, { api });
   await settle(8);
-  const body = document.querySelector(".settings__body") as HTMLElement;
-  expect(body.querySelector("#rh-mine-help, .settings-row__value")).toBeTruthy();
-  expect(body.textContent).toContain("Zen da Ana");
-  const share = within(body).getByRole("switch", { name: "Atende outras pessoas" });
+  const body = document.querySelector(".page") as HTMLElement;
+  expect(
+    within(body)
+      .getByRole("button", { name: /^IA de quem não tem plano próprio/ })
+      .querySelector(".settings-row__status")?.textContent,
+  ).toBe("Plano Zen da Ana");
+  const share = within(body).getByRole("switch", { name: "Emprestar este plano a quem não tem um" });
   expect(share.hasAttribute("disabled")).toBe(false);
   await act(async () => fireEvent.click(share));
   await settle(4);

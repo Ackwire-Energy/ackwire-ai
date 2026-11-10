@@ -1252,8 +1252,7 @@
     "noDate": "无截止日期",
     "clearDate": "移除日期",
     "risky": "合并、部署和其他高风险操作",
-    "riskyOff": "关闭时，这些只由你决定。",
-    "riskyOn": "开启时，这些也由此人决定。",
+    "riskyOn": "这些也由此人决定。",
     "lock": "始终由你决定：资金、成员与角色、AI 密钥、你的邮箱和删除。",
     "coveringTitle": "你替这些人审批",
     "coveringSubtitle": "发给这些人的请求也会发给你，由你以他们的名义决定。绝不包括你自己提出的请求。",
@@ -1264,7 +1263,7 @@
     "failed": "无法保存，请重试。"
   },
   "rightHandApprovals": {
-    "title": "{{name}} 替你审批",
+    "title": "{{name}} 替你创建和调整智能体",
     "subtitle": "只处理来自你自己请求的事项。不会批准的，转交给你。",
     "newAgents": "创建其他智能体提议的智能体",
     "newAgentsHelp": "不含应用，只在公开频道。24 小时内可撤销。",
@@ -2035,7 +2034,8 @@
       "change": "更改",
       "planHelp": "费用由套餐的所有者支付。套餐所在的电脑不可用时，对话里会说明，并提供使用 API 密钥的选项。",
       "lookEdit": "更改{{name}}的外观",
-      "planOwner": "来自{{owner}}",
+      "planOwner": "{{owner}}的账号",
+      "planName": "{{name}} 套餐",
       "mine": "你的 AI",
       "mineHelp": "你与{{name}}的对话使用你的套餐或共享给你的套餐思考，且仅限你的对话。",
       "connectMine": "连接我的套餐",
@@ -2053,15 +2053,17 @@
       "fallbackPlan": "没有自己的套餐时，使用{{owner}}的套餐，它回复所有人。",
       "fallbackYours": "没有其他套餐时，使用工作区的套餐，它是你的。",
       "fallbackNone": "没有自己的套餐时，{{name}}无法回复你：工作区的套餐只回复{{owner}}。",
-      "workspace": "工作区 AI",
+      "workspace": "没有自己套餐的人使用的 AI",
       "workspaceHelp": "没有自己套餐的人通过这个 AI 与{{name}}交谈。",
       "workspacePlan": "工作区套餐",
       "workspacePlanHelp": "用套餐代替密钥。只有所有者允许时，它才回复其他人。",
       "noPlans": "请先在“AI 和用量”中连接套餐，才能在这里使用。",
       "pickPlan": "选择套餐",
-      "sharesOn": "开启：没有自己套餐的人通过这个套餐与{{name}}交谈。",
-      "sharesOff": "关闭：只有{{owner}}能通过它交谈。没有自己套餐的人得不到回复。",
-      "sharesOffYou": "关闭：只有你能通过它交谈。没有自己套餐的人得不到回复。"
+      "sharesOn": "没有自己套餐的人通过这个套餐与{{name}}交谈。",
+      "lend": "把这个套餐借给没有套餐的人",
+      "groupMine": "仅对你",
+      "groupWorkspace": "对整个工作区",
+      "groupAdmins": "仅管理员"
     },
     "card": {
       "settings": "{{name}} · 设置",
@@ -13299,10 +13301,7 @@
     "notOpen": "你在这个工作区的角色打不开 {{section}}。管理角色的人可以为你开放。",
     "nav": "设置分区",
     "group": {
-      "you": "你",
-      "org": "工作区",
-      "agents": "智能体",
-      "costs": "费用和数据"
+      "org": "工作区"
     },
     "section": {
       "account": "你的账号",
@@ -13611,6 +13610,9 @@
         "jev": "只有使用 Jev 时，智能体才会主动发送贴纸。",
         "jevLink": "设置 Jev"
       }
+    },
+    "tab": {
+      "account": "个人资料"
     }
   },
   "personalMode": {

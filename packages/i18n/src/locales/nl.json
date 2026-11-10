@@ -1288,8 +1288,7 @@
     "noDate": "Geen datum",
     "clearDate": "Datum weghalen",
     "risky": "Merge, deploy en andere risicovolle acties",
-    "riskyOff": "Uit, deze blijven alleen bij jou.",
-    "riskyOn": "Aan, deze persoon beslist deze ook.",
+    "riskyOn": "Deze persoon beslist deze ook.",
     "lock": "Altijd bij jou: geld, mensen en rollen, AI-sleutels, je mailbox en verwijderen.",
     "coveringTitle": "Je keurt goed voor",
     "coveringSubtitle": "Wat aan deze mensen gevraagd wordt, komt ook bij jou, en je beslist namens hen. Nooit wat je zelf vroeg.",
@@ -1300,7 +1299,7 @@
     "failed": "Opslaan lukte niet. Probeer het opnieuw."
   },
   "rightHandApprovals": {
-    "title": "{{name}} keurt voor je goed",
+    "title": "{{name}} maakt en past agents voor je aan",
     "subtitle": "Alleen wat uit een verzoek van jou kwam. Wat het niet zou goedkeuren, geeft het aan jou door.",
     "newAgents": "Agents maken die andere agents voorstellen",
     "newAgentsHelp": "Zonder apps, alleen in open kanalen. Je kunt het 24 uur ongedaan maken.",
@@ -2114,7 +2113,8 @@
       "change": "Wijzigen",
       "planHelp": "De eigenaar van het abonnement betaalt. Is de computer ervan niet bereikbaar, dan zegt het gesprek dat en biedt het een API-sleutel aan.",
       "lookEdit": "Uiterlijk van {{name}} wijzigen",
-      "planOwner": "van {{owner}}",
+      "planOwner": "account van {{owner}}",
+      "planName": "{{name}}-abonnement",
       "mine": "Jouw AI",
       "mineHelp": "Jouw gesprek met {{name}} denkt met jouw abonnement of een abonnement dat met je gedeeld is, en alleen dat van jou.",
       "connectMine": "Mijn abonnement koppelen",
@@ -2132,15 +2132,17 @@
       "fallbackPlan": "Zonder eigen abonnement gebruikt het het abonnement van {{owner}}, dat iedereen antwoordt.",
       "fallbackYours": "Zonder ander abonnement gebruikt het dat van de workspace, dat van jou is.",
       "fallbackNone": "Zonder eigen abonnement kan {{name}} je niet antwoorden: het abonnement van de workspace antwoordt alleen {{owner}}.",
-      "workspace": "AI van de workspace",
+      "workspace": "AI voor wie geen eigen abonnement heeft",
       "workspaceHelp": "Wie geen eigen abonnement heeft, praat via deze AI met {{name}}.",
       "workspacePlan": "Abonnement van de workspace",
       "workspacePlanHelp": "Een abonnement in plaats van de sleutel. Het antwoordt anderen alleen als de eigenaar dat toestaat.",
       "noPlans": "Koppel een abonnement onder AI en gebruik om het hier te gebruiken.",
       "pickPlan": "Kies een abonnement",
-      "sharesOn": "Aan: wie geen eigen abonnement heeft, praat via dit abonnement met {{name}}.",
-      "sharesOff": "Uit: alleen {{owner}} praat erdoor. Wie geen eigen abonnement heeft, krijgt geen antwoord.",
-      "sharesOffYou": "Uit: alleen jij praat erdoor. Wie geen eigen abonnement heeft, krijgt geen antwoord."
+      "sharesOn": "Wie geen eigen abonnement heeft, praat via dit abonnement met {{name}}.",
+      "lend": "Dit abonnement uitlenen aan wie er geen heeft",
+      "groupMine": "Alleen voor jou",
+      "groupWorkspace": "Voor de hele workspace",
+      "groupAdmins": "alleen admins"
     },
     "card": {
       "settings": "{{name}} · Instellingen",
@@ -13799,10 +13801,7 @@
     "notOpen": "Je rol in deze werkruimte opent {{section}} niet. Wie de rollen beheert, kan het voor je openzetten.",
     "nav": "Onderdelen van de instellingen",
     "group": {
-      "you": "Jij",
-      "org": "Werkruimte",
-      "agents": "Agents",
-      "costs": "Kosten en gegevens"
+      "org": "Werkruimte"
     },
     "section": {
       "account": "Je account",
@@ -14121,6 +14120,9 @@
         "jev": "Agents sturen alleen zelf stickers met Jev.",
         "jevLink": "Jev instellen"
       }
+    },
+    "tab": {
+      "account": "Profiel"
     }
   },
   "personalMode": {
