@@ -785,6 +785,20 @@ describe("folders and tools on the machine (protocol 10)", () => {
     expect(notAllowedMessage("Box", "Grok is turned off", "/srv", true)).toBe("Grok is turned off. Tell the people.");
   });
 
+  test("a person's computer used as a device: folders and tools are that person's to allow, never request_folder_access", () => {
+    const detail = "/Users/sam/Projects is outside your folder (ask for it with request_folder_access)";
+    const mac = { os: "darwin", executors: {} };
+    expect(notAllowedMessage("Sam's Mac", detail, "/Users/sam/Projects", false, mac)).toBe(
+      "/Users/sam/Projects is outside your folder. Only the person at Sam's Mac can allow /Users/sam/Projects, in the agentes.chat app there (Preferences › Folders): tell them, or work inside your own folder.",
+    );
+    expect(notAllowedMessage("Box", detail, "/srv", false, { os: "linux", executors: {} })).toContain(
+      "with `agentes-runner folders allow /srv` there",
+    );
+    expect(notAllowedMessage("Sam's Mac", "Cursor is turned off on this computer", undefined, false, mac)).toBe(
+      "Cursor is turned off on this computer. On Sam's Mac, only the person at it can allow folders or turn tools on: tell them.",
+    );
+  });
+
   test("what the agent reads: its folders, the tools that are off, and the outcome of a request", () => {
     const text = machineAccessText({
       name: "MacBook",

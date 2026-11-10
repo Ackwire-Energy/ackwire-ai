@@ -264,6 +264,36 @@ describe("computer on someone else's device", () => {
     const one = await call(ctx, "computer_status", { computer: "pixel 8" });
     expect(one.content).toBe('- Phone "Pixel 8" (Android 15): ready, on "Sam\'s MacBook".\nYou may use it for ana.');
   });
+
+  test("computer_status says which switches are off on a shared computer and who turns them on", async () => {
+    const w = await world();
+    const ctx = await runCtx();
+    const machine = eq(schema.machines.id, w.mac.machineId);
+    await f.db
+      .update(schema.machines)
+      .set({
+        audienceMode: "everyone",
+        os: "darwin",
+        execAllowed: false,
+        access: { folders: [], tools: { claude: false, codex: false, commands: false } },
+        executors: { claude: { version: "2.1.0" } },
+      })
+      .where(machine);
+    const mac = await call(ctx, "computer_status", { computer: "Sam's MacBook" });
+    // Codex was never found there: nothing to turn on.
+    expect(mac.content).toContain(
+      "\n  Off there: shell commands, Claude Code. Only the person at it can turn them on, in the agentes.chat app there (Preferences › Tools).\n",
+    );
+    await f.db.update(schema.machines).set({ os: "linux" }).where(machine);
+    expect((await call(ctx, "computer_status", {})).content).toContain(
+      "  Off there: shell commands, Claude Code. Only the person at it can turn them on, with `agentes-runner tools enable commands` and `agentes-runner tools enable claude` there.",
+    );
+    await f.db
+      .update(schema.machines)
+      .set({ execAllowed: true, access: { folders: [], tools: { claude: true, codex: false, commands: true } } })
+      .where(machine);
+    expect((await call(ctx, "computer_status", {})).content).not.toContain("Off there");
+  });
 });
 
 describe("phone tools", () => {
