@@ -317,7 +317,7 @@ A failure names the check, what happened and the fix:
 | `app.config` | The app refused a value in `.env` | The values `error` names. |
 | `app.health`, `tailscale.timeout` | Something didn't answer in time (`--timeout`, 300 s by default) | `docker compose logs agentes`, or `tailscale`. |
 | `computer` | `--computer yes` on a machine that can't be the agents' computer: sign-up is open, a provisioner gives workspaces their computers, no root or no systemd on Linux, or it's already connected as a computer. Or one of the first two was turned on after a yes, and agentes.chat won't start with the token | What `fix` says, or `--computer no`. |
-| `computer.install`, `computer.off`, `computer.token` | The agents' computer didn't install or wasn't accepted (agentes.chat itself is up, and the result still has `url` and `appLink`) | What `fix` says, then the same command again. Its log shows its state: `journalctl -u agentes-runner` on Linux, `~/.agentes-runner/runner.log` on a Mac. |
+| `computer.install`, `computer.off`, `computer.token` | The agents' computer didn't install or wasn't accepted (agentes.chat itself is up, and the result still has `url` and `appLink`) | What `fix` says, then the same command again. Its log shows its state: `journalctl -u agentes-runner` on Linux, `~/.agentes-runner/runner.log` on a Mac. On any computer you connected, `agentes-runner doctor` lists what it gives agents (connections, agent apps, toolchains, phones) and what needs you, and waits there until each is fixed. |
 
 </details>
 
@@ -672,8 +672,9 @@ internet instead, and need it public:
 
 - Routines started by a GitHub or Sentry webhook (the address the routine shows, `/api/webhooks/…`).
 - Routines started by a webhook of their own (the address on the routine's page, `/api/hooks/…`).
-- A GitHub App's events (`/api/github-app/webhook`). Optional: without them, the GitHub panel in
-  **Settings → Connectors** checks the installations with GitHub when it opens.
+- A GitHub App's events (`/api/github-app/webhook`): what people write on the pull requests, issues and discussions
+  agents worked on, or that name the app, wakes the agent. Without them agents don't hear GitHub, and the GitHub
+  panel in **Settings → Connectors** checks the installations with GitHub when it opens.
 - Composio's events (`/api/webhooks/composio`, with `COMPOSIO_API_KEY`): new mail for routines, and connector
   accounts that expired.
 - AI apps that call from their own servers (Apps de IA, below): claude.ai, the Claude apps and ChatGPT reach
@@ -989,8 +990,11 @@ There are two ways to set the app up:
   `GITHUB_APP_CLIENT_SECRET` and, with a webhook, `GITHUB_APP_WEBHOOK_SECRET`. Register it with:
   - Callback URL `{PUBLIC_URL}/api/app/github-app/callback`, with **Request user authorization (OAuth) during
     installation** on.
-  - Webhook URL `{PUBLIC_URL}/api/github-app/webhook`, optional: without it, the GitHub panel checks the
-    installations with GitHub when it opens.
+  - Webhook URL `{PUBLIC_URL}/api/github-app/webhook`, optional: without it, agents don't hear what happens on
+    GitHub, and the GitHub panel checks the installations with GitHub when it opens. Subscribe it to Issues, Issue
+    comment, Pull request, Pull request review, Pull request review comment, Pull request review thread, Discussion
+    and Discussion comment (an app made from Settings has them; one made before shows its owner which to tick, with
+    its page on GitHub).
   - Repository permissions, read and write: Actions, Administration, Attestations, Checks, Code scanning alerts, Commit
     statuses, Contents, Custom properties, Dependabot alerts, Dependabot secrets, Deployments, Discussions,
     Environments, Issues, Merge queues, Packages, Pages, Projects (classic), Pull requests, Repository security

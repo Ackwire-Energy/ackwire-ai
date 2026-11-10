@@ -148,6 +148,36 @@ describe("1Password source: connect", () => {
     expect(`${err.message} ${err.stack ?? ""}`).not.toContain(other);
   });
 
+  test("a token the SDK can't use, in its own words, is auth_failed, never unreachable", async () => {
+    // The SDK's messages (0.5.0) for a revoked, mangled or orphaned token: trying again with it can't work.
+    for (const said of [
+      "bad service account token, please rotate it: ",
+      "service account token base64 decoding failed, please create another token",
+      "service account deserialization failed, please create another token",
+      "secret key was the wrong length",
+      "account couldn't be found",
+    ]) {
+      const sdk: OnePasswordSdk = {
+        createClient: async () => {
+          throw new Error(`${said} (${FAKE_OP_TOKEN})`);
+        },
+      };
+      const source = createOnePasswordSource({ loadSdk: async () => sdk });
+      const err = await sourceError(() => source.connect({ token: FAKE_OP_TOKEN }));
+      expect({ said, code: err.code }).toEqual({ said, code: "auth_failed" });
+      expect(err.message).not.toContain(FAKE_OP_TOKEN);
+    }
+  });
+
+  test("a token as 1Password issues it (ops_, then ~900 base64url characters), pasted with spaces", async () => {
+    const details = { signInAddress: "my.1password.example", srpX: "0".repeat(64), padding: "fake ".repeat(120) };
+    const token = `ops_${Buffer.from(JSON.stringify(details)).toString("base64url")}`;
+    expect(token.length).toBeGreaterThan(800);
+    const fake = createFakeOnePassword({ token });
+    const source = createOnePasswordSource({ loadSdk: async () => fake.sdk });
+    expect((await source.connect({ token: ` ${token}\n` })).secret).toEqual({ token });
+  });
+
   test("an SDK that can't load is unsupported, and is tried again next time", async () => {
     let loads = 0;
     const fake = createFakeOnePassword();
@@ -290,6 +320,9 @@ describe("1Password source: list", () => {
       [`Unauthorized: service account ${FAKE_OP_TOKEN} was deleted`, "auth_failed"],
       [`vault not found for ${FAKE_OP_TOKEN}`, "no_vault"],
       [`error sending request for ${FAKE_OP_TOKEN}`, "unreachable"],
+      // The SDK's own words (0.5.0).
+      ["vault couldn't be found", "no_vault"],
+      ["bad service account token, please rotate it: ", "auth_failed"],
     ];
     for (const [text, code] of said) {
       fake.state.failWith = () => new Error(text);
@@ -330,6 +363,10 @@ describe("1Password source: reveal", () => {
     const calls = fake.calls.get.length;
     expect((await sourceError(() => source.reveal(connection, "../items", "password"))).code).toBe("not_found");
     expect(fake.calls.get.length).toBe(calls);
+    // Deleted in 1Password since the last sync, in the SDK's own words (0.5.0).
+    fake.state.failOn = "items.get";
+    fake.state.failWith = () => new Error("item couldn't be found");
+    expect((await sourceError(() => source.reveal(connection, ID.admin, "password"))).code).toBe("not_found");
   });
 });
 

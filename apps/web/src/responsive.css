@@ -195,7 +195,7 @@
     mask-image: linear-gradient(to bottom, #000 calc(100% - 10px), transparent), var(--scroll-strip);
   }
   .channel__messages .ac-msg:not([data-look="bubbles"], [data-look="compact"]) {
-    --msg-lead: 46px;
+    --msg-lead: calc(var(--name-face) + 10px);
   }
   .channel__messages .ac-msg {
     --msg-inline: 12px;
@@ -207,6 +207,27 @@
   .channel__notice {
     margin-right: 12px;
     margin-left: 12px;
+  }
+}
+/* The narrowest phones have no room for a DM's name, its pill and its topic beside the face: the pill goes under the
+   name, which rises to the face's top as a name alone does, and the topic stays in the profile the header opens. */
+@media (max-width: 359px) {
+  .dm-who .channel__title {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .dm-who .channel__title.ac-captop {
+    margin-block-start: calc(var(--cap-top) - 11px);
+  }
+  .dm-who .channel__topic {
+    display: none;
+  }
+}
+@media (max-width: 359px) {
+  @supports (top: 1lh) {
+    .dm-who .channel__title.ac-captop {
+      margin-block-start: calc(var(--cap-top) - 0.5lh);
+    }
   }
 }
 
@@ -253,6 +274,7 @@
   /* No keyboard hints on a touch screen or at phone width (the kit's own: components.css). A hint whose words only
      follow its keys goes with them. */
   .sidebar__jump .ac-kbd,
+  .sidebar__goto-keys,
   .titlebar__search .ac-kbd,
   .wiki-suggest .ac-kbd,
   .newag__hint:has(> .ac-kbd) {
@@ -305,8 +327,8 @@
   .agp-subnav {
     position: static;
     flex-direction: row;
-    margin: 0 -16px;
-    padding: 2px 16px 4px;
+    margin: 0 calc(-1 * var(--agp-gutter));
+    padding: 2px var(--agp-gutter) 4px;
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: none;
@@ -405,8 +427,8 @@
   .agp-subnav {
     position: static;
     flex-direction: row;
-    margin: 0 -16px;
-    padding: 2px 16px 4px;
+    margin: 0 calc(-1 * var(--agp-gutter));
+    padding: 2px var(--agp-gutter) 4px;
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: none;

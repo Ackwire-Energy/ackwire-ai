@@ -47,6 +47,16 @@ describe("replyPolicyFor", () => {
     expect(replyPolicyFor(run(), person(), { answerOwed: true }).mayPass).toBe(false);
   });
 
+  test("a request of its own withdrawn as moot lets it stay quiet, called by name or not, unless a person is owed", () => {
+    expect(replyPolicyFor(run({ trigger: "mention" }), person(), { moot: true }).mayPass).toBe(true);
+    expect(replyPolicyFor(run({ trigger: "dm" }), person(), { moot: true }).mayPass).toBe(true);
+    expect(replyPolicyFor(run({ trigger: "mention" }), person(), { moot: true, answerOwed: true }).mayPass).toBe(false);
+    expect(replyPolicyFor(run({ background: true }), person(), { moot: true })).toEqual({
+      mayPass: false,
+      background: true,
+    });
+  });
+
   test("another agent's message about its routine's report: an agent the router brings in may still pass", () => {
     const report = { routine: { id: "r", name: "Sentry", runId: "rr" } };
     expect(replyPolicyFor(run(), { authorType: "agent", meta: report }).mayPass).toBe(true);

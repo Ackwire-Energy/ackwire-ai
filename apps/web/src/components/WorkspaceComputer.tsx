@@ -11,6 +11,7 @@ import {
   setupEta,
   setupLines,
   setupNoticeKey,
+  setupNoticeStatusKey,
   setupNoticeTitleKey,
   setupPending,
   setupPortrait,
@@ -23,6 +24,7 @@ import { joinNames, lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { namesComputers } from "@agenteschat/client/lib/machines";
 import { around, endSentence } from "@agenteschat/client/lib/text";
+import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
 import {
   Button,
   Card,
@@ -280,7 +282,7 @@ export function WorkspaceComputerCard({ view }: { view: SetupView }) {
   const { org } = useOrg();
   const reader = useWaitReader();
   const machine = managedOf(useMachines(org.id).data);
-  const title = computerName(t, org.name, machine);
+  const title = computerName(t, org.name, machine, isPersonal(org));
   return (
     <Card aria-labelledby="sec-workspace-computer" className="setup-card" data-phase={view.phase}>
       <div className="computers-card__head">
@@ -361,14 +363,12 @@ export function ComputerSetupNotice() {
   const key = setupNoticeKey(org.id, view);
   if (hidden === key) return null;
   const waiting = agentsWaitingForComputer(agents.data ?? [], machines.data ?? []);
-  const data = [
-    view.step
-      ? t("computerSetup.stepOf", { n: view.stepNumber, total: SETUP_STEPS.length, step: t(view.textKey) })
-      : t(view.textKey),
-    eta ? lowerFirst(etaLine(t, eta), i18n.language) : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const status = setupNoticeStatusKey(view);
+  const where = view.step
+    ? t("computerSetup.stepOf", { n: view.stepNumber, total: SETUP_STEPS.length, step: t(view.textKey) })
+    : status && t(status);
+  const left = eta ? etaLine(t, eta) : null;
+  const data = [where, left && where ? lowerFirst(left, i18n.language) : left].filter(Boolean).join(" · ");
   const line =
     view.phase === "waiting" && email && reader.owner ? `${endSentence(data)} ${t("computerSetup.email.short")}` : data;
   return (
@@ -376,8 +376,8 @@ export function ComputerSetupNotice() {
       <div className="outage setup-notice" role="status" data-phase={view.phase}>
         <ComputerIcon kind={WORKSPACE_COMPUTER_KIND} size={20} className="outage__icon" />
         <span className="outage__text">
-          <b>{t(setupNoticeTitleKey(view), { org: org.name })}</b>
-          <span>{line}</span>
+          <b>{t(modeKey(org, setupNoticeTitleKey(view)), { org: org.name })}</b>
+          {line && <span>{line}</span>}
         </span>
         <span className="outage__crew">
           {waiting.slice(0, 4).map((a) => (

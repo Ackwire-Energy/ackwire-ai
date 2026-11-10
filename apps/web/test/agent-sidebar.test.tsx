@@ -113,6 +113,37 @@ describe("the toggle", () => {
     expect(side()).toBeNull();
   });
 
+  /** The seeded workspace as a personal one (ADR 0159). */
+  const personalState = () => {
+    const state = seedState();
+    const org = state.me?.organizations[0];
+    if (org) org.mode = "personal";
+    return state;
+  };
+
+  test("a personal workspace starts it closed on a wide window; opening it is remembered", async () => {
+    widthIs(DM_SIDE_WIDE_QUERY);
+    await openDm({ state: personalState() });
+    expect(side()).toBeNull();
+    expect(toggle()?.getAttribute("aria-pressed")).toBe("false");
+    // With the column closed, Computador is back in the header.
+    expect(screen().getByRole("button", { name: "Computador" })).toBeTruthy();
+    await act(async () => fireEvent.click(toggle() as HTMLElement));
+    expect(side()).toBeTruthy();
+    expect(localStorage.getItem(KEY)).toBe("1");
+    cleanup();
+    await openDm({ state: personalState() });
+    expect(side()).toBeTruthy();
+    expect(toggle()?.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  test("in a personal workspace a choice saved before still wins", async () => {
+    widthIs(DM_SIDE_WIDE_QUERY);
+    localStorage.setItem(KEY, "1");
+    await openDm({ state: personalState() });
+    expect(side()).toBeTruthy();
+  });
+
   test("a narrow window: closed at first, it floats over the chat with its scrim, and nothing is saved", async () => {
     widthIs(DM_SIDE_NARROW_QUERY);
     await openDm();
@@ -219,6 +250,24 @@ describe("what the viewer sees", () => {
     await openDm({ state, agentId: lodi?.id ?? "" });
     expect(section("Computador")).toBeNull();
     expect(section("Como pensa")).toBeTruthy();
+    // One role name, the sidebar's and its header's: never a second one in its panel.
+    expect((side() as HTMLElement).querySelector(".dm-side__role")?.textContent).toBe("Seu braço direito");
+    expect(side()?.textContent).not.toContain("Assistente do workspace");
+  });
+
+  test("on Automático it is named by the maker of the key it thinks with, in its panel and its header", async () => {
+    widthIs(DM_SIDE_WIDE_QUERY);
+    const state = seedState();
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (ada) ada.model = "auto";
+    state.aiStatus = {
+      any: true,
+      agents: state.agents.map((a) => ({ agentId: a.id, state: "ready" as const, provider: "anthropic" })),
+    };
+    await openDm({ state });
+    expect(section("Como pensa")?.textContent).toContain("Claude");
+    expect(section("Como pensa")?.textContent).not.toContain("Automático");
+    expect(document.querySelector(".channel__header .channel__brain")?.textContent).toBe("Claude");
   });
 
   test("routines: a switch for who may change one, read-only for who may not, at most three, with the count", async () => {

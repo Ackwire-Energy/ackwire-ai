@@ -283,6 +283,85 @@ describe("live row in the timeline", () => {
     expect(later.compareDocumentPosition(row()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  test("a reply keeps the place its first words showed in: what is sent meanwhile goes below it, then its message takes it", async () => {
+    const { ev } = await open();
+    const said = (id: string, body: string, createdAt: string, agentRunId: string | null = null) =>
+      ev({
+        type: "message.created",
+        messageId: id,
+        message: {
+          id,
+          channelId: ENG_ID,
+          threadId: null,
+          author: agentRunId ? { type: "agent", id: ADA_ID } : { type: "person", id: "u-joao" },
+          body,
+          mentionedAgentIds: [],
+          agentRunId,
+          createdAt,
+        },
+      });
+    const now = Date.now();
+    await said("m-ask", "Por que o login cai?", new Date(now - 2_000).toISOString());
+    const shownAt = new Date(now - 1_000).toISOString();
+    await ev({ type: "agent.run", ...ids, status: "running" });
+    await ev({ type: "agent.delta", ...ids, seq: 0, turn: 1, at: 0, text: "O login cai depois do refresh.", shownAt });
+    await settle(3);
+    await said("m-meanwhile", "Também confere o refresh", new Date(now + 10_000).toISOString());
+    await settle(3);
+    const meanwhile = () => document.querySelector('[data-message-id="m-meanwhile"]') as HTMLElement;
+    // The block stays where its words first showed; the message sent meanwhile is below it, with its own header.
+    expect(row().compareDocumentPosition(meanwhile()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(meanwhile().classList.contains("ac-msg--grouped")).toBe(false);
+    expect(meanwhile().querySelector(".ac-msg__head")?.textContent).toContain("João");
+    // Its message, another text than the draft, is posted at that moment: it takes the block's place, still above.
+    await said("m-reply", "A chave do cache mudou no deploy de ontem.", shownAt, "r-live");
+    await ev({ type: "agent.run", ...ids, status: "done" });
+    await settle(4);
+    const reply = document.querySelector('[data-message-id="m-reply"]') as HTMLElement;
+    expect(reply.textContent).toContain("A chave do cache mudou");
+    expect(document.body.textContent).not.toContain("O login cai depois do refresh.");
+    expect(reply.compareDocumentPosition(meanwhile()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  test("a reply that lands above the last message marks the conversation read, as one at the end does", async () => {
+    // Only messages with the server's ids here: they sort in the order it posted them (UUIDv7).
+    const { ev, state } = await open((s) => {
+      s.messages = s.messages.filter((m) => m.channelId !== ENG_ID);
+    });
+    const id = (n: number) => `0198f000-0000-7000-8000-${String(n).padStart(12, "0")}`;
+    const said = (n: number, createdAt: string, agentRunId: string | null = null) =>
+      ev({
+        type: "message.created",
+        messageId: id(n),
+        message: {
+          id: id(n),
+          channelId: ENG_ID,
+          threadId: null,
+          author: agentRunId ? { type: "agent", id: ADA_ID } : { type: "person", id: "u-joao" },
+          body: `mensagem ${n}`,
+          mentionedAgentIds: [],
+          agentRunId,
+          createdAt,
+        },
+      });
+    const reads = () => state.calls.filter((c) => c.method === "dms.markRead" && c.args[1] === ENG_ID).length;
+    const now = Date.now();
+    await said(1, new Date(now - 2_000).toISOString());
+    const shownAt = new Date(now - 1_000).toISOString();
+    await ev({ type: "agent.run", ...ids, status: "running" });
+    await ev({ type: "agent.delta", ...ids, seq: 0, turn: 1, at: 0, text: "O login cai depois do refresh.", shownAt });
+    await said(2, new Date(now + 10_000).toISOString());
+    await settle(3);
+    const before = reads();
+    await said(3, shownAt, "r-live");
+    await ev({ type: "agent.run", ...ids, status: "done" });
+    await settle(4);
+    const reply = document.querySelector(`[data-message-id="${id(3)}"]`) as HTMLElement;
+    const meanwhile = document.querySelector(`[data-message-id="${id(2)}"]`) as HTMLElement;
+    expect(reply.compareDocumentPosition(meanwhile) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(reads()).toBeGreaterThan(before);
+  });
+
   test("under the agent's own message its row starts with its face once its words arrive (no grouping, no jump)", async () => {
     const { ev } = await open();
     await ev({

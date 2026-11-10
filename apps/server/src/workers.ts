@@ -23,6 +23,7 @@ import {
   expireConsultations,
   expireQuestions,
   expireSecretRequests,
+  type FeedbackFileDeps,
   fireDueRoutines,
   isHandback,
   type JobHandlers,
@@ -54,6 +55,7 @@ import {
   releaseJobs,
   sweepEndedInboxes,
   sweepExpiredVoice,
+  sweepFeedbackFiles,
   sweepWidgetDrafts,
   type VoiceDeps,
   wakeSnoozedNotifications,
@@ -113,6 +115,8 @@ export interface WorkerDeps {
   context?: ContextDeps;
   /** Drive files (purging deleted ones after 30 days). */
   artifacts?: ArtifactDeps;
+  /** Feedback's pictures and videos (ADR 0160): the sweep under their purge jobs. */
+  feedbackFiles?: FeedbackFileDeps;
   /** Voice recordings (deleting them past their retention, ADR 0100). */
   voice?: VoiceDeps;
   /** Approval reminder emails. */
@@ -158,6 +162,8 @@ export const WORKER_INTERVALS_MS = {
   inboxes: 30_000,
   /** Deleted files past 30 days lose their contents. */
   artifactPurge: 6 * 3600_000,
+  /** Feedback files their purge job missed (it failed for good, or its row went first). */
+  feedbackFiles: 6 * 3600_000,
   /** Wiki pages in the trash past 30 days are removed with their history. */
   wikiPurge: 6 * 3600_000,
   voiceExpiry: 24 * 3600_000,
@@ -350,6 +356,14 @@ export function startWorkers(deps: WorkerDeps) {
     every("artifactPurge", WORKER_INTERVALS_MS.artifactPurge, async () => {
       const purged = await purgeDeletedArtifacts(files);
       if (purged > 0) log.info("deleted files purged", { versions: purged });
+    });
+  }
+
+  const feedbackFiles = deps.feedbackFiles;
+  if (feedbackFiles) {
+    every("feedbackFiles", WORKER_INTERVALS_MS.feedbackFiles, async () => {
+      const swept = await sweepFeedbackFiles(feedbackFiles);
+      if (swept > 0) log.info("feedback files past their time swept", { files: swept });
     });
   }
 

@@ -100,7 +100,7 @@ function workspaceScreen(rest: string[], q: Record<string, string>): Record<stri
       if (!isSafeId(sub)) return null;
       return id === "agent" ? { agent: sub, m } : id === "person" ? { person: sub, m } : null;
     case "threads":
-      if (id === undefined) return open ? { thread: open } : "/threads";
+      if (id === undefined) return open ? { thread: open } : "/conversations/threads";
       return isSafeId(id) ? { thread: id, m } : null;
     case "agents":
       if (id === "new") return "/new-agent";
@@ -139,9 +139,11 @@ function workspaceScreen(rest: string[], q: Record<string, string>): Record<stri
       // A join request's Approve/Deny in its email: that request, on top of the requests.
       if (id === "members" && isSafeId(q.request)) return `/join-requests?request=${q.request}`;
       if ((id === "computers" || id === "devices") && sub !== undefined) {
-        // A phone's guide (the web's QR code), for the computer it plugs into.
-        if (sub === "android-setup" || sub === "iphone-setup")
-          return isSafeId(q.machine) ? `/settings/devices/${sub}?machine=${q.machine}` : `/settings/devices/${sub}`;
+        // A phone's guide (the web's and the desktop app's QR codes name it `computer`), for the computer it plugs into.
+        if (sub === "android-setup" || sub === "iphone-setup") {
+          const machine = isSafeId(q.machine) ? q.machine : isSafeId(q.computer) ? q.computer : null;
+          return machine ? `/settings/devices/${sub}?machine=${machine}` : `/settings/devices/${sub}`;
+        }
         return isSafeId(sub) ? `/settings/devices/${sub}` : null;
       }
       return SETTINGS_SCREENS[id] ?? null;

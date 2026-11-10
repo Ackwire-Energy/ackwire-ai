@@ -388,10 +388,6 @@ th.pu-num .pu-sort {
   }
   /* A control stays on its row's line while the words wrap, down to 14 characters a line (at 320 it goes under them,
      on the rows' right edge); the lone Salvar fills the card. */
-  .pu-limits .settings-row {
-    flex-direction: row;
-    align-items: center;
-  }
   .pu-limits .settings-row > .ac-actrow__text {
     flex-basis: 14ch;
   }

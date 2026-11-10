@@ -8,9 +8,11 @@ import {
   requesterDecidesLine,
 } from "@agenteschat/client/lib/approval-words";
 import { nextLabel } from "@agenteschat/client/lib/format";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { useOrg } from "@/providers/org";
 import {
   Button,
   GroupedFooter,
@@ -45,6 +47,7 @@ import {
   ApprovalAheadLine,
   ApprovalEmailLetter,
   approvalTitleText,
+  traitKey,
   useCancelAhead,
   useConnectorNamer,
   useOriginShort,
@@ -71,6 +74,7 @@ export function ApprovalSheet({
 }) {
   const { t, i18n } = useTranslation();
   const orgId = useOrgId();
+  const { org } = useOrg();
   const dir = useDirectory();
   const c = useColors();
   const now = useNow();
@@ -154,7 +158,7 @@ export function ApprovalSheet({
     const facts = approvalTable(a, Number.POSITIVE_INFINITY, nameOf, true);
     // A built-in tool's action in words; a connector's is in its facts, an email is the letter.
     const detail = !a.connector && !a.email ? approvalDetail(a, i18n.language) : null;
-    const traits = approvalTraits(a).map((tr) => t(`mobile.approval.trait.${tr}`));
+    const traits = approvalTraits(a).map((tr) => t(traitKey(tr, isPersonal(org))));
     const foot = [traits.join(" · "), requester].filter(Boolean).join("\n");
     const who = (
       <View style={styles.who}>

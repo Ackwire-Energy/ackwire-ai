@@ -321,6 +321,13 @@ describe("phone tools", () => {
     const busy = await call(ctx, "phone_launch", { phone: "Pixel 8", app: "com.acme.app" });
     expect(busy.content).toStartWith("Pixel 8 is in use by Dev (testing checkout for Sam) since ");
     expect(busy.content).toContain('wait_for_device("Pixel 8")');
+    // Sam took control of its screen from the apps: it's Sam's until they give it back.
+    await f.db
+      .update(schema.machinePhones)
+      .set({ holder: { runId: null, agentId: null, userId: w.sam.id, since: new Date().toISOString() } })
+      .where(eq(schema.machinePhones.id, w.phone.id));
+    const taken = await call(ctx, "phone_launch", { phone: "Pixel 8", app: "com.acme.app" });
+    expect(taken.content).toStartWith("Sam took control of Pixel 8, so it's theirs for now. ");
     w.answer(() => {
       throw new MachineRequestError("phone_missing", "gone");
     });
@@ -379,7 +386,7 @@ describe("phone tools", () => {
     expect(w.asked.at(-1)).toMatchObject({ op: "phone.release", serial: "R5CT1234", holder: { runId: ctx.runId } });
   });
 
-  test("a real iPhone says what it can't do yet and which phones can; a missing app says to install it", async () => {
+  test("a real iPhone whose test helper waits on the person says what to do; a missing app says to install it", async () => {
     const w = await world();
     await f.db.update(schema.machines).set({ audienceMode: "everyone" }).where(eq(schema.machines.id, w.mac.machineId));
     await f.db
@@ -396,18 +403,18 @@ describe("phone tools", () => {
       osVersion: "26.1",
       ownerUserId: w.sam.id,
       followsHost: true,
+      state: "needs_you",
+      reason: "helper_untrusted",
     });
     w.answer((req) => {
       if (req.op === "phone.launch") throw new MachineRequestError("not_found", "com.acme.app is not installed");
-      throw new MachineRequestError(
-        "tool_missing",
-        "Screenshots of a real iPhone need the test helper, which isn't set up on this Mac yet.",
-      );
+      throw new MachineRequestError("phone_not_ready", "The iPhone doesn't trust the test helper yet.");
     });
     const ctx = await runCtx();
     const shot = await call(ctx, "phone_screenshot", { phone: "iphone 16" });
-    expect(shot.content).toBe(
-      "Screenshots of a real iPhone need the test helper, which isn't set up on this Mac yet. Installing, opening apps and reading the log work on Sam's iPhone; screenshots, recordings and flows don't yet. These can do it now: \"Pixel 8\".",
+    expect(shot).toMatchObject({ isError: true, data: { code: "device.phone_not_ready" } });
+    expect(shot.content).toStartWith(
+      "Sam's iPhone doesn't trust the test helper yet. Ask the person to trust the developer on it: Settings → General → VPN & Device Management. Then ",
     );
     const launch = await call(ctx, "phone_launch", { phone: "Pixel 8", app: "com.acme.app" });
     expect(launch).toMatchObject({ isError: true, data: { code: "device.app_missing" } });
@@ -505,7 +512,8 @@ describe("waiting for a device", () => {
     expect(await holdsMessages(f.db, held, f.owner.id)).toBe(false);
     expect((await currentWaits(f.db, held)).map((x: { kind: string }) => x.kind)).toEqual(["device"]);
 
-    // A report with the phone still busy wakes nobody; once ready and free, the run goes on.
+    // A report with the phone still busy wakes nobody; once ready and free (or given back to this run by a person
+    // who took control of it), the run goes on.
     expect(
       await resumePhoneWaits({ db: f.db }, { id: w.mac.machineId, orgId: f.org.id }, [
         { ...w.phone, state: "ready", holder: { runId: "x", agentId: null, userId: null, since: "" } },
@@ -514,7 +522,7 @@ describe("waiting for a device", () => {
     expect(await resumeComputerWaits({ db: f.db }, w.mac.machineId)).toEqual([]);
     expect(
       await resumePhoneWaits({ db: f.db, pubsub: f.pubsub }, { id: w.mac.machineId, orgId: f.org.id }, [
-        { ...w.phone, state: "ready", holder: null },
+        { ...w.phone, state: "ready", holder: { runId: run.id, agentId: null, userId: null, since: "" } },
       ]),
     ).toEqual([run.id]);
     await drainOutbox(f.db, f.handlers);

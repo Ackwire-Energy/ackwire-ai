@@ -1258,10 +1258,10 @@ describe("memory changes and proposals in the chat", () => {
     await open(state);
     const card = screen().getByRole("group", { name: "Proposta de mudança de Ada" });
     expect(card.getAttribute("data-ask-kind")).toBe("proposal");
-    // The change is behind "Ver a mudança"; Editar lives there too.
-    expect(card.querySelector(".ac-diff__line--add")).toBeNull();
+    // The change is behind "Ver a mudança", drawn as its Markdown in green and red blocks; Editar lives there too.
+    expect(card.querySelector(".ac-diff__block--add")).toBeNull();
     await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Ver a mudança" })));
-    expect(card.querySelectorAll(".ac-diff__line--add").length).toBeGreaterThan(0);
+    expect(card.querySelectorAll(".ac-diff__block--add").length).toBeGreaterThan(0);
     await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Editar" })));
     await act(async () =>
       fireEvent.change(within(card).getByLabelText("Texto final das instruções"), {

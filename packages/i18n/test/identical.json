@@ -201,7 +201,6 @@
       "timezone.group.Oceania",
       "toolReview.ok",
       "usageViews.tokens",
-      "webPushAsk.minutes",
       "wiki.editor.link",
       "wiki.form.tags",
       "wiki.import.stat.links",
@@ -266,9 +265,14 @@
       "devices.iphone.mac",
       "devices.iphone.steps.xcode",
       "devices.iphone.connectedDone",
-      "members.passwordLink.label"
+      "members.passwordLink.label",
+      "openOnPhone.appStore",
+      "openOnPhone.googlePlay",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "es": [
+      "devices.iphone.path.general",
       "devices.cpus",
       "devices.memory",
       "devices.system.android",
@@ -448,7 +452,6 @@
       "timezone.group.Asia",
       "toolReview.ok",
       "usageViews.tokens",
-      "webPushAsk.minutes",
       "wiki.audienceRoles",
       "wiki.legend.obsidian",
       "wiki.markdown",
@@ -482,7 +485,14 @@
       "routines.setup.sentry.url",
       "team.chart.supervisor",
       "team.sectors.supervisor",
-      "share.groupRoles"
+      "share.groupRoles",
+      "settings.mode.personal",
+      "onboarding.personal.name",
+      "newAgentAsk.ideas",
+      "openOnPhone.appStore",
+      "openOnPhone.googlePlay",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "fr": [
       "devices.cpus",
@@ -788,7 +798,6 @@
       "threads.tabs.missions",
       "timezone.group.Europe",
       "toolReview.ok",
-      "webPushAsk.minutes",
       "wiki.ask.agent",
       "wiki.audienceAgentDetail",
       "wiki.audienceAgents",
@@ -863,9 +872,18 @@
       "routines.setup.github.url",
       "routines.setup.sentry.url",
       "agentSetup.how.instructions",
-      "share.agent"
+      "share.agent",
+      "teamPlan.lifeArea.money",
+      "teamTemplates.agents.rui.role",
+      "newAgentAsk.idea.money.label",
+      "agentSetup.firstRun.team.donePersonal",
+      "openOnPhone.appStore",
+      "openOnPhone.googlePlay",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "de": [
+      "devices.iphone.steps.account",
       "devices.workspace",
       "devices.cpus",
       "devices.memory",
@@ -1262,9 +1280,17 @@
       "team.chart.supervisor",
       "team.sectors.supervisor",
       "share.agent",
-      "members.passwordLink.label"
+      "settings.mode.team",
+      "teamTemplates.agents.leo.role",
+      "newAgentAsk.idea.training.label",
+      "members.passwordLink.label",
+      "openOnPhone.appStore",
+      "openOnPhone.googlePlay",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "it": [
+      "devices.iphone.steps.account",
       "devices.cpus",
       "devices.memory",
       "devices.system.android",
@@ -1539,7 +1565,6 @@
       "toolReview.ok",
       "usageQueue.routine",
       "usageQueue.thread",
-      "webPushAsk.minutes",
       "wiki.editor.link",
       "wiki.home",
       "wiki.import.stat.links",
@@ -1587,9 +1612,15 @@
       "browser.live.emulated.desktop",
       "artifacts.files",
       "share.fileRef",
-      "members.passwordLink.label"
+      "settings.mode.team",
+      "members.passwordLink.label",
+      "openOnPhone.appStore",
+      "openOnPhone.googlePlay",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "nl": [
+      "devices.iphone.steps.account",
       "devices.filter.computers",
       "devices.cpus",
       "devices.phoneKind.emulator",
@@ -2040,7 +2071,6 @@
       "toolReview.ok",
       "toolReview.subjectCount",
       "usageViews.tokens",
-      "webPushAsk.minutes",
       "wiki.ask.agent",
       "wiki.audienceAgentDetail",
       "wiki.audienceAgents",
@@ -2131,7 +2161,15 @@
       "team.sectors.supervisor",
       "agentSetup.how.model",
       "share.agent",
-      "members.passwordLink.label"
+      "settings.mode.team",
+      "teamTemplates.agents.leo.role",
+      "newAgentAsk.idea.training.label",
+      "agentSetup.firstRun.team.donePersonal",
+      "members.passwordLink.label",
+      "openOnPhone.appStore",
+      "openOnPhone.googlePlay",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "ja": [
       "devices.system.android",
@@ -2278,7 +2316,12 @@
       "routines.setup.github.secret",
       "routines.setup.github.type",
       "routines.setup.github.url",
-      "routines.setup.sentry.url"
+      "routines.setup.sentry.url",
+      "agentSetup.firstRun.people.email",
+      "openOnPhone.appStore",
+      "openOnPhone.googlePlay",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "ko": [
       "devices.system.android",
@@ -2421,7 +2464,12 @@
       "routines.setup.github.secret",
       "routines.setup.github.type",
       "routines.setup.github.url",
-      "routines.setup.sentry.url"
+      "routines.setup.sentry.url",
+      "agentSetup.firstRun.people.email",
+      "openOnPhone.appStore",
+      "openOnPhone.googlePlay",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "zh-Hans": [
       "devices.system.android",
@@ -2556,7 +2604,12 @@
       "routines.setup.github.secret",
       "routines.setup.github.type",
       "routines.setup.github.url",
-      "routines.setup.sentry.url"
+      "routines.setup.sentry.url",
+      "agentSetup.firstRun.people.email",
+      "openOnPhone.appStore",
+      "openOnPhone.googlePlay",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "id": [
       "devices.cpus",
@@ -2819,7 +2872,11 @@
       "team.chart.supervisor",
       "team.sectors.supervisor",
       "agentSetup.how.model",
-      "share.fileRef"
+      "share.fileRef",
+      "openOnPhone.appStore",
+      "openOnPhone.googlePlay",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "tr": [
       "devices.cpus",
@@ -2980,7 +3037,11 @@
       "routines.setup.github.url",
       "routines.setup.sentry.url",
       "browser.live.emulated.tablet",
-      "agentSetup.how.model"
+      "agentSetup.how.model",
+      "openOnPhone.appStore",
+      "openOnPhone.googlePlay",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "pl": [
       "devices.cpus",
@@ -3193,7 +3254,6 @@
       "threads.panel.agent",
       "timezone.group.Oceania",
       "toolReview.ok",
-      "webPushAsk.minutes",
       "wiki.ask.agent",
       "wiki.audienceAgentDetail",
       "wiki.editor.link",
@@ -3239,7 +3299,12 @@
       "browser.live.emulated.tablet",
       "agentSetup.how.model",
       "share.agent",
-      "members.passwordLink.label"
+      "agentSetup.firstRun.team.donePersonal",
+      "members.passwordLink.label",
+      "openOnPhone.appStore",
+      "openOnPhone.googlePlay",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "ru": [
       "devices.system.android",
@@ -3372,7 +3437,12 @@
       "routines.setup.github.secret",
       "routines.setup.github.type",
       "routines.setup.github.url",
-      "routines.setup.sentry.url"
+      "routines.setup.sentry.url",
+      "agentSetup.firstRun.people.email",
+      "openOnPhone.appStore",
+      "openOnPhone.googlePlay",
+      "arrival.beta.word",
+      "feedback.mark"
     ]
   },
   "mobile-base": {
@@ -3933,6 +4003,7 @@
       "prefs.advanced.claude",
       "prefs.folders.agents",
       "prefs.nav.label",
+      "prefs.thisMac.agents",
       "prefs.tools.protection",
       "server.jev",
       "tools.claudeName",
@@ -3941,6 +4012,7 @@
     "de": [
       "device.mac",
       "device.windows",
+      "iphone.account",
       "link.chipTailnet",
       "prefs.accounts.codeAria",
       "prefs.accounts.org",
@@ -3981,6 +4053,7 @@
       "common.minutes",
       "device.linux",
       "device.mac",
+      "iphone.account",
       "link.chipTailnet",
       "menu.help",
       "menu.servers",
@@ -3992,6 +4065,7 @@
       "prefs.nav.servers",
       "prefs.nav.tools",
       "prefs.nav.updates",
+      "prefs.thisMac.agents",
       "prefs.tools.title",
       "prefs.updates.title",
       "server.jev",

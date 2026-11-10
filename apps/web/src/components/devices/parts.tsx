@@ -2,6 +2,7 @@ import type { ComputerDevice, DeviceStatus, PhoneDevice } from "@agenteschat/cli
 import { useDesktopLatest } from "@agenteschat/client";
 import { type AudienceIcon, audienceWords, portraitOf, statusLook, statusPill } from "@agenteschat/client/lib/devices";
 import { desktopTargetOf, downloadHref } from "@agenteschat/client/lib/machines";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import {
   Avatar,
   Button,
@@ -69,8 +70,9 @@ export function DevicePortrait({ device, size = 48 }: { device: ComputerDevice |
 /** Whose it is: a person's face and name, or the workspace's mark for one that belongs to the workspace. */
 export function OwnerLine({ device, className }: { device: { ownerUserId: string | null }; className?: string }) {
   const { t } = useTranslation();
-  const { org } = useOrg();
-  const owner = useOwner(device.ownerUserId);
+  const { org, me } = useOrg();
+  // A personal workspace names no workspace (ADR 0159): a device of nobody in particular is its person's.
+  const owner = useOwner(device.ownerUserId ?? (isPersonal(org) ? me.user.id : null));
   return (
     <span className={className ?? "dv-row__owner"}>
       {owner ? (

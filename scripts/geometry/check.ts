@@ -22,8 +22,11 @@ const BASELINE = join(HERE, "baseline.json");
 const WIDTHS = [1280, 320, 390];
 /** One browser each: tabs on the same file:// origin share a renderer, so they'd lay out one at a time. */
 const BROWSERS = 4;
-/** Fewer than this means the capture broke, and an empty run must not read as a clean one. */
-const MIN_STATES = 300;
+/**
+ * Fewer than this means the capture broke, and an empty run must not read as a clean one. `GEOMETRY_MIN_STATES` lowers
+ * it for a local run over a few test files.
+ */
+const MIN_STATES = Number(process.env.GEOMETRY_MIN_STATES ?? 300);
 /** The window's height, and how much taller the second look at a `sliver` is. */
 const HEIGHT = 900;
 const TALLER = 40;
@@ -292,6 +295,8 @@ export const SELF_TESTED = [
   "captop",
   "timeedge",
   "panefill",
+  "bleed",
+  "stampout",
 ];
 
 /** Rules about a desktop layout only (panes floating beside the conversation, a toolbar's one row): a phone has none. */
@@ -336,7 +341,7 @@ async function orderFindings(tab: Tab, reverse: Tab): Promise<Finding[]> {
 
 /**
  * Every rule fires on each of its fixture's offenders (`bad-<rule>`, `bad-<rule>--<case>`) and stays quiet on each
- * sound twin (`good-…`).
+ * sound twin (`good-…`), and what opens from another layer is the topmost thing at its center (`geometry.layers`).
  */
 async function selfTest(tab: Tab, reverse: Tab) {
   const fixture = readFileSync(join(HERE, "fixture.html"), "utf8");
@@ -356,6 +361,16 @@ async function selfTest(tab: Tab, reverse: Tab) {
         if (cls.startsWith("good-") && hit(rule, cls)) wrong.push(`${rule}@${width} flagged ${cls}`);
       }
     }
+  }
+  // At every width (a dialog is a sheet on a phone) and in both CSS orders.
+  for (const width of WIDTHS) {
+    await Promise.all([tab.resize(width), reverse.resize(width)]);
+    for (const [t, order] of [
+      [tab, "app"],
+      [reverse, "reverse"],
+    ] as const)
+      for (const layer of await t.run<string[]>("geometry.layers()"))
+        wrong.push(`layers@${width} (${order} order): ${layer} opens under what opened it`);
   }
   if (wrong.length) throw new Error(`Self-test: ${wrong.join(", ")}`);
 }

@@ -16,6 +16,7 @@ import { type ContextLimit, contextChoices, contextSize, isContextLimit } from "
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { planOf } from "@agenteschat/client/lib/plans";
 import { isAuto } from "@agenteschat/client/lib/providers";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -98,7 +99,7 @@ export function AgentAdvancedScreen({ agentId }: { agentId: string }) {
   const effort = useEffortChoice(agentId, now?.effort);
   const speed = useBrainChoice<BrainSpeed>(agentId, now?.speed ?? "standard", (value) => ({ speed: value }));
   const fallbackLabel = t("agentPage.work.brain.fallbackTitle", {
-    computer: computerNameOf(t, org?.name ?? "", view?.computer?.name ?? ""),
+    computer: computerNameOf(t, org?.name ?? "", view?.computer?.name ?? "", isPersonal(org)),
   });
 
   /** Saves at once and says what the row on "Pensa com" will say now (or `done`). */
@@ -244,6 +245,7 @@ export function AgentAdvancedScreen({ agentId }: { agentId: string }) {
                     plan={signInPlan(view, row, kind)}
                     coding={planOf(current?.provider)}
                     disabled={busy}
+                    keep
                   />
                 ) : null}
                 {apiKey ? (

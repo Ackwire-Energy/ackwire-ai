@@ -386,10 +386,12 @@ export function applyReceiptEvent(
         event,
       );
     case "agent.run.steered": {
-      // Went into the agent's task in progress: that agent is on it (a "stop" ends it).
+      // Went into the agent's task in progress: that agent is on it (a "stop" ends it). A task other than the run the
+      // receipt follows (Tentar de novo after a failure joins one) is the news, as `message.claimed`'s is.
       const linked = linkRun(state, event.messageId, event.runId, event.agentId);
       const phase = event.stop ? "handled" : (event.computer ?? event.usage ?? "claimed");
-      return event.agentId ? set(linked, event.messageId, event.agentId, phase) : linked;
+      const moved = Boolean(event.agentId && state[event.messageId]?.runOf?.[event.agentId] !== event.runId);
+      return event.agentId ? set(linked, event.messageId, event.agentId, phase, moved) : linked;
     }
     case "agent.run":
       return setForRun(
@@ -424,13 +426,14 @@ export function applyReceiptEvent(
     case "message.created": {
       const m = event.message;
       // An agent's sticker after its reply (ADR 0091) answers nobody: a newer message's receipt stays. Neither does its
-      // note that it still waits for its computer.
+      // note that it still waits for its computer, or for its plan or budget, or why it didn't answer.
       if (
         m?.author?.type === "agent" &&
         m.author.id &&
         m.threadId &&
         !m.meta?.approvalId &&
         !m.meta?.brainUnavailable &&
+        !m.meta?.usageWait &&
         !isMediaAfterReply(m.meta)
       ) {
         return setForRun(state, m.agentRunId, m.threadId, m.author.id, "handled");

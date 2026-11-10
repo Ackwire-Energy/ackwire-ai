@@ -132,6 +132,7 @@
     "refuseTitle": "Het verzoek weigeren",
     "refuseAsk": "Het verzoek weigeren?",
     "leaves": "gaat buiten het bedrijf",
+    "leavesPersonal": "gaat buiten je werkruimte",
     "refuseWhyF": "{{name}} leert van de reden. Optioneel.",
     "refuseWhyM": "{{name}} leert van de reden. Optioneel.",
     "sheet": {
@@ -167,6 +168,7 @@
       "irreversible": "Kan niet ongedaan worden",
       "reversible": "Kan ongedaan worden",
       "external": "Gaat buiten het bedrijf",
+      "externalPersonal": "Gaat buiten je werkruimte",
       "unsent": "Er wordt niets verstuurd",
       "deletable": "Kan worden verwijderd"
     },
@@ -237,6 +239,9 @@
     "newChannelHint": "Voor een team of een onderwerp",
     "channelPlaceholder": "Kanaalnaam, bijv. marketing",
     "createChannel": "Kanaal aanmaken",
+    "newChannelHintPersonal": "Voor één onderwerp, met meerdere agents",
+    "channelPlaceholderPersonal": "Naam, bijv. reis",
+    "createChannelPersonal": "Groepsgesprek aanmaken",
     "waitIn": "in {{where}}",
     "workingNowLine_one": "{{count}} agent nu aan het werk",
     "workingNowLine_other": "{{count}} agents nu aan het werk",
@@ -247,6 +252,7 @@
       "unmute": "Ontdempen"
     },
     "firstRunLine": "{{name}} zet het team op · {{done}} van {{total}}",
+    "firstRunLinePersonal": "{{name}} richt je agents in · {{done}} van {{total}}",
     "first": {
       "title": "Begin met je eerste agent",
       "subtitle": "Geef hem een naam en zeg wat hij doet. Hij verschijnt hier, als gesprek.",
@@ -275,6 +281,8 @@
     "chat": "Gesprek met…",
     "name": "Naam",
     "channelFine": "Voor een team of een onderwerp.",
+    "channelPersonal": "Groepsgesprek",
+    "channelFinePersonal": "Voor één onderwerp, met meerdere agents.",
     "chatSearch": "Zoek een persoon of een agent",
     "to": "Aan:",
     "people": "Mensen",
@@ -287,6 +295,7 @@
     "routineHint": "Een agent doet het zelf, volgens schema",
     "wikiPage": "Wikipagina",
     "wikiHint": "Om te lezen voor het team en de agents",
+    "wikiHintPersonal": "Om te lezen voor je agents",
     "inviteHint": "Via e-mail of link",
     "agent": {
       "question": "Wat gaat hij doen?"
@@ -460,12 +469,14 @@
       "arrived": "{{name}} is bij het team gekomen",
       "meet": "Je eerste gesprek met {{name}}",
       "roleIntro": "{{role}} in je team. Vraag het in gewone woorden.",
+      "roleIntroPersonal": "{{role}}, er voor jou. Vraag het in gewone woorden.",
       "noIntro": "Vraag wat je nodig hebt, in gewone woorden.",
       "firstTitle": "Om te beginnen",
       "sendHint": "Tik om te versturen",
       "hello": "Hoi {{person}}! Ik ben {{name}}.",
       "helloNoName": "Hoi! Ik ben {{name}}.",
       "helloRole": "{{role}} in het team.",
+      "helloRolePersonal": "{{role}}, er voor jou.",
       "helloAsk": "Waar beginnen we?",
       "now": "nu",
       "start": {
@@ -787,6 +798,7 @@
     "noGroupSection": "Geen afdeling",
     "workingSection": "Aan het werk",
     "teamSection": "Team",
+    "teamSectionPersonal": "Je agents",
     "managerQuiet": "Er loopt niets",
     "state": {
       "waitsYou": "wacht op je akkoord",
@@ -1043,7 +1055,9 @@
     "title": "Jij",
     "role": {
       "owner": "eigenaar",
-      "member": "lid"
+      "member": "lid",
+      "ownerPersonal": "je persoonlijke werkruimte",
+      "memberPersonal": "een persoonlijke werkruimte die met je is gedeeld"
     },
     "appearance": "Weergave",
     "notifications": "Meldingen",
@@ -1798,6 +1812,9 @@
       "device_support": "De Mac maakt deze iPhone klaar",
       "helper_missing": "De testhelper is nog niet ingesteld",
       "helper_expired": "De testhelper moet worden vernieuwd",
+      "apple_account_missing": "Xcode op de Mac heeft een Apple Account nodig",
+      "team_limit": "Verwijder een zelfgemaakte app van deze iPhone",
+      "helper_untrusted": "Vertrouw de testhelper op deze iPhone",
       "booting": "Wordt opgestart",
       "no_driver": "Windows heeft de USB-driver van deze telefoon nodig",
       "os_too_old": "Het systeem van deze telefoon is te oud",
@@ -1914,8 +1931,12 @@
       "wifiText": "Telefoon en computer op hetzelfde wifinetwerk",
       "cable": "Toch een kabel gebruiken",
       "wifi1": "Zet Draadloze foutopsporing aan",
-      "wifi2": "Koppel hem vanaf {{host}}",
-      "wifi2Text": "Open in Android Studio op {{host}} Device Manager en dan Pair Devices Using Wi-Fi. Scan de code hier in Draadloze foutopsporing.",
+      "wifi1Text": "Vink Altijd toestaan op dit netwerk aan en tik op Toestaan.",
+      "wifi2": "Scan de code op een computer",
+      "wifi2Text": "Via Draadloze foutopsporing › Apparaat koppelen met QR-code.",
+      "wifi2Hint": "Open in agentes.chat op een computer Apparaat koppelen › Android-telefoon › Via wifi en kies {{host}}.",
+      "codeHead": "Koppelen met een koppelingscode",
+      "codeNote": "Via Draadloze foutopsporing › Apparaat koppelen met koppelingscode. Open Instellingen en agentes.chat naast elkaar, zodat de code in beeld blijft.",
       "wifiNote": "Wifi kan wegvallen na een herstart. Een kabel is betrouwbaarder.",
       "done": "{{name}} is gekoppeld",
       "openFailed": "Deze telefoon opende dat scherm niet. Zoek het in Instellingen."
@@ -1990,6 +2011,7 @@
     "loadFailed": "De connectors konden niet worden geladen.",
     "connectedCheck": "{{name}}, gekoppeld",
     "adminsOnly": "Alleen een beheerder van {{org}} koppelt diensten. Vraag het een van hen.",
+    "adminsOnlyPersonal": "Alleen wie deze werkruimte beheert, koppelt apps. Vraag het aan die persoon.",
     "canTitle": "Agents kunnen dan",
     "asks": "{{text}} · vraagt om je goedkeuring",
     "connect": "Verbinden",
@@ -2136,11 +2158,13 @@
     "zoneChange": "Wijzigen",
     "zoneTitle": "Tijdzone",
     "anotherTitle": "Hoe heet de nieuwe werkruimte?",
+    "anotherPurpose": "Waarvoor is de nieuwe werkruimte?",
     "anotherLead": "Op agentes.chat. Je blijft in {{org}} en kunt altijd wisselen.",
     "suggested": "Op basis van je e-mail bij {{domain}} stelde ik {{org}} voor.",
     "create": "Aanmaken",
     "shareMessage": "Kom bij {{org}} op agentes.chat: {{url}}",
-    "failed": "Opslaan lukte niet. Probeer het opnieuw."
+    "failed": "Opslaan lukte niet. Probeer het opnieuw.",
+    "enter": "Naar de werkruimte"
   },
   "ai": {
     "yourPlan": "Je AI-abonnement",
@@ -2465,7 +2489,6 @@
   "dashboards": {
     "homeRow": "Alleen jij · je eigen widgets",
     "loadFailed": "De dashboards konden niet worden geladen.",
-    "onlyHome": "Dashboards van de werkruimte of jouw rollen verschijnen hier.",
     "create": "Maken",
     "routineTarget": "zijn widget",
     "pin": {
@@ -2536,7 +2559,11 @@
       "title": "Stel je team van agents samen",
       "text": "Elke agent krijgt een rol en werkt met je samen in de chat.",
       "viewerTitle": "Hier staat je team van agents",
-      "viewerText": "Wie in deze werkruimte agents maakt, voegt de eerste toe, en die verschijnt hier."
+      "viewerText": "Wie in deze werkruimte agents maakt, voegt de eerste toe, en die verschijnt hier.",
+      "titlePersonal": "Laat je helpen door je eigen agents",
+      "textPersonal": "Elke agent regelt één ding voor je, gewoon in de chat.",
+      "viewerTitlePersonal": "Hier staan je agents",
+      "viewerTextPersonal": "Wie hier agents maakt, voegt de eerste toe, en die verschijnt hier."
     },
     "agentsForYou": {
       "title": "Je agents verschijnen hier",
@@ -2546,13 +2573,20 @@
       "title": "Alles wat het team maakt, op één plek",
       "text": "Rapporten, tabellen en bestanden van agents en mensen blijven hier, makkelijk te vinden.",
       "viewerTitle": "Vind wat het team maakt",
-      "viewerText": "Wat agents en mensen in gesprekken maken, verschijnt hier."
+      "viewerText": "Wat agents en mensen in gesprekken maken, verschijnt hier.",
+      "titlePersonal": "Alles wat je agents maken, op één plek",
+      "textPersonal": "Rapporten, tabellen en bestanden van je agents blijven hier, makkelijk te vinden.",
+      "viewerTitlePersonal": "Vind wat je agents maken",
+      "viewerTextPersonal": "Wat agents in je gesprekken maken, verschijnt hier."
     },
     "tasks": {
       "title": "Geef werk aan het team",
       "text": "Maak een taak voor een agent of een persoon en volg die tot het einde.",
       "viewerTitle": "Volg het werk van het team",
-      "viewerText": "Taken verschijnen hier zodra iemand de eerste maakt."
+      "viewerText": "Taken verschijnen hier zodra iemand de eerste maakt.",
+      "titlePersonal": "Geef je to-do's aan je agents",
+      "textPersonal": "Maak een taak voor een agent en volg die tot het einde.",
+      "viewerTitlePersonal": "Volg het werk van je agents"
     },
     "routines": {
       "title": "Laat herhalend werk over aan je agents",
@@ -2564,7 +2598,10 @@
       "title": "Bewaar wat het team moet weten",
       "text": "Mensen en agents lezen deze pagina's, zodat iedereen met dezelfde informatie werkt.",
       "viewerTitle": "Zoek op wat het team weet",
-      "viewerText": "Wie de wiki bewerkt, schrijft de eerste pagina, en die verschijnt hier."
+      "viewerText": "Wie de wiki bewerkt, schrijft de eerste pagina, en die verschijnt hier.",
+      "titlePersonal": "Bewaar notities die je agents kunnen lezen",
+      "textPersonal": "Je agents lezen deze pagina's en werken met wat jij schreef.",
+      "viewerTitlePersonal": "Zoek op wat hier staat"
     },
     "memory": {
       "title": "Je agents leren terwijl ze werken",
@@ -2587,13 +2624,21 @@
       "text": "Elk kanaal brengt samen wie voor een onderwerp zorgt.",
       "viewerTitle": "Hier staan de kanalen van het team",
       "viewerText": "Wie kanalen maakt, opent het eerste, en dat verschijnt hier.",
-      "action": "Kanaal maken"
+      "action": "Kanaal maken",
+      "titlePersonal": "Praat met meerdere agents tegelijk",
+      "textPersonal": "Elk groepsgesprek brengt de agents en mensen voor één onderwerp samen.",
+      "viewerTitlePersonal": "Hier staan de groepsgesprekken",
+      "viewerTextPersonal": "Wie groepsgesprekken maakt, opent het eerste, en dat verschijnt hier."
     },
     "people": {
       "title": "Werk hier samen met je team",
       "text": "Nodig mensen uit om met hen en je agents op één plek te praten.",
       "viewerTitle": "Je team verschijnt hier",
-      "viewerText": "Wie mensen uitnodigt, haalt de rest van het team erbij, en die verschijnen hier."
+      "viewerText": "Wie mensen uitnodigt, haalt de rest van het team erbij, en die verschijnen hier.",
+      "titlePersonal": "Haal je familie of vrienden erbij",
+      "textPersonal": "Nodig iemand uit om met jou en je agents op één plek te praten.",
+      "viewerTitlePersonal": "Familie en vrienden verschijnen hier",
+      "viewerTextPersonal": "Als iemand meedoet, verschijnt die hier."
     },
     "chat": {
       "title": "Alles begint met een bericht",
@@ -2613,7 +2658,11 @@
       "title": "Deel logins zonder wachtwoorden door te geven",
       "text": "Sla de logins en sleutels op die je agents voor het team gebruiken.",
       "viewerTitle": "De logins van het team verschijnen hier",
-      "viewerText": "Als iemand een login of sleutel met je deelt, verschijnt die hier."
+      "viewerText": "Als iemand een login of sleutel met je deelt, verschijnt die hier.",
+      "titlePersonal": "Bewaar gedeelde logins op één plek",
+      "textPersonal": "Sla de logins en sleutels op die je agents voor iedereen hier gebruiken.",
+      "viewerTitlePersonal": "Gedeelde logins verschijnen hier",
+      "viewerTextPersonal": "Als iemand van hier een login of sleutel met je deelt, verschijnt die hier."
     },
     "skills": {
       "title": "Leer je agents hoe jullie werken",

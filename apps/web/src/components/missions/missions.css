@@ -462,10 +462,12 @@ a.mi-ref:hover code {
   flex-direction: column;
   gap: 2px;
 }
+/* Its chips go under the title when both don't fit, so a narrow header never cuts the title to a letter. */
 .mh__line {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 4px 8px;
   min-width: 0;
 }
 .mh__title.channel__title {
@@ -552,6 +554,11 @@ a.mi-ref:hover code {
   }
   .mh__end {
     grid-column: 3;
+  }
+  /* The buttons on each side stay at the title's height, not in the middle of the lines its chips wrap to. */
+  .mh__lead,
+  .mh__end {
+    align-self: start;
   }
   .mh__mini,
   .mh[data-compact] .mh__mini,
@@ -884,7 +891,7 @@ a.mi-pr:hover {
 /* One event pill (`EventPill`) in the messages' text column: its words wrap inside the frame, its actions ("Ver
    plano", "Revogar") in it, what it opens (commands, a request's command) under it. */
 .mi-evt {
-  margin-inline: var(--thread-indent, 64px) 12px;
+  margin-inline: var(--thread-indent, calc(16px + var(--name-face) + var(--space-3))) 12px;
   animation: mi-fade 0.35s var(--out) both;
 }
 /* A command allowed without a card: quiet, the command in mono. */
@@ -929,7 +936,7 @@ a.mi-pr:hover {
 
 /* ── Ephemeral cards (`/summary`, `/plan`): only you see them ─────────────── */
 .mi-ephemeral {
-  margin: 8px 12px 4px var(--thread-indent, 64px);
+  margin: 8px 12px 4px var(--thread-indent, calc(16px + var(--name-face) + var(--space-3)));
   max-width: 640px;
 }
 .mi-ephemeral__head {
@@ -971,10 +978,13 @@ a.mi-pr:hover {
 .mi-files .ac-details__body {
   gap: 12px;
 }
-/* The tabs and the file's line make one block, one divider under it. */
+/* The tabs and the file's line make one block, one divider under it. Where the tabs scroll, they slide under the
+   dialog's edges (its room, `--bleed`). */
 .mi-files__tabs {
   overflow-x: auto;
   scrollbar-width: none;
+  margin-inline: calc(-1 * var(--bleed));
+  padding-inline: var(--bleed);
 }
 .mi-files__tabs::-webkit-scrollbar {
   display: none;
@@ -1547,7 +1557,7 @@ html:not([data-pointer]) .mi-quiet:focus-visible {
 
 /* A mission's card in place of its thread's start marker (threads proposed before the link card). */
 .mi-linkrow {
-  margin-inline: var(--thread-indent, 64px) 12px;
+  margin-inline: var(--thread-indent, calc(16px + var(--name-face) + var(--space-3))) 12px;
 }
 
 /* ── Delivery card: the mission's end (like an approval) ─────────────────── */
@@ -1652,11 +1662,10 @@ html:not([data-pointer]) .mi-quiet:focus-visible {
   gap: 10px;
   width: 100%;
 }
+/* An `.ac-iconline`: words that wrap on a phone keep the check on their first line. */
 .mi-cfg__saved {
   flex: 1;
   min-width: 0;
-  display: inline-flex;
-  align-items: center;
   gap: 6px;
   font-size: 13px;
   color: var(--faint);

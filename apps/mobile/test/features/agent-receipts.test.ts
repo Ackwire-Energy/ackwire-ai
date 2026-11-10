@@ -175,6 +175,32 @@ describe("the agents' receipt line under a person's message", () => {
     expect(line?.alert).toBe(true);
   });
 
+  test("Retry says it is trying while it is out, and the new run's claim takes the line off the failure at once", async () => {
+    const failed = applyReceiptEvent(routed({}), {
+      type: "message.handled",
+      channelId: "c1",
+      messageId: "m1",
+      agentId: "ada",
+      runId: "r1",
+      status: "failed",
+    });
+    expect(receiptLine(failed.m1)?.action).toBe("retry");
+    // What the server sends as it starts the run again, before any worker claims it.
+    const again = applyReceiptEvent(failed, {
+      type: "message.claimed",
+      channelId: "c1",
+      messageId: "m1",
+      agentId: "ada",
+      runId: "r2",
+    });
+    expect(receiptLine(again.m1)?.action).not.toBe("retry");
+    expect(receiptLine(again.m1)?.alert).not.toBe(true);
+    const src = readFileSync(join(import.meta.dir, "..", "..", "src", "features/chat/AgentReceipts.tsx"), "utf8");
+    expect(src).toContain('loading={action === "retry" && retrying}');
+    expect((await translator("pt-BR"))("receipts.retrying")).toBe("Tentando de novo…");
+    expect((await translator("en"))("receipts.retrying")).toBe("Trying again…");
+  });
+
   test("routed to nobody: two ticks, no line; 'No agent will answer' is its label (the sheet says it)", () => {
     const line = receiptLine(routed({}, { pickedBy: [] }).m1);
     expect(line?.faces).toEqual([]);

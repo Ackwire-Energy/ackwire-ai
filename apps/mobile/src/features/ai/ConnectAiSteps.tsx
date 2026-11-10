@@ -60,6 +60,7 @@ import {
   providersForKey,
 } from "@agenteschat/client/lib/providers";
 import { rightHandOnKey, thinksWithLine } from "@agenteschat/client/lib/right-hand";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -446,6 +447,7 @@ export function ConnectAiFlow(props: ConnectAiFlowProps) {
                 t,
                 org?.name ?? "",
                 managedNamed(gates.view?.computer ?? bareGates.at(choice).computer),
+                isPersonal(org),
               ),
             })
           }
@@ -835,7 +837,7 @@ function PlanWithoutAgent({
   const has = added ?? freePlanAccount(gates.accounts, choice);
   const cloud = gates.edition === "cloud";
   const managed = machines.data?.find((m) => m.kind === "managed");
-  const name = cloud ? computerName(t, org?.name ?? "", managed) : (computer?.name ?? "");
+  const name = cloud ? computerName(t, org?.name ?? "", managed, isPersonal(org)) : (computer?.name ?? "");
   const steps = gate.state === "ready" || gate.state === "preparing" || (gate.state === "offline" && signingIn);
   // Only whoever connected the computers there signs a plan in on them: a computer of their own is the way on.
   const elsewhere = gate.state === "locked" && !cloud;
@@ -940,7 +942,8 @@ function PlanSteps({
   const waited = gates.waited || justReady === true;
 
   const managed = machines.data?.find((m) => m.kind === "managed");
-  const computer = edition === "cloud" ? computerName(t, org?.name ?? "", managed) : (view?.computer?.name ?? "");
+  const computer =
+    edition === "cloud" ? computerName(t, org?.name ?? "", managed, isPersonal(org)) : (view?.computer?.name ?? "");
   const refresh = () => {
     for (const key of [
       keys.agentBrain(orgId, agentId),

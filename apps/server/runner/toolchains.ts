@@ -4,6 +4,7 @@ import type { RunnerToolchains } from "@agenteschat/adapters/machine-protocol";
 import { findAdb, findSdk } from "./adb";
 import { readJson, writeJson } from "./json-file";
 import { extraToolDirs, runTool, which } from "./phones";
+import { type AppleTeam, teamLabel, xcodeTeams } from "./wda";
 
 /**
  * What this computer can build and drive phones with (`hello.toolchains`): versions found, best effort. A look runs
@@ -18,6 +19,8 @@ export interface ToolchainsProbe {
   platform?: NodeJS.Platform;
   home?: string;
   dirs?: string[];
+  /** Tests: the teams of Xcode's Apple Accounts (default `xcodeTeams`). */
+  teams?: () => Promise<AppleTeam[]>;
 }
 
 /** The first version-looking word after `prefix` in `text`. */
@@ -41,7 +44,7 @@ export async function probeToolchains(opts: ToolchainsProbe = {}): Promise<Runne
   const git = find("git");
   const java = find("java");
   const hasJava = !stub(java) || (await say("/usr/libexec/java_home", [])) !== "";
-  const [gitV, javaV, adbV, scrcpyV, maestroV, xcodeV, nodeV] = await Promise.all([
+  const [gitV, javaV, adbV, scrcpyV, maestroV, xcodeV, nodeV, teams] = await Promise.all([
     stub(git) && !devTools ? "" : say(git, ["--version"]),
     hasJava ? say(java, ["-version"]) : "",
     say(findAdb(env, platform, home, dirs), ["version"]),
@@ -49,6 +52,7 @@ export async function probeToolchains(opts: ToolchainsProbe = {}): Promise<Runne
     say(find("maestro"), ["--version"]),
     platform === "darwin" && devTools ? say(find("xcodebuild"), ["-version"]) : "",
     say(find("node"), ["--version"]),
+    platform === "darwin" && devTools ? (opts.teams ?? (() => xcodeTeams(env)))() : [],
   ]);
   const sdk = findSdk(env, platform, home);
   const found: RunnerToolchains = {
@@ -59,6 +63,7 @@ export async function probeToolchains(opts: ToolchainsProbe = {}): Promise<Runne
     scrcpy: version(scrcpyV, /scrcpy/),
     maestro: /^\s*(\d+(?:\.\d+)+)\s*$/m.exec(maestroV)?.[1],
     xcode: version(xcodeV, /Xcode/),
+    appleTeam: teams[0] ? teamLabel(teams[0]) : undefined,
     node: version(nodeV, /^/),
   };
   return Object.fromEntries(Object.entries(found).filter(([, v]) => v !== undefined)) as RunnerToolchains;

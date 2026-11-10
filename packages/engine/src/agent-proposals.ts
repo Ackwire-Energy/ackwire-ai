@@ -22,6 +22,7 @@ import { setAgentBrain } from "./brain-settings";
 import { requireChannelAccess } from "./channels";
 import { prefixService, toolPrefixOf, toolPrefixOfConnection } from "./connectors/connections";
 import { customScope, isCustom } from "./connectors/custom";
+import { normalizeNote } from "./consultations";
 import { type ContextDeps, schedulesOf } from "./context/summaries";
 import { publishDelivery } from "./delivery";
 import { openPersonAgentDm } from "./dms";
@@ -40,6 +41,7 @@ import { checkFrequency, createRoutine, routineTimezone } from "./routines";
 import type { ScheduleRule } from "./rrule";
 import { deliverNoticeToRun } from "./run-resume";
 import { parseSchedule } from "./schedule";
+import { isPersonalWorkspace } from "./workspace-mode";
 
 const {
   agentRuns,
@@ -48,6 +50,7 @@ const {
   channelMembers,
   channels,
   connectorConnections,
+  contextProposals,
   machineAccounts,
   machines,
   mailAccounts,
@@ -385,6 +388,59 @@ export async function checkRoutine(
   };
 }
 
+/** An active agent a draft would repeat (`agentsLike`), and the draft's name. */
+export interface AgentLike {
+  draft: string;
+  name: string;
+  handle: string;
+  role: string;
+}
+
+/**
+ * Active agents that new ones would repeat: the same name, or the same role, case, accents and spacing aside. The
+ * tools that propose agents post nothing then until the person says to make another (`also_new`), since a free
+ * handle alone would put a second one on the team. One `personId` asked to remove, on a card still open, is on its
+ * way out: starting the team over, its replacement is no repeat.
+ */
+export async function agentsLike(
+  db: Database,
+  orgId: string,
+  drafts: { name?: unknown; role?: unknown }[],
+  personId: string | null,
+): Promise<AgentLike[]> {
+  const leaving = personId
+    ? sql`not exists (select 1 from ${contextProposals} where ${contextProposals.orgId} = ${agents.orgId}
+        and ${contextProposals.agentId} = ${agents.id} and ${contextProposals.requestedByUserId} = ${personId}
+        and ${contextProposals.status} = 'pending' and ${contextProposals.target} = 'agent_settings'
+        and (${contextProposals.settings} @> '[{"field":"archive"}]' or ${contextProposals.settings} @> '[{"field":"delete"}]'))`
+    : undefined;
+  const team = await db
+    .select({ name: agents.name, handle: agents.handle, role: agents.role })
+    .from(agents)
+    .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt), isNull(agents.deletedAt), leaving));
+  const same = (have: string, asked: unknown) => {
+    const plain = normalizeNote(have);
+    return plain !== "" && plain === normalizeNote(str(asked));
+  };
+  return drafts.flatMap((d) => {
+    const found = team.find((a) => same(a.name, d.name) || same(a.role, d.role));
+    return found ? [{ draft: str(d.name), ...found }] : [];
+  });
+}
+
+/** What a proposing tool answers when agents like its drafts exist: who they are, and to ask the person first. */
+export function agentsLikeText(found: AgentLike[], tool: string) {
+  const one = found.length === 1;
+  const who = found
+    .map(
+      (a) =>
+        `${a.name} (@${a.handle}${a.role ? `, ${a.role}` : ""})${normalizeNote(a.draft) === normalizeNote(a.name) ? "" : ` for ${a.draft}`}`,
+    )
+    .join(", ");
+  const another = one ? "another" : "new ones";
+  return `Not posted: ${one ? "an agent like this already exists" : "agents like these already exist"}: ${who}. Ask the person whether to change ${one ? "that one" : "those"} or make ${another}, then end your turn. Only once they say to make ${another}, call ${tool} again with also_new: true.`;
+}
+
 /**
  * The draft checked as the create-agent API checks an agent: the name, a free handle of the right shape, the
  * role, the instructions and the look; plus the channels it joins (by name: `offerableChannels`), its access to the
@@ -687,11 +743,14 @@ async function settle(
   if (!run) return;
   const [person] = await deps.db.select({ name: users.name }).from(users).where(eq(users.id, userId));
   const who = by ? `${by}, on behalf of ${person?.name ?? "a person"},` : (person?.name ?? "A person");
+  // A personal workspace has no team (ADR 0159): the agent joins its person's own.
+  const personal = await isPersonalWorkspace(deps.db, message.orgId);
+  const joined = personal ? "It is one of their agents now." : "It is on the team now.";
   const notice: Notice = {
     kind: "proposal_result",
     from: `Your proposal of the agent «${card.params.draft.name}»`,
     text: agent
-      ? `${who} created it: @${agent.handle} (${agent.name}). It is on the team now.${got ? ` ${got}` : ""}`
+      ? `${who} created it: @${agent.handle} (${agent.name}). ${joined}${got ? ` ${got}` : ""}`
       : `${who} said no. Don't propose it again unless someone asks.`,
     // `runId`: the run that proposed it, so what comes next is that run's work, for whoever is behind it.
     refs: { messageId: message.id, runId: run.id, ...(agent ? { agentId: agent.id } : {}) },

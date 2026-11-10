@@ -19,6 +19,7 @@ import type { ChoiceAnswer } from "../lib/choices";
 import { newerSetup } from "../lib/computer";
 import { CONSULT_CONVERSATION_POLL_MS, CONSULT_GROUP_POLL_MS } from "../lib/consult-group";
 import { forPeople } from "../lib/consultations";
+import { WIFI_PAIR_POLL_MS, wifiPairLive } from "../lib/devices";
 import { answerWithin, noAnswer, sendWaits } from "../lib/errors";
 import { ISSUES_VIEW_DEFAULT, type IssuesViewChange, withIssuesView } from "../lib/issues-view";
 import { LoginReadError, loginReadPasses } from "../lib/machines";
@@ -36,14 +37,14 @@ import { learnPlanModels } from "../lib/plans";
 import { setMyReaction } from "../lib/reactions";
 import { recentConversations } from "../lib/recent";
 import { replyOf } from "../lib/reply";
-import { firstVisitOf } from "../lib/right-hand";
+import { firstVisitOf, teamAnswered } from "../lib/right-hand";
 import { usagePauseRefetchMs } from "../lib/routine-view";
 import { withRead } from "../lib/seen";
 import {
   knownToolOrder,
-  SIDEBAR_DEFAULTS,
-  SIDEBAR_ITEMS,
-  SIDEBAR_SECTIONS,
+  sidebarDefaults,
+  sidebarItemOrder,
+  sidebarSections,
   withSidebarPlace,
 } from "../lib/sidebar-items";
 import { repinAgent, SIDEBAR_VIEW_DEFAULT, unpinAgents } from "../lib/sidebar-view";
@@ -126,7 +127,6 @@ import type {
   MailImapInput,
   Me,
   Message,
-  MessageMemory,
   MoveAgentsInput,
   NoticeCategory,
   NoticePrefs,
@@ -178,6 +178,7 @@ import type {
   UnreadEvent,
   WebhookProvider,
   WebhookSetup,
+  WifiPairing,
   WikiBulkFailed,
   WikiBulkTarget,
   WikiPage,
@@ -830,16 +831,25 @@ export function useTeamTemplates(orgId: string, locale: string, enabled = true) 
   });
 }
 
-/** "Usar este modelo": its card and the right hand's first question land in the person's DM with it. */
+/**
+ * "Usar este modelo": its card and the right hand's first question land in the person's DM with it. Made, it stays
+ * pending until the team is in the agents' list, its routines and channels read before it: a screen that shows the
+ * team (the onboarding's last step, the sidebar) finds them there, and nothing on it changes while it arrives.
+ */
 export function useApplyTeamTemplate(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ templateId, locale }: { templateId: string; locale?: string }) =>
       api.agents.applyTeamTemplate(orgId, templateId, locale),
-    onSuccess: ({ channelId }) => {
+    onSuccess: async ({ channelId, state }) => {
       void qc.invalidateQueries({ queryKey: keys.messages(orgId, channelId) });
-      void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
+      if (state === "created")
+        await Promise.all([
+          qc.prefetchQuery({ ...routinesQuery(api, orgId), staleTime: 0 }),
+          qc.prefetchQuery({ ...channelsQuery(api, orgId), staleTime: 0 }),
+        ]);
+      await qc.invalidateQueries({ queryKey: keys.agents(orgId) });
     },
   });
 }
@@ -1425,7 +1435,12 @@ export async function catchUpChannel(
           ? [api.chat.messages(orgId, channelId, { threadId: rootId, limit: THREAD_PAGE })]
           : [],
     );
-  const read = (await Promise.all(reads).catch(() => [])).flat();
+  const settled = await Promise.allSettled(reads);
+  // A read that failed (a deploy, a dropped connection) would leave its list without what it came for until a
+  // reload: the lists read again through the query client, which tries again.
+  if (settled.some((r) => r.status === "rejected"))
+    void qc.invalidateQueries({ queryKey: prefix, predicate: (q) => isMessageList(q.queryKey) });
+  const read = settled.flatMap((r) => (r.status === "fulfilled" ? r.value : []));
   const known = new Set(
     qc
       .getQueriesData<Message[]>({ queryKey: prefix, predicate: (q) => isMessageList(q.queryKey) })
@@ -1436,6 +1451,35 @@ export async function catchUpChannel(
   // Only what it added: this runs on every channel opened, and a reconnect reads the thread lists on its own.
   for (const threadId of new Set(added.flatMap((m) => m.threadId ?? []))) refreshRepliedThread(qc, orgId, threadId);
   return read;
+}
+
+/** The screens open on each conversation (a thread beside its channel is a second one), per query client. */
+const openScreens = new WeakMap<QueryClient, Map<string, number>>();
+
+/**
+ * A screen opened that applies a conversation's live events to its caches; call what this returns when it closes.
+ * Once its last one closes, nothing keeps those caches current: they are marked stale, not read, so the next showing
+ * reads them whatever their `staleTime`, within which it would show the conversation (and its thread lines) as it
+ * was when it closed.
+ */
+export function openConversation(qc: QueryClient, orgId: string, channelId: string): () => void {
+  const counts = openScreens.get(qc) ?? new Map<string, number>();
+  openScreens.set(qc, counts);
+  const key = `${orgId}:${channelId}`;
+  counts.set(key, (counts.get(key) ?? 0) + 1);
+  let closed = false;
+  return () => {
+    if (closed) return;
+    closed = true;
+    const left = (counts.get(key) ?? 1) - 1;
+    if (left > 0) return void counts.set(key, left);
+    counts.delete(key);
+    const conversation = ["org", orgId, "channel", channelId];
+    // A read still on its way would be joined by the next showing, which would take an answer older than itself.
+    void qc.cancelQueries({ queryKey: conversation, predicate: (q) => q.getObserversCount() === 0 });
+    void qc.invalidateQueries({ queryKey: conversation, refetchType: "none" });
+    void qc.invalidateQueries({ queryKey: keys.threads(orgId), refetchType: "none" });
+  };
 }
 
 /** A read's receipts on the copies of its messages the channel's lists hold (nothing else of them changes). */
@@ -2643,6 +2687,21 @@ export const useAgentStatuses = (orgId: string, enabled = true) => {
   });
 };
 
+/**
+ * Whether the team answered the person once (`teamAnswered`), from the agents' statuses the sidebar keeps fresh: no
+ * poll of its own.
+ */
+export const useTeamAnswered = (orgId: string, team: readonly Pick<Agent, "id">[]) => {
+  const api = useApi();
+  const statuses = useQuery({
+    queryKey: keys.agentStatus(orgId),
+    queryFn: () => api.agents.statuses(orgId),
+    staleTime: 15_000,
+    enabled: orgId.length > 0,
+  }).data;
+  return teamAnswered(team, statuses);
+};
+
 export const useAllInvitations = (orgId: string, enabled = true) => {
   const api = useApi();
   return useQuery({ queryKey: keys.allInvitations(orgId), queryFn: () => api.orgs.allInvitations(orgId), enabled });
@@ -3283,22 +3342,6 @@ export function applyReactions(
       onAgentReaction(messageId, kind);
   }
   qc.setQueryData(keys.reactions(orgId, messageId), next);
-}
-
-/** `message.memories`: the memory marks of one message, in every cached list of that channel. */
-export function cacheMessageMemories(
-  qc: ReturnType<typeof useQueryClient>,
-  orgId: string,
-  channelId: string,
-  messageId: string,
-  memories: MessageMemory[],
-) {
-  qc.setQueriesData({ queryKey: ["org", orgId, "channel", channelId] }, (data: unknown) => {
-    if (!Array.isArray(data)) return data;
-    const list = data as Message[];
-    if (!list.some((m) => m && m.id === messageId)) return data;
-    return list.map((m) => (m.id === messageId ? { ...m, memories } : m));
-  });
 }
 
 /**
@@ -4172,13 +4215,12 @@ export function useIssueColumnAction(orgId: string) {
 
 // ── Routines ─────────────────────────────────────────────────────────────────
 
+export const routinesQuery = (api: ApiClient, orgId: string) =>
+  queryOptions({ queryKey: keys.routines(orgId), queryFn: () => api.routines.list(orgId) });
+
 export const useRoutines = (orgId: string) => {
   const api = useApi();
-  return useQuery({
-    queryKey: keys.routines(orgId),
-    queryFn: () => api.routines.list(orgId),
-    refetchInterval: (q) => usagePauseRefetchMs(q.state.data),
-  });
+  return useQuery({ ...routinesQuery(api, orgId), refetchInterval: (q) => usagePauseRefetchMs(q.state.data) });
 };
 
 export const useRoutineRuns = (orgId: string, id: string | null) => {
@@ -5175,6 +5217,9 @@ export function useThreadInfo(orgId: string, threadId: string | null | undefined
     queryFn: () => api.threads.get(orgId, threadId ?? ""),
     enabled: Boolean(threadId),
     staleTime: 15_000,
+    // Every opening reads it, as its replies: the open thread clears its unread in this cache before this query
+    // mounts, which would pass for a fresh read, and its count and people kept what they were when it last read.
+    refetchOnMount: "always",
     placeholderData: () => (threadId ? cachedThreadInfo(qc, orgId, threadId) : undefined),
   });
 }
@@ -5373,9 +5418,10 @@ export const useSidebarItems = (orgId: string) => {
  * Moves one tool, or with `null` puts every tool back on its default: the sidebar changes at once and goes back if the
  * server refuses. The server keeps my other choices as it has them, so one made on another device stays, and answers
  * with every choice it keeps. The requests go one at a time, so the last answer is what stays (`onMutate` still runs
- * at once for one that waits its turn).
+ * at once for one that waits its turn). A tool put where the workspace's mode has it by default (`personal`, ADR
+ * 0158) is no choice: it is dropped, and follows the mode from then on.
  */
-export function useSetSidebarItem(orgId: string) {
+export function useSetSidebarItem(orgId: string, personal = false) {
   const api = useApi();
   const qc = useQueryClient();
   const mutationKey = ["sidebar-items", orgId];
@@ -5384,13 +5430,17 @@ export function useSetSidebarItem(orgId: string) {
     scope: { id: `sidebar-items:${orgId}` },
     mutationFn: (move: { item: SidebarItem; place: SidebarPlace } | null) =>
       move
-        ? api.orgs.setSidebarItem(orgId, move.item, move.place === SIDEBAR_DEFAULTS[move.item] ? null : move.place)
+        ? api.orgs.setSidebarItem(
+            orgId,
+            move.item,
+            move.place === sidebarDefaults(personal)[move.item] ? null : move.place,
+          )
         : api.orgs.setSidebarItems(orgId, {}),
     onMutate: async (move) => {
       await qc.cancelQueries({ queryKey: keys.sidebarItems(orgId) });
       const before = qc.getQueryData<SidebarItems>(keys.sidebarItems(orgId));
       qc.setQueryData<SidebarItems>(keys.sidebarItems(orgId), (items) =>
-        move ? withSidebarPlace(items, move.item, move.place) : {},
+        move ? withSidebarPlace(items, move.item, move.place, personal) : {},
       );
       return { before };
     },
@@ -5408,33 +5458,43 @@ export function useSetSidebarItem(orgId: string) {
   });
 }
 
-/** The sidebar's sections in my order in this workspace (the default until it loads). */
-export const useSidebarOrder = (orgId: string): SidebarSection[] => {
+/**
+ * A sidebar order's cache, per mode: the server answers an order never saved with the default of the workspace's mode
+ * (ADR 0159), so a workspace that changes mode reads it again at once.
+ */
+const sidebarOrderKey = (orgId: string, personal: boolean) =>
+  [...keys.sidebarOrder(orgId), personal ? "personal" : "team"] as const;
+const sidebarToolOrderKey = (orgId: string, personal: boolean) =>
+  [...keys.sidebarToolOrder(orgId), personal ? "personal" : "team"] as const;
+
+/** The sidebar's sections in my order in this workspace (the default of its mode until it loads). */
+export const useSidebarOrder = (orgId: string, personal = false): SidebarSection[] => {
   const api = useApi();
   return (
     useQuery({
-      queryKey: keys.sidebarOrder(orgId),
+      queryKey: sidebarOrderKey(orgId, personal),
       queryFn: () => api.orgs.sidebarOrder(orgId),
       staleTime: 60_000,
-    }).data ?? [...SIDEBAR_SECTIONS]
+    }).data ?? [...sidebarSections(personal)]
   );
 };
 
 /** Saves my section order (`null`: the default): the sidebar changes at once and goes back if the server refuses. */
-export function useSetSidebarOrder(orgId: string) {
+export function useSetSidebarOrder(orgId: string, personal = false) {
   const api = useApi();
   const qc = useQueryClient();
+  const key = sidebarOrderKey(orgId, personal);
   return useMutation({
     scope: { id: `sidebar-order:${orgId}` },
     mutationFn: (order: SidebarSection[] | null) => api.orgs.setSidebarOrder(orgId, order),
     onMutate: async (order) => {
-      await qc.cancelQueries({ queryKey: keys.sidebarOrder(orgId) });
-      const before = qc.getQueryData<SidebarSection[]>(keys.sidebarOrder(orgId));
-      qc.setQueryData<SidebarSection[]>(keys.sidebarOrder(orgId), order ?? [...SIDEBAR_SECTIONS]);
+      await qc.cancelQueries({ queryKey: key });
+      const before = qc.getQueryData<SidebarSection[]>(key);
+      qc.setQueryData<SidebarSection[]>(key, order ?? [...sidebarSections(personal)]);
       return { before };
     },
-    onError: (_error, _order, context) => qc.setQueryData(keys.sidebarOrder(orgId), context?.before),
-    onSuccess: (order) => qc.setQueryData(keys.sidebarOrder(orgId), order),
+    onError: (_error, _order, context) => qc.setQueryData(key, context?.before),
+    onSuccess: (order) => qc.setQueryData(key, order),
   });
 }
 
@@ -5523,34 +5583,35 @@ export function useSetIssuesView(orgId: string) {
 }
 
 /**
- * The sidebar's tools in my order in this workspace (the default until it loads); a tool the app gained since the
- * order was saved goes at its end, as the server's `sidebarToolOrderOf` does.
+ * The sidebar's tools in my order in this workspace (the default of its mode until it loads); a tool the app gained
+ * since the order was saved goes at its end, as the server's `sidebarToolOrderOf` does.
  */
-export const useSidebarToolOrder = (orgId: string): SidebarItem[] => {
+export const useSidebarToolOrder = (orgId: string, personal = false): SidebarItem[] => {
   const api = useApi();
   const saved = useQuery({
-    queryKey: keys.sidebarToolOrder(orgId),
+    queryKey: sidebarToolOrderKey(orgId, personal),
     queryFn: () => api.orgs.sidebarToolOrder(orgId),
     staleTime: 60_000,
   }).data;
-  return knownToolOrder(saved ?? []);
+  return knownToolOrder(saved ?? [], personal);
 };
 
 /** Saves my order of the tools (`null`: the default): the sidebar changes at once and goes back if the server refuses. */
-export function useSetSidebarToolOrder(orgId: string) {
+export function useSetSidebarToolOrder(orgId: string, personal = false) {
   const api = useApi();
   const qc = useQueryClient();
+  const key = sidebarToolOrderKey(orgId, personal);
   return useMutation({
     scope: { id: `sidebar-tool-order:${orgId}` },
     mutationFn: (order: SidebarItem[] | null) => api.orgs.setSidebarToolOrder(orgId, order),
     onMutate: async (order) => {
-      await qc.cancelQueries({ queryKey: keys.sidebarToolOrder(orgId) });
-      const before = qc.getQueryData<SidebarItem[]>(keys.sidebarToolOrder(orgId));
-      qc.setQueryData<SidebarItem[]>(keys.sidebarToolOrder(orgId), order ?? [...SIDEBAR_ITEMS]);
+      await qc.cancelQueries({ queryKey: key });
+      const before = qc.getQueryData<SidebarItem[]>(key);
+      qc.setQueryData<SidebarItem[]>(key, order ?? [...sidebarItemOrder(personal)]);
       return { before };
     },
-    onError: (_error, _order, context) => qc.setQueryData(keys.sidebarToolOrder(orgId), context?.before),
-    onSuccess: (order) => qc.setQueryData(keys.sidebarToolOrder(orgId), order),
+    onError: (_error, _order, context) => qc.setQueryData(key, context?.before),
+    onSuccess: (order) => qc.setQueryData(key, order),
   });
 }
 
@@ -5936,6 +5997,10 @@ const taskNoticeOf = (event: { type: string }) =>
 export function applyUnreadEvent(qc: QueryClient, orgId: string, event: { type: string }) {
   const e = event as UnreadEvent;
   if (e.type === "channel.activity") {
+    // Said where no screen of this app listens (a list loaded ahead, on hover or at start, counts as fresh): that
+    // conversation reads again when it is shown.
+    if (!openScreens.get(qc)?.has(`${orgId}:${e.channelId}`))
+      void qc.invalidateQueries({ queryKey: ["org", orgId, "channel", e.channelId], refetchType: "none" });
     if (e.dm) readOncePerBurst(`${orgId}:dms`, () => void qc.invalidateQueries({ queryKey: keys.dms(orgId) }));
     else readOncePerBurst(`${orgId}:channels`, () => void qc.invalidateQueries({ queryKey: keys.channels(orgId) }));
     if (e.threadId)
@@ -6350,4 +6415,28 @@ export function useAppActions(orgId: string) {
       onSuccess: done,
     }),
   };
+}
+
+/**
+ * Where a Wi-Fi pairing that `started` stands (bring your own devices), asked every 1.5 s while the computer looks
+ * for the phone, pairs or connects it. Another try, another computer or leaving the screen stops it on the computer.
+ * The QR comes only with the start, so it is kept from there.
+ */
+export function useWifiPairState(orgId: string, machineId: string | null, started: WifiPairing | undefined) {
+  const api = useApi();
+  const id = started && wifiPairLive(started) ? started.id : null;
+  const state = useQuery({
+    queryKey: ["wifi-pair-state", orgId, machineId, id],
+    queryFn: () => api.devices.wifiPairing(orgId, machineId ?? "", id ?? ""),
+    enabled: id !== null && machineId !== null,
+    gcTime: 0,
+    retry: false,
+    refetchInterval: (q) => (wifiPairLive(q.state.data ?? started) ? WIFI_PAIR_POLL_MS : false),
+    meta: { quiet: true },
+  });
+  useEffect(() => {
+    if (!id || !machineId) return;
+    return () => void api.devices.cancelWifiPairing(orgId, machineId, id).catch(() => undefined);
+  }, [api, orgId, machineId, id]);
+  return started && state.data ? { ...state.data, qr: started.qr } : started;
 }

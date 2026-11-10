@@ -95,6 +95,7 @@ import type {
   DmRead,
   EndpointCheck,
   EndpointModel,
+  FeedbackFile,
   ForeignMailbox,
   FormerAgent,
   GifKey,
@@ -229,6 +230,7 @@ import type {
   UsageQueue,
   UsageReport,
   WebhookSetup,
+  WifiPairing,
   WikiGraph,
   WikiImportResult,
   WikiPage,
@@ -532,6 +534,13 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       instance: () => request<Instance>("/api/instance"),
       telemetry: () => nullOn(404, () => request<ServerTelemetry>("/api/app/telemetry")),
       setTelemetry: (enabled) => request<ServerTelemetry>("/api/app/telemetry", { method: "PUT", json: { enabled } }),
+      sendFeedback: (input) => request<void>("/api/app/feedback", { json: input }),
+      uploadFeedbackFile: (file) => {
+        const form = new FormData();
+        form.append("file", file, file.name);
+        return files.upload<FeedbackFile>("/api/app/feedback/files", form);
+      },
+      dropFeedbackFile: (id) => request<void>(`/api/app/feedback/files/${enc(id)}`, { method: "DELETE" }),
       jev: () => nullOn(404, () => request<JevKey>("/api/app/jev")),
       saveJev: (apiKey) => request<JevKey>("/api/app/jev", { method: "PUT", json: { apiKey } }),
       checkJev: () => request<JevKey>("/api/app/jev/check", { method: "POST" }),
@@ -587,8 +596,10 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       removeAvatar: (orgId) => request<void>(`${org(orgId)}/me/avatar`, { method: "DELETE" }),
       setLogo: (orgId, input) => request<{ logo: string }>(`${org(orgId)}/logo`, { method: "PUT", json: input }),
       removeLogo: (orgId) => request<void>(`${org(orgId)}/logo`, { method: "DELETE" }),
-      billingLink: (orgId, from, returnTo) =>
-        request<{ url: string; expiresAt: string }>(`${org(orgId)}/billing-link`, { json: { from, returnTo } }),
+      billingLink: (orgId, from, returnTo, plan) =>
+        request<{ url: string; expiresAt: string }>(`${org(orgId)}/billing-link`, {
+          json: { from, returnTo, ...(plan ? { plan } : {}) },
+        }),
       limits: (orgId) => request<WorkspaceLimits>(`${org(orgId)}/limits`),
       updateMe: (orgId, input) => request<Person>(`${org(orgId)}/me`, { method: "PATCH", json: input }),
       setStatus: (orgId, input) => request<Person>(`${org(orgId)}/me/status`, { method: "PUT", json: input }),
@@ -991,6 +1002,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         }),
       cancelFollowUp: (orgId, messageId) =>
         request<void>(`${org(orgId)}/messages/${enc(messageId)}/cancel-follow-up`, { json: {} }),
+      answerGitHub: (orgId, messageId) =>
+        request<void>(`${org(orgId)}/messages/${enc(messageId)}/github-answer`, { json: {} }),
       archive: (orgId, channelId) => request<void>(`${org(orgId)}/channels/${enc(channelId)}`, { method: "DELETE" }),
       unarchive: (orgId, channelId) =>
         request<void>(`${org(orgId)}/channels/${enc(channelId)}/unarchive`, { json: {} }),
@@ -1168,6 +1181,14 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<void>(`${org(orgId)}/devices/access-requests/${enc(requestId)}/decide`, { json: { decision } }),
       deviceWait: (orgId, runId, action) =>
         request<void>(`${org(orgId)}/runs/${enc(runId)}/device-wait`, { json: { action } }),
+      startWifiPairing: (orgId, machineId, input) =>
+        request<WifiPairing>(`${org(orgId)}/devices/computers/${enc(machineId)}/wifi-pairings`, { json: input }),
+      wifiPairing: (orgId, machineId, pairingId) =>
+        request<WifiPairing>(`${org(orgId)}/devices/computers/${enc(machineId)}/wifi-pairings/${enc(pairingId)}`),
+      cancelWifiPairing: (orgId, machineId, pairingId) =>
+        request<void>(`${org(orgId)}/devices/computers/${enc(machineId)}/wifi-pairings/${enc(pairingId)}`, {
+          method: "DELETE",
+        }),
     },
     machines: {
       list: async (orgId) => (await request<{ machines: Machine[] }>(`${org(orgId)}/machines`)).machines,

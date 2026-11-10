@@ -1,4 +1,5 @@
 import type { SecretRequest, VaultScope } from "@agenteschat/client";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import { Button, Checkbox, Field, Icon, Input, Segmented, Token, TokenList } from "@agenteschat/ui";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -96,13 +97,13 @@ export function VaultSaveBlock({
               onValueChange={(scope) => set({ scope })}
               options={[
                 { value: "personal", label: t("vault.scope.personal") },
-                { value: "team", label: t("vault.scope.team") },
+                { value: "team", label: t(modeKey(org, "vault.scope.team")) },
               ]}
             />
             <span className="vlt-save__hint">
               {canManageTeam
-                ? t(value.scope === "team" ? "vault.card.teamText" : "vault.card.personalText")
-                : t("vault.card.teamLocked")}
+                ? t(value.scope === "team" ? modeKey(org, "vault.card.teamText") : "vault.card.personalText")
+                : t(modeKey(org, "vault.card.teamLocked"))}
             </span>
           </div>
           <div className="vlt-save__line">

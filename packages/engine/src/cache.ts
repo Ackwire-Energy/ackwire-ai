@@ -133,7 +133,7 @@ export type CacheOp = "delete" | "deletePrefix" | "clear";
 export const CACHE_TOPIC = "system:cache-invalidate";
 
 /**
- * Every process forgets what any process changed (ADR 0161): an invalidation of `caches` made here is published,
+ * Every process forgets what any process changed (ADR 0163): an invalidation of `caches` made here is published,
  * and one received is applied here without being published again. Without it, a worker would go on reading a revoked
  * scope, a removed member or a changed credential until its entry's TTL ran out. Returns the way to stop.
  */

@@ -418,6 +418,7 @@ async function boot(
     pubsub: adapters.pubsub,
     context: engine.context,
     artifacts: engine.artifacts,
+    feedbackFiles: { db: database.db, blobs: adapters.platformBlobs },
     voice: engine.voice,
     approvalDigest: { publicUrl: config.PUBLIC_URL, afterHours: config.APPROVAL_REMINDER_HOURS },
     mail: { deps: engine.mail, pollSeconds: config.MAIL_POLL_SECONDS },

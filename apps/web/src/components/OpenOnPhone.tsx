@@ -1,10 +1,9 @@
 import { ApiError, keys } from "@agenteschat/client";
 import { formatTimeLeft } from "@agenteschat/client/lib/actions";
 import { connectLink, isLoopback, isTailnet } from "@agenteschat/client/lib/server";
-import { Alert, Button, Dialog, DialogBody, PixelSpinner } from "@agenteschat/ui";
+import { Alert, Button, Dialog, DialogBody, PixelSpinner, QrCode } from "@agenteschat/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { encode } from "uqr";
 import { useApi } from "@/api/context";
 import { useNow } from "@/components/missions/MissionBits";
 
@@ -103,11 +102,11 @@ function PhoneCode() {
           <li>
             {t("openOnPhone.stepTailscale")}{" "}
             <a className="ac-link" href={TAILSCALE_STORES.appStore} target="_blank" rel="noreferrer">
-              App Store
+              {t("openOnPhone.appStore")}
             </a>
             {" · "}
             <a className="ac-link" href={TAILSCALE_STORES.googlePlay} target="_blank" rel="noreferrer">
-              Google Play
+              {t("openOnPhone.googlePlay")}
             </a>
           </li>
         )}
@@ -115,22 +114,5 @@ function PhoneCode() {
       </ol>
       <span className="small muted">{t("openOnPhone.private")}</span>
     </div>
-  );
-}
-
-/** Dark modules on white whatever the theme: phone cameras read that best. */
-export function QrCode({ text, label }: { text: string; label: string }) {
-  const { size, data } = encode(text, { ecc: "M", border: 2 });
-  let path = "";
-  data.forEach((row, y) => {
-    row.forEach((dark, x) => {
-      if (dark) path += `M${x} ${y}h1v1h-1z`;
-    });
-  });
-  return (
-    <svg viewBox={`0 0 ${size} ${size}`} role="img" aria-label={label} shapeRendering="crispEdges">
-      <rect width={size} height={size} fill="#fff" />
-      <path d={path} fill="#000" />
-    </svg>
   );
 }

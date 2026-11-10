@@ -26,7 +26,7 @@ test("Sua IA is one status: what answers me, by its logo and what it is to me, a
   const screen = readFileSync(join(import.meta.dir, "../../src/features/right-hand/SettingsScreen.tsx"), "utf8");
   const profile = readFileSync(join(import.meta.dir, "../../src/features/agents/AgentProfileScreen.tsx"), "utf8");
   // The four states come from the client's rule, as on the web (ADR 0137 §11).
-  expect(screen).toContain('const status = mineStatus(view, meId ?? "", platform);');
+  expect(screen).toContain('const status = mineStatus(view, meId ?? "", platform, agent.brain?.maker);');
   for (const kind of ["own", "key", "plan"]) expect(screen).toContain(`status.kind === "${kind}"`);
   // A plan of mine or lent to me: its maker's logo, whose it is, Trocar, and back to the workspace's in one tap.
   expect(screen).toContain('leading={<ProviderLogo id={status.brain} size="sm" />}');

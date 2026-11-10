@@ -300,7 +300,13 @@ describe("the Cloud's plan gate tells the truth", () => {
 
   test("on the phone a hold closes keys in words, with the same way out", () => {
     const t = ((key: string, o?: { a: string; b: string }) => (o ? `${o.a} ${o.b}` : key)) as unknown as TFunction;
-    expect(planHoldPhoneLine(t, true, true)).toBe("connectAi.key.closed connectAi.billingWeb");
+    expect(planHoldPhoneLine(t, true, "keys")).toBe("connectAi.key.closed connectAi.billingWeb");
+  });
+
+  test("on the phone the onboarding's team waits for its plan in words, with the same way out", () => {
+    const t = ((key: string, o?: { a: string; b: string }) => (o ? `${o.a} ${o.b}` : key)) as unknown as TFunction;
+    expect(planHoldPhoneLine(t, true, "team")).toBe("standing.billing.teamReady connectAi.billingWeb");
+    expect(planHoldPhoneLine(t, false, "team")).toBe("standing.billing.teamReady standing.billing.askAdmin");
   });
 
   test("a dimmed plan's rows always have words: the hold's, the computer's, or that it has none", () => {
@@ -970,6 +976,21 @@ describe("a card says the real cause, not that the agent has no AI", () => {
     expect(serverBody(pt, "…", meta("commands_off"))).toBe(
       "Agora não consigo responder: os comandos estão desligados no computador do meu plano.",
     );
+  });
+
+  test("the right hand's run nobody asked for never says to connect your plan: only a key, for who sets its AI", () => {
+    expect(card("plan_unattended")?.planLine).toBe("plan_unattended");
+    expect(pt("noAi.rightHand.plan_unattended", { name: "Bento" })).toBe(
+      "Bento não respondeu: o pedido não veio de uma pessoa, e o plano do workspace só atende o próprio dono.",
+    );
+    expect(serverBody(pt, "…", meta("plan_unattended"))).toBe(
+      "Não respondi: o pedido não veio de uma pessoa, e o plano do workspace só atende o próprio dono.",
+    );
+    const rightHand = { ownerUserId: "u1", builtin: "right_hand" as const };
+    expect(planLineFix("plan_unattended", rightHand, "u1", { permissions: [] })).toBe("useKey");
+    expect(planLineFix("plan_unattended", rightHand, "u2", { permissions: ["manage_agents"] })).toBe("useKey");
+    // A member's own plan never answers it: no Connect for them.
+    expect(planLineFix("plan_unattended", rightHand, "u2", { permissions: [] })).toBeNull();
   });
 
   test("a wait that doesn't pass by itself names its cause and who fixes it", () => {

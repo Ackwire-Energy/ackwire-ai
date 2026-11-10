@@ -172,9 +172,11 @@
   align-items: center;
   gap: 12px;
 }
+/* Out over the page's side room: a chart wider than the page slides under the page's edges as it scrolls. */
 .team-tree {
   overflow-x: auto;
-  padding-bottom: 8px;
+  margin-inline: calc(-1 * var(--page-x));
+  padding: 0 var(--page-x) 8px;
 }
 .team-tree__top {
   position: relative;

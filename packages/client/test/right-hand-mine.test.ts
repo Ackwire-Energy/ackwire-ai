@@ -34,6 +34,10 @@ test("without a plan of mine: the workspace's key, this server's own where it ha
   expect(mineStatus(ws({ brain: "model", ownerId: null, servesYou: true, key: null }), "u-me", true)).toEqual({
     kind: "key",
   });
+  // This server's own key, by the maker the right hand's models come from: its logo and name, never a key glyph.
+  expect(
+    mineStatus(ws({ brain: "model", ownerId: null, servesYou: true, key: null }), "u-me", true, "anthropic"),
+  ).toEqual({ kind: "key", label: "Claude", provider: "anthropic" });
   expect(mineStatus(ws({ brain: "codex", ownerId: "u-ana", servesYou: true }), "u-me", false)).toEqual({
     kind: "plan",
     brain: "codex",

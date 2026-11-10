@@ -19,6 +19,7 @@ import {
   machineTitle,
 } from "@agenteschat/client/lib/machines";
 import { can } from "@agenteschat/client/lib/permissions";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import {
   Card,
   CardHeader,
@@ -92,7 +93,7 @@ export function useNoComputer() {
     /** `current`: the agent has no computer now (the option shows for it even when not offered). */
     choice: (current: boolean) => noComputerChoice(setup, current),
     label: (choice: NoComputer) =>
-      choice === "workspace" ? t("computerSetup.title", { org: org.name }) : t("computer.target.none"),
+      choice === "workspace" ? t(modeKey(org, "computerSetup.title"), { org: org.name }) : t("computer.target.none"),
   };
 }
 

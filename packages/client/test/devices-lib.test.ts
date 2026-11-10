@@ -5,6 +5,7 @@ import type { ComputerDevice, DeviceAudience, PhoneDevice } from "../src/api/typ
 import {
   androidStage,
   audienceWords,
+  controlRefusalText,
   deviceCounts,
   deviceNoticeOf,
   deviceRows,
@@ -12,11 +13,19 @@ import {
   deviceWaitOf,
   iphoneSteps,
   linkPhase,
+  mayTakePhone,
   narrowsAudience,
+  phoneCloseState,
+  phoneScreenCover,
+  phoneScreenUrl,
+  screenGesture,
   statusDetail,
   statusPill,
   waitEndedText,
   waitText,
+  wifiHosts,
+  wifiPairLive,
+  wifiPairText,
 } from "../src/lib/devices";
 
 const i18n = i18next.createInstance();
@@ -159,11 +168,22 @@ describe("connecting a phone", () => {
   });
 
   test("iPhone: steps before the phone's reason are done, that one waits on the person", () => {
-    const mac = computer({ toolchains: { xcode: "27.0" } });
-    expect(iphoneSteps(mac, null)).toMatchObject({ xcode: "done", tools: "done", connected: "current" });
+    const mac = computer({ toolchains: { xcode: "27.0", appleTeam: "Sam Rivera (Personal Team)" } });
+    expect(iphoneSteps(mac, null)).toMatchObject({
+      xcode: "done",
+      tools: "done",
+      account: "done",
+      connected: "current",
+    });
     expect(iphoneSteps(computer({}), null).xcode).toBe("needs");
+    // No Apple Account in Xcode yet: that's the person's step.
+    expect(iphoneSteps(computer({ toolchains: { xcode: "27.0" } }), null)).toMatchObject({
+      account: "needs",
+      connected: "waiting",
+    });
     const iphone = phone({ platform: "ios", status: { kind: "needs_you", reason: "developer_mode_off" } });
     expect(Object.values(iphoneSteps(mac, iphone))).toEqual([
+      "done",
       "done",
       "done",
       "done",
@@ -173,6 +193,51 @@ describe("connecting a phone", () => {
       "waiting",
     ]);
     expect(Object.values(iphoneSteps(mac, phone({ platform: "ios" }))).every((s) => s === "done")).toBe(true);
+    // The Mac builds the test helper by itself; trusting it on the iPhone is the person's.
+    const at = (status: PhoneDevice["status"]) => iphoneSteps(mac, phone({ platform: "ios", status }));
+    expect(at({ kind: "preparing", reason: "helper_missing" }).helper).toBe("current");
+    // Its build failed: the person sees it.
+    expect(at({ kind: "needs_you", reason: "helper_missing" }).helper).toBe("needs");
+    expect(at({ kind: "needs_you", reason: "helper_untrusted" }).helper).toBe("needs");
+    expect(at({ kind: "needs_you", reason: "team_limit" }).helper).toBe("needs");
+    // Plugged in, trusted and in Developer Mode before the Mac looks for the account.
+    expect(at({ kind: "needs_you", reason: "apple_account_missing" })).toMatchObject({
+      account: "needs",
+      connected: "done",
+      developerMode: "done",
+      uiAutomation: "waiting",
+    });
+  });
+});
+
+describe("pairing over Wi-Fi", () => {
+  test("computers one may manage that run as a person; the live line, then the cause and the way out", () => {
+    const hosts = [
+      computer({ id: "mine" }),
+      computer({ id: "theirs", mayManage: false }),
+      computer({ id: "server", systemMode: true }),
+      computer({ id: "cloud", machineKind: "managed" }),
+    ];
+    expect(wifiHosts(hosts).map((h) => h.id)).toEqual(["mine"]);
+    const line = (p: Parameters<typeof wifiPairText>[1]) => wifiPairText(t, p, "Sam's MacBook Pro");
+    expect(line({ state: "waiting", way: "qr" })).toBe("Waiting for the phone to scan…");
+    expect(line({ state: "pairing", way: "qr" })).toBe("Found a phone. Pairing…");
+    expect(line({ state: "connected", way: "qr" })).toBe("Paired. Connecting…");
+    expect(line({ state: "failed", way: "qr", reason: "same_wifi" })).toBe(
+      "Couldn't reach the phone. Put it on the same Wi-Fi as Sam's MacBook Pro and try again.",
+    );
+    expect(line({ state: "failed", way: "code", reason: "refused" })).toBe(
+      "The phone didn't take that code. Check the code and the address, then pair again.",
+    );
+    expect(line({ state: "failed", way: "qr", reason: "refused" })).toBe(
+      "The phone stopped the pairing. Keep its pairing screen open and try again.",
+    );
+    expect(line({ state: "failed", way: "qr" })).toBe("The pairing didn't work. Try again, or use a cable.");
+    expect([
+      wifiPairLive({ state: "connecting" }),
+      wifiPairLive({ state: "connected" }),
+      wifiPairLive(undefined),
+    ]).toEqual([true, false, false]);
   });
 });
 
@@ -243,5 +308,97 @@ describe("in the chat and the inbox", () => {
       forName: "Rui",
     });
     expect(deviceNoticeOf({ kind: "mention", source: {}, latest: {} } as never)).toBeNull();
+  });
+});
+
+describe("a phone's screen", () => {
+  const inUse = (agentId: string | null, userId: string | null) =>
+    ({
+      kind: "in_use",
+      agentId,
+      agentName: agentId ? "Lia" : null,
+      userId,
+      userName: userId === "u-rui" ? "Rui Tanaka" : "Sam Rivera",
+      since: at(14, 10),
+    }) as const;
+
+  test("its socket, and what each close means", () => {
+    expect(phoneScreenUrl("https://app.example.com", { orgId: "o", phoneId: "p", mode: "watch", text: true })).toBe(
+      "wss://app.example.com/api/phone-screen?orgId=o&phoneId=p&mode=watch&text=1",
+    );
+    expect(phoneCloseState(4410, "in_use")).toEqual({ state: "connecting", retry: "now", control: "in_use" });
+    expect(phoneCloseState(4410, "control ended").control).toBe("lost");
+    expect(phoneCloseState(4502, "unsupported").control).toBe("unsupported");
+    // A workspace on hold starts nothing on its computers: control is refused, watching goes on.
+    expect(phoneCloseState(4502, "held").control).toBe("held");
+    expect(controlRefusalText(t, "held", { name: "Pixel 8", host: "Sam's MacBook Pro", agent: "Lia" })).toBe(
+      "This workspace is paused, so control waits until it's active again.",
+    );
+    expect(phoneCloseState(4502, "phone_missing")).toEqual({ state: "offline", retry: "later" });
+    expect(phoneCloseState(4502, "runner_outdated")).toEqual({ state: "outdated", retry: "never" });
+    expect(phoneCloseState(4403)).toEqual({ state: "forbidden", retry: "never" });
+    expect(phoneCloseState(1006)).toEqual({ state: "connecting", retry: "later" });
+  });
+
+  test("who may take control: free or theirs, or an agent they may stop; never another person's", () => {
+    expect(mayTakePhone(phone({ mayManage: false }), "u-rui")).toBe(true);
+    expect(mayTakePhone(phone({ mayUse: false }), "u-sam")).toBe(false);
+    const agent = phone({ mayManage: false, status: inUse("a-lia", "u-sam") });
+    expect(mayTakePhone(agent, "u-rui")).toBe(false);
+    expect(mayTakePhone(agent, "u-sam")).toBe(true);
+    expect(mayTakePhone({ ...agent, mayManage: true }, "u-rui")).toBe(true);
+    const person = phone({ status: inUse(null, "u-rui") });
+    expect(mayTakePhone(person, "u-sam")).toBe(false);
+    expect(mayTakePhone(person, "u-rui")).toBe(true);
+    // The pill names a person in control, and its detail is only the time.
+    expect(statusPill(t, inUse(null, "u-rui"))).toBe("In use by Rui");
+    expect(statusDetail(t, "en-US", inUse(null, "u-rui"), { now: NOW })).toBe("since 2:10 PM");
+  });
+
+  test("what covers it: the cause, and Try again only where nothing retries by itself", () => {
+    const host = "Sam's MacBook Pro";
+    expect(phoneScreenCover(t, "live", phone({}), host)).toBeNull();
+    expect(phoneScreenCover(t, "connecting", phone({}), host)).toEqual({ title: "Opening the screen…", spinner: true });
+    // Offline or waiting on its person, by its state: no socket, the fix in words.
+    expect(phoneScreenCover(t, "live", phone({ status: { kind: "offline", lastSeenAt: null } }), host)?.text).toBe(
+      "It shows again by itself once Sam's MacBook Pro sees it.",
+    );
+    expect(phoneScreenCover(t, "live", phone({ status: { kind: "needs_you", reason: "unauthorized" } }), host)).toEqual(
+      { title: "Pixel 8 isn't ready", text: "Tap Allow on the phone" },
+    );
+    expect(phoneScreenCover(t, "live", phone({ mayUse: false }), host)?.title).toBe("You can't see this screen");
+    const iphone = phone({ platform: "ios", name: "Sam's iPhone 16" });
+    expect(phoneScreenCover(t, "unavailable", iphone, host)).toMatchObject({
+      text: "Finish the iPhone setup on the Mac to add the test helper it needs.",
+      retry: true,
+    });
+    expect(controlRefusalText(t, "in_use", { name: "Pixel 8", host, agent: "Lia" })).toBe(
+      "Only its owner, an admin or the person Lia works for can take control.",
+    );
+    expect(controlRefusalText(t, "lost", { name: "Pixel 8", host, agent: "Lia" })).toBe(
+      "Control ended. You're watching Pixel 8 again.",
+    );
+  });
+
+  test("a press is a tap, a drag a swipe, a hold in place a long press", () => {
+    expect(screenGesture({ x: 0.5, y: 0.5, at: 0 }, { x: 0.505, y: 0.5, at: 120 })).toEqual({
+      type: "tap",
+      x: 0.5,
+      y: 0.5,
+    });
+    expect(screenGesture({ x: 0.5, y: 0.9, at: 0 }, { x: 0.5, y: 0.2, at: 250 })).toEqual({
+      type: "swipe",
+      x1: 0.5,
+      y1: 0.9,
+      x2: 0.5,
+      y2: 0.2,
+      ms: 250,
+    });
+    expect(screenGesture({ x: 0.3, y: 0.3, at: 0 }, { x: 0.3, y: 0.3, at: 900 })).toMatchObject({
+      type: "swipe",
+      ms: 900,
+    });
+    // Off the picture's edge: kept on it.
+    expect(screenGesture({ x: 0.5, y: 0.5, at: 0 }, { x: 1.4, y: -0.2, at: 200 })).toMatchObject({ x2: 1, y2: 0 });
   });
 });

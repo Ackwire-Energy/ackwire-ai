@@ -5,7 +5,7 @@ import { errorText } from "@agenteschat/client/lib/errors";
 import type { TimelineItem } from "@agenteschat/client/lib/timeline";
 import type { TFunction } from "i18next";
 import { failedOffline } from "@/chat/offline";
-import { dividerIsFar, firstNewKey, pillParts, unseenOf } from "@/chat/unseen";
+import { dividerIsFar, earlierKey, firstNewKey, landedKey, pillParts, unseenOf } from "@/chat/unseen";
 import { createI18n } from "@/i18n";
 import { createStreamsStore } from "@/realtime/context";
 
@@ -58,6 +58,17 @@ describe("the round button's count and the 'Novas' divider", () => {
     expect(pillParts(t, 4, ["Marina", "Ada", "João", "Ana"], [])).toEqual(["4 novas", "Marina, Ada e mais 2"]);
     expect(pillParts(t, 0, [], ["Theo"])).toEqual(["Theo escrevendo"]);
     expect(pillParts(t, 1, ["Ada"], [], true)).toEqual(["1 nova", "Ada", "mencionaram você"]);
+  });
+
+  test("a reply that took its block's place above newer rows is where the divider goes; its run's older message isn't", () => {
+    const shown = new Set(["a", "card", "b"]);
+    const items = [msg("a", marina), msg("card", ada), msg("reply", ada), msg("b", marina)];
+    expect(landedKey(items, new Map([["r1", "reply"]]), new Set(["r1"]), shown)).toBe("reply");
+    expect(earlierKey(items, "b", "reply")).toBe("reply");
+    expect(earlierKey(items, null, "reply")).toBe("reply");
+    // Its run ended with nothing more to say: its last message is the card it posted before, read already.
+    const ended = [msg("a", marina), msg("card", ada), msg("b", marina)];
+    expect(landedKey(ended, new Map([["r1", "card"]]), new Set(["r1"]), shown)).toBeNull();
   });
 
   test("the pill lands on the divider only when it is more than 1.2 screens from the end", () => {

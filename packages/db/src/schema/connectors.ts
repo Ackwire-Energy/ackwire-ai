@@ -3,6 +3,7 @@ import {
   bigint,
   boolean,
   date,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -14,7 +15,9 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import { agents } from "./agents";
 import { users } from "./auth";
+import { channels } from "./chat";
 import { organizations } from "./tenancy";
 
 /**
@@ -285,6 +288,41 @@ export const githubAppInstallations = pgTable(
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index().on(t.orgId)],
+);
+
+/**
+ * The GitHub items agents opened or wrote on (pull requests, issues, discussions, their reviews and comments), with the
+ * conversation each came from: what happens on one later wakes that agent there. Issues, pull requests and
+ * discussions share a repository's numbers, so `repo` and `number` name one item. The agent that opened an item keeps
+ * it; one it only wrote on goes to whichever agent wrote on it last.
+ */
+export const githubItems = pgTable(
+  "github_items",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    orgId: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    /** `owner/name`, lowercased: GitHub's names don't tell case apart. */
+    repo: text().notNull(),
+    number: integer().notNull(),
+    agentId: uuid().notNull(),
+    /** The agent opened it: its being merged or closed tells the agent. */
+    authored: boolean().notNull().default(false),
+    channelId: uuid()
+      .notNull()
+      .references(() => channels.id, { onDelete: "cascade" }),
+    /** Where the run's replies went: a thread's root, or null for the conversation's main timeline. */
+    threadId: uuid(),
+    /** The last run on a task that wrote on it, else the last that did: its task is what a merge or a close changes. */
+    runId: uuid(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.orgId, t.agentId], foreignColumns: [agents.orgId, agents.id] }).onDelete("cascade"),
+    unique().on(t.orgId, t.repo, t.number),
+  ],
 );
 
 /** How a connector's tools reach it: our own code, an MCP server, or this server's Composio project. */

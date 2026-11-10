@@ -820,6 +820,22 @@ describe("Aceitar convite", () => {
     expect(screen().getByRole("alert").textContent).toBe("Esse é o seu nome? É igual à senha que você digitou.");
   });
 
+  test("a personal workspace's invitation goes by whose it is, never by its name (ADR 0159)", async () => {
+    await openInvite({ orgName: "Pessoal", mode: "personal" });
+    // On top: whose workspace it is, which already says who invited.
+    const org = document.querySelector(".invite__org")?.textContent ?? "";
+    expect(org).toContain("Workspace de Ana Souza");
+    expect(org).not.toContain("Pessoal");
+    expect(org).not.toContain("Convite de");
+    expect(heading()).toBe("Oi. Ana chamou você para entrar.");
+    expect(lead()).toBe("Para começar: como os agentes devem te chamar?");
+    await type("Seu nome", "Rafael Costa");
+    await press(/^Continuar(?! com)/, 2);
+    expect(lead()).toBe("Com ela você entra agora e nas próximas vezes.");
+    expect(screen().getByRole("button", { name: "Entrar" })).toBeTruthy();
+    expect(document.body.textContent).not.toContain("Pessoal");
+  });
+
   test("an account with a password: only its password, Esqueci a senha in place, its provider too; then in", async () => {
     let tries = 0;
     const { auth, calls } = createFakeAuth();
@@ -964,6 +980,17 @@ describe("Aceitar convite", () => {
     expect(lead()).toBe("Este convite já foi usado, em 12 out. É só abrir.");
     await press("Abrir a Acme", 10);
     expect(router.state.location.pathname.startsWith(`/org/${ORG_ID}`)).toBe(true);
+    cleanup();
+
+    // A member of a personal workspace: never its name (ADR 0159).
+    const mine = seedState({ invitationStates: { used: { ...used, orgName: "Pessoal" } } });
+    const membership = mine.me?.organizations[0];
+    if (membership) membership.mode = "personal";
+    await renderApp("/invite/used", { api: createFakeApi(mine) });
+    await settle(4);
+    expect(heading()).toBe("Você já entrou.");
+    expect(screen().getByRole("button", { name: "Abrir" })).toBeTruthy();
+    expect(document.body.textContent).not.toContain("Pessoal");
     cleanup();
 
     // Signed out: signing in on the way.
@@ -1235,23 +1262,33 @@ describe("Onboarding: the workspace's name", () => {
     state.authConfig = { workspaceComputer: false, billingUrl, ...patch.authConfig };
     const api = createFakeApi(state);
     const r = await renderApp("/onboarding", { api });
+    // First what it is for (ADR 0159): a company or team names it next. Where no workspace may be made, no question.
+    const team = screen().queryByRole("radio", { name: /Para minha empresa ou time/ });
+    if (team) {
+      await click(team, 8);
+      await click(button("Continuar"), 8);
+    }
     return { ...r, api, state };
   };
   const button = (name: string | RegExp) => screen().getByRole("button", { name });
-  const click = async (el: HTMLElement, rounds = 4) => {
+  /** What it is for: a company or team, then its name (ADR 0159). */
+  const toName = async () => {
+    await click(screen().getByRole("radio", { name: /Para minha empresa ou time/ }), 8);
+    await click(button("Continuar"), 8);
+  };
+  async function click(el: HTMLElement, rounds = 4) {
     await act(async () => fireEvent.click(el));
     await settle(rounds);
-  };
+  }
   const next = () => click(button("Continuar"), 8);
   const calls = (state: ReturnType<typeof seedState>, method: string) => state.calls.filter((c) => c.method === method);
 
-  test("one question, asked by the right hand, not a guide among the presets; no steps to count", async () => {
+  test("the name, step 1 on the rail, Lodi's line on its horizon, never a guide among the presets", async () => {
     await start();
     expect(screen().getByRole("heading", { name: "Como se chama o seu workspace?" })).toBeTruthy();
-    expect(document.querySelector(".onb__host-name")?.textContent).toBe("Lodi");
+    expect(screen().getByRole("navigation", { name: "Passos para começar" })).toBeTruthy();
+    expect(document.querySelector(".onb__say")?.textContent).toContain("Eu sou o Lodi.");
     expect(document.body.textContent).not.toContain("Oi, eu sou a Ada");
-    expect(screen().queryByRole("navigation", { name: "Passos para começar" })).toBeNull();
-    expect(document.querySelector(".onb__progress")).toBeNull();
     // A name is no misspelling.
     expect(screen().getByLabelText("Nome").getAttribute("spellcheck")).toBe("false");
     expect(button("Continuar").hasAttribute("disabled")).toBe(true);
@@ -1268,16 +1305,17 @@ describe("Onboarding: the workspace's name", () => {
     expect(bar.contains(note)).toBe(false);
     expect(note.compareDocumentPosition(bar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect([...bar.children].map((b) => b.textContent)).toEqual([expect.stringMatching(/^Continuar/)]);
-    // It holds the screen's bottom, clear of a phone's home bar, and a field being typed in scrolls clear of it.
+    // Right under the step, it holds the screen's bottom only while the step is taller than the screen, clear of a
+    // phone's home bar, and a field being typed in scrolls clear of it.
     const css = readFileSync(join(import.meta.dir, "../src/pages/onboarding.css"), "utf8");
     const rule = (selector: string, from = 0) => css.slice(css.indexOf(`${selector} {`, from)).split("}")[0] ?? "";
     expect(rule("\n.onb__actions")).toContain("position: sticky");
     expect(rule("\n.onb__actions")).toContain("bottom: 0");
     expect(rule("\n.onb__body")).not.toMatch(/(^|\n)\s*margin:/);
-    expect(rule("\n.onb__actions")).toContain("margin: auto calc(-1 * var(--onb-gutter)) 0");
-    expect(rule("\n.onb__body")).toContain("--onb-gutter: clamp(16px, 4vw, 32px)");
+    expect(rule("\n.onb__actions")).toContain("margin: 0 calc(-1 * var(--onb-gutter))");
+    expect(rule("\n.onb__cols")).toContain("--onb-gutter: clamp(16px, 4vw, 32px)");
     expect(rule("\n.onb__actions")).toContain(
-      "padding: 0 var(--onb-gutter) calc(env(safe-area-inset-bottom, 0px) + 24px)",
+      "padding: var(--space-1) var(--onb-gutter) calc(env(safe-area-inset-bottom, 0px) + var(--space-6))",
     );
     expect(rule("\n.onb__actions")).toContain("background: var(--pane)");
     expect(rule("\nhtml:has(.onb)")).toContain("scroll-padding-bottom: 104px");
@@ -1294,7 +1332,15 @@ describe("Onboarding: the workspace's name", () => {
     };
     const { router } = await renderApp("/onboarding", { api: createFakeApi(state), auth });
     await settle(4);
-    await click(button("Sair"), 6);
+    // In the account menu on the rail (Radix: keyboard).
+    const me = button("Sua conta");
+    me.focus();
+    await act(async () => {
+      fireEvent.keyDown(me, { key: "Enter" });
+      fireEvent.keyUp(me, { key: "Enter" });
+    });
+    await settle(2);
+    await click(screen().getByRole("menuitem", { name: "Sair" }), 6);
     expect(authCalls.map((c) => c.method)).toEqual(["signOut"]);
     expect(router.state.location.pathname).toBe("/login");
   });
@@ -1309,10 +1355,14 @@ describe("Onboarding: the workspace's name", () => {
     expect([...document.querySelectorAll(".onb__note")].map((n) => n.textContent)).toEqual([
       "Novos workspaces precisam de convite por enquanto. Peça um em suporte@agentes.chat.",
     ]);
-    await type("Nome", "Acme Saúde");
+    // It stops at what the workspace is for (ADR 0159): the answer is picked, and Continuar stays off.
+    expect(
+      screen()
+        .getByRole("radio", { name: /Para minha empresa ou time/ })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
     expect(button("Continuar").hasAttribute("disabled")).toBe(true);
-    await act(async () => fireEvent.keyDown(screen().getByLabelText("Nome"), { key: "Enter" }));
-    await settle(4);
+    expect(screen().queryByLabelText("Nome")).toBeNull();
     expect(calls(state, "orgs.create")).toEqual([]);
   });
 
@@ -1361,7 +1411,14 @@ describe("Onboarding: the workspace's name", () => {
     const css = sheet("pages/onboarding.css");
     const desktop = sheet("desktop.css");
     const rule = (from: string, selector: string) => from.slice(from.indexOf(`${selector} {`)).split("}")[0] ?? "";
-    const px = (decls: string, prop: string) => Number(decls.match(new RegExp(`\\n\\s*${prop}: (-?[\\d.]+)px`))?.[1]);
+    const tokens = readFileSync(join(import.meta.dir, "../../../packages/ui/src/styles/tokens.css"), "utf8");
+    // A length in px, through the kit's token where the rule names one (`var(--control-h-sm)`).
+    const px = (decls: string, prop: string) => {
+      const value = decls.match(new RegExp(`\\n\\s*${prop}: ([^;\\s]+)`))?.[1] ?? "";
+      const token = value.match(/^var\((--[\w-]+)\)$/)?.[1];
+      const raw = token ? tokens.match(new RegExp(`${token}: (-?[\\d.]+)px`))?.[1] : value.match(/^(-?[\d.]+)px/)?.[1];
+      return Number(raw);
+    };
     // No room above the step that follows what's in it, centring it or pinned as it opens.
     const rows = css.match(/\.onb__body[^{]*::before \{[^}]*\}/g) ?? [];
     expect(rows.filter((r) => /auto|--onb-lead/.test(r))).toEqual([]);
@@ -1427,6 +1484,7 @@ describe("Onboarding: the workspace's name", () => {
       expect(note()).toBe("Mandamos um link de confirmação para walter@acme.com.br.Mandar outro link");
       // Nothing waits for it.
       expect(button("Continuar").hasAttribute("disabled")).toBe(true);
+      await toName();
       await type("Nome", "Acme");
       expect(button("Continuar").hasAttribute("disabled")).toBe(false);
 
@@ -1454,6 +1512,8 @@ describe("Onboarding: the workspace's name", () => {
     state.me.user.emailVerified = false;
     await renderApp("/onboarding", { api: createFakeApi(state) });
     await settle(4);
+    expect(document.querySelector(".onb__note")).toBeNull();
+    await toName();
     expect(screen().getByRole("heading", { name: "Como se chama o seu workspace?" })).toBeTruthy();
     expect(document.querySelector(".onb__note")).toBeNull();
   });

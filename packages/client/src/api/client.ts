@@ -132,6 +132,8 @@ import type {
   EndpointCheck,
   EndpointModel,
   EndpointStyle,
+  FeedbackFile,
+  FeedbackInput,
   ForeignMailbox,
   FormerAgent,
   GifKey,
@@ -316,6 +318,7 @@ import type {
   UsageReport,
   WebhookProvider,
   WebhookSetup,
+  WifiPairing,
   WikiBulkFailed,
   WikiBulkTarget,
   WikiFolderAudience,
@@ -332,6 +335,7 @@ import type {
   WorkspaceActionCard,
   WorkspaceActionCardView,
   WorkspaceLimits,
+  WorkspaceMode,
 } from "./types";
 
 /**
@@ -346,6 +350,11 @@ export interface ApiClient {
     /** `null` unless I am the installation's owner (and not on agentes.chat itself). */
     telemetry(): Promise<ServerTelemetry | null>;
     setTelemetry(enabled: boolean): Promise<ServerTelemetry>;
+    /** By email to whoever runs the server; only where it takes feedback (`AuthConfig.feedback`). */
+    sendFeedback(input: FeedbackInput): Promise<void>;
+    /** A picture or a video for the feedback being written: kept an hour unless it is sent. */
+    uploadFeedbackFile(file: File): Promise<FeedbackFile>;
+    dropFeedbackFile(id: string): Promise<void>;
     /** `null` unless I am the installation's owner on a self-hosted server. */
     jev(): Promise<JevKey | null>;
     /** Checked with TypeSafe first: `jev_key_invalid` (422) when it refuses, `jev_key_env` (409) with an env key. */
@@ -439,6 +448,8 @@ export interface ApiClient {
     create(input: {
       name: string;
       context?: string;
+      /** Who it is for (ADR 0159); a team's when left out. */
+      mode?: WorkspaceMode;
     }): Promise<{ organization: Organization; generalChannelId: string }>;
     /**
      * Its owner's progress in setting it up: the furthest step reached (it only moves forward), or `finished`. Null
@@ -502,9 +513,14 @@ export interface ApiClient {
      * A signed link that opens the workspace's plan and billing on the billing service (owners and admins; ADR
      * 0079). Navigate to it at once and keep it nowhere else: it lasts 5 minutes and opens once. `billing.off` 404
      * on a server without billing. `returnTo`: the page it was opened from, where the billing service sends the
-     * person back.
+     * person back. `plan`: the plan picked in the app (the billing service's key), whose Checkout it opens.
      */
-    billingLink(orgId: string, from: BillingFrom, returnTo?: string): Promise<{ url: string; expiresAt: string }>;
+    billingLink(
+      orgId: string,
+      from: BillingFrom,
+      returnTo?: string,
+      plan?: string,
+    ): Promise<{ url: string; expiresAt: string }>;
     /** People, files and today's uploads against the workspace's limits (any member; ADR 0079). */
     limits(orgId: string): Promise<WorkspaceLimits>;
     members(orgId: string): Promise<Member[]>;
@@ -889,6 +905,11 @@ export interface ApiClient {
     answerNow(orgId: string, messageId: string): Promise<{ runs: { agentId: string; runId: string }[] }>;
     /** Cancels an agent's follow-up from its line (`messageId`); 409 `follow_up.not_pending` once it came. */
     cancelFollowUp(orgId: string, messageId: string): Promise<void>;
+    /**
+     * "Pedir resposta" on a GitHub notice of someone the agent doesn't answer (`messageId`): the agent answers them
+     * there, with this person behind it. 409 `github_event.answered` once someone asked.
+     */
+    answerGitHub(orgId: string, messageId: string): Promise<void>;
   };
 
   approvals: {
@@ -1007,6 +1028,14 @@ export interface ApiClient {
     denyRequest(orgId: string, requestId: string): Promise<void>;
     decideAccess(orgId: string, requestId: string, decision: "once" | "always" | "no"): Promise<void>;
     deviceWait(orgId: string, runId: string, action: "retry" | "stop"): Promise<void>;
+    /** Pairs an Android phone with the computer over Wi-Fi: the QR way, or the six-digit `code` and its `address`. */
+    startWifiPairing(
+      orgId: string,
+      machineId: string,
+      input: { address?: string; code?: string },
+    ): Promise<WifiPairing>;
+    wifiPairing(orgId: string, machineId: string, pairingId: string): Promise<WifiPairing>;
+    cancelWifiPairing(orgId: string, machineId: string, pairingId: string): Promise<void>;
   };
   /** Connected computers (ADR 0025): machines running `agentes-runner`. */
   machines: {

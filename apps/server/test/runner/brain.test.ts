@@ -1111,6 +1111,25 @@ test.if(posix)(
   },
 );
 
+test.if(posix)(
+  "a turn whose processes all die: the error says how the last ended and the line that said why",
+  async () => {
+    const { turn } = setup();
+    const why = "TypeError: Cannot read properties of undefined (reading 'x')";
+    expect((await turn(1, "DIES please")).final).toEqual({
+      type: "error",
+      code: "claude_failed",
+      message: `Claude Code ended without an answer (exit 3): ${why}`,
+      retryable: false,
+    });
+    // Killed without a word the second time: the signal, and what the process before it said.
+    expect((await turn(2, "KILLED please")).final).toMatchObject({
+      code: "claude_failed",
+      message: `Claude Code ended without an answer (signal SIGKILL): ${why}`,
+    });
+  },
+);
+
 test.if(posix)("a process that dies mid-turn: the same turn runs again one-shot, resuming the session", async () => {
   const { m, spawns, turn } = setup();
   const r = await turn(1, "CRASH please");

@@ -187,7 +187,7 @@ export const FAIR_SCAN = 10_000;
 
 /**
  * One statement (no transaction round trips): lock due rows matching `filter`, skipping locked ones; lease them.
- * Workspaces take turns (ADR 0161): each one's due jobs are ranked oldest first, after the jobs of the lane it
+ * Workspaces take turns (ADR 0163): each one's due jobs are ranked oldest first, after the jobs of the lane it
  * already runs on any worker, so a workspace that holds more than another one waiting claims after it, and one
  * workspace's burst queues only that workspace. Ranked without locks (a window can't take `FOR UPDATE`), then
  * locked and checked again: only the first turns, twice the claim and some, so the lock looks each one up by its id
@@ -471,7 +471,7 @@ export const MEMORY_SHED_AT = 0.85;
 export const QUICK_JOBS_PER_DB_CONNECTION = 4;
 /**
  * What a run waiting on its model or its computer holds in memory, with room to spare (`run-cost.test.ts` measures
- * it). Runs hold no database connection while they wait (ADR 0161), so memory is what bounds the long lane; the live
+ * it). Runs hold no database connection while they wait (ADR 0163), so memory is what bounds the long lane; the live
  * memory brake (`MEMORY_GROW_MAX`) covers the runs that hold far more (images).
  */
 export const RUN_MEMORY_BYTES = 4 * 1024 * 1024;
@@ -500,7 +500,7 @@ export function laneLimits(
 }
 
 /**
- * One step of the pump's self-tuning (ADR 0161): a lane whose jobs waited for a slot doubles, the quick lane first,
+ * One step of the pump's self-tuning (ADR 0163): a lane whose jobs waited for a slot doubles, the quick lane first,
  * within its limit and the total's, unless something brakes (`busy`); a lane that waited for nothing and used at
  * most half its slots halves, and so does the long lane when memory runs out (`shed`), never below where it
  * started. Pure.

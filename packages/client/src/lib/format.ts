@@ -212,6 +212,9 @@ export function timeLeft(t: TFunction, iso: string, now = new Date()) {
 /** "Ana" for "Ana Souza". */
 export const firstName = (name: string) => name.trim().split(/\s+/)[0] ?? "";
 
+/** What an address names before its "@" ("joao.lima"), for a line too short for the whole address. */
+export const emailName = (email: string) => email.split("@")[0] || email;
+
 /** "Ada, Atlas, and Theo", "Ada, Atlas e Theo", "Ada、Atlas、Theo": the language's own list (Intl.ListFormat), in `t`'s language. */
 export const joinNames = (names: readonly string[], t: TFunction): string => t("format.list", { names });
 

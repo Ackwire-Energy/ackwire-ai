@@ -27,6 +27,20 @@ test("whoever hasn't chosen: channels on the left, DMs in light bubbles", () => 
   expect(chatLookOf({}, true)).toEqual({ style: "bubbles", tone: "light" });
 });
 
+test("in a personal workspace every conversation opens in bubbles; a team's channels stay on the left (ADR 0159)", () => {
+  expect(chatLookOf(undefined, false, true)).toEqual({ style: "bubbles", tone: "light" });
+  expect(chatLookOf({}, true, true)).toEqual({ style: "bubbles", tone: "light" });
+  expect(chatLookOf({}, false, false)).toEqual({ style: "left", tone: "light" });
+});
+
+test("the person's own choice wins over a personal workspace's default", () => {
+  expect(chatLookOf({ channelStyle: "left", channelTone: "strong" }, false, true)).toEqual({
+    style: "left",
+    tone: "strong",
+  });
+  expect(chatLookOf({ dmStyle: "compact" }, true, true)).toEqual({ style: "compact", tone: "light" });
+});
+
 test("channels and DMs each keep their own choice", () => {
   const prefs = { channelStyle: "compact", dmStyle: "comfortable", channelTone: "strong" } as const;
   expect(chatLookOf(prefs, false)).toEqual({ style: "compact", tone: "strong" });

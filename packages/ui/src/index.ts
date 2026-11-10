@@ -158,7 +158,7 @@ export {
   DialogSearchList,
   useUnsavedInDialog,
 } from "./components/Dialog";
-export { Diff, type DiffKind, type DiffLine, diffLines } from "./components/Diff";
+export { Diff, type DiffBlock, type DiffKind, type DiffLine, diffBlocks, diffLines } from "./components/Diff";
 export { drawEffort, EffortPixels, type EffortStep } from "./components/EffortPixels";
 export {
   EMOJI_COLUMNS,
@@ -213,7 +213,6 @@ export {
   type StickerPickerLabels,
   stickerMoodsFor,
 } from "./components/MediaPicker";
-export { AgentReadingBook } from "./components/MemoryPixels";
 export { Mention } from "./components/Mention";
 export {
   Menu,
@@ -286,6 +285,7 @@ export {
   ProviderStack,
   type ProviderStackProps,
 } from "./components/ProviderLogo";
+export { QrCode } from "./components/QrCode";
 export {
   modeOf,
   monthlyKindOf,
@@ -323,6 +323,7 @@ export { SearchSelect, type SearchSelectLabels, type SearchSelectProps } from ".
 export { Segmented, type SegmentedOption, SplitButton } from "./components/Segmented";
 export { ChosenValue, Select, type SelectOption, type SelectProps } from "./components/Select";
 export { SettingNote, SettingRow, SettingsMore, SettingsSection } from "./components/Settings";
+export { SettingsPath } from "./components/SettingsPath";
 export {
   SKELETON_DELAY_MS,
   Skeleton,

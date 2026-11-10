@@ -120,6 +120,12 @@ export class ControlServer {
         return d.accountCancel(str(m.loginId));
       case "account.remove":
         return d.accountRemove(m.kind, str(m.accountId));
+      case "iphone.setup":
+        return d.iphoneSetup().check();
+      case "iphone.download":
+        return d.iphoneSetup().start();
+      case "iphone.open":
+        return d.iphoneSetup().open(m.app === "xcode" ? "xcode" : "appStore");
       case "shutdown":
         return { stopping: true };
       default:

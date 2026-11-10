@@ -1,4 +1,5 @@
 import { markTerms } from "@agenteschat/client/lib/search-filters";
+import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
 import { type AgentPresetColor, gradientOf, mixHex } from "@agenteschat/ui/agent/engine";
 import { type NativeStackNavigationOptions, useIsFocused, useNavigation } from "expo-router";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
@@ -246,15 +247,19 @@ const CREATE_LOOK: Record<Exclude<CreateItem, "invite">, { icon: IconName; color
   wiki: { icon: "file", color: "graphite" },
 };
 
-/** What to start, as rows: a soft tile of its color, a short name and a hint under it. */
+/**
+ * What to start, as rows: a soft tile of its color, a short name and a hint under it. A personal workspace's channel
+ * is a group conversation, and its wiki is for its person's agents (ADR 0159).
+ */
 function CreateList({ items }: { items: CreateItem[] }) {
   const { t } = useTranslation();
+  const { org } = useOrg();
   // The short names reuse labels already translated in every language (a form field's or a screen's name elsewhere).
   const spec: Record<Exclude<CreateItem, "invite">, { label: string; sub: string; onPress: () => void }> = {
     agent: { label: t("missions.new.agent"), sub: t("mobile.new.agentHint"), onPress: () => router.push("/new-agent") },
     channel: {
-      label: t("missions.new.channel"),
-      sub: t("mobile.chats.newChannelHint"),
+      label: isPersonal(org) ? t("mobile.new.channelPersonal") : t("missions.new.channel"),
+      sub: t(modeKey(org, "mobile.chats.newChannelHint")),
       onPress: () => router.push("/new-channel"),
     },
     task: { label: t("mobile.agent.task"), sub: t("mobile.new.taskHint"), onPress: () => router.push("/issues/new") },
@@ -263,7 +268,11 @@ function CreateList({ items }: { items: CreateItem[] }) {
       sub: t("mobile.new.routineHint"),
       onPress: () => router.push("/routines/new"),
     },
-    wiki: { label: t("mobile.new.wikiPage"), sub: t("mobile.new.wikiHint"), onPress: () => newWikiPage() },
+    wiki: {
+      label: t("mobile.new.wikiPage"),
+      sub: t(modeKey(org, "mobile.new.wikiHint")),
+      onPress: () => newWikiPage(),
+    },
   };
   const create = items.filter((i): i is Exclude<CreateItem, "invite"> => i !== "invite");
   if (create.length === 0) return null;

@@ -4,7 +4,13 @@ import { type Database, type Executor, eq, schema } from "@agenteschat/db";
 import { type AuditEntry, auditEveryOrg } from "../audit";
 import { deriveSecret, openSecret, sealSecret } from "../crypto";
 import { ConflictError, ValidationError } from "../errors";
-import { forgetAllInstallationTokens, type GitHubAppConfig, type GitHubHttp, githubAppCallbackUri } from "./github-app";
+import {
+  appRegistration,
+  forgetAllInstallationTokens,
+  type GitHubAppConfig,
+  type GitHubHttp,
+  githubAppCallbackUri,
+} from "./github-app";
 
 const { instanceSecrets } = schema;
 
@@ -204,9 +210,41 @@ const APP_PERMISSIONS = {
 } as const;
 
 /**
- * The app a server's owner creates on GitHub: the permissions and addresses agentes.chat's own app is registered with,
- * at this server's `PUBLIC_URL`. A webhook GitHub can't deliver to (no https) is left off: reading the GitHub panel
- * reconciles installations instead.
+ * What happens on GitHub that agents hear (`github-events.ts`), by GitHub's event names: comments, reviews and new
+ * items that name the app, and items being merged or closed. agentes.chat's own app subscribes to the same.
+ */
+export const GITHUB_APP_EVENTS = [
+  "issues",
+  "issue_comment",
+  "pull_request",
+  "pull_request_review",
+  "pull_request_review_comment",
+  "pull_request_review_thread",
+  "discussion",
+  "discussion_comment",
+] as const;
+
+/**
+ * The events an app lacks (GitHub keeps the events an app was made with: one made from an older manifest, or by hand,
+ * has none), and its page on GitHub where they're ticked. Null when it has them all, or GitHub didn't answer.
+ */
+export async function missingGitHubAppEvents(app: GitHubAppConfig, http: GitHubHttp) {
+  const registered = await appRegistration(app, http);
+  if (!registered) return null;
+  const missing = GITHUB_APP_EVENTS.filter((e) => !registered.events.includes(e));
+  if (missing.length === 0) return null;
+  const slug = encodeURIComponent(registered.slug);
+  const url =
+    registered.owner?.type === "Organization"
+      ? `https://github.com/organizations/${encodeURIComponent(registered.owner.login)}/settings/apps/${slug}/permissions`
+      : `https://github.com/settings/apps/${slug}/permissions`;
+  return { missing: [...missing], url };
+}
+
+/**
+ * The app a server's owner creates on GitHub: the permissions, events and addresses agentes.chat's own app is
+ * registered with, at this server's `PUBLIC_URL`. A webhook GitHub can't deliver to (no https) is left off: reading the
+ * GitHub panel reconciles installations instead.
  */
 export function githubAppManifest(publicUrl: string) {
   const base = publicUrl.replace(/\/$/, "");
@@ -222,7 +260,7 @@ export function githubAppManifest(publicUrl: string) {
     public: true,
     hook_attributes: { url: `${base}/api/github-app/webhook`, active: base.startsWith("https://") },
     default_permissions: APP_PERMISSIONS,
-    default_events: [],
+    default_events: [...GITHUB_APP_EVENTS],
   };
 }
 

@@ -7,6 +7,8 @@ import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { requireUserIn } from "@/app/guards";
 import { usePageTextSize } from "@/chat/look";
+import { Arrival } from "@/components/arrival/Arrival";
+import { FeedbackHost } from "@/components/arrival/FeedbackDialog";
 import { ArtifactViewerProvider } from "@/components/artifacts/ArtifactViewer";
 import { CommandMenu } from "@/components/CommandMenu";
 import { ConnectAiProvider } from "@/components/ConnectAi";
@@ -26,7 +28,7 @@ import { RemoveMemberProvider } from "@/components/RemoveMember";
 import { Sidebar } from "@/components/Sidebar";
 import { BootSplash } from "@/components/Sky";
 import { DeletingScreen, HoldBanner, SuspendedScreen } from "@/components/Standing";
-import { useWebPushClear, useWebPushRefresh, WebPushAsk } from "@/components/WebPush";
+import { useWebPushClear, useWebPushRefresh } from "@/components/WebPush";
 import { ComputerSetupNotice } from "@/components/WorkspaceComputer";
 import { HeaderSearchProvider } from "@/hooks/useWorkspaceSearch";
 import { useServerLocale } from "@/i18n";
@@ -174,7 +176,8 @@ function OrgLayout() {
                               <PushOpens />
                               {/* What reaches me while I'm here, at the top of the work area (ADR 0071 §9). */}
                               {!focused && <NoticeIsland />}
-                              <WebPushAsk />
+                              <Arrival />
+                              <FeedbackHost />
                               <Outlet />
                             </DetailsHost>
                           </ComputerDialogProvider>

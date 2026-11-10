@@ -7,6 +7,7 @@ import {
   createMemoryRateLimiter,
   createPostgresPubSub,
   isReservedSecretName,
+  listenResumedTopic,
   PayloadTooLargeError,
   type PgNotifier,
   type PubSub,
@@ -135,6 +136,94 @@ test("postgres pub/sub: publish doesn't wait for the database; a tick's events g
   await pubsub.close?.();
   expect(statements).toHaveLength(1);
   expect(got).toEqual([1, 2, 3]);
+});
+
+/**
+ * A Postgres whose LISTEN can go deaf: NOTIFY still works, its payloads stop arriving (the LISTEN's connection died and
+ * postgres.js gave up on it). Each listen counts; `back()` is postgres.js listening again once its connection came
+ * back, with the same handlers.
+ */
+function deafeningNotifier() {
+  const listeners: { on: (p: string) => void; onListen?: () => void }[] = [];
+  const state = { deaf: false, listens: 0 };
+  const notifier: PgNotifier = {
+    listen: async (_c, on, onListen) => {
+      state.listens++;
+      state.deaf = false;
+      const entry = { on, onListen };
+      listeners.push(entry);
+      onListen?.();
+      return async () => {
+        listeners.splice(listeners.indexOf(entry), 1);
+      };
+    },
+    notify: async (_c, p) => {
+      if (!state.deaf) for (const l of [...listeners]) l.on(p);
+    },
+  };
+  const back = () => {
+    state.deaf = false;
+    for (const l of listeners) l.onListen?.();
+  };
+  return { notifier, state, back, listeners };
+}
+
+const until = async (done: () => boolean) => {
+  for (let i = 0; i < 100 && !done(); i++) await new Promise((r) => setTimeout(r, 5));
+};
+
+test("postgres pub/sub: a LISTEN gone deaf is made again, and once it hears its subscribers learn events were missed", async () => {
+  const { notifier, state } = deafeningNotifier();
+  const pubsub = await createPostgresPubSub(notifier, { heartbeatMs: 10 });
+  const resumed: RealtimeEvent[] = [];
+  const got: unknown[] = [];
+  pubsub.subscribe(listenResumedTopic, (e) => resumed.push(e));
+  pubsub.subscribe("t", (e) => got.push(e.n));
+  await new Promise((r) => setTimeout(r, 40));
+  // Heard all along: nothing is made again, nothing said.
+  expect(state.listens).toBe(1);
+  expect(resumed).toEqual([]);
+  state.deaf = true;
+  await until(() => state.listens === 2);
+  expect(state.listens).toBe(2);
+  await until(() => resumed.length > 0);
+  expect(resumed).toEqual([{ type: "pubsub.resumed" }]);
+  await pubsub.publish("t", { type: "x", n: 1 });
+  await until(() => got.length > 0);
+  expect(got).toEqual([1]);
+  await pubsub.close?.();
+});
+
+test("postgres pub/sub: postgres.js listening again after its connection came back says so once, with no event twice", async () => {
+  const { notifier, back } = deafeningNotifier();
+  const pubsub = await createPostgresPubSub(notifier, { heartbeatMs: 1000 });
+  const resumed: RealtimeEvent[] = [];
+  const got: unknown[] = [];
+  pubsub.subscribe(listenResumedTopic, (e) => resumed.push(e));
+  pubsub.subscribe("t", (e) => got.push(e.n));
+  back();
+  await pubsub.publish("t", { type: "x", n: 1 });
+  await until(() => got.length > 0);
+  expect(got).toEqual([1]);
+  expect(resumed).toEqual([{ type: "pubsub.resumed" }]);
+  await pubsub.close?.();
+});
+
+test("postgres pub/sub: a LISTEN made again leaves the one it replaced silent, should its driver bring it back", async () => {
+  const { notifier, state, listeners } = deafeningNotifier();
+  const pubsub = await createPostgresPubSub(notifier, { heartbeatMs: 10 });
+  const got: unknown[] = [];
+  pubsub.subscribe("t", (e) => got.push(e.n));
+  // The first one stays registered, as a driver that made it again would keep it.
+  const first = listeners[0];
+  state.deaf = true;
+  await until(() => state.listens === 2);
+  if (first && !listeners.includes(first)) listeners.unshift(first);
+  await pubsub.publish("t", { type: "x", n: 1 });
+  await until(() => got.length > 0);
+  await new Promise((r) => setTimeout(r, 20));
+  expect(got).toEqual([1]);
+  await pubsub.close?.();
 });
 
 test("secret names that would steer an AI CLI's sign-in or requests are reserved", () => {

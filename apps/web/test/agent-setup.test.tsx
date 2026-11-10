@@ -57,9 +57,77 @@ describe("the setup checklist in a new agent's DM", () => {
     expect(card()?.textContent).toContain("Falo com todos de Acme");
   });
 
+  test("with nothing left, its greeting asks for no help over a card that is all done", async () => {
+    const state = withSetup(seedState(), ["apps", "who", "how"]);
+    await openDm(state);
+    expect(card()?.textContent).toContain("5 de 5");
+    expect(document.body.textContent).not.toContain("Pra eu começar");
+  });
+
   test("an agent made before the checklist shows none: its empty conversation as before", async () => {
     const state = seedState();
     await openDm(state);
     expect(card()).toBeNull();
+  });
+
+  test("alone in a personal workspace nobody else could talk to it: no who step, back once someone joins (ADR 0159)", async () => {
+    const personal = (alone: boolean) => {
+      const state = withSetup(seedState());
+      const org = state.me?.organizations[0];
+      if (org) org.mode = "personal";
+      if (alone) state.members = state.members.filter((m) => m.userId === state.me?.user.id);
+      return state;
+    };
+    await openDm(personal(true));
+    expect(card()?.querySelectorAll(".setup-row")).toHaveLength(4);
+    cleanup();
+    await openDm(personal(false));
+    expect(card()?.querySelectorAll(".setup-row")).toHaveLength(5);
+  });
+});
+
+describe("a template agent's greeting", () => {
+  test("in its own role, never 'Você me pediu', and never a doubled period", async () => {
+    const state = seedState();
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (ada) {
+      ada.setup = { role: null, done: [] };
+      ada.role = "Atendimento";
+      ada.instructions = "Responde os clientes no WhatsApp.";
+    }
+    await openDm(state);
+    const text = document.body.textContent ?? "";
+    expect(text).not.toContain("Você me pediu");
+    expect(text).toContain("a nova de atendimento");
+  });
+
+  test("an agent with no role says back what it was asked, closing its sentence once", async () => {
+    const state = seedState();
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (ada) {
+      ada.setup = { role: null, done: [] };
+      ada.role = "";
+      ada.instructions = "Responde os clientes no WhatsApp.";
+    }
+    await openDm(state);
+    expect(document.body.textContent).toContain("Você me pediu: “Responde os clientes no WhatsApp”.");
+    expect(document.body.textContent).not.toContain(".”.");
+  });
+
+  test("apps skipped on the right hand's card stay skipped for the team's agents", async () => {
+    const state = seedState();
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (ada) ada.setup = { role: "dev", done: [] };
+    if (ada)
+      state.agents.push({
+        ...ada,
+        id: "lodi-x",
+        name: "Lodi",
+        handle: "lodi",
+        builtin: "right_hand",
+        setup: { role: null, done: ["apps"] },
+      });
+    await openDm(state);
+    expect(card()?.textContent).toContain("Sem apps por enquanto");
   });
 });

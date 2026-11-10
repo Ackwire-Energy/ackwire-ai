@@ -314,7 +314,7 @@ pub fn cookie_header<'a>(cookies: impl Iterator<Item = (&'a str, &'a str)>) -> S
 }
 
 /// An id the app passes on (`orgId` in main_window.rs): letters, digits, `-` and `_`.
-fn good_id(id: &str) -> bool {
+pub(crate) fn good_id(id: &str) -> bool {
     !id.is_empty() && id.len() <= 64 && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
 }
 
@@ -421,6 +421,92 @@ pub fn workspaces_get(app: AppHandle, window: tauri::Window) -> Result<Vec<Serve
     Ok(list(&app))
 }
 
+/// What the app's own windows may ask a server with its session (`site_fetch`): this computer's devices and who can
+/// use them, a phone's Stop, and the workspace's people and roles for the rule's picker. Nothing else.
+pub fn site_path_allowed(method: &str, path: &str) -> bool {
+    if path.len() > 512 || path.contains(['?', '#', '%', '\\']) {
+        return false;
+    }
+    let parts: Vec<&str> = path.split('/').collect();
+    let ["", "api", "app", "organizations", org, rest @ ..] = parts.as_slice() else { return false };
+    good_id(org)
+        && match (method, rest) {
+            ("GET", ["devices" | "members" | "roles"]) => true,
+            ("PATCH", ["devices", "computers" | "phones", id]) => good_id(id),
+            ("POST", ["devices", "phones", id, "stop"]) => good_id(id),
+            _ => false,
+        }
+}
+
+/// A request body's size (a device's rule with its people).
+const SITE_BODY_MAX: usize = 64 * 1024;
+
+#[derive(Debug, Serialize)]
+pub struct SiteAnswer {
+    pub status: u16,
+    pub body: String,
+}
+
+/// One request to `server` (a server of the app's list) with the main window's session for it, the way the phone
+/// app asks. Blocking: reading the cookies waits for the web view, so never from a command's or an event's own thread.
+pub fn with_session(
+    app: &AppHandle,
+    server: &str,
+    method: &str,
+    path: &str,
+    body: Option<&str>,
+) -> Result<SiteAnswer, String> {
+    if !servers::get(app).servers.iter().any(|s| s == server) {
+        return Err("not a server of this app".into());
+    }
+    if !site_path_allowed(method, path) || body.is_some_and(|b| b.len() > SITE_BODY_MAX) {
+        return Err("not allowed".into());
+    }
+    let url: Url = format!("{server}{path}").parse().map_err(|_| "bad address")?;
+    let page = app.get_webview(main_window::LABEL).ok_or("signed_out")?;
+    let cookies = page.cookies_for_url(url.clone()).unwrap_or_default();
+    let cookie = cookie_header(cookies.iter().map(|c| (c.name(), c.value())));
+    if cookie.is_empty() {
+        return Err("signed_out".into());
+    }
+    let agent = ureq::AgentBuilder::new().timeout(TIMEOUT).redirects(0).build();
+    let request = agent
+        .request(method, url.as_str())
+        .set("Cookie", &cookie)
+        .set("X-Agentes-Client", "mobile")
+        .set("Accept", "application/json");
+    let sent = match body {
+        Some(body) => request.set("Content-Type", "application/json").send_string(body),
+        None => request.call(),
+    };
+    let response = match sent {
+        Ok(response) | Err(ureq::Error::Status(_, response)) => response,
+        Err(e) => return Err(e.to_string()),
+    };
+    let status = response.status();
+    let mut text = String::new();
+    response.into_reader().take(BODY_MAX).read_to_string(&mut text).map_err(|e| e.to_string())?;
+    Ok(SiteAnswer { status, body: text })
+}
+
+/// Preferences › This Mac reads and sets this computer's devices on its server (`with_session`).
+#[tauri::command]
+pub async fn site_fetch(
+    app: AppHandle,
+    window: tauri::Window,
+    server: String,
+    method: String,
+    path: String,
+    body: Option<String>,
+) -> Result<SiteAnswer, String> {
+    if window.label() != "prefs" {
+        return Err("only Preferences asks this".into());
+    }
+    tauri::async_runtime::spawn_blocking(move || with_session(&app, &server, &method, &path, body.as_deref()))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 /// How the welcome window opens next, taken once: `add` when the site's "Add a workspace" opened it.
 #[derive(Default)]
 pub struct WelcomeMode(pub Mutex<Option<&'static str>>);
@@ -501,6 +587,30 @@ mod tests {
         assert_eq!(counts.get("o-1"), Some(&(3, 1)));
         assert_eq!(counts.get("o-2"), Some(&(0, 0)));
         assert_eq!(counts.len(), 2);
+    }
+
+    #[test]
+    fn only_the_devices_paths_go_with_the_session() {
+        let org = "/api/app/organizations/o-1";
+        assert!(site_path_allowed("GET", &format!("{org}/devices")));
+        assert!(site_path_allowed("GET", &format!("{org}/members")));
+        assert!(site_path_allowed("GET", &format!("{org}/roles")));
+        assert!(site_path_allowed("PATCH", &format!("{org}/devices/computers/m-1")));
+        assert!(site_path_allowed("PATCH", &format!("{org}/devices/phones/p-1")));
+        assert!(site_path_allowed("POST", &format!("{org}/devices/phones/p-1/stop")));
+        for (method, path) in [
+            ("DELETE", format!("{org}/devices/computers/m-1")),
+            ("POST", format!("{org}/devices/connect-links")),
+            ("GET", format!("{org}/devices?x=1")),
+            ("GET", format!("{org}/devices/")),
+            ("PATCH", format!("{org}/devices/phones/../stop")),
+            ("GET", "/api/app/organizations/../x/devices".into()),
+            ("GET", "/api/app/me".into()),
+            ("GET", format!("{org}/channels")),
+            ("POST", format!("{org}/devices/phones/p%2F1/stop")),
+        ] {
+            assert!(!site_path_allowed(method, &path), "{method} {path}");
+        }
     }
 
     #[test]
