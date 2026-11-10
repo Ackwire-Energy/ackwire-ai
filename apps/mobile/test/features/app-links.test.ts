@@ -89,6 +89,7 @@ describe("web addresses → the app's screens", () => {
     // The web's QR code opens this phone's guide for the computer it plugs into.
     expect(to("/settings/devices/android-setup?machine=k1")).toBe("/settings/devices/android-setup?machine=k1");
     expect(to("/settings/devices/iphone-setup")).toBe("/settings/devices/iphone-setup");
+    expect(to("/settings/devices/iphone-setup?computer=k1")).toBe("/settings/devices/iphone-setup?machine=k1");
     expect(to("/settings/account")).toBe("/me/account");
     expect(to("/settings/approvals")).toBe("/me/approvals");
     expect(to("/settings/right_hand")).toBe("/settings/right-hand");

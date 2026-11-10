@@ -11421,3 +11421,43 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
     --mediarow-axis: var(--mediarow-face);
   }
 }
+
+/* ---------- A phone's own Settings path (`SettingsPath`) ---------- */
+.ac-setpath {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+  line-height: 18px;
+}
+.ac-setpath > li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+/* The › ends a segment, so a path that wraps ends its line with it instead of starting the next one. */
+.ac-setpath > li:not(:last-child)::after {
+  content: "›";
+  color: var(--faint);
+  font-weight: 600;
+  margin-inline: var(--space-1);
+}
+.ac-setpath__seg {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--ink2);
+  font-weight: 600;
+}
+.ac-setpath > li:last-child > .ac-setpath__seg {
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1.5px var(--line-strong);
+}

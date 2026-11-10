@@ -118,6 +118,9 @@ describe("the phone in hand", () => {
     expect(iphoneStep(phone({ id: "i", status: needs("developer_mode_off") }))).toBe(2);
     expect(iphoneStep(phone({ id: "i", status: needs("ui_automation_off") }))).toBe(3);
     expect(iphoneStep(phone({ id: "i", status: needs("helper_expired") }))).toBe(4);
+    // The Mac builds the test helper; trusting it, or an Apple Account or app limit, holds that last step.
+    for (const reason of ["helper_untrusted", "team_limit", "apple_account_missing"])
+      expect(iphoneStep(phone({ id: "i", status: needs(reason) }))).toBe(4);
     expect(iphoneStep(phone({ id: "i" }))).toBe(5);
   });
   test("a phone waiting on someone is drawn dimmed, an offline one dark", () => {

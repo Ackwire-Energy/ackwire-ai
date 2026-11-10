@@ -227,8 +227,11 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     "devices.fix.helper_expired",
     "devices.who.followsHint",
     "devices.choose.thisMac",
+    "devices.screen.needsHelper",
+    "devices.screen.unsupported",
     "mobile.devices.reason.xcode_missing",
     "mobile.devices.reason.device_support",
+    "mobile.devices.reason.apple_account_missing",
   ],
 };
 

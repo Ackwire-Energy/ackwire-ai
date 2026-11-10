@@ -273,6 +273,7 @@
       "feedback.mark"
     ],
     "es": [
+      "devices.iphone.path.general",
       "devices.cpus",
       "devices.memory",
       "devices.system.android",
@@ -885,6 +886,7 @@
       "feedback.mark"
     ],
     "de": [
+      "devices.iphone.steps.account",
       "devices.workspace",
       "devices.cpus",
       "devices.memory",
@@ -1291,6 +1293,7 @@
       "feedback.mark"
     ],
     "it": [
+      "devices.iphone.steps.account",
       "devices.cpus",
       "devices.memory",
       "devices.system.android",
@@ -1621,6 +1624,7 @@
       "feedback.mark"
     ],
     "nl": [
+      "devices.iphone.steps.account",
       "devices.filter.computers",
       "devices.cpus",
       "devices.phoneKind.emulator",
@@ -4001,6 +4005,7 @@
       "prefs.advanced.claude",
       "prefs.folders.agents",
       "prefs.nav.label",
+      "prefs.thisMac.agents",
       "prefs.tools.protection",
       "server.jev",
       "tools.claudeName",
@@ -4009,6 +4014,7 @@
     "de": [
       "device.mac",
       "device.windows",
+      "iphone.account",
       "link.chipTailnet",
       "prefs.accounts.codeAria",
       "prefs.accounts.org",
@@ -4049,6 +4055,7 @@
       "common.minutes",
       "device.linux",
       "device.mac",
+      "iphone.account",
       "link.chipTailnet",
       "menu.help",
       "menu.servers",
@@ -4060,6 +4067,7 @@
       "prefs.nav.servers",
       "prefs.nav.tools",
       "prefs.nav.updates",
+      "prefs.thisMac.agents",
       "prefs.tools.title",
       "prefs.updates.title",
       "server.jev",

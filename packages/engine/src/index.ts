@@ -106,6 +106,7 @@ export * from "./device-links";
 export * from "./device-resolve";
 export * from "./device-tools";
 export * from "./device-waits";
+export * from "./device-wifi";
 export * from "./devices";
 export * from "./dispatch";
 export * from "./dms";

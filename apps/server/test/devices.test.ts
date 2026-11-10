@@ -70,6 +70,10 @@ test("connect link over HTTP: the one-line install, the computer asking to join,
   const { machineId } = (await approved.json()) as { machineId: string };
   const token = await runnerPost("/api/machines/device/token", { deviceCode: started.deviceCode });
   expect(token.status).toBe(200);
+  // The computer says who may use it and where that changes, as it connects.
+  const granted = (await token.json()) as { org: { id: string }; audience: string; owner: string; url: string };
+  expect(granted).toMatchObject({ machineId, audience: "everyone", owner: "sam" });
+  expect(granted.url).toBe(`${t.config.PUBLIC_URL}/org/${granted.org.id}/settings/devices/${machineId}`);
   const devices = (await (await rui("/devices")).json()) as {
     devices: { id: string; name: string; audience: { mode: string }; mayUse: boolean; mayManage: boolean }[];
     requests: unknown[];
@@ -116,4 +120,26 @@ test("a computer and its phones over HTTP: rename, who can use it, stop, forget,
 
   expect((await owner(`/devices/computers/${machine.id}`, { method: "DELETE" })).status).toBe(204);
   expect(((await (await owner("/devices")).json()) as { devices: unknown[] }).devices).toEqual([]);
+});
+
+test("Wi-Fi pairing over HTTP: the computer's owner only, a checked address and code, its computer reached", async () => {
+  const { owner, rui } = await start();
+  const paired = await pairComputer(t, owner, { ...RUNNER, exec: true }, { name: "MacBook" });
+  const path = `/devices/computers/${paired.machineId}/wifi-pairings`;
+  expect((await rui(path, { json: {} })).status).toBe(403);
+  for (const bad of [
+    { address: "192.168.1.20:37099" },
+    { address: "192.168.1.20:37099", code: "12345" },
+    { address: "-s 1", code: "123456" },
+    { address: "192.168.1.300:37099", code: "123456" },
+  ])
+    expect((await owner(path, { json: bad })).status).toBe(400);
+  // Not connected now: the person is told it's offline (no runner here to pair with).
+  const offline = await owner(path, { json: { address: "192.168.1.20:37099", code: "123456" } });
+  expect(offline.status).toBe(409);
+  expect(((await offline.json()) as { error: { code: string } }).error.code).toBe("machine.offline");
+  expect((await owner(`${path}/${crypto.randomUUID()}`)).status).toBe(409);
+  expect((await rui(`${path}/${crypto.randomUUID()}`, { method: "DELETE" })).status).toBe(403);
+  // Cancel never fails on a computer that's gone.
+  expect((await owner(`${path}/${crypto.randomUUID()}`, { method: "DELETE" })).status).toBe(204);
 });

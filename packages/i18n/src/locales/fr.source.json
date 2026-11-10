@@ -2822,6 +2822,18 @@
   "desktopNotice.waiting": {
     "value": "Something is waiting for you"
   },
+  "desktopNotice.deviceInUse": {
+    "value": "{{agent}} is using {{deviceName}}"
+  },
+  "desktopNotice.deviceInUseAny": {
+    "value": "An agent is using {{deviceName}}"
+  },
+  "desktopNotice.deviceDoingFor": {
+    "value": "{{doing}} for {{person}}"
+  },
+  "desktopNotice.deviceFor": {
+    "value": "For {{person}}"
+  },
   "island.label": {
     "value": "New notifications"
   },
@@ -30927,6 +30939,108 @@
   "devices.onTheIphone": {
     "value": "On the iPhone"
   },
+  "devices.screen.title": {
+    "value": "Screen"
+  },
+  "devices.screen.label": {
+    "value": "{{name}}'s screen, live"
+  },
+  "devices.screen.take": {
+    "value": "Take control"
+  },
+  "devices.screen.give": {
+    "value": "Give back"
+  },
+  "devices.screen.yours": {
+    "value": "You're in control"
+  },
+  "devices.screen.yoursHint": {
+    "value": "Click to tap, drag to swipe and type on your keyboard, with Esc for Back."
+  },
+  "devices.screen.agentUses": {
+    "value": "{{agent}} is using it"
+  },
+  "devices.screen.agentUsesFor": {
+    "value": "{{agent}} is using it for {{person}}"
+  },
+  "devices.screen.takeHint": {
+    "value": "Taking control pauses {{agent}} until you give it back."
+  },
+  "devices.screen.noTake": {
+    "value": "Only its owner, an admin or the person {{agent}} works for can take control."
+  },
+  "devices.screen.personControls": {
+    "value": "{{name}} is in control"
+  },
+  "devices.screen.home": {
+    "value": "Home"
+  },
+  "devices.screen.fullExit": {
+    "value": "Exit full screen"
+  },
+  "devices.screen.opening": {
+    "value": "Opening the screen…"
+  },
+  "devices.screen.offline": {
+    "value": "{{name}} isn't reachable right now"
+  },
+  "devices.screen.offlineText": {
+    "value": "It shows again by itself once {{host}} sees it."
+  },
+  "devices.screen.busy": {
+    "value": "Too many people are watching"
+  },
+  "devices.screen.busyText": {
+    "value": "It shows again when someone leaves."
+  },
+  "devices.screen.notReady": {
+    "value": "{{name}} isn't ready"
+  },
+  "devices.screen.notReadyText": {
+    "value": "It shows again by itself once it's ready."
+  },
+  "devices.screen.forbidden": {
+    "value": "You can't see this screen"
+  },
+  "devices.screen.forbiddenText": {
+    "value": "Its owner chooses who can use {{name}}."
+  },
+  "devices.screen.outdated": {
+    "value": "The app on {{host}} is too old for this"
+  },
+  "devices.screen.outdatedText": {
+    "value": "Update agentes.chat on {{host}}, then try again."
+  },
+  "devices.screen.unavailable": {
+    "value": "This screen can't be shown"
+  },
+  "devices.screen.unavailableText": {
+    "value": "Check that {{host}} has adb or Xcode installed, then try again."
+  },
+  "devices.screen.needsHelper": {
+    "value": "Finish the iPhone setup on the Mac to add the test helper it needs."
+  },
+  "devices.screen.ended": {
+    "value": "The screen closed"
+  },
+  "devices.screen.someone": {
+    "value": "Someone else is in control of {{name}}."
+  },
+  "devices.screen.unsupported": {
+    "value": "Controlling an iPhone needs the test helper on the Mac. You can still watch it."
+  },
+  "devices.screen.paused": {
+    "value": "{{host}} is paused, so control waits until it's resumed."
+  },
+  "devices.screen.held": {
+    "value": "This workspace is paused, so control waits until it's active again."
+  },
+  "devices.screen.lost": {
+    "value": "Control ended. You're watching {{name}} again."
+  },
+  "devices.screen.typeLabel": {
+    "value": "Type on {{name}}"
+  },
   "devices.status.ready": {
     "value": "Ready"
   },
@@ -31017,6 +31131,15 @@
   "devices.reason.helper_expired": {
     "value": "The test helper needs renewing"
   },
+  "devices.reason.apple_account_missing": {
+    "value": "Xcode isn't signed in to an Apple Account"
+  },
+  "devices.reason.team_limit": {
+    "value": "The free Apple Account reached its app limit"
+  },
+  "devices.reason.helper_untrusted": {
+    "value": "The iPhone doesn't trust the test helper yet"
+  },
   "devices.reason.booting": {
     "value": "Starting"
   },
@@ -31061,6 +31184,15 @@
   },
   "devices.fix.helper_expired": {
     "value": "Open the app on the Mac"
+  },
+  "devices.fix.apple_account_missing": {
+    "value": "Sign in to Xcode"
+  },
+  "devices.fix.team_limit": {
+    "value": "Remove an app you built"
+  },
+  "devices.fix.helper_untrusted": {
+    "value": "Trust it on the iPhone"
   },
   "devices.fix.booting": {
     "value": "Wait for it to start"
@@ -31401,18 +31533,6 @@
   "devices.android.allowText": {
     "value": "Check Always allow from this computer first."
   },
-  "devices.android.allowTextWifi": {
-    "value": "Check Always allow on this network first."
-  },
-  "devices.android.wifiPair": {
-    "value": "Pair it over Wi-Fi"
-  },
-  "devices.android.wifiPairText": {
-    "value": "Phone and computer on the same Wi-Fi."
-  },
-  "devices.android.wifiRun": {
-    "value": "Then run this on {{computer}}, with the address, port and code the phone shows:"
-  },
   "devices.android.wifiNote": {
     "value": "Wireless debugging turns off when the phone restarts. A cable is more reliable."
   },
@@ -31470,6 +31590,99 @@
   "devices.android.prompt.allow": {
     "value": "Allow"
   },
+  "devices.wifiPair.noComputer": {
+    "value": "Wi-Fi pairing works with a computer of yours. Use a cable, or connect one."
+  },
+  "devices.wifiPair.wireless": {
+    "value": "Turn on Wireless debugging"
+  },
+  "devices.wifiPair.wirelessText": {
+    "value": "Developer options › Wireless debugging. Check Always allow on this network, then tap Allow."
+  },
+  "devices.wifiPair.scan": {
+    "value": "Scan the code with the phone"
+  },
+  "devices.wifiPair.code": {
+    "value": "Type what the phone shows"
+  },
+  "devices.wifiPair.pathQr": {
+    "value": "Pair device with QR code"
+  },
+  "devices.wifiPair.making": {
+    "value": "Making the code…"
+  },
+  "devices.wifiPair.waiting": {
+    "value": "Waiting for the phone to scan…"
+  },
+  "devices.wifiPair.pairing": {
+    "value": "Found a phone. Pairing…"
+  },
+  "devices.wifiPair.connecting": {
+    "value": "Paired. Connecting…"
+  },
+  "devices.wifiPair.narrow": {
+    "value": "Open this page on a computer to show the code."
+  },
+  "devices.wifiPair.useCode": {
+    "value": "Use a pairing code instead"
+  },
+  "devices.wifiPair.useQr": {
+    "value": "Scan a QR code instead"
+  },
+  "devices.wifiPair.address": {
+    "value": "IP address and port"
+  },
+  "devices.wifiPair.addressExample": {
+    "value": "192.168.1.20:37099"
+  },
+  "devices.wifiPair.pairingCode": {
+    "value": "Wi-Fi pairing code"
+  },
+  "devices.wifiPair.pair": {
+    "value": "Pair"
+  },
+  "devices.wifiPair.tryAgain": {
+    "value": "Try again"
+  },
+  "devices.wifiPair.qrLabel": {
+    "value": "QR code for Wireless debugging on the phone"
+  },
+  "devices.wifiPair.qrLine": {
+    "value": "Scan with the phone"
+  },
+  "devices.wifiPair.qrCaption": {
+    "value": "Phone and computer on the same Wi-Fi."
+  },
+  "devices.wifiPair.fail.mdns_off": {
+    "value": "{{computer}} can't look for phones on the Wi-Fi. Update Android platform-tools there, or use a cable."
+  },
+  "devices.wifiPair.fail.same_wifi": {
+    "value": "Couldn't reach the phone. Put it on the same Wi-Fi as {{computer}} and try again."
+  },
+  "devices.wifiPair.fail.refused": {
+    "value": "The phone stopped the pairing. Keep its pairing screen open and try again."
+  },
+  "devices.wifiPair.fail.refusedCode": {
+    "value": "The phone didn't take that code. Check the code and the address, then pair again."
+  },
+  "devices.wifiPair.fail.timed_out": {
+    "value": "Nothing scanned the code in 2 minutes. Check the phone is on the same Wi-Fi as {{computer}} and try again."
+  },
+  "devices.wifiPair.fail.outdated": {
+    "value": "Wi-Fi pairing needs Android 14 or newer with the May 2026 security update. Update the phone, or use a cable."
+  },
+  "devices.wifiPair.fail.adb_missing": {
+    "value": "{{computer}} has no Android platform-tools. Install Android Studio there, then try again."
+  },
+  "devices.wifiPair.fail.update": {
+    "value": "Wi-Fi pairing needs a newer agentes.chat on {{computer}}. Update it, then try again."
+  },
+  "devices.wifiPair.fail.canceled": {
+    "value": "The pairing stopped. Try again."
+  },
+  "devices.wifiPair.fail.failed": {
+    "value": "The pairing didn't work. Try again, or use a cable."
+  },
   "devices.iphone.title": {
     "value": "Connect an iPhone"
   },
@@ -31490,6 +31703,9 @@
   },
   "devices.iphone.steps.tools": {
     "value": "iPhone tools"
+  },
+  "devices.iphone.steps.account": {
+    "value": "Apple Account in Xcode"
   },
   "devices.iphone.steps.connected": {
     "value": "iPhone connected"
@@ -31521,6 +31737,12 @@
   "devices.iphone.toolsText": {
     "value": "The Mac downloads them, about 8 GB."
   },
+  "devices.iphone.accountDone": {
+    "value": "Added"
+  },
+  "devices.iphone.accountText": {
+    "value": "Add a free or paid one in Xcode on {{mac}}: Settings › Accounts."
+  },
   "devices.iphone.connectedDone": {
     "value": "{{name}} · iOS {{version}}"
   },
@@ -31545,6 +31767,12 @@
   "devices.iphone.helperText": {
     "value": "Built and renewed by the Mac every 7 days. A free Apple Account in Xcode is enough."
   },
+  "devices.iphone.helperUntrustedText": {
+    "value": "Tap the developer's name, then Trust."
+  },
+  "devices.iphone.teamLimitText": {
+    "value": "Remove an app you built yourself from the iPhone: a free Apple Account allows 3."
+  },
   "devices.iphone.ready": {
     "value": "{{name}} is ready for agents."
   },
@@ -31562,6 +31790,12 @@
   },
   "devices.iphone.path.uiAutomation": {
     "value": "Enable UI Automation"
+  },
+  "devices.iphone.path.general": {
+    "value": "General"
+  },
+  "devices.iphone.path.deviceManagement": {
+    "value": "VPN & Device Management"
   },
   "devices.wait.title": {
     "value": "Waiting for {{deviceName}}"

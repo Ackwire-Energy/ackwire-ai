@@ -524,8 +524,17 @@ export function RealtimeProvider({
         event.alert !== false &&
         inDesktopApp()
       ) {
-        const notice = desktopNotice(tRef.current, orgId, event.notification);
-        if (notice) void thisMac.notify(notice.title, notice.body, notice.path).catch(() => {});
+        const agentName = (id: string) => qc.getQueryData<Agent[]>(keys.agents(orgId))?.find((a) => a.id === id)?.name;
+        const notice = desktopNotice(tRef.current, orgId, event.notification, agentName);
+        if (notice)
+          void thisMac
+            .notify(
+              notice.title,
+              notice.body,
+              notice.path,
+              notice.phoneId ? { orgId, phoneId: notice.phoneId } : undefined,
+            )
+            .catch(() => {});
       }
       // A mission waits for me (a decision, a review, an approval): the lists and the sidebar's count.
       if (event.type.startsWith("mission.") && "missionId" in event && typeof event.missionId === "string") {
