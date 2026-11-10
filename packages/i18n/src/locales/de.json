@@ -14850,6 +14850,7 @@
         "settingStatus": "Den eigenen Status aktualisiert",
         "settingReplyStyle": "Die Art zu antworten angepasst",
         "sendingFeedback": "Um das Senden von Feedback gebeten",
+        "offeringFeedback": "Angeboten, ein Problem zu melden",
         "deletingRoutine": "Eine Routine gelöscht",
         "runningRoutine": "Eine Routine jetzt ausgeführt",
         "proposingTeam": "Ein Team vorgeschlagen",
@@ -14963,6 +14964,7 @@
       "settingStatus": "Aktualisieren des eigenen Status",
       "settingReplyStyle": "Anpassen der Art zu antworten",
       "sendingFeedback": "Feedback vorbereiten",
+      "offeringFeedback": "Bericht vorbereiten",
       "deletingRoutine": "Löschen einer Routine",
       "runningRoutine": "Ausführen einer Routine",
       "proposingTeam": "Vorschlagen eines Teams",
@@ -17457,6 +17459,24 @@
     "send": "Senden",
     "thanks": "Zugestellt. Danke.",
     "reply": "Alles wird gelesen. Eine Antwort, falls nötig, kommt an {{email}}.",
-    "another": "Noch eins senden"
+    "another": "Noch eins senden",
+    "offer": {
+      "group": "Bericht über die App",
+      "ready": "<b>Bericht bereit</b>: {{summary}}",
+      "goesCloud": "Geht in deinem Namen an das Team von agentes.chat",
+      "goesServer": "Geht in deinem Namen an die Person, die diesen Server betreibt",
+      "see": "Bericht ansehen",
+      "hide": "Bericht schließen",
+      "send": "Senden",
+      "notNow": "Jetzt nicht",
+      "answer": "Die Antwort kommt an deine E-Mail-Adresse.",
+      "sentCloud": "<b>Bericht gesendet</b> an das Team von agentes.chat",
+      "sentServer": "<b>Bericht gesendet</b> an die Person, die diesen Server betreibt",
+      "sentAuto": "<b>Bericht ohne Nachfrage gesendet</b>: {{summary}}",
+      "view": "Ansehen",
+      "always": "Immer senden",
+      "alwaysOn": "Ab jetzt gehen solche Berichte ohne Nachfrage raus.",
+      "askFirst": "Vor dem Senden fragen"
+    }
   }
 }

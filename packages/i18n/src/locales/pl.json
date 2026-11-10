@@ -15841,6 +15841,7 @@
         "settingStatus": "Zaktualizowano własny status",
         "settingReplyStyle": "Dostosowano sposób odpowiadania",
         "sendingFeedback": "Poproszono o wysłanie opinii",
+        "offeringFeedback": "Zaproponowano zgłoszenie problemu",
         "deletingRoutine": "Usunięto rutynę",
         "runningRoutine": "Uruchomiono rutynę teraz",
         "proposingTeam": "Zaproponowano zespół",
@@ -15954,6 +15955,7 @@
       "settingStatus": "aktualizowanie własnego statusu",
       "settingReplyStyle": "dostosowywanie sposobu odpowiadania",
       "sendingFeedback": "przygotowywanie opinii",
+      "offeringFeedback": "przygotowywanie zgłoszenia",
       "deletingRoutine": "usuwanie rutyny",
       "runningRoutine": "uruchamianie rutyny teraz",
       "proposingTeam": "proponowanie zespołu",
@@ -18586,6 +18588,24 @@
     "send": "Wyślij",
     "thanks": "Dostarczono. Dziękujemy.",
     "reply": "Wszystko jest czytane. Odpowiedź, jeśli będzie potrzebna, przyjdzie na {{email}}.",
-    "another": "Wyślij kolejną"
+    "another": "Wyślij kolejną",
+    "offer": {
+      "group": "Zgłoszenie dotyczące aplikacji",
+      "ready": "<b>Zgłoszenie gotowe</b>: {{summary}}",
+      "goesCloud": "Trafi w twoim imieniu do zespołu agentes.chat",
+      "goesServer": "Trafi w twoim imieniu do osoby, która prowadzi ten serwer",
+      "see": "Zobacz zgłoszenie",
+      "hide": "Zamknij zgłoszenie",
+      "send": "Wyślij",
+      "notNow": "Nie teraz",
+      "answer": "Odpowiedź przyjdzie na twój e-mail.",
+      "sentCloud": "<b>Zgłoszenie wysłane</b> do zespołu agentes.chat",
+      "sentServer": "<b>Zgłoszenie wysłane</b> do osoby, która prowadzi ten serwer",
+      "sentAuto": "<b>Zgłoszenie wysłane bez pytania</b>: {{summary}}",
+      "view": "Zobacz",
+      "always": "Zawsze wysyłaj",
+      "alwaysOn": "Od teraz takie zgłoszenia będą wysyłane bez pytania.",
+      "askFirst": "Pytaj przed wysłaniem"
+    }
   }
 }

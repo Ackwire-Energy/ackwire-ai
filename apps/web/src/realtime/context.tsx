@@ -828,6 +828,12 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
       if (event.type === "card.delegate") cacheCardDelegate(qc, orgId, event, event.delegate);
       // A right hand's card of a workspace change was applied, dismissed or sent on: the whole card.
       if (event.type === "action_card.updated") cacheActionCard(qc, orgId, event, event.card);
+      // A report an agent offered was sent or put away (on another device of the person's): its row follows.
+      if (event.type === "feedback_offer.updated") {
+        cacheMessageMeta(qc, orgId, event.channelId, event.messageId, () => ({ feedbackOffer: event.offer }));
+        if (event.threadId)
+          void qc.invalidateQueries({ queryKey: keys.thread(orgId, event.channelId, event.threadId) });
+      }
       // An agent's wait for a device ended (or changed): its card flips to how it ended, without a reload.
       const deviceWait = deviceWaitEventOf(event);
       if (deviceWait) {

@@ -14325,6 +14325,7 @@
         "settingStatus": "自分のステータスを更新しました",
         "settingReplyStyle": "返信のしかたを調整しました",
         "sendingFeedback": "フィードバックの送信を依頼しました",
+        "offeringFeedback": "問題の報告を提案しました",
         "deletingRoutine": "ルーティンを削除しました",
         "runningRoutine": "ルーティンを今すぐ実行しました",
         "proposingTeam": "チームを提案しました",
@@ -14438,6 +14439,7 @@
       "settingStatus": "自分のステータスを更新中",
       "settingReplyStyle": "返信のしかたを調整中",
       "sendingFeedback": "フィードバックを準備中",
+      "offeringFeedback": "報告を準備中",
       "deletingRoutine": "ルーティンを削除中",
       "runningRoutine": "ルーティンを今すぐ実行中",
       "proposingTeam": "チームを提案中",
@@ -16897,6 +16899,24 @@
     "send": "送信",
     "thanks": "届きました。ありがとうございます。",
     "reply": "すべて読まれます。返信が必要な場合は{{email}}に届きます。",
-    "another": "もう1件送る"
+    "another": "もう1件送る",
+    "offer": {
+      "group": "アプリについての報告",
+      "ready": "<b>報告の準備ができました</b>: {{summary}}",
+      "goesCloud": "あなたの名前でagentes.chatのチームに届きます",
+      "goesServer": "あなたの名前でこのサーバーの管理者に届きます",
+      "see": "報告を見る",
+      "hide": "報告を閉じる",
+      "send": "送信",
+      "notNow": "今はしない",
+      "answer": "返信はあなたのメールに届きます。",
+      "sentCloud": "agentes.chatのチームに<b>報告を送信しました</b>",
+      "sentServer": "このサーバーの管理者に<b>報告を送信しました</b>",
+      "sentAuto": "<b>確認なしで報告を送信しました</b>: {{summary}}",
+      "view": "見る",
+      "always": "常に送信",
+      "alwaysOn": "今後、このような報告は確認なしで送信されます。",
+      "askFirst": "送信前に確認する"
+    }
   }
 }

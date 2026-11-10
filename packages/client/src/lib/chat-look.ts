@@ -29,6 +29,8 @@ export interface ChatPrefs {
   dmTone?: ChatTone;
   openAt?: ChatOpenAt;
   textSize?: ChatTextSize;
+  /** "Always send": a report an agent offers about the app goes with its reply, without asking me. */
+  feedbackAuto?: boolean;
 }
 
 /** Owner's decision: a channel reads as one log, and in a DM right and left already say who spoke. */

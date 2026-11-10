@@ -14780,6 +14780,7 @@
         "settingStatus": "Kendi durumunu güncelledi",
         "settingReplyStyle": "Yanıtlama biçimini ayarladı",
         "sendingFeedback": "Geri bildirim göndermeyi istedi",
+        "offeringFeedback": "Bir sorunu bildirmeyi önerdi",
         "deletingRoutine": "Bir rutini sildi",
         "runningRoutine": "Bir rutini şimdi çalıştırdı",
         "proposingTeam": "Bir ekip önerdi",
@@ -14893,6 +14894,7 @@
       "settingStatus": "kendi durumunu güncelliyor",
       "settingReplyStyle": "yanıtlama biçimini ayarlıyor",
       "sendingFeedback": "geri bildirim hazırlıyor",
+      "offeringFeedback": "bildirim hazırlıyor",
       "deletingRoutine": "bir rutini siliyor",
       "runningRoutine": "bir rutini şimdi çalıştırıyor",
       "proposingTeam": "bir ekip öneriyor",
@@ -17387,6 +17389,24 @@
     "send": "Gönder",
     "thanks": "Ulaştı. Teşekkürler.",
     "reply": "Hepsi okunur. Gerekirse yanıt {{email}} adresine gelir.",
-    "another": "Bir tane daha gönder"
+    "another": "Bir tane daha gönder",
+    "offer": {
+      "group": "Uygulama hakkında bildirim",
+      "ready": "<b>Bildirim hazır</b>: {{summary}}",
+      "goesCloud": "Adınıza agentes.chat ekibine gider",
+      "goesServer": "Adınıza bu sunucuyu yöneten kişiye gider",
+      "see": "Bildirimi gör",
+      "hide": "Bildirimi kapat",
+      "send": "Gönder",
+      "notNow": "Şimdi değil",
+      "answer": "Yanıt e-posta adresinize gelir.",
+      "sentCloud": "agentes.chat ekibine <b>bildirim gönderildi</b>",
+      "sentServer": "Bu sunucuyu yöneten kişiye <b>bildirim gönderildi</b>",
+      "sentAuto": "<b>Bildirim sormadan gönderildi</b>: {{summary}}",
+      "view": "Gör",
+      "always": "Her zaman gönder",
+      "alwaysOn": "Bundan sonra bu tür bildirimler sormadan gider.",
+      "askFirst": "Göndermeden önce sor"
+    }
   }
 }

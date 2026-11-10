@@ -130,6 +130,8 @@ const HERE = new Set([
   "update_thread",
   "offer_connect_ai",
   "offer_connect_app",
+  // A report about the app, as a row under the reply the person sends or dismisses (ADR 0160 §12).
+  "offer_feedback",
   "offer_invites",
   "offer_install_skill",
   "propose_agent",

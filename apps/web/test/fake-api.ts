@@ -34,6 +34,7 @@ import type {
   Credential,
   Edition,
   EndpointCheck,
+  FeedbackOffer,
   ForeignMailbox,
   FormerAgent,
   Gif,
@@ -1365,6 +1366,11 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       },
       dropFeedbackFile: async (id) => {
         log("system.dropFeedbackFile", id);
+      },
+      decideFeedbackOffer: async (orgId, messageId, decision) => {
+        log("system.decideFeedbackOffer", orgId, messageId, decision);
+        const offer = state.messages.find((m) => m.id === messageId)?.meta?.feedbackOffer as FeedbackOffer;
+        return { ...offer, state: decision === "send" ? "sent" : "dismissed", decidedAt: new Date().toISOString() };
       },
       jev: async () => state.jev ?? null,
       saveJev: async (apiKey) => {

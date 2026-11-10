@@ -15355,6 +15355,7 @@
         "settingStatus": "Ha aggiornato il proprio stato",
         "settingReplyStyle": "Ha regolato come risponde",
         "sendingFeedback": "Ha chiesto di inviare un feedback",
+        "offeringFeedback": "Ha proposto di segnalare un problema",
         "deletingRoutine": "Ha eliminato una routine",
         "runningRoutine": "Ha eseguito una routine adesso",
         "proposingTeam": "Ha proposto un team",
@@ -15468,6 +15469,7 @@
       "settingStatus": "aggiornando il proprio stato",
       "settingReplyStyle": "regolando come risponde",
       "sendingFeedback": "preparando un feedback",
+      "offeringFeedback": "preparando una segnalazione",
       "deletingRoutine": "eliminando una routine",
       "runningRoutine": "eseguendo una routine adesso",
       "proposingTeam": "proponendo un team",
@@ -18103,6 +18105,24 @@
     "send": "Invia",
     "thanks": "Consegnato. Grazie.",
     "reply": "Viene letto tutto. La risposta, se serve, arriva a {{email}}.",
-    "another": "Invia un altro"
+    "another": "Invia un altro",
+    "offer": {
+      "group": "Segnalazione sull'app",
+      "ready": "<b>Segnalazione pronta</b>: {{summary}}",
+      "goesCloud": "Parte a tuo nome per il team di agentes.chat",
+      "goesServer": "Parte a tuo nome per chi gestisce questo server",
+      "see": "Vedi la segnalazione",
+      "hide": "Chiudi la segnalazione",
+      "send": "Invia",
+      "notNow": "Non ora",
+      "answer": "La risposta arriva alla tua email.",
+      "sentCloud": "<b>Segnalazione inviata</b> al team di agentes.chat",
+      "sentServer": "<b>Segnalazione inviata</b> a chi gestisce questo server",
+      "sentAuto": "<b>Segnalazione inviata senza chiedere</b>: {{summary}}",
+      "view": "Vedi",
+      "always": "Invia sempre",
+      "alwaysOn": "D'ora in poi, segnalazioni come questa partono senza chiedere.",
+      "askFirst": "Chiedi prima di inviare"
+    }
   }
 }
