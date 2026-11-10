@@ -4,14 +4,19 @@
  */
 export const isIdHandle = (handle: string) => /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}/i.test(handle);
 
+/** A last word that tells same-named relatives apart ("III", "Jr.", "Filho"), not a surname. */
+const AGNOMEN = /^(?:jr|sr|ii|iii|iv|j[uú]nior|filho|neto|sobrinho)\.?$/i;
+
 /**
- * 1–2 letters: "Ada" → "A"; "Marina Souza" → "MS". A word that starts with no letter ("🌴 Ana Souza") gives way to
- * those that do, and a first character is taken whole: an emoji is two UTF-16 units, and half of one draws as "�".
+ * 1–2 letters: "Ada" → "A"; "Marina Souza" → "MS"; "Christopher Alexander Montgomery III" → "CM". A word that starts
+ * with no letter ("🌴 Ana Souza") gives way to those that do, and a first character is taken whole: an emoji is two
+ * UTF-16 units, and half of one draws as "�".
  */
 export function initialsOf(name: string): string {
   const words = name.trim().split(/\s+/).filter(Boolean);
   const lettered = words.filter((w) => /^[\p{L}\p{N}]/u.test(w));
-  const parts = lettered.length > 0 ? lettered : words;
+  const named = lettered.length > 0 ? lettered : words;
+  const parts = named.length > 2 && AGNOMEN.test(named[named.length - 1] ?? "") ? named.slice(0, -1) : named;
   const first = (w: string | undefined) => Array.from(w ?? "")[0] ?? "";
   if (parts.length === 0) return "?";
   if (parts.length === 1) return first(parts[0]).toUpperCase() || "?";

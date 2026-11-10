@@ -122,6 +122,11 @@ describe("Avatar", () => {
     expect(initialsOf("🌴 Ana Souza")).toBe("AS");
     expect(initialsOf("🦊")).toBe("🦊");
     expect(initialsOf("Ólafur Darri Ólafsson")).toBe("ÓÓ");
+    // What tells relatives apart is no surname: "CM", never "CI"; a name of two words keeps both.
+    expect(initialsOf("Christopher Alexander Montgomery III")).toBe("CM");
+    expect(initialsOf("João Pereira Filho")).toBe("JP");
+    expect(initialsOf("Martin Luther King Jr.")).toBe("MK");
+    expect(initialsOf("Pedro Neto")).toBe("PN");
   });
 });
 
