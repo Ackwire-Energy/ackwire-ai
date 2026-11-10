@@ -9576,7 +9576,16 @@
         "spiky": "Stachelig",
         "mohawk": "Irokese",
         "braids": "Flechtzöpfe",
-        "pigtails": "Zwei Zöpfe"
+        "pigtails": "Zwei Zöpfe",
+        "crew": "Bürstenschnitt",
+        "fade": "Fade",
+        "slick": "Zurückgekämmt",
+        "flat": "Flat Top",
+        "undercut": "Undercut",
+        "mullet": "Vokuhila",
+        "dreads": "Dreadlocks",
+        "medium": "Mittellang",
+        "receding": "Geheimratsecken"
       },
       "beard": {
         "none": "Kein Bart",

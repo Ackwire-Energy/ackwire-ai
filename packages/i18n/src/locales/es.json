@@ -9866,7 +9866,16 @@
         "spiky": "De punta",
         "mohawk": "Mohicano",
         "braids": "Trenzas",
-        "pigtails": "Coletas"
+        "pigtails": "Coletas",
+        "crew": "Militar",
+        "fade": "Degradado",
+        "slick": "Hacia atrás",
+        "flat": "Plano",
+        "undercut": "Undercut",
+        "mullet": "Mullet",
+        "dreads": "Rastas",
+        "medium": "Medio",
+        "receding": "Entradas"
       },
       "beard": {
         "none": "Sin barba",

@@ -9277,7 +9277,16 @@
         "spiky": "刺猬头",
         "mohawk": "莫西干",
         "braids": "辫子",
-        "pigtails": "双马尾"
+        "pigtails": "双马尾",
+        "crew": "圆寸",
+        "fade": "渐变",
+        "slick": "大背头",
+        "flat": "平头",
+        "undercut": "底削",
+        "mullet": "鲻鱼头",
+        "dreads": "脏辫",
+        "medium": "中长发",
+        "receding": "发际线后移"
       },
       "beard": {
         "none": "无胡子",

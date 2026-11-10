@@ -9262,7 +9262,16 @@
         "spiky": "Jabrik",
         "mohawk": "Mohawk",
         "braids": "Kepang",
-        "pigtails": "Kuncir dua"
+        "pigtails": "Kuncir dua",
+        "crew": "Cepak",
+        "fade": "Fade",
+        "slick": "Sisir ke belakang",
+        "flat": "Flat top",
+        "undercut": "Undercut",
+        "mullet": "Mullet",
+        "dreads": "Gimbal",
+        "medium": "Sedang",
+        "receding": "Garis rambut mundur"
       },
       "beard": {
         "none": "Tanpa janggut",

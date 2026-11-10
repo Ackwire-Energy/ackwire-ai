@@ -9209,7 +9209,16 @@
         "spiky": "ツンツン",
         "mohawk": "モヒカン",
         "braids": "三つ編み",
-        "pigtails": "ツインテール"
+        "pigtails": "ツインテール",
+        "crew": "クルーカット",
+        "fade": "フェード",
+        "slick": "オールバック",
+        "flat": "フラットトップ",
+        "undercut": "アンダーカット",
+        "mullet": "マレット",
+        "dreads": "ドレッド",
+        "medium": "ミディアム",
+        "receding": "後退した生え際"
       },
       "beard": {
         "none": "ひげなし",

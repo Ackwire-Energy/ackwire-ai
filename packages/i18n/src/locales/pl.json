@@ -10251,7 +10251,16 @@
         "spiky": "Na jeża",
         "mohawk": "Irokez",
         "braids": "Warkocze",
-        "pigtails": "Kitki"
+        "pigtails": "Kitki",
+        "crew": "Na jeża",
+        "fade": "Fade",
+        "slick": "Zaczesane do tyłu",
+        "flat": "Flat top",
+        "undercut": "Undercut",
+        "mullet": "Mullet",
+        "dreads": "Dredy",
+        "medium": "Średnie",
+        "receding": "Zakola"
       },
       "beard": {
         "none": "Bez brody",

@@ -23136,6 +23136,33 @@
   "portrait.options.hair.pigtails": {
     "value": "Pigtails"
   },
+  "portrait.options.hair.crew": {
+    "value": "Crew cut"
+  },
+  "portrait.options.hair.fade": {
+    "value": "Fade"
+  },
+  "portrait.options.hair.slick": {
+    "value": "Slicked back"
+  },
+  "portrait.options.hair.flat": {
+    "value": "Flat top"
+  },
+  "portrait.options.hair.undercut": {
+    "value": "Undercut"
+  },
+  "portrait.options.hair.mullet": {
+    "value": "Mullet"
+  },
+  "portrait.options.hair.dreads": {
+    "value": "Dreadlocks"
+  },
+  "portrait.options.hair.medium": {
+    "value": "Medium"
+  },
+  "portrait.options.hair.receding": {
+    "value": "Receding"
+  },
   "portrait.options.beard.none": {
     "value": "No beard"
   },

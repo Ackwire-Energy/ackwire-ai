@@ -63,6 +63,15 @@ export const HAIRS = [
   "mohawk",
   "braids",
   "pigtails",
+  "crew",
+  "fade",
+  "slick",
+  "flat",
+  "undercut",
+  "mullet",
+  "dreads",
+  "medium",
+  "receding",
 ];
 export const BEARDS = ["none", "stubble", "mustache", "goatee", "strap", "full", "long"];
 export const BUILDS = ["m", "f"];
@@ -137,6 +146,15 @@ export const CATALOG = {
       "bun",
       "pony",
       "braids",
+      "crew",
+      "fade",
+      "slick",
+      "flat",
+      "undercut",
+      "mullet",
+      "dreads",
+      "medium",
+      "receding",
     ],
     ear: ["none", "studs", "hoops"],
     neck: ["none", "necklace", "bowtie", "muffler"],
@@ -157,6 +175,8 @@ export const CATALOG = {
       "pony",
       "braids",
       "pigtails",
+      "medium",
+      "dreads",
       "afro",
       "curly",
       "short",
@@ -327,6 +347,45 @@ const HAIR_SHAPES = {
     back: both(rows("8:4-7 9:3-7 10:2-7 11:2-7 12:2-7 13:2-7 14:3-7 15:3-7 16:4-6 17:4-6 18:5")),
     front: union(CAP, rows("4:12-19 10:10-12,19-21")),
   },
+  crew: { front: rows("6:10-21 7:9-22 8:8-23 9:8-23 10:8,23 11:8,23") },
+  fade: {
+    front: rows("4:11-20 5:10-21 6:9-22 7:9-22 8:9-22 9:10-21"),
+    fade: both(rows("8:8 9:8-9 10:8-9 11:8-9 12:8-9 13:9")),
+  },
+  slick: { front: union(CAP, rows("4:11-20")), slick: true },
+  flat: { front: union(CAP, rows("2:9-22 3:8-23 4:8-23 5:8-23 6:8-23")) },
+  undercut: {
+    front: rows("3:12-21 4:10-22 5:9-23 6:9-23 7:9-23 8:9-23 9:10-23 10:16-23 11:20-23"),
+    fade: rows("8:8 9:8-9 10:8-9 11:8-9 12:8-9 13:9"),
+  },
+  mullet: {
+    back: rows("15:7-24 16:6-25 17:6-25 18:6-25 19:6-25 20:6-25 21:6-25 22:6-25 23:6-25 24:6-25 25:7-24"),
+    front: union(CAP, rows("4:12-19 10:10-13,18-21")),
+  },
+  dreads: {
+    back: rows(
+      "8:6-25 9:6-25 10:6-25 11:6-25 12:6-25 13:6-25 14:6-25 15:6-25 16:6-25 17:6-25 18:6-25 19:6-25 20:6-25 21:6-25 22:6-25",
+    ),
+    front: union(
+      CAP,
+      rows(
+        "3:10,13,16,19,22 4:9-22 10:6-10,21-25 11:6-9,22-25 12:6-8,23-25 13:6-8,23-25 14:6-8,23-25 15:6-8,23-25 16:6-8,23-25 17:6-8,23-25 18:6-8,23-25 19:6-8,23-25 20:6-8,23-25 21:6-8,23-25 22:6,8,23,25",
+      ),
+    ),
+    braid: true,
+  },
+  medium: {
+    back: rows(
+      "8:7-24 9:7-24 10:7-24 11:7-24 12:7-24 13:7-24 14:7-24 15:7-24 16:7-24 17:7-24 18:7-24 19:7-24 20:7-24 21:8-23",
+    ),
+    front: union(
+      CAP,
+      rows(
+        "4:12-19 10:7-11,20-24 11:7-9,22-24 12:7-8,23-24 13:7-8,23-24 14:7,24 15:7,24 16:7,24 17:7-8,23-24 18:7-8,23-24 19:7-8,23-24 20:8,23",
+      ),
+    ),
+  },
+  receding: { front: rows("6:11-20 7:9-22 8:8-23 9:8-11,14-17,20-23 10:8-9,22-23 11:8,23") },
   pony: {
     back: rows(
       "7:23-27 8:24-28 9:24-28 10:24-28 11:24-28 12:24-28 13:25-28 14:25-28 15:25-28 16:25-27 17:25-27 18:25-27 19:26-27 20:26",
@@ -377,6 +436,7 @@ function hairFill(color, shape, mask) {
   const lo = mixHex(color, "#000000", 0.28);
   return (x, y) => {
     if (shape.braid && y > 12 && (x < 10 || x > 21)) return y % 4 === 1 ? lo : y % 4 === 3 ? hi : color;
+    if (shape.slick && y <= 9 && x % 3 === 0) return lo;
     if (shape.curl) return (x + y * 3) % 5 === 0 ? lo : (x * 2 + y) % 7 === 0 ? hi : color;
     // light at the top left, shade along the bottom edge
     if (!mask.has(key(x, y + 1)) && y > 9) return lo;
@@ -570,6 +630,15 @@ export function drawPerson(recipe) {
     dot(buf, "18:15-16 19:14,17 20:15-16", bearded ? skin.blush : lip);
     dot(buf, "19:15-16", "#5a1f2a");
   } else dot(buf, "18:13,18 19:14-17", bearded ? skin.blush : lip);
+
+  // shaved sides under a longer top
+  if (shape.fade && r.extra !== "scarf")
+    paint(
+      buf,
+      shape.fade,
+      (x, y) => ((x + y) % 2 ? mixHex(skin.base, hairC, 0.55) : mixHex(skin.base, hairC, 0.75)),
+      null,
+    );
 
   // hair in front
   if (r.extra === "scarf") {
@@ -838,8 +907,8 @@ export function randomPerson(seed = Math.random(), wanted) {
   const hair = pick(
     HAIRS,
     f
-      ? [0.2, 0.3, 0.6, 0.8, 0.3, 2, 2, 4, 4, 5, 5, 4, 3, 3, 0.2, 0.2, 2, 1.2]
-      : [1.5, 3, 5, 4, 4, 3, 2, 0.4, 0.2, 0.6, 0.5, 0.5, 0.5, 0.6, 2, 0.5, 0.3, 0],
+      ? [0.2, 0.3, 0.6, 0.8, 0.3, 2, 2, 4, 4, 5, 5, 4, 3, 3, 0.2, 0.2, 2, 1.2, 0, 0, 0, 0, 0, 0, 0.6, 1.5, 0]
+      : [1.5, 3, 5, 4, 4, 3, 2, 0.4, 0.2, 0.6, 0.5, 0.5, 0.5, 0.6, 2, 0.5, 0.3, 0, 2, 3, 2, 1, 2, 0.8, 1, 1.5, 1],
   );
   return {
     build,

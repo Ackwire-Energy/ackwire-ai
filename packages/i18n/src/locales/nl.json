@@ -9644,7 +9644,16 @@
         "spiky": "Stekels",
         "mohawk": "Hanenkam",
         "braids": "Vlechten",
-        "pigtails": "Staartjes"
+        "pigtails": "Staartjes",
+        "crew": "Crewcut",
+        "fade": "Fade",
+        "slick": "Achterover",
+        "flat": "Flattop",
+        "undercut": "Undercut",
+        "mullet": "Matje",
+        "dreads": "Dreadlocks",
+        "medium": "Halflang",
+        "receding": "Inhammen"
       },
       "beard": {
         "none": "Geen baard",

@@ -9952,7 +9952,16 @@
         "spiky": "A punte",
         "mohawk": "Cresta",
         "braids": "Trecce",
-        "pigtails": "Codini"
+        "pigtails": "Codini",
+        "crew": "A spazzola",
+        "fade": "Sfumato",
+        "slick": "All'indietro",
+        "flat": "Flat top",
+        "undercut": "Undercut",
+        "mullet": "Mullet",
+        "dreads": "Dreadlock",
+        "medium": "Medi",
+        "receding": "Stempiato"
       },
       "beard": {
         "none": "Senza barba",

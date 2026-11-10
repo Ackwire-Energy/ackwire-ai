@@ -9203,7 +9203,16 @@
         "spiky": "스파이크",
         "mohawk": "모히칸",
         "braids": "땋은 머리",
-        "pigtails": "양갈래"
+        "pigtails": "양갈래",
+        "crew": "크루컷",
+        "fade": "페이드",
+        "slick": "올백",
+        "flat": "플랫탑",
+        "undercut": "언더컷",
+        "mullet": "멀릿",
+        "dreads": "드레드",
+        "medium": "중간 길이",
+        "receding": "M자 이마"
       },
       "beard": {
         "none": "수염 없음",

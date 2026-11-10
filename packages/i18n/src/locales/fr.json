@@ -9935,7 +9935,16 @@
         "spiky": "En pics",
         "mohawk": "Crête",
         "braids": "Tresses",
-        "pigtails": "Couettes"
+        "pigtails": "Couettes",
+        "crew": "Brosse",
+        "fade": "Dégradé",
+        "slick": "Plaqués en arrière",
+        "flat": "Brosse carrée",
+        "undercut": "Undercut",
+        "mullet": "Mulet",
+        "dreads": "Dreadlocks",
+        "medium": "Mi-longs",
+        "receding": "Dégarni"
       },
       "beard": {
         "none": "Sans barbe",

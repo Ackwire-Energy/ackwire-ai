@@ -9520,7 +9520,16 @@
         "spiky": "Dikenli",
         "mohawk": "Mohawk",
         "braids": "Örgü",
-        "pigtails": "Çift kuyruk"
+        "pigtails": "Çift kuyruk",
+        "crew": "Asker tıraşı",
+        "fade": "Fade",
+        "slick": "Geriye taranmış",
+        "flat": "Düz tepe",
+        "undercut": "Undercut",
+        "mullet": "Mullet",
+        "dreads": "Rasta",
+        "medium": "Orta boy",
+        "receding": "Açık alın"
       },
       "beard": {
         "none": "Sakalsız",
