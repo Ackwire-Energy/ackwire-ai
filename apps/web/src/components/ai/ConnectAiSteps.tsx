@@ -290,12 +290,15 @@ export function useExistingAi({
   agent,
   credentials,
   toEveryone = false,
+  withOwn = false,
   onUsed,
 }: {
   gates: PlanGates;
   agent: PlanAgent;
   credentials: readonly Credential[];
   toEveryone?: boolean;
+  /** The account the agent is set to think with is listed too: it has no AI, so that sign-in ended or never began. */
+  withOwn?: boolean;
   onUsed: (agentId: string, used: ExistingUsed) => void;
 }) {
   const { t } = useTranslation();
@@ -308,7 +311,7 @@ export function useExistingAi({
   const [busy, setBusy] = useState(false);
   const [refused, setRefused] = useState<ReturnType<typeof keyRefusal>>(null);
   const view = gates.view?.agentId === agent.id ? gates.view : undefined;
-  const rows = view ? existingAi(view, credentials) : null;
+  const rows = view ? existingAi(withOwn ? { ...view, account: null } : view, credentials) : null;
   const save = async (run: () => Promise<ExistingUsed>) => {
     setBusy(true);
     setRefused(null);

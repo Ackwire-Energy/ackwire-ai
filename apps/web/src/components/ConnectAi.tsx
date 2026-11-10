@@ -518,6 +518,7 @@ function ConnectAiDialog({
     gates,
     agent: askedAgent,
     credentials: credentials.data ?? [],
+    withOwn: true,
     onUsed: (id, next) => {
       setLinked((l) => ({ ...l, [id]: next.choice }));
       setUsed(next);
