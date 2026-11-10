@@ -1483,14 +1483,17 @@ The app runs its jobs (agents' runs, routines, messages' routing, notifications,
 process: 48 at once to start with, 12 of them kept for the quick ones. While jobs wait for a slot, it
 gives itself more, every 30 seconds: agents' runs as far as half of its memory holds them, about 4 MB
 each while they wait on their model or their computer, and quick jobs up to 4 per database connection
-(`DATABASE_POOL_MAX`), never while its processor, its database or its memory is what jobs wait on.
+(`DATABASE_POOL_MAX`), never while its processor, its database or its memory is what jobs wait on. Its
+memory is its container's limit when it has one; beside Postgres and the speech server on one computer,
+it counts only what it holds and what was free there when it started.
 Workspaces take turns, so one workspace's burst of routines makes only that workspace wait. When jobs
 keep waiting anyway, the log says so, with `add a worker process`, and so do the error reports when
 they are on (`SENTRY_DSN`).
 
-A worker process runs jobs only: it answers its health check and nothing else over HTTP. Add one next
-to `agentes` in the compose file, with the same image and settings. It leaves the migrations to the app
-and starts once the app is up:
+A worker process runs jobs only: it answers its health check and nothing else over HTTP, and leaves
+pushes to the app, the process that knows who has the app open. Add one next to `agentes` in the
+compose file, with the same image and settings. It leaves the migrations to the app and starts once the
+app is up:
 
 ```yaml
   agentes-worker:
@@ -1526,8 +1529,10 @@ process at a time (a job whose process stopped mid-way runs again once its lease
 written for), so each worker adds as many jobs at once as the app runs. Each process keeps up to
 `DATABASE_POOL_MAX` connections (20), plus one it listens on: keep their sum under Postgres's
 `max_connections` (100 in the compose file's Postgres). Before a reboot, stop the worker with the app
-(`docker compose stop agentes agentes-worker`). The built-in database (on this computer, without
-Docker) belongs to one process and takes no worker.
+(`docker compose stop agentes agentes-worker`). A worker on another computer needs the app's files
+where it can reach them (`S3_*`, or Postgres without `FILES_DIR`), and one on the app's computer
+outside Docker a `PORT` of its own. The built-in database (on this computer, without Docker) belongs
+to one process and takes no worker.
 
 </details>
 
