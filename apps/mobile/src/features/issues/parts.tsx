@@ -163,7 +163,7 @@ export function StateWords({ issue, state, words }: { issue: Issue; state: CardS
   const dir = useDirectory();
   const agent = issue.assignee?.type === "agent" ? dir.agentById.get(issue.assignee.id) : undefined;
   return (
-    <View style={styles.inline}>
+    <View style={[styles.inline, styles.state]}>
       {state.kind === "running" ? (
         <PixelOrbit color={agentLook(agent).color} size={10} />
       ) : (
@@ -173,7 +173,7 @@ export function StateWords({ issue, state, words }: { issue: Issue; state: CardS
           color={c.warn}
         />
       )}
-      <Text variant="small" style={[styles.bold, { color: state.kind === "running" ? c.agent : c.ink }]}>
+      <Text variant="small" style={[styles.bold, styles.shrink, { color: state.kind === "running" ? c.agent : c.ink }]}>
         {words}
       </Text>
     </View>
@@ -322,6 +322,9 @@ const styles = StyleSheet.create({
   card: { borderRadius: 20, paddingHorizontal: 12, paddingVertical: 12, gap: 8, overflow: "hidden" },
   pressed: { opacity: 0.85 },
   inline: { flexDirection: "row", alignItems: "center", gap: 4 },
+  // A long state (a stopped run's reason) wraps inside the card instead of running past its edge.
+  state: { flexShrink: 1, maxWidth: "100%" },
+  shrink: { flexShrink: 1 },
   bold: { fontWeight: "600" },
   heavy: { fontWeight: "700" },
   title: { fontWeight: "600" },

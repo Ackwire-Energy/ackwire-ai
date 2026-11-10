@@ -15,6 +15,15 @@ test("a narrow task card wraps its facts between facts, never inside one or past
   expect(last(declarations(kit, '.ac-factline__fact[data-tone="label"]'), "overflow-wrap")).toBe("anywhere");
 });
 
+test("a task's state moves whole under the name, and one longer than the card wraps inside it", async () => {
+  const issues = await sheet("apps/web/src/pages/issues.css");
+  // "Bloqueado · não terminou: …" with a run's reason drew past a 248px card on one line.
+  const state = declarations(issues, ".issue-card__state");
+  expect(last(state, "display")).toBe("inline-block");
+  expect(last(state, "max-width")).toBe("100%");
+  expect(last(state, "white-space")).toBeUndefined();
+});
+
 test("on a phone a task row is stacked as a card: its facts wrap under its title, from the row's start", async () => {
   const issues = await sheet("apps/web/src/pages/issues.css");
   // "Pede aprovação" beside the face ran 23px past its column and 9px past the row at 390px.

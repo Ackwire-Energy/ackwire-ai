@@ -138,7 +138,7 @@ describe("Tarefas: a card", () => {
   test("three parts on its left edge: the title whole, one line of facts starting with its number, who has it", async () => {
     await go();
     const card = cardOf(128);
-    const parts = [...card.children].map((c) => c.className.split(" ")[0]);
+    const parts = [...card.children].filter((c) => !(c as HTMLElement).hidden).map((c) => c.className.split(" ")[0]);
     expect(parts).toEqual(["issue-card__title", "ac-factline", "issue-card__who"]);
     // The title is the title: no number in front of it, never cut.
     expect((card.querySelector(".issue-card__title") as HTMLElement).textContent).toBe(
@@ -178,6 +178,10 @@ describe("Tarefas: a card", () => {
     expect(card.querySelector(".issue-card__state")?.textContent).toBe("Pergunta algo");
     expect(card.textContent).not.toContain("Trabalhando");
     expect(card.getAttribute("aria-label")).toBe("#129 Timeout no agendamento em horários de pico, Pergunta algo");
+    // Who has it, for a screen reader: the link's description, before how to move it.
+    const [whoId, helpId] = card.getAttribute("aria-describedby")?.split(" ") ?? [];
+    expect(document.getElementById(whoId ?? "")?.textContent).toBe("Responsável: Ada");
+    expect(helpId).toBeTruthy();
     // Waiting on a person: the approval card's sky at its top, and no sweep, which is for an agent at work.
     expect(card.firstElementChild?.className).toBe("ac-approval__sky");
     expect(card.querySelector(".ac-work-sweep")).toBeNull();
@@ -224,7 +228,10 @@ describe("Tarefas: a card", () => {
     expect(rule(".issue-card__title")).not.toContain("line-clamp");
     expect(rule(".issue-card__who")).toContain("--who-face: 24px");
     expect(rule(".issue-card__who")).toContain("display: block");
-    expect(rule(".issue-card__state")).toContain("white-space: nowrap");
+    // The state moves whole to the next line, and one longer than the card wraps inside itself.
+    expect(rule(".issue-card__state")).toContain("display: inline-block");
+    expect(rule(".issue-card__state")).toContain("max-width: 100%");
+    expect(rule(".issue-card__state")).not.toContain("white-space: nowrap");
     expect(rule(".issue-card > .ac-approval__sky")).toContain("height: 64px");
     // Fades in, never pops (none under reduced motion).
     expect(css).toMatch(/@starting-style \{\s*\.issue-card > \.ac-approval__sky \{\s*opacity: 0;/);

@@ -664,12 +664,27 @@ function CardFacts({ issue: i, fields }: { issue: Issue; fields: IssuesView["fie
   return <FactLine className="issue-card__facts" facts={facts} />;
 }
 
-/** What a card and a row say of a task: its one state (from its agent's work or a live turn) and their link's name. */
+/**
+ * What a card and a row say of a task: its one state (from its agent's work or a live turn), their link's name, and
+ * who has it as the link's description (`who`, rendered inside it; `describedBy` adds the drag help).
+ */
 function useTaskCard(i: Issue) {
   const { t } = useTranslation();
+  const actors = useActors();
+  const whoId = useId();
   const state = cardState(i, useTaskLive(i));
   const name = t("issues.open", { number: i.number, title: i.title });
-  return { state, label: state ? `${name}, ${cardStateText(t, state)}` : name };
+  const who = i.assignee && (
+    <span id={whoId} hidden>
+      {`${t("issues.form.assignee")}: ${actors.name(i.assignee)}`}
+    </span>
+  );
+  return {
+    state,
+    label: state ? `${name}, ${cardStateText(t, state)}` : name,
+    who,
+    describedBy: (help: string) => (who ? `${whoId} ${help}` : help),
+  };
 }
 
 /** An issue's right click (board card, list row): open beside the list, open its page, copy its link, delete it. */
@@ -751,7 +766,7 @@ function IssueCard({
   const { t } = useTranslation();
   const { org } = useOrg();
   const color = useAssigneeColor();
-  const { state, label } = useTaskCard(i);
+  const { state, label, who, describedBy } = useTaskCard(i);
   const menu = useIssueMenu()(i, () => !selected && onOpen());
   return (
     <Link
@@ -761,7 +776,7 @@ function IssueCard({
       aria-label={label}
       aria-current={selected || undefined}
       aria-roledescription={t("issues.drag.role")}
-      aria-describedby={drag.help}
+      aria-describedby={describedBy(drag.help)}
       draggable={drag.draggable}
       onDragStart={drag.onDragStart}
       onPointerDown={drag.onPointerDown}
@@ -776,6 +791,7 @@ function IssueCard({
       <CardFacts issue={i} fields={fields} />
       {fields.assignee && <CardWho issue={i} state={state} />}
       {state?.kind === "running" && <WorkSweep color={color(i) ?? "sky"} />}
+      {who}
     </Link>
   );
 }
@@ -961,7 +977,7 @@ function IssueRow({
   const { t } = useTranslation();
   const { org } = useOrg();
   const color = useAssigneeColor();
-  const { state, label } = useTaskCard(i);
+  const { state, label, who, describedBy } = useTaskCard(i);
   return (
     <Link
       to="/org/$orgId/issues/$number"
@@ -969,7 +985,7 @@ function IssueRow({
       className={cx("issue-list__row", selected && "is-on", picked && "is-picked")}
       aria-label={label}
       aria-roledescription={t("issues.drag.role")}
-      aria-describedby={drag.help}
+      aria-describedby={describedBy(drag.help)}
       draggable={drag.draggable}
       onDragStart={drag.onDragStart}
       onPointerDown={drag.onPointerDown}
@@ -986,6 +1002,7 @@ function IssueRow({
       {fields.assignee && <CardWho issue={i} state={state} />}
       <span className="issue-sr">{t(`issues.status.${i.status}`)}</span>
       {state?.kind === "running" && <WorkSweep color={color(i) ?? "sky"} />}
+      {who}
     </Link>
   );
 }

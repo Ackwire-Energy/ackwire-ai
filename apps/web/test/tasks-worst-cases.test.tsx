@@ -14,9 +14,9 @@ afterEach(() => cleanup());
 /**
  * Tarefas with what breaks a card, a row and the details' strip (break-ui): an unbroken address in a title, twelve
  * criteria, a PR and a GitHub link at once, 1284 messages with twelve mentions, Japanese with emoji, a long name, a
- * long label, a bare "Ok", every fact at once; in the strip a long name and column, seven people, three PRs, twelve
- * labels, a long GitHub link, and German. CI's geometry check lays out every screen these tests reach at 1280, 390
- * and 320.
+ * long label, a bare "Ok", every fact at once, nobody on it, a long name with initials like another's; in the strip a
+ * long name and column, nine people (one an emoji first), three PRs, twelve labels, a long GitHub link, and German.
+ * CI's geometry check lays out every screen these tests reach at 1280, 390 and 320.
  */
 const URL_TITLE =
   "Atualizar https://docs.example.com/integracoes/whatsapp-business/webhooks/configuracao-avancada antes da revisão";
@@ -24,6 +24,7 @@ const LONG_PERSON = "Aleksandra Wiśniewska-Kowalczyk";
 const LONG_ASSIGNEE = "Christopher Alexander Montgomery III";
 const LONG_LABEL = "infraestrutura-e-plataforma";
 const LONG_GITHUB = "https://github.com/example-org/a-very-long-repository-name/pull/10942";
+const CODE_TITLE = "Rodar `bun test` no CI do `apps/web`";
 
 const person = (userId: string, name: string): Member => ({
   userId,
@@ -43,6 +44,8 @@ const PEOPLE = [
   person("u-dora", "Dora"),
   person("u-enzo", "Enzo"),
   person("u-fe", "Fê"),
+  person("u-anas", "Ana Beatriz Albuquerque de Souza e Silva"),
+  person("u-palm", "🌴 Ana Souza"),
 ];
 const day = (offset: number) => {
   const d = new Date();
@@ -127,6 +130,38 @@ function worst(base: Issue): Issue[] {
       assignee: { type: "person", id: "u-ale" },
       conversation: talk(2),
     }),
+    // Nobody on it yet, due today: no third part at all.
+    task({
+      number: 133,
+      title: "Definir a política de reembolso para clientes do plano anual",
+      status: "todo",
+      labels: ["financeiro"],
+      dueDate: day(0),
+    }),
+    // Its background work stopped on an error: the longest state a card says, whole under the name.
+    task({
+      number: 135,
+      title: "Gerar o relatório de faturas",
+      status: "in_progress",
+      assignee: { type: "agent", id: ATLAS_ID },
+      blocked: { reason: "failed", since: new Date().toISOString(), text: "run.brain_unavailable" },
+    }),
+    // Code an agent wrote between backticks: drawn as code, as in a message.
+    task({
+      number: 136,
+      title: CODE_TITLE,
+      status: "todo",
+      assignee: { type: "agent", id: ADA_ID },
+    }),
+    // A person's long name, the same initials as another's: the face's letters and the name wrapping under it.
+    task({
+      number: 134,
+      title: "Trocar o provedor de SMS",
+      status: "in_progress",
+      priority: "high",
+      assignee: { type: "person", id: "u-anas" },
+      conversation: talk(1),
+    }),
   ];
 }
 
@@ -170,6 +205,16 @@ describe("Tarefas at their worst", () => {
     expect(cardOf(7).querySelector(".issue-card__state")?.textContent).toBe("Trabalhando");
     expect(cardOf(9931).querySelector(".issue-card__state")?.textContent).toBe("Parado há 21 dias");
     expect(cardOf(455).querySelector(".issue-card__who .ac-who > b")?.textContent).toBe(LONG_PERSON);
+    // Nobody on it: the title and the facts, no "Sem responsável" in its place.
+    expect(cardOf(133).querySelector(".issue-card__who")).toBeNull();
+    expect(facts(cardOf(133))).toEqual(["#133", "financeiro", "hoje"]);
+    expect(cardOf(134).querySelector(".issue-card__who .ac-avatar__initials")?.textContent).toBe("AS");
+    expect([...cardOf(136).querySelectorAll(".issue-card__title > code.ac-inlinecode")].map((c) => c.textContent)).toEqual(
+      ["bun test", "apps/web"],
+    );
+    expect(cardOf(135).querySelector(".issue-card__state")?.textContent).toBe(
+      "Bloqueado · não terminou: a IA do computador não conseguiu responder. Confira o computador e peça de novo",
+    );
   });
 
   test("Agentes trabalhando agora says what each agent is doing, never the cards' state words", async () => {
@@ -192,9 +237,23 @@ describe("Tarefas at their worst", () => {
     expect(row.classList.contains("issue-list__row")).toBe(true);
     expect(row.querySelector(".issue-list__title")?.textContent).toBe(URL_TITLE);
     expect(facts(row)[0]).toBe("#12873");
+    expect(cardOf(136).querySelector(".issue-list__title > code.ac-inlinecode")?.textContent).toBe("bun test");
   });
 
-  test("the details' strip: a long name and column, seven people, three PRs, twelve labels, a long GitHub link, German", async () => {
+  test("the task's page draws its title's code as code too", async () => {
+    const { api } = await go("board", "issues");
+    const task = worst((await api.issues.list(ORG_ID, {}))[0] as Issue).find((i) => i.number === 136) as Issue;
+    const get = api.issues.get;
+    api.issues.get = async (orgId, number) => (number === 136 ? task : get(orgId, number));
+    cleanup();
+    await renderApp(`/org/${ORG_ID}/issues/136`, { api });
+    await settle(8);
+    const title = document.querySelector(".issue-details__title") as HTMLElement;
+    expect(title.textContent).toBe("Rodar bun test no CI do apps/web");
+    expect([...title.querySelectorAll("code.ac-inlinecode")].map((c) => c.textContent)).toEqual(["bun test", "apps/web"]);
+  });
+
+  test("the details' strip: a long name and column, nine people, three PRs, twelve labels, a long GitHub link, German", async () => {
     const { api } = await go("board", "issues");
     const task = await api.issues.get(ORG_ID, 131);
     await api.issues.addColumn(ORG_ID, { name: "Aguardando aprovação do jurídico", stage: "todo" });

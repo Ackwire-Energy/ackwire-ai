@@ -70,7 +70,7 @@ import {
   useStageName,
   useStepText,
 } from "@/lib/issues";
-import { Markdown } from "@/lib/markdown";
+import { codeAndBold, Markdown } from "@/lib/markdown";
 import { useOpenParam } from "@/lib/open-param";
 import { useToast } from "@/lib/toast";
 import { useIssueRealtime } from "@/realtime/context";
@@ -375,7 +375,7 @@ function IssueTitle({ issue: i, onSaved }: { issue: Issue; onSaved: () => void }
     );
   return (
     <EditInPlace label={t("issues.edit.title")} onEdit={() => setDraft(title)}>
-      <h1 className="issue-details__title">{title}</h1>
+      <h1 className="issue-details__title">{codeAndBold(title)}</h1>
     </EditInPlace>
   );
 }

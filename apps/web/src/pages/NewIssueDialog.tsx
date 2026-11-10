@@ -51,7 +51,7 @@ export function NewIssueDialog({
   onClose,
 }: {
   open: boolean;
-  /** The column of A fazer it was asked from ("Nova tarefa" under a column); else the first. */
+  /** The column of A fazer it was asked from (the "+" in its head); else the first. */
   columnId: string | null;
   columns: IssueColumn[];
   onClose: () => void;

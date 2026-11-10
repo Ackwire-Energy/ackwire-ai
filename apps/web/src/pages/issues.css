@@ -516,10 +516,12 @@ html:not([data-pointer]) .issue-card:focus-visible {
   color: var(--ink2);
 }
 /* In the name's line of words, so they share one baseline; the space before it lets it move whole to the next line.
-   That space is 0.2em in the app's font: with it, 8 after the name. */
+   That space is 0.2em in the app's font: with it, 8 after the name. A state longer than the card (a stopped run's
+   reason) wraps inside itself on the line it then has to itself. */
 .issue-card__state {
+  display: inline-block;
+  max-width: 100%;
   font-weight: 600;
-  white-space: nowrap;
 }
 .ac-who + .issue-card__state {
   margin-inline-start: calc(var(--space-2) - 0.2em);

@@ -651,6 +651,9 @@ describe("a task's GitHub link", () => {
   test("on a narrow card the facts wrap between facts, and the state under the name, instead of running past its edge", () => {
     expect(source("parts.tsx")).toMatch(/facts: \{ flexDirection: "row", flexWrap: "wrap",/);
     expect(source("parts.tsx")).toMatch(/who: \{ flexDirection: "row", flexWrap: "wrap",/);
+    // A state longer than the card (a stopped run's reason) wraps inside it, never past the card's clipped edge.
+    expect(source("parts.tsx")).toContain('state: { flexShrink: 1, maxWidth: "100%" }');
+    expect(source("parts.tsx")).toContain("style={[styles.bold, styles.shrink,");
   });
 });
 
