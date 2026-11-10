@@ -38316,6 +38316,9 @@
   "standing.createUnpaid": {
     "value": "You already have a workspace waiting for an agentes.chat plan. Choose its plan before creating another."
   },
+  "standing.createUnpaidOpen": {
+    "value": "Open {{name}}"
+  },
   "standing.createInactive": {
     "value": "You already have a workspace that isn't active yet, so you can't create another for now."
   },

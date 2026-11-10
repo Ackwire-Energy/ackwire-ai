@@ -15335,6 +15335,7 @@
     "suspended": "Ruang kerja ini untuk sementara tidak tersedia.",
     "createRefused": "Kamu tidak bisa membuat ruang kerja sekarang.",
     "createUnpaid": "Kamu sudah punya ruang kerja yang menunggu paket agentes.chat. Pilih paketnya sebelum membuat yang lain.",
+    "createUnpaidOpen": "Buka {{name}}",
     "createInactive": "Kamu sudah punya ruang kerja yang belum aktif, jadi untuk sementara kamu tidak bisa membuat yang lain.",
     "agentPaused": "Agen ini sedang dijeda.",
     "onHold": "Ruang kerja ini ditangguhkan sementara: {{reason}}",

@@ -15813,6 +15813,7 @@
     "suspended": "Dieser Workspace ist vorerst nicht verfügbar.",
     "createRefused": "Du kannst gerade keinen Workspace erstellen.",
     "createUnpaid": "Du hast schon einen Workspace, der auf einen agentes.chat-Tarif wartet. Wähle seinen Tarif, bevor du einen weiteren erstellst.",
+    "createUnpaidOpen": "{{name}} öffnen",
     "createInactive": "Du hast schon einen Workspace, der noch nicht aktiv ist, daher kannst du vorerst keinen weiteren erstellen.",
     "agentPaused": "Dieser Agent ist vorerst pausiert.",
     "onHold": "Dieser Workspace ist angehalten: {{reason}}",

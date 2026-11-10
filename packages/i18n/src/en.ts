@@ -15770,6 +15770,8 @@ export const en = {
     createRefused: "You can't create a workspace right now.",
     createUnpaid:
       "You already have a workspace waiting for an agentes.chat plan. Choose its plan before creating another.",
+    /** The button under it: into the workspace they already have. */
+    createUnpaidOpen: "Open {{name}}",
     /** The same refusal with no call to pay, for the phone app: the stores allow paying only in their own flow. */
     createInactive: "You already have a workspace that isn't active yet, so you can't create another for now.",
     agentPaused: "This agent is paused for now.",

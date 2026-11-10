@@ -526,7 +526,11 @@ export function OnboardingPage() {
                         }))}
                       />
                       {unpaidElsewhere && (
-                        <UnpaidNote orgId={unpaidElsewhere} billing={Boolean(authConfig?.billingUrl)} />
+                        <UnpaidNote
+                          orgId={unpaidElsewhere}
+                          name={me.data.organizations.find((o) => o.id === unpaidElsewhere)?.name}
+                          billing={Boolean(authConfig?.billingUrl)}
+                        />
                       )}
                     </div>
                   ) : (
@@ -602,7 +606,11 @@ export function OnboardingPage() {
                         onRemoved={() => setLogoOpen(false)}
                       />
                       {unpaidElsewhere && (
-                        <UnpaidNote orgId={unpaidElsewhere} billing={Boolean(authConfig?.billingUrl)} />
+                        <UnpaidNote
+                          orgId={unpaidElsewhere}
+                          name={me.data.organizations.find((o) => o.id === unpaidElsewhere)?.name}
+                          billing={Boolean(authConfig?.billingUrl)}
+                        />
                       )}
                     </div>
                   )}
@@ -712,20 +720,31 @@ export function OnboardingPage() {
 /** The two answers to "What will you use agentes.chat for?" (ADR 0159), in this order. */
 const PURPOSES = ["personal", "team"] as const satisfies readonly WorkspaceMode[];
 
-/** Owning a workspace that waits for its first plan: said in place, with the way to that plan. */
-function UnpaidNote({ orgId, billing }: { orgId: string; billing: boolean }) {
+/**
+ * Owning a workspace that waits for its first plan: said in place, with the way into that workspace (someone who came
+ * back to this page after making it was looking for it, not for another) and the way to its plan.
+ */
+function UnpaidNote({ orgId, name, billing }: { orgId: string; name: string | undefined; billing: boolean }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   return (
     <>
       <p className="onb__status ac-iconline" role="alert">
         <Icon name="pause" size={14} />
         <span>{t("standing.createUnpaid")}</span>
       </p>
-      {billing && (
+      {(name || billing) && (
         <div className="row">
-          <BillingLinkButton orgId={orgId} from="new_workspace" icon="external">
-            {t("standing.billing.cta.payment")}
-          </BillingLinkButton>
+          {name && (
+            <Button onClick={() => void navigate({ href: returnPlace(orgId) })}>
+              {t("standing.createUnpaidOpen", { name })}
+            </Button>
+          )}
+          {billing && (
+            <BillingLinkButton orgId={orgId} from="new_workspace" icon="external">
+              {t("standing.billing.cta.payment")}
+            </BillingLinkButton>
+          )}
         </div>
       )}
     </>

@@ -15928,6 +15928,7 @@
     "suspended": "Deze werkruimte is voorlopig niet beschikbaar.",
     "createRefused": "Je kunt nu geen werkruimte maken.",
     "createUnpaid": "Je hebt al een werkruimte die wacht op een agentes.chat-abonnement. Kies daar een abonnement voordat je er nog een maakt.",
+    "createUnpaidOpen": "{{name}} openen",
     "createInactive": "Je hebt al een werkruimte die nog niet actief is, dus je kunt voorlopig geen nieuwe maken.",
     "agentPaused": "Deze agent is voorlopig gepauzeerd.",
     "onHold": "Deze werkruimte staat in de wacht: {{reason}}",
