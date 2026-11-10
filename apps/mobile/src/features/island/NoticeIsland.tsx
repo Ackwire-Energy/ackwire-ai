@@ -567,7 +567,7 @@ const faceOf = (n: AppNotification) => {
 };
 
 /**
- * Who it is from; with nobody behind it (a connected server changed tools, the workspace itself), what it is about as
+ * Who it is from; with nobody behind it (the workspace itself), what it is about as
  * an icon on a soft tile, never an unknown face.
  */
 function IslandFace({ n, size }: { n: AppNotification; size: number }) {
@@ -575,7 +575,7 @@ function IslandFace({ n, size }: { n: AppNotification; size: number }) {
   if (who) return <Face who={who} size={size} />;
   return (
     <View style={[styles.sysFace, { width: size, height: size, borderRadius: size * 0.3 }]}>
-      <Icon name={n.kind === "connector_tool_changed" ? "bolt" : "bell"} size={Math.round(size * 0.48)} color={WHITE} />
+      <Icon name="bell" size={Math.round(size * 0.48)} color={WHITE} />
     </View>
   );
 }

@@ -278,7 +278,9 @@ export interface DesktopStatus {
 
 /**
  * `GET …/agents/{agentId}/desktop`: for whoever may watch it. Who may see the agent's browser but whose roles don't
- * give them its whole computer gets a screen that can't be shown (`browser_only`), so the apps show the browser.
+ * give them its whole computer gets a screen that can't be shown (`browser_only`), so the apps show the browser. The
+ * apps ask it while a view of the computer is open: that keeps the workspace's own computer wanted, and wakes it from
+ * standby (ADR 0161).
  */
 export async function desktopStatus(
   deps: DesktopDeps,
@@ -290,6 +292,7 @@ export async function desktopStatus(
   if ((await screenAccess(db, userId, orgId, agentId, undefined, "desktop")).refusal === "level") {
     await requireBrowserAccess(db, userId, orgId, agentId);
     const served = await desktopTarget(db, ANYWHERE, orgId, agentId, "desktop");
+    if ("machineId" in served) void deps.hub?.wake?.(served.machineId, "view").catch(() => {});
     // An agent with no screen to show isn't one whose browser alone they get.
     const none = "refused" in served && NO_SCREEN.includes(served.reason) ? served.reason : null;
     return {
@@ -318,6 +321,7 @@ export async function desktopStatus(
     standingRefusal(db, orgId, agentId).then((refusal) => refusal !== null),
     browserOnDesktop(db, orgId, agentId),
   ]);
+  if ("machineId" in served) void deps.hub?.wake?.(served.machineId, "view").catch(() => {});
   const online = "machineId" in served && deps.hub ? (await deps.hub.status(served.machineId))?.online === true : false;
   const desktop: StreamTarget = "refused" in served || online ? served : refused(STREAM_CLOSE.unreachable, "offline");
   let running = false;

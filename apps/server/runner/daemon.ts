@@ -214,7 +214,9 @@ export function prepareWorkspace(dir: string): string {
 /**
  * The config after a device-code pairing. Limits of an earlier pairing of
  * this home stay; access starts from `tools` with no folders, except when
- * the server gave back the same machine (a reconnect): its folders and tools stay.
+ * the server gave back the same machine (a reconnect, or a workspace's computer
+ * moved to new hardware with its files): its folders, tools, allowed services
+ * and pause stay.
  * The mode always stays: a system home paired again must never become a
  * root runner that does agents' work itself.
  */
@@ -247,6 +249,8 @@ export function configFromGrant(
     ...(grant.org.id ? { orgId: grant.org.id } : {}),
     ...(grant.org.name ? { orgName: grant.org.name } : {}),
     access: same && prev?.access ? prev.access : { folders: [], tools },
+    ...(same && prev?.services?.length ? { services: prev.services } : {}),
+    ...(same && prev?.paused ? { paused: prev.paused } : {}),
   };
 }
 

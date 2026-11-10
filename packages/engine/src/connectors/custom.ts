@@ -607,8 +607,10 @@ export class ToolsUnreadable extends Error {}
  * Lists the server's tools again: new ones come in unclassified (hidden from
  * agents until an admin classifies them), gone ones are marked removed. Each
  * gets a suggestion (annotations, the verb, else the judge: its answers are
- * kept per tool name and not asked again). A tool that turns out sensitive
- * can't stay free: its read/write decision becomes approval.
+ * kept per tool name and asked again only when its description changed). A tool
+ * that turns out sensitive can't stay free: its read/write decision becomes
+ * approval. A level nobody set by hand follows a stricter suggestion (a read
+ * that became a write); no level ever gets looser here.
  */
 export async function syncCustomTools(deps: CustomDeps, c: ConnectorConnection) {
   const preset = presetForServer(c.serverUrl);
@@ -643,7 +645,10 @@ export async function syncCustomTools(deps: CustomDeps, c: ConnectorConnection) 
   const existing = await deps.db.select().from(customTools).where(eq(customTools.connectionId, c.id));
   const byName = new Map(existing.map((t) => [t.name, t]));
   const cached = new Map<string, ToolClass>();
+  const said = new Map(listed.map((t) => [t.name, (t.description ?? "").slice(0, 2000)]));
   for (const t of existing) {
+    // The judge read the description: its answer holds only for that text.
+    if (said.get(t.name) !== t.description) continue;
     if (t.suggestionSource === "judge" && ACCESS.includes(t.suggestedAccess as ToolAccess)) {
       cached.set(t.name, {
         level: t.suggestedAccess as ToolAccess,
@@ -673,7 +678,8 @@ export async function syncCustomTools(deps: CustomDeps, c: ConnectorConnection) 
       sensitive: cls.sensitive,
     };
     if (old) {
-      const unsafe = cls.sensitive && (old.access === "read" || old.access === "write");
+      const free = old.access === "read" || old.access === "write" ? old.access : null;
+      const stricter = free && old.confirmedAt === null && ACCESS.indexOf(cls.level) > ACCESS.indexOf(free);
       await deps.db
         .update(customTools)
         .set({
@@ -681,7 +687,7 @@ export async function syncCustomTools(deps: CustomDeps, c: ConnectorConnection) 
           readOnlyHint: tool.readOnlyHint ?? null,
           destructiveHint: tool.destructiveHint ?? null,
           ...suggestion,
-          ...(unsafe ? { access: "approval" } : {}),
+          ...(free && cls.sensitive ? { access: "approval" } : stricter ? { access: cls.level } : {}),
           removedAt: null,
         })
         .where(eq(customTools.id, old.id));

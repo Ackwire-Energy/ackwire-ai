@@ -24,7 +24,10 @@ export type PhoneStage =
   /** The agent's page, live, where its computer serves no screen, or for a person helping in its browser. */
   | "page"
   | "offline"
-  /** Cloud: the workspace's computer is ready and gives itself to this agent at its next hello. */
+  /**
+   * Cloud: the workspace's computer is ready and gives itself to this agent at its next hello, or wakes from standby
+   * (ADR 0161).
+   */
   | "joining"
   | "noComputer"
   | "noScreen"
@@ -34,7 +37,7 @@ export type PhoneStage =
 export function phoneStage(f: AgentComputerFacts): PhoneStage {
   const surface = surfaceOf(f);
   if (surface !== "cover") return surface;
-  if (f.machine && !f.machine.online) return "offline";
+  if (f.machine && !f.machine.online) return f.machine.standby ? "joining" : "offline";
   if (!f.machine) return f.edition === "cloud" ? "joining" : "noComputer";
   return f.desktop?.reason === "no_desktop" && !f.browserGranted ? "noScreen" : "unavailable";
 }

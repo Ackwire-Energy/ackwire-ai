@@ -989,8 +989,6 @@
       "plan_lent_female_other": "{{names}} hebben je {{plan}}-abonnement aan {{agent}} gekoppeld",
       "plan_model_dropped_one": "{{model}} is uit {{plan}} gehaald. {{names}} gebruikt voorlopig {{runs}}",
       "plan_model_dropped_other": "{{model}} is uit {{plan}} gehaald. {{names}} gebruikt voorlopig {{runs}}",
-      "connector_tool_changed_one": "Een gekoppelde server heeft tools gewijzigd die je hebt goedgekeurd",
-      "connector_tool_changed_other": "Gekoppelde servers hebben tools gewijzigd die je hebt goedgekeurd",
       "computer_disk_full_one": "De schijf van een computer is bijna vol",
       "computer_disk_full_other": "Schijven van computers zijn bijna vol",
       "computer_no_chrome_one": "Een computer heeft Google Chrome nodig. Download het op google.com/chrome",
@@ -1463,15 +1461,11 @@
       "browser": "Browser",
       "secret": "Geheim",
       "join": "Leden",
-      "tools": "Tools",
       "limit": "Limiet"
     },
     "review": "Nakijken",
     "answer": "Antwoorden",
     "open": "Openen",
-    "toolsTitle": "Heeft tools gewijzigd die je hebt goedgekeurd",
-    "toolsWhy": "Agents blijven de goedgekeurde versie gebruiken tot je de nieuwe accepteert.",
-    "reviewChanges": "Wijzigingen bekijken",
     "clear": {
       "title": "Er wacht niets op je",
       "text": "Als een agent je nodig heeft, zie je dat hier als eerste."

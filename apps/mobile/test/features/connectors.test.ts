@@ -323,25 +323,16 @@ test("icons only from our own path; brand colors only as #rrggbb; monograms; htt
   expect(isHttpsUrl("http://mcp.acme.dev")).toBe(false);
 });
 
-describe("Ferramentas: what changed comes first, Salvar stays at hand", () => {
+describe("Ferramentas: Salvar stays at hand", () => {
   const read = (path: string) =>
     Bun.file(new URL(`../../src/features/connectors/${path}`, import.meta.url).pathname).text();
 
-  test("changed tools lead the screen and open their change; Salvar is pinned outside the scroll", async () => {
-    const [screen, changes, review] = await Promise.all([
-      read("ToolsScreen.tsx"),
-      read("ToolChanges.tsx"),
-      read("ToolReview.tsx"),
-    ]);
-    // Atividade's card opens this screen: the changes are its first block, before the levels.
-    expect(screen.indexOf("<ChangedTools")).toBeGreaterThan(-1);
-    expect(screen.indexOf("<ChangedTools")).toBeLessThan(screen.indexOf("<ReviewStep"));
+  test("Salvar is pinned outside the scroll, and no changed tool waits for an Aceitar", async () => {
+    const [screen, review] = await Promise.all([read("ToolsScreen.tsx"), read("ToolReview.tsx")]);
+    expect(screen).not.toContain("ChangedTools");
     // Salvar sits in the bar under the scroll, never at the end of a long list.
     expect(screen.indexOf("<BottomBar")).toBeGreaterThan(screen.indexOf("</ScrollView>"));
     expect(review).toContain("{onSaveBar ? null : <Button");
-    // One helper for the web and the phone says what changed.
-    expect(changes).toContain('from "@agenteschat/client/lib/tool-changes"');
-    expect(changes).toContain('pathname: "/connectors/change"');
   });
 });
 

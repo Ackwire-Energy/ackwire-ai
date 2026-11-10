@@ -11,6 +11,7 @@ import { publishOrgEvent } from "./events";
 import { TASK_OFFLINE_GRACE_MS } from "./machine-tasks";
 import {
   getMachine,
+  inStandby,
   type MachineRow,
   machineOnline,
   machinePause,
@@ -136,7 +137,8 @@ export async function listMachineOutages(
     .from(machines)
     .where(and(eq(machines.orgId, orgId), isNull(machines.deletedAt)))
     .orderBy(machines.createdAt);
-  const offline = rows.filter((m) => !machineOnline(m, now));
+  // One in standby is asleep by design, never an outage (ADR 0161).
+  const offline = rows.filter((m) => !machineOnline(m, now) && !inStandby(m));
   const offlineIds = offline.map((m) => m.id);
 
   const [onMachines, waiting] = offlineIds.length

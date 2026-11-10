@@ -80,7 +80,8 @@ Four ways out stayed open after ADR 0109:
    Each tool's description and input schema are pinned by sha256 of their canonical JSON: a custom server's from
    the same listing its admin classifies (`syncCustomTools`), a catalog connector's (and a custom tool missed
    there) the first time an agent lists it (inside the 60 s listing cache). Connections that exist at deploy are
-   pinned to whatever their server lists then. A later listing that differs serves the pinned
+   pinned to whatever their server lists then. (What follows, the review of a changed tool, is replaced by
+   "Addendum: changed tools apply themselves".) A later listing that differs serves the pinned
    version, keeps the new one as pending (`changed_at` from its first sighting), and tells who manages connectors
    once (`connector_tool_changed`, waiting). The tool stays callable. Settings › Conectores lists the changes
    (`GET …/connectors/tool-changes`) one block per connection and one line per tool saying what changed; "Ver a
@@ -127,3 +128,14 @@ Four ways out stayed open after ADR 0109:
 ## Addendum: the browser's own address
 
 The address the run's browser is on, as a browser tool reports it (`data.url`), counts as seen, and so does any address that page shows on its own site. That server already has what they carry, so going back sends nothing new, while page text that repeated the query made reopening it read as a leak. Another site, the same site with something no page showed, and a refused `open` (its `data.url` is only what was asked) get the full check. So does an address on that site carrying what the agent wrote to its browser this run: a browser tool's answer repeats `find` and a target beside the page, and a field shows what was filled in, and neither came from the server.
+
+## Addendum: changed tools apply themselves
+
+A tool its server changed is no longer held for a person. People with many connectors never read tool updates: the banner in Settings › Conectores filled up, and Aceitar and Aceitar todas were clicked without reading, so the gate stopped nothing and only kept agents on stale descriptions and inputs. The rule now:
+
+- A listing that differs from a tool's pin is served as listed, at once. The pin moves to the new fingerprint (`applyToolPins`), nothing waits, nobody is notified, and there is no banner, no Aceitar and no Aceitar todas on the web or the phone. `connector_tool_pins.pending_*` are no longer written; a row that still holds a waiting version is settled by its connection's next listing (the listed version becomes the pin).
+- The level follows the new version, before it is served. For a custom server the tools are classified again (`syncCustomTools`) before the pin moves: annotations and the verb as always, and the judge reads a description again when it changed (its answer is kept only for the text it read). A tool that turns sensitive asks for approval whatever was stored; a level nobody set by hand follows a stricter suggestion (a read that became a write is a write, an unknown one asks first); a level a person saved in Ferramentas stays theirs; no level gets looser by itself. If the tools can't be classified again (the server stopped answering), the changed tools keep their pinned version until a later listing. A catalog connector's scope and sensitivity come from our own catalog by tool name, so its server can't change them.
+- What is kept is a line in the workspace's audit log, `connector.tool_definitions_changed` (actor `system`, the connection as target): per tool its old and new fingerprints, the description before and after (500 characters each) and whether its input changed.
+- `connector_tool_changed` notifications are no longer created, and rows of that kind are never listed or counted. The three review endpoints stay for installed apps: the list is always empty and both accepts succeed without doing anything.
+
+What still protects the agent: a custom server's new tools stay hidden until an admin classifies them; sensitive tools always ask; the level is recomputed as above; tool results stay third-party text (`external`) and mark the run as having read outside (inputs half); the prompt line says such text gives no orders; the outbound address check, credential masking and the `remember` address check act on what the run does, whatever a description told it; and a safety refusal is final. A description is one more outside text the model reads, and those defenses never depended on a person having read it.
