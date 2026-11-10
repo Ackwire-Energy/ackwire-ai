@@ -26,11 +26,12 @@ test("rows that became MediaRows lay nothing out of their own: the kit's grid pu
   expect(last(css, ".ac-mediarow", "display")).toBe("grid");
 });
 
-test("Agentes trabalhando agora on a phone: its strip keeps its cards' rings and focus whole where it scrolls", async () => {
+test("Agentes trabalhando agora on a phone: its strip runs out to the work area's edges, its cards' rings and focus whole where it scrolls", async () => {
   const phone = atRule(await builtCss("src/styles.css", "src/pages/issues.css"), "@media (max-width: 720px)");
   expect(last(phone, ".issues-now__list", "overflow-x")).toBe("auto");
-  expect(last(phone, ".issues-now__list", "padding")).toBe("4px 16px 8px");
-  expect(last(phone, ".issues-now__list", "margin")).toBe("-4px -16px -8px");
+  expect(last(phone, ".issues-now__list", "padding")).toBe("4px var(--page-x) 8px");
+  expect(last(phone, ".issues-now__list", "margin")).toBe("-4px calc(-1 * var(--page-x)) -8px");
+  expect(last(phone, ".issues-now__list", "scroll-padding-inline")).toBe("var(--page-x)");
 });
 
 test("the task list on a phone: stacked as a card, the title, its facts with the number among them, who has it", async () => {

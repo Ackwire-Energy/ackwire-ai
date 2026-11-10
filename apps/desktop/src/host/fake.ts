@@ -34,6 +34,7 @@ import type { Platform } from "../control/platform";
 import type { ServerList, ServerWorkspaces } from "../control/server";
 import type { TrayState } from "../control/tray";
 import { acmeSeed, FAKE_SERVER, FakeRunner, horizonteSeed } from "../dev/fake-runner";
+import { createFakeSite, type FakeSite } from "../dev/fake-site";
 import type { AppInfo, Host, RunnerInfo, RunnerStateChange, WindowName } from "./types";
 
 export type Scenario = "first" | "windows" | "linux" | "cloud" | "selfhost" | "link" | "here";
@@ -66,6 +67,8 @@ export interface FakeHost extends Host {
   readonly runners: Map<string, FakeRunner>;
   readonly tray: TrayState;
   readonly list: ServerList;
+  /** The server's devices API behind `siteFetch`. */
+  readonly site: FakeSite;
   onDev(cb: () => void): () => void;
   setVersion(version: string): void;
 }
@@ -114,6 +117,8 @@ export function createFakeHost(
   const shownListeners = new Set<(n: WindowName) => void>();
   const devListeners = new Set<() => void>();
   let signIns = 0;
+  /** Servers the app signed out of (`signOutServer`): listed with no workspaces. */
+  const signedOut = new Set<string>();
   let tray: TrayState = "idle";
   let autostart = true;
   let version = "0.6.0";
@@ -213,12 +218,18 @@ export function createFakeHost(
     signIns = 1;
   }
 
+  const site = createFakeSite((orgId) => {
+    const ids = [...runners.values()].map((r) => r.ids()).find((i) => i?.orgId === orgId);
+    return ids ? { machineId: ids.machineId, name: ids.name } : null;
+  });
+
   const host: FakeHost = {
     window: initial,
     fake: true,
     platform,
     runners,
     list,
+    site,
     get tray() {
       return tray;
     },
@@ -275,9 +286,10 @@ export function createFakeHost(
     workspaces: async (): Promise<ServerWorkspaces[]> =>
       list.servers.map((server, i) => ({
         server,
-        signedIn: true,
-        orgs:
-          i === 0
+        signedIn: !signedOut.has(server),
+        orgs: signedOut.has(server)
+          ? []
+          : i === 0
             ? [
                 { id: "o-acme", name: "Acme", logo: null, unread: 0, waiting: 0 },
                 { id: "o-norte", name: "Estúdio Norte", logo: null, unread: 3, waiting: 0 },
@@ -285,9 +297,17 @@ export function createFakeHost(
             : [{ id: `o-${i}`, name: "Oficina", logo: null, unread: 1, waiting: 0 }],
       })),
     welcomeMode: async () => (options.welcomeAdd ? "add" : null),
+    siteFetch: async (server, method, path, body) => {
+      if (!list.servers.includes(server)) throw "not a server of this app";
+      return site.answer(method, path, body);
+    },
     removeServer: async (server) => {
       list.servers = list.servers.filter((s) => s !== server);
       if (list.current === server) list.current = list.servers[0] ?? null;
+      devChanged();
+    },
+    signOutServer: async (server) => {
+      signedOut.add(server);
       devChanged();
     },
     discover: async (): Promise<Candidate[]> => {
@@ -442,13 +462,18 @@ export function createFakeHost(
     },
     cancelLocalSetup: async () => cancelSetup?.(),
     startLocalServer: async () => {
-      setLocal({ run: true, phase: "starting", backTo: null });
+      setLocal({ run: true, phase: "starting", backTo: null, held: false, heldUntil: null });
       await wait(1200);
       setLocal({ phase: "running" });
     },
-    stopLocalServer: async (forget) => {
+    stopLocalServer: async (forget, minutes) => {
       await wait(600);
-      setLocal({ phase: forget ? "off" : "stopped", run: !forget });
+      setLocal({
+        phase: forget ? "off" : "stopped",
+        run: !forget,
+        held: !forget,
+        heldUntil: !forget && minutes ? Date.now() + minutes * 60_000 : null,
+      });
       if (forget) await host.removeServer(local.publicUrl ?? LOCAL_URL);
     },
     restartLocalServer: async () => {

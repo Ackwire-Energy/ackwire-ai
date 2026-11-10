@@ -21,6 +21,7 @@ import { clockAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { computerKind, isPaused } from "@agenteschat/client/lib/machines";
 import { can } from "@agenteschat/client/lib/permissions";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { Button, ComputerPortrait, cx, Dialog, gradientOf, Icon, SkyStrip } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
 import { type CSSProperties, type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -298,7 +299,7 @@ function ComputerStage({
   const flashing = useReadyFlash(surface);
   const reader = useWaitReader();
   const machine = view.machine;
-  const computer = computerName(t, org.name, machine);
+  const computer = computerName(t, org.name, machine, isPersonal(org));
   const manages = can(org, "manage_agents") || agent.ownerUserId === me.user.id;
   // Whose role gives no browser here gets Fechar, never "Assumir o navegador" (ADR 0085 §12).
   const mayBrowser = can(org, agent.ownerUserId === me.user.id ? "own_browsers" : "control_browsers");
@@ -466,7 +467,7 @@ function ComputerStage({
         ))}
       </ol>
     );
-  } else if (machine && !machine.online) {
+  } else if (machine && !machine.online && !machine.standby) {
     const since = machine.lastSeenAt ? clockAt(i18n.language, machine.lastSeenAt) : null;
     const outage = outages.data?.outages.find((o) => o.machineId === machine.id);
     body =
@@ -510,8 +511,8 @@ function ComputerStage({
           )}
         </>
       );
-  } else if (!machine && f.edition === "cloud") {
-    // The workspace's computer is ready and this agent gets it at its first hello: a moment more.
+  } else if ((!machine && f.edition === "cloud") || (machine?.standby && !machine.online)) {
+    // The workspace's computer is ready and this agent gets it at its first hello, or it wakes: a moment more.
     body = (
       <>
         <DialogHead sub="" />
@@ -671,7 +672,7 @@ function useEntrySignal(agent: Agent, view: AgentComputerView): EntrySignal {
     line: entryLine(t, entry, {
       edition: f.edition,
       locale: i18n.language,
-      computer: computerName(t, org.name, view.machine),
+      computer: computerName(t, org.name, view.machine, isPersonal(org)),
       lastSeenAt: null,
       person: (id) => dir.memberById.get(id)?.name ?? t("channel.unknownPerson"),
       step: null,

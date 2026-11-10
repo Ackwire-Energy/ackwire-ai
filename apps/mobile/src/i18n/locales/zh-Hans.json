@@ -47,7 +47,7 @@
       "now": "当前在 {{host}}",
       "invalid": "请检查地址，格式类似 agentes.yourteam.ts.net。",
       "unreachable": "无法连接到 {{host}}。请检查地址和网络连接后重试。",
-      "unreachableTailscale": "无法连接到 {{host}}。它在 Tailscale 上：请打开 Tailscale 应用，连接后重试。",
+      "unreachableTailscale": "无法连接 {{host}}。它在 Tailscale 上：打开 Tailscale 应用，连接后再试一次。已经连接了？服务器所在的电脑可能在睡眠，或者应用已关闭。",
       "certificate": "{{host}} 的证书无效。请联系服务器的管理者。",
       "notAgentes": "{{host}} 不是 agentes.chat 服务器。请检查地址。",
       "serverTooOld": "{{host}} 需要更新才能配合此应用使用。",

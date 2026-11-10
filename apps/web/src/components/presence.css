@@ -7,6 +7,10 @@
 .sidebar {
   --presence-ring: var(--side);
 }
+/* The account card at the sidebar's foot is raised; the rail leaves you on the sidebar's paper. */
+.sidebar:not([data-rail="true"]) .sidebar__me {
+  --presence-ring: var(--raised);
+}
 /* A hovered row's plate, so the ring never shows as a dark arc around the badge on it in dark. */
 .sidebar__item:hover,
 .members-side__row.profile-trigger:hover {
@@ -171,7 +175,7 @@ html:not([data-pointer]) .status-field__emoji:focus-visible {
 .status-suggest {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--space-2);
   margin-top: 10px;
 }
 .status-dialog__row {

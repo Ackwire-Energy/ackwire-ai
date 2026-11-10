@@ -23,6 +23,7 @@ import {
 } from "./branches";
 import type { GitHubAppConfig } from "./github-app";
 import { noTokenMessage } from "./github-call";
+import { recordGitHubItem } from "./github-events";
 import { cloneOnMachine } from "./machine";
 import { parseRepo } from "./repos";
 import { signatureLine, signedBody } from "./signature";
@@ -327,6 +328,12 @@ export function createGitToolSource(deps: GitToolDeps): ToolSource {
                 const why = [body.message, ...(body.errors ?? []).map((e) => e.message)].filter(Boolean).join("; ");
                 return { content: `GitHub refused the pull request (${res.status}): ${why}`, isError: true };
               }
+              if (typeof body.number === "number")
+                await recordGitHubItem(c, {
+                  repo: `${repo.owner}/${repo.repo}`,
+                  number: body.number,
+                  authored: true,
+                }).catch(() => {});
               return {
                 content: `Opened PR #${body.number}: ${body.html_url}`,
                 data: { pullRequest: { number: body.number, url: body.html_url, repo: `${repo.owner}/${repo.repo}` } },

@@ -16,6 +16,7 @@ import {
   githubAppPanel,
   githubDisconnectNote,
   installationReach,
+  missingEventsText,
   removedText,
   removeInstallationText,
 } from "@agenteschat/client/lib/github-app";
@@ -322,25 +323,16 @@ test("icons only from our own path; brand colors only as #rrggbb; monograms; htt
   expect(isHttpsUrl("http://mcp.acme.dev")).toBe(false);
 });
 
-describe("Ferramentas: what changed comes first, Salvar stays at hand", () => {
+describe("Ferramentas: Salvar stays at hand", () => {
   const read = (path: string) =>
     Bun.file(new URL(`../../src/features/connectors/${path}`, import.meta.url).pathname).text();
 
-  test("changed tools lead the screen and open their change; Salvar is pinned outside the scroll", async () => {
-    const [screen, changes, review] = await Promise.all([
-      read("ToolsScreen.tsx"),
-      read("ToolChanges.tsx"),
-      read("ToolReview.tsx"),
-    ]);
-    // Atividade's card opens this screen: the changes are its first block, before the levels.
-    expect(screen.indexOf("<ChangedTools")).toBeGreaterThan(-1);
-    expect(screen.indexOf("<ChangedTools")).toBeLessThan(screen.indexOf("<ReviewStep"));
+  test("Salvar is pinned outside the scroll, and no changed tool waits for an Aceitar", async () => {
+    const [screen, review] = await Promise.all([read("ToolsScreen.tsx"), read("ToolReview.tsx")]);
+    expect(screen).not.toContain("ChangedTools");
     // Salvar sits in the bar under the scroll, never at the end of a long list.
     expect(screen.indexOf("<BottomBar")).toBeGreaterThan(screen.indexOf("</ScrollView>"));
     expect(review).toContain("{onSaveBar ? null : <Button");
-    // One helper for the web and the phone says what changed.
-    expect(changes).toContain('from "@agenteschat/client/lib/tool-changes"');
-    expect(changes).toContain('pathname: "/connectors/change"');
   });
 });
 
@@ -408,6 +400,19 @@ describe("GitHub through the agentes.chat app (ADR 0156), as the web shows it", 
     const [github] = connectedItems([appAlone], [], [def("github")]);
     expect(github?.viaGithubApp).toBe(true);
     expect(accountActions(github as NonNullable<typeof github>)).toEqual(["rename"]);
+  });
+
+  test("an app made without the events agents hear says which to tick, by GitHub's own names", async () => {
+    const pt = await translator("pt-BR");
+    const events = {
+      missing: ["issue_comment", "pull_request_review"],
+      url: "https://github.com/settings/apps/x/permissions",
+    };
+    expect(missingEventsText(pt, { events })).toBe(
+      "Para os agentes ouvirem o que acontece no GitHub, marque estes eventos no app: Issue comment e Pull request review.",
+    );
+    expect(missingEventsText(pt, { events: { ...events, missing: [] } })).toBeNull();
+    expect(missingEventsText(pt, null)).toBeNull();
   });
 
   test("its words in both languages: the state, the removal and what Desconectar does to the app", async () => {

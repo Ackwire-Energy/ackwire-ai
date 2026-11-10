@@ -28,15 +28,21 @@ export function voiceOf(meta: Record<string, unknown> | null | undefined): Messa
 /**
  * A message's text for what lists it (previews, notifications, quotes, snippets): none for a voice message (ADR 0100).
  * A notice's body is written for the agent, in English: only what people may read of it (a routine's report, a fast
- * reply, another agent's own answer), else nothing, as the chat's `noticeView` does.
+ * reply, another agent's own answer), else nothing, as the chat's `noticeView` does. What happened on GitHub lists as
+ * its line with who wrote it (the apps word it by `previewMeta`): the words alone, under the agent's name, would read
+ * as the agent's.
  */
 export const readableBody = (body: string, meta: Record<string, unknown> | null | undefined) => {
   if (voiceOf(meta)) return "";
   const notice = meta?.notice as { kind?: unknown; refs?: { answer?: unknown } } | undefined;
   if (!notice || typeof notice !== "object") return body;
-  if (notice.kind === "routine_handoff" || notice.kind === "talker_reply") return body;
+  if (notice.kind === "routine_handoff" || notice.kind === "talker_reply" || notice.kind === "github_event")
+    return body;
   return notice.kind === "consult_reply" && typeof notice.refs?.answer === "string" ? notice.refs.answer : "";
 };
+
+/** What a GitHub event's line says (`chat.notice.github.*`): the refs the apps word it by. */
+const GITHUB_LINE_REFS = ["event", "item", "state", "who", "number", "repo", "agent", "asker", "answerFor"] as const;
 
 /** One line of at most `max` chars (a preview's text). */
 function oneLine(text: string, max = 200): string {
@@ -119,6 +125,18 @@ export function previewMeta(meta: Record<string, unknown> | null | undefined): P
           : [],
       )
       .slice(0, 3);
+  }
+  // A server-written body, so a push never quotes it as the agent's words (`pushQuote`).
+  const notice = meta.notice as { kind?: unknown; text?: unknown; refs?: Record<string, unknown> } | undefined;
+  if (notice?.kind === "github_event") {
+    const said = cut(notice.text);
+    out.bodyCode = "github_event";
+    out.bodyParams = {
+      ...Object.fromEntries(
+        GITHUB_LINE_REFS.flatMap((k) => (typeof notice.refs?.[k] === "string" ? [[k, notice.refs[k]]] : [])),
+      ),
+      ...(said ? { said } : {}),
+    };
   }
   return Object.keys(out).length > 0 ? out : null;
 }

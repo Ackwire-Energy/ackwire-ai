@@ -3,7 +3,7 @@ import { randomBytes, sign as signWithKey } from "node:crypto";
 import type { HumanAction, HumanCheck, PubSub, RateLimiter } from "@agenteschat/adapters";
 import { nameIsPassword } from "@agenteschat/client/lib/text";
 import type { Config } from "@agenteschat/config";
-import { type Database, eq, schema } from "@agenteschat/db";
+import { and, type Database, eq, ne, schema } from "@agenteschat/db";
 import {
   accountBlock,
   announceProfile,
@@ -190,15 +190,18 @@ export function createAuth(deps: {
                 template: { kind: "password_reset", locale, url },
               });
             },
-            // The link reached the mailbox, as a confirmation link would, and the password nobody proved is gone with
-            // every session: the address counts as confirmed, so a provider can join the account (ADR 0006).
-            onPasswordReset: async ({ user }: { user: { id: string } }) => {
-              await db.update(schema.users).set({ emailVerified: true }).where(eq(schema.users.id, user.id));
-              // A new password cuts off every AI app and personal token the old one let in (ADR 0119).
-              await revokeUserApps(db, user.id);
-            },
           }
         : {}),
+      onPasswordReset: async ({ user }: { user: { id: string } }) => {
+        // An emailed link reached the mailbox, as a confirmation link would, and the password nobody proved is gone
+        // with every session: the address counts as confirmed, so a provider can join the account (ADR 0006). A link
+        // an owner made on a server without email proves nothing about the mailbox (ADR 0158).
+        if (emailEnabled) {
+          await db.update(schema.users).set({ emailVerified: true }).where(eq(schema.users.id, user.id));
+        }
+        // A new password cuts off every AI app and personal token the old one let in (ADR 0119).
+        await revokeUserApps(db, user.id);
+      },
     },
     ...(emailEnabled
       ? {
@@ -648,6 +651,7 @@ export function authUiConfig(config: Config) {
     termsUrl: config.TERMS_URL ?? null,
     privacyUrl: config.PRIVACY_URL ?? null,
     supportEmail: config.SUPPORT_EMAIL ?? null,
+    feedback: Boolean(config.FEEDBACK_EMAIL),
   };
 }
 
@@ -690,6 +694,18 @@ export async function mintUserSignIn(auth: Auth, userId: string) {
 export async function hashPassword(auth: Auth, password: string) {
   const context = await auth.$context;
   return context.password.hash(password);
+}
+
+/**
+ * A new password in place of the account's own, after a fresh sign-in (ADR 0158 §4: the server's owner after
+ * Continue on this Mac, or anyone who just signed in). As a reset does: every other session ends and every AI app
+ * and personal token the old password let in is cut off (ADR 0119); the session that asked stays.
+ */
+export async function replacePassword(auth: Auth, db: Database, userId: string, password: string, keepToken: string) {
+  const context = await auth.$context;
+  await context.internalAdapter.updatePassword(userId, await context.password.hash(password));
+  await db.delete(schema.sessions).where(and(eq(schema.sessions.userId, userId), ne(schema.sessions.token, keepToken)));
+  await revokeUserApps(db, userId);
 }
 
 /**

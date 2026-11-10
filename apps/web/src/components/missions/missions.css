@@ -435,13 +435,14 @@ a.mi-ref:hover code {
 }
 
 /* ── The mission header (a mission's thread: the thread header is the mission's) ─
-   One grid: the lead (back, the agent), the text column, the folded strip and
-   the controls; the strip and the computer note sit under the text column, so
-   every block starts on the title's left edge. Part of the layout, above the
-   messages (never floating over them). */
+   One grid: the lead (back, the agent), then an action line of the text column
+   (title, state and the line under them), the folded strip and the controls,
+   which go under a title that can't keep its line beside them. The strip and the
+   computer note sit under the text column, so every block starts on the title's
+   left edge. Part of the layout, above the messages (never floating over them). */
 .mh.channel__header {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   column-gap: 12px;
   row-gap: 8px;
@@ -449,31 +450,48 @@ a.mi-ref:hover code {
 .mh__row {
   display: contents;
 }
+/* On the title's first line (its 24px), never the middle of a title that wraps: the buttons and the face centre on
+   that line's capitals, past the box. Reading back, the one row's middle. */
 .mh__lead {
   grid-column: 1;
+  align-self: start;
   display: flex;
   align-items: center;
   gap: 8px;
+  height: 24px;
+  translate: 0 calc(-1 * var(--title-cap-mid, var(--cap-mid)));
+}
+.mh[data-compact] .mh__lead {
+  align-self: center;
+}
+.mh__main {
+  grid-column: 2;
+  align-items: center;
+  column-gap: 12px;
 }
 .mh__text {
-  grid-column: 2;
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
+/* The state after the title's words, under them when both don't fit, so a narrow header never cuts the title to a
+   letter. */
 .mh__line {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-1) var(--space-2);
   min-width: 0;
 }
 .mh__title.channel__title {
   display: block;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+}
+/* The line under the title never widens the action line: the title alone sets where the controls go. */
+.mh__meta {
+  contain: inline-size;
 }
 .mh__line > .ac-chip,
 .mh__exec {
@@ -490,11 +508,9 @@ a.mi-ref:hover code {
   font-size: 12px;
 }
 .mh__mini {
-  grid-column: 3;
   display: none;
 }
 .mh__end {
-  grid-column: 4;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -547,11 +563,7 @@ a.mi-ref:hover code {
 }
 @media (max-width: 760px) {
   .mh.channel__header {
-    grid-template-columns: auto minmax(0, 1fr) auto;
     padding: 8px 12px;
-  }
-  .mh__end {
-    grid-column: 3;
   }
   .mh__mini,
   .mh[data-compact] .mh__mini,
@@ -884,7 +896,7 @@ a.mi-pr:hover {
 /* One event pill (`EventPill`) in the messages' text column: its words wrap inside the frame, its actions ("Ver
    plano", "Revogar") in it, what it opens (commands, a request's command) under it. */
 .mi-evt {
-  margin-inline: var(--thread-indent, 64px) 12px;
+  margin-inline: var(--thread-indent, calc(16px + var(--name-face) + var(--space-3))) 12px;
   animation: mi-fade 0.35s var(--out) both;
 }
 /* A command allowed without a card: quiet, the command in mono. */
@@ -929,7 +941,7 @@ a.mi-pr:hover {
 
 /* ── Ephemeral cards (`/summary`, `/plan`): only you see them ─────────────── */
 .mi-ephemeral {
-  margin: 8px 12px 4px var(--thread-indent, 64px);
+  margin: 8px 12px 4px var(--thread-indent, calc(16px + var(--name-face) + var(--space-3)));
   max-width: 640px;
 }
 .mi-ephemeral__head {
@@ -971,10 +983,13 @@ a.mi-pr:hover {
 .mi-files .ac-details__body {
   gap: 12px;
 }
-/* The tabs and the file's line make one block, one divider under it. */
+/* The tabs and the file's line make one block, one divider under it. Where the tabs scroll, they slide under the
+   dialog's edges (its room, `--bleed`). */
 .mi-files__tabs {
   overflow-x: auto;
   scrollbar-width: none;
+  margin-inline: calc(-1 * var(--bleed));
+  padding-inline: var(--bleed);
 }
 .mi-files__tabs::-webkit-scrollbar {
   display: none;
@@ -1542,7 +1557,7 @@ html:not([data-pointer]) .mi-quiet:focus-visible {
 
 /* A mission's card in place of its thread's start marker (threads proposed before the link card). */
 .mi-linkrow {
-  margin-inline: var(--thread-indent, 64px) 12px;
+  margin-inline: var(--thread-indent, calc(16px + var(--name-face) + var(--space-3))) 12px;
 }
 
 /* ── Delivery card: the mission's end (like an approval) ─────────────────── */
@@ -1647,11 +1662,10 @@ html:not([data-pointer]) .mi-quiet:focus-visible {
   gap: 10px;
   width: 100%;
 }
+/* An `.ac-iconline`: words that wrap on a phone keep the check on their first line. */
 .mi-cfg__saved {
   flex: 1;
   min-width: 0;
-  display: inline-flex;
-  align-items: center;
   gap: 6px;
   font-size: 13px;
   color: var(--faint);

@@ -11,7 +11,7 @@ import {
   Reaction,
   Reactions,
 } from "@agenteschat/ui";
-import { type ReactNode, useMemo } from "react";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useDirectory } from "@/hooks/useDirectory";
 import { AgentAvatar } from "./AgentAvatar";
@@ -108,14 +108,11 @@ export function MessageReactions({
   messageId,
   initial,
   feedback,
-  extra,
 }: {
   messageId: string;
   initial?: ReactionCount[];
   /** An agent's reply: 👍/👎 replace each other (they teach the agent). */
   feedback?: boolean;
-  /** After the pills (the memory mark): the row shows even without reactions. */
-  extra?: ReactNode;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -123,14 +120,12 @@ export function MessageReactions({
   const labels = useEmojiLabels();
   const { list, toggle, userId } = useMessageReactions(messageId, initial, { feedback });
   const shown = list.filter((r) => r.count > 0);
-  if (shown.length === 0 && !extra) return null;
+  if (shown.length === 0) return null;
   const nameOf = (id: string) =>
     id === userId ? t("reactions.you") : (dir.memberById.get(id)?.name ?? t("reactions.someone"));
   const agentName = (id: string) => dir.anyAgent(id)?.name ?? t("reactions.someone");
   return (
     <Reactions label={t("channel.reactions")}>
-      {/* No pills: the memory mark starts the row (no divider before it), "+" after it. */}
-      {shown.length === 0 && extra}
       {shown.map((r) => {
         const emoji = reactionEmoji(r.reaction);
         const agentIds = r.agentIds ?? [];
@@ -174,7 +169,6 @@ export function MessageReactions({
           </button>
         }
       />
-      {shown.length > 0 && extra}
     </Reactions>
   );
 }

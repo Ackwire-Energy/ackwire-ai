@@ -26,6 +26,71 @@ const byTime = (a: Timed, b: Timed) =>
   sending(a) - sending(b) ||
   (a.createdAt === b.createdAt ? a.id.localeCompare(b.id) : a.createdAt < b.createdAt ? -1 : 1);
 
+/**
+ * How long a streamed reply keeps the place where its first words showed (its `createdAt`). Mirrors the engine's
+ * `PLACE_KEPT_MS` (packages/engine/src/message-place.ts).
+ */
+export const PLACE_KEPT_MS = 10 * 60_000;
+
+/** When the server posted a message (ms): its id is a UUIDv7 from the clock at its insert. NaN for an id made here. */
+export const postedAtOf = (id: string) => Number.parseInt(id.slice(0, 8) + id.slice(9, 13), 16);
+
+/**
+ * The id of the message the server posted last, wherever its place: a reply that keeps the place of its first words
+ * lands above what was sent while it was written. Messages still on their way (`local-…`) are left out.
+ */
+export function lastPostedId(list: readonly Pick<Message, "id">[] | undefined): string | undefined {
+  let last: string | undefined;
+  for (const m of list ?? []) if (!m.id.startsWith("local-") && (last === undefined || m.id > last)) last = m.id;
+  return last;
+}
+
+/**
+ * A message landed after `at` (ms), for whoever last looked then: written after it, or posted since in a place before
+ * it (`PLACE_KEPT_MS`). As the server counts unread (`landedAfterSql`).
+ */
+export function landedAfter(m: Pick<Message, "id" | "createdAt">, at: number) {
+  const placed = Date.parse(m.createdAt);
+  return placed > at || (placed > at - PLACE_KEPT_MS && postedAtOf(m.id) > at);
+}
+
+type PlacedRow = { kind: string; iso?: string; message?: Pick<Message, "createdAt" | "local"> };
+
+/** A row's moment: a day's first message, a message's place, a message on its way after all; none for the rest. */
+const rowAt = (r: PlacedRow) =>
+  r.kind === "day" && r.iso
+    ? Date.parse(r.iso)
+    : r.kind === "message" && r.message
+      ? r.message.local === "pending"
+        ? Number.POSITIVE_INFINITY
+        : Date.parse(r.message.createdAt)
+      : Number.NaN;
+
+/**
+ * Where the agents' live blocks draw among the rows (oldest first): one whose reply first showed words at its
+ * `shownAt` goes right before the first row after that moment, where its message will be posted, so what people sent
+ * while it wrote reads below it. One with no words yet, or nothing after them, goes after every row, as before.
+ * `before`: the blocks right before the row at each index, by when their words showed.
+ */
+export function blockPlaces<B>(
+  rows: readonly PlacedRow[],
+  blocks: readonly B[],
+  shownAt: (block: B) => string | null | undefined,
+): { before: Map<number, B[]>; after: B[] } {
+  const before = new Map<number, B[]>();
+  const after: B[] = [];
+  const times = rows.map(rowAt);
+  const placed = blocks.map((block) => ({ block, at: Date.parse(shownAt(block) ?? "") }));
+  for (const { block, at } of [...placed].sort((a, b) => (a.at || 0) - (b.at || 0))) {
+    const i = Number.isNaN(at) ? -1 : times.findIndex((t) => t > at);
+    if (i < 0) continue;
+    before.set(i, [...(before.get(i) ?? []), block]);
+  }
+  const shown = new Set([...before.values()].flat());
+  for (const { block } of placed) if (!shown.has(block)) after.push(block);
+  return { before, after };
+}
+
 /** Adds (or replaces) a message in a list, keeping it ordered and without duplicates. */
 export function upsertMessage(list: Message[] | undefined, message: Message): Message[] {
   const rest = (list ?? []).filter((m) => m.id !== message.id);

@@ -34,6 +34,7 @@ import {
   workMeta,
   workSteps,
 } from "@agenteschat/client/lib/work";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import {
   type AgentColor,
   Icon,
@@ -110,6 +111,8 @@ const KIND_ICON: Partial<Record<ActivityKind, IconName>> = {
   runningCommand: "code",
   runningCommandAny: "code",
   usingScreen: "computer",
+  testingOnPhone: "phone",
+  waitingForDevice: "waiting",
   cloningRepo: "repo",
   openingPullRequest: "pullRequest",
   handingOff: "routines",
@@ -138,7 +141,7 @@ export function useCallLogo() {
 }
 
 /** A line of the block from the shared model: its phrase, time, open view (code, output, what it got and gave). */
-function blockLine(t: TFunction, locale: string, l: ToolLine, logo: ReactNode) {
+function blockLine(t: TFunction, locale: string, l: ToolLine, logo: ReactNode, personal = false) {
   const lines = l.code ? l.code.source.split("\n").length : 0;
   const output = l.output ?? [];
   const label =
@@ -152,7 +155,7 @@ function blockLine(t: TFunction, locale: string, l: ToolLine, logo: ReactNode) {
           ),
         })
       : toolPhrase(t, l);
-  const why = toolWhy(t, l);
+  const why = toolWhy(t, l, personal);
   // What the tool answered, its own words when it failed: only in the open view, never under the line.
   const answered = l.result ?? why ?? l.why;
   const detail = l.code ? (
@@ -193,9 +196,10 @@ function blockLine(t: TFunction, locale: string, l: ToolLine, logo: ReactNode) {
 function useBlockItems(items: ToolItem[]): ToolBlockItem[] {
   const { t, i18n } = useTranslation();
   const logo = useCallLogo();
+  const personal = isPersonal(useOrg().org);
   return items.flatMap((item): ToolBlockItem[] =>
     item.kind === "call"
-      ? [{ kind: "line", line: blockLine(t, i18n.language, item.line, logo(item.line)) }]
+      ? [{ kind: "line", line: blockLine(t, i18n.language, item.line, logo(item.line), personal) }]
       : item.kind === "say"
         ? [{ kind: "note", key: item.key, node: item.text }]
         : [],
@@ -387,7 +391,7 @@ export function SavedTools({
   // unknown (saved before the server wrote it): kept, it may have failed.
   if (lone && lone.ms !== null && quietLine(lone)) return null;
   if (lone && (!work || oneCall(items) || !items.some((i) => i.kind === "call"))) {
-    const line = blockLine(t, i18n.language, lone, logo(lone));
+    const line = blockLine(t, i18n.language, lone, logo(lone), isPersonal(org));
     const wait = run.isError ? (
       t("chat.work.failed")
     ) : !work ? (

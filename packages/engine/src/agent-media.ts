@@ -23,6 +23,7 @@ import { missionOfThread } from "./missions";
 import { enqueue } from "./outbox";
 import { routineBriefOf } from "./routine-brief";
 import { standingRefusal } from "./standing";
+import { isPersonalWorkspace } from "./workspace-mode";
 
 /**
  * An agent's sticker or GIF after its own reply (ADR 0091 §4). The agent's prompt knows nothing of this step: once
@@ -242,6 +243,8 @@ export interface AgentMediaInput {
   conversation: { from: string; kind: "person" | "agent"; text: string; media?: MessageMedia["kind"] }[];
   /** The agent's reply, as it wrote it. */
   reply: string;
+  /** A personal workspace (ADR 0159): one person, maybe their family, and their agents; not a team. */
+  personal?: boolean;
 }
 
 const clip = (text: string, max = MEDIA_STATE_CLIP) => {
@@ -259,7 +262,9 @@ export function agentMediaState(input: AgentMediaInput): Record<string, unknown>
     where:
       input.where === "dm"
         ? "a direct conversation between one person and the agent"
-        : "a team channel where people and AI agents talk",
+        : input.personal
+          ? "a group conversation where a person, maybe their family, and their AI agents talk"
+          : "a team channel where people and AI agents talk",
     conversation: input.conversation.map((m) => ({
       from: m.from,
       kind: m.kind,
@@ -280,6 +285,13 @@ export const FITS_QUESTION: JudgeQuestion = {
     false:
       "Out of place: a problem, an error, a failure or bad news; a question or decision still waiting on someone; a serious, sensitive or personal subject; formal, dense or purely informational work content; a reply meant for a customer or a stranger; or any doubt.",
   },
+};
+
+/** The same in a personal workspace (ADR 0159): one of a person's own agents, not a teammate. */
+export const FITS_QUESTION_PERSONAL: JudgeQuestion = {
+  ...FITS_QUESTION,
+  instructions:
+    "`agent` is one of a person's own AI agents in their personal chat. It just posted `reply` in `where`, after `conversation` (the messages before it, oldest first). Would a light visual reaction from `agent` right after its reply, one of its own animated stickers or a GIF, feel natural and welcome to the people there, the way a friendly assistant might add one?",
 };
 
 const MOOD_INSTRUCTIONS = "Which of `agent`'s own animated stickers fits best right after `reply`?";
@@ -312,11 +324,16 @@ export const GIF_CRITERIA = {
  * The questions, exactly as production asks them: whether a reaction fits, which mood, and which GIF category
  * when a GIF may go. `reversed` (evals only) turns every option list around to measure the first-option lean.
  */
-export function agentMediaQuestions(options: { gif: boolean; reversed?: boolean }): Record<string, JudgeQuestion> {
+export function agentMediaQuestions(options: {
+  gif: boolean;
+  reversed?: boolean;
+  /** A personal workspace (ADR 0159). */
+  personal?: boolean;
+}): Record<string, JudgeQuestion> {
   const ordered = (criteria: Record<string, string>) =>
     Object.fromEntries(options.reversed ? Object.entries(criteria).reverse() : Object.entries(criteria));
   const questions: Record<string, JudgeQuestion> = {
-    fits: FITS_QUESTION,
+    fits: options.personal ? FITS_QUESTION_PERSONAL : FITS_QUESTION,
     mood: { type: "choice", instructions: MOOD_INSTRUCTIONS, criteria: ordered(MOOD_CRITERIA) },
   };
   if (options.gif) questions.gif = { type: "choice", instructions: GIF_INSTRUCTIONS, criteria: ordered(GIF_CRITERIA) };
@@ -351,7 +368,7 @@ export function withTimeout<T>(promise: Promise<T>, ms: number, what: string): P
 export async function judgeAgentMedia(
   judge: Judge,
   request: { orgId: string; agentId?: string | null; runId?: string; input: AgentMediaInput },
-  options: { gif: boolean; reversed?: boolean; timeoutMs?: number },
+  options: { gif: boolean; reversed?: boolean; personal?: boolean; timeoutMs?: number },
 ): Promise<AgentMediaJudgment> {
   const answers = await withTimeout(
     judge.ask({
@@ -658,18 +675,20 @@ export async function maybeSendAgentMedia(
   if (await standingRefusal(db, reply.orgId, agentId)) return skip("standing");
   if (!deps.judge) return skip("no_judge");
 
+  const personal = await isPersonalWorkspace(db, reply.orgId);
   const asked: AgentMediaInput = {
     agent: { name: agent.name, role: agent.role },
     where: channel.kind === "dm" ? "dm" : "channel",
     conversation: await conversationBefore(db, reply, now()),
     reply: reply.body,
+    personal,
   };
   let judged: AgentMediaJudgment;
   try {
     judged = await judgeAgentMedia(
       deps.judge,
       { orgId: reply.orgId, agentId, runId, input: asked },
-      { gif, timeoutMs: deps.judgeTimeoutMs },
+      { gif, personal, timeoutMs: deps.judgeTimeoutMs },
     );
   } catch {
     // An error, a timeout, or no Jev key (a calibrated request has no fallback): nothing, quietly.

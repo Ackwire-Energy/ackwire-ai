@@ -47,7 +47,7 @@
       "now": "Şu an {{host}} sunucusundasınız",
       "invalid": "Adresi kontrol edin, agentes.ekibiniz.ts.net gibi bir şey olmalı.",
       "unreachable": "{{host}} sunucusuna ulaşamıyoruz. Adresi ve bağlantınızı kontrol edip tekrar deneyin.",
-      "unreachableTailscale": "{{host}} sunucusuna ulaşamıyoruz. Sunucu Tailscale üzerinde: Tailscale uygulamasını açın, bağlanın ve tekrar deneyin.",
+      "unreachableTailscale": "{{host}} adresine ulaşamıyoruz. Tailscale üzerinde: Tailscale uygulamasını açın, bağlanın ve tekrar deneyin. Zaten bağlı mısınız? Sunucunun bilgisayarı uykuda ya da uygulaması kapalı olabilir.",
       "certificate": "{{host}} sertifikası geçerli değil. Sunucuyu yöneten kişiyle konuşun.",
       "notAgentes": "{{host}} bir agentes.chat sunucusu değil. Adresi kontrol edin.",
       "serverTooOld": "{{host}} bu uygulamayla çalışmak için güncellenmeli.",

@@ -143,7 +143,9 @@ export function ownerSignIn(deps: OwnerSignInDeps) {
             }
           }
           if (!ownerId) throw new APIError("INTERNAL_SERVER_ERROR", { message: "No owner account" });
-          return ctx.json(await deps.mint(ctx.context.internalAdapter, ownerId));
+          // `userId`: the desktop app signs its window in as the owner after an address change only when the owner
+          // was the one signed in there.
+          return ctx.json({ ...(await deps.mint(ctx.context.internalAdapter, ownerId)), userId: ownerId });
         },
       ),
     },

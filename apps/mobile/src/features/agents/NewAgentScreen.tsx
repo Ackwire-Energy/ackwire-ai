@@ -35,6 +35,8 @@ import {
   freeHandle,
   handleForName,
   handleProblem,
+  PERSONAL_STARTERS,
+  type PersonalStarter,
   presetChannels,
   presetLevels,
   ROLE_DEFAULTS,
@@ -45,6 +47,7 @@ import {
 } from "@agenteschat/client/lib/new-agent";
 import { addsAgentsTo, can } from "@agenteschat/client/lib/permissions";
 import { AUTO, modelChoices, usableModels } from "@agenteschat/client/lib/providers";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { usePreventRemove } from "expo-router";
 import { Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -200,6 +203,9 @@ function NewAgentForm({
   const [tried, setTried] = useState(false);
   const [busy, setBusy] = useState(false);
   const [role, setRole] = useState<RoleId | null>(proposed || initialWhat ? "custom" : null);
+  // A personal workspace's starting point (one of the right hand's personal agents), on top of "custom" (ADR 0159 §3).
+  const [starter, setStarter] = useState<PersonalStarter["id"] | null>(null);
+  const personal = isPersonal(org);
   const [roleText, setRoleText] = useState(proposed?.role ?? "");
   const [name, setName] = useState(proposed?.name ?? (initialWhat ? suggested : ""));
   const [handle, setHandle] = useState(proposed?.handle ?? (initialWhat ? handleForName(suggested) : ""));
@@ -293,8 +299,8 @@ function NewAgentForm({
   );
   const levels = useMemo(
     // A proposal's levels (the reviewer's, in Revisar) over the role's; the apps it doesn't name open as any role's.
-    () => (managesAgents ? { ...presetLevels(role ?? "custom", items), ...proposedLevels } : {}),
-    [proposedLevels, role, items, managesAgents],
+    () => (managesAgents ? { ...presetLevels(role ?? "custom", items, isPersonal(org)), ...proposedLevels } : {}),
+    [proposedLevels, role, items, managesAgents, org],
   );
   const granted = items.filter((i) => (levels[i.id] ?? "none") !== "none");
   const myMail = (proposed?.mail ?? []).filter((m) => m.accountId in mailLevels);
@@ -341,8 +347,9 @@ function NewAgentForm({
   const pickRole = (id: RoleId) => {
     tapHaptic();
     setRole(id);
+    setStarter(null);
     // A new role fills in the rest. The role it already has keeps what was typed, and a proposal keeps its draft.
-    if (id !== role && !proposed) {
+    if ((id !== role || starter) && !proposed) {
       const agentName = id === "custom" ? "" : t(`newAgent.roles.${id}.agent`);
       setRoleText("");
       setName(agentName);
@@ -353,6 +360,22 @@ function NewAgentForm({
       setChannelIds(new Set([...asked, ...presetChannels(id, myChannels)]));
     }
     // A tap is the answer: on to the next step, or back to Revisar on a proposal.
+    setTimeout(() => goTo(proposed ? total - 1 : 1), 180);
+  };
+  /** A personal workspace's starting point: from scratch, with its agent's name, look, role and line filled in. */
+  const pickStarter = (s: PersonalStarter) => {
+    tapHaptic();
+    setRole("custom");
+    setStarter(s.id);
+    if (starter !== s.id && !proposed) {
+      setRoleText(t(`teamTemplates.agents.${s.id}.role`));
+      setName(s.name);
+      setHandle(handleForName(s.name));
+      setHandleTouched(false);
+      setLook(fullLook(s.look));
+      setInstructions(t(`teamTemplates.agents.${s.id}.line`));
+      setChannelIds(new Set(asked));
+    }
     setTimeout(() => goTo(proposed ? total - 1 : 1), 180);
   };
   const refuse = () => {
@@ -388,7 +411,9 @@ function NewAgentForm({
         // Its setup checklist suggests from the ready-made role it started from (ADR 0155 §2).
         setup: { role: role && role !== "custom" ? role : null },
         ownerUserId: meId ?? null,
-        audience: { mode: "everyone", userIds: [] },
+        // A personal workspace's new agent answers its owner only (ADR 0159 §3a): someone who joins later is not
+        // answered by every agent made while the person was alone.
+        audience: { mode: isPersonal(org) ? "owner" : "everyone", userIds: [] },
         credentialId: thinks.credentialId,
         monthlyBudgetUsd: null,
         appearance: look,
@@ -457,10 +482,13 @@ function NewAgentForm({
         successHaptic();
         // Agentes greets it once when it is next on screen (its row comes in, the others look at it).
         markArrived(agent.id);
-        // It joined, and what it thinks with, under its face: the one note before its conversation opens.
+        // It joined (a personal workspace has no team to join: it is here, ADR 0159), and what it thinks with, under
+        // its face: the one note before its conversation opens.
         const thinksLabel = chosen?.title ?? (start && useLast ? startText : t("brain.auto.label"));
         toast({
-          title: t("mobile.agents.created", { name: agent.name }),
+          title: isPersonal(org)
+            ? t("newAgent.createdTitlePersonal", { name: agent.name })
+            : t("mobile.agents.created", { name: agent.name }),
           subtitle: t("mobile.agents.thinksWith", { label: thinksLabel }),
           agentId: agent.id,
           // Its profile one tap away while its conversation opens under the toast.
@@ -566,14 +594,38 @@ function NewAgentForm({
             label={t("newAgent.roles.custom.name")}
             sub={t("newAgent.roles.custom.desc")}
             subLines={2}
-            checked={role === "custom"}
+            checked={role === "custom" && !starter}
             onPress={() => pickRole("custom")}
           />
         </GroupedList>
-        {role === "custom" ? (
+        {role === "custom" && !starter ? (
           <RoleInput value={roleText} onChangeText={setRoleText} placeholder={t("agent.roleHelp")} grouped />
         ) : null}
-        {ROLE_GROUPS.map((group) => (
+        {personal ? (
+          // One person's agents (ADR 0159 §3): the right hand's personal ones, not a company's roles.
+          <>
+            <GroupedHeader>{t("newAgent.roleGroups.personal")}</GroupedHeader>
+            <GroupedList>
+              {PERSONAL_STARTERS.map((s) => (
+                <GroupedRow
+                  key={s.id}
+                  leading={<AgentAvatar agent={fullLook(s.look)} size={36} live={false} />}
+                  label={t(`teamTemplates.agents.${s.id}.role`)}
+                  sub={roleLine(
+                    t(`teamTemplates.agents.${s.id}.line`),
+                    t("newAgent.startsAs", { name: s.name }),
+                    s.name,
+                    i18n.language,
+                  )}
+                  subLines={2}
+                  checked={starter === s.id}
+                  onPress={() => pickStarter(s)}
+                />
+              ))}
+            </GroupedList>
+          </>
+        ) : null}
+        {(personal ? [] : ROLE_GROUPS).map((group) => (
           <Fragment key={group.id}>
             <GroupedHeader>{t(`newAgent.roleGroups.${group.id}`)}</GroupedHeader>
             <GroupedList>

@@ -1,4 +1,6 @@
 import type { AppNotification, SignInProvider } from "@agenteschat/client";
+import { deviceNoticeOf } from "@agenteschat/client/lib/devices";
+import { firstName } from "@agenteschat/client/lib/format";
 import { noticeLine } from "@agenteschat/client/lib/island";
 import { mediaWord } from "@agenteschat/client/lib/media";
 import type { i18n as I18n, TFunction } from "i18next";
@@ -66,14 +68,41 @@ const oneLine = (text: string, max: number) => {
 /**
  * The desktop app's notification for one that just arrived (`notification.upserted`): new and unread, of a
  * kind a phone would get pushed, or waiting on the person. Its page is the inbox, where it is on top. Merged
- * into one already there, read, or done: none.
+ * into one already there, read, or done: none. Someone's agent using a phone of the person's: "Lia is using Pixel 8",
+ * what it does for whom, the phone's page, and `phoneId` for the notification's Stop (`agentName` names the agent).
  */
 export function desktopNotice(
   t: TFunction,
   orgId: string,
-  n: Pick<AppNotification, "kind" | "waiting" | "count" | "readAt" | "doneAt" | "latest">,
-): { title: string; body: string; path: string } | null {
+  n: Pick<AppNotification, "kind" | "waiting" | "count" | "readAt" | "doneAt" | "latest" | "source" | "actors">,
+  agentName?: (agentId: string) => string | undefined,
+): { title: string; body: string; path: string; phoneId?: string } | null {
   if (n.readAt || n.doneAt || n.count > 1) return null;
+  const device = n.kind === "device.in_use" ? deviceNoticeOf(n) : null;
+  if (device?.phoneId) {
+    const agent = device.agentId ? agentName?.(device.agentId) : undefined;
+    const person = device.forName ? firstName(device.forName) : null;
+    const doing = device.text?.trim() || null;
+    const deviceName = device.device;
+    return {
+      title: oneLine(
+        agent
+          ? t("desktopNotice.deviceInUse", { agent, deviceName })
+          : t("desktopNotice.deviceInUseAny", { deviceName }),
+        NOTICE_TITLE_MAX,
+      ),
+      body: oneLine(
+        doing && person
+          ? t("desktopNotice.deviceDoingFor", { doing, person })
+          : person
+            ? t("desktopNotice.deviceFor", { person })
+            : (doing ?? ""),
+        NOTICE_BODY_MAX,
+      ),
+      path: `/org/${encodeURIComponent(orgId)}/settings/devices/phones/${encodeURIComponent(device.phoneId)}`,
+      phoneId: device.phoneId,
+    };
+  }
   const kind = isNoticeKind(n.kind) ? n.kind : n.waiting ? "waiting" : null;
   if (!kind) return null;
   return {
@@ -199,8 +228,12 @@ export const thisMac = {
   badge: (waiting: number, unread: number) => invoke<unknown>({ kind: "badge", waiting, unread }),
   /** The Mac's Go menu: the person's organizations (⌘⌥1–9). */
   orgs: (orgs: { id: string; name: string }[]) => invoke<unknown>({ kind: "orgs", orgs }),
-  /** A notification while the app is in the background (the app limits how many); `path` opens on a click. */
-  notify: (title: string, body: string, path: string) => invoke<unknown>({ kind: "notify", title, body, path }),
+  /**
+   * A notification while the app is in the background (the app limits how many); `path` opens on a click. With
+   * `phoneId` (a phone of the person's that someone's agent uses), it has a Stop button, the same stop as the web's.
+   */
+  notify: (title: string, body: string, path: string, stop?: { orgId: string; phoneId: string }) =>
+    invoke<unknown>({ kind: "notify", title, body, path, ...stop }),
   /**
    * On the server the app runs here: the app signs its owner in (its owner key buys a one-time sign-in, which
    * this window trades at `/desktop/handover`; the key never reaches the page). The window moves there.
@@ -216,6 +249,11 @@ export const thisMac = {
   openWorkspace: (server: string, orgId: string) => invoke<unknown>({ kind: "openWorkspace", server, orgId }),
   /** The app's own window to add a workspace: a new one on agentes.chat, or the team's server. */
   addWorkspace: () => invoke<unknown>({ kind: "addWorkspace" }),
+  /**
+   * The window goes to a server of the app's list on its own first page (its sign-in when the app has no session
+   * there). An app without it refuses: the caller falls back to the app's servers window.
+   */
+  openServer: (server: string) => invoke<unknown>({ kind: "openServer", server }),
 };
 
 /** The app lists every server's workspaces (`workspaces` in `window.__agentesDesktop`, ADR 0154); older apps don't. */

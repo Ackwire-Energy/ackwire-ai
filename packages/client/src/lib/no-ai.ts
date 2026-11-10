@@ -48,7 +48,8 @@ export interface NoAiCard {
   /**
    * The team's right hand on a plan (ADR 0137 §7): why that plan can't think now, said as one line with the way to an
    * API key (its computer away or with a problem, the plan at its limit or its model's own, the region that model needs, commands off
-   * there, a plan that answers only its owner, a runner to update there, the plan's CLI offering tools of its own).
+   * there, a plan that answers only its owner, to someone else or to a request no person made, a runner to update
+   * there, the plan's CLI offering tools of its own).
    */
   planLine?: RightHandPlanLine;
   /** With `model_limit`, `model_region` and `model_off`: the model's name. */
@@ -63,6 +64,7 @@ export interface NoAiCard {
 export type RightHandPlanLine =
   | "computer_away"
   | "computer_failed"
+  | "cli_failed"
   | "plan_limit"
   | "model_limit"
   | "model_region"
@@ -70,11 +72,13 @@ export type RightHandPlanLine =
   | "plan_inactive"
   | "commands_off"
   | "plan_not_shared"
+  | "plan_unattended"
   | "runner_outdated"
   | "plan_tools";
 export const RIGHT_HAND_PLAN_LINES: ReadonlySet<string> = new Set<RightHandPlanLine>([
   "computer_away",
   "computer_failed",
+  "cli_failed",
   "plan_limit",
   "model_limit",
   "model_region",
@@ -82,6 +86,7 @@ export const RIGHT_HAND_PLAN_LINES: ReadonlySet<string> = new Set<RightHandPlanL
   "plan_inactive",
   "commands_off",
   "plan_not_shared",
+  "plan_unattended",
   "runner_outdated",
   "plan_tools",
 ]);
@@ -133,7 +138,7 @@ export function keptCardState(s: { hold: BillingHold | null; paid: boolean; read
 
 /** A plan line that passes by itself: once the agent can think again, its card offers "Responder agora". */
 export const planLinePasses = (line: RightHandPlanLine | undefined) =>
-  line === "computer_away" || line === "computer_failed";
+  line === "computer_away" || line === "computer_failed" || line === "cli_failed";
 
 /**
  * The key of a card's line while the agent still can't think (`agentGrammar(name)` fills it): the computer's own
@@ -172,7 +177,8 @@ export const mayConnectAi = (
 
 /**
  * The way out of a plan line for this person: their own plan when the workspace's doesn't serve them, or when a key
- * isn't theirs to set (an API key is always the workspace's, §11), else an API key. Null: neither is theirs to do.
+ * isn't theirs to set (an API key is always the workspace's, §11), else an API key. A request no person made thinks
+ * with no one's own plan: only a key helps there. Null: neither is theirs to do.
  */
 export function planLineFix(
   line: RightHandPlanLine,
@@ -180,6 +186,7 @@ export function planLineFix(
   meId: string | null | undefined,
   org: Parameters<typeof can>[0],
 ): "connectMine" | "useKey" | null {
+  if (line === "plan_unattended") return maySetAgentAi(agent, meId, org) ? "useKey" : null;
   if (!mayConnectAi(agent, meId, org)) return null;
   return line === "plan_not_shared" || !maySetAgentAi(agent, meId, org) ? "connectMine" : "useKey";
 }
@@ -287,9 +294,24 @@ export const planLabel = (t: TFunction, choice: PlanChoice) =>
 /** A plan's name in its panel, as its maker sells it: "Your Claude plan", "GLM Coding Plan"… */
 export const planTitle = (t: TFunction, choice: PlanChoice) =>
   isPlanId(choice) ? CODING_PLANS[choice].name : t(`connectAi.plan.${choice}.title`);
-/** What a search for a plan finds it by: its name, its maker, what it is sold as and its tiers. */
+/** Other names people search a plan by: the CLIs it goes by ("codex" finds ChatGPT). Product names, not translated. */
+const PLAN_SEARCH_NAMES: Partial<Record<PlanChoice, string>> = {
+  claude: "Claude Code",
+  chatgpt: "Codex",
+  gemini: "Gemini CLI Antigravity",
+  grok: "Grok Build",
+  zen: "OpenCode Zen",
+};
+export const planSearchNames = (choice: PlanChoice) => PLAN_SEARCH_NAMES[choice] ?? "";
+/** What a search for a plan finds it by: its name, its maker, what it is sold as, its tiers and its CLIs. */
 export const planPickText = (t: TFunction, choice: PlanChoice) =>
-  [planLabel(t, choice), planMark(choice), planTitle(t, choice), t(`connectAi.plan.${choice}.tiers`)].join(" ");
+  [
+    planLabel(t, choice),
+    planMark(choice),
+    planTitle(t, choice),
+    t(`connectAi.plan.${choice}.tiers`),
+    planSearchNames(choice),
+  ].join(" ");
 /** The marks overlapped on the computer's plan line, and on the API key row. */
 export const PLAN_MARKS = ["claude", "openai", "zai", "kimi"] as const;
 export const KEY_MARKS = ["claude", "openai", "gemini", "openrouter"] as const;
@@ -562,13 +584,20 @@ export function dimmedLine(
   return gateLine(t, { gate, ...where })?.text ?? t("aiAccounts.connect.noComputer");
 }
 
+/** What a hold stops, said first on the phone: a plan's sign-in, the keys, or the team the onboarding just made. */
+const HOLD_LEAD = {
+  plan: "connectAi.billing",
+  keys: "connectAi.key.closed",
+  team: "standing.billing.teamReady",
+} as const;
+
 /**
- * The phone's words for a plan a billing hold stops: paying has no button or link there (ADR 0079 §6, App Store 3.1.1),
+ * The phone's words for what a billing hold stops: paying has no button or link there (ADR 0079 §6, App Store 3.1.1),
  * so whoever pays reads where, and anyone else who can.
  */
-export const planHoldPhoneLine = (t: TFunction, mayPay: boolean, keys = false) =>
+export const planHoldPhoneLine = (t: TFunction, mayPay: boolean, lead: keyof typeof HOLD_LEAD = "plan") =>
   t("common.joinSentences", {
-    a: t(keys ? "connectAi.key.closed" : "connectAi.billing"),
+    a: t(HOLD_LEAD[lead]),
     b: t(mayPay ? "connectAi.billingWeb" : "standing.billing.askAdmin"),
   });
 

@@ -9,6 +9,7 @@
  */
 import { loadConfig } from "@agenteschat/config";
 import { createDatabase } from "@agenteschat/db";
+import { passwordLinkByEmail } from "@agenteschat/engine";
 import { createLogger } from "./logger";
 import { prepareDatabase, startServer } from "./start";
 import { printTelemetry } from "./telemetry";
@@ -26,6 +27,24 @@ if (process.argv[2] === "migrate") {
   const database = createDatabase({ url: config.DATABASE_URL, poolMax: config.DATABASE_POOL_MAX });
   await prepareDatabase(database, createLogger(config.LOG_LEVEL));
   await database.close();
+  process.exit(0);
+}
+
+// `main.ts password-link <email>` (`docker compose run --rm agentes password-link ana@example.com`, ADR 0158): a
+// new-password link for that account, for a server that sends no email.
+if (process.argv[2] === "password-link") {
+  const email = process.argv[3] ?? "";
+  const config = loadConfig();
+  const database = createDatabase({ url: config.DATABASE_URL, poolMax: 1 });
+  const link = await passwordLinkByEmail(database.db, config.PUBLIC_URL, email);
+  await database.close();
+  if (!link) {
+    process.stderr.write(`No account here uses ${email}.\n`);
+    process.exit(1);
+  }
+  process.stdout.write(`${link.url}\n`);
+  process.stderr.write(`Works once, until ${link.expiresAt.toLocaleString()}.\n`);
+  await new Promise((resolve) => process.stdout.write("", resolve));
   process.exit(0);
 }
 

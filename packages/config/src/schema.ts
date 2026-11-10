@@ -108,6 +108,30 @@ export const envVars = {
       "On SIGTERM, how long the server keeps serving while `/api/health` answers 503, before it stops taking requests. Behind a reverse proxy with an active health check (and a retry window), set it above the check's interval so the proxy stops sending requests here first and holds them for the next instance instead of failing them (2000 for a check every second). 0 (default): stop taking requests at once.",
     section: "Server",
   },
+  OUTBOX_MAX_IN_FLIGHT: {
+    schema: z.coerce.number().int().min(1).default(48),
+    description:
+      "How many jobs one server process runs at once besides its requests: agents' runs, routines, a message's routing, notifications, emails. Agents' runs spend most of their time waiting for their model or their computer, so this can be far above the number of CPUs. A job holds a database connection only while it reads or writes (`DATABASE_POOL_MAX`).",
+    section: "Server",
+  },
+  OUTBOX_QUICK_SLOTS: {
+    schema: z.coerce.number().int().min(0).default(12),
+    description:
+      "Of `OUTBOX_MAX_IN_FLIGHT`, the slots only quick jobs may take (a message's routing, notifications, push, emails, search indexing), so they never wait behind agents' runs and routines, which hold the rest at most. Must be below `OUTBOX_MAX_IN_FLIGHT`. 0: no slots of their own.",
+    section: "Server",
+  },
+  OUTBOX_MAX_IN_FLIGHT_CEILING: {
+    schema: z.coerce.number().int().min(1).optional(),
+    description:
+      "At most this many jobs at once in one process, however far the slots could grow. While jobs wait for a slot (a burst of routines, a busy hour), the slots double every 30 seconds from `OUTBOX_MAX_IN_FLIGHT`: agents' runs as far as half the process's memory holds them (about 4 MB each while they wait), quick jobs to 4 per database connection (`DATABASE_POOL_MAX`); they shrink back once nothing waits. Unset (default): only those limits. Set it to `OUTBOX_MAX_IN_FLIGHT` to keep the slots fixed. With the built-in database they never grow.",
+    section: "Server",
+  },
+  SERVER_ROLE: {
+    schema: z.enum(["all", "worker"]).default("all"),
+    description:
+      "What this process does. `all` (default): serves the app and its API, and runs jobs. `worker`: only runs jobs (agents' runs, routines, notifications, emails; pushes stay with the app, which knows who has it open), and answers nothing over HTTP but its health check (`/api/health` on `PORT`). When jobs keep waiting for a slot (the log says so), start one more process with `SERVER_ROLE=worker` and the same settings: jobs share out across every process on the database, each workspace taking its turn. Processes booting together take turns on the migrations; a worker may leave them to the app (`RUN_MIGRATIONS_ON_BOOT=false`). Needs a PostgreSQL database, not the built-in one.",
+    section: "Server",
+  },
   DATABASE_URL: {
     schema: z
       .string()
@@ -122,8 +146,9 @@ export const envVars = {
     secret: true,
   },
   DATABASE_POOL_MAX: {
-    schema: z.coerce.number().int().min(1).default(10),
-    description: "Maximum number of open connections per agentes.chat process.",
+    schema: z.coerce.number().int().min(1).default(20),
+    description:
+      "Maximum number of open connections per agentes.chat process, shared by its HTTP requests and its jobs (`OUTBOX_MAX_IN_FLIGHT`). Keep it, times the number of processes, under the database's `max_connections`.",
     section: "Database",
   },
   RUN_MIGRATIONS_ON_BOOT: {
@@ -890,7 +915,7 @@ export const envVars = {
     schema: z
       .string()
       .regex(/^[\w.-]+\/[\w.-]+$/, "must be owner/repo")
-      .default("agentes-chat/agentes.chat"),
+      .default("agentes-chat/agentes-chat"),
     description:
       "GitHub repository (`owner/repo`) whose releases tagged `desktop-v<version>` hold the desktop app, and `v<version>` the packages without Docker.",
     section: "Sandbox",
@@ -918,6 +943,13 @@ export const envVars = {
       "Where people write to whoever runs this server, shown with a workspace's hold notice, its suspended screen and the workspace's own computer when something on it doesn't work. Unset (default): they are told to ask the people who run the server.",
     section: "Operator",
     example: "support@example.com",
+  },
+  FEEDBACK_EMAIL: {
+    schema: z.email().optional(),
+    description:
+      "Where the apps' feedback form sends what people write (the Beta mark beside their name): one email per message, with the person's name and address to answer them, the workspace's name and the app's version, never a conversation. Unset (default): the apps show no form.",
+    section: "Operator",
+    example: "feedback@example.com",
   },
   OPS_REPORT_EMAIL: {
     schema: z
@@ -968,7 +1000,7 @@ export const envVars = {
   MACHINE_PROVISIONING: {
     schema: z.enum(["off", "external"]).default("off"),
     description:
-      "Where workspaces get their computer. `off` (default): people connect their own computers. `external`: from a provisioner you run (ADR 0056 §10): every workspace without a ready computer is a request it reads on the operator API, its people see the computer being prepared, and it hands the computer a single-use code to connect with. People can't connect computers of their own then (pairing answers 403 `machine.pairing_off`). Needs `OPERATOR_API_TOKEN`; can't be set with `HOST_COMPUTER_TOKEN`.",
+      "Where workspaces get their computer. `off` (default): people connect their own computers. `external`: from a provisioner you run (ADR 0056 §10): every workspace without a ready computer is a request it reads on the operator API, its people see the computer being prepared, and it hands the computer a single-use code to connect with. People may still connect computers of their own under Settings › Devices: agents use them when they name them, but always live on the workspace's computer. Needs `OPERATOR_API_TOKEN`; can't be set with `HOST_COMPUTER_TOKEN`.",
     section: "Operator",
   },
   TELEMETRY: {

@@ -16,7 +16,8 @@ import type { ToolDefinition } from "./types";
  *   webhook) feeds it, so it keeps the routine's bounds (below), plus the reply where it is (`here`), never
  *   `hand_off` nor a mission's tools; every write to a connected app asks a person.
  * - `routine`: nothing that speaks for someone (reactions, GIFs and stickers, questions, reminders,
- *   routines, events, channels, secrets, permissions). It reports through `hand_off`. Otherwise it
+ *   routines, events, channels, secrets, permissions). It reports through `hand_off`, whose message may carry a GIF
+ *   (its `gif`, as `post_message`'s, ADR 0091 addendum 2026-11-09). Otherwise it
  *   works as the agent (ADR 0109: one permission model, the agent's own): reads, the web and the browser,
  *   internal changes people can undo (issues, memory, wiki, Drive, Vault contacts, its own branches and pull
  *   requests, its computer); every write to a connected app asks a person, except the actions its creator allowed for its job
@@ -136,6 +137,8 @@ const HERE = new Set([
   "offer_answers",
   "follow_up",
   "cancel_follow_up",
+  // Lets another agent's wait here go, with a note here (`parked-asks.ts`).
+  "release_waiting_agent",
 ]);
 
 /** Reads under a scope that also writes, by name. */
@@ -153,6 +156,8 @@ const READS = new Set([
   "web_search",
   "web_fetch",
   "list_dashboards",
+  "phone_screenshot",
+  "phone_logs",
 ]);
 
 /**
@@ -215,7 +220,12 @@ export function toolKind(tool: PolicyTool): ToolKind {
   if (tool.name === "hand_off") return { kind: "hand_off" };
   if (tool.name === "update_widget" && tool.scope === "") return { kind: "widget" };
   if (tool.name === "pass") return { kind: "pass" };
-  if (tool.name === "set_status" || tool.name === "withdraw_request" || tool.name === "set_reply_style")
+  if (
+    tool.name === "set_status" ||
+    tool.name === "withdraw_request" ||
+    tool.name === "set_reply_style" ||
+    tool.name === "wait_for_device"
+  )
     return { kind: "self" };
   // Long work (ADR 0121): the run's own work only; who may go to the background is the tool source's.
   if (!tool.scope && SELF_WORK.has(tool.name)) return { kind: "self" };
@@ -244,7 +254,7 @@ export const REFUSALS = {
     "This is a routine's background work: nobody is here to answer. Decide with your best judgement; if a person must decide, say so in hand_off.",
   routineReact: "This is a routine's background work: there is no message to react to. Just finish, or use hand_off.",
   routineMedia:
-    "This is a routine's background work: nobody is in its room to send a GIF or a sticker to. Just finish, or use hand_off.",
+    "This is a routine's background work: nobody is in its room to send a GIF or a sticker to. A GIF goes with the routine's message: give hand_off a `gif` (when it has one), never a link to a GIF site.",
   routineHere: "This is a routine's background work in a room nobody reads: put it in hand_off; the people decide.",
   routineShare:
     "This is a routine's background work: the files you save already go where it reports, and hand_off carries their cards. Just hand off.",

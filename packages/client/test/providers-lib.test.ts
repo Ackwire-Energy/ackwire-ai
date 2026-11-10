@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { PROVIDER_IDS } from "@agenteschat/providers";
 import type { TFunction } from "i18next";
 import {
+  apiModelName,
+  autoMakerOf,
   keyLine,
   keyLooksValid,
   keyStepHint,
@@ -78,5 +80,20 @@ describe("a saved key's line", () => {
     expect(keyLine(t, { label: "Marketing", provider: "anthropic", keyHint: "0000" })).toBe(
       'newAgent.otherKeyDesc {"provider":"Claude","hint":"0000"}',
     );
+  });
+});
+
+describe("what an agent on a key thinks with, by name", () => {
+  const t = ((key: string) => (key === "brain.auto.label" ? "Automático" : key)) as unknown as TFunction;
+  test("on Automático, the maker of the key it runs on, as the right hand's panel names its key; else its model", () => {
+    const status = { agents: [{ agentId: "iara", provider: "anthropic" }, { agentId: "otto" }] };
+    expect(autoMakerOf(status, "iara")).toBe("anthropic");
+    expect(apiModelName(t, "auto", undefined, autoMakerOf(status, "iara"))).toBe("Claude");
+    // No key known yet (or no AI): the mode's own name.
+    expect(apiModelName(t, "auto", undefined, autoMakerOf(status, "otto"))).toBe("Automático");
+    expect(apiModelName(t, "auto", undefined, autoMakerOf(undefined, "iara"))).toBe("Automático");
+    // A model picked by name keeps it.
+    expect(apiModelName(t, "claude-sonnet-5-5", "Sonnet 5.5", "anthropic")).toBe("Sonnet 5.5");
+    expect(apiModelName(t, "my-model", undefined, undefined)).toBe("my-model");
   });
 });

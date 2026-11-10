@@ -15,8 +15,9 @@ const importers = (name: string) =>
     .sort();
 
 test("the computers' screens and the import load with their own pages, never with the app (#1)", () => {
-  expect(importers("Machines")).toEqual(["components/Computers.tsx", "pages/SettingsPage.tsx"]);
-  expect(importers("Computers")).toEqual(["pages/SettingsPage.tsx"]);
+  expect(importers("Machines")).toEqual(["components/devices/DevicePage.tsx", "components/devices/DevicesSection.tsx"]);
+  expect(importers("DevicePage")).toEqual(["pages/SettingsPage.tsx"]);
+  expect(importers("DevicesSection")).toEqual(["components/devices/DevicePage.tsx", "pages/SettingsPage.tsx"]);
   expect(importers("ImportFlow")).toEqual(["pages/NewAgentPage.tsx", "pages/SettingsPage.tsx"]);
   // Pages only routes import, which the router splits out of the first load.
   for (const page of ["SettingsPage", "NewAgentPage"])

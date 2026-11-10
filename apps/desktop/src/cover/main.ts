@@ -8,7 +8,7 @@
  * expected. A server out of reach offers another one.
  */
 
-import { isTailnet, serverHost } from "@agenteschat/client/lib/server";
+import { CLOUD_SERVER, isTailnet, serverHost } from "@agenteschat/client/lib/server";
 import { drawAgent, idlePose } from "@agenteschat/ui/agent/engine";
 import { startSky } from "@agenteschat/ui/sky/engine";
 import { SKY_TONES } from "@agenteschat/ui/sky/math";
@@ -56,6 +56,15 @@ let hereWaiting = false;
 let waitSince: { state: "starting" | "migrating"; at: number } | null = null;
 /** How many of the stuck page's steps were taken in this showing (`stuck.ts`). */
 let stuckSteps = 0;
+/** The server open now is the one here (the last check): Copy details copies its diagnostics, else the window's. */
+let overHere = false;
+/** A short word in the time's place ("Copied"), until then: the explanation above it stays as it is. */
+let aside: { text: string; until: number } | null = null;
+
+function sayAside(text: string) {
+  aside = { text, until: performance.now() + 2500 };
+  tick();
+}
 
 if (sky) {
   // The same sky as the site's BootSplash (apps/web Sky.tsx), so the hand-over doesn't show.
@@ -124,8 +133,13 @@ function buttons(list: [string, () => void][]) {
  * with Copy details.
  */
 function tick() {
+  const word = aside && performance.now() < aside.until ? aside.text : null;
   if (!waitSince) {
-    if (time) time.textContent = "";
+    if (time) time.textContent = word ?? "";
+    return;
+  }
+  if (word) {
+    if (time) time.textContent = word;
     return;
   }
   const ms = performance.now() - waitSince.at;
@@ -184,14 +198,53 @@ function unreachableText(server: string): string {
 
 const localStatus = () => invoke<LocalServerStatus>("local_server_status").catch(() => null);
 
+/**
+ * Copy details: the server here's diagnostics over it, the window's own story (its log) over any other server.
+ * "Copied" or that it couldn't shows in the time's place, never over what the cover explains.
+ */
 const copyDiagnostics = () =>
-  void invoke<string>("local_server_diagnostics")
+  void invoke<string>(overHere ? "local_server_diagnostics" : "cover_details")
     .then((text) => navigator.clipboard.writeText(text))
-    .then(() => say(words.copied))
-    .catch(() => {});
+    .then(
+      () => sayAside(words.copied),
+      () => sayAside(words.copyFailed),
+    );
+
+/** Another server of the app's list than the one open (and the server here), to open instead. */
+async function otherServer(status: LocalServerStatus | null): Promise<string | null> {
+  const list = await invoke<{ current: string | null; servers: string[] }>("servers_get").catch(() => null);
+  if (!list) return null;
+  return list.servers.find((s) => s !== list.current && !(status && isHereServer(status, s))) ?? null;
+}
+const serverName = (server: string) => (server === CLOUD_SERVER ? "agentes.chat" : serverHost(server));
+const openServer = (server: string) => void invoke("server_choose", { server }).catch(() => {});
+
+/** "Use only on this Mac": reach off, said while it takes and when it didn't work. */
+function useOnlyHere() {
+  say(fillIn(words.onlyHereWorking, { device }));
+  buttons([]);
+  void invoke<{ ok: boolean }>("local_server_reach", { on: false })
+    .then(
+      (r) => r.ok,
+      () => false,
+    )
+    .then((ok) => {
+      if (ok) return;
+      say(fillIn(words.onlyHereFailed, { device }));
+      buttons([
+        [words.retry, useOnlyHere],
+        [words.copy, copyDiagnostics],
+      ]);
+    });
+}
 
 /** The server here's state on the cover, with what fixes it. */
-function showHere(state: NonNullable<ReturnType<typeof coverHere>>, tailnet: Tailnet | null) {
+function showHere(
+  state: NonNullable<ReturnType<typeof coverHere>>,
+  tailnet: Tailnet | null,
+  status: LocalServerStatus,
+  other: string | null,
+) {
   const start = () => void invoke("local_server_start").catch(() => {});
   const fill = (text: string) => fillIn(text, { device });
   if (state === "starting" || state === "migrating") {
@@ -203,8 +256,20 @@ function showHere(state: NonNullable<ReturnType<typeof coverHere>>, tailnet: Tai
   waitSince = null;
   tick();
   if (state === "stopped") {
-    say(fill(words.stopped));
-    buttons([[words.start, start]]);
+    // Stopped to stay stopped (Stop): until when, Start now, and another server of the list meanwhile.
+    const until = status.held && status.heldUntil ? clockTime(status.heldUntil) : null;
+    say(
+      until ? fillIn(words.heldUntil, { device, time: until }) : status.held ? fill(words.held) : fill(words.stopped),
+    );
+    buttons([
+      [status.held ? words.startNow : words.start, start],
+      ...(other
+        ? ([[fillIn(words.openOther, { server: serverName(other) }), () => openServer(other)]] as [
+            string,
+            () => void,
+          ][])
+        : []),
+    ]);
   } else if (state === "failing") {
     say(fill(words.failing));
     buttons([
@@ -212,10 +277,7 @@ function showHere(state: NonNullable<ReturnType<typeof coverHere>>, tailnet: Tai
       [words.copy, copyDiagnostics],
     ]);
   } else {
-    const onlyHere: [string, () => void] = [
-      fill(words.onlyHere),
-      () => void invoke("local_server_reach", { on: false }).catch(() => {}),
-    ];
+    const onlyHere: [string, () => void] = [fill(words.onlyHere), useOnlyHere];
     const next = coverTailnet(platform, tailnet);
     if (next === "openTailscale") {
       say(fill(words.tailnetOff));
@@ -232,14 +294,16 @@ async function check() {
   const waited = performance.now() - shownAt;
   const server = await currentServer();
   const here = await localStatus();
-  if (here && isHereServer(here, server)) {
+  overHere = !!here && isHereServer(here, server);
+  if (here && overHere) {
     const answered = here.phase === "running" && (await reachable(server));
     const state = coverHere(here, server, answered);
     if (state) {
       hereWaiting = true;
       unreachable = state === "stopped" || state === "failing" || state === "tailnetOff";
       const tailnet = state === "tailnetOff" ? await invoke<Tailnet>("tailscale_status").catch(() => null) : null;
-      showHere(state, tailnet);
+      const other = state === "stopped" ? await otherServer(here) : null;
+      showHere(state, tailnet, here, other);
       return;
     }
     if (hereWaiting) {
@@ -254,7 +318,16 @@ async function check() {
   if (!(await reachable(server))) {
     unreachable = true;
     say(unreachableText(server));
-    buttons([[words.otherServer, () => void invoke("show_window", { name: "welcome" }).catch(() => {})]]);
+    const welcome: [string, () => void] = [
+      words.otherServer,
+      () => void invoke("show_window", { name: "welcome" }).catch(() => {}),
+    ];
+    // On Tailscale: connecting it here is the likely fix.
+    buttons(
+      isTailnet(server)
+        ? [[words.openTailscale, () => void invoke("tailscale_open", { page: "app" }).catch(() => {})], welcome]
+        : [welcome],
+    );
     return;
   }
   if (unreachable) {
@@ -288,6 +361,15 @@ function stuck(waited: number) {
     [words.copy, copyDiagnostics],
     [words.showAnyway, () => void invoke("cover_hide").catch(() => {})],
   ]);
+}
+
+/** "15:32": the hour and minute in the person's own way. */
+function clockTime(ms: number): string {
+  try {
+    return new Date(ms).toLocaleTimeString(systemLocale(), { hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return new Date(ms).toLocaleTimeString();
+  }
 }
 
 setInterval(() => void check(), CHECK_MS);

@@ -144,9 +144,32 @@ fn make_window(app: &AppHandle, name: &str) -> Result<tauri::WebviewWindow, Stri
         .find(|w| w.label == name)
         .ok_or("window not found")?
         .clone();
-    tauri::WebviewWindowBuilder::from_config(app, &config)
+    let window = tauri::WebviewWindowBuilder::from_config(app, &config)
         .and_then(|b| b.build())
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    // Named in the app's language (the Dock's list, the Window menu): never a second "agentes.chat".
+    let key = match name {
+        "welcome" => Some("windowWelcome"),
+        "prefs" => Some("windowPrefs"),
+        _ => None,
+    };
+    if let Some(title) = key.and_then(|k| menus::labels(app).get(k).cloned()) {
+        let _ = window.set_title(&title);
+    }
+    Ok(window)
+}
+
+/// A panel (the menu bar's popover, the notch's island) stays out of the Window menu and the Dock's list of
+/// windows: only the app's real windows are listed there, each by its own name.
+#[cfg(target_os = "macos")]
+pub(crate) fn keep_out_of_window_list(ns_window: *mut std::ffi::c_void) {
+    use objc2::{msg_send, runtime::AnyObject};
+    // SAFETY: an NSWindow pointer from Tauri, used on the main thread.
+    unsafe {
+        if let Some(w) = (ns_window as *mut AnyObject).as_ref() {
+            let _: () = msg_send![w, setExcludedFromWindowsMenu: true];
+        }
+    }
 }
 
 /// The launch argument start at login passes, so a login start stays in the menu bar.
@@ -615,6 +638,7 @@ pub fn run() {
             servers::servers_get,
             servers::server_choose,
             servers::server_remove,
+            servers::server_sign_out,
             discover::discover,
             deep_link::link_take,
             local_server::local_server_status,
@@ -637,6 +661,7 @@ pub fn run() {
             main_window::this_mac_listening,
             main_window::notify_site_set,
             workspaces::workspaces_get,
+            workspaces::site_fetch,
             workspaces::welcome_mode_take,
             dock::dock_set,
             menus::app_menu_set,
@@ -644,7 +669,8 @@ pub fn run() {
             cover::page_ready,
             cover::cover_retry,
             cover::cover_hide,
-            cover::cover_server
+            cover::cover_server,
+            cover::cover_details
         ])
         .on_menu_event(|app, event| menus::on_event(app, event.id().as_ref()))
         .on_window_event(|window, event| match event {
@@ -720,6 +746,10 @@ pub fn run() {
             // Before the tray (it lists them).
             servers::load(&handle);
             tray::create(&handle)?;
+            #[cfg(target_os = "macos")]
+            if let Some(ns) = handle.get_webview_window("popover").and_then(|w| w.ns_window().ok()) {
+                keep_out_of_window_list(ns);
+            }
             migrate_login_item(&handle);
             // Start at login written before the flag existed: write it again, now with the flag.
             let launcher = handle.autolaunch();
@@ -733,6 +763,7 @@ pub fn run() {
             host_sync::start(&handle);
             // Every server's workspaces, for the site's menu and Preferences (ADR 0154).
             workspaces::start(&handle);
+            main_window::stop_from_notices(&handle);
             deep_link::setup(&handle);
             // Started at login: in the background (the popover, the tray). Opened by hand: the main window on
             // the server open now, or the first run while there is none.
@@ -768,7 +799,14 @@ pub fn run() {
         }
         // A click on the Dock icon: bring the app's window back.
         #[cfg(target_os = "macos")]
-        RunEvent::Reopen { .. } => open_app(app),
+        RunEvent::Reopen { .. } => {
+            // A click on a notification of the server here brings the app forward: the popover, which says why.
+            if local_server::take_notice_click() {
+                let _ = present(app, "popover");
+            } else {
+                open_app(app);
+            }
+        }
         _ => {}
     });
 }

@@ -7,7 +7,7 @@ import type { MergeDone } from "./command-policy";
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 53;
+export const MACHINE_PROTOCOL_VERSION = 55;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -583,6 +583,189 @@ export const CLAUDE_SHARED_PROTOCOL = 51;
  * command ("The browser doesn't take agentes:viewport"): the server asks no older runner.
  */
 export const BROWSER_VIEWPORT_PROTOCOL = 52;
+/**
+ * Bring your own devices: `hello.phones` and `phones.changed` (the phones this computer reaches: Android over adb, an
+ * iPhone through `devicectl`, its own emulators and simulators), `hello.toolchains`, and the `phone.*` ops. Each phone
+ * op names one phone and the holder it runs for; the runner keeps the phone's lock and answers `phone_busy` for
+ * another holder. Older runners report no phones, so nothing asks them.
+ */
+export const PHONES_PROTOCOL = 54;
+/**
+ * A phone's screen live, a stream (`stream.open` with `kind: "phone"`): the runner sends its pictures as binary frames
+ * (a PNG or a JPEG each, at most `PHONE_VIEW.window` the viewer hasn't acknowledged), and a viewer in control sends
+ * `tap`, `swipe`, `text` and `key` text frames. Control takes the phone for the person (`phone.holder`); an agent
+ * holding it waits until they give it back, and what it was doing on the phone stops. Older runners don't know the
+ * stream: the server refuses it as `runner_outdated`.
+ */
+export const PHONE_SCREEN_PROTOCOL = 55;
+/** Pairing an Android phone over Wi-Fi (`phone.pair.*`): the server asks no older runner. */
+export const PHONE_PAIRING_PROTOCOL = 55;
+
+export type PhonePlatform = "android" | "ios";
+export type PhoneKind = "device" | "emulator" | "simulator";
+/** A phone the host sees; one it doesn't see isn't reported (the server marks it offline). */
+export type PhoneState = "ready" | "needs_you" | "preparing" | "unsupported";
+/** Why a phone isn't ready, as a code the apps word. */
+export type PhoneReason =
+  /** The screen is locked (iPhone), or the phone asks to be unlocked to trust the computer. */
+  | "locked"
+  /** Android: USB debugging isn't allowed for this computer yet (tap Allow on the phone). */
+  | "unauthorized"
+  /** iPhone: the phone doesn't trust this Mac yet (tap Trust on the phone). */
+  | "untrusted"
+  /** iPhone: Developer Mode is off (Settings › Privacy & Security › Developer Mode). */
+  | "developer_mode_off"
+  /** iPhone: Settings › Developer › Enable UI Automation is off. */
+  | "ui_automation_off"
+  /** iPhone: no Xcode on the Mac, or it can't serve this iOS (`xcode_too_old`). */
+  | "xcode_missing"
+  | "xcode_too_old"
+  /** iPhone: the Mac is preparing the phone (device support download, needs internet). */
+  | "device_support"
+  /** iPhone: the test helper isn't built yet, or its free signature ran out (`helper_expired`). */
+  | "helper_missing"
+  | "helper_expired"
+  /** iPhone: Xcode on the Mac is signed in to no Apple Account (Xcode › Settings › Accounts), so nothing signs the helper. */
+  | "apple_account_missing"
+  /** iPhone: a free Apple Account's limit (3 apps of its own per phone, 10 app ids a week) stops the helper. */
+  | "team_limit"
+  /** iPhone: the phone doesn't trust the helper's developer yet (Settings › General › VPN & Device Management). */
+  | "helper_untrusted"
+  /** An emulator or simulator still starting. */
+  | "booting"
+  /** Windows sees no driver for this phone (install its maker's USB driver). */
+  | "no_driver"
+  /** Too old an OS for the tools (`unsupported`). */
+  | "os_too_old"
+  /** adb reports the phone `offline` (replug it, or it is restarting). */
+  | "adb_offline";
+
+/** Who holds a phone: the run and agent, and the person it works for. */
+export interface PhoneHolder {
+  runId: string | null;
+  agentId: string | null;
+  userId: string | null;
+  /** What it is doing, in the agent's words ("Recording a test video"). */
+  label?: string;
+  /** ISO; when it first took the phone. */
+  since: string;
+}
+
+/** One phone in `hello.phones` / `phones.changed`. */
+export interface RunnerPhone {
+  platform: PhonePlatform;
+  /** adb's serial, or the UDID. */
+  serial: string;
+  kind: PhoneKind;
+  /** The maker's model name ("Pixel 8", "iPhone 16"). */
+  model: string;
+  /** The name the phone itself carries, when it has one ("Sam's iPhone"). */
+  name?: string;
+  osVersion: string;
+  state: PhoneState;
+  reason?: PhoneReason;
+  transport?: "usb" | "wifi" | "local";
+  screen?: { width: number; height: number };
+  abi?: string;
+  power?: "ac" | "battery";
+  battery?: number;
+  /** Who holds it now; null or absent: free. */
+  holder?: PhoneHolder | null;
+}
+
+/** `PHONES_PROTOCOL`: where pairing an Android phone over Wi-Fi (Wireless debugging) stands on its computer. */
+export type PhonePairState = "waiting" | "pairing" | "connecting" | "connected" | "failed";
+/** Why a Wi-Fi pairing failed, as a code the apps word. */
+export type PhonePairFailure =
+  /** adb's mDNS is off on the computer, so it can't find phones on the network. */
+  | "mdns_off"
+  /** The phone couldn't be reached (another network, or one that keeps devices apart). */
+  | "same_wifi"
+  /** The phone didn't take the pairing (a wrong code, or its pairing screen closed). */
+  | "refused"
+  /** Nothing scanned the code, or nothing answered, in 2 minutes. */
+  | "timed_out"
+  /** Under Android 14, or a security patch before 2026-05-01 (CVE-2026-0073): disconnected again. */
+  | "outdated"
+  | "adb_missing"
+  | "canceled"
+  | "failed";
+
+export interface PhonePairing {
+  id: string;
+  way: "qr" | "code";
+  state: PhonePairState;
+  reason?: PhonePairFailure;
+  /** Only in `phone.pair.start`'s answer: the QR text, `WIFI:T:ADB;S:<service>;P:<password>;;`. */
+  qr?: string;
+  /** Connected: the phone's own serial, as `phones.changed` reports it. */
+  serial?: string;
+  /** ISO: when it stops waiting for the phone. */
+  expiresAt: string;
+}
+
+/** `192.168.1.20:37099` (or `[fe80::1]:37099`) as the phone shows it under Pair device with pairing code. */
+export function pairAddress(input: unknown): string | null {
+  if (typeof input !== "string") return null;
+  const text = input.trim();
+  const v4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3}):(\d{1,5})$/.exec(text);
+  const v6 = /^\[([0-9a-fA-F:%.\w]{2,60})\]:(\d{1,5})$/.exec(text);
+  const port = Number((v4 ? v4[5] : v6?.[2]) ?? 0);
+  if (port < 1 || port > 65535) return null;
+  if (v4?.slice(1, 5).every((o) => Number(o) <= 255)) return text;
+  return v6?.[1]?.includes(":") ? text : null;
+}
+
+/** What this computer can build and drive with (versions found, best effort; absent: not found). */
+export interface RunnerToolchains {
+  git?: string;
+  java?: string;
+  /** The Android SDK's folder was found (`ANDROID_HOME`, the usual places). */
+  androidSdk?: string;
+  adb?: string;
+  scrcpy?: string;
+  maestro?: string;
+  /** Xcode's version (macOS). */
+  xcode?: string;
+  /** The Apple Account team that signs the iPhone test helper, as Xcode names it ("Sam Rivera (Personal Team)"). */
+  appleTeam?: string;
+  node?: string;
+}
+
+/** The phone a `phone.*` op is for. */
+export interface PhoneTarget {
+  platform: PhonePlatform;
+  serial: string;
+  /** Whom it runs for: the call takes the phone, or renews the lock, as this holder. */
+  holder: PhoneHolder;
+}
+
+/** The keys a person presses on a phone's screen from the apps. */
+export const PHONE_KEYS = [
+  "home",
+  "back",
+  "enter",
+  "delete",
+  "app_switch",
+  "volume_up",
+  "volume_down",
+  "power",
+] as const;
+export type PhoneKey = (typeof PHONE_KEYS)[number];
+
+/** A phone's screen live (`stream.open` with `kind: "phone"`). */
+export const PHONE_VIEW = {
+  /** Pictures on their way that the viewer hasn't acknowledged (`{"type":"ack"}` once it drew one). */
+  window: 2,
+  /** The shortest time between two pictures: about 8 a second at most. */
+  frameMs: 120,
+  /** How often an unchanged screen is looked at again. */
+  idleMs: 400,
+  /** A swipe's length, in milliseconds. */
+  swipeMs: [1, 5000] as [number, number],
+  /** Characters typed in one `text` frame. */
+  text: 2000,
+} as const;
 export const BROWSER_DEVICES = ["phone", "tablet", "desktop"] as const;
 export type BrowserDevice = (typeof BROWSER_DEVICES)[number];
 /** A phone's and a tablet's size when none is given, in CSS pixels, and their pixel ratio. */
@@ -1139,7 +1322,11 @@ export const STREAM_CLOSE = {
  * server may add a desktop's `keyboard` (a layout): it is ignored, as Xvnc types what the person's own layout made
  * (ADR 0058 §16).
  */
-export type StreamRequest = { kind: "desktop"; mode: DesktopMode } | { kind: "terminal"; cols: number; rows: number };
+export type StreamRequest =
+  | { kind: "desktop"; mode: DesktopMode }
+  | { kind: "terminal"; cols: number; rows: number }
+  /** A phone's screen (`PHONES_PROTOCOL`): `stream.open` carries the phone itself as `phone`, its holder the person. */
+  | { kind: "phone"; mode: DesktopMode; phoneId: string };
 
 /** A desktop stream's mode: `watch` logs in with the view-only password, `control` with the full one. */
 export type DesktopMode = "watch" | "control";
@@ -1152,7 +1339,7 @@ export type DesktopMode = "watch" | "control";
  * starts first; without it the runner refuses `desktop_off`, as runners before
  * it did. The server leaves it out while the agent may start nothing (held).
  */
-export type StreamOpenRequest = StreamRequest & { streamId: string; start?: boolean };
+export type StreamOpenRequest = StreamRequest & { streamId: string; start?: boolean; phone?: PhoneTarget };
 
 /**
  * A data socket's first frame (runner → server, text): the machine's token
@@ -1174,8 +1361,13 @@ export type StreamControl =
   | { type: "resize"; cols: number; rows: number }
   | { type: "exit"; code: number | null }
   | { type: "mode"; mode: DesktopMode }
-  /** Protocol 49: a browser view's frame arrived (server → runner): one more may go (`BROWSER_VIEW`). */
-  | { type: "ack" };
+  /** Protocol 49: a browser view's frame arrived (server → runner), or a phone's picture was drawn (viewer → runner). */
+  | { type: "ack" }
+  /** A person in control of a phone's screen (viewer → runner), at fractions (0 to 1) of its width and height. */
+  | { type: "tap"; x: number; y: number }
+  | { type: "swipe"; x1: number; y1: number; x2: number; y2: number; ms: number }
+  | { type: "text"; text: string }
+  | { type: "key"; key: PhoneKey };
 
 /**
  * A person's turn in an agent's browser (`browser.handoff`, ADR 0040 §6), as
@@ -1911,6 +2103,9 @@ export interface RunnerInfo {
   ownUsage?: OwnPlanUsage;
   /** Protocol 22: how big the computer is. */
   size?: MachineSize;
+  /** `PHONES_PROTOCOL`: the phones it reaches, and what it can build with. */
+  phones?: RunnerPhone[];
+  toolchains?: RunnerToolchains;
   /** Protocol 50: the methods a new Claude sign-in for all agents can use here (`claudeLoginMethodsOf`). */
   claudeLoginMethods?: AuthMethod[];
   /** Why this computer doesn't list `cli_login` for all agents though it was switched on (its self-check's answer). */
@@ -2085,6 +2280,39 @@ export type MachineRequest = (
   | { op: "vault.key" }
   /** `requestId` and `publicKey`: what the answer is sealed to (`madePasswordAad`). */
   | { op: "vault.password"; requestId: string; publicKey: string; rules: PasswordRules }
+  /** `PHONES_PROTOCOL`: take the phone (or renew the lock) for `holder`, doing nothing else. */
+  | ({ op: "phone.claim" } & PhoneTarget)
+  /** Let the phone go: `holder.runId`'s lock only, or anyone's with `force` (its owner pressed Stop). */
+  | ({ op: "phone.release" } & PhoneTarget & { force?: boolean })
+  /** Install an app from `path` (an `.apk`, `.aab`, `.app` or `.ipa` in the agent's folder) and say its id. */
+  | ({ op: "phone.install" } & PhoneTarget & { path: string })
+  /** Start an installed app by its id (Android package, iOS bundle id). */
+  | ({ op: "phone.launch" } & PhoneTarget & { app: string })
+  /**
+   * Run a Maestro flow (YAML text) on the phone, recording the screen around it with `record`. The video and the
+   * log land in the agent's folder (`.agentes/phone/`).
+   */
+  | ({ op: "phone.flow" } & PhoneTarget & {
+        flow: string;
+        record?: boolean;
+        timeoutSeconds: number;
+        env?: Record<string, string>;
+      })
+  /** Record the screen for `seconds` (at most 170) into the agent's folder. */
+  | ({ op: "phone.record" } & PhoneTarget & { seconds: number })
+  /** A PNG of the screen into the agent's folder. */
+  | ({ op: "phone.screenshot" } & PhoneTarget)
+  /** The phone's log: the last `lines`, only `app`'s when given. */
+  | ({ op: "phone.logs" } & PhoneTarget & { app?: string; lines: number })
+  /**
+   * `PHONES_PROTOCOL`: pair an Android phone over Wi-Fi. `start` answers the QR the phone scans (Wireless debugging ›
+   * Pair device with QR code); `code` pairs with the six digits and the address the phone shows instead. Either goes
+   * on by itself until connected, failed or 2 minutes; `status` says where it is. One at a time: a new one ends the last.
+   */
+  | { op: "phone.pair.start" }
+  | { op: "phone.pair.code"; address: string; code: string }
+  | { op: "phone.pair.status"; pairingId: string }
+  | { op: "phone.pair.cancel"; pairingId: string }
 ) & {
   agent?: AgentScope;
   /** Protocol 34: a `browser.*` op in this browser profile's session instead of the agent's (ADR 0110). */
@@ -2143,6 +2371,18 @@ export const MACHINE_OPS: readonly MachineOp[] = [
   "desktop.text",
   "vault.key",
   "vault.password",
+  "phone.claim",
+  "phone.release",
+  "phone.install",
+  "phone.launch",
+  "phone.flow",
+  "phone.record",
+  "phone.screenshot",
+  "phone.logs",
+  "phone.pair.start",
+  "phone.pair.code",
+  "phone.pair.status",
+  "phone.pair.cancel",
 ];
 
 /** What each op answers with `ok: true`. */
@@ -2283,6 +2523,20 @@ export interface MachineReplies {
   /** Protocol 45: the key's id, its public key (raw P-256, base64) and when it stops opening anything (ISO). */
   "vault.key": { vaultKey: { keyId: string; publicKey: string; expiresAt: string } };
   "vault.password": { box: WireSecretBox };
+  "phone.claim": { holder: PhoneHolder };
+  "phone.release": { released: boolean };
+  /** `app`: the installed app's id, when the runner could read it. */
+  "phone.install": { app?: string; output: string };
+  "phone.launch": { output: string };
+  /** Paths are relative to the agent's folder. `video`: with `record`, when the recording held. */
+  "phone.flow": { passed: boolean; output: string; seconds: number; video?: string; log?: string };
+  "phone.record": { path: string; seconds: number; bytes: number };
+  "phone.screenshot": { path: string; width?: number; height?: number };
+  "phone.logs": { text: string };
+  "phone.pair.start": PhonePairing;
+  "phone.pair.code": PhonePairing;
+  "phone.pair.status": PhonePairing;
+  "phone.pair.cancel": { canceled: boolean };
 }
 
 /** An element numbered on a `browser.capture` image: its ref and box (CSS pixels). */
@@ -2359,6 +2613,14 @@ export type MachineErrorCode =
    * message says why. Older servers read it like `internal`.
    */
   | "unsupported"
+  /** `PHONES_PROTOCOL`: the host doesn't see this phone now (unplugged, adb restarted). */
+  | "phone_missing"
+  /** Another holder has the phone; the message names it. */
+  | "phone_busy"
+  /** The phone needs its person first (locked, not trusted, Developer Mode off); the message says what to do. */
+  | "phone_not_ready"
+  /** A tool the op needs isn't on the computer and couldn't be fetched (adb, Maestro, scrcpy, Xcode); the message says which. */
+  | "tool_missing"
   | "bad_request"
   | "internal";
 
@@ -2465,6 +2727,8 @@ export type RunnerFrame =
   | { type: "accounts.changed"; accounts: RunnerAccountInfo[]; ownUsage?: OwnPlanUsage }
   /** Protocol 41: the coding CLIs found changed since `hello` (`hello.executors`, whole). */
   | { type: "executors.changed"; executors: NonNullable<RunnerInfo["executors"]> }
+  /** `PHONES_PROTOCOL`: the phones it reaches changed (one came or went, a state or a holder changed), whole. */
+  | { type: "phones.changed"; phones: RunnerPhone[] }
   /**
    * Protocol 10: the person answered an `access.request` on the machine (or it
    * expired). `granted` also comes with an `access.changed`.
@@ -2510,6 +2774,79 @@ const fileList = (v: unknown) =>
 const finite = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
 /** A full or short git commit id (lowercase hex). */
 export const isSha = (v: unknown): v is string => typeof v === "string" && /^[0-9a-f]{7,64}$/.test(v);
+
+/** What a phones report may carry: the host's own word only, so each field is bounded here. */
+export const PHONE_LIMITS = { phones: 32, serial: 200, model: 100, name: 80, osVersion: 40, label: 200 };
+const PHONE_STATES: readonly PhoneState[] = ["ready", "needs_you", "preparing", "unsupported"];
+const PHONE_KINDS: readonly PhoneKind[] = ["device", "emulator", "simulator"];
+const TOOLCHAINS: readonly (keyof RunnerToolchains)[] = [
+  "git",
+  "java",
+  "androidSdk",
+  "adb",
+  "scrcpy",
+  "maestro",
+  "xcode",
+  "appleTeam",
+  "node",
+];
+const idOrNull = (v: unknown) => (isString(v) && v.length <= 64 ? v : null);
+
+function parsePhoneHolder(v: unknown): PhoneHolder | null {
+  if (!isObject(v) || !isString(v.since) || !Number.isFinite(Date.parse(v.since))) return null;
+  const label = cut(v.label, PHONE_LIMITS.label);
+  return {
+    runId: idOrNull(v.runId),
+    agentId: idOrNull(v.agentId),
+    userId: idOrNull(v.userId),
+    ...(label ? { label } : {}),
+    since: v.since.slice(0, 40),
+  };
+}
+
+/** `hello.phones` / `phones.changed`: each phone checked, the rest dropped. */
+export function parsePhones(v: unknown[]): RunnerPhone[] {
+  const out: RunnerPhone[] = [];
+  for (const p of v.slice(0, PHONE_LIMITS.phones)) {
+    if (!isObject(p) || (p.platform !== "android" && p.platform !== "ios")) continue;
+    if (!isString(p.serial) || !p.serial || p.serial.length > PHONE_LIMITS.serial) continue;
+    const state = PHONE_STATES.find((s) => s === p.state);
+    if (!state) continue;
+    const name = cut(p.name, PHONE_LIMITS.name);
+    const width = finite(isObject(p.screen) ? p.screen.width : undefined);
+    const height = finite(isObject(p.screen) ? p.screen.height : undefined);
+    const battery = finite(p.battery);
+    const transport = (["usb", "wifi", "local"] as const).find((t) => t === p.transport);
+    const power = (["ac", "battery"] as const).find((t) => t === p.power);
+    out.push({
+      platform: p.platform,
+      serial: p.serial,
+      kind: PHONE_KINDS.find((k) => k === p.kind) ?? "device",
+      model: cut(p.model, PHONE_LIMITS.model) ?? "",
+      ...(name ? { name } : {}),
+      osVersion: cut(p.osVersion, PHONE_LIMITS.osVersion) ?? "",
+      state,
+      ...(isString(p.reason) && /^[a-z_]{1,40}$/.test(p.reason) ? { reason: p.reason as PhoneReason } : {}),
+      ...(transport ? { transport } : {}),
+      ...(width !== undefined && height !== undefined ? { screen: { width, height } } : {}),
+      ...(isString(p.abi) ? { abi: p.abi.slice(0, 40) } : {}),
+      ...(power ? { power } : {}),
+      ...(battery !== undefined && battery >= 0 && battery <= 100 ? { battery } : {}),
+      holder: parsePhoneHolder(p.holder),
+    });
+  }
+  return out;
+}
+
+/** `hello.toolchains`: known tools only, each a short version string. */
+export function parseToolchains(v: Record<string, unknown>): RunnerToolchains {
+  const out: RunnerToolchains = {};
+  for (const key of TOOLCHAINS) {
+    const value = cut(v[key], 100);
+    if (value) out[key] = value;
+  }
+  return out;
+}
 
 /** Protocol 14: `task.start`'s `baseBehind` (a count of commits; absent when the runner couldn't tell). */
 export function parseBaseBehind(data: unknown): number | undefined {
@@ -2828,8 +3165,12 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
           : {}),
         ...(isString(f.claudeLoginBlocked) ? { claudeLoginBlocked: f.claudeLoginBlocked.slice(0, 300) } : {}),
         ...(f.authEgressGroup === true ? { authEgressGroup: true as const } : {}),
+        ...(Array.isArray(f.phones) ? { phones: parsePhones(f.phones) } : {}),
+        ...(isObject(f.toolchains) ? { toolchains: parseToolchains(f.toolchains) } : {}),
       };
     }
+    case "phones.changed":
+      return Array.isArray(f.phones) ? { type: "phones.changed", phones: parsePhones(f.phones) } : null;
     case "browser.frame": {
       if (!isString(f.agentId) || !isString(f.data) || f.data.length > BROWSER_LIMITS.frameBytes) return null;
       const seq = finite(f.seq);
@@ -3584,8 +3925,22 @@ export const isTerminalSize = (cols: unknown, rows: unknown) =>
 
 /** A text frame on a ready stream (either side); null when it isn't one or a size is out of bounds. */
 export function parseStreamControl(raw: string): StreamControl | null {
-  const f = smallJson(raw, 200);
-  if (!isObject(f)) return null;
+  // A phone's `text` may carry a pasted line (JSON escapes take up to 6 characters each); every other frame is short.
+  const f = smallJson(raw, PHONE_VIEW.text * 6 + 100);
+  if (!isObject(f) || (f.type !== "text" && raw.length > 200)) return null;
+  const share = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 1;
+  if (f.type === "tap") return share(f.x) && share(f.y) ? { type: "tap", x: f.x, y: f.y } : null;
+  if (f.type === "swipe") {
+    const { x1, y1, x2, y2, ms } = f;
+    if (!share(x1) || !share(y1) || !share(x2) || !share(y2) || !inRange(ms, PHONE_VIEW.swipeMs)) return null;
+    return { type: "swipe", x1, y1, x2, y2, ms };
+  }
+  if (f.type === "text") {
+    return isString(f.text) && f.text !== "" && f.text.length <= PHONE_VIEW.text
+      ? { type: "text", text: f.text }
+      : null;
+  }
+  if (f.type === "key") return PHONE_KEYS.includes(f.key as PhoneKey) ? { type: "key", key: f.key as PhoneKey } : null;
   if (f.type === "resize") {
     return isTerminalSize(f.cols, f.rows) ? { type: "resize", cols: f.cols as number, rows: f.rows as number } : null;
   }

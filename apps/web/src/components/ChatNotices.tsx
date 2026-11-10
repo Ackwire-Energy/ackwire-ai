@@ -3,6 +3,7 @@ import { keys } from "@agenteschat/client";
 import { APP_BRANDS } from "@agenteschat/client/lib/apps";
 import { seesDetails } from "@agenteschat/client/lib/audience";
 import { pairItemOf } from "@agenteschat/client/lib/consult-group";
+import { errorText } from "@agenteschat/client/lib/errors";
 import { formatTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
@@ -36,6 +37,7 @@ import { DetailsLink } from "@/components/details-link";
 import { useOrg } from "@/components/org-context";
 import { SayWhy } from "@/components/tasks/TaskBits";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useToast } from "@/lib/toast";
 import "./chat-notices.css";
 
 const NOTICE_ICON: Record<string, IconName> = {
@@ -52,14 +54,15 @@ const NOTICE_ICON: Record<string, IconName> = {
  */
 function EventLine({
   message,
-  icon,
+  mark,
   label,
   detail,
   labels,
   action,
 }: {
   message: Message;
-  icon: IconName;
+  /** Its icon, or the service's own logo (GitHub's). */
+  mark: ReactNode;
   label: ReactNode;
   /** What "Ver" opens (`noticeView`): never the words written for the agent. */
   detail: NoticeView["detail"];
@@ -80,7 +83,7 @@ function EventLine({
     <EventPill
       className="cn-pill"
       data-message-id={message.id}
-      mark={<Icon name={icon} size={14} />}
+      mark={mark}
       time={formatTime(i18n.language, message.createdAt)}
       actions={
         action || text ? (
@@ -156,11 +159,23 @@ export function NoticeLine({ message }: { message: Message }) {
   return (
     <EventLine
       message={message}
-      icon={NOTICE_ICON[notice.kind] ?? "info"}
+      mark={
+        notice.kind === "github_event" ? (
+          <ProviderLogo id="github" size="xs" />
+        ) : (
+          <Icon name={NOTICE_ICON[notice.kind] ?? "info"} size={14} />
+        )
+      }
       label={t(view.key as "chat.notice.other", view.values as { name: string })}
       detail={view.detail}
       labels={{ show: t("chat.notice.show"), hide: t("chat.notice.hide") }}
-      action={view.pending ? <CancelFollowUp messageId={message.id} /> : undefined}
+      action={
+        view.pending ? (
+          <CancelFollowUp messageId={message.id} />
+        ) : view.answer ? (
+          <AnswerGitHub messageId={message.id} />
+        ) : undefined
+      }
     />
   );
 }
@@ -343,6 +358,32 @@ function CancelFollowUp({ messageId }: { messageId: string }) {
       }}
     >
       {t("chat.notice.followUpCancel")}
+    </EventPillAction>
+  );
+}
+
+/**
+ * "Pedir resposta" on what someone the agent doesn't answer wrote on GitHub: the agent answers them there, with this
+ * person behind it. The line changes in place once the server has it; a refusal says why.
+ */
+function AnswerGitHub({ messageId }: { messageId: string }) {
+  const { t } = useTranslation();
+  const api = useApi();
+  const { org } = useOrg();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  return (
+    <EventPillAction
+      disabled={busy}
+      onClick={() => {
+        setBusy(true);
+        void api.chat
+          .answerGitHub(org.id, messageId)
+          .catch((error: unknown) => toast.show(errorText(t, error), "error"))
+          .finally(() => setBusy(false));
+      }}
+    >
+      {t("chat.notice.github.ask")}
     </EventPillAction>
   );
 }

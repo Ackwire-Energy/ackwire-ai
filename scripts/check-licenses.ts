@@ -2,7 +2,7 @@
  * Fails when an installed dependency's license is not permissive or weak copyleft (LGPL, MPL-2.0):
  * strong copyleft (GPL, AGPL), source-available (SSPL, Business Source, Elastic, Commons Clause),
  * proprietary, unknown or missing. The phone and desktop apps reach app stores through the section 7
- * permission in LICENSE, which can't cover code others license under the GPL or AGPL (and
+ * permission in NOTICE, which can't cover code others license under the GPL or AGPL (and
  * GPL-2.0-only can't be combined with AGPL-3.0 at all), so no dependency may bring strong copyleft.
  * Run in CI via `bun run check:licenses`, after `bun install`.
  */

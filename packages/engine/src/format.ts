@@ -8,8 +8,26 @@ export const cutText = (text: string, max: number) => text.slice(0, max).replace
 /** `cutText` for text people read: a cut ends in "…", never passing for the whole. */
 export const cutMarked = (text: string, max: number) => (text.length > max ? `${cutText(text, max - 1)}…` : text);
 
+/** "Ana's", for the English the agents read. */
+export const possessive = (name: string) => `${name}'s`;
+
+/** "in 3 h", "in 2 days": how soon `at` comes, for the English the agents read. */
+export function fromNow(at: Date, now = Date.now()) {
+  const minutes = Math.max(1, Math.round((at.getTime() - now) / 60_000));
+  if (minutes < 60) return `in ${minutes} min`;
+  const hours = Math.round(minutes / 60);
+  return hours < 48 ? `in ${hours} h` : `in ${Math.round(hours / 24)} days`;
+}
+
+/** "Ana, Bia and Caio", for the English the agents read. */
+export const andList = (xs: string[]) =>
+  xs.length < 2 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`;
+
 /** Whether `text` asks something by its punctuation, in any script: `?`, the full-width `？`, the Arabic `؟`. */
 export const hasQuestionMark = (text: string) => /[?？؟]/.test(text);
+
+/** A person's first name, from their whole name. */
+export const firstName = (name: string) => name.trim().split(/\s+/)[0] ?? "";
 
 const WORDS = new Intl.Segmenter(undefined, { granularity: "word" });
 /** How many words `text` has, in any script: Chinese, Japanese or Thai, written without spaces, count theirs too. */
@@ -118,4 +136,14 @@ export function editDistance(a: string, b: string): number {
     prev = row;
   }
   return prev[b.length] as number;
+}
+
+/**
+ * The `p` quantile (0..1) of `values` by nearest rank: the smallest of them that a `p` share of them don't exceed;
+ * 0 for none.
+ */
+export function percentile(values: readonly number[], p: number): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.min(sorted.length, Math.max(1, Math.ceil(p * sorted.length))) - 1] as number;
 }

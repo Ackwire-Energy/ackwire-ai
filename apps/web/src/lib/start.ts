@@ -33,6 +33,9 @@ export function rememberPlace(orgId: string, path: string) {
 /** The channel a workspace path shows (`/org/{orgId}/c/{channelId}`), if any. */
 export const channelOfPath = (path: string) => /^\/org\/[^/]+\/c\/([^/?#]+)/.exec(path)?.[1] ?? null;
 
+/** Whether a workspace path is a conversation: a channel or a direct message. */
+export const isChatPath = (path: string) => /^\/org\/[^/]+\/(c|dm)\//.test(path);
+
 /** The workspace this tab shows; null before the first one, and after the app's own address (`/`), which opens one. */
 let shown: string | null = null;
 export const showWorkspace = (orgId: string | null) => {

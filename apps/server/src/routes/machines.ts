@@ -29,6 +29,7 @@ import {
   safeEqual,
   setAgentComputerTarget,
   startDeviceCode,
+  startLinkedDeviceCode,
   syncHostComputer,
   UUID,
   ValidationError,
@@ -50,16 +51,6 @@ import {
 } from "./app/context";
 
 const tags = ["Connected computers"];
-
-/**
- * With external provisioning every workspace gets its own computer (ADR 0056 §10) and people connect none:
- * refused on the server, so a runner pointed at it stops at once instead of showing a code nobody can confirm.
- * The workspace's own computer never asks for a code: it redeems the one it was issued.
- */
-const PAIRING_OFF = {
-  workspace: "This workspace has its own computer: other computers can't be connected to it.",
-  server: "Every workspace on this server has its own computer: other computers can't be connected to it.",
-};
 
 /** Headers and framing around a pushed file: the body may be a little over the file limit. */
 const UPLOAD_SLACK_BYTES = 64 * 1024;
@@ -117,6 +108,10 @@ export const Machine = z
         "`connected`: a person paired it; `host`: this server's own computer (`HOST_COMPUTER_TOKEN`); `managed`: the workspace's own computer (ADR 0056 §10), which people can't remove and whose hostname, OS and arch aren't shown.",
     }),
     online: z.boolean().openapi({ description: "Runner connected now. Changes come as `machine.status` events." }),
+    standby: z.boolean().openapi({
+      description:
+        "The workspace's own computer is asleep in standby (ADR 0161): offline by design, it wakes when something wants it. A change comes as `machine.updated`.",
+    }),
     lastSeenAt: z.string().nullable(),
     hostname: z.string(),
     os: z.string().openapi({ description: "`linux`, `darwin`, `windows` or `other`." }),
@@ -497,9 +492,6 @@ export function machineAppRoutes(deps: AppDeps) {
       responses: { 201: json(Machine, "Connected"), 429: errorResponse("Too many attempts"), ...errors },
     }),
     async (c) => {
-      if (deps.config.MACHINE_PROVISIONING === "external") {
-        return apiError(c, 403, "machine.pairing_off", PAIRING_OFF.workspace);
-      }
       const { orgId, userCode } = c.req.valid("param");
       const userId = c.get("user").id;
       const machine = await withCodeBudget(codeKeys(c, userId), () =>
@@ -802,6 +794,8 @@ const DeviceBody = z.object({
   previousMachineId: z.string().max(64).optional(),
   /** The token it had for `previousMachineId`, its proof of being that computer: no reconnect without it. */
   previousToken: z.string().max(200).optional(),
+  /** The code of the connect link it was installed with (`/i/{code}`): it asks that link's maker to join. */
+  link: z.string().max(20).optional(),
 });
 
 const HostSyncBody = z.object({
@@ -875,7 +869,8 @@ export function registerMachinePublicRoutes(api: OpenAPIHono, deps: AppDeps) {
       method: "post",
       path: "/machines/device",
       tags,
-      summary: "A computer asks for a connection code (the desktop app or `agentes-runner pair`)",
+      summary:
+        "A computer asks for a connection code (the desktop app or `agentes-runner pair`), or with `link` asks the maker of that connect link to join",
       request: { body: body(DeviceBody) },
       responses: {
         200: json(
@@ -886,22 +881,33 @@ export function registerMachinePublicRoutes(api: OpenAPIHono, deps: AppDeps) {
               verificationUrl: z.string(),
               expiresIn: z.number().int(),
               interval: z.number().int(),
+              maker: z
+                .object({ name: z.string() })
+                .optional()
+                .openapi({ description: "With `link`: who lets it join (the link's maker)." }),
+              org: z
+                .object({ name: z.string() })
+                .optional()
+                .openapi({ description: "With `link`: the workspace it joins." }),
             })
             .openapi("MachineDeviceStart"),
         ),
-        400: errorResponse("Invalid body or runner too old"),
-        403: errorResponse("Each workspace here has its own computer: no other can connect (`machine.pairing_off`)"),
+        400: errorResponse(
+          "Invalid body, runner too old, or the link is unknown, used or expired (`machine.link_invalid`)",
+        ),
         429: errorResponse("Too many requests or pending codes from this address"),
       },
     }),
     async (c) => {
-      if (config.MACHINE_PROVISIONING === "external")
-        return apiError(c, 403, "machine.pairing_off", PAIRING_OFF.server);
       const ip = requestIp(c.req.raw.headers, config.TRUSTED_PROXIES);
       const limit = await adapters.rateLimiter.consume(`machine-device:${limitIp(ip)}`, DEVICE_START_LIMIT);
       if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many attempts. Try again in a minute.");
+      const { link, ...input } = c.req.valid("json");
+      const start = { db, pubsub: adapters.pubsub, publicUrl: config.PUBLIC_URL };
       try {
-        const started = await startDeviceCode({ db, publicUrl: config.PUBLIC_URL }, c.req.valid("json"), { ip });
+        const started = link
+          ? await startLinkedDeviceCode(start, link, input, { ip })
+          : await startDeviceCode(start, input, { ip });
         return c.json(started, 200);
       } catch (error) {
         if (error instanceof DeviceCodeLimitError) return apiError(c, 429, "machine.device_too_many", error.message);
@@ -926,6 +932,11 @@ export function registerMachinePublicRoutes(api: OpenAPIHono, deps: AppDeps) {
               machineId: z.uuid(),
               name: z.string(),
               org: z.object({ id: z.uuid(), name: z.string() }),
+              audience: z
+                .enum(["everyone", "people", "owner"])
+                .openapi({ description: "Who may use it, as it joined (its owner, everyone, or people and roles)." }),
+              owner: z.string().nullable().openapi({ description: "The name of the person who connected it." }),
+              url: z.url().openapi({ description: "Its page in the web app, where who may use it changes." }),
             })
             .openapi("MachineDeviceToken"),
         ),
@@ -945,7 +956,8 @@ export function registerMachinePublicRoutes(api: OpenAPIHono, deps: AppDeps) {
       const result = await pollDeviceToken({ db, pubsub: adapters.pubsub }, c.req.valid("json").deviceCode);
       if (!result.ok) return c.json({ error: result.error }, 400);
       const { ok: _ok, ...token } = result;
-      return c.json(token, 200);
+      const url = `${config.PUBLIC_URL.replace(/\/+$/, "")}/org/${token.org.id}/settings/devices/${token.machineId}`;
+      return c.json({ ...token, url }, 200);
     },
   );
 

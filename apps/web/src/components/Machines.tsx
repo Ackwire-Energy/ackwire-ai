@@ -3,7 +3,6 @@ import {
   profilesApply,
   useAgents,
   useAuthConfig,
-  useDesktopLatest,
   useDesktopStatus,
   useHostComputer,
   useHostComputerOn,
@@ -12,7 +11,6 @@ import {
   useReduceMachineAccess,
 } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
-import { formatBytes } from "@agenteschat/client/lib/files";
 import { clockAt, joinNames, relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
@@ -21,22 +19,16 @@ import {
   canReduceAccess,
   computerKind,
   computerState,
-  desktopTargetOf,
-  downloadHref,
   folderName,
   hostDescKey,
-  installCommand,
-  isHandheld,
   isPaused,
   MACHINE_TOOLS,
   machineTitle,
-  platformOf,
   sharedFolderFacts,
   sharedFolderOf,
 } from "@agenteschat/client/lib/machines";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
-  Alert,
   AvatarStack,
   Button,
   Card,
@@ -60,22 +52,20 @@ import {
 } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOpenComputer } from "@/components/computer/open";
 import { HelpLink } from "@/components/HelpLink";
-import { ErrorState, LoadingLine, LoadingList } from "@/components/Loading";
+import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
-import { OpenPrefsButton, ThisMacButton, useAgentsHere, useIsThisMac } from "@/components/ThisMac";
-import { useRightHandLook } from "@/hooks/useRightHandLook";
-import { inDesktopApp } from "@/lib/desktop";
+import { OpenPrefsButton, useIsThisMac } from "@/components/ThisMac";
 import { useToast } from "@/lib/toast";
 import { BrowserProfilesCard } from "./browser/BrowserProfiles";
 import { MachineBrowserCard } from "./browser/MachineBrowserCard";
 import { Egress } from "./computer/Egress";
 import { MachineDesktopUseCard } from "./desktop/MachineDesktopUseCard";
-import { CommandBlock, MachineChip, osOf, useCopy } from "./machine-bits";
+import { CommandBlock, MachineChip, osOf } from "./machine-bits";
 import { ComputerTitle, SetupFacts, useSetupView } from "./WorkspaceComputer";
 
 /** "Pausado até 16:24" (another day: "Pausado até 18 out 09:00"), "Pausado"; null when not paused now. */
@@ -95,141 +85,6 @@ export function PausedChip({ paused }: { paused: MachinePause | null | undefined
     <Chip icon="pause" className="machine-chip">
       {text}
     </Chip>
-  );
-}
-
-/**
- * "Baixar o app para macOS" (or the system this page is open on) from the latest build, small; nothing while there
- * is none (the connect card says so). In the app itself: "Usar este Mac" instead (ADR 0036).
- */
-export function DownloadMacButton({ primary = false }: { primary?: boolean }) {
-  const { t } = useTranslation();
-  const { org } = useOrg();
-  const target = desktopTargetOf(navigator.userAgent);
-  const latest = useDesktopLatest(target?.target ?? "", target?.arch ?? "", target !== null);
-  const origin = typeof window === "undefined" ? "" : window.location.origin;
-  if (inDesktopApp()) return <ThisMacButton orgId={org.id} canPair={can(org, "pair_computers")} primary={primary} />;
-  if (!target || !latest.data) return null;
-  return (
-    <Button asChild size="sm" variant={primary ? "primary" : "default"}>
-      <a href={downloadHref(latest.data.url, origin)} download>
-        <Icon name="download" />
-        {t("machines.download.mac", { system: t(`machines.os.${target.target}`) })}
-      </a>
-    </Button>
-  );
-}
-
-/**
- * How to connect a computer (ADR 0036 §2, §10): the app for the system this page is open on, from the latest
- * release (version, size, SHA-256), the first-run steps, and the terminal installer for servers and Linux. The
- * computer shows a code and the person confirms it on `/conectar`. In the app itself (ADR 0036): "Usar este Mac" in
- * one click instead of the download, unless `download` (connecting another computer from the app).
- */
-export function ConnectComputer({ orgId, download = false }: { orgId: string; download?: boolean }) {
-  const { t, i18n } = useTranslation();
-  const copy = useCopy();
-  const platform = platformOf(navigator.userAgent);
-  const handheld = isHandheld(navigator.userAgent);
-  const target = desktopTargetOf(navigator.userAgent);
-  const latest = useDesktopLatest(target?.target ?? "", target?.arch ?? "", target !== null);
-  const [other, setOther] = useState(false);
-  const otherId = useId();
-  const origin = typeof window === "undefined" ? "" : window.location.origin;
-  const release = latest.data ?? null;
-  // In the app where agents may work on this computer: "Use this Mac" in place of the download.
-  const app = useAgentsHere() && !download;
-  return (
-    <div className="machine-connect">
-      {/* With no build for this computer there is nothing to install: the note below says the app isn't out yet. A
-          phone or a tablet installs it on the computer: the line alone, no system guessed. */}
-      {(app || release || handheld) && (
-        <p className="small muted" style={{ margin: 0 }}>
-          {app ? t("machines.thisMac.text") : t("machines.download.text")}
-        </p>
-      )}
-      {app ? (
-        <div className="row" style={{ gap: 12, alignItems: "center" }}>
-          <ComputerPortrait kind={platform} state="online" />
-          <ThisMacButton orgId={orgId} canPair primary />
-        </div>
-      ) : handheld ? null : latest.isLoading ? (
-        <LoadingLine width={220} />
-      ) : release && target ? (
-        <div className="machine-connect__release">
-          <div className="row" style={{ gap: 12, alignItems: "center" }}>
-            <ComputerPortrait kind={platform} state="online" />
-            <Button asChild variant="primary">
-              <a href={downloadHref(release.url, origin)} download>
-                <Icon name="download" />
-                {t("machines.download.mac", { system: t(`machines.os.${target.target}`) })}
-              </a>
-            </Button>
-            <span className="small muted">
-              {release.size
-                ? t("machines.download.versionSize", {
-                    version: release.version,
-                    size: formatBytes(i18n.language, release.size),
-                  })
-                : t("machines.download.version", { version: release.version })}
-            </span>
-          </div>
-          {release.sha256 && (
-            <div className="machine-connect__sha">
-              <span className="ac-hintline small muted">
-                <span>{t("machines.download.sha")}</span>
-                <InfoHint name={t("common.about", { label: t("machines.download.sha") })}>
-                  {t("machines.download.shaHelp")}
-                </InfoHint>
-              </span>
-              <code className="machine-connect__hash">{release.sha256}</code>
-              <Button
-                size="sm"
-                variant="ghost"
-                iconOnly
-                icon="copy"
-                aria-label={t("machines.download.shaCopy")}
-                onClick={() => void copy(release.sha256, t("machines.download.shaCopied"))}
-              />
-            </div>
-          )}
-        </div>
-      ) : (
-        // The command below is a shell script: Windows' own terminal can't run it.
-        <Alert tone="neutral">
-          {t(platform === "windows" ? "machines.download.unavailable" : "machines.download.unavailableCommand")}
-        </Alert>
-      )}
-      {release && !app && (
-        <div className="stack-4" style={{ gap: 6 }}>
-          <span className="newag__label">{t("machines.download.firstTime")}</span>
-          <ol className="machine-pair__steps small">
-            <li>{t(platform === "mac" ? "machines.download.step1" : "machines.download.step1Install")}</li>
-            <li>{t("machines.download.step2", { device: t(`machines.thisMac.device.${platform}`) })}</li>
-          </ol>
-        </div>
-      )}
-      <div className="machine-connect__other">
-        <button
-          type="button"
-          className="machine-connect__toggle"
-          aria-expanded={other}
-          aria-controls={otherId}
-          onClick={() => setOther((o) => !o)}
-        >
-          <Icon name={other ? "chevronDown" : "chevronRight"} />
-          {t("machines.download.other")}
-        </button>
-        {other && (
-          <div id={otherId} className="stack-4" style={{ gap: 8 }}>
-            <p className="small muted" style={{ margin: 0 }}>
-              {t("machines.download.otherText")}
-            </p>
-            <CommandBlock command={installCommand(origin)} />
-          </div>
-        )}
-      </div>
-    </div>
   );
 }
 
@@ -299,8 +154,8 @@ function MachineRow({
       <span className="ac-mediarow__head">
         <span className="list-title">
           <Link
-            to="/org/$orgId/settings/computers/$machineId"
-            params={{ orgId: org.id, machineId: m.id }}
+            to="/org/$orgId/settings/devices/$deviceId"
+            params={{ orgId: org.id, deviceId: m.id }}
             className="machine-row__name"
             aria-label={t("machines.open", { name: machineTitle(m, t("machines.host.label")) })}
           >
@@ -491,7 +346,7 @@ function RemoveDialog({
  * is installed on. An admin who stopped it here can use it again; with none, admins read how to make it one,
  * but only while sign-up is closed (with open sign-up the server refuses one).
  */
-export function HostComputerCard() {
+export function HostComputerCard({ onlyOff = false }: { onlyOff?: boolean } = {}) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const machines = useMachines(org.id);
@@ -502,7 +357,8 @@ export function HostComputerCard() {
   const m = (machines.data ?? []).find((x) => x.kind === "host");
   const off = host.data?.on === false;
   const missing = host.isSuccess && host.data === null && can(org, "configure") && auth.data?.signupOpen === false;
-  if (!m && !off && !missing) return null;
+  // The Devices list shows it when it's there: this card says only that it was stopped, or how to make one.
+  if ((!m && !off && !missing) || (onlyOff && m)) return null;
   return (
     <Card aria-labelledby="sec-host-computer">
       <h2 id="sec-host-computer" className="ac-visually-hidden">
@@ -527,63 +383,6 @@ export function HostComputerCard() {
       <RenameDialog machine={renaming} onClose={() => setRenaming(null)} />
       <RemoveDialog machine={removing} onClose={() => setRemoving(null)} />
     </Card>
-  );
-}
-
-/**
- * Configurações → Computadores, "Outros computadores": the computers people connected with a code (each opens
- * its page), and how to connect one.
- */
-export function MachinesSection() {
-  const { t } = useTranslation();
-  const { org } = useOrg();
-  const machines = useMachines(org.id);
-  const canPair = can(org, "pair_computers");
-  const [renaming, setRenaming] = useState<Machine | null>(null);
-  const [removing, setRemoving] = useState<Machine | null>(null);
-  const look = useRightHandLook();
-  // This server's computer and the workspace's own have cards of their own: this list is people's.
-  const list = (machines.data ?? []).filter((m) => m.kind !== "managed" && m.kind !== "host");
-  return (
-    <>
-      <Card aria-labelledby="sec-machines">
-        <CardHeader
-          id="sec-machines"
-          icon="computer"
-          title={t("computers.other.title")}
-          hint={{ name: t("common.about", { label: t("computers.other.title") }), text: t("computers.other.text") }}
-          action={<DownloadMacButton />}
-        />
-        {machines.isLoading && <LoadingList count={2} trailing />}
-        {machines.isError && !machines.data && (
-          <ErrorState error={machines.error} onRetry={() => void machines.refetch()} />
-        )}
-        {machines.isSuccess && list.length === 0 && (
-          <EmptyState
-            size="panel"
-            agent={look}
-            title={t(canPair ? "computers.other.emptyTitle" : "computers.other.emptyViewerTitle")}
-          >
-            {t(canPair ? "computers.other.emptyText" : "computers.other.emptyViewer")}
-          </EmptyState>
-        )}
-        {list.length > 0 && (
-          <List className="machine-list" aria-label={t("computers.other.title")}>
-            {list.map((m) => (
-              <MachineRow key={m.id} machine={m} onRename={() => setRenaming(m)} onRemove={() => setRemoving(m)} />
-            ))}
-          </List>
-        )}
-      </Card>
-      {canPair && (
-        <Card aria-labelledby="sec-machines-connect">
-          <CardHeader id="sec-machines-connect" icon="plus" title={t("machines.download.title")} />
-          <ConnectComputer orgId={org.id} />
-        </Card>
-      )}
-      <RenameDialog machine={renaming} onClose={() => setRenaming(null)} />
-      <RemoveDialog machine={removing} onClose={() => setRemoving(null)} />
-    </>
   );
 }
 
@@ -904,6 +703,94 @@ function OpenComputerButton({ agentId, name }: { agentId: string; name: string }
 }
 
 /**
+ * The agents working on a computer: each to its page, what it may use there beyond its own folder, and Open beside it
+ * for whoever may watch its computer. Nothing while none works there.
+ */
+export function MachineAgents({ machine: m }: { machine: Machine }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const managed = m.kind === "managed";
+  if (m.agents.length === 0) return null;
+  return (
+    <div className="stack-4" style={{ gap: 6 }}>
+      <span className="newag__label">{t("machines.page.agents")}</span>
+      <div className="machine-page__agents">
+        {m.agents.map((a) => {
+          // What this agent may use here, beyond its own folder (only who may see the access knows).
+          const folders = m.access?.folders.filter((f) => f.agents.includes(a.id)).map((f) => folderName(f.path));
+          return (
+            <div key={a.id} className="machine-page__agent-row">
+              <Link
+                to="/org/$orgId/agents/$agentId"
+                params={{ orgId: org.id, agentId: a.id }}
+                className="machine-page__agent ac-mediarow"
+              >
+                <span className="ac-mediarow__face">
+                  <AgentAvatar agentId={a.id} size="md" name={a.name} />
+                </span>
+                <span className="ac-mediarow__head machine-page__agent-name">
+                  <b>{a.name}</b>
+                  <span className="ac-mediarow__meta">@{a.handle}</span>
+                </span>
+                <span className="ac-mediarow__end">
+                  <Icon name="chevronRight" />
+                </span>
+                {/* On the workspace's own computer, each agent's own folder is its name's ⓘ. */}
+                {folders && (folders.length > 0 || !managed) && (
+                  <span className="ac-mediarow__body small muted">
+                    {folders.length > 0
+                      ? t("machines.page.agentFolders", {
+                          ...agentGrammar(a.name),
+                          folders: joinNames(folders, t),
+                        })
+                      : t("machines.page.agentOwnFolder", agentGrammar(a.name))}
+                  </span>
+                )}
+              </Link>
+              <OpenComputerButton agentId={a.id} name={a.name} />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** What a connected computer's own page adds under its facts: its egress, and the folder it was connected from. */
+export function MachineFactsExtra({ machine: m }: { machine: Machine }) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <Egress machine={m} />
+      {m.workspace && m.mode !== "system" && (
+        <span className="small muted machine-row__workspace">
+          {t("machines.workspace")} <code>{m.workspace}</code>
+        </span>
+      )}
+    </>
+  );
+}
+
+/**
+ * What a connected computer allows (its folders and which agents use each, its tools, its browser and desktop use)
+ * and how to grant more, with the confirmation before taking anything away. Under its device page's own cards.
+ */
+export function MachineAccessCards({ machine: m }: { machine: Machine }) {
+  const [reduce, setReduce] = useState<Reduce | null>(null);
+  return (
+    <>
+      <FoldersCard machine={m} onReduce={setReduce} />
+      <ToolsCard machine={m} onReduce={setReduce} />
+      <MachineBrowserCard machine={m} onTurnOff={() => setReduce({ kind: "tool", tool: "browser" })} />
+      {profilesApply(m) && <BrowserProfilesCard machine={m} />}
+      <MachineDesktopUseCard machine={m} />
+      <GrantCard machine={m} />
+      <ReduceDialog machine={m} reduce={reduce} onClose={() => setReduce(null)} />
+    </>
+  );
+}
+
+/**
  * One connected computer: its state (online, paused), the folders it allows and which
  * agents use each, its tools. The site only shows and reduces; the admins and
  * whoever connected it reduce, everyone else reads.
@@ -915,14 +802,13 @@ export function MachinePage({ machineId }: { machineId: string }) {
   const machines = useMachines(org.id);
   const [renaming, setRenaming] = useState<Machine | null>(null);
   const [removing, setRemoving] = useState<Machine | null>(null);
-  const [reduce, setReduce] = useState<Reduce | null>(null);
   const setup = useSetupView(org.id);
   const m = machines.data?.find((x) => x.id === machineId);
   const back = (
     <Button asChild size="sm" variant="ghost" className="machine-page__back">
-      <Link to="/org/$orgId/settings/$section" params={{ orgId: org.id, section: "computers" }} search={{}}>
+      <Link to="/org/$orgId/settings/$section" params={{ orgId: org.id, section: "devices" }} search={{}}>
         <Icon name="chevronLeft" />
-        {t("machines.page.back")}
+        {t("devices.back")}
       </Link>
     </Button>
   );
@@ -1001,49 +887,7 @@ export function MachinePage({ machineId }: { machineId: string }) {
             </span>
           )}
         </div>
-        {m.agents.length > 0 && (
-          <div className="stack-4" style={{ gap: 6 }}>
-            <span className="newag__label">{t("machines.page.agents")}</span>
-            <div className="machine-page__agents">
-              {m.agents.map((a) => {
-                // What this agent may use here, beyond its own folder (only who may see the access knows).
-                const folders = m.access?.folders.filter((f) => f.agents.includes(a.id)).map((f) => folderName(f.path));
-                return (
-                  <div key={a.id} className="machine-page__agent-row">
-                    <Link
-                      to="/org/$orgId/agents/$agentId"
-                      params={{ orgId: org.id, agentId: a.id }}
-                      className="machine-page__agent ac-mediarow"
-                    >
-                      <span className="ac-mediarow__face">
-                        <AgentAvatar agentId={a.id} size="md" name={a.name} />
-                      </span>
-                      <span className="ac-mediarow__head machine-page__agent-name">
-                        <b>{a.name}</b>
-                        <span className="ac-mediarow__meta">@{a.handle}</span>
-                      </span>
-                      <span className="ac-mediarow__end">
-                        <Icon name="chevronRight" />
-                      </span>
-                      {/* On the workspace's own computer, each agent's own folder is its name's ⓘ. */}
-                      {folders && (folders.length > 0 || !managed) && (
-                        <span className="ac-mediarow__body small muted">
-                          {folders.length > 0
-                            ? t("machines.page.agentFolders", {
-                                ...agentGrammar(a.name),
-                                folders: joinNames(folders, t),
-                              })
-                            : t("machines.page.agentOwnFolder", agentGrammar(a.name))}
-                        </span>
-                      )}
-                    </Link>
-                    <OpenComputerButton agentId={a.id} name={a.name} />
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        <MachineAgents machine={m} />
       </Card>
       {/* Nobody in the workspace changes what its own computer allows, admins included. */}
       {!m.canManage && !managed && (
@@ -1056,16 +900,8 @@ export function MachinePage({ machineId }: { machineId: string }) {
           <HelpLink slug="workspace-computer">{t("computers.about")}</HelpLink>
         </p>
       ) : (
-        <>
-          <FoldersCard machine={m} onReduce={setReduce} />
-          <ToolsCard machine={m} onReduce={setReduce} />
-          <MachineBrowserCard machine={m} onTurnOff={() => setReduce({ kind: "tool", tool: "browser" })} />
-          {profilesApply(m) && <BrowserProfilesCard machine={m} />}
-          <MachineDesktopUseCard machine={m} />
-          <GrantCard machine={m} />
-        </>
+        <MachineAccessCards machine={m} />
       )}
-      <ReduceDialog machine={m} reduce={reduce} onClose={() => setReduce(null)} />
       <RenameDialog machine={renaming} onClose={() => setRenaming(null)} />
       <RemoveDialog
         machine={removing}
@@ -1073,7 +909,7 @@ export function MachinePage({ machineId }: { machineId: string }) {
         onRemoved={() =>
           void navigate({
             to: "/org/$orgId/settings/$section",
-            params: { orgId: org.id, section: "computers" },
+            params: { orgId: org.id, section: "devices" },
             search: {},
           })
         }

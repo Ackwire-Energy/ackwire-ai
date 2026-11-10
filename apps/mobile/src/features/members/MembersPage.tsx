@@ -16,6 +16,7 @@ import { namesText } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import { removalLines } from "@agenteschat/client/lib/removal";
 import { leaves, removes } from "@agenteschat/client/lib/roles";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -69,7 +70,15 @@ function Members() {
   const removable = (m: Person) => (m.userId === meId ? leaves(viewer, list ?? []) : removes(viewer, m, roles));
 
   return (
-    <Page title={invites ? t("settings.section.members") : t("members.title")}>
+    <Page
+      title={
+        isPersonal(org)
+          ? t("settings.section.membersPersonal")
+          : invites
+            ? t("settings.section.members")
+            : t("members.title")
+      }
+    >
       <View style={styles.gap} />
       {invites ? (
         <>

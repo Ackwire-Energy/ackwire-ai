@@ -96,7 +96,14 @@ describe("a routine's runs", () => {
     // A report it couldn't deliver says why, not "Não rodou"; every code the ledger writes has its words.
     expect(say(run({ status: "skipped", code: "creator_no_access" })).key).toBe("routines.code.creator_no_access");
     expect(say(run({ status: "canceled", code: "creator_left" })).key).toBe("routines.code.creator_left");
-    for (const code of ["empty_reply", "model_refused", "credential_wrong_provider", "model_unlisted", "gave_up"])
+    for (const code of [
+      "empty_reply",
+      "model_refused",
+      "credential_wrong_provider",
+      "model_unlisted",
+      "gave_up",
+      "cli_failed",
+    ])
       expect(say(run({ status: "failed", code })).key).toBe(`routines.code.${code}`);
     // Stopped by a person: their name; an unknown id as is; nobody named: "alguém".
     expect(say(run({ status: "canceled", code: "stopped", codeParams: { by: "u-joao" } }))).toEqual({

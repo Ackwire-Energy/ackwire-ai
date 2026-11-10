@@ -85,7 +85,11 @@ export function MissionSettingsDialog({
       closeLabel={t("common.close")}
       footer={
         <div className="mi-cfg__foot">
-          <span className="mi-cfg__saved" key={savedNow ? "saved" : "idle"} data-saved={savedNow || undefined}>
+          <span
+            className="mi-cfg__saved ac-iconline"
+            key={savedNow ? "saved" : "idle"}
+            data-saved={savedNow || undefined}
+          >
             <Icon name="check" size={14} />
             <span>{savedNow ? t("missions.settings.savedNow") : t("missions.settings.footer")}</span>
           </span>

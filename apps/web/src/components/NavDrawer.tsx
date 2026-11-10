@@ -1,3 +1,4 @@
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { Button } from "@agenteschat/ui";
 import { useRouterState } from "@tanstack/react-router";
 import {
@@ -15,7 +16,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { openPalette } from "./CommandMenu";
 import { useOrg } from "./org-context";
-import { OrgMark } from "./ProfilePhoto";
+import { MyFace, OrgMark } from "./ProfilePhoto";
 
 /**
  * Breakpoints (layout.css keeps the same numbers):
@@ -218,19 +219,20 @@ export function NavScrim() {
 
 /**
  * The top bar on narrow screens: menu, workspace, search. Chat pages hide it
- * (their header carries the menu button instead; see layout.css).
+ * (their header carries the menu button instead; see layout.css). A personal
+ * workspace shows the person, as its sidebar does on top (ADR 0159).
  */
 export function ShellBar() {
   const { t } = useTranslation();
-  const { org } = useOrg();
+  const { org, me } = useOrg();
   const drawer = useNavDrawer();
   if (!drawer?.compact) return null;
   return (
     <header className="shell__bar">
       <NavToggle />
       <span className="shell__bar-org">
-        <OrgMark logo={org.logo} size={22} />
-        <span className="shell__bar-name">{org.name}</span>
+        {isPersonal(org) ? <MyFace size="sm" /> : <OrgMark logo={org.logo} size={22} />}
+        <span className="shell__bar-name">{isPersonal(org) ? me.user.name : org.name}</span>
       </span>
       <Button variant="ghost" iconOnly icon="search" aria-label={t("palette.jump")} onClick={openPalette} />
     </header>

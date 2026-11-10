@@ -61,6 +61,8 @@ export const strings: Partial<PushStrings> = {
   joinRequestTitle: (name, org) => `${name} demande à rejoindre ${org}`,
   joinSuggestionTitle: (by, name, org) => `${by} a proposé ${name} pour ${org}`,
   joinRequestBody: "Touchez pour approuver ou refuser.",
+  deviceJoinRequestTitle: (computer, org) => `${computer} veut rejoindre ${org}`,
+  deviceJoinRequestBody: "Touchez pour accepter ou refuser.",
   waitingTitle: "Quelque chose vous attend",
   openBody: "Touchez pour ouvrir.",
   sentGif: "A envoyé un GIF",
@@ -75,6 +77,23 @@ export const strings: Partial<PushStrings> = {
   usageRaisedTitle: (a) => `${a} a augmenté votre limite ce mois-ci`,
   usageRaisedBody: "Vous pouvez continuer.",
   usageRefusedTitle: (a) => `${a} a refusé votre demande d’utilisation supplémentaire`,
+  deviceInUseTitle: (a, p, d) => (p ? `${a} (pour ${p}) utilise votre ${d}` : `${a} utilise votre ${d}`),
+  deviceInUseBody: "Touchez pour l’arrêter.",
+  deviceAccessTitle: (a, p, d) =>
+    p ? `${a} (pour ${p}) demande à utiliser votre ${d}` : `${a} demande à utiliser votre ${d}`,
+  deviceAccessBody: "Touchez pour autoriser une fois, toujours, ou dire non.",
+  deviceWaitingTitle: (p, d) => `L’agent de ${p} attend votre ${d}`,
+  deviceWaitingBody: "Il commencera à son retour.",
   teamWeekReady: "La semaine de votre équipe est prête",
   teamDayReady: "Votre résumé du jour est prêt",
+  machineConnectedTitlePersonal: "Un nouvel ordinateur a été connecté",
+  computerReadyTitlePersonal: "L’ordinateur de vos agents est prêt",
+  agentUnreachedBodyPersonal:
+    "La personne qui a créé la routine ne peut pas encore parler à cet agent. Touchez pour l’autoriser.",
+  widgetFailedReasonsPersonal: {
+    creator_left: "La personne qui l’a configuré ne fait plus partie de votre espace de travail.",
+  },
+  joinRequestTitlePersonal: (name) => `${name} demande à rejoindre votre espace de travail`,
+  joinSuggestionTitlePersonal: (by, name) => `${by} a proposé d’inviter ${name}`,
+  teamWeekReadyPersonal: "Votre semaine est prête",
 };

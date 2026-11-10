@@ -1,5 +1,6 @@
 import { entryLine, entryState } from "@agenteschat/client/lib/agent-computer";
 import { computerName } from "@agenteschat/client/lib/computer";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/providers/org";
 import { IconButton } from "@/ui";
@@ -34,7 +35,7 @@ export function useComputerSays(agentId: string) {
     ? entryLine(t, entry, {
         edition: f.edition,
         locale: i18n.language,
-        computer: computerName(t, org?.name ?? "", view.machine),
+        computer: computerName(t, org?.name ?? "", view.machine, isPersonal(org)),
         lastSeenAt: null,
         person: (id) => dir.nameOf({ type: "person", id }) || t("channel.unknownPerson"),
         step: null,

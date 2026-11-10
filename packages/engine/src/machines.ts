@@ -148,6 +148,10 @@ export function machineOnline(row: Pick<MachineRow, "online" | "lastSeenAt" | "d
   return now.getTime() - row.lastSeenAt.getTime() <= MACHINE_STALE_MS;
 }
 
+/** The operator put the workspace's own computer in standby (ADR 0161): offline by design until something wants it. */
+export const inStandby = (row: Pick<MachineRow, "kind" | "standbyAt">) =>
+  row.kind === "managed" && row.standbyAt !== null;
+
 /** The pause in force now (a past `until` is over); null when not paused. */
 export function machinePause(
   row: Pick<MachineRow, "paused" | "pausedUntil">,
@@ -276,30 +280,24 @@ export function driveRefusal(
 }
 
 /**
- * The computers a person connected in these workspaces that are theirs alone (`drivesComputer`: not in system mode,
- * where a computer is the team's). Every agent on one runs as their OS user, so it leaves the workspace with them.
+ * The computers a person connected in these workspaces that leave with them: every one, a system-mode server too (it
+ * runs on hardware they control), unless an admin marked it the workspace's (`belongs_to_workspace`).
  */
 export async function personalMachines(db: Executor, userId: string, orgIds: string[]) {
   if (orgIds.length === 0) return [];
-  const rows = await db
-    .select({
-      id: machines.id,
-      orgId: machines.orgId,
-      name: machines.name,
-      kind: machines.kind,
-      executors: machines.executors,
-    })
+  return db
+    .select({ id: machines.id, orgId: machines.orgId, name: machines.name, kind: machines.kind })
     .from(machines)
     .where(
       and(
         inArray(machines.orgId, orgIds),
         eq(machines.pairedByUserId, userId),
         eq(machines.kind, "connected"),
+        eq(machines.belongsToWorkspace, false),
         isNull(machines.deletedAt),
       ),
     )
     .orderBy(machines.createdAt);
-  return rows.filter((m) => m.executors?.mode !== "system").map(({ executors: _, ...m }) => m);
 }
 
 /** The computer of an agent that the person may drive (`drivesComputer`); refused otherwise. */
@@ -426,6 +424,8 @@ async function machineViews(db: Database, actorId: string, orgId: string, only?:
       /** `connected` (a person paired it), `host` (the server's own) or `managed` (the workspace's, never removed here). */
       kind: m.kind,
       online: machineOnline(m, now),
+      /** The workspace's own computer is asleep in standby (ADR 0161): it wakes when wanted, nothing is wrong. */
+      standby: inStandby(m),
       networkTransition: managed ? m.networkTransition : null,
       egress: managed && machineOnline(m, now) && m.egress?.ip ? { ...m.egress, ip: m.egress.ip } : null,
       lastSeenAt: m.lastSeenAt?.toISOString() ?? null,
@@ -698,10 +698,17 @@ export async function detachMachine(tx: Executor, machine: Pick<MachineRow, "id"
       ...(machine.kind === "connected" ? {} : { tokenHash: null }),
       online: false,
       connectedReplica: null,
+      // A managed computer issued again comes back on this row, not asleep (ADR 0161).
+      standbyAt: null,
       previousAgentIds: ids,
       updatedAt: now,
     })
     .where(eq(machines.id, machine.id));
+  // Its phones keep their rows (names, rules) for a host that reports them again.
+  await tx
+    .update(schema.machinePhones)
+    .set({ machineId: null, holder: null, updatedAt: now })
+    .where(and(eq(schema.machinePhones.orgId, machine.orgId), eq(schema.machinePhones.machineId, machine.id)));
   return ids;
 }
 
@@ -749,10 +756,23 @@ export async function computerTarget(db: Database, orgId: string, agentId: strin
   return { kind: "machine", machineId: machine.id, name: machine.name, online: machineOnline(machine) };
 }
 
+let workspaceComputers = false;
+
+/**
+ * With external provisioning (agentes.chat Cloud) the workspace's computer is every agent's home: a computer someone
+ * brought is a target an agent names for a call or a task, never where it lives.
+ */
+export function setWorkspaceComputers(on: boolean) {
+  workspaceComputers = on;
+}
+
+/** Whether a computer may be an agent's home (`setWorkspaceComputers`). */
+export const mayBeHome = (m: Pick<MachineRow, "kind">) => !workspaceComputers || m.kind !== "connected";
+
 /**
  * Points an agent at a connected machine, or at none with null. An admin (`manage_agents`) may; so may the
  * agent's owner when they paired that machine or it is the workspace's own (leaving it with none only needs
- * the owner).
+ * the owner). Never at a brought computer where workspaces have their own (`mayBeHome`).
  */
 export async function setAgentComputerTarget(
   deps: Pick<MachineDeps, "db" | "pubsub">,
@@ -768,6 +788,12 @@ export async function setAgentComputerTarget(
   const admin = can(membership, "manage_agents");
   const machine = machineId ? await getMachine(deps.db, orgId, machineId) : null;
   if (machineId && !machine) throw new NotFoundError("Computer not found", "machine.not_found");
+  if (machine && !mayBeHome(machine)) {
+    throw new ForbiddenError(
+      `${machine.name} can't be an agent's computer here: agents live on the workspace computer and use ${machine.name} when they name it.`,
+      "device.not_home",
+    );
+  }
   if (!admin) {
     if (agent.ownerUserId !== actorId) {
       throw new ForbiddenError("Only an admin or the agent's owner can choose its computer", "machine.forbidden");

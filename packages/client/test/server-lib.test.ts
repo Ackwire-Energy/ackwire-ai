@@ -56,6 +56,10 @@ describe("server addresses", () => {
     expect(normalizeServer("http://localhost:3000/login", loopback)).toBe("http://localhost:3000");
     expect(normalizeServer("http://[::1]:4310", loopback)).toBe("http://[::1]:4310");
     expect(normalizeServer("agentes.tail1234.ts.net", loopback)).toBe("https://agentes.tail1234.ts.net");
+    // Typed without its scheme, as Preferences shows it: plain http on this computer.
+    expect(normalizeServer("127.0.0.1:4310", loopback)).toBe("http://127.0.0.1:4310");
+    expect(normalizeServer("localhost:3000/login", loopback)).toBe("http://localhost:3000");
+    expect(normalizeServer("127.0.0.1:4310")).toBe("https://127.0.0.1:4310");
     for (const other of ["http://192.168.1.20:3000", "http://mac-mini.local:3000", "http://chat.example.com"])
       expect(normalizeServer(other, loopback)).toBeNull();
     expect(isLoopback("http://127.0.0.1:4310")).toBe(true);

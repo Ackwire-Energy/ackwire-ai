@@ -9,9 +9,11 @@ import {
   requesterDecidesLine,
 } from "@agenteschat/client/lib/approval-words";
 import { nextLabel } from "@agenteschat/client/lib/format";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { useOrg } from "@/providers/org";
 import {
   Button,
   GroupedFooter,
@@ -47,6 +49,7 @@ import {
   ApprovalEmailLetter,
   ApprovalUndoChip,
   approvalTitleText,
+  traitKey,
   useCancelAhead,
   useConnectorNamer,
   useOriginShort,
@@ -74,6 +77,7 @@ export function ApprovalSheet({
 }) {
   const { t, i18n } = useTranslation();
   const orgId = useOrgId();
+  const { org } = useOrg();
   const dir = useDirectory();
   const c = useColors();
   const now = useNow();
@@ -161,7 +165,7 @@ export function ApprovalSheet({
     const { undo } = approvalEffects(a);
     const traits = approvalTraits(a)
       .filter((tr) => tr !== undo)
-      .map((tr) => t(`mobile.approval.trait.${tr}`));
+      .map((tr) => t(traitKey(tr, isPersonal(org))));
     const foot = [traits.join(" · "), requester].filter(Boolean).join("\n");
     const who = (
       <View style={styles.who}>

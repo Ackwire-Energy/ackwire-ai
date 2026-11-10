@@ -4,7 +4,7 @@ import { setupDom } from "../testing/dom";
 setupDom();
 
 import { cleanup, render, within } from "@testing-library/react";
-import { Button, Card, CardHeader, DetailsDialog, Dialog, DialogBody, FactStrip } from "../src";
+import { Button, Card, CardHeader, DetailsDialog, Dialog, DialogBody, DialogFooter, FactStrip } from "../src";
 
 afterEach(cleanup);
 
@@ -14,12 +14,18 @@ const body = () => within(document.body);
  * The worst realistic data through the heads that keep words beside their actions: CI's geometry check lays these
  * screens out at 1280, 320 and 390 (the capture preload saves them), so a head that squeezes its title fails there.
  */
-test("an event pill's line is the control's 32: 7 over and under its 18px line", async () => {
+test("an event pill's line is the control's 32: 7 over and under its 18px line, one hairline on its left edge", async () => {
   const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
   const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
   expect(rule(".ac-eventpill__main")).toContain("padding: 7px 12px");
   expect(rule(".ac-eventpill__frame")).toContain("line-height: 18px");
   expect(rule(".ac-eventpill__frame")).toContain("min-height: var(--control-h-sm)");
+  // Actions that went under the sentence start on the frame's edge: their first hairline, 1px out, is cut there.
+  expect(rule(".ac-eventpill__frame")).toContain("overflow: hidden;");
+  expect(rule(".ac-eventpill__actions")).toContain("margin-left: -1px;");
+  expect(rule(".ac-eventpill__action")).toContain("border-left: 1px solid var(--line);");
+  // The frame cuts what passes it: an action's focus ring is drawn inside it.
+  expect(rule("html:not([data-pointer]) .ac-eventpill__action:focus-visible")).toContain("var(--focus-ring-inset)");
 });
 
 describe("worst cases: words and their actions", () => {
@@ -92,6 +98,30 @@ describe("worst cases: words and their actions", () => {
     );
     const head = body().getByRole("dialog").querySelector(".ac-dialog__head") as HTMLElement;
     expect(head.lastElementChild?.className).toBe("ac-dialog__close ac-acts");
+  });
+
+  test("a dialog's footer in German: a long note over three buttons that keep one group, a short note beside two", () => {
+    render(
+      <Dialog open onOpenChange={() => {}} title="MCP-Server verbinden" closeLabel="Schließen">
+        <DialogBody>
+          <p>Adresse</p>
+        </DialogBody>
+        <DialogFooter
+          bar
+          note="Beim Verbinden können alle Agenten ihn nutzen. Das änderst du in Schritt 3, bevor etwas geteilt wird."
+        >
+          <Button>Abbrechen</Button>
+          <Button>Mit API-Schlüssel verbinden</Button>
+          <Button variant="primary">Verbinden</Button>
+        </DialogFooter>
+        <DialogFooter note="Schritt 1 von 3">
+          <Button>Abbrechen</Button>
+          <Button variant="primary">Weiter</Button>
+        </DialogFooter>
+      </Dialog>,
+    );
+    const feet = [...body().getByRole("dialog").querySelectorAll(".ac-dialog__foot")];
+    expect(feet.map((f) => f.querySelectorAll(":scope > .ac-dialog__foot-acts > .ac-btn").length)).toEqual([3, 2]);
   });
 
   test("a card's head: a long title with its key and an action, Japanese beside it", () => {

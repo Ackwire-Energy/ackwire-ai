@@ -57,7 +57,7 @@ describe("web addresses → the app's screens", () => {
     const to = (path: string) => (linkOf(`${W}/org/${O}${path}`) as { to?: string }).to;
     expect(to("")).toBe("/");
     expect(to("/home")).toBe("/");
-    expect(to("/threads")).toBe("/threads");
+    expect(to("/threads")).toBe("/conversations/threads");
     expect(to("/agents/a1")).toBe("/agent/a1");
     expect(to("/agents/a1/memory")).toBe("/memory?agent=a1");
     expect(to("/agents/new")).toBe("/new-agent");
@@ -81,8 +81,15 @@ describe("web addresses → the app's screens", () => {
     expect(to("/settings/members")).toBe("/me/members");
     expect(to("/settings/keys")).toBe("/ai-accounts");
     expect(to("/settings/usage")).toBe("/usage");
-    expect(to("/settings/computers")).toBe("/settings/computers");
-    expect(to("/settings/computers/k1")).toBe("/settings/computers/k1");
+    // Computadores became Dispositivos: its old addresses land there.
+    expect(to("/settings/computers")).toBe("/settings/devices");
+    expect(to("/settings/computers/k1")).toBe("/settings/devices/k1");
+    expect(to("/settings/devices")).toBe("/settings/devices");
+    expect(to("/settings/devices/k1")).toBe("/settings/devices/k1");
+    // The web's QR code opens this phone's guide for the computer it plugs into.
+    expect(to("/settings/devices/android-setup?machine=k1")).toBe("/settings/devices/android-setup?machine=k1");
+    expect(to("/settings/devices/iphone-setup")).toBe("/settings/devices/iphone-setup");
+    expect(to("/settings/devices/iphone-setup?computer=k1")).toBe("/settings/devices/iphone-setup?machine=k1");
     expect(to("/settings/account")).toBe("/me/account");
     expect(to("/settings/approvals")).toBe("/me/approvals");
     expect(to("/settings/right_hand")).toBe("/settings/right-hand");

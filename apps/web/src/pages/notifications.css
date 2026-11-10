@@ -45,12 +45,13 @@
   align-items: center;
   justify-content: space-between;
 }
+/* Out over the page's side room: where the filters scroll, they slide under the work area's edges. */
 .nt-segwrap {
-  max-width: 100%;
+  max-width: calc(100% + 2 * var(--page-x));
   overflow-x: auto;
   scrollbar-width: none;
-  padding: 2px;
-  margin: -2px;
+  padding: 2px var(--page-x);
+  margin: -2px calc(-1 * var(--page-x));
 }
 .nt-segwrap::-webkit-scrollbar {
   display: none;
@@ -234,9 +235,9 @@ html:not([data-pointer]) .nt-item:focus-visible {
   font-size: 13.5px;
   color: var(--muted);
 }
-/* The chips 4 under the headline, the snippet the body's 8 under them. */
+/* A source chip ("Devices", "Routine") never touches the headline above it: 8 under it, like the snippet under them. */
 .nt-item:has(> .ac-mediarow__body > .nt-tags:first-child) {
-  row-gap: var(--space-1);
+  row-gap: var(--space-2);
 }
 /* In the body its parts stand the body's gap apart. */
 .nt-item > .ac-mediarow__body > * {
@@ -268,14 +269,11 @@ html:not([data-pointer]) .nt-item:focus-visible {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+/* The kit's chips as they are: 22 high, their words 12. */
 .nt-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-}
-.nt-tags .ac-chip {
-  height: 22px;
-  font-size: 11.5px;
 }
 .nt-chip-ink {
   color: var(--ink2);
@@ -475,6 +473,10 @@ html:not([data-pointer]) .nt-more:focus-visible {
   margin-top: 7px;
   font-size: 12.5px;
   color: var(--muted);
+}
+/* A device notice's decisions on that line: the kit's line of actions keeps its own column gap, plated pairs 8 apart. */
+.nt-steprow.ac-acts {
+  column-gap: calc(2 * var(--ghost-plate));
 }
 
 /* ── Inline actions: on hover / focus (a floating bar), a row on phones ──── */

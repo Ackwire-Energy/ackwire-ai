@@ -35,10 +35,12 @@ import {
 } from "@agenteschat/client/lib/approval-words";
 import { nextLabel } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
+import { useOrg } from "@/providers/org";
 import {
   ACT_LINE,
   Button,
@@ -562,6 +564,7 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
   const c = useColors();
   const asks = useAskStore();
   const origin = useOriginShort(a);
+  const { org } = useOrg();
   const ownerId = a.ownerUserId ?? dir.agentById.get(a.agentId)?.ownerUserId ?? null;
   const owner = approvalWaitsFor(a, ownerId ? dir.memberById.get(ownerId)?.name : undefined);
   const requester = requesterDecidesLine(t, a);
@@ -582,8 +585,9 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
     <AskCard
       id={a.id}
       kind="approval"
-      // A request that leaves the workspace (an e-mail, a post, a payment) says so before anything else.
-      kindNote={high ? t("mobile.approval.leaves") : undefined}
+      // A request that leaves the workspace (an e-mail, a post, a payment) says so before anything else; a personal
+      // workspace's is no company's (ADR 0159).
+      kindNote={high ? t(modeKey(org, "mobile.approval.leaves")) : undefined}
       agentId={a.agentId}
       waitsFor={a.canDecide ? "you" : owner ? t("ask.waitingFor", { name: owner }) : null}
       lead={approvalWhy(a) ?? approvalAskLine(t, a.canDecide)}

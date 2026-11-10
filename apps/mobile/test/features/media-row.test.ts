@@ -70,7 +70,8 @@ describe("MediaRow", () => {
 
   test("release 13's rows, a lead beside three lines or more on the web, are media rows on the phone too", () => {
     const uses: [string, number][] = [
-      ["features/settings/ComputersScreen.tsx", 3],
+      // The computers' own rows are the devices list's now, a tree under each computer's portrait.
+      ["features/settings/ComputersScreen.tsx", 1],
       ["features/settings/MachineScreen.tsx", 6],
       ["features/chats/ArchivedChannelsScreen.tsx", 1],
       ["features/routines/RoutineScreen.tsx", 1],

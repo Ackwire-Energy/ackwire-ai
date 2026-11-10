@@ -5,7 +5,7 @@ import { isExecutable } from "./executors";
 /**
  * System mode under systemd: an agent's Chrome and its AI CLIs run in slices
  * of their own inside the agent's (`agents-<uid>-browser.slice`,
- * `agents-<uid>-cli.slice`), so the Cloud's guard can tell their traffic
+ * `agents-<uid>-cli.slice`), so an operator's network guard can tell their traffic
  * apart by the cgroup of each socket. Root moves the process (`scope.enter`),
  * and it must be there before its first byte: `/bin/sh` waits on a descriptor
  * of its own, past the caller's, then becomes the program (`exec`), with the

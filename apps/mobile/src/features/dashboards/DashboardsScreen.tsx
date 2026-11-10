@@ -1,10 +1,16 @@
 import { type DashboardSummary, dashboardGroups, useDashboards } from "@agenteschat/client";
+import { mayAsk } from "@agenteschat/client/lib/audience";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { rightHandOf } from "@agenteschat/client/lib/right-hand";
 import { useTranslation } from "react-i18next";
 import { RefreshControl, StyleSheet, View } from "react-native";
-import { Button, GroupedFooter, GroupedHeader, GroupedList, IconButton, SkeletonList, Text } from "@/ui";
+import { useOrg } from "@/providers/org";
+import { Button, EmptyState, GroupedHeader, GroupedList, IconButton, SkeletonList, Text } from "@/ui";
 import { router } from "@/ui/navigation";
 import { boardHref } from "../links/logic";
-import { useOrgId, usePullRefresh } from "../shared/hooks";
+import { useOpenDm } from "../new/useOpenDm";
+import { useEmptyLook } from "../shared/FirstUse";
+import { useDirectory, useOrgId, usePullRefresh } from "../shared/hooks";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { HOME } from "./logic";
 import { BoardRow, useBoardByline } from "./parts";
@@ -16,7 +22,8 @@ export const openNewBoard = () => router.push("/board-new");
  * Dashboards, pushed from "See all" over the home's widgets (ADR 0135; the tab bar stays as it is): My Home on top (the
  * person's own widgets), then the boards of the whole workspace, of the person's roles and only theirs, each with a
  * thumbnail of its widgets (the one on Início says "On Home"). A row pushes the board; "+" in the bar makes a new one.
- * With only My Home, a line under it says where the others will be (no empty state: My Home is a board).
+ * With only My Home, the right hand under it says what a dashboard is, with Novo painel and an ask to it, as the
+ * web's: the bar's "+" steps aside, one way in.
  */
 export function DashboardsScreen() {
   const { t } = useTranslation();
@@ -28,6 +35,11 @@ export function DashboardsScreen() {
   // The board on Início ("Use on Home", ADR 0135 §18) says so first on its line.
   const onHome = list.data?.homeDashboardId ?? null;
   const any = groups.workspace.length + groups.roles.length + groups.mine.length > 0;
+  const first = list.data !== undefined && !any;
+  const look = useEmptyLook();
+  const lodi = rightHandOf(useDirectory().agents);
+  const { org } = useOrg();
+  const openDm = useOpenDm();
   const row = (board: DashboardSummary) => (
     <BoardRow
       key={board.id}
@@ -48,7 +60,7 @@ export function DashboardsScreen() {
   return (
     <PushedLargeTitle
       title={t("dashboards.title")}
-      right={<IconButton icon="plus" label={t("dashboards.new")} onPress={openNewBoard} />}
+      right={first ? undefined : <IconButton icon="plus" label={t("dashboards.new")} onPress={openNewBoard} />}
       grouped
       refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
     >
@@ -83,8 +95,26 @@ export function DashboardsScreen() {
             {group(t("dashboards.groups.roles"), groups.roles)}
             {group(t("dashboards.groups.mine"), groups.mine)}
           </>
-        ) : list.data ? (
-          <GroupedFooter>{t("mobile.dashboards.onlyHome")}</GroupedFooter>
+        ) : first ? (
+          <EmptyState
+            size="page"
+            agent={look}
+            title={t("dashboards.first.title")}
+            subtitle={t("dashboards.first.text")}
+            action={
+              <View style={styles.firstActs}>
+                <Button variant="primary" size="md" label={t("dashboards.new")} onPress={openNewBoard} />
+                {lodi && mayAsk(org, lodi) ? (
+                  <Button
+                    variant="secondary"
+                    size="md"
+                    label={t("common.askAgent", agentGrammar(lodi.name))}
+                    onPress={() => openDm({ agentId: lodi.id }, { compose: true, text: t("dashboards.first.ask") })}
+                  />
+                ) : null}
+              </View>
+            }
+          />
         ) : null}
       </View>
     </PushedLargeTitle>
@@ -95,4 +125,6 @@ const styles = StyleSheet.create({
   in: { paddingHorizontal: 16, paddingTop: 4 },
   center: { alignItems: "center", gap: 12, paddingVertical: 48, paddingHorizontal: 24 },
   centerText: { textAlign: "center" },
+  // Two buttons that wrap to a second line before they leave the screen.
+  firstActs: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 8, flexShrink: 1 },
 });

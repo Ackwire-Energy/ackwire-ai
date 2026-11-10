@@ -1,9 +1,10 @@
 import { useAuthConfig, useIssues, useMe, useOverview } from "@agenteschat/client";
 import { showsAbout } from "@agenteschat/client/lib/about";
+import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
 import { isAppLocale, localeInfo, readyLocales } from "@agenteschat/i18n/locale";
 import Constants from "expo-constants";
 import { useHeaderHeight } from "expo-router/react-navigation";
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, StyleSheet, View } from "react-native";
 import Animated, { Easing, FadeIn, FadeInUp } from "react-native-reanimated";
@@ -30,17 +31,36 @@ import { router } from "@/ui/navigation";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
-import { OrgAvatar } from "../shared/OrgAvatar";
 import { pickOne } from "../shared/PickerSheet";
 import { goBack, MentionCount, PushedHeader } from "../shared/parts";
 import { usePersonPhoto } from "../shared/photo";
-import { useTasksUnreadMarks } from "../shared/queries";
+import { useTasksUnreadMarks, useUnreadThreads } from "../shared/queries";
 import { useMyPerson, usePresenceOf } from "../status/hooks";
 import { personLine } from "../status/logic";
 import { openStatus } from "../status/StatusScreen";
 import { openIssuesWithMe, workspacesBeyond } from "./logic";
 import { useLanguageChoice, usePushSwitch, useSoundLabel, useStartLabel } from "./PreferencePages";
-import { useWorkspacesAcross } from "./WorkspacesPages";
+import { useWorkspacesAcross, WorkspaceMark } from "./WorkspacesPages";
+
+/** The rows of Você's Work group. */
+type WorkRow = "issues" | "proposals" | "routines" | "wiki" | "drive" | "dashboards" | "memory" | "threads" | "team";
+/** A team's workspace: Threads is a tab and Team a row of Agents. */
+const TEAM_WORK: WorkRow[] = ["issues", "proposals", "routines", "wiki", "drive", "dashboards", "memory"];
+/**
+ * A personal workspace (ADR 0159): what its sidebar keeps in sight first, then the rest of its More; Threads (no tab
+ * there) and Team (no row in Agents) live here, Team last.
+ */
+const PERSONAL_WORK: WorkRow[] = [
+  "routines",
+  "drive",
+  "issues",
+  "threads",
+  "proposals",
+  "wiki",
+  "dashboards",
+  "memory",
+  "team",
+];
 
 /** Opens a screen over this page with the platform's push (back comes here). */
 const open = (href: string) => router.push(href as never);
@@ -67,13 +87,16 @@ let horizonArrived = false;
  * Rotinas, Wiki, Drive, Painéis, Memória): what belongs to the workspace lives in Configurações, once. The
  * preferences; Sons and Aparência change in their row through the system's choice on iOS (a screen on Android, whose
  * dialog holds three buttons at most). Sair alone in red; the version is in Sobre. A settings page is opened many
- * times a day, so nothing here animates beyond the rows' press highlight and the platform's push.
+ * times a day, so nothing here animates beyond the rows' press highlight and the platform's push. A personal workspace
+ * (ADR 0159) is yours: no workspace name after your @, your face as its mark, and its work led by what its sidebar
+ * keeps in sight (Routines, Drive), with Threads (no tab there) and Team (no row in Agents) in it.
  */
 export function MeScreen() {
   const { t, i18n } = useTranslation();
   const me = useMe();
   const meId = useMeId();
   const org = useOrg();
+  const personal = isPersonal(org.org);
   const { groups, elsewhere } = useWorkspacesAcross();
   const theme = useTheme();
   const dir = useDirectory();
@@ -98,10 +121,14 @@ export function MeScreen() {
   const withMe = openIssuesWithMe(issues.data, meId);
   // Mentions of me not read in a task's conversation: the red badge before the value, as on Conversas.
   const tasksUnread = useTasksUnreadMarks();
+  // Threads with something new, the badge their tab has in a team's workspace.
+  const unreadThreads = useUnreadThreads();
   const version = Constants.expoConfig?.version ?? "";
   const myAgents = dir.agents.filter((a) => a.ownerUserId === meId);
-  const headline = [mine?.handle ? `@${mine.handle}` : null, org.org?.name].filter(Boolean).join(" · ");
-  const role = org.org ? t(`mobile.me.role.${org.org.role}`) : "";
+  const handle = mine?.handle ? `@${mine.handle}` : null;
+  // A personal workspace's name ("Personal") says nothing after your @.
+  const headline = [handle, personal ? null : org.org?.name].filter(Boolean).join(" · ");
+  const role = org.org ? t(modeKey(org.org, `mobile.me.role.${org.org.role}`)) : "";
   const beyond = workspacesBeyond(groups, org.orgId);
   const workspaceSub =
     beyond.others === 0
@@ -111,6 +138,59 @@ export function MeScreen() {
         : beyond.servers === 1
           ? t("mobile.me.workspaceMoreElsewhere", { count: beyond.others })
           : t("mobile.me.workspaceMoreServers", { count: beyond.others });
+  // Your work's rows, in the order of the workspace's mode (`TEAM_WORK`, `PERSONAL_WORK`).
+  const work: Record<WorkRow, ReactNode> = {
+    issues: (
+      <GroupedRow
+        key="issues"
+        icon="checkc"
+        label={t("mobile.me.issues")}
+        {...(withMe > 0 ? { value: t("mobile.me.issuesWithMe", { count: withMe }) } : {})}
+        {...(tasksUnread.mentions > 0 ? { valueLeading: <MentionCount count={tasksUnread.mentions} /> } : {})}
+        chevron
+        onPress={() => open("/issues")}
+      />
+    ),
+    proposals: (
+      <GroupedRow
+        key="proposals"
+        icon="flag"
+        label={t("shell.proposals")}
+        {...(proposals > 0 ? { value: t("mobile.me.proposalsWaiting", { count: proposals }) } : {})}
+        chevron
+        onPress={() => open("/proposals")}
+      />
+    ),
+    routines: (
+      <GroupedRow key="routines" icon="clock" label={t("routines.title")} chevron onPress={() => open("/routines")} />
+    ),
+    wiki: <GroupedRow key="wiki" icon="file" label={t("wiki.title")} chevron onPress={() => open("/wiki")} />,
+    drive: <GroupedRow key="drive" icon="doc" label={t("mobile.me.drive")} chevron onPress={() => open("/drive")} />,
+    dashboards: (
+      <GroupedRow
+        key="dashboards"
+        icon="chart"
+        label={t("mobile.me.dashboards")}
+        chevron
+        onPress={() => open("/dashboards")}
+      />
+    ),
+    memory: (
+      <GroupedRow key="memory" icon="brain" label={t("mobile.memory.title")} chevron onPress={() => open("/memory")} />
+    ),
+    // The tab's list, pushed: a tab left out of the bar can't be opened.
+    threads: (
+      <GroupedRow
+        key="threads"
+        icon="reply"
+        label={t("mobile.threads.title")}
+        {...(unreadThreads > 0 ? { value: String(unreadThreads) } : {})}
+        chevron
+        onPress={() => open("/conversations/threads")}
+      />
+    ),
+    team: <GroupedRow key="team" icon="members" label={t("team.title")} chevron onPress={() => open("/team")} />,
+  };
   const soundValue = sounds === "off" ? t("mobile.me.soundsOff") : styleLabel(sounds);
   const themeValue = t(`mobile.theme.${theme.preference}`);
 
@@ -210,7 +290,7 @@ export function MeScreen() {
             {org.org ? (
               <GroupedRow
                 key="workspace"
-                leading={<OrgAvatar logo={org.org.logo} size={36} />}
+                leading={<WorkspaceMark org={org.org} size={36} />}
                 label={org.org.name}
                 sub={workspaceSub}
                 // What's unread in the other workspaces (ADR 0154).
@@ -249,48 +329,7 @@ export function MeScreen() {
           ) : null}
 
           <GroupedHeader>{t("mobile.me.work")}</GroupedHeader>
-          <GroupedList>
-            <GroupedRow
-              key="issues"
-              icon="checkc"
-              label={t("mobile.me.issues")}
-              {...(withMe > 0 ? { value: t("mobile.me.issuesWithMe", { count: withMe }) } : {})}
-              {...(tasksUnread.mentions > 0 ? { valueLeading: <MentionCount count={tasksUnread.mentions} /> } : {})}
-              chevron
-              onPress={() => open("/issues")}
-            />
-            <GroupedRow
-              key="proposals"
-              icon="flag"
-              label={t("shell.proposals")}
-              {...(proposals > 0 ? { value: t("mobile.me.proposalsWaiting", { count: proposals }) } : {})}
-              chevron
-              onPress={() => open("/proposals")}
-            />
-            <GroupedRow
-              key="routines"
-              icon="clock"
-              label={t("routines.title")}
-              chevron
-              onPress={() => open("/routines")}
-            />
-            <GroupedRow key="wiki" icon="file" label={t("wiki.title")} chevron onPress={() => open("/wiki")} />
-            <GroupedRow key="drive" icon="doc" label={t("mobile.me.drive")} chevron onPress={() => open("/drive")} />
-            <GroupedRow
-              key="dashboards"
-              icon="chart"
-              label={t("mobile.me.dashboards")}
-              chevron
-              onPress={() => open("/dashboards")}
-            />
-            <GroupedRow
-              key="memory"
-              icon="brain"
-              label={t("mobile.memory.title")}
-              chevron
-              onPress={() => open("/memory")}
-            />
-          </GroupedList>
+          <GroupedList>{(personal ? PERSONAL_WORK : TEAM_WORK).map((key) => work[key])}</GroupedList>
 
           <GroupedHeader>{t("mobile.me.preferences")}</GroupedHeader>
           <GroupedList>
@@ -302,14 +341,17 @@ export function MeScreen() {
               chevron
               onPress={() => open("/me/notifications")}
             />
-            {/* Who approves for me, and whom I approve for (ADR 0139). */}
-            <GroupedRow
-              key="approvals"
-              icon="shield"
-              label={t("settings.section.approvals")}
-              chevron
-              onPress={() => open("/me/approvals")}
-            />
+            {/* Who approves for me, and whom I approve for (ADR 0139); a personal workspace lists it in Settings ›
+                Advanced instead (ADR 0159 §3). */}
+            {personal ? null : (
+              <GroupedRow
+                key="approvals"
+                icon="shield"
+                label={t("settings.section.approvals")}
+                chevron
+                onPress={() => open("/me/approvals")}
+              />
+            )}
             {/* A server from before the choice sends none and can't keep one (`PUT …/me/start` answers 404). */}
             {org.org?.start !== undefined ? (
               <GroupedRow

@@ -1744,6 +1744,8 @@ export async function openTasksBrief(
   agentId: string,
   channelId: string,
   updates: boolean,
+  /** A personal workspace (ADR 0159): the person, not a team, sees the work. */
+  personal = false,
 ) {
   const visible = await agentSearchChannels(db, orgId, agentId, channelId);
   const rows = await db
@@ -1782,7 +1784,7 @@ export async function openTasksBrief(
     }),
     ...(updates
       ? [
-          "When what you're doing belongs to one of them, keep that task updated as you go: a short progress comment (`comment_issue`) and each criterion as you meet it (`update_issue`); its status moves on its own. That also ties your run to it, so the team sees you working on it.",
+          `When what you're doing belongs to one of them, keep that task updated as you go: a short progress comment (\`comment_issue\`) and each criterion as you meet it (\`update_issue\`); its status moves on its own. That also ties your run to it, so ${personal ? "the person" : "the team"} sees you working on it.`,
         ]
       : []),
   ].join("\n");

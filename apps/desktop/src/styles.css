@@ -1156,6 +1156,107 @@ body[data-window="popover"] {
 .dk-fr__steps .dk-fr__problem {
   margin: 0;
 }
+/* The iPhone setup (IphoneSetup.tsx): the steps, and beside them the QR, the tip and the way out. */
+.dk-ip {
+  flex: 1;
+  margin-top: var(--space-6);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 200px;
+  gap: var(--space-8);
+}
+.dk-ip__main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.dk-ip__main > .dk-bar {
+  margin-top: var(--space-6);
+}
+.dk-ip__ready {
+  margin-top: var(--space-4);
+  gap: var(--space-2);
+  color: var(--ink2);
+}
+.dk-ip__ready .ac-icon {
+  color: var(--ok);
+}
+.dk-ip .dk-fr__stepline {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+.dk-ip__download {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-variant-numeric: tabular-nums;
+}
+.dk-ip__side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.dk-ip__qr svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius-sm);
+}
+.dk-ip__qr p {
+  margin-top: var(--space-3);
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--ink2);
+  text-wrap: balance;
+}
+.dk-ip__tip {
+  padding-inline: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--ink2);
+}
+.dk-ip__tip b {
+  font-weight: 600;
+}
+.dk-ip__acts {
+  margin-top: auto;
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+/* Preferences' "Specific people or roles": the search, then people and roles to tick. */
+.dk-pick {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.dk-pick .dk-ctitle {
+  margin-top: var(--space-2);
+}
+.dk-pick__list {
+  max-height: 240px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.dk-pick__row {
+  gap: var(--space-2);
+  min-height: var(--control-h-sm);
+  padding-inline: var(--space-2);
+  border-radius: var(--radius-sm);
+}
+.dk-pick__row > label {
+  flex: 1;
+  gap: var(--space-2);
+  cursor: pointer;
+}
+.dk-pick__row:hover {
+  background: var(--plate);
+}
+
 /* A progress bar (setting it up, an update's download), placed by its context. */
 .dk-bar {
   height: 6px;
@@ -1260,6 +1361,13 @@ body[data-window="popover"] {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+/* A server that doesn't answer: its last workspaces dimmed, its state in the waiting color (ADR 0158). */
+.dk-ws-list[data-dim] {
+  opacity: 0.5;
+}
+.dk-state-waiting {
+  color: var(--warn);
 }
 .dk-ws-logo {
   width: 16px;

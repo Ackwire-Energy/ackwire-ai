@@ -122,7 +122,8 @@
     "quitTitle": "agentes.chatを終了しますか？",
     "quitBody": "アプリを閉じている間、エージェントはこの{{device}}を使えません。すでに実行中のものは完了し、次にアプリを開いたときに結果を送ります。",
     "quitHereBody": "この{{device}}でagentes.chatが停止します。再びアプリを開くまで、ここでも、あなたやチームメイトのスマートフォンからも、誰も使えません。",
-    "quitConfirm": "終了"
+    "quitConfirm": "終了",
+    "pauseHintServer": "実行中のものは通常どおり終わります。サーバーは動き続けます。"
   },
   "first": {
     "title": "チームとエージェントが、ひとつに",
@@ -134,7 +135,9 @@
     "addTitle": "ワークスペースを追加",
     "addLead": "今あるワークスペースはそれぞれのログインのまま残ります。",
     "addCloud": "agentes.chatでワークスペースを作成",
-    "addOwn": "チームのサーバーを使う"
+    "addOwn": "チームのサーバーを使う",
+    "addNew": "新しいワークスペースが必要ですか？",
+    "addNewLink": "作成する"
   },
   "own": {
     "title": "自分のサーバー",
@@ -161,14 +164,22 @@
     "none": "まだありませんか？ そのマシンでこれを実行してください",
     "noneText": "サーバーかMac miniのターミナルで実行します。最後に、このアプリと接続するリンクが表示されます。",
     "invalid": "アドレスを確認してください（例: agentes.yourteam.ts.net）。",
-    "httpRefused": "{{host}}は暗号化されていないhttpを使っているため、この{{device}}でしか動きません。Tailscaleのアドレスかhttpsのアドレスを使ってください。",
-    "noOwner": "{{host}}にはまだオーナーのアカウントがありません。オーナー用リンク（/owner#claim=…で終わるもの）を、この{{device}}かスマートフォンで開いてください。",
-    "unreachable": "{{host}}に接続できません。Tailscale上のサーバーなら、この{{device}}でTailscaleを開いて接続し、もう一度お試しください。",
+    "httpRefused": "{{host}}は安全な接続（https）を使っていません。httpsなしで使えるのはこの{{device}}上のサーバーだけです。httpsのアドレスかTailscaleのアドレスを使ってください。",
+    "noOwner": "{{host}}にはまだオーナーがいません。サーバーをインストールした人に、オーナーのアカウントを作るリンクが届いています。そのリンクをこの{{device}}かスマートフォンで開いてください。",
+    "unreachable": "{{host}}に接続できません。アドレスとサーバーが起動しているかを確認して、もう一度お試しください。",
     "unreachableHere": "この{{device}}の{{host}}から応答がありません。ここでagentes.chatを起動してから、もう一度お試しください。",
     "certificate": "{{host}}の証明書が無効です。サーバーの管理者に相談してください。",
     "notAgentes": "{{host}}はagentes.chatのサーバーではありません。アドレスを確認してください。",
     "serverTooOld": "このアプリで使うには、{{host}}の更新が必要です。",
-    "appTooOld": "{{host}}を使うには、アプリを更新してください。"
+    "appTooOld": "{{host}}を使うには、アプリを更新してください。",
+    "foundNoOwner": "オーナーのアカウント待ち",
+    "setUp": "設定する",
+    "noneFound": "サーバーが見つかりませんでした。",
+    "lookAgain": "もう一度探す",
+    "tailnetOff": "この{{device}}のTailscaleがオフのため、Tailscaleネットワーク上のサーバーはここに表示されません。",
+    "addressHint": "httpsのアドレス、または.ts.netで終わるTailscaleのアドレスです。",
+    "checkUpdates": "アップデートを確認",
+    "unreachableTailnet": "Tailscaleネットワーク上の{{host}}に接続できません。この{{device}}でTailscaleを開いて接続し、もう一度お試しください。"
   },
   "here": {
     "title": "この{{device}}でagentes.chatを動かす",
@@ -224,7 +235,9 @@
       "serve": "この{{device}}のTailscaleでは共有できません",
       "operator": "先にTailscaleへの許可が必要です",
       "stopped": "HTTPSが有効になるのを待つのをやめました",
-      "start": "新しいアドレスでagentes.chatが応答しませんでした"
+      "start": "新しいアドレスでagentes.chatが応答しませんでした",
+      "notConnected": "この{{device}}でTailscaleが接続されていません",
+      "back": "デバイスからのアクセスをオフにした後、この{{device}}のagentes.chatが再び応答しませんでした。"
     },
     "serveFix": "tailscale.comからTailscaleをインストールしてください。",
     "operatorRun": "ターミナルで一度だけ許可してください:",
@@ -234,13 +247,15 @@
     "notifyFailed": "この{{device}}でのagentes.chatの設定が完了しませんでした",
     "notifyFailedBody": "agentes.chatを開いて、何が起きたか確認してください。",
     "already": "この{{device}}にはすでにagentes.chatがインストールされています",
-    "alreadyText": "ターミナルからインストールされ、{{url}}で単独で動いています。",
+    "alreadyText": "ターミナルからインストールされ、単独で動いています。このアプリで使えます。",
     "useIt": "これを使う",
     "notRunning": "この{{device}}にagentes.chatはインストールされていますが、動いていません",
-    "notRunningText": "ターミナルから{{path}}にインストールされています。そこで起動してから、もう一度お試しください。",
+    "notRunningText": "ターミナルから{{path}}にインストールされています。起動するには、ターミナルでこれを実行してから、もう一度お試しください。",
     "running": "この{{device}}ではすでにagentes.chatが動いています",
-    "runningText": "このアプリが{{url}}で動かしています。",
-    "openIt": "開く"
+    "runningText": "このアプリが動かしています。開いてサインインしてください。",
+    "openIt": "開く",
+    "connectTray": "時計の近くにあるアイコンから接続してください。",
+    "alreadyDocker": "Dockerでインストールされ、単独で動いています。このアプリで使えます。"
   },
   "link": {
     "question": "アプリをこのサーバーに接続しますか？",
@@ -252,7 +267,9 @@
     "checking": "サーバーを確認中…",
     "notALink": "このリンクはagentes.chatのサーバーのものではありません。",
     "chipTailnet": "Tailscale",
-    "chipHere": "この{{device}}"
+    "chipHere": "この{{device}}",
+    "thisServer": "この{{device}}のagentes.chat",
+    "tailnetHelp": "Tailscaleネットワーク上にあります。同じアカウントでTailscaleに接続しているデバイスでしか開けません。"
   },
   "servers": {
     "title": "サーバー",
@@ -277,7 +294,12 @@
     "workspaces_other": "{{count}}個のワークスペース",
     "signedOut": "ログインしていません",
     "newsOne": "新しい通知が1件",
-    "newsMany": "新しい通知が{{n}}件"
+    "newsMany": "新しい通知が{{n}}件",
+    "offline": "{{time}} からオフライン",
+    "signIn": "サインイン",
+    "signOut": "このサーバーからサインアウト",
+    "signedOutDone": "{{host}} からサインアウトしました",
+    "removeFromApp": "このアプリから削除"
   },
   "server": {
     "title": "この{{device}}のagentes.chat",
@@ -316,7 +338,30 @@
     "failingBanner": "この{{device}}でagentes.chatが起動しません",
     "version": "バージョン{{version}}、アプリと一緒に更新されます",
     "updatesWithApp": "アプリを更新すると、この{{device}}のagentes.chatも更新されます。",
-    "updateBack": "更新が始まりませんでした。agentes.chatは{{version}}に戻りました。"
+    "updateBack": "更新が始まりませんでした。agentes.chatは{{version}}に戻りました。",
+    "restarting": "再起動中",
+    "tailnetDown": "実行中 · この{{device}}でTailscaleが接続されていません",
+    "failingBody": "アプリを開いて、何が起きたかを確認し、もう一度お試しください。",
+    "restartedBanner": "この{{device}}のagentes.chatが3回再起動しました",
+    "restartedBody": "自動で復帰します。続く場合は、アプリを開いて原因を確認してください。",
+    "updateBackBody": "新しいバージョンは、次回のアプリのアップデートで再度試されます。",
+    "stopFor1h": "1時間停止",
+    "startNow": "今すぐ開始",
+    "stopUntilStart": "自分で開始するまで停止",
+    "stopForget": "アプリと一緒に開始しない…",
+    "stopNote": "停止すると、スマートフォンを含め全員がアクセスできなくなります。",
+    "stopTitle": "この{{device}}の agentes.chat を停止しますか？",
+    "stopBody": "戻るまで、スマートフォンとチームはアクセスできません。",
+    "stoppedUntil": "停止中 · {{time}} に再開",
+    "stoppedHeld": "開始するまで停止中",
+    "reachRestart": "オン・オフを切り替えると agentes.chat が少しの間再起動します。",
+    "reachOffTitle": "デバイスからのアクセスをオフにしますか？",
+    "reachOffBody": "スマートフォンとチームはアクセスできなくなります。使い続けられるのはこの{{device}}だけです。",
+    "reachOffConfirm": "オフにする",
+    "failingWhy": "詳細に理由が書かれています。手伝ってくれる人のためにコピーするか、ログを確認してください。",
+    "showLogs": "ログを表示",
+    "help": "ヘルプ",
+    "gotIt": "わかりました"
   },
   "pair": {
     "title": "{{org}}のエージェントがこの{{device}}で作業するのを許可しますか？",
@@ -396,6 +441,34 @@
       "menuBarTitle": "メニューバーに表示",
       "notchTitle": "ノッチにエージェントを表示",
       "notchDesc": "ノッチのあるMacBookで、作業中のエージェントをカメラの周りに表示します。"
+    },
+    "thisMac": {
+      "agents": "エージェント",
+      "letAgents": "エージェントにこの{{device}}を使わせる",
+      "letAgentsDesc": "アプリが開いている間、エージェントは必要なときにこの{{device}}を使います。",
+      "commandsDesc": "テストやビルドなどのターミナルコマンド。{{user}}として実行され、それぞれアクティビティに表示されます。",
+      "who": "使える人",
+      "whoDesc": "「自分だけ」は、あなたとあなたのために働くエージェントのことです。",
+      "whoIn": "{{org}}で使える人",
+      "owner": "自分だけ",
+      "everyone": "{{org}}の全員",
+      "people": "特定の人またはロール",
+      "edit": "編集",
+      "pickTitle": "この{{device}}を使える人",
+      "search": "人を検索",
+      "noMatch": "該当する人はいません",
+      "ownerAlways": "所有者として、あなたはいつでも使えます。",
+      "save": "保存",
+      "saved": "保存しました",
+      "phones": "この{{device}}の電話",
+      "phonesIn": "{{org}}でのこの{{device}}の電話",
+      "plug": "電話をこの{{device}}につなぐと追加されます。",
+      "androidSteps": "Androidの手順",
+      "iphoneSteps": "iPhoneの手順",
+      "wider": "ほかの人のエージェントはここで{{user}}として実行され、あなたのファイルを読めます。",
+      "phoneWho": "{{who}}が使えます",
+      "signedOut": "この{{device}}を使える人を見るには、アプリで{{server}}にサインインしてください。",
+      "unreachable": "{{server}}に接続できませんでした。接続を確認して、もう一度お試しください。"
     },
     "folders": {
       "title": "フォルダ",
@@ -560,6 +633,32 @@
       "folderDesc": "ワークスペースごとにひとつのフォルダがあり、その中にエージェントごとのフォルダがあります。"
     }
   },
+  "iphone": {
+    "lead": "設定はこの{{device}}が行います。iPhoneをタップするのは、手順に求められたときだけです。",
+    "account": "XcodeのAppleアカウント",
+    "checking": "この{{device}}を確認しています…",
+    "xcodeText": "App StoreからXcodeをインストールしてください。入ると、この手順は自動で進みます。",
+    "xcodeOld": "このiPhoneには新しいXcodeが必要です。App Storeでアップデートしてください。",
+    "updateXcode": "Xcodeをアップデート",
+    "toolsStarting": "ダウンロードを開始しています…",
+    "toolsProgress": "{{done}} / {{total}}",
+    "toolsPercent": "{{percent}}% ダウンロード済み",
+    "toolsFailed": "ダウンロードが止まりました: {{message}}",
+    "accountText": "Xcode › Settings › Accountsで追加してください。無料のAppleアカウントで十分です。",
+    "openXcode": "Xcodeを開く",
+    "personalTeam": "{{name}} · 個人チーム",
+    "unlockText": "iPhoneのロックを解除し、しばらくそのままにしてください。",
+    "oldText": "このiPhoneのiOSは古すぎて、Xcodeのツールが使えません。",
+    "devModeHint": "Macが一度iPhoneとペアリングしたあとにだけ、設定に表示されます。この{{device}}はペアリング済みです。",
+    "helperText": "この{{device}}が作成し、7日ごとに更新します。初回はiPhoneで信頼してください。",
+    "helperHint": "設定 › 一般 › VPNとデバイス管理で自分のAppleアカウントをタップし、「信頼」をタップします。更新にはXcodeへのサインインが必要です。",
+    "helperBuilding": "テストヘルパーを作成しています…",
+    "qr": "iPhoneでスキャンすると、この手順をそこで見られます。",
+    "qrLabel": "この手順をiPhoneで開くQRコード",
+    "tip": "いつでも使えるようにしておく",
+    "tipHint": "つないだままにするテスト用iPhoneの場合: 自動ロックは「なし」、自動アップデートはオフ、パスコードなし、この{{device}}は電源に接続。",
+    "progress": "iPhoneの設定"
+  },
   "cover": {
     "offline": "インターネットに接続されていません · 再試行しています…",
     "unreachable": "{{host}}に接続できません · 再試行しています…",
@@ -579,7 +678,14 @@
     "openTailscale": "Tailscaleを開く",
     "otherServer": "別のサーバーを使う",
     "stuck": "agentes.chatを開けませんでした。もう一度試すか、今の状態のページを表示してください。",
-    "showAnyway": "このまま表示"
+    "showAnyway": "このまま表示",
+    "copyFailed": "コピーできませんでした",
+    "held": "この{{device}}のagentes.chatは、開始するまで停止しています。",
+    "heldUntil": "この{{device}}のagentes.chatは停止中です。{{time}}に自動で再開します。",
+    "startNow": "今すぐ開始",
+    "openOther": "{{server}}を開く",
+    "onlyHereWorking": "デバイスからのアクセスをオフにしています…",
+    "onlyHereFailed": "デバイスからのアクセスをオフにできませんでした。"
   },
   "menu": {
     "about": "agentes.chatについて",
@@ -628,5 +734,9 @@
     "bringAllToFront": "すべてを手前に移動",
     "help": "ヘルプ",
     "downloaded": "ダウンロード完了"
+  },
+  "windowTitle": {
+    "welcome": "ようこそ",
+    "prefs": "環境設定"
   }
 }

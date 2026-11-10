@@ -117,6 +117,8 @@ describe("Avatar", () => {
   test("initials", () => {
     expect(initialsOf("Ada")).toBe("A");
     expect(initialsOf("Marina Souza Lima")).toBe("ML");
+    expect(initialsOf("佐藤 花子")).toBe("佐");
+    expect(initialsOf("김 민수")).toBe("김");
     expect(initialsOf("  ")).toBe("?");
     // An emoji before the name gives way to the words; an emoji alone stays whole, never half a character.
     expect(initialsOf("🌴 Ana Souza")).toBe("AS");
@@ -148,6 +150,15 @@ describe("Chip", () => {
     const chip = container.querySelector(".ac-chip");
     expect(chip?.querySelector("svg")).toBeNull();
     expect(chip?.textContent).toBe("Issue: ACME-177");
+  });
+
+  test("22 high with 12px words; an icon's side pads 6, its ink 2 into its box, so the ink reads 8 on both sides", async () => {
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+    expect(rule(".ac-chip")).toContain("height: 22px;");
+    expect(rule(".ac-chip")).toContain("padding: 0 var(--space-2);");
+    expect(rule(".ac-chip")).toContain("font-size: 12px;");
+    expect(rule(".ac-chip:has(> .ac-icon:first-child)")).toContain("padding-inline-start: 6px;");
   });
 });
 
@@ -605,7 +616,11 @@ describe("Message", () => {
     const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
     const rule = (selector: string) => css.split(`${selector} {`)[1]?.split("}")[0] ?? "";
     expect(rule(".ac-msg")).toContain("align-items: flex-start");
-    expect(rule(".ac-msg__avatar,\n.ac-msg__gutter")).toContain("flex: 0 0 36px");
+    // One face size beside a name, in a message as in the sidebar's rows and a MediaRow: `--name-face`, 32.
+    expect(css).toContain("--name-face: 32px;");
+    expect(rule(".ac-msg__avatar,\n.ac-msg__gutter")).toContain("flex: 0 0 var(--name-face)");
+    expect(rule(".ac-msg__avatar .ac-avatar:not(.ac-avatar--xs)")).toContain("width: var(--name-face)");
+    expect(rule(".ac-mediarow")).toContain("--mediarow-face: var(--name-face);");
     expect(rule(".ac-msg__avatar")).toContain("align-self: flex-start");
   });
 });
@@ -805,7 +820,68 @@ describe("Diff", () => {
     ]);
   });
 
-  test("renders neutral lines with screen-reader labels", async () => {
+  test("blocks as a reader takes them in: runs joined, a long unchanged run cut to the line beside each change", async () => {
+    const { diffBlocks, diffLines } = await import("../src");
+    const before = [
+      "# Atendimento",
+      "Responde em português.",
+      "Um",
+      "Dois",
+      "Três",
+      "Quatro",
+      "- Nunca promete prazo.",
+    ];
+    const after = [
+      "# Atendimento",
+      "Responde no idioma do cliente.",
+      "Um",
+      "Dois",
+      "Três",
+      "Quatro",
+      "- Nunca promete prazo.",
+    ];
+    expect(diffBlocks(diffLines(before, after))).toEqual([
+      { kind: "same", text: "# Atendimento" },
+      { kind: "del", text: "Responde em português." },
+      { kind: "add", text: "Responde no idioma do cliente." },
+      { kind: "same", text: "Um" },
+      { kind: "fold", count: 4 },
+    ]);
+    // Three unchanged lines or fewer stay whole; with no change at all, the text stays whole.
+    expect(diffBlocks(diffLines(["a", "b", "c", "d"], ["a", "b", "c", "e"]))).toEqual([
+      { kind: "same", text: "a\nb\nc" },
+      { kind: "del", text: "d" },
+      { kind: "add", text: "e" },
+    ]);
+    expect(diffBlocks(diffLines(["a", "b", "c", "d", "e"], ["a", "b", "c", "d", "e"]))).toEqual([
+      { kind: "same", text: "a\nb\nc\nd\ne" },
+    ]);
+  });
+
+  test("prose: each block drawn by the caller, no mark column, a fold says how many lines it hides", async () => {
+    const { Diff, diffLines } = await import("../src");
+    const { container } = render(
+      <Diff
+        aria-label="Mudança"
+        addedLabel="Adicionado: "
+        removedLabel="Removido: "
+        lines={diffLines(["a", "b", "c", "d", "velho"], ["a", "b", "c", "d", "novo"])}
+        prose={{ render: (text) => <p className="md">{text}</p>, folded: (n) => `${n} linhas iguais` }}
+      />,
+    );
+    expect(container.querySelector(".ac-diff__mark")).toBeNull();
+    expect([...container.querySelectorAll(".ac-diff--prose > *")].map((b) => [b.className, b.textContent])).toEqual([
+      ["ac-diff__fold", "3 linhas iguais"],
+      ["ac-diff__block", "d"],
+      ["ac-diff__block ac-diff__block--del", "Removido: velho"],
+      ["ac-diff__block ac-diff__block--add", "Adicionado: novo"],
+    ]);
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    expect(css).toContain("box-shadow: inset 3px 0 0 var(--ok);");
+    expect(css).toContain("box-shadow: inset 3px 0 0 var(--danger);");
+  });
+
+  test("renders lines with screen-reader labels", async () => {
     const { Diff } = await import("../src");
     const { container } = render(
       <Diff

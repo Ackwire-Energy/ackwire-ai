@@ -5,19 +5,24 @@
  */
 
 /*
- * A list or a nav beside what it opens (Aprovações, Propostas, Settings): `.page-split` holds the columns. Where they
- * sit side by side, the page fills the work area and never scrolls: the split takes the height under the page's
- * header and each of its columns scrolls on its own, so the header, a column's head and a footer floating at its
- * bottom stay put. Every element between the work area and the split hands the height down. Narrower (these pages
+ * A list or a nav beside what it opens (Aprovações, Propostas, Settings), or the task board: `.page-split` holds the
+ * columns, and ends its page. Where they sit side by side, the page fills the work area: the split takes the height
+ * under what sits above it and each of its columns scrolls on its own, so the header, a column's head and a footer
+ * floating at its bottom stay put. Every element between the work area and the split hands the height down. When what
+ * sits above leaves the split under half the work area (Tarefas' agents at work), its columns keep the work area's
+ * height, 8px short, and run past the split: the page scrolls down to them, and there they fill the window again, the
+ * board's scrollbar along its bottom and what sat above them, shadows included, out of sight. Narrower (these pages
  * stack their columns at 940px), the page scrolls as any other. So it does in a window under 560px tall (a small or
- * zoomed-in one): there the page's header would leave the columns too little room, or none, and what they hold out of
- * reach. `.shell__main` in each selector: it outranks the pages' own rules for these boxes.
+ * zoomed-in one). `.shell__main` in each selector: it outranks the pages' own rules for these boxes.
  */
 @media (min-width: 941px) and (min-height: 560px) {
   .shell__main:has(.page-split) {
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    overflow: hidden auto;
+    /* The work area's height as `cqh`. An unnamed @container query in these pages with no container of its own now
+       measures the work area. */
+    container-type: size;
   }
   .shell__main > :is(:has(.page-split), .page-split) {
     flex: 1 1 auto;
@@ -37,15 +42,22 @@
   .shell__main :has(.page-split) > :is(:has(.page-split), .page-split) {
     flex: 1 1 auto;
   }
+  /* The columns reach the work area's foot; a list under the split (Aprovações' missions) keeps the page's room
+     there, or its edge is cut by the sheet's. */
+  .shell__main .page-split ~ :last-child:not(:empty) {
+    margin-bottom: var(--space-8);
+  }
   .shell__main .page-split {
     min-height: 0;
     align-items: stretch;
     grid-template-rows: minmax(0, 1fr);
   }
+  /* A step: 0 (the split's height) while the split keeps half the work area; under that, the area's height less 8px.
+     Up and down a column's scroll hands over to the page's, which scrolls only then. */
   .shell__main .page-split > * {
-    min-height: 0;
+    min-height: min(100cqh - var(--space-2), (50cqh - 100%) * 10000);
     overflow-y: auto;
-    overscroll-behavior: contain;
+    overscroll-behavior-x: contain;
   }
   /* A column is as tall as the split, not as its content: what it holds scrolls in it instead of squeezing to fit. */
   .shell__main .page-split > * > * {

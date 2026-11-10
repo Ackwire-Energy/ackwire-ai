@@ -1,6 +1,7 @@
-import type { LiveRun } from "@agenteschat/client";
+import type { LiveRun, Message } from "@agenteschat/client";
 import { waitsForWords } from "@agenteschat/client/lib/activity";
 import { holdsText } from "@agenteschat/client/lib/text";
+import { blockPlaces } from "@agenteschat/client/lib/timeline";
 import { type ToolItem, toolItemsLive } from "@agenteschat/client/lib/work";
 
 /**
@@ -65,6 +66,41 @@ export function turnOpener(items: readonly ToolItem[], posted = ""): { said: str
  */
 export function turnOrder<R extends Pick<LiveRun, "status" | "text" | "work">>(runs: readonly R[]): R[] {
   return [...runs.filter((r) => !waitsForWords(r)), ...runs.filter((r) => waitsForWords(r))];
+}
+
+/** A conversation row as `turnsInPlace` reads it: its moment, and how it groups with the row above. */
+interface PlacedRow {
+  kind: string;
+  iso?: string;
+  message?: Pick<Message, "createdAt" | "local">;
+  grouped?: boolean;
+  continued?: boolean;
+  above?: unknown;
+}
+
+/**
+ * The rows with each block at work where its words first showed (`blockPlaces`), so what people sent meanwhile reads
+ * below it, as its message will once posted there; `last`: the other blocks, for the end (`turnOrder`). A block between
+ * two rows of one author ends their run: the row under it shows its name again.
+ */
+export function turnsInPlace<R extends PlacedRow, T>(
+  rows: readonly R[],
+  runs: readonly LiveRun[],
+  rowOf: (run: LiveRun) => T,
+): { rows: (R | T)[]; last: T[] } {
+  const { before, after } = blockPlaces(rows, turnOrder(runs), (r) => r.shownAt);
+  const out: (R | T)[] = [];
+  for (const [i, row] of rows.entries()) {
+    const turns = before.get(i);
+    if (turns) {
+      // The row above is the last one in (blocks go before their row).
+      const above = out.at(-1) as R | undefined;
+      if (above?.continued) out[out.length - 1] = { ...above, continued: false };
+      out.push(...turns.map(rowOf));
+    }
+    out.push(turns && row.grouped ? ({ ...row, grouped: false, above: undefined } as R) : row);
+  }
+  return { rows: out, last: after.map(rowOf) };
 }
 
 const TURN_STATUSES: ReadonlySet<string> = new Set(["thinking", "queued", "running", "canceled"]);

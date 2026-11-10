@@ -33,6 +33,7 @@ import { appAccountsText, githubDisconnectNote } from "@agenteschat/client/lib/g
 import { choiceOf, newestAccount } from "@agenteschat/client/lib/mail";
 import { can } from "@agenteschat/client/lib/permissions";
 import { connectorBrand } from "@agenteschat/client/lib/scopes";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import {
   AvatarStack,
   Button,
@@ -77,7 +78,6 @@ import {
   mailChoices,
 } from "@/components/MailConnect";
 import { useOrg } from "@/components/org-context";
-import { ToolChanges } from "@/components/ToolChanges";
 import { useAgentsAccess } from "@/hooks/useAgentsAccess";
 import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { takesConnectorReturn } from "@/lib/desktop";
@@ -249,13 +249,12 @@ export function ConnectorsSection({
         {composio.data && nearComposioLimit(composio.data) && (
           <p className="small muted">{composioUsageText(t, i18n.language, composio.data)}</p>
         )}
-        {admin && <ToolChanges orgId={org.id} />}
         {(connections.isLoading || servers.isLoading) && <LoadingList count={2} trailing />}
         {noneYet && (
           <EmptyState
             size="panel"
             agent={look}
-            title={t(admin ? "connectors.noneTitle" : "access.noConnectorsViewerTitle")}
+            title={t(admin ? modeKey(org, "connectors.noneTitle") : "access.noConnectorsViewerTitle")}
             actions={
               admin && (
                 <Button variant="primary" icon="plus" onClick={() => setAdding(true)}>

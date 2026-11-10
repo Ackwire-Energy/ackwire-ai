@@ -41,6 +41,7 @@ import {
   orgOverview,
   pickerEndpoint,
   pickerModels,
+  publishWorkspaceMode,
   queueInvitationEmail,
   requirePermission,
   resendInvitation,
@@ -77,6 +78,7 @@ import {
   updateMyProfile,
   updateOrgSettings,
   usageReport,
+  WORKSPACE_MODES,
 } from "@agenteschat/engine";
 import { contextWindowOf, nanoUsdToUsd, PROVIDERS, pricesAt, usdToNanoUsd } from "@agenteschat/providers";
 import { createRoute, z } from "@hono/zod-openapi";
@@ -186,6 +188,10 @@ const Settings = z
     }),
     voiceMessages: z.boolean().openapi({
       description: "People can send voice messages (ADR 0100); they also need `voiceAvailable`. On by default.",
+    }),
+    mode: z.enum(WORKSPACE_MODES).openapi({
+      description:
+        "Who the workspace is for (ADR 0159): `team` (the default) or `personal`. It changes the apps' defaults and words, never what anyone may do; a change is audited (`organization.mode_changed`) and reaches every member's apps (`org.mode`).",
     }),
     voiceAvailable: z.boolean().openapi({
       description: "Read only: this server has a speech engine now, from its environment or from its owner's Settings.",
@@ -568,6 +574,7 @@ export function managementRoutes(deps: AppDeps) {
             gifRating: z.enum(GIF_RATINGS).optional(),
             agentStickers: z.boolean().optional(),
             agentMedia: z.enum(AGENT_MEDIA_LEVELS).optional(),
+            mode: z.enum(WORKSPACE_MODES).optional().openapi({ description: "`team` or `personal` (ADR 0159)." }),
           }),
         ),
       },
@@ -583,6 +590,8 @@ export function managementRoutes(deps: AppDeps) {
           ? { defaultAgentBudgetNanoUsd: usdToNanoUsd(defaultAgentBudgetUsd) }
           : {}),
       });
+      // Every member's apps reshape at once (ADR 0159): the mode is in `GET /me`, which they read again.
+      if (input.mode !== undefined) await publishWorkspaceMode(adapters.pubsub, orgId, settings.mode);
       const seesCost = await canViewCost(db, actor, orgId);
       // Only who configures the workspace gets here (`updateOrgSettings`).
       return c.json({ ...settingsFor(settings, seesCost, true), ...(await mediaAvailable()) }, 200);

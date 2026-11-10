@@ -1,6 +1,6 @@
 {
   "identifier": "prefs",
-  "description": "Preferences: general, the servers this app opens (the server here's reach, usage statistics, backups, start and stop), updates, and (while agents work here) this computer's folders, tools, activity and limits.",
+  "description": "Preferences: general, the servers this app opens (the server here's reach, usage statistics, backups, start and stop), updates, and (while agents work here) this computer's folders, tools, activity and limits, and its devices on its server with the main window's session (`site_fetch`: only those paths).",
   "windows": ["prefs"],
   "permissions": [
     "core:default",
@@ -12,8 +12,10 @@
     "allow-pick-folder",
     "allow-servers-get",
     "allow-workspaces-get",
+    "allow-site-fetch",
     "allow-server-choose",
     "allow-server-remove",
+    "allow-server-sign-out",
     "allow-tray-visible",
     "allow-notify-site-set",
     "allow-show-window",

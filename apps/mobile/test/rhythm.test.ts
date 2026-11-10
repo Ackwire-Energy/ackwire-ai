@@ -61,6 +61,13 @@ test("an icon button in a row or a heading is the toolbar's 32, its target still
   expect(button).toContain("hitSlop={small ? (TOUCH - TOOL_H) / 2 : 4}");
 });
 
+test("a strip that scrolls sideways under a screen's title runs edge to edge, its first item on the title's line", () => {
+  expect(source("Filters.tsx")).toContain("paddingHorizontal: SCREEN_X");
+  const tasks = readFileSync(join(SRC, "features/issues/IssuesScreen.tsx"), "utf8");
+  expect(tasks).toContain("paddingLeft: SCREEN_X");
+  expect(tasks).toContain("width - PEEK - SCREEN_X");
+});
+
 test("no screen keeps a 20-point side of its own: screens read SCREEN_X and cards CARD_PAD", () => {
   // A button's own padding isn't a screen's side.
   const NOT_A_SIDE = new Set(["ui/Button.tsx"]);

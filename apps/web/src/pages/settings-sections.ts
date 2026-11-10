@@ -1,6 +1,8 @@
 import type { AuthConfig, OrgSummary } from "@agenteschat/client";
-import { showsAbout } from "@agenteschat/client/lib/about";
+import { selfHosted, showsAbout } from "@agenteschat/client/lib/about";
 import { can } from "@agenteschat/client/lib/permissions";
+import { personalSettingsHost } from "@agenteschat/client/lib/personal-view";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import type { IconName } from "@agenteschat/ui";
 
 // Apart from the settings page so the shell (⌘K, the sidebar) and the settings routes' guards can read
@@ -22,7 +24,7 @@ export type SettingsSection =
   | "skills"
   | "keys"
   | "storage"
-  | "computers"
+  | "devices"
   | "usage"
   | "billing"
   | "import"
@@ -63,13 +65,14 @@ export const SETTINGS_SECTIONS: {
   { id: "audit", icon: "shield", group: "org", allowed: (o) => can(o, "view_audit") },
   // GIFs and stickers in chat (ADR 0091): who configures the workspace.
   { id: "media", icon: "sticker", group: "org", allowed: (o) => can(o, "configure") },
-  // Voice messages (ADR 0100): who configures the workspace.
-  { id: "voice", icon: "mic", group: "org", allowed: (o) => can(o, "configure") },
+  // Voice messages (ADR 0100): who configures the workspace, on a self-hosted server only. agentes.chat Cloud runs its
+  // own speech engine, so the section has nothing to offer there (product decision).
+  { id: "voice", icon: "mic", group: "org", allowed: (o, server) => selfHosted(server) && can(o, "configure") },
   { id: "access", icon: "agent", group: "agents", allowed: (o) => can(o, "manage_agents") },
   { id: "connectors", icon: "plug", group: "agents", allowed: () => true },
   { id: "skills", icon: "bulb", group: "agents", allowed: (o) => can(o, "manage_agents") },
-  // Every member sees the computers and can pair one (ADR 0025).
-  { id: "computers", icon: "computer", group: "agents", allowed: (o) => can(o, "read") },
+  // Every member sees the devices and can connect one (ADR 0025): computers and the phones they reach.
+  { id: "devices", icon: "computer", group: "agents", allowed: (o) => can(o, "read") },
   // Everyone (ADR 0063): their plans' meters and the agents whose details they see, in tokens and percentages;
   // money and the workspace's report only for who has `view_usage`.
   { id: "usage", icon: "wallet", group: "costs", allowed: () => true },
@@ -89,6 +92,19 @@ export const SETTINGS_SECTIONS: {
 export const SETTINGS_GROUPS: SettingsGroup[] = ["you", "org", "agents", "costs"];
 
 export const isSettingsSection = (v: unknown): v is SettingsSection => SETTINGS_SECTIONS.some((s) => s.id === v);
+
+/**
+ * The nav entry that stands for the open section: in a personal workspace (ADR 0159 §3) connectors and skills open on
+ * AI and apps' entry, billing on Plan and usage's, when the person may open those; else the section itself.
+ */
+export function settingsNavEntry(
+  org: Pick<OrgSummary, "mode">,
+  current: SettingsSection,
+  open: readonly SettingsSection[],
+): SettingsSection {
+  const host = isPersonal(org) ? personalSettingsHost(current, new Set(open)) : null;
+  return host !== null && isSettingsSection(host) ? host : current;
+}
 
 /**
  * `?connected=github` (back from OAuth), `?review=1` (a custom MCP server to

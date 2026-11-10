@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import type { Credential, Model } from "../api/types";
+import type { AiStatus, Credential, Model } from "../api/types";
 
 interface ProviderEntry {
   id: string;
@@ -212,6 +212,20 @@ export function apiProviderOf(model: string | null | undefined, models: readonly
   const usable = new Set(models.filter((m) => m.available).map((m) => m.provider));
   return usable.size === 1 ? [...usable][0] : undefined;
 }
+
+/** The maker of the key an agent on Automático thinks with, as the AI status says (none while it can't think). */
+export const autoMakerOf = (
+  status: { agents: readonly Pick<AiStatus["agents"][number], "agentId" | "provider">[] } | undefined,
+  agentId: string,
+) => status?.agents.find((a) => a.agentId === agentId)?.provider;
+
+/**
+ * What an agent on an API key thinks with, by name: its model ("Sonnet 5.5"), or on Automático the maker of the key it
+ * runs on (`autoMakerOf`: "Claude"), the way the right hand's panel names its key. "Automático" only while no key is
+ * known. `label`: the model's label in the catalog.
+ */
+export const apiModelName = (t: TFunction, model: string, label: string | undefined, maker: string | undefined) =>
+  isAuto(model) ? (maker ? providerLabel(maker) : t("brain.auto.label")) : (label ?? model);
 
 /** Automático's sizes and the server's own tier rule (`modelForTier`): a tier's default reads as the one that runs. */
 export { MODEL_TIERS, nearestTier } from "@agenteschat/providers/catalog";

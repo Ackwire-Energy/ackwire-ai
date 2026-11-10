@@ -36,20 +36,36 @@ export interface HealthDeps {
   draining?: () => boolean;
 }
 
+async function healthOf(deps: HealthDeps) {
+  const database = await deps
+    .pingDatabase()
+    .then(() => "ok" as const)
+    .catch(() => "unreachable" as const);
+  const draining = deps.draining?.() === true;
+  return {
+    status: draining ? ("draining" as const) : database === "ok" ? ("ok" as const) : ("degraded" as const),
+    version: deps.version,
+    edition: deps.edition,
+    database,
+    modules: deps.modules,
+  };
+}
+
 export function registerHealth(app: OpenAPIHono, deps: HealthDeps) {
   app.openapi(route, async (c) => {
-    const database = await deps
-      .pingDatabase()
-      .then(() => "ok" as const)
-      .catch(() => "unreachable" as const);
-    const draining = deps.draining?.() === true;
-    const body = {
-      status: draining ? ("draining" as const) : database === "ok" ? ("ok" as const) : ("degraded" as const),
-      version: deps.version,
-      edition: deps.edition,
-      database,
-      modules: deps.modules,
-    };
-    return database === "ok" && !draining ? c.json(body, 200) : c.json(body, 503);
+    const body = await healthOf(deps);
+    return body.status === "ok" ? c.json(body, 200) : c.json(body, 503);
   });
+}
+
+/**
+ * All the HTTP a worker process answers (`SERVER_ROLE=worker`): `/api/health` as the app does, for its container's
+ * health check, and a 404 for anything else.
+ */
+export function workerHealth(deps: HealthDeps) {
+  return async (req: Request) => {
+    if (new URL(req.url).pathname !== "/api/health") return new Response("Not found\n", { status: 404 });
+    const body = await healthOf(deps);
+    return Response.json(body, { status: body.status === "ok" ? 200 : 503 });
+  };
 }

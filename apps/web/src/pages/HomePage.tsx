@@ -28,6 +28,7 @@ import { allItems, waitingCardOf, widgetNoticeOf } from "@agenteschat/client/lib
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { dayPart } from "@agenteschat/client/lib/welcome";
 import { WORKING_POLL_MS, type WorkItem, workByAgent, workingNow } from "@agenteschat/client/lib/working";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import { Composer, EmptyState, GroupHeading, Icon, PageHeader, Select } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { type ReactNode, type RefObject, useRef, useState } from "react";
@@ -93,14 +94,14 @@ export function HomePage() {
 
   // The right hand's first-run checklist (ADR 0155 §6), while a row is left: one line back to it, never a second list.
   const lodi = dir.agents.find(isRightHand);
-  const firstRun = useFirstRun(lodi, null);
+  const firstRun = useFirstRun(lodi);
   const showSteps = firstRun.ready && firstRun.state === "open";
   const loaded = waitingList.isSuccess && inbox.isSuccess && missionList.isSuccess && !runs.isLoading;
   const calm = loaded && !showSteps && waitingCount === 0 && working.length === 0 && done.length === 0;
 
   const summary =
     waitingCount === 0 && working.length === 0
-      ? t(showSteps ? "home.summary.new" : "home.summary.calm")
+      ? t(showSteps ? modeKey(org, "home.summary.new") : "home.summary.calm")
       : [
           waitingCount > 0 ? t("home.summary.waiting", { count: waitingCount }) : "",
           working.length > 0 ? t("sky.working", { count: working.length }) : "",

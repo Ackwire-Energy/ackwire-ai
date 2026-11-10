@@ -204,6 +204,8 @@ pub(crate) mod native {
             let _: () = msg_send![w, setCollectionBehavior: behavior];
             let _: () = msg_send![w, setHasShadow: false];
         }
+        // Out of the Dock's list of windows and the Window menu, as the popover.
+        crate::keep_out_of_window_list(ns_window);
     }
 
     /// Top-centered on the notch, shown without taking focus from the app in front.

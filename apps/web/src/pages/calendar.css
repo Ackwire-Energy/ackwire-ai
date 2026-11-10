@@ -1059,7 +1059,10 @@ html:not([data-pointer]) .cal-mini__day:focus-visible {
     margin-top: -4px;
     padding-top: 4px;
   }
+  /* Not a scroller here, so no room of its own for rings at its sides: it starts on the page's line, as the grid does,
+     and the filters' strip runs out over the page's room to the screen's edges. */
   .cal-page[data-panel] .cal-side {
     overflow: visible;
+    padding-inline: 0;
   }
 }

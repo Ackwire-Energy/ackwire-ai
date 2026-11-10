@@ -42,3 +42,34 @@ export function diffLines(before: string[], after: string[]): DiffLine[] {
   }
   return out;
 }
+
+/** A run of one kind of line, joined, or a run of unchanged lines folded away (`count` of them). */
+export type DiffBlock = { kind: DiffKind; text: string } | { kind: "fold"; count: number };
+
+/**
+ * A text diff the way a reader takes it in, as GitHub shows a rendered change: each run of lines of one kind joined
+ * into one block, and a run of more than `fold` unchanged lines cut to the `context` lines beside each change, the
+ * rest counted. A diff with no change keeps its text whole.
+ */
+export function diffBlocks(lines: DiffLine[], context = 1, fold = 3): DiffBlock[] {
+  const runs: { kind: DiffKind; lines: string[] }[] = [];
+  for (const l of lines) {
+    const last = runs.at(-1);
+    if (last?.kind === l.kind) last.lines.push(l.text);
+    else runs.push({ kind: l.kind, lines: [l.text] });
+  }
+  if (runs.every((r) => r.kind === "same")) return runs.map((r) => ({ kind: r.kind, text: r.lines.join("\n") }));
+  const out: DiffBlock[] = [];
+  runs.forEach((r, i) => {
+    if (r.kind !== "same" || r.lines.length <= fold) {
+      out.push({ kind: r.kind, text: r.lines.join("\n") });
+      return;
+    }
+    const head = i > 0 ? r.lines.slice(0, context) : [];
+    const tail = i < runs.length - 1 ? r.lines.slice(-context) : [];
+    if (head.length) out.push({ kind: "same", text: head.join("\n") });
+    out.push({ kind: "fold", count: r.lines.length - head.length - tail.length });
+    if (tail.length) out.push({ kind: "same", text: tail.join("\n") });
+  });
+  return out;
+}

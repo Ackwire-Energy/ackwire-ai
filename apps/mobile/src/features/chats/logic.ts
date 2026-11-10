@@ -389,6 +389,18 @@ export function homeLayout(
   ].filter((b) => b.total > 0);
 }
 
+/** #general with nothing new in it: no unread message and no mention of me. */
+export const isQuietGeneral = (r: ConversationRow) =>
+  r.kind === "channel" && r.name === "general" && r.unread === 0 && r.mentions === 0;
+
+/**
+ * The rows without a quiet #general when `hide` (pure): a personal workspace while its person is the only member
+ * leaves it out of the home and of its channels' "See all", as the web's sidebar does (ADR 0159). Every workspace has
+ * one; with family in it, or something new there, it shows.
+ */
+export const withoutQuietGeneral = (rows: ConversationRow[], hide: boolean) =>
+  hide ? rows.filter((r) => !isQuietGeneral(r)) : rows;
+
 /**
  * The agents to start a conversation with, as rows of the home's Agentes section while there is no agent DM yet:
  * each a DM with no channel (`channelId: ""`), opened on press. Agents hidden from me are left out.

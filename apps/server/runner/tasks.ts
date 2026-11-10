@@ -271,6 +271,8 @@ export interface TaskManagerOptions {
   wrapperCommand?: string[];
   /** A task ended (once per task, after `task.done` was queued): the desktop app's jobs and activity log. */
   onSettled?: (task: SettledTask) => void;
+  /** The server's host, for `commitChanges`' fallback author. */
+  commitHost?: () => string | undefined;
   /** Tests: shorter intervals. */
   watchMs?: number;
   eventEveryMs?: number;
@@ -1722,6 +1724,7 @@ export class TaskManager {
           env: secrets?.env ?? {},
           handle: t.agentHandle,
           startSha: t.startSha as string,
+          host: this.opts.commitHost?.(),
         });
       } catch (err) {
         commit = { startSha: t.startSha as string, endSha: t.startSha as string, error: String(err) };
@@ -1881,12 +1884,13 @@ export function commitsBehind(cwd: string, check: { branch?: unknown; sha?: unkn
  * there (`commitPathspecs`). Nothing when the tree is clean. Hooks run (never
  * `--no-verify`); when the commit fails the changes stay and `error` says why.
  * The author is whoever the checkout has (`git.sync` sets the agent), else
- * the agent by its handle.
+ * the agent by its handle at `agents.<host>`, the server's host as the engine's
+ * `agentCommitEmail` has it (`invalid`, a reserved name, when it isn't known).
  */
 export async function commitChanges(
   cwd: string,
   message: string,
-  opts: { env: Record<string, string>; handle: string; startSha: string },
+  opts: { env: Record<string, string>; handle: string; startSha: string; host?: string | undefined },
 ): Promise<{ startSha: string; endSha: string; error?: string }> {
   const { env } = opts;
   const end = async () => {
@@ -1908,7 +1912,7 @@ export async function commitChanges(
   const author =
     email.code === 0 && email.stdout.trim()
       ? []
-      : ["-c", `user.name=${handle} (agentes)`, "-c", `user.email=${handle}@agents.agentes.chat`];
+      : ["-c", `user.name=${handle} (agentes)`, "-c", `user.email=${handle}@agents.${opts.host ?? "invalid"}`];
   const commit = await git(cwd, [...author, "commit", "-q", "-m", message], { env, timeoutMs: COMMIT_TIMEOUT_MS });
   return {
     startSha: opts.startSha,

@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { MachineRequestError } from "@agenteschat/engine";
 import type { ModuleContext } from "@agenteschat/modules";
 import { createApp } from "../src/app";
+import { workerHealth } from "../src/routes/health";
 import { createTestServer } from "./harness";
 
 test("health reports database state", async () => {
@@ -43,6 +44,35 @@ test("health answers 503 once the server is shutting down, so a proxy stops send
   const res = await app.request("/api/health");
   expect(res.status).toBe(503);
   expect(await res.json()).toMatchObject({ status: "draining", database: "ok" });
+});
+
+test("a worker process answers its health check alone, as the app does, so its container turns healthy", async () => {
+  let up = true;
+  let draining = false;
+  const fetch = workerHealth({
+    version: "1.2.3",
+    edition: "selfhost",
+    modules: [],
+    pingDatabase: async () => (up ? undefined : Promise.reject(new Error("x"))),
+    draining: () => draining,
+  });
+  const health = () => fetch(new Request("http://localhost:3000/api/health"));
+  const res = await health();
+  expect(res.status).toBe(200);
+  expect(await res.json()).toEqual({
+    status: "ok",
+    version: "1.2.3",
+    edition: "selfhost",
+    database: "ok",
+    modules: [],
+  });
+  expect((await fetch(new Request("http://localhost:3000/api/app/me"))).status).toBe(404);
+  expect((await fetch(new Request("http://localhost:3000/"))).status).toBe(404);
+  up = false;
+  expect((await health()).status).toBe(503);
+  up = true;
+  draining = true;
+  expect((await health()).status).toBe(503);
 });
 
 test("a computer's error is a 503 with its code: behind Cloudflare an origin's 502 never reaches the app", async () => {
@@ -97,6 +127,8 @@ test("the OpenAPI document lists the app API", async () => {
     "/app/me",
     "/app/organizations/{orgId}/agents",
     "/app/organizations/{orgId}/channels/{channelId}/messages",
+    "/app/organizations/{orgId}/devices",
+    "/app/organizations/{orgId}/devices/requests/{requestId}/approve",
   ]) {
     expect(Object.keys(doc.paths)).toContain(path);
   }

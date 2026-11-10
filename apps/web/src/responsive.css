@@ -29,10 +29,24 @@
   .shell__main--chat {
     padding-bottom: 0;
   }
+  /* A phone has no room for the sheet's margin: the page fills the screen, square, as before. */
   .shell__work {
     flex: 1 1 auto;
     min-height: 0;
     height: auto;
+    padding: 0;
+    background: var(--pane);
+  }
+  .shell__pages,
+  [data-theme="light"] .shell__pages {
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .shell__work > .outages {
+    margin-bottom: 0;
+    border-radius: 0;
+    box-shadow: none;
+    border-bottom: 1px solid var(--line);
   }
   /* Chat pages hide the bar: the notice keeps clear of the notch itself. */
   .shell:has(.channel__header) .outages {
@@ -146,15 +160,14 @@
   .channel__header > .ac-acts {
     flex: none;
   }
+  /* A header's name and its line wrap whole, never cut: the header's glyphs go under them instead (`.channel__line`). */
   .channel__title {
     display: block;
     min-width: 0;
     font-size: 17px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
   }
-  /* A DM's name keeps its line, its pill 8 after it on its capitals, and under it when both don't fit. */
+  /* A DM's name, its pill 8 after it on its capitals, and under it when both don't fit. */
   .dm-who .channel__title {
     display: flex;
     flex-wrap: wrap;
@@ -164,16 +177,9 @@
   .dm-who .channel__title > .channel__name {
     min-width: 0;
     max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
   .dm-who .channel__title > .ac-chip {
     flex: none;
-  }
-  .channel__topic {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
   .channel__messages {
     padding: 12px 0 10px;
@@ -181,7 +187,7 @@
     mask-image: linear-gradient(to bottom, #000 calc(100% - 10px), transparent), var(--scroll-strip);
   }
   .channel__messages .ac-msg:not([data-look="bubbles"], [data-look="compact"]) {
-    --msg-lead: 46px;
+    --msg-lead: calc(var(--name-face) + 10px);
   }
   .channel__messages .ac-msg {
     --msg-inline: 12px;
@@ -193,6 +199,27 @@
   .channel__notice {
     margin-right: 12px;
     margin-left: 12px;
+  }
+}
+/* The narrowest phones have no room for a DM's name, its pill and its topic beside the face: the pill goes under the
+   name, which rises to the face's top as a name alone does, and the topic stays in the profile the header opens. */
+@media (max-width: 359px) {
+  .dm-who .channel__title {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .dm-who .channel__title.ac-captop {
+    margin-block-start: calc(var(--cap-top) - 11px);
+  }
+  .dm-who .channel__topic {
+    display: none;
+  }
+}
+@media (max-width: 359px) {
+  @supports (top: 1lh) {
+    .dm-who .channel__title.ac-captop {
+      margin-block-start: calc(var(--cap-top) - 0.5lh);
+    }
   }
 }
 
@@ -239,6 +266,7 @@
   /* No keyboard hints on a touch screen or at phone width (the kit's own: components.css). A hint whose words only
      follow its keys goes with them. */
   .sidebar__jump .ac-kbd,
+  .sidebar__goto-keys,
   .titlebar__search .ac-kbd,
   .wiki-suggest .ac-kbd,
   .newag__hint:has(> .ac-kbd) {
@@ -291,8 +319,8 @@
   .agp-subnav {
     position: static;
     flex-direction: row;
-    margin: 0 -16px;
-    padding: 2px 16px 4px;
+    margin: 0 calc(-1 * var(--agp-gutter));
+    padding: 2px var(--agp-gutter) 4px;
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: none;
@@ -391,8 +419,8 @@
   .agp-subnav {
     position: static;
     flex-direction: row;
-    margin: 0 -16px;
-    padding: 2px 16px 4px;
+    margin: 0 calc(-1 * var(--agp-gutter));
+    padding: 2px var(--agp-gutter) 4px;
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: none;

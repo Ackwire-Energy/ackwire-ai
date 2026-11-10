@@ -1,4 +1,10 @@
-import { COMPUTER_GRID, type ComputerKind, type ComputerState, drawComputer } from "@agenteschat/ui/computer/portrait";
+import {
+  COMPUTER_GRID,
+  type ComputerKind,
+  type ComputerState,
+  drawComputer,
+  type PortraitKind,
+} from "@agenteschat/ui/computer/portrait";
 
 /**
  * A computer portrait (the shared engine, `@agenteschat/ui/computer/portrait`) recorded as pixel cells so
@@ -11,7 +17,8 @@ import { COMPUTER_GRID, type ComputerKind, type ComputerState, drawComputer } fr
  * path per tone and still blends in the canvas's order.
  */
 
-export type { ComputerKind, ComputerState };
+/** `PortraitKind`: a computer, or a phone a computer reaches (the same engine draws both). */
+export type { ComputerKind, ComputerState, PortraitKind };
 
 /** One layer's cells of one color: flat [x, y, x, y, …] on the 48 grid. */
 export interface CellRun {
@@ -65,7 +72,7 @@ export class CellRecorder {
 }
 
 /** One frame of a computer's portrait as cell runs. `t` in seconds (0 or a fixed time: a still frame). */
-export function portraitFrame(kind: ComputerKind, state: ComputerState, dark: boolean, t: number): CellRun[] {
+export function portraitFrame(kind: PortraitKind, state: ComputerState, dark: boolean, t: number): CellRun[] {
   const rec = new CellRecorder();
   drawComputer(rec, kind, state, { dark, t });
   return rec.runs();

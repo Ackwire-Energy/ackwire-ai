@@ -25,12 +25,17 @@ import {
 import { lastLine, REQUIREMENTS as SETUP_REQUIREMENTS } from "@agenteschat/setup/src/lib";
 import { TERM_SH } from "@agenteschat/setup/src/term-sh";
 import {
+  expiredLinkScript,
+  expiredLinkScriptPowerShell,
   GOOGLE_APT,
   GOOGLE_CHROME_LINUX,
   installScript,
+  installScriptPowerShell,
+  LINK_EXPIRED,
   REQUIREMENTS,
   RUNNER_BUN_SHA256,
   RUNNER_BUN_VERSION,
+  RUNNER_BUN_WINDOWS_SHA256,
   SYSTEM_BROWSER_DIR,
   shQuote,
 } from "../../runner/install-script";
@@ -80,7 +85,20 @@ mkdir -p "$dir/bun-linux-aarch64" && cp "$FAKE_BUN" "$dir/bun-linux-aarch64/bun"
   }
   const fetched = path.join(root, "fetched-bun");
   writeFileSync(fetched, fakeBun(RUNNER_BUN_VERSION, true), { mode: 0o755 });
-  for (const tool of ["sed", "grep", "mkdir", "chmod", "mv", "cp", "rm", "mktemp", "cut", "sha256sum", "shasum"]) {
+  for (const tool of [
+    "sed",
+    "grep",
+    "mkdir",
+    "chmod",
+    "mv",
+    "cp",
+    "rm",
+    "mktemp",
+    "cut",
+    "sha256sum",
+    "shasum",
+    "date",
+  ]) {
     const real = Bun.which(tool);
     if (real) symlinkSync(real, path.join(sys, tool));
   }
@@ -228,7 +246,8 @@ test.skipIf(process.platform === "win32")(
     expect(r.out).toContain(
       `●  To use the agentes-runner command, add it to your PATH:\n     export PATH="${pc.home}/.agentes-runner/bin:$PATH"\n`,
     );
-    expect(r.out).toEndWith("\nDone\n");
+    // How long it took, as term.ts's elapsed() writes it.
+    expect(r.out).toMatch(/\nDone in \d+s\n$/);
     expect(r.out).not.toContain("\x1b");
     expect(r.out).not.toContain("│");
 
@@ -265,7 +284,7 @@ test.skipIf(process.platform === "win32")(
   async () => {
     const pc = fakeComputer({ bun: fakeBun(RUNNER_BUN_VERSION, true) });
     writeFileSync(path.join(pc.fake, "curl"), CURL_404, { mode: 0o755 });
-    for (const tool of ["date", "sleep", "stty", "fold", "tail", "tr"]) {
+    for (const tool of ["sleep", "stty", "fold", "tail", "tr"]) {
       const real = Bun.which(tool);
       if (real) symlinkSync(real, path.join(pc.sys, tool));
     }
@@ -504,8 +523,8 @@ test.skipIf(process.platform === "win32")(
       const r = pc.install(`umask ${umask}\n${pc.script}`, ["--system", "--desktop", "--no-pair", "--no-start"]);
       expect(r.status).toBe(0);
       expect(r.log).toContain("service install --system --no-start");
-      expect(r.out).toEndWith(
-        `●  The agentes-runner command is ${pc.at("bin/agentes-runner")}. To check this computer's connection:\n     agentes-runner status\n\nDone\n`,
+      expect(r.out).toContain(
+        `●  The agentes-runner command is ${pc.at("bin/agentes-runner")}. To check this computer's connection:\n     agentes-runner status\n\nDone in `,
       );
       return Object.fromEntries(
         readdirSync(pc.at(""), { recursive: true })
@@ -1052,3 +1071,263 @@ test("service files: systemd unit, launchd plist and the Windows task command", 
     'schtasks /Create /TN agentes-runner /SC ONLOGON /RL LIMITED /F /TR "\\"C:\\Program Files\\nodejs\\node.exe\\" \\"C:\\Users\\me\\.agentes-runner\\agentes-runner.mjs\\" start"',
   );
 });
+
+test.skipIf(process.platform === "win32")(
+  "a connect link baked in: pair --link with no arguments, also in a home already connected; a bad code stops",
+  () => {
+    const dir = tempDir("install-");
+    dirs.push(dir);
+    const site = path.join(dir, "site");
+    const calls = path.join(dir, "calls");
+    mkdirSync(path.join(site, "runner"), { recursive: true });
+    writeFileSync(
+      path.join(site, "runner", "agentes-runner.mjs"),
+      `import { appendFileSync } from "node:fs";\nappendFileSync(${JSON.stringify(calls)}, process.argv.slice(2).join(" ") + "\\n");\n`,
+    );
+    const home = path.join(dir, "home");
+    mkdirSync(home);
+    writeFileSync(path.join(home, "config.json"), '{ "token": "agm_x" }\n');
+    const script = installScript(`file://${site}`, { link: "7KQ2-M9XD" });
+    expect(script).toContain("LINK='7KQ2-M9XD'");
+    const install = (text: string, ...args: string[]) =>
+      spawnSync("sh", ["-s", "--", ...args, "--no-service"], {
+        input: text,
+        env: {
+          ...process.env,
+          PATH: `${path.dirname(process.execPath)}:${process.env.PATH}`,
+          AGENTES_RUNNER_HOME: home,
+        },
+        encoding: "utf8",
+      });
+    const run = install(script);
+    expect(run.stderr).toBe("");
+    expect(run.status).toBe(0);
+    expect(readFileSync(calls, "utf8")).toBe(`pair --server file://${site} --link 7KQ2-M9XD\n`);
+
+    const bad = install(installScript(`file://${site}`), "--link", "7KQ2;M9XD");
+    expect(bad.status).toBe(1);
+    expect(bad.stdout + bad.stderr).toContain("--link takes the code at the end of the link");
+    const both = install(script, "--enroll-file", "/run/agentes/enroll-code");
+    expect(both.status).toBe(1);
+    expect(both.stdout + both.stderr).toContain("use one");
+  },
+);
+
+test.skipIf(process.platform === "win32")("a used or expired link's installer says so in one line and fails", () => {
+  const r = spawnSync("sh", ["-s"], { input: expiredLinkScript(), encoding: "utf8" });
+  expect(r.status).toBe(1);
+  expect(r.stderr).toBe(`${LINK_EXPIRED}\n`);
+  expect(expiredLinkScriptPowerShell()).toBe(
+    "Write-Host ('This link expired. Make a new one under Settings ' + [char]0x203a + ' Devices.') -ForegroundColor Red\n",
+  );
+});
+
+test("the PowerShell installer: the link and server baked in, Bun pinned by SHA-256, a task at sign-in, ASCII only", () => {
+  const ps = installScriptPowerShell("https://agentes.test/", { link: "7KQ2-M9XD" });
+  // `irm` reads a script without a charset as Latin-1: anything past ASCII would arrive garbled.
+  expect([...ps].every((c) => c.charCodeAt(0) < 128)).toBe(true);
+  expect(ps).toContain("$Server = 'https://agentes.test'");
+  expect(ps).toContain("$Link = '7KQ2-M9XD'");
+  expect(ps).toContain(`$BunVersion = '${RUNNER_BUN_VERSION}'`);
+  for (const [target, sha] of Object.entries(RUNNER_BUN_WINDOWS_SHA256)) {
+    expect(ps).toContain(`$Target = '${target}'; $Sha = '${sha}'`);
+    expect(sha).toMatch(/^[0-9a-f]{64}$/);
+  }
+  expect(ps).toContain("https://github.com/oven-sh/bun/releases/download/bun-v$BunVersion/bun-$Target.zip");
+  expect(ps).toContain("Get-FileHash -Algorithm SHA256");
+  expect(ps).toContain('"$Server/runner/agentes-runner.mjs"');
+  expect(ps).toContain("& $Bun $Bundle pair --server $Server --link $Link");
+  expect(ps).toContain("Register-ScheduledTask -TaskName $Task");
+  expect(ps).toContain("$Task = 'agentes-runner'");
+  expect(ps).toContain("[Environment]::GetFolderPath('Startup')");
+  // Everything runs from the last line, and nothing exits the window `iex` runs in.
+  expect(ps.trimEnd().split("\n").at(-1)).toBe(
+    'try { Install-AgentesRunner } catch { Write-Host "$([char]0x25A0)  $($_.Exception.Message)" -ForegroundColor Red }',
+  );
+  expect(ps).not.toMatch(/^\s*exit\b/m);
+  expect(ps.split("{").length).toBe(ps.split("}").length);
+  // A value with a quote stays one PowerShell string.
+  expect(installScriptPowerShell("https://o'neil.test", { link: "AB12-CD34" })).toContain(
+    "$Server = 'https://o''neil.test'",
+  );
+});
+
+test.skipIf(process.platform === "win32")("the shell installer ends with how long it took: 52s, 1m 04s", () => {
+  const doneIn = /^done_in\(\) \{[\s\S]*?^\}$/m.exec(installScript("https://x.test"))?.[0];
+  expect(doneIn).toBeDefined();
+  for (const [ago, says] of [
+    [52, /^Done in 5[23]s\n$/],
+    [64, /^Done in 1m 0[45]s\n$/],
+  ] as const) {
+    const run = `${TERM_SH}\n${doneIn}\nt_init 1\nT_START=$(($(date +%s) - ${ago}))\ndone_in\n`;
+    expect(spawnSync("/bin/sh", ["-c", run], { encoding: "utf8" }).stdout).toMatch(says);
+  }
+});
+
+const PWSH = Bun.which("pwsh");
+
+/**
+ * Reads the installer with PowerShell's own parser and says what it uses: parse errors, syntax newer than Windows
+ * PowerShell 5.1 (`&&`, `? :`, `??`, `?.`), each command with its named parameters and whether this PowerShell knows
+ * them (Get-Command), the .NET types, the environment variables, and the special folders it asks Windows for.
+ */
+const PS_ANALYZER = `param([string]$File)
+$tokens = $null; $errors = $null
+$ast = [System.Management.Automation.Language.Parser]::ParseFile($File, [ref]$tokens, [ref]$errors)
+$all = @($ast.FindAll({ $true }, $true))
+$defined = @($all | Where-Object { $_ -is [System.Management.Automation.Language.FunctionDefinitionAst] } | ForEach-Object { $_.Name })
+$newer = @($all | ForEach-Object {
+  $n = $_.GetType().Name
+  if ($n -eq 'PipelineChainAst' -or $n -eq 'TernaryExpressionAst') { $n }
+  elseif ($_ -is [System.Management.Automation.Language.BinaryExpressionAst] -and "$($_.Operator)" -like 'QuestionQuestion*') { 'NullCoalescing' }
+  elseif ($_ -is [System.Management.Automation.Language.MemberExpressionAst] -and $_.NullConditional) { 'NullConditional' }
+})
+$commands = @($all | Where-Object { $_ -is [System.Management.Automation.Language.CommandAst] } | ForEach-Object {
+  $name = $_.GetCommandName()
+  if ($name -and $defined -notcontains $name) {
+    $params = @($_.CommandElements | Where-Object { $_ -is [System.Management.Automation.Language.CommandParameterAst] } | ForEach-Object { $_.ParameterName })
+    $known = Get-Command $name -ErrorAction SilentlyContinue
+    $unknown = @()
+    if ($known) {
+      $names = @($known.Parameters.Values | ForEach-Object { $_.Name; $_.Aliases })
+      $unknown = @($params | Where-Object { $names -notcontains $_ })
+    }
+    [pscustomobject]@{ name = $name; params = $params; here = [bool]$known; unknown = $unknown }
+  }
+})
+$types = @($all | Where-Object { $_ -is [System.Management.Automation.Language.TypeExpressionAst] -or $_ -is [System.Management.Automation.Language.TypeConstraintAst] } | ForEach-Object { $_.TypeName.FullName } | Sort-Object -Unique)
+$unresolved = @($types | Where-Object { -not ($_ -as [type]) })
+$envs = @($all | Where-Object { $_ -is [System.Management.Automation.Language.VariableExpressionAst] -and $_.VariablePath.DriveName -eq 'env' } | ForEach-Object { $_.VariablePath.UserPath.Substring(4) } | Sort-Object -Unique)
+$folders = @($all | Where-Object { $_ -is [System.Management.Automation.Language.InvokeMemberExpressionAst] -and "$($_.Member)" -eq 'GetFolderPath' } | ForEach-Object {
+  $arg = $_.Arguments[0].Value
+  [pscustomobject]@{ name = $arg; known = [Enum]::IsDefined([Environment+SpecialFolder], $arg) }
+})
+[pscustomobject]@{ errors = @($errors | ForEach-Object { $_.Message }); newer = $newer; commands = $commands; types = $types; unresolved = $unresolved; envs = $envs; folders = $folders } | ConvertTo-Json -Depth 6 -Compress
+`;
+
+/**
+ * What the installer may call on Windows 10 and 11 as they ship (Windows PowerShell 5.1): its cmdlets, with the named
+ * parameters each takes. The ScheduledTasks module's are there since Windows 8; the rest are PowerShell's own, so
+ * where this PowerShell has them too their parameters are also checked against it.
+ */
+const WINDOWS_CMDLETS: Record<string, string[] | "builtin"> = {
+  "Write-Host": "builtin",
+  "Join-Path": "builtin",
+  "Test-Path": "builtin",
+  "Get-Content": "builtin",
+  "Set-Content": "builtin",
+  "New-Item": "builtin",
+  "Copy-Item": "builtin",
+  "Move-Item": "builtin",
+  "Remove-Item": "builtin",
+  "Out-Null": "builtin",
+  "Get-Date": "builtin",
+  "Invoke-WebRequest": "builtin",
+  "Get-FileHash": "builtin",
+  "Expand-Archive": "builtin",
+  "ConvertFrom-Json": "builtin",
+  "Stop-Process": "builtin",
+  "Start-Process": "builtin",
+  "New-TimeSpan": "builtin",
+  "New-ScheduledTaskAction": ["Execute", "Argument", "WorkingDirectory", "Id"],
+  "New-ScheduledTaskTrigger": ["AtLogOn", "AtStartup", "User", "Once", "At", "Daily", "Weekly", "RandomDelay"],
+  "New-ScheduledTaskPrincipal": ["UserId", "LogonType", "RunLevel", "GroupId", "Id"],
+  "New-ScheduledTaskSettingsSet": [
+    "AllowStartIfOnBatteries",
+    "DontStopIfGoingOnBatteries",
+    "StartWhenAvailable",
+    "ExecutionTimeLimit",
+    "RestartCount",
+    "RestartInterval",
+    "Hidden",
+    "MultipleInstances",
+  ],
+  "Register-ScheduledTask": [
+    "TaskName",
+    "TaskPath",
+    "Action",
+    "Trigger",
+    "Principal",
+    "Settings",
+    "Force",
+    "Description",
+  ],
+  "Start-ScheduledTask": ["TaskName", "TaskPath"],
+};
+/** Variables Windows sets for every signed-in user, and the installer's own. */
+const WINDOWS_ENV = ["PROCESSOR_ARCHITECTURE", "PROCESSOR_ARCHITEW6432", "USERPROFILE", "USERDOMAIN", "USERNAME"];
+const OWN_ENV = ["AGENTES_RUNNER_HOME", "AGENTES_FRAME"];
+/** .NET Framework 4.x types (what Windows PowerShell 5.1 runs on) the installer uses. */
+const FRAMEWORK_TYPES = ["Net.ServicePointManager", "Net.SecurityProtocolType", "IO.Path", "guid", "Environment"];
+const PS_PRIMITIVES = ["char", "string", "int", "math", "TimeSpan"];
+
+test.skipIf(!PWSH)(
+  "the PowerShell installer parses as PowerShell 5.1 and calls only what Windows has, as it has it",
+  () => {
+    const dir = tempDir("ps-");
+    dirs.push(dir);
+    const file = path.join(dir, "install.ps1");
+    writeFileSync(file, installScriptPowerShell("https://agentes.test", { link: "7KQ2-M9XD" }));
+    writeFileSync(path.join(dir, "analyze.ps1"), PS_ANALYZER);
+    const run = spawnSync(
+      PWSH as string,
+      ["-NoProfile", "-NonInteractive", "-File", path.join(dir, "analyze.ps1"), file],
+      {
+        encoding: "utf8",
+      },
+    );
+    expect(run.stderr).toBe("");
+    const found = JSON.parse(run.stdout) as {
+      errors: string[];
+      newer: string[];
+      commands: { name: string; params: string[]; here: boolean; unknown: string[] }[];
+      types: string[];
+      unresolved: string[];
+      envs: string[];
+      folders: { name: string; known: boolean }[];
+    };
+    expect(found.errors).toEqual([]);
+    expect(found.newer).toEqual([]);
+    for (const c of found.commands) {
+      const allowed = WINDOWS_CMDLETS[c.name];
+      expect({ command: c.name, onWindows: allowed !== undefined }).toEqual({ command: c.name, onWindows: true });
+      if (allowed === "builtin") {
+        expect({ command: c.name, here: c.here, unknown: c.unknown }).toEqual({
+          command: c.name,
+          here: true,
+          unknown: [],
+        });
+      } else if (allowed) {
+        expect({ command: c.name, unknown: c.params.filter((p) => !allowed.includes(p)) }).toEqual({
+          command: c.name,
+          unknown: [],
+        });
+      }
+    }
+    // Every scheduled-task cmdlet it needs is called (the Startup folder is the way out when they refuse).
+    expect(new Set(found.commands.map((c) => c.name))).toContain("Register-ScheduledTask");
+    expect(found.types.filter((t) => !FRAMEWORK_TYPES.includes(t) && !PS_PRIMITIVES.includes(t))).toEqual([]);
+    expect(found.unresolved).toEqual([]);
+    expect(found.envs.filter((e) => !WINDOWS_ENV.includes(e) && !OWN_ENV.includes(e))).toEqual([]);
+    expect(found.folders).toEqual([{ name: "Startup", known: true }]);
+
+    // The end line's time, run as the installer writes it.
+    const took = installScriptPowerShell("https://agentes.test", { link: "7KQ2-M9XD" })
+      .split("\n")
+      .find((l) => l.trim().startsWith("$Took = "));
+    for (const [seconds, says] of [
+      [21, "21s"],
+      [64, "1m 04s"],
+    ] as const) {
+      const r = spawnSync(
+        PWSH as string,
+        ["-NoProfile", "-NonInteractive", "-Command", `$S = ${seconds}\n${took}\n$Took`],
+        {
+          encoding: "utf8",
+        },
+      );
+      expect(r.stdout.trim()).toBe(says);
+    }
+  },
+  60_000,
+);

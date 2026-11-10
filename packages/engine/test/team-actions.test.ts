@@ -17,12 +17,17 @@ import {
   type ToolContext,
   type ToolDefinition,
   type ToolSource,
+  teamNoticeText,
   updateOrgSettings,
 } from "../src";
 import { type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
-afterEach(() => f?.close());
+afterEach(async () => {
+  const current = f;
+  f = undefined as unknown as Fixture;
+  await current?.close();
+});
 
 describe("targets", () => {
   test("addresses, numbers, pages and code; never the text or the sender", () => {
@@ -309,4 +314,25 @@ describe("team actions in the Tool Gateway", () => {
     const [now] = await f.db.select().from(schema.teamActions);
     expect(now).toMatchObject({ agentId: qa.id, source: "command", reason: "went on after the notice" });
   });
+});
+
+test("a personal workspace's notice speaks of one person's agents, never a team (ADR 0159)", () => {
+  const at = new Date("2026-11-09T12:00:00Z");
+  const match = (agentId: string | null) => ({
+    actionId: "a1",
+    agentId,
+    tool: null,
+    summary: null,
+    channelId: null,
+    targets: ["ana@example.com"],
+    at: new Date(at.getTime() - 3_600_000).toISOString(),
+  });
+  const names = { agents: new Map<string, string>(), channels: new Map<string, string>() };
+  const personal = teamNoticeText([match(null), match("gone")], names, "self", at, true);
+  expect(personal).toContain("Not done: this was already done.");
+  expect(personal).toContain("- Someone already acted on");
+  expect(personal).toContain("- Another agent already acted on");
+  expect(personal).not.toMatch(/team/i);
+  // A team's reads as before.
+  expect(teamNoticeText([match(null)], names, "self", at)).toContain("Someone on the team already acted on");
 });

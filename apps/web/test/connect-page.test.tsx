@@ -55,7 +55,7 @@ describe("/conectar: confirm a computer's code", () => {
     const link = screen().getByRole("link", { name: "Ver o computador" });
     await click(link);
     await settle(6);
-    expect(router.state.location.pathname).toMatch(new RegExp(`^/org/${ORG_ID}/settings/computers/.+`));
+    expect(router.state.location.pathname).toMatch(new RegExp(`^/org/${ORG_ID}/settings/devices/.+`));
   });
 
   test("Não fui eu: the computer isn't connected", async () => {

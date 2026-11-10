@@ -1,4 +1,5 @@
 import type { Message } from "../api/types";
+import { landedAfter } from "./timeline";
 
 /**
  * How a person's conversations look (`chatPrefs` on their membership, on every device). `comfortable` is the original
@@ -53,11 +54,28 @@ export const CHAT_RHYTHM: Record<ChatStyle, { part: number; turn: number; card: 
   compact: { part: 4, turn: 8, card: 12, block: 1 },
 };
 
-/** What a conversation shows. A DM has two speakers; anything with more, or with no one person across, is a channel. */
-export function chatLookOf(prefs: ChatPrefs | undefined, dm: boolean): { style: ChatStyle; tone: ChatTone } {
+/**
+ * A channel's look by default in a personal workspace (ADR 0159): a group conversation of one person and their agents
+ * reads like a chat app's, as a DM already does.
+ */
+export const PERSONAL_CHANNEL_STYLE: ChatStyle = "bubbles";
+
+/** A channel's look for whoever hasn't chosen, by the workspace's mode. */
+export const defaultChannelStyle = (personal = false): ChatStyle =>
+  personal ? PERSONAL_CHANNEL_STYLE : DEFAULT_CHANNEL_STYLE;
+
+/**
+ * What a conversation shows. A DM has two speakers; anything with more, or with no one person across, is a channel.
+ * `personal`: the workspace is personal (ADR 0159), where a channel opens in bubbles too; the person's choice wins.
+ */
+export function chatLookOf(
+  prefs: ChatPrefs | undefined,
+  dm: boolean,
+  personal = false,
+): { style: ChatStyle; tone: ChatTone } {
   return dm
     ? { style: prefs?.dmStyle ?? DEFAULT_DM_STYLE, tone: prefs?.dmTone ?? DEFAULT_CHAT_TONE }
-    : { style: prefs?.channelStyle ?? DEFAULT_CHANNEL_STYLE, tone: prefs?.channelTone ?? DEFAULT_CHAT_TONE };
+    : { style: prefs?.channelStyle ?? defaultChannelStyle(personal), tone: prefs?.channelTone ?? DEFAULT_CHAT_TONE };
 }
 
 /** Whether my own rows stand apart on the right. In the others, a row of mine is a row like anyone's. */
@@ -72,15 +90,16 @@ export const facesShown = (style: ChatStyle, dm: boolean) => !(dm && mineOnRight
 /** Where a conversation opens the first time it is shown with `unread` messages waiting. */
 export const opensAtLastRead = (prefs: ChatPrefs | undefined, unread: number) => prefs?.openAt === "read" && unread > 0;
 
-/** The first message after `lastReadAt` that isn't mine: where the "Novas" line goes. Null: none in what's loaded. */
+/**
+ * The first message that landed after `lastReadAt` and isn't mine: where the "Novas" line goes. Null: none in what's
+ * loaded.
+ */
 export function firstUnreadId(
   messages: readonly Pick<Message, "id" | "author" | "createdAt">[],
   lastReadAt: string | null | undefined,
   meId: string | null,
 ): string | null {
   const after = lastReadAt ? Date.parse(lastReadAt) : -Infinity;
-  const first = messages.find(
-    (m) => Date.parse(m.createdAt) > after && !(m.author.type === "person" && m.author.id === meId),
-  );
+  const first = messages.find((m) => landedAfter(m, after) && !(m.author.type === "person" && m.author.id === meId));
   return first?.id ?? null;
 }

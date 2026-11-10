@@ -472,6 +472,7 @@ export const UNAVAILABLE_CODES: ReadonlySet<string> = new Set([
   "plan_limit",
   "plan_not_owner",
   "plan_not_shared",
+  "plan_unattended",
   "tools_not_locked",
 ]);
 
@@ -687,9 +688,11 @@ async function sessionFor(
         at: sql<Date>`coalesce(${agentRuns.finishedAt}, ${agentRuns.updatedAt})`.mapWith(
           (v: string | Date) => new Date(v),
         ),
-        // Qualified by hand: inside the subquery a bare "id" would be usage_records.id.
-        input: sql<number>`coalesce((select max(u.input_tokens) from ${usageRecords} u
-          where u.run_id = "agent_runs"."id" and u.provider = ${kind}), 0)`.mapWith(Number),
+        // Qualified by hand: inside the subquery a bare "id" would be usage_records.id. A row's `input_tokens` is
+        // only the uncached part (`recordPlanUsage`), so the cache counts here too: a well-cached session reads
+        // almost all of its history from the cache.
+        input: sql<number>`coalesce((select max(u.input_tokens + u.cache_read_tokens + u.cache_write_tokens)
+          from ${usageRecords} u where u.run_id = "agent_runs"."id" and u.provider = ${kind}), 0)`.mapWith(Number),
         promptKey: sql<string | null>`${agentRuns.transcript}->>'promptKey'`,
       })
       .from(agentRuns)

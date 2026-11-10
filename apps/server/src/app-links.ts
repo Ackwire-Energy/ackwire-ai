@@ -52,6 +52,7 @@ export const APP_LINK_PATHS = [
   "/org/*/settings/keys",
   "/org/*/settings/storage",
   "/org/*/settings/computers",
+  "/org/*/settings/devices",
   "/org/*/settings/usage",
   "/org/*/settings/import",
   "/org/*/settings/media",
@@ -61,6 +62,7 @@ export const APP_LINK_PATHS = [
   "/org/*/settings/vault",
   "/org/*/settings/about",
   "/org/*/settings/computers/*",
+  "/org/*/settings/devices/*",
 ];
 
 /**

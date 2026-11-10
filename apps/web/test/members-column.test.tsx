@@ -83,6 +83,28 @@ describe("the members column", () => {
     expect(body.querySelector(":scope > .channel__col .channel__composer")).toBeTruthy();
   });
 
+  test("a personal workspace starts it closed on a desktop; opening it is remembered (ADR 0159)", async () => {
+    widthIs(DESKTOP_QUERY);
+    const personal = () => {
+      const state = seedState();
+      const org = state.me?.organizations[0];
+      if (org) org.mode = "personal";
+      return state;
+    };
+    // The toggle and the column by their count and the channel's name: a personal workspace may word them its way.
+    const button = () => screen().getByRole("button", { name: /\(4\)/ });
+    const side = () => screen().queryByRole("complementary", { name: /eng/ });
+    await open(personal());
+    expect(side()).toBeNull();
+    expect(button().getAttribute("aria-pressed")).toBe("false");
+    await act(async () => fireEvent.click(button()));
+    expect(side()).toBeTruthy();
+    expect(localStorage.getItem(COLUMN_KEY)).toBe("1");
+    cleanup();
+    await open(personal());
+    expect(side()).toBeTruthy();
+  });
+
   test("closed by default on a tablet, where the toggle opens it beside the chat", async () => {
     widthIs(TABLET_QUERY);
     await open();
@@ -129,8 +151,11 @@ describe("the members column", () => {
     const ada = row(column() as HTMLElement, "Ada") as HTMLElement;
     // Named "Perfil de Ada", described by all it shows (presence, line, chips).
     expect(ada.getAttribute("aria-label")).toBe("Perfil de Ada");
-    expect(document.getElementById(ada.getAttribute("aria-describedby") ?? "")?.textContent).toContain("pensando");
-    expect(ada.textContent).toContain("pensando");
+    // What it does here: the pixel orbit beside its name, labelled, and the row's title; the row keeps its height.
+    expect(ada.querySelector(".members-side__name .ac-pixspin")?.getAttribute("aria-label")).toBe("pensando");
+    expect(document.getElementById(ada.getAttribute("aria-describedby") ?? "")?.getAttribute("title")).toContain(
+      "pensando",
+    );
     expect(ada.querySelector("[data-busy] .sidebar__trail")).toBeTruthy();
     // ↑/↓ between the rows.
     const rows = [...(column() as HTMLElement).querySelectorAll<HTMLElement>(".members-side__row")];

@@ -141,7 +141,7 @@ export function IssuesPage() {
           <PageHeader
             className="issues-head"
             title={t("issues.title")}
-            meta={
+            count={
               <>
                 <span>
                   {t("issues.summary", {

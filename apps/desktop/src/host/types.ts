@@ -47,6 +47,12 @@ export interface AppInfo {
   arch: string;
 }
 
+/** A server's answer to `siteFetch`: its status and body as text. */
+export interface SiteAnswer {
+  status: number;
+  body: string;
+}
+
 /** What the site last put on the Dock's badge (`this_mac` `badge`). */
 export interface BadgeCounts {
   waiting: number;
@@ -87,10 +93,17 @@ export interface Host {
   chooseServer(server: string, page?: string): Promise<void>;
   /** Every server's workspaces, as the app last read them with each one's session (ADR 0154). */
   workspaces(): Promise<ServerWorkspaces[]>;
+  /**
+   * One request to a server of the app's list with the main window's session there (Preferences only): this
+   * computer's devices, who can use them and a phone's Stop (`site_fetch` in workspaces.rs allows only those).
+   */
+  siteFetch(server: string, method: string, path: string, body?: string): Promise<SiteAnswer>;
   /** How the welcome window opens, taken once: `add` from the site's "Add a workspace", else null. */
   welcomeMode(): Promise<"add" | null>;
   /** Takes `server` out of the list (the server and the account there stay as they are). */
   removeServer(server: string): Promise<void>;
+  /** Signs the app out of `server`, which stays in the list (signed out); a window on it goes to its sign-in. */
+  signOutServer(server: string): Promise<void>;
   /** Where a server may be: this computer and the person's Tailscale network, not checked yet. */
   discover(): Promise<Candidate[]>;
   /** Whether `server` is an agentes.chat server this app can use (`GET /api/instance`). */
@@ -160,8 +173,11 @@ export interface Host {
   cancelLocalSetup(): Promise<void>;
   onSetupStep(cb: (change: StepChange) => void): () => void;
   startLocalServer(): Promise<void>;
-  /** Stops it; `forget`: it no longer starts with the app (its data stays). */
-  stopLocalServer(forget: boolean): Promise<void>;
+  /**
+   * Stops it, and it stays stopped (also when the app opens again) until Start, or for `minutes` and then it starts
+   * by itself. `forget`: the app no longer runs it here (its data stays).
+   */
+  stopLocalServer(forget: boolean, minutes?: number): Promise<void>;
   restartLocalServer(): Promise<void>;
   /** Reach from the person's other devices (Tailscale), on or off; the main window follows the address. */
   setLocalReach(on: boolean): Promise<ReachResult>;
@@ -194,4 +210,6 @@ export type MenuAction =
   | "pause1h"
   | "pauseTomorrow"
   | "pauseManual"
-  | "resume";
+  | "resume"
+  // The Mac's Servers › this computer's server › Restart (menus.rs `here_menu`).
+  | "hereRestart";

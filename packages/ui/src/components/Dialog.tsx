@@ -244,10 +244,17 @@ export function DialogFooter({
 }) {
   // An empty footer would only stack its padding under the content: the body or list above keeps the edge instead.
   if (note == null && Children.toArray(children).length === 0) return null;
+  // Beside a note the buttons are one group, so a row too narrow for both never splits them one over the other.
   return (
     <div className={cx("ac-dialog__foot", bar && "ac-dialog__foot--bar", className)}>
-      {note !== undefined && <span className="ac-dialog__foot-note">{note}</span>}
-      {children}
+      {note !== undefined ? (
+        <>
+          <span className="ac-dialog__foot-note">{note}</span>
+          <div className="ac-dialog__foot-acts">{children}</div>
+        </>
+      ) : (
+        children
+      )}
     </div>
   );
 }

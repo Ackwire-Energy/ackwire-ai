@@ -83,6 +83,24 @@ describe("what arrived below", () => {
     expect(unseenBelow([row("a"), row("b")], null).messages).toBe(0);
     expect(unseenBelow([row("a"), row("b")], "zz").firstKey).toBeNull();
   });
+  test("a reply posted since I was at the end, in its place above what I saw last, is new too; the line goes before it", () => {
+    // Ids sort in the order the server posted them. At the end "b" (v2) was the newest, below a block at work; its
+    // reply (v3) took the block's row once I read above.
+    const said = (key: string, id: string, who?: string) => ({ ...row(key, "message", false, who), id });
+    const rows = [said("a", "v1"), said("turn-1", "v3", "agent:ada"), said("b", "v2", "person:marina")];
+    expect(unseenBelow(rows, "b", "v2")).toEqual({
+      messages: 1,
+      firstKey: "turn-1",
+      authors: ["agent:ada"],
+      working: [],
+      mentionsMe: false,
+    });
+    // Still at work there: nothing new yet.
+    expect(unseenBelow([said("a", "v1"), row("turn-1", "run"), said("b", "v2")], "b", "v2").firstKey).toBeNull();
+    // Its run ended with nothing more to say: the card it posted before takes the block's row again, and isn't new.
+    const old = [said("a", "v1"), said("turn-1", "v0", "agent:ada"), said("b", "v2", "person:marina")];
+    expect(unseenBelow(old, "b", "v2").firstKey).toBeNull();
+  });
 });
 
 describe("turnKeys", () => {

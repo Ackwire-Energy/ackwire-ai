@@ -58,6 +58,7 @@ import { SidePanel } from "@/components/SidePanel";
 import { TaskConversationButton, TaskConversationPanel, TaskConversationSummary } from "@/components/TaskConversation";
 import { IssueWhoSeesDialog, WhoSeesButton } from "@/components/WhoSees";
 import { useWikiLinkRenderer } from "@/components/WikiLinks";
+import { usePersonalView } from "@/hooks/usePersonalView";
 import {
   columnIdOf,
   columnsOf,
@@ -870,6 +871,15 @@ function useIssueFields(i: Issue) {
 }
 
 /**
+ * Whether a task shows "Who sees it": always, but alone in a personal workspace only once it says anything but
+ * everyone (ADR 0159): nobody else is there to see it.
+ */
+function useWhoSeesShown(i: Issue) {
+  const { solo } = usePersonalView();
+  return !solo || (i.audience?.mode ?? "everyone") !== "everyone";
+}
+
+/**
  * The task's fields as one strip under who made it, at every width: Coluna, Responsável, Prioridade, Prazo and Quem
  * vê, each its icon or face and its value (its name on hover and to a screen reader), then after a hairline its pull
  * requests, labels and GitHub link. With no link yet, "GitHub" opens the field to paste one.
@@ -880,6 +890,7 @@ function PropsLine({ issue: i }: { issue: Issue }) {
   const actors = useActors();
   const f = useIssueFields(i);
   const [choosing, setChoosing] = useState(false);
+  const whoSees = useWhoSeesShown(i);
   const prop = (label: string, control: ReactNode) => (
     <span className="issue-prop" title={label}>
       {control}
@@ -935,10 +946,11 @@ function PropsLine({ issue: i }: { issue: Issue }) {
           }
         />,
       )}
-      {prop(
-        t("whoSees.label"),
-        <WhoSeesButton select value={i.audience ?? { mode: "everyone" }} onClick={() => setChoosing(true)} />,
-      )}
+      {whoSees &&
+        prop(
+          t("whoSees.label"),
+          <WhoSeesButton select value={i.audience ?? { mode: "everyone" }} onClick={() => setChoosing(true)} />,
+        )}
       {choosing && <IssueWhoSeesDialog issue={i} onClose={() => setChoosing(false)} />}
       <span className="ac-props__sep" aria-hidden="true" />
       {i.pullRequests.map((pr) => (

@@ -104,6 +104,8 @@ function parseWorkerState(f: Record<string, unknown>): WorkerState | null {
   const viewers = Number.isSafeInteger(f.desktopViewers) ? Math.max(0, f.desktopViewers as number) : 0;
   const account = f.account === null || isAccountId(f.account) ? { account: f.account } : {};
   const accounts = Array.isArray(f.accounts) ? { accounts: f.accounts.filter(isAccountId) } : {};
+  const host = typeof f.commitHost === "string" && /^[a-z0-9.-]{1,253}$/i.test(f.commitHost) ? f.commitHost : null;
+  const commitHost = host ? { commitHost: host } : {};
   return access && paused
     ? {
         access,
@@ -113,6 +115,7 @@ function parseWorkerState(f: Record<string, unknown>): WorkerState | null {
         privateNetwork: f.privateNetwork === true,
         ...account,
         ...accounts,
+        ...commitHost,
       }
     : null;
 }
@@ -568,6 +571,7 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
     ...(self.compiled ? { wrapperCommand: [...self.command, "task-wrapper"] } : {}),
     ...(cli ? { spawnCli: cli } : {}),
     hostedStop: (taskId) => link.taskStop(taskId),
+    commitHost: () => state.commitHost,
   });
   link.onTaskOut = (taskId, stream, line) => tasks.hostedOutput(taskId, stream, line);
   await tasks.init();

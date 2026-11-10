@@ -1,7 +1,7 @@
 /* What reached an agent's conversation (a notice), a stopped task, a part that failed to draw: one event pill
    (`EventPill`) in the messages' text column; what it opens goes under it. */
 .cn-pill {
-  margin-inline: var(--thread-indent, 64px) 12px;
+  margin-inline: var(--thread-indent, calc(16px + var(--name-face) + var(--space-3))) 12px;
 }
 /* Inside a message, in place of one of its parts, or under a stopped reply: already in the text's column. */
 .cn-pill--part,
@@ -24,7 +24,7 @@
 .cn-line {
   flex-wrap: wrap;
   gap: 4px 8px;
-  margin-inline: var(--thread-indent, 64px) 12px;
+  margin-inline: var(--thread-indent, calc(16px + var(--name-face) + var(--space-3))) 12px;
   font-size: 12.5px;
   line-height: 18px;
   color: var(--faint);

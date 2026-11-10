@@ -1,4 +1,5 @@
 import type { VaultAccess, VaultItem, VaultItemKind, VaultScope } from "@agenteschat/client";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import {
   Button,
   DetailsDialog,
@@ -186,10 +187,10 @@ export function VaultNewDialog({
                 onValueChange={pickScope}
                 options={[
                   { value: "personal", label: t("vault.scope.personal") },
-                  { value: "team", label: t("vault.scope.team") },
+                  { value: "team", label: t(modeKey(org, "vault.scope.team")) },
                 ]}
               />
-              {!canManageTeam && <SettingNote icon="lock">{t("vault.new.teamLocked")}</SettingNote>}
+              {!canManageTeam && <SettingNote icon="lock">{t(modeKey(org, "vault.new.teamLocked"))}</SettingNote>}
               <AccessBlock
                 scope={scope}
                 access={access}

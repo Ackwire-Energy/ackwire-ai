@@ -22,7 +22,7 @@ const AGENT_SLICE_PREFIX = "agents-";
 export const agentSlice = (uid: number) => `${AGENT_SLICE_PREFIX}${uid}.slice`;
 /**
  * Inside it, the agent's Chrome and its AI CLIs each in a slice of their own (`scope-gate.ts`):
- * `agents-<uid>-browser.slice`, `agents-<uid>-cli.slice`. The Cloud's guard reads these names.
+ * `agents-<uid>-browser.slice`, `agents-<uid>-cli.slice`. These names are a contract: an operator's network guard may read them.
  */
 export const agentCategorySlice = (uid: number, kind: ScopeKind) => `${AGENT_SLICE_PREFIX}${uid}-${kind}.slice`;
 /**
@@ -54,7 +54,7 @@ export function agentLimits(memoryBytes: number, host: boolean): { each: string;
 }
 /**
  * The agents' share of the RAM, all of them together. With their swap in RAM at half its size, they take 87.5% at
- * most, about 1 GiB of 8 GB left to the system, the runner and the Cloud's guard. On the server's own computer
+ * most, about 1 GiB of 8 GB left to the system, the runner and any operator's guard beside it. On the server's own computer
  * (`host`) they take 58% at most, about 1.6 GiB of 4 GB left to Docker, Postgres and the server too.
  */
 const AGENTS_SHARE = 75;

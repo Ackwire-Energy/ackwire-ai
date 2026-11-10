@@ -209,8 +209,10 @@ export async function assessThread(
   const { replies, text } = await conversationLines(db, orgId, root);
   const last = replies.at(-1);
   if (!last) return null;
-  // A newer reply came after the one that asked: its own job assesses the thread later.
-  if (input.messageId && last.id !== input.messageId) return null;
+  // A newer reply came after the one that asked: its own job assesses the thread later. Newer by when it was posted
+  // (ids are UUIDv7): a reply keeps the place of its first words (ADR 0010), above replies sent while it was written.
+  const newest = replies.reduce((a, b) => (b.id > a.id ? b : a));
+  if (input.messageId && newest.id !== input.messageId) return null;
 
   const answer = await askAssessment(deps, orgId, text);
   if (!answer) return null;

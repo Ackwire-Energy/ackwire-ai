@@ -40,6 +40,14 @@ export const ptBR: Words = {
     small: "O convite vale por 7 dias. Aceite com este endereço de e-mail.",
     why: (org) =>
       `Você recebeu este e-mail porque alguém da ${org} convidou este endereço. Se não conhece essa pessoa, ignore. Nada acontece até você aceitar.`,
+    personal: {
+      body: (inviter, email) =>
+        inviter
+          ? [{ b: inviter }, `${email ? ` (${email})` : ""} convidou você para um workspace pessoal no agentes.chat.`]
+          : "Você recebeu um convite para um workspace pessoal no agentes.chat.",
+      why: () =>
+        "Você recebeu este e-mail porque alguém convidou este endereço para um workspace pessoal. Se não conhece essa pessoa, ignore. Nada acontece até você aceitar.",
+    },
   },
   inviteRequest: {
     subject: "Pediram um novo convite",
@@ -52,6 +60,13 @@ export const ptBR: Words = {
     next: "Se você espera essa pessoa, mande um novo convite em Membros. Se não, não precisa fazer nada.",
     button: "Abrir Membros",
     why: (org) => `Você recebeu este e-mail porque criou este convite, ou cuida dos membros da ${org}.`,
+    personal: {
+      body: (email) =>
+        email
+          ? [{ b: email }, " abriu um convite vencido para o seu workspace e pediu um novo."]
+          : "Alguém com um link de convite vencido para o seu workspace pediu um novo.",
+      why: () => "Você recebeu este e-mail porque criou este convite, ou cuida de quem está no seu workspace.",
+    },
   },
   calendar: {
     subject: "Você recebeu um convite para um evento",
@@ -61,6 +76,9 @@ export const ptBR: Words = {
     someone: "Alguém",
     button: "Ver o evento",
     why: (org) => `Você recebeu este e-mail porque alguém da ${org} convidou você para um evento.`,
+    personal: {
+      why: () => "Você recebeu este e-mail porque alguém do seu workspace convidou você para um evento.",
+    },
   },
   waitlist: {
     subject: "Confirme seu lugar na lista do agentes.chat",
@@ -114,6 +132,11 @@ export const ptBR: Words = {
     button: "Ver o orçamento",
     why: (org) =>
       `Você recebeu este e-mail porque é dono deste agente, ou admin da ${org}. É enviado em 80% e em 100%, uma vez por mês cada.`,
+    personal: {
+      warning: "Em 100%, ele para e avisa você. Você pode mudar o limite na página do agente.",
+      exhausted: "Ele não responde até o mês virar, ou até você subir o limite na página do agente.",
+      why: () => "Você recebeu este e-mail porque este agente é seu. É enviado em 80% e em 100%, uma vez por mês cada.",
+    },
   },
   digest: {
     subject: (n) =>
@@ -133,6 +156,15 @@ export const ptBR: Words = {
     button: (n) => plural("pt-BR", n, { one: "Ver o pedido", other: "Abrir aprovações" }),
     why: (org, hours) =>
       `Você recebeu este e-mail porque pode aprovar estes pedidos na ${org}.${hours ? ` É enviado quando um pedido espera mais de ${hours} horas, uma vez por pedido.` : ""}`,
+    personal: {
+      body: (n) =>
+        plural("pt-BR", n, {
+          one: "Um dos seus agentes pediu para fazer algo que precisa da sua aprovação.",
+          other: "Seus agentes pediram para fazer coisas que precisam da sua aprovação.",
+        }),
+      why: (_org, hours) =>
+        `Você recebeu este e-mail porque pode aprovar estes pedidos.${hours ? ` É enviado quando um pedido espera mais de ${hours} horas, uma vez por pedido.` : ""}`,
+    },
   },
   ready: {
     subject: "O computador dos seus agentes está pronto",
@@ -165,6 +197,15 @@ export const ptBR: Words = {
     button: { ai: "Conectar sua IA", task: "Passar a primeira tarefa", create: "Criar um agente" },
     why: (org) =>
       `Você recebeu este e-mail porque é dono da ${org} no agentes.chat. É o único e-mail sobre este computador.`,
+    personal: {
+      body: () =>
+        "Obrigado por esperar. O computador dos seus agentes está ligado e configurado, com um usuário só para cada agente. Ele fica ligado dia e noite, para os agentes trabalharem a qualquer hora.",
+      steps: {
+        task: ["Passe a primeira tarefa.", "Abra uma conversa com um dos seus agentes e diga do que precisa."],
+      },
+      why: () =>
+        "Você recebeu este e-mail porque este workspace no agentes.chat é seu. É o único e-mail sobre este computador.",
+    },
   },
   joinRequest: {
     subject: "Alguém pede para entrar no seu workspace",
@@ -176,6 +217,11 @@ export const ptBR: Words = {
     deny: "Recusar",
     more: ["Todos os pedidos ", { nobr: "em espera estão em Membros." }],
     why: (org) => `Você recebeu este e-mail porque é dono ou admin da ${org}. É enviado no máximo uma vez por hora.`,
+    personal: {
+      body: () => "Essa pessoa abriu o link de convite do seu workspace e pediu para entrar.",
+      why: () =>
+        "Você recebeu este e-mail porque cuida de quem entra no seu workspace. É enviado no máximo uma vez por hora.",
+    },
   },
   joinAnswer: {
     someone: "Alguém",
@@ -203,6 +249,17 @@ export const ptBR: Words = {
       small: "Se acha que foi engano, peça a alguém de lá para convidar você por e-mail.",
     },
     why: (org) => `Você recebeu este e-mail porque este endereço pediu para entrar na ${org} no agentes.chat.`,
+    personal: {
+      joined: { body: (who) => `${who} aprovou seu pedido. Agora você está no workspace.` },
+      invited: { body: (who) => `${who} aprovou seu pedido para entrar no workspace.` },
+      denied: {
+        preheader: "A pessoa viu e não aprovou.",
+        body: () => "A pessoa para quem você pediu viu seu pedido e não aprovou.",
+        small: "Se acha que foi engano, peça para ela convidar você por e-mail.",
+      },
+      why: () =>
+        "Você recebeu este e-mail porque este endereço pediu para entrar num workspace pessoal no agentes.chat.",
+    },
   },
   joinCode: {
     subject: (code) => `${code} é seu código do agentes.chat`,
@@ -212,6 +269,11 @@ export const ptBR: Words = {
     small: ["Vale por 10 minutos. Se não foi você, ", { nobr: "ignore este e-mail." }],
     why: (org) =>
       `Você recebeu este e-mail porque alguém digitou este endereço para pedir para entrar na ${org} no agentes.chat.`,
+    personal: {
+      body: () => "Digite este código na página para pedir para entrar neste workspace.",
+      why: () =>
+        "Você recebeu este e-mail porque alguém digitou este endereço para pedir para entrar num workspace pessoal no agentes.chat.",
+    },
   },
   deletionCode: {
     subjectWorkspace: (code) => `${code} é seu código para apagar um workspace`,
@@ -238,6 +300,13 @@ export const ptBR: Words = {
     whyWorkspace: (org) =>
       `Você recebeu este e-mail porque sua conta pediu para apagar o workspace ${org} no agentes.chat.`,
     whyAccount: "Você recebeu este e-mail porque sua conta pediu para ser apagada no agentes.chat.",
+    personal: {
+      workspace: (org) => [
+        "Digite este código para apagar o seu workspace ",
+        { b: org },
+        ". Ele fecha na hora e é apagado de vez 7 dias depois.",
+      ],
+    },
   },
   deleting: {
     subject: (day) => `Um workspace em que você está vai ser apagado em ${day}`,
@@ -253,6 +322,10 @@ export const ptBR: Words = {
     button: "Restaurar o workspace",
     member: "Se foi um engano, peça para um dono restaurar.",
     why: (org) => `Você recebeu este e-mail porque está na ${org} no agentes.chat.`,
+    personal: {
+      member: "Se foi um engano, peça para quem apagou restaurar.",
+      why: () => "Você recebeu este e-mail porque está neste workspace no agentes.chat.",
+    },
   },
   restored: {
     subject: "Um workspace em que você está voltou",
@@ -261,6 +334,9 @@ export const ptBR: Words = {
     body: (by, org) => [{ b: by }, " restaurou ", { b: org }, ". Ele voltou a funcionar."],
     button: "Abrir o workspace",
     why: (org) => `Você recebeu este e-mail porque está na ${org} no agentes.chat.`,
+    personal: {
+      why: () => "Você recebeu este e-mail porque está neste workspace no agentes.chat.",
+    },
   },
   appConnected: {
     subject: "Um app foi conectado à sua conta do agentes.chat",
@@ -270,6 +346,11 @@ export const ptBR: Words = {
     note: "Não foi você? Desconecte agora e troque sua senha.",
     button: "Ver apps conectados",
     why: (org) => `Você recebeu este e-mail porque um app foi conectado à sua conta na ${org} no agentes.chat.`,
+    personal: {
+      body: (app) => [{ b: app }, " agora tem acesso à sua conta no seu workspace pessoal."],
+      why: () =>
+        "Você recebeu este e-mail porque um app foi conectado à sua conta no seu workspace pessoal no agentes.chat.",
+    },
   },
   accountDeleting: {
     subject: (day) => `Sua conta do agentes.chat vai ser apagada em ${day}`,
@@ -360,6 +441,10 @@ export const ptBR: Words = {
     button: "Ver quem pode falar",
     why: (org) =>
       `Você recebeu este e-mail porque um agente seu na ${org} pensa com o seu plano e outra pessoa mudou quem pode falar com ele.`,
+    personal: {
+      why: () =>
+        "Você recebeu este e-mail porque um agente seu pensa com o seu plano e outra pessoa mudou quem pode falar com ele.",
+    },
   },
   planLent: {
     subject: (plan) => `Seu plano do ${plan} agora pensa por outro agente`,
@@ -377,6 +462,9 @@ export const ptBR: Words = {
     note: "Tire de volta com um clique nas suas notificações, e o agente para de pensar com o seu plano.",
     button: "Abrir notificações",
     why: (org) => `Você recebeu este e-mail porque alguém na ${org} conectou o seu plano a um agente.`,
+    personal: {
+      why: () => "Você recebeu este e-mail porque alguém do seu workspace conectou o seu plano a um agente.",
+    },
   },
   planWaiting: {
     subject: "Seu time está esperando",
@@ -392,5 +480,15 @@ export const ptBR: Words = {
     },
     button: "Ver planos do agentes.chat",
     why: (org) => `Você recebeu este e-mail porque administra ${org} no agentes.chat. São só dois avisos como este.`,
+    personal: {
+      subject: "Seus agentes estão esperando",
+      headline: "Seus agentes estão esperando",
+      body: (agents, _channels, routines) => {
+        const a = plural("pt-BR", agents, { one: `1 agente`, other: `${agents} agentes` });
+        const r = plural("pt-BR", routines, { one: `1 rotina`, other: `${routines} rotinas` });
+        return `Tudo pronto: ${routines > 0 ? `${a} e ${r}` : a}. Só falta um plano do agentes.chat.`;
+      },
+      why: () => "Você recebeu este e-mail porque este workspace no agentes.chat é seu. São só dois avisos como este.",
+    },
   },
 };

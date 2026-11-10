@@ -19,6 +19,7 @@ import {
   planCells,
   planCellTitles,
 } from "@agenteschat/client/lib/missions";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import { AvatarStack, Button, Icon, Menu, MenuItem, MenuSeparator } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
@@ -134,111 +135,112 @@ export function MissionThreadHeader({ thread, mission: m }: { thread: ThreadInfo
           />
           <AgentAvatar agentId={m.agentId} name={agentName} size="sm" running={running > 0 && !offline} />
         </div>
-        <div className="mh__text">
-          <div className="mh__line">
-            <h1 className="channel__title mh__title" title={m.title}>
-              {m.title}
-            </h1>
-            <MissionStatusChip mission={m} />
-            {m.machine && (
-              <span className="mh__exec">
-                <ExecutorChip mission={m} agentName={agentName} />
-              </span>
-            )}
+        {/* The title and the header's buttons: the buttons go under a title that can't keep its line beside them. */}
+        <div className="mh__main ac-actline">
+          <div className="mh__text">
+            <div className="mh__line">
+              <h1 className="channel__title mh__title">{m.title}</h1>
+              <MissionStatusChip mission={m} />
+              {m.machine && (
+                <span className="mh__exec">
+                  <ExecutorChip mission={m} agentName={agentName} />
+                </span>
+              )}
+            </div>
+            <span className="channel__topic mh__meta">
+              {t("missions.header.meta", { where })}
+              {m.branch && (
+                <span className="mh__branch">
+                  {" · "}
+                  <code>{m.branch}</code>
+                  {m.baseBranch && ` ${t("missions.header.base", { base: m.baseBranch })}`}
+                </span>
+              )}
+            </span>
           </div>
-          <span className="channel__topic mh__meta">
-            {t("missions.header.meta", { where })}
-            {m.branch && (
-              <span className="mh__branch">
-                {" · "}
-                <code>{m.branch}</code>
-                {m.baseBranch && ` ${t("missions.header.base", { base: m.baseBranch })}`}
-              </span>
-            )}
-          </span>
-        </div>
-        <span className="mh__mini">{strip}</span>
-        <div className="mh__end">
-          {who.length > 0 && (
-            <button
-              type="button"
-              className="mi-pill mh__people"
-              onClick={() => setDialog("share")}
-              aria-label={t("missions.pinned.people", { count: who.length })}
-              title={who.map((p) => p.name).join(", ")}
-            >
-              <AvatarStack aria-label={who.map((p) => p.name).join(", ")}>
-                {who.slice(0, 3).map((p) => (
-                  <ActorAvatar key={p.userId} actor={{ type: "person", id: p.userId }} name={p.name} size="xs" />
-                ))}
-              </AvatarStack>
-              {who.length > 3 && <small>+{who.length - 3}</small>}
-            </button>
-          )}
-          {open && m.canAct && m.pending.joinRequests > 0 && (
-            <button type="button" className="mi-pill mi-pill--need" onClick={() => setDialog("share")}>
-              <Icon name="members" size={14} />
-              {t("missions.join.pendingCount", { count: m.pending.joinRequests })}
-            </button>
-          )}
-          {panel && (
-            <Button
-              size="sm"
-              icon="document"
-              className="mh__files"
-              aria-label={t("missions.pinned.files")}
-              onClick={() => panel.openFiles(m.id, "mission.md")}
-            >
-              <span className="mh__files-label">{t("missions.pinned.files")}</span>
-            </Button>
-          )}
-          <Menu
-            align="end"
-            label={t("missions.menu.label")}
-            trigger={<Button size="sm" variant="ghost" iconOnly icon="more" aria-label={t("missions.pinned.more")} />}
-          >
-            {/* Actions only, each saying what it does; the settings are in their own dialog. */}
-            {menu && m.canAct && (m.status === "active" || m.status === "awaiting_close") && (
-              <MenuItem icon="pause" description={t("missions.menu.pauseHint")} onSelect={() => act("pause")}>
-                {t("missions.menu.pause")}
-              </MenuItem>
-            )}
-            {menu && m.canAct && m.status === "paused" && (
-              <MenuItem icon="play" description={t("missions.menu.resumeHint")} onSelect={() => act("resume")}>
-                {t("missions.menu.resume")}
-              </MenuItem>
-            )}
-            {menu && m.canAct && m.status !== "proposed" && (
-              <MenuItem icon="stop" description={t("missions.menu.stopHint")} onSelect={() => act("stop")}>
-                {t("missions.menu.stop")}
-              </MenuItem>
-            )}
-            <MenuItem icon="members" description={t("missions.menu.shareHint")} onSelect={() => setDialog("share")}>
-              {t("missions.menu.share")}
-            </MenuItem>
-            {open && m.canManage && (
-              <MenuItem
-                icon="archive"
-                danger
-                description={t("missions.menu.closeHint")}
-                onSelect={() => setDialog("close")}
+          <span className="mh__mini">{strip}</span>
+          <div className="mh__end">
+            {who.length > 0 && (
+              <button
+                type="button"
+                className="mi-pill mh__people"
+                onClick={() => setDialog("share")}
+                aria-label={t("missions.pinned.people", { count: who.length })}
+                title={who.map((p) => p.name).join(", ")}
               >
-                {t("missions.menu.close")}
-              </MenuItem>
+                <AvatarStack aria-label={who.map((p) => p.name).join(", ")}>
+                  {who.slice(0, 3).map((p) => (
+                    <ActorAvatar key={p.userId} actor={{ type: "person", id: p.userId }} name={p.name} size="xs" />
+                  ))}
+                </AvatarStack>
+                {who.length > 3 && <small>+{who.length - 3}</small>}
+              </button>
             )}
-            {open && (
-              <>
-                <MenuSeparator />
-                <MenuItem
-                  icon="settings"
-                  hint={t(`missions.commandApproval.${m.commandApproval}` as const)}
-                  onSelect={() => setDialog("settings")}
-                >
-                  {t("missions.menu.settings")}
+            {open && m.canAct && m.pending.joinRequests > 0 && (
+              <button type="button" className="mi-pill mi-pill--need" onClick={() => setDialog("share")}>
+                <Icon name="members" size={14} />
+                {t("missions.join.pendingCount", { count: m.pending.joinRequests })}
+              </button>
+            )}
+            {panel && (
+              <Button
+                size="sm"
+                icon="document"
+                className="mh__files"
+                aria-label={t("missions.pinned.files")}
+                onClick={() => panel.openFiles(m.id, "mission.md")}
+              >
+                <span className="mh__files-label">{t("missions.pinned.files")}</span>
+              </Button>
+            )}
+            <Menu
+              align="end"
+              label={t("missions.menu.label")}
+              trigger={<Button size="sm" variant="ghost" iconOnly icon="more" aria-label={t("missions.pinned.more")} />}
+            >
+              {/* Actions only, each saying what it does; the settings are in their own dialog. */}
+              {menu && m.canAct && (m.status === "active" || m.status === "awaiting_close") && (
+                <MenuItem icon="pause" description={t("missions.menu.pauseHint")} onSelect={() => act("pause")}>
+                  {t("missions.menu.pause")}
                 </MenuItem>
-              </>
-            )}
-          </Menu>
+              )}
+              {menu && m.canAct && m.status === "paused" && (
+                <MenuItem icon="play" description={t("missions.menu.resumeHint")} onSelect={() => act("resume")}>
+                  {t("missions.menu.resume")}
+                </MenuItem>
+              )}
+              {menu && m.canAct && m.status !== "proposed" && (
+                <MenuItem icon="stop" description={t("missions.menu.stopHint")} onSelect={() => act("stop")}>
+                  {t("missions.menu.stop")}
+                </MenuItem>
+              )}
+              <MenuItem icon="members" description={t("missions.menu.shareHint")} onSelect={() => setDialog("share")}>
+                {t("missions.menu.share")}
+              </MenuItem>
+              {open && m.canManage && (
+                <MenuItem
+                  icon="archive"
+                  danger
+                  description={t("missions.menu.closeHint")}
+                  onSelect={() => setDialog("close")}
+                >
+                  {t("missions.menu.close")}
+                </MenuItem>
+              )}
+              {open && (
+                <>
+                  <MenuSeparator />
+                  <MenuItem
+                    icon="settings"
+                    hint={t(`missions.commandApproval.${m.commandApproval}` as const)}
+                    onSelect={() => setDialog("settings")}
+                  >
+                    {t("missions.menu.settings")}
+                  </MenuItem>
+                </>
+              )}
+            </Menu>
+          </div>
         </div>
       </div>
       <div className="mh__strip">
@@ -382,7 +384,9 @@ function PickComputer({ mission }: { mission: Mission }) {
       {mine.length === 0 && (
         <MenuItem icon="info" disabled onSelect={() => {}}>
           {cloud
-            ? t("missions.waitingCloud", { computer: t("computerSetup.title", { org: org.name }) })
+            ? t("missions.waitingCloud", {
+                computer: t(modeKey(org, "computerSetup.titleInSentence"), { org: org.name }),
+              })
             : t("missions.pinned.noComputers")}
         </MenuItem>
       )}

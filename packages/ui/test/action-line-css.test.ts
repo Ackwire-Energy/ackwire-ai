@@ -22,6 +22,12 @@ test("on a phone a lone button takes the width of what holds it, at its own heig
   expect(rule(":is(.ac-dialog__foot, .ac-empty__actions):not(:has(> .ac-btn ~ .ac-btn)) > .ac-btn")).toContain(
     "flex: 1 1 100%",
   );
+  // Beside a note the one button is the footer's group of buttons: the group takes the line, the button the group.
+  expect(
+    rule(
+      ".ac-dialog__foot-acts:not(:has(> .ac-btn ~ .ac-btn)),\n  .ac-dialog__foot-acts:not(:has(> .ac-btn ~ .ac-btn)) > .ac-btn",
+    ),
+  ).toContain("flex: 1 1 100%");
   // A MediaRow's end that went under its row: the end takes the row, its one plated button too.
   expect(rule(".ac-mediarow__end--wrap:has(> .ac-btn:only-child:not(.ac-btn--ghost))")).toContain(
     "justify-self: stretch",

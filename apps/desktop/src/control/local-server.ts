@@ -6,7 +6,8 @@
 
 import type { Platform } from "./platform";
 
-export type LocalPhase = "off" | "starting" | "updating" | "running" | "stopped" | "failing";
+/** `restarting`: it stopped by itself and starts again in a moment (nobody has to start it). */
+export type LocalPhase = "off" | "starting" | "updating" | "running" | "stopped" | "restarting" | "failing";
 
 export interface LocalServerStatus {
   /** This build carries the server (Mac and Linux builds do). */
@@ -35,6 +36,12 @@ export interface LocalServerStatus {
   claim: string | null;
   /** An update didn't start and it went back to this version. */
   backTo: string | null;
+  /** Stopped by the person to stay stopped: it doesn't start with the app until Start, or until `heldUntil`. */
+  held: boolean;
+  /** When a stop for a while ends and it starts again by itself (milliseconds since 1970); null: until Start. */
+  heldUntil: number | null;
+  /** Reach is on, but Tailscale isn't connected on this computer: nobody else reaches it now. */
+  tailnetDown: boolean;
 }
 
 /** `app`: Tailscale's Mac app is there to open, not only its command-line tool (Homebrew's). */
@@ -54,15 +61,19 @@ const COVER_TAILNET = { app: "openTailscale", tray: "tailnetTray", terminal: "ta
 export const coverTailnet = (platform: Platform, tailnet: Tailnet | null) =>
   COVER_TAILNET[tailscaleFrom(platform, tailnet)];
 /**
- * Why reach didn't turn on: HTTPS off in the tailnet, Tailscale's permission (Linux), Tailscale refused, the person
- * stopped waiting for HTTPS, or the server didn't answer again at its new address.
+ * Why reach didn't turn on: HTTPS off in the tailnet, Tailscale's permission (Linux), Tailscale missing or refusing,
+ * Tailscale installed but not connected here (`app`: its Mac app is there to open), the person stopped waiting for
+ * HTTPS, or the server didn't answer again at its new address. `back`: turning it off, the server didn't answer again
+ * at this computer's own address.
  */
 export type ServeProblem =
   | { reason: "https"; url: string | null }
   | { reason: "operator" }
   | { reason: "serve" }
+  | { reason: "notConnected"; app: boolean }
   | { reason: "stopped" }
-  | { reason: "start" };
+  | { reason: "start" }
+  | { reason: "back" };
 /**
  * What turning reach on or off is doing now (`local-server://reach`): Tailscale sharing it, Tailscale waiting for
  * HTTPS to be allowed at `url`, the server starting again at its new address, the window signing in there.
@@ -102,6 +113,9 @@ export const NO_SERVER: LocalServerStatus = {
   serving: false,
   claim: null,
   backTo: null,
+  held: false,
+  heldUntil: null,
+  tailnetDown: false,
 };
 
 /** "Setting it up", in order; access from other devices only when it was asked for. */
@@ -181,17 +195,22 @@ export const REASON_TEXT: Record<ServeProblem["reason"], string> = {
   https: "desktop.here.reason.https",
   operator: "desktop.here.reason.operator",
   serve: "desktop.here.reason.serve",
+  notConnected: "desktop.here.reason.notConnected",
   stopped: "desktop.here.reason.stopped",
   start: "desktop.here.reason.start",
+  back: "desktop.here.reason.back",
 };
 
 /** The server here in a few words: "Running · only on this Mac", "Starting", … */
 export function hereLine(status: LocalServerStatus): string {
   switch (status.phase) {
     case "running":
-      return status.reach ? "desktop.server.onTailnet" : "desktop.server.onlyHere";
+      if (!status.reach) return "desktop.server.onlyHere";
+      return status.tailnetDown ? "desktop.server.tailnetDown" : "desktop.server.onTailnet";
     case "starting":
       return "desktop.server.starting";
+    case "restarting":
+      return "desktop.server.restarting";
     case "updating":
       return "desktop.server.updating";
     case "failing":
@@ -229,7 +248,8 @@ export function coverHere(
   reachable: boolean,
 ): "starting" | "migrating" | "stopped" | "failing" | "tailnetOff" | null {
   if (!isHereServer(status, current)) return null;
-  if (status.phase === "starting") return "starting";
+  // Starting again by itself: the same wait as a start, never "stopped".
+  if (status.phase === "starting" || status.phase === "restarting") return "starting";
   if (status.phase === "updating") return "migrating";
   if (status.phase === "failing") return "failing";
   if (status.phase !== "running") return "stopped";

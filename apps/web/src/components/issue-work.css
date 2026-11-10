@@ -60,7 +60,7 @@
 }
 /* Where the issue came from: one event pill (`EventPill`), like the other automatic events of a conversation. */
 .iw-line {
-  margin-inline: var(--thread-indent, 64px) 12px;
+  margin-inline: var(--thread-indent, calc(16px + var(--name-face) + var(--space-3))) 12px;
 }
 .iw-line__link {
   color: var(--ink2);

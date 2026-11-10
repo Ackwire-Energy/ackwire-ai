@@ -18,6 +18,7 @@ import { liveSubLine } from "@agenteschat/client/lib/agent-computer";
 import { computerName } from "@agenteschat/client/lib/computer";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { type AgentColorName, bodyTones } from "@agenteschat/ui/agent/engine";
 import { Canvas, Fill, Shader, Skia } from "@shopify/react-native-skia";
 import * as Clipboard from "expo-clipboard";
@@ -441,7 +442,7 @@ export function AgentScreen({
       action={again}
     />
   );
-  const computer = computerName(t, org?.name ?? "", view.machine);
+  const computer = computerName(t, org?.name ?? "", view.machine, isPersonal(org));
   const askCover = (
     <Cover
       fill

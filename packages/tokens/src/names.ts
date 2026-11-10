@@ -7,10 +7,13 @@ export const isIdHandle = (handle: string) => /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{
 /** A last word that tells same-named relatives apart ("III", "Jr.", "Filho"), not a surname. */
 const AGNOMEN = /^(?:jr|sr|ii|iii|iv|j[uú]nior|filho|neto|sobrinho)\.?$/i;
 
+/** Han, kana or Hangul first: a name with no initials, whose first glyph alone fills a small tile, as on the phone. */
+const CJK_START = /^[\u1100-\u11ff\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\uf900-\ufaff]/;
+
 /**
- * 1–2 letters: "Ada" → "A"; "Marina Souza" → "MS"; "Christopher Alexander Montgomery III" → "CM". A word that starts
- * with no letter ("🌴 Ana Souza") gives way to those that do, and a first character is taken whole: an emoji is two
- * UTF-16 units, and half of one draws as "�".
+ * 1–2 letters: "Ada" → "A"; "Marina Souza" → "MS"; "Christopher Alexander Montgomery III" → "CM"; "佐藤 花子" → "佐". A
+ * word that starts with no letter ("🌴 Ana Souza") gives way to those that do, and a first character is taken whole: an
+ * emoji is two UTF-16 units, and half of one draws as "�".
  */
 export function initialsOf(name: string): string {
   const words = name.trim().split(/\s+/).filter(Boolean);
@@ -19,7 +22,7 @@ export function initialsOf(name: string): string {
   const parts = named.length > 2 && AGNOMEN.test(named[named.length - 1] ?? "") ? named.slice(0, -1) : named;
   const first = (w: string | undefined) => Array.from(w ?? "")[0] ?? "";
   if (parts.length === 0) return "?";
-  if (parts.length === 1) return first(parts[0]).toUpperCase() || "?";
+  if (parts.length === 1 || CJK_START.test(parts[0] ?? "")) return first(parts[0]).toUpperCase() || "?";
   return `${first(parts[0])}${first(parts[parts.length - 1])}`.toUpperCase();
 }
 

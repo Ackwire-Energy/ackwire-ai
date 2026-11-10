@@ -4,20 +4,16 @@ import type { ApiClient } from "../src/api/client";
 import { keys } from "../src/api/keys";
 import { addDm } from "../src/api/queries";
 import type { DirectMessage, Me } from "../src/api/types";
-import { createWorkspace, finishOnboarding } from "../src/lib/right-hand";
+import { finishOnboarding } from "../src/lib/right-hand";
 
 const ME: Me = { user: { id: "u1", name: "Walter", email: "walter@example.com", image: null }, organizations: [] };
 
-/** A server that answers only what opening a workspace asks, each call written down. `old`: one that says neither. */
+/** A server that answers only what finishing a workspace asks, each call written down. `old`: one that says neither. */
 function server(old = false) {
   const calls: string[] = [];
   const opened = old ? {} : { rightHandId: "lodi", me: ME };
   const api = {
     orgs: {
-      create: async (input: object) => {
-        calls.push(`orgs.create ${JSON.stringify(input)}`);
-        return { organization: { id: "o1", name: "Acme", role: "owner" }, generalChannelId: "g1", ...opened };
-      },
       saveOnboarding: async (orgId: string, input: object) => {
         calls.push(`orgs.saveOnboarding ${orgId} ${JSON.stringify(input)}`);
         return { step: "done", finished: true, ...opened };
@@ -34,33 +30,16 @@ function server(old = false) {
 }
 
 describe("opening a workspace in round trips (#1)", () => {
-  test("a new one is one call: its zones go with it, finished, and it says where it opens and who the person is", async () => {
-    const { api, calls } = server();
-    const at = await createWorkspace(api, {
-      name: "Acme",
-      timezone: "America/Sao_Paulo",
-      memberTimezone: "Europe/Lisbon",
-    });
-    expect(at).toEqual({ orgId: "o1", agentId: "lodi", me: ME });
-    expect(calls).toEqual([
-      'orgs.create {"name":"Acme","timezone":"America/Sao_Paulo","memberTimezone":"Europe/Lisbon","finished":true}',
-    ]);
-  });
-
-  test("finishing one is one call, its answer saying the same", async () => {
+  test("finishing one is one call, its answer saying where it opens and who the person is now", async () => {
     const { api, calls } = server();
     expect(await finishOnboarding(api, "o1")).toEqual({ orgId: "o1", agentId: "lodi", me: ME });
     expect(calls).toEqual(['orgs.saveOnboarding o1 {"finished":true}']);
   });
 
-  test("an older server that says neither: a second call finishes it, its agents say which is the right hand", async () => {
+  test("an older server that says neither: its agents say which is the right hand", async () => {
     const { api, calls } = server(true);
-    expect(await createWorkspace(api, { name: "Acme" })).toEqual({ orgId: "o1", agentId: "lodi", me: null });
-    expect(calls).toEqual([
-      'orgs.create {"name":"Acme","finished":true}',
-      'orgs.saveOnboarding o1 {"finished":true}',
-      "agents.list",
-    ]);
+    expect(await finishOnboarding(api, "o1")).toEqual({ orgId: "o1", agentId: "lodi", me: null });
+    expect(calls).toEqual(['orgs.saveOnboarding o1 {"finished":true}', "agents.list"]);
   });
 });
 

@@ -128,7 +128,8 @@
     "quitTitle": "Zakończyć agentes.chat?",
     "quitBody": "Agenci nie mogą korzystać z tego urządzenia ({{device}}), gdy aplikacja jest zamknięta. To, co już działa, skończy się i wyśle wynik, gdy znowu ją otworzysz.",
     "quitHereBody": "agentes.chat zatrzymuje się na tym urządzeniu ({{device}}): nikt nie może z niego korzystać, ani tutaj, ani z twojego telefonu, ani z telefonów zespołu, dopóki znowu nie otworzysz aplikacji.",
-    "quitConfirm": "Zakończ"
+    "quitConfirm": "Zakończ",
+    "pauseHintServer": "To, co już działa, kończy się normalnie. Serwer działa dalej."
   },
   "first": {
     "title": "Twój zespół i twoi agenci, razem",
@@ -140,7 +141,9 @@
     "addTitle": "Dodaj przestrzeń roboczą",
     "addLead": "Te, które już masz, zostają tutaj, każda z własnym logowaniem.",
     "addCloud": "Utwórz przestrzeń roboczą w agentes.chat",
-    "addOwn": "Użyj serwera twojego zespołu"
+    "addOwn": "Użyj serwera twojego zespołu",
+    "addNew": "Chcesz nowy workspace?",
+    "addNewLink": "Utwórz go"
   },
   "own": {
     "title": "Twój własny serwer",
@@ -167,14 +170,22 @@
     "none": "Nie masz jeszcze serwera? Uruchom na nim to polecenie",
     "noneText": "W terminalu serwera albo Maca mini. Na końcu pojawi się link, który połączy z nim tę aplikację.",
     "invalid": "Sprawdź adres, na przykład agentes.twojzespol.ts.net.",
-    "httpRefused": "{{host}} używa zwykłego http, które działa tylko na tym urządzeniu ({{device}}). Użyj adresu Tailscale albo adresu z https.",
-    "noOwner": "{{host}} nie ma jeszcze konta właściciela. Otwórz jego link właściciela (kończy się na /owner#claim=…), na tym urządzeniu ({{device}}) albo na telefonie.",
-    "unreachable": "Nie możemy połączyć się z {{host}}. Jeśli działa w Tailscale, otwórz Tailscale na tym urządzeniu ({{device}}), połącz się i spróbuj ponownie.",
+    "httpRefused": "{{host}} nie używa bezpiecznego połączenia (https), a obejść się bez niego mogą tylko serwery na tym urządzeniu ({{device}}). Użyj jego adresu https albo adresu Tailscale.",
+    "noOwner": "{{host}} nie ma jeszcze właściciela. Osoba, która zainstalowała serwer, dostała link do utworzenia konta właściciela: otwórz ten link na tym urządzeniu ({{device}}) albo na telefonie.",
+    "unreachable": "Nie możemy połączyć się z {{host}}. Sprawdź adres i czy serwer jest włączony, a potem spróbuj ponownie.",
     "unreachableHere": "Pod adresem {{host}} nic nie odpowiada na tym urządzeniu ({{device}}). Uruchom tutaj agentes.chat i spróbuj ponownie.",
     "certificate": "Certyfikat {{host}} jest nieprawidłowy. Porozmawiaj z osobą, która zarządza serwerem.",
     "notAgentes": "{{host}} nie jest serwerem agentes.chat. Sprawdź adres.",
     "serverTooOld": "{{host}} wymaga aktualizacji, żeby działać z tą aplikacją.",
-    "appTooOld": "Zaktualizuj aplikację, żeby korzystać z {{host}}."
+    "appTooOld": "Zaktualizuj aplikację, żeby korzystać z {{host}}.",
+    "foundNoOwner": "Czeka na konto właściciela",
+    "setUp": "Skonfiguruj",
+    "noneFound": "Nie znaleziono serwera.",
+    "lookAgain": "Szukaj ponownie",
+    "tailnetOff": "Tailscale jest wyłączony na tym urządzeniu ({{device}}), więc serwery z twojej sieci Tailscale się tu nie pojawiają.",
+    "addressHint": "Adres z https albo jego adres Tailscale, który kończy się na .ts.net.",
+    "checkUpdates": "Sprawdź aktualizacje",
+    "unreachableTailnet": "Nie możemy połączyć się z {{host}}, który jest w twojej sieci Tailscale. Otwórz Tailscale na tym urządzeniu ({{device}}), połącz się i spróbuj ponownie."
   },
   "here": {
     "title": "Uruchom agentes.chat na tym urządzeniu ({{device}})",
@@ -230,7 +241,9 @@
       "serve": "Tailscale na tym urządzeniu ({{device}}) nie może tego udostępnić",
       "operator": "Tailscale najpierw potrzebuje twojego pozwolenia",
       "stopped": "przerwano czekanie na włączenie HTTPS",
-      "start": "agentes.chat nie odpowiedział ponownie pod nowym adresem"
+      "start": "agentes.chat nie odpowiedział ponownie pod nowym adresem",
+      "notConnected": "Tailscale nie jest połączony na tym urządzeniu ({{device}})",
+      "back": "agentes.chat nie odpowiedział ponownie na tym urządzeniu ({{device}}) po wyłączeniu dostępu z twoich urządzeń."
     },
     "serveFix": "Zainstaluj Tailscale z tailscale.com.",
     "operatorRun": "Daj to pozwolenie raz, w terminalu:",
@@ -240,13 +253,15 @@
     "notifyFailed": "Konfiguracja agentes.chat na tym urządzeniu ({{device}}) się nie zakończyła",
     "notifyFailedBody": "Otwórz agentes.chat, aby zobaczyć, co się stało.",
     "already": "agentes.chat jest już zainstalowany na tym urządzeniu ({{device}})",
-    "alreadyText": "Działa samodzielnie, zainstalowany z terminala, pod adresem {{url}}.",
+    "alreadyText": "Działa samodzielnie, zainstalowany z terminala. Używaj go w tej aplikacji.",
     "useIt": "Użyj go",
     "notRunning": "agentes.chat jest zainstalowany na tym urządzeniu ({{device}}), ale nie działa",
-    "notRunningText": "Został zainstalowany z terminala, w {{path}}. Uruchom go tam i spróbuj ponownie.",
+    "notRunningText": "Został zainstalowany z terminala, w {{path}}. Aby go uruchomić, wpisz to w terminalu i spróbuj ponownie:",
     "running": "agentes.chat już działa na tym urządzeniu ({{device}})",
-    "runningText": "Uruchamia go ta aplikacja, pod adresem {{url}}.",
-    "openIt": "Otwórz"
+    "runningText": "Uruchamia go ta aplikacja. Otwórz go, aby się zalogować.",
+    "openIt": "Otwórz",
+    "connectTray": "Połącz go przez jego ikonę obok zegara.",
+    "alreadyDocker": "Działa samodzielnie, zainstalowany przez Docker. Używaj go w tej aplikacji."
   },
   "link": {
     "question": "Połączyć aplikację z tym serwerem?",
@@ -258,7 +273,9 @@
     "checking": "Sprawdzanie serwera…",
     "notALink": "Ten link nie pochodzi z serwera agentes.chat.",
     "chipTailnet": "Tailscale",
-    "chipHere": "Ten {{device}}"
+    "chipHere": "Ten {{device}}",
+    "thisServer": "agentes.chat na tym urządzeniu ({{device}})",
+    "tailnetHelp": "Jest w sieci Tailscale: otwiera się tylko na urządzeniach połączonych z Tailscale tym samym kontem."
   },
   "servers": {
     "title": "Serwery",
@@ -286,7 +303,12 @@
     "workspaces_other": "{{count}} przestrzeni roboczej",
     "signedOut": "Nie zalogowano",
     "newsOne": "1 nowe powiadomienie",
-    "newsMany": "Nowe powiadomienia: {{n}}"
+    "newsMany": "Nowe powiadomienia: {{n}}",
+    "offline": "Offline od {{time}}",
+    "signIn": "Zaloguj się",
+    "signOut": "Wyloguj z tego serwera",
+    "signedOutDone": "Wylogowano z {{host}}",
+    "removeFromApp": "Usuń z tej aplikacji"
   },
   "server": {
     "title": "agentes.chat na tym urządzeniu ({{device}})",
@@ -325,7 +347,30 @@
     "failingBanner": "agentes.chat nie uruchamia się na tym urządzeniu ({{device}})",
     "version": "Wersja {{version}}, aktualizowana razem z aplikacją",
     "updatesWithApp": "Aktualizacja aplikacji aktualizuje też agentes.chat na tym urządzeniu ({{device}}).",
-    "updateBack": "Aktualizacja się nie uruchomiła. agentes.chat wrócił do wersji {{version}}."
+    "updateBack": "Aktualizacja się nie uruchomiła. agentes.chat wrócił do wersji {{version}}.",
+    "restarting": "Uruchamia się ponownie",
+    "tailnetDown": "Działa · Tailscale nie jest połączony na tym urządzeniu ({{device}})",
+    "failingBody": "Otwórz aplikację, aby zobaczyć, co się stało, i spróbować ponownie.",
+    "restartedBanner": "agentes.chat uruchomił się ponownie 3 razy na tym urządzeniu ({{device}})",
+    "restartedBody": "Wraca sam. Jeśli to się powtarza, otwórz aplikację, aby zobaczyć przyczynę.",
+    "updateBackBody": "Nowa wersja zostanie wypróbowana ponownie przy następnej aktualizacji aplikacji.",
+    "stopFor1h": "Zatrzymaj na 1 godzinę",
+    "startNow": "Uruchom teraz",
+    "stopUntilStart": "Zatrzymaj, aż go uruchomię",
+    "stopForget": "Nie uruchamiaj z aplikacją…",
+    "stopNote": "Zatrzymanie odcina dostęp wszystkim, także na telefonie.",
+    "stopTitle": "Zatrzymać agentes.chat na tym urządzeniu ({{device}})?",
+    "stopBody": "Telefon i zespół tracą dostęp, dopóki nie wróci.",
+    "stoppedUntil": "Zatrzymany · wraca o {{time}}",
+    "stoppedHeld": "Zatrzymany, dopóki go nie uruchomisz",
+    "reachRestart": "Włączenie lub wyłączenie na chwilę uruchamia agentes.chat ponownie.",
+    "reachOffTitle": "Wyłączyć dostęp z twoich urządzeń?",
+    "reachOffBody": "Telefon i zespół tracą dostęp. Korzysta z niego dalej tylko to urządzenie ({{device}}).",
+    "reachOffConfirm": "Wyłącz",
+    "failingWhy": "Szczegóły mówią dlaczego: skopiuj je dla osoby, która ci pomaga, albo zajrzyj do logów.",
+    "showLogs": "Pokaż logi",
+    "help": "Pomoc",
+    "gotIt": "Rozumiem"
   },
   "pair": {
     "title": "Pozwolić agentom z {{org}} pracować na tym urządzeniu ({{device}})?",
@@ -408,6 +453,34 @@
       "menuBarTitle": "Pokazuj na pasku menu",
       "notchTitle": "Pokazuj agentów w notchu",
       "notchDesc": "Na MacBookach z notchem: wokół kamery widać, kto pracuje."
+    },
+    "thisMac": {
+      "agents": "Agenci",
+      "letAgents": "Pozwól agentom używać tego urządzenia ({{device}})",
+      "letAgentsDesc": "Agenci używają tego urządzenia ({{device}}), gdy go potrzebują, dopóki aplikacja jest otwarta.",
+      "commandsDesc": "Testy, kompilacje i inne polecenia terminala. Działają jako {{user}}, a każde widać w Aktywności.",
+      "who": "Kto może używać",
+      "whoDesc": "Tylko ja oznacza ciebie i agentów, którzy dla ciebie pracują.",
+      "whoIn": "Kto może używać w {{org}}",
+      "owner": "Tylko ja",
+      "everyone": "Wszyscy w {{org}}",
+      "people": "Wybrane osoby lub role",
+      "edit": "Edytuj",
+      "pickTitle": "Kto może używać tego urządzenia ({{device}})",
+      "search": "Szukaj osób",
+      "noMatch": "Nikogo nie znaleziono",
+      "ownerAlways": "Jako właściciel zawsze możesz z niego korzystać.",
+      "save": "Zapisz",
+      "saved": "Zapisano",
+      "phones": "Telefony podłączone do tego urządzenia ({{device}})",
+      "phonesIn": "Telefony podłączone do tego urządzenia ({{device}}) w {{org}}",
+      "plug": "Podłącz telefon do tego urządzenia ({{device}}), żeby go dodać.",
+      "androidSteps": "Kroki dla Androida",
+      "iphoneSteps": "Kroki dla iPhone'a",
+      "wider": "Agenci innych osób działają tu jako {{user}} i mogą czytać twoje pliki.",
+      "phoneWho": "Może używać: {{who}}",
+      "signedOut": "Zaloguj się w aplikacji do {{server}}, żeby zobaczyć, kto może używać tego urządzenia ({{device}}).",
+      "unreachable": "Nie udało się połączyć z {{server}}. Sprawdź połączenie i spróbuj ponownie."
     },
     "folders": {
       "title": "Foldery",
@@ -572,6 +645,32 @@
       "folderDesc": "Jeden folder na przestrzeń roboczą, z folderem dla każdego agenta."
     }
   },
+  "iphone": {
+    "lead": "To urządzenie ({{device}}) wszystko konfiguruje. Dotykasz iPhone'a tylko wtedy, gdy krok o to prosi.",
+    "account": "Konto Apple w Xcode",
+    "checking": "Sprawdzanie tego urządzenia ({{device}})…",
+    "xcodeText": "Zainstaluj Xcode z App Store. Ten krok ruszy sam, gdy Xcode się pojawi.",
+    "xcodeOld": "Ten iPhone potrzebuje nowszego Xcode. Zaktualizuj go w App Store.",
+    "updateXcode": "Zaktualizuj Xcode",
+    "toolsStarting": "Rozpoczynanie pobierania…",
+    "toolsProgress": "{{done}} z {{total}}",
+    "toolsPercent": "Pobrano {{percent}}%",
+    "toolsFailed": "Pobieranie się zatrzymało: {{message}}",
+    "accountText": "Dodaj je w Xcode › Settings › Accounts. Wystarczy bezpłatne konto Apple.",
+    "openXcode": "Otwórz Xcode",
+    "personalTeam": "{{name}} · Zespół osobisty",
+    "unlockText": "Odblokuj iPhone'a i zostaw go odblokowanego na chwilę.",
+    "oldText": "iOS na tym iPhonie jest za stary dla narzędzi Xcode.",
+    "devModeHint": "Pojawia się w Ustawieniach dopiero po sparowaniu Maca z iPhone'em. To urządzenie ({{device}}) już to zrobiło.",
+    "helperText": "To urządzenie ({{device}}) tworzy go i odnawia co 7 dni. Za pierwszym razem zaufaj mu na iPhonie.",
+    "helperHint": "Ustawienia › Ogólne › VPN i zarządzanie urządzeniem, stuknij swoje konto Apple, a potem Zaufaj. Odnawianie wymaga zalogowania w Xcode.",
+    "helperBuilding": "Tworzenie pomocnika testowego…",
+    "qr": "Zeskanuj iPhone'em, żeby zobaczyć te kroki na nim.",
+    "qrLabel": "Kod QR, który otwiera te kroki na iPhonie",
+    "tip": "Gotowy o każdej porze",
+    "tipHint": "Dla testowego iPhone'a, który zostaje podłączony: Autoblokada Nigdy, automatyczne uaktualnienia wyłączone, bez kodu i to urządzenie ({{device}}) podłączone do zasilania.",
+    "progress": "Konfiguracja iPhone'a"
+  },
   "cover": {
     "offline": "Brak połączenia z internetem · próbujemy ponownie…",
     "unreachable": "Nie można połączyć się z {{host}} · próbujemy ponownie…",
@@ -591,7 +690,14 @@
     "openTailscale": "Otwórz Tailscale",
     "otherServer": "Użyj innego serwera",
     "stuck": "agentes.chat się nie otworzył. Spróbuj ponownie albo zobacz stronę taką, jaka jest.",
-    "showAnyway": "Pokaż mimo to"
+    "showAnyway": "Pokaż mimo to",
+    "copyFailed": "Nie udało się skopiować",
+    "held": "agentes.chat jest zatrzymany na tym urządzeniu ({{device}}), dopóki go nie uruchomisz.",
+    "heldUntil": "agentes.chat jest zatrzymany na tym urządzeniu ({{device}}). Wróci sam o {{time}}.",
+    "startNow": "Uruchom teraz",
+    "openOther": "Otwórz {{server}}",
+    "onlyHereWorking": "Wyłączanie dostępu z twoich urządzeń…",
+    "onlyHereFailed": "Nie udało się wyłączyć dostępu z twoich urządzeń."
   },
   "menu": {
     "about": "O agentes.chat",
@@ -640,5 +746,9 @@
     "bringAllToFront": "Przenieś wszystko na wierzch",
     "help": "Pomoc",
     "downloaded": "Pobieranie zakończone"
+  },
+  "windowTitle": {
+    "welcome": "Witamy",
+    "prefs": "Preferencje"
   }
 }

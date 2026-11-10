@@ -4,7 +4,7 @@
  * (two organizations, one with a logo, agents at work, a folder request), so every screen can be seen
  * without the Tauri shell. Never part of the real app's behaviour: the host picks it only outside Tauri.
  */
-import type { RunnerAccess, RunnerAccountInfo, RunnerPause } from "@agenteschat/adapters/machine-protocol";
+import type { RunnerAccess, RunnerAccountInfo, RunnerPause, RunnerPhone } from "@agenteschat/adapters/machine-protocol";
 import {
   type ActivityEntry,
   CONTROL_PROTOCOL_VERSION,
@@ -12,6 +12,7 @@ import {
   type ControlAgent,
   type ControlConfig,
   type ControlEvent,
+  type ControlIphoneSetup,
   type ControlJob,
   type ControlOut,
   type ControlStatus,
@@ -238,6 +239,42 @@ export class FakeRunner {
 
   /** The server this home is paired with (the server here's homes point at its loopback address). */
   server = FAKE_SERVER;
+  /** The phones plugged into this computer: a Pixel an agent uses, an iPhone that needs Developer Mode. */
+  phones: RunnerPhone[] = [
+    {
+      platform: "android",
+      serial: "38021FDH2000AB",
+      kind: "device",
+      model: "Pixel 8",
+      osVersion: "16",
+      state: "ready",
+      transport: "usb",
+      holder: {
+        runId: "run_1",
+        agentId: "ag_ada",
+        userId: "u_rui",
+        label: "Recording a test video",
+        since: minutesAgo(10),
+      },
+    },
+    {
+      platform: "ios",
+      serial: "00008110-001475263AC0A01E",
+      kind: "device",
+      model: "iPhone 16",
+      name: "Sam's iPhone 16",
+      osVersion: "27.1",
+      state: "needs_you",
+      reason: "developer_mode_off",
+      transport: "usb",
+    },
+  ];
+  /** The Mac's side of an iPhone's setup; `iphone.download` fills the platform in about a second. */
+  iphone: ControlIphoneSetup = {
+    xcode: "27.0",
+    platform: { state: "missing" },
+    account: { name: "Sam Rivera", personal: true },
+  };
 
   constructor(
     readonly homeId: string,
@@ -474,9 +511,39 @@ export class FakeRunner {
         this.accounts = this.accounts.filter((a) => !(a.id === msg.accountId && a.kind === msg.kind));
         return reply({ removed: this.accounts.length < before });
       }
+      case "iphone.setup":
+        return reply(this.iphone);
+      case "iphone.download":
+        if (this.iphone.platform.state === "missing" || this.iphone.platform.state === "failed") this.download();
+        return reply(this.iphone);
+      case "iphone.open":
+        console.info("[fake] open", msg.app);
+        return reply({ opened: true });
       case "shutdown":
         return reply({ stopping: true });
     }
+  }
+
+  /** The workspace and machine this home is paired as (the fake server's devices list names them). */
+  ids(): { orgId: string; machineId: string; name: string } | null {
+    return this.seed ? { orgId: this.seed.org.id, machineId: `m_${this.homeId}`, name: this.machineName } : null;
+  }
+
+  private download() {
+    let percent = 0;
+    const step = () => {
+      percent += 25;
+      this.iphone = {
+        ...this.iphone,
+        platform:
+          percent >= 100
+            ? { state: "installed", version: "27.1" }
+            : { state: "downloading", percent, done: `${((8.4 * percent) / 100).toFixed(1)} GB`, total: "8.4 GB" },
+      };
+      if (percent < 100) this.later(step, 300);
+    };
+    this.iphone = { ...this.iphone, platform: { state: "downloading", percent: null } };
+    this.later(step, 300);
   }
 
   private accessChanged(reply: (data: unknown) => void) {
@@ -504,6 +571,7 @@ export class FakeRunner {
       workspace: this.config.workspace,
       agents: s?.agents ?? [],
       access: s?.access,
+      ...(s ? { phones: this.phones, user: "sam" } : {}),
     };
   }
 
@@ -552,6 +620,12 @@ export class FakeRunner {
     };
     s.jobs.push(job);
     this.emit({ kind: "job.started", job });
+  }
+
+  /** The phones change (plugged in, unplugged, a step further): the app hears a new status, as the runner sends. */
+  setPhones(phones: RunnerPhone[]) {
+    this.phones = phones;
+    this.emit({ kind: "status", status: this.status() });
   }
 
   private emit(event: ControlEvent) {

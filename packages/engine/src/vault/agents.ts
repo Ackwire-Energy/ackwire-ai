@@ -23,6 +23,7 @@ import { SealedValueError } from "../crypto";
 import { ConflictError, ValidationError } from "../errors";
 import { publishVaultChanged } from "../events";
 import { secretLabelOf } from "../secrets";
+import { isPersonalWorkspace } from "../workspace-mode";
 import {
   type ConnectionRow,
   effectiveColumns,
@@ -388,7 +389,7 @@ export async function saveVaultItemByAgent(
   if (item.connectionId) throw refuse.notAllowed(`${named(item)} comes from ${source}. It changes there, not here.`);
   if (!item.ownerUserId && !(person.personId && person.manages)) {
     throw refuse.notAllowed(
-      `${named(item)} is the team's: only someone who manages credentials changes it, and nobody behind this request does. Ask one of them, or a person can change it in Settings, Vault.`,
+      `${named(item)} is ${await sharedWords(db, run)}: only someone who manages credentials changes it, and nobody behind this request does. Ask one of them, or a person can change it in Settings, Vault.`,
     );
   }
   const kind = item.kind as VaultItemKind;
@@ -499,12 +500,16 @@ async function createContact(
 export type VaultMadeTarget = { website: string; username: string | null } | { keyName: string; title: string };
 
 /** A value the agent made replaces only what the run could type or use anyway, on the terms of `vault_save`. */
-function assertMayReplace(item: ItemRow, run: VaultRun, person: VaultRunPerson) {
+async function assertMayReplace(db: Executor, item: ItemRow, run: VaultRun, person: VaultRunPerson) {
   if (item.ownerUserId || item.createdByAgentId === run.agentId || (person.personId && person.manages)) return;
   throw refuse.notAllowed(
-    `${named(item)} is the team's and you didn't make it: only someone who manages credentials changes it. Nothing was changed.`,
+    `${named(item)} is ${await sharedWords(db, run)} and you didn't make it: only someone who manages credentials changes it. Nothing was changed.`,
   );
 }
+
+/** Whose a shared item is, in the refusal: the team's, or the workspace's in a personal one (ADR 0159). */
+const sharedWords = async (db: Executor, run: VaultRun) =>
+  (await isPersonalWorkspace(db, run.orgId)) ? "shared in this workspace" : "the team's";
 
 /**
  * A password an agent's computer made, into the Vault (ADR 0144 §8), before anything is typed: a form sent with a
@@ -548,7 +553,7 @@ export async function saveMadePassword(
   );
   const existing = same.find((item) => item.ownerUserId && item.ownerUserId === person.personId) ?? same[0];
   if (existing) {
-    assertMayReplace(existing, run, person);
+    await assertMayReplace(deps.db, existing, run, person);
     const sealed = await sealItemValue(deps, existing, existing.secretVersion + 1, value);
     const kept = keptBehind([...existing.previousSecrets, ...sealedValueOf(existing)]);
     const row = await replaceValue(deps, run, person, existing, sealed, kept);
@@ -624,7 +629,7 @@ export async function restoreMadePassword(
 ): Promise<VaultAgentResult & { kept: number }> {
   const person = await vaultPersonOfRun(deps.db, run);
   const { item } = await itemForRun(deps, run, person, itemId, "item");
-  assertMayReplace(item, run, person);
+  await assertMayReplace(deps.db, item, run, person);
   const last = item.previousSecrets.at(-1);
   if (!last) throw refuse.notAllowed(`${named(item)} keeps no earlier password.`);
   const value = await openItemValue(deps, { ...item, ...last }).catch(() => null);

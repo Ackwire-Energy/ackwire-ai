@@ -4,7 +4,7 @@ import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { memberGroups } from "@agenteschat/client/lib/member-groups";
 import { agentStatusShort, isOutOfOffice } from "@agenteschat/client/lib/presence";
-import { Avatar, Button, Icon, matchesWords, RoleMark, SearchField } from "@agenteschat/ui";
+import { Avatar, Button, Icon, matchesWords, PixelSpinner, RoleMark, SearchField } from "@agenteschat/ui";
 import { type KeyboardEvent, type TouchEvent, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
@@ -100,24 +100,26 @@ export function MembersSheet({
         }}
       >
         <header className="members-sheet__head">
-          <span className="members-sheet__title">
-            <Icon name="channel" size={18} />
-            <span>{channel.name}</span>
-          </span>
-          <span className="members-sheet__acts">
-            {isMember && <ChannelThreadsButton channelId={channel.id} channelName={channel.name} />}
-            {isMember && <ChannelPinsButton channelId={channel.id} channelName={channel.name} />}
-            <button
-              type="button"
-              className="ac-btn ac-btn--ghost ac-btn--icon channel__icon"
-              aria-label={settings}
-              title={settings}
-              onClick={onDetails}
-            >
-              <Icon name="cog" />
-            </button>
-            <Button size="sm" variant="ghost" iconOnly icon="close" aria-label={t("common.close")} onClick={onClose} />
-          </span>
+          <div className="ac-actline members-sheet__line">
+            <span className="members-sheet__title">
+              <Icon name="channel" size={18} />
+              <span>{channel.name}</span>
+            </span>
+            <span className="members-sheet__acts">
+              {isMember && <ChannelThreadsButton channelId={channel.id} channelName={channel.name} />}
+              {isMember && <ChannelPinsButton channelId={channel.id} channelName={channel.name} />}
+              <button
+                type="button"
+                className="ac-btn ac-btn--ghost ac-btn--icon channel__icon"
+                aria-label={settings}
+                title={settings}
+                onClick={onDetails}
+              >
+                <Icon name="cog" />
+              </button>
+            </span>
+          </div>
+          <Button size="sm" variant="ghost" iconOnly icon="close" aria-label={t("common.close")} onClick={onClose} />
         </header>
         <div className="members-sheet__find">
           <SearchField
@@ -181,7 +183,7 @@ function MembersList({ channelId, people, agents, onAdd }: Lists) {
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: arrow keys between the row buttons
     <div className="members-side__groups" onKeyDown={onKey}>
-      <p className="members-side__caption">{t("channelMembers.caption")}</p>
+      <h2 className="members-side__title">{t("members.title")}</h2>
       {groups.map((g) => {
         const label = g.role?.name ?? name(g.key);
         // ponytail: every row is in the DOM (offline capped at 100); virtualize if a channel reaches thousands.
@@ -285,7 +287,8 @@ function AgentRow({ agent, channelId, busy }: { agent: Agent; channelId: string;
   const line = shown?.line ? agentStatusShort(t, shown.line, i18n.language) : null;
   const full = agentLine(t, shown?.line ?? null, i18n.language)?.text;
   const doing = state !== "idle" ? t(`channel.agentState.${state}`) : null;
-  const text = line?.text ?? doing ?? agent.role ?? word;
+  // Under the name, one line of one height: its line (why it is out, what it is on), else its role (the agent's fixed
+  // label) as a tag, else its presence. Working here is the pixel orbit beside its name, so the row never jumps.
   const shows = useId();
   return (
     <ProfileTrigger
@@ -315,13 +318,15 @@ function AgentRow({ agent, channelId, busy }: { agent: Agent; channelId: string;
         <span className="members-side__text">
           <span className="members-side__name">
             <span className="members-side__label">{agent.name}</span>
+            {doing && <PixelSpinner size={14} color={colorOf(agent)} label={doing} className="members-side__spin" />}
           </span>
-          {text &&
-            (line ? (
-              <StatusLine {...line} className="members-side__line members-side__work" />
-            ) : (
-              <span className={busy ? "members-side__line members-side__work" : "members-side__line"}>{text}</span>
-            ))}
+          {line ? (
+            <StatusLine {...line} className="members-side__line" />
+          ) : agent.role ? (
+            <span className="members-side__line ac-tag">{agent.role}</span>
+          ) : (
+            word && <span className="members-side__line">{word}</span>
+          )}
         </span>
       </span>
     </ProfileTrigger>

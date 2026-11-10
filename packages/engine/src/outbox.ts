@@ -1,4 +1,5 @@
 import { and, type Database, type Executor, eq, inArray, type SQL, schema, sql } from "@agenteschat/db";
+import { percentile } from "./format";
 
 const { outbox } = schema;
 
@@ -64,6 +65,15 @@ export interface ClaimOptions {
   batchSize?: number;
   leaseMs?: number;
   now?: Date;
+  /** At most this many quick jobs in this claim: the pump's room for them (`LaneLimits`). Undefined: no cap. */
+  maxQuick?: number;
+  /** Kinds this process leaves to the others: a worker process leaves `APP_JOB_KINDS` to the app. */
+  skipKinds?: string[];
+  /**
+   * At most this many long jobs in this claim (`LONG_JOB_KINDS`), background ones included: the pump's
+   * free long slots. Undefined: no cap (batches, tests).
+   */
+  maxLong?: number;
   /**
    * At most this many background jobs in this claim (`backgroundJobSql`): the pump's free background
    * slots. Undefined: no cap (batches, tests).
@@ -73,8 +83,40 @@ export interface ClaimOptions {
   onTiming?(name: string, ms: number, attrs: Record<string, unknown>): void;
 }
 
-/** A claimed job, and whether it is background work (it counts against the pump's background slots). */
-export type ClaimedJob = OutboxJob & { background: boolean };
+/** A claimed job, and its lane: long work and background work count against the pump's slots for them. */
+export type ClaimedJob = OutboxJob & { long: boolean; background: boolean };
+
+/**
+ * Kinds that can hold a slot for minutes, or that sweeps queue by the hundred with nobody waiting on them
+ * (ADR 0053 §10). They share the long slots, so a quick job (a message's routing, its notifications, search
+ * indexing, push, email) never waits behind them. Every other kind is quick. Background work is long too.
+ */
+export const LONG_JOB_KINDS = [
+  "agent_run.execute",
+  "routine.run",
+  "autonomy.later",
+  "agent_work.check_in",
+  "agent.follow_up",
+  "context.consolidate",
+  "context.reflect",
+  "search.reindex",
+  "storage.migrate",
+  "skills.update",
+  "vault.sync",
+  "org.delete",
+  "account.delete",
+  "channel.delete",
+  "org.files.purge",
+  "user.files.purge",
+];
+
+const longJobSql = inArray(outbox.kind, LONG_JOB_KINDS);
+
+/**
+ * Kinds only a process serving the app runs (`SERVER_ROLE=all`), never a worker: a push waits while its person has the
+ * app open, and in core only the process holding their socket knows that (`Presence`, in memory).
+ */
+export const APP_JOB_KINDS = ["push.send"];
 
 /** The run an `agent_run.execute` job executes (null for a malformed payload). */
 const runOfJob = sql`case when ${outbox.payload}->>'runId' ~ '^[0-9a-fA-F-]{36}$' then (${outbox.payload}->>'runId')::uuid end`;
@@ -82,7 +124,7 @@ const runOfJob = sql`case when ${outbox.payload}->>'runId' ~ '^[0-9a-fA-F-]{36}$
 /**
  * Background work (ADR 0053 §10): a routine firing (`routine.run`), or the execution of a routine's
  * background run (`agent_run.execute` of a run with `agent_runs.background`). A person's message never
- * waits behind it: it holds at most half of a worker's slots.
+ * waits behind it: it holds at most half of a worker's long slots. Both kinds are in `LONG_JOB_KINDS`.
  */
 const backgroundJobSql = sql`(${outbox.kind} = 'routine.run' or (${outbox.kind} = 'agent_run.execute' and exists (
   select 1 from ${schema.agentRuns} r where r.id = ${runOfJob} and r.background)))`;
@@ -97,20 +139,35 @@ const orphanedRunJobSql = sql`(${outbox.kind} = 'agent_run.execute' and exists (
 
 const LEASE_LOST = "lease expired on the final attempt";
 
+/** Each lane's jobs, less the kinds this process leaves to the others (`ClaimOptions.skipKinds`). */
+function laneJobs(skipKinds: string[] = []): Record<Lane, SQL> {
+  const mine = skipKinds.length > 0 ? sql` and not ${inArray(outbox.kind, skipKinds)}` : sql``;
+  return {
+    quick: sql`not ${longJobSql}${mine}`,
+    long: sql`${longJobSql} and not ${backgroundJobSql}${mine}`,
+    background: sql`${backgroundJobSql}${mine}`,
+  };
+}
+
 /**
  * Claims due jobs: pending ones whose time has come, and processing ones whose lease expired (except a dead
- * worker's agent run, `orphanedRunJobSql`). Other work first, then background jobs up to `maxBackground` in the
- * slots left.
+ * worker's agent run, `orphanedRunJobSql`). Quick jobs first, then long ones up to `maxLong` in the slots left,
+ * then background ones up to `maxBackground` in the long room left.
  */
 export async function claimJobs(db: Database, options: ProcessOptions): Promise<ClaimedJob[]> {
   const now = options.now ?? new Date();
   const batch = options.batchSize ?? 20;
-  const foreground = await claimWhere(db, options, now, sql`not ${backgroundJobSql}`, batch);
-  const room = Math.min(batch - foreground.length, options.maxBackground ?? batch);
-  const background = room > 0 ? await claimWhere(db, options, now, backgroundJobSql, room) : [];
+  const lanes = laneJobs(options.skipKinds);
+  const quickRoom = Math.min(batch, options.maxQuick ?? batch);
+  const quick = quickRoom > 0 ? await claimWhere(db, options, now, lanes.quick, quickRoom) : [];
+  const longRoom = Math.min(batch - quick.length, options.maxLong ?? batch);
+  const long = longRoom > 0 ? await claimWhere(db, options, now, lanes.long, longRoom) : [];
+  const room = Math.min(longRoom - long.length, options.maxBackground ?? batch);
+  const background = room > 0 ? await claimWhere(db, options, now, lanes.background, room) : [];
   const claimed: ClaimedJob[] = [
-    ...foreground.map((job) => ({ ...job, background: false })),
-    ...background.map((job) => ({ ...job, background: true })),
+    ...quick.map((job) => ({ ...job, long: false, background: false })),
+    ...long.map((job) => ({ ...job, long: true, background: false })),
+    ...background.map((job) => ({ ...job, long: true, background: true })),
   ];
 
   // A job whose lease expired after its final attempt is not retried again. Its worker died or hung on it, which
@@ -129,6 +186,7 @@ export async function claimJobs(db: Database, options: ProcessOptions): Promise<
         jobId: job.id,
         kind: job.kind,
         attempt: job.attempts,
+        long: job.long,
         background: job.background,
       });
     }
@@ -136,9 +194,31 @@ export async function claimJobs(db: Database, options: ProcessOptions): Promise<
   return runnable;
 }
 
-/** One statement (no transaction round trips): lock due rows matching `filter`, skipping locked ones; lease them. */
+/**
+ * Whose turn a job takes: its workspace's. Jobs of no workspace (an email to an address, an account's contact) take
+ * theirs by kind, so a backfill of one kind waits on itself alone. Bytewise ("C"), not the database's collation: every
+ * claim sorts the lane's due jobs by it.
+ */
+const turnKey = sql`coalesce(${outbox.orgId}::text, ${outbox.kind}) collate "C"`;
+
+/**
+ * One statement (no transaction round trips): lock due rows matching `filter`, skipping locked ones; lease them.
+ * Workspaces take turns (ADR 0163): each one's due jobs are ranked oldest first, after the jobs of the lane it
+ * already runs on any worker, so a workspace that holds more than another one waiting claims after it, and one
+ * workspace's burst, however long, queues only that workspace. Ranked without locks (a window can't take
+ * `FOR UPDATE`), then locked and checked again: only the first turns, twice the claim and some, so the lock looks each
+ * one up by its id, with room for the ones another worker is taking.
+ */
 function claimWhere(db: Database, options: ClaimOptions, now: Date, filter: SQL, limit: number) {
   const leaseUntil = new Date(now.getTime() + (options.leaseMs ?? DEFAULT_LEASE_MS));
+  const at = sql`${now.toISOString()}::timestamptz`;
+  const due = sql`((${outbox.status} = 'pending' and ${outbox.nextAttemptAt} <= ${at})
+      or (${outbox.status} = 'processing' and ${outbox.lockedUntil} < ${at} and not ${orphanedRunJobSql}))
+    and ${filter}`;
+  // ponytail: every due job of the lane is read and sorted by workspace (the claim read them all before turns too: the
+  // due condition's two states can't come in order from the partial indexes); about 60 ms for 100,000 on PGlite. Past
+  // backlogs like that, an index on (workspace, due) and a lateral per workspace.
+  const room = limit * 2 + 64;
   return db
     .update(outbox)
     .set({
@@ -148,14 +228,27 @@ function claimWhere(db: Database, options: ClaimOptions, now: Date, filter: SQL,
       lockedBy: options.workerId,
     })
     .where(
-      sql`${outbox.id} in (select ${outbox.id} from ${outbox}
-        where ((${outbox.status} = 'pending' and ${outbox.nextAttemptAt} <= ${now.toISOString()}::timestamptz)
-           or (${outbox.status} = 'processing' and ${outbox.lockedUntil} < ${now.toISOString()}::timestamptz
-             and not ${orphanedRunJobSql}))
-          and ${filter}
-        order by ${outbox.nextAttemptAt}
+      sql`${outbox.id} in (
+        with busy as materialized (
+          select ${turnKey} as key, count(*)::int as n from ${outbox}
+          where ${outbox.status} = 'processing' and ${outbox.lockedUntil} >= ${at} and ${filter}
+          group by 1
+        ), turns as materialized (
+          select c.id, c.due_at, coalesce(b.n, 0) + c.nth as turn
+          from (
+            select ${outbox.id} as id, ${turnKey} as key, ${outbox.nextAttemptAt} as due_at,
+              row_number() over (partition by ${turnKey} order by ${outbox.nextAttemptAt}, ${outbox.id}) as nth
+            from ${outbox} where ${due}
+          ) c left join busy b on b.key = c.key
+          where c.nth <= ${room}
+          order by turn, c.due_at
+          limit ${room}
+        )
+        select ${outbox.id} from ${outbox} join turns t on t.id = ${outbox.id}
+        where ${due}
+        order by t.turn, t.due_at
         limit ${limit}
-        for update skip locked)`,
+        for update of ${outbox} skip locked)`,
     )
     .returning();
 }
@@ -336,50 +429,291 @@ export interface OutboxPump {
   inFlight(): number;
   /** Resolves when every running job has finished. */
   idle(): Promise<void>;
+  /**
+   * One step of the self-tuning, run every `WORKER_INTERVALS_MS.outboxTune`: what each lane waited since the last
+   * step resizes its slots (`resizeLanes`), and a lane that keeps waiting is told (`laneAlarm`, once across the
+   * processes on the database). `lateBeats`: the process's timer beats that fired late meanwhile (`LOOP_LATE_MS`);
+   * `rssBytes`: the memory it holds now (default: read here).
+   */
+  tune(input?: { now?: Date; lateBeats?: number; rssBytes?: number }): Promise<PumpTune>;
 }
 
-/** The share of a worker's slots background jobs may hold at most (ADR 0053 §10), never less than one. */
-export const backgroundSlotsOf = (maxInFlight: number) => Math.max(1, Math.floor(maxInFlight / 2));
+/** The pump's lanes: quick jobs, long ones (`LONG_JOB_KINDS`), and background work among the long ones (routines). */
+export const LANES = ["quick", "long", "background"] as const;
+export type Lane = (typeof LANES)[number];
+
+/** A pump's slots: the ones only quick jobs take, and the ones long jobs may hold at most. */
+export interface LaneSlots {
+  quick: number;
+  long: number;
+}
+
+/** How far each lane may grow, and all of them together. Quick jobs run up to `lanes.quick` at once. */
+export interface LaneLimits {
+  lanes: LaneSlots;
+  total: number;
+}
+
+/** What a lane saw since the pump's last step. */
+export interface LaneWindow {
+  /** How long its jobs waited for a slot: the p90 of its claims, or its oldest job still due when that is longer. */
+  waitMs: number;
+  /** The most of its jobs running at once. */
+  peak: number;
+}
+
+/** What keeps the slots from growing: a busy processor, a slow database, memory running out. */
+export type Brake = "processor" | "database" | "memory";
+
+export interface PumpTune extends LaneSlots {
+  waits: Record<Lane, number>;
+  resized: boolean;
+  braked: Brake[];
+  /** The lanes to tell about now (`laneAlarm`), this process being the one to tell. */
+  slow: Lane[];
+}
+
+/** A job claimed this long after it was due found its lane full: the pump looks every second, and when woken. */
+export const LANE_FULL_MS = 2_000;
+/** A lane is slow past this wait for a slot; told once it stayed slow `LANE_SLOW_FOR_MS`, at most every hour. */
+export const LANE_SLOW_MS: Record<Lane, number> = { quick: 5_000, long: 30_000, background: 5 * 60_000 };
+export const LANE_SLOW_FOR_MS = 5 * 60_000;
+export const LANE_SLOW_EVERY_MS = 3600_000;
+/** A timer beat this late counts as late, and so does each beat a longer block swallowed. */
+export const LOOP_LATE_MS = 100;
+/** Late beats between two steps (of about 300) that mean a busy processor: more jobs would only wait on it. */
+export const LOOP_LATE_BEATS_MAX = 30;
+/** A `select 1` this slow: the database, or the connections to it, are what jobs wait on. */
+export const POOL_SLOW_MS = 100;
+/** Of the process's memory, held now: past the first nothing grows, past the second the long lane halves. */
+export const MEMORY_GROW_MAX = 0.7;
+export const MEMORY_SHED_AT = 0.85;
+/** Quick jobs per database connection the quick lane grows to at most: they read and write more than they wait. */
+export const QUICK_JOBS_PER_DB_CONNECTION = 4;
+/**
+ * What a run waiting on its model or its computer holds in memory, with room to spare (`run-cost.test.ts` measures
+ * it). Runs hold no database connection while they wait (ADR 0163), so memory is what bounds the long lane; the live
+ * memory brake (`MEMORY_GROW_MAX`) covers the runs that hold far more (images).
+ */
+export const RUN_MEMORY_BYTES = 4 * 1024 * 1024;
+/** The share of the process's memory its long jobs may take, beside what it held at boot. */
+export const RUNS_MEMORY_SHARE = 0.5;
+
+/** The share of a worker's long slots background jobs may hold at most (ADR 0053 §10), never less than one. */
+export const backgroundSlotsOf = (longSlots: number) => Math.max(1, Math.floor(longSlots / 2));
+
+/**
+ * The memory a process may count on (`laneLimits`' `memoryBytes`, the memory brake): its container's limit, and on a
+ * computer it shares with others (the database, the speech server) no more than it holds plus what is free there as it
+ * starts.
+ */
+export const memoryBudget = (host: { limitBytes: number; rssBytes: number; freeBytes: number }) =>
+  Math.min(host.limitBytes, host.rssBytes + host.freeBytes);
+
+/**
+ * How far a pump's lanes may grow from `base`: the quick lane to `QUICK_JOBS_PER_DB_CONNECTION` per connection, the
+ * long one to the runs the memory left holds (`RUN_MEMORY_BYTES` each, in `RUNS_MEMORY_SHARE` of `memoryBytes` less
+ * what the process holds now), and both together to `cap` when one is set. Never below the base.
+ */
+export function laneLimits(
+  base: LaneSlots,
+  host: { memoryBytes: number; rssBytes: number; dbConnections: number },
+  cap?: number,
+): LaneLimits {
+  const runs = Math.floor((host.memoryBytes * RUNS_MEMORY_SHARE - host.rssBytes) / RUN_MEMORY_BYTES);
+  const lanes = {
+    quick: Math.max(base.quick, QUICK_JOBS_PER_DB_CONNECTION * host.dbConnections),
+    long: Math.max(base.long, runs),
+  };
+  return { lanes, total: Math.max(base.quick + base.long, cap ?? lanes.quick + lanes.long) };
+}
+
+/**
+ * One step of the pump's self-tuning (ADR 0163): a lane whose jobs waited for a slot doubles, the quick lane first,
+ * within its limit and the total's, unless something brakes (`busy`); a lane that waited for nothing and used at
+ * most half its slots halves, and so does the long lane when memory runs out (`shed`), never below where it
+ * started. Pure.
+ */
+export function resizeLanes(
+  slots: LaneSlots,
+  base: LaneSlots,
+  limits: LaneLimits,
+  window: Record<keyof LaneSlots, LaneWindow>,
+  brake: { busy?: boolean; shed?: boolean } = {},
+): LaneSlots {
+  const next = { ...slots };
+  const half = (lane: keyof LaneSlots) => Math.max(base[lane], Math.ceil(next[lane] / 2));
+  for (const lane of ["quick", "long"] as const) {
+    const room = Math.max(0, limits.total - next.quick - next.long);
+    if (lane === "long" && brake.shed) next.long = half("long");
+    else if (window[lane].waitMs > LANE_FULL_MS) {
+      if (!brake.busy) next[lane] = Math.min(limits.lanes[lane], next[lane] + Math.min(room, Math.max(1, next[lane])));
+    } else if (window[lane].peak <= next[lane] / 2) next[lane] = half(lane);
+  }
+  return next;
+}
+
+/**
+ * Whether to tell, now, about a lane slow at each step (`laneAlarm()(slow, now)`): once it stayed slow for
+ * `LANE_SLOW_FOR_MS`, then at most every `LANE_SLOW_EVERY_MS`, whether or not it recovered in between.
+ */
+export function laneAlarm() {
+  let since: number | null = null;
+  let toldAt = Number.NEGATIVE_INFINITY;
+  return (slow: boolean, now: number) => {
+    if (!slow) {
+      since = null;
+      return false;
+    }
+    since ??= now;
+    if (now - since < LANE_SLOW_FOR_MS || now - toldAt < LANE_SLOW_EVERY_MS) return false;
+    toldAt = now;
+    return true;
+  };
+}
+
+/**
+ * Whether this process is the one to tell about a slow lane this hour, among every process on the database: the
+ * first to record it (a finished outbox row, never claimed, whose dedupe key names the lane and the hour).
+ */
+export async function claimLaneAlarm(db: Database, lane: Lane, now: Date): Promise<boolean> {
+  const hour = Math.floor(now.getTime() / LANE_SLOW_EVERY_MS);
+  const rows = await db
+    .insert(outbox)
+    .values({
+      orgId: null,
+      kind: "outbox.lane_alarm",
+      payload: { lane },
+      status: "done",
+      nextAttemptAt: now,
+      completedAt: now,
+      dedupeKey: `outbox.lane_alarm:${lane}:${hour}`,
+    })
+    .onConflictDoNothing()
+    .returning({ id: outbox.id });
+  return rows.length > 0;
+}
+
+/** How long the oldest job still due in each lane (`laneJobs`) has waited (0: none waits). */
+async function oldestDueMs(db: Database, now: Date, lanes: Record<Lane, SQL>): Promise<Record<Lane, number>> {
+  const at = sql`${now.toISOString()}::timestamptz`;
+  const age = (lane: SQL) =>
+    sql<number | null>`1000 * extract(epoch from ${at} - min(${outbox.nextAttemptAt}) filter (where ${lane}))::float8`;
+  const [row] = await db
+    .select({ quick: age(lanes.quick), long: age(lanes.long), background: age(lanes.background) })
+    .from(outbox)
+    .where(sql`${outbox.status} = 'pending' and ${outbox.nextAttemptAt} <= ${at}`);
+  return { quick: Number(row?.quick ?? 0), long: Number(row?.long ?? 0), background: Number(row?.background ?? 0) };
+}
+
+/** How long a `select 1` takes now: waiting for a connection included. */
+async function poolMs(db: Database) {
+  const t = performance.now();
+  await db.execute(sql`select 1`);
+  return performance.now() - t;
+}
 
 /**
  * The worker's job pool: up to `maxInFlight` jobs at once, and a slot that
  * frees is refilled right away (`onSlotFree`). Unlike `processOutbox`, a
  * long job (a 5-minute agent run) never holds back the jobs claimed after it.
- * Background jobs (routines) hold at most half of the slots
- * (`backgroundSlotsOf`), so a person's message always finds one.
+ * `quickSlots` of them are for quick jobs only: long jobs (`LONG_JOB_KINDS`)
+ * hold the rest at most, so a message's routing never waits behind agent
+ * runs. Background jobs (routines) hold at most half of the long slots
+ * (`backgroundSlotsOf`), so a person's run always finds one. `tune` grows a
+ * lane that waits, within `limits` (`laneLimits`), and shrinks it back once it
+ * doesn't. Several pumps, in one process or many, share one database:
+ * claims never overlap and workspaces take turns across all of them.
  */
 export function createOutboxPump(
   db: Database,
   handlers: JobHandlers,
-  options: Omit<ProcessOptions, "batchSize" | "maxBackground"> & { maxInFlight?: number; onSlotFree?: () => void },
+  options: Omit<ProcessOptions, "batchSize" | "maxQuick" | "maxLong" | "maxBackground"> & {
+    maxInFlight?: number;
+    quickSlots?: number;
+    /** How far `tune` may grow the lanes (`laneLimits`); default: where they start, quick jobs in any free slot. */
+    limits?: LaneLimits;
+    /** The process's memory (`laneLimits`' `memoryBytes`): `tune` brakes and sheds by it. Absent: no memory brake. */
+    memoryBytes?: number;
+    onSlotFree?: () => void;
+  },
 ): OutboxPump {
   const max = options.maxInFlight ?? 20;
-  const backgroundMax = backgroundSlotsOf(max);
+  const base: LaneSlots = { quick: options.quickSlots ?? 0, long: max - (options.quickSlots ?? 0) };
+  const limits = options.limits ?? { lanes: { quick: max, long: base.long }, total: max };
+  let slots = { ...base };
   const running = new Set<Promise<void>>();
+  let longRunning = 0;
   let backgroundRunning = 0;
+  const noWaits = (): Record<Lane, number[]> => ({ quick: [], long: [], background: [] });
+  let waits = noWaits();
+  const peak: LaneSlots = { quick: 0, long: 0 };
+  const alarms = { quick: laneAlarm(), long: laneAlarm(), background: laneAlarm() };
+  const onTiming: NonNullable<ClaimOptions["onTiming"]> = (name, ms, attrs) => {
+    if (name === "queue_wait_ms") waits[attrs.background ? "background" : attrs.long ? "long" : "quick"].push(ms);
+    options.onTiming?.(name, ms, attrs);
+  };
   return {
     async pump() {
-      const free = max - running.size;
+      const quickRunning = running.size - longRunning;
+      // Runs the long lane shed while they ran (`MEMORY_SHED_AT`) hold none of the quick lane's slots.
+      const free = slots.quick + slots.long - quickRunning - Math.min(longRunning, slots.long);
       if (free <= 0) return 0;
       const jobs = await claimJobs(db, {
         ...options,
+        onTiming,
         batchSize: free,
-        maxBackground: Math.max(0, backgroundMax - backgroundRunning),
+        maxQuick: Math.max(0, limits.lanes.quick - quickRunning),
+        maxLong: Math.max(0, slots.long - longRunning),
+        maxBackground: Math.max(0, backgroundSlotsOf(slots.long) - backgroundRunning),
       });
       for (const job of jobs) {
+        if (job.long) longRunning++;
         if (job.background) backgroundRunning++;
         const p: Promise<void> = runJob(db, handlers, job, options).finally(() => {
           running.delete(p);
+          if (job.long) longRunning--;
           if (job.background) backgroundRunning--;
           options.onSlotFree?.();
         });
         running.add(p);
       }
+      peak.quick = Math.max(peak.quick, running.size - longRunning);
+      peak.long = Math.max(peak.long, longRunning);
       return jobs.length;
     },
     inFlight: () => running.size,
     async idle() {
       while (running.size > 0) await Promise.all(running);
+    },
+    async tune({ now = new Date(), lateBeats = 0, rssBytes = process.memoryUsage().rss } = {}) {
+      const [due, dbMs] = [await oldestDueMs(db, now, laneJobs(options.skipKinds)), await poolMs(db)];
+      const waited = (lane: Lane) => Math.max(percentile(waits[lane], 0.9), due[lane]);
+      const w = { quick: waited("quick"), long: waited("long"), background: waited("background") };
+      // Background work waiting for its share waits for the long lane to grow too.
+      const window = {
+        quick: { waitMs: w.quick, peak: peak.quick },
+        long: { waitMs: Math.max(w.long, w.background), peak: peak.long },
+      };
+      const memory = options.memoryBytes ? rssBytes / options.memoryBytes : 0;
+      const braked: Brake[] = [];
+      if (lateBeats > LOOP_LATE_BEATS_MAX) braked.push("processor");
+      if (dbMs > POOL_SLOW_MS) braked.push("database");
+      if (memory > MEMORY_GROW_MAX) braked.push("memory");
+      const next = resizeLanes(slots, base, limits, window, {
+        busy: braked.length > 0,
+        shed: memory > MEMORY_SHED_AT,
+      });
+      const resized = next.quick !== slots.quick || next.long !== slots.long;
+      slots = next;
+      waits = noWaits();
+      peak.quick = running.size - longRunning;
+      peak.long = longRunning;
+      const slow: Lane[] = [];
+      for (const lane of LANES)
+        if (alarms[lane](w[lane] > LANE_SLOW_MS[lane], now.getTime()) && (await claimLaneAlarm(db, lane, now)))
+          slow.push(lane);
+      return { ...slots, waits: w, resized, braked, slow };
     },
   };
 }

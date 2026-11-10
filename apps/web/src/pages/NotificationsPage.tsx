@@ -17,6 +17,7 @@ import {
 import { approvalCardItems } from "@agenteschat/client/lib/approval-card";
 import { approvalOriginWords } from "@agenteschat/client/lib/approval-origin";
 import { appCreatedLine } from "@agenteschat/client/lib/apps";
+import { deviceNoticeOf } from "@agenteschat/client/lib/devices";
 import { errorText, restrictionLine } from "@agenteschat/client/lib/errors";
 import { daysBetween, formatShortDate, formatTime, namesText, timeLeft } from "@agenteschat/client/lib/format";
 import { agentGrammar, isFeminineName } from "@agenteschat/client/lib/grammar";
@@ -83,6 +84,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { ApprovalAsk, ApprovalGroupAsk } from "@/components/ApprovalAsk";
 import { useConnectAi } from "@/components/ConnectAi";
+import { DeviceNoticeActions, deviceNoticeLine } from "@/components/devices/DeviceNotice";
 import { ErrorState, LoadingCards } from "@/components/Loading";
 import { useNotificationHref, useNotificationOpener } from "@/components/NotificationOpen";
 import { type Dir, Face, Headline, joinerOf, nameOf, SystemFace, sayWords } from "@/components/NotificationParts";
@@ -170,14 +172,15 @@ function sourceOf(t: TFunction, n: AppNotification, channelName: (id: string) =>
   if (runFailedGroupOf(n) || (n.kind === "catch_up_closed" && n.count > 1)) return null;
   let icon: IconName = "channel";
   let label = "";
-  if (WIDGET_NOTICES.has(n.kind)) [icon, label] = ["grid", t("notifications.source.dashboard")];
+  const device = deviceNoticeOf(n);
+  if (device) [icon, label] = [device.phoneId ? "phone" : "computer", t("devices.notice.source")];
+  else if (WIDGET_NOTICES.has(n.kind)) [icon, label] = ["grid", t("notifications.source.dashboard")];
   else if (n.kind === "approval") [icon, label] = ["shield", t("notifications.source.approval")];
   else if (n.kind === "approval_cover" || n.kind === "right_hand_paused")
     [icon, label] = ["approve", t("settings.section.approvals")];
   else if (n.kind === "join_request" || n.kind === "invitation_accepted")
     [icon, label] = ["members", t("notifications.source.members")];
   else if (n.kind === "composio_limit") [icon, label] = ["wallet", t("notifications.source.usage")];
-  else if (n.kind === "connector_tool_changed") [icon, label] = ["plug", t("notifications.source.connectors")];
   else if (n.kind === "skill_update") [icon, label] = ["book", t("skills.title")];
   else if (
     n.kind === "machine_connected" ||
@@ -223,9 +226,18 @@ function SourceChip({
   const { t } = useTranslation();
   const source = sourceOf(t, n, channelName);
   if (!source) return null;
+  const channel = channelOf(n);
   return (
     <Chip icon={source[0]} className={className}>
-      {source[1]}
+      {/* The channel's icon is its #: the words show its bare name, a screen reader still hears the #. */}
+      {source[0] === "channel" && channel ? (
+        <>
+          <span className="ac-visually-hidden">#</span>
+          {channelName(channel)}
+        </>
+      ) : (
+        source[1]
+      )}
     </Chip>
   );
 }
@@ -731,8 +743,9 @@ function Row({
         {tags && (
           <span className="nt-tags">
             <SourceChip n={n} channelName={channelName} />
+            {/* The arrow is in its words: no icon to say it again. */}
             {statusMove && (
-              <Chip icon="arrowRight" className="nt-chip-ink">
+              <Chip className="nt-chip-ink">
                 {t("notifications.status", { from: statusName(t, l.statusFrom), to: statusName(t, l.statusTo) })}
               </Chip>
             )}
@@ -788,6 +801,7 @@ function Row({
               </div>
             )}
             {n.kind === "usage_limit" && <UsageLimitActions n={n} />}
+            <DeviceNoticeActions n={n} />
             {n.kind === "agent_unreached" && n.source.agentId && n.source.userId && (
               <UnreachedAllow agentId={n.source.agentId} userId={n.source.userId} />
             )}
@@ -1182,7 +1196,9 @@ function WaitRow({
         ? secretNoticeLine(n)
         : n.kind === "usage_limit"
           ? usageLimitLine(t, n)
-          : (widgetNoticeLine(t, n, dir) ?? n.latest.title ?? n.latest.text);
+          : deviceNoticeOf(n)
+            ? deviceNoticeLine(t, n)
+            : (widgetNoticeLine(t, n, dir) ?? n.latest.title ?? n.latest.text);
   const source = sourceOf(t, n, channelName);
   const when = whenText(t, i18n.language, n.createdAt);
   return (
@@ -1232,6 +1248,7 @@ function WaitRow({
         <div className="rq__foot nt-wr__acts">
           {/* A board's notice is decided or resolved right here (ADR 0135). */}
           <WidgetNoticeActions n={n} onOpen={() => h.onOpen(n)} open={false} />
+          <DeviceNoticeActions n={n} inline />
           <Button size="sm" className="nt-wr__open" title={t("notifications.openTip")} onClick={() => h.onOpen(n)}>
             {t("notifications.open")}
           </Button>
@@ -1633,8 +1650,8 @@ export function NotificationsPage() {
     <div className="page page--list nt">
       <PageHeader
         title={t("notifications.title")}
-        // The counts the sidebar already has show at once; the list's own replace them when it arrives.
-        meta={(list.isSuccess || badge.isSuccess) && summary}
+        // On the title's row: the counts the sidebar already has show at once, the list's own replace them.
+        count={(list.isSuccess || badge.isSuccess) && summary}
         actions={
           <>
             <Menu

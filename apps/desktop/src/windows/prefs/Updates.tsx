@@ -177,7 +177,7 @@ function Out({ href, children }: { href: string; children?: ReactNode }) {
 }
 
 /**
- * AGPL-3.0's Appropriate Legal Notices and the attribution the license's section 7(b) term requires (LICENSE), with
+ * AGPL-3.0's Appropriate Legal Notices and the attribution the section 7(b) term in NOTICE requires, with
  * no setting that hides them.
  */
 function About() {

@@ -140,6 +140,8 @@ export {
   ComputerPortrait,
   type ComputerPortraitProps,
   type ComputerState,
+  type PhoneKind,
+  type PortraitKind,
 } from "./components/Computer";
 export { DatePicker, type DatePickerProps, monthGrid, parseYmd, ymd } from "./components/DatePicker";
 export {
@@ -156,7 +158,7 @@ export {
   DialogSearchList,
   useUnsavedInDialog,
 } from "./components/Dialog";
-export { Diff, type DiffKind, type DiffLine, diffLines } from "./components/Diff";
+export { Diff, type DiffBlock, type DiffKind, type DiffLine, diffBlocks, diffLines } from "./components/Diff";
 export { drawEffort, EffortPixels, type EffortStep } from "./components/EffortPixels";
 export {
   EMOJI_COLUMNS,
@@ -212,7 +214,6 @@ export {
   type StickerPickerLabels,
   stickerMoodsFor,
 } from "./components/MediaPicker";
-export { AgentReadingBook } from "./components/MemoryPixels";
 export { Mention } from "./components/Mention";
 export {
   Menu,
@@ -285,6 +286,7 @@ export {
   ProviderStack,
   type ProviderStackProps,
 } from "./components/ProviderLogo";
+export { QrCode } from "./components/QrCode";
 export {
   modeOf,
   monthlyKindOf,
@@ -322,6 +324,7 @@ export { SearchSelect, type SearchSelectLabels, type SearchSelectProps } from ".
 export { Segmented, type SegmentedOption, SplitButton } from "./components/Segmented";
 export { ChosenValue, Select, type SelectOption, type SelectProps } from "./components/Select";
 export { SettingNote, SettingRow, SettingsMore, SettingsSection } from "./components/Settings";
+export { SettingsPath } from "./components/SettingsPath";
 export {
   SKELETON_DELAY_MS,
   Skeleton,
@@ -399,7 +402,7 @@ export {
 } from "./components/voice-recorder";
 export { Reaction, Reactions, type WorkStep, WorkSummary } from "./components/Work";
 export { WorkLine, WorkLineAction, type WorkLineTone, WorkPlan } from "./components/WorkLine";
-export { COMPUTER_GRID, COMPUTER_KINDS, COMPUTER_STATES, drawComputer } from "./computer/portrait.js";
+export { COMPUTER_GRID, COMPUTER_KINDS, COMPUTER_STATES, drawComputer, PHONE_KINDS } from "./computer/portrait.js";
 export { cx } from "./cx";
 export { hoverPointer, movesByKeys, onScreenKeyboard, onScreenNow, trackInput } from "./device";
 export {

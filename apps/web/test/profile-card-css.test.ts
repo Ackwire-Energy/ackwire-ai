@@ -20,7 +20,7 @@ test("a chip under an agent's names keeps the card's row gap, never touching the
 test("the card's banner buttons are one round kind: the computer's and the ⋯", async () => {
   const card = await sheet("apps/web/src/components/profile-card.css");
   expect(last(declarations(card, ".mcard__act.ac-btn"), "border-radius")).toBe("var(--radius-full)");
-  // Side by side, 8 apart, as icon buttons are in every strip.
+  // Their plates 8 apart, as every pair of icon buttons stands.
   expect(last(declarations(card, ".mcard__acts"), "gap")).toBe("var(--space-2)");
 });
 

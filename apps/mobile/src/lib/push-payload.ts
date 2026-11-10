@@ -24,6 +24,9 @@ const FIELDS = [
   "machineId",
   "topicId",
   "issueNumber",
+  // A device's notifications: the phone it is about, and the join or access request.
+  "phoneId",
+  "requestId",
 ] as const;
 
 export function readPushData(data: unknown): PushData {

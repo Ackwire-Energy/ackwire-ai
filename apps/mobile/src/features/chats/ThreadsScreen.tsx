@@ -4,6 +4,7 @@ import { STORED } from "@/lib/storage";
 import { Button, LargeTitleScreen, PULL_TINT, PullOrbit, SkeletonList } from "@/ui";
 import { router } from "@/ui/navigation";
 import { usePullRefresh } from "../shared/hooks";
+import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { useConversations } from "../shared/queries";
 import { RetryLine, TeamSkyEmpty } from "../shared/TeamSkyEmpty";
 import { useTabHeader } from "../shared/tabHeader";
@@ -20,8 +21,10 @@ const LIVE_ROWS = 8;
  * ("Missão · #produto") over the name and its state as words (amber for what waits on you, the orbit for who
  * works); what is closed sits at the end of its section. What waits on you is on Conversas' strip and in Atividade,
  * not repeated here. Loading: rows of its own shape. Empty: the sky with the team, and the way to the conversations.
+ * `pushed`: the same list pushed from You › Work, with the back button in its bar, where a personal workspace
+ * (ADR 0159) keeps it instead of a tab.
  */
-export function ThreadsScreen() {
+export function ThreadsScreen({ pushed = false }: { pushed?: boolean }) {
   const { t } = useTranslation();
   const header = useTabHeader();
   const list = useConversations();
@@ -30,13 +33,8 @@ export function ThreadsScreen() {
   const sections = threadSections(rows);
   const pull = usePullRefresh(() => list.refetch());
   let live = 0;
-  return (
-    <LargeTitleScreen
-      title={t("mobile.threads.title")}
-      {...header}
-      refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} tintColor={PULL_TINT} />}
-      pullMark={<PullOrbit refreshing={pull.refreshing} />}
-    >
+  const body = (
+    <>
       {list.loading ? (
         <>
           <CollapsibleSection
@@ -89,6 +87,25 @@ export function ThreadsScreen() {
           );
         })
       )}
+    </>
+  );
+  if (pushed)
+    return (
+      <PushedLargeTitle
+        title={t("mobile.threads.title")}
+        refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
+      >
+        {body}
+      </PushedLargeTitle>
+    );
+  return (
+    <LargeTitleScreen
+      title={t("mobile.threads.title")}
+      {...header}
+      refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} tintColor={PULL_TINT} />}
+      pullMark={<PullOrbit refreshing={pull.refreshing} />}
+    >
+      {body}
     </LargeTitleScreen>
   );
 }

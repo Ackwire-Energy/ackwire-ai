@@ -132,6 +132,7 @@
     "refuseTitle": "Het verzoek weigeren",
     "refuseAsk": "Het verzoek weigeren?",
     "leaves": "gaat buiten het bedrijf",
+    "leavesPersonal": "gaat buiten je werkruimte",
     "refuseWhyF": "{{name}} leert van de reden. Optioneel.",
     "refuseWhyM": "{{name}} leert van de reden. Optioneel.",
     "sheet": {
@@ -167,6 +168,7 @@
       "irreversible": "Kan niet ongedaan worden",
       "reversible": "Kan ongedaan worden",
       "external": "Gaat buiten het bedrijf",
+      "externalPersonal": "Gaat buiten je werkruimte",
       "unsent": "Er wordt niets verstuurd",
       "deletable": "Kan worden verwijderd"
     },
@@ -237,6 +239,9 @@
     "newChannelHint": "Voor een team of een onderwerp",
     "channelPlaceholder": "Kanaalnaam, bijv. marketing",
     "createChannel": "Kanaal aanmaken",
+    "newChannelHintPersonal": "Voor één onderwerp, met meerdere agents",
+    "channelPlaceholderPersonal": "Naam, bijv. reis",
+    "createChannelPersonal": "Groepsgesprek aanmaken",
     "waitIn": "in {{where}}",
     "workingNowLine_one": "{{count}} agent nu aan het werk",
     "workingNowLine_other": "{{count}} agents nu aan het werk",
@@ -247,6 +252,7 @@
       "unmute": "Ontdempen"
     },
     "firstRunLine": "{{name}} zet het team op · {{done}} van {{total}}",
+    "firstRunLinePersonal": "{{name}} richt je agents in · {{done}} van {{total}}",
     "first": {
       "title": "Begin met je eerste agent",
       "subtitle": "Geef hem een naam en zeg wat hij doet. Hij verschijnt hier, als gesprek.",
@@ -275,6 +281,8 @@
     "chat": "Gesprek met…",
     "name": "Naam",
     "channelFine": "Voor een team of een onderwerp.",
+    "channelPersonal": "Groepsgesprek",
+    "channelFinePersonal": "Voor één onderwerp, met meerdere agents.",
     "chatSearch": "Zoek een persoon of een agent",
     "to": "Aan:",
     "people": "Mensen",
@@ -287,6 +295,7 @@
     "routineHint": "Een agent doet het zelf, volgens schema",
     "wikiPage": "Wikipagina",
     "wikiHint": "Om te lezen voor het team en de agents",
+    "wikiHintPersonal": "Om te lezen voor je agents",
     "inviteHint": "Via e-mail of link",
     "agent": {
       "question": "Wat gaat hij doen?"
@@ -460,12 +469,14 @@
       "arrived": "{{name}} is bij het team gekomen",
       "meet": "Je eerste gesprek met {{name}}",
       "roleIntro": "{{role}} in je team. Vraag het in gewone woorden.",
+      "roleIntroPersonal": "{{role}}, er voor jou. Vraag het in gewone woorden.",
       "noIntro": "Vraag wat je nodig hebt, in gewone woorden.",
       "firstTitle": "Om te beginnen",
       "sendHint": "Tik om te versturen",
       "hello": "Hoi {{person}}! Ik ben {{name}}.",
       "helloNoName": "Hoi! Ik ben {{name}}.",
       "helloRole": "{{role}} in het team.",
+      "helloRolePersonal": "{{role}}, er voor jou.",
       "helloAsk": "Waar beginnen we?",
       "now": "nu",
       "start": {
@@ -787,6 +798,7 @@
     "noGroupSection": "Geen afdeling",
     "workingSection": "Aan het werk",
     "teamSection": "Team",
+    "teamSectionPersonal": "Je agents",
     "managerQuiet": "Er loopt niets",
     "state": {
       "waitsYou": "wacht op je akkoord",
@@ -977,8 +989,6 @@
       "plan_lent_female_other": "{{names}} hebben je {{plan}}-abonnement aan {{agent}} gekoppeld",
       "plan_model_dropped_one": "{{model}} is uit {{plan}} gehaald. {{names}} gebruikt voorlopig {{runs}}",
       "plan_model_dropped_other": "{{model}} is uit {{plan}} gehaald. {{names}} gebruikt voorlopig {{runs}}",
-      "connector_tool_changed_one": "Een gekoppelde server heeft tools gewijzigd die je hebt goedgekeurd",
-      "connector_tool_changed_other": "Gekoppelde servers hebben tools gewijzigd die je hebt goedgekeurd",
       "computer_disk_full_one": "De schijf van een computer is bijna vol",
       "computer_disk_full_other": "Schijven van computers zijn bijna vol",
       "computer_no_chrome_one": "Een computer heeft Google Chrome nodig. Download het op google.com/chrome",
@@ -1043,7 +1053,9 @@
     "title": "Jij",
     "role": {
       "owner": "eigenaar",
-      "member": "lid"
+      "member": "lid",
+      "ownerPersonal": "je persoonlijke werkruimte",
+      "memberPersonal": "een persoonlijke werkruimte die met je is gedeeld"
     },
     "appearance": "Weergave",
     "notifications": "Meldingen",
@@ -1449,15 +1461,11 @@
       "browser": "Browser",
       "secret": "Geheim",
       "join": "Leden",
-      "tools": "Tools",
       "limit": "Limiet"
     },
     "review": "Nakijken",
     "answer": "Antwoorden",
     "open": "Openen",
-    "toolsTitle": "Heeft tools gewijzigd die je hebt goedgekeurd",
-    "toolsWhy": "Agents blijven de goedgekeurde versie gebruiken tot je de nieuwe accepteert.",
-    "reviewChanges": "Wijzigingen bekijken",
     "clear": {
       "title": "Er wacht niets op je",
       "text": "Als een agent je nodig heeft, zie je dat hier als eerste."
@@ -1766,6 +1774,216 @@
     "pick": "Computer kiezen",
     "pickHelp": "Kies een van de computers die aan staan."
   },
+  "devices": {
+    "title": "Apparaten",
+    "empty": {
+      "title": "Nog geen apparaten",
+      "text": "Koppel een computer en sluit er dan een telefoon op aan."
+    },
+    "status": {
+      "ready": "Klaar",
+      "inUse": "In gebruik door {{name}}",
+      "inUseFor": "voor {{person}} sinds {{time}}",
+      "since": "sinds {{time}}",
+      "busy": "Bezet {{running}}/{{max}}",
+      "needsYou": "Heeft je nodig",
+      "preparing": "Wordt klaargemaakt",
+      "paused": "Gepauzeerd",
+      "until": "tot {{time}}",
+      "offline": "Offline",
+      "seen": "laatst gezien {{when}}",
+      "withHost": "met {{host}}",
+      "unsupported": "Niet bruikbaar"
+    },
+    "reason": {
+      "locked": "Het scherm is vergrendeld",
+      "unauthorized": "Tik op Toestaan op de telefoon",
+      "untrusted": "Tik op Vertrouw op de iPhone",
+      "developer_mode_off": "Ontwikkelaarsmodus staat uit",
+      "ui_automation_off": "UI-automatisering staat uit",
+      "xcode_missing": "De Mac heeft Xcode nodig",
+      "xcode_too_old": "Xcode is te oud voor deze iPhone",
+      "device_support": "De Mac maakt deze iPhone klaar",
+      "helper_missing": "De testhelper is nog niet ingesteld",
+      "helper_expired": "De testhelper moet worden vernieuwd",
+      "apple_account_missing": "Xcode op de Mac heeft een Apple Account nodig",
+      "team_limit": "Verwijder een zelfgemaakte app van deze iPhone",
+      "helper_untrusted": "Vertrouw de testhelper op deze iPhone",
+      "booting": "Wordt opgestart",
+      "no_driver": "Windows heeft de USB-driver van deze telefoon nodig",
+      "os_too_old": "Het systeem van deze telefoon is te oud",
+      "adb_offline": "Haal de kabel eruit en sluit hem opnieuw aan",
+      "other": "Nog niet klaar"
+    },
+    "os": {
+      "android": "Android {{version}}",
+      "ios": "iOS {{version}}"
+    },
+    "onHost": "op {{host}}",
+    "cpus_one": "{{count}} CPU",
+    "cpus_other": "{{count}} CPU's",
+    "memory": "{{gb}} GB",
+    "audience": {
+      "label": "Wie het mag gebruiken",
+      "me": "Alleen ik",
+      "only": "Alleen {{name}}",
+      "everyone": "Iedereen",
+      "sameAs": "Zelfde als {{host}}",
+      "mode": {
+        "owner": "Alleen ik",
+        "ownerOf": "Alleen {{name}}",
+        "everyone": "Iedereen in de werkruimte",
+        "people": "Alleen bepaalde mensen of rollen"
+      },
+      "modeText": {
+        "owner": "Jij, en agents die voor jou werken.",
+        "ownerOf": "{{name}}, en agents die voor die persoon werken.",
+        "everyone": "De agents van iedereen in de werkruimte kunnen het gebruiken.",
+        "people": "Kies de mensen en rollen wier agents het mogen gebruiken."
+      },
+      "people": "Mensen en rollen",
+      "pickSomeone": "Kies minstens één persoon of rol.",
+      "narrowOnly": "Je kunt beperken wie het apparaat van {{name}} gebruikt, nooit uitbreiden.",
+      "runsAs": "Agents van anderen draaien er als jou op en kunnen je bestanden lezen.",
+      "phoneOnly": "Dit deelt alleen de telefoon, nooit {{host}}.",
+      "saved": "Opgeslagen"
+    },
+    "page": {
+      "belongs": "Hoort bij de werkruimte",
+      "belongsHint": "Het blijft als de eigenaar de werkruimte verlaat, en Alleen ik geldt dan als iedereen.",
+      "phones": "Telefoons",
+      "ownerReads": "De eigenaar kan de code, bestanden en builds lezen die je agent hier achterlaat.",
+      "followsHost": "Een iPhone volgt de regel van zijn Mac.",
+      "shareNote": "Een telefoon delen deelt nooit {{host}}.",
+      "showHow": "Laat zien hoe",
+      "name": "Naam",
+      "renamed": "Hernoemd naar {{name}}",
+      "stop": "{{name}} stoppen",
+      "stopped": "{{device}} is terug van {{name}}",
+      "forget": "Deze telefoon vergeten",
+      "forgetTitle": "{{name}} vergeten?",
+      "forgetText": "Hij komt terug als {{host}} hem weer ziet.",
+      "forgotten": "{{name}} is vergeten",
+      "notFound": "Dit apparaat is er niet meer",
+      "notFoundText": "Het is verwijderd, of het is met de eigenaar vertrokken."
+    },
+    "join": {
+      "header": "Vraagt om lid te worden",
+      "title": "{{name}} wil lid worden van {{org}}",
+      "allow": "Toelaten",
+      "deny": "Weigeren",
+      "joined": "{{name}} is lid geworden",
+      "denied": "{{name}} is geweigerd"
+    },
+    "connect": {
+      "title": "Apparaat koppelen",
+      "thisPhone": "Deze telefoon",
+      "computers": "Computers",
+      "androidText": "Via een computer waarop hij is aangesloten",
+      "iphoneText": "Via een Mac",
+      "server": "Een server of VPS",
+      "serverText": "Eén regel om in de terminal te plakken",
+      "computer": "Een andere computer",
+      "computerText": "Mac, Windows of Linux",
+      "appNote": "Op een Mac of pc die je gebruikt, koppelt de desktop-app van agentes.chat hem ook.",
+      "unix": "Linux en macOS",
+      "windows": "Windows",
+      "once": "Werkt één keer, 10 minuten lang. Voer hem uit op de computer en laat hem hier toe.",
+      "copied": "Opdracht gekopieerd. Plak hem in de terminal van de computer.",
+      "waiting": "Wachten tot de computer hem uitvoert",
+      "joined": "{{name}} is gekoppeld",
+      "denied": "Je hebt {{name}} niet toegelaten.",
+      "expired": "Deze link is verlopen.",
+      "again": "Nieuwe link maken"
+    },
+    "android": {
+      "entry": "Deze telefoon gebruiken met agents",
+      "title": "Laat agents deze telefoon gebruiken",
+      "connecting": "Verbinden met {{host}}",
+      "computer": "Computer",
+      "noHost": "Deze telefoon werkt via een computer van je. Koppel er eerst een.",
+      "hostOffline": "{{host}} is offline. Zet hem aan en open daar agentes.chat.",
+      "step1": "Zet Ontwikkelaarsopties aan",
+      "step1Text": "Tik 7 keer op Buildnummer en voer dan je pincode in.",
+      "openAbout": "Over de telefoon openen",
+      "step2": "Zet USB-foutopsporing aan",
+      "openDev": "Ontwikkelaarsopties openen",
+      "step3": "Sluit hem aan op {{host}}",
+      "step3Hint": "Gebruik een kabel die data doorgeeft, niet een die alleen oplaadt. Kies Bestandsoverdracht als de telefoon vraagt waarvoor de USB is.",
+      "looking": "Zoeken naar deze telefoon",
+      "step4": "Tik op Toestaan op deze telefoon",
+      "step4Text": "Vink eerst Altijd toestaan vanaf deze computer aan.",
+      "prompt": {
+        "a11y": "Android vraagt: USB-foutopsporing toestaan? Vink Altijd toestaan vanaf deze computer aan en tik dan op Toestaan.",
+        "title": "USB-foutopsporing toestaan?",
+        "fingerprint": "De vingerafdruk voor de RSA-sleutel van de computer is:",
+        "always": "Altijd toestaan vanaf deze computer",
+        "cancel": "Annuleren",
+        "allow": "Toestaan"
+      },
+      "wifi": "Geen kabel? Koppel via wifi",
+      "wifiText": "Telefoon en computer op hetzelfde wifinetwerk",
+      "cable": "Toch een kabel gebruiken",
+      "wifi1": "Zet Draadloze foutopsporing aan",
+      "wifi1Text": "Vink Altijd toestaan op dit netwerk aan en tik op Toestaan.",
+      "wifi2": "Scan de code op een computer",
+      "wifi2Text": "Via Draadloze foutopsporing › Apparaat koppelen met QR-code.",
+      "wifi2Hint": "Open in agentes.chat op een computer Apparaat koppelen › Android-telefoon › Via wifi en kies {{host}}.",
+      "codeHead": "Koppelen met een koppelingscode",
+      "codeNote": "Via Draadloze foutopsporing › Apparaat koppelen met koppelingscode. Open Instellingen en agentes.chat naast elkaar, zodat de code in beeld blijft.",
+      "wifiNote": "Wifi kan wegvallen na een herstart. Een kabel is betrouwbaarder.",
+      "done": "{{name}} is gekoppeld",
+      "openFailed": "Deze telefoon opende dat scherm niet. Zoek het in Instellingen."
+    },
+    "iphone": {
+      "title": "Deze iPhone koppelen",
+      "with": "Met {{host}}",
+      "noHost": "Een iPhone verbindt via een Mac van je. Koppel er eerst een.",
+      "step1": "Sluit aan op {{host}}",
+      "step2": "Tik op Vertrouw op deze iPhone",
+      "step2Text": "Voer daarna je toegangscode in.",
+      "step3": "Zet Ontwikkelaarsmodus aan",
+      "step3Hint": "iPhone-apps kunnen de instellingen van een andere app niet openen, dus hier is het pad.",
+      "path": {
+        "settings": "Instellingen",
+        "privacy": "Privacy en beveiliging",
+        "devMode": "Ontwikkelaarsmodus"
+      },
+      "pathA11y": "Op deze iPhone: Instellingen, dan Privacy en beveiliging, dan Ontwikkelaarsmodus",
+      "switchA11y": "De schakelaar Ontwikkelaarsmodus, uit",
+      "step3Text": "Zet hem aan en tik op Herstart. Tik na het herstarten op Zet aan en voer je toegangscode in.",
+      "step4": "Zet UI-automatisering aan",
+      "step4Text": "Instellingen › Ontwikkelaar › Schakel UI-automatisering in",
+      "step5": "Vertrouw de testhelper",
+      "step5Hint": "De app die {{host}} installeert zodat agents op deze iPhone kunnen tikken en typen. Hij verschijnt in deze lijst zodra hij is geïnstalleerd.",
+      "step5Text": "Instellingen › Algemeen › VPN en apparaatbeheer. Tik op de naam van de ontwikkelaar en dan op Vertrouw.",
+      "waiting": "Wachten tot {{host}} hem ziet",
+      "footer": "Je Mac doet de rest en vernieuwt de testhelper elke 7 dagen zolang hij aan staat."
+    },
+    "notice": {
+      "kind": "Apparaten",
+      "join_request": "{{device}} wil lid worden van {{org}}",
+      "in_use": "{{names}} gebruikt {{device}}",
+      "in_useFor": "{{names}} gebruikt {{device}} voor {{person}}",
+      "access_request": "{{names}} vraagt om {{device}} te gebruiken",
+      "access_requestFor": "{{names}} vraagt om {{device}} te gebruiken voor {{person}}",
+      "waiting": "{{names}} wacht op {{device}}",
+      "waitingFor": "{{names}} wacht op {{device}} voor {{person}}",
+      "allowOnce": "Eén keer toestaan",
+      "always": "{{name}} altijd toestaan",
+      "no": "Nee",
+      "stop": "Stoppen"
+    },
+    "wait": {
+      "waiting": "Wachten op {{device}}",
+      "back": "{{device}} is terug",
+      "tryNow": "Nu proberen",
+      "other": "Ander apparaat gebruiken",
+      "stop": "Stoppen met wachten",
+      "useInstead": "Gebruik {{name}} in plaats daarvan",
+      "none": "Geen ander apparaat dat je kunt gebruiken is klaar."
+    }
+  },
   "connectors": {
     "title": "Connectors",
     "search": "Zoek of plak een adres",
@@ -1787,6 +2005,7 @@
     "loadFailed": "De connectors konden niet worden geladen.",
     "connectedCheck": "{{name}}, gekoppeld",
     "adminsOnly": "Alleen een beheerder van {{org}} koppelt diensten. Vraag het een van hen.",
+    "adminsOnlyPersonal": "Alleen wie deze werkruimte beheert, koppelt apps. Vraag het aan die persoon.",
     "canTitle": "Agents kunnen dan",
     "asks": "{{text}} · vraagt om je goedkeuring",
     "connect": "Verbinden",
@@ -1933,11 +2152,13 @@
     "zoneChange": "Wijzigen",
     "zoneTitle": "Tijdzone",
     "anotherTitle": "Hoe heet de nieuwe werkruimte?",
+    "anotherPurpose": "Waarvoor is de nieuwe werkruimte?",
     "anotherLead": "Op agentes.chat. Je blijft in {{org}} en kunt altijd wisselen.",
     "suggested": "Op basis van je e-mail bij {{domain}} stelde ik {{org}} voor.",
     "create": "Aanmaken",
     "shareMessage": "Kom bij {{org}} op agentes.chat: {{url}}",
-    "failed": "Opslaan lukte niet. Probeer het opnieuw."
+    "failed": "Opslaan lukte niet. Probeer het opnieuw.",
+    "enter": "Naar de werkruimte"
   },
   "ai": {
     "yourPlan": "Je AI-abonnement",
@@ -2262,7 +2483,6 @@
   "dashboards": {
     "homeRow": "Alleen jij · je eigen widgets",
     "loadFailed": "De dashboards konden niet worden geladen.",
-    "onlyHome": "Dashboards van de werkruimte of jouw rollen verschijnen hier.",
     "create": "Maken",
     "routineTarget": "zijn widget",
     "pin": {
@@ -2333,7 +2553,11 @@
       "title": "Stel je team van agents samen",
       "text": "Elke agent krijgt een rol en werkt met je samen in de chat.",
       "viewerTitle": "Hier staat je team van agents",
-      "viewerText": "Wie in deze werkruimte agents maakt, voegt de eerste toe, en die verschijnt hier."
+      "viewerText": "Wie in deze werkruimte agents maakt, voegt de eerste toe, en die verschijnt hier.",
+      "titlePersonal": "Laat je helpen door je eigen agents",
+      "textPersonal": "Elke agent regelt één ding voor je, gewoon in de chat.",
+      "viewerTitlePersonal": "Hier staan je agents",
+      "viewerTextPersonal": "Wie hier agents maakt, voegt de eerste toe, en die verschijnt hier."
     },
     "agentsForYou": {
       "title": "Je agents verschijnen hier",
@@ -2343,13 +2567,20 @@
       "title": "Alles wat het team maakt, op één plek",
       "text": "Rapporten, tabellen en bestanden van agents en mensen blijven hier, makkelijk te vinden.",
       "viewerTitle": "Vind wat het team maakt",
-      "viewerText": "Wat agents en mensen in gesprekken maken, verschijnt hier."
+      "viewerText": "Wat agents en mensen in gesprekken maken, verschijnt hier.",
+      "titlePersonal": "Alles wat je agents maken, op één plek",
+      "textPersonal": "Rapporten, tabellen en bestanden van je agents blijven hier, makkelijk te vinden.",
+      "viewerTitlePersonal": "Vind wat je agents maken",
+      "viewerTextPersonal": "Wat agents in je gesprekken maken, verschijnt hier."
     },
     "tasks": {
       "title": "Geef werk aan het team",
       "text": "Maak een taak voor een agent of een persoon en volg die tot het einde.",
       "viewerTitle": "Volg het werk van het team",
-      "viewerText": "Taken verschijnen hier zodra iemand de eerste maakt."
+      "viewerText": "Taken verschijnen hier zodra iemand de eerste maakt.",
+      "titlePersonal": "Geef je to-do's aan je agents",
+      "textPersonal": "Maak een taak voor een agent en volg die tot het einde.",
+      "viewerTitlePersonal": "Volg het werk van je agents"
     },
     "routines": {
       "title": "Laat herhalend werk over aan je agents",
@@ -2361,7 +2592,10 @@
       "title": "Bewaar wat het team moet weten",
       "text": "Mensen en agents lezen deze pagina's, zodat iedereen met dezelfde informatie werkt.",
       "viewerTitle": "Zoek op wat het team weet",
-      "viewerText": "Wie de wiki bewerkt, schrijft de eerste pagina, en die verschijnt hier."
+      "viewerText": "Wie de wiki bewerkt, schrijft de eerste pagina, en die verschijnt hier.",
+      "titlePersonal": "Bewaar notities die je agents kunnen lezen",
+      "textPersonal": "Je agents lezen deze pagina's en werken met wat jij schreef.",
+      "viewerTitlePersonal": "Zoek op wat hier staat"
     },
     "memory": {
       "title": "Je agents leren terwijl ze werken",
@@ -2384,13 +2618,21 @@
       "text": "Elk kanaal brengt samen wie voor een onderwerp zorgt.",
       "viewerTitle": "Hier staan de kanalen van het team",
       "viewerText": "Wie kanalen maakt, opent het eerste, en dat verschijnt hier.",
-      "action": "Kanaal maken"
+      "action": "Kanaal maken",
+      "titlePersonal": "Praat met meerdere agents tegelijk",
+      "textPersonal": "Elk groepsgesprek brengt de agents en mensen voor één onderwerp samen.",
+      "viewerTitlePersonal": "Hier staan de groepsgesprekken",
+      "viewerTextPersonal": "Wie groepsgesprekken maakt, opent het eerste, en dat verschijnt hier."
     },
     "people": {
       "title": "Werk hier samen met je team",
       "text": "Nodig mensen uit om met hen en je agents op één plek te praten.",
       "viewerTitle": "Je team verschijnt hier",
-      "viewerText": "Wie mensen uitnodigt, haalt de rest van het team erbij, en die verschijnen hier."
+      "viewerText": "Wie mensen uitnodigt, haalt de rest van het team erbij, en die verschijnen hier.",
+      "titlePersonal": "Haal je familie of vrienden erbij",
+      "textPersonal": "Nodig iemand uit om met jou en je agents op één plek te praten.",
+      "viewerTitlePersonal": "Familie en vrienden verschijnen hier",
+      "viewerTextPersonal": "Als iemand meedoet, verschijnt die hier."
     },
     "chat": {
       "title": "Alles begint met een bericht",
@@ -2410,7 +2652,11 @@
       "title": "Deel logins zonder wachtwoorden door te geven",
       "text": "Sla de logins en sleutels op die je agents voor het team gebruiken.",
       "viewerTitle": "De logins van het team verschijnen hier",
-      "viewerText": "Als iemand een login of sleutel met je deelt, verschijnt die hier."
+      "viewerText": "Als iemand een login of sleutel met je deelt, verschijnt die hier.",
+      "titlePersonal": "Bewaar gedeelde logins op één plek",
+      "textPersonal": "Sla de logins en sleutels op die je agents voor iedereen hier gebruiken.",
+      "viewerTitlePersonal": "Gedeelde logins verschijnen hier",
+      "viewerTextPersonal": "Als iemand van hier een login of sleutel met je deelt, verschijnt die hier."
     },
     "skills": {
       "title": "Leer je agents hoe jullie werken",
