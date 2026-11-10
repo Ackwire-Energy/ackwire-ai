@@ -1,10 +1,9 @@
 import { resolve } from "node:path";
 import { sql } from "drizzle-orm";
-import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
+import { readMigrationFiles } from "drizzle-orm/migrator";
+import type { PgDatabase, PgDialect, PgQueryResultHKT, PgSession } from "drizzle-orm/pg-core";
 import { drizzle as drizzlePglite } from "drizzle-orm/pglite";
-import { migrate as migratePglite } from "drizzle-orm/pglite/migrator";
 import { drizzle } from "drizzle-orm/postgres-js";
-import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 import { assertMigrationsMatch } from "./migration-guard";
 import { openPglite, pgliteFolder } from "./pglite";
@@ -51,6 +50,22 @@ export interface DatabaseHandle {
   close: () => Promise<void>;
 }
 
+/**
+ * The pending migrations, as Drizzle's `migrate` applies them but in steps. Drizzle runs every pending one in a single
+ * transaction, and Postgres refuses a new enum value in the transaction that added it ("unsafe use of new value"), so a
+ * database several versions behind stopped at the first migration using a value an earlier pending one adds. Each step
+ * ends after a migration that adds one. `upTo`: only the first that many migrations (tests).
+ */
+export async function migrateInSteps(db: unknown, folder: string, upTo?: number) {
+  // Both of Drizzle's Postgres migrators are `dialect.migrate(readMigrationFiles(config), session, config)`.
+  const { dialect, session } = db as { dialect: PgDialect; session: PgSession };
+  const all = readMigrationFiles({ migrationsFolder: folder }).slice(0, upTo);
+  const ends = all.flatMap((m, i) => (m.sql.some((s) => /\bADD VALUE\b/i.test(s)) ? [i + 1] : []));
+  for (const end of [...ends, all.length]) {
+    await dialect.migrate(all.slice(0, end), session, { migrationsFolder: folder });
+  }
+}
+
 /** The advisory lock every process takes around its migrations (`DatabaseHandle.migrate`). */
 export const MIGRATIONS_LOCK = 4_242_017;
 
@@ -74,7 +89,7 @@ export function createDatabase(options: DatabaseOptions): DatabaseHandle {
       try {
         await lock`select pg_advisory_lock(${MIGRATIONS_LOCK}::bigint)`;
         await assertMigrationsMatch(db as unknown as Database, migrationsFolder);
-        await migrate(db, { migrationsFolder });
+        await migrateInSteps(db, migrationsFolder);
         await lock`select pg_advisory_unlock(${MIGRATIONS_LOCK}::bigint)`;
       } finally {
         // Closing the session releases the lock too, when the migrations failed.
@@ -107,7 +122,7 @@ function createPgliteDatabase(folder: string): DatabaseHandle {
     migrate: async () => {
       await ready;
       await assertMigrationsMatch(db as unknown as Database, migrationsFolder);
-      await migratePglite(db, { migrationsFolder });
+      await migrateInSteps(db, migrationsFolder);
     },
     ping: async () => {
       await ready;
