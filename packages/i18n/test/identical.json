@@ -265,7 +265,10 @@
       "devices.android.buildNumberSub",
       "devices.iphone.mac",
       "devices.iphone.steps.xcode",
-      "devices.iphone.connectedDone"
+      "devices.iphone.connectedDone",
+      "members.passwordLink.label",
+      "openOnPhone.appStore",
+      "openOnPhone.googlePlay"
     ],
     "es": [
       "devices.cpus",
@@ -484,7 +487,9 @@
       "share.groupRoles",
       "settings.mode.personal",
       "onboarding.personal.name",
-      "newAgentAsk.ideas"
+      "newAgentAsk.ideas",
+      "openOnPhone.appStore",
+      "openOnPhone.googlePlay"
     ],
     "fr": [
       "devices.cpus",
@@ -869,7 +874,9 @@
       "teamPlan.lifeArea.money",
       "teamTemplates.agents.rui.role",
       "newAgentAsk.idea.money.label",
-      "agentSetup.firstRun.team.donePersonal"
+      "agentSetup.firstRun.team.donePersonal",
+      "openOnPhone.appStore",
+      "openOnPhone.googlePlay"
     ],
     "de": [
       "devices.workspace",
@@ -1270,7 +1277,10 @@
       "share.agent",
       "settings.mode.team",
       "teamTemplates.agents.leo.role",
-      "newAgentAsk.idea.training.label"
+      "newAgentAsk.idea.training.label",
+      "members.passwordLink.label",
+      "openOnPhone.appStore",
+      "openOnPhone.googlePlay"
     ],
     "it": [
       "devices.cpus",
@@ -1595,7 +1605,10 @@
       "browser.live.emulated.desktop",
       "artifacts.files",
       "share.fileRef",
-      "settings.mode.team"
+      "settings.mode.team",
+      "members.passwordLink.label",
+      "openOnPhone.appStore",
+      "openOnPhone.googlePlay"
     ],
     "nl": [
       "devices.filter.computers",
@@ -2142,7 +2155,10 @@
       "settings.mode.team",
       "teamTemplates.agents.leo.role",
       "newAgentAsk.idea.training.label",
-      "agentSetup.firstRun.team.donePersonal"
+      "agentSetup.firstRun.team.donePersonal",
+      "members.passwordLink.label",
+      "openOnPhone.appStore",
+      "openOnPhone.googlePlay"
     ],
     "ja": [
       "devices.system.android",
@@ -2289,7 +2305,9 @@
       "routines.setup.github.secret",
       "routines.setup.github.type",
       "routines.setup.github.url",
-      "routines.setup.sentry.url"
+      "routines.setup.sentry.url",
+      "openOnPhone.appStore",
+      "openOnPhone.googlePlay"
     ],
     "ko": [
       "devices.system.android",
@@ -2432,7 +2450,9 @@
       "routines.setup.github.secret",
       "routines.setup.github.type",
       "routines.setup.github.url",
-      "routines.setup.sentry.url"
+      "routines.setup.sentry.url",
+      "openOnPhone.appStore",
+      "openOnPhone.googlePlay"
     ],
     "zh-Hans": [
       "devices.system.android",
@@ -2567,7 +2587,9 @@
       "routines.setup.github.secret",
       "routines.setup.github.type",
       "routines.setup.github.url",
-      "routines.setup.sentry.url"
+      "routines.setup.sentry.url",
+      "openOnPhone.appStore",
+      "openOnPhone.googlePlay"
     ],
     "id": [
       "devices.cpus",
@@ -2830,7 +2852,9 @@
       "team.chart.supervisor",
       "team.sectors.supervisor",
       "agentSetup.how.model",
-      "share.fileRef"
+      "share.fileRef",
+      "openOnPhone.appStore",
+      "openOnPhone.googlePlay"
     ],
     "tr": [
       "devices.cpus",
@@ -2991,7 +3015,9 @@
       "routines.setup.github.url",
       "routines.setup.sentry.url",
       "browser.live.emulated.tablet",
-      "agentSetup.how.model"
+      "agentSetup.how.model",
+      "openOnPhone.appStore",
+      "openOnPhone.googlePlay"
     ],
     "pl": [
       "devices.cpus",
@@ -3250,7 +3276,10 @@
       "browser.live.emulated.tablet",
       "agentSetup.how.model",
       "share.agent",
-      "agentSetup.firstRun.team.donePersonal"
+      "agentSetup.firstRun.team.donePersonal",
+      "members.passwordLink.label",
+      "openOnPhone.appStore",
+      "openOnPhone.googlePlay"
     ],
     "ru": [
       "devices.system.android",
@@ -3383,7 +3412,9 @@
       "routines.setup.github.secret",
       "routines.setup.github.type",
       "routines.setup.github.url",
-      "routines.setup.sentry.url"
+      "routines.setup.sentry.url",
+      "openOnPhone.appStore",
+      "openOnPhone.googlePlay"
     ]
   },
   "mobile-base": {

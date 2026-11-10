@@ -20,6 +20,7 @@ import {
   insertMessage,
   invokeToolForRun,
   issueRunToolToken,
+  LONG_JOB_KINDS,
   type MachineStatus,
   mayFallBack,
   openDm,
@@ -928,5 +929,10 @@ describe("the outbox", () => {
     const rest = await claimJobs(f.db, { workerId: "w", maxBackground: 5 });
     expect(rest.map((j) => j.background)).toEqual([true, true]);
     expect(rest.map((j) => j.kind).sort()).toEqual(["agent_run.execute", "routine.run"]);
+  });
+
+  test("every long job kind is one the core runs", async () => {
+    f = await setup();
+    expect(LONG_JOB_KINDS.filter((kind) => !f.handlers[kind])).toEqual([]);
   });
 });

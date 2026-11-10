@@ -287,9 +287,24 @@ export const planLabel = (t: TFunction, choice: PlanChoice) =>
 /** A plan's name in its panel, as its maker sells it: "Your Claude plan", "GLM Coding Plan"… */
 export const planTitle = (t: TFunction, choice: PlanChoice) =>
   isPlanId(choice) ? CODING_PLANS[choice].name : t(`connectAi.plan.${choice}.title`);
-/** What a search for a plan finds it by: its name, its maker, what it is sold as and its tiers. */
+/** Other names people search a plan by: the CLIs it goes by ("codex" finds ChatGPT). Product names, not translated. */
+const PLAN_SEARCH_NAMES: Partial<Record<PlanChoice, string>> = {
+  claude: "Claude Code",
+  chatgpt: "Codex",
+  gemini: "Gemini CLI Antigravity",
+  grok: "Grok Build",
+  zen: "OpenCode Zen",
+};
+export const planSearchNames = (choice: PlanChoice) => PLAN_SEARCH_NAMES[choice] ?? "";
+/** What a search for a plan finds it by: its name, its maker, what it is sold as, its tiers and its CLIs. */
 export const planPickText = (t: TFunction, choice: PlanChoice) =>
-  [planLabel(t, choice), planMark(choice), planTitle(t, choice), t(`connectAi.plan.${choice}.tiers`)].join(" ");
+  [
+    planLabel(t, choice),
+    planMark(choice),
+    planTitle(t, choice),
+    t(`connectAi.plan.${choice}.tiers`),
+    planSearchNames(choice),
+  ].join(" ");
 /** The marks overlapped on the computer's plan line, and on the API key row. */
 export const PLAN_MARKS = ["claude", "openai", "zai", "kimi"] as const;
 export const KEY_MARKS = ["claude", "openai", "gemini", "openrouter"] as const;

@@ -145,7 +145,8 @@ const results = async () =>
     .map((s) => s.data as { name: string; content: string; isError: boolean });
 
 const fireNow = async () => {
-  await f.db.update(schema.routines).set({ nextRunAt: new Date(Date.now() - 1000) });
+  // A minute ago: past any routine's offset into its minute (`fireDueRoutines`).
+  await f.db.update(schema.routines).set({ nextRunAt: new Date(Date.now() - 60_000) });
   await fireDueRoutines({ db: f.db, pubsub: f.pubsub, context: f.context });
   await drainOutbox(f.db, f.handlers);
 };

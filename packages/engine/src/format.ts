@@ -119,3 +119,13 @@ export function editDistance(a: string, b: string): number {
   }
   return prev[b.length] as number;
 }
+
+/**
+ * The `p` quantile (0..1) of `values` by nearest rank: the smallest of them that a `p` share of them don't exceed;
+ * 0 for none.
+ */
+export function percentile(values: readonly number[], p: number): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.min(sorted.length, Math.max(1, Math.ceil(p * sorted.length))) - 1] as number;
+}

@@ -74,6 +74,7 @@ describe("sign-up policy (self-host)", () => {
       {
         id: orgId,
         name: "Acme",
+        mode: "team",
         role: "member",
         permissions: expect.arrayContaining(["read", "post", "talk_to_agents"]),
         rank: null,

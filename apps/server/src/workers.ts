@@ -39,6 +39,8 @@ import {
   purgeApps,
   purgeDeletedArtifacts,
   purgeDeletedWikiPages,
+  QUICK_SLOW_FOR_MS,
+  QUICK_SLOW_MS,
   queueApprovalDigests,
   reapRoutineRuns,
   reconcileComposioAccounts,
@@ -100,6 +102,11 @@ export interface WorkerDeps {
   desktops?: Pick<DesktopControl, "keepAlive">;
   /** The daily stall-and-noise report (`OPS_REPORT_EMAIL`); absent: none. */
   opsReport?: { to: string[]; publicUrl: string };
+  /**
+   * Job slots (`OUTBOX_MAX_IN_FLIGHT`, `OUTBOX_QUICK_SLOTS`, `OUTBOX_MAX_IN_FLIGHT_CEILING`) and the database
+   * connections the jobs share; absent: the pump's own.
+   */
+  outbox?: { maxInFlight: number; quickSlots: number; ceiling: number; dbConnections: number };
   log: Logger;
   workerId?: string;
 }
@@ -110,12 +117,15 @@ export const WAKE_TOPIC = "system:outbox-wake";
 /** How often each background job runs. */
 export const WORKER_INTERVALS_MS = {
   outbox: 1_000,
+  /** The job slots follow what each lane waited since the last look (`OutboxPump.tune`). */
+  outboxTune: 30_000,
   partitions: 24 * 3600_000,
   approvals: 60_000,
   approvalDigest: 15 * 60_000,
   reflections: 10 * 60_000,
   consolidation: 24 * 3600_000,
-  routines: 30_000,
+  /** Often enough that the routines of one minute fire as the ramp their offsets make (`fireDueRoutines`). */
+  routines: 5_000,
   /** Snoozed notifications whose time came back to the inbox. */
   notifications: 30_000,
   /** Runs whose worker died (deploy, crash): also once at boot. */
@@ -192,8 +202,10 @@ export function startWorkers(deps: WorkerDeps) {
     void tick();
   };
 
-  // A pool, not batches: a slow job (a long agent run) doesn't hold back the ones claimed after it.
+  // A pool, not batches: a slow job (a long agent run) doesn't hold back the ones claimed after it, and quick jobs
+  // keep slots of their own.
   const outboxPump = createOutboxPump(db, deps.handlers, {
+    ...deps.outbox,
     workerId,
     onSlotFree: () => void ticks.get("outbox")?.(),
     onError: (job, error, outcome) => logJobFailure(log, job, error, outcome),
@@ -202,6 +214,22 @@ export function startWorkers(deps: WorkerDeps) {
   });
   every("outbox", WORKER_INTERVALS_MS.outbox, async () => {
     while (!stopped && (await outboxPump.pump()) > 0) {}
+  });
+  every("outboxTune", WORKER_INTERVALS_MS.outboxTune, async () => {
+    const t = await outboxPump.tune();
+    const lanes = { quick: t.quick, long: t.long, quickWaitMs: t.quickWaitMs, longWaitMs: t.longWaitMs };
+    if (t.resized) {
+      log.info("job slots resized", lanes);
+      void ticks.get("outbox")?.();
+    }
+    if (t.slow)
+      log.error("quick jobs kept waiting for a slot", {
+        job: "outbox",
+        ...lanes,
+        error: new Error(
+          `quick jobs waited over ${QUICK_SLOW_MS / 1000} s for a slot for ${QUICK_SLOW_FOR_MS / 60_000} minutes`,
+        ),
+      });
   });
 
   every("apps", WORKER_INTERVALS_MS.apps, () => purgeApps(db));

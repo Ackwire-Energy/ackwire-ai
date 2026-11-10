@@ -1605,6 +1605,9 @@ export const en = {
     making: "Making the code…",
     stepApp: "Install the agentes app on your phone (App Store or Google Play).",
     stepTailscale: "Install Tailscale on your phone and sign in with the same Tailscale account as this server.",
+    /** The links to Tailscale in each store, after the step: the store's own name. */
+    appStore: "App Store",
+    googlePlay: "Google Play",
     stepScan: "Point your phone's camera at the code.",
     validFor: "Valid for {{time}}",
     private: "Whoever scans this code signs in as you.",

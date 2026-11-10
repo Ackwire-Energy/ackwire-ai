@@ -133,6 +133,37 @@ describe("schedule phrases", () => {
 describe("routines", () => {
   const routineDeps = () => ({ db: f.db, pubsub: f.pubsub, context: f.context });
 
+  test("the routines of one minute fire as a ramp, each at its own offset into it; their slot stays the minute", async () => {
+    f = await setup();
+    const slot = new Date("2026-11-09T09:00:00.000Z");
+    await f.db.insert(schema.routines).values(
+      Array.from({ length: 30 }, (_, i) => ({
+        orgId: f.org.id,
+        agentId: f.agent.id,
+        name: `Bom dia ${i}`,
+        prompt: "Bom dia",
+        target: { type: "dm" },
+        triggerType: "schedule",
+        cron: "0 9 * * *",
+        timezone: "UTC",
+        nextRunAt: slot,
+        createdByUserId: f.owner.id,
+      })),
+    );
+    const fired: number[] = [];
+    for (let s = 0; s <= 60; s += 10) {
+      await fireDueRoutines(routineDeps(), new Date(slot.getTime() + s * 1000));
+      fired.push((await f.db.select().from(schema.routineRuns)).length);
+    }
+    expect(fired[0]).toBeLessThan(30);
+    expect(new Set(fired).size).toBeGreaterThanOrEqual(3);
+    expect(fired.at(-1)).toBe(30);
+    const runs = await f.db.select().from(schema.routineRuns);
+    expect(new Set(runs.map((r) => r.at.toISOString()))).toEqual(new Set([slot.toISOString()]));
+    const next = await f.db.select({ at: schema.routines.nextRunAt }).from(schema.routines);
+    expect(new Set(next.map((r) => r.at?.toISOString()))).toEqual(new Set(["2026-11-10T09:00:00.000Z"]));
+  });
+
   test("scheduled in the workspace time zone; fires once across two workers; runs in the background", async () => {
     f = await setup({
       reply: () => ({ chunks: ["Resumo: tudo certo."], usage: { inputTokens: 100, outputTokens: 20 } }),
