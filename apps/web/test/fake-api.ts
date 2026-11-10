@@ -1279,6 +1279,27 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       return { ...o, permissions: ["read", ...grants(keys)] };
     }),
   });
+  /** A DM as the list has it: its last message and unread count. */
+  const dmRow = (d: FakeState["dms"][number]) => {
+    const last = state.messages
+      .filter((m) => m.channelId === d.channelId && !m.threadId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+    return {
+      ...d,
+      lastMessage: last
+        ? { id: last.id, body: last.body, createdAt: last.createdAt, authorType: last.author.type }
+        : null,
+      unread: d.unread ?? 0,
+    };
+  };
+  // A person who picked Portuguese, as the screens' tests read it (`useServerLocale` keeps the app in it).
+  const meNow = () =>
+    state.me && withPermissions({ ...state.me, user: { locale: "pt-BR", localeAuto: false, ...state.me.user } });
+  /** What finishing a workspace's onboarding answers, as the server does: where it opens, and `/me` now. */
+  const opened = () => ({
+    rightHandId: state.agents.find((a) => a.builtin === "right_hand")?.id ?? null,
+    me: meNow() ?? undefined,
+  });
   // "Quem pensa": every agent starts on the API, with a MacBook that has Claude Code and Codex.
   const brains = new Map<string, AgentBrain>();
   const brainOf = (agentId: string): AgentBrain => {
@@ -1425,9 +1446,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         if (humanCheck !== undefined) state.calls.push({ method: "account.signInOptions", args: [input, humanCheck] });
         return state.signInOptions ?? { account: false, password: false, providers: [], canSignUp: true };
       },
-      // A person who picked Portuguese, as the screens' tests read it (`useServerLocale` keeps the app in it).
-      me: async () =>
-        state.me && withPermissions({ ...state.me, user: { locale: "pt-BR", localeAuto: false, ...state.me.user } }),
+      me: async () => meNow(),
       updateMe: async (input) => {
         log("account.updateMe", input);
       },
@@ -1549,16 +1568,19 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         const me = requireMe();
         const orgId = id("org");
         const general = id("chan");
-        // As the server makes it: its owner sets it up in the onboarding, already past its first step.
+        // As the server makes it: its owner sets it up in the onboarding, already past its first step, unless it's
+        // finished at once.
         me.organizations.push({
           id: orgId,
           name: input.name,
           role: "owner",
-          onboarding: { step: "context", generalChannelId: general },
+          ...(input.finished ? {} : { onboarding: { step: "context" as const, generalChannelId: general } }),
           ...(state.newWorkspaceStanding ? { standing: state.newWorkspaceStanding } : {}),
           // Who it is for (ADR 0159), as the server keeps it.
           ...(input.mode ? { mode: input.mode } : {}),
         });
+        const mine = state.members.find((m) => m.userId === me.user.id);
+        if (mine && input.memberTimezone) mine.timezone = input.memberTimezone;
         state.channels.push({
           id: general,
           name: "general",
@@ -1572,13 +1594,14 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         return {
           organization: { id: orgId, name: input.name, role: "owner", context: input.context },
           generalChannelId: general,
+          ...opened(),
         };
       },
       saveOnboarding: async (orgId, input) => {
         log("orgs.saveOnboarding", orgId, input);
         const me = requireMe();
         const at = me.organizations.find((o) => o.id === orgId)?.onboarding;
-        if (!at) return { step: "done", finished: true };
+        if (!at) return { step: "done", finished: true, ...("finished" in input ? opened() : {}) };
         const onboarding =
           "finished" in input
             ? undefined
@@ -1589,7 +1612,11 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           ...me,
           organizations: me.organizations.map((o) => (o.id === orgId ? { ...o, onboarding } : o)),
         };
-        return { step: onboarding?.step ?? "done", finished: onboarding === undefined };
+        return {
+          step: onboarding?.step ?? "done",
+          finished: onboarding === undefined,
+          ...("finished" in input ? opened() : {}),
+        };
       },
       get: async (orgId) => ({ id: orgId, name: "Acme", role: "owner", context: "" }),
       deletionCode: async (orgId) => {
@@ -1945,6 +1972,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           roleIds: [],
           owner: false,
           money: seesCost(),
+          estimated: false,
           renewsAt: new Date().toISOString(),
           since: new Date().toISOString(),
           until: new Date().toISOString(),
@@ -3461,25 +3489,13 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       },
     },
     dms: {
-      list: async () =>
-        state.dms.map((d) => {
-          const last = state.messages
-            .filter((m) => m.channelId === d.channelId && !m.threadId)
-            .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
-          return {
-            ...d,
-            lastMessage: last
-              ? { id: last.id, body: last.body, createdAt: last.createdAt, authorType: last.author.type }
-              : null,
-            unread: d.unread ?? 0,
-          };
-        }),
+      list: async () => state.dms.map(dmRow),
       open: async (orgId, target) => {
         log("dms.open", orgId, target);
         const existing = state.dms.find((d) =>
           "agentId" in target ? d.with.id === target.agentId : d.with.id === target.userId,
         );
-        if (existing) return { channelId: existing.channelId };
+        if (existing) return { channelId: existing.channelId, dm: dmRow(existing) };
         const channelId = id("dm");
         const agent = "agentId" in target ? state.agents.find((a) => a.id === target.agentId) : undefined;
         const person = "userId" in target ? state.members.find((m) => m.userId === target.userId) : undefined;
@@ -3494,7 +3510,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
             : { type: "person", id: person?.userId ?? "", name: person?.name ?? "", handle: null },
           openedAt: new Date().toISOString(),
         });
-        return { channelId };
+        return { channelId, dm: dmRow(state.dms.at(-1) as (typeof state.dms)[number]) };
       },
       markRead: async (orgId, channelId) => {
         log("dms.markRead", orgId, channelId);

@@ -17,6 +17,7 @@ import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
 import { CardSky, colorOf } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
+import { codeAndBold, inlineWords } from "@/lib/markdown";
 import { useToast } from "@/lib/toast";
 import "./blocks.css";
 
@@ -67,13 +68,13 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
         <ul className="choices__summary">
           {choiceSummary(questions, answered.picks, answered.others).map((s) => (
             <li key={s.question}>
-              {questions.length > 1 && <span className="choices__asked">{s.question}</span>}
+              {questions.length > 1 && <span className="choices__asked">{inlineWords(s.question, "sq")}</span>}
               <span className="choices__picked">
                 <span className="choices__letter" aria-hidden="true">
                   {s.letter}
                 </span>
                 <span className="choices__said" data-written={s.written ? "" : undefined}>
-                  {s.label}
+                  {codeAndBold(s.label, "s")}
                 </span>
               </span>
             </li>
@@ -162,18 +163,20 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
           <b>{a.title}</b>
           {questions.length > 1 && <small>{t("choices.step", { step: d.step + 1, total: questions.length })}</small>}
         </span>
-        <Button
-          variant="ghost"
-          size="sm"
-          iconOnly
-          icon="close"
-          aria-label={t("choices.close")}
-          title={t("choices.close")}
-          onClick={() => setClosed(true)}
-        />
+        <span className="ac-acts">
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            icon="close"
+            aria-label={t("choices.close")}
+            title={t("choices.close")}
+            onClick={() => setClosed(true)}
+          />
+        </span>
       </header>
       <p className="choices__question" id={`choices-${id}-q`}>
-        {q.question}
+        {inlineWords(q.question, "q")}
       </p>
       <fieldset
         ref={list}
@@ -197,11 +200,11 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
               </span>
             </span>
             <span className="ac-mediarow__head">
-              <span className="choices__label">{o.label}</span>
+              <span className="choices__label">{codeAndBold(o.label, "l")}</span>
             </span>
             {o.description && (
               <span className="ac-mediarow__body">
-                <span className="choices__description">{o.description}</span>
+                <span className="choices__description">{codeAndBold(o.description, "d")}</span>
               </span>
             )}
           </button>

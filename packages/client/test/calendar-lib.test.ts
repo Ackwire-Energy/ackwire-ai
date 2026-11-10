@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   type CalItem,
   collapseRoutines,
+  dayEntries,
   dayRuns,
   dragRange,
   HOUR_PX,
@@ -10,7 +11,7 @@ import {
   layoutDay,
   onDay,
   rangeLabel,
-  runSlots,
+  runStacks,
   toItems,
   upcomingItems,
   viewDays,
@@ -30,16 +31,20 @@ const item = (key: string, start: Date, end: Date, allDay = false): CalItem => (
   people: [],
 });
 
+const run = (key: string, start: Date): CalItem => ({
+  ...item(key, start, new Date(start.getTime() + 15 * 60_000)),
+  kind: "routine",
+  source: "routine",
+  routineId: key,
+});
+/** A stack as the grid shows it: its first run's minute, its runs, the rows it shows and how many go behind "+N". */
+const stacked = (list: ReturnType<typeof runStacks>) =>
+  list.map((s) => [Math.round(s.top), s.runs.map((r) => r.key), s.shown, s.more]);
+
 describe("calendar layout", () => {
-  test("single routine runs group into one slot per hour (earliest first); events and bands stay out", () => {
-    const run = (key: string, start: Date): CalItem => ({
-      ...item(key, start, new Date(start.getTime() + 15 * 60_000)),
-      kind: "routine",
-      source: "routine",
-      routineId: key,
-    });
+  test("runs that would meet stack (earliest first): two rows, then +N; events and bands stay out", () => {
     const band: CalItem = { ...run("band", at(0)), allDay: true, end: at(0, 0, new Date(2026, 9, 15)), runs: [at(1)] };
-    const slots = runSlots(
+    const stacks = runStacks(
       [
         run("b", at(9, 30)),
         run("a", at(9, 10)),
@@ -52,9 +57,89 @@ describe("calendar layout", () => {
       ],
       day,
     );
-    expect(slots.map((s) => [s.top, s.runs.map((r) => r.key)])).toEqual([
-      [9 * 60 + 10, ["a", "b", "c", "d"]],
-      [18 * 60, ["e"]],
+    expect(stacked(stacks)).toEqual([
+      [9 * 60 + 10, ["a", "b", "c", "d"], 2, 2],
+      [18 * 60, ["e"], 1, 0],
+    ]);
+    expect(stacks[0]?.kind).toBe("runs");
+  });
+
+  test("a stack shows only the rows that fit before the next item under it, at least one", () => {
+    // A meeting 40 minutes after three runs: room for one row and "+2" (40px), not two rows and "+1" (62px).
+    const runs = [run("a", at(7)), run("b", at(7, 1)), run("c", at(7, 2))];
+    expect(stacked(runStacks([...runs, item("meeting", at(7, 40), at(8, 40))], day))).toEqual([
+      [7 * 60, ["a", "b", "c"], 1, 2],
+    ]);
+    // A run an hour later starts its own stack, under the first one's line and "+2".
+    expect(stacked(runStacks([...runs, run("d", at(8))], day))).toEqual([
+      [7 * 60, ["a", "b", "c"], 1, 2],
+      [8 * 60, ["d"], 1, 0],
+    ]);
+    // Ten minutes after the first run there's no room even for one line: it still shows one.
+    expect(stacked(runStacks([run("a", at(7)), item("soon", at(7, 10), at(8))], day))).toEqual([[7 * 60, ["a"], 1, 0]]);
+  });
+
+  test("a stack drawn taller than a line (a name that wraps) takes in the run that would start inside it", () => {
+    const runs = [run("a", at(7)), run("b", at(7, 40))];
+    expect(stacked(runStacks(runs, day))).toEqual([
+      [7 * 60, ["a"], 1, 0],
+      [7 * 60 + 40, ["b"], 1, 0],
+    ]);
+    const tall = new Map([["runs-a", 3 * 16 + 4]]);
+    expect(stacked(runStacks(runs, day, tall))).toEqual([[7 * 60, ["a", "b"], 2, 0]]);
+  });
+
+  test("a stack is one item beside the meetings it meets; a block drawn past its slot pushes the next beside it", () => {
+    const runs = [run("a", at(7)), run("b", at(7, 1)), run("c", at(7, 2))];
+    const meeting = item("meeting", at(7, 40), at(8, 40));
+    const stacks = runStacks([...runs, meeting], day);
+    const placed = layoutDay([meeting], day, stacks);
+    expect(placed.map((p) => [p.item.key, p.col, p.cols])).toEqual([
+      ["runs-a", 0, 2],
+      ["meeting", 1, 2],
+    ]);
+    // The runs' column is the narrow one: the meeting keeps room for its name.
+    expect(placed.map((p) => [p.thin, p.thins, p.thinBefore])).toEqual([
+      [true, 1, 0],
+      [false, 1, 1],
+    ]);
+    // A stack alone takes the column, and meetings beside meetings share it evenly.
+    const two = runStacks([run("x", at(7)), run("y", at(7, 1)), run("z", at(7, 2)), item("m", at(7, 50), at(9))], day);
+    expect(layoutDay([], day, two).map((p) => p.thins)).toEqual([0]);
+    expect(layoutDay([item("p", at(9), at(10)), item("q", at(9), at(10))], day).map((p) => p.thins)).toEqual([0, 0]);
+    // 09:00–09:30 drawn 50px tall (its title wraps) reaches 10:08: the 09:45 meeting goes beside it.
+    const short = item("short", at(9), at(9, 30));
+    const next = item("next", at(9, 45), at(10, 15));
+    expect(layoutDay([short, next], day).map((p) => p.cols)).toEqual([1, 1]);
+    expect(layoutDay([short, next], day, [], new Map([["short", 50]])).map((p) => [p.col, p.cols])).toEqual([
+      [0, 2],
+      [1, 2],
+    ]);
+    // Its own slot stays its slot: only what it reaches into moves.
+    expect(layoutDay([short], day, [], new Map([["short", 50]]))[0]?.height).toBe(30);
+  });
+
+  test("a day's rows for the month and the agenda: all day first, then by time, a frequent routine once", () => {
+    const band: CalItem = {
+      ...run("band", at(0)),
+      allDay: true,
+      end: at(0, 0, new Date(2026, 9, 15)),
+      runs: [at(6), at(12), at(18)],
+    };
+    const rows = dayEntries(
+      [
+        run("late", at(18, 30)),
+        item("lunch", at(12), at(13)),
+        item("holiday", at(0), at(0, 0, new Date(2026, 9, 15)), true),
+        band,
+      ],
+      day,
+    );
+    expect(rows.map((r) => [r.key, r.day?.count])).toEqual([
+      ["holiday", undefined],
+      [`band@${day.getFullYear()}-${day.getMonth() + 1}-${day.getDate()}`, 3],
+      ["lunch", undefined],
+      ["late", undefined],
     ]);
   });
 
@@ -120,6 +205,58 @@ describe("calendar layout", () => {
     expect(onDay(reminder, next)).toBe(false);
     expect(layoutDay([reminder], day).map((p) => [p.top, p.height])).toEqual([[1430, 10]]);
     expect(layoutDay([{ ...reminder, start: at(9), end: at(9, 1) }], day).map((p) => p.height)).toEqual([30]);
+  });
+
+  test("each item knows whose it is: who made an event, a run's and a reminder's agent, who has a task", () => {
+    const event = (id: string, createdBy: { type: "person" | "agent"; id: string }) => ({
+      id,
+      title: id,
+      description: "",
+      start: at(10).toISOString(),
+      end: at(11).toISOString(),
+      allDay: false,
+      timezone: "UTC",
+      recurrence: "none" as const,
+      participants: [],
+      rsvp: [],
+      channelId: null,
+      issueId: null,
+      createdBy,
+    });
+    const items = toItems({
+      events: [event("by-person", { type: "person", id: "u-ana" }), event("by-agent", { type: "agent", id: "ag-ada" })],
+      routines: [
+        { routineId: "r1", name: "Diária", agentId: "ag-atlas", at: at(7).toISOString(), target: { type: "dm" } },
+      ],
+      reminders: [
+        {
+          id: "rem",
+          message: "m",
+          at: at(9).toISOString(),
+          forUserId: "u-ana",
+          channelId: "c",
+          threadId: null,
+          agentId: "ag-ada",
+          createdBy: "u-ana",
+          canCancel: true,
+        },
+      ],
+      deadlines: [
+        { issueId: "i1", number: 128, title: "Login", date: "2026-10-14", assignee: { type: "agent", id: "ag-ada" } },
+        { issueId: "i2", number: 129, title: "Nobody", date: "2026-10-14", assignee: null },
+        { issueId: "i3", number: 130, title: "Older server", date: "2026-10-14" },
+      ],
+      proposals: [],
+    });
+    expect(items.map((it) => [it.key, it.owner])).toEqual([
+      ["by-person", { type: "person", id: "u-ana" }],
+      ["by-agent", { type: "agent", id: "ag-ada" }],
+      [`r1@${at(7).toISOString()}`, { type: "agent", id: "ag-atlas" }],
+      ["reminder-rem", { type: "agent", id: "ag-ada" }],
+      ["deadline-i1", { type: "agent", id: "ag-ada" }],
+      ["deadline-i2", undefined],
+      ["deadline-i3", undefined],
+    ]);
   });
 
   test("overlapping events sit side by side; a later one gets the full width again", () => {

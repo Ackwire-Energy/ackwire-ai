@@ -140,6 +140,8 @@ test("a plan's turn counts for the person at what it would cost through the API"
   const report = await peopleUsage(f.db, f.owner.id, f.org.id);
   expect(report.plansOnly).toBe(true);
   expect(report.people.find((p) => p.userId === member.id)).toMatchObject({ estimated: true });
+  // Their drawer says the same of their month.
+  expect((await personUsageDetail(f.db, f.owner.id, f.org.id, member.id)).estimated).toBe(true);
 });
 
 test("at the limit the agent posts the card instead of answering, and a raise turns it into go on", async () => {
@@ -208,6 +210,7 @@ test("admins see counts and cost of a DM, never its title; members see only thei
 
   const detail = await personUsageDetail(f.db, admin.id, f.org.id, member.id);
   expect(detail.money).toBe(true);
+  expect(detail.estimated).toBe(false);
   const work = detail.recent.find((r) => r.kind === "work");
   expect(work).toMatchObject({ title: "Proposta para a Lumen Tiles", place: { kind: "channel" } });
   const priv = detail.recent.find((r) => r.kind === "private");

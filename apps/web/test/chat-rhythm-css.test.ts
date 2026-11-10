@@ -199,33 +199,27 @@ test("a failed reply's reason sits under the name like the text it stands for, i
   const line = px(last(reason, "line-height"));
   expect(line).toBe(24);
   // The × hangs over the reason's first line by as much as it outgrows it: centred on it, and the row no taller than
-  // its words. On touch the small buttons grow to the default step of the ruler.
+  // its words. On touch too: a small button keeps its 32 plate there, only its target grows.
   const at = (sheet: string, selector: string) =>
     declarations(sheet, selector)
       .filter(([p]) => p === "margin-block")
       .at(-1)?.[1];
-  const button = at(topLevel(css), ".ac-msg__error-row > .ac-btn--icon");
-  const touch = at(atRule(css, "@media (pointer: coarse)"), ".ac-msg__error-row > .ac-btn--icon");
+  const touch = atRule(css, "@media (pointer: coarse)");
+  const small = px(last(":root", "--control-h-sm"));
+  const hung = px(at(topLevel(css), ".ac-msg__error-row > .ac-btn--icon"));
+  expect(small + 2 * hung).toBe(line);
+  expect(hung + small / 2).toBe(line / 2);
+  expect(at(touch, ".ac-msg__error-row > .ac-btn--icon")).toBeUndefined();
   // Its fix (a key, a model) on a line of its own under the reason: beside it, a long reason went a word per line.
   const fix = ".ac-msg__error-row > .ac-btn:not(.ac-btn--icon)";
   const bare = (value: string | undefined) => value?.replace(/\s/g, "");
   // In the reason's column only: spanning the ×'s too, its width went to that column and squeezed the reason.
   expect(bare(last(fix, "grid-area"))).toBe("2/1");
   expect(bare(last(".ac-msg__error-row", "grid-template-columns"))).toBe("minmax(0,max-content)max-content");
-  for (const [margin, height] of [
-    [button, px(last(":root", "--control-h-sm"))],
-    [touch, px(last(":root", "--control-h-md"))],
-  ] as const) {
-    const m = px(margin);
-    expect(height + 2 * m).toBe(line);
-    expect(m + height / 2).toBe(line / 2);
-  }
   // "sem notícias há N min · Atualizar": its button hangs over its 16px line the same way.
   const quiet = px(last(".ac-msg__activity", "line-height"));
-  expect(px(at(topLevel(css), ".run-quiet > .ac-btn")) * 2 + px(last(":root", "--control-h-sm"))).toBe(quiet);
-  expect(
-    px(at(atRule(css, "@media (pointer: coarse)"), ".run-quiet > .ac-btn")) * 2 + px(last(":root", "--control-h-md")),
-  ).toBe(quiet);
+  expect(px(at(topLevel(css), ".run-quiet > .ac-btn")) * 2 + small).toBe(quiet);
+  expect(at(touch, ".run-quiet > .ac-btn")).toBeUndefined();
 });
 
 test("in Compacta a pill's time stays one line in the clock's column, however long", () => {
@@ -255,7 +249,7 @@ test("the agents' line is the conversation's width, the pair on its middle, and 
   expect(last(".consult-pair", "margin")).toBeUndefined();
   // The hidden chevron keeps no room on one side only.
   expect(last(".consult-pair__chev", "position")).toBe("absolute");
-  expect(last(".consult-pair__row", "padding")).toBe("0 20px");
+  expect(last(".consult-pair__row", "padding")).toBe("var(--space-1) 20px");
   // Inside a message it leaves the row's body for the same width.
   expect(last(".ag-rc--talk", "margin-left")).toBe("calc(-1 * var(--msg-lead))");
   // And comes short of the list's by what a look's rows stand in from it: the two lines end on the same point.

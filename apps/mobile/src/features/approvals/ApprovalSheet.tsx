@@ -1,5 +1,6 @@
 import { useApproval, useChannels, useDecideApproval } from "@agenteschat/client";
 import { aheadPhase } from "@agenteschat/client/lib/approval-kind";
+import { approvalEffects } from "@agenteschat/client/lib/approval-review";
 import {
   aheadEndLine,
   alwaysRoutineName,
@@ -46,6 +47,7 @@ import {
 import {
   ApprovalAheadLine,
   ApprovalEmailLetter,
+  ApprovalUndoChip,
   approvalTitleText,
   traitKey,
   useCancelAhead,
@@ -58,10 +60,11 @@ const SHORT_VALUE = 22;
 
 /**
  * A request, from anywhere (deep link `approval/<id>`), as the system's sheets read: its title ("Pedido") and ×, who
- * asks with the action in words, where and the fuse to its deadline; then the request in groups (why, the service
- * it goes through, the values it runs with, what it affects) and, where its kind allows it, "Aprovar sempre" as a
- * switch for next time. Two buttons side by side: Recusar and Aprovar (held, for high risk). Recusar writes the
- * optional reason in the sheet (the deep link's `refuse` opens there; the cards ask in the system's alert).
+ * asks with the action in words and whether it can be undone after it, where and the fuse to its deadline under them
+ * at the sheet's width; then the request in groups (why, the service it goes through, the values it runs with, what
+ * it affects) and, where its kind allows it, "Aprovar sempre" as a switch for next time. Two buttons side by side:
+ * Recusar and Aprovar (held, for high risk). Recusar writes the optional reason in the sheet (the deep link's `refuse`
+ * opens there; the cards ask in the system's alert).
  */
 export function ApprovalSheet({
   id,
@@ -158,21 +161,29 @@ export function ApprovalSheet({
     const facts = approvalTable(a, Number.POSITIVE_INFINITY, nameOf, true);
     // A built-in tool's action in words; a connector's is in its facts, an email is the letter.
     const detail = !a.connector && !a.email ? approvalDetail(a, i18n.language) : null;
-    const traits = approvalTraits(a).map((tr) => t(traitKey(tr, isPersonal(org))));
+    // Whether it can be undone is the chip after the title; what it touches stays in the foot.
+    const { undo } = approvalEffects(a);
+    const traits = approvalTraits(a)
+      .filter((tr) => tr !== undo)
+      .map((tr) => t(traitKey(tr, isPersonal(org))));
     const foot = [traits.join(" · "), requester].filter(Boolean).join("\n");
     const who = (
       <View style={styles.who}>
-        <AgentFace agentId={a.agentId} size={40} />
-        <View style={styles.grow}>
-          <Text variant="body" numberOfLines={3} style={styles.semibold}>
-            {approvalTitleText(t, a)}
-          </Text>
-          <View style={styles.whereRow}>
-            <Text variant="footnote" tone="muted" numberOfLines={1} style={styles.shrink}>
-              {where || t("mobile.approval.asksYou")}
+        <View style={styles.whoHead}>
+          <AgentFace agentId={a.agentId} size={40} />
+          {/* The chip on the title's last line while it fits, under the title otherwise. */}
+          <View style={[styles.grow, styles.titleLine]}>
+            <Text variant="body" style={[styles.semibold, styles.shrink]}>
+              {approvalTitleText(t, a)}
             </Text>
-            {pending ? <ExpiryLine createdAt={a.createdAt} expiresAt={a.expiresAt} /> : null}
+            <ApprovalUndoChip approval={a} />
           </View>
+        </View>
+        <View style={styles.whereRow}>
+          <Text variant="footnote" tone="muted" style={styles.shrink}>
+            {where || t("mobile.approval.asksYou")}
+          </Text>
+          {pending ? <ExpiryLine createdAt={a.createdAt} expiresAt={a.expiresAt} /> : null}
         </View>
       </View>
     );
@@ -321,8 +332,11 @@ const styles = StyleSheet.create({
   barEnd: { position: "absolute", right: -2, top: 0, bottom: 0, justifyContent: "center" },
   semibold: { fontWeight: "600" },
   in: { gap: 24 },
-  who: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
-  whereRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 2 },
+  // The face beside the title alone (never a column beside where and when): those go under, at the sheet's width.
+  who: { gap: 8 },
+  whoHead: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
+  titleLine: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 8, rowGap: 4 },
+  whereRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 8, rowGap: 4 },
   grow: { flex: 1, minWidth: 0 },
   shrink: { flexShrink: 1 },
   pair: { flexDirection: "row", gap: 8 },

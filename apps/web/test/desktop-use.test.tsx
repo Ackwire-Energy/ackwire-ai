@@ -102,10 +102,13 @@ describe("whether agents can use apps on their desktops", () => {
       "Os agentes abrem e usam apps na própria tela aqui, como uma pessoa faria, e as pessoas assistem pela página de cada um.",
     );
     expect(card().textContent).toContain("Indisponível");
-    expect(card().textContent).toContain("missing: python3-gi");
+    // A runner from before reason codes: the app's own sentence, the command once, in its block to copy.
+    expect(card().textContent).toContain("Instale neste computador o que o uso da área de trabalho precisa:");
+    expect(card().textContent).not.toContain("Install what desktop use needs");
     expect(card().querySelector(".machine-command code")?.textContent).toBe(
       "sudo apt install --no-install-recommends python3-gi",
     );
+    expect(card().textContent?.split("sudo apt install").length).toBe(2);
 
     // Nothing to install on a Mac: the app's own words, not the computer's English.
     await page(mac);
@@ -143,7 +146,8 @@ describe("whether agents can use apps on their desktops", () => {
     const linux = { name: "Servidor", desktopUse: { available: false, reason: MISSING } };
     const page = await open(linux, true);
     expect(page).toContain("A Ada ainda não consegue usar apps na própria tela no Servidor.");
-    expect(page).toContain("sudo apt install --no-install-recommends python3-gi");
+    expect(page).toContain("Instale neste computador o que o uso da área de trabalho precisa:");
+    expect(page.split("sudo apt install --no-install-recommends python3-gi").length).toBe(2);
 
     expect(await open(linux, false)).not.toContain("ainda não consegue usar apps");
     const mac = { ...linux, name: "MacBook", os: "darwin" };

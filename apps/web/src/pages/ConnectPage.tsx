@@ -11,7 +11,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { CenteredLayout } from "@/components/AuthLayout";
 import { LoadingLine } from "@/components/Loading";
-import { osOf } from "@/components/Machines";
+import { osOf } from "@/components/machine-bits";
 
 /** A code the server no longer knows: expired, used, denied or never made. */
 export const isGoneCode = (error: unknown) =>

@@ -11,7 +11,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from "react-native-reanimated";
-import { BUTTON_SIZES, type ButtonSize, primaryLook } from "./Button";
+import { BUTTON_SIZES, type ButtonSize, primaryLook, slopOf } from "./Button";
 import { haptics } from "./haptics";
 import { systemText } from "./Text";
 import { useTheme } from "./theme";
@@ -98,6 +98,7 @@ export function HoldButton({ label, onConfirm, durationMs = 700, disabled = fals
         accessibilityLabel={label}
         accessibilityHint={t("mobile.a11y.hold")}
         accessibilityState={{ disabled }}
+        hitSlop={slopOf(s.height)}
         style={[styles.face, { borderRadius: s.radius }]}
       >
         <LinearGradient

@@ -97,8 +97,8 @@ test("code in a message takes the step as its words do, the default keeping its 
   expect(block("line-height")).toBe("var(--msg-line-tight)");
   expect(STEPS.md[0] - 1.5).toBe(12.5);
   expect(STEPS.md[2]).toBe(20);
-  // Inline code is a share of the words; outside a message (a document), a card's code keeps its own size.
-  expect(last(".ac-msg__text code", "font-size")).toMatch(/em$/);
+  // Inline code is a share of the words, a message's or anyone's (one look); a card's code block keeps its own size.
+  expect(last(".ac-inlinecode", "font-size")).toMatch(/em$/);
   expect(last(".code-card__code", "font-size")).toBe("12.5px");
   expect(last(".code-card__code", "line-height")).toBe("20px");
 });

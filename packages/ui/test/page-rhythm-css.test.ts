@@ -267,3 +267,12 @@ describe("a pill on a name's first line", () => {
       expect(body(selector)).toContain("margin-block-start: 0;");
   });
 });
+
+describe("a tab strip", () => {
+  test("starts its first label on the content's edge, its underline too, and the first section under it has no hairline", () => {
+    expect(body(".ac-tabs > .ac-tab:first-child")).toContain("padding-inline-start: 0;");
+    expect(body('.ac-tabs > .ac-tab:first-child[data-state="active"]::after')).toContain("left: 0;");
+    expect(body(".ac-tabpanel > .ac-details__section:first-child")).toContain("border-top: 0;");
+    expect(body(".ac-tabpanel > .ac-details__section:first-child")).toContain("padding-top: 0;");
+  });
+});

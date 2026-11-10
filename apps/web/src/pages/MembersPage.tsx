@@ -1068,7 +1068,7 @@ function Suggestions() {
               : t("members.suggest.leadNoNames")
           }
         />
-        <div>
+        <div className="ac-acts">
           <Button
             variant="primary"
             icon="plus"

@@ -178,20 +178,23 @@ export function Dialog({
           {bare ? (
             <RDialog.Title className="ac-visually-hidden">{title}</RDialog.Title>
           ) : (
-            <div className="ac-dialog__head ac-actrow">
+            <div className="ac-dialog__head">
               {leading && <span className="ac-dialog__lead">{leading}</span>}
-              {subtitle === undefined ? (
-                <RDialog.Title className="ac-dialog__title ac-actrow__text">{title}</RDialog.Title>
-              ) : (
-                <span className="ac-dialog__titles ac-actrow__text">
+              {/* Actions that don't fit beside the title go under it, the × stays on the title's line. */}
+              <div className="ac-actline">
+                {subtitle === undefined ? (
                   <RDialog.Title className="ac-dialog__title">{title}</RDialog.Title>
-                  <span className="ac-dialog__sub" aria-live="polite">
-                    {subtitle}
+                ) : (
+                  <span className="ac-dialog__titles">
+                    <RDialog.Title className="ac-dialog__title">{title}</RDialog.Title>
+                    <span className="ac-dialog__sub" aria-live="polite">
+                      {subtitle}
+                    </span>
                   </span>
-                </span>
-              )}
-              <span className="ac-dialog__acts ac-acts">
-                {actions}
+                )}
+                {actions && <span className="ac-dialog__acts ac-acts">{actions}</span>}
+              </div>
+              <span className="ac-dialog__close ac-acts">
                 <RDialog.Close asChild>
                   <Button
                     variant="ghost"
@@ -241,10 +244,17 @@ export function DialogFooter({
 }) {
   // An empty footer would only stack its padding under the content: the body or list above keeps the edge instead.
   if (note == null && Children.toArray(children).length === 0) return null;
+  // Beside a note the buttons are one group, so a row too narrow for both never splits them one over the other.
   return (
     <div className={cx("ac-dialog__foot", bar && "ac-dialog__foot--bar", className)}>
-      {note !== undefined && <span className="ac-dialog__foot-note">{note}</span>}
-      {children}
+      {note !== undefined ? (
+        <>
+          <span className="ac-dialog__foot-note">{note}</span>
+          <div className="ac-dialog__foot-acts">{children}</div>
+        </>
+      ) : (
+        children
+      )}
     </div>
   );
 }

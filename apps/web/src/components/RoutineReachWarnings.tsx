@@ -43,16 +43,18 @@ export function RoutineReachWarnings({
 function Warning({ agent, creator }: { agent: Agent; creator: string }) {
   const g = agentGrammar(agent.name);
   return (
-    <div className="ag-rc ac-actrow">
+    <div className="ag-rc">
       <span className="ag-rc__ic" aria-hidden="true">
         <Icon name="info" size={16} />
       </span>
-      <span className="ag-rc__tx ac-actrow__text">
-        <span className="ag-rc__sentence">
-          <Trans i18nKey="routines.reachWarning.blocked" values={g} components={{ b: <b /> }} />
+      <span className="ac-actline">
+        <span className="ag-rc__tx">
+          <span className="ag-rc__sentence">
+            <Trans i18nKey="routines.reachWarning.blocked" values={g} components={{ b: <b /> }} />
+          </span>
         </span>
+        <AllowTalkButton agent={agent} userId={creator} className="ag-rc__btn" />
       </span>
-      <AllowTalkButton agent={agent} userId={creator} className="ag-rc__btn" />
     </div>
   );
 }

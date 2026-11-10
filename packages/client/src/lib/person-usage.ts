@@ -1,5 +1,6 @@
 import type { TFunction } from "i18next";
 import type { AppNotification, PeopleUsage } from "../api/types";
+import { formatUsd } from "./format";
 
 /** Uso › Pessoas (ADR 0141): what the web and the phone share. */
 
@@ -21,6 +22,14 @@ export function usagePeriod(kind: UsagePeriodKind, now = new Date()): { since?: 
   }
   return {};
 }
+
+/**
+ * A person's amount, "≈ US$ 3,10" when any of it was use on a plan: that part is what the same use would cost at the
+ * API's list price, which nobody pays (the ⓘ beside it says so). Each person by their own use, so in a workspace
+ * with plans and API keys only the estimates read ≈.
+ */
+export const personAmount = (t: TFunction, locale: string, estimated: boolean, usd: number) =>
+  estimated ? t("peopleUsage.meter.approx", { amount: formatUsd(locale, usd) }) : formatUsd(locale, usd);
 
 export const PEOPLE_CHIPS = ["near", "at", "idle"] as const;
 export type PeopleChip = (typeof PEOPLE_CHIPS)[number];

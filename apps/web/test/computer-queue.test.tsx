@@ -595,14 +595,18 @@ describe("an offline computer's note", () => {
   });
 });
 
-test("pills never wrap; the pair row before a reply stays one 26px line, its names cut with no ellipsis", async () => {
+test("pills never wrap; the pair row before a reply is one 26px line that wraps whole, its names never cut", async () => {
   const css = await builtCss("src/styles.css", "src/components/computer-queue.css");
   const value = (selector: string, property: string) =>
     declarations(css, selector).findLast(([p]) => p === property)?.[1];
   expect(value(".ac-chip", "white-space")).toBe("nowrap");
   expect(value(".cq-link", "white-space")).toBe("nowrap");
-  expect(value(".consult-pair__row", "white-space")).toBe("nowrap");
-  expect(value(".consult-pair__row", "height")).toBe("26px");
+  // One centred sentence: 26 tall on one line, names too long for it wrap at their spaces, each face with its first word.
+  expect(value(".consult-pair__row", "white-space")).toBeUndefined();
+  expect(value(".consult-pair__row", "min-height")).toBe("26px");
+  expect(value(".consult-pair__row", "overflow-wrap")).toBe("anywhere");
+  expect(value(".consult-pair__who", "white-space")).toBe("nowrap");
+  expect(value(".consult-pair__who>.consult-pair__name", "white-space")).toBe("normal");
   expect(value(".consult-pair__name", "text-overflow")).toBeUndefined();
 });
 
@@ -625,13 +629,14 @@ test("a narrow header fits: the waiting count alone beside the computer, the nam
   expect(value(phone, ".cq-btn .cq-btn__label", "width")).toBe("1px");
   expect(value(phone, ".cq-btn .cq-btn__count", "display")).toBe("inline-block");
   expect(value(phone, ".brw-dm .brw-dm__label", "position")).toBe("absolute");
-  // One line: buttons keep their size, the title and its subtitle shrink and end in "…".
+  // Buttons keep their size; the title and its line wrap whole, never cut, and the glyphs go under them instead.
   const narrow = atRule(css, "@media (max-width: 760px)");
   expect(value(narrow, ".channel__header", "flex-wrap")).toBe("nowrap");
   expect(value(narrow, ".channel__header>.ac-btn", "flex")).toBe("none");
   expect(value(narrow, ".channel__header>.ac-acts", "flex")).toBe("none");
-  expect(value(narrow, ".channel__header>.channel__acts", "column-gap")).toBe("8px");
-  expect(value(narrow, ".channel__title", "text-overflow")).toBe("ellipsis");
+  expect(value(narrow, ".channel__header>.channel__acts", "column-gap")).toBeUndefined();
+  expect(value(narrow, ".channel__title", "text-overflow")).toBeUndefined();
+  expect(value(narrow, ".channel__title", "overflow-wrap")).toBe("anywhere");
   expect(value(narrow, ".channel__title", "min-width")).toBe("0");
-  expect(value(narrow, ".channel__topic", "text-overflow")).toBe("ellipsis");
+  expect(value(narrow, ".channel__topic", "text-overflow")).toBeUndefined();
 });

@@ -9,16 +9,21 @@ const last = (css: string, selector: string, property: string) =>
     .filter(([p]) => p === property)
     .at(-1)?.[1];
 
-test("a DM's name keeps its line on a phone, its pill 8 after it and under it when both don't fit", async () => {
+test("a DM's name wraps whole on a phone, its pill 8 after it and under it when both don't fit", async () => {
   const phone = atRule(await read("responsive.css"), "@media (max-width: 760px)");
   expect(last(phone, ".dm-who .channel__title", "display")).toBe("flex");
   expect(last(phone, ".dm-who .channel__title", "flex-wrap")).toBe("wrap");
   expect(last(phone, ".dm-who .channel__title", "gap")).toBe("var(--space-1) var(--space-2)");
-  expect(last(phone, ".dm-who .channel__title>.channel__name", "text-overflow")).toBe("ellipsis");
+  // Never cut: a header's name and its line wrap, the header's glyphs go under them.
+  for (const selector of [".channel__title", ".dm-who .channel__title>.channel__name", ".channel__topic"]) {
+    expect([selector, last(phone, selector, "text-overflow")]).toEqual([selector, undefined]);
+    expect([selector, last(phone, selector, "white-space")]).toEqual([selector, undefined]);
+  }
+  expect(last(phone, ".channel__title", "overflow-wrap")).toBe("anywhere");
   expect(last(phone, ".dm-who .channel__title>.ac-chip", "flex")).toBe("none");
-  // On a phone the header's search is its icon, in a DM's header as in a channel's.
+  // On a phone the header's search is its icon, in a DM's header as in a channel's: both hold it with their glyphs.
   const header = atRule(await read("components/channel-header.css"), "@media (max-width: 760px)");
-  expect(last(header, ".channel__header>.channel__search", "display")).toBe("none");
+  expect(last(header, ".channel__acts>.channel__search", "display")).toBe("none");
   // A tag on a first line that rises keeps the line where it is, as the kit's pills do.
   expect(last(topLevel(await read("layout.css")), ".ac-captop:has(.agp-tag)", "margin-block-start")).toBe("0");
 });

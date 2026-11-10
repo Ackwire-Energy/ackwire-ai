@@ -374,33 +374,35 @@ export function LiveBlockCard({ id, version }: { id: string; version?: number })
   return (
     <section className="live-block" aria-label={a.title}>
       <CardSky color={colorOf(dir.anyAgent(agentId))} />
-      <header className="live-block__head">
+      <header className="live-block__head ac-actline">
         <span className="live-block__titles">
           <b>{a.title}</b>
           {subtitle && <small>{subtitle}</small>}
         </span>
-        <Button
-          variant="ghost"
-          size="sm"
-          iconOnly
-          icon="expand"
-          aria-label={t("blocks.openBig")}
-          title={t("blocks.openBig")}
-          onClick={() => viewer.open(a.id)}
-        />
-        <Menu
-          align="end"
-          label={t("blocks.more")}
-          trigger={<Button variant="ghost" size="sm" iconOnly icon="more" aria-label={t("blocks.more")} />}
-        >
-          <MenuItem
-            icon="drive"
-            disabled={a.inDrive || keep.isPending}
-            onSelect={() => keep.mutate(undefined, { onSuccess: () => toast.show(t("blocks.kept")) })}
+        <span className="ac-acts">
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            icon="expand"
+            aria-label={t("blocks.openBig")}
+            title={t("blocks.openBig")}
+            onClick={() => viewer.open(a.id)}
+          />
+          <Menu
+            align="end"
+            label={t("blocks.more")}
+            trigger={<Button variant="ghost" size="sm" iconOnly icon="more" aria-label={t("blocks.more")} />}
           >
-            {a.inDrive ? t("blocks.inDrive") : t("blocks.keep")}
-          </MenuItem>
-        </Menu>
+            <MenuItem
+              icon="drive"
+              disabled={a.inDrive || keep.isPending}
+              onSelect={() => keep.mutate(undefined, { onSuccess: () => toast.show(t("blocks.kept")) })}
+            >
+              {a.inDrive ? t("blocks.inDrive") : t("blocks.keep")}
+            </MenuItem>
+          </Menu>
+        </span>
       </header>
       {a.content.spec ? (
         <SpecBlock id={a.id} version={a.shownVersion} spec={a.content.spec} agentId={agentId} />

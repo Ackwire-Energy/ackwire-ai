@@ -247,36 +247,45 @@ html:not([data-pointer]) .members-side__row.profile-trigger:focus-visible {
     animation: none;
   }
 }
+/* The channel's name and its glyphs are an action line, as the channel header's: the glyphs go under a name that can't
+   keep its line beside them, the × stays on the name's first line. */
 .members-sheet__head {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  align-items: flex-start;
   gap: 8px;
   padding: calc(env(safe-area-inset-top, 0px) + 14px) 12px 6px 18px;
 }
+.members-sheet__line {
+  flex: 1 1 0%;
+  align-items: center;
+  column-gap: var(--space-2);
+}
+/* Its first line is the glyphs' 32. */
 .members-sheet__title {
   min-width: 0;
-  display: inline-flex;
-  align-items: center;
+  display: flex;
+  align-items: flex-start;
   gap: 6px;
+  padding-block: var(--space-1);
   font-size: 17px;
   font-weight: 650;
+  line-height: 24px;
 }
 .members-sheet__title > span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .members-sheet__title .ac-icon {
   flex: none;
   color: var(--faint);
+  translate: 0 calc(12px - var(--cap-mid) - 50%);
 }
 /* The 32px icon boxes carry their own air: the phone header's 8px between them. */
 .members-sheet__acts {
   flex: none;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 .members-sheet__find {
   padding: 4px 14px 8px;

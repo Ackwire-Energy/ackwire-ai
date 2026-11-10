@@ -117,7 +117,8 @@ export function NoticePrefsSection() {
  * its control, centred on each other. Under the name only what must stay in sight (`status`: why the control is off,
  * the value a line opens to); a value before the control (`value`: the plan it uses). With `onOpen` the whole line is a
  * button that opens something, a chevron at its end, and it takes no ⓘ (a button can't hold one). With a switch a press
- * anywhere on the line toggles it, its name the switch's label.
+ * anywhere on the line toggles it, its name the switch's label. Several controls (`actions`: a day, an hour and Parar de
+ * receber) go under the words when they don't fit beside them, from the words' edge; one control keeps its place.
  */
 export function PrefRow({
   id,
@@ -128,6 +129,7 @@ export function PrefRow({
   status,
   value,
   control,
+  actions,
   onOpen,
 }: {
   id: string;
@@ -142,6 +144,8 @@ export function PrefRow({
   /** A value before the control (a plan's logo and name). */
   value?: ReactNode;
   control?: ReactNode;
+  /** In place of `control`: several controls or buttons, which wrap under the words rather than keep their place. */
+  actions?: ReactNode;
   onOpen?: () => void;
 }) {
   const { t } = useTranslation();
@@ -162,28 +166,46 @@ export function PrefRow({
   ) : (
     <span className="settings-row__label">{label}</span>
   );
+  const face = (
+    <span className="settings-row__icon" aria-hidden="true">
+      {lead ?? (icon && <Icon name={icon} size={16} />)}
+    </span>
+  );
+  const words = (
+    <span className={actions ? "settings-row__text" : "settings-row__text ac-actrow__text"}>
+      {hint && !onOpen ? (
+        <span className="ac-hintline">
+          {name}
+          <InfoHint id={`${id}-help`} name={t("common.about", { label })}>
+            {hint}
+          </InfoHint>
+        </span>
+      ) : (
+        name
+      )}
+      {status && (
+        <span className="settings-row__status" id={`${id}-status`}>
+          {status}
+        </span>
+      )}
+    </span>
+  );
+  // The icon and the words are the line's words: controls under them start from the row's edge, never leaving the
+  // icon a column beside three lines.
+  if (actions)
+    return (
+      <div className="settings-row settings-row--lead settings-row--acts ac-actline">
+        <span className="settings-row__lead">
+          {face}
+          {words}
+        </span>
+        <span className="settings-row__end">{actions}</span>
+      </div>
+    );
   const body = (
     <>
-      <span className="settings-row__icon" aria-hidden="true">
-        {lead ?? (icon && <Icon name={icon} size={16} />)}
-      </span>
-      <span className="settings-row__text ac-actrow__text">
-        {hint && !onOpen ? (
-          <span className="ac-hintline">
-            {name}
-            <InfoHint id={`${id}-help`} name={t("common.about", { label })}>
-              {hint}
-            </InfoHint>
-          </span>
-        ) : (
-          name
-        )}
-        {status && (
-          <span className="settings-row__status" id={`${id}-status`}>
-            {status}
-          </span>
-        )}
-      </span>
+      {face}
+      {words}
       {value && <span className="settings-row__value">{value}</span>}
       {onOpen ? (
         <Icon name="chevronRight" size={16} className="settings-row__chevron" />

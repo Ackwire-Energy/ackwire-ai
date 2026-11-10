@@ -1,5 +1,4 @@
 import type {
-  ApiClient,
   BundleTodo,
   ImportItemKind,
   ImportItemResult,
@@ -43,9 +42,8 @@ import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { failedOffline } from "@/chat/offline";
 import { AgentAvatar } from "@/components/AgentAvatar";
-import { fileSaver } from "@/components/artifacts/fileSaver";
 import { HelpLink } from "@/components/HelpLink";
-import { CommandBlock } from "@/components/Machines";
+import { CommandBlock } from "@/components/machine-bits";
 import { useOrg } from "@/components/org-context";
 import {
   type AgentFile,
@@ -89,6 +87,7 @@ import {
 import { hasFiles } from "@/lib/obsidian";
 import { useTheme } from "@/lib/theme";
 import { useToast } from "@/lib/toast";
+import { saveExport } from "@/lib/workspace-export";
 import "./import-flow.css";
 
 const KIND_ICON: Record<ImportItemKind, IconName> = {
@@ -1511,10 +1510,6 @@ export function ImportReport({
     </section>
   );
 }
-
-/** Downloads the workspace as a file: its agents, skills, routines and shared memory, never conversations or files. */
-export const saveExport = (api: ApiClient, orgId: string) =>
-  fileSaver.save(api.imports.exportUrl(orgId), `agentes-chat-${new Date().toISOString().slice(0, 10)}.json`);
 
 /**
  * Configurações → Importar e exportar (admins): the import flow, and this workspace as a file, with what it never

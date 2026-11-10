@@ -13,6 +13,7 @@ import {
   useState,
 } from "react";
 import { useTranslation } from "react-i18next";
+import { inlineWords } from "@/lib/markdown";
 import { CardSky, colorOf } from "./Sky";
 import "./request-card.css";
 
@@ -108,8 +109,8 @@ export function useExpired(expiresAt: string | null | undefined) {
  * One card for every request an agent makes in the conversation, so each reads the same way and its decision
  * sits in the same place: a quiet header (what kind of request, and who else it waits for), the agent's own
  * words, what will happen drawn edge to edge (its preview, as an attachment's cover), the object on a line of its own between
- * hairlines with "Ver …" opening it whole, anything to fill in, and the footer strip with the decision on the left and
- * the time left on the right. One surface: nothing inside has a background of its own.
+ * hairlines with "Ver …" under its words opening it whole, anything to fill in, and the footer strip with the decision on
+ * the left and the time left on the right. One surface: nothing inside has a background of its own.
  *
  * While it waits for the viewer it registers with its conversation (`AskRegistryProvider`), so the bar above the
  * composer can say it waits while it is out of view; `data-ask-id` lets "Ver" find it and bring it back.
@@ -229,20 +230,21 @@ export function RequestCard({
         {/* Who else it waits for; waiting for me needs no words (the buttons say it). */}
         {!mine && waitingFor && <span className="rq__state rq__state--other">{waitingFor}</span>}
       </div>
-      <p className="rq__lead">{lead}</p>
+      <p className="rq__lead">{inlineWords(lead, "rq")}</p>
       {preview && !(open && details) && <div className="rq__preview">{preview}</div>}
       {object && (
-        <div className="rq__well ac-actrow">
+        <div className="rq__well">
           <span className="rq__logo">{object.logo}</span>
-          <span className="rq__wt ac-actrow__text">
+          {/* "Ver …" under the words, never a column beside them that would squeeze them. */}
+          <span className="rq__wt">
             <b>{object.title}</b>
-            {object.detail && <small>{object.detail}</small>}
+            {object.detail && <small>{inlineWords(object.detail, "rq-d")}</small>}
+            {object.more && (details || onOpenChange) && (
+              <RequestMore open={open} onClick={toggle}>
+                {object.more}
+              </RequestMore>
+            )}
           </span>
-          {object.more && (details || onOpenChange) && (
-            <RequestMore open={open} onClick={toggle}>
-              {object.more}
-            </RequestMore>
-          )}
         </div>
       )}
       {open && details && (
@@ -305,6 +307,7 @@ export function RequestDone({
   more,
   action,
   time,
+  note,
   children,
 }: {
   /** It went through. */
@@ -317,6 +320,8 @@ export function RequestDone({
   action?: ReactNode;
   /** When it was decided. */
   time?: string;
+  /** A quiet line under the pill (when one approved ahead runs, when it ran): a long time never squeezes the words. */
+  note?: ReactNode;
   /** The words: what it was and how it ended. */
   children: ReactNode;
 }) {
@@ -344,7 +349,14 @@ export function RequestDone({
       }
       time={time}
       actions={actions}
-      below={open && more ? <div className="rq__details">{more.content}</div> : undefined}
+      below={
+        note || (open && more) ? (
+          <>
+            {note && <p className="rq-done__note">{note}</p>}
+            {open && more && <div className="rq__details">{more.content}</div>}
+          </>
+        ) : undefined
+      }
     >
       <span className="rq-done__text">{children}</span>
     </EventPill>

@@ -53,16 +53,19 @@ export const allowFolderCommand = (path: string, handle?: string) =>
   `agentes-runner folders allow ${shellQuote(path)}${handle ? ` --agent ${handle}` : ""}`;
 
 /**
- * Why a computer can't run its agent browser or desktop use yet, in the person's words (`machines.reasons.<code>`);
- * a runner from before reason codes says it in its own English.
+ * Why a computer can't run its agent browser or desktop use yet, in the person's words (`machines.reasons.<code>`).
+ * A runner from before reason codes says it in its own English: with `install`, the code its reason means when it
+ * carries a command to run (the command shows in its own block, `commandInReason`), else its English.
  */
 export function machineReasonText(
   t: TFunction,
   info: { reason: string | null; code?: string | null } | null | undefined,
+  install?: string,
 ): string | null {
-  if (!info?.code) return info?.reason ?? null;
+  const code = info?.code ?? (install && commandInReason(info?.reason) ? install : null);
+  if (!code) return info?.reason ?? null;
   const tt = t as unknown as (key: string, options: { defaultValue: string }) => string;
-  return tt(`machines.reasons.${info.code}`, { defaultValue: info.reason ?? "" }) || info.reason;
+  return tt(`machines.reasons.${code}`, { defaultValue: info?.reason ?? "" }) || (info?.reason ?? null);
 }
 
 /** The first command in a runner's own words ("…run `agentes-runner browser install --with-deps`"), to copy. */

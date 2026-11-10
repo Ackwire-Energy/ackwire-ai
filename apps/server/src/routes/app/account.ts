@@ -47,6 +47,7 @@ import {
   restoreAccount,
   restoreWorkspace,
   revokeInvitation,
+  rightHandId,
   saveOnboarding,
   scheduleAccountDeletion,
   scheduleDeletion,
@@ -60,6 +61,7 @@ import {
   toldReason,
   USER_LOCALES,
   unfinishedWorkspaces,
+  updateMyProfile,
   updateOrganization,
   updateOrgSettings,
   WORKSPACE_MODES,
@@ -127,9 +129,136 @@ const INVITE_LOGO_PER_IP = { limit: 60, windowMs: 60_000 };
 const Name = z.string().trim().min(1).max(100);
 const Context = z.string().max(20_000).openapi({ description: "Shared with every agent of the organization." });
 
+/** `GET /me`: the signed-in person and their workspaces, also in the answers that finish a workspace's onboarding. */
+const Me = z
+  .object({
+    user: z.object({
+      id: z.string(),
+      name: z.string(),
+      email: z.string(),
+      image: z.string().nullable(),
+      hasPassword: z.boolean().openapi({
+        description:
+          "Signs in with a password. False for social sign-ins only, and for the owner the desktop app signs in.",
+      }),
+      emailVerified: z.boolean().openapi({
+        description: "The person opened the link that confirms their email address.",
+      }),
+      locale: z.string().nullable().openapi({
+        description: "The app's language (`PATCH /me`); null until an app said one.",
+      }),
+      localeAuto: z.boolean().openapi({
+        description: "The language follows each device's own until the person picks one (ADR 0122).",
+      }),
+      canCreateWorkspace: z.boolean().openapi({
+        description:
+          "`POST /organizations` would make a workspace for them. False on agentes.chat Cloud while sign-up is by invitation, unless early access allowed their account and its address is confirmed (ADR 0078). `org.create_refused` and `org.create_unpaid` (ADR 0079) can still refuse it.",
+      }),
+      deletion: z
+        .object({
+          dueAt: z.string().nullable().openapi({ description: "When it goes for good; null once that date passed." }),
+          requestedAt: z.string().nullable(),
+        })
+        .optional()
+        .openapi({
+          description:
+            "They deleted this account: the apps show only its waiting screen (`DELETE /account/deletion` restores it). No workspace answers meanwhile.",
+        }),
+    }),
+    organizations: z.array(Organization),
+  })
+  .openapi("Me");
+
+const RightHandId = z.uuid().nullable().openapi({
+  description: "The right hand, whose DM the workspace opens in (ADR 0137); null when it has none.",
+});
+const Created = z.object({
+  organization: Organization,
+  generalChannelId: z.uuid(),
+  rightHandId: RightHandId,
+  me: Me.optional().openapi({ description: "`GET /me` as it is now." }),
+});
+
 /** Account, organizations, members and invitations. */
 export function accountRoutes(deps: AppDeps) {
   const { db, config } = deps;
+  /** `GET /me`'s body; null once the account is deleted (its cached session cookie outlives it for minutes). */
+  const meBody = async (user: { id: string; name: string; email: string }): Promise<z.infer<typeof Me> | null> => {
+    const [memberships, password, verified, creates, unfinished, account] = await Promise.all([
+      listMemberships(db, user.id),
+      hasPassword(db, user.id),
+      isEmailVerified(db, user.id),
+      canCreateWorkspace(db, user.id, workspacePolicy(config)),
+      unfinishedWorkspaces(db, user.id),
+      myAccount(db, user.id),
+    ]);
+    if (verified === null) return null;
+    const onboardingOf = (orgId: string) => unfinished.find((u) => u.organization.id === orgId);
+    const deletions = await workspaceDeletions(
+      db,
+      memberships.flatMap((m) => (m.standing?.deletionDueAt ? [m.orgId] : [])),
+    );
+    const now = Date.now();
+    return {
+      user: {
+        id: user.id,
+        name: account.name ?? user.name,
+        email: user.email,
+        image: account.image,
+        hasPassword: password,
+        emailVerified: verified,
+        locale: account.locale,
+        localeAuto: account.localeAuto,
+        canCreateWorkspace: creates && !account.deletionDueAt,
+        ...(account.deletionDueAt
+          ? {
+              deletion: {
+                dueAt: account.deletionDueAt.getTime() > now ? account.deletionDueAt.toISOString() : null,
+                requestedAt: iso(account.deletionRequestedAt),
+              },
+            }
+          : {}),
+      },
+      organizations: memberships.map((m) => {
+        const setup = onboardingOf(m.orgId);
+        const deleting = deletions.get(m.orgId);
+        return {
+          id: m.orgId,
+          name: m.orgName,
+          role: m.role,
+          permissions: [...m.permissions],
+          rank: m.rank,
+          logo: m.orgLogo ?? null,
+          ...(m.orgCreatedAt ? { createdAt: m.orgCreatedAt.toISOString() } : {}),
+          ...(m.start ? { start: m.start } : {}),
+          showActivity: m.showActivity ?? false,
+          agentStyle: m.agentStyle ?? null,
+          chatPrefs: m.chatPrefs ?? {},
+          mode: m.mode ?? "team",
+          ...(m.standing
+            ? { standing: { state: m.standing.state, reason: toldReason(m.standing), ...cloudNotice() } }
+            : {}),
+          ...(setup
+            ? { onboarding: { step: setup.organization.onboardingStep, generalChannelId: setup.general.id } }
+            : {}),
+          ...(deleting
+            ? {
+                deletion: {
+                  dueAt: deleting.dueAt.getTime() > now ? deleting.dueAt.toISOString() : null,
+                  requestedAt: iso(deleting.requestedAt),
+                  requestedBy: deleting.requestedBy,
+                },
+              }
+            : {}),
+        };
+      }),
+    };
+  };
+  /** What finishing a workspace's onboarding answers: where it opens (its right hand's DM) and `/me` as it is now. */
+  const opened = async (user: { id: string; name: string; email: string }, orgId: string) => {
+    const me = await meBody(user);
+    return { rightHandId: await rightHandId(db, orgId), ...(me ? { me } : {}) };
+  };
   const app = createAppRouter(deps);
   const session = requireSession(deps.auth);
   const deletion: DeletionDeps = {
@@ -479,129 +608,16 @@ export function accountRoutes(deps: AppDeps) {
       summary: "The signed-in person and their organizations",
       description:
         "401 with the session cookies expired once the account is deleted: a cached session cookie outlives it for minutes.",
-      responses: {
-        200: json(
-          z.object({
-            user: z.object({
-              id: z.string(),
-              name: z.string(),
-              email: z.string(),
-              image: z.string().nullable(),
-              hasPassword: z.boolean().openapi({
-                description:
-                  "Signs in with a password. False for social sign-ins only, and for the owner the desktop app signs in.",
-              }),
-              emailVerified: z.boolean().openapi({
-                description: "The person opened the link that confirms their email address.",
-              }),
-              locale: z.string().nullable().openapi({
-                description: "The app's language (`PATCH /me`); null until an app said one.",
-              }),
-              localeAuto: z.boolean().openapi({
-                description: "The language follows each device's own until the person picks one (ADR 0122).",
-              }),
-              canCreateWorkspace: z.boolean().openapi({
-                description:
-                  "`POST /organizations` would make a workspace for them. False on agentes.chat Cloud while sign-up is by invitation, unless early access allowed their account and its address is confirmed (ADR 0078). `org.create_refused` and `org.create_unpaid` (ADR 0079) can still refuse it.",
-              }),
-              deletion: z
-                .object({
-                  dueAt: z
-                    .string()
-                    .nullable()
-                    .openapi({ description: "When it goes for good; null once that date passed." }),
-                  requestedAt: z.string().nullable(),
-                })
-                .optional()
-                .openapi({
-                  description:
-                    "They deleted this account: the apps show only its waiting screen (`DELETE /account/deletion` restores it). No workspace answers meanwhile.",
-                }),
-            }),
-            organizations: z.array(Organization),
-          }),
-        ),
-        401: errors[401],
-      },
+      responses: { 200: json(Me), 401: errors[401] },
     }),
     async (c) => {
-      const user = c.get("user");
-      const [memberships, password, verified, creates, unfinished, account] = await Promise.all([
-        listMemberships(db, user.id),
-        hasPassword(db, user.id),
-        isEmailVerified(db, user.id),
-        canCreateWorkspace(db, user.id, workspacePolicy(config)),
-        unfinishedWorkspaces(db, user.id),
-        myAccount(db, user.id),
-      ]);
+      const me = await meBody(c.get("user"));
       // A deleted account's session lives on in a cached cookie for minutes: its other tabs and devices learn it here.
-      if (verified === null) {
+      if (!me) {
         for (const cookie of expiredSessionCookies()) c.header("set-cookie", cookie, { append: true });
         return apiError(c, 401, "unauthorized", "Sign in to continue");
       }
-      const onboardingOf = (orgId: string) => unfinished.find((u) => u.organization.id === orgId);
-      const deletions = await workspaceDeletions(
-        db,
-        memberships.flatMap((m) => (m.standing?.deletionDueAt ? [m.orgId] : [])),
-      );
-      const now = Date.now();
-      return c.json(
-        {
-          user: {
-            id: user.id,
-            name: account.name ?? user.name,
-            email: user.email,
-            image: account.image,
-            hasPassword: password,
-            emailVerified: verified,
-            locale: account.locale,
-            localeAuto: account.localeAuto,
-            canCreateWorkspace: creates && !account.deletionDueAt,
-            ...(account.deletionDueAt
-              ? {
-                  deletion: {
-                    dueAt: account.deletionDueAt.getTime() > now ? account.deletionDueAt.toISOString() : null,
-                    requestedAt: iso(account.deletionRequestedAt),
-                  },
-                }
-              : {}),
-          },
-          organizations: memberships.map((m) => {
-            const setup = onboardingOf(m.orgId);
-            const deleting = deletions.get(m.orgId);
-            return {
-              id: m.orgId,
-              name: m.orgName,
-              role: m.role,
-              permissions: [...m.permissions],
-              rank: m.rank,
-              logo: m.orgLogo ?? null,
-              ...(m.orgCreatedAt ? { createdAt: m.orgCreatedAt.toISOString() } : {}),
-              ...(m.start ? { start: m.start } : {}),
-              showActivity: m.showActivity ?? false,
-              agentStyle: m.agentStyle ?? null,
-              chatPrefs: m.chatPrefs ?? {},
-              mode: m.mode ?? "team",
-              ...(m.standing
-                ? { standing: { state: m.standing.state, reason: toldReason(m.standing), ...cloudNotice() } }
-                : {}),
-              ...(setup
-                ? { onboarding: { step: setup.organization.onboardingStep, generalChannelId: setup.general.id } }
-                : {}),
-              ...(deleting
-                ? {
-                    deletion: {
-                      dueAt: deleting.dueAt.getTime() > now ? deleting.dueAt.toISOString() : null,
-                      requestedAt: iso(deleting.requestedAt),
-                      requestedBy: deleting.requestedBy,
-                    },
-                  }
-                : {}),
-            };
-          }),
-        },
-        200,
-      );
+      return c.json(me, 200);
     },
   );
 
@@ -1051,7 +1067,7 @@ export function accountRoutes(deps: AppDeps) {
       security,
       summary: "Create an organization (you become its owner)",
       description:
-        "Its owner sets it up in the onboarding, already past its first step (`onboarding` in `GET /me` until `PATCH …/onboarding` says it's finished). While they have one they haven't finished, that one comes back (200) instead of a new one, so a stale tab or a second press makes no other, even one waiting for its first plan. 403 `org.create_refused` while your account is blocked or you are in a workspace suspended or on a hold the billing service didn't set; 403 `org.create_unpaid` (`params.orgId`) while you own a workspace waiting for its first plan; 403 `org.create_invite_only` on agentes.chat Cloud while sign-up is by invitation, unless early access allowed the person's account and its address is confirmed (ADR 0078). With BILLING_HOLD_NEW_WORKSPACES it starts on the `payment` hold (ADR 0079). 429 after 10 tries in a day; 401 once your account is deleted.",
+        "Its owner sets it up in the onboarding, already past its first step (`onboarding` in `GET /me` until `PATCH …/onboarding` says it's finished, or `finished` here). While they have one they haven't finished, that one comes back (200) instead of a new one, so a stale tab or a second press makes no other, even one waiting for its first plan; `timezone`, `memberTimezone` and `finished` apply to it as they would to a new one. The answer says where it opens (`rightHandId`) and carries `GET /me` as it is now, so an app opens it without asking again. 403 `org.create_refused` while your account is blocked or you are in a workspace suspended or on a hold the billing service didn't set; 403 `org.create_unpaid` (`params.orgId`) while you own a workspace waiting for its first plan; 403 `org.create_invite_only` on agentes.chat Cloud while sign-up is by invitation, unless early access allowed the person's account and its address is confirmed (ADR 0078). With BILLING_HOLD_NEW_WORKSPACES it starts on the `payment` hold (ADR 0079). 429 after 10 tries in a day; 401 once your account is deleted.",
       request: {
         body: body(
           z.object({
@@ -1059,6 +1075,13 @@ export function accountRoutes(deps: AppDeps) {
             context: Context.optional(),
             teamSize: z.enum(["solo", "small", "medium", "large"]).optional(),
             timezone: z.string().max(64).optional().openapi({ description: "IANA zone, e.g. America/Sao_Paulo." }),
+            memberTimezone: z.string().max(64).optional().openapi({
+              description:
+                "The owner's own zone in it (`PATCH …/me`), when it isn't the workspace's. An unknown one is left out.",
+            }),
+            finished: z.literal(true).optional().openapi({
+              description: "Its onboarding is over at once (`PATCH …/onboarding`'s `finished`).",
+            }),
             mode: z
               .enum(WORKSPACE_MODES)
               .optional()
@@ -1067,18 +1090,16 @@ export function accountRoutes(deps: AppDeps) {
         ),
       },
       responses: {
-        201: json(z.object({ organization: Organization, generalChannelId: z.uuid() }), "Created"),
-        200: json(
-          z.object({ organization: Organization, generalChannelId: z.uuid() }),
-          "The workspace they are still setting up, as it is",
-        ),
+        201: json(Created, "Created"),
+        200: json(Created, "The workspace they are still setting up"),
         ...errors,
         429: errorResponse("More than 10 in a day (`rate_limited`)"),
       },
     }),
     async (c) => {
-      const { teamSize, timezone, ...input } = c.req.valid("json");
-      const userId = c.get("user").id;
+      const { teamSize, timezone, memberTimezone, finished, ...input } = c.req.valid("json");
+      const user = c.get("user");
+      const userId = user.id;
       if (!(await deps.adapters.rateLimiter.consume(`new-workspace:${userId}`, WORKSPACES_PER_DAY)).allowed) {
         return apiError(c, 429, "rate_limited", "Too many new workspaces today. Try again tomorrow.");
       }
@@ -1087,7 +1108,17 @@ export function accountRoutes(deps: AppDeps) {
         needsAllowance: await needsWorkspaceAllowance(db, userId, workspacePolicy(config)),
         onboarding: true,
       });
-      const created = {
+      if (!existing && config.HOST_COMPUTER_TOKEN) await addHostComputer(db, organization.id);
+      if (teamSize || (timezone && isValidTimeZone(timezone))) {
+        await updateOrgSettings(db, userId, organization.id, {
+          ...(teamSize ? { teamSize } : {}),
+          ...(timezone && isValidTimeZone(timezone) ? { timezone } : {}),
+        });
+      }
+      if (memberTimezone && isValidTimeZone(memberTimezone))
+        await updateMyProfile(db, userId, organization.id, { timezone: memberTimezone });
+      if (finished) await saveOnboarding(db, userId, organization.id, { finished: true });
+      const answer = {
         organization: {
           id: organization.id,
           name: organization.name,
@@ -1098,16 +1129,9 @@ export function accountRoutes(deps: AppDeps) {
           mode: existing ? await workspaceMode(db, organization.id) : (input.mode ?? "team"),
         },
         generalChannelId: general.id,
+        ...(await opened(user, organization.id)),
       };
-      if (existing) return c.json(created, 200);
-      if (config.HOST_COMPUTER_TOKEN) await addHostComputer(db, organization.id);
-      if (teamSize || (timezone && isValidTimeZone(timezone))) {
-        await updateOrgSettings(db, c.get("user").id, organization.id, {
-          ...(teamSize ? { teamSize } : {}),
-          ...(timezone && isValidTimeZone(timezone) ? { timezone } : {}),
-        });
-      }
-      return c.json(created, 201);
+      return existing ? c.json(answer, 200) : c.json(answer, 201);
     },
   );
 
@@ -1119,7 +1143,7 @@ export function accountRoutes(deps: AppDeps) {
       security,
       summary: "Save how far you got in setting up your workspace",
       description:
-        "Its owner only (403 for anyone else). `step`: the furthest step reached, saved as each one is passed (a skipped one counts); it only moves forward, so an earlier one changes nothing. `finished`: the onboarding is over, for good. Until then the apps open the onboarding instead of the workspace (`onboarding` in `GET /me`).",
+        "Its owner only (403 for anyone else). `step`: the furthest step reached, saved as each one is passed (a skipped one counts); it only moves forward, so an earlier one changes nothing. `finished`: the onboarding is over, for good; the answer then says where the workspace opens (`rightHandId`) and carries `GET /me` as it is now. Until then the apps open the onboarding instead of the workspace (`onboarding` in `GET /me`).",
       request: {
         params: OrgParams,
         body: body(z.object({ step: z.enum(ONBOARDING_STEPS).optional(), finished: z.literal(true).optional() })),
@@ -1129,13 +1153,20 @@ export function accountRoutes(deps: AppDeps) {
           z.object({
             step: z.enum(ONBOARDING_STEPS).openapi({ description: "The furthest step reached." }),
             finished: z.boolean(),
+            rightHandId: RightHandId.optional(),
+            me: Me.optional(),
           }),
         ),
         ...errors,
       },
     }),
-    async (c) =>
-      c.json(await saveOnboarding(db, c.get("user").id, c.req.valid("param").orgId, c.req.valid("json")), 200),
+    async (c) => {
+      const user = c.get("user");
+      const { orgId } = c.req.valid("param");
+      const input = c.req.valid("json");
+      const saved = await saveOnboarding(db, user.id, orgId, input);
+      return c.json({ ...saved, ...(input.finished ? await opened(user, orgId) : {}) }, 200);
+    },
   );
 
   app.openapi(

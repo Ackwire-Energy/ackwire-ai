@@ -570,9 +570,9 @@ function ItemDialog({
         )
       }
     >
-      <div className="issue-layout">
+      <div className="vlt-layout">
         <Locked when={actions.updating}>
-          <div className="issue-layout__main vlt-details__main">
+          <div className="vlt-details__main">
             {external && editable && <SettingNote icon="plug">{t("vault.item.editIn", { source })}</SettingNote>}
             {item.missing && <SettingNote icon="alert">{t("vault.item.missingText", { source })}</SettingNote>}
             {unreadable && <SettingNote icon="alert">{t("vault.item.unreadable")}</SettingNote>}
@@ -605,7 +605,7 @@ function ItemDialog({
             )}
           </div>
           {/* The fields on the left; who has access and its recent uses beside them (ADR 0144 §7). */}
-          <aside className="issue-aside vlt-aside">
+          <aside className="vlt-aside">
             <DetailsSection title={t("vault.access.title")}>
               <ScopeLine scope={item.scope} />
               <AccessBlock

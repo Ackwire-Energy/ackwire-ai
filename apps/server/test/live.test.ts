@@ -101,7 +101,9 @@ test("DM API: open, list with unread, read, agent replies; memory undo API", asy
   const { orgId, agentId } = await seedOrg(owner);
   const api = (path: string, init?: Parameters<typeof owner>[1]) =>
     owner(`/api/app/organizations/${orgId}${path}`, init);
-  const opened = (await (await api("/dms", { json: { agentId } })).json()) as { channelId: string };
+  const opened = (await (await api("/dms", { json: { agentId } })).json()) as { channelId: string; dm: unknown };
+  // The DM as the list has it, so an app shows it there without asking for the list again.
+  expect(opened.dm).toEqual(((await (await api("/dms")).json()) as { dms: unknown[] }).dms[0]);
   expect(((await (await api("/dms", { json: { agentId } })).json()) as { channelId: string }).channelId).toBe(
     opened.channelId,
   );

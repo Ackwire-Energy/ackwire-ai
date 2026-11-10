@@ -10,7 +10,7 @@ Measure, don't eyeball. Vision misses 1 to 2 px errors, source review can't see 
 ## The kit's numbers (packages/ui tokens)
 
 - Three control heights: 32 (toolbars, list filters, in-row actions, composer), 40 (forms, page and dialog buttons, search, selects, sidebar items), 48 (only the main action of a full screen). Radius is 30% of the height. Pills only for labels you don't press.
-- Spacing steps 4, 8, 12, 16, 24, 32. Form fields 16 apart, a label 4 from its control. List rows 8 above and below (`--row-py`, 12 on touch): one line 36, with a 24 face 40, with a 32 control 48. Cards 16 inside (`--card-pad`). A plated button stays 8 from its row's or card's edges (`--action-clear`). A row of actions (`.ac-acts`) puts 16 between what the eye sees, 24 on touch.
+- Spacing steps 4, 8, 12, 16, 24, 32. Form fields 16 apart, a label 4 from its control. List rows 8 above and below (`--row-py`, 12 on touch): one line 36, with a 24 face 40, with a 32 control 48. Cards 16 inside (`--card-pad`). A plated button stays 8 from its row's or card's edges (`--action-clear`). A row of actions (`.ac-acts`) puts 16 between what the eye sees, on touch too, and two plated buttons 8 apart. A small button keeps its 32 plate on touch: its target grows to 44 past it (`--touch-target`), up and down only when it has words.
 - Every page starts at `--page-top` (its title's line on the sidebar's workspace row, 20 on phones) and `--page-x` (24, 16 under 640). Header, toolbar and content 16 apart, list groups 24 (`.ac-groups`).
 - No raw px for padding, gaps or heights. Use the tokens.
 - Rounded inside rounded: inner radius is the outer radius minus the gap between them.
@@ -28,7 +28,7 @@ Layout
 
 Alignment and spacing
 7. Controls side by side share one height. Shrink the taller one.
-8. Gaps between buttons are even and never zero: plated buttons 8 apart, header glyph boxes 32 and 8 apart. Header icon buttons get no plate on hover or press, only the icon colour changes.
+8. Gaps between buttons are even and never zero: plated buttons 8 apart, icon buttons' plates 8 apart, header glyph boxes 32 and 8 apart. Header icon buttons get no plate on hover or press, only the icon colour changes.
 9. Faces, tiles and controls stay at least 8 from every row edge and divider, also inside a highlighted or bordered row. Top padding equals bottom, left equals right.
 10. Icons, ⓘ and count badges centre on the capitals' middle within 1 px (`.ac-iconline`, `0.5lh - var(--cap-mid)`), also inside a line of words. A face beside one line centres on it. Words right after an inline face share its baseline. Initials sit optically centred in their tile.
 11. A picture taller than 1.25 lines beside 2 or more lines: the first line's capitals start at its top (`.ac-captop`). A step badge beside a name and a subtitle centres on the whole two-line block.
@@ -39,12 +39,12 @@ Alignment and spacing
 16. One class keeps one height, padding and gap on every screen.
 
 Text
-17. Wrap meaning, never cut it with an ellipsis. Give a fact value the room to stay on one line. No row wraps word by word.
+17. Wrap meaning, never cut it with an ellipsis. Give a fact value the room to stay on one line. No row wraps word by word. Words and their actions (a title and its buttons, a notice and its fix, a toast and Desfazer) are an action line (`.ac-actline`, phone `ACT_LINE`): the actions sit beside the words only while the words fit on one line there, else on a row of their own under the words, from their edge. A close × stays beside the title, outside the line. Ver detalhes and every toggle like it go under their words. Only one small control that keeps its place (a switch, a select, a chevron) ends a row with `.ac-actrow`.
 18. No button covers text. Desfazer never takes its own column: it goes at the end of its sentence, or under it when there's no room.
 19. Badge, pill and button text 4.5:1 (3:1 for large text) in both themes. An unread or waiting count at least 3:1 against what's behind it.
 20. Less text: a title, at most one short sentence, the controls. Help goes behind an ⓘ beside its label, a title plus one sentence (Field's and SettingRow's `hint`). Under a field only a format example (`example`) or an error. Under a setting only what must stay in sight (`status`). Background reading goes to a site page, linked once. Cut sentences that only reassure.
 21. No semicolons in product copy, in any language or surface. No em dashes, except member group headers like "DONO — 1". Long "·" chains read dense.
-22. Links use the house link style, never the browser's blue underline. Third-party products and AI providers show their official logo, never a generic icon.
+22. Links use the house link style, never the browser's blue underline. Third-party products and AI providers show their official logo, never a generic icon. Text between backticks is an inline code pill (`.ac-inlinecode`) wherever formatted words show: a message, a document, an agent's words on a card.
 
 Components
 23. On phones, a card's lone primary button is full width (at least 90% of the card).

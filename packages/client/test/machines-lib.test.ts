@@ -81,6 +81,14 @@ describe("connected computers helpers (ADR 0036)", () => {
     // A code this app has no words for yet: the runner's own.
     expect(machineReasonText(t, { reason: download, code: "browser_new_thing" })).toBe(download);
     expect(machineReasonText(t, null)).toBeNull();
+    // A runner from before codes, its install sentence with the command in it: the app's words, the command in its block.
+    const install = "Install what desktop use needs: `sudo apt install xdotool` (missing: xdotool)";
+    expect(machineReasonText(t, { reason: install }, "desktop_use_install")).toBe(
+      ptBR.machines.reasons.desktop_use_install,
+    );
+    expect(machineReasonText(t, { reason: "Desktop use runs on Linux computers only" }, "desktop_use_install")).toBe(
+      "Desktop use runs on Linux computers only",
+    );
   });
 
   test("folders: the name, and the ones an agent may use", () => {

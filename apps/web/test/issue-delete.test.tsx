@@ -45,7 +45,12 @@ describe("Excluir tarefa", () => {
     await click(cardOf(128));
     await settle(4);
     const dialog = screen().getAllByRole("dialog").at(-1) as HTMLElement;
-    await click(within(dialog).getByRole("button", { name: "Excluir tarefa" }));
+    // In the dialog, behind ⋯ beside the ×, after a divider.
+    const more = within(dialog).getByRole("button", { name: "Mais opções" });
+    more.focus();
+    await act(async () => fireEvent.keyDown(more, { key: "Enter" }));
+    await settle(2);
+    await click(within(screen().getByRole("menu")).getByRole("menuitem", { name: "Excluir tarefa" }));
     await settle(3);
     expect(screen().getByRole("dialog", { name: "Excluir a tarefa #128?" })).toBeTruthy();
     cleanup();

@@ -120,6 +120,15 @@ describe("Avatar", () => {
     expect(initialsOf("佐藤 花子")).toBe("佐");
     expect(initialsOf("김 민수")).toBe("김");
     expect(initialsOf("  ")).toBe("?");
+    // An emoji before the name gives way to the words; an emoji alone stays whole, never half a character.
+    expect(initialsOf("🌴 Ana Souza")).toBe("AS");
+    expect(initialsOf("🦊")).toBe("🦊");
+    expect(initialsOf("Ólafur Darri Ólafsson")).toBe("ÓÓ");
+    // What tells relatives apart is no surname: "CM", never "CI"; a name of two words keeps both.
+    expect(initialsOf("Christopher Alexander Montgomery III")).toBe("CM");
+    expect(initialsOf("João Pereira Filho")).toBe("JP");
+    expect(initialsOf("Martin Luther King Jr.")).toBe("MK");
+    expect(initialsOf("Pedro Neto")).toBe("PN");
   });
 });
 
@@ -141,6 +150,15 @@ describe("Chip", () => {
     const chip = container.querySelector(".ac-chip");
     expect(chip?.querySelector("svg")).toBeNull();
     expect(chip?.textContent).toBe("Issue: ACME-177");
+  });
+
+  test("22 high with 12px words; an icon's side pads 6, its ink 2 into its box, so the ink reads 8 on both sides", async () => {
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+    expect(rule(".ac-chip")).toContain("height: 22px;");
+    expect(rule(".ac-chip")).toContain("padding: 0 var(--space-2);");
+    expect(rule(".ac-chip")).toContain("font-size: 12px;");
+    expect(rule(".ac-chip:has(> .ac-icon:first-child)")).toContain("padding-inline-start: 6px;");
   });
 });
 
@@ -245,12 +263,13 @@ describe("Card", () => {
       </>,
     );
     // The key leads the title's own row (the action stays out of it), so it keeps the title's first line however the
-    // title wraps beside a taller action.
+    // title wraps beside a taller action. The head is an action line: an action that doesn't fit goes under the title.
     const [withKey, plain] = [...container.querySelectorAll(".ac-card__lead")];
-    expect(withKey?.className).toBe("ac-card__lead ac-actrow__text ac-iconline");
+    expect(withKey?.className).toBe("ac-card__lead ac-iconline");
     expect(withKey?.firstElementChild?.className).toBe("ac-card__key");
+    expect(withKey?.parentElement?.className).toBe("ac-card__head ac-actline");
     expect(withKey?.parentElement?.lastElementChild?.className).toBe("ac-card__action");
-    expect(plain?.className).toBe("ac-card__lead ac-actrow__text");
+    expect(plain?.className).toBe("ac-card__lead");
     const [foot, bare] = [...container.querySelectorAll(".ac-card__foot")];
     expect(foot?.className).toBe("ac-card__foot ac-iconline");
     expect(foot?.firstElementChild?.tagName.toLowerCase()).toBe("svg");
@@ -983,20 +1002,27 @@ describe("Message aside and foot", () => {
     expect(value(".ac-msg__actions .ac-btn--sm", "width")).toBe("26px");
     expect(value(".ac-msg__actions .ac-btn--sm", "height")).toBe("26px");
     expect(value(".ac-msg__actions .ac-btn--sm .ac-icon", "width")).toBe("16px");
-    // On touch too, where small buttons grow to 40px: the bar's keep their 32px plates, and each target reaches 4px
-    // past its plate to the ruler's 40px, the plates 8px apart so no two targets overlap.
+    // On touch a small button keeps its 32px plate and its target grows to 44 past it: one with words up and down
+    // only, an icon 4px to each side too. The bar's 26px plates grow to the 32 of the rest, 8px apart, so the
+    // targets of two side by side touch and never overlap.
     const touch = [...css.matchAll(/@media \(pointer: coarse\) \{((?:[^{}]*\{[^{}]*\})*[^{}]*)\}/g)]
       .map((m) => m[1] ?? "")
       .join("\n");
-    expect(value(".ac-btn--sm", "min-height", touch)).toBe("var(--control-h-md)");
+    expect(value(".ac-btn--sm", "min-height", touch)).toBeUndefined();
+    expect(value(".ac-btn--sm.ac-btn--icon", "min-width", touch)).toBeUndefined();
+    expect(value(":where(.ac-btn--sm)", "position", touch)).toBe("relative");
+    expect(value(".ac-btn--sm::after", "position", touch)).toBe("absolute");
+    expect(value(".ac-btn--sm::after", "inset", touch)).toBe("calc((var(--control-h-sm) - var(--touch-target)) / 2) 0");
+    expect(value(".ac-btn--sm.ac-btn--icon::after", "inset", touch)).toBe(
+      "calc((var(--control-h-sm) - var(--touch-target)) / 2) calc(-1 * var(--space-1))",
+    );
+    const tokens = await Bun.file(new URL("../src/styles/tokens.css", import.meta.url).pathname).text();
+    expect(tokens).toContain("--touch-target: 44px;");
     const buttons = ".ac-msg__actions .ac-btn--sm";
     expect(value(buttons, "min-height", touch)).toBe("var(--control-h-sm)");
     expect(value(buttons, "min-width", touch)).toBe("var(--control-h-sm)");
-    expect(value(buttons, "position", touch)).toBe("relative");
-    expect(value(`${buttons}::after`, "position", touch)).toBe("absolute");
-    const reach = -Number.parseFloat(value(`${buttons}::after`, "inset", touch) ?? "");
-    expect(32 + 2 * reach).toBe(40);
-    expect(Number.parseFloat(value(bar, "gap", touch) ?? "")).toBe(2 * reach);
+    expect(value(`${buttons}::after`, "inset", touch)).toBeUndefined();
+    expect(Number.parseFloat(value(bar, "gap", touch) ?? "")).toBe(8);
     // Left of a grouped message's check at the row's end (a 16px icon, 2px each side) and 8px from it, past the row's
     // own side padding; a check right after the time in the name's line is out of its way.
     expect(
@@ -1200,7 +1226,7 @@ describe("Message on touch", () => {
 });
 
 describe("ListRow and RunMark", () => {
-  test("a list row is a neutral button: lead, the whole title on hover, meta", () => {
+  test("a list row is a neutral button: its lead on the title's first line, the title whole, meta", async () => {
     let clicked = 0;
     const { container } = render(
       <ListRow
@@ -1212,11 +1238,17 @@ describe("ListRow and RunMark", () => {
     );
     const row = within(container).getByRole("button", { name: /Revisão do roadmap/ });
     expect(row.getAttribute("type")).toBe("button");
-    expect(row.className).toBe("ac-row");
-    expect(row.querySelector(".ac-row__title")?.getAttribute("title")).toBe("Revisão do roadmap");
+    expect(row.className).toBe("ac-row ac-iconline");
+    expect(row.querySelector(".ac-row__title")?.textContent).toBe("Revisão do roadmap");
     expect(row.querySelector(".ac-row__meta")?.textContent).toBe("Hoje · 21:00");
     fireEvent.click(row);
     expect(clicked).toBe(1);
+    // A long title wraps: never "…" with the rest only on hover.
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+    expect(rule(".ac-row__title")).not.toContain("ellipsis");
+    expect(rule(".ac-row__title")).toContain("overflow-wrap: anywhere");
+    expect(rule(".ac-row")).toContain("align-items: flex-start");
   });
 
   test("a run mark is a decorative 8px canvas carrying its status", () => {

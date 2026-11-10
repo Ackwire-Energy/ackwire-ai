@@ -79,6 +79,7 @@ import { TeamWeekCardView } from "@/components/TeamWeekCard";
 import { TextAction, UsagePauseCardView } from "@/components/UsagePauseCard";
 import { useDirectory } from "@/hooks/useDirectory";
 import { lookOf } from "@/lib/look";
+import { inlineWords } from "@/lib/markdown";
 import { inPlaceClick } from "@/lib/navigate";
 import { proposedRoutineWhen } from "@/lib/recurrence";
 import { useToast } from "@/lib/toast";
@@ -177,7 +178,7 @@ export function ActionCard({ message }: { message: Message }) {
           </EventPillAction>
         ) : undefined
       }
-      below={card.why ? <p>{card.why}</p> : undefined}
+      below={card.why ? <p>{inlineWords(card.why)}</p> : undefined}
     >
       {title}
     </RequestOpen>
@@ -228,7 +229,7 @@ function ConnectAppCardView({ card }: { card: ConnectAppCard }) {
         below={
           card.why || card.url || !may ? (
             <>
-              {card.why && <p>{card.why}</p>}
+              {card.why && <p>{inlineWords(card.why)}</p>}
               {card.url && (
                 <p>
                   <code>{card.url}</code>
@@ -280,7 +281,7 @@ function InstallSkillCardView({ card }: { card: InstallSkillCard }) {
         }
         below={
           <>
-            {card.why && <p>{card.why}</p>}
+            {card.why && <p>{inlineWords(card.why)}</p>}
             <p>
               <code>{card.url}</code>
             </p>
@@ -348,7 +349,7 @@ function UpdateSkillsCardView({ message, card }: { message: Message; card: Updat
         label={title}
         below={
           <>
-            {card.why && <p>{card.why}</p>}
+            {card.why && <p>{inlineWords(card.why)}</p>}
             {/* A skill a line, each with its own action ("Update", "Review"): the pill's sentence covers them all. */}
             <ul className="waitcard__lines">
               {named.map((r) => (
@@ -425,7 +426,7 @@ function InviteCardView({ card }: { card: InviteCard }) {
       }
       below={
         <>
-          {card.why && <p>{card.why}</p>}
+          {card.why && <p>{inlineWords(card.why)}</p>}
           <p>{card.emails.join(", ")}</p>
           {!(mayInvite && invite) && <p>{t("actionCard.invite.adminOnly")}</p>}
         </>
@@ -653,7 +654,7 @@ export function AgentProposalCardView({
           <span className="small muted">{[`@${draft.handle}`, draft.role].filter(Boolean).join(" · ")}</span>
         </span>
       </span>
-      {byRightHand && delegate?.reason ? <p>{delegate.reason}</p> : why && <p>{why}</p>}
+      {byRightHand && delegate?.reason ? <p>{inlineWords(delegate.reason)}</p> : why && <p>{inlineWords(why)}</p>}
       {lines.length > 0 && <ProposalLines lines={lines} draft={draft} />}
       {byRightHand && delegate?.state === "approved" ? (
         <span className="small muted ac-iconline">

@@ -78,8 +78,9 @@ import {
   timerDelay,
 } from "./ask-store";
 import { LineStop, useRowsInView } from "./LiveRows";
-import { approvalIdOf, lineStops, markedParts, markName, questionOf, workingEntries } from "./logic";
+import { approvalIdOf, lineStops, markedParts, markName, parseInline, questionOf, workingEntries } from "./logic";
 import { useCardTop, useOwnTop } from "./look";
+import { Spans } from "./MessageSpans";
 import type { RowSight } from "./row-sight";
 
 /**
@@ -477,8 +478,8 @@ export function AskCard({
     return store.register(id, card);
   }, [store, id]);
   const more = well?.more;
-  // The thing it is about, edge to edge: its mark, its title and "Ver …" on one line, its details under them across
-  // the whole width (from the title's column to the card's edge).
+  // The thing it is about, edge to edge: its mark and its title on one line, its details under them across the whole
+  // width (from the title's column to the card's edge), then "Ver …" on their edge, never a column beside the words.
   const line = well ? (
     <>
       <View style={styles.lineTop}>
@@ -486,21 +487,21 @@ export function AskCard({
         <Text variant="subhead" tone="ink" style={[styles.semibold, styles.grow]}>
           {well.title}
         </Text>
-        {more ? (
-          <View style={styles.lineMore}>
-            <Text variant="footnote" tone="muted" style={styles.semibold} numberOfLines={1}>
-              {more.label}
-            </Text>
-            <View style={open ? styles.flip : undefined}>
-              <Icon name="chev" size={13} color={c.faint} />
-            </View>
-          </View>
-        ) : null}
       </View>
       {well.detail ? (
         <Text variant="footnote" tone="faint" style={styles.lineDetail}>
-          {well.detail}
+          <Spans inline={parseInline(well.detail)} />
         </Text>
+      ) : null}
+      {more ? (
+        <View style={styles.lineMore}>
+          <Text variant="footnote" tone="muted" style={styles.semibold} numberOfLines={1}>
+            {more.label}
+          </Text>
+          <View style={open ? styles.flip : undefined}>
+            <Icon name="chev" size={13} color={c.faint} />
+          </View>
+        </View>
       ) : null}
     </>
   ) : null;
@@ -534,7 +535,7 @@ export function AskCard({
           </View>
           {lead ? (
             <Text variant={well ? "body" : "title"} tone="ink" style={well ? styles.lead : undefined}>
-              {lead}
+              <Spans inline={parseInline(lead)} />
             </Text>
           ) : null}
           {/* With a preview, "Ver …" opens the whole in its place; without one, under the name line. */}
@@ -880,12 +881,12 @@ const styles = StyleSheet.create({
   // What will happen, drawn small: as tall as a preview gets, fading at its foot.
   preview: { maxHeight: 152, overflow: "hidden", paddingVertical: 10 },
   fade: { position: "absolute", left: 0, right: 0, bottom: 0, height: 40 },
-  // The name line: its mark, its title and details, "Ver …"; a hairline under it too, over the decision. The mark
-  // and "Ver …" stand on the title's line (20 points), not in the middle of a tall detail.
+  // The name line: its mark, its title and details, "Ver …" under them; a hairline under it too, over the decision. The
+  // mark stands on the title's line (20 points), not in the middle of a tall detail.
   line: { paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth },
   lineTop: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   lineMark: { flexShrink: 0, width: 20, height: 20, alignItems: "center", justifyContent: "center" },
-  lineMore: { flexDirection: "row", alignItems: "center", gap: 3, flexShrink: 0, maxWidth: "40%", height: 20 },
+  lineMore: { flexDirection: "row", alignItems: "center", gap: 3, alignSelf: "flex-start", marginLeft: 30, height: 22 },
   // Under the title, on its column (the mark and its gap), to the card's edge.
   lineDetail: { marginLeft: 30, marginTop: 1 },
   // The deadline at the foot's end, right-aligned under the decision.

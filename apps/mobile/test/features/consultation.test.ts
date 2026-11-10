@@ -1,4 +1,6 @@
 import { expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   composerRequestFor,
   currentComposerRequest,
@@ -23,4 +25,12 @@ test("'Falar com o Theo' hands '@theo ' to that conversation's composer, once", 
   expect(currentComposerRequest()).toBe(asked);
   takeComposerRequest(asked?.at ?? 0);
   expect(currentComposerRequest()).toBeNull();
+});
+
+test("the two agents' line wraps their names whole, never clipped at a narrow width", () => {
+  const group = readFileSync(join(import.meta.dir, "../../src/features/chat/ConsultGroup.tsx"), "utf8");
+  const pair = group.slice(group.indexOf("<AgentFace agentId={askerId}"), group.indexOf("</Pressable>"));
+  expect(pair).not.toContain("numberOfLines");
+  expect(pair).not.toContain('ellipsizeMode="clip"');
+  expect(group).toContain('flexWrap: "wrap",\n    justifyContent: "center",');
 });

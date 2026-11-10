@@ -16,7 +16,7 @@ export type { PlanState } from "@/sky/math";
 export { PlanTrack, type PlanTrackProps } from "@/sky/PlanTrack";
 export { Sky, type SkyProps, WorkspaceSky } from "@/sky/Sky";
 export { SpendBar, type SpendBarProps } from "@/sky/SpendBar";
-export { ACT_ROW } from "./ActRow";
+export { ACT_LINE } from "./ActLine";
 export { Button, type ButtonProps, type ButtonVariant } from "./Button";
 export { Card, type CardProps } from "./Card";
 export { Chip, type ChipProps } from "./Chip";

@@ -184,8 +184,8 @@ export function ChatLookSettings() {
       <CardHeader id="account-chat" title={t("settings.account.chat.title")} />
       <div className="settings-rows">
         <div className="chat-look__group">
-          <div className="chat-look__top">
-            <span className="settings-row__text ac-actrow__text">
+          <div className="chat-look__top ac-actline">
+            <span className="settings-row__text">
               <span className="ac-hintline">
                 <span className="settings-row__label">{t("settings.account.chat.density")}</span>
                 <InfoHint name={t("common.about", { label: t("settings.account.chat.density") })}>

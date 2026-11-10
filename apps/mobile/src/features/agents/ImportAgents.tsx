@@ -20,7 +20,20 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { serverUrl } from "@/lib/server";
-import { AgentAvatar, Button, CARD_PAD, Card, Icon, LineIcon, Locked, LogoMark, Text, Toggle, useTheme } from "@/ui";
+import {
+  ACT_LINE,
+  AgentAvatar,
+  Button,
+  CARD_PAD,
+  Card,
+  Icon,
+  LineIcon,
+  Locked,
+  LogoMark,
+  Text,
+  Toggle,
+  useTheme,
+} from "@/ui";
 import { router } from "@/ui/navigation";
 import { openPage } from "../ai/parts";
 import { tapHaptic } from "../shared/parts";
@@ -222,10 +235,12 @@ function Picker({ imp }: { imp: AgentImport }) {
       {busy ? (
         <View style={styles.reading}>
           <ActivityIndicator color={c.muted} />
-          <Text variant="body" tone="muted" style={styles.fill} accessibilityLiveRegion="polite">
-            {imp.busy === "planning" ? t("onboarding.import.planning") : t("onboarding.import.reading")}
-          </Text>
-          <Button variant="secondary" size="sm" label={t("common.cancel")} onPress={imp.cancel} />
+          <View style={[ACT_LINE.row, styles.line]}>
+            <Text variant="body" tone="muted" style={ACT_LINE.text} accessibilityLiveRegion="polite">
+              {imp.busy === "planning" ? t("onboarding.import.planning") : t("onboarding.import.reading")}
+            </Text>
+            <Button variant="secondary" size="sm" label={t("common.cancel")} onPress={imp.cancel} />
+          </View>
         </View>
       ) : takesFiles(imp.card) ? (
         <Button
@@ -355,18 +370,21 @@ function Preview({ imp, orgId }: { imp: AgentImport; orgId: string }) {
 
   return (
     <>
+      {/* The name whole, Trocar arquivo beside it while it fits its line, under it from its edge otherwise. */}
       <View style={styles.previewHead}>
         <SourceMark card={origin.card} size={44} />
-        <Text variant="title" accessibilityRole="header" numberOfLines={2} style={styles.fill}>
-          {bundle.source.name}
-        </Text>
-        <Button
-          variant="secondary"
-          size="sm"
-          label={planned.from === "files" ? t("onboarding.import.change") : t("mobile.newAgent.import.change")}
-          disabled={applying}
-          onPress={imp.reset}
-        />
+        <View style={[ACT_LINE.row, styles.line]}>
+          <Text variant="title" accessibilityRole="header" style={ACT_LINE.text}>
+            {bundle.source.name}
+          </Text>
+          <Button
+            variant="secondary"
+            size="sm"
+            label={planned.from === "files" ? t("onboarding.import.change") : t("mobile.newAgent.import.change")}
+            disabled={applying}
+            onPress={imp.reset}
+          />
+        </View>
       </View>
       <Text variant="footnote" tone="muted">
         {[origin.app ? t("onboarding.import.from", { app: origin.app }) : t("onboarding.import.fromOther"), summary]
@@ -530,10 +548,12 @@ const styles = StyleSheet.create({
   tile: { borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, alignItems: "center", justifyContent: "center" },
   source: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 10, paddingHorizontal: 14 },
   reading: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 6 },
-  actions: { flexDirection: "row", justifyContent: "flex-end", gap: 10 },
+  actions: { flexDirection: "row", justifyContent: "flex-end", gap: 8 },
   failure: { gap: 8, alignItems: "flex-start" },
   request: { gap: 8, padding: CARD_PAD, alignItems: "flex-start" },
   previewHead: { flexDirection: "row", alignItems: "center", gap: 12 },
+  // Words and their button past the lead: the button under the words once they take more than their line.
+  line: { flex: 1, minWidth: 0, alignItems: "center", columnGap: 16, rowGap: 8 },
   agent: { flexDirection: "row", alignItems: "flex-start", gap: 12, paddingVertical: 12, paddingHorizontal: 14 },
   kindRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 13, paddingHorizontal: 14 },
   // Under the source's name: the row's side, its mark and the gap.

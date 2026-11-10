@@ -28,8 +28,13 @@ export interface DetailsDialogProps {
   icon?: ReactNode;
   /** Under the title: where, who, when. */
   subtitle?: ReactNode;
-  /** Header buttons before "abrir em página própria" and close ("Baixar", "Editar"). */
+  /**
+   * Header buttons before "abrir em página própria" ("Baixar", "Editar"): beside the title while it fits on one line
+   * there, else on a row of their own under it.
+   */
   actions?: ReactNode;
+  /** A ⋯ menu of the item's own actions, right before the close: it stays beside the title with it. */
+  more?: ReactNode;
   /** "Abrir em página própria": the item's own page. */
   page?: DetailsDialogPageLink;
   closeLabel: string;
@@ -82,6 +87,7 @@ export function DetailsDialog({
   icon,
   subtitle,
   actions,
+  more,
   page,
   closeLabel,
   size = "md",
@@ -118,55 +124,85 @@ export function DetailsDialog({
   const forms = useUnsavedForms();
   const keep = () => unsaved || forms.held();
   const inline = !eyebrow && !titleHidden;
-  const heading = titleHidden ? (
-    <RDialog.Title className="ac-visually-hidden">{title}</RDialog.Title>
-  ) : (
-    <div className="ac-details__heading ac-actrow__text">
-      {icon && <span className="ac-details__icon">{icon}</span>}
-      <div className="ac-details__titles">
-        <RDialog.Title className="ac-details__title">{title}</RDialog.Title>
-        {subtitle && <div className="ac-details__subtitle">{subtitle}</div>}
-      </div>
+  const titles = (
+    <div className="ac-details__titles">
+      <RDialog.Title className="ac-details__title">{title}</RDialog.Title>
+      {subtitle && <div className="ac-details__subtitle">{subtitle}</div>}
     </div>
   );
   const pageIcon = <Icon name="external" size={16} />;
   const pageClass = "ac-btn ac-btn--ghost ac-btn--sm ac-btn--icon";
+  const buttons = (actions || page) && (
+    <div className="ac-details__actions ac-acts">
+      {actions}
+      {page &&
+        (page.render ? (
+          page.render({
+            className: pageClass,
+            "aria-label": page.label,
+            title: page.label,
+            children: pageIcon,
+          })
+        ) : (
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            icon="external"
+            aria-label={page.label}
+            title={page.label}
+            onClick={page.onOpen}
+          />
+        ))}
+    </div>
+  );
+  // With a side column, its own close is the one at the top right (Esc and the scrim still close).
+  const close = (more || !side) && (
+    <div className="ac-details__close ac-acts">
+      {more}
+      {!side && (
+        <RDialog.Close asChild>
+          <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={closeLabel} title={closeLabel} />
+        </RDialog.Close>
+      )}
+    </div>
+  );
   const main = (
     <>
       <div className="ac-details__head">
-        {/* With no eyebrow, the heading takes the bar's empty start, beside the buttons, instead of a row of its own. */}
-        <div className={cx("ac-details__bar ac-actrow", inline && "ac-details__bar--titled")}>
-          {inline ? heading : <div className="ac-details__eyebrow ac-actrow__text">{eyebrow}</div>}
-          <div className="ac-details__actions ac-acts">
-            {actions}
-            {page &&
-              (page.render ? (
-                page.render({
-                  className: pageClass,
-                  "aria-label": page.label,
-                  title: page.label,
-                  children: pageIcon,
-                })
-              ) : (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  iconOnly
-                  icon="external"
-                  aria-label={page.label}
-                  title={page.label}
-                  onClick={page.onOpen}
-                />
-              ))}
-            {/* With a side column, its own close is the one at the top right (Esc and the scrim still close). */}
-            {!side && (
-              <RDialog.Close asChild>
-                <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={closeLabel} title={closeLabel} />
-              </RDialog.Close>
-            )}
+        {/* With no eyebrow, the heading takes the bar's start beside the close, instead of a row of its own. It and the
+            buttons share an action line, which puts the buttons under it when they don't fit: from the kind's tile, so
+            the tile never keeps a column beside the title, its line and the buttons. */}
+        {inline ? (
+          <div className="ac-details__bar ac-details__bar--titled">
+            <div className="ac-details__lead ac-actline">
+              <div className="ac-details__heading">
+                {icon && <span className="ac-details__icon">{icon}</span>}
+                {titles}
+              </div>
+              {buttons}
+            </div>
+            {close}
           </div>
-        </div>
-        {!inline && heading}
+        ) : (
+          <>
+            <div className="ac-details__bar">
+              <div className="ac-details__lead ac-actline">
+                <div className="ac-details__eyebrow">{eyebrow}</div>
+                {buttons}
+              </div>
+              {close}
+            </div>
+            {titleHidden ? (
+              <RDialog.Title className="ac-visually-hidden">{title}</RDialog.Title>
+            ) : (
+              <div className="ac-details__heading">
+                {icon && <span className="ac-details__icon">{icon}</span>}
+                {titles}
+              </div>
+            )}
+          </>
+        )}
       </div>
       <div className="ac-details__body">{children}</div>
       {footer && <div className="ac-details__foot">{footer}</div>}

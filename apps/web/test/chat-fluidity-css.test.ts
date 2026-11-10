@@ -26,6 +26,17 @@ test("an image alone on a message keeps its loading size too (the lone tile's he
   expect(last(topLevel(css), lone, "width")).toBe("240px");
 });
 
+test("a file's name wraps whole, never ending in …; on a phone a file takes the row, pictures two to a row (#51)", () => {
+  for (const part of [".artifact-tile__title", ".artifact-tile__meta"]) {
+    expect(last(topLevel(css), part, "overflow-wrap")).toBe("anywhere");
+    expect(last(topLevel(css), part, "text-overflow")).toBeUndefined();
+    expect(last(topLevel(css), part, "white-space")).toBeUndefined();
+  }
+  const phone = atRule(css, "@media (max-width: 640px)");
+  expect(last(phone, ".artifact-tile", "--tile-w")).toBe("calc(50% - 5px)");
+  expect(last(phone, ".artifact-tile:not([data-media], .artifact-tile--loading)", "--tile-w")).toBe("100%");
+});
+
 test("two tiles to a row on a small phone: a document's cover is drawn smaller, its lines keeping their words", () => {
   // At 120px (a 320px phone) a document's words at their size wrap one or two a line.
   const cover = ".artifact-tile__cover:has(> :is(.artifact-tile__doc, .artifact-tile__text))";
