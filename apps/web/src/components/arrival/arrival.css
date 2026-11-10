@@ -276,7 +276,10 @@
   align-items: flex-start;
   gap: 6px;
 }
+/* The arrow on the title's line, as tall as it; a hair up, where the title's capitals have their middle. */
 .arrival-lede--row > .ac-btn {
+  flex: none;
+  margin-top: -1px;
   margin-inline-start: -6px;
 }
 .arrival-lede--row .arrival-lede__title {
@@ -301,39 +304,62 @@
 .arrival-have > .arrival-opts__label:not(:first-child) {
   margin-top: 6px;
 }
+/* The radio, the mark and how full the plan is sit on the title's line, whatever the lines under it. */
 .arrival-have__row {
-  align-items: center;
+  align-items: flex-start;
   width: 100%;
+}
+.arrival-have__row > .ac-radio {
+  margin-top: 2px;
+}
+.arrival-have__row > .ac-brand {
+  margin-top: -1px;
 }
 .arrival-have__row > .ac-option__text {
   flex: 1;
   min-width: 0;
 }
 /* How near its limit the plan is, in the words' colour: the state is the words, the colour only follows them. */
-.arrival-have__row .ac-option__desc[data-plan="almost"] {
+.arrival-have__word[data-plan="almost"] {
   color: var(--attention);
 }
 .arrival-have__row[data-disabled] {
   opacity: 0.6;
 }
-.arrival-have__meter {
+/* How much of the plan is used: the number, and its bar under it, at the row's end. */
+.arrival-have__room {
   flex: none;
-  width: 88px;
-  height: 4px;
-  border-radius: 2px;
-  background: color-mix(in srgb, var(--ink) 9%, transparent);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+  width: 72px;
+  color: var(--ink-muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  line-height: 22px;
+}
+.arrival-have__room[data-plan="almost"] .arrival-have__pct {
+  color: var(--attention);
+}
+.arrival-have__meter {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--ink) 10%, transparent);
   overflow: hidden;
 }
 .arrival-have__meter i {
   display: block;
   width: var(--used);
   height: 100%;
-  background: var(--ok);
+  border-radius: 3px;
+  background: var(--ink-muted);
 }
-.arrival-have__meter[data-plan="almost"] i {
+.arrival-have__room[data-plan="almost"] .arrival-have__meter i {
   background: var(--attention);
 }
-.arrival-have__meter[data-plan="limited"] i {
+.arrival-have__room[data-plan="limited"] .arrival-have__meter i {
   background: var(--faint);
 }
 .arrival-have__more {

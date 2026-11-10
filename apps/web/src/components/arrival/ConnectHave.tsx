@@ -1,4 +1,5 @@
 import { accountAbout, accountTitle, type ExistingAi } from "@agenteschat/client/lib/ai-accounts";
+import { namesText } from "@agenteschat/client/lib/format";
 import { type PlanChoice, planOfAccount } from "@agenteschat/client/lib/no-ai";
 import { keyLine } from "@agenteschat/client/lib/providers";
 import { ProviderLogo, planState, Radio, RadioGroup } from "@agenteschat/ui";
@@ -105,14 +106,20 @@ export function ConnectHave({
               const off = disabled || offOf(r, dims);
               const state = room(r);
               const a = r.kind === "account" ? r.choice.login : undefined;
-              // Under its owner's name a row says only how its plan is; one's own says who else thinks with it.
-              const words = a
-                ? [a.mine ? accountAbout(t, r.choice, agentName) : undefined, planWord(t, i18n.language, a.usage)]
-                    .filter(Boolean)
-                    .join(" · ")
-                : r.kind === "key"
+              // Under its owner's name a row says only how its plan is; one's own says who else thinks with it, two
+              // names and how many more (a plan for all of one's agents would name them all).
+              const others = a ? [...new Set(a.usedBy)].filter((n) => n !== agentName) : [];
+              const about = !a
+                ? r.kind === "key"
                   ? keyLine(t, r.key)
-                  : "";
+                  : undefined
+                : !a.mine
+                  ? undefined
+                  : others.length > 0 && a.shared === true
+                    ? t("agentPage.work.brain.accountAlso", { agents: namesText(t, others, 2) })
+                    : accountAbout(t, r.choice, agentName);
+              const word = a ? planWord(t, i18n.language, a.usage) : null;
+              const used = state ? Math.min(100, Math.round(state.used)) : 0;
               return (
                 <label
                   key={id}
@@ -127,15 +134,21 @@ export function ConnectHave({
                     <span className="ac-option__title">
                       {a ? accountTitle(a) : r.kind === "key" ? r.key.label : ""}
                     </span>
-                    {words && (
-                      <span className="ac-option__desc" data-plan={state?.state}>
-                        {words}
+                    {about && <span className="ac-option__desc">{about}</span>}
+                    {word && (
+                      <span className="ac-option__desc arrival-have__word" data-plan={state?.state}>
+                        {word}
                       </span>
                     )}
                   </span>
                   {state && (
-                    <span className="arrival-have__meter" data-plan={state.state} aria-hidden="true">
-                      <i style={{ "--used": `${Math.min(100, Math.round(state.used))}%` } as CSSProperties} />
+                    <span className="arrival-have__room" data-plan={state.state} aria-hidden="true">
+                      <span className="arrival-have__pct">
+                        {new Intl.NumberFormat(i18n.language, { style: "percent" }).format(used / 100)}
+                      </span>
+                      <span className="arrival-have__meter">
+                        <i style={{ "--used": `${used}%` } as CSSProperties} />
+                      </span>
                     </span>
                   )}
                 </label>
