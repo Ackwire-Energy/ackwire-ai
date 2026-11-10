@@ -80,6 +80,8 @@ async function workspace(options: AppOptions = {}) {
   const me = browser(t);
   await signUp(me, `me${n}@example.com`);
   const { orgId, channelId } = await seedOrg(me);
+  // Set up already, as a workspace in use is: opening it doesn't go through the onboarding and its arrival (ADR 0160).
+  await me(`/api/app/organizations/${orgId}/onboarding`, { method: "PATCH", json: { finished: true } });
   const admin = await joinByInvitation(t, me, orgId, `admin${n}@example.com`, { role: "admin" });
   const member = await joinByInvitation(t, me, orgId, `member${n}@example.com`);
   const ids = { me: await userId(me), admin: await userId(admin), member: await userId(member) };
