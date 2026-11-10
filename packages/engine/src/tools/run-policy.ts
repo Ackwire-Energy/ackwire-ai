@@ -104,6 +104,8 @@ const ELSEWHERE = new Set([
   "request_permission",
   "request_folder_access",
   "propose_event",
+  // An email to whoever runs the server, in a person's name (ADR 0160 §11): only a run a person is behind sends it.
+  "send_feedback",
 ]);
 
 /** Long work's tools (ADR 0121), on the run's own work: `self`. */
