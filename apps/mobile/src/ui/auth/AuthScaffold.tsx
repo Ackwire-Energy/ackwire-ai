@@ -1,11 +1,12 @@
 import type { Expression } from "@agenteschat/ui/agent/engine";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { ScrollView, View } from "react-native";
+import { Platform, ScrollView, View } from "react-native";
 import { KeyboardAvoidingView, KeyboardToolbar } from "react-native-keyboard-controller";
 import Animated, { Easing, FadeIn } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AgentAvatar } from "@/agent/AgentAvatar";
+import type { AgentLookInput } from "@/agent/looks";
 import type { AgentMode } from "@/agent/poses";
 import { Sky, WorkspaceSky } from "@/sky/Sky";
 import { IconButton } from "../IconButton";
@@ -23,6 +24,9 @@ const AGENT = 96;
 const AGENT_OVERLAP = 8;
 /** The system bar over the keyboard (`KeyboardToolbar`), as tall as the library draws it. */
 const TOOLBAR = 42;
+
+/** The app's own agent, on the sky of every screen before the app. */
+const APP_AGENT: AgentLookInput = { color: "sky", eyes: "round", id: "agentes" };
 
 /** The text of the screens before the app: centered under the agent (fields and buttons keep the width). */
 export const CENTER = { textAlign: "center" } as const;
@@ -47,6 +51,8 @@ export interface AuthScaffoldProps {
   stepKey?: string;
   /** The agent works while a request is out ("run": writing dashes), sleeps while nothing answers, and reacts with a face. */
   agentMode?: AgentMode;
+  /** Another agent on the sky in the app's place: the first run's right hand, who asks its questions. */
+  agent?: AgentLookInput;
   expression?: Expression;
   /** Over the screen and outside the steps, so a step's change never remounts it (the bot check's WebView). */
   overlay?: ReactNode;
@@ -59,6 +65,11 @@ export interface AuthScaffoldProps {
    * and Pronto, so the keyboard walks the form instead of closing and reopening on each field.
    */
   toolbar?: boolean;
+  /**
+   * A field low on a long screen, under a list: on iOS the page scrolls it above the keyboard, where a screen giving
+   * way to the keyboard leaves it under it. Android's own scrolling keeps a focused field in view.
+   */
+  scrollToFocus?: boolean;
   /**
    * What stands on the sky's edge instead of the app's agent: an invitation's team (its first agents), so the people
    * who'll work with you are seen before any field. Same overlap as the agent, so the title keeps its place.
@@ -80,11 +91,13 @@ export function AuthScaffold({
   footer,
   stepKey,
   agentMode = "idle",
+  agent = APP_AGENT,
   expression,
   overlay,
   sky = "normal",
   skyHost,
   toolbar = false,
+  scrollToFocus = false,
   hero,
 }: AuthScaffoldProps) {
   const { colors, reducedMotion } = useTheme();
@@ -95,10 +108,16 @@ export function AuthScaffold({
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       {/* The keyboard library's view: with its provider on, Android no longer resizes the window by itself. With the
           bar over the keyboard, the content keeps clear of it too. */}
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={toolbar ? TOOLBAR : 0}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior="padding"
+        enabled={!(scrollToFocus && Platform.OS === "ios")}
+        keyboardVerticalOffset={toolbar ? TOOLBAR : 0}
+      >
         <ScrollView
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="none"
+          automaticallyAdjustKeyboardInsets={scrollToFocus}
           contentContainerStyle={{ flexGrow: 1, paddingBottom: insets.bottom + 16 }}
         >
           <View
@@ -112,14 +131,7 @@ export function AuthScaffold({
               <Sky color="sky" depth={0.9} fade={0.55} style={skyStyle} />
             )}
             <View style={{ flex: 1, alignItems: "center", justifyContent: "flex-end", marginBottom: -AGENT_OVERLAP }}>
-              {hero ?? (
-                <AgentAvatar
-                  agent={{ color: "sky", eyes: "round", id: "agentes" }}
-                  size={AGENT}
-                  mode={agentMode}
-                  expression={expression}
-                />
-              )}
+              {hero ?? <AgentAvatar agent={agent} size={AGENT} mode={agentMode} expression={expression} />}
             </View>
             {onBack ? (
               <View style={{ position: "absolute", top: insets.top + 8, left: 16 }}>

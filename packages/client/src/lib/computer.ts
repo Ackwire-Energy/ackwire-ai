@@ -249,6 +249,13 @@ export const statusRestatesChip = (view: SetupView) =>
 export const setupNoticeTitleKey = (view: SetupView) =>
   view.phase === "waiting" ? "computerSetup.title" : "computerSetup.notice.title";
 
+/**
+ * The notice's status line under its title: the step, else the phase, except before a step while it is prepared,
+ * where "Preparando o computador." would only say the title again. Null then.
+ */
+export const setupNoticeStatusKey = (view: SetupView) =>
+  view.phase === "preparing" && view.step === null ? null : view.textKey;
+
 /** On its way: the notice, the waiting agents and the onboarding's progress show. */
 export const setupPending = (view: SetupView | null): view is SetupView =>
   view !== null && view.phase !== "ready" && view.phase !== "paused";

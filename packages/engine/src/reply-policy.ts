@@ -70,9 +70,16 @@ export interface ReplyPolicy {
 
 /**
  * Notices that only inform the agent (ADR 0053 §10): another agent's note, the late result of a wait it
- * stopped waiting on, its own fast reply, its own follow-up coming due. The run one of them wakes may stay quiet.
+ * stopped waiting on, its own fast reply, its own follow-up coming due, what happened on GitHub (it answers there).
+ * The run one of them wakes may stay quiet.
  */
-const INFORMING_NOTICES: ReadonlySet<string> = new Set(["agent_note", "wait_result", "talker_reply", "follow_up"]);
+const INFORMING_NOTICES: ReadonlySet<string> = new Set([
+  "agent_note",
+  "wait_result",
+  "talker_reply",
+  "follow_up",
+  "github_event",
+]);
 
 /**
  * How a run must answer. Only runs nobody called by name may pass: the router
@@ -84,17 +91,18 @@ const INFORMING_NOTICES: ReadonlySet<string> = new Set(["agent_note", "wait_resu
  * call or report, a quote reply to this agent, a router follow-up to the agent
  * the person was talking to, nor a run a person answered or wrote into
  * (`answerOwed`). A run catching up after a usage pause (`catchUp`) may pass whoever called it: what it was asked
- * may have been answered or dropped while it waited.
+ * may have been answered or dropped while it waited. So may one whose own request was withdrawn as moot (`moot`): what
+ * met its need may have met the person's too.
  */
 export function replyPolicyFor(
   run: Pick<AgentRun, "agentId" | "trigger" | "background" | "hop">,
   trigger: (Pick<Message, "authorType" | "meta"> & { authorAgentId?: string | null }) | null | undefined,
-  options: { followUp?: boolean; answerOwed?: boolean; catchUp?: boolean } = {},
+  options: { followUp?: boolean; answerOwed?: boolean; catchUp?: boolean; moot?: boolean } = {},
 ): ReplyPolicy {
   if (run.background) return { mayPass: false, background: true };
   if (options.answerOwed) return { mayPass: false, background: false };
   // Catching up after a usage pause (`catch-up.ts`): someone else may have answered it meanwhile.
-  if (options.catchUp) return { mayPass: true, background: false };
+  if (options.catchUp || options.moot) return { mayPass: true, background: false };
   const notice = trigger?.meta?.notice as { kind?: unknown; refs?: { report?: unknown } } | undefined;
   if (typeof notice?.kind === "string" && INFORMING_NOTICES.has(notice.kind))
     return { mayPass: true, background: false };
@@ -126,7 +134,8 @@ const followUpSql = sql<boolean>`exists (select 1 from ${routingDecisions} d
 
 /**
  * `replyPolicyFor` from the database (the run, its trigger, the router's decision): one read. `listsPass`:
- * `pass` is in its tools, also once it may no longer pass (`Transcript.passListed`).
+ * `pass` is in its tools, also once it may no longer pass (`Transcript.passListed`). A moot request lets it pass but
+ * never adds `pass` to a run that started without it: its replayed thinking needs the same tools.
  */
 export async function loadReplyPolicy(
   db: Executor,
@@ -143,6 +152,7 @@ export async function loadReplyPolicy(
       answerOwed: sql<boolean>`coalesce((${agentRuns.transcript} ->> 'answerOwed')::boolean, false)`,
       passListed: sql<boolean>`coalesce((${agentRuns.transcript} ->> 'passListed')::boolean, false)`,
       catchUp: sql<boolean>`coalesce((${agentRuns.transcript} -> 'catchUp' ->> 'mayPass')::boolean, false)`,
+      moot: sql<boolean>`coalesce((${agentRuns.transcript} ->> 'requestMoot')::boolean, false)`,
       authorType: messages.authorType,
       authorAgentId: messages.authorAgentId,
       meta: messages.meta,
@@ -155,12 +165,13 @@ export async function loadReplyPolicy(
   const trigger = row.authorType
     ? { authorType: row.authorType, authorAgentId: row.authorAgentId, meta: row.meta ?? {} }
     : null;
-  const policy = replyPolicyFor(row, trigger, {
+  const options = {
     followUp: row.followUp === true,
     answerOwed: row.answerOwed === true,
     catchUp: row.catchUp === true,
-  });
-  return { ...policy, listsPass: policy.mayPass || row.passListed === true };
+  };
+  const policy = replyPolicyFor(row, trigger, { ...options, moot: row.moot === true });
+  return { ...policy, listsPass: replyPolicyFor(row, trigger, options).mayPass || row.passListed === true };
 }
 
 /** Whether the router sent this run's trigger to it as a follow-up of its own conversation. */

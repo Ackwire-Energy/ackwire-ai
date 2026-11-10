@@ -27,6 +27,9 @@ const KNOWN = {
   "webhook.github_failed": "errors.webhook.githubFailed",
   "webhook.invalid_secret": "errors.webhook.invalidSecret",
   "webhook.invalid_repo": "errors.webhook.invalidRepo",
+  "github_event.answered": "errors.githubEvent.answered",
+  "github_event.not_found": "errors.said.gone",
+  "github_event.agent_not_here": "errors.routine.agentNotInChannel",
   "channel.post_denied": "channel.perms.readOnlyComposer",
   "channel.permission_forbidden": "channel.perms.forbidden",
   "agent.handle_taken": "newAgent.errors.handleTaken",
@@ -138,6 +141,7 @@ const KNOWN = {
   "run.answer_forbidden": "errors.run.answerForbidden",
   "run.stop_reason_forbidden": "errors.run.stopReasonForbidden",
   "run.not_restartable": "errors.run.notRestartable",
+  "run.not_restartable_voice": "errors.run.notRestartableVoice",
   "routine.too_frequent": "errors.routine.tooFrequent",
   "routine.too_many": "errors.routine.tooMany",
   "routine.creator_cannot_post": "errors.routine.creatorCannotPost",
@@ -507,6 +511,9 @@ const KNOWN = {
   "voice.bad_duration": "errors.said.voiceLength",
   "voice.too_large": "errors.said.voiceLength",
   "upload.expired": "errors.said.sendAgain",
+  // The feedback form (ADR 0160): a file that went before the feedback was sent, or too many waiting to be sent.
+  "feedback.files_gone": "errors.feedback.filesGone",
+  "feedback.files_pending": "errors.feedback.filesPending",
   "upload.sha_mismatch": "errors.said.sendAgain",
   gif_key_env: "errors.said.serverKey",
   jev_key_env: "errors.said.serverKey",
@@ -897,6 +904,16 @@ export function keyRefusal(t: TFunction, error: unknown): { text: string; href: 
 }
 
 const KEY_REFUSALS = new Set(["provider_key_invalid", "provider_key_no_credit", "provider_key_denied"]);
+
+/**
+ * A password manager's refusal to connect (`vault.source.<code>`, ADR 0144) in that source's own words when the app
+ * has them (`vault.source.<kind>.error.<code>`: 1Password's token, its one vault), else as `errorText` says it.
+ */
+export function vaultConnectRefusal(t: TFunction, kind: string, error: unknown, locale?: string): string {
+  const code = errorCode(error)?.match(/^vault\.source\.(\w+)$/)?.[1];
+  const say = t as unknown as (key: string, options: Record<string, unknown>) => string;
+  return (code && say(`vault.source.${kind}.error.${code}`, { defaultValue: "" })) || errorText(t, error, locale);
+}
 
 /**
  * A failed request in the person's words: a code the app knows, a file too big, a refusal, no answer (offline or the

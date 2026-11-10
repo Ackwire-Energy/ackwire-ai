@@ -291,6 +291,53 @@ describe("Settings › Vault (ADR 0144)", () => {
     ).toBeNull();
   });
 
+  test("a refused connect says why under the token, in 1Password's own words, until the token changes", async () => {
+    const r = await openVault(seedState(), overviewOf({ connections: [] }));
+    const { t, state } = r;
+    const vault = r.services.api.vault as NonNullable<ApiClient["vault"]>;
+    let refusal = new ApiError(400, "vault.source.many_vaults", "The service account sees more than one vault.");
+    vault.connect = async (orgId, input) => {
+      state.calls.push({ method: "vault.connect", args: [orgId, input.kind] });
+      throw refusal;
+    };
+    const views = screen().getByRole("radiogroup", { name: t("vault.tab.label") });
+    await click(within(views).getByRole("radio", { name: new RegExp(`^${t("vault.tab.connections")}`) }));
+    const card = screen().getByRole("region", { name: "1Password" });
+    await click(within(card).getByRole("button", { name: t("vault.connections.connect") }));
+    const token = within(card).getByLabelText(t("vault.source.onepassword.field.token"));
+    const connect = async () => {
+      await click(within(card).getByRole("button", { name: t("vault.connections.connect") }));
+      await settle();
+    };
+    await type(token, `ops_${"a".repeat(40)}`);
+    await connect();
+    expect(state.calls.filter((c) => c.method === "vault.connect")).toHaveLength(1);
+    expect(within(card).getByRole("alert").textContent).toBe(t("vault.source.onepassword.error.many_vaults"));
+
+    await type(token, `ops_${"b".repeat(40)}`);
+    expect(within(card).queryByRole("alert")).toBeNull();
+
+    // A refusal 1Password has no line of its own for reads as any other.
+    refusal = new ApiError(429, "vault.source.rate_limited", "1Password asked us to wait before reading more.");
+    await connect();
+    expect(within(card).getByRole("alert").textContent).toBe(t("errors.vault.source.rateLimited"));
+  });
+
+  test("a write the server refuses says why in a toast, never nothing", async () => {
+    const r = await openVault();
+    const { t } = r;
+    const vault = r.services.api.vault as NonNullable<ApiClient["vault"]>;
+    vault.syncConnection = async () => {
+      throw new ApiError(400, "vault.source.unreachable", "Couldn't reach the password manager.");
+    };
+    const views = screen().getByRole("radiogroup", { name: t("vault.tab.label") });
+    await click(within(views).getByRole("radio", { name: new RegExp(`^${t("vault.tab.connections")}`) }));
+    const card = screen().getByRole("region", { name: "1Password" });
+    await click(within(card).getByRole("button", { name: t("vault.connections.syncNow") }));
+    await settle();
+    expect(document.querySelector(".ac-toast")?.textContent).toContain(t("errors.vault.source.unreachable"));
+  });
+
   test("a member who doesn't manage the Vault: a team item reads only, and new items stay personal", async () => {
     const state = seedState();
     if (state.me?.organizations[0]) state.me.organizations[0].role = "member";

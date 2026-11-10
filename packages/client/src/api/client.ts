@@ -513,9 +513,14 @@ export interface ApiClient {
      * A signed link that opens the workspace's plan and billing on the billing service (owners and admins; ADR
      * 0079). Navigate to it at once and keep it nowhere else: it lasts 5 minutes and opens once. `billing.off` 404
      * on a server without billing. `returnTo`: the page it was opened from, where the billing service sends the
-     * person back.
+     * person back. `plan`: the plan picked in the app (the billing service's key), whose Checkout it opens.
      */
-    billingLink(orgId: string, from: BillingFrom, returnTo?: string): Promise<{ url: string; expiresAt: string }>;
+    billingLink(
+      orgId: string,
+      from: BillingFrom,
+      returnTo?: string,
+      plan?: string,
+    ): Promise<{ url: string; expiresAt: string }>;
     /** People, files and today's uploads against the workspace's limits (any member; ADR 0079). */
     limits(orgId: string): Promise<WorkspaceLimits>;
     members(orgId: string): Promise<Member[]>;
@@ -900,6 +905,11 @@ export interface ApiClient {
     answerNow(orgId: string, messageId: string): Promise<{ runs: { agentId: string; runId: string }[] }>;
     /** Cancels an agent's follow-up from its line (`messageId`); 409 `follow_up.not_pending` once it came. */
     cancelFollowUp(orgId: string, messageId: string): Promise<void>;
+    /**
+     * "Pedir resposta" on a GitHub notice of someone the agent doesn't answer (`messageId`): the agent answers them
+     * there, with this person behind it. 409 `github_event.answered` once someone asked.
+     */
+    answerGitHub(orgId: string, messageId: string): Promise<void>;
   };
 
   approvals: {

@@ -2260,6 +2260,8 @@ export const featureKeysEn = {
     /** The first run's name, suggested from a work address's domain. */
     suggested: "From your {{domain}} e-mail, I suggested {{org}}.",
     create: "Create",
+    /** The onboarding's plan step on the phone, which can't take the plan: into the workspace, the team asleep. */
+    enter: "Go to the workspace",
     shareMessage: "Join {{org}} on agentes.chat: {{url}}",
     failed: "Couldn't save. Try again.",
   },
@@ -2602,8 +2604,6 @@ export const featureKeysEn = {
   dashboards: {
     homeRow: "Only you · your own widgets",
     loadFailed: "Couldn't load the dashboards.",
-    /** Under "My Home" when the person sees no other board; "+" in the bar makes one. */
-    onlyHome: "Dashboards for the workspace or your roles show up here.",
     create: "Create",
     routineTarget: "its widget",
     pin: {

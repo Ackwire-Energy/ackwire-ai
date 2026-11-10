@@ -7,7 +7,6 @@ import {
   eq,
   inArray,
   isNull,
-  lte,
   ne,
   notInArray,
   or,
@@ -37,10 +36,12 @@ import { openTasksBrief } from "./issues";
 import type { MachineCaller } from "./machine-hub";
 import { type MessageMedia, mediaOf } from "./media";
 import { type DescribedMessage, describeMessages } from "./message-links";
+import { postedBySql } from "./message-place";
 import { type Message, unreachedNote } from "./messages";
 import { missionBrief } from "./mission-brief";
 import { handoffGuidance, noticeForOthers, noticeText } from "./notices";
 import { openRequestsBlock, openRequestsOf } from "./open-requests";
+import { parkedOnBlock } from "./parked-asks";
 import { reachNote, reachOf } from "./reach";
 import {
   byAnotherAgent,
@@ -608,7 +609,9 @@ export async function buildRunContext(
   const handOffs =
     options.routine || run.background || isAgentOnlyDm(channel) ? null : handOffsFrom(db, run).catch(() => null);
 
-  const upToTrigger = lte(messages.createdAt, trigger.createdAt);
+  // What was here when it was asked: a trigger an agent wrote over a while keeps the place of its first words, and what
+  // people sent meanwhile sits after it.
+  const upToTrigger = postedBySql(messages, trigger);
   const rootIsTrigger = run.threadRootId === trigger.id;
   // Asked in the main timeline: the run answers there, not in a thread.
   const flat = rootIsTrigger;
@@ -674,7 +677,7 @@ export async function buildRunContext(
               and(
                 scope,
                 sql`${messages.threadId} is distinct from ${run.threadRootId}::uuid`,
-                sql`${messages.createdAt} <= ${rootTime}`,
+                postedBySql(messages, { createdAt: rootTime, id: run.threadRootId }),
                 ne(messages.id, run.threadRootId),
               ),
             )
@@ -682,6 +685,12 @@ export async function buildRunContext(
             .limit(Math.max(1, options.maxMessages - 1)),
   ]);
   const root = rootRows[0];
+  // Other agents waiting (their plan, budget or computer) on what it answers, its thread's root included: it may let
+  // them go once it handled it.
+  const parkedHere =
+    options.routine || run.background || isAgentOnlyDm(channel)
+      ? null
+      : parkedOnBlock(db, run, trigger, root ?? null).catch(() => null);
   // The thread comes first; earlier channel messages (or the range) fill what's left.
   // A range longer than that loses its oldest messages (the thread summary, when the
   // thread itself is long, covers the thread, not the range).
@@ -1187,6 +1196,7 @@ export async function buildRunContext(
     ...(works ? await works.then((text) => (text ? [{ turn: true, found: true, text }] : [])) : []),
     ...(heldElsewhere ? await heldElsewhere.then((text) => (text ? [{ turn: true, found: true, text }] : [])) : []),
     ...(openRequests ? await openRequests.then((text) => (text ? [{ turn: true, found: true, text }] : [])) : []),
+    ...(parkedHere ? await parkedHere.then((text) => (text ? [{ turn: true, found: true, text }] : [])) : []),
     ...(handOffs
       ? await handOffs.then((rows) => {
           const text = rows && handOffsBlock(rows, zone, new Date(), personal);

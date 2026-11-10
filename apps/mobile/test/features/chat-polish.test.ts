@@ -21,13 +21,24 @@ describe("the floating date while the conversation scrolls", () => {
     expect(dayInView([{ index: 2, item: { kind: "day", iso: "2026-10-29T00:00:00.000Z" } }])).toBe(
       "2026-10-29T00:00:00.000Z",
     );
-    expect(dayInView([{ index: 0, item: { kind: "run" } }])).toBeNull();
+    expect(dayInView([{ index: 1, item: { kind: "run" } }])).toBeNull();
     expect(dayInView([])).toBeNull();
+  });
+
+  test("none while the list's first row is in view: above it are the greeting and the setup card, which have no day", () => {
+    const m = message({ id: "a", createdAt: "2026-10-30T12:00:00.000Z" });
+    expect(
+      dayInView([
+        { index: 0, item: { kind: "day", iso: "2026-10-30T00:00:00.000Z" } },
+        { index: 1, item: { kind: "message", message: m } },
+      ]),
+    ).toBeNull();
+    expect(dayInView([{ index: 1, item: { kind: "message", message: m } }])).toBe("2026-10-30T12:00:00.000Z");
   });
 
   test("the day it keeps stays the same string while rows of that day pass the top, so scrolling skips re-renders", () => {
     const at = (createdAt: string) => [
-      { index: 0, item: { kind: "message", message: message({ id: createdAt, createdAt }) } },
+      { index: 3, item: { kind: "message", message: message({ id: createdAt, createdAt }) } },
     ];
     const prev = "2026-10-30T12:00:00.000Z";
     expect(dayInView(at(new Date(new Date(prev).getTime() + 60_000).toISOString()), prev)).toBe(prev);

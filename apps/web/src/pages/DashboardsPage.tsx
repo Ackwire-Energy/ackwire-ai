@@ -1,23 +1,25 @@
 import type { DashboardSummary } from "@agenteschat/client";
 import { dashboardGroups, useDashboards, useMembers } from "@agenteschat/client";
 import { relativeTime } from "@agenteschat/client/lib/format";
-import { Button, GroupHeading, Icon, PageHeader } from "@agenteschat/ui";
+import { Button, EmptyState, GroupHeading, Icon, PageHeader } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { AskAgentButton } from "@/components/AskAgentButton";
 import { DashboardThumb } from "@/components/dashboards/DashboardThumb";
 import { NewDashboardDialog } from "@/components/dashboards/NewDashboardDialog";
 import { OwnerLine, roleNames, useCustomRoles } from "@/components/dashboards/parts";
 import { ErrorState, LoadingCards } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useNow } from "@/hooks/useNow";
+import { useRightHandLook } from "@/hooks/useRightHandLook";
 import "./dashboards.css";
 
 /**
  * Dashboards (ADR 0135 §14): "My Home" first, then the boards the person sees, grouped as the workspace's, their
  * roles' and only theirs, each a card with its widgets' thumbnail, who made it, how many widgets and when it was
- * updated; "New dashboard" makes one. With only "My Home", a line under it says so (no empty state: there is a
- * board, and the header already has "New dashboard").
+ * updated; "New dashboard" makes one. With only "My Home", the right hand under it says what a dashboard is, with
+ * New dashboard and an ask to it, and the header's button steps aside: one way in.
  */
 export function DashboardsPage() {
   const { t } = useTranslation();
@@ -26,6 +28,7 @@ export function DashboardsPage() {
   const members = useMembers(org.id);
   const roles = useCustomRoles(org.id);
   const [creating, setCreating] = useState(false);
+  const look = useRightHandLook();
   const groups = dashboardGroups(list.data?.dashboards ?? []);
   const myRoleIds = members.data?.find((m) => m.userId === me.user.id)?.roleIds ?? [];
   const myRoles = roleNames(roles, myRoleIds);
@@ -50,9 +53,11 @@ export function DashboardsPage() {
         title={t("dashboards.title")}
         meta={t("dashboards.subtitle")}
         actions={
-          <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
-            {t("dashboards.new")}
-          </Button>
+          !(list.data && onlyHome) && (
+            <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
+              {t("dashboards.new")}
+            </Button>
+          )
         }
       />
       {list.isLoading && <LoadingCards count={3} />}
@@ -76,8 +81,25 @@ export function DashboardsPage() {
                 </Link>
               )}
             </div>
-            {onlyHome && <p className="db-group__only">{t("dashboards.onlyHome")}</p>}
           </section>
+          {onlyHome && (
+            <EmptyState
+              className="db-empty"
+              size="page"
+              agent={look}
+              title={t("dashboards.first.title")}
+              actions={
+                <>
+                  <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
+                    {t("dashboards.new")}
+                  </Button>
+                  <AskAgentButton draft={t("dashboards.first.ask")} />
+                </>
+              }
+            >
+              {t("dashboards.first.text")}
+            </EmptyState>
+          )}
           <BoardGroup
             title={t("dashboards.groups.workspace")}
             hint={t("dashboards.groups.workspaceHint")}

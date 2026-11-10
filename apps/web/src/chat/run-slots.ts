@@ -3,11 +3,11 @@ import { waitsForWords } from "@agenteschat/client/lib/activity";
 import { isMediaAfterReply } from "@agenteschat/client/lib/media";
 
 /**
- * One block per agent answer, from "pensando" to the final message:
- * the live blocks sit at the end of the conversation (your new messages go above them), each under a key
- * that never changes while it lives. A "pensando…" guessed on send hands its key to the real run that
- * replaces it, and the final message is rendered under the same key, so React keeps the element: no
- * remount, no flash, no height jump.
+ * One block per agent answer, from "pensando" to the final message: a block whose words showed sits where they first
+ * did (`shownAt`, `blockPlaces`), with what people send meanwhile below it, as its message will once posted there; the
+ * others sit at the end of the conversation. Each lives under a key that never changes. A "pensando…" guessed on send
+ * hands its key to the real run that replaces it, and the final message is rendered under the same key, so React keeps
+ * the element: no remount, no flash, no height jump.
  */
 export interface RunSlot {
   key: string;
@@ -16,13 +16,18 @@ export interface RunSlot {
   provisional: boolean;
   /** When its run left the live store (it waits there for its message to land). */
   goneAt: number | null;
+  /** When its words first showed (`LiveRun.shownAt`): where it draws. */
+  shownAt?: string;
 }
 
 export interface SlotRun {
   runId: string;
   agentId: string;
   provisional?: boolean;
+  shownAt?: string;
 }
+
+const shownOf = (r: SlotRun) => (r.shownAt ? { shownAt: r.shownAt } : {});
 
 /** How long a finished block waits for its message (normally a frame or two). */
 export const SLOT_HOLD_MS = 4000;
@@ -61,7 +66,14 @@ export function nextSlots(
     // question, then resumed after the answer).
     if (!r && opts.landed(s.runId)) continue;
     if (r) {
-      out.push({ key: s.key, runId: r.runId, agentId: r.agentId, provisional: Boolean(r.provisional), goneAt: null });
+      out.push({
+        key: s.key,
+        runId: r.runId,
+        agentId: r.agentId,
+        provisional: Boolean(r.provisional),
+        goneAt: null,
+        ...shownOf(r),
+      });
       continue;
     }
     const goneAt = s.goneAt ?? opts.now;
@@ -75,6 +87,7 @@ export function nextSlots(
       agentId: r.agentId,
       provisional: Boolean(r.provisional),
       goneAt: null,
+      ...shownOf(r),
     });
   }
   return out;
@@ -102,10 +115,13 @@ export function blockRowByRun(
   return out;
 }
 
-/** Same blocks (keys and runs) in the same order. */
+/** Same blocks (keys, runs and places) in the same order. */
 export const sameSlots = (a: RunSlot[], b: RunSlot[]) =>
   a.length === b.length &&
-  a.every((s, i) => s.key === b[i]?.key && s.runId === b[i]?.runId && s.goneAt === b[i]?.goneAt);
+  a.every(
+    (s, i) =>
+      s.key === b[i]?.key && s.runId === b[i]?.runId && s.goneAt === b[i]?.goneAt && s.shownAt === b[i]?.shownAt,
+  );
 
 /**
  * The blocks in the order they draw: every agent at work has its own, and the ones still waiting for their first

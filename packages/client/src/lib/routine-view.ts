@@ -121,6 +121,7 @@ export const RUN_CODES = [
   "computer_busy",
   "computer_failed",
   "computer_timeout",
+  "cli_failed",
   "account_missing",
   "our_error",
 ] as const;

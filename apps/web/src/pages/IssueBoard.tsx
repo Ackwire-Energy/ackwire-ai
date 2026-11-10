@@ -208,8 +208,9 @@ export function Board({
 
   return (
     <>
-      {/* As Trello's: the board fills the window under the page's head, its scrollbar along the window's bottom, each
-          column scrolling on its own (`.page-split`, layout.css); a press on its empty space and a drag slides it. */}
+      {/* As Trello's: the board fills the window under the page's head (under a tall one, a window's height the page
+          scrolls down to), its scrollbar along the window's bottom, each column scrolling on its own (`.page-split`,
+          over-pages.css); a press on its empty space and a drag slides it. */}
       <div className="issues-boardframe page-split">
         <div ref={wrap} className="issues-boardwrap" data-scroll-restoration-id="issues-board">
           <div className={cx("issues-board", grouped && "is-grouped")}>

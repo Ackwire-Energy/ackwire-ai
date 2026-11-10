@@ -1868,6 +1868,11 @@ describe("Onde trabalha and the browser (their dialogs)", () => {
     await click(within(d).getByRole("radio", { name: /^Qualquer site/ }));
     expect(d.textContent).toContain("A Ada passa para o MacBook, que tem navegador.");
     const steps = within(d).getByRole("region", { name: "Falta 1 passo, no próprio MacBook" });
+    // Esperando starts with its loader, never an empty spot where the loader goes.
+    const wait = steps.querySelector(".brw-steps__head .brw-steps__wait") as HTMLElement;
+    expect(wait.getAttribute("role")).toBe("status");
+    expect(wait.firstElementChild?.classList.contains("ac-pixspin")).toBe(true);
+    expect(wait.textContent).toBe("Esperando");
     // The app's icon sits by the clock: at the top on a Mac, at the bottom on a PC.
     expect(steps.textContent).toContain("Clique no ícone do agentes.chat perto do relógio");
     expect(steps.querySelector(".machine-command__code")).toBeNull();

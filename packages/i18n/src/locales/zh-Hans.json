@@ -686,6 +686,42 @@
       "left_other": "还剩 {{count}} 步",
       "done": "全部就绪"
     },
+    "flow": {
+      "steps": {
+        "name": "工作区名称",
+        "business": "你们做什么",
+        "team": "你的团队",
+        "plan": "开启团队"
+      },
+      "stepOf": "第 {{n}} 步，共 {{total}} 步",
+      "lodi": {
+        "name": "你好，{{first}}。我是{{name}}。大约两分钟，我们一起把团队组建好。",
+        "business": "有了这些，我就知道该请谁加入团队了。",
+        "team": "这是我会组建的团队。之后可以随时修改。",
+        "plan": "有了套餐之后，只差连接一个 AI。我会告诉你在哪里连接。"
+      },
+      "preview": {
+        "label": "你的工作区，随你的回答而变化",
+        "name": "你的工作区",
+        "ghost": "你的团队会出现在这里"
+      },
+      "team": {
+        "title": "你的团队"
+      },
+      "plan": {
+        "title": "开启你的团队",
+        "lead": "你的团队已就绪。有了套餐和 AI，今天就能开工。",
+        "asleep": "在套餐开通前休眠中",
+        "price": "<b>{{name}}套餐</b> · 每月 {{price}}",
+        "name": "<b>{{name}}套餐</b>",
+        "generic": "一个 agentes.chat 套餐",
+        "cancel": "可随时取消",
+        "cta": "开启团队",
+        "all": "查看所有套餐",
+        "skip": "先进入工作区，暂不开启"
+      },
+      "account": "你的账号"
+    },
     "railValue": {
       "context": "已填写",
       "skipped": "已跳过",
@@ -1309,27 +1345,19 @@
     }
   },
   "webPushAsk": {
-    "title": "及时知道智能体何时需要你",
-    "text": "你忙别的事情时，它们也在工作。即使关闭了标签页，当它们需要你同意、完成了你交代的事或呼叫你时，我们都会通知你。",
     "on": "开启通知",
     "later": "暂不",
     "done": "已在此浏览器中开启通知",
     "failed": "无法开启通知。请在“设置 › 通知”中重试。",
     "someone": "一个智能体",
-    "examples": "通知示例",
     "now": "现在",
-    "minutes": "{{n}} 分钟",
-    "approval": {
-      "title": "{{name}} 需要你同意",
-      "body": "可以按你说的继续做吗？"
-    },
     "finished": {
       "title": "{{name}} 已完成",
       "body": "你要的东西已经准备好了。"
     },
-    "mention": {
-      "title": "{{name}} 呼叫了你",
-      "body": "有空的时候能看一下吗？"
+    "inline": {
+      "title": "想在 {{name}} 回复时第一时间知道吗？",
+      "why": "即使标签页已关闭也会提醒。可随时在“设置 › 通知”中更改。"
     }
   },
   "shell": {
@@ -1523,8 +1551,6 @@
     "expandAll": "全部展开",
     "organize": "在团队中整理部门",
     "more_other": "团队中还有 {{count}} 个智能体",
-    "createFirst": "创建第一个智能体",
-    "createFirstPersonal": "创建你的第一个智能体",
     "newAgent": "新智能体",
     "working_other": "{{count}} 个工作中",
     "count_other": "{{count}} 个智能体",
@@ -1539,7 +1565,6 @@
     "pin": "置顶",
     "unpin": "取消置顶",
     "pinned": "已置顶",
-    "hint": "你的智能体会保持在顶部。右键点击任意对话即可置顶。",
     "full": {
       "agents": "你已置顶 5 个智能体。取消一个才能置顶这个。",
       "channels": "你已置顶 5 个频道。取消一个才能置顶这个。",
@@ -1935,6 +1960,7 @@
     "popoverTitle": "智能体",
     "seenBy": "{{names}} 已读",
     "retry": "重试",
+    "retrying": "正在重试…",
     "platformCap": "用 @ 提及智能体，让它来回答。",
     "mentionNeeded": "不用 @ 就没有智能体会回答",
     "mentionNeededHint": "这里没有可用的 AI 为这条消息挑选智能体。提及一个智能体来呼叫它。",
@@ -1948,9 +1974,8 @@
   },
   "rightHand": {
     "label": "你的得力助手",
+    "labelCapitalized": "你的得力助手",
     "newDot": "新",
-    "role": "工作区助手",
-    "rolePersonal": "个人助理",
     "actsAsYou": "以你的权限行事",
     "composerHint": "没有你，什么都不会变",
     "intro": {
@@ -1974,9 +1999,6 @@
         "questionPersonal": "要和我一起再准备一些智能体吗？",
         "actionPersonal": "准备智能体",
         "messagePersonal": "帮我准备我的智能体。"
-      },
-      "next": {
-        "firstTask": "给 {{name}} 第一个任务"
       },
       "style": {
         "question": "你希望我怎么跟你说？",
@@ -2293,8 +2315,10 @@
     "rightHand": {
       "computer_away": "{{name}} 现在无法回答：套餐所在的电脑不可用。",
       "computer_failed": "{{name}} 现在无法回答：套餐所在的电脑出了问题。",
+      "cli_failed": "{{name}} 现在无法回答：套餐的 AI 因出错而停止。",
       "plan_limit": "{{name}} 现在无法回答：套餐已达到上限。",
       "plan_not_shared": "连接你自己的套餐才能与{{name}}交谈：工作区的套餐只回复其所有者。",
+      "plan_unattended": "{{name}} 没有回复：这个请求不是由人发出的，而工作区的套餐只回复其所有者。",
       "runner_outdated": "{{name}} 现在无法回复：套餐所在电脑上的程序需要更新。",
       "plan_tools": "{{name}} 在回复前停下了：那台电脑上套餐的 AI 没有只使用 agentes.chat 的工具。",
       "model_limit": "{{name}} 现在无法回答：{{model}} 已达到它在套餐中的自身上限。套餐中的其他模型仍可使用。",
@@ -3500,6 +3524,14 @@
         },
         "field": {
           "token": "服务账号令牌"
+        },
+        "error": {
+          "invalid_input": "这不是服务账号令牌。请粘贴以 ops_ 开头的令牌。",
+          "auth_failed": "1Password 不接受这个令牌。请新建一个服务账号，并在这里粘贴它的令牌。",
+          "no_vault": "这个服务账号无法访问任何保险库。请新建一个能访问智能体保险库的服务账号。",
+          "many_vaults": "这个服务账号能访问多个保险库。请新建一个只能访问智能体保险库的服务账号。",
+          "unreachable": "无法连接到 1Password。请一分钟后重试。",
+          "unsupported": "这里无法连接 1Password。请改为把智能体需要的登录信息保存在 Vault 中。"
         }
       },
       "bitwarden": {
@@ -4869,6 +4901,9 @@
         "computer_busy": "电脑一直忙于其他任务。",
         "computer_failed": "电脑遇到问题，已停止。",
         "computer_timeout": "电脑响应时间过长。",
+        "cli_failed": "因为出错，{{brain}} 程序已停止：{{detail}}",
+        "cli_stopped": "因为出错，{{brain}} 程序已停止。",
+        "cli_closed": "程序 {{brain}} 意外关闭。",
         "account_missing": "为这个智能体选择的账号已不在它的电脑上。请在智能体设置中选择另一个账号，或重新添加。",
         "our_error": "我们这边出了点问题，任务已停止。请稍后再提一次。",
         "unknown": "失败。"
@@ -5063,6 +5098,15 @@
     "include": "包括 {{name}}",
     "acceptAll": "全部接受",
     "acceptSome": "接受 {{count}} 项",
+    "all": {
+      "label": "处理全部建议",
+      "accept": "全部接受",
+      "refuse": "全部拒绝",
+      "acceptAsk_other": "接受全部 {{count}} 条建议？每条都会立即生效。",
+      "refuseAsk_other": "拒绝全部 {{count}} 条建议？智能体不会再提这些建议。",
+      "acceptGo_other": "接受 {{count}} 条",
+      "refuseGo_other": "拒绝 {{count}} 条"
+    },
     "staleSome_other": "有 {{count}} 项未被接受：提议后文本已更改。",
     "staleSomeAgent_other": "有 {{count}} 项未被接受：提议后智能体已更改。",
     "waitingFor": "等待 {{name}}",
@@ -5092,6 +5136,7 @@
     "refuseNote": "拒绝后，{{name}} 就不会再提这条建议。",
     "added": "新增：",
     "removed": "删除：",
+    "sameLines_other": "{{count}} 行未改动",
     "empty": "有人请智能体做出改变，或某条经验反复出现时，建议会显示在这里。",
     "emptyTitle": "没有待审核的内容",
     "titleInstructions": "更新 {{name}} 的指令",
@@ -5222,10 +5267,7 @@
       "notNow": "以后再说",
       "afterPlan": "开通套餐后可用。",
       "about": {
-        "todo": "告诉我 {{org}} 是做什么的。",
-        "todoDesc": "所有智能体都会读到这个。",
         "action": "告诉我",
-        "done": "我知道 {{org}} 是做什么的",
         "title": "{{org}} 是做什么的？",
         "desc": "所有智能体都会读到这个。你随时可以修改。",
         "line": "用一句话",
@@ -5239,24 +5281,17 @@
         "optionalPersonal": "选填。不写的话，就用你选的方面。"
       },
       "team": {
-        "todo": "组建团队。",
-        "todoDesc": "为你的业务准备的模板，之后什么都能改。",
-        "action": "查看团队",
-        "done_other": "团队里有 {{count}} 个智能体",
         "todoPersonal": "选择你的智能体。",
         "todoDescPersonal": "现成的起点，之后什么都能改。",
         "actionPersonal": "查看智能体",
-        "donePersonal_other": "{{count}} 个智能体",
-        "card": "请在下面的卡片里继续"
+        "donePersonal_other": "{{count}} 个智能体"
       },
       "ai": {
         "todo": "连接一个 AI。",
         "todoDesc": "用你已经付费的那个就行。",
         "action": "连接",
         "done": "我用 {{label}} 思考",
-        "doneAny": "我已经能用 AI 思考了",
-        "plan": "开通 agentes.chat 套餐后可用。",
-        "planAction": "查看 agentes.chat 套餐"
+        "doneAny": "我已经能用 AI 思考了"
       },
       "apps": {
         "todo": "连接工作用的应用。",
@@ -5278,14 +5313,17 @@
         "todoDesc": "他们也会和智能体对话。",
         "action": "邀请",
         "done_other": "这里有 {{count}} 个人",
-        "doneNone": "暂时只有你"
+        "doneNone": "暂时只有你",
+        "invited": "已邀请 {{names}} · 等待中",
+        "email": "name@company.com",
+        "send": "发送",
+        "more": "更多选项"
       },
       "say": {
-        "about": "记下了。所有智能体都会读到这个。",
-        "team": "团队来了。",
         "ai": "现在团队能思考了。",
         "apps": "好了，我能读取这些应用了。",
         "people": "很高兴这里有更多人。",
+        "invited": "邀请已发送。",
         "aboutPersonal": "记下了。你所有的智能体都会读到这个。",
         "teamPersonal": "你的智能体来了。",
         "aiPersonal": "现在你的智能体能思考了。",
@@ -7146,6 +7184,7 @@
       "computer_busy": "电脑一直忙于其他任务",
       "computer_failed": "电脑遇到问题，已停止",
       "computer_timeout": "电脑响应时间过长",
+      "cli_failed": "电脑上的 AI 程序因出错而停止",
       "account_missing": "智能体的账号已不在它的电脑上",
       "our_error": "我们这边出了点问题"
     },
@@ -10053,6 +10092,7 @@
     "noChannel": "无频道",
     "files": "文件",
     "select": "选择 {{title}}",
+    "selectAll_other": "全选 {{count}} 项",
     "selection": "已选内容",
     "selected_other": "已选择 {{count}} 项",
     "clearSelection": "清除选择",
@@ -10231,8 +10271,10 @@
       },
       "line": {
         "env": "已在此服务器的设置中配置（GITHUB_APP_ID）。",
-        "invalid": "此服务器无法打开已保存的应用。请移除后重新创建。"
+        "invalid": "此服务器无法打开已保存的应用。请移除后重新创建。",
+        "events": "要让智能体收到 GitHub 上发生的事，请在应用中勾选这些事件：{{events}}。"
       },
+      "events": "勾选事件",
       "open": "在 GitHub 上打开",
       "remove": "移除应用",
       "removeTitle": "移除这台服务器的 GitHub 应用？",
@@ -11794,6 +11836,9 @@
       "invalidSecret": "请完整粘贴 Client Secret，不要带空格。",
       "invalidRepo": "请把仓库写成 所有者/名称。"
     },
+    "githubEvent": {
+      "answered": "已经有人请求了这条回复。智能体正在处理。"
+    },
     "issue": {
       "assigneeOutside": "这个人看不到这个任务。请先把他加入“谁能看到”。",
       "stageFull": "一个阶段最多 {{max}} 列。请先删除其中一列。",
@@ -11963,6 +12008,7 @@
       "agentBusy": "智能体已在这段对话中工作，请等它完成后再继续。",
       "continueForbidden": "只有提问者、智能体负责人或管理员可以让它继续。",
       "notRestartable": "这个回答已经开始，无法重新开始。请重新发送你的消息。",
+      "notRestartableVoice": "这个回答已经开始，无法重新开始。请重新录制你的消息。",
       "cancelForbidden": "只有提问者、智能体负责人或管理员可以停止它。",
       "answerForbidden": "只有提问者、智能体负责人或管理员可以执行此操作。",
       "stopReasonForbidden": "只有停止它的人可以说明原因。"
@@ -12095,6 +12141,10 @@
         "invalidInput": "请检查各字段后重试。",
         "tooManyItems": "Vault 已满。请先删除项目，再同步更多。"
       }
+    },
+    "feedback": {
+      "filesGone": "你添加的文件已经不在了。请重新添加。",
+      "filesPending": "等待发送的文件太多。请先发送或移除一些，然后重试。"
     }
   },
   "machines": {
@@ -13913,6 +13963,10 @@
     "statusReplyTurn": "我正在处理一项任务（{{duration}}），暂时无法回复。你的消息已在队列中，这一轮工作结束后我会读到。",
     "statusReplyQueued": "正在等待电脑（{{duration}}）。轮到我时我会读你的消息。",
     "statusReplyAway": "正在等我的电脑恢复。电脑一恢复我就读你的消息。",
+    "statusReplyPlan": "正在等我的套餐恢复（{{when}}）。套餐恢复后我就读你的消息。",
+    "statusReplyPlanUnknown": "正在等我的套餐恢复。套餐一恢复我就读你的消息。",
+    "statusReplyBudget": "正在等我本月的预算更新（{{when}}）。到时我会读你的消息，如果管理员提高限额会更早。",
+    "statusReplyBudgetUnknown": "正在等我本月的预算更新。到时我会读你的消息，如果管理员提高限额会更早。",
     "status": {
       "one": "正在处理：{{subject}}",
       "oneUntitled": "正在后台工作",
@@ -14055,6 +14109,21 @@
       "wakeSkippedAnon": "{{name}} 的提及没有叫到其他智能体",
       "wakeSkippedAudience": "只有部分人可以呼叫 {{agents}}，而 {{name}} 的这项工作并非来自其中任何人。可以呼叫 {{agents}} 的人可以把请求转交过去。",
       "wakeSkippedCallable": "{{name}} 的设置不允许它呼叫 {{agents}}（属于其他项目，或不在它可呼叫的智能体列表中）。负责 {{name}} 的人可以在该智能体的页面上更改。",
+      "github": {
+        "comment": "{{who}} 在 GitHub 上评论了 PR #{{number}}（{{repo}}）",
+        "commentIssue": "{{who}} 在 GitHub 上评论了 issue #{{number}}（{{repo}}）",
+        "commentDiscussion": "{{who}} 在 GitHub 上评论了讨论 #{{number}}（{{repo}}）",
+        "opened": "{{who}} 在 GitHub 的 #{{number}}（{{repo}}）中呼叫了 agentes.chat 应用",
+        "reviewed": "{{who}} 在 GitHub 上审查了 PR #{{number}}（{{repo}}）",
+        "approved": "{{who}} 在 GitHub 上批准了 PR #{{number}}（{{repo}}）",
+        "changes": "{{who}} 在 GitHub 上要求修改 PR #{{number}}（{{repo}}）",
+        "reviewRequested": "{{who}} 在 GitHub 上请 {{name}} 审查 PR #{{number}}（{{repo}}）",
+        "merged": "{{who}} 在 GitHub 上合并了 PR #{{number}}（{{repo}}）",
+        "closed": "{{who}} 在 GitHub 上关闭了 PR #{{number}}（{{repo}}）",
+        "closedIssue": "{{who}} 在 GitHub 上关闭了 issue #{{number}}（{{repo}}）",
+        "ask": "请求回复",
+        "asked": "{{asker}} 请 {{name}} 在 GitHub 上回复 {{who}}"
+      },
       "show": "显示",
       "hide": "隐藏",
       "talker": "工作间隙",
@@ -14192,6 +14261,7 @@
         "startingWork": "开始了一项长时间工作",
         "updatingWork": "更新了一项长时间工作",
         "withdrawingRequest": "撤回了一项请求",
+        "releasingAgent": "放行了一个等待中的智能体",
         "schedulingAction": "准备了一个稍后执行的操作",
         "updatingDashboard": "处理了一个仪表盘",
         "testingOnPhone": "在手机上测试了",
@@ -14303,6 +14373,7 @@
       "startingWork": "开始长时间工作",
       "updatingWork": "更新长时间工作",
       "withdrawingRequest": "撤回请求",
+      "releasingAgent": "放行等待中的智能体",
       "schedulingAction": "准备稍后执行的操作",
       "updatingDashboard": "处理仪表盘",
       "testingOnPhone": "在手机上测试",
@@ -14442,8 +14513,10 @@
       "no_ai_not_signed_in": "我暂时无法回答：{{brain}} 还没有在我的电脑上登录。",
       "no_ai_computer_away": "我现在无法回答：我的套餐所在的电脑不可用。",
       "no_ai_computer_failed": "我现在无法回答：我的套餐所在的电脑出了问题。",
+      "no_ai_cli_failed": "我现在无法回答：我的套餐的 AI 因出错而停止。",
       "no_ai_plan_limit": "我现在无法回答：我用来思考的套餐已达到上限。",
       "no_ai_plan_not_shared": "我无法通过工作区的套餐回复你：它只回复其所有者。连接你自己的套餐后我就能回复。",
+      "no_ai_plan_unattended": "我没有回复：这个请求不是由人发出的，而工作区的套餐只回复其所有者。",
       "no_ai_runner_outdated": "我现在无法回复：我的套餐所在电脑上的程序需要更新。",
       "no_ai_plan_tools": "我在回复前停下了：那台电脑上我的套餐的 AI 没有只使用 agentes.chat 的工具。",
       "no_ai_model_limit": "我现在无法回答：{{model}} 已达到它在我套餐中的自身上限。",
@@ -16242,7 +16315,11 @@
       "text": "请智能体做一个小组件，或固定聊天里的区块，它会在这里保持更新。",
       "viewer": "能编辑此仪表盘的成员添加小组件后，它们会显示在这里。"
     },
-    "onlyHome": "用“新建仪表盘”为工作区或部分角色创建仪表盘。",
+    "first": {
+      "title": "创建团队的第一个仪表盘",
+      "text": "仪表盘把数字和图表汇集在一页上，智能体会让一切保持最新。",
+      "ask": "帮我创建团队的第一个仪表盘。"
+    },
     "create": {
       "title": "新建仪表盘",
       "subtitle": "把小组件放在同一页上，给你自己或给团队。",
@@ -16439,9 +16516,8 @@
     "firstTask": {
       "suggestion": "建议",
       "lead": "每个智能体一个简短任务，让你今天就看到每个人在工作。",
-      "heldLead": "每个智能体一个简短任务。补全句子并发送。工作区有 agentes.chat 套餐后，它们就会开始。",
-      "example": "{{name}} 的交付示例",
       "open": "带着任务打开",
+      "finish": "把这句话补完再发送",
       "invite": "邀请{{names}}",
       "later": "稍后"
     },
@@ -16642,7 +16718,7 @@
     },
     "software": {
       "name": "软件与应用",
-      "sub": "支持、收费和代码",
+      "sub": "客户服务、收款和代码",
       "desc": "适合销售软件并照顾自有客户的公司。"
     },
     "support": {
@@ -16655,54 +16731,74 @@
       "sub": "会计、法律、咨询",
       "desc": "适合为客户预约、发送方案并收费的事务所。"
     },
+    "hello": {
+      "lodi": {
+        "starting": "套餐已生效。我的电脑正在启动。开始工作吧。",
+        "ready": "套餐已生效。开始工作吧。",
+        "created": "团队已就位。开始工作吧。"
+      },
+      "lodiNoAi": {
+        "starting": "套餐已生效。我的电脑正在启动。连接 AI 后，我们就开始工作。",
+        "ready": "套餐已生效。连接 AI 后，我们就开始工作。",
+        "created": "团队已就位。连接 AI 后，我们就开始工作。"
+      }
+    },
     "agents": {
       "iara": {
         "role": "客户服务",
         "line": "在 WhatsApp 和邮件上回复客户。不知道时会叫你。",
         "routine": "汇总还没回复的内容",
-        "task": "为这条客户消息写一条回复："
+        "task": "为这条客户消息写一条回复：",
+        "hello": "你好，{{first}}。通过 WhatsApp 来联系的人交给我吧。"
       },
       "caio": {
         "role": "收款",
         "line": "提醒逾期付款的人，并在你同意后发送催款。",
         "routine": "列出付款逾期的人",
-        "task": "给以下对象写一条友好的付款提醒："
+        "task": "给以下对象写一条友好的付款提醒：",
+        "hello": "你好，我负责收款，只在你同意后才发提醒。"
       },
       "ada": {
         "role": "开发",
         "line": "修复客户报告的 bug 并提交 PR。",
         "routine": "列出新的 bug",
-        "task": "告诉我该从哪里开始排查这个 bug："
+        "task": "告诉我该从哪里开始排查这个 bug：",
+        "hello": "嗨，把收到的 bug 交给我，我来排查并提交 PR。"
       },
       "lia": {
         "role": "内容",
         "line": "按公司的语气写帖子和脚本，在你同意后排期发布。",
         "routine": "提出本周的帖子",
-        "task": "围绕以下主题提出本周的三篇帖子："
+        "task": "围绕以下主题提出本周的三篇帖子：",
+        "hello": "大家好，本周的帖子交给我。"
       },
       "theo": {
         "role": "销售",
         "line": "跟进所有询价的人并撰写方案。",
         "routine": "列出询价后没有得到回复的人",
-        "task": "为这个需求写一份简短报价："
+        "task": "为这个需求写一份简短报价：",
+        "hello": "你好，{{first}}。每个来询价的人都不会没有回音。"
       },
       "nina": {
         "role": "日程",
         "line": "预约、确认和改约，并在前一天提醒客户。",
         "routine": "确认明天的预约",
-        "task": "整理明天的这些时间安排："
+        "task": "整理明天的这些时间安排：",
+        "hello": "你好，日程由我来管，我会在前一天提醒客户。"
       },
       "otto": {
         "role": "订单",
         "line": "跟踪订单和库存，提醒快用完的东西。",
         "routine": "提醒库存里快用完的东西",
-        "task": "列出这些订单还有哪些事要做："
+        "task": "列出这些订单还有哪些事要做：",
+        "hello": "我来了。我会盯着订单，库存不足时告诉你。"
       },
       "bia": {
         "role": "回答库",
         "line": "让回答库与团队的回答保持一致。",
         "routine": "用本周的回答更新回答库",
-        "task": "写出这些客户问题的答案："
+        "task": "写出这些客户问题的答案：",
+        "hello": "嗨，我会根据团队的回答，让答案库保持最新。"
       },
       "clara": {
         "role": "日程和提醒",
@@ -16758,17 +16854,6 @@
         "routine": "列出每位客户今天在等什么",
         "task": "为这位客户写一份简短方案："
       }
-    },
-    "example": {
-      "iara": "你好，Marina。你的订单昨天已发出，周五前送达。物流单号就在下方。如果周五不方便，我再找别的日期。",
-      "lia": "1. 选择代理公司时常见的三个错误。2. 一个差点失败的项目的幕后故事。3. 问问关注者：你们想在这里看到什么？",
-      "nina": "明天：9:00 Carla，10:30 Pedro，14:00 空闲。Pedro 还没确认。要我给他写信吗？",
-      "clara": "今天：9:00 看牙医，12:30 和 Paula 吃午饭，18:00 取包裹。明天是你妈妈的生日。要我明天早上提醒你吗？",
-      "leo": "今天 30 分钟：热身 5 分钟，3 组（12 个深蹲、10 个俯卧撑、30 秒平板支撑），最后拉伸 5 分钟。告诉我练得怎么样，我来调整周三的训练。",
-      "gabi": "今天的主题：光合作用。简单来说，植物把光、水和二氧化碳变成糖和氧气。三个问题：它在哪里发生？进去的是什么？出来的是什么？",
-      "rosa": "本周：大米、豆子、鸡蛋、香蕉、咖啡和洗涤剂。家里：周四换床单，找人修厨房水龙头。",
-      "vic": "里斯本 3 天：第 1 天，阿尔法玛和城堡。第 2 天，贝伦和河边。第 3 天，辛特拉。最便宜的航班在 12 号周二。要我帮你盯着价格吗？",
-      "rui": "你好，Marcos，方案如下：新网站共 5 个页面，3 周内交付，分两次付款。如果你觉得合适，我今天就把合同发过去。"
     },
     "channels": {
       "iara": "support",
@@ -16865,7 +16950,7 @@
     "fileTooLarge": "{{name}} 太大了：上限是 {{mb}} MB。",
     "fileTooMany": "一条反馈最多可带 {{images}} 张照片和一个视频。",
     "send": "发送",
-    "thanks": "已送达，谢谢！",
+    "thanks": "已送达，谢谢。",
     "reply": "每条都会有人看。如需回复，会发到 {{email}}。",
     "another": "再发一条"
   }

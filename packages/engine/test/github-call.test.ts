@@ -220,6 +220,47 @@ describe("GitHub's tools act as the app where it is installed (ADR 0156)", () =>
   });
 });
 
+describe("where the agent's words went on GitHub is kept with its conversation", () => {
+  test("a pull request it opened is its own; an issue it commented on is kept too; reads and failures aren't", async () => {
+    const w = await world();
+    await w.call("github_create_pull_request", { owner: "acme", repo: "App", title: "T", head: "a", base: "main" });
+    await w.call("github_add_issue_comment", { owner: "acme", repo: "api", issue_number: 4, body: "On it" });
+    await w.call("github_pull_request_read", { owner: "acme", repo: "app", pullNumber: 3 });
+    await w.call("github_add_issue_comment", { owner: "other", repo: "x", issue_number: 1, body: "Refused" });
+    const items = await f.db.select().from(schema.githubItems).orderBy(schema.githubItems.repo);
+    expect(
+      items.map((i) => ({
+        repo: i.repo,
+        number: i.number,
+        authored: i.authored,
+        agentId: i.agentId,
+        channelId: i.channelId,
+        threadId: i.threadId,
+        runId: i.runId,
+      })),
+    ).toEqual([
+      {
+        repo: "acme/api",
+        number: 4,
+        authored: false,
+        agentId: f.agent.id,
+        channelId: f.general.id,
+        threadId: w.ctx.threadRootId,
+        runId: w.ctx.runId,
+      },
+      {
+        repo: "acme/app",
+        number: 12,
+        authored: true,
+        agentId: f.agent.id,
+        channelId: f.general.id,
+        threadId: w.ctx.threadRootId,
+        runId: w.ctx.runId,
+      },
+    ]);
+  });
+});
+
 describe("what only an organization's installation reaches (ADR 0156, addendum)", () => {
   const personal = () =>
     f.db.insert(schema.githubAppInstallations).values({

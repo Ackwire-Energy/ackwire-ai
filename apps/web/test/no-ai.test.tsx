@@ -6,6 +6,7 @@ setupDom();
 import type { AgentBrain, AiStatus, MachineAccount, MachineAccountKind, Message } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { loadLocale } from "@/i18n";
 import { aiSelect, chooseAi, closeAiSelect, openAiSelect, payWith } from "./ai-picker";
 import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, fakeMachinesOf, NOW, ORG_ID, seedState } from "./fake-api";
 import { hintOf, shownText } from "./hint";
@@ -88,7 +89,8 @@ const receiptOf = (text: string) =>
     .find((a) => a.textContent?.includes(text))
     ?.querySelector(".ac-receipt") as HTMLElement;
 const sendText = async (text: string) => {
-  const box = screen().getByRole("combobox", { name: /Mensagem para/ });
+  // The composer in Portuguese, or in German for the worst case.
+  const box = screen().getByRole("combobox", { name: /Mensagem para|Nachricht an/ });
   await act(async () => fireEvent.change(box, { target: { value: text } }));
   await act(async () => fireEvent.keyDown(box, { key: "Enter" }));
   await settle(4);
@@ -1196,6 +1198,28 @@ describe("Tentar de novo under my message an agent couldn't answer", () => {
     expect(line.querySelector("[title]")?.getAttribute("title")).toBe("runner_error");
   });
 
+  test("her Claude Code's own failure names it and what it said, never her computer, with nothing more on hover", async () => {
+    const { socket } = await open(seedState({ aiStatus: aiStatus(true) }));
+    await sendText("@ada e o login?");
+    const run = { threadId: null, runId: "r-cli", agentId: ADA_ID };
+    await push(socket, { type: "agent.thinking", ...run });
+    const failure = {
+      status: "failed",
+      error: "cli_failed: Claude Code: prompt is too long",
+      errorCode: "run.cli_failed",
+      errorParams: { brain: "Claude Code", detail: "prompt is too long" },
+    };
+    await push(socket, { type: "agent.run", ...run, status: "failed", error: failure.error });
+    await push(socket, { type: "run.finished", ...run, ...failure });
+    await settle();
+    const line = document.querySelector(".ac-msg__error") as HTMLElement;
+    expect(line.textContent).toContain(
+      "Ada não conseguiu responder: o Claude Code parou com um erro: prompt is too long",
+    );
+    expect(line.textContent).not.toContain("computador");
+    expect(line.querySelector("[title]")).toBeNull();
+  });
+
   test("a run that had already done things can't start over: the words go again", async () => {
     const state = seedState({ aiStatus: aiStatus(true) });
     state.messages.push(failed());
@@ -1204,4 +1228,201 @@ describe("Tentar de novo under my message an agent couldn't answer", () => {
     await click(within(receiptOf("resume o canal")).getByRole("button", { name: "Tentar de novo" }));
     expect(calls(state, "chat.post").map((c) => (c.args[2] as { body: string }).body)).toEqual(["@ada resume o canal"]);
   });
+
+  test("a voice message that can't start over is never sent again as text: the words say to record it again", async () => {
+    const state = seedState({ aiStatus: aiStatus(true) });
+    const voice = { clipId: "clip-1", durationMs: 4000, peaks: [] };
+    state.messages.push({ ...failed(), body: "resume o canal", meta: { voice } });
+    state.answerNowError = new ApiError(409, "run.not_restartable", "already started");
+    await open(state);
+    await click(within(receiptOf("resume o canal")).getByRole("button", { name: "Tentar de novo" }));
+    expect(calls(state, "chat.post")).toEqual([]);
+    expect([...document.querySelectorAll(".ac-toast")].at(-1)?.textContent).toContain(
+      "Esta resposta já tinha começado, então não dá para recomeçar. Grave a mensagem de novo.",
+    );
+  });
+
+  test("after the × on her failed line: the cause stays under my message, Tentar de novo says it is trying, and the line moves on once she starts again", async () => {
+    const { socket, state, api } = await open(seedState({ aiStatus: aiStatus(true) }));
+    await sendText("@ada e o login?");
+    const asked = state.messages.at(-1) as Message;
+    const failure = { error: "runner_error", errorCode: "run.computer_failed", errorParams: { code: "runner_error" } };
+    const fails = async (runId: string) => {
+      const run = { threadId: null, runId, agentId: ADA_ID };
+      await push(socket, { type: "agent.thinking", ...run });
+      await push(socket, { type: "message.claimed", messageId: asked.id, agentId: ADA_ID, runId });
+      await push(socket, { type: "agent.run", ...run, status: "failed", ...failure });
+      await push(socket, { type: "run.finished", ...run, status: "failed", ...failure });
+      await push(socket, {
+        type: "message.handled",
+        messageId: asked.id,
+        agentId: ADA_ID,
+        runId,
+        status: "failed",
+        ...failure,
+      });
+      await settle(2);
+    };
+    await fails("r1");
+    const reason = "Ada não conseguiu responder: o computador teve um problema e parou";
+    const errorLine = () => document.querySelector(".ac-msg__error")?.textContent ?? null;
+    expect(errorLine()).toContain(reason);
+    // While her line says why, mine doesn't say it twice.
+    expect(receiptOf("e o login?").textContent).toBe("Não conseguiu responder·Tentar de novo");
+
+    const row = document.querySelector(".ac-msg__error-row") as HTMLElement;
+    await click(within(row).getByRole("button", { name: "Fechar" }));
+    expect(errorLine()).toBeNull();
+    expect(receiptOf("e o login?").textContent).toBe(`${reason}·Tentar de novo`);
+
+    // Held, to see the click's own feedback while the request is out.
+    let answer: (v: { runs: { agentId: string; runId: string }[] }) => void = () => {};
+    api.chat.answerNow = (orgId, messageId) => {
+      state.calls.push({ method: "chat.answerNow", args: [orgId, messageId] });
+      return new Promise((resolve) => {
+        answer = resolve;
+      });
+    };
+    await click(within(receiptOf("e o login?")).getByRole("button", { name: "Tentar de novo" }), 2);
+    const busy = within(receiptOf("e o login?")).getByRole("button", {
+      name: "Tentando de novo…",
+    }) as HTMLButtonElement;
+    expect(busy.disabled).toBe(true);
+    expect(busy.getAttribute("aria-busy")).toBe("true");
+    expect(busy.querySelector(".ac-pixspin")).not.toBeNull();
+
+    // What `restartFailedRun` publishes before it answers: the new run claims her message at once.
+    await push(socket, { type: "agent.thinking", threadId: null, runId: "r2", agentId: ADA_ID });
+    await push(socket, { type: "message.claimed", messageId: asked.id, agentId: ADA_ID, runId: "r2" });
+    await act(async () => answer({ runs: [{ agentId: ADA_ID, runId: "r2" }] }));
+    await settle(3);
+    expect(receiptOf("e o login?").textContent ?? "").not.toContain("Não conseguiu responder");
+    expect(receiptOf("e o login?").textContent ?? "").not.toContain("Tentar de novo");
+    expect(calls(state, "chat.post").map((c) => (c.args[2] as { body: string }).body)).toEqual(["@ada e o login?"]);
+
+    // It fails again: the line comes back with the button ready.
+    await fails("r2");
+    expect(errorLine()).toContain(reason);
+    expect(within(receiptOf("e o login?")).getByRole("button", { name: "Tentar de novo" })).toBeTruthy();
+  });
+
+  test("Tentar de novo with her failed line still there, clicked twice: one request, and her new run takes the failed one's place", async () => {
+    const { socket, state, api } = await open(seedState({ aiStatus: aiStatus(true) }));
+    await sendText("@ada e o login?");
+    const asked = state.messages.at(-1) as Message;
+    const failure = { error: "runner_error", errorCode: "run.computer_failed", errorParams: { code: "runner_error" } };
+    const r1 = { threadId: null, runId: "r1", agentId: ADA_ID };
+    await push(socket, { type: "agent.thinking", ...r1 });
+    await push(socket, { type: "message.claimed", messageId: asked.id, agentId: ADA_ID, runId: "r1" });
+    await push(socket, { type: "agent.run", ...r1, status: "failed", ...failure });
+    await push(socket, { type: "run.finished", ...r1, status: "failed", ...failure });
+    await push(socket, {
+      type: "message.handled",
+      messageId: asked.id,
+      agentId: ADA_ID,
+      runId: "r1",
+      status: "failed",
+    });
+    await settle(2);
+    expect(document.querySelectorAll(".ac-msg__error-row")).toHaveLength(1);
+
+    let answer: (v: { runs: { agentId: string; runId: string }[] }) => void = () => {};
+    api.chat.answerNow = (orgId, messageId) => {
+      state.calls.push({ method: "chat.answerNow", args: [orgId, messageId] });
+      return new Promise((resolve) => {
+        answer = resolve;
+      });
+    };
+    // A double click: both land before the button turns disabled.
+    const retry = within(receiptOf("e o login?")).getByRole("button", { name: "Tentar de novo" });
+    await act(async () => {
+      fireEvent.click(retry);
+      fireEvent.click(retry);
+    });
+    await settle(2);
+    expect(calls(state, "chat.answerNow")).toHaveLength(1);
+    expect(within(receiptOf("e o login?")).getByRole("button", { name: "Tentando de novo…" })).toBeTruthy();
+
+    // The server starts her again: her failed row goes (that run is deleted), her new one shows, my line moves on.
+    await push(socket, { type: "agent.thinking", threadId: null, runId: "r2", agentId: ADA_ID });
+    await push(socket, { type: "message.claimed", messageId: asked.id, agentId: ADA_ID, runId: "r2" });
+    await act(async () => answer({ runs: [{ agentId: ADA_ID, runId: "r2" }] }));
+    await settle(3);
+    expect(document.querySelector(".ac-msg__error-row")).toBeNull();
+    expect(receiptOf("e o login?").textContent ?? "").not.toContain("Tentar de novo");
+    expect(calls(state, "chat.answerNow")).toHaveLength(1);
+    expect(calls(state, "chat.post")).toHaveLength(1);
+  });
+
+  /** The longest name an agent may have (80), and a CLI's reason at its 200 with an address that can't break. */
+  const LONG_NAME = "Assistente de Atendimento ao Cliente para Contas Empresariais da América Latina";
+  const LONG_DETAIL =
+    "Failed to connect to MCP server github: request to https://api.githubcopilot.com/mcp/x/repos/readonly?installation_id=58204931&agent=0b6f2c9e-5d4a-4f7b-9a1e-3c8d2b7f6e10 timed out after 30000 ms";
+
+  /**
+   * Ada (the longest name) fails on a CLI's longest reason and her row is closed, so the line under my message says
+   * it; Atlas fails on a refused key, his row with its fix and its ×. In German too.
+   */
+  const worstCase = async (german: boolean) => {
+    const seeded = seedState({ aiStatus: aiStatus(true) });
+    const ada = seeded.agents.find((a) => a.id === ADA_ID);
+    if (ada) ada.name = LONG_NAME;
+    const { socket, state, services } = await open(seeded);
+    if (german)
+      await act(async () => {
+        await loadLocale("de", services.i18n);
+        await services.i18n.changeLanguage("de");
+      });
+    const fail = async (agentId: string, runId: string, failure: Record<string, unknown>) => {
+      const asked = state.messages.at(-1) as Message;
+      const run = { threadId: null, runId, agentId };
+      await push(socket, { type: "agent.thinking", ...run });
+      await push(socket, { type: "message.claimed", messageId: asked.id, agentId, runId });
+      await push(socket, { type: "agent.run", ...run, status: "failed", ...failure });
+      await push(socket, { type: "run.finished", ...run, status: "failed", ...failure });
+      await push(socket, {
+        type: "message.handled",
+        messageId: asked.id,
+        agentId,
+        runId,
+        status: "failed",
+        ...failure,
+      });
+      await settle(2);
+    };
+    await sendText("@ada e o login?");
+    await fail(ADA_ID, "r-ada", {
+      error: `cli_failed: Claude Code: ${LONG_DETAIL}`,
+      errorCode: "run.cli_failed",
+      errorParams: { brain: "Claude Code", detail: LONG_DETAIL },
+    });
+    const row = document.querySelector(".ac-msg__error-row") as HTMLElement;
+    // Said whole, never cut: the address too.
+    expect(row.textContent).toContain(
+      german
+        ? `${LONG_NAME} konnte nicht antworten: Das Programm Claude Code wurde mit einem Fehler beendet:`
+        : `${LONG_NAME} não conseguiu responder: o Claude Code parou com um erro:`,
+    );
+    expect(row.textContent).toContain("agent=0b6f2c9e-5d4a-4f7b-9a1e-3c8d2b7f6e10 timed out after 30000 ms");
+    await click(within(row).getByRole("button", { name: services.i18n.t("common.close") }));
+    // Her row closed: the line under my message says why, in full, with its way out.
+    expect(receiptOf("e o login?").textContent).toContain("timed out after 30000 ms");
+    expect(
+      within(receiptOf("e o login?")).getByRole("button", { name: services.i18n.t("receipts.retry") }),
+    ).toBeTruthy();
+
+    await sendText("@atlas e a chave?");
+    await fail(ATLAS_ID, "r-atlas", {
+      error: "provider_error: invalid_key@Claude: invalid x-api-key",
+      errorCode: "run.provider_invalid_key",
+      errorParams: { provider: "Claude", detail: "invalid x-api-key" },
+    });
+    const keyRow = document.querySelector(".ac-msg__error-row") as HTMLElement;
+    expect(within(keyRow).getByRole("button", { name: services.i18n.t("noAi.rightHand.useKey") })).toBeTruthy();
+  };
+
+  test("worst case: the longest agent name, a CLI's longest reason with an address, a refused key with its fix", () =>
+    worstCase(false));
+
+  test("worst case in German: the same, its sentences longer", () => worstCase(true));
 });

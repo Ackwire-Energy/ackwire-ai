@@ -83,7 +83,7 @@ describe("geometry check", () => {
       expect(SELF_TESTED).toContain(rule);
     for (const rule of ["pagetop", "groupedge", "menuitem", "rowpad", "emptyselect", "toolorder", "toolrow", "captop"])
       expect(SELF_TESTED).toContain(rule);
-    for (const rule of ["timeedge", "panefill"]) expect(SELF_TESTED).toContain(rule);
+    for (const rule of ["timeedge", "panefill", "bleed", "stampout"]) expect(SELF_TESTED).toContain(rule);
     for (const rule of SELF_TESTED) {
       expect(fixture).toContain(`bad-${rule}`);
       expect(fixture).toContain(`good-${rule}`);
@@ -96,6 +96,14 @@ describe("geometry check", () => {
     expect(check).toMatch(/async function selfTest[\s\S]*for \(const width of WIDTHS\)/);
     expect(DESKTOP_ONLY).toEqual(["floating", "toolorder"]);
     for (const rule of DESKTOP_ONLY) expect(SELF_TESTED).toContain(rule);
+  });
+
+  test("the self-test opens a card, a popover, a dialog and a list over each other: each must be the topmost", () => {
+    const check = readFileSync(join(import.meta.dir, "check.ts"), "utf8");
+    const rules = readFileSync(join(import.meta.dir, "rules.js"), "utf8");
+    expect(check).toMatch(/async function selfTest[\s\S]*for \(const width of WIDTHS\)[\s\S]*geometry\.layers\(\)/);
+    expect(rules).toContain('["a dialog from the popover", dialog]');
+    expect(rules).toContain("document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)");
   });
 
   test("a captured toolbar stacks where the app's does: rules.js measures one row as Toolbar.tsx's fitsOneRow", () => {

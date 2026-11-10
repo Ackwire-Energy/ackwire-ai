@@ -112,7 +112,7 @@ export function SkeletonMessage({
       {grouped ? (
         <span className="ac-skeleton-msg__gutter" />
       ) : (
-        <Skeleton shape={agent ? "square" : "circle"} width={36} height={36} />
+        <Skeleton shape={agent ? "square" : "circle"} width="var(--name-face)" height="var(--name-face)" />
       )}
       <div className="ac-skeleton-msg__body">
         {!grouped && <Skeleton width={seed % 2 ? 96 : 128} height={12} />}

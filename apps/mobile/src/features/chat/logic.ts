@@ -923,13 +923,16 @@ function textBlocks(chunk: string, out: Block[]) {
 
 /**
  * The day of the topmost row in view that has one (a day line, a message), for the floating date while the list
- * scrolls; null with none. `prev` comes back unchanged while the day is the same, so the screen's state only changes
- * when the day does (a new timestamp per row reaching the top would re-render the whole chat during a fling).
+ * scrolls; null with none, and while the list's first row is in view: above it is the conversation's start (its
+ * greeting, the setup card, the pins), which has no day for a date to float over. `prev` comes back unchanged while
+ * the day is the same, so the screen's state only changes when the day does (a new timestamp per row reaching the top
+ * would re-render the whole chat during a fling).
  */
 export function dayInView(
   rows: readonly { index: number; item: { kind: string; iso?: string; message?: Pick<Message, "createdAt"> } }[],
   prev: string | null = null,
 ): string | null {
+  if (rows.some((r) => r.index === 0)) return null;
   const top = [...rows]
     .sort((a, b) => a.index - b.index)
     .find(({ item }) => (item.kind === "day" && item.iso) || (item.kind === "message" && item.message));
