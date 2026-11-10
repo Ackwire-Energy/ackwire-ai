@@ -1,4 +1,4 @@
-import { type ComposioClient, composioFile, FileTooLargeError, type PubSub } from "@agenteschat/adapters";
+import { type ComposioClient, composioFile, FileTooLargeError } from "@agenteschat/adapters";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { FetchLike, Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
@@ -7,7 +7,9 @@ import { recordAudit } from "../audit";
 import { connectorKeyOf } from "../connector-usage";
 import { cutText } from "../format";
 import { type GitHubAppAccess, githubCallAuth, githubListingHeaders } from "../git/github-call";
+import { githubItemOfCall, recordGitHubItem } from "../git/github-events";
 import { creditedMessage, runCoAuthor, signatureLine, signedBody } from "../git/signature";
+import type { Judge } from "../judge";
 import { assertPublicHttpsUrl, type ResolveHost } from "../net-guard";
 import { replyThreadOf } from "../runs";
 import { alwaysAsks, customAlwaysAsks, MAX_RESULT_CHARS } from "../tools/gateway";
@@ -31,6 +33,7 @@ import {
   composioActions,
   customScope,
   isCustom,
+  syncCustomTools,
   type ToolAccess,
 } from "./custom";
 import { applyToolPins } from "./pins";
@@ -238,14 +241,16 @@ export function createConnectorToolSource(
     /** Where files a Composio action returns are kept (the workspace's Drive); none: they aren't kept. */
     artifacts?: ArtifactDeps;
     log?: { warn(message: string, data?: Record<string, unknown>): void };
-    /** Tells connector admins live when a server changes an approved tool. */
-    pubsub?: PubSub;
+    /** Reads a changed tool whose name doesn't say its level (none: such a tool asks first). */
+    judge?: Judge;
     /** The server's GitHub App (ADR 0156): GitHub's tools act as it wherever the workspace installed it. */
     githubApp?: GitHubAppAccess;
   },
 ): ToolSource {
   const connect = deps.connect ?? connectOverHttp;
   const cache = new Map<string, { at: number; tools: McpTool[] }>();
+  /** How many times a listing found changed tools and worked out a custom server's levels again. */
+  let reclassified = 0;
   const github = { fetch: deps.http ?? fetch, apiUrl: "https://api.github.com", ...deps.githubApp?.http };
 
   /** A session with the connection's own sign-in, or `auth` when the call goes as someone else (the GitHub App). */
@@ -279,7 +284,10 @@ export function createConnectorToolSource(
         : undefined;
     if (auth === null) throw new Error("no installation of the GitHub App to list GitHub's tools with");
     const listed = await withSession(connection, (s) => s.listTools(), auth);
-    const tools = await applyToolPins(deps, connection, listed, pinnedTool(connection));
+    const reclassify = isCustom(connection)
+      ? () => syncCustomTools({ ...deps, connect }, connection).finally(() => reclassified++)
+      : undefined;
+    const tools = await applyToolPins({ ...deps, reclassify }, connection, listed, pinnedTool(connection));
     cache.set(key, { at: Date.now(), tools });
     return tools;
   }
@@ -305,7 +313,7 @@ export function createConnectorToolSource(
     return trailer ? { ...input, message: creditedMessage(given, trailer) } : input;
   }
 
-  /** Which of a connection's tools keep their approved text (ADR 0117): not Composio's (pinned by toolkit version), not ours. */
+  /** Which of a connection's tools are watched for changes (ADR 0117): not Composio's (pinned by toolkit version), not ours. */
   function pinnedTool(connection: ConnectorConnection): (name: string) => boolean {
     if (isCustom(connection)) return composioServiceOf(connection.serverUrl) ? () => false : () => true;
     const def = CONNECTOR_CATALOG[connection.connector];
@@ -324,14 +332,17 @@ export function createConnectorToolSource(
   async function customToolsOf(connection: ConnectorConnection): Promise<ToolDefinition[]> {
     // A sign-in that stopped working (a Composio account too) has no tools until it is reconnected.
     if (connection.status === "needs_reconnect") return [];
-    const classified = await classifiedTools(deps.db, connection.id);
+    let classified = await classifiedTools(deps.db, connection.id);
     if (classified.length === 0) return [];
+    const before = reclassified;
     let listed: McpTool[];
     try {
       listed = await serverTools(connection);
     } catch {
       return [];
     }
+    // The listing found changed tools: their levels are the ones worked out from the new version.
+    if (reclassified !== before) classified = await classifiedTools(deps.db, connection.id);
     const byName = new Map(listed.map((t) => [t.name, t]));
     const preset = presetForServer(connection.serverUrl)?.id;
     const composio = composioServiceOf(connection.serverUrl);
@@ -485,6 +496,12 @@ export function createConnectorToolSource(
                 args = await signed(input, mapped.sign, { ...ctx, token: how.token });
               }
               const result = await withSession(connection, (s) => s.callTool(tool.name, args), auth);
+              // Where the agent's words went on GitHub: what people answer there comes back to it here.
+              const item =
+                def.id === "github" && mapped.sign?.field === "body" && !result.isError
+                  ? githubItemOfCall(tool.name, input, result.content)
+                  : null;
+              if (item) await recordGitHubItem(ctx, item).catch(() => {});
               return {
                 content: result.content,
                 isError: result.isError,

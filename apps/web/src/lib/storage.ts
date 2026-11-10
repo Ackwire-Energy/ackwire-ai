@@ -46,6 +46,16 @@ export const STORAGE_KEYS = {
   lastPlace: "agentes.lastPlace",
   /** How this browser signed in last ("google", "github", "apple" or "email"): marked on the sign-in screen. */
   lastSignIn: "agentes.lastSignIn",
+  /**
+   * "1" after Sign out (or Switch account) by hand: on the server the desktop app runs here, the sign-in screen waits
+   * for the owner's click instead of signing them in again at once. Any sign-in removes it.
+   */
+  signedOut: "agentes.signedOut",
+  /**
+   * sessionStorage, "1": the owner chose Forgot password › Continue on this Mac, so once signed in the app opens
+   * "Create a new password" (ADR 0158).
+   */
+  newPasswordAsk: "agentes.newPasswordAsk",
   /** "0" when the person switched off the picture viewer's hover lens (on by default). */
   imageLens: "agentes.image.lens",
   /** The Drive's view: "grid" (default) or "list". */
@@ -84,7 +94,7 @@ export const STORAGE_KEYS = {
   sounds: "agentes.sounds",
   /** In `sessionStore`, this tab's id; in `storage`, the tab the person used last (it plays sounds while hidden). */
   soundTab: "agentes.sounds.tab",
-  /** How many times the notifications dialog opened by itself in this browser (`WebPushAsk`, ADR 0071). */
+  /** How many times our notifications ask showed by itself in this browser (`usePushAsk`, ADR 0071). */
   pushOffers: "agentes.push.offers",
   /** In `sessionStore`: when the boot last reloaded because the app's files didn't load (index.html keeps a copy). */
   bootRetry: "agentes.bootRetry",

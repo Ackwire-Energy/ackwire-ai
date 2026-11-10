@@ -17,6 +17,7 @@ import { errorText } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { executorName } from "@agenteschat/client/lib/missions";
 import { can } from "@agenteschat/client/lib/permissions";
+import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
 import {
   Button,
   Dialog,
@@ -82,7 +83,9 @@ export function NewMissionDialog({
   const { org } = useOrg();
   // On the Cloud every agent works on the workspace's own computer: missions wait for it, nobody connects one.
   const cloud = useComputerEdition(org.id) === "cloud";
-  const waitWords = t("missions.waitingCloud", { computer: t("computerSetup.title", { org: org.name }) });
+  const waitWords = t("missions.waitingCloud", {
+    computer: t(modeKey(org, "computerSetup.titleInSentence"), { org: org.name }),
+  });
   // Its computer by name only where there are two to tell apart; else only one that is offline says so.
   const names = useNamesComputers(org.id);
   const api = useApi();
@@ -235,7 +238,7 @@ export function NewMissionDialog({
                       a.eligible && a.machine
                         ? names
                           ? t("missions.new.agentOn", {
-                              computer: computerNameOf(t, org.name, a.machine.name),
+                              computer: computerNameOf(t, org.name, a.machine.name, isPersonal(org)),
                               state: a.machine.online ? t("missions.online") : t("missions.offline"),
                             })
                           : a.machine.online
@@ -244,7 +247,7 @@ export function NewMissionDialog({
                         : cloud && (a.reason ?? "no_computer") === "no_computer"
                           ? waitWords
                           : t(`missions.new.reason.${a.reason ?? "no_computer"}`, {
-                              computer: computerNameOf(t, org.name, a.machine?.name ?? ""),
+                              computer: computerNameOf(t, org.name, a.machine?.name ?? "", isPersonal(org)),
                             }),
                     leading: <AgentAvatar agentId={a.id} name={a.name} size="sm" />,
                   }))}
@@ -278,7 +281,7 @@ export function NewMissionDialog({
                       {cloud && (a.reason ?? "no_computer") === "no_computer"
                         ? waitWords
                         : t(`missions.new.reason.${a.reason ?? "no_computer"}`, {
-                            computer: computerNameOf(t, org.name, a.machine?.name ?? ""),
+                            computer: computerNameOf(t, org.name, a.machine?.name ?? "", isPersonal(org)),
                           })}
                     </span>
                     {!cloud && (
@@ -310,7 +313,9 @@ export function NewMissionDialog({
               {agent.codexTooOld && (
                 <span className="mi-hint ac-iconline">
                   <Icon name="info" size={14} />
-                  {t("missions.new.codexOld", { computer: computerNameOf(t, org.name, agent.machine?.name ?? "") })}
+                  {t("missions.new.codexOld", {
+                    computer: computerNameOf(t, org.name, agent.machine?.name ?? "", isPersonal(org)),
+                  })}
                 </span>
               )}
             </div>
@@ -506,7 +511,7 @@ export function CloseMissionDialog({
                 {names
                   ? t("missions.close.running", {
                       count: mission.runningTasks,
-                      computer: computerNameOf(t, org.name, mission.machine?.name ?? ""),
+                      computer: computerNameOf(t, org.name, mission.machine?.name ?? "", isPersonal(org)),
                     })
                   : t("missions.close.runningNoComputer", { count: mission.runningTasks })}
               </span>
@@ -769,7 +774,9 @@ export function ShareMissionDialog({
               <div className="mi-optrow">
                 <div>
                   <label htmlFor={lendId}>
-                    {t("missions.share.lend", { computer: computerNameOf(t, org.name, mission.machine.name) })}
+                    {t("missions.share.lend", {
+                      computer: computerNameOf(t, org.name, mission.machine.name, isPersonal(org)),
+                    })}
                   </label>
                   <small>{t("missions.share.lendText", { name: handing?.name ?? "" })}</small>
                 </div>

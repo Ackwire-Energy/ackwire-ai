@@ -19,6 +19,7 @@ import { endOfCategory, requireCategoryInOrg } from "./channel-categories";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishChannelsChanged, publishOrgEvent, publishUserEvent } from "./events";
 import { followsThreadSql, threadReadAtSql } from "./follows";
+import { landedAfterSql } from "./message-place";
 import { type PreviewMeta, previewMediaKind, previewMeta, readableBody } from "./message-preview";
 import { quietNoticeSql } from "./notices";
 import { clearChannelNotifications, notificationSnippet } from "./notifications";
@@ -319,15 +320,16 @@ const uuidArray = (v: string[] | string | null) =>
  */
 export async function listChannels(db: Database, userId: string, orgId: string): Promise<ChannelListItem[]> {
   await requirePermission(db, userId, orgId, "read");
-  // Message `u` I haven't read in channel `c`: not mine, after my read (or my joining), a thread's reply only in one I
-  // follow or that mentions me, and haven't read there.
+  // Message `u` I haven't read in channel `c`: not mine, landed after my read (or my joining), a thread's reply only in
+  // one I follow or that mentions me, and haven't read there.
+  const u = { createdAt: sql`u.created_at`, id: sql`u.id` };
   const unread = sql`cm.id is not null and u.org_id = ${orgId}::uuid and u.channel_id = c.id and u.deleted_at is null
-    and u.created_at > coalesce(cr.last_read_at, cm.created_at)
+    and ${landedAfterSql(u, sql`coalesce(cr.last_read_at, cm.created_at)`)}
     and (u.author_user_id is null or u.author_user_id <> ${userId})
     and not ${quietNoticeSql(sql`u.meta`)}
     and (u.thread_id is null or ((${userId} = any(u.mentioned_user_ids)
         or ${followsThreadSql(orgId, userId, sql`u.thread_id`)})
-      and u.created_at > ${threadReadAtSql(userId, sql`u.thread_id`)}))
+      and ${landedAfterSql(u, threadReadAtSql(userId, sql`u.thread_id`))}))
     -- Nor one more unread (ADR 0091): it is silent.
     and u.meta->>'mediaAfter' is null`;
   const rows = rowsOf<ChannelListRow>(

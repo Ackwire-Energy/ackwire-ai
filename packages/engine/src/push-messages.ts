@@ -54,6 +54,8 @@ export interface PushTextInput {
   percent?: number | null;
   /** `widget_failed`: its coded reason (ADR 0135 §6); `agent_reported` sends the agent's words in `text`. */
   reason?: string | null;
+  /** The workspace is personal (ADR 0159): the words for one person and their agents, where a team's would differ. */
+  personal?: boolean;
 }
 
 const clip = (s: string, max: number) => {
@@ -108,7 +110,10 @@ export function renderPush(locale: PushLocale, input: PushTextInput): { title: s
       // The right hand's name (what the workspace calls it).
       return out(s.rightHandPausedTitle(actor), s.rightHandPausedBody);
     case "agent_unreached":
-      return out(s.agentUnreachedTitle(actor), what || s.agentUnreachedBody);
+      return out(
+        s.agentUnreachedTitle(actor),
+        what || (input.personal ? s.agentUnreachedBodyPersonal : s.agentUnreachedBody),
+      );
     case "routine_stalled":
       // The computer's name (what the person calls it), else the routine's.
       return out(s.routineStalledTitle, text ? s.routineStalledBody(text) : what || s.openBody);
@@ -123,9 +128,12 @@ export function renderPush(locale: PushLocale, input: PushTextInput): { title: s
       );
     case "machine_connected":
       // Its name and who connected it: if nobody here expected it, it can be removed at once.
-      return out(s.machineConnectedTitle, [what, input.actorName?.trim()].filter(Boolean).join(" · ") || s.openBody);
+      return out(
+        input.personal ? s.machineConnectedTitlePersonal : s.machineConnectedTitle,
+        [what, input.actorName?.trim()].filter(Boolean).join(" · ") || s.openBody,
+      );
     case "computer_ready":
-      return out(s.computerReadyTitle, s.computerReadyBody);
+      return out(input.personal ? s.computerReadyTitlePersonal : s.computerReadyTitle, s.computerReadyBody);
     case "browser_handoff":
       // What the agent asked for, in its words ("Entrar no Stripe com a conta de teste"). A desktop doesn't
       // open on the phone: its body says where it does.
@@ -144,9 +152,12 @@ export function renderPush(locale: PushLocale, input: PushTextInput): { title: s
     case "widget_alert":
       // What the agent saw, in its words; never in the chat (ADR 0135 §6).
       return out(s.widgetAlertTitle(actor, what), text || s.openBody);
-    case "widget_failed":
+    case "widget_failed": {
       // The agent's own words when it said why, else its coded reason in words.
-      return out(s.widgetFailedTitle(what), text || s.widgetFailedReasons[input.reason ?? ""] || s.widgetFailedBody);
+      const reason = input.reason ?? "";
+      const why = (input.personal ? s.widgetFailedReasonsPersonal[reason] : undefined) || s.widgetFailedReasons[reason];
+      return out(s.widgetFailedTitle(what), text || why || s.widgetFailedBody);
+    }
     case "proposal_waiting":
       return out(s.proposalWaitingTitle(actor), s.dashboardProposalBody(""));
     case "dashboard_proposal":
@@ -156,9 +167,28 @@ export function renderPush(locale: PushLocale, input: PushTextInput): { title: s
       // The name the person typed, never their note: approving happens in the app, never from the notification.
       const who = input.title?.trim() || s.someone;
       const by = input.suggestedBy?.trim();
+      // A personal workspace's name ("Personal") reads as no place: theirs is "your workspace".
+      if (input.personal)
+        return out(by ? s.joinSuggestionTitlePersonal(by, who) : s.joinRequestTitlePersonal(who), s.joinRequestBody);
       if (by) return out(s.joinSuggestionTitle(by, who, input.label?.trim() || ""), s.joinRequestBody);
       return out(s.joinRequestTitle(who, input.label?.trim() || ""), s.joinRequestBody);
     }
+    case "device.join_request":
+      // The computer's name as it said it; letting it in happens in the app, never from the notification.
+      return out(
+        s.deviceJoinRequestTitle(input.label?.trim() || s.someone, input.title?.trim() || ""),
+        s.deviceJoinRequestBody,
+      );
+    // The agent's name, whom it works for (`title`) and the device's name (`label`); what it does in `text`.
+    case "device.in_use":
+      return out(
+        s.deviceInUseTitle(actor, input.title?.trim() ?? "", input.label?.trim() ?? ""),
+        text || s.deviceInUseBody,
+      );
+    case "device.access_request":
+      return out(s.deviceAccessTitle(actor, input.title?.trim() ?? "", input.label?.trim() ?? ""), s.deviceAccessBody);
+    case "device.waiting":
+      return out(s.deviceWaitingTitle(input.title?.trim() || actor, input.label?.trim() ?? ""), s.deviceWaitingBody);
     case "usage_limit":
       // Percentages only for the person; who decides reads the person's name (ADR 0141).
       switch (input.status) {

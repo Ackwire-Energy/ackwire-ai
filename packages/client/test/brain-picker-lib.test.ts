@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import type { TFunction } from "i18next";
+import { resources } from "@agenteschat/i18n";
+import { matchesWords } from "@agenteschat/ui/search";
+import i18next, { type TFunction } from "i18next";
 import type { AiAccounts, BrainMachine, BrainOption, Model } from "../src/api/types";
 import {
   brainModelLine,
@@ -155,12 +157,32 @@ describe("Quem pensa as one list (the new agent's step)", () => {
     expect(free).toContain("opencode@m1#acc-go/iceman-contributor-free");
     expect(options.filter((o) => o.free).map((o) => o.value)).toEqual([
       "some-free-model",
+      "opencode@m1#acc-go/longcat-2.5-free",
       "opencode@m1#acc-go/beam-free",
       "opencode@m1#acc-go/crouton-alpha-free",
       "opencode@m1#acc-go/iceman-contributor-free",
     ]);
     expect(finds(options, "deepseek-v4.1-flash")).toEqual(["opencode@m1#acc-go/deepseek-v4.1-flash"]);
     expect(options.find((o) => o.value.endsWith("/beam-free"))?.description).toBe("brain.free");
+  });
+
+  test("search finds ChatGPT's rows by Codex, the CLI it thinks through, as the apps search", () => {
+    const enI18n = i18next.createInstance();
+    void enI18n.init({ lng: "en", resources, initAsync: false });
+    const codex: BrainOption = {
+      ...codexOff,
+      available: true,
+      models: [{ value: "gpt-6-astra", label: "GPT-6 Astra" }],
+    };
+    const options = brainPickOptions(enI18n.t.bind(enI18n) as TFunction, "en", {
+      api: modelChoices(MODELS, [], false),
+      machines: [{ ...MAC, options: [claudeCode, codex] }],
+      accounts: [],
+      ownerIsMe: true,
+    });
+    const found = (q: string) => options.filter((o) => matchesWords(brainPickText(o), q)).map((o) => o.value);
+    expect(found("Codex")).toEqual(["chatgpt@m1/auto", "chatgpt@m1/gpt-6-astra"]);
+    expect(found("claude code")).toContain("claude@m1/auto");
   });
 
   test("the choice shows as its option, and a plan saves its account and model", () => {

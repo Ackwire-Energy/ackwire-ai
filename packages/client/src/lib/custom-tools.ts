@@ -59,26 +59,3 @@ export const isHttpsUrl = (v: string) => /^https:\/\/[^\s/]+/.test(v.trim());
 /** Same MCP address, ignoring a trailing slash and case. */
 export const sameServer = (a: string | null | undefined, b: string | null | undefined) =>
   Boolean(a && b) && (a ?? "").replace(/\/+$/, "").toLowerCase() === (b ?? "").replace(/\/+$/, "").toLowerCase();
-
-export interface InputField {
-  name: string;
-  type: string;
-  description: string;
-  /** The field's whole schema as JSON: two versions of a field differ when this does. */
-  json: string;
-}
-
-/** The fields a tool's JSON Schema input takes, with what the model reads of each (none without `properties`). */
-export function inputFields(schema: Record<string, unknown>): InputField[] {
-  const props = schema.properties;
-  if (!props || typeof props !== "object") return [];
-  return Object.entries(props as Record<string, unknown>).map(([name, raw]) => {
-    const p = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
-    return {
-      name,
-      type: typeof p.type === "string" ? p.type : "",
-      description: typeof p.description === "string" ? p.description : "",
-      json: JSON.stringify(raw ?? null),
-    };
-  });
-}

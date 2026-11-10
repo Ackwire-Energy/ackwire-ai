@@ -15,7 +15,7 @@ const link = (href: string) => (
 
 /**
  * Sobre o agentes.chat, pushed from Você: AGPL-3.0's Appropriate Legal Notices and the attribution the license's
- * section 7(b) term requires (LICENSE). Shown on every self-hosted server, with no setting that hides it (`showsAbout`).
+ * section 7(b) term in NOTICE requires. Shown on every self-hosted server, with no setting that hides it (`showsAbout`).
  */
 export function AboutPage() {
   const { t } = useTranslation();

@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { type Database, eq, schema } from "@agenteschat/db";
+import { type Database, eq, inArray, schema } from "@agenteschat/db";
 import { createTestDatabase } from "@agenteschat/db/testing";
 import {
+  APP_JOB_KINDS,
   claimJobs,
+  claimLaneAlarm,
   clearOldOutboxPayloads,
   completeJob,
   createOutboxPump,
@@ -10,11 +12,18 @@ import {
   drainOutbox,
   enqueue,
   failJob,
+  LANE_SLOW_FOR_MS,
+  laneAlarm,
+  laneLimits,
   MissingCredentialError,
+  memoryBudget,
   PermanentJobError,
+  POOL_SLOW_MS,
   processOutbox,
+  RUN_MEMORY_BYTES,
   releaseJobs,
   renewLease,
+  resizeLanes,
   retryDelayMs,
 } from "../src";
 
@@ -371,6 +380,424 @@ test("createOutboxPump: routines hold at most half of the slots, so other work a
   await pump.idle();
   expect(await pump.pump()).toBe(1);
   await pump.idle();
+  expect((await rows()).every((r) => r.status === "done")).toBe(true);
+});
+
+test("createOutboxPump: long jobs hold at most the slots quick jobs keep for themselves, so a quick job finds one", async () => {
+  let release: () => void = () => {};
+  const held = new Promise<void>((r) => {
+    release = r;
+  });
+  const done: string[] = [];
+  const pump = createOutboxPump(
+    db,
+    { "agent_run.execute": () => held, "message.posted": async () => void done.push("message") },
+    { workerId: "w", maxInFlight: 4, quickSlots: 1 },
+  );
+  for (let i = 0; i < 5; i++) await enqueue(db, job("agent_run.execute"));
+  expect(await pump.pump()).toBe(3);
+  // Every long slot is busy; the one left is the quick lane's.
+  expect(await pump.pump()).toBe(0);
+  await enqueue(db, job("message.posted"));
+  expect(await pump.pump()).toBe(1);
+  while (pump.inFlight() > 3) await Bun.sleep(1);
+  expect(done).toEqual(["message"]);
+  release();
+  await pump.idle();
+  expect(await pump.pump()).toBe(2);
+  await pump.idle();
+  expect((await rows()).every((r) => r.status === "done")).toBe(true);
+});
+
+test("createOutboxPump: routines hold at most half of the long slots; a person's run and quick jobs find theirs", async () => {
+  let release: () => void = () => {};
+  const held = new Promise<void>((r) => {
+    release = r;
+  });
+  const pump = createOutboxPump(
+    db,
+    { "routine.run": () => held, "agent_run.execute": () => held, "message.posted": () => held },
+    { workerId: "w", maxInFlight: 6, quickSlots: 2 },
+  );
+  for (let i = 0; i < 5; i++) await enqueue(db, job("routine.run"));
+  expect(await pump.pump()).toBe(2);
+  expect(await pump.pump()).toBe(0);
+  for (let i = 0; i < 3; i++) await enqueue(db, job("agent_run.execute"));
+  expect(await pump.pump()).toBe(2);
+  for (let i = 0; i < 3; i++) await enqueue(db, job("message.posted"));
+  expect(await pump.pump()).toBe(2);
+  const running = (await rows()).filter((r) => r.status === "processing").map((r) => r.kind);
+  expect(running.sort()).toEqual([
+    "agent_run.execute",
+    "agent_run.execute",
+    "message.posted",
+    "message.posted",
+    "routine.run",
+    "routine.run",
+  ]);
+  release();
+  await pump.idle();
+});
+
+test("createOutboxPump under load: 400 routines and 60 agent runs, quick jobs still go at once, every lane within its cap", async () => {
+  const live = { all: 0, long: 0, background: 0, runs: 0 };
+  type Lane = keyof typeof live;
+  const peak = { ...live };
+  let finished = 0;
+  const work = (counted: Lane[], ms: number) => async () => {
+    for (const lane of counted) peak[lane] = Math.max(peak[lane], ++live[lane]);
+    await Bun.sleep(ms);
+    for (const lane of counted) live[lane]--;
+    finished++;
+  };
+  const quickWaits: number[] = [];
+  const pump = createOutboxPump(
+    db,
+    {
+      "routine.run": work(["all", "long", "background"], 50),
+      "agent_run.execute": work(["all", "long", "runs"], 1_000),
+      "message.posted": async (j) => {
+        quickWaits.push(Date.now() - Number(j.payload.at));
+        await work(["all"], 1)();
+      },
+    },
+    { workerId: "w", maxInFlight: 48, quickSlots: 12 },
+  );
+  await db
+    .insert(schema.outbox)
+    .values([
+      ...Array.from({ length: 400 }, () => ({ orgId, kind: "routine.run", payload: {} })),
+      ...Array.from({ length: 60 }, () => ({ orgId, kind: "agent_run.execute", payload: {} })),
+    ]);
+  const quick = 100;
+  const feed = (async () => {
+    for (let i = 0; i < quick; i++) {
+      await enqueue(db, job("message.posted", { payload: { at: Date.now() } }));
+      await Bun.sleep(20);
+    }
+  })();
+  const deadline = Date.now() + 25_000;
+  while (finished < 460 + quick && Date.now() < deadline) {
+    await pump.pump();
+    await Bun.sleep(5);
+  }
+  await feed;
+  await pump.idle();
+  expect(finished).toBe(460 + quick);
+  // The long lane is 48 - 12 slots, background work half of it; the agent runs filled it while routines waited.
+  expect(peak).toMatchObject({ long: 36, background: 18, runs: 36 });
+  expect(peak.all).toBeLessThanOrEqual(48);
+  // A quick job waiting behind one agent run would wait about a second.
+  expect(Math.max(...quickWaits)).toBeLessThan(500);
+}, 30_000);
+
+test("resizeLanes: a lane that waits doubles within its limit and the total, quick first; an idle one halves back", () => {
+  const base = { quick: 12, long: 36 };
+  const limits = { lanes: { quick: 80, long: 500 }, total: 580 };
+  const calm = { waitMs: 0, peak: 0 };
+  const waiting = { waitMs: 3_000, peak: 0 };
+  expect(resizeLanes(base, base, limits, { quick: waiting, long: waiting })).toEqual({ quick: 24, long: 72 });
+  expect(resizeLanes({ quick: 48, long: 288 }, base, limits, { quick: waiting, long: waiting })).toEqual({
+    quick: 80,
+    long: 500,
+  });
+  // The total binds: the quick lane takes its share of the room first.
+  const tight = { lanes: limits.lanes, total: 100 };
+  expect(resizeLanes({ quick: 12, long: 80 }, base, tight, { quick: waiting, long: waiting })).toEqual({
+    quick: 20,
+    long: 80,
+  });
+  // Something brakes: nothing grows. Memory running out: the long lane halves, waiting or not.
+  expect(resizeLanes(base, base, limits, { quick: waiting, long: waiting }, { busy: true })).toEqual(base);
+  expect(
+    resizeLanes({ quick: 24, long: 288 }, base, limits, { quick: waiting, long: waiting }, { busy: true, shed: true }),
+  ).toEqual({ quick: 24, long: 144 });
+  // Waiting for nothing and half used at most: half, never below the base; a lane still using more keeps it.
+  expect(resizeLanes({ quick: 24, long: 288 }, base, limits, { quick: calm, long: calm })).toEqual({
+    quick: 12,
+    long: 144,
+  });
+  expect(resizeLanes(base, base, limits, { quick: calm, long: calm })).toEqual(base);
+  expect(resizeLanes({ quick: 12, long: 288 }, base, limits, { quick: calm, long: { waitMs: 0, peak: 200 } })).toEqual({
+    quick: 12,
+    long: 288,
+  });
+});
+
+test("laneLimits: runs as far as half the memory holds them, quick jobs 4 per connection, a cap over both", () => {
+  const base = { quick: 12, long: 36 };
+  const gb = 1024 ** 3;
+  const host = { memoryBytes: 4 * gb, rssBytes: 0.5 * gb, dbConnections: 20 };
+  const runs = Math.floor((2 * gb - 0.5 * gb) / RUN_MEMORY_BYTES);
+  expect(laneLimits(base, host)).toEqual({ lanes: { quick: 80, long: runs }, total: 80 + runs });
+  expect(laneLimits(base, host, 200).total).toBe(200);
+  // A small box never goes below where the slots start.
+  expect(laneLimits(base, { memoryBytes: gb / 2, rssBytes: gb / 2, dbConnections: 2 })).toEqual({
+    lanes: base,
+    total: 48,
+  });
+});
+
+test("memoryBudget: a container's limit; on a computer it shares, what the process holds and what is free there", () => {
+  const gb = 1024 ** 3;
+  // 8 GB, the database and the speech server beside it holding 5: 0.5 held and 2.5 free, not the whole computer.
+  const shared = memoryBudget({ limitBytes: 8 * gb, rssBytes: 0.5 * gb, freeBytes: 2.5 * gb });
+  expect(shared).toBe(3 * gb);
+  expect(
+    laneLimits({ quick: 12, long: 36 }, { memoryBytes: shared, rssBytes: 0.5 * gb, dbConnections: 20 }).lanes.long,
+  ).toBe(256);
+  expect(memoryBudget({ limitBytes: 2 * gb, rssBytes: 0.5 * gb, freeBytes: 30 * gb })).toBe(2 * gb);
+});
+
+test("createOutboxPump.tune: jobs left waiting grow their lane up to its limit; once idle, it halves back", async () => {
+  const limits = { lanes: { quick: 8, long: 24 }, total: 32 };
+  const pump = createOutboxPump(db, {}, { workerId: "w", maxInFlight: 8, quickSlots: 2, limits });
+  await enqueue(db, job("message.posted", { runAt: at(-60_000) }));
+  await enqueue(db, job("agent_run.execute", { runAt: at(-60_000) }));
+  const sizes = async () => {
+    const t = await pump.tune();
+    return [t.quick, t.long];
+  };
+  expect(await sizes()).toEqual([4, 12]);
+  expect(await sizes()).toEqual([8, 24]);
+  expect(await sizes()).toEqual([8, 24]);
+  await db.delete(schema.outbox);
+  expect(await sizes()).toEqual([4, 12]);
+  expect(await sizes()).toEqual([2, 6]);
+  expect(await sizes()).toEqual([2, 6]);
+});
+
+test("laneAlarm: tells once a lane stayed slow 5 minutes, then at most every hour, recovered or not", () => {
+  const told = laneAlarm();
+  const minute = 60_000;
+  const step = (slow: boolean, m: number) => told(slow, m * minute);
+  expect([step(true, 0), step(true, 4), step(true, 5), step(true, 6)]).toEqual([false, false, true, false]);
+  // It recovers and is slow again soon: not told within the hour.
+  expect([step(false, 7), step(true, 8), step(true, 13), step(true, 64)]).toEqual([false, false, false, false]);
+  expect(step(true, 65)).toBe(true);
+  expect(LANE_SLOW_FOR_MS).toBe(5 * minute);
+});
+
+test("createOutboxPump.tune: names each lane its jobs keep waiting in", async () => {
+  const pump = createOutboxPump(db, {}, { workerId: "w", maxInFlight: 4, quickSlots: 1 });
+  const start = Date.now();
+  await enqueue(db, job("message.posted", { runAt: at(-10_000) }));
+  await enqueue(db, job("routine.run", { runAt: at(-600_000) }));
+  const told: string[] = [];
+  for (let ms = 0; ms <= LANE_SLOW_FOR_MS; ms += 30_000)
+    told.push(...(await pump.tune({ now: new Date(start + ms) })).slow);
+  // Quick jobs waited over 5 s and routines over 5 minutes; no agent run waited.
+  expect(told.sort()).toEqual(["background", "quick"]);
+});
+
+test("workspaces take turns: one workspace's burst queues only that workspace", async () => {
+  const [other] = await db.insert(schema.organizations).values({ name: "Globex" }).returning();
+  const busyOrg = orgId;
+  const otherOrg = other?.id ?? "";
+  for (let i = 0; i < 20; i++) await enqueue(db, { orgId: busyOrg, kind: "routine.run", payload: { i } });
+  for (let i = 0; i < 3; i++) await enqueue(db, { orgId: otherOrg, kind: "routine.run", payload: { i } });
+  const first = await claimJobs(db, { workerId: "w", batchSize: 4 });
+  expect(first.filter((j) => j.orgId === otherOrg)).toHaveLength(2);
+  // The busy workspace holds 2 now: the other one's last job goes before its 18 left.
+  const second = await claimJobs(db, { workerId: "w", batchSize: 2 });
+  expect(second.map((j) => j.orgId).sort()).toEqual([busyOrg, otherOrg].sort());
+  // Alone, a workspace takes every slot.
+  const rest = await claimJobs(db, { workerId: "w", batchSize: 50 });
+  expect(rest).toHaveLength(17);
+  expect(rest.every((j) => j.orgId === busyOrg)).toBe(true);
+});
+
+test("a workspace running jobs on another worker claims after one that runs none, though its own job is older", async () => {
+  const [other] = await db.insert(schema.organizations).values({ name: "Globex" }).returning();
+  const busyOrg = orgId;
+  const waitingOrg = other?.id ?? "";
+  await db.insert(schema.outbox).values(
+    Array.from({ length: 3 }, () => ({
+      orgId: busyOrg,
+      kind: "agent_run.execute",
+      payload: {},
+      status: "processing" as const,
+      attempts: 1,
+      lockedUntil: at(60_000),
+      lockedBy: "other",
+    })),
+  );
+  await enqueue(db, { orgId: busyOrg, kind: "agent_run.execute", payload: {}, runAt: at(-60_000) });
+  for (let i = 0; i < 2; i++) await enqueue(db, { orgId: waitingOrg, kind: "agent_run.execute", payload: { i } });
+  const claimed = await claimJobs(db, { workerId: "w", batchSize: 2 });
+  expect(claimed.map((j) => j.orgId)).toEqual([waitingOrg, waitingOrg]);
+});
+
+test("jobs of no workspace take turns by kind: a backfill of one kind holds back neither workspaces nor a sign-in email", async () => {
+  for (let i = 0; i < 50; i++)
+    await enqueue(db, { orgId: null, kind: "account.contact", payload: { i }, runAt: at(-60_000) });
+  await enqueue(db, { orgId: null, kind: "email.send", payload: { code: 1 } });
+  for (let i = 0; i < 2; i++) await enqueue(db, job("message.posted", { payload: { i } }));
+  const claimed = await claimJobs(db, { workerId: "w", batchSize: 3 });
+  expect(claimed.map((j) => j.kind).sort()).toEqual(["account.contact", "email.send", "message.posted"]);
+});
+
+test("workspaces take turns however long one workspace's backlog is", async () => {
+  const [other] = await db.insert(schema.organizations).values({ name: "Globex" }).returning();
+  const older = Date.now() - 3600_000;
+  const burst = Array.from({ length: 10_050 }, (_, i) => ({
+    orgId,
+    kind: "search.index",
+    payload: { i },
+    nextAttemptAt: new Date(older + i),
+  }));
+  for (let i = 0; i < burst.length; i += 2000) await db.insert(schema.outbox).values(burst.slice(i, i + 2000));
+  const otherOrg = other?.id ?? "";
+  await enqueue(db, { orgId: otherOrg, kind: "message.posted", payload: {} });
+  const claimed = await claimJobs(db, { workerId: "w", batchSize: 2 });
+  expect(claimed.map((j) => j.orgId).sort()).toEqual([orgId, otherOrg].sort());
+}, 30_000);
+
+test("a worker process leaves a push to the app, the one process that knows who has the app open", async () => {
+  await enqueue(db, job("push.send", { runAt: at(-60_000) }));
+  await enqueue(db, job("message.posted"));
+  const worker = createOutboxPump(
+    db,
+    { "message.posted": async () => {} },
+    { workerId: "worker", skipKinds: APP_JOB_KINDS },
+  );
+  expect(await worker.pump()).toBe(1);
+  await worker.idle();
+  // Its quick lane doesn't count the push it leaves, due a minute ago, as waiting.
+  expect((await worker.tune()).waits.quick).toBeLessThan(30_000);
+  expect((await claimJobs(db, { workerId: "app" })).map((j) => j.kind)).toEqual(["push.send"]);
+});
+
+// Locks between connections: a real server only (`TEST_DATABASE_URL`); PGlite is one connection.
+test.skipIf(!process.env.TEST_DATABASE_URL)(
+  "a claim skips the jobs another worker is taking, without waiting on it",
+  async () => {
+    for (let i = 0; i < 4; i++) await enqueue(db, job("message.posted", { payload: { i } }));
+    const ids = (await rows()).map((r) => r.id).sort();
+    await db.transaction(async (tx) => {
+      // Another worker's claim, its transaction still open: two rows locked.
+      await tx
+        .select()
+        .from(schema.outbox)
+        .where(inArray(schema.outbox.id, ids.slice(0, 2)))
+        .for("update");
+      const claimed = await claimJobs(db, { workerId: "w", batchSize: 4 });
+      expect(claimed.map((j) => j.id).sort()).toEqual(ids.slice(2));
+    });
+  },
+);
+
+test("createOutboxPump: quick jobs run no more at once than their lane's limit, however many slots are free", async () => {
+  let release: () => void = () => {};
+  const held = new Promise<void>((r) => {
+    release = r;
+  });
+  const limits = { lanes: { quick: 3, long: 8 }, total: 11 };
+  const pump = createOutboxPump(
+    db,
+    { "message.posted": () => held },
+    { workerId: "w", maxInFlight: 10, quickSlots: 2, limits },
+  );
+  for (let i = 0; i < 6; i++) await enqueue(db, job("message.posted"));
+  expect(await pump.pump()).toBe(3);
+  expect(await pump.pump()).toBe(0);
+  release();
+  await pump.idle();
+});
+
+test("createOutboxPump.tune: nothing grows while the processor, the database or memory is short; then the long lane sheds", async () => {
+  const limits = { lanes: { quick: 8, long: 24 }, total: 32 };
+  const pump = createOutboxPump(db, {}, { workerId: "w", maxInFlight: 8, quickSlots: 2, limits, memoryBytes: 1000 });
+  await enqueue(db, job("message.posted", { runAt: at(-60_000) }));
+  await enqueue(db, job("agent_run.execute", { runAt: at(-60_000) }));
+  const step = async (input: { lateBeats?: number; rssBytes?: number }) => {
+    const t = await pump.tune({ rssBytes: 100, ...input });
+    return [t.quick, t.long, t.braked];
+  };
+  expect(await step({ lateBeats: 31 })).toEqual([2, 6, ["processor"]]);
+  expect(await step({ rssBytes: 750 })).toEqual([2, 6, ["memory"]]);
+  const execute = db.execute;
+  db.execute = (async (query: Parameters<typeof execute>[0]) => {
+    await Bun.sleep(POOL_SLOW_MS + 50);
+    return execute.call(db, query);
+  }) as typeof db.execute;
+  try {
+    expect(await step({})).toEqual([2, 6, ["database"]]);
+  } finally {
+    db.execute = execute;
+  }
+  expect(await step({})).toEqual([4, 12, []]);
+  expect(await step({})).toEqual([8, 24, []]);
+  // Past 85% of its memory the process gives back half its long slots, though jobs still wait.
+  expect(await step({ rssBytes: 900 })).toEqual([8, 12, ["memory"]]);
+});
+
+test("createOutboxPump: runs left running past a memory shed keep no quick job waiting", async () => {
+  let release: () => void = () => {};
+  const held = new Promise<void>((r) => {
+    release = r;
+  });
+  const limits = { lanes: { quick: 8, long: 24 }, total: 32 };
+  const pump = createOutboxPump(
+    db,
+    { "agent_run.execute": () => held, "message.posted": async () => {} },
+    { workerId: "w", maxInFlight: 8, quickSlots: 2, limits, memoryBytes: 1000 },
+  );
+  for (let i = 0; i < 24; i++) await enqueue(db, job("agent_run.execute", { runAt: at(-60_000), payload: { i } }));
+  expect((await pump.tune({ rssBytes: 100 })).long).toBe(12);
+  expect((await pump.tune({ rssBytes: 100 })).long).toBe(24);
+  expect(await pump.pump()).toBe(24);
+  // Memory runs out with 24 runs going: the long lane halves to 12 under them.
+  expect((await pump.tune({ rssBytes: 900 })).long).toBe(12);
+  await enqueue(db, job("message.posted"));
+  expect(await pump.pump()).toBe(1);
+  release();
+  await pump.idle();
+});
+
+test("claimLaneAlarm: one process tells about a lane each hour, the first to record it", async () => {
+  const now = new Date("2026-11-10T09:10:00Z");
+  const later = (minutes: number) => new Date(now.getTime() + minutes * 60_000);
+  expect(await claimLaneAlarm(db, "long", now)).toBe(true);
+  expect(await claimLaneAlarm(db, "long", later(20))).toBe(false);
+  expect(await claimLaneAlarm(db, "quick", later(20))).toBe(true);
+  expect(await claimLaneAlarm(db, "long", later(60))).toBe(true);
+  // The record is never a job to run.
+  expect(await claimJobs(db, { workerId: "w", now: later(120) })).toEqual([]);
+});
+
+test("two workers on one database never claim the same job, and workspaces take turns across both", async () => {
+  const [other] = await db.insert(schema.organizations).values({ name: "Globex" }).returning();
+  const orgs = [orgId, other?.id ?? ""];
+  for (const org of orgs)
+    for (let i = 0; i < 30; i++) await enqueue(db, { orgId: org, kind: "agent_run.execute", payload: { i } });
+  const ran: string[] = [];
+  let release: () => void = () => {};
+  const held = new Promise<void>((r) => {
+    release = r;
+  });
+  const handlers = {
+    "agent_run.execute": async (j: { id: string }) => {
+      ran.push(j.id);
+      await held;
+    },
+  };
+  const pumps = ["a", "b"].map((w) => createOutboxPump(db, handlers, { workerId: w, maxInFlight: 10, quickSlots: 2 }));
+  // Both claim at once: 8 long slots each.
+  expect(await Promise.all(pumps.map((p) => p.pump()))).toEqual([8, 8]);
+  const byOrg = async () => {
+    const rows = await db.select().from(schema.outbox).where(eq(schema.outbox.status, "processing"));
+    return orgs.map((org) => rows.filter((r) => r.orgId === org).length);
+  };
+  expect(await byOrg()).toEqual([8, 8]);
+  release();
+  for (let i = 0; i < 20 && (await rows()).some((r) => r.status !== "done"); i++) {
+    await Promise.all(pumps.map((p) => p.idle()));
+    await Promise.all(pumps.map((p) => p.pump()));
+  }
+  await Promise.all(pumps.map((p) => p.idle()));
+  expect(ran).toHaveLength(60);
+  expect(new Set(ran).size).toBe(60);
   expect((await rows()).every((r) => r.status === "done")).toBe(true);
 });
 

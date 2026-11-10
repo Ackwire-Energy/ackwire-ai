@@ -1,21 +1,23 @@
 import type { Proposal } from "@agenteschat/client";
-import { ApiError, useDecideProposal, useProposals } from "@agenteschat/client";
+import { ApiError, useDecideProposal, useDecideProposals, useProposals } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { relativeTime, whenAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
+  isOpen,
   proposalTarget,
   proposalTitle,
   proposalWhy,
   proposerOf,
   sortProposals,
+  staleCount,
 } from "@agenteschat/client/lib/proposals";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import {
   Alert,
   Button,
   Card,
   Chip,
-  Diff,
   diffLines,
   EmptyState,
   Field,
@@ -31,6 +33,7 @@ import { AgentAvatar } from "@/components/AgentAvatar";
 import { ApprovalsTabs } from "@/components/ApprovalsTabs";
 import { isText, SettingChange } from "@/components/ChatCards";
 import { useOrg } from "@/components/org-context";
+import { ProseDiff } from "@/components/ProseDiff";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { useToast } from "@/lib/toast";
@@ -75,9 +78,9 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
 
   const backAgent = agentId ? dir.agentById.get(agentId) : undefined;
   const agentName = (id: string) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent");
-  const targetLabel = (p: Proposal) => proposalTarget(t, p, agentName, org.name);
+  const targetLabel = (p: Proposal) => proposalTarget(t, p, agentName, org);
   const tt = t as unknown as (key: string, options: Record<string, string>) => string;
-  const titleOf = (p: Proposal) => proposalTitle(t, p, org.name, agentName);
+  const titleOf = (p: Proposal) => proposalTitle(t, p, org, agentName);
   const whereOf = (e: Proposal["evidence"][number]) =>
     e.type ? tt(`proposals.evidence.${e.type}`, { defaultValue: e.where }) : e.where;
   const statusText = (p: Proposal) =>
@@ -113,8 +116,8 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
           {t("memory.title", agentGrammar(backAgent.name))}
         </Link>
       )}
-      <PageHeader title={t("approvals.title")} meta={t("proposals.subtitle", { org: org.name })} />
-      <ApprovalsTabs value="proposals" />
+      <PageHeader title={t("approvals.title")} meta={t(modeKey(org, "proposals.subtitle"), { org: org.name })} />
+      <ApprovalsTabs value="proposals" actions={<DecideAll proposals={list} />} />
 
       {proposals.isSuccess && list.length === 0 && (
         <EmptyState size="page" agent={look} mood="deal" title={t("proposals.emptyTitle")}>
@@ -221,10 +224,8 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
                   </Locked>
                 </Field>
               ) : (
-                <Diff
-                  aria-label={t("proposals.changeLabel")}
-                  addedLabel={t("proposals.added")}
-                  removedLabel={t("proposals.removed")}
+                <ProseDiff
+                  label={t("proposals.changeLabel")}
                   lines={diffLines(current.before.split("\n"), (editing ? draft : current.after).split("\n"))}
                 />
               )}
@@ -268,6 +269,75 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
             )}
           </Card>
         </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * "Aceitar todas" / "Recusar todas", small, at the tabs' right: the waiting proposals this person may decide, two or
+ * more. A press asks once in the same spot, then decides them oldest first, each on its own, so one gone stale never
+ * stops the rest, and says which didn't go.
+ */
+function DecideAll({ proposals }: { proposals: Proposal[] }) {
+  const { t, i18n } = useTranslation();
+  const { org } = useOrg();
+  const decide = useDecideProposals(org.id);
+  const toast = useToast();
+  const [asking, setAsking] = useState<"accept" | "refuse" | null>(null);
+  const open = proposals.filter((p) => isOpen(p) && p.canDecide).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  if (open.length < 2) return null;
+  const count = open.length;
+  const run = (decision: "accept" | "refuse") => {
+    setAsking(null);
+    decide.mutate(
+      { ids: open.map((p) => p.id), decision },
+      {
+        onSuccess: ({ failed }) => {
+          const stale = staleCount(failed);
+          const agentRows = failed.some((f) => open.find((p) => p.id === f.id && !isText(p)));
+          if (stale > 0)
+            toast.show(t(agentRows ? "proposals.staleSomeAgent" : "proposals.staleSome", { count: stale }), "error");
+          if (failed.length > stale) toast.show(errorText(t, failed[0]?.error, i18n.language), "error");
+        },
+      },
+    );
+  };
+  return (
+    // biome-ignore lint/a11y/useSemanticElements: a pair of buttons, not form fields
+    <div className="proposals-all" role="group" aria-label={t("proposals.all.label")}>
+      {asking ? (
+        <>
+          <span className="proposals-all__ask">
+            {t(asking === "accept" ? "proposals.all.acceptAsk" : "proposals.all.refuseAsk", { count })}
+          </span>
+          <Button size="sm" variant="primary" onClick={() => run(asking)}>
+            {t(asking === "accept" ? "proposals.all.acceptGo" : "proposals.all.refuseGo", { count })}
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setAsking(null)}>
+            {t("common.cancel")}
+          </Button>
+        </>
+      ) : (
+        <>
+          <Button
+            size="sm"
+            disabled={decide.isPending}
+            loading={decide.isPending && decide.variables?.decision === "accept"}
+            onClick={() => setAsking("accept")}
+          >
+            {t("proposals.all.accept")}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={decide.isPending}
+            loading={decide.isPending && decide.variables?.decision === "refuse"}
+            onClick={() => setAsking("refuse")}
+          >
+            {t("proposals.all.refuse")}
+          </Button>
+        </>
       )}
     </div>
   );

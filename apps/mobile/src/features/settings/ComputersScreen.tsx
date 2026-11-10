@@ -1,4 +1,4 @@
-import type { Machine } from "@agenteschat/client";
+import type { OrgSummary } from "@agenteschat/client";
 import {
   useAgents,
   useAuthConfig,
@@ -8,177 +8,48 @@ import {
   useMachines,
   useSetComputerTarget,
 } from "@agenteschat/client";
-import { computerEdition, computerName, type SetupView, setupView } from "@agenteschat/client/lib/computer";
+import { type NoComputer, setupView } from "@agenteschat/client/lib/computer";
 import { errorText } from "@agenteschat/client/lib/errors";
-import { joinNames } from "@agenteschat/client/lib/format";
-import { computerKind, computerState, installCommand, machineTitle } from "@agenteschat/client/lib/machines";
+import { computerState, machineTitle } from "@agenteschat/client/lib/machines";
 import { can } from "@agenteschat/client/lib/permissions";
 import { helpUrl } from "@agenteschat/client/lib/server";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import type { TFunction } from "i18next";
 import { Trans, useTranslation } from "react-i18next";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { ActivityIndicator, StyleSheet } from "react-native";
 import { ComputerPortrait } from "@/computer/ComputerPortrait";
-import { serverUrl } from "@/lib/server";
 import { useOrg } from "@/providers/org";
-import {
-  Button,
-  GroupedFooter,
-  GroupedHeader,
-  GroupedList,
-  GroupedRow,
-  type GroupedRowProps,
-  Text,
-  useToast,
-} from "@/ui";
+import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, Text, useToast } from "@/ui";
 import { router } from "@/ui/navigation";
-import { Note, openPage } from "../ai/parts";
-import { SetupWait } from "../computer/SetupWait";
+import { openPage } from "../ai/parts";
 import { computerIcon } from "../outages/logic";
 import { AgentFace } from "../shared/Face";
-import { firstUseCopy } from "../shared/first-use";
 import { useColors, useMeId } from "../shared/hooks";
-import { goBack, Loaded, successHaptic } from "../shared/parts";
-import {
-  type AgentComputerPick,
-  agentComputerPick,
-  machineFacts,
-  NO_COMPUTER,
-  noComputerKey,
-  pauseText,
-  peoplesMachines,
-} from "./logic";
-import { CommandBlock, Gap, SettingsPage } from "./parts";
+import { goBack, successHaptic } from "../shared/parts";
+import { type AgentComputerPick, agentComputerPick, NO_COMPUTER, noComputerKey } from "./logic";
+import { Gap, SettingsPage } from "./parts";
 
-/** Opens a computer's page. */
-export const openMachine = (id: string) => router.push(`/settings/computers/${id}`);
-
-/** "Usado por Infra e Dev", or that no agent uses it yet. */
-export function usedByText(t: TFunction, agents: readonly { name: string }[]) {
-  return agents.length > 0
-    ? t("machines.usedBy", {
-        names: joinNames(
-          agents.map((a) => a.name),
-          t,
-        ),
-      })
-    : t("machines.noAgents");
-}
-
-/** A computer's row in the lists: its portrait, name, facts, who uses it, and online (or paused) on the right. */
-function machineRow(t: TFunction, locale: string, m: Machine): GroupedRowProps {
-  return {
-    leading: <ComputerPortrait kind={computerKind(m.os)} state={computerState(m)} />,
-    label: machineTitle(m, t("machines.host.label")),
-    sub: machineFacts(t, locale, m),
-    subLines: 2,
-    media: true,
-    below: (
-      <Text variant="caption" tone="faint" numberOfLines={2}>
-        {[usedByText(t, m.agents), m.execAllowed ? null : t("machines.execOff")].filter(Boolean).join(" · ")}
-      </Text>
-    ),
-    value: pauseText(t, locale, m.paused) ?? (m.online ? t("machines.online") : t("machines.offline")),
-    chevron: true,
-  };
+/**
+ * What "no computer" stands for, by name: the workspace's own computer on its way reads in its mode's words (a
+ * personal one's: its person's agents', ADR 0159), else plainly none.
+ */
+function noComputerName(t: TFunction, org: OrgSummary | null, choice: NoComputer) {
+  const key = noComputerKey(choice);
+  return t(choice === "workspace" ? modeKey(org, key) : key, { org: org?.name ?? "" });
 }
 
 /** A choice's name in "Qual computador cada agente usa": a computer by its name, or what "no computer" stands for. */
-function choiceName(t: TFunction, orgName: string, pick: AgentComputerPick, id: string) {
-  if (id === NO_COMPUTER) return t(noComputerKey(pick.noComputer ?? "none"), { org: orgName });
+function choiceName(t: TFunction, org: OrgSummary | null, pick: AgentComputerPick, id: string) {
+  if (id === NO_COMPUTER) return noComputerName(t, org, pick.noComputer ?? "none");
   const m = pick.choices.find((x) => x.id === id);
   return m ? machineTitle(m, t("machines.host.label")) : "";
 }
 
 /**
- * Computadores, as the web's. Where the workspace gets its own computer (ADR 0056 §10): its card and nothing else.
- * Where people bring their own: this server's computer, the other computers and how to connect one (the app goes on
- * the computer; a server's command to copy), which computer each agent uses, then how computers work.
+ * This server's computer (`HOST_COMPUTER_TOKEN`) when it isn't in the devices list: an admin who stopped it here can
+ * use it again; with none, admins read how to make it one, but only while sign-up is closed.
  */
-export function ComputersScreen() {
-  const { t, i18n } = useTranslation();
-  const c = useColors();
-  const { orgId } = useOrg();
-  const setup = useComputerSetup(orgId);
-  const view = setupView(setup.data, setup.dataUpdatedAt);
-  const edition = computerEdition(setup.data);
-  return (
-    <SettingsPage title={t("settings.section.computers")}>
-      {edition ? (
-        <GroupedFooter>{edition === "cloud" ? t("computers.leadCloud") : t("computers.lead")}</GroupedFooter>
-      ) : null}
-      {/* No edition's words before the server says which this is: a failed answer is asked again, not guessed. */}
-      {!setup.data ? (
-        setup.isError ? (
-          <View style={styles.note}>
-            <Note icon="x">{t("common.loadFailed")}</Note>
-            <Button size="sm" variant="secondary" label={t("common.retry")} onPress={() => void setup.refetch()} />
-          </View>
-        ) : (
-          <ActivityIndicator color={c.muted} style={styles.loading} />
-        )
-      ) : view ? (
-        <Loaded>
-          <WorkspaceComputer view={view} />
-        </Loaded>
-      ) : (
-        <Loaded>
-          <HostComputer />
-          <OtherComputers />
-          <AgentComputers />
-          <Gap />
-          <GroupedList>
-            <GroupedRow
-              icon="help"
-              label={t("computers.how")}
-              chevron
-              onPress={() => openPage(helpUrl("computers", i18n.language))}
-            />
-          </GroupedList>
-        </Loaded>
-      )}
-    </SettingsPage>
-  );
-}
-
-/** The workspace's own computer: how far it is (or that it is ready), and its page once it exists. */
-function WorkspaceComputer({ view }: { view: SetupView }) {
-  const { t } = useTranslation();
-  const { orgId, org } = useOrg();
-  const machine = useMachines(orgId).data?.find((m) => m.kind === "managed");
-  return (
-    <>
-      <Gap />
-      <GroupedList>
-        <View style={styles.wait}>
-          <SetupWait view={view} online={machine?.online ?? false} />
-        </View>
-      </GroupedList>
-      {machine ? (
-        <>
-          <Gap />
-          <GroupedList>
-            <GroupedRow
-              icon={computerIcon(machine.os)}
-              label={computerName(t, org?.name ?? "", machine)}
-              sub={usedByText(t, machine.agents)}
-              subLines={2}
-              media
-              value={machine.online ? t("machines.online") : t("machines.offline")}
-              chevron
-              onPress={() => openMachine(machine.id)}
-            />
-          </GroupedList>
-        </>
-      ) : null}
-    </>
-  );
-}
-
-/**
- * This server's computer (`HOST_COMPUTER_TOKEN`), the machine agentes.chat is installed on. An admin who stopped it
- * here can use it again; with none, admins read how to make it one, but only while sign-up is closed.
- */
-function HostComputer() {
+export function HostComputerOff() {
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const { orgId, org } = useOrg();
@@ -191,15 +62,11 @@ function HostComputer() {
   const m = machines.data?.find((x) => x.kind === "host");
   const off = host.data?.on === false;
   const missing = host.isSuccess && host.data === null && admin && auth.data?.signupOpen === false;
-  if (!m && !off && !missing) return null;
+  if (m || (!off && !missing)) return null;
   return (
     <>
       <GroupedHeader>{label}</GroupedHeader>
-      {m ? (
-        <GroupedList>
-          <GroupedRow {...machineRow(t, i18n.language, m)} onPress={() => openMachine(m.id)} />
-        </GroupedList>
-      ) : off ? (
+      {off ? (
         <GroupedList>
           <GroupedRow
             leading={<ComputerPortrait kind="linux" state="offline" />}
@@ -247,77 +114,11 @@ function HostComputer() {
   );
 }
 
-/** "Outros computadores": the computers people connected with a code (each opens its page), and how to connect one. */
-function OtherComputers() {
-  const { t, i18n } = useTranslation();
-  const c = useColors();
-  const { orgId, org } = useOrg();
-  const machines = useMachines(orgId);
-  const list = peoplesMachines(machines.data ?? []);
-  const pairs = can(org, "pair_computers");
-  const noneCopy = firstUseCopy("computers", pairs);
-  return (
-    <>
-      <GroupedHeader
-        hint={{ name: t("common.about", { label: t("computers.other.title") }), text: t("computers.other.text") }}
-      >
-        {t("computers.other.title")}
-      </GroupedHeader>
-      {machines.isLoading ? <ActivityIndicator color={c.muted} style={styles.loading} /> : null}
-      {machines.isError && !machines.data ? (
-        <View style={styles.note}>
-          <Note icon="x">{t("common.loadFailed")}</Note>
-        </View>
-      ) : null}
-      {machines.isSuccess && list.length === 0 ? (
-        <GroupedList>
-          <View style={styles.empty}>
-            <ComputerPortrait kind="mac" state="offline" size={96} />
-            <Text variant="callout" tone="ink" style={[styles.bold, styles.emptyLine]}>
-              {t(noneCopy.title)}
-            </Text>
-            <Text variant="small" tone="muted" style={styles.emptyLine}>
-              {t(noneCopy.text)}
-            </Text>
-          </View>
-        </GroupedList>
-      ) : null}
-      {list.length > 0 ? (
-        <GroupedList>
-          {list.map((m) => (
-            <GroupedRow key={m.id} {...machineRow(t, i18n.language, m)} onPress={() => openMachine(m.id)} />
-          ))}
-        </GroupedList>
-      ) : null}
-      {pairs ? <ConnectComputer /> : null}
-    </>
-  );
-}
-
-/**
- * "Conectar outro computador" on a phone (ADR 0036 §2): the app goes on the computer itself (as the web says on a
- * phone, with no download here), and a server's or Linux's command, to copy and run there.
- */
-function ConnectComputer() {
-  const { t } = useTranslation();
-  return (
-    <>
-      <GroupedHeader>{t("machines.download.title")}</GroupedHeader>
-      <GroupedList>
-        <GroupedRow icon="laptop" label={t("machines.download.text")} labelLines={3} />
-      </GroupedList>
-      <GroupedHeader>{t("machines.download.other")}</GroupedHeader>
-      <CommandBlock command={installCommand(serverUrl())} />
-      <GroupedFooter>{t("machines.download.otherText")}</GroupedFooter>
-    </>
-  );
-}
-
 /**
  * "Qual computador cada agente usa": each agent and its computer. Who manages agents picks any; an agent's owner,
  * the ones they connected (the server checks again); a row anyone else can't change only says it.
  */
-function AgentComputers() {
+export function AgentComputers() {
   const { t } = useTranslation();
   const c = useColors();
   const { orgId, org } = useOrg();
@@ -344,7 +145,7 @@ function AgentComputers() {
                 key={a.id}
                 leading={<AgentFace agentId={a.id} size={30} live={false} />}
                 label={a.name}
-                value={choiceName(t, org?.name ?? "", pick, pick.value)}
+                value={choiceName(t, org ?? null, pick, pick.value)}
                 chevron={pick.canPick}
                 {...(pick.canPick
                   ? {
@@ -378,7 +179,6 @@ export function AgentComputerScreen({ agentId }: { agentId: string }) {
   const setup = setupView(setupQ.data, setupQ.dataUpdatedAt);
   const setTarget = useSetComputerTarget(orgId);
   const agent = agents.data?.find((a) => a.id === agentId);
-  const orgName = org?.name ?? "";
   if (!agent) {
     return (
       <SettingsPage title={t("computers.agents.title")}>
@@ -398,7 +198,7 @@ export function AgentComputerScreen({ agentId }: { agentId: string }) {
         onSuccess: () => {
           successHaptic();
           toast({
-            title: t("computers.agents.saved", { name: agent.name, computer: choiceName(t, orgName, pick, id) }),
+            title: t("computers.agents.saved", { name: agent.name, computer: choiceName(t, org, pick, id) }),
             icon: "check",
           });
           goBack();
@@ -414,7 +214,7 @@ export function AgentComputerScreen({ agentId }: { agentId: string }) {
         {pick.noComputer ? (
           <GroupedRow
             icon={pick.noComputer === "workspace" ? computerIcon("other") : "circle"}
-            label={t(noComputerKey(pick.noComputer), { org: orgName })}
+            label={noComputerName(t, org, pick.noComputer)}
             sub={pick.noComputer === "workspace" && setup ? t(setup.chipKey) : t("computer.target.noneText")}
             checked={pick.value === NO_COMPUTER}
             disabled={setTarget.isPending}
@@ -438,11 +238,6 @@ export function AgentComputerScreen({ agentId }: { agentId: string }) {
 }
 
 const styles = StyleSheet.create({
-  note: { paddingHorizontal: 4, paddingTop: 10, gap: 10, alignItems: "flex-start" },
   loading: { marginVertical: 16 },
-  wait: { padding: 16 },
-  emptyLine: { textAlign: "center" },
-  empty: { alignItems: "center", gap: 8, paddingVertical: 20, paddingHorizontal: 16 },
-  bold: { fontWeight: "600" },
   link: { textDecorationLine: "underline" },
 });

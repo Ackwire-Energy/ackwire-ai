@@ -1,18 +1,20 @@
 /**
- * Two rules for the public repository, run in CI via `bun run check:boundaries`:
+ * Three rules for the public repository, run in CI via `bun run check:boundaries`:
  *
  * - The edition boundary (docs/adr/0002-editions-and-modules.md): open-source code under apps/ and
  *   packages/ must never import a Cloud-only package (`@agenteschat/cloud`) or an `@agenteschat/ee` module.
- * - No internal notes: every file outside PRIVATE_PATHS is public, comments included, so none may point
- *   at the private docs (the planning doc's decision ids, the progress logs, the prototype screens) or
- *   name the team's other projects, companies and repositories.
+ * - No private files: nothing under PRIVATE_PATHS may be tracked here.
+ * - No internal notes: every file is public, comments included, so none may point at the maintainers'
+ *   private docs (planning decision ids, progress logs, prototype screens) or name the team's other
+ *   projects, companies and repositories.
  */
 import { createHash } from "node:crypto";
 import { Glob } from "bun";
 
 /**
- * The only files that stay out of the public repository. Internal notes (planning, progress, prototypes,
- * instructions about the team's own machines) go in these files and nowhere else.
+ * Paths that must never be tracked in this repository: the maintainers' internal notes (planning, progress,
+ * prototypes, instructions about their own machines) live in a private repository. docs/design/telas/ is
+ * also gitignored, for prototypes kept on a designer's computer.
  */
 export const PRIVATE_PATHS = [
   "docs/planejamento.md",
@@ -107,12 +109,17 @@ if (import.meta.main) {
     }
   }
 
+  const lsFiles = (...args: string[]) => {
+    const git = Bun.spawnSync(["git", "ls-files", "-z", ...args]);
+    if (!git.success) throw new Error(`git ls-files failed: ${git.stderr.toString()}`);
+    return git.stdout.toString().split("\0").filter(Boolean);
+  };
+  const tracked = lsFiles("--cached").filter(isPrivate);
+
   // Tracked files and new ones not ignored, so a file is checked before its first commit too.
-  const git = Bun.spawnSync(["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"]);
-  if (!git.success) throw new Error(`git ls-files failed: ${git.stderr.toString()}`);
   const notes: string[] = [];
-  for (const path of git.stdout.toString().split("\0")) {
-    if (!path || isPrivate(path) || NAMES_PRIVATE_PATHS.has(path)) continue;
+  for (const path of lsFiles("--cached", "--others", "--exclude-standard")) {
+    if (isPrivate(path) || NAMES_PRIVATE_PATHS.has(path)) continue;
     const file = Bun.file(path);
     if (!(await file.exists())) continue; // deleted, not staged yet
     const text = await file.text();
@@ -123,12 +130,13 @@ if (import.meta.main) {
   if (violations.length > 0) {
     console.error(`Open-source code must not depend on cloud/ or ee/:\n${violations.join("\n")}`);
   }
+  if (tracked.length > 0) {
+    console.error(`Private files must not be tracked here (git rm --cached them):\n${tracked.join("\n")}`);
+  }
   if (notes.length > 0) {
-    console.error(
-      "Internal notes in public files: cite the ADR or state the reason, or move the note to PRIVATE_PATHS:",
-    );
+    console.error("Internal notes in public files: cite the ADR or state the reason itself:");
     console.error(notes.join("\n"));
   }
-  if (violations.length > 0 || notes.length > 0) process.exit(1);
+  if (violations.length > 0 || tracked.length > 0 || notes.length > 0) process.exit(1);
   console.log("boundaries ok");
 }

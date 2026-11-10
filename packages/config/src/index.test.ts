@@ -97,6 +97,30 @@ describe("loadConfig", () => {
     expect(() => loadConfig({ ...valid, DATABASE_URL: "mysql://x" })).toThrow(/DATABASE_URL/);
   });
 
+  test("job slots: the quick ones leave agents' runs some; a ceiling, when set, is above where they start", () => {
+    const config = loadConfig(valid);
+    expect([
+      config.OUTBOX_MAX_IN_FLIGHT,
+      config.OUTBOX_QUICK_SLOTS,
+      config.OUTBOX_MAX_IN_FLIGHT_CEILING,
+      config.DATABASE_POOL_MAX,
+    ]).toEqual([48, 12, undefined, 20]);
+    expect(() => loadConfig({ ...valid, OUTBOX_MAX_IN_FLIGHT: "12" })).toThrow(/OUTBOX_QUICK_SLOTS must be below/);
+    expect(loadConfig({ ...valid, OUTBOX_MAX_IN_FLIGHT: "4", OUTBOX_QUICK_SLOTS: "0" }).OUTBOX_QUICK_SLOTS).toBe(0);
+    expect(loadConfig({ ...valid, OUTBOX_MAX_IN_FLIGHT: "120" }).OUTBOX_MAX_IN_FLIGHT).toBe(120);
+    expect(() => loadConfig({ ...valid, OUTBOX_MAX_IN_FLIGHT_CEILING: "40" })).toThrow(/CEILING can't be below/);
+    expect(loadConfig({ ...valid, OUTBOX_MAX_IN_FLIGHT_CEILING: "48" }).OUTBOX_MAX_IN_FLIGHT_CEILING).toBe(48);
+  });
+
+  test("a worker process runs jobs only, on a PostgreSQL database", () => {
+    expect(loadConfig(valid).SERVER_ROLE).toBe("all");
+    expect(loadConfig({ ...valid, SERVER_ROLE: "worker" }).SERVER_ROLE).toBe("worker");
+    expect(() => loadConfig({ ...valid, SERVER_ROLE: "web" })).toThrow(/SERVER_ROLE/);
+    expect(() => loadConfig({ ...valid, SERVER_ROLE: "worker", DATABASE_URL: "pglite:///data/db" })).toThrow(
+      /SERVER_ROLE=worker needs a PostgreSQL/,
+    );
+  });
+
   test("rejects malformed model ids", () => {
     expect(() => loadConfig({ ...valid, AGENT_DEFAULT_MODEL: "Claude Sonnet" })).toThrow(/AGENT_DEFAULT_MODEL/);
   });

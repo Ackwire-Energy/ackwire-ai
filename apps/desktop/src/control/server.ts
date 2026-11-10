@@ -23,6 +23,10 @@ export interface ServerWorkspaces {
   server: string;
   signedIn: boolean;
   orgs: ServerWorkspace[];
+  /** It didn't answer since this time (milliseconds since 1970): its last answer, kept. Absent: it answered. */
+  offlineSince?: number;
+  /** The server the app runs on this computer (also at its Tailscale address). Absent in older apps. */
+  here?: boolean;
 }
 
 /** agentes.chat, a server on this computer, one on the person's Tailscale network, or one elsewhere. */

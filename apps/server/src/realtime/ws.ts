@@ -3,6 +3,7 @@ import {
   BROWSER_VIEW,
   channelTopic,
   chatActivityTopic,
+  listenResumedTopic,
   MAX_FRAME_BYTES,
   orgTopic,
   type Presence,
@@ -280,7 +281,9 @@ export async function currentSubscriptions(
 export function createRealtime(deps: RealtimeDeps) {
   const origins = allowedOrigins(deps.config);
   const send = (ws: BrowserSocket, frame: unknown): void => {
-    ws.send(JSON.stringify(frame));
+    // 0: Bun dropped it, past its backpressure limit (a frozen tab that stopped reading). The app would never learn
+    // what it missed; closed, it reconnects and reads it.
+    if (ws.send(JSON.stringify(frame)) === 0 && ws.readyState === 1) ws.close(1013, "too far behind");
   };
   // A new message reaches its members' sockets on this replica as `channel.activity` (no content): their lists
   // count it as unread without subscribing to every channel. The author's own sockets never hear it.
@@ -312,6 +315,11 @@ export function createRealtime(deps: RealtimeDeps) {
             send(ws, { type: "event", scope: "user", event });
       })
       .catch(() => {});
+  });
+  // This replica's LISTEN came back after a gap: its sockets stayed open while what was said meanwhile never reached
+  // them. Closed as a service restart, their apps reconnect, which subscribes again and reads what they missed.
+  deps.pubsub.subscribe(listenResumedTopic, () => {
+    for (const ws of browsers) if (ws.readyState === 1) ws.close(1012, "events were missed");
   });
 
   async function liveSession(ws: BrowserSocket, force = false): Promise<boolean> {

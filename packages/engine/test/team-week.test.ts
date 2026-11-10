@@ -255,6 +255,21 @@ describe("the card", () => {
     expect(inbox.map((n) => n.kind)).toContain("agent_reply");
   });
 
+  test("a personal workspace's card says the week is the person's own (ADR 0159)", async () => {
+    f = await setup({ rightHand: true });
+    await busyWeek(f);
+    await f.db
+      .update(schema.organizationSettings)
+      .set({ mode: "personal" })
+      .where(eq(schema.organizationSettings.orgId, f.org.id));
+    const id = await postTeamWeek({ db: f.db, pubsub: f.pubsub }, f.org.id, {
+      userId: f.owner.id,
+      slot: SLOT.toISOString(),
+    });
+    const { m } = await cardOf(f, id as string);
+    expect(m.body).toBe("Sua semana está pronta");
+  });
+
   test("a quiet week says nothing, and a member never gets one", async () => {
     f = await setup({ rightHand: true });
     await inZone(f);

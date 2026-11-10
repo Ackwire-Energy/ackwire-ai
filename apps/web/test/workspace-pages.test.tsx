@@ -208,7 +208,7 @@ describe("Memória e propostas", () => {
     expect(document.body.textContent).toContain("Nada encontrado com “zzz”.");
   });
 
-  test("proposals: neutral diff, edit before accepting, accept", async () => {
+  test("proposals: the change drawn as Markdown, green and red, edit before accepting, accept", async () => {
     const r = await go(`proposals?agent=${ADA_ID}`);
     expect(screen().getByRole("heading", { level: 1, name: "Aprovações" })).toBeTruthy();
     expect(screen().getByRole("tab", { name: /Propostas de melhoria/, selected: true }).textContent).toContain("2");
@@ -216,11 +216,14 @@ describe("Memória e propostas", () => {
     const detail = screen().getByRole("article");
     expect(detail.textContent).toContain("Ada propõe · instruções da Ada");
     expect(detail.querySelector(".ac-chip--waiting")?.textContent).toBe("Aguardando você");
-    const added = detail.querySelectorAll(".ac-diff__line--add");
-    const removed = detail.querySelectorAll(".ac-diff__line--del");
+    const added = detail.querySelectorAll(".ac-diff__block--add");
+    const removed = detail.querySelectorAll(".ac-diff__block--del");
     expect(added.length).toBe(2);
     expect(removed.length).toBe(1);
-    expect(removed[0]?.textContent).toBe("−Removido: Pede ajuda ao João quando a mudança tocar em pagamentos.");
+    expect(removed[0]?.textContent).toBe("Removido: Pede ajuda ao João quando a mudança tocar em pagamentos.");
+    // Each block is the instructions' own Markdown, drawn as the Instructions tab draws them: no "+" or "−" column.
+    expect(removed[0]?.querySelector(".md")).not.toBeNull();
+    expect(detail.querySelector(".ac-diff__mark")).toBeNull();
     expect(detail.textContent).toContain("Recusar ensina a Ada a não propor isso de novo.");
     await click(within(detail).getByRole("button", { name: "Editar antes de aceitar" }));
     const text = within(detail).getByLabelText("Texto final das instruções");
@@ -302,6 +305,43 @@ describe("Memória e propostas (fase 5)", () => {
     for (const p of state.proposals) p.canDecide = false;
     await go("proposals", state);
     expect(screen().getByRole("tab", { name: /Pedidos/ }).textContent).toBe("Pedidos");
+  });
+
+  test("Aceitar todas at the tabs' right asks once, then decides every waiting proposal oldest first", async () => {
+    const state = seedState();
+    const [newer, older] = state.proposals;
+    if (!newer || !older) throw new Error("two proposals expected");
+    for (const p of state.proposals) p.canDecide = true;
+    Object.assign(newer, { createdAt: "2026-11-05T10:00:00.000Z" });
+    Object.assign(older, { createdAt: "2026-11-01T10:00:00.000Z" });
+    const r = await go("proposals", state);
+    const bar = screen().getByRole("group", { name: "Decidir todas as propostas" });
+    expect(bar.closest(".tabs-bar")).not.toBeNull();
+    await click(within(bar).getByRole("button", { name: "Aceitar todas" }));
+    expect(bar.textContent).toContain("Aceitar as 2 propostas? Cada uma muda na hora.");
+    expect(r.state.calls.some((c) => c.method === "proposals.accept")).toBe(false);
+    await click(within(bar).getByRole("button", { name: "Aceitar as 2" }));
+    await settle(4);
+    const accepted = r.state.calls.filter((c) => c.method === "proposals.accept").map((c) => c.args[1]);
+    expect(accepted).toEqual([older.id, newer.id]);
+  });
+
+  test("Recusar todas asks first, and Cancelar decides nothing; one proposal to decide has no bar", async () => {
+    const state = seedState();
+    for (const p of state.proposals) p.canDecide = true;
+    const r = await go("proposals", state);
+    const bar = screen().getByRole("group", { name: "Decidir todas as propostas" });
+    await click(within(bar).getByRole("button", { name: "Recusar todas" }));
+    expect(bar.textContent).toContain("Recusar as 2 propostas? Os agentes não propõem isso de novo.");
+    await click(within(bar).getByRole("button", { name: "Cancelar" }));
+    expect(within(bar).getByRole("button", { name: "Recusar todas" })).toBeTruthy();
+    expect(r.state.calls.some((c) => c.method === "proposals.refuse")).toBe(false);
+    cleanup();
+    const one = seedState();
+    const [first] = one.proposals;
+    for (const p of one.proposals) p.canDecide = p === first;
+    await go("proposals", one);
+    expect(screen().queryByRole("group", { name: "Decidir todas as propostas" })).toBeNull();
   });
 
   test("proposals you can't decide have no actions", async () => {
@@ -490,7 +530,9 @@ describe("Equipe (ADR 0148)", () => {
     state.approvals = state.approvals.filter((a) => a.agentId !== ATLAS_ID);
     await go("team", state);
     expect(screen().getByRole("heading", { name: "Equipe" })).toBeTruthy();
-    expect(document.querySelector(".ac-pagehead__meta")?.textContent).toBe("2 pessoas · 2 agentes · 0 setores");
+    // Its count on the title's row.
+    const count = document.querySelector(".ac-pagehead__titleline > .ac-pagehead__count");
+    expect(count?.textContent).toBe("2 pessoas · 2 agentes · 0 setores");
     // The same action as the sidebar's, in the same words.
     const head = document.querySelector(".ac-pagehead") as HTMLElement;
     expect(within(head).getByRole("link", { name: "Criar agente" })).toBeTruthy();

@@ -107,6 +107,7 @@ const MULTIPART_PATHS = [
   /\/organizations\/[^/]+\/artifacts(\/[^/]+)?\/files$/,
   /\/organizations\/[^/]+\/imports\/files$/,
   /\/organizations\/[^/]+\/channels\/[^/]+\/voice$/,
+  /\/feedback\/files$/,
 ];
 /** Multipart overhead allowed on top of an uploaded file itself. */
 export const MULTIPART_SLACK_BYTES = 64 * 1024;

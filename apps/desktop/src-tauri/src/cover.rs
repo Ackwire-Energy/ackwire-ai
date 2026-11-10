@@ -152,6 +152,15 @@ pub fn server_here_ready(app: &AppHandle) {
     }
 }
 
+/// The server here can't start while a page of it is on screen: the cover comes back over it (Try again, Copy
+/// details), and loads the page again once it answers.
+pub fn over_server_here(app: &AppHandle) {
+    let Some(site) = main_window::site(app) else { return };
+    if crate::local_server::is_here(app, &site.origin().ascii_serialization()) {
+        show(app, Duration::ZERO);
+    }
+}
+
 /// The site, once it painted its first screen (apps/web `pageReady`).
 #[tauri::command]
 pub fn page_ready(app: AppHandle, webview: tauri::Webview) -> Result<(), String> {
@@ -282,6 +291,30 @@ pub fn cover_server(app: AppHandle, webview: tauri::Webview) -> Result<Option<St
     Ok(main_window::site(&app).map(|s| s.origin().ascii_serialization()))
 }
 
+/// The cover's Copy details over a server other than the one here: the window's own story (the app's version, the
+/// server it opens, what the cover did, from `window.log`), never the server here's.
+#[tauri::command]
+pub fn cover_details(app: AppHandle, webview: tauri::Webview) -> Result<String, String> {
+    if webview.label() != LABEL {
+        return Err("only the cover asks this".into());
+    }
+    let server = main_window::site(&app).map(|s| s.origin().ascii_serialization()).unwrap_or_default();
+    let log = app
+        .path()
+        .app_log_dir()
+        .ok()
+        .and_then(|d| std::fs::read_to_string(d.join("window.log")).ok())
+        .unwrap_or_default();
+    Ok(window_details(&app.package_info().version.to_string(), std::env::consts::OS, &server, &log))
+}
+
+/// What the window's Copy details says: versions, the server, the last lines of `window.log`.
+pub fn window_details(version: &str, os: &str, server: &str, log: &str) -> String {
+    let lines: Vec<&str> = log.lines().collect();
+    let tail = lines[lines.len().saturating_sub(40)..].join("\n");
+    format!("agentes.chat {version} ({os})\nserver: {server}\n\nwindow.log:\n{tail}\n")
+}
+
 /// The cover: the person chose to see the page as it is ("Mostrar assim mesmo"), after it didn't open.
 #[tauri::command]
 pub fn cover_hide(app: AppHandle, webview: tauri::Webview) -> Result<(), String> {
@@ -291,4 +324,19 @@ pub fn cover_hide(app: AppHandle, webview: tauri::Webview) -> Result<(), String>
     note(&app, "the page never painted: shown as it is, by hand");
     hide(&app);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_windows_own_details() {
+        let log: String = (1..=50).map(|n| format!("{n} 0.6.0 step {n}\n")).collect();
+        let text = window_details("0.6.0", "macos", "https://chat.example.com", &log);
+        assert!(text.starts_with("agentes.chat 0.6.0 (macos)\nserver: https://chat.example.com\n"));
+        // The last 40 lines only.
+        assert!(text.contains("11 0.6.0 step 11") && !text.contains("\n10 0.6.0 step 10"));
+        assert!(window_details("0.6.0", "macos", "", "").ends_with("window.log:\n\n"));
+    }
 }

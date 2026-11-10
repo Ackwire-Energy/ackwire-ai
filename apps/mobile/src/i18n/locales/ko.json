@@ -47,7 +47,7 @@
       "now": "지금 {{host}}에 연결됨",
       "invalid": "주소를 확인해 주세요. agentes.yourteam.ts.net 같은 형식이에요.",
       "unreachable": "{{host}}에 연결할 수 없어요. 주소와 연결 상태를 확인하고 다시 시도해 주세요.",
-      "unreachableTailscale": "{{host}}에 연결할 수 없어요. Tailscale에 있는 서버예요. Tailscale 앱을 열어 연결한 다음 다시 시도해 주세요.",
+      "unreachableTailscale": "{{host}}에 연결할 수 없어요. Tailscale에 있는 서버예요. Tailscale 앱을 열고 연결한 뒤 다시 시도하세요. 이미 연결돼 있나요? 서버 컴퓨터가 잠자기 상태이거나 앱이 닫혀 있을 수 있어요.",
       "certificate": "{{host}}의 인증서가 유효하지 않아요. 서버 관리자에게 문의해 주세요.",
       "notAgentes": "{{host}}은(는) agentes.chat 서버가 아니에요. 주소를 확인해 주세요.",
       "serverTooOld": "{{host}}을(를) 이 앱에서 쓰려면 서버 업데이트가 필요해요.",

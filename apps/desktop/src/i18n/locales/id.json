@@ -122,7 +122,8 @@
     "quitTitle": "Keluar dari agentes.chat?",
     "quitBody": "Agen tidak bisa memakai {{device}} ini selama aplikasi tertutup. Yang sudah berjalan akan selesai dan mengirim hasilnya saat kamu membukanya lagi.",
     "quitHereBody": "agentes.chat berhenti di {{device}} ini: tidak ada yang bisa memakainya, di sini, di ponselmu, atau di ponsel rekan timmu, sampai kamu membuka aplikasinya lagi.",
-    "quitConfirm": "Keluar"
+    "quitConfirm": "Keluar",
+    "pauseHintServer": "Yang sudah berjalan selesai seperti biasa. Server tetap menyala."
   },
   "first": {
     "title": "Timmu dan agenmu, bersama",
@@ -134,7 +135,9 @@
     "addTitle": "Tambah ruang kerja",
     "addLead": "Yang sudah kamu punya tetap di sini, masing-masing dengan login sendiri.",
     "addCloud": "Buat ruang kerja di agentes.chat",
-    "addOwn": "Pakai server timmu"
+    "addOwn": "Pakai server timmu",
+    "addNew": "Mau workspace baru?",
+    "addNewLink": "Buat satu"
   },
   "own": {
     "title": "Servermu sendiri",
@@ -161,14 +164,22 @@
     "none": "Belum punya? Jalankan ini di sana",
     "noneText": "Di terminal server atau Mac mini. Di akhir, muncul tautan yang menghubungkan aplikasi ini ke sana.",
     "invalid": "Periksa alamatnya, misalnya agentes.timkamu.ts.net.",
-    "httpRefused": "{{host}} memakai http biasa, yang hanya berfungsi di {{device}} ini. Pakai alamat Tailscale-nya atau alamat dengan https.",
-    "noOwner": "{{host}} belum punya akun pemilik. Buka tautan pemiliknya (berakhiran /owner#claim=…), di {{device}} ini atau di ponselmu.",
-    "unreachable": "Kami tidak bisa menjangkau {{host}}. Jika ada di Tailscale, buka Tailscale di {{device}} ini, hubungkan, lalu coba lagi.",
+    "httpRefused": "{{host}} tidak memakai koneksi aman (https), dan hanya server di {{device}} ini yang boleh tanpanya. Pakai alamat https-nya atau alamat Tailscale-nya.",
+    "noOwner": "{{host}} belum punya pemilik. Orang yang memasang server mendapat tautan untuk membuat akun pemilik: buka tautan itu di {{device}} ini atau di ponselmu.",
+    "unreachable": "Kami tidak bisa menjangkau {{host}}. Periksa alamatnya dan pastikan servernya menyala, lalu coba lagi.",
     "unreachableHere": "Tidak ada yang merespons di {{host}} pada {{device}} ini. Jalankan agentes.chat di sini, lalu coba lagi.",
     "certificate": "Sertifikat {{host}} tidak valid. Hubungi orang yang mengelola server.",
     "notAgentes": "{{host}} bukan server agentes.chat. Periksa alamatnya.",
     "serverTooOld": "{{host}} perlu diperbarui agar bisa dipakai dengan aplikasi ini.",
-    "appTooOld": "Perbarui aplikasi untuk memakai {{host}}."
+    "appTooOld": "Perbarui aplikasi untuk memakai {{host}}.",
+    "foundNoOwner": "Menunggu akun pemiliknya",
+    "setUp": "Siapkan",
+    "noneFound": "Tidak ada server yang ditemukan.",
+    "lookAgain": "Cari lagi",
+    "tailnetOff": "Tailscale mati di {{device}} ini, jadi server di jaringan Tailscale-mu tidak muncul di sini.",
+    "addressHint": "Alamat dengan https, atau alamat Tailscale-nya, yang berakhiran .ts.net.",
+    "checkUpdates": "Periksa pembaruan",
+    "unreachableTailnet": "Kami tidak bisa menjangkau {{host}}, yang ada di jaringan Tailscale-mu. Buka Tailscale di {{device}} ini, hubungkan, lalu coba lagi."
   },
   "here": {
     "title": "Jalankan agentes.chat di {{device}} ini",
@@ -224,7 +235,9 @@
       "serve": "Tailscale di {{device}} ini tidak bisa membagikannya",
       "operator": "Tailscale butuh izinmu dulu",
       "stopped": "kamu berhenti menunggu HTTPS diaktifkan",
-      "start": "agentes.chat tidak merespons lagi di alamat barunya"
+      "start": "agentes.chat tidak merespons lagi di alamat barunya",
+      "notConnected": "Tailscale tidak terhubung di {{device}} ini",
+      "back": "agentes.chat tidak merespons lagi di {{device}} ini setelah akses dari perangkatmu dimatikan."
     },
     "serveFix": "Pasang Tailscale dari tailscale.com.",
     "operatorRun": "Berikan izin itu sekali, di terminal:",
@@ -234,13 +247,15 @@
     "notifyFailed": "Penyiapan agentes.chat di {{device}} ini tidak selesai",
     "notifyFailedBody": "Buka agentes.chat untuk melihat apa yang terjadi.",
     "already": "agentes.chat sudah terpasang di {{device}} ini",
-    "alreadyText": "Berjalan sendiri, dipasang dari terminal, di {{url}}.",
+    "alreadyText": "Berjalan sendiri, dipasang dari terminal. Pakai di aplikasi ini.",
     "useIt": "Pakai",
     "notRunning": "agentes.chat terpasang di {{device}} ini, tapi tidak berjalan",
-    "notRunningText": "Dipasang dari terminal, di {{path}}. Jalankan di sana, lalu coba lagi.",
+    "notRunningText": "Dipasang dari terminal, di {{path}}. Untuk menjalankannya, jalankan ini di terminal, lalu coba lagi:",
     "running": "agentes.chat sudah berjalan di {{device}} ini",
-    "runningText": "Aplikasi ini yang menjalankannya, di {{url}}.",
-    "openIt": "Buka"
+    "runningText": "Aplikasi ini yang menjalankannya. Buka untuk masuk.",
+    "openIt": "Buka",
+    "connectTray": "Hubungkan lewat ikonnya di dekat jam.",
+    "alreadyDocker": "Berjalan sendiri, dipasang dengan Docker. Pakai di aplikasi ini."
   },
   "link": {
     "question": "Hubungkan aplikasi ke server ini?",
@@ -252,7 +267,9 @@
     "checking": "Memeriksa server…",
     "notALink": "Tautan ini bukan dari server agentes.chat.",
     "chipTailnet": "Tailscale",
-    "chipHere": "{{device}} ini"
+    "chipHere": "{{device}} ini",
+    "thisServer": "agentes.chat di {{device}} ini",
+    "tailnetHelp": "Ada di jaringan Tailscale: hanya terbuka di perangkat yang terhubung ke Tailscale dengan akun yang sama."
   },
   "servers": {
     "title": "Server",
@@ -277,7 +294,12 @@
     "workspaces_other": "{{count}} ruang kerja",
     "signedOut": "Belum masuk",
     "newsOne": "1 notifikasi baru",
-    "newsMany": "{{n}} notifikasi baru"
+    "newsMany": "{{n}} notifikasi baru",
+    "offline": "Offline sejak {{time}}",
+    "signIn": "Masuk",
+    "signOut": "Keluar dari server ini",
+    "signedOutDone": "Kamu keluar dari {{host}}",
+    "removeFromApp": "Hapus dari aplikasi ini"
   },
   "server": {
     "title": "agentes.chat di {{device}} ini",
@@ -316,7 +338,30 @@
     "failingBanner": "agentes.chat gagal dimulai di {{device}} ini",
     "version": "Versi {{version}}, diperbarui bersama aplikasi",
     "updatesWithApp": "Memperbarui aplikasi juga memperbarui agentes.chat di {{device}} ini.",
-    "updateBack": "Pembaruan tidak berjalan. agentes.chat kembali ke {{version}}."
+    "updateBack": "Pembaruan tidak berjalan. agentes.chat kembali ke {{version}}.",
+    "restarting": "Memulai ulang",
+    "tailnetDown": "Berjalan · Tailscale tidak terhubung di {{device}} ini",
+    "failingBody": "Buka aplikasinya untuk melihat apa yang terjadi dan mencoba lagi.",
+    "restartedBanner": "agentes.chat dimulai ulang 3 kali di {{device}} ini",
+    "restartedBody": "Ini akan kembali sendiri. Kalau terus terjadi, buka aplikasinya untuk melihat alasannya.",
+    "updateBackBody": "Versi baru akan dicoba lagi pada pembaruan aplikasi berikutnya.",
+    "stopFor1h": "Hentikan selama 1 jam",
+    "startNow": "Mulai sekarang",
+    "stopUntilStart": "Hentikan sampai saya memulainya",
+    "stopForget": "Jangan mulai bersama aplikasi…",
+    "stopNote": "Menghentikannya memutus akses semua orang, termasuk dari ponsel.",
+    "stopTitle": "Hentikan agentes.chat di {{device}} ini?",
+    "stopBody": "Ponsel dan tim kehilangan akses sampai server kembali.",
+    "stoppedUntil": "Berhenti · kembali pukul {{time}}",
+    "stoppedHeld": "Berhenti sampai kamu memulainya",
+    "reachRestart": "Menyalakan atau mematikannya memulai ulang agentes.chat sebentar.",
+    "reachOffTitle": "Matikan akses dari perangkatmu?",
+    "reachOffBody": "Ponsel dan tim kehilangan akses. Hanya {{device}} ini yang tetap memakainya.",
+    "reachOffConfirm": "Matikan",
+    "failingWhy": "Detailnya menjelaskan alasannya: salin untuk orang yang membantumu, atau lihat log.",
+    "showLogs": "Tampilkan log",
+    "help": "Bantuan",
+    "gotIt": "Mengerti"
   },
   "pair": {
     "title": "Izinkan agen {{org}} bekerja di {{device}} ini?",
@@ -396,6 +441,34 @@
       "menuBarTitle": "Tampilkan di bar menu",
       "notchTitle": "Tampilkan agen di notch",
       "notchDesc": "Di MacBook dengan notch: siapa yang sedang bekerja tampil di sekitar kamera."
+    },
+    "thisMac": {
+      "agents": "Agen",
+      "letAgents": "Izinkan agen memakai {{device}} ini",
+      "letAgentsDesc": "Agen memakai {{device}} ini saat perlu, selama aplikasi terbuka.",
+      "commandsDesc": "Tes, build, dan perintah Terminal lainnya. Semuanya berjalan sebagai {{user}}, dan setiap perintah muncul di Aktivitas.",
+      "who": "Siapa yang bisa memakai",
+      "whoDesc": "Hanya saya berarti kamu, dan agen yang bekerja untukmu.",
+      "whoIn": "Siapa yang bisa memakai di {{org}}",
+      "owner": "Hanya saya",
+      "everyone": "Semua orang di {{org}}",
+      "people": "Orang atau peran tertentu",
+      "edit": "Ubah",
+      "pickTitle": "Siapa yang bisa memakai {{device}} ini",
+      "search": "Cari orang",
+      "noMatch": "Tidak ada yang cocok",
+      "ownerAlways": "Kamu selalu bisa memakainya, sebagai pemilik.",
+      "save": "Simpan",
+      "saved": "Tersimpan",
+      "phones": "Ponsel di {{device}} ini",
+      "phonesIn": "Ponsel di {{device}} ini dalam {{org}}",
+      "plug": "Colokkan ponsel ke {{device}} ini untuk menambahkannya.",
+      "androidSteps": "Langkah Android",
+      "iphoneSteps": "Langkah iPhone",
+      "wider": "Agen milik orang lain berjalan di sini sebagai {{user}} dan bisa membaca file kamu.",
+      "phoneWho": "{{who}} bisa memakainya",
+      "signedOut": "Masuk ke {{server}} di aplikasi untuk melihat siapa yang bisa memakai {{device}} ini.",
+      "unreachable": "Tidak bisa terhubung ke {{server}}. Periksa koneksi lalu coba lagi."
     },
     "folders": {
       "title": "Folder",
@@ -560,6 +633,32 @@
       "folderDesc": "Satu folder per ruang kerja, dengan satu folder untuk setiap agen."
     }
   },
+  "iphone": {
+    "lead": "{{device}} ini yang mengurus penyiapannya. Kamu hanya mengetuk iPhone saat sebuah langkah memintanya.",
+    "account": "Akun Apple di Xcode",
+    "checking": "Memeriksa {{device}} ini…",
+    "xcodeText": "Pasang Xcode dari App Store. Langkah ini lanjut sendiri setelah Xcode ada.",
+    "xcodeOld": "iPhone ini butuh Xcode yang lebih baru. Perbarui di App Store.",
+    "updateXcode": "Perbarui Xcode",
+    "toolsStarting": "Memulai unduhan…",
+    "toolsProgress": "{{done}} dari {{total}}",
+    "toolsPercent": "{{percent}}% terunduh",
+    "toolsFailed": "Unduhan berhenti: {{message}}",
+    "accountText": "Tambahkan di Xcode › Settings › Accounts. Akun Apple gratis sudah cukup.",
+    "openXcode": "Buka Xcode",
+    "personalTeam": "{{name}} · Tim Pribadi",
+    "unlockText": "Buka kunci iPhone dan biarkan terbuka sebentar.",
+    "oldText": "iOS di iPhone ini terlalu lama untuk alat Xcode.",
+    "devModeHint": "Ini baru muncul di Pengaturan setelah sebuah Mac dipasangkan dengan iPhone. {{device}} ini sudah melakukannya.",
+    "helperText": "{{device}} ini membuatnya dan memperbaruinya setiap 7 hari. Pertama kali, percayai di iPhone.",
+    "helperHint": "Pengaturan › Umum › VPN & Manajemen Perangkat, ketuk Akun Apple kamu, lalu Percayai. Pembaruan butuh Xcode yang sudah masuk.",
+    "helperBuilding": "Membuat helper pengujian…",
+    "qr": "Pindai dengan iPhone untuk melihat langkah ini di sana.",
+    "qrLabel": "Kode QR yang membuka langkah ini di iPhone",
+    "tip": "Siap kapan saja",
+    "tipHint": "Untuk iPhone uji yang tetap tercolok: Kunci Otomatis Jangan Pernah, pembaruan otomatis mati, tanpa kode sandi, dan {{device}} ini tersambung ke listrik.",
+    "progress": "Penyiapan iPhone"
+  },
   "cover": {
     "offline": "Tidak ada koneksi internet · mencoba lagi…",
     "unreachable": "Tidak bisa menjangkau {{host}} · mencoba lagi…",
@@ -579,7 +678,14 @@
     "openTailscale": "Buka Tailscale",
     "otherServer": "Pakai server lain",
     "stuck": "agentes.chat tidak terbuka. Coba lagi, atau lihat halamannya apa adanya.",
-    "showAnyway": "Tetap tampilkan"
+    "showAnyway": "Tetap tampilkan",
+    "copyFailed": "Gagal menyalin",
+    "held": "agentes.chat berhenti di {{device}} ini sampai kamu memulainya.",
+    "heldUntil": "agentes.chat berhenti di {{device}} ini. Akan kembali sendiri pukul {{time}}.",
+    "startNow": "Mulai sekarang",
+    "openOther": "Buka {{server}}",
+    "onlyHereWorking": "Mematikan akses dari perangkatmu…",
+    "onlyHereFailed": "Akses dari perangkatmu tidak bisa dimatikan."
   },
   "menu": {
     "about": "Tentang agentes.chat",
@@ -628,5 +734,9 @@
     "bringAllToFront": "Bawa semua ke depan",
     "help": "Bantuan",
     "downloaded": "Unduhan selesai"
+  },
+  "windowTitle": {
+    "welcome": "Selamat datang",
+    "prefs": "Preferensi"
   }
 }

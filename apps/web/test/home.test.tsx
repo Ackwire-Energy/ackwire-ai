@@ -292,8 +292,9 @@ describe("Início", () => {
     expect(document.querySelector(".ac-pagehead__meta")?.textContent).toBe(
       "Seu workspace está pronto. Comece por aqui.",
     );
+    // The card's three rows (ADR 0162): an AI, apps, people.
     const line = document.querySelector(".home-continue") as HTMLElement;
-    expect(line.textContent).toBe("Continue de onde parou · 1 de 5");
+    expect(line.textContent).toBe("Continue de onde parou · 1 de 3");
     expect(screen().queryByRole("region", { name: "Primeiros passos" })).toBeNull();
     for (const empty of ["Desde a sua última visita", "Próximas rotinas"])
       expect(screen().queryByRole("region", { name: empty })).toBeNull();
@@ -366,6 +367,37 @@ describe("what opens when the app starts", () => {
     localStorage.setItem("agentes.lastPlace", JSON.stringify({ [ORG_ID]: `/org/${ORG_ID}/c/${GENERAL_ID}` }));
     ({ router } = await opening({ page: "last", channelId: null }, left));
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/home`);
+  });
+
+  test("a personal workspace opens on the last conversation, else on its right hand's", async () => {
+    const personal = (state: FakeState) => {
+      if (state.me?.organizations[0]) state.me.organizations[0].mode = "personal";
+      withRightHand(state);
+    };
+    let { router } = await opening({ page: "home", channelId: null }, personal);
+    await settle(4);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/dm/agent/${LODI_ID}`);
+    cleanup();
+
+    // A page that isn't a conversation doesn't count: still the right hand's.
+    showWorkspace(null);
+    localStorage.setItem("agentes.lastPlace", JSON.stringify({ [ORG_ID]: `/org/${ORG_ID}/wiki` }));
+    ({ router } = await opening({ page: "home", channelId: null }, personal));
+    await settle(4);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/dm/agent/${LODI_ID}`);
+    cleanup();
+
+    showWorkspace(null);
+    localStorage.setItem("agentes.lastPlace", JSON.stringify({ [ORG_ID]: `/org/${ORG_ID}/c/${ENG_ID}` }));
+    ({ router } = await opening({ page: "home", channelId: null }, personal));
+    await settle(4);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${ENG_ID}`);
+    cleanup();
+
+    // A chosen channel still wins.
+    showWorkspace(null);
+    ({ router } = await opening({ page: "channel", channelId: GENERAL_ID }, personal));
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${GENERAL_ID}`);
   });
 
   test("only when the workspace opens: inside it, its address is Início, and a link's request goes there too", async () => {

@@ -15,6 +15,7 @@ import {
   NOW,
   ORG_ID,
   seedState,
+  withRightHand,
 } from "./fake-api";
 import type { FakeDashboards } from "./fakes/dashboards";
 import { renderApp, screen, settle } from "./render";
@@ -38,8 +39,8 @@ function setup(prepare?: (fake: FakeDashboards) => void, state: FakeState = seed
   prepare?.(fake);
   return { api, fake, state };
 }
-const open = async (path: string, prepare?: (fake: FakeDashboards) => void) => {
-  const s = setup(prepare);
+const open = async (path: string, prepare?: (fake: FakeDashboards) => void, state?: FakeState) => {
+  const s = setup(prepare, state);
   const view = await renderApp(path, { api: s.api });
   await settle(8);
   return { ...s, router: view.router };
@@ -125,16 +126,28 @@ describe("Dashboards: in the sidebar's More, and the list (ADR 0135 §14)", () =
     expect(css).toMatch(/\.db-thumb:has\(> \.db-thumb__tile--empty\) \{\s*grid-auto-rows: 1fr;/);
   });
 
-  test("only My Home: no empty state saying there are none, a line under it pointing at New dashboard", async () => {
-    await open(`/org/${ORG_ID}/dashboards`, (fake) => {
-      fake.addBoard({ kind: "home" });
-    });
+  test("only My Home: under it the right hand says what a dashboard is, with Novo painel and an ask to it", async () => {
+    await open(
+      `/org/${ORG_ID}/dashboards`,
+      (fake) => {
+        fake.addBoard({ kind: "home" });
+      },
+      withRightHand(seedState()),
+    );
     const home = section("Meu Início");
     expect(within(home).getByRole("link", { name: /Meu Início/ })).toBeTruthy();
-    expect(home.textContent).toContain("Crie um painel para o workspace ou para alguns papéis em “Novo painel”.");
-    expect(document.querySelector(".ac-empty")).toBeNull();
-    // The page's own button is the one way to make one.
+    const empty = document.querySelector(".ac-empty") as HTMLElement;
+    expect(empty.querySelector(".ac-empty__agent")).not.toBeNull();
+    expect(empty.querySelector(".ac-empty__title")?.textContent).toBe("Monte o primeiro painel do time");
+    expect(empty.querySelector(".ac-empty__text")?.textContent).toBe(
+      "Um painel junta números e gráficos numa página, e os agentes mantêm tudo em dia.",
+    );
+    // One way in: the empty state's Novo painel, the header's steps aside.
     expect(screen().getAllByRole("button", { name: "Novo painel" })).toHaveLength(1);
+    expect(document.querySelector(".ac-pagehead__actions")).toBeNull();
+    expect(within(empty).getByRole("button", { name: "Peça ao Lodi" })).toBeTruthy();
+    await act(async () => fireEvent.click(within(empty).getByRole("button", { name: "Novo painel" })));
+    expect(screen().getByRole("dialog", { name: "Novo painel" })).toBeTruthy();
   });
 });
 

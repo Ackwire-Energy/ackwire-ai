@@ -246,6 +246,7 @@ export function ApprovalsPage() {
   const { missions } = useMissionsWaitingYou();
   const commands = pendingCommandCount(missions);
   const missionWaiting = missionsWaiting(missions).length > 0;
+  const missionsBelow = filter === "pending" && (commands > 0 || missionWaiting);
   const waitingYou = mine.length + commands;
 
   // J/K (and ↑/↓ inside the list) walk the requests, A approves the open one (high risk: focuses the hold), R
@@ -376,7 +377,8 @@ export function ApprovalsPage() {
         )}
 
         {(shownOpen.length > 0 || shownDecided.length > 0) && (
-          <div className="ap-split page-split">
+          // A split ends its page (over-pages.css): with the missions listed under it, the page scrolls as one.
+          <div className={cx("ap-split", !missionsBelow && "page-split")}>
             <nav
               className="ap-list"
               data-scroll-restoration-id="approvals-list"

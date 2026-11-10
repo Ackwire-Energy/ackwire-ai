@@ -30,6 +30,7 @@ import { LoadingLine } from "@/components/Loading";
 import { PrefRow } from "@/components/NoticePrefs";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
+import { usePersonalView } from "@/hooks/usePersonalView";
 import { useToast } from "@/lib/toast";
 
 /** "Ninguém" in the person list (Radix lists take no empty value). */
@@ -38,7 +39,8 @@ const NOBODY = "none";
 /**
  * Configurações › Você › Aprovações (ADR 0139): "Quem aprova por mim" (one person, always or only while my status
  * says out, until a day, risky actions off unless turned on), each change saved at once; then the people I approve
- * for, each with "Não quero cobrir".
+ * for, each with "Não quero cobrir". Alone in a personal workspace there is nobody to approve for you: only the right
+ * hand's part, until someone joins or while a cover is set (ADR 0159).
  */
 export function ApprovalsSection() {
   const { t, i18n } = useTranslation();
@@ -50,6 +52,7 @@ export function ApprovalsSection() {
   const rightHand = useRightHandApprovals(org.id).data;
   const set = useSetApprovalCover(org.id, meId);
   const decline = useDeclineApprovalCover(org.id);
+  const { solo } = usePersonalView();
   const failed = () => toast.show(t("approvalCover.failed"), "error");
   if (!covers.data) return covers.isError ? <p className="muted">{t("approvalCover.failed")}</p> : <LoadingLine />;
   const cover = covers.data.cover;
@@ -70,91 +73,95 @@ export function ApprovalsSection() {
   const people = dir.members
     .filter((m) => m.userId !== meId)
     .map((m) => ({ value: m.userId, label: m.name, leading: face(m.userId) }));
+  // A cover goes with its person's membership: one still read after they left shows Ninguém, never an empty box.
+  const coverPerson = cover && people.some((p) => p.value === cover.userId) ? cover.userId : NOBODY;
 
   return (
     <>
-      <Card aria-labelledby="cover-title">
-        <CardHeader
-          id="cover-title"
-          icon="audiencePeople"
-          title={t("approvalCover.title")}
-          subtitle={t("approvalCover.subtitle")}
-        />
-        <div className="settings-rows">
-          <PrefRow
-            id="cover-person"
-            icon="person"
-            label={t("approvalCover.person")}
-            control={
-              <Select
-                value={cover?.userId ?? NOBODY}
-                onValueChange={(userId) => save({ userId: userId === NOBODY ? "" : userId })}
-                aria-label={t("approvalCover.person")}
-                align="end"
-                options={[{ value: NOBODY, label: t("approvalCover.nobody") }, ...people]}
-              />
-            }
+      {(!solo || cover) && (
+        <Card aria-labelledby="cover-title">
+          <CardHeader
+            id="cover-title"
+            icon="audiencePeople"
+            title={t("approvalCover.title")}
+            subtitle={t("approvalCover.subtitle")}
           />
-          {cover && (
-            <>
-              <PrefRow
-                id="cover-when"
-                icon="clock"
-                label={t("approvalCover.when")}
-                hint={t("approvalCover.whenHelp")}
-                control={
-                  <Select
-                    value={cover.mode}
-                    onValueChange={(mode) => save({ mode })}
-                    aria-label={t("approvalCover.when")}
-                    align="end"
-                    options={[
-                      { value: "while_out", label: t("approvalCover.whileOut") },
-                      { value: "always", label: t("approvalCover.always") },
-                    ]}
-                  />
-                }
-              />
-              <PrefRow
-                id="cover-until"
-                icon="calendar"
-                label={t("approvalCover.until")}
-                control={
-                  <DatePicker
-                    value={cover.endsAt ? toYmd(new Date(cover.endsAt)) : null}
-                    onChange={(day) => save({ endsAt: endOfDay(day) })}
-                    onClear={() => save({ endsAt: null })}
-                    min={toYmd(new Date())}
-                    placeholder={t("approvalCover.noDate")}
-                    aria-label={t("approvalCover.until")}
-                    locale={i18n.language}
-                    labels={{
-                      previousMonth: t("common.previousMonth"),
-                      nextMonth: t("common.nextMonth"),
-                      choose: t("common.chooseDate"),
-                      clear: t("approvalCover.clearDate"),
-                    }}
-                  />
-                }
-              />
-              <PrefRow
-                id="cover-risky"
-                icon="alert"
-                label={t("approvalCover.risky")}
-                hint={t(cover.risky ? "approvalCover.riskyOn" : "approvalCover.riskyOff")}
-                control={
-                  <Switch
-                    checked={cover.risky}
-                    onCheckedChange={(risky) => save({ risky })}
-                    aria-label={t("approvalCover.risky")}
-                  />
-                }
-              />
-            </>
-          )}
-        </div>
-        {!rightHand?.rightHand && <CardFooter icon="lock">{t("approvalCover.lock")}</CardFooter>}
-      </Card>
+          <div className="settings-rows">
+            <PrefRow
+              id="cover-person"
+              icon="person"
+              label={t("approvalCover.person")}
+              control={
+                <Select
+                  value={coverPerson}
+                  onValueChange={(userId) => save({ userId: userId === NOBODY ? "" : userId })}
+                  aria-label={t("approvalCover.person")}
+                  align="end"
+                  options={[{ value: NOBODY, label: t("approvalCover.nobody") }, ...people]}
+                />
+              }
+            />
+            {cover && (
+              <>
+                <PrefRow
+                  id="cover-when"
+                  icon="clock"
+                  label={t("approvalCover.when")}
+                  hint={t("approvalCover.whenHelp")}
+                  control={
+                    <Select
+                      value={cover.mode}
+                      onValueChange={(mode) => save({ mode })}
+                      aria-label={t("approvalCover.when")}
+                      align="end"
+                      options={[
+                        { value: "while_out", label: t("approvalCover.whileOut") },
+                        { value: "always", label: t("approvalCover.always") },
+                      ]}
+                    />
+                  }
+                />
+                <PrefRow
+                  id="cover-until"
+                  icon="calendar"
+                  label={t("approvalCover.until")}
+                  control={
+                    <DatePicker
+                      value={cover.endsAt ? toYmd(new Date(cover.endsAt)) : null}
+                      onChange={(day) => save({ endsAt: endOfDay(day) })}
+                      onClear={() => save({ endsAt: null })}
+                      min={toYmd(new Date())}
+                      placeholder={t("approvalCover.noDate")}
+                      aria-label={t("approvalCover.until")}
+                      locale={i18n.language}
+                      labels={{
+                        previousMonth: t("common.previousMonth"),
+                        nextMonth: t("common.nextMonth"),
+                        choose: t("common.chooseDate"),
+                        clear: t("approvalCover.clearDate"),
+                      }}
+                    />
+                  }
+                />
+                <PrefRow
+                  id="cover-risky"
+                  icon="alert"
+                  label={t("approvalCover.risky")}
+                  hint={t(cover.risky ? "approvalCover.riskyOn" : "approvalCover.riskyOff")}
+                  control={
+                    <Switch
+                      checked={cover.risky}
+                      onCheckedChange={(risky) => save({ risky })}
+                      aria-label={t("approvalCover.risky")}
+                    />
+                  }
+                />
+              </>
+            )}
+          </div>
+          {!rightHand?.rightHand && <CardFooter icon="lock">{t("approvalCover.lock")}</CardFooter>}
+        </Card>
+      )}
 
       {rightHand?.rightHand && <RightHandCard view={rightHand} name={rightHand.rightHand.name} />}
 

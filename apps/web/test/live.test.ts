@@ -48,6 +48,16 @@ describe("agent activity: thinking → typing → idle", () => {
     expect(runsInChannel(s, "c1")[0]?.status).toBe("failed");
   });
 
+  test("a run that fails says why in words from its first event, never its stored code until run.finished comes", () => {
+    const failure = {
+      error: "cli_failed: Claude Code: prompt is too long",
+      errorCode: "run.cli_failed",
+      errorParams: { brain: "Claude Code", detail: "prompt is too long" },
+    };
+    const s = applyChannelEvent(emptyStreams, { type: "agent.run", ...base, status: "failed", ...failure });
+    expect(runsInChannel(s, "c1")[0]).toMatchObject({ status: "failed", ...failure });
+  });
+
   test("an agent's reply message settles its provisional row", () => {
     let s = expectReply(emptyStreams, { channelId: "c1", threadId: "m1", agentId: "ada" });
     const reply = { id: "m2", agentRunId: "r1", threadId: "m1", author: { type: "agent", id: "ada" } } as Message;
@@ -481,6 +491,15 @@ describe("receipts", () => {
     // A late claim of the run it already follows never undoes its end.
     s = step(s, { type: "message.handled", messageId: "m1", agentId: "ada", runId: "r2", status: "done" });
     s = step(s, { type: "message.claimed", messageId: "m1", agentId: "ada", runId: "r2" });
+    expect(receiptView(s.m1).status?.kind).toBe("handled");
+  });
+
+  test("Tentar de novo into her task already at work: going into it replaces the failure too, a late one undoes nothing", () => {
+    let s = seedReceipt({}, read([{ agentId: "ada", runId: "r1", status: "failed" }]));
+    s = step(s, { type: "agent.run.steered", messageId: "m1", agentId: "ada", runId: "t1" } as never);
+    expect(receiptView(s.m1).status).toEqual({ kind: "claimed", agents: ["ada"] });
+    s = step(s, { type: "message.handled", messageId: "m1", agentId: "ada", runId: "t1", status: "done" });
+    s = step(s, { type: "agent.run.steered", messageId: "m1", agentId: "ada", runId: "t1" } as never);
     expect(receiptView(s.m1).status?.kind).toBe("handled");
   });
 

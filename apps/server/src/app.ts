@@ -35,7 +35,9 @@ import { type AppDeps, agentDetailsGate } from "./routes/app/context";
 import { dashboardRoutes } from "./routes/app/dashboards";
 import { databaseRoutes } from "./routes/app/databases";
 import { desktopRoutes } from "./routes/app/desktop";
+import { deviceWaitRoutes } from "./routes/app/device-waits";
 import { dmRoutes } from "./routes/app/dms";
+import { feedbackRoutes, registerFeedbackFiles } from "./routes/app/feedback";
 import { gifKeyRoutes } from "./routes/app/gif-key";
 import { gifRoutes } from "./routes/app/gifs";
 import { inviteRoutes } from "./routes/app/invites";
@@ -70,6 +72,7 @@ import {
   registerDesktopRoutes,
   registerNativeRoutes,
 } from "./routes/desktop";
+import { deviceAppRoutes, registerConnectScripts } from "./routes/devices";
 import { registerGitProxy } from "./routes/git";
 import { githubAppRoutes, registerGitHubAppWebhook } from "./routes/github-app";
 import { registerHealth } from "./routes/health";
@@ -123,6 +126,7 @@ export interface AppOptions {
  * - `/api/ws`             WebSocket (real-time)
  * - `/api/openapi.json`   OpenAPI 3.1 document; `/api/reference` interactive docs
  * - `/install`            the self-host installer, `install.sh` (`curl -fsSL <server>/install | sh`)
+ * - `/i/<code>`           a new computer's installer with a connect link baked in (`/i/<code>/ps` for Windows)
  * - `/install/docker-compose.yml` the compose file of this release, which the setup downloads
  * - `/sw.js`              the web app's service worker (browser push, ADR 0071)
  * - everything else       web app (single-page app), when built
@@ -164,6 +168,7 @@ export function createApp(options: AppOptions) {
     });
     const deps: AppDeps = { log, ...options.services };
     registerInstance(api, deps, version);
+    registerFeedbackFiles(api, deps);
     api.use("/app/organizations/:orgId/agents/:agentId/:part", agentDetailsGate(deps));
     api.route("/app", accountRoutes(deps));
     api.route("/app", accessRoutes(deps));
@@ -206,6 +211,8 @@ export function createApp(options: AppOptions) {
     api.route("/app", agentImportRoutes(deps));
     api.route("/app", sandboxRoutes(deps));
     api.route("/app", machineAppRoutes(deps));
+    api.route("/app", deviceWaitRoutes(deps));
+    api.route("/app", deviceAppRoutes(deps));
     api.route("/app", machineAccountRoutes(deps));
     api.route("/app", planUsageRoutes(deps));
     api.route("/app", personUsageRoutes(deps));
@@ -213,6 +220,7 @@ export function createApp(options: AppOptions) {
     api.route("/app", dashboardRoutes(deps));
     api.route("/app", telemetryRoutes(deps));
     api.route("/app", jevRoutes(deps));
+    api.route("/app", feedbackRoutes(deps));
     api.route("/app", gifKeyRoutes(deps));
     api.route("/app", speechKeyRoutes(deps));
     api.route("/app", voiceRoutes(deps));
@@ -328,6 +336,7 @@ export function createApp(options: AppOptions) {
   app.use("/api/*", errorPages(options.services?.config.PUBLIC_URL));
   app.route("/api", api);
   if (options.services) {
+    registerConnectScripts(app, { log, ...options.services });
     registerAppLinks(app, options.services.config);
     registerAppsRoot(app, { log, ...options.services }, { version, fetchDocument: options.appsFetchDocument });
   }
@@ -349,7 +358,7 @@ export function createApp(options: AppOptions) {
       return c.redirect(helpDocsUrl(c.req.param("slug"), locale), 301);
     });
   }
-  // The setup downloads it into a folder that has none: this release's, from any instance.
+  // The setup downloads it into a folder that has none: this build's, from any instance.
   app.get("/install/docker-compose.yml", (c) =>
     c.body(composeFile, 200, { "content-type": "application/yaml; charset=utf-8", "cache-control": "no-store" }),
   );

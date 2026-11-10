@@ -108,6 +108,7 @@ function AppStack() {
       <Stack.Screen name="agent-ai/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent-model/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent-advanced/[id]" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="agent-more/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent-setup/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent-step/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent-edit" options={{ ...pushed, ...scrollUnder }} />
@@ -155,7 +156,6 @@ function AppStack() {
       <Stack.Screen name="agent-tasks/[agentId]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="connectors/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="connectors/tools" options={{ ...pushed, ...scrollUnder }} />
-      <Stack.Screen name="connectors/change" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="connectors/[id]" options={{ ...pushed, ...coverBarOptions }} />
       <Stack.Screen
         name="connectors/oauth"
@@ -201,6 +201,8 @@ function AppStack() {
       {/* The workspace's settings: its page under the sky (from Você), then each section on the grouped gray. */}
       <Stack.Screen name="settings/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/general" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/advanced" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/mode" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/delete" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/right-hand" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/zone" options={{ ...pushed, ...scrollUnder }} />
@@ -216,6 +218,13 @@ function AppStack() {
       <Stack.Screen name="settings/skills/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/skills/new" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/skills/edit" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/devices/index" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/devices/[machineId]" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/devices/phone/[phoneId]" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/devices/audience" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/devices/android-setup" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/devices/iphone-setup" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/devices/connect" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/computers/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/computers/[machineId]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/computers/rename" options={{ ...pushed, ...scrollUnder }} />

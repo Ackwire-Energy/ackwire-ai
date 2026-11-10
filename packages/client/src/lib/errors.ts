@@ -19,10 +19,17 @@ export const REAUTH_PASSWORD = "reauth.password";
  * takes `untranslatedText`; a guard test (`error-words.test.ts`) fails on a new code that isn't here or on its list.
  */
 const KNOWN = {
+  // A new-password link an owner can't make (ADR 0158).
+  "password_link.email": "errors.passwordLink.email",
+  "password_link.server_owner": "errors.passwordLink.serverOwner",
+  "password_link.other_workspace": "errors.passwordLink.otherWorkspace",
   "webhook.github_no_access": "errors.webhook.githubNoAccess",
   "webhook.github_failed": "errors.webhook.githubFailed",
   "webhook.invalid_secret": "errors.webhook.invalidSecret",
   "webhook.invalid_repo": "errors.webhook.invalidRepo",
+  "github_event.answered": "errors.githubEvent.answered",
+  "github_event.not_found": "errors.said.gone",
+  "github_event.agent_not_here": "errors.routine.agentNotInChannel",
   "channel.post_denied": "channel.perms.readOnlyComposer",
   "channel.permission_forbidden": "channel.perms.forbidden",
   "agent.handle_taken": "newAgent.errors.handleTaken",
@@ -63,6 +70,11 @@ const KNOWN = {
   "artifact.sharing_too_many": "errors.artifact.sharingTooMany",
   "artifact.not_in_drive": "errors.artifact.notInDrive",
   "machine.forbidden": "errors.machine.forbidden",
+  "device.forbidden": "errors.machine.forbidden",
+  "device.link_not_found": "errors.machine.pairingInvalid",
+  "device.not_link_maker": "errors.device.notLinkMaker",
+  "device.widen_forbidden": "errors.device.widenForbidden",
+  "device.not_home": "errors.device.notHome",
   "machine.not_found": "errors.machine.notFound",
   "machine.name_required": "errors.machine.nameRequired",
   "account.method_unsupported": "errors.machine.accountMethodUnsupported",
@@ -129,6 +141,7 @@ const KNOWN = {
   "run.answer_forbidden": "errors.run.answerForbidden",
   "run.stop_reason_forbidden": "errors.run.stopReasonForbidden",
   "run.not_restartable": "errors.run.notRestartable",
+  "run.not_restartable_voice": "errors.run.notRestartableVoice",
   "routine.too_frequent": "errors.routine.tooFrequent",
   "routine.too_many": "errors.routine.tooMany",
   "routine.creator_cannot_post": "errors.routine.creatorCannotPost",
@@ -333,6 +346,7 @@ const KNOWN = {
   "vault.source.unsupported": "errors.vault.source.unsupported",
   "vault.source.invalid_input": "errors.vault.source.invalidInput",
   "account.login_not_found": "errors.said.gone",
+  "device.not_found": "errors.said.gone",
   "account.not_found": "errors.said.gone",
   "account.invalid": "errors.said.gone",
   "action.not_found": "errors.said.gone",
@@ -358,6 +372,7 @@ const KNOWN = {
   "wiki.page_not_found": "errors.said.gone",
   "wiki.version_not_found": "errors.said.gone",
   "action.already_undone": "errors.said.alreadyDone",
+  "device.request_not_found": "errors.said.alreadyDone",
   "action.not_undone": "errors.said.alreadyDone",
   "action_card.asked": "errors.said.alreadyDone",
   "action_card.decided": "errors.said.alreadyDone",
@@ -425,6 +440,7 @@ const KNOWN = {
   "wiki.folder_depth": "errors.said.tooMany",
   "wiki.import_too_many": "errors.said.tooMany",
   "database.host_required": "errors.said.fillIn",
+  "device.name_required": "errors.said.fillIn",
   "database.password_required": "errors.said.fillIn",
   "database.user_required": "errors.said.fillIn",
   "endpoint.no_models": "errors.said.fillIn",
@@ -495,6 +511,9 @@ const KNOWN = {
   "voice.bad_duration": "errors.said.voiceLength",
   "voice.too_large": "errors.said.voiceLength",
   "upload.expired": "errors.said.sendAgain",
+  // The feedback form (ADR 0160): a file that went before the feedback was sent, or too many waiting to be sent.
+  "feedback.files_gone": "errors.feedback.filesGone",
+  "feedback.files_pending": "errors.feedback.filesPending",
   "upload.sha_mismatch": "errors.said.sendAgain",
   gif_key_env: "errors.said.serverKey",
   jev_key_env: "errors.said.serverKey",
@@ -885,6 +904,16 @@ export function keyRefusal(t: TFunction, error: unknown): { text: string; href: 
 }
 
 const KEY_REFUSALS = new Set(["provider_key_invalid", "provider_key_no_credit", "provider_key_denied"]);
+
+/**
+ * A password manager's refusal to connect (`vault.source.<code>`, ADR 0144) in that source's own words when the app
+ * has them (`vault.source.<kind>.error.<code>`: 1Password's token, its one vault), else as `errorText` says it.
+ */
+export function vaultConnectRefusal(t: TFunction, kind: string, error: unknown, locale?: string): string {
+  const code = errorCode(error)?.match(/^vault\.source\.(\w+)$/)?.[1];
+  const say = t as unknown as (key: string, options: Record<string, unknown>) => string;
+  return (code && say(`vault.source.${kind}.error.${code}`, { defaultValue: "" })) || errorText(t, error, locale);
+}
 
 /**
  * A failed request in the person's words: a code the app knows, a file too big, a refusal, no answer (offline or the

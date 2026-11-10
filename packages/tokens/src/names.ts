@@ -4,11 +4,14 @@
  */
 export const isIdHandle = (handle: string) => /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}/i.test(handle);
 
-/** 1–2 letters: "Ada" → "A"; "Marina Souza" → "MS". */
+/** Han, kana or Hangul first: a name with no initials, whose first glyph alone fills a small tile, as on the phone. */
+const CJK_START = /^[\u1100-\u11ff\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\uf900-\ufaff]/;
+
+/** 1–2 letters: "Ada" → "A"; "Marina Souza" → "MS"; "佐藤 花子" → "佐". */
 export function initialsOf(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "?";
-  if (parts.length === 1) return (parts[0]?.[0] ?? "?").toUpperCase();
+  if (parts.length === 1 || CJK_START.test(parts[0] ?? "")) return (parts[0]?.[0] ?? "?").toUpperCase();
   return `${parts[0]?.[0] ?? ""}${parts[parts.length - 1]?.[0] ?? ""}`.toUpperCase();
 }
 

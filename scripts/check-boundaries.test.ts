@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { internalNotes, isPrivate } from "./check-boundaries";
 
-test("only the listed docs, the prototypes and the team's rules are private", () => {
+test("only the listed docs, the prototypes and the team's rules are forbidden here", () => {
   for (const path of [
     "docs/planejamento.md",
     "docs/prototipo/a.html",

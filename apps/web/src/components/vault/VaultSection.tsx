@@ -1,6 +1,7 @@
 import type { VaultItem, VaultItemKind, VaultScope } from "@agenteschat/client";
 import { useVault } from "@agenteschat/client";
 import { relativeTime } from "@agenteschat/client/lib/format";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import { Button, EmptyState, Icon, List, PageHeader, SearchField, Segmented, Select, Toolbar } from "@agenteschat/ui";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -121,6 +122,8 @@ export function VaultSection() {
   const current: Tab = tab ?? (data && !data.canManageTeam && team.length === 0 ? "personal" : "team");
   const scope: VaultScope = current === "personal" ? "personal" : "team";
   const canManageTeam = data?.canManageTeam ?? false;
+  // The team's items are the shared ones in a personal workspace (ADR 0159): the same items, its own word.
+  const teamTab = t(modeKey(org, "vault.tab.team"));
   const inTab = current === "personal" ? personal : team;
   const shown = sortItems(
     inTab.filter((i) => (kind === "all" || i.kind === kind) && matchesQuery(i, query)),
@@ -142,7 +145,7 @@ export function VaultSection() {
   const list = () => {
     if (shown.length > 0)
       return (
-        <List className="vlt-list" aria-label={t(`vault.tab.${scope}`)}>
+        <List className="vlt-list" aria-label={scope === "team" ? teamTab : t("vault.tab.personal")}>
           {shown.map((item) => (
             <VaultRow key={item.id} item={item} onOpen={() => setOpenId(item.id)} />
           ))}
@@ -181,10 +184,10 @@ export function VaultSection() {
       <EmptyState
         size="page"
         agent={look}
-        title={canManageTeam ? t("vault.list.teamEmpty") : t("vault.list.sharedEmpty")}
+        title={canManageTeam ? t(modeKey(org, "vault.list.teamEmpty")) : t("vault.list.sharedEmpty")}
         actions={canManageTeam && adds}
       >
-        {canManageTeam ? t("vault.list.teamEmptyText") : t("vault.list.sharedEmptyText")}
+        {canManageTeam ? t("vault.list.teamEmptyText") : t(modeKey(org, "vault.list.sharedEmptyText"))}
       </EmptyState>
     );
   };
@@ -220,7 +223,7 @@ export function VaultSection() {
             value={current}
             onValueChange={pickTab}
             options={[
-              { value: "team", label: t("vault.tab.team"), count: team.length },
+              { value: "team", label: teamTab, count: team.length },
               { value: "personal", label: t("vault.tab.personal"), count: personal.length },
               { value: "connections", label: t("vault.tab.connections"), count: data.connections.length },
             ]}

@@ -208,10 +208,21 @@ export function citedEvidence(text: string, needles: string[]) {
   return needles.filter((n) => t.includes(norm(n)));
 }
 
-/** "a|b" = any of them was called. Returns the groups nobody called. */
-export function missingCalls(calls: Pick<EvalToolCall, "name">[], required: string[]) {
-  const called = new Set(calls.map((c) => c.name));
-  return required.filter((group) => !group.split("|").some((name) => called.has(name.trim())));
+/**
+ * "a|b" = any of them was called; "a+key" = `a` was called with a non-empty `key` (`hand_off+gif`: the routine's
+ * message went with a GIF). Returns the groups nobody called.
+ */
+export function missingCalls(calls: Pick<EvalToolCall, "name" | "input">[], required: string[]) {
+  const calledAs = (wanted: string) => {
+    const [name, key] = wanted.trim().split("+");
+    return calls.some((c) => {
+      if (c.name !== name) return false;
+      if (!key) return true;
+      const value = c.input[key];
+      return value !== undefined && value !== null && value !== "" && value !== false;
+    });
+  };
+  return required.filter((group) => !group.split("|").some(calledAs));
 }
 
 /** The tools in `forbidden` that actually ran (not just requested for approval). */

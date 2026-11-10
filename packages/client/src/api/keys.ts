@@ -64,7 +64,6 @@ export const keys = {
   agentRepos: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "repositories"] as const,
   agentMergeRepos: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "merge-repositories"] as const,
   customServers: (orgId: string) => ["org", orgId, "custom-servers"] as const,
-  toolChanges: (orgId: string) => ["org", orgId, "tool-changes"] as const,
   scopes: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "scopes"] as const,
   /** What the agent runs without asking ("Aprovar sempre"). */
   approvalCovers: (orgId: string) => ["org", orgId, "approval-covers"] as const,
@@ -131,6 +130,9 @@ export const keys = {
   computers: (orgId: string) => ["org", orgId, "sandbox", "computer"] as const,
   agentSecrets: (orgId: string, agentId: string) => ["org", orgId, "agent-secrets", agentId] as const,
   machines: (orgId: string) => ["org", orgId, "machines"] as const,
+  /** Devices (under `machines`: every computer event refetches them too). */
+  devices: (orgId: string) => ["org", orgId, "machines", "devices"] as const,
+  connectLink: (orgId: string, linkId: string) => ["org", orgId, "machines", "devices", "link", linkId] as const,
   /** Under `machines`: a computer that changes refreshes what a new agent could think with. */
   brainMachines: (orgId: string) => ["org", orgId, "machines", "brains"] as const,
   /** What a new agent starts thinking with (ADR 0094). */

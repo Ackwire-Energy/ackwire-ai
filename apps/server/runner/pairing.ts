@@ -18,6 +18,9 @@ export interface DeviceCode {
   expiresIn: number;
   /** Seconds between polls. */
   interval: number;
+  /** A connect link's code: who made the link (they let this computer in), and their workspace. */
+  maker?: string;
+  orgName?: string;
 }
 
 export interface DeviceGrant {
@@ -25,9 +28,16 @@ export interface DeviceGrant {
   machineId: string;
   name: string;
   org: { id: string; name: string };
+  /** Who may use it as it joined, whoever connected it, and its page (servers before bring your own devices: none). */
+  audience?: "everyone" | "people" | "owner";
+  owner?: string;
+  url?: string;
 }
 
-export type PairingFailure = "expired" | "denied" | "network" | "internal" | "canceled";
+export type PairingFailure = "expired" | "denied" | "network" | "internal" | "canceled" | "link_invalid";
+
+/** A connect link that was used, expired or never existed (`machine.link_invalid`). */
+export const LINK_INVALID = "This link expired or was used already. Make a new one under Settings › Devices.";
 
 export class PairingError extends Error {
   constructor(
@@ -55,6 +65,25 @@ export interface DeviceInfo {
   previousMachineId?: string;
   /** The token it had for `previousMachineId`: the proof that it is that computer (no reconnect without it). */
   previousToken?: string;
+  /**
+   * A connect link's code (`/i/<code>`): the server makes the device code for the link's workspace and asks the
+   * link's maker to let this computer in, instead of anyone confirming a code.
+   */
+  link?: string;
+}
+
+/** Who may use the computer it just connected, in a sentence; null from a server that doesn't say. */
+export function whoCanUse(grant: DeviceGrant, name: string): string | null {
+  switch (grant.audience) {
+    case "everyone":
+      return `Everyone in the workspace can use ${name}.`;
+    case "people":
+      return `Only the people and roles chosen can use ${name}.`;
+    case "owner":
+      return `Only ${grant.owner ?? "the person who connected it"} can use ${name}.`;
+    default:
+      return null;
+  }
 }
 
 /** `K7Q4ZP` → `K7Q·4ZP`. */
@@ -119,6 +148,9 @@ export async function requestDeviceCode(
 ): Promise<DeviceCode> {
   const fetchFn: FetchFn = opts.fetch ?? ((u, i) => fetch(u, i));
   const res = await postJson(fetchFn, `${server}/api/machines/device`, info, opts.signal);
+  if (!res.ok && errorWord(res.json) === "machine.link_invalid") {
+    throw new PairingError("link_invalid", errorMessage(res.json) ?? LINK_INVALID);
+  }
   if (!res.ok) {
     throw new PairingError(
       res.status === 429 ? "network" : "internal",
@@ -138,7 +170,15 @@ export async function requestDeviceCode(
     throw new PairingError("internal", "The server's answer was not understood");
   }
   const num = (v: unknown, fallback: number) => (typeof v === "number" && Number.isFinite(v) && v > 0 ? v : fallback);
+  const named = (v: unknown) => {
+    const name = typeof v === "object" && v !== null ? (v as { name?: unknown }).name : undefined;
+    return typeof name === "string" && name.trim() ? name.trim().slice(0, 80) : undefined;
+  };
+  const maker = named((d as { maker?: unknown }).maker);
+  const orgName = named((d as { org?: unknown }).org);
   return {
+    ...(maker ? { maker } : {}),
+    ...(orgName ? { orgName } : {}),
     deviceCode: d.deviceCode,
     userCode: d.userCode.replace(/[^A-Za-z0-9]/g, "").toUpperCase(),
     verificationUrl: d.verificationUrl,
@@ -210,7 +250,16 @@ export async function pollDeviceToken(
       }
       const org =
         g.org && typeof g.org.id === "string" ? { id: g.org.id, name: String(g.org.name ?? "") } : { id: "", name: "" };
-      return { token: g.token, machineId: g.machineId, name: typeof g.name === "string" ? g.name : "", org };
+      const audience = ["everyone", "people", "owner"].find((a) => a === g.audience) as DeviceGrant["audience"];
+      return {
+        token: g.token,
+        machineId: g.machineId,
+        name: typeof g.name === "string" ? g.name : "",
+        org,
+        ...(audience ? { audience } : {}),
+        ...(typeof g.owner === "string" && g.owner ? { owner: g.owner } : {}),
+        ...(typeof g.url === "string" && /^https?:\/\//.test(g.url) ? { url: g.url } : {}),
+      };
     }
     const word = errorWord(res.json);
     if (word === "authorization_pending") {

@@ -113,23 +113,22 @@ test("the built stylesheet keeps the hover bar placed by its middle, 4px lower a
   }
 });
 
-test("the built stylesheet keeps the bar's 32px plates on touch, their 40px targets, and the receipt dot's room", async () => {
+test("the built stylesheet keeps the bar's 32px plates on touch, the small buttons' 44px targets, and the receipt dot's room", async () => {
   const css = await builtCss();
   const kit = await Bun.file(join(ROOT, "packages/ui/src/styles/components.css")).text();
   const [built, source] = [touchRules(css), touchRules(kit)];
-  for (const selector of [".ac-msg__actions", ".ac-msg__actions .ac-btn--sm", ".ac-msg__actions .ac-btn--sm::after"]) {
+  // The bar's 26px plates grow to the 32 every small button keeps on touch; each one's target grows to 44 past it.
+  for (const selector of [
+    ".ac-msg__actions",
+    ".ac-msg__actions .ac-btn--sm",
+    ".ac-btn--sm::after",
+    ".ac-btn--sm.ac-btn--icon::after",
+  ]) {
     expect(declarations(source, selector).length).toBeGreaterThan(0);
     expect(declarations(built, selector)).toEqual(expect.arrayContaining(declarations(source, selector)));
   }
-  // As specific as the touch rule that grows icon buttons to 40px, so it only wins after it.
-  const at = (selector: string) =>
-    [...built.matchAll(/([^{}]+)\{/g)].findIndex((m) =>
-      normal(m[1] ?? "")
-        .split(",")
-        .includes(normal(selector)),
-    );
-  expect(at(".ac-btn--sm.ac-btn--icon")).toBeGreaterThanOrEqual(0);
-  expect(at(".ac-msg__actions .ac-btn--sm")).toBeGreaterThan(at(".ac-btn--sm.ac-btn--icon"));
+  // No touch rule grows a small button's plate past its 32.
+  expect(declarations(built, ".ac-btn--sm").filter(([p]) => /^min-(height|width)$/.test(p))).toEqual([]);
   // A receipt's words wrap on their own column, and a dot and its action as one piece.
   for (const selector of [
     ".ac-receipt",

@@ -14,6 +14,7 @@ import { StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, useToast } from "@/ui";
 import { DUE_CHOICES, dueDateOf } from "../issues/logic";
+import { usePersonalView } from "../settings/hooks";
 import { Face } from "../shared/Face";
 import { useDirectory, useMeId } from "../shared/hooks";
 import { TextArea } from "../shared/TextArea";
@@ -22,7 +23,8 @@ import { Page } from "./parts";
 /**
  * Perfil › Aprovações (ADR 0139), the web's Configurações › Você › Aprovações: who approves for me (one person or
  * no one), when (only while my status says out, or always), until when and whether risky actions are in, each saved
- * as it is tapped; then whom I approve for, each with Não quero cobrir.
+ * as it is tapped; then whom I approve for, each with Não quero cobrir. In a personal workspace it is listed in
+ * Settings › Advanced (ADR 0159 §3), and alone there the cover part waits until someone joins or one is set.
  */
 export function ApprovalsPage() {
   const { t, i18n } = useTranslation();
@@ -36,6 +38,7 @@ export function ApprovalsPage() {
   const decline = useDeclineApprovalCover(orgId);
   const failed = () => toast({ title: t("approvalCover.failed"), icon: "x" });
   const cover = covers.data?.cover ?? null;
+  const { solo } = usePersonalView();
   const save = (patch: Partial<ApprovalCoverInput>) => {
     const next = {
       mode: cover?.mode ?? "while_out",
@@ -51,68 +54,85 @@ export function ApprovalsPage() {
   const days = DUE_CHOICES.filter((c) => c !== "none").map((c) => ({ choice: c, day: dueDateOf(c) as string }));
   return (
     <Page title={t("settings.section.approvals")}>
-      <GroupedHeader>{t("approvalCover.title")}</GroupedHeader>
-      <GroupedList>
-        <GroupedRow label={t("approvalCover.nobody")} checked={!cover} onPress={() => cover && save({ userId: "" })} />
-        {people.map((m) => (
-          <GroupedRow
-            key={m.userId}
-            leading={<Face who={{ type: "person", id: m.userId }} size={28} />}
-            label={m.name}
-            checked={cover?.userId === m.userId}
-            onPress={() => save({ userId: m.userId })}
-          />
-        ))}
-      </GroupedList>
-      <GroupedFooter>{t("approvalCover.subtitle")}</GroupedFooter>
-      {cover ? (
+      {/* Alone in a personal workspace there is no one to approve for you (ADR 0159): only the right hand's part,
+          unless a cover is already set, which always shows. */}
+      {solo && !cover ? null : (
         <>
-          <GroupedHeader
-            hint={{ name: t("common.about", { label: t("approvalCover.when") }), text: t("approvalCover.whenHelp") }}
-          >
-            {t("approvalCover.when")}
-          </GroupedHeader>
+          <GroupedHeader>{t("approvalCover.title")}</GroupedHeader>
           <GroupedList>
             <GroupedRow
-              label={t("approvalCover.whileOut")}
-              checked={cover.mode === "while_out"}
-              onPress={() => save({ mode: "while_out" })}
+              label={t("approvalCover.nobody")}
+              checked={!cover}
+              onPress={() => cover && save({ userId: "" })}
             />
-            <GroupedRow
-              label={t("approvalCover.always")}
-              checked={cover.mode === "always"}
-              onPress={() => save({ mode: "always" })}
-            />
-          </GroupedList>
-          <GroupedHeader>{t("approvalCover.until")}</GroupedHeader>
-          <GroupedList>
-            <GroupedRow label={t("approvalCover.noDate")} checked={!endDay} onPress={() => save({ endsAt: null })} />
-            {days.map(({ choice, day }) => (
+            {people.map((m) => (
               <GroupedRow
-                key={choice}
-                label={t(`mobile.issues.form.dueChoice.${choice}`)}
-                value={formatShortDate(i18n.language, endOfDay(day))}
-                checked={endDay === day}
-                onPress={() => save({ endsAt: endOfDay(day) })}
+                key={m.userId}
+                leading={<Face who={{ type: "person", id: m.userId }} size={28} />}
+                label={m.name}
+                checked={cover?.userId === m.userId}
+                onPress={() => save({ userId: m.userId })}
               />
             ))}
-            {endDay && !days.some((d) => d.day === endDay) ? (
-              <GroupedRow label={formatShortDate(i18n.language, cover.endsAt as string)} checked />
-            ) : null}
           </GroupedList>
-          <View style={styles.gap} />
-          <GroupedList>
-            <GroupedRow
-              label={t("approvalCover.risky")}
-              labelLines={2}
-              sub={t(cover.risky ? "approvalCover.riskyOn" : "approvalCover.riskyOff")}
-              subLines={2}
-              toggle={cover.risky}
-              onPress={() => save({ risky: !cover.risky })}
-            />
-          </GroupedList>
+          <GroupedFooter>{t("approvalCover.subtitle")}</GroupedFooter>
+          {cover ? (
+            <>
+              <GroupedHeader
+                hint={{
+                  name: t("common.about", { label: t("approvalCover.when") }),
+                  text: t("approvalCover.whenHelp"),
+                }}
+              >
+                {t("approvalCover.when")}
+              </GroupedHeader>
+              <GroupedList>
+                <GroupedRow
+                  label={t("approvalCover.whileOut")}
+                  checked={cover.mode === "while_out"}
+                  onPress={() => save({ mode: "while_out" })}
+                />
+                <GroupedRow
+                  label={t("approvalCover.always")}
+                  checked={cover.mode === "always"}
+                  onPress={() => save({ mode: "always" })}
+                />
+              </GroupedList>
+              <GroupedHeader>{t("approvalCover.until")}</GroupedHeader>
+              <GroupedList>
+                <GroupedRow
+                  label={t("approvalCover.noDate")}
+                  checked={!endDay}
+                  onPress={() => save({ endsAt: null })}
+                />
+                {days.map(({ choice, day }) => (
+                  <GroupedRow
+                    key={choice}
+                    label={t(`mobile.issues.form.dueChoice.${choice}`)}
+                    value={formatShortDate(i18n.language, endOfDay(day))}
+                    checked={endDay === day}
+                    onPress={() => save({ endsAt: endOfDay(day) })}
+                  />
+                ))}
+                {endDay && !days.some((d) => d.day === endDay) ? (
+                  <GroupedRow label={formatShortDate(i18n.language, cover.endsAt as string)} checked />
+                ) : null}
+              </GroupedList>
+              <View style={styles.gap} />
+              <GroupedList>
+                <GroupedRow
+                  label={t("approvalCover.risky")}
+                  labelLines={2}
+                  sub={t(cover.risky ? "approvalCover.riskyOn" : "approvalCover.riskyOff")}
+                  subLines={2}
+                  toggle={cover.risky}
+                  onPress={() => save({ risky: !cover.risky })}
+                />
+              </GroupedList>
+            </>
+          ) : null}
         </>
-      ) : null}
+      )}
       {rightHand?.rightHand ? <RightHandGroup view={rightHand} name={rightHand.rightHand.name} /> : null}
       <GroupedFooter>{t("approvalCover.lock")}</GroupedFooter>
       {(covers.data?.covering ?? []).length > 0 ? (

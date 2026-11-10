@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GroupedList, GroupedRow, Locked, Text, useToast } from "@/ui";
 import { useColors } from "../shared/hooks";
 import { showActionSheet } from "../shared/PickerSheet";
-import { copyText, type HeaderWordAction, MONO, PushedHeader, successHaptic } from "../shared/parts";
+import { BottomBar, copyText, type HeaderWordAction, MONO, PushedHeader, successHaptic } from "../shared/parts";
 
 /**
  * What the workspace's settings screens share (each one a screen pushed with the platform's push, as Você's): the
@@ -26,6 +26,7 @@ export function SettingsPage({
   subtitle,
   action,
   locked = false,
+  bottom,
   children,
 }: {
   title: string;
@@ -33,6 +34,8 @@ export function SettingsPage({
   action?: HeaderWordAction;
   /** The page's form is sending: its controls are off, the page still scrolls. */
   locked?: boolean;
+  /** The page's one main action, docked under it ("Done" at the end of a guide). */
+  bottom?: ReactNode;
   children?: ReactNode;
 }) {
   const c = useColors();
@@ -58,6 +61,7 @@ export function SettingsPage({
           <LayoutAnimationConfig skipEntering>{children}</LayoutAnimationConfig>
         </Locked>
       </ScrollView>
+      {bottom ? <BottomBar bottom={insets.bottom}>{bottom}</BottomBar> : null}
     </View>
   );
 }

@@ -126,6 +126,7 @@
     "refuseTitle": "Tolak permintaan",
     "refuseAsk": "Tolak permintaan ini?",
     "leaves": "keluar dari perusahaan",
+    "leavesPersonal": "keluar dari ruang kerjamu",
     "refuseWhyF": "{{name}} belajar dari alasannya. Opsional.",
     "refuseWhyM": "{{name}} belajar dari alasannya. Opsional.",
     "sheet": {
@@ -161,6 +162,7 @@
       "irreversible": "Tidak bisa dibatalkan",
       "reversible": "Bisa dibatalkan",
       "external": "Keluar dari perusahaan",
+      "externalPersonal": "Keluar dari ruang kerjamu",
       "unsent": "Tidak ada yang dikirim",
       "deletable": "Bisa dihapus"
     },
@@ -229,6 +231,9 @@
     "newChannelHint": "Untuk tim atau topik",
     "channelPlaceholder": "Nama kanal, mis. marketing",
     "createChannel": "Buat kanal",
+    "newChannelHintPersonal": "Untuk satu topik, dengan beberapa agen",
+    "channelPlaceholderPersonal": "Nama, mis. liburan",
+    "createChannelPersonal": "Buat percakapan grup",
     "waitIn": "di {{where}}",
     "workingNowLine_other": "{{count}} agen sedang bekerja",
     "nobodyWorking": "Tidak ada agen yang bekerja saat ini",
@@ -238,6 +243,7 @@
       "unmute": "Bunyikan"
     },
     "firstRunLine": "{{name}} sedang menyiapkan tim · {{done}} dari {{total}}",
+    "firstRunLinePersonal": "{{name}} sedang menyiapkan agenmu · {{done}} dari {{total}}",
     "first": {
       "title": "Mulai dengan agen pertamamu",
       "subtitle": "Beri nama dan jelaskan tugasnya. Agen akan muncul di sini, sebagai obrolan.",
@@ -266,6 +272,8 @@
     "chat": "Mengobrol dengan…",
     "name": "Nama",
     "channelFine": "Untuk tim atau topik.",
+    "channelPersonal": "Percakapan grup",
+    "channelFinePersonal": "Untuk satu topik, dengan beberapa agen.",
     "chatSearch": "Cari orang atau agen",
     "to": "Kepada:",
     "people": "Orang",
@@ -278,6 +286,7 @@
     "routineHint": "Agen mengerjakannya sendiri, sesuai jadwal",
     "wikiPage": "Halaman wiki",
     "wikiHint": "Untuk dibaca tim dan agen",
+    "wikiHintPersonal": "Untuk dibaca agenmu",
     "inviteHint": "Lewat email atau tautan",
     "agent": {
       "question": "Apa yang akan dikerjakannya?"
@@ -445,12 +454,14 @@
       "arrived": "{{name}} bergabung dengan tim",
       "meet": "Percakapan pertamamu dengan {{name}}",
       "roleIntro": "{{role}} di timmu. Minta dengan kata-kata biasa.",
+      "roleIntroPersonal": "{{role}}, siap membantumu. Minta dengan kata-kata biasa.",
       "noIntro": "Minta yang kamu butuhkan, dengan kata-kata biasa.",
       "firstTitle": "Untuk memulai",
       "sendHint": "Ketuk untuk mengirim",
       "hello": "Hai, {{person}}! Aku {{name}}.",
       "helloNoName": "Hai! Aku {{name}}.",
       "helloRole": "{{role}} di tim.",
+      "helloRolePersonal": "{{role}}, siap membantumu.",
       "helloAsk": "Kita mulai dari mana?",
       "now": "sekarang",
       "start": {
@@ -764,6 +775,7 @@
     "noGroupSection": "Tanpa departemen",
     "workingSection": "Sedang bekerja",
     "teamSection": "Tim",
+    "teamSectionPersonal": "Agenmu",
     "managerQuiet": "Tidak ada yang berjalan",
     "state": {
       "waitsYou": "menunggu persetujuanmu",
@@ -910,7 +922,6 @@
       "plan_lent_other": "{{names}} menghubungkan paket {{plan}} kamu ke {{agent}}",
       "plan_lent_female_other": "{{names}} menghubungkan paket {{plan}} kamu ke {{agent}}",
       "plan_model_dropped_other": "{{model}} keluar dari {{plan}}. {{names}} memakai {{runs}} untuk sementara",
-      "connector_tool_changed_other": "Server yang terhubung mengubah alat yang kamu setujui",
       "computer_disk_full_other": "Disk komputer hampir penuh",
       "computer_no_chrome_other": "Komputer memerlukan Google Chrome. Unduh di google.com/chrome",
       "app_created_other": "Aplikasi AI membuat sesuatu untukmu"
@@ -972,7 +983,9 @@
     "title": "Kamu",
     "role": {
       "owner": "pemilik",
-      "member": "anggota"
+      "member": "anggota",
+      "ownerPersonal": "ruang kerja pribadimu",
+      "memberPersonal": "ruang kerja pribadi yang dibagikan denganmu"
     },
     "appearance": "Tampilan",
     "notifications": "Notifikasi",
@@ -1363,15 +1376,11 @@
       "browser": "Browser",
       "secret": "Rahasia",
       "join": "Anggota",
-      "tools": "Alat",
       "limit": "Batas"
     },
     "review": "Tinjau",
     "answer": "Balas",
     "open": "Buka",
-    "toolsTitle": "Mengubah alat yang kamu setujui",
-    "toolsWhy": "Agen tetap memakai versi yang disetujui sampai kamu menerima yang baru.",
-    "reviewChanges": "Tinjau perubahannya",
     "clear": {
       "title": "Tidak ada yang menunggumu",
       "text": "Saat agen membutuhkanmu, itu muncul di sini lebih dulu."
@@ -1669,6 +1678,215 @@
     "pick": "Pilih komputer",
     "pickHelp": "Pilih salah satu komputer yang menyala."
   },
+  "devices": {
+    "title": "Perangkat",
+    "empty": {
+      "title": "Belum ada perangkat",
+      "text": "Hubungkan komputer, lalu colokkan ponsel ke komputer itu."
+    },
+    "status": {
+      "ready": "Siap",
+      "inUse": "Dipakai {{name}}",
+      "inUseFor": "untuk {{person}} sejak {{time}}",
+      "since": "sejak {{time}}",
+      "busy": "Sibuk {{running}}/{{max}}",
+      "needsYou": "Butuh kamu",
+      "preparing": "Sedang disiapkan",
+      "paused": "Dijeda",
+      "until": "sampai {{time}}",
+      "offline": "Offline",
+      "seen": "terakhir terlihat {{when}}",
+      "withHost": "bersama {{host}}",
+      "unsupported": "Tidak bisa dipakai"
+    },
+    "reason": {
+      "locked": "Layarnya terkunci",
+      "unauthorized": "Ketuk Izinkan di ponsel",
+      "untrusted": "Ketuk Percayai di iPhone",
+      "developer_mode_off": "Mode Pengembang mati",
+      "ui_automation_off": "Otomatisasi UI mati",
+      "xcode_missing": "Mac butuh Xcode",
+      "xcode_too_old": "Xcode terlalu lama untuk iPhone ini",
+      "device_support": "Mac sedang menyiapkan iPhone ini",
+      "helper_missing": "Helper pengujian belum disiapkan",
+      "helper_expired": "Helper pengujian perlu diperbarui",
+      "apple_account_missing": "Xcode di Mac perlu Apple Account",
+      "team_limit": "Hapus satu aplikasi buatan sendiri dari iPhone ini",
+      "helper_untrusted": "Percayai helper pengujian di iPhone ini",
+      "booting": "Sedang memulai",
+      "no_driver": "Windows butuh driver USB ponsel ini",
+      "os_too_old": "Sistem ponsel ini terlalu lama",
+      "adb_offline": "Cabut kabelnya lalu colokkan lagi",
+      "other": "Belum siap"
+    },
+    "os": {
+      "android": "Android {{version}}",
+      "ios": "iOS {{version}}"
+    },
+    "onHost": "di {{host}}",
+    "cpus_other": "{{count}} CPU",
+    "memory": "{{gb}} GB",
+    "audience": {
+      "label": "Siapa yang bisa memakai",
+      "me": "Hanya aku",
+      "only": "Hanya {{name}}",
+      "everyone": "Semua orang",
+      "sameAs": "Sama dengan {{host}}",
+      "mode": {
+        "owner": "Hanya aku",
+        "ownerOf": "Hanya {{name}}",
+        "everyone": "Semua orang di ruang kerja",
+        "people": "Hanya orang atau peran tertentu"
+      },
+      "modeText": {
+        "owner": "Kamu, dan agen yang bekerja untukmu.",
+        "ownerOf": "{{name}}, dan agen yang bekerja untuknya.",
+        "everyone": "Agen milik siapa pun di ruang kerja bisa memakainya.",
+        "people": "Pilih orang dan peran yang agennya bisa memakai perangkat ini."
+      },
+      "people": "Orang dan peran",
+      "pickSomeone": "Pilih setidaknya satu orang atau peran.",
+      "narrowOnly": "Kamu bisa mempersempit siapa yang memakai perangkat {{name}}, tapi tidak bisa memperluasnya.",
+      "runsAs": "Agen milik orang lain akan berjalan sebagai kamu di sana dan bisa membaca file-filemu.",
+      "phoneOnly": "Ini hanya membagikan ponselnya, tidak pernah {{host}}.",
+      "saved": "Tersimpan"
+    },
+    "page": {
+      "belongs": "Milik ruang kerja",
+      "belongsHint": "Perangkat ini tetap ada saat pemiliknya keluar dari ruang kerja, dan Hanya aku lalu berarti semua orang.",
+      "phones": "Ponsel",
+      "ownerReads": "Pemiliknya bisa membaca kode, file, dan build yang ditaruh agenmu di sini.",
+      "followsHost": "iPhone mengikuti aturan Mac-nya.",
+      "shareNote": "Membagikan ponsel tidak pernah membagikan {{host}}.",
+      "showHow": "Tunjukkan caranya",
+      "name": "Nama",
+      "renamed": "Nama diganti menjadi {{name}}",
+      "stop": "Hentikan {{name}}",
+      "stopped": "{{device}} sudah dilepas oleh {{name}}",
+      "forget": "Lupakan ponsel ini",
+      "forgetTitle": "Lupakan {{name}}?",
+      "forgetText": "Ponsel ini muncul lagi jika {{host}} melihatnya lagi.",
+      "forgotten": "{{name}} sudah dilupakan",
+      "notFound": "Perangkat ini sudah tidak ada di sini",
+      "notFoundText": "Perangkat ini sudah dihapus, atau ikut keluar bersama pemiliknya."
+    },
+    "join": {
+      "header": "Minta bergabung",
+      "title": "{{name}} ingin bergabung ke {{org}}",
+      "allow": "Izinkan bergabung",
+      "deny": "Tolak",
+      "joined": "{{name}} sudah bergabung",
+      "denied": "{{name}} ditolak"
+    },
+    "connect": {
+      "title": "Hubungkan perangkat",
+      "thisPhone": "Ponsel ini",
+      "computers": "Komputer",
+      "androidText": "Lewat komputer tempat ponsel ini dicolokkan",
+      "iphoneText": "Lewat Mac",
+      "server": "Server atau VPS",
+      "serverText": "Satu baris untuk ditempel di terminalnya",
+      "computer": "Komputer lain",
+      "computerText": "Mac, Windows, atau Linux",
+      "appNote": "Di Mac atau PC yang kamu pakai, aplikasi desktop agentes.chat juga bisa menghubungkannya.",
+      "unix": "Linux dan macOS",
+      "windows": "Windows",
+      "once": "Berlaku sekali, selama 10 menit. Jalankan di komputernya, lalu izinkan bergabung di sini.",
+      "copied": "Perintah disalin. Tempel di terminal komputernya.",
+      "waiting": "Menunggu komputernya menjalankan perintah",
+      "joined": "{{name}} sudah terhubung",
+      "denied": "Kamu tidak mengizinkan {{name}} bergabung.",
+      "expired": "Tautan ini sudah kedaluwarsa.",
+      "again": "Buat tautan baru"
+    },
+    "android": {
+      "entry": "Pakai ponsel ini dengan agen",
+      "title": "Izinkan agen memakai ponsel ini",
+      "connecting": "Menghubungkan ke {{host}}",
+      "computer": "Komputer",
+      "noHost": "Ponsel ini bekerja lewat salah satu komputermu. Hubungkan komputer dulu.",
+      "hostOffline": "{{host}} sedang offline. Nyalakan dan buka agentes.chat di sana.",
+      "step1": "Nyalakan Opsi developer",
+      "step1Text": "Ketuk Nomor build 7 kali, lalu masukkan PIN-mu.",
+      "openAbout": "Buka Tentang ponsel",
+      "step2": "Nyalakan Proses debug USB",
+      "openDev": "Buka Opsi developer",
+      "step3": "Colokkan ke {{host}}",
+      "step3Hint": "Pakai kabel yang bisa mengirim data, bukan yang hanya untuk mengisi daya. Jika ponsel menanyakan fungsi USB-nya, pilih Transfer file.",
+      "looking": "Mencari ponsel ini",
+      "step4": "Ketuk Izinkan di ponsel ini",
+      "step4Text": "Centang dulu Selalu izinkan dari komputer ini.",
+      "prompt": {
+        "a11y": "Android bertanya: Izinkan proses debug USB? Centang Selalu izinkan dari komputer ini, lalu ketuk Izinkan.",
+        "title": "Izinkan proses debug USB?",
+        "fingerprint": "Sidik jari kunci RSA komputer adalah:",
+        "always": "Selalu izinkan dari komputer ini",
+        "cancel": "Batal",
+        "allow": "Izinkan"
+      },
+      "wifi": "Tidak ada kabel? Sambungkan lewat Wi-Fi",
+      "wifiText": "Ponsel dan komputer di Wi-Fi yang sama",
+      "cable": "Pakai kabel saja",
+      "wifi1": "Nyalakan Proses debug nirkabel",
+      "wifi1Text": "Centang Selalu izinkan di jaringan ini, lalu ketuk Izinkan.",
+      "wifi2": "Pindai kode di komputer",
+      "wifi2Text": "Dari Proses debug nirkabel › Sambungkan perangkat dengan kode QR.",
+      "wifi2Hint": "Di agentes.chat pada komputer, buka Hubungkan perangkat › Ponsel Android › Lewat Wi-Fi dan pilih {{host}}.",
+      "codeHead": "Sambungkan dengan kode penyambungan",
+      "codeNote": "Dari Proses debug nirkabel › Sambungkan perangkat dengan kode penyambungan. Buka Setelan dan agentes.chat berdampingan agar kodenya tetap terlihat.",
+      "wifiNote": "Wi-Fi bisa terputus setelah dimulai ulang. Kabel lebih andal.",
+      "done": "{{name}} sudah terhubung",
+      "openFailed": "Ponsel ini tidak membuka layar itu. Cari di Setelan."
+    },
+    "iphone": {
+      "title": "Hubungkan iPhone ini",
+      "with": "Dengan {{host}}",
+      "noHost": "iPhone terhubung lewat salah satu Mac-mu. Hubungkan Mac dulu.",
+      "step1": "Colokkan ke {{host}}",
+      "step2": "Ketuk Percayai di iPhone ini",
+      "step2Text": "Lalu masukkan kode sandimu.",
+      "step3": "Nyalakan Mode Pengembang",
+      "step3Hint": "Aplikasi iPhone tidak bisa membuka pengaturan aplikasi lain, jadi ini jalurnya.",
+      "path": {
+        "settings": "Pengaturan",
+        "privacy": "Privasi & Keamanan",
+        "devMode": "Mode Pengembang"
+      },
+      "pathA11y": "Di iPhone ini: Pengaturan, lalu Privasi & Keamanan, lalu Mode Pengembang",
+      "switchA11y": "Tombol Mode Pengembang, mati",
+      "step3Text": "Nyalakan, lalu ketuk Mulai Ulang. Setelah dimulai ulang, ketuk Nyalakan dan masukkan kode sandimu.",
+      "step4": "Nyalakan Otomatisasi UI",
+      "step4Text": "Pengaturan › Pengembang › Aktifkan Otomatisasi UI",
+      "step5": "Percayai helper pengujian",
+      "step5Hint": "Aplikasi yang dipasang {{host}} agar agen bisa mengetuk dan mengetik di iPhone ini. Aplikasi ini muncul di daftar ini setelah terpasang.",
+      "step5Text": "Pengaturan › Umum › VPN & Manajemen Perangkat. Ketuk nama developernya, lalu Percayai.",
+      "waiting": "Menunggu {{host}} melihatnya",
+      "footer": "Mac-mu mengurus sisanya, dan memperbarui helper pengujian setiap 7 hari selama menyala."
+    },
+    "notice": {
+      "kind": "Perangkat",
+      "join_request": "{{device}} ingin bergabung ke {{org}}",
+      "in_use": "{{names}} sedang memakai {{device}}",
+      "in_useFor": "{{names}} sedang memakai {{device}} untuk {{person}}",
+      "access_request": "{{names}} minta izin memakai {{device}}",
+      "access_requestFor": "{{names}} minta izin memakai {{device}} untuk {{person}}",
+      "waiting": "{{names}} sedang menunggu {{device}}",
+      "waitingFor": "{{names}} sedang menunggu {{device}} untuk {{person}}",
+      "allowOnce": "Izinkan sekali",
+      "always": "Selalu izinkan {{name}}",
+      "no": "Tidak",
+      "stop": "Hentikan"
+    },
+    "wait": {
+      "waiting": "Menunggu {{device}}",
+      "back": "{{device}} sudah kembali",
+      "tryNow": "Coba sekarang",
+      "other": "Pakai perangkat lain",
+      "stop": "Berhenti menunggu",
+      "useInstead": "Pakai {{name}} saja",
+      "none": "Tidak ada perangkat lain yang bisa kamu pakai yang sedang siap."
+    }
+  },
   "connectors": {
     "title": "Konektor",
     "search": "Cari atau tempel alamat",
@@ -1688,6 +1906,7 @@
     "loadFailed": "Tidak bisa memuat konektor.",
     "connectedCheck": "{{name}}, terhubung",
     "adminsOnly": "Hanya admin {{org}} yang bisa menghubungkan layanan. Minta ke salah satunya.",
+    "adminsOnlyPersonal": "Hanya yang mengelola ruang kerja ini yang bisa menghubungkan aplikasi. Minta ke orang itu.",
     "canTitle": "Agen akan bisa",
     "asks": "{{text}} · meminta persetujuanmu",
     "connect": "Hubungkan",
@@ -1832,11 +2051,13 @@
     "zoneChange": "Ganti",
     "zoneTitle": "Zona waktu",
     "anotherTitle": "Apa nama ruang kerja barunya?",
+    "anotherPurpose": "Untuk apa ruang kerja barunya?",
     "anotherLead": "Di agentes.chat. Kamu tetap di {{org}} dan bisa berpindah kapan saja.",
     "suggested": "Dari emailmu di {{domain}}, aku menyarankan {{org}}.",
     "create": "Buat",
     "shareMessage": "Gabung ke {{org}} di agentes.chat: {{url}}",
-    "failed": "Tidak bisa menyimpan. Coba lagi."
+    "failed": "Tidak bisa menyimpan. Coba lagi.",
+    "enter": "Masuk ke ruang kerja"
   },
   "ai": {
     "yourPlan": "Paket AI-mu",
@@ -2153,7 +2374,6 @@
   "dashboards": {
     "homeRow": "Hanya kamu · widget milikmu sendiri",
     "loadFailed": "Dasbor tidak bisa dimuat.",
-    "onlyHome": "Dasbor untuk ruang kerja atau peranmu muncul di sini.",
     "create": "Buat",
     "routineTarget": "widget-nya",
     "pin": {
@@ -2221,7 +2441,11 @@
       "title": "Bentuk tim agenmu",
       "text": "Setiap agen mengambil satu peran dan bekerja bersamamu langsung di obrolan.",
       "viewerTitle": "Tim agenmu ada di sini",
-      "viewerText": "Orang yang membuat agen di ruang kerja ini menambahkan yang pertama, lalu muncul di sini."
+      "viewerText": "Orang yang membuat agen di ruang kerja ini menambahkan yang pertama, lalu muncul di sini.",
+      "titlePersonal": "Dapatkan bantuan dari agenmu sendiri",
+      "textPersonal": "Setiap agen mengurus satu hal untukmu, langsung di obrolan.",
+      "viewerTitlePersonal": "Agenmu ada di sini",
+      "viewerTextPersonal": "Orang yang membuat agen di sini menambahkan yang pertama, lalu muncul di sini."
     },
     "agentsForYou": {
       "title": "Agenmu muncul di sini",
@@ -2231,13 +2455,20 @@
       "title": "Semua yang dibuat tim, di satu tempat",
       "text": "Laporan, tabel, dan file dari agen dan orang tersimpan di sini, mudah ditemukan.",
       "viewerTitle": "Temukan yang dibuat tim",
-      "viewerText": "Yang dibuat agen dan orang di obrolan muncul di sini."
+      "viewerText": "Yang dibuat agen dan orang di obrolan muncul di sini.",
+      "titlePersonal": "Semua yang dibuat agenmu, di satu tempat",
+      "textPersonal": "Laporan, tabel, dan file dari agenmu tersimpan di sini, mudah ditemukan.",
+      "viewerTitlePersonal": "Temukan yang dibuat agenmu",
+      "viewerTextPersonal": "Yang dibuat agen di obrolanmu muncul di sini."
     },
     "tasks": {
       "title": "Serahkan pekerjaan ke tim",
       "text": "Buat tugas untuk agen atau orang dan pantau sampai selesai.",
       "viewerTitle": "Ikuti pekerjaan tim",
-      "viewerText": "Tugas muncul di sini begitu seseorang membuat yang pertama."
+      "viewerText": "Tugas muncul di sini begitu seseorang membuat yang pertama.",
+      "titlePersonal": "Serahkan tugasmu ke agenmu",
+      "textPersonal": "Buat tugas untuk agen dan ikuti sampai selesai.",
+      "viewerTitlePersonal": "Ikuti pekerjaan agenmu"
     },
     "routines": {
       "title": "Serahkan pekerjaan berulang ke agenmu",
@@ -2249,7 +2480,10 @@
       "title": "Simpan yang perlu diketahui tim",
       "text": "Orang dan agen membaca halaman ini, jadi semua bekerja dengan informasi yang sama.",
       "viewerTitle": "Cari yang diketahui tim",
-      "viewerText": "Orang yang mengedit wiki menulis halaman pertama, lalu muncul di sini."
+      "viewerText": "Orang yang mengedit wiki menulis halaman pertama, lalu muncul di sini.",
+      "titlePersonal": "Simpan catatan yang bisa dibaca agenmu",
+      "textPersonal": "Agenmu membaca halaman ini dan bekerja dari apa yang kamu tulis.",
+      "viewerTitlePersonal": "Lihat apa yang tertulis di sini"
     },
     "memory": {
       "title": "Agenmu belajar sambil bekerja",
@@ -2272,13 +2506,21 @@
       "text": "Setiap kanal mengumpulkan siapa pun yang mengurus satu topik.",
       "viewerTitle": "Kanal tim ada di sini",
       "viewerText": "Orang yang membuat kanal membuka yang pertama, lalu muncul di sini.",
-      "action": "Buat kanal"
+      "action": "Buat kanal",
+      "titlePersonal": "Bicara dengan beberapa agen sekaligus",
+      "textPersonal": "Setiap percakapan grup mengumpulkan agen dan orang untuk satu topik.",
+      "viewerTitlePersonal": "Percakapan grup ada di sini",
+      "viewerTextPersonal": "Orang yang membuat percakapan grup membuka yang pertama, lalu muncul di sini."
     },
     "people": {
       "title": "Bekerja bersama timmu di sini",
       "text": "Undang orang untuk mengobrol dengan mereka dan agenmu di satu tempat.",
       "viewerTitle": "Timmu muncul di sini",
-      "viewerText": "Orang yang mengundang membawa anggota tim lainnya, lalu mereka muncul di sini."
+      "viewerText": "Orang yang mengundang membawa anggota tim lainnya, lalu mereka muncul di sini.",
+      "titlePersonal": "Ajak keluarga atau temanmu",
+      "textPersonal": "Undang seseorang untuk mengobrol denganmu dan agenmu di satu tempat.",
+      "viewerTitlePersonal": "Keluarga dan teman muncul di sini",
+      "viewerTextPersonal": "Saat seseorang bergabung, mereka muncul di sini."
     },
     "chat": {
       "title": "Semua dimulai dari satu pesan",
@@ -2298,7 +2540,11 @@
       "title": "Bagikan login tanpa mengoper kata sandi",
       "text": "Simpan login dan kunci yang digunakan agenmu untuk tim.",
       "viewerTitle": "Login tim muncul di sini",
-      "viewerText": "Saat seseorang membagikan login atau kunci denganmu, itu muncul di sini."
+      "viewerText": "Saat seseorang membagikan login atau kunci denganmu, itu muncul di sini.",
+      "titlePersonal": "Simpan login bersama di satu tempat",
+      "textPersonal": "Simpan login dan kunci yang digunakan agenmu untuk semua orang di sini.",
+      "viewerTitlePersonal": "Login bersama muncul di sini",
+      "viewerTextPersonal": "Saat seseorang di sini membagikan login atau kunci denganmu, itu muncul di sini."
     },
     "skills": {
       "title": "Ajari agenmu cara kalian bekerja",

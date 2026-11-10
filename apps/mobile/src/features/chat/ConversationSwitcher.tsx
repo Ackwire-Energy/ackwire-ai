@@ -1,7 +1,9 @@
 import { previewBody } from "@agenteschat/client/lib/message-body";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
+import { useOrg } from "@/providers/org";
 import { Count, GroupedHeader, GroupedList, GroupedRow, SearchField, Text } from "@/ui";
 import { type ConversationRow, rowName } from "../chats/logic";
 import { matches } from "../search/logic";
@@ -16,7 +18,8 @@ type Conversation = Extract<ConversationRow, { kind: "dm" | "channel" }>;
 /**
  * "Trocar de conversa", the sheet that holding the conversation's pill opens: every DM and channel, newest first
  * within Agentes, Canais and Pessoas, with a search on top. The current one has a check; the others their unread
- * count. A tap picks (`onPick`); the screen swaps the conversation in place.
+ * count. A tap picks (`onPick`); the screen swaps the conversation in place. A personal workspace's channels are its
+ * group conversations (ADR 0159).
  */
 export function ConversationSwitcher({
   channelId,
@@ -27,8 +30,10 @@ export function ConversationSwitcher({
 }) {
   const { t } = useTranslation();
   const dir = useDirectory();
+  const { org } = useOrg();
   const { rows } = useConversations();
   const [q, setQ] = useState("");
+  const channelsLabel = isPersonal(org) ? t("shell.channelsPersonal") : t("mobile.chat.switchChannels");
   const groups = useMemo(() => {
     const shown = rows.filter(
       (r): r is Conversation =>
@@ -38,10 +43,10 @@ export function ConversationSwitcher({
     const agent = (r: Conversation) => r.kind === "dm" && r.with.type === "agent";
     return [
       { key: "agents", label: t("mobile.chat.switchAgents"), rows: shown.filter(agent) },
-      { key: "channels", label: t("mobile.chat.switchChannels"), rows: shown.filter((r) => r.kind === "channel") },
+      { key: "channels", label: channelsLabel, rows: shown.filter((r) => r.kind === "channel") },
       { key: "people", label: t("mobile.chat.switchPeople"), rows: shown.filter((r) => r.kind === "dm" && !agent(r)) },
     ].filter((g) => g.rows.length > 0);
-  }, [rows, q, dir.agentById, t]);
+  }, [rows, q, dir.agentById, t, channelsLabel]);
 
   // The sheets' rows (a face or a tile in the 32 column), as Novo's and the actions' sheets.
   const leading = (r: Conversation) =>

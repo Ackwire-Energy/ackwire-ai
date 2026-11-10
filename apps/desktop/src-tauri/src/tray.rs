@@ -105,7 +105,7 @@ fn menu(app: &AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
         let phase = crate::local_server::phase(app);
         let (state, action) = match phase {
             Phase::Running => ("serverRunning", ("hereStop", "serverStop")),
-            Phase::Starting | Phase::Updating => ("serverStarting", ("hereStop", "serverStop")),
+            Phase::Starting | Phase::Updating | Phase::Restarting => ("serverStarting", ("hereStop", "serverStop")),
             Phase::Failing => ("serverFailing", ("hereStart", "serverStart")),
             Phase::Stopped | Phase::Off => ("serverStopped", ("hereStart", "serverStart")),
         };
@@ -137,8 +137,9 @@ pub fn refresh(app: &AppHandle) {
         BUILT_WITH_AGENTS.store(u8::from(agents_work_here(app)), std::sync::atomic::Ordering::Relaxed);
         let _ = tray.set_menu(Some(menu));
     }
+    // The Mac's menu bar has the server here's state and Stop or Start (menus.rs `here_menu`).
     #[cfg(target_os = "macos")]
-    let _ = app;
+    crate::menus::here_changed(app);
 }
 
 pub fn set_state(app: &AppHandle, state: &str) -> Result<(), String> {

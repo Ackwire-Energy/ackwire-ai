@@ -47,7 +47,7 @@
       "now": "Sekarang di {{host}}",
       "invalid": "Periksa alamatnya, misalnya agentes.timkamu.ts.net.",
       "unreachable": "Kami tidak bisa menjangkau {{host}}. Periksa alamat dan koneksimu, lalu coba lagi.",
-      "unreachableTailscale": "Kami tidak bisa menjangkau {{host}}. Server ini ada di Tailscale: buka aplikasi Tailscale, hubungkan, lalu coba lagi.",
+      "unreachableTailscale": "Kami tidak bisa menjangkau {{host}}. Server ini ada di Tailscale: buka aplikasi Tailscale, hubungkan, lalu coba lagi. Sudah terhubung? Komputer servernya mungkin sedang tidur atau aplikasinya ditutup.",
       "certificate": "Sertifikat {{host}} tidak valid. Hubungi orang yang mengelola server.",
       "notAgentes": "{{host}} bukan server agentes.chat. Periksa alamatnya.",
       "serverTooOld": "{{host}} perlu diperbarui agar bisa dipakai dengan aplikasi ini.",

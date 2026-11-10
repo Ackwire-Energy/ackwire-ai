@@ -1,17 +1,21 @@
 name: CI
 
-# All verification runs here.
-# Only on demand (every run is paid by the minute): `gh workflow run CI --ref <branch>` or "Run
-# workflow" in Actions. A `v*` tag still runs on its own and publishes the image, since pushing a tag
-# is already a deliberate release. Pull requests and pushes to main start nothing. A manual run or a
-# release tag checks everything.
+# All verification runs here: on every pull request (a draft once it is marked ready), every push to
+# main, every `v*` release tag, and on demand (`gh workflow run CI --ref <branch>` or "Run workflow" in
+# Actions). The `changes` job narrows a pull request or a push to the jobs its files touch; a manual run
+# or a release tag checks everything.
 #
-# Runners are GitHub's standard hosted ones (the plan's included minutes come first); a third-party
-# runner service cost more than the speed it bought. Everything runs on x64: on ARM the backend
-# shards took 2.5x as long (603 and 667 s against 229 and 275 s, 2026-10-26). Only the arm64 image
-# builds on ARM, natively.
+# Pull requests run as `pull_request`, never `pull_request_target`: a fork's code gets a read-only token
+# and no secrets. Only jobs gated on a push or a tag (the images, the release assets) write anything or
+# read a secret.
+#
+# Runners are GitHub's standard hosted ones. Everything runs on x64: on ARM the backend shards took 2.5x
+# as long (603 and 667 s against 229 and 275 s, 2026-10-26). Only the arm64 image builds on ARM, natively.
 on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
+    branches: [main]
     tags: ["v*"]
   workflow_dispatch:
 
@@ -112,10 +116,14 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # A tag publishes exactly the version /api/health reports; a tag that disagrees with
-      # apps/server/package.json is refused before anything runs.
-      - name: Tag must match the server version
+      # apps/server/package.json is refused before anything runs. It must be strict semver
+      # (v1.2.3 or v1.2.3-rc.1, no leading zeros): the image tags come from metadata-action's
+      # semver patterns, which give nothing for any other shape.
+      - name: Tag must be semver and match the server version
         if: github.ref_type == 'tag'
-        run: test "v$(jq -r .version apps/server/package.json)" = "$GITHUB_REF_NAME"
+        run: |
+          [[ "$GITHUB_REF_NAME" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$ ]]
+          test "v$(jq -r .version apps/server/package.json)" = "$GITHUB_REF_NAME"
       - &setup-bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
@@ -537,14 +545,15 @@ jobs:
         if: failure()
         run: docker compose logs --no-color
 
-  # Images publish only from a green run on main or a version tag, so a tag a deployment tracks can
-  # never point at a build the tests rejected. main → :edge (moving head); version tags → :1.2.3,
-  # :1.2 and :latest (metadata-action adds :latest to semver tags by itself). While the repository
-  # is private only tags publish: an edge image per push to main costs about 10 runner minutes, and
-  # public repositories run them free. The backup and speech services' images ship on the same tags, so
-  # the standalone compose file needs no build context. The speech image has no layer cache: its models
-  # (about 700 MB) would crowd the app's layers out of the repository's cache quota. It is optional like
-  # its service: a build that fails (its models come from Hugging Face) publishes the app without it.
+  # Images publish only from a green run on a push to main or a version tag, never from a pull
+  # request, so a tag a deployment tracks can never point at a build the tests rejected. main → :edge
+  # (moving head); version tags → :1.2.3, :1.2 and :latest (metadata-action adds :latest to semver
+  # tags by itself). A private copy of the repository publishes tags only (an edge image costs about
+  # 10 runner minutes there; public repositories run them free). The backup and speech services' images
+  # ship on the same tags, so the standalone compose file needs no build context. The speech image has no
+  # layer cache: its models (about 700 MB) would crowd the app's layers out of the repository's cache
+  # quota. It is optional like its service: a build that fails (its models come from Hugging Face)
+  # publishes the app without it.
   #
   # Each platform builds on its own native runner (Bun under QEMU emulation is slow and fragile) and
   # pushes by digest only; publish then stitches the digests into one tag per image.

@@ -33,6 +33,7 @@ import { useOrg } from "@/components/org-context";
 import { WhoSeesButton, WhoSeesDialog } from "@/components/WhoSees";
 import { useComposerFiles } from "@/hooks/useComposerFiles";
 import { useEdited } from "@/hooks/useEdited";
+import { usePersonalView } from "@/hooks/usePersonalView";
 import { columnIdOf, columnsOf, PRIORITIES, splitCriteria, useColumnTitle } from "@/lib/issues";
 import { useToast } from "@/lib/toast";
 
@@ -86,6 +87,10 @@ export function NewIssueDialog({
   const [due, setDue] = useState<string | null>(null);
   const [another, setAnother] = useState(false);
   const [audience, setAudience] = useState<AudienceChoice>(EVERYONE);
+  // Alone in a personal workspace there is nobody else to see it: "Who sees it" leaves the form while it says
+  // everyone, the default (ADR 0159). Anything else always shows.
+  const { solo } = usePersonalView();
+  const whoSeesShown = !solo || audience.mode !== "everyone";
   const [choosing, setChoosing] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
   const textRef = useRef<HTMLTextAreaElement>(null);
@@ -396,9 +401,11 @@ export function NewIssueDialog({
                     />
                   </Field>
                 )}
-                <Field label={t("whoSees.label")} id="ni-sees">
-                  <WhoSeesButton select value={audience} onClick={() => setChoosing(true)} />
-                </Field>
+                {whoSeesShown && (
+                  <Field label={t("whoSees.label")} id="ni-sees">
+                    <WhoSeesButton select value={audience} onClick={() => setChoosing(true)} />
+                  </Field>
+                )}
                 <Field label={t("issues.form.priority")} id="ni-pri">
                   <Select
                     size="sm"
@@ -487,7 +494,7 @@ export function NewIssueDialog({
                     </MenuItem>
                   ))}
                 </Menu>
-                <WhoSeesButton value={audience} onClick={() => setChoosing(true)} />
+                {whoSeesShown && <WhoSeesButton value={audience} onClick={() => setChoosing(true)} />}
                 <DueDate value={due} onChange={setDue} />
                 {todoColumns.length > 1 && chosenColumn && (
                   <Menu

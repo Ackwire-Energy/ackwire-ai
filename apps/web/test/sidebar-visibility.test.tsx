@@ -121,6 +121,8 @@ describe("what a member's sidebar lists", () => {
     const ada = within(nav()).getByRole("link", { name: /^Ada/ });
     expect(within(ada).getByRole("img", { name: "Pessoal" })).toBeTruthy();
     expect(ada.querySelector(".sidebar__item-role")?.textContent).toBe("só fala com João");
+    // Who it talks to is words, not the role's tag.
+    expect(ada.querySelector(".sidebar__item-role")?.classList.contains("ac-tag")).toBe(false);
   });
 });
 
@@ -193,7 +195,7 @@ describe("an agent's row", () => {
     // A name over a role is a face line: the name's capitals on the face's top.
     expect([...(text?.children ?? [])].map((el) => [el.className, el.textContent])).toEqual([
       ["sidebar__item-label ac-captop", "Ada"],
-      ["sidebar__item-role", "Assistente de e-mails e agenda da diretoria"],
+      ["sidebar__item-role ac-tag", "Assistente de e-mails e agenda da diretoria"],
     ]);
     // Nothing at the row's end shares the name's line with the role: only the lock.
     const end = row?.querySelector(":scope > .sidebar__item-meta");

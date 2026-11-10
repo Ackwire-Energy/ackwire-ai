@@ -27,6 +27,7 @@ import {
   type RunnerFrame,
   type RunnerInfo,
   type RunnerPause,
+  type RunnerToolchains,
   type RunnerTools,
 } from "@agenteschat/adapters/machine-protocol";
 import { redactCommon } from "@agenteschat/adapters/redact";
@@ -106,6 +107,7 @@ import { NetworkChangingError, RUNNER_VERSION, RunnerError } from "./errors";
 import { cachedExecutors, EXECUTORS_TTL_MS, type ExecutorRun } from "./executors";
 import { systemGitCache } from "./git";
 import type { HandlerContext, RequestObserver, RequestOutcome } from "./handlers";
+import { IphoneSetup, type IphoneSetupOptions } from "./iphone-setup";
 import { currentProcess, isCompiled, selfCommand } from "./launch";
 import { tailLines } from "./logfile";
 import { LoopbackGuard, loopbackEndpoints, runnerEndpoints } from "./loopback-guard";
@@ -127,6 +129,7 @@ import {
 import { type CachedLogo, logoDataUrl, readCachedLogo, removeCachedLogo, syncOrgLogo } from "./org-logo";
 import { type DeviceGrant, devicePair, type FetchFn, PairingError, uniqueWorkspace } from "./pairing";
 import { agentId8, agentWorkspace } from "./paths";
+import { PhoneManager, type PhoneManagerOptions } from "./phones";
 import { agentSecrets, dropStoredSiteSecrets, secretValue } from "./secrets";
 import { AGENTS_CGROUP } from "./service";
 import {
@@ -150,6 +153,7 @@ import {
 } from "./supervisor";
 import { type SettledTask, TaskManager } from "./tasks";
 import { runnerTerminalUser, systemTerminalUser, Terminals, type TerminalUser } from "./terminal";
+import { cachedToolchains, TOOLCHAINS_FILE } from "./toolchains";
 
 /**
  * The runner's long-lived core, shared by `agentes-runner start` (terminal,
@@ -210,7 +214,9 @@ export function prepareWorkspace(dir: string): string {
 /**
  * The config after a device-code pairing. Limits of an earlier pairing of
  * this home stay; access starts from `tools` with no folders, except when
- * the server gave back the same machine (a reconnect): its folders and tools stay.
+ * the server gave back the same machine (a reconnect, or a workspace's computer
+ * moved to new hardware with its files): its folders, tools, allowed services
+ * and pause stay.
  * The mode always stays: a system home paired again must never become a
  * root runner that does agents' work itself.
  */
@@ -243,6 +249,8 @@ export function configFromGrant(
     ...(grant.org.id ? { orgId: grant.org.id } : {}),
     ...(grant.org.name ? { orgName: grant.org.name } : {}),
     access: same && prev?.access ? prev.access : { folders: [], tools },
+    ...(same && prev?.services?.length ? { services: prev.services } : {}),
+    ...(same && prev?.paused ? { paused: prev.paused } : {}),
   };
 }
 
@@ -274,13 +282,22 @@ export function deviceInfo(name?: string, previous?: { machineId: string; token:
 }
 
 /** `16:24`, or `Oct 18 16:24` when not today (local time; the person's own computer). */
-function shortTime(iso: string, now = Date.now()) {
+export function shortTime(iso: string, now = Date.now()) {
   const d = new Date(iso);
   const hm = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
   const today = new Date(now);
   if (d.toDateString() === today.toDateString()) return hm;
   return `${d.toLocaleString("en", { month: "short" })} ${d.getDate()} ${hm}`;
 }
+
+/** Who agents' commands run as on this computer (`os.userInfo` throws for a uid with no passwd entry). */
+const OS_USER = (() => {
+  try {
+    return os.userInfo().username;
+  } catch {
+    return "";
+  }
+})();
 
 const firstLine = (s: string, max = 120) => {
   const t = s.replace(/\s+/g, " ").trim();
@@ -357,6 +374,12 @@ export interface DaemonOptions {
   selfCheck?: () => Promise<string | null>;
   /** Tests: how soon a failed self-check runs again (`SELF_CHECK_RETRY_MS`). */
   selfCheckRetryMs?: number;
+  /** Tests: what `hello.toolchains` says instead of a look at the computer's tools. */
+  toolchains?: () => RunnerToolchains | undefined;
+  /** Tests: the phones' tools and folders, or `false` for none (a single-user runner looks for phones). */
+  phones?: Partial<PhoneManagerOptions> | false;
+  /** Tests: the iPhone setup's tools and folders. */
+  iphone?: Partial<IphoneSetupOptions>;
 }
 
 /** What a task is in its activity words: a shell task's command, or the CLI that works it (the app names it). */
@@ -441,6 +464,14 @@ export class RunnerDaemon implements RequestObserver {
   readonly terminals: Terminals;
   /** The refs each agent's desktop use gave out, across sessions: a number never comes back for another element. */
   private readonly desktopRefsGiven = new Map<string, { last: number }>();
+  /** The phones this computer reaches (single-user runners): their locks outlive a reconnect. */
+  private phones: PhoneManager | null = null;
+  /** The phones the last `hello` carried (JSON). */
+  private toldPhones = "[]";
+  /** What this computer builds with, cached (`hello.toolchains`); looked at from the first session on. */
+  private toolchains: { get(): RunnerToolchains | undefined; stop(): void } | null = null;
+  /** The Mac's side of an iPhone's setup (the desktop app asks), made on its first request. */
+  private iphone: IphoneSetup | null = null;
 
   constructor(private readonly opts: DaemonOptions) {
     this.uidNetworks = new AgentNetworks({}, readNetworkPins(opts.home));
@@ -712,7 +743,7 @@ export class RunnerDaemon implements RequestObserver {
     const sizes = setInterval(() => this.measureShared(), SHARED_SIZE_MS);
     sizes.unref?.();
     this.timers.push(sizes);
-    // System mode: for the Cloud's guard, at most once a minute.
+    // System mode: for an operator's network guard, at most once a minute.
     const relayed = setInterval(() => {
       if (!this.session?.supervisor) return;
       try {
@@ -754,6 +785,9 @@ export class RunnerDaemon implements RequestObserver {
     const s = this.session;
     this.session = null;
     if (s) await this.closeSession(s);
+    await this.phones?.stop();
+    this.iphone?.stop();
+    this.toolchains?.stop();
     await this.accounts.close().catch(() => undefined);
     await this.chain.catch(() => undefined);
     this.startWaiter?.({ exitCode: 0, reason: "stopped", message: "stopped" });
@@ -911,6 +945,7 @@ export class RunnerDaemon implements RequestObserver {
       privateNetwork: Boolean(
         (this.session?.network ?? c)?.networkLauncher || (this.session?.network ?? c)?.networkMark,
       ),
+      ...(c ? { commitHost: new URL(c.server).hostname } : {}),
       limits: {
         maxConcurrentTasks: c?.maxConcurrentTasks ?? DEFAULT_LIMITS.maxConcurrentTasks,
         taskMaxSeconds: c?.taskMaxSeconds ?? DEFAULT_LIMITS.taskMaxSeconds,
@@ -1087,6 +1122,7 @@ export class RunnerDaemon implements RequestObserver {
       accounts: this.accounts,
       ...(this.self.compiled ? { wrapperCommand: [...this.self.command, "task-wrapper"] } : {}),
       onSettled: (t) => this.taskSettled(t),
+      commitHost: () => this.workerState().commitHost,
       ...(this.opts.caffeinate !== undefined ? { caffeinate: this.opts.caffeinate } : {}),
     });
     await tasks.init();
@@ -1323,6 +1359,22 @@ export class RunnerDaemon implements RequestObserver {
     // Agents working as this runner's user: what their browsers' first command would install is installed now (in
     // system mode, the installer shares it with every agent).
     if (!supervisor && this.access().tools.browser === true) void browser.prepareInBackground();
+    this.toolchains ??= this.opts.toolchains
+      ? { get: this.opts.toolchains, stop: () => {} }
+      : cachedToolchains(path.join(home, TOOLCHAINS_FILE));
+    // Phones are reached as the person (adb's key, the Mac's pairing with the iPhone): a system-mode runner has none.
+    if (!this.phones && config.mode !== "system" && this.opts.phones !== false) {
+      this.phones = new PhoneManager({
+        log,
+        onChange: (phones) => {
+          this.send({ type: "phones.changed", phones });
+          this.queueStatus();
+        },
+        ...(this.opts.caffeinate !== undefined ? { caffeinate: this.opts.caffeinate } : {}),
+        ...this.opts.phones,
+      });
+      this.phones.start();
+    }
     const context: HandlerContext = {
       workspaceReal,
       get exec() {
@@ -1368,6 +1420,7 @@ export class RunnerDaemon implements RequestObserver {
           browser.stopInput(agentId);
         }
       },
+      ...(this.phones ? { phones: this.phones } : {}),
     };
     // `hello` lists the accounts it already knows; a fresh look (each runs its CLI) never delays connecting:
     // it lands in `hello` if it finishes first, else comes after as `accounts.changed`. Nothing reaches the
@@ -1382,7 +1435,12 @@ export class RunnerDaemon implements RequestObserver {
         const accounts = this.accounts.snapshot();
         const usage = this.ownUsage();
         told = JSON.stringify([accounts, usage]);
+        const phones = this.phones?.list();
+        if (phones) this.toldPhones = JSON.stringify(phones);
+        const toolchains = this.toolchains?.get();
         return {
+          ...(phones ? { phones } : {}),
+          ...(toolchains ? { toolchains } : {}),
           ...this.info(workspaceReal),
           browser: browser.info(),
           desktop: this.desktops.info(),
@@ -1433,6 +1491,8 @@ export class RunnerDaemon implements RequestObserver {
         if (accounts && JSON.stringify([accounts, usage]) !== told) {
           this.send({ type: "accounts.changed", accounts, ...usage });
         }
+        const phones = this.phones?.list();
+        if (phones && JSON.stringify(phones) !== this.toldPhones) this.send({ type: "phones.changed", phones });
       },
       ...(this.opts.dial ? { dial: this.opts.dial } : {}),
     });
@@ -1942,6 +2002,9 @@ export class RunnerDaemon implements RequestObserver {
       agents: this.agents.map((a) => ({ ...a })),
       access: this.access(),
       browsers,
+      ...(this.phones ? { phones: this.phones.list() } : {}),
+      // In system mode each agent runs as a user of its own, not as the runner's.
+      ...(OS_USER && c?.mode !== "system" && s?.mode !== "system" ? { user: OS_USER } : {}),
       seq: ++this.statusSeq,
     };
   }
@@ -1992,6 +2055,12 @@ export class RunnerDaemon implements RequestObserver {
     const out = await s.browser.stop({ id: agentId, handle: agent?.handle ?? "agent" });
     this.browsersChanged();
     return out;
+  }
+
+  /** The desktop app's iPhone setup: what the Mac has, a download of the iOS platform, Xcode opened. */
+  iphoneSetup(): IphoneSetup {
+    this.iphone ??= new IphoneSetup({ log: this.opts.log, ...this.opts.iphone });
+    return this.iphone;
   }
 
   // ── Accounts (ADR 0041) ────────────────────────────────────────────────────
@@ -2161,7 +2230,7 @@ export class RunnerDaemon implements RequestObserver {
       },
       (err: unknown) => {
         if (this.pairing === ac) this.pairing = null;
-        const code = err instanceof PairingError ? err.code : "internal";
+        const code = err instanceof PairingError && err.code !== "link_invalid" ? err.code : "internal";
         if (code === "canceled") return;
         this.emit({ kind: "pair.failed", code, message: err instanceof Error ? err.message : String(err) });
       },

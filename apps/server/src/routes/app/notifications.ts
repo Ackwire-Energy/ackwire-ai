@@ -67,10 +67,6 @@ const Notification = z
         .string()
         .optional()
         .openapi({ description: "`plan_lent`: the plan's account (`POST …/ai-accounts/{id}/take-back`)." }),
-      connectionId: z
-        .string()
-        .optional()
-        .openapi({ description: "`connector_tool_changed`: the connected server whose approved tools changed." }),
       label: z.string().optional(),
     }),
     latest: z.object({

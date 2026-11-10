@@ -61,6 +61,8 @@ export const strings: Partial<PushStrings> = {
   joinRequestTitle: (name, org) => `${name} prosi o dołączenie do przestrzeni roboczej ${org}`,
   joinSuggestionTitle: (by, name, org) => `${by} proponuje osobę ${name} do przestrzeni roboczej ${org}`,
   joinRequestBody: "Dotknij, żeby zatwierdzić lub odrzucić.",
+  deviceJoinRequestTitle: (computer, org) => `${computer} chce dołączyć do przestrzeni roboczej ${org}`,
+  deviceJoinRequestBody: "Dotknij, żeby wpuścić albo odmówić.",
   waitingTitle: "Coś na ciebie czeka",
   openBody: "Dotknij, żeby otworzyć.",
   sentGif: "Wysłano GIF-a",
@@ -75,6 +77,24 @@ export const strings: Partial<PushStrings> = {
   usageRaisedTitle: (a) => `${a} podnosi twój limit w tym miesiącu`,
   usageRaisedBody: "Możesz kontynuować.",
   usageRefusedTitle: (a) => `${a} odmawia prośby o większe użycie`,
+  deviceInUseTitle: (a, p, d) =>
+    p ? `${a} (dla ${p}) używa twojego urządzenia ${d}` : `${a} używa twojego urządzenia ${d}`,
+  deviceInUseBody: "Dotknij, żeby zatrzymać.",
+  deviceAccessTitle: (a, p, d) =>
+    p ? `${a} (dla ${p}) prosi o dostęp do twojego urządzenia ${d}` : `${a} prosi o dostęp do twojego urządzenia ${d}`,
+  deviceAccessBody: "Dotknij, żeby zezwolić raz, zawsze albo odmówić.",
+  deviceWaitingTitle: (p, d) => `Agent dla ${p} czeka na twoje urządzenie ${d}`,
+  deviceWaitingBody: "Zacznie, gdy urządzenie wróci.",
   teamWeekReady: "Tydzień twojego zespołu jest gotowy",
   teamDayReady: "Twoje podsumowanie dnia jest gotowe",
+  machineConnectedTitlePersonal: "Podłączono nowy komputer",
+  computerReadyTitlePersonal: "Komputer twoich agentów jest gotowy",
+  agentUnreachedBodyPersonal:
+    "Osoba, która utworzyła rutynę, nie może jeszcze rozmawiać z tym agentem. Dotknij, żeby na to pozwolić.",
+  widgetFailedReasonsPersonal: {
+    creator_left: "Osoby, która go skonfigurowała, nie ma już w twojej przestrzeni roboczej.",
+  },
+  joinRequestTitlePersonal: (name) => `${name} prosi o dołączenie do twojej przestrzeni roboczej`,
+  joinSuggestionTitlePersonal: (by, name) => `${by} proponuje zaprosić osobę ${name}`,
+  teamWeekReadyPersonal: "Twój tydzień jest gotowy",
 };

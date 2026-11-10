@@ -952,6 +952,28 @@
       }
     },
     /**
+     * A bubble's time (`.ac-msg__stamp`, with what the row is doing and its stop button) inside its bubble: one wider
+     * than the words widens the bubble, it never hangs past the bubble's edge.
+     */
+    stampout(out) {
+      for (const stamp of document.querySelectorAll(".ac-msg__text > .ac-msg__stamp")) {
+        const bubble = stamp.parentElement;
+        if (!seen(stamp) || !painted(style(bubble).backgroundColor)) continue;
+        const s = stamp.getBoundingClientRect();
+        const b = bubble.getBoundingClientRect();
+        const px = Math.max(b.left - s.left, s.right - b.right);
+        if (px > 0.5)
+          out.push({
+            rule: "stampout",
+            node: stamp,
+            el: sig(stamp),
+            box: sig(bubble),
+            px: +px.toFixed(1),
+            text: words(stamp),
+          });
+      }
+    },
+    /**
      * A box that scrolls for a few px: margins, a border or rounding past its edge show a scrollbar (and let the wheel
      * nudge it) over content that, to the eye, fits. The check keeps one only if it stays in a taller window
      * (`lasting` in check.ts). A box with no class of its own is named by the nearest one with a class around it, so
@@ -994,8 +1016,13 @@
           !hasSurface(style(square))
         )
           continue;
+        // What ends the row after the words (a count, "Novo") sits on the row's middle in a column of its own: between
+        // two lines, it is none of theirs.
+        const words = kids.slice(1).find((k) => visibleText(k));
+        const end = words ? words.getBoundingClientRect().right : Number.POSITIVE_INFINITY;
         const beside = [];
         for (const kid of kids.slice(1)) {
+          if (kid !== words && kid.getBoundingClientRect().left >= end - 1) continue;
           const walker = document.createTreeWalker(kid, NodeFilter.SHOW_TEXT);
           for (let n = walker.nextNode(); n; n = walker.nextNode()) {
             if (!n.textContent.trim() || !seen(n.parentElement)) continue;
@@ -1349,7 +1376,15 @@
           left: b.left + parseFloat(cs.borderLeftWidth),
           right: b.right - parseFloat(cs.borderRightWidth),
         };
-        // A side of the clip on the window's own edge cuts nothing the window wouldn't.
+        // A side of the clip on the window's own edge cuts nothing the window wouldn't. Nor does a scroller's side with
+        // more to scroll to: what it cuts there shows whole once scrolled (the work's sheet ends above the window's edge).
+        const more = {
+          top: clip.scrollTop > 0.5,
+          bottom: clip.scrollHeight - clip.clientHeight - clip.scrollTop > 0.5,
+          left: clip.scrollLeft > 0.5,
+          right: clip.scrollWidth - clip.clientWidth - clip.scrollLeft > 0.5,
+        };
+        const scrolls = (overflow) => overflow === "auto" || overflow === "scroll";
         const cut = [
           ["top", cs.overflowY, pad.top > 0.5 && a.top >= pad.top - 0.5 && a.top - reach.top < pad.top - 0.5],
           [
@@ -1365,7 +1400,7 @@
             cs.overflowX,
             pad.right < innerWidth - 0.5 && a.right <= pad.right + 0.5 && a.right + reach.right > pad.right + 0.5,
           ],
-        ].find(([, overflow, hit]) => hit && overflow !== "visible");
+        ].find(([side, overflow, hit]) => hit && overflow !== "visible" && !(scrolls(overflow) && more[side]));
         if (cut) out.push({ rule: "clip", node: el, el: sig(el), box: sig(clip), side: cut[0] });
       }
     },
@@ -1509,9 +1544,11 @@
           (el) => seen(el) && !el.closest(OWN) && !el.parentElement.closest(ITEM),
         );
         if (!items.length) continue;
-        const faces = items.some((el) =>
-          el.querySelector(":scope > .ac-menu__leading > .ac-avatar, :scope > .ac-avatar"),
-        );
+        // The palette (⌘K) finds people and agents among the rest: its rows are option rows whatever a query found,
+        // one height as it's typed.
+        const faces =
+          menu.matches(".ac-palette__list") ||
+          items.some((el) => el.querySelector(":scope > .ac-menu__leading > .ac-avatar, :scope > .ac-avatar"));
         // The workspace menu (MenuOverlay) fills the screen in 15px type: its rows are the touch ones everywhere.
         const roomy = touch || menu.matches(".ac-mo__group");
         const own = [...menu.querySelectorAll(OWN)].filter((x) => style(x).display !== "none");
@@ -1952,7 +1989,7 @@
      * Buttons side by side stand 8 apart (rule 8): two plated ones, or two icon buttons' plates (a glyph's plate is its
      * box less its air, `.ac-btn--glyph`). A ghost with words reads by its words (`.ac-acts`), and the parts of one
      * control (a split button, a segmented control, a token's ×, an event pill's actions, a message's bar) are drawn
-     * as one, and so is the composer's strip of format toggles.
+     * as one, and so are the strips of format toggles: the composer's and the wiki editor's.
      */
     btngap(out) {
       const kind = (el) => {
@@ -1967,7 +2004,7 @@
         return { left: r.left + air, right: r.right - air, top: r.top + air, bottom: r.bottom - air };
       };
       const ONE =
-        ".ac-split,.ac-seg,.ac-token,.ac-eventpill,.ac-msg__actions,.ac-composer__tools--format,[role=menu],[role=menubar],svg";
+        ".ac-split,.ac-seg,.ac-token,.ac-eventpill,.ac-msg__actions,.ac-composer__tools--format,.wiki-bar,[role=menu],[role=menubar],svg";
       for (const row of document.body.querySelectorAll("*")) {
         if (!seen(row) || row.closest(ONE) || !isRow(style(row))) continue;
         const kids = flow(row);
@@ -2154,6 +2191,49 @@
           out.push({ rule: "countfill", node: count, el: sig(count), box: placeOf(count), ratio: +ratio.toFixed(2) });
       }
     },
+    /**
+     * A strip that scrolls sideways on a page (the task board, a row of chips or tabs) runs out over the page's side
+     * room (`--page-x`) to the work area's edge, its own padding putting its first item on the page's line: what
+     * scrolls slides under the work area's edge. One that stops in that room, on the page's padding line or a ring's
+     * width past it, cuts its items in mid-air. Only on a side where the box that frames it (the nearest that clips or
+     * shows a surface: the work area, a split's column, a card) meets the work area's edge: in a card or a field it
+     * stops at that box's edge, which shows.
+     */
+    bleed(out) {
+      const room = lengthOf("--page-x");
+      for (const strip of document.querySelectorAll(".shell__main *")) {
+        const s = style(strip);
+        if (!/^(auto|scroll)$/.test(s.overflowX) || strip.scrollWidth <= strip.clientWidth + 1) continue;
+        if (strip.matches("textarea,input,select") || !seen(strip) || hasSurface(s)) continue;
+        const main = strip.parentElement.closest(".shell__main");
+        let frame = strip.parentElement;
+        while (frame !== main && !hasSurface(style(frame)) && style(frame).overflowX === "visible")
+          frame = frame.parentElement;
+        const edges = (el) => {
+          const left = el.getBoundingClientRect().left + el.clientLeft;
+          return { left, right: left + el.clientWidth };
+        };
+        const area = edges(main);
+        const box = edges(frame);
+        const r = strip.getBoundingClientRect();
+        const short = { left: r.left - box.left, right: box.right - r.right };
+        const sides = ["left", "right"].filter(
+          (side) => Math.abs(box[side] - area[side]) <= 0.5 && short[side] > 0.5 && short[side] <= room + 0.5,
+        );
+        if (!sides.length) continue;
+        let page = strip;
+        while (page.parentElement !== main) page = page.parentElement;
+        const px = Math.max(...sides.map((side) => short[side]));
+        out.push({
+          rule: "bleed",
+          node: strip,
+          el: sig(strip),
+          box: sig(page),
+          side: sides.join(" "),
+          px: +px.toFixed(1),
+        });
+      }
+    },
   };
 
   /**
@@ -2233,6 +2313,52 @@
           };
         });
       });
+    },
+    /**
+     * What opens from another layer stacks above it: a profile card (a popover), a popover from it, a confirm dialog from
+     * that, a list from the dialog, put in the page in that order as Radix portals them, each over the whole window.
+     * The ones that aren't the topmost thing at their center when they open.
+     */
+    layers() {
+      document.body.innerHTML = "";
+      const box = (className) => {
+        const el = document.createElement("div");
+        el.className = className;
+        return el;
+      };
+      // Radix's popper: the content in a fixed wrapper that takes the content's own z-index.
+      const floating = (className) => {
+        const wrapper = document.createElement("div");
+        wrapper.setAttribute("data-radix-popper-content-wrapper", "");
+        wrapper.style.cssText = "position: fixed; inset: 0";
+        const content = box(className);
+        content.style.cssText = "width: 100%; height: 100%; max-width: none; max-height: none";
+        wrapper.append(content);
+        document.body.append(wrapper);
+        wrapper.style.zIndex = getComputedStyle(content).zIndex;
+        return content;
+      };
+      const dialog = () => {
+        const panel = box("ac-dialog");
+        panel.style.height = "240px";
+        document.body.append(box("ac-dialog__scrim"), panel);
+        return panel;
+      };
+      const onTop = (el) => {
+        const r = el.getBoundingClientRect();
+        const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        return hit !== null && el.contains(hit);
+      };
+      const under = [];
+      for (const [name, open] of [
+        ["a card", () => floating("ac-menu ac-popover profile-card")],
+        ["a popover from the card", () => floating("ac-menu ac-popover")],
+        ["a dialog from the popover", dialog],
+        ["a list from the dialog", () => floating("ac-menu ac-menu--select")],
+      ])
+        if (!onTop(open())) under.push(name);
+      document.body.innerHTML = "";
+      return under;
     },
   };
 })();

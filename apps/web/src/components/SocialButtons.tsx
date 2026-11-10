@@ -36,7 +36,10 @@ const ORDER: SignInProvider[] = ["google", "github", "apple"];
 
 /** How this browser signed in last (marked "Último usado"). */
 export const lastSignIn = () => storage.get(STORAGE_KEYS.lastSignIn);
-export const rememberSignIn = (method: SignInProvider | "email") => storage.set(STORAGE_KEYS.lastSignIn, method);
+export const rememberSignIn = (method: SignInProvider | "email") => {
+  storage.set(STORAGE_KEYS.lastSignIn, method);
+  storage.remove(STORAGE_KEYS.signedOut);
+};
 
 /** The providers the server has configured, or only `only` (an account linked to them). */
 export function useSocialProviders(only?: SignInProvider[]): SignInProvider[] {

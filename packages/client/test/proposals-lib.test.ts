@@ -13,6 +13,8 @@ import {
   onlyKey,
   pendingOnAgent,
   proposalSections,
+  proposalTarget,
+  proposalTitle,
   proposalWhy,
   proposerOf,
   removalOf,
@@ -207,6 +209,26 @@ describe("a card of proposals", () => {
     const one = cardHead(t, [row("1"), role("1"), access("1")], "Theo", name, "Acme");
     expect(one.key).toBe("proposals.proposes");
     expect(String(one.values.target)).toContain('proposals.targetChanges {"name":"Ada"');
+  });
+
+  test("the context: the workspace's by its name, a personal workspace's as what its agents know (ADR 0159)", () => {
+    const name = () => "Ada";
+    const context = row("1", { target: { type: "org_context" }, title: "Update the context" });
+    // By name only, as before; a team's workspace reads the same.
+    expect(proposalTarget(t, context, name, "Acme")).toBe('proposals.targetContext {"org":"Acme"}');
+    expect(proposalTarget(t, context, name, { name: "Acme", mode: "team" })).toBe(
+      'proposals.targetContext {"org":"Acme"}',
+    );
+    expect(proposalTitle(t, context, "Acme", name)).toBe("proposals.titleContext=Update the context");
+    // A personal workspace's never reads "Personal context".
+    const personal = { name: "Personal", mode: "personal" as const };
+    expect(proposalTarget(t, context, name, personal)).toBe('proposals.targetContextPersonal {"org":"Personal"}');
+    expect(proposalTitle(t, context, personal, name)).toBe("proposals.titleContextPersonal=Update the context");
+    expect(cardHead(t, [context], "Theo", name, personal).values.target).toBe(
+      'proposals.targetContextPersonal {"org":"Personal"}',
+    );
+    // An agent's own changes read the same in either mode.
+    expect(proposalTarget(t, role("1"), name, personal)).toContain("proposals.targetRole");
   });
 });
 

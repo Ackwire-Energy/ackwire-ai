@@ -41,6 +41,24 @@ test("a settings row's control centres on its words, never pinned to the first l
   expect(last(panel, ".agp-card .settings-row", "flex-direction")).toBeUndefined();
 });
 
+test("a text field of several lines in a settings row keeps its rows: the row's one-line control height spares it", () => {
+  expect(last(top, "textarea.ac-input", "height")).toBe("auto");
+  // What a rule in a settings row gives a height to, a textarea (`textarea`, or an `.ac-input` not kept to inputs).
+  const squeezes = (selector: string) => {
+    const inRow = selector.slice(selector.indexOf(".settings-row"));
+    return (
+      /(^|[^\w-])textarea\b/.test(inRow.replaceAll(":not(textarea)", "")) ||
+      /\.ac-input(?![\w-])(?!:not\(textarea\))/.test(inRow)
+    );
+  };
+  const squeezed = rules(css).flatMap((rule) =>
+    rule.declarations.some(([p]) => p === "height" || p === "block-size")
+      ? rule.selectors.filter((s) => s.includes(".settings-row") && squeezes(s))
+      : [],
+  );
+  expect(squeezed).toEqual([]);
+});
+
 test("what a row says wraps instead of losing its end to an ellipsis", () => {
   for (const selector of [
     ".routine-row__when-text b",

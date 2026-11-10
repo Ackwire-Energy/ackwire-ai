@@ -3,6 +3,7 @@ import { type MachineOs, MIN_RUNNER_PROTOCOL, type PubSub } from "@agenteschat/a
 import { and, count, type Database, eq, gt, inArray, isNull, schema } from "@agenteschat/db";
 import { recordAudit } from "./audit";
 import { caches } from "./cache";
+import type { DeviceAudience } from "./devices";
 import { ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
 import {
@@ -19,7 +20,7 @@ import { notifyMachineConnected } from "./notification-producers";
 import { can, getMembership, requireActiveMembership } from "./organizations";
 import { closedRefusal } from "./standing";
 
-const { agents, machineDeviceCodes, machines, organizations } = schema;
+const { agents, machineDeviceCodes, machines, organizations, users } = schema;
 
 /**
  * Connecting a computer (ADR 0036 §5): a device-code flow like OAuth's. The
@@ -118,12 +119,14 @@ const nowOf = (deps: { now?: () => Date }) => deps.now?.() ?? new Date();
 
 /**
  * `POST /api/machines/device` (no session): a new code for the computer.
- * At most `DEVICE_MAX_PENDING_PER_IP` pending codes per address.
+ * At most `DEVICE_MAX_PENDING_PER_IP` pending codes per address. With `link` (a connect link, `device-links.ts`) the
+ * code is that link's organization's and only the link's maker can approve it: nobody can confirm it by typing it.
  */
 export async function startDeviceCode(
   deps: DeviceDeps & { publicUrl: string },
   input: DeviceStartInput,
   requester: DeviceRequester,
+  link?: { id: string; orgId: string },
 ) {
   if (input.protocol !== undefined && input.protocol < MIN_RUNNER_PROTOCOL) {
     throw new ValidationError("This runner is too old. Download the latest one.", "machine.outdated");
@@ -159,6 +162,7 @@ export async function startDeviceCode(
         ...(input.workspace !== undefined ? { workspace: input.workspace.slice(0, 500) } : {}),
         ...(input.exec !== undefined ? { execAllowed: input.exec } : {}),
         ...(previousMachineId ? { previousMachineId } : {}),
+        ...(link ? { orgId: link.orgId, linkId: link.id } : {}),
         requesterIp: ip,
         approxLocation: requester.approxLocation?.slice(0, 120) || null,
         expiresAt,
@@ -201,7 +205,16 @@ async function provenPreviousMachine(db: Database, input: DeviceStartInput): Pro
 export type DeviceTokenError = "authorization_pending" | "slow_down" | "access_denied" | "expired_token";
 
 export type DeviceTokenResult =
-  | { ok: true; token: string; machineId: string; name: string; org: { id: string; name: string } }
+  | {
+      ok: true;
+      token: string;
+      machineId: string;
+      name: string;
+      org: { id: string; name: string };
+      /** Who may use it, as it joined, and the name of whoever connected it: the computer says so when it connects. */
+      audience: DeviceAudience["mode"];
+      owner: string | null;
+    }
   | { ok: false; error: DeviceTokenError };
 
 /**
@@ -258,7 +271,10 @@ export async function pollDeviceToken(deps: DeviceDeps, deviceCode: string): Pro
       .select({ id: organizations.id, name: organizations.name })
       .from(organizations)
       .where(eq(organizations.id, machine.orgId));
-    return { machine, org: org ?? { id: machine.orgId, name: "" } };
+    const [owner] = machine.pairedByUserId
+      ? await tx.select({ name: users.name }).from(users).where(eq(users.id, machine.pairedByUserId))
+      : [];
+    return { machine, org: org ?? { id: machine.orgId, name: "" }, owner: owner?.name ?? null };
   });
   if (!issued) return { ok: false, error: "expired_token" };
   await recordAudit(deps.db, {
@@ -269,7 +285,15 @@ export async function pollDeviceToken(deps: DeviceDeps, deviceCode: string): Pro
     target: { type: "machine", id: issued.machine.id },
     details: { name: issued.machine.name, hostname: issued.machine.hostname, os: issued.machine.os },
   });
-  return { ok: true, token, machineId: issued.machine.id, name: issued.machine.name, org: issued.org };
+  return {
+    ok: true,
+    token,
+    machineId: issued.machine.id,
+    name: issued.machine.name,
+    org: issued.org,
+    audience: issued.machine.audienceMode,
+    owner: issued.owner,
+  };
 }
 
 /** A machine whose code expired before the computer took its token: removed (it has no token to connect with). */
@@ -295,7 +319,7 @@ async function dropUncollected(deps: DeviceDeps, row: DeviceCodeRow, now: Date) 
   });
 }
 
-/** A pending, unexpired code by what the person typed or followed; null otherwise. */
+/** A pending, unexpired code by what the person typed or followed; null otherwise. A connect link's never is. */
 async function pendingCode(db: Database, userCode: string, now: Date) {
   const code = normalizeUserCode(userCode);
   if (code.length !== USER_CODE_LENGTH) return null;
@@ -307,6 +331,7 @@ async function pendingCode(db: Database, userCode: string, now: Date) {
         eq(machineDeviceCodes.userCode, code),
         eq(machineDeviceCodes.status, "pending"),
         gt(machineDeviceCodes.expiresAt, now),
+        isNull(machineDeviceCodes.linkId),
       ),
     );
   return row ?? null;
@@ -398,17 +423,35 @@ export async function confirmDeviceCode(
   userCode: string,
   input: { name?: string | null },
 ): Promise<MachineView> {
-  const membership = await requireActiveMembership(deps.db, actorId, orgId);
+  await requirePairing(deps.db, actorId, orgId);
+  const pending = await pendingCode(deps.db, userCode, nowOf(deps));
+  if (!pending) throw notFound();
+  return confirmPendingCode(deps, actorId, orgId, pending, input);
+}
+
+async function requirePairing(db: Database, actorId: string, orgId: string) {
+  const membership = await requireActiveMembership(db, actorId, orgId);
   if (!can(membership, "pair_computers")) {
     throw new ForbiddenError(
       "Only members who can post in the organization can connect a computer",
       "machine.forbidden",
     );
   }
+}
+
+/**
+ * `confirmDeviceCode` for a code already found pending (a connect link's request, `approveJoinRequest`), with the
+ * rule a new computer starts with (`audience`, else Only its owner).
+ */
+export async function confirmPendingCode(
+  deps: DeviceDeps,
+  actorId: string,
+  orgId: string,
+  pending: DeviceCodeRow,
+  input: { name?: string | null; audience?: DeviceAudience },
+): Promise<MachineView> {
+  await requirePairing(deps.db, actorId, orgId);
   const now = nowOf(deps);
-  const code = normalizeUserCode(userCode);
-  const pending = await pendingCode(deps.db, code, now);
-  if (!pending) throw notFound();
   const previous = pending.previousMachineId
     ? ((await reconnectTarget(deps.db, actorId, pending.previousMachineId, orgId))?.machine ?? null)
     : null;
@@ -470,9 +513,16 @@ export async function confirmDeviceCode(
       }
     } else {
       const name = cleanMachineName(input.name) || claimed.name || claimed.hostname.slice(0, 80) || "Computer";
+      const rule = input.audience
+        ? {
+            audienceMode: input.audience.mode,
+            audienceUserIds: input.audience.userIds,
+            audienceRoleIds: input.audience.roleIds,
+          }
+        : {};
       [row] = await tx
         .insert(machines)
-        .values({ orgId, name, pairedByUserId: actorId, ...reported, createdAt: now, updatedAt: now })
+        .values({ orgId, name, pairedByUserId: actorId, ...reported, ...rule, createdAt: now, updatedAt: now })
         .returning();
     }
     if (!row) throw new Error("machine write returned nothing");
@@ -543,6 +593,7 @@ export async function denyDeviceCode(deps: DeviceDeps, actorId: string, userCode
         eq(machineDeviceCodes.userCode, normalizeUserCode(userCode)),
         eq(machineDeviceCodes.status, "pending"),
         gt(machineDeviceCodes.expiresAt, now),
+        isNull(machineDeviceCodes.linkId),
       ),
     )
     .returning({ id: machineDeviceCodes.id });

@@ -18,7 +18,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { createMillionSendSender, createSmtpEmailSender } from "@agenteschat/adapters";
 import { defaultEmailFrom, emailArtFor, renderEmail } from "../src/email";
-import { EMAIL_SAMPLES } from "../test/email-samples";
+import { EMAIL_SAMPLES, PERSONAL_EMAIL_SAMPLES } from "../test/email-samples";
 
 const webDir = resolve(import.meta.dir, "../../../apps/web/public");
 const args = process.argv.slice(2);
@@ -47,6 +47,8 @@ if (to) {
   const index: Record<string, { subject: string; preheader: string }> = {};
   const samples = {
     ...EMAIL_SAMPLES,
+    // A personal workspace's (ADR 0159), where its words differ.
+    ...PERSONAL_EMAIL_SAMPLES,
     // A self-hosted server: its footer names it.
     "verify_email-selfhost.en": EMAIL_SAMPLES["verify_email.en"],
   };

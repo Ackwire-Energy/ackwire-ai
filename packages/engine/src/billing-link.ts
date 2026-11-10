@@ -33,6 +33,8 @@ export interface BillingLinkClaims {
   role: "owner" | "admin";
   locale: UserLocale;
   from: BillingFrom;
+  /** The plan the person picked in the app (the billing service's own key, `PLAN_CLAIM`), to open its Checkout. */
+  plan?: string;
   /** The path on this server the billing service sends the person back to. */
   return: string;
   /**
@@ -52,6 +54,9 @@ export interface BillingLinkClaims {
     since: number;
   };
 }
+
+/** A plan's key as the billing service names it: this server passes it on and never reads it. */
+export const PLAN_CLAIM = /^[a-z][a-z0-9_]{0,31}$/;
 
 /** How long a link opens the billing service: minted on click, it only has to reach the next page. */
 export const BILLING_LINK_SECONDS = 300;
@@ -124,6 +129,8 @@ export async function mintBillingLink(
     from: BillingFrom;
     /** The page it was opened from, to come back to (`placeIn`). */
     returnTo?: string;
+    /** The plan picked in the app (`PLAN_CLAIM`); anything else is left out. */
+    plan?: string;
     now?: Date;
   },
 ): Promise<{ url: string; expiresAt: Date }> {
@@ -153,6 +160,7 @@ export async function mintBillingLink(
     role: membership.role === "owner" ? "owner" : "admin",
     locale: appLocale([user.locale], true) ?? "en",
     from,
+    ...(input.plan && PLAN_CLAIM.test(input.plan) ? { plan: input.plan } : {}),
     return: placeIn(orgId, input.returnTo) ?? `/org/${orgId}${RETURN_TO[from] ?? ""}`,
     usage: {
       members: org.counts.members,

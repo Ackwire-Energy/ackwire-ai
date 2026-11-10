@@ -5,7 +5,9 @@ import type {
   VaultScope,
   VaultSourceInfo,
 } from "@agenteschat/client";
+import { vaultConnectRefusal } from "@agenteschat/client/lib/errors";
 import { relativeTime } from "@agenteschat/client/lib/format";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import {
   Alert,
   Button,
@@ -101,24 +103,33 @@ function ConnectForm({
   canManageTeam: boolean;
   onDone: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const toast = useToast();
-  const actions = useVaultConnectionActions(org.id);
+  const kind = source.kind;
+  // The password manager's refusal (a token that isn't one, a vault too many), until a field changes.
+  const [refusal, setRefusal] = useState<string | null>(null);
+  const actions = useVaultConnectionActions(org.id, (error) =>
+    setRefusal(vaultConnectRefusal(t, kind, error, i18n.language)),
+  );
   const [values, setValues] = useState<Record<string, string>>(() =>
     Object.fromEntries(source.fields.map((f) => [f.id, initialOf(f)])),
   );
   const [scope, setScope] = useState<VaultScope>(canManageTeam ? "team" : "personal");
   const [tried, setTried] = useState(false);
-  const kind = source.kind;
   const shown = source.fields.filter((f) => shownFor(f, source.fields, values));
   const missing = shown.filter((f) => f.required && !values[f.id]?.trim());
   const busy = actions.connecting || actions.updating;
   const label = (f: VaultConnectField) => words(t, `vault.source.${kind}.field.${f.id}`, f.label);
+  const set = (id: string, value: string) => {
+    setValues((s) => ({ ...s, [id]: value }));
+    setRefusal(null);
+  };
 
   const submit = async () => {
     setTried(true);
     if (missing.length > 0) return;
+    setRefusal(null);
     // Secrets go as typed (a password may start or end with a space); the rest trimmed.
     const input = Object.fromEntries(
       shown.map((f) => [f.id, f.kind === "secret" ? (values[f.id] ?? "") : (values[f.id] ?? "").trim()]),
@@ -165,7 +176,7 @@ function ConnectForm({
               {f.kind === "choice" ? (
                 <Select
                   value={values[f.id]}
-                  onValueChange={(v) => setValues((s) => ({ ...s, [f.id]: v }))}
+                  onValueChange={(v) => set(f.id, v)}
                   options={(f.choices ?? []).map((c) => ({
                     value: c.value,
                     // A value that is a domain is its own name; a word (`self`) has a translation.
@@ -181,12 +192,13 @@ function ConnectForm({
                   placeholder={f.placeholder}
                   autoComplete="off"
                   spellCheck={false}
-                  onChange={(e) => setValues((s) => ({ ...s, [f.id]: e.target.value }))}
+                  onChange={(e) => set(f.id, e.target.value)}
                   data-1p-ignore
                 />
               )}
             </Field>
           ))}
+          {refusal && <Alert>{refusal}</Alert>}
           {!connection && (
             <div className="ac-field">
               <span className="ac-field__label">{t("vault.connections.for")}</span>
@@ -196,14 +208,14 @@ function ConnectForm({
                 disabled={!canManageTeam}
                 onValueChange={setScope}
                 options={[
-                  { value: "team", label: t("vault.scope.team") },
+                  { value: "team", label: t(modeKey(org, "vault.scope.team")) },
                   { value: "personal", label: t("vault.scope.personal") },
                 ]}
               />
               <span className="ac-field__example">
                 {canManageTeam
-                  ? t(scope === "team" ? "vault.connections.forTeam" : "vault.connections.forPersonal")
-                  : t("vault.connections.teamLocked")}
+                  ? t(scope === "team" ? modeKey(org, "vault.connections.forTeam") : "vault.connections.forPersonal")
+                  : t(modeKey(org, "vault.connections.teamLocked"))}
               </span>
             </div>
           )}

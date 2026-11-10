@@ -69,10 +69,13 @@ import type {
   CodeSent,
   CommandApproval,
   ComposioUsage,
+  ComputerDevice,
   ComputerQueue,
   ComputerSetup,
   ComputerTarget,
   Connection,
+  ConnectLink,
+  ConnectLinkState,
   ConnectOutcome,
   ConnectorCatalog,
   ConsultationConversation,
@@ -87,10 +90,12 @@ import type {
   DesktopRelease,
   DesktopStatus,
   DeviceRequest,
+  DevicesList,
   DirectMessage,
   DmRead,
   EndpointCheck,
   EndpointModel,
+  FeedbackFile,
   ForeignMailbox,
   FormerAgent,
   GifKey,
@@ -169,6 +174,7 @@ import type {
   Person,
   PersonLimits,
   PersonUsage,
+  PhoneDevice,
   PhoneSignIn,
   Poll,
   Proposal,
@@ -217,13 +223,13 @@ import type {
   ThreadFollow,
   ThreadInfo,
   ThreadPage,
-  ToolChange,
   TrashedArtifact,
   UndoAllResult,
   UnreadTask,
   UsageQueue,
   UsageReport,
   WebhookSetup,
+  WifiPairing,
   WikiGraph,
   WikiImportResult,
   WikiPage,
@@ -527,6 +533,13 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       instance: () => request<Instance>("/api/instance"),
       telemetry: () => nullOn(404, () => request<ServerTelemetry>("/api/app/telemetry")),
       setTelemetry: (enabled) => request<ServerTelemetry>("/api/app/telemetry", { method: "PUT", json: { enabled } }),
+      sendFeedback: (input) => request<void>("/api/app/feedback", { json: input }),
+      uploadFeedbackFile: (file) => {
+        const form = new FormData();
+        form.append("file", file, file.name);
+        return files.upload<FeedbackFile>("/api/app/feedback/files", form);
+      },
+      dropFeedbackFile: (id) => request<void>(`/api/app/feedback/files/${enc(id)}`, { method: "DELETE" }),
       jev: () => nullOn(404, () => request<JevKey>("/api/app/jev")),
       saveJev: (apiKey) => request<JevKey>("/api/app/jev", { method: "PUT", json: { apiKey } }),
       checkJev: () => request<JevKey>("/api/app/jev/check", { method: "POST" }),
@@ -582,8 +595,10 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       removeAvatar: (orgId) => request<void>(`${org(orgId)}/me/avatar`, { method: "DELETE" }),
       setLogo: (orgId, input) => request<{ logo: string }>(`${org(orgId)}/logo`, { method: "PUT", json: input }),
       removeLogo: (orgId) => request<void>(`${org(orgId)}/logo`, { method: "DELETE" }),
-      billingLink: (orgId, from, returnTo) =>
-        request<{ url: string; expiresAt: string }>(`${org(orgId)}/billing-link`, { json: { from, returnTo } }),
+      billingLink: (orgId, from, returnTo, plan) =>
+        request<{ url: string; expiresAt: string }>(`${org(orgId)}/billing-link`, {
+          json: { from, returnTo, ...(plan ? { plan } : {}) },
+        }),
       limits: (orgId) => request<WorkspaceLimits>(`${org(orgId)}/limits`),
       updateMe: (orgId, input) => request<Person>(`${org(orgId)}/me`, { method: "PATCH", json: input }),
       setStatus: (orgId, input) => request<Person>(`${org(orgId)}/me/status`, { method: "PUT", json: input }),
@@ -631,6 +646,11 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       removal: (orgId, userId) => request<RemovalPreview>(`${org(orgId)}/members/${enc(userId)}/removal`),
       removeMember: (orgId, userId, via) =>
         request<void>(`${org(orgId)}/members/${enc(userId)}`, { method: "DELETE", query: via ? { via } : {} }),
+      passwordLink: (orgId, userId) =>
+        request<{ url: string; expiresAt: string }>(`${org(orgId)}/members/${enc(userId)}/password-link`, {
+          method: "POST",
+          json: {},
+        }),
       invitations: async (orgId) =>
         (await request<{ invitations: Invitation[] }>(`${org(orgId)}/invitations`)).invitations,
       invite: (orgId, input) =>
@@ -981,6 +1001,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         }),
       cancelFollowUp: (orgId, messageId) =>
         request<void>(`${org(orgId)}/messages/${enc(messageId)}/cancel-follow-up`, { json: {} }),
+      answerGitHub: (orgId, messageId) =>
+        request<void>(`${org(orgId)}/messages/${enc(messageId)}/github-answer`, { json: {} }),
       archive: (orgId, channelId) => request<void>(`${org(orgId)}/channels/${enc(channelId)}`, { method: "DELETE" }),
       unarchive: (orgId, channelId) =>
         request<void>(`${org(orgId)}/channels/${enc(channelId)}/unarchive`, { json: {} }),
@@ -1135,6 +1157,36 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<ComputerTarget>(`${org(orgId)}/agents/${enc(agentId)}/computer/target`, {
           method: "PUT",
           json: { machineId },
+        }),
+    },
+    devices: {
+      list: (orgId) => request<DevicesList>(`${org(orgId)}/devices`),
+      updateComputer: (orgId, machineId, input) =>
+        request<ComputerDevice>(`${org(orgId)}/devices/computers/${enc(machineId)}`, { method: "PATCH", json: input }),
+      removeComputer: (orgId, machineId) =>
+        request<void>(`${org(orgId)}/devices/computers/${enc(machineId)}`, { method: "DELETE" }),
+      updatePhone: (orgId, phoneId, input) =>
+        request<PhoneDevice>(`${org(orgId)}/devices/phones/${enc(phoneId)}`, { method: "PATCH", json: input }),
+      forgetPhone: (orgId, phoneId) =>
+        request<void>(`${org(orgId)}/devices/phones/${enc(phoneId)}`, { method: "DELETE" }),
+      stopPhone: (orgId, phoneId) => request<void>(`${org(orgId)}/devices/phones/${enc(phoneId)}/stop`, { json: {} }),
+      createLink: (orgId, kind) => request<ConnectLink>(`${org(orgId)}/devices/connect-links`, { json: { kind } }),
+      link: (orgId, linkId) => request<ConnectLinkState>(`${org(orgId)}/devices/connect-links/${enc(linkId)}`),
+      approveRequest: (orgId, requestId, input) =>
+        request<{ machineId: string }>(`${org(orgId)}/devices/requests/${enc(requestId)}/approve`, { json: input }),
+      denyRequest: (orgId, requestId) =>
+        request<void>(`${org(orgId)}/devices/requests/${enc(requestId)}/deny`, { json: {} }),
+      decideAccess: (orgId, requestId, decision) =>
+        request<void>(`${org(orgId)}/devices/access-requests/${enc(requestId)}/decide`, { json: { decision } }),
+      deviceWait: (orgId, runId, action) =>
+        request<void>(`${org(orgId)}/runs/${enc(runId)}/device-wait`, { json: { action } }),
+      startWifiPairing: (orgId, machineId, input) =>
+        request<WifiPairing>(`${org(orgId)}/devices/computers/${enc(machineId)}/wifi-pairings`, { json: input }),
+      wifiPairing: (orgId, machineId, pairingId) =>
+        request<WifiPairing>(`${org(orgId)}/devices/computers/${enc(machineId)}/wifi-pairings/${enc(pairingId)}`),
+      cancelWifiPairing: (orgId, machineId, pairingId) =>
+        request<void>(`${org(orgId)}/devices/computers/${enc(machineId)}/wifi-pairings/${enc(pairingId)}`, {
+          method: "DELETE",
         }),
     },
     machines: {
@@ -1677,16 +1729,6 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         }),
       disconnect: (orgId, serverId) =>
         request<void>(`${org(orgId)}/connectors/custom/${enc(serverId)}`, { method: "DELETE" }),
-      toolChanges: async (orgId) =>
-        (await request<{ changes: ToolChange[] }>(`${org(orgId)}/connectors/tool-changes`)).changes,
-      acceptToolChange: (orgId, connectionId, toolName) =>
-        request<void>(`${org(orgId)}/connectors/${enc(connectionId)}/tools/${enc(toolName)}/accept-change`, {
-          json: {},
-        }),
-      acceptConnectionToolChanges: (orgId, connectionId) =>
-        request<{ accepted: number }>(`${org(orgId)}/connectors/${enc(connectionId)}/tool-changes/accept`, {
-          json: {},
-        }),
     },
     questions: {
       answer: (orgId, questionId, input) =>

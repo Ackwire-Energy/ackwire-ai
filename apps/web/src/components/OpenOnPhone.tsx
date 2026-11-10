@@ -1,15 +1,20 @@
-import { keys } from "@agenteschat/client";
+import { ApiError, keys } from "@agenteschat/client";
 import { formatTimeLeft } from "@agenteschat/client/lib/actions";
-import { connectLink, isTailnet } from "@agenteschat/client/lib/server";
-import { Alert, Button, Dialog, DialogBody, PixelSpinner } from "@agenteschat/ui";
+import { connectLink, isLoopback, isTailnet } from "@agenteschat/client/lib/server";
+import { Alert, Button, Dialog, DialogBody, PixelSpinner, QrCode } from "@agenteschat/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { encode } from "uqr";
 import { useApi } from "@/api/context";
 import { useNow } from "@/components/missions/MissionBits";
 
 /** A new code this long before the one on screen expires, so a scan never meets an expired one. */
 const RENEW_BEFORE_MS = 20_000;
+
+/** Tailscale's app in each phone store. */
+const TAILSCALE_STORES = {
+  appStore: "https://apps.apple.com/app/tailscale/id1470499037",
+  googlePlay: "https://play.google.com/store/apps/details?id=com.tailscale.ipn",
+} as const;
 
 /**
  * "Abrir no celular" (Configurações › Sua conta): a QR code that opens the phone app on this server, signed in as this
@@ -53,6 +58,20 @@ function PhoneCode() {
   });
   const now = useNow(code.isSuccess);
 
+  // A server only its own computer answers at (the desktop app's, with access from other devices off): no code
+  // would open on the phone, so the way to turn that access on instead. An older server still mints one: its
+  // address says the same.
+  const localOnly =
+    (code.error instanceof ApiError && code.error.code === "phone.local_only") ||
+    (code.data !== undefined && isLoopback(code.data.server));
+  if (localOnly)
+    return (
+      <div className="stack-4" style={{ gap: 12 }}>
+        <Alert>{t("openOnPhone.localOnly")}</Alert>
+        <span className="small muted">{t("openOnPhone.localOnlyHow")}</span>
+      </div>
+    );
+
   if (code.isError)
     return (
       <div className="stack-4" style={{ gap: 12 }}>
@@ -79,27 +98,21 @@ function PhoneCode() {
       )}
       <ol className="machine-pair__steps small">
         <li>{t("openOnPhone.stepApp")}</li>
-        {isTailnet(server) && <li>{t("openOnPhone.stepTailscale")}</li>}
+        {isTailnet(server) && (
+          <li>
+            {t("openOnPhone.stepTailscale")}{" "}
+            <a className="ac-link" href={TAILSCALE_STORES.appStore} target="_blank" rel="noreferrer">
+              {t("openOnPhone.appStore")}
+            </a>
+            {" · "}
+            <a className="ac-link" href={TAILSCALE_STORES.googlePlay} target="_blank" rel="noreferrer">
+              {t("openOnPhone.googlePlay")}
+            </a>
+          </li>
+        )}
         <li>{t("openOnPhone.stepScan")}</li>
       </ol>
       <span className="small muted">{t("openOnPhone.private")}</span>
     </div>
-  );
-}
-
-/** Dark modules on white whatever the theme: phone cameras read that best. */
-function QrCode({ text, label }: { text: string; label: string }) {
-  const { size, data } = encode(text, { ecc: "M", border: 2 });
-  let path = "";
-  data.forEach((row, y) => {
-    row.forEach((dark, x) => {
-      if (dark) path += `M${x} ${y}h1v1h-1z`;
-    });
-  });
-  return (
-    <svg viewBox={`0 0 ${size} ${size}`} role="img" aria-label={label} shapeRendering="crispEdges">
-      <rect width={size} height={size} fill="#fff" />
-      <path d={path} fill="#000" />
-    </svg>
   );
 }

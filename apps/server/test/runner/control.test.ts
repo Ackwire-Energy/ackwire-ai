@@ -114,6 +114,9 @@ function control(
       dial,
       // No network: the org logo asked after each welcome finds none.
       fetch: async () => new Response(null, { status: 404 }),
+      // Never this computer's own phones or tools.
+      phones: false,
+      toolchains: () => undefined,
       ...daemon,
     },
   });
@@ -151,6 +154,51 @@ function control(
 const sharedGrant = () => ({ path: expect.stringMatching(/[\\/]shared$/), agents: ["*"] });
 
 const stored = (home: string) => JSON.parse(readFileSync(configPath(home), "utf8")) as Record<string, unknown>;
+
+test("hello carries what this computer builds with and the phones it reaches; a phone found after it goes out", async () => {
+  const { home } = pairedHome();
+  const root = tempDir("phones-");
+  dirs.push(root);
+  const bin = path.join(root, "bin");
+  mkdirSync(bin);
+  const fake = path.join(import.meta.dir, "fake-phone-tools.mjs");
+  writeFileSync(path.join(bin, "adb"), `#!/bin/sh\nexec "${process.execPath}" "${fake}" adb "$@"\n`, { mode: 0o755 });
+  const state = path.join(root, "state.json");
+  writeFileSync(
+    state,
+    JSON.stringify({
+      adbDevices: "List of devices attached\nemulator-5554 device model:sdk_gphone64_arm64\n",
+      facts: { "emulator-5554": "model=sdk_gphone64_arm64\nrelease=15\nsdk=35\nboot=1\nqemu=1\navd=Pixel_8_API_35\n" },
+    }),
+  );
+  const c = control(home, {
+    toolchains: () => ({ git: "2.50.1", adb: "36.0.2" }),
+    phones: {
+      env: { PATH: bin, FAKE_PHONE_STATE: state, FAKE_PHONE_LOG: path.join(root, "log") },
+      platform: "linux",
+      home: root,
+      dirs: [],
+      adbServer: async () => null,
+      lockDir: path.join(root, "locks"),
+    },
+  });
+  const s = await c.connect();
+  expect(s.of("hello")[0]).toMatchObject({ toolchains: { git: "2.50.1", adb: "36.0.2" }, phones: expect.any(Array) });
+  const told = () =>
+    s.sent.flatMap((f) =>
+      (f.type === "hello" || f.type === "phones.changed") && Array.isArray(f.phones) ? f.phones : [],
+    );
+  await waitFor(() => told().length > 0);
+  expect(told()[0]).toMatchObject({
+    platform: "android",
+    serial: "emulator-5554",
+    kind: "emulator",
+    model: "Pixel 8 API 35",
+    state: "ready",
+  });
+  c.input.end();
+  expect(await c.done).toBe(0);
+});
 
 test("hello comes first; an unpaired runner answers status; unknown requests are bad_request; stdin closing ends it", async () => {
   const home = tempDir("home-");

@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNotNull, isNull, ne, rowsOf, schema, sql } from "@agenteschat/db";
+import { and, asc, eq, inArray, isNotNull, isNull, rowsOf, schema, sql } from "@agenteschat/db";
 import type { PlanModel } from "@agenteschat/providers/plans";
 import { approvalCardThreads, approvalOriginOf, notifiedIds } from "./approvals";
 import { accountablePerson, runAuthorityById } from "./authority";
@@ -1326,6 +1326,27 @@ export async function notifyMachineConnected(
   });
 }
 
+/** A computer ran a connect link and asks to join: the link's maker decides, in the app (`device-links.ts`). */
+export async function notifyDeviceJoinRequest(
+  deps: NotificationDeps,
+  request: { id: string; name: string },
+  to: { orgId: string; orgName: string; makerId: string; facts: string },
+) {
+  await notify(deps, {
+    orgId: to.orgId,
+    userIds: [to.makerId],
+    kind: "device.join_request",
+    groupKey: `device.join_request:${request.id}`,
+    waiting: true,
+    source: { requestId: request.id, label: request.name },
+    // The workspace's name: the push says "build-box wants to join Acme".
+    latest: { title: to.orgName, ...(to.facts ? { text: notificationSnippet(to.facts) } : {}) },
+  });
+}
+
+export const resolveDeviceJoinRequest = (deps: NotificationDeps, orgId: string, requestId: string) =>
+  resolveNotifications(deps, orgId, { groupKey: `device.join_request:${requestId}` });
+
 /** The share of a computer's workspace disk in use past which its admins hear it (ADR 0115). */
 export const DISK_WARN_USE = 0.85;
 /** Under this share the warning is armed again, so a disk hovering at the line doesn't notify on every report. */
@@ -1454,48 +1475,6 @@ export async function notifyComposioLimit(deps: NotificationDeps, orgId: string,
     latest: { title: month, calls },
   });
 }
-
-const toolChangedGroup = (connectionId: string) => `connector_tool_changed:${connectionId}:`;
-
-/**
- * A connected MCP server changed tools an admin approved (ADR 0117): who manages connectors hears it once per change,
- * `source.label` the connection's name and `latest.title` the tools. Resolved when nothing of it waits any more.
- * One waiting row per server: its review lists every pending change, so a newer change replaces the older row
- * (two "TikTok changed tools" cards opened the same review).
- */
-export async function notifyToolChanged(
-  deps: NotificationDeps,
-  connection: { id: string; orgId: string; label: string },
-  tools: { name: string; fingerprint: string }[],
-) {
-  const prefix = toolChangedGroup(connection.id);
-  const groupKey = `${prefix}${tools[0]?.fingerprint ?? ""}`;
-  // The same change again (a retried job) keeps its row; only older changes of this server give way.
-  const older = await deps.db
-    .select({ id: schema.notifications.id })
-    .from(schema.notifications)
-    .where(
-      and(
-        eq(schema.notifications.orgId, connection.orgId),
-        isNull(schema.notifications.doneAt),
-        sql`${schema.notifications.groupKey} like ${`${prefix}%`}`,
-        ne(schema.notifications.groupKey, groupKey),
-      ),
-    );
-  if (older.length) await resolveNotifications(deps, connection.orgId, { ids: older.map((r) => r.id) });
-  await notify(deps, {
-    orgId: connection.orgId,
-    userIds: await adminsOf(deps, connection.orgId, "manage_connectors"),
-    kind: "connector_tool_changed",
-    groupKey,
-    waiting: true,
-    source: { label: connection.label, connectionId: connection.id },
-    latest: { title: tools.map((t) => t.name).join(", ") },
-  });
-}
-
-export const resolveToolChanged = (deps: NotificationDeps, orgId: string, connectionId: string) =>
-  resolveNotifications(deps, orgId, { groupKeyPrefix: toolChangedGroup(connectionId) });
 
 const skillWaitingGroup = (skillId: string) => `skill_update:waiting:${skillId}:`;
 

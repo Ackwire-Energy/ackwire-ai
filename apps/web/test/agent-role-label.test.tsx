@@ -54,10 +54,11 @@ test("where a role is cut to the line, it shows whole on hover", async () => {
   // The sidebar's DM row.
   const row = document.querySelector(`[data-agent-row="${ADA_ID}"] .sidebar__item`);
   expect(row?.getAttribute("title")).toContain("Assistente de e-mails");
-  // The channel's members column: the role wraps whole under the name, and the row's title has it too.
+  // The channel's members column: the role is a one-line tag under the name, and the row's title has it whole.
   const member = [...document.querySelectorAll(".members-side__inner")].find((m) =>
     m.textContent?.includes("Assistente"),
   );
   expect(member?.querySelector(".members-side__line")?.textContent).toBe("Assistente de e-mails");
+  expect(member?.querySelector(".members-side__line")?.classList.contains("ac-tag")).toBe(true);
   expect(member?.getAttribute("title")).toEndWith(" · Assistente de e-mails");
 });

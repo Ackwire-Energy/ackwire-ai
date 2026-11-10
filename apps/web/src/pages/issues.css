@@ -257,8 +257,9 @@ html:not([data-pointer]) .issues-layout:focus-visible {
 /*
  * The board scrolls sideways in its own box, with the kit's scrollbar always drawn along its bottom (no fade, no
  * arrows: the bar, a drag on its empty space, shift and the wheel, a trackpad, a finger). The card drag scrolls it near
- * its edges too. Where the page fills the window (`.page-split`, layout.css) that bottom is the window's and each column
- * scrolls on its own, as Trello's lists do.
+ * its edges too. Where the page fills the window (`.page-split`, over-pages.css) that bottom is the window's and each
+ * column scrolls on its own, as Trello's lists do. The box runs out over the page's side room to the work area's
+ * edges, its first column on the page's line: the columns slide under those edges.
  */
 .issues-boardframe {
   display: grid;
@@ -267,8 +268,9 @@ html:not([data-pointer]) .issues-layout:focus-visible {
 .issues-boardwrap {
   overflow-x: auto;
   overscroll-behavior-x: contain;
-  margin: 0 -6px;
-  padding: 2px 6px 10px;
+  margin: 0 calc(-1 * var(--page-x));
+  padding: 2px var(--page-x) 10px;
+  scroll-padding-inline: var(--page-x);
 }
 .issues-board {
   --cw: 248px;
@@ -420,13 +422,13 @@ html:not([data-pointer]) .issues-layout:focus-visible {
   .issues-col > * {
     flex-shrink: 0;
   }
-  /* Out to the column's sides and bottom, so the scroll cuts no card's shadow, lift or focus ring. Contained up and down
-     only: a sideways trackpad swipe over a column still slides the board. */
+  /* Out to the column's sides and bottom, so the scroll cuts no card's shadow, lift or focus ring. Contained neither
+     way: a sideways trackpad swipe over a column still slides the board, and a column scrolled to its end hands the
+     wheel to the page, which scrolls when what sits above squeezes the board. */
   .issues-col > .issues-col__cards {
     flex-shrink: 1;
     min-height: 0;
     overflow-y: auto;
-    overscroll-behavior-y: contain;
     margin: -4px -8px -8px;
     padding: 4px 8px 8px;
   }
@@ -1433,23 +1435,20 @@ html:not([data-pointer]) .issue-ask__other:focus-visible {
     --cw: 78vw;
   }
   .issues-boardwrap {
-    margin: 0 -16px;
-    padding: 2px 16px 10px;
     scroll-snap-type: x mandatory;
-    scroll-padding: 0 16px;
   }
   .issues-col {
     scroll-snap-align: start;
   }
-  /* A strip that scrolls clips what it holds at its padding edge: the room keeps the cards' rings and focus whole,
-     the negative margin keeps the cards where they were. */
+  /* A strip that scrolls clips what it holds at its padding edge: out to the work area's edges as the board is, the
+     room up and down keeping the cards' rings and focus whole, the negative margin keeping the cards where they were. */
   .issues-now__list {
     grid-auto-flow: column;
     grid-template-columns: none;
     grid-auto-columns: minmax(78vw, 1fr);
-    margin: -4px -16px -8px;
-    padding: 4px 16px 8px;
-    scroll-padding-inline: 16px;
+    margin: -4px calc(-1 * var(--page-x)) -8px;
+    padding: 4px var(--page-x) 8px;
+    scroll-padding-inline: var(--page-x);
     overflow-x: auto;
     scrollbar-width: none;
   }

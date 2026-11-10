@@ -1,6 +1,7 @@
 import type { AppNotification, NotificationActor } from "@agenteschat/client";
 import { appCreatedLine } from "@agenteschat/client/lib/apps";
 import { WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
+import { deviceNoticeOf } from "@agenteschat/client/lib/devices";
 import { formatUsd, namesText } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
@@ -11,10 +12,13 @@ import {
   workspaceHeadline,
 } from "@agenteschat/client/lib/notifications";
 import type { Words } from "@agenteschat/client/lib/routine-view";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { Avatar, ComputerIcon, cx, Icon } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
 import { Trans, useTranslation } from "react-i18next";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
+import { DeviceFace, DeviceHeadline } from "@/components/devices/DeviceNotice";
+import { useOrg } from "@/components/org-context";
 import type { useDirectory } from "@/hooks/useDirectory";
 import { TYPED_VALUES } from "@/i18n";
 
@@ -82,6 +86,7 @@ export function SystemFace({ n, className = "nt-av24" }: { n: AppNotification; c
   // A board's notice with nobody named: its agent (ADR 0135).
   const widget = widgetNoticeOf(n);
   if (widget?.agentId) return <AgentAvatar agentId={widget.agentId} name="" size="md" className={className} />;
+  if (deviceNoticeOf(n)) return <DeviceFace n={n} className={className} />;
   if (n.kind === "join_request") return <Avatar name={askersOf(n).names[0] ?? ""} size="sm" className={className} />;
   if (n.kind === "computer_ready")
     return (
@@ -89,7 +94,7 @@ export function SystemFace({ n, className = "nt-av24" }: { n: AppNotification; c
         <ComputerIcon kind={WORKSPACE_COMPUTER_KIND} size={16} />
       </span>
     );
-  if (n.kind === "composio_limit" || n.kind === "connector_tool_changed")
+  if (n.kind === "composio_limit")
     return (
       <span className={cx("nt-sys", className)} aria-hidden="true">
         <Icon name="plug" size={16} />
@@ -207,6 +212,8 @@ export function Headline({
   channelName: (id: string) => string;
 }) {
   const { t, i18n } = useTranslation();
+  // A personal workspace (ADR 0159): its computer is its person's agents', and its name ("Personal") says no place.
+  const personal = isPersonal(useOrg().org);
   const name = nameOf(t, dir, n.actors[0]);
   const names = namesText(
     t,
@@ -222,8 +229,10 @@ export function Headline({
     <Trans i18nKey={`notifications.what.${key}`} values={values} components={{ b: <b /> }} {...TYPED_VALUES} />
   );
   const own = workspaceHeadline(n);
+  if (own === "computerSetup.notification.ready" && personal) return t("computerSetup.notification.readyPersonal");
   if (own) return t(own, { name: n.source.label });
   if (n.kind === "app_created") return appCreatedLine(t, n);
+  if (deviceNoticeOf(n)) return <DeviceHeadline n={n} dir={dir} />;
   // A board's notice (ADR 0135): the agent who looks after the widget or asks to publish the board.
   const widget = widgetNoticeOf(n);
   if (widget) {
@@ -329,7 +338,7 @@ export function Headline({
         : k("joinRequest", { name: asked.names[0] });
     }
     case "invitation_accepted":
-      return n.source.label
+      return n.source.label && !personal
         ? k("invitationAccepted", { name: joinerOf(t, dir, n), org: n.source.label })
         : k("invitationAcceptedAny", { name: joinerOf(t, dir, n) });
     case "reaction":

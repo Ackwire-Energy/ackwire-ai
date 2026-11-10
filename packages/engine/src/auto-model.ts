@@ -1,7 +1,7 @@
-import { type Executor, eq, schema } from "@agenteschat/db";
+import { type Database, type Executor, eq, schema } from "@agenteschat/db";
 import { isAutoModel, MODEL_TIERS, type ModelTier, modelForTier, modelInfo } from "@agenteschat/providers";
 import type { Agent } from "./agents";
-import { brainOf, CLAUDE_CODE_MODELS } from "./brain-settings";
+import { agentBrainSummaries, brainOf, CLAUDE_CODE_MODELS } from "./brain-settings";
 import type { BrainPlan } from "./brains/select";
 import type { BrainKind } from "./brains/types";
 import { caches } from "./cache";
@@ -292,6 +292,25 @@ export async function autoProvider(db: Executor, agent: Pick<Agent, "orgId" | "c
     if (own) return own.provider;
   }
   return orgModelProvider(db, agent.orgId);
+}
+
+/**
+ * Each agent's brain summary for this viewer (`agentBrainSummaries`) and, for an API brain on Automático, the maker its
+ * models come from (`autoProvider`), so the app shows that maker's logo and never a generic mark.
+ */
+export async function agentBrainLines(
+  db: Database,
+  viewerId: string,
+  orgId: string,
+  agents: readonly (Parameters<typeof agentBrainSummaries>[3][number] &
+    Pick<Agent, "orgId" | "model" | "credentialId">)[],
+) {
+  const out = await agentBrainSummaries(db, viewerId, orgId, agents);
+  for (const a of agents) {
+    const line = out.get(a.id);
+    if (line?.kind === "model" && isAutoModel(a.model)) out.set(a.id, { ...line, maker: await autoProvider(db, a) });
+  }
+  return out;
 }
 
 /** Whether the run answers in a mission's thread for this agent (read-only; the brain plan says it later too). */

@@ -272,8 +272,9 @@ export function TaskManagerPage({
     <div className="page page--list tm">
       <PageHeader
         title={t("taskManager.title")}
-        meta={
-          working > 0 || summary.waiting > 0 ? (
+        meta={t("taskManager.subtitle")}
+        count={
+          (working > 0 || summary.waiting > 0) && (
             <span className="tm-sum">
               {working > 0 && (
                 <span className="tm-sum__item">
@@ -288,8 +289,6 @@ export function TaskManagerPage({
                 </span>
               )}
             </span>
-          ) : (
-            t("taskManager.subtitle")
           )
         }
         actions={

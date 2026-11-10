@@ -12,6 +12,7 @@ import { clockAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { computerKind, isPaused } from "@agenteschat/client/lib/machines";
 import { can } from "@agenteschat/client/lib/permissions";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { useNavigation } from "expo-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -119,7 +120,7 @@ function ComputerView({ agentId, onLeave }: { agentId: string; onLeave: (held: B
   const name = agent?.name ?? "";
   const g = agentGrammar(name);
   const machine = view.machine;
-  const computer = computerName(t, org?.name ?? "", machine);
+  const computer = computerName(t, org?.name ?? "", machine, isPersonal(org));
   const manages = can(org, "manage_agents") || (Boolean(meId) && agent?.ownerUserId === meId);
   const pickComputer = usePickComputer(agentId);
   const person = (id: string) => dir.nameOf({ type: "person", id }) || t("channel.unknownPerson");
@@ -262,7 +263,7 @@ function ComputerView({ agentId, onLeave }: { agentId: string; onLeave: (held: B
       );
     }
   } else if (stage === "joining") {
-    // The workspace's computer is ready and this agent gets it at its first hello: a moment more.
+    // The workspace's computer is ready and this agent gets it at its first hello, or it wakes: a moment more.
     body = <Cover sky spinner color={agentLook(agent).color} text={t("agentComputer.state.opening", g)} />;
   } else if (stage === "noComputer") {
     sub = t("agentComputer.status.noComputer");

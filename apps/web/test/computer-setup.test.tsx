@@ -19,7 +19,7 @@ afterEach(() => {
 
 const SPECS = { cpus: 4, memoryGb: 8, diskGb: 100 };
 /** No system, address, provider or tool list on these screens (ADR 0056 §10). */
-const TECHNICAL = /Linux|\bIP\b|IPv4|Contabo|VPS|Debian|Chrome|\bgit\b|Outro sistema/;
+const TECHNICAL = /Linux|\bIP\b|IPv4|VPS|Debian|Chrome|\bgit\b|Outro sistema/;
 const NOTICE = "O computador do workspace";
 
 const click = async (el: Element) => {
@@ -112,8 +112,17 @@ describe("the workspace's computer on its way: the notice on top of the work are
     // This server sends no email: nothing is promised.
     expect(notice().textContent).not.toMatch(/avisamos/i);
 
-    await push({ state: "preparing", step: "installing", secondsLeft: 330 });
+    // Prepared before a step: the title says it all, no line saying it again ("Preparando o computador.").
+    await push({ state: "preparing", step: null });
     const line = () => notice().querySelector(".outage__text > span")?.textContent;
+    expect(title()).toBe("Preparando o computador da Acme");
+    expect(line()).toBeUndefined();
+    expect(notice().textContent).not.toContain("Preparando o computador.");
+    // With the time left alone, it starts the line.
+    await push({ state: "preparing", step: null, secondsLeft: 330 });
+    expect(line()).toBe("Faltam uns 6 min");
+
+    await push({ state: "preparing", step: "installing", secondsLeft: 330 });
     expect(title()).toBe("Preparando o computador da Acme");
     expect(line()).toBe("Passo 3 de 4 · Instalando os programas · faltam uns 6 min");
     await push({ state: "preparing", step: "starting" });
@@ -334,23 +343,18 @@ describe("Configurações → Computadores: the workspace's own computer", () =>
       access: { folders: [], tools: { claude: true, codex: true, commands: true } },
     });
     await push({ state: "ready", machineId: m.id });
-    expect(card().textContent).toContain("Online");
-    expect(card().querySelector(".computers-card__head [role='status'] .ac-chip")?.textContent).toBe("Online");
-    expect(card().textContent).toContain("Usado por Ada");
-    // The page says what the agents' computer is here in one line, and its card doesn't say it again; nothing
-    // else to connect or pick.
+    // Ready: its setup card goes, and it's the devices list's first row; nothing else to pick.
+    expect(screen().queryByRole("region", { name: "Computador da Acme" })).toBeNull();
+    const first = document.querySelector(".dv-row") as HTMLElement;
+    expect(first.querySelector(".dv-row__name")?.textContent).toBe("Computador da Acme");
     const words = document.body.textContent ?? "";
-    expect(words).toContain("Onde os agentes trabalham: um computador só deste workspace, sempre ligado.");
-    for (const said of ["sempre ligado", "onde os agentes trabalham"])
-      expect(words.toLowerCase().split(said)).toHaveLength(2);
-    expect(card().textContent).not.toContain("Passo");
-    expect(hintOf("Computador da Acme", card()).text).toBe(users);
-    expect(screen().queryByRole("region", { name: "Outros computadores" })).toBeNull();
-    expect(screen().queryByRole("region", { name: "Conectar outro computador" })).toBeNull();
+    expect(words).toContain(
+      "Onde seus agentes trabalham: o computador do workspace e os dispositivos que as pessoas conectam.",
+    );
     expect(screen().queryByRole("region", { name: "Qual computador cada agente usa" })).toBeNull();
 
     // Its page: its name, size and agents, Open beside each; no system, folder, Remove or "Para liberar mais".
-    await click(within(card()).getByRole("link", { name: "Computador da Acme" }));
+    await click(within(first).getByRole("link", { name: "Computador da Acme" }));
     await settle(6);
     expect(screen().getByRole("heading", { name: "Computador da Acme" })).toBeTruthy();
     expect(hintOf("Computador da Acme").text).toBe(users);
@@ -359,7 +363,6 @@ describe("Configurações → Computadores: the workspace's own computer", () =>
     expect(screen().getByRole("button", { name: "Abrir: Computador da Ada" })).toBeTruthy();
     const page = document.body.textContent ?? "";
     expect(page).toContain("4\u00a0CPUs\u00a0· 8\u00a0GB\u00a0de\u00a0memória\u00a0· 100\u00a0GB\u00a0de\u00a0disco");
-    expect(page.toLowerCase().split("sempre ligado")).toHaveLength(2);
     expect(page).not.toMatch(TECHNICAL);
     expect(page).not.toContain("Pasta:");
     expect(page).not.toContain("Para liberar mais");

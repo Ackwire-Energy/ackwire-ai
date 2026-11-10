@@ -200,21 +200,6 @@ describe("Atividade: cards and what comes next", () => {
     ).toEqual({ kind: "question", title: "Devolvo o reembolso?", expiresAt: null, action: "answer" });
   });
 
-  test("a connected server's changed tools: reviewed (Revisar), never a question", () => {
-    const changed = notification({
-      id: "t",
-      kind: "connector_tool_changed",
-      waiting: true,
-      latest: { title: "get_resource, execute_tool" },
-    });
-    expect(waitingCardOf(changed)).toEqual({
-      kind: "tools",
-      title: "get_resource, execute_tool",
-      expiresAt: null,
-      action: "review",
-    });
-  });
-
   test("someone asking to join: the newest name (no actor, not a member yet), Revisar, after the rest", () => {
     const join = notification({
       id: "j",

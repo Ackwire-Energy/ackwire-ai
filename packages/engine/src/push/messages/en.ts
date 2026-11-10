@@ -50,6 +50,8 @@ export interface PushStrings {
   joinRequestTitle: (name: string, org: string) => string;
   joinSuggestionTitle: (by: string, name: string, org: string) => string;
   joinRequestBody: string;
+  deviceJoinRequestTitle: (computer: string, org: string) => string;
+  deviceJoinRequestBody: string;
   waitingTitle: string;
   openBody: string;
   sentGif: string;
@@ -65,9 +67,28 @@ export interface PushStrings {
   usageRaisedBody: string;
   usageRefusedTitle: (admin: string) => string;
   /** Lodi's weekly card (ADR 0137 §9): its message's text, so the push and the conversation list read it. */
+  /** Bring your own devices: `agent` works for `person` on this person's `device`. */
+  deviceInUseTitle: (agent: string, person: string, device: string) => string;
+  deviceInUseBody: string;
+  deviceAccessTitle: (agent: string, person: string, device: string) => string;
+  deviceAccessBody: string;
+  deviceWaitingTitle: (person: string, device: string) => string;
+  deviceWaitingBody: string;
   teamWeekReady: string;
   /** Lodi's daily card ("Resumo do dia") came. */
   teamDayReady: string;
+  /**
+   * A personal workspace's words (ADR 0159), where the team's would speak of a workspace, a team or its admins: one
+   * person and their agents (and maybe their family) read these. `renderPush` picks them for `personal`.
+   */
+  machineConnectedTitlePersonal: string;
+  computerReadyTitlePersonal: string;
+  agentUnreachedBodyPersonal: string;
+  /** Over `widgetFailedReasons`, by the same codes: only those that would read wrong. */
+  widgetFailedReasonsPersonal: Record<string, string>;
+  joinRequestTitlePersonal: (name: string) => string;
+  joinSuggestionTitlePersonal: (by: string, name: string) => string;
+  teamWeekReadyPersonal: string;
 }
 
 export const en: PushStrings = {
@@ -130,6 +151,8 @@ export const en: PushStrings = {
   joinRequestTitle: (name, org) => `${name} asks to join ${org}`,
   joinSuggestionTitle: (by, name, org) => `${by} suggested ${name} for ${org}`,
   joinRequestBody: "Tap to approve or deny.",
+  deviceJoinRequestTitle: (computer, org) => `${computer} wants to join ${org}`,
+  deviceJoinRequestBody: "Tap to let it join or deny.",
   waitingTitle: "Something is waiting for you",
   openBody: "Tap to open.",
   sentGif: "Sent a GIF",
@@ -144,6 +167,19 @@ export const en: PushStrings = {
   usageRaisedTitle: (a) => `${a} raised your limit this month`,
   usageRaisedBody: "You can keep going.",
   usageRefusedTitle: (a) => `${a} declined your request for more usage`,
+  deviceInUseTitle: (a, p, d) => (p ? `${a} (for ${p}) is using your ${d}` : `${a} is using your ${d}`),
+  deviceInUseBody: "Tap to stop it.",
+  deviceAccessTitle: (a, p, d) => (p ? `${a} (for ${p}) asks to use your ${d}` : `${a} asks to use your ${d}`),
+  deviceAccessBody: "Tap to allow once, always, or say no.",
+  deviceWaitingTitle: (p, d) => `${p}'s agent is waiting for your ${d}`,
+  deviceWaitingBody: "It starts when it's back.",
   teamWeekReady: "Your team's week is ready",
   teamDayReady: "Your day's summary is ready",
+  machineConnectedTitlePersonal: "A new computer was connected",
+  computerReadyTitlePersonal: "Your agents' computer is ready",
+  agentUnreachedBodyPersonal: "Whoever made the routine can't talk to this agent yet. Tap to let them.",
+  widgetFailedReasonsPersonal: { creator_left: "Whoever set it up is no longer in your workspace." },
+  joinRequestTitlePersonal: (name) => `${name} asks to join your workspace`,
+  joinSuggestionTitlePersonal: (by, name) => `${by} suggested inviting ${name}`,
+  teamWeekReadyPersonal: "Your week is ready",
 };

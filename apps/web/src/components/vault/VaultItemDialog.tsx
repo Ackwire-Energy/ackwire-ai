@@ -12,6 +12,7 @@ import type {
 import { useVaultItem } from "@agenteschat/client";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { MAX_SECRET_BYTES } from "@agenteschat/client/lib/secret-box";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import {
   Button,
   Chip,
@@ -75,14 +76,17 @@ export function ItemChips({ item }: { item: VaultItem }) {
 /** Personal or Team, with what it means, as a line: its icon in the access lines' column, so the words line up. */
 export function ScopeLine({ scope }: { scope: VaultScope }) {
   const { t } = useTranslation();
+  const { org } = useOrg();
+  // Team reads Shared in a personal workspace (ADR 0159).
+  const team = scope === "team";
   return (
     <span className="vlt-scope">
       <span className="vlt-access__lead" aria-hidden="true">
-        <Icon name={scope === "team" ? "members" : "person"} size={18} />
+        <Icon name={team ? "members" : "person"} size={18} />
       </span>
       <span className="vlt-scope__text">
-        <b>{t(`vault.scope.${scope}`)}</b>
-        <small>{t(`vault.scope.${scope}Text`)}</small>
+        <b>{team ? t(modeKey(org, "vault.scope.team")) : t("vault.scope.personal")}</b>
+        <small>{team ? t(modeKey(org, "vault.scope.teamText")) : t("vault.scope.personalText")}</small>
       </span>
     </span>
   );
@@ -168,8 +172,11 @@ export function ItemFields({
   secret: ReactNode;
 }) {
   const { t } = useTranslation();
+  const { org } = useOrg();
   const fixed = readOnly || locked;
   const origin = vaultOrigin(draft.website);
+  const example =
+    kind === "login" ? t(modeKey(org, "vault.field.loginPlaceholder")) : t(`vault.field.${kind}Placeholder`);
   // Read only, an empty field says nothing: only what has a value shows.
   const filled = (value: string | undefined, fixedHere = readOnly) => !fixedHere || Boolean(value?.trim());
   const title = (
@@ -178,7 +185,7 @@ export function ItemFields({
         value={draft.title}
         maxLength={LIMITS.title}
         readOnly={fixed}
-        placeholder={fixed ? undefined : (kind === "login" && hostOf(origin)) || t(`vault.field.${kind}Placeholder`)}
+        placeholder={fixed ? undefined : (kind === "login" && hostOf(origin)) || example}
         onChange={(e) => onDraft({ title: e.target.value })}
       />
     </Field>
@@ -531,7 +538,7 @@ function ItemDialog({
         <span className="vlt-details__sub">
           <span>{t(`vault.kind.${item.kind}`)}</span>
           <span aria-hidden="true">·</span>
-          <span>{t(`vault.scope.${item.scope}`)}</span>
+          <span>{item.scope === "team" ? t(modeKey(org, "vault.scope.team")) : t("vault.scope.personal")}</span>
           <ItemChips item={item} />
         </span>
       }

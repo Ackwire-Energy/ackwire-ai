@@ -22,6 +22,7 @@ import {
 } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import { Button, Chip, Dialog, DialogFooter, EventPillAction, Icon, InfoHint } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
@@ -280,7 +281,9 @@ function KeptCard({ message, card, hold }: { message: Message; card: NoAiCardMet
                 </EventPillAction>
               )}
               {noTeam && (
-                <EventPillAction onClick={() => setTemplates(true)}>{t("teamPlan.start.templates")}</EventPillAction>
+                <EventPillAction onClick={() => setTemplates(true)}>
+                  {t(modeKey(org, "teamPlan.start.templates"))}
+                </EventPillAction>
               )}
             </>
           ) : undefined

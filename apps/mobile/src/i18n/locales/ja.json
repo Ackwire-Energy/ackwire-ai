@@ -47,7 +47,7 @@
       "now": "{{host}}に接続中",
       "invalid": "アドレスを確認してください（例: agentes.yourteam.ts.net）。",
       "unreachable": "{{host}}に接続できません。アドレスと接続を確認して、もう一度お試しください。",
-      "unreachableTailscale": "{{host}}に接続できません。Tailscale上のサーバーです。Tailscaleアプリを開いて接続し、もう一度お試しください。",
+      "unreachableTailscale": "{{host}}に接続できません。Tailscale上のサーバーです。Tailscaleアプリを開いて接続し、もう一度お試しください。すでに接続済みの場合は、サーバーのコンピュータがスリープ中か、アプリが閉じている可能性があります。",
       "certificate": "{{host}}の証明書が無効です。サーバーの管理者に相談してください。",
       "notAgentes": "{{host}}はagentes.chatのサーバーではありません。アドレスを確認してください。",
       "serverTooOld": "このアプリで使うには、{{host}}の更新が必要です。",

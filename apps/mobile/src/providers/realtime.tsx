@@ -1,6 +1,6 @@
 import { type ConnectionStatus, keys, type Me, RealtimeConnection, realtimeUrl } from "@agenteschat/client";
 import { useQueryClient } from "@tanstack/react-query";
-import { createContext, type ReactNode, useContext, useEffect, useState } from "react";
+import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, AppState } from "react-native";
 import { lastCookie, readCookie } from "@/lib/auth";
@@ -28,6 +28,8 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
   const { i18n } = useTranslation();
   const [active, setActive] = useState(AppState.currentState === "active");
   const [state, setState] = useState<RealtimeState>({ connection: null, status: "idle" });
+  // The organization whose socket opened before: one opened again for it, back from the background, is a reconnect.
+  const opened = useRef<string | null>(null);
 
   useEffect(() => {
     const sub = AppState.addEventListener("change", (s) => setActive(s === "active"));
@@ -52,7 +54,18 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
         browserFrameSockets: false,
       });
       connection = c;
-      offs.push(c.onStatus((status) => setState({ connection: c, status })));
+      let first = true;
+      offs.push(
+        c.onStatus((status) => {
+          setState({ connection: c, status });
+          if (status !== "open" || !first) return;
+          first = false;
+          // Nothing reached the app while its socket was closed in the background: as after a reconnect, every
+          // screen reads again, not only the conversations.
+          if (opened.current === orgId) void queryClient.invalidateQueries();
+          opened.current = orgId;
+        }),
+      );
       offs.push(c.onReconnect(() => void queryClient.invalidateQueries()));
       // Taken out of the workspace: said plainly (not when it was their own doing, `membership_ended`), then `me` without it opens another one (or the first run).
       offs.push(

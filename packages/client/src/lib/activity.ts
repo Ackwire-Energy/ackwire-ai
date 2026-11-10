@@ -95,8 +95,11 @@ export type ActivityKind =
   | "startingWork"
   | "updatingWork"
   | "withdrawingRequest"
+  | "releasingAgent"
   | "schedulingAction"
   | "updatingDashboard"
+  | "testingOnPhone"
+  | "waitingForDevice"
   | "readingDashboards"
   | "pushingBranch"
   | "deletingBranches"
@@ -196,6 +199,7 @@ const BUILTIN: Record<string, ActivityKind> = {
   list_reminders: "listingReminders",
   list_routines: "listingRoutines",
   computer_status: "checkingComputer",
+  wait_for_device: "waitingForDevice",
   create_wiki_page: "writingWiki",
   update_wiki_page: "writingWiki",
   read_wiki_page: "readingWiki",
@@ -248,6 +252,7 @@ const BUILTIN: Record<string, ActivityKind> = {
   stop_work: "updatingWork",
   post_update: "updatingWork",
   withdraw_request: "withdrawingRequest",
+  release_waiting_agent: "releasingAgent",
   schedule_action: "schedulingAction",
   create_dashboard: "updatingDashboard",
   create_widget: "updatingDashboard",
@@ -367,6 +372,7 @@ function activityOf(tool: string | null | undefined, connector?: string | null, 
   // The agent's own browser (ADR 0040) and screen (ADR 0062): not apps called "browser" and "desktop".
   if (name.startsWith("browser_")) return { kind: "browsing" };
   if (name.startsWith("desktop_")) return { kind: "usingScreen" };
+  if (name.startsWith("phone_")) return { kind: "testingOnPhone" };
   const label = connector?.trim();
   if (label) {
     if (isDrive(serviceKey(label))) return { kind: "readingDrive" };

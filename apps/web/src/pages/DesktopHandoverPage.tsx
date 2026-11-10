@@ -5,6 +5,7 @@ import { useAuth } from "@/auth/context";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { AuthShell } from "@/components/AuthLayout";
 import { takeFragmentParam } from "@/lib/fragment";
+import { STORAGE_KEYS, storage } from "@/lib/storage";
 
 /**
  * In the app's window: the one-time sign-in a connect link carried, taken out of the address and the history
@@ -27,8 +28,10 @@ export function DesktopHandoverPage({ to }: { to?: string }) {
     }
     void auth.signInOneTime(token).then((r) => {
       // A whole load: the session is new, so everything is asked again with it.
-      if (r.ok) window.location.assign(to ?? "/");
-      else setFailed(true);
+      if (r.ok) {
+        storage.remove(STORAGE_KEYS.signedOut);
+        window.location.assign(to ?? "/");
+      } else setFailed(true);
     });
   }, [auth, to]);
 

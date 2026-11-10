@@ -481,6 +481,85 @@ describe("the broker", () => {
   });
 });
 
+describe("a phone's screen", () => {
+  test("goes to the phone's computer with no agent; pictures to a viewer, base64 for the phone app; only control's input goes back", async () => {
+    f = await setup();
+    const machine = await paired();
+    const phone = {
+      platform: "android" as const,
+      serial: "emulator-5554",
+      holder: { runId: null, agentId: null, userId: f.owner.id, since: "" },
+    };
+    const { broker, requests, runners } = brokerFor(machine, {
+      authorize: async () => ({ machineId: machine.machineId, phone }),
+    });
+    const phoneId = crypto.randomUUID();
+    const open = (mode: "watch" | "control", text = false) => {
+      const viewer = fakeSocket();
+      const stream = broker.open(viewer.socket, {
+        userId: f.owner.id,
+        orgId: f.org.id,
+        agentId: "",
+        request: { kind: "phone", mode, phoneId },
+        ...(text ? { text: true } : {}),
+      });
+      return { viewer, stream };
+    };
+    const control = open("control");
+    await until(() => control.stream.runner !== null, "the data socket");
+    expect(requests[0]).toEqual({
+      op: "stream.open",
+      streamId: control.stream.id,
+      kind: "phone",
+      mode: "control",
+      phoneId,
+      phone,
+    });
+    const runner = runners[0] as (typeof runners)[number];
+    await broker.fromRunner(runner.link, new Uint8Array([0x89, 0x50, 0x4e, 0x47]));
+    expect(control.viewer.sent).toEqual([new Uint8Array([0x89, 0x50, 0x4e, 0x47])]);
+    const tap = JSON.stringify({ type: "tap", x: 0.5, y: 0.25 });
+    broker.fromViewer(control.stream, tap);
+    broker.fromViewer(control.stream, JSON.stringify({ type: "ack" }));
+    expect(runner.socket.sent.slice(1)).toEqual([tap, '{"type":"ack"}']);
+    // Control ended on the computer (its owner took it back): the viewer opens again as a watcher.
+    broker.runnerClosed(runner.link, STREAM_CLOSE.controlEnded);
+    expect(control.viewer.closed?.code).toBe(STREAM_CLOSE.controlEnded);
+
+    // The phone app's watcher: pictures as base64 text, and a watcher's input closes it.
+    const watch = open("watch", true);
+    await until(() => watch.stream.runner !== null, "the watcher's data socket");
+    await broker.fromRunner((runners[1] as (typeof runners)[number]).link, new Uint8Array([0xff, 0xd8, 0xff]));
+    expect(watch.viewer.sent).toEqual(["/9j/"]);
+    broker.fromViewer(watch.stream, tap);
+    expect(watch.viewer.closed).toEqual({ code: STREAM_CLOSE.badRequest, reason: "bad frame" });
+    // Bytes from a viewer go nowhere either.
+    const other = open("control");
+    await until(() => other.stream.runner !== null, "the third data socket");
+    broker.fromViewer(other.stream, new Uint8Array([1]));
+    expect(other.viewer.closed?.code).toBe(STREAM_CLOSE.badRequest);
+  });
+
+  test("at most 4 people watch one phone", async () => {
+    f = await setup();
+    const machine = await paired();
+    const { broker } = brokerFor(machine, { authorize: async () => ({ machineId: machine.machineId }) });
+    const phoneId = crypto.randomUUID();
+    const viewers = Array.from({ length: 5 }, () => {
+      const viewer = fakeSocket();
+      broker.open(viewer.socket, {
+        userId: f.owner.id,
+        orgId: f.org.id,
+        agentId: "",
+        request: { kind: "phone", mode: "watch", phoneId },
+      });
+      return viewer;
+    });
+    await until(() => viewers.some((v) => v.closed !== null), "the fifth refused");
+    expect(viewers.map((v) => v.closed?.code ?? null)).toEqual([null, null, null, null, STREAM_CLOSE.tooMany]);
+  });
+});
+
 describe("a browser card's view of the screen (ADR 0058 §7)", () => {
   test("never starts the desktop, holds 3 of its 4 places, yields to a full viewer and never changes mode", async () => {
     f = await setup();

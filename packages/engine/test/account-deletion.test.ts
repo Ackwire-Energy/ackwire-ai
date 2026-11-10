@@ -61,13 +61,13 @@ function toComputers() {
   f.pubsub.subscribe(MACHINE_CONTROL_TOPIC, (e) => signals.push(e));
   return signals;
 }
-/** A computer `userId` connected in `orgId`; `system`: in system mode, where it is the team's. */
-async function computer(userId: string, name: string, options: { system?: boolean; orgId?: string } = {}) {
+/** A computer `userId` connected in `orgId`; `kept`: a server an admin marked the workspace's, which stays. */
+async function computer(userId: string, name: string, options: { kept?: boolean; orgId?: string } = {}) {
   const { machineId } = await pairMachine({ db: f.db, pubsub: f.pubsub }, userId, options.orgId ?? f.org.id, { name });
-  if (options.system) {
+  if (options.kept) {
     await f.db
       .update(schema.machines)
-      .set({ executors: { mode: "system" } })
+      .set({ executors: { mode: "system" }, belongsToWorkspace: true })
       .where(eq(schema.machines.id, machineId));
   }
   return machineId;
@@ -256,12 +256,12 @@ describe("deleting an account", () => {
     expect((await f.db.select().from(schema.instanceTelemetry))[0]?.ownerUserId).toBe(f.owner.id);
   });
 
-  test("the computers they connected where they leave go, a system-mode one stays; the early-access row stays; the feed, the email and the photos' purge go out with it", async () => {
+  test("the computers they connected where they leave go, one marked the workspace's stays; the early-access row stays; the feed, the email and the photos' purge go out with it", async () => {
     f = await setup();
     enableOperatorEvents();
     const bia = await addMember(f.db, f.org.id, "admin", "bia");
     const laptop = await computer(bia.id, "Bia's laptop");
-    const server = await computer(bia.id, "Team server", { system: true });
+    const server = await computer(bia.id, "Team server", { kept: true });
     await f.db.update(schema.agents).set({ machineId: laptop }).where(eq(schema.agents.id, f.agent.id));
     await f.db.insert(schema.earlyAccessInvitations).values({
       email: bia.email,

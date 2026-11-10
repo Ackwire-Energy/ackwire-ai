@@ -21,6 +21,7 @@ import {
   typedCode,
 } from "@agenteschat/client/lib/join-requests";
 import { emailTypoFix, isEmail } from "@agenteschat/client/lib/text";
+import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { type ComponentRef, type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -106,7 +107,7 @@ function Invitation({ token, mail, onAsked }: { token: string; mail?: string; on
   const org = invitation.orgName;
   if (invitation.full) {
     return (
-      <AuthScaffold title={t("invite.fullTitle", { org })} subtitle={t("invite.fullLead")}>
+      <AuthScaffold title={t(modeKey(invitation, "invite.fullTitle"), { org })} subtitle={t("invite.fullLead")}>
         <Text variant="small" tone="muted" style={CENTER}>
           {t("invite.fullFine")}
         </Text>
@@ -145,9 +146,16 @@ function Invitation({ token, mail, onAsked }: { token: string; mail?: string; on
     );
   }
 
-  const title = invitation.invitedBy
-    ? t("mobile.invite.invitedBy", { name: invitation.invitedBy.split(/\s+/)[0], org })
-    : t("mobile.invite.invited", { org });
+  const by = invitation.invitedBy ? invitation.invitedBy.split(/\s+/)[0] : null;
+  // A personal workspace's name ("Personal") says nothing to who is invited: who invited does (ADR 0159).
+  const personal = isPersonal(invitation);
+  const title = personal
+    ? by
+      ? t("invite.calledYouPersonal", { name: by })
+      : t("invite.calledYouNoNamePersonal")
+    : by
+      ? t("mobile.invite.invitedBy", { name: by, org })
+      : t("mobile.invite.invited", { org });
   const role = t(`roles.${invitation.role}Lower`);
   const user = me.data?.user;
   const matches = user ? user.email.toLowerCase() === invitation.email.toLowerCase() : false;
@@ -171,7 +179,7 @@ function Invitation({ token, mail, onAsked }: { token: string; mail?: string; on
         <Button
           variant="primary"
           wide
-          label={t("mobile.invite.accept", { org })}
+          label={personal ? t("invite.enterPersonal") : t("mobile.invite.accept", { org })}
           disabled={joining}
           onPress={() => void join()}
         />
@@ -305,13 +313,15 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
       break;
     case "in": {
       const orgId = view.orgId;
-      title = view.already ? t("invite.ask.memberTitle", { org }) : t("invite.ask.inTitle", { org });
+      title = view.already
+        ? t(modeKey(preview, "invite.ask.memberTitle"), { org })
+        : t(modeKey(preview, "invite.ask.inTitle"), { org });
       expression = "happy";
       body = orgId ? (
         <Button
           variant="primary"
           wide
-          label={t("invite.ask.open", { org })}
+          label={t(modeKey(preview, "invite.ask.open"), { org })}
           onPress={() =>
             void qc.invalidateQueries({ queryKey: keys.me }).then(() => {
               gate.choose(orgId);
@@ -335,11 +345,11 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
           <>
             <Said reason={view.reason} />
             <Text variant="callout" tone="muted" style={CENTER}>
-              {t("invite.ask.deniedText", { org })}
+              {t(modeKey(preview, "invite.ask.deniedText"), { org })}
             </Text>
           </>
         );
-      else subtitle = t("invite.ask.deniedText", { org });
+      else subtitle = t(modeKey(preview, "invite.ask.deniedText"), { org });
       break;
     case "sent":
       title = t("invite.ask.sentTitle");
@@ -351,7 +361,7 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
       expression = "happy";
       break;
     case "form":
-      title = t("invite.ask.title", { org });
+      title = t(modeKey(preview, "invite.ask.title"), { org });
       subtitle = preview.invitedBy
         ? t("invite.ask.lead", { name: preview.invitedBy.split(/\s+/)[0], org })
         : t("invite.ask.leadNoName", { org });

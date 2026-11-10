@@ -90,6 +90,8 @@ describe("what thinks, in one sentence", () => {
       kind: "agent",
       mark: null,
     });
+    // Automático on the API: the maker its models come from, never a generic mark.
+    expect(brainLine(t, { kind: "model", model: null, maker: "openai" }, "Automático").mark).toBe("openai");
   });
 });
 

@@ -9,7 +9,15 @@ import { publishQueueChanged } from "./computer-queue";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
 import { TASK_OFFLINE_GRACE_MS } from "./machine-tasks";
-import { getMachine, type MachineRow, machineOnline, machinePause, setAgentComputerTarget } from "./machines";
+import {
+  getMachine,
+  inStandby,
+  type MachineRow,
+  machineOnline,
+  machinePause,
+  mayBeHome,
+  setAgentComputerTarget,
+} from "./machines";
 import { missionTurnFor } from "./missions-engine";
 import { can, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
@@ -129,7 +137,8 @@ export async function listMachineOutages(
     .from(machines)
     .where(and(eq(machines.orgId, orgId), isNull(machines.deletedAt)))
     .orderBy(machines.createdAt);
-  const offline = rows.filter((m) => !machineOnline(m, now));
+  // One in standby is asleep by design, never an outage (ADR 0161).
+  const offline = rows.filter((m) => !machineOnline(m, now) && !inStandby(m));
   const offlineIds = offline.map((m) => m.id);
 
   const [onMachines, waiting] = offlineIds.length
@@ -215,7 +224,7 @@ export async function listMachineOutages(
 
   const out = new Set(outages.map((o) => o.machineId));
   const targets: OutageTarget[] = rows
-    .filter((m) => !out.has(m.id))
+    .filter((m) => !out.has(m.id) && mayBeHome(m))
     .map((m) => {
       const online = machineOnline(m, now);
       return {

@@ -67,6 +67,7 @@ import type {
   NewAgentSetup,
   OrgRole,
   OrgSettings,
+  OrgStanding,
   PeopleUsage,
   Person,
   PersonLimits,
@@ -108,7 +109,7 @@ import { freeHandle, takenHandles } from "@agenteschat/client/lib/new-agent";
 import { stepIndex } from "@agenteschat/client/lib/onboarding";
 import type { PlanModel } from "@agenteschat/client/lib/plans";
 import { grants, SUMMARY_ORDER } from "@agenteschat/client/lib/roles";
-import { SIDEBAR_ITEMS } from "@agenteschat/client/lib/sidebar-items";
+import { sidebarItemOrder, sidebarSections } from "@agenteschat/client/lib/sidebar-items";
 import type { TeamWeekPrefs } from "@agenteschat/client/lib/team-week";
 import { driveFolder, isSecretFile } from "@agenteschat/ui/names";
 import { createFakeAccess } from "./fakes/access";
@@ -119,6 +120,7 @@ import type { MockContext } from "./fakes/context";
 import { createMockCustomConnectors } from "./fakes/custom-connectors";
 import { createFakeDashboards, type FakeDashboards } from "./fakes/dashboards";
 import { createFakeDatabases, type FakeDatabases } from "./fakes/databases";
+import { createFakeDevices, type FakeDevices } from "./fakes/devices";
 import { createFakeMachines, type FakeMachines } from "./fakes/machines";
 import { createFakeMail, type FakeMail } from "./fakes/mail";
 import { createFakeMissions } from "./fakes/missions";
@@ -350,6 +352,8 @@ export interface FakeState {
   holdPosts?: Promise<void>;
   /** What `orgs.billingLink` throws (default: a link on billing.example.com). */
   billingLinkError?: ApiError;
+  /** A new workspace's standing (`orgs.create`): agentes.chat Cloud starts it waiting for its first plan. */
+  newWorkspaceStanding?: OrgStanding;
   /** `orgs.limits` (ADR 0079); unset = no limits, the members counted from `members`. */
   limits?: WorkspaceLimits;
   /** `agents.aiStatus`; unset = every agent ready. */
@@ -1206,6 +1210,7 @@ type FakedParts =
   | "notifications"
   | "sandbox"
   | "machines"
+  | "devices"
   | "skills"
   | "access"
   | "invites"
@@ -1286,6 +1291,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
   };
   // Budgets like the backend: every agent has one (its own or the default); members see only percentages.
   const seesCost = () => state.me?.organizations[0]?.role !== "member";
+  // A personal workspace (ADR 0159), as `me` says.
+  const personalOrg = (orgId: string) => state.me?.organizations.find((o) => o.id === orgId)?.mode === "personal";
   // A new `me` with the org's logo changed, as the server answers: what the app read before stays as it was.
   const setOrgLogo = (orgId: string, logo: string | null) => {
     if (!state.me) return;
@@ -1320,6 +1327,23 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         if (!state.telemetry) throw new ApiError(404, "not_found", "Not found");
         state.telemetry = { ...state.telemetry, enabled };
         return state.telemetry;
+      },
+      sendFeedback: async (input) => {
+        log("system.sendFeedback", input);
+      },
+      uploadFeedbackFile: async (file) => {
+        log("system.uploadFeedbackFile", file.name);
+        const kind = file.type.startsWith("video/") ? "video" : "image";
+        return {
+          id: `00000000-0000-4000-8000-0000000f${String(state.calls.length).padStart(4, "0")}`,
+          name: file.name,
+          size: file.size,
+          kind,
+          contentType: file.type,
+        };
+      },
+      dropFeedbackFile: async (id) => {
+        log("system.dropFeedbackFile", id);
       },
       jev: async () => state.jev ?? null,
       saveJev: async (apiKey) => {
@@ -1531,6 +1555,9 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           name: input.name,
           role: "owner",
           onboarding: { step: "context", generalChannelId: general },
+          ...(state.newWorkspaceStanding ? { standing: state.newWorkspaceStanding } : {}),
+          // Who it is for (ADR 0159), as the server keeps it.
+          ...(input.mode ? { mode: input.mode } : {}),
         });
         state.channels.push({
           id: general,
@@ -1670,11 +1697,12 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         state.sidebarItems = structuredClone(items);
         return structuredClone(items);
       },
-      sidebarOrder: async () => [...(state.sidebarOrder ?? ["tools", "channels", "agents", "people"])],
+      // As the server: an order never saved is the default of the workspace's mode (ADR 0159).
+      sidebarOrder: async (orgId) => [...(state.sidebarOrder ?? sidebarSections(personalOrg(orgId)))],
       setSidebarOrder: async (orgId, order) => {
         log("orgs.setSidebarOrder", orgId, order);
         state.sidebarOrder = order ? [...order] : undefined;
-        return [...(order ?? ["tools", "channels", "agents", "people"])];
+        return [...(order ?? sidebarSections(personalOrg(orgId)))];
       },
       issuesView: async () => structuredClone(state.issuesView ?? ISSUES_VIEW_DEFAULT),
       setIssuesView: async (orgId, view) => {
@@ -1682,11 +1710,11 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         state.issuesView = structuredClone(view);
         return structuredClone(view);
       },
-      sidebarToolOrder: async () => [...(state.sidebarToolOrder ?? SIDEBAR_ITEMS)],
+      sidebarToolOrder: async (orgId) => [...(state.sidebarToolOrder ?? sidebarItemOrder(personalOrg(orgId)))],
       setSidebarToolOrder: async (orgId, order) => {
         log("orgs.setSidebarToolOrder", orgId, order);
         state.sidebarToolOrder = order ? [...order] : undefined;
-        return [...(order ?? SIDEBAR_ITEMS)];
+        return [...(order ?? sidebarItemOrder(personalOrg(orgId)))];
       },
       sidebarView: async () =>
         structuredClone(state.sidebarView ?? { agentSort: "workspace", showAllAgents: false, pins: null }),
@@ -1720,8 +1748,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("orgs.removeLogo", orgId);
         setOrgLogo(orgId, null);
       },
-      billingLink: async (orgId, from) => {
-        log("orgs.billingLink", orgId, from);
+      billingLink: async (orgId, from, _returnTo, plan) => {
+        log("orgs.billingLink", orgId, from, ...(plan ? [plan] : []));
         if (state.billingLinkError) throw state.billingLinkError;
         return { url: `https://billing.example.com/link?t=${from}`, expiresAt: NOW.toISOString() };
       },
@@ -1753,6 +1781,13 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         if (via) log("via", via);
         state.members = state.members.filter((m) => m.userId !== userId);
         for (const a of state.agents) if (a.ownerUserId === userId) a.ownerUserId = state.me?.user.id ?? null;
+      },
+      passwordLink: async (orgId, userId) => {
+        log("orgs.passwordLink", orgId, userId);
+        return {
+          url: `https://agentes.example.com/reset-password?token=link-for-${userId}`,
+          expiresAt: new Date(Date.now() + 3600_000).toISOString(),
+        };
       },
       invitations: async () => structuredClone(state.invitations),
       invite: async (orgId, input) => {
@@ -1791,11 +1826,21 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         actionCheck: state.actionCheck ?? true,
         autoModels: state.autoModels ?? {},
         ...mediaSettings(state),
+        mode: personalOrg(orgId) ? "personal" : "team",
         // Money: admins only, like the backend.
         ...(seesCost() ? { defaultAgentBudgetUsd: state.defaultAgentBudgetUsd ?? 50 } : {}),
       }),
       updateSettings: async (orgId, input) => {
         log("orgs.updateSettings", orgId, input);
+        // A switch of mode (ADR 0159), with the name it may bring: `me` says them at once, as the server's.
+        const { mode, name } = input;
+        if (mode !== undefined && state.me) {
+          const named = name ? { name } : {};
+          state.me = {
+            ...state.me,
+            organizations: state.me.organizations.map((o) => (o.id === orgId ? { ...o, mode, ...named } : o)),
+          };
+        }
         if (input.context !== undefined) state.context = input.context;
         if (input.defaultCredentialId !== undefined) state.defaultCredentialId = input.defaultCredentialId;
         if (input.defaultAgentBudgetUsd !== undefined) state.defaultAgentBudgetUsd = input.defaultAgentBudgetUsd;
@@ -1826,6 +1871,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           actionCheck: state.actionCheck ?? true,
           autoModels: state.autoModels ?? {},
           ...mediaSettings(state),
+          mode: personalOrg(orgId) ? "personal" : "team",
         };
       },
       overview: async () => ({
@@ -3005,6 +3051,12 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         const notice = line?.meta?.notice as { refs?: Record<string, string> } | undefined;
         if (notice?.refs) notice.refs = { ...notice.refs, state: "canceled" };
       },
+      answerGitHub: async (orgId, messageId) => {
+        log("chat.answerGitHub", orgId, messageId);
+        const line = state.messages.find((m) => m.id === messageId);
+        const notice = line?.meta?.notice as { refs?: Record<string, string> } | undefined;
+        if (notice?.refs) notice.refs = { ...notice.refs, answeredBy: "me" };
+      },
       roster: async (_orgId, channelId) =>
         (state.channelMembers[channelId] ?? []).map((m) =>
           m.type === "agent"
@@ -3743,6 +3795,8 @@ function newInvitation(email: string, role: Role, roleIds: string[] = []): Invit
 
 /** The connected-computers fake behind each `createFakeApi` client (tests pair machines with it). */
 export const fakeMachinesOf = new WeakMap<ApiClient, FakeMachines>();
+/** The devices fake behind each client (tests set the list and move a connect link on with it). */
+export const fakeDevicesOf = new WeakMap<ApiClient, FakeDevices>();
 
 /** The mailboxes fake behind each `createFakeApi` client (tests add mailboxes and failures with it). */
 export const fakeMailOf = new WeakMap<ApiClient, FakeMail>();
@@ -3777,6 +3831,12 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
   const threads = createFakeThreads(ctx, (method, ...args) => state.calls.push({ method, args }));
   state.openThread = threads.openByReply;
   const machines = createFakeMachines(ctx, (method, ...args) => state.calls.push({ method, args }));
+  const devices = createFakeDevices(
+    (method, ...args) => state.calls.push({ method, args }),
+    ctx.now,
+    () => machines.all(),
+    (orgId, id) => machines.client.remove(orgId, id),
+  );
   const agentIds = async (orgId: string) => (await http.agents.list(orgId)).map((a) => a.id);
   const customConnectors = createMockCustomConnectors(
     ctx,
@@ -3808,6 +3868,7 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
     apps: apps.client,
     sandbox: createFakeSandbox(ctx, (method, ...args) => state.calls.push({ method, args }), machines),
     machines: machines.client,
+    devices: devices.client,
     notifications: createFakeNotifications(
       {
         get items() {
@@ -4022,6 +4083,7 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
       : {}),
   };
   fakeMachinesOf.set(client, machines);
+  fakeDevicesOf.set(client, devices);
   fakeMailOf.set(client, mail);
   fakeDatabasesOf.set(client, databases);
   fakeDashboardsOf.set(client, dashboards);

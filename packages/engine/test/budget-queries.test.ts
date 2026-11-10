@@ -98,7 +98,7 @@ test("claim → model request stays within 18 statements; a whole mention run wi
   expect(run.total).toBeLessThanOrEqual(39);
 });
 
-test("with tools, as every production run has them (find_agent among them): within 22 before the model call, 44 in all", async () => {
+test("with tools, as every production run has them (find_agent among them): within 23 before the model call, 44 in all", async () => {
   const run = await mentionRun({ askAgent: true });
   // 4 more, all for the tool list and the prompt: who is behind the run (2, the Tool Gateway's policy), the connectors
   // it lacks (1) and whether the person may talk to agents ("# Your team", 1, beside the context's other reads).
@@ -107,7 +107,8 @@ test("with tools, as every production run has them (find_agent among them): with
   // run's parallel reads ask (`messageRoot`).
   // 21 with the background work in this conversation (ADR 0121).
   // 22 with the person's app language (ADR 0122).
-  expect(run.beforeModel).toBeLessThanOrEqual(22);
+  // 23 with the devices people connected (one statement the prompt's list and the tool lists share, `deviceRoster`).
+  expect(run.beforeModel).toBeLessThanOrEqual(23);
   // 36: the browser profile release above, and the turn-end judge naming the teammates the person may reach (ADR 0109):
   // whether they may talk to agents, read again because a resumed run has no context of its own to carry it from.
   // Who is behind the run comes from the run in memory, and the calls it tried are read only when it made some.

@@ -796,6 +796,10 @@ textarea.ac-input {
 .ac-brand svg {
   fill: currentColor;
 }
+/* An image mark that isn't square (Tux) keeps its shape in the square box. */
+.ac-brand img {
+  object-fit: contain;
+}
 /* A mark's second color (Kimi's dot, OpenCode's block), as its maker draws it on each theme. */
 .ac-brand__part {
   fill: var(--part);
@@ -846,11 +850,18 @@ textarea.ac-input {
   border-radius: 4px;
   background: var(--sunken);
 }
+/* As a face's initials (`.ac-avatar__initials`): its box trimmed to its capital, so the tile centres the letter. */
 .ac-brand__initial {
   font-weight: 600;
   font-size: 18px;
   line-height: 1;
   color: var(--ink-muted);
+  text-box: trim-both cap alphabetic;
+}
+@supports not (text-box: trim-both cap alphabetic) {
+  .ac-brand__initial {
+    translate: 0 var(--cap-mid);
+  }
 }
 .ac-brand--sm .ac-brand__initial {
   font-size: 13px;
@@ -1099,8 +1110,13 @@ textarea.ac-input {
   --msg-turn-gap: 20px;
   --msg-card-gap: 12px;
   --msg-block: 4px;
+  /*
+   * A person's or an agent's face beside its name, one size wherever it sits: a message's, a row of the sidebar's and
+   * of the members column's, a MediaRow's. The faces' scale has 24 for a row's small face and 32 for this one.
+   */
+  --name-face: 32px;
   /* The avatar column and its gap: how far a body stands in from its row. */
-  --msg-lead: calc(36px + var(--space-3));
+  --msg-lead: calc(var(--name-face) + var(--space-3));
 }
 /*
  * Tamanho do texto (`textSize`, packages/client/src/lib/chat-look.ts), the same in every look: a message's words
@@ -1187,7 +1203,7 @@ textarea.ac-input {
   row-gap: 2px;
 }
 .ac-msg > .ac-msg__reply {
-  --reply-face: 36px;
+  --reply-face: var(--name-face);
   --reply-gap: var(--space-3);
   position: relative;
   flex: 0 0 100%;
@@ -1224,11 +1240,11 @@ textarea.ac-input {
   background: color-mix(in srgb, currentColor 8%, transparent);
   color: inherit;
 }
-/* The face is 36px in the feed, the sidebar's size. */
+/* The face in the feed: the sidebar's size (`--name-face`). */
 .ac-msg__avatar,
 .ac-msg__gutter {
-  flex: 0 0 36px;
-  width: 36px;
+  flex: 0 0 var(--name-face);
+  width: var(--name-face);
   display: flex;
   justify-content: center;
 }
@@ -1244,8 +1260,8 @@ textarea.ac-input {
   align-self: flex-start;
 }
 .ac-msg__avatar .ac-avatar:not(.ac-avatar--xs) {
-  width: 36px;
-  height: 36px;
+  width: var(--name-face);
+  height: var(--name-face);
 }
 /* On the words' first line, whatever their size. */
 .ac-msg__gutter-time {
@@ -1284,7 +1300,7 @@ html:not([data-pointer]) .ac-msg--grouped:focus-within .ac-msg__gutter-time {
   margin-top: var(--msg-card-gap);
 }
 /* The name stays on its words, and a line's caption on its bubble. */
-.ac-msg .ac-msg__body > .ac-msg__head + :is(.ac-msg__text, .rq-done, .rq-open) {
+.ac-msg .ac-msg__body > .ac-msg__head + :is(.ac-msg__text, .ac-msg__error-row, .rq-done, .rq-open) {
   margin-top: 2px;
 }
 .ac-msg.ac-msg .ac-msg__body > :is(.ac-msg__own-foot, .ac-msg__foot) {
@@ -1438,18 +1454,33 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
   line-height: 20px;
 }
 /*
- * An error line with its fix and its × after it, out of the .ac-iconline: they stay on the reason's first line, not the
- * middle of a reason that wraps. The words start as far down as a small button (32) centres a line, so a one-line
- * error is as tall as before and its first line runs through the buttons' middle.
+ * A failed run's reason in its text's place, its × after it, out of the .ac-iconline: on the reason's first line, not
+ * the middle of a reason that wraps. The reason takes the text's size and reading line, so its words stand where a
+ * message's would at every text size and look. The × (32, on touch too) hangs over that line by as much as it outgrows
+ * it, so the row is as tall as its words. Its fix (a key, a model) goes on a line of its own under the reason, where
+ * the words start (after the 16px alert and its 6px gap): beside it, it squeezed a long reason to a word per line.
  */
 .ac-msg__error-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: minmax(0, max-content) max-content;
+  column-gap: 6px;
+  align-items: start;
 }
 .ac-msg__error-row > .ac-msg__error {
   min-width: 0;
-  margin: calc((var(--control-h-sm) - 20px) / 2) 0 0;
+  margin: 0;
+  font-size: var(--msg-text);
+  line-height: var(--msg-line);
+}
+.ac-msg__error-row > .ac-btn--icon {
+  margin-block: calc((var(--msg-line) - var(--control-h-sm)) / 2);
+}
+/* In the reason's column only: spanning the ×'s too, its width went to that column, sized by its content. */
+.ac-msg__error-row > .ac-btn:not(.ac-btn--icon) {
+  grid-area: 2 / 1;
+  justify-self: start;
+  margin-block-start: var(--space-2);
+  margin-inline-start: calc(16px + 6px);
 }
 .ac-mention {
   color: var(--ink);
@@ -1747,9 +1778,12 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
 .ac-eventpill__more[aria-expanded="true"] .ac-eventpill__chev {
   transform: rotate(90deg);
 }
+/* More actions than the width holds wrap onto another line of the frame instead of running out of it. */
 .ac-eventpill__actions {
   display: inline-flex;
-  flex: none;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  max-width: 100%;
   align-items: stretch;
   /* Under the sentence, still the frame's height. */
   min-height: inherit;
@@ -1847,6 +1881,23 @@ html:not([data-pointer]) .ac-eventpill__action:focus-visible {
 /* Words with no `.ac-chip__text` have nothing to shrink into: the chip keeps their width, or they'd eat its padding. */
 .ac-chip:not(:has(> .ac-chip__text)) {
   flex: none;
+}
+/* Tag: a short fixed label in small type on a soft plate, square-cornered so it never reads as a state pill (an
+   agent's role under its name). A state stays plain words. */
+.ac-tag {
+  display: inline-block;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: var(--plate-soft);
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 18px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 /* Small attention note: icon + text, no background */
 .ac-note-attention {
@@ -2089,6 +2140,7 @@ html:not([data-pointer]) .ac-select__trigger:focus-visible,
   flex-direction: column;
   gap: 2px;
   padding: var(--menu-pad);
+  --bleed: var(--menu-pad);
   background: var(--surface-raised);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
@@ -2356,11 +2408,19 @@ html:not([data-pointer]) .ac-menu__item:focus-visible,
   flex-direction: row;
   align-items: baseline;
   column-gap: 0.4em;
+  /* The room the face and what ends the row (the hint, the check) leave, never more: its description ends in "…"
+     instead of running under the hint (WebKit sizes a flex item by its content first). */
+  flex: 1 1 0%;
+  overflow: hidden;
+}
+:is(.ac-menu, .ac-palette__list):has(.ac-menu__leading > .ac-avatar) .ac-menu__hint {
+  flex: none;
 }
 :is(.ac-menu, .ac-palette__list):has(.ac-menu__leading > .ac-avatar) .ac-menu__label > :first-child {
   flex: none;
 }
 :is(.ac-menu, .ac-palette__list):has(.ac-menu__leading > .ac-avatar) .ac-menu__desc {
+  flex-shrink: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2679,6 +2739,7 @@ html:not([data-pointer]) .ac-tab:focus-visible {
   line-height: 22px;
   /* One inset for every edge: the head's top, the sides, and the bottom under the last body item, list or footer. */
   --dialog-pad: 20px;
+  --bleed: var(--dialog-pad);
 }
 .ac-dialog:focus {
   outline: none;
@@ -3056,6 +3117,7 @@ html:not([data-pointer]) .ac-tab:focus-visible {
   gap: var(--space-3);
   /* Read by the foot to reach the card's edges; pages that change the padding set this instead. */
   --card-pad: var(--space-4);
+  --bleed: var(--card-pad);
   padding: var(--card-pad);
   background: var(--surface-raised);
   border: 1px solid var(--line);
@@ -3334,13 +3396,22 @@ html:not([data-pointer]) .ac-back:focus-visible {
   border-radius: var(--radius-cut);
 }
 
-/* Neutral before/after diff: no green or red. */
+/* Before and after, as GitHub shows a change: added on green with a green bar, removed on red, struck through. */
 .ac-diff {
   display: flex;
   flex-direction: column;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   overflow: hidden;
+}
+/* The rows on its rounded corners take its radius less its border, so a row's tint and bar follow the corner. */
+.ac-diff > :first-child {
+  border-top-left-radius: calc(var(--radius-sm) - 1px);
+  border-top-right-radius: calc(var(--radius-sm) - 1px);
+}
+.ac-diff > :last-child {
+  border-bottom-left-radius: calc(var(--radius-sm) - 1px);
+  border-bottom-right-radius: calc(var(--radius-sm) - 1px);
 }
 .ac-diff__line {
   display: flex;
@@ -3359,15 +3430,44 @@ html:not([data-pointer]) .ac-back:focus-visible {
   flex: 1;
   min-width: 0;
 }
-.ac-diff__line--add {
-  background: var(--surface-sunken);
+.ac-diff__line--add,
+.ac-diff__block--add {
+  background: color-mix(in srgb, var(--ok) 12%, transparent);
+  box-shadow: inset 3px 0 0 var(--ok);
 }
-.ac-diff__line--add .ac-diff__text {
-  font-weight: 600;
+.ac-diff__line--del,
+.ac-diff__block--del {
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  box-shadow: inset 3px 0 0 var(--danger);
 }
-.ac-diff__line--del .ac-diff__text {
+.ac-diff__line--add .ac-diff__mark {
+  color: var(--ok);
+}
+.ac-diff__line--del .ac-diff__mark {
+  color: var(--danger);
+}
+.ac-diff__line--del .ac-diff__text,
+.ac-diff__block--del {
   color: var(--ink-muted);
   text-decoration: line-through;
+}
+/* Words: each run rendered as one block, every block's text on the same 12px from the edge. */
+.ac-diff__block {
+  padding: 8px 12px;
+  min-width: 0;
+}
+.ac-diff__block > :not(.ac-visually-hidden) > :first-child {
+  margin-top: 0;
+}
+.ac-diff__block > :not(.ac-visually-hidden) > :last-child {
+  margin-bottom: 0;
+}
+.ac-diff__fold {
+  padding: 4px 12px;
+  font-size: 12.5px;
+  line-height: 18px;
+  color: var(--ink-muted);
+  background: var(--surface-sunken);
 }
 
 .ac-diff--code .ac-diff__line {
@@ -3411,6 +3511,7 @@ html:not([data-pointer]) .ac-back:focus-visible {
   line-height: 22px;
   /* One inset for every edge, as in `.ac-dialog`. */
   --details-pad: 24px;
+  --bleed: var(--details-pad);
 }
 .ac-details--lg {
   width: min(960px, calc(100% - 48px));
@@ -3728,6 +3829,8 @@ html:not([data-pointer]) .ac-msg:focus-within .ac-msg__actions,
 .ac-receipt__words {
   min-width: 0;
   text-wrap: balance;
+  /* A failure's reason can hold an address with nowhere to break. */
+  overflow-wrap: anywhere;
 }
 /* The dot and its action are one piece that wraps whole, the dot 4px from each. The room before the dot is the
    words', so a line the dot starts starts on the column. */
@@ -3763,6 +3866,15 @@ html:not([data-pointer]) .ac-msg:focus-within .ac-msg__actions,
   color: var(--ink);
   text-decoration: underline;
   cursor: pointer;
+}
+/* On its way (a retry, opening the plans): muted words, and its spinner (which sits on the capitals) before them. */
+.ac-receipt__action:disabled {
+  color: var(--ink-muted);
+  text-decoration: none;
+  cursor: default;
+}
+.ac-receipt__action > .ac-pixspin {
+  margin-inline-end: 4px;
 }
 html:not([data-pointer]) .ac-receipt__action:focus-visible {
   outline: none;
@@ -4443,7 +4555,7 @@ html:not([data-pointer]) .ac-switch:focus-visible {
 }
 .ac-skeleton-msg__gutter {
   flex: none;
-  width: 36px;
+  width: var(--name-face);
 }
 .ac-skeleton-msg__body {
   flex: 1;
@@ -8199,11 +8311,12 @@ html:not([data-pointer]) .ac-msg:focus-within .ac-react--add,
   max-height: min(420px, 60vh);
   overflow-y: auto;
 }
+/* An option row's height (OptionRow) whatever the query finds, faces or none: the rows keep one height as it's typed. */
 .ac-palette__item {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 40px;
+  min-height: var(--option-h);
   padding: 0 10px;
   border-radius: calc(var(--radius-section) - var(--palette-pad));
   cursor: pointer;
@@ -8824,11 +8937,15 @@ html:not([data-pointer]) .ac-recur__day:focus-visible {
 /*
  * Every page's room, Settings, the wiki and the calendar included: the first line starts `--page-top` under the work
  * area's top and `--page-x` in from its side. From 761px the title's line centres on the sidebar's workspace row,
- * whose middle is 38px from the top (the sidebar's 16 above its 44px row).
+ * whose middle is 38px from the top (the sidebar's 16 above its 44px row). A strip that scrolls sideways runs out over
+ * the side room of what holds it, `--bleed`, to its edge, so what scrolls slides under that edge instead of being cut
+ * on a line inside the room. A box with a room of its own (a dialog, a card, a menu) sets it to that room: running out
+ * past the box's edge would scroll the box sideways.
  */
 :root {
   --page-top: calc(38px - var(--control-h-md) / 2);
   --page-x: 24px;
+  --bleed: var(--page-x);
 }
 @media (max-width: 760px) {
   :root {
@@ -8842,9 +8959,8 @@ html:not([data-pointer]) .ac-recur__day:focus-visible {
 }
 /*
  * Every inner page's header (PageHeader): the title, 28px on a line as tall as the page's buttons (so they centre on
- * it), the page's line under it (always there, always one line), the buttons at the end of the title's line, then the
- * page's bar. One shape and one height on every page, so a title and what follows start at the same place wherever
- * you go.
+ * it), the page's line under it (always one line) or its count beside it, the buttons at the end of the title's line,
+ * then the page's bar. One shape on every page, so a title and what follows start at the same place wherever you go.
  */
 .ac-pagehead {
   display: flex;
@@ -8884,6 +9000,22 @@ html:not([data-pointer]) .ac-recur__day:focus-visible {
 .ac-pagehead__meta {
   min-height: 20px;
   margin: -2px 0 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--muted);
+}
+/* The page's count on the title's row: on the title's baseline, 12 after it; under it only when the row has no room. */
+.ac-pagehead__titleline:has(> .ac-pagehead__count) {
+  flex-wrap: wrap;
+  column-gap: var(--space-3);
+  row-gap: 0;
+}
+.ac-pagehead__titleline > .ac-pagehead__title:has(+ .ac-pagehead__count),
+.ac-pagehead__count {
+  align-self: baseline;
+}
+.ac-pagehead__count {
+  margin: 0;
   font-size: 14px;
   line-height: 20px;
   color: var(--muted);
@@ -9119,9 +9251,11 @@ html:not([data-pointer]) .ac-grouphead__title > button:focus-visible {
 }
 /*
  * Two rows, on a phone and when one doesn't fit: the search and the actions on top, the tabs and filters under them in
- * one row that scrolls sideways. That row is the only scroller (the filter bar inside it doesn't scroll on its own),
- * and its 4px of room keep the controls' rings whole. Its basis counts the room its margins give back, so it never
- * fits beside a search that has no actions to share its row, which would squeeze that search to nothing.
+ * one row that scrolls sideways. That row is the only scroller (the filter bar inside it doesn't scroll on its own).
+ * It runs out over the page's side room (`--bleed`) to the edge, its first control on the page's line, and its 4px up
+ * and down keep the controls' rings whole. Where something shares its row (the actions before it, or after it in a
+ * toolbar without a search), that side keeps only those 4px. Its basis counts the room its margins give back, so it
+ * never fits beside a search that has no actions to share its row, which would squeeze that search to nothing.
  */
 @media (max-width: 760px) {
   .ac-toolbar > .ac-toolbar__search {
@@ -9133,19 +9267,23 @@ html:not([data-pointer]) .ac-grouphead__title > button:focus-visible {
   }
   .ac-toolbar:has(> .ac-toolbar__search) > .ac-toolbar__filters {
     order: 2;
-    flex: 1 1 calc(100% + 8px);
+    flex: 1 1 calc(100% + 2 * var(--bleed));
   }
   .ac-toolbar__filters,
   .ac-toolbar__filters > .ac-filterbar {
     flex-wrap: nowrap;
   }
   .ac-toolbar__filters {
-    max-width: calc(100% + 8px);
-    margin: -2px -4px;
-    padding: 4px;
+    max-width: calc(100% + 2 * var(--bleed));
+    margin: -2px calc(-1 * var(--bleed));
+    padding: 4px var(--bleed);
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: none;
+  }
+  .ac-toolbar:not(:has(> .ac-toolbar__search)):has(> .ac-toolbar__actions) > .ac-toolbar__filters {
+    margin-right: -4px;
+    padding-right: 4px;
   }
   .ac-toolbar__filters::-webkit-scrollbar {
     display: none;
@@ -9164,11 +9302,11 @@ html:not([data-pointer]) .ac-grouphead__title > button:focus-visible {
 }
 .ac-toolbar[data-stack] > .ac-toolbar__filters {
   order: 2;
-  flex: 1 1 calc(100% + 8px);
+  flex: 1 1 calc(100% + 2 * var(--bleed));
   flex-wrap: nowrap;
-  max-width: calc(100% + 8px);
-  margin: -2px -4px;
-  padding: 4px;
+  max-width: calc(100% + 2 * var(--bleed));
+  margin: -2px calc(-1 * var(--bleed));
+  padding: 4px var(--bleed);
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
@@ -9190,6 +9328,8 @@ html:not([data-pointer]) .ac-grouphead__title > button:focus-visible {
 }
 .ac-toolbar[data-stack="split"] > .ac-toolbar__filters {
   flex: 1 1 0;
+  margin-left: -4px;
+  padding-left: 4px;
 }
 .ac-toolbar[data-stack="split"]:not(:has(> .ac-toolbar__filters)) > .ac-toolbar__actions {
   flex: 1 1 100%;
@@ -10942,6 +11082,12 @@ html:not([data-pointer]) .ac-msg__note:focus-visible {
   height: 32px;
   margin: -6px;
 }
+/* A face there (a personal workspace's, ADR 0159) is the slot's size, as a workspace's mark is: a larger one would
+   reach into the gap before the name. */
+.ac-mo__leading > .ac-avatar {
+  width: 32px;
+  height: 32px;
+}
 @media (prefers-reduced-motion: no-preference) {
   .ac-mo__scrim {
     animation: ac-mo-fade var(--dur-panel) var(--out) both;
@@ -11127,9 +11273,6 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
   display: flex;
   justify-content: center;
   width: 32px;
-}
-.ac-access__start {
-  margin-right: auto;
 }
 
 /*
@@ -11411,7 +11554,7 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
    name's first line sits on the line's axis however many lines the head wraps to, and what ends that line on it too
    (a box as tall as the axis, anything taller reaching as far above as below): never the wrapped head's middle. */
 .ac-mediarow {
-  --mediarow-face: 32px;
+  --mediarow-face: var(--name-face);
   /* The first line's axis: the face's middle, or a control's that ends the line and is taller than the face. */
   --mediarow-axis: var(--mediarow-face);
   display: grid;
@@ -11515,4 +11658,44 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
   .ac-mediarow__end--wrap > .ac-btn:only-child:not(.ac-btn--ghost) {
     flex: 1 1 auto;
   }
+}
+
+/* ---------- A phone's own Settings path (`SettingsPath`) ---------- */
+.ac-setpath {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+  line-height: 18px;
+}
+.ac-setpath > li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+/* The › ends a segment, so a path that wraps ends its line with it instead of starting the next one. */
+.ac-setpath > li:not(:last-child)::after {
+  content: "›";
+  color: var(--faint);
+  font-weight: 600;
+  margin-inline: var(--space-1);
+}
+.ac-setpath__seg {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--ink2);
+  font-weight: 600;
+}
+.ac-setpath > li:last-child > .ac-setpath__seg {
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1.5px var(--line-strong);
 }

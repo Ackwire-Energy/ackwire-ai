@@ -186,13 +186,13 @@ describe("proof that it's you: a code emailed to you", () => {
     expect((await owner("/api/auth/change-password", { json: change })).status).toBe(404);
   });
 
-  test("adding a password takes a sign-in in the last 10 minutes; one minted from an old session, for the phone or the desktop app, is just as old", async () => {
+  test("setting a password takes a sign-in in the last 10 minutes; one minted from an old session, for the phone or the desktop app, is just as old", async () => {
     const owner = browser(t);
     await signUp(owner, "owner@example.com");
     const ownerId = (await meOf(owner)).user.id;
     const password = { password: "another fake password" };
-    // Signed in just now: past the sign-in, to the account's own check (it has one).
-    expect(await answer(await owner("/api/app/me/password", { json: password }))).toEqual([409, "password_set"]);
+    // Signed in just now: a new password in place of its own (the same one here, so the sign-in below keeps working).
+    expect((await owner("/api/app/me/password", { json: { password: "correct horse battery" } })).status).toBe(204);
     await signedInAnHourAgo(ownerId);
     expect(await answer(await owner("/api/app/me/password", { json: password }))).toEqual([403, "reauth.sign_in"]);
 

@@ -2,7 +2,7 @@
 # Deploys a commit of this repository on a server that runs docker-compose.yml from a checkout of it:
 # builds the commit's image (or pulls DEPLOY_IMAGE), migrates the database while the running app still
 # serves, recreates what changed and waits for it to be healthy, or goes back to the previous image
-# and commit. .github/workflows/deploy.yml runs it over SSH once CI passes on main.
+# and commit. Run it on the server, by hand or over SSH.
 #   deploy/deploy.sh [SHA [VERSION]]    a commit of main, in full (default: main's tip), and this deploy's
 #                                       version (2026.10.31.4), set in the image as APP_VERSION: the release
 #                                       its error reports are filed under (without it, the server's own)
@@ -23,8 +23,8 @@
 # AGENTES_SPEECH_IMAGE=agentes-speech:current, which this script builds from deploy/speech when that
 # folder changed; the speech service is optional, so it never holds a deploy or a rollback: an image
 # that doesn't build, or a service that doesn't start, leaves voice messages to the next engine in
-# SPEECH_ENGINES. For the workflow,
-# the deploy key's line in authorized_keys runs this script alone, with the commit the workflow sends:
+# SPEECH_ENGINES. Over SSH,
+# a deploy key's line in authorized_keys can run this script alone, with the commit the caller sends:
 #   command="/srv/agentes/deploy/deploy.sh $SSH_ORIGINAL_COMMAND",restrict ssh-ed25519 AAAA...
 # With DEPLOY_IMAGE=ghcr.io/agentes-chat/agentes:edge before the script's path there, it pulls the
 # image CI publishes instead of building one.

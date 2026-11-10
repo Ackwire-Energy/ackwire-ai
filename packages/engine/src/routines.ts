@@ -1973,7 +1973,14 @@ export async function listRoutineRuns(
 }
 
 /**
- * Worker tick: fires every scheduled routine whose slot has come. Each
+ * When a due routine fires: its slot plus a stable offset into that minute, from its id (0 to 59 s), so the
+ * routines of one minute fire as a ramp instead of all at once. Its slot stays what it shows and records
+ * (`next_run_at`, the run's `at`): the minute is right.
+ */
+const firesAt = sql`${routines.nextRunAt} + ((hashtext(${routines.id}::text) & 2147483647) % 60) * interval '1 second'`;
+
+/**
+ * Worker tick: fires every scheduled routine whose slot has come (`firesAt`). Each
  * routine is taken with `FOR UPDATE SKIP LOCKED` and a transaction-level
  * advisory lock, and `(routine_id, at)` is unique, so two replicas never
  * fire the same slot. The next slot is computed from now: a routine that
@@ -1990,9 +1997,10 @@ export async function fireDueRoutines(deps: RoutineDeps, now = new Date()) {
           inArray(routines.triggerType, ["schedule", "once"]),
           isNotNull(routines.nextRunAt),
           lte(routines.nextRunAt, now),
+          sql`${firesAt} <= ${now.toISOString()}::timestamptz`,
         ),
       )
-      .orderBy(routines.nextRunAt)
+      .orderBy(firesAt)
       .limit(100)
       .for("update", { skipLocked: true });
     let fired = 0;

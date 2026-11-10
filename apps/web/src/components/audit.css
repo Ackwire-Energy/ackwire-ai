@@ -84,8 +84,9 @@ html:not([data-pointer]) .audit-row:focus-visible {
   .audit-row {
     grid-template-columns: 32px minmax(0, 1fr) 44px;
   }
+  /* How it ended goes under the face and the words, from the row's start: the face stands beside two lines at most. */
   .audit-row > .ac-chip {
-    grid-column: 2;
+    grid-column: 1 / -1;
     grid-row: 2;
     justify-self: start;
   }

@@ -1,4 +1,4 @@
-import { BILLING_FROM, mintBillingLink, orgLimitsView } from "@agenteschat/engine";
+import { BILLING_FROM, mintBillingLink, orgLimitsView, PLAN_CLAIM } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiError } from "../../http/errors";
 import { type AppDeps, body, createAppRouter, errors, json, OrgParams, requireSession, security } from "./context";
@@ -34,6 +34,10 @@ export function billingRoutes(deps: AppDeps) {
               description:
                 "The page it was opened from (a path in this workspace, `/org/{orgId}/…`): the billing service sends the person back there instead of the entry point's default, its search and hash dropped. Anything else is ignored.",
             }),
+            plan: z.string().regex(PLAN_CLAIM).optional().openapi({
+              description:
+                "The plan picked in the app, as the billing service's own plan list names it: it opens that plan's Checkout. This server never reads it.",
+            }),
           }),
         ),
       },
@@ -49,6 +53,7 @@ export function billingRoutes(deps: AppDeps) {
         orgId: c.req.valid("param").orgId,
         from: c.req.valid("json").from,
         returnTo: c.req.valid("json").returnTo,
+        plan: c.req.valid("json").plan,
       });
       return c.json({ url: link.url, expiresAt: link.expiresAt.toISOString() }, 200);
     },

@@ -4,6 +4,7 @@ import { errorCode, invitedErrorText } from "@agenteschat/client/lib/errors";
 import { withHumanCheck } from "@agenteschat/client/lib/human-check";
 import { CODE_LENGTH, JOIN_NAME_MAX, JOIN_NOTE_MAX, typedCode } from "@agenteschat/client/lib/join-requests";
 import { emailTypoFix, isEmail, nameIsPassword, passwordState, webmailOf } from "@agenteschat/client/lib/text";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { useQueryClient } from "@tanstack/react-query";
 import { type ComponentRef, type ReactNode, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -230,10 +231,13 @@ export function LinkSteps({
   const fix = step === "email" ? emailTypoFix(email) : null;
   const mail = webmailOf(typed);
   const bubble: Record<AskStep, [string, string | undefined]> = {
-    email: [
-      by ? t("mobile.invite.ask.called", { name: by, org }) : t("mobile.invite.ask.calledNoName", { org }),
-      t("mobile.invite.ask.approves", { org }),
-    ],
+    // A personal workspace's words (ADR 0159): never its name ("Personal"), who invited instead.
+    email: isPersonal(preview)
+      ? [by ? t("invite.calledYouPersonal", { name: by }) : t("invite.ask.helloPersonal"), t("invite.ask.leadNoName")]
+      : [
+          by ? t("mobile.invite.ask.called", { name: by, org }) : t("mobile.invite.ask.calledNoName", { org }),
+          t("mobile.invite.ask.approves", { org }),
+        ],
     code: [t("invite.ask.codeTitle", { email: typed }), t("invite.ask.codeLead")],
     // The subtitle's place holds the confirmed e-mail line, drawn below with its check.
     you: [t("mobile.invite.ask.youTitle"), undefined],

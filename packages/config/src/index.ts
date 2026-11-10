@@ -71,6 +71,24 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       "BILLING_HOLD_NEW_WORKSPACES=true needs BILLING_URL, BILLING_LINK_SECRET and OPERATOR_API_TOKEN",
     ]);
   }
+  // With no slot left over, no agent run would ever start.
+  if (config.OUTBOX_QUICK_SLOTS >= config.OUTBOX_MAX_IN_FLIGHT) {
+    throw new ConfigError(["OUTBOX_QUICK_SLOTS must be below OUTBOX_MAX_IN_FLIGHT: agents' runs need the slots left"]);
+  }
+  if (
+    config.OUTBOX_MAX_IN_FLIGHT_CEILING !== undefined &&
+    config.OUTBOX_MAX_IN_FLIGHT_CEILING < config.OUTBOX_MAX_IN_FLIGHT
+  ) {
+    throw new ConfigError([
+      "OUTBOX_MAX_IN_FLIGHT_CEILING can't be below OUTBOX_MAX_IN_FLIGHT, where the job slots start",
+    ]);
+  }
+  // A worker shares the server's database; the built-in one belongs to one process.
+  if (config.SERVER_ROLE === "worker" && config.DATABASE_URL.startsWith("pglite:")) {
+    throw new ConfigError([
+      "SERVER_ROLE=worker needs a PostgreSQL DATABASE_URL: the built-in database serves one process",
+    ]);
+  }
   // Half a pair means the bot check was meant to be on: it never runs quietly off.
   if (Boolean(config.TURNSTILE_SITE_KEY) !== Boolean(config.TURNSTILE_SECRET_KEY)) {
     throw new ConfigError(["TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY go together: set both, or neither"]);

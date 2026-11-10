@@ -20,8 +20,8 @@ function Out({ href, children }: { href: string; children?: ReactNode }) {
 }
 
 /**
- * Configurações › Sobre: AGPL-3.0's Appropriate Legal Notices and the attribution the license's section 7(b) term
- * requires (LICENSE). Shown to everyone on every self-hosted server, with no setting that hides it (`showsAbout`).
+ * Configurações › Sobre: AGPL-3.0's Appropriate Legal Notices and the attribution the 7(b) term in NOTICE
+ * requires. Shown to everyone on every self-hosted server, with no setting that hides it (`showsAbout`).
  */
 export function AboutSection() {
   const { t } = useTranslation();

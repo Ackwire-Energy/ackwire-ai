@@ -54,13 +54,20 @@ describe("brain settings", () => {
   test("a coding plan's models: any of them by id, its aliases named after what they run there", () => {
     expect(brainModelOptions("claude_code").map((o) => o.label)).toEqual(["Opus", "Sonnet", "Haiku"]);
     expect(brainModelOptions("codex").every((o) => o.modelId?.startsWith("gpt"))).toBe(true);
-    // Codex offers the catalog's OpenAI rows, GPT-6.1 Terra among them.
+    // Codex offers the catalog's OpenAI rows, GPT-6.1 Terra and GPT-6 Astra among them; GPT-6.1 Sol stays its default.
     expect(brainModelOptions("codex").map((o) => o.label)).toEqual([
+      "GPT-6 Astra",
       "GPT-6.1 Sol",
       "GPT-6.1 Terra",
       "GPT-6 Sol",
       "GPT-6 Luna",
     ]);
+    expect(brainModelOptions("codex")[0]).toMatchObject({
+      value: "gpt-6-astra",
+      modelId: "gpt-6-astra",
+      contextWindow: 1_050_000,
+    });
+    expect(normalizeBrainModel("codex", "gpt-6-astra")).toBe("gpt-6-astra");
     // An alias the plan leaves out, or "Automático", is its main model; the value stays an alias.
     expect(brainModelLabel("claude_code", "opus", "zai")).toBe("GLM-5.3");
     expect(brainModelLabel("claude_code", "auto", "minimax")).toBe("MiniMax M3.1 Flash");
@@ -155,6 +162,17 @@ describe("brain settings", () => {
       ["codex", true, null],
     ]);
     expect(reasons(mac({ access: { tools: { claude: true } } }))[1]).toEqual(["claude_code", true, null]);
+    // Commands off (the app's default for a new workspace) with Claude Code on: the plan still thinks there, as the
+    // runner runs it; "no permission to run programs" is only for a runner that reports no tools.
+    const commandsOff = mac({
+      ...both,
+      execAllowed: false,
+      access: { tools: { claude: true, codex: true, commands: false } },
+    });
+    expect(reasons(commandsOff).slice(1, 3)).toEqual([
+      ["claude_code", true, null],
+      ["codex", true, null],
+    ]);
   });
 });
 

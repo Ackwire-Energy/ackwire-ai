@@ -77,6 +77,8 @@ export interface MachineExecutors {
   claudeLoginBlocked?: string;
   /** `hello.authEgressGroup` (protocol 50): root's Claude sign-in CLIs there run in the `agentes-auth` group. */
   authEgressGroup?: true;
+  /** `hello.toolchains` (bring your own devices): what it can build and drive phones with, by tool, its version. */
+  toolchains?: Record<string, string>;
   /** The usage of the computer's own sign-ins (protocol 19), by brain; kept across reconnects. */
   ownUsage?: {
     claude_code?: MachinePlanUsage;
@@ -218,11 +220,28 @@ export const machines = pgTable(
      * gives it back to those that still have none, then clears this.
      */
     previousAgentIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
+    /**
+     * Who may point their agents at it as a target (bring your own devices): `owner` (its pairer, and agents working
+     * for them), `everyone`, or `people` (`audience_user_ids`, anyone holding one of `audience_role_ids`, plus the
+     * owner). An agent whose home it is always uses it; the machine's own `access` stays the ceiling.
+     */
+    audienceMode: text().$type<"everyone" | "people" | "owner">().notNull().default("owner"),
+    audienceUserIds: text().array().notNull().default(sql`'{}'::text[]`),
+    audienceRoleIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
+    /** An admin marked it the workspace's: it stays when its pairer leaves (an `owner` rule then reads as everyone). */
+    belongsToWorkspace: boolean().notNull().default(false),
     /** Last known; trust it only with a recent `last_seen_at` (a replica may have died). */
     online: boolean().notNull().default(false),
     /** The server process holding its socket. */
     connectedReplica: text(),
     lastSeenAt: timestamp({ withTimezone: true }),
+    /**
+     * The operator put the workspace's own computer (`managed`) in standby (ADR 0161): asleep by design, it is woken
+     * when something wants it. Its runner's next hello clears it.
+     */
+    standbyAt: timestamp({ withTimezone: true }),
+    /** Last time a run or a person wanted this computer (written at most every 30 s per server process). */
+    wantedAt: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp({ withTimezone: true }),
@@ -411,6 +430,8 @@ export const machineDeviceCodes = pgTable(
     previousMachineId: uuid(),
     /** The machine made (or reconnected) on confirm; its token is issued when the computer polls. */
     machineId: uuid(),
+    /** The connect link the computer came with (`machine_connect_links`): only that link's maker may approve it. */
+    linkId: uuid(),
     lastPolledAt: timestamp({ withTimezone: true }),
     decidedAt: timestamp({ withTimezone: true }),
     expiresAt: timestamp({ withTimezone: true }).notNull(),
@@ -488,4 +509,139 @@ export const machineFilePulls = pgTable(
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index().on(t.machineId, t.expiresAt), index().on(t.orgId)],
+);
+
+/** What a phone's host last said about it (`RunnerPhone` in the machine protocol, minus who holds it). */
+export interface MachinePhoneFacts {
+  /** `usb`, `wifi` (adb over the network) or `local` (an emulator or simulator on the host itself). */
+  transport?: "usb" | "wifi" | "local";
+  screen?: { width: number; height: number };
+  abi?: string;
+  /** On power (`ac`) or battery, when the host can tell. */
+  power?: "ac" | "battery";
+  battery?: number;
+}
+
+/** Who holds a phone right now (its host keeps the lock; this is the last it said). */
+export interface MachinePhoneHolder {
+  runId: string | null;
+  agentId: string | null;
+  /** The person the agent works for. */
+  userId: string | null;
+  /** What it is doing, in the agent's words ("Recording a test video"). */
+  label?: string;
+  since: string;
+}
+
+/**
+ * Phones reached through a connected computer (bring your own devices): Android over adb, iPhone through a Mac
+ * (`devicectl`), and the host's own emulators and simulators. A phone keeps its row, name and rule when it moves to
+ * another host; `machine_id` is its host now (null: none sees it). An iPhone follows its host's rule
+ * (`follows_host`): building and testing run on the Mac as its owner. An Android phone has its own: sharing it grants
+ * only the phone operations, never the host's commands.
+ */
+export const machinePhones = pgTable(
+  "machine_phones",
+  {
+    id: uuid()
+      .primaryKey()
+      .$defaultFn(() => Bun.randomUUIDv7()),
+    orgId: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    machineId: uuid(),
+    /** `android` or `ios`. */
+    platform: text().$type<"android" | "ios">().notNull(),
+    /** adb's serial, or the iPhone's UDID (a simulator's UDID). */
+    serial: text().notNull(),
+    /** `device`, `emulator` or `simulator`. */
+    kind: text().$type<"device" | "emulator" | "simulator">().notNull().default("device"),
+    name: text().notNull(),
+    model: text().notNull().default(""),
+    osVersion: text().notNull().default(""),
+    /** `ready`, `needs_you`, `preparing`, `unsupported` or `offline` (its host doesn't see it, or is offline). */
+    state: text().notNull().default("ready"),
+    /** With `needs_you`, `preparing` or `unsupported`: a code the apps word (`locked`, `unauthorized`, `developer_mode_off`…). */
+    reason: text(),
+    facts: jsonb().$type<MachinePhoneFacts>().notNull().default({}),
+    holder: jsonb().$type<MachinePhoneHolder>(),
+    /** Whose phone it is: the person who paired its host when it was first seen. */
+    ownerUserId: text().references(() => users.id, { onDelete: "set null" }),
+    followsHost: boolean().notNull().default(false),
+    audienceMode: text().$type<"everyone" | "people" | "owner">().notNull().default("owner"),
+    audienceUserIds: text().array().notNull().default(sql`'{}'::text[]`),
+    audienceRoleIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
+    lastSeenAt: timestamp({ withTimezone: true }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    deletedAt: timestamp({ withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex("machine_phones_serial").on(t.orgId, t.platform, t.serial),
+    index().on(t.orgId, t.machineId),
+    check("machine_phones_platform", sql`${t.platform} in ('android', 'ios')`),
+    check("machine_phones_kind", sql`${t.kind} in ('device', 'emulator', 'simulator')`),
+  ],
+);
+
+/**
+ * A one-line install for a new computer (bring your own devices): `curl -fsSL <server>/i/<code> | sh`. The code is
+ * stored as SHA-256 only, works once and for a few minutes, and grants nothing by itself: the computer that runs it
+ * asks to join (a `machine_device_codes` row with `link_id`), and only the link's maker can approve it.
+ */
+export const machineConnectLinks = pgTable(
+  "machine_connect_links",
+  {
+    id: uuid()
+      .primaryKey()
+      .$defaultFn(() => Bun.randomUUIDv7()),
+    orgId: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    createdByUserId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    codeHash: text().notNull().unique(),
+    /** `server` (a system install, each agent its own user) or `computer` (one person's). */
+    kind: text().$type<"server" | "computer">().notNull().default("server"),
+    /** The device code of the computer that used it; null until one did. */
+    deviceCodeId: uuid(),
+    usedAt: timestamp({ withTimezone: true }),
+    expiresAt: timestamp({ withTimezone: true }).notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index().on(t.orgId, t.createdAt)],
+);
+
+/**
+ * An agent asked to use a device its requester isn't allowed on (bring your own devices). The device's owner
+ * answers: `once` (that run, until `expires_at`), `always` (the requester joins its rule) or `denied`.
+ */
+export const deviceAccessRequests = pgTable(
+  "device_access_requests",
+  {
+    id: uuid()
+      .primaryKey()
+      .$defaultFn(() => Bun.randomUUIDv7()),
+    orgId: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    /** The computer, or the phone's host when `phone_id` is set. */
+    machineId: uuid(),
+    phoneId: uuid(),
+    requesterUserId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    agentId: uuid(),
+    runId: uuid(),
+    /** What the agent wants to do there, in its words. */
+    reason: text().notNull().default(""),
+    /** `pending`, `once`, `always`, `denied` or `expired`. */
+    status: text().notNull().default("pending"),
+    decidedByUserId: text().references(() => users.id, { onDelete: "set null" }),
+    decidedAt: timestamp({ withTimezone: true }),
+    expiresAt: timestamp({ withTimezone: true }).notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index().on(t.orgId, t.requesterUserId, t.status), index().on(t.orgId, t.machineId)],
 );

@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import type { Connection, GitHubAppInfo, GitHubAppInstallation } from "../api/types";
+import type { Connection, GitHubAppInfo, GitHubAppInstallation, GitHubAppSetup } from "../api/types";
 import { GITHUB_APP_AUTH } from "./connected";
 import { joinNames, namesText } from "./format";
 
@@ -47,6 +47,29 @@ export function githubAppPanel(
  */
 export const appAccountsText = (t: TFunction, accounts: string) =>
   t("githubApp.viaApp", { accounts: namesText(t, accounts.split(", "), 2) });
+
+/** GitHub's own names for the events, as the app's Permissions & events page lists them. */
+const GITHUB_EVENT_LABELS: Record<string, string> = {
+  issues: "Issues",
+  issue_comment: "Issue comment",
+  pull_request: "Pull request",
+  pull_request_review: "Pull request review",
+  pull_request_review_comment: "Pull request review comment",
+  pull_request_review_thread: "Pull request review thread",
+  discussion: "Discussion",
+  discussion_comment: "Discussion comment",
+};
+
+/** What the server's owner ticks on the app for agents to hear GitHub (`setup.events`); null when nothing is missing. */
+export const missingEventsText = (t: TFunction, setup: Pick<GitHubAppSetup, "events"> | null | undefined) =>
+  setup?.events?.missing.length
+    ? t("githubApp.server.line.events", {
+        events: joinNames(
+          setup.events.missing.map((e) => GITHUB_EVENT_LABELS[e] ?? e),
+          t,
+        ),
+      })
+    : null;
 
 /** An installation's state: suspended on GitHub, or which of its account's repositories it reaches. */
 export const installationReach = (t: TFunction, i: Pick<GitHubAppInstallation, "suspended" | "repositorySelection">) =>

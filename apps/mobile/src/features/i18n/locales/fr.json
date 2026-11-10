@@ -138,6 +138,7 @@
     "refuseTitle": "Refuser la demande",
     "refuseAsk": "Refuser la demande ?",
     "leaves": "sort de l'entreprise",
+    "leavesPersonal": "sort de votre espace de travail",
     "refuseWhyF": "{{name}} tire des leçons du motif. Facultatif.",
     "refuseWhyM": "{{name}} tire des leçons du motif. Facultatif.",
     "sheet": {
@@ -173,6 +174,7 @@
       "irreversible": "Irréversible",
       "reversible": "Réversible",
       "external": "Sort de l'entreprise",
+      "externalPersonal": "Sort de votre espace de travail",
       "unsent": "Rien n'est envoyé",
       "deletable": "Peut être supprimé"
     },
@@ -245,6 +247,9 @@
     "newChannelHint": "Pour une équipe ou un sujet",
     "channelPlaceholder": "Nom du canal, par ex. marketing",
     "createChannel": "Créer le canal",
+    "newChannelHintPersonal": "Pour un sujet, avec plusieurs agents",
+    "channelPlaceholderPersonal": "Nom, par ex. voyage",
+    "createChannelPersonal": "Créer la conversation de groupe",
     "waitIn": "dans {{where}}",
     "workingNowLine_one": "{{count}} agent au travail",
     "workingNowLine_many": "{{count}} agents au travail",
@@ -256,6 +261,7 @@
       "unmute": "Réactiver"
     },
     "firstRunLine": "{{name}} constitue l'équipe · {{done}} sur {{total}}",
+    "firstRunLinePersonal": "{{name}} prépare vos agents · {{done}} sur {{total}}",
     "first": {
       "title": "Commencez par votre premier agent",
       "subtitle": "Donnez-lui un nom et dites ce qu'il fait. Il apparaît ici, comme une discussion.",
@@ -284,6 +290,8 @@
     "chat": "Discuter avec…",
     "name": "Nom",
     "channelFine": "Pour une équipe ou un sujet.",
+    "channelPersonal": "Conversation de groupe",
+    "channelFinePersonal": "Pour un sujet, avec plusieurs agents.",
     "chatSearch": "Chercher une personne ou un agent",
     "to": "À :",
     "people": "Personnes",
@@ -296,6 +304,7 @@
     "routineHint": "Un agent s'en charge seul, à l'heure prévue",
     "wikiPage": "Page du wiki",
     "wikiHint": "À lire pour l'équipe et les agents",
+    "wikiHintPersonal": "À lire pour vos agents",
     "inviteHint": "Par e-mail ou lien",
     "agent": {
       "question": "Que va-t-il faire ?"
@@ -475,12 +484,14 @@
       "arrived": "{{name}} a rejoint l'équipe",
       "meet": "Votre première conversation avec {{name}}",
       "roleIntro": "{{role}} dans votre équipe. Demandez avec des mots simples.",
+      "roleIntroPersonal": "{{role}}, là pour vous. Demandez avec des mots simples.",
       "noIntro": "Demandez ce dont vous avez besoin, avec des mots simples.",
       "firstTitle": "Pour commencer",
       "sendHint": "Touchez pour envoyer",
       "hello": "Bonjour, {{person}} ! Je suis {{name}}.",
       "helloNoName": "Bonjour ! Je suis {{name}}.",
       "helloRole": "{{role}} dans l'équipe.",
+      "helloRolePersonal": "{{role}}, là pour vous.",
       "helloAsk": "Par où commencer ?",
       "now": "maintenant",
       "start": {
@@ -810,6 +821,7 @@
     "noGroupSection": "Sans service",
     "workingSection": "Au travail",
     "teamSection": "Équipe",
+    "teamSectionPersonal": "Vos agents",
     "managerQuiet": "Rien en cours",
     "state": {
       "waitsYou": "attend votre accord",
@@ -1044,9 +1056,6 @@
       "plan_model_dropped_one": "{{model}} a quitté {{plan}}. {{names}} utilise {{runs}} pour l’instant",
       "plan_model_dropped_many": "{{model}} a quitté {{plan}}. {{names}} utilise {{runs}} pour l’instant",
       "plan_model_dropped_other": "{{model}} a quitté {{plan}}. {{names}} utilise {{runs}} pour l’instant",
-      "connector_tool_changed_one": "Un serveur connecté a modifié des outils que vous aviez approuvés",
-      "connector_tool_changed_many": "Un serveur connecté a modifié des outils que vous aviez approuvés",
-      "connector_tool_changed_other": "Un serveur connecté a modifié des outils que vous aviez approuvés",
       "computer_disk_full_one": "Le disque d'un ordinateur est presque plein",
       "computer_disk_full_many": "Le disque d'un ordinateur est presque plein",
       "computer_disk_full_other": "Le disque d'un ordinateur est presque plein",
@@ -1114,7 +1123,9 @@
     "title": "Vous",
     "role": {
       "owner": "propriétaire",
-      "member": "membre"
+      "member": "membre",
+      "ownerPersonal": "votre espace personnel",
+      "memberPersonal": "un espace personnel partagé avec vous"
     },
     "appearance": "Apparence",
     "notifications": "Notifications",
@@ -1530,15 +1541,11 @@
       "browser": "Navigateur",
       "secret": "Secret",
       "join": "Membres",
-      "tools": "Outils",
       "limit": "Limite"
     },
     "review": "Examiner",
     "answer": "Répondre",
     "open": "Ouvrir",
-    "toolsTitle": "A modifié des outils que tu as approuvés",
-    "toolsWhy": "Les agents gardent la version approuvée jusqu'à ce que tu acceptes la nouvelle.",
-    "reviewChanges": "Revoir les changements",
     "clear": {
       "title": "Rien ne vous attend",
       "text": "Quand un agent a besoin de vous, ça apparaît d'abord ici."
@@ -1858,6 +1865,217 @@
     "pick": "Choisir un ordinateur",
     "pickHelp": "Choisissez un des ordinateurs allumés."
   },
+  "devices": {
+    "title": "Appareils",
+    "empty": {
+      "title": "Aucun appareil pour l'instant",
+      "text": "Connectez un ordinateur, puis branchez-y un téléphone."
+    },
+    "status": {
+      "ready": "Prêt",
+      "inUse": "Utilisé par {{name}}",
+      "inUseFor": "pour {{person}} depuis {{time}}",
+      "since": "depuis {{time}}",
+      "busy": "Occupé {{running}}/{{max}}",
+      "needsYou": "Action requise",
+      "preparing": "Préparation en cours",
+      "paused": "En pause",
+      "until": "jusqu'à {{time}}",
+      "offline": "Hors ligne",
+      "seen": "vu pour la dernière fois {{when}}",
+      "withHost": "avec {{host}}",
+      "unsupported": "Inutilisable"
+    },
+    "reason": {
+      "locked": "L'écran est verrouillé",
+      "unauthorized": "Touchez Autoriser sur le téléphone",
+      "untrusted": "Touchez Se fier sur l'iPhone",
+      "developer_mode_off": "Le mode développeur est désactivé",
+      "ui_automation_off": "L'automatisation de l'IU est désactivée",
+      "xcode_missing": "Le Mac a besoin de Xcode",
+      "xcode_too_old": "Xcode est trop ancien pour cet iPhone",
+      "device_support": "Le Mac prépare cet iPhone",
+      "helper_missing": "L'app de test n'est pas encore configurée",
+      "helper_expired": "L'app de test doit être renouvelée",
+      "apple_account_missing": "Xcode sur le Mac a besoin d'un Apple Account",
+      "team_limit": "Supprimez de cet iPhone une app que vous avez créée",
+      "helper_untrusted": "Faites confiance à l'app de test sur cet iPhone",
+      "booting": "Démarrage en cours",
+      "no_driver": "Windows a besoin du pilote USB de ce téléphone",
+      "os_too_old": "Le système de ce téléphone est trop ancien",
+      "adb_offline": "Débranchez le câble et rebranchez-le",
+      "other": "Pas encore prêt"
+    },
+    "os": {
+      "android": "Android {{version}}",
+      "ios": "iOS {{version}}"
+    },
+    "onHost": "sur {{host}}",
+    "cpus_one": "{{count}} CPU",
+    "cpus_many": "{{count}} CPU",
+    "cpus_other": "{{count}} CPU",
+    "memory": "{{gb}} Go",
+    "audience": {
+      "label": "Qui peut l'utiliser",
+      "me": "Moi seulement",
+      "only": "Seulement {{name}}",
+      "everyone": "Tout le monde",
+      "sameAs": "Comme {{host}}",
+      "mode": {
+        "owner": "Moi seulement",
+        "ownerOf": "Seulement {{name}}",
+        "everyone": "Tout l'espace de travail",
+        "people": "Seulement certaines personnes ou certains rôles"
+      },
+      "modeText": {
+        "owner": "Vous, et les agents qui travaillent pour vous.",
+        "ownerOf": "{{name}}, et les agents qui travaillent pour cette personne.",
+        "everyone": "Les agents de toutes les personnes de l'espace de travail peuvent l'utiliser.",
+        "people": "Choisissez les personnes et les rôles dont les agents peuvent l'utiliser."
+      },
+      "people": "Personnes et rôles",
+      "pickSomeone": "Choisissez au moins une personne ou un rôle.",
+      "narrowOnly": "Vous pouvez restreindre qui utilise l'appareil de {{name}}, jamais l'élargir.",
+      "runsAs": "Les agents des autres personnes y tourneront en votre nom et pourront lire vos fichiers.",
+      "phoneOnly": "Cela partage seulement le téléphone, jamais {{host}}.",
+      "saved": "Enregistré"
+    },
+    "page": {
+      "belongs": "Appartient à l'espace de travail",
+      "belongsHint": "Il reste quand son propriétaire quitte l'espace de travail, et Moi seulement vaut alors pour tout le monde.",
+      "phones": "Téléphones",
+      "ownerReads": "Son propriétaire peut lire le code, les fichiers et les builds que votre agent y dépose.",
+      "followsHost": "Un iPhone suit la règle de son Mac.",
+      "shareNote": "Partager un téléphone ne partage jamais {{host}}.",
+      "showHow": "Montrez-moi comment",
+      "name": "Nom",
+      "renamed": "Il s'appelle maintenant {{name}}",
+      "stop": "Arrêter {{name}}",
+      "stopped": "{{device}} est revenu de {{name}}",
+      "forget": "Oublier ce téléphone",
+      "forgetTitle": "Oublier {{name}} ?",
+      "forgetText": "Il reviendra si {{host}} le détecte à nouveau.",
+      "forgotten": "{{name}} a été oublié",
+      "notFound": "Cet appareil n'est plus là",
+      "notFoundText": "Il a été retiré, ou il est parti avec son propriétaire."
+    },
+    "join": {
+      "header": "Demandent à rejoindre",
+      "title": "{{name}} veut rejoindre {{org}}",
+      "allow": "Accepter",
+      "deny": "Refuser",
+      "joined": "{{name}} a été ajouté",
+      "denied": "{{name}} a été refusé"
+    },
+    "connect": {
+      "title": "Connecter un appareil",
+      "thisPhone": "Ce téléphone",
+      "computers": "Ordinateurs",
+      "androidText": "Via un ordinateur auquel il est branché",
+      "iphoneText": "Via un Mac",
+      "server": "Un serveur ou un VPS",
+      "serverText": "Une ligne à coller dans son terminal",
+      "computer": "Un autre ordinateur",
+      "computerText": "Mac, Windows ou Linux",
+      "appNote": "Sur un Mac ou un PC que vous utilisez, l'app de bureau agentes.chat le connecte aussi.",
+      "unix": "Linux et macOS",
+      "windows": "Windows",
+      "once": "Fonctionne une fois, pendant 10 minutes. Exécutez-la sur l'ordinateur, puis acceptez-le ici.",
+      "copied": "Commande copiée. Collez-la dans le terminal de l'ordinateur.",
+      "waiting": "En attente de l'exécution sur l'ordinateur",
+      "joined": "{{name}} est connecté",
+      "denied": "Vous n'avez pas accepté {{name}}.",
+      "expired": "Ce lien a expiré.",
+      "again": "Créer un nouveau lien"
+    },
+    "android": {
+      "entry": "Utiliser ce téléphone avec des agents",
+      "title": "Laisser les agents utiliser ce téléphone",
+      "connecting": "Connexion à {{host}}",
+      "computer": "Ordinateur",
+      "noHost": "Ce téléphone fonctionne via l'un de vos ordinateurs. Connectez-en un d'abord.",
+      "hostOffline": "{{host}} est hors ligne. Allumez-le et ouvrez agentes.chat dessus.",
+      "step1": "Activez les Options pour les développeurs",
+      "step1Text": "Touchez 7 fois Numéro de build, puis saisissez votre code PIN.",
+      "openAbout": "Ouvrir À propos du téléphone",
+      "step2": "Activez le Débogage USB",
+      "openDev": "Ouvrir Options pour les développeurs",
+      "step3": "Branchez-le sur {{host}}",
+      "step3Hint": "Utilisez un câble qui transmet les données, pas un câble de charge seule. Si le téléphone demande à quoi sert l'USB, choisissez Transfert de fichiers.",
+      "looking": "Recherche de ce téléphone",
+      "step4": "Touchez Autoriser sur ce téléphone",
+      "step4Text": "Cochez d'abord Toujours autoriser cet ordinateur.",
+      "prompt": {
+        "a11y": "Android demande : Autoriser le débogage USB ? Cochez Toujours autoriser cet ordinateur, puis touchez Autoriser.",
+        "title": "Autoriser le débogage USB ?",
+        "fingerprint": "Empreinte de la clé RSA de l'ordinateur :",
+        "always": "Toujours autoriser cet ordinateur",
+        "cancel": "Annuler",
+        "allow": "Autoriser"
+      },
+      "wifi": "Pas de câble ? Associez-le par Wi-Fi",
+      "wifiText": "Téléphone et ordinateur sur le même Wi-Fi",
+      "cable": "Utiliser plutôt un câble",
+      "wifi1": "Activez le Débogage sans fil",
+      "wifi1Text": "Cochez Toujours autoriser sur ce réseau, puis touchez Autoriser.",
+      "wifi2": "Scannez le code sur un ordinateur",
+      "wifi2Text": "Depuis Débogage sans fil › Associer l'appareil avec un code QR.",
+      "wifi2Hint": "Dans agentes.chat sur un ordinateur, ouvrez Connecter un appareil › Téléphone Android › Par Wi-Fi et choisissez {{host}}.",
+      "codeHead": "Associer avec un code d'association",
+      "codeNote": "Depuis Débogage sans fil › Associer l'appareil avec un code d'association. Ouvrez Paramètres et agentes.chat côte à côte pour garder le code à l'écran.",
+      "wifiNote": "Le Wi-Fi peut se couper après un redémarrage. Un câble est plus fiable.",
+      "done": "{{name}} est connecté",
+      "openFailed": "Ce téléphone n'a pas ouvert cet écran. Cherchez-le dans Paramètres."
+    },
+    "iphone": {
+      "title": "Connecter cet iPhone",
+      "with": "Avec {{host}}",
+      "noHost": "Un iPhone se connecte via l'un de vos Mac. Connectez-en un d'abord.",
+      "step1": "Branchez-le sur {{host}}",
+      "step2": "Touchez Se fier sur cet iPhone",
+      "step2Text": "Puis saisissez votre code.",
+      "step3": "Activer le mode développeur",
+      "step3Hint": "Les apps iPhone ne peuvent pas ouvrir les réglages d'une autre app, voici donc le chemin.",
+      "path": {
+        "settings": "Réglages",
+        "privacy": "Confidentialité et sécurité",
+        "devMode": "Mode développeur"
+      },
+      "pathA11y": "Sur cet iPhone : Réglages, puis Confidentialité et sécurité, puis Mode développeur",
+      "switchA11y": "L'interrupteur Mode développeur, désactivé",
+      "step3Text": "Activez-le et touchez Redémarrer. Après le redémarrage, touchez Activer et saisissez votre code.",
+      "step4": "Activer l'automatisation de l'IU",
+      "step4Text": "Réglages › Développeur › Activer l'automatisation de l'IU",
+      "step5": "Faites confiance à l'app de test",
+      "step5Hint": "L'app que {{host}} installe pour que les agents puissent toucher et écrire sur cet iPhone. Elle apparaît dans cette liste une fois installée.",
+      "step5Text": "Réglages › Général › VPN et gestion de l'appareil. Touchez le nom du développeur, puis Se fier.",
+      "waiting": "En attente que {{host}} le détecte",
+      "footer": "Votre Mac fait le reste, et renouvelle l'app de test tous les 7 jours tant qu'il est allumé."
+    },
+    "notice": {
+      "kind": "Appareils",
+      "join_request": "{{device}} veut rejoindre {{org}}",
+      "in_use": "{{names}} utilise {{device}}",
+      "in_useFor": "{{names}} utilise {{device}} pour {{person}}",
+      "access_request": "{{names}} demande à utiliser {{device}}",
+      "access_requestFor": "{{names}} demande à utiliser {{device}} pour {{person}}",
+      "waiting": "{{names}} attend {{device}}",
+      "waitingFor": "{{names}} attend {{device}} pour {{person}}",
+      "allowOnce": "Autoriser une fois",
+      "always": "Toujours autoriser {{name}}",
+      "no": "Non",
+      "stop": "Arrêter"
+    },
+    "wait": {
+      "waiting": "En attente de {{device}}",
+      "back": "{{device}} est de retour",
+      "tryNow": "Réessayer maintenant",
+      "other": "Utiliser un autre appareil",
+      "stop": "Arrêter d'attendre",
+      "useInstead": "Utiliser plutôt {{name}}",
+      "none": "Aucun autre appareil que vous pouvez utiliser n'est prêt."
+    }
+  },
   "connectors": {
     "title": "Connecteurs",
     "search": "Rechercher ou coller une adresse",
@@ -1879,6 +2097,7 @@
     "loadFailed": "Impossible de charger les connecteurs.",
     "connectedCheck": "{{name}}, connecté",
     "adminsOnly": "Seul un admin de {{org}} connecte des services. Demandez à l'un d'eux.",
+    "adminsOnlyPersonal": "Seule la personne qui gère cet espace de travail connecte des applications. Demandez-lui.",
     "canTitle": "Les agents pourront",
     "asks": "{{text}} · demande votre approbation",
     "connect": "Connecter",
@@ -2027,11 +2246,13 @@
     "zoneChange": "Changer",
     "zoneTitle": "Fuseau horaire",
     "anotherTitle": "Comment s'appelle le nouvel espace de travail ?",
+    "anotherPurpose": "À quoi servira le nouvel espace de travail ?",
     "anotherLead": "Sur agentes.chat. Vous restez dans {{org}} et pouvez changer à tout moment.",
     "suggested": "D'après votre e-mail {{domain}}, j'ai suggéré {{org}}.",
     "create": "Créer",
     "shareMessage": "Rejoignez {{org}} sur agentes.chat : {{url}}",
-    "failed": "Impossible d'enregistrer. Réessayez."
+    "failed": "Impossible d'enregistrer. Réessayez.",
+    "enter": "Entrer dans l'espace de travail"
   },
   "ai": {
     "yourPlan": "Votre abonnement IA",
@@ -2358,7 +2579,6 @@
   "dashboards": {
     "homeRow": "Vous seul · vos propres widgets",
     "loadFailed": "Impossible de charger les tableaux de bord.",
-    "onlyHome": "Les tableaux de bord de l'espace de travail ou de vos rôles apparaissent ici.",
     "create": "Créer",
     "routineTarget": "son widget",
     "pin": {
@@ -2432,7 +2652,11 @@
       "title": "Composez votre équipe d'agents",
       "text": "Chaque agent prend un rôle et travaille avec vous dans la discussion.",
       "viewerTitle": "Votre équipe d'agents se trouve ici",
-      "viewerText": "La personne qui crée les agents de cet espace ajoute le premier, et il apparaît ici."
+      "viewerText": "La personne qui crée les agents de cet espace ajoute le premier, et il apparaît ici.",
+      "titlePersonal": "Faites-vous aider par vos propres agents",
+      "textPersonal": "Chaque agent s'occupe d'une chose pour vous, directement dans la discussion.",
+      "viewerTitlePersonal": "Vos agents se trouvent ici",
+      "viewerTextPersonal": "La personne qui crée des agents ici ajoute le premier, et il apparaît ici."
     },
     "agentsForYou": {
       "title": "Vos agents apparaissent ici",
@@ -2442,13 +2666,20 @@
       "title": "Tout ce que l'équipe crée, au même endroit",
       "text": "Rapports, tableaux et fichiers des agents et des personnes restent ici, faciles à retrouver.",
       "viewerTitle": "Retrouvez ce que l'équipe crée",
-      "viewerText": "Ce que les agents et les personnes créent dans les discussions apparaît ici."
+      "viewerText": "Ce que les agents et les personnes créent dans les discussions apparaît ici.",
+      "titlePersonal": "Tout ce que vos agents créent, au même endroit",
+      "textPersonal": "Les rapports, tableaux et fichiers de vos agents restent ici, faciles à retrouver.",
+      "viewerTitlePersonal": "Retrouvez ce que vos agents créent",
+      "viewerTextPersonal": "Ce que les agents créent dans vos discussions apparaît ici."
     },
     "tasks": {
       "title": "Confiez du travail à l'équipe",
       "text": "Créez une tâche pour un agent ou une personne et suivez-la jusqu'au bout.",
       "viewerTitle": "Suivez le travail de l'équipe",
-      "viewerText": "Les tâches apparaissent ici dès que quelqu'un crée la première."
+      "viewerText": "Les tâches apparaissent ici dès que quelqu'un crée la première.",
+      "titlePersonal": "Confiez vos tâches à vos agents",
+      "textPersonal": "Créez une tâche pour un agent et suivez-la jusqu'au bout.",
+      "viewerTitlePersonal": "Suivez le travail de vos agents"
     },
     "routines": {
       "title": "Laissez le travail répétitif à vos agents",
@@ -2460,7 +2691,10 @@
       "title": "Gardez ce que l'équipe doit savoir",
       "text": "Les personnes et les agents lisent ces pages, et tout le monde travaille avec les mêmes informations.",
       "viewerTitle": "Consultez ce que l'équipe sait",
-      "viewerText": "La personne qui modifie le wiki écrit la première page, et elle apparaît ici."
+      "viewerText": "La personne qui modifie le wiki écrit la première page, et elle apparaît ici.",
+      "titlePersonal": "Gardez des notes que vos agents peuvent lire",
+      "textPersonal": "Vos agents lisent ces pages et travaillent à partir de ce que vous avez écrit.",
+      "viewerTitlePersonal": "Consultez ce qui est écrit ici"
     },
     "memory": {
       "title": "Vos agents apprennent en travaillant",
@@ -2483,13 +2717,21 @@
       "text": "Chaque canal réunit celles et ceux qui s'occupent d'un sujet.",
       "viewerTitle": "Les canaux de l'équipe se trouvent ici",
       "viewerText": "La personne qui crée les canaux ouvre le premier, et il apparaît ici.",
-      "action": "Créer un canal"
+      "action": "Créer un canal",
+      "titlePersonal": "Parlez à plusieurs agents à la fois",
+      "textPersonal": "Chaque conversation de groupe réunit les agents et les personnes autour d'un sujet.",
+      "viewerTitlePersonal": "Les conversations de groupe se trouvent ici",
+      "viewerTextPersonal": "La personne qui crée des conversations de groupe ouvre la première, et elle apparaît ici."
     },
     "people": {
       "title": "Travaillez avec votre équipe ici",
       "text": "Invitez des personnes pour leur parler, ainsi qu'à vos agents, au même endroit.",
       "viewerTitle": "Votre équipe apparaît ici",
-      "viewerText": "La personne qui invite fait venir le reste de l'équipe, et ces personnes apparaissent ici."
+      "viewerText": "La personne qui invite fait venir le reste de l'équipe, et ces personnes apparaissent ici.",
+      "titlePersonal": "Faites venir votre famille ou vos amis",
+      "textPersonal": "Invitez quelqu'un pour discuter avec vous et vos agents au même endroit.",
+      "viewerTitlePersonal": "La famille et les amis apparaissent ici",
+      "viewerTextPersonal": "Quand quelqu'un vous rejoint, cette personne apparaît ici."
     },
     "chat": {
       "title": "Tout commence par un message",
@@ -2509,7 +2751,11 @@
       "title": "Partagez des accès sans faire circuler de mots de passe",
       "text": "Enregistrez les identifiants et les clés que vos agents utilisent pour l'équipe.",
       "viewerTitle": "Les accès de l'équipe apparaissent ici",
-      "viewerText": "Quand quelqu'un partage un identifiant ou une clé avec vous, ils apparaissent ici."
+      "viewerText": "Quand quelqu'un partage un identifiant ou une clé avec vous, ils apparaissent ici.",
+      "titlePersonal": "Gardez les accès partagés au même endroit",
+      "textPersonal": "Enregistrez les identifiants et les clés que vos agents utilisent pour tout le monde ici.",
+      "viewerTitlePersonal": "Les accès partagés apparaissent ici",
+      "viewerTextPersonal": "Quand quelqu'un d'ici partage un identifiant ou une clé avec vous, ils apparaissent ici."
     },
     "skills": {
       "title": "Apprenez à vos agents comment vous faites",

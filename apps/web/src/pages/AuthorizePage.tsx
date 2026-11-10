@@ -22,6 +22,7 @@ import { AppMark } from "@/components/AiApps";
 import { CenteredLayout } from "@/components/AuthLayout";
 import { LoadingLine } from "@/components/Loading";
 import { DEFAULT_LOCALE, type LocaleCode, locales, TYPED_VALUES, usePageT } from "@/i18n";
+import { STORAGE_KEYS, storage } from "@/lib/storage";
 import "@/components/ai-apps.css";
 
 /** How long "Pronto" shows before the browser goes back to the app. */
@@ -284,6 +285,7 @@ function ConsentForm({
               className="ac-link"
               onClick={async () => {
                 await auth.signOut();
+                storage.set(STORAGE_KEYS.signedOut, "1");
                 qc.clear();
                 window.location.assign(signInPath(window.location.pathname + window.location.search));
               }}
