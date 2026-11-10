@@ -195,7 +195,7 @@
     mask-image: linear-gradient(to bottom, #000 calc(100% - 10px), transparent), var(--scroll-strip);
   }
   .channel__messages .ac-msg:not([data-look="bubbles"], [data-look="compact"]) {
-    --msg-lead: 46px;
+    --msg-lead: calc(var(--name-face) + 10px);
   }
   .channel__messages .ac-msg {
     --msg-inline: 12px;
@@ -327,8 +327,8 @@
   .agp-subnav {
     position: static;
     flex-direction: row;
-    margin: 0 -16px;
-    padding: 2px 16px 4px;
+    margin: 0 calc(-1 * var(--agp-gutter));
+    padding: 2px var(--agp-gutter) 4px;
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: none;
@@ -427,8 +427,8 @@
   .agp-subnav {
     position: static;
     flex-direction: row;
-    margin: 0 -16px;
-    padding: 2px 16px 4px;
+    margin: 0 calc(-1 * var(--agp-gutter));
+    padding: 2px var(--agp-gutter) 4px;
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: none;

@@ -65,7 +65,8 @@ async function onPlan(fx: Fixture, agentId: string, fallback: boolean) {
 
 test("an agent whose monthly budget is spent is out of office until the next month", async () => {
   f = await setup();
-  expect((await statusOf(f, f.agent.id))?.presence).toBe("away");
+  // Just made: online, not out.
+  expect((await statusOf(f, f.agent.id))?.presence).toBe("online");
   await spendBudget(f, f.agent.id);
   const s = await statusOf(f, f.agent.id);
   expect(s?.presence).toBe("out");
@@ -87,15 +88,15 @@ test("a plan at its limit: out only when no model answers instead, and back at t
 
   // With the fallback on, the model brain answers in a conversation: out only when it has no key.
   await f.db.update(schema.agents).set({ brainFallback: true }).where(eq(schema.agents.id, f.agent.id));
-  expect((await statusOf(f, f.agent.id))?.presence).toBe("away");
-  expect((await statusOf(f, f.agent.id, { hasModel: async () => true }))?.presence).toBe("away");
+  expect((await statusOf(f, f.agent.id))?.presence).toBe("online");
+  expect((await statusOf(f, f.agent.id, { hasModel: async () => true }))?.presence).toBe("online");
   expect((await statusOf(f, f.agent.id, { hasModel: async () => false }))?.presence).toBe("out");
   // The model it would fall back on has no budget left either.
   await spendBudget(f, f.agent.id);
   expect((await statusOf(f, f.agent.id, { hasModel: async () => true }))?.status?.kind).toBe("out_of_budget");
 
   clearPlanLimits();
-  expect((await statusOf(f, f.agent.id, { hasModel: async () => true }))?.presence).toBe("away");
+  expect((await statusOf(f, f.agent.id, { hasModel: async () => true }))?.presence).toBe("online");
 });
 
 test("out of office keeps the agent's own words, and a held agent still reads offline", async () => {

@@ -845,6 +845,8 @@ export interface AgentBrainLine {
   usage?: PlanUsage;
   /** Set to Rápida where that applies to what it thinks with; absent: standard speed. */
   speed?: "fast";
+  /** An API brain on Automático: the maker its models come from, whose logo shows beside it. */
+  maker?: string;
 }
 
 /** `appearance` as stored: the UI only draws known values. */
@@ -974,8 +976,6 @@ export interface TeamPlan {
   /** People named as working there, invited after. */
   invite: string[];
   template?: string;
-  /** On a billing hold, from a template: what its first agent delivers, shown labelled and never posted. */
-  example?: string;
 }
 
 /** The right hand's team card (`meta.actionCard`): several agents created in one click ("Criar o time"). */
@@ -1367,6 +1367,7 @@ export interface AiStatus {
       | "cli_missing"
       | "computer_away"
       | "computer_failed"
+      | "cli_failed"
       | "plan_limit"
       | "model_limit"
       | "model_region"
@@ -1376,6 +1377,8 @@ export interface AiStatus {
       | "plan_not_shared"
       | "runner_outdated"
       | "plan_tools";
+    /** Ready on an API key with Automático: the maker of the key it thinks with (`autoMakerOf`). */
+    provider?: string;
   }[];
 }
 
@@ -1458,9 +1461,9 @@ export interface ActiveRun {
   background?: boolean;
   /**
    * What its current model call streamed so far past its last tool: `text` starts at `at` of the call's text, so an
-   * app opened mid-answer goes on from `at` plus its length.
+   * app opened mid-answer goes on from `at` plus its length. `shownAt`: as `agent.delta.shownAt`.
    */
-  live?: { turn: number; at: number; text: string };
+  live?: { turn: number; at: number; text: string; shownAt?: string };
 }
 
 /** Real-time channel events (packages/engine/src/events.ts, docs/adr/0010-realtime.md). */
@@ -1542,6 +1545,8 @@ export type ChannelEvent =
       at?: number;
       /** Where its stretch starts in the turn's text (a stretch: the text between two calls of a computer brain). */
       from?: number;
+      /** When its reply first showed words (ISO, the server's clock): its message is posted there (`LiveRun.shownAt`). */
+      shownAt?: string;
     }
   | {
       type: "agent.run";
@@ -1551,6 +1556,9 @@ export type ChannelEvent =
       agentId: string;
       status: RunStatus;
       error?: string;
+      /** A failed run's reason by its code, as `run.finished` says it (`runErrorDetail`). */
+      errorCode?: string;
+      errorParams?: Record<string, string>;
       /** The message that started the run (anchors its live row). */
       triggerMessageId?: string | null;
       startedAt?: string | null;
@@ -2050,6 +2058,11 @@ export interface GitHubAppSetup {
   state: "off" | "ok" | "invalid";
   /** No app yet: the manifest flow makes one. */
   canCreate: boolean;
+  /**
+   * The events agents hear that the app isn't subscribed to on GitHub (by GitHub's names), and its page there where
+   * they're ticked. Absent when it has them all, or GitHub didn't answer.
+   */
+  events?: { missing: string[]; url: string };
 }
 
 /** `GET …/github-app`: whether the app can be installed here, the organization's installations, the server's app. */

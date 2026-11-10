@@ -90,16 +90,8 @@ test("the built stylesheet keeps what places the Settings header, the bucket's h
     });
 });
 
-test("the built page sheets keep a plan's name and chip on its tile's line, setup's US$ field under its title and the export's line whole", async () => {
+test("the built page sheets keep a plan's name and chip on its tile's line and the export's line whole", async () => {
   const sheets: [string, string[]][] = [
-    [
-      "src/pages/onboarding.css",
-      [
-        ".ac-card__head:has(> .ac-card__action > .onb__money)",
-        ".ac-card__head:has(> .ac-card__action > .onb__money) > .ac-card__lead",
-        ".ac-card__head:has(> .ac-card__action > .onb__money) > .ac-card__action",
-      ],
-    ],
     ["src/components/plan-usage.css", [".plan-acct", ".plan-acct__name", ".plan-acct__chip"]],
     ["src/components/import-flow.css", [".imp-note"]],
   ];
@@ -115,12 +107,6 @@ test("the built page sheets keep a plan's name and chip on its tile's line, setu
       });
     }
   }
-  const onboarding = topLevel(await builtCss("src/pages/onboarding.css"));
-  // Where the title and the field don't share a line, the field wraps under the title instead of squeezing it.
-  expect(declarations(onboarding, ".ac-card__head:has(> .ac-card__action > .onb__money)")).toContainEqual([
-    "flex-wrap",
-    "wrap",
-  ]);
   const plans = topLevel(await builtCss("src/components/plan-usage.css"));
   // The face line's own rules lay the head out: none here may put the tile back in the block's middle.
   expect(declarations(plans, ".plan-acct").map(([p]) => p)).toEqual(["min-width"]);

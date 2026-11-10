@@ -1,10 +1,10 @@
 import type { Message, TeamAgentDraft, TeamPlan, TeamProposalCard } from "@agenteschat/client";
-import { useApplyTeamTemplate, useMessages, useTeamCard, useTeamTemplates } from "@agenteschat/client";
+import { useAiStatus, useApplyTeamTemplate, useMessages, useTeamCard, useTeamTemplates } from "@agenteschat/client";
 import { setDraftFor } from "@agenteschat/client/lib/drafts";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { joinNames, whenAt } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
-import { isRightHand } from "@agenteschat/client/lib/right-hand";
+import { isRightHand, RIGHT_HAND_DEFAULT } from "@agenteschat/client/lib/right-hand";
 import {
   answerAfter,
   answerPicks,
@@ -42,7 +42,6 @@ import { useTranslation } from "react-i18next";
 import { MESSAGE_STICKER } from "@/chat/ChatMedia";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { usePlanHold } from "@/components/ai/ConnectAiSteps";
-import { BillingLinkButton } from "@/components/BillingLinkButton";
 import { useConnectAi } from "@/components/ConnectAi";
 import { useChannelActions } from "@/components/channel-actions";
 import { useInviteDialog } from "@/components/invite/InviteDialog";
@@ -145,25 +144,25 @@ export function ReplyChips({ message }: { message: Message }) {
 }
 
 /**
- * The team on a card or a template: a row per agent, the routines, the skills and what waits for approval. An agent's
- * channel shows only in a team's workspace and when it has one: in a personal workspace (ADR 0159) each agent is
- * someone to talk to, not a place.
+ * The team on a card or a template: a row per agent, the routines, the skills and what waits for approval. `reviewer`:
+ * the right hand's name, whose weekly check is one of the routines. `personal` (ADR 0159): each agent is someone to
+ * talk to, not a place, so its channel shows only in a team's workspace and when it has one.
  */
 export function TeamPlanBody({
   plan,
+  reviewer,
+  personal = false,
   onAdjust,
   locked,
 }: {
   plan: TeamPlan;
+  reviewer: string;
+  personal?: boolean;
   onAdjust?: (agent: TeamAgentDraft) => void;
   locked?: boolean;
 }) {
   const { t, i18n } = useTranslation();
-  const { org } = useOrg();
-  const dir = useDirectory(org.id);
-  const lodi = dir.agents.find(isRightHand);
   const routines = teamRoutines(plan);
-  const personal = isPersonal(org);
   const channelOf = (a: TeamAgentDraft) => (personal ? "" : a.channel);
   return (
     <div className="tp-body">
@@ -214,7 +213,7 @@ export function TeamPlanBody({
                   <b>{proposedRoutineWhen(t, i18n.language, routine)}</b> ·{" "}
                   {agent
                     ? `${channelOf(agent) ? `${agent.name}, #${agent.channel}` : agent.name}: ${routine.name}`
-                    : `${lodi?.name ?? "Lodi"}: ${t(modeKey(org, "teamPlan.card.weekly"))}`}
+                    : `${reviewer}: ${t(personal ? "teamPlan.card.weeklyPersonal" : "teamPlan.card.weekly")}`}
                 </span>
               </li>
             ))}
@@ -315,7 +314,13 @@ export function TeamPlanCardView({ message, card }: { message: Message; card: Te
           lead={plan.lead || names}
           body={
             <>
-              <TeamPlanBody plan={plan} onAdjust={decides ? setAdjusting : undefined} locked={busy} />
+              <TeamPlanBody
+                plan={plan}
+                reviewer={dir.agents.find(isRightHand)?.name ?? RIGHT_HAND_DEFAULT.name}
+                personal={personal}
+                onAdjust={decides ? setAdjusting : undefined}
+                locked={busy}
+              />
               {card.error && (
                 <p className="rq__error" role="alert">
                   {teamFailureText(t, card.error, i18n.language)}
@@ -432,7 +437,7 @@ export function TeamPlanCardView({ message, card }: { message: Message; card: Te
             ))}
           </div>
         )}
-        {card.decidedByUserId === me.user.id && <FirstTaskCard message={message} card={card} held={held} />}
+        {card.decidedByUserId === me.user.id && !held && <FirstTaskCard message={message} card={card} />}
       </>
     );
   }
@@ -452,21 +457,20 @@ export function TeamPlanCardView({ message, card }: { message: Message; card: Te
 
 /**
  * After the team: a short first task per agent (its DM opens with it typed, never sent, for the person to finish) and
- * inviting the people. On a billing hold, the way to the plans in their place, and a labelled example of what the
- * first agent delivers, since nobody can answer yet.
+ * inviting the people. Only once the team can answer: never on a billing hold (the caller's), nor before an AI.
  */
-function FirstTaskCard({ message, card, held }: { message: Message; card: TeamProposalCard; held: boolean }) {
+function FirstTaskCard({ message, card }: { message: Message; card: TeamProposalCard }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
   const navigate = useNavigate();
   const invite = useInviteDialog();
+  const thinks = useAiStatus(org.id).data?.any === true;
   const [later, setLater] = useState(false);
   const tasks = firstTasks(card).filter((f) => dir.agentById.has(f.agentId));
   // No "Invite …" in a personal workspace (ADR 0159): it is for one person, inviting stays in Settings.
-  const people = held || isPersonal(org) ? [] : card.params.invite;
-  const example = held && tasks[0] ? card.params.example : undefined;
-  if (later || (tasks.length === 0 && people.length === 0)) return null;
+  const people = isPersonal(org) ? [] : card.params.invite;
+  if (later || !thinks || (tasks.length === 0 && people.length === 0)) return null;
   const agent = message.author.id ? dir.anyAgent(message.author.id) : undefined;
   const label = t("ask.kind.firstTask");
   return (
@@ -477,66 +481,43 @@ function FirstTaskCard({ message, card, held }: { message: Message; card: TeamPr
       label={label}
       mine={false}
       waitingFor={t("teamPlan.firstTask.suggestion")}
-      lead={t(held ? "teamPlan.firstTask.heldLead" : "teamPlan.firstTask.lead")}
+      lead={t("teamPlan.firstTask.lead")}
       body={
         tasks.length > 0 ? (
-          <>
-            <ul className="tp-agents">
-              {tasks.map((f) => (
-                <li key={f.agentId} className="tp-agent ac-mediarow">
-                  <span className="ac-mediarow__face">
-                    <AgentAvatar agentId={f.agentId} name={f.name} size="md" />
-                  </span>
-                  <span className="ac-mediarow__head">
-                    <b>{f.name}</b>
-                  </span>
-                  <span className="ac-mediarow__end ac-mediarow__end--wrap">
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        // The task ends in a blank for them to finish.
-                        setDraftFor(`agent:${f.agentId}`, `${f.task} `);
-                        void navigate({
-                          to: "/org/$orgId/dm/agent/$agentId",
-                          params: { orgId: org.id, agentId: f.agentId },
-                        });
-                      }}
-                    >
-                      {t("teamPlan.firstTask.open")}
-                    </Button>
-                  </span>
-                  <span className="ac-mediarow__body">
-                    <span className="tp-agent__line">{f.task}</span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-            {example && tasks[0] && (
-              <figure className="tp-example">
-                <figcaption className="small muted">
-                  {t("teamPlan.firstTask.example", { name: tasks[0].name })}
-                </figcaption>
-                <span className="tp-example__message ac-mediarow ac-mediarow--row">
-                  <span className="ac-mediarow__face">
-                    <AgentAvatar agentId={tasks[0].agentId} name={tasks[0].name} size="sm" />
-                  </span>
-                  <span className="ac-mediarow__head">
-                    <b>{tasks[0].name}</b>
-                  </span>
-                  <span className="ac-mediarow__body">{example}</span>
+          <ul className="tp-agents">
+            {tasks.map((f) => (
+              <li key={f.agentId} className="tp-agent ac-mediarow">
+                <span className="ac-mediarow__face">
+                  <AgentAvatar agentId={f.agentId} name={f.name} size="md" />
                 </span>
-              </figure>
-            )}
-          </>
+                <span className="ac-mediarow__head">
+                  <b>{f.name}</b>
+                </span>
+                <span className="ac-mediarow__end ac-mediarow__end--wrap">
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      // The task ends in a blank for them to finish.
+                      setDraftFor(`agent:${f.agentId}`, `${f.task} `);
+                      void navigate({
+                        to: "/org/$orgId/dm/agent/$agentId",
+                        params: { orgId: org.id, agentId: f.agentId },
+                      });
+                    }}
+                  >
+                    {t("teamPlan.firstTask.open")}
+                  </Button>
+                </span>
+                <span className="ac-mediarow__body">
+                  <span className="tp-agent__line">{f.task}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
         ) : undefined
       }
       actions={
         <>
-          {held && can(org, "manage_billing") && (
-            <BillingLinkButton orgId={org.id} from="hold" size="sm" variant="primary">
-              {t("standing.billing.cta.payment")}
-            </BillingLinkButton>
-          )}
           {people.length > 0 && invite && can(org, "invite_people") && (
             <Button
               size="sm"
@@ -754,7 +735,7 @@ export function TeamTemplatesDialog({
       <>
         <h3 className="tp-gallery__title">{chosen.name}</h3>
         <p className="muted">{chosen.description}</p>
-        <TeamPlanBody plan={chosen.team} />
+        <TeamPlanBody plan={chosen.team} reviewer={name} personal={personal} />
         {!held && (
           <p className={lodi ? "small muted ac-iconline" : "small muted"}>
             {lodi && <AgentAvatar agentId={lodi.id} name={name} size="xs" />}

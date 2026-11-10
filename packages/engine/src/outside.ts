@@ -1,6 +1,7 @@
-import { and, desc, type Executor, eq, inArray, isNull, lte, or, schema, sql } from "@agenteschat/db";
+import { and, desc, type Executor, eq, inArray, isNull, or, schema, sql } from "@agenteschat/db";
 import { type AuthorityRun, fedByRoutine, type RunAuthority, runAuthority } from "./authority";
 import { caches, cachesEnabled } from "./cache";
+import { postedBySql } from "./message-place";
 
 const { agentRuns, agentRunSteps, messages } = schema;
 
@@ -43,7 +44,8 @@ async function conversationReadOutside(db: Executor, run: OutsideRun, authority?
           eq(messages.orgId, run.orgId),
           eq(messages.channelId, trigger.channelId),
           isNull(messages.threadId),
-          lte(messages.createdAt, trigger.createdAt),
+          // What its context reads (`buildRunContext`).
+          postedBySql(messages, { createdAt: trigger.createdAt, id: run.triggerMessageId }),
         ),
       )
       .orderBy(desc(messages.createdAt))

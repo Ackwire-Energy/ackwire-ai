@@ -29,7 +29,7 @@ import { can } from "@agenteschat/client/lib/permissions";
 import { usageShown } from "@agenteschat/client/lib/plan-usage";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { siteHost } from "@agenteschat/client/lib/secret-requests";
-import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import {
   BrainIcon,
   Button,
@@ -37,6 +37,7 @@ import {
   GroupHeading,
   Icon,
   InfoHint,
+  PresenceBadge,
   ProviderLogo,
   Switch,
 } from "@agenteschat/ui";
@@ -164,12 +165,12 @@ function Section({
 
 function AgentHead({ agent }: { agent: Agent }) {
   const { t, i18n } = useTranslation();
-  const { org } = useOrg();
   const shown = useAgentPresence(agent.id);
   const busy = useStreams((s) => agentStateIn(s, agent.id) !== "idle");
   const line = agentLine(t, shown?.line ?? null, i18n.language);
   const word = busy ? t("team.workingNow") : shown ? t(`presence.${shown.presence}`) : null;
-  const role = isRightHand(agent) ? t(modeKey(org, "rightHand.role")) : agent.role || `@${agent.handle}`;
+  // The right hand's one role name, as the sidebar and its DM's header say it.
+  const role = isRightHand(agent) ? t("rightHand.labelCapitalized") : agent.role || `@${agent.handle}`;
   return (
     <header className="dm-side__head">
       <div className="agp-cover dm-side__cover">
@@ -186,8 +187,9 @@ function AgentHead({ agent }: { agent: Agent }) {
         <StatusLine {...line} className="dm-side__status" />
       ) : (
         word && (
-          <p className="dm-side__status" data-offline={(!busy && shown?.presence === "offline") || undefined}>
-            <span className="dm-side__dot" aria-hidden="true" />
+          <p className="dm-side__status">
+            {/* The presence's own badge, as beside its face everywhere: away wears its clock, offline its outline. */}
+            <PresenceBadge presence={busy ? "online" : (shown?.presence ?? "offline")} ring={false} />
             {word}
           </p>
         )

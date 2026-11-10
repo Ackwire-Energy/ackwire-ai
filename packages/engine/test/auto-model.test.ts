@@ -10,6 +10,7 @@ import {
 import { CODING_PLANS, planModel } from "@agenteschat/providers/plans";
 import fixture from "../../providers/test/fixtures/openrouter-models.json";
 import {
+  agentBrainLines,
   answerQuestion,
   autoApplied,
   autoWanted,
@@ -21,6 +22,7 @@ import {
   createCredential,
   createFakeJudge,
   drainOutbox,
+  getAgent,
   isBrainEffortSetting,
   type Judge,
   NEW_AGENT_DEFAULTS,
@@ -224,6 +226,32 @@ describe("one decision, mapped per brain", () => {
     expect(isBrainEffortSetting("auto")).toBe(true);
     expect(isBrainEffortSetting("high")).toBe(true);
     expect(isBrainEffortSetting("turbo")).toBe(false);
+  });
+});
+
+describe("the maker beside an agent on Automático", () => {
+  test("its own key's, else the workspace's: the logo the app shows, never a generic mark", async () => {
+    f = await setup();
+    const line = async () => {
+      const agent = await getAgent(f.db, f.org.id, f.agent.id);
+      return agent ? (await agentBrainLines(f.db, f.owner.id, f.org.id, [agent])).get(agent.id) : undefined;
+    };
+    // A fixed model: its provider is the model's, read beside it.
+    expect((await line())?.maker).toBeUndefined();
+    const key = await createCredential(f.db, f.keyWrapper, f.owner.id, f.org.id, {
+      provider: "openai",
+      label: "oa",
+      apiKey: "sk-test-openai-key-1234567890",
+    });
+    await updateAgent(f.db, f.owner.id, f.org.id, f.agent.id, { model: AUTO_MODEL, credentialId: key.id });
+    expect(await line()).toMatchObject({ kind: "model", maker: "openai" });
+    // No key of its own: the workspace's newest key, as its runs pick (`autoProvider`).
+    await updateAgent(f.db, f.owner.id, f.org.id, f.agent.id, { credentialId: null });
+    await f.db
+      .update(schema.providerCredentials)
+      .set({ revokedAt: new Date() })
+      .where(eq(schema.providerCredentials.id, key.id));
+    expect((await line())?.maker).toBe("anthropic");
   });
 });
 

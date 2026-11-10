@@ -25,6 +25,12 @@ export function BetaDialog({ onContinue }: { onContinue: () => void }) {
   const feedback = useAuthConfig().data?.feedback === true;
   const lead = rightHandOf(dir.agents);
   const go = useRef<HTMLButtonElement>(null);
+  const where = feedback ? (
+    <span className="ac-iconline">
+      <Icon name="message" />
+      <span>{t("arrival.beta.where")}</span>
+    </span>
+  ) : undefined;
   return (
     <Dialog
       open
@@ -63,7 +69,7 @@ export function BetaDialog({ onContinue }: { onContinue: () => void }) {
         <ul className="arrival-points">
           {/* Asking for feedback only where there is a form to send it. */}
           {POINTS.filter((p) => feedback || p.key !== "feedback").map((p) => (
-            <li key={p.key}>
+            <li key={p.key} className="ac-iconline">
               <Icon name={p.icon} />
               <div>
                 <b>{t(`arrival.beta.${p.key}.title`)}</b>
@@ -73,16 +79,7 @@ export function BetaDialog({ onContinue }: { onContinue: () => void }) {
           ))}
         </ul>
       </DialogBody>
-      <DialogFooter
-        note={
-          feedback ? (
-            <>
-              <Icon name="message" />
-              <span>{t("arrival.beta.where")}</span>
-            </>
-          ) : undefined
-        }
-      >
+      <DialogFooter note={where}>
         <Button ref={go} variant="primary" kbd={["↵"]} onClick={onContinue}>
           {t("common.continue")}
         </Button>

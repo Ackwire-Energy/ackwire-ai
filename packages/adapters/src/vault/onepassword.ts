@@ -240,7 +240,15 @@ type Context = "connect" | "list" | "reveal";
 const SAYS_RATE_LIMITED = /rate.?limit|too many requests|\b429\b/i;
 const SAYS_AUTH_FAILED =
   /unauthori[sz]ed|forbidden|\b40[13]\b|authenticat|invalid.{0,40}token|token.{0,40}(invalid|expired|revoked)|signature/i;
-const SAYS_NOT_FOUND = /not.?found|no item|could not be found|does ?n[o']t exist|\b404\b/i;
+/**
+ * A token the SDK can't use, in its own words (SDK 0.5.0): "bad service account token, please rotate it",
+ * "service account token base64 decoding failed, please create another token", "secret key was the wrong length",
+ * "account couldn't be found". Connecting again with it can't work.
+ */
+const SAYS_BAD_TOKEN =
+  /bad service account token|create (another|a new) token|secret key|account (couldn't|could not) be found/i;
+/** A missing item or vault (the SDK 0.5.0 says "item couldn't be found"). */
+const SAYS_NOT_FOUND = /not.?found|no item|could(n't| not) be found|does ?n[o']t exist|\b404\b/i;
 
 /**
  * Our code for an SDK failure. The SDK raises typed errors only for rate limits and expired sessions; anything else
@@ -255,7 +263,7 @@ function classify(err: unknown, sdk: OnePasswordSdk | null, context: Context, no
   if (isSdkError(err, sdk?.AuthExpiredError, "AuthExpiredError")) return fail("auth_failed", MESSAGES.authFailed);
   const said = err instanceof Error ? err.message : typeof err === "string" ? err : "";
   if (SAYS_RATE_LIMITED.test(said)) return fail("rate_limited", MESSAGES.rateLimited, retryAt());
-  if (SAYS_AUTH_FAILED.test(said)) return fail("auth_failed", MESSAGES.authFailed);
+  if (SAYS_AUTH_FAILED.test(said) || SAYS_BAD_TOKEN.test(said)) return fail("auth_failed", MESSAGES.authFailed);
   if (context !== "connect" && SAYS_NOT_FOUND.test(said)) {
     return context === "reveal" ? fail("not_found", MESSAGES.notFound) : fail("no_vault", MESSAGES.vaultGone);
   }

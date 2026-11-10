@@ -1433,6 +1433,9 @@ test("a Claude Code turn's provider failure is kept on its account and told the 
     ]);
     const finished = (await events("run.finished")) as { status: string; failure?: unknown }[];
     expect(finished.find((e) => e.status === "failed")?.failure).toEqual({ code: "claude_failed", cause: "unknown" });
+    // The run keeps whose failure it was and what Claude Code said: never "the computer had a problem".
+    const [failed] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.status, "failed"));
+    expect(failed?.error).toBe("cli_failed: Claude Code: boom");
     expect(finished.filter((e) => e.status === "done").every((e) => e.failure === undefined)).toBe(true);
 
     // Not the provider's: nothing kept nor told.
@@ -2835,6 +2838,50 @@ test("a short line before a bridged approval never shows live: the card says it,
   expect((await f.db.select().from(schema.agentRuns))[0]?.status).toBe("waiting_approval");
   expect(events.some((e) => e.type === "agent.delta")).toBe(false);
   expect((await timeline(f)).some((m) => m.body.includes("Vou pedir"))).toBe(false);
+});
+
+test("a long line shown before a bridged approval goes with its card, not up where its words first showed", async () => {
+  const gh = fakeGithub();
+  f = await setup({ toolSources: [gh.source] });
+  await grantScopes(f.db, f.org.id, f.agent.id, ALL_GITHUB_SCOPES);
+  const machineId = await computerAgent(f);
+  const said = `Revisei o PR 42: ${"os testes passaram e a revisão aprovou a troca da chave do cache. ".repeat(5)}Peço a aprovação do merge.`;
+  const { brain } = scriptedComputerBrain(async function* (n, turn) {
+    if (n > 0) {
+      yield { type: "done", text: "Ok." };
+      return;
+    }
+    yield { type: "text_delta", text: said };
+    // Someone writes once its words are on screen, before it asks.
+    await Bun.sleep(5);
+    await post(f, "manda ver");
+    await Bun.sleep(5);
+    const id = { orgId: turn.orgId, agentId: turn.agentId, runId: turn.runId, machineId };
+    await executeToolForRun(f.jobDeps, id, {
+      id: "call-1",
+      name: "github_merge_pr",
+      input: { repo: "acme/app", pr: 42, why: "CI passed on the PR and it was reviewed: merging ships the fix." },
+    });
+    yield { type: "done", text: said };
+  });
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  const events = f.listen(f.general.id);
+  await post(f, "@dev faz o merge do PR 42");
+  await drainOutbox(f.db, handlers);
+
+  expect(events.some((e) => e.type === "agent.delta" && Boolean((e as { shownAt?: string }).shownAt))).toBe(true);
+  const main = await timeline(f);
+  const meanwhile = main.findIndex((m) => m.body === "manda ver");
+  const card = main.findIndex((m) => typeof m.meta.approvalId === "string");
+  const lead = main.findIndex((m) => m.body.startsWith("Revisei o PR 42"));
+  expect(meanwhile).toBeGreaterThan(0);
+  // The bridge posted the card when it asked: what the agent said reads right after it.
+  expect(card).toBeGreaterThan(meanwhile);
+  expect(lead).toBe(card + 1);
 });
 
 test("stopped between calls: the stopped reply keeps the stretch it was on, never the working text before a call", async () => {

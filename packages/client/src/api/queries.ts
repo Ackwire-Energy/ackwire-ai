@@ -37,7 +37,7 @@ import { learnPlanModels } from "../lib/plans";
 import { setMyReaction } from "../lib/reactions";
 import { recentConversations } from "../lib/recent";
 import { replyOf } from "../lib/reply";
-import { firstVisitOf } from "../lib/right-hand";
+import { firstVisitOf, teamAnswered } from "../lib/right-hand";
 import { usagePauseRefetchMs } from "../lib/routine-view";
 import { withRead } from "../lib/seen";
 import {
@@ -832,16 +832,25 @@ export function useTeamTemplates(orgId: string, locale: string, enabled = true) 
   });
 }
 
-/** "Usar este modelo": its card and the right hand's first question land in the person's DM with it. */
+/**
+ * "Usar este modelo": its card and the right hand's first question land in the person's DM with it. Made, it stays
+ * pending until the team is in the agents' list, its routines and channels read before it: a screen that shows the
+ * team (the onboarding's last step, the sidebar) finds them there, and nothing on it changes while it arrives.
+ */
 export function useApplyTeamTemplate(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ templateId, locale }: { templateId: string; locale?: string }) =>
       api.agents.applyTeamTemplate(orgId, templateId, locale),
-    onSuccess: ({ channelId }) => {
+    onSuccess: async ({ channelId, state }) => {
       void qc.invalidateQueries({ queryKey: keys.messages(orgId, channelId) });
-      void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
+      if (state === "created")
+        await Promise.all([
+          qc.prefetchQuery({ ...routinesQuery(api, orgId), staleTime: 0 }),
+          qc.prefetchQuery({ ...channelsQuery(api, orgId), staleTime: 0 }),
+        ]);
+      await qc.invalidateQueries({ queryKey: keys.agents(orgId) });
     },
   });
 }
@@ -1427,7 +1436,12 @@ export async function catchUpChannel(
           ? [api.chat.messages(orgId, channelId, { threadId: rootId, limit: THREAD_PAGE })]
           : [],
     );
-  const read = (await Promise.all(reads).catch(() => [])).flat();
+  const settled = await Promise.allSettled(reads);
+  // A read that failed (a deploy, a dropped connection) would leave its list without what it came for until a
+  // reload: the lists read again through the query client, which tries again.
+  if (settled.some((r) => r.status === "rejected"))
+    void qc.invalidateQueries({ queryKey: prefix, predicate: (q) => isMessageList(q.queryKey) });
+  const read = settled.flatMap((r) => (r.status === "fulfilled" ? r.value : []));
   const known = new Set(
     qc
       .getQueriesData<Message[]>({ queryKey: prefix, predicate: (q) => isMessageList(q.queryKey) })
@@ -1438,6 +1452,35 @@ export async function catchUpChannel(
   // Only what it added: this runs on every channel opened, and a reconnect reads the thread lists on its own.
   for (const threadId of new Set(added.flatMap((m) => m.threadId ?? []))) refreshRepliedThread(qc, orgId, threadId);
   return read;
+}
+
+/** The screens open on each conversation (a thread beside its channel is a second one), per query client. */
+const openScreens = new WeakMap<QueryClient, Map<string, number>>();
+
+/**
+ * A screen opened that applies a conversation's live events to its caches; call what this returns when it closes.
+ * Once its last one closes, nothing keeps those caches current: they are marked stale, not read, so the next showing
+ * reads them whatever their `staleTime`, within which it would show the conversation (and its thread lines) as it
+ * was when it closed.
+ */
+export function openConversation(qc: QueryClient, orgId: string, channelId: string): () => void {
+  const counts = openScreens.get(qc) ?? new Map<string, number>();
+  openScreens.set(qc, counts);
+  const key = `${orgId}:${channelId}`;
+  counts.set(key, (counts.get(key) ?? 0) + 1);
+  let closed = false;
+  return () => {
+    if (closed) return;
+    closed = true;
+    const left = (counts.get(key) ?? 1) - 1;
+    if (left > 0) return void counts.set(key, left);
+    counts.delete(key);
+    const conversation = ["org", orgId, "channel", channelId];
+    // A read still on its way would be joined by the next showing, which would take an answer older than itself.
+    void qc.cancelQueries({ queryKey: conversation, predicate: (q) => q.getObserversCount() === 0 });
+    void qc.invalidateQueries({ queryKey: conversation, refetchType: "none" });
+    void qc.invalidateQueries({ queryKey: keys.threads(orgId), refetchType: "none" });
+  };
 }
 
 /** A read's receipts on the copies of its messages the channel's lists hold (nothing else of them changes). */
@@ -2643,6 +2686,21 @@ export const useAgentStatuses = (orgId: string, enabled = true) => {
     refetchInterval: 30_000,
     enabled: enabled && orgId.length > 0,
   });
+};
+
+/**
+ * Whether the team answered the person once (`teamAnswered`), from the agents' statuses the sidebar keeps fresh: no
+ * poll of its own.
+ */
+export const useTeamAnswered = (orgId: string, team: readonly Pick<Agent, "id">[]) => {
+  const api = useApi();
+  const statuses = useQuery({
+    queryKey: keys.agentStatus(orgId),
+    queryFn: () => api.agents.statuses(orgId),
+    staleTime: 15_000,
+    enabled: orgId.length > 0,
+  }).data;
+  return teamAnswered(team, statuses);
 };
 
 export const useAllInvitations = (orgId: string, enabled = true) => {
@@ -4174,13 +4232,12 @@ export function useIssueColumnAction(orgId: string) {
 
 // ── Routines ─────────────────────────────────────────────────────────────────
 
+export const routinesQuery = (api: ApiClient, orgId: string) =>
+  queryOptions({ queryKey: keys.routines(orgId), queryFn: () => api.routines.list(orgId) });
+
 export const useRoutines = (orgId: string) => {
   const api = useApi();
-  return useQuery({
-    queryKey: keys.routines(orgId),
-    queryFn: () => api.routines.list(orgId),
-    refetchInterval: (q) => usagePauseRefetchMs(q.state.data),
-  });
+  return useQuery({ ...routinesQuery(api, orgId), refetchInterval: (q) => usagePauseRefetchMs(q.state.data) });
 };
 
 export const useRoutineRuns = (orgId: string, id: string | null) => {
@@ -5177,6 +5234,9 @@ export function useThreadInfo(orgId: string, threadId: string | null | undefined
     queryFn: () => api.threads.get(orgId, threadId ?? ""),
     enabled: Boolean(threadId),
     staleTime: 15_000,
+    // Every opening reads it, as its replies: the open thread clears its unread in this cache before this query
+    // mounts, which would pass for a fresh read, and its count and people kept what they were when it last read.
+    refetchOnMount: "always",
     placeholderData: () => (threadId ? cachedThreadInfo(qc, orgId, threadId) : undefined),
   });
 }
@@ -5954,6 +6014,10 @@ const taskNoticeOf = (event: { type: string }) =>
 export function applyUnreadEvent(qc: QueryClient, orgId: string, event: { type: string }) {
   const e = event as UnreadEvent;
   if (e.type === "channel.activity") {
+    // Said where no screen of this app listens (a list loaded ahead, on hover or at start, counts as fresh): that
+    // conversation reads again when it is shown.
+    if (!openScreens.get(qc)?.has(`${orgId}:${e.channelId}`))
+      void qc.invalidateQueries({ queryKey: ["org", orgId, "channel", e.channelId], refetchType: "none" });
     if (e.dm) readOncePerBurst(`${orgId}:dms`, () => void qc.invalidateQueries({ queryKey: keys.dms(orgId) }));
     else readOncePerBurst(`${orgId}:channels`, () => void qc.invalidateQueries({ queryKey: keys.channels(orgId) }));
     if (e.threadId)

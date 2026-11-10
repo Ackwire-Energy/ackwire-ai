@@ -1,11 +1,12 @@
 import { type Message, useApi } from "@agenteschat/client";
 import { type ConsultNoticeFold, pairItemOf } from "@agenteschat/client/lib/consult-group";
 import { agentsByAnyHandle } from "@agenteschat/client/lib/directory";
-import { consultationOfNotice, stoppedNoticeOf } from "@agenteschat/client/lib/notices";
+import { errorText } from "@agenteschat/client/lib/errors";
+import { consultationOfNotice, noticeOf, stoppedNoticeOf } from "@agenteschat/client/lib/notices";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
-import { EventPill, EventPillAction, EventPillText } from "@/ui";
+import { EventPill, EventPillAction, EventPillText, ProviderLogo, useToast } from "@/ui";
 import { useDirectory, useOrgId, useWhen } from "../shared/hooks";
 import { ConsultPairRow } from "./ConsultGroup";
 import { eventLineOf } from "./logic";
@@ -67,10 +68,11 @@ export function EventLine({ message, fold, gap }: { message: Message; fold?: Con
   return (
     <View style={[styles.line, { paddingLeft: inset, marginTop: gap }]}>
       <EventPill
-        mark={line.icon}
+        mark={noticeOf(message.meta)?.kind === "github_event" ? <ProviderLogo id="github" size="xs" /> : line.icon}
         time={when.time(message.createdAt)}
         actions={[
           line.pending ? <CancelFollowUp key="cancel" messageId={message.id} /> : null,
+          line.answer ? <AnswerGitHub key="answer" messageId={message.id} /> : null,
           line.detail ? (
             <EventPillAction
               key="show"
@@ -113,6 +115,31 @@ function CancelFollowUp({ messageId }: { messageId: string }) {
         void api.chat
           .cancelFollowUp(orgId, messageId)
           .catch(() => {})
+          .finally(() => setBusy(false));
+      }}
+    />
+  );
+}
+
+/**
+ * "Pedir resposta" on what someone the agent doesn't answer wrote on GitHub: the agent answers them there, with this
+ * person behind it. The pill changes in place once the server has it; a refusal says why.
+ */
+function AnswerGitHub({ messageId }: { messageId: string }) {
+  const { t } = useTranslation();
+  const api = useApi();
+  const orgId = useOrgId();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  return (
+    <EventPillAction
+      label={t("chat.notice.github.ask")}
+      loading={busy}
+      onPress={() => {
+        setBusy(true);
+        void api.chat
+          .answerGitHub(orgId, messageId)
+          .catch((error: unknown) => toast({ title: errorText(t, error), icon: "x" }))
           .finally(() => setBusy(false));
       }}
     />

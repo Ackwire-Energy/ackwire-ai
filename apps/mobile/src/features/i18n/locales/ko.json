@@ -2061,7 +2061,8 @@
     "suggested": "{{domain}} 이메일을 보고 {{org}}을(를) 제안했어요.",
     "create": "만들기",
     "shareMessage": "agentes.chat에서 {{org}}에 참여하세요: {{url}}",
-    "failed": "저장하지 못했어요. 다시 시도해 주세요."
+    "failed": "저장하지 못했어요. 다시 시도해 주세요.",
+    "enter": "워크스페이스로 가기"
   },
   "ai": {
     "yourPlan": "내 AI 요금제",
@@ -2378,7 +2379,6 @@
   "dashboards": {
     "homeRow": "나만 · 내 위젯",
     "loadFailed": "대시보드를 불러오지 못했어요.",
-    "onlyHome": "워크스페이스나 내 역할의 대시보드가 여기에 표시돼요.",
     "create": "만들기",
     "routineTarget": "해당 위젯",
     "pin": {

@@ -411,7 +411,7 @@ export function FeedbackDialog({ reported, onClose }: { reported: Reported | nul
             </div>
           </DialogBody>
           <DialogFooter>
-            <Button type="button" variant="ghost" onClick={onClose}>
+            <Button type="button" onClick={onClose}>
               {t("common.cancel")}
             </Button>
             <Button

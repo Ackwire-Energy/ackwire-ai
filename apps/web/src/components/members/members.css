@@ -121,8 +121,8 @@ html:not([data-pointer]) .members-side__row.profile-trigger:focus-visible {
 }
 .members-side__inner > .ac-avatar {
   flex: none;
-  width: 32px;
-  height: 32px;
+  width: var(--name-face);
+  height: var(--name-face);
 }
 .members-side__text {
   flex: 1;

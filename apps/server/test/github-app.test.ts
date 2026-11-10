@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { createHmac, generateKeyPairSync } from "node:crypto";
 import { createFakeErrorReporter } from "@agenteschat/adapters";
+import { eq, schema } from "@agenteschat/db";
 import { browser, createTestServer, joinByInvitation, seedOrg, signUp, type TestServer } from "./harness";
 
 let t: TestServer;
@@ -177,9 +178,67 @@ test("without the app configured: not installable, webhook not mounted, the owne
     "/app/github-app/manifest/start",
     "/app/github-app/manifest/callback",
     "/app/github-app/settings",
+    "/app/organizations/{orgId}/messages/{messageId}/github-answer",
   ]) {
     expect(Object.keys(doc.paths)).toContain(path);
   }
+});
+
+test("what happens on the items is queued once per delivery; the owner is told which events the app lacks", async () => {
+  // GitHub has the app subscribed to issues alone.
+  const withApp = (async (input: string | URL | Request, init?: RequestInit) =>
+    String(input) === "https://api.github.com/app"
+      ? Response.json({ slug: "agentes-chat", events: ["issues"], owner: { login: "acme", type: "Organization" } })
+      : http(input, init)) as typeof fetch;
+  t = await createTestServer({ http: withApp, env });
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const info = (await (await owner(`/api/app/organizations/${orgId}/github-app`)).json()) as {
+    setup: { events?: { missing: string[]; url: string } };
+  };
+  expect(info.setup.events).toEqual({
+    missing: [
+      "issue_comment",
+      "pull_request",
+      "pull_request_review",
+      "pull_request_review_comment",
+      "pull_request_review_thread",
+      "discussion",
+      "discussion_comment",
+    ],
+    url: "https://github.com/organizations/acme/settings/apps/agentes-chat/permissions",
+  });
+
+  await t.db
+    .insert(schema.githubAppInstallations)
+    .values({ orgId, installationId: 7, accountLogin: "acme", accountType: "Organization" });
+  const body = JSON.stringify({
+    action: "created",
+    installation: { id: 7 },
+    repository: { full_name: "acme/app" },
+    sender: { id: 5, login: "someone", type: "User" },
+    issue: { number: 3, html_url: "https://github.com/acme/app/issues/3" },
+    comment: { body: "@agentes-chat hi", html_url: "https://github.com/acme/app/issues/3#issuecomment-1" },
+  });
+  const hook = (event: string, delivery: string) =>
+    t.app.request("/api/github-app/webhook", {
+      method: "POST",
+      headers: {
+        "x-github-event": event,
+        "x-github-delivery": delivery,
+        "content-type": "application/json",
+        "x-hub-signature-256": signHook(body, "hook-secret"),
+      },
+      body,
+    });
+  const first = await hook("issue_comment", "delivery-1");
+  expect(first.status).toBe(202);
+  expect(await first.json()).toEqual({ ok: true, result: "queued" });
+  await hook("issue_comment", "delivery-1");
+  expect(await (await hook("star", "delivery-2")).json()).toEqual({ ok: true, result: "ignored" });
+  const jobs = await t.db.select().from(schema.outbox).where(eq(schema.outbox.kind, "github_app.event"));
+  expect(jobs).toHaveLength(1);
 });
 
 test("GitHub's return without a session in this browser: the sign-in page first, then it finishes", async () => {

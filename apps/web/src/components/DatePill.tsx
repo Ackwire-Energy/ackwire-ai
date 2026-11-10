@@ -24,10 +24,11 @@ export function DatePill({ scroller, ref }: { scroller: RefObject<HTMLElement | 
       poke() {
         const list = scroller.current;
         const top = list ? dayAtTop(list) : null;
-        if (!top) return;
+        clearTimeout(timer.current);
+        // Scrolled up past the first day, onto the conversation's start: it goes at once, never left over a card.
+        if (!top) return setShown(false);
         setDay(top);
         setShown(true);
-        clearTimeout(timer.current);
         timer.current = setTimeout(() => setShown(false), DATE_PILL_IDLE_MS);
       },
     }),

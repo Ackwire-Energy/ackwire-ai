@@ -1,5 +1,5 @@
 {
-  "id": "8b53a70d-da1c-440b-9d05-02a27fa1c9a2",
+  "id": "d969033c-a7d0-4cb4-a40a-7478c89ca974",
   "prevId": "2f617b6b-0672-4f5e-a03d-aafc31639db5",
   "version": "7",
   "dialect": "postgresql",
@@ -5386,6 +5386,141 @@
           "nullsNotDistinct": false,
           "columns": [
             "installation_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.github_items": {
+      "name": "github_items",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "org_id": {
+          "name": "org_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "repo": {
+          "name": "repo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "number": {
+          "name": "number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "agent_id": {
+          "name": "agent_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "authored": {
+          "name": "authored",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "channel_id": {
+          "name": "channel_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "thread_id": {
+          "name": "thread_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "run_id": {
+          "name": "run_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "github_items_org_id_organizations_id_fk": {
+          "name": "github_items_org_id_organizations_id_fk",
+          "tableFrom": "github_items",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "org_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "github_items_channel_id_channels_id_fk": {
+          "name": "github_items_channel_id_channels_id_fk",
+          "tableFrom": "github_items",
+          "tableTo": "channels",
+          "columnsFrom": [
+            "channel_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "github_items_org_id_agent_id_agents_org_id_id_fk": {
+          "name": "github_items_org_id_agent_id_agents_org_id_id_fk",
+          "tableFrom": "github_items",
+          "tableTo": "agents",
+          "columnsFrom": [
+            "org_id",
+            "agent_id"
+          ],
+          "columnsTo": [
+            "org_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "github_items_orgId_repo_number_unique": {
+          "name": "github_items_orgId_repo_number_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "org_id",
+            "repo",
+            "number"
           ]
         }
       },
@@ -11148,18 +11283,6 @@
         },
         "last_seen_at": {
           "name": "last_seen_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "standby_at": {
-          "name": "standby_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "wanted_at": {
-          "name": "wanted_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false

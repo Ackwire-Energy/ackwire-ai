@@ -1720,8 +1720,15 @@
     {
       "idx": 247,
       "version": "7",
-      "when": 1794283702948,
-      "tag": "0247_machine_standby",
+      "when": 1794614300000,
+      "tag": "0247_github_items",
+      "breakpoints": true
+    },
+    {
+      "idx": 248,
+      "version": "7",
+      "when": 1794615300000,
+      "tag": "0248_machine_standby",
       "breakpoints": true
     }
   ]

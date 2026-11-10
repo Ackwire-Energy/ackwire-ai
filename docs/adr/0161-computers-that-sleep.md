@@ -16,7 +16,7 @@ as disconnected, and nothing asks for it back.
 
 ### 1. Standby is the operator's word
 
-`machines.standby_at` (migration 0247). The operator says it put the workspace's computer to sleep, or that it no
+`machines.standby_at` (migration 0248). The operator says it put the workspace's computer to sleep, or that it no
 longer is: `PUT /api/operator/v1/orgs/{orgId}/machines/{machineId}/standby` with `{ standby }` answers `{ standby }`,
 404 unless the workspace has that `managed` computer; `true` again keeps the first time. The computer's next hello
 clears it, whoever woke it, and so does removing the computer. Only the workspace's own computer is ever in standby

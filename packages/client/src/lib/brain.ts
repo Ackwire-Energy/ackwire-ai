@@ -67,7 +67,8 @@ export function thinksWith(t: TFunction, plan: PlanChoice, model: string | null,
  * model by that plan (`thinksWith`), else the API model's label. Its computer only where it tells two apart, when
  * the organization's `agents` think on more than one ("… no mac"; a computer's name reaches only its owner and
  * admins). Whoever doesn't see its computer also reads whose plan it is (`owner`). `mark` is the maker's
- * (`ProviderLogo` id: a plan account's own provider when it has one), null for the API.
+ * (`ProviderLogo` id: a plan account's own provider when it has one); for the API, Automático's maker (`maker`), else
+ * null: the model's own provider is the caller's to read.
  */
 export function brainLine(
   t: TFunction,
@@ -78,7 +79,7 @@ export function brainLine(
     agents = [],
   }: { owner?: string | null; agents?: readonly { brain?: Pick<AgentBrainLine, "computer"> | null }[] } = {},
 ): { text: string; kind: EngineKind; mark: string | null } {
-  if (!brain || brain.kind === "model") return { text: apiModelLabel, kind: "agent", mark: null };
+  if (!brain || brain.kind === "model") return { text: apiModelLabel, kind: "agent", mark: brain?.maker ?? null };
   const plan = planOfAccount({ kind: brain.kind, provider: brain.provider ?? null });
   const named = thinksWith(
     t,

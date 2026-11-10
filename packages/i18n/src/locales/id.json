@@ -686,6 +686,42 @@
       "left_other": "{{count}} langkah lagi",
       "done": "Semua siap"
     },
+    "flow": {
+      "steps": {
+        "name": "Nama ruang kerja",
+        "business": "Apa yang kalian lakukan",
+        "team": "Timmu",
+        "plan": "Nyalakan tim"
+      },
+      "stepOf": "Langkah {{n}} dari {{total}}",
+      "lodi": {
+        "name": "Hai, {{first}}. Aku {{name}}. Aku akan menyusun tim bersamamu dalam sekitar dua menit.",
+        "business": "Dengan ini aku tahu siapa yang perlu masuk tim.",
+        "team": "Ini tim yang akan aku susun. Kamu bisa mengubah semuanya nanti.",
+        "plan": "Setelah paketnya, tinggal hubungkan AI. Nanti aku tunjukkan di mana."
+      },
+      "preview": {
+        "label": "Ruang kerjamu, saat kamu menjawab",
+        "name": "Ruang kerjamu",
+        "ghost": "Timmu muncul di sini"
+      },
+      "team": {
+        "title": "Timmu"
+      },
+      "plan": {
+        "title": "Nyalakan timmu",
+        "lead": "Timmu sudah siap. Dengan paketnya dan sebuah AI, tim mulai hari ini.",
+        "asleep": "Tidur sampai ada paket",
+        "price": "<b>Paket {{name}}</b> · {{price}} per bulan",
+        "name": "<b>Paket {{name}}</b>",
+        "generic": "Paket agentes.chat",
+        "cancel": "Batalkan kapan saja",
+        "cta": "Nyalakan tim",
+        "all": "Lihat semua paket",
+        "skip": "Masuk ke ruang kerja tanpa menyalakannya"
+      },
+      "account": "Akunmu"
+    },
     "railValue": {
       "context": "Sudah ditulis",
       "skipped": "Dilewati",
@@ -1309,27 +1345,19 @@
     }
   },
   "webPushAsk": {
-    "title": "Ketahui saat agen membutuhkanmu",
-    "text": "Mereka bekerja saat kamu melakukan hal lain. Bahkan saat tab ditutup, kami akan memberi tahu saat mereka butuh persetujuanmu, menyelesaikan permintaanmu, atau memanggilmu.",
     "on": "Aktifkan notifikasi",
     "later": "Nanti saja",
     "done": "Notifikasi aktif di browser ini",
     "failed": "Notifikasi tidak bisa diaktifkan. Coba lagi di Pengaturan › Notifikasi.",
     "someone": "Sebuah agen",
-    "examples": "Contoh notifikasi",
     "now": "sekarang",
-    "minutes": "{{n}} mnt",
-    "approval": {
-      "title": "{{name}} butuh persetujuanmu",
-      "body": "Boleh aku lanjutkan yang kamu minta?"
-    },
     "finished": {
       "title": "{{name}} sudah selesai",
       "body": "Yang kamu minta sudah siap."
     },
-    "mention": {
-      "title": "{{name}} memanggilmu",
-      "body": "Bisa lihat sebentar kalau ada waktu?"
+    "inline": {
+      "title": "Mau langsung tahu saat {{name}} membalas?",
+      "why": "Bahkan saat tab ditutup. Ubah kapan saja di Pengaturan › Notifikasi."
     }
   },
   "shell": {
@@ -1523,8 +1551,6 @@
     "expandAll": "Bentangkan semua",
     "organize": "Tata departemen di Tim",
     "more_other": "{{count}} agen lagi di Tim",
-    "createFirst": "Buat agen pertama",
-    "createFirstPersonal": "Buat agen pertamamu",
     "newAgent": "Agen baru",
     "working_other": "{{count}} sedang bekerja",
     "count_other": "{{count}} agen",
@@ -1539,7 +1565,6 @@
     "pin": "Sematkan di atas",
     "unpin": "Lepas sematan",
     "pinned": "Disematkan di atas",
-    "hint": "Agenmu tetap di atas. Klik kanan percakapan mana pun untuk menyematkannya.",
     "full": {
       "agents": "Kamu sudah menyematkan 5 agen. Lepaskan satu untuk menyematkan yang ini.",
       "channels": "Kamu sudah menyematkan 5 kanal. Lepaskan satu untuk menyematkan yang ini.",
@@ -1932,6 +1957,7 @@
     "popoverTitle": "Agen",
     "seenBy": "Dilihat oleh {{names}}",
     "retry": "Coba lagi",
+    "retrying": "Mencoba lagi…",
     "platformCap": "Sebut agen dengan @ agar dia menjawab.",
     "mentionNeeded": "Tidak ada agen yang akan menjawab tanpa @",
     "mentionNeededHint": "Tidak ada AI di sini yang bisa memilih agen untuk pesan ini. Sebut agen untuk memanggilnya.",
@@ -1949,9 +1975,8 @@
   },
   "rightHand": {
     "label": "tangan kanan Anda",
+    "labelCapitalized": "Tangan kanan Anda",
     "newDot": "Baru",
-    "role": "Asisten workspace",
-    "rolePersonal": "Asisten pribadi",
     "actsAsYou": "bertindak dengan izin Anda",
     "composerHint": "tak ada yang berubah tanpa Anda",
     "intro": {
@@ -1975,9 +2000,6 @@
         "questionPersonal": "Mau menyiapkan lebih banyak agen bersama saya?",
         "actionPersonal": "Siapkan agen",
         "messagePersonal": "Bantu saya menyiapkan agen-agen saya."
-      },
-      "next": {
-        "firstTask": "Beri {{name}} tugas pertama"
       },
       "style": {
         "question": "Bagaimana sebaiknya saya bicara dengan kamu?",
@@ -2300,8 +2322,10 @@
     "rightHand": {
       "computer_away": "{{name}} tidak bisa menjawab sekarang: komputer paketnya sedang tidak tersedia.",
       "computer_failed": "{{name}} tidak bisa menjawab sekarang: komputer paketnya mengalami masalah.",
+      "cli_failed": "{{name}} tidak bisa menjawab sekarang: AI paketnya berhenti karena kesalahan.",
       "plan_limit": "{{name}} tidak bisa menjawab sekarang: paketnya sudah mencapai batas.",
       "plan_not_shared": "Hubungkan paketmu sendiri untuk berbicara dengan {{name}}: paket workspace hanya menjawab pemiliknya.",
+      "plan_unattended": "{{name}} tidak menjawab: permintaannya tidak datang dari seseorang, dan paket workspace hanya menjawab pemiliknya.",
       "runner_outdated": "{{name}} belum bisa menjawab sekarang: program di komputer paket perlu diperbarui.",
       "plan_tools": "{{name}} berhenti sebelum menjawab: AI paket di komputer itu tidak tetap memakai alat agentes.chat saja.",
       "model_limit": "{{name}} tidak bisa menjawab sekarang: {{model}} sudah mencapai batasnya sendiri di paket. Model lain di paket itu tetap berjalan.",
@@ -3510,6 +3534,14 @@
         },
         "field": {
           "token": "Token akun layanan"
+        },
+        "error": {
+          "invalid_input": "Ini bukan token akun layanan. Tempel token yang diawali ops_.",
+          "auth_failed": "1Password tidak menerima token ini. Buat akun layanan baru dan tempel tokennya di sini.",
+          "no_vault": "Akun layanan ini tidak punya akses ke brankas mana pun. Buat yang baru dengan akses ke brankas agenmu.",
+          "many_vaults": "Akun layanan ini punya akses ke lebih dari satu brankas. Buat yang baru dengan akses hanya ke brankas agenmu.",
+          "unreachable": "Tidak bisa menghubungi 1Password. Coba lagi dalam satu menit.",
+          "unsupported": "1Password tidak bisa dihubungkan di sini. Simpan saja login yang dibutuhkan agenmu di Vault."
         }
       },
       "bitwarden": {
@@ -4848,6 +4880,9 @@
         "computer_busy": "Komputer terus sibuk dengan tugas lain.",
         "computer_failed": "Komputer mengalami masalah dan berhenti.",
         "computer_timeout": "Komputer terlalu lama menjawab.",
+        "cli_failed": "Program {{brain}} berhenti karena kesalahan: {{detail}}",
+        "cli_stopped": "Program {{brain}} berhenti karena kesalahan.",
+        "cli_closed": "Program {{brain}} tertutup tiba-tiba.",
         "account_missing": "Akun yang dipilih untuk agen ini sudah tidak ada di komputernya. Pilih akun lain di pengaturan agen, atau tambahkan lagi.",
         "our_error": "Ada yang salah di pihak kami dan tugasnya berhenti. Minta lagi sebentar lagi.",
         "unknown": "Gagal."
@@ -5037,6 +5072,15 @@
     "include": "Sertakan {{name}}",
     "acceptAll": "Terima untuk semua",
     "acceptSome": "Terima untuk {{count}}",
+    "all": {
+      "label": "Putuskan semua usulan",
+      "accept": "Terima semua",
+      "refuse": "Tolak semua",
+      "acceptAsk_other": "Terima {{count}} usulan? Masing-masing langsung berlaku.",
+      "refuseAsk_other": "Tolak {{count}} usulan? Agen tidak akan mengusulkannya lagi.",
+      "acceptGo_other": "Terima {{count}}",
+      "refuseGo_other": "Tolak {{count}}"
+    },
     "staleSome_other": "{{count}} tidak diterima: teksnya berubah setelah usulan dibuat.",
     "staleSomeAgent_other": "{{count}} tidak diterima: agennya berubah setelah usulan dibuat.",
     "waitingFor": "Menunggu {{name}}",
@@ -5067,6 +5111,7 @@
     "refuseNote_female": "Menolak mengajari {{name}} agar tidak mengusulkan ini lagi.",
     "added": "Ditambahkan: ",
     "removed": "Dihapus: ",
+    "sameLines_other": "{{count}} baris tidak berubah",
     "empty": "Saat seseorang meminta perubahan ke agen, atau suatu pelajaran berulang, usulannya muncul di sini.",
     "emptyTitle": "Tidak ada yang perlu ditinjau",
     "titleInstructions": "Perbarui instruksi {{name}}",
@@ -5200,10 +5245,7 @@
       "notNow": "Nanti saja",
       "afterPlan": "Terbuka dengan paket.",
       "about": {
-        "todo": "Ceritakan apa yang dilakukan {{org}}.",
-        "todoDesc": "Semua agen membaca ini.",
         "action": "Ceritakan",
-        "done": "Saya tahu apa yang dilakukan {{org}}",
         "title": "Apa yang dilakukan {{org}}?",
         "desc": "Semua agen membaca ini. Kamu bisa mengubahnya kapan saja.",
         "line": "Dalam satu kalimat",
@@ -5217,24 +5259,17 @@
         "optionalPersonal": "Opsional. Tanpa kalimat, bidang yang kamu pilih yang dipakai."
       },
       "team": {
-        "todo": "Bentuk timnya.",
-        "todoDesc": "Template untuk bisnismu, semuanya bisa diubah nanti.",
-        "action": "Lihat tim",
-        "done_other": "{{count}} agen di tim",
         "todoPersonal": "Pilih agenmu.",
         "todoDescPersonal": "Awal yang siap pakai, semuanya bisa diubah nanti.",
         "actionPersonal": "Lihat agen",
-        "donePersonal_other": "{{count}} agen",
-        "card": "Lanjutkan di kartu di bawah"
+        "donePersonal_other": "{{count}} agen"
       },
       "ai": {
         "todo": "Hubungkan AI.",
         "todoDesc": "Yang sudah kamu bayar bisa dipakai.",
         "action": "Hubungkan",
         "done": "Saya berpikir dengan {{label}}",
-        "doneAny": "Saya sudah berpikir dengan AI",
-        "plan": "Terbuka dengan paket agentes.chat.",
-        "planAction": "Lihat paket agentes.chat"
+        "doneAny": "Saya sudah berpikir dengan AI"
       },
       "apps": {
         "todo": "Hubungkan aplikasi kerjamu.",
@@ -5256,14 +5291,17 @@
         "todoDesc": "Mereka juga bicara dengan agen.",
         "action": "Undang",
         "done_other": "{{count}} orang di sini",
-        "doneNone": "Baru kamu saja"
+        "doneNone": "Baru kamu saja",
+        "invited": "Mengundang {{names}} · menunggu",
+        "email": "nama@perusahaan.com",
+        "send": "Kirim",
+        "more": "Opsi lainnya"
       },
       "say": {
-        "about": "Dicatat. Semua agen membaca ini.",
-        "team": "Timnya sudah datang.",
         "ai": "Sekarang tim bisa berpikir.",
         "apps": "Selesai, saya sudah membaca aplikasinya.",
         "people": "Senang ada lebih banyak orang di sini.",
+        "invited": "Undangan terkirim.",
         "aboutPersonal": "Dicatat. Semua agenmu membaca ini.",
         "teamPersonal": "Agenmu sudah datang.",
         "aiPersonal": "Sekarang agenmu bisa berpikir.",
@@ -7137,6 +7175,7 @@
       "computer_busy": "Komputernya terus sibuk dengan tugas lain",
       "computer_failed": "Komputer mengalami masalah dan berhenti",
       "computer_timeout": "Komputer terlalu lama menjawab",
+      "cli_failed": "Program AI di komputer berhenti karena kesalahan",
       "account_missing": "Akun agen sudah tidak ada di komputernya",
       "our_error": "Ada yang salah di pihak kami"
     },
@@ -10040,6 +10079,7 @@
     "noChannel": "Tanpa kanal",
     "files": "File",
     "select": "Pilih {{title}}",
+    "selectAll_other": "Pilih semua {{count}}",
     "selection": "Pilihan",
     "selected_other": "{{count}} dipilih",
     "clearSelection": "Hapus pilihan",
@@ -10218,8 +10258,10 @@
       },
       "line": {
         "env": "Diatur di pengaturan server ini (GITHUB_APP_ID).",
-        "invalid": "Server ini tidak bisa membuka aplikasi yang tersimpan. Hapus lalu buat lagi."
+        "invalid": "Server ini tidak bisa membuka aplikasi yang tersimpan. Hapus lalu buat lagi.",
+        "events": "Agar agen mendengar apa yang terjadi di GitHub, centang event berikut di aplikasi: {{events}}."
       },
+      "events": "Centang event",
       "open": "Buka di GitHub",
       "remove": "Hapus aplikasi",
       "removeTitle": "Hapus aplikasi GitHub server ini?",
@@ -11785,6 +11827,9 @@
       "invalidSecret": "Tempel Client Secret secara utuh, tanpa spasi.",
       "invalidRepo": "Tulis repositori sebagai pemilik/nama."
     },
+    "githubEvent": {
+      "answered": "Seseorang sudah meminta balasan ini. Agen sedang menanganinya."
+    },
     "issue": {
       "assigneeOutside": "Orang ini tidak bisa melihat tugas ini. Tambahkan dulu ke Siapa yang melihat.",
       "stageFull": "Satu tahap paling banyak punya {{max}} kolom. Hapus dulu salah satu kolomnya.",
@@ -11954,6 +11999,7 @@
       "agentBusy": "Agen sedang bekerja di percakapan ini. Tunggu sampai selesai untuk melanjutkan.",
       "continueForbidden": "Hanya orang yang meminta, pemilik agen, atau Admin yang bisa melanjutkannya.",
       "notRestartable": "Jawaban ini sudah dimulai, jadi tidak bisa diulang dari awal. Kirim lagi pesanmu.",
+      "notRestartableVoice": "Jawaban ini sudah dimulai, jadi tidak bisa diulang dari awal. Rekam lagi pesanmu.",
       "cancelForbidden": "Hanya orang yang meminta, pemilik agen, atau Admin yang bisa menghentikannya.",
       "answerForbidden": "Hanya orang yang meminta, pemilik agen, atau Admin yang bisa melakukan ini.",
       "stopReasonForbidden": "Hanya orang yang menghentikannya yang bisa menyebut alasannya."
@@ -12086,6 +12132,10 @@
         "invalidInput": "Periksa kolom-kolomnya lalu coba lagi.",
         "tooManyItems": "Vault penuh. Hapus item sebelum menyinkronkan lebih banyak."
       }
+    },
+    "feedback": {
+      "filesGone": "File yang ditambahkan sudah hilang. Tambahkan lagi.",
+      "filesPending": "Terlalu banyak file menunggu dikirim. Kirim atau hapus beberapa, lalu coba lagi."
     }
   },
   "machines": {
@@ -13910,6 +13960,10 @@
     "statusReplyTurn": "Saya sedang di tengah tugas ({{duration}}) dan belum bisa menjawab. Pesan Anda sudah antre dan saya baca setelah putaran kerja ini selesai.",
     "statusReplyQueued": "Menunggu komputer ({{duration}}). Saya baca pesan Anda saat tiba giliran saya.",
     "statusReplyAway": "Menunggu komputer saya kembali. Saya baca pesan Anda begitu komputer kembali.",
+    "statusReplyPlan": "Menunggu paket saya kembali ({{when}}). Saya baca pesan Anda saat paket kembali.",
+    "statusReplyPlanUnknown": "Menunggu paket saya kembali. Saya baca pesan Anda begitu paket kembali.",
+    "statusReplyBudget": "Menunggu anggaran bulanan saya diperbarui ({{when}}). Saya baca pesan Anda saat itu, atau lebih cepat jika admin menaikkan batasnya.",
+    "statusReplyBudgetUnknown": "Menunggu anggaran bulanan saya diperbarui. Saya baca pesan Anda saat itu, atau lebih cepat jika admin menaikkan batasnya.",
     "status": {
       "one": "Sedang mengerjakan: {{subject}}",
       "oneUntitled": "Bekerja di latar belakang",
@@ -14041,6 +14095,21 @@
       "wakeSkippedAnon": "Sebutan dari {{name}} tidak sampai ke agen lain",
       "wakeSkippedAudience": "Hanya sebagian orang yang boleh memanggil {{agents}}, dan pekerjaan {{name}} ini tidak datang dari salah satu dari mereka. Orang yang boleh memanggil {{agents}} bisa meneruskan permintaannya.",
       "wakeSkippedCallable": "Pengaturan {{name}} tidak mengizinkannya memanggil {{agents}} (proyek lain, atau tidak ada di daftar agen yang boleh dipanggil). Orang yang mengurus {{name}} bisa mengubahnya di halaman agen.",
+      "github": {
+        "comment": "{{who}} berkomentar di PR #{{number}} ({{repo}}) di GitHub",
+        "commentIssue": "{{who}} berkomentar di issue #{{number}} ({{repo}}) di GitHub",
+        "commentDiscussion": "{{who}} berkomentar di diskusi #{{number}} ({{repo}}) di GitHub",
+        "opened": "{{who}} memanggil aplikasi agentes.chat di #{{number}} ({{repo}}) di GitHub",
+        "reviewed": "{{who}} meninjau PR #{{number}} ({{repo}}) di GitHub",
+        "approved": "{{who}} menyetujui PR #{{number}} ({{repo}}) di GitHub",
+        "changes": "{{who}} meminta perubahan di PR #{{number}} ({{repo}}) di GitHub",
+        "reviewRequested": "{{who}} meminta {{name}} meninjau PR #{{number}} ({{repo}}) di GitHub",
+        "merged": "{{who}} menggabungkan PR #{{number}} ({{repo}}) di GitHub",
+        "closed": "{{who}} menutup PR #{{number}} ({{repo}}) di GitHub",
+        "closedIssue": "{{who}} menutup issue #{{number}} ({{repo}}) di GitHub",
+        "ask": "Minta balasan",
+        "asked": "{{asker}} meminta {{name}} membalas {{who}} di GitHub"
+      },
       "show": "Tampilkan",
       "hide": "Sembunyikan",
       "talker": "sambil bekerja",
@@ -14178,6 +14247,7 @@
         "startingWork": "Memulai pekerjaan panjang",
         "updatingWork": "Memperbarui pekerjaan panjang",
         "withdrawingRequest": "Menarik permintaan",
+        "releasingAgent": "Melepaskan agen yang sedang menunggu",
         "schedulingAction": "Menyiapkan tindakan untuk nanti",
         "updatingDashboard": "Mengerjakan dasbor",
         "testingOnPhone": "Menguji di ponsel",
@@ -14289,6 +14359,7 @@
       "startingWork": "memulai pekerjaan panjang",
       "updatingWork": "memperbarui pekerjaan panjang",
       "withdrawingRequest": "menarik permintaan",
+      "releasingAgent": "melepaskan agen yang sedang menunggu",
       "schedulingAction": "menyiapkan tindakan untuk nanti",
       "updatingDashboard": "mengerjakan dasbor",
       "testingOnPhone": "menguji di ponsel",
@@ -14427,8 +14498,10 @@
       "no_ai_not_signed_in": "Aku belum bisa menjawab: {{brain}} belum masuk di komputerku.",
       "no_ai_computer_away": "Aku tidak bisa menjawab sekarang: komputer paketku sedang tidak tersedia.",
       "no_ai_computer_failed": "Aku tidak bisa menjawab sekarang: komputer paketku mengalami masalah.",
+      "no_ai_cli_failed": "Aku tidak bisa menjawab sekarang: AI paketku berhenti karena kesalahan.",
       "no_ai_plan_limit": "Aku tidak bisa menjawab sekarang: paket yang kupakai untuk berpikir sudah mencapai batas.",
       "no_ai_plan_not_shared": "Aku tidak bisa menjawabmu lewat paket workspace: paket itu hanya menjawab pemiliknya. Hubungkan paketmu sendiri dan aku akan menjawab.",
+      "no_ai_plan_unattended": "Aku tidak menjawab: permintaannya tidak datang dari seseorang, dan paket workspace hanya menjawab pemiliknya.",
       "no_ai_runner_outdated": "Aku belum bisa menjawab sekarang: program di komputer paketku perlu diperbarui.",
       "no_ai_plan_tools": "Aku berhenti sebelum menjawab: AI paketku di komputer itu tidak tetap memakai alat agentes.chat saja.",
       "no_ai_model_limit": "Aku tidak bisa menjawab sekarang: {{model}} sudah mencapai batasnya sendiri di paketku.",
@@ -16167,7 +16240,11 @@
       "text": "Minta widget ke agen atau sematkan blok dari chat, dan itu tetap terbarui di sini.",
       "viewer": "Orang yang mengedit dasbor ini menambahkan widget, lalu muncul di sini."
     },
-    "onlyHome": "Buat dasbor untuk ruang kerja atau beberapa peran dengan “Dasbor baru”.",
+    "first": {
+      "title": "Buat dasbor pertama tim",
+      "text": "Dasbor mengumpulkan angka dan grafik dalam satu halaman, dan agen menjaga semuanya tetap terbaru.",
+      "ask": "Bantu aku membuat dasbor pertama tim."
+    },
     "create": {
       "title": "Dasbor baru",
       "subtitle": "Widget berkumpul di satu halaman, untukmu atau untuk tim.",
@@ -16364,9 +16441,8 @@
     "firstTask": {
       "suggestion": "saran",
       "lead": "Satu tugas singkat per agen, supaya kamu melihat masing-masing bekerja hari ini.",
-      "heldLead": "Satu tugas singkat per agen. Lengkapi kalimatnya lalu kirim. Mereka mulai setelah workspace punya paket agentes.chat.",
-      "example": "Contoh hasil kerja {{name}}",
       "open": "Buka dengan tugasnya",
+      "finish": "Lengkapi kalimatnya lalu kirim",
       "invite": "Undang {{names}}",
       "later": "Nanti"
     },
@@ -16567,7 +16643,7 @@
     },
     "software": {
       "name": "Software dan aplikasi",
-      "sub": "Dukungan, tagihan, dan kode",
+      "sub": "Layanan pelanggan, tagihan, dan kode",
       "desc": "Untuk perusahaan yang menjual software dan mengurus pelanggannya sendiri."
     },
     "support": {
@@ -16580,54 +16656,74 @@
       "sub": "Akuntansi, hukum, konsultasi",
       "desc": "Untuk kantor yang menjadwalkan klien, mengirim proposal, dan menagih."
     },
+    "hello": {
+      "lodi": {
+        "starting": "Paket aktif. Komputerku sedang menyala. Ayo mulai bekerja.",
+        "ready": "Paket aktif. Ayo mulai bekerja.",
+        "created": "Timnya sudah lengkap. Ayo mulai bekerja."
+      },
+      "lodiNoAi": {
+        "starting": "Paket aktif. Komputerku sedang menyala. Hubungkan AI dan kita mulai bekerja.",
+        "ready": "Paket aktif. Hubungkan AI dan kita mulai bekerja.",
+        "created": "Timnya sudah lengkap. Hubungkan AI dan kita mulai bekerja."
+      }
+    },
     "agents": {
       "iara": {
         "role": "Layanan pelanggan",
         "line": "Menjawab pelanggan di WhatsApp dan email. Memanggilmu saat tidak tahu.",
         "routine": "Merangkum yang belum dijawab",
-        "task": "Tulis balasan untuk pesan pelanggan ini:"
+        "task": "Tulis balasan untuk pesan pelanggan ini:",
+        "hello": "Hai, {{first}}. Serahkan padaku siapa pun yang menulis lewat WhatsApp."
       },
       "caio": {
         "role": "Penagihan",
         "line": "Mengingatkan yang terlambat bayar dan mengirim tagihan setelah kamu setuju.",
         "routine": "Mendaftar siapa yang terlambat bayar",
-        "task": "Tulis pengingat pembayaran yang ramah untuk:"
+        "task": "Tulis pengingat pembayaran yang ramah untuk:",
+        "hello": "Halo. Aku mengurus tagihan dan hanya mengirim pengingat setelah kamu setuju."
       },
       "ada": {
         "role": "Dev",
         "line": "Memperbaiki bug yang dilaporkan pelanggan dan membuka PR.",
         "routine": "Mendaftar bug baru",
-        "task": "Beri tahu saya harus mulai dari mana menyelidiki bug ini:"
+        "task": "Beri tahu saya harus mulai dari mana menyelidiki bug ini:",
+        "hello": "Hai. Kirim bug yang masuk ke aku, aku selidiki dan buka PR-nya."
       },
       "lia": {
         "role": "Konten",
         "line": "Menulis posting dan naskah dengan gaya perusahaan dan menjadwalkannya setelah kamu setuju.",
         "routine": "Mengusulkan posting minggu ini",
-        "task": "Usulkan tiga posting minggu ini tentang:"
+        "task": "Usulkan tiga posting minggu ini tentang:",
+        "hello": "Hai, semuanya. Postingan minggu ini urusanku."
       },
       "theo": {
         "role": "Penjualan",
         "line": "Menindaklanjuti semua yang meminta penawaran dan menulis proposalnya.",
         "routine": "Mendaftar siapa yang meminta penawaran dan belum dijawab",
-        "task": "Tulis penawaran singkat untuk permintaan ini:"
+        "task": "Tulis penawaran singkat untuk permintaan ini:",
+        "hello": "Hai, {{first}}. Tidak ada yang minta penawaran harga dibiarkan tanpa jawaban."
       },
       "nina": {
         "role": "Jadwal",
         "line": "Membuat, mengonfirmasi, dan memindahkan janji, dan mengingatkan klien sehari sebelumnya.",
         "routine": "Mengonfirmasi janji besok",
-        "task": "Atur jadwal besok ini:"
+        "task": "Atur jadwal besok ini:",
+        "hello": "Halo. Jadwal aku yang pegang, dan aku ingatkan klien sehari sebelumnya."
       },
       "otto": {
         "role": "Pesanan",
         "line": "Memantau pesanan dan stok dan memberi tahu yang hampir habis.",
         "routine": "Memberi tahu stok yang hampir habis",
-        "task": "Daftar yang masih harus dikerjakan pada pesanan ini:"
+        "task": "Daftar yang masih harus dikerjakan pada pesanan ini:",
+        "hello": "Aku datang. Aku pantau pesanan dan memberi tahu kalau stok menipis."
       },
       "bia": {
         "role": "Basis jawaban",
         "line": "Menjaga basis jawaban tetap sesuai dengan jawaban tim.",
         "routine": "Memperbarui basis dengan jawaban minggu ini",
-        "task": "Tulis jawaban untuk pertanyaan pelanggan ini:"
+        "task": "Tulis jawaban untuk pertanyaan pelanggan ini:",
+        "hello": "Hai. Aku jaga basis jawaban tetap terbaru dengan jawaban tim."
       },
       "clara": {
         "role": "Jadwal dan pengingat",
@@ -16683,17 +16779,6 @@
         "routine": "Mendaftar apa yang ditunggu tiap klien hari ini",
         "task": "Tulis proposal singkat untuk klien ini:"
       }
-    },
-    "example": {
-      "iara": "Hai Marina. Pesananmu dikirim kemarin dan tiba paling lambat Jumat. Kode pelacakan ada di bawah ini. Kalau Jumat tidak cocok, saya carikan tanggal lain.",
-      "lia": "1. Tiga kesalahan umum saat memilih agensi. 2. Di balik layar proyek yang nyaris gagal. 3. Pertanyaan untuk pengikut kalian: apa yang ingin kalian lihat di sini?",
-      "nina": "Besok: 9.00 Carla, 10.30 Pedro, 14.00 kosong. Pedro belum konfirmasi. Mau saya kirim pesan ke dia?",
-      "clara": "Hari ini: 9.00 dokter gigi, 12.30 makan siang dengan Paula, 18.00 ambil paket. Besok ulang tahun ibumu. Mau saya ingatkan besok pagi?",
-      "leo": "Hari ini, 30 menit: pemanasan 5 menit, 3 putaran 12 squat, 10 push-up, dan plank 30 detik, lalu peregangan 5 menit. Ceritakan hasilnya dan saya sesuaikan latihan hari Rabu.",
-      "gabi": "Topik hari ini: fotosintesis. Singkatnya, tumbuhan mengubah cahaya, air, dan karbon dioksida menjadi gula dan oksigen. Tiga pertanyaan: di mana terjadinya, apa yang masuk, dan apa yang keluar?",
-      "rosa": "Minggu ini: beras, kacang, telur, pisang, kopi, dan deterjen. Di rumah: ganti seprai hari Kamis dan panggil tukang untuk keran dapur.",
-      "vic": "Lisboa dalam 3 hari: hari 1, Alfama dan kastelnya. Hari 2, Belém dan tepi sungai. Hari 3, Sintra. Penerbangan termurah ada di hari Selasa tanggal 12. Mau saya pantau harganya?",
-      "rui": "Hai Marcos, ini proposalnya: situs baru dengan 5 halaman, selesai dalam 3 minggu, dibayar dua kali. Kalau cocok, saya kirim kontraknya hari ini."
     },
     "channels": {
       "iara": "layanan",
@@ -16790,7 +16875,7 @@
     "fileTooLarge": "{{name}} terlalu besar: batasnya {{mb}} MB.",
     "fileTooMany": "Satu masukan memuat hingga {{images}} foto dan satu video.",
     "send": "Kirim",
-    "thanks": "Terkirim. Terima kasih!",
+    "thanks": "Terkirim. Terima kasih.",
     "reply": "Semua dibaca. Balasan, kalau perlu, dikirim ke {{email}}.",
     "another": "Kirim lagi"
   }

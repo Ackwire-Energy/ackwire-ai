@@ -238,7 +238,7 @@ function Board({ right, views }: { right: ReactNode; views: ReactNode }) {
   // A tab tapped: where the pager is going, so the columns it passes on the way don't light up.
   const going = useRef<number | null>(null);
   const board = useMemo(() => issueBoard(issues.data ?? [], columns.data ?? []), [issues.data, columns.data]);
-  const columnWidth = width - PEEK - 16;
+  const columnWidth = width - PEEK - SCREEN_X;
   const step = columnWidth + COLUMN_GAP;
   const columnAt = (x: number) => Math.max(0, Math.min(board.length - 1, Math.round(x / step)));
   const onPagerScroll = (x: number) => {
@@ -354,7 +354,8 @@ const styles = StyleSheet.create({
   subLine: { flexDirection: "row", alignItems: "center", gap: 4, minWidth: 0 },
   shrink: { flexShrink: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
-  pager: { paddingLeft: 16, paddingRight: PEEK - COLUMN_GAP, paddingTop: 8, gap: COLUMN_GAP },
+  // Edge to edge: the columns slide under the screen's sides, the first one on the title's line.
+  pager: { paddingLeft: SCREEN_X, paddingRight: PEEK - COLUMN_GAP, paddingTop: 8, gap: COLUMN_GAP },
   column: { borderTopLeftRadius: 20, borderTopRightRadius: 20 },
   columnBody: { padding: 10, gap: 10 },
   none: { padding: 16, textAlign: "center" },

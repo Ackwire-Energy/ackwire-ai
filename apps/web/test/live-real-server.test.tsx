@@ -50,7 +50,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { createHttpApi, UNREAD_REFRESH_MS } from "@agenteschat/client";
-import { act, cleanup, fireEvent } from "@testing-library/react";
+import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { DESKTOP_QUERY } from "@/components/NavDrawer";
 import { renderApp, settle } from "./render";
 
@@ -80,6 +80,8 @@ async function workspace(options: AppOptions = {}) {
   const me = browser(t);
   await signUp(me, `me${n}@example.com`);
   const { orgId, channelId } = await seedOrg(me);
+  // Set up already, as a workspace in use is: opening it doesn't go through the onboarding and its arrival (ADR 0160).
+  await me(`/api/app/organizations/${orgId}/onboarding`, { method: "PATCH", json: { finished: true } });
   const admin = await joinByInvitation(t, me, orgId, `admin${n}@example.com`, { role: "admin" });
   const member = await joinByInvitation(t, me, orgId, `member${n}@example.com`);
   const ids = { me: await userId(me), admin: await userId(admin), member: await userId(member) };
@@ -423,5 +425,37 @@ describe("my own presence", () => {
     await otherDevice(w.people.member, w.orgId);
     await real(2000);
     expect(rowPresence(w.names.member)).toBe("online");
+  });
+});
+
+describe("a conversation shown again after another page", () => {
+  /** "Reply" on a message of the open channel: its thread in the panel. */
+  const openThread = async (rootId: string) => {
+    const row = document.querySelector(`article[data-message-id="${rootId}"]`) as HTMLElement;
+    await act(async () => fireEvent.mouseEnter(row));
+    await click(within(within(row).getByRole("toolbar")).getByRole("button", { name: "Reply" }));
+    return document.querySelector("aside.thread-panel") as HTMLElement;
+  };
+
+  test("a thread open, the approvals page, a reply meanwhile, back and the thread again: the reply, and its header counts it", async () => {
+    const w = await workspace();
+    await click(link("general"));
+    const root = (await (
+      await w.as.me(`/channels/${w.general}/messages`, { json: { body: "pergunta no general" } })
+    ).json()) as { id: string };
+    await w.as.admin(`/channels/${w.general}/messages`, { json: { body: "primeira resposta", threadId: root.id } });
+    await burst();
+    const first = await openThread(root.id);
+    expect(first.textContent).toContain("primeira resposta");
+    await click(links().find((a) => a.getAttribute("href")?.endsWith("/approvals")));
+    await w.as.admin(`/channels/${w.general}/messages`, {
+      json: { body: "resposta enquanto eu aprovava", threadId: root.id },
+    });
+    await live();
+    await click(link("general"));
+    const again = await openThread(root.id);
+    await live();
+    expect(again.textContent).toContain("resposta enquanto eu aprovava");
+    expect(again.querySelector(".thread-head__meta")?.textContent).toMatch(/2 replies/i);
   });
 });

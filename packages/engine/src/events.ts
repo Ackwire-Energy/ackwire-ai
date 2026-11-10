@@ -70,6 +70,8 @@ export interface LiveTurn {
   stretches?: boolean;
   /** A call started in this stretch: the app moved it to the narration, and the rest of it goes there too. */
   spoke?: boolean;
+  /** When the reply it writes first showed words (`agent.delta.shownAt`). */
+  shownAt?: string;
 }
 
 /**
@@ -121,7 +123,7 @@ export function liveTurnOf(runId: string) {
   const live = liveTurns.get(runId);
   if (!live) return undefined;
   const at = live.spoke ? live.text.length : live.from;
-  return { turn: live.turn, at, text: live.text.slice(at) };
+  return { turn: live.turn, at, text: live.text.slice(at), ...(live.shownAt ? { shownAt: live.shownAt } : {}) };
 }
 
 const RULES = new Set(["reply", "only_agent", "follow_up", "coordinator", "default", "alone"]);
@@ -179,6 +181,11 @@ export type ChannelEvent =
        * Only from a brain that says when each call ended (`createDeltaPublisher`).
        */
       from?: number;
+      /**
+       * When the reply it belongs to first showed words (ISO, the server's clock), until the run posts it: its message
+       * keeps that place (`PLACE_KEPT_MS`), so the apps draw the live reply there, with what people send meanwhile below.
+       */
+      shownAt?: string;
     }
   /** An agent run changed state (`running` = typing indicator). */
   | {

@@ -1,9 +1,10 @@
 import { and, type Executor, eq, type SQL, schema, sql } from "@agenteschat/db";
-import { PROVIDERS, type ProviderCause, type ProviderError, providerCause } from "@agenteschat/providers";
+import { PROVIDERS, type ProviderCause, ProviderError, providerCause } from "@agenteschat/providers";
+import { BRAIN_NAMES, type ComputerBrainKind, planName } from "./brains/types";
 import { cutText, pgSafeJson } from "./format";
 import { recordRunFinished } from "./operator-events";
 import { standingErrorDetail } from "./standing";
-import { redactCredentials } from "./tool-detail";
+import { cliErrorWords, redactCredentials } from "./tool-detail";
 
 const { agentRuns, agentRunSteps } = schema;
 
@@ -60,6 +61,16 @@ export const usageWaitSql = sql<"plan" | "budget" | null>`(case when ${agentRuns
   when 'plan_limit' then 'plan' when 'budget' then 'budget'
   when 'usage_pause' then coalesce(${agentRuns.transcript}->'waitingForBrain'->>'source', 'plan') end) end)`;
 
+/** `usageWaitSql` for a loaded run. */
+export function usageWaitOf(run: Pick<AgentRun, "status" | "waitingMachineId" | "transcript">) {
+  if (run.status !== "waiting_input" || run.waitingMachineId) return null;
+  const wait = (run.transcript as { waitingForBrain?: { code?: string; source?: string } } | null)?.waitingForBrain;
+  if (wait?.code === "plan_limit") return "plan" as const;
+  if (wait?.code === "budget") return "budget" as const;
+  if (wait?.code === "usage_pause") return wait.source === "budget" ? ("budget" as const) : ("plan" as const);
+  return null;
+}
+
 /**
  * Where a run's replies go: asked in the main timeline (a channel or a
  * DM), it answers in the main timeline; asked in a thread, in
@@ -104,13 +115,107 @@ export const STUCK_ERROR = "stuck" as const;
 export const INTERRUPTED_BY_RESTART = "Interrupted by a server restart";
 
 /**
- * A computer brain's generic failure codes (`BrainFailure.code`, from the brains and the runner): worded as the
- * computer's problem, the code kept only as a detail. The ones that call for a different step (signed out, outdated
- * program, missing CLI, plan limit) keep their own code.
+ * The computer's own failure codes (`BrainFailure.code`: its program, the call to it): worded as the computer's problem,
+ * the code kept only as a detail. The ones that call for a different step (signed out, outdated program, missing CLI,
+ * plan limit) keep their own code, and a CLI's failure is the CLI's (`CLI_CODES`).
  */
-const COMPUTER_ERRORS = new Set(["runner_error", "runner_failed", "claude_failed", "bad_request"]);
-/** Any other CLI's failed turn (`codex_failed`, `opencode_failed`, `brain_failed`…): the computer's problem too. */
-const CLI_FAILED = /^[a-z]+(?:_[a-z]+)*_failed$/;
+const COMPUTER_ERRORS = new Set(["runner_error", "runner_failed"]);
+/** Any other code a computer turn failed with (`brain_failed`…): the computer's problem too. */
+const OTHER_FAILED = /^[a-z]+(?:_[a-z]+)*_failed$/;
+
+/** A CLI's failed turn (`BrainFailure.code`), by the brain whose CLI it is. */
+const CLI_CODES: Readonly<Record<string, ComputerBrainKind>> = {
+  claude_failed: "claude_code",
+  codex_failed: "codex",
+  cursor_failed: "cursor",
+  opencode_failed: "opencode",
+  grok_failed: "grok",
+  antigravity_failed: "antigravity",
+};
+/** The runner's causes that are the provider's answer (runner protocol 50), never the CLI's or the computer's. */
+const PROVIDER_CAUSES: ReadonlySet<string> = new Set([
+  "quota",
+  "billing",
+  "provider_transient",
+  "auth_rejected",
+  "account_disabled",
+]);
+/** The status a provider's cause stands for when the CLI gave none, so it reads as a key's would. */
+const CAUSE_STATUS: Readonly<Record<string, number>> = { quota: 429, billing: 402, provider_transient: 503 };
+/** "API Error: 529 {…}": a provider's answer, as Claude Code words it. */
+const API_ERROR = /\bAPI Error:? (\d{3})\b/;
+/**
+ * The runner's words when the CLI ended without its answer, how it ended then what it said on its way out: Claude
+ * Code's (`ended without an answer (exit 1): …`) and the other CLIs' (`Codex exited with code 1: …`).
+ */
+const ENDED =
+  /^\S.*? (?:ended without an answer \(((?:exit|signal) [^)]*)\)|exited with code (\S+?))(?::\s*([\s\S]*))?$/;
+/**
+ * The CLI's turn ended failed and it said nothing more: Claude Code's result (`error_during_execution`, `an error`),
+ * another CLI that left with exit 0 short of its answer (`ended without finishing the turn`).
+ */
+const BARE_RESULT = /^\S.*? ended (?:with (?:\w+|an error)|without finishing the turn)$/;
+
+/** A CLI's own failed turn (`claude_failed`, `codex_failed`…), as against its computer's or its plan's. */
+export const isCliFailure = (code: string) => Object.hasOwn(CLI_CODES, code);
+
+/** A CLI's failure, from its code and what it said (`BrainFailure`). */
+export interface CliFailure {
+  code: string;
+  message: string;
+  provider?: { cause?: string; httpStatus?: number };
+}
+
+/**
+ * Who failed a CLI's turn: the provider, when it refused or failed the CLI's call (a status, or the runner's cause), as
+ * a key's failure would read on that plan; else the CLI itself, with what it said (`cliErrorWords`, safe for anyone in
+ * the conversation; empty when it said nothing), and how it ended when it ended without its answer. Never the computer:
+ * it ran the CLI. Null for any other code.
+ */
+export function cliFailureOf(
+  failure: CliFailure,
+  account?: { provider?: string },
+): { provider: ProviderError } | { brain: string; words: string; ended?: string } | null {
+  const kind = CLI_CODES[failure.code];
+  if (!kind) return null;
+  const { cause, httpStatus } = failure.provider ?? {};
+  const status =
+    httpStatus ?? (Number(API_ERROR.exec(failure.message)?.[1]) || (cause ? CAUSE_STATUS[cause] : undefined));
+  if (status || (cause && PROVIDER_CAUSES.has(cause))) {
+    const words = cliErrorWords(failure.message);
+    const provider = new ProviderError(words, false, status, undefined, words || undefined);
+    provider.provider = planName(kind, account?.provider);
+    return { provider };
+  }
+  const brain = BRAIN_NAMES[kind];
+  const said = failure.message;
+  // The runner's own sentence about its CLI, never one the CLI said itself ("MCP server exited with code 1").
+  const runner = said.startsWith(`${brain} `) || said.startsWith(`The ${brain} `);
+  if (runner && BARE_RESULT.test(said)) return { brain, words: "" };
+  const ended = runner ? ENDED.exec(said) : null;
+  if (!ended) return { brain, words: cliErrorWords(said) };
+  return { brain, words: cliErrorWords(ended[3] ?? ""), ended: ended[1] ?? `exit ${ended[2]}` };
+}
+
+/**
+ * A CLI's failure as its run stores it (`runErrorDetail` reads it back): the provider's as a key's
+ * (`provider_error: cause@Claude: …`, `gave_up: …` after the outage's waits), else `cli_failed: Claude Code: what it
+ * said`, or `cli_closed: Claude Code: exit 1` when it ended without a word. Null for any other code.
+ */
+export function cliFailureText(
+  failure: CliFailure,
+  account?: { provider?: string },
+  kind: "provider_error" | "gave_up" = "provider_error",
+): string | null {
+  const of = cliFailureOf(failure, account);
+  if (!of) return null;
+  if ("provider" in of) return providerFailureText(kind, of.provider);
+  if (of.words) return `cli_failed: ${of.brain}: ${of.words}`;
+  return of.ended ? `cli_closed: ${of.brain}: ${of.ended}` : `cli_failed: ${of.brain}`;
+}
+
+/** `cli_failed: Claude Code: what it said` (`cliFailureText`); `cli_closed` when it ended without a word. */
+const CLI_FAILURE = /^cli_(failed|closed): ([^:]+?)(?:: ([\s\S]*))?$/;
 
 /** A run that stopped on an error of ours that kept repeating (`gave up` in the executor): its stored text's start. */
 export const OUR_ERROR = "Stopped after an error";
@@ -169,7 +274,20 @@ export function runErrorDetail(error: string | null | undefined): {
   ];
   if (simple.includes(error)) return { errorCode: `run.${error}` };
   if (error === "timeout") return { errorCode: "run.computer_timeout", errorParams: { code: error } };
-  if (COMPUTER_ERRORS.has(error) || CLI_FAILED.test(error))
+  const cli = CLI_FAILURE.exec(error);
+  if (cli) {
+    const [, how, brain = "", detail = ""] = cli;
+    if (how === "closed") return { errorCode: "run.cli_closed", errorParams: { brain } };
+    return detail
+      ? { errorCode: "run.cli_failed", errorParams: { brain, detail } }
+      : { errorCode: "run.cli_stopped", errorParams: { brain } };
+  }
+  // Older rows kept only the CLI's code: whose CLI it was, not what it said.
+  const cliKind = CLI_CODES[error];
+  if (cliKind) return { errorCode: "run.cli_stopped", errorParams: { brain: BRAIN_NAMES[cliKind] } };
+  // The runner refused a request of ours: nothing on the computer or the plan is wrong.
+  if (error === "bad_request") return { errorCode: "run.our_error" };
+  if (COMPUTER_ERRORS.has(error) || OTHER_FAILED.test(error))
     return { errorCode: "run.computer_failed", errorParams: { code: error } };
   // The agent's account folder isn't on its computer anymore: choose another account or add it again.
   if (error === "account_missing") return { errorCode: "run.account_missing" };

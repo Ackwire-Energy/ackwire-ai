@@ -16,6 +16,7 @@ import {
   githubAppPanel,
   githubDisconnectNote,
   installationReach,
+  missingEventsText,
   removedText,
   removeInstallationText,
 } from "@agenteschat/client/lib/github-app";
@@ -408,6 +409,19 @@ describe("GitHub through the agentes.chat app (ADR 0156), as the web shows it", 
     const [github] = connectedItems([appAlone], [], [def("github")]);
     expect(github?.viaGithubApp).toBe(true);
     expect(accountActions(github as NonNullable<typeof github>)).toEqual(["rename"]);
+  });
+
+  test("an app made without the events agents hear says which to tick, by GitHub's own names", async () => {
+    const pt = await translator("pt-BR");
+    const events = {
+      missing: ["issue_comment", "pull_request_review"],
+      url: "https://github.com/settings/apps/x/permissions",
+    };
+    expect(missingEventsText(pt, { events })).toBe(
+      "Para os agentes ouvirem o que acontece no GitHub, marque estes eventos no app: Issue comment e Pull request review.",
+    );
+    expect(missingEventsText(pt, { events: { ...events, missing: [] } })).toBeNull();
+    expect(missingEventsText(pt, null)).toBeNull();
   });
 
   test("its words in both languages: the state, the removal and what Desconectar does to the app", async () => {

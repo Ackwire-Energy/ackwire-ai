@@ -165,7 +165,8 @@ export function SectionGroups({
                     key={s.id}
                     leading={<AgentFace agentId={rightHand.id} size={36} live={false} />}
                     label={rightHand.name}
-                    {...(rightHand.role ? { sub: rightHand.role } : {})}
+                    // Its one role name, never its stored role ("Workspace assistant", in no person's language).
+                    sub={t("rightHand.labelCapitalized")}
                     chevron
                     onPress={() => router.push(s.href as never)}
                   />

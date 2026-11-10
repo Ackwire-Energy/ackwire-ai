@@ -247,7 +247,7 @@ describe("Dragging into a setor", () => {
 });
 
 describe("Fixar no topo", () => {
-  test("day one: my own agents on top of Agentes, with a line about pins; its ✕ keeps them and the line goes", async () => {
+  test("day one: my own agents on top of Agentes, with no tip about pins (the row's menu has Fixar no topo)", async () => {
     const state = seedState();
     const atlas = state.agents.find((a) => a.id === ATLAS_ID);
     if (atlas) atlas.ownerUserId = "u-walter";
@@ -256,11 +256,8 @@ describe("Fixar no topo", () => {
     const pinned = nav().querySelector(`[data-agent-row="${ATLAS_ID}"]`) as HTMLElement;
     expect(within(pinned).getByRole("img", { name: "Fixado no topo" })).toBeTruthy();
     expect(section("Agentes").querySelector(".sidebar__pins-end")).not.toBeNull();
-    const hint = section("Agentes").querySelector(".sidebar__pins-hint") as HTMLElement;
-    expect(hint.textContent).toContain("Seus agentes ficam no topo.");
-    await click(within(hint).getByRole("button", { name: "Fechar" }));
-    expect(section("Agentes").querySelector(".sidebar__pins-hint")).toBeNull();
-    expect(views(state).at(-1)).toMatchObject({ pins: { agents: [ATLAS_ID], channels: [], people: [] } });
+    expect(section("Agentes").querySelector('[role="note"]')).toBeNull();
+    expect(section("Agentes").textContent).not.toContain("Seus agentes ficam no topo.");
   });
 
   test("day one leaves my agents in their groups: an agent writing in its DM keeps its group", async () => {
@@ -274,7 +271,6 @@ describe("Fixar no topo", () => {
     expect(rowsIn(section("Integrations"))).toEqual(["Atlas"]);
     expect(rowsIn(section("Diretoria"))).toEqual(["Ada"]);
     expect(within(nav()).queryByRole("img", { name: "Fixado no topo" })).toBeNull();
-    expect(section("Agentes").querySelector(".sidebar__pins-hint")).toBeNull();
   });
 
   test("a channel pinned from its right click goes on top of Canais; Tirar do topo puts it back", async () => {
