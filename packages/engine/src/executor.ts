@@ -1396,7 +1396,8 @@ async function executeRunInner(
     lineMachine = null;
     await db
       .update(agentRuns)
-      .set({ waitingMachineId: null, ...(run.turns === 0 ? { startedAt: new Date() } : {}) })
+      // Out of the line, it works from now: "thinking for …" never counts the wait for room.
+      .set({ waitingMachineId: null, workingSince: new Date(), ...(run.turns === 0 ? { startedAt: new Date() } : {}) })
       .where(and(eq(agentRuns.id, run.id), eq(agentRuns.status, "running")));
     await publishChannelEvent(deps.pubsub, { type: "agent.thinking", ...where, ...bg });
     await publishChannelEvent(deps.pubsub, {
@@ -1893,6 +1894,17 @@ async function executeRunInner(
       ? new Date(at)
       : undefined;
   };
+  /**
+   * When it last posted, not yet on its row: what it posts ends the stretch of work the conversation was counting
+   * ("thinking for …"), so if it goes on it counts from there (`agent_runs.working_since`), as the apps that saw the
+   * message land already do. Written with the run's next save (`worked`), never in a statement of its own.
+   */
+  let postedAt: Date | null = null;
+  const worked = () => {
+    const at = postedAt;
+    postedAt = null;
+    return at ? { workingSince: at } : {};
+  };
   /** Posts as the agent where it replies. `note`: a line the server writes about the run (not its words). */
   const post = async (
     tx: Executor,
@@ -2023,6 +2035,7 @@ async function executeRunInner(
       };
     }
     if (feedbackSend) await queueFeedback(tx, { orgId: run.orgId, ...feedbackSend });
+    postedAt = new Date();
     // Act with undo (ADR 0037 round 2): the changes the run made so far become this message's receipts.
     if ((await linkRunActions(tx, run.orgId, run.id, m.id)) > 0) withReceipts.push(m.id);
     if (!note && transcript) transcript.lastPosted = body.trim();
@@ -2037,7 +2050,7 @@ async function executeRunInner(
   const saveTranscript = (tx: Executor, t: Transcript) =>
     tx
       .update(agentRuns)
-      .set({ transcript: storedTranscript(t), updatedAt: new Date() })
+      .set({ transcript: storedTranscript(t), updatedAt: new Date(), ...worked() })
       .where(eq(agentRuns.id, run.id));
 
   // What the bridge kept stays on the row until taken (`takeBridgeEffects`); this copy never carries it.
@@ -2616,7 +2629,12 @@ async function executeRunInner(
     const [counted] = await Promise.all([
       db
         .update(agentRuns)
-        .set({ turns: sql`${agentRuns.turns} + 1`, transcript: storedTranscript(t), updatedAt: new Date() })
+        .set({
+          turns: sql`${agentRuns.turns} + 1`,
+          transcript: storedTranscript(t),
+          updatedAt: new Date(),
+          ...worked(),
+        })
         .where(eq(agentRuns.id, run.id))
         .returning(),
       addRunStep(db, run, "model_call", {
