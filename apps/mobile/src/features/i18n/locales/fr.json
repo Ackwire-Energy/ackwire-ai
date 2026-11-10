@@ -2408,6 +2408,7 @@
       "ready": "Connecté",
       "syncing": "Synchronisation…",
       "reads": "Lit {{label}}",
+      "noWrites": "lecture seule",
       "items_one": "{{count}} élément",
       "items_other": "{{count}} éléments",
       "synced": "synchronisé {{when}}",

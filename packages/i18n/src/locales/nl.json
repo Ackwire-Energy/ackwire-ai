@@ -3603,6 +3603,7 @@
       "ready": "Gekoppeld",
       "syncing": "Synchroniseren",
       "reads": "Leest {{label}}",
+      "readOnly": "alleen-lezen",
       "items_one": "{{count}} item",
       "items_other": "{{count}} items",
       "synced": "gesynchroniseerd {{when}}",
@@ -3651,7 +3652,7 @@
       "onepassword": {
         "step": {
           "1": "Maak in 1Password een kluis alleen voor je agenten en zet daar de logins in die ze mogen gebruiken",
-          "2": "Maak een serviceaccount met alleen toegang tot die kluis",
+          "2": "Maak een serviceaccount met alleen toegang tot die kluis (lezen en schrijven, als je agenten daar nieuwe logins moeten opslaan)",
           "3": "Plak hier het token van het serviceaccount"
         },
         "field": {

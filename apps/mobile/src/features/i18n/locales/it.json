@@ -2408,6 +2408,7 @@
       "ready": "Collegato",
       "syncing": "Sincronizzazione…",
       "reads": "Legge {{label}}",
+      "noWrites": "sola lettura",
       "items_one": "{{count}} elemento",
       "items_other": "{{count}} elementi",
       "synced": "sincronizzato {{when}}",

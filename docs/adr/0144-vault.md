@@ -1,6 +1,7 @@
 # 0144. The Vault: logins, keys and contacts agents use, personal or the team's, from any source
 
 - Status: Accepted (built: the server, the runner, the web and the phone app)
+- Addendum, 2026-11-10: §9, logins agents save in a connected password manager (sources may write)
 - Date: 2026-11-03
 - Amends: ADR 0027 (§7: a site's password is kept in the runner's memory only, never in `store.json`; a request may
   carry a username and ask for a code; the card can save the value to the Vault), ADR 0040 and 0054 (the browser
@@ -78,7 +79,7 @@ deletes only what it saved itself; everything people saved, people delete in Set
 ### 3. Sources
 
 A source (`VaultSource`, `packages/adapters/src/vault/source.ts`) connects, lists metadata and reveals one value on
-demand. Nothing else knows which source an item comes from: access, history, the box to the computer and the
+demand; one that can also keeps a new login and changes one it holds (§9). Nothing else knows which source an item comes from: access, history, the box to the computer and the
 runner's checks are the same for all.
 
 - **Built-in**, always on, needs only Postgres: values sealed like every org credential (ADR 0007), with additional
@@ -227,6 +228,80 @@ for this agent, or for every agent of the shared browser profile it is made in: 
 agent's browser for all its work (§5), so the agent's next run needs it whoever asked. It shows in Settings, Vault with
 its site and username, where people replace it as any other, and the value comes back to nobody (§2). Every step is in
 the audit log, never with the value. Desktop apps stay out: nothing types a password there.
+
+### 9. Logins agents save in a connected password manager
+
+A workspace whose agents' logins all live in 1Password expects a login an agent makes to land there too, and an agent
+that can't tell where an item is kept tells people the wrong place. So places are named, and sources may write.
+
+**Every item says where it is kept.** `vault_list` puts the place on each item (`kept in the Vault`, `kept in
+1Password · "Agents"`: the brand and what the connection reads, as one short quoted line) and, when a password manager
+is connected, lists the places with whether each takes a new login and where a login the agent makes will go. The
+tools that answer about one item (`vault_save`, `browser_make_password`) name its place the same way.
+
+**Where a new login goes** (`destinationFor`, `packages/engine/src/vault/agents.ts`), for a password an agent makes
+(§8):
+
+1. The place the person named (`save_in` on `browser_make_password`: `vault`, or a connected password manager by its
+   name, what it reads, both, or its id). A place that can't take it is refused, saying why; nothing goes elsewhere
+   quietly.
+2. Else the one connected password manager the run uses by default (the connection's own access gives this agent use
+   for the person behind the run) that takes new logins: that is where the agent's logins live.
+3. Else the Vault: no password manager, more than one that takes new logins (the agent is told to name one), only
+   read-only ones, or one a shared browser profile couldn't type from (§2: the connection must be the team's, open to
+   everyone, for every agent of the profile).
+
+The answer always names the place and, when a rule chose it, why. The same site and username again changes the login
+where it is: in a password manager when its source can change one (the old password is read first and sealed behind
+the row here, `previous_secrets`, so `undo` writes it back, as for a Vault item); when it can't, the new password is
+kept in the Vault as a new login and the answer says the one in the password manager still has the old password. A
+login made in a password manager follows that connection's access, like everything read from it, and is indexed from
+the write's own answer (`indexSourceItem`), so it shows at once, without waiting for the next sync. A key
+(`vault_make_password`) is always the Vault's. `vault_save` changes a login's username in a password manager that
+takes changes, on the same terms as in the Vault (the owner's own, or the team's for who manages credentials).
+
+Nothing is deleted from a password manager, ever. A login made there whose form was never filled stays, and the next
+call replaces its password.
+
+**The same permission as the Vault.** Writing to a password manager needs what writing to the Vault needs (the
+`vault:write` scope checked by the tools, §8), replaces only what the run could replace in the Vault (its own, the
+person's, or the team's for who manages credentials), and leaves the same trail: `vault.item_created` and
+`vault.item_changed` in the audit log with the source's kind, a use on the item, never a value. No value is in a
+source's answer, an error or a log: a source returns metadata, and its failures are our words (§3).
+
+**Read-only connections.** A source refuses a write its credential may not make as `read_only`. The engine remembers
+it on the connection (`config.readOnly`, cleared when a person connects it again, since `connect` returns a new
+config), the connection shows "read-only" in Settings, Vault, Connections, `vault_list` says so, and the rule stops
+trying it. The refusal the agent gets says the cause and the way out: the token can only read, and someone who
+manages the connection reconnects it with one that also writes. Nothing tells a read-only credential from one that
+writes before the first write (1Password's SDK shows no permissions), so it is found then.
+
+What each provider allowed, read in its documentation on 2026-11-10 (no live account was used: the request shapes
+are the documented ones, exercised against fakes):
+
+- **1Password, service account token** (what a connection holds). Creates and edits items through the SDK
+  (`items.create`, `items.put`; `@1password/sdk` 0.5.0) when the service account was made with read and write access
+  to the vault ("Read & Write" on the Developer page; `--vault name:read_items,write_items` in the CLI). Permissions
+  can't be changed after creation: a read-only one is replaced by a new service account. A login is created as the
+  documented `Login` item (`username` Text and `password` Concealed built-in fields, a website with its autofill
+  behavior, notes); a change puts back the item exactly as read with one field's value changed. A refused write is
+  recognised by 1Password's words about permissions (documented: "don't have the right permissions"), or a bare 403.
+  Docs: <https://www.1password.dev/sdks/manage-items/>, <https://www.1password.dev/service-accounts/get-started/>,
+  <https://www.1password.dev/service-accounts/security/>.
+- **Bitwarden and Vaultwarden, personal API key and master password.** The API key is the whole account's (scope
+  `api`), and the master password gives the account's key, so there is no read-only kind. A new login is a
+  `POST /ciphers` as Bitwarden's own clients send it (`CipherRequestModel` in bitwarden/server,
+  `cipher.request.ts` in bitwarden/clients): every text an EncString of type 2 under the account's key
+  (`bitwarden-crypto.ts`, the primitives the reads use, round-tripped in tests), in the agents' folder, a website
+  with its checksum. That endpoint is the product's own API, not a documented public one (the public API covers
+  organizations, not items; the documented way is the CLI's `bw create item`, <https://bitwarden.com/help/cli/>),
+  as the reads already are. A login already there is **not** changed: `PUT /ciphers/{id}` replaces the whole login
+  (passkeys, attachments, custom fields, history), and what this client doesn't read it can't send back.
+
+Left out: saving a person's typed password from the request card (§6) into a password manager (the card's "Save to
+the Vault" still means the Vault: where it goes and who may use it are the person's choices on that card, and a
+password manager's access is the connection's); keys in a password manager; changing a Bitwarden login; deleting or
+archiving anything; a description or notes on a made login; telling a read-only credential before the first write.
 
 ## Consequences
 

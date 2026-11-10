@@ -2209,6 +2209,7 @@
       "ready": "接続済み",
       "syncing": "同期しています…",
       "reads": "{{label}}を読み取り",
+      "noWrites": "読み取り専用",
       "items_other": "{{count}}件",
       "synced": "{{when}}に同期",
       "sync": "今すぐ同期",

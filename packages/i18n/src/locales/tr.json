@@ -3589,6 +3589,7 @@
       "ready": "Bağlı",
       "syncing": "Eşitleniyor",
       "reads": "Okunan: {{label}}",
+      "readOnly": "salt okunur",
       "items_one": "{{count}} öğe",
       "items_other": "{{count}} öğe",
       "synced": "{{when}} eşitlendi",
@@ -3637,7 +3638,7 @@
       "onepassword": {
         "step": {
           "1": "1Password'de yalnızca ajanlarınız için bir kasa oluşturun ve kullanabilecekleri giriş bilgilerini oraya taşıyın",
-          "2": "Yalnızca o kasaya erişimi olan bir hizmet hesabı oluşturun",
+          "2": "Yalnızca o kasaya erişimi olan bir hizmet hesabı oluşturun (ajanlarınız oraya yeni giriş bilgileri kaydedecekse okuma ve yazma)",
           "3": "Hizmet hesabının token'ını buraya yapıştırın"
         },
         "field": {

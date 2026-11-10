@@ -2209,6 +2209,7 @@
       "ready": "Terhubung",
       "syncing": "Menyinkronkan…",
       "reads": "Membaca {{label}}",
+      "noWrites": "hanya baca",
       "items_other": "{{count}} item",
       "synced": "disinkronkan {{when}}",
       "sync": "Sinkronkan sekarang",

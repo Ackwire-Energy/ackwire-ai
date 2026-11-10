@@ -3602,6 +3602,7 @@
       "ready": "Verbunden",
       "syncing": "Wird synchronisiert",
       "reads": "Liest {{label}}",
+      "readOnly": "nur Lesezugriff",
       "items_one": "{{count}} Eintrag",
       "items_other": "{{count}} Einträge",
       "synced": "synchronisiert {{when}}",
@@ -3650,7 +3651,7 @@
       "onepassword": {
         "step": {
           "1": "Leg in 1Password einen Tresor nur für deine Agenten an und verschiebe die Logins hinein, die sie verwenden dürfen",
-          "2": "Leg ein Dienstkonto an, das nur auf diesen Tresor Zugriff hat",
+          "2": "Leg ein Dienstkonto an, das nur auf diesen Tresor Zugriff hat (Lesen und Schreiben, wenn deine Agenten dort neue Logins speichern sollen)",
           "3": "Füge hier das Token des Dienstkontos ein"
         },
         "field": {

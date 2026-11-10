@@ -2518,6 +2518,7 @@
       "ready": "Подключено",
       "syncing": "Синхронизация…",
       "reads": "Читает: {{label}}",
+      "noWrites": "только чтение",
       "items_one": "{{count}} элемент",
       "items_few": "{{count}} элемента",
       "items_many": "{{count}} элементов",

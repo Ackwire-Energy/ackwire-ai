@@ -2312,6 +2312,7 @@
       "ready": "Verbunden",
       "syncing": "Wird synchronisiert…",
       "reads": "Liest {{label}}",
+      "noWrites": "nur Lesezugriff",
       "items_one": "{{count}} Eintrag",
       "items_other": "{{count}} Einträge",
       "synced": "synchronisiert {{when}}",

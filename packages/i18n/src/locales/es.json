@@ -3705,6 +3705,7 @@
       "ready": "Conectado",
       "syncing": "Sincronizando",
       "reads": "Lee {{label}}",
+      "readOnly": "solo lectura",
       "items_one": "{{count}} elemento",
       "items_other": "{{count}} elementos",
       "synced": "sincronizado {{when}}",
@@ -3753,7 +3754,7 @@
       "onepassword": {
         "step": {
           "1": "Crea en 1Password una bóveda solo para tus agentes y mueve a ella los inicios de sesión que pueden usar",
-          "2": "Crea una cuenta de servicio con acceso solo a esa bóveda",
+          "2": "Crea una cuenta de servicio con acceso solo a esa bóveda (lectura y escritura, si tus agentes van a guardar allí nuevos inicios de sesión)",
           "3": "Pega aquí el token de la cuenta de servicio"
         },
         "field": {

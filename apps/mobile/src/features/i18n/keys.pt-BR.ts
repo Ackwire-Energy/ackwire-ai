@@ -2354,6 +2354,7 @@ export const featureKeysPtBR = {
       ready: "Conectado",
       syncing: "Sincronizando…",
       reads: "Lê {{label}}",
+      noWrites: "só leitura",
       items_one: "{{count}} item",
       items_other: "{{count}} itens",
       synced: "sincronizado {{when}}",

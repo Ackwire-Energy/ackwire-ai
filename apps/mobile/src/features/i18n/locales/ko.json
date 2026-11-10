@@ -2209,6 +2209,7 @@
       "ready": "연결됨",
       "syncing": "동기화하는 중…",
       "reads": "{{label}} 읽기",
+      "noWrites": "읽기 전용",
       "items_other": "항목 {{count}}개",
       "synced": "{{when}} 동기화",
       "sync": "지금 동기화",

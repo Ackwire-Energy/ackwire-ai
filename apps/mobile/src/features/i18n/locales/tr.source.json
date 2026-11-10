@@ -5645,6 +5645,9 @@
   "vault.connection.reads": {
     "value": "Reads {{label}}"
   },
+  "vault.connection.noWrites": {
+    "value": "read-only"
+  },
   "vault.connection.items": {
     "value": {
       "one": "{{count}} item",

@@ -3840,6 +3840,7 @@
       "ready": "Połączono",
       "syncing": "Synchronizowanie",
       "reads": "Odczytuje: {{label}}",
+      "readOnly": "tylko do odczytu",
       "items_one": "{{count}} element",
       "items_few": "{{count}} elementy",
       "items_many": "{{count}} elementów",
@@ -3892,7 +3893,7 @@
       "onepassword": {
         "step": {
           "1": "Utwórz w 1Password sejf tylko dla swoich agentów i przenieś do niego loginy, których mogą używać",
-          "2": "Utwórz konto usługi z dostępem tylko do tego sejfu",
+          "2": "Utwórz konto usługi z dostępem tylko do tego sejfu (odczyt i zapis, jeśli agenci mają zapisywać tam nowe loginy)",
           "3": "Wklej tutaj token konta usługi"
         },
         "field": {

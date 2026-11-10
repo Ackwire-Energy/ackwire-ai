@@ -2423,6 +2423,7 @@ export const featureKeysEn = {
       ready: "Connected",
       syncing: "Syncing…",
       reads: "Reads {{label}}",
+      noWrites: "read-only",
       items_one: "{{count}} item",
       items_other: "{{count}} items",
       synced: "synced {{when}}",

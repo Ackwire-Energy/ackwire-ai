@@ -8793,6 +8793,9 @@
   "vault.connections.reads": {
     "value": "Reads {{label}}"
   },
+  "vault.connections.readOnly": {
+    "value": "read-only"
+  },
   "vault.connections.items": {
     "value": {
       "one": "{{count}} item",
@@ -8914,7 +8917,7 @@
     "value": "Create a vault in 1Password only for your agents and move into it the logins they may use"
   },
   "vault.source.onepassword.step.2": {
-    "value": "Create a service account with access to that vault only"
+    "value": "Create a service account with access to that vault only (read and write, if your agents should save new logins there)"
   },
   "vault.source.onepassword.step.3": {
     "value": "Paste the service account token here"
