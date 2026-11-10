@@ -139,7 +139,6 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     "outage.dialog.none",
     "settings.platformAvailable",
     "settings.telemetry.",
-    "settings.tileState.platformKey",
     "skills.unavailable",
     "storage.server",
     "storage.serverText.",

@@ -2669,9 +2669,6 @@
   "me.connectors": {
     "value": "Connectors and MCPs"
   },
-  "me.usage": {
-    "value": "Usage"
-  },
   "me.preferences": {
     "value": "Preferences"
   },
@@ -5443,9 +5440,6 @@
   },
   "settings.section.connectors": {
     "value": "Connectors"
-  },
-  "settings.section.usage": {
-    "value": "Usage and budget"
   },
   "settings.ofOnline": {
     "value": "{{online}} of {{count}}"

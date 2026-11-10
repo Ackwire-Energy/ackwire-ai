@@ -443,7 +443,6 @@
       "run.ctx.minutes",
       "settings.media.gifs",
       "settings.section.general",
-      "settings.tileState.plans",
       "skills.version",
       "storage.bucket",
       "storage.endpoint",
@@ -2166,7 +2165,8 @@
       "openOnPhone.appStore",
       "openOnPhone.googlePlay",
       "arrival.beta.word",
-      "feedback.mark"
+      "feedback.mark",
+      "usageViews.accounts.title"
     ],
     "ja": [
       "devices.system.android",
@@ -3002,7 +3002,6 @@
       "routines.form.kind.webhook",
       "routines.target.dmShort",
       "routines.webhook.callTest",
-      "settings.tileState.plans",
       "skills.version",
       "storage.bucket",
       "taskManager.program.agentes",
@@ -3239,7 +3238,6 @@
       "settings.import.title",
       "settings.kinds.router",
       "settings.tileState.agents",
-      "settings.tileState.plans",
       "skills.source.url",
       "skills.version",
       "storage.bucket",

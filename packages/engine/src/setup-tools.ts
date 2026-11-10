@@ -89,7 +89,7 @@ export const APP_PAGES = {
   delete_workspace: "Deleting this workspace (owners): its email code, typed name and grace period",
   delete_account: "Deleting their whole account, not one workspace: it goes at once and for good after its email code",
   account: "Their profile, password and sign-in methods",
-  ai_accounts: "AI accounts and API keys (Settings › Keys), typed only in our dialogs",
+  ai_accounts: "AI accounts and API keys (Settings › AI and usage), typed only in our dialogs",
   workspace: "Workspace settings: name, logo, time zone and the context every agent reads",
   members: "People: members, invitations, requests to join",
   roles: "Roles and what each may do",

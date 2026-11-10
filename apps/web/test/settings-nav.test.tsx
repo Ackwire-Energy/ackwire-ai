@@ -102,10 +102,9 @@ describe("finding the settings", () => {
       ["access", "Agentes e acesso"],
       ["connectors", "Conectores e MCPs"],
       ["skills", "Skills"],
-      ["keys", "Contas de IA"],
       ["storage", "Armazenamento"],
       ["devices", "Dispositivos"],
-      ["usage", "Orçamento e uso"],
+      ["usage", "IA e uso"],
       ["import", "Importar e exportar"],
     ];
     for (const [id, heading] of sections) {

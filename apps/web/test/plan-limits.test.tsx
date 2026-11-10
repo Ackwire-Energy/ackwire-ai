@@ -158,6 +158,83 @@ describe("the Uso tile: the workspace's budget only where it uses the API", () =
   });
 });
 
+describe("IA e uso: budget only where the workspace uses the API", () => {
+  const BUDGET = ["API do workspace", "Gastos da API por tipo", "Orçamento padrão dos agentes"];
+  const regions = () => BUDGET.filter((name) => screen().queryByRole("region", { name }));
+
+  test("on plans alone: no budget anywhere on the screen, only the accounts and the keys", async () => {
+    await go("settings/usage", onPlans());
+    expect(screen().getByRole("region", { name: "Contas" })).toBeTruthy();
+    expect(regions()).toEqual([]);
+    const body = document.querySelector(".settings__body")?.textContent ?? "";
+    expect(body).not.toMatch(/orçamento|US\$/i);
+    // Where the first key is added, which is what brings the budget in.
+    expect(screen().getByRole("region", { name: "Chaves de provedor" })).toBeTruthy();
+    // The tabs stay: Resumo, then Pessoas.
+    expect(
+      within(screen().getByRole("tablist", { name: "IA e uso" }))
+        .getAllByRole("tab")
+        .map((tab) => tab.textContent),
+    ).toEqual(["Resumo", "Pessoas"]);
+  });
+
+  test("one agent on the API with a key: the API per agent, its spend by kind and the default budget", async () => {
+    const state = seedState();
+    state.spentUsd = { [ADA_ID]: 0, [ATLAS_ID]: 0 };
+    // Ada stays on the API (her key is the workspace's); Atlas thinks with Claude Team.
+    const atlas = state.agents.find((a) => a.id === ATLAS_ID);
+    if (atlas) atlas.brain = { kind: "claude_code", model: "Sonnet", account: "Claude Team", usage: used(12, 40) };
+    await go("settings/usage", state);
+    expect(regions()).toEqual(BUDGET);
+    expect(screen().getByLabelText("Orçamento mensal por agente (US$)")).toBeTruthy();
+  });
+});
+
+describe("IA e uso › Contas with many accounts and long names", () => {
+  // The worst case the list is built for: a dozen accounts, names that run past any row, two near their limit.
+  const LONG = "Assinatura corporativa compartilhada do time de atendimento e operações";
+  const MANY: AiAccounts["accounts"] = Array.from({ length: 12 }, (_, i) => ({
+    ...TEAM,
+    id: `acct_${i}`,
+    label: `${LONG} ${i + 1}`,
+    email: `conta-${i + 1}-com-um-endereco-bem-comprido@subdominio.example.com`,
+    ownerName: "Maximiliano Albuquerque de Vasconcelos",
+    usedBy: i === 0 ? ["Ada", "Atlas"] : [],
+    usage: i === 11 ? null : used(5 * i, i < 2 ? 96 - 10 * i : 7 * i),
+  }));
+
+  test("each is one row: whole name, plan, owner's first name and one meter; only those near a limit start open", async () => {
+    await go("settings/usage", onPlans(), MANY);
+    const plans = screen().getByRole("region", { name: "Contas" });
+    // The seeded computer's own sign-in comes first.
+    const rows = ([...plans.querySelectorAll(".plan-row")] as HTMLElement[]).slice(1);
+    expect(rows).toHaveLength(12);
+    const heads = rows.map((r) => r.querySelector(".plan-row__head") as HTMLElement);
+    // Names wrap whole, never cut: the words are all there, the plan and whose it is after them.
+    expect(heads.map((h) => h.querySelector(".plan-acct__name")?.textContent)).toEqual(
+      MANY.map((a) => `${a.label}Teamde Maximiliano`),
+    );
+    // One meter each, none while nothing is known: never 0%.
+    expect(heads.map((h) => within(h).queryAllByRole("meter").length)).toEqual([...Array(11).fill(1), 0]);
+    expect(heads[0]?.querySelector(".ac-planmeter__line")?.textContent).toBe("semana 96%");
+    expect(heads.map((h) => h.getAttribute("aria-expanded"))).toEqual(["true", "true", ...Array(10).fill("false")]);
+    expect(heads.map((h) => Boolean(h.querySelector(".plan-row__alert")))).toEqual([
+      true,
+      true,
+      ...Array(10).fill(false),
+    ]);
+    // A closed row holds nothing: twelve accounts stay twelve lines.
+    expect(rows.slice(2).map((r) => r.querySelector(".plan-row__body")?.textContent)).toEqual(Array(10).fill(""));
+    // The keyboard opens one: its head is a button that says whether it is open.
+    const third = heads[2] as HTMLElement;
+    expect(third.tagName).toBe("BUTTON");
+    await click(third);
+    expect(third.getAttribute("aria-expanded")).toBe("true");
+    expect(rows[2]?.textContent).toContain("conta-3-com-um-endereco-bem-comprido@subdominio.example.com");
+    expect(within(rows[2] as HTMLElement).getByRole("button", { name: "Desconectar" })).toBeTruthy();
+  });
+});
+
 describe("the account menu: a plan near its limit", () => {
   test("under 80%: no line, the menu as it was", async () => {
     await go("settings", onPlans(), [{ ...TEAM, usage: used(12, 79) }]);

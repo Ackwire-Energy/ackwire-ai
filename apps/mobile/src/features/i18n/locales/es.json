@@ -1170,7 +1170,6 @@
     "proposalsWaiting_other": "{{count}} en espera",
     "drive": "Drive",
     "connectors": "Conectores y MCP",
-    "usage": "Uso",
     "preferences": "Preferencias",
     "editProfile": "Editar perfil",
     "switchWorkspace": "Cambiar de espacio de trabajo",
@@ -2312,8 +2311,7 @@
       "members": "Miembros",
       "roles": "Roles",
       "access": "Acceso de los agentes",
-      "connectors": "Conectores",
-      "usage": "Uso y presupuesto"
+      "connectors": "Conectores"
     },
     "ofOnline": "{{online}} de {{count}}",
     "deleteName": "Eliminar {{name}}",

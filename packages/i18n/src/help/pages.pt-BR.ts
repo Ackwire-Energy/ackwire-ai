@@ -373,7 +373,7 @@ export const helpPtBR: Record<HelpSlug, HelpDocument> = {
               "Abra https://console.typesafe.ai e entre com o Google ou o seu e-mail. Uma conta nova é criada do mesmo jeito.",
               "Adicione crédito no console. O Jev é pré-pago.",
               "Abra https://console.typesafe.ai/keys, crie uma chave e copie na hora.",
-              "No agentes.chat, abra **Configurações\u00a0›\u00a0Contas de IA** e cole em **Jev**. Só quem configurou este servidor vê essa parte.",
+              "No agentes.chat, abra **Configurações\u00a0›\u00a0IA e uso** e cole em **Jev**. Só quem configurou este servidor vê essa parte.",
             ],
           },
           "Num servidor que você roda com Docker, dá para colocar a chave no `.env` como `TYPESAFE_API_KEY`. Essa vale mais que a das Configurações.",
@@ -387,7 +387,7 @@ export const helpPtBR: Record<HelpSlug, HelpDocument> = {
             list: [
               "US$ 0,042 por milhão de tokens que o Jev lê. As respostas são grátis. Escolher quem responde lê cerca de 2.500 tokens, ou seja, cerca de US$ 0,0001. Uma captura de tela tem cerca de 3.900 tokens.",
               "O crédito comprado vale por 12 meses. Ligue a recarga automática no console para o Jev não ficar sem crédito.",
-              "**Configurações\u00a0›\u00a0Contas de IA** mostra quantas decisões o Jev tomou no mês e quanto custaram.",
+              "**Configurações\u00a0›\u00a0IA e uso** mostra quantas decisões o Jev tomou no mês e quanto custaram.",
             ],
           },
         ],
@@ -418,7 +418,7 @@ export const helpPtBR: Record<HelpSlug, HelpDocument> = {
         blocks: [
           {
             list: [
-              "**Chave recusada:** crie uma chave nova e cole em **Configurações\u00a0›\u00a0Contas de IA**.",
+              "**Chave recusada:** crie uma chave nova e cole em **Configurações\u00a0›\u00a0IA e uso**.",
               "**Sem crédito:** adicione crédito no console. O Jev tenta de novo em até 30 minutos, ou clique em **Verificar de novo**.",
               "**Ocupado ou fora do ar:** a TypeSafe pode limitar os pedidos por segundo, ou parar de responder por um tempo. O Jev volta sozinho. Os seus limites: https://console.typesafe.ai/rate-limits. Para limites maiores, escreva para sales@typesafe.ai.",
             ],

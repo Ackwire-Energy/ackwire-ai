@@ -630,7 +630,7 @@ function ConnectAiDialog({
                     onClose();
                     void navigate({
                       to: "/org/$orgId/settings/$section",
-                      params: { orgId: org.id, section: "keys" },
+                      params: { orgId: org.id, section: "usage" },
                     });
                   }}
                   onUsed={(id, next) => {

@@ -372,7 +372,7 @@ export const helpPl: Partial<Record<HelpSlug, HelpDocument>> = {
               "Otwórz https://console.typesafe.ai i zaloguj się przez Google albo e-mailem. Nowe konto zakłada się tak samo.",
               "Doładuj środki w konsoli. Jev działa na przedpłatę.",
               "Otwórz https://console.typesafe.ai/keys, utwórz klucz i od razu go skopiuj.",
-              "W agentes.chat otwórz **Ustawienia › Konta AI** i wklej go w sekcji **Jev**. Widzi go tylko osoba, która skonfigurowała ten serwer.",
+              "W agentes.chat otwórz **Ustawienia › AI i zużycie** i wklej go w sekcji **Jev**. Widzi go tylko osoba, która skonfigurowała ten serwer.",
             ],
           },
           "Na serwerze uruchomionym przez Docker możesz zamiast tego wpisać klucz do `.env` jako `TYPESAFE_API_KEY`. Ten ma pierwszeństwo przed kluczem z Ustawień.",
@@ -386,7 +386,7 @@ export const helpPl: Partial<Record<HelpSlug, HelpDocument>> = {
             list: [
               "0,042 USD za milion tokenów, które Jev przeczyta. Jego odpowiedzi są bezpłatne. Wybór, kto odpowiada, to około 2500 tokenów, czyli około 0,0001 USD. Zrzut ekranu to około 3900 tokenów.",
               "Kupione środki są ważne 12 miesięcy. Włącz w konsoli automatyczne doładowania, żeby Jevowi ich nie zabrakło.",
-              "**Ustawienia › Konta AI** pokazują, ile decyzji Jev podjął w tym miesiącu i ile kosztowały.",
+              "**Ustawienia › AI i zużycie** pokazują, ile decyzji Jev podjął w tym miesiącu i ile kosztowały.",
             ],
           },
         ],
@@ -417,7 +417,7 @@ export const helpPl: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           {
             list: [
-              "**Klucz nie został przyjęty:** utwórz nowy klucz i wklej go w **Ustawienia › Konta AI**.",
+              "**Klucz nie został przyjęty:** utwórz nowy klucz i wklej go w **Ustawienia › AI i zużycie**.",
               "**Brak środków:** doładuj środki w konsoli. Jev spróbuje ponownie w ciągu 30 minut, możesz też kliknąć **Sprawdź ponownie**.",
               "**Zajęty lub nieosiągalny:** TypeSafe może ograniczać liczbę żądań na sekundę albo na jakiś czas przestać odpowiadać. Jev sam wróci do pracy. Twoje limity: https://console.typesafe.ai/rate-limits. Po wyższe napisz na sales@typesafe.ai.",
             ],

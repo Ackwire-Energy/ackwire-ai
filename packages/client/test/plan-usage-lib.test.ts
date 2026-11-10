@@ -3,6 +3,7 @@ import type { TFunction } from "i18next";
 import type { AgentBrainLine, AiAccounts, AiComputer, AiStatus, PlanAccountUsage, PlanUsage } from "../src/api/types";
 import {
   accountShares,
+  groupUsageAccounts,
   ownPlanLines,
   planMeterText,
   SHARES_SHOWN,
@@ -330,5 +331,91 @@ describe("a plan account's agents in one list, its bar split by agent (Contas do
     const segments = split.windows[0]?.segments ?? [];
     expect(segments).toHaveLength(SHARES_SHOWN);
     expect(segments.reduce((sum, g) => sum + g.value, 0)).toBeLessThanOrEqual(3);
+  });
+});
+
+describe("the viewer's own logins of one account are one row (IA e uso › Contas)", () => {
+  type Login = AiAccounts["accounts"][number];
+  const login = (id: string, over: Partial<Login> = {}): Login => ({
+    id,
+    kind: "claude_code",
+    label: "GLM Coding",
+    email: null,
+    plan: null,
+    status: "active",
+    ownerId: "u-1",
+    ownerName: "Bia",
+    mine: true,
+    usedBy: [],
+    usage: null,
+    provider: "zai",
+    keyHint: "4f2a",
+    machineId: "m1",
+    computer: "MacBook",
+    ...over,
+  });
+  const row = (accountId: string | null, over: Partial<PlanAccountUsage> = {}): PlanAccountUsage => ({
+    key: `m1:claude_code:${accountId ?? "computer"}`,
+    machineId: "m1",
+    machineName: "MacBook",
+    kind: "claude_code",
+    accountId,
+    label: "GLM Coding",
+    plan: null,
+    provider: "zai",
+    ownerName: "Bia",
+    mine: true,
+    email: null,
+    signedOut: false,
+    usage: null,
+    agents: [],
+    monthTokens: 0,
+    ...over,
+  });
+  const week = (at: string, percent: number, agentId: string): NonNullable<PlanAccountUsage["usage"]> => ({
+    source: "turn",
+    at,
+    windows: [{ kind: "seven_day", usedPercent: percent, agents: [{ agentId, name: agentId, percent: 5 }] }],
+  });
+
+  test("a login per agent: one row where the first was, the newest windows with every agent, the months summed", () => {
+    const rows = groupUsageAccounts(
+      [
+        row(null, { label: null }),
+        row("a", {
+          usage: week("2026-11-02T10:00:00.000Z", 40, "ada"),
+          agents: [{ agentId: "ada", name: "Ada", tokens: 1000, now: true }],
+          monthTokens: 1000,
+          equivalentUsd: 2,
+        }),
+        row("other", { mine: false, ownerName: "Caio" }),
+        row("b", {
+          usage: week("2026-11-02T11:00:00.000Z", 62, "theo"),
+          agents: [{ agentId: "theo", name: "Theo", tokens: 500, now: false }],
+          monthTokens: 500,
+          equivalentUsd: 1,
+          signedOut: true,
+        }),
+      ],
+      { accounts: [login("a"), login("b")] },
+    );
+    expect(rows.map((r) => r.accountId)).toEqual([null, "a", "other"]);
+    const [, glm] = rows;
+    expect(glm?.usage?.at).toBe("2026-11-02T11:00:00.000Z");
+    expect(glm?.usage?.windows[0]?.usedPercent).toBe(62);
+    expect(glm?.usage?.windows[0]?.agents?.map((a) => a.agentId)).toEqual(["theo", "ada"]);
+    expect(glm?.agents.map((a) => [a.agentId, a.tokens])).toEqual([
+      ["ada", 1000],
+      ["theo", 500],
+    ]);
+    expect([glm?.monthTokens, glm?.equivalentUsd]).toEqual([1500, 3]);
+    // Out only when every login is.
+    expect(glm?.signedOut).toBe(false);
+  });
+
+  test("two accounts of one name stay two rows, and so does everything while the viewer's plans load", () => {
+    const list = [row("a"), row("b")];
+    expect(groupUsageAccounts(list, { accounts: [login("a"), login("b", { keyHint: "9z9z" })] })).toHaveLength(2);
+    expect(groupUsageAccounts(list, undefined)).toEqual(list);
   });
 });

@@ -318,7 +318,7 @@
     "usageRestart": "更改此项会让 agentes.chat 短暂重启。",
     "jev": "Jev",
     "jevText": "TypeSafe 推出的快速模型，负责决定由谁回答、整理记忆，并让智能体看到屏幕。可选，需使用你自己的密钥。",
-    "jevWhere": "在 agentes.chat › 设置 › AI 账号中。",
+    "jevWhere": "在 agentes.chat › 设置 › AI 和用量中。",
     "reachFailed": "从你的设备访问未能开启：{{reason}}。",
     "backup": "立即备份",
     "backedUp": "已备份：{{file}}",

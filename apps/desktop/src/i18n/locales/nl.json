@@ -321,7 +321,7 @@
     "usageRestart": "Wijzigen herstart agentes.chat heel even.",
     "jev": "Jev",
     "jevText": "Een snel model van TypeSafe dat kiest wie antwoordt, het geheugen netjes houdt en agents het scherm laat zien. Optioneel, met je eigen sleutel.",
-    "jevWhere": "In agentes.chat › Instellingen › AI-accounts.",
+    "jevWhere": "In agentes.chat › Instellingen › AI en gebruik.",
     "reachFailed": "Toegang vanaf je apparaten is niet aangezet: {{reason}}.",
     "backup": "Nu een back-up maken",
     "backedUp": "Back-up gemaakt: {{file}}",

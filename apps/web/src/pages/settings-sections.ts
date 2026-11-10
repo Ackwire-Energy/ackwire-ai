@@ -22,7 +22,6 @@ export type SettingsSection =
   | "access"
   | "connectors"
   | "skills"
-  | "keys"
   | "storage"
   | "devices"
   | "usage"
@@ -73,11 +72,10 @@ export const SETTINGS_SECTIONS: {
   { id: "skills", icon: "bulb", group: "agents", allowed: (o) => can(o, "manage_agents") },
   // Every member sees the devices and can connect one (ADR 0025): computers and the phones they reach.
   { id: "devices", icon: "computer", group: "agents", allowed: (o) => can(o, "read") },
-  // Everyone (ADR 0063): their plans' meters and the agents whose details they see, in tokens and percentages;
-  // money and the workspace's report only for who has `view_usage`.
+  // "IA e uso", for everyone (ADR 0063): the workspace's AI accounts with their meters, what each person does with
+  // their own, and the agents whose details they see, in tokens and percentages. The workspace's API keys only for who
+  // manages them, money and the workspace's report only for who has `view_usage`.
   { id: "usage", icon: "wallet", group: "costs", allowed: () => true },
-  // "Contas de IA": everyone's own plans; the workspace's API keys only for who manages them.
-  { id: "keys", icon: "key", group: "costs", allowed: (o) => can(o, "read") },
   { id: "storage", icon: "drive", group: "costs", allowed: (o) => can(o, "configure") },
   // Only where a billing service runs (ADR 0079), for who may open it.
   {
@@ -94,8 +92,17 @@ export const SETTINGS_GROUPS: SettingsGroup[] = ["you", "org", "agents", "costs"
 export const isSettingsSection = (v: unknown): v is SettingsSection => SETTINGS_SECTIONS.some((s) => s.id === v);
 
 /**
- * The nav entry that stands for the open section: in a personal workspace (ADR 0159 §3) connectors and skills open on
- * AI and apps' entry, billing on Plan and usage's, when the person may open those; else the section itself.
+ * Sections that became another one's: Computers is Devices, AI accounts is part of AI and usage. Their addresses
+ * still open, on the section that holds them now.
+ */
+export const MOVED_SETTINGS_SECTIONS: Readonly<Record<string, SettingsSection>> = {
+  computers: "devices",
+  keys: "usage",
+};
+
+/**
+ * The nav entry that stands for the open section: in a personal workspace (ADR 0159 §3) billing opens on AI and
+ * usage's entry, when the person may open that; else the section itself.
  */
 export function settingsNavEntry(
   org: Pick<OrgSummary, "mode">,

@@ -362,7 +362,7 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
               "打开 https://console.typesafe.ai ，用 Google 或你的邮箱登录。新账号也用同样的方式创建。",
               "在控制台中充值。Jev 是预付费的。",
               "打开 https://console.typesafe.ai/keys ，创建一个密钥并立即复制。",
-              "在 agentes.chat 中打开 **设置 › AI 账号**，把它粘贴到 **Jev** 下面。只有设置这台服务器的人能看到它。",
+              "在 agentes.chat 中打开 **设置 › AI 和用量**，把它粘贴到 **Jev** 下面。只有设置这台服务器的人能看到它。",
             ],
           },
           "在用 Docker 运行的服务器上，你也可以把密钥写进 `.env` 的 `TYPESAFE_API_KEY`。它优先于设置中的密钥。",
@@ -376,7 +376,7 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
             list: [
               "Jev 每读取一百万 token 收费 0.042 美元。它的回答免费。选择谁来回复大约读取 2,500 个 token，也就是约 0.0001 美元。一张屏幕截图大约 3,900 个 token。",
               "购买的额度 12 个月内有效。在控制台中开启自动充值，以免 Jev 额度用完。",
-              "**设置 › AI 账号** 会显示 Jev 本月做了多少次决定，以及花了多少钱。",
+              "**设置 › AI 和用量** 会显示 Jev 本月做了多少次决定，以及花了多少钱。",
             ],
           },
         ],
@@ -407,7 +407,7 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           {
             list: [
-              "**密钥不被接受：** 创建一个新密钥，粘贴到 **设置 › AI 账号** 中。",
+              "**密钥不被接受：** 创建一个新密钥，粘贴到 **设置 › AI 和用量** 中。",
               "**额度用完：** 在控制台中充值。Jev 会在 30 分钟内重试，你也可以点 **重新检查**。",
               "**繁忙或无法连接：** TypeSafe 可能会限制每秒请求数，或暂时停止响应。Jev 会自行恢复。你的限额：https://console.typesafe.ai/rate-limits 。需要更高的限额，请写信至 sales@typesafe.ai。",
             ],

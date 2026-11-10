@@ -119,7 +119,7 @@ describe("the workspace's settings on the phone: who opens what (the web's sub-n
     // No Geral (what the agents know of the workspace) or GIFs: those are the workspace's, for admins. Uso stays:
     // their own plans' meters, in percentages (ADR 0063).
     // The Vault is every member's (ADR 0144): their own items, and the team's shared with them.
-    expect(ids(["read", "post"])).toEqual(["members", "connectors", "computers", "vault", "apps", "usage", "keys"]);
+    expect(ids(["read", "post"])).toEqual(["members", "connectors", "computers", "vault", "apps", "usage"]);
     expect(ids(["read", "manage_agents"])).toEqual([
       "right_hand",
       "members",
@@ -130,7 +130,6 @@ describe("the workspace's settings on the phone: who opens what (the web's sub-n
       "skills",
       "apps",
       "usage",
-      "keys",
     ]);
     expect(ids(["read", "configure"])).toEqual(expect.arrayContaining(["general", "media", "storage"]));
     expect(ids(["read", "view_audit"])).toContain("audit");
@@ -168,10 +167,9 @@ describe("a personal workspace's settings on the phone (ADR 0159 §3): one short
   const ids = (entries: readonly { id: string }[]) => entries.map((s) => s.id);
   const src = (file: string) => readFileSync(join(import.meta.dir, "..", "..", "src", "features", file), "utf8");
 
-  test("alone: About you, AI and apps, Plan and usage, Vault, Computers; every other section under Advanced", () => {
+  test("alone: About you, AI and usage, Connectors, Vault, Computers; every other section under Advanced", () => {
     const { main, advanced } = personalSections(owner("personal"), 0);
-    expect(ids(main)).toEqual(["general", "keys", "usage", "vault", "computers"]);
-    // Connectors and Skills are on AI and apps' screen, so neither list repeats them; the rest keeps its groups.
+    expect(ids(main)).toEqual(["general", "usage", "connectors", "vault", "computers"]);
     expect(ids(advanced)).toEqual([
       "right_hand",
       "media",
@@ -179,20 +177,22 @@ describe("a personal workspace's settings on the phone (ADR 0159 §3): one short
       "roles",
       "audit",
       "access",
+      "skills",
       "apps",
       "storage",
       "import",
     ]);
-    expect([...main, ...advanced].length + 2).toBe(visibleSections(owner("personal")).length);
-    expect(ids(personalAiParts(owner("personal")))).toEqual(["connectors", "skills"]);
+    // Every section is in one list or the other: the AI accounts screen holds none.
+    expect([...main, ...advanced].length).toBe(visibleSections(owner("personal")).length);
+    expect(ids(personalAiParts(owner("personal")))).toEqual([]);
   });
 
   test("People joins the short list after About you once someone else is a member, never while that loads", () => {
     expect(ids(personalSections(owner("personal"), 2).main)).toEqual([
       "general",
       "members",
-      "keys",
       "usage",
+      "connectors",
       "vault",
       "computers",
     ]);
@@ -203,12 +203,10 @@ describe("a personal workspace's settings on the phone (ADR 0159 §3): one short
   test("only where a section is listed changes: a family member opens the same sections as in a team's", () => {
     const member = { id: "o", name: "Pessoal", role: "member" as const, permissions: ["read", "post"] };
     const { main, advanced } = personalSections({ ...member, mode: "personal" }, 1);
-    // No About you (the workspace's context is who configures it), and Skills isn't theirs: Connectors stays on AI and
-    // apps, which they open.
-    expect(ids(main)).toEqual(["members", "keys", "usage", "vault", "computers"]);
+    // No About you (the workspace's context is who configures it), and Skills isn't theirs.
+    expect(ids(main)).toEqual(["members", "usage", "connectors", "vault", "computers"]);
     expect(ids(advanced)).toEqual(["apps"]);
-    expect(ids(personalAiParts({ ...member, mode: "personal" }))).toEqual(["connectors"]);
-    expect(new Set([...ids(main), ...ids(advanced), "connectors"])).toEqual(
+    expect(new Set([...ids(main), ...ids(advanced)])).toEqual(
       new Set(ids(visibleSections({ ...member, mode: "personal" }))),
     );
   });
@@ -276,9 +274,8 @@ describe("the workspace's page: one short value per row", () => {
         connectors: ["Planilhas", "E-mail"],
         skills: 0,
         computers: { count: 2, online: 1 },
-        keys: { manages: false, plans: 2 },
       }),
-    ).toEqual({ members: "5", access: "4", usage: "40%", connectors: "2", computers: "1 de 2", keys: "2" });
+    ).toEqual({ members: "5", access: "4", usage: "40%", connectors: "2", computers: "1 de 2" });
     // On plans alone the budget says nothing; nothing connected, no computer: no value at all.
     expect(
       areaValues(t, "pt-BR", {

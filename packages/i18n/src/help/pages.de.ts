@@ -378,7 +378,7 @@ export const helpDe: Partial<Record<HelpSlug, HelpDocument>> = {
               "Öffne https://console.typesafe.ai und melde dich mit Google oder deiner E-Mail-Adresse an. Ein neues Konto entsteht auf demselben Weg.",
               "Lade in der Konsole Guthaben auf. Jev ist Prepaid.",
               "Öffne https://console.typesafe.ai/keys, erstelle einen Schlüssel und kopiere ihn sofort.",
-              "Öffne in agentes.chat **Einstellungen\u00a0›\u00a0KI-Konten** und füge ihn unter **Jev** ein. Nur die Person, die diesen Server eingerichtet hat, sieht ihn.",
+              "Öffne in agentes.chat **Einstellungen\u00a0›\u00a0KI und Verbrauch** und füge ihn unter **Jev** ein. Nur die Person, die diesen Server eingerichtet hat, sieht ihn.",
             ],
           },
           "Auf einem Server, den du mit Docker betreibst, kannst du den Schlüssel stattdessen als `TYPESAFE_API_KEY` in `.env` eintragen. Dieser hat Vorrang vor dem in den Einstellungen.",
@@ -392,7 +392,7 @@ export const helpDe: Partial<Record<HelpSlug, HelpDocument>> = {
             list: [
               "US$ 0,042 pro Million Tokens, die Jev liest. Seine Antworten sind kostenlos. Zu wählen, wer antwortet, liest etwa 2.500 Tokens, also etwa US$ 0,0001. Ein Screenshot sind etwa 3.900 Tokens.",
               "Gekauftes Guthaben gilt 12 Monate. Schalte in der Konsole das automatische Aufladen ein, damit Jev das Guthaben nicht ausgeht.",
-              "**Einstellungen\u00a0›\u00a0KI-Konten** zeigt, wie viele Entscheidungen Jev diesen Monat getroffen hat und was sie gekostet haben.",
+              "**Einstellungen\u00a0›\u00a0KI und Verbrauch** zeigt, wie viele Entscheidungen Jev diesen Monat getroffen hat und was sie gekostet haben.",
             ],
           },
         ],
@@ -423,7 +423,7 @@ export const helpDe: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           {
             list: [
-              "**Schlüssel nicht akzeptiert:** Erstelle einen neuen Schlüssel und füge ihn unter **Einstellungen\u00a0›\u00a0KI-Konten** ein.",
+              "**Schlüssel nicht akzeptiert:** Erstelle einen neuen Schlüssel und füge ihn unter **Einstellungen\u00a0›\u00a0KI und Verbrauch** ein.",
               "**Kein Guthaben mehr:** Lade in der Konsole Guthaben auf. Jev versucht es innerhalb von 30 Minuten erneut, oder klick auf **Erneut prüfen**.",
               "**Ausgelastet oder nicht erreichbar:** TypeSafe kann Anfragen pro Sekunde begrenzen oder eine Weile nicht antworten. Jev macht von selbst weiter. Deine Limits: https://console.typesafe.ai/rate-limits. Für höhere schreib an sales@typesafe.ai.",
             ],

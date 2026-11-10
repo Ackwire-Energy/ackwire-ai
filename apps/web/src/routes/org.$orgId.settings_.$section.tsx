@@ -1,17 +1,17 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { Main } from "@/components/Main";
 import { SettingsPage } from "@/pages/SettingsPage";
-import { isSettingsSection, settingsSearch } from "@/pages/settings-sections";
+import { isSettingsSection, MOVED_SETTINGS_SECTIONS, settingsSearch } from "@/pages/settings-sections";
 
 /** One settings section per URL: `/settings/connectors` (OAuth returns here with `?connected`/`?review=1`/`?mail`). */
 export const Route = createFileRoute("/org/$orgId/settings_/$section")({
   validateSearch: settingsSearch,
   beforeLoad: ({ params, search }) => {
-    // Settings › Computers became Devices: old links still land there.
-    if (params.section === "computers")
+    const moved = MOVED_SETTINGS_SECTIONS[params.section];
+    if (moved)
       throw redirect({
         to: "/org/$orgId/settings/$section",
-        params: { ...params, section: "devices" },
+        params: { ...params, section: moved },
         search,
         replace: true,
       });

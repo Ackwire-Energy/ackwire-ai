@@ -1,21 +1,16 @@
 import {
-  useAgents,
-  useAiAccounts,
-  useAiStatus,
   useComputerSetup,
   useConnections,
-  useCredentials,
   useInvitations,
   useMachines,
   useOverview,
-  usePlatformKey,
   useSkills,
   useStorage,
+  useWorkspaceUsesApi,
 } from "@agenteschat/client";
 import { computerEdition } from "@agenteschat/client/lib/computer";
 import { can } from "@agenteschat/client/lib/permissions";
 import { settingsSectionNameKey } from "@agenteschat/client/lib/personal-view";
-import { workspaceUsesApi } from "@agenteschat/client/lib/plan-usage";
 import { rightHandOf } from "@agenteschat/client/lib/right-hand";
 import { Fragment, type ReactElement } from "react";
 import { useTranslation } from "react-i18next";
@@ -46,7 +41,6 @@ const SHORT: Partial<Record<SettingsSection, string>> = {
   roles: "mobile.settings.section.roles",
   access: "mobile.settings.section.access",
   connectors: "mobile.settings.section.connectors",
-  usage: "mobile.settings.section.usage",
 };
 
 /**
@@ -234,34 +228,18 @@ function useAreaValues(areas: readonly SettingsEntry[]) {
   const connections = useConnections(orgId);
   const skills = useSkills(orgId, shown("skills"));
   const machines = useMachines(orgId, shown("computers"));
-  const managesKeys = can(org, "manage_credentials");
-  const credentials = useCredentials(orgId, managesKeys);
-  const plans = useAiAccounts(orgId, shown("keys") && !managesKeys);
-  const platform = usePlatformKey(orgId);
   const storage = useStorage(orgId, shown("storage"));
   const edition = computerEdition(useComputerSetup(orgId, shown("storage")).data);
-  const agents = useAgents(orgId).data ?? [];
-  const aiStatus = useAiStatus(orgId).data;
+  const usesApi = useWorkspaceUsesApi(orgId);
   return areaValues(t, i18n.language, {
     overview: overview.data,
-    usesApi: overview.data && workspaceUsesApi(agents, aiStatus, overview.data.budgetUsedPercent),
+    usesApi,
     invitations: invitations.data?.length,
     connectors: connections.data?.filter((x) => !x.revokedAt).map((x) => x.label),
     skills: skills.data?.length,
     computers: machines.data
       ? { count: machines.data.length, online: machines.data.filter((m) => m.online).length }
       : undefined,
-    keys: managesKeys
-      ? credentials.data
-        ? {
-            manages: true,
-            live: credentials.data.filter((k) => !k.revokedAt).length,
-            platform: Boolean(platform.data),
-          }
-        : undefined
-      : plans.data
-        ? { manages: false, plans: plans.data.accounts.length }
-        : undefined,
     storage: storage.data && edition ? { kind: storage.data.kind, edition } : undefined,
   });
 }

@@ -13377,14 +13377,11 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
   line-height: 18px;
   color: var(--ink-muted);
 }
-/* A plan's or a key's row is a MediaRow: the maker's logo and its name on one line, the facts, notes and meter under
-   them; its actions end the name's line, or go under the words in a list under 480px. As deep as it is wide at its
-   ends: a plan's meter makes it a block. */
-.ai-accounts__list,
+/* A key's row is a MediaRow: the maker's logo and its name on one line, the facts and notes under them; its actions
+   end the name's line, or go under the words in a list under 480px. */
 .key-list {
   container-type: inline-size;
 }
-.ai-accounts__row,
 .key-row {
   padding: var(--row-py) var(--space-4);
 }
@@ -13394,11 +13391,7 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
 .ai-accounts__name {
   font-weight: 600;
 }
-.ai-accounts__row .ac-planmeter {
-  margin-top: 4px;
-  max-width: 320px;
-}
-/* Who picks the agents (Settings › AI accounts): the title with how they are picked beside it, one line on who picks
+/* Who picks the agents (Settings › AI and usage): the title with how they are picked beside it, one line on who picks
    now, and Jev's key under it for the installation's owner. */
 .who-card .ac-card__action > .ac-link,
 .jev__foot {

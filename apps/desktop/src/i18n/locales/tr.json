@@ -321,7 +321,7 @@
     "usageRestart": "Değiştirmek agentes.chat'i kısa bir süre yeniden başlatır.",
     "jev": "Jev",
     "jevText": "TypeSafe'in hızlı bir modeli: kimin yanıt vereceğini seçer, belleği düzenli tutar ve ajanların ekranı görmesini sağlar. İsteğe bağlı, kendi anahtarınızla.",
-    "jevWhere": "agentes.chat › Ayarlar › Yapay zeka hesapları bölümünde.",
+    "jevWhere": "agentes.chat › Ayarlar › Yapay zeka ve kullanım bölümünde.",
     "reachFailed": "Cihazlarınızdan erişim açılmadı: {{reason}}.",
     "backup": "Şimdi yedekle",
     "backedUp": "Yedeklendi: {{file}}",

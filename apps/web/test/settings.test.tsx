@@ -461,18 +461,25 @@ describe("Configurações do workspace", () => {
       router.navigate({ to: "/org/$orgId/settings/$section", params: { orgId: ORG_ID, section: "usage" } }),
     );
     await settle(4);
-    // The plan accounts by computer, each window with every agent's part, then the API per agent (ADR 0063).
-    const plans = screen().getByRole("region", { name: "Contas dos planos" });
-    expect(plans.textContent).toContain("MacBook");
-    expect(plans.textContent).toContain("A conta que os seus agentes dividemMax");
-    expect(plans.textContent).toContain("Claude Code · de Walter");
+    // The plan accounts, each a row that opens to its windows with every agent's part, then the API per agent
+    // (ADR 0063).
+    const plans = screen().getByRole("region", { name: "Contas" });
+    const head = within(plans).getByRole("button", { name: /^A conta que os seus agentes dividem/ });
+    // Closed: its name, plan and owner, and one meter, the fullest window. One computer: it isn't named.
+    expect(head.textContent).toBe("A conta que os seus agentes dividemMaxde Walter5h 62%");
+    expect(head.getAttribute("aria-expanded")).toBe("false");
+    expect(within(plans).getAllByRole("meter")).toHaveLength(1);
+    expect(plans.textContent).not.toContain("MacBook");
+    await click(head);
+    expect(head.getAttribute("aria-expanded")).toBe("true");
+    expect(plans.querySelector(".plan-row__body .plan-acct__sub")?.textContent).toBe("Claude Code");
     expect(within(plans).getByRole("meter", { name: "Semana" }).getAttribute("aria-valuenow")).toBe("41");
     // The week's bar split by agent, and one list: no line of parts under it.
     expect(within(plans).getByRole("meter", { name: "Semana" }).querySelectorAll(".ac-meter__seg").length).toBe(2);
     expect(plans.textContent).not.toContain("Ada ≈ 30%");
     expect([...plans.querySelectorAll(".plan-shares__row")].map((r) => r.textContent)).toEqual([
-      "Ada30%4,5 mi",
-      "Atlas11%600 mil",
+      "Ada · semana 30% · 4,5 mi tokens",
+      "Atlas · semana 11% · 600 mil tokens",
     ]);
     expect(plans.textContent).toContain("5,1 mi tokens este mês · ≈ US$\u00a092,00 pelo preço da API");
     const api = screen().getByRole("region", { name: "API do workspace" });
@@ -493,6 +500,7 @@ describe("Configurações do workspace", () => {
       "Agentes sem orçamento próprio usam este. O de cada agente muda na página dele. Admins veem valores e membros veem porcentagens.",
     ]);
     await act(async () => fireEvent.change(field, { target: { value: "80" } }));
+    console.log("DBG", field.value, field.isConnected, (within(fallback).getByRole("button", { name: "Salvar" }) as HTMLButtonElement).disabled, fallback.isConnected, fallback.querySelector("form")?.outerHTML.slice(-900), state.calls.slice(-6).map((c) => c.method));
     await click(within(fallback).getByRole("button", { name: "Salvar" }));
     await settle(4);
     expect(state.calls.findLast((c) => c.method === "orgs.updateSettings")?.args[1]).toEqual({
@@ -579,9 +587,8 @@ describe("Configurações do workspace", () => {
       "Cofre",
       "Conectores e MCPs",
       "Dispositivos",
-      // Their own plans' meters, in percentages (ADR 0063).
-      "Orçamento e uso",
-      "Contas de IA",
+      // The AI accounts and their meters, in percentages (ADR 0063).
+      "IA e uso",
     ]);
     // Settings opens on their account: what the agents know of the workspace is not theirs to read.
     expect(screen().queryByLabelText("O que os agentes sabem da Acme")).toBeNull();
@@ -590,15 +597,11 @@ describe("Configurações do workspace", () => {
     await go(state, "settings/connectors");
     expect(screen().queryByRole("button", { name: "Adicionar conector" })).toBeNull();
     cleanup();
-    // Contas de IA: their own plans, never the workspace's keys.
-    await go(state, "settings/keys");
-    expect(screen().getByRole("region", { name: "Seus planos" })).toBeTruthy();
-    expect(screen().queryByRole("region", { name: "Chaves de provedor" })).toBeNull();
-    cleanup();
-    // Orçamento e uso: the plans in percentages, never money or the workspace's report.
+    // IA e uso: the plans in percentages, never the workspace's keys, money or report.
     await go(state, "settings/usage");
-    const plans = screen().getByRole("region", { name: "Contas dos planos" });
+    const plans = screen().getByRole("region", { name: "Contas" });
     expect(within(plans).getByRole("meter", { name: "5 horas" }).getAttribute("aria-valuenow")).toBe("62");
+    expect(screen().queryByRole("region", { name: "Chaves de provedor" })).toBeNull();
     expect(screen().queryByRole("region", { name: "Gastos da API por tipo" })).toBeNull();
     expect(screen().queryByRole("region", { name: "Orçamento padrão dos agentes" })).toBeNull();
     expect(document.body.textContent).not.toContain("US$");
@@ -638,10 +641,10 @@ describe("Configurações do workspace", () => {
     expect(screen().getByRole("heading", { level: 2, name: "Sua conta" })).toBeTruthy();
   });
 
-  test("budget and usage: the plans' estimate is their title's ⓘ, no card has a subtitle or footer; no plans, one line", async () => {
+  test("AI and usage: the plans' estimate is their title's ⓘ, no card has a subtitle or footer; no plans, one line", async () => {
     await go(seedState(), "settings/usage");
-    const plans = screen().getByRole("region", { name: "Contas dos planos" });
-    expect(hintOf("Contas dos planos", plans)).toMatchObject({
+    const plans = screen().getByRole("region", { name: "Contas" });
+    expect(hintOf("Contas", plans)).toMatchObject({
       text: "Os planos só dizem quanto a conta inteira usou. A parte de cada agente é uma estimativa, pelo que cada um gastou nela.",
       hidden: true,
     });
@@ -653,13 +656,16 @@ describe("Configurações do workspace", () => {
     api.orgs.planUsage = async () => ({ month: "2026-10", money: true, accounts: [], api: [] });
     await renderApp(`/org/${ORG_ID}/settings/usage`, { api });
     await settle(5);
-    expect(shownText(screen().getByRole("region", { name: "Contas dos planos" }))).toBe(
-      "Contas dos planosUse o plano de IA que você já pagaConecte um plano e acompanhe aqui o quanto cada agente usa dele.Conectar uma IA",
+    const empty = screen().getByRole("region", { name: "Contas" });
+    expect(shownText(empty)).toBe(
+      "ContasUse o plano de IA que você já pagaConecte um plano e acompanhe aqui o quanto cada agente usa dele.Conectar uma IA",
     );
+    // One way to connect one, in the empty state: the head's button is for a list that has accounts.
+    expect(within(empty).getAllByRole("button", { name: "Conectar uma IA" })).toHaveLength(1);
   });
 });
 
-describe("a plan account's agents (Contas dos planos)", () => {
+describe("a plan account's agents (IA e uso › Contas)", () => {
   /** The shared account with more agents than the list shows: Ada and Atlas, and five made-up colleagues. */
   const crowded = () => {
     const api = createFakeApi(seedState());
@@ -686,7 +692,8 @@ describe("a plan account's agents (Contas dos planos)", () => {
   test("the bar split in each agent's color, then one list biggest share first, then when it renews and the month", async () => {
     await renderApp(`/org/${ORG_ID}/settings/usage`, { api: crowded() });
     await settle(5);
-    const plans = screen().getByRole("region", { name: "Contas dos planos" });
+    const plans = screen().getByRole("region", { name: "Contas" });
+    await click(within(plans).getByRole("button", { name: /^A conta que os seus agentes dividem/ }));
     const week = within(plans).getByRole("meter", { name: "Semana" });
     const segs = [...week.querySelectorAll<HTMLElement>(".ac-meter__seg")];
     // Colours only for the agents the list shows: the folded ones stay the plain use under them.
@@ -695,15 +702,17 @@ describe("a plan account's agents (Contas dos planos)", () => {
     // The total stays at the bar's right.
     expect(plans.textContent).toContain("Semana41%");
     const rows = () => [...plans.querySelectorAll(".plan-shares__row")].map((r) => r.textContent);
+    // One line of words per agent, starting at the list's left edge: no column titles over empty cells.
     expect(rows()).toEqual([
-      "Ada30%4,5 mi",
-      "Atlas11%600 mil",
-      "Rio2%900 mil",
-      "Nova1,5%700 mil",
-      "Lia1,2%500 mil",
-      "+2 agentes1,5%500 mil",
+      "Ada · semana 30% · 4,5 mi tokens",
+      "Atlas · semana 11% · 600 mil tokens",
+      "Rio · semana 2% · 900 mil tokens",
+      "Nova · semana 1,5% · 700 mil tokens",
+      "Lia · semana 1,2% · 500 mil tokens",
+      "+2 agentes · semana 1,5% · 500 mil tokens",
     ]);
-    expect(within(plans).getByText("Este mês")).toBeTruthy();
+    expect(plans.querySelector(".plan-shares__head")).toBeNull();
+    expect(plans.textContent).not.toContain("Este mês");
     // When it renews, once, under the list; then how old the numbers are; then the month.
     const text = plans.textContent ?? "";
     expect(plans.querySelectorAll(".ac-planmeter__reset").length).toBe(1);
@@ -718,7 +727,7 @@ describe("a plan account's agents (Contas dos planos)", () => {
     expect(more.getAttribute("aria-expanded")).toBe("false");
     await click(more);
     await settle(2);
-    expect(rows().slice(5)).toEqual(["Theo<1%300 mil", "Bia<1%200 mil"]);
+    expect(rows().slice(5)).toEqual(["Theo · semana <1% · 300 mil tokens", "Bia · semana <1% · 200 mil tokens"]);
     expect(within(plans).queryByRole("button", { name: /\+2 agentes/ })).toBeNull();
   });
 });

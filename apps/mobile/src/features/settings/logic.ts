@@ -57,7 +57,6 @@ export type SettingsSection =
   | "access"
   | "connectors"
   | "skills"
-  | "keys"
   | "storage"
   | "computers"
   | "usage"
@@ -123,11 +122,9 @@ export const SETTINGS_SECTIONS: readonly SettingsEntry[] = [
   { id: "skills", group: "agents", icon: "sparkle", href: "/settings/skills", allowed: (o) => can(o, "manage_agents") },
   // AI apps (ADR 0119): each person's own connections in this workspace; connecting one happens on the web.
   { id: "apps", group: "agents", icon: "share", href: "/settings/apps", allowed: () => true },
-  // Everyone (ADR 0063): their plans' meters and the agents whose details they see, in tokens and percentages;
-  // money only for who has `view_usage`.
+  // "IA e uso", for everyone (ADR 0063): the workspace's AI accounts with their meters and the agents whose details
+  // they see, in tokens and percentages; money only for who has `view_usage`. It leads to the AI accounts screen.
   { id: "usage", group: "costs", icon: "chart", href: "/usage", allowed: () => true },
-  // "Contas de IA": everyone's own plans; the workspace's API keys only for who manages them.
-  { id: "keys", group: "costs", icon: "brain", href: "/ai-accounts", allowed: (o) => can(o, "read") },
   { id: "storage", group: "costs", icon: "archive", href: "/settings/storage", allowed: (o) => can(o, "configure") },
   { id: "import", group: "costs", icon: "out", href: "/settings/import", allowed: (o) => can(o, "create_agents") },
 ];
@@ -148,15 +145,18 @@ export interface PersonalSettings {
 
 /**
  * A personal workspace's settings on the phone (ADR 0159 §3), from the sections this person opens, as the web lists
- * them (`personalSettingsNav`): About you, AI and apps, Plan and usage, Vault and Computers in one list, with People
+ * them (`personalSettingsNav`): About you, AI and usage, Connectors, Vault and Computers in one list, with People
  * after About you once someone else is a member (`others`, unknown while loading: it doesn't); every other one under
- * Advanced, but for Connectors and Skills, which AI and apps shows at its foot. Only where a section is listed
+ * Advanced. Only where a section is listed
  * changes: each opens the same screen, with the same permission, as in a team's workspace.
  */
 export const personalSections = (org: OrgSummary | null | undefined, others: number | undefined): PersonalSettings =>
   personalSettingsNav(visibleSections(org), others);
 
-/** What AI and apps lists at its foot in a personal workspace: Connectors and Skills, those this person opens. */
+/**
+ * What the AI accounts screen lists at its foot in a personal workspace: the sections it holds (`personalSettingsHost`),
+ * those this person opens. None now that Connectors has its own row.
+ */
 export function personalAiParts(org: OrgSummary | null | undefined): SettingsEntry[] {
   const open = visibleSections(org);
   const ids = new Set<string>(open.map((s) => s.id));
@@ -190,8 +190,6 @@ export interface TileFacts {
   connectors?: string[] | undefined;
   skills?: number | undefined;
   computers?: { count: number; online: number } | undefined;
-  /** Who manages keys sees the workspace's; anyone else, their own plans. */
-  keys?: { manages: true; live: number; platform: boolean } | { manages: false; plans: number } | undefined;
   storage?: { kind: "agentes" | "s3"; edition: "cloud" | "selfhost" } | undefined;
 }
 
@@ -210,10 +208,6 @@ export function areaValues(t: TFunction, locale: string, f: TileFacts): Partial<
   if (f.skills !== undefined && f.skills > 0) out.skills = String(f.skills);
   if (f.computers && f.computers.count > 0)
     out.computers = t("mobile.settings.ofOnline", { online: f.computers.online, count: f.computers.count });
-  if (f.keys) {
-    const n = f.keys.manages ? f.keys.live : f.keys.plans;
-    if (n > 0) out.keys = String(n);
-  }
   return out;
 }
 

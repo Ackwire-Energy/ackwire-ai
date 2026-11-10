@@ -4082,6 +4082,41 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
         }
       : {}),
   };
+  // As the server's: the usage views list every account on a computer, so what `setAiAccounts` set is there too, each
+  // the viewer's own with its address, after the computer's own sign-in.
+  const seededPlans = client.orgs.planUsage;
+  client.orgs.planUsage = async (...args) => {
+    const usage = await seededPlans(...args);
+    const { accounts } = await client.machines.aiAccounts(...args);
+    return {
+      ...usage,
+      accounts: [
+        ...usage.accounts,
+        ...accounts.map((a) => ({
+          key: `${a.machineId}:${a.kind}:${a.id}`,
+          machineId: a.machineId,
+          machineName: a.computer,
+          kind: a.kind,
+          accountId: a.id,
+          label: a.label,
+          plan: a.plan,
+          provider: a.provider,
+          ownerName: a.ownerName,
+          mine: a.mine,
+          email: a.email,
+          signedOut: a.status === "signed_out",
+          usage: a.usage && { ...a.usage, windows: a.usage.windows.map((w) => ({ ...w, agents: [] })) },
+          agents: a.usedBy.map((name) => ({
+            agentId: state.agents.find((x) => x.name === name)?.id ?? name,
+            name,
+            tokens: 0,
+            now: true,
+          })),
+          monthTokens: 0,
+        })),
+      ],
+    };
+  };
   fakeMachinesOf.set(client, machines);
   fakeDevicesOf.set(client, devices);
   fakeMailOf.set(client, mail);

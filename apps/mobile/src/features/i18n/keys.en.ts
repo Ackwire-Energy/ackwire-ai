@@ -1159,7 +1159,6 @@ export const featureKeysEn = {
     proposalsWaiting_other: "{{count}} waiting",
     drive: "Drive",
     connectors: "Connectors and MCPs",
-    usage: "Usage",
     preferences: "Preferences",
     editProfile: "Edit profile",
     switchWorkspace: "Switch workspace",
@@ -2321,7 +2320,6 @@ export const featureKeysEn = {
       roles: "Roles",
       access: "Agents' access",
       connectors: "Connectors",
-      usage: "Usage and budget",
     },
     /** The computers row's value: how many are on, of how many. */
     ofOnline: "{{online}} of {{count}}",

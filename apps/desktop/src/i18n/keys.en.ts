@@ -350,7 +350,7 @@ export const desktopEn = {
     jev: "Jev",
     jevText:
       "A fast model by TypeSafe that picks who answers, keeps memory tidy and lets agents see the screen. Optional, with your own key.",
-    jevWhere: "In agentes.chat\u00a0›\u00a0Settings\u00a0›\u00a0AI accounts.",
+    jevWhere: "In agentes.chat\u00a0›\u00a0Settings\u00a0›\u00a0AI and usage.",
     reachFailed: "Access from your devices didn't turn on: {{reason}}.",
     backup: "Back up now",
     backedUp: "Backed up: {{file}}",

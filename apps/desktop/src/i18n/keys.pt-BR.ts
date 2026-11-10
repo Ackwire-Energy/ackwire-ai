@@ -352,7 +352,7 @@ export const desktopPtBR = {
     jev: "Jev",
     jevText:
       "Um modelo rápido da TypeSafe que escolhe quem responde, organiza a memória e deixa os agentes enxergarem a tela. Opcional, com uma chave sua.",
-    jevWhere: "No agentes.chat\u00a0›\u00a0Configurações\u00a0›\u00a0Contas de IA.",
+    jevWhere: "No agentes.chat\u00a0›\u00a0Configurações\u00a0›\u00a0IA e uso.",
     reachFailed: "O acesso pelos aparelhos não ligou: {{reason}}.",
     backup: "Fazer backup agora",
     backedUp: "Backup feito: {{file}}",

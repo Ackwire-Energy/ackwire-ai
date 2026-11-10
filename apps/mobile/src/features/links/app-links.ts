@@ -28,7 +28,8 @@ export const SETTINGS_SCREENS: Record<string, string> = {
   access: "/settings/access",
   connectors: "/connectors",
   skills: "/settings/skills",
-  keys: "/ai-accounts",
+  // AI accounts became part of AI and usage: its old address opens that.
+  keys: "/usage",
   storage: "/settings/storage",
   computers: "/settings/devices",
   devices: "/settings/devices",

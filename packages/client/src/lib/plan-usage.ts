@@ -329,6 +329,69 @@ export function accountShares(account: Pick<PlanAccountUsage, "usage" | "agents"
   };
 }
 
+type AccountWindows = NonNullable<PlanAccountUsage["usage"]>;
+
+/** Two logins of one account as one: the newest reading of its windows with both logins' agents, their months summed. */
+function mergeLogin(a: PlanAccountUsage, b: PlanAccountUsage): PlanAccountUsage {
+  const newest = (x: AccountWindows | null, y: AccountWindows | null) =>
+    x && y ? (Date.parse(y.at) > Date.parse(x.at) ? [y, x] : [x, y]) : [x ?? y, null];
+  const [usage, other] = newest(a.usage, b.usage);
+  const agents = a.agents.map((x) => ({ ...x }));
+  for (const x of b.agents) {
+    const same = agents.find((y) => y.agentId === x.agentId);
+    if (same) Object.assign(same, { tokens: same.tokens + x.tokens, now: same.now || x.now });
+    else agents.push({ ...x });
+  }
+  return {
+    ...a,
+    signedOut: a.signedOut && b.signedOut,
+    usage: usage
+      ? {
+          ...usage,
+          windows: usage.windows.map((w) => {
+            const theirs = other?.windows.find((o) => o.kind === w.kind && o.label === w.label)?.agents ?? [];
+            const mine = w.agents ?? [];
+            const more = theirs.filter((t) => !mine.some((m) => m.agentId === t.agentId));
+            return more.length > 0 ? { ...w, agents: [...mine, ...more] } : w;
+          }),
+        }
+      : null,
+    agents,
+    monthTokens: a.monthTokens + b.monthTokens,
+    ...(typeof a.equivalentUsd === "number" || typeof b.equivalentUsd === "number"
+      ? { equivalentUsd: (a.equivalentUsd ?? 0) + (b.equivalentUsd ?? 0) }
+      : {}),
+  };
+}
+
+/**
+ * The usage views' accounts with the viewer's own logins of one account as one row, as their plans group them
+ * (`groupPlans`, from `GET …/ai-accounts`): a plan with a login per agent, or one signed in again and again, is one
+ * account to its owner. The row stands where its first login was and goes by it. Anyone else's logins stay as the
+ * server lists them: what tells them apart (the address, the key's end) is only their owner's to see.
+ */
+export function groupUsageAccounts(
+  accounts: readonly PlanAccountUsage[],
+  mine: Pick<AiAccounts, "accounts"> | undefined,
+): PlanAccountUsage[] {
+  const groupOf = new Map<string, string>();
+  for (const g of groupPlans(mine?.accounts ?? []))
+    for (const l of g.logins) groupOf.set(`${l.machineId}:${l.id}`, g.key);
+  const out: PlanAccountUsage[] = [];
+  const rowOf = new Map<string, number>();
+  for (const a of accounts) {
+    const group = a.accountId ? groupOf.get(`${a.machineId}:${a.accountId}`) : undefined;
+    const row = group === undefined ? undefined : rowOf.get(group);
+    const first = row === undefined ? undefined : out[row];
+    if (row !== undefined && first) out[row] = mergeLogin(first, a);
+    else {
+      if (group !== undefined) rowOf.set(group, out.length);
+      out.push(a);
+    }
+  }
+  return out;
+}
+
 /** What people call a plan account: its label, or the computer's own sign-in's name (`ownSignInName`). */
 export const accountName = (t: TFunction, a: Pick<PlanAccountInfo, "label" | "machineName" | "mine" | "kind">) =>
   a.label ?? ownSignInName(t, a.mine, a.machineName, a.kind);

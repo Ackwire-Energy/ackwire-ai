@@ -51,8 +51,8 @@ describe("a personal workspace's settings list", () => {
     expect(rows()).toEqual([
       "Sua conta",
       "Sobre você",
-      "IA e apps",
-      "Plano e uso",
+      "IA e uso",
+      "Conectores e MCPs",
       "Cofre",
       "Dispositivos",
       "Avançado",
@@ -68,23 +68,24 @@ describe("a personal workspace's settings list", () => {
       "Sua conta",
       "Sobre você",
       "Pessoas",
-      "IA e apps",
-      "Plano e uso",
+      "IA e uso",
+      "Conectores e MCPs",
       "Cofre",
       "Dispositivos",
       "Avançado",
     ]);
   });
 
-  test("Advanced shows every other section the person may open; connectors and skills are on AI and apps", async () => {
+  test("Advanced shows every other section the person may open, Skills among them; connectors are in the list", async () => {
     await go(alone());
     await click(within(nav()).getByRole("button", { name: "Avançado" }));
     expect(within(nav()).getByRole("button", { name: "Avançado" }).getAttribute("aria-expanded")).toBe("true");
     const all = rows();
-    for (const name of ["Notificações", "Pessoas", "Papéis e permissões", "Auditoria", "Armazenamento"])
+    for (const name of ["Notificações", "Pessoas", "Papéis e permissões", "Auditoria", "Armazenamento", "Skills"])
       expect(all).toContain(name);
-    expect(all).not.toContain("Conectores e MCPs");
-    expect(all).not.toContain("Skills");
+    expect(all.filter((name) => name === "Conectores e MCPs")).toHaveLength(1);
+    expect(all.indexOf("Conectores e MCPs")).toBeLessThan(all.indexOf("Avançado"));
+    expect(all.indexOf("Skills")).toBeGreaterThan(all.indexOf("Avançado"));
     expect(all.indexOf("Notificações")).toBeGreaterThan(all.indexOf("Avançado"));
   });
 
@@ -94,25 +95,22 @@ describe("a personal workspace's settings list", () => {
     expect(marked()).toBe("Papéis e permissões");
   });
 
-  test("AI and apps holds the AI accounts, connectors and skills, each under its heading", async () => {
+  test("the old address of AI accounts opens AI and usage, where the accounts and the keys are", async () => {
     await go(personal(), "settings/keys");
-    expect(marked()).toBe("IA e apps");
-    for (const name of ["IA e apps", "Conectores e MCPs", "Skills"])
-      expect(screen().getAllByRole("heading", { level: 2, name }).length).toBeGreaterThan(0);
+    expect(marked()).toBe("IA e uso");
+    expect(screen().getByRole("region", { name: "Contas" })).toBeTruthy();
+    expect(screen().getByRole("region", { name: "Chaves de provedor" })).toBeTruthy();
+    // Connectors and Skills are sections of their own: not on this page.
+    expect(screen().queryByRole("heading", { level: 2, name: "Conectores e MCPs" })).toBeNull();
+    expect(screen().queryByRole("heading", { level: 2, name: "Skills" })).toBeNull();
   });
 
-  test("connectors' own address still opens them alone, AI and apps marked in the list", async () => {
-    await go(personal(), "settings/connectors");
-    expect(marked()).toBe("IA e apps");
-    expect(document.querySelector(".settings__body > .ac-pagehead h2")?.textContent).toBe("Conectores e MCPs");
-  });
-
-  test("Plan and usage holds Plan and billing where a billing service runs", async () => {
+  test("AI and usage holds Plan and billing where a billing service runs", async () => {
     const state = personal();
     state.authConfig = { ...state.authConfig, billingUrl: "https://billing.example.com" };
     await go(state, "settings/usage");
-    expect(marked()).toBe("Plano e uso");
-    expect(screen().getAllByRole("heading", { level: 2, name: "Plano e uso" }).length).toBeGreaterThan(0);
+    expect(marked()).toBe("IA e uso");
+    expect(screen().getAllByRole("heading", { level: 2, name: "IA e uso" }).length).toBeGreaterThan(0);
     expect(screen().getByRole("heading", { level: 2, name: "Plano e cobrança" })).toBeTruthy();
     expect(rows()).not.toContain("Plano e cobrança");
   });

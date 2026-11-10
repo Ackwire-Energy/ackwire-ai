@@ -1,9 +1,6 @@
 import type { Credential, OrgSettings } from "@agenteschat/client";
 import {
   useAddCredential,
-  useAgents,
-  useAiAccounts,
-  useAiStatus,
   useAuthConfig,
   useComposioUsage,
   useComputerSetup,
@@ -22,6 +19,7 @@ import {
   useStorage,
   useUpdateSettings,
   useUsageReport,
+  useWorkspaceUsesApi,
 } from "@agenteschat/client";
 import { selfHosted, showsAbout } from "@agenteschat/client/lib/about";
 import { keyRemovalText } from "@agenteschat/client/lib/ai-accounts";
@@ -81,7 +79,6 @@ import { AiAppsSection } from "@/components/AiApps";
 import { ApprovalsSection } from "@/components/ApprovalCover";
 import { AuditSection } from "@/components/Audit";
 import { AutoModelsRow } from "@/components/AutoModels";
-import { AiAccountsSection } from "@/components/ai/AiAccounts";
 import { usePlanHold } from "@/components/ai/ConnectAiSteps";
 import { EndpointForm } from "@/components/ai/EndpointForm";
 import { WhoPicksSection } from "@/components/ai/Jev";
@@ -98,7 +95,7 @@ import { MediaSettingsSection } from "@/components/MediaSettings";
 import { NoticePrefsSection } from "@/components/NoticePrefs";
 import { useOrg } from "@/components/org-context";
 import { UsageTabs } from "@/components/PeopleUsage";
-import { PlanUsageCards } from "@/components/PlanUsage";
+import { ApiCard, PlanUsageCards } from "@/components/PlanUsage";
 import { MyFace, OrgLogoDialog, OrgMark } from "@/components/ProfilePhoto";
 import { KeyMismatch, KeyRefused, KeySite, ProviderKeySelect } from "@/components/ProviderKey";
 import { RightHandSettingsSection } from "@/components/RightHandSettings";
@@ -114,7 +111,6 @@ import { useDirectory } from "@/hooks/useDirectory";
 import { usePersonalView } from "@/hooks/usePersonalView";
 import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { useOpenParam } from "@/lib/open-param";
-import { workspaceUsesApi } from "@/lib/plan-usage";
 import { useToast } from "@/lib/toast";
 import { MembersPage } from "./MembersPage";
 import { SETTINGS_GROUPS, SETTINGS_SECTIONS, type SettingsSection, settingsNavEntry } from "./settings-sections";
@@ -315,23 +311,6 @@ function Settings({
           <ConnectorsSection connected={connected} outcome={outcome} review={review} mail={mail} account={account} />
         )}
         {current === "skills" && <SkillsSection install={install} connected={connected} skill={skill} />}
-        {current === "keys" && (
-          <>
-            <AiAccountsSection />
-            <KeysSection />
-            <WhoPicksSection />
-            {personal && opens("connectors") && (
-              <SettingsPart id="connectors">
-                <ConnectorsSection />
-              </SettingsPart>
-            )}
-            {personal && opens("skills") && (
-              <SettingsPart id="skills">
-                <SkillsSection />
-              </SettingsPart>
-            )}
-          </>
-        )}
         {current === "storage" && <StorageSection />}
         {current === "devices" && (device ? <DevicePage path={device} /> : <DevicesSection start={connect} />)}
         {current === "usage" && (
@@ -353,10 +332,10 @@ function Settings({
 }
 
 /**
- * A section on another one's page in a personal workspace (ADR 0159 §3): Connectors and MCPs and Skills on AI and
- * apps, Plan and billing on Plan and usage, each under its own heading.
+ * A section on another one's page in a personal workspace (ADR 0159 §3): Plan and billing on AI and usage, under its
+ * own heading.
  */
-function SettingsPart({ id, children }: { id: "connectors" | "skills" | "billing"; children: ReactNode }) {
+function SettingsPart({ id, children }: { id: "billing"; children: ReactNode }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   return (
@@ -778,22 +757,13 @@ function SettingsTiles() {
   const connections = useConnections(org.id);
   const skills = useSkills(org.id, shown("skills"));
   const machines = useMachines(org.id, shown("devices"));
-  const managesKeys = can(org, "manage_credentials");
-  const credentials = useCredentials(org.id, managesKeys);
-  const plans = useAiAccounts(org.id, shown("keys") && !managesKeys);
-  const platform = usePlatformKey(org.id);
   const storage = useStorage(org.id, shown("storage"));
   const edition = computerEdition(useComputerSetup(org.id, shown("storage")).data);
-  const agents = useAgents(org.id).data ?? [];
-  const aiStatus = useAiStatus(org.id).data;
+  const usesApi = useWorkspaceUsesApi(org.id);
   // The budget's share only where the workspace uses the API: on plans alone no 0% budget (ADR 0063 §5).
-  const budget =
-    overview.data && workspaceUsesApi(agents, aiStatus, overview.data.budgetUsedPercent)
-      ? overview.data.budgetUsedPercent
-      : null;
+  const budget = overview.data && usesApi ? overview.data.budgetUsedPercent : null;
 
   const live = (connections.data ?? []).filter((c) => !c.revokedAt);
-  const keys = (credentials.data ?? []).filter((c) => !c.revokedAt);
   const online = (machines.data ?? []).filter((m) => m.online).length;
   const pending = invitations.data?.length ?? 0;
   const state: Partial<Record<SettingsSection, string | undefined>> = {
@@ -825,17 +795,6 @@ function SettingsTiles() {
         : t("settings.tileState.devices", { count: machines.data.length, online })),
     usage:
       budget !== null ? t("settings.tileState.usage", { percent: formatPercent(i18n.language, budget) }) : undefined,
-    keys: managesKeys
-      ? credentials.data &&
-        (keys.length > 0
-          ? t("settings.tileState.keys", { count: keys.length })
-          : platform.data
-            ? t("settings.tileState.platformKey")
-            : t("settings.tileState.noKeys"))
-      : plans.data &&
-        (plans.data.accounts.length > 0
-          ? t("settings.tileState.plans", { count: plans.data.accounts.length })
-          : t("settings.tileState.noPlans")),
     storage:
       storage.data && edition
         ? t(storage.data.kind === "s3" ? "storage.s3" : edition === "cloud" ? "storage.agentes" : "storage.server")
@@ -1241,10 +1200,16 @@ export function KeyDialog({
  * Uso (ADR 0063): the plan accounts by computer and the API per agent for everyone (money only for
  * admins), then the API's spend by kind and the default budget (admins).
  */
+/**
+ * IA e uso › Resumo: the workspace's AI accounts, then its provider keys and who picks the agents. What bills per use
+ * (the API per agent, its spend by kind, the default budget) shows only once the workspace uses the API
+ * (`workspaceUsesApi`): on plans alone there is no budget to show.
+ */
 function UsageSection() {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
-  const allowed = can(org, "view_usage");
+  const usesApi = useWorkspaceUsesApi(org.id);
+  const allowed = can(org, "view_usage") && usesApi;
   const report = useUsageReport(org.id, allowed);
   // Calls, not money: every member sees them.
   const composio = useComposioUsage(org.id);
@@ -1256,6 +1221,8 @@ function UsageSection() {
           <span className="small">{composioUsageText(t, i18n.language, composio.data)}</span>
         </Card>
       )}
+      <KeysSection />
+      {usesApi && <ApiCard />}
       {allowed && (
         <Card aria-labelledby="sec-usage">
           <CardHeader id="sec-usage" icon="chart" title={t("settings.usageTitle")} />
@@ -1285,6 +1252,7 @@ function UsageSection() {
         </Card>
       )}
       {allowed && <DefaultBudgetCard />}
+      <WhoPicksSection />
     </>
   );
 }

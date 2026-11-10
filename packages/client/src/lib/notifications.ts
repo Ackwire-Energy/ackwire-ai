@@ -332,7 +332,7 @@ export type OpenTarget =
   | { to: "/org/$orgId/settings/computers/$machineId"; params: { machineId: string } }
   | {
       to: "/org/$orgId/settings/$section";
-      params: { section: "computers" | "members" | "usage" | "connectors" | "billing" | "approvals" | "keys" };
+      params: { section: "computers" | "members" | "usage" | "connectors" | "billing" | "approvals" };
     }
   | { to: "/org/$orgId/home"; search?: { widget: string } }
   | { to: "/org/$orgId/dashboards" }
@@ -412,8 +412,8 @@ export function openTarget(n: AppNotification): OpenTarget | null {
   // The agent's model left its plan's list: its page, with "Quem pensa" open to choose another.
   if (n.kind === "plan_model_dropped" && s.agentId)
     return { to: "/org/$orgId/agents/$agentId", params: { agentId: s.agentId }, search: { sec: "brain" } };
-  // Someone gave an agent the person's plan: Contas de IA, where their plans and the agents on them are.
-  if (n.kind === "plan_lent") return { to: "/org/$orgId/settings/$section", params: { section: "keys" } };
+  // Someone gave an agent the person's plan: IA e uso, where their plans and the agents on them are.
+  if (n.kind === "plan_lent") return { to: "/org/$orgId/settings/$section", params: { section: "usage" } };
   // An update of a skill from its link: the skill, in Skills.
   if (n.kind === "skill_update")
     return {

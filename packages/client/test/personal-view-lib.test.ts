@@ -35,7 +35,6 @@ describe("a personal workspace's settings list", () => {
       "skills",
       "devices",
       "usage",
-      "keys",
       "storage",
       "billing",
     ]);
@@ -46,18 +45,18 @@ describe("a personal workspace's settings list", () => {
       "account",
       "computers",
     ]);
-    // Connectors, skills and billing are on AI and apps' and Plan and usage's pages, not listed again.
-    expect(advanced.map((s) => s.id)).toEqual(["notifications", "members", "roles", "storage"]);
+    // Billing is on AI and usage's page, not listed again.
+    expect(advanced.map((s) => s.id)).toEqual(["notifications", "members", "roles", "skills", "storage"]);
   });
 
   test("with other people here, People joins the short list after About you; alone or unknown, it doesn't", () => {
-    const open = sections(["account", "general", "members", "roles", "vault", "usage", "keys", "computers"]);
+    const open = sections(["account", "general", "members", "roles", "vault", "usage", "connectors", "computers"]);
     expect(personalSettingsNav(open, 1).main.map((s) => s.id)).toEqual([
       "account",
       "general",
       "members",
-      "keys",
       "usage",
+      "connectors",
       "vault",
       "computers",
     ]);
@@ -67,28 +66,27 @@ describe("a personal workspace's settings list", () => {
   });
 
   test("a section the person can't open is left out; a part whose page they can't open stays under Advanced", () => {
-    const { main, advanced } = personalSettingsNav(sections(["account", "vault", "connectors", "usage"]));
-    expect(main.map((s) => s.id)).toEqual(["account", "usage", "vault"]);
-    expect(advanced.map((s) => s.id)).toEqual(["connectors"]);
+    const { main, advanced } = personalSettingsNav(sections(["account", "vault", "billing", "skills"]));
+    expect(main.map((s) => s.id)).toEqual(["account", "vault"]);
+    expect(advanced.map((s) => s.id)).toEqual(["billing", "skills"]);
   });
 
-  test("a part's page: AI and apps for connectors and skills, Plan and usage for billing, when it opens", () => {
-    const open = new Set(["keys", "usage"]);
-    expect(personalSettingsHost("connectors", open)).toBe("keys");
-    expect(personalSettingsHost("skills", open)).toBe("keys");
+  test("a part's page: AI and usage for billing, when it opens", () => {
+    const open = new Set(["connectors", "usage"]);
     expect(personalSettingsHost("billing", open)).toBe("usage");
+    expect(personalSettingsHost("skills", open)).toBeNull();
     expect(personalSettingsHost("vault", open)).toBeNull();
-    expect(personalSettingsHost("connectors", new Set(["usage"]))).toBeNull();
+    expect(personalSettingsHost("billing", new Set(["connectors"]))).toBeNull();
   });
 
   test("names and lines: a personal workspace's own for the sections it renames, the usual ones elsewhere", () => {
     expect(settingsSectionNameKey(personal, "general")).toBe("settings.section.generalPersonal");
-    expect(settingsSectionNameKey(personal, "keys")).toBe("settings.section.keysPersonal");
-    expect(settingsSectionNameKey(personal, "usage")).toBe("settings.section.usagePersonal");
+    expect(settingsSectionNameKey(personal, "usage")).toBe("settings.section.usage");
+    expect(settingsSectionTextKey(personal, "usage")).toBe("settings.sectionText.usagePersonal");
     expect(settingsSectionNameKey(personal, "vault")).toBe("settings.section.vault");
     expect(settingsSectionNameKey(team, "general")).toBe("settings.section.general");
     // An older server says no mode: a team's.
-    expect(settingsSectionNameKey({}, "keys")).toBe("settings.section.keys");
+    expect(settingsSectionNameKey({}, "usage")).toBe("settings.section.usage");
     expect(settingsSectionTextKey(personal, "connectors")).toBe("settings.sectionText.connectorsPersonal");
     expect(settingsSectionNameKey(personal, "members")).toBe("settings.section.membersPersonal");
     expect(settingsSectionTextKey(personal, "roles")).toBe("settings.sectionText.rolesPersonal");

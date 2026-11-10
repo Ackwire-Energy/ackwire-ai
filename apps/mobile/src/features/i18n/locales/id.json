@@ -1024,7 +1024,6 @@
     "proposalsWaiting_other": "{{count}} menunggu",
     "drive": "Drive",
     "connectors": "Konektor dan MCP",
-    "usage": "Pemakaian",
     "preferences": "Preferensi",
     "editProfile": "Ubah profil",
     "switchWorkspace": "Ganti ruang kerja",
@@ -2113,8 +2112,7 @@
       "members": "Anggota",
       "roles": "Peran",
       "access": "Akses agen",
-      "connectors": "Konektor",
-      "usage": "Pemakaian dan anggaran"
+      "connectors": "Konektor"
     },
     "ofOnline": "{{online}} dari {{count}}",
     "deleteName": "Hapus {{name}}",

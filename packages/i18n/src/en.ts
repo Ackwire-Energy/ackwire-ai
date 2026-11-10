@@ -2189,7 +2189,7 @@ export const en = {
       workspaceHelp: "People without their own plan talk to {{name}} through this AI.",
       workspacePlan: "Workspace plan",
       workspacePlanHelp: "A plan in place of the key. It serves other people only when its owner lets it.",
-      noPlans: "Connect a plan in AI accounts to use it here.",
+      noPlans: "Connect a plan in AI and usage to use it here.",
       pickPlan: "Choose a plan",
       /** "Atende outras pessoas" on the workspace's plan. */
       sharesOn: "On: people without their own plan talk to {{name}} through this plan.",
@@ -8977,7 +8977,6 @@ export const en = {
     page: {
       title: "Your plans",
       hint: "Each plan stays on the computer it was connected on, and whoever runs that computer can reach it. agentes.chat keeps only its name, email and usage.",
-      empty: "Sign in with your account and agents think with it.",
       emptyTitle: "Use the AI plan you already pay for",
       emptyViewer: "Whoever looks after the workspace's AI connects a plan, and it shows up here.",
       connect: "Connect an AI",
@@ -13582,11 +13581,10 @@ export const en = {
       access: "Agents and access",
       connectors: "Connectors and MCPs",
       skills: "Skills",
-      keys: "AI accounts",
       storage: "Storage",
       computers: "Computers",
       devices: "Devices",
-      usage: "Budget and usage",
+      usage: "AI and usage",
       audit: "Audit log",
       import: "Import and export",
       billing: "Plan and billing",
@@ -13595,12 +13593,10 @@ export const en = {
       apps: "AI apps",
       approvals: "Approvals",
       about: "About agentes.chat",
-      // A personal workspace's names (ADR 0159): General, AI accounts and Budget and usage in their own words.
+      // A personal workspace's names (ADR 0159): General and Members in their own words.
       generalPersonal: "About you",
-      /** AI accounts, connectors and skills on one page. */
+      /** The phone's AI accounts screen. */
       keysPersonal: "AI and apps",
-      /** Budget and usage, and the plan and billing, on one page. */
-      usagePersonal: "Plan and usage",
       /** Members and invitations, in the short list once someone else is a member. */
       membersPersonal: "People",
     },
@@ -13617,9 +13613,8 @@ export const en = {
       access: "What each agent can use: one level per connector.",
       connectors: "Services and MCP servers connected once for the whole workspace.",
       skills: "Markdown instructions agents open when they need them.",
-      keys: "Your plans and the workspace's API keys.",
       storage: "Where the workspace's files live.",
-      usage: "How much AI each person and each agent uses, and the month's limits.",
+      usage: "The workspace's AI accounts, and how much each person and agent uses.",
       audit: "What agents did outside the conversation and what people changed.",
       import: "Bring agents from another app or workspace, or take this one along.",
       billing: "The plan, card and invoices, on a page of ours outside the app.",
@@ -13629,7 +13624,6 @@ export const en = {
       approvals: "Who decides for you when an agent asks for your approval.",
       about: "Who makes it, its license and where its source code is.",
       generalPersonal: "What your agents know about you, and how this workspace works.",
-      keysPersonal: "The AI your agents think with, and the apps and skills they use.",
       usagePersonal: "How much AI your agents use, and your plan.",
       connectorsPersonal: "Your apps and MCP servers, connected once for your agents.",
       membersPersonal: "Who's here with you, and invitations.",
@@ -13783,13 +13777,6 @@ export const en = {
       devices_other: "{{online}} of {{count}} on",
       noDevices: "No device yet",
       usage: "{{percent}} of the budget used this month",
-      keys_one: "{{count}} key",
-      keys_other: "{{count}} keys",
-      platformKey: "Using this server's key",
-      noKeys: "No keys yet",
-      plans_one: "{{count}} plan",
-      plans_other: "{{count}} plans",
-      noPlans: "No plans yet",
     },
     import: {
       title: "Import",
@@ -14093,7 +14080,6 @@ export const en = {
     apiPriceHint:
       "When agents use plans, nobody pays by use. This amount is what the same use would cost through the API.",
     /** The column of each agent's tokens in an account's list. */
-    thisMonth: "This month",
     /** The row an account's list folds the rest of its agents into: how many (`percent`, their share, sits beside it). */
     moreAgents_one: "+{{count}} agent",
     moreAgents_other: "+{{count}} agents",
@@ -14102,7 +14088,7 @@ export const en = {
     estimate:
       "Plans only tell how much the whole account used. Each agent's part is an estimate, from what each one spent on it.",
     accounts: {
-      title: "Plan accounts",
+      title: "Accounts",
       empty: "Connect a plan and follow here how much each agent uses.",
     },
     api: {
