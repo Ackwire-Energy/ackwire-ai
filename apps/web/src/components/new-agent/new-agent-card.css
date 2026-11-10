@@ -237,7 +237,7 @@
   top: 10px;
   right: 10px;
   display: flex;
-  gap: 6px;
+  gap: 8px;
 }
 .nac__glass.ac-btn {
   background: var(--sky-glass);

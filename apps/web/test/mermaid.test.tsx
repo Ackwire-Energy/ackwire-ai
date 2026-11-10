@@ -191,8 +191,11 @@ describe("the frame mermaid draws in", () => {
 
   test("a frame that doesn't answer in time is thrown away, and the next drawing gets a fresh one", async () => {
     const stuck = drawWithMermaid("stuck", FLOW, false, 30);
+    // Watched before anything else is awaited: on a busy machine the 30 ms end before the frame is ready, and a
+    // rejection nobody watches yet fails the test as an unhandled error.
+    const failed = expect(stuck).rejects.toThrow("didn't finish");
     const first = await readyFrame();
-    await expect(stuck).rejects.toThrow("didn't finish");
+    await failed;
     expect(first.removed).toBe(true);
     const next = drawWithMermaid("next", FLOW, false, 1000);
     expect(frames).toHaveLength(2);
