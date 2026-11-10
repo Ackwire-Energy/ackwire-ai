@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { createMemoryPubSub } from "@agenteschat/adapters";
+import { createMemoryPubSub, listenResumedTopic } from "@agenteschat/adapters";
 import { CACHE_TOPIC, caches, enableCaches, shareCacheInvalidations } from "../src";
 
 afterEach(() => enableCaches(false));
@@ -38,4 +38,17 @@ test("an invalidation reaches every process: published where the write was, appl
   // Stopped: invalidations stay here.
   caches.agents.delete("org1:agent1");
   expect(seen).toHaveLength(4);
+});
+
+test("a process whose LISTEN came back after a gap forgets what it cached: invalidations sent meanwhile never reached it", async () => {
+  enableCaches();
+  const pubsub = createMemoryPubSub();
+  const stop = shareCacheInvalidations(pubsub);
+  try {
+    caches.scopes.set("org1:agent1:visible", ["deploy"]);
+    await pubsub.publish(listenResumedTopic, { type: "pubsub.resumed" });
+    expect(caches.scopes.get("org1:agent1:visible")).toBeUndefined();
+  } finally {
+    stop();
+  }
 });

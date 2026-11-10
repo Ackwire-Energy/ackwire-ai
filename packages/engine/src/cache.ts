@@ -1,4 +1,4 @@
-import type { PubSub } from "@agenteschat/adapters";
+import { listenResumedTopic, type PubSub } from "@agenteschat/adapters";
 
 /**
  * Per-process caches for data read on every run but rarely changed (agent
@@ -135,7 +135,8 @@ export const CACHE_TOPIC = "system:cache-invalidate";
 /**
  * Every process forgets what any process changed (ADR 0163): an invalidation of `caches` made here is published,
  * and one received is applied here without being published again. Without it, a worker would go on reading a revoked
- * scope, a removed member or a changed credential until its entry's TTL ran out. Returns the way to stop.
+ * scope, a removed member or a changed credential until its entry's TTL ran out. A process whose LISTEN came back after
+ * a gap (`listenResumedTopic`) missed the invalidations sent meanwhile: it forgets everything. Returns the way to stop.
  */
 export function shareCacheInvalidations(pubsub: Pick<PubSub, "publish" | "subscribe">) {
   const named: Record<string, TtlCache<unknown>> = caches;
@@ -148,8 +149,12 @@ export function shareCacheInvalidations(pubsub: Pick<PubSub, "publish" | "subscr
     if (target && typeof event.key === "string" && (op === "delete" || op === "deletePrefix" || op === "clear"))
       target.apply(op, event.key);
   });
+  const offResumed = pubsub.subscribe(listenResumedTopic, () => {
+    for (const c of Object.values(named)) c.apply("clear", "");
+  });
   return () => {
     off();
+    offResumed();
     for (const c of Object.values(named)) c.onInvalidate = undefined;
   };
 }
