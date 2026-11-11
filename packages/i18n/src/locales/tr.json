@@ -1400,6 +1400,110 @@
     "moveDown": "Aşağı taşı",
     "restoreOrder": "Varsayılan sırayı geri yükle"
   },
+  "install": {
+    "frames": "{{system}} için kurulum",
+    "step": "Adım {{n}}",
+    "previous": "Önceki adım",
+    "next": "Sonraki adım",
+    "fullGuide": "Adım adım tam anlatım",
+    "copied": "Kopyalandı. Terminale yapıştırın.",
+    "mac": {
+      "why": "<b>Uygulama beta aşamasında.</b> Bu yüzden ilk seferde Mac'iniz onay ister:",
+      "drag": "agentes.chat'i Uygulamalar'a sürükleyin.",
+      "dragLong": "İndirilen dosyayı açın ve agentes.chat'i Uygulamalar'a sürükleyin.",
+      "blocked": "Uygulamayı açın ve Bitti'ye tıklayın.",
+      "blockedSub": "Çöp Sepeti'ne Taşı'ya tıklamayın.",
+      "settings": "Ayarlar › Gizlilik ve Güvenlik bölümünde Yine de Aç'a tıklayın.",
+      "settingsLong": "Hemen ardından Sistem Ayarları › Gizlilik ve Güvenlik'i açın, Güvenlik bölümüne inin ve Yine de Aç'a tıklayın.",
+      "settingsSub": "Düğme orada yalnızca uygulamayı açmayı denedikten sonra (2. adım) görünür ve yaklaşık bir saat sonra kaybolur. Yok mu? Uygulamayı tekrar açın ve geri gelin.",
+      "settingsShort": "Yalnızca 2. adımdan hemen sonra görünür.",
+      "openSettings": "Gizlilik ve Güvenlik'i aç",
+      "confirm": "Touch ID veya parolanızla onaylayın.",
+      "confirmLong": "Yine de Aç'a tekrar tıklayın ve Touch ID veya Mac parolanızla onaylayın.",
+      "done": "Tamam: artık doğrudan açılır.",
+      "stuckTitle": "Düğme hâlâ yok mu, ya da Mac'iniz uygulamanın hasarlı olduğunu mu söylüyor?",
+      "stuckText": "Bunu Terminal'e yapıştırın ve uygulamayı tekrar açın:"
+    },
+    "windows": {
+      "why": "<b>Uygulama beta aşamasında.</b> Bu yüzden ilk seferde Windows onay ister:",
+      "keep": "Tarayıcınız sorarsa Sakla'yı seçin.",
+      "more": "Yükleyiciyi açın ve Ek bilgi'ye tıklayın.",
+      "moreLong": "Yükleyiciyi açın. Windows bilgisayarınızı korudu mesajı çıkarsa Ek bilgi'ye tıklayın.",
+      "run": "Yine de çalıştır'a tıklayın.",
+      "runLong": "Yine de çalıştır'a tıklayın ve yükleyicinin adımlarını izleyin.",
+      "done": "Tamam: artık doğrudan açılır."
+    },
+    "linux": {
+      "why": "Ubuntu, Debian ve benzeri sistemler için (x64). Linux fazladan bir şey sormaz:",
+      "apt": ".deb dosyasını çift tıklayarak ya da terminalden kurun.",
+      "aptLong": "İndirilen dosyaya çift tıklayıp Yükle'ye tıklayın ya da bunu terminale yapıştırın:",
+      "open": "agentes.chat'i uygulamalarınızdan açın."
+    },
+    "page": {
+      "docTitle": "Uygulamayı indirin · agentes.chat",
+      "title": "agentes.chat uygulamasını indirin",
+      "beta": "Beta",
+      "text": "Workspace'iniz kendi penceresinde, sisteminizin bildirimleriyle. Tek tıkla ajanlar bu bilgisayarda, kendilerine ait klasörlerde çalışır.",
+      "open": "agentes.chat'i aç",
+      "version": "Sürüm {{version}}",
+      "versionSize": "Sürüm {{version}} · {{size}}",
+      "soon": "{{system}} için henüz bir sürüm yok.",
+      "unavailable": "Uygulama şu anda buradan indirilemiyor. Birazdan tekrar deneyin.",
+      "installOn": "{{system}} için kur",
+      "system": "Sistem",
+      "whyTitle": "Bilgisayarım neden onay istiyor?",
+      "whyText": "agentes.chat beta aşamasında: Mac sürümü henüz Apple tarafından onaylanmadı (notarize edilmedi) ve Windows yükleyicisi henüz bir Microsoft sertifikası taşımıyor. Bunlar olmadan bilgisayarınız, internetten indirilen bir uygulamayı açmadan önce bir kez sorar. Sonrasında doğrudan açılır ve kendini günceller. Beta bitmeden bu adım kalkacak.",
+      "openSource": "Açık kaynak",
+      "onlyHere": "Yalnızca burada ve projenin sürümlerinde yayımlanır",
+      "signedUpdates": "İmzalı güncellemeler"
+    },
+    "scene": {
+      "finder": "Finder",
+      "file": "Dosya",
+      "edit": "Düzen",
+      "view": "Görüntü",
+      "window": "Pencere",
+      "applications": "Uygulamalar",
+      "notOpened": "“{{app}}” Açılmadı",
+      "notOpenedText": "Apple, “{{app}}” uygulamasının Mac'inize zarar verebilecek veya gizliliğinizi tehlikeye atabilecek kötü amaçlı yazılım içermediğini doğrulayamadı.",
+      "done": "Bitti",
+      "moveToTrash": "Çöp Sepeti'ne Taşı",
+      "search": "Ara",
+      "account": "Apple Hesabı",
+      "general": "Genel",
+      "appearance": "Görünüm",
+      "accessibility": "Erişilebilirlik",
+      "privacy": "Gizlilik ve Güvenlik",
+      "desktopDock": "Masaüstü ve Dock",
+      "displays": "Ekranlar",
+      "security": "Güvenlik",
+      "allowFrom": "Uygulamalara şuradan izin ver",
+      "allowValue": "App Store ve tanınmış geliştiriciler",
+      "blocked": "“{{app}}”, Mac'inizi korumak için engellendi.",
+      "openAnyway": "Yine de Aç",
+      "confirmTitle": "“{{app}}” açılsın mı?",
+      "confirmText": "Yalnızca nereden geldiğine güveniyorsanız açın.",
+      "touchIdTitle": "Sistem Ayarları",
+      "touchIdText": "Buna izin vermek için Touch ID'yi kullanın veya parolanızı girin.",
+      "password": "Parola",
+      "downloads": "İndirilenler",
+      "rare": "Bu dosya pek sık indirilmiyor. Açmadan önce güvenilir olduğundan emin olun.",
+      "delete": "Sil",
+      "keep": "Sakla",
+      "protectedTitle": "Windows bilgisayarınızı korudu",
+      "protectedText": "Microsoft Defender SmartScreen tanınmayan bir uygulamanın başlatılmasını engelledi. Bu uygulamayı çalıştırmak bilgisayarınızı riske atabilir.",
+      "protectedShort": "Microsoft Defender SmartScreen tanınmayan bir uygulamanın başlatılmasını engelledi.",
+      "moreInfo": "Ek bilgi",
+      "dontRun": "Çalıştırma",
+      "appLabel": "Uygulama:",
+      "publisher": "Yayımcı:",
+      "unknownPublisher": "Bilinmeyen yayımcı",
+      "runAnyway": "Yine de çalıştır",
+      "activities": "Etkinlikler",
+      "readingLists": "Paket listeleri okunuyor... Bitti",
+      "settingUp": "agentes-chat ({{version}}) ayarlanıyor ..."
+    }
+  },
   "legal": {
     "updated": "Son güncelleme: {{date}}",
     "contents": "Bu sayfada",
@@ -14369,6 +14473,9 @@
       "membersPersonal": "Kişiler"
     },
     "advanced": "Gelişmiş",
+    "tab": {
+      "account": "Profil"
+    },
     "sectionText": {
       "account": "Profiliniz ve uygulamanın size nasıl göründüğü.",
       "notifications": "Burada size bildirim olarak ulaşanlar. Gelen kutusu her şeyi saklar.",
@@ -14641,9 +14748,6 @@
         "jev": "Ajanlar kendiliğinden çıkartmayı yalnızca Jev ile gönderir.",
         "jevLink": "Jev'i kur"
       }
-    },
-    "tab": {
-      "account": "Profil"
     }
   },
   "personalMode": {

@@ -1439,9 +1439,9 @@ export const ptBR = {
       dragLong: "Abra o arquivo baixado e arraste o agentes.chat para Aplicativos.",
       blocked: "Abra o app e clique em Concluído.",
       blockedSub: "Não clique em Mover para o Lixo.",
-      settings: "Em Ajustes › Privacidade e Segurança, clique em Abrir Mesmo Assim.",
+      settings: "Em Ajustes\u00a0›\u00a0Privacidade e Segurança, clique em Abrir Mesmo Assim.",
       settingsLong:
-        "Logo depois, abra Ajustes do Sistema › Privacidade e Segurança, desça até Segurança e clique em Abrir Mesmo Assim.",
+        "Logo depois, abra Ajustes do Sistema\u00a0›\u00a0Privacidade e Segurança, desça até Segurança e clique em Abrir Mesmo Assim.",
       settingsSub:
         "O botão só aparece ali depois que você tenta abrir o app (passo 2), e some em cerca de uma hora. Não está lá? Abra o app de novo e volte.",
       settingsShort: "Só aparece logo depois do passo 2.",

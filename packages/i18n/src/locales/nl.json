@@ -1400,6 +1400,110 @@
     "moveDown": "Omlaag",
     "restoreOrder": "Standaardvolgorde herstellen"
   },
+  "install": {
+    "frames": "Zo installeer je het op {{system}}",
+    "step": "Stap {{n}}",
+    "previous": "Vorige stap",
+    "next": "Volgende stap",
+    "fullGuide": "Alle stappen in detail",
+    "copied": "Gekopieerd. Plak het in de terminal.",
+    "mac": {
+      "why": "<b>De app is in beta.</b> Daarom vraagt je Mac de eerste keer om een bevestiging:",
+      "drag": "Sleep agentes.chat naar Apps.",
+      "dragLong": "Open het gedownloade bestand en sleep agentes.chat naar Apps.",
+      "blocked": "Open de app en klik op Gereed.",
+      "blockedSub": "Klik niet op Verplaats naar prullenmand.",
+      "settings": "Klik in Systeeminstellingen › Privacy en beveiliging op Open toch.",
+      "settingsLong": "Open meteen daarna Systeeminstellingen › Privacy en beveiliging, scrol naar Beveiliging en klik op Open toch.",
+      "settingsSub": "De knop staat daar pas nadat je de app hebt geprobeerd te openen (stap 2), en verdwijnt na ongeveer een uur. Staat hij er niet? Open de app nog een keer en kom terug.",
+      "settingsShort": "Hij verschijnt alleen direct na stap 2.",
+      "openSettings": "Open Privacy en beveiliging",
+      "confirm": "Bevestig met Touch ID of je wachtwoord.",
+      "confirmLong": "Klik nog een keer op Open toch en bevestig met Touch ID of het wachtwoord van je Mac.",
+      "done": "Klaar: vanaf nu opent hij meteen.",
+      "stuckTitle": "Nog steeds geen knop, of zegt je Mac dat de app beschadigd is?",
+      "stuckText": "Plak dit in Terminal en open de app opnieuw:"
+    },
+    "windows": {
+      "why": "<b>De app is in beta.</b> Daarom vraagt Windows de eerste keer om een bevestiging:",
+      "keep": "Als je browser het vraagt, kies Behouden.",
+      "more": "Open het installatieprogramma en klik op Meer informatie.",
+      "moreLong": "Open het installatieprogramma. Als Uw pc is beveiligd door Windows verschijnt, klik op Meer informatie.",
+      "run": "Klik op Toch uitvoeren.",
+      "runLong": "Klik op Toch uitvoeren en volg het installatieprogramma.",
+      "done": "Klaar: vanaf nu opent hij meteen."
+    },
+    "linux": {
+      "why": "Voor Ubuntu, Debian en vergelijkbare systemen (x64). Linux vraagt niets extra:",
+      "apt": "Installeer de .deb met een dubbelklik, of via de terminal.",
+      "aptLong": "Dubbelklik op het gedownloade bestand en klik op Installeren, of plak dit in de terminal:",
+      "open": "Open agentes.chat vanuit je apps."
+    },
+    "page": {
+      "docTitle": "Download de app · agentes.chat",
+      "title": "Download de agentes.chat-app",
+      "beta": "Beta",
+      "text": "Je workspace in een eigen venster, met de meldingen van je systeem. Met één klik werken agents op deze computer, in hun eigen mappen.",
+      "open": "agentes.chat openen",
+      "version": "Versie {{version}}",
+      "versionSize": "Versie {{version}} · {{size}}",
+      "soon": "Er is nog geen versie voor {{system}}.",
+      "unavailable": "De app kan nu niet van hier worden gedownload. Probeer het zo opnieuw.",
+      "installOn": "Installeren op {{system}}",
+      "system": "Systeem",
+      "whyTitle": "Waarom vraagt mijn computer om een bevestiging?",
+      "whyText": "agentes.chat is in beta: de Mac-versie is nog niet door Apple genotariseerd, en het Windows-installatieprogramma heeft nog geen Microsoft-certificaat. Zonder die twee vraagt je computer één keer om bevestiging voordat hij een app van internet opent. Daarna opent hij meteen en werkt hij zichzelf bij. Voordat de beta afloopt, verdwijnt deze stap.",
+      "openSource": "Opensource",
+      "onlyHere": "Alleen hier en in de releases van het project gepubliceerd",
+      "signedUpdates": "Ondertekende updates"
+    },
+    "scene": {
+      "finder": "Finder",
+      "file": "Archief",
+      "edit": "Wijzig",
+      "view": "Weergave",
+      "window": "Venster",
+      "applications": "Apps",
+      "notOpened": "‘{{app}}’ is niet geopend",
+      "notOpenedText": "Apple kan niet verifiëren of ‘{{app}}’ vrij is van malware die je Mac kan beschadigen of je privacy in gevaar kan brengen.",
+      "done": "Gereed",
+      "moveToTrash": "Verplaats naar prullenmand",
+      "search": "Zoek",
+      "account": "Apple Account",
+      "general": "Algemeen",
+      "appearance": "Weergave",
+      "accessibility": "Toegankelijkheid",
+      "privacy": "Privacy en beveiliging",
+      "desktopDock": "Bureaublad en Dock",
+      "displays": "Beeldschermen",
+      "security": "Beveiliging",
+      "allowFrom": "Sta apps toe die zijn gedownload van",
+      "allowValue": "App Store en bekende ontwikkelaars",
+      "blocked": "‘{{app}}’ is geblokkeerd om je Mac te beschermen.",
+      "openAnyway": "Open toch",
+      "confirmTitle": "‘{{app}}’ openen?",
+      "confirmText": "Open het alleen als je de herkomst vertrouwt.",
+      "touchIdTitle": "Systeeminstellingen",
+      "touchIdText": "Gebruik Touch ID of voer je wachtwoord in om dit toe te staan.",
+      "password": "Wachtwoord",
+      "downloads": "Downloads",
+      "rare": "Dit bestand wordt niet vaak gedownload. Zorg ervoor dat u het vertrouwt voordat u het opent.",
+      "delete": "Verwijderen",
+      "keep": "Behouden",
+      "protectedTitle": "Uw pc is beveiligd door Windows",
+      "protectedText": "Microsoft Defender SmartScreen heeft voorkomen dat een niet-herkende app werd gestart. Als u deze app uitvoert, loopt uw pc mogelijk risico.",
+      "protectedShort": "Microsoft Defender SmartScreen heeft voorkomen dat een niet-herkende app werd gestart.",
+      "moreInfo": "Meer informatie",
+      "dontRun": "Niet uitvoeren",
+      "appLabel": "App:",
+      "publisher": "Uitgever:",
+      "unknownPublisher": "Onbekende uitgever",
+      "runAnyway": "Toch uitvoeren",
+      "activities": "Activiteiten",
+      "readingLists": "Pakketlijsten worden ingelezen... Klaar",
+      "settingUp": "agentes-chat ({{version}}) wordt ingesteld ..."
+    }
+  },
   "legal": {
     "updated": "Laatst bijgewerkt op {{date}}",
     "contents": "Op deze pagina",
@@ -14496,6 +14600,9 @@
       "membersPersonal": "Mensen"
     },
     "advanced": "Geavanceerd",
+    "tab": {
+      "account": "Profiel"
+    },
     "sectionText": {
       "account": "Je profiel en hoe de app er voor jou uitziet.",
       "notifications": "Wat je hier als melding bereikt. De inbox bewaart alles.",
@@ -14768,9 +14875,6 @@
         "jev": "Agents sturen alleen zelf stickers met Jev.",
         "jevLink": "Jev instellen"
       }
-    },
-    "tab": {
-      "account": "Profiel"
     }
   },
   "personalMode": {

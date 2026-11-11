@@ -1440,6 +1440,110 @@
     "moveDown": "Bajar",
     "restoreOrder": "Restaurar el orden predeterminado"
   },
+  "install": {
+    "frames": "Cómo instalar en {{system}}",
+    "step": "Paso {{n}}",
+    "previous": "Paso anterior",
+    "next": "Paso siguiente",
+    "fullGuide": "Paso a paso completo",
+    "copied": "Copiado. Pégalo en la terminal.",
+    "mac": {
+      "why": "<b>La app está en beta.</b> Por eso, la primera vez, tu Mac te pide que confirmes:",
+      "drag": "Arrastra agentes.chat a Aplicaciones.",
+      "dragLong": "Abre el archivo descargado y arrastra agentes.chat a Aplicaciones.",
+      "blocked": "Abre la app y haz clic en Aceptar.",
+      "blockedSub": "No hagas clic en Trasladar a la papelera.",
+      "settings": "En Ajustes › Privacidad y seguridad, haz clic en Abrir igualmente.",
+      "settingsLong": "Justo después, abre Ajustes del Sistema › Privacidad y seguridad, baja hasta Seguridad y haz clic en Abrir igualmente.",
+      "settingsSub": "El botón aparece ahí solo después de que intentes abrir la app (paso 2), y desaparece al cabo de una hora más o menos. ¿No está? Abre la app otra vez y vuelve.",
+      "settingsShort": "Aparece solo justo después del paso 2.",
+      "openSettings": "Abrir Privacidad y seguridad",
+      "confirm": "Confirma con Touch ID o tu contraseña.",
+      "confirmLong": "Haz clic otra vez en Abrir igualmente y confirma con Touch ID o la contraseña de tu Mac.",
+      "done": "Listo: a partir de ahora se abre directamente.",
+      "stuckTitle": "¿Sigue sin aparecer el botón, o tu Mac dice que la app está dañada?",
+      "stuckText": "Pega esto en Terminal y abre la app otra vez:"
+    },
+    "windows": {
+      "why": "<b>La app está en beta.</b> Por eso, la primera vez, Windows te pide que confirmes:",
+      "keep": "Si tu navegador pregunta, elige Conservar.",
+      "more": "Abre el instalador y haz clic en Más información.",
+      "moreLong": "Abre el instalador. Si aparece Windows protegió su PC, haz clic en Más información.",
+      "run": "Haz clic en Ejecutar de todas formas.",
+      "runLong": "Haz clic en Ejecutar de todas formas y sigue el instalador.",
+      "done": "Listo: a partir de ahora se abre directamente."
+    },
+    "linux": {
+      "why": "Para Ubuntu, Debian y sistemas similares (x64). Linux no pide nada más:",
+      "apt": "Instala el .deb con doble clic, o desde la terminal.",
+      "aptLong": "Haz doble clic en el archivo descargado y luego en Instalar, o pega esto en la terminal:",
+      "open": "Abre agentes.chat desde tus aplicaciones."
+    },
+    "page": {
+      "docTitle": "Descarga la app · agentes.chat",
+      "title": "Descarga la app de agentes.chat",
+      "beta": "Beta",
+      "text": "Tu espacio de trabajo en una ventana propia, con las notificaciones de tu sistema. Con un clic, los agentes trabajan en esta computadora, en carpetas propias.",
+      "open": "Abrir agentes.chat",
+      "version": "Versión {{version}}",
+      "versionSize": "Versión {{version}} · {{size}}",
+      "soon": "Todavía no hay versión para {{system}}.",
+      "unavailable": "Ahora mismo no se puede descargar la app desde aquí. Inténtalo de nuevo en un momento.",
+      "installOn": "Instalar en {{system}}",
+      "system": "Sistema",
+      "whyTitle": "¿Por qué mi computadora pide confirmación?",
+      "whyText": "agentes.chat está en beta: la versión para Mac todavía no está notarizada por Apple, y el instalador de Windows todavía no lleva un certificado de Microsoft. Sin ellos, tu computadora pregunta una vez antes de abrir una app descargada de internet. Después, se abre directamente y se actualiza sola. Antes de que termine la beta, este paso desaparece.",
+      "openSource": "Código abierto",
+      "onlyHere": "Publicada solo aquí y en los lanzamientos del proyecto",
+      "signedUpdates": "Actualizaciones firmadas"
+    },
+    "scene": {
+      "finder": "Finder",
+      "file": "Archivo",
+      "edit": "Edición",
+      "view": "Visualización",
+      "window": "Ventana",
+      "applications": "Aplicaciones",
+      "notOpened": "No se ha abierto “{{app}}”",
+      "notOpenedText": "Apple no ha podido verificar que “{{app}}” esté libre de software malicioso que pueda dañar tu Mac o poner en riesgo tu privacidad.",
+      "done": "Aceptar",
+      "moveToTrash": "Trasladar a la papelera",
+      "search": "Buscar",
+      "account": "Cuenta de Apple",
+      "general": "General",
+      "appearance": "Apariencia",
+      "accessibility": "Accesibilidad",
+      "privacy": "Privacidad y seguridad",
+      "desktopDock": "Escritorio y Dock",
+      "displays": "Pantallas",
+      "security": "Seguridad",
+      "allowFrom": "Permitir aplicaciones de",
+      "allowValue": "App Store y desarrolladores conocidos",
+      "blocked": "Se ha bloqueado “{{app}}” para proteger tu Mac.",
+      "openAnyway": "Abrir igualmente",
+      "confirmTitle": "¿Abrir “{{app}}”?",
+      "confirmText": "Ábrela solo si confías en su origen.",
+      "touchIdTitle": "Ajustes del Sistema",
+      "touchIdText": "Usa Touch ID o introduce tu contraseña para permitirlo.",
+      "password": "Contraseña",
+      "downloads": "Descargas",
+      "rare": "Este archivo no se descarga con frecuencia. Asegúrate de que confías en él antes de abrirlo.",
+      "delete": "Eliminar",
+      "keep": "Conservar",
+      "protectedTitle": "Windows protegió su PC",
+      "protectedText": "Microsoft Defender SmartScreen impidió el inicio de una aplicación no reconocida. Si ejecutas esta aplicación, podrías poner en riesgo tu PC.",
+      "protectedShort": "Microsoft Defender SmartScreen impidió el inicio de una aplicación no reconocida.",
+      "moreInfo": "Más información",
+      "dontRun": "No ejecutar",
+      "appLabel": "Aplicación:",
+      "publisher": "Editor:",
+      "unknownPublisher": "Editor desconocido",
+      "runAnyway": "Ejecutar de todas formas",
+      "activities": "Actividades",
+      "readingLists": "Leyendo lista de paquetes... Hecho",
+      "settingUp": "Configurando agentes-chat ({{version}}) ..."
+    }
+  },
   "legal": {
     "updated": "Última actualización: {{date}}",
     "contents": "En esta página",
@@ -14835,6 +14939,9 @@
       "membersPersonal": "Personas"
     },
     "advanced": "Avanzado",
+    "tab": {
+      "account": "Perfil"
+    },
     "sectionText": {
       "account": "Tu perfil y cómo se ve la app para ti.",
       "notifications": "Lo que te llega como aviso aquí. La bandeja de entrada guarda todo.",
@@ -15111,9 +15218,6 @@
         "jev": "Los agentes envían stickers por su cuenta solo con Jev.",
         "jevLink": "Configurar Jev"
       }
-    },
-    "tab": {
-      "account": "Perfil"
     }
   },
   "personalMode": {
