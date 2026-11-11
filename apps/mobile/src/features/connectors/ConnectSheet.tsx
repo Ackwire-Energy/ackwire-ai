@@ -28,6 +28,7 @@ import { sameServer } from "@agenteschat/client/lib/custom-tools";
 import { knownErrorText, oauthReturnText } from "@agenteschat/client/lib/errors";
 import { can } from "@agenteschat/client/lib/permissions";
 import { connectorName, scopeText } from "@agenteschat/client/lib/scopes";
+import { reviewDecisions, reviewToolsOf } from "@agenteschat/client/lib/tool-review";
 import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import { useQueryClient } from "@tanstack/react-query";
 import * as Clipboard from "expo-clipboard";
@@ -72,32 +73,30 @@ import {
   stateOf,
 } from "./logic";
 import { Problem } from "./Problem";
-import { ADDRESS_STEPS, CATALOG_STEPS, firstStep, STEP_KEYS, type Step } from "./review";
+import { ADDRESS_STEPS, CATALOG_STEPS, doneSummary, firstStep, reviewTarget, STEP_KEYS, type Step } from "./review";
 import { ReviewStep } from "./ToolReview";
 import { openTools } from "./ToolsScreen";
 
 /**
- * One service in a sheet over the gallery, in four steps as on the web: what agents could do there (what
- * always asks marked "pede sua aprovação") → connect (sign in in the browser and come back, or paste a key) →
- * its tools ("O que faz") → who uses it and how far. A connected one opens on who uses it (its tools are a screen
- * of their own; `item`: that connection, when the service is connected more than once; `start`, back from a
- * sign-in that finished elsewhere, with `fresh` saying it just connected). `mode` starts at connecting: `add`,
- * another account of the service (it goes on to its tools), or `reconnect`, a new sign-in for `item` (a toast
- * says it, and the sheet closes). `account`: GitHub's sign-in alone, without the agentes.chat app first (GitHub
- * through the app alone connecting an account).
+ * One service in a sheet over the gallery, as on the web: what agents could do there (what always asks marked
+ * "pede sua aprovação") → connect (sign in in the browser and come back, or paste a key) → a short confirmation
+ * that ends it. "Ajustar" there goes on to its tools ("O que faz") and who uses it and how far. A connected one
+ * opens on who uses it (its tools are a screen of their own; `item`: that connection, when the service is
+ * connected more than once; `start`, back from a sign-in that finished elsewhere). `mode` starts at connecting:
+ * `add`, another account of the service, or `reconnect`, a new sign-in for `item` (a toast says it, and the sheet
+ * closes). `account`: GitHub's sign-in alone, without the agentes.chat app first (GitHub through the app alone
+ * connecting an account).
  */
 export function ConnectSheet({
   def,
   item,
   start,
-  fresh = false,
   mode,
   account = false,
 }: {
   def: ConnectorDef;
   item?: ConnectedItem;
   start?: Step;
-  fresh?: boolean;
   mode?: "add" | "reconnect";
   account?: boolean;
 }) {
@@ -116,8 +115,6 @@ export function ConnectSheet({
   const connecting = Boolean(mode) || account;
   const [connectionId, setConnectionId] = useState<string | null>(connecting ? null : (existing?.id ?? null));
   const [step, setStep] = useState<Step>(() => (connecting ? "connect" : firstStep(existing, admin, start)));
-  // Connected in this sheet: it says so on top of its tools (the list catching up must not take that away).
-  const [justConnected, setJustConnected] = useState(fresh);
   const service = connectorName(t, def);
   const name =
     mode === "reconnect" && item
@@ -179,11 +176,12 @@ export function ConnectSheet({
           accountOnly={connecting}
           onConnected={(id) => {
             setConnectionId(id);
-            setJustConnected(true);
-            setStep("review");
+            setStep("done");
           }}
           onDone={sheet.close}
         />
+      ) : connectionId && step === "done" ? (
+        <DoneStep connectionId={connectionId} def={def} name={service} onAdjust={() => setStep("review")} />
       ) : connectionId ? (
         <ConnectedSteps
           step={step}
@@ -191,7 +189,6 @@ export function ConnectSheet({
           connectionId={connectionId}
           def={def}
           name={service}
-          justConnected={justConnected}
           item={mode ? undefined : existing}
         />
       ) : null}
@@ -242,15 +239,10 @@ export function AddressSheet({
         </View>
       </View>
       <Progress steps={ADDRESS_STEPS} step={step} />
-      {connected ? (
-        <ConnectedSteps
-          step={step}
-          onStep={setStep}
-          connectionId={connected.id}
-          def={null}
-          name={connected.name}
-          justConnected
-        />
+      {connected && step === "done" ? (
+        <DoneStep connectionId={connected.id} def={null} name={connected.name} onAdjust={() => setStep("who")} />
+      ) : connected ? (
+        <ConnectedSteps step={step} onStep={setStep} connectionId={connected.id} def={null} name={connected.name} />
       ) : (
         <ConnectStep
           def={null}
@@ -260,8 +252,7 @@ export function AddressSheet({
           reconnect={mode === "reconnect"}
           onConnected={(id, name) => {
             setConnected({ id, name });
-            // Its tools don't hold the flow: what needs a decision waits on the connection's screen.
-            setStep("who");
+            setStep("done");
           }}
           onDone={sheet.close}
         />
@@ -274,11 +265,11 @@ export function AddressSheet({
  * A server connected by its address that isn't in the catalog: its name and address, then its tools and who
  * uses it (the same steps as connecting it), and disconnecting it.
  */
-export function ServerSheet({ item, start, fresh = false }: { item: ConnectedItem; start?: Step; fresh?: boolean }) {
+export function ServerSheet({ item, start }: { item: ConnectedItem; start?: Step }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const admin = can(org, "manage_connectors");
-  // Back from a sign-in it opens on who uses it: its tools wait on the connection's screen.
+  // Its tools never hold this sheet: they wait on the connection's screen.
   const [step, setStep] = useState<Step>(() => firstStep(item, admin, start === "review" ? "who" : start));
   const name = itemName(t, item);
   return (
@@ -297,23 +288,89 @@ export function ServerSheet({ item, start, fresh = false }: { item: ConnectedIte
         </View>
       </View>
       <Progress steps={ADDRESS_STEPS} step={step} />
-      <ConnectedSteps
-        step={step}
-        onStep={setStep}
-        connectionId={item.id}
-        def={item.def}
-        name={name}
-        justConnected={fresh}
-        item={item}
-      />
+      {step === "done" ? (
+        <DoneStep connectionId={item.id} def={item.def} name={name} onAdjust={() => setStep("who")} />
+      ) : (
+        <ConnectedSteps step={step} onStep={setStep} connectionId={item.id} def={item.def} name={name} item={item} />
+      )}
     </View>
   );
 }
 
 /**
- * After connecting: a catalog service's tools ("O que faz", then Continuar), then who uses it (one row per agent,
- * the level as its value). What a server's tools need from an admin is one row there (it opens Ferramentas); anyone
- * else is told when they still wait for an admin. Ferramentas, the account and Desconectar live on its screen.
+ * The end of connecting, as on the web: a check, "<name> conectado" and who can use it with how many actions ask,
+ * then "Pronto". A server whose tools no one gave a level yet says so instead, and "Continuar" saves the levels we
+ * suggest: agents get none before that. "Ajustar" goes on to the detail.
+ */
+function DoneStep({
+  connectionId,
+  def,
+  name,
+  onAdjust,
+}: {
+  connectionId: string;
+  def: ConnectorDef | null;
+  name: string;
+  onAdjust: () => void;
+}) {
+  const { t } = useTranslation();
+  const sheet = useSheet();
+  const orgId = useOrgId();
+  const servers = useCustomServers(orgId);
+  const { save } = useCustomServerAction(orgId);
+  const [failed, setFailed] = useState<string | null>(null);
+  const summary = doneSummary(t, reviewTarget(connectionId, def, servers.data, servers.isFetching));
+  const waiting = summary?.waiting ?? null;
+  const apply = (server: CustomServer) => {
+    setFailed(null);
+    save.mutate(
+      { id: server.id, label: server.label, tools: reviewDecisions(reviewToolsOf(t, server), {}, new Set()) },
+      {
+        onSuccess: () => {
+          successHaptic();
+          sheet.close();
+        },
+        onError: () => {
+          errorHaptic();
+          setFailed(t("mobile.connectors.review.saveFailed", { name }));
+        },
+      },
+    );
+  };
+  return (
+    <>
+      <ConnectedNote name={name} text={summary?.text ?? null} />
+      {summary?.unreadable ? <Problem text={t("toolReview.unreadable", { reason: summary.unreadable })} /> : null}
+      {failed ? <Problem key={failed} text={failed} /> : null}
+      <Button
+        variant="primary"
+        wide
+        label={
+          save.isPending
+            ? t("mobile.connectors.review.saving")
+            : waiting
+              ? t("connectFlow.next")
+              : t("connectFlow.done.ok")
+        }
+        disabled={!summary || save.isPending}
+        onPress={() => (waiting ? apply(waiting) : sheet.close())}
+      />
+      <Button
+        variant="secondary"
+        wide
+        label={t("connectFlow.done.adjust")}
+        disabled={!summary || save.isPending}
+        onPress={onAdjust}
+      />
+    </>
+  );
+}
+
+/**
+ * The detail behind "Ajustar": a catalog service's tools ("O que faz", then Continuar), then who uses it (one row
+ * per agent, the level as its value). What a server's tools need from an admin is one row there (it opens
+ * Ferramentas); anyone else is told when they still wait for an admin. Ferramentas, the account and Desconectar
+ * live on its screen.
  */
 function ConnectedSteps({
   step,
@@ -321,7 +378,6 @@ function ConnectedSteps({
   connectionId,
   def,
   name,
-  justConnected,
   item,
 }: {
   step: Step;
@@ -329,7 +385,6 @@ function ConnectedSteps({
   connectionId: string;
   def: ConnectorDef | null;
   name: string;
-  justConnected: boolean;
   /** The connection as it was opened (the live lists win once they have it). */
   item?: ConnectedItem;
 }) {
@@ -346,18 +401,11 @@ function ConnectedSteps({
       (i) => i.id === connectionId,
     ) ?? item;
   if (step === "review") {
-    return (
-      <>
-        {justConnected ? <ConnectedNote name={name} /> : null}
-        <ReviewStep connectionId={connectionId} def={def} name={name} onNext={() => onStep("who")} />
-      </>
-    );
+    return <ReviewStep connectionId={connectionId} def={def} name={name} onNext={() => onStep("who")} />;
   }
   const waiting = admin && live ? live.pending : 0;
   return (
     <>
-      {/* A server comes straight here from connecting; a service said it on its tools' step. */}
-      {justConnected && !def ? <ConnectedNote name={name} /> : null}
       <AgentLevelList connectionId={connectionId} />
       {waiting > 0 ? (
         // What the server's tools need from the person, one tap away, never in the way of finishing.
@@ -386,8 +434,8 @@ function ConnectedSteps({
 /** A strong ease-out: the check settles fast. */
 const POP = Easing.bezier(0.23, 1, 0.32, 1);
 
-/** Just connected: a check that pops in (the phone buzzes with it), the name and what comes next. */
-function ConnectedNote({ name }: { name: string }) {
+/** Just connected: a check that pops in (the phone buzzes with it), the name and, once known, what it means. */
+function ConnectedNote({ name, text }: { name: string; text: string | null }) {
   const { t } = useTranslation();
   const { colors, reducedMotion } = useTheme();
   return (
@@ -415,9 +463,13 @@ function ConnectedNote({ name }: { name: string }) {
         <Text variant="body" style={styles.bold}>
           {t("mobile.connectors.connectedTitle", { name })}
         </Text>
-        <Text variant="small" tone="muted">
-          {t("mobile.connectors.connectedSub")}
-        </Text>
+        {text ? (
+          <Animated.View entering={reducedMotion ? undefined : FadeIn.duration(160)}>
+            <Text variant="small" tone="muted">
+              {text}
+            </Text>
+          </Animated.View>
+        ) : null}
       </View>
     </Animated.View>
   );
@@ -786,6 +838,7 @@ function ConnectStep({
 export function Progress({ steps, step }: { steps: Step[]; step: Step }) {
   const { t } = useTranslation();
   const c = useColors();
+  if (step === "done") return null;
   const index = steps.indexOf(step);
   const said = t("mobile.connectors.step", { n: index + 1, total: steps.length, label: t(STEP_KEYS[step]) });
   return (

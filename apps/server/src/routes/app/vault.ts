@@ -168,6 +168,9 @@ const VaultConnection = z
     id: z.uuid(),
     kind: z.string(),
     name: z.string().openapi({ description: "Brand name (`1Password`)." }),
+    readOnly: z.boolean().openapi({
+      description: "Its credential may only read: agents save no new login there until it is connected again.",
+    }),
     scope: Scope,
     ownerUserId: z.string().nullable(),
     label: z.string().openapi({ description: "What it reads (a vault's or a folder's name)." }),
