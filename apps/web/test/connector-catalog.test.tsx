@@ -715,7 +715,7 @@ describe("the connect flow: conectar → conectado; Ajustar → o que faz → qu
     expect(note()).toBe(shown);
     await act(async () => answer());
     await settle(4);
-    expect(screen().getByRole("dialog", { name: "O que GitHub faz" })).toBeTruthy();
+    expect(screen().getByRole("dialog", { name: "GitHub conectado" })).toBe(flow());
   });
 
   test("back from OAuth (`?connected=github`): what it does (read-only, by scope), then 'Ler' = its read scopes", async () => {
