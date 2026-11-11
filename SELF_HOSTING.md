@@ -174,7 +174,11 @@ Agents run commands and code, drive a browser, and can think with Claude Code or
 you connect (Agent computers, below). A computer must reach the instance, so on Tailscale, install
 Tailscale on it and sign in to the same tailnet first.
 
-The agentes.chat desktop app (macOS, Windows and Linux) opens your instance in a window of its own:
+The agentes.chat desktop app (macOS, Windows and Linux) opens your instance in a window of its own.
+Download it from `/download` on your instance (or the latest `desktop-v*` release). It's in beta: the Mac
+build isn't notarized by Apple yet and the Windows installer isn't signed, so the first open asks once (macOS:
+**System Settings › Privacy & Security › Open Anyway**, right after you try to open it; Windows: **More info ›
+Run anyway**). `/download` shows each step with pictures. Then:
 
 1. On its first screen, under **Sign in to agentes.chat**, click **Use your own server**, then
    **Connect to my server**.

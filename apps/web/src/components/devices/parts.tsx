@@ -160,8 +160,11 @@ const SYSTEMS = [
  */
 export function DownloadButtons({
   primary = false,
+  onPick,
 }: {
   primary?: boolean;
+  /** The system whose download was started (the install steps under it follow it). */
+  onPick?: (system: (typeof SYSTEMS)[number]["platform"]) => void;
   /**
    * @deprecated Not used: a system with no build is disabled with "Em breve", and its terminal line is reached from
    * the flow's own link.
@@ -195,7 +198,7 @@ export function DownloadButtons({
       {mine &&
         (mineHref ? (
           <Button asChild size="sm" variant={variant}>
-            <a href={mineHref} download>
+            <a href={mineHref} download onClick={() => onPick?.(mine.platform)}>
               <Icon name="download" />
               {t("devices.downloadFor", { system: name(mine) })}
             </a>
@@ -227,7 +230,14 @@ export function DownloadButtons({
                 leading={<ProviderLogo id={s.target === "darwin" ? "apple" : s.target} size="xs" off={!href} />}
                 disabled={!href}
                 hint={soon(s) ? soonChip : undefined}
-                onSelect={href ? () => window.location.assign(href) : undefined}
+                onSelect={
+                  href
+                    ? () => {
+                        onPick?.(s.platform);
+                        window.location.assign(href);
+                      }
+                    : undefined
+                }
               >
                 {t("devices.downloadFor", { system: name(s) })}
               </MenuItem>
