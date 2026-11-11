@@ -657,3 +657,22 @@ test("Auditoria's row screen: the call's title in words, and what the tool said 
   const tech = src.slice(src.indexOf('t("audit.panel.tech")'));
   expect(tech).toContain('label={t("audit.panel.techSaid")} sub={said}');
 });
+
+test("my photo on Você changes it with a tap, through Conta's own Alterar foto", () => {
+  const read = (file: string) => readFileSync(join(import.meta.dir, "..", "..", "src", "features", "me", file), "utf8");
+  const me = read("MeScreen.tsx");
+  // One button around the photo and its presence badge, named as Conta's link, off while a photo uploads.
+  const button = me.slice(me.indexOf("onPress={changePhoto}"), me.indexOf("</Pressable>"));
+  expect(button).toContain("disabled={uploading}");
+  expect(button).toContain('accessibilityRole="button"');
+  expect(button).toContain('accessibilityLabel={t("mobile.me.account.changePhoto")}');
+  expect(button).toContain('<PersonAvatar name={name || "?"} size={PHOTO} photo={photo} />');
+  // One flow: the sheet, the upload and the refresh live in `useChangePhoto`, which Conta's link opens too.
+  expect(me).toContain("const { changePhoto, uploading } = useChangePhoto();");
+  const account = read("AccountPage.tsx");
+  expect(account).toContain("const { changePhoto, uploading } = useChangePhoto();");
+  expect(account).not.toContain("ImagePicker");
+  const parts = read("parts.tsx");
+  expect(parts).toContain("export function useChangePhoto()");
+  expect(parts).toContain('...(hasPhoto ? [t("mobile.me.account.removePhoto")] : [])');
+});

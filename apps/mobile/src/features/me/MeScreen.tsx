@@ -6,7 +6,7 @@ import Constants from "expo-constants";
 import { useHeaderHeight } from "expo-router/react-navigation";
 import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Alert, StyleSheet, View } from "react-native";
+import { Alert, Pressable, StyleSheet, View } from "react-native";
 import Animated, { Easing, FadeIn, FadeInUp } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { signOut } from "@/features/account";
@@ -40,6 +40,7 @@ import { personLine } from "../status/logic";
 import { openStatus } from "../status/StatusScreen";
 import { openIssuesWithMe, workspacesBeyond } from "./logic";
 import { useLanguageChoice, usePushSwitch, useSoundLabel, useStartLabel } from "./PreferencePages";
+import { useChangePhoto } from "./parts";
 import { useWorkspacesAcross, WorkspaceMark } from "./WorkspacesPages";
 
 /** The rows of Você's Work group. */
@@ -80,11 +81,11 @@ let horizonArrived = false;
 
 /**
  * Você, pushed from your avatar, as the phone's own settings: the bar reads "Você" with Editar on the right; the
- * workspace's sky as a band with your photo hanging from it, your name, your @ and workspace; then grouped lists on
- * the grouped gray, one value per row. Status first (ADR 0084). The workspace as one row: where you are, how many
- * more and the unread elsewhere, opening the list by server (ADR 0154), with the workspace's settings under it. Your
- * agents, alive (a working one says what it does), "Ver todos" to the Agentes tab. Your work (Tarefas, Propostas,
- * Rotinas, Wiki, Drive, Painéis, Memória): what belongs to the workspace lives in Configurações, once. The
+ * workspace's sky as a band with your photo hanging from it (a tap changes it), your name, your @ and workspace; then
+ * grouped lists on the grouped gray, one value per row. Status first (ADR 0084). The workspace as one row: where you
+ * are, how many more and the unread elsewhere, opening the list by server (ADR 0154), with the workspace's settings
+ * under it. Your agents, alive (a working one says what it does), "Ver todos" to the Agentes tab. Your work (Tarefas,
+ * Propostas, Rotinas, Wiki, Drive, Painéis, Memória): what belongs to the workspace lives in Configurações, once. The
  * preferences; Sons and Aparência change in their row through the system's choice on iOS (a screen on Android, whose
  * dialog holds three buttons at most). Sair alone in red; the version is in Sobre. A settings page is opened many
  * times a day, so nothing here animates beyond the rows' press highlight and the platform's push. A personal workspace
@@ -114,6 +115,7 @@ export function MeScreen() {
   const myPresence = useMyPerson()?.presence;
   const name = me.data?.user.name ?? "";
   const photo = usePersonPhoto(mine?.avatarUrl ?? mine?.image ?? me.data?.user.image);
+  const { changePhoto, uploading } = useChangePhoto();
   const sounds = useSoundChoice();
   const language = useLanguageChoice();
   const styleLabel = useSoundLabel();
@@ -264,11 +266,19 @@ export function MeScreen() {
           <HorizonTeam ids={myAgents.slice(0, HORIZON).map((a) => a.id)} />
         </View>
         <View style={styles.cover}>
-          <WithPresence size={PHOTO + 6} presence={myPresence} ring={c.grouped}>
-            <View style={[styles.ring, { borderColor: c.grouped }]}>
-              <PersonAvatar name={name || "?"} size={PHOTO} photo={photo} />
-            </View>
-          </WithPresence>
+          <Pressable
+            onPress={changePhoto}
+            disabled={uploading}
+            accessibilityRole="button"
+            accessibilityLabel={t("mobile.me.account.changePhoto")}
+            style={({ pressed }) => (pressed || uploading ? styles.pressed : null)}
+          >
+            <WithPresence size={PHOTO + 6} presence={myPresence} ring={c.grouped}>
+              <View style={[styles.ring, { borderColor: c.grouped }]}>
+                <PersonAvatar name={name || "?"} size={PHOTO} photo={photo} />
+              </View>
+            </WithPresence>
+          </Pressable>
           <Text variant="display2" numberOfLines={2} style={styles.center}>
             {name}
           </Text>
@@ -557,6 +567,7 @@ const styles = StyleSheet.create({
   cover: { alignItems: "center", gap: 6, marginTop: -PHOTO_OVERLAP, paddingHorizontal: 16 },
   // A ring in the page's color lifts the photo off the sky.
   ring: { borderRadius: 999, borderWidth: 3 },
+  pressed: { opacity: 0.6 },
   center: { textAlign: "center" },
   groups: { paddingHorizontal: SCREEN_X, paddingTop: 4 },
   gapBig: { height: 24 },

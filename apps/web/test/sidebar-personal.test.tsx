@@ -84,8 +84,10 @@ describe("a personal workspace's sidebar", () => {
     expect(
       within(menu)
         .getAllByRole("menuitem")
-        .map((el) => el.textContent),
+        .map((el) => el.getAttribute("aria-label") ?? el.textContent),
     ).toEqual([
+      // My face on top changes my photo.
+      "Trocar foto",
       "Definir status",
       "Editar perfil",
       "Sua conta",
