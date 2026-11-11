@@ -165,6 +165,8 @@ import {
   callLine,
   continuationVerdict,
   decideTurnEnd,
+  heldNudge,
+  heldReplyRead,
   type LearnSignal,
   reportRunFailure,
   type TurnEndDecision,
@@ -537,6 +539,11 @@ export interface Transcript {
   postedCount: number;
   /** The words of the last message it posted (trimmed): saying exactly them again next adds nothing. */
   lastPosted?: string;
+  /**
+   * A reply judged `untried` and held back (ADR 0109): nobody saw it. It goes out with the run's next words
+   * (`heldWords`), or alone when the run ends without any (a pass, an empty turn, a closing line, a failure).
+   */
+  held?: string;
   deltaSeq: number;
   /** Memory changes made by tools, not yet attached to a posted message (`meta.memoryUpdates`). */
   memoryUpdates?: MemoryUpdate[];
@@ -1444,8 +1451,13 @@ async function executeRunInner(
    * nothing sent to the agent is swallowed by an ending.
    */
   const redispatchPending = (reason: ReleaseReason) => releaseInbox(db, deps.pubsub, run, { reason }).catch(() => null);
+  /** Set once the run can post (`closeWith`): it ends the run on the reply it held back (`held`). */
+  let endWithHeld: (() => Promise<void>) | null = null;
   /** `ledger`: the routine run's coded reason when the run error's own code isn't the right one. */
   const fail = async (reason: string, ledger?: { code: string; detail?: string }) => {
+    // The turn after a held reply failed (its provider, its plan): that reply is still the answer, and it goes out.
+    if (endWithHeld && transcript?.held && reason !== "agent_archived" && !standingErrorDetail(reason))
+      return endWithHeld();
     await deferred;
     const plan = brainPlan && isComputerBrain(brainPlan.kind) ? BRAIN_PLAN_NAMES[brainPlan.kind] : undefined;
     failCause = { ...(ledger ? { code: ledger.code } : {}), ...(plan ? { plan } : {}) };
@@ -2025,7 +2037,11 @@ async function executeRunInner(
     if (feedbackSend) await queueFeedback(tx, { orgId: run.orgId, ...feedbackSend });
     // Act with undo (ADR 0037 round 2): the changes the run made so far become this message's receipts.
     if ((await linkRunActions(tx, run.orgId, run.id, m.id)) > 0) withReceipts.push(m.id);
-    if (!note && transcript) transcript.lastPosted = body.trim();
+    if (!note && transcript) {
+      transcript.lastPosted = body.trim();
+      // Its words went out, the held reply with them or in their place (`heldWords`), or before them (`closeWith`).
+      delete transcript.held;
+    }
     return m;
   };
   /**
@@ -2033,6 +2049,22 @@ async function executeRunInner(
    * answer) often opens its next turn with the same line ("Vou procurar…"), and posting it again shows it twice.
    */
   const repeatsLastPost = (text: string) => text.trim() !== "" && text.trim() === transcript?.lastPosted;
+  /**
+   * What a message of the run says when it held a reply back (`held`): `words` alone when they stand on their own, the
+   * held reply with them, or the held reply alone when they add nothing ("nothing to add", "see above", no words).
+   * A judge error keeps both: nothing it wrote is lost.
+   */
+  const heldWords = async (words: string): Promise<string> => {
+    const held = transcript?.held;
+    if (!held) return words;
+    if (!words) return held;
+    const read = judge
+      ? await heldReplyRead(judge, { orgId: run.orgId, agentId: run.agentId, runId: run.id, held, reply: words }).catch(
+          () => "both" as const,
+        )
+      : "both";
+    return read === "reply" ? words : read === "held" ? held : `${held}\n\n${words}`;
+  };
 
   const saveTranscript = (tx: Executor, t: Transcript) =>
     tx
@@ -2821,10 +2853,13 @@ async function executeRunInner(
     }
   }
 
-  /** Ends the run with a closing line the server writes (`code`), with what it changed (its receipts) and its cards. */
+  /**
+   * Ends the run with a closing line the server writes (`code`), with what it changed (its receipts) and its cards. A
+   * reply it held back (`held`) goes out first: it is still what it has to say. No `code`: `text` is its own words.
+   */
   const closeWith = async (
     text: string,
-    code: string,
+    code: string | null,
     step: Record<string, unknown>,
     meta: Record<string, unknown> = {},
   ) => {
@@ -2832,12 +2867,21 @@ async function executeRunInner(
     const t = transcript as Transcript;
     // Long work (ADR 0121): this closing line is its report, home; out of steps or stuck, it didn't finish.
     const unfinished = code === "step_limit" ? "run.too_many_tool_calls" : code === "stuck" ? "run.stuck" : undefined;
-    const reply = await db.transaction(async (tx) => {
+    const held = t.held;
+    const posted = await db.transaction(async (tx) => {
+      const lead = held ? await post(tx, workThread(), held, withFallback(t, takeMemoryUpdates(t))) : null;
+      if (lead) {
+        t.postedCount++;
+        await addRunStep(tx, run, "message", { messageId: lead.id, held: true });
+      }
       const m = await post(
         tx,
         workThread(),
         text,
-        withFallback(t, withCode({ ...takeMemoryUpdates(t), ...meta, ...workEnd(unfinished) }, bodyCode(code))),
+        withFallback(
+          t,
+          withCode({ ...takeMemoryUpdates(t), ...meta, ...workEnd(unfinished) }, code ? bodyCode(code) : undefined),
+        ),
       );
       t.postedUpTo = t.messages.length;
       t.postedCount++;
@@ -2848,10 +2892,12 @@ async function executeRunInner(
         transcript: storedTranscript(t),
       });
       if (!done) throw new PermanentJobError("run changed state while executing");
-      return m;
+      return [lead, m];
     });
-    const [view] = await withWikiLinks(db, run.orgId, [messageView(reply)]);
-    if (view) await publishMessageCreated(deps.pubsub, view);
+    for (const m of posted) {
+      const [view] = m ? await withWikiLinks(db, run.orgId, [messageView(m)]) : [];
+      if (view) await publishMessageCreated(deps.pubsub, view);
+    }
     await publishChannelEvent(deps.pubsub, event("done"));
     await finished("done");
     await redispatchPending("done");
@@ -2859,6 +2905,15 @@ async function executeRunInner(
 
   /** Ends the run with a plain closing line that carries what it changed (its receipts). */
   const endWithReceipts = () => closeWith(DONE_TEXT, "done", { receipts: true });
+
+  /** Ends the run on the reply it held back (`held`), its own words, with what it changed and its cards. */
+  const closeOnHeld = () => {
+    const t = transcript as Transcript;
+    const held = t.held ?? "";
+    delete t.held;
+    return closeWith(held, null, { held: true });
+  };
+  endWithHeld = closeOnHeld;
 
   /**
    * A conversation run at its cap in the middle of its work: instead of failing, it says it ran out of steps (with
@@ -2884,6 +2939,13 @@ async function executeRunInner(
     if ((still?.pending.length ?? 0) > 0) {
       delete t.passed;
       return false;
+    }
+    // It held a reply back (`held`): passing or ending without a word after it ("nothing to add") leaves that reply
+    // as its answer, never lost.
+    if (t.held) {
+      delete t.passed;
+      await closeOnHeld();
+      return true;
     }
     // It changed something (receipts with Undo, ADR 0037): people see what it did, so it posts them
     // instead of passing.
@@ -2920,6 +2982,8 @@ async function executeRunInner(
     const questionId = Bun.randomUUIDv7();
     const toolUseId = `continuation:${questionId}`;
     t.pending = { calls: [{ toolUseId, name: ASK_USER_TOOL, questionId, bridged: true }] };
+    // Its question carries the reply it held back (`heldWords`).
+    delete t.held;
     // The card is the reply its words showed for: it takes their place.
     const at = takePlace(replyThreadId);
     const pause = await db.transaction(async (tx) => {
@@ -3211,6 +3275,7 @@ async function executeRunInner(
     }
     // A background run never posts by itself (ADR 0053 §5): its cards speak for it.
     if (run.background || repeatsLastPost(text)) text = "";
+    text = await heldWords(text);
     // The bridge posted its cards when it asked: what it says goes with them, not up where its words first showed.
     takePlace(replyThreadId);
     const message = text ? await post(db, replyThreadId, text, withFallback(t, takeMemoryUpdates(t)), at) : null;
@@ -3253,7 +3318,8 @@ async function executeRunInner(
     await deferred;
     const t = transcript as Transcript;
     const name = isComputerBrain(from) ? BRAIN_NAMES[from] : "Claude Code";
-    const said = stripSentinel(partial);
+    // A reply it held back (`held`) is still part of what it said.
+    const said = [t.held, stripSentinel(partial)].filter(Boolean).join("\n\n");
     // What the CLI said goes where everyone in the conversation reads it: without its paths, stack or secrets.
     const why = cliErrorWords(failure.message);
     const note = `_${name} stopped before finishing (${why}). Already done, not repeated: ${executed.join(", ")}._`;
@@ -4660,13 +4726,13 @@ async function executeRunInner(
         const t = transcript;
         // What it says and its cards end the reply its words showed for: they take its place, in that order.
         const at = takePlace(replyThreadId);
+        // Only this turn's text: what leads to a question, or what says more than an approval's or a secret's
+        // card, with a reply it held back (`heldWords`). Earlier narration is in the steps. A background run never
+        // posts by itself (ADR 0053 §5): its cards speak for it.
+        const text = stripSentinel(turnText);
+        const spoken = run.background ? "" : asks.length > 0 ? text : pauseLead(text);
+        const said = await heldWords(repeatsLastPost(spoken) ? "" : spoken);
         const posted = await db.transaction(async (tx) => {
-          // Only this turn's text: what leads to a question, or what says more than an approval's or a secret's
-          // card. Earlier narration is in the steps. A background run never posts by itself (ADR 0053 §5): its
-          // cards speak for it.
-          const text = stripSentinel(turnText);
-          const spoken = run.background ? "" : asks.length > 0 ? text : pauseLead(text);
-          const said = repeatsLastPost(spoken) ? "" : spoken;
           const lead = said ? await post(tx, replyThreadId, said, withFallback(t, takeMemoryUpdates(t)), at) : null;
           // The cards, the same way a computer brain's bridged call posts them (`postPauseCards`).
           const pause = await postPauseCards(
@@ -4809,14 +4875,18 @@ async function executeRunInner(
       // Or it posted a mission report and has no card left to attach: the report is the answer. Coding CLIs
       // always close with a summary that repeats it, whatever the prompt says, so the text is dropped too.
       const noCards = !transcript.artifacts?.length && !transcript.memoryUpdates?.length;
+      // A reply it held back (`held`) is no reaction's or GIF's to replace.
+      const held = transcript.held ?? "";
       const silent =
-        (Boolean(transcript.reacted) && restatesReaction(said)) ||
-        (Boolean(transcript.mediaSent) && !said && noCards) ||
+        (!held && Boolean(transcript.reacted) && restatesReaction(said)) ||
+        (!held && Boolean(transcript.mediaSent) && !said && noCards) ||
         (Boolean(transcript.reported) && noCards);
+      // Its own words: this turn's, with the reply it held back, or that reply alone when this turn adds nothing.
+      const words = silent ? said : await heldWords(said);
       // The message is the final answer only: the last model call's text. Without it, a short closing line.
       const written = silent
         ? ""
-        : said ||
+        : words ||
           (updates.length > 0 ? updates.map(describeUpdate).join("\n") : "") ||
           saved ||
           closingSummary(transcript, anythingPosted) ||
@@ -4825,7 +4895,7 @@ async function executeRunInner(
       const text = written || (!silent && anythingPosted && (await hasUnpostedReceipts(db, run)) ? DONE_TEXT : "");
       // A line the server wrote (not the model): its code, so the app shows it in the person's language.
       const code =
-        said || text === ""
+        words || text === ""
           ? undefined
           : updates.length > 0
             ? bodyCode("memory")
@@ -4840,9 +4910,12 @@ async function executeRunInner(
       const decided = t.decided;
       delete t.decided;
       const betweenAgents = Boolean(channelRow && isAgentOnlyDm(channelRow));
-      // A mission's report card is its answer (`silent`): what it said there is what is judged.
+      // A mission's report card is its answer (`silent`): what it said there is what is judged. The reply it held back,
+      // posted alone, was judged already.
       const judged = !silent
-        ? said
+        ? held && words === held
+          ? ""
+          : words
         : plan.missionId && t.reported
           ? said || (await missionReportSince(db, run, replyThreadId).catch(() => ""))
           : "";
@@ -4897,7 +4970,7 @@ async function executeRunInner(
         bound: t.stuck?.endAt !== undefined ? "stuck" : t.wrapUpNoted ? "step_limit" : null,
         quiet: silent && !judged,
         decided: decided && !silent && !said && !capped && !closingSummary(t, true) ? decided : null,
-        unanswered: !silent && !viaRoutine && (sentinelOnly || (!text && !anythingPosted)),
+        unanswered: !silent && !viaRoutine && !words && (sentinelOnly || (!text && !anythingPosted)),
         unreached,
         judged: owesAnswer && !capped ? judged : "",
         mission: Boolean(plan.missionId),
@@ -4946,7 +5019,9 @@ async function executeRunInner(
       if (decision.outcome === "ask_card" && (text || judged).length > QUESTION_MAX_CHARS)
         decision = { outcome: "done", rule: "ask_long", verdict: decision.verdict };
       turnEnd = decision;
-      if (decision.verdict) t.followThroughVerdict = verdictRecord(decision.verdict);
+      // A promise something already keeps (`comes_back`) waits on it: no unkept promise.
+      if (decision.verdict)
+        t.followThroughVerdict = decision.outcome === "waiting" ? "waiting" : verdictRecord(decision.verdict);
       t.continuation = advanceContinuation(state, decision, transcript.executedCalls ?? 0);
       const nudgedAs = {
         decision: "decision",
@@ -4968,8 +5043,12 @@ async function executeRunInner(
       if (decision.outcome === "ask_card") return askWithCard(text || judged);
       let keep: string | null = null;
       if (decision.outcome === "continue" && decision.nudge) {
-        appendUserText(t, decision.nudge);
-        if (plan.kind !== "model") nextPrompt = decision.nudge;
+        // A give-up judged untried is held back, not dropped (`held`): it reads as unseen, and goes out if nothing
+        // better comes.
+        if (decision.rule === "untried") t.held = text;
+        const nudge = decision.rule === "untried" ? heldNudge(decision.nudge) : decision.nudge;
+        appendUserText(t, nudge);
+        if (plan.kind !== "model") nextPrompt = nudge;
         // Nothing to post first: it simply goes on. A give-up judged untried isn't posted either: it would send people
         // after something the next turn may do itself.
         // Nor a secret asked in the chat (ADR 0109 addendum).
