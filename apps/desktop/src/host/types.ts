@@ -47,6 +47,8 @@ export interface AppInfo {
   os: string;
   /** Rust's name: `aarch64` or `x86_64`. */
   arch: string;
+  /** The system's own version where the app reads it (macOS: `15.1`). */
+  system?: string | null;
 }
 
 /** A server's answer to `siteFetch`: its status and body as text. */

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { allDone, askedIn, readGrants, viaSettings, withAsked } from "../src/control/permissions";
+import { allDone, askedIn, hasLocalNetwork, readGrants, viaSettings, withAsked } from "../src/control/permissions";
 import type { Host } from "../src/host/types";
 
 /** A Mac's answers for Screen Recording and Full Disk Access. Local Network has none. */
@@ -27,6 +27,18 @@ test("states without a prompt: off once asked and not allowed, Local Network onl
   expect(allDone(ready)).toBe(true);
   expect(allDone({ ...ready, network: "ask" })).toBe(false);
   expect(allDone({ ...ready, disk: "off" })).toBe(false);
+});
+
+test("Local Network is a permission from macOS 15 on: before that it is no row and nothing to ask", async () => {
+  expect(hasLocalNetwork("14.7.1")).toBe(false);
+  expect(hasLocalNetwork("11.0")).toBe(false);
+  expect(hasLocalNetwork("15.0")).toBe(true);
+  expect(hasLocalNetwork("26.1")).toBe(true);
+  // A version the app couldn't read keeps the row: asking costs a click, hiding it could leave adb without the grant.
+  expect(hasLocalNetwork(null)).toBe(true);
+  const sonoma = await readGrants(mac(true, true), [], false);
+  expect(sonoma).toEqual({ screen: "on", disk: "on", network: "none" });
+  expect(allDone(sonoma)).toBe(true);
 });
 
 test("Full Disk Access always goes to System Settings, the others once asked", () => {

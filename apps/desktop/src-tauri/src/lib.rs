@@ -52,6 +52,8 @@ struct AppInfo {
     version: String,
     os: &'static str,
     arch: &'static str,
+    /// The system's own version where it is read (macOS: `15.1`).
+    system: Option<String>,
 }
 
 /// The providers' own sign-in pages the runner gets from `claude auth login` / `codex login --device-auth`
@@ -444,6 +446,7 @@ fn app_info(app: AppHandle) -> AppInfo {
         version: app.package_info().version.to_string(),
         os: std::env::consts::OS,
         arch: std::env::consts::ARCH,
+        system: prepare::system_version(),
     }
 }
 

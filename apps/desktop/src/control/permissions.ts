@@ -12,9 +12,9 @@ export type MacPermission = (typeof MAC_PERMISSIONS)[number];
 
 /**
  * `ask`: not asked in this version yet; `off`: asked and not allowed (the way out is System Settings); `asked`: asked,
- * and macOS never says the answer (Local Network).
+ * and macOS never says the answer (Local Network); `none`: not a permission on this macOS (Local Network before 15).
  */
-export type Grant = "on" | "off" | "ask" | "asked";
+export type Grant = "on" | "off" | "ask" | "asked" | "none";
 export type Grants = Record<MacPermission, Grant>;
 
 /** The permissions asked for in a version of the app. */
@@ -32,19 +32,23 @@ export const withAsked = (saved: Asked | null, version: string, p: MacPermission
   return { version, asked: asked.includes(p) ? asked : [...asked, p] };
 };
 
-/** Each permission's state, without raising a prompt. */
-export async function readGrants(host: Host, asked: readonly MacPermission[]): Promise<Grants> {
+/** Local Network is a permission from macOS 15 on (`system`: macOS's version). Unread, the row stays. */
+export const hasLocalNetwork = (system?: string | null) => !system || Number.parseInt(system, 10) >= 15;
+
+/** Each permission's state, without raising a prompt. `localNetwork`: whether this macOS has that permission. */
+export async function readGrants(host: Host, asked: readonly MacPermission[], localNetwork = true): Promise<Grants> {
   const [screen, disk] = await Promise.all([host.screenAccess(), host.diskAccess()]);
   const state = (p: MacPermission, on: boolean): Grant => (on ? "on" : asked.includes(p) ? "off" : "ask");
   return {
     screen: state("screen", screen),
     disk: state("disk", disk),
-    network: asked.includes("network") ? "asked" : "ask",
+    network: !localNetwork ? "none" : asked.includes("network") ? "asked" : "ask",
   };
 }
 
-/** Nothing left to ask: each permission on, or asked where macOS keeps the answer. */
-export const allDone = (grants: Grants) => MAC_PERMISSIONS.every((p) => grants[p] === "on" || grants[p] === "asked");
+/** Nothing left to ask: each permission on, asked where macOS keeps the answer, or not one on this macOS. */
+export const allDone = (grants: Grants) =>
+  MAC_PERMISSIONS.every((p) => grants[p] === "on" || grants[p] === "asked" || grants[p] === "none");
 
 /** Its button opens System Settings: Full Disk Access always (no prompt asks for it), the others once asked. */
 export const viaSettings = (p: MacPermission, grant: Grant) => p === "disk" || grant === "off" || grant === "asked";

@@ -75,13 +75,13 @@ else, while the app already pairs this computer in one click behind the system's
    prompts stopped agents mid-task: no prompt can ask for it, so its button always opens System Settings on its list
    (`Privacy_AllFiles`) and the row says to turn agentes.chat on there. Its state comes from opening the privacy
    database (`TCC.db`, the user's or else the system's), which opens only with it and never prompts. Local Network
-   (macOS 15 and later) covers adb, the runner's child, finding and connecting Android phones over Wi-Fi (mDNS and the
-   TCP connect). macOS has no call that reads it: Allow raises its prompt with a short Bonjour browse from the app,
-   then the button opens System Settings (`Privacy_LocalNetwork`), and the row says only "Not asked yet" or "Asked",
-   never On. `Info.plist` names its Bonjour types and keeps the folder usage strings, which still word any folder
-   prompt. States are read again whenever the window comes to the front. Skip for now and Continue both close it, and
-   the pairing never depends on it. Preferences › General › This Mac lists the same rows under Permissions. Windows
-   and Linux skip the step.
+   (macOS 15 and later, no row before that) covers adb, the runner's child, finding and connecting Android phones over
+   Wi-Fi (mDNS and the TCP connect). macOS has no call that reads it: Allow raises its prompt with a short Bonjour
+   browse from the app, then the button opens System Settings (`Privacy_LocalNetwork`), and the row says only "Not
+   asked yet" or "Asked", never On. `Info.plist` names its Bonjour types and keeps the folder usage strings, which
+   still word any folder prompt. States are read again whenever the window comes to the front. Skip for now and
+   Continue both close it, and the pairing never depends on it. Preferences › General › Permissions lists the same
+   rows. Windows and Linux skip the step.
 9. **Resume after Quit & Reopen.** Screen Recording and Full Disk Access apply only once the app opens again, so macOS
    offers to quit and reopen it. While the step shows, the app keeps it in its data folder (`setup.json`: the step,
    the workspace, the time and the main window's page). Opened again within 30 minutes, not at login, the app opens
@@ -103,5 +103,5 @@ else, while the app already pairs this computer in one click behind the system's
 - Nothing interrupts agents later for a Mac permission the person already gave, and a refused one has its way out in
   the app, never a terminal command.
 - An ad-hoc signed Mac app loses every one of these grants with each update (macOS ties them to the build's
-  signature), and what was asked is forgotten with the version, so Preferences › This Mac shows them off again
-  and is where people turn them back on. A Developer ID signature keeps them across updates.
+  signature), and what was asked is forgotten with the version, so Preferences › General › Permissions shows them off
+  again and is where people turn them back on. A Developer ID signature keeps them across updates.

@@ -184,6 +184,33 @@ pub fn disk_access(app: AppHandle) -> bool {
     opens_first(&user.into_iter().chain([Path::new("/").join(tcc)]).collect::<Vec<_>>())
 }
 
+/// macOS's version (`15.1`), which says whether Local Network is a permission there (15 and later).
+#[cfg(target_os = "macos")]
+pub fn system_version() -> Option<String> {
+    let mut buf = [0u8; 32];
+    let mut len = buf.len();
+    // SAFETY: a NUL-terminated name, a buffer with its length, and no new value.
+    let err = unsafe {
+        libc::sysctlbyname(
+            c"kern.osproductversion".as_ptr(),
+            buf.as_mut_ptr().cast(),
+            &mut len,
+            std::ptr::null_mut(),
+            0,
+        )
+    };
+    if err != 0 {
+        return None;
+    }
+    let text = std::str::from_utf8(buf.get(..len)?).ok()?.trim_end_matches('\0');
+    (!text.is_empty()).then(|| text.to_owned())
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn system_version() -> Option<String> {
+    None
+}
+
 /// Local Network (macOS 15 and later) has no call that reads it either. A Bonjour browse from the app raises its
 /// prompt the first time, and the grant covers adb, the app's grandchild, pairing Android phones over Wi-Fi.
 #[cfg(target_os = "macos")]
@@ -296,6 +323,14 @@ mod tests {
             assert_eq!(opens_first(&[there.clone(), dir.clone()]), root);
         }
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn the_system_version_reads_as_macos_writes_it() {
+        let version = system_version().expect("kern.osproductversion");
+        let major: u32 = version.split('.').next().and_then(|m| m.parse().ok()).expect(&version);
+        assert!(major >= 11, "{version}");
     }
 
     #[test]

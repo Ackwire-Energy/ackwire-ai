@@ -397,6 +397,22 @@ describe("pairing from the app", () => {
         },
       },
     );
+    // macOS 14 has no Local Network permission: no row that could only ever say "Asked".
+    await mount(
+      "prefs",
+      <General />,
+      async (el) => {
+        await until(() => rowOf(el, "Screen Recording")?.querySelector("button"));
+        expect(rowOf(el, "Full Disk Access")).toBeTruthy();
+        expect(rowOf(el, "Local network (phones over Wi-Fi)")).toBeUndefined();
+      },
+      {
+        host: (host) => {
+          const info = host.appInfo;
+          host.appInfo = async () => ({ ...(await info()), system: "14.7.1" });
+        },
+      },
+    );
   });
 
   test("Preferences: a switch for every workspace signed in to; on for one not here yet pairs it", () =>

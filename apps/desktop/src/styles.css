@@ -1623,6 +1623,10 @@ body[data-window="popover"] {
   flex-basis: 100%;
   padding-left: 44px;
 }
+/* A row without a picture: the line under it starts with its words. */
+.dk-crow > .dk-crow__text:first-child ~ .dk-crow__under {
+  padding-left: 0;
+}
 .dk-inline-form {
   display: flex;
   gap: 6px;

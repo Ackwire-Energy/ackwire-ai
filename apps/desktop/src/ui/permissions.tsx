@@ -1,4 +1,4 @@
-import { Button, Chip, Icon, type IconName } from "@agenteschat/ui";
+import { Button, Chip, Icon } from "@agenteschat/ui";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useHost } from "../app";
@@ -7,6 +7,7 @@ import {
   allDone,
   askedIn,
   type Grants,
+  hasLocalNetwork,
   MAC_ASKED_PREF,
   MAC_PERMISSIONS,
   type MacPermission,
@@ -19,16 +20,10 @@ import type { Host } from "../host/types";
 import { hintFor, PrefCard, PrefRow } from "./settings";
 import { useToast } from "./Toast";
 
-const ICON: Record<MacPermission, IconName> = {
-  screen: "image",
-  disk: "drive",
-  network: "phone",
-};
-
 /** This Mac's permissions now, nothing asked. */
 export async function macGrants(host: Host): Promise<Grants> {
-  const { version } = await host.appInfo();
-  return readGrants(host, askedIn(readPref<Asked | null>(MAC_ASKED_PREF, null), version));
+  const { version, system } = await host.appInfo();
+  return readGrants(host, askedIn(readPref<Asked | null>(MAC_ASKED_PREF, null), version), hasLocalNetwork(system));
 }
 
 /** A pairing on a Mac goes on to Prepare this Mac while any permission is left to ask. */
@@ -82,9 +77,11 @@ export function useMacGrants(beforeQuit?: () => Promise<void>): MacGrants {
 }
 
 /**
- * The permissions as rows: what each lets agents do, its state, one button. Under them, once Screen Recording or Full
- * Disk Access was asked and is still off, what to do when macOS asks to quit and reopen the app; `resumed`: it just
- * did, so the line says it took effect. Local Network shows only whether it was asked, never a green it can't know.
+ * The permissions as rows: what each lets agents do, its state, one button. No picture before them: their words run to
+ * three lines or more, which a picture's column would squeeze. Under them, once Screen Recording or Full Disk Access
+ * was asked and is still off, what to do when macOS asks to quit and reopen the app; `resumed`: it just did, so the
+ * line says it took effect. Local Network shows only whether it was asked, never a green it can't know, and only on a
+ * macOS that has it (15 and later).
  */
 export function MacPermissionCard({ mac, resumed = false }: { mac: MacGrants; resumed?: boolean }) {
   const { t } = useTranslation();
@@ -111,7 +108,7 @@ export function MacPermissionCard({ mac, resumed = false }: { mac: MacGrants; re
   return (
     <>
       <PrefCard>
-        {MAC_PERMISSIONS.map((p) => {
+        {MAC_PERMISSIONS.filter((p) => grants?.[p] !== "none").map((p) => {
           const grant = grants?.[p];
           const title = t(`desktop.prepare.${p}`);
           const under =
@@ -123,11 +120,6 @@ export function MacPermissionCard({ mac, resumed = false }: { mac: MacGrants; re
           return (
             <PrefRow
               key={p}
-              lead={
-                <span className="dk-logo">
-                  <Icon name={ICON[p]} size={16} />
-                </span>
-              }
               title={title}
               hint={p === "network" ? hintFor(t, title, t("desktop.prepare.networkHint")) : undefined}
               chip={
