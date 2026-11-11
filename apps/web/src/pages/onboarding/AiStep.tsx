@@ -1,5 +1,6 @@
 import { type Agent, type Me, type OrgSummary, useComputerSetup } from "@agenteschat/client";
 import { joinNames } from "@agenteschat/client/lib/format";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { type AiChoice, gateDims, planLabel, planMark } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { Button, Icon, ProviderLogo } from "@agenteschat/ui";
@@ -155,16 +156,25 @@ export function AiStage({
   agents,
   lead,
   awake,
+  personal,
 }: {
   /** The right hand first, then the team. */
   agents: readonly Agent[];
   lead: Agent | undefined;
   /** Every agent thinks: the sky turns to day. */
   awake: boolean;
+  /** A personal workspace has no team (ADR 0159): its agents, or its right hand by name while it is alone. */
+  personal: boolean;
 }) {
   const { t } = useTranslation();
   const day = useDawn(awake);
   const names = agents.map((a) => a.name);
+  const alone = personal && lead !== undefined && agents.length === 1 ? agentGrammar(lead.name) : null;
+  const head = alone
+    ? t(awake ? "onboarding.flow.ai.awakeAlone" : "onboarding.flow.ai.readyAlone", alone)
+    : personal
+      ? t(awake ? "onboarding.flow.ai.awakePersonal" : "onboarding.flow.ai.readyPersonal")
+      : t(awake ? "onboarding.flow.ai.awake" : "arrival.stage.ready");
   return (
     <aside className="onb-stage">
       <div className="onb-stage__frame arrival-stage">
@@ -178,11 +188,11 @@ export function AiStage({
           expression={awake ? "happy" : undefined}
         />
         <div className="arrival-stage__cap">
-          <b>{t(awake ? "onboarding.flow.ai.awake" : "arrival.stage.ready")}</b>
+          <b>{head}</b>
           <span>
             {awake
               ? t("onboarding.flow.ai.answer", { names: joinNames(names, t), count: agents.length })
-              : t("arrival.stage.wake")}
+              : t(personal ? "onboarding.flow.ai.wakePersonal" : "arrival.stage.wake")}
           </span>
         </div>
       </div>

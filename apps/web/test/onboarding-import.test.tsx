@@ -309,6 +309,13 @@ describe("a personal workspace (ADR 0159)", () => {
     await click(button("Ler a resposta"), 14);
     await click(button("Trazer os agentes"), 24);
     expect(applies(state).filter((a) => !a.dryRun)).toHaveLength(1);
-    expect(heading()).toBe(CONNECT);
+    // Its own words on the last step: no team in a personal workspace.
+    expect(heading()).toBe("Conecte uma IA para os seus agentes pensarem");
+    // Back on its agents, who is there now in words of its own.
+    await click(button("Voltar"), 8);
+    expect(heading()).toBe("Seus agentes");
+    expect(document.querySelector(".onb__say")?.textContent).toBe(
+      "Os seus agentes já estão aqui. Quando quiser, a gente segue.",
+    );
   });
 });

@@ -739,6 +739,9 @@ export const en = {
         name: "Hi, {{first}}. I'm {{name}}. I'll put the team together with you in about two minutes.",
         business: "With that I'll know who to bring onto the team.",
         team: "This is the team I'd put together. You can change anything later.",
+        /** Back on the team step once the team is made: the list of who is in it. */
+        teamMade: "The team is already put together. We move on whenever you're ready.",
+        teamMadePersonal: "Your agents are already here. We move on whenever you're ready.",
         plan: "After the plan, all that's left is connecting an AI. I'll show you where.",
         /** On the plan step, with the AI step right after it. */
         planThen: "Once the plan is on, the next screen is where you connect your AI.",
@@ -762,9 +765,12 @@ export const en = {
         /** The workspace's name in the preview until one is typed. */
         name: "Your workspace",
         ghost: "Your team shows up here",
+        ghostPersonal: "Your agents show up here",
       },
       team: {
         title: "Your team",
+        /** Under the title once the team is made (back from a later step): the list of who is in it. */
+        madeLead: "They're already in the workspace. You can adjust each one later.",
         /** The team step opens on this question; the cards are the import page's apps, then "none". */
         ask: {
           title: "Do you already have agents in another app?",
@@ -822,9 +828,12 @@ export const en = {
         titlePersonal: "Turn your agents on",
         leadPersonal: "With the plan and an AI, they start today.",
         asleepPersonal: "Asleep until the plan",
+        ctaPersonal: "Turn the agents on",
       },
       /** The rail's last step (ADR 0162): the AI the team thinks with, then the workspace. */
       ai: {
+        /** A personal workspace's heading for the step (a team's is `arrival.connect.title`). */
+        titlePersonal: "Connect an AI for your agents to think",
         later: "Connect later",
         /** `{{org}}`: the workspace's name. */
         doneTitle: "Done. The {{org}} team is thinking now.",
@@ -840,6 +849,15 @@ export const en = {
         awake: "Your team woke up",
         answer_one: "{{names}} answers now.",
         answer_other: "{{names}} answer now.",
+        /**
+         * Over a personal workspace's sky (a team's is `arrival.stage`): its agents, or `{{name}}`, its right hand,
+         * while it is alone there. Asleep, then awake.
+         */
+        readyPersonal: "Your agents are ready",
+        readyAlone: "{{name}} is ready",
+        wakePersonal: "Just one AI away from waking up.",
+        awakePersonal: "Your agents woke up",
+        awakeAlone: "{{name}} woke up",
       },
       account: "Your account",
     },

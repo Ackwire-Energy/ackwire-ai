@@ -703,6 +703,8 @@
         "name": "你好，{{first}}。我是{{name}}。大约两分钟，我们一起把团队组建好。",
         "business": "有了这些，我就知道该请谁加入团队了。",
         "team": "这是我会组建的团队。之后可以随时修改。",
+        "teamMade": "团队已经组好了。准备好了我们就继续。",
+        "teamMadePersonal": "你的智能体已经到了。准备好了我们就继续。",
         "plan": "有了套餐之后，只差连接一个 AI。我会告诉你在哪里连接。",
         "planThen": "套餐开通后，下一个界面就是连接你的 AI。",
         "ask": "在别处已经有团队了？我把它完整地搬过来。",
@@ -718,10 +720,12 @@
       "preview": {
         "label": "你的工作区，随你的回答而变化",
         "name": "你的工作区",
-        "ghost": "你的团队会出现在这里"
+        "ghost": "你的团队会出现在这里",
+        "ghostPersonal": "你的智能体会出现在这里"
       },
       "team": {
         "title": "你的团队",
+        "madeLead": "它们已经在工作区里了。之后可以逐个调整。",
         "ask": {
           "title": "你已经在其他应用中有智能体了吗？",
           "lead": "如果有，我会把整个团队搬过来：指令、技能和例行工作。",
@@ -768,9 +772,11 @@
         "next": "下一步：连接你的 AI。",
         "titlePersonal": "开启你的智能体",
         "leadPersonal": "有了套餐和 AI，今天就能开工。",
-        "asleepPersonal": "在套餐开通前休眠中"
+        "asleepPersonal": "在套餐开通前休眠中",
+        "ctaPersonal": "开启智能体"
       },
       "ai": {
+        "titlePersonal": "连接一个 AI，让你的智能体开始思考",
         "later": "稍后连接",
         "doneTitle": "好了。{{org}} 的团队已经在思考了。",
         "doneTitlePersonal": "好了。{{name}} 已经在思考了。",
@@ -779,7 +785,12 @@
         "connected": "已连接",
         "enter": "进入工作区",
         "awake": "你的团队醒了",
-        "answer_other": "{{names}} 已经能回复了。"
+        "answer_other": "{{names}} 已经能回复了。",
+        "readyPersonal": "你的智能体准备好了",
+        "readyAlone": "{{name}} 准备好了",
+        "wakePersonal": "只差一个 AI 就能醒来。",
+        "awakePersonal": "你的智能体醒了",
+        "awakeAlone": "{{name}} 醒了"
       },
       "account": "你的账号"
     },

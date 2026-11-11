@@ -703,6 +703,8 @@
         "name": "Hai, {{first}}. Aku {{name}}. Aku akan menyusun tim bersamamu dalam sekitar dua menit.",
         "business": "Dengan ini aku tahu siapa yang perlu masuk tim.",
         "team": "Ini tim yang akan aku susun. Kamu bisa mengubah semuanya nanti.",
+        "teamMade": "Timnya sudah tersusun. Kita lanjut kapan pun kamu siap.",
+        "teamMadePersonal": "Agenmu sudah di sini. Kita lanjut kapan pun kamu siap.",
         "plan": "Setelah paketnya, tinggal hubungkan AI. Nanti aku tunjukkan di mana.",
         "planThen": "Setelah paketnya aktif, layar berikutnya untuk menghubungkan AI-mu.",
         "ask": "Sudah punya tim di tempat lain? Aku bawa semuanya ke sini.",
@@ -718,10 +720,12 @@
       "preview": {
         "label": "Ruang kerjamu, saat kamu menjawab",
         "name": "Ruang kerjamu",
-        "ghost": "Timmu muncul di sini"
+        "ghost": "Timmu muncul di sini",
+        "ghostPersonal": "Agenmu muncul di sini"
       },
       "team": {
         "title": "Timmu",
+        "madeLead": "Mereka sudah ada di ruang kerja. Kamu bisa menyesuaikan masing-masing nanti.",
         "ask": {
           "title": "Sudah punya agen di aplikasi lain?",
           "lead": "Kalau ada, aku bawa seluruh timnya: instruksi, skill, dan rutinitas.",
@@ -768,9 +772,11 @@
         "next": "Berikutnya: hubungkan AI-mu.",
         "titlePersonal": "Nyalakan agenmu",
         "leadPersonal": "Dengan paketnya dan sebuah AI, mereka mulai hari ini.",
-        "asleepPersonal": "Tidur sampai ada paket"
+        "asleepPersonal": "Tidur sampai ada paket",
+        "ctaPersonal": "Nyalakan agen"
       },
       "ai": {
+        "titlePersonal": "Hubungkan AI supaya agenmu bisa berpikir",
         "later": "Hubungkan nanti",
         "doneTitle": "Beres. Tim {{org}} sudah berpikir.",
         "doneTitlePersonal": "Beres. {{name}} sudah berpikir.",
@@ -779,7 +785,12 @@
         "connected": "Terhubung",
         "enter": "Masuk ke ruang kerja",
         "awake": "Timmu sudah bangun",
-        "answer_other": "{{names}} sudah bisa menjawab."
+        "answer_other": "{{names}} sudah bisa menjawab.",
+        "readyPersonal": "Agenmu sudah siap",
+        "readyAlone": "{{name}} sudah siap",
+        "wakePersonal": "Tinggal butuh AI untuk bangun.",
+        "awakePersonal": "Agenmu sudah bangun",
+        "awakeAlone": "{{name}} sudah bangun"
       },
       "account": "Akunmu"
     },

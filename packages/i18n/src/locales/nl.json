@@ -713,6 +713,8 @@
         "name": "Hoi {{first}}. Ik ben {{name}}. Ik stel het team in zo'n twee minuten met je samen.",
         "business": "Daarmee weet ik wie ik bij het team haal.",
         "team": "Dit is het team dat ik zou samenstellen. Je kunt later alles veranderen.",
+        "teamMade": "Het team staat al. We gaan verder wanneer je wilt.",
+        "teamMadePersonal": "Je agents zijn er al. We gaan verder wanneer je wilt.",
         "plan": "Na het abonnement hoef je alleen nog een AI te koppelen. Ik laat je zien waar.",
         "planThen": "Zodra het abonnement aanstaat, koppel je op het volgende scherm je AI.",
         "ask": "Heb je al een team ergens anders? Ik haal het in zijn geheel hierheen.",
@@ -728,10 +730,12 @@
       "preview": {
         "label": "Je werkruimte, terwijl je antwoordt",
         "name": "Je werkruimte",
-        "ghost": "Hier verschijnt je team"
+        "ghost": "Hier verschijnt je team",
+        "ghostPersonal": "Hier verschijnen je agents"
       },
       "team": {
         "title": "Je team",
+        "madeLead": "Ze staan al in de werkruimte. Je kunt ze later een voor een aanpassen.",
         "ask": {
           "title": "Heb je al agents in een andere app?",
           "lead": "Zo ja, dan haal ik het hele team: instructies, skills en routines.",
@@ -779,9 +783,11 @@
         "next": "Daarna: je AI koppelen.",
         "titlePersonal": "Zet je agents aan",
         "leadPersonal": "Met het abonnement en een AI beginnen ze vandaag.",
-        "asleepPersonal": "Slapen tot het abonnement"
+        "asleepPersonal": "Slapen tot het abonnement",
+        "ctaPersonal": "Agents aanzetten"
       },
       "ai": {
+        "titlePersonal": "Koppel een AI zodat je agents kunnen denken",
         "later": "Later koppelen",
         "doneTitle": "Klaar. Het team van {{org}} denkt nu mee.",
         "doneTitlePersonal": "Klaar. {{name}} denkt nu mee.",
@@ -791,7 +797,12 @@
         "enter": "Naar de werkruimte",
         "awake": "Je team is wakker",
         "answer_one": "{{names}} antwoordt nu.",
-        "answer_other": "{{names}} antwoorden nu."
+        "answer_other": "{{names}} antwoorden nu.",
+        "readyPersonal": "Je agents staan klaar",
+        "readyAlone": "{{name}} staat klaar",
+        "wakePersonal": "Alleen nog een AI om wakker te worden.",
+        "awakePersonal": "Je agents zijn wakker",
+        "awakeAlone": "{{name}} is wakker"
       },
       "account": "Je account"
     },

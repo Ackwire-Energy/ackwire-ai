@@ -733,6 +733,8 @@
         "name": "Cześć, {{first}}. Jestem {{name}}. Złożę z tobą zespół w jakieś dwie minuty.",
         "business": "Dzięki temu wiem, kogo zaprosić do zespołu.",
         "team": "Taki zespół bym złożył. Wszystko możesz potem zmienić.",
+        "teamMade": "Zespół jest już gotowy. Ruszamy dalej, kiedy chcesz.",
+        "teamMadePersonal": "Twoi agenci już tu są. Ruszamy dalej, kiedy chcesz.",
         "plan": "Po planie zostaje tylko podłączyć AI. Pokażę ci, gdzie.",
         "planThen": "Gdy plan będzie włączony, na następnym ekranie połączysz swoją AI.",
         "ask": "Masz już zespół gdzie indziej? Przeniosę go tu w całości.",
@@ -748,10 +750,12 @@
       "preview": {
         "label": "Twoja przestrzeń robocza, gdy odpowiadasz",
         "name": "Twoja przestrzeń robocza",
-        "ghost": "Tu pojawi się twój zespół"
+        "ghost": "Tu pojawi się twój zespół",
+        "ghostPersonal": "Tu pojawią się twoi agenci"
       },
       "team": {
         "title": "Twój zespół",
+        "madeLead": "Są już w przestrzeni roboczej. Każdego możesz później dopasować.",
         "ask": {
           "title": "Masz już agentów w innej aplikacji?",
           "lead": "Jeśli tak, przeniosę cały zespół: instrukcje, umiejętności i rutyny.",
@@ -801,9 +805,11 @@
         "next": "Dalej: połącz swoją AI.",
         "titlePersonal": "Włącz swoich agentów",
         "leadPersonal": "Z planem i AI zaczynają dziś.",
-        "asleepPersonal": "Śpią do czasu planu"
+        "asleepPersonal": "Śpią do czasu planu",
+        "ctaPersonal": "Włącz agentów"
       },
       "ai": {
+        "titlePersonal": "Połącz AI, żeby Twoi agenci mogli myśleć",
         "later": "Połącz później",
         "doneTitle": "Gotowe. Zespół {{org}} już myśli.",
         "doneTitlePersonal": "Gotowe. {{name}} już myśli.",
@@ -815,7 +821,14 @@
         "answer_one": "{{names}} już odpowiada.",
         "answer_few": "{{names}} już odpowiadają.",
         "answer_many": "{{names}} już odpowiadają.",
-        "answer_other": "{{names}} już odpowiadają."
+        "answer_other": "{{names}} już odpowiadają.",
+        "readyPersonal": "Twoi agenci są gotowi",
+        "readyAlone": "{{name}} jest gotowy",
+        "readyAlone_female": "{{name}} jest gotowa",
+        "wakePersonal": "Do pobudki brakuje tylko AI.",
+        "awakePersonal": "Twoi agenci się obudzili",
+        "awakeAlone": "{{name}} obudził się",
+        "awakeAlone_female": "{{name}} obudziła się"
       },
       "account": "Twoje konto"
     },

@@ -456,7 +456,8 @@ export function OnboardingPage() {
   if (!me.data || !known || (at === "open" && !stay && deleting === null)) return <BootSplash />;
 
   const lodiWords = { first: firstName(me.data.user.name), ...agentGrammar(lodiName) };
-  // The team step's heading and Lodi's line from its source, until the team is made.
+  // The team step's heading and Lodi's line from its source, until the team is made; then words for a team that
+  // exists (back from a later step), never the template's.
   const teamHead = step === "team" && !teamList ? source.head(t, name) : null;
   const aiLabel = aiNamed && aiNamed !== "key" ? planLabel(t, aiNamed) : null;
   const say =
@@ -465,7 +466,8 @@ export function OnboardingPage() {
       : step === "business"
         ? t("onboarding.flow.lodi.business", lodiWords)
         : step === "team"
-          ? (teamHead?.say ?? t("onboarding.flow.lodi.team", lodiWords))
+          ? (teamHead?.say ??
+            t(personalNow ? "onboarding.flow.lodi.teamMadePersonal" : "onboarding.flow.lodi.teamMade", lodiWords))
           : step === "plan"
             ? t("onboarding.flow.lodi.planThen", lodiWords)
             : aiDone
@@ -485,7 +487,7 @@ export function OnboardingPage() {
               ? personalNow
                 ? t("onboarding.flow.ai.doneTitlePersonal", agentGrammar(lodiName))
                 : t("onboarding.flow.ai.doneTitle", { org: name })
-              : t("arrival.connect.title");
+              : t(personalNow ? "onboarding.flow.ai.titlePersonal" : "arrival.connect.title");
   const lead = asking
     ? t("onboarding.purpose.lead")
     : step === "name"
@@ -493,7 +495,7 @@ export function OnboardingPage() {
       : step === "business"
         ? t("agentSetup.firstRun.about.desc")
         : step === "team"
-          ? (teamHead?.lead ?? t(personalNow ? "teamPlan.templates.heldLeadPersonal" : "teamPlan.templates.heldLead"))
+          ? (teamHead?.lead ?? t("onboarding.flow.team.madeLead"))
           : step === "plan"
             ? t(personalNow ? "onboarding.flow.plan.leadPersonal" : "onboarding.flow.plan.lead")
             : aiDone
@@ -941,7 +943,7 @@ export function OnboardingPage() {
             {wide &&
               (step === "ai" && mine ? (
                 // The team on its stage, asleep until it thinks, in place of the sidebar.
-                <AiStage agents={crew} lead={lodi} awake={aiDone} />
+                <AiStage agents={crew} lead={lodi} awake={aiDone} personal={personalNow} />
               ) : (
                 <OnboardingPreview
                   org={name || t("onboarding.flow.preview.name")}
@@ -952,6 +954,7 @@ export function OnboardingPage() {
                   orgId={team.length > 0 && !personalNow ? orgId : null}
                   agents={preview}
                   person={me.data.user}
+                  personal={personalNow}
                 />
               ))}
           </StepHost>

@@ -63,6 +63,8 @@ const GREETING = "Oi, eu sou o Lodi. Monto o time com você.";
 const ASK = "Você já tem agentes em outro app?";
 /** The last step's heading while no AI is connected. */
 const CONNECT = "Conecte uma IA para o seu time pensar";
+/** The same, in a personal workspace (ADR 0159): no team there. */
+const CONNECT_PERSONAL = "Conecte uma IA para os seus agentes pensarem";
 /** The geometry capture, where CI runs one (`check:geometry`). */
 const snapshot = () => (globalThis as { geometrySnapshot?: () => void }).geometrySnapshot?.();
 /** A new workspace's zone and the person's own in it: this browser's, sent with the workspace. */
@@ -342,6 +344,13 @@ describe("the steps", () => {
     expect(heading()).toBe(CONNECT);
     await click(button("Voltar"), 8);
     expect(heading()).toBe("Seu time");
+    // Words for a team already made, never the template's.
+    expect(document.querySelector(".onb__lead")?.textContent).toBe(
+      "Eles já estão no workspace. Você ajusta cada um depois.",
+    );
+    expect(document.querySelector(".onb__say")?.textContent).toBe(
+      "O time já está montado. Quando quiser, a gente segue.",
+    );
     expect(router.state.location.pathname).toBe("/onboarding");
     await click(button("Continuar"), 8);
     expect(heading()).toBe(CONNECT);
@@ -683,7 +692,10 @@ describe("for me (ADR 0159)", () => {
   test("no name nor business to ask: its agents, its plan, and the plan left for later opens Lodi's DM", async () => {
     const state = newcomer(true);
     plans(PLANS);
-    const { router } = await renderApp("/onboarding", { api: createFakeApi(state) });
+    const api = createFakeApi(state);
+    // A new workspace has no routines yet: its right hand has no first job to show on the plan step.
+    api.routines = { ...api.routines, list: async () => [] };
+    const { router } = await renderApp("/onboarding", { api });
     const landed = landings(router);
     await settle(10);
     expect(heading()).toBe("Para que você vai usar o agentes.chat?");
@@ -702,8 +714,11 @@ describe("for me (ADR 0159)", () => {
     expect(calls(state, "orgs.saveOnboarding")).toEqual([]);
     await noneYet("Seguir sem agentes");
     expect(heading()).toBe("Ligue os seus agentes");
-    // Its right hand alone, asleep until the plan.
+    // Its right hand alone, asleep until the plan, said as what it is (it has no role), and the button in its words.
     expect(planCard().querySelectorAll(".onb__plan-face")).toHaveLength(1);
+    expect(planCard().querySelector(".onb__plan-week")?.textContent).toBe("Lodi · Seu braço direito");
+    expect(within(planCard()).getByRole("button", { name: "Ligar os agentes" })).toBeTruthy();
+    expect(within(planCard()).queryByRole("button", { name: "Ligar o time" })).toBeNull();
     await click(button("Ligar depois e só conhecer o workspace"), 16);
     expect(calls(state, "orgs.saveOnboarding").map((c) => c.args)).toEqual([
       [orgId, { step: "agents" }],
@@ -724,7 +739,7 @@ describe("for me (ADR 0159)", () => {
     expect(document.querySelectorAll(".onb__step")).toHaveLength(3);
     await click(button("Continuar"), 16);
     await noneYet("Seguir sem agentes");
-    expect(heading()).toBe(CONNECT);
+    expect(heading()).toBe(CONNECT_PERSONAL);
     expect(eyebrow()).toBe("Passo 3 de 3");
     await click(button("Conectar depois"), 16);
     const orgId = state.me?.organizations.at(-1)?.id;
@@ -784,7 +799,7 @@ describe("opening a new workspace, in round trips", () => {
     // Its zones went with it and the answers said who the person is: none of them is asked on its own.
     expect(log.filter((c) => ["account.me", "orgs.updateSettings", "orgs.updateMe"].includes(c))).toEqual([]);
     await noneYet("Seguir sem agentes");
-    expect(heading()).toBe(CONNECT);
+    expect(heading()).toBe(CONNECT_PERSONAL);
     log.length = 0;
     const off = router.subscribe("onBeforeNavigate", (e) => {
       if (e.pathChanged) log.push(`→ ${e.toLocation.pathname}`);

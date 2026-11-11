@@ -713,6 +713,8 @@
         "name": "Merhaba {{first}}. Ben {{name}}. Ekibi seninle yaklaşık iki dakikada kuracağım.",
         "business": "Bununla ekibe kimi çağıracağımı biliyorum.",
         "team": "Ben olsam bu ekibi kurardım. Her şeyi sonra değiştirebilirsin.",
+        "teamMade": "Ekip zaten kuruldu. Hazır olduğunuzda devam ederiz.",
+        "teamMadePersonal": "Ajanlarınız zaten burada. Hazır olduğunuzda devam ederiz.",
         "plan": "Plandan sonra sadece bir yapay zeka bağlamak kalıyor. Nerede olduğunu gösteririm.",
         "planThen": "Plan başlayınca sıradaki ekranda yapay zekanı bağlayacaksın.",
         "ask": "Başka bir yerde zaten ekibin mi var? Hepsini buraya getiririm.",
@@ -728,10 +730,12 @@
       "preview": {
         "label": "Sen cevapladıkça çalışma alanın",
         "name": "Çalışma alanın",
-        "ghost": "Ekibin burada görünecek"
+        "ghost": "Ekibin burada görünecek",
+        "ghostPersonal": "Ajanlarınız burada görünecek"
       },
       "team": {
         "title": "Ekibin",
+        "madeLead": "Zaten çalışma alanındalar. Her birini sonra ayarlayabilirsiniz.",
         "ask": {
           "title": "Başka bir uygulamada zaten ajanın var mı?",
           "lead": "Varsa bütün ekibi getiririm: talimatlar, beceriler ve rutinler.",
@@ -779,9 +783,11 @@
         "next": "Sırada: yapay zekanı bağlamak.",
         "titlePersonal": "Ajanlarını başlat",
         "leadPersonal": "Plan ve bir yapay zekayla bugün başlıyorlar.",
-        "asleepPersonal": "Plana kadar uykuda"
+        "asleepPersonal": "Plana kadar uykuda",
+        "ctaPersonal": "Ajanları başlat"
       },
       "ai": {
+        "titlePersonal": "Ajanlarınız düşünebilsin diye bir yapay zeka bağlayın",
         "later": "Sonra bağla",
         "doneTitle": "Tamam. {{org}} ekibi artık düşünüyor.",
         "doneTitlePersonal": "Tamam. {{name}} artık düşünüyor.",
@@ -791,7 +797,12 @@
         "enter": "Çalışma alanına git",
         "awake": "Ekibin uyandı",
         "answer_one": "{{names}} artık cevap veriyor.",
-        "answer_other": "{{names}} artık cevap veriyor."
+        "answer_other": "{{names}} artık cevap veriyor.",
+        "readyPersonal": "Ajanlarınız hazır",
+        "readyAlone": "{{name}} hazır",
+        "wakePersonal": "Uyanmak için tek eksik bir yapay zeka.",
+        "awakePersonal": "Ajanlarınız uyandı",
+        "awakeAlone": "{{name}} uyandı"
       },
       "account": "Hesabın"
     },

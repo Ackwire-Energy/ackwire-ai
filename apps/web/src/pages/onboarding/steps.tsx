@@ -3,6 +3,7 @@ import { keys, useApplyTeamTemplate, useRoutines, useTeamTemplates } from "@agen
 import type { PlanOffer } from "@agenteschat/client/lib/billing";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { firstJob } from "@agenteschat/client/lib/onboarding";
+import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import {
   aboutContext,
   aboutOf,
@@ -253,9 +254,10 @@ export function TeamStep({
 
 /**
  * Step 4, "Turn the team on" (agentes.chat Cloud, a workspace waiting for its first plan): the team asleep until it,
- * what each one does (its first routine, else its role), the plan the billing service recommends with its price when
- * it says one, what comes after it (`next`: connecting an AI, ADR 0162), and the way in without it, where the right
- * hand's card keeps the plan. Back from paying (`confirming`), the payment said as received until the hold lifts.
+ * what each one does (its first routine, else its role; the right hand, what it is to the person), the plan the
+ * billing service recommends with its price when it says one, what comes after it (`next`: connecting an AI, ADR
+ * 0162), and the way in without it, where the right hand's card keeps the plan. Back from paying (`confirming`), the
+ * payment said as received until the hold lifts.
  */
 export function PlanStep({
   orgId,
@@ -300,14 +302,19 @@ export function PlanStep({
           </Chip>
         </div>
         <ul className="onb__plan-week">
-          {team.map((a) => (
-            <li key={a.id} className="ac-iconline">
-              <Icon name="check" size={14} />
-              <span>
-                <b>{a.name}</b> · {firstJob(a, routines)}
-              </span>
-            </li>
-          ))}
+          {team.map((a) => {
+            // The right hand has no role of its own: it is said as what it is to the person. Nothing to say, no dot.
+            const job = firstJob(a, routines) || (isRightHand(a) ? t("rightHand.labelCapitalized") : "");
+            return (
+              <li key={a.id} className="ac-iconline">
+                <Icon name="check" size={14} />
+                <span>
+                  <b>{a.name}</b>
+                  {job && ` · ${job}`}
+                </span>
+              </li>
+            );
+          })}
         </ul>
         <div className="onb__plan-price">
           <span>
@@ -333,7 +340,7 @@ export function PlanStep({
         ) : (
           <div className="onb__plan-acts">
             <Button variant="primary" loading={turnOn.isPending} disabled={skipping} onClick={() => turnOn.mutate()}>
-              {t("onboarding.flow.plan.cta")}
+              {t(personal ? "onboarding.flow.plan.ctaPersonal" : "onboarding.flow.plan.cta")}
             </Button>
             {offer && (
               <button

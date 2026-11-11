@@ -713,6 +713,8 @@
         "name": "Hallo {{first}}. Ich bin {{name}}. Ich stelle das Team in etwa zwei Minuten mit dir zusammen.",
         "business": "Damit weiß ich, wen ich ins Team hole.",
         "team": "So würde ich das Team zusammenstellen. Du kannst später alles ändern.",
+        "teamMade": "Das Team steht schon. Wir machen weiter, wann immer du bereit bist.",
+        "teamMadePersonal": "Deine Agenten sind schon da. Wir machen weiter, wann immer du bereit bist.",
         "plan": "Nach dem Tarif fehlt nur noch eine KI. Ich zeige dir, wo.",
         "planThen": "Sobald der Tarif läuft, verbindest du auf dem nächsten Bildschirm deine KI.",
         "ask": "Du hast schon ein Team woanders? Ich hole es komplett hierher.",
@@ -728,10 +730,12 @@
       "preview": {
         "label": "Dein Workspace, während du antwortest",
         "name": "Dein Workspace",
-        "ghost": "Hier erscheint dein Team"
+        "ghost": "Hier erscheint dein Team",
+        "ghostPersonal": "Hier erscheinen deine Agenten"
       },
       "team": {
         "title": "Dein Team",
+        "madeLead": "Sie sind schon im Workspace. Du kannst jeden später anpassen.",
         "ask": {
           "title": "Hast du schon Agenten in einer anderen App?",
           "lead": "Wenn ja, hole ich das ganze Team: Anweisungen, Skills und Routinen.",
@@ -779,9 +783,11 @@
         "next": "Danach: deine KI verbinden.",
         "titlePersonal": "Schalte deine Agenten ein",
         "leadPersonal": "Mit dem Tarif und einer KI legen sie heute los.",
-        "asleepPersonal": "Schlafen bis zum Tarif"
+        "asleepPersonal": "Schlafen bis zum Tarif",
+        "ctaPersonal": "Agenten einschalten"
       },
       "ai": {
+        "titlePersonal": "Verbinde eine KI, damit deine Agenten denken können",
         "later": "Später verbinden",
         "doneTitle": "Fertig. Das Team von {{org}} denkt jetzt.",
         "doneTitlePersonal": "Fertig. {{name}} denkt jetzt.",
@@ -791,7 +797,12 @@
         "enter": "Zum Workspace",
         "awake": "Dein Team ist aufgewacht",
         "answer_one": "{{names}} antwortet jetzt.",
-        "answer_other": "{{names}} antworten jetzt."
+        "answer_other": "{{names}} antworten jetzt.",
+        "readyPersonal": "Deine Agenten sind bereit",
+        "readyAlone": "{{name}} ist bereit",
+        "wakePersonal": "Nur noch eine KI bis zum Aufwachen.",
+        "awakePersonal": "Deine Agenten sind aufgewacht",
+        "awakeAlone": "{{name}} ist aufgewacht"
       },
       "account": "Dein Konto"
     },

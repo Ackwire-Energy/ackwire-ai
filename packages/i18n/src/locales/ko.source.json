@@ -1742,6 +1742,12 @@
   "onboarding.flow.lodi.team": {
     "value": "This is the team I'd put together. You can change anything later."
   },
+  "onboarding.flow.lodi.teamMade": {
+    "value": "The team is already put together. We move on whenever you're ready."
+  },
+  "onboarding.flow.lodi.teamMadePersonal": {
+    "value": "Your agents are already here. We move on whenever you're ready."
+  },
   "onboarding.flow.lodi.plan": {
     "value": "After the plan, all that's left is connecting an AI. I'll show you where."
   },
@@ -1784,8 +1790,14 @@
   "onboarding.flow.preview.ghost": {
     "value": "Your team shows up here"
   },
+  "onboarding.flow.preview.ghostPersonal": {
+    "value": "Your agents show up here"
+  },
   "onboarding.flow.team.title": {
     "value": "Your team"
+  },
+  "onboarding.flow.team.madeLead": {
+    "value": "They're already in the workspace. You can adjust each one later."
   },
   "onboarding.flow.team.ask.title": {
     "value": "Do you already have agents in another app?"
@@ -1907,6 +1919,12 @@
   "onboarding.flow.plan.asleepPersonal": {
     "value": "Asleep until the plan"
   },
+  "onboarding.flow.plan.ctaPersonal": {
+    "value": "Turn the agents on"
+  },
+  "onboarding.flow.ai.titlePersonal": {
+    "value": "Connect an AI for your agents to think"
+  },
   "onboarding.flow.ai.later": {
     "value": "Connect later"
   },
@@ -1936,6 +1954,21 @@
       "one": "{{names}} answers now.",
       "other": "{{names}} answer now."
     }
+  },
+  "onboarding.flow.ai.readyPersonal": {
+    "value": "Your agents are ready"
+  },
+  "onboarding.flow.ai.readyAlone": {
+    "value": "{{name}} is ready"
+  },
+  "onboarding.flow.ai.wakePersonal": {
+    "value": "Just one AI away from waking up."
+  },
+  "onboarding.flow.ai.awakePersonal": {
+    "value": "Your agents woke up"
+  },
+  "onboarding.flow.ai.awakeAlone": {
+    "value": "{{name}} woke up"
   },
   "onboarding.flow.account": {
     "value": "Your account"

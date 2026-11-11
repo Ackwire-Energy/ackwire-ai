@@ -703,6 +703,8 @@
         "name": "안녕하세요, {{first}}님. 저는 {{name}}예요. 2분 정도면 같이 팀을 꾸릴 수 있어요.",
         "business": "이제 팀에 누구를 부를지 알겠어요.",
         "team": "제가 꾸린다면 이런 팀이에요. 나중에 뭐든 바꿀 수 있어요.",
+        "teamMade": "팀은 이미 꾸려졌어요. 준비되면 다음으로 넘어가요.",
+        "teamMadePersonal": "에이전트가 이미 와 있어요. 준비되면 다음으로 넘어가요.",
         "plan": "요금제 다음에는 AI만 연결하면 돼요. 어디서 하는지 보여 드릴게요.",
         "planThen": "요금제가 켜지면 다음 화면에서 AI를 연결해요.",
         "ask": "다른 곳에 이미 팀이 있나요? 통째로 여기로 데려올게요.",
@@ -718,10 +720,12 @@
       "preview": {
         "label": "답하는 동안 채워지는 내 워크스페이스",
         "name": "내 워크스페이스",
-        "ghost": "팀이 여기에 나타나요"
+        "ghost": "팀이 여기에 나타나요",
+        "ghostPersonal": "에이전트가 여기에 나타나요"
       },
       "team": {
         "title": "내 팀",
+        "madeLead": "이미 워크스페이스에 있어요. 나중에 하나씩 조정할 수 있어요.",
         "ask": {
           "title": "다른 앱에서 이미 에이전트를 쓰고 있나요?",
           "lead": "그렇다면 팀 전체를 데려올게요. 지침, 스킬, 루틴까지요.",
@@ -768,9 +772,11 @@
         "next": "다음: AI 연결하기.",
         "titlePersonal": "에이전트를 켜세요",
         "leadPersonal": "요금제와 AI가 있으면 오늘부터 일해요.",
-        "asleepPersonal": "요금제 전까지 잠자는 중"
+        "asleepPersonal": "요금제 전까지 잠자는 중",
+        "ctaPersonal": "에이전트 켜기"
       },
       "ai": {
+        "titlePersonal": "에이전트가 생각할 수 있게 AI를 연결하세요",
         "later": "나중에 연결",
         "doneTitle": "완료됐어요. {{org}} 팀이 이제 생각해요.",
         "doneTitlePersonal": "완료됐어요. {{name}}이(가) 이제 생각해요.",
@@ -779,7 +785,12 @@
         "connected": "연결됨",
         "enter": "워크스페이스로 가기",
         "awake": "팀이 깨어났어요",
-        "answer_other": "{{names}}이(가) 이제 답해요."
+        "answer_other": "{{names}}이(가) 이제 답해요.",
+        "readyPersonal": "에이전트가 준비됐어요",
+        "readyAlone": "{{name}}이(가) 준비됐어요",
+        "wakePersonal": "깨어나려면 AI만 있으면 돼요.",
+        "awakePersonal": "에이전트가 깨어났어요",
+        "awakeAlone": "{{name}}이(가) 깨어났어요"
       },
       "account": "내 계정"
     },

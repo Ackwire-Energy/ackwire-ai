@@ -723,6 +723,8 @@
         "name": "Bonjour {{first}}. Je suis {{name}}. Je monte l'équipe avec vous en deux minutes environ.",
         "business": "Avec ça, je sais qui appeler dans l'équipe.",
         "team": "Voici l'équipe que je monterais. Vous pourrez tout changer ensuite.",
+        "teamMade": "L'équipe est déjà en place. On continue quand vous voulez.",
+        "teamMadePersonal": "Vos agents sont déjà là. On continue quand vous voulez.",
         "plan": "Après l'abonnement, il ne reste qu'à connecter une IA. Je vous montre où.",
         "planThen": "Une fois l'abonnement activé, l'écran suivant sert à connecter votre IA.",
         "ask": "Vous avez déjà une équipe ailleurs ? Je l'apporte ici en entier.",
@@ -738,10 +740,12 @@
       "preview": {
         "label": "Votre espace de travail, pendant que vous répondez",
         "name": "Votre espace de travail",
-        "ghost": "Votre équipe apparaît ici"
+        "ghost": "Votre équipe apparaît ici",
+        "ghostPersonal": "Vos agents apparaissent ici"
       },
       "team": {
         "title": "Votre équipe",
+        "madeLead": "Ils sont déjà dans l'espace de travail. Vous pourrez ajuster chacun ensuite.",
         "ask": {
           "title": "Vous avez déjà des agents dans une autre app ?",
           "lead": "Si oui, j'apporte toute l'équipe : instructions, compétences et routines.",
@@ -790,9 +794,11 @@
         "next": "Ensuite : connecter votre IA.",
         "titlePersonal": "Activez vos agents",
         "leadPersonal": "Avec l'abonnement et une IA, ils commencent aujourd'hui.",
-        "asleepPersonal": "Endormis jusqu'à l'abonnement"
+        "asleepPersonal": "Endormis jusqu'à l'abonnement",
+        "ctaPersonal": "Activer les agents"
       },
       "ai": {
+        "titlePersonal": "Connectez une IA pour que vos agents réfléchissent",
         "later": "Connecter plus tard",
         "doneTitle": "C'est fait. L'équipe de {{org}} réfléchit déjà.",
         "doneTitlePersonal": "C'est fait. {{name}} réfléchit déjà.",
@@ -803,7 +809,14 @@
         "awake": "Votre équipe s'est réveillée",
         "answer_one": "{{names}} répond déjà.",
         "answer_many": "{{names}} répondent déjà.",
-        "answer_other": "{{names}} répondent déjà."
+        "answer_other": "{{names}} répondent déjà.",
+        "readyPersonal": "Vos agents sont prêts",
+        "readyAlone": "{{name}} est prêt",
+        "readyAlone_female": "{{name}} est prête",
+        "wakePersonal": "Plus qu'une IA avant le réveil.",
+        "awakePersonal": "Vos agents se sont réveillés",
+        "awakeAlone": "{{name}} s'est réveillé",
+        "awakeAlone_female": "{{name}} s'est réveillée"
       },
       "account": "Votre compte"
     },

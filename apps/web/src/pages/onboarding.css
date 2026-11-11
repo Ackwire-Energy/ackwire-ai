@@ -113,6 +113,17 @@ html:not([data-pointer]) .onb__me:focus-visible {
   align-items: flex-start;
   min-width: 0;
 }
+/*
+ * A step taller than the window (bringing a team from another app) scrolls the page, and the scrollbar takes its room
+ * from this pane's right edge, which moved the centred column half of it to the left of every other step's. The same
+ * room on the left keeps the column in place: `100vw` counts the scrollbar and this pane (`100%`, beside the rail's
+ * 280px column in layout.css) doesn't, so it is 0 while nothing scrolls or where scrollbars take no room.
+ */
+@media (min-width: 761px) {
+  .onb--rail > .onb__main {
+    padding-left: calc(100vw - 100% - 280px);
+  }
+}
 /* The step's column and, on wide screens, the workspace's preview beside it. */
 .onb__cols {
   --onb-gutter: clamp(16px, 4vw, 32px);

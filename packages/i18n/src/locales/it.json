@@ -723,6 +723,8 @@
         "name": "Ciao {{first}}. Sono {{name}}. Metto su il team con te in circa due minuti.",
         "business": "Con questo so già chi chiamare nel team.",
         "team": "Questo è il team che metterei su. Puoi cambiare tutto dopo.",
+        "teamMade": "Il team è già pronto. Andiamo avanti quando vuoi.",
+        "teamMadePersonal": "I tuoi agenti sono già qui. Andiamo avanti quando vuoi.",
         "plan": "Dopo il piano, manca solo collegare un'IA. Ti mostro dove.",
         "planThen": "Con il piano attivo, la prossima schermata è quella per collegare la tua IA.",
         "ask": "Hai già un team da un'altra parte? Lo porto qui tutto intero.",
@@ -738,10 +740,12 @@
       "preview": {
         "label": "Il tuo spazio di lavoro, mentre rispondi",
         "name": "Il tuo spazio di lavoro",
-        "ghost": "Il tuo team appare qui"
+        "ghost": "Il tuo team appare qui",
+        "ghostPersonal": "I tuoi agenti appaiono qui"
       },
       "team": {
         "title": "Il tuo team",
+        "madeLead": "Sono già nello spazio di lavoro. Puoi sistemare ciascuno dopo.",
         "ask": {
           "title": "Hai già agenti in un'altra app?",
           "lead": "Se sì, porto tutto il team: istruzioni, skill e routine.",
@@ -790,9 +794,11 @@
         "next": "Poi: collega la tua IA.",
         "titlePersonal": "Attiva i tuoi agenti",
         "leadPersonal": "Con il piano e un'IA, iniziano oggi.",
-        "asleepPersonal": "Dormono fino al piano"
+        "asleepPersonal": "Dormono fino al piano",
+        "ctaPersonal": "Attiva gli agenti"
       },
       "ai": {
+        "titlePersonal": "Collega un'IA per far ragionare i tuoi agenti",
         "later": "Collega dopo",
         "doneTitle": "Fatto. Il team di {{org}} ragiona già.",
         "doneTitlePersonal": "Fatto. {{name}} ragiona già.",
@@ -803,7 +809,14 @@
         "awake": "Il tuo team si è svegliato",
         "answer_one": "{{names}} risponde già.",
         "answer_many": "{{names}} rispondono già.",
-        "answer_other": "{{names}} rispondono già."
+        "answer_other": "{{names}} rispondono già.",
+        "readyPersonal": "I tuoi agenti sono pronti",
+        "readyAlone": "{{name}} è pronto",
+        "readyAlone_female": "{{name}} è pronta",
+        "wakePersonal": "Manca solo un'IA per svegliarsi.",
+        "awakePersonal": "I tuoi agenti si sono svegliati",
+        "awakeAlone": "{{name}} si è svegliato",
+        "awakeAlone_female": "{{name}} si è svegliata"
       },
       "account": "Il tuo account"
     },

@@ -198,6 +198,45 @@ describe("Connect an AI, the rail's last step", () => {
   });
 });
 
+describe("a personal workspace (ADR 0159)", () => {
+  test("its own words, never a team's: its agents beside the question, its right hand by name on the sky", async () => {
+    const restore = wide();
+    try {
+      // Being set up, the team's question next, its right hand alone and with no AI yet.
+      const state = withRightHand(seedState({ agents: [] }));
+      if (state.me)
+        state.me.organizations = [
+          {
+            id: ORG_ID,
+            name: "Pessoal",
+            role: "owner",
+            mode: "personal",
+            onboarding: { step: "context", generalChannelId: GENERAL_ID },
+          },
+        ];
+      state.aiStatus = {
+        any: false,
+        agents: state.agents.map((a) => ({ agentId: a.id, state: "no_ai", reason: "no_key" })),
+      };
+      const { services } = await renderApp("/onboarding", { api: createFakeApi(state) });
+      await settle(16);
+      expect(document.querySelector(".onb-preview__ghost")?.textContent).toBe("Os seus agentes aparecem aqui");
+      await click(screen().getByRole("radio", { name: /Ainda não uso nenhum/ }), 4);
+      await click(button("Seguir sem agentes"), 16);
+      expect(heading()).toBe("Conecte uma IA para os seus agentes pensarem");
+      const stage = () => document.querySelector(".onb-stage")?.textContent ?? "";
+      expect(stage()).toContain("O Lodi está pronto");
+      expect(stage()).toContain("Só falta uma IA para acordar.");
+      expect(stage()).not.toContain("time");
+      await allThink(state, services);
+      expect(stage()).toContain("O Lodi acordou");
+      expect(stage()).not.toContain("time");
+    } finally {
+      restore();
+    }
+  });
+});
+
 describe("what a pick opens", () => {
   test("for the team, the step the person asked for; for the right hand alone, its own dialog", () => {
     const team = [LODI_ID, "ada", "atlas"];
