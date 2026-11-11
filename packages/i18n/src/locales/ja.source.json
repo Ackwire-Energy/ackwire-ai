@@ -19107,6 +19107,9 @@
   "missions.notice.machine_task_resume_waits": {
     "value": "{{computer}} is back: “{{title}}” resumes where it stopped once the project is ready"
   },
+  "missions.notice.machine_task_restarted": {
+    "value": "{{computer}} is back: “{{title}}” started again"
+  },
   "missions.notice.machine_task_done": {
     "value": "“{{title}}” finished in {{span}} on {{computer}}"
   },
@@ -37093,6 +37096,9 @@
   },
   "chat.body.machine_task_resume_waits": {
     "value": "{{computer}} is back: “{{title}}” resumes where it stopped once the project is ready."
+  },
+  "chat.body.machine_task_restarted": {
+    "value": "{{computer}} is back: “{{title}}” started again."
   },
   "chat.body.machine_offline": {
     "value": "{{computer}} went offline."
