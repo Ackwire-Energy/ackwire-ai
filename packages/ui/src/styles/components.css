@@ -6780,43 +6780,42 @@ html:not([data-pointer]) .ac-react:focus-visible {
   background: var(--sunken);
   box-shadow: var(--e1);
 }
-/* Lower: one 32px line at rest, the toolbar 4px under it. */
-/* In the column card the height comes from the text (Composer measures it); `flex: 1` from the
-   row layout above would pin it to its minimum. */
+/* One row: attach and emoji, the text, the microphone and send, `--space-2` from the card on every side so the
+   buttons' corners are concentric with the card's. One line of text is a button tall; more lines grow the row and
+   the buttons stay at its bottom. */
+.ac-composer__row {
+  display: flex;
+  align-items: flex-end;
+  padding: var(--space-2);
+}
+.ac-composer__tools {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+}
+.ac-composer__tools:empty {
+  display: none;
+}
+/* In the column the height comes from the text (Composer measures it); `flex: 1` from the row layout above would
+   pin it to its minimum. */
 .ac-composer textarea {
   flex: none;
   font-size: 15.5px;
   line-height: 22px;
-  min-height: 32px;
-  padding: 12px 16px 2px;
+  min-height: var(--control-h-sm);
+  padding: calc((var(--control-h-sm) - 22px) / 2) var(--space-2);
 }
 .ac-composer textarea::placeholder {
   color: var(--faint);
 }
-/* One room at both ends and under it, so its first and last buttons are concentric with the card's corners. */
-.ac-composer__tools {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px var(--space-2) var(--space-2);
-}
+/* Context pills: a line of their own over the text's row. */
 .ac-composer__pills {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--space-2);
   min-width: 0;
-  flex: 1;
-}
-.ac-composer__tools > .ac-btn:first-child,
-.ac-composer__tools > .ac-composer__send:first-child {
-  margin-left: auto;
-}
-.ac-composer__pills + .ac-btn,
-.ac-composer__pills + .ac-composer__send {
-  margin-left: 0;
-}
-.ac-composer__tools .ac-btn + .ac-composer__send {
-  margin-left: 0;
+  padding: var(--space-2) var(--space-2) 0;
 }
 /* Context chips: neutral; the target agent carries its own identity. Compact controls of the ruler. */
 .ac-composer__pill,
@@ -6994,26 +6993,28 @@ html:not([data-pointer]) .ac-composer__send:focus-visible {
 .ac-composer__attachments {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  padding: 6px 14px;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-2) 0;
 }
 /* Voice messages (ADR 0100). The recording sits on the text's first line and hides nothing but the text, which keeps
    its place: the box never changes height, whatever was typed. */
 .ac-composer__text {
   position: relative;
   display: flex;
+  flex: 1;
   flex-direction: column;
   min-width: 0;
 }
 .ac-composer__voice {
   position: absolute;
-  top: 7px;
-  left: 16px;
-  right: 16px;
-  height: 32px;
+  bottom: 0;
+  left: var(--space-2);
+  right: var(--space-2);
+  height: var(--control-h-sm);
   display: none;
   align-items: center;
   gap: 10px;
+  container: ac-composer-voice / inline-size;
 }
 .ac-composer[data-voice] .ac-composer__voice {
   display: flex;
@@ -7066,29 +7067,25 @@ html:not([data-pointer]) .ac-composer__send:focus-visible {
   width: 28px;
   height: 28px;
 }
-/* The toolbar stays: the send button and the microphone where they were, and the rest gives way to delete and the keys. */
-.ac-composer[data-voice]
-  .ac-composer__tools
-  > :not(.ac-composer__voice-trash, .ac-composer__voice-hint, .ac-composer__mic, .ac-composer__send) {
+/* The row stays: the send button and the microphone where they were, attach and emoji give way to delete. */
+.ac-composer[data-voice] .ac-composer__tools > :not(.ac-composer__voice-trash, .ac-composer__mic, .ac-composer__send),
+.ac-composer[data-voice] .ac-composer__pills {
   display: none;
-}
-.ac-composer[data-voice] .ac-composer__tools {
-  flex-wrap: nowrap;
-}
-.ac-composer[data-voice] .ac-composer__send {
-  margin-left: 0;
 }
 .ac-composer__voice-trash {
   color: var(--danger);
 }
+/* The keys, after the wave while there is room for both. The last seconds' countdown always shows. */
 .ac-composer__voice-hint {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
+  flex: none;
   white-space: nowrap;
-  text-overflow: ellipsis;
   font-size: 13px;
   color: var(--muted);
+}
+@container ac-composer-voice (max-width: 420px) {
+  .ac-composer__voice-hint:not([data-left]) {
+    display: none;
+  }
 }
 .ac-composer__voice-hint[data-left] {
   font-weight: 700;
@@ -7625,30 +7622,19 @@ html:not([data-pointer]) .ac-video__rail:focus-visible .ac-video__knob {
     var(--top),
     inset 0 0 0 2px var(--line-strong);
 }
-.ac-composer__tools--format {
-  flex-wrap: wrap;
-  row-gap: 4px;
-}
-/* With the toolbar, context pills get their own line above it, and send stays on the right. */
-.ac-composer__tools--format .ac-composer__pills {
-  flex-basis: 100%;
-}
-/* Inline pills (a DM with an agent): its chip opens the toolbar row, a hairline before the tools. */
-.ac-composer--inline-pills .ac-composer__tools--format .ac-composer__pills {
+/* Inline pills (a DM with an agent): its chip opens the text's row, a hairline between it and attach. */
+.ac-composer__row > .ac-composer__pills {
   flex: 0 1 auto;
-  flex-basis: auto;
   flex-wrap: nowrap;
   align-items: center;
+  padding: 0 var(--space-2) 0 0;
 }
-.ac-composer--inline-pills .ac-composer__pills::after {
+.ac-composer__row > .ac-composer__pills::after {
   content: "";
   flex: none;
   align-self: center;
   width: 1px;
   height: 16px;
-  /* The chip's edge is drawn, the next tool's glyph sits ~8px inside its button: the extra room on the left makes
-     the hairline look centred between them. */
-  margin: 0 0 0 8px;
   background: var(--line2);
 }
 .ac-composer--inline-pills .ac-composer__agent {
@@ -7659,43 +7645,73 @@ html:not([data-pointer]) .ac-video__rail:focus-visible .ac-video__knob {
   font-size: 13px;
   font-weight: 550;
 }
-.ac-composer__tools--format .ac-composer__send,
-.ac-composer__tools--format .ac-btn + .ac-composer__send {
-  margin-left: auto;
+/* A phone's row has no room for a name beside the text: the chip is the face, the header and the placeholder say who. */
+@media (max-width: 640px) {
+  .ac-composer--inline-pills .ac-composer__agent {
+    padding: 0 4px;
+  }
+  .ac-composer--inline-pills .ac-composer__agent .ac-composer__pill-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 }
-/* As wide as its buttons where there is room; narrower (a thread or a task's conversation beside the chat, a phone),
-   it keeps the line with emoji, attach and send and scrolls sideways. A basis of its full width wrapped it onto a
-   line of its own in any composer under ~500px, the other buttons on a second one; `max-width` keeps it from
-   growing past its buttons, send's auto margin takes the rest. Scrolling sideways it clips on every side: 3px of
-   room around the buttons (taken back by the margin, so nothing moves) keep their focus rings whole. */
-.ac-composer__format {
+/* Formatting, floating over the text selected in the box (`FormatBar` places it from the selection). As wide as its
+   buttons, capped to the composer's width by the script: on a narrow one they wrap onto a second row. */
+.ac-formatbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: var(--z-floating);
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 2px;
-  flex: 1 1 0;
-  max-width: max-content;
-  min-width: 0;
-  margin: -3px;
-  padding: 3px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: none;
+  gap: var(--space-1);
+  box-sizing: border-box;
+  width: max-content;
+  padding: var(--space-1);
+  border-radius: calc(var(--control-r-sm) + var(--space-1));
+  background: var(--raised);
+  box-shadow: var(--e3), var(--top);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 0.12s ease,
+    visibility 0s 0.12s;
 }
-.ac-composer__format::-webkit-scrollbar {
-  display: none;
+.ac-formatbar[data-open] {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition: opacity 0.12s ease;
 }
-.ac-composer__format-item {
+@starting-style {
+  .ac-formatbar[data-open] {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ac-formatbar,
+  .ac-formatbar[data-open] {
+    transition: none;
+  }
+}
+.ac-formatbar__item {
   display: inline-flex;
   flex: none;
 }
-.ac-composer__format-item[data-group-end]::after {
+.ac-formatbar__item[data-group-end]::after {
   content: "";
   width: 1px;
   height: 16px;
-  margin: auto 4px;
+  margin: auto 0 auto var(--space-1);
   background: var(--line);
 }
-.ac-composer__format-btn {
+.ac-formatbar__btn {
   width: var(--control-h-sm);
   height: var(--control-h-sm);
   border: 0;
@@ -7711,14 +7727,14 @@ html:not([data-pointer]) .ac-video__rail:focus-visible .ac-video__knob {
     color 0.15s,
     transform 0.18s var(--spring);
 }
-.ac-composer__format-btn:hover {
+.ac-formatbar__btn:hover {
   background: var(--sunken);
   color: var(--ink);
 }
-.ac-composer__format-btn:active {
+.ac-formatbar__btn:active {
   transform: scale(0.94);
 }
-html:not([data-pointer]) .ac-composer__format-btn:focus-visible {
+html:not([data-pointer]) .ac-formatbar__btn:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -7835,7 +7851,7 @@ html:not([data-pointer]) .ac-composer__file-remove:focus-visible {
   box-shadow: var(--focus-ring);
 }
 @media (prefers-reduced-motion: reduce) {
-  .ac-composer__format-btn {
+  .ac-formatbar__btn {
     transition: none;
   }
 }
@@ -10031,10 +10047,25 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
     min-height: var(--control-h-sm);
     border-radius: calc(var(--bar-r) - var(--bar-pad));
   }
-  .ac-composer__format-btn {
-    width: var(--control-h-md);
+  /* The floating bar keeps its 32px buttons (nine fit a phone's width on one row), their targets taller. */
+  .ac-formatbar__btn {
+    position: relative;
+  }
+  .ac-formatbar__btn::after {
+    content: "";
+    position: absolute;
+    inset: calc((var(--control-h-sm) - var(--touch-target)) / 2) 0;
+  }
+  /* The row is as tall as its send button here: one line of text and the small buttons centre on it. */
+  .ac-composer textarea {
+    min-height: var(--control-h-md);
+    padding-block: calc((var(--control-h-md) - 22px) / 2);
+  }
+  .ac-composer__tools {
+    min-height: var(--control-h-md);
+  }
+  .ac-composer__voice {
     height: var(--control-h-md);
-    border-radius: var(--control-r-md);
   }
   .ac-composer__send {
     height: var(--control-h-md);

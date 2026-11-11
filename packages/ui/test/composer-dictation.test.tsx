@@ -117,7 +117,7 @@ describe("dictated text lands in the message box", () => {
   });
 });
 
-test("a click in the empty room under the text puts the caret in the box; a button keeps its own click", () => {
+test("a click in the card's empty room puts the caret in the box; a button keeps its own click", () => {
   render(
     <Composer
       value=""
@@ -129,7 +129,7 @@ test("a click in the empty room under the text puts the caret in the box; a butt
     />,
   );
   const box = screen.getByLabelText("Message");
-  const row = document.querySelector(".ac-composer__tools") as HTMLElement;
+  const row = document.querySelector(".ac-composer__pills") as HTMLElement;
   expect(fireEvent.mouseDown(row)).toBe(false);
   expect(document.activeElement).toBe(box);
   (document.activeElement as HTMLElement).blur();

@@ -155,8 +155,8 @@ test("a button inside a field is as far from its end as from its top and bottom,
   expect(last(kit, ".ac-token--sm", "--token-x-spare")).toBe("5px");
   expect(last(kit, ".ac-token--sm", "border-radius")).toBe("var(--radius-xs)");
   expect(last(kit, ".ac-token--sm .ac-token__remove", "border-radius")).toBe("var(--radius-cut)");
-  // The composer's tools: one room at both ends and under them, its send button the card's corner less it.
-  expect(last(kit, ".ac-composer__tools", "padding")).toBe("4px var(--space-2) var(--space-2)");
+  // The composer's row: one room on every side, its send button the card's corner less it.
+  expect(last(kit, ".ac-composer__row", "padding")).toBe("var(--space-2)");
   expect(last(kit, ".ac-composer__send", "border-radius")).toBe("var(--control-r-sm)");
   // The password field's eye: a 32px button in the ruler's 48px field, as far from its end as from its top and
   // bottom, its corner the field's less that room.
