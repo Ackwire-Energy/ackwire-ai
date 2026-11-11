@@ -2011,7 +2011,8 @@ export const featureKeysEn = {
       wifi1: "Turn on Wireless debugging",
       wifi1Text: "Check Always allow on this network, then tap Allow.",
       wifi2: "Scan the code on a computer",
-      wifi2Text: "From Wireless debugging\u00a0›\u00a0Pair device with QR code.",
+      wifi2Text:
+        "From Wireless debugging\u00a0›\u00a0Pair device with QR code. Don't use the camera: it reads the code as a Wi-Fi network and takes the phone off your Wi-Fi.",
       wifi2Hint:
         "In agentes.chat on a computer, open Connect a device\u00a0›\u00a0Android phone\u00a0›\u00a0Over Wi-Fi and pick {{host}}.",
       codeHead: "Pair with a pairing code",

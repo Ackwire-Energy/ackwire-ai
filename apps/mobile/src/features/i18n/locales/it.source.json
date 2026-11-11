@@ -4755,7 +4755,7 @@
     "value": "Scan the code on a computer"
   },
   "devices.android.wifi2Text": {
-    "value": "From Wireless debugging › Pair device with QR code."
+    "value": "From Wireless debugging › Pair device with QR code. Don't use the camera: it reads the code as a Wi-Fi network and takes the phone off your Wi-Fi."
   },
   "devices.android.wifi2Hint": {
     "value": "In agentes.chat on a computer, open Connect a device › Android phone › Over Wi-Fi and pick {{host}}."
@@ -5315,6 +5315,9 @@
   },
   "onb.create": {
     "value": "Create"
+  },
+  "onb.enter": {
+    "value": "Go to the workspace"
   },
   "onb.shareMessage": {
     "value": "Join {{org}} on agentes.chat: {{url}}"
@@ -6535,8 +6538,5 @@
   },
   "empty.audit.text": {
     "value": "When an agent does something outside the conversation, it shows up here."
-  },
-  "onb.enter": {
-    "value": "Go to the workspace"
   }
 }

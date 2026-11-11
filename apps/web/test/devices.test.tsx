@@ -245,7 +245,8 @@ describe("Connect a device", () => {
     await click(screen().getByRole("button", { name: /Android phone/ }));
     const dialog = screen().getByRole("dialog", { name: "Connect an Android phone" });
     expect(dialog.textContent).toContain("Looking for a phone on Sam's MacBook Pro…");
-    expect(dialog.querySelector(".dv-qr svg")).toBeTruthy();
+    // Our phone app is in no store yet: no QR that would only open this page in the phone's browser.
+    expect(dialog.querySelector(".dv-qr")).toBeNull();
     const list = acmeDevices();
     const mac = list.devices.find((d) => d.id === MAC);
     const pixel = mac?.phones.find((p) => p.id === PIXEL);
@@ -285,18 +286,26 @@ describe("Connect a device", () => {
     expect(dialog.querySelector('.dv-step[data-state="current"]')?.textContent).toContain(
       "Waiting for the phone to scan…",
     );
-    expect(dialog.querySelector(".ac-setpath")?.textContent).toBe("Wireless debuggingPair device with QR code");
+    expect(dialog.querySelector(".ac-setpath")?.textContent).toBe(
+      "Developer optionsWireless debuggingPair device with QR code",
+    );
+    expect(dialog.querySelector('.dv-step[data-state="current"] .dv-step__title')?.textContent).toBe(
+      "Scan it from Wireless debugging, not the camera",
+    );
+    expect(dialog.querySelector(".dv-qr")?.textContent).toBe(
+      "Not with the cameraIt offers a Wi-Fi network named agentes-…, which doesn't exist. Keep the phone on the computer's Wi-Fi.",
+    );
     devices.setPairing({ state: "pairing" });
     await ask();
     expect(dialog.textContent).toContain("Found a phone. Pairing…");
     expect(dialog.querySelector(".dv-qr--used")).toBeTruthy();
 
-    // Nothing in 2 minutes: the cause, and Try again makes a new code.
+    // Nothing in 2 minutes: the camera or a phone off the Wi-Fi, and on a Mac its Local Network setting. Try again makes a new code.
     devices.setPairing({ state: "failed", reason: "timed_out" });
     await ask();
     const failed = dialog.querySelector('.dv-step[data-state="needs"]');
     expect(failed?.textContent).toContain(
-      "Nothing scanned the code in 2 minutes. Check the phone is on the same Wi-Fi as Sam's MacBook Pro and try again.",
+      "No phone paired in 2 minutes. If the camera scanned the code or the phone left the Wi-Fi, put it on the same Wi-Fi as Sam's MacBook Pro and scan from Wireless debugging. On that Mac, also turn on agentes.chat in System Settings › Privacy & Security › Local Network.",
     );
     await click(within(dialog).getByRole("button", { name: "Try again" }));
     expect(calls(state, "devices.startWifiPairing")).toHaveLength(2);
@@ -304,6 +313,8 @@ describe("Connect a device", () => {
     // The six-digit way: what the phone shows, typed here.
     await click(within(dialog).getByRole("button", { name: "Use a pairing code instead" }));
     expect(calls(state, "devices.cancelWifiPairing").length).toBeGreaterThan(0);
+    // No pairing QR now, and no QR into a phone app that isn't out yet: the steps take the dialog's width.
+    expect(dialog.querySelector(".dv-qr")).toBeNull();
     const pairButton = within(dialog).getByRole("button", { name: "Pair" }) as HTMLButtonElement;
     expect(pairButton.disabled).toBe(true);
     await act(async () => {
@@ -329,12 +340,27 @@ describe("Connect a device", () => {
     expect(screen().getByRole("dialog", { name: "Galaxy S24 is connected" })).toBeTruthy();
   });
 
-  test("the Android steps draw Android's own prompt in Portuguese", async () => {
+  test("the Android steps in Portuguese: Android's own prompt, where to scan, the code way", async () => {
     const app = await open(`/org/${ORG_ID}/settings/devices/android-setup?computer=${MAC}`);
     await showIn(app.services, "pt-BR");
     const dialog = screen().getByRole("dialog", { name: "Conectar um celular Android" });
     expect(dialog.textContent).toContain("Permitir a depuração USB?");
     expect(dialog.textContent).toContain("Sempre permitir neste computador");
+    await click(within(dialog).getByRole("radio", { name: "Por Wi-Fi" }));
+    const qr = dialog.querySelector(".dv-qr")?.textContent;
+    app.devices.setPairing({ state: "failed", reason: "same_wifi" });
+    await act(async () => {
+      await app.services.queryClient.invalidateQueries({ queryKey: ["wifi-pair-state"] });
+    });
+    await settle(4);
+    const failed = dialog.querySelector('.dv-step[data-state="needs"] .dv-step__head .dv-step__text')?.textContent;
+    await click(within(dialog).getByRole("button", { name: "Usar um código de pareamento" }));
+    expect(qr).toContain("Não pela câmera");
+    expect(failed).toBe(
+      "Não deu para alcançar o celular. Coloque-o no mesmo Wi-Fi que Sam's MacBook Pro. Nesse Mac, ligue também o agentes.chat em Ajustes do Sistema › Privacidade e Segurança › Rede Local.",
+    );
+    expect(within(dialog).getByLabelText("Endereço IP e porta")).toBeTruthy();
+    expect(within(dialog).getByLabelText("Código de pareamento por Wi-Fi")).toBeTruthy();
   });
 
   test("an iPhone: the checklist mirrors the Mac, Developer Mode as a Settings path", async () => {

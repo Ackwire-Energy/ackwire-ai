@@ -2026,7 +2026,7 @@
       "wifi1": "Activez le Débogage sans fil",
       "wifi1Text": "Cochez Toujours autoriser sur ce réseau, puis touchez Autoriser.",
       "wifi2": "Scannez le code sur un ordinateur",
-      "wifi2Text": "Depuis Débogage sans fil › Associer l'appareil avec un code QR.",
+      "wifi2Text": "Depuis Débogage sans fil › Associer l'appareil avec un code QR. N'utilisez pas l'appareil photo : il lit le code comme un réseau Wi-Fi et sort le téléphone de votre Wi-Fi.",
       "wifi2Hint": "Dans agentes.chat sur un ordinateur, ouvrez Connecter un appareil › Téléphone Android › Par Wi-Fi et choisissez {{host}}.",
       "codeHead": "Associer avec un code d'association",
       "codeNote": "Depuis Débogage sans fil › Associer l'appareil avec un code d'association. Ouvrez Paramètres et agentes.chat côte à côte pour garder le code à l'écran.",
@@ -2256,9 +2256,9 @@
     "anotherLead": "Sur agentes.chat. Vous restez dans {{org}} et pouvez changer à tout moment.",
     "suggested": "D'après votre e-mail {{domain}}, j'ai suggéré {{org}}.",
     "create": "Créer",
+    "enter": "Entrer dans l'espace de travail",
     "shareMessage": "Rejoignez {{org}} sur agentes.chat : {{url}}",
-    "failed": "Impossible d'enregistrer. Réessayez.",
-    "enter": "Entrer dans l'espace de travail"
+    "failed": "Impossible d'enregistrer. Réessayez."
   },
   "ai": {
     "yourPlan": "Votre abonnement IA",

@@ -1961,7 +1961,8 @@ export const featureKeysPtBR = {
       wifi1: "Ative a Depuração por Wi-Fi",
       wifi1Text: "Marque Sempre permitir nesta rede e toque em Permitir.",
       wifi2: "Escaneie o código num computador",
-      wifi2Text: "Em Depuração por Wi-Fi\u00a0›\u00a0Parear o dispositivo com um código QR.",
+      wifi2Text:
+        "Em Depuração por Wi-Fi\u00a0›\u00a0Parear o dispositivo com um código QR. Não use a câmera: ela lê o código como uma rede Wi-Fi e tira o celular do seu Wi-Fi.",
       wifi2Hint:
         "No agentes.chat num computador, abra Conectar um dispositivo\u00a0›\u00a0Celular Android\u00a0›\u00a0Por Wi-Fi e escolha {{host}}.",
       codeHead: "Parear com um código de pareamento",

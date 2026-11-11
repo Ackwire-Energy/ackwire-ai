@@ -13215,7 +13215,7 @@ export const en = {
       wireless: "Turn on Wireless debugging",
       wirelessText:
         "Developer options\u00a0›\u00a0Wireless debugging. Check Always allow on this network, then tap Allow.",
-      scan: "Scan the code with the phone",
+      scan: "Scan it from Wireless debugging, not the camera",
       code: "Type what the phone shows",
       pathQr: "Pair device with QR code",
       making: "Making the code…",
@@ -13231,16 +13231,28 @@ export const en = {
       pair: "Pair",
       tryAgain: "Try again",
       qrLabel: "QR code for Wireless debugging on the phone",
-      qrLine: "Scan with the phone",
-      qrCaption: "Phone and computer on the same Wi-Fi.",
+      qrLine: "Not with the camera",
+      /** "agentes-…" is how the camera names the Wi-Fi network it reads in the QR: keep it as written. */
+      qrCaption:
+        "It offers a Wi-Fi network named agentes-…, which doesn't exist. Keep the phone on the computer's Wi-Fi.",
       fail: {
         mdns_off:
           "{{computer}} can't look for phones on the Wi-Fi. Update Android platform-tools there, or use a cable.",
-        same_wifi: "Couldn't reach the phone. Put it on the same Wi-Fi as {{computer}} and try again.",
+        /** On a Mac: macOS's own names for its Local Network privacy setting, as System Settings shows them in this language. */
+        mdns_offMac:
+          "{{computer}} can't look for phones on the Wi-Fi. On that Mac, turn on agentes.chat in System Settings\u00a0›\u00a0Privacy & Security\u00a0›\u00a0Local Network, then try again.",
+        same_wifi:
+          "Couldn't reach the phone. It's not on the same network as {{computer}}. Put it on the same Wi-Fi and try again.",
+        /** On a Mac: macOS's own names for its Local Network privacy setting, as System Settings shows them in this language. */
+        same_wifiMac:
+          "Couldn't reach the phone. Put it on the same Wi-Fi as {{computer}}. On that Mac, also turn on agentes.chat in System Settings\u00a0›\u00a0Privacy & Security\u00a0›\u00a0Local Network.",
         refused: "The phone stopped the pairing. Keep its pairing screen open and try again.",
         refusedCode: "The phone didn't take that code. Check the code and the address, then pair again.",
         timed_out:
-          "Nothing scanned the code in 2 minutes. Check the phone is on the same Wi-Fi as {{computer}} and try again.",
+          "No phone paired in 2 minutes. If the camera scanned the code or the phone left the Wi-Fi, put it on the same Wi-Fi as {{computer}} and scan from Wireless debugging.",
+        /** On a Mac: macOS's own names for its Local Network privacy setting, as System Settings shows them in this language. */
+        timed_outMac:
+          "No phone paired in 2 minutes. If the camera scanned the code or the phone left the Wi-Fi, put it on the same Wi-Fi as {{computer}} and scan from Wireless debugging. On that Mac, also turn on agentes.chat in System Settings\u00a0›\u00a0Privacy & Security\u00a0›\u00a0Local Network.",
         outdated:
           "Wi-Fi pairing needs Android 14 or newer with the May 2026 security update. Update the phone, or use a cable.",
         adb_missing: "{{computer}} has no Android platform-tools. Install Android Studio there, then try again.",

@@ -2026,7 +2026,7 @@
       "wifi1": "Activa la Depuración inalámbrica",
       "wifi1Text": "Marca Permitir siempre en esta red y toca Permitir.",
       "wifi2": "Escanea el código en una computadora",
-      "wifi2Text": "Desde Depuración inalámbrica › Vincular dispositivo con código QR.",
+      "wifi2Text": "Desde Depuración inalámbrica › Vincular dispositivo con código QR. No uses la cámara: lee el código como una red Wi-Fi y saca el teléfono de tu Wi-Fi.",
       "wifi2Hint": "En agentes.chat en una computadora, abre Conectar un dispositivo › Teléfono Android › Por Wi-Fi y elige {{host}}.",
       "codeHead": "Vincular con un código de vinculación",
       "codeNote": "Desde Depuración inalámbrica › Vincular dispositivo con código de sincronización. Abre Configuración y agentes.chat en pantalla dividida para que el código siga a la vista.",
@@ -2256,9 +2256,9 @@
     "anotherLead": "En agentes.chat. Sigues en {{org}} y puedes cambiar cuando quieras.",
     "suggested": "Por tu correo de {{domain}}, sugerí {{org}}.",
     "create": "Crear",
+    "enter": "Entrar al espacio de trabajo",
     "shareMessage": "Únete a {{org}} en agentes.chat: {{url}}",
-    "failed": "No se pudo guardar. Inténtalo de nuevo.",
-    "enter": "Entrar al espacio de trabajo"
+    "failed": "No se pudo guardar. Inténtalo de nuevo."
   },
   "ai": {
     "yourPlan": "Tu plan de IA",
