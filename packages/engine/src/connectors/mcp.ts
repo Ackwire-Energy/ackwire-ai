@@ -2,6 +2,7 @@ import { type ComposioClient, composioFile, FileTooLargeError } from "@agentesch
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { FetchLike, Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
+import type { jsonSchemaValidator } from "@modelcontextprotocol/sdk/validation/types.js";
 import { ARTIFACT_LIMITS, type ArtifactDeps, createFileArtifact, fileReach } from "../artifacts";
 import { recordAudit } from "../audit";
 import { connectorKeyOf } from "../connector-usage";
@@ -77,9 +78,18 @@ export type McpConnect = (
   headers: Record<string, string>,
 ) => Promise<McpSession>;
 
+/**
+ * Every tool result passes. The SDK's default compiles each listed tool's `outputSchema` with a new Ajv for every
+ * client, so for every listing, on the main thread: a second or more and tens of MB for a server with large schemas.
+ * Nothing here checks a result against its schema; it reaches the model as untrusted text either way.
+ */
+const NO_OUTPUT_VALIDATION: jsonSchemaValidator = {
+  getValidator: () => (input) => ({ valid: true, data: input as never, errorMessage: undefined }),
+};
+
 /** Wraps an official MCP SDK client over any transport. */
 export async function mcpSessionOver(transport: Transport): Promise<McpSession> {
-  const client = new Client({ name: "agentes.chat", version: "1" });
+  const client = new Client({ name: "agentes.chat", version: "1" }, { jsonSchemaValidator: NO_OUTPUT_VALIDATION });
   await client.connect(transport);
   return {
     async listTools() {
@@ -275,6 +285,7 @@ export function createConnectorToolSource(
   }
 
   async function serverTools(connection: ConnectorConnection) {
+    // A change to the connection lists again at once; a token refresh isn't one (it leaves `updatedAt` as it was).
     const key = `${connection.id}:${connection.updatedAt.getTime()}`;
     const hit = cache.get(key);
     if (hit && Date.now() - hit.at < LIST_TTL_MS) return hit.tools;
