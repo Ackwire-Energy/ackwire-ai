@@ -285,6 +285,8 @@ describe("the bar's CSS", () => {
       return sheet.slice(at, sheet.indexOf("}", at));
     };
     expect(rule(".ac-formatbar")).toContain("flex-wrap: wrap");
+    // Unplaced or closed, it stays in the text's cell: a bar as wide as its buttons would scroll a 320px page sideways.
+    expect(rule(".ac-formatbar")).toContain("max-width: 100%");
     expect(rule(".ac-formatbar")).toContain("z-index: var(--z-floating)");
     expect(rule(".ac-formatbar")).toContain("opacity: 0");
     expect(rule(".ac-formatbar")).toContain("visibility: hidden");

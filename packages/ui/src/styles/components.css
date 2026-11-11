@@ -7689,6 +7689,8 @@ html:not([data-pointer]) .ac-video__rail:focus-visible .ac-video__knob {
   gap: var(--space-1);
   box-sizing: border-box;
   width: max-content;
+  /* Until the script places and caps it: never past the text's cell, so it can't widen the page. */
+  max-width: 100%;
   padding: var(--space-1);
   border-radius: calc(var(--control-r-sm) + var(--space-1));
   background: var(--raised);
