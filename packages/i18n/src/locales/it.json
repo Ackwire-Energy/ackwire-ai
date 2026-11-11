@@ -713,6 +713,7 @@
         "team": "Il tuo team",
         "plan": "Attiva il team",
         "ai": "Collega un'IA",
+        "people": "Invita persone",
         "namePersonal": "A cosa ti serve",
         "teamPersonal": "I tuoi agenti",
         "planPersonal": "Attiva gli agenti",
@@ -735,7 +736,12 @@
         "foundPersonal": "Ho trovato i tuoi agenti. Controlla che ci siano tutti.",
         "ai": "Ultimo passo. Scegli l'IA che usi già e il team si sveglia.",
         "aiPersonal": "Ultimo passo. Scegli l'IA che usi già e io mi sveglio.",
-        "connected": "Ecco fatto. Chiamami nello spazio di lavoro e ti mostro il resto."
+        "aiThen": "Scegli l'IA che usi già e il team si sveglia. Poi resta solo da invitare le persone.",
+        "aiThenAlone": "Scegli l'IA che usi già e io mi sveglio. Poi resta solo da invitare le persone.",
+        "connected": "Ecco fatto. Chiamami nello spazio di lavoro e ti mostro il resto.",
+        "connectedThen": "Ecco fatto. Resta solo da invitare chi lavora con te.",
+        "people": "Ora le persone. Dammi le loro email e mando gli inviti.",
+        "peopleLink": "Ora le persone. Mandagli il link e ti mostro ogni richiesta."
       },
       "preview": {
         "label": "Il tuo spazio di lavoro, mentre rispondi",
@@ -821,6 +827,12 @@
         "awakePersonal": "I tuoi agenti si sono svegliati",
         "awakeAlone": "{{name}} si è svegliato",
         "awakeAlone_female": "{{name}} si è svegliata"
+      },
+      "people": {
+        "title": "Chi lavora con te?",
+        "lead": "Invita le persone del tuo team. Ognuna riceve un'email per entrare.",
+        "send": "Invia gli inviti",
+        "later": "Invita più tardi"
       },
       "account": "Il tuo account"
     },

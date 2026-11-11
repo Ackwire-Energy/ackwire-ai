@@ -17,7 +17,13 @@ import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { settingUp } from "@agenteschat/client/lib/guards";
 import { sendsEmail } from "@agenteschat/client/lib/join-requests";
 import { type AiChoice, planLabel, teamThinks } from "@agenteschat/client/lib/no-ai";
-import { landingOf, type RailStep, railState, stepIndex } from "@agenteschat/client/lib/onboarding";
+import {
+  landingOf,
+  type OnboardingStepId,
+  type RailStep,
+  railState,
+  stepIndex,
+} from "@agenteschat/client/lib/onboarding";
 import { finishOnboarding, isRightHand, RIGHT_HAND_DEFAULT } from "@agenteschat/client/lib/right-hand";
 import { browserTimezone, timezoneName } from "@agenteschat/client/lib/routines";
 import { aboutOf, type BusinessType } from "@agenteschat/client/lib/team-plan";
@@ -49,6 +55,7 @@ import { DeleteAccountDialog } from "@/components/DeleteAccount";
 import { DeleteWorkspaceDialog } from "@/components/DeleteWorkspace";
 import { ErrorState } from "@/components/Loading";
 import { COMPACT_QUERY, DESKTOP_QUERY, useMediaQuery } from "@/components/NavDrawer";
+import { OrgProvider } from "@/components/org-context";
 import { ImageCropDialog, OrgMark } from "@/components/ProfilePhoto";
 import { PurposeScene } from "@/components/PurposeScene";
 import { BootSplash, OnboardingHorizon, OnboardingProgress } from "@/components/Sky";
@@ -65,6 +72,7 @@ import { STORAGE_KEYS, sessionStore, storage } from "@/lib/storage";
 import { useToast } from "@/lib/toast";
 import { AiHost, AiStage, AiStep } from "./onboarding/AiStep";
 import { OnboardingPreview, type PreviewAgent } from "./onboarding/OnboardingPreview";
+import { PeopleStep } from "./onboarding/PeopleStep";
 import { BusinessStep, PlanStep, TeamStep, useTemplate } from "./onboarding/steps";
 import { TeamSource, useTeamSource } from "./onboarding/TeamSource";
 import "./onboarding.css";
@@ -78,8 +86,8 @@ const AI_POLL_MS = 10_000;
  * The onboarding (ADR 0162): the blue rail with Lodi on its horizon, one step at a time, read from the workspace's own
  * data so a workspace left at any step resumes there. First what the workspace is for (ADR 0159). A company or team
  * goes on with its name (which creates it), what it does, its team (agents brought from another app, a template made
- * in one click, or none for now: its right hand alone), the plan where the workspace waits for its first one, and an
- * AI for the team to think with. A
+ * in one click, or none for now: its right hand alone), the plan where the workspace waits for its first one, an AI
+ * for the team to think with, and the people who work there, invited last (ADR 0162, amended 2026-11-11). A
  * personal workspace has no name to ask nor a business: its agents (brought, or none for now), the plan, the AI. On
  * wide screens its sidebar fills in beside the question, and the team on its stage beside the AI step. A team's opens
  * in #general, a personal one or one whose plan was left for later in its right hand's DM, on its arrival (ADR 0160):
@@ -112,8 +120,11 @@ export function OnboardingPage() {
   const [picked, setPicked] = useState<RailStep | null>(null);
   // What step 2 picked in this visit: step 3 starts on its template.
   const [business, setBusiness] = useState<BusinessType | null>(null);
-  // The AI step was on screen in this visit: once the team thinks, its done screen stays until "Go to the workspace".
+  // The AI step was on screen in this visit: once the team thinks, its done screen stays until "Go to the workspace"
+  // (a team's: until Continuar, the people step next).
   const [aiSeen, setAiSeen] = useState(false);
+  // A team went on from the AI step to inviting people (Continuar on its done screen, or "Connect later").
+  const [aiLeft, setAiLeft] = useState(false);
   // What the AI step's dialog connected last in this visit, said on the done screen and the rail ("Claude"), with
   // whether the workspace had a key then.
   const [aiPick, setAiPick] = useState<{ choice: AiChoice; key: boolean } | null>(null);
@@ -126,7 +137,8 @@ export function OnboardingPage() {
   const mainRef = useRef<HTMLElement>(null);
 
   const me = useQuery({ ...meQuery(api), refetchOnWindowFocus: "always" });
-  const authConfig = useAuthConfig().data;
+  const config = useAuthConfig();
+  const authConfig = config.data;
   const unfinished = me.data?.organizations.find(settingUp);
   // Finished and on its way into the workspace, the data no longer says a step (`onboarding` is gone): the workspace
   // and its last step stay until it opens.
@@ -161,8 +173,12 @@ export function OnboardingPage() {
   const team = (agents.data ?? []).filter((a) => !isRightHand(a));
   const context = settings.data?.context?.trim() ?? "";
   // The furthest step the server keeps for it: "import" once a team's "I don't use any yet" was answered, "agents" once
-  // the team step was left with no agents, "computer" once its plan step showed (ADR 0162).
+  // the team step was left with no agents, "computer" once its plan step showed, "ai" once a team left its AI step for
+  // later, "team" once its people were invited (ADR 0162).
   const passed = mine?.onboarding?.step;
+  // The AI step was shown, in this visit or an earlier one that left it for later: the workspace opens without asking
+  // for an AI again.
+  const aiLaterSaved = passed !== undefined && stepIndex(passed) >= stepIndex("ai");
   const held = billingHoldOf(mine?.standing) === "payment";
   // Back from paying, until the billing service lifts the hold: `/me` again meanwhile, as the hold's banner does.
   const paid = usePaidReturn(orgId ?? "", held);
@@ -195,17 +211,35 @@ export function OnboardingPage() {
     status.isStale && status.isFetching
       ? undefined
       : (teamThinks(ids, status.data) ?? (listed ? teamThinks(listed, status.data) : undefined));
-  const rail = railState({
-    orgId,
-    standing: mine?.standing,
-    billingUrl: authConfig?.billingUrl,
-    context,
-    team: team.length,
-    picked,
-    personal: personalNow,
-    funnel: { thinks, passed },
-  });
-  const loaded = orgId === null || (settings.data !== undefined && agents.data !== undefined && mine !== undefined);
+  const railAt = (pick: RailStep | null) =>
+    railState({
+      orgId,
+      standing: mine?.standing,
+      billingUrl: authConfig?.billingUrl,
+      context,
+      team: team.length,
+      picked: pick,
+      personal: personalNow,
+      funnel: { thinks, passed },
+    });
+  const reachedRail = railAt(picked);
+  // Connected on its step in this visit, a team's AI step stays on screen (what was connected, the Connect dialog still
+  // over it) until its Continuar: the people step never takes its place under the person (ADR 0162, amended 2026-11-11).
+  const keepAi =
+    picked === null &&
+    aiSeen &&
+    !aiLeft &&
+    reachedRail.thinks &&
+    reachedRail.at !== "ai" &&
+    reachedRail.steps.includes("people");
+  const rail = keepAi ? railAt("ai") : reachedRail;
+  // The server's billing too: a plan step passed on the way to the people step is listed only where there is billing.
+  const loaded =
+    orgId === null ||
+    (settings.data !== undefined &&
+      agents.data !== undefined &&
+      mine !== undefined &&
+      (authConfig !== undefined || config.isError));
   // Everything else answered, the AI decides between its step and opening: while that read is on its way, the step on
   // screen stays (a template's button pending), never a splash between it and the next one.
   const deciding =
@@ -215,7 +249,9 @@ export function OnboardingPage() {
   // from another app) keeps the screen that made it, its button pending, rather than its list for a moment.
   const lastTeam = useRef(0);
   const frozen = deciding || leaving.current ? lastRail.current : null;
-  const { steps, at, reached, step, index } = frozen ?? rail;
+  const { steps, at, reached, step, index, thinks: thinksNow } = frozen ?? rail;
+  // A team's rail ends on inviting people (ADR 0162, amended 2026-11-11).
+  const hasPeople = steps.includes("people");
   useEffect(() => {
     if (!loaded || deciding || leaving.current) return;
     lastRail.current = rail;
@@ -252,7 +288,10 @@ export function OnboardingPage() {
   useEffect(() => {
     if (known && at === "ai" && !deciding) setAiSeen(true);
   }, [known, at, deciding]);
-  const aiDone = aiSeen && at === "open";
+  // On the AI step with every agent thinking: its done screen (a team's, gone back to, too: Continuar leads on).
+  const aiDone = step === "ai" && thinksNow && (aiSeen || hasPeople);
+  // The rail ends on the AI step and it is done: every step answered, none current.
+  const allDone = aiDone && !hasPeople;
   // What the dialog connected is named only where the status doesn't say otherwise (a key connected some other way
   // after it): a key needs the workspace's key, a plan no key that came after it.
   const keyNow = status.data?.apiKey === true;
@@ -271,18 +310,30 @@ export function OnboardingPage() {
   // files copying, a step they went back to.
   const stay = aiSeen || holding || picked !== null;
 
+  /** A step the server saved, in `/me` as it answered, where the rail reads it. */
+  const remember = (id: string, saved: { step: OnboardingStepId } | null) => {
+    const now = qc.getQueryData<Me>(keys.me);
+    if (!saved || !now) return;
+    const organizations = now.organizations.map((o) =>
+      o.id === id && o.onboarding ? { ...o, onboarding: { ...o.onboarding, step: saved.step } } : o,
+    );
+    qc.setQueryData<Me>(keys.me, { ...now, organizations });
+  };
   // A plan step shown is marked as passed, so that once paid it stays on the rail as answered; a server that never
   // held the workspace for a plan has no plan step at all (ADR 0162).
   const markPlan = useMutation({
     meta: { silent: true },
     mutationFn: (id: string) => api.orgs.saveOnboarding(id, { step: "computer" }),
+    onSuccess: (saved, id) => remember(id, saved),
+  });
+  // A team's "Connect later" goes on to inviting people, kept as "ai" so a reload resumes there (ADR 0162, amended
+  // 2026-11-11).
+  const aiLater = useMutation({
+    mutationFn: (id: string) => api.orgs.saveOnboarding(id, { step: "ai" }),
     onSuccess: (saved, id) => {
-      const now = qc.getQueryData<Me>(keys.me);
-      if (!saved || !now) return;
-      const organizations = now.organizations.map((o) =>
-        o.id === id && o.onboarding ? { ...o, onboarding: { ...o.onboarding, step: saved.step } } : o,
-      );
-      qc.setQueryData<Me>(keys.me, { ...now, organizations });
+      remember(id, saved);
+      setAiLeft(true);
+      setPicked(null);
     },
   });
   useEffect(() => {
@@ -314,11 +365,14 @@ export function OnboardingPage() {
   const leaveTo = others.find((o) => o.id === storage.get(STORAGE_KEYS.lastOrg)) ?? others[0];
 
   const open = useMutation({
-    // "done": opening by itself; "later": the AI step's buttons ("Connect later", "Go to the workspace"), which land
-    // the same way; "skipped": the plan left for later.
-    mutationFn: async (how: "done" | "later" | "skipped") => {
+    // "done": opening by itself; "later": the last step's buttons ("Connect later", "Go to the workspace", "Invite
+    // later"), which land the same way; "invited": the people step's invitations sent; "skipped": the plan left for
+    // later.
+    mutationFn: async (how: "done" | "later" | "invited" | "skipped") => {
       if (!target) return;
       leaving.current = true;
+      // The invitations went: kept as "team" first, so a finish that fails resumes past the step, never asking again.
+      if (how === "invited") await api.orgs.saveOnboarding(target.orgId, { step: "team" });
       const done = await finishOnboarding(api, target.orgId);
       sessionStore.remove(STORAGE_KEYS.confirmationSent);
       // The answer that finished it says who the person is now: it opens without asking the server again.
@@ -326,9 +380,11 @@ export function OnboardingPage() {
       else await qc.invalidateQueries({ queryKey: keys.me });
       const params = { orgId: target.orgId };
       // Wherever it opens, on its arrival (ADR 0160): the beta notice, then Connect an AI; the notice alone once the
-      // rail offered the AI, or when the plan was left for later (the right hand's card leads with the plan).
-      const search = { [ARRIVAL_PARAM]: aiSeen || how === "skipped" ? ARRIVAL_BETA_ONLY : 1 } as never;
-      if (landingOf(how === "later" ? "done" : how, personalNow) === "rightHand" && done.agentId)
+      // rail offered the AI (in this visit, or left for later in an earlier one), or when the plan was left for later
+      // (the right hand's card leads with the plan).
+      const offered = aiSeen || aiLaterSaved || how === "skipped";
+      const search = { [ARRIVAL_PARAM]: offered ? ARRIVAL_BETA_ONLY : 1 } as never;
+      if (landingOf(how === "skipped" ? "skipped" : "done", personalNow) === "rightHand" && done.agentId)
         await navigate({ to: "/org/$orgId/dm/agent/$agentId", params: { ...params, agentId: done.agentId }, search });
       else
         await navigate({
@@ -428,7 +484,7 @@ export function OnboardingPage() {
     refused instanceof ApiError && refused.code === "org.create_unpaid" && typeof refused.params?.orgId === "string"
       ? refused.params.orgId
       : null;
-  const busy = save.isPending || open.isPending;
+  const busy = save.isPending || open.isPending || aiLater.isPending;
   const savedLogo = logoDirty ? null : mine?.logo;
   const shownLogo = logo ? `data:${logo.contentType};base64,${logo.imageBase64}` : (savedLogo ?? null);
   const lodiName = lodi?.name ?? RIGHT_HAND_DEFAULT.name;
@@ -474,9 +530,14 @@ export function OnboardingPage() {
             t(personalNow ? "onboarding.flow.lodi.teamMadePersonal" : "onboarding.flow.lodi.teamMade", lodiWords))
           : step === "plan"
             ? t("onboarding.flow.lodi.planThen", lodiWords)
-            : aiDone
-              ? t("onboarding.flow.lodi.connected", lodiWords)
-              : t(personalNow || alone ? "onboarding.flow.lodi.aiPersonal" : "onboarding.flow.lodi.ai", lodiWords);
+            : step === "people"
+              ? t(emails ? "onboarding.flow.lodi.people" : "onboarding.flow.lodi.peopleLink", lodiWords)
+              : aiDone
+                ? t(hasPeople ? "onboarding.flow.lodi.connectedThen" : "onboarding.flow.lodi.connected", lodiWords)
+                : hasPeople
+                  ? // Not the last step: the people come after it.
+                    t(alone ? "onboarding.flow.lodi.aiThenAlone" : "onboarding.flow.lodi.aiThen", lodiWords)
+                  : t(personalNow || alone ? "onboarding.flow.lodi.aiPersonal" : "onboarding.flow.lodi.ai", lodiWords);
   const title = asking
     ? t("onboarding.purpose.title")
     : step === "name"
@@ -487,11 +548,13 @@ export function OnboardingPage() {
           ? (teamHead?.title ?? t(personalNow ? "onboarding.flow.steps.teamPersonal" : "onboarding.flow.team.title"))
           : step === "plan"
             ? t(personalNow ? "onboarding.flow.plan.titlePersonal" : "onboarding.flow.plan.title")
-            : aiDone
-              ? personalNow || alone
-                ? t("onboarding.flow.ai.doneTitlePersonal", agentGrammar(lodiName))
-                : t("onboarding.flow.ai.doneTitle", { org: name })
-              : t(personalNow ? "onboarding.flow.ai.titlePersonal" : "arrival.connect.title");
+            : step === "people"
+              ? t("onboarding.flow.people.title")
+              : aiDone
+                ? personalNow || alone
+                  ? t("onboarding.flow.ai.doneTitlePersonal", agentGrammar(lodiName))
+                  : t("onboarding.flow.ai.doneTitle", { org: name })
+                : t(personalNow ? "onboarding.flow.ai.titlePersonal" : "arrival.connect.title");
   const lead = asking
     ? t("onboarding.purpose.lead")
     : step === "name"
@@ -508,13 +571,16 @@ export function OnboardingPage() {
                     ? "onboarding.flow.plan.leadAlone"
                     : "onboarding.flow.plan.lead",
               )
-            : aiDone
-              ? aiLabel
-                ? t("onboarding.flow.ai.doneLead", { label: aiLabel })
-                : t("onboarding.flow.ai.doneLeadAny")
-              : t("arrival.connect.text");
+            : step === "people"
+              ? // A server that sends no email invites through its link only (ADR 0090).
+                t(emails ? "onboarding.flow.people.lead" : "members.dialog.linkStep.lead")
+              : aiDone
+                ? aiLabel
+                  ? t("onboarding.flow.ai.doneLead", { label: aiLabel })
+                  : t("onboarding.flow.ai.doneLeadAny")
+                : t("arrival.connect.text");
   // Its own back: the first question from the name, the workspace the person came from, the team step's previous
-  // view, the team from the AI step (nothing to go back to once it thinks).
+  // view, the team from the AI step (nothing to go back to once it thinks), the AI step from the people step.
   let back: { label: string; go: () => void } | null = null;
   if (step === "name" && orgId === null && forTeam) {
     back = { label: t("onboarding.back"), go: () => setForTeam(false) };
@@ -525,11 +591,15 @@ export function OnboardingPage() {
     back = { label: t("onboarding.back"), go: source.back };
   } else if (step === "ai" && !aiDone) {
     back = { label: t("onboarding.back"), go: () => setPicked("team") };
+  } else if (step === "people") {
+    back = { label: t("onboarding.back"), go: () => setPicked("ai") };
   }
   const answered = Math.min(reached, steps.length);
-  // A personal workspace's own words for its steps (ADR 0159), from the first question on.
+  // A personal workspace's own words for its steps (ADR 0159), from the first question on; it never invites here.
   const stepName = (s: RailStep) =>
-    personalNow && s !== "business" ? t(`onboarding.flow.steps.${s}Personal`) : t(`onboarding.flow.steps.${s}`);
+    personalNow && s !== "business" && s !== "people"
+      ? t(`onboarding.flow.steps.${s}Personal`)
+      : t(`onboarding.flow.steps.${s}`);
   const values: Partial<Record<RailStep, string>> = {
     // A personal workspace's first answer is what it is for, never its name ("Pessoal", ADR 0159).
     name: personalNow ? t("onboarding.purpose.personal") : name || undefined,
@@ -547,7 +617,12 @@ export function OnboardingPage() {
         )
       : t("onboarding.railValue.later"),
     plan: steps.includes("plan") && !held ? t("onboarding.railValue.on") : undefined,
-    ai: aiDone ? (aiLabel ?? t("onboarding.railValue.ai")) : undefined,
+    // Connected, or (a team's) left for later on the way to its people.
+    ai: thinksNow
+      ? (aiLabel ?? t("onboarding.railValue.ai"))
+      : aiLaterSaved
+        ? t("onboarding.railValue.later")
+        : undefined,
   };
 
   // Beside the team step: what an import would bring, else the template's team while the templates show.
@@ -629,8 +704,8 @@ export function OnboardingPage() {
         )}
         <StepRail
           label={t("onboarding.stepsLabel")}
-          // Once the team thinks, every step done with its answer under it, none current.
-          current={aiDone ? steps.length : index}
+          // Once the team thinks on a rail that ends there, every step done with its answer under it, none current.
+          current={allDone ? steps.length : index}
           onGo={(i) => {
             // Back on the name, its field holds the saved one, to change or clear.
             if (steps[i] === "name") setOrg(name);
@@ -716,7 +791,7 @@ export function OnboardingPage() {
               </div>
             </div>
           )}
-          <StepHost on={step === "ai"} org={mine} me={me.data}>
+          <StepHost step={step} org={mine} me={me.data}>
             <div className="onb__body" key={asking ? "purpose" : step}>
               {back && (
                 <button type="button" className="onb__back" onClick={back.go} disabled={busy}>
@@ -725,8 +800,8 @@ export function OnboardingPage() {
                 </button>
               )}
               <header className="onb__head">
-                {/* Once the team thinks, the rail is done: no step to count. */}
-                {!asking && !aiDone && (
+                {/* Once the team thinks on a rail that ends there, it is done: no step to count. */}
+                {!asking && !allDone && (
                   <p className="onb__eyebrow">{t("onboarding.flow.stepOf", { n: index + 1, total: steps.length })}</p>
                 )}
                 <h1 className="onb__title" ref={titleRef} tabIndex={-1}>
@@ -946,11 +1021,28 @@ export function OnboardingPage() {
                   orgId={orgId}
                   agents={crew}
                   done={aiDone}
-                  leaving={open.isPending}
+                  leaving={open.isPending || aiLater.isPending}
                   picked={aiNamed}
+                  next={hasPeople}
                   onConnected={(choice) => setAiPick({ choice, key: keyNow })}
+                  // A team's goes on to inviting people; a personal workspace's finishes it.
+                  onLater={() => (hasPeople ? aiLater.mutate(orgId) : open.mutate("later"))}
+                  onEnter={() => {
+                    if (!hasPeople) return open.mutate("later");
+                    setAiLeft(true);
+                    setPicked(null);
+                  }}
+                />
+              )}
+              {step === "people" && orgId && (
+                <PeopleStep
+                  orgId={orgId}
+                  org={name}
+                  email={me.data.user.email}
+                  byLink={!emails}
+                  leaving={open.isPending}
+                  onSent={() => open.mutate("invited")}
                   onLater={() => open.mutate("later")}
-                  onEnter={() => open.mutate("later")}
                 />
               )}
             </div>
@@ -983,26 +1075,33 @@ const PURPOSES = ["personal", "team"] as const satisfies readonly WorkspaceMode[
 
 /**
  * The AI step and its stage inside the workspace's context and Connect an AI (ADR 0160), which the onboarding has
- * nowhere else; any other step as it is, so the earlier steps ask the server for nothing more.
+ * nowhere else; the people step inside the workspace's context, which the invite link's panel reads; any other step
+ * as it is, so the earlier steps ask the server for nothing more.
  */
 function StepHost({
-  on,
+  step,
   org,
   me,
   children,
 }: {
-  on: boolean;
+  step: RailStep;
   org: OrgSummary | undefined;
   me: Me;
   children: ReactNode;
 }) {
-  return on && org ? (
-    <AiHost org={org} me={me}>
-      {children}
-    </AiHost>
-  ) : (
-    <>{children}</>
-  );
+  if (org && step === "ai")
+    return (
+      <AiHost org={org} me={me}>
+        {children}
+      </AiHost>
+    );
+  if (org && step === "people")
+    return (
+      <OrgProvider org={org} me={me}>
+        {children}
+      </OrgProvider>
+    );
+  return <>{children}</>;
 }
 
 /**

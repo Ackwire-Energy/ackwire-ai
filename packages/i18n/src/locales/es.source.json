@@ -1742,6 +1742,9 @@
   "onboarding.flow.steps.ai": {
     "value": "Connect an AI"
   },
+  "onboarding.flow.steps.people": {
+    "value": "Invite people"
+  },
   "onboarding.flow.steps.namePersonal": {
     "value": "What it's for"
   },
@@ -1802,8 +1805,23 @@
   "onboarding.flow.lodi.aiPersonal": {
     "value": "Last step. Pick the AI you already use and I wake up."
   },
+  "onboarding.flow.lodi.aiThen": {
+    "value": "Pick the AI you already use and the team wakes up. Then all that's left is inviting people."
+  },
+  "onboarding.flow.lodi.aiThenAlone": {
+    "value": "Pick the AI you already use and I wake up. Then all that's left is inviting people."
+  },
   "onboarding.flow.lodi.connected": {
     "value": "There we go. Call me in the workspace and I'll show you the rest."
+  },
+  "onboarding.flow.lodi.connectedThen": {
+    "value": "There we go. All that's left is inviting the people you work with."
+  },
+  "onboarding.flow.lodi.people": {
+    "value": "Now the people. Give me their emails and I'll send the invitations."
+  },
+  "onboarding.flow.lodi.peopleLink": {
+    "value": "Now the people. Send them the link and I'll show you each request."
   },
   "onboarding.flow.preview.label": {
     "value": "Your workspace, as you answer"
@@ -2005,6 +2023,18 @@
   },
   "onboarding.flow.ai.awakeAlone": {
     "value": "{{name}} woke up"
+  },
+  "onboarding.flow.people.title": {
+    "value": "Who works with you?"
+  },
+  "onboarding.flow.people.lead": {
+    "value": "Invite your teammates. Each one gets an email to join."
+  },
+  "onboarding.flow.people.send": {
+    "value": "Send invitations"
+  },
+  "onboarding.flow.people.later": {
+    "value": "Invite later"
   },
   "onboarding.flow.account": {
     "value": "Your account"

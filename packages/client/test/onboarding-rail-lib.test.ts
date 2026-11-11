@@ -13,6 +13,15 @@ describe("the onboarding's rail (ADR 0162)", () => {
     expect(railSteps({ plan: false, ai: true, personal: false })).toEqual(["name", "business", "team", "ai"]);
     expect(railSteps({ plan: true, ai: true, personal: true })).toEqual(["name", "team", "plan", "ai"]);
     expect(railSteps({ plan: false, ai: true, personal: true })).toEqual(["name", "team", "ai"]);
+    // A team's web rail ends on inviting people (ADR 0162, amended 2026-11-11).
+    expect(railSteps({ plan: true, ai: true, personal: false, people: true })).toEqual([
+      "name",
+      "business",
+      "team",
+      "plan",
+      "ai",
+      "people",
+    ]);
   });
 
   test("the step comes from the workspace's own data, so a workspace left at any step resumes there", () => {
@@ -38,6 +47,10 @@ describe("the onboarding's rail (ADR 0162)", () => {
     expect(at({ ai: true })).toBe("ai");
     expect(at({ ai: true, waitsForPlan: true })).toBe("plan");
     expect(at({ ai: true, thinks: true })).toBe("open");
+    // With the people step: after the AI step, until the invitations are answered.
+    expect(at({ ai: true, people: true })).toBe("ai");
+    expect(at({ ai: true, thinks: true, people: true })).toBe("people");
+    expect(at({ ai: true, thinks: true, people: true, invited: true })).toBe("open");
     // A personal workspace is never asked what it does.
     expect(at({ personal: true, context: false, team: false })).toBe("team");
   });
@@ -93,14 +106,18 @@ describe("the onboarding's rail (ADR 0162)", () => {
       funnel,
     };
     const payment = { state: "hold", reason: "payment" } as OrgStanding;
-    // A team made with no AI: the AI step; once every agent thinks, it opens.
-    expect(railState(base)).toMatchObject({ steps: ["name", "business", "team", "ai"], at: "ai", step: "ai" });
-    expect(railState({ ...base, funnel: { ...funnel, thinks: true } })).toMatchObject({ at: "open", step: "ai" });
+    // A team made with no AI: the AI step; once every agent thinks, inviting people (ADR 0162, amended 2026-11-11).
+    expect(railState(base)).toMatchObject({
+      steps: ["name", "business", "team", "ai", "people"],
+      at: "ai",
+      step: "ai",
+    });
+    expect(railState({ ...base, funnel: { ...funnel, thinks: true } })).toMatchObject({ at: "people", step: "people" });
     // Not known yet reads as not yet: the page waits for it before showing a step.
     expect(railState({ ...base, funnel: { ...funnel, thinks: undefined } }).at).toBe("ai");
     // Waiting for its first plan: the plan step, then the AI step.
     expect(railState({ ...base, standing: payment })).toMatchObject({
-      steps: ["name", "business", "team", "plan", "ai"],
+      steps: ["name", "business", "team", "plan", "ai", "people"],
       at: "plan",
       waitsForPlan: true,
       hasPlanStep: true,
@@ -108,7 +125,7 @@ describe("the onboarding's rail (ADR 0162)", () => {
     // Paid once the plan step was shown ("computer" saved): it stays on the rail, answered, and may be gone back to.
     const paid = { ...base, funnel: { ...funnel, passed: "computer" as const } };
     expect(railState(paid)).toMatchObject({
-      steps: ["name", "business", "team", "plan", "ai"],
+      steps: ["name", "business", "team", "plan", "ai", "people"],
       at: "ai",
       reached: 4,
       waitsForPlan: false,
@@ -117,7 +134,7 @@ describe("the onboarding's rail (ADR 0162)", () => {
     expect(railState({ ...paid, picked: "plan" })).toMatchObject({ step: "plan", index: 3 });
     // A server with billing that never held the workspace: no plan step, once the workspace exists.
     expect(railState({ ...base, billingUrl: "https://billing.example.com" })).toMatchObject({
-      steps: ["name", "business", "team", "ai"],
+      steps: ["name", "business", "team", "ai", "people"],
       hasPlanStep: false,
     });
     // A step gone back to is shown only while it stays answered: the AI step isn't, the plan step on a hold isn't.
@@ -138,19 +155,23 @@ describe("the onboarding's rail (ADR 0162)", () => {
       picked: null,
       funnel,
     };
-    // Self-hosted: on to the AI step with the right hand alone; once it thinks, it opens.
+    // Self-hosted: on to the AI step with the right hand alone; once it thinks, inviting people.
     expect(railState(base)).toMatchObject({
-      steps: ["name", "business", "team", "ai"],
+      steps: ["name", "business", "team", "ai", "people"],
       at: "ai",
       step: "ai",
       reached: 3,
     });
-    expect(railState({ ...base, funnel: { thinks: true, passed: "agents" } }).at).toBe("open");
+    expect(railState({ ...base, funnel: { thinks: true, passed: "agents" } }).at).toBe("people");
     // Waiting for its first plan: the plan step next, then the AI step; still so once the plan step showed and was paid.
     const held = { ...base, standing: { state: "hold", reason: "payment" } as OrgStanding };
-    expect(railState(held)).toMatchObject({ steps: ["name", "business", "team", "plan", "ai"], at: "plan", index: 3 });
+    expect(railState(held)).toMatchObject({
+      steps: ["name", "business", "team", "plan", "ai", "people"],
+      at: "plan",
+      index: 3,
+    });
     expect(railState({ ...base, funnel: { thinks: false, passed: "computer" } })).toMatchObject({
-      steps: ["name", "business", "team", "plan", "ai"],
+      steps: ["name", "business", "team", "plan", "ai", "people"],
       at: "ai",
     });
     // Answered, the team step may be gone back to (its question again, to bring or build a team after all).
@@ -163,6 +184,57 @@ describe("the onboarding's rail (ADR 0162)", () => {
       steps: ["name", "business", "team", "plan"],
       at: "team",
     });
+  });
+
+  test("a team's rail ends on inviting people, never a personal workspace's nor the phone's (ADR 0162, amended 2026-11-11)", () => {
+    const funnel = { thinks: false, passed: "context" as const };
+    const base = {
+      orgId: "o1",
+      standing: undefined,
+      billingUrl: null,
+      context: "Loja online",
+      team: 3,
+      picked: null,
+      funnel,
+    };
+    const fiveSteps = ["name", "business", "team", "ai", "people"];
+    // Every agent thinking, or "Connect later" ("ai"), answers the AI step: the people step is next.
+    expect(railState({ ...base, funnel: { thinks: true, passed: "context" } })).toMatchObject({
+      steps: fiveSteps,
+      at: "people",
+      step: "people",
+      index: 4,
+      reached: 4,
+      thinks: true,
+    });
+    expect(railState({ ...base, funnel: { thinks: false, passed: "ai" } })).toMatchObject({
+      steps: fiveSteps,
+      at: "people",
+      thinks: false,
+    });
+    // Not known yet reads as not yet: the AI step.
+    expect(railState({ ...base, funnel: { thinks: undefined, passed: "context" } }).at).toBe("ai");
+    // The invitations sent ("team"): it opens.
+    expect(railState({ ...base, funnel: { thinks: false, passed: "team" } }).at).toBe("open");
+    // Gone back from it: the AI step, answered.
+    expect(railState({ ...base, funnel: { thinks: true, passed: "context" }, picked: "ai" })).toMatchObject({
+      step: "ai",
+      index: 3,
+      reached: 4,
+    });
+    // A step stored past the plan's lists the plan only on a server with billing, which held the workspace for it.
+    expect(
+      railState({ ...base, billingUrl: "https://billing.example.com", funnel: { thinks: false, passed: "ai" } }),
+    ).toMatchObject({ steps: ["name", "business", "team", "plan", "ai", "people"], at: "people", hasPlanStep: true });
+    // A personal workspace ends on the AI step; the phone has neither.
+    expect(railState({ ...base, team: 0, personal: true, funnel: { thinks: true, passed: "agents" } })).toMatchObject({
+      steps: ["name", "team", "ai"],
+      at: "open",
+    });
+    expect(railState({ ...base, funnel: null })).toMatchObject({ steps: ["name", "business", "team"], at: "open" });
+    expect(
+      railState({ ...base, standing: { state: "hold", reason: "payment" } as OrgStanding, funnel: null }),
+    ).toMatchObject({ steps: ["name", "business", "team", "plan"], at: "plan" });
   });
 
   test("the AI step's answer: every agent thinks, read only from a status that lists them all", () => {

@@ -703,6 +703,7 @@
         "team": "Je team",
         "plan": "Team aanzetten",
         "ai": "Een AI koppelen",
+        "people": "Mensen uitnodigen",
         "namePersonal": "Waarvoor je het gebruikt",
         "teamPersonal": "Je agents",
         "planPersonal": "Agents aanzetten",
@@ -725,7 +726,12 @@
         "foundPersonal": "Ik heb je agents gevonden. Kijk of ze er allemaal zijn.",
         "ai": "Laatste stap. Kies de AI die je al gebruikt en het team wordt wakker.",
         "aiPersonal": "Laatste stap. Kies de AI die je al gebruikt en ik word wakker.",
-        "connected": "Zo. Roep me in de werkruimte en ik laat je de rest zien."
+        "aiThen": "Kies de AI die je al gebruikt en het team wordt wakker. Daarna hoef je alleen nog mensen uit te nodigen.",
+        "aiThenAlone": "Kies de AI die je al gebruikt en ik word wakker. Daarna hoef je alleen nog mensen uit te nodigen.",
+        "connected": "Zo. Roep me in de werkruimte en ik laat je de rest zien.",
+        "connectedThen": "Zo. Je hoeft alleen nog de mensen uit te nodigen met wie je werkt.",
+        "people": "Nu de mensen. Geef me hun e-mailadressen en ik stuur de uitnodigingen.",
+        "peopleLink": "Nu de mensen. Stuur ze de link en ik laat je elk verzoek zien."
       },
       "preview": {
         "label": "Je werkruimte, terwijl je antwoordt",
@@ -807,6 +813,12 @@
         "wakePersonal": "Alleen nog een AI om wakker te worden.",
         "awakePersonal": "Je agents zijn wakker",
         "awakeAlone": "{{name}} is wakker"
+      },
+      "people": {
+        "title": "Wie werkt er met je samen?",
+        "lead": "Nodig de mensen van je team uit. Iedereen krijgt een e-mail om mee te doen.",
+        "send": "Uitnodigingen sturen",
+        "later": "Later uitnodigen"
       },
       "account": "Je account"
     },

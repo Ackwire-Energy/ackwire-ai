@@ -703,6 +703,7 @@
         "team": "Dein Team",
         "plan": "Team einschalten",
         "ai": "KI verbinden",
+        "people": "Leute einladen",
         "namePersonal": "Wofür du es nutzt",
         "teamPersonal": "Deine Agenten",
         "planPersonal": "Agenten einschalten",
@@ -725,7 +726,12 @@
         "foundPersonal": "Ich habe deine Agenten gefunden. Schau, ob alle da sind.",
         "ai": "Letzter Schritt. Wähle die KI, die du schon nutzt, und das Team wacht auf.",
         "aiPersonal": "Letzter Schritt. Wähle die KI, die du schon nutzt, und ich wache auf.",
-        "connected": "Jetzt passt es. Ruf mich im Workspace, dann zeige ich dir den Rest."
+        "aiThen": "Wähle die KI, die du schon nutzt, und das Team wacht auf. Danach fehlen nur noch die Leute.",
+        "aiThenAlone": "Wähle die KI, die du schon nutzt, und ich wache auf. Danach fehlen nur noch die Leute.",
+        "connected": "Jetzt passt es. Ruf mich im Workspace, dann zeige ich dir den Rest.",
+        "connectedThen": "Jetzt passt es. Es fehlen nur noch die Leute, mit denen du arbeitest.",
+        "people": "Jetzt die Leute. Gib mir ihre E-Mail-Adressen, und ich schicke die Einladungen.",
+        "peopleLink": "Jetzt die Leute. Schick ihnen den Link, und ich zeige dir jede Anfrage."
       },
       "preview": {
         "label": "Dein Workspace, während du antwortest",
@@ -807,6 +813,12 @@
         "wakePersonal": "Nur noch eine KI bis zum Aufwachen.",
         "awakePersonal": "Deine Agenten sind aufgewacht",
         "awakeAlone": "{{name}} ist aufgewacht"
+      },
+      "people": {
+        "title": "Wer arbeitet mit dir?",
+        "lead": "Lade die Leute aus deinem Team ein. Jede Person bekommt eine E-Mail zum Beitreten.",
+        "send": "Einladungen senden",
+        "later": "Später einladen"
       },
       "account": "Dein Konto"
     },

@@ -703,6 +703,7 @@
         "team": "Ekibin",
         "plan": "Ekibi başlat",
         "ai": "Yapay zeka bağla",
+        "people": "Kişileri davet et",
         "namePersonal": "Ne için kullanacaksın",
         "teamPersonal": "Ajanların",
         "planPersonal": "Ajanları başlat",
@@ -725,7 +726,12 @@
         "foundPersonal": "Ajanlarını buldum. Hepsi burada mı, bir bak.",
         "ai": "Son adım. Zaten kullandığın yapay zekayı seç, ekip uyansın.",
         "aiPersonal": "Son adım. Zaten kullandığın yapay zekayı seç, ben uyanayım.",
-        "connected": "İşte oldu. Çalışma alanında bana seslen, gerisini göstereyim."
+        "aiThen": "Zaten kullandığın yapay zekayı seç, ekip uyansın. Sonra yalnızca kişileri davet etmek kalıyor.",
+        "aiThenAlone": "Zaten kullandığın yapay zekayı seç, ben uyanayım. Sonra yalnızca kişileri davet etmek kalıyor.",
+        "connected": "İşte oldu. Çalışma alanında bana seslen, gerisini göstereyim.",
+        "connectedThen": "İşte oldu. Geriye yalnızca birlikte çalıştığın kişileri davet etmek kaldı.",
+        "people": "Şimdi sıra kişilerde. E-postalarını bana ver, davetleri göndereyim.",
+        "peopleLink": "Şimdi sıra kişilerde. Onlara bağlantıyı gönder, her isteği sana göstereyim."
       },
       "preview": {
         "label": "Sen cevapladıkça çalışma alanın",
@@ -807,6 +813,12 @@
         "wakePersonal": "Uyanmak için tek eksik bir yapay zeka.",
         "awakePersonal": "Ajanlarınız uyandı",
         "awakeAlone": "{{name}} uyandı"
+      },
+      "people": {
+        "title": "Seninle kim çalışıyor?",
+        "lead": "Ekibindeki kişileri davet et. Her biri katılmak için bir e-posta alır.",
+        "send": "Davetleri gönder",
+        "later": "Sonra davet et"
       },
       "account": "Hesabın"
     },

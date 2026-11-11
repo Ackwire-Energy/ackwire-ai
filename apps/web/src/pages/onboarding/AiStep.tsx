@@ -15,7 +15,7 @@ import { OrgProvider, useOrg } from "@/components/org-context";
 import "./ai-step.css";
 
 /*
- * The rail's last step, Connect an AI (ADR 0162, amended), before the workspace opens: the arrival's choices as cards
+ * The rail's Connect an AI step (ADR 0162, amended), the last but a team's people: the arrival's choices as cards
  * (ADR 0160), each opening the same Connect dialog as anywhere in the app for the right hand and the whole team, and
  * the team asleep on its stage beside them until it thinks. The step is answered by the data (every agent ready or
  * waiting), never by the dialog closing, so a connect made in another tab moves it on too.
@@ -55,7 +55,8 @@ export function connectRequest(choice: AiChoice, agentIds: readonly string[]): C
 
 /**
  * The step's body: the choices, with what not connecting means and Connect later beside it; once every agent thinks,
- * the AI picked here (when one was) and Go to the workspace. `agents`: the right hand first, then the team.
+ * the AI picked here (when one was) and Go to the workspace, or Continue where a step comes after it (`next`: a team's
+ * people, ADR 0162 amended 2026-11-11). `agents`: the right hand first, then the team.
  */
 export function AiStep({
   orgId,
@@ -63,6 +64,7 @@ export function AiStep({
   done,
   leaving,
   picked,
+  next = false,
   onConnected,
   onLater,
   onEnter,
@@ -75,12 +77,14 @@ export function AiStep({
   leaving: boolean;
   /** What was connected, as the page names it (the connected screen's tile), when it can. */
   picked: AiChoice | null;
+  /** A step comes after this one: the connected screen goes on to it instead of into the workspace. */
+  next?: boolean;
   /**
    * What the dialog connected ("Claude"): the page names it on the rail and in the heading. Not the card picked, since
    * the dialog's Back leads to every other choice.
    */
   onConnected?: (choice: AiChoice) => void;
-  /** Connect later: the onboarding finishes as it is. */
+  /** Connect later: on to the next step, else the onboarding finishes as it is. */
   onLater: () => void;
   onEnter: () => void;
 }) {
@@ -131,7 +135,7 @@ export function AiStep({
             disabled={leaving}
             loading={leaving}
           >
-            {t("onboarding.flow.ai.enter")}
+            {t(next ? "onboarding.actions.continue" : "onboarding.flow.ai.enter")}
           </Button>
         </div>
       </>

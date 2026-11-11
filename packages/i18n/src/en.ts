@@ -728,6 +728,8 @@ export const en = {
         plan: "Turn the team on",
         /** The rail's last step: connecting the AI the team thinks with. */
         ai: "Connect an AI",
+        /** A team's last step: inviting the people who work there. */
+        people: "Invite people",
         /** A personal workspace's first step: what it is for ("For me"). */
         namePersonal: "What it's for",
         teamPersonal: "Your agents",
@@ -757,8 +759,16 @@ export const en = {
         /** The AI step: picking an AI wakes the team (or, alone, Lodi). */
         ai: "Last step. Pick the AI you already use and the team wakes up.",
         aiPersonal: "Last step. Pick the AI you already use and I wake up.",
+        /** The same where inviting people comes after it (a team's rail), for the team or the right hand alone. */
+        aiThen: "Pick the AI you already use and the team wakes up. Then all that's left is inviting people.",
+        aiThenAlone: "Pick the AI you already use and I wake up. Then all that's left is inviting people.",
         /** Once an AI is connected, before the workspace opens. */
         connected: "There we go. Call me in the workspace and I'll show you the rest.",
+        /** Once an AI is connected, with inviting people still to come. */
+        connectedThen: "There we go. All that's left is inviting the people you work with.",
+        /** The people step: by email, or (a server that sends no email) through the workspace's link. */
+        people: "Now the people. Give me their emails and I'll send the invitations.",
+        peopleLink: "Now the people. Send them the link and I'll show you each request.",
       },
       preview: {
         label: "Your workspace, as you answer",
@@ -869,6 +879,15 @@ export const en = {
         wakePersonal: "Just one AI away from waking up.",
         awakePersonal: "Your agents woke up",
         awakeAlone: "{{name}} woke up",
+      },
+      /** A team's last step (ADR 0162, amended 2026-11-11): inviting the people who work there. */
+      people: {
+        title: "Who works with you?",
+        lead: "Invite your teammates. Each one gets an email to join.",
+        /** The button while no address is typed yet. */
+        send: "Send invitations",
+        /** The quiet link under the button: the workspace opens with no invitations. */
+        later: "Invite later",
       },
       account: "Your account",
     },

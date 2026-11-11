@@ -693,6 +693,7 @@
         "team": "Timmu",
         "plan": "Nyalakan tim",
         "ai": "Hubungkan AI",
+        "people": "Undang orang",
         "namePersonal": "Untuk apa",
         "teamPersonal": "Agenmu",
         "planPersonal": "Nyalakan agen",
@@ -715,7 +716,12 @@
         "foundPersonal": "Agenmu sudah ketemu. Cek apakah semuanya ada.",
         "ai": "Langkah terakhir. Pilih AI yang sudah kamu pakai dan timmu bangun.",
         "aiPersonal": "Langkah terakhir. Pilih AI yang sudah kamu pakai dan aku bangun.",
-        "connected": "Nah, beres. Panggil aku di ruang kerja dan aku tunjukkan sisanya."
+        "aiThen": "Pilih AI yang sudah kamu pakai dan timmu bangun. Setelah itu, tinggal mengundang orang-orangnya.",
+        "aiThenAlone": "Pilih AI yang sudah kamu pakai dan aku bangun. Setelah itu, tinggal mengundang orang-orangnya.",
+        "connected": "Nah, beres. Panggil aku di ruang kerja dan aku tunjukkan sisanya.",
+        "connectedThen": "Nah, beres. Tinggal mengundang orang-orang yang bekerja denganmu.",
+        "people": "Sekarang orang-orangnya. Kasih tahu email mereka dan aku kirim undangannya.",
+        "peopleLink": "Sekarang orang-orangnya. Kirim tautannya ke mereka dan aku tunjukkan tiap permintaan."
       },
       "preview": {
         "label": "Ruang kerjamu, saat kamu menjawab",
@@ -795,6 +801,12 @@
         "wakePersonal": "Tinggal butuh AI untuk bangun.",
         "awakePersonal": "Agenmu sudah bangun",
         "awakeAlone": "{{name}} sudah bangun"
+      },
+      "people": {
+        "title": "Siapa yang bekerja denganmu?",
+        "lead": "Undang orang-orang di timmu. Tiap orang menerima email untuk bergabung.",
+        "send": "Kirim undangan",
+        "later": "Undang nanti"
       },
       "account": "Akunmu"
     },

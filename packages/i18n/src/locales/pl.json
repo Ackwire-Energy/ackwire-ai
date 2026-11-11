@@ -723,6 +723,7 @@
         "team": "Twój zespół",
         "plan": "Włącz zespół",
         "ai": "Połącz AI",
+        "people": "Zaproś ludzi",
         "namePersonal": "Do czego",
         "teamPersonal": "Twoi agenci",
         "planPersonal": "Włącz agentów",
@@ -745,7 +746,12 @@
         "foundPersonal": "Znalazłem twoich agentów. Sprawdź, czy wszyscy są.",
         "ai": "Ostatni krok. Wybierz AI, której już używasz, a zespół się obudzi.",
         "aiPersonal": "Ostatni krok. Wybierz AI, której już używasz, a ja się obudzę.",
-        "connected": "No i gotowe. Zawołaj mnie w przestrzeni roboczej, a pokażę ci resztę."
+        "aiThen": "Wybierz AI, której już używasz, a zespół się obudzi. Potem zostaje tylko zaprosić ludzi.",
+        "aiThenAlone": "Wybierz AI, której już używasz, a ja się obudzę. Potem zostaje tylko zaprosić ludzi.",
+        "connected": "No i gotowe. Zawołaj mnie w przestrzeni roboczej, a pokażę ci resztę.",
+        "connectedThen": "No i gotowe. Zostaje tylko zaprosić osoby, z którymi pracujesz.",
+        "people": "Teraz ludzie. Podaj mi ich adresy e-mail, a wyślę zaproszenia.",
+        "peopleLink": "Teraz ludzie. Wyślij im link, a pokażę ci każdą prośbę."
       },
       "preview": {
         "label": "Twoja przestrzeń robocza, gdy odpowiadasz",
@@ -833,6 +839,12 @@
         "awakePersonal": "Twoi agenci się obudzili",
         "awakeAlone": "{{name}} obudził się",
         "awakeAlone_female": "{{name}} obudziła się"
+      },
+      "people": {
+        "title": "Kto z tobą pracuje?",
+        "lead": "Zaproś osoby ze swojego zespołu. Każda dostanie e-mail, żeby dołączyć.",
+        "send": "Wyślij zaproszenia",
+        "later": "Zaproś później"
       },
       "account": "Twoje konto"
     },

@@ -24,6 +24,8 @@ afterEach(() => {
 });
 
 const CONNECT = "Conecte uma IA para o seu time pensar";
+/** A team's last step, after this one (ADR 0162, amended 2026-11-11). */
+const PEOPLE = "Quem trabalha com você?";
 const BETA = "Você chegou cedo. Que bom.";
 
 const button = (name: string | RegExp) => screen().getByRole("button", { name });
@@ -101,7 +103,7 @@ describe("Connect an AI, the rail's last step", () => {
     const state = madeTeam();
     await renderApp("/onboarding", { api: createFakeApi(state) });
     await settle(16);
-    expect(eyebrow()).toBe("Passo 4 de 4");
+    expect(eyebrow()).toBe("Passo 4 de 5");
     expect(heading()).toBe(CONNECT);
     expect(document.querySelector(".onb__steps")?.textContent).toContain("Conectar uma IA");
     for (const name of ["Claude", "ChatGPT", "Outro plano", "Chave de API", "Começar grátis"])
@@ -120,14 +122,19 @@ describe("Connect an AI, the rail's last step", () => {
     expect(heading()).toBe(CONNECT);
   });
 
-  test("Connect later finishes it and opens #general on the beta notice alone", async () => {
+  test("Connect later goes on to inviting people, whose Convidar depois opens #general on the beta notice alone", async () => {
     const state = madeTeam();
     const { router } = await renderApp("/onboarding", { api: createFakeApi(state) });
     await settle(16);
     const asked = arrivals(router);
     await click(button("Conectar depois"), 16);
+    expect(heading()).toBe(PEOPLE);
+    await click(button("Convidar depois"), 16);
     await settle(8);
-    expect(calls(state, "orgs.saveOnboarding").map((c) => c.args)).toEqual([[ORG_ID, { finished: true }]]);
+    expect(calls(state, "orgs.saveOnboarding").map((c) => c.args)).toEqual([
+      [ORG_ID, { step: "ai" }],
+      [ORG_ID, { finished: true }],
+    ]);
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${GENERAL_ID}`);
     expect(asked).toContain("beta");
     const beta = screen().getByRole("dialog", { name: BETA });
@@ -137,7 +144,7 @@ describe("Connect an AI, the rail's last step", () => {
     expect(screen().queryByRole("dialog", { name: /^Conectar uma IA/ })).toBeNull();
   });
 
-  test("once every agent thinks: the connected screen, the team awake, then Go to the workspace", async () => {
+  test("once every agent thinks: the connected screen, the team awake, then on to the people and into the workspace", async () => {
     const restore = wide();
     try {
       const state = madeTeam();
@@ -149,12 +156,15 @@ describe("Connect an AI, the rail's last step", () => {
       // It stays on the step to say so, rather than opening the workspace by itself.
       expect(router.state.location.pathname).toBe("/onboarding");
       expect(heading()).toBe("Pronto. O time da Acme já pensa.");
-      expect(document.querySelector(".onb__progress-text")?.textContent).toContain("Tudo certo");
+      // One step left: the people.
+      expect(document.querySelector(".onb__progress-text")?.textContent).toContain("Falta 1 etapa");
       expect(stage().textContent).toContain("O seu time acordou");
       expect(stage().textContent).toContain("já respondem");
       expect(calls(state, "orgs.saveOnboarding")).toEqual([]);
       const asked = arrivals(router);
-      await click(button("Entrar no workspace"), 16);
+      await click(button("Continuar"), 12);
+      expect(heading()).toBe(PEOPLE);
+      await click(button("Convidar depois"), 16);
       expect(calls(state, "orgs.saveOnboarding").map((c) => c.args)).toEqual([[ORG_ID, { finished: true }]]);
       expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${GENERAL_ID}`);
       expect(asked).toContain("beta");
@@ -215,7 +225,7 @@ describe("Connect an AI, the rail's last step", () => {
     const { router } = await renderApp("/onboarding", { api: createFakeApi(state) });
     await settle(16);
     expect(heading()).toBe("Ligue o time");
-    expect(eyebrow()).toBe("Passo 4 de 5");
+    expect(eyebrow()).toBe("Passo 4 de 6");
     const asked = arrivals(router);
     await click(button(/^Ligar depois/), 16);
     await settle(8);

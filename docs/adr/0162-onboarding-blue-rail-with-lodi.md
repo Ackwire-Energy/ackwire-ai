@@ -10,7 +10,8 @@
   row), `lib/push-offer.ts` (`pushAskAt`), `lib/billing.ts` (`planOfferOf`); engine `team-templates.ts`
   (`sayTeamHello`), `standing.ts` (`TEAM_HELLO_JOB` queued by `setBillingHold`), `billing-link.ts` (`plan`); web
   `pages/OnboardingPage.tsx`, `pages/onboarding/*` (`TeamSource.tsx`: `useTeamSource`, `TeamSource`; `AiStep.tsx`:
-  `AiHost`, `AiStep`, `AiStage`), `components/Sky.tsx` (`OnboardingProgress`, `TeamAsleepSky`), `lib/plan-offer.ts`,
+  `AiHost`, `AiStep`, `AiStage`; `PeopleStep.tsx`), `components/invite/EmailChips.tsx` (`chipsFrom`),
+  `components/Sky.tsx` (`OnboardingProgress`, `TeamAsleepSky`), `lib/plan-offer.ts`,
   `lib/arrival.ts` (`ARRIVAL_BETA_ONLY`), `components/arrival/Arrival.tsx`, `components/FirstRun.tsx`,
   `components/Standing.tsx` (`HoldBanner`), `components/WebPush.tsx` (`PushAskInline`), `routes/onboarding.tsx`; phone
   `features/onboarding/OnboardingFlow.tsx`, `features/onboarding/steps.tsx`, `features/right-hand/FirstRun.tsx`
@@ -149,11 +150,12 @@ the workspace. Amends §1 (the steps), §2 (the plan step's words), §3 (where i
 - **The phone** (§7) keeps its steps (`funnel: null`): no AI step, and a workspace left at the web's AI step opens
   there. Its card on a hold shows the plan row in words only, saying the plan is chosen on the web.
 
-## Amended 2026-11-11: a team may leave its team step with no agents
+## Amended 2026-11-11: a team may leave its team step with no agents, and invites its people last
 
 People who would rather build their agents by hand were made to go through an import or a template: the owner, trying
-the rail live, wants them to go on without one. Amends the 2026-11-10 bullets on the steps and on "Ainda não uso
-nenhum".
+the rail live, wants them to go on without one. A team's workspace is also for the people who work there, and nothing
+on the rail brought them in. Amends the 2026-11-10 bullets on the steps, on "Ainda não uso nenhum", on the AI step and
+on where it opens.
 
 - **Two ways out, one per view.** A team's question has "Pular esta etapa" under its button, with "Você cria os agentes
   depois, um por um." beside it, as the AI step's "Conectar depois"; its templates have "Criar os agentes depois, por
@@ -171,3 +173,19 @@ nenhum".
   hoje. Os outros agentes você cria depois."; on the AI step, Lodi's line, the stage beside it and the done heading
   speak of the right hand by name, as for a personal workspace with no agents. The workspace opens as any team's:
   #general, or the right hand's DM when the plan was left for later. The phone (`funnel: null`) is unchanged.
+- **Inviting people, a team's last step.** A team's rail on the web ends on "Convidar pessoas", after the AI step, so
+  reaching a connected AI takes no more steps than before: "Quem trabalha com você?", the addresses as chips with each
+  one's role, and the workspace's link a click away, with the invite dialog's own pieces (ADR 0090: `EmailChips`,
+  `ChipRole`, `InviteLinkPanel`, the batch invite) on the step rather than a form of its own. Its button sends the
+  invitations and finishes the onboarding; "Convidar depois" under it finishes it with none. A server that sends no
+  email shows the link alone, with "Entrar no workspace". A personal workspace and the phone (`funnel: null`) have no
+  such step.
+- **What answers it.** The AI step is answered by every agent thinking, or, on a team's rail, by "Conectar depois",
+  which now goes on to the people step and saves the onboarding's step as `ai`. The invitations sent save `team` before
+  the onboarding finishes, so a finish that fails resumes past the step. Both are the server's steps already (no new
+  step or column). A stored step past the plan's (`ai`, `team`) lists the plan step only on a server with billing,
+  where the workspace waited for it: a self-hosted rail never gets one.
+- **The AI step on a team's rail.** Its words no longer say it is the last step, and an AI connected on it keeps the
+  connected screen (and the Connect dialog over it) until "Continuar", which goes on to the people; going back from the
+  people shows it again. The workspace opens in #general, on the arrival's beta notice alone whenever the AI step was
+  shown, in this visit or left for later in an earlier one.
