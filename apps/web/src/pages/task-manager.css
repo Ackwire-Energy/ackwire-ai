@@ -478,15 +478,10 @@ html:not([data-pointer]) .tm-more:focus-visible {
   }
 }
 
-/* On a phone the buttons beside the stacked lines left their words a few characters a line: the lines take the row's
-   width, the buttons go under them at the row's end, as the kit's `.ac-actrow` puts an action. */
+/* On a phone what it uses takes the row's width under the state and its buttons: beside them it was left a few
+   characters a line. */
 @container tm (max-width: 480px) {
-  .tm-row:not(.tm-row--ended) > :is(.tm-cell--state, .tm-cell--use) {
-    grid-column: 1 / -1;
-  }
-  /* The first full row free: under what it uses, or under the state when nothing is in use. */
-  .tm-cell--act {
-    grid-row: auto;
+  .tm-row:not(.tm-row--ended) > .tm-cell--use {
     grid-column: 1 / -1;
   }
 }
