@@ -153,10 +153,8 @@ test("the CLI's words: its models, its sign-in status, its sign-in link and its 
   expect(parseAgyStatus(1, signedOut, null)).toEqual({ loggedIn: false });
   expect(parseAgyStatus(0, "Fetching available models...\n", null)).toEqual({ loggedIn: false });
   const login =
-    "Open this link in a browser to log in with Google:\r\n\r\n  https://accounts.google.com/o/oauth2/auth?client_id=agy&state=s1";
-  // Printed last, with nothing after it: whole only once nothing more comes (`final`).
-  expect(parseAgyLoginUrl(login)).toBeNull();
-  expect(parseAgyLoginUrl(login, true)).toBe("https://accounts.google.com/o/oauth2/auth?client_id=agy&state=s1");
+    "Open this link in a browser to log in with Google:\r\n\r\n  https://accounts.google.com/o/oauth2/auth?client_id=agy&state=s1\r\n\r\nThen paste the authorization code";
+  expect(parseAgyLoginUrl(login)).toBe("https://accounts.google.com/o/oauth2/auth?client_id=agy&state=s1");
   expect(parseAgyLoginUrl("https://evil.example/accounts.google.com\n", true)).toBeNull();
   // Why a sign-in failed, by the CLI's words.
   expect(loginFailureOf('couldn\'t log in: token exchange failed: oauth2: "invalid_grant" "Bad Request"')).toBe(
@@ -414,11 +412,8 @@ test.skipIf(!posix)(
     });
     managers.push(m);
     const id = "0193eeee-0000-7000-8000-0000000000d2";
-    const started = Date.now();
     const begun = await m.begin("antigravity", id, false, undefined, "enterprise");
     expect(begun.url).toBe("https://accounts.google.com/o/oauth2/auth?client_id=agy&state=s1");
-    // The link comes last, with nothing after it: taken once the CLI goes quiet, not after the whole wait.
-    expect(Date.now() - started).toBeLessThan(5000);
     expect(typeof begun.publicKey).toBe("string");
     expect(agyAuthOf(path.join(home, "accounts", "antigravity", id))).toBe("oauth-business");
     const aad = accountCodeAad(id, ORG);

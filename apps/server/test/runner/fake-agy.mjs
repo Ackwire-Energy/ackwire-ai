@@ -3,7 +3,7 @@
 // $HOME/.gemini/antigravity-cli. `--version` prints a version line, `models` the models as Antigravity CLI 1.5.0 does
 // (seen on Linux, 2026-11-11): "Fetching available models..." on stderr, then one model a line on stdout, its slug and
 // name split by a tab; signed out "Please sign in…", an account Google won't serve "Eligibility check failed…", exit 1.
-// `acp --login` prints a Google sign-in link last, with nothing after it, and, as 1.5.x does, reads the pasted code only
+// `acp --login` prints its Google sign-in link and prompt as 1.5.0 does and, as 1.5.x does, reads the pasted code only
 // from its terminal (none: "no controlling terminal", exit 1), then exchanges it: a code with "bad" in it, or with paste
 // marks it never turned on, is refused by Google (`invalid_grant`), one with "offline" can't reach Google, one with
 // "ineligible" signs in an account `models` then refuses; else "Logged in as …", exit 0. `-p /usage` prints the
@@ -65,7 +65,7 @@ if (args[0] === "models") {
 }
 if (args[0] === "acp" && args[1] === "--login") {
   process.stdout.write(
-    "Open this link in a browser to log in with Google:\r\n\r\n  https://accounts.google.com/o/oauth2/auth?client_id=agy&state=s1",
+    "Open this link in a browser to log in with Google:\r\n\r\n  https://accounts.google.com/o/oauth2/auth?client_id=agy&state=s1\r\n\r\nThen paste the authorization code, or the full URL of the page you land on, and press Enter:\r\n",
   );
   if (!process.stdin.isTTY) {
     process.stderr.write("Error: no controlling terminal; cannot complete interactive login\n");

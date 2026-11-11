@@ -129,8 +129,6 @@ const USAGE_PROBES_AT_ONCE = 2;
 const SIGN_INS_AT_ONCE = 4;
 /** How long `begin` waits for the CLI to print its URL (and Codex its code). */
 export const ACCOUNT_BEGIN_WAIT_MS = 15_000;
-/** A link the CLI printed last is taken once nothing more came for this long. */
-const LINK_QUIET_MS = 500;
 /** A finished sign-in still answers `status` this long (a late poll gets the result). */
 export const ACCOUNT_FINISHED_KEEP_MS = 5 * 60_000;
 /** Status and sign-out commands are killed after this. */
@@ -1616,12 +1614,10 @@ export class AccountManager {
                 ? toUrl(parseCursorLoginUrl(login.output, final))
                 : toUrl(parseClaudeLoginUrl(this.shown(login), final));
       let done = false;
-      let quiet: ReturnType<typeof setTimeout> | undefined;
       const finish = (v: { url: string; userCode?: string } | null) => {
         if (done) return;
         done = true;
         clearTimeout(wait);
-        clearTimeout(quiet);
         login.watch = undefined;
         resolve(v);
       };
@@ -1630,10 +1626,7 @@ export class AccountManager {
       login.watch = () => {
         if (login.exited || login.state !== "waiting") return finish(parse(true));
         const v = parse(false);
-        if (v) return finish(v);
-        // Antigravity CLI 1.5.0 prints its link last, with nothing after it: whole once the CLI goes quiet.
-        clearTimeout(quiet);
-        if (kind === "antigravity" && parse(true)) quiet = setTimeout(() => finish(parse(true)), LINK_QUIET_MS);
+        if (v) finish(v);
       };
       login.watch();
     });
