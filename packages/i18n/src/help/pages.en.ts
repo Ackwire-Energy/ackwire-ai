@@ -66,7 +66,7 @@ export const helpEn: Record<HelpSlug, HelpDocument> = {
         id: "password",
         heading: "Signing in from other devices",
         blocks: [
-          "The owner starts with no password: the app signs you in on this computer. To sign in from a browser on another computer, add one in **Settings\u00a0›\u00a0Your account**. The phone app connects by scanning the QR code under **On your phone**, in **Preferences\u00a0›\u00a0Servers**.",
+          "The owner starts with no password: the app signs you in on this computer. To sign in from a browser on another computer, add one in **Settings\u00a0›\u00a0Your account**. The phone app connects by scanning the QR code under **On your phone**, in **Preferences\u00a0›\u00a0Servers**. The QR code needs **Reach it from your phone and teammates** on.",
         ],
       },
       {
@@ -182,7 +182,7 @@ export const helpEn: Record<HelpSlug, HelpDocument> = {
         id: "phones",
         heading: "Phones",
         blocks: [
-          "An Android phone connects through any computer that's already connected: by cable, or over Wi-Fi on Android 14 and later. An iPhone connects through a Mac with the app, which sets up the iPhone tools for you. Both start from **Connect a device**.",
+          "An Android phone connects through any computer that's already connected: by cable, or over Wi-Fi on Android 14 or newer with the May 2026 security update. An iPhone connects through a Mac that has the app and Xcode, and the app sets up the rest. Both start from **Connect a device**.",
         ],
       },
       {
@@ -196,7 +196,7 @@ export const helpEn: Record<HelpSlug, HelpDocument> = {
         id: "open",
         heading: "While the app is open",
         blocks: [
-          "Agents work on a computer only while the app runs there and the computer is awake. **Open at login** turns on when you press **Allow**: keep it on. A computer that's off or asleep shows **Offline**, and agents wait for it to come back.",
+          "Agents work on a computer only while the app runs there and the computer is awake. When the app asks, leave **Keep it ready: open agentes.chat at login** checked. A computer that's off or asleep shows **Offline**, and agents wait for it to come back.",
         ],
       },
       {
@@ -236,7 +236,7 @@ export const helpEn: Record<HelpSlug, HelpDocument> = {
               "on a computer that also runs agentes.chat, its database and keys in `.agentes`",
             ],
           },
-          "agentes.chat refuses commands that name those places, but that's a rule, not a wall. So **Commands** start off. Turning them on in **Preferences\u00a0›\u00a0Tools** counts for every workspace on the computer at once: do it only if you'd trust every workspace's agents, and the people they work for, with everything on it. Claude Code and Codex run their own commands in the agent's folder, under their own rules.",
+          "agentes.chat refuses commands that name its keys, tokens and sign-ins, but that's a rule, not a wall. So **Commands** start off. Turning them on in **Preferences\u00a0›\u00a0Tools** counts for every workspace on the computer at once: do it only if you'd trust every workspace's agents, and the people they work for, with everything on it. Claude Code and Codex run their own commands in the agent's folder, under their own rules.",
           "For a real wall, use a Linux server. On Debian 13, installed with `--system`, each agent is a user of its own. On Ubuntu, agents share one user, `agentes`: they see each other's folders, not yours or the server's. Or give the agents a computer of their own.",
         ],
       },

@@ -67,7 +67,7 @@ export const helpFr: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "password",
         heading: "Se connecter depuis d’autres appareils",
         blocks: [
-          "Le propriétaire commence sans mot de passe\u00a0: l’app vous connecte sur cet ordinateur. Pour vous connecter depuis un navigateur sur un autre ordinateur, ajoutez-en un dans **Paramètres\u00a0›\u00a0Votre compte**. L’app mobile se connecte en scannant le QR code sous **Sur votre téléphone**, dans **Préférences\u00a0›\u00a0Serveurs**.",
+          "Le propriétaire commence sans mot de passe\u00a0: l’app vous connecte sur cet ordinateur. Pour vous connecter depuis un navigateur sur un autre ordinateur, ajoutez-en un dans **Paramètres\u00a0›\u00a0Votre compte**. L’app mobile se connecte en scannant le QR code sous **Sur votre téléphone**, dans **Préférences\u00a0›\u00a0Serveurs**. Il faut pour cela que **Y accéder depuis votre téléphone et vos collègues** soit activé.",
         ],
       },
       {
@@ -185,7 +185,7 @@ export const helpFr: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "phones",
         heading: "Téléphones",
         blocks: [
-          "Un téléphone Android se connecte via n’importe quel ordinateur déjà connecté\u00a0: par câble, ou en Wi-Fi à partir d’Android 14. Un iPhone se connecte via un Mac avec l’app, qui installe les outils iPhone pour vous. Les deux commencent par **Connecter un appareil**.",
+          "Un téléphone Android se connecte via n’importe quel ordinateur déjà connecté\u00a0: par câble, ou en Wi-Fi à partir d’Android 14 avec la mise à jour de sécurité de mai 2026. Un iPhone se connecte via un Mac qui a l’app et Xcode, et l’app prépare le reste. Les deux commencent par **Connecter un appareil**.",
         ],
       },
       {
@@ -199,7 +199,7 @@ export const helpFr: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "open",
         heading: "Tant que l’app est ouverte",
         blocks: [
-          "Les agents travaillent sur un ordinateur seulement tant que l’app y tourne et que l’ordinateur est éveillé. **Ouvrir à la connexion** s’active quand vous cliquez sur **Autoriser**\u00a0: laissez-le activé. Un ordinateur éteint ou en veille apparaît **Hors ligne**, et les agents attendent son retour.",
+          "Les agents travaillent sur un ordinateur seulement tant que l’app y tourne et que l’ordinateur est éveillé. Quand l’app le demande, laissez coché **Le garder prêt\u00a0: ouvrir agentes.chat à la connexion**. Un ordinateur éteint ou en veille apparaît **Hors ligne**, et les agents attendent son retour.",
         ],
       },
       {
@@ -239,7 +239,7 @@ export const helpFr: Partial<Record<HelpSlug, HelpDocument>> = {
               "sur un ordinateur qui fait aussi tourner agentes.chat, sa base de données et ses clés dans `.agentes`",
             ],
           },
-          "agentes.chat refuse les commandes qui citent ces emplacements, mais c’est une règle, pas un mur. C’est pourquoi les **Commandes** sont désactivées au départ. Les activer dans **Préférences\u00a0›\u00a0Outils** vaut pour tous les espaces de travail de l’ordinateur à la fois\u00a0: faites-le seulement si vous confieriez tout ce qu’il contient aux agents de chaque espace de travail et aux personnes pour qui ils travaillent. Claude Code et Codex lancent leurs propres commandes dans le dossier de l’agent, selon leurs propres règles.",
+          "agentes.chat refuse les commandes qui citent ses clés, ses jetons et les connexions enregistrées, mais c’est une règle, pas un mur. C’est pourquoi les **Commandes** sont désactivées au départ. Les activer dans **Préférences\u00a0›\u00a0Outils** vaut pour tous les espaces de travail de l’ordinateur à la fois\u00a0: faites-le seulement si vous confieriez tout ce qu’il contient aux agents de chaque espace de travail et aux personnes pour qui ils travaillent. Claude Code et Codex lancent leurs propres commandes dans le dossier de l’agent, selon leurs propres règles.",
           "Pour un vrai mur, utilisez un serveur Linux. Sous Debian 13, installé avec `--system`, chaque agent est un utilisateur à part. Sous Ubuntu, les agents partagent un utilisateur, `agentes`\u00a0: ils voient les dossiers les uns des autres, pas les vôtres ni ceux du serveur. Ou donnez aux agents un ordinateur rien qu’à eux.",
         ],
       },

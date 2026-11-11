@@ -67,7 +67,7 @@ export const helpPl: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "password",
         heading: "Logowanie z innych urządzeń",
         blocks: [
-          "Właściciel zaczyna bez hasła: aplikacja loguje cię na tym komputerze. Żeby zalogować się w przeglądarce na innym komputerze, ustaw hasło w **Ustawienia › Twoje konto**. Aplikacja na telefon łączy się po zeskanowaniu kodu QR z sekcji **Na telefonie**, w **Preferencje › Serwery**.",
+          "Właściciel zaczyna bez hasła: aplikacja loguje cię na tym komputerze. Żeby zalogować się w przeglądarce na innym komputerze, ustaw hasło w **Ustawienia › Twoje konto**. Aplikacja na telefon łączy się po zeskanowaniu kodu QR z sekcji **Na telefonie**, w **Preferencje › Serwery**. Musi być przy tym włączone **Dostęp z telefonu i dla zespołu**.",
         ],
       },
       {
@@ -183,7 +183,7 @@ export const helpPl: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "phones",
         heading: "Telefony",
         blocks: [
-          "Telefon z Androidem łączy się przez dowolny już podłączony komputer: kablem albo przez Wi-Fi od Androida 14. iPhone łączy się przez Maca z aplikacją, która sama przygotuje narzędzia dla iPhone’a. Jedno i drugie zaczyna się od **Podłącz urządzenie**.",
+          "Telefon z Androidem łączy się przez dowolny już podłączony komputer: kablem albo przez Wi-Fi od Androida 14 z aktualizacją zabezpieczeń z maja 2026. iPhone łączy się przez Maca z aplikacją i Xcode, a resztę przygotuje aplikacja. Jedno i drugie zaczyna się od **Podłącz urządzenie**.",
         ],
       },
       {
@@ -197,7 +197,7 @@ export const helpPl: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "open",
         heading: "Dopóki aplikacja jest otwarta",
         blocks: [
-          "Agenci pracują na komputerze tylko wtedy, gdy działa na nim aplikacja, a komputer nie śpi. **Otwieraj po zalogowaniu** włącza się, gdy naciśniesz **Zezwól**: nie wyłączaj tego. Komputer wyłączony albo uśpiony pokazuje **Offline**, a agenci czekają, aż wróci.",
+          "Agenci pracują na komputerze tylko wtedy, gdy działa na nim aplikacja, a komputer nie śpi. Gdy aplikacja zapyta, zostaw zaznaczone **Trzymaj w gotowości: otwieraj agentes.chat po zalogowaniu**. Komputer wyłączony albo uśpiony pokazuje **Offline**, a agenci czekają, aż wróci.",
         ],
       },
       {
@@ -237,7 +237,7 @@ export const helpPl: Partial<Record<HelpSlug, HelpDocument>> = {
               "na komputerze, który uruchamia też agentes.chat, jego bazę danych i klucze w `.agentes`",
             ],
           },
-          "agentes.chat odrzuca polecenia, które wskazują te miejsca, ale to zasada, nie mur. Dlatego **Polecenia** są na początku wyłączone. Włączenie ich w **Preferencje › Narzędzia** obowiązuje od razu wszystkie przestrzenie robocze na komputerze: zrób to tylko wtedy, gdy powierzyłbyś wszystko, co na nim jest, agentom każdej przestrzeni roboczej i osobom, dla których pracują. Claude Code i Codex uruchamiają własne polecenia w folderze agenta, według własnych zasad.",
+          "agentes.chat odrzuca polecenia, które wskazują jego klucze, tokeny i dane logowania, ale to zasada, nie mur. Dlatego **Polecenia** są na początku wyłączone. Włączenie ich w **Preferencje › Narzędzia** obowiązuje od razu wszystkie przestrzenie robocze na komputerze: zrób to tylko wtedy, gdy powierzyłbyś wszystko, co na nim jest, agentom każdej przestrzeni roboczej i osobom, dla których pracują. Claude Code i Codex uruchamiają własne polecenia w folderze agenta, według własnych zasad.",
           "Prawdziwy mur da ci serwer z Linuksem. Na Debianie 13, zainstalowanym z `--system`, każdy agent jest osobnym użytkownikiem. Na Ubuntu agenci dzielą jednego użytkownika, `agentes`: widzą nawzajem swoje foldery, ale nie twoje ani serwera. Możesz też dać agentom osobny komputer.",
         ],
       },

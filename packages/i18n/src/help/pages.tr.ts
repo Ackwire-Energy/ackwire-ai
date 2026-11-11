@@ -67,7 +67,7 @@ export const helpTr: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "password",
         heading: "Diğer cihazlardan giriş",
         blocks: [
-          "Sahibin başta bir şifresi yoktur: uygulama bu bilgisayarda sizin yerinize oturum açar. Başka bir bilgisayardaki tarayıcıdan giriş yapmak için **Ayarlar\u00a0›\u00a0Hesabınız** bölümünden bir şifre ekleyin. Telefon uygulaması, **Tercihler\u00a0›\u00a0Sunucular** içindeki **Telefonunuzda** altında bulunan QR kodunu tarayarak bağlanır.",
+          "Sahibin başta bir şifresi yoktur: uygulama bu bilgisayarda sizin yerinize oturum açar. Başka bir bilgisayardaki tarayıcıdan giriş yapmak için **Ayarlar\u00a0›\u00a0Hesabınız** bölümünden bir şifre ekleyin. Telefon uygulaması, **Tercihler\u00a0›\u00a0Sunucular** içindeki **Telefonunuzda** altında bulunan QR kodunu tarayarak bağlanır. Bunun için **Telefonunuzdan ve ekip arkadaşlarınızdan erişin** açık olmalıdır.",
         ],
       },
       {
@@ -145,7 +145,7 @@ export const helpTr: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "phones",
         heading: "Telefonlar",
         blocks: [
-          "Bir Android telefon, zaten bağlı herhangi bir bilgisayar üzerinden bağlanır: kabloyla ya da Android 14 ve sonrasında Wi-Fi ile. Bir iPhone, uygulama kurulu bir Mac üzerinden bağlanır ve Mac iPhone araçlarını sizin için kurar. İkisi de **Cihaz bağla** ile başlar.",
+          "Bir Android telefon, zaten bağlı herhangi bir bilgisayar üzerinden bağlanır: kabloyla ya da Mayıs 2026 güvenlik güncellemesi yüklü Android 14 ve sonrasında Wi-Fi ile. Bir iPhone, uygulama ve Xcode kurulu bir Mac üzerinden bağlanır, gerisini uygulama hazırlar. İkisi de **Cihaz bağla** ile başlar.",
         ],
       },
       {
@@ -159,7 +159,7 @@ export const helpTr: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "open",
         heading: "Uygulama açıkken",
         blocks: [
-          "Ajanlar bir bilgisayarda yalnızca uygulama orada çalışırken ve bilgisayar uyanıkken çalışır. **Oturum açılınca başlat**, **İzin ver** düğmesine bastığınızda açılır: açık bırakın. Kapalı ya da uykudaki bir bilgisayar **Çevrimdışı** görünür ve ajanlar onun geri gelmesini bekler.",
+          "Ajanlar bir bilgisayarda yalnızca uygulama orada çalışırken ve bilgisayar uyanıkken çalışır. Uygulama sorduğunda **Hazır tut: oturum açılınca agentes.chat'i başlat** işaretli kalsın. Kapalı ya da uykudaki bir bilgisayar **Çevrimdışı** görünür ve ajanlar onun geri gelmesini bekler.",
         ],
       },
       {
@@ -199,7 +199,7 @@ export const helpTr: Partial<Record<HelpSlug, HelpDocument>> = {
               "agentes.chat'i de çalıştıran bir bilgisayarda, onun `.agentes` içindeki veritabanı ve anahtarları",
             ],
           },
-          "agentes.chat bu yerlerin adını geçiren komutları reddeder, ama bu bir kuraldır, duvar değil. Bu yüzden **Komutlar** kapalı başlar. Onları **Tercihler\u00a0›\u00a0Araçlar** içinde açmak bilgisayardaki tüm çalışma alanları için aynı anda geçerlidir: bunu yalnızca her çalışma alanının ajanlarına ve onların çalıştığı kişilere bilgisayardaki her şeyi emanet edebiliyorsanız yapın. Claude Code ve Codex kendi komutlarını ajanın klasöründe, kendi kurallarıyla çalıştırır.",
+          "agentes.chat anahtarların, token'ların ve oturum bilgilerinin adını geçiren komutları reddeder, ama bu bir kuraldır, duvar değil. Bu yüzden **Komutlar** kapalı başlar. Onları **Tercihler\u00a0›\u00a0Araçlar** içinde açmak bilgisayardaki tüm çalışma alanları için aynı anda geçerlidir: bunu yalnızca her çalışma alanının ajanlarına ve onların çalıştığı kişilere bilgisayardaki her şeyi emanet edebiliyorsanız yapın. Claude Code ve Codex kendi komutlarını ajanın klasöründe, kendi kurallarıyla çalıştırır.",
           "Gerçek bir duvar için bir Linux sunucu kullanın. Debian 13'te `--system` ile kurulduğunda her ajan ayrı bir kullanıcıdır. Ubuntu'da ajanlar tek bir kullanıcıyı, `agentes` kullanıcısını paylaşır: birbirlerinin klasörlerini görürler, sizinkileri ya da sunucununkileri görmezler. Ya da ajanlara kendilerine ait bir bilgisayar verin.",
         ],
       },

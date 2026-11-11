@@ -67,7 +67,7 @@ export const helpIt: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "password",
         heading: "Accedere da altri dispositivi",
         blocks: [
-          "Il proprietario parte senza password: l’app ti fa accedere su questo computer. Per accedere da un browser su un altro computer, aggiungine una in **Impostazioni › Il tuo account**. L’app per il telefono si collega scansionando il codice QR sotto **Sul telefono**, in **Preferenze › Server**.",
+          "Il proprietario parte senza password: l’app ti fa accedere su questo computer. Per accedere da un browser su un altro computer, aggiungine una in **Impostazioni › Il tuo account**. L’app per il telefono si collega scansionando il codice QR sotto **Sul telefono**, in **Preferenze › Server**. Serve **Raggiungilo dal telefono e dai colleghi** attivo.",
         ],
       },
       {
@@ -183,7 +183,7 @@ export const helpIt: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "phones",
         heading: "Telefoni",
         blocks: [
-          "Un telefono Android si collega tramite qualsiasi computer già collegato: con il cavo, o via Wi-Fi da Android 14 in poi. Un iPhone si collega tramite un Mac con l’app, che prepara per te gli strumenti per iPhone. Entrambi partono da **Collega un dispositivo**.",
+          "Un telefono Android si collega tramite qualsiasi computer già collegato: con il cavo, o via Wi-Fi da Android 14 in poi con l’aggiornamento di sicurezza di maggio 2026. Un iPhone si collega tramite un Mac con l’app e Xcode, e al resto pensa l’app. Entrambi partono da **Collega un dispositivo**.",
         ],
       },
       {
@@ -197,7 +197,7 @@ export const helpIt: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "open",
         heading: "Mentre l’app è aperta",
         blocks: [
-          "Gli agenti lavorano su un computer solo mentre l’app gira lì e il computer è sveglio. **Apri all’accesso** si attiva quando premi **Consenti**: lascialo attivo. Un computer spento o in stop mostra **Offline**, e gli agenti aspettano che torni.",
+          "Gli agenti lavorano su un computer solo mentre l’app gira lì e il computer è sveglio. Quando l’app lo chiede, lascia spuntato **Tienilo pronto: apri agentes.chat all'accesso**. Un computer spento o in stop mostra **Offline**, e gli agenti aspettano che torni.",
         ],
       },
       {
@@ -237,7 +237,7 @@ export const helpIt: Partial<Record<HelpSlug, HelpDocument>> = {
               "su un computer che fa girare anche agentes.chat, il suo database e le sue chiavi in `.agentes`",
             ],
           },
-          "agentes.chat rifiuta i comandi che nominano quei posti, ma è una regola, non un muro. Per questo i **Comandi** partono disattivati. Attivarli in **Preferenze › Strumenti** vale per tutti gli spazi di lavoro sul computer insieme: fallo solo se affideresti tutto ciò che c’è sopra agli agenti di ogni spazio di lavoro, e alle persone per cui lavorano. Claude Code e Codex eseguono i propri comandi nella cartella dell’agente, con le proprie regole.",
+          "agentes.chat rifiuta i comandi che nominano le sue chiavi, i token e gli accessi salvati, ma è una regola, non un muro. Per questo i **Comandi** partono disattivati. Attivarli in **Preferenze › Strumenti** vale per tutti gli spazi di lavoro sul computer insieme: fallo solo se affideresti tutto ciò che c’è sopra agli agenti di ogni spazio di lavoro, e alle persone per cui lavorano. Claude Code e Codex eseguono i propri comandi nella cartella dell’agente, con le proprie regole.",
           "Per un vero muro, usa un server Linux. Su Debian 13, installato con `--system`, ogni agente è un utente a sé. Su Ubuntu, gli agenti condividono un solo utente, `agentes`: vedono le cartelle degli altri, non le tue né quelle del server. Oppure dai agli agenti un computer tutto loro.",
         ],
       },

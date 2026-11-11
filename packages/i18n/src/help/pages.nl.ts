@@ -67,7 +67,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "password",
         heading: "Inloggen vanaf andere apparaten",
         blocks: [
-          "De eigenaar begint zonder wachtwoord: de app logt je in op deze computer. Om in te loggen vanuit een browser op een andere computer, stel je er een in bij **Instellingen › Je account**. De telefoonapp maakt verbinding als je de QR-code scant onder **Op je telefoon**, in **Voorkeuren › Servers**.",
+          "De eigenaar begint zonder wachtwoord: de app logt je in op deze computer. Om in te loggen vanuit een browser op een andere computer, stel je er een in bij **Instellingen › Je account**. De telefoonapp maakt verbinding als je de QR-code scant onder **Op je telefoon**, in **Voorkeuren › Servers**. Daarvoor moet **Bereik het vanaf je telefoon en je teamgenoten** aan staan.",
         ],
       },
       {
@@ -183,7 +183,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "phones",
         heading: "Telefoons",
         blocks: [
-          "Een Android-telefoon maakt verbinding via elke computer die al gekoppeld is: met een kabel, of via wifi vanaf Android 14. Een iPhone maakt verbinding via een Mac met de app, die de iPhone-tools voor je instelt. Allebei begin je bij **Apparaat koppelen**.",
+          "Een Android-telefoon maakt verbinding via elke computer die al gekoppeld is: met een kabel, of via wifi vanaf Android 14 met de beveiligingsupdate van mei 2026. Een iPhone maakt verbinding via een Mac met de app en Xcode, en de app regelt de rest. Allebei begin je bij **Apparaat koppelen**.",
         ],
       },
       {
@@ -197,7 +197,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "open",
         heading: "Zolang de app open is",
         blocks: [
-          "Agents werken alleen op een computer zolang de app daar draait en de computer wakker is. **Openen bij inloggen** gaat aan als je op **Toestaan** drukt: laat het aan. Een computer die uit staat of slaapt, toont **Offline**, en agents wachten tot hij terug is.",
+          "Agents werken alleen op een computer zolang de app daar draait en de computer wakker is. Als de app het vraagt, laat **Klaar houden: agentes.chat openen bij inloggen** aangevinkt. Een computer die uit staat of slaapt, toont **Offline**, en agents wachten tot hij terug is.",
         ],
       },
       {
@@ -237,7 +237,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
               "op een computer die ook agentes.chat draait, de database en sleutels ervan in `.agentes`",
             ],
           },
-          "agentes.chat weigert opdrachten die die plekken noemen, maar dat is een regel, geen muur. Daarom staan **Opdrachten** eerst uit. Ze aanzetten in **Voorkeuren › Tools** geldt voor alle werkruimtes op de computer tegelijk: doe het alleen als je de agents van elke werkruimte, en de mensen voor wie ze werken, met alles erop zou vertrouwen. Claude Code en Codex voeren hun eigen opdrachten uit in de map van de agent, volgens hun eigen regels.",
+          "agentes.chat weigert opdrachten die zijn sleutels, tokens en aanmeldingen noemen, maar dat is een regel, geen muur. Daarom staan **Opdrachten** eerst uit. Ze aanzetten in **Voorkeuren › Tools** geldt voor alle werkruimtes op de computer tegelijk: doe het alleen als je de agents van elke werkruimte, en de mensen voor wie ze werken, met alles erop zou vertrouwen. Claude Code en Codex voeren hun eigen opdrachten uit in de map van de agent, volgens hun eigen regels.",
           "Voor een echte muur gebruik je een Linux-server. Op Debian 13, geïnstalleerd met `--system`, is elke agent een eigen gebruiker. Op Ubuntu delen agents één gebruiker, `agentes`: ze zien elkaars mappen, niet die van jou of van de server. Of geef de agents een eigen computer.",
         ],
       },

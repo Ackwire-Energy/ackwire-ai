@@ -66,7 +66,7 @@ export const helpPtBR: Record<HelpSlug, HelpDocument> = {
         id: "password",
         heading: "Entrar de outros aparelhos",
         blocks: [
-          "A conta dona começa sem senha: o app faz o seu login neste computador. Para entrar pelo navegador de outro computador, crie uma em **Configurações\u00a0›\u00a0Sua conta**. O app do celular se conecta escaneando o QR code em **No celular**, em **Preferências\u00a0›\u00a0Servidores**.",
+          "A conta dona começa sem senha: o app faz o seu login neste computador. Para entrar pelo navegador de outro computador, crie uma em **Configurações\u00a0›\u00a0Sua conta**. O app do celular se conecta escaneando o QR code em **No celular**, em **Preferências\u00a0›\u00a0Servidores**. Para isso, **Acessar pelo celular e pela equipe** precisa estar ligado.",
         ],
       },
       {
@@ -81,7 +81,7 @@ export const helpPtBR: Record<HelpSlug, HelpDocument> = {
         heading: "Backup",
         blocks: [
           "Nada faz backup sozinho ainda. **Fazer backup agora**, em **Preferências\u00a0›\u00a0Servidores**, para o servidor por um instante e guarda o banco de dados, os arquivos e o `.env` em `.agentes/backups`, na sua pasta pessoal. Ele mantém os dois mais novos.",
-          "De vez em quando, copie esses backups para fora deste computador, num disco ou num drive na nuvem. Eles guardam as suas chaves: mantenha em sigilo.",
+          "De vez em quando, copie esses backups para fora deste computador, num disco ou num serviço de arquivos on-line. Eles guardam as suas chaves: mantenha em sigilo.",
         ],
       },
       {
@@ -182,7 +182,7 @@ export const helpPtBR: Record<HelpSlug, HelpDocument> = {
         id: "phones",
         heading: "Celulares",
         blocks: [
-          "Um celular Android se conecta por qualquer computador já conectado: por cabo ou, no Android 14 ou mais novo, pelo Wi-Fi. Um iPhone se conecta por um Mac com o app, que prepara as ferramentas do iPhone para você. Os dois começam em **Conectar um dispositivo**.",
+          "Um celular Android se conecta por qualquer computador já conectado: por cabo ou, no Android 14 ou mais novo com a atualização de segurança de maio de 2026, pelo Wi-Fi. Um iPhone se conecta por um Mac com o app e o Xcode, e o app prepara o resto. Os dois começam em **Conectar um dispositivo**.",
         ],
       },
       {
@@ -196,7 +196,7 @@ export const helpPtBR: Record<HelpSlug, HelpDocument> = {
         id: "open",
         heading: "Enquanto o app está aberto",
         blocks: [
-          "Os agentes trabalham num computador só enquanto o app roda nele e o computador está acordado. **Abrir ao iniciar a sessão** liga quando você aperta **Permitir**: deixe ligado. Um computador desligado ou em repouso aparece como **Offline**, e os agentes esperam ele voltar.",
+          "Os agentes trabalham num computador só enquanto o app roda nele e o computador está acordado. Quando o app perguntar, deixe marcado **Deixar pronto: abrir o agentes.chat ao iniciar a sessão**. Um computador desligado ou em repouso aparece como **Offline**, e os agentes esperam ele voltar.",
         ],
       },
       {
@@ -236,7 +236,7 @@ export const helpPtBR: Record<HelpSlug, HelpDocument> = {
               "num computador que também roda o agentes.chat, o banco de dados e as chaves dele em `.agentes`",
             ],
           },
-          "O agentes.chat recusa comandos que citam esses lugares, mas isso é uma regra, não uma parede. Por isso os **Comandos** começam desligados. Ligar em **Preferências\u00a0›\u00a0Ferramentas** vale para todos os workspaces do computador de uma vez: faça isso só se você confiaria tudo o que há nele aos agentes de cada workspace e às pessoas para quem eles trabalham. O Claude Code e o Codex rodam os próprios comandos na pasta do agente, com as próprias regras.",
+          "O agentes.chat recusa comandos que citam as chaves, os tokens e os logins, mas isso é uma regra, não uma parede. Por isso os **Comandos** começam desligados. Ligar em **Preferências\u00a0›\u00a0Ferramentas** vale para todos os workspaces do computador de uma vez: faça isso só se você confiaria tudo o que há nele aos agentes de cada workspace e às pessoas para quem eles trabalham. O Claude Code e o Codex rodam os próprios comandos na pasta do agente, com as próprias regras.",
           "Para uma parede de verdade, use um servidor Linux. No Debian 13, instalado com `--system`, cada agente é um usuário só dele. No Ubuntu, os agentes dividem um usuário, `agentes`: eles veem as pastas uns dos outros, não as suas nem as do servidor. Ou dê aos agentes um computador só deles.",
         ],
       },

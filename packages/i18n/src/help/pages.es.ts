@@ -67,7 +67,7 @@ export const helpEs: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "password",
         heading: "Iniciar sesión desde otros dispositivos",
         blocks: [
-          "El propietario empieza sin contraseña: la app inicia tu sesión en esta computadora. Para entrar desde un navegador en otra computadora, crea una en **Configuración\u00a0›\u00a0Tu cuenta**. La app del teléfono se conecta escaneando el código QR de **En tu teléfono**, en **Preferencias\u00a0›\u00a0Servidores**.",
+          "El propietario empieza sin contraseña: la app inicia tu sesión en esta computadora. Para entrar desde un navegador en otra computadora, crea una en **Configuración\u00a0›\u00a0Tu cuenta**. La app del teléfono se conecta escaneando el código QR de **En tu teléfono**, en **Preferencias\u00a0›\u00a0Servidores**. Para eso, **Accede desde tu teléfono y tu equipo** tiene que estar activado.",
         ],
       },
       {
@@ -185,7 +185,7 @@ export const helpEs: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "phones",
         heading: "Teléfonos",
         blocks: [
-          "Un teléfono Android se conecta a través de cualquier computadora ya conectada: por cable, o por Wi-Fi en Android 14 y posteriores. Un iPhone se conecta a través de una Mac con la app, que prepara las herramientas del iPhone por ti. Ambos empiezan en **Conectar un dispositivo**.",
+          "Un teléfono Android se conecta a través de cualquier computadora ya conectada: por cable, o por Wi-Fi en Android 14 o posterior con la actualización de seguridad de mayo de 2026. Un iPhone se conecta a través de una Mac con la app y Xcode, y la app prepara el resto. Ambos empiezan en **Conectar un dispositivo**.",
         ],
       },
       {
@@ -199,7 +199,7 @@ export const helpEs: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "open",
         heading: "Mientras la app está abierta",
         blocks: [
-          "Los agentes trabajan en una computadora solo mientras la app funciona allí y la computadora está despierta. **Abrir al iniciar sesión** se activa cuando pulsas **Permitir**: déjalo activado. Una computadora apagada o en reposo aparece como **Sin conexión**, y los agentes esperan a que vuelva.",
+          "Los agentes trabajan en una computadora solo mientras la app funciona allí y la computadora está despierta. Cuando la app pregunte, deja marcada **Tenerla lista: abrir agentes.chat al iniciar sesión**. Una computadora apagada o en reposo aparece como **Sin conexión**, y los agentes esperan a que vuelva.",
         ],
       },
       {
@@ -239,7 +239,7 @@ export const helpEs: Partial<Record<HelpSlug, HelpDocument>> = {
               "en una computadora que también ejecuta agentes.chat, su base de datos y sus claves en `.agentes`",
             ],
           },
-          "agentes.chat rechaza los comandos que nombran esos lugares, pero es una regla, no un muro. Por eso los **Comandos** empiezan desactivados. Activarlos en **Preferencias\u00a0›\u00a0Herramientas** vale para todos los espacios de trabajo de la computadora a la vez: hazlo solo si confiarías todo lo que hay en ella a los agentes de cada espacio de trabajo y a las personas para las que trabajan. Claude Code y Codex ejecutan sus propios comandos en la carpeta del agente, con sus propias reglas.",
+          "agentes.chat rechaza los comandos que nombran sus claves, tokens e inicios de sesión, pero es una regla, no un muro. Por eso los **Comandos** empiezan desactivados. Activarlos en **Preferencias\u00a0›\u00a0Herramientas** vale para todos los espacios de trabajo de la computadora a la vez: hazlo solo si confiarías todo lo que hay en ella a los agentes de cada espacio de trabajo y a las personas para las que trabajan. Claude Code y Codex ejecutan sus propios comandos en la carpeta del agente, con sus propias reglas.",
           "Para un muro de verdad, usa un servidor Linux. En Debian 13, instalado con `--system`, cada agente es un usuario propio. En Ubuntu, los agentes comparten un usuario, `agentes`: ven las carpetas de los demás, no las tuyas ni las del servidor. O dales a los agentes una computadora propia.",
         ],
       },

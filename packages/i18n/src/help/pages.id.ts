@@ -67,7 +67,7 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "password",
         heading: "Masuk dari perangkat lain",
         blocks: [
-          "Awalnya pemilik tidak punya kata sandi: aplikasi memasukkanmu di komputer ini. Untuk masuk dari browser di komputer lain, tambahkan kata sandi di **Pengaturan\u00a0›\u00a0Akunmu**. Aplikasi ponsel terhubung dengan memindai kode QR di bawah **Di ponselmu**, di **Preferensi\u00a0›\u00a0Server**.",
+          "Awalnya pemilik tidak punya kata sandi: aplikasi memasukkanmu di komputer ini. Untuk masuk dari browser di komputer lain, tambahkan kata sandi di **Pengaturan\u00a0›\u00a0Akunmu**. Aplikasi ponsel terhubung dengan memindai kode QR di bawah **Di ponselmu**, di **Preferensi\u00a0›\u00a0Server**. Untuk itu, **Akses dari ponselmu dan rekan tim** harus menyala.",
         ],
       },
       {
@@ -145,7 +145,7 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "phones",
         heading: "Ponsel",
         blocks: [
-          "Ponsel Android terhubung lewat komputer mana pun yang sudah terhubung: dengan kabel, atau lewat Wi-Fi di Android 14 ke atas. iPhone terhubung lewat Mac dengan aplikasinya, yang menyiapkan alat iPhone untukmu. Keduanya dimulai dari **Hubungkan perangkat**.",
+          "Ponsel Android terhubung lewat komputer mana pun yang sudah terhubung: dengan kabel, atau lewat Wi-Fi di Android 14 ke atas dengan pembaruan keamanan Mei 2026. iPhone terhubung lewat Mac yang punya aplikasinya dan Xcode, dan aplikasinya menyiapkan sisanya. Keduanya dimulai dari **Hubungkan perangkat**.",
         ],
       },
       {
@@ -159,7 +159,7 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "open",
         heading: "Selama aplikasinya terbuka",
         blocks: [
-          "Agen bekerja di komputer hanya selama aplikasi berjalan di sana dan komputernya tidak tidur. **Buka saat login** menyala saat kamu menekan **Izinkan**: biarkan tetap menyala. Komputer yang mati atau tidur tampil **Offline**, dan agen menunggu sampai komputernya kembali.",
+          "Agen bekerja di komputer hanya selama aplikasi berjalan di sana dan komputernya tidak tidur. Saat aplikasi bertanya, biarkan **Tetap siap: buka agentes.chat saat login** tercentang. Komputer yang mati atau tidur tampil **Offline**, dan agen menunggu sampai komputernya kembali.",
         ],
       },
       {
@@ -199,7 +199,7 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
               "di komputer yang juga menjalankan agentes.chat, database dan kuncinya di `.agentes`",
             ],
           },
-          "agentes.chat menolak perintah yang menyebut tempat-tempat itu, tapi itu aturan, bukan tembok. Karena itu **Perintah** awalnya mati. Menyalakannya di **Preferensi\u00a0›\u00a0Alat** berlaku untuk semua ruang kerja di komputer itu sekaligus: lakukan hanya kalau kamu percaya menyerahkan semua isinya kepada agen dari setiap ruang kerja, dan kepada orang-orang yang mereka bantu. Claude Code dan Codex menjalankan perintahnya sendiri di folder agen, dengan aturannya sendiri.",
+          "agentes.chat menolak perintah yang menyebut kunci, token, dan data login, tapi itu aturan, bukan tembok. Karena itu **Perintah** awalnya mati. Menyalakannya di **Preferensi\u00a0›\u00a0Alat** berlaku untuk semua ruang kerja di komputer itu sekaligus: lakukan hanya kalau kamu percaya menyerahkan semua isinya kepada agen dari setiap ruang kerja, dan kepada orang-orang yang mereka bantu. Claude Code dan Codex menjalankan perintahnya sendiri di folder agen, dengan aturannya sendiri.",
           "Untuk tembok sungguhan, pakai server Linux. Di Debian 13, kalau dipasang dengan `--system`, tiap agen jadi pengguna tersendiri. Di Ubuntu, agen berbagi satu pengguna, `agentes`: mereka bisa melihat folder satu sama lain, tapi bukan foldermu atau folder server. Atau beri agen komputer milik mereka sendiri.",
         ],
       },

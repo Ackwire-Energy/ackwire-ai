@@ -67,7 +67,7 @@ export const helpDe: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "password",
         heading: "Anmelden auf anderen Geräten",
         blocks: [
-          "Der Inhaber startet ohne Passwort: Die App meldet dich auf diesem Computer an. Um dich im Browser eines anderen Computers anzumelden, leg unter **Einstellungen › Dein Konto** eins an. Die Handy-App verbindet sich, wenn du den QR-Code unter **Auf deinem Handy** in **Einstellungen › Server** scannst.",
+          "Der Inhaber startet ohne Passwort: Die App meldet dich auf diesem Computer an. Um dich im Browser eines anderen Computers anzumelden, leg unter **Einstellungen › Dein Konto** eins an. Die Handy-App verbindet sich, wenn du den QR-Code unter **Auf deinem Handy** in **Einstellungen › Server** scannst. Dafür muss **Von deinem Handy und deinem Team erreichbar** an sein.",
         ],
       },
       {
@@ -183,7 +183,7 @@ export const helpDe: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "phones",
         heading: "Handys",
         blocks: [
-          "Ein Android-Handy verbindet sich über jeden Computer, der schon verbunden ist: per Kabel oder ab Android 14 auch über WLAN. Ein iPhone verbindet sich über einen Mac mit der App, die die iPhone-Tools für dich einrichtet. Beides beginnt bei **Gerät verbinden**.",
+          "Ein Android-Handy verbindet sich über jeden Computer, der schon verbunden ist: per Kabel oder über WLAN ab Android 14 mit dem Sicherheitsupdate vom Mai 2026. Ein iPhone verbindet sich über einen Mac mit der App und Xcode, den Rest richtet die App ein. Beides beginnt bei **Gerät verbinden**.",
         ],
       },
       {
@@ -197,7 +197,7 @@ export const helpDe: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "open",
         heading: "Solange die App offen ist",
         blocks: [
-          "Agenten arbeiten auf einem Computer nur, solange die App dort läuft und der Computer wach ist. **Bei der Anmeldung öffnen** schaltet sich ein, wenn du **Erlauben** drückst: Lass es an. Ein Computer, der aus ist oder schläft, zeigt **Offline**, und die Agenten warten, bis er wieder da ist.",
+          "Agenten arbeiten auf einem Computer nur, solange die App dort läuft und der Computer wach ist. Wenn die App fragt, lass **Bereithalten: agentes.chat bei der Anmeldung öffnen** angehakt. Ein Computer, der aus ist oder schläft, zeigt **Offline**, und die Agenten warten, bis er wieder da ist.",
         ],
       },
       {
@@ -237,7 +237,7 @@ export const helpDe: Partial<Record<HelpSlug, HelpDocument>> = {
               "auf einem Computer, der auch agentes.chat ausführt, dessen Datenbank und Schlüssel in `.agentes`",
             ],
           },
-          "agentes.chat lehnt Befehle ab, die diese Orte nennen, aber das ist eine Regel, keine Mauer. Deshalb sind **Befehle** zu Beginn aus. Sie unter **Einstellungen › Tools** einzuschalten gilt für alle Workspaces auf dem Computer zugleich: Tu es nur, wenn du den Agenten jedes Workspace und den Personen, für die sie arbeiten, alles darauf anvertrauen würdest. Claude Code und Codex führen ihre eigenen Befehle im Ordner des Agenten aus, nach ihren eigenen Regeln.",
+          "agentes.chat lehnt Befehle ab, die seine Schlüssel, Tokens und Anmeldungen nennen, aber das ist eine Regel, keine Mauer. Deshalb sind **Befehle** zu Beginn aus. Sie unter **Einstellungen › Tools** einzuschalten gilt für alle Workspaces auf dem Computer zugleich: Tu es nur, wenn du den Agenten jedes Workspace und den Personen, für die sie arbeiten, alles darauf anvertrauen würdest. Claude Code und Codex führen ihre eigenen Befehle im Ordner des Agenten aus, nach ihren eigenen Regeln.",
           "Für eine echte Mauer nimm einen Linux-Server. Unter Debian 13, installiert mit `--system`, ist jeder Agent ein eigener Benutzer. Unter Ubuntu teilen sich die Agenten einen Benutzer, `agentes`: Sie sehen die Ordner der anderen, aber nicht deine oder die des Servers. Oder gib den Agenten einen eigenen Computer.",
         ],
       },
