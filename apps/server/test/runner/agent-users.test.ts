@@ -607,18 +607,23 @@ test("every launch with containers: its runtime dir bound in its view, Podman's 
 test("the containers service: a delegated unit of the agent's slice, its steps, set-user-ID for the id-map helpers alone", () => {
   const user = { id: ANA.id, user: "ag-a1b2c3d4", uid: 21003, networkLauncher: ROOT_TOOL, networkMark: 0x08000000 };
   const argv = containersCommand(user, true);
-  expect(argv.slice(0, 12)).toEqual([
+  // No --collect: a unit its start limit stopped stays loaded as failed, which is how the runner tells. Its steps'
+  // stderr goes to the journal under one identifier, where the runner reads why.
+  expect(argv.slice(0, 15)).toEqual([
     "/usr/bin/systemd-run",
     "--quiet",
-    "--collect",
     "--expand-environment=no",
     "--unit=agentes-containers-21003.service",
     "--slice=agents-21003.slice",
     "--property=Delegate=yes",
     "--property=Restart=always",
     "--property=RestartSec=5",
+    "--property=StartLimitIntervalSec=60",
+    "--property=StartLimitBurst=5",
     "--property=OOMPolicy=continue",
     "--property=TimeoutStopSec=15",
+    "--property=StandardError=journal",
+    "--property=SyslogIdentifier=agentes-containers",
     "--",
   ]);
   // systemd writes an expanded command to the unit's file with each `$` doubled, and runs that after a daemon-reload:
@@ -641,13 +646,22 @@ test("the containers service: a delegated unit of the agent's slice, its steps, 
     'for f in /usr/bin/newuidmap /usr/bin/newgidmap; do mount --bind "$f" "$f"; mount -o remount,bind,suid "$f"; done',
     'exec "$@"',
   ]);
-  // Then its network hook, the bounding set without no_new_privs, its user and only its environment.
-  expect(argv.slice(at + 8, at + 19)).toEqual([
+  // The computer's cgroup2 kept before the network hook, which may mount a /sys without one (`ip netns exec` does).
+  expect(view.indexOf('mount --bind /sys/fs/cgroup "$m/cgroup"')).toBeGreaterThan(view.indexOf("chown"));
+  expect(view.indexOf('mount --bind /sys/fs/cgroup "$m/cgroup"')).toBeLessThan(view.indexOf("findmnt -rno"));
+  // Then its network hook, cgroup2 put back after it, the bounding set without no_new_privs, its user and only its
+  // environment.
+  expect(argv.slice(at + 8, at + 24)).toEqual([
     "sh",
     "21003",
     ROOT_TOOL,
     "21003",
     "--",
+    "/bin/sh",
+    "-c",
+    'set -e\n[ -e /sys/fs/cgroup/cgroup.controllers ] || mount --bind "$1" /sys/fs/cgroup\nshift\nexec "$@"',
+    "sh",
+    "/run/agentes-runner-tmp/21003/cgroup",
     "/usr/bin/setpriv",
     "--bounding-set=-net_admin,-net_raw",
     "--",
@@ -661,6 +675,13 @@ test("the containers service: a delegated unit of the agent's slice, its steps, 
   expect(argv.some((a) => /^(CONTAINER|DOCKER)_HOST=/.test(a))).toBe(false);
   expect(argv.at(-2)).toContain("compose_warning_logs = false");
   expect(argv.at(-1)).toContain('graphroot = "/home/ag-a1b2c3d4/.local/share/containers/storage"');
+  // Its user manager logs to the journal: the console it would use otherwise is root's.
+  expect(argv.at(-4)?.split("\n").at(-1)).toBe("exec /usr/lib/systemd/systemd --user --log-target=journal");
+  // Without a network hook, /sys stays the computer's: nothing kept, nothing put back.
+  const plain = containersCommand({ id: ANA.id, user: "ag-a1b2c3d4", uid: 21003 }, true);
+  expect(plain.join("\n")).not.toContain("/sys/fs/cgroup/cgroup.controllers");
+  expect(plain.join("\n")).not.toContain('"$m/cgroup"');
+  expect(plain[plain.indexOf("/usr/bin/unshare") + 10]).toBe("/usr/bin/setpriv");
 });
 
 test.if(process.platform !== "win32")(
@@ -669,8 +690,10 @@ test.if(process.platform !== "win32")(
     const home = tempDir("containers-home-");
     dirs.push(home);
     const argv = containersCommand({ id: ANA.id, user: "ag-a1b2c3d4", uid: 21003 }, true);
-    const start = (argv.at(-4) ?? "").replace("exec /usr/lib/systemd/systemd --user", "exit 0");
-    expect(argv.at(-4)?.split("\n").at(-1)).toBe("exec /usr/lib/systemd/systemd --user");
+    const lines = (argv.at(-4) ?? "").split("\n");
+    // Its cgroup checked, then its user manager: neither runs here.
+    expect(lines.at(-1)).toBe("exec /usr/lib/systemd/systemd --user --log-target=journal");
+    const start = [...lines.slice(0, -3), "exit 0"].join("\n");
     const sh = (conf: string) =>
       spawnSync("/bin/sh", ["-c", start, "sh", conf, "storage"], { env: { HOME: home, PATH: "/usr/bin:/bin" } });
     expect(sh("first").status).toBe(0);
@@ -689,6 +712,29 @@ test.if(process.platform !== "win32")(
   },
 );
 
+test.if(process.platform !== "win32")(
+  "the service's start says why its user manager can't run where its view has no cgroup of its own (a hook's /sys)",
+  () => {
+    const home = tempDir("containers-home-");
+    const bin = tempDir("containers-bin-");
+    dirs.push(home, bin);
+    // What /proc/self/cgroup names, where the view's /sys has no cgroup2 under it.
+    writeFileSync(path.join(bin, "sed"), "#!/bin/sh\necho /agents.slice/agents-21003.slice/nowhere.service\n", {
+      mode: 0o755,
+    });
+    const argv = containersCommand({ id: ANA.id, user: "ag-a1b2c3d4", uid: 21003 }, true);
+    const r = spawnSync("/bin/sh", ["-c", argv.at(-4) ?? "", "sh", "conf", "storage"], {
+      env: { HOME: home, PATH: `${bin}:/usr/bin:/bin` },
+      encoding: "utf8",
+    });
+    // A user manager with no cgroup exits 1 and says nothing anywhere its unit's journal shows: this line is what does.
+    expect(r.status).toBe(1);
+    expect(r.stderr.trim()).toBe(
+      "its user manager has no cgroup to run in (/sys/fs/cgroup/agents.slice/agents-21003.slice/nowhere.service is not writable)",
+    );
+  },
+);
+
 test("ensureContainers: started when it isn't, left when it runs as it would start, started anew when that changed", () => {
   const calls: string[][] = [];
   let shown = "ActiveState=inactive\nDescription=\n";
@@ -697,7 +743,7 @@ test("ensureContainers: started when it isn't, left when it runs as it would sta
     return { code: 0, output: file === "systemctl" && args[0] === "show" ? shown : "" };
   };
   const user = { id: ANA.id, user: "ag-a1b2c3d4", uid: 21003 };
-  const show = ["systemctl", "show", "--property=ActiveState,Description", "agentes-containers-21003.service"];
+  const show = ["systemctl", "show", "--property=ActiveState,Description,Result", "agentes-containers-21003.service"];
   expect(ensureContainers(user, run)).toBeNull();
   expect(calls[0]).toEqual(show);
   const [file, description = "", ...rest] = calls[1] ?? [];
@@ -720,6 +766,53 @@ test("ensureContainers: started when it isn't, left when it runs as it would sta
   calls.length = 0;
   stopContainers(21003, run);
   expect(calls).toEqual([["systemctl", "stop", "--no-block", "agentes-containers-21003.service"]]);
+});
+
+test("ensureContainers: one its start limit stopped stays down for the same command, with the reason its journal has", () => {
+  const user = { id: ANA.id, user: "ag-a1b2c3d4", uid: 21003 };
+  const calls: string[][] = [];
+  let shown = "";
+  let journal = "network hook: no namespace for agent 21003\n";
+  const run: RunCommand = (file, args) => {
+    calls.push([file, ...args]);
+    if (file === "systemctl" && args[0] === "show") return { code: 0, output: shown };
+    return { code: 0, output: file === "journalctl" ? journal : "" };
+  };
+  // Its description as the runner starts it.
+  expect(ensureContainers(user, run)).toBeNull();
+  const description = (calls[1]?.[1] ?? "").slice("--description=".length);
+  // Systemd stopped restarting it: the last failure's result stays, not start-limit-hit.
+  shown = `ActiveState=failed\nDescription=${description}\nResult=exit-code\n`;
+  calls.length = 0;
+  expect(ensureContainers(user, run)).toBe("network hook: no namespace for agent 21003");
+  expect(calls.slice(1)).toEqual([
+    [
+      "journalctl",
+      "--no-pager",
+      "--output=cat",
+      "--lines=1",
+      "_SYSTEMD_UNIT=agentes-containers-21003.service",
+      "SYSLOG_IDENTIFIER=agentes-containers",
+      "+",
+      "_UID=21003",
+      "SYSLOG_IDENTIFIER=systemd",
+    ],
+  ]);
+  journal = "";
+  expect(ensureContainers(user, run)).toBe("its service failed at every start (exit-code)");
+  // A stop that timed out says nothing about its next start; a changed command gets its own tries.
+  for (const failed of [
+    `ActiveState=failed\nDescription=${description}\nResult=timeout\n`,
+    "ActiveState=failed\nDescription=agentes.chat containers 0000000000000000\nResult=exit-code\n",
+  ]) {
+    shown = failed;
+    calls.length = 0;
+    expect(ensureContainers(user, run)).toBeNull();
+    expect(calls.slice(1).map((c) => c.slice(0, 2))).toEqual([
+      ["systemctl", "reset-failed"],
+      ["/usr/bin/systemd-run", `--description=${description}`],
+    ]);
+  }
 });
 
 test("keepContainers: none for an agent whose brain's shell has a sandbox of its own, its service stopped (ADR 0169)", () => {

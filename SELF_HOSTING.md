@@ -1278,7 +1278,10 @@ is, its `docker` talks to the agent's Podman, never to Docker's daemon), then re
 would make any agent root on the computer: each agent's containers are rootless Podman under its own user, run by a
 containers service of its own (`agentes-containers-<uid>.service`, a systemd user manager in the agent's slice), its
 images and volumes in its home, its limits the agent's share (one container's `--memory` and `--cpus` work inside
-it). Each agent gets the 65536 subordinate ids from `uid << 16` in `/etc/subuid` and `/etc/subgid`, the runner
+it). One that fails at every start stops after 5 tries in a minute, and the runner's log says `containers
+unavailable:` and why (`journalctl -u agentes-containers-<uid>.service` has the rest); after a fix,
+`systemctl reset-failed agentes-containers-<uid>.service` lets the agent's next request start it again. Each agent
+gets the 65536 subordinate ids from `uid << 16` in `/etc/subuid` and `/etc/subgid`, the runner
 replacing the range useradd gave it, and none if another range is in the way (the log says which). Their traffic
 leaves as the agent's own uid, but a container on the host network (`--network host`) whose user inside isn't root
 leaves as one of those ids: a firewall of yours that keys on the agents' uid range should treat every uid from 65536
