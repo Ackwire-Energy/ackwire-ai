@@ -29,10 +29,11 @@ const { agentRuns, agentRunSteps, outbox, channels, approvals } = schema;
 /** A run is resumed at most this many times after a dead worker; then it fails. */
 const MAX_RECOVERIES = 2;
 /**
- * A run dead longer than this fails with the notice instead of resuming: work went on without it (another run may
- * have done its task since), so taking it up again could repeat what was done.
+ * A run dead longer than this fails with the notice instead of resuming. A restart's runs are swept within minutes,
+ * and a long outage's resume as they were; past this, work went on without the run (another may have done its task
+ * since), so taking it up again could repeat what was done.
  */
-export const RESUME_MAX_AGE_MS = 30 * 60_000;
+export const RESUME_MAX_AGE_MS = 6 * 60 * 60_000;
 
 type StoredTranscript = {
   messages?: { role: string; content: Parameters<typeof textOf>[0] }[];
