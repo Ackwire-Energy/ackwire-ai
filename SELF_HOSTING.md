@@ -714,6 +714,7 @@ ones a self-hosted instance usually touches:
 | `POSTGRES_PASSWORD` | required | Database password. Read by the compose file only. |
 | `AGENTES_IMAGE` | `ghcr.io/agentes-chat/agentes:latest` | The image to run. A version tag or a digest holds a version. |
 | `BIND_ADDRESS`, `HOST_PORT` | `127.0.0.1`, `3000` | Where the compose file publishes the app. |
+| `AGENTES_MEMORY` | `8g` | The most memory the app's container may take, swap included. Over it, the kernel stops the app alone and Docker restarts it, instead of the machine swapping until something else is killed. The speech server's is `SPEECH_MEMORY` (Voice messages). |
 | `COMPOSE_PROFILES` | | How people reach it: `tailscale` (the setup's default), `https` (Caddy for `DOMAIN`), or neither (this machine only). Comma-separated, with other optional services: `backup` (Backups and restore), `speech` (Voice messages). |
 | `DOMAIN` | | The public domain Caddy gets a certificate for. |
 | `TS_AUTHKEY` | | The auth key or OAuth client secret the server joins your tailnet with, read only until it has joined. The setup empties it then. |
