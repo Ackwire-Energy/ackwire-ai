@@ -601,7 +601,7 @@ html:not([data-pointer]) .nwc-ask:focus-visible {
 /* After the test: the ask as one line that opens it again. */
 .nwc-asked {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   min-width: 0;
   margin: -3px -6px;
@@ -626,8 +626,10 @@ html:not([data-pointer]) .nwc-ask:focus-visible {
 .nwc-row > .nwc-asked {
   flex: 1 1 200px;
 }
+/* The pencil stays on the ask's first line when the ask wraps. */
 .nwc-asked .ac-icon {
   flex: none;
+  margin-top: calc(0.5lh - 7px);
 }
 .nwc-asked:hover {
   background: var(--plate);
