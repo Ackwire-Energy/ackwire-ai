@@ -20,7 +20,23 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "who",
         heading: "Voor wie het is",
         blocks: [
-          "Gemaakt voor jou of een klein team, zolang deze computer aanstaat. Voor een groter team, of een server die altijd aanstaat, [installeer je agentes.chat op een server](/help/install-on-a-server) en kies je **Verbinden met mijn server** in de app. Je gegevens kunnen er later naartoe verhuizen.",
+          "Voor jou of een klein team. Een Mac mini, een reserve-pc of een laptop die aan blijft, is een goed thuis: stel hem in zoals in [Aan laten staan](#keep-on). Op een Mac of een pc draai je agentes.chat met de app, zonder Docker.",
+          "Voor een groter team, zie [Welke opzet je kiest](/help/install-on-a-server#choose). Je gegevens kunnen later naar een server verhuizen.",
+        ],
+      },
+      {
+        id: "keep-on",
+        heading: "Aan laten staan",
+        blocks: [
+          "Op een computer die anderen gebruiken, stel je dit één keer in:",
+          {
+            list: [
+              "**Openen bij inloggen** gaat na de installatie vanzelf aan.",
+              "Zet op een Mac **Automatisch inloggen** aan in **Systeeminstellingen › Gebruikers en groepen**, zodat de app na een herstart opent. FileVault zet automatisch inloggen uit.",
+              "Zet op een Mac **Start automatisch op na een stroomstoring** aan in **Systeeminstellingen › Energie**.",
+              "Een Mac blijft wakker zolang de server draait en **Bereik het vanaf je telefoon en je teamgenoten** aanstaat. Zet op Windows en Linux de slaapstand uit in de energie-instellingen van het systeem.",
+            ],
+          },
         ],
       },
       {
@@ -28,62 +44,71 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
         heading: "Je agents werken hier ook",
         blocks: [
           "Je agents werken ook op deze computer, in hun eigen mappen, met een browser, en met Claude Code of Codex als die hier zijn geïnstalleerd. Opdrachten staan uit tot je ze aanzet in **Voorkeuren › Tools**.",
+          "Agents draaien hier onder jouw naam. Met Opdrachten aan kunnen ze bij de rest van deze computer, ook bij `.agentes`: de database, `.env` met `AGENTES_SECRET`, de eigenaarssleutel en het token van deze computer. Dat geldt voor elke werkruimte die deze computer gebruikt, ook een op agentes.chat Cloud. Zie [Waar agents bij kunnen](/help/computers#reach).",
+        ],
+      },
+      {
+        id: "another-workspace",
+        heading: "Leen hem ook uit aan een andere werkruimte",
+        blocks: [
+          "De werkruimtes van de server die je hier draait, gebruiken deze computer vanzelf. Wil je dat een werkruimte ergens anders hem ook gebruikt, zoals een op agentes.chat Cloud, open dan **Voorkeuren › Servers**, druk op **Een server toevoegen…**, meld je aan bij die werkruimte en druk op **Toestaan** als de app het vraagt.",
+          "Elke werkruimte krijgt hier eigen agents en mappen. **Opdrachten** in **Voorkeuren › Tools** geldt voor alle werkruimtes op deze computer tegelijk: zet het alleen aan als je de agents van elke werkruimte met heel deze computer vertrouwt.",
         ],
       },
       {
         id: "reach",
         heading: "Vanaf je telefoon en voor je team",
         blocks: [
-          "**Bereikbaar vanaf je telefoon en voor teamgenoten** zet agentes.chat op Tailscale, een privénetwerk voor je apparaten: je telefoon en de mensen die je uitnodigt doen mee, en verder kan niemand agentes.chat bereiken. Tailscale is gratis: https://tailscale.com/download. Staat het uit, dan werkt agentes.chat alleen op deze computer.",
+          "**Bereik het vanaf je telefoon en je teamgenoten** zet agentes.chat op Tailscale, een privénetwerk voor je apparaten: je telefoon en de mensen die je uitnodigt doen mee, en verder kan niemand agentes.chat bereiken. Tailscale is gratis: https://tailscale.com/download. Staat het uit, dan werkt agentes.chat alleen op deze computer.",
+          "Deelt deze computer al iets anders op poort 443 van Tailscale, dan neemt agentes.chat 8443, en eindigt het adres op `:8443`.",
+        ],
+      },
+      {
+        id: "password",
+        heading: "Inloggen vanaf andere apparaten",
+        blocks: [
+          "De eigenaar begint zonder wachtwoord: de app logt je in op deze computer. Om in te loggen vanuit een browser op een andere computer, stel je er een in bij **Instellingen › Je account**. De telefoonapp maakt verbinding als je de QR-code scant onder **Op je telefoon**, in **Voorkeuren › Servers**.",
+        ],
+      },
+      {
+        id: "updates",
+        heading: "Updates",
+        blocks: [
+          "De app zoekt zelf naar updates en installeert er een als je op **Bijwerken en opnieuw openen** drukt in **Voorkeuren › Updates**. De server en alle agents starten mee opnieuw op. Eerst wordt de database gekopieerd, en als de nieuwe versie niet binnen 3 minuten reageert, gaat de app vanzelf terug naar de vorige versie en de gegevens daarvan.",
         ],
       },
       {
         id: "backups",
-        heading: "Back-ups en verhuizen",
+        heading: "Back-ups",
         blocks: [
-          "**Nu back-up maken**, in **Voorkeuren › Servers**, bewaart de database, de bestanden en de instellingen in `.agentes/backups`, in je thuismap.",
-        ],
-      },
-    ],
-  },
-  computers: {
-    title: "Computers voor je agents",
-    summary:
-      "Agents voeren code uit en werken met bestanden op computers die je koppelt: een Mac of een pc met de agentes.chat-app, of een server.",
-    sections: [
-      {
-        id: "mac",
-        heading: "Een Mac of een pc, met de app",
-        blocks: [
-          "De agentes.chat-app opent je server in een eigen venster, en met één klik werken de agents op die computer, in hun eigen mappen. Installeer de app, open hem, kies **Je eigen server gebruiken › Verbinden met mijn server** en typ het adres van je server. Klik daarna, ingelogd, op **Deze Mac gebruiken** (**Deze pc gebruiken** op Windows, **Deze computer gebruiken** op Linux) in **Instellingen › Computers**.",
+          "Er wordt nog niets vanzelf geback-upt. **Nu een back-up maken**, in **Voorkeuren › Servers**, stopt de server even en bewaart de database, de bestanden en `.env` in `.agentes/backups`, in je thuismap. De twee nieuwste blijven bewaard.",
+          "Kopieer ze af en toe van deze computer af, naar een schijf of een clouddrive. Ze bevatten je sleutels: houd ze privé.",
         ],
       },
       {
-        id: "server",
-        heading: "Een server of een Linux-computer",
+        id: "ai-programs",
+        heading: "Claude Code en Codex",
         blocks: [
-          "Kopieer in **Instellingen › Computers** de opdracht onder **Andere manieren** en voer hem uit in de terminal van die computer. Je ziet een code en een link: open de link, controleer of de code klopt en bevestig met je account. Je hoeft vooraf niets te installeren.",
+          "De app vindt Claude Code en Codex via de `PATH` van je login-shell, plus de gebruikelijke mappen zoals `~/.local/bin`, `/opt/homebrew/bin` en `/usr/local/bin`. Staat er in **Voorkeuren › Tools** **Niet gevonden**, controleer dan of `claude` of `codex` werkt in een nieuw Terminal-venster, en sluit de app daarna af en open hem opnieuw.",
         ],
       },
       {
-        id: "folders",
-        heading: "Mappen",
+        id: "moving",
+        heading: "Verhuizen naar een server",
         blocks: [
-          "Elke agent heeft altijd een eigen map, in `~/agentes/<workspace>`. Meer mappen geef je vrij op de computer zelf, nooit via de website: in de app via **Voorkeuren › Mappen**, of met `agentes-runner folders allow` op een server. Elke werkruimte geeft zijn eigen mappen vrij: wat je voor de ene vrijgeeft, geldt alleen voor de agents daarvan. Een map weghalen verwijdert niets. Het neemt alleen de toegang weg.",
-        ],
-      },
-      {
-        id: "pausing",
-        heading: "Pauzeren",
-        blocks: [
-          "Met de app kan degene die een computer heeft gekoppeld de agents daar pauzeren, via het agentes.chat-icoon bij de klok. Er start niets nieuws tot diegene hervat. Wat al liep, maakt zijn werk af.",
-        ],
-      },
-      {
-        id: "organizations",
-        heading: "Meerdere werkruimtes",
-        blocks: [
-          "Eén computer kan voor meerdere werkruimtes werken. Elke werkruimte heeft daar zijn eigen agents, mappen en taken, en er één ontkoppelen raakt de andere niet.",
+          {
+            list: ["Sluit de app af en maak dan een dump van de database met de eigen kopie van de server in de app. Op een Mac:"],
+          },
+          {
+            code: "BUN_BE_BUN=1 /Applications/agentes.chat.app/Contents/MacOS/agentes-runner \\\n  ~/.agentes/app/current/server/native.js db dump --data ~/.agentes --out agentes.sql",
+          },
+          {
+            list: [
+              "[Installeer agentes.chat op een server](/help/install-on-a-server), maar start het nog niet. Zet in de `.env` ervan het `AGENTES_SECRET` uit `~/.agentes/.env` en start dan alleen de database: `docker compose up -d postgres`.",
+              "Laad de dump: `docker compose exec -T postgres psql -U agentes -d agentes -v ON_ERROR_STOP=1 < agentes.sql`.",
+              "Start het met `docker compose up -d`, kopieer `~/.agentes/files` erin zoals de volledige gids laat zien, en log in zoals eerst.",
+            ],
+          },
         ],
       },
     ],
@@ -100,6 +125,13 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
         ],
       },
       {
+        id: "own",
+        heading: "Je eigen computers en telefoons",
+        blocks: [
+          "Agents kunnen ook werken op computers en telefoons die je zelf meebrengt: een Mac of een pc met de agentes.chat-app, een server, een Android-telefoon of een iPhone. Zie [Je computers en telefoons](/help/computers).",
+        ],
+      },
+      {
         id: "plans",
         heading: "Je AI-abonnementen",
         blocks: [
@@ -110,12 +142,104 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
       {
         id: "size",
         heading: "Hoe groot hij is",
-        blocks: ["De CPU's, het geheugen en de schijf staan in **Instellingen › Computers**."],
+        blocks: ["De CPU's, het geheugen en de schijf staan in **Instellingen › Apparaten**."],
       },
       {
         id: "trouble",
         heading: "Als hij niet meer reageert",
         blocks: ["Meestal is hij binnen een paar minuten terug, en we zijn ermee bezig: je hoeft zelf niets te doen."],
+      },
+    ],
+  },
+  computers: {
+    title: "Je computers en telefoons",
+    summary:
+      "Breng een Mac, een pc, een Linux-computer, een server of een telefoon mee, en je agents werken erop. Op agentes.chat Cloud net zo goed als op een eigen server.",
+    sections: [
+      {
+        id: "app",
+        heading: "Vanuit de agentes.chat-app",
+        blocks: [
+          "Installeer de app op de computer, open hem en meld je aan bij je werkruimte. Hij vraagt **Agents van <workspace> deze Mac laten gebruiken?** (deze pc op Windows, deze computer op Linux). Kies wie hem mag gebruiken en druk op **Toestaan**. Dat is alles.",
+          "Al aangemeld? Zet de werkruimte aan in **Voorkeuren › Algemeen**, in de kaart **Agents**.",
+        ],
+      },
+      {
+        id: "web",
+        heading: "Vanaf de website",
+        blocks: [
+          "Druk in **Instellingen › Apparaten** op **Apparaat koppelen**:",
+          {
+            list: [
+              "**Deze Mac** of **Deze pc**: opent de app, die het je eerst vraagt.",
+              "**Een andere computer**: installeer daar de app, meld je aan met je eigen account en druk op **Toestaan**. Hij verschijnt hier vanzelf.",
+              "**Een server of VPS**: voer één regel uit in de terminal ervan en laat hem dan toe. De regel werkt één keer, 10 minuten lang.",
+            ],
+          },
+          "De app maakt met één klik alleen verbinding met een adres met https, zoals een Tailscale-adres dat eindigt op `.ts.net`. Bij een gewoon http-adres gebruik je de regel voor de terminal.",
+        ],
+      },
+      {
+        id: "phones",
+        heading: "Telefoons",
+        blocks: [
+          "Een Android-telefoon maakt verbinding via elke computer die al gekoppeld is: met een kabel, of via wifi vanaf Android 14. Een iPhone maakt verbinding via een Mac met de app, die de iPhone-tools voor je instelt. Allebei begin je bij **Apparaat koppelen**.",
+        ],
+      },
+      {
+        id: "who",
+        heading: "Wie hem mag gebruiken",
+        blocks: [
+          "Een nieuw apparaat is alleen voor jou: **Alleen ik** betekent jij en de agents die voor jou werken. Open het voor iedereen in de werkruimte, of voor bepaalde mensen en rollen, als je het toestaat of later op de pagina ervan in **Instellingen › Apparaten**.",
+        ],
+      },
+      {
+        id: "open",
+        heading: "Zolang de app open is",
+        blocks: [
+          "Agents werken alleen op een computer zolang de app daar draait en de computer wakker is. **Openen bij inloggen** gaat aan als je op **Toestaan** drukt: laat het aan. Een computer die uit staat of slaapt, toont **Offline**, en agents wachten tot hij terug is.",
+        ],
+      },
+      {
+        id: "pausing",
+        heading: "Pauzeren en loskoppelen",
+        blocks: [
+          "Op de computer pauzeert het agentes.chat-icoon bij de klok de agents van alle werkruimtes. In **Voorkeuren › Algemeen** pauzeert de schakelaar van elke werkruimte alleen die ene, en **Verlaten** koppelt hem los. Tijdens een pauze start er niets nieuws, en wat al liep, maakt het af. Na het loskoppelen blijven de mappen van de agents op de schijf staan.",
+          "Op de website koppel je een apparaat los met **Verwijderen** op de pagina ervan.",
+        ],
+      },
+      {
+        id: "organizations",
+        heading: "Meerdere werkruimtes, één computer",
+        blocks: [
+          "Meld je in dezelfde app aan bij elke werkruimte en druk voor elk op **Toestaan**. Werkruimtes op agentes.chat Cloud en op je eigen servers kunnen een computer delen (app 0.6.1 en nieuwer). Elk heeft er eigen agents en mappen, en als je er een loskoppelt, blijven de andere ongemoeid.",
+          "Een server die de app op deze computer draait, is al gekoppeld en heeft niets nodig. Om die computer ook uit te lenen aan een werkruimte ergens anders, zie [Leen hem ook uit aan een andere werkruimte](/help/run-on-your-computer#another-workspace).",
+          "Gebruik je de app op een laptop alleen als venster op je werkruimte? Als hij vraagt of agents de laptop mogen gebruiken, houdt **Niet nu** het bij een gewoon venster.",
+        ],
+      },
+      {
+        id: "folders",
+        heading: "Mappen",
+        blocks: [
+          "Elke agent heeft altijd een eigen map, in `~/agentes/<workspace>`. Meer mappen geef je vrij op de computer zelf, nooit via de website: in de app via **Voorkeuren › Mappen**, of met `agentes-runner folders allow` op een server. Elke werkruimte geeft zijn eigen mappen vrij: wat je voor de ene vrijgeeft, geldt alleen voor de agents daarvan. Een map weghalen verwijdert niets. Het neemt alleen de toegang weg.",
+        ],
+      },
+      {
+        id: "reach",
+        heading: "Waar agents bij kunnen",
+        blocks: [
+          "Agents draaien als jij, de gebruiker van de computer. Hun bestandstools blijven in hun mappen, maar een opdracht kan alles lezen wat jij kunt lezen:",
+          {
+            list: [
+              "je bestanden en logins",
+              "de mappen van andere agents, ook die van andere werkruimtes, en de logins die hun browsers bewaren",
+              "het token dat deze computer koppelt",
+              "op een computer die ook agentes.chat draait, de database en sleutels ervan in `.agentes`",
+            ],
+          },
+          "agentes.chat weigert opdrachten die die plekken noemen, maar dat is een regel, geen muur. Daarom staan **Opdrachten** eerst uit. Ze aanzetten in **Voorkeuren › Tools** geldt voor alle werkruimtes op de computer tegelijk: doe het alleen als je de agents van elke werkruimte, en de mensen voor wie ze werken, met alles erop zou vertrouwen. Claude Code en Codex voeren hun eigen opdrachten uit in de map van de agent, volgens hun eigen regels.",
+          "Voor een echte muur gebruik je een Linux-server. Op Debian 13, geïnstalleerd met `--system`, is elke agent een eigen gebruiker. Op Ubuntu delen agents één gebruiker, `agentes`: ze zien elkaars mappen, niet die van jou of van de server. Of geef de agents een eigen computer.",
+        ],
       },
     ],
   },
@@ -534,12 +658,26 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
     summary: "Draai agentes.chat op je eigen server, gratis, voor je hele team. Eén opdracht zet alles klaar.",
     sections: [
       {
+        id: "choose",
+        heading: "Welke opzet je kiest",
+        blocks: [
+          {
+            list: [
+              "**agentes.chat Cloud**: voor elk team, overal bereikbaar. Wij draaien het, werken het bij en maken back-ups. Elke werkruimte krijgt een eigen computer, waarop elke agent een eigen gebruiker is.",
+              "**Je computer, met de app**: voor jou of een klein team, bereikbaar zolang die computer aanstaat. Een Mac mini die aan blijft, werkt goed. Je werkt het bij met één klik en maakt zelf back-ups. Agents draaien als jij op die computer.",
+              "**Een server**: voor een groter team, altijd bereikbaar. Je werkt het bij met drie opdrachten, en het kan elke dag vanzelf een back-up maken. Op Debian 13 is elke agent een eigen gebruiker.",
+            ],
+          },
+          "Van je computer naar een server: [Verhuizen naar een server](/help/run-on-your-computer#moving). Elk van de drie kan agents uit een andere meenemen met [Je agents meenemen](/help/import).",
+        ],
+      },
+      {
         id: "need",
         heading: "Wat je nodig hebt",
         blocks: [
           {
             list: [
-              "Een server of VPS met 64-bit Linux, op x64 of arm64. Voor een klein team zijn 2 CPU's, 4 GB geheugen en 20 GB schijf een goed begin. Om het te proberen werkt ook een Mac met Docker Desktop, OrbStack of Colima.",
+              "Een server of VPS met 64-bit Linux, op x64 of arm64. Voor een klein team zijn 2 CPU's, 4 GB geheugen en 20 GB schijf een goed begin. Op een Mac of een pc [draait de app agentes.chat](/help/run-on-your-computer) zonder Docker.",
               "Docker met Compose. Op Linux zet het installatieprogramma ze erop als ze ontbreken, nadat het heeft gevraagd.",
               "Een manier om erbij te komen: een gratis Tailscale-account (de standaard, privé, zonder domein en zonder open poort), of een domein dat naar de server wijst, met poort 80 en 443 open.",
             ],
@@ -613,11 +751,11 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "computers",
         heading: "De computers van je agents",
         blocks: [
-          "De installatie kan van deze server ook de computer van je agents maken, waar ze opdrachten uitvoeren, een browser gebruiken en hun bestanden bewaren. Ze vraagt het, en stelt ja voor waar de server het goed kan. Op Linux krijgt elke agent een eigen gebruiker, met een scherm. Zei je nee, voer de installatie dan opnieuw uit met `--computer yes`:",
+          "De installatie kan van deze server ook de computer van je agents maken, waar ze opdrachten uitvoeren, een browser gebruiken en hun bestanden bewaren. Ze vraagt het, en stelt ja voor waar de server het goed kan. Op Debian 13 krijgt elke agent een eigen gebruiker, met een scherm. Op Ubuntu delen agents één gebruiker, `agentes`. Zei je nee, voer de installatie dan opnieuw uit met `--computer yes`:",
           {
             code: "curl -fsSL https://agentes.chat/install | sh -s -- --computer yes",
           },
-          "Meer computers, zoals een Mac met de agentes.chat-app of een andere server, koppel je via **Instellingen\u00a0›\u00a0Computers**, zoals in [Computers voor je agents](/help/computers). Bij Tailscale komen ze eerst in je tailnet.",
+          "Meer computers, zoals een Mac met de agentes.chat-app of een andere server, koppel je via **Instellingen\u00a0›\u00a0Apparaten**, zoals in [Je computers en telefoons](/help/computers). Bij Tailscale komen ze eerst in je tailnet.",
         ],
       },
       {
