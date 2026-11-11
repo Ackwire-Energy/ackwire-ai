@@ -238,13 +238,68 @@ describe("a personal workspace (ADR 0159)", () => {
 });
 
 describe("what a pick opens", () => {
-  test("for the team, the step the person asked for; for the right hand alone, its own dialog", () => {
+  test("for the team, Connect for the whole team on the card picked; for the right hand alone, its own dialog", () => {
     const team = [LODI_ID, "ada", "atlas"];
-    expect(connectRequest("claude", team)).toEqual({ agentIds: team, intent: "claude" });
-    expect(connectRequest("chatgpt", team)).toEqual({ agentIds: team, intent: "chatgpt" });
-    expect(connectRequest("key", team)).toEqual({ agentIds: team, intent: "api_key" });
-    expect(connectRequest("cursor", team)).toEqual({ agentIds: team, plan: "cursor" });
+    for (const start of ["claude", "chatgpt", "key", "cursor"] as const)
+      expect(connectRequest(start, team)).toEqual({ agentIds: team, start });
     expect(connectRequest("claude", [LODI_ID])).toEqual({ agentId: LODI_ID, intent: "claude" });
+    expect(connectRequest("key", [LODI_ID])).toEqual({ agentId: LODI_ID, intent: "api_key" });
     expect(connectRequest("zen", [LODI_ID])).toEqual({ agentId: LODI_ID, plan: "zen" });
+  });
+});
+
+/** The narrow dialog under the sky: Connect for the whole team (ADR 0160, addendum). */
+const inBand = (dialog: HTMLElement) => dialog.querySelector(".arrival-hero") !== null;
+
+/** `madeTeam`, its team the person's own (a plan signs in only for its owner's agents, ADR 0059 §3). */
+const ownTeam = () => {
+  const state = madeTeam();
+  for (const a of state.agents) a.ownerUserId = "u-walter";
+  return state;
+};
+
+describe("each card opens Connect for the whole team on its own steps (ADR 0162)", () => {
+  for (const [card, title] of [
+    ["Claude", "Seu plano do Claude"],
+    ["ChatGPT", "Seu plano do ChatGPT"],
+    ["Cursor", "Seu plano do Cursor"],
+    ["Chave de API", "Adicionar uma chave de API"],
+  ] as const) {
+    test(`${card}: straight to its steps in the team's dialog, never the plain one nor the team's first screen`, async () => {
+      const state = ownTeam();
+      await renderApp("/onboarding", { api: createFakeApi(state) });
+      await settle(16);
+      const cardOf = () => within(body()).queryByRole("button", { name: new RegExp(`^${card}`) });
+      if (!cardOf()) await click(within(body()).getByRole("button", { name: /^Outro plano/ }), 4);
+      await click(cardOf() as HTMLElement, 12);
+      const dialog = screen().getByRole("dialog", { name: title });
+      expect(inBand(dialog)).toBe(true);
+      // On the steps: the way back to the choices, and no list of whom it is for.
+      expect(within(dialog).getByRole("button", { name: "Voltar" })).toBeTruthy();
+      expect(dialog.querySelector(".arrival-forline")).toBeNull();
+      expect(dialog.querySelector(".ai-picker")).toBeNull();
+      if (card !== "Chave de API") expect(within(dialog).getByRole("region", { name: title })).toBeTruthy();
+    });
+  }
+
+  test("the right hand alone: its own plain dialog", async () => {
+    // Every other agent someone else's: only the right hand is the person's to wake.
+    const state = madeTeam();
+    await renderApp("/onboarding", { api: createFakeApi(state) });
+    await settle(16);
+    await click(within(body()).getByRole("button", { name: /^Claude/ }), 12);
+    const dialog = screen().getByRole("dialog");
+    expect(inBand(dialog)).toBe(false);
+    expect(dialog.querySelector(".ai-picker")).toBeTruthy();
+  });
+
+  test("connected while the dialog is open: the step moves on by the data", async () => {
+    const state = ownTeam();
+    const { services } = await renderApp("/onboarding", { api: createFakeApi(state) });
+    await settle(16);
+    await click(within(body()).getByRole("button", { name: /^Claude/ }), 12);
+    expect(screen().getByRole("dialog", { name: "Seu plano do Claude" })).toBeTruthy();
+    await allThink(state, services);
+    expect(heading()).toBe("Pronto. O time da Acme já pensa.");
   });
 });

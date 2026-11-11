@@ -3,6 +3,7 @@ import { joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { type AiChoice, gateDims, planLabel, planMark } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
+import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { Button, Icon, ProviderLogo } from "@agenteschat/ui";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -30,22 +31,23 @@ const GATES_POLL_MS = 5000;
 export function AiHost({ org, me, children }: { org: OrgSummary; me: Me; children: ReactNode }) {
   return (
     <OrgProvider org={org} me={me}>
-      <ConnectAiProvider>{children}</ConnectAiProvider>
+      {/* No socket here: the dialog reads its status, computers and plans again as the step does. */}
+      <ConnectAiProvider poll={GATES_POLL_MS}>{children}</ConnectAiProvider>
     </OrgProvider>
   );
 }
 
 /**
- * The dialog a pick opens, for every agent here (the right hand first). Claude and ChatGPT go in as the step the
- * person asked for and a key as its own, which open the dialog for the whole team on that choice; any other plan as
- * the plan to open on. The right hand alone is its own dialog.
+ * The dialog a pick opens. For the team (the right hand and the others), Connect for the whole team on the card picked
+ * (`start`), the key's included (ADR 0160 addendum, ADR 0162). The right hand alone is its own dialog: Claude and
+ * ChatGPT as the step asked for, the key as its own, any other plan as the plan to open on.
  */
 export function connectRequest(choice: AiChoice, agentIds: readonly string[]): ConnectAiRequest {
   const [first, ...rest] = agentIds;
-  const who = first !== undefined && rest.length === 0 ? { agentId: first } : { agentIds: [...agentIds] };
-  if (choice === "key") return { ...who, intent: "api_key" };
-  if (choice === "claude" || choice === "chatgpt") return { ...who, intent: choice };
-  return { ...who, plan: choice };
+  if (first === undefined || rest.length > 0) return { agentIds: [...agentIds], start: choice };
+  if (choice === "key") return { agentId: first, intent: "api_key" };
+  if (choice === "claude" || choice === "chatgpt") return { agentId: first, intent: choice };
+  return { agentId: first, plan: choice };
 }
 
 /**
@@ -80,11 +82,13 @@ export function AiStep({
   const { org } = useOrg();
   const connect = useConnectAi();
   const ids = agents.map((a) => a.id);
-  const lead = agents[0];
   // A plan's tile dims while it can't sign in (no computer yet, or the Cloud's still being prepared after paying):
   // read again while the choices show, the computer's setup too (the dialog reads the same), so they light up alone.
+  // Read for the first agent other than the right hand, which never has a computer (ADR 0160 addendum), as the
+  // dialog reads it; the right hand alone reads its own.
+  const reader = agents.find((a) => !isRightHand(a)) ?? agents[0];
   const poll = done ? false : GATES_POLL_MS;
-  const gates = usePlanGates(orgId, lead?.id, poll);
+  const gates = usePlanGates(orgId, reader?.id, poll);
   useComputerSetup(orgId, true, poll);
   if (done)
     return (
@@ -131,7 +135,7 @@ export function AiStep({
       <div className="onb__answer">
         <ConnectChoices
           mayAddKey={can(org, "manage_credentials")}
-          dims={(c) => lead !== undefined && gateDims(gates.gateOf(c))}
+          dims={(c) => reader !== undefined && gateDims(gates.gateOf(c))}
           onPick={(choice) => {
             onPick?.(choice);
             connect?.open(connectRequest(choice, ids));

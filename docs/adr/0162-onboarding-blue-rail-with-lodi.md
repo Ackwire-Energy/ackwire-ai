@@ -128,8 +128,8 @@ the workspace. Amends §1 (the steps), §2 (the plan step's words), §3 (where i
   (`?paid`) the step says the payment was received and asks again every 5 s until the hold lifts, then the AI step
   follows.
 - **The AI step** is Connect an AI (ADR 0160 §3) on the onboarding page: the same choices as cards, with the team asleep
-  on the stage beside them. Claude and ChatGPT open the team's Connect on that plan (`intent`), an API key the key's
-  panel (`intent: "api_key"`), another plan that plan's own steps; with the right hand alone, its own Connect. The step
+  on the stage beside them. Every card, the API key's included, opens Connect for the whole team (ADR 0160, "For
+  the whole team") directly on that choice's steps (`start`); with the right hand alone, its own Connect. The step
   is answered from data: every agent of the team has an AI, ready or waiting for its computer (`teamThinks`). A status
   that doesn't list every agent answers nothing until it is read again, which happens whenever the team changes. While
   the step is up it reads the status every 10 s and the plans' state every 5 s, since the onboarding has no socket, so

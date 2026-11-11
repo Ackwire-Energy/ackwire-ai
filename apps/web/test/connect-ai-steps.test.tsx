@@ -1433,7 +1433,7 @@ describe("All agents: one plan for the team, a login per agent", () => {
     const panel = within(dialog).getByRole("region", { name: "Seu plano do Claude" });
     expect(facesOf(panel)).toEqual(["now", "next", "next"]);
     // One instruction at a time: how far along, whose turn, the help under it; the sign-in is the dialog's action.
-    expect(shownText(panel)).toContain("É a mesma conta; o Claude só pede o login de novo para cada agente.");
+    expect(shownText(panel)).toContain("É a mesma conta. O Claude só pede o login de novo para cada agente.");
     expect(shownText(panel)).not.toContain("Um login por agente, com a mesma conta.");
     for (const [n, line] of [
       [1, "Entre no Claude para a Ada"],

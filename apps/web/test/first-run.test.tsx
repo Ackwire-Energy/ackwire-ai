@@ -127,6 +127,8 @@ describe("the first-run checklist", () => {
     const state = withRightHand(seedState(), { setup: { role: null, done: [] } });
     state.members = state.members.slice(0, 1);
     state.connections = [];
+    // The team the person made: theirs, so it wakes with the right hand (alone, Lodi would get its own dialog).
+    for (const a of state.agents) a.ownerUserId = "u-walter";
     state.aiStatus = {
       any: false,
       agents: [LODI_ID, ADA_ID, ATLAS_ID].map((agentId) => ({ agentId, state: "no_ai", reason: "no_key" })),

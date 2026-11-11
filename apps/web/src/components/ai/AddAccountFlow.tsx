@@ -753,6 +753,8 @@ function AddAccountFlow({
       </Step>
     );
   const signInHint = t("agentPage.work.brain.add.stepOneHint", { computer, brand: t(`aiAccounts.connect.${kind}`) });
+  // Under `quiet` the step that starts the sign-in shows no number of its own, so the steps after it count one less.
+  const after = (n: number) => (quiet ? n - 1 : n);
   let steps: ReactNode;
   // A device sign-in's one-time code (ChatGPT's, Grok's), to type on the provider's page.
   const deviceCode = (n: number, label: string, code: string) => (
@@ -867,7 +869,7 @@ function AddAccountFlow({
           1,
         )}
         {login?.userCode
-          ? deviceCode(2, t("agentPage.work.brain.add.grokCode"), login.userCode)
+          ? deviceCode(after(2), t("agentPage.work.brain.add.grokCode"), login.userCode)
           : login && opened && <Step side={waiting}>{t("agentPage.work.brain.add.grokFinish", { computer })}</Step>}
       </>
     );
@@ -883,7 +885,7 @@ function AddAccountFlow({
           <StepTitle title={t("agentPage.work.brain.add.stepOne.codex")} hint={signInHint} />,
           2,
         )}
-        {login?.userCode && deviceCode(3, t("agentPage.work.brain.add.deviceCode"), login.userCode)}
+        {login?.userCode && deviceCode(after(3), t("agentPage.work.brain.add.deviceCode"), login.userCode)}
       </>
     );
   } else {

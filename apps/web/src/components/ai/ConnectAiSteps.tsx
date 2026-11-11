@@ -665,8 +665,16 @@ export interface PlanPanelProps {
   onKey: () => void;
   /** Self-host with no computer for the agent: where one is connected. */
   onComputer: () => void;
-  /** These agents think with the plan now: the account they signed in (null: the computer's own sign-in). */
+  /**
+   * These agents think with the plan now: the account they signed in (null: the computer's own sign-in). With
+   * `onSkip`, none when every agent was passed over.
+   */
   onDone: (agentIds: string[], account: MachineAccount | null) => void;
+  /**
+   * One login per agent in turn (the team's Connect, ADR 0160 addendum): an agent passed over after its login didn't
+   * end, with why. Given, any agent may be skipped, the last one too.
+   */
+  onSkip?: (agentId: string, why: string | null) => void;
   /**
    * One agent thinks with the account it signed in, the others of "All agents" maybe still to go: kept by a caller
    * that knows only what `onDone` says (the setup), so the panel shown again (another tile and back) goes on from the
@@ -1005,6 +1013,7 @@ function PlanSteps({
   onKey,
   onComputer,
   onDone,
+  onSkip,
   onAssigned,
   onStart,
 }: PlanPanelProps & {
@@ -1110,9 +1119,12 @@ function PlanSteps({
     }
   };
   const account = Object.values(assigned)[0];
-  // Every agent signed in, or skipped once at least one did: those that think now are told.
+  // Every agent signed in, or skipped once at least one did: those that think now are told. A caller that hears of
+  // each skip (`onSkip`) is told too when every agent was skipped, with nobody.
   const allDone =
-    todo.length > 0 && todo.every((a) => assigned[a.id] || skipped.includes(a.id)) && todo.some((a) => assigned[a.id]);
+    todo.length > 0 &&
+    todo.every((a) => assigned[a.id] || skipped.includes(a.id)) &&
+    (onSkip !== undefined || todo.some((a) => assigned[a.id]));
   const told = useRef(false);
   useEffect(() => {
     if (!allDone || told.current) return;
@@ -1190,6 +1202,8 @@ function PlanSteps({
         </Button>
       </div>
     );
+  // Every agent passed over: the caller says so in place of the panel.
+  if (allDone && !todo.some((a) => assigned[a.id])) return null;
   // Done, or nothing to do: every agent of "All agents" already thought with this plan.
   if (allDone || (everyone && todo.length === 0)) {
     return (
@@ -1309,11 +1323,14 @@ function PlanSteps({
         : "next";
   // Under a dialog that already names the plan (`plain`), one login per agent is one instruction at a time: how far
   // along, whose turn it is, and every agent's face in order; a login that didn't end says so in its place, with the
-  // way to skip that agent beside "Try again" once someone else is left or done.
+  // way to skip that agent beside "Try again": always where the caller hears of skips (the team's end lists who
+  // stayed, ADR 0160 addendum), else once someone else is left or done.
   const perAgent = plain && turn !== undefined;
   const turnAt = turn ? todo.findIndex((a) => a.id === turn.id) + 1 : 0;
   const maySkip =
-    todo.some((a) => assigned[a.id]) || todo.filter((a) => !assigned[a.id] && !skipped.includes(a.id)).length > 1;
+    onSkip !== undefined ||
+    todo.some((a) => assigned[a.id]) ||
+    todo.filter((a) => !assigned[a.id] && !skipped.includes(a.id)).length > 1;
   const faceOf = (a: PlanAgent): FaceState =>
     assigned[a.id] || forWhom.find((x) => x.id === a.id)?.done
       ? "done"
@@ -1340,6 +1357,7 @@ function PlanSteps({
   const skip = turn && (
     <Button
       onClick={() => {
+        onSkip?.(turn.id, endWhy);
         setSkipped((s) => [...s, turn.id]);
         setEndWhy(null);
       }}

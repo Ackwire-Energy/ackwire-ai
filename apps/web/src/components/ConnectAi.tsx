@@ -147,6 +147,11 @@ export interface ConnectAiRequest {
    * of theirs with no AI unless they narrow it to this one (ADR 0160, addendum).
    */
   chat?: boolean;
+  /**
+   * The card already picked (the onboarding's AI step, ADR 0162): for the team the dialog opens on that choice's steps,
+   * a key's too. Unlike `plan` (sign in again) and `intent: "api_key"` (a key asked for), which keep the plain dialog.
+   */
+  start?: AiChoice;
 }
 
 /** How "Responder agora" went for a message, in this tab. */
@@ -179,7 +184,17 @@ export function useMayConnectAi() {
   );
 }
 
-export function ConnectAiProvider({ children }: { children: ReactNode }) {
+export function ConnectAiProvider({
+  children,
+  poll,
+}: {
+  children: ReactNode;
+  /**
+   * Where no socket keeps them current (the onboarding, ADR 0162): how often the dialog reads the AI status, the
+   * computers and the plans' state again while it is open.
+   */
+  poll?: number;
+}) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const api = useApi();
@@ -223,6 +238,7 @@ export function ConnectAiProvider({ children }: { children: ReactNode }) {
         <ConnectAiDialog
           key={request.n}
           request={request}
+          poll={poll ?? false}
           onClose={() => setRequest(null)}
           onConnected={() => {
             if (request.from) void answer(request.from);
@@ -362,17 +378,21 @@ function BandDialog({
 
 function ConnectAiDialog({
   request,
+  poll,
   onClose,
   onConnected,
 }: {
   request: ConnectAiRequest;
+  poll: number | false;
   onClose: () => void;
   onConnected: () => void;
 }) {
   const { t } = useTranslation();
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
-  const status = useAiStatus(org.id);
+  const status = useAiStatus(org.id, true, poll);
+  // Another dialog in place of this one: the right hand's own Connect from the team's end.
+  const connect = useConnectAi();
   const qc = useQueryClient();
   const navigate = useNavigate();
   const add = useAddCredential(org.id, true);
@@ -389,7 +409,7 @@ function ConnectAiDialog({
   const named = request.agentIds?.length ? request.agentIds : null;
   // From the agent's conversation: decided once the agents and their AI are known, and kept, since connecting changes
   // both. `others`: more agents of the person's have no AI, so the dialog opens for all of them.
-  const machines = useMachines(org.id);
+  const machines = useMachines(org.id, true, poll);
   const loaded = !(dir.loading || status.isPending || machines.isPending);
   const machineOf = (id: string) => machines.data?.find((m) => m.agents.some((a) => a.id === id))?.id;
   // Any way in that names one agent and no step (a key, a plan to sign in to again) is that agent's dialog.
@@ -424,12 +444,12 @@ function ConnectAiDialog({
   };
   const [chatKept, setChatKept] = useState<typeof chatNow>();
   // Opened for several agents or none (the channel's notice, Settings › AI accounts, the first-run list, a team just
-  // made, a receipt or a card for several agents): the narrow dialog under the sky, for every agent of the person's
-  // that can't think, on the computer of the first of them since a plan signs in on one computer (ADR 0160, addendum).
-  // The plain dialog stays for every way in that names one thing or has its own: someone else's agent (locked), one
-  // agent alone (the right hand's own AI among them), a plan to sign in to again (`plan`), a key asked for or pasted,
-  // an agent still being made (`forNewAgent`), a billing hold (its notice is the whole dialog), and nobody to wake (no
-  // agent of theirs yet, or every one of them already thinks).
+  // made, a receipt or a card for several agents, the onboarding's AI step): the narrow dialog under the sky, for every
+  // agent of the person's that can't think, on the computer of the first of them since a plan signs in on one computer
+  // (ADR 0160, addendum). The plain dialog stays for every way in that names one thing or has its own: someone else's
+  // agent (locked), one agent alone (the right hand's own AI among them), a plan to sign in to again (`plan`), a key
+  // asked for or pasted, an agent still being made (`forNewAgent`), a billing hold (its notice is the whole dialog),
+  // and nobody to wake (no agent of theirs yet, or every one of them already thinks).
   const teamAsk =
     hold === null &&
     !request.arrival &&
@@ -439,11 +459,17 @@ function ConnectAiDialog({
     !request.forNewAgent &&
     request.intent !== "api_key" &&
     (named ? named.length >= 2 : request.agentId === undefined);
+  // The right hand never has a computer (ADR 0137), so it never picks the one a plan signs in on: that is the first
+  // other agent's. It wakes with the others and comes last, so neither whom a plan's panel is for nor whose computer
+  // it reads is ever the right hand. With nobody else to wake it is one agent alone: its own plain dialog.
+  const handOf = (id: string) => isRightHand(dir.agentById.get(id));
   const teamNow = (() => {
     if (!teamAsk) return [];
     const ids = (named ?? mine.map((a) => a.id)).filter((id) => mine.some((a) => a.id === id) && asleep(id));
-    const where = ids[0] === undefined ? null : (machineOf(ids[0]) ?? null);
-    return ids.filter((id) => (machineOf(id) ?? null) === where);
+    const lead = ids.find((id) => !handOf(id));
+    if (lead === undefined) return [];
+    const where = machineOf(lead) ?? null;
+    return [...ids.filter((id) => !handOf(id) && (machineOf(id) ?? null) === where), ...ids.filter((id) => handOf(id))];
   })();
   const [teamKept, setTeamKept] = useState<string[]>();
   // biome-ignore lint/correctness/useExhaustiveDependencies: once, as the agents and their AI load
@@ -461,6 +487,12 @@ function ConnectAiDialog({
   const forTeam = teamPick ?? teamIds;
   const [draftPick, setDraftPick] = useState<string[] | null>(null);
   const [round, setRound] = useState(0);
+  // The end counts the whole team across those rounds (`whole`, set by the first "Connect Lia"), names why each agent
+  // passed over stayed without an AI (its login's reason), and says what they think with: the account signed in.
+  const [whole, setWhole] = useState<string[]>();
+  const [why, setWhy] = useState<Record<string, string | null>>({});
+  const [nobody, setNobody] = useState(false);
+  const [thinksWith, setThinksWith] = useState<MachineAccount | null>(null);
   const dom = useId();
   const [scope, setScope] = useState<"all" | "one">();
   const several = chat.set.length >= 2;
@@ -492,6 +524,8 @@ function ConnectAiDialog({
     appearance: lookOf(a),
     initials: dir.agentInitials(a.id),
   }));
+  // For the team, whom a plan signs in for: never the right hand, which has no computer (its AI follows the person's).
+  const planAgents = team ? agents.filter((a) => !handOf(a.id)) : agents;
   // The agents a plan or a key was connected for here: they think with it before the AI status says so.
   const [linked, setLinked] = useState<Record<string, AiChoice>>({});
   // From a conversation an agent that can't think has no AI, whatever it is set to (a plan nobody is signed in to):
@@ -507,7 +541,7 @@ function ConnectAiDialog({
       ? []
       : allAgents({
           choice: c,
-          agents,
+          agents: planAgents,
           aiOf,
           machineOf,
           sharedOn: (id) =>
@@ -522,7 +556,7 @@ function ConnectAiDialog({
   const [heldReader, setHeldReader] = useState<string>();
   // For all of them, the agent of the conversation is still the one a plan that can't be shared signs in for.
   const aimed = {
-    agents,
+    agents: planAgents,
     hasAi,
     // For the team, its plan's panel is for all of them whenever the plan may sign in for more than one.
     picked: pickedTarget ?? (team ? ALL_AGENTS : undefined),
@@ -536,7 +570,7 @@ function ConnectAiDialog({
   const mayUseKeys = can(org, "manage_agents");
   const forId = one?.id ?? (agents.length === 1 ? agents[0]?.id : undefined);
   const forAgent = forId ? { id: forId, name: dir.agentById.get(forId)?.name ?? "" } : undefined;
-  const gates = usePlanGates(org.id, reader ?? (theirs && mayUseKeys ? one?.id : undefined));
+  const gates = usePlanGates(org.id, reader ?? (theirs && mayUseKeys ? one?.id : undefined), poll);
   const credentials = useCredentials(org.id, mayUseKeys && forId !== undefined);
   // No agent of theirs yet, and it isn't opened for someone else's: a plan signs in for the agents they create.
   const bare = agents.length === 0 && !theirs && !named && !team;
@@ -545,7 +579,7 @@ function ConnectAiDialog({
     agents.length > 0 ? gates.gateOf(c) : bare ? bareGates.at(c).gate : { state: "loading" };
   const [used, setUsed] = useState<ExistingUsed | null>(null);
   const [login, setLogin] = useState<ExistingSignIn | null>(null);
-  const [picked, setPicked] = useState<AiChoice | null>(null);
+  const [picked, setPicked] = useState<AiChoice | null>(request.start ?? null);
   const choice =
     picked ??
     request.plan ??
@@ -569,8 +603,10 @@ function ConnectAiDialog({
   // The arrival's stage: never over a billing hold, whose notice is the whole dialog.
   const stage = request.arrival === true && !hold;
   // Its first screen is the cards; a pick moves on to that plan's steps, and Back returns to the cards.
-  // For the team, a message that asked for Claude or ChatGPT opens on its steps.
-  const [chosen, setChosen] = useState(teamAsk && (request.intent === "claude" || request.intent === "chatgpt"));
+  // For the team, a card already picked (`start`) or a message that asked for Claude or ChatGPT opens on its steps.
+  const [chosen, setChosen] = useState(
+    teamAsk && (request.start !== undefined || request.intent === "claude" || request.intent === "chatgpt"),
+  );
   // From a conversation: the sky as a band over a narrow dialog.
   const band = chat.on && !hold;
   // An account picked for every agent: its plan's panel uses it at once.
@@ -708,7 +744,7 @@ function ConnectAiDialog({
         choice={choice}
         gates={gates}
         justReady={request.ready}
-        agents={agents}
+        agents={planAgents}
         all={all}
         target={target}
         onTarget={(next) => {
@@ -729,10 +765,19 @@ function ConnectAiDialog({
           setLogin(null);
         }}
         onComputer={toComputers}
-        onDone={(ids) => {
+        {...(team
+          ? {
+              // Any agent may be passed over, the last too; the end then says why it stayed without an AI.
+              onSkip: (id: string, reason: string | null) => setWhy((w) => ({ ...w, [id]: reason })),
+            }
+          : {})}
+        onDone={(ids, account) => {
+          // Every agent of the round passed over: the end says nobody woke, with no dawn and nothing answered.
+          if (ids.length === 0) return setNobody(true);
           // The panel stays on whom it was for, saying it's done.
           setPickedTarget(target);
           setLinked((l) => ({ ...l, ...Object.fromEntries(ids.map((id) => [id, choice])) }));
+          if (account) setThinksWith(account);
           done();
         }}
       />
@@ -767,8 +812,8 @@ function ConnectAiDialog({
         r.choice.login.status === "active",
     );
     const choosing = draftPick !== null;
-    const draft = draftPick ?? [];
-    const picking = ready && !chosen && !used && rows.length > 0 && !adding && !choosing;
+    const pickDraft = draftPick ?? [];
+    const picking = ready && !chosen && rows.length > 0 && !adding && !choosing;
     const selected = picking ? rows.find((r) => haveId(r) === (haveSel ?? bestHave(rows, dims))) : undefined;
     const account = selected?.kind === "account" ? selected.choice.login : undefined;
     const pick = (next: AiChoice, a?: MachineAccount) => {
@@ -787,11 +832,22 @@ function ConnectAiDialog({
     const faces = (ids: readonly string[]) =>
       rowsOf(ids).map((a) => ({ id: a.id, name: a.name, appearance: lookOf(a), initials: dir.agentInitials(a.id) }));
     const nameOf = (id: string | undefined) => (id ? (dir.agentById.get(id)?.name ?? "") : "");
-    const woke = forTeam.filter((id) => linked[id] !== undefined);
-    const stayed = forTeam.filter((id) => linked[id] === undefined);
-    // Done with a plan: who woke, who didn't and why, and whom they answer. A key's own panel says it is saved.
-    const finished = connected && choice !== "key" && woke.length > 0;
-    const plan = choice === "key" ? "" : planLabel(t, choice);
+    // The whole team, across "Connect Lia" rounds. An agent woke once a plan was connected for it here or the AI
+    // status says it thinks; the right hand only by the status (read again as a round ends), since a plan's steps
+    // never sign in for it.
+    const everyone = whole ?? forTeam;
+    const awoke = (id: string) => !asleep(id) || (!handOf(id) && linked[id] !== undefined);
+    const woke = everyone.filter(awoke);
+    const stayed = everyone.filter((id) => !awoke(id));
+    // Those a round may go again for, and the right hand left without an AI, which has its own Connect.
+    const left = stayed.filter((id) => !handOf(id));
+    const handLeft = stayed.find(handOf);
+    const thinking = woke.filter((id) => !handOf(id));
+    // Done with a plan: who woke, who didn't and why, and whom they answer; or nobody, every agent passed over. A key's
+    // own panel says it is saved.
+    const finished = choice !== "key" && (nobody || (connected && woke.length > 0));
+    // What they think with: the account signed in, else the plan's name.
+    const plan = choice === "key" ? "" : (thinksWith?.label ?? planLabel(t, choice));
     const screen = !ready
       ? "loading"
       : choosing
@@ -809,9 +865,11 @@ function ConnectAiDialog({
       screen === "agents"
         ? t("connectAi.team.pickTitle")
         : finished
-          ? teamIds.every((id) => linked[id] !== undefined)
-            ? t("connectAi.team.wokeAll")
-            : t("connectAi.team.woke", { count: woke.length })
+          ? woke.length === 0
+            ? t("connectAi.team.wokeNone")
+            : stayed.length === 0 && everyone.length > 1
+              ? t("connectAi.team.wokeAll")
+              : t("connectAi.team.woke", { count: woke.length })
           : chosen
             ? stepTitle(t, choice)
             : listing
@@ -821,26 +879,39 @@ function ConnectAiDialog({
                 : t("connectAi.team.title");
     const back = choosing || stepping || listing || (adding && rows.length > 0 && !chosen);
     // The sky shows whom it is for: the list as it is being ticked, then those who woke.
-    const cast = rowsOf(choosing ? teamIds.filter((id) => draft.includes(id)) : finished ? woke : forTeam);
+    const cast = rowsOf(
+      choosing ? teamIds.filter((id) => pickDraft.includes(id)) : finished && woke.length > 0 ? woke : forTeam,
+    );
     const drawn = sceneTeam(
       cast,
       cast.find((a) => isRightHand(a)),
     );
     const mark = chosen ? choice : account ? planOfAccount(account) : undefined;
     // A plan that will ask for one login per agent on their computer says so on its card (ADR 0059 §2).
-    const computer = accounts.data?.computers.find((m) => m.machineId === machineOf(forTeam[0] ?? ""));
+    const computer = accounts.data?.computers.find((m) => m.machineId === machineOf(planAgents[0]?.id ?? ""));
     const perAgent = (c: PlanChoice) =>
-      forTeam.length >= 2 && !isPlanId(c) && signsInPerAgent(c) && !signsInOnce(c, computer);
+      planAgents.length >= 2 && !isPlanId(c) && signsInPerAgent(c) && !signsInOnce(c, computer);
     const applyPick = () => {
-      setTeamPick(teamIds.filter((id) => draft.includes(id)));
+      const kept = teamIds.filter((id) => pickDraft.includes(id));
+      // The right hand alone is one agent alone: its own Connect, as anywhere else.
+      const [first] = kept;
+      if (first !== undefined && kept.every(handOf)) return connect?.open({ agentId: first });
+      setTeamPick(kept);
       setDraftPick(null);
       setHaveSel(undefined);
       setPickedTarget(undefined);
       setHeldReader(undefined);
     };
-    // Those a round left without an AI: the same plan's steps again, for them alone.
+    // Those a round left without an AI: the same plan's steps again, for them alone. The right hand left alone without
+    // one opens its own Connect instead.
     const again = () => {
-      setTeamPick(stayed);
+      if (left.length === 0) {
+        if (handLeft) connect?.open({ agentId: handLeft });
+        return;
+      }
+      setWhole(everyone);
+      setTeamPick(left);
+      setNobody(false);
       setConnected(false);
       setChosen(true);
       setUse(undefined);
@@ -877,7 +948,7 @@ function ConnectAiDialog({
         scene={{
           agents: drawn,
           lead: cast.find((a) => isRightHand(a))?.id,
-          awake: connected,
+          awake: connected || (finished && woke.length > 0),
           day,
           more: cast.length - drawn.length,
           mark,
@@ -886,18 +957,18 @@ function ConnectAiDialog({
         actsRef={stepping ? setFootAt : undefined}
         footer={
           choosing ? (
-            <DialogFooter note={note(t("connectAi.team.marked", { n: draft.length, total: teamIds.length }))}>
-              <Button variant="primary" disabled={draft.length === 0} onClick={applyPick}>
-                {t("connectAi.team.useThese", { count: draft.length })}
+            <DialogFooter note={note(t("connectAi.team.marked", { n: pickDraft.length, total: teamIds.length }))}>
+              <Button variant="primary" disabled={pickDraft.length === 0} onClick={applyPick}>
+                {t("connectAi.team.useThese", { count: pickDraft.length })}
               </Button>
             </DialogFooter>
           ) : finished ? (
             <DialogFooter>
-              {stayed.length > 0 && (
+              {(left.length > 0 || handLeft) && (
                 <Button onClick={again}>
-                  {stayed.length === 1
-                    ? t("connectAi.team.again", agentGrammar(nameOf(stayed[0])))
-                    : t("connectAi.team.againMany", { n: stayed.length })}
+                  {left.length === 0 || left.length === 1
+                    ? t("connectAi.team.again", agentGrammar(nameOf(left[0] ?? handLeft)))
+                    : t("connectAi.team.againMany", { n: left.length })}
                 </Button>
               )}
               <Button variant="primary" onClick={onClose}>
@@ -930,11 +1001,12 @@ function ConnectAiDialog({
         {!ready ? (
           <Spinner />
         ) : choosing ? (
-          // Long names fit whole on a row of their own; the list scrolls inside the dialog.
+          // Long names whole, wrapping on their row; the list scrolls inside the dialog. Named as its title asks (whom
+          // it is for), not as the agents a plan already serves.
           // biome-ignore lint/a11y/useSemanticElements: a list of checkboxes, not a native fieldset
-          <div className="arrival-picks" role="group" aria-label={t("connectAi.agentAria")}>
+          <div className="arrival-picks" role="group" aria-label={t("connectAi.team.pickTitle")}>
             {rowsOf(teamIds).map((a) => {
-              const on = draft.includes(a.id);
+              const on = pickDraft.includes(a.id);
               return (
                 <label key={a.id} htmlFor={`${dom}-${a.id}`} className="arrival-pick" data-checked={on}>
                   <Checkbox
@@ -951,28 +1023,46 @@ function ConnectAiDialog({
             })}
           </div>
         ) : finished ? (
-          <div className="ai-turn">
-            <p className="ai-turn__title" role="status">
-              {woke.length === 1
-                ? t("connectAi.team.thinksOne", { ...agentGrammar(nameOf(woke[0])), plan })
-                : t("connectAi.team.thinksAll", { plan })}
-            </p>
-            {stayed.length > 0 && (
+          <div className="ai-turn" role="status">
+            {thinking.length > 0 && (
+              <p className="ai-turn__title">
+                {thinking.length === 1
+                  ? t("connectAi.team.thinksOne", { ...agentGrammar(nameOf(thinking[0])), plan })
+                  : t("connectAi.team.thinksAll", { plan })}
+              </p>
+            )}
+            {left.length > 0 && (
               <span className="ai-turn__help">
-                {stayed.length === 1
-                  ? t("connectAi.team.stayed", agentGrammar(nameOf(stayed[0])))
+                {left.length === 1
+                  ? t("connectAi.team.stayed", agentGrammar(nameOf(left[0])))
                   : t("connectAi.team.stayedMany", {
-                      names: namesText(t, stayed.map(nameOf), NAMES_TEAM),
+                      names: namesText(t, left.map(nameOf), NAMES_TEAM),
                     })}
               </span>
             )}
-            {forTeam.length > 1 && (
-              <FaceStrip agents={faces(forTeam)} stateOf={(a) => (linked[a.id] ? "done" : "failed")} />
+            {/* Each one's own reason, as its login said it when it was passed over. */}
+            {left.flatMap((id) => {
+              const reason = why[id];
+              return reason
+                ? [
+                    <span key={id} className="ai-turn__help">
+                      {t("connectAi.team.why", { name: nameOf(id), why: reason })}
+                    </span>,
+                  ]
+                : [];
+            })}
+            {handLeft && (
+              <span className="ai-turn__help">{t("connectAi.team.stayedHand", agentGrammar(nameOf(handLeft)))}</span>
             )}
-            {/* Whom they answer, on the plan just connected: the team's right hand serves each person alone. */}
+            {everyone.length > 1 && (
+              <FaceStrip agents={faces(everyone)} stateOf={(a) => (awoke(a.id) ? "done" : "failed")} />
+            )}
+            {/* Whom they answer, on the plan just connected (its seat's own words): the team's right hand serves each
+                person alone. A plan only: `finished` is never true for a key, which has no subscription to answer on. */}
             <PlanAudience
-              agents={faces(woke.filter((id) => !isRightHand(dir.agentById.get(id))))}
+              agents={faces(thinking)}
               brain={kindOf(choice)}
+              plan={thinksWith?.plan ?? null}
               coding={planOf(choice)}
             />
           </div>
