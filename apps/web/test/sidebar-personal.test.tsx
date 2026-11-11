@@ -8,7 +8,7 @@ import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState, withRightHand } from 
 import { renderApp, screen, settle } from "./render";
 
 /* A personal workspace's sidebar (ADR 0159): the person on top, the agents with no header and New agent under them,
-   group conversations and people only when there are some, one More at the end with Início, Go to… and every tool. */
+   group conversations (a row to create the first while there is none), people only when there are some, one More at the end with Início, Go to… and every tool. */
 
 /** A narrow screen (the new agent's two steps, NEW_AGENT_STEPS_QUERY): only that query matches. */
 let media: { mockRestore: () => void } | null = null;
@@ -130,15 +130,6 @@ describe("a personal workspace's sidebar", () => {
     expect(within(menu).getByRole("button", { name: /Ir para…/ })).toBeTruthy();
     const tasks = within(menu).getByRole("link", { name: /Tarefas/ });
     expect(tasks.querySelector(".ac-menu__desc")?.textContent).toBe("Suas tarefas e as dos seus agentes");
-  });
-
-  test("More has New group conversation, even with no group conversation in the list yet", async () => {
-    await go(personal({ alone: true }), "home");
-    expect(channelRows()).toEqual([]);
-    await click(nav().querySelector(".sidebar__end .sidebar__more") as HTMLElement);
-    const menu = screen().getByRole("dialog", { name: "Mais" });
-    await click(within(menu).getByRole("button", { name: "Nova conversa em grupo" }));
-    expect(screen().getByRole("dialog", { name: "Nova conversa em grupo" })).toBeTruthy();
   });
 
   test("Aprovações comes into sight while something waits", async () => {
@@ -402,11 +393,20 @@ describe("a personal workspace's sidebar", () => {
     expect(channelRows()).toEqual(["eng"]);
   });
 
-  test("alone with only #general: no group conversations at all", async () => {
+  test("alone with only #general: Conversas em grupo holds one row, which creates the first", async () => {
     const state = personal({ alone: true });
     state.channels = state.channels.filter((c) => c.name === "general");
     await go(state, `dm/agent/${ADA_ID}`);
-    expect(blocks()).toEqual(["agents"]);
+    expect(blocks()).toEqual(["agents", "channels"]);
+    expect(channelRows()).toEqual([]);
+    await click(within(nav()).getByRole("button", { name: "Nova conversa em grupo" }));
+    expect(screen().getByRole("dialog", { name: "Nova conversa em grupo" })).toBeTruthy();
+  });
+
+  test("with a group conversation in the list the row is gone: the header's + creates the next", async () => {
+    await go(personal({ alone: true }));
+    expect(channelRows()).toEqual(["eng"]);
+    expect(nav().querySelector(".sidebar__new-channel")).toBeNull();
   });
 
   test("a team's sidebar is as before: the workspace on top, ⌘K under it, me and the bell at the foot", async () => {
