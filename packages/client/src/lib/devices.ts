@@ -102,6 +102,9 @@ type StatusOptions = { host?: string | null; now?: Date; ios?: string | null };
 export const iosOf = (d: ComputerDevice | PhoneDevice) =>
   "platform" in d && d.platform === "ios" ? d.osVersion : null;
 
+/** The version a "too old" line names: devicectl gives none for some iPhones below iOS 17. */
+export const tooOldVersion = (t: TFunction, version: string) => version || t("devices.iphone.tooOldVersion");
+
 /**
  * The quiet line under a row's pill: "for Rui since 14:10", "last seen 14:02", "with Ana's iMac", "until 18:00";
  * for Needs you the fix itself ("Turn on Developer Mode"). Null when the pill says it all.
@@ -128,8 +131,8 @@ export function statusDetail(
       if (s.withHost && options.host) return t("devices.detail.withHost", { host: options.host });
       return s.lastSeenAt ? t("devices.detail.lastSeen", { time: clockAt(locale, s.lastSeenAt, now) }) : null;
     case "unsupported":
-      return s.reason === "os_too_old" && options.ios
-        ? t("devices.reason.iosTooOld", { version: options.ios })
+      return s.reason === "os_too_old" && options.ios != null
+        ? t("devices.reason.iosTooOld", { version: tooOldVersion(t, options.ios) })
         : reasonText(t, s.reason);
     default:
       return null;

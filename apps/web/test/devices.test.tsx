@@ -385,6 +385,9 @@ describe("Connect a device", () => {
     expect(step()?.textContent).toContain("Sam's iPhone 16 runs iOS 16.7.10, and agents need iOS 17 or newer.");
     expect(dialog().querySelector(".dv-step__mark .ac-pixspin")).toBeNull();
     expect(within(dialog()).queryByRole("button", { name: "Done" })).toBeNull();
+    // devicectl names no version for some of them.
+    await show(iphoneAs({ kind: "unsupported", reason: "os_too_old" }, { osVersion: "" }));
+    expect(step()?.textContent).toContain("Sam's iPhone 16 runs iOS 16 or older, and agents need iOS 17 or newer.");
 
     // Xcode lists an account that shows no team yet: how to get one, not "sign in".
     await show(iphoneAs(null, {}, { appleAccount: "no_team" }));

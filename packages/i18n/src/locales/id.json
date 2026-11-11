@@ -13297,6 +13297,7 @@
       "xcodeOldAny": "{{name}} memakai iOS {{version}}, lebih baru dari yang dikenal Xcode di {{mac}}. Instal Xcode {{major}}, lalu jalankan ini di Terminal.",
       "uiRefusedText": "iPhone menolak ketukan helper pengujian. Buka kuncinya dan masukkan kode sandinya jika diminta. Jika terus terjadi, matikan lalu nyalakan lagi Pengaturan › Pengembang › Aktifkan Otomatisasi UI.",
       "tooOld": "{{name}} memakai iOS {{version}}, dan agen butuh iOS 17 atau lebih baru. Perbarui jika bisa, atau colokkan iPhone yang lebih baru.",
+      "tooOldVersion": "16 atau lebih lama",
       "pluggedIn": "Sudah tercolok",
       "stall": {
         "xcode": "Sudah terinstal? Buka Xcode sekali dan setujui ketentuannya, agar {{mac}} bisa memakainya.",

@@ -13798,6 +13798,7 @@
       "xcodeOldAny": "{{name}} draait iOS {{version}}, nieuwer dan Xcode op {{mac}} kent. Installeer Xcode {{major}} en voer dit daarna uit in Terminal.",
       "uiRefusedText": "De iPhone weigerde de tikken van de testhelper. Ontgrendel hem en voer de toegangscode in als hij erom vraagt. Blijft het gebeuren, zet dan Instellingen › Ontwikkelaar › Schakel UI-automatisering in uit en weer aan.",
       "tooOld": "{{name}} draait iOS {{version}}, en agents hebben iOS 17 of nieuwer nodig. Werk hem bij als dat kan, of sluit een nieuwere iPhone aan.",
+      "tooOldVersion": "16 of ouder",
       "pluggedIn": "Hij is aangesloten",
       "stall": {
         "xcode": "Al geïnstalleerd? Open Xcode één keer en ga akkoord met de voorwaarden, zodat {{mac}} het kan gebruiken.",

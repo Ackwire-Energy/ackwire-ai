@@ -10,7 +10,9 @@ import {
   iphoneOf,
   iphoneSteps,
   phoneLine,
+  reasonText,
   type StepState,
+  tooOldVersion,
   useStalled,
   wifiHosts,
   wifiPairLive,
@@ -580,9 +582,17 @@ export function IphoneFlow({
   const reason = phone && "reason" in phone.status ? phone.status.reason : null;
   const tooOld = phone?.status.kind === "unsupported";
   const at = IPHONE_STEPS.find((s) => states[s] === "current" || states[s] === "needs") ?? null;
-  // The Mac reports by itself; a step that sits unchanged gets what most likely holds it (an iPhone below iOS 17 has
-  // nothing to try).
-  const stalled = useStalled(at && mac && !tooOld ? [mac.id, at, phone?.id, reason].join(":") : null);
+  // The Mac reports by itself; a step that sits unchanged gets what most likely holds it. Nothing to add for an iPhone
+  // below iOS 17, nor where the step's own text already says what to do (a helper the person must act on, no team).
+  const stalled = useStalled(
+    at &&
+      mac &&
+      !tooOld &&
+      !(at === "helper" && states.helper === "needs") &&
+      !(at === "account" && iphoneNoTeam(mac, phone))
+      ? [mac.id, at, phone?.id, reason].join(":")
+      : null,
+  );
   const [plugged, setPlugged] = useState(false);
   const looking = at === "connected" && !phone;
   useEffect(() => setTitle(t("devices.iphone.title")), [setTitle, t]);
@@ -592,14 +602,16 @@ export function IphoneFlow({
     xcode:
       states.xcode === "done"
         ? t("devices.iphone.xcodeDone", { version: mac?.toolchains.xcode ?? "" })
-        : reason === "xcode_too_old" && phone
-          ? t(sdk ? "devices.iphone.xcodeOld" : "devices.iphone.xcodeOldAny", {
-              name: phone.name,
-              version: phone.osVersion,
-              major: iosMajor(phone.osVersion),
-              sdk,
-              mac: macName,
-            })
+        : reason === "xcode_too_old"
+          ? phone?.osVersion
+            ? t(sdk ? "devices.iphone.xcodeOld" : "devices.iphone.xcodeOldAny", {
+                name: phone.name,
+                version: phone.osVersion,
+                major: iosMajor(phone.osVersion),
+                sdk,
+                mac: macName,
+              })
+            : reasonText(t, reason)
           : t("devices.iphone.xcodeText", { mac: macName }),
     tools: states.tools === "done" ? t("devices.iphone.toolsDone") : t("devices.iphone.toolsText"),
     account:
@@ -610,7 +622,7 @@ export function IphoneFlow({
           : t("devices.iphone.accountText", { mac: macName }),
     connected:
       tooOld && phone
-        ? t("devices.iphone.tooOld", { name: phone.name, version: phone.osVersion })
+        ? t("devices.iphone.tooOld", { name: phone.name, version: tooOldVersion(t, phone.osVersion) })
         : states.connected === "done" && phone
           ? t("devices.iphone.connectedDone", { name: phone.name, version: phone.osVersion })
           : t("devices.iphone.connectedText", { mac: macName }),
@@ -635,7 +647,7 @@ export function IphoneFlow({
             </a>
           </Button>
         </span>
-        {reason === "xcode_too_old" && <CommandBlock command={DDIS_UPDATE} />}
+        {reason === "xcode_too_old" && phone?.osVersion && <CommandBlock command={DDIS_UPDATE} />}
       </>
     ),
     ...(looking && !plugged && !stalled

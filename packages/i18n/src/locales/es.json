@@ -14123,6 +14123,7 @@
       "xcodeOldAny": "{{name}} usa iOS {{version}}, más nuevo de lo que conoce Xcode en {{mac}}. Instala Xcode {{major}} y luego ejecuta esto en Terminal.",
       "uiRefusedText": "El iPhone rechazó los toques de la app de pruebas. Desbloquéalo y escribe su código si lo pide. Si vuelve a pasar, desactiva y activa Configuración › Desarrollador › Activar automatización de la IU.",
       "tooOld": "{{name}} usa iOS {{version}}, y los agentes necesitan iOS 17 o posterior. Actualízalo si se puede, o conecta un iPhone más nuevo.",
+      "tooOldVersion": "16 o anterior",
       "pluggedIn": "Ya está conectado",
       "stall": {
         "xcode": "¿Ya está instalado? Abre Xcode una vez y acepta sus términos, para que {{mac}} pueda usarlo.",

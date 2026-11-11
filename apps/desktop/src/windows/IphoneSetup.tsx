@@ -6,7 +6,7 @@
  * on the iPhone.
  */
 import type { ControlIphoneSetup } from "@agenteschat/adapters/runner-control";
-import { DDIS_UPDATE, iosMajor, reasonText, useStalled } from "@agenteschat/client/lib/devices";
+import { DDIS_UPDATE, iosMajor, reasonText, tooOldVersion, useStalled } from "@agenteschat/client/lib/devices";
 import { Button, Icon, InfoHint, PixelSpinner, QrCode, SettingsPath } from "@agenteschat/ui";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -99,9 +99,15 @@ export function IphoneSetup({ onClose }: { onClose: () => void }) {
   const macName = mac?.name ?? "";
   const phoneName = phone ? (phone.name ?? phone.model) : "";
   const tooOld = phone?.state === "unsupported";
-  // A step that sits unchanged gets what most likely holds it (an iPhone below iOS 17 has nothing to try).
+  // A step that sits unchanged gets what most likely holds it. A download that moves is no stall, and an iPhone below
+  // iOS 17 gets nothing, nor a step whose own text already says what to do (a helper the person must act on, no team).
+  const progress = platform?.state === "downloading" ? `${platform.percent ?? ""}/${platform.done ?? ""}` : "";
+  const quiet =
+    (tooOld && current === "connected") ||
+    (current === "helper" && states.helper === "needs") ||
+    (current === "account" && (!!setup?.noTeam || reason === "apple_team_missing"));
   const stalled = useStalled(
-    current && !tooOld ? [current, setup ? "" : "asking", phone?.serial, reason, platform?.state].join(":") : null,
+    current && !quiet ? [current, setup ? "" : "asking", phone?.serial, reason, platform?.state, progress].join(":") : null,
   );
   const [plugged, setPlugged] = useState(false);
   const looking = current === "connected" && !phone;
@@ -135,7 +141,7 @@ export function IphoneSetup({ onClose }: { onClose: () => void }) {
     switch (step) {
       case "xcode":
         if (!setup) return t("desktop.iphone.checking");
-        return reason === "xcode_too_old" && phone ? (
+        return reason === "xcode_too_old" && phone?.osVersion ? (
           <>
             {t(setup.sdk ? "devices.iphone.xcodeOld" : "devices.iphone.xcodeOldAny", {
               name: phoneName,
@@ -151,6 +157,12 @@ export function IphoneSetup({ onClose }: { onClose: () => void }) {
               </Button>
             </span>
           </>
+        ) : reason === "xcode_too_old" ? (
+          <Act text={reasonText(t, reason)}>
+            <Button size="sm" icon="external" onClick={() => open("appStore")}>
+              {t("desktop.iphone.updateXcode")}
+            </Button>
+          </Act>
         ) : (
           <Act text={t("desktop.iphone.xcodeText")}>
             <Button size="sm" icon="external" onClick={() => open("appStore")}>
@@ -210,7 +222,7 @@ export function IphoneSetup({ onClose }: { onClose: () => void }) {
         ) : reason === "locked" ? (
           t("desktop.iphone.unlockText")
         ) : tooOld && phone ? (
-          t("devices.iphone.tooOld", { name: phoneName, version: phone.osVersion })
+          t("devices.iphone.tooOld", { name: phoneName, version: tooOldVersion(t, phone.osVersion) })
         ) : looking && !plugged && !stalled ? (
           <Act text={t("devices.iphone.connectedText", { mac: macName })}>
             <Button size="sm" onClick={() => setPlugged(true)}>

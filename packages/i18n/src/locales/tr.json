@@ -13671,6 +13671,7 @@
       "xcodeOldAny": "{{name}} iOS {{version}} kullanıyor, bu {{mac}} üzerindeki Xcode'un bildiğinden yeni. Xcode {{major}} yükleyin, ardından bunu Terminal'de çalıştırın.",
       "uiRefusedText": "iPhone, test yardımcısının dokunuşlarını reddetti. Kilidini açın ve isterse parolasını girin. Tekrar olursa Ayarlar › Geliştirici › UI Otomasyonunu Etkinleştir seçeneğini kapatıp açın.",
       "tooOld": "{{name}} iOS {{version}} kullanıyor ve ajanlar iOS 17 veya daha yenisini gerektirir. Mümkünse güncelleyin ya da daha yeni bir iPhone takın.",
+      "tooOldVersion": "16 veya daha eski",
       "pluggedIn": "Taktım",
       "stall": {
         "xcode": "Zaten yüklü mü? {{mac}} kullanabilsin diye Xcode'u bir kez açıp koşullarını kabul edin.",

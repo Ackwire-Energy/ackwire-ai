@@ -33411,6 +33411,9 @@
   "devices.iphone.tooOld": {
     "value": "{{name}} runs iOS {{version}}, and agents need iOS 17 or newer. Update it if it can, or plug in a newer iPhone."
   },
+  "devices.iphone.tooOldVersion": {
+    "value": "16 or older"
+  },
   "devices.iphone.pluggedIn": {
     "value": "It's plugged in"
   },

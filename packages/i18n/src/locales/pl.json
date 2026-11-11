@@ -14657,6 +14657,7 @@
       "xcodeOldAny": "{{name}} ma iOS {{version}}, nowszy niż zna Xcode na {{mac}}. Zainstaluj Xcode {{major}}, a potem uruchom to w Terminalu.",
       "uiRefusedText": "iPhone odrzucił stuknięcia pomocnika testowego. Odblokuj go i wpisz jego kod, jeśli poprosi. Jeśli to się powtarza, wyłącz i włącz Ustawienia › Deweloper › Włącz automatyzację UI.",
       "tooOld": "{{name}} ma iOS {{version}}, a agenci potrzebują iOS 17 lub nowszego. Zaktualizuj go, jeśli się da, albo podłącz nowszego iPhone'a.",
+      "tooOldVersion": "16 lub starszy",
       "pluggedIn": "Jest podłączony",
       "stall": {
         "xcode": "Już zainstalowany? Otwórz raz Xcode i zaakceptuj jego warunki, wtedy będzie działać na {{mac}}.",

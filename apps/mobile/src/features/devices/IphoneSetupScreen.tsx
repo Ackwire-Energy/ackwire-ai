@@ -1,6 +1,6 @@
 import type { ComputerDevice, PhoneDevice } from "@agenteschat/client";
 import { computerName } from "@agenteschat/client/lib/computer";
-import { iosMajor, useStalled } from "@agenteschat/client/lib/devices";
+import { iosMajor, tooOldVersion, useStalled } from "@agenteschat/client/lib/devices";
 import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import * as Device from "expo-device";
 import { Fragment, useState } from "react";
@@ -59,7 +59,7 @@ export function IphoneSetupScreen({ machineId }: { machineId?: string }) {
       ? t("mobile.devices.iphone.teamMissing")
       : r === "ui_not_authorized"
         ? t("mobile.devices.iphone.uiRefused")
-        : r === "xcode_too_old" && phone
+        : r === "xcode_too_old" && phone?.osVersion
           ? t("mobile.devices.iphone.xcodeOld", {
               version: phone.osVersion,
               major: iosMajor(phone.osVersion),
@@ -115,7 +115,7 @@ export function IphoneSetupScreen({ machineId }: { machineId?: string }) {
       ) : null}
       {host && tooOld && phone ? (
         <View style={styles.block}>
-          <Note icon="x">{t("mobile.devices.iphone.tooOld", { version: phone.osVersion })}</Note>
+          <Note icon="x">{t("mobile.devices.iphone.tooOld", { version: tooOldVersion(t, phone.osVersion) })}</Note>
         </View>
       ) : null}
       {host && !tooOld ? (

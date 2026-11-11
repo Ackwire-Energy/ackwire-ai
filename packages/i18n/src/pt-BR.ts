@@ -13732,6 +13732,7 @@ export const ptBR = {
         "O iPhone recusou os toques do assistente de testes. Desbloqueie e digite o código se ele pedir. Se continuar, desligue e ligue Ajustes\u00a0›\u00a0Desenvolvedor\u00a0›\u00a0Ativar Automação de UI.",
       tooOld:
         "{{name}} usa o iOS {{version}}, e os agentes precisam do iOS 17 ou mais novo. Atualize se ele aceitar, ou conecte um iPhone mais novo.",
+      tooOldVersion: "16 ou anterior",
       pluggedIn: "Já está conectado",
       stall: {
         xcode: "Já instalou? Abra o Xcode uma vez e aceite os termos, para {{mac}} poder usar.",

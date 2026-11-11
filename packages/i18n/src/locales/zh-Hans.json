@@ -13305,6 +13305,7 @@
       "xcodeOldAny": "{{name}} 运行 iOS {{version}}，比 {{mac}} 上的 Xcode 支持的版本更新。安装 Xcode {{major}}，然后在终端中运行下面的命令。",
       "uiRefusedText": "iPhone 拒绝了测试助手的点按。请解锁它，如有要求就输入密码。如果反复出现，把 设置 › 开发者 › 启用 UI 自动化 关闭再打开。",
       "tooOld": "{{name}} 运行 iOS {{version}}，而智能体需要 iOS 17 或更新版本。能更新就更新，或者连接一台更新的 iPhone。",
+      "tooOldVersion": "16 或更早版本",
       "pluggedIn": "已经插好了",
       "stall": {
         "xcode": "已经装好了？打开一次 Xcode 并同意它的条款，{{mac}} 才能使用它。",

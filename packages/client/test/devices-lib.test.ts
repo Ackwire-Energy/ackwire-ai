@@ -263,6 +263,10 @@ describe("connecting a phone", () => {
     expect(statusDetail(t, "en-US", old.status, { ios: iosOf(old) })).toBe(
       "It runs iOS 16.7.10, agents need iOS 17 or newer",
     );
+    // devicectl names no version for some iPhones below iOS 17.
+    expect(statusDetail(t, "en-US", old.status, { ios: "" })).toBe(
+      "It runs iOS 16 or older, agents need iOS 17 or newer",
+    );
     // An Android phone keeps the general line.
     expect(iosOf(phone({ osVersion: "9" }))).toBeNull();
     expect(statusDetail(t, "en-US", old.status)).toBe("This system is too old for the tools");

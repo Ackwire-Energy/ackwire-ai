@@ -13235,6 +13235,7 @@
       "xcodeOldAny": "{{name}}은(는) {{mac}}의 Xcode가 아는 것보다 새로운 iOS {{version}}을(를) 써요. Xcode {{major}}을(를) 설치한 다음 터미널에서 이것을 실행하세요.",
       "uiRefusedText": "iPhone이 테스트 도우미의 탭을 거부했어요. 잠금을 해제하고 요청하면 암호를 입력하세요. 계속 그러면 설정 › 개발자 › UI 자동화 활성화를 껐다가 다시 켜세요.",
       "tooOld": "{{name}}은(는) iOS {{version}}을(를) 쓰는데 에이전트에는 iOS 17 이상이 필요해요. 가능하면 업데이트하거나 더 새로운 iPhone을 연결하세요.",
+      "tooOldVersion": "16 이하",
       "pluggedIn": "연결했어요",
       "stall": {
         "xcode": "이미 설치했나요? Xcode를 한 번 열고 약관에 동의하면 {{mac}}에서 쓸 수 있어요.",

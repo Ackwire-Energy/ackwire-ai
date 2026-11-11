@@ -13694,6 +13694,8 @@ export const en = {
       /** An iPhone below iOS 17: the guide ends here. */
       tooOld:
         "{{name}} runs iOS {{version}}, and agents need iOS 17 or newer. Update it if it can, or plug in a newer iPhone.",
+      /** The version in the "too old" lines when the iPhone doesn't say which iOS it runs (always one below 17). */
+      tooOldVersion: "16 or older",
       /** A button on "iPhone connected": the person says it's plugged in, and the guide says what to check. */
       pluggedIn: "It's plugged in",
       /** Under a step that sat unchanged for a while: what most likely holds it, and one way out. */
