@@ -2537,6 +2537,20 @@ export const en = {
       other: "Or connect another",
       manageKeys: "Manage or delete keys",
     },
+    /** Connect opened from an agent's conversation (ADR 0160, addendum): what is already connected, to pick from. */
+    chat: {
+      mine: "Yours",
+      yours: "Yours",
+      keys: "Workspace key",
+      best: "Most room right now",
+      atLimit: "At their limit",
+      seeAll: "See all {{count}} accounts",
+      allTitle: "All accounts",
+      search: "Search an account or a person",
+      none: "No account by that name.",
+      other: "Connect another AI",
+      told: "{{name}} gets an email about it.",
+    },
     /** The Cloud's workspace on a billing hold, where a plan would sign in. */
     billing: "A plan signs in on the workspace's computer, and the computer comes with an active agentes.chat plan.",
     /** After `billing`, on the phone, where paying isn't offered. */

@@ -1324,7 +1324,8 @@ function PlanSteps({
           {...(plain && actionsAt ? { actionsAt } : {})}
         />
       )}
-      {(steps || ownable) && foot}
+      {/* Under the conversation's Connect who the agents answer is said once they think, not at every step. */}
+      {(steps || ownable) && !plain && foot}
     </>
   );
 }

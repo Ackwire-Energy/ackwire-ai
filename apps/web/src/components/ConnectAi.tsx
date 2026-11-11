@@ -397,6 +397,8 @@ function ConnectAiDialog({
   // What the person already has: the row picked (the best one until they pick), or the choices of a new one instead.
   const [haveSel, setHaveSel] = useState<string>();
   const [adding, setAdding] = useState(false);
+  // Many accounts: the list of every one, under its search.
+  const [allOpen, setAllOpen] = useState(false);
   // Where a plan's panel puts its own two actions (an account to use, another sign-in): the dialog's footer.
   const [footAt, setFootAt] = useState<HTMLElement | null>(null);
   const day = useDawn((stage || band) && connected);
@@ -605,15 +607,20 @@ function ConnectAiDialog({
       setPickedTarget(asked.id);
       setChosen(true);
     };
+    const listing = picking && allOpen;
     const title = chosen
       ? stepTitle(t, choice)
-      : wide
-        ? t("arrival.connect.title")
-        : t("connectAi.titleFor", agentGrammar(asked.name));
+      : listing
+        ? t("connectAi.chat.allTitle")
+        : adding && rows.length > 0
+          ? t("connectAi.chat.other")
+          : wide
+            ? t("arrival.connect.title")
+            : t("connectAi.titleFor", agentGrammar(asked.name));
     const mark = chosen ? choice : account ? planOfAccount(account) : selected?.kind === "key" ? "key" : undefined;
     // Someone else's plan: its owner hears of it and may take it back.
     const lends = account !== undefined && !account.mine && account.ownerId !== asked.ownerUserId;
-    const back = stepping || (adding && rows.length > 0 && !chosen && !used);
+    const back = stepping || listing || (adding && rows.length > 0 && !chosen && !used);
     return (
       <Dialog
         open
@@ -676,7 +683,8 @@ function ConnectAiDialog({
                   setChosen(false);
                   setLogin(null);
                   setUse(undefined);
-                } else setAdding(false);
+                } else if (listing) setAllOpen(false);
+                else setAdding(false);
               }}
             />
           )}
@@ -697,6 +705,7 @@ function ConnectAiDialog({
           ) : (
             <div className="arrival-main__pick">
               {several &&
+                !listing &&
                 (() => {
                   // Whom it is for, as two cards with their faces: everyone who can't think, or this agent alone. The
                   // sky above follows the pick.
@@ -751,18 +760,22 @@ function ConnectAiDialog({
                     value={selected ? haveId(selected) : undefined}
                     onChange={setHaveSel}
                     dims={dims}
+                    all={listing}
+                    onAll={() => setAllOpen(true)}
                     disabled={have.busy}
                   />
                   {have.refused && <KeyRefused refusal={have.refused} />}
-                  <button type="button" className="ac-option arrival-have__other" onClick={() => setAdding(true)}>
-                    <span className="arrival-opts__tile" aria-hidden="true">
-                      <Icon name="plus" />
-                    </span>
-                    <span className="ac-option__text">
-                      <span className="ac-option__title">{t("connectAi.have.other")}</span>
-                    </span>
-                    <Icon name="chevronRight" className="arrival-opts__end" />
-                  </button>
+                  {!listing && (
+                    <button
+                      type="button"
+                      className="arrival-have__link arrival-have__link--other"
+                      onClick={() => setAdding(true)}
+                    >
+                      <Icon name="plus" size={16} />
+                      <span>{t("connectAi.chat.other")}</span>
+                      <Icon name="chevronRight" size={16} />
+                    </button>
+                  )}
                 </>
               ) : (
                 <ConnectChoices mayAddKey={mayAddKey} dims={dims} onPick={(next) => pick(next)} />
@@ -784,7 +797,7 @@ function ConnectAiDialog({
               lends ? (
                 <span className="ac-iconline">
                   <Icon name="mail" />
-                  <span>{t("agentPage.work.brain.accountOthers")}</span>
+                  <span>{t("connectAi.chat.told", { name: account?.ownerName?.split(" ")[0] ?? "" })}</span>
                 </span>
               ) : undefined
             }
