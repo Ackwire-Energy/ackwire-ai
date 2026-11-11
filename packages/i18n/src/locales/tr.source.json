@@ -1781,6 +1781,12 @@
   "onboarding.flow.lodi.planThen": {
     "value": "Once the plan is on, the next screen is where you connect your AI."
   },
+  "onboarding.flow.lodi.area": {
+    "value": "One last thing before the team."
+  },
+  "onboarding.flow.lodi.areaPersonal": {
+    "value": "One last thing before your agents."
+  },
   "onboarding.flow.lodi.ask": {
     "value": "Already have a team somewhere else? I'll bring all of it here."
   },
@@ -1825,6 +1831,36 @@
   },
   "onboarding.flow.lodi.peopleLink": {
     "value": "Now the people. Send them the link and I'll show you each request."
+  },
+  "onboarding.flow.area.title": {
+    "value": "And you, what do you work on?"
+  },
+  "onboarding.flow.area.lead": {
+    "value": "Just so we know who uses agentes.chat."
+  },
+  "onboarding.flow.area.skip": {
+    "value": "Skip this step"
+  },
+  "onboarding.flow.area.options.dev": {
+    "value": "Development"
+  },
+  "onboarding.flow.area.options.marketing": {
+    "value": "Marketing"
+  },
+  "onboarding.flow.area.options.sales": {
+    "value": "Sales"
+  },
+  "onboarding.flow.area.options.finance": {
+    "value": "Finance"
+  },
+  "onboarding.flow.area.options.ops": {
+    "value": "Operations"
+  },
+  "onboarding.flow.area.options.support": {
+    "value": "Customer support"
+  },
+  "onboarding.flow.area.options.other": {
+    "value": "Something else"
   },
   "onboarding.flow.preview.label": {
     "value": "Your workspace, as you answer"
@@ -2133,7 +2169,7 @@
     "value": "Agents that look after your day."
   },
   "onboarding.purpose.team": {
-    "value": "For my company or team"
+    "value": "For my team"
   },
   "onboarding.purpose.teamText": {
     "value": "People and agents work together, with channels, roles and approvals."
@@ -2143,6 +2179,39 @@
   },
   "onboarding.purpose.teamExamples": {
     "value": "Customer support · Finance · Reports"
+  },
+  "onboarding.purpose.personalLine": {
+    "value": "Agents that look after your day."
+  },
+  "onboarding.purpose.teamLine": {
+    "value": "People and agents in one place."
+  },
+  "onboarding.purpose.activities.agenda": {
+    "value": "Daily agenda"
+  },
+  "onboarding.purpose.activities.home": {
+    "value": "Home"
+  },
+  "onboarding.purpose.activities.bills": {
+    "value": "Bills"
+  },
+  "onboarding.purpose.activities.studies": {
+    "value": "Studies"
+  },
+  "onboarding.purpose.activities.travel": {
+    "value": "Trips"
+  },
+  "onboarding.purpose.activities.support": {
+    "value": "Support"
+  },
+  "onboarding.purpose.activities.finance": {
+    "value": "Finance"
+  },
+  "onboarding.purpose.activities.reports": {
+    "value": "Reports"
+  },
+  "onboarding.purpose.activities.sales": {
+    "value": "Sales"
   },
   "onboarding.personal.name": {
     "value": "Personal"
@@ -32664,6 +32733,12 @@
   "devices.reason.apple_account_missing": {
     "value": "Xcode isn't signed in to an Apple Account"
   },
+  "devices.reason.apple_team_missing": {
+    "value": "Xcode shows no team yet"
+  },
+  "devices.reason.ui_not_authorized": {
+    "value": "The iPhone refused the test helper's taps"
+  },
   "devices.reason.team_limit": {
     "value": "The free Apple Account reached its app limit"
   },
@@ -32684,6 +32759,9 @@
   },
   "devices.reason.other": {
     "value": "It needs something on the device"
+  },
+  "devices.reason.iosTooOld": {
+    "value": "It runs iOS {{version}}, agents need iOS 17 or newer"
   },
   "devices.fix.locked": {
     "value": "Unlock it"
@@ -32717,6 +32795,12 @@
   },
   "devices.fix.apple_account_missing": {
     "value": "Sign in to Xcode"
+  },
+  "devices.fix.apple_team_missing": {
+    "value": "Run an app on the iPhone from Xcode once"
+  },
+  "devices.fix.ui_not_authorized": {
+    "value": "Unlock the iPhone"
   },
   "devices.fix.team_limit": {
     "value": "Remove an app you built"
@@ -33313,7 +33397,10 @@
     "value": "Added"
   },
   "devices.iphone.accountText": {
-    "value": "Add a free or paid one in Xcode on {{mac}}: Settings › Accounts."
+    "value": "Add a free or paid one in Xcode on {{mac}}: Settings › Apple Accounts."
+  },
+  "devices.iphone.teamMissingText": {
+    "value": "Xcode is signed in but shows no team yet. In Xcode, make any iOS app, pick your team under Signing & Capabilities and run it on the iPhone once."
   },
   "devices.iphone.connectedDone": {
     "value": "{{name}} · iOS {{version}}"
@@ -33344,6 +33431,48 @@
   },
   "devices.iphone.teamLimitText": {
     "value": "Remove an app you built yourself from the iPhone: a free Apple Account allows 3."
+  },
+  "devices.iphone.xcodeOld": {
+    "value": "{{name}} runs iOS {{version}} and Xcode on {{mac}} knows iOS {{sdk}} at most. Install Xcode {{major}}, then run this in Terminal."
+  },
+  "devices.iphone.xcodeOldAny": {
+    "value": "{{name}} runs iOS {{version}}, newer than Xcode on {{mac}} knows. Install Xcode {{major}}, then run this in Terminal."
+  },
+  "devices.iphone.uiRefusedText": {
+    "value": "The iPhone refused the test helper's taps. Unlock it and enter its passcode if it asks. If it keeps happening, turn Settings › Developer › Enable UI Automation off and on."
+  },
+  "devices.iphone.tooOld": {
+    "value": "{{name}} runs iOS {{version}}, and agents need iOS 17 or newer. Update it if it can, or plug in a newer iPhone."
+  },
+  "devices.iphone.tooOldVersion": {
+    "value": "16 or older"
+  },
+  "devices.iphone.pluggedIn": {
+    "value": "It's plugged in"
+  },
+  "devices.iphone.stall.xcode": {
+    "value": "Installed already? Open Xcode once and agree to its terms, so {{mac}} can use it."
+  },
+  "devices.iphone.stall.tools": {
+    "value": "The download needs {{mac}} awake and online, about 8 GB. If it stopped, get iOS in Xcode › Settings › Components."
+  },
+  "devices.iphone.stall.account": {
+    "value": "Signed in already? In Xcode, make any iOS app, pick your team under Signing & Capabilities and run it on the iPhone once."
+  },
+  "devices.iphone.stall.connected": {
+    "value": "{{mac}} doesn't see an iPhone yet. Use a cable that carries data, not only power, unlock the iPhone and tap Trust if it asks."
+  },
+  "devices.iphone.stall.trust": {
+    "value": "No Trust prompt? Unplug the iPhone, unlock it and plug it in again, then tap Trust and enter its passcode."
+  },
+  "devices.iphone.stall.developerMode": {
+    "value": "Developer Mode turns on only after the iPhone restarts. Tap Restart, then Turn On once it's back. No switch there? Unplug the iPhone and plug it in again."
+  },
+  "devices.iphone.stall.uiAutomation": {
+    "value": "The switch shows once Developer Mode is on and the iPhone restarted. Keep it unlocked while you look."
+  },
+  "devices.iphone.stall.helper": {
+    "value": "{{mac}} builds the test helper and starts it on the iPhone, which takes a few minutes the first time. Keep the iPhone unlocked and plugged in."
   },
   "devices.iphone.ready": {
     "value": "{{name}} is ready for agents."

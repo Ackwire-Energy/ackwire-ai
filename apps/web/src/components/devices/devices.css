@@ -1144,3 +1144,8 @@ html:not([data-pointer]) .dv-screen:focus-visible {
     --dv-screen-h: min(60vh, 35rem);
   }
 }
+/* What most likely holds a step that sat unchanged, and the one way out. */
+.dv-step__stall {
+  margin: 0;
+  color: var(--ink2);
+}

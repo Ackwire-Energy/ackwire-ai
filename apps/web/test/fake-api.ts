@@ -1293,9 +1293,11 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       unread: d.unread ?? 0,
     };
   };
-  // A person who picked Portuguese, as the screens' tests read it (`useServerLocale` keeps the app in it).
+  // A person who picked Portuguese, as the screens' tests read it (`useServerLocale` keeps the app in it), and who said
+  // their own area already (the onboarding asks it once per account): a test of that screen sets `workArea: null`.
   const meNow = () =>
-    state.me && withPermissions({ ...state.me, user: { locale: "pt-BR", localeAuto: false, ...state.me.user } });
+    state.me &&
+    withPermissions({ ...state.me, user: { locale: "pt-BR", localeAuto: false, workArea: "dev", ...state.me.user } });
   /** What finishing a workspace's onboarding answers, as the server does: where it opens, and `/me` now. */
   const opened = () => ({
     rightHandId: state.agents.find((a) => a.builtin === "right_hand")?.id ?? null,
@@ -1455,6 +1457,10 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       me: async () => meNow(),
       updateMe: async (input) => {
         log("account.updateMe", input);
+      },
+      setWorkArea: async (area) => {
+        log("account.setWorkArea", area);
+        if (state.me) state.me.user.workArea = area;
       },
       addPassword: async (password) => {
         log("account.addPassword", { password });

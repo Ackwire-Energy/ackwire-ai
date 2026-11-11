@@ -718,6 +718,8 @@
         "teamMadePersonal": "Deine Agenten sind schon da. Wir machen weiter, wann immer du bereit bist.",
         "plan": "Nach dem Tarif fehlt nur noch eine KI. Ich zeige dir, wo.",
         "planThen": "Sobald der Tarif läuft, verbindest du auf dem nächsten Bildschirm deine KI.",
+        "area": "Noch eine letzte Frage vor dem Team.",
+        "areaPersonal": "Noch eine letzte Frage vor deinen Agenten.",
         "ask": "Du hast schon ein Team woanders? Ich hole es komplett hierher.",
         "start": "Ich habe ein Team, das zu dem passt, was ihr macht. Oder wir fangen zu zweit an.",
         "askPersonal": "Du nutzt schon Agenten woanders? Ich hole sie alle hierher.",
@@ -733,6 +735,20 @@
         "connectedThen": "Jetzt passt es. Es fehlen nur noch die Leute, mit denen du arbeitest.",
         "people": "Jetzt die Leute. Gib mir ihre E-Mail-Adressen, und ich schicke die Einladungen.",
         "peopleLink": "Jetzt die Leute. Schick ihnen den Link, und ich zeige dir jede Anfrage."
+      },
+      "area": {
+        "title": "Und du, woran arbeitest du?",
+        "lead": "Nur damit wir wissen, wer agentes.chat nutzt.",
+        "skip": "Diesen Schritt überspringen",
+        "options": {
+          "dev": "Entwicklung",
+          "marketing": "Marketing",
+          "sales": "Vertrieb",
+          "finance": "Finanzen",
+          "ops": "Betrieb",
+          "support": "Kundenservice",
+          "other": "Etwas anderes"
+        }
       },
       "preview": {
         "label": "Dein Workspace, während du antwortest",
@@ -860,10 +876,23 @@
       "lead": "Du kannst das später ändern, nichts geht verloren.",
       "personal": "Für mich",
       "personalText": "Agenten für deinen Kalender, deine Rechnungen, dein Training und alles, worum du sonst bittest.",
-      "team": "Für meine Firma oder mein Team",
+      "team": "Für mein Team",
       "teamText": "Personen und Agenten arbeiten zusammen, mit Kanälen, Rollen und Freigaben.",
       "personalExamples": "Dein Tag um 7 · Rechnungen · Training",
-      "teamExamples": "Kundensupport · Finanzen · Berichte"
+      "teamExamples": "Kundensupport · Finanzen · Berichte",
+      "personalLine": "Agenten, die sich um deinen Tag kümmern.",
+      "teamLine": "Menschen und Agenten an einem Ort.",
+      "activities": {
+        "agenda": "Tagesplan",
+        "home": "Zuhause",
+        "bills": "Rechnungen",
+        "studies": "Lernen",
+        "travel": "Reisen",
+        "support": "Kundenservice",
+        "finance": "Finanzen",
+        "reports": "Berichte",
+        "sales": "Vertrieb"
+      }
     },
     "personal": {
       "name": "Privat"
@@ -13447,13 +13476,16 @@
       "helper_missing": "Die Test-App ist noch nicht eingerichtet",
       "helper_expired": "Die Test-App muss erneuert werden",
       "apple_account_missing": "Xcode ist bei keinem Apple Account angemeldet",
+      "apple_team_missing": "Xcode zeigt noch kein Team",
+      "ui_not_authorized": "Das iPhone hat die Eingaben der Test-App abgelehnt",
       "team_limit": "Der kostenlose Apple Account hat sein App-Limit erreicht",
       "helper_untrusted": "Das iPhone vertraut der Test-App noch nicht",
       "booting": "Startet",
       "no_driver": "Windows hat keinen Treiber für dieses Handy",
       "os_too_old": "Dieses System ist zu alt für die Tools",
       "adb_offline": "Das Handy antwortet nicht",
-      "other": "Auf dem Gerät fehlt noch etwas"
+      "other": "Auf dem Gerät fehlt noch etwas",
+      "iosTooOld": "Es läuft mit iOS {{version}}, Agenten brauchen iOS 17 oder neuer"
     },
     "fix": {
       "locked": "Entsperre es",
@@ -13467,6 +13499,8 @@
       "helper_missing": "Öffne die App auf dem Mac",
       "helper_expired": "Öffne die App auf dem Mac",
       "apple_account_missing": "Melde dich in Xcode an",
+      "apple_team_missing": "Führe in Xcode einmal eine App auf dem iPhone aus",
+      "ui_not_authorized": "Entsperre das iPhone",
       "team_limit": "Entferne eine selbst erstellte App",
       "helper_untrusted": "Vertraue ihr auf dem iPhone",
       "booting": "Warte, bis es gestartet ist",
@@ -13699,7 +13733,8 @@
       "toolsDone": "Vom Mac geladen",
       "toolsText": "Der Mac lädt sie herunter, etwa 8 GB.",
       "accountDone": "Hinzugefügt",
-      "accountText": "Füge in Xcode auf {{mac}} einen hinzu, kostenlos oder bezahlt: Settings › Accounts.",
+      "accountText": "Füge in Xcode auf {{mac}} einen hinzu, kostenlos oder bezahlt: Settings › Apple Accounts.",
+      "teamMissingText": "Xcode ist angemeldet, zeigt aber noch kein Team. Erstelle in Xcode eine beliebige iOS-App, wähle unter Signing & Capabilities dein Team und führe sie einmal auf dem iPhone aus.",
       "connectedDone": "{{name}} · iOS {{version}}",
       "connectedText": "Schließ das iPhone mit einem Kabel an {{mac}} an.",
       "trustDone": "Vertraut",
@@ -13710,6 +13745,22 @@
       "helperText": "Wird vom Mac erstellt und alle 7 Tage erneuert. Ein kostenloser Apple Account in Xcode reicht.",
       "helperUntrustedText": "Tippe auf den Namen des Entwicklers und dann auf Vertrauen.",
       "teamLimitText": "Entferne eine selbst erstellte App vom iPhone: Ein kostenloser Apple Account erlaubt 3.",
+      "xcodeOld": "{{name}} läuft mit iOS {{version}}, Xcode auf {{mac}} kennt höchstens iOS {{sdk}}. Installiere Xcode {{major}} und führe dann das hier im Terminal aus.",
+      "xcodeOldAny": "{{name}} läuft mit iOS {{version}}, neuer als Xcode auf {{mac}} kennt. Installiere Xcode {{major}} und führe dann das hier im Terminal aus.",
+      "uiRefusedText": "Das iPhone hat die Eingaben der Test-App abgelehnt. Entsperre es und gib seinen Code ein, wenn es danach fragt. Passiert es wieder, schalte Einstellungen › Entwickler › UI-Automatisierung aktivieren aus und wieder ein.",
+      "tooOld": "{{name}} läuft mit iOS {{version}}, Agenten brauchen iOS 17 oder neuer. Aktualisiere es, wenn das geht, oder schließ ein neueres iPhone an.",
+      "tooOldVersion": "16 oder älter",
+      "pluggedIn": "Es ist angeschlossen",
+      "stall": {
+        "xcode": "Schon installiert? Öffne Xcode einmal und stimme den Bedingungen zu, damit {{mac}} es nutzen kann.",
+        "tools": "Der Download hat etwa 8 GB und braucht {{mac}} wach und online. Ist er stehen geblieben, lade iOS unter Xcode › Settings › Components.",
+        "account": "Schon angemeldet? Erstelle in Xcode eine beliebige iOS-App, wähle unter Signing & Capabilities dein Team und führe sie einmal auf dem iPhone aus.",
+        "connected": "{{mac}} sieht noch kein iPhone. Nimm ein Kabel, das Daten überträgt und nicht nur lädt, entsperre das iPhone und tippe auf Vertrauen, wenn es fragt.",
+        "trust": "Keine Vertrauen-Abfrage? Zieh das iPhone ab, entsperre es und schließ es wieder an, dann tippe auf Vertrauen und gib seinen Code ein.",
+        "developerMode": "Der Entwicklermodus geht erst nach einem Neustart des iPhones an. Tippe auf Neustart und danach auf Aktivieren. Kein Schalter da? Zieh das iPhone ab und schließ es wieder an.",
+        "uiAutomation": "Der Schalter erscheint, wenn der Entwicklermodus an ist und das iPhone neu gestartet hat. Lass es beim Suchen entsperrt.",
+        "helper": "{{mac}} erstellt die Test-App und startet sie auf dem iPhone, das dauert beim ersten Mal ein paar Minuten. Lass das iPhone entsperrt und angeschlossen."
+      },
       "ready": "{{name}} ist bereit für Agenten.",
       "path": {
         "settings": "Einstellungen",
