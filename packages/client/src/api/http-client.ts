@@ -1134,6 +1134,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
     },
     memory: {
       listAll: async (orgId) => (await request<{ memories: Memory[] }>(`${org(orgId)}/memories`)).memories,
+      listTeam: async (orgId) => (await request<{ memories: Memory[] }>(`${org(orgId)}/team-memories`)).memories,
+      makeTeam: (orgId, id) => request<Memory>(`${org(orgId)}/memories/${enc(id)}/team`, { json: {} }),
       list: async (orgId, agentId, filter) =>
         (
           await request<{ memories: Memory[] }>(`${org(orgId)}/agents/${enc(agentId)}/memories`, {
@@ -1146,6 +1148,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<Memory>(`${org(orgId)}/memories/${enc(id)}`, { method: "PATCH", json: { pinned } }),
       setArchived: (orgId, id, archived) =>
         request<Memory>(`${org(orgId)}/memories/${enc(id)}`, { method: "PATCH", json: { archived } }),
+      confirm: (orgId, id) =>
+        request<Memory>(`${org(orgId)}/memories/${enc(id)}`, { method: "PATCH", json: { confirmed: true } }),
       revert: async (orgId, id) => {
         await request<unknown>(`${org(orgId)}/memories/${enc(id)}/revert`, { json: {} });
       },

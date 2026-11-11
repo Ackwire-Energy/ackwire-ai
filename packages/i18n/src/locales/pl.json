@@ -2501,6 +2501,12 @@
       "action": "Utwórz rutynę",
       "done": "Rutyna utworzona"
     },
+    "howto": {
+      "title": "{{name}} nauczył się: {{what}}",
+      "line": "Użyte {{uses}}×. Zrobić z tego umiejętność?",
+      "action": "Zrób umiejętność",
+      "done": "Potwierdzono"
+    },
     "stalled": {
       "title": "Kroki stoją w #{{number}} {{title}}",
       "line_one": "Krok {{steps}} stoi od {{hours}} h i czeka na #{{on}}.",
@@ -2550,6 +2556,7 @@
   },
   "routing": {
     "title": "Kto wybiera agentów",
+    "reflectionOff": "Pamięć jeszcze nie uczy się z zakończonych rozmów: do tego potrzebny jest klucz dostawcy, powyżej.",
     "how": "Jak wybierani są agenci",
     "by": {
       "jev": "Jev wybiera, kto odpowie na każdą wiadomość bez wzmianki.",
@@ -5510,6 +5517,15 @@
       "andMore": "{{names}} i inne"
     }
   },
+  "teamMemory": {
+    "title": "Pamięć zespołu",
+    "help": "To, co ludzie poprosili wszystkich agentów zapamiętać, z tym, kto to powiedział i kiedy. Każdy agent czyta to w całej swojej pracy.",
+    "empty": "Na razie nic. Gdy ktoś poprosi wszystkich agentów, by coś zapamiętali, pojawi się to tutaj.",
+    "remove": "Usuń",
+    "removed": "Usunięto z pamięci zespołu",
+    "make": "Przenieś do zespołu",
+    "made": "Teraz pamiętają to wszyscy agenci"
+  },
   "memory": {
     "fromRefusal": "Nie proponować ponownie: {{text}}",
     "fromCorrection": "Ktoś poprawił: {{text}}",
@@ -5549,6 +5565,9 @@
     "unverifiedTitle": "Mówili to tylko agenci. Trafia do kontekstu jako oznaczona wskazówka.",
     "pinned": "Zawsze w kontekście",
     "lowTrust": "Źródło zewnętrzne, niezaufane",
+    "confirm": "Potwierdź",
+    "confirmTitle": "Potwierdź, że to prawda: agenci będą używać tego jako wiarygodnego.",
+    "confirmed": "Potwierdzono",
     "used_one": "użyte {{count}} raz",
     "used_few": "użyte {{count}} razy",
     "used_many": "użyte {{count}} razy",

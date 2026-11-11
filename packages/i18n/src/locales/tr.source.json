@@ -5681,6 +5681,18 @@
   "teamWeek.routine.done": {
     "value": "Routine created"
   },
+  "teamWeek.howto.title": {
+    "value": "{{name}} learned: {{what}}"
+  },
+  "teamWeek.howto.line": {
+    "value": "Used {{uses}}×. Make it a skill?"
+  },
+  "teamWeek.howto.action": {
+    "value": "Make it a skill"
+  },
+  "teamWeek.howto.done": {
+    "value": "Confirmed"
+  },
   "teamWeek.stalled.title": {
     "value": "Steps stopped in #{{number}} {{title}}"
   },
@@ -5785,6 +5797,9 @@
   },
   "routing.title": {
     "value": "Who picks the agents"
+  },
+  "routing.reflectionOff": {
+    "value": "Memory doesn't learn from finished conversations yet: that needs a provider key, added above."
   },
   "routing.how": {
     "value": "How agents are picked"
@@ -12596,6 +12611,27 @@
   "agentPage.saveBar.andMore": {
     "value": "{{names}} and more"
   },
+  "teamMemory.title": {
+    "value": "Team memory"
+  },
+  "teamMemory.help": {
+    "value": "What people asked every agent to keep, with who said it and when. Every agent reads it in all its work."
+  },
+  "teamMemory.empty": {
+    "value": "Nothing yet. When someone asks every agent to remember something, it shows here."
+  },
+  "teamMemory.remove": {
+    "value": "Remove"
+  },
+  "teamMemory.removed": {
+    "value": "Removed from team memory"
+  },
+  "teamMemory.make": {
+    "value": "Make it the team's"
+  },
+  "teamMemory.made": {
+    "value": "Every agent keeps it now"
+  },
   "memory.fromRefusal": {
     "value": "Not to propose again: {{text}}"
   },
@@ -12685,6 +12721,15 @@
   },
   "memory.lowTrust": {
     "value": "External source, not trusted"
+  },
+  "memory.confirm": {
+    "value": "Confirm"
+  },
+  "memory.confirmTitle": {
+    "value": "Say it's right: agents then use it as trusted."
+  },
+  "memory.confirmed": {
+    "value": "Confirmed"
   },
   "memory.used": {
     "value": {

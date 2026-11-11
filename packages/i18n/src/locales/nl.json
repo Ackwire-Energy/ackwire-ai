@@ -2319,6 +2319,12 @@
       "action": "Routine maken",
       "done": "Routine gemaakt"
     },
+    "howto": {
+      "title": "{{name}} leerde: {{what}}",
+      "line": "{{uses}}× gebruikt. Een skill van maken?",
+      "action": "Maak er een skill van",
+      "done": "Bevestigd"
+    },
     "stalled": {
       "title": "Stappen staan stil in #{{number}} {{title}}",
       "line_one": "Stap {{steps}} staat al {{hours}} u stil en wacht op #{{on}}.",
@@ -2364,6 +2370,7 @@
   },
   "routing": {
     "title": "Wie de agents kiest",
+    "reflectionOff": "Het geheugen leert nog niet van afgeronde gesprekken: daarvoor is een sleutel van een aanbieder nodig, hierboven.",
     "how": "Hoe agents worden gekozen",
     "by": {
       "jev": "Jev kiest wie elk bericht zonder vermelding beantwoordt.",
@@ -5177,6 +5184,15 @@
       "andMore": "{{names}} en meer"
     }
   },
+  "teamMemory": {
+    "title": "Teamgeheugen",
+    "help": "Wat mensen alle agents vroegen te onthouden, met wie het zei en wanneer. Elke agent leest het bij al zijn werk.",
+    "empty": "Nog niets. Als iemand alle agents vraagt iets te onthouden, verschijnt het hier.",
+    "remove": "Verwijderen",
+    "removed": "Uit het teamgeheugen verwijderd",
+    "make": "Naar het team",
+    "made": "Alle agents onthouden het nu"
+  },
   "memory": {
     "fromRefusal": "Niet opnieuw voorstellen: {{text}}",
     "fromCorrection": "Iemand heeft gecorrigeerd: {{text}}",
@@ -5217,6 +5233,9 @@
     "unverifiedTitle": "Alleen agents zeiden dit. Het gaat als gemarkeerde hint mee in de context.",
     "pinned": "Altijd in de context",
     "lowTrust": "Externe bron, niet vertrouwd",
+    "confirm": "Bevestigen",
+    "confirmTitle": "Zeg dat het klopt: agents gebruiken het dan als betrouwbaar.",
+    "confirmed": "Bevestigd",
     "used_zero": "nooit gebruikt",
     "used_one": "{{count}} keer gebruikt",
     "used_other": "{{count}} keer gebruikt",

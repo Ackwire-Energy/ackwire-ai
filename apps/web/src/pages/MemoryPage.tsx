@@ -260,6 +260,17 @@ function MemoryView({ agent, item }: { agent: Agent; item?: string }) {
               </span>
               {/* A row of ghosts: their words 16px apart, the last one on the item's padding line. */}
               <div className="ac-acts">
+                {(m.lowTrust || !m.verified) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    title={t("memory.confirmTitle")}
+                    disabled={action.isPending}
+                    onClick={() => action.mutate({ type: "confirm", id: m.id })}
+                  >
+                    {t("memory.confirm")}
+                  </Button>
+                )}
                 <Button variant="ghost" size="sm" onClick={() => setEditing(m)}>
                   {t("memory.edit")}
                 </Button>

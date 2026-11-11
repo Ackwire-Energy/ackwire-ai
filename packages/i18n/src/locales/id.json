@@ -2230,6 +2230,12 @@
       "action": "Buat rutinitas",
       "done": "Rutinitas dibuat"
     },
+    "howto": {
+      "title": "{{name}} belajar: {{what}}",
+      "line": "Dipakai {{uses}}×. Jadikan skill?",
+      "action": "Jadikan skill",
+      "done": "Dikonfirmasi"
+    },
     "stalled": {
       "title": "Langkah berhenti di #{{number}} {{title}}",
       "line_other": "Langkah {{steps}} sudah berhenti {{hours}} jam menunggu #{{on}}.",
@@ -2273,6 +2279,7 @@
   },
   "routing": {
     "title": "Siapa yang memilih agen",
+    "reflectionOff": "Memori belum belajar dari percakapan yang selesai: untuk itu perlu kunci penyedia, di atas.",
     "how": "Cara agen dipilih",
     "by": {
       "jev": "Jev memilih siapa yang menjawab tiap pesan tanpa sebutan.",
@@ -4960,6 +4967,15 @@
       "andMore": "{{names}} dan lainnya"
     }
   },
+  "teamMemory": {
+    "title": "Memori tim",
+    "help": "Apa yang orang minta agar diingat semua agen, dengan siapa yang mengatakannya dan kapan. Setiap agen membacanya dalam semua pekerjaannya.",
+    "empty": "Belum ada. Saat seseorang meminta semua agen mengingat sesuatu, itu muncul di sini.",
+    "remove": "Hapus",
+    "removed": "Dihapus dari memori tim",
+    "make": "Jadikan milik tim",
+    "made": "Sekarang semua agen menyimpannya"
+  },
   "memory": {
     "fromRefusal": "Jangan usulkan lagi: {{text}}",
     "fromCorrection": "Seseorang mengoreksi: {{text}}",
@@ -4999,6 +5015,9 @@
     "unverifiedTitle": "Hanya agen yang mengatakan ini. Masuk ke konteks sebagai petunjuk bertanda.",
     "pinned": "Selalu ada di konteks",
     "lowTrust": "Sumber eksternal, tidak tepercaya",
+    "confirm": "Konfirmasi",
+    "confirmTitle": "Nyatakan bahwa ini benar: agen lalu memakainya sebagai tepercaya.",
+    "confirmed": "Dikonfirmasi",
     "used_other": "dipakai {{count}} kali",
     "unusedFor": "tidak dipakai selama {{days}} hari",
     "supersedes": "Menggantikan:",

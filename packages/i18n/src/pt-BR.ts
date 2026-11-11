@@ -2360,6 +2360,12 @@ export const ptBR = {
       action: "Criar rotina",
       done: "Rotina criada",
     },
+    howto: {
+      title: "{{name}} aprendeu: {{what}}",
+      line: "Usado {{uses}}×. Virar skill?",
+      action: "Virar skill",
+      done: "Confirmado",
+    },
     stalled: {
       title: "Passos parados em #{{number}} {{title}}",
       line_one: "O passo {{steps}} está parado há {{hours}} h esperando o #{{on}}.",
@@ -2411,6 +2417,8 @@ export const ptBR = {
   },
   routing: {
     title: "Quem escolhe os agentes",
+    reflectionOff:
+      "A memória ainda não aprende com as conversas encerradas: para isso, adicione uma chave de provedor acima.",
     how: "Como os agentes são escolhidos",
     by: {
       jev: "O Jev escolhe quem responde cada mensagem sem menção.",
@@ -5308,6 +5316,15 @@ export const ptBR = {
       andMore: "{{names}} e mais",
     },
   },
+  teamMemory: {
+    title: "Memória do time",
+    help: "O que as pessoas pediram para todos os agentes guardarem, com quem disse e quando. Todo agente lê isso em todo o trabalho.",
+    empty: "Nada ainda. Quando alguém pedir para todos os agentes lembrarem de algo, aparece aqui.",
+    remove: "Remover",
+    removed: "Removida da memória do time",
+    make: "Tornar do time",
+    made: "Agora todos os agentes guardam isso",
+  },
   memory: {
     fromRefusal: "Não propor de novo: {{text}}",
     fromCorrection: "Uma pessoa corrigiu: {{text}}",
@@ -5333,6 +5350,9 @@ export const ptBR = {
     unverifiedTitle: "Só agentes afirmaram isso. Entra no contexto como dica marcada.",
     pinned: "Sempre no contexto",
     lowTrust: "Fonte externa, não confiável",
+    confirm: "Confirmar",
+    confirmTitle: "Diga que está certo: os agentes passam a usar como confiável.",
+    confirmed: "Confirmada",
     used_zero: "nunca usado",
     used_one: "usado {{count}} vez",
     used_other: "usado {{count}} vezes",

@@ -229,6 +229,11 @@ function hostsIn(text: string, anyTld = false): string[] {
   return out.map((h) => h.toLowerCase().replace(/\.$/, "")).filter(Boolean);
 }
 
+/** Whether `text` holds an email address or a phone number: someone's contact details. */
+export const hasContact = (text: string) =>
+  [...text.matchAll(EMAIL)].length > 0 ||
+  [...text.replace(EMAIL, " ").matchAll(PHONE)].some((m) => digits(m[0]).length >= 8);
+
 /**
  * The first address in `text` (a URL's host, a bare domain, an IP address, an email address, an @handle, a phone
  * number) that no person wrote in `words` (`personWords`), or null. Hosts and emails compare whole, without case; a
