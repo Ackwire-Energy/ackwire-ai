@@ -1,10 +1,9 @@
 import { type ManagedTask, useCatalog, useContinueTasks } from "@agenteschat/client";
 import {
   type TaskWaitGroup,
-  taskClock,
   taskProgram,
-  taskSince,
   taskState,
+  taskTime,
   taskWaitGroups,
   taskWaitGroupText,
 } from "@agenteschat/client/lib/task-manager";
@@ -70,7 +69,7 @@ export function useAgentColor(agentId: string): AgentColorName {
 }
 
 /**
- * "Trabalhando · 6:12", "Espera seu ok · 18:03" (amber: it waits on a person), "Parando…"; a wait wraps whole, with
+ * "Trabalhando · 6:12", "Espera seu ok · 18 min" (amber: it waits on a person), "Parando…"; a wait wraps whole, with
  * what comes next under it ("Volta sáb às 18:00", or when it should start in the computer's line).
  */
 export function StateLine({ task, state, now }: { task: ManagedTask; state: RowState; now: number }) {
@@ -87,7 +86,7 @@ export function StateLine({ task, state, now }: { task: ManagedTask; state: RowS
       </Text>
       {state === "stopping" ? null : (
         <Text variant="caption" tone="faint" style={styles.num}>
-          · {taskClock(now - taskSince(task))}
+          · {taskTime(t, task, now)}
         </Text>
       )}
     </View>

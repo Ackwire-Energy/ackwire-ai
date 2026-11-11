@@ -132,17 +132,29 @@ describe("rows with a face (#41)", () => {
     const screen = read("TaskManagerScreen.tsx");
     expect(screen).toContain("<AgentFace agentId={task.agentId} size={MEDIA_ROW.card.face} live={false} />");
     expect(screen).toMatch(/name=\{agent\}\s*meta=\{sub \|\| undefined\}\s*>/);
-    // The row opens the task (stopping lives on its screen): the title on one line, its state as words under it, and
-    // a chevron, never a stop button squeezing the title.
+    // The row opens the task (stopping lives on its screen): the title whole, never cut, its state as words under it,
+    // and a chevron, never a stop button squeezing the title.
     expect(screen).toMatch(
-      /\{title\}\s*<\/Text>\s*<StateLine task=\{task\} state=\{state\} now=\{now\} \/>\s*<\/MediaRow>/,
+      /<Text variant="body">\{title\}<\/Text>\s*<StateLine task=\{task\} state=\{state\} now=\{now\} \/>\s*<\/MediaRow>/,
     );
+    expect(screen).not.toMatch(/numberOfLines=\{\d\}[^>]*>\s*\{(title|line\.text)\}/);
     expect(screen).not.toContain("end={stop}");
-    expect(screen).not.toContain("numberOfLines={2}");
     expect(screen).toContain('<Icon name="right" size={15} color={c.faint} />');
     expect(screen).toContain(
       'flatTask: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, paddingHorizontal: 16 }',
     );
+  });
+
+  test("an agent's tasks stay folded under its row until it is tapped; the row says how long, as its tasks do", () => {
+    const screen = read("TaskManagerScreen.tsx");
+    expect(screen).toContain("useState<ReadonlySet<string>>(() => new Set())");
+    expect(screen).toContain("open={opened.has(g.agentId)}");
+    expect(screen).toContain("open={opened.has(`by:");
+    expect(screen).not.toContain("closed.has(");
+    expect(screen).toContain("taskTime(t, groupLead(group), now)");
+    // A task's time is its clock at work, how long it has waited otherwise: never "82:07:59".
+    expect(read("parts.tsx")).toContain("taskTime(t, task, now)");
+    expect(read("parts.tsx")).not.toContain("taskClock");
   });
 
   test("stopping several asks with the agent's face and the question on one line, what happens under them", () => {

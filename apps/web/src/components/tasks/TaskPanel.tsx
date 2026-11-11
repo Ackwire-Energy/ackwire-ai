@@ -6,11 +6,12 @@ import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
   delegationText,
   endedState,
-  taskClock,
   taskPlace,
   taskState,
+  taskTime,
   taskTitle,
 } from "@agenteschat/client/lib/task-manager";
+import { formatDuration } from "@agenteschat/client/lib/work";
 import { Button, Chip, GroupHeading, PixelStop } from "@agenteschat/ui";
 import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -24,7 +25,7 @@ import { TaskStepsBlock } from "@/components/ToolCalls";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useEscClose } from "@/hooks/useEscClose";
 import { inlineWords } from "@/lib/markdown";
-import { SayWhy, StopTaskButton, TaskStateChip, taskAge, UsingNow, useOpenTask } from "./TaskBits";
+import { SayWhy, StopTaskButton, TaskStateChip, UsingNow, useOpenTask } from "./TaskBits";
 import "@/components/threads/threads.css";
 
 /**
@@ -111,7 +112,7 @@ export function TaskPanel({
   const using = task ? <UsingNow task={task} /> : "—";
   const facts: [string, ReactNode][] = [
     [t("taskManager.columns.state"), state],
-    [t("taskManager.columns.time"), task ? taskClock(taskAge(task, now)) : took !== null ? taskClock(took) : "—"],
+    [t("taskManager.columns.time"), task ? taskTime(t, task, now) : took !== null ? formatDuration(t, took) : "—"],
     [t("taskManager.columns.using"), using],
     [t("taskManager.columns.computer"), last ? (last.machine?.name ?? t("taskManager.servers")) : "—"],
   ];
@@ -136,10 +137,12 @@ export function TaskPanel({
 
       <div className="thread-panel__page tm-panel__body">
         {working && (
-          <p className="tm-panel__now" aria-live="polite">
+          <p className="tm-panel__now ac-iconline" aria-live="polite">
             <AgentSpinner agentId={source.agentId} size={14} />
-            <b className="ac-tools__shimmer">{capitalize(activityVerb(t, doing), i18n.language)}…</b>
-            {task?.now?.detail && <small>{inlineWords(task.now.detail)}</small>}
+            <span>
+              <b className="ac-tools__shimmer">{capitalize(activityVerb(t, doing), i18n.language)}…</b>
+              {task?.now?.detail && <small> {inlineWords(task.now.detail)}</small>}
+            </span>
           </p>
         )}
         {end === "stopped" && (

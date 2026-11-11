@@ -281,12 +281,12 @@ export function ProgramLogo({ program }: { program: TaskProgram }) {
   return <span className="tm-logo">{logo(program.activity)}</span>;
 }
 
-/** "Usando agora": the logo, the program and what it does in it; a dash queued or in a computer's line. */
+/** "Usando agora": the logo, the program and what it does in it, whole; a dash queued or in a computer's line. */
 export function UsingNow({ task }: { task: ManagedTask }) {
   const text = useProgramText()(task);
   if (!text || linePlace(task)) return <span className="tm-use tm-use--none">—</span>;
   return (
-    <span className="tm-use">
+    <span className="tm-use ac-iconline">
       <ProgramLogo program={taskProgram(task)} />
       <span className="tm-use__text">
         <b>{text.name}</b>

@@ -6762,6 +6762,8 @@ export interface TaskWait {
   window: string | null;
   /** When the limit resets; null when unknown. */
   resetsAt: string | null;
+  /** When it began waiting on its plan or budget; null when unknown (absent on an older server). */
+  since?: string | null;
   /** You may press Continuar agora. */
   canContinue: boolean;
 }
