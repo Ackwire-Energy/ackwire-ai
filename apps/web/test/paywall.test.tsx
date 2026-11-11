@@ -259,7 +259,8 @@ test("a first task opens with the caret at its blank, in the box", async () => {
 describe("Lodi's DM on a hold", () => {
   const dm = `dm/agent/${LODI_ID}`;
   const lodi = (aiStatus: AiStatus = noAi(LODI_ID)) => {
-    const state = withRightHand(held(seedState({ aiStatus })), { setup: { role: null, done: [] } });
+    const state = held(seedState({ aiStatus, authConfig: { billingUrl: BILLING } }));
+    withRightHand(state, { setup: { role: null, done: [] } });
     state.agents = state.agents.filter((a) => a.id === LODI_ID);
     state.members = state.members.slice(0, 1);
     state.connections = [];
@@ -267,6 +268,9 @@ describe("Lodi's DM on a hold", () => {
   };
   const row = (text: string) =>
     [...document.querySelectorAll(".setup-row")].find((r) => r.textContent?.includes(text)) as HTMLElement;
+  const heads = () =>
+    [...document.querySelectorAll(".setup-row")].map((r) => r.querySelector(".ac-mediarow__head")?.textContent);
+  const count = () => document.querySelector(".setup-cl__head small")?.textContent;
 
   test("its lead says the plan up front, the checklist shows, and neither Connect nor the style card", async () => {
     await open(lodi(), dm);
@@ -284,20 +288,60 @@ describe("Lodi's DM on a hold", () => {
     expect(text).toContain("Crio os agentes, conecto os apps e convido as pessoas.");
   });
 
-  test("every row waits for the plan, whose one button is the banner's; no asks (ADR 0162)", async () => {
+  test("the plan leads with the card's one button, the AI row is next, the rest wait; no asks (ADR 0162)", async () => {
     await open(lodi(), dm);
-    for (const waits of ["Conecte uma IA.", "Conecte os apps do trabalho.", "Chame quem trabalha com você."]) {
+    expect(heads()).toEqual([
+      "Ligue o time.",
+      "Conecte uma IA.",
+      "Conecte os apps do trabalho.",
+      "Chame quem trabalha com você.",
+    ]);
+    expect(count()).toBe("0 de 4");
+    const plan = row("Ligue o time.");
+    expect(plan.textContent).toContain("Com um plano do agentes.chat, os agentes começam a trabalhar.");
+    expect(row("Conecte uma IA.").textContent).toContain("É o passo seguinte ao plano.");
+    for (const waits of ["Conecte os apps do trabalho.", "Chame quem trabalha com você."])
       expect(row(waits).textContent).toContain("Abre com o plano.");
-      expect(within(row(waits)).queryByRole("button")).toBeNull();
-    }
-    expect(document.querySelector(".setup-cl")?.querySelectorAll("button")).toHaveLength(0);
+    const buttons = [...(document.querySelector(".setup-cl")?.querySelectorAll("button") ?? [])];
+    expect(buttons.map((b) => b.textContent)).toEqual(["Ver planos"]);
+    expect(within(plan).getByRole("button", { name: "Ver planos" })).toBeTruthy();
     expect(document.body.textContent).not.toContain("Agora me peça algo:");
   });
 
   test("a saved key on a hold reads as ready, and still the AI row waits for the plan", async () => {
     await open(lodi({ any: true, agents: [{ agentId: LODI_ID, state: "ready" }] }), dm);
-    expect(row("Conecte uma IA.").textContent).toContain("Abre com o plano.");
-    expect(document.querySelector(".setup-cl__head small")?.textContent).toBe("0 de 3");
+    expect(row("Conecte uma IA.").textContent).toContain("É o passo seguinte ao plano.");
+    expect(count()).toBe("0 de 4");
+  });
+
+  test("with a team, the banner leaves Lodi's DM to the card's plan row and stays everywhere else", async () => {
+    const team = () =>
+      withRightHand(held(seedState({ authConfig: { billingUrl: BILLING } })), { setup: { role: null, done: [] } });
+    await open(team(), dm);
+    expect(within(row("Ligue o time.")).getByRole("button", { name: "Ver planos" })).toBeTruthy();
+    expect(document.querySelector(".hold-banner")).toBeNull();
+    cleanup();
+    sessionStorage.clear();
+    await open(team());
+    const banner = document.querySelector(".hold-banner") as HTMLElement;
+    expect(within(banner).getByRole("button", { name: PLANS })).toBeTruthy();
+  });
+
+  test("a personal workspace on a hold: the plan first in its own words, one of five", async () => {
+    const state = lodi();
+    const org = state.me?.organizations[0];
+    if (org) org.mode = "personal";
+    await open(state, dm);
+    expect(heads()).toEqual([
+      "Ligue os seus agentes.",
+      "Me conte um pouco sobre você.",
+      "Escolha os seus agentes.",
+      "Conecte uma IA.",
+      "Conecte os seus apps.",
+    ]);
+    expect(count()).toBe("0 de 5");
+    expect(within(row("Ligue os seus agentes.")).getByRole("button", { name: "Ver planos" })).toBeTruthy();
+    expect(row("Conecte uma IA.").textContent).toContain("É o passo seguinte ao plano.");
   });
 });
 

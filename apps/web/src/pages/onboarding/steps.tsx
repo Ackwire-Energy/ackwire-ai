@@ -3,6 +3,7 @@ import { keys, useApplyTeamTemplate, useRoutines, useTeamTemplates } from "@agen
 import type { PlanOffer } from "@agenteschat/client/lib/billing";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { firstJob } from "@agenteschat/client/lib/onboarding";
+import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import {
   aboutContext,
   aboutOf,
@@ -11,7 +12,7 @@ import {
   teamFailureText,
   templateFor,
 } from "@agenteschat/client/lib/team-plan";
-import { Button, Chip, Field, Icon, Locked, Select, Skeleton, Textarea } from "@agenteschat/ui";
+import { Button, Chip, Field, Icon, Locked, Select, Skeleton, Spinner, Textarea } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
@@ -120,30 +121,33 @@ export function BusinessStep({
 }
 
 /**
- * Step 3, "Seu time": the template for the workspace's business (another one from the select), made in one click with
- * no model call. Once the team exists, it shows who is in it. Bringing agents from another app instead opens the
- * workspace's import.
+ * Step 3, "Your team", once "Start with a ready-made team" answered how to start (`TeamStart`, ADR 0162 amended
+ * 2026-11-11): the template for the workspace's business (another one from the select), made in one click with no model
+ * call; its Back returns to how to start, where "Start from scratch" is the way on with no agents. Once the team exists,
+ * it shows who is in it. A personal workspace never gets a template here (ADR 0159): its card in the right hand's DM
+ * makes its agents later.
  */
 export function TeamStep({
   orgId,
   team,
+  waiting = false,
   template,
   reviewer,
   onContinue,
-  onImport,
-  leaving,
 }: {
   orgId: string;
   team: Agent[];
+  /** The team made, the page still reading where it goes next: the template stays, its button pending. */
+  waiting?: boolean;
   template: ReturnType<typeof useTemplate>;
   reviewer: string;
   onContinue: () => void;
-  onImport: () => void;
-  leaving: boolean;
 }) {
   const { t, i18n } = useTranslation();
-  // Pending until the team is in the agents' list, when the next step opens: a second press never makes a second team.
+  // Pending until the team is in the agents' list, then while the page places the next step: a second press never
+  // makes a second team.
   const use = useApplyTeamTemplate(orgId);
+  const pending = use.isPending || waiting;
   const [failed, setFailed] = useState<string | null>(null);
   const { chosen } = template;
   if (team.length > 0)
@@ -171,7 +175,7 @@ export function TeamStep({
     );
   return (
     <>
-      <Locked when={use.isPending || leaving}>
+      <Locked when={pending}>
         <div className="onb__answer">
           <Field label={t("teamPlan.templates.title")} id="onb-template">
             <Select
@@ -209,11 +213,6 @@ export function TeamStep({
               ))}
             </ul>
           )}
-          <p className="onb__help">
-            <button type="button" className="ac-link onb__link" onClick={onImport} disabled={leaving}>
-              {t("teamPlan.templates.import")}
-            </button>
-          </p>
         </div>
       </Locked>
       <div className="onb__actions">
@@ -227,8 +226,8 @@ export function TeamStep({
           block
           kbd={["↵"]}
           data-enter=""
-          disabled={!chosen || leaving}
-          loading={use.isPending}
+          disabled={!chosen}
+          loading={pending}
           onClick={() =>
             chosen &&
             use.mutate(
@@ -255,9 +254,11 @@ export function TeamStep({
 }
 
 /**
- * Step 4, "Ligue o time" (agentes.chat Cloud, a workspace waiting for its first plan): the team asleep until it, what
- * each one does (its first routine, else its role), the plan the billing service recommends with its price when it
- * says one, and the way in without it, where the hold's banner keeps the plan.
+ * Step 4, "Turn the team on" (agentes.chat Cloud, a workspace waiting for its first plan): the team asleep until it,
+ * what each one does (its first routine, else its role; the right hand, what it is to the person), the plan the
+ * billing service recommends with its price when it says one, what comes after it (`next`: connecting an AI, ADR
+ * 0162), and the way in without it, where the right hand's card keeps the plan. Back from paying (`confirming`), the
+ * payment said as received until the hold lifts.
  */
 export function PlanStep({
   orgId,
@@ -265,12 +266,18 @@ export function PlanStep({
   offer,
   skipping,
   onSkip,
+  next,
+  confirming,
+  personal,
 }: {
   orgId: string;
   team: Agent[];
   offer: PlanOffer | null;
   skipping: boolean;
   onSkip: () => void;
+  next: boolean;
+  confirming: boolean;
+  personal: boolean;
 }) {
   const { t } = useTranslation();
   const routines = useRoutines(orgId).data;
@@ -278,7 +285,10 @@ export function PlanStep({
   const allPlans = useOpenBilling(orgId, "onboarding");
   return (
     <>
-      <section className="onb__plan" aria-label={t("onboarding.flow.steps.plan")}>
+      <section
+        className="onb__plan"
+        aria-label={t(personal ? "onboarding.flow.steps.planPersonal" : "onboarding.flow.steps.plan")}
+      >
         {/* A picture of the list under it (each name, then what it does first): read once, from the list. */}
         <div className="onb__plan-faces" aria-hidden="true">
           <TeamAsleepSky />
@@ -288,17 +298,24 @@ export function PlanStep({
               <Chip className="sky-chip">{a.name}</Chip>
             </span>
           ))}
-          <Chip className="sky-chip onb__plan-zz">{t("onboarding.flow.plan.asleep")}</Chip>
+          <Chip className="sky-chip onb__plan-zz">
+            {t(personal ? "onboarding.flow.plan.asleepPersonal" : "onboarding.flow.plan.asleep")}
+          </Chip>
         </div>
         <ul className="onb__plan-week">
-          {team.map((a) => (
-            <li key={a.id} className="ac-iconline">
-              <Icon name="check" size={14} />
-              <span>
-                <b>{a.name}</b> · {firstJob(a, routines)}
-              </span>
-            </li>
-          ))}
+          {team.map((a) => {
+            // The right hand has no role of its own: it is said as what it is to the person. Nothing to say, no dot.
+            const job = firstJob(a, routines) || (isRightHand(a) ? t("rightHand.labelCapitalized") : "");
+            return (
+              <li key={a.id} className="ac-iconline">
+                <Icon name="check" size={14} />
+                <span>
+                  <b>{a.name}</b>
+                  {job && ` · ${job}`}
+                </span>
+              </li>
+            );
+          })}
         </ul>
         <div className="onb__plan-price">
           <span>
@@ -314,27 +331,39 @@ export function PlanStep({
           </span>
           <span className="muted">{t("onboarding.flow.plan.cancel")}</span>
         </div>
-        <div className="onb__plan-acts">
-          <Button variant="primary" loading={turnOn.isPending} disabled={skipping} onClick={() => turnOn.mutate()}>
-            {t("onboarding.flow.plan.cta")}
-          </Button>
-          {offer && (
-            <button
-              type="button"
-              className="ac-link"
-              disabled={allPlans.isPending || skipping}
-              onClick={() => allPlans.mutate()}
-            >
-              {t("onboarding.flow.plan.all")}
-            </button>
-          )}
-        </div>
+        {confirming ? (
+          // Back from paying: the billing service lifts the hold on its next pass, and the next step opens then. A line
+          // of the card in place of its buttons, never a box inside it.
+          <p className="onb__paid ac-iconline" role="status">
+            <Spinner size={14} />
+            <span>{t("standing.billing.paid")}</span>
+          </p>
+        ) : (
+          <div className="onb__plan-acts">
+            <Button variant="primary" loading={turnOn.isPending} disabled={skipping} onClick={() => turnOn.mutate()}>
+              {t(personal ? "onboarding.flow.plan.ctaPersonal" : "onboarding.flow.plan.cta")}
+            </Button>
+            {offer && (
+              <button
+                type="button"
+                className="ac-link"
+                disabled={allPlans.isPending || skipping}
+                onClick={() => allPlans.mutate()}
+              >
+                {t("onboarding.flow.plan.all")}
+              </button>
+            )}
+            {next && <span className="muted">{t("onboarding.flow.plan.next")}</span>}
+          </div>
+        )}
       </section>
-      <p className="onb__skip">
-        <button type="button" className="ac-link" disabled={skipping || turnOn.isPending} onClick={onSkip}>
-          {t("onboarding.flow.plan.skip")}
-        </button>
-      </p>
+      {!confirming && (
+        <p className="onb__skip">
+          <button type="button" className="ac-link" disabled={skipping || turnOn.isPending} onClick={onSkip}>
+            {t("onboarding.flow.plan.skip")}
+          </button>
+        </p>
+      )}
     </>
   );
 }

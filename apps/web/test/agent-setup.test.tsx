@@ -44,7 +44,7 @@ describe("the setup checklist in a new agent's DM", () => {
     expect(c?.textContent).toContain("Já tenho uma IA para pensar");
     expect(c?.textContent).toContain("2 de 3");
     // On top, its sky, awake (it can think).
-    expect(c?.querySelector(".nac-band[data-day]")).toBeTruthy();
+    expect(c?.querySelector(".nac-band[data-lit]")).toBeTruthy();
   });
 
   test("made from its card it says what it said there, in its own voice (ADR 0164)", async () => {

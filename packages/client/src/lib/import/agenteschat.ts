@@ -10,6 +10,8 @@ import {
   type LeftOutKind,
   list,
   obj,
+  sha256,
+  slug,
   str,
   type Trigger,
 } from "./shared";
@@ -48,6 +50,8 @@ const LEFT_OUT_KINDS = new Set<string>([
  * replies with.
  */
 export const EXPORT_PROMPT = `Please export everything I set up with you, so I can move it to agentes.chat (a workspace where people and AI agents work together).
+
+Export all of my agents in this one file, not only the one I'm talking to now: every agent, bot or assistant in my account or workspace, each with its own instructions, skills and scheduled tasks. List them all first and read each one's setup with the tools you have, then write the file.
 
 Write one JSON file named agentes-chat-export.json and give it to me to download. If you can't make files, reply with the JSON in a single \`\`\`json code block and nothing else.
 
@@ -90,7 +94,9 @@ Use exactly this shape:
 }
 
 Rules:
-- Include every agent, skill, scheduled task and group chat you have. If you are a single assistant, you are one agent.
+- "agents" has one entry for every agent I have, and the same goes for every skill, scheduled task and group chat. An export with only you in it is wrong when I have other agents. If you are a single assistant, you are one agent.
+- If you really can't read another agent's instructions from here, still list it with its name and role and "instructions": "". I will paste this request in that agent's own chat to fill it in.
+- Use each agent's name, in lowercase with hyphens, as its "key", so the same agent gets the same key every time I export.
 - Copy instructions, skills and routine prompts exactly. Do not summarize or shorten them.
 - A skill's "markdown" is its whole SKILL.md: the frontmatter with a lowercase, hyphenated name and a description, then the body.
 - A task that runs once uses "trigger": { "at": "<ISO 8601 date and time with its offset>" }. A task that starts on an event (an email, a message, a webhook) goes in "leftOut" with kind "routine".
@@ -110,16 +116,31 @@ export function parse(files: ImportFile[], d: Draft) {
   d.used.add(file.name);
   const source = obj(b.source);
   d.name = str(source.name) || str(source.app);
-  d.ref = [str(source.app), str(source.ref)].filter(Boolean).join(":");
+  const app = slug(str(source.app));
+  // Our export names the workspace. A reply's `ref` is a model's guess that changes from one export to the next, so
+  // every reply from one app is one package: asking again updates what came before, it never makes it twice.
+  const reply = app !== "agenteschat";
+  d.ref = reply ? app || str(source.ref) : `${app}:${str(source.ref)}`;
 
   const skills = new Map<string, string>();
   for (const s of list(b.skills).map(obj)) {
     const key = d.skill(str(s.markdown), str(s.key));
     if (key) skills.set(str(s.key), key);
   }
+  // A reply's keys are guesses too. An agent goes by its name, which stays when the model picks another key; a
+  // routine by its agent and name and a note by what it says, so two exports never collide.
+  const keys = new Map<string, string>();
+  const taken = new Set<string>();
   for (const a of list(b.agents).map(obj)) {
+    const given = str(a.key);
+    const named = slug(str(a.name)) || slug(str(a.handle)) || given;
+    const key = !reply ? given : taken.has(named) ? `${named}-${slug(given) || taken.size}` : named;
+    taken.add(key);
+    for (const ref of [given, str(a.handle).replace(/^@/, ""), str(a.name)]) {
+      if (ref && !keys.has(ref.toLowerCase())) keys.set(ref.toLowerCase(), key);
+    }
     d.agent({
-      key: str(a.key),
+      key,
       name: str(a.name),
       handle: str(a.handle),
       role: str(a.role),
@@ -132,6 +153,12 @@ export function parse(files: ImportFile[], d: Draft) {
       }),
     });
   }
+  // What names an agent may use its key, its handle or its name; with a single agent, any name means it.
+  const agentOf = (ref: unknown) => {
+    const wanted = str(ref).replace(/^@/, "");
+    const only = d.agents.length === 1 ? d.agents[0]?.key : undefined;
+    return keys.get(wanted.toLowerCase()) ?? (reply ? only : undefined) ?? wanted;
+  };
   for (const c of list(b.channels).map(obj)) {
     d.channel({
       key: str(c.key),
@@ -139,14 +166,15 @@ export function parse(files: ImportFile[], d: Draft) {
       topic: str(c.topic),
       agents: list(c.agents)
         .map(obj)
-        .map((m) => ({ key: str(m.key), autoReply: m.autoReply !== false })),
+        .map((m) => ({ key: agentOf(m.key), autoReply: m.autoReply !== false })),
     });
   }
   for (const r of list(b.routines).map(obj)) {
+    const agent = agentOf(r.agent);
     d.routine({
-      key: str(r.key),
+      key: reply && slug(str(r.name)) ? `${agent}/${slug(str(r.name))}` : str(r.key),
       name: str(r.name),
-      agent: str(r.agent),
+      agent,
       prompt: str(r.prompt),
       channel: str(r.channel) || null,
       trigger: trigger(obj(r.trigger)),
@@ -155,9 +183,10 @@ export function parse(files: ImportFile[], d: Draft) {
   for (const n of list(b.notes).map(obj)) {
     const kind = NOTE_KINDS.find((k) => k === n.kind) ?? "note";
     const title = str(n.title).trim();
+    const agent = str(n.agent) ? agentOf(n.agent) : null;
     d.note({
-      key: str(n.key),
-      agent: str(n.agent) || null,
+      key: reply ? `${agent ?? "workspace"}/${sha256(str(n.content)).slice(0, 16)}` : str(n.key),
+      agent,
       kind,
       ...(title ? { title } : {}),
       content: str(n.content),
@@ -165,7 +194,7 @@ export function parse(files: ImportFile[], d: Draft) {
   }
   for (const t of list(b.todo).map(obj)) {
     const kind = TODO_KINDS.find((k) => k === t.kind) ?? "app";
-    d.need(kind, str(t.label), list(t.agents).map(str), cleanUrl(str(t.url)) || undefined);
+    d.need(kind, str(t.label), list(t.agents).map(agentOf), cleanUrl(str(t.url)) || undefined);
   }
   for (const l of list(b.leftOut).map(obj)) {
     d.left(LEFT_OUT_KINDS.has(str(l.kind)) ? (str(l.kind) as LeftOutKind) : "other", str(l.label));

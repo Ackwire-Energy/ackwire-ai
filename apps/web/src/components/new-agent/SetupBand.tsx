@@ -110,7 +110,8 @@ export function SetupBand({
     <div
       className="nac-band"
       ref={host}
-      data-day={thinks || undefined}
+      // Not `data-day`: that marks the conversation's day dividers, which its floating date reads as a date.
+      data-lit={thinks || undefined}
       style={{ "--trail": thinks ? gradientOf(color)[1] : "#fff" } as CSSProperties}
       role="img"
       aria-label={thinks ? t("newAgentCard.band.label", agentGrammar(agent.name)) : t("newAgentCard.band.asleep")}
