@@ -1189,9 +1189,15 @@ export interface ApiClient {
     /** `about: "me"`: only what came from the viewer, each with `from` (the message). */
     list(orgId: string, agentId: string, filter?: { about?: "me" }): Promise<Memory[]>;
     listAll(orgId: string): Promise<Memory[]>;
+    /** Memória do time (ADR 0167): what people asked every agent to keep. */
+    listTeam(orgId: string): Promise<Memory[]>;
+    /** Tornar do time (ADR 0167): an agent's memory becomes the team's; its copies are archived. */
+    makeTeam(orgId: string, memoryId: string): Promise<Memory>;
     edit(orgId: string, memoryId: string, text: string): Promise<Memory>;
     setPinned(orgId: string, memoryId: string, pinned: boolean): Promise<Memory>;
     setArchived(orgId: string, memoryId: string, archived: boolean): Promise<Memory>;
+    /** Confirmar (ADR 0167): trusted and verified, by who may edit it or the person who said it. */
+    confirm(orgId: string, memoryId: string): Promise<Memory>;
     /** Undoes a change the agent made from the chat (`update.undo.path`). */
     revert(orgId: string, memoryId: string): Promise<void>;
   };

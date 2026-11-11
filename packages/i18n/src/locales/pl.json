@@ -2631,6 +2631,12 @@
       "action": "Utwórz rutynę",
       "done": "Rutyna utworzona"
     },
+    "howto": {
+      "title": "{{name}} nauczył się: {{what}}",
+      "line": "Użyte {{uses}}×. Zrobić z tego umiejętność?",
+      "action": "Zrób umiejętność",
+      "done": "Potwierdzono"
+    },
     "stalled": {
       "title": "Kroki stoją w #{{number}} {{title}}",
       "line_one": "Krok {{steps}} stoi od {{hours}} h i czeka na #{{on}}.",
@@ -2680,6 +2686,7 @@
   },
   "routing": {
     "title": "Kto wybiera agentów",
+    "reflectionOff": "Pamięć jeszcze nie uczy się z zakończonych rozmów: do tego potrzebny jest klucz dostawcy, powyżej.",
     "how": "Jak wybierani są agenci",
     "by": {
       "jev": "Jev wybiera, kto odpowie na każdą wiadomość bez wzmianki.",
@@ -5733,6 +5740,15 @@
       "andMore": "{{names}} i inne"
     }
   },
+  "teamMemory": {
+    "title": "Pamięć zespołu",
+    "help": "To, co ludzie poprosili wszystkich agentów zapamiętać, z tym, kto to powiedział i kiedy. Każdy agent czyta to w całej swojej pracy.",
+    "empty": "Na razie nic. Gdy ktoś poprosi wszystkich agentów, by coś zapamiętali, pojawi się to tutaj.",
+    "remove": "Usuń",
+    "removed": "Usunięto z pamięci zespołu",
+    "make": "Przenieś do zespołu",
+    "made": "Teraz pamiętają to wszyscy agenci"
+  },
   "memory": {
     "fromRefusal": "Nie proponować ponownie: {{text}}",
     "fromCorrection": "Ktoś poprawił: {{text}}",
@@ -5772,6 +5788,9 @@
     "unverifiedTitle": "Mówili to tylko agenci. Trafia do kontekstu jako oznaczona wskazówka.",
     "pinned": "Zawsze w kontekście",
     "lowTrust": "Źródło zewnętrzne, niezaufane",
+    "confirm": "Potwierdź",
+    "confirmTitle": "Potwierdź, że to prawda: agenci będą używać tego jako wiarygodnego.",
+    "confirmed": "Potwierdzono",
     "used_one": "użyte {{count}} raz",
     "used_few": "użyte {{count}} razy",
     "used_many": "użyte {{count}} razy",
@@ -8694,6 +8713,7 @@
       "machine_offline_resumes_other": "{{computer}} jest offline: {{count}} zadania działa tam dalej, jeśli zerwało się tylko połączenie, a jeśli komputer się zrestartował, wznowią się tam, gdzie przerwały.",
       "machine_task_resumed": "{{computer}} wrócił: „{{title}}” wznowiono tam, gdzie się zatrzymało",
       "machine_task_resume_waits": "{{computer}} wrócił: „{{title}}” wznowi się tam, gdzie się zatrzymało, gdy projekt będzie gotowy",
+      "machine_task_restarted": "{{computer}} wrócił: „{{title}}” uruchomiono od nowa",
       "machine_task_done": "„{{title}}” ukończono w {{span}} na {{computer}}",
       "machine_task_failed": "„{{title}}” nie powiodło się po {{span}} na {{computer}}",
       "machine_task_canceled": "„{{title}}” zatrzymano na {{computer}}",
@@ -12101,6 +12121,7 @@
       "support": "Wsparcie",
       "marketing": "Marketing",
       "automation": "Automatyzacja",
+      "social": "Media społecznościowe",
       "email": "E-mail"
     },
     "emptyCategory": "W tej kategorii nie ma jeszcze konektorów",
@@ -12452,6 +12473,41 @@
         "1": "Podgląd obciążeń i klientów",
         "2": "Tworzenie płatności Pix"
       },
+      "instagram": {
+        "1": "Podgląd postów, relacji i statystyk",
+        "2": "Publikowanie postów i czytanie wiadomości prywatnych",
+        "ask": "Odpowiadanie na wiadomości zawsze prosi o twoje zatwierdzenie"
+      },
+      "facebook": {
+        "1": "Podgląd postów, komentarzy i statystyk",
+        "2": "Publikowanie postów, zdjęć i filmów oraz odpowiadanie na komentarze",
+        "ask": "Usuwanie postów i komentarzy zawsze prosi o twoje zatwierdzenie"
+      },
+      "linkedin": {
+        "1": "Publikowanie postów, linków i filmów",
+        "2": "Komentowanie postów",
+        "ask": "Usuwanie postów zawsze prosi o twoje zatwierdzenie"
+      },
+      "youtube": {
+        "1": "Podgląd filmów, komentarzy i statystyk",
+        "2": "Edycja filmów i playlist oraz komentowanie",
+        "ask": "Odpowiadanie na komentarze, ich moderowanie i usuwanie zawsze prosi o twoje zatwierdzenie"
+      },
+      "pinterest": {
+        "1": "Podgląd pinów, tablic i statystyk",
+        "2": "Tworzenie pinów i porządkowanie tablic",
+        "ask": "Zmiana tablic i usuwanie zawsze prosi o twoje zatwierdzenie"
+      },
+      "reddit": {
+        "1": "Wyszukiwanie postów i czytanie komentarzy",
+        "2": "Publikowanie, komentowanie i edycja",
+        "ask": "Usuwanie zawsze prosi o twoje zatwierdzenie"
+      },
+      "whatsapp": {
+        "1": "Podgląd numerów, szablonów i dostarczeń",
+        "2": "Tworzenie szablonów wiadomości",
+        "ask": "Wysyłanie wiadomości zawsze prosi o twoje zatwierdzenie"
+      },
       "database": {
         "1": "Podgląd tabel",
         "2": "Zapytania do danych, żeby odpowiedzieć",
@@ -12605,7 +12661,14 @@
       "revenuecat": "Subskrypcje w aplikacji, produkty, oferty i przychody.",
       "superwall": "Paywalle, kampanie i eksperymenty.",
       "paddle": "Klienci, subskrypcje, transakcje i produkty.",
-      "abacatepay": "Płatności Pix, klienci i wypłaty."
+      "abacatepay": "Płatności Pix, klienci i wypłaty.",
+      "instagram": "Konta firmowe i twórców na Instagramie: posty, relacje, statystyki i wiadomości prywatne.",
+      "facebook": "Strony na Facebooku: posty, zdjęcia, filmy, komentarze i statystyki.",
+      "linkedin": "Posty, filmy i komentarze na LinkedIn w imieniu zalogowanego członka.",
+      "youtube": "Filmy, komentarze, playlisty i statystyki kanału YouTube.",
+      "pinterest": "Piny, tablice i statystyki na Pintereście.",
+      "reddit": "Posty, komentarze i społeczności na Reddicie.",
+      "whatsapp": "Wiadomości i szablony WhatsApp Business."
     }
   },
   "toolNames": {
@@ -13997,7 +14060,8 @@
       "draining": "Sieć się zmienia. Otwarte sesje komputera uruchomią się ponownie o {{when}}.",
       "restart": "Sesje komputera uruchamiają się ponownie, aby zastosować sieć. Nowa praca czeka, aż to się skończy.",
       "line": "IP wyjściowe {{ip}}",
-      "hint": "Adres, który widzą strony, gdy agenci przeglądają sieć. Zmienia się razem z siecią komputera."
+      "hint": "Adres, który widzą strony, gdy agenci przeglądają sieć. Zmienia się razem z siecią komputera.",
+      "waiting": "Ponownie łączymy agentów z internetem. Ich połączenia czekają, aż wróci."
     },
     "online": "Online",
     "offline": "Offline",
@@ -16450,6 +16514,7 @@
       "machine_task_interruptedNoComputer": "„{{title}}” przerwano.",
       "machine_task_resumed": "{{computer}} wrócił: „{{title}}” wznowiono tam, gdzie się zatrzymało.",
       "machine_task_resume_waits": "{{computer}} wrócił: „{{title}}” wznowi się tam, gdzie się zatrzymało, gdy projekt będzie gotowy.",
+      "machine_task_restarted": "{{computer}} wrócił: „{{title}}” uruchomiono od nowa.",
       "machine_offline": "{{computer}} jest offline.",
       "brain_unavailable": "{{brain}} nie może teraz odpowiedzieć. Odpowiem, gdy wróci.",
       "brain_unavailable_paused": "Komputer, na którym działa {{brain}}, jest wstrzymany. Odpowiem, gdy zostanie wznowiony.",

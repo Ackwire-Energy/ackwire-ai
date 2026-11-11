@@ -29,7 +29,13 @@ const { agentRuns, agents, channelMembers, channels, messages } = schema;
  * waiting within a rank. Only the head of the line asks the runner again, and agents' turns start
  * `ROOM_ASK_SPACING_MS` apart, so a burst of mentions reaches the computer one by one instead of all refused at once.
  */
-export const ROOM_ASK_SPACING_MS = 10_000;
+export const ROOM_ASK_SPACING_MS = 3_000;
+
+/**
+ * When a run behind another in line looks again. The line moves by kicks (a turn ended, the spacing is over), so this
+ * is only the fallback: polling at the spacing would triple the line's jobs for no earlier start.
+ */
+export const ROOM_BEHIND_RETRY_MS = 10_000;
 
 /**
  * A run of the last rank waiting this long ranks with work a person asked for, so a steady stream of that work can't
@@ -145,7 +151,7 @@ export async function roomGate(
         ),
       )
       .limit(1);
-    if (ahead) return { retryAt: now + ROOM_ASK_SPACING_MS };
+    if (ahead) return { retryAt: now + ROOM_BEHIND_RETRY_MS };
     if (rank > 0) {
       const [last] = await tx
         .select({ at: sql<string>`max((${agentRuns.transcript}->'roomAsk'->>'at')::bigint)` })

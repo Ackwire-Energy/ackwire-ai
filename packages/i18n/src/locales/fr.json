@@ -2538,6 +2538,12 @@
       "action": "Créer la routine",
       "done": "Routine créée"
     },
+    "howto": {
+      "title": "{{name}} a appris : {{what}}",
+      "line": "Utilisé {{uses}}×. En faire une compétence ?",
+      "action": "En faire une compétence",
+      "done": "Confirmé"
+    },
     "stalled": {
       "title": "Étapes à l’arrêt dans #{{number}} {{title}}",
       "line_one": "L’étape {{steps}} est à l’arrêt depuis {{hours}} h en attendant #{{on}}.",
@@ -2585,6 +2591,7 @@
   },
   "routing": {
     "title": "Qui choisit les agents",
+    "reflectionOff": "La mémoire n’apprend pas encore des conversations terminées : il faut pour cela une clé de fournisseur, ci-dessus.",
     "how": "Comment les agents sont choisis",
     "by": {
       "jev": "Jev choisit qui répond à chaque message sans mention.",
@@ -5544,6 +5551,15 @@
       "andMore": "{{names}} et plus"
     }
   },
+  "teamMemory": {
+    "title": "Mémoire de l’équipe",
+    "help": "Ce que les gens ont demandé à tous les agents de garder, avec qui l’a dit et quand. Chaque agent le lit dans tout son travail.",
+    "empty": "Rien pour l’instant. Quand quelqu’un demande à tous les agents de retenir quelque chose, cela apparaît ici.",
+    "remove": "Retirer",
+    "removed": "Retirée de la mémoire de l’équipe",
+    "make": "Passer à l’équipe",
+    "made": "Tous les agents la gardent maintenant"
+  },
   "memory": {
     "fromRefusal": "À ne plus proposer : {{text}}",
     "fromCorrection": "Une personne a corrigé : {{text}}",
@@ -5582,6 +5598,9 @@
     "unverifiedTitle": "Seuls des agents l'ont dit. Ça entre dans le contexte comme une piste signalée.",
     "pinned": "Toujours dans le contexte",
     "lowTrust": "Source externe, non fiable",
+    "confirm": "Confirmer",
+    "confirmTitle": "Dire que c’est juste : les agents l’utilisent alors comme fiable.",
+    "confirmed": "Confirmée",
     "used_one": "utilisé {{count}} fois",
     "used_many": "utilisé {{count}} fois",
     "used_other": "utilisé {{count}} fois",
@@ -8433,6 +8452,7 @@
       "machine_offline_resumes_other": "{{computer}} est hors ligne : {{count}} tâches continuent d'y tourner si seule la connexion a coupé, et reprennent là où elles se sont arrêtées si l'ordinateur a redémarré.",
       "machine_task_resumed": "{{computer}} est de retour : « {{title}} » a repris là où elle s'était arrêtée",
       "machine_task_resume_waits": "{{computer}} est de retour : « {{title}} » reprendra là où elle s'était arrêtée dès que le projet sera prêt",
+      "machine_task_restarted": "{{computer}} est de retour : « {{title}} » a redémarré",
       "machine_task_done": "« {{title}} » s'est terminée en {{span}} sur {{computer}}",
       "machine_task_failed": "« {{title}} » a échoué après {{span}} sur {{computer}}",
       "machine_task_canceled": "« {{title}} » a été arrêtée sur {{computer}}",
@@ -11680,6 +11700,7 @@
       "support": "Assistance",
       "marketing": "Marketing et pub",
       "automation": "Automatisation",
+      "social": "Réseaux sociaux",
       "email": "E-mail"
     },
     "emptyCategory": "Aucun connecteur dans cette catégorie pour l'instant",
@@ -12031,6 +12052,41 @@
         "1": "Voir les paiements demandés et les clients",
         "2": "Créer des demandes de paiement Pix"
       },
+      "instagram": {
+        "1": "Voir les publications, les stories et les statistiques",
+        "2": "Publier des posts et lire les messages privés",
+        "ask": "Les réponses aux messages demandent toujours votre approbation"
+      },
+      "facebook": {
+        "1": "Voir les publications, les commentaires et les statistiques",
+        "2": "Publier des posts, des photos et des vidéos et répondre aux commentaires",
+        "ask": "La suppression de publications et de commentaires demande toujours votre approbation"
+      },
+      "linkedin": {
+        "1": "Publier des posts, des liens et des vidéos",
+        "2": "Commenter des publications",
+        "ask": "La suppression de publications demande toujours votre approbation"
+      },
+      "youtube": {
+        "1": "Voir les vidéos, les commentaires et les statistiques",
+        "2": "Modifier les vidéos et les playlists et commenter",
+        "ask": "Les réponses, la modération et la suppression des commentaires demandent toujours votre approbation"
+      },
+      "pinterest": {
+        "1": "Voir les épingles, les tableaux et les statistiques",
+        "2": "Créer des épingles et organiser les tableaux",
+        "ask": "La modification des tableaux et les suppressions demandent toujours votre approbation"
+      },
+      "reddit": {
+        "1": "Rechercher des publications et lire les commentaires",
+        "2": "Publier, commenter et modifier",
+        "ask": "La suppression demande toujours votre approbation"
+      },
+      "whatsapp": {
+        "1": "Voir les numéros, les modèles et l'état d'envoi",
+        "2": "Créer des modèles de message",
+        "ask": "L'envoi de messages demande toujours votre approbation"
+      },
       "database": {
         "1": "Voir les tables",
         "2": "Interroger les données pour répondre",
@@ -12179,7 +12235,14 @@
       "revenuecat": "Abonnements in-app, produits, offres et revenus.",
       "superwall": "Paywalls, campagnes et expériences.",
       "paddle": "Clients, abonnements, transactions et produits.",
-      "abacatepay": "Paiements Pix, clients et retraits."
+      "abacatepay": "Paiements Pix, clients et retraits.",
+      "instagram": "Comptes professionnels et créateur Instagram : publications, stories, statistiques et messages privés.",
+      "facebook": "Pages Facebook : publications, photos, vidéos, commentaires et statistiques.",
+      "linkedin": "Publications, vidéos et commentaires LinkedIn au nom du membre qui se connecte.",
+      "youtube": "Vidéos, commentaires, playlists et statistiques de la chaîne YouTube.",
+      "pinterest": "Épingles, tableaux et statistiques Pinterest.",
+      "reddit": "Publications, commentaires et communautés Reddit.",
+      "whatsapp": "Messages et modèles WhatsApp Business."
     }
   },
   "toolNames": {
@@ -13538,7 +13601,8 @@
       "draining": "Le réseau change. Les sessions ouvertes de l’ordinateur redémarreront à {{when}}.",
       "restart": "Les sessions de l’ordinateur redémarrent pour appliquer le réseau. Les nouvelles tâches attendent la fin.",
       "line": "IP de sortie {{ip}}",
-      "hint": "L’adresse que voient les sites quand les agents naviguent. Elle change quand le réseau de l’ordinateur change."
+      "hint": "L’adresse que voient les sites quand les agents naviguent. Elle change quand le réseau de l’ordinateur change.",
+      "waiting": "Les agents se reconnectent à internet. Leurs connexions attendent son retour."
     },
     "online": "En ligne",
     "offline": "Hors ligne",
@@ -15951,6 +16015,7 @@
       "machine_task_interruptedNoComputer": "« {{title}} » a été interrompue.",
       "machine_task_resumed": "{{computer}} est de retour : « {{title}} » a repris là où elle s'était arrêtée.",
       "machine_task_resume_waits": "{{computer}} est de retour : « {{title}} » reprendra là où elle s'était arrêtée dès que le projet sera prêt.",
+      "machine_task_restarted": "{{computer}} est de retour : « {{title}} » a redémarré.",
       "machine_offline": "{{computer}} est passé hors ligne.",
       "brain_unavailable": "{{brain}} ne peut pas répondre pour le moment. Je répondrai à son retour.",
       "brain_unavailable_paused": "L'ordinateur sur lequel tourne {{brain}} est en pause. Je répondrai dès qu'il aura repris.",

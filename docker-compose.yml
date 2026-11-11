@@ -71,8 +71,12 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    networks: [default, speech]
+    networks: [default, speech, embeddings]
     restart: unless-stopped
+    # What the app may take from the machine it shares with Postgres (and the speech server). Over it, the kernel
+    # stops this container alone and it restarts, instead of the machine swapping until something else is killed.
+    mem_limit: "${AGENTES_MEMORY:-8g}"
+    memswap_limit: "${AGENTES_MEMORY:-8g}"
     # Above the 20 s that runs in progress get to finish on SIGTERM (RUN_DRAIN_MS, apps/server/src/start.ts).
     stop_grace_period: 40s
     init: true
@@ -112,6 +116,50 @@ services:
       timeout: 5s
       retries: 3
       start_period: 120s
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+
+  embeddings:
+    # Search's vectors on this machine (ADR 0167), so a request finds a memory written in another language or other
+    # words: Hugging Face's text-embeddings-inference on the CPU, with EMBEDDING_MODEL (Qwen3-Embedding-0.6B, as on
+    # agentes.chat Cloud, by default). On with embeddings in COMPOSE_PROFILES, EMBEDDINGS_PROVIDER=openai and
+    # EMBEDDINGS_URL=http://embeddings:8080/v1: SELF_HOSTING.md, Search across languages. Its first start downloads
+    # the model from Hugging Face into its volume, so its network reaches the internet. Nothing waits for it: while it
+    # starts, or if it is down, search goes on with words alone.
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.9.4@sha256:2538ea1c9640d3763b15af668039d24172d063b42337b0c27796fc2be180c78d
+    profiles: ["embeddings"]
+    environment:
+      MODEL_ID: "${EMBEDDING_MODEL:-Qwen/Qwen3-Embedding-0.6B}"
+      PORT: "8080"
+      HF_HOME: /data
+      # Tokens in one batch, and the most it reads of one text: a query waits behind one batch at most, and the
+      # batch's activations stay inside the memory below.
+      MAX_BATCH_TOKENS: "${EMBEDDINGS_BATCH_TOKENS:-2048}"
+      # The image's 8 threads would fight over the CPUs it may use.
+      RAYON_NUM_THREADS: "${EMBEDDINGS_THREADS:-2}"
+      OMP_NUM_THREADS: "${EMBEDDINGS_THREADS:-2}"
+      MKL_NUM_THREADS: "${EMBEDDINGS_THREADS:-2}"
+    volumes:
+      - embeddings-models:/data
+    networks: [embeddings]
+    # What it may take from the machine the app and Postgres share. Over the memory, it restarts rather than swaps.
+    cpus: "${EMBEDDINGS_CPUS:-2}"
+    mem_limit: "${EMBEDDINGS_MEMORY:-3g}"
+    memswap_limit: "${EMBEDDINGS_MEMORY:-3g}"
+    restart: unless-stopped
+    healthcheck:
+      # 200 once the model is loaded; the first start downloads it first.
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 600s
     init: true
     security_opt:
       - no-new-privileges:true
@@ -389,9 +437,12 @@ networks:
   # The speech service's: the app reaches it there, and it reaches nothing else, the internet included.
   speech:
     internal: true
+  # The embeddings service's: the app reaches it there, and it reaches the internet for its model.
+  embeddings:
 
 volumes:
   pgdata:
   files:
+  embeddings-models:
   caddy-data:
   tailscale-state:

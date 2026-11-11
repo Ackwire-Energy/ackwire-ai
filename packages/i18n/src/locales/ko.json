@@ -2348,6 +2348,12 @@
       "action": "루틴 만들기",
       "done": "루틴을 만들었어요"
     },
+    "howto": {
+      "title": "{{name}}이(가) 배운 것: {{what}}",
+      "line": "{{uses}}번 사용됨. 스킬로 만들까요?",
+      "action": "스킬로 만들기",
+      "done": "확인됨"
+    },
     "stalled": {
       "title": "#{{number}} {{title}}의 단계가 멈췄어요",
       "line_other": "단계 {{steps}}가 #{{on}}을 기다리며 {{hours}}시간째 멈춰 있어요.",
@@ -2391,6 +2397,7 @@
   },
   "routing": {
     "title": "에이전트를 고르는 주체",
+    "reflectionOff": "메모리는 아직 끝난 대화에서 배우지 않습니다: 그러려면 위에서 제공업체 키를 추가하세요.",
     "how": "에이전트를 고르는 방식",
     "by": {
       "jev": "멘션 없는 메시지마다 Jev가 답할 에이전트를 골라요.",
@@ -5139,6 +5146,15 @@
       "andMore": "{{names}} 등"
     }
   },
+  "teamMemory": {
+    "title": "팀 메모리",
+    "help": "사람들이 모든 에이전트에게 기억해 달라고 한 것으로, 누가 언제 말했는지도 함께 남습니다. 모든 에이전트가 모든 작업에서 읽습니다.",
+    "empty": "아직 없습니다. 누군가 모든 에이전트에게 무언가를 기억해 달라고 하면 여기에 표시됩니다.",
+    "remove": "삭제",
+    "removed": "팀 메모리에서 삭제했습니다",
+    "make": "팀 메모리로 만들기",
+    "made": "이제 모든 에이전트가 기억합니다"
+  },
   "memory": {
     "fromRefusal": "다시 제안하지 않기: {{text}}",
     "fromCorrection": "사람이 수정함: {{text}}",
@@ -5175,6 +5191,9 @@
     "unverifiedTitle": "에이전트만 한 말이에요. 표시된 힌트로 컨텍스트에 들어가요.",
     "pinned": "항상 컨텍스트에 포함",
     "lowTrust": "외부 출처, 신뢰할 수 없음",
+    "confirm": "확인",
+    "confirmTitle": "맞다고 알려 주세요: 에이전트가 신뢰할 수 있는 내용으로 사용합니다.",
+    "confirmed": "확인됨",
     "used_other": "{{count}}번 사용됨",
     "unusedFor": "{{days}}일 동안 사용 안 함",
     "supersedes": "대체 대상:",
@@ -7836,6 +7855,7 @@
       "machine_offline_resumes_other": "{{computer}}이(가) 오프라인이 됐어요. 연결만 끊긴 거라면 작업 {{count}}개는 그곳에서 계속 실행되고, 컴퓨터가 다시 시작됐다면 멈춘 곳에서 재개돼요.",
       "machine_task_resumed": "{{computer}}이(가) 돌아왔어요. “{{title}}”이(가) 멈춘 곳에서 재개됐어요",
       "machine_task_resume_waits": "{{computer}}이(가) 돌아왔어요. 프로젝트가 준비되면 “{{title}}”이(가) 멈춘 곳에서 재개돼요",
+      "machine_task_restarted": "{{computer}}이(가) 돌아왔어요. “{{title}}”을(를) 다시 시작했어요",
       "machine_task_done": "“{{title}}”이(가) {{computer}}에서 {{span}} 만에 끝났어요",
       "machine_task_failed": "“{{title}}”이(가) {{computer}}에서 {{span}} 후 실패했어요",
       "machine_task_canceled": "“{{title}}”이(가) {{computer}}에서 중지됐어요",
@@ -10807,6 +10827,7 @@
       "support": "고객 지원",
       "marketing": "마케팅",
       "automation": "자동화",
+      "social": "소셜",
       "email": "이메일"
     },
     "emptyCategory": "이 카테고리에는 아직 커넥터가 없어요",
@@ -11158,6 +11179,41 @@
         "1": "청구와 고객 보기",
         "2": "Pix 청구 만들기"
       },
+      "instagram": {
+        "1": "게시물, 스토리, 인사이트 보기",
+        "2": "게시물 게시와 DM 읽기",
+        "ask": "메시지 답장은 항상 승인을 요청해요"
+      },
+      "facebook": {
+        "1": "게시물, 댓글, 인사이트 보기",
+        "2": "게시물, 사진, 동영상 게시와 댓글 답장",
+        "ask": "게시물과 댓글 삭제는 항상 승인을 요청해요"
+      },
+      "linkedin": {
+        "1": "게시물, 링크, 동영상 게시",
+        "2": "게시물에 댓글 달기",
+        "ask": "게시물 삭제는 항상 승인을 요청해요"
+      },
+      "youtube": {
+        "1": "동영상, 댓글, 분석 보기",
+        "2": "동영상과 재생목록 수정과 댓글 작성",
+        "ask": "댓글 답글, 관리, 삭제는 항상 승인을 요청해요"
+      },
+      "pinterest": {
+        "1": "핀, 보드, 분석 보기",
+        "2": "핀 만들기와 보드 정리",
+        "ask": "보드 변경과 삭제는 항상 승인을 요청해요"
+      },
+      "reddit": {
+        "1": "게시물 검색과 댓글 읽기",
+        "2": "게시, 댓글, 수정",
+        "ask": "삭제는 항상 승인을 요청해요"
+      },
+      "whatsapp": {
+        "1": "전화번호, 템플릿, 전송 상태 보기",
+        "2": "메시지 템플릿 만들기",
+        "ask": "메시지 보내기는 항상 승인을 요청해요"
+      },
       "database": {
         "1": "테이블 보기",
         "2": "데이터를 조회해 답변하기",
@@ -11296,7 +11352,14 @@
       "revenuecat": "인앱 구독, 상품, 오퍼링, 매출.",
       "superwall": "페이월, 캠페인, 실험.",
       "paddle": "고객, 구독, 거래, 상품.",
-      "abacatepay": "Pix 청구, 고객, 출금."
+      "abacatepay": "Pix 청구, 고객, 출금.",
+      "instagram": "Instagram 비즈니스 및 크리에이터 계정: 게시물, 스토리, 인사이트, DM.",
+      "facebook": "Facebook 페이지: 게시물, 사진, 동영상, 댓글, 인사이트.",
+      "linkedin": "로그인한 회원으로 올리는 LinkedIn 게시물, 동영상, 댓글.",
+      "youtube": "YouTube 채널의 동영상, 댓글, 재생목록, 분석.",
+      "pinterest": "Pinterest 핀, 보드, 분석.",
+      "reddit": "Reddit 게시물, 댓글, 커뮤니티.",
+      "whatsapp": "WhatsApp Business 메시지와 템플릿."
     }
   },
   "toolNames": {
@@ -12589,7 +12652,8 @@
       "draining": "네트워크가 바뀌고 있어요. 컴퓨터의 열린 세션은 {{when}}에 다시 시작돼요.",
       "restart": "네트워크를 적용하려고 컴퓨터 세션을 다시 시작하고 있어요. 새 작업은 끝날 때까지 기다려요.",
       "line": "출구 IP {{ip}}",
-      "hint": "에이전트가 웹을 탐색할 때 사이트에 보이는 주소예요. 컴퓨터의 네트워크가 바뀌면 함께 바뀌어요."
+      "hint": "에이전트가 웹을 탐색할 때 사이트에 보이는 주소예요. 컴퓨터의 네트워크가 바뀌면 함께 바뀌어요.",
+      "waiting": "에이전트의 인터넷을 다시 연결하고 있어요. 돌아올 때까지 연결이 기다려요."
     },
     "online": "온라인",
     "offline": "오프라인",
@@ -14898,6 +14962,7 @@
       "machine_task_interruptedNoComputer": "“{{title}}”이(가) 중단됐어요.",
       "machine_task_resumed": "{{computer}}이(가) 돌아왔어요: “{{title}}”을(를) 멈춘 곳에서 다시 시작했어요.",
       "machine_task_resume_waits": "{{computer}}이(가) 돌아왔어요: 프로젝트가 준비되면 “{{title}}”을(를) 멈춘 곳에서 다시 시작해요.",
+      "machine_task_restarted": "{{computer}}이(가) 돌아왔어요: “{{title}}”을(를) 다시 시작했어요.",
       "machine_offline": "{{computer}}이(가) 오프라인이 됐어요.",
       "brain_unavailable": "지금은 {{brain}}이(가) 답할 수 없어요. 돌아오면 답할게요.",
       "brain_unavailable_paused": "{{brain}}이(가) 실행되는 컴퓨터가 일시 중지됐어요. 다시 시작되면 답할게요.",

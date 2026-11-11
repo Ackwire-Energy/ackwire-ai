@@ -13,6 +13,7 @@ import {
 import { type Level, saveLevels } from "@agenteschat/client/lib/access-levels";
 import { errorText as failureText } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { useHeldWhile } from "@agenteschat/client/lib/hold";
 import { addsAgentsTo, can } from "@agenteschat/client/lib/permissions";
 import { connectorName, scopeText } from "@agenteschat/client/lib/scopes";
 import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
@@ -500,7 +501,8 @@ function NewAgentDialog({
   }, [sel, draft.name, draft.what, nameRoll, takenNames, tt]);
 
   // Its @: from the name; a taken one gets the next free one, and the card says so.
-  const taken = useMemo(() => takenHandles(agents.data ?? [], members.data ?? []), [agents.data, members.data]);
+  const handles = useMemo(() => takenHandles(agents.data ?? [], members.data ?? []), [agents.data, members.data]);
+  const taken = useHeldWhile(handles, busy);
   const base = handleForName(name);
   const isTaken = base !== "" && taken.has(base);
   const handle = isTaken ? freeHandle(base, taken) : base;

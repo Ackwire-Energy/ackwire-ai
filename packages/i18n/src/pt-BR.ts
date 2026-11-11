@@ -2505,6 +2505,12 @@ export const ptBR = {
       action: "Criar rotina",
       done: "Rotina criada",
     },
+    howto: {
+      title: "{{name}} aprendeu: {{what}}",
+      line: "Usado {{uses}}×. Virar skill?",
+      action: "Virar skill",
+      done: "Confirmado",
+    },
     stalled: {
       title: "Passos parados em #{{number}} {{title}}",
       line_one: "O passo {{steps}} está parado há {{hours}} h esperando o #{{on}}.",
@@ -2556,6 +2562,8 @@ export const ptBR = {
   },
   routing: {
     title: "Quem escolhe os agentes",
+    reflectionOff:
+      "A memória ainda não aprende com as conversas encerradas: para isso, adicione uma chave de provedor acima.",
     how: "Como os agentes são escolhidos",
     by: {
       jev: "O Jev escolhe quem responde cada mensagem sem menção.",
@@ -5582,6 +5590,15 @@ export const ptBR = {
       andMore: "{{names}} e mais",
     },
   },
+  teamMemory: {
+    title: "Memória do time",
+    help: "O que as pessoas pediram para todos os agentes guardarem, com quem disse e quando. Todo agente lê isso em todo o trabalho.",
+    empty: "Nada ainda. Quando alguém pedir para todos os agentes lembrarem de algo, aparece aqui.",
+    remove: "Remover",
+    removed: "Removida da memória do time",
+    make: "Tornar do time",
+    made: "Agora todos os agentes guardam isso",
+  },
   memory: {
     fromRefusal: "Não propor de novo: {{text}}",
     fromCorrection: "Uma pessoa corrigiu: {{text}}",
@@ -5607,6 +5624,9 @@ export const ptBR = {
     unverifiedTitle: "Só agentes afirmaram isso. Entra no contexto como dica marcada.",
     pinned: "Sempre no contexto",
     lowTrust: "Fonte externa, não confiável",
+    confirm: "Confirmar",
+    confirmTitle: "Diga que está certo: os agentes passam a usar como confiável.",
+    confirmed: "Confirmada",
     used_zero: "nunca usado",
     used_one: "usado {{count}} vez",
     used_other: "usado {{count}} vezes",
@@ -8387,6 +8407,7 @@ export const ptBR = {
       machine_task_resumed: "{{computer}} voltou: “{{title}}” retomou de onde parou",
       machine_task_resume_waits:
         "{{computer}} voltou: “{{title}}” retoma de onde parou quando o projeto estiver pronto",
+      machine_task_restarted: "{{computer}} voltou: “{{title}}” começou de novo",
       machine_task_done: "“{{title}}” terminou em {{span}} no {{computer}}",
       machine_task_failed: "“{{title}}” falhou depois de {{span}} no {{computer}}",
       machine_task_canceled: "“{{title}}” foi parada no {{computer}}",
@@ -11494,6 +11515,7 @@ export const ptBR = {
       support: "Suporte",
       marketing: "Marketing",
       automation: "Automação",
+      social: "Redes sociais",
       email: "Email",
     },
     emptyCategory: "Nenhum conector nesta categoria ainda",
@@ -11663,6 +11685,41 @@ export const ptBR = {
       superwall: { "1": "Ver paywalls e resultados", "2": "Criar e ajustar campanhas" },
       paddle: { "1": "Ver clientes, assinaturas e transações", "2": "Criar produtos e preços" },
       abacatepay: { "1": "Ver cobranças e clientes", "2": "Criar cobranças Pix" },
+      instagram: {
+        "1": "Ver posts, stories e métricas",
+        "2": "Publicar posts e ler mensagens do Direct",
+        ask: "Responder mensagens sempre pede sua aprovação",
+      },
+      facebook: {
+        "1": "Ver posts, comentários e métricas",
+        "2": "Publicar posts, fotos e vídeos e responder comentários",
+        ask: "Apagar posts e comentários sempre pede sua aprovação",
+      },
+      linkedin: {
+        "1": "Publicar posts, links e vídeos",
+        "2": "Comentar em posts",
+        ask: "Apagar posts sempre pede sua aprovação",
+      },
+      youtube: {
+        "1": "Ver vídeos, comentários e métricas",
+        "2": "Editar vídeos e playlists e comentar",
+        ask: "Responder, moderar e apagar comentários sempre pede sua aprovação",
+      },
+      pinterest: {
+        "1": "Ver pins, pastas e métricas",
+        "2": "Criar pins e organizar pastas",
+        ask: "Mudar pastas e apagar sempre pede sua aprovação",
+      },
+      reddit: {
+        "1": "Buscar posts e ler comentários",
+        "2": "Publicar, comentar e editar",
+        ask: "Apagar sempre pede sua aprovação",
+      },
+      whatsapp: {
+        "1": "Ver números, modelos e entregas",
+        "2": "Criar modelos de mensagem",
+        ask: "Enviar mensagens sempre pede sua aprovação",
+      },
       database: { "1": "Ver as tabelas", "2": "Consultar os dados para responder", "3": "Nunca altera nada" },
     },
     connectedList: "Conectados",
@@ -11806,6 +11863,13 @@ export const ptBR = {
       superwall: "Paywalls, campanhas e experimentos.",
       paddle: "Clientes, assinaturas, transações e produtos.",
       abacatepay: "Cobranças Pix, clientes e saques.",
+      instagram: "Contas comerciais e de criador do Instagram: posts, stories, métricas e mensagens do Direct.",
+      facebook: "Páginas do Facebook: posts, fotos, vídeos, comentários e métricas.",
+      linkedin: "Posts, vídeos e comentários no LinkedIn em nome de quem conecta.",
+      youtube: "Vídeos, comentários, playlists e métricas do canal no YouTube.",
+      pinterest: "Pins, pastas e métricas do Pinterest.",
+      reddit: "Posts, comentários e comunidades do Reddit.",
+      whatsapp: "Mensagens e modelos do WhatsApp Business.",
     },
   },
   toolNames: {
@@ -13087,6 +13151,7 @@ export const ptBR = {
       restart: "As sessões do computador estão reiniciando para aplicar a rede. Novos trabalhos aguardam a conclusão.",
       line: "IP de saída {{ip}}",
       hint: "O endereço que os sites veem quando os agentes navegam. Ele acompanha as mudanças de rede do computador.",
+      waiting: "Reconectando a internet dos agentes. As conexões deles esperam até ela voltar.",
     },
     online: "Online",
     offline: "Offline",
@@ -15497,6 +15562,7 @@ export const ptBR = {
       machine_task_resumed: "{{computer}} voltou: “{{title}}” retomou de onde parou.",
       machine_task_resume_waits:
         "{{computer}} voltou: “{{title}}” retoma de onde parou quando o projeto estiver pronto.",
+      machine_task_restarted: "{{computer}} voltou: “{{title}}” começou de novo.",
       machine_offline: "{{computer}} ficou offline.",
       brain_unavailable: "O {{brain}} não está disponível agora. Respondo quando ele voltar.",
       /** Waits that don't pass by themselves (`meta.brainUnavailable.code`): the cause and who fixes it. */

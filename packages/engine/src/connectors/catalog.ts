@@ -34,7 +34,7 @@ export interface ConnectorTool {
   sign?: { field: "body" | "message"; always?: true };
 }
 
-/** Catalog groups (the app translates them, `connectors.category.*`): development, product, docs, data (analytics), payments, sales, support, marketing, automation. */
+/** Catalog groups (the app translates them, `connectors.category.*`): development, product, docs, data (analytics), payments, sales, support, marketing, automation, social. */
 export type ConnectorCategory =
   | "dev"
   | "product"
@@ -44,7 +44,8 @@ export type ConnectorCategory =
   | "sales"
   | "support"
   | "marketing"
-  | "automation";
+  | "automation"
+  | "social";
 
 export interface ConnectorDefinition {
   id: string;
