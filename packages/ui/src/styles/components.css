@@ -2697,11 +2697,20 @@ html:not([data-pointer]) .ac-pill:has(:focus-visible) .ac-check {
   box-shadow: none;
 }
 
-/* Tabs */
+/* Tabs: a strip that never cuts a label. When its tabs don't fit it scrolls sideways by swipe, with no scrollbar,
+   fading at the side with more to see (with `.ac-seg`, below). It keeps its height in a column that scrolls: a box
+   that clips may shrink to nothing there. */
 .ac-tabs {
   display: flex;
+  flex: none;
   gap: var(--space-1);
   border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.ac-tabs::-webkit-scrollbar {
+  display: none;
 }
 .ac-tabpanel {
   display: flex;
@@ -2711,13 +2720,15 @@ html:not([data-pointer]) .ac-pill:has(:focus-visible) .ac-check {
 .ac-tabpanel[hidden] {
   display: none;
 }
+/* Inside the strip, which clips at its hairline: the tab ends on it (a pixel less under its words keeps the strip's
+   height), its underline above it and its focus ring drawn inside. */
 .ac-tab {
+  flex: none;
   font: inherit;
   font-size: 14px;
   font-weight: 600;
   white-space: nowrap;
-  padding: 8px 12px;
-  margin-bottom: -1px;
+  padding: var(--space-2) var(--space-3) calc(var(--space-2) - 1px);
   background: transparent;
   border: 0;
   border-bottom: 2px solid transparent;
@@ -2730,7 +2741,7 @@ html:not([data-pointer]) .ac-pill:has(:focus-visible) .ac-check {
 }
 html:not([data-pointer]) .ac-tab:focus-visible {
   outline: none;
-  box-shadow: var(--focus-ring);
+  box-shadow: var(--focus-ring-inset);
   border-radius: var(--radius-sm) var(--radius-sm) 0 0;
 }
 
@@ -5357,7 +5368,7 @@ html:not([data-pointer]) .ac-btn--primary:focus-visible {
     .ac-seg,
     .ac-toolbar__filters,
     .ac-toolbar__filters > .ac-filterbar,
-    .agp-tabs .ac-tabs,
+    .ac-tabs,
     .level-matrix {
       --ac-fade: linear-gradient(
         to right,
@@ -6058,7 +6069,7 @@ html:not([data-pointer]) .ac-hint:focus-visible {
   position: absolute;
   left: 8px;
   right: 8px;
-  bottom: -1px;
+  bottom: 0;
   height: 2px;
   border-radius: 2px;
   background: var(--ink);

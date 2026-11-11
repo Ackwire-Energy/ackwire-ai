@@ -6430,22 +6430,6 @@ html:not([data-pointer]) .photo-drop:focus-visible {
   min-width: 0;
   min-height: 0;
 }
-/* The tabs are a strip: on a narrow dialog they scroll sideways by swipe, with no scrollbar. */
-.avatar-builder__main .ac-tabs {
-  flex: none;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: none;
-}
-.avatar-builder__main .ac-tabs::-webkit-scrollbar {
-  display: none;
-}
-/* Inside the sideways strip the tab and its underline stay within it (1px past the edge made it scroll up and down). */
-.avatar-builder__main .ac-tab {
-  flex: none;
-  margin-bottom: 0;
-  white-space: nowrap;
-}
 .avatar-builder__main .ac-tabpanel {
   flex: 1;
   min-height: 0;
@@ -10278,34 +10262,16 @@ html:not([data-pointer]) .agp-cell:focus-visible {
   z-index: var(--z-sticky);
   margin: 18px 0 0;
   padding: 0 var(--agp-gutter);
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: none;
   background: color-mix(in srgb, var(--bg) 88%, transparent);
   -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
 }
-.agp-tabs .ac-tabs::-webkit-scrollbar {
-  display: none;
-}
 .agp-tabs .ac-tab {
   display: inline-flex;
-  flex: none;
   align-items: center;
   gap: 7px;
   height: 48px;
-  white-space: nowrap;
-}
-/* Inside the sideways scroller: the tab and its underline stay within it (1px past the edge made it scroll up and down). */
-.agp-tabs .ac-tab {
-  margin-bottom: 0;
-}
-.agp-tabs .ac-tab[data-state="active"]::after {
-  bottom: 0;
-}
-/* The strip scrolls sideways with its tabs at its top and its ends, where it clips their rings: drawn inside. */
-html:not([data-pointer]) .agp-tabs .ac-tab:focus-visible {
-  box-shadow: var(--focus-ring-inset);
+  padding-block: 0;
 }
 .agp-badge {
   display: inline-flex;
