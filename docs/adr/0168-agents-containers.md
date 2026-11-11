@@ -6,10 +6,11 @@
   (what a uid-keyed firewall must count as an agent's), ADR 0057 (what an agent's share holds)
 - Code: runner `agent-users.ts` (`agentSubids`, `ensureSubids`, `rootlessContainers`, `containersCommand`,
   `ensureContainers`, `stopContainers`, `RUNTIME_DIR`, `DELEGATE`, `NOSUID_VIEW`, `CONTAINERS_START`, the launcher's
-  `containers`), `supervisor.ts` (`launchWorker`, `stopContainers` at a network's deadline), `daemon.ts` (a desktop or
-  terminal, an agent that left), `service.ts` (`AGENT_TMP_CLEANUP`), `toolchains.ts` (`podman`); adapters `RunnerToolchains.podman`; engine
-  `context.ts` (`containersText`); tests `agent-users.test.ts`, `supervisor.test.ts`, `system-mode.test.ts`,
-  `toolchains.test.ts`, engine `desktop.test.ts`, `turn-context.test.ts`
+  `containers`), `supervisor.ts` (`launchWorker`, `stopContainers` at a network's deadline), `daemon.ts` (a desktop
+  or terminal, an agent that left), `service.ts` (`AGENT_TMP_CLEANUP`), `toolchains.ts` (`podman`); adapters
+  `RunnerToolchains.podman`; engine `context.ts` (`containersText`); tests `agent-users.test.ts`,
+  `supervisor.test.ts`, `system-mode.test.ts`, `toolchains.test.ts`, `isolation.root.test.ts`, engine
+  `desktop.test.ts`, `turn-context.test.ts`
 
 ## Context
 
