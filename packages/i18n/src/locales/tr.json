@@ -879,7 +879,20 @@
       "team": "Ekibim için",
       "teamText": "Kişiler ve ajanlar kanallar, roller ve onaylarla birlikte çalışır.",
       "personalExamples": "Saat 7'de günün · Faturalar · Antrenman",
-      "teamExamples": "Müşteri desteği · Finans · Raporlar"
+      "teamExamples": "Müşteri desteği · Finans · Raporlar",
+      "personalLine": "Gününüzle ilgilenen ajanlar.",
+      "teamLine": "İnsanlar ve ajanlar aynı yerde.",
+      "activities": {
+        "agenda": "Günün ajandası",
+        "home": "Ev",
+        "bills": "Faturalar",
+        "studies": "Ders çalışma",
+        "travel": "Seyahatler",
+        "support": "Müşteri desteği",
+        "finance": "Finans",
+        "reports": "Raporlar",
+        "sales": "Satış"
+      }
     },
     "personal": {
       "name": "Kişisel"

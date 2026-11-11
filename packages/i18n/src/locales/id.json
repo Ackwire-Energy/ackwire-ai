@@ -863,7 +863,20 @@
       "team": "Untuk timku",
       "teamText": "Orang dan agen bekerja bersama, dengan kanal, peran, dan persetujuan.",
       "personalExamples": "Harimu jam 7 · Tagihan · Latihan",
-      "teamExamples": "Layanan pelanggan · Keuangan · Laporan"
+      "teamExamples": "Layanan pelanggan · Keuangan · Laporan",
+      "personalLine": "Agen yang mengurus harimu.",
+      "teamLine": "Orang dan agen di satu tempat.",
+      "activities": {
+        "agenda": "Agenda harian",
+        "home": "Rumah",
+        "bills": "Tagihan",
+        "studies": "Belajar",
+        "travel": "Perjalanan",
+        "support": "Layanan pelanggan",
+        "finance": "Keuangan",
+        "reports": "Laporan",
+        "sales": "Penjualan"
+      }
     },
     "personal": {
       "name": "Pribadi"

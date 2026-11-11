@@ -863,7 +863,20 @@
       "team": "给我的团队用",
       "teamText": "人和智能体一起工作，有频道、角色和审批。",
       "personalExamples": "早上7点的一天 · 账单 · 训练",
-      "teamExamples": "客户支持 · 财务 · 报告"
+      "teamExamples": "客户支持 · 财务 · 报告",
+      "personalLine": "照看你一天的智能体。",
+      "teamLine": "人和智能体在同一个地方。",
+      "activities": {
+        "agenda": "今日日程",
+        "home": "家务",
+        "bills": "账单",
+        "studies": "学习",
+        "travel": "旅行",
+        "support": "客户支持",
+        "finance": "财务",
+        "reports": "报告",
+        "sales": "销售"
+      }
     },
     "personal": {
       "name": "个人"

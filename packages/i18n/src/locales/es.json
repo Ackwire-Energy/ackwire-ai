@@ -896,7 +896,20 @@
       "team": "Para mi equipo",
       "teamText": "Personas y agentes trabajan juntos, con canales, roles y aprobaciones.",
       "personalExamples": "Tu día a las 7 · Cuentas · Entreno",
-      "teamExamples": "Atención al cliente · Finanzas · Informes"
+      "teamExamples": "Atención al cliente · Finanzas · Informes",
+      "personalLine": "Agentes que cuidan de tu día.",
+      "teamLine": "Personas y agentes en un mismo lugar.",
+      "activities": {
+        "agenda": "Agenda del día",
+        "home": "Casa",
+        "bills": "Cuentas",
+        "studies": "Estudios",
+        "travel": "Viajes",
+        "support": "Atención al cliente",
+        "finance": "Finanzas",
+        "reports": "Informes",
+        "sales": "Ventas"
+      }
     },
     "personal": {
       "name": "Personal"
