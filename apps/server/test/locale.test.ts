@@ -31,6 +31,25 @@ test("the person's language (ADR 0122): PATCH /me saves any language of the app,
   expect(t.email.sent.slice(before).map((m) => m.html.includes('lang="fr"'))).toEqual([true]);
 });
 
+test("the person's own area: PUT /me/work-area takes an id of the list or skipped, /me returns it", async () => {
+  t = await createTestServer();
+  const ana = browser(t);
+  await signUp(ana, "ana@example.com");
+  const area = async () =>
+    ((await (await ana("/api/app/me")).json()) as { user: { workArea: string | null } }).user.workArea;
+  // Not asked yet.
+  expect(await area()).toBeNull();
+  expect((await ana("/api/app/me/work-area", { method: "PUT", json: { area: "marketing" } })).status).toBe(204);
+  expect(await area()).toBe("marketing");
+  expect((await ana("/api/app/me/work-area", { method: "PUT", json: { area: "skipped" } })).status).toBe(204);
+  expect(await area()).toBe("skipped");
+  // Only the list's ids.
+  expect((await ana("/api/app/me/work-area", { method: "PUT", json: { area: "astronaut" } })).status).toBe(400);
+  expect(await area()).toBe("skipped");
+  // Signed out: nothing to say it for.
+  expect((await browser(t)("/api/app/me/work-area", { method: "PUT", json: { area: "dev" } })).status).toBe(401);
+});
+
 test("a browser that says no language of ours gets English", async () => {
   t = await createTestServer();
   const bia = browser(t);

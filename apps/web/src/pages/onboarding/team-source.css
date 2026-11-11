@@ -23,6 +23,10 @@
 .onb-source .ac-option__title {
   overflow-wrap: anywhere;
 }
+/* "I don't use any yet" names the workspace: a name with one long word breaks inside the card, never past the screen. */
+.onb-sources .ac-option__desc {
+  overflow-wrap: anywhere;
+}
 /* The request and the pasted answer: a few lines tall from the start, the step scrolling instead of the field. */
 .onb__body .imp-other__prompt.ac-input {
   min-height: 132px;

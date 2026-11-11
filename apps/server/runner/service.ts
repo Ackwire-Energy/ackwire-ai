@@ -292,14 +292,19 @@ export function systemdUserAvailable(run: RunCommand = runSync) {
 /** systemd's version from `systemctl --version` ("systemd 257 (257.13-1~deb13u1)"); 0 when it isn't there. */
 export const systemdVersion = (text: string) => Number(/^systemd (\d+)\b/m.exec(text)?.[1] ?? 0);
 
-let oomPolicyOnScopes: boolean | undefined;
+let systemdHere: number | undefined;
+/** This computer's systemd version (`systemdVersion`), asked once. */
+export function installedSystemd(run: RunCommand = runSync): number {
+  systemdHere ??= systemdVersion(run("systemctl", ["--version"]).output);
+  return systemdHere;
+}
+
 /**
  * Whether this systemd takes `OOMPolicy=` on a scope (253 and later). By default it then stops the whole scope
  * when the kernel stops one of its processes for memory; older ones refuse the setting, and leave the rest running.
  */
 export function scopeOomPolicy(run: RunCommand = runSync): boolean {
-  oomPolicyOnScopes ??= systemdVersion(run("systemctl", ["--version"]).output) >= 253;
-  return oomPolicyOnScopes;
+  return installedSystemd(run) >= 253;
 }
 
 export interface ServiceIo {

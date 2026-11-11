@@ -606,11 +606,12 @@ test("every launch with containers: its runtime dir bound in its view, Podman's 
 
 test("the containers service: a delegated unit of the agent's slice, its steps, set-user-ID for the id-map helpers alone", () => {
   const user = { id: ANA.id, user: "ag-a1b2c3d4", uid: 21003, networkLauncher: ROOT_TOOL, networkMark: 0x08000000 };
-  const argv = containersCommand(user);
-  expect(argv.slice(0, 11)).toEqual([
+  const argv = containersCommand(user, true);
+  expect(argv.slice(0, 12)).toEqual([
     "/usr/bin/systemd-run",
     "--quiet",
     "--collect",
+    "--expand-environment=no",
     "--unit=agentes-containers-21003.service",
     "--slice=agents-21003.slice",
     "--property=Delegate=yes",
@@ -620,10 +621,15 @@ test("the containers service: a delegated unit of the agent's slice, its steps, 
     "--property=TimeoutStopSec=15",
     "--",
   ]);
-  // systemd expands `$` in a service's command line: each goes doubled, which it reads as one.
-  for (const arg of argv.slice(11)) expect(arg.replaceAll("$$", "")).not.toContain("$");
+  // systemd writes an expanded command to the unit's file with each `$` doubled, and runs that after a daemon-reload:
+  // a `$$` sent there reaches the shell as its own pid. Unexpanded, the scripts go as they are.
+  for (const arg of argv) expect(arg).not.toContain("$$");
+  // Before 254 there is no switch: each `$` doubled, which systemd reads as one.
+  expect(containersCommand(user, false)).toEqual(
+    argv.filter((a) => a !== "--expand-environment=no").map((a) => a.replaceAll("$", () => "$$")),
+  );
   const at = argv.indexOf("/usr/bin/unshare");
-  const view = (argv[at + 7] ?? "").replaceAll("$$", "$");
+  const view = argv[at + 7] ?? "";
   expect(view).toContain("hidepid=2");
   expect(view).toContain('mount --bind "$m/run" "/run/user/$u"');
   // Its own cgroup only, made the agent's.
@@ -662,7 +668,7 @@ test.if(process.platform !== "win32")(
   () => {
     const home = tempDir("containers-home-");
     dirs.push(home);
-    const argv = containersCommand({ id: ANA.id, user: "ag-a1b2c3d4", uid: 21003 }).map((a) => a.replaceAll("$$", "$"));
+    const argv = containersCommand({ id: ANA.id, user: "ag-a1b2c3d4", uid: 21003 }, true);
     const start = (argv.at(-4) ?? "").replace("exec /usr/lib/systemd/systemd --user", "exit 0");
     expect(argv.at(-4)?.split("\n").at(-1)).toBe("exec /usr/lib/systemd/systemd --user");
     const sh = (conf: string) =>
