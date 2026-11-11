@@ -97,7 +97,9 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
         heading: "Verhuizen naar een server",
         blocks: [
           {
-            list: ["Sluit de app af en maak dan een dump van de database met de eigen kopie van de server in de app. Op een Mac:"],
+            list: [
+              "Sluit de app af en maak dan een dump van de database met de eigen kopie van de server in de app. Op een Mac:",
+            ],
           },
           {
             code: "BUN_BE_BUN=1 /Applications/agentes.chat.app/Contents/MacOS/agentes-runner \\\n  ~/.agentes/app/current/server/native.js db dump --data ~/.agentes --out agentes.sql",
