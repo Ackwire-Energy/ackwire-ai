@@ -605,6 +605,42 @@ describe("OAuth (state + PKCE)", () => {
     expect(token.seen.at(-1)?.get("grant_type")).toBe("refresh_token");
     expect(token.seen.at(-1)?.get("refresh_token")).toBe("ghr_refresh_1");
   });
+
+  test("a refreshed token keeps the tools as listed; a new sign-in lists them again", async () => {
+    f = await setup();
+    const token = tokenEndpoint();
+    const deps = depsOf(f, { http: token.http });
+    const signIn = async () => {
+      const { authorizeUrl, state } = await startOAuth(deps, f.owner.id, f.org.id, "github");
+      token.setChallenge(new URL(authorizeUrl).searchParams.get("code_challenge") ?? "");
+      await completeOAuth(deps, { id: f.owner.id }, { state, code: "good-code" });
+    };
+    await signIn();
+    const mcp = fakeGithubMcp();
+    // A minute before the token ends: the first listing refreshes it. Each listing opens a session.
+    const soon = depsOf(f, { http: token.http, now: () => new Date(Date.now() + 3590_000) });
+    const source = createConnectorToolSource({ ...soon, connect: mcp.connect });
+    const ctx = {
+      db: f.db,
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      runId: crypto.randomUUID(),
+      channelId: f.general.id,
+      threadRootId: crypto.randomUUID(),
+      triggerMessageId: crypto.randomUUID(),
+    };
+    const names = async () => (await source.tools(ctx)).map((t) => t.name);
+    const listed = await names();
+    expect(listed.length).toBeGreaterThan(0);
+    expect(token.seen.at(-1)?.get("grant_type")).toBe("refresh_token");
+    expect(mcp.sessions.map((s) => s.headers.authorization)).toEqual(["Bearer gho_token_2"]);
+    expect(await names()).toEqual(listed);
+    expect(mcp.sessions).toHaveLength(1);
+
+    await signIn();
+    expect(await names()).toEqual(listed);
+    expect(mcp.sessions).toHaveLength(2);
+  });
 });
 
 describe("a sign-in that stops working", () => {

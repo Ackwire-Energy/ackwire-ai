@@ -708,6 +708,8 @@
         "teamMadePersonal": "Agenmu sudah di sini. Kita lanjut kapan pun kamu siap.",
         "plan": "Setelah paketnya, tinggal hubungkan AI. Nanti aku tunjukkan di mana.",
         "planThen": "Setelah paketnya aktif, layar berikutnya untuk menghubungkan AI-mu.",
+        "area": "Satu pertanyaan terakhir sebelum tim.",
+        "areaPersonal": "Satu pertanyaan terakhir sebelum agen-agenmu.",
         "ask": "Sudah punya tim di tempat lain? Aku bawa semuanya ke sini.",
         "start": "Aku punya tim yang siap untuk pekerjaan kalian. Atau kita mulai berdua saja.",
         "askPersonal": "Sudah memakai agen di tempat lain? Aku bawa semuanya ke sini.",
@@ -723,6 +725,20 @@
         "connectedThen": "Nah, beres. Tinggal mengundang orang-orang yang bekerja denganmu.",
         "people": "Sekarang orang-orangnya. Kasih tahu email mereka dan aku kirim undangannya.",
         "peopleLink": "Sekarang orang-orangnya. Kirim tautannya ke mereka dan aku tunjukkan tiap permintaan."
+      },
+      "area": {
+        "title": "Kalau kamu, mengurus bidang apa?",
+        "lead": "Hanya supaya kami tahu siapa yang memakai agentes.chat.",
+        "skip": "Lewati langkah ini",
+        "options": {
+          "dev": "Pengembangan",
+          "marketing": "Marketing",
+          "sales": "Penjualan",
+          "finance": "Keuangan",
+          "ops": "Operasional",
+          "support": "Layanan pelanggan",
+          "other": "Lainnya"
+        }
       },
       "preview": {
         "label": "Ruang kerjamu, saat kamu menjawab",
@@ -844,7 +860,7 @@
       "lead": "Bisa diubah nanti, tidak ada yang hilang.",
       "personal": "Untukku",
       "personalText": "Agen yang mengurus harimu.",
-      "team": "Untuk perusahaan atau timku",
+      "team": "Untuk timku",
       "teamText": "Orang dan agen bekerja bersama, dengan kanal, peran, dan persetujuan.",
       "personalExamples": "Harimu jam 7 · Tagihan · Latihan",
       "teamExamples": "Layanan pelanggan · Keuangan · Laporan"

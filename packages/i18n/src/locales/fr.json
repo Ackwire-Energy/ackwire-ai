@@ -728,6 +728,8 @@
         "teamMadePersonal": "Vos agents sont déjà là. On continue quand vous voulez.",
         "plan": "Après l'abonnement, il ne reste qu'à connecter une IA. Je vous montre où.",
         "planThen": "Une fois l'abonnement activé, l'écran suivant sert à connecter votre IA.",
+        "area": "Une dernière question avant l'équipe.",
+        "areaPersonal": "Une dernière question avant vos agents.",
         "ask": "Vous avez déjà une équipe ailleurs ? Je l'apporte ici en entier.",
         "start": "J'ai une équipe prête pour ce que vous faites. Ou on commence à deux.",
         "askPersonal": "Vous utilisez déjà des agents ailleurs ? Je les apporte tous ici.",
@@ -743,6 +745,20 @@
         "connectedThen": "Voilà. Il ne reste qu'à inviter les personnes avec qui vous travaillez.",
         "people": "Maintenant, les personnes. Donnez-moi leurs e-mails et j'envoie les invitations.",
         "peopleLink": "Maintenant, les personnes. Envoyez-leur le lien et je vous montre chaque demande."
+      },
+      "area": {
+        "title": "Et vous, vous travaillez sur quoi ?",
+        "lead": "Juste pour savoir qui utilise agentes.chat.",
+        "skip": "Passer cette étape",
+        "options": {
+          "dev": "Développement",
+          "marketing": "Marketing",
+          "sales": "Ventes",
+          "finance": "Finances",
+          "ops": "Opérations",
+          "support": "Service client",
+          "other": "Autre chose"
+        }
       },
       "preview": {
         "label": "Votre espace de travail, pendant que vous répondez",
@@ -878,7 +894,7 @@
       "lead": "Vous pourrez le changer plus tard, rien n'est perdu.",
       "personal": "Pour moi",
       "personalText": "Des agents pour votre agenda, vos factures, votre entraînement et tout ce que vous leur demandez.",
-      "team": "Pour mon entreprise ou mon équipe",
+      "team": "Pour mon équipe",
       "teamText": "Personnes et agents travaillent ensemble, avec des canaux, des rôles et des approbations.",
       "personalExamples": "Ta journée à 7 h · Factures · Sport",
       "teamExamples": "Support client · Finances · Rapports"
