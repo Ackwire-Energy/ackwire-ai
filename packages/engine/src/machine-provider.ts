@@ -20,7 +20,7 @@ import {
 import { ARTIFACT_LIMITS } from "./artifacts";
 import { type MachineCaller, MachineRequestError, type MachineStatus } from "./machine-hub";
 import { MachineOfflineError, MachinePausedError } from "./machines";
-import { runnerUpdateWay } from "./runner-update";
+import { personAtComputerWay, runnerUpdateWay } from "./runner-update";
 
 /** Provider id of connected machines; their computer id is the machine id. */
 export const MACHINE_PROVIDER_ID = "machine";
@@ -35,10 +35,18 @@ export const foldersFixedMessage = (name: string) =>
  * A runner's `not_allowed` (protocol 10): the path is outside every folder
  * this agent may use on the machine, or the tool is off there. Points the
  * agent at `request_folder_access` for a folder, where someone can answer it
- * (`managed`: nobody can). The command policy's own (`policyRefusal`) already
+ * (`managed`: nobody can). On a `device`, a person's computer the agent
+ * named, only that person can, on that computer: the tool is for the agent's
+ * own computer alone. The command policy's own (`policyRefusal`) already
  * says where to go and stays as it is.
  */
-export function notAllowedMessage(name: string, detail: string, path?: string, managed = false) {
+export function notAllowedMessage(
+  name: string,
+  detail: string,
+  path?: string,
+  managed = false,
+  device?: Pick<MachineStatus, "os" | "executors">,
+) {
   if (policyRefusal(detail)) return detail;
   if (managed) {
     const pointer = " (ask for it with request_folder_access)";
@@ -46,8 +54,16 @@ export function notAllowedMessage(name: string, detail: string, path?: string, m
       ? `${detail.replace(pointer, ".")} ${foldersFixedMessage(name)}`
       : `${(detail || "Not allowed on this computer").replace(/\.$/, "")}. Tell the people.`;
   }
+  const absolute = path && /^(\/|~|[A-Za-z]:)/.test(path);
+  if (device) {
+    return `${(detail || "Not allowed on this computer").replace(/ \(ask for it with request_folder_access\)|\.$/g, "")}. ${
+      absolute
+        ? `Only the person at ${name} can allow ${path}, ${personAtComputerWay(device, "Folders", [`folders allow ${path}`])}: tell them, or work inside your own folder.`
+        : `On ${name}, only the person at it can allow folders or turn tools on: tell them.`
+    }`;
+  }
   return `${detail || "Not allowed on this computer."} ${
-    path && /^(\/|~|[A-Za-z]:)/.test(path)
+    absolute
       ? `${path} is outside the folders you may use on ${name}: ask its owner for it with request_folder_access (path and a short reason), or work inside your own folder.`
       : `On ${name}, only the person at the computer can allow folders or turn tools on: for a folder outside your own, ask with request_folder_access; for a tool that is off, tell the people.`
   }`;
@@ -57,13 +73,22 @@ export function notAllowedMessage(name: string, detail: string, path?: string, m
  * Runner error codes → what the agent reads (and tells the people). The runner's error stays as the `cause` of the
  * words given, so a caller can still tell where it failed (a Vault key's use, ADR 0144 §4).
  */
-function explain(error: unknown, name: string, path?: string, managed = false, tooLarge?: string): Error {
+function explain(
+  error: unknown,
+  status: MachineStatus | null,
+  { path, device = false, tooLarge }: { path?: string; device?: boolean; tooLarge?: string } = {},
+): Error {
   if (!(error instanceof MachineRequestError)) return error instanceof Error ? error : new Error(String(error));
   const said = (message: string) => new Error(message, { cause: error });
+  const name = status?.name ?? "computer";
+  const managed = status?.kind === "managed";
   switch (error.code) {
     case "exec_disabled":
+      // A runner that reports access (protocol 10) has a switch for it; an older one only its start flag.
       return said(
-        `Commands are turned off on the computer ${name} (its runner was started with --no-exec): you can only read, write, list and upload files there. Tell the person; its owner can restart the runner without --no-exec.`,
+        status?.access
+          ? `Commands are turned off on the computer ${name}: you can only read, write, list and upload files there. Tell the people: only the person at ${name} can turn commands on, ${personAtComputerWay(status, "Tools, Commands", ["tools enable commands"])}.`
+          : `Commands are turned off on the computer ${name} (its runner was started with --no-exec): you can only read, write, list and upload files there. Tell the person; its owner can restart the runner without --no-exec.`,
       );
     // The runner names what is wrong with the path and what to use instead.
     case "outside_workspace":
@@ -80,7 +105,9 @@ function explain(error: unknown, name: string, path?: string, managed = false, t
       return said(`${path ?? "The file"} didn't reach ${name}: ${error.message}`);
     case "not_allowed":
       // The command policy's `never` (a push our git proxy refuses): callers read its code, as below.
-      return policyRefusal(error.message) ? error : said(notAllowedMessage(name, error.message, path, managed));
+      return policyRefusal(error.message)
+        ? error
+        : said(notAllowedMessage(name, error.message, path, managed, device && status ? status : undefined));
     case "paused":
       return said(
         `The owner paused the computer ${name}: nothing new can start there until they resume it. Tell the people.`,
@@ -132,7 +159,7 @@ export async function requestMadePassword(
     return await openSecret(pair.privateKey, reply.box, madePasswordAad({ requestId, agentId: String(agent.id) }));
   } catch (error) {
     if (error instanceof MachineOfflineError || error instanceof MachinePausedError) throw error;
-    if (error instanceof MachineRequestError) throw explain(error, name);
+    if (error instanceof MachineRequestError) throw explain(error, status);
     throw new Error(`The password from the computer ${name} didn't open. Nothing was saved. Try again.`);
   }
 }
@@ -143,14 +170,13 @@ export async function requestMadePassword(
  * past that the computer moves them itself over HTTP, to our upload URL (`push`) or from our file URL (`pull`).
  * Every request is for `agent`, which the runner keeps in its own folder of the workspace.
  */
-export function createMachineSandboxProvider(hub: MachineCaller, agent: AgentScope): SandboxProvider {
+export function createMachineSandboxProvider(hub: MachineCaller, agent: AgentScope, device = false): SandboxProvider {
   const guard = async <T>(id: string, fn: () => Promise<T>, path?: string, tooLarge?: string): Promise<T> => {
     try {
       return await fn();
     } catch (error) {
       if (error instanceof MachineOfflineError || error instanceof MachinePausedError) throw error;
-      const status = await hub.status(id);
-      throw explain(error, status?.name ?? "computer", path, status?.kind === "managed", tooLarge);
+      throw explain(error, await hub.status(id), { path, device, tooLarge });
     }
   };
   const pullRefusal = async (id: string) => {
@@ -306,6 +332,6 @@ export async function requestVaultKey(
     return { keyId: key.keyId, publicKey: key.publicKey, expiresAt: key.expiresAt };
   } catch (error) {
     if (error instanceof MachineOfflineError || error instanceof MachinePausedError) throw error;
-    throw explain(error, name);
+    throw explain(error, status);
   }
 }
