@@ -1,6 +1,13 @@
 import { and, type Executor, eq, schema } from "@agenteschat/db";
 import { appLocale } from "@agenteschat/i18n/locale";
-import { fedByRoutine, personOfMessage, type RunAuthority, runAuthority, runAuthorityById } from "./authority";
+import {
+  accountablePerson,
+  fedByRoutine,
+  personOfMessage,
+  type RunAuthority,
+  runAuthority,
+  runAuthorityById,
+} from "./authority";
 import type { Audience } from "./task-access";
 import type { ToolContext } from "./tools/types";
 import type { WikiActor } from "./wiki";
@@ -39,16 +46,12 @@ export async function personLocale(db: Executor, userId: string | null, preferre
 }
 
 /**
- * The language of a line the server writes in a chat as an agent (a device wait, a task's end): the person it works
- * for, else the person behind its run's trigger message, else English.
+ * The language of a line the server writes in a chat as an agent (a device wait, a task's end, a long work's update):
+ * the person it works for, else the one behind its run (who asked, or a routine's creator), else English.
  */
 export async function lineLocale(db: Executor, orgId: string, person: string | null, runId: string | null) {
   if (person || !runId) return personLocale(db, person);
-  const [run] = await db
-    .select({ trigger: agentRuns.triggerMessageId })
-    .from(agentRuns)
-    .where(and(eq(agentRuns.orgId, orgId), eq(agentRuns.id, runId)));
-  return personLocale(db, run ? await personOfMessage(db, orgId, run.trigger) : null);
+  return personLocale(db, accountablePerson(await runAuthorityById(db, orgId, runId)));
 }
 
 /** `visible_to` of the tools that make something people read (ADR 0151). */
