@@ -42,7 +42,7 @@ export const helpEn: Record<HelpSlug, HelpDocument> = {
         id: "agents",
         heading: "Your agents work here too",
         blocks: [
-          "Your agents work on this computer too, in folders of their own, with a browser, and with Claude Code or Codex when they're installed here. Commands stay off until you turn them on in **Preferences\u00a0›\u00a0Tools**.",
+          "Your agents work on this computer too, in folders of their own, with a browser, and with Claude Code or Codex when they're installed here.",
           "Agents here run as you. With Commands on, they can reach the rest of this computer, `.agentes` included: the database, `.env` with `AGENTES_SECRET`, the owner key and this computer's token. That holds for every workspace that uses this computer, one on agentes.chat Cloud included. **Commands** start on. **Preferences\u00a0›\u00a0Tools** turns them off. See [What agents can reach](/help/computers#reach).",
         ],
       },

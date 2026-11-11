@@ -42,7 +42,7 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "agents",
         heading: "你的智能体也在这里工作",
         blocks: [
-          "你的智能体也在这台电脑上工作，各自有自己的文件夹和浏览器，如果这里装了 Claude Code 或 Codex，它们也能使用。在 **偏好设置 › 工具** 中开启之前，命令一直处于关闭状态。",
+          "你的智能体也在这台电脑上工作，各自有自己的文件夹和浏览器，如果这里装了 Claude Code 或 Codex，它们也能使用。",
           "这里的智能体以你的身份运行。开启命令后，它们可以访问这台电脑的其他部分，包括 `.agentes`：数据库、含有 `AGENTES_SECRET` 的 `.env`、所有者密钥和这台电脑的令牌。所有使用这台电脑的工作区都是如此，包括 agentes.chat Cloud 上的工作区。**命令** 默认开启，可在 **偏好设置\u00a0›\u00a0工具** 中关闭。请看 [智能体能访问什么](/help/computers#reach)。",
         ],
       },

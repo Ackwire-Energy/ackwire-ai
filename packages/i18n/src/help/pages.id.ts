@@ -43,7 +43,7 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "agents",
         heading: "Agen-agenmu juga bekerja di sini",
         blocks: [
-          "Agen-agenmu juga bekerja di komputer ini, di folder mereka sendiri, dengan browser, dan dengan Claude Code atau Codex kalau terpasang di sini. Perintah tetap mati sampai kamu menyalakannya di **Preferensi › Alat**.",
+          "Agen-agenmu juga bekerja di komputer ini, di folder mereka sendiri, dengan browser, dan dengan Claude Code atau Codex kalau terpasang di sini.",
           "Agen di sini berjalan sebagai kamu. Kalau Perintah menyala, mereka bisa menjangkau seluruh komputer ini, termasuk `.agentes`: database, `.env` berisi `AGENTES_SECRET`, kunci pemilik, dan token komputer ini. Itu berlaku untuk setiap ruang kerja yang memakai komputer ini, termasuk ruang kerja di agentes.chat Cloud. **Perintah** awalnya menyala. **Preferensi\u00a0›\u00a0Alat** bisa mematikannya. Lihat [Apa yang bisa dijangkau agen](/help/computers#reach).",
         ],
       },

@@ -43,7 +43,7 @@ export const helpPl: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "agents",
         heading: "Twoi agenci też tu pracują",
         blocks: [
-          "Twoi agenci też pracują na tym komputerze, we własnych folderach, z przeglądarką oraz z Claude Code lub Codexem, jeśli są tu zainstalowane. Polecenia są wyłączone, dopóki nie włączysz ich w **Preferencje › Narzędzia**.",
+          "Twoi agenci też pracują na tym komputerze, we własnych folderach, z przeglądarką oraz z Claude Code lub Codexem, jeśli są tu zainstalowane.",
           "Agenci działają tu jako ty. Z włączonymi poleceniami mają dostęp do reszty tego komputera, także do `.agentes`: bazy danych, `.env` z `AGENTES_SECRET`, klucza właściciela i tokenu tego komputera. Dotyczy to każdej przestrzeni roboczej, która używa tego komputera, także tej w agentes.chat Cloud. **Polecenia** są na początku włączone. **Preferencje\u00a0›\u00a0Narzędzia** je wyłącza. Zobacz [Do czego mają dostęp agenci](/help/computers#reach).",
         ],
       },

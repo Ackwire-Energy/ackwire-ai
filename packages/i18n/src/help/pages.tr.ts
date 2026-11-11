@@ -43,7 +43,7 @@ export const helpTr: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "agents",
         heading: "Ajanlarınız da burada çalışır",
         blocks: [
-          "Ajanlarınız da bu bilgisayarda, kendi klasörlerinde, bir tarayıcıyla ve burada kuruluysa Claude Code ya da Codex ile çalışır. Komutlar, siz **Tercihler › Araçlar** bölümünden açana kadar kapalı kalır.",
+          "Ajanlarınız da bu bilgisayarda, kendi klasörlerinde, bir tarayıcıyla ve burada kuruluysa Claude Code ya da Codex ile çalışır.",
           "Buradaki ajanlar sizin adınıza çalışır. Komutlar açıkken bu bilgisayarın geri kalanına, `.agentes` dahil, ulaşabilirler: veritabanı, `AGENTES_SECRET` içeren `.env`, sahip anahtarı ve bu bilgisayarın jetonu. Bu, agentes.chat Cloud'daki bir çalışma alanı dahil, bu bilgisayarı kullanan her çalışma alanı için geçerlidir. **Komutlar** açık başlar. **Tercihler\u00a0›\u00a0Araçlar** onları kapatır. [Ajanlar nelere ulaşabilir](/help/computers#reach) bölümüne bakın.",
         ],
       },

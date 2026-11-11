@@ -42,7 +42,7 @@ export const helpPtBR: Record<HelpSlug, HelpDocument> = {
         id: "agents",
         heading: "Os agentes também trabalham aqui",
         blocks: [
-          "Os agentes também trabalham neste computador, em pastas só deles, com um navegador e com o Claude Code ou o Codex quando estão instalados aqui. Comandos ficam desligados até você ligar em **Preferências\u00a0›\u00a0Ferramentas**.",
+          "Os agentes também trabalham neste computador, em pastas só deles, com um navegador e com o Claude Code ou o Codex quando estão instalados aqui.",
           "Os agentes aqui rodam como você. Com Comandos ligado, eles alcançam o resto deste computador, inclusive a `.agentes`: o banco de dados, o `.env` com o `AGENTES_SECRET`, a chave do dono e o token deste computador. Isso vale para todo workspace que usa este computador, inclusive um no agentes.chat Cloud. Os **Comandos** começam ligados. **Preferências\u00a0›\u00a0Ferramentas** desliga. Veja [O que os agentes alcançam](/help/computers#reach).",
         ],
       },

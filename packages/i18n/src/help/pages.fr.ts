@@ -43,7 +43,7 @@ export const helpFr: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "agents",
         heading: "Vos agents travaillent ici aussi",
         blocks: [
-          "Vos agents travaillent aussi sur cet ordinateur, dans des dossiers rien qu’à eux, avec un navigateur, et avec Claude Code ou Codex s’ils sont installés ici. Les commandes restent désactivées tant que vous ne les activez pas dans **Préférences › Outils**.",
+          "Vos agents travaillent aussi sur cet ordinateur, dans des dossiers rien qu’à eux, avec un navigateur, et avec Claude Code ou Codex s’ils sont installés ici.",
           "Ici, les agents tournent sous votre compte. Avec les commandes activées, ils peuvent atteindre le reste de cet ordinateur, `.agentes` compris\u00a0: la base de données, le `.env` avec `AGENTES_SECRET`, la clé du propriétaire et le jeton de cet ordinateur. C’est vrai pour chaque espace de travail qui utilise cet ordinateur, y compris un espace sur agentes.chat Cloud. Les **Commandes** sont activées au départ. **Préférences\u00a0›\u00a0Outils** les désactive. Voir [Ce que les agents peuvent atteindre](/help/computers#reach).",
         ],
       },

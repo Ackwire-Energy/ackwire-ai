@@ -43,7 +43,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "agents",
         heading: "Je agents werken hier ook",
         blocks: [
-          "Je agents werken ook op deze computer, in hun eigen mappen, met een browser, en met Claude Code of Codex als die hier zijn geïnstalleerd. Opdrachten staan uit tot je ze aanzet in **Voorkeuren › Tools**.",
+          "Je agents werken ook op deze computer, in hun eigen mappen, met een browser, en met Claude Code of Codex als die hier zijn geïnstalleerd.",
           "Agents draaien hier onder jouw naam. Met Opdrachten aan kunnen ze bij de rest van deze computer, ook bij `.agentes`: de database, `.env` met `AGENTES_SECRET`, de eigenaarssleutel en het token van deze computer. Dat geldt voor elke werkruimte die deze computer gebruikt, ook een op agentes.chat Cloud. **Opdrachten** staan eerst aan. **Voorkeuren\u00a0›\u00a0Tools** zet ze uit. Zie [Waar agents bij kunnen](/help/computers#reach).",
         ],
       },

@@ -43,7 +43,7 @@ export const helpEs: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "agents",
         heading: "Tus agentes también trabajan aquí",
         blocks: [
-          "Tus agentes también trabajan en esta computadora, en carpetas propias, con un navegador, y con Claude Code o Codex cuando están instalados aquí. Los comandos quedan desactivados hasta que los actives en **Preferencias › Herramientas**.",
+          "Tus agentes también trabajan en esta computadora, en carpetas propias, con un navegador, y con Claude Code o Codex cuando están instalados aquí.",
           "Aquí los agentes se ejecutan como tú. Con los comandos activados, pueden llegar al resto de esta computadora, `.agentes` incluida: la base de datos, el `.env` con `AGENTES_SECRET`, la clave del propietario y el token de esta computadora. Eso vale para cada espacio de trabajo que usa esta computadora, incluido uno en agentes.chat Cloud. Los **Comandos** empiezan activados. **Preferencias\u00a0›\u00a0Herramientas** los desactiva. Consulta [A qué pueden llegar los agentes](/help/computers#reach).",
         ],
       },

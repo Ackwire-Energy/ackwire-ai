@@ -43,7 +43,7 @@ export const helpDe: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "agents",
         heading: "Deine Agenten arbeiten auch hier",
         blocks: [
-          "Deine Agenten arbeiten auch auf diesem Computer, in eigenen Ordnern, mit einem Browser und mit Claude Code oder Codex, wenn sie hier installiert sind. Befehle bleiben aus, bis du sie unter **Einstellungen › Tools** einschaltest.",
+          "Deine Agenten arbeiten auch auf diesem Computer, in eigenen Ordnern, mit einem Browser und mit Claude Code oder Codex, wenn sie hier installiert sind.",
           "Agenten laufen hier als du. Mit eingeschalteten Befehlen erreichen sie den Rest dieses Computers, auch `.agentes`: die Datenbank, `.env` mit `AGENTES_SECRET`, den Inhaberschlüssel und das Token dieses Computers. Das gilt für jeden Workspace, der diesen Computer nutzt, auch für einen auf agentes.chat Cloud. **Befehle** sind zu Beginn an. **Einstellungen\u00a0›\u00a0Tools** schaltet sie aus. Siehe [Was Agenten erreichen können](/help/computers#reach).",
         ],
       },

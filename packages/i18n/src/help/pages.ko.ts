@@ -43,7 +43,7 @@ export const helpKo: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "agents",
         heading: "에이전트도 여기서 일해요",
         blocks: [
-          "에이전트도 이 컴퓨터에서 각자의 폴더와 브라우저를 쓰며 일하고, Claude Code나 Codex가 설치되어 있으면 그것도 써요. 명령 실행은 **환경설정 › 도구**에서 켜기 전까지 꺼져 있어요.",
+          "에이전트도 이 컴퓨터에서 각자의 폴더와 브라우저를 쓰며 일하고, Claude Code나 Codex가 설치되어 있으면 그것도 써요.",
           "여기서 에이전트는 내 권한으로 실행돼요. 명령을 켜면 `.agentes`를 포함해 이 컴퓨터의 다른 곳에도 접근할 수 있어요. 데이터베이스, `AGENTES_SECRET`이 든 `.env`, 소유자 키, 이 컴퓨터의 토큰도요. agentes.chat Cloud 워크스페이스를 포함해 이 컴퓨터를 쓰는 모든 워크스페이스가 마찬가지예요. **명령**은 처음에 켜져 있어요. **환경설정\u00a0›\u00a0도구**에서 끌 수 있어요. [에이전트가 접근할 수 있는 것](/help/computers#reach)을 보세요.",
         ],
       },
