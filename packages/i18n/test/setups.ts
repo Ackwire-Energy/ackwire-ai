@@ -229,6 +229,9 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     "mobile.devices.reason.xcode_missing",
     "mobile.devices.reason.device_support",
     "mobile.devices.reason.apple_account_missing",
+    "mobile.devices.reason.apple_team_missing",
+    // The iPhone setup window opens only on a Mac.
+    "desktop.iphone.checkingStall",
   ],
 };
 

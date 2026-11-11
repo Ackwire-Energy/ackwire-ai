@@ -1685,11 +1685,11 @@
   "iphone.checking": {
     "value": "Looking at this {{device}}…"
   },
+  "iphone.checkingStall": {
+    "value": "This {{device}} isn't answering yet. Quit agentes.chat from its menu bar icon and open it again."
+  },
   "iphone.xcodeText": {
     "value": "Install Xcode from the App Store. This step goes on by itself when it's there."
-  },
-  "iphone.xcodeOld": {
-    "value": "This iPhone needs a newer Xcode. Update it in the App Store."
   },
   "iphone.updateXcode": {
     "value": "Update Xcode"
@@ -1707,7 +1707,7 @@
     "value": "The download stopped: {{message}}"
   },
   "iphone.accountText": {
-    "value": "Add it in Xcode › Settings › Accounts. A free Apple Account is enough."
+    "value": "Add it in Xcode › Settings › Apple Accounts. A free Apple Account is enough."
   },
   "iphone.openXcode": {
     "value": "Open Xcode"
@@ -1717,9 +1717,6 @@
   },
   "iphone.unlockText": {
     "value": "Unlock the iPhone and keep it unlocked for a moment."
-  },
-  "iphone.oldText": {
-    "value": "This iPhone's iOS is too old for Xcode's tools."
   },
   "iphone.devModeHint": {
     "value": "It shows in Settings only after a Mac pairs with the iPhone. This {{device}} did that."

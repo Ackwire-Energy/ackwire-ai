@@ -32727,6 +32727,12 @@
   "devices.reason.apple_account_missing": {
     "value": "Xcode isn't signed in to an Apple Account"
   },
+  "devices.reason.apple_team_missing": {
+    "value": "Xcode shows no team yet"
+  },
+  "devices.reason.ui_not_authorized": {
+    "value": "The iPhone refused the test helper's taps"
+  },
   "devices.reason.team_limit": {
     "value": "The free Apple Account reached its app limit"
   },
@@ -32750,6 +32756,9 @@
   },
   "devices.reason.other": {
     "value": "It needs something on the device"
+  },
+  "devices.reason.iosTooOld": {
+    "value": "It runs iOS {{version}}, agents need iOS 17 or newer"
   },
   "devices.fix.locked": {
     "value": "Unlock it"
@@ -32783,6 +32792,12 @@
   },
   "devices.fix.apple_account_missing": {
     "value": "Sign in to Xcode"
+  },
+  "devices.fix.apple_team_missing": {
+    "value": "Run an app on the iPhone from Xcode once"
+  },
+  "devices.fix.ui_not_authorized": {
+    "value": "Unlock the iPhone"
   },
   "devices.fix.team_limit": {
     "value": "Remove an app you built"
@@ -33430,7 +33445,10 @@
     "value": "Added"
   },
   "devices.iphone.accountText": {
-    "value": "Add a free or paid one in Xcode on {{mac}}: Settings › Accounts."
+    "value": "Add a free or paid one in Xcode on {{mac}}: Settings › Apple Accounts."
+  },
+  "devices.iphone.teamMissingText": {
+    "value": "Xcode is signed in but shows no team yet. In Xcode, make any iOS app, pick your team under Signing & Capabilities and run it on the iPhone once."
   },
   "devices.iphone.connectedDone": {
     "value": "{{name}} · iOS {{version}}"
@@ -33461,6 +33479,48 @@
   },
   "devices.iphone.teamLimitText": {
     "value": "Remove an app you built yourself from the iPhone: a free Apple Account allows 3."
+  },
+  "devices.iphone.xcodeOld": {
+    "value": "{{name}} runs iOS {{version}} and Xcode on {{mac}} knows iOS {{sdk}} at most. Install Xcode {{major}}, then run this in Terminal."
+  },
+  "devices.iphone.xcodeOldAny": {
+    "value": "{{name}} runs iOS {{version}}, newer than Xcode on {{mac}} knows. Install Xcode {{major}}, then run this in Terminal."
+  },
+  "devices.iphone.uiRefusedText": {
+    "value": "The iPhone refused the test helper's taps. Unlock it and enter its passcode if it asks. If it keeps happening, turn Settings › Developer › Enable UI Automation off and on."
+  },
+  "devices.iphone.tooOld": {
+    "value": "{{name}} runs iOS {{version}}, and agents need iOS 17 or newer. Update it if it can, or plug in a newer iPhone."
+  },
+  "devices.iphone.tooOldVersion": {
+    "value": "16 or older"
+  },
+  "devices.iphone.pluggedIn": {
+    "value": "It's plugged in"
+  },
+  "devices.iphone.stall.xcode": {
+    "value": "Installed already? Open Xcode once and agree to its terms, so {{mac}} can use it."
+  },
+  "devices.iphone.stall.tools": {
+    "value": "The download needs {{mac}} awake and online, about 8 GB. If it stopped, get iOS in Xcode › Settings › Components."
+  },
+  "devices.iphone.stall.account": {
+    "value": "Signed in already? In Xcode, make any iOS app, pick your team under Signing & Capabilities and run it on the iPhone once."
+  },
+  "devices.iphone.stall.connected": {
+    "value": "{{mac}} doesn't see an iPhone yet. Use a cable that carries data, not only power, unlock the iPhone and tap Trust if it asks."
+  },
+  "devices.iphone.stall.trust": {
+    "value": "No Trust prompt? Unplug the iPhone, unlock it and plug it in again, then tap Trust and enter its passcode."
+  },
+  "devices.iphone.stall.developerMode": {
+    "value": "Developer Mode turns on only after the iPhone restarts. Tap Restart, then Turn On once it's back. No switch there? Unplug the iPhone and plug it in again."
+  },
+  "devices.iphone.stall.uiAutomation": {
+    "value": "The switch shows once Developer Mode is on and the iPhone restarted. Keep it unlocked while you look."
+  },
+  "devices.iphone.stall.helper": {
+    "value": "{{mac}} builds the test helper and starts it on the iPhone, which takes a few minutes the first time. Keep the iPhone unlocked and plugged in."
   },
   "devices.iphone.ready": {
     "value": "{{name}} is ready for agents."

@@ -13444,6 +13444,8 @@ export const ptBR = {
       helper_missing: "O assistente de testes ainda não foi preparado",
       helper_expired: "O assistente de testes precisa ser renovado",
       apple_account_missing: "O Xcode não está conectado a uma Conta Apple",
+      apple_team_missing: "O Xcode ainda não mostra um time",
+      ui_not_authorized: "O iPhone recusou os toques do assistente de testes",
       team_limit: "A Conta Apple gratuita atingiu o limite de apps",
       helper_untrusted: "O iPhone ainda não confia no assistente de testes",
       booting: "Iniciando",
@@ -13452,6 +13454,7 @@ export const ptBR = {
       os_too_old: "Este sistema é antigo demais para as ferramentas",
       adb_offline: "O celular não está respondendo",
       other: "Ele precisa de algo no dispositivo",
+      iosTooOld: "Ele usa o iOS {{version}}, os agentes precisam do iOS 17 ou mais novo",
     },
     fix: {
       locked: "Desbloqueie",
@@ -13465,6 +13468,8 @@ export const ptBR = {
       helper_missing: "Abra o app no Mac",
       helper_expired: "Abra o app no Mac",
       apple_account_missing: "Entre no Xcode",
+      apple_team_missing: "Rode um app no iPhone pelo Xcode uma vez",
+      ui_not_authorized: "Desbloqueie o iPhone",
       team_limit: "Remova um app que você criou",
       helper_untrusted: "Confie nele no iPhone",
       booting: "Espere ele iniciar",
@@ -13732,7 +13737,9 @@ export const ptBR = {
       toolsDone: "Baixadas pelo Mac",
       toolsText: "O Mac baixa sozinho, uns 8 GB.",
       accountDone: "Adicionada",
-      accountText: "Adicione uma, gratuita ou paga, no Xcode em {{mac}}: Settings\u00a0›\u00a0Accounts.",
+      accountText: "Adicione uma, gratuita ou paga, no Xcode em {{mac}}: Settings\u00a0›\u00a0Apple Accounts.",
+      teamMissingText:
+        "O Xcode está conectado, mas ainda não mostra um time. No Xcode, crie qualquer app de iOS, escolha seu time em Signing & Capabilities e rode no iPhone uma vez.",
       connectedDone: "{{name}} · iOS {{version}}",
       connectedText: "Conecte o iPhone a {{mac}} com um cabo.",
       trustDone: "Confiado",
@@ -13743,6 +13750,33 @@ export const ptBR = {
       helperText: "Criado e renovado pelo Mac a cada 7 dias. Uma Conta Apple gratuita no Xcode basta.",
       helperUntrustedText: "Toque no nome do desenvolvedor e em Confiar.",
       teamLimitText: "Remova do iPhone um app que você mesmo criou: a Conta Apple gratuita permite 3.",
+      xcodeOld:
+        "{{name}} usa o iOS {{version}} e o Xcode em {{mac}} conhece no máximo o iOS {{sdk}}. Instale o Xcode {{major}} e rode isto no Terminal.",
+      xcodeOldAny:
+        "{{name}} usa o iOS {{version}}, mais novo do que o Xcode em {{mac}} conhece. Instale o Xcode {{major}} e rode isto no Terminal.",
+      uiRefusedText:
+        "O iPhone recusou os toques do assistente de testes. Desbloqueie e digite o código se ele pedir. Se continuar, desligue e ligue Ajustes\u00a0›\u00a0Desenvolvedor\u00a0›\u00a0Ativar Automação de UI.",
+      tooOld:
+        "{{name}} usa o iOS {{version}}, e os agentes precisam do iOS 17 ou mais novo. Atualize se ele aceitar, ou conecte um iPhone mais novo.",
+      tooOldVersion: "16 ou anterior",
+      pluggedIn: "Já está conectado",
+      stall: {
+        xcode: "Já instalou? Abra o Xcode uma vez e aceite os termos, para {{mac}} poder usar.",
+        tools:
+          "O download precisa de {{mac}} ligado e com internet, uns 8 GB. Se parou, baixe o iOS em Xcode\u00a0›\u00a0Settings\u00a0›\u00a0Components.",
+        account:
+          "Já entrou? No Xcode, crie qualquer app de iOS, escolha seu time em Signing & Capabilities e rode no iPhone uma vez.",
+        connected:
+          "{{mac}} ainda não vê um iPhone. Use um cabo que passe dados, não só carga, desbloqueie o iPhone e toque em Confiar se ele pedir.",
+        trust:
+          "Não apareceu Confiar? Desconecte o iPhone, desbloqueie e conecte de novo, depois toque em Confiar e digite o código.",
+        developerMode:
+          "O Modo de Desenvolvedor só liga depois que o iPhone reinicia. Toque em Reiniciar e em Ativar quando ele voltar. Não tem a opção? Desconecte o iPhone e conecte de novo.",
+        uiAutomation:
+          "A opção aparece quando o Modo de Desenvolvedor está ativo e o iPhone reiniciou. Deixe desbloqueado enquanto procura.",
+        helper:
+          "{{mac}} cria o assistente de testes e abre no iPhone, o que leva alguns minutos na primeira vez. Deixe o iPhone desbloqueado e conectado.",
+      },
       ready: "{{name}} está pronto para os agentes.",
       path: {
         settings: "Ajustes",
