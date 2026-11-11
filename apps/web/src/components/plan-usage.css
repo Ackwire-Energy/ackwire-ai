@@ -46,16 +46,16 @@
 /*
  * Configurações › IA e uso: an account is a row that opens. One step (--space-3) between everything in it: the head's
  * parts, the head and what it folds, and each block inside. The head is a grid of the mark, the name, the meter and
- * the chevron, with the line of a plan near its limit under all four, starting on the mark's edge. A name that wraps
- * keeps the mark at its top and the meter and the chevron on its first line (`--line`, the mark's height): none of
- * them drifts to the middle of a tall row.
+ * the chevron, with the line of a plan near its limit under all four, starting on the mark's edge. The mark is a list
+ * row's face (24px, as MediaRow's): no taller than a line and a quarter, so the name's first line, the meter and the
+ * chevron sit on its middle (`--line`) however many lines the name wraps to.
  */
 .plan-row + .plan-row {
   border-top: 1px solid var(--line);
 }
 .plan-row__head {
   display: grid;
-  --line: var(--mediarow-face, 30px);
+  --line: 24px;
   grid-template-columns: auto minmax(0, 1fr) minmax(0, 180px) auto;
   align-items: start;
   gap: var(--space-1) var(--space-3);
@@ -77,10 +77,14 @@ html:not([data-pointer]) .plan-row__head:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring-inset);
 }
-/* The name's 22px line sits on the mark's middle: 4 above and below it make the mark's 30. */
-.plan-row__head .plan-acct__name {
+.plan-row__head > .ac-brand {
+  width: var(--line);
+  height: var(--line);
+}
+/* The name's 22px line on the mark's middle. Room above it only: under its last line the row's padding is whole. */
+.plan-row__head > .plan-acct__name {
   grid-column: 2;
-  margin-block: var(--space-1);
+  margin-top: calc((var(--line) - 22px) / 2);
   overflow-wrap: anywhere;
   text-wrap: wrap;
 }
@@ -89,10 +93,15 @@ html:not([data-pointer]) .plan-row__head:focus-visible {
 .plan-row__head .plan-acct__chip {
   margin-left: 0;
 }
-.plan-row__meter {
+/* One line on the mark's middle: the tightest window in words, then its bar, each half of the column so every row's
+   bar starts on one edge. Words longer than their half take the room from the bar. */
+.plan-row__head > .plan-row__meter {
   grid-column: 3;
-  min-height: var(--line);
+  grid-template-columns: minmax(max-content, 1fr) 1fr;
+  align-items: center;
   align-content: center;
+  gap: var(--space-2);
+  min-height: var(--line);
 }
 /* "de Ana" moves to the next line whole. */
 .plan-row__owner {
@@ -168,18 +177,28 @@ html:not([data-pointer]) .plan-row__head:focus-visible {
     transition: none;
   }
 }
-/* A phone: the meter under the name, as wide as the words, so a long name keeps the row's width. */
+/* A phone: the mark, the name and the chevron on one line, then the plan and whose it is, the meter and the limit's
+   line, each at the row's width from the mark's edge. The mark never keeps a column beside them. */
 @media (max-width: 560px) {
   .plan-row__head {
     grid-template-columns: auto minmax(0, 1fr) auto;
+    row-gap: var(--space-2);
   }
-  .plan-row__meter {
-    grid-column: 2;
-    grid-row: 2;
-    min-height: 0;
+  .plan-row__head > .plan-acct__name {
+    display: contents;
+  }
+  .plan-row__title {
+    grid-area: 1 / 2;
+    margin-top: calc((var(--line) - 22px) / 2);
+    overflow-wrap: anywhere;
   }
   .plan-row__chevron {
     grid-column: 3;
+  }
+  .plan-row__facts,
+  .plan-row__head > .plan-row__meter {
+    grid-column: 1 / -1;
+    min-height: 0;
   }
 }
 .plan-block__month {
@@ -214,13 +233,15 @@ html:not([data-pointer]) .plan-row__head:focus-visible {
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
+/* A one-line row is a small control tall. Its face sits on the first line's capitals, as an `.ac-iconline` lead does,
+   so it stays there when the words wrap. */
 .plan-shares__row {
   display: grid;
   grid-template-columns: 20px minmax(0, 1fr);
-  align-items: center;
+  align-items: start;
   column-gap: var(--space-2);
-  min-height: var(--control-h-sm);
-  padding: 0;
+  /* Browsers without the lh unit: the page's 22px line. */
+  padding: calc((var(--control-h-sm) - 22px) / 2) 0;
   border: 0;
   background: none;
   font: inherit;
@@ -228,6 +249,18 @@ html:not([data-pointer]) .plan-row__head:focus-visible {
   text-align: left;
   text-decoration: none;
   cursor: pointer;
+}
+.plan-shares__row > :first-child {
+  line-height: inherit;
+  translate: 0 calc(11px - var(--cap-mid) - 50%);
+}
+@supports (top: 1lh) {
+  .plan-shares__row {
+    padding-block: calc((var(--control-h-sm) - 1lh) / 2);
+  }
+  .plan-shares__row > :first-child {
+    translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
+  }
 }
 .plan-shares__row + .plan-shares__row {
   border-top: 1px solid var(--line);

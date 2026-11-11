@@ -196,6 +196,7 @@ function AccountRow({
     <AgentShares shares={shares} window={shares.window ? text.short(shares.window) : null} />
   );
   const owner = accountOwner(t, account);
+  const chips = Boolean(account.plan) || Boolean(account.signedOut);
   return (
     <div className="plan-row" data-open={open || undefined}>
       <button
@@ -209,25 +210,23 @@ function AccountRow({
         }}
       >
         <ProviderLogo id={account.provider ?? account.kind} size="sm" off={account.signedOut} />
+        {/* Two parts: one line of words on a wide row, and on a phone the name beside the mark with the plan and
+            whose it is under both. The space that parts them ends the name, so neither starts with it. */}
         <span className="plan-acct__name">
-          {accountName(t, account)}
-          {account.plan && (
-            <>
-              {WIDE_SPACE}
-              <span className="plan-acct__chip">{planName(account.plan)}</span>
-            </>
-          )}
-          {account.signedOut && (
-            <>
-              {WIDE_SPACE}
-              <span className="plan-acct__chip plan-acct__chip--out">{t("usageViews.signedOut")}</span>
-            </>
-          )}
-          {owner && (
-            <>
-              {WIDE_SPACE}
-              <span className="plan-row__owner">{owner}</span>
-            </>
+          <span className="plan-row__title">
+            {accountName(t, account)}
+            {(chips || owner) && WIDE_SPACE}
+          </span>
+          {(chips || owner) && (
+            <span className="plan-row__facts">
+              {account.plan && <span className="plan-acct__chip">{planName(account.plan)}</span>}
+              {account.plan && account.signedOut && WIDE_SPACE}
+              {account.signedOut && (
+                <span className="plan-acct__chip plan-acct__chip--out">{t("usageViews.signedOut")}</span>
+              )}
+              {chips && owner && WIDE_SPACE}
+              {owner && <span className="plan-row__owner">{owner}</span>}
+            </span>
           )}
         </span>
         {line?.top && (
