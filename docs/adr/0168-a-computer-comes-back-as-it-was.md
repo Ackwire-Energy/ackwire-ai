@@ -14,11 +14,10 @@
 ## Context
 
 A computer stops under its agents more often than it looks: the nightly reboot that takes the system's updates, a
-host's restart, a sleep that ends in a real stop (ADR 0161), a crash, and the operator moving the workspace's
-computer to another server (the Cloud copies the workspace's folders, then the new machine pairs as the same
-computer). What lives on disk comes back: the agents' files, their sign-ins, their browsers' profiles. What ran
-doesn't. Moving our own workspace from a Contabo VPS to a VM on one of our own hosts held the agents for 2 minutes 40
-seconds, and a terminal open before the move wasn't there after it.
+host's restart, a sleep that ends in a real stop (ADR 0161), a crash, and an operator moving the workspace's computer
+to another server (copying the workspace's folders, then pairing the new machine as the same computer, ADR 0056).
+What lives on disk comes back: the agents' files, their sign-ins, their browsers' profiles. What ran doesn't. A move
+held a workspace's agents for a few minutes, and a terminal open before it wasn't there after it.
 
 Some of it already comes back:
 
@@ -38,11 +37,10 @@ What doesn't: the desktop's other windows (its Files windows, any other app), th
 shell command running in the background (a dev server), and a Terminal's history since its shell started.
 
 Keeping the running programs themselves would mean keeping the computer's memory: a stateful stop or a live
-migration of the VM. Neither fits now. A VM started from saved state runs QEMU as root until its next cold start (Incus
-drops QEMU's privileges only on a fresh start); the hosts we have are an Intel and an AMD, between which no running VM
-can move; and a Contabo VPS isn't ours to move at all. The Cloud's `docs/own-hosts.md` has the details and where a
-live migration could still fit later. So what comes back is rebuilt at the app level: what was open opens again,
-fresh, and says so.
+migration of its VM, where it is one. That isn't a way for every computer. Incus, for one, starts QEMU from saved or
+migrated state as root and drops its privileges only on a cold start; a running VM can't move between processors of
+different vendors; and a computer that isn't a VM of the operator's own can't move at all. So what comes back is
+rebuilt at the app level, on every computer: what was open opens again, fresh, and says so.
 
 ## Decision
 
@@ -57,7 +55,7 @@ runs) keeps:
 - whether the agent's Chrome showed there;
 - the computer it was kept on (`/etc/machine-id`).
 
-The runner's home travels with a move (the Cloud copies it with the workspace), and a reboot keeps it.
+The runner's home travels with a move (the operator copies it with the workspace), and a reboot keeps it.
 
 ### 2. The keeper lists the desktop's app windows
 
@@ -127,9 +125,9 @@ to tell the people, as before. Codex tasks still stop and wake the agent.
 - A stop after the pause: the runner was stopped before the pause, so the record is the desktop's as it was; its next
   start opens it ("restarted"), and the background commands start again once the computer is back.
 - A reboot, a host's restart or a crash of the whole computer: the same (§4).
-- A move: the old machine's work is held (its runner stopped, then every agent process), and the record goes with the
-  runner's home. On the new machine the first start of the desktop opens it ("moved to another server"); the commands
-  start again when its runner pairs.
+- A move: the old computer's runner stops first, then its agents' processes, and the record goes with the runner's
+  home. On the new computer the first start of the desktop opens it ("moved to another server"); the commands start
+  again when its runner pairs.
 
 ### 8. What can't come back
 
@@ -153,7 +151,7 @@ Only a process's memory would bring these, and nothing here keeps it:
 - One more Python process per running desktop, idle between window changes, with a `/proc` read every 30 seconds. It
   needs python3-xlib, which desktop use (ADR 0062) already installs; without it the keeper exits, and only the
   Terminals and nothing else come back.
-- The runner changes (the record, the look it writes), so the Cloud's machines get it through a new runner pin.
+- The runner changes (the record, the look it writes): computers get it with their runner's next update.
 - The keeper's list is the agent's own file: whatever the agent lists opens as the agent, which could run it anyway.
 - A shell task that does something once (a deploy, a migration) runs again after a restart, unless the computer holds
   it for a person: the thread says it started again, and its Stop ends it.
