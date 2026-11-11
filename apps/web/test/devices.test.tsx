@@ -125,12 +125,16 @@ describe("Settings › Devices", () => {
   test("a row's menu opens with Settings, its page, for computers and phones", async () => {
     const { router } = await open(`/org/${ORG_ID}/settings/devices`);
     let menu = await openMenu(screen().getByRole("button", { name: "Sam's MacBook Pro actions" }));
-    expect(within(menu).getAllByRole("menuitem").map((i) => i.textContent)).toEqual(["Settings", "Rename", "Remove"]);
+    expect(
+      within(menu)
+        .getAllByRole("menuitem")
+        .map((i) => i.textContent),
+    ).toEqual(["Settings", "Rename", "Remove"]);
     await click(within(menu).getByRole("menuitem", { name: "Settings" }));
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/devices/${MAC}`);
-    await act(async () => {
-      await router.navigate({ to: `/org/${ORG_ID}/settings/devices` });
-    });
+    await act(() =>
+      router.navigate({ to: "/org/$orgId/settings/$section", params: { orgId: ORG_ID, section: "devices" } }),
+    );
     await settle(4);
     menu = await openMenu(screen().getByRole("button", { name: "Pixel 8 actions" }));
     expect(within(menu).getAllByRole("menuitem")[0]?.textContent).toBe("Settings");

@@ -308,7 +308,10 @@ export function DeviceRowView({
                       to: "/org/$orgId/settings/devices/phones/$phoneId",
                       params: { orgId: org.id, phoneId: d.id },
                     })
-                  : navigate({ to: "/org/$orgId/settings/devices/$deviceId", params: { orgId: org.id, deviceId: d.id } }))
+                  : navigate({
+                      to: "/org/$orgId/settings/devices/$deviceId",
+                      params: { orgId: org.id, deviceId: d.id },
+                    }))
               }
             >
               {t("devices.settings")}
