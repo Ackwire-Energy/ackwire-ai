@@ -1,12 +1,15 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
 import { keys, type Message } from "@agenteschat/client";
 import type { ChatPrefs } from "@agenteschat/client/lib/chat-look";
+import { MessageLookContext, MessageText, Message as Row } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, render, within } from "@testing-library/react";
-import { useLayoutEffect } from "react";
+import { type ReactNode, useLayoutEffect } from "react";
 import { usePageTextSize } from "@/chat/look";
 import {
   ADA_ID,
@@ -99,6 +102,9 @@ describe("the defaults", () => {
     expect(mine.style.getPropertyValue("--msg-mine")).not.toBe("");
     expect(mine.querySelector(".ac-msg__own-foot")).toBeNull();
     expect(mine.querySelector(".ac-msg__text .ac-msg__stamp")?.textContent).toContain(":");
+    expect(mine.style.getPropertyValue("--stamp-text")).toBe(
+      JSON.stringify(mine.querySelector(".ac-msg__stamp .ac-msg__time")?.textContent),
+    );
     const theirs = row("a1");
     expect(theirs.dataset.names).toBe("false");
     expect(theirs.querySelector(".ac-msg__head")).toBeNull();
@@ -190,6 +196,46 @@ describe("Tamanho do texto in a conversation", () => {
       </>,
     );
     expect(painted).toBe("xl");
+  });
+});
+
+describe("The room a bubble's last line keeps for its time", () => {
+  const bubble = (time: ReactNode, own = false) =>
+    render(
+      <MessageLookContext.Provider value={{ style: "bubbles", tone: "light", mine: "#0a7", names: true, faces: true }}>
+        <Row avatar={null} author="Ada" time={time} own={own}>
+          <MessageText>B</MessageText>
+        </Row>
+      </MessageLookContext.Provider>,
+    ).container.querySelector<HTMLElement>(".ac-msg");
+
+  test("is the time's own words, a 12-hour one as a 24-hour one, mine as anyone's", () => {
+    for (const words of ["23:43", "11:08 PM", "오후 11:08"]) {
+      for (const own of [false, true]) {
+        const row = bubble(<time dateTime="2026-01-01T23:08:00Z">{words}</time>, own);
+        expect(row?.style.getPropertyValue("--stamp-text")).toBe(JSON.stringify(words));
+        expect(row?.querySelector(".ac-msg__text > .ac-msg__stamp")?.textContent).toBe(words);
+        cleanup();
+      }
+    }
+    expect(bubble("9:05 AM")?.style.getPropertyValue("--stamp-text")).toBe('"9:05 AM"');
+  });
+
+  test("a time that isn't plain words names none: the sheet keeps the widest clock's room", () => {
+    const row = bubble(
+      <span>
+        <b>23</b>:43
+      </span>,
+    );
+    expect(row?.style.getPropertyValue("--stamp-text")).toBe("");
+  });
+
+  test("the sheet reads those words, and keeps the mark's room on a row of mine before the mark is there", () => {
+    const css = readFileSync(join(import.meta.dir, "../src/chat/looks.css"), "utf8");
+    expect(css).toContain('content: var(--stamp-text, "00:00 PM");');
+    expect(css).toContain(
+      '.ac-msg--own[data-look="bubbles"],\n.ac-msg[data-look="bubbles"]:has(.ac-msg__stamp .ac-msg__aside) {',
+    );
   });
 });
 
