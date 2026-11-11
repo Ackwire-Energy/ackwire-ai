@@ -1,4 +1,4 @@
-import { elapsedClock, type LiveConsult, type LiveRun, usesBrowser } from "@agenteschat/client";
+import { elapsedClock, type LiveConsult, type LiveRun, usesBrowser, workingSinceOf } from "@agenteschat/client";
 import {
   type ActivityEntry,
   activitySentence,
@@ -217,7 +217,7 @@ export const TurnRow = memo(function TurnRow({
   const consults = useRunConsults(run.runId, run, null);
   const pair =
     consults.length > 0 ? <ConsultPairRow askerId={run.agentId} channelId={run.channelId} items={consults} /> : null;
-  const since = run.startedAt ?? run.since ?? null;
+  const since = workingSinceOf(run) ?? run.since ?? null;
   const secs = since ? Math.max(0, now - since) : 0;
   const word = t(`mobile.chat.turn.${phase}`);
   const took = secs >= 2000 ? ` · ${formatDuration(t, secs)}` : "";

@@ -18,7 +18,8 @@ function stepAfter(events: Record<string, unknown>[], ms: number) {
   for (const e of events) s = applyChannelEvent(s, e as Ev, at);
   const run = s.runs.r1;
   if (!run) throw new Error("no run");
-  return barStep(t, { ...run, startedAt: at }, "pt-BR", at + ms);
+  // The turn's work began at `at`: what the bar counts from (`workingSince`), and where the row sits.
+  return barStep(t, { ...run, startedAt: at, workingSince: at }, "pt-BR", at + ms);
 }
 
 const call = (toolUseId: string, tool: string, said?: string) => ({

@@ -579,7 +579,7 @@ test("recording an Android phone: scrcpy with the running adb, else the phone's 
 });
 
 test("a Maestro flow, recorded around: its YAML, log and video in the agent's folder", async () => {
-  const r = rig({ ...ANDROID_STATE, wait: true });
+  const r = rig({ ...ANDROID_STATE, wait: true, videoFirst: true });
   const t = { platform: "android", serial: PIXEL, holder: r.holder("run-1") };
   const flow = "appId: com.acme.app\n---\n- launchApp\n- tapOn: Checkout\n";
   const out = (await r.op({
