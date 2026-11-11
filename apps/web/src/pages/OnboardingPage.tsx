@@ -113,8 +113,8 @@ export function OnboardingPage() {
   const [business, setBusiness] = useState<BusinessType | null>(null);
   // The AI step was on screen in this visit: once the team thinks, its done screen stays until "Go to the workspace".
   const [aiSeen, setAiSeen] = useState(false);
-  // What the AI step's cards picked last in this visit, said on the done screen and the rail ("Claude"), with whether
-  // the workspace had a key then.
+  // What the AI step's dialog connected last in this visit, said on the done screen and the rail ("Claude"), with
+  // whether the workspace had a key then.
   const [aiPick, setAiPick] = useState<{ choice: AiChoice; key: boolean } | null>(null);
   const [polling, setPolling] = useState(false);
   // "Apagar este workspace" (`?delete=1`, which the phone's onboarding opens) and "Apagar conta", kept in the address.
@@ -252,8 +252,8 @@ export function OnboardingPage() {
     if (known && at === "ai" && !deciding) setAiSeen(true);
   }, [known, at, deciding]);
   const aiDone = aiSeen && at === "open";
-  // A pick is named only where the status doesn't say otherwise (its dialog may have been closed, and the AI connected
-  // some other way): a key picked needs the workspace's key, a plan picked no key that came after it.
+  // What the dialog connected is named only where the status doesn't say otherwise (a key connected some other way
+  // after it): a key needs the workspace's key, a plan no key that came after it.
   const keyNow = status.data?.apiKey === true;
   const aiNamed = aiPick && (aiPick.choice === "key" ? keyNow : !keyNow || aiPick.key) ? aiPick.choice : null;
   // The team step's question and the agents it brings from another app (ADR 0055): at the page, so they outlive the
@@ -934,7 +934,7 @@ export function OnboardingPage() {
                   done={aiDone}
                   leaving={open.isPending}
                   picked={aiNamed}
-                  onPick={(choice) => setAiPick({ choice, key: keyNow })}
+                  onConnected={(choice) => setAiPick({ choice, key: keyNow })}
                   onLater={() => open.mutate("later")}
                   onEnter={() => open.mutate("later")}
                 />

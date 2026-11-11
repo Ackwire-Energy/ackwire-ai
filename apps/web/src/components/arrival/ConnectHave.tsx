@@ -22,7 +22,7 @@ export interface HaveItem {
   title: string;
   /** In its owner's group: who else thinks with it, its email or its key's end. */
   about?: string;
-  /** In a list of mixed owners: whose it is ("Sua", "De Hélio", "Chave do workspace"). */
+  /** In a list of mixed owners: whose it is ("Sua", "De Walter", "Chave do workspace"). */
   whose: string;
   /** Its group, by owner: `mine`, `keys`, or another owner's key. */
   group: { key: string; label: string };
@@ -158,8 +158,10 @@ export function HaveRow({
         )}
       </span>
       {state && (
-        <span className="arrival-have__room" data-plan={state.state} aria-hidden="true">
-          <span className="arrival-have__meter">
+        // Only the bar is hidden: how full the plan is stays read with the row, since the rows are sorted and picked
+        // by room (ADR 0032, addendum).
+        <span className="arrival-have__room" data-plan={state.state}>
+          <span className="arrival-have__meter" aria-hidden="true">
             <i style={{ "--used": `${used}%` } as CSSProperties} />
           </span>
           <span className="arrival-have__pct">

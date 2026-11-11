@@ -2455,6 +2455,7 @@
     },
     "team": {
       "title": "Hubungkan AI untuk tim",
+      "titlePersonal": "Hubungkan AI untuk agenmu",
       "asleep_other": "{{count}} agen tanpa AI",
       "asleepSome": "{{n}} dari {{total}} agen tanpa AI",
       "choose": "Pilih",
@@ -2473,6 +2474,7 @@
       },
       "woke_other": "{{count}} agen sudah bangun",
       "wokeAll": "Tim sudah bangun",
+      "wokeAllPersonal": "Agenmu sudah bangun",
       "wokeNone": "Tidak ada yang bangun",
       "thinksAll": "Mereka sudah berpikir dengan paket {{plan}} kamu",
       "thinksOne": "{{name}} sudah berpikir dengan paket {{plan}} kamu",
@@ -2566,7 +2568,8 @@
       "email": "Kami akan mengirim email saat komputernya siap. Kamu boleh menutup halaman ini.",
       "ready": "Komputernya sudah siap.",
       "useKey": "Pakai kunci API sekarang",
-      "connecting": "Komputer server ini terhubung dalam semenit. Kamu bisa masuk di sini begitu terhubung."
+      "connecting": "Komputer server ini terhubung dalam semenit. Kamu bisa masuk di sini begitu terhubung.",
+      "computerLater": "Akun disimpan di komputer yang terhubung. Kamu bisa menghubungkan satu begitu ruang kerja terbuka."
     },
     "theComputer": "komputer",
     "own": {
@@ -4478,7 +4481,6 @@
       "failed": "Tidak bisa menyimpan. Coba lagi.",
       "use": "Pakai",
       "brain": {
-        "sub": "Hanya berlaku untuk {{name}}, di setiap percakapan.",
         "model": "Kunci API",
         "modelText": "Bayar per pemakaian. Dihitung dari anggaran {{name}}.",
         "planText": "Memakai paket {{plan}} kamu",
@@ -4498,8 +4500,6 @@
         "accountOthers": "Paket orang lain menunjukkan milik siapa. Pemiliknya menerima email dan bisa menariknya kembali.",
         "addAccount": "Tambah akun",
         "signInAgain": "Masuk lagi",
-        "connectPlan": "Hubungkan paket lain",
-        "keyLabel": "Kunci API",
         "fallbackTitle": "Jika {{computer}} berhenti merespons, jawab lewat API",
         "fallbackHint": "Agen menjawab lewat API dan dihitung dari anggaran {{name}}. Jika tidak, {{name}} memberi tahu siapa pun yang meminta dan menunggu komputernya kembali.",
         "effort": "Upaya",
@@ -4544,11 +4544,8 @@
         },
         "advanced": {
           "title": "Pengaturan lanjutan",
-          "sub": "{{brain}}. Berlaku untuk setiap percakapan.",
-          "think": "Cara berpikirnya",
           "answers": "Siapa yang dijawabnya",
           "defaults": "Kembali ke default",
-          "done": "Selesai",
           "contents": {
             "model": "Jendela konteks",
             "auto": "Jendela konteks dan siapa yang dijawabnya",

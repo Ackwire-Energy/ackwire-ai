@@ -169,6 +169,16 @@ describe("no AI connected: above the composer", () => {
     expect(panel.textContent).toContain("A conta que os seus agentes dividem");
   });
 
+  test("a channel with one agent of the person's: Connect for the whole team all the same, its other agents too", async () => {
+    const state = walters(seedState({ aiStatus: aiStatus(false, ADA_ID, ATLAS_ID) }), ADA_ID, ATLAS_ID);
+    state.channelMembers[ENG_ID] = (state.channelMembers[ENG_ID] ?? []).filter((m) => m.id !== ATLAS_ID);
+    await open(state);
+    await click(within(banner() as HTMLElement).getByRole("button", { name: "Conectar uma IA" }), 6);
+    const team = dialog("Conectar uma IA para o time") as HTMLElement;
+    expect(inBand(team)).toBe(true);
+    expect(shownText(team)).toContain("2 agentes sem IA");
+  });
+
   test("without Jev, nothing in the chat would understand the ask: no ⓘ", async () => {
     for (const routing of [undefined, { by: "rules", mine: "rules", model: null, noSmallModel: null } as const]) {
       await open(seedState({ aiStatus: { ...aiStatus(false, ADA_ID, ATLAS_ID), ...(routing ? { routing } : {}) } }));

@@ -980,6 +980,7 @@ function BrainFlow({ view, onClose, at }: { view: AgentBrain; onClose: () => voi
             <BrainLine
               label={t("agentPage.work.brain.copy.row")}
               value={t("agentPage.work.brain.copy.rowLine")}
+              opensDialog
               onOpen={() => setCopying(true)}
             />
           )}
@@ -1277,7 +1278,18 @@ function BrainFlow({ view, onClose, at }: { view: AgentBrain; onClose: () => voi
         />
       </div>
       <div className="bd-glide" ref={glide}>
-        <div key={`${screen}:${trail.length}`} ref={screenRef} className="bd-screen" data-dir={dir} tabIndex={-1}>
+        {/* The screen takes the focus as it comes: named by its title, so a screen reader says where it is (the drawn
+            title is hidden from it, and a dialog's own name isn't read again on a move inside). */}
+        {/* biome-ignore lint/a11y/useSemanticElements: a screen of the dialog, not a group of form fields */}
+        <div
+          key={`${screen}:${trail.length}`}
+          ref={screenRef}
+          className="bd-screen"
+          data-dir={dir}
+          tabIndex={-1}
+          role="group"
+          aria-label={title}
+        >
           {/* The dialog's name is its hidden title; this is the same sentence, drawn. */}
           <div className="arrival-lede arrival-lede--row">
             {hasBack && (

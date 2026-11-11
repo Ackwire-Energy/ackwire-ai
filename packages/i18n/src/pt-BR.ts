@@ -2633,6 +2633,8 @@ export const ptBR = {
     /** Connect for the whole team (ADR 0160, addendum): the agents without an AI, picked, signed in and woken. */
     team: {
       title: "Conectar uma IA para o time",
+      /** A personal workspace has no team (ADR 0159): the same title for its agents. */
+      titlePersonal: "Conectar uma IA para os seus agentes",
       asleep_one: "{{count}} agente sem IA",
       asleep_other: "{{count}} agentes sem IA",
       /** The "For" line once the agents were narrowed with Choose. */
@@ -2662,6 +2664,7 @@ export const ptBR = {
       woke_one: "{{count}} agente acordou",
       woke_other: "{{count}} agentes acordaram",
       wokeAll: "O time acordou",
+      wokeAllPersonal: "Os seus agentes acordaram",
       /** The end's title when every agent was passed over. */
       wokeNone: "Ninguém acordou",
       thinksAll: "Eles já pensam com o seu {{plan}}",
@@ -2748,6 +2751,8 @@ export const ptBR = {
       ready: "O computador está pronto.",
       useKey: "Usar uma chave de API agora",
       connecting: "O computador deste servidor conecta em até um minuto. Você entra aqui assim que ele conectar.",
+      /** On the onboarding with no computer: one is connected only once the workspace opens. */
+      computerLater: "As contas ficam num computador conectado. Dá para conectar um assim que o workspace abrir.",
     },
     /** Without its article: the sentences carry it ("Enviar ao {{computer}}", "O {{computer}} está…"). */
     theComputer: "computador",
@@ -4783,8 +4788,6 @@ export const ptBR = {
       failed: "Não deu para salvar. Tente de novo.",
       use: "Usar",
       brain: {
-        sub: "Vale só para o {{name}}, em todas as conversas.",
-        sub_female: "Vale só para a {{name}}, em todas as conversas.",
         model: "Chave de API",
         modelText: "Pago por uso. Conta no orçamento do {{name}}.",
         modelText_female: "Pago por uso. Conta no orçamento da {{name}}.",
@@ -4812,8 +4815,6 @@ export const ptBR = {
           "Os planos de outras pessoas mostram de quem são. O dono recebe um e-mail e pode tirar de volta.",
         addAccount: "Adicionar conta",
         signInAgain: "Entrar de novo",
-        connectPlan: "Conectar outro plano",
-        keyLabel: "Chave da API",
         fallbackTitle: "Se o {{computer}} parar de responder, responder pela API",
         /** The switch's ⓘ: the same in both states. */
         fallbackHint:
@@ -4852,11 +4853,8 @@ export const ptBR = {
         /** "Configuração avançada": a row in the brain's card that opens a smaller dialog over "Quem pensa". */
         advanced: {
           title: "Configuração avançada",
-          sub: "{{brain}}. Vale para todas as conversas.",
-          think: "Como pensa",
           answers: "Quem atende",
           defaults: "Voltar ao padrão",
-          done: "Pronto",
           /** The row's line: what the dialog holds. The effort shows only with a fixed model on a plan. */
           contents: {
             model: "Janela de contexto",

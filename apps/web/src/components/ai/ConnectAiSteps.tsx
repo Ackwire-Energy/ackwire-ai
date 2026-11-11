@@ -663,8 +663,12 @@ export interface PlanPanelProps {
   actionsAt?: HTMLElement | null;
   /** "Usar uma chave de API agora": the API key row. */
   onKey: () => void;
-  /** Self-host with no computer for the agent: where one is connected. */
-  onComputer: () => void;
+  /**
+   * Self-host with no computer for the agent: where one is connected. None on the onboarding, whose workspace pages
+   * don't open until it ends (the org route sends them back to it): the panel says a computer comes after, and offers
+   * the key.
+   */
+  onComputer?: () => void;
   /**
    * These agents think with the plan now: the account they signed in (null: the computer's own sign-in). With
    * `onSkip`, none when every agent was passed over.
@@ -727,7 +731,8 @@ export function PlanWithoutAgent({
   /** Only an admin adds an API key: the way on from someone else's computer for them. */
   mayAddKey: boolean;
   onKey: () => void;
-  onComputer: () => void;
+  /** None on the onboarding (`PlanPanelProps.onComputer`). */
+  onComputer?: () => void;
   onDone: (account: MachineAccount) => void;
 }) {
   const { t } = useTranslation();
@@ -774,7 +779,7 @@ export function PlanWithoutAgent({
             onKey={onKey}
             onComputer={onComputer}
           />
-          {elsewhere && (
+          {elsewhere && onComputer && (
             <span>
               <Button size="sm" variant="primary" onClick={onComputer}>
                 {t("aiAccounts.connect.addComputer")}
@@ -1577,7 +1582,8 @@ function GateWait({
   hostConnecting?: boolean;
   signingIn: boolean;
   onKey: () => void;
-  onComputer: () => void;
+  /** None on the onboarding (`PlanPanelProps.onComputer`). */
+  onComputer?: () => void;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -1666,7 +1672,7 @@ function GateWait({
       </>
     );
   } else if (gate.state === "missing") {
-    wait = (
+    wait = onComputer ? (
       <>
         <SettingNote icon="computer">{t("aiAccounts.connect.noComputer")}</SettingNote>
         <span>
@@ -1674,6 +1680,12 @@ function GateWait({
             {t("aiAccounts.connect.addComputer")}
           </Button>
         </span>
+      </>
+    ) : (
+      // On the onboarding no page to connect one is open yet: it comes once the workspace opens, the key meanwhile.
+      <>
+        <SettingNote icon="computer">{t("connectAi.wait.computerLater")}</SettingNote>
+        {useKey}
       </>
     );
   } else if (gate.state === "locked") {

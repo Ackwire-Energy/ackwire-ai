@@ -2548,6 +2548,7 @@
     },
     "team": {
       "title": "Een AI koppelen voor het team",
+      "titlePersonal": "Een AI voor je agents koppelen",
       "asleep_one": "{{count}} agent zonder AI",
       "asleep_other": "{{count}} agents zonder AI",
       "asleepSome": "{{n}} van {{total}} agents zonder AI",
@@ -2569,6 +2570,7 @@
       "woke_one": "{{count}} agent is wakker geworden",
       "woke_other": "{{count}} agents zijn wakker geworden",
       "wokeAll": "Het team is wakker",
+      "wokeAllPersonal": "Je agents zijn wakker",
       "wokeNone": "Niemand is wakker geworden",
       "thinksAll": "Ze denken al met je {{plan}}-abonnement",
       "thinksOne": "{{name}} denkt al met je {{plan}}-abonnement",
@@ -2663,7 +2665,8 @@
       "email": "We mailen je zodra de computer klaar is. Je kunt deze pagina sluiten.",
       "ready": "De computer is klaar.",
       "useKey": "Nu een API-sleutel gebruiken",
-      "connecting": "De computer van deze server maakt binnen een minuut verbinding. Je logt hier in zodra dat gebeurt."
+      "connecting": "De computer van deze server maakt binnen een minuut verbinding. Je logt hier in zodra dat gebeurt.",
+      "computerLater": "Accounts blijven op een gekoppelde computer. Je kunt er een koppelen zodra de werkruimte open is."
     },
     "theComputer": "de computer",
     "own": {
@@ -4652,8 +4655,6 @@
       "failed": "Opslaan lukte niet. Probeer het opnieuw.",
       "use": "Gebruiken",
       "brain": {
-        "sub": "Geldt alleen voor {{name}}, in elk gesprek.",
-        "sub_female": "Geldt alleen voor {{name}}, in elk gesprek.",
         "model": "API-sleutel",
         "modelText": "Betalen per gebruik. Telt mee voor het budget van {{name}}.",
         "modelText_female": "Betalen per gebruik. Telt mee voor het budget van {{name}}.",
@@ -4674,8 +4675,6 @@
         "accountOthers": "Abonnementen van anderen laten zien van wie ze zijn. De eigenaar krijgt een e-mail en kan het terugnemen.",
         "addAccount": "Account toevoegen",
         "signInAgain": "Opnieuw inloggen",
-        "connectPlan": "Ander abonnement koppelen",
-        "keyLabel": "API-sleutel",
         "fallbackTitle": "Als {{computer}} niet meer reageert, antwoord via de API",
         "fallbackHint": "Antwoordt dan via de API en telt mee voor het budget van {{name}}. Anders laat {{name}} het weten aan wie het vroeg en wacht tot de computer terug is.",
         "fallbackHint_female": "Antwoordt dan via de API en telt mee voor het budget van {{name}}. Anders laat {{name}} het weten aan wie het vroeg en wacht tot de computer terug is.",
@@ -4721,11 +4720,8 @@
         },
         "advanced": {
           "title": "Geavanceerde instellingen",
-          "sub": "{{brain}}. Geldt voor elk gesprek.",
-          "think": "Hoe het denkt",
           "answers": "Wie het antwoordt",
           "defaults": "Terug naar standaard",
-          "done": "Klaar",
           "contents": {
             "model": "Contextvenster",
             "auto": "Contextvenster en wie het antwoordt",

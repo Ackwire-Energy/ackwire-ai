@@ -198,6 +198,43 @@ describe("whom it is for: the right hand never picks the computer", () => {
     const { dialog } = await team({ hand: true, ready: [ADA_ID, ATLAS_ID, LIA_ID] });
     expect(inBand(dialog)).toBe(false);
     expect(dialog.querySelector(".ai-picker")).toBeTruthy();
+    // Its own dialog, named for it, never the generic one over agents that already think.
+    expect(screen().getByRole("dialog", { name: /^Conectar uma IA para (o|a) Lodi$/ })).toBe(dialog);
+    expect(within(dialog).queryByRole("combobox", { name: "Agentes que usam este plano" })).toBeNull();
+  });
+});
+
+describe("the arrival's Connect: the right hand never picks the computer either", () => {
+  test("Claude's panel is for the agents on the MacBook, never the right hand listed first", async () => {
+    const state = seedState();
+    withRightHand(state);
+    state.agents.unshift(state.agents.pop() as Agent);
+    for (const a of state.agents) a.ownerUserId = "u-walter";
+    state.aiStatus = {
+      any: false,
+      agents: state.agents.map((a) => ({ agentId: a.id, state: "no_ai" as const, reason: "no_key" as const })),
+    };
+    const api = createFakeApi(state);
+    const machines = fakeMachinesOf.get(api);
+    const row = (id: string) => {
+      const a = state.agents.find((x) => x.id === id);
+      return { id, name: a?.name ?? "", handle: a?.handle ?? "" };
+    };
+    machines?.pair({ id: "machine_1", name: "MacBook", agents: [row(ADA_ID), row(ATLAS_ID)] });
+    machines?.setAiAccounts({ accounts: [], computers: [MAC] });
+    await renderApp(`/org/${ORG_ID}?arrival=1`, { api });
+    await settle(6);
+    await click(
+      within(screen().getByRole("dialog", { name: "Você chegou cedo. Que bom." })).getByRole("button", {
+        name: /Continuar/,
+      }),
+    );
+    await settle(6);
+    const dialog = screen().getByRole("dialog", { name: "Conecte uma IA para o seu time pensar" });
+    await pickPlan(dialog, "Claude");
+    const panel = within(dialog).getByRole("region", { name: "Seu plano do Claude" });
+    expect(shownText(panel)).not.toContain("Lodi");
+    expect(shownText(panel)).toMatch(/Ada|Atlas|Todos os agentes/);
   });
 });
 
@@ -218,6 +255,9 @@ describe("the end: who woke, why the others stayed, what they think with", () =>
     expect(facesOf(dialog)).toEqual(["failed", "failed", "failed"]);
     // No dawn for nobody, and no audience line: nothing thinks yet.
     expect(dialog.querySelector(".ai-aud")).toBeNull();
+    // An end, not a step: no way back to the steps, and the trail to the plan's mark no longer walks.
+    expect(within(dialog).queryByRole("button", { name: "Voltar" })).toBeNull();
+    expect(dialog.querySelector(".team-scene__trail")?.getAttribute("data-state")).toBeNull();
     await click(within(dialog).getByRole("button", { name: "Conectar os 3" }));
     const panel = within(dialog).getByRole("region", { name: "Seu plano do Claude" });
     expect(shownText(panel)).toContain("1 de 3");
@@ -308,6 +348,16 @@ describe("the team dialog's styles", () => {
     const still = without(css, "@media (prefers-reduced-motion: no-preference)");
     expect(still).not.toMatch(/\.arrival-swap[^{]*\{[^}]*animation/);
     expect(still).not.toMatch(/\.ai-strip__badge[^{]*\{[^}]*animation/);
+  });
+
+  test("a choice's tile sits on its title's first line, never on the middle of the title and its line", async () => {
+    const css = await stylesheet("../src/components/arrival/arrival.css");
+    const rule = css.split(/\n\.arrival-opts \.ac-option \{/)[1]?.split("}")[0] ?? "";
+    expect(rule).not.toContain("align-items: center");
+    expect(css).toContain(
+      ".arrival-opts .ac-option > :is(.ac-brand, .arrival-opts__tile):first-child + .ac-option__text > .ac-option__title {",
+    );
+    expect(css).toContain("margin-block-start: calc(var(--cap-top) - 0.5lh);");
   });
 
   test("Choose keeps long names whole, the box and the face on the name's first line", async () => {

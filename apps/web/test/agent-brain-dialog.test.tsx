@@ -102,8 +102,12 @@ describe("Quem pensa (its dialog)", () => {
     // The key it thinks with, as a row shown alone; the model and "Mais opções" one line each.
     expect(inUse(d)?.mark).toBe("claude");
     expect(brainLines(d).map((l) => l.label)).toEqual(["Modelo", "Mais opções"]);
+    // Lines that go on to another screen of this dialog open no popup of their own.
+    for (const line of d.querySelectorAll(".bd-line")) expect(line.getAttribute("aria-haspopup")).toBeNull();
     await toScreen(d, "Trocar de conta");
     expect(brainScreen(d)).toBe("Trocar a conta da Ada");
+    // The screen that takes the focus is named by its title, which a screen reader says on the move.
+    expect(within(d).getByRole("group", { name: "Trocar a conta da Ada" }).classList.contains("bd-screen")).toBe(true);
     const rows = brainRows(d);
     // The agent has no computer: a plan says where it will go, before it is chosen; each by its maker's mark.
     const plan = (title: string) => rows.find(notInUse(title));
@@ -968,6 +972,9 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
       ["Pessoal · Max", "40%"],
       ["Trabalho · Max", "70%"],
     ]);
+    // How full each one is is read with its row, below 80% too: only the bar is hidden from a screen reader.
+    expect(within(d).getByRole("radio", { name: /Pessoal · Max.*40\s?%/ })).toBeTruthy();
+    for (const pct of d.querySelectorAll(".arrival-have__pct")) expect(pct.closest("[aria-hidden]")).toBeNull();
     expect(best[0]?.checked).toBe(true);
     expect(mainButton(d)?.textContent).toBe("Trocar para Folga · Max");
     await toScreen(d, "Ver as");

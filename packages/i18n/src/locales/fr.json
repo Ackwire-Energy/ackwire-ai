@@ -2641,6 +2641,7 @@
     },
     "team": {
       "title": "Connecter une IA pour l'équipe",
+      "titlePersonal": "Connecter une IA pour vos agents",
       "asleep_one": "{{count}} agent sans IA",
       "asleep_many": "{{count}} agents sans IA",
       "asleep_other": "{{count}} agents sans IA",
@@ -2665,6 +2666,7 @@
       "woke_many": "{{count}} agents se sont réveillés",
       "woke_other": "{{count}} agents se sont réveillés",
       "wokeAll": "L'équipe est réveillée",
+      "wokeAllPersonal": "Vos agents se sont réveillés",
       "wokeNone": "Personne ne s'est réveillé",
       "thinksAll": "Ils réfléchissent déjà avec votre abonnement {{plan}}",
       "thinksOne": "{{name}} réfléchit déjà avec votre abonnement {{plan}}",
@@ -2758,7 +2760,8 @@
       "email": "Nous vous écrirons dès que l'ordinateur sera prêt. Vous pouvez fermer cette page.",
       "ready": "L'ordinateur est prêt.",
       "useKey": "Utiliser une clé API maintenant",
-      "connecting": "L'ordinateur de ce serveur se connecte en moins d'une minute. Vous vous connectez ici dès que c'est fait."
+      "connecting": "L'ordinateur de ce serveur se connecte en moins d'une minute. Vous vous connectez ici dès que c'est fait.",
+      "computerLater": "Les comptes restent sur un ordinateur connecté. Vous pourrez en connecter un dès que l'espace de travail sera ouvert."
     },
     "theComputer": "ordinateur",
     "own": {
@@ -4790,8 +4793,6 @@
       "failed": "Enregistrement impossible. Réessayez.",
       "use": "Utiliser",
       "brain": {
-        "sub": "S'applique seulement à {{name}}, dans chaque conversation.",
-        "sub_female": "S'applique seulement à {{name}}, dans chaque conversation.",
         "model": "Clé API",
         "modelText": "Payé à l'usage. Compte dans le budget de {{name}}.",
         "modelText_female": "Payé à l'usage. Compte dans le budget de {{name}}.",
@@ -4812,8 +4813,6 @@
         "accountOthers": "Les forfaits d’autres personnes indiquent à qui ils sont. Leur propriétaire reçoit un e-mail et peut les reprendre.",
         "addAccount": "Ajouter un compte",
         "signInAgain": "Se reconnecter",
-        "connectPlan": "Connecter un autre abonnement",
-        "keyLabel": "Clé API",
         "fallbackTitle": "Si {{computer}} ne répond plus, répondre via l'API",
         "fallbackHint": "Il répond via l'API et cela compte dans le budget de {{name}}. Sinon, {{name}} prévient la personne qui a demandé et attend le retour de l'ordinateur.",
         "fallbackHint_female": "Elle répond via l'API et cela compte dans le budget de {{name}}. Sinon, {{name}} prévient la personne qui a demandé et attend le retour de l'ordinateur.",
@@ -4859,11 +4858,8 @@
         },
         "advanced": {
           "title": "Paramètres avancés",
-          "sub": "{{brain}}. S'applique à chaque conversation.",
-          "think": "Sa façon de réfléchir",
           "answers": "À qui il répond",
           "defaults": "Revenir aux valeurs par défaut",
-          "done": "Terminé",
           "contents": {
             "model": "Fenêtre de contexte",
             "auto": "Fenêtre de contexte et à qui il répond",

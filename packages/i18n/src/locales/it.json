@@ -2642,6 +2642,7 @@
     },
     "team": {
       "title": "Collega un'IA per il team",
+      "titlePersonal": "Collega un'IA per i tuoi agenti",
       "asleep_one": "{{count}} agente senza IA",
       "asleep_many": "{{count}} agenti senza IA",
       "asleep_other": "{{count}} agenti senza IA",
@@ -2666,6 +2667,7 @@
       "woke_many": "{{count}} agenti si sono svegliati",
       "woke_other": "{{count}} agenti si sono svegliati",
       "wokeAll": "Il team si è svegliato",
+      "wokeAllPersonal": "I tuoi agenti si sono svegliati",
       "wokeNone": "Nessuno si è svegliato",
       "thinksAll": "Pensano già con il tuo piano {{plan}}",
       "thinksOne": "{{name}} pensa già con il tuo piano {{plan}}",
@@ -2760,7 +2762,8 @@
       "email": "Ti scriveremo quando il computer sarà pronto. Puoi chiudere questa pagina.",
       "ready": "Il computer è pronto.",
       "useKey": "Usa una chiave API ora",
-      "connecting": "Il computer di questo server si collega entro un minuto. Accedi qui appena è collegato."
+      "connecting": "Il computer di questo server si collega entro un minuto. Accedi qui appena è collegato.",
+      "computerLater": "Gli account restano su un computer collegato. Puoi collegarne uno appena si apre lo spazio di lavoro."
     },
     "theComputer": "computer",
     "own": {
@@ -4792,8 +4795,6 @@
       "failed": "Impossibile salvare. Riprova.",
       "use": "Usa",
       "brain": {
-        "sub": "Vale solo per {{name}}, in ogni conversazione.",
-        "sub_female": "Vale solo per {{name}}, in ogni conversazione.",
         "model": "Chiave API",
         "modelText": "Si paga a consumo. Rientra nel budget di {{name}}.",
         "modelText_female": "Si paga a consumo. Rientra nel budget di {{name}}.",
@@ -4814,8 +4815,6 @@
         "accountOthers": "I piani di altre persone mostrano di chi sono. Il proprietario riceve un’email e può riprenderlo.",
         "addAccount": "Aggiungi account",
         "signInAgain": "Accedi di nuovo",
-        "connectPlan": "Collega un altro piano",
-        "keyLabel": "Chiave API",
         "fallbackTitle": "Se {{computer}} smette di rispondere, rispondi tramite l'API",
         "fallbackHint": "Risponde tramite l'API e rientra nel budget di {{name}}. Altrimenti {{name}} avvisa chi ha chiesto e aspetta che il computer torni disponibile.",
         "fallbackHint_female": "Risponde tramite l'API e rientra nel budget di {{name}}. Altrimenti {{name}} avvisa chi ha chiesto e aspetta che il computer torni disponibile.",
@@ -4861,11 +4860,8 @@
         },
         "advanced": {
           "title": "Impostazioni avanzate",
-          "sub": "{{brain}}. Vale per ogni conversazione.",
-          "think": "Come ragiona",
           "answers": "A chi risponde",
           "defaults": "Ripristina i predefiniti",
-          "done": "Fatto",
           "contents": {
             "model": "Finestra di contesto",
             "auto": "Finestra di contesto e a chi risponde",

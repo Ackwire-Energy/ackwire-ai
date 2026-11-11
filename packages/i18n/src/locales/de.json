@@ -2547,6 +2547,7 @@
     },
     "team": {
       "title": "Eine KI für das Team verbinden",
+      "titlePersonal": "Eine KI für deine Agenten verbinden",
       "asleep_one": "{{count}} Agent ohne KI",
       "asleep_other": "{{count}} Agenten ohne KI",
       "asleepSome": "{{n}} von {{total}} Agenten ohne KI",
@@ -2568,6 +2569,7 @@
       "woke_one": "{{count}} Agent ist aufgewacht",
       "woke_other": "{{count}} Agenten sind aufgewacht",
       "wokeAll": "Das Team ist wach",
+      "wokeAllPersonal": "Deine Agenten sind aufgewacht",
       "wokeNone": "Niemand ist aufgewacht",
       "thinksAll": "Sie denken schon mit deinem {{plan}}-Abo",
       "thinksOne": "{{name}} denkt schon mit deinem {{plan}}-Abo",
@@ -2662,7 +2664,8 @@
       "email": "Wir schreiben dir, sobald der Computer bereit ist. Du kannst diese Seite schließen.",
       "ready": "Der Computer ist bereit.",
       "useKey": "Jetzt einen API-Schlüssel nutzen",
-      "connecting": "Der Computer dieses Servers verbindet sich innerhalb einer Minute. Sobald er so weit ist, meldest du dich hier an."
+      "connecting": "Der Computer dieses Servers verbindet sich innerhalb einer Minute. Sobald er so weit ist, meldest du dich hier an.",
+      "computerLater": "Konten bleiben auf einem verbundenen Computer. Du kannst einen verbinden, sobald der Workspace offen ist."
     },
     "theComputer": "Computer",
     "own": {
@@ -4631,7 +4634,6 @@
       "failed": "Speichern hat nicht geklappt. Versuch es noch einmal.",
       "use": "Verwenden",
       "brain": {
-        "sub": "Gilt nur für {{name}}, in jeder Unterhaltung.",
         "model": "API-Schlüssel",
         "modelText": "Bezahlt nach Nutzung. Zählt zum Budget von {{name}}.",
         "planText": "Nutzt dein {{plan}}-Abo",
@@ -4651,8 +4653,6 @@
         "accountOthers": "Abos anderer Personen zeigen, wem sie gehören. Der Inhaber bekommt eine E-Mail und kann es zurücknehmen.",
         "addAccount": "Konto hinzufügen",
         "signInAgain": "Erneut anmelden",
-        "connectPlan": "Weiteres Abo verbinden",
-        "keyLabel": "API-Schlüssel",
         "fallbackTitle": "Wenn {{computer}} nicht mehr antwortet, über die API antworten",
         "fallbackHint": "Die Antwort kommt dann über die API und zählt zum Budget von {{name}}. Sonst sagt {{name}} der Person, die gefragt hat, Bescheid und wartet, bis der Computer zurück ist.",
         "effort": "Aufwand",
@@ -4697,11 +4697,8 @@
         },
         "advanced": {
           "title": "Erweiterte Einstellungen",
-          "sub": "{{brain}}. Gilt für jede Unterhaltung.",
-          "think": "Wie er denkt",
           "answers": "Wem er antwortet",
           "defaults": "Auf Standard zurücksetzen",
-          "done": "Fertig",
           "contents": {
             "model": "Kontextfenster",
             "auto": "Kontextfenster und wem er antwortet",

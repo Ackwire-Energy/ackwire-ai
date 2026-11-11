@@ -2732,6 +2732,7 @@
     },
     "team": {
       "title": "Połącz AI dla zespołu",
+      "titlePersonal": "Podłącz AI dla swoich agentów",
       "asleep_one": "{{count}} agent bez AI",
       "asleep_few": "{{count}} agentów bez AI",
       "asleep_many": "{{count}} agentów bez AI",
@@ -2759,6 +2760,7 @@
       "woke_many": "Obudziło się {{count}} agentów",
       "woke_other": "Obudziło się {{count}} agenta",
       "wokeAll": "Zespół się obudził",
+      "wokeAllPersonal": "Twoi agenci się obudzili",
       "wokeNone": "Nikt się nie obudził",
       "thinksAll": "Już myślą z twoim planem {{plan}}",
       "thinksOne": "{{name}} już myśli z twoim planem {{plan}}",
@@ -2853,7 +2855,8 @@
       "email": "Napiszemy do ciebie, gdy komputer będzie gotowy. Możesz zamknąć tę stronę.",
       "ready": "Komputer jest gotowy.",
       "useKey": "Użyj teraz klucza API",
-      "connecting": "Komputer tego serwera połączy się w ciągu minuty. Zalogujesz się tutaj, gdy tylko to nastąpi."
+      "connecting": "Komputer tego serwera połączy się w ciągu minuty. Zalogujesz się tutaj, gdy tylko to nastąpi.",
+      "computerLater": "Konta zostają na połączonym komputerze. Możesz go połączyć, gdy tylko otworzy się przestrzeń robocza."
     },
     "theComputer": "komputer",
     "own": {
@@ -4957,8 +4960,6 @@
       "failed": "Nie udało się zapisać. Spróbuj ponownie.",
       "use": "Użyj",
       "brain": {
-        "sub": "Dotyczy tylko agenta {{name}}, w każdej rozmowie.",
-        "sub_female": "Dotyczy tylko agentki {{name}}, w każdej rozmowie.",
         "model": "Klucz API",
         "modelText": "Płatne za użycie. Liczy się do budżetu agenta {{name}}.",
         "modelText_female": "Płatne za użycie. Liczy się do budżetu agentki {{name}}.",
@@ -4979,8 +4980,6 @@
         "accountOthers": "Plany innych osób pokazują, czyje są. Właściciel dostaje e-mail i może go odebrać.",
         "addAccount": "Dodaj konto",
         "signInAgain": "Zaloguj się ponownie",
-        "connectPlan": "Połącz inny plan",
-        "keyLabel": "Klucz API",
         "fallbackTitle": "Jeśli {{computer}} przestanie odpowiadać, odpowiadaj przez API",
         "fallbackHint": "Odpowiada przez API i liczy się to do budżetu agenta {{name}}. W przeciwnym razie {{name}} informuje osobę, która prosiła, i czeka, aż komputer wróci.",
         "fallbackHint_female": "Odpowiada przez API i liczy się to do budżetu agentki {{name}}. W przeciwnym razie {{name}} informuje osobę, która prosiła, i czeka, aż komputer wróci.",
@@ -5026,11 +5025,8 @@
         },
         "advanced": {
           "title": "Ustawienia zaawansowane",
-          "sub": "{{brain}}. Dotyczy każdej rozmowy.",
-          "think": "Jak myśli",
           "answers": "Komu odpowiada",
           "defaults": "Przywróć domyślne",
-          "done": "Gotowe",
           "contents": {
             "model": "Okno kontekstu",
             "auto": "Okno kontekstu i komu odpowiada",

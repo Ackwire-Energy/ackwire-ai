@@ -31,8 +31,11 @@ const GATES_POLL_MS = 5000;
 export function AiHost({ org, me, children }: { org: OrgSummary; me: Me; children: ReactNode }) {
   return (
     <OrgProvider org={org} me={me}>
-      {/* No socket here: the dialog reads its status, computers and plans again as the step does. */}
-      <ConnectAiProvider poll={GATES_POLL_MS}>{children}</ConnectAiProvider>
+      {/* No socket here: the dialog reads its status, computers and plans again as the step does. The workspace's
+          pages open only after this step, so the dialog never leaves for one. */}
+      <ConnectAiProvider poll={GATES_POLL_MS} settingUp>
+        {children}
+      </ConnectAiProvider>
     </OrgProvider>
   );
 }
@@ -60,7 +63,7 @@ export function AiStep({
   done,
   leaving,
   picked,
-  onPick,
+  onConnected,
   onLater,
   onEnter,
 }: {
@@ -70,10 +73,13 @@ export function AiStep({
   done: boolean;
   /** The workspace is opening: both ways out wait. */
   leaving: boolean;
-  /** The card picked, as the page names it once connected (the connected screen's tile), when it can. */
+  /** What was connected, as the page names it (the connected screen's tile), when it can. */
   picked: AiChoice | null;
-  /** A card picked: the page names it on the rail and in the heading once connected ("Claude"). */
-  onPick?: (choice: AiChoice) => void;
+  /**
+   * What the dialog connected ("Claude"): the page names it on the rail and in the heading. Not the card picked, since
+   * the dialog's Back leads to every other choice.
+   */
+  onConnected?: (choice: AiChoice) => void;
   /** Connect later: the onboarding finishes as it is. */
   onLater: () => void;
   onEnter: () => void;
@@ -136,10 +142,9 @@ export function AiStep({
         <ConnectChoices
           mayAddKey={can(org, "manage_credentials")}
           dims={(c) => reader !== undefined && gateDims(gates.gateOf(c))}
-          onPick={(choice) => {
-            onPick?.(choice);
-            connect?.open(connectRequest(choice, ids));
-          }}
+          onPick={(choice) =>
+            connect?.open({ ...connectRequest(choice, ids), ...(onConnected ? { onConnected } : {}) })
+          }
         />
       </div>
       <p className="onb__skip">

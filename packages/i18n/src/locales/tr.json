@@ -2537,6 +2537,7 @@
     },
     "team": {
       "title": "Ekip için bir yapay zeka bağlayın",
+      "titlePersonal": "Ajanların için bir yapay zeka bağla",
       "asleep_one": "Yapay zekası olmayan {{count}} ajan",
       "asleep_other": "Yapay zekası olmayan {{count}} ajan",
       "asleepSome": "{{total}} ajandan {{n}} tanesinin yapay zekası yok",
@@ -2558,6 +2559,7 @@
       "woke_one": "{{count}} ajan uyandı",
       "woke_other": "{{count}} ajan uyandı",
       "wokeAll": "Ekip uyandı",
+      "wokeAllPersonal": "Ajanlarınız uyandı",
       "wokeNone": "Kimse uyanmadı",
       "thinksAll": "Artık {{plan}} planınızla düşünüyorlar",
       "thinksOne": "{{name}} artık {{plan}} planınızla düşünüyor",
@@ -2651,7 +2653,8 @@
       "email": "Bilgisayar hazır olduğunda size e-posta göndereceğiz. Bu sayfayı kapatabilirsiniz.",
       "ready": "Bilgisayar hazır.",
       "useKey": "Şimdi bir API anahtarı kullan",
-      "connecting": "Bu sunucunun bilgisayarı bir dakika içinde bağlanır. Bağlanır bağlanmaz burada giriş yaparsınız."
+      "connecting": "Bu sunucunun bilgisayarı bir dakika içinde bağlanır. Bağlanır bağlanmaz burada giriş yaparsınız.",
+      "computerLater": "Hesaplar bağlı bir bilgisayarda kalır. Çalışma alanı açılınca bir bilgisayar bağlayabilirsiniz."
     },
     "theComputer": "bilgisayar",
     "own": {
@@ -4614,7 +4617,6 @@
       "failed": "Kaydedilemedi. Tekrar deneyin.",
       "use": "Kullan",
       "brain": {
-        "sub": "Yalnızca {{name}} için, her sohbette geçerlidir.",
         "model": "API anahtarı",
         "modelText": "Kullandıkça ödenir. {{name}} ajanının bütçesinden düşer.",
         "planText": "{{plan}} planınızı kullanır",
@@ -4634,8 +4636,6 @@
         "accountOthers": "Başkalarının planları kimin olduğunu gösterir. Sahibi bir e-posta alır ve geri alabilir.",
         "addAccount": "Hesap ekle",
         "signInAgain": "Yeniden giriş yap",
-        "connectPlan": "Başka bir plan bağla",
-        "keyLabel": "API anahtarı",
         "fallbackTitle": "{{computer}} yanıt vermezse API üzerinden yanıtla",
         "fallbackHint": "API üzerinden yanıt verir ve {{name}} ajanının bütçesinden düşer. Aksi halde {{name}} isteyen kişiye haber verir ve bilgisayarın geri gelmesini bekler.",
         "effort": "Çaba",
@@ -4680,11 +4680,8 @@
         },
         "advanced": {
           "title": "Gelişmiş ayarlar",
-          "sub": "{{brain}}. Her sohbette geçerlidir.",
-          "think": "Nasıl düşünür",
           "answers": "Kime yanıt verir",
           "defaults": "Varsayılanlara dön",
-          "done": "Bitti",
           "contents": {
             "model": "Bağlam penceresi",
             "auto": "Bağlam penceresi ve kime yanıt verdiği",

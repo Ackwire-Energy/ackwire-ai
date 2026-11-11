@@ -2445,6 +2445,7 @@
     },
     "team": {
       "title": "팀을 위한 AI 연결",
+      "titlePersonal": "에이전트를 위한 AI 연결",
       "asleep_other": "AI가 없는 에이전트 {{count}}개",
       "asleepSome": "에이전트 {{total}}개 중 {{n}}개 AI 없음",
       "choose": "선택",
@@ -2463,6 +2464,7 @@
       },
       "woke_other": "에이전트 {{count}}개가 깨어났어요",
       "wokeAll": "팀이 깨어났어요",
+      "wokeAllPersonal": "에이전트가 깨어났어요",
       "wokeNone": "아무도 깨어나지 않았어요",
       "thinksAll": "이제 모두 내 {{plan}} 요금제로 생각해요",
       "thinksOne": "{{name}}은(는) 이제 내 {{plan}} 요금제로 생각해요",
@@ -2556,7 +2558,8 @@
       "email": "컴퓨터가 준비되면 이메일로 알려 드릴게요. 이 페이지는 닫아도 돼요.",
       "ready": "컴퓨터가 준비됐어요.",
       "useKey": "지금 API 키 사용하기",
-      "connecting": "이 서버의 컴퓨터는 1분 안에 연결돼요. 연결되는 대로 여기서 로그인해요."
+      "connecting": "이 서버의 컴퓨터는 1분 안에 연결돼요. 연결되는 대로 여기서 로그인해요.",
+      "computerLater": "계정은 연결된 컴퓨터에 남아요. 워크스페이스가 열리면 컴퓨터를 연결할 수 있어요."
     },
     "theComputer": "컴퓨터",
     "own": {
@@ -4461,7 +4464,6 @@
       "failed": "저장하지 못했어요. 다시 시도해 주세요.",
       "use": "사용",
       "brain": {
-        "sub": "모든 대화에서 {{name}}에게만 적용돼요.",
         "model": "API 키",
         "modelText": "사용한 만큼 결제해요. {{name}}의 예산에서 차감돼요.",
         "planText": "내 {{plan}} 요금제 사용",
@@ -4481,8 +4483,6 @@
         "accountOthers": "다른 사람의 플랜에는 주인이 표시돼요. 주인은 이메일을 받고 되돌려 받을 수 있어요.",
         "addAccount": "계정 추가",
         "signInAgain": "다시 로그인",
-        "connectPlan": "다른 요금제 연결",
-        "keyLabel": "API 키",
         "fallbackTitle": "{{computer}}이(가) 응답하지 않으면 API로 답하기",
         "fallbackHint": "API로 답하고 {{name}}의 예산에서 차감돼요. 끄면 {{name}}은(는) 요청한 사람에게 알리고 컴퓨터가 돌아오기를 기다려요.",
         "effort": "사고 수준",
@@ -4527,11 +4527,8 @@
         },
         "advanced": {
           "title": "고급 설정",
-          "sub": "{{brain}}. 모든 대화에 적용돼요.",
-          "think": "생각하는 방식",
           "answers": "답하는 대상",
           "defaults": "기본값으로 되돌리기",
-          "done": "완료",
           "contents": {
             "model": "컨텍스트 창",
             "auto": "컨텍스트 창과 답하는 대상",

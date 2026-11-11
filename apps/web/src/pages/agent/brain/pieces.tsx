@@ -74,6 +74,7 @@ export function BrainLine({
   lead,
   onOpen,
   folds = false,
+  opensDialog = false,
   open = false,
   controls,
 }: {
@@ -83,6 +84,8 @@ export function BrainLine({
   onOpen?: () => void;
   /** It opens under itself (`Fold`), not a screen of its own. */
   folds?: boolean;
+  /** It opens a dialog of its own over this one; else it goes on to another screen of the same dialog. */
+  opensDialog?: boolean;
   open?: boolean;
   /** The fold it opens. */
   controls?: string;
@@ -102,7 +105,11 @@ export function BrainLine({
       type="button"
       className="bd-line"
       onClick={onOpen}
-      {...(folds ? { "aria-expanded": open, "aria-controls": controls } : { "aria-haspopup": "dialog" as const })}
+      {...(folds
+        ? { "aria-expanded": open, "aria-controls": controls }
+        : opensDialog
+          ? { "aria-haspopup": "dialog" as const }
+          : {})}
     >
       {body}
       <Icon name={folds ? "chevronDown" : "chevronRight"} size={16} className="bd-line__chev" />

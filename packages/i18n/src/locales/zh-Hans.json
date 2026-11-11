@@ -2448,6 +2448,7 @@
     },
     "team": {
       "title": "为团队连接 AI",
+      "titlePersonal": "为你的智能体连接 AI",
       "asleep_other": "{{count}} 个智能体没有 AI",
       "asleepSome": "{{total}} 个智能体中有 {{n}} 个没有 AI",
       "choose": "选择",
@@ -2466,6 +2467,7 @@
       },
       "woke_other": "{{count}} 个智能体醒了",
       "wokeAll": "团队醒了",
+      "wokeAllPersonal": "你的智能体醒了",
       "wokeNone": "没有智能体醒来",
       "thinksAll": "他们已经在用你的 {{plan}} 套餐思考",
       "thinksOne": "{{name}} 已经在用你的 {{plan}} 套餐思考",
@@ -2559,7 +2561,8 @@
       "email": "电脑就绪后我们会发邮件通知你，你可以关闭此页面。",
       "ready": "电脑已就绪。",
       "useKey": "现在使用 API 密钥",
-      "connecting": "这台服务器的电脑会在一分钟内连接。连接后你就可以在这里登录。"
+      "connecting": "这台服务器的电脑会在一分钟内连接。连接后你就可以在这里登录。",
+      "computerLater": "账号保存在已连接的电脑上。工作区打开后即可连接一台电脑。"
     },
     "theComputer": "电脑",
     "own": {
@@ -4484,8 +4487,6 @@
       "failed": "无法保存，请重试。",
       "use": "使用",
       "brain": {
-        "sub": "只对 {{name}} 生效，适用于所有对话。",
-        "sub_female": "只对 {{name}} 生效，适用于所有对话。",
         "model": "API 密钥",
         "modelText": "按用量付费，计入 {{name}} 的预算。",
         "modelText_female": "按用量付费，计入 {{name}} 的预算。",
@@ -4506,8 +4507,6 @@
         "accountOthers": "其他人的套餐会显示是谁的。主人会收到邮件，并且可以收回。",
         "addAccount": "添加账号",
         "signInAgain": "重新登录",
-        "connectPlan": "连接其他套餐",
-        "keyLabel": "API 密钥",
         "fallbackTitle": "{{computer}} 无响应时，通过 API 回复",
         "fallbackHint": "将通过 API 回复，并计入 {{name}} 的预算。否则 {{name}} 会告知提出请求的人，并等待电脑恢复。",
         "fallbackHint_female": "将通过 API 回复，并计入 {{name}} 的预算。否则 {{name}} 会告知提出请求的人，并等待电脑恢复。",
@@ -4553,11 +4552,8 @@
         },
         "advanced": {
           "title": "高级设置",
-          "sub": "{{brain}}。适用于所有对话。",
-          "think": "思考方式",
           "answers": "回复对象",
           "defaults": "恢复默认",
-          "done": "完成",
           "contents": {
             "model": "上下文窗口",
             "auto": "上下文窗口和回复对象",

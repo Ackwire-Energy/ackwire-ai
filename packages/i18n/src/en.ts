@@ -2667,6 +2667,8 @@ export const en = {
     /** Connect for the whole team (ADR 0160, addendum): the agents without an AI, picked, signed in and woken. */
     team: {
       title: "Connect an AI for the team",
+      /** A personal workspace has no team (ADR 0159): the same title for its agents. */
+      titlePersonal: "Connect an AI for your agents",
       asleep_one: "{{count}} agent without AI",
       asleep_other: "{{count}} agents without AI",
       /** The "For" line once the agents were narrowed with Choose. */
@@ -2693,6 +2695,7 @@ export const en = {
       woke_one: "{{count}} agent woke up",
       woke_other: "{{count}} agents woke up",
       wokeAll: "The team is awake",
+      wokeAllPersonal: "Your agents woke up",
       /** The end's title when every agent was passed over. */
       wokeNone: "Nobody woke up",
       thinksAll: "They already think with your {{plan}}",
@@ -2779,6 +2782,8 @@ export const en = {
       ready: "The computer is ready.",
       useKey: "Use an API key now",
       connecting: "This server's computer connects within a minute. You sign in here as soon as it does.",
+      /** On the onboarding with no computer: one is connected only once the workspace opens. */
+      computerLater: "Accounts stay on a connected computer. You can connect one once the workspace opens.",
     },
     /** The Cloud's one computer in a plan's sign-in, unnamed: "Send to the computer". */
     theComputer: "the computer",
@@ -4819,7 +4824,6 @@ export const en = {
       failed: "Couldn't save. Try again.",
       use: "Use",
       brain: {
-        sub: "Applies only to {{name}}, in every conversation.",
         model: "API key",
         modelText: "Paid per use. It counts against {{name}}'s budget.",
         /** A plan's card: `plan` is its name ("Claude", "ChatGPT", "OpenCode Go"). */
@@ -4845,8 +4849,6 @@ export const en = {
         accountOthers: "Other people's plans show whose they are. Their owner gets an email and can take it back.",
         addAccount: "Add account",
         signInAgain: "Sign in again",
-        connectPlan: "Connect another plan",
-        keyLabel: "API key",
         fallbackTitle: "If {{computer}} stops answering, answer through the API",
         fallbackHint:
           "It answers through the API and counts against {{name}}'s budget. Otherwise {{name}} tells whoever asked and waits for the computer to come back.",
@@ -4878,11 +4880,8 @@ export const en = {
         },
         advanced: {
           title: "Advanced settings",
-          sub: "{{brain}}. Applies to every conversation.",
-          think: "How it thinks",
           answers: "Who it answers",
           defaults: "Back to defaults",
-          done: "Done",
           contents: {
             model: "Context window",
             auto: "Context window and who it answers",

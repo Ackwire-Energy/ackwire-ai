@@ -7,6 +7,7 @@ import { keys } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { connectRequest } from "@/pages/onboarding/AiStep";
 import { createFakeApi, type FakeState, GENERAL_ID, LODI_ID, ORG_ID, seedState, withRightHand } from "./fake-api";
+import { shownText } from "./hint";
 import { renderApp, screen, settle } from "./render";
 
 /*
@@ -67,6 +68,12 @@ const madeTeam = (opts: { held?: boolean } = {}) => {
     agents: state.agents.map((a) => ({ agentId: a.id, state: "no_ai", reason: "no_key" })),
   };
   if (opts.held) state.authConfig = { billingUrl: "https://billing.example.com" };
+  return state;
+};
+/** `madeTeam`, its team the person's own (a plan signs in only for its owner's agents, ADR 0059 §3). */
+const ownTeam = () => {
+  const state = madeTeam();
+  for (const a of state.agents) a.ownerUserId = "u-walter";
   return state;
 };
 /** Every agent thinks now (a key or a plan connected, here or in another tab), and the page reads it again. */
@@ -156,14 +163,16 @@ describe("Connect an AI, the rail's last step", () => {
     }
   });
 
-  test("the AI picked is named once the team thinks, unless a key connected some other way meanwhile", async () => {
+  test("a card picked names nothing by itself: the dialog closed, and the AI connected some other way", async () => {
     const lead = () => document.querySelector(".onb__lead")?.textContent;
     for (const keyCame of [false, true]) {
       const state = madeTeam();
       const { services } = await renderApp("/onboarding", { api: createFakeApi(state) });
       await settle(16);
       await click(within(body()).getByRole("button", { name: /^Claude/ }), 12);
-      // The plan signed in from that dialog; or the dialog was closed, and a key connected in another tab.
+      // Its dialog closed with nothing connected, then a plan or a key connected in another tab.
+      await act(async () => fireEvent.keyDown(screen().getByRole("dialog"), { key: "Escape" }));
+      await settle(4);
       state.aiStatus = {
         any: true,
         ...(keyCame ? { apiKey: true } : {}),
@@ -171,13 +180,32 @@ describe("Connect an AI, the rail's last step", () => {
       };
       await act(async () => services.queryClient.invalidateQueries({ queryKey: keys.aiStatus(ORG_ID) }));
       await settle(10);
-      expect(lead()).toBe(
-        keyCame
-          ? "A IA que você conectou responde por todos os agentes. Dá para trocar depois, um por um."
-          : "O seu Claude responde por todos os agentes. Dá para trocar depois, um por um.",
-      );
+      expect(lead()).toBe("A IA que você conectou responde por todos os agentes. Dá para trocar depois, um por um.");
+      expect(document.querySelector(".onb-ai__connected")).toBeNull();
       cleanup();
     }
+  });
+
+  test("what the dialog connected is named, not the card it opened on: Back leads to every other choice", async () => {
+    const state = ownTeam();
+    const { services } = await renderApp("/onboarding", { api: createFakeApi(state) });
+    await settle(16);
+    await click(within(body()).getByRole("button", { name: /^Claude/ }), 12);
+    const dialog = screen().getByRole("dialog", { name: "Seu plano do Claude" });
+    await click(within(dialog).getByRole("button", { name: "Voltar" }), 6);
+    await click(within(dialog).getByRole("button", { name: /^Chave de API/ }), 6);
+    const panel = within(dialog).getByRole("region", { name: "Chave de API" });
+    await act(async () =>
+      fireEvent.change(within(panel).getByLabelText("Cole aqui"), {
+        target: { value: "sk-ant-api03-abcdefghijklmnop" },
+      }),
+    );
+    await click(within(panel).getByRole("button", { name: "Salvar chave" }), 10);
+    expect(calls(state, "agents.addCredential")).toHaveLength(1);
+    state.aiStatus = { any: true, apiKey: true, agents: state.agents.map((a) => ({ agentId: a.id, state: "ready" })) };
+    await act(async () => services.queryClient.invalidateQueries({ queryKey: keys.aiStatus(ORG_ID) }));
+    await settle(10);
+    expect(document.querySelector(".onb-ai__connected .ac-option__title")?.textContent).toBe("Chave de API");
   });
 
   test("on agentes.chat Cloud, a plan left for later skips the step: Lodi's DM, the beta notice alone", async () => {
@@ -237,6 +265,20 @@ describe("a personal workspace (ADR 0159)", () => {
   });
 });
 
+describe("a personal workspace's Connect (ADR 0159)", () => {
+  test("its agents in its own words: the dialog's title, never the team's", async () => {
+    const state = ownTeam();
+    for (const o of state.me?.organizations ?? []) o.mode = "personal";
+    await renderApp("/onboarding", { api: createFakeApi(state) });
+    await settle(16);
+    await click(within(body()).getByRole("button", { name: /^Claude/ }), 12);
+    const dialog = screen().getByRole("dialog", { name: "Seu plano do Claude" });
+    await click(within(dialog).getByRole("button", { name: "Voltar" }), 6);
+    expect(screen().getByRole("dialog", { name: "Conectar uma IA para os seus agentes" })).toBe(dialog);
+    expect(shownText(dialog)).not.toContain("time");
+  });
+});
+
 describe("what a pick opens", () => {
   test("for the team, Connect for the whole team on the card picked; for the right hand alone, its own dialog", () => {
     const team = [LODI_ID, "ada", "atlas"];
@@ -250,13 +292,6 @@ describe("what a pick opens", () => {
 
 /** The narrow dialog under the sky: Connect for the whole team (ADR 0160, addendum). */
 const inBand = (dialog: HTMLElement) => dialog.querySelector(".arrival-hero") !== null;
-
-/** `madeTeam`, its team the person's own (a plan signs in only for its owner's agents, ADR 0059 §3). */
-const ownTeam = () => {
-  const state = madeTeam();
-  for (const a of state.agents) a.ownerUserId = "u-walter";
-  return state;
-};
 
 describe("each card opens Connect for the whole team on its own steps (ADR 0162)", () => {
   for (const [card, title] of [
@@ -291,6 +326,45 @@ describe("each card opens Connect for the whole team on its own steps (ADR 0162)
     const dialog = screen().getByRole("dialog");
     expect(inBand(dialog)).toBe(false);
     expect(dialog.querySelector(".ai-picker")).toBeTruthy();
+    expect(screen().getByRole("dialog", { name: "Conectar uma IA para o Lodi" })).toBe(dialog);
+  });
+
+  test("the team already thinking and the right hand not: a card opens the right hand's own dialog", async () => {
+    const state = ownTeam();
+    state.aiStatus = {
+      any: true,
+      agents: state.agents.map((a) =>
+        a.id === LODI_ID
+          ? { agentId: a.id, state: "no_ai" as const, reason: "no_key" as const }
+          : { agentId: a.id, state: "ready" as const },
+      ),
+    };
+    await renderApp("/onboarding", { api: createFakeApi(state) });
+    await settle(16);
+    await click(within(body()).getByRole("button", { name: /^Claude/ }), 12);
+    const dialog = screen().getByRole("dialog", { name: "Conectar uma IA para o Lodi" });
+    expect(inBand(dialog)).toBe(false);
+    // For the right hand alone: no For offering the agents that already think.
+    expect(within(dialog).queryByRole("combobox", { name: "Agentes que usam este plano" })).toBeNull();
+  });
+
+  test("with no computer, a plan's panel never leaves for Computers, which the onboarding would send back here", async () => {
+    const state = ownTeam();
+    const api = createFakeApi(state);
+    // A self-hosted workspace with no computer connected yet.
+    const viewOf = api.agents.brain;
+    api.agents.brain = async (orgId, agentId) => ({ ...(await viewOf(orgId, agentId)), computer: null });
+    const { router } = await renderApp("/onboarding", { api });
+    await settle(16);
+    await click(within(body()).getByRole("button", { name: /^Claude/ }), 12);
+    const panel = within(screen().getByRole("dialog")).getByRole("region", { name: "Seu plano do Claude" });
+    expect(panel.textContent).toContain(
+      "As contas ficam num computador conectado. Dá para conectar um assim que o workspace abrir.",
+    );
+    expect(within(panel).queryByRole("button", { name: "Conectar um computador" })).toBeNull();
+    await click(within(panel).getByRole("button", { name: "Usar uma chave de API agora" }), 6);
+    expect(router.state.location.pathname).toBe("/onboarding");
+    expect(within(screen().getByRole("dialog")).getByRole("region", { name: "Chave de API" })).toBeTruthy();
   });
 
   test("connected while the dialog is open: the step moves on by the data", async () => {

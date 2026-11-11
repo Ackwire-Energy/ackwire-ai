@@ -6277,6 +6277,9 @@
   "connectAi.team.title": {
     "value": "Connect an AI for the team"
   },
+  "connectAi.team.titlePersonal": {
+    "value": "Connect an AI for your agents"
+  },
   "connectAi.team.asleep": {
     "value": {
       "one": "{{count}} agent without AI",
@@ -6333,6 +6336,9 @@
   },
   "connectAi.team.wokeAll": {
     "value": "The team is awake"
+  },
+  "connectAi.team.wokeAllPersonal": {
+    "value": "Your agents woke up"
   },
   "connectAi.team.wokeNone": {
     "value": "Nobody woke up"
@@ -6519,6 +6525,9 @@
   },
   "connectAi.wait.connecting": {
     "value": "This server's computer connects within a minute. You sign in here as soon as it does."
+  },
+  "connectAi.wait.computerLater": {
+    "value": "Accounts stay on a connected computer. You can connect one once the workspace opens."
   },
   "connectAi.theComputer": {
     "value": "the computer"
@@ -11409,9 +11418,6 @@
   "agentPage.work.use": {
     "value": "Use"
   },
-  "agentPage.work.brain.sub": {
-    "value": "Applies only to {{name}}, in every conversation."
-  },
   "agentPage.work.brain.model": {
     "value": "API key"
   },
@@ -11468,12 +11474,6 @@
   },
   "agentPage.work.brain.signInAgain": {
     "value": "Sign in again"
-  },
-  "agentPage.work.brain.connectPlan": {
-    "value": "Connect another plan"
-  },
-  "agentPage.work.brain.keyLabel": {
-    "value": "API key"
   },
   "agentPage.work.brain.fallbackTitle": {
     "value": "If {{computer}} stops answering, answer through the API"
@@ -11568,20 +11568,11 @@
   "agentPage.work.brain.advanced.title": {
     "value": "Advanced settings"
   },
-  "agentPage.work.brain.advanced.sub": {
-    "value": "{{brain}}. Applies to every conversation."
-  },
-  "agentPage.work.brain.advanced.think": {
-    "value": "How it thinks"
-  },
   "agentPage.work.brain.advanced.answers": {
     "value": "Who it answers"
   },
   "agentPage.work.brain.advanced.defaults": {
     "value": "Back to defaults"
-  },
-  "agentPage.work.brain.advanced.done": {
-    "value": "Done"
   },
   "agentPage.work.brain.advanced.contents.model": {
     "value": "Context window"

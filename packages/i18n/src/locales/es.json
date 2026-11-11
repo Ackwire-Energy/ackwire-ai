@@ -2636,6 +2636,7 @@
     },
     "team": {
       "title": "Conecta una IA para el equipo",
+      "titlePersonal": "Conectar una IA para tus agentes",
       "asleep_one": "{{count}} agente sin IA",
       "asleep_many": "{{count}} agentes sin IA",
       "asleep_other": "{{count}} agentes sin IA",
@@ -2660,6 +2661,7 @@
       "woke_many": "{{count}} agentes despertaron",
       "woke_other": "{{count}} agentes despertaron",
       "wokeAll": "El equipo despertó",
+      "wokeAllPersonal": "Tus agentes despertaron",
       "wokeNone": "Nadie despertó",
       "thinksAll": "Ya piensan con tu plan de {{plan}}",
       "thinksOne": "{{name}} ya piensa con tu plan de {{plan}}",
@@ -2753,7 +2755,8 @@
       "email": "Te escribiremos por correo cuando la computadora esté lista. Puedes cerrar esta página.",
       "ready": "La computadora está lista.",
       "useKey": "Usar una clave de API ahora",
-      "connecting": "La computadora de este servidor se conecta en menos de un minuto. Inicias sesión aquí en cuanto lo haga."
+      "connecting": "La computadora de este servidor se conecta en menos de un minuto. Inicias sesión aquí en cuanto lo haga.",
+      "computerLater": "Las cuentas quedan en una computadora conectada. Puedes conectar una en cuanto se abra el espacio de trabajo."
     },
     "theComputer": "la computadora",
     "own": {
@@ -4766,7 +4769,6 @@
       "failed": "No se pudo guardar. Inténtalo de nuevo.",
       "use": "Usar",
       "brain": {
-        "sub": "Se aplica solo a {{name}}, en todas las conversaciones.",
         "model": "Clave de API",
         "modelText": "Se paga por uso. Cuenta para el presupuesto de {{name}}.",
         "planText": "Usa tu plan de {{plan}}",
@@ -4786,8 +4788,6 @@
         "accountOthers": "Los planes de otras personas muestran de quién son. Su dueño recibe un correo y puede recuperarlo.",
         "addAccount": "Agregar cuenta",
         "signInAgain": "Volver a iniciar sesión",
-        "connectPlan": "Conectar otro plan",
-        "keyLabel": "Clave de API",
         "fallbackTitle": "Si {{computer}} deja de responder, responder a través de la API",
         "fallbackHint": "Responde a través de la API y cuenta para el presupuesto de {{name}}. Si no, {{name}} le avisa a quien preguntó y espera a que la computadora vuelva.",
         "effort": "Esfuerzo",
@@ -4832,11 +4832,8 @@
         },
         "advanced": {
           "title": "Configuración avanzada",
-          "sub": "{{brain}}. Se aplica a todas las conversaciones.",
-          "think": "Cómo piensa",
           "answers": "A quién responde",
           "defaults": "Volver a los valores predeterminados",
-          "done": "Listo",
           "contents": {
             "model": "Ventana de contexto",
             "auto": "Ventana de contexto y a quién responde",
