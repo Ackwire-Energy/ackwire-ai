@@ -1234,7 +1234,8 @@ replacing the range useradd gave it, and none if another range is in the way (th
 leaves as the agent's own uid, but a container on the host network (`--network host`) whose user inside isn't root
 leaves as one of those ids: a firewall of yours that keys on the agents' uid range should treat every uid from 65536
 up the same way. Containers stop when the computer restarts and come back, those with `restart: always`, with the
-agent's next request. [ADR 0168](docs/adr/0168-agents-containers.md) has the rest.
+agent's next request. Agents on Codex, Cursor, Grok or Antigravity get none: their CLI's own sandbox is what holds
+them, and the containers service runs outside it. [ADR 0169](docs/adr/0169-agents-containers.md) has the rest.
 
 **The shared folder.** Every computer has one folder all of its agents read and write, so what one of
 them downloads, clones or installs, the others use instead of fetching it again. With `--system` it is

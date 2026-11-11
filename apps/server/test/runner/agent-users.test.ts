@@ -20,6 +20,7 @@ import {
   denySchedulers,
   ensureContainers,
   ensureSubids,
+  keepContainers,
   readAccountUsers,
   readAgentUsers,
   rootlessContainers,
@@ -134,7 +135,7 @@ test("an agent's first request makes its user with the lowest free uid, listed i
     "getent passwd",
     "useradd --uid 21003 --user-group --create-home --home-dir /home/ag-a1b2c3d4 --shell /bin/bash --comment Ana Ção ag-a1b2c3d4",
     "chmod 0700 /home/ag-a1b2c3d4",
-    // The range useradd gave it by the order users came in goes; its own block, from its uid, comes (ADR 0168).
+    // The range useradd gave it by the order users came in goes; its own block, from its uid, comes (ADR 0169).
     "usermod --del-subuids 100000-165535 --add-subuids 1376452608-1376518143 --del-subgids 100000-165535 --add-subgids 1376452608-1376518143 ag-a1b2c3d4",
   ]);
   expect(listed(home)).toEqual([
@@ -522,7 +523,7 @@ test("a configured routing mark drops network capabilities even without a namesp
   expect(systemLauncher({ ...user, networkMark: undefined }, false).prefix[0]).toBe("/usr/sbin/runuser");
 });
 
-// ── Rootless containers (ADR 0168) ──────────────────────────────────────────
+// ── Rootless containers (ADR 0169) ──────────────────────────────────────────
 
 test("an agent's subordinate ids: the 65536 from its uid, apart from every other agent's block and every real uid", () => {
   expect(SUBIDS).toBe(65536);
@@ -713,6 +714,24 @@ test("ensureContainers: started when it isn't, left when it runs as it would sta
   calls.length = 0;
   stopContainers(21003, run);
   expect(calls).toEqual([["systemctl", "stop", "--no-block", "agentes-containers-21003.service"]]);
+});
+
+test("keepContainers: none for an agent whose brain's shell has a sandbox of its own, its service stopped (ADR 0169)", () => {
+  const calls: string[][] = [];
+  const run: RunCommand = (file, args) => {
+    calls.push([file, ...args]);
+    return { code: 0, output: file === "systemctl" && args[0] === "show" ? "ActiveState=active\nDescription=\n" : "" };
+  };
+  const user = { id: ANA.id, user: "ag-a1b2c3d4", uid: 21003 };
+  expect(keepContainers(user, false, run)).toBeNull();
+  expect(calls).toEqual([["systemctl", "stop", "--no-block", "agentes-containers-21003.service"]]);
+  calls.length = 0;
+  expect(keepContainers(user, true, run)).toBeNull();
+  expect(calls.map((c) => c.slice(0, 2))).toEqual([
+    ["systemctl", "show"],
+    ["systemctl", "stop"],
+    ["/usr/bin/systemd-run", expect.stringMatching(/^--description=/)],
+  ]);
 });
 
 // ── A Claude login for several agents: the sign-in's own user ────────────────

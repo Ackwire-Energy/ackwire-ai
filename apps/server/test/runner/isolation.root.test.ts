@@ -686,7 +686,7 @@ describe.if(ROOT)("the agents' isolation on this computer, as root", () => {
     } else console.log("no at here");
   });
 
-  test("each agent's subordinate ids: its own block alone in /etc/subuid and /etc/subgid, by the real usermod (ADR 0168)", () => {
+  test("each agent's subordinate ids: its own block alone in /etc/subuid and /etc/subgid, by the real usermod (ADR 0169)", () => {
     for (const u of [A, B]) {
       const [first, last] = agentSubids(u.uid);
       for (const file of ["/etc/subuid", "/etc/subgid"]) {

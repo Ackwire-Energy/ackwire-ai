@@ -849,7 +849,7 @@ describe("folders and tools on the machine (protocol 10)", () => {
     );
   });
 
-  test("the containers block: Docker's commands, the agent's own containers, ports above 1024 (ADR 0168)", () => {
+  test("the containers block: Docker's commands, the agent's own containers, ports above 1024 (ADR 0169)", () => {
     const text = containersText("Build box");
     expect(text).toStartWith('# Containers on "Build box"\ndocker, docker compose and podman work there');
     expect(text).toContain("never another agent's containers or files");

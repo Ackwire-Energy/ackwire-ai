@@ -23,6 +23,7 @@ import type { AiStatusDeps } from "./ai-status";
 import { canTalkTo, NO_PERSON, speakerFor, viaAgent } from "./audience";
 import { runAuthority, UUID } from "./authority";
 import { type BlockSpecReader, blockStateNotes } from "./block-state";
+import { isSandboxedBrain } from "./brains/types";
 import { caches } from "./cache";
 import { summarizeScopes } from "./capabilities";
 import { peopleAllIn } from "./channels";
@@ -1112,14 +1113,8 @@ export async function buildRunContext(
                   ? [{ text: sharedFolderText(a.name, a.shared) }]
                   : []),
                 ...(a.shares && a.tools.commands ? [{ text: sharingText(a.name, a.size) }] : []),
-                // Codex's, Cursor's, Grok's and Antigravity's sandboxes keep their shell off the network and out of the
-                // home, where the agent's containers service and its images are.
-                ...(a.containers &&
-                a.tools.commands &&
-                agent.brain !== "codex" &&
-                agent.brain !== "cursor" &&
-                agent.brain !== "grok" &&
-                agent.brain !== "antigravity"
+                // A sandboxed brain's agent has no containers service there (`MachineAgent.containers`).
+                ...(a.containers && a.tools.commands && !isSandboxedBrain(agent.brain)
                   ? [{ text: containersText(a.name) }]
                   : []),
               ]
@@ -1965,7 +1960,7 @@ async function machineAccessOf(db: Database, orgId: string, agentId: string, mac
     // Its agents share it (`sharingText`), with `agentes-runner computer` to see who uses it.
     shares: system && m.protocol >= SHARED_COMPUTER_PROTOCOL,
     size: m.size ? (m.size.limit ?? m.size) : null,
-    // Each agent its own containers service there (ADR 0168).
+    // Each agent its own containers service there (ADR 0169).
     containers: system && Boolean(m.executors?.toolchains?.podman),
   };
 }
@@ -2113,7 +2108,7 @@ export function sharingText(computer: string, size: { cpus: number; memoryGb: nu
 }
 
 /**
- * Rootless containers on a computer where each agent is its own user (ADR 0168): Docker's commands work, and what an
+ * Rootless containers on a computer where each agent is its own user (ADR 0169): Docker's commands work, and what an
  * agent should know of them there.
  */
 export function containersText(computer: string) {

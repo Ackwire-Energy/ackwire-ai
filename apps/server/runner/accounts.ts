@@ -232,6 +232,15 @@ export function withoutSignIns(base: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   return env;
 }
 
+/**
+ * `base` without the agent's containers service (`systemLauncher`'s runtime dir and Podman's socket), for a CLI whose
+ * shell runs in a sandbox of its own: that service, outside it, would be a way out (ADR 0169).
+ */
+export function withoutContainers(base: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const { CONTAINER_HOST: _podman, DOCKER_HOST: _docker, XDG_RUNTIME_DIR: _runtime, ...env } = base;
+  return env;
+}
+
 /** The env a CLI runs with for an account folder: `base` without any other sign-in, the folder as its home. */
 export function accountEnv(kind: AccountKind, dir: string, base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
   const env = withoutSignIns(base);

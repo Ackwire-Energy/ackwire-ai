@@ -477,7 +477,7 @@ describe("# This turn", () => {
     expect(seen).toHaveLength(6);
     expect(seen[5]?.system).not.toContain("# Containers");
 
-    // Its runner found Podman: each agent has its containers there (ADR 0168), which Cursor's sandbox keeps it from.
+    // Its runner found Podman: each agent has its containers there (ADR 0169), which Cursor's sandbox keeps it from.
     await f.db
       .update(schema.machines)
       .set({ executors: { ...row?.executors, mode: "system", toolchains: { podman: "5.4.2" } } })

@@ -109,7 +109,7 @@ const PRIVATE_TMP_STEPS = [
 const PRIVATE_TMP = [...PRIVATE_TMP_STEPS, 'exec "$@"'].join("\n");
 
 /**
- * Rootless containers for the agents (ADR 0168): Podman, and the set-user-ID helpers that map an agent's own ids
+ * Rootless containers for the agents (ADR 0169): Podman, and the set-user-ID helpers that map an agent's own ids
  * into its user namespaces. Where they are, each agent has a containers service (`containersCommand`), and every
  * launch of it a runtime dir and Podman's socket.
  */
@@ -384,7 +384,7 @@ export function denySchedulers(user: string, etc = "/etc") {
  * containers map to: the 65536 from `uid << 16`. Taken from the uid alone, they are the same on every computer where
  * the agent keeps its uid (a move keeps it), so what its containers left in its home keeps owners it maps. No two
  * agents share one, and none is a real uid: those are all below 65536, an agent's block 1000 << 16 or above. An
- * operator's firewall that keys on agents' uids must also take every id from 65536 up for an agent's (ADR 0168).
+ * operator's firewall that keys on agents' uids must also take every id from 65536 up for an agent's (ADR 0169).
  */
 export const SUBIDS = 65536;
 export const agentSubids = (uid: number): [number, number] => [uid * SUBIDS, (uid + 1) * SUBIDS - 1];
@@ -535,7 +535,7 @@ function agentView(u: AgentUser, more: string[]) {
 }
 
 /**
- * The agent's containers service, `agentes-containers-<uid>.service` (ADR 0168): a systemd user manager of the
+ * The agent's containers service, `agentes-containers-<uid>.service` (ADR 0169): a systemd user manager of the
  * agent's own, which runs Podman's API (its socket, every launch's `CONTAINER_HOST` and `DOCKER_HOST`), the
  * healthcheck timers, compose's DNS helper and the containers themselves. It goes through the steps every launch of
  * the agent does (its tmpfs, its mount namespace and /tmp, its network hook, its user) in a unit of its slice whose
@@ -625,6 +625,17 @@ export function ensureContainers(u: AgentUser, run: RunCommand = runSync): strin
 /** The agent's containers stop (a network change's deadline, the agent left this computer). */
 export const stopContainers = (uid: number, run: RunCommand = runSync) =>
   run("systemctl", ["stop", "--no-block", containersUnit(uid)]);
+
+/**
+ * Its containers service as the agents frame says (`MachineAgent.containers`): kept as `ensureContainers` keeps it, or
+ * stopped for an agent whose brain's shell runs in a sandbox of its CLI's own, which the service, outside it, would be
+ * a way out of (ADR 0169).
+ */
+export function keepContainers(u: AgentUser, allowed: boolean, run: RunCommand = runSync): string | null {
+  if (allowed) return ensureContainers(u, run);
+  stopContainers(u.uid, run);
+  return null;
+}
 
 /** Root executes this hook before dropping privileges. Every path component must remain root-controlled. */
 export const trustedNetworkLauncher = (file: string, stat = lstatSync) =>

@@ -3196,7 +3196,7 @@ test("the launch line: the agent's launcher, then this runner's worker with the 
     "SHELL",
     "USER",
   ]);
-  // With rootless containers (ADR 0168): its runtime dir, and Podman's socket for docker and podman alike.
+  // With rootless containers (ADR 0169): its runtime dir, and Podman's socket for docker and podman alike.
   expect(workerCommand(ana, runner, home, true, false, true).env).toMatchObject({
     XDG_RUNTIME_DIR: "/run/user/21000",
     CONTAINER_HOST: "unix:///run/user/21000/podman/podman.sock",

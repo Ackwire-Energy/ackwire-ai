@@ -41,7 +41,7 @@ import {
   type TurnContext,
 } from "@agenteschat/adapters/machine-protocol";
 import type { AccountGrant } from "./accounts";
-import { type AgentUser, ensureContainers, readAgentUsers, rootlessContainers, systemLauncher } from "./agent-users";
+import { type AgentUser, keepContainers, readAgentUsers, rootlessContainers, systemLauncher } from "./agent-users";
 import { type BindPolicyOptions, ensureBrowserBindPolicy } from "./browser-bind-policy";
 import type { BrowserViews } from "./browser-views";
 import { backoffDelay } from "./connection";
@@ -370,7 +370,7 @@ export interface SupervisorOptions {
   grant?: (kind: AccountKind, accountId: string) => Promise<AccountGrant | null>;
   /** What root launched for this agent on a sign-in with its own user: no stop by uid reaches it. */
   stopAccountScopes?: (uid: number) => void;
-  /** Its containers service (ADR 0168), which outlives its worker but not a network it is leaving. */
+  /** Its containers service (ADR 0169), which outlives its worker but not a network it is leaving. */
   stopContainers?: (uid: number) => void;
   /** A turn's plan usage, for its account (`AccountManager.noteRateLimit`, `noteCodexRateLimits`). */
   usage?: (kind: AccountKind, accountId: string, info: unknown) => void;
@@ -1895,19 +1895,20 @@ export function workerCommand(
 
 /**
  * Starts each agent's worker as a process (`runner`: how this runner starts itself), its bind check passed first and
- * its containers service running (ADR 0168), where there are rootless containers; without it, only its containers
- * don't work.
+ * its containers service as the agents frame says (`containers`, ADR 0169), where there are rootless containers;
+ * without it, only its containers don't work.
  */
 export function launchWorker(
   runner: string[],
   policy: BindPolicyOptions,
   base = AGENT_WORKER_HOMES,
   log?: (line: string) => void,
+  containers: (agentId: string) => boolean = () => false,
 ): StartWorker {
   return (user) => {
     ensureBrowserBindPolicy(user, runner, policy);
-    const containers = rootlessContainers() ? ensureContainers(user) : null;
-    if (containers) log?.(`[${user.user}] its containers service didn't start: ${containers}`);
+    const problem = rootlessContainers() ? keepContainers(user, containers(user.id)) : null;
+    if (problem) log?.(`[${user.user}] its containers service didn't start: ${problem}`);
     const home = workerHome(base, user);
     retireLegacyPending(base, home, user);
     const { argv, cwd, env } = workerCommand(user, runner, home);
