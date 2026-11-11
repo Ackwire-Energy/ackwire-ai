@@ -32,7 +32,7 @@ import {
 } from "../src";
 import { currentWaits, onMessageWhileWaiting } from "../src/waits";
 import { addMember, type Fixture, setup } from "./fixtures";
-import { connectedComputer, fakeRunner, pairMachine, RUNNER } from "./machine-fixtures";
+import { connectedComputer, type FakeRunnerOptions, fakeRunner, pairMachine, RUNNER } from "./machine-fixtures";
 
 let f: Fixture;
 afterEach(async () => {
@@ -52,14 +52,16 @@ type PhoneAnswer = (req: MachineRequest) => unknown;
  * Ana's agent @dev on its own computer, and Sam with his MacBook (online) reaching a Pixel 8. The device tools' hub
  * answers `phone.*` itself (`answer`) and passes everything else to the real hub, so files come back for real.
  */
-async function world(options: { reply?: (req: ModelRequest) => { chunks: string[]; toolUses?: never[] } } = {}) {
+async function world(
+  options: { reply?: (req: ModelRequest) => { chunks: string[]; toolUses?: never[] }; exec?: FakeRunnerOptions["exec"] } = {},
+) {
   const devDeps = {} as DeviceToolDeps;
   f = await setup({
     machines: true,
     reply: (options.reply as never) ?? (() => ({ chunks: ["ok"] })),
     toolSources: [createDeviceToolSource(devDeps)],
   });
-  await connectedComputer(f);
+  await connectedComputer(f, { exec: options.exec });
   const sam = await addMember(f.db, f.org.id, "member", "Sam Rivera");
   const mac = await pairMachine({ db: f.db, pubsub: f.pubsub }, sam.id, f.org.id, {
     name: "Sam's MacBook",
@@ -67,6 +69,7 @@ async function world(options: { reply?: (req: ModelRequest) => { chunks: string[
     os: "darwin",
   });
   const runner = fakeRunner(f.machineHub as MachineHub, {
+    exec: options.exec,
     async push(req, bytes, name) {
       await receiveMachineUpload(
         { db: f.db, artifacts: f.artifactDeps, pubsub: f.pubsub },
@@ -293,6 +296,24 @@ describe("computer on someone else's device", () => {
       .set({ execAllowed: true, access: { folders: [], tools: { claude: true, codex: false, commands: true } } })
       .where(machine);
     expect((await call(ctx, "computer_status", {})).content).not.toContain("Off there");
+  });
+
+  test("a refusal on a person's computer points to that person; on the agent's own, to request_folder_access", async () => {
+    const w = await world({
+      exec: () => ({ fail: { code: "not_allowed", message: "Grok Build is turned off on this computer" } }),
+    });
+    const ctx = await runCtx();
+    await f.db
+      .update(schema.machines)
+      .set({ audienceMode: "everyone" })
+      .where(eq(schema.machines.id, w.mac.machineId));
+    const there = await call(ctx, "run_code", { language: "bash", code: "ls", computer: "Sam's MacBook" });
+    expect(there.content).toContain(
+      "On Sam's MacBook, only the person at it can allow folders or turn tools on: tell them.",
+    );
+    expect(there.content).not.toContain("request_folder_access");
+    const own = await call(ctx, "run_code", { language: "bash", code: "ls", computer: "Build box" });
+    expect(own.content).toContain("ask with request_folder_access");
   });
 });
 

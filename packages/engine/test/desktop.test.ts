@@ -15,6 +15,7 @@ import {
   DEVICE_MAX_PENDING_PER_IP,
   DeviceCodeLimitError,
   denyDeviceCode,
+  devicesText,
   drainOutbox,
   ForbiddenError,
   formatUserCode,
@@ -797,6 +798,14 @@ describe("folders and tools on the machine (protocol 10)", () => {
     expect(notAllowedMessage("Sam's Mac", "Cursor is turned off on this computer", undefined, false, mac)).toBe(
       "Cursor is turned off on this computer. On Sam's Mac, only the person at it can allow folders or turn tools on: tell them.",
     );
+  });
+
+  test("a person's Mac among the devices: a screenshot is screencapture through commands, Screen Recording in the app", () => {
+    const phones: { name: string; platform: string }[] = [];
+    const mac = devicesText({ computers: [{ name: "Sam's Mac", os: "darwin" }], phones });
+    expect(mac).toContain("`screencapture -x screen.png`");
+    expect(mac).toContain("Screen Recording in the agentes.chat app there (Preferences › General › Permissions)");
+    expect(devicesText({ computers: [{ name: "Box", os: "linux" }], phones })).not.toContain("screencapture");
   });
 
   test("what the agent reads: its folders, the tools that are off, and the outcome of a request", () => {
