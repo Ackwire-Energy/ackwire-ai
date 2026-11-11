@@ -2332,6 +2332,12 @@
       "action": "Buat rutinitas",
       "done": "Rutinitas dibuat"
     },
+    "howto": {
+      "title": "{{name}} belajar: {{what}}",
+      "line": "Dipakai {{uses}}×. Jadikan skill?",
+      "action": "Jadikan skill",
+      "done": "Dikonfirmasi"
+    },
     "stalled": {
       "title": "Langkah berhenti di #{{number}} {{title}}",
       "line_other": "Langkah {{steps}} sudah berhenti {{hours}} jam menunggu #{{on}}.",
@@ -2375,6 +2381,7 @@
   },
   "routing": {
     "title": "Siapa yang memilih agen",
+    "reflectionOff": "Memori belum belajar dari percakapan yang selesai: untuk itu perlu kunci penyedia, di atas.",
     "how": "Cara agen dipilih",
     "by": {
       "jev": "Jev memilih siapa yang menjawab tiap pesan tanpa sebutan.",
@@ -5140,6 +5147,15 @@
       "andMore": "{{names}} dan lainnya"
     }
   },
+  "teamMemory": {
+    "title": "Memori tim",
+    "help": "Apa yang orang minta agar diingat semua agen, dengan siapa yang mengatakannya dan kapan. Setiap agen membacanya dalam semua pekerjaannya.",
+    "empty": "Belum ada. Saat seseorang meminta semua agen mengingat sesuatu, itu muncul di sini.",
+    "remove": "Hapus",
+    "removed": "Dihapus dari memori tim",
+    "make": "Jadikan milik tim",
+    "made": "Sekarang semua agen menyimpannya"
+  },
   "memory": {
     "fromRefusal": "Jangan usulkan lagi: {{text}}",
     "fromCorrection": "Seseorang mengoreksi: {{text}}",
@@ -5179,6 +5195,9 @@
     "unverifiedTitle": "Hanya agen yang mengatakan ini. Masuk ke konteks sebagai petunjuk bertanda.",
     "pinned": "Selalu ada di konteks",
     "lowTrust": "Sumber eksternal, tidak tepercaya",
+    "confirm": "Konfirmasi",
+    "confirmTitle": "Nyatakan bahwa ini benar: agen lalu memakainya sebagai tepercaya.",
+    "confirmed": "Dikonfirmasi",
     "used_other": "dipakai {{count}} kali",
     "unusedFor": "tidak dipakai selama {{days}} hari",
     "supersedes": "Menggantikan:",
@@ -7865,6 +7884,7 @@
       "machine_offline_resumes_other": "{{computer}} offline: {{count}} tugas tetap berjalan di sana jika hanya koneksinya yang putus, dan berlanjut dari titik berhenti jika komputer dinyalakan ulang.",
       "machine_task_resumed": "{{computer}} kembali: “{{title}}” berlanjut dari titik berhenti",
       "machine_task_resume_waits": "{{computer}} kembali: “{{title}}” berlanjut dari titik berhenti setelah proyek siap",
+      "machine_task_restarted": "{{computer}} kembali: “{{title}}” dimulai lagi",
       "machine_task_done": "“{{title}}” selesai dalam {{span}} di {{computer}}",
       "machine_task_failed": "“{{title}}” gagal setelah {{span}} di {{computer}}",
       "machine_task_canceled": "“{{title}}” dihentikan di {{computer}}",
@@ -10851,6 +10871,7 @@
       "support": "Dukungan",
       "marketing": "Pemasaran",
       "automation": "Otomatisasi",
+      "social": "Media sosial",
       "email": "Email"
     },
     "emptyCategory": "Belum ada konektor di kategori ini",
@@ -11202,6 +11223,41 @@
         "1": "Melihat tagihan dan pelanggan",
         "2": "Membuat tagihan Pix"
       },
+      "instagram": {
+        "1": "Melihat postingan, story, dan statistik",
+        "2": "Memublikasikan postingan dan membaca pesan langsung",
+        "ask": "Membalas pesan selalu meminta persetujuanmu"
+      },
+      "facebook": {
+        "1": "Melihat postingan, komentar, dan statistik",
+        "2": "Memublikasikan postingan, foto, dan video serta membalas komentar",
+        "ask": "Menghapus postingan dan komentar selalu meminta persetujuanmu"
+      },
+      "linkedin": {
+        "1": "Memublikasikan postingan, tautan, dan video",
+        "2": "Mengomentari postingan",
+        "ask": "Menghapus postingan selalu meminta persetujuanmu"
+      },
+      "youtube": {
+        "1": "Melihat video, komentar, dan analitik",
+        "2": "Mengedit video dan playlist serta berkomentar",
+        "ask": "Membalas, memoderasi, dan menghapus komentar selalu meminta persetujuanmu"
+      },
+      "pinterest": {
+        "1": "Melihat pin, papan, dan analitik",
+        "2": "Membuat pin dan merapikan papan",
+        "ask": "Mengubah papan dan menghapus selalu meminta persetujuanmu"
+      },
+      "reddit": {
+        "1": "Mencari postingan dan membaca komentar",
+        "2": "Memposting, berkomentar, dan mengedit",
+        "ask": "Menghapus selalu meminta persetujuanmu"
+      },
+      "whatsapp": {
+        "1": "Melihat nomor, template, dan status pengiriman",
+        "2": "Membuat template pesan",
+        "ask": "Mengirim pesan selalu meminta persetujuanmu"
+      },
       "database": {
         "1": "Melihat tabel",
         "2": "Menjalankan query ke data untuk menjawab",
@@ -11340,7 +11396,14 @@
       "revenuecat": "Langganan dalam aplikasi, produk, penawaran, dan pendapatan.",
       "superwall": "Paywall, kampanye, dan eksperimen.",
       "paddle": "Pelanggan, langganan, transaksi, dan produk.",
-      "abacatepay": "Tagihan Pix, pelanggan, dan penarikan dana."
+      "abacatepay": "Tagihan Pix, pelanggan, dan penarikan dana.",
+      "instagram": "Akun bisnis dan kreator Instagram: postingan, story, statistik, dan pesan langsung.",
+      "facebook": "Halaman Facebook: postingan, foto, video, komentar, dan statistik.",
+      "linkedin": "Postingan, video, dan komentar LinkedIn atas nama anggota yang masuk.",
+      "youtube": "Video, komentar, playlist, dan analitik kanal YouTube.",
+      "pinterest": "Pin, papan, dan analitik Pinterest.",
+      "reddit": "Postingan, komentar, dan komunitas Reddit.",
+      "whatsapp": "Pesan dan template WhatsApp Business."
     }
   },
   "toolNames": {
@@ -12633,7 +12696,8 @@
       "draining": "Jaringan sedang berubah. Sesi komputer yang terbuka akan dimulai ulang pukul {{when}}.",
       "restart": "Sesi komputer sedang dimulai ulang untuk menerapkan jaringan. Pekerjaan baru menunggu sampai selesai.",
       "line": "IP keluar {{ip}}",
-      "hint": "Alamat yang dilihat situs saat agen menjelajah. Alamat ini ikut berubah saat jaringan komputer berubah."
+      "hint": "Alamat yang dilihat situs saat agen menjelajah. Alamat ini ikut berubah saat jaringan komputer berubah.",
+      "waiting": "Menyambungkan ulang internet agen. Koneksi mereka menunggu sampai kembali."
     },
     "online": "Online",
     "offline": "Offline",
@@ -14944,6 +15008,7 @@
       "machine_task_interruptedNoComputer": "“{{title}}” terputus.",
       "machine_task_resumed": "{{computer}} sudah kembali: “{{title}}” dilanjutkan dari titik berhentinya.",
       "machine_task_resume_waits": "{{computer}} sudah kembali: “{{title}}” dilanjutkan dari titik berhentinya setelah proyeknya siap.",
+      "machine_task_restarted": "{{computer}} sudah kembali: “{{title}}” dimulai lagi.",
       "machine_offline": "{{computer}} sedang offline.",
       "brain_unavailable": "{{brain}} tidak bisa menjawab sekarang. Aku akan menjawab saat ia kembali.",
       "brain_unavailable_paused": "Komputer tempat {{brain}} berjalan sedang dijeda. Aku akan menjawab setelah dilanjutkan.",

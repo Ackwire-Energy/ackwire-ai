@@ -11,8 +11,19 @@ const { agentRuns, agentRunSteps } = schema;
 export type AgentRun = typeof agentRuns.$inferSelect;
 export type RunStatus = AgentRun["status"];
 
-/** For a select over `agent_runs`: parked on a provider outage (`transcript.outage`), it resumes by itself. */
-export const outageParkedSql = sql<boolean>`(${agentRuns.status} = 'waiting_input' and ${agentRuns.transcript} -> 'outage' is not null)`;
+/**
+ * For a select over `agent_runs`: parked on a provider outage (`transcript.outage`), it resumes by itself. The marker
+ * stays until a turn answers, so a run that waits on its computer or its plan since (`waitingMachineId`,
+ * `waitingForBrain`) reads as that wait, never as the provider being down.
+ */
+export const outageParkedSql = sql<boolean>`(${agentRuns.status} = 'waiting_input' and ${agentRuns.transcript} -> 'outage' is not null
+  and ${agentRuns.waitingMachineId} is null and ${agentRuns.transcript} -> 'waitingForBrain' is null)`;
+
+/** `outageParkedSql` for a loaded run. */
+export function outageParkedOf(run: Pick<AgentRun, "status" | "waitingMachineId" | "transcript">): boolean {
+  const t = run.transcript as { outage?: unknown; waitingForBrain?: unknown } | null;
+  return run.status === "waiting_input" && !run.waitingMachineId && Boolean(t?.outage) && !t?.waitingForBrain;
+}
 
 /**
  * For a select over `agent_runs`: it ended without answering, so its receipt reads "didn't reply": it passed and posted
@@ -165,6 +176,19 @@ export interface CliFailure {
   message: string;
   provider?: { cause?: string; httpStatus?: number };
 }
+
+/**
+ * Grok Build's words when it fails closed at its start: on Linux without bubblewrap (1.0.70: "Install bubblewrap with
+ * `apt install -y bubblewrap`. Refusing to start with denied paths unprotected."), outside its pinned version range.
+ */
+const REFUSED_START = /\brefus(?:e|es|ing) to start\b/i;
+
+/**
+ * A CLI that refused to start on its computer: every retry fails the same way until someone installs or updates
+ * something there, whatever the runner called it.
+ */
+export const cliRefusedStart = (failure: CliFailure) =>
+  isCliFailure(failure.code) && REFUSED_START.test(failure.message);
 
 /**
  * Who failed a CLI's turn: the provider, when it refused or failed the CLI's call (a status, or the runner's cause), as

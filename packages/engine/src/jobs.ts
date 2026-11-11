@@ -32,7 +32,7 @@ import { consolidateOrg } from "./context/consolidate";
 import { applyReactionFeedback } from "./context/feedback";
 import { LEARN_JOB, learnRun } from "./context/learn";
 import { REFLECT_DEFAULTS, reflectThread } from "./context/reflect";
-import { judgeOf } from "./context/summaries";
+import { judgeOf, summaryModelReady } from "./context/summaries";
 import { reportDroppedMentions, tellWakeSkipped } from "./continuation";
 import { DEVICE_WAIT_EXPIRED_JOB, expireDeviceWait } from "./device-waits";
 import {
@@ -140,6 +140,8 @@ async function maybeEnqueueReflection(deps: JobDeps, orgId: string, threadId: st
     .where(and(eq(schema.messages.orgId, orgId), eq(schema.messages.threadId, threadId)));
   const n = Number(row?.n ?? 0);
   if (n === 0 || n % every !== 0) return;
+  // No model to reflect with: a job would only fail (ADR 0167).
+  if (deps.context && !(await summaryModelReady(deps.context, orgId))) return;
   await enqueue(deps.db, {
     orgId,
     kind: "context.reflect",
@@ -851,7 +853,9 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     },
     "search.reindex": async (job) => {
       if (!deps.search) return;
-      await reindexOrg({ db: deps.db, search: deps.search, gateway: deps.gateway }, orgOf(job));
+      // The boot backfill's reindex names the kinds that get vectors (`queueEmbeddingBackfill`); a person's has none.
+      const kinds = Array.isArray(job.payload.kinds) ? (job.payload.kinds as SearchKind[]) : undefined;
+      await reindexOrg({ db: deps.db, search: deps.search, gateway: deps.gateway }, orgOf(job), { kinds });
     },
     "context.reflect": async (job) => {
       if (!deps.context) return;

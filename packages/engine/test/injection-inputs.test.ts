@@ -7,6 +7,7 @@ import {
   drainOutbox,
   grantScopes,
   HOW_YOU_WORK,
+  insertMessage,
   type Judge,
   postPersonMessage,
   type ToolContext,
@@ -471,12 +472,24 @@ describe("raw channels inside the envelope", () => {
     await call(ctx, "create_issue", { title: "Flaky build", description: `Steps\n${INJECTION}` });
     enveloped((await call(ctx, "list_issues", { issue: "1" })).content, "issue 1");
 
+    // A person's own message is the team's (ADR 0167): outside the envelope, its closing marker still neutralised.
+    // What an agent relayed from outside stays inside.
     await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
       body: `deploy checklist ${INJECTION}`,
+    });
+    await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 1, stretchId: null },
+      body: `The vendor page's deploy checklist: ${INJECTION}`,
+      meta: { readOutside: true },
     });
     await drainOutbox(f.db, f.handlers);
     const search = await call(ctx, "search_context", { query: "deploy checklist" });
     enveloped(search.content, "workspace search");
+    const own = search.content.slice(0, search.content.indexOf("<external_data "));
+    expect(own).toContain("deploy checklist");
+    expect(own).not.toMatch(CLOSER);
   });
 });
 

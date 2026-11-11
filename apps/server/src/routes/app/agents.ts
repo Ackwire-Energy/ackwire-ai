@@ -68,6 +68,7 @@ import {
   setAgentBrain,
   setReportsTo,
   speakerOf,
+  summaryModelReady,
   TEAM_TEMPLATES,
   unarchiveAgent,
   undoTeam,
@@ -708,6 +709,8 @@ export function agentRoutes(deps: AppDeps) {
               noSmallModel: z.string().nullable(),
             }),
             apiKey: z.boolean(),
+            /** Memory reflects on finished conversations: a summary model it can call (ADR 0167). */
+            reflection: z.boolean(),
           }),
         ),
         ...errors,
@@ -718,11 +721,13 @@ export function agentRoutes(deps: AppDeps) {
       const userId = c.get("user").id;
       await requirePermission(db, userId, orgId, "read");
       const status = aiStatusDeps(deps);
-      const [ai, routing] = await Promise.all([
+      const context = deps.extras?.context;
+      const [ai, routing, reflection] = await Promise.all([
         orgAiStatus(status, orgId, userId),
         orgRouting(status, deps.extras?.router?.routing ?? null, orgId, userId),
+        context ? summaryModelReady(context, orgId) : false,
       ]);
-      return c.json({ ...ai, ...routing }, 200);
+      return c.json({ ...ai, ...routing, reflection }, 200);
     },
   );
 

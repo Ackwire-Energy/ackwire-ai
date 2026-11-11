@@ -2331,6 +2331,12 @@
       "action": "创建例行任务",
       "done": "例行任务已创建"
     },
+    "howto": {
+      "title": "{{name}} 学会了：{{what}}",
+      "line": "已使用 {{uses}} 次。要做成技能吗？",
+      "action": "做成技能",
+      "done": "已确认"
+    },
     "stalled": {
       "title": "#{{number}} {{title}} 的步骤停了",
       "line_other": "步骤 {{steps}} 已经停了 {{hours}} 小时，在等 #{{on}}。",
@@ -2374,6 +2380,7 @@
   },
   "routing": {
     "title": "谁来挑选智能体",
+    "reflectionOff": "记忆还不会从结束的对话中学习：需要在上方添加一个服务商密钥。",
     "how": "如何挑选智能体",
     "by": {
       "jev": "对于没有提及的消息，由 Jev 挑选回答者。",
@@ -5172,6 +5179,15 @@
       "andMore": "{{names}} 等"
     }
   },
+  "teamMemory": {
+    "title": "团队记忆",
+    "help": "大家要求所有智能体记住的内容，附上是谁在何时说的。每个智能体在所有工作中都会读到。",
+    "empty": "还没有内容。有人让所有智能体记住某件事时，会显示在这里。",
+    "remove": "移除",
+    "removed": "已从团队记忆中移除",
+    "make": "设为团队记忆",
+    "made": "现在所有智能体都会记住它"
+  },
   "memory": {
     "fromRefusal": "不再提议：{{text}}",
     "fromCorrection": "有人更正：{{text}}",
@@ -5208,6 +5224,9 @@
     "unverifiedTitle": "只是智能体这么说的。会作为带标记的提示进入上下文。",
     "pinned": "始终在上下文中",
     "lowTrust": "外部来源，不可信",
+    "confirm": "确认",
+    "confirmTitle": "确认无误后，智能体会把它当作可信内容使用。",
+    "confirmed": "已确认",
     "used_other": "已使用 {{count}} 次",
     "unusedFor": "已 {{days}} 天未使用",
     "supersedes": "取代：",
@@ -7869,6 +7888,7 @@
       "machine_offline_resumes_other": "{{computer}} 已离线：如果只是连接断开，{{count}} 个任务会继续在上面运行。如果电脑重启了，任务会从停下的地方恢复。",
       "machine_task_resumed": "{{computer}} 已恢复：“{{title}}”从停下的地方继续",
       "machine_task_resume_waits": "{{computer}} 已恢复：项目就绪后，“{{title}}”会从停下的地方继续",
+      "machine_task_restarted": "{{computer}} 已恢复：“{{title}}”已重新开始",
       "machine_task_done": "“{{title}}”在 {{computer}} 上用时 {{span}} 完成",
       "machine_task_failed": "“{{title}}”在 {{computer}} 上运行 {{span}} 后失败",
       "machine_task_canceled": "“{{title}}”在 {{computer}} 上被停止",
@@ -10859,6 +10879,7 @@
       "support": "客服",
       "marketing": "营销",
       "automation": "自动化",
+      "social": "社交媒体",
       "email": "邮件"
     },
     "emptyCategory": "这个分类下还没有连接器",
@@ -11210,6 +11231,41 @@
         "1": "查看收款和客户",
         "2": "创建 Pix 收款"
       },
+      "instagram": {
+        "1": "查看帖子、快拍和数据分析",
+        "2": "发布帖子并阅读私信",
+        "ask": "回复消息始终需要你的审批"
+      },
+      "facebook": {
+        "1": "查看帖子、评论和数据分析",
+        "2": "发布帖子、照片和视频并回复评论",
+        "ask": "删除帖子和评论始终需要你的审批"
+      },
+      "linkedin": {
+        "1": "发布帖子、链接和视频",
+        "2": "评论帖子",
+        "ask": "删除帖子始终需要你的审批"
+      },
+      "youtube": {
+        "1": "查看视频、评论和数据分析",
+        "2": "编辑视频和播放列表并发表评论",
+        "ask": "回复、审核和删除评论始终需要你的审批"
+      },
+      "pinterest": {
+        "1": "查看 Pin 图、图板和数据分析",
+        "2": "创建 Pin 图并整理图板",
+        "ask": "更改图板和删除始终需要你的审批"
+      },
+      "reddit": {
+        "1": "搜索帖子并阅读评论",
+        "2": "发帖、评论和编辑",
+        "ask": "删除始终需要你的审批"
+      },
+      "whatsapp": {
+        "1": "查看号码、模板和送达情况",
+        "2": "创建消息模板",
+        "ask": "发送消息始终需要你的审批"
+      },
       "database": {
         "1": "查看数据表",
         "2": "查询数据来回答问题",
@@ -11348,7 +11404,14 @@
       "revenuecat": "应用内订阅、产品、产品组合和收入。",
       "superwall": "付费墙、营销活动和实验。",
       "paddle": "客户、订阅、交易和产品。",
-      "abacatepay": "Pix 收款、客户和提现。"
+      "abacatepay": "Pix 收款、客户和提现。",
+      "instagram": "Instagram 商家和创作者账号：帖子、快拍、数据分析和私信。",
+      "facebook": "Facebook 公共主页：帖子、照片、视频、评论和数据分析。",
+      "linkedin": "以登录成员身份发布的 LinkedIn 帖子、视频和评论。",
+      "youtube": "YouTube 频道的视频、评论、播放列表和数据分析。",
+      "pinterest": "Pinterest 的 Pin 图、图板和数据分析。",
+      "reddit": "Reddit 的帖子、评论和社区。",
+      "whatsapp": "WhatsApp Business 消息和模板。"
     }
   },
   "toolNames": {
@@ -12641,7 +12704,8 @@
       "draining": "网络正在变更。电脑上打开的会话将在 {{when}} 重启。",
       "restart": "电脑会话正在重启以应用网络设置。新工作会等到完成后再开始。",
       "line": "出口 IP {{ip}}",
-      "hint": "智能体浏览网页时网站看到的地址。电脑的网络变化时会随之更新。"
+      "hint": "智能体浏览网页时网站看到的地址。电脑的网络变化时会随之更新。",
+      "waiting": "正在重新连接智能体的网络。网络恢复前，它们的连接会等待。"
     },
     "online": "在线",
     "offline": "离线",
@@ -14958,6 +15022,7 @@
       "machine_task_interruptedNoComputer": "“{{title}}”被中断了。",
       "machine_task_resumed": "{{computer}} 恢复了：“{{title}}”已从中断处继续。",
       "machine_task_resume_waits": "{{computer}} 恢复了：项目就绪后，“{{title}}”会从中断处继续。",
+      "machine_task_restarted": "{{computer}} 恢复了：“{{title}}”已重新开始。",
       "machine_offline": "{{computer}} 已离线。",
       "brain_unavailable": "{{brain}} 暂时无法回答。恢复后我会回复。",
       "brain_unavailable_paused": "{{brain}} 运行的电脑已暂停。恢复后我会回复。",

@@ -169,6 +169,43 @@ describe("the invite dialog", () => {
     expect(box("#eng").getAttribute("aria-checked")).toBe("true");
   });
 
+  test("whoever is being invited never reads as invited already, though the list has them before Convidar is answered", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    const send = api.orgs.inviteMany;
+    let answer = () => {};
+    const answered = new Promise<void>((resolve) => {
+      answer = resolve;
+    });
+    api.orgs.inviteMany = async (...args) => {
+      const said = await send(...args);
+      await answered;
+      return said;
+    };
+    const { sockets } = await renderApp(`/org/${ORG_ID}/settings/members`, { api });
+    await settle(6);
+    await act(async () => sockets.last().open());
+    await settle(2);
+    const invite = await openInvite();
+    await type(within(invite).getByLabelText("E-mails"), "lia.prado@example.com");
+    await press("Continuar");
+    await press("Continuar");
+    await press("Continuar");
+    expect(stepOf()).toBe("Passo 4 de 4 · Recado");
+    const mail = () => dialog().querySelector(".invite-mail-fig")?.textContent;
+    expect(mail()).toContain("Assim chega para Lia");
+    await press("Convidar 1 pessoa");
+    // Invited on the server, which says so on the socket before it answers.
+    await act(async () => sockets.last().push({ type: "event", scope: "org", event: { type: "org.members" } }));
+    await settle(6);
+    expect(state.invitations.some((i) => i.email === "lia.prado@example.com")).toBe(true);
+    expect(mail()).toContain("Assim chega para Lia");
+    expect(within(dialog()).getByRole("button", { name: "Convidar 1 pessoa" })).toBeTruthy();
+    await act(async () => answer());
+    await settle(6);
+    expect(asked()).toBe("Pronto, mandei o convite para Lia.");
+  });
+
   test("a pasted address book, a role per person, then what became of each address, in place of the toasts", async () => {
     const state = seedState();
     state.invitations.push(

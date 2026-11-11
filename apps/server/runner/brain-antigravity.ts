@@ -6,7 +6,7 @@ import { createInterface } from "node:readline";
 import type { CommandProfile } from "@agenteschat/adapters/command-policy";
 import type { AgentScope, BrainEffort } from "@agenteschat/adapters/machine-protocol";
 import { isAccountId } from "@agenteschat/adapters/machine-protocol";
-import { ACCOUNT_MISSING_MESSAGE, accountEnv, withoutSignIns } from "./accounts";
+import { ACCOUNT_MISSING_MESSAGE, accountEnv, withoutContainers, withoutSignIns } from "./accounts";
 import { AGY_CHAT_AGENT, prepareAgyHome } from "./agy-home";
 import { LIMIT_TEXT } from "./brain";
 import { type CodexBrainEvent, CodexThreads, chatFolder, codexProfileOf, codexThreadKey } from "./brain-codex";
@@ -250,7 +250,7 @@ export async function runAntigravityTurn(input: AntigravityTurnInput, opts: Anti
   }
   const chatKey = codexThreadKey(input.sessionId, input.account.id);
   const base: NodeJS.ProcessEnv = {
-    ...(input.chat ? withoutSignIns(process.env) : process.env),
+    ...withoutContainers(input.chat ? withoutSignIns(process.env) : process.env),
     ...(opts.env ?? {}),
     [AGY_RUN_ENV]: input.runId,
     [CODEX_MCP_ENV[0]]: input.mcp.token,

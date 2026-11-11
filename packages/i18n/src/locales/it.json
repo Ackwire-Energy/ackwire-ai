@@ -2517,6 +2517,12 @@
       "action": "Crea routine",
       "done": "Routine creata"
     },
+    "howto": {
+      "title": "{{name}} ha imparato: {{what}}",
+      "line": "Usato {{uses}}×. Farne una skill?",
+      "action": "Fanne una skill",
+      "done": "Confermato"
+    },
     "stalled": {
       "title": "Passi fermi in #{{number}} {{title}}",
       "line_one": "Il passo {{steps}} è fermo da {{hours}} h in attesa di #{{on}}.",
@@ -2564,6 +2570,7 @@
   },
   "routing": {
     "title": "Chi sceglie gli agenti",
+    "reflectionOff": "La memoria non impara ancora dalle conversazioni concluse: serve una chiave di un fornitore, qui sopra.",
     "how": "Come vengono scelti gli agenti",
     "by": {
       "jev": "Jev sceglie chi risponde a ogni messaggio senza menzione.",
@@ -5530,6 +5537,15 @@
       "andMore": "{{names}} e altro"
     }
   },
+  "teamMemory": {
+    "title": "Memoria del team",
+    "help": "Ciò che le persone hanno chiesto a tutti gli agenti di tenere, con chi l’ha detto e quando. Ogni agente lo legge in tutto il suo lavoro.",
+    "empty": "Ancora niente. Quando qualcuno chiede a tutti gli agenti di ricordare qualcosa, compare qui.",
+    "remove": "Rimuovi",
+    "removed": "Rimossa dalla memoria del team",
+    "make": "Rendi del team",
+    "made": "Ora tutti gli agenti la tengono"
+  },
   "memory": {
     "fromRefusal": "Da non riproporre: {{text}}",
     "fromCorrection": "Una persona ha corretto: {{text}}",
@@ -5571,6 +5587,9 @@
     "unverifiedTitle": "Lo hanno detto solo gli agenti. Entra nel contesto come indizio segnalato.",
     "pinned": "Sempre nel contesto",
     "lowTrust": "Fonte esterna, non attendibile",
+    "confirm": "Conferma",
+    "confirmTitle": "Di’ che è giusto: gli agenti la usano come affidabile.",
+    "confirmed": "Confermata",
     "used_one": "usato {{count}} volta",
     "used_many": "usato {{count}} volte",
     "used_other": "usato {{count}} volte",
@@ -8425,6 +8444,7 @@
       "machine_offline_resumes_other": "{{computer}} è andato offline: {{count}} attività continuano lì se è caduta solo la connessione, e riprendono da dove si erano fermate se il computer si è riavviato.",
       "machine_task_resumed": "{{computer}} è tornato: “{{title}}” è ripresa da dove si era fermata",
       "machine_task_resume_waits": "{{computer}} è tornato: “{{title}}” riprende da dove si era fermata appena il progetto è pronto",
+      "machine_task_restarted": "{{computer}} è tornato: “{{title}}” è ripartito da capo",
       "machine_task_done": "“{{title}}” completata in {{span}} su {{computer}}",
       "machine_task_failed": "“{{title}}” non è riuscita dopo {{span}} su {{computer}}",
       "machine_task_canceled": "“{{title}}” è stata fermata su {{computer}}",
@@ -11674,6 +11694,7 @@
       "support": "Assistenza",
       "marketing": "Marketing",
       "automation": "Automazione",
+      "social": "Social network",
       "email": "Email"
     },
     "emptyCategory": "Ancora nessun connettore in questa categoria",
@@ -12025,6 +12046,41 @@
         "1": "Vedere addebiti e clienti",
         "2": "Creare addebiti Pix"
       },
+      "instagram": {
+        "1": "Vedere post, storie e statistiche",
+        "2": "Pubblicare post e leggere i messaggi diretti",
+        "ask": "Rispondere ai messaggi chiede sempre la tua approvazione"
+      },
+      "facebook": {
+        "1": "Vedere post, commenti e statistiche",
+        "2": "Pubblicare post, foto e video e rispondere ai commenti",
+        "ask": "Eliminare post e commenti chiede sempre la tua approvazione"
+      },
+      "linkedin": {
+        "1": "Pubblicare post, link e video",
+        "2": "Commentare i post",
+        "ask": "Eliminare post chiede sempre la tua approvazione"
+      },
+      "youtube": {
+        "1": "Vedere video, commenti e statistiche",
+        "2": "Modificare video e playlist e commentare",
+        "ask": "Rispondere, moderare ed eliminare commenti chiede sempre la tua approvazione"
+      },
+      "pinterest": {
+        "1": "Vedere pin, bacheche e statistiche",
+        "2": "Creare pin e organizzare le bacheche",
+        "ask": "Modificare le bacheche ed eliminare chiede sempre la tua approvazione"
+      },
+      "reddit": {
+        "1": "Cercare post e leggere commenti",
+        "2": "Pubblicare, commentare e modificare",
+        "ask": "Eliminare chiede sempre la tua approvazione"
+      },
+      "whatsapp": {
+        "1": "Vedere numeri, modelli e consegne",
+        "2": "Creare modelli di messaggio",
+        "ask": "L'invio di messaggi chiede sempre la tua approvazione"
+      },
       "database": {
         "1": "Vedere le tabelle",
         "2": "Interrogare i dati per rispondere",
@@ -12173,7 +12229,14 @@
       "revenuecat": "Abbonamenti in-app, prodotti, offerte e ricavi.",
       "superwall": "Paywall, campagne ed esperimenti.",
       "paddle": "Clienti, abbonamenti, transazioni e prodotti.",
-      "abacatepay": "Addebiti Pix, clienti e prelievi."
+      "abacatepay": "Addebiti Pix, clienti e prelievi.",
+      "instagram": "Account business e creator di Instagram: post, storie, statistiche e messaggi diretti.",
+      "facebook": "Pagine Facebook: post, foto, video, commenti e statistiche.",
+      "linkedin": "Post, video e commenti su LinkedIn a nome del membro che accede.",
+      "youtube": "Video, commenti, playlist e statistiche del canale YouTube.",
+      "pinterest": "Pin, bacheche e statistiche di Pinterest.",
+      "reddit": "Post, commenti e community di Reddit.",
+      "whatsapp": "Messaggi e modelli di WhatsApp Business."
     }
   },
   "toolNames": {
@@ -13532,7 +13595,8 @@
       "draining": "La rete sta cambiando. Le sessioni aperte del computer si riavvieranno alle {{when}}.",
       "restart": "Le sessioni del computer si stanno riavviando per applicare la rete. Il nuovo lavoro aspetta che finisca.",
       "line": "IP di uscita {{ip}}",
-      "hint": "L’indirizzo che i siti vedono quando gli agenti navigano. Si aggiorna quando cambia la rete del computer."
+      "hint": "L’indirizzo che i siti vedono quando gli agenti navigano. Si aggiorna quando cambia la rete del computer.",
+      "waiting": "Gli agenti si stanno ricollegando a internet. Le loro connessioni aspettano che torni."
     },
     "online": "Online",
     "offline": "Offline",
@@ -15939,6 +16003,7 @@
       "machine_task_interruptedNoComputer": "“{{title}}” è stato interrotto.",
       "machine_task_resumed": "{{computer}} è tornato: “{{title}}” è ripreso da dove si era fermato.",
       "machine_task_resume_waits": "{{computer}} è tornato: “{{title}}” riprenderà da dove si era fermato quando il progetto sarà pronto.",
+      "machine_task_restarted": "{{computer}} è tornato: “{{title}}” è ripartito da capo.",
       "machine_offline": "{{computer}} è andato offline.",
       "brain_unavailable": "{{brain}} non può rispondere in questo momento. Risponderò quando tornerà disponibile.",
       "brain_unavailable_paused": "Il computer su cui gira {{brain}} è in pausa. Risponderò quando riprende.",

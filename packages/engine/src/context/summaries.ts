@@ -65,6 +65,22 @@ export async function resolveSummaryModel(
 }
 
 /**
+ * Whether the workspace's summary model can be called now (its key, or the server's own): reflection and summaries
+ * need it, so without it none is queued, and the AI status says so (ADR 0167). No key is decrypted.
+ */
+export async function summaryModelReady(
+  deps: Pick<ContextDeps, "db" | "gateway" | "summaryModel" | "cheapModels">,
+  orgId: string,
+): Promise<boolean> {
+  try {
+    const model = await resolveSummaryModel(deps, orgId);
+    return await deps.gateway.hasModelCredential({ orgId, model, credentialId: null });
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Content from outside the org (webhooks, system notices) is untrusted, and so is an agent's message
  * relaying what it read outside (`meta.readOutside`, ADR 0117): memory built from it stays low trust.
  */

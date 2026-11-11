@@ -19,6 +19,7 @@ import {
   type AccountGrant,
   accountEnv,
   accountSignIn,
+  withoutContainers,
   withoutSignIns,
 } from "./accounts";
 import { CODEX_ROUTE_OFF } from "./brain-route";
@@ -758,7 +759,7 @@ async function runCodexExec(input: CodexTurnInput, opts: CodexTurnOptions): Prom
     ...(input.chat ? { chat: true } : {}),
   });
   const base: NodeJS.ProcessEnv = {
-    ...(input.chat ? withoutSignIns(process.env) : process.env),
+    ...withoutContainers(input.chat ? withoutSignIns(process.env) : process.env),
     ...(opts.env ?? {}),
     [CODEX_MCP_ENV[0]]: input.mcp.token,
     ...(opts.socketPath ? { [CODEX_MCP_ENV[1]]: opts.socketPath } : {}),
