@@ -52,16 +52,19 @@
 .ac-msg[data-look="bubbles"] {
   --msg-inline: 8px;
   --own-bubble: color-mix(in srgb, var(--msg-mine) var(--msg-mine-mix), var(--bg));
-  /* The room the time takes at the end of the last line (`.ac-msg__stamp`), past the bubble's padding. */
-  --stamp-room: 44px;
+  /* The room the last line keeps before the time's own words (`.ac-msg__stamp`, `--stamp-text`). */
+  --stamp-room: 20px;
   gap: 8px;
 }
 .ac-msg[data-look="bubbles"][data-tone="strong"] {
   --own-bubble: color-mix(in oklab, var(--msg-mine) 82%, black);
   --stamp-ink: var(--on-dark);
 }
-.ac-msg[data-look="bubbles"]:has(.ac-msg__stamp .ac-msg__aside:not(:empty)) {
-  --stamp-room: 62px;
+/* With the receipt's mark too, from the first paint (a row of mine gets its slot once sent): the mark arriving later
+   finds its room, the bubble keeps its width. */
+.ac-msg--own[data-look="bubbles"],
+.ac-msg[data-look="bubbles"]:has(.ac-msg__stamp .ac-msg__aside) {
+  --stamp-room: 38px;
 }
 /* The bubble is the plate: it lights on hover, the row doesn't. */
 .ac-msg[data-look="bubbles"]:is(:hover, [data-menu-open="true"]) {
@@ -239,10 +242,21 @@
 }
 .ac-msg[data-look="bubbles"]:not(.ac-msg--streaming) .ac-msg__text .md > p:last-child::after,
 .ac-msg[data-look="bubbles"]:not(.ac-msg--streaming) .ac-msg__text .md > :is(ul, ol):last-child > li:last-child::after {
-  content: "";
+  /* The time's own words, unseen, in the time's type: as wide as "23:43", "11:43 PM" or "오후 11:43" is drawn. A time
+     that isn't plain words keeps the widest clock's room. */
+  content: var(--stamp-text, "00:00 PM");
   display: inline-block;
-  width: var(--stamp-room);
+  box-sizing: content-box;
   height: 1px;
+  padding-inline-start: var(--stamp-room);
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 400;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: normal;
+  white-space: nowrap;
+  visibility: hidden;
 }
 /*
  * A time on a line of its own (after a table or code, with no words, while a reply streams, with what the row is

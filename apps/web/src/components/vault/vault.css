@@ -564,6 +564,12 @@ html:not([data-pointer]) .vlt-drop__area:focus-visible {
 .vlt-conn__fix {
   color: var(--ink2);
 }
+/* The line and its action wrap on a narrow card instead of running past it. */
+.vlt-conn__none {
+  flex-wrap: wrap;
+  row-gap: 2px;
+  white-space: normal;
+}
 
 /* "Save to the Vault" on a secret request's card: the check, then what it saves as, under the field. */
 .vlt-save {

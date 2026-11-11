@@ -237,11 +237,12 @@ describe("apps in words", () => {
 });
 
 describe("Configurações › Apps de IA (ADR 0119)", () => {
-  test("its own section under Você, the server's address with Copiar, the empty state and the tokens shown at once", async () => {
+  test("a tab of Sua conta, the server's address with Copiar, the empty state and the tokens shown at once", async () => {
     copied.length = 0;
     await go();
     const nav = screen().getByRole("navigation", { name: "Seções das configurações" });
-    expect(within(nav).getByRole("link", { name: "Apps de IA" }).getAttribute("aria-current")).toBe("page");
+    expect(within(nav).getByRole("link", { name: "Sua conta" }).getAttribute("aria-current")).toBe("page");
+    expect(section().getByRole("tab", { name: "Apps de IA" }).getAttribute("aria-selected")).toBe("true");
     expect(section().getByRole("heading", { level: 2, name: "Apps de IA" })).toBeTruthy();
     const server = section().getByRole("region", { name: "Endereço do servidor" });
     expect(server.textContent).toContain(SERVER_URL);

@@ -1383,8 +1383,7 @@
     "noDate": "无截止日期",
     "clearDate": "移除日期",
     "risky": "合并、部署和其他高风险操作",
-    "riskyOff": "关闭时，这些只由你决定。",
-    "riskyOn": "开启时，这些也由此人决定。",
+    "riskyOn": "这些也由此人决定。",
     "lock": "始终由你决定：资金、成员与角色、AI 密钥、你的邮箱和删除。",
     "coveringTitle": "你替这些人审批",
     "coveringSubtitle": "发给这些人的请求也会发给你，由你以他们的名义决定。绝不包括你自己提出的请求。",
@@ -1395,7 +1394,7 @@
     "failed": "无法保存，请重试。"
   },
   "rightHandApprovals": {
-    "title": "{{name}} 替你审批",
+    "title": "{{name}} 替你创建和调整智能体",
     "subtitle": "只处理来自你自己请求的事项。不会批准的，转交给你。",
     "newAgents": "创建其他智能体提议的智能体",
     "newAgentsHelp": "不含应用，只在公开频道。24 小时内可撤销。",
@@ -2163,10 +2162,10 @@
       "audienceHelp": "不在范围内的人在侧边栏里看不到{{name}}。",
       "lock": "{{name}}不能归档或删除。没人和它说话时，它只会给管理员发团队周报。",
       "audit": "查看{{name}}做了什么",
-      "change": "更改",
       "planHelp": "费用由套餐的所有者支付。套餐所在的电脑不可用时，对话里会说明，并提供使用 API 密钥的选项。",
       "lookEdit": "更改{{name}}的外观",
-      "planOwner": "来自{{owner}}",
+      "planOwner": "{{owner}}的账号",
+      "planName": "{{name}} 套餐",
       "mine": "你的 AI",
       "mineHelp": "你与{{name}}的对话使用你的套餐或共享给你的套餐思考，且仅限你的对话。",
       "connectMine": "连接我的套餐",
@@ -2184,15 +2183,13 @@
       "fallbackPlan": "没有自己的套餐时，使用{{owner}}的套餐，它回复所有人。",
       "fallbackYours": "没有其他套餐时，使用工作区的套餐，它是你的。",
       "fallbackNone": "没有自己的套餐时，{{name}}无法回复你：工作区的套餐只回复{{owner}}。",
-      "workspace": "工作区 AI",
+      "workspace": "没有自己套餐的人使用的 AI",
       "workspaceHelp": "没有自己套餐的人通过这个 AI 与{{name}}交谈。",
-      "workspacePlan": "工作区套餐",
-      "workspacePlanHelp": "用套餐代替密钥。只有所有者允许时，它才回复其他人。",
-      "noPlans": "请先在“AI 账号”中连接套餐，才能在这里使用。",
-      "pickPlan": "选择套餐",
-      "sharesOn": "开启：没有自己套餐的人通过这个套餐与{{name}}交谈。",
-      "sharesOff": "关闭：只有{{owner}}能通过它交谈。没有自己套餐的人得不到回复。",
-      "sharesOffYou": "关闭：只有你能通过它交谈。没有自己套餐的人得不到回复。"
+      "noPlans": "请先在“AI 和用量”中连接套餐，才能在这里使用。",
+      "lend": "把这个套餐借给没有套餐的人",
+      "groupMine": "仅对你",
+      "groupWorkspace": "对整个工作区",
+      "groupAdmins": "仅管理员"
     },
     "card": {
       "settings": "{{name}} · 设置",
@@ -3662,6 +3659,8 @@
       "access": "默认权限",
       "accessTitle": "{{label}} 的默认权限",
       "accessText": "除非你单独修改某一项，其中的项目都遵循此设置。每次更改都会立即保存。",
+      "noAgents": "没有智能体使用此连接。",
+      "giveAccess": "授予访问权限",
       "actionsName": "{{name}} 的更多操作",
       "disconnect": "断开连接",
       "removeTitle": "要断开 {{name}} 吗？",
@@ -4562,6 +4561,7 @@
         "accountOthers": "其他人的套餐会显示是谁的。主人会收到邮件，并且可以收回。",
         "addAccount": "添加账号",
         "signInAgain": "重新登录",
+        "connectPlan": "连接其他套餐",
         "fallbackTitle": "{{computer}} 无响应时，通过 API 回复",
         "fallbackHint": "将通过 API 回复，并计入 {{name}} 的预算。否则 {{name}} 会告知提出请求的人，并等待电脑恢复。",
         "fallbackHint_female": "将通过 API 回复，并计入 {{name}} 的预算。否则 {{name}} 会告知提出请求的人，并等待电脑恢复。",
@@ -9042,7 +9042,6 @@
     "page": {
       "title": "你的套餐",
       "hint": "每个套餐都保存在连接它的那台电脑上，管理那台电脑的人可以访问它。agentes.chat 只保存它的名称、邮箱和用量。",
-      "empty": "用你的账号登录，智能体就能用它来思考。",
       "emptyTitle": "使用你已付费的 AI 套餐",
       "emptyViewer": "负责工作区 AI 的成员连接套餐后，它会显示在这里。",
       "connect": "连接 AI",
@@ -13938,10 +13937,7 @@
     "notOpen": "你在这个工作区的角色打不开 {{section}}。管理角色的人可以为你开放。",
     "nav": "设置分区",
     "group": {
-      "you": "你",
-      "org": "工作区",
-      "agents": "智能体",
-      "costs": "费用和数据"
+      "org": "工作区"
     },
     "section": {
       "account": "你的账号",
@@ -13954,11 +13950,10 @@
       "access": "智能体和访问权限",
       "connectors": "连接器和 MCP",
       "skills": "技能",
-      "keys": "AI 账号",
       "storage": "存储",
       "computers": "电脑",
       "devices": "设备",
-      "usage": "预算和用量",
+      "usage": "AI 和用量",
       "audit": "审计日志",
       "import": "导入和导出",
       "billing": "套餐和账单",
@@ -13969,7 +13964,6 @@
       "about": "关于 agentes.chat",
       "generalPersonal": "关于你",
       "keysPersonal": "AI 和应用",
-      "usagePersonal": "套餐和用量",
       "membersPersonal": "成员"
     },
     "advanced": "高级",
@@ -13984,9 +13978,8 @@
       "access": "每个智能体可以使用什么：每个连接器一个级别。",
       "connectors": "为整个工作区一次性连接的服务和 MCP 服务器。",
       "skills": "智能体在需要时打开的 Markdown 指令。",
-      "keys": "你的套餐和工作区的 API 密钥。",
       "storage": "工作区文件的存放位置。",
-      "usage": "每个人和每个智能体的 AI 用量,以及本月的额度。",
+      "usage": "工作区的 AI 账号,以及每个人和每个智能体的用量。",
       "audit": "智能体在对话之外做了什么，以及人们改了什么。",
       "import": "从其他应用或工作区导入智能体，或把这个带走。",
       "billing": "套餐、银行卡和账单都在应用外的我们的页面上。",
@@ -13996,7 +13989,6 @@
       "approvals": "当智能体请求你的批准时，替你做决定的人。",
       "about": "开发者、许可证以及源代码的位置。",
       "generalPersonal": "你的智能体对你的了解，以及这个工作区的使用方式。",
-      "keysPersonal": "你的智能体用来思考的 AI，以及它们使用的应用和技能。",
       "usagePersonal": "你的智能体用了多少 AI，以及你的套餐。",
       "connectorsPersonal": "你的应用和 MCP 服务器，连接一次即可供智能体使用。",
       "membersPersonal": "和你一起在这里的人，以及邀请。",
@@ -14112,24 +14104,8 @@
       "dialogTitle": "发送的内容",
       "dialogText": "每天一次。下面就是下一份报告的完整内容。"
     },
-    "tilesTitle": "工作区中的一切",
     "tileState": {
-      "members_other": "{{count}} 位成员",
-      "invitations_other": "{{count}} 个待处理的邀请",
-      "agents_other": "{{count}} 个智能体",
-      "connectors_other": "已连接 {{count}} 个",
-      "noConnectors": "还没有连接应用",
-      "skills_other": "{{count}} 个技能",
-      "computers_other": "{{count}} 台中 {{online}} 台开着",
-      "noComputers": "还没有电脑",
-      "devices_other": "{{count}} 台中 {{online}} 台开着",
-      "noDevices": "还没有设备",
-      "usage": "本月已用预算的 {{percent}}",
-      "keys_other": "{{count}} 个密钥",
-      "platformKey": "使用此服务器的密钥",
-      "noKeys": "还没有密钥",
-      "plans_other": "{{count}} 个套餐",
-      "noPlans": "还没有套餐"
+      "members_other": "{{count}} 位成员"
     },
     "import": {
       "title": "导入",
@@ -14259,6 +14235,9 @@
         "jev": "只有使用 Jev 时，智能体才会主动发送贴纸。",
         "jevLink": "设置 Jev"
       }
+    },
+    "tab": {
+      "account": "个人资料"
     }
   },
   "personalMode": {
@@ -14452,13 +14431,12 @@
     "equivalent": "按 API 价格约 {{amount}}",
     "apiPrice": "API 价格",
     "apiPriceHint": "智能体使用套餐时，没有人按用量付费。这个金额是同样的用量通过 API 需要的费用。",
-    "thisMonth": "本月",
     "moreAgents_other": "+{{count}} 个智能体",
     "paid": "已支付 {{amount}}",
     "budgetShare": "预算的 {{percent}}",
     "estimate": "套餐只显示整个账号的用量。每个智能体的部分是根据各自的花费估算的。",
     "accounts": {
-      "title": "套餐账号",
+      "title": "账号",
       "empty": "连接套餐后，可以在这里查看每个智能体的用量。"
     },
     "api": {
@@ -16977,7 +16955,6 @@
       "created": "小组件已添加到 {{where}}",
       "test": "测试",
       "testAgain": "再测试一次",
-      "testing": "{{name}} 正在用真实数据制作…",
       "tested": "真实数据 · {{when}}",
       "stale": "测试后有改动",
       "testFailed": "没有成功：{{reason}}",
@@ -16999,6 +16976,10 @@
       "editAskOf": "修改需求：{{ask}}",
       "testingShort": "测试中…",
       "buildingFoot": "{{name}} 正在制作…",
+      "thinking": "思考中",
+      "finishing": "正在制作小组件",
+      "stop": "停止",
+      "stillWorking": "仍在处理。真实数据可能需要一两分钟。",
       "failedTitle": "{{name}} 未能制作成功",
       "staleHint": "再测试一次，看看效果。",
       "whoButton": "由谁负责：{{name}}",

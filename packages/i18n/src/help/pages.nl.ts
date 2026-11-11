@@ -502,7 +502,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
               "Open https://console.typesafe.ai en log in met Google of je e-mailadres. Een nieuw account maak je op dezelfde manier.",
               "Zet tegoed in de console. Jev is prepaid.",
               "Open https://console.typesafe.ai/keys, maak een sleutel aan en kopieer hem meteen.",
-              "Open in agentes.chat **Instellingen › AI-accounts** en plak hem onder **Jev**. Alleen degene die deze server heeft ingericht, ziet hem.",
+              "Open in agentes.chat **Instellingen › AI en gebruik** en plak hem onder **Jev**. Alleen degene die deze server heeft ingericht, ziet hem.",
             ],
           },
           "Op een server die je met Docker draait, kun je de sleutel ook in `.env` zetten als `TYPESAFE_API_KEY`. Die gaat voor op de sleutel in Instellingen.",
@@ -516,7 +516,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
             list: [
               "US$ 0,042 per miljoen tokens die Jev leest. Zijn antwoorden zijn gratis. Kiezen wie antwoordt leest ongeveer 2.500 tokens, dus ongeveer US$ 0,0001. Een screenshot is ongeveer 3.900 tokens.",
               "Tegoed dat je koopt, blijft 12 maanden geldig. Zet automatisch opwaarderen aan in de console, zodat Jev niet zonder komt te zitten.",
-              "**Instellingen › AI-accounts** laat zien hoeveel beslissingen Jev deze maand nam, en wat ze kostten.",
+              "**Instellingen › AI en gebruik** laat zien hoeveel beslissingen Jev deze maand nam, en wat ze kostten.",
             ],
           },
         ],
@@ -547,7 +547,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           {
             list: [
-              "**Sleutel niet geaccepteerd:** maak een nieuwe sleutel aan en plak hem in **Instellingen › AI-accounts**.",
+              "**Sleutel niet geaccepteerd:** maak een nieuwe sleutel aan en plak hem in **Instellingen › AI en gebruik**.",
               "**Tegoed op:** zet tegoed in de console. Jev probeert het binnen 30 minuten opnieuw, of klik op **Opnieuw controleren**.",
               "**Druk of onbereikbaar:** TypeSafe kan het aantal verzoeken per seconde beperken, of een tijdje niet antwoorden. Jev pakt het vanzelf weer op. Je limieten: https://console.typesafe.ai/rate-limits. Voor hogere limieten schrijf je naar sales@typesafe.ai.",
             ],

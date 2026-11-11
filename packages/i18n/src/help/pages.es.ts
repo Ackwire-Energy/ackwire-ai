@@ -504,7 +504,7 @@ export const helpEs: Partial<Record<HelpSlug, HelpDocument>> = {
               "Abre https://console.typesafe.ai e inicia sesión con Google o tu correo. Una cuenta nueva se crea de la misma forma.",
               "Agrega saldo en la consola. Jev es prepago.",
               "Abre https://console.typesafe.ai/keys, crea una clave y cópiala de inmediato.",
-              "En agentes.chat, abre **Configuración › Cuentas de IA** y pégala en **Jev**. Solo la persona que configuró este servidor la ve.",
+              "En agentes.chat, abre **Configuración › IA y uso** y pégala en **Jev**. Solo la persona que configuró este servidor la ve.",
             ],
           },
           "En un servidor que ejecutas con Docker, también puedes poner la clave en `.env` como `TYPESAFE_API_KEY`. Esa tiene prioridad sobre la de Configuración.",
@@ -518,7 +518,7 @@ export const helpEs: Partial<Record<HelpSlug, HelpDocument>> = {
             list: [
               "US$ 0.042 por millón de tokens que lee Jev. Sus respuestas son gratis. Elegir quién responde lee unos 2500 tokens, es decir, unos US$ 0.0001. Una captura de pantalla son unos 3900 tokens.",
               "El saldo que compras dura 12 meses. Activa las recargas automáticas en la consola para que Jev no se quede sin saldo.",
-              "**Configuración › Cuentas de IA** muestra cuántas decisiones tomó Jev este mes y cuánto costaron.",
+              "**Configuración › IA y uso** muestra cuántas decisiones tomó Jev este mes y cuánto costaron.",
             ],
           },
         ],
@@ -549,7 +549,7 @@ export const helpEs: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           {
             list: [
-              "**Clave no aceptada:** crea una clave nueva y pégala en **Configuración › Cuentas de IA**.",
+              "**Clave no aceptada:** crea una clave nueva y pégala en **Configuración › IA y uso**.",
               "**Sin saldo:** agrega saldo en la consola. Jev vuelve a intentarlo en menos de 30 minutos, o haz clic en **Comprobar de nuevo**.",
               "**Ocupado o inaccesible:** TypeSafe puede limitar las solicitudes por segundo, o dejar de responder por un rato. Jev se recupera solo. Tus límites: https://console.typesafe.ai/rate-limits. Para límites más altos, escribe a sales@typesafe.ai.",
             ],

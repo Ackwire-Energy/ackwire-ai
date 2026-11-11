@@ -377,12 +377,18 @@ export function TeamWeekSchedule({
   admin,
   locale,
   onChange,
+  plated = false,
 }: {
   prefs: { off: boolean; day: number; hour: number; daily?: boolean };
   /** An administrator picks a day of the week or every day; anyone else gets it every day or not at all. */
   admin: boolean;
   locale: string;
   onChange: (patch: { off?: boolean; day?: number; hour?: number; daily?: boolean }) => void;
+  /**
+   * The button on a plate like the selects: where it can wrap under them (a settings row on a phone), a plate starts
+   * on their edge, while bare words would start a padding further in.
+   */
+  plated?: boolean;
 }) {
   const { t } = useTranslation();
   const on = teamWeekOn(prefs, admin);
@@ -411,7 +417,7 @@ export function TeamWeekSchedule({
       />
       <Button
         size="sm"
-        variant="ghost"
+        {...(plated ? {} : { variant: "ghost" as const })}
         onClick={() => onChange(admin ? { off: !prefs.off } : on ? { daily: false } : { daily: true, off: false })}
       >
         {t(on ? "teamWeek.schedule.stop" : "teamWeek.schedule.start")}

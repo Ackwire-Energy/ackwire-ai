@@ -111,6 +111,11 @@ describe("inbox items", () => {
     expect(notificationHref(notification({ id: "n", kind: "mission_finished", source: { missionId: "m1" } }))).toBe(
       "/mission/m1",
     );
+    // The right hand paused what it does without asking: its own settings. Who approves for whom: Perfil › Aprovações.
+    expect(notificationHref(notification({ id: "n", kind: "right_hand_paused", source: {} }))).toBe(
+      "/settings/right-hand",
+    );
+    expect(notificationHref(notification({ id: "n", kind: "approval_cover", source: {} }))).toBe("/me/approvals");
     expect(
       notificationHref(notification({ id: "n", kind: "thread_reply", source: { channelId: "c1", threadId: "t1" } })),
     ).toBe("/chat/c1?thread=t1");

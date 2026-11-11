@@ -122,7 +122,7 @@ test("Preferences › Servers: the server here leads to Jev's key in its Setting
     // Its title's ⓘ says what Jev is, the line where its key goes, and only Open at the end.
     expect(row?.querySelector("button.ac-hint")?.getAttribute("aria-label")).toBe("About Jev");
     expect(row?.querySelector(".dk-crow__text > small")?.textContent).toBe(
-      "In agentes.chat\u00a0›\u00a0Settings\u00a0›\u00a0AI accounts.",
+      "In agentes.chat\u00a0›\u00a0Settings\u00a0›\u00a0AI and usage.",
     );
     expect(row?.querySelector(".ac-chip")).toBeNull();
     expect([openOf(el)?.textContent, openOf(el)?.disabled]).toEqual(["Open", false]);

@@ -134,12 +134,12 @@ export interface AccountDeletionLine {
   kind: "when" | "closes" | "leaves" | "computers" | "staysBehind" | "plan" | "messages" | "serverOwner";
   text: string;
   /** What stays behind (`staysBehind`), each with the settings section of its workspace where it is disconnected. */
-  links?: { label: string; orgId: string; section: "keys" | "connectors" }[];
+  links?: { label: string; orgId: string; section: "usage" | "connectors" }[];
 }
 
 /** Where a key, a connection, a mailbox or a database someone added is disconnected: its workspace's settings. */
 export const staysBehindSection = (kind: AccountDeletionPlan["staysBehind"][number]["kind"]) =>
-  kind === "key" ? ("keys" as const) : ("connectors" as const);
+  kind === "key" ? ("usage" as const) : ("connectors" as const);
 
 /**
  * The ways out of a workspace that keeps the account (`soleOwner`), as the web app's paths: make someone else an

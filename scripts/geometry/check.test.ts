@@ -84,7 +84,7 @@ describe("geometry check", () => {
       expect(SELF_TESTED).toContain(rule);
     for (const rule of ["pagetop", "groupedge", "menuitem", "rowpad", "emptyselect", "toolorder", "toolrow", "captop"])
       expect(SELF_TESTED).toContain(rule);
-    for (const rule of ["timeedge", "panefill", "bleed", "stampout"]) expect(SELF_TESTED).toContain(rule);
+    for (const rule of ["timeedge", "panefill", "bleed", "stampout", "stampover"]) expect(SELF_TESTED).toContain(rule);
     // Words squeezed beside actions, a lone main button on a phone, buttons 8 apart and never split by words before
     // them, one height in a row, a fact on one line, Desfazer in its sentence, a count that calls on someone readable
     // on what's behind it.

@@ -203,9 +203,9 @@ describe("a plan with no agentes.chat plan in force", () => {
 });
 
 describe("the other places a plan is chosen", () => {
-  test("Contas de IA: why and the plans page at the head of the section, no key", async () => {
+  test("IA e uso, by the old address of Contas de IA: why and the plans page in the accounts' card, no key", async () => {
     await open("owner", `/org/${ORG_ID}/settings/keys`);
-    const card = screen().getByRole("region", { name: "Seus planos" });
+    const card = screen().getByRole("region", { name: "Contas" });
     expect(shownText(card)).toContain(WHY);
     expect(buttonNamed(card, PAY)).not.toBeNull();
     expect(buttonNamed(card, KEY)).toBeNull();
@@ -214,7 +214,7 @@ describe("the other places a plan is chosen", () => {
   });
 
   test("Uso with no plan: the hold's lines in the plans' card, no invitation to connect one", async () => {
-    const card = () => screen().getByRole("region", { name: "Contas dos planos" });
+    const card = () => screen().getByRole("region", { name: "Contas" });
     await open("owner", `/org/${ORG_ID}/settings/usage`);
     expect(shownText(card())).toContain(WHY);
     expect(buttonNamed(card(), PAY)).not.toBeNull();
@@ -225,12 +225,12 @@ describe("the other places a plan is chosen", () => {
     expect(screen().getByText("Use o plano de IA que você já paga")).toBeTruthy();
   });
 
-  test("Contas de IA, with the plan in force or self-hosted: nothing of it", async () => {
+  test("IA e uso, with the plan in force or self-hosted: nothing of it", async () => {
     await open("paid", `/org/${ORG_ID}/settings/keys`);
-    expect(shownText(screen().getByRole("region", { name: "Seus planos" }))).not.toContain(WHY);
+    expect(shownText(screen().getByRole("region", { name: "Contas" }))).not.toContain(WHY);
     cleanup();
     await open("selfhost", `/org/${ORG_ID}/settings/keys`);
-    expect(shownText(screen().getByRole("region", { name: "Seus planos" }))).not.toContain(WHY);
+    expect(shownText(screen().getByRole("region", { name: "Contas" }))).not.toContain(WHY);
   });
 
   test("Quem pensa: why and the plans page on its first screen and in Trocar de conta, the key closed, no plan to pick", async () => {
@@ -251,11 +251,11 @@ describe("the other places a plan is chosen", () => {
 
   test("Lodi's settings: why and the way on in place of the plan row", async () => {
     await open("owner", `/org/${ORG_ID}/settings/right_hand`);
-    const body = document.querySelector(".settings__body") as HTMLElement;
+    const body = document.querySelector(".page") as HTMLElement;
     expect(shownText(body)).toContain(WHY);
     expect(buttonNamed(body, PAY)).not.toBeNull();
     expect(buttonNamed(body, KEY)).toBeNull();
-    expect(shownText(body)).not.toContain("Conecte um plano em Contas de IA para usar aqui.");
+    expect(shownText(body)).not.toContain("Conecte um plano em IA e uso para usar aqui.");
   });
 });
 

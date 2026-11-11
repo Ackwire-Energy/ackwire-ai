@@ -1,7 +1,8 @@
 import type { AuthConfig, OrgSummary } from "@agenteschat/client";
 import { selfHosted, showsAbout } from "@agenteschat/client/lib/about";
 import { can } from "@agenteschat/client/lib/permissions";
-import { personalSettingsHost } from "@agenteschat/client/lib/personal-view";
+import { personalSettingsShort } from "@agenteschat/client/lib/personal-view";
+import { settingsEntry, teamSettings } from "@agenteschat/client/lib/settings-nav";
 import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import type { IconName } from "@agenteschat/ui";
 
@@ -14,7 +15,6 @@ export type SettingsSection =
   | "approvals"
   | "apps"
   | "general"
-  | "right_hand"
   | "members"
   | "roles"
   | "vault"
@@ -22,7 +22,6 @@ export type SettingsSection =
   | "access"
   | "connectors"
   | "skills"
-  | "keys"
   | "storage"
   | "devices"
   | "usage"
@@ -32,78 +31,87 @@ export type SettingsSection =
   | "voice"
   | "about";
 
-export type SettingsGroup = "you" | "org" | "agents" | "costs";
-
-/** The settings sub-nav, in order and in groups, with who can open each on this server. */
+/**
+ * Every settings section with who can open it on this server, in the order the list and each entry's tabs show them:
+ * an entry, then the sections its page holds (`SETTINGS_PARTS`), then what goes under Advanced.
+ */
 export const SETTINGS_SECTIONS: {
   id: SettingsSection;
   icon: IconName;
-  group: SettingsGroup;
   allowed: (org: OrgSummary, server: AuthConfig | undefined) => boolean;
 }[] = [
   // Mine, not the workspace's: my profile here and what this device keeps (the nav shows my face for it).
-  { id: "account", icon: "person", group: "you", allowed: () => true },
+  { id: "account", icon: "person", allowed: () => true },
   // What reaches my devices as a notification here (ADR 0071 §8).
-  { id: "notifications", icon: "bell", group: "you", allowed: () => true },
+  { id: "notifications", icon: "bell", allowed: () => true },
   // Who approves for me, and whom I approve for (ADR 0139).
-  { id: "approvals", icon: "approve", group: "you", allowed: () => true },
+  { id: "approvals", icon: "approve", allowed: () => true },
   // AI apps (ADR 0119): each person connects their own, in this workspace.
-  { id: "apps", icon: "link", group: "you", allowed: () => true },
-  // AGPL-3.0's legal notices and the license's required attribution: for everyone on a self-hosted server, never
-  // hidden there; none on agentes.chat Cloud (`showsAbout`).
-  { id: "about", icon: "info", group: "you", allowed: (_o, server) => showsAbout(server) },
+  { id: "apps", icon: "link", allowed: () => true },
   // The workspace's sections are for who runs it: a member keeps only their own (above) and what they use themselves
   // (the people, where a member who may not invite suggests someone (ADR 0090), connectors, computers, AI accounts).
-  { id: "general", icon: "settings", group: "org", allowed: (o) => can(o, "configure") },
-  // The team's right hand (ADR 0137): its name, AI, budget and audience, for who manages agents.
-  { id: "right_hand", icon: "agent", group: "org", allowed: (o) => can(o, "manage_agents") },
-  { id: "members", icon: "members", group: "org", allowed: () => true },
-  { id: "roles", icon: "audiencePeople", group: "org", allowed: (o) => can(o, "manage_roles") },
-  // Every member keeps their own logins, keys and contacts there; team items show to who they're shared with (ADR 0144).
-  { id: "vault", icon: "lock", group: "org", allowed: () => true },
-  // What agents did and people changed: only for who may see it (it shows everyone's work).
-  { id: "audit", icon: "shield", group: "org", allowed: (o) => can(o, "view_audit") },
+  { id: "general", icon: "settings", allowed: (o) => can(o, "configure") },
   // GIFs and stickers in chat (ADR 0091): who configures the workspace.
-  { id: "media", icon: "sticker", group: "org", allowed: (o) => can(o, "configure") },
+  { id: "media", icon: "sticker", allowed: (o) => can(o, "configure") },
   // Voice messages (ADR 0100): who configures the workspace, on a self-hosted server only. agentes.chat Cloud runs its
   // own speech engine, so the section has nothing to offer there (product decision).
-  { id: "voice", icon: "mic", group: "org", allowed: (o, server) => selfHosted(server) && can(o, "configure") },
-  { id: "access", icon: "agent", group: "agents", allowed: (o) => can(o, "manage_agents") },
-  { id: "connectors", icon: "plug", group: "agents", allowed: () => true },
-  { id: "skills", icon: "bulb", group: "agents", allowed: (o) => can(o, "manage_agents") },
-  // Every member sees the devices and can connect one (ADR 0025): computers and the phones they reach.
-  { id: "devices", icon: "computer", group: "agents", allowed: (o) => can(o, "read") },
-  // Everyone (ADR 0063): their plans' meters and the agents whose details they see, in tokens and percentages;
-  // money and the workspace's report only for who has `view_usage`.
-  { id: "usage", icon: "wallet", group: "costs", allowed: () => true },
-  // "Contas de IA": everyone's own plans; the workspace's API keys only for who manages them.
-  { id: "keys", icon: "key", group: "costs", allowed: (o) => can(o, "read") },
-  { id: "storage", icon: "drive", group: "costs", allowed: (o) => can(o, "configure") },
+  { id: "voice", icon: "mic", allowed: (o, server) => selfHosted(server) && can(o, "configure") },
+  { id: "members", icon: "members", allowed: () => true },
+  { id: "roles", icon: "audiencePeople", allowed: (o) => can(o, "manage_roles") },
+  // "IA e uso", for everyone (ADR 0063): the workspace's AI accounts with their meters, what each person does with
+  // their own, and the agents whose details they see, in tokens and percentages. The workspace's API keys only for who
+  // manages them, money and the workspace's report only for who has `view_usage`.
+  { id: "usage", icon: "wallet", allowed: () => true },
   // Only where a billing service runs (ADR 0079), for who may open it.
-  {
-    id: "billing",
-    icon: "coin",
-    group: "costs",
-    allowed: (o, server) => !!server?.billingUrl && can(o, "manage_billing"),
-  },
-  { id: "import", icon: "archiveBox", group: "costs", allowed: (o) => can(o, "create_agents") },
+  { id: "billing", icon: "coin", allowed: (o, server) => !!server?.billingUrl && can(o, "manage_billing") },
+  { id: "connectors", icon: "plug", allowed: () => true },
+  { id: "skills", icon: "bulb", allowed: (o) => can(o, "manage_agents") },
+  // Every member keeps their own logins, keys and contacts there; team items show to who they're shared with (ADR 0144).
+  { id: "vault", icon: "lock", allowed: () => true },
+  { id: "access", icon: "agent", allowed: (o) => can(o, "manage_agents") },
+  // Every member sees the devices and can connect one (ADR 0025): computers and the phones they reach.
+  { id: "devices", icon: "computer", allowed: (o) => can(o, "read") },
+  { id: "storage", icon: "drive", allowed: (o) => can(o, "configure") },
+  { id: "import", icon: "archiveBox", allowed: (o) => can(o, "create_agents") },
+  // What agents did and people changed: only for who may see it (it shows everyone's work).
+  { id: "audit", icon: "shield", allowed: (o) => can(o, "view_audit") },
+  // AGPL-3.0's legal notices and the license's required attribution: for everyone on a self-hosted server, never
+  // hidden there; none on agentes.chat Cloud (`showsAbout`).
+  { id: "about", icon: "info", allowed: (_o, server) => showsAbout(server) },
 ];
-
-export const SETTINGS_GROUPS: SettingsGroup[] = ["you", "org", "agents", "costs"];
 
 export const isSettingsSection = (v: unknown): v is SettingsSection => SETTINGS_SECTIONS.some((s) => s.id === v);
 
 /**
- * The nav entry that stands for the open section: in a personal workspace (ADR 0159 §3) connectors and skills open on
- * AI and apps' entry, billing on Plan and usage's, when the person may open those; else the section itself.
+ * Sections that became another one's: Computers is Devices, AI accounts is part of AI and usage. Their addresses
+ * still open, on the section that holds them now.
  */
-export function settingsNavEntry(
+export const MOVED_SETTINGS_SECTIONS: Readonly<Record<string, SettingsSection>> = {
+  computers: "devices",
+  keys: "usage",
+};
+
+/** Where the workspace's right hand is set now: its own page. Its old settings address opens that. */
+export const RIGHT_HAND_SECTION = "right_hand";
+
+/**
+ * The short list of this workspace's settings: a personal one's own (ADR 0159 §3, People on it once `others` are
+ * members), a team's entries.
+ */
+export const settingsShort = (
   org: Pick<OrgSummary, "mode">,
+  server: AuthConfig | undefined,
+  others?: number,
+): readonly string[] => (isPersonal(org) ? personalSettingsShort(others) : teamSettings(server?.cloud === true));
+
+/** The nav entry that stands for the open section: the one whose page holds it, else the section itself. */
+export function settingsNavEntry(
   current: SettingsSection,
   open: readonly SettingsSection[],
+  short: readonly string[],
 ): SettingsSection {
-  const host = isPersonal(org) ? personalSettingsHost(current, new Set(open)) : null;
-  return host !== null && isSettingsSection(host) ? host : current;
+  const entry = settingsEntry(current, new Set(open), short);
+  return isSettingsSection(entry) ? entry : current;
 }
 
 /**

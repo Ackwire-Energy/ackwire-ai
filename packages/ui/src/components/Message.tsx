@@ -2,6 +2,7 @@ import {
   type CSSProperties,
   createContext,
   type HTMLAttributes,
+  isValidElement,
   type MouseEvent,
   type ReactNode,
   useContext,
@@ -267,7 +268,15 @@ export function Message({
       {aside && <span className="ac-msg__aside">{aside}</span>}
     </span>
   ) : null;
+  // A time given as words, or as one element around them (`<time>`): the bubble's last line keeps exactly their room.
+  const timeWords =
+    typeof time === "string"
+      ? time
+      : isValidElement<{ children?: ReactNode }>(time) && typeof time.props.children === "string"
+        ? time.props.children
+        : undefined;
   const rowVars = {
+    ...(inBubble && timeWords ? { "--stamp-text": JSON.stringify(timeWords) } : {}),
     ...(mine && drawn === "bubbles" ? { "--msg-mine": look?.mine } : {}),
     ...(nameColor && drawn === "bubbles" ? { "--msg-name": nameColor[0], "--msg-name-dark": nameColor[1] } : {}),
   };

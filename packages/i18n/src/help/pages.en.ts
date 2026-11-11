@@ -495,7 +495,7 @@ export const helpEn: Record<HelpSlug, HelpDocument> = {
               "Open https://console.typesafe.ai and sign in with Google or your email. A new account is made the same way.",
               "Add credit in the console. Jev is prepaid.",
               "Open https://console.typesafe.ai/keys, create a key and copy it right away.",
-              "In agentes.chat, open **Settings\u00a0›\u00a0AI accounts** and paste it under **Jev**. Only the person who set up this server sees it.",
+              "In agentes.chat, open **Settings\u00a0›\u00a0AI and usage** and paste it under **Jev**. Only the person who set up this server sees it.",
             ],
           },
           "On a server you run with Docker, you can put the key in `.env` as `TYPESAFE_API_KEY` instead. That one wins over the one in Settings.",
@@ -509,7 +509,7 @@ export const helpEn: Record<HelpSlug, HelpDocument> = {
             list: [
               "US$ 0.042 per million tokens Jev reads. Its answers are free. Picking who answers reads about 2,500 tokens, so about US$ 0.0001. A screenshot is about 3,900 tokens.",
               "Credits you buy last 12 months. Turn on automatic refills in the console so Jev doesn't run out.",
-              "**Settings\u00a0›\u00a0AI accounts** shows how many decisions Jev made this month, and what they cost.",
+              "**Settings\u00a0›\u00a0AI and usage** shows how many decisions Jev made this month, and what they cost.",
             ],
           },
         ],
@@ -540,7 +540,7 @@ export const helpEn: Record<HelpSlug, HelpDocument> = {
         blocks: [
           {
             list: [
-              "**Key not accepted:** create a new key and paste it in **Settings\u00a0›\u00a0AI accounts**.",
+              "**Key not accepted:** create a new key and paste it in **Settings\u00a0›\u00a0AI and usage**.",
               "**Out of credit:** add credit in the console. Jev tries again within 30 minutes, or click **Check again**.",
               "**Busy or unreachable:** TypeSafe may limit requests per second, or stop answering for a while. Jev picks up again by itself. Your limits: https://console.typesafe.ai/rate-limits. For higher ones, write to sales@typesafe.ai.",
             ],

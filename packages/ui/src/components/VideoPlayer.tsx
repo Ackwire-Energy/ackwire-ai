@@ -27,7 +27,7 @@ export interface VideoPlayerProps {
   src: string;
   /** The file's name, in the big play button's name. */
   name: string;
-  /** `tile` in the chat (its own proportions, capped; a corner button opens the viewer), `viewer` fills its box. */
+  /** `tile` in the chat (one box, the video whole inside it; a corner button opens the viewer), `viewer` fills its box. */
   variant?: "tile" | "viewer";
   labels: VideoPlayerLabels;
   /** The tile's corner button. */
@@ -174,7 +174,6 @@ export function VideoPlayer({
   const hideTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const lastTouch = useRef(false);
   const [phase, setPhase] = useState<Phase>("idle");
-  const [ready, setReady] = useState(false);
   const [waiting, setWaiting] = useState(false);
   const [hidden, setHidden] = useState(false);
   const [time, setTime] = useState(0);
@@ -184,7 +183,6 @@ export function VideoPlayer({
   const [volume, setVolume] = useState(1);
   const [speed, setSpeed] = useState(1);
   const [full, setFull] = useState(false);
-  const [tall, setTall] = useState(false);
 
   const pause = useCallback(() => video.current?.pause(), []);
   useEffect(
@@ -289,8 +287,6 @@ export function VideoPlayer({
       ref={root}
       className={cx("ac-video", `ac-video--${variant}`, className)}
       data-phase={phase}
-      data-ready={ready || undefined}
-      data-tall={tall || undefined}
       data-hide={(hidden && phase === "playing") || undefined}
       data-full={full || undefined}
       tabIndex={-1}
@@ -314,12 +310,7 @@ export function VideoPlayer({
         src={`${src}${src.includes("#") ? "" : "#t=0.001"}`}
         preload="metadata"
         playsInline
-        onLoadedMetadata={(e) => {
-          const v = e.currentTarget;
-          setDuration(v.duration);
-          setTall(v.videoHeight > v.videoWidth);
-          setReady(true);
-        }}
+        onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
         onDurationChange={(e) => Number.isFinite(e.currentTarget.duration) && setDuration(e.currentTarget.duration)}
         onPlay={() => {
           claimPlayback(pause);

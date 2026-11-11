@@ -7,7 +7,7 @@ import { decisionOutcome } from "@agenteschat/client/lib/approval-words";
 import { resources } from "@agenteschat/i18n";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import i18next from "i18next";
-import { createFakeApi, type FakeState, ORG_ID, seedState } from "./fake-api";
+import { createFakeApi, type FakeState, LODI_ID, ORG_ID, seedState, withRightHand } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -35,7 +35,9 @@ describe("Configurações › Você › Aprovações (ADR 0139)", () => {
   test("Quem aprova por mim: one person, then when, until and risky actions, each saved at once", async () => {
     const { state } = await go();
     const nav = screen().getByRole("navigation", { name: "Seções das configurações" });
-    expect(within(nav).getByRole("link", { name: "Aprovações" }).getAttribute("aria-current")).toBe("page");
+    // A tab of Sua conta: the list marks the entry, the strip the section.
+    expect(within(nav).getByRole("link", { name: "Sua conta" }).getAttribute("aria-current")).toBe("page");
+    expect(screen().getByRole("tab", { name: "Aprovações" }).getAttribute("aria-selected")).toBe("true");
     expect(section().getByRole("region", { name: "Quem aprova por mim" })).toBeTruthy();
     // No one yet: only the person to pick, and what never leaves you.
     expect(section().queryByRole("switch", { name: "Merge, deploy e outras ações de risco" })).toBeNull();
@@ -46,7 +48,7 @@ describe("Configurações › Você › Aprovações (ADR 0139)", () => {
       ORG_ID,
       { userId: "u-joao", mode: "while_out", risky: false, endsAt: null },
     ]);
-    expect(section().getByText("Desligado, essas continuam só com você.")).toBeTruthy();
+    expect(section().getByText("Essa pessoa decide essas também.")).toBeTruthy();
     await click(section().getByRole("switch", { name: "Merge, deploy e outras ações de risco" }));
     expect(last(state, "approvals.setCover")?.[1]).toMatchObject({ userId: "u-joao", risky: true });
     await pick("Quando", "Sempre");
@@ -68,6 +70,13 @@ describe("Configurações › Você › Aprovações (ADR 0139)", () => {
     await click(within(card).getByRole("button", { name: "Não quero cobrir" }));
     expect(last(state, "approvals.endCover")).toEqual([ORG_ID, "u-joao"]);
     expect(section().queryByRole("region", { name: "Você aprova por" })).toBeNull();
+  });
+
+  test("what Lodi does for me is on Lodi's page: one row here opens it", async () => {
+    const { router } = await go(withRightHand(seedState()));
+    expect(section().queryByRole("switch", { name: /Lodi/ })).toBeNull();
+    await click(section().getByRole("button", { name: "Lodi cria e ajusta agentes por você" }));
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/agents/${LODI_ID}`);
   });
 
   test("alone in a personal workspace nobody can approve for you: no Quem aprova por mim, unless one is set (ADR 0159)", async () => {

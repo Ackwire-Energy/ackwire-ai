@@ -1,6 +1,7 @@
 import type { PlanAccountInfo } from "@agenteschat/client";
 import {
   accountName,
+  accountOwner,
   brandOf,
   type MeterSegment,
   type MeterWindow,
@@ -96,11 +97,14 @@ export function Meter({
 export function PlanMeter({
   usage,
   compact = false,
+  plain = false,
   label,
   children,
 }: {
   usage: MeterUsage;
   compact?: boolean;
+  /** No words above the bars on where the plan stands: what holds the meter already says it. */
+  plain?: boolean;
   label?: string;
   /** An account's agents: between the bars and when they renew, which then shows once under them. */
   children?: ReactNode;
@@ -134,7 +138,7 @@ export function PlanMeter({
   }
   const rows = planWindows(usage, now);
   const { state, until, used } = planState(usage, now);
-  const headline = state === "limited" ? text.limited(until) : state === "almost" ? text.almost : null;
+  const headline = plain ? null : state === "limited" ? text.limited(until) : state === "almost" ? text.almost : null;
   const passed = (iso: string | undefined) => iso !== undefined && Date.parse(iso) <= now;
   const renews = children ? renewals(rows, text, now) : null;
   return (
@@ -198,8 +202,7 @@ export function PlanMeter({
 export function AccountHead({ account, extra }: { account: PlanAccountInfo; extra?: string | null }) {
   const { t } = useTranslation();
   const c = useColors();
-  const whose =
-    account.email ?? (account.ownerName ? t("usageViews.whose", { name: account.ownerName.split(" ")[0] }) : null);
+  const whose = account.email ?? accountOwner(t, account);
   // The maker's logo, the account and its plan on one line, whose it is under them at the row's width.
   return (
     <View style={styles.acctBox}>
@@ -221,7 +224,7 @@ export function AccountHead({ account, extra }: { account: PlanAccountInfo; extr
 }
 
 /** The small plate beside an account's name (its plan, "saiu da conta"). */
-function Tag({ text, color }: { text: string; color: string }) {
+export function Tag({ text, color }: { text: string; color: string }) {
   const c = useColors();
   return (
     <View style={[styles.tag, { backgroundColor: c.plate }]}>

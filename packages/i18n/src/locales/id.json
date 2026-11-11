@@ -1383,8 +1383,7 @@
     "noDate": "Tanpa tanggal",
     "clearDate": "Hapus tanggal",
     "risky": "Merge, deploy, dan tindakan berisiko lainnya",
-    "riskyOff": "Mati, ini tetap hanya kamu yang memutuskan.",
-    "riskyOn": "Nyala, orang ini juga memutuskan ini.",
+    "riskyOn": "Orang ini juga memutuskan ini.",
     "lock": "Selalu di tanganmu: uang, orang dan peran, kunci AI, kotak suratmu, dan menghapus.",
     "coveringTitle": "Kamu menyetujui untuk",
     "coveringSubtitle": "Yang diminta dari orang-orang ini juga sampai padamu, dan kamu memutuskan atas nama mereka. Tidak pernah yang kamu minta sendiri.",
@@ -1395,7 +1394,7 @@
     "failed": "Tidak bisa menyimpan. Coba lagi."
   },
   "rightHandApprovals": {
-    "title": "{{name}} menyetujui untukmu",
+    "title": "{{name}} membuat dan menyesuaikan agen untukmu",
     "subtitle": "Hanya yang berasal dari permintaanmu. Yang tidak akan disetujui, diteruskan kepadamu.",
     "newAgents": "Membuat agen yang diusulkan agen lain",
     "newAgentsHelp": "Tanpa aplikasi, hanya di kanal terbuka. Kamu bisa membatalkannya selama 24 jam.",
@@ -2164,10 +2163,10 @@
       "audienceHelp": "Di luar itu, orang tidak melihat {{name}} di bilah samping.",
       "lock": "{{name}} tidak bisa diarsipkan atau dihapus. Tanpa diajak bicara, ia hanya memposting Minggu tim, untuk admin.",
       "audit": "Lihat apa yang dilakukan {{name}}",
-      "change": "Ubah",
       "planHelp": "Yang membayar adalah pemilik paket. Saat komputernya tidak tersedia, percakapan memberi tahu dan menawarkan kunci API.",
       "lookEdit": "Ubah tampilan {{name}}",
-      "planOwner": "dari {{owner}}",
+      "planOwner": "akun {{owner}}",
+      "planName": "Paket {{name}}",
       "mine": "AI kamu",
       "mineHelp": "Percakapanmu dengan {{name}} berpikir dengan paketmu atau paket yang dibagikan kepadamu, dan hanya percakapanmu.",
       "connectMine": "Hubungkan paket saya",
@@ -2185,15 +2184,13 @@
       "fallbackPlan": "Tanpa paket sendiri, ia memakai paket {{owner}}, yang menjawab semua orang.",
       "fallbackYours": "Tanpa paket lain, ia memakai paket workspace, yang milikmu.",
       "fallbackNone": "Tanpa paket sendiri, {{name}} tidak bisa menjawabmu: paket workspace hanya menjawab {{owner}}.",
-      "workspace": "AI workspace",
+      "workspace": "AI bagi yang tidak punya paket sendiri",
       "workspaceHelp": "Yang tidak punya paket sendiri berbicara dengan {{name}} lewat AI ini.",
-      "workspacePlan": "Paket workspace",
-      "workspacePlanHelp": "Paket sebagai pengganti kunci. Paket ini menjawab orang lain hanya kalau pemiliknya mengizinkan.",
-      "noPlans": "Hubungkan paket di Akun AI untuk memakainya di sini.",
-      "pickPlan": "Pilih paket",
-      "sharesOn": "Aktif: yang tidak punya paket sendiri berbicara dengan {{name}} lewat paket ini.",
-      "sharesOff": "Nonaktif: hanya {{owner}} yang berbicara lewat paket ini. Yang tidak punya paket sendiri tidak mendapat jawaban.",
-      "sharesOffYou": "Nonaktif: hanya kamu yang berbicara lewat paket ini. Yang tidak punya paket sendiri tidak mendapat jawaban."
+      "noPlans": "Hubungkan paket di AI dan pemakaian untuk memakainya di sini.",
+      "lend": "Pinjamkan paket ini ke yang tidak punya",
+      "groupMine": "Hanya untukmu",
+      "groupWorkspace": "Untuk seluruh workspace",
+      "groupAdmins": "khusus admin"
     },
     "card": {
       "settings": "{{name}} · Pengaturan",
@@ -3672,6 +3669,8 @@
       "access": "Akses bawaan",
       "accessTitle": "Akses bawaan {{label}}",
       "accessText": "Item-itemnya mengikuti ini, kecuali kamu mengubah salah satunya. Setiap perubahan langsung tersimpan.",
+      "noAgents": "Belum ada agen yang memakai koneksi ini.",
+      "giveAccess": "Beri akses",
       "actionsName": "Lainnya untuk {{name}}",
       "disconnect": "Putuskan",
       "removeTitle": "Putuskan {{name}}?",
@@ -4555,6 +4554,7 @@
         "accountOthers": "Paket orang lain menunjukkan milik siapa. Pemiliknya menerima email dan bisa menariknya kembali.",
         "addAccount": "Tambah akun",
         "signInAgain": "Masuk lagi",
+        "connectPlan": "Hubungkan paket lain",
         "fallbackTitle": "Jika {{computer}} berhenti merespons, jawab lewat API",
         "fallbackHint": "Agen menjawab lewat API dan dihitung dari anggaran {{name}}. Jika tidak, {{name}} memberi tahu siapa pun yang meminta dan menunggu komputernya kembali.",
         "effort": "Upaya",
@@ -9038,7 +9038,6 @@
     "page": {
       "title": "Paketmu",
       "hint": "Setiap paket tetap di komputer tempat ia dihubungkan, dan siapa pun yang mengelola komputer itu bisa mengaksesnya. agentes.chat hanya menyimpan nama, email, dan pemakaiannya.",
-      "empty": "Masuk dengan akunmu dan agen akan berpikir dengannya.",
       "emptyTitle": "Pakai paket AI yang sudah kamu bayar",
       "emptyViewer": "Orang yang mengurus AI ruang kerja menghubungkan paket, lalu muncul di sini.",
       "connect": "Hubungkan AI",
@@ -13930,10 +13929,7 @@
     "notOpen": "Peranmu di ruang kerja ini tidak membuka {{section}}. Orang yang mengelola peran bisa membukanya untukmu.",
     "nav": "Bagian pengaturan",
     "group": {
-      "you": "Kamu",
-      "org": "Ruang kerja",
-      "agents": "Agen",
-      "costs": "Biaya dan data"
+      "org": "Ruang kerja"
     },
     "section": {
       "account": "Akunmu",
@@ -13946,11 +13942,10 @@
       "access": "Agen dan akses",
       "connectors": "Konektor dan MCP",
       "skills": "Skill",
-      "keys": "Akun AI",
       "storage": "Penyimpanan",
       "computers": "Komputer",
       "devices": "Perangkat",
-      "usage": "Anggaran dan pemakaian",
+      "usage": "AI dan pemakaian",
       "audit": "Log audit",
       "import": "Impor dan ekspor",
       "billing": "Paket dan tagihan",
@@ -13961,7 +13956,6 @@
       "about": "Tentang agentes.chat",
       "generalPersonal": "Tentang kamu",
       "keysPersonal": "AI dan aplikasi",
-      "usagePersonal": "Paket dan pemakaian",
       "membersPersonal": "Orang"
     },
     "advanced": "Lanjutan",
@@ -13976,9 +13970,8 @@
       "access": "Yang bisa dipakai tiap agen: satu tingkat per konektor.",
       "connectors": "Layanan dan server MCP yang dihubungkan sekali untuk seluruh ruang kerja.",
       "skills": "Instruksi Markdown yang dibuka agen saat dibutuhkan.",
-      "keys": "Paketmu dan kunci API ruang kerja.",
       "storage": "Tempat file ruang kerja disimpan.",
-      "usage": "Berapa banyak AI yang dipakai tiap orang dan tiap agen, dan batas bulan ini.",
+      "usage": "Akun AI ruang kerja, dan berapa banyak yang dipakai tiap orang dan tiap agen.",
       "audit": "Apa yang dilakukan agen di luar percakapan dan apa yang diubah orang.",
       "import": "Bawa agen dari aplikasi atau ruang kerja lain, atau bawa yang ini.",
       "billing": "Paket, kartu, dan tagihan, di halaman kami di luar aplikasi.",
@@ -13988,7 +13981,6 @@
       "approvals": "Siapa yang memutuskan untukmu saat agen meminta persetujuanmu.",
       "about": "Siapa pembuatnya, lisensinya, dan letak kode sumbernya.",
       "generalPersonal": "Yang diketahui agen-agenmu tentang kamu, dan cara kerja ruang kerja ini.",
-      "keysPersonal": "AI yang dipakai agen-agenmu untuk berpikir, serta aplikasi dan skill yang mereka gunakan.",
       "usagePersonal": "Seberapa banyak AI yang dipakai agen-agenmu, dan paketmu.",
       "connectorsPersonal": "Aplikasi dan server MCP-mu, dihubungkan sekali untuk agen-agenmu.",
       "membersPersonal": "Siapa yang ada di sini bersamamu, dan undangan.",
@@ -14104,24 +14096,8 @@
       "dialogTitle": "Apa yang dikirim",
       "dialogText": "Sekali sehari. Ini laporan berikutnya, persis apa adanya."
     },
-    "tilesTitle": "Semua yang ada di ruang kerja",
     "tileState": {
-      "members_other": "{{count}} anggota",
-      "invitations_other": "{{count}} undangan menunggu",
-      "agents_other": "{{count}} agen",
-      "connectors_other": "{{count}} terhubung",
-      "noConnectors": "Belum ada aplikasi yang terhubung",
-      "skills_other": "{{count}} skill",
-      "computers_other": "{{online}} dari {{count}} menyala",
-      "noComputers": "Belum ada komputer",
-      "devices_other": "{{online}} dari {{count}} menyala",
-      "noDevices": "Belum ada perangkat",
-      "usage": "{{percent}} anggaran terpakai bulan ini",
-      "keys_other": "{{count}} kunci",
-      "platformKey": "Memakai kunci server ini",
-      "noKeys": "Belum ada kunci",
-      "plans_other": "{{count}} paket",
-      "noPlans": "Belum ada paket"
+      "members_other": "{{count}} anggota"
     },
     "import": {
       "title": "Impor",
@@ -14251,6 +14227,9 @@
         "jev": "Agen mengirim stiker sendiri hanya dengan Jev.",
         "jevLink": "Siapkan Jev"
       }
+    },
+    "tab": {
+      "account": "Profil"
     }
   },
   "personalMode": {
@@ -14444,13 +14423,12 @@
     "equivalent": "≈ {{amount}} dengan harga API",
     "apiPrice": "harga API",
     "apiPriceHint": "Saat agen memakai paket, tidak ada yang membayar per pemakaian. Nilai ini adalah biaya pemakaian yang sama lewat API.",
-    "thisMonth": "Bulan ini",
     "moreAgents_other": "+{{count}} agen",
     "paid": "{{amount}} dibayar",
     "budgetShare": "{{percent}} dari anggaran",
     "estimate": "Paket hanya memberi tahu pemakaian seluruh akun. Bagian tiap agen adalah perkiraan, dari pemakaian masing-masing.",
     "accounts": {
-      "title": "Akun paket",
+      "title": "Akun",
       "empty": "Hubungkan paket dan pantau di sini seberapa banyak setiap agen memakainya."
     },
     "api": {
@@ -16903,7 +16881,6 @@
       "created": "Widget ditambahkan ke {{where}}",
       "test": "Uji",
       "testAgain": "Uji lagi",
-      "testing": "{{name}} sedang membuatnya dengan data sungguhan…",
       "tested": "Data sungguhan · {{when}}",
       "stale": "Berubah sejak diuji",
       "testFailed": "Tidak berhasil: {{reason}}",
@@ -16925,6 +16902,10 @@
       "editAskOf": "Ubah permintaan: {{ask}}",
       "testingShort": "Menguji…",
       "buildingFoot": "{{name}} sedang membuat…",
+      "thinking": "Berpikir",
+      "finishing": "Membuat widget",
+      "stop": "Hentikan",
+      "stillWorking": "Masih bekerja. Data asli bisa butuh satu atau dua menit.",
       "failedTitle": "{{name}} tidak bisa membuatnya",
       "staleHint": "Uji lagi untuk melihat hasilnya.",
       "whoButton": "Siapa yang mengurus: {{name}}",

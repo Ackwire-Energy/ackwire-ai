@@ -3491,11 +3491,8 @@
   "approvalCover.risky": {
     "value": "Merge, deploy and other risky actions"
   },
-  "approvalCover.riskyOff": {
-    "value": "Off, these stay with you only."
-  },
   "approvalCover.riskyOn": {
-    "value": "On, this person decides these too."
+    "value": "This person decides these too."
   },
   "approvalCover.lock": {
     "value": "Always yours: money, people and roles, AI keys, your mailbox and deleting."
@@ -3522,7 +3519,7 @@
     "value": "Couldn't save. Try again."
   },
   "rightHandApprovals.title": {
-    "value": "{{name}} approves for you"
+    "value": "{{name}} creates and adjusts agents for you"
   },
   "rightHandApprovals.subtitle": {
     "value": "Only what came from a request of yours. What it wouldn't approve, it passes to you."
@@ -5564,9 +5561,6 @@
   "rightHand.settings.audit": {
     "value": "See what {{name}} did"
   },
-  "rightHand.settings.change": {
-    "value": "Change"
-  },
   "rightHand.settings.planHelp": {
     "value": "The plan's owner pays. When its computer is away, the conversation says so and offers an API key."
   },
@@ -5574,7 +5568,10 @@
     "value": "Change {{name}}'s look"
   },
   "rightHand.settings.planOwner": {
-    "value": "from {{owner}}"
+    "value": "{{owner}}'s account"
+  },
+  "rightHand.settings.planName": {
+    "value": "{{name}} plan"
   },
   "rightHand.settings.mine": {
     "value": "Your AI"
@@ -5628,31 +5625,25 @@
     "value": "Without your own plan, {{name}} can't answer you: the workspace's plan serves only {{owner}}."
   },
   "rightHand.settings.workspace": {
-    "value": "Workspace AI"
+    "value": "AI for people without their own plan"
   },
   "rightHand.settings.workspaceHelp": {
     "value": "People without their own plan talk to {{name}} through this AI."
   },
-  "rightHand.settings.workspacePlan": {
-    "value": "Workspace plan"
-  },
-  "rightHand.settings.workspacePlanHelp": {
-    "value": "A plan in place of the key. It serves other people only when its owner lets it."
-  },
   "rightHand.settings.noPlans": {
-    "value": "Connect a plan in AI accounts to use it here."
+    "value": "Connect a plan in AI and usage to use it here."
   },
-  "rightHand.settings.pickPlan": {
-    "value": "Choose a plan"
+  "rightHand.settings.lend": {
+    "value": "Lend this plan to people without one"
   },
-  "rightHand.settings.sharesOn": {
-    "value": "On: people without their own plan talk to {{name}} through this plan."
+  "rightHand.settings.groupMine": {
+    "value": "Just for you"
   },
-  "rightHand.settings.sharesOff": {
-    "value": "Off: only {{owner}} talks through it. People without their own plan get no answer."
+  "rightHand.settings.groupWorkspace": {
+    "value": "For the whole workspace"
   },
-  "rightHand.settings.sharesOffYou": {
-    "value": "Off: only you talk through it. People without their own plan get no answer."
+  "rightHand.settings.groupAdmins": {
+    "value": "admins only"
   },
   "rightHand.card.settings": {
     "value": "{{name}} · Settings"
@@ -9351,6 +9342,12 @@
   "vault.connections.accessText": {
     "value": "Its items follow this, unless you change one of them. Each change saves at once."
   },
+  "vault.connections.noAgents": {
+    "value": "No agent uses this connection."
+  },
+  "vault.connections.giveAccess": {
+    "value": "Give access"
+  },
   "vault.connections.actionsName": {
     "value": "More for {{name}}"
   },
@@ -11600,6 +11597,9 @@
   },
   "agentPage.work.brain.signInAgain": {
     "value": "Sign in again"
+  },
+  "agentPage.work.brain.connectPlan": {
+    "value": "Connect another plan"
   },
   "agentPage.work.brain.fallbackTitle": {
     "value": "If {{computer}} stops answering, answer through the API"
@@ -22684,9 +22684,6 @@
   },
   "aiAccounts.page.hint": {
     "value": "Each plan stays on the computer it was connected on, and whoever runs that computer can reach it. agentes.chat keeps only its name, email and usage."
-  },
-  "aiAccounts.page.empty": {
-    "value": "Sign in with your account and agents think with it."
   },
   "aiAccounts.page.emptyTitle": {
     "value": "Use the AI plan you already pay for"
@@ -34986,17 +34983,8 @@
   "settings.nav": {
     "value": "Settings sections"
   },
-  "settings.group.you": {
-    "value": "You"
-  },
   "settings.group.org": {
     "value": "Workspace"
-  },
-  "settings.group.agents": {
-    "value": "Agents"
-  },
-  "settings.group.costs": {
-    "value": "Costs and data"
   },
   "settings.section.account": {
     "value": "Your account"
@@ -35028,9 +35016,6 @@
   "settings.section.skills": {
     "value": "Skills"
   },
-  "settings.section.keys": {
-    "value": "AI accounts"
-  },
   "settings.section.storage": {
     "value": "Storage"
   },
@@ -35041,7 +35026,7 @@
     "value": "Devices"
   },
   "settings.section.usage": {
-    "value": "Budget and usage"
+    "value": "AI and usage"
   },
   "settings.section.audit": {
     "value": "Audit log"
@@ -35072,9 +35057,6 @@
   },
   "settings.section.keysPersonal": {
     "value": "AI and apps"
-  },
-  "settings.section.usagePersonal": {
-    "value": "Plan and usage"
   },
   "settings.section.membersPersonal": {
     "value": "People"
@@ -35112,14 +35094,11 @@
   "settings.sectionText.skills": {
     "value": "Markdown instructions agents open when they need them."
   },
-  "settings.sectionText.keys": {
-    "value": "Your plans and the workspace's API keys."
-  },
   "settings.sectionText.storage": {
     "value": "Where the workspace's files live."
   },
   "settings.sectionText.usage": {
-    "value": "How much AI each person and each agent uses, and the month's limits."
+    "value": "The workspace's AI accounts, and how much each person and agent uses."
   },
   "settings.sectionText.audit": {
     "value": "What agents did outside the conversation and what people changed."
@@ -35147,9 +35126,6 @@
   },
   "settings.sectionText.generalPersonal": {
     "value": "What your agents know about you, and how this workspace works."
-  },
-  "settings.sectionText.keysPersonal": {
-    "value": "The AI your agents think with, and the apps and skills they use."
   },
   "settings.sectionText.usagePersonal": {
     "value": "How much AI your agents use, and your plan."
@@ -35451,83 +35427,11 @@
   "settings.telemetry.dialogText": {
     "value": "Once a day. This is the next report, exactly."
   },
-  "settings.tilesTitle": {
-    "value": "Everything in the workspace"
-  },
   "settings.tileState.members": {
     "value": {
       "one": "{{count}} member",
       "other": "{{count}} members"
     }
-  },
-  "settings.tileState.invitations": {
-    "value": {
-      "one": "{{count}} invitation waiting",
-      "other": "{{count}} invitations waiting"
-    }
-  },
-  "settings.tileState.agents": {
-    "value": {
-      "one": "{{count}} agent",
-      "other": "{{count}} agents"
-    }
-  },
-  "settings.tileState.connectors": {
-    "value": {
-      "one": "{{count}} connected",
-      "other": "{{count}} connected"
-    }
-  },
-  "settings.tileState.noConnectors": {
-    "value": "No apps connected yet"
-  },
-  "settings.tileState.skills": {
-    "value": {
-      "one": "{{count}} skill",
-      "other": "{{count}} skills"
-    }
-  },
-  "settings.tileState.computers": {
-    "value": {
-      "one": "{{online}} of {{count}} on",
-      "other": "{{online}} of {{count}} on"
-    }
-  },
-  "settings.tileState.noComputers": {
-    "value": "No computer yet"
-  },
-  "settings.tileState.devices": {
-    "value": {
-      "one": "{{online}} of {{count}} on",
-      "other": "{{online}} of {{count}} on"
-    }
-  },
-  "settings.tileState.noDevices": {
-    "value": "No device yet"
-  },
-  "settings.tileState.usage": {
-    "value": "{{percent}} of the budget used this month"
-  },
-  "settings.tileState.keys": {
-    "value": {
-      "one": "{{count}} key",
-      "other": "{{count}} keys"
-    }
-  },
-  "settings.tileState.platformKey": {
-    "value": "Using this server's key"
-  },
-  "settings.tileState.noKeys": {
-    "value": "No keys yet"
-  },
-  "settings.tileState.plans": {
-    "value": {
-      "one": "{{count}} plan",
-      "other": "{{count}} plans"
-    }
-  },
-  "settings.tileState.noPlans": {
-    "value": "No plans yet"
   },
   "settings.import.title": {
     "value": "Import"
@@ -36321,9 +36225,6 @@
   "usageViews.apiPriceHint": {
     "value": "When agents use plans, nobody pays by use. This amount is what the same use would cost through the API."
   },
-  "usageViews.thisMonth": {
-    "value": "This month"
-  },
   "usageViews.moreAgents": {
     "value": {
       "one": "+{{count}} agent",
@@ -36340,7 +36241,7 @@
     "value": "Plans only tell how much the whole account used. Each agent's part is an estimate, from what each one spent on it."
   },
   "usageViews.accounts.title": {
-    "value": "Plan accounts"
+    "value": "Accounts"
   },
   "usageViews.accounts.empty": {
     "value": "Connect a plan and follow here how much each agent uses."
@@ -42100,9 +42001,6 @@
   "dashboards.newWidget.testAgain": {
     "value": "Test again"
   },
-  "dashboards.newWidget.testing": {
-    "value": "{{name}} is building it with real data…"
-  },
   "dashboards.newWidget.tested": {
     "value": "Real data · {{when}}"
   },
@@ -42165,6 +42063,18 @@
   },
   "dashboards.newWidget.buildingFoot": {
     "value": "{{name}} building…"
+  },
+  "dashboards.newWidget.thinking": {
+    "value": "Thinking"
+  },
+  "dashboards.newWidget.finishing": {
+    "value": "Building the widget"
+  },
+  "dashboards.newWidget.stop": {
+    "value": "Stop"
+  },
+  "dashboards.newWidget.stillWorking": {
+    "value": "Still working. Real data can take a minute or two."
   },
   "dashboards.newWidget.failedTitle": {
     "value": "{{name}} couldn't build it"
@@ -43386,6 +43296,9 @@
   },
   "feedback.another": {
     "value": "Send another"
+  },
+  "settings.tab.account": {
+    "value": "Profile"
   },
   "feedback.offer.group": {
     "value": "Report about the app"

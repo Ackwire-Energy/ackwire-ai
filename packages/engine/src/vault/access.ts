@@ -44,6 +44,15 @@ export const DEFAULT_ACCESS: Record<VaultScope, VaultAccess> = {
   team: { everyone: true, roleIds: [], userIds: [], allAgents: false, agentIds: [] },
 };
 
+/**
+ * A connection made now: every agent, its owner's for a personal one. A standing choice (`allAgents`), so an agent
+ * created later is in. Connections made before this keep what they had.
+ */
+export const DEFAULT_CONNECTION_ACCESS: Record<VaultScope, VaultAccess> = {
+  personal: DEFAULT_ACCESS.personal,
+  team: { ...DEFAULT_ACCESS.team, allAgents: true },
+};
+
 /** The columns that decide an item's access now: its own, or its connection's while it follows it. */
 export function effectiveColumns(item: ItemRow, connection: ConnectionRow | undefined): AccessColumns {
   return item.accessFromConnection && connection ? connection : item;

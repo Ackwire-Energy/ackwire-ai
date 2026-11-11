@@ -19,7 +19,7 @@ import {
   useSettings,
   useSkills,
 } from "@agenteschat/client";
-import { LEVELS, type Level, saveLevels } from "@agenteschat/client/lib/access-levels";
+import { LEVELS, type Level, saveLevels, sharedLevel } from "@agenteschat/client/lib/access-levels";
 import { draftLevels, draftMailLevels } from "@agenteschat/client/lib/action-cards";
 import {
   autonomyName,
@@ -72,6 +72,7 @@ import {
   ProviderLogo,
   prefersReducedMotion,
   randomAppearance,
+  Segmented,
   SettingNote,
   SettingRow,
   Spinner,
@@ -1268,26 +1269,29 @@ function NewAgentFlow({
                 {managesAgents && (
                   <span className="newag__quick">
                     {t("newAgent.all")}
-                    <Button
+                    <Segmented
                       size="sm"
-                      variant="ghost"
-                      onClick={() => {
-                        setLevels(presetLevels("custom", connectedList, personal));
-                        setMailLevels({});
+                      label={t("newAgent.connectorsLabel")}
+                      value={
+                        sharedLevel([
+                          ...connectedList.map((i) => levels[i.id] ?? "none"),
+                          ...mailboxes.map((a) => mailLevels[a.id] ?? "none"),
+                        ]) ?? "custom"
+                      }
+                      onValueChange={(l) => {
+                        if (l === "none") {
+                          setLevels(presetLevels("custom", connectedList, personal));
+                          setMailLevels({});
+                        } else if (l === "read") {
+                          setLevels(Object.fromEntries(connectedList.map((i) => [i.id, "read" as Level])));
+                          setMailLevels(Object.fromEntries(mailboxes.map((a) => [a.id, "read" as Level])));
+                        }
                       }}
-                    >
-                      {t("access.level.none")}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => {
-                        setLevels(Object.fromEntries(connectedList.map((i) => [i.id, "read" as Level])));
-                        setMailLevels(Object.fromEntries(mailboxes.map((a) => [a.id, "read" as Level])));
-                      }}
-                    >
-                      {t("access.level.read")}
-                    </Button>
+                      options={[
+                        { value: "none", label: t("access.level.none") },
+                        { value: "read", label: t("access.level.read") },
+                      ]}
+                    />
                   </span>
                 )}
               </div>

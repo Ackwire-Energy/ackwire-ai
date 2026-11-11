@@ -71,12 +71,23 @@ import {
   type WidgetSize,
   type WidgetSpec,
   type WidgetStatus,
+  type WidgetStepView,
   type WidgetUpdateView,
   type WidgetView,
 } from "./types";
 
-const { dashboards, dashboardWidgets, dashboardWidgetUpdates, agents, users, routines, orgRoles, organizationMembers } =
-  schema;
+const {
+  dashboards,
+  dashboardWidgets,
+  dashboardWidgetUpdates,
+  agents,
+  users,
+  routines,
+  routineRuns,
+  agentRunSteps,
+  orgRoles,
+  organizationMembers,
+} = schema;
 
 /**
  * Boards and widgets for people (ADR 0135): the HTTP layer's calls, each checking who may (`access.ts`), and the
@@ -1297,12 +1308,47 @@ export async function getWidget(
   widgetId: string,
 ): Promise<WidgetDetailView> {
   const { widget, board, viewer } = await requireWidget(deps.db, actorId, orgId, widgetId, "see");
-  const [view, history] = await Promise.all([widgetView(deps.db, widget), widgetHistory(deps.db, orgId, widget.id)]);
+  const [view, history, step] = await Promise.all([
+    widgetView(deps.db, widget),
+    widgetHistory(deps.db, orgId, widget.id),
+    widget.status === "building" || widget.status === "updating" ? widgetStep(deps.db, orgId, widget) : null,
+  ]);
   return {
     ...view,
     dashboard: { id: board.id, kind: board.kind === "home" ? "home" : "board", title: board.title },
     canEdit: dashboardRights(board, viewer).edit,
     history,
+    step,
+  };
+}
+
+/**
+ * The tool call the widget's refresh run is in: the latest step of its routine's unfinished run, when that is a call
+ * (a result or a model round after it means it is thinking: null). No access check: callers check.
+ */
+async function widgetStep(db: Executor, orgId: string, widget: WidgetRow): Promise<WidgetStepView | null> {
+  if (!widget.routineId) return null;
+  const [step] = await db
+    .select({ kind: agentRunSteps.kind, data: agentRunSteps.data, at: agentRunSteps.createdAt })
+    .from(agentRunSteps)
+    .innerJoin(routineRuns, eq(routineRuns.agentRunId, agentRunSteps.runId))
+    .where(
+      and(
+        eq(agentRunSteps.orgId, orgId),
+        eq(routineRuns.routineId, widget.routineId),
+        isNull(routineRuns.finishedAt),
+        inArray(agentRunSteps.kind, ["tool_call", "tool_result", "model_call"]),
+      ),
+    )
+    .orderBy(desc(routineRuns.createdAt), desc(agentRunSteps.seq))
+    .limit(1);
+  if (step?.kind !== "tool_call") return null;
+  const text = (v: unknown) => (typeof v === "string" && v ? v : null);
+  return {
+    tool: text(step.data.name) ?? "",
+    connector: text(step.data.connector),
+    service: text(step.data.service),
+    at: step.at.toISOString(),
   };
 }
 

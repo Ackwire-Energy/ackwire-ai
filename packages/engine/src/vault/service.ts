@@ -262,6 +262,13 @@ export interface VaultPlace {
   writes: "yes" | "read_only" | "no";
 }
 
+/** A connected password manager an agent is told of without using it: where it is, whose, and whether it holds items. */
+export interface VaultUnreached {
+  place: VaultPlace;
+  scope: VaultScope;
+  hasItems: boolean;
+}
+
 /** An item as an agent sees it: never a value. `contact` only for contacts (their fields are meant for agents). */
 export interface VaultItemForAgent {
   id: string;

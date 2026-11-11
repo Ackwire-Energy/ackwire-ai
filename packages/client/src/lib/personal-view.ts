@@ -10,19 +10,25 @@ import { isPersonal } from "./workspace-mode";
 type Org = Pick<OrgSummary, "mode"> | null | undefined;
 
 /**
- * Settings in a personal workspace (ADR 0159 §3), in this order: Your account, About you, AI and apps, Plan and usage,
+ * Settings in a personal workspace (ADR 0159 §3), in this order: Your account, About you, AI and usage, Connectors,
  * Vault, Devices (the web's `devices`, the phone's `computers`). Every other section the person may open is under
  * Advanced. Ids are the settings sections' (`/settings/{id}` on the web).
  */
-export const PERSONAL_SETTINGS = ["account", "general", "keys", "usage", "vault", "devices", "computers"] as const;
+export const PERSONAL_SETTINGS = [
+  "account",
+  "general",
+  "usage",
+  "connectors",
+  "vault",
+  "devices",
+  "computers",
+] as const;
 
 /**
- * Sections a personal workspace shows on another one's page: AI and apps holds connectors and skills, Plan and usage
- * holds billing. Their own address still opens them alone.
+ * Sections a personal workspace shows on another one's page: AI and usage holds billing. Its own address still opens
+ * it alone.
  */
 export const PERSONAL_SETTINGS_PARTS: Readonly<Record<string, (typeof PERSONAL_SETTINGS)[number]>> = {
-  connectors: "keys",
-  skills: "keys",
   billing: "usage",
 };
 
@@ -40,12 +46,16 @@ const PERSONAL_SETTINGS_SHARED = [
   "account",
   "general",
   "members",
-  "keys",
   "usage",
+  "connectors",
   "vault",
   "devices",
   "computers",
 ] as const;
+
+/** A personal workspace's short list: with other people here (`others`), the one People is on. */
+export const personalSettingsShort = (others?: number): readonly string[] =>
+  others !== undefined && others > 0 ? PERSONAL_SETTINGS_SHARED : PERSONAL_SETTINGS;
 
 /**
  * A personal workspace's settings list from the sections the person may open (`open`, in their usual order): the
@@ -57,18 +67,18 @@ export function personalSettingsNav<T extends { id: string }>(
   others?: number,
 ): { main: T[]; advanced: T[] } {
   const ids = new Set(open.map((s) => s.id));
-  const short: readonly string[] = others !== undefined && others > 0 ? PERSONAL_SETTINGS_SHARED : PERSONAL_SETTINGS;
+  const short = personalSettingsShort(others);
   return {
     main: short.flatMap((id) => open.filter((s) => s.id === id)),
     advanced: open.filter((s) => !short.includes(s.id) && personalSettingsHost(s.id, ids) === null),
   };
 }
 
-/** The sections a personal workspace names in its own words: About you, People, AI and apps, Plan and usage. */
-const RENAMED = ["general", "members", "keys", "usage"] as const;
+/** The sections a personal workspace names in its own words: About you, People. */
+const RENAMED = ["general", "members"] as const;
 type Renamed = (typeof RENAMED)[number];
 /** The sections whose line under the title has a personal variant. */
-const RETOLD = ["general", "members", "keys", "usage", "connectors", "roles"] as const;
+const RETOLD = ["general", "members", "usage", "connectors", "roles"] as const;
 type Retold = (typeof RETOLD)[number];
 
 type NameKey<S extends string> = `settings.section.${S}` | `settings.section.${S & Renamed}Personal`;

@@ -1017,7 +1017,6 @@
     "proposalsWaiting_other": "{{count}} menunggu",
     "drive": "Drive",
     "connectors": "Konektor dan MCP",
-    "usage": "Pemakaian",
     "preferences": "Preferensi",
     "editProfile": "Ubah profil",
     "switchWorkspace": "Ganti ruang kerja",
@@ -2106,16 +2105,13 @@
     "editSub": "Nama, logo, zona waktu, dan yang diketahui agen",
     "group": {
       "org": "Ruang kerja",
-      "people": "Orang",
-      "agents": "Agen",
-      "costs": "Biaya dan data"
+      "people": "Orang"
     },
     "section": {
       "members": "Anggota",
       "roles": "Peran",
       "access": "Akses agen",
-      "connectors": "Konektor",
-      "usage": "Pemakaian dan anggaran"
+      "connectors": "Konektor"
     },
     "ofOnline": "{{online}} dari {{count}}",
     "deleteName": "Hapus {{name}}",
@@ -2199,7 +2195,7 @@
       "guide": "Buka panduan {{name}}",
       "fields": "Data",
       "private": "Data ini disimpan terenkripsi dan tidak pernah ditampilkan lagi.",
-      "teamHelp": "Item-itemnya awalnya terlihat oleh semua orang di ruang kerja dan tidak dipakai agen mana pun. Kamu memilih agennya nanti.",
+      "teamHelp": "Semua orang di ruang kerja melihat item-itemnya dan semua agen bisa memakainya. Kamu bisa menyesuaikannya setelah itu.",
       "personalHelp": "Hanya kamu yang melihat item-itemnya, dan agenmu menggunakannya saat kamu minta.",
       "checking": "Memeriksa dengan {{name}}…",
       "connected": "{{name}} terhubung",

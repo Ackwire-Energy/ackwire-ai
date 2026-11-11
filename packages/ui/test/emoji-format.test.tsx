@@ -238,13 +238,20 @@ describe("Composer toolbar", () => {
     const sent: string[] = [];
     render(<Harness sent={sent} />);
     const box = body().getByRole("textbox", { name: "Mensagem para #eng" }) as HTMLTextAreaElement;
+    // The formatting bar floats over selected text: none before there is some.
+    expect(body().queryByRole("toolbar", { name: "Formatação" })).toBeNull();
+    box.focus();
+    box.setSelectionRange(7, 13);
+    // React only reports a select whose range differs from the last one it saw, in any test: the focus reports it too.
+    await act(async () => {
+      fireEvent.select(box);
+      fireEvent.focus(box);
+    });
     const toolbar = body().getByRole("toolbar", { name: "Formatação" });
     // One tab stop; the tooltip tells the shortcut.
     const bold = within(toolbar).getByRole("button", { name: "Negrito" });
     expect(bold.getAttribute("tabindex")).toBe("0");
     expect(bold.getAttribute("title")).toMatch(/^Negrito \((⌘|Ctrl) B\)$/);
-    box.focus();
-    box.setSelectionRange(7, 13);
     await act(async () => fireEvent.click(bold));
     expect(box.value).toBe("deploy **amanhã**");
     box.setSelectionRange(0, 6);

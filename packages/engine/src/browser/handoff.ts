@@ -793,7 +793,7 @@ async function afterChange(deps: HandoffDeps, row: BrowserHandoffRow, movedFrom?
  * never signs it in on its computer. What it changes goes through its tools and cards, else a link to the page.
  */
 export const ownAppRefusal = (orgId: string) =>
-  `Nothing was asked: that is agentes.chat itself, the app you work in. Never sign in to it on your computer, nor ask a person to. Change the workspace with your own tools, which post cards a person applies as themselves (propose_remove_agents archives or deletes agents, propose_agent creates them, propose_settings_change, offer_invites, offer_connect_app; find_tools finds them). When no tool does it, send the person the link to the page instead: the team ${appPageLink(orgId, "/team")}, settings ${appPageLink(orgId, "/settings/members")} (or /settings/roles, /settings/connectors, /settings/computers, /settings/usage, /settings/keys).`;
+  `Nothing was asked: that is agentes.chat itself, the app you work in. Never sign in to it on your computer, nor ask a person to. Change the workspace with your own tools, which post cards a person applies as themselves (propose_remove_agents archives or deletes agents, propose_agent creates them, propose_settings_change, offer_invites, offer_connect_app; find_tools finds them). When no tool does it, send the person the link to the page instead: the team ${appPageLink(orgId, "/team")}, settings ${appPageLink(orgId, "/settings/members")} (or /settings/roles, /settings/connectors, /settings/computers, /settings/usage).`;
 
 /** The address the agent's browser shows, as its computer says (short: it runs before a person is asked). */
 async function browserUrl(hub: MachineCaller, machineId: string, agent: { id: string; handle: string }) {

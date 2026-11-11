@@ -985,6 +985,33 @@
       }
     },
     /**
+     * A bubble's time in its corner never covers the bubble's words: the last line keeps the room of the time as it
+     * is written (a 12-hour "11:43 PM" is half again as wide as "23:43") and of the mark after it.
+     */
+    stampover(out) {
+      for (const stamp of document.querySelectorAll(".ac-msg__text > .ac-msg__stamp")) {
+        if (!seen(stamp) || style(stamp).position !== "absolute") continue;
+        const s = stamp.getBoundingClientRect();
+        let px = 0;
+        const walker = document.createTreeWalker(stamp.parentElement, NodeFilter.SHOW_TEXT);
+        for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+          if (!n.textContent.trim() || stamp.contains(n) || !seen(n.parentElement)) continue;
+          for (const t of textRects(n))
+            if (Math.min(t.bottom, s.bottom) - Math.max(t.top, s.top) > 1)
+              px = Math.max(px, Math.min(t.right, s.right) - Math.max(t.left, s.left));
+        }
+        if (px > 0.5)
+          out.push({
+            rule: "stampover",
+            node: stamp,
+            el: sig(stamp),
+            box: sig(stamp.parentElement),
+            px: +px.toFixed(1),
+            text: words(stamp),
+          });
+      }
+    },
+    /**
      * A box that scrolls for a few px: margins, a border or rounding past its edge show a scrollbar (and let the wheel
      * nudge it) over content that, to the eye, fits. The check keeps one only if it stays in a taller window
      * (`lasting` in check.ts). A box with no class of its own is named by the nearest one with a class around it, so
@@ -2024,7 +2051,7 @@
         return { left: r.left + air, right: r.right - air, top: r.top + air, bottom: r.bottom - air };
       };
       const ONE =
-        ".ac-split,.ac-seg,.ac-token,.ac-eventpill,.ac-msg__actions,.ac-composer__tools--format,.wiki-bar,[role=menu],[role=menubar],svg";
+        ".ac-split,.ac-seg,.ac-token,.ac-eventpill,.ac-msg__actions,.ac-formatbar,.wiki-bar,[role=menu],[role=menubar],svg";
       for (const row of document.body.querySelectorAll("*")) {
         if (!seen(row) || row.closest(ONE) || !isRow(style(row))) continue;
         const kids = flow(row);

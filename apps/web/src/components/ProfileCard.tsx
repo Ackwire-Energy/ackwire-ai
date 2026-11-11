@@ -554,9 +554,7 @@ function RightHandCardBody({ agent, onDone }: { agent: Agent; onDone: () => void
           <Button
             icon="cog"
             onClick={() =>
-              go(() =>
-                navigate({ to: "/org/$orgId/settings/$section", params: { orgId: org.id, section: "right_hand" } }),
-              )
+              go(() => navigate({ to: "/org/$orgId/agents/$agentId", params: { orgId: org.id, agentId: agent.id } }))
             }
           >
             {t("rightHand.profile.configure")}

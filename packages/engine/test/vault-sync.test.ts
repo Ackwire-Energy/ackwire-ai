@@ -85,7 +85,8 @@ describe("connecting", () => {
       status: "ready",
       errorCode: null,
       itemCount: 2,
-      access: { everyone: true, allAgents: false, agentIds: [] },
+      // Connected without an access: every agent (ADR 0144 §10).
+      access: { everyone: true, allAgents: true, agentIds: [] },
       can: { edit: true },
     });
     expect(connection.syncedAt).not.toBeNull();

@@ -168,6 +168,14 @@ people than asked.
     no longer shown to them reads as none, and Início is My Home again. Meanwhile My Home opens as a board page of its
     own (Dashboards' first card), whose menu brings Início back to it; the chosen board's card says "On Home". Home's
     head says "See all", which opens Dashboards, on the web and the phone.
+19. **A build says what it is doing.** While a widget is `building` or `updating`, its page (`GET …/widgets/{id}`,
+    under the same access check, so a draft's is its creator's alone) carries `step`: the tool call its run is in (the
+    name, the connected app's label and service, when it started; never the input), null between calls. The apps say it
+    in the chat's own words for a call, never a tool's name, with the time it has taken and a Stop that deletes the
+    draft and keeps the ask; the draft's poll and its events refresh it. The run starts with what it needs in hand:
+    on Claude Code, whose ToolSearch holds our tools back by default, the bridge's list marks `update_widget`, the web
+    and the connected apps' reads (60 at most) to be listed from the first round (`widgetUpFront`), and its prompt
+    forbids arithmetic and waiting in a shell.
 
 ## Consequences
 

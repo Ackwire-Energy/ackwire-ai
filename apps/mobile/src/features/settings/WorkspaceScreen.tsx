@@ -1,34 +1,27 @@
 import {
-  useAgents,
-  useAiAccounts,
-  useAiStatus,
   useComputerSetup,
   useConnections,
-  useCredentials,
   useInvitations,
   useMachines,
   useOverview,
-  usePlatformKey,
   useSkills,
   useStorage,
+  useWorkspaceUsesApi,
 } from "@agenteschat/client";
 import { computerEdition } from "@agenteschat/client/lib/computer";
 import { can } from "@agenteschat/client/lib/permissions";
 import { settingsSectionNameKey } from "@agenteschat/client/lib/personal-view";
-import { workspaceUsesApi } from "@agenteschat/client/lib/plan-usage";
-import { rightHandOf } from "@agenteschat/client/lib/right-hand";
 import { Fragment, type ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert } from "react-native";
 import { useOrg } from "@/providers/org";
 import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, haptics } from "@/ui";
 import { router } from "@/ui/navigation";
-import { AgentFace } from "../shared/Face";
-import { useDirectory } from "../shared/hooks";
 import { OrgAvatar } from "../shared/OrgAvatar";
 import { usePersonalView } from "./hooks";
 import {
   areaValues,
+  GROUP_LABEL,
   PERSONAL_ICON,
   personalSections,
   SETTINGS_GROUPS,
@@ -46,14 +39,13 @@ const SHORT: Partial<Record<SettingsSection, string>> = {
   roles: "mobile.settings.section.roles",
   access: "mobile.settings.section.access",
   connectors: "mobile.settings.section.connectors",
-  usage: "mobile.settings.section.usage",
 };
 
 /**
- * The workspace's settings, a screen pushed from Você on the grouped gray, as the phone's own settings: four groups,
- * each thing once. Workspace: the workspace itself (its mark, its name, what Geral holds), its right hand by its
- * face and name, GIFs. Pessoas, Agentes, Custos e dados: one neutral tile and one short value per row (a count or
- * a state), the area's own screen says the rest. Owners get "Apagar <nome>" alone in red at the end, behind the
+ * The workspace's settings, a screen pushed from Você on the grouped gray, as the phone's own settings: the web's
+ * entries as groups, each thing once. Workspace: the workspace itself (its mark, its name, what Geral holds) and GIFs.
+ * Pessoas, IA e uso, Conectores, Avançado: one neutral tile and one short value per row (a count or a state), the
+ * area's own screen says the rest. Owners get "Apagar <nome>" alone in red at the end, behind the
  * system's alert (one firm haptic as it confirms), then the proof and the hold. Opened often, so nothing animates
  * here beyond the rows' press highlight and the platform's push. A personal workspace gets its short list instead
  * (ADR 0159 §3, `PersonalSettingsList`).
@@ -63,7 +55,7 @@ export function WorkspaceScreen() {
   return personal ? <PersonalSettingsList others={others} /> : <TeamSettingsList />;
 }
 
-/** A team's workspace settings: every section this person opens, in the phone's four groups, then deleting it. */
+/** A team's workspace settings: every section this person opens, in the phone's groups, then deleting it. */
 function TeamSettingsList() {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -123,22 +115,23 @@ function PersonalSettingsList({ others }: { others: number | undefined }) {
 }
 
 /**
- * Sections in the phone's groups, each with its header: the workspace itself by its mark and name, its right hand by
- * its face and name, the rest by a neutral tile, a short name and one value. `extra`: rows a group ends with (a
+ * Sections in the phone's groups, each with its header: the workspace itself by its mark and name, the rest by a
+ * neutral tile, a short name and one value. `extra`: rows a group ends with (a
  * personal workspace's delegated approvals under People); a group with none of either draws nothing.
  */
 export function SectionGroups({
   areas,
   extra,
+  untitled,
 }: {
   areas: readonly SettingsEntry[];
   extra?: Partial<Record<SettingsGroup, ReactElement>>;
+  /** The group the screen's own title already names (Advanced on the Advanced screen): its rows, no header. */
+  untitled?: SettingsGroup;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const values = useAreaValues(areas);
-  // The right hand's row goes by its name and face (admins may rename it).
-  const rightHand = rightHandOf(useDirectory().agents);
   const name = org?.name ?? "";
   return (
     <>
@@ -148,7 +141,7 @@ export function SectionGroups({
         if (rows.length === 0 && !more) return null;
         return (
           <Fragment key={group}>
-            <GroupedHeader>{t(`mobile.settings.group.${group}`)}</GroupedHeader>
+            {group === untitled ? <Gap /> : <GroupedHeader>{t(GROUP_LABEL[group])}</GroupedHeader>}
             <GroupedList>
               {rows.map((s) =>
                 s.id === "general" ? (
@@ -157,16 +150,6 @@ export function SectionGroups({
                     leading={<OrgAvatar logo={org?.logo} size={36} />}
                     label={name}
                     sub={t("mobile.settings.editSub")}
-                    chevron
-                    onPress={() => router.push(s.href as never)}
-                  />
-                ) : s.id === "right_hand" && rightHand ? (
-                  <GroupedRow
-                    key={s.id}
-                    leading={<AgentFace agentId={rightHand.id} size={36} live={false} />}
-                    label={rightHand.name}
-                    // Its one role name, never its stored role ("Workspace assistant", in no person's language).
-                    sub={t("rightHand.labelCapitalized")}
                     chevron
                     onPress={() => router.push(s.href as never)}
                   />
@@ -234,34 +217,18 @@ function useAreaValues(areas: readonly SettingsEntry[]) {
   const connections = useConnections(orgId);
   const skills = useSkills(orgId, shown("skills"));
   const machines = useMachines(orgId, shown("computers"));
-  const managesKeys = can(org, "manage_credentials");
-  const credentials = useCredentials(orgId, managesKeys);
-  const plans = useAiAccounts(orgId, shown("keys") && !managesKeys);
-  const platform = usePlatformKey(orgId);
   const storage = useStorage(orgId, shown("storage"));
   const edition = computerEdition(useComputerSetup(orgId, shown("storage")).data);
-  const agents = useAgents(orgId).data ?? [];
-  const aiStatus = useAiStatus(orgId).data;
+  const usesApi = useWorkspaceUsesApi(orgId);
   return areaValues(t, i18n.language, {
     overview: overview.data,
-    usesApi: overview.data && workspaceUsesApi(agents, aiStatus, overview.data.budgetUsedPercent),
+    usesApi,
     invitations: invitations.data?.length,
     connectors: connections.data?.filter((x) => !x.revokedAt).map((x) => x.label),
     skills: skills.data?.length,
     computers: machines.data
       ? { count: machines.data.length, online: machines.data.filter((m) => m.online).length }
       : undefined,
-    keys: managesKeys
-      ? credentials.data
-        ? {
-            manages: true,
-            live: credentials.data.filter((k) => !k.revokedAt).length,
-            platform: Boolean(platform.data),
-          }
-        : undefined
-      : plans.data
-        ? { manages: false, plans: plans.data.accounts.length }
-        : undefined,
     storage: storage.data && edition ? { kind: storage.data.kind, edition } : undefined,
   });
 }

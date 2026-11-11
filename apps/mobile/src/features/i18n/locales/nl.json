@@ -1090,7 +1090,6 @@
     "proposalsWaiting_other": "{{count}} wachten",
     "drive": "Drive",
     "connectors": "Connectors en MCP's",
-    "usage": "Gebruik",
     "preferences": "Voorkeuren",
     "editProfile": "Profiel bewerken",
     "switchWorkspace": "Van werkruimte wisselen",
@@ -2209,16 +2208,13 @@
     "editSub": "Naam, logo, tijdzone en wat de agents weten",
     "group": {
       "org": "Werkruimte",
-      "people": "Mensen",
-      "agents": "Agents",
-      "costs": "Kosten en gegevens"
+      "people": "Mensen"
     },
     "section": {
       "members": "Leden",
       "roles": "Rollen",
       "access": "Toegang van agents",
-      "connectors": "Connectors",
-      "usage": "Gebruik en budget"
+      "connectors": "Connectors"
     },
     "ofOnline": "{{online}} van {{count}}",
     "deleteName": "{{name}} verwijderen",
@@ -2302,7 +2298,7 @@
       "guide": "De handleiding van {{name}} openen",
       "fields": "Gegevens",
       "private": "Deze gegevens worden versleuteld bewaard en nooit meer getoond.",
-      "teamHelp": "De items zijn eerst zichtbaar voor iedereen in de werkruimte en door geen agent gebruikt. Daarna kies je de agenten.",
+      "teamHelp": "Iedereen in de werkruimte ziet de items en elke agent mag ze gebruiken. Daarna kun je dat aanpassen.",
       "personalHelp": "Alleen jij ziet de items, en je agenten gebruiken ze als je erom vraagt.",
       "checking": "Controleren bij {{name}}…",
       "connected": "{{name}} gekoppeld",

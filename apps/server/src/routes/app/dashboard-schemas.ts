@@ -205,6 +205,18 @@ export const WidgetDetail = Widget.extend({
   dashboard: z.object({ id: z.uuid(), kind: z.enum(["board", "home"]), title: z.string() }),
   canEdit: z.boolean(),
   history: z.array(WidgetUpdate).openapi({ description: "The latest updates, newest first." }),
+  step: z
+    .object({
+      tool: z.string(),
+      connector: z.string().nullable(),
+      service: z.string().nullable(),
+      at: z.string(),
+    })
+    .nullable()
+    .openapi({
+      description:
+        "While it is building or updating: the tool call its run is in (the app says it in words). Null between calls and otherwise.",
+    }),
 }).openapi("WidgetDetail");
 
 export const WidgetCostEstimate = z

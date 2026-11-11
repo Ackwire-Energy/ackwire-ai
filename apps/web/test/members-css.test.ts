@@ -61,16 +61,16 @@ test("the column's add row: a 24px plus tile and 13px text, so it fits one line 
   expect(last(".member-row__plus", "width")).toBe("32px");
 });
 
-test("a DM's sidebar: a settings row's words keep the column, and its buttons wrap under them", async () => {
+test("a DM's sidebar: the row that opens its AI is a plate like the panel's other rows, its icon 8 inside it", async () => {
   const css = await Bun.file(new URL("../src/components/agents/agent-sidebar.css", import.meta.url).pathname).text();
-  const rule = (selector: string) => css.slice(css.indexOf(`${selector} {`)).split("}")[0];
-  expect(rule(".dm-side__sec .settings-row")).toContain("flex-wrap: wrap");
-  expect(rule(".dm-side__sec .settings-row > .settings-row__text")).toContain("flex: 1 1 0");
-  const buttons = rule(".dm-side .dm-side__sec .settings-row.settings-row--lead > .settings-row__end");
-  expect(buttons).toContain("flex-basis: 100%");
-  // Raised to the name's line beside the words, never under them.
-  expect(buttons).toContain("translate: none");
-  expect(rule(".dm-side__sec .rh-set__acts")).toContain("flex-wrap: wrap");
+  const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+  const row = rule(".dm-side__sec .settings-row--open");
+  // The plate reaches 8 past the section's sides and pads 8, so the icon starts on the heading's edge.
+  expect(row).toContain("margin: 0 calc(-1 * var(--space-2)) var(--space-2)");
+  expect(row).toContain("padding: var(--space-2)");
+  expect(row).toContain("width: calc(100% + 2 * var(--space-2))");
+  expect(row).toContain("border-top: 0");
+  expect(rule(".dm-side__sec .settings-row--open:hover")).toContain("background: var(--side-hover)");
   // Only there: Settings' rows keep their layout.
   expect(css.match(/^[^\n]*settings-row[^\n]*\{$/gm)?.every((line) => /^(\.dm-side )?\.dm-side__sec/.test(line))).toBe(
     true,

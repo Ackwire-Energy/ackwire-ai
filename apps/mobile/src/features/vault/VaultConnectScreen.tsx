@@ -11,15 +11,24 @@ import { vaultConnectRefusal } from "@agenteschat/client/lib/errors";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
-import { GroupedField, GroupedFooter, GroupedHeader, GroupedList, GroupedRow, Text, useToast } from "@/ui";
+import { Button, GroupedField, GroupedFooter, GroupedHeader, GroupedList, GroupedRow, Text, useToast } from "@/ui";
 import { router } from "@/ui/navigation";
 import { Note, openPage } from "../ai/parts";
+import { ConnectedNote } from "../connectors/ConnectSheet";
 import { SettingsPage } from "../settings/parts";
 import { useColors, useOrgId } from "../shared/hooks";
 import { pickOne } from "../shared/PickerSheet";
 import { goBack, successHaptic, Tile } from "../shared/parts";
-import { connectInput, connectMissing, fieldKeyboard, initialValues, shownFields, vaultHref } from "./logic";
-import { InputField, ScopeRows } from "./parts";
+import {
+  accessSentence,
+  connectInput,
+  connectMissing,
+  fieldKeyboard,
+  initialValues,
+  shownFields,
+  vaultHref,
+} from "./logic";
+import { InputField, ScopeRows, useVaultNames } from "./parts";
 
 /**
  * Connecting a password manager (ADR 0144 §3), drawn from what the source describes: a warning when it has one
@@ -74,6 +83,8 @@ function ConnectForm({
   const [values, setValues] = useState<Record<string, string>>(() => initialValues(source));
   const [chosen, setChosen] = useState<VaultScope>(canTeam ? "team" : "personal");
   const [refusal, setRefusal] = useState<string | null>(null);
+  const [made, setMade] = useState<VaultConnection | null>(null);
+  const names = useVaultNames();
   const scope: VaultScope = chosen === "team" && canTeam ? "team" : "personal";
   const missing = connectMissing(source, values);
   const busy = connect.isPending || update.isPending;
@@ -107,10 +118,9 @@ function ConnectForm({
     connect.mutate(
       { kind: k, scope, input },
       {
-        onSuccess: (made) => {
+        onSuccess: (connected) => {
           successHaptic();
-          toast({ title: t("mobile.vault.connect.connected", { name: source.name }) });
-          router.replace(vaultHref.connection(made.id) as never);
+          setMade(connected);
         },
         onError: failed,
       },
@@ -129,6 +139,24 @@ function ConnectForm({
     }).then((key) => {
       if (key !== null) set(f.id, key);
     });
+
+  // The end of connecting, as a tool's: who can use it, then "Pronto" or "Ajustar" (its access).
+  if (made) {
+    return (
+      <SettingsPage title={t("mobile.vault.connect.title", { name: source.name })}>
+        <View style={styles.done}>
+          <ConnectedNote name={source.name} text={accessSentence(t, made.scope, made.access, names)} />
+          <Button variant="primary" wide label={t("connectFlow.done.ok")} onPress={goBack} />
+          <Button
+            variant="secondary"
+            wide
+            label={t("connectFlow.done.adjust")}
+            onPress={() => router.replace(vaultHref.connectionAccess(made.id) as never)}
+          />
+        </View>
+      </SettingsPage>
+    );
+  }
 
   return (
     <SettingsPage
@@ -240,6 +268,7 @@ function ConnectForm({
 
 const styles = StyleSheet.create({
   note: { paddingHorizontal: 4, paddingTop: 10 },
+  done: { gap: 12, paddingTop: 16 },
   loading: { marginVertical: 16 },
   number: { fontWeight: "600" },
 });

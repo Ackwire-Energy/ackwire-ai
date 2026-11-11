@@ -48,3 +48,18 @@ export function pullToFit(box: {
   const natural = box.scroll + box.height - box.client;
   return Math.max(0, Math.ceil(Math.min(natural - box.base, box.window - 2 * EDGE_ROOM - box.base)));
 }
+
+/**
+ * Where a bar about selected text goes (the composer's formatting): `placeTip` centred over the selection, under it
+ * when the window has no room over it (it never sits on the selected text), then kept inside its `column` (the
+ * composer's own left and right). One wider than the column starts at the column's left.
+ */
+export function placeOverSelection(
+  selection: { left: number; top: number; right: number; bottom: number },
+  bar: { width: number; height: number },
+  column: { left: number; right: number },
+  windowWidth: number,
+) {
+  const at = placeTip(selection, bar, "center", windowWidth);
+  return { left: Math.max(column.left, Math.min(at.left, column.right - bar.width)), top: at.top };
+}
