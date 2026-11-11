@@ -1142,6 +1142,7 @@ const NOTICE_ICON: Record<string, IconName> = {
   machine_offline: "computer",
   machine_task_resumed: "refresh",
   machine_task_resume_waits: "waiting",
+  machine_task_restarted: "refresh",
   machine_task_done: "check",
   machine_task_failed: "alert",
   machine_task_canceled: "stop",

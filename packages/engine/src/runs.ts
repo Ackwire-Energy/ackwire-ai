@@ -11,8 +11,19 @@ const { agentRuns, agentRunSteps } = schema;
 export type AgentRun = typeof agentRuns.$inferSelect;
 export type RunStatus = AgentRun["status"];
 
-/** For a select over `agent_runs`: parked on a provider outage (`transcript.outage`), it resumes by itself. */
-export const outageParkedSql = sql<boolean>`(${agentRuns.status} = 'waiting_input' and ${agentRuns.transcript} -> 'outage' is not null)`;
+/**
+ * For a select over `agent_runs`: parked on a provider outage (`transcript.outage`), it resumes by itself. The marker
+ * stays until a turn answers, so a run that waits on its computer or its plan since (`waitingMachineId`,
+ * `waitingForBrain`) reads as that wait, never as the provider being down.
+ */
+export const outageParkedSql = sql<boolean>`(${agentRuns.status} = 'waiting_input' and ${agentRuns.transcript} -> 'outage' is not null
+  and ${agentRuns.waitingMachineId} is null and ${agentRuns.transcript} -> 'waitingForBrain' is null)`;
+
+/** `outageParkedSql` for a loaded run. */
+export function outageParkedOf(run: Pick<AgentRun, "status" | "waitingMachineId" | "transcript">): boolean {
+  const t = run.transcript as { outage?: unknown; waitingForBrain?: unknown } | null;
+  return run.status === "waiting_input" && !run.waitingMachineId && Boolean(t?.outage) && !t?.waitingForBrain;
+}
 
 /**
  * For a select over `agent_runs`: it ended without answering, so its receipt reads "didn't reply": it passed and posted

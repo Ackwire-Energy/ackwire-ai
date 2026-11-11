@@ -8125,6 +8125,7 @@ export const ptBR = {
       machine_task_resumed: "{{computer}} voltou: “{{title}}” retomou de onde parou",
       machine_task_resume_waits:
         "{{computer}} voltou: “{{title}}” retoma de onde parou quando o projeto estiver pronto",
+      machine_task_restarted: "{{computer}} voltou: “{{title}}” começou de novo",
       machine_task_done: "“{{title}}” terminou em {{span}} no {{computer}}",
       machine_task_failed: "“{{title}}” falhou depois de {{span}} no {{computer}}",
       machine_task_canceled: "“{{title}}” foi parada no {{computer}}",
@@ -15279,6 +15280,7 @@ export const ptBR = {
       machine_task_resumed: "{{computer}} voltou: “{{title}}” retomou de onde parou.",
       machine_task_resume_waits:
         "{{computer}} voltou: “{{title}}” retoma de onde parou quando o projeto estiver pronto.",
+      machine_task_restarted: "{{computer}} voltou: “{{title}}” começou de novo.",
       machine_offline: "{{computer}} ficou offline.",
       brain_unavailable: "O {{brain}} não está disponível agora. Respondo quando ele voltar.",
       /** Waits that don't pass by themselves (`meta.brainUnavailable.code`): the cause and who fixes it. */

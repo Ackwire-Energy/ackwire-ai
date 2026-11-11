@@ -8055,6 +8055,7 @@ export const en = {
         "{{computer}} went offline: {{count}} tasks keep running there if only the connection dropped, and resume where they stopped if the computer restarted.",
       machine_task_resumed: "{{computer}} is back: “{{title}}” resumed where it stopped",
       machine_task_resume_waits: "{{computer}} is back: “{{title}}” resumes where it stopped once the project is ready",
+      machine_task_restarted: "{{computer}} is back: “{{title}}” started again",
       machine_task_done: "“{{title}}” finished in {{span}} on {{computer}}",
       machine_task_failed: "“{{title}}” failed after {{span}} on {{computer}}",
       machine_task_canceled: "“{{title}}” was stopped on {{computer}}",
@@ -15196,6 +15197,7 @@ export const en = {
       machine_task_resumed: "{{computer}} is back: “{{title}}” resumed where it stopped.",
       machine_task_resume_waits:
         "{{computer}} is back: “{{title}}” resumes where it stopped once the project is ready.",
+      machine_task_restarted: "{{computer}} is back: “{{title}}” started again.",
       machine_offline: "{{computer}} went offline.",
       brain_unavailable: "{{brain}} can't answer right now. I'll answer when it's back.",
       /** Waits that don't pass by themselves (`meta.brainUnavailable.code`): the cause and who fixes it. */
