@@ -904,7 +904,15 @@ export function Sidebar() {
       {/* A personal workspace's end (ADR 0159): one More, holding Início, Go to… and every tool not in sight. */}
       {personal && (
         <div className="sidebar__end">
-          <MoreTools items={inMore} row={toolRow} countOf={countOf} onCustomize={() => setCustomizing(true)} home />
+          <MoreTools
+            items={inMore}
+            row={toolRow}
+            countOf={countOf}
+            onCustomize={() => setCustomizing(true)}
+            // The list has no "Group conversations" header (and so no +) until there is one: the way to the first.
+            onNewChannel={can(org, "create_channels") ? () => setCreatingChannel(true) : undefined}
+            home
+          />
         </div>
       )}
 
@@ -1584,12 +1592,15 @@ function MoreTools({
   row,
   countOf,
   onCustomize,
+  onNewChannel,
   home = false,
 }: {
   items: SidebarItem[];
   row: (id: SidebarItem) => ReactNode;
   countOf: (id: SidebarItem) => ReactNode;
   onCustomize: () => void;
+  /** At a personal workspace's end: "New group conversation", for who may create one. */
+  onNewChannel?: () => void;
   /** At a personal workspace's end (ADR 0159): Início and Go to… open its list, and it opens upward. */
   home?: boolean;
 }) {
@@ -1644,6 +1655,21 @@ function MoreTools({
                 <Kbd>K</Kbd>
               </span>
             </button>
+            {onNewChannel && (
+              <button
+                type="button"
+                className="ac-menu__item sidebar__more-item"
+                onClick={() => {
+                  setOpen(false);
+                  // Closing the dialog brings focus back to More, not to this line, gone with the panel.
+                  trigger.current?.focus();
+                  onNewChannel();
+                }}
+              >
+                <Icon name="channel" />
+                <span className="ac-menu__label">{t("shell.sidebarMenu.newChannelPersonal")}</span>
+              </button>
+            )}
             <div className="ac-menu__separator" aria-hidden="true" />
           </>
         )}

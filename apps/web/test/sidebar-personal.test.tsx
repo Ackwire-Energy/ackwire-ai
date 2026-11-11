@@ -132,6 +132,15 @@ describe("a personal workspace's sidebar", () => {
     expect(tasks.querySelector(".ac-menu__desc")?.textContent).toBe("Suas tarefas e as dos seus agentes");
   });
 
+  test("More has New group conversation, even with no group conversation in the list yet", async () => {
+    await go(personal({ alone: true }), "home");
+    expect(channelRows()).toEqual([]);
+    await click(nav().querySelector(".sidebar__end .sidebar__more") as HTMLElement);
+    const menu = screen().getByRole("dialog", { name: "Mais" });
+    await click(within(menu).getByRole("button", { name: "Nova conversa em grupo" }));
+    expect(screen().getByRole("dialog", { name: "Nova conversa em grupo" })).toBeTruthy();
+  });
+
   test("Aprovações comes into sight while something waits", async () => {
     const state = personal();
     const first = state.approvals[0];
