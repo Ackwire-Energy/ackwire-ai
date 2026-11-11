@@ -205,21 +205,21 @@ export function IphoneSetup({ onClose }: { onClose: () => void }) {
           </Act>
         );
       case "connected":
-        return reason === "untrusted"
-          ? t("devices.iphone.trustText")
-          : reason === "locked"
-            ? t("desktop.iphone.unlockText")
-            : tooOld && phone
-              ? t("devices.iphone.tooOld", { name: phoneName, version: phone.osVersion })
-              : looking && !plugged && !stalled
-                ? (
-                    <Act text={t("devices.iphone.connectedText", { mac: macName })}>
-                      <Button size="sm" onClick={() => setPlugged(true)}>
-                        {t("devices.iphone.pluggedIn")}
-                      </Button>
-                    </Act>
-                  )
-                : t("devices.iphone.connectedText", { mac: macName });
+        return reason === "untrusted" ? (
+          t("devices.iphone.trustText")
+        ) : reason === "locked" ? (
+          t("desktop.iphone.unlockText")
+        ) : tooOld && phone ? (
+          t("devices.iphone.tooOld", { name: phoneName, version: phone.osVersion })
+        ) : looking && !plugged && !stalled ? (
+          <Act text={t("devices.iphone.connectedText", { mac: macName })}>
+            <Button size="sm" onClick={() => setPlugged(true)}>
+              {t("devices.iphone.pluggedIn")}
+            </Button>
+          </Act>
+        ) : (
+          t("devices.iphone.connectedText", { mac: macName })
+        );
       case "developerMode":
         return (
           <>

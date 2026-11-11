@@ -2007,8 +2007,7 @@ export const featureKeysPtBR = {
         "Este iPhone recusou os toques do app de testes. Desbloqueie e digite seu código se ele pedir. Se continuar, desligue e ligue Ajustes\u00a0›\u00a0Desenvolvedor\u00a0›\u00a0Ativar Automação da IU.",
       pluggedIn: "Já está ligado",
       stall: {
-        plug:
-          "O {{host}} ainda não vê este iPhone. Use um cabo que passe dados, não só carga, deixe este iPhone desbloqueado e toque em Confiar se ele pedir.",
+        plug: "O {{host}} ainda não vê este iPhone. Use um cabo que passe dados, não só carga, deixe este iPhone desbloqueado e toque em Confiar se ele pedir.",
         devmode:
           "O Modo de Desenvolvedor só liga depois que este iPhone reinicia. Toque em Reiniciar e em Ativar quando ele voltar. Não tem a opção? Desconecte este iPhone e ligue de novo.",
       },

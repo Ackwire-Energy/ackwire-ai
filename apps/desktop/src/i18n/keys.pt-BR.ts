@@ -701,8 +701,7 @@ export const desktopPtBR = {
     toolsProgress: "{{done}} de {{total}}",
     toolsPercent: "{{percent}}% baixado",
     toolsFailed: "O download parou: {{message}}",
-    accountText:
-      "Adicione em Xcode\u00a0›\u00a0Settings\u00a0›\u00a0Apple Accounts. Uma Conta Apple gratuita basta.",
+    accountText: "Adicione em Xcode\u00a0›\u00a0Settings\u00a0›\u00a0Apple Accounts. Uma Conta Apple gratuita basta.",
     openXcode: "Abrir o Xcode",
     personalTeam: "{{name}} · Equipe pessoal",
     unlockText: "Desbloqueie o iPhone e deixe desbloqueado por um momento.",

@@ -2062,8 +2062,7 @@ export const featureKeysEn = {
       pluggedIn: "It's plugged in",
       /** Under a step that sat unchanged for a while: what most likely holds it, and one way out. */
       stall: {
-        plug:
-          "{{host}} doesn't see this iPhone yet. Use a cable that carries data, not only power, keep this iPhone unlocked and tap Trust if it asks.",
+        plug: "{{host}} doesn't see this iPhone yet. Use a cable that carries data, not only power, keep this iPhone unlocked and tap Trust if it asks.",
         devmode:
           "Developer Mode turns on only after this iPhone restarts. Tap Restart, then Turn On once it's back. No switch there? Unplug this iPhone and plug it in again.",
       },

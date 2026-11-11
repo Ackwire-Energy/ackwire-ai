@@ -173,6 +173,8 @@ describe("the iPhone setup window", () => {
       for (const runner of host.runners.values()) runner.iphone = { ...runner.iphone, sdk: "26.2" };
       phone({ reason: "xcode_too_old", osVersion: "27.0" });
       await at("Xcode");
+      // The SDK comes with the next ask of the Mac (every 2 s), after the phone's own report.
+      await until(() => step()?.textContent?.includes("knows iOS 26.2 at most"));
       expect(step()?.textContent).toContain("Sam's iPhone 16 runs iOS 27.0 and Xcode on");
       expect(step()?.textContent).toContain("knows iOS 26.2 at most. Install Xcode 27, then run this in Terminal.");
       expect(step()?.querySelector("code")?.textContent).toBe("xcrun devicectl manage ddis update");
