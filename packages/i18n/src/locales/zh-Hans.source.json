@@ -26920,6 +26920,9 @@
   "connectors.category.automation": {
     "value": "Automation"
   },
+  "connectors.category.social": {
+    "value": "Social"
+  },
   "connectors.category.email": {
     "value": "Email"
   },
@@ -27493,6 +27496,69 @@
   "connectors.can.abacatepay.2": {
     "value": "Create Pix charges"
   },
+  "connectors.can.instagram.1": {
+    "value": "See posts, stories and insights"
+  },
+  "connectors.can.instagram.2": {
+    "value": "Publish posts and read direct messages"
+  },
+  "connectors.can.instagram.ask": {
+    "value": "Answering messages always asks for your approval"
+  },
+  "connectors.can.facebook.1": {
+    "value": "See posts, comments and insights"
+  },
+  "connectors.can.facebook.2": {
+    "value": "Publish posts, photos and videos and answer comments"
+  },
+  "connectors.can.facebook.ask": {
+    "value": "Deleting posts and comments always asks for your approval"
+  },
+  "connectors.can.linkedin.1": {
+    "value": "Publish posts, links and videos"
+  },
+  "connectors.can.linkedin.2": {
+    "value": "Comment on posts"
+  },
+  "connectors.can.linkedin.ask": {
+    "value": "Deleting posts always asks for your approval"
+  },
+  "connectors.can.youtube.1": {
+    "value": "See videos, comments and analytics"
+  },
+  "connectors.can.youtube.2": {
+    "value": "Edit videos and playlists and write comments"
+  },
+  "connectors.can.youtube.ask": {
+    "value": "Replying to, moderating and deleting comments always asks for your approval"
+  },
+  "connectors.can.pinterest.1": {
+    "value": "See pins, boards and analytics"
+  },
+  "connectors.can.pinterest.2": {
+    "value": "Create pins and organize boards"
+  },
+  "connectors.can.pinterest.ask": {
+    "value": "Changing boards and deleting always asks for your approval"
+  },
+  "connectors.can.reddit.1": {
+    "value": "Search posts and read comments"
+  },
+  "connectors.can.reddit.2": {
+    "value": "Post, comment and edit"
+  },
+  "connectors.can.reddit.ask": {
+    "value": "Deleting always asks for your approval"
+  },
+  "connectors.can.whatsapp.1": {
+    "value": "See numbers, templates and deliveries"
+  },
+  "connectors.can.whatsapp.2": {
+    "value": "Create message templates"
+  },
+  "connectors.can.whatsapp.ask": {
+    "value": "Sending messages always asks for your approval"
+  },
   "connectors.can.database.1": {
     "value": "See the tables"
   },
@@ -27888,6 +27954,27 @@
   },
   "connectors.descriptions.abacatepay": {
     "value": "Pix charges, customers and withdrawals."
+  },
+  "connectors.descriptions.instagram": {
+    "value": "Instagram business and creator accounts: posts, stories, insights and direct messages."
+  },
+  "connectors.descriptions.facebook": {
+    "value": "Facebook Pages: posts, photos, videos, comments and insights."
+  },
+  "connectors.descriptions.linkedin": {
+    "value": "LinkedIn posts, videos and comments as the member who signs in."
+  },
+  "connectors.descriptions.youtube": {
+    "value": "YouTube channel videos, comments, playlists and analytics."
+  },
+  "connectors.descriptions.pinterest": {
+    "value": "Pinterest pins, boards and analytics."
+  },
+  "connectors.descriptions.reddit": {
+    "value": "Reddit posts, comments and communities."
+  },
+  "connectors.descriptions.whatsapp": {
+    "value": "WhatsApp Business messages and templates."
   },
   "toolNames.order": {
     "value": "modifiers-first"

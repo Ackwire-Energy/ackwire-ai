@@ -11133,6 +11133,7 @@
       "support": "Support",
       "marketing": "Marketing",
       "automation": "Automatisering",
+      "social": "Sociale media",
       "email": "E-mail"
     },
     "emptyCategory": "Nog geen connectors in deze categorie",
@@ -11484,6 +11485,41 @@
         "1": "Betaalverzoeken en klanten bekijken",
         "2": "Pix-betaalverzoeken maken"
       },
+      "instagram": {
+        "1": "Posts, verhalen en statistieken bekijken",
+        "2": "Posts publiceren en directe berichten lezen",
+        "ask": "Op berichten antwoorden vraagt altijd om jouw goedkeuring"
+      },
+      "facebook": {
+        "1": "Posts, reacties en statistieken bekijken",
+        "2": "Posts, foto's en video's publiceren en op reacties antwoorden",
+        "ask": "Posts en reacties verwijderen vraagt altijd om jouw goedkeuring"
+      },
+      "linkedin": {
+        "1": "Posts, links en video's publiceren",
+        "2": "Op posts reageren",
+        "ask": "Posts verwijderen vraagt altijd om jouw goedkeuring"
+      },
+      "youtube": {
+        "1": "Video's, reacties en statistieken bekijken",
+        "2": "Video's en afspeellijsten bewerken en reageren",
+        "ask": "Reacties beantwoorden, modereren en verwijderen vraagt altijd om jouw goedkeuring"
+      },
+      "pinterest": {
+        "1": "Pins, borden en statistieken bekijken",
+        "2": "Pins maken en borden ordenen",
+        "ask": "Borden wijzigen en verwijderen vraagt altijd om jouw goedkeuring"
+      },
+      "reddit": {
+        "1": "Posts zoeken en reacties lezen",
+        "2": "Posten, reageren en bewerken",
+        "ask": "Verwijderen vraagt altijd om jouw goedkeuring"
+      },
+      "whatsapp": {
+        "1": "Nummers, sjablonen en bezorging bekijken",
+        "2": "Berichtsjablonen maken",
+        "ask": "Berichten versturen vraagt altijd om jouw goedkeuring"
+      },
       "database": {
         "1": "De tabellen bekijken",
         "2": "De data bevragen om te antwoorden",
@@ -11627,7 +11663,14 @@
       "revenuecat": "In-app-abonnementen, producten, aanbiedingen en omzet.",
       "superwall": "Paywalls, campagnes en experimenten.",
       "paddle": "Klanten, abonnementen, transacties en producten.",
-      "abacatepay": "Pix-betaalverzoeken, klanten en opnames."
+      "abacatepay": "Pix-betaalverzoeken, klanten en opnames.",
+      "instagram": "Zakelijke en creator-accounts op Instagram: posts, verhalen, statistieken en directe berichten.",
+      "facebook": "Facebook-pagina's: posts, foto's, video's, reacties en statistieken.",
+      "linkedin": "LinkedIn-posts, video's en reacties namens het lid dat inlogt.",
+      "youtube": "Video's, reacties, afspeellijsten en statistieken van het YouTube-kanaal.",
+      "pinterest": "Pins, borden en statistieken op Pinterest.",
+      "reddit": "Posts, reacties en community's op Reddit.",
+      "whatsapp": "Berichten en sjablonen van WhatsApp Business."
     }
   },
   "toolNames": {

@@ -11006,6 +11006,7 @@
       "support": "Destek",
       "marketing": "Pazarlama",
       "automation": "Otomasyon",
+      "social": "Sosyal medya",
       "email": "E-posta"
     },
     "emptyCategory": "Bu kategoride henüz bağlayıcı yok",
@@ -11357,6 +11358,41 @@
         "1": "Tahsilatları ve müşterileri görür",
         "2": "Pix tahsilatı oluşturur"
       },
+      "instagram": {
+        "1": "Gönderileri, hikayeleri ve istatistikleri görür",
+        "2": "Gönderi yayınlar ve direkt mesajları okur",
+        "ask": "Mesajları yanıtlamak her zaman onayınızı ister"
+      },
+      "facebook": {
+        "1": "Gönderileri, yorumları ve istatistikleri görür",
+        "2": "Gönderi, fotoğraf ve video yayınlar ve yorumları yanıtlar",
+        "ask": "Gönderi ve yorum silmek her zaman onayınızı ister"
+      },
+      "linkedin": {
+        "1": "Gönderi, bağlantı ve video yayınlar",
+        "2": "Gönderilere yorum yapar",
+        "ask": "Gönderi silmek her zaman onayınızı ister"
+      },
+      "youtube": {
+        "1": "Videoları, yorumları ve analizleri görür",
+        "2": "Videoları ve oynatma listelerini düzenler ve yorum yapar",
+        "ask": "Yorumları yanıtlamak, denetlemek ve silmek her zaman onayınızı ister"
+      },
+      "pinterest": {
+        "1": "Pinleri, panoları ve analizleri görür",
+        "2": "Pin oluşturur ve panoları düzenler",
+        "ask": "Panoları değiştirmek ve silmek her zaman onayınızı ister"
+      },
+      "reddit": {
+        "1": "Gönderi arar ve yorumları okur",
+        "2": "Gönderi paylaşır, yorum yapar ve düzenler",
+        "ask": "Silmek her zaman onayınızı ister"
+      },
+      "whatsapp": {
+        "1": "Numaraları, şablonları ve teslimatları görür",
+        "2": "Mesaj şablonları oluşturur",
+        "ask": "Mesaj göndermek her zaman onayınızı ister"
+      },
       "database": {
         "1": "Tabloları görür",
         "2": "Yanıt vermek için verileri sorgular",
@@ -11500,7 +11536,14 @@
       "revenuecat": "Uygulama içi abonelikler, ürünler, teklifler ve gelir.",
       "superwall": "Ödeme duvarları, kampanyalar ve deneyler.",
       "paddle": "Müşteriler, abonelikler, işlemler ve ürünler.",
-      "abacatepay": "Pix tahsilatları, müşteriler ve para çekme işlemleri."
+      "abacatepay": "Pix tahsilatları, müşteriler ve para çekme işlemleri.",
+      "instagram": "Instagram işletme ve içerik üreticisi hesapları: gönderiler, hikayeler, istatistikler ve direkt mesajlar.",
+      "facebook": "Facebook Sayfaları: gönderiler, fotoğraflar, videolar, yorumlar ve istatistikler.",
+      "linkedin": "Giriş yapan üye adına LinkedIn gönderileri, videoları ve yorumları.",
+      "youtube": "YouTube kanalının videoları, yorumları, oynatma listeleri ve analizleri.",
+      "pinterest": "Pinterest pinleri, panoları ve analizleri.",
+      "reddit": "Reddit gönderileri, yorumları ve toplulukları.",
+      "whatsapp": "WhatsApp Business mesajları ve şablonları."
     }
   },
   "toolNames": {
