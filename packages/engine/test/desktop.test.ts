@@ -468,6 +468,8 @@ describe("the agents frame (protocol 9)", () => {
           name: "Dev",
           locale: "pt-BR",
           look: { color: "rose", eyes: "happy", accessory: "crown" },
+          // On a model, its shell has no sandbox of its own: its containers service may run (ADR 0169).
+          containers: true,
         },
       ],
     });
