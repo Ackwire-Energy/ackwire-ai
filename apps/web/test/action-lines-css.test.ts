@@ -29,14 +29,11 @@ test("words and their actions are action lines: the actions under the words when
   expect(review).toContain('grid-template-areas: "k end" "v v";');
 });
 
-test("Desfazer ends its sentence, its room kept, never a column beside the words", async () => {
+test("a receipt keeps no room for an action in its sentence", async () => {
   const css = await sheet("components/agent-actions.css");
-  expect(rule(css, ".ag-rc__act")).toContain("display: inline-block");
-  expect(rule(css, ".ag-rc__room")).toContain("height: 0");
-  expect(rule(css, ".ag-rc__room")).toContain("visibility: hidden");
-  expect(rule(css, ".ag-rc__sentence .ag-rc__btn")).toContain("min-height: 0");
-  expect(rule(css, ".ag-rc__sentence .ag-rc__btn::after")).toContain("var(--touch-target)");
-  expect(css).not.toMatch(/\.ag-rc__act \{[^}]*display: grid/);
+  for (const gone of [".ag-rc__act", ".ag-rc__room", ".ag-rc__time", ".ag-rcg__grow"]) expect(css).not.toContain(gone);
+  // The webhook address's copy button keeps its words-only face.
+  expect(rule(css, ".ag-rc__btn")).toContain("background: none");
 });
 
 test("buttons side by side stand 8 apart: header glyph boxes 32, bulk pairs, a request's lone button fills on a phone", async () => {

@@ -387,8 +387,8 @@ export async function reconnectTarget(db: Database, orgId: string, connectionId:
  * ("Reconectar") gives that account a new sign-in in place, so its name, tools and grants stay; signing in to
  * another account there is refused (`connector.other_account`), the grants were given for that one. Without it a
  * new account comes in, except when the provider says it is one already connected (its sign-in is refreshed,
- * `same_account`) or the server has no sign-in at all (the one connection it has). Only a server's first account
- * is every agent's (`grantToEveryAgent`); the others start with no agent. Addresses match as the apps match them
+ * `same_account`) or the server has no sign-in at all (the one connection it has). Every new account
+ * is every agent's (`grantToEveryAgent`). Addresses match as the apps match them
  * (`serverKey`). A service through Composio (ADR 0107) keeps Composio's account and no secret; the account it
  * replaces goes away at Composio.
  */
@@ -501,7 +501,6 @@ export async function storeCustomConnection(
             ? live[0]
             : null;
         if (twin) return { twin, row: null };
-        const first = live.length === 0;
         // The service's name, not the account's: `stripe`, then `stripe_2`; a later account goes by the server's
         // oldest one, whatever it is called now.
         const base = live[0] ? prefixService(toolPrefixOfConnection(live[0])) : toolPrefixOf(service);
@@ -531,10 +530,10 @@ export async function storeCustomConnection(
             authType: input.authType,
             label,
             account: named,
-            everyAgent: first,
+            everyAgent: true,
           },
         });
-        if (first) await grantToEveryAgent(tx, input.orgId, input.actorId, row);
+        await grantToEveryAgent(tx, input.orgId, input.actorId, row);
         return { twin: null, row };
       });
       if (!done.row) {

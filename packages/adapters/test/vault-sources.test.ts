@@ -26,6 +26,7 @@ const CODES: VaultSourceErrorCode[] = [
   "unreachable",
   "unsupported",
   "invalid_input",
+  "read_only",
 ];
 
 /** What a source's access tokens look like in the fakes: they must never come out either. */

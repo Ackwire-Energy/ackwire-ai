@@ -94,7 +94,7 @@ describe("1Password source: connect", () => {
     expect(d.kinds).toEqual(["login", "key"]);
     expect(d.steps).toEqual([
       "Create a vault in 1Password only for your agents and move into it the logins they may use",
-      "Create a service account with access to that vault only",
+      "Create a service account with access to that vault only (read and write, if your agents should save new logins there)",
       "Paste the service account token here",
     ]);
     expect(d.fields).toHaveLength(1);
@@ -367,6 +367,124 @@ describe("1Password source: reveal", () => {
     fake.state.failOn = "items.get";
     fake.state.failWith = () => new Error("item couldn't be found");
     expect((await sourceError(() => source.reveal(connection, ID.admin, "password"))).code).toBe("not_found");
+  });
+});
+
+describe("1Password source: writing", () => {
+  const NEW = {
+    title: "shop.acme.example",
+    username: "agent@acme.example",
+    password: "fake-op-new-password-6Uv",
+    website: "https://shop.acme.example",
+    match: "site" as const,
+    notes: "Made by an agent",
+  };
+
+  test("a new login is created as the SDK's Login item, and comes back without its password", async () => {
+    const { fake, source, connection } = await setup();
+    const created = await source.createLogin?.(connection, NEW);
+    expect(fake.calls.create).toEqual([
+      {
+        category: "Login",
+        vaultId: connection.config.vaultId ?? "",
+        title: NEW.title,
+        fields: [
+          { id: "username", title: "username", fieldType: "Text", value: NEW.username },
+          { id: "password", title: "password", fieldType: "Concealed", value: NEW.password },
+        ],
+        websites: [{ url: NEW.website, label: "website", autofillBehavior: "AnywhereOnWebsite" }],
+        notes: NEW.notes,
+      },
+    ]);
+    expect(created).toMatchObject({
+      kind: "login",
+      title: NEW.title,
+      username: NEW.username,
+      websites: [{ url: NEW.website, match: "site" }],
+    });
+    expect(JSON.stringify(created)).not.toContain(NEW.password);
+    const ref = created?.ref ?? "";
+    expect((await source.list(connection)).map((i) => i.ref)).toContain(ref);
+    expect(await source.reveal(connection, ref, "password")).toBe(NEW.password);
+  });
+
+  test("the exact origin, and a login with no username or website", async () => {
+    const { fake, source, connection } = await setup();
+    await source.createLogin?.(connection, { ...NEW, match: "exact" });
+    await source.createLogin?.(connection, { title: "Bare", password: NEW.password });
+    expect(fake.calls.create[0]?.websites?.[0]?.autofillBehavior).toBe("ExactDomain");
+    expect(fake.calls.create[1]).toEqual({
+      category: "Login",
+      vaultId: connection.config.vaultId ?? "",
+      title: "Bare",
+      fields: [{ id: "password", title: "password", fieldType: "Concealed", value: NEW.password }],
+    });
+  });
+
+  test("a change puts the item back as it was read, with only that field changed", async () => {
+    const { fake, source, connection } = await setup();
+    const changed = await source.updateLogin?.(connection, ID.admin, { password: NEW.password });
+    expect(changed).toMatchObject({ ref: ID.admin, kind: "login", username: "ana@acme.example" });
+    expect(JSON.stringify(changed)).not.toContain(NEW.password);
+    const [put] = fake.calls.put;
+    const before = await fake.sdk.createClient({ auth: FAKE_OP_TOKEN, integrationName: "t", integrationVersion: "t" });
+    const now = await before.items.get(connection.config.vaultId ?? "", ID.admin);
+    expect(put?.id).toBe(ID.admin);
+    expect(put?.title).toBe("Acme admin");
+    expect(put?.websites).toEqual(now.websites);
+    // Every field it had is still there (the notes too), in place.
+    expect(put?.fields.map((f) => [f.id, f.id === "password" ? NEW.password : f.value])).toEqual(
+      now.fields.map((f) => [f.id, f.value]),
+    );
+    expect(await source.reveal(connection, ID.admin, "password")).toBe(NEW.password);
+
+    await source.updateLogin?.(connection, ID.admin, { username: "bruno@acme.example" });
+    expect(fake.calls.put[1]?.fields.find((f) => f.id === "username")?.value).toBe("bruno@acme.example");
+    expect(fake.calls.put[1]?.fields.find((f) => f.id === "password")?.value).toBe(NEW.password);
+    // Nothing to change: nothing is sent.
+    await source.updateLogin?.(connection, ID.admin, {});
+    expect(fake.calls.put).toHaveLength(2);
+  });
+
+  test("only a login of this vault changes", async () => {
+    const { fake, source, connection } = await setup();
+    const change = { password: NEW.password };
+    expect(
+      (await sourceError(() => source.updateLogin?.(connection, ID.openai, change) ?? Promise.resolve())).code,
+    ).toBe("invalid_input");
+    const missing = await sourceError(
+      () => source.updateLogin?.(connection, "doesnotexist00000000000099", change) ?? Promise.resolve(),
+    );
+    expect(missing.code).toBe("not_found");
+    expect((await sourceError(() => source.updateLogin?.(connection, "../x", change) ?? Promise.resolve())).code).toBe(
+      "not_found",
+    );
+    expect(fake.calls.put).toHaveLength(0);
+  });
+
+  test("a service account that only reads is read_only at the write, in our words, and still reads", async () => {
+    const { fake, source, connection } = await setup();
+    fake.state.readOnly = true;
+    const create = await sourceError(() => source.createLogin?.(connection, NEW) ?? Promise.resolve());
+    const update = await sourceError(
+      () => source.updateLogin?.(connection, ID.admin, { password: NEW.password }) ?? Promise.resolve(),
+    );
+    for (const refused of [create, update]) {
+      expect(refused.code).toBe("read_only");
+      expect(refused.message).not.toContain(FAKE_OP_TOKEN);
+      expect(refused.message).not.toContain(NEW.password);
+    }
+    // 1Password's documented words for it, and a bare status.
+    fake.state.readOnly = false;
+    fake.state.failOn = "items.create";
+    for (const said of ["You don't have the right permissions to execute this argument", "403 Forbidden"]) {
+      fake.state.failWith = () => new Error(said);
+      expect((await sourceError(() => source.createLogin?.(connection, NEW) ?? Promise.resolve())).code).toBe(
+        "read_only",
+      );
+    }
+    fake.state.failOn = null;
+    expect(await source.reveal(connection, ID.admin, "password")).toBe(SECRETS.admin);
   });
 });
 
