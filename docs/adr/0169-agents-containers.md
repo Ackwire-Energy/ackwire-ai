@@ -5,8 +5,8 @@
 - Amends: ADR 0030 and 0101 (no_new_privs: kept on every launch of an agent but its containers service), ADR 0096
   (what a uid-keyed firewall must count as an agent's), ADR 0057 (what an agent's share holds)
 - Code: runner `agent-users.ts` (`agentSubids`, `ensureSubids`, `rootlessContainers`, `containersCommand`,
-  `ensureContainers`, `keepContainers`, `stopContainers`, `RUNTIME_DIR`, `DELEGATE`, `NOSUID_VIEW`,
-  `CONTAINERS_START`, the launcher's `containers`), `supervisor.ts` (`launchWorker`, `stopContainers` at a network's
+  `ensureContainers`, `containersFailure`, `keepContainers`, `stopContainers`, `RUNTIME_DIR`, `DELEGATE`,
+  `CGROUP_KEPT`, `CGROUP_BACK`, `NOSUID_VIEW`, `CONTAINERS_START`, the launcher's `containers`), `supervisor.ts` (`launchWorker`, `stopContainers` at a network's
   deadline), `daemon.ts` (a desktop or terminal, an agent that left, `containersAllowed`, a brain that changed),
   `accounts.ts` (`withoutContainers`) in `brain-codex.ts`, `brain-codex-app.ts`, `brain-cursor.ts`, `brain-grok.ts`,
   `brain-antigravity.ts`, `brain-route.ts` and `tasks.ts`, `access.ts` (`parseAgents`), `service.ts`
@@ -47,6 +47,12 @@ started inside it.
    (`agents-<uid>.slice`) through the same steps as every launch of the agent (its tmpfs, its mount namespace with its
    own /tmp, the private /proc a network policy asks for, its network hook, its user), with `Delegate=yes` and its
    cgroup given to the agent as user@ gets its own, `Restart=always` (network hook included) and `OOMPolicy=continue`.
+   A network hook that enters its namespace through `ip netns exec` mounts a fresh /sys with no cgroup2 under it, where
+   a user manager can't start, so the computer's cgroup2 is kept before the hook and bound there again after it (a
+   bind: a new cgroup2 mount from the init cgroup namespace would set the hierarchy's root flags from its own options).
+   Its steps' stderr goes to the journal as `agentes-containers`, and the user manager logs there too
+   (`--log-target=journal`: the console it uses otherwise is root's). One that exits at once loses its unit in the
+   journal, so the start checks the cgroup it needs first and says so when it can't have it.
    Its start, as the agent, writes Podman's defaults where the agent has none (`storage.conf` with its images and
    volumes in its home, `containers.conf` without compose's banner) and switches on Podman's socket and its restart of
    `restart: always` containers, all of it the agent's to change. The service gets its runtime dir at `/run/user/<uid>`
@@ -75,6 +81,9 @@ started inside it.
 8. **Lifecycle.** Root makes sure the service runs as it should before it starts the agent's worker, desktop or
    terminal (`ensureContainers`): started when it isn't, started anew when its command changed (a namespace, a network
    hook, a runner whose steps differ: the unit's description carries the command's hash), which stops its containers.
+   It gets 5 starts a minute: one that fails at every start then stays failed (no `--collect`), and for that same
+   command root doesn't start it again but logs `containers unavailable:` and the last line its steps or its user
+   manager wrote. A new command, a restart of the computer or `systemctl reset-failed` on the unit gives it new tries.
    A network change's deadline stops it (`retireNetworkAgent`), as does an agent leaving the computer. Stopping
    `agents.slice` (a hold) stops every container. After a reboot it comes back with the agent's next worker, and its
    `restart: always` containers with it.
@@ -127,7 +136,8 @@ started inside it.
 Unit tests on fakes: the ids (blocks, useradd's range replaced, a clash leaving none, missing files), the launcher's
 environment and view, the service's command (delegation only of its own cgroup, the nosuid view last, no no_new_privs,
 its network hook, no client variables), its start script run by a real shell, `ensureContainers`' start, keep and
-restart, `keepContainers` stopping it for an agent the frame doesn't let have it, the frame's flag per brain (none for
+restart, its start limit (down for the same command with its journal's reason, tried again for a new one or after a
+stop that timed out), its start saying why where its view has no cgroup of its own, `keepContainers` stopping it for an agent the frame doesn't let have it, the frame's flag per brain (none for
 Codex, Cursor, Grok, Antigravity or the right hand), a Codex turn, task and route started from a client's environment
 getting none of its variables, the toolchains probe, and the prompt block per brain. On a Debian 13 VM (kernel 6.12,
 Podman 5.4.2, crun 1.21, netavark 1.14, pasta, Compose 2.26.1) with two test agents launched as these steps do: an image
@@ -137,4 +147,9 @@ every container process stayed in the agent's slice and outlived the command tha
 launch couldn't map ids, while a client under it used the service; a set-user-ID-root program ran by the service's user
 manager stayed the agent; pasta's traffic left as the agent's uid, a non-root host-network container's as a subordinate
 id, which a rule refusing ids from 65536 up off loopback stopped while loopback still worked; the other agent could
-neither list the first one's home, mount it into a container, see its containers nor signal them.
+neither list the first one's home, mount it into a container, see its containers nor signal them. On Debian 13
+(systemd 257, Podman 5.4.2), through a network hook entering its namespace with `ip netns exec`, the user manager
+exited 1 within milliseconds and wrote nothing its unit's journal shows ("Cannot determine cgroup we are running in: No
+medium found", under the agent's uid only), restarted every 5 s for good; with cgroup2 put back after the hook it
+stayed up and the agent's `podman --remote info` answered through the socket, and a hook that fails every time stopped
+after 5 starts with its own line as the reason.
