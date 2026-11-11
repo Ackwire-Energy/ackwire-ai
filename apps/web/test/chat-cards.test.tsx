@@ -330,8 +330,8 @@ const order = (row: HTMLElement) =>
     el.classList.contains("ac-msg__text") ? "text" : el.classList.contains("ag-rcs") ? "receipts" : "tools",
   );
 
-describe("the tools sit last, live, right after and once reloaded", () => {
-  test("while it works, the moment it lands and when opened later: its words, what it changed, its tools", async () => {
+describe("the tools sit last, the moment it lands and once reloaded", () => {
+  test("nothing while it works; the moment it lands and when opened later: its words, what it changed, its tools", async () => {
     const { socket, routine } = await openChannel(() => []);
     const ids = { threadId: null, runId: "r-answer", agentId: ADA_ID };
     const ev = (event: Record<string, unknown>) =>
@@ -339,10 +339,9 @@ describe("the tools sit last, live, right after and once reloaded", () => {
     await ev({ type: "agent.run", ...ids, status: "running" });
     await ev({ type: "agent.tool", ...ids, tool: "create_routine", toolUseId: "t1" });
     await ev({ type: "agent.tool", ...ids, tool: null, toolUseId: "t1" });
-    await ev({ type: "agent.delta", ...ids, seq: 0, text: ANSWER });
+    await ev({ type: "agent.typing", ...ids });
     await settle(3);
-    const live = document.querySelector(".ac-msg--streaming") as HTMLElement;
-    expect(order(live)).toEqual(["text", "tools"]);
+    expect(document.querySelector(".ac-msg--streaming")).toBeNull();
     const saved = answer(routine.id);
     await ev({ type: "message.created", messageId: saved.id, message: saved });
     await ev({ type: "run.finished", ...ids, status: "done" });
@@ -366,7 +365,7 @@ describe("what waits for a person's click comes last", () => {
     await ev({ type: "agent.run", ...ids, status: "running" });
     await ev({ type: "agent.tool", ...ids, tool: "create_routine", toolUseId: "t1" });
     await ev({ type: "agent.tool", ...ids, tool: null, toolUseId: "t1" });
-    await ev({ type: "agent.delta", ...ids, seq: 0, text: ANSWER });
+    await ev({ type: "agent.typing", ...ids });
     await settle(3);
     const m = answer(routine.id, []);
     const asking = {

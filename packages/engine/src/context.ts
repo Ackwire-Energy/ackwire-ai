@@ -615,8 +615,8 @@ export async function buildRunContext(
   const handOffs =
     options.routine || run.background || isAgentOnlyDm(channel) ? null : handOffsFrom(db, run).catch(() => null);
 
-  // What was here when it was asked: a trigger an agent wrote over a while keeps the place of its first words, and what
-  // people sent meanwhile sits after it.
+  // What was here when it was asked: a trigger placed before its post (`PLACE_KEPT_MS`) has what people sent before it
+  // was posted after it.
   const upToTrigger = postedBySql(messages, trigger);
   const rootIsTrigger = run.threadRootId === trigger.id;
   // Asked in the main timeline: the run answers there, not in a thread.

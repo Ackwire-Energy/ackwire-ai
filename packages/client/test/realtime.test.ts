@@ -11,7 +11,6 @@ import {
   parseServerFrame,
   RealtimeConnection,
   realtimeUrl,
-  reconcileRuns,
   retargetProvisional,
   runningAgents,
   runsInChannel,
@@ -772,211 +771,57 @@ describe("RealtimeConnection", () => {
   });
 });
 
-describe("live agent runs (streaming)", () => {
+describe("live agent runs: their words show whole, once posted", () => {
   const base = { channelId: "c1", threadId: "m1", runId: "r1", agentId: "atlas" };
   const delta = (seq: number, text: string): ChannelEvent => ({ type: "agent.delta", ...base, seq, text });
+  type Ev = Parameters<typeof applyChannelEvent>[1];
+  const tool = (name: string | null, id: string) => ({ type: "agent.tool", ...base, tool: name, toolUseId: id }) as Ev;
+  const play = (events: Ev[], from = emptyStreams) => events.reduce((s, e) => applyChannelEvent(s, e), from);
 
-  describe("a turn with several stretches of text (a computer brain's: one turn, many model calls)", () => {
-    type Ev = Parameters<typeof applyChannelEvent>[1];
-    const piece = (seq: number, at: number, from: number, text: string) =>
-      ({ type: "agent.delta", ...base, seq, turn: 1, at, from, text }) as Ev;
-    const tool = (id: string) => ({ type: "agent.tool", ...base, tool: "offer_connect_app", toolUseId: id }) as Ev;
-    const ended = (id: string, failed = false) =>
-      ({ type: "agent.tool", ...base, tool: null, toolUseId: id, ...(failed ? { failed } : {}) }) as Ev;
-    const read = { type: "agent.run.read", ...base, messageIds: ["m9"] } as Ev;
-    const play = (events: Ev[], from = emptyStreams) => events.reduce((s, e) => applyChannelEvent(s, e), from);
-    const said = (s: typeof emptyStreams) => (s.runs.r1?.work ?? []).flatMap((w) => (w.kind === "say" ? [w.text] : []));
-    const head = "Se você me passar o `build.gra";
-    const tail = "dle`, eu respondo com base neles.";
-
-    test("a call starts before the end of its text arrives: the end joins its line, nothing starts mid-word", () => {
-      // The brain keeps its last characters back (a secret can't leave in pieces) until the call ends; the call's
-      // start comes from the bridge, so it overtakes them.
-      const s = play([piece(0, 0, 0, head), tool("t1"), ended("t1", true), piece(1, head.length, 0, tail), tool("t2")]);
-      expect(said(s)).toEqual([head + tail]);
-      expect(s.runs.r1?.text).toBe("");
-      // A message read at the call's end doesn't change it either.
-      expect(said(play([ended("t2"), read], s))).toEqual([head + tail]);
-    });
-
-    test("each stretch keeps its own line: a later one never takes an earlier one's place", () => {
-      const s = play([
-        piece(0, 0, 0, "Vou olhar o repo."),
-        tool("t1"),
-        ended("t1"),
-        piece(1, 17, 17, "Sem acesso."),
-        tool("t2"),
-      ]);
-      expect(said(s)).toEqual(["Vou olhar o repo.", "Sem acesso."]);
-    });
-
-    test("a stretch that arrives whole after its call: it shows from its start, and the next never glues to it", () => {
-      const s = play([tool("t1"), ended("t1"), piece(0, 0, 0, "Vou olhar."), piece(1, 10, 10, "Pronto.")]);
-      expect(s.runs.r1?.text).toBe("Vou olhar.\n\nPronto.");
-    });
-
-    test("stretches around the brain's own tools (no line of theirs): one text in order, no line left behind", () => {
-      const s = play([piece(0, 0, 0, "Vou olhar. "), piece(1, 11, 11, "Achei."), piece(2, 17, 17, "Pronto.")]);
-      expect(s.runs.r1?.text).toBe("Vou olhar.\n\nAchei.\n\nPronto.");
-      expect(said(s)).toEqual([]);
-    });
-
-    test("back from a hole around a call: what still comes of the stretch never joins its line over the hole", () => {
-      let s = play([piece(0, 0, 0, head), piece(1, 40, 0, "xx"), tool("t1")]);
-      s = reconcileRuns(s, "c1", [
-        {
-          runId: "r1",
-          agentId: "atlas",
-          channelId: "c1",
-          threadId: "m1",
-          status: "running" as const,
-          live: { turn: 1, at: 42, text: "" },
-        },
-      ]);
-      s = play([piece(2, 42, 0, tail)], s);
-      expect(said(s)).toEqual([head]);
-      expect(s.runs.r1?.text).toBe("");
-    });
-
-    test("a message read mid-answer: the answer stays where it is and goes on, one text from its start", () => {
-      const first = "A resposta inteira.\n\n";
-      const s = play([piece(0, 0, 0, first), read, piece(1, first.length, 0, "E sobre o seu recado.")]);
-      expect(s.runs.r1?.text).toBe("A resposta inteira.\n\nE sobre o seu recado.");
-      expect(s.runs.r1?.status).toBe("running");
-      expect(s.runs.r1?.work).toEqual([{ kind: "steer", messageId: "m9" }]);
-    });
-
-    test("a brain that doesn't say when its calls end (no `from`): its next text is the body, its lines all stay", () => {
-      const plain = (seq: number, at: number, text: string) =>
-        ({ type: "agent.delta", ...base, seq, turn: 1, at, text }) as Ev;
-      let s = play([plain(0, 0, "Vou olhar."), tool("t1"), ended("t1"), plain(1, 10, "Sem acesso.")]);
-      expect(s.runs.r1?.text).toBe("Sem acesso.");
-      s = play([tool("t2"), ended("t2"), plain(2, 21, "Pronto.")], s);
-      expect(said(s)).toEqual(["Vou olhar.", "Sem acesso."]);
-      expect(s.runs.r1?.text).toBe("Pronto.");
-    });
-
-    test("opened during a call: the end of a text it never saw the start of never shows, the next stretch does", () => {
-      const active = [
-        {
-          runId: "r1",
-          agentId: "atlas",
-          channelId: "c1",
-          threadId: "m1",
-          status: "running" as const,
-          live: { turn: 1, at: 30, text: "" },
-        },
-      ];
-      let s = reconcileRuns(emptyStreams, "c1", active);
-      s = play([piece(4, 30, 0, tail)], s);
-      expect(s.runs.r1?.text).toBe("");
-      s = play([piece(5, 30 + tail.length, 30 + tail.length, "Pronto.")], s);
-      expect(s.runs.r1?.text).toBe("Pronto.");
-    });
-  });
-
-  test("a piece of the text that never arrived: no glued text, what came before stays, it goes on from the next turn", () => {
-    const piece = (seq: number, turn: number, at: number, text: string): ChannelEvent => ({
-      type: "agent.delta",
-      ...base,
-      seq,
-      turn,
-      at,
-      text,
-    });
-    const text = (s: typeof emptyStreams) => s.runs.r1?.text;
+  test("thinking, at a tool, writing: the run says what it does, never what it writes", () => {
     let s = applyChannelEvent(emptyStreams, { type: "agent.run", ...base, status: "running" });
-    s = applyChannelEvent(s, piece(0, 1, 0, "O bot já existe "));
-    // Pieces 1 and 2 were lost (the socket went down a moment, or this conversation was closed meanwhile).
-    // What was being read stays, nothing glued after it.
-    s = applyChannelEvent(s, piece(3, 1, 40, "no Entra ID."));
-    expect(text(s)).toBe("O bot já existe ");
-    s = applyChannelEvent(s, piece(4, 1, 52, " Qual dos dois?"));
-    expect(text(s)).toBe("O bot já existe ");
-    s = applyChannelEvent(s, piece(5, 2, 0, "Pronto: "));
-    s = applyChannelEvent(s, piece(6, 2, 8, "conferi."));
-    expect(text(s)).toBe("Pronto: conferi.");
-    // Opened in the middle of a turn: what came before is missing too.
-    let late = applyChannelEvent(emptyStreams, { type: "agent.run", ...base, status: "running" });
-    late = applyChannelEvent(late, piece(9, 3, 120, "metade de uma frase"));
-    expect(text(late)).toBe("");
-    // Nothing missed: every piece in place, also after a tool call moved the text so far to the narration.
-    let whole = applyChannelEvent(emptyStreams, piece(0, 1, 0, "Vou olhar. "));
-    whole = applyChannelEvent(whole, { type: "agent.tool", ...base, tool: "azure_monitor", toolUseId: "t1" });
-    whole = applyChannelEvent(whole, piece(1, 1, 11, "Achei."));
-    expect(text(whole)).toBe("Achei.");
+    expect(runsInChannel(s, "c1")[0]?.status).toBe("thinking");
+    expect(agentStateIn(s, "atlas")).toBe("thinking");
+    s = play([tool("github_list_prs", "t1")], s);
+    expect(runsInChannel(s, "c1")[0]).toMatchObject({ status: "thinking", tool: "github_list_prs" });
+    s = play([tool(null, "t1"), { type: "agent.typing", ...base } as Ev], s);
+    expect(runsInChannel(s, "c1")[0]?.status).toBe("running");
+    expect(agentStateIn(s, "atlas")).toBe("writing");
+    // The run event of a run that writes keeps it writing.
+    s = applyChannelEvent(s, { type: "agent.run", ...base, status: "running" });
+    expect(runsInChannel(s, "c1")[0]?.status).toBe("running");
+    expect(Object.keys(runsInChannel(s, "c1")[0] ?? {})).not.toContain("text");
   });
 
-  test("opened mid-answer: the server's text of the turn so far shows, and the deltas go on from it", () => {
-    const piece = (seq: number, turn: number, at: number, text: string): ChannelEvent => ({
-      type: "agent.delta",
-      ...base,
-      seq,
-      turn,
-      at,
-      text,
-    });
-    const active = (live?: { turn: number; at: number; text: string }) => [
-      {
-        runId: "r1",
-        agentId: "atlas",
-        channelId: "c1",
-        threadId: "m1",
-        status: "running" as const,
-        ...(live ? { live } : {}),
-      },
-    ];
-    const text = (s: typeof emptyStreams) => s.runs.r1?.text;
-    // Opened with nothing heard: the list's text, then the next delta right after it.
-    let s = reconcileRuns(emptyStreams, "c1", active({ turn: 2, at: 0, text: "O bot já existe " }));
-    expect(s.runs.r1).toMatchObject({ status: "running", text: "O bot já existe ", turnChars: 16, gap: false });
-    // A delta sent before the list was read, arriving after it: nothing new in it.
-    s = applyChannelEvent(s, piece(6, 2, 9, "existe "));
-    expect(text(s)).toBe("O bot já existe ");
-    s = applyChannelEvent(s, piece(7, 2, 16, "no Entra ID."));
-    expect(text(s)).toBe("O bot já existe no Entra ID.");
-    // The socket's pieces came first (past the hole), then the list: stitched where they overlap.
-    let early = applyChannelEvent(emptyStreams, { type: "agent.run", ...base, status: "running" });
-    early = applyChannelEvent(early, piece(5, 2, 9, "existe no "));
-    early = applyChannelEvent(early, piece(6, 2, 19, "Entra ID."));
-    expect(text(early)).toBe("");
-    early = reconcileRuns(early, "c1", active({ turn: 2, at: 0, text: "O bot já existe" }));
-    expect(early.runs.r1).toMatchObject({ text: "O bot já existe no Entra ID.", turnChars: 28, gap: false });
-    early = applyChannelEvent(early, piece(7, 2, 28, " Qual?"));
-    expect(text(early)).toBe("O bot já existe no Entra ID. Qual?");
-    // A computer brain's call that ran a tool: the body starts past it (`at`).
-    let tool = reconcileRuns(emptyStreams, "c1", active({ turn: 1, at: 11, text: "Achei." }));
-    tool = applyChannelEvent(tool, piece(3, 1, 17, " Pronto."));
-    expect(text(tool)).toBe("Achei. Pronto.");
-    // A row that heard the whole turn keeps its own; an older turn's text never replaces a newer one.
-    let whole = applyChannelEvent(emptyStreams, piece(0, 3, 0, "Vou olhar o log e já volto."));
-    whole = reconcileRuns(whole, "c1", active({ turn: 3, at: 0, text: "Vou olhar" }));
-    expect(text(whole)).toBe("Vou olhar o log e já volto.");
-    whole = reconcileRuns(whole, "c1", active({ turn: 2, at: 0, text: "Antes" }));
-    expect(text(whole)).toBe("Vou olhar o log e já volto.");
-    // Failed after the list was read: the late list never brings it back to life.
-    let stopped = applyChannelEvent(emptyStreams, { type: "agent.run", ...base, status: "running" });
-    stopped = applyChannelEvent(stopped, { type: "run.finished", ...base, status: "failed", error: "gave_up" });
-    expect(stopped.runs.r1?.status).toBe("failed");
-    stopped = reconcileRuns(stopped, "c1", active({ turn: 2, at: 0, text: "O bot" }));
-    expect(stopped.runs.r1).toMatchObject({ status: "failed", text: "" });
-    // No text on the server (another replica, or between calls): the waiting row, as before.
-    expect(reconcileRuns(emptyStreams, "c1", active()).runs.r1).toMatchObject({ status: "thinking", text: "" });
-  });
-
-  test("running → ordered deltas (duplicates ignored) → final message replaces the stream", () => {
+  test("an older server's deltas only say it writes: their text is never kept, so nothing can show then change", () => {
     let s = applyChannelEvent(emptyStreams, { type: "agent.run", ...base, status: "running" });
     expect(runningAgents(s)).toEqual(new Set(["atlas"]));
-    s = applyChannelEvent(s, delta(1, "Os 401 no Sentry "));
-    s = applyChannelEvent(s, delta(2, "caíram de 312 para"));
-    s = applyChannelEvent(s, delta(2, "caíram de 312 para"));
-    expect(runsInChannel(s, "c1")[0]?.text).toBe("Os 401 no Sentry caíram de 312 para");
+    s = play([delta(1, "Os 401 no Sentry "), delta(2, "caíram de 312 para"), tool("azure_monitor", "t1")], s);
+    const [row] = runsInChannel(s, "c1");
+    expect(row?.status).toBe("thinking");
+    expect(row?.work).toMatchObject([{ kind: "call", tool: "azure_monitor", running: true }]);
+    expect(JSON.stringify(row)).not.toContain("Sentry");
+    // Its call ended, then its message: the run is over.
+    s = play([tool(null, "t1")], s);
     const message = { id: "m9", agentRunId: "r1", channelId: "c1" } as Message;
     s = applyChannelEvent(s, { type: "message.created", channelId: "c1", messageId: "m9", message });
     expect(runsInChannel(s, "c1")).toEqual([]);
     // Late events for a finished run don't bring it back.
     s = applyChannelEvent(s, delta(3, "x"));
     s = applyChannelEvent(s, { type: "agent.run", ...base, status: "done" });
+    expect(runsInChannel(s, "c1")).toEqual([]);
+  });
+
+  test("a message read mid-run joins its work, and the work never holds what it said", () => {
+    const read = { type: "agent.run.read", ...base, messageIds: ["m9"] } as Ev;
+    const s = play([{ type: "agent.typing", ...base } as Ev, tool("check_env", "t1"), tool(null, "t1"), read]);
+    const work = runsInChannel(s, "c1")[0]?.work ?? [];
+    expect(work.map((w) => w.kind)).toEqual(["call", "steer"]);
+  });
+
+  test("stopped: its row goes at once, whatever it did; the message the server posts says what it wrote and who stopped it", () => {
+    let s = play([{ type: "agent.typing", ...base } as Ev, tool("check_env", "t1")]);
+    s = applyChannelEvent(s, { type: "run.canceled", ...base, byUserId: "u1" } as Ev);
     expect(runsInChannel(s, "c1")).toEqual([]);
   });
 
@@ -988,24 +833,22 @@ describe("live agent runs (streaming)", () => {
     expect(runningAgents(s)).toEqual(new Set());
     expect(agentStateIn(s, "atlas")).toBe("idle");
     // A row that still says waiting_input (an older event order) rests too.
-    const row = { ...base, status: "waiting_input", text: "" } as unknown as Parameters<typeof agentStateOfRun>[0];
+    const row = { ...base, status: "waiting_input" } as unknown as Parameters<typeof agentStateOfRun>[0];
     expect(agentStateOfRun(row)).toBe("idle");
     // Back: the resumed run works again.
     s = applyChannelEvent(s, { type: "agent.run", ...base, status: "running" });
     expect(agentStateIn(s, "atlas")).toBe("thinking");
   });
 
-  test("a delta before the run event still opens the stream; failures keep the reason", () => {
+  test("a delta before the run event still opens the run; failures keep the reason", () => {
     let s = applyChannelEvent(emptyStreams, delta(1, "Oi"));
-    expect(runsInChannel(s, "c1")[0]).toMatchObject({ status: "running", text: "Oi" });
+    expect(runsInChannel(s, "c1")[0]).toMatchObject({ status: "running" });
     s = applyChannelEvent(s, { type: "agent.run", ...base, status: "failed", error: "budget_exceeded" });
     expect(runsInChannel(s, "c1")[0]).toMatchObject({ status: "failed", error: "budget_exceeded" });
     expect(runningAgents(s).size).toBe(0);
   });
 
   test("what a run posts inside a call (a tool's card, a DM) doesn't end it: the call's end and the reply still come", () => {
-    const tool = (name: string | null, id: string) =>
-      ({ type: "agent.tool", ...base, tool: name, toolUseId: id }) as unknown as ChannelEvent;
     const posted = (id: string, channelId: string, meta: Record<string, unknown>) =>
       ({
         type: "message.created",
@@ -1030,13 +873,13 @@ describe("live agent runs (streaming)", () => {
     s = applyChannelEvent(s, posted("m7", "c1", { actionCard: { kind: "connect_app" } }));
     s = applyChannelEvent(s, posted("m6", "dm1", { agentNote: { runId: "r1" } }));
     s = applyChannelEvent(s, tool(null, "tu2"));
-    s = applyChannelEvent(s, delta(1, "Propus o Caio."));
+    s = applyChannelEvent(s, { type: "agent.typing", ...base } as ChannelEvent);
     const [row] = runsInChannel(s, "c1");
     expect(row?.work).toMatchObject([
       { kind: "call", tool: "propose_agent", running: false },
       { kind: "call", tool: "offer_connect_app", running: false },
     ]);
-    expect(row?.text).toBe("Propus o Caio.");
+    expect(row?.status).toBe("running");
     // Its reply, with no call running, ends it.
     s = applyChannelEvent(s, posted("m9", "c1", {}));
     expect(runsInChannel(s, "c1")).toEqual([]);
@@ -1146,9 +989,9 @@ describe("user events and resumed runs", () => {
     expect(channel).toEqual([]);
   });
 
-  test("a run resumed after an approval streams again", () => {
+  test("a run resumed after an approval works again", () => {
     const base = { channelId: "c1", threadId: "m1", runId: "r1", agentId: "ada" };
-    let s = applyChannelEvent(emptyStreams, { type: "agent.delta", ...base, seq: 1, text: "Vou pedir aprovação." });
+    let s = applyChannelEvent(emptyStreams, { type: "agent.typing", ...base } as ChannelEvent);
     s = applyChannelEvent(s, {
       type: "message.created",
       channelId: "c1",
@@ -1157,7 +1000,7 @@ describe("user events and resumed runs", () => {
     });
     expect(runsInChannel(s, "c1")).toEqual([]);
     s = applyChannelEvent(s, { type: "agent.run", ...base, status: "running" });
-    s = applyChannelEvent(s, { type: "agent.delta", ...base, seq: 1, text: "Merge feito." });
-    expect(runsInChannel(s, "c1")[0]?.text).toBe("Merge feito.");
+    s = applyChannelEvent(s, { type: "agent.typing", ...base } as ChannelEvent);
+    expect(runsInChannel(s, "c1")[0]?.status).toBe("running");
   });
 });

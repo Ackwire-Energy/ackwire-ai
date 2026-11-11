@@ -221,6 +221,13 @@ export function cliFailureOf(
   return { brain, words: cliErrorWords(ended[3] ?? ""), ended: ended[1] ?? `exit ${ended[2]}` };
 }
 
+/** What a CLI's failure said (`cliFailureOf`'s words), or how it ended when it said nothing; empty for neither. */
+export function cliWords(failure: CliFailure): string {
+  const of = cliFailureOf(failure);
+  if (!of) return "";
+  return "brain" in of ? of.words || (of.ended ?? "") : (of.provider.said ?? "");
+}
+
 /**
  * A CLI's failure as its run stores it (`runErrorDetail` reads it back): the provider's as a key's
  * (`provider_error: cause@Claude: …`, `gave_up: …` after the outage's waits), else `cli_failed: Claude Code: what it

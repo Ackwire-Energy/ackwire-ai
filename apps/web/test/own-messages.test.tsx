@@ -171,20 +171,21 @@ describe("own message styles", () => {
     const mouse =
       css
         .split(
-          "@media not ((hover: none) or (pointer: coarse)) {\n  .ac-msg--own > .ac-msg__body > .ac-msg__actions,",
+          "@media not ((hover: none) or (pointer: coarse)) {\n  .ac-msg--own > .ac-msg__body > .ac-msg__actions {",
         )[1]
         ?.split("\n}")[0] ?? "";
     expect(mouse).toContain("right: calc(100% + 2px);");
-    for (const sel of [
-      ".ac-msg--own > .ac-msg__body > .ac-msg__actions",
-      ".ac-msg--own:has(> .ac-msg__body .ac-msg__aside:not(:empty)) > .ac-msg__body > .ac-msg__actions",
-    ]) {
-      const bar = r.get(sel) ?? "";
-      expect(bar).toContain("right: calc(100% + 2px)");
-      expect(bar).toContain("top: calc(7px + var(--msg-line) / 2 - var(--cap-mid) - 14px)");
-      expect(bar).toMatch(/background: transparent;\s*box-shadow: none;\s*transform: none;/);
-      expect(bar).not.toContain("top: 0");
-    }
+    const bar = r.get(".ac-msg--own > .ac-msg__body > .ac-msg__actions") ?? "";
+    expect(bar).toContain("right: calc(100% + 2px)");
+    expect(bar).toContain("top: calc(7px + var(--msg-line) / 2 - var(--cap-mid) - 14px)");
+    expect(bar).toMatch(/background: transparent;\s*box-shadow: none;\s*transform: none;/);
+    expect(bar).not.toContain("top: 0");
+    // A check at a row's end moves no row's bar, so mine needs no rule of its own to stay put beside one.
+    expect(
+      [...r.keys()].filter(
+        (sel) => sel.includes(".ac-msg__actions") && sel.includes(":has(> .ac-msg__body .ac-msg__aside"),
+      ),
+    ).toEqual([]);
     // Three 28px square icons fit the row's 96px left padding beside a full-width bubble.
     expect(mouse).toMatch(/\.ac-msg__actions \.ac-btn--sm \{\s*min-width: 28px;\s*width: 28px;\s*height: 28px;/);
     // The bubble's padding and line, which the bar's top is computed from.

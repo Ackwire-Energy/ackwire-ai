@@ -408,7 +408,6 @@ export async function setup(
     contextMessages: 30,
     workspaceComputer: options.workspaceComputer,
     maxHops: 100,
-    deltaFlushMs: 0,
     tools,
     context,
     search,

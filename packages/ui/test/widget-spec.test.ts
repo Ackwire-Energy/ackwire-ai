@@ -271,5 +271,7 @@ describe("notes and text are never cut mid-word (ADR 0135 §17)", () => {
     expect(clipText("one two three four", 12)).toBe("one two…");
     expect(clipText("one two, three", 10)).toBe("one two…");
     expect(clipText("x".repeat(20), 10)).toBe(`${"x".repeat(9)}…`);
+    // Never between an emoji's two halves.
+    expect(clipText(`${"x".repeat(8)}😀😀`, 10)).toBe(`${"x".repeat(8)}…`);
   });
 });

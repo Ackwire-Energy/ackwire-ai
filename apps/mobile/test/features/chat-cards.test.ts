@@ -13,7 +13,7 @@ const at = (text: string, pieces: string[]) =>
   });
 const ascending = (xs: number[]) => xs.every((x, i) => i === 0 || (xs[i - 1] ?? 0) < x);
 
-describe("a reply's tools sit last, live and saved", () => {
+describe("a reply's tools sit last", () => {
   test("saved: its words, what it changed and its cards, then its tools", () => {
     const row = source("MessageRow.tsx");
     expect(
@@ -61,16 +61,10 @@ describe("a reply's tools sit last, live and saved", () => {
       expect([card, last.includes(card)]).toEqual([card, true]);
   });
 
-  test("live: the words stream above its tools, where the saved reply keeps them", () => {
+  test("live: none drawn, nor any of its words: the reply brings them whole", () => {
     const live = source("LiveRows.tsx");
-    expect(
-      ascending(
-        at(live, [
-          "{run.text && !wordsOnTop ? (\n                  <RevealText",
-          '<TurnTools items={lines} agentName={agent?.name ?? ""}',
-        ]),
-      ),
-    ).toBe(true);
+    for (const part of ["<TurnTools", "<RevealText", "run.text"])
+      expect([part, live.includes(part)]).toEqual([part, false]);
   });
 });
 
@@ -85,12 +79,18 @@ describe("agents it asked first: one pair row right before the reply, never insi
     expect(row.slice(bodyAt, endAt)).not.toContain("Consult");
   });
 
-  test("live: a turn that posted nothing yet carries the row above its working row", () => {
+  test("live: the working line carries the pair, the one asking and the one asked, while the turn works", () => {
     const live = source("LiveRows.tsx");
-    expect(live).toContain("const consults = useRunConsults(run.runId, run, null);");
-    // Before its words only the row stands (no thinking row); after them, right above the measured row.
-    expect(live).toContain("if (waiting) return pair;");
-    expect(live).toContain("{pair}\n      <View\n        ref={seen}\n        collapsable={false}");
+    expect(live).not.toContain("useRunConsults");
+    expect(
+      ascending(
+        at(live, [
+          "if (asking && e.consult === asking)",
+          '<AgentFace agentId={e.id} size={18} mode="idle" />',
+          '<AgentFace agentId={asking.to} size={18} mode="think" />',
+        ]),
+      ),
+    ).toBe(true);
   });
 
   test("the row says no answer: only faces, names, a short word and the time", () => {
@@ -278,12 +278,19 @@ describe("an approval card's layout", () => {
     return cards.slice(start, cards.indexOf("\nfunction ", start + 1));
   };
 
-  test("the buttons sit in one row (a grouped request's at its row's end), Aprovar, Aprovar sempre on a grouped request, Recusar, what it covers under them", () => {
+  test("the buttons sit in one row (a grouped request's at its row's end), Aprovar, Aprovar sempre and its ⓘ on a grouped request, Recusar, and only buttons there: what it covers opens from the ⓘ, under them", () => {
     const rows: [string, string[]][] = [
       ["ApprovalAsk", ['variant="primary"', 't("mobile.approval.refuse")', "</View>"]],
       [
         "ApprovalGroupItem",
-        ['variant="primary"', "<ApproveAlwaysButton", 't("mobile.approval.refuse")', "</View>", "<ApproveAlwaysHint"],
+        [
+          'variant="primary"',
+          "<ApproveAlwaysButton",
+          "{info.button}",
+          't("mobile.approval.refuse")',
+          "</View>",
+          "{info.text}",
+        ],
       ],
     ];
     for (const [name, pieces] of rows) {

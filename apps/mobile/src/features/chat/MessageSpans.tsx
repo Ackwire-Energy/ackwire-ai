@@ -42,7 +42,6 @@ export function Spans({
   channelRefs,
   everyone = false,
   ink,
-  live = false,
 }: {
   inline: Inline[];
   channelRefs?: Record<string, string>;
@@ -50,8 +49,6 @@ export function Spans({
   everyone?: boolean;
   /** Over a solid bubble: a mention's color and plate in place of its own. */
   ink?: string | undefined;
-  /** Still being written: an address would change pill at every letter, so it stays plain until it settles. */
-  live?: boolean;
 }) {
   const c = useColors();
   const myHandle = useMyHandle();
@@ -91,7 +88,7 @@ export function Spans({
             const file = parseFileLink(s.href, [serverUrl()]);
             if (file) return <FileRefText key={key} link={file} />;
             // An address as written, whatever way: the words of a link written with its own stay.
-            const pill = !live && s.text === s.href ? linkPill(s.href) : null;
+            const pill = s.text === s.href ? linkPill(s.href) : null;
             if (pill) return <LinkPillText key={key} href={s.href} pill={pill} />;
             // A page of this server opens its screen here; any other site the in-app browser. A press on a link wins
             // over the row's long press.
@@ -118,7 +115,7 @@ export function Spans({
                 {s.text}
               </RNText>
             );
-            return live ? shown : <IdRefText key={key} id={s.id} shown={shown} />;
+            return <IdRefText key={key} id={s.id} shown={shown} />;
           }
           case "mention": {
             const handle = s.text.slice(1);

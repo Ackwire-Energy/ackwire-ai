@@ -15,7 +15,7 @@ import {
 } from "@agenteschat/client";
 import { elapsedParts } from "@agenteschat/client/lib/activity";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { blockRowByRun, nextSlots, openerOf, rowShows, SLOT_HOLD_MS, sameSlots, waitingLast } from "@/chat/run-slots";
+import { blockRowByRun, nextSlots, rowShows, SLOT_HOLD_MS, sameSlots, waitingLast } from "@/chat/run-slots";
 import { createStreamsStore, reconcileChannelRuns } from "@/realtime/context";
 import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
@@ -99,21 +99,20 @@ describe("one block per answer (run-slots)", () => {
     expect(blockRowByRun(items, new Set(["r1"]))).toEqual(new Map([["r2", "m4"]]));
   });
 
-  test("every block draws, the ones waiting for words last (each group in its order)", () => {
+  test("every block draws, the ones still at work last (each group in its order)", () => {
     const slots = ["a", "b", "c", "d"].map((runId) => ({ runId }));
     const waiting = new Set(["a", "c"]);
     expect(waitingLast(slots, (id) => waiting.has(id)).map((s) => s.runId)).toEqual(["b", "d", "a", "c"]);
     expect(waitingLast(slots, () => false)).toEqual(slots);
   });
 
-  test("no thinking row: its block shows once it has words, a browser card or a quiet notice (the bar says the rest)", () => {
+  test("at work no row draws, writing or not: only for a browser card or a quiet notice (the bar says the rest)", () => {
     const fresh = {
       runId: "a",
       agentId: "ada",
       channelId: "c",
       threadId: null,
       status: "running" as const,
-      text: "",
       work: [],
       startedAt: 10_000,
       lastEventAt: 10_000,
@@ -131,24 +130,15 @@ describe("one block per answer (run-slots)", () => {
       running: true,
     };
     expect(rowShows({ ...fresh, work: [call] }, 60_000)).toBe(false);
-    expect(rowShows({ ...fresh, text: "Oi" }, 10_500)).toBe(true);
-    expect(rowShows({ ...fresh, work: [{ kind: "say", text: "Vou ler.", turn: 1 }] } as LiveRun, 10_500)).toBe(true);
+    // A message it read mid-run: its receipt is under that message, never a row of its own.
+    expect(rowShows({ ...fresh, work: [{ kind: "steer", messageId: "m9" }] }, 10_500)).toBe(false);
     expect(rowShows({ ...fresh, work: [{ ...call, tool: "browser_navigate" }] }, 10_500)).toBe(true);
     expect(rowShows(fresh, 10_000 + QUIET_AFTER_MS)).toBe(true);
+    // Ended badly: its row says why.
+    expect(rowShows({ ...fresh, status: "failed" }, 10_500)).toBe(true);
   });
 
-  test("it opens with the first thing it said (no placeholder before); the elapsed time", () => {
-    const base = { work: [] };
-    expect(openerOf(base)).toEqual({ said: null, work: [] });
-    const said = openerOf({
-      ...base,
-      work: [
-        { kind: "say" as const, text: "Vou ler o código.", turn: 1 },
-        { kind: "say" as const, text: "Uso as ferramentas.", turn: 2 },
-      ],
-    });
-    expect(said.said).toBe("Vou ler o código.");
-    expect(said.work).toEqual([{ kind: "say", text: "Uso as ferramentas.", turn: 2 }]);
+  test("the elapsed time", () => {
     expect(elapsedParts(1_500)).toBeNull();
     expect(elapsedParts(4_200)).toEqual({ m: 0, s: 4 });
     expect(elapsedParts(75_000)).toEqual({ m: 1, s: 15 });
@@ -241,7 +231,7 @@ describe("live row in the timeline", () => {
   const bar = () => document.querySelector(".ac-typing") as HTMLElement;
   const shownText = (el: Element) => [...el.querySelectorAll(".ac-turn__in")].map((e) => e.textContent).join("|");
 
-  test("no thinking row: the bar alone says its face, step, time and stop; words bring its row, last while it works", async () => {
+  test("while it works only the bar speaks, writing too: no row, no words; its reply shows whole once, after what came meanwhile", async () => {
     const { ev } = await open();
     await ev({ type: "agent.run", ...ids, status: "running" });
     await settle(2);
@@ -267,63 +257,42 @@ describe("live row in the timeline", () => {
     await ev({ type: "agent.tool", ...ids, tool: null, toolUseId: "t1" });
     await settle(2);
     expect(bar().querySelector(".ac-typing__text")?.textContent).toBe("Ada pensando…");
+    // It writes: the bar says so, and nothing of its words shows yet (an older server's delta carries some: never shown).
+    await ev({ type: "agent.typing", ...ids });
     await ev({ type: "agent.delta", ...ids, seq: 0, text: "O login devolve 401 depois do refresh." });
     await settle(3);
-    // Its words: the row, with its name, the time it started, its time and its stop in the header.
-    expect(row().classList.contains("ac-msg--waiting")).toBe(false);
-    expect(row().querySelector(".ac-msg__head")?.textContent).toContain("Ada");
-    expect(row().querySelector(".ac-msg__head time")).not.toBeNull();
-    const tail = row().querySelector(".ac-msg__head .ac-msg__status .run-tail") as HTMLElement;
-    expect(tail.querySelector(".run-tail__clock")).not.toBeNull();
-    expect(within(tail).getByRole("button", { name: "Parar" })).toBeTruthy();
-    expect(row().textContent).toContain("O login devolve 401");
+    expect(row()).toBeNull();
+    expect(bar().querySelector(".ac-typing__text")?.textContent).toBe("Ada escrevendo…");
+    expect(within(bar()).getByRole("button", { name: "Parar" })).toBeTruthy();
+    expect(document.body.textContent).not.toContain("O login devolve 401");
     await post(ev, "m-later", "Também confere o refresh");
     await settle(3);
-    const later = screen().getByText("Também confere o refresh").closest(".ac-msg") as HTMLElement;
-    expect(later.compareDocumentPosition(row()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  });
-
-  test("a reply keeps the place its first words showed in: what is sent meanwhile goes below it, then its message takes it", async () => {
-    const { ev } = await open();
-    const said = (id: string, body: string, createdAt: string, agentRunId: string | null = null) =>
-      ev({
-        type: "message.created",
-        messageId: id,
-        message: {
-          id,
-          channelId: ENG_ID,
-          threadId: null,
-          author: agentRunId ? { type: "agent", id: ADA_ID } : { type: "person", id: "u-joao" },
-          body,
-          mentionedAgentIds: [],
-          agentRunId,
-          createdAt,
-        },
-      });
-    const now = Date.now();
-    await said("m-ask", "Por que o login cai?", new Date(now - 2_000).toISOString());
-    const shownAt = new Date(now - 1_000).toISOString();
-    await ev({ type: "agent.run", ...ids, status: "running" });
-    await ev({ type: "agent.delta", ...ids, seq: 0, turn: 1, at: 0, text: "O login cai depois do refresh.", shownAt });
-    await settle(3);
-    await said("m-meanwhile", "Também confere o refresh", new Date(now + 10_000).toISOString());
-    await settle(3);
-    const meanwhile = () => document.querySelector('[data-message-id="m-meanwhile"]') as HTMLElement;
-    // The block stays where its words first showed; the message sent meanwhile is below it, with its own header.
-    expect(row().compareDocumentPosition(meanwhile()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(meanwhile().classList.contains("ac-msg--grouped")).toBe(false);
-    expect(meanwhile().querySelector(".ac-msg__head")?.textContent).toContain("João");
-    // Its message, another text than the draft, is posted at that moment: it takes the block's place, still above.
-    await said("m-reply", "A chave do cache mudou no deploy de ontem.", shownAt, "r-live");
+    // The reply, posted now: whole, once, after the message sent meanwhile, sliding in as any new row.
+    await ev({
+      type: "message.created",
+      messageId: "m-reply",
+      message: {
+        id: "m-reply",
+        channelId: ENG_ID,
+        threadId: null,
+        author: { type: "agent", id: ADA_ID },
+        body: "A chave do cache mudou no deploy de ontem.",
+        mentionedAgentIds: [],
+        agentRunId: "r-live",
+        createdAt: new Date(Date.now() + 20_000).toISOString(),
+      },
+    });
     await ev({ type: "agent.run", ...ids, status: "done" });
     await settle(4);
+    const later = screen().getByText("Também confere o refresh").closest(".ac-msg") as HTMLElement;
     const reply = document.querySelector('[data-message-id="m-reply"]') as HTMLElement;
     expect(reply.textContent).toContain("A chave do cache mudou");
-    expect(document.body.textContent).not.toContain("O login cai depois do refresh.");
-    expect(reply.compareDocumentPosition(meanwhile()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(later.compareDocumentPosition(reply) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(reply.classList.contains("ac-msg--enter")).toBe(true);
+    expect(bar().dataset.active).toBe("false");
   });
 
-  test("a reply that lands above the last message marks the conversation read, as one at the end does", async () => {
+  test("a message placed above the last one (as replies once were) marks the conversation read, as one at the end does", async () => {
     // Only messages with the server's ids here: they sort in the order it posted them (UUIDv7).
     const { ev, state } = await open((s) => {
       s.messages = s.messages.filter((m) => m.channelId !== ENG_ID);
@@ -349,7 +318,7 @@ describe("live row in the timeline", () => {
     await said(1, new Date(now - 2_000).toISOString());
     const shownAt = new Date(now - 1_000).toISOString();
     await ev({ type: "agent.run", ...ids, status: "running" });
-    await ev({ type: "agent.delta", ...ids, seq: 0, turn: 1, at: 0, text: "O login cai depois do refresh.", shownAt });
+    await ev({ type: "agent.typing", ...ids });
     await said(2, new Date(now + 10_000).toISOString());
     await settle(3);
     const before = reads();
@@ -362,31 +331,6 @@ describe("live row in the timeline", () => {
     expect(reads()).toBeGreaterThan(before);
   });
 
-  test("under the agent's own message its row starts with its face once its words arrive (no grouping, no jump)", async () => {
-    const { ev } = await open();
-    await ev({
-      type: "message.created",
-      messageId: "m-ada",
-      message: {
-        id: "m-ada",
-        channelId: ENG_ID,
-        threadId: null,
-        author: { type: "agent", id: ADA_ID },
-        body: "Feito, o deploy subiu.",
-        mentionedAgentIds: [],
-        agentRunId: "r-old",
-        createdAt: new Date().toISOString(),
-      },
-    });
-    await settle(2);
-    await ev({ type: "agent.run", ...ids, status: "running" });
-    await ev({ type: "agent.delta", ...ids, seq: 0, text: "Também revisei o rollback." });
-    await settle(3);
-    expect(row().classList.contains("ac-msg--grouped")).toBe(false);
-    expect(row().querySelector(".ac-msg__avatar .ac-avatar")).not.toBeNull();
-    expect(row().querySelector(".ac-msg__head")?.textContent).toContain("Ada");
-  });
-
   test("a call that waits for approval draws no thinking row (its request says it)", async () => {
     const { ev } = await open();
     await ev({ type: "agent.run", ...ids, status: "running" });
@@ -397,7 +341,7 @@ describe("live row in the timeline", () => {
     expect(row()).toBeNull();
   });
 
-  test("two agents: no rows while they think, the bar says both; the one that answers gets its row", async () => {
+  test("two agents: no rows while they think or write, the bar says both", async () => {
     const { ev } = await open();
     const atlas = { threadId: null, runId: "r-atlas", agentId: ATLAS_ID };
     await ev({ type: "agent.run", ...ids, status: "running" });
@@ -407,48 +351,55 @@ describe("live row in the timeline", () => {
     expect(row()).toBeNull();
     expect(atlasRow()).toBeNull();
     expect(shownText(bar())).toBe("Ada e Atlas estão trabalhando…");
-    await ev({ type: "agent.delta", ...atlas, seq: 0, text: "Nenhum deploy desde ontem." });
+    await ev({ type: "agent.typing", ...atlas });
     await settle(3);
-    expect(atlasRow().classList.contains("ac-msg--waiting")).toBe(false);
+    expect(atlasRow()).toBeNull();
     expect(row()).toBeNull();
+    expect(shownText(bar())).toBe("Ada e Atlas estão trabalhando…");
   });
 
-  test("steering: 'lê na próxima pausa' → 'leu', 'Leu seu recado' in the block; 'Ver' leads back", async () => {
-    const proto = HTMLElement.prototype as unknown as { scrollIntoView?: () => void };
-    const before = proto.scrollIntoView;
-    const scrolled: string[] = [];
-    proto.scrollIntoView = function (this: HTMLElement) {
-      scrolled.push(this.getAttribute("data-run-id") ?? "");
-    };
-    try {
-      const { ev } = await open();
-      await ev({ type: "agent.run", ...ids, status: "running" });
-      await ev({ type: "agent.delta", ...ids, seq: 0, text: "Olhando o login." });
-      await settle(2);
-      await post(ev, "m-steer", "Olha também o refresh");
-      await ev({ type: "agent.run.steered", ...ids, messageId: "m-steer" });
-      await settle(4);
-      // By id: once read, the text is also quoted in the agent's block.
-      const mine = () => document.querySelector('[data-message-id="m-steer"]') as HTMLElement;
-      expect(mine().textContent).toContain("Ada lê na próxima pausa");
-      await ev({ type: "agent.run.read", ...ids, messageIds: ["m-steer"] });
-      await settle(4);
-      expect(mine().textContent).toContain("Ada leu");
-      expect(row().querySelector(".live-work__steer")?.textContent).toContain("Leu seu recado");
-      expect(row().querySelector(".live-work__steer")?.textContent).toContain("Olha também o refresh");
-      // Out of view (no layout here), the line above the composer leads back to the block.
-      await act(async () => fireEvent.click(screen().getByRole("button", { name: "Ver" })));
-      expect(scrolled).toContain("r-live");
-    } finally {
-      proto.scrollIntoView = before;
-    }
+  test("steering: 'lê na próxima pausa' → 'leu' under the message; 'Leu seu recado' in the reply's steps once it lands", async () => {
+    const { ev } = await open();
+    await ev({ type: "agent.run", ...ids, status: "running" });
+    await ev({ type: "agent.typing", ...ids });
+    await settle(2);
+    await post(ev, "m-steer", "Olha também o refresh");
+    await ev({ type: "agent.run.steered", ...ids, messageId: "m-steer" });
+    await settle(4);
+    const mine = () => document.querySelector('[data-message-id="m-steer"]') as HTMLElement;
+    expect(mine().textContent).toContain("Ada lê na próxima pausa");
+    await ev({ type: "agent.run.read", ...ids, messageIds: ["m-steer"] });
+    await settle(4);
+    expect(mine().textContent).toContain("Ada leu");
+    // No row of its own while it works, and no "Ver" back to one.
+    expect(row()).toBeNull();
+    expect(within(bar()).queryByRole("button", { name: "Ver" })).toBeNull();
+    await ev({
+      type: "message.created",
+      messageId: "m-reply",
+      message: {
+        id: "m-reply",
+        channelId: ENG_ID,
+        threadId: null,
+        author: { type: "agent", id: ADA_ID },
+        body: "O refresh também estava errado.",
+        mentionedAgentIds: [],
+        agentRunId: "r-live",
+        createdAt: new Date(Date.now() + 20_000).toISOString(),
+      },
+    });
+    await ev({ type: "agent.run", ...ids, status: "done" });
+    await settle(4);
+    const reply = document.querySelector('[data-message-id="m-reply"]') as HTMLElement;
+    expect(reply.querySelector(".live-work__steer")?.textContent).toContain("Leu seu recado");
+    expect(reply.querySelector(".live-work__steer")?.textContent).toContain("Olha também o refresh");
   });
 
   test("no news for 3 min: 'Atualizar' asks the server and drops a run that no longer exists", async () => {
     const { ev, state } = await open();
     setSystemTime(new Date(Date.now() - 4 * 60_000));
     await ev({ type: "agent.run", ...ids, status: "running" });
-    await ev({ type: "agent.delta", ...ids, seq: 0, text: "Rodando os testes." });
+    await ev({ type: "agent.typing", ...ids });
     setSystemTime();
     await act(async () => window.dispatchEvent(new Event("focus")));
     await settle(2);
@@ -487,19 +438,19 @@ describe("live row in the timeline", () => {
     expect(text.split(said).length - 1).toBe(1);
   });
 
-  test("after a reconnect, once the server confirms the channel again, live rows it no longer runs go away", async () => {
+  test("after a reconnect, once the server confirms the channel again, runs it no longer has leave the bar", async () => {
     const { ev, sockets } = await open((s) => {
       s.activeRuns = { [ENG_ID]: [] };
     });
     await ev({ type: "agent.run", ...ids, status: "running" });
-    await ev({ type: "agent.delta", ...ids, seq: 0, text: "Quase lá." });
+    await ev({ type: "agent.typing", ...ids });
     await settle(2);
-    expect(row()).not.toBeNull();
+    expect(bar().dataset.active).toBe("true");
     await act(async () => sockets.last().drop());
     await act(() => new Promise((r) => setTimeout(r, 650)));
     await act(async () => sockets.last().open());
     await act(async () => sockets.last().push({ type: "subscribed", channelId: ENG_ID }));
     await settle(4);
-    expect(row()).toBeNull();
+    expect(bar().dataset.active).toBe("false");
   });
 });

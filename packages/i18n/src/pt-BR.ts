@@ -47,7 +47,6 @@ export const ptBR = {
     table: "Tabela",
     chartItem: "Item",
     chartShare: "Parte",
-    chartPending: "Montando o gráfico…",
     you: "você",
     youSuffix: " (você)",
     saved: "Salvo",
@@ -2627,6 +2626,7 @@ export const ptBR = {
       computer_failed: "{{name}} não consegue responder agora: o computador do plano teve um problema.",
       /** The plan's CLI on that computer failed, not the computer. */
       cli_failed: "{{name}} não consegue responder agora: a IA do plano parou com um erro.",
+      cli_failedWhy: "{{name}} não consegue responder agora: a IA do plano parou com um erro ({{why}}).",
       plan_limit: "{{name}} não consegue responder agora: o plano chegou ao limite.",
       plan_not_shared:
         "Conecte o seu plano para conversar com {{name}}: o plano do workspace só atende o próprio dono.",
@@ -3408,8 +3408,6 @@ export const ptBR = {
     messageTo: "Mensagem para {{name}}",
     audienceEdit: "Editar",
     nowIn: "agora, em #{{channel}}",
-    /** An agent set to answer in this channel without being mentioned (its card opened from the channel). */
-    answersHere: "Responde aqui sem precisar de @",
     more: "Mais",
     of: "Perfil de {{name}}",
     presence: "Presença",
@@ -15661,6 +15659,7 @@ export const ptBR = {
       no_ai_computer_away: "Agora não consigo responder: o computador do meu plano está fora do ar.",
       no_ai_computer_failed: "Agora não consigo responder: o computador do meu plano teve um problema.",
       no_ai_cli_failed: "Agora não consigo responder: a IA do meu plano parou com um erro.",
+      no_ai_cli_failedWhy: "Agora não consigo responder: a IA do meu plano parou com um erro ({{why}}).",
       no_ai_plan_limit: "Agora não consigo responder: o plano com que eu penso chegou ao limite.",
       no_ai_plan_not_shared:
         "Não consigo te responder pelo plano do workspace: ele só atende o próprio dono. Conecte o seu plano e eu respondo.",
@@ -17142,7 +17141,7 @@ export const ptBR = {
       fromRoutine: "começou na rotina {{name}}",
       stopNote: "Se parar, {{name}} fica sabendo que você parou e não pede de novo por conta própria.",
     },
-    columns: { task: "Tarefa", state: "Estado", using: "Usando agora", time: "Tempo", computer: "Onde roda" },
+    columns: { task: "Tarefa", state: "Estado", using: "Usando agora", time: "Tempo" },
     sections: {
       asked: "Pedidas por pessoas",
       delegated: "Pedidas por agentes",
@@ -17207,7 +17206,6 @@ export const ptBR = {
     },
     askedBy: "{{name}} pediu",
     askedByYou: "Você pediu",
-    servers: "Nossos servidores",
     plan: "{{done}} de {{total}} feitos",
     program: {
       browser: "Navegador",

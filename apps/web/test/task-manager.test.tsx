@@ -20,7 +20,7 @@ import { keys, TASK_MANAGER_POLL_MS } from "@agenteschat/client";
 import { usageWhenShort } from "@agenteschat/client/lib/plan-usage";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, type FakeState, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
-import { renderApp, screen, settle } from "./render";
+import { renderApp, screen, settle, showIn } from "./render";
 
 afterEach(() => {
   cleanup();
@@ -270,6 +270,12 @@ const open = async (state: FakeState, path: string, queue?: ComputerQueue) => {
 };
 /** A task's row on the page, by its title (the button that picks it). */
 const rowOf = (title: string) => screen().getByRole("button", { name: title }).closest(".tm-row") as HTMLElement;
+/** An agent's row in the table (in `inside`, when two sections both have it), and the press that opens its tasks. */
+const agentToggle = (name: string, inside: HTMLElement = document.body) =>
+  within(inside).getByRole("button", { name: `Mostrar ou esconder as tarefas de ${name}` });
+const agentRowOf = (name: string, inside?: HTMLElement) => agentToggle(name, inside).closest(".tm-row") as HTMLElement;
+/** Its tasks start folded: opens them. */
+const openAgent = (name: string, inside?: HTMLElement) => click(agentToggle(name, inside));
 function cardOf(name: string) {
   const cards = [...document.querySelectorAll<HTMLElement>(".tm-card")];
   return cards.find((c) => c.querySelector(".tm-card__text b")?.textContent === name) as HTMLElement;
@@ -282,7 +288,7 @@ const stopCalls = (state: FakeState) =>
   state.calls.filter((c) => c.method === "agents.cancelRun").map((c) => c.args.slice(1));
 
 describe("the task manager page", () => {
-  test("the agents as cards, then the tasks by agent with what each uses, how long and where it runs; no money", async () => {
+  test("the agents as cards, then the tasks by agent with what each uses and how long; no money", async () => {
     const state = seedState({ taskManager: busy() });
     await open(state, "task-manager");
     expect(screen().getByRole("heading", { level: 1 }).textContent).toBe("Gerenciador de tarefas");
@@ -302,27 +308,42 @@ describe("the task manager page", () => {
       "O que Ada fez nos últimos 30 min",
     );
 
-    // Asked by people, by agent; the routines apart.
+    // Asked by people, by agent; the routines apart. Four columns: where a task runs is no column.
+    const columns = [...document.querySelectorAll(".tm-row--head > span")].map((s) => s.textContent);
+    expect(columns).toEqual(["Tarefa", "Estado", "Usando agora", "Tempo"]);
+    expect(document.querySelector(".tm-cell--where")).toBeNull();
     const asked = screen().getByRole("region", { name: "Pedidas por pessoas" });
     expect(asked.querySelector(".tm-sec")?.textContent).toBe("Pedidas por pessoas3");
-    expect(within(asked).getByRole("button", { name: "Mostrar ou esconder as tarefas de Ada" })).toBeTruthy();
     const background = screen().getByRole("region", { name: "Rotinas em segundo plano" });
     expect(within(background).getByRole("button", { name: "Backups" })).toBeTruthy();
     expect(rowOf("Backups").textContent).toContain("Ada · Rotina «Backups»");
+
+    // Each agent folded: its count, how it stands and the time of the task that says it.
+    const ada = agentRowOf("Ada", asked);
+    expect(agentToggle("Ada").getAttribute("aria-expanded")).toBe("false");
+    expect(ada.querySelector(".ac-countchip")?.getAttribute("aria-label")).toBe("2 tarefas");
+    expect(ada.querySelector(".tm-cell--state")?.textContent).toBe("Trabalhando");
+    expect(ada.querySelector(".tm-cell--time")?.textContent).toMatch(/^6:0\d$/);
+    expect(agentRowOf("Atlas").querySelector(".tm-cell--time")?.textContent).toMatch(/^41:0\d$/);
+    expect(screen().queryByRole("button", { name: "Corrigir o link de cancelar" })).toBeNull();
+    await openAgent("Ada");
+    await openAgent("Atlas");
 
     // Claude Code in Ada's browser, on her computer; the wait for my ok; Atlas in a terminal on our servers.
     const link = rowOf("Corrigir o link de cancelar");
     expect(link.textContent).toContain("Trabalhando");
     expect(link.textContent).toContain("Claude Code");
     expect(link.textContent).toContain("Navegador · página de cancelar");
-    expect(link.querySelector(".tm-cell--where")?.textContent).toBe("MacBook");
+    expect(link.textContent).not.toContain("MacBook");
     expect(link.querySelector(".tm-cell--time")?.textContent).toMatch(/^6:0\d$/);
     expect(rowOf("Revisar o PR #231").textContent).toContain("Espera seu ok");
     expect(rowOf("Revisar o PR #231").textContent).toContain("#eng · João pediu");
+    // A wait says how long it has waited, as people say it: no clock.
+    expect(rowOf("Revisar o PR #231").querySelector(".tm-cell--time")?.textContent).toBe("18 min");
     const api = rowOf("Investigar a lentidão da API");
     expect(api.textContent).toContain("Terminal");
     expect(api.textContent).toContain("consultas lentas");
-    expect(api.querySelector(".tm-cell--where")?.textContent).toBe("Nossos servidores");
+    expect(api.textContent).not.toContain("Nossos servidores");
     // "Tempo" warms with the time: full past 40 minutes, a little at 6.
     const warmth = (row: HTMLElement) =>
       (row.querySelector(".tm-cell--time") as HTMLElement).style.getPropertyValue("--h");
@@ -349,6 +370,7 @@ describe("the task manager page", () => {
     expect((screen().getByRole("button", { name: "Ver passos" }) as HTMLButtonElement).disabled).toBe(true);
     expect((screen().getByRole("button", { name: "Parar tarefa" }) as HTMLButtonElement).disabled).toBe(true);
 
+    await openAgent("Atlas");
     const slow = () => screen().getByRole("button", { name: "Investigar a lentidão da API" });
     await click(slow());
     expect(slow().getAttribute("aria-pressed")).toBe("true");
@@ -364,17 +386,19 @@ describe("the task manager page", () => {
   test("Ver passos opens the task's panel: what it does now, its facts, its steps; Abrir na conversa", async () => {
     const state = seedState({ taskManager: busy(), taskSteps: { "r-link": linkSteps() } });
     const { router, services } = await open(state, "task-manager");
+    await openAgent("Ada");
     await click(screen().getByRole("button", { name: "Corrigir o link de cancelar" }));
     await click(screen().getByRole("button", { name: "Ver passos" }));
     await settle(4);
     const panel = screen().getByRole("complementary", { name: "Corrigir o link de cancelar" });
     expect(panel.querySelector(".thread-head__meta")?.textContent).toBe("Ada · Conversa direta · Você pediu");
-    // Estado, Tempo, Usando agora, Onde roda; no cost.
+    // Estado, Tempo, Usando agora; where it runs is nowhere, and no cost.
     const facts = [...panel.querySelectorAll(".tm-panel__facts dt")].map((d) => d.textContent);
-    expect(facts).toEqual(["Estado", "Tempo", "Usando agora", "Onde roda"]);
+    expect(facts).toEqual(["Estado", "Tempo", "Usando agora"]);
     expect(panel.textContent).toContain("Trabalhando");
     expect(panel.textContent).toContain("Claude Code");
-    expect(panel.textContent).toContain("MacBook");
+    expect(panel.textContent).not.toContain("MacBook");
+    expect(panel.textContent).not.toContain("Onde roda");
     expect(panel.textContent).not.toMatch(/US\$|R\$|\$/);
     // Its steps as a reply's block lists them: the one done, the one it is on.
     expect(state.calls.find((c) => c.method === "working.taskSteps")?.args).toEqual([ORG_ID, "r-link"]);
@@ -396,6 +420,7 @@ describe("the task manager page", () => {
     const state = seedState({ taskManager: busy() });
     await open(state, "task-manager");
     // Each row opens its own panel too.
+    await openAgent("Atlas");
     await click(screen().getByRole("button", { name: "Ver passos: Investigar a lentidão da API" }));
     await settle(4);
     const panel = () => screen().getByRole("complementary", { name: "Investigar a lentidão da API" });
@@ -422,11 +447,11 @@ describe("the task manager page", () => {
   test("stopped with a reason from Parar tudo: the open panel says that reason and asks for none", async () => {
     const state = seedState({ taskManager: busy() });
     await open(state, "task-manager");
+    await openAgent("Ada");
     await click(screen().getByRole("button", { name: "Ver passos: Revisar o PR #231" }));
     const panel = () => screen().getByRole("complementary", { name: "Revisar o PR #231" });
-    // Ada's row's "Parar 2", behind the panel.
-    const row = screen().getByRole("button", { name: "Ada" }).closest(".tm-row") as HTMLElement;
-    await click(within(row).getByRole("button", { name: "Parar 2" }));
+    // Ada's row's own stop, behind the panel.
+    await click(within(agentRowOf("Ada")).getByRole("button", { name: "Parar tudo de Ada" }));
     const ask = screen().getByRole("dialog", { name: "Parar as 2 tarefas de Ada?" });
     await type(within(ask).getByRole("textbox", { name: "Por quê? (opcional)" }), "Vou fazer eu mesmo");
     await click(within(ask).getByRole("button", { name: "Parar 2" }));
@@ -466,30 +491,50 @@ describe("the task manager page", () => {
   test("Cancelar leaves every task as it was", async () => {
     const state = seedState({ taskManager: busy() });
     await open(state, "task-manager");
-    await click(screen().getByRole("button", { name: "Ada" }));
-    await click(screen().getByRole("button", { name: "Parar tudo de Ada" }));
+    await click(within(agentRowOf("Ada")).getByRole("button", { name: "Parar tudo de Ada" }));
     await click(within(screen().getByRole("dialog")).getByRole("button", { name: "Cancelar" }));
     expect(stopCalls(state)).toEqual([]);
+    await openAgent("Ada");
     expect(screen().getByRole("button", { name: "Corrigir o link de cancelar" })).toBeTruthy();
   });
 
-  test("an agent's row folds its tasks and stops them all from its own Parar", async () => {
+  test("an agent's row: folded at first, the whole row opens and folds it; its own Parar stops them all", async () => {
     const state = seedState({ taskManager: busy() });
     await open(state, "task-manager");
-    const fold = screen().getByRole("button", { name: "Mostrar ou esconder as tarefas de Ada" });
-    expect(fold.getAttribute("aria-expanded")).toBe("true");
-    await click(fold);
+    const fold = agentToggle("Ada");
     expect(fold.getAttribute("aria-expanded")).toBe("false");
+    expect(agentRowOf("Ada").hasAttribute("data-open")).toBe(false);
+    expect(screen().queryByRole("button", { name: "Corrigir o link de cancelar" })).toBeNull();
+    // Its press covers the row (its name's button reaches every edge), and no second button does the same.
+    await click(fold);
+    expect(fold.getAttribute("aria-expanded")).toBe("true");
+    expect(agentRowOf("Ada").hasAttribute("data-open")).toBe(true);
+    expect(screen().getByRole("button", { name: "Corrigir o link de cancelar" })).toBeTruthy();
+    expect(agentRowOf("Ada").querySelectorAll(".tm-cell--name button")).toHaveLength(2);
+    await click(fold);
     expect(screen().queryByRole("button", { name: "Corrigir o link de cancelar" })).toBeNull();
     // The routines' run stays in its own section.
     expect(screen().getByRole("button", { name: "Backups" })).toBeTruthy();
 
-    const row = screen().getByRole("button", { name: "Ada" }).closest(".tm-row") as HTMLElement;
-    await click(within(row).getByRole("button", { name: "Parar 2" }));
+    // The stop, a square named for screen readers and on hover, asks first.
+    const stopAll = within(agentRowOf("Ada")).getByRole("button", { name: "Parar tudo de Ada" });
+    expect(stopAll.getAttribute("title")).toBe("Parar tudo de Ada");
+    expect(stopAll.textContent).toBe("");
+    await click(stopAll);
     const ask = screen().getByRole("dialog", { name: "Parar as 2 tarefas de Ada?" });
     await click(within(ask).getByRole("button", { name: "Parar 2" }));
     await settle(4);
     expect(stopCalls(state).sort()).toEqual([["r-link"], ["r-pr"]]);
+  });
+
+  test("an agent with one task to stop has its stop on its row too, folded or not", async () => {
+    const state = seedState({ taskManager: busy() });
+    await open(state, "task-manager");
+    await click(within(agentRowOf("Atlas")).getByRole("button", { name: "Parar tudo de Atlas" }));
+    const ask = screen().getByRole("dialog", { name: "Parar a tarefa de Atlas?" });
+    await click(within(ask).getByRole("button", { name: "Parar" }));
+    await settle(4);
+    expect(stopCalls(state)).toEqual([["r-api"]]);
   });
 
   test("Terminadas hoje, folded at the end: how each ended and who stopped it", async () => {
@@ -536,12 +581,17 @@ describe("the task manager page", () => {
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${ENG_ID}`);
   });
 
-  test("the search finds a task by its title, its agent or the program it uses", async () => {
+  test("the search finds a task by its title, its agent or the program it uses, its agent opened", async () => {
     await open(seedState({ taskManager: busy() }), "task-manager");
     const search = screen().getByRole("searchbox", { name: "Buscar tarefa, agente ou programa" });
     await type(search, "terminal");
     expect(screen().getByRole("button", { name: "Investigar a lentidão da API" })).toBeTruthy();
     expect(screen().queryByRole("button", { name: "Corrigir o link de cancelar" })).toBeNull();
+    // Folded while searching, it stays folded until the search ends; then every agent is as it was before.
+    await click(agentToggle("Atlas"));
+    expect(screen().queryByRole("button", { name: "Investigar a lentidão da API" })).toBeNull();
+    await type(search, "");
+    expect(agentToggle("Atlas").getAttribute("aria-expanded")).toBe("false");
     await type(search, "nada disso");
     expect(document.body.textContent).toContain("Nenhuma tarefa com essa busca.");
   });
@@ -574,6 +624,76 @@ describe("the task manager page", () => {
     const working = screen().getByRole("region", { name: "Trabalhando agora" });
     const link = within(working).getByRole("link", { name: "Abrir no gerenciador" });
     expect(link.getAttribute("href")).toBe(`/org/${ORG_ID}/task-manager`);
+  });
+
+  test("the worst case: a long name, a long title, a long command, a pause of days, whole in Portuguese and German", async () => {
+    const NOVA = "00000000-0000-4000-8000-0000000000a9";
+    const name = "Assistente de Atendimento Internacional";
+    const title = "Levantar as cobranças duplicadas do último trimestre e preparar um resumo ao time";
+    const command = "bun scripts/cobrancas-duplicadas.ts --desde 2026-07-01 --formato csv --saida rel";
+    // A page's address, with nowhere to wrap: it breaks where it must.
+    const site = "loja.example/checkout/pedidos/2026/11/confirmacao-de-pagamento-pendente-de-revisao";
+    const view = busy();
+    view.tasks.push(
+      task({
+        runId: "r-site",
+        agentId: ATLAS_ID,
+        label: "Ver o checkout",
+        brain: "claude_code",
+        now: using("browser_do", site),
+      }),
+      task({
+        runId: "r-long",
+        agentId: NOVA,
+        label: title,
+        brain: "claude_code",
+        now: using("run_code", command),
+        startedAt: ago(73),
+        createdAt: ago(73),
+      }),
+      task({
+        runId: "r-paused",
+        agentId: NOVA,
+        channelId: "dm-nova",
+        channelKind: "dm",
+        channelName: null,
+        status: "waiting_input",
+        held: "plan",
+        wait: {
+          code: "usage_pause",
+          key: "plan:nova",
+          plan: "Claude",
+          model: null,
+          scope: null,
+          percent: 95,
+          window: "seven_day",
+          resetsAt: in_(3 * 24 * 60),
+          since: ago(50 * 60),
+          canContinue: true,
+        },
+        startedAt: ago(82 * 60 + 8),
+        createdAt: ago(82 * 60 + 8),
+      }),
+    );
+    const state = seedState({ taskManager: view });
+    const base = state.agents[0];
+    if (base) state.agents.push({ ...base, id: NOVA, name, handle: "atendimento" });
+    const { services } = await open(state, "task-manager");
+    for (const agent of ["Ada", "Atlas", name]) await openAgent(agent);
+    const row = rowOf(title);
+    // The program and what it does in it, whole: no cut name ("Claude …") and no cut command.
+    expect(row.querySelector(".tm-use__text b")?.textContent).toBe("Claude Code");
+    expect(row.querySelector(".tm-use__text small")?.textContent).toBe(`Terminal · ${command}`);
+    expect(rowOf("Ver o checkout").querySelector(".tm-use__text small")?.textContent).toBe(`Navegador · ${site}`);
+    // It may wrap after each of its five slashes, before breaking inside a word.
+    expect(rowOf("Ver o checkout").querySelectorAll(".tm-use__text small wbr")).toHaveLength(5);
+    expect(rowOf("Conversa direta").querySelector(".tm-cell--time")?.textContent).toBe("2 dias");
+    // Its row speaks for the task at work: its clock.
+    expect(agentRowOf(name).querySelector(".tm-cell--time")?.textContent).toMatch(/^1:13:0\d$/);
+    // Longer words in German, measured by the geometry check too.
+    await showIn(services, "de");
+    expect(rowOf("Direkte Unterhaltung").querySelector(".tm-cell--time")?.textContent).toBe("2 Tage");
+    expect(row.querySelector(".tm-use__text small")?.textContent).toBe(`Terminal · ${command}`);
   });
 
   test("More in the sidebar opens it", async () => {
@@ -694,6 +814,8 @@ describe("a computer's line", () => {
   test("a task waiting for room says its place in the line and when it should start; unknown, Computador cheio", async () => {
     const { view } = withLine();
     await open(seedState({ taskManager: view }), "task-manager");
+    await openAgent("Ada");
+    await openAgent("Atlas");
     const checkout = rowOf("Ajustar o texto do checkout");
     expect(stateOf(checkout)).toEqual(["Na fila · 1º", "começa em ~3 min"]);
     // Grey with the clock: it waits on its computer, not on me.
@@ -710,6 +832,7 @@ describe("a computer's line", () => {
     const checkout = view.tasks.find((x) => x.runId === "r-checkout");
     if (checkout?.line) checkout.line.estimatedStartAt = null;
     await open(seedState({ taskManager: view }), "task-manager");
+    await openAgent("Ada");
     const row = rowOf("Ajustar o texto do checkout");
     expect(stateOf(row)).toEqual(["Na fila · 1º", "Começa quando tiver espaço"]);
     expect(row.querySelector(".tm-cell--use")?.textContent).toBe("—");
@@ -736,16 +859,16 @@ describe("a computer's line", () => {
     expect(text).not.toMatch(/US\$|GB|memória/i);
   });
 
-  test("Onde roda opens its computer's line in the same dialog, over the page", async () => {
+  test("a task's row says nothing of where it runs: its computer's line opens from Computadores", async () => {
     const { view, queue } = withLine();
     await open(seedState({ taskManager: view }), "task-manager", queue);
-    // On our servers there is no line to open.
-    expect(within(rowOf("Investigar a lentidão da API")).queryByRole("button", { name: /^Ver fila/ })).toBeNull();
-    await click(within(rowOf("Corrigir o link de cancelar")).getByRole("button", { name: "Ver fila: MacBook" }));
-    await settle(4);
-    expect(screen().getByRole("dialog", { name: "Fila de MacBook" }).textContent).toContain("Trabalhando agora · 1");
-    // No task's panel opens for it.
-    expect(document.querySelector(".tm-panel")).toBeNull();
+    await openAgent("Ada");
+    const link = rowOf("Corrigir o link de cancelar");
+    expect(within(link).queryByRole("button", { name: /^Ver fila/ })).toBeNull();
+    expect(link.textContent).not.toContain("MacBook");
+    expect(
+      within(screen().getByRole("region", { name: "Computadores" })).getByRole("button", { name: "Ver fila: MacBook" }),
+    ).toBeTruthy();
   });
 
   test("in her DM's panel a task in line says its place; Ver fila opens the line over the tasks", async () => {
@@ -792,6 +915,7 @@ describe("work agents asked of each other", () => {
   test("its own section: who asked, what started it, stopped from its row; no way into their conversation", async () => {
     await open(seedState({ taskManager: chain() }), "task-manager");
     const section = screen().getByRole("region", { name: "Pedidas por agentes" });
+    await openAgent("Atlas", section);
     expect(section.textContent).toContain("Vê o log de ontem");
     expect(section.textContent).toContain("a pedido de Atlas · começou na rotina Triagem");
     expect(section.textContent).not.toContain("Conversa direta");
@@ -805,9 +929,10 @@ describe("work agents asked of each other", () => {
   test("the row of a run with helpers stops it and them in one action, after a confirmation", async () => {
     const state = seedState({ taskManager: chain() });
     await open(state, "task-manager");
+    await openAgent("Atlas", screen().getByRole("region", { name: "Pedidas por pessoas" }));
     const row = rowOf("Olhar os bugs");
     expect(row.textContent).toContain("1 ajudante");
-    await click(within(row).getByRole("button", { name: "Parar todas" }));
+    await click(within(row).getByRole("button", { name: "Parar todas: Olhar os bugs" }));
     const ask = screen().getByRole("dialog", { name: "Parar Atlas e 1 ajudante?" });
     await click(within(ask).getByRole("button", { name: "Parar 2" }));
     await settle(4);
@@ -820,8 +945,7 @@ describe("work agents asked of each other", () => {
     const state = seedState({ taskManager: view });
     await open(state, "task-manager");
     const asked = screen().getByRole("region", { name: "Pedidas por pessoas" });
-    const row = within(asked).getByRole("button", { name: "Atlas" }).closest(".tm-row") as HTMLElement;
-    await click(within(row).getByRole("button", { name: "Parar 2" }));
+    await click(within(agentRowOf("Atlas", asked)).getByRole("button", { name: "Parar tudo de Atlas" }));
     const ask = screen().getByRole("dialog", { name: "Parar Atlas e 1 ajudante?" });
     await click(within(ask).getByRole("button", { name: "Parar 3" }));
     await settle(4);
@@ -1004,17 +1128,39 @@ describe("why a task waits", () => {
     expect(stateOf(rowOf("Falta a resposta"))).toEqual(["Espera resposta", "Segue quando alguém responder"]);
   });
 
-  test("Estado and Onde roda are never cut: no chip, no ellipsis class", async () => {
+  test("Estado, Usando agora and the title are never cut: no chip, no ellipsis, no clamp", async () => {
     await open(seedState({ taskManager: view([waiting("r1", "Pausa do plano", "plan", wait())]) }), "task-manager");
     const row = rowOf("Pausa do plano");
     const state = row.querySelector(".tm-cell--state") as HTMLElement;
-    const where = row.querySelector(".tm-cell--where") as HTMLElement;
-    expect(where.textContent).toBe("Computador da Ada");
     expect(state.querySelector(".ac-chip")).toBeNull();
     expect(row.querySelector(".tm-ellipsis")).toBeNull();
-    const css = readFileSync(join(import.meta.dir, "../src/pages/task-manager.css"), "utf8");
+    const read = (file: string) => readFileSync(join(import.meta.dir, "../src", file), "utf8");
+    const css = read("pages/task-manager.css");
     expect(css).not.toContain(".tm-ellipsis");
-    expect(css).not.toMatch(/\.tm-cell--(state|where)[^{]*\{[^}]*(nowrap|text-overflow)/);
+    expect(css).not.toMatch(/text-overflow|line-clamp/);
+    expect(css).not.toMatch(/\.tm-cell--state[^{]*\{[^}]*nowrap/);
+    expect(read("components/tasks/tasks.css")).not.toMatch(/\.tm-use[^{]*\{[^}]*(nowrap|text-overflow)/);
+  });
+
+  test("a paused conversation says how long it has been paused, never a clock of days", async () => {
+    const dm = waiting("r-dm", "", "plan", wait({ since: ago(50 * 60) }), {
+      background: false,
+      channelKind: "dm",
+      channelName: null,
+      startedAt: ago(82 * 60 + 8),
+      createdAt: ago(82 * 60 + 8),
+    });
+    await open(seedState({ taskManager: view([dm]) }), "task-manager");
+    const ada = agentRowOf("Ada");
+    expect(ada.querySelector(".tm-cell--time")?.textContent).toBe("2 dias");
+    await openAgent("Ada");
+    const row = rowOf("Conversa direta");
+    expect(row.querySelector(".tm-cell--time")?.textContent).toBe("2 dias");
+    expect(document.querySelector(".tm")?.textContent).not.toMatch(/\d+:\d\d:\d\d/);
+    // An older server says no since when: from when it started.
+    cleanup();
+    await open(seedState({ taskManager: view([{ ...dm, wait: wait() }]) }), "task-manager");
+    expect(agentRowOf("Ada").querySelector(".tm-cell--time")?.textContent).toBe("3 dias");
   });
 
   test("Tempo warms for work taking long, not for a wait", async () => {

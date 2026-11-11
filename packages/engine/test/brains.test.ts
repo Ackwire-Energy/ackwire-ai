@@ -78,7 +78,7 @@ const stepsOf = async (fx: Fixture, runId: string) =>
     (a, b) => a.seq - b.seq,
   );
 
-test("a fake brain's text deltas become the agent's message; usage lands on the model_call step", async () => {
+test("a fake brain's text deltas become the agent's message, posted whole; usage lands on the model_call step", async () => {
   f = await setup();
   const { brain, seen } = scriptedBrain(() => [
     { type: "text_delta", text: "Olá, " },
@@ -92,8 +92,9 @@ test("a fake brain's text deltas become the agent's message; usage lands on the 
 
   const timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
   expect(timeline.map((m) => m.body)).toEqual(["@dev oi", "Olá, tudo certo."]);
-  const deltas = events.flatMap((e) => (e.type === "agent.delta" ? [(e as unknown as { text: string }).text] : []));
-  expect(deltas.join("")).toBe("Olá, tudo certo.");
+  // It writes: the apps say so, its words wait for the message.
+  expect(events.filter((e) => e.type === "agent.typing")).toHaveLength(1);
+  expect(JSON.stringify(events.filter((e) => e.type !== "message.created"))).not.toContain("tudo certo");
   expect(events.at(-1)).toMatchObject({ type: "message.handled", status: "done" });
 
   // The brain got the engine-built context (system with the org context, the trigger).
@@ -114,7 +115,7 @@ test("a fake brain's text deltas become the agent's message; usage lands on the 
   ).toEqual([]);
 });
 
-test("a computer brain's text before its own tool call never shows live, only the text that ends the turn", async () => {
+test("a computer brain's text before its own tool call is only its step line; the text that ends the turn is the message", async () => {
   f = await setup();
   const { brain } = scriptedBrain(() => [
     { type: "text_delta", text: "I need the inbox id first." },
@@ -131,8 +132,7 @@ test("a computer brain's text before its own tool call never shows live, only th
   const said = events.flatMap((e) => ("said" in e && e.said ? [e.said] : []));
   expect(said).toEqual(["I need the inbox id first"]);
   expect(JSON.stringify(events, (k, v) => (k === "said" ? undefined : v))).not.toContain("inbox id");
-  const deltas = events.flatMap((e) => (e.type === "agent.delta" ? [(e as unknown as { text: string }).text] : []));
-  expect(deltas.join("")).toBe("Caixa conferida.");
+  expect(JSON.stringify(events.filter((e) => e.type !== "message.created"))).not.toContain("conferida");
   const timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
   expect(timeline.map((m) => m.body)).toEqual(["@dev confere a caixa", "Caixa conferida."]);
 });

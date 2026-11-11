@@ -136,8 +136,6 @@ describe("the working line's sentence", () => {
     channelId: "c",
     threadId: "m1",
     status: "thinking",
-    text: "",
-    lastSeq: -1,
   });
 
   test("one, two, three or more agents working (pt-BR and en)", () => {
@@ -227,8 +225,10 @@ describe("the working line's sentence", () => {
     expect(activityText(t, entries("answered", [run("dev", "r-dev"), run("theo"), run("nina")]))).toBe(
       "Dev e mais 2 estão trabalhando…",
     );
-    // Its words are on screen: the reply's row says it, not the bar.
-    expect(entries("answered", [{ ...run("dev", "r-dev"), status: "running", text: "O Infra" }])).toEqual([]);
+    // It writes now: the bar says so, its words wait for its reply.
+    expect(activityText(t, entries("answered", [{ ...run("dev", "r-dev"), status: "running" }]))).toBe(
+      "Bento respondeu. Dev está escrevendo…",
+    );
     // The line times the question of an agent on its own; beside others it tells (and times) none.
     expect(barAsking(entries("asking"))).toMatchObject({ to: "bento", status: "asking" });
     expect(barAsking(entries("answered"))).toBeUndefined();

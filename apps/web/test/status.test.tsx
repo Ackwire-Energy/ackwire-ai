@@ -30,13 +30,14 @@ const press = async (el: Element, key: string) => {
   await settle(2);
 };
 /**
- * The account menu (Enter on the row, focus on its first item, "Definir status") → its menu beside (→) → what I'm up
+ * The account menu (Enter on the row, focus on my face, ↓ to "Definir status") → its menu beside (→) → what I'm up
  * to: "O que você está fazendo?", or my line once I wrote one.
  */
 const openDialog = async () => {
   const row = account();
   row.focus();
   await press(row, "Enter");
+  await press(document.activeElement as HTMLElement, "ArrowDown");
   await press(document.activeElement as HTMLElement, "ArrowRight");
   const status = screen().getAllByRole("menu")[1] as HTMLElement;
   await click(within(status).getByRole("menuitem"));
