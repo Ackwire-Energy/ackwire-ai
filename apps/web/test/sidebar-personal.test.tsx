@@ -63,6 +63,8 @@ describe("a personal workspace's sidebar", () => {
     await go(personal());
     const me = within(top()).getByRole("button", { name: /^Conta: / });
     expect(me.textContent).toContain("Walter");
+    // My row, not the workspace's: my name wraps whole there, never cut.
+    expect(me.classList.contains("sidebar__org-button--me")).toBe(true);
     expect(within(top()).getByRole("link", { name: "Notificações" }).getAttribute("href")).toBe(
       `/org/${ORG_ID}/notifications`,
     );
@@ -84,8 +86,10 @@ describe("a personal workspace's sidebar", () => {
     expect(
       within(menu)
         .getAllByRole("menuitem")
-        .map((el) => el.textContent),
+        .map((el) => el.getAttribute("aria-label") ?? el.textContent),
     ).toEqual([
+      // My face on top changes my photo.
+      "Trocar foto",
       "Definir status",
       "Editar perfil",
       "Sua conta",

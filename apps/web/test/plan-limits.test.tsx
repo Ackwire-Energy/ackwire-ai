@@ -87,9 +87,11 @@ const openMenu = async () => {
   await settle(4);
   return screen().getAllByRole("menu")[0] as HTMLElement;
 };
+/** The menu's rows, under my face on top (an item too: it changes my photo). */
 const names = (menu: HTMLElement) =>
   within(menu)
     .getAllByRole("menuitem")
+    .filter((i) => !i.matches(".ac-face-edit"))
     .map((i) => i.textContent);
 
 /** Sua conta's card of your plans, by its words (null: none). */

@@ -1,11 +1,10 @@
-import { ApiError, keys, useApi, useMe, useSettings } from "@agenteschat/client";
+import { ApiError, useApi, useMe, useSettings } from "@agenteschat/client";
 import { browserTimezone, zoneDisplayName } from "@agenteschat/client/lib/routines";
 import { filterZones, type ZoneOption, zoneOptions } from "@agenteschat/ui/timezones";
 import { useQueryClient } from "@tanstack/react-query";
-import * as ImagePicker from "expo-image-picker";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActionSheetIOS, Alert, FlatList, Platform, Pressable, StyleSheet, TextInput, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { authClient } from "@/lib/auth";
 import { useOrg, useOrgMaybe } from "@/providers/org";
@@ -27,15 +26,8 @@ import { SheetHeader } from "../new/parts";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import { goBack, PushedHeader } from "../shared/parts";
 import { usePersonPhoto } from "../shared/photo";
-import {
-  type AccountDraft,
-  accountChanges,
-  accountProblem,
-  handleErrorKey,
-  PHOTO_MAX_BASE64,
-  photoContentType,
-} from "./logic";
-import { Page, setAccountDraft, useAccountDraft } from "./parts";
+import { type AccountDraft, accountChanges, accountProblem, handleErrorKey } from "./logic";
+import { Page, refreshProfile, setAccountDraft, useAccountDraft, useChangePhoto } from "./parts";
 
 /** A zone as the list says it: "Horário de Brasília" (a friendly name) or the city. */
 const zoneName = (zone: string, locale: string) =>
@@ -79,7 +71,7 @@ export function AccountPage() {
   const draft = useAccountDraft() ?? initial;
   const setDraft = setAccountDraft;
   const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  const { changePhoto, uploading } = useChangePhoto();
   const [error, setError] = useState<string | null>(null);
 
   // A message from the last OK goes away once the form changes.
@@ -91,12 +83,6 @@ export function AccountPage() {
   const changed = Boolean(changes.name || changes.profile);
   // Show what's wrong once the person changed something (not on a fresh, untouched form).
   const shownProblem = changed && problem ? t(`mobile.me.account.${problem}`) : null;
-
-  const refresh = () => {
-    void qc.invalidateQueries({ queryKey: keys.me });
-    void qc.invalidateQueries({ queryKey: keys.members(org.orgId) });
-    void qc.invalidateQueries({ queryKey: keys.people(org.orgId) });
-  };
 
   const save = async () => {
     if (saving) return;
@@ -111,7 +97,7 @@ export function AccountPage() {
         if (res.error) throw new Error(res.error.message ?? "");
       }
       if (changes.profile) await api.orgs.updateMe(org.orgId, changes.profile);
-      refresh();
+      refreshProfile(qc, org.orgId);
       toast({ title: t("mobile.me.account.saved") });
       goBack();
     } catch (e) {
@@ -120,84 +106,6 @@ export function AccountPage() {
     } finally {
       setSaving(false);
     }
-  };
-
-  const upload = async (from: "library" | "camera") => {
-    const options: ImagePicker.ImagePickerOptions = {
-      mediaTypes: ["images"],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.5,
-      base64: true,
-    };
-    if (from === "camera") {
-      const perm = await ImagePicker.requestCameraPermissionsAsync();
-      if (!perm.granted) {
-        toast({ title: t("mobile.me.account.noCamera"), icon: "camera" });
-        return;
-      }
-    }
-    const res =
-      from === "camera"
-        ? await ImagePicker.launchCameraAsync(options)
-        : await ImagePicker.launchImageLibraryAsync(options);
-    const a = res.canceled ? null : res.assets[0];
-    if (!a?.base64) return;
-    if (a.base64.length > PHOTO_MAX_BASE64) {
-      toast({ title: t("mobile.me.account.photoTooBig"), icon: "x" });
-      return;
-    }
-    setUploading(true);
-    try {
-      await api.orgs.setAvatar(org.orgId, {
-        imageBase64: a.base64,
-        contentType: photoContentType(a.mimeType, a.fileName, a.base64),
-      });
-      refresh();
-      toast({ title: t("mobile.me.account.photoSaved") });
-    } catch {
-      toast({ title: t("mobile.me.account.photoFailed"), icon: "x" });
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const remove = async () => {
-    try {
-      await api.orgs.removeAvatar(org.orgId);
-      refresh();
-      toast({ title: t("mobile.me.account.photoRemoved") });
-    } catch {
-      toast({ title: t("mobile.app.failed"), icon: "x" });
-    }
-  };
-
-  const changePhoto = () => {
-    const hasPhoto = Boolean(mine?.avatarUrl);
-    const labels = [
-      t("mobile.me.account.fromLibrary"),
-      t("mobile.me.account.fromCamera"),
-      ...(hasPhoto ? [t("mobile.me.account.removePhoto")] : []),
-    ];
-    const run = (i: number) => {
-      if (i === 0) void upload("library");
-      else if (i === 1) void upload("camera");
-      else if (i === 2 && hasPhoto) void remove();
-    };
-    if (Platform.OS === "ios")
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options: [...labels, t("mobile.common.cancel")],
-          cancelButtonIndex: labels.length,
-          ...(hasPhoto ? { destructiveButtonIndex: 2 } : {}),
-        },
-        run,
-      );
-    else
-      Alert.alert(t("mobile.me.account.changePhoto"), undefined, [
-        ...labels.map((text, i) => ({ text, onPress: () => run(i) })),
-        { text: t("mobile.common.cancel"), style: "cancel" as const },
-      ]);
   };
 
   const input = [fieldText("callout"), styles.input, { color: c.ink }];

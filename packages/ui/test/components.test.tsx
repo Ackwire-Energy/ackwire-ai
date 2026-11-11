@@ -25,6 +25,7 @@ import {
   Logo,
   Menu,
   MenuCheckboxItem,
+  MenuFace,
   MenuItem,
   MenuRadioGroup,
   MenuReactions,
@@ -749,6 +750,61 @@ describe("Menu", () => {
     expect(more).toBe(1);
     expect(picked).toBe("");
     expect(body().queryByRole("menu")).toBeNull();
+  });
+
+  test("a face on top that changes it is the first item the keys reach, named, with its glyph hidden from readers", async () => {
+    let changed = 0;
+    render(
+      <Menu trigger={<Button>Walter</Button>} label="Conta">
+        <div>
+          <MenuFace label="Trocar foto" onSelect={() => changed++}>
+            <Avatar name="Walter Lima" size="lg" presence="online" />
+          </MenuFace>
+          <span>Walter Lima</span>
+        </div>
+        <MenuItem>Sair</MenuItem>
+      </Menu>,
+    );
+    const trigger = body().getByRole("button", { name: "Walter" });
+    trigger.focus();
+    await act(async () => fireEvent.keyDown(trigger, { key: "Enter" }));
+    const items = within(body().getByRole("menu")).getAllByRole("menuitem");
+    expect(items.map((i) => i.getAttribute("aria-label") ?? i.textContent)).toEqual(["Trocar foto", "Sair"]);
+    const face = items[0] as HTMLElement;
+    expect(document.activeElement).toBe(face);
+    expect(face.className).toBe("ac-face-edit");
+    expect(face.getAttribute("title")).toBe("Trocar foto");
+    expect([...face.children].map((c) => c.getAttribute("class")?.split(" ")[0])).toEqual([
+      "ac-avatar",
+      "ac-face-edit__glyph",
+      "ac-face-edit__badge",
+    ]);
+    for (const part of [".ac-face-edit__glyph", ".ac-face-edit__badge"])
+      expect(face.querySelector(part)?.getAttribute("aria-hidden")).toBe("true");
+    await act(async () => fireEvent.keyDown(face, { key: "Enter" }));
+    expect(changed).toBe(1);
+    expect(body().queryByRole("menu")).toBeNull();
+    // Shown on hover and while the keys hold it, over the tile's hairline and under the presence badge.
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    expect(css).toContain(
+      ".ac-face-edit:hover > .ac-face-edit__glyph,\n.ac-face-edit[data-highlighted] > .ac-face-edit__glyph {\n  opacity: 1;",
+    );
+    expect(css).toContain("html:not([data-pointer]) .ac-face-edit:focus-visible {\n  box-shadow: var(--focus-ring);");
+    // Initials give way to the glyph, at the same pace; a photo stays under the scrim.
+    expect(css).toContain(
+      ".ac-face-edit:hover .ac-avatar__initials,\n.ac-face-edit[data-highlighted] .ac-avatar__initials {\n  opacity: 0;",
+    );
+    expect(css).toContain(".ac-face-edit .ac-avatar__initials {\n  transition: opacity 150ms var(--out);");
+    const glyph = css.split(".ac-face-edit__glyph {")[1]?.split("}")[0] ?? "";
+    expect(glyph).toContain("z-index: var(--z-raised);");
+    expect(glyph).toContain("opacity: 0;");
+    // No hover on a touch screen: the photo badge stays on the face's top corner there, and only there.
+    expect(css).toContain(
+      ".ac-face-edit__badge {\n  display: none;\n}\n@media (hover: none) {\n  .ac-face-edit__badge {",
+    );
+    const badge = css.split("@media (hover: none) {\n  .ac-face-edit__badge {")[1]?.split("}")[0] ?? "";
+    for (const line of ["top: -4px;", "right: -4px;", "z-index: var(--z-lifted);", "display: grid;"])
+      expect(badge).toContain(line);
   });
 });
 
