@@ -21,8 +21,10 @@ import {
   schema,
   sql,
 } from "@agenteschat/db";
+import type { EmbeddingResult } from "@agenteschat/providers";
 import { agentIdsSeen, isPlaybook } from "./audience";
 import { caches } from "./cache";
+import { ACCESS_WORD, HOW_TO_WORD } from "./context/items";
 import { personAgentDmKey } from "./dms";
 import { cutText } from "./format";
 import type { ModelGateway } from "./gateway";
@@ -33,6 +35,7 @@ import { isQuietNotice } from "./notices";
 import { can, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
 import { isRoutineRoomKey } from "./routine-brief";
+import { openOrg } from "./standing";
 import { adminChannelSql, fileSeenSql, fileSharedSql, taskSeenSql } from "./task-access";
 import { visibleWikiPageIds } from "./wiki-links";
 
@@ -78,6 +81,11 @@ registerDocumentBuilder("context_item", async (db, orgId, id) => {
     channelIds: c.channelIds,
     title: `${c.kind}${c.title ? `: ${c.title}` : ""}`,
     body: c.content,
+    // Its key is English (`KEY_DESCRIPTION`): a request in another language still finds it by those words (ADR 0167).
+    keywords: c.subjectKey
+      .split(" ")
+      .filter((w) => w !== HOW_TO_WORD && w !== ACCESS_WORD)
+      .join(" "),
     createdAt: c.createdAt,
   };
 });
@@ -104,31 +112,54 @@ export async function indexSource(deps: SearchDeps, input: { orgId: string; kind
   await upsertWithEmbeddings(deps, input.orgId, [doc]);
 }
 
+/**
+ * Upserts documents, with vectors for the kinds that get them (`EMBEDDINGS_KINDS`). When the vectors fail, the
+ * documents still go in, found by their words, and the failure is thrown so the job tries them again.
+ */
 async function upsertWithEmbeddings(deps: SearchDeps, orgId: string, docs: SearchDocument[]) {
   if (docs.length === 0) return;
-  const embedded = await deps.gateway.embed({
-    orgId,
-    texts: docs.map((d) => cutText(`${d.title ? `${d.title}\n` : ""}${d.body}`, 8000)),
-    inputType: "document",
-  });
-  const withVectors = docs.map((d, i) => ({
-    ...d,
-    embedding: embedded?.vectors[i] ?? null,
-    embeddingModel: embedded?.model ?? null,
-  }));
+  const withVectors: SearchDocument[] = [];
+  let failed = false;
+  let failure: unknown;
+  for (const kind of new Set(docs.map((d) => d.kind))) {
+    const group = docs.filter((d) => d.kind === kind);
+    let embedded: EmbeddingResult | null = null;
+    try {
+      embedded = await deps.gateway.embed({
+        orgId,
+        texts: group.map((d) =>
+          cutText(`${d.title ? `${d.title}\n` : ""}${d.body}${d.keywords ? `\n${d.keywords}` : ""}`, 8000),
+        ),
+        inputType: "document",
+        kinds: [kind],
+      });
+    } catch (error) {
+      failed = true;
+      failure = error;
+    }
+    for (const [i, d] of group.entries()) {
+      withVectors.push({ ...d, embedding: embedded?.vectors[i] ?? null, embeddingModel: embedded?.model ?? null });
+    }
+  }
   await (await deps.search.forOrg(orgId)).upsert(withVectors);
+  if (failed) throw failure;
 }
 
 /**
- * Job `search.reindex`: rebuilds an organization's index (messages and
- * context items), in pages, embedding each page in one call.
+ * Job `search.reindex`: rebuilds an organization's index (messages, context items, then the kinds modules register),
+ * in pages, embedding each page in one call. `kinds`: only those.
  */
-export async function reindexOrg(deps: SearchDeps, orgId: string, options: { pageSize?: number } = {}) {
+export async function reindexOrg(
+  deps: SearchDeps,
+  orgId: string,
+  options: { pageSize?: number; kinds?: readonly SearchKind[] } = {},
+) {
   const page = options.pageSize ?? 200;
+  const wanted = (kind: SearchKind) => !options.kinds?.length || options.kinds.includes(kind);
   let indexed = 0;
   let cursor = new Date(0);
   let cursorId = "";
-  for (;;) {
+  while (wanted("message")) {
     const rows = await deps.db
       .select({ id: messages.id, createdAt: messages.createdAt })
       .from(messages)
@@ -149,10 +180,12 @@ export async function reindexOrg(deps: SearchDeps, orgId: string, options: { pag
     cursor = new Date(last.createdAt.getTime() - 1);
     cursorId = last.id;
   }
-  const items = await deps.db
-    .select({ id: contextItems.id })
-    .from(contextItems)
-    .where(and(eq(contextItems.orgId, orgId), eq(contextItems.status, "active"), isNull(contextItems.supersededBy)));
+  const items = wanted("context_item")
+    ? await deps.db
+        .select({ id: contextItems.id })
+        .from(contextItems)
+        .where(and(eq(contextItems.orgId, orgId), eq(contextItems.status, "active"), isNull(contextItems.supersededBy)))
+    : [];
   for (let i = 0; i < items.length; i += page) {
     const docs: SearchDocument[] = [];
     for (const it of items.slice(i, i + page)) {
@@ -163,7 +196,7 @@ export async function reindexOrg(deps: SearchDeps, orgId: string, options: { pag
     indexed += docs.length;
   }
   for (const [kind, builder] of builders) {
-    if (kind === "message" || kind === "context_item") continue;
+    if (kind === "message" || kind === "context_item" || !wanted(kind)) continue;
     for (const id of (await extraSources.get(kind)?.(deps.db, orgId)) ?? []) {
       const doc = await builder(deps.db, orgId, id);
       if (doc) {
@@ -179,6 +212,30 @@ export async function reindexOrg(deps: SearchDeps, orgId: string, options: { pag
 const extraSources = new Map<SearchKind, (db: Database, orgId: string) => Promise<string[]>>();
 export function registerReindexSource(kind: SearchKind, list: (db: Database, orgId: string) => Promise<string[]>) {
   extraSources.set(kind, list);
+}
+
+/**
+ * At boot (ADR 0167): each open workspace holding documents of `kinds` that `model` didn't embed gets one reindex of
+ * those kinds, once per model and kinds (its dedupe key), and again at a later start when that one failed (the
+ * provider was down, or its key wrong). Turning vectors on, changing the model or adding a kind takes no step of
+ * anyone's; a workspace on hold gets it at a start after it opens again. Returns how many it queued.
+ */
+export async function queueEmbeddingBackfill(db: Database, input: { model: string; kinds: readonly SearchKind[] }) {
+  const kinds = [...new Set(input.kinds)].sort();
+  if (kinds.length === 0) return 0;
+  const o = schema.organizations;
+  const d = schema.searchDocuments;
+  const queued = await db.execute(sql`insert into ${schema.outbox} (id, org_id, kind, payload, dedupe_key)
+    select gen_random_uuid(), ${o.id}, 'search.reindex', ${JSON.stringify({ kinds })}::jsonb,
+      'search.reindex:' || ${o.id} || ':' || ${input.model}::text || ':' || ${kinds.join(",")}::text
+    from ${o}
+    where ${openOrg} and exists (select 1 from ${d} where ${d.orgId} = ${o.id}
+      and ${d.kind} = any(${`{${kinds.join(",")}}`}::text[]) and ${d.embeddingModel} is distinct from ${input.model}::text)
+    on conflict (dedupe_key) do update
+      set status = 'pending', attempts = 0, next_attempt_at = now(), last_error = null, locked_by = null
+      where ${schema.outbox.status} = 'failed'
+    returning id`);
+  return rowsOf(queued).length;
 }
 
 /** Channels an agent can see: the ones it belongs to (resolved at query time, ADR 0017). */
@@ -353,15 +410,23 @@ export async function searchVisible(
     "after" | "before" | "messages" | "sort" | "visibleIssueScopes" | "visibleFileScopes" | "minTextRank"
   >,
 ): Promise<SearchHit[]> {
-  // A list by date ranks by no vector: no embedding to pay for.
+  // A list by date ranks by no vector: no embedding to pay for. A provider that fails or is slow leaves the words.
   const embedded =
     input.text.trim() && (input.sort ?? "relevance") === "relevance"
-      ? await deps.gateway.embed({ orgId: input.orgId, texts: [input.text], inputType: "query" })
+      ? await deps.gateway
+          .embed({
+            orgId: input.orgId,
+            texts: [input.text],
+            inputType: "query",
+            kinds: input.messages ? ["message"] : input.kinds,
+          })
+          .catch(() => null)
       : null;
   const index = await deps.search.forOrg(input.orgId);
   return index.query({
     text: input.text,
     embedding: embedded?.vectors[0] ?? null,
+    embeddingModel: embedded?.model,
     visibleChannelIds: input.visibleChannelIds,
     visibleIssueScopes: input.visibleIssueScopes,
     visibleFileScopes: input.visibleFileScopes,

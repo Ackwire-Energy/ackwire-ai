@@ -155,6 +155,20 @@ test("the phone's greeting draws the checklist and Conversas has one line back t
   expect(steps).toContain('router.push({ pathname: "/connectors", params: { connect: def.id } })');
 });
 
+test("on a hold for its first plan the phone's card leads with the plan row: where to choose it, in words only", () => {
+  const card = readFileSync(new URL("../../src/features/right-hand/FirstRun.tsx", import.meta.url), "utf8");
+  // The row comes only while the workspace waits for its first plan (ADR 0162, amended 2026-11-10).
+  expect(card).toContain('waitsForPlan: hold === "payment",');
+  expect(card).toContain('plan: "play",');
+  // No button and no way to pay from the phone (App Store 3.1.1): its line says where the plan is chosen, or who can.
+  expect(card).toContain("plan: () => undefined,");
+  expect(card).toContain('...(words.action && s !== "plan" && !(s === "about" && next === "about")');
+  expect(card).toContain('b: t(mayPay ? "connectAi.billingWeb" : "standing.billing.askAdmin"),');
+  // Any other hold has no plan row: the AI row says it, as before.
+  expect(card).toContain('const holdLine = s === "ai" && state === "afterPlan" && !steps.includes("plan");');
+  for (const banned of ["billingLink", "BillingLink", "planOffer", "plans.json"]) expect(card).not.toContain(banned);
+});
+
 test("Configurações has its section for who manages agents, at its own screen", () => {
   const ids = (permissions: string[]) =>
     visibleSections({ id: "o", name: "Acme", role: "member", permissions }).map((s) => s.id);

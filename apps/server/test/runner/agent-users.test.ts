@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readlinkSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { writeAgents } from "../../runner/access";
 import { accountSelfCheck, REFUSED, type SelfCheck } from "../../runner/account-check";
@@ -13,12 +13,20 @@ import {
   accountLauncher,
   adbServerPort,
   agentGid,
+  agentSubids,
   agentUserName,
   authEgressPrefix,
+  containersCommand,
   denySchedulers,
+  ensureContainers,
+  ensureSubids,
+  keepContainers,
   readAccountUsers,
   readAgentUsers,
+  rootlessContainers,
+  SUBIDS,
   stopAccountScopes,
+  stopContainers,
   systemLauncher,
   trustedNetworkLauncher,
 } from "../../runner/agent-users";
@@ -41,8 +49,23 @@ interface OsUser {
   comment: string;
 }
 
-/** passwd in memory; useradd and usermod fail the way the real ones do (9: the name exists, 4: the uid is taken). */
-function fakeOs(users: OsUser[] = [{ name: "root", uid: 0, comment: "root" }]) {
+/** `name:first:count` lines of a subuid or subgid file. */
+const subidLines = (file: string) => (existsSync(file) ? readFileSync(file, "utf8").split("\n").filter(Boolean) : []);
+
+/**
+ * passwd in memory; useradd and usermod fail the way the real ones do (9: the name exists, 4: the uid is taken). With
+ * `etc`, useradd gives a new user the next free range of subordinate ids, as Debian's does, and usermod's
+ * `--add-subuids`/`--del-subuids` (and gids) change those files.
+ */
+function fakeOs(users: OsUser[] = [{ name: "root", uid: 0, comment: "root" }], etc?: string) {
+  const subids = (name: string, add: boolean, file: "subuid" | "subgid", range: string) => {
+    if (!etc) return;
+    const [first = 0, last = 0] = range.split("-").map(Number);
+    const at = path.join(etc, file);
+    const line = `${name}:${first}:${last - first + 1}`;
+    const lines = subidLines(at).filter((l) => l !== line);
+    writeFileSync(at, [...lines, ...(add ? [line] : [])].map((l) => `${l}\n`).join(""));
+  };
   const calls: string[] = [];
   const fails = new Map<string, number>();
   const run: RunCommand = (file, args) => {
@@ -64,12 +87,20 @@ function fakeOs(users: OsUser[] = [{ name: "root", uid: 0, comment: "root" }]) {
       if (users.some((u) => u.name === name)) return { code: 9, output: `useradd: user '${name}' already exists` };
       if (users.some((u) => u.uid === uid)) return { code: 4, output: `useradd: UID ${uid} is not unique` };
       users.push({ name, uid, comment: args[args.indexOf("--comment") + 1] ?? "" });
+      if (etc && !args.includes("--system")) {
+        const next = 100000 + 65536 * subidLines(path.join(etc, "subuid")).length;
+        for (const f of ["subuid", "subgid"] as const) subids(name, true, f, `${next}-${next + 65535}`);
+      }
       return { code: 0, output: "" };
     }
     if (file === "usermod") {
       const u = users.find((x) => x.name === name);
       if (!u) return { code: 6, output: `usermod: user '${name}' does not exist` };
       if (args[0] === "--comment") u.comment = args[1] ?? "";
+      for (const [i, flag] of args.entries()) {
+        const m = /^--(add|del)-sub(uid|gid)s$/.exec(flag);
+        if (m) subids(name, m[1] === "add", m[2] === "uid" ? "subuid" : "subgid", args[i + 1] ?? "");
+      }
       return { code: 0, output: "" };
     }
     return { code: 0, output: "" };
@@ -80,7 +111,7 @@ function fakeOs(users: OsUser[] = [{ name: "root", uid: 0, comment: "root" }]) {
 function setup(users?: OsUser[]) {
   const home = tempDir("agent-users-");
   dirs.push(home);
-  const os = fakeOs(users);
+  const os = fakeOs(users, home);
   return { home, os, users: new AgentUsers({ home, range: RANGE, run: os.run, etc: home }) };
 }
 
@@ -104,6 +135,8 @@ test("an agent's first request makes its user with the lowest free uid, listed i
     "getent passwd",
     "useradd --uid 21003 --user-group --create-home --home-dir /home/ag-a1b2c3d4 --shell /bin/bash --comment Ana Ção ag-a1b2c3d4",
     "chmod 0700 /home/ag-a1b2c3d4",
+    // The range useradd gave it by the order users came in goes; its own block, from its uid, comes (ADR 0169).
+    "usermod --del-subuids 100000-165535 --add-subuids 1376452608-1376518143 --del-subgids 100000-165535 --add-subgids 1376452608-1376518143 ag-a1b2c3d4",
   ]);
   expect(listed(home)).toEqual([
     { id: "gone-0001", user: "ag-gone0001", uid: 21002 },
@@ -183,7 +216,10 @@ test("agents.json lost: the agent's existing user is listed again with its own u
     { name: "ag-b2c3d4e5", uid: 1001, comment: "Bia" },
   ]);
   expect(users.ensure(ANA)).toEqual({ id: ANA.id, user: "ag-a1b2c3d4", uid: 21007 });
-  expect(os.calls).toEqual(["getent passwd"]);
+  expect(os.calls).toEqual([
+    "getent passwd",
+    "usermod --add-subuids 1376714752-1376780287 --add-subgids 1376714752-1376780287 ag-a1b2c3d4",
+  ]);
   expect(await errorCode(() => users.ensure(BIA))).toBe("internal");
   expect(readAgentUsers(home)).toEqual([{ id: ANA.id, user: "ag-a1b2c3d4", uid: 21007 }]);
 });
@@ -202,7 +238,7 @@ test("a useradd that fails keeps the uid listed: the next request makes the user
 test("with a shared folder, each agent's user joins its group and gets ~/shared, made as the agent, once per process", () => {
   const home = tempDir("agent-users-");
   dirs.push(home);
-  const os = fakeOs();
+  const os = fakeOs(undefined, home);
   const shared = { path: "/srv/agentes/shared", group: "agentes-shared" };
   const users = new AgentUsers({ home, range: RANGE, run: os.run, etc: home, shared });
   users.ensure(ANA);
@@ -275,7 +311,7 @@ test("the launcher: the agent's slice, its own temporary folders, its user, abso
     // A finished build's Gradle and Kotlin daemons give the memory back after 5 idle minutes, not 3 hours.
     GRADLE_OPTS: "-Dorg.gradle.daemon.idletimeout=300000",
   };
-  const launcher = systemLauncher(user, true, false);
+  const launcher = systemLauncher(user, true, false, false);
   const p = launcher.prefix;
   expect(p.slice(0, 8)).toEqual([
     "/usr/bin/systemd-run",
@@ -338,7 +374,7 @@ test("the launcher: the agent's slice, its own temporary folders, its user, abso
     'exec "$@"',
   ]);
   // systemd 253 and later: a process the kernel stops for memory takes only itself, not the rest of the scope.
-  const keeps = systemLauncher(user, true, true).prefix;
+  const keeps = systemLauncher(user, true, true, false).prefix;
   expect(keeps.slice(3, 6)).toEqual(["--collect", "--property=OOMPolicy=continue", "--slice=agents-21003.slice"]);
   expect(keeps.slice(6)).toEqual(p.slice(5));
   // No systemd as PID 1 (a container): runuser alone.
@@ -485,6 +521,217 @@ test("a configured routing mark drops network capabilities even without a namesp
   expect(scoped.join("\n")).toContain("mount -t proc -o nosuid,nodev,noexec,hidepid=2 proc /proc");
   expect(scoped.indexOf("/usr/bin/setpriv")).toBeLessThan(scoped.indexOf("/usr/sbin/runuser"));
   expect(systemLauncher({ ...user, networkMark: undefined }, false).prefix[0]).toBe("/usr/sbin/runuser");
+});
+
+// ── Rootless containers (ADR 0169) ──────────────────────────────────────────
+
+test("an agent's subordinate ids: the 65536 from its uid, apart from every other agent's block and every real uid", () => {
+  expect(SUBIDS).toBe(65536);
+  expect(agentSubids(21000)).toEqual([1376256000, 1376321535]);
+  // The next agent's block starts right after: none shares an id.
+  expect(agentSubids(21001)[0]).toBe(agentSubids(21000)[1] + 1);
+  // The lowest agent uid's block lies above every real uid (all below 65536), the highest's below the last id.
+  expect(agentSubids(1000)[0]).toBeGreaterThan(65535);
+  expect(agentSubids(59999)[1]).toBeLessThan(2 ** 32 - 1);
+});
+
+test("ensureSubids: the agent's block once, by name or by uid; files that aren't there are made", () => {
+  const etc = tempDir("subids-");
+  dirs.push(etc);
+  const calls: string[] = [];
+  const run: RunCommand = (file, args) => {
+    calls.push([file, ...args].join(" "));
+    return { code: 0, output: "" };
+  };
+  const user = { user: "ag-a1b2c3d4", uid: 21000 };
+  expect(ensureSubids(user, etc, run)).toBeNull();
+  expect(calls).toEqual([
+    "usermod --add-subuids 1376256000-1376321535 --add-subgids 1376256000-1376321535 ag-a1b2c3d4",
+  ]);
+  for (const f of ["subuid", "subgid"]) expect(statSync(path.join(etc, f)).mode & 0o777).toBe(0o644);
+  calls.length = 0;
+  writeFileSync(path.join(etc, "subuid"), "ag-a1b2c3d4:1376256000:65536\n");
+  writeFileSync(path.join(etc, "subgid"), "21000:1376256000:65536\n");
+  expect(ensureSubids(user, etc, run)).toBeNull();
+  expect(calls).toEqual([]);
+  // A usermod that fails says so.
+  const failing: RunCommand = () => ({ code: 10, output: "usermod: cannot lock /etc/subuid" });
+  expect(ensureSubids({ user: "ag-b2c3d4e5", uid: 21001 }, etc, failing)).toBe(
+    "usermod failed (10): usermod: cannot lock /etc/subuid",
+  );
+});
+
+test("a range anyone else holds over the agent's block leaves it none, never sharing ids; only logged", () => {
+  const home = tempDir("agent-users-");
+  dirs.push(home);
+  const os = fakeOs(undefined, home);
+  const lines: string[] = [];
+  writeFileSync(path.join(home, "subuid"), "someone:1376300000:100\n");
+  const users = new AgentUsers({ home, range: RANGE, run: os.run, etc: home, log: (l) => lines.push(l) });
+  expect(users.ensure(ANA)).toEqual({ id: ANA.id, user: "ag-a1b2c3d4", uid: 21000 });
+  // useradd's range goes, and no block comes.
+  expect(os.calls.at(-1)).toBe("usermod --del-subuids 165536-231071 --del-subgids 165536-231071 ag-a1b2c3d4");
+  expect(readFileSync(path.join(home, "subuid"), "utf8")).toBe("someone:1376300000:100\n");
+  expect(readFileSync(path.join(home, "subgid"), "utf8")).toBe("");
+  expect(lines).toEqual([
+    "ag-a1b2c3d4 has no ids for containers: someone holds 1376300000-1376300099, over its 1376256000-1376321535",
+  ]);
+});
+
+test("rootlessContainers: Podman and both id-map helpers, or none", () => {
+  const have = (files: string[]) => (file: string) => files.includes(file);
+  expect(rootlessContainers(have(["/usr/bin/podman", "/usr/bin/newuidmap", "/usr/bin/newgidmap"]))).toBe(true);
+  expect(rootlessContainers(have(["/usr/bin/podman", "/usr/bin/newuidmap"]))).toBe(false);
+  expect(rootlessContainers(have(["/usr/bin/newuidmap", "/usr/bin/newgidmap"]))).toBe(false);
+});
+
+test("every launch with containers: its runtime dir bound in its view, Podman's socket, no_new_privs as before", () => {
+  const user = { id: ANA.id, user: "ag-a1b2c3d4", uid: 21003, networkMark: 0x08000000 };
+  const l = systemLauncher(user, true, false, true);
+  const socket = "unix:///run/user/21003/podman/podman.sock";
+  expect(l.env).toMatchObject({ XDG_RUNTIME_DIR: "/run/user/21003", CONTAINER_HOST: socket, DOCKER_HOST: socket });
+  const view = (l.prefix[18] ?? "").split("\n");
+  expect(view[1]).toBe("/usr/bin/mount -t proc -o nosuid,nodev,noexec,hidepid=2 proc /proc");
+  expect(view.slice(-5)).toEqual([
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the shell's own expansion, not JavaScript's.
+    "u=${m##*/}",
+    'install -d -m 0700 -o "$u" "$m/run"',
+    'mkdir -p "/run/user/$u"',
+    'mount --bind "$m/run" "/run/user/$u"',
+    'exec "$@"',
+  ]);
+  // Only the containers service goes without it.
+  expect(l.prefix).toContain("--no-new-privs");
+});
+
+test("the containers service: a delegated unit of the agent's slice, its steps, set-user-ID for the id-map helpers alone", () => {
+  const user = { id: ANA.id, user: "ag-a1b2c3d4", uid: 21003, networkLauncher: ROOT_TOOL, networkMark: 0x08000000 };
+  const argv = containersCommand(user);
+  expect(argv.slice(0, 11)).toEqual([
+    "/usr/bin/systemd-run",
+    "--quiet",
+    "--collect",
+    "--unit=agentes-containers-21003.service",
+    "--slice=agents-21003.slice",
+    "--property=Delegate=yes",
+    "--property=Restart=always",
+    "--property=RestartSec=5",
+    "--property=OOMPolicy=continue",
+    "--property=TimeoutStopSec=15",
+    "--",
+  ]);
+  // systemd expands `$` in a service's command line: each goes doubled, which it reads as one.
+  for (const arg of argv.slice(11)) expect(arg.replaceAll("$$", "")).not.toContain("$");
+  const at = argv.indexOf("/usr/bin/unshare");
+  const view = (argv[at + 7] ?? "").replaceAll("$$", "$");
+  expect(view).toContain("hidepid=2");
+  expect(view).toContain('mount --bind "$m/run" "/run/user/$u"');
+  // Its own cgroup only, made the agent's.
+  expect(view).toContain('*/agents-"$u".slice/agentes-containers-"$u".service) ;;');
+  expect(view).toContain('chown "$u" "$c" "$c/cgroup.procs" "$c/cgroup.subtree_control" "$c/cgroup.threads"');
+  // Every mount nosuid with its options kept, the two helpers set-user-ID again; last, after every bind.
+  expect(view).toContain('mount -o "remount,bind,nosuid,$o" "$p"');
+  expect(view.trimEnd().split("\n").slice(-2)).toEqual([
+    'for f in /usr/bin/newuidmap /usr/bin/newgidmap; do mount --bind "$f" "$f"; mount -o remount,bind,suid "$f"; done',
+    'exec "$@"',
+  ]);
+  // Then its network hook, the bounding set without no_new_privs, its user and only its environment.
+  expect(argv.slice(at + 8, at + 19)).toEqual([
+    "sh",
+    "21003",
+    ROOT_TOOL,
+    "21003",
+    "--",
+    "/usr/bin/setpriv",
+    "--bounding-set=-net_admin,-net_raw",
+    "--",
+    "/usr/sbin/runuser",
+    "-u",
+    "ag-a1b2c3d4",
+  ]);
+  expect(argv).not.toContain("--no-new-privs");
+  expect(argv).toContain("XDG_RUNTIME_DIR=/run/user/21003");
+  // It is Podman's own service: never a client of itself.
+  expect(argv.some((a) => /^(CONTAINER|DOCKER)_HOST=/.test(a))).toBe(false);
+  expect(argv.at(-2)).toContain("compose_warning_logs = false");
+  expect(argv.at(-1)).toContain('graphroot = "/home/ag-a1b2c3d4/.local/share/containers/storage"');
+});
+
+test.if(process.platform !== "win32")(
+  "the service's start, as the agent: its defaults where it has none, Podman's socket on",
+  () => {
+    const home = tempDir("containers-home-");
+    dirs.push(home);
+    const argv = containersCommand({ id: ANA.id, user: "ag-a1b2c3d4", uid: 21003 }).map((a) => a.replaceAll("$$", "$"));
+    const start = (argv.at(-4) ?? "").replace("exec /usr/lib/systemd/systemd --user", "exit 0");
+    expect(argv.at(-4)?.split("\n").at(-1)).toBe("exec /usr/lib/systemd/systemd --user");
+    const sh = (conf: string) =>
+      spawnSync("/bin/sh", ["-c", start, "sh", conf, "storage"], { env: { HOME: home, PATH: "/usr/bin:/bin" } });
+    expect(sh("first").status).toBe(0);
+    const c = path.join(home, ".config");
+    expect(readFileSync(path.join(c, "containers/containers.conf"), "utf8")).toBe("first");
+    expect(readFileSync(path.join(c, "containers/storage.conf"), "utf8")).toBe("storage");
+    expect(readlinkSync(path.join(c, "systemd/user/sockets.target.wants/podman.socket"))).toBe(
+      "/usr/lib/systemd/user/podman.socket",
+    );
+    expect(readlinkSync(path.join(c, "systemd/user/default.target.wants/podman-restart.service"))).toBe(
+      "/usr/lib/systemd/user/podman-restart.service",
+    );
+    // What the agent changed stays.
+    expect(sh("second").status).toBe(0);
+    expect(readFileSync(path.join(c, "containers/containers.conf"), "utf8")).toBe("first");
+  },
+);
+
+test("ensureContainers: started when it isn't, left when it runs as it would start, started anew when that changed", () => {
+  const calls: string[][] = [];
+  let shown = "ActiveState=inactive\nDescription=\n";
+  const run: RunCommand = (file, args) => {
+    calls.push([file, ...args]);
+    return { code: 0, output: file === "systemctl" && args[0] === "show" ? shown : "" };
+  };
+  const user = { id: ANA.id, user: "ag-a1b2c3d4", uid: 21003 };
+  const show = ["systemctl", "show", "--property=ActiveState,Description", "agentes-containers-21003.service"];
+  expect(ensureContainers(user, run)).toBeNull();
+  expect(calls[0]).toEqual(show);
+  const [file, description = "", ...rest] = calls[1] ?? [];
+  expect(file).toBe("/usr/bin/systemd-run");
+  expect(description).toMatch(/^--description=agentes\.chat containers [0-9a-f]{16}$/);
+  expect(rest).toEqual(containersCommand(user).slice(1));
+  shown = `ActiveState=active\nDescription=${description.slice("--description=".length)}\n`;
+  calls.length = 0;
+  expect(ensureContainers(user, run)).toBeNull();
+  expect(calls).toEqual([show]);
+  // In a namespace now: what runs there stops, and it starts again through the network hook.
+  calls.length = 0;
+  expect(ensureContainers({ ...user, networkLauncher: ROOT_TOOL }, run)).toBeNull();
+  expect(calls[1]).toEqual(["systemctl", "stop", "agentes-containers-21003.service"]);
+  expect(calls[2]?.[1]).not.toBe(description);
+  expect(calls[2]).toContain(ROOT_TOOL);
+  const refused: RunCommand = (f) =>
+    f === "systemctl" ? { code: 0, output: "ActiveState=inactive\n" } : { code: 1, output: "Unit was already loaded" };
+  expect(ensureContainers(user, refused)).toBe("/usr/bin/systemd-run failed (1): Unit was already loaded");
+  calls.length = 0;
+  stopContainers(21003, run);
+  expect(calls).toEqual([["systemctl", "stop", "--no-block", "agentes-containers-21003.service"]]);
+});
+
+test("keepContainers: none for an agent whose brain's shell has a sandbox of its own, its service stopped (ADR 0169)", () => {
+  const calls: string[][] = [];
+  const run: RunCommand = (file, args) => {
+    calls.push([file, ...args]);
+    return { code: 0, output: file === "systemctl" && args[0] === "show" ? "ActiveState=active\nDescription=\n" : "" };
+  };
+  const user = { id: ANA.id, user: "ag-a1b2c3d4", uid: 21003 };
+  expect(keepContainers(user, false, run)).toBeNull();
+  expect(calls).toEqual([["systemctl", "stop", "--no-block", "agentes-containers-21003.service"]]);
+  calls.length = 0;
+  expect(keepContainers(user, true, run)).toBeNull();
+  expect(calls.map((c) => c.slice(0, 2))).toEqual([
+    ["systemctl", "show"],
+    ["systemctl", "stop"],
+    ["/usr/bin/systemd-run", expect.stringMatching(/^--description=/)],
+  ]);
 });
 
 // ── A Claude login for several agents: the sign-in's own user ────────────────

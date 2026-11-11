@@ -6,6 +6,7 @@ import {
   PROVISIONING_STATES,
   PROVISIONING_STEPS,
   revokeManagedMachine,
+  setMachineEgressWaiting,
   setMachineStandby,
   setProvisioning,
 } from "@agenteschat/engine";
@@ -245,6 +246,25 @@ export function registerOperatorMachines(api: OpenAPIHono, { db, config, pubsub,
     async (c) => {
       const { orgId, machineId } = c.req.valid("param");
       const set = await setMachineStandby({ db, pubsub }, orgId, machineId, c.req.valid("json").standby);
+      if (!set) return apiError(c, 404, "not_found", "This workspace has no managed computer with this id");
+      return c.json(set, 200);
+    },
+  );
+
+  api.openapi(
+    createRoute({
+      method: "put",
+      path: "/orgs/{orgId}/machines/{machineId}/egress-waiting",
+      tags,
+      summary: "Say the workspace's computer's agents wait for their way out, or no longer",
+      description:
+        "Say it (`true`) when the computer's network sends its agents out only through a proxy and none works now, so their connections are refused for a while; `false` once one works. Its people see a line saying so on the computer, never an error, while it is online. `true` again keeps the first time it was said; removing the computer ends it. A change comes as `machine.updated`. 404 when the workspace has no such managed computer.",
+      request: { params: MachineParams, body: body(z.object({ waiting: z.boolean() })) },
+      responses: { 200: json(z.object({ waiting: z.boolean() }).openapi("OperatorEgressWaiting")), ...errors },
+    }),
+    async (c) => {
+      const { orgId, machineId } = c.req.valid("param");
+      const set = await setMachineEgressWaiting({ db, pubsub }, orgId, machineId, c.req.valid("json").waiting);
       if (!set) return apiError(c, 404, "not_found", "This workspace has no managed computer with this id");
       return c.json(set, 200);
     },

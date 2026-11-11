@@ -240,6 +240,12 @@ export const machines = pgTable(
      * when something wants it. Its runner's next hello clears it.
      */
     standbyAt: timestamp({ withTimezone: true }),
+    /**
+     * The operator says the workspace's own computer's agents wait for their way out (`PUT …/egress-waiting`): where
+     * its network sends them only through a proxy, none works now, so their connections are refused for a while. The
+     * apps show a line; null: they don't wait.
+     */
+    egressWaitingAt: timestamp({ withTimezone: true }),
     /** Last time a run or a person wanted this computer (written at most every 30 s per server process). */
     wantedAt: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),

@@ -691,26 +691,97 @@
         "name": "Nama ruang kerja",
         "business": "Apa yang kalian lakukan",
         "team": "Timmu",
-        "plan": "Nyalakan tim"
+        "plan": "Nyalakan tim",
+        "ai": "Hubungkan AI",
+        "people": "Undang orang",
+        "namePersonal": "Untuk apa",
+        "teamPersonal": "Agenmu",
+        "planPersonal": "Nyalakan agen",
+        "aiPersonal": "Hubungkan AI"
       },
       "stepOf": "Langkah {{n}} dari {{total}}",
       "lodi": {
         "name": "Hai, {{first}}. Aku {{name}}. Aku akan menyusun tim bersamamu dalam sekitar dua menit.",
         "business": "Dengan ini aku tahu siapa yang perlu masuk tim.",
         "team": "Ini tim yang akan aku susun. Kamu bisa mengubah semuanya nanti.",
-        "plan": "Setelah paketnya, tinggal hubungkan AI. Nanti aku tunjukkan di mana."
+        "teamMade": "Timnya sudah tersusun. Kita lanjut kapan pun kamu siap.",
+        "teamMadePersonal": "Agenmu sudah di sini. Kita lanjut kapan pun kamu siap.",
+        "plan": "Setelah paketnya, tinggal hubungkan AI. Nanti aku tunjukkan di mana.",
+        "planThen": "Setelah paketnya aktif, layar berikutnya untuk menghubungkan AI-mu.",
+        "ask": "Sudah punya tim di tempat lain? Aku bawa semuanya ke sini.",
+        "start": "Aku punya tim yang siap untuk pekerjaan kalian. Atau kita mulai berdua saja.",
+        "askPersonal": "Sudah memakai agen di tempat lain? Aku bawa semuanya ke sini.",
+        "bring": "Salin permintaannya, tempel di {{app}}, lalu bawa jawabannya. Sisanya urusanku.",
+        "bringFiles": "Taruh di sini apa yang diekspor aplikasinya. Sisanya urusanku.",
+        "found": "Timmu sudah ketemu. Cek apakah semuanya ada.",
+        "foundPersonal": "Agenmu sudah ketemu. Cek apakah semuanya ada.",
+        "ai": "Langkah terakhir. Pilih AI yang sudah kamu pakai dan timmu bangun.",
+        "aiPersonal": "Langkah terakhir. Pilih AI yang sudah kamu pakai dan aku bangun.",
+        "aiThen": "Pilih AI yang sudah kamu pakai dan timmu bangun. Setelah itu, tinggal mengundang orang-orangnya.",
+        "aiThenAlone": "Pilih AI yang sudah kamu pakai dan aku bangun. Setelah itu, tinggal mengundang orang-orangnya.",
+        "connected": "Nah, beres. Panggil aku di ruang kerja dan aku tunjukkan sisanya.",
+        "connectedThen": "Nah, beres. Tinggal mengundang orang-orang yang bekerja denganmu.",
+        "people": "Sekarang orang-orangnya. Kasih tahu email mereka dan aku kirim undangannya.",
+        "peopleLink": "Sekarang orang-orangnya. Kirim tautannya ke mereka dan aku tunjukkan tiap permintaan."
       },
       "preview": {
         "label": "Ruang kerjamu, saat kamu menjawab",
         "name": "Ruang kerjamu",
-        "ghost": "Timmu muncul di sini"
+        "ghost": "Timmu muncul di sini",
+        "ghostPersonal": "Agenmu muncul di sini"
       },
       "team": {
-        "title": "Timmu"
+        "title": "Timmu",
+        "madeLead": "Mereka sudah ada di ruang kerja. Kamu bisa menyesuaikan masing-masing nanti.",
+        "start": {
+          "title": "Bagaimana kamu mau memulai tim?",
+          "lead": "Semuanya bisa diubah nanti, tidak ada yang hilang.",
+          "template": "Mulai dengan tim siap pakai",
+          "templateText_other": "{{count}} agen dari template {{template}}, masing-masing di kanalnya sendiri, dengan rutinitas yang sudah siap.",
+          "scratch": "Mulai dari nol",
+          "scratchText": "Hanya {{name}}, tangan kananmu. Setiap agen kamu buat nanti, dengan caramu sendiri.",
+          "scratchWho": "{{name}} dan agen yang kamu buat",
+          "see": "Lihat tim siap pakai",
+          "scratchGo": "Lanjut hanya dengan {{name}}"
+        },
+        "ask": {
+          "title": "Sudah punya agen di aplikasi lain?",
+          "lead": "Kalau ada, aku bawa seluruh timnya: instruksi, skill, dan rutinitas.",
+          "leadPersonal": "Kalau ada, aku bawa semuanya: instruksi, skill, dan rutinitas.",
+          "none": "Belum pakai satu pun",
+          "noneText": "Aku susun tim untuk {{org}} berdasarkan apa yang kalian lakukan.",
+          "noneTextPersonal": "Kita mulai berdua saja. Agen bisa menyusul nanti, kapan pun kamu mau.",
+          "from": "Bawa dari {{app}}",
+          "fresh": "Susun tim baru",
+          "freshPersonal": "Lanjut tanpa agen",
+          "skip": "Lewati langkah ini",
+          "skipText": "Kamu bisa membuat agen nanti, satu per satu."
+        },
+        "bring": {
+          "title": "Bawa timmu dari {{app}}",
+          "titlePersonal": "Bawa agenmu dari {{app}}",
+          "titleOther": "Bawa timmu dari aplikasi lain",
+          "titleOtherPersonal": "Bawa agenmu dari aplikasi lain",
+          "lead": "Cuma semenit. Di sana tidak ada yang berubah.",
+          "ask": "Minta {{app}} mengekspor",
+          "paste": "Tempel di obrolanmu dengan {{app}}.",
+          "reply": "Ia menjawab dengan JSON: salin seluruh jawabannya dan tempel di kolom bawah.",
+          "field": "Tempel jawaban dari {{app}} di sini",
+          "placeholder": "JSON jawabannya",
+          "read": "Baca jawabannya",
+          "fresh": "Aku lebih suka menyusun tim baru"
+        },
+        "found": {
+          "title_other": "Ketemu {{count}} agen di {{app}}",
+          "lead": "Mereka datang dengan instruksi, skill, dan rutinitas yang sudah mereka punya. Kamu bisa mengubah semuanya nanti.",
+          "bring": "Bawa timnya",
+          "bringPersonal": "Bawa agennya"
+        }
       },
       "plan": {
         "title": "Nyalakan timmu",
         "lead": "Timmu sudah siap. Dengan paketnya dan sebuah AI, tim mulai hari ini.",
+        "leadAlone": "Dengan paketnya dan sebuah AI, tangan kananmu mulai hari ini. Agen lainnya bisa kamu buat nanti.",
         "asleep": "Tidur sampai ada paket",
         "price": "<b>Paket {{name}}</b> · {{price}} per bulan",
         "name": "<b>Paket {{name}}</b>",
@@ -718,7 +789,36 @@
         "cancel": "Batalkan kapan saja",
         "cta": "Nyalakan tim",
         "all": "Lihat semua paket",
-        "skip": "Masuk ke ruang kerja tanpa menyalakannya"
+        "skip": "Nyalakan nanti dan lihat-lihat ruang kerja dulu",
+        "next": "Berikutnya: hubungkan AI-mu.",
+        "titlePersonal": "Nyalakan agenmu",
+        "leadPersonal": "Dengan paketnya dan sebuah AI, mereka mulai hari ini.",
+        "asleepPersonal": "Tidur sampai ada paket",
+        "ctaPersonal": "Nyalakan agen"
+      },
+      "ai": {
+        "titlePersonal": "Hubungkan AI supaya agenmu bisa berpikir",
+        "titleAlone": "Hubungkan AI supaya {{name}} bisa berpikir",
+        "later": "Hubungkan nanti",
+        "doneTitle": "Beres. Tim {{org}} sudah berpikir.",
+        "doneTitlePersonal": "Beres. {{name}} sudah berpikir.",
+        "doneLead": "{{label}}-mu menjawab untuk semua agen. Nanti bisa diganti satu per satu.",
+        "doneLeadAny": "AI yang kamu hubungkan menjawab untuk semua agen. Nanti bisa diganti satu per satu.",
+        "connected": "Terhubung",
+        "enter": "Masuk ke ruang kerja",
+        "awake": "Timmu sudah bangun",
+        "answer_other": "{{names}} sudah bisa menjawab.",
+        "readyPersonal": "Agenmu sudah siap",
+        "readyAlone": "{{name}} sudah siap",
+        "wakePersonal": "Tinggal butuh AI untuk bangun.",
+        "awakePersonal": "Agenmu sudah bangun",
+        "awakeAlone": "{{name}} sudah bangun"
+      },
+      "people": {
+        "title": "Siapa yang bekerja denganmu?",
+        "lead": "Undang orang-orang di timmu. Tiap orang menerima email untuk bergabung.",
+        "send": "Kirim undangan",
+        "later": "Undang nanti"
       },
       "account": "Akunmu"
     },
@@ -726,6 +826,8 @@
       "context": "Sudah ditulis",
       "skipped": "Dilewati",
       "later": "Nanti",
+      "on": "Aktif",
+      "ai": "Terhubung",
       "invites_other": "{{count}} undangan"
     },
     "back": "Kembali",
@@ -938,7 +1040,7 @@
       "go_other": "Impor {{count}} item",
       "nothingNew": "Semua ini sudah ada di sini.",
       "nothingToBring": "Tidak ada yang bisa dibawa dari sini. Tiap item menjelaskan alasannya.",
-      "withTeam": "Tiba saat kamu membuat tim.",
+      "withTeam": "Tiba saat kamu membawa timnya.",
       "applying": "Mengimpor… {{done}} dari {{total}}",
       "files": {
         "copy": "Salin file ke Drive",
@@ -2230,6 +2332,12 @@
       "action": "Buat rutinitas",
       "done": "Rutinitas dibuat"
     },
+    "howto": {
+      "title": "{{name}} belajar: {{what}}",
+      "line": "Dipakai {{uses}}×. Jadikan skill?",
+      "action": "Jadikan skill",
+      "done": "Dikonfirmasi"
+    },
     "stalled": {
       "title": "Langkah berhenti di #{{number}} {{title}}",
       "line_other": "Langkah {{steps}} sudah berhenti {{hours}} jam menunggu #{{on}}.",
@@ -2273,6 +2381,7 @@
   },
   "routing": {
     "title": "Siapa yang memilih agen",
+    "reflectionOff": "Memori belum belajar dari percakapan yang selesai: untuk itu perlu kunci penyedia, di atas.",
     "how": "Cara agen dipilih",
     "by": {
       "jev": "Jev memilih siapa yang menjawab tiap pesan tanpa sebutan.",
@@ -2366,6 +2475,59 @@
       "other": "Atau hubungkan yang lain",
       "manageKeys": "Kelola atau hapus kunci"
     },
+    "chat": {
+      "mine": "Milikmu",
+      "yours": "Milikmu",
+      "keys": "Kunci ruang kerja",
+      "best": "Paling longgar saat ini",
+      "atLimit": "Mencapai batas",
+      "seeAll": "Lihat semua {{count}} akun",
+      "allTitle": "Semua akun",
+      "search": "Cari akun atau orang",
+      "none": "Tidak ada akun dengan nama itu.",
+      "other": "Hubungkan AI lain",
+      "told": "{{name}} mendapat email tentang ini."
+    },
+    "team": {
+      "title": "Hubungkan AI untuk tim",
+      "titlePersonal": "Hubungkan AI untuk agenmu",
+      "asleep_other": "{{count}} agen tanpa AI",
+      "asleepSome": "{{n}} dari {{total}} agen tanpa AI",
+      "choose": "Pilih",
+      "perAgent": "Satu proses masuk per agen",
+      "pickTitle": "Untuk agen yang mana",
+      "marked": "{{n}} dari {{total}} dicentang.",
+      "useThese_other": "Pakai untuk {{count}} agen ini",
+      "progress": "{{n}} dari {{total}}",
+      "turn": "Masuk ke {{plan}} untuk {{name}}",
+      "turnHelp": "Akunnya sama. {{plan}} hanya memintamu masuk lagi untuk setiap agen.",
+      "signIn": "Masuk ke {{plan}}",
+      "failed": "Proses masuk untuk {{name}} belum selesai",
+      "skip": "Lewati {{name}}",
+      "state": {
+        "failed": "Proses masuk belum selesai"
+      },
+      "woke_other": "{{count}} agen sudah bangun",
+      "wokeAll": "Tim sudah bangun",
+      "wokeAllPersonal": "Agenmu sudah bangun",
+      "wokeNone": "Tidak ada yang bangun",
+      "thinksAll": "Mereka sudah berpikir dengan paket {{plan}} kamu",
+      "thinksOne": "{{name}} sudah berpikir dengan paket {{plan}} kamu",
+      "stayed": "{{name}} masih tanpa AI: proses masuknya belum selesai.",
+      "stayedMany": "{{names}} masih tanpa AI: proses masuknya belum selesai.",
+      "why": "{{name}}: {{why}}",
+      "stayedHand": "{{name}} belum punya AI untukmu.",
+      "again": "Hubungkan {{name}}",
+      "againMany": "Hubungkan {{n}} agen itu",
+      "audience": {
+        "offAll": "Dengan langgananmu, mereka hanya menjawabmu.",
+        "onAll": "Mereka menjawab siapa pun yang bisa bicara dengan mereka.",
+        "off": "Dengan langgananmu, {{name}} hanya menjawabmu.",
+        "on": "{{name}} menjawab siapa pun yang bisa bicara dengannya.",
+        "share": "Buka untuk tim",
+        "unshare": "Hanya untukku"
+      }
+    },
     "billing": "Paket masuk di komputer workspace, dan komputer itu datang dengan paket agentes.chat yang aktif.",
     "billingWeb": "Pilih satu di web, di agentes.chat.",
     "orPayGo": "Atau bayar sesuai pemakaian",
@@ -2441,7 +2603,8 @@
       "email": "Kami akan mengirim email saat komputernya siap. Kamu boleh menutup halaman ini.",
       "ready": "Komputernya sudah siap.",
       "useKey": "Pakai kunci API sekarang",
-      "connecting": "Komputer server ini terhubung dalam semenit. Kamu bisa masuk di sini begitu terhubung."
+      "connecting": "Komputer server ini terhubung dalam semenit. Kamu bisa masuk di sini begitu terhubung.",
+      "computerLater": "Akun butuh komputer, dan ruang kerja ini belum punya. Kamu bisa menambahkannya begitu ruang kerja terbuka."
     },
     "theComputer": "komputer",
     "own": {
@@ -4344,7 +4507,6 @@
       "failed": "Tidak bisa menyimpan. Coba lagi.",
       "use": "Pakai",
       "brain": {
-        "sub": "Hanya berlaku untuk {{name}}, di setiap percakapan.",
         "model": "Kunci API",
         "modelText": "Bayar per pemakaian. Dihitung dari anggaran {{name}}.",
         "planText": "Memakai paket {{plan}} kamu",
@@ -4364,8 +4526,6 @@
         "accountOthers": "Paket orang lain menunjukkan milik siapa. Pemiliknya menerima email dan bisa menariknya kembali.",
         "addAccount": "Tambah akun",
         "signInAgain": "Masuk lagi",
-        "connectPlan": "Hubungkan paket lain",
-        "keyLabel": "Kunci API",
         "fallbackTitle": "Jika {{computer}} berhenti merespons, jawab lewat API",
         "fallbackHint": "Agen menjawab lewat API dan dihitung dari anggaran {{name}}. Jika tidak, {{name}} memberi tahu siapa pun yang meminta dan menunggu komputernya kembali.",
         "effort": "Upaya",
@@ -4410,11 +4570,8 @@
         },
         "advanced": {
           "title": "Pengaturan lanjutan",
-          "sub": "{{brain}}. Berlaku untuk setiap percakapan.",
-          "think": "Cara berpikirnya",
           "answers": "Siapa yang dijawabnya",
           "defaults": "Kembali ke default",
-          "done": "Selesai",
           "contents": {
             "model": "Jendela konteks",
             "auto": "Jendela konteks dan siapa yang dijawabnya",
@@ -4524,9 +4681,39 @@
           },
           "startFailed": "Tidak ada jawaban dari {{computer}}. Coba lagi sebentar lagi.",
           "sendFailed": "Tidak bisa mengirim kode. Periksa lalu coba lagi.",
-          "done": "Akun {{account}} sudah ada di {{computer}}. Klik Pakai untuk menyimpan."
+          "done": "Akun {{account}} sudah masuk lagi di {{computer}}. Sekarang sedang dipakai."
         },
-        "offCloud": "{{computer}} tidak merespons"
+        "offCloud": "{{computer}} tidak merespons",
+        "v2": {
+          "title": "Siapa yang berpikir untuk {{name}}",
+          "only": "Hanya untuk {{name}}.",
+          "more": "Opsi lainnya",
+          "switch": "Ganti akun",
+          "switchTitle": "Ganti akun {{name}}",
+          "inUse": "Sedang dipakai",
+          "switchTo": "Ganti ke {{label}}",
+          "teamTitle": "Ganti akun tim",
+          "teamAria": "Untuk siapa",
+          "justOne": "Hanya {{name}}",
+          "everyone": "Semua di akun ini",
+          "target": "Ganti ke",
+          "switchMany_other": "Ganti {{count}} agen",
+          "limitTitle": "Akun {{name}} mencapai batas",
+          "limitBack": "{{account}} kembali {{when}}",
+          "limitSoon": "{{account}} kembali saat paketnya diperbarui",
+          "limitHelp": "Sementara itu {{name}} bisa berpikir dengan akun lain yang sudah terhubung.",
+          "wait": "Tunggu",
+          "modelTitle": "Model {{name}}",
+          "moreTitle": "Opsi lainnya untuk {{name}}",
+          "fallback": "Pakai kunci API jika paketnya berhenti",
+          "computer": "Komputer",
+          "doneTitle": "Beres",
+          "doneSub": "Yang sedang berjalan lanjut dengan akun baru.",
+          "finish": "Selesai",
+          "undo": "Batalkan",
+          "undone": "Kembali seperti semula.",
+          "missed_other": "{{names}} tetap memakai akun sebelumnya."
+        }
       },
       "computer": {
         "title": "Di mana {{name}} bekerja?",
@@ -4960,6 +5147,15 @@
       "andMore": "{{names}} dan lainnya"
     }
   },
+  "teamMemory": {
+    "title": "Memori tim",
+    "help": "Apa yang orang minta agar diingat semua agen, dengan siapa yang mengatakannya dan kapan. Setiap agen membacanya dalam semua pekerjaannya.",
+    "empty": "Belum ada. Saat seseorang meminta semua agen mengingat sesuatu, itu muncul di sini.",
+    "remove": "Hapus",
+    "removed": "Dihapus dari memori tim",
+    "make": "Jadikan milik tim",
+    "made": "Sekarang semua agen menyimpannya"
+  },
   "memory": {
     "fromRefusal": "Jangan usulkan lagi: {{text}}",
     "fromCorrection": "Seseorang mengoreksi: {{text}}",
@@ -4999,6 +5195,9 @@
     "unverifiedTitle": "Hanya agen yang mengatakan ini. Masuk ke konteks sebagai petunjuk bertanda.",
     "pinned": "Selalu ada di konteks",
     "lowTrust": "Sumber eksternal, tidak tepercaya",
+    "confirm": "Konfirmasi",
+    "confirmTitle": "Nyatakan bahwa ini benar: agen lalu memakainya sebagai tepercaya.",
+    "confirmed": "Dikonfirmasi",
     "used_other": "dipakai {{count}} kali",
     "unusedFor": "tidak dipakai selama {{days}} hari",
     "supersedes": "Menggantikan:",
@@ -5234,6 +5433,14 @@
       "complete": "Semua siap.",
       "notNow": "Nanti saja",
       "afterPlan": "Terbuka dengan paket.",
+      "afterPlanNext": "Ini langkah setelah paket.",
+      "plan": {
+        "todo": "Nyalakan timnya.",
+        "todoDesc": "Dengan paket agentes.chat, agen mulai bekerja.",
+        "action": "Lihat paket",
+        "todoPersonal": "Nyalakan agenmu.",
+        "todoDescPersonal": "Dengan paket agentes.chat, agenmu mulai bekerja."
+      },
       "about": {
         "action": "Ceritakan",
         "title": "Apa yang dilakukan {{org}}?",
@@ -7677,6 +7884,7 @@
       "machine_offline_resumes_other": "{{computer}} offline: {{count}} tugas tetap berjalan di sana jika hanya koneksinya yang putus, dan berlanjut dari titik berhenti jika komputer dinyalakan ulang.",
       "machine_task_resumed": "{{computer}} kembali: “{{title}}” berlanjut dari titik berhenti",
       "machine_task_resume_waits": "{{computer}} kembali: “{{title}}” berlanjut dari titik berhenti setelah proyek siap",
+      "machine_task_restarted": "{{computer}} kembali: “{{title}}” dimulai lagi",
       "machine_task_done": "“{{title}}” selesai dalam {{span}} di {{computer}}",
       "machine_task_failed": "“{{title}}” gagal setelah {{span}} di {{computer}}",
       "machine_task_canceled": "“{{title}}” dihentikan di {{computer}}",
@@ -10663,6 +10871,7 @@
       "support": "Dukungan",
       "marketing": "Pemasaran",
       "automation": "Otomatisasi",
+      "social": "Media sosial",
       "email": "Email"
     },
     "emptyCategory": "Belum ada konektor di kategori ini",
@@ -11014,6 +11223,41 @@
         "1": "Melihat tagihan dan pelanggan",
         "2": "Membuat tagihan Pix"
       },
+      "instagram": {
+        "1": "Melihat postingan, story, dan statistik",
+        "2": "Memublikasikan postingan dan membaca pesan langsung",
+        "ask": "Membalas pesan selalu meminta persetujuanmu"
+      },
+      "facebook": {
+        "1": "Melihat postingan, komentar, dan statistik",
+        "2": "Memublikasikan postingan, foto, dan video serta membalas komentar",
+        "ask": "Menghapus postingan dan komentar selalu meminta persetujuanmu"
+      },
+      "linkedin": {
+        "1": "Memublikasikan postingan, tautan, dan video",
+        "2": "Mengomentari postingan",
+        "ask": "Menghapus postingan selalu meminta persetujuanmu"
+      },
+      "youtube": {
+        "1": "Melihat video, komentar, dan analitik",
+        "2": "Mengedit video dan playlist serta berkomentar",
+        "ask": "Membalas, memoderasi, dan menghapus komentar selalu meminta persetujuanmu"
+      },
+      "pinterest": {
+        "1": "Melihat pin, papan, dan analitik",
+        "2": "Membuat pin dan merapikan papan",
+        "ask": "Mengubah papan dan menghapus selalu meminta persetujuanmu"
+      },
+      "reddit": {
+        "1": "Mencari postingan dan membaca komentar",
+        "2": "Memposting, berkomentar, dan mengedit",
+        "ask": "Menghapus selalu meminta persetujuanmu"
+      },
+      "whatsapp": {
+        "1": "Melihat nomor, template, dan status pengiriman",
+        "2": "Membuat template pesan",
+        "ask": "Mengirim pesan selalu meminta persetujuanmu"
+      },
       "database": {
         "1": "Melihat tabel",
         "2": "Menjalankan query ke data untuk menjawab",
@@ -11152,7 +11396,14 @@
       "revenuecat": "Langganan dalam aplikasi, produk, penawaran, dan pendapatan.",
       "superwall": "Paywall, kampanye, dan eksperimen.",
       "paddle": "Pelanggan, langganan, transaksi, dan produk.",
-      "abacatepay": "Tagihan Pix, pelanggan, dan penarikan dana."
+      "abacatepay": "Tagihan Pix, pelanggan, dan penarikan dana.",
+      "instagram": "Akun bisnis dan kreator Instagram: postingan, story, statistik, dan pesan langsung.",
+      "facebook": "Halaman Facebook: postingan, foto, video, komentar, dan statistik.",
+      "linkedin": "Postingan, video, dan komentar LinkedIn atas nama anggota yang masuk.",
+      "youtube": "Video, komentar, playlist, dan analitik kanal YouTube.",
+      "pinterest": "Pin, papan, dan analitik Pinterest.",
+      "reddit": "Postingan, komentar, dan komunitas Reddit.",
+      "whatsapp": "Pesan dan template WhatsApp Business."
     }
   },
   "toolNames": {
@@ -12445,7 +12696,8 @@
       "draining": "Jaringan sedang berubah. Sesi komputer yang terbuka akan dimulai ulang pukul {{when}}.",
       "restart": "Sesi komputer sedang dimulai ulang untuk menerapkan jaringan. Pekerjaan baru menunggu sampai selesai.",
       "line": "IP keluar {{ip}}",
-      "hint": "Alamat yang dilihat situs saat agen menjelajah. Alamat ini ikut berubah saat jaringan komputer berubah."
+      "hint": "Alamat yang dilihat situs saat agen menjelajah. Alamat ini ikut berubah saat jaringan komputer berubah.",
+      "waiting": "Menyambungkan ulang internet agen. Koneksi mereka menunggu sampai kembali."
     },
     "online": "Online",
     "offline": "Offline",
@@ -14759,6 +15011,7 @@
       "machine_task_interruptedNoComputer": "“{{title}}” terputus.",
       "machine_task_resumed": "{{computer}} sudah kembali: “{{title}}” dilanjutkan dari titik berhentinya.",
       "machine_task_resume_waits": "{{computer}} sudah kembali: “{{title}}” dilanjutkan dari titik berhentinya setelah proyeknya siap.",
+      "machine_task_restarted": "{{computer}} sudah kembali: “{{title}}” dimulai lagi.",
       "machine_offline": "{{computer}} sedang offline.",
       "brain_unavailable": "{{brain}} tidak bisa menjawab sekarang. Aku akan menjawab saat ia kembali.",
       "brain_unavailable_paused": "Komputer tempat {{brain}} berjalan sedang dijeda. Aku akan menjawab setelah dilanjutkan.",

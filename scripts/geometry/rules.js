@@ -1791,7 +1791,8 @@
         if (!seen(row) || row.closest("svg") || !isRow(style(row))) continue;
         const nodes = flowNodes(row);
         const pic = nodes[0];
-        if (pic?.nodeType !== 1 || pic.matches(`${CONTROL},a`)) continue;
+        // A check's or a radio's look, in a row that is itself the button, leads as that control does: no picture.
+        if (pic?.nodeType !== 1 || pic.matches(`${CONTROL},a,.ac-check,.ac-radio`)) continue;
         const tile =
           !pic.matches(PILL_LABEL) &&
           hasSurface(style(pic)) &&

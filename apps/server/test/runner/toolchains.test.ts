@@ -17,6 +17,7 @@ const TOOLS: Record<string, string> = {
   "xcode-select": "echo /Applications/Xcode.app/Contents/Developer",
   xcodebuild: "printf 'Xcode 26.3\\nBuild version 17C529\\n'",
   node: "echo v24.22.1",
+  podman: "echo 'podman version 5.4.2'",
 };
 
 function computer(tools: string[]) {
@@ -43,6 +44,7 @@ test("what this computer builds with: each tool's version, the Android SDK's fol
     xcode: "26.3",
     appleTeam: "Sam Rivera (Personal Team)",
     node: "24.22.1",
+    podman: "5.4.2",
   });
   // Linux: no Xcode asked; without the tools, nothing said.
   const bare = computer(["git"]);

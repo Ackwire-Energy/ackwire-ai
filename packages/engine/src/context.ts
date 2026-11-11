@@ -23,10 +23,12 @@ import type { AiStatusDeps } from "./ai-status";
 import { canTalkTo, NO_PERSON, speakerFor, viaAgent } from "./audience";
 import { runAuthority, UUID } from "./authority";
 import { type BlockSpecReader, blockStateNotes } from "./block-state";
+import { isSandboxedBrain } from "./brains/types";
 import { caches } from "./cache";
 import { summarizeScopes } from "./capabilities";
 import { peopleAllIn } from "./channels";
 import { consultationOrigin, type HandOff, handOffsFrom } from "./consultations";
+import { teamMemoryForPrompt } from "./context/tools";
 import { widgetRunContext } from "./dashboards/refresh-context";
 import { deviceRoster, osName } from "./device-resolve";
 import { isAgentOnlyDm } from "./dms";
@@ -553,7 +555,7 @@ export async function buildRunContext(
   // Independent lookups go out together (the database may be remote); org,
   // channel and members come from the per-process cache when enabled.
   const scope = and(eq(messages.orgId, run.orgId), eq(messages.channelId, run.channelId), isNull(messages.deletedAt));
-  const [org, channel, triggerRows, threadInfo, mode] = await Promise.all([
+  const [org, channel, triggerRows, threadInfo, mode, teamMemory] = await Promise.all([
     getOrgCached(db, run.orgId),
     getChannelCached(db, run.orgId, run.channelId),
     options.trigger
@@ -568,6 +570,8 @@ export async function buildRunContext(
     run.threadRootId === run.triggerMessageId ? null : threadRunInfo(db, run.orgId, run.threadRootId),
     // A personal workspace (ADR 0159): the rules and the workspace's block speak of one person and their agents.
     workspaceMode(db, run.orgId),
+    // What people asked every agent to keep (ADR 0167): with the org's context, in the cached prompt.
+    teamMemoryForPrompt(db, run.orgId).catch(() => ""),
   ]);
   const personal = mode === "personal";
   // A range from another channel counts only while everyone here can still see it (re-checked, cached).
@@ -1021,6 +1025,7 @@ export async function buildRunContext(
           ? `You work in "${org.name}" on agentes.chat, a personal workspace: one person, and maybe their family, with the AI agents that help them with their life and work. The app shows its channels to them as group conversations.`
           : `You work in "${org.name}" on agentes.chat, a workspace where people and AI agents work together.`,
         org.context.trim() ? `# About ${personal ? "the person" : "the organization"}\n${org.context.trim()}` : "",
+        teamMemory,
         options.workspaceComputer ? workspaceComputerText(options.workspaceComputer) : "",
       ]
         .filter(Boolean)
@@ -1113,6 +1118,10 @@ export async function buildRunContext(
                   ? [{ text: sharedFolderText(a.name, a.shared) }]
                   : []),
                 ...(a.shares && a.tools.commands ? [{ text: sharingText(a.name, a.size) }] : []),
+                // A sandboxed brain's agent has no containers service there (`MachineAgent.containers`).
+                ...(a.containers && a.tools.commands && !isSandboxedBrain(agent.brain)
+                  ? [{ text: containersText(a.name) }]
+                  : []),
               ]
             : [],
         )
@@ -1956,6 +1965,8 @@ async function machineAccessOf(db: Database, orgId: string, agentId: string, mac
     // Its agents share it (`sharingText`), with `agentes-runner computer` to see who uses it.
     shares: system && m.protocol >= SHARED_COMPUTER_PROTOCOL,
     size: m.size ? (m.size.limit ?? m.size) : null,
+    // Each agent its own containers service there (ADR 0169).
+    containers: system && Boolean(m.executors?.toolchains?.podman),
   };
 }
 
@@ -2098,6 +2109,19 @@ export function sharingText(computer: string, size: { cpus: number; memoryGb: nu
     "- Before something heavy (a build, a big install or download, a dataset or a model, many browser tabs), run agentes-runner computer: it shows what is free now and which agents use the most. If what you are about to start needs more than is free, tell the person which agent is using the computer and what you'll do: wait until it frees up, or do a lighter version now.",
     '- When a command is killed (exit code 137, "Killed") or your commands are much slower than usual, run agentes-runner computer before trying again, and tell the person what happened and why.',
     "- When something heavy is done, stop what it left running in the background (a build's daemons: ./gradlew --stop), so the others get the memory back.",
+  ].join("\n");
+}
+
+/**
+ * Rootless containers on a computer where each agent is its own user (ADR 0169): Docker's commands work, and what an
+ * agent should know of them there.
+ */
+export function containersText(computer: string) {
+  return [
+    `# Containers on "${computer}"`,
+    "docker, docker compose and podman work there: rootless Podman as your own user, your images and volumes in your home and your share of the computer. Containers reach the network as you do and never another agent's containers or files.",
+    "- Publish ports above 1024 (-p 8080:80).",
+    "- Containers keep running after your command ends, until the computer restarts; those with restart: always come back.",
   ].join("\n");
 }
 

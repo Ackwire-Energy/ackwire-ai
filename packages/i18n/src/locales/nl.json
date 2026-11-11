@@ -701,26 +701,99 @@
         "name": "Naam van de werkruimte",
         "business": "Wat jullie doen",
         "team": "Je team",
-        "plan": "Team aanzetten"
+        "plan": "Team aanzetten",
+        "ai": "Een AI koppelen",
+        "people": "Mensen uitnodigen",
+        "namePersonal": "Waarvoor je het gebruikt",
+        "teamPersonal": "Je agents",
+        "planPersonal": "Agents aanzetten",
+        "aiPersonal": "Een AI koppelen"
       },
       "stepOf": "Stap {{n}} van {{total}}",
       "lodi": {
         "name": "Hoi {{first}}. Ik ben {{name}}. Ik stel het team in zo'n twee minuten met je samen.",
         "business": "Daarmee weet ik wie ik bij het team haal.",
         "team": "Dit is het team dat ik zou samenstellen. Je kunt later alles veranderen.",
-        "plan": "Na het abonnement hoef je alleen nog een AI te koppelen. Ik laat je zien waar."
+        "teamMade": "Het team staat al. We gaan verder wanneer je wilt.",
+        "teamMadePersonal": "Je agents zijn er al. We gaan verder wanneer je wilt.",
+        "plan": "Na het abonnement hoef je alleen nog een AI te koppelen. Ik laat je zien waar.",
+        "planThen": "Zodra het abonnement aanstaat, koppel je op het volgende scherm je AI.",
+        "ask": "Heb je al een team ergens anders? Ik haal het in zijn geheel hierheen.",
+        "start": "Ik heb een team klaar voor wat jullie doen. Of we beginnen met z'n tweeën.",
+        "askPersonal": "Gebruik je al agents ergens anders? Ik haal ze allemaal hierheen.",
+        "bring": "Kopieer het verzoek, plak het in {{app}} en breng het antwoord terug. De rest doe ik.",
+        "bringFiles": "Zet hier neer wat de app heeft geëxporteerd. De rest doe ik.",
+        "found": "Ik heb je team gevonden. Kijk of iedereen er is.",
+        "foundPersonal": "Ik heb je agents gevonden. Kijk of ze er allemaal zijn.",
+        "ai": "Laatste stap. Kies de AI die je al gebruikt en het team wordt wakker.",
+        "aiPersonal": "Laatste stap. Kies de AI die je al gebruikt en ik word wakker.",
+        "aiThen": "Kies de AI die je al gebruikt en het team wordt wakker. Daarna hoef je alleen nog mensen uit te nodigen.",
+        "aiThenAlone": "Kies de AI die je al gebruikt en ik word wakker. Daarna hoef je alleen nog mensen uit te nodigen.",
+        "connected": "Zo. Roep me in de werkruimte en ik laat je de rest zien.",
+        "connectedThen": "Zo. Je hoeft alleen nog de mensen uit te nodigen met wie je werkt.",
+        "people": "Nu de mensen. Geef me hun e-mailadressen en ik stuur de uitnodigingen.",
+        "peopleLink": "Nu de mensen. Stuur ze de link en ik laat je elk verzoek zien."
       },
       "preview": {
         "label": "Je werkruimte, terwijl je antwoordt",
         "name": "Je werkruimte",
-        "ghost": "Hier verschijnt je team"
+        "ghost": "Hier verschijnt je team",
+        "ghostPersonal": "Hier verschijnen je agents"
       },
       "team": {
-        "title": "Je team"
+        "title": "Je team",
+        "madeLead": "Ze staan al in de werkruimte. Je kunt ze later een voor een aanpassen.",
+        "start": {
+          "title": "Hoe wil je het team beginnen?",
+          "lead": "Je kunt later alles veranderen, er gaat niets verloren.",
+          "template": "Beginnen met een kant-en-klaar team",
+          "templateText_one": "{{count}} agent uit het sjabloon {{template}}, in een eigen kanaal, met de routine al klaar.",
+          "templateText_other": "{{count}} agents uit het sjabloon {{template}}, elk in een eigen kanaal, met de routines al klaar.",
+          "scratch": "Vanaf nul beginnen",
+          "scratchText": "Alleen {{name}}, je rechterhand. Elke agent maak je later, op jouw manier.",
+          "scratchWho": "{{name}} en wie je zelf maakt",
+          "see": "Het kant-en-klare team bekijken",
+          "scratchGo": "Verder met alleen {{name}}"
+        },
+        "ask": {
+          "title": "Heb je al agents in een andere app?",
+          "lead": "Zo ja, dan haal ik het hele team: instructies, skills en routines.",
+          "leadPersonal": "Zo ja, dan haal ik ze allemaal: instructies, skills en routines.",
+          "none": "Ik gebruik er nog geen",
+          "noneText": "Ik stel een team samen voor {{org}} op basis van wat jullie doen.",
+          "noneTextPersonal": "We beginnen met z'n tweeën. Agents komen later, wanneer je wilt.",
+          "from": "Ophalen uit {{app}}",
+          "fresh": "Een nieuw team samenstellen",
+          "freshPersonal": "Doorgaan zonder agents",
+          "skip": "Deze stap overslaan",
+          "skipText": "Je kunt de agents later een voor een aanmaken."
+        },
+        "bring": {
+          "title": "Haal je team uit {{app}}",
+          "titlePersonal": "Haal je agents uit {{app}}",
+          "titleOther": "Haal je team uit een andere app",
+          "titleOtherPersonal": "Haal je agents uit een andere app",
+          "lead": "Het duurt een minuut. Daar verandert niets.",
+          "ask": "Vraag {{app}} om te exporteren",
+          "paste": "Plak het in je chat met {{app}}.",
+          "reply": "Het antwoordt met een JSON: kopieer het hele antwoord en plak het in het veld hieronder.",
+          "field": "Plak hier het antwoord van {{app}}",
+          "placeholder": "De JSON van het antwoord",
+          "read": "Antwoord lezen",
+          "fresh": "Ik stel liever een nieuw team samen"
+        },
+        "found": {
+          "title_one": "{{count}} agent gevonden in {{app}}",
+          "title_other": "{{count}} agents gevonden in {{app}}",
+          "lead": "Ze komen met de instructies, skills en routines die ze al hebben. Je kunt later alles veranderen.",
+          "bring": "Team ophalen",
+          "bringPersonal": "Agents ophalen"
+        }
       },
       "plan": {
         "title": "Zet je team aan",
         "lead": "Je team is klaar. Met het abonnement en een AI begint het vandaag.",
+        "leadAlone": "Met het abonnement en een AI begint je rechterhand vandaag. De andere agents kun je later aanmaken.",
         "asleep": "Slaapt tot het abonnement",
         "price": "<b>Abonnement {{name}}</b> · {{price}} per maand",
         "name": "<b>Abonnement {{name}}</b>",
@@ -728,7 +801,37 @@
         "cancel": "Altijd opzegbaar",
         "cta": "Team aanzetten",
         "all": "Alle abonnementen bekijken",
-        "skip": "Naar de werkruimte zonder aanzetten"
+        "skip": "Later aanzetten en eerst de werkruimte bekijken",
+        "next": "Daarna: je AI koppelen.",
+        "titlePersonal": "Zet je agents aan",
+        "leadPersonal": "Met het abonnement en een AI beginnen ze vandaag.",
+        "asleepPersonal": "Slapen tot het abonnement",
+        "ctaPersonal": "Agents aanzetten"
+      },
+      "ai": {
+        "titlePersonal": "Koppel een AI zodat je agents kunnen denken",
+        "titleAlone": "Koppel een AI zodat {{name}} kan denken",
+        "later": "Later koppelen",
+        "doneTitle": "Klaar. Het team van {{org}} denkt nu mee.",
+        "doneTitlePersonal": "Klaar. {{name}} denkt nu mee.",
+        "doneLead": "Je {{label}} antwoordt voor alle agents. Je kunt het later per agent veranderen.",
+        "doneLeadAny": "De AI die je hebt gekoppeld antwoordt voor alle agents. Je kunt het later per agent veranderen.",
+        "connected": "Gekoppeld",
+        "enter": "Naar de werkruimte",
+        "awake": "Je team is wakker",
+        "answer_one": "{{names}} antwoordt nu.",
+        "answer_other": "{{names}} antwoorden nu.",
+        "readyPersonal": "Je agents staan klaar",
+        "readyAlone": "{{name}} staat klaar",
+        "wakePersonal": "Alleen nog een AI om wakker te worden.",
+        "awakePersonal": "Je agents zijn wakker",
+        "awakeAlone": "{{name}} is wakker"
+      },
+      "people": {
+        "title": "Wie werkt er met je samen?",
+        "lead": "Nodig de mensen van je team uit. Iedereen krijgt een e-mail om mee te doen.",
+        "send": "Uitnodigingen sturen",
+        "later": "Later uitnodigen"
       },
       "account": "Je account"
     },
@@ -736,6 +839,8 @@
       "context": "Geschreven",
       "skipped": "Overgeslagen",
       "later": "Later",
+      "on": "Aan",
+      "ai": "Gekoppeld",
       "invites_one": "{{count}} uitnodiging",
       "invites_other": "{{count}} uitnodigingen"
     },
@@ -959,7 +1064,7 @@
       "go_other": "{{count}} items importeren",
       "nothingNew": "Dit staat hier allemaal al.",
       "nothingToBring": "Niets hiervan kan mee. Bij elk item staat waarom.",
-      "withTeam": "Het komt binnen als je het team maakt.",
+      "withTeam": "Het komt binnen als je het team ophaalt.",
       "applying": "Importeren… {{done}} van {{total}}",
       "files": {
         "copy": "De bestanden naar de Drive kopiëren",
@@ -2319,6 +2424,12 @@
       "action": "Routine maken",
       "done": "Routine gemaakt"
     },
+    "howto": {
+      "title": "{{name}} leerde: {{what}}",
+      "line": "{{uses}}× gebruikt. Een skill van maken?",
+      "action": "Maak er een skill van",
+      "done": "Bevestigd"
+    },
     "stalled": {
       "title": "Stappen staan stil in #{{number}} {{title}}",
       "line_one": "Stap {{steps}} staat al {{hours}} u stil en wacht op #{{on}}.",
@@ -2364,6 +2475,7 @@
   },
   "routing": {
     "title": "Wie de agents kiest",
+    "reflectionOff": "Het geheugen leert nog niet van afgeronde gesprekken: daarvoor is een sleutel van een aanbieder nodig, hierboven.",
     "how": "Hoe agents worden gekozen",
     "by": {
       "jev": "Jev kiest wie elk bericht zonder vermelding beantwoordt.",
@@ -2457,6 +2569,63 @@
       "other": "Of koppel een ander",
       "manageKeys": "Sleutels beheren of verwijderen"
     },
+    "chat": {
+      "mine": "Van jou",
+      "yours": "Van jou",
+      "keys": "Werkruimtesleutel",
+      "best": "Nu met de meeste ruimte",
+      "atLimit": "Op hun limiet",
+      "seeAll": "Alle {{count}} accounts bekijken",
+      "allTitle": "Alle accounts",
+      "search": "Zoek een account of een persoon",
+      "none": "Geen account met die naam.",
+      "other": "Een andere AI koppelen",
+      "told": "{{name}} krijgt hierover een e-mail."
+    },
+    "team": {
+      "title": "Een AI koppelen voor het team",
+      "titlePersonal": "Een AI voor je agents koppelen",
+      "asleep_one": "{{count}} agent zonder AI",
+      "asleep_other": "{{count}} agents zonder AI",
+      "asleepSome": "{{n}} van {{total}} agents zonder AI",
+      "choose": "Kiezen",
+      "perAgent": "Eén login per agent",
+      "pickTitle": "Voor welke agents",
+      "marked": "{{n}} van {{total}} aangevinkt.",
+      "useThese_one": "Deze agent gebruiken",
+      "useThese_other": "Deze {{count}} gebruiken",
+      "progress": "{{n}} van {{total}}",
+      "turn": "Log in bij {{plan}} voor {{name}}",
+      "turnHelp": "Het is hetzelfde account. {{plan}} vraagt alleen voor elke agent opnieuw om in te loggen.",
+      "signIn": "Inloggen bij {{plan}}",
+      "failed": "De login van {{name}} is niet afgerond",
+      "skip": "{{name}} overslaan",
+      "state": {
+        "failed": "Login niet afgerond"
+      },
+      "woke_one": "{{count}} agent is wakker geworden",
+      "woke_other": "{{count}} agents zijn wakker geworden",
+      "wokeAll": "Het team is wakker",
+      "wokeAllPersonal": "Je agents zijn wakker",
+      "wokeNone": "Niemand is wakker geworden",
+      "thinksAll": "Ze denken al met je {{plan}}-abonnement",
+      "thinksOne": "{{name}} denkt al met je {{plan}}-abonnement",
+      "stayed": "{{name}} heeft nog geen AI: de login is niet afgerond.",
+      "stayedMany": "{{names}} hebben nog geen AI: de logins zijn niet afgerond.",
+      "why": "{{name}}: {{why}}",
+      "stayedHand": "{{name}} heeft nog geen AI voor je.",
+      "again": "{{name}} koppelen",
+      "againMany": "De {{n}} koppelen",
+      "audience": {
+        "offAll": "Met je abonnement antwoorden ze alleen jou.",
+        "onAll": "Ze antwoorden iedereen die met ze kan praten.",
+        "off": "Met je abonnement antwoordt {{name}} alleen jou.",
+        "on": "{{name}} antwoordt iedereen die met hem kan praten.",
+        "on_female": "{{name}} antwoordt iedereen die met haar kan praten.",
+        "share": "Openzetten voor het team",
+        "unshare": "Alleen ik"
+      }
+    },
     "billing": "Een abonnement meldt zich aan op de computer van de workspace, en die computer hoort bij een actief agentes.chat-abonnement.",
     "billingWeb": "Kies er een op het web, op agentes.chat.",
     "orPayGo": "Of betaal per gebruik",
@@ -2532,7 +2701,8 @@
       "email": "We mailen je zodra de computer klaar is. Je kunt deze pagina sluiten.",
       "ready": "De computer is klaar.",
       "useKey": "Nu een API-sleutel gebruiken",
-      "connecting": "De computer van deze server maakt binnen een minuut verbinding. Je logt hier in zodra dat gebeurt."
+      "connecting": "De computer van deze server maakt binnen een minuut verbinding. Je logt hier in zodra dat gebeurt.",
+      "computerLater": "Accounts hebben een computer nodig, en deze werkruimte heeft er nog geen. Je kunt er een toevoegen zodra de werkruimte open is."
     },
     "theComputer": "de computer",
     "own": {
@@ -4510,8 +4680,6 @@
       "failed": "Opslaan lukte niet. Probeer het opnieuw.",
       "use": "Gebruiken",
       "brain": {
-        "sub": "Geldt alleen voor {{name}}, in elk gesprek.",
-        "sub_female": "Geldt alleen voor {{name}}, in elk gesprek.",
         "model": "API-sleutel",
         "modelText": "Betalen per gebruik. Telt mee voor het budget van {{name}}.",
         "modelText_female": "Betalen per gebruik. Telt mee voor het budget van {{name}}.",
@@ -4532,8 +4700,6 @@
         "accountOthers": "Abonnementen van anderen laten zien van wie ze zijn. De eigenaar krijgt een e-mail en kan het terugnemen.",
         "addAccount": "Account toevoegen",
         "signInAgain": "Opnieuw inloggen",
-        "connectPlan": "Ander abonnement koppelen",
-        "keyLabel": "API-sleutel",
         "fallbackTitle": "Als {{computer}} niet meer reageert, antwoord via de API",
         "fallbackHint": "Antwoordt dan via de API en telt mee voor het budget van {{name}}. Anders laat {{name}} het weten aan wie het vroeg en wacht tot de computer terug is.",
         "fallbackHint_female": "Antwoordt dan via de API en telt mee voor het budget van {{name}}. Anders laat {{name}} het weten aan wie het vroeg en wacht tot de computer terug is.",
@@ -4579,11 +4745,8 @@
         },
         "advanced": {
           "title": "Geavanceerde instellingen",
-          "sub": "{{brain}}. Geldt voor elk gesprek.",
-          "think": "Hoe het denkt",
           "answers": "Wie het antwoordt",
           "defaults": "Terug naar standaard",
-          "done": "Klaar",
           "contents": {
             "model": "Contextvenster",
             "auto": "Contextvenster en wie het antwoordt",
@@ -4698,9 +4861,41 @@
           },
           "startFailed": "Geen antwoord van {{computer}}. Probeer het zo opnieuw.",
           "sendFailed": "Kon de code niet versturen. Controleer hem en probeer het opnieuw.",
-          "done": "Het account {{account}} staat op {{computer}}. Klik op Gebruiken om op te slaan."
+          "done": "Het account {{account}} is weer ingelogd op {{computer}}. Het is nu in gebruik."
         },
-        "offCloud": "{{computer}} reageert niet"
+        "offCloud": "{{computer}} reageert niet",
+        "v2": {
+          "title": "Wie denkt voor {{name}}",
+          "only": "Alleen voor {{name}}.",
+          "more": "Meer opties",
+          "switch": "Account wisselen",
+          "switchTitle": "Account van {{name}} wisselen",
+          "inUse": "In gebruik",
+          "switchTo": "Overstappen naar {{label}}",
+          "teamTitle": "Account van het team wisselen",
+          "teamAria": "Voor wie het is",
+          "justOne": "Alleen {{name}}",
+          "everyone": "Iedereen op dit account",
+          "target": "Overstappen naar",
+          "switchMany_one": "{{count}} agent overzetten",
+          "switchMany_other": "De {{count}} agents overzetten",
+          "limitTitle": "Het account van {{name}} zit aan de limiet",
+          "limitBack": "{{account}} is {{when}} terug",
+          "limitSoon": "{{account}} is terug als het abonnement vernieuwt",
+          "limitHelp": "Tot die tijd kan {{name}} denken met een ander account dat al gekoppeld is.",
+          "wait": "Wachten",
+          "modelTitle": "Model van {{name}}",
+          "moreTitle": "Meer opties voor {{name}}",
+          "fallback": "De API-sleutel gebruiken als het abonnement stopt",
+          "computer": "Computer",
+          "doneTitle": "Alles geregeld",
+          "doneSub": "Wat bezig was, gaat verder met het nieuwe account.",
+          "finish": "Klaar",
+          "undo": "Ongedaan maken",
+          "undone": "Weer zoals het was.",
+          "missed_one": "{{names}} houdt het vorige account.",
+          "missed_other": "{{names}} houden hun vorige accounts."
+        }
       },
       "computer": {
         "title": "Waar werkt {{name}}?",
@@ -5177,6 +5372,15 @@
       "andMore": "{{names}} en meer"
     }
   },
+  "teamMemory": {
+    "title": "Teamgeheugen",
+    "help": "Wat mensen alle agents vroegen te onthouden, met wie het zei en wanneer. Elke agent leest het bij al zijn werk.",
+    "empty": "Nog niets. Als iemand alle agents vraagt iets te onthouden, verschijnt het hier.",
+    "remove": "Verwijderen",
+    "removed": "Uit het teamgeheugen verwijderd",
+    "make": "Naar het team",
+    "made": "Alle agents onthouden het nu"
+  },
   "memory": {
     "fromRefusal": "Niet opnieuw voorstellen: {{text}}",
     "fromCorrection": "Iemand heeft gecorrigeerd: {{text}}",
@@ -5217,6 +5421,9 @@
     "unverifiedTitle": "Alleen agents zeiden dit. Het gaat als gemarkeerde hint mee in de context.",
     "pinned": "Altijd in de context",
     "lowTrust": "Externe bron, niet vertrouwd",
+    "confirm": "Bevestigen",
+    "confirmTitle": "Zeg dat het klopt: agents gebruiken het dan als betrouwbaar.",
+    "confirmed": "Bevestigd",
     "used_zero": "nooit gebruikt",
     "used_one": "{{count}} keer gebruikt",
     "used_other": "{{count}} keer gebruikt",
@@ -5455,6 +5662,14 @@
       "complete": "Alles klaar.",
       "notNow": "Niet nu",
       "afterPlan": "Opent met het abonnement.",
+      "afterPlanNext": "Dat is de stap na het abonnement.",
+      "plan": {
+        "todo": "Zet het team aan.",
+        "todoDesc": "Met een agentes.chat-abonnement gaan de agents aan de slag.",
+        "action": "Abonnementen bekijken",
+        "todoPersonal": "Zet je agents aan.",
+        "todoDescPersonal": "Met een agentes.chat-abonnement gaan je agents aan de slag."
+      },
       "about": {
         "action": "Vertellen",
         "title": "Wat doet {{org}}?",
@@ -7975,6 +8190,7 @@
       "machine_offline_resumes_other": "{{computer}} is offline gegaan: {{count}} taken blijven daar draaien als alleen de verbinding wegviel, en gaan verder waar ze stopten als de computer opnieuw is opgestart.",
       "machine_task_resumed": "{{computer}} is terug: „{{title}}” gaat verder waar het stopte",
       "machine_task_resume_waits": "{{computer}} is terug: „{{title}}” gaat verder waar het stopte zodra het project klaar is",
+      "machine_task_restarted": "{{computer}} is terug: „{{title}}” is opnieuw gestart",
       "machine_task_done": "„{{title}}” klaar na {{span}} op {{computer}}",
       "machine_task_failed": "„{{title}}” mislukt na {{span}} op {{computer}}",
       "machine_task_canceled": "„{{title}}” is gestopt op {{computer}}",
@@ -11114,6 +11330,7 @@
       "support": "Support",
       "marketing": "Marketing",
       "automation": "Automatisering",
+      "social": "Sociale media",
       "email": "E-mail"
     },
     "emptyCategory": "Nog geen connectors in deze categorie",
@@ -11465,6 +11682,41 @@
         "1": "Betaalverzoeken en klanten bekijken",
         "2": "Pix-betaalverzoeken maken"
       },
+      "instagram": {
+        "1": "Posts, verhalen en statistieken bekijken",
+        "2": "Posts publiceren en directe berichten lezen",
+        "ask": "Op berichten antwoorden vraagt altijd om jouw goedkeuring"
+      },
+      "facebook": {
+        "1": "Posts, reacties en statistieken bekijken",
+        "2": "Posts, foto's en video's publiceren en op reacties antwoorden",
+        "ask": "Posts en reacties verwijderen vraagt altijd om jouw goedkeuring"
+      },
+      "linkedin": {
+        "1": "Posts, links en video's publiceren",
+        "2": "Op posts reageren",
+        "ask": "Posts verwijderen vraagt altijd om jouw goedkeuring"
+      },
+      "youtube": {
+        "1": "Video's, reacties en statistieken bekijken",
+        "2": "Video's en afspeellijsten bewerken en reageren",
+        "ask": "Reacties beantwoorden, modereren en verwijderen vraagt altijd om jouw goedkeuring"
+      },
+      "pinterest": {
+        "1": "Pins, borden en statistieken bekijken",
+        "2": "Pins maken en borden ordenen",
+        "ask": "Borden wijzigen en verwijderen vraagt altijd om jouw goedkeuring"
+      },
+      "reddit": {
+        "1": "Posts zoeken en reacties lezen",
+        "2": "Posten, reageren en bewerken",
+        "ask": "Verwijderen vraagt altijd om jouw goedkeuring"
+      },
+      "whatsapp": {
+        "1": "Nummers, sjablonen en bezorging bekijken",
+        "2": "Berichtsjablonen maken",
+        "ask": "Berichten versturen vraagt altijd om jouw goedkeuring"
+      },
       "database": {
         "1": "De tabellen bekijken",
         "2": "De data bevragen om te antwoorden",
@@ -11608,7 +11860,14 @@
       "revenuecat": "In-app-abonnementen, producten, aanbiedingen en omzet.",
       "superwall": "Paywalls, campagnes en experimenten.",
       "paddle": "Klanten, abonnementen, transacties en producten.",
-      "abacatepay": "Pix-betaalverzoeken, klanten en opnames."
+      "abacatepay": "Pix-betaalverzoeken, klanten en opnames.",
+      "instagram": "Zakelijke en creator-accounts op Instagram: posts, verhalen, statistieken en directe berichten.",
+      "facebook": "Facebook-pagina's: posts, foto's, video's, reacties en statistieken.",
+      "linkedin": "LinkedIn-posts, video's en reacties namens het lid dat inlogt.",
+      "youtube": "Video's, reacties, afspeellijsten en statistieken van het YouTube-kanaal.",
+      "pinterest": "Pins, borden en statistieken op Pinterest.",
+      "reddit": "Posts, reacties en community's op Reddit.",
+      "whatsapp": "Berichten en sjablonen van WhatsApp Business."
     }
   },
   "toolNames": {
@@ -12934,7 +13193,8 @@
       "draining": "Het netwerk verandert. Open sessies van de computer starten om {{when}} opnieuw.",
       "restart": "De sessies van de computer starten opnieuw om het netwerk toe te passen. Nieuw werk wacht tot dit klaar is.",
       "line": "Uitgaand IP {{ip}}",
-      "hint": "Het adres dat websites zien als de agents browsen. Het verandert mee met het netwerk van de computer."
+      "hint": "Het adres dat websites zien als de agents browsen. Het verandert mee met het netwerk van de computer.",
+      "waiting": "Het internet van de agents wordt opnieuw verbonden. Hun verbindingen wachten tot het terug is."
     },
     "online": "Online",
     "offline": "Offline",
@@ -15299,6 +15559,7 @@
       "machine_task_interruptedNoComputer": "“{{title}}” is onderbroken.",
       "machine_task_resumed": "{{computer}} is terug: “{{title}}” gaat verder waar het stopte.",
       "machine_task_resume_waits": "{{computer}} is terug: “{{title}}” gaat verder waar het stopte zodra het project klaar is.",
+      "machine_task_restarted": "{{computer}} is terug: “{{title}}” is opnieuw gestart.",
       "machine_offline": "{{computer}} is offline gegaan.",
       "brain_unavailable": "{{brain}} kan nu niet antwoorden. Ik antwoord zodra het terug is.",
       "brain_unavailable_paused": "De computer waarop {{brain}} draait is gepauzeerd. Ik antwoord zodra die wordt hervat.",

@@ -3377,6 +3377,12 @@
   "memory.unconfirmed": {
     "value": "Not confirmed yet"
   },
+  "memory.confirm": {
+    "value": "Confirm"
+  },
+  "memory.confirmedToast": {
+    "value": "Confirmed"
+  },
   "memory.details": {
     "value": "Technical details"
   },

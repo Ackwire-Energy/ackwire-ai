@@ -10,6 +10,7 @@ import {
   useWorkspaceLimits,
 } from "@agenteschat/client";
 import { knownErrorText } from "@agenteschat/client/lib/errors";
+import { useHeldWhile } from "@agenteschat/client/lib/hold";
 import { INVITE_NOTE_MAX, sendsEmail } from "@agenteschat/client/lib/join-requests";
 import { membersFull } from "@agenteschat/client/lib/limits";
 import { aiStateOf, onlyOwnerReplies } from "@agenteschat/client/lib/no-ai";
@@ -101,8 +102,11 @@ function InvitePeople() {
   const draft = useInviteDraft() ?? EMPTY_INVITE;
 
   // Who is in already, and who has an invitation waiting: said on their row and left out of the send.
-  const members = new Set(people.map((m) => m.email.toLowerCase()));
-  const invited = new Set(pendingInvitations(invitations).map((i) => i.email.toLowerCase()));
+  const members = useHeldWhile(new Set(people.map((m) => m.email.toLowerCase())), inviteMany.isPending);
+  const invited = useHeldWhile(
+    new Set(pendingInvitations(invitations).map((i) => i.email.toLowerCase())),
+    inviteMany.isPending,
+  );
   const stateOf = (a: InviteAddress) => addressState(a, members, invited);
   // What's still in the field counts: the button is pressed with the keyboard up, so the field never lost focus.
   const all = withAddresses(draft.addresses, typed);

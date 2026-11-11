@@ -1533,6 +1533,8 @@
     "uses_other": "Użyte {{count}} razy",
     "confirmed": "Potwierdzone przez osobę",
     "unconfirmed": "Jeszcze niepotwierdzone",
+    "confirm": "Potwierdź",
+    "confirmedToast": "Potwierdzono",
     "details": "Szczegóły techniczne",
     "before": "Wcześniej było: {{text}}",
     "fix": "Popraw",

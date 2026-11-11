@@ -5,6 +5,7 @@ setupDom();
 
 import type { ApiClient, DirectMessage, TeamTemplate } from "@agenteschat/client";
 import { ApiError, keys } from "@agenteschat/client";
+import type { OnboardingStepId } from "@agenteschat/client/lib/onboarding";
 import { browserTimezone } from "@agenteschat/client/lib/routines";
 import { focusManager } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
@@ -20,11 +21,14 @@ import {
 } from "./fake-api";
 import { pick } from "./new-agent-flow";
 import { renderApp, screen, settle, showIn } from "./render";
+// The team step's views load on their own (`TeamSource`'s lazy import): loaded here first, so a step shows them within
+// its first rounds and the geometry capture never measures their placeholder.
+import "@/pages/onboarding/TeamSourceBody";
 
 /*
- * The onboarding (ADR 0162): what the workspace is for first (ADR 0159), then, for a company or team, the blue rail
- * with Lodi, its steps read from the workspace's own data, the plan only where the workspace waits for its first one,
- * and where the workspace opens after it.
+ * The onboarding (ADR 0162): what the workspace is for first (ADR 0159), then the blue rail with Lodi, its steps read
+ * from the workspace's own data: a team's name, business and team, a personal workspace's agents, the plan only where
+ * the workspace waits for its first one, an AI for the team to think with, and where the workspace opens after it.
  */
 
 const realFetch = globalThis.fetch;
@@ -55,6 +59,18 @@ const eyebrow = () => document.querySelector(".onb__eyebrow")?.textContent;
 /** The plan step's card: its button shares the rail step's name, "Ligar o time". */
 const planCard = () => document.querySelector(".onb__plan") as HTMLElement;
 const GREETING = "Oi, eu sou o Lodi. Monto o time com você.";
+/** How a team with no agents yet starts, after "I don't use any yet" (ADR 0162, amended 2026-11-11). */
+const START = "Como você quer começar o time?";
+/** The team step's question, before a template or an import. */
+const ASK = "Você já tem agentes em outro app?";
+/** The last step's heading while no AI is connected. */
+const CONNECT = "Conecte uma IA para o seu time pensar";
+/** The same, in a personal workspace (ADR 0159): no team there. */
+const CONNECT_PERSONAL = "Conecte uma IA para os seus agentes pensarem";
+/** A team's last step: inviting the people who work there (ADR 0162, amended 2026-11-11). */
+const PEOPLE = "Quem trabalha com você?";
+/** The geometry capture, where CI runs one (`check:geometry`). */
+const snapshot = () => (globalThis as { geometrySnapshot?: () => void }).geometrySnapshot?.();
 /** A new workspace's zone and the person's own in it: this browser's, sent with the workspace. */
 const zones = () => {
   const zone = browserTimezone();
@@ -120,8 +136,8 @@ const newcomer = (cloud: boolean) => {
   }
   return state;
 };
-/** One being set up already, at whatever its data says. */
-const settingUp = (opts: { held?: boolean; context?: string; team?: boolean } = {}) => {
+/** One being set up already, at whatever its data says; `step`: the furthest one the server keeps. */
+const settingUp = (opts: { held?: boolean; context?: string; team?: boolean; step?: OnboardingStepId } = {}) => {
   const state = withRightHand(seedState(opts.team ? {} : { agents: [] }));
   if (state.me)
     state.me.organizations = [
@@ -129,7 +145,7 @@ const settingUp = (opts: { held?: boolean; context?: string; team?: boolean } = 
         id: ORG_ID,
         name: "Ateliê Couto",
         role: "owner",
-        onboarding: { step: "context", generalChannelId: GENERAL_ID },
+        onboarding: { step: opts.step ?? "context", generalChannelId: GENERAL_ID },
         ...(opts.held ? { standing: { state: "hold" as const, reason: "payment" } } : {}),
       },
     ];
@@ -157,17 +173,58 @@ const PLANS = {
   ],
 };
 
-/** Steps 1 to 3 as a person goes through them: the name, "Loja online", the store's team made. */
+/**
+ * No agent has an AI yet, whoever is made later (the fake's own answer is every agent ready): the last step asks for
+ * one.
+ */
+const noAiYet = (state: FakeState) => {
+  Object.defineProperty(state, "aiStatus", {
+    configurable: true,
+    get: () => ({ any: false, agents: state.agents.map((a) => ({ agentId: a.id, state: "no_ai" as const })) }),
+  });
+  return state;
+};
+/** An AI connected meanwhile (in the step's dialog, another tab, the phone): every agent ready again. */
+const aiConnected = (state: FakeState) =>
+  Object.defineProperty(state, "aiStatus", { configurable: true, writable: true, value: undefined });
+/** The team step's question answered "I don't use any yet", then its button ("Build a new team" for a team's). */
+const noneYet = async (go = "Montar um time novo") => {
+  const none = screen().queryByRole("radio", { name: /Ainda não uso nenhum/ }) ?? button(/Ainda não uso nenhum/);
+  await click(none, 4);
+  await click(button(go), 14);
+};
+/** On how a team starts, "Start with a ready-made team" and its button: the template's screen. */
+const readyMade = async () => {
+  await click(answer(/Começar com um time pronto/), 4);
+  await click(button("Ver o time pronto"), 8);
+};
+/** Where the onboarding sends the person, with the arrival it asks for (the workspace drops it from the address). */
+const landings = (router: Awaited<ReturnType<typeof renderApp>>["router"]) => {
+  const seen: { path: string; arrival: string | undefined }[] = [];
+  router.subscribe("onBeforeNavigate", (e) => {
+    // Against the last path seen, not `pathChanged`: the router's resolved location can lag behind a navigation that
+    // only drops the arrival from the address.
+    if (e.toLocation.pathname === (seen.at(-1)?.path ?? e.fromLocation?.pathname)) return;
+    const arrival = (e.toLocation.search as Record<string, unknown>).arrival;
+    seen.push({ path: e.toLocation.pathname, arrival: arrival === undefined ? undefined : String(arrival) });
+  });
+  return seen;
+};
+
+/** Steps 1 to 3 as a person goes through them: the name, "Loja online", no agents yet, the store's team made. */
 async function throughTheTeam(state: FakeState) {
   const r = await renderApp("/onboarding", { api: createFakeApi(state) });
+  const landed = landings(r.router);
   await settle(10);
   await forATeam();
   await type("Nome", "Ateliê Couto");
   await click(button("Continuar"), 14);
   await click(button("Loja online"), 4);
   await click(button("Continuar"), 14);
-  await click(button("Criar o time"), 16);
-  return r;
+  await noneYet();
+  await readyMade();
+  await click(button("Criar o time"), 20);
+  return { ...r, landed };
 }
 
 describe("the steps", () => {
@@ -177,19 +234,30 @@ describe("the steps", () => {
     await settle(10);
     expect(document.querySelector(".onb__say")?.textContent).toContain("Eu sou o Lodi.");
     await forATeam();
-    expect(eyebrow()).toBe("Passo 1 de 3");
+    expect(eyebrow()).toBe("Passo 1 de 5");
+    // The whole path on the rail, connecting an AI last.
+    expect(document.querySelector(".onb__steps")?.textContent).toContain("Conectar uma IA");
     await type("Nome", "Ateliê Couto");
     await click(button("Continuar"), 14);
     expect(calls(state, "orgs.create")[0]?.args[0]).toEqual({ name: "Ateliê Couto", ...zones() });
     expect(calls(state, "orgs.saveOnboarding")).toEqual([]);
     expect(heading()).toBe("O que a Ateliê Couto faz?");
-    expect(eyebrow()).toBe("Passo 2 de 3");
+    expect(eyebrow()).toBe("Passo 2 de 5");
     // A type alone is enough; its words are the context.
     expect((button("Continuar") as HTMLButtonElement).disabled).toBe(true);
     await click(button("Loja online"), 4);
     await click(button("Continuar"), 14);
     const orgId = state.me?.organizations[0]?.id;
     expect(calls(state, "orgs.updateSettings").at(-1)?.args).toEqual([orgId, { context: "Loja online" }]);
+    // Its team: first whether its agents come from another app.
+    expect(heading()).toBe(ASK);
+    expect(calls(state, "orgs.saveOnboarding")).toEqual([]);
+    await noneYet();
+    // "None" is kept by the server: another visit opens on how to start, "Start from scratch" picked.
+    expect(calls(state, "orgs.saveOnboarding").map((c) => c.args)).toEqual([[orgId, { step: "import" }]]);
+    expect(heading()).toBe(START);
+    expect(answer(/Começar do zero/).getAttribute("aria-checked")).toBe("true");
+    await readyMade();
     expect(heading()).toBe("Seu time");
     // The store's team, picked for its business.
     expect(document.querySelector(".tp-agents")?.textContent).toContain("Otto");
@@ -216,9 +284,13 @@ describe("the steps", () => {
     await click(button("Continuar"), 14);
     expect(calls(state, "orgs.updateSettings").at(-1)?.args).toEqual([orgId, { context }]);
     cleanup();
-    // Another visit (a reload, the phone): the team step starts on the clinic's template, not the first one.
-    await renderApp("/onboarding", { api: createFakeApi(settingUp({ context })) });
+    // Another visit (a reload, the phone), "none" answered: the team step starts on how to start, the clinic's template
+    // a click away.
+    await renderApp("/onboarding", { api: createFakeApi(settingUp({ context, step: "import" })) });
     await settle(14);
+    expect(heading()).toBe(START);
+    expect(answer(/Começar com um time pronto/).closest("label")?.textContent).toContain("Nina");
+    await readyMade();
     expect(heading()).toBe("Seu time");
     expect(document.querySelector(".tp-agents")?.textContent).toContain("Nina");
   });
@@ -227,6 +299,8 @@ describe("the steps", () => {
     const state = settingUp({ context: "Roupas sob medida para noivas" });
     await renderApp("/onboarding", { api: createFakeApi(state) });
     await settle(14);
+    await noneYet();
+    await readyMade();
     const team = () => document.querySelector(".tp-agents")?.textContent;
     expect(team()).toContain("Otto");
     await pick(screen().getByRole("combobox", { name: "Modelos de time" }), "Clínica ou consultório");
@@ -252,19 +326,101 @@ describe("the steps", () => {
     expect((button("Continuar") as HTMLButtonElement).disabled).toBe(false);
   });
 
-  test("self-hosted (no plans): three steps, Criar o time opens #general", async () => {
+  test("self-hosted (no plans), the server's AI there: Criar o time goes on to inviting people, never the AI step", async () => {
     const state = newcomer(false);
-    const { router } = await throughTheTeam(state);
+    const { router, landed } = await throughTheTeam(state);
     const orgId = state.me?.organizations[0]?.id;
     expect(calls(state, "agents.applyTeamTemplate").map((c) => c.args[1])).toEqual(["store"]);
-    expect(calls(state, "orgs.saveOnboarding").map((c) => c.args)).toEqual([[orgId, { finished: true }]]);
+    expect(heading()).toBe(PEOPLE);
+    expect(eyebrow()).toBe("Passo 5 de 5");
+    expect(router.state.location.pathname).toBe("/onboarding");
+    await click(button("Convidar depois"), 16);
+    expect(calls(state, "orgs.saveOnboarding").map((c) => c.args)).toEqual([
+      [orgId, { step: "import" }],
+      [orgId, { finished: true }],
+    ]);
     expect(router.state.location.pathname).toMatch(new RegExp(`^/org/${orgId}/c/`));
+    // The team thought before its step showed: the arrival as ever, the beta notice then Connect for whoever has none.
+    expect(landed.at(-1)?.arrival).toBe("1");
     // Never a price, a plan or a billing call.
     expect(calls(state, "orgs.billingLink")).toEqual([]);
   });
 
+  test("no AI yet: a step connects one, Conectar depois goes on to inviting people, then #general with the beta notice alone", async () => {
+    const state = noAiYet(newcomer(false));
+    const { router, landed } = await throughTheTeam(state);
+    const orgId = state.me?.organizations[0]?.id;
+    expect(heading()).toBe(CONNECT);
+    expect(eyebrow()).toBe("Passo 4 de 5");
+    // Not the last step: the people come after it.
+    expect(document.querySelector(".onb__say")?.textContent).toBe(
+      "Escolha a IA que você já usa e o time acorda. Depois, falta só chamar as pessoas.",
+    );
+    expect(router.state.location.pathname).toBe("/onboarding");
+    await click(button("Conectar depois"), 16);
+    // Kept as left for later, so a reload resumes on the people step.
+    expect(calls(state, "orgs.saveOnboarding").at(-1)?.args).toEqual([orgId, { step: "ai" }]);
+    expect(heading()).toBe(PEOPLE);
+    expect(eyebrow()).toBe("Passo 5 de 5");
+    expect(document.querySelector(".onb__steps")?.textContent).toContain("Depois");
+    await click(button("Convidar depois"), 16);
+    expect(calls(state, "orgs.saveOnboarding").at(-1)?.args).toEqual([orgId, { finished: true }]);
+    expect(router.state.location.pathname).toMatch(new RegExp(`^/org/${orgId}/c/`));
+    expect(landed.at(-1)?.arrival).toBe("beta");
+  });
+
+  test("back from the AI step: the team, whose Continuar comes back to it; nothing opens meanwhile", async () => {
+    const state = noAiYet(settingUp({ context: "Loja online", team: true }));
+    const { router } = await renderApp("/onboarding", { api: createFakeApi(state) });
+    await settle(16);
+    expect(heading()).toBe(CONNECT);
+    await click(button("Voltar"), 8);
+    expect(heading()).toBe("Seu time");
+    // Words for a team already made, never the template's.
+    expect(document.querySelector(".onb__lead")?.textContent).toBe(
+      "Eles já estão no workspace. Você ajusta cada um depois.",
+    );
+    expect(document.querySelector(".onb__say")?.textContent).toBe(
+      "O time já está montado. Quando quiser, a gente segue.",
+    );
+    expect(router.state.location.pathname).toBe("/onboarding");
+    await click(button("Continuar"), 8);
+    expect(heading()).toBe(CONNECT);
+    expect(calls(state, "orgs.saveOnboarding")).toEqual([]);
+  });
+
+  test("an AI connected meanwhile: its done screen stays, Continuar goes on to the people, then #general with the beta notice alone", async () => {
+    const state = noAiYet(settingUp({ context: "Loja online", team: true }));
+    const { router, services } = await renderApp("/onboarding", { api: createFakeApi(state) });
+    const landed = landings(router);
+    await settle(16);
+    expect(heading()).toBe(CONNECT);
+    aiConnected(state);
+    await act(() => services.queryClient.invalidateQueries({ queryKey: keys.aiStatus(ORG_ID) }));
+    await settle(10);
+    // The step stays on what was connected, rather than the people step taking its place.
+    expect(heading()).toBe("Pronto. O time da Ateliê Couto já pensa.");
+    expect(eyebrow()).toBe("Passo 4 de 5");
+    expect(document.querySelector(".onb__progress-text")?.textContent).toContain("Falta 1 etapa");
+    expect(document.querySelector(".onb__say")?.textContent).toBe("Agora sim. Falta só chamar quem trabalha com você.");
+    expect(router.state.location.pathname).toBe("/onboarding");
+    await click(button("Continuar"), 12);
+    expect(heading()).toBe(PEOPLE);
+    expect(document.querySelector(".onb__steps")?.textContent).toContain("Conectada");
+    // Back from the people: the AI step's done screen again, and Continuar returns.
+    await click(button("Voltar"), 8);
+    expect(heading()).toBe("Pronto. O time da Ateliê Couto já pensa.");
+    await click(button("Continuar"), 8);
+    expect(heading()).toBe(PEOPLE);
+    expect(calls(state, "orgs.saveOnboarding")).toEqual([]);
+    await click(button("Convidar depois"), 16);
+    expect(calls(state, "orgs.saveOnboarding").map((c) => c.args)).toEqual([[ORG_ID, { finished: true }]]);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${GENERAL_ID}`);
+    expect(landed.at(-1)?.arrival).toBe("beta");
+  });
+
   test("a step of the template that fails says why, and the same button tries again", async () => {
-    const state = settingUp({ context: "Loja online" });
+    const state = settingUp({ context: "Loja online", step: "import" });
     const api = createFakeApi(state);
     api.agents.applyTeamTemplate = async () => ({
       channelId: "dm",
@@ -274,6 +430,7 @@ describe("the steps", () => {
     });
     await renderApp("/onboarding", { api });
     await settle(12);
+    await readyMade();
     await click(button("Criar o time"), 12);
     expect(document.querySelector(".onb__actions [role='alert']")).not.toBeNull();
     expect(button("Tentar de novo")).toBeTruthy();
@@ -307,6 +464,19 @@ describe("the steps", () => {
       await click(button("Continuar"), 14);
       await click(button("Loja online"), 4);
       await click(button("Continuar"), 14);
+      // On the team's question, nobody but Lodi yet.
+      expect(agents()).toEqual(["Lodi"]);
+      await noneYet();
+      // Starting from scratch: still Lodi alone, the team's place empty.
+      expect(agents()).toEqual(["Lodi"]);
+      expect(preview().querySelector(".onb-preview__ghost")?.textContent).toBe("O time aparece aqui");
+      // The ready-made team picked: the template's agents and channels show as they would come.
+      await click(answer(/Começar com um time pronto/), 4);
+      expect(agents()).toEqual(["Lodi", "Iara", "Otto", "Lia"]);
+      expect(preview().querySelectorAll(".sidebar__item[data-fresh]").length).toBeGreaterThan(3);
+      await click(answer(/Começar do zero/), 4);
+      expect(agents()).toEqual(["Lodi"]);
+      await readyMade();
       // The template's order, the one step 3 lists, before and after the team is made.
       expect(
         [...document.querySelectorAll(".onb__body .tp-agent .ac-mediarow__head b")].map((b) => b.textContent),
@@ -332,15 +502,20 @@ describe("the plan step (agentes.chat Cloud)", () => {
     const state = newcomer(true);
     const asked = plans(PLANS);
     await throughTheTeam(state);
-    expect(eyebrow()).toBe("Passo 4 de 4");
+    expect(eyebrow()).toBe("Passo 4 de 6");
     expect(heading()).toBe("Ligue o time");
     const card = document.querySelector(".onb__plan") as HTMLElement;
     expect(card.textContent).toContain("Plano Equipe · $49 por mês");
     expect(card.querySelectorAll(".onb__plan-face")).toHaveLength(3);
+    // What comes after it: connecting an AI.
+    expect(card.textContent).toContain("Em seguida: conectar a sua IA.");
     expect(asked[0]).toBe("https://billing.example.com/plans.json?locale=pt-BR");
-    // Nothing is finished while it waits for the plan.
-    expect(calls(state, "orgs.saveOnboarding")).toEqual([]);
     const orgId = state.me?.organizations[0]?.id;
+    // Nothing is finished while it waits for the plan: the step is only kept as shown, so once paid it stays.
+    expect(calls(state, "orgs.saveOnboarding").map((c) => c.args)).toEqual([
+      [orgId, { step: "import" }],
+      [orgId, { step: "computer" }],
+    ]);
     await click(within(planCard()).getByRole("button", { name: "Ligar o time" }), 6);
     expect(calls(state, "orgs.billingLink").map((c) => c.args)).toEqual([[orgId, "onboarding", "team"]]);
     await click(button("Ver todos os planos"), 6);
@@ -374,23 +549,31 @@ describe("the plan step (agentes.chat Cloud)", () => {
     expect(calls(state, "orgs.billingLink").map((c) => c.args.length)).toEqual([2]);
   });
 
-  test("Entrar no workspace sem ligar finishes it and opens Lodi's DM, where the banner keeps the plan", async () => {
+  test("Ligar depois e só conhecer o workspace finishes it and opens Lodi's DM, with the beta notice alone", async () => {
     const state = newcomer(true);
     plans(PLANS);
-    const { router } = await throughTheTeam(state);
+    const { router, landed } = await throughTheTeam(state);
     const orgId = state.me?.organizations[0]?.id;
-    await click(button("Entrar no workspace sem ligar"), 16);
-    expect(calls(state, "orgs.saveOnboarding").map((c) => c.args)).toEqual([[orgId, { finished: true }]]);
+    await click(button("Ligar depois e só conhecer o workspace"), 16);
+    expect(calls(state, "orgs.saveOnboarding").map((c) => c.args)).toEqual([
+      [orgId, { step: "import" }],
+      [orgId, { step: "computer" }],
+      [orgId, { finished: true }],
+    ]);
+    // Its card there leads with the plan: no Connect an AI on a workspace that waits for it.
     expect(router.state.location.pathname).toBe(`/org/${orgId}/dm/agent/${LODI_ID}`);
+    expect(landed.at(-1)?.arrival).toBe("beta");
   });
 });
 
 describe("a workspace being set up resumes from its data", () => {
-  test("at what it does, at its team, at its plan; never a second workspace", async () => {
-    for (const [opts, title] of [
-      [{}, "O que a Ateliê Couto faz?"],
-      [{ context: "Loja online" }, "Seu time"],
-      [{ context: "Loja online", team: true, held: true }, "Ligue o time"],
+  test("at what it does, at its team's question or how it starts, at its plan; never a second workspace", async () => {
+    for (const [opts, title, saved] of [
+      [{}, "O que a Ateliê Couto faz?", []],
+      [{ context: "Loja online" }, ASK, []],
+      // Past the question ("I don't use any yet"), wherever it was left: how to start, its templates a click away.
+      [{ context: "Loja online", step: "import" }, START, []],
+      [{ context: "Loja online", team: true, held: true }, "Ligue o time", [[ORG_ID, { step: "computer" }]]],
     ] as const) {
       const state = settingUp(opts);
       plans(PLANS);
@@ -398,7 +581,7 @@ describe("a workspace being set up resumes from its data", () => {
       await settle(14);
       expect(heading()).toBe(title);
       expect(calls(state, "orgs.create")).toEqual([]);
-      expect(calls(state, "orgs.saveOnboarding")).toEqual([]);
+      expect(calls(state, "orgs.saveOnboarding").map((c) => c.args)).toEqual<typeof saved>(saved);
       cleanup();
     }
   });
@@ -408,7 +591,7 @@ describe("a workspace being set up resumes from its data", () => {
     plans(PLANS);
     await renderApp("/onboarding", { api: createFakeApi(state) });
     await settle(14);
-    expect(heading()).toBe("Seu time");
+    expect(heading()).toBe(ASK);
     // The other tab made the team.
     state.agents.push(...seedState().agents);
     await act(async () => {
@@ -433,10 +616,11 @@ describe("a workspace being set up resumes from its data", () => {
     await renderApp("/onboarding", { api });
     await settle(14);
     await click(button("Tentar de novo"), 14);
-    expect(heading()).toBe("Seu time");
+    expect(heading()).toBe(ASK);
     cleanup();
 
-    const ready = settingUp({ context: "Loja online", team: true });
+    // Its people invited already ("team"): nothing left to answer, it opens by itself.
+    const ready = settingUp({ context: "Loja online", team: true, step: "team" });
     const opening = createFakeApi(ready);
     const finish = opening.orgs.saveOnboarding;
     let refusals = 1;
@@ -451,20 +635,50 @@ describe("a workspace being set up resumes from its data", () => {
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${GENERAL_ID}`);
   });
 
-  test("everything done and no plan to wait for: it opens in #general", async () => {
+  test("its team thinking, it resumes on inviting people; invited already, it opens in #general", async () => {
     const state = settingUp({ context: "Loja online", team: true });
-    const { router } = await renderApp("/onboarding", { api: createFakeApi(state) });
+    const first = await renderApp("/onboarding", { api: createFakeApi(state) });
+    await settle(16);
+    expect(first.router.state.location.pathname).toBe("/onboarding");
+    expect(heading()).toBe(PEOPLE);
+    cleanup();
+    // The AI left for later ("ai"): the people step too, never the AI step again.
+    const later = noAiYet(settingUp({ context: "Loja online", team: true, step: "ai" }));
+    await renderApp("/onboarding", { api: createFakeApi(later) });
+    await settle(16);
+    expect(heading()).toBe(PEOPLE);
+    cleanup();
+    const invited = settingUp({ context: "Loja online", team: true, step: "team" });
+    const { router } = await renderApp("/onboarding", { api: createFakeApi(invited) });
     await settle(16);
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${GENERAL_ID}`);
   });
 
-  test("back from paying: #general, the payment said as being confirmed; back without: the plan step", async () => {
-    const paid = settingUp({ context: "Loja online", team: true, held: true });
+  test("back from paying: the payment received, then the AI step once the hold lifts; back without: the plan", async () => {
+    const paid = noAiYet(settingUp({ context: "Loja online", team: true, held: true }));
+    plans(PLANS);
     const { router } = await renderApp(`/org/${ORG_ID}/onboarding?paid=1`, { api: createFakeApi(paid) });
     await settle(14);
-    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${GENERAL_ID}`);
-    expect((router.state.location.search as { paid?: boolean }).paid).toBe(true);
-    expect(calls(paid, "orgs.saveOnboarding").map((c) => c.args)).toEqual([[ORG_ID, { finished: true }]]);
+    expect(router.state.location.pathname).toBe("/onboarding");
+    expect(heading()).toBe("Ligue o time");
+    expect(within(planCard()).getByRole("status").textContent).toContain("Pagamento recebido");
+    expect(within(planCard()).queryByRole("button", { name: "Ligar o time" })).toBeNull();
+    // Nothing finished: the step only kept as shown.
+    expect(calls(paid, "orgs.saveOnboarding").map((c) => c.args)).toEqual([[ORG_ID, { step: "computer" }]]);
+    // The billing service lifts the hold; `/me` says so when asked again.
+    const org = paid.me?.organizations[0];
+    if (org) delete org.standing;
+    await act(async () => {
+      focusManager.setFocused(false);
+      focusManager.setFocused(true);
+    });
+    await settle(16);
+    expect(heading()).toBe(CONNECT);
+    // The plan stays on the rail, on, and is never asked again.
+    expect(document.querySelector(".onb__steps")?.textContent).toContain("Ligado");
+    const rail = [...document.querySelectorAll<HTMLButtonElement>(".onb__step")];
+    expect(rail.find((b) => b.textContent?.includes("Ligar o time"))?.disabled).toBe(true);
+    expect(calls(paid, "orgs.saveOnboarding").map((c) => c.args)).toEqual([[ORG_ID, { step: "computer" }]]);
     cleanup();
 
     const back = settingUp({ context: "Loja online", team: true, held: true });
@@ -472,13 +686,13 @@ describe("a workspace being set up resumes from its data", () => {
     await renderApp(`/org/${ORG_ID}/onboarding`, { api: createFakeApi(back) });
     await settle(14);
     expect(heading()).toBe("Ligue o time");
-    expect(calls(back, "orgs.saveOnboarding")).toEqual([]);
+    expect(calls(back, "orgs.saveOnboarding").map((c) => c.args)).toEqual([[ORG_ID, { step: "computer" }]]);
     cleanup();
 
     // Back without paying to one set up meanwhile in another tab: it opens as it is, never a new workspace's step 1.
     const meanwhile = settingUp({ context: "Loja online", team: true, held: true });
-    const org = meanwhile.me?.organizations[0];
-    if (org) delete org.onboarding;
+    const setUp = meanwhile.me?.organizations[0];
+    if (setUp) delete setUp.onboarding;
     const again = await renderApp(`/org/${ORG_ID}/onboarding`, { api: createFakeApi(meanwhile) });
     await settle(14);
     expect(again.router.state.location.pathname.startsWith(`/org/${ORG_ID}/`)).toBe(true);
@@ -491,6 +705,232 @@ describe("a workspace being set up resumes from its data", () => {
     await settle(10);
     expect(screen().getByRole("dialog")).toBeTruthy();
     expect(calls(state, "orgs.saveOnboarding")).toEqual([]);
+  });
+});
+
+describe("a team with no agents for now (ADR 0162, amended 2026-11-11)", () => {
+  test("Skip this step on the question: the right hand alone on the AI step; back, the question again", async () => {
+    const state = noAiYet(settingUp({ context: "Loja online" }));
+    const { router } = await renderApp("/onboarding", { api: createFakeApi(state) });
+    await settle(14);
+    expect(heading()).toBe(ASK);
+    // The quiet way out under the step's button, with what it means.
+    const skip = document.querySelector(".onb__actions .onb__skip");
+    expect(skip?.textContent).toContain("Você cria os agentes depois, um por um.");
+    await click(button("Pular esta etapa"), 16);
+    // Kept by the server, so a reload resumes after the step; nothing made.
+    expect(calls(state, "orgs.saveOnboarding").map((c) => c.args)).toEqual([[ORG_ID, { step: "agents" }]]);
+    expect(calls(state, "agents.applyTeamTemplate")).toEqual([]);
+    // Its right hand alone thinks with it: named, never a team that isn't there.
+    expect(heading()).toBe("Conecte uma IA para o Lodi pensar");
+    expect(eyebrow()).toBe("Passo 4 de 5");
+    // The team step answered, its agents to come; Lodi alone wakes with the AI, the people still to come.
+    expect(document.querySelector(".onb__steps")?.textContent).toContain("Depois");
+    expect(document.querySelector(".onb__say")?.textContent).toBe(
+      "Escolha a IA que você já usa e eu acordo. Depois, falta só chamar as pessoas.",
+    );
+    expect(router.state.location.pathname).toBe("/onboarding");
+    // Back on the team step: the question again, to bring or build a team after all, never an empty team.
+    await click(button("Voltar"), 8);
+    expect(heading()).toBe(ASK);
+    expect(button("Pular esta etapa")).toBeTruthy();
+    // "I don't use any yet" there, then the ready-made team: the templates, which stay on screen.
+    await noneYet();
+    await readyMade();
+    expect(heading()).toBe("Seu time");
+    await click(button("Criar o time"), 20);
+    expect(calls(state, "agents.applyTeamTemplate").map((c) => c.args[1])).toEqual(["store"]);
+    // The step gone back to stays on screen with who is in the team now, until Continuar.
+    expect(
+      [...document.querySelectorAll(".onb__body .tp-agent .ac-mediarow__head b")].map((b) => b.textContent),
+    ).toEqual(["Iara", "Otto", "Lia"]);
+    await click(button("Continuar"), 12);
+    expect(heading()).toBe(CONNECT);
+    expect(document.querySelector(".onb__steps")?.textContent).toContain("Iara, Otto e Lia");
+  });
+
+  test("Start from scratch, picked on how to start: the plan for the right hand alone, and a reload resumes there", async () => {
+    const state = settingUp({ context: "Loja online", held: true });
+    plans(PLANS);
+    const withoutRoutines = () => {
+      const api = createFakeApi(state);
+      // A new workspace has no routines yet: its right hand has no first job to show on the plan step.
+      api.routines = { ...api.routines, list: async () => [] };
+      return api;
+    };
+    await renderApp("/onboarding", { api: withoutRoutines() });
+    await settle(14);
+    await noneYet();
+    expect(heading()).toBe(START);
+    expect(document.querySelector(".onb__lead")?.textContent).toBe("Dá para mudar tudo depois, nada se perde.");
+    expect(document.querySelector(".onb__say")?.textContent).toBe(
+      "Tenho um time pronto para o que vocês fazem. Ou a gente começa só nós dois.",
+    );
+    // Two radio cards in one group, "Start from scratch" picked, each with who comes in it.
+    expect(screen().getByRole("radiogroup", { name: START })).toBeTruthy();
+    const template = answer(/Começar com um time pronto/);
+    const scratch = answer(/Começar do zero/);
+    expect(template.getAttribute("aria-checked")).toBe("false");
+    expect(scratch.getAttribute("aria-checked")).toBe("true");
+    expect(template.closest("label")?.textContent).toContain(
+      "3 agentes do modelo Loja online, cada um no seu canal, com as rotinas prontas.",
+    );
+    expect(template.closest("label")?.querySelector(".onb-start__names")?.textContent).toBe("Iara, Otto e Lia");
+    expect(scratch.closest("label")?.textContent).toContain(
+      "Só o Lodi, o seu braço direito. Você cria cada agente depois, do seu jeito.",
+    );
+    expect(scratch.closest("label")?.querySelector(".onb-start__names")?.textContent).toBe("Lodi e quem você criar");
+    await click(button("Seguir só com o Lodi"), 16);
+    expect(calls(state, "orgs.saveOnboarding").map((c) => c.args)).toEqual([
+      [ORG_ID, { step: "import" }],
+      [ORG_ID, { step: "agents" }],
+      [ORG_ID, { step: "computer" }],
+    ]);
+    expect(calls(state, "agents.applyTeamTemplate")).toEqual([]);
+    expect(heading()).toBe("Ligue o time");
+    expect(document.querySelector(".onb__lead")?.textContent).toBe(
+      "Com o plano e uma IA, o seu braço direito começa hoje. Os outros agentes você cria depois.",
+    );
+    // Its right hand alone, asleep until the plan, said as what it is.
+    expect(planCard().querySelectorAll(".onb__plan-face")).toHaveLength(1);
+    expect(planCard().querySelector(".onb__plan-week")?.textContent).toBe("Lodi · Seu braço direito");
+    cleanup();
+
+    // Another visit: after the team step, never back on how to start.
+    plans(PLANS);
+    await renderApp("/onboarding", { api: withoutRoutines() });
+    await settle(14);
+    expect(heading()).toBe("Ligue o time");
+  });
+
+  test("Start with a ready-made team: its templates with no way out but Back, to how to start, then the question", async () => {
+    const state = noAiYet(settingUp({ context: "Loja online" }));
+    await renderApp("/onboarding", { api: createFakeApi(state) });
+    await settle(14);
+    await noneYet();
+    // The keyboard: an arrow picks the other card, Enter on a card presses the step's button.
+    const scratch = answer(/Começar do zero/);
+    scratch.focus();
+    await act(async () => fireEvent.keyDown(scratch, { key: "ArrowUp" }));
+    await settle(4);
+    expect(answer(/Começar com um time pronto/).getAttribute("aria-checked")).toBe("true");
+    expect(button("Ver o time pronto")).toBeTruthy();
+    await act(async () => fireEvent.keyDown(answer(/Começar com um time pronto/), { key: "Enter" }));
+    await settle(8);
+    expect(heading()).toBe("Seu time");
+    // Nothing stored for looking at the templates; and no "create later" under their button any more.
+    expect(calls(state, "orgs.saveOnboarding").map((c) => c.args)).toEqual([[ORG_ID, { step: "import" }]]);
+    expect(document.querySelector(".onb__actions .onb__skip")).toBeNull();
+    expect(screen().queryByRole("button", { name: /depois/ })).toBeNull();
+    // Back: how to start, the ready-made team still picked; Back again: the question.
+    await click(button("Voltar"), 6);
+    expect(heading()).toBe(START);
+    expect(answer(/Começar com um time pronto/).getAttribute("aria-checked")).toBe("true");
+    await click(button("Voltar"), 6);
+    expect(heading()).toBe(ASK);
+    // "I don't use any yet" again: from scratch picked again; Start with a ready-made team, then the team made.
+    await noneYet();
+    expect(answer(/Começar do zero/).getAttribute("aria-checked")).toBe("true");
+    await readyMade();
+    await click(button("Criar o time"), 20);
+    expect(calls(state, "agents.applyTeamTemplate").map((c) => c.args[1])).toEqual(["store"]);
+    expect(heading()).toBe(CONNECT);
+    expect(document.querySelector(".onb__steps")?.textContent).toContain("Iara, Otto e Lia");
+  });
+
+  test("self-hosted with an AI already there: skipping goes on to the people, then #general, the team's place", async () => {
+    const state = settingUp({ context: "Loja online" });
+    const { router } = await renderApp("/onboarding", { api: createFakeApi(state) });
+    await settle(14);
+    await click(button("Pular esta etapa"), 16);
+    expect(heading()).toBe(PEOPLE);
+    await click(button("Convidar depois"), 16);
+    expect(calls(state, "orgs.saveOnboarding").map((c) => c.args)).toEqual([
+      [ORG_ID, { step: "agents" }],
+      [ORG_ID, { finished: true }],
+    ]);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${GENERAL_ID}`);
+  });
+});
+
+describe("inviting people, a team's last step (ADR 0162, amended 2026-11-11)", () => {
+  test("the addresses as chips, each with its role, sent by the step's button; the workspace opens in #general", async () => {
+    const state = settingUp({ context: "Loja online", team: true });
+    const { router } = await renderApp("/onboarding", { api: createFakeApi(state) });
+    const landed = landings(router);
+    await settle(16);
+    expect(heading()).toBe(PEOPLE);
+    expect(eyebrow()).toBe("Passo 5 de 5");
+    expect(document.querySelector(".onb__lead")?.textContent).toBe(
+      "Convide as pessoas do time. Cada uma recebe um e-mail para entrar.",
+    );
+    expect(document.querySelector(".onb__say")?.textContent).toBe(
+      "Agora as pessoas. Me passa os e-mails que eu mando os convites.",
+    );
+    expect(document.querySelector(".onb__steps")?.textContent).toContain("Convidar pessoas");
+    // Nothing typed: the button waits, and the way past the step is under it.
+    expect((button("Enviar convites") as HTMLButtonElement).disabled).toBe(true);
+    expect(document.querySelector(".onb__actions .onb__skip")?.textContent).toBe("Convidar depois");
+    const field = screen().getByLabelText("E-mails");
+    await act(async () => fireEvent.change(field, { target: { value: "bia@example.com, caio@example.com" } }));
+    await act(async () => fireEvent.keyDown(field, { key: "Enter" }));
+    await settle(4);
+    await pick(screen().getByRole("combobox", { name: "Papel de caio@example.com" }), "Admin");
+    await click(button("Convidar 2 pessoas"), 20);
+    expect(calls(state, "orgs.inviteMany").map((c) => c.args[1])).toEqual([
+      {
+        invites: [
+          { email: "bia@example.com", roleIds: [] },
+          { email: "caio@example.com", roleIds: ["role-admin"] },
+        ],
+      },
+    ]);
+    // Kept as invited, then finished.
+    expect(calls(state, "orgs.saveOnboarding").map((c) => c.args)).toEqual([
+      [ORG_ID, { step: "team" }],
+      [ORG_ID, { finished: true }],
+    ]);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${GENERAL_ID}`);
+    // The team thought before the AI step could show: the arrival as ever.
+    expect(landed.at(-1)?.arrival).toBe("1");
+  });
+
+  test("Convidar depois opens the workspace with no invitation; an address already in is said and left out", async () => {
+    const state = settingUp({ context: "Loja online", team: true });
+    const { router } = await renderApp("/onboarding", { api: createFakeApi(state) });
+    await settle(16);
+    const field = screen().getByLabelText("E-mails");
+    await act(async () => fireEvent.change(field, { target: { value: state.me?.user.email ?? "" } }));
+    await act(async () => fireEvent.keyDown(field, { key: "Enter" }));
+    await settle(2);
+    expect(document.querySelector(".email-chip")?.textContent).toContain("já está na Ateliê Couto");
+    expect((button("Enviar convites") as HTMLButtonElement).disabled).toBe(true);
+    await click(button("Convidar depois"), 16);
+    expect(calls(state, "orgs.inviteMany")).toEqual([]);
+    expect(calls(state, "orgs.saveOnboarding").map((c) => c.args)).toEqual([[ORG_ID, { finished: true }]]);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${GENERAL_ID}`);
+  });
+
+  test("a server that sends no email: the workspace's link, and Entrar no workspace", async () => {
+    const state = settingUp({ context: "Loja online", team: true });
+    state.authConfig = { passwordReset: false };
+    const { router } = await renderApp("/onboarding", { api: createFakeApi(state) });
+    await settle(16);
+    expect(heading()).toBe(PEOPLE);
+    expect(document.querySelector(".onb__lead")?.textContent).toBe(
+      "Quem abrir pede para entrar. Eu te mostro cada pedido, e você aprova.",
+    );
+    expect(screen().queryByLabelText("E-mails")).toBeNull();
+    // The link to copy and until when it works: renewing or turning it off is for Members, once the workspace opens.
+    await click(button("Criar link"), 8);
+    const link = document.querySelector(".onb__body .invite-link") as HTMLElement;
+    expect(within(link).getByRole("button", { name: "Copiar link" })).toBeTruthy();
+    expect(link.querySelector(".invite-link__foot")?.textContent).toMatch(/^Vale até \d+ \S+$/);
+    expect(within(link).queryByRole("button", { name: "Renovar" })).toBeNull();
+    expect(within(link).queryByRole("button", { name: "Desativar" })).toBeNull();
+    await click(button("Entrar no workspace"), 16);
+    expect(calls(state, "orgs.inviteMany")).toEqual([]);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${GENERAL_ID}`);
   });
 });
 
@@ -541,22 +981,73 @@ describe("the name step's other cases", () => {
 });
 
 describe("for me (ADR 0159)", () => {
-  test("no name to ask and no rail: a personal workspace, named in the person's language, opens in Lodi's DM", async () => {
+  test("no name nor business to ask: its agents, its plan, and the plan left for later opens Lodi's DM", async () => {
     const state = newcomer(true);
-    const { router } = await renderApp("/onboarding", { api: createFakeApi(state) });
+    plans(PLANS);
+    const api = createFakeApi(state);
+    // A new workspace has no routines yet: its right hand has no first job to show on the plan step.
+    api.routines = { ...api.routines, list: async () => [] };
+    const { router } = await renderApp("/onboarding", { api });
+    const landed = landings(router);
     await settle(10);
     expect(heading()).toBe("Para que você vai usar o agentes.chat?");
     expect((button("Continuar") as HTMLButtonElement).disabled).toBe(true);
     // "For me", not "For my company or team", whose words start the same in Portuguese.
     await click(answer(/^Para mim(?!ha)/), 4);
     expect(screen().queryByLabelText("Nome")).toBeNull();
+    // Its whole path on the rail at once: what it is for, its agents, the plan, an AI.
+    expect(document.querySelectorAll(".onb__step")).toHaveLength(4);
+    expect(document.querySelector(".onb__steps")?.textContent).not.toContain("O que vocês fazem");
     await click(button("Continuar"), 16);
     expect(calls(state, "orgs.create")[0]?.args[0]).toEqual({ name: "Pessoal", mode: "personal", ...zones() });
     const orgId = state.me?.organizations.at(-1)?.id;
-    expect(calls(state, "orgs.saveOnboarding").map((c) => c.args)).toEqual([[orgId, { finished: true }]]);
+    // Whether its agents come from another app, never a team template.
+    expect(heading()).toBe(ASK);
+    expect(calls(state, "orgs.saveOnboarding")).toEqual([]);
+    // Its "I don't use any yet" already goes on with no agents: no "Skip this step" beside it.
+    expect(screen().queryByRole("button", { name: "Pular esta etapa" })).toBeNull();
+    // Its "I don't use any yet" goes on with no agents at once: never how a team starts.
+    await noneYet("Seguir sem agentes");
+    expect(heading()).toBe("Ligue os seus agentes");
+    // Its agents step answered with none: they come later.
+    expect(document.querySelector(".onb__steps")?.textContent).toContain("Depois");
+    // Its right hand alone, asleep until the plan, said as what it is (it has no role), and the button in its words.
+    expect(planCard().querySelectorAll(".onb__plan-face")).toHaveLength(1);
+    expect(planCard().querySelector(".onb__plan-week")?.textContent).toBe("Lodi · Seu braço direito");
+    expect(within(planCard()).getByRole("button", { name: "Ligar os agentes" })).toBeTruthy();
+    expect(within(planCard()).queryByRole("button", { name: "Ligar o time" })).toBeNull();
+    await click(button("Ligar depois e só conhecer o workspace"), 16);
+    expect(calls(state, "orgs.saveOnboarding").map((c) => c.args)).toEqual([
+      [orgId, { step: "agents" }],
+      [orgId, { step: "computer" }],
+      [orgId, { finished: true }],
+    ]);
     expect(router.state.location.pathname).toBe(`/org/${orgId}/dm/agent/${LODI_ID}`);
-    // Never the plan step nor a team template: its card in Lodi's DM holds the rest.
+    expect(landed.at(-1)?.arrival).toBe("beta");
     expect(calls(state, "agents.applyTeamTemplate")).toEqual([]);
+  });
+
+  test("self-hosted with no AI yet: the AI step for its right hand, and Conectar depois opens Lodi's DM", async () => {
+    const state = noAiYet(newcomer(false));
+    const { router } = await renderApp("/onboarding", { api: createFakeApi(state) });
+    const landed = landings(router);
+    await settle(10);
+    await click(answer(/^Para mim(?!ha)/), 4);
+    // Its agents, then an AI: no people to invite here.
+    expect(document.querySelectorAll(".onb__step")).toHaveLength(3);
+    expect(document.querySelector(".onb__steps")?.textContent).not.toContain("Convidar pessoas");
+    await click(button("Continuar"), 16);
+    await noneYet("Seguir sem agentes");
+    expect(heading()).toBe(CONNECT_PERSONAL);
+    expect(eyebrow()).toBe("Passo 3 de 3");
+    await click(button("Conectar depois"), 16);
+    const orgId = state.me?.organizations.at(-1)?.id;
+    expect(calls(state, "orgs.saveOnboarding").map((c) => c.args)).toEqual([
+      [orgId, { step: "agents" }],
+      [orgId, { finished: true }],
+    ]);
+    expect(router.state.location.pathname).toBe(`/org/${orgId}/dm/agent/${LODI_ID}`);
+    expect(landed.at(-1)?.arrival).toBe("beta");
   });
 
   test("back from the name, the question again; the answer can change", async () => {
@@ -595,24 +1086,30 @@ function recorded(api: ApiClient) {
  */
 describe("opening a new workspace, in round trips", () => {
   test("For me: one call makes it with both zones, one finishes it and opens Lodi's DM, nobody asked again", async () => {
-    const state = newcomer(false);
+    const state = noAiYet(newcomer(false));
     const { api, log } = recorded(createFakeApi(state));
     const { router } = await renderApp("/onboarding", { api });
     await settle(10);
     await click(answer(/^Para mim(?!ha)/), 4);
     log.length = 0;
+    await click(button("Continuar"), 16);
+    expect(heading()).toBe(ASK);
+    expect(log[0]).toBe("orgs.create");
+    // Its zones went with it and the answers said who the person is: none of them is asked on its own.
+    expect(log.filter((c) => ["account.me", "orgs.updateSettings", "orgs.updateMe"].includes(c))).toEqual([]);
+    await noneYet("Seguir sem agentes");
+    expect(heading()).toBe(CONNECT_PERSONAL);
+    log.length = 0;
     const off = router.subscribe("onBeforeNavigate", (e) => {
       if (e.pathChanged) log.push(`→ ${e.toLocation.pathname}`);
     });
-    await click(button("Continuar"), 16);
+    await click(button("Conectar depois"), 16);
     off();
     const orgId = state.me?.organizations.at(-1)?.id;
     const before = log.slice(0, log.findIndex((c) => c.startsWith("→")) + 1);
-    expect(before[0]).toBe("orgs.create");
-    // Its zones went with it and the answers said who the person is: none of them is asked on its own.
-    expect(before.filter((c) => ["account.me", "orgs.updateSettings", "orgs.updateMe"].includes(c))).toEqual([]);
     // One call finishes it, and its answer says where it opens.
     expect(before.slice(-2)).toEqual(["orgs.saveOnboarding", `→ /org/${orgId}/dm/agent/${LODI_ID}`]);
+    expect(before.filter((c) => c === "account.me")).toEqual([]);
     expect(state.me?.organizations.at(-1)?.onboarding).toBeUndefined();
   });
 
@@ -670,8 +1167,44 @@ describe("the worst case, measured by CI's geometry in German and Russian too", 
       await showIn(services, lang);
       for (const step of [0, 1, 3]) {
         await click(document.querySelectorAll(".onb__step")[step] as HTMLElement, 8);
-        (globalThis as { geometrySnapshot?: () => void }).geometrySnapshot?.();
+        snapshot();
       }
+    }
+  });
+
+  test("the team's question, the AI step and its done screen, with the same long names", async () => {
+    const LONG = "Cerâmicas Pneumoultramicroscopicossilicovulcanoconióticas Artesanais Ltda";
+    const long = (state: FakeState) => {
+      const org = state.me?.organizations[0];
+      if (org) org.name = LONG;
+      if (state.me) state.me.user = { ...state.me.user, name: "Maximiliana Bartolomeu Constantinopla de Albuquerque" };
+      return state;
+    };
+    const context = "Vendemos cerâmica feita à mão. ".repeat(16).trim();
+    const asking = await renderApp("/onboarding", { api: createFakeApi(long(settingUp({ context }))) });
+    await settle(14);
+    expect(heading()).toBe(ASK);
+    for (const lang of ["de", "ru"] as const) {
+      await showIn(asking.services, lang);
+      snapshot();
+    }
+    cleanup();
+
+    const state = noAiYet(long(settingUp({ context, team: true })));
+    const { services } = await renderApp("/onboarding", { api: createFakeApi(state) });
+    await settle(16);
+    expect(heading()).toBe(CONNECT);
+    for (const lang of ["de", "ru"] as const) {
+      await showIn(services, lang);
+      snapshot();
+    }
+    aiConnected(state);
+    await act(() => services.queryClient.invalidateQueries({ queryKey: keys.aiStatus(ORG_ID) }));
+    await settle(10);
+    expect(heading()).toContain(LONG);
+    for (const lang of ["de", "ru"] as const) {
+      await showIn(services, lang);
+      snapshot();
     }
   });
 });

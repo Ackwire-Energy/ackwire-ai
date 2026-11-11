@@ -1,13 +1,13 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import type { AgentBrain, AiAccounts, AiComputer, BrainOption, ComputerSetup, OrgStanding } from "@agenteschat/client";
-import { PLAN_CHOICES, type PlanChoice, planTitle } from "@agenteschat/client/lib/no-ai";
+import { PLAN_CHOICES, type PlanChoice, planLabel, planTitle } from "@agenteschat/client/lib/no-ai";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import i18next from "i18next";
-import { brainTitle, openAiSelect, payWith } from "./ai-picker";
+import { brainDialog, brainRows, brainScreen, mainButton, openAiSelect, payWith, toScreen } from "./ai-picker";
 import { ADA_ID, createFakeApi, fakeMachinesOf, ORG_ID, seedState, withRightHand } from "./fake-api";
 import { shownText } from "./hint";
 import { renderApp, screen, settle } from "./render";
@@ -96,9 +96,34 @@ async function connect(who: Who, accounts: AiAccounts["accounts"] = []) {
   return { ...opened, dialog: screen().getByRole("dialog", { name: /Conectar uma IA/ }) };
 }
 
+/** The narrow dialog under the sky: Connect for the team (ADR 0160, addendum), its AIs as cards. */
+const inBand = (dialog: HTMLElement) => dialog.querySelector(".arrival-hero") !== null;
+
+/** A card of the team's Connect, from its first screen ("Other plan" opens the rest). */
+async function pickCard(dialog: HTMLElement, title: string) {
+  const back = within(dialog).queryByRole("button", { name: "Voltar" });
+  if (back) await click(back);
+  const card = () => within(dialog).queryByRole("button", { name: new RegExp(`^${title}`) });
+  if (!card()) await click(within(dialog).getByRole("button", { name: /^Outro plano/ }));
+  await click(card() as Element);
+}
+
+/** Each plan's card title in Portuguese; a coding plan's is its own name (`planLabel`). */
+const CARD: Partial<Record<PlanChoice, string>> = {
+  claude: "Claude",
+  chatgpt: "ChatGPT",
+  cursor: "Cursor",
+  grok: "Grok",
+  gemini: "Gemini",
+  zen: "Começar grátis",
+};
+
 async function planPanel(dialog: HTMLElement, choice: PlanChoice) {
-  const rows = await openAiSelect(dialog);
-  await click(rows[PLAN_CHOICES.indexOf(choice)] as Element);
+  if (inBand(dialog)) await pickCard(dialog, CARD[choice] ?? planLabel(i18next.t, choice));
+  else {
+    const rows = await openAiSelect(dialog);
+    await click(rows[PLAN_CHOICES.indexOf(choice)] as Element);
+  }
   await settle(2);
   return within(dialog).getAllByRole("region", { name: planTitle(i18next.t, choice) })[0] as HTMLElement;
 }
@@ -142,7 +167,7 @@ describe("a plan with no agentes.chat plan in force", () => {
       expect(shownText(panel)).not.toContain("agentes.chat");
       expect(buttonNamed(panel, PAY)).toBeNull();
     }
-    await click(payWith(dialog, "Com chave de API"));
+    await pickCard(dialog, "Chave de API");
     expect(shownText(dialog)).not.toContain(HELD);
     expect(shownText(dialog)).toContain("Todo agente sem plano pensa com ela.");
   });
@@ -208,21 +233,20 @@ describe("the other places a plan is chosen", () => {
     expect(shownText(screen().getByRole("region", { name: "Seus planos" }))).not.toContain(WHY);
   });
 
-  test("Quem pensa: the plans in its select say why, and the dialog offers the way on; the key is one choice away", async () => {
+  test("Quem pensa: why and the plans page on its first screen and in Trocar de conta, the key closed, no plan to pick", async () => {
     await open("owner", `/org/${ORG_ID}/agents/${ADA_ID}`);
-    await click(screen().getByRole("button", { name: "Mudar quem pensa" }));
-    const d = screen().getByRole("dialog", { name: "Quem pensa" });
-    const rows = await openAiSelect(d, "Quem pensa");
-    const plans = rows.filter((o) => brainTitle(o) !== "Chave de API");
-    expect(plans.length).toBeGreaterThan(0);
-    for (const o of plans) {
-      expect(o.getAttribute("aria-disabled")).toBe("true");
-      expect(o.querySelector(".ac-menu__desc")?.textContent).toBe(WHY);
-    }
-    await act(async () => fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" }));
-    await settle(2);
+    const d = await brainDialog("Quem pensa pela Ada");
     expect(shownText(d)).toContain(WHY);
     expect(buttonNamed(d, PAY)).not.toBeNull();
+    // Ada thinks with the key, which waits for the plan too.
+    expect(shownText(d)).toContain(CLOSED);
+    await toScreen(d, "Trocar de conta");
+    expect(brainScreen(d)).toBe("Trocar a conta da Ada");
+    expect(shownText(d)).toContain(WHY);
+    expect(buttonNamed(d, PAY)).not.toBeNull();
+    // Only the key in use: no plan to sign in to or switch to while the hold lasts, so nothing to switch to.
+    expect(brainRows(d).map((r) => [r.group, r.title])).toEqual([["Em uso", "Chave padrão do workspace"]]);
+    expect(mainButton(d)?.disabled).toBe(true);
   });
 
   test("Lodi's settings: why and the way on in place of the plan row", async () => {
@@ -265,7 +289,7 @@ describe("what a plan's panel never says on the Cloud", () => {
     await renderApp(`/org/${ORG_ID}?connect=ai`, { api });
     await settle(8);
     const dialog = screen().getByRole("dialog", { name: /Conectar uma IA/ });
-    if (within(dialog).queryByRole("combobox", { name: "Plano" }) === null)
+    if (!inBand(dialog) && within(dialog).queryByRole("combobox", { name: "Plano" }) === null)
       await click(payWith(dialog, "Com um plano"));
     return planPanel(dialog, "chatgpt");
   }

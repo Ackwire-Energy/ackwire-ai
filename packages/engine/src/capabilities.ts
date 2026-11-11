@@ -261,11 +261,11 @@ export const DESKTOP_GUIDANCE =
  * the next message costs the person more than saying once what can't be done and doing the rest).
  */
 export const CAPABILITIES_LIMIT =
-  "Beyond this, you can't. Never say you did or can do, offer or promise something that isn't on this list, and don't deny what is on it. A step needing a person (a sign-in, a QR code, an approval) is not a can't: hand it to them. If you can't do something or a part of it, say so once, clearly, do the rest and suggest who can: a person in the channel or another agent (mention them with @).";
+  "Beyond this, you can't. Never say you did or can do, offer or promise something that isn't on this list, and don't deny what is on it. Say something is made, sent or done only when a call of yours did it. A step needing a person (a sign-in, a QR code, an approval) is not a can't: hand it to them. If you can't do something or a part of it, say so once, clearly, do the rest and suggest who can: a person in the channel or another agent (mention them with @).";
 
 /** The same line for a computer brain: its computer's own tools are not on the list but are allowed. */
 const COMPUTER_CAPABILITIES_LIMIT =
-  "Beyond this list and your computer's own tools, you can't. Never say you did or can do, offer or promise something that isn't on this list or among those tools, and don't deny what is. A step needing a person (a sign-in, a QR code, an approval) is not a can't: hand it to them. If you can't do something or a part of it, say so once, clearly, do the rest and suggest who can: a person in the channel or another agent (mention them with @).";
+  "Beyond this list and your computer's own tools, you can't. Never say you did or can do, offer or promise something that isn't on this list or among those tools, and don't deny what is. Say something is made, sent or done only when a call of yours did it. A step needing a person (a sign-in, a QR code, an approval) is not a can't: hand it to them. If you can't do something or a part of it, say so once, clearly, do the rest and suggest who can: a person in the channel or another agent (mention them with @).";
 
 /** What a computer brain (Claude Code, Codex) is told about its own tools. */
 export const COMPUTER_TOOLS_NOTE =

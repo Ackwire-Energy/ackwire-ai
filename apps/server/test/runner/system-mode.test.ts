@@ -265,7 +265,7 @@ test.if(posix)("service install --system: a system home, and it starts only when
   expect(agentTmpCleanupPath()).toBe("/etc/tmpfiles.d/agentes-runner.conf");
   expect(agentTmp(21003)).toBe("/run/agentes-runner-tmp/21003/tmp");
   expect(readFileSync(agentTmpCleanupPath(unitPath), "utf8")).toBe(
-    "# agentes.chat runner: each agent's own temporary folders\ne /run/agentes-runner-tmp/*/* - - - 10d\ne /var/lib/agentes-runner-tmp/*/* - - - 30d\n",
+    "# agentes.chat runner: each agent's own temporary folders\ne /run/agentes-runner-tmp/*/* - - - 10d\nx /run/agentes-runner-tmp/*/run\ne /var/lib/agentes-runner-tmp/*/* - - - 30d\n",
   );
 
   // Not connected yet: an unpaired runner would only restart in a loop.

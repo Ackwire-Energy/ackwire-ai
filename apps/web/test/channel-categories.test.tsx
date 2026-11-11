@@ -6,7 +6,7 @@ setupDom();
 
 import { act, cleanup, createEvent, fireEvent, within } from "@testing-library/react";
 import { createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
-import { renderApp, screen, settle } from "./render";
+import { endExit, exitsLast, renderApp, screen, settle } from "./render";
 
 afterEach(() => {
   cleanup();
@@ -154,6 +154,155 @@ describe("Criar canal in a category made there (ADR 0080)", () => {
     await click(within(dialog).getByRole("button", { name: "Criar #roadmap" }));
     await settle(6);
     expect(created(state)).toEqual([{ name: "roadmap", visibility: "public", categoryId: "cat-produto" }]);
+  });
+});
+
+describe("what a dialog makes or renames is never taken by itself, while it is sent or closes", () => {
+  const click = (el: Element) => act(async () => fireEvent.click(el));
+  const type = (el: Element, value: string) => act(async () => fireEvent.change(el, { target: { value } }));
+  const openMenu = async (trigger: HTMLElement) => {
+    await act(async () => {
+      fireEvent.keyDown(trigger, { key: "Enter" });
+      fireEvent.keyUp(trigger, { key: "Enter" });
+    });
+    await settle(2);
+    return screen().getByRole("menu");
+  };
+  /** The sidebar under an open dialog: out of the accessibility tree then, with no names to find its rows by. */
+  const sidebar = () => document.querySelector("nav.sidebar") as HTMLElement;
+  const categoryNames = () =>
+    [...sidebar().querySelectorAll(".sidebar__section-toggle .sidebar__label")].map((l) => l.textContent);
+  /** The dialog, closed and still on screen (`exitsLast`), then its exit ended. */
+  const closing = async (dialog: HTMLElement) => {
+    expect([dialog.isConnected, dialog.getAttribute("data-state")]).toEqual([true, "closed"]);
+    expect(dialog.textContent).not.toContain("Já existe");
+    await endExit(dialog);
+    expect(dialog.isConnected).toBe(false);
+  };
+
+  test("Criar canal: the channel being made, in the list before Criar is answered", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    // A new list on each read, as the server sends: the fake's own array would read as unchanged.
+    const readChannels = api.chat.channels;
+    api.chat.channels = async (...args) => [...(await readChannels(...args))];
+    const make = api.chat.createChannel;
+    let answer = () => {};
+    const answered = new Promise<void>((resolve) => {
+      answer = resolve;
+    });
+    api.chat.createChannel = async (...args) => {
+      const made = await make(...args);
+      await answered;
+      return made;
+    };
+    const { sockets, router } = await renderApp(`/org/${ORG_ID}/c/${GENERAL_ID}`, { api });
+    await settle(8);
+    await act(async () => sockets.last().open());
+    await settle(2);
+    exitsLast();
+    const plus = within(nav()).getByRole("button", { name: "Novo canal ou categoria" });
+    await click(within(await openMenu(plus)).getByRole("menuitem", { name: "Novo canal" }));
+    await settle(2);
+    const dialog = screen().getByRole("dialog", { name: "Criar canal" });
+    await type(within(dialog).getByLabelText("Nome"), "vendas");
+    await click(within(dialog).getByRole("button", { name: "Criar #vendas" }));
+    // Made on the server, which says so on the socket before it answers.
+    await act(async () => sockets.last().push({ type: "event", scope: "org", event: { type: "channels.changed" } }));
+    await settle(6);
+    expect(sidebar().querySelector('a.sidebar__item[title="#vendas"]')).not.toBeNull();
+    expect(dialog.textContent).not.toContain("Já existe");
+    await act(async () => answer());
+    await settle(6);
+    await closing(dialog);
+    const made = state.channels.find((c) => c.name === "vendas");
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${made?.id}`);
+  });
+
+  test("Nova categoria: the category being made, in the list before Criar is answered", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    // After Criar, the categories are read again before the channels.
+    const readChannels = api.chat.channels;
+    let channelsRead: Promise<void> | null = null;
+    let answer = () => {};
+    api.chat.channels = async (...args) => {
+      await channelsRead;
+      return readChannels(...args);
+    };
+    await go(state, { api });
+    exitsLast();
+    const plus = within(nav()).getByRole("button", { name: "Novo canal ou categoria" });
+    await click(within(await openMenu(plus)).getByRole("menuitem", { name: "Nova categoria" }));
+    await settle(2);
+    const dialog = screen().getByRole("dialog", { name: "Nova categoria" });
+    await type(within(dialog).getByLabelText("Nome"), "Produto");
+    channelsRead = new Promise<void>((resolve) => {
+      answer = resolve;
+    });
+    await click(within(dialog).getByRole("button", { name: "Criar categoria" }));
+    await settle(6);
+    expect(categoryNames()).toContain("Produto");
+    expect(dialog.textContent).not.toContain("Já existe");
+    await act(async () => answer());
+    await settle(6);
+    await closing(dialog);
+  });
+
+  test("Mover › Criar: the name it opened with stays while the category is made", async () => {
+    const seeded = seedState();
+    seeded.channelCategories = [{ id: "cat-engenharia", name: "Engenharia", position: 0 }];
+    const api = createFakeApi(seeded);
+    const readChannels = api.chat.channels;
+    let channelsRead: Promise<void> | null = null;
+    let answer = () => {};
+    api.chat.channels = async (...args) => {
+      await channelsRead;
+      return readChannels(...args);
+    };
+    await go(seeded, { api });
+    const menu = new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: 30, clientY: 40 });
+    await act(async () => void row("general").dispatchEvent(menu));
+    await settle(2);
+    await click(within(screen().getByRole("menu")).getByRole("menuitem", { name: "Mover para…" }));
+    await settle(2);
+    const move = screen().getByRole("dialog", { name: "Mover #general" });
+    await type(within(move).getByRole("searchbox", { name: "Buscar categoria" }), "Produto");
+    await click(within(move).getByRole("button", { name: "Criar “Produto”" }));
+    await settle(2);
+    const dialog = screen().getByRole("dialog", { name: "Nova categoria" });
+    const field = within(dialog).getByLabelText("Nome") as HTMLInputElement;
+    expect(field.value).toBe("Produto");
+    exitsLast();
+    channelsRead = new Promise<void>((resolve) => {
+      answer = resolve;
+    });
+    await click(within(dialog).getByRole("button", { name: "Criar categoria" }));
+    await settle(6);
+    expect(categoryNames()).toContain("Produto");
+    expect(field.value).toBe("Produto");
+    expect(dialog.textContent).not.toContain("Já existe");
+    await act(async () => answer());
+    await settle(6);
+    await closing(dialog);
+    const back = screen().getByRole("dialog", { name: "Mover #general" });
+    expect(within(back).getByRole("button", { name: "Mover para Produto" })).toBeTruthy();
+  });
+
+  test("Renomear categoria: its new name in the list once saved", async () => {
+    const seeded = seedState();
+    seeded.channelCategories = [{ id: "cat-produto", name: "Produto", position: 0 }];
+    await go(seeded);
+    exitsLast();
+    const options = within(nav()).getByRole("button", { name: "Opções de Produto" });
+    await click(within(await openMenu(options)).getByRole("menuitem", { name: "Renomear" }));
+    await settle(2);
+    const dialog = screen().getByRole("dialog", { name: "Renomear categoria" });
+    await type(within(dialog).getByLabelText("Nome"), "Produtos");
+    await click(within(dialog).getByRole("button", { name: "Salvar" }));
+    await settle(6);
+    expect(categoryNames()).toContain("Produtos");
+    await closing(dialog);
   });
 });
 

@@ -31,6 +31,12 @@ export const BRAIN_PLAN_NAMES: Readonly<Record<ComputerBrainKind, string>> = {
 export const isComputerBrain = (v: unknown): v is ComputerBrainKind =>
   v === "claude_code" || v === "codex" || v === "cursor" || v === "opencode" || v === "grok" || v === "antigravity";
 
+/**
+ * Brains whose shell runs in a sandbox of the CLI's own (ADR 0053 §3, 0114, 0142, 0143), the limit of what their turns
+ * do. Claude Code's own sandbox is never switched on here, and OpenCode has none.
+ */
+export const isSandboxedBrain = (v: unknown) => v === "codex" || v === "cursor" || v === "grok" || v === "antigravity";
+
 /** The plan's name in a note: the coding plan's maker, else Claude's or ChatGPT's. */
 export function planName(kind: BrainKind, provider?: string): string {
   const plan = planOf(provider);

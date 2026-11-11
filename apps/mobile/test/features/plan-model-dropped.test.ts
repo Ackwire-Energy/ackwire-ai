@@ -3,7 +3,7 @@ import { openTarget } from "@agenteschat/client/lib/notifications";
 import { notificationHref } from "../../src/features/links/logic";
 import { notification } from "./fixtures";
 
-test("an agent's model that left its plan's list opens where another is chosen: its model on the phone, Quem pensa on the web", () => {
+test("an agent's model that left its plan's list opens where another is chosen: its model on the phone, Quem pensa's model screen on the web", () => {
   const n = notification({
     id: "n-dropped",
     kind: "plan_model_dropped",
@@ -14,7 +14,8 @@ test("an agent's model that left its plan's list opens where another is chosen: 
   expect(openTarget(n)).toEqual({
     to: "/org/$orgId/agents/$agentId",
     params: { agentId: "ag-1" },
-    search: { sec: "brain" },
+    // The web's dialog opens straight on the model's screen (`brain=model`), as the phone opens its model.
+    search: { sec: "brain", brain: "model" },
   });
   expect(notificationHref({ ...n, source: { agentId: "../x" } })).toBeNull();
 });

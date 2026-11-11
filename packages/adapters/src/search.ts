@@ -14,6 +14,8 @@ export interface SearchDocument {
   channelIds: string[];
   title?: string;
   body: string;
+  /** Words it is also found by, never shown (a memory's English key, ADR 0167): matched like its title. */
+  keywords?: string;
   /** Optional vector (EMBEDDING_DIMENSIONS); without it the doc is full-text only. */
   embedding?: number[] | null;
   embeddingModel?: string | null;
@@ -24,6 +26,8 @@ export interface SearchQuery {
   text: string;
   /** Query vector, when an embedding provider is configured. */
   embedding?: number[] | null;
+  /** The model that made `embedding`: only documents it embedded are compared, so a reindex half done never mixes two. */
+  embeddingModel?: string;
   /** Channels the reader can see. Enforced by every implementation. */
   visibleChannelIds: string[];
   /** Scopes the reader sees on tasks' documents only: a DM's id here reaches its tasks, never its messages. */
@@ -171,6 +175,13 @@ const RRF_K = 60;
 const vectorLiteral = (v: number[]) => `[${v.map((x) => (Number.isFinite(x) ? x : 0)).join(",")}]`;
 
 /**
+ * One HNSW index holds every workspace's vectors, and by default pgvector takes the 40 nearest before any filter: a
+ * small workspace could get almost none of its own. An iterative scan (pgvector 0.8) reads on until enough rows pass.
+ */
+const ITERATIVE_SCAN = sql`select set_config('hnsw.iterative_scan', 'relaxed_order', true),
+  set_config('hnsw.ef_search', '100', true)`;
+
+/**
  * Hybrid search on Postgres (`search_documents`): full-text with
  * `websearch_to_tsquery('simple', …)` and, when vectors exist, cosine
  * distance with pgvector; the two rankings are fused with reciprocal-rank
@@ -179,6 +190,19 @@ const vectorLiteral = (v: number[]) => `[${v.map((x) => (Number.isFinite(x) ? x 
  */
 export function createPostgresSearchResolver(db: Database): SearchIndexResolver {
   const t = schema.searchDocuments;
+  // Older pgvector (0.7 and before) has no iterative scans: its vector queries run without them.
+  let iterative: Promise<boolean> | undefined;
+  const iterativeScans = () =>
+    (iterative ??= db
+      .execute(sql`select string_to_array(extversion, '.')::int[] >= array[0, 8] as iterative
+        from pg_extension where extname = 'vector'`)
+      .then(
+        (r) => rowsOf<{ iterative: boolean }>(r)[0]?.iterative === true,
+        () => {
+          iterative = undefined;
+          return false;
+        },
+      ));
   return {
     async forOrg(orgId) {
       return {
@@ -191,7 +215,10 @@ export function createPostgresSearchResolver(db: Database): SearchIndexResolver 
               kind: d.kind,
               sourceId: d.sourceId,
               channelIds: d.channelIds,
-              title: d.title ?? "",
+              // Keywords ride on the title's second line: indexed and ranked as the title, cut off every hit.
+              title: d.keywords?.trim()
+                ? `${(d.title ?? "").replace(/\n/g, " ")}\n${d.keywords.trim()}`
+                : (d.title ?? ""),
               body: d.body,
               embedding: d.embedding ?? null,
               embeddingModel: d.embedding ? (d.embeddingModel ?? null) : null,
@@ -271,7 +298,7 @@ export function createPostgresSearchResolver(db: Database): SearchIndexResolver 
             kind: row.kind as SearchKind,
             sourceId: row.sourceId,
             channelIds: row.channelIds,
-            title: row.title,
+            title: row.title.split("\n")[0] ?? "",
             snippet: row.body.slice(0, 300),
             score,
             createdAt: row.sourceCreatedAt,
@@ -309,12 +336,21 @@ export function createPostgresSearchResolver(db: Database): SearchIndexResolver 
           const vectorRows = q.embedding
             ? (async () => {
                 const vec = sql`${vectorLiteral(q.embedding ?? [])}::vector`;
-                // One statement: nearest ids with their rows (no second fetch).
-                const ids = rowsOf<{ id: string }>(
-                  await db.execute(sql`select ${t.id} as id from ${t}
+                // pgvector's shape for a filtered search with a distance cut: the filters inside, the cut outside.
+                // `+ 0`: Postgres 17+ would trust the relaxed scan's order and skip the sort.
+                const nearest = sql`with nearest as materialized (
+                    select ${t.id} as id, ${t.embedding} <=> ${vec} as distance from ${t}
                     where ${scope} and ${t.embedding} is not null
-                      and ${t.embedding} <=> ${vec} < ${q.maxDistance ?? 0.75}
-                    order by ${t.embedding} <=> ${vec} limit 50`),
+                      ${q.embeddingModel ? sql`and ${t.embeddingModel} = ${q.embeddingModel}` : sql``}
+                    order by distance limit 50
+                  ) select id from nearest where distance < ${q.maxDistance ?? 0.75} order by distance + 0`;
+                const ids = rowsOf<{ id: string }>(
+                  (await iterativeScans())
+                    ? await db.transaction(async (tx) => {
+                        await tx.execute(ITERATIVE_SCAN);
+                        return tx.execute(nearest);
+                      })
+                    : await db.execute(nearest),
                 ).map((r) => r.id);
                 if (ids.length === 0) return [];
                 const full = await db.select().from(t).where(inArray(t.id, ids));
