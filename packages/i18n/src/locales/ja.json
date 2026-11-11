@@ -863,7 +863,20 @@
       "team": "チーム用",
       "teamText": "人とエージェントが、チャンネル、ロール、承認を使って一緒に働きます。",
       "personalExamples": "朝7時の一日 · 支払い · トレーニング",
-      "teamExamples": "カスタマーサポート · 経理 · レポート"
+      "teamExamples": "カスタマーサポート · 経理 · レポート",
+      "personalLine": "あなたの一日を見守るエージェント。",
+      "teamLine": "人とエージェントが同じ場所に。",
+      "activities": {
+        "agenda": "今日の予定",
+        "home": "家のこと",
+        "bills": "支払い",
+        "studies": "学習",
+        "travel": "旅行",
+        "support": "カスタマーサポート",
+        "finance": "経理",
+        "reports": "レポート",
+        "sales": "営業"
+      }
     },
     "personal": {
       "name": "個人"

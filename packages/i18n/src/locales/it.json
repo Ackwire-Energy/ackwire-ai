@@ -897,7 +897,20 @@
       "team": "Per il mio team",
       "teamText": "Persone e agenti lavorano insieme, con canali, ruoli e approvazioni.",
       "personalExamples": "La tua giornata alle 7 · Bollette · Allenamento",
-      "teamExamples": "Assistenza clienti · Finanze · Report"
+      "teamExamples": "Assistenza clienti · Finanze · Report",
+      "personalLine": "Agenti che si occupano della tua giornata.",
+      "teamLine": "Persone e agenti nello stesso posto.",
+      "activities": {
+        "agenda": "Agenda del giorno",
+        "home": "Casa",
+        "bills": "Bollette",
+        "studies": "Studio",
+        "travel": "Viaggi",
+        "support": "Assistenza clienti",
+        "finance": "Finanze",
+        "reports": "Report",
+        "sales": "Vendite"
+      }
     },
     "personal": {
       "name": "Personale"
