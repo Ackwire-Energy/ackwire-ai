@@ -684,6 +684,8 @@ describe("the task manager page", () => {
     expect(row.querySelector(".tm-use__text b")?.textContent).toBe("Claude Code");
     expect(row.querySelector(".tm-use__text small")?.textContent).toBe(`Terminal · ${command}`);
     expect(rowOf("Ver o checkout").querySelector(".tm-use__text small")?.textContent).toBe(`Navegador · ${site}`);
+    // It may wrap after each of its five slashes, before breaking inside a word.
+    expect(rowOf("Ver o checkout").querySelectorAll(".tm-use__text small wbr")).toHaveLength(5);
     expect(rowOf("Conversa direta").querySelector(".tm-cell--time")?.textContent).toBe("2 dias");
     // Its row speaks for the task at work: its clock.
     expect(agentRowOf(name).querySelector(".tm-cell--time")?.textContent).toMatch(/^1:13:0\d$/);

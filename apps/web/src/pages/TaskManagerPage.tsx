@@ -766,26 +766,28 @@ function AgentRow({
   return (
     <li className="tm-row tm-row--agent" data-open={open || undefined}>
       <span className="tm-cell tm-cell--name">
-        <span className="tm-twist" aria-hidden="true">
-          <Icon name="chevronDown" size={14} />
+        <span className="tm-who">
+          <span className="tm-twist" aria-hidden="true">
+            <Icon name="chevronDown" size={14} />
+          </span>
+          <OpensAgent agentId={group.agentId}>
+            <AgentAvatar agentId={group.agentId} name={name} size="xs" />
+          </OpensAgent>
+          <span className="tm-name">
+            <button
+              type="button"
+              className="tm-hit"
+              aria-expanded={open}
+              aria-label={t("taskManager.toggleAgent", { name })}
+              onClick={onToggle}
+            >
+              {name}
+            </button>
+          </span>
+          <CountChip size="sm" aria-label={t("taskManager.tasks", { count: group.tasks.length })}>
+            {group.tasks.length}
+          </CountChip>
         </span>
-        <OpensAgent agentId={group.agentId}>
-          <AgentAvatar agentId={group.agentId} name={name} size="sm" />
-        </OpensAgent>
-        <span className="tm-name">
-          <button
-            type="button"
-            className="tm-hit"
-            aria-expanded={open}
-            aria-label={t("taskManager.toggleAgent", { name })}
-            onClick={onToggle}
-          >
-            {name}
-          </button>
-        </span>
-        <CountChip size="sm" aria-label={t("taskManager.tasks", { count: group.tasks.length })}>
-          {group.tasks.length}
-        </CountChip>
       </span>
       <span className="tm-cell tm-cell--state">{state}</span>
       <span className="tm-cell tm-cell--use">
