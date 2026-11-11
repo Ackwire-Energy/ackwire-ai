@@ -52,9 +52,9 @@
 .tm-card__head {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-2);
   min-width: 0;
-  padding: 12px 12px 0;
+  padding: var(--space-3) var(--space-3) 0;
 }
 /* The card's press: it covers the card, so the face (`OpensAgent`) alone sits above it. */
 .tm-card__text {
@@ -394,8 +394,9 @@ html:not([data-pointer]) .tm-more:focus-visible {
     flex-basis: 100%;
     width: 100%;
   }
+  /* Room for "10 tarefas" on one line beside a "1 espera você" chip; the next card still peeks at the edge. */
   .tm-card.ac-card {
-    width: 156px;
+    width: 172px;
   }
   /* No arrows: a strip a finger swipes, out over the page's side room so the cards slide under the screen's edges,
      each settling on the page's line. */
@@ -456,7 +457,9 @@ html:not([data-pointer]) .tm-more:focus-visible {
     grid-row: 2 / span 2;
     grid-column: 2;
   }
+  /* Nothing in use is a column's dash beside the others; stacked it would be a line of its own saying nothing. */
   .tm-cell--use:empty,
+  .tm-cell--use:has(> .tm-use--none),
   .tm-cell--act:empty {
     display: none;
   }
