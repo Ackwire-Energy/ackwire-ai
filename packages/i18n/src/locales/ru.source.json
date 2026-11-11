@@ -1781,6 +1781,12 @@
   "onboarding.flow.lodi.planThen": {
     "value": "Once the plan is on, the next screen is where you connect your AI."
   },
+  "onboarding.flow.lodi.area": {
+    "value": "One last thing before the team."
+  },
+  "onboarding.flow.lodi.areaPersonal": {
+    "value": "One last thing before your agents."
+  },
   "onboarding.flow.lodi.ask": {
     "value": "Already have a team somewhere else? I'll bring all of it here."
   },
@@ -1825,6 +1831,36 @@
   },
   "onboarding.flow.lodi.peopleLink": {
     "value": "Now the people. Send them the link and I'll show you each request."
+  },
+  "onboarding.flow.area.title": {
+    "value": "And you, what do you work on?"
+  },
+  "onboarding.flow.area.lead": {
+    "value": "Just so we know who uses agentes.chat."
+  },
+  "onboarding.flow.area.skip": {
+    "value": "Skip this step"
+  },
+  "onboarding.flow.area.options.dev": {
+    "value": "Development"
+  },
+  "onboarding.flow.area.options.marketing": {
+    "value": "Marketing"
+  },
+  "onboarding.flow.area.options.sales": {
+    "value": "Sales"
+  },
+  "onboarding.flow.area.options.finance": {
+    "value": "Finance"
+  },
+  "onboarding.flow.area.options.ops": {
+    "value": "Operations"
+  },
+  "onboarding.flow.area.options.support": {
+    "value": "Customer support"
+  },
+  "onboarding.flow.area.options.other": {
+    "value": "Something else"
   },
   "onboarding.flow.preview.label": {
     "value": "Your workspace, as you answer"

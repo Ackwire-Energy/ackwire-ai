@@ -718,6 +718,8 @@
         "teamMadePersonal": "Deine Agenten sind schon da. Wir machen weiter, wann immer du bereit bist.",
         "plan": "Nach dem Tarif fehlt nur noch eine KI. Ich zeige dir, wo.",
         "planThen": "Sobald der Tarif läuft, verbindest du auf dem nächsten Bildschirm deine KI.",
+        "area": "Noch eine letzte Frage vor dem Team.",
+        "areaPersonal": "Noch eine letzte Frage vor deinen Agenten.",
         "ask": "Du hast schon ein Team woanders? Ich hole es komplett hierher.",
         "start": "Ich habe ein Team, das zu dem passt, was ihr macht. Oder wir fangen zu zweit an.",
         "askPersonal": "Du nutzt schon Agenten woanders? Ich hole sie alle hierher.",
@@ -733,6 +735,20 @@
         "connectedThen": "Jetzt passt es. Es fehlen nur noch die Leute, mit denen du arbeitest.",
         "people": "Jetzt die Leute. Gib mir ihre E-Mail-Adressen, und ich schicke die Einladungen.",
         "peopleLink": "Jetzt die Leute. Schick ihnen den Link, und ich zeige dir jede Anfrage."
+      },
+      "area": {
+        "title": "Und du, woran arbeitest du?",
+        "lead": "Nur damit wir wissen, wer agentes.chat nutzt.",
+        "skip": "Diesen Schritt überspringen",
+        "options": {
+          "dev": "Entwicklung",
+          "marketing": "Marketing",
+          "sales": "Vertrieb",
+          "finance": "Finanzen",
+          "ops": "Betrieb",
+          "support": "Kundenservice",
+          "other": "Etwas anderes"
+        }
       },
       "preview": {
         "label": "Dein Workspace, während du antwortest",

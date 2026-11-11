@@ -718,6 +718,8 @@
         "teamMadePersonal": "Je agents zijn er al. We gaan verder wanneer je wilt.",
         "plan": "Na het abonnement hoef je alleen nog een AI te koppelen. Ik laat je zien waar.",
         "planThen": "Zodra het abonnement aanstaat, koppel je op het volgende scherm je AI.",
+        "area": "Nog één laatste vraag voor het team.",
+        "areaPersonal": "Nog één laatste vraag voor je agents.",
         "ask": "Heb je al een team ergens anders? Ik haal het in zijn geheel hierheen.",
         "start": "Ik heb een team klaar voor wat jullie doen. Of we beginnen met z'n tweeën.",
         "askPersonal": "Gebruik je al agents ergens anders? Ik haal ze allemaal hierheen.",
@@ -733,6 +735,20 @@
         "connectedThen": "Zo. Je hoeft alleen nog de mensen uit te nodigen met wie je werkt.",
         "people": "Nu de mensen. Geef me hun e-mailadressen en ik stuur de uitnodigingen.",
         "peopleLink": "Nu de mensen. Stuur ze de link en ik laat je elk verzoek zien."
+      },
+      "area": {
+        "title": "En jij, waar werk je aan?",
+        "lead": "Alleen zodat we weten wie agentes.chat gebruikt.",
+        "skip": "Deze stap overslaan",
+        "options": {
+          "dev": "Ontwikkeling",
+          "marketing": "Marketing",
+          "sales": "Verkoop",
+          "finance": "Financiën",
+          "ops": "Bedrijfsvoering",
+          "support": "Klantenservice",
+          "other": "Iets anders"
+        }
       },
       "preview": {
         "label": "Je werkruimte, terwijl je antwoordt",
