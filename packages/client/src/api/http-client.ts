@@ -568,6 +568,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
           request<{ organizations: { orgId: string; unread: number; waiting: number }[] }>("/api/app/me/unread"),
         ),
       updateMe: (input) => request<void>("/api/app/me", { method: "PATCH", json: input }),
+      setWorkArea: (area) => request<void>("/api/app/me/work-area", { method: "PUT", json: { area } }),
       phoneSignIn: () => request<PhoneSignIn>("/api/app/phone-sign-in", { json: {} }),
       addPassword: (password) => request<void>("/api/app/me/password", { json: { password } }),
       deletionPlan: () => request<AccountDeletionPlan>("/api/app/account/deletion"),

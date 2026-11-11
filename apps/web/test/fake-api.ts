@@ -1456,6 +1456,10 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       updateMe: async (input) => {
         log("account.updateMe", input);
       },
+      setWorkArea: async (area) => {
+        log("account.setWorkArea", area);
+        if (state.me) state.me.user.workArea = area;
+      },
       addPassword: async (password) => {
         log("account.addPassword", { password });
         if (state.me) state.me.user.hasPassword = true;

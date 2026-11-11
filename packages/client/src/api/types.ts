@@ -265,6 +265,8 @@ export interface User {
   locale?: string | null;
   /** The language follows each device's own (Automático) until the person picks one. */
   localeAuto?: boolean;
+  /** Their own area, asked once during the onboarding (`WORK_AREAS`), or `skipped`; null until asked. */
+  workArea?: string | null;
 }
 
 /** ADR 0056 §8: `hold` pauses the agents, `suspended` closes the workspace. */

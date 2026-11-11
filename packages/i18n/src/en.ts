@@ -747,6 +747,9 @@ export const en = {
         plan: "After the plan, all that's left is connecting an AI. I'll show you where.",
         /** On the plan step, with the AI step right after it. */
         planThen: "Once the plan is on, the next screen is where you connect your AI.",
+        /** The person's own area, asked once: on a team's rail after what it does, on a personal one after its purpose. */
+        area: "One last thing before the team.",
+        areaPersonal: "One last thing before your agents.",
         /** The team step's question: does the person already have agents in another app. */
         ask: "Already have a team somewhere else? I'll bring all of it here.",
         /** How a team with no agents yet starts: the template for what it does, or just the two of them. */
@@ -771,6 +774,24 @@ export const en = {
         /** The people step: by email, or (a server that sends no email) through the workspace's link. */
         people: "Now the people. Give me their emails and I'll send the invitations.",
         peopleLink: "Now the people. Send them the link and I'll show you each request.",
+      },
+      /**
+       * The person's own area (about them, never the workspace), asked once per account: on a team's rail after what
+       * it does, on a personal one after what it is for. Optional; the operator API reads it.
+       */
+      area: {
+        title: "And you, what do you work on?",
+        lead: "Just so we know who uses agentes.chat.",
+        skip: "Skip this step",
+        options: {
+          dev: "Development",
+          marketing: "Marketing",
+          sales: "Sales",
+          finance: "Finance",
+          ops: "Operations",
+          support: "Customer support",
+          other: "Something else",
+        },
       },
       preview: {
         label: "Your workspace, as you answer",
