@@ -369,7 +369,7 @@ describe("each card opens Connect for the whole team on its own steps (ADR 0162)
     await click(within(body()).getByRole("button", { name: /^Claude/ }), 12);
     const panel = within(screen().getByRole("dialog")).getByRole("region", { name: "Seu plano do Claude" });
     expect(panel.textContent).toContain(
-      "As contas ficam num computador conectado. Dá para conectar um assim que o workspace abrir.",
+      "As contas precisam de um computador, e este workspace ainda não tem. Dá para adicionar um assim que o workspace abrir.",
     );
     expect(within(panel).queryByRole("button", { name: "Conectar um computador" })).toBeNull();
     await click(within(panel).getByRole("button", { name: "Usar uma chave de API agora" }), 6);

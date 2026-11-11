@@ -2872,7 +2872,7 @@
       "ready": "Komputer jest gotowy.",
       "useKey": "Użyj teraz klucza API",
       "connecting": "Komputer tego serwera połączy się w ciągu minuty. Zalogujesz się tutaj, gdy tylko to nastąpi.",
-      "computerLater": "Konta zostają na połączonym komputerze. Możesz go połączyć, gdy tylko otworzy się przestrzeń robocza."
+      "computerLater": "Konta potrzebują komputera, a ta przestrzeń robocza jeszcze go nie ma. Możesz go dodać, gdy tylko otworzy się przestrzeń robocza."
     },
     "theComputer": "komputer",
     "own": {

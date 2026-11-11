@@ -2670,7 +2670,7 @@
       "ready": "Bilgisayar hazır.",
       "useKey": "Şimdi bir API anahtarı kullan",
       "connecting": "Bu sunucunun bilgisayarı bir dakika içinde bağlanır. Bağlanır bağlanmaz burada giriş yaparsınız.",
-      "computerLater": "Hesaplar bağlı bir bilgisayarda kalır. Çalışma alanı açılınca bir bilgisayar bağlayabilirsiniz."
+      "computerLater": "Hesapların bir bilgisayara ihtiyacı var ve bu çalışma alanında henüz yok. Çalışma alanı açılınca bir tane ekleyebilirsiniz."
     },
     "theComputer": "bilgisayar",
     "own": {

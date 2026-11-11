@@ -2772,7 +2772,7 @@
       "ready": "La computadora está lista.",
       "useKey": "Usar una clave de API ahora",
       "connecting": "La computadora de este servidor se conecta en menos de un minuto. Inicias sesión aquí en cuanto lo haga.",
-      "computerLater": "Las cuentas quedan en una computadora conectada. Puedes conectar una en cuanto se abra el espacio de trabajo."
+      "computerLater": "Las cuentas necesitan una computadora, y este espacio de trabajo aún no tiene. Puedes añadir una en cuanto se abra el espacio de trabajo."
     },
     "theComputer": "la computadora",
     "own": {

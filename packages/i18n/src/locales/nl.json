@@ -2682,7 +2682,7 @@
       "ready": "De computer is klaar.",
       "useKey": "Nu een API-sleutel gebruiken",
       "connecting": "De computer van deze server maakt binnen een minuut verbinding. Je logt hier in zodra dat gebeurt.",
-      "computerLater": "Accounts blijven op een gekoppelde computer. Je kunt er een koppelen zodra de werkruimte open is."
+      "computerLater": "Accounts hebben een computer nodig, en deze werkruimte heeft er nog geen. Je kunt er een toevoegen zodra de werkruimte open is."
     },
     "theComputer": "de computer",
     "own": {

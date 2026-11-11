@@ -2768,7 +2768,8 @@ export const ptBR = {
       useKey: "Usar uma chave de API agora",
       connecting: "O computador deste servidor conecta em até um minuto. Você entra aqui assim que ele conectar.",
       /** On the onboarding with no computer: one is connected only once the workspace opens. */
-      computerLater: "As contas ficam num computador conectado. Dá para conectar um assim que o workspace abrir.",
+      computerLater:
+        "As contas precisam de um computador, e este workspace ainda não tem. Dá para adicionar um assim que o workspace abrir.",
     },
     /** Without its article: the sentences carry it ("Enviar ao {{computer}}", "O {{computer}} está…"). */
     theComputer: "computador",

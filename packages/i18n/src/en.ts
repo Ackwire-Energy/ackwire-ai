@@ -2813,7 +2813,8 @@ export const en = {
       useKey: "Use an API key now",
       connecting: "This server's computer connects within a minute. You sign in here as soon as it does.",
       /** On the onboarding with no computer: one is connected only once the workspace opens. */
-      computerLater: "Accounts stay on a connected computer. You can connect one once the workspace opens.",
+      computerLater:
+        "Accounts need a computer, and this workspace has none yet. You can add one once the workspace opens.",
     },
     /** The Cloud's one computer in a plan's sign-in, unnamed: "Send to the computer". */
     theComputer: "the computer",

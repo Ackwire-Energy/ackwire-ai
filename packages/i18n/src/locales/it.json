@@ -2779,7 +2779,7 @@
       "ready": "Il computer è pronto.",
       "useKey": "Usa una chiave API ora",
       "connecting": "Il computer di questo server si collega entro un minuto. Accedi qui appena è collegato.",
-      "computerLater": "Gli account restano su un computer collegato. Puoi collegarne uno appena si apre lo spazio di lavoro."
+      "computerLater": "Gli account hanno bisogno di un computer, e questo spazio di lavoro non ne ha ancora. Puoi aggiungerne uno appena si apre lo spazio di lavoro."
     },
     "theComputer": "computer",
     "own": {

@@ -2585,7 +2585,7 @@
       "ready": "Komputernya sudah siap.",
       "useKey": "Pakai kunci API sekarang",
       "connecting": "Komputer server ini terhubung dalam semenit. Kamu bisa masuk di sini begitu terhubung.",
-      "computerLater": "Akun disimpan di komputer yang terhubung. Kamu bisa menghubungkan satu begitu ruang kerja terbuka."
+      "computerLater": "Akun butuh komputer, dan ruang kerja ini belum punya. Kamu bisa menambahkannya begitu ruang kerja terbuka."
     },
     "theComputer": "komputer",
     "own": {

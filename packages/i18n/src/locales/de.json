@@ -2681,7 +2681,7 @@
       "ready": "Der Computer ist bereit.",
       "useKey": "Jetzt einen API-Schlüssel nutzen",
       "connecting": "Der Computer dieses Servers verbindet sich innerhalb einer Minute. Sobald er so weit ist, meldest du dich hier an.",
-      "computerLater": "Konten bleiben auf einem verbundenen Computer. Du kannst einen verbinden, sobald der Workspace offen ist."
+      "computerLater": "Konten brauchen einen Computer, und dieser Workspace hat noch keinen. Du kannst einen hinzufügen, sobald der Workspace offen ist."
     },
     "theComputer": "Computer",
     "own": {
