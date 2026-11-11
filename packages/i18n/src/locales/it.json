@@ -13326,7 +13326,8 @@
       "draining": "La rete sta cambiando. Le sessioni aperte del computer si riavvieranno alle {{when}}.",
       "restart": "Le sessioni del computer si stanno riavviando per applicare la rete. Il nuovo lavoro aspetta che finisca.",
       "line": "IP di uscita {{ip}}",
-      "hint": "L’indirizzo che i siti vedono quando gli agenti navigano. Si aggiorna quando cambia la rete del computer."
+      "hint": "L’indirizzo che i siti vedono quando gli agenti navigano. Si aggiorna quando cambia la rete del computer.",
+      "waiting": "Gli agenti si stanno ricollegando a internet. Le loro connessioni aspettano che torni."
     },
     "online": "Online",
     "offline": "Offline",

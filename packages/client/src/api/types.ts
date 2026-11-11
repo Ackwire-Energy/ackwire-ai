@@ -4385,6 +4385,11 @@ export interface Machine {
   /** The public address measured through an agent process, absent on older runners. */
   egress?: { ip: string; country?: string; at: string } | null;
   networkTransition?: { state: "draining" | "restart_required"; deadline: string; agents: string[] } | null;
+  /**
+   * The workspace's own computer, online, has its agents waiting for their way out: none of the proxies its network
+   * requires works now, so their connections are refused for a while. Absent from an older server: they don't wait.
+   */
+  egressWaiting?: boolean;
   name: string;
   /**
    * Absent from a server that doesn't say: `connected`. A `managed` one can't be removed, and its hostname,

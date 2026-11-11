@@ -13317,7 +13317,8 @@
       "draining": "Le réseau change. Les sessions ouvertes de l’ordinateur redémarreront à {{when}}.",
       "restart": "Les sessions de l’ordinateur redémarrent pour appliquer le réseau. Les nouvelles tâches attendent la fin.",
       "line": "IP de sortie {{ip}}",
-      "hint": "L’adresse que voient les sites quand les agents naviguent. Elle change quand le réseau de l’ordinateur change."
+      "hint": "L’adresse que voient les sites quand les agents naviguent. Elle change quand le réseau de l’ordinateur change.",
+      "waiting": "Les agents se reconnectent à internet. Leurs connexions attendent son retour."
     },
     "online": "En ligne",
     "offline": "Hors ligne",

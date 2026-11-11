@@ -12714,6 +12714,7 @@ export const en = {
       restart: "Computer sessions are restarting to apply network settings. New work waits until this finishes.",
       line: "Exit IP {{ip}}",
       hint: "The address websites see when the agents browse. It updates when the computer’s network changes.",
+      waiting: "Reconnecting the agents’ internet. Their connections wait until it’s back.",
     },
     online: "Online",
     offline: "Offline",

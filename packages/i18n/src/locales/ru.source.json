@@ -31081,6 +31081,9 @@
   "machines.egress.hint": {
     "value": "The address websites see when the agents browse. It updates when the computer’s network changes."
   },
+  "machines.egress.waiting": {
+    "value": "Reconnecting the agents’ internet. Their connections wait until it’s back."
+  },
   "machines.online": {
     "value": "Online"
   },

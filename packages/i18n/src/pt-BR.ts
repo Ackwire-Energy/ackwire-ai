@@ -12805,6 +12805,7 @@ export const ptBR = {
       restart: "As sessões do computador estão reiniciando para aplicar a rede. Novos trabalhos aguardam a conclusão.",
       line: "IP de saída {{ip}}",
       hint: "O endereço que os sites veem quando os agentes navegam. Ele acompanha as mudanças de rede do computador.",
+      waiting: "Reconectando a internet dos agentes. As conexões deles esperam até ela voltar.",
     },
     online: "Online",
     offline: "Offline",
