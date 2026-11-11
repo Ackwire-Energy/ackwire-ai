@@ -77,8 +77,9 @@ const AI_POLL_MS = 10_000;
 /**
  * The onboarding (ADR 0162): the blue rail with Lodi on its horizon, one step at a time, read from the workspace's own
  * data so a workspace left at any step resumes there. First what the workspace is for (ADR 0159). A company or team
- * goes on with its name (which creates it), what it does, its team (agents brought from another app, or a template
- * made in one click), the plan where the workspace waits for its first one, and an AI for the team to think with. A
+ * goes on with its name (which creates it), what it does, its team (agents brought from another app, a template made
+ * in one click, or none for now: its right hand alone), the plan where the workspace waits for its first one, and an
+ * AI for the team to think with. A
  * personal workspace has no name to ask nor a business: its agents (brought, or none for now), the plan, the AI. On
  * wide screens its sidebar fills in beside the question, and the team on its stage beside the AI step. A team's opens
  * in #general, a personal one or one whose plan was left for later in its right hand's DM, on its arrival (ADR 0160):
@@ -159,8 +160,8 @@ export function OnboardingPage() {
   // In the order they were made (the server's), a template's team in its template's order: as every screen lists it.
   const team = (agents.data ?? []).filter((a) => !isRightHand(a));
   const context = settings.data?.context?.trim() ?? "";
-  // The furthest step the server keeps for it: "agents" once "I don't use any yet" was answered, "computer" once its
-  // plan step showed (ADR 0162).
+  // The furthest step the server keeps for it: "import" once a team's "I don't use any yet" was answered, "agents" once
+  // the team step was left with no agents, "computer" once its plan step showed (ADR 0162).
   const passed = mine?.onboarding?.step;
   const held = billingHoldOf(mine?.standing) === "payment";
   // Back from paying, until the billing service lifts the hold: `/me` again meanwhile, as the hold's banner does.
@@ -456,6 +457,9 @@ export function OnboardingPage() {
   if (!me.data || !known || (at === "open" && !stay && deleting === null)) return <BootSplash />;
 
   const lodiWords = { first: firstName(me.data.user.name), ...agentGrammar(lodiName) };
+  // No agents besides the right hand (the team step left with none, ADR 0162 amended 2026-11-11, or a personal
+  // workspace's "no agents yet"): the plan and AI steps speak of it, never of a team that isn't there.
+  const alone = team.length === 0;
   // The team step's heading and Lodi's line from its source, until the team is made; then words for a team that
   // exists (back from a later step), never the template's.
   const teamHead = step === "team" && !teamList ? source.head(t, name) : null;
@@ -472,7 +476,7 @@ export function OnboardingPage() {
             ? t("onboarding.flow.lodi.planThen", lodiWords)
             : aiDone
               ? t("onboarding.flow.lodi.connected", lodiWords)
-              : t(personalNow ? "onboarding.flow.lodi.aiPersonal" : "onboarding.flow.lodi.ai", lodiWords);
+              : t(personalNow || alone ? "onboarding.flow.lodi.aiPersonal" : "onboarding.flow.lodi.ai", lodiWords);
   const title = asking
     ? t("onboarding.purpose.title")
     : step === "name"
@@ -484,7 +488,7 @@ export function OnboardingPage() {
           : step === "plan"
             ? t(personalNow ? "onboarding.flow.plan.titlePersonal" : "onboarding.flow.plan.title")
             : aiDone
-              ? personalNow
+              ? personalNow || alone
                 ? t("onboarding.flow.ai.doneTitlePersonal", agentGrammar(lodiName))
                 : t("onboarding.flow.ai.doneTitle", { org: name })
               : t(personalNow ? "onboarding.flow.ai.titlePersonal" : "arrival.connect.title");
@@ -497,7 +501,13 @@ export function OnboardingPage() {
         : step === "team"
           ? (teamHead?.lead ?? t("onboarding.flow.team.madeLead"))
           : step === "plan"
-            ? t(personalNow ? "onboarding.flow.plan.leadPersonal" : "onboarding.flow.plan.lead")
+            ? t(
+                personalNow
+                  ? "onboarding.flow.plan.leadPersonal"
+                  : alone
+                    ? "onboarding.flow.plan.leadAlone"
+                    : "onboarding.flow.plan.lead",
+              )
             : aiDone
               ? aiLabel
                 ? t("onboarding.flow.ai.doneLead", { label: aiLabel })
@@ -529,12 +539,13 @@ export function OnboardingPage() {
         : context
           ? t("onboarding.railValue.context")
           : undefined,
+    // Answered with no agents (shown only once answered): they come later.
     team: team.length
       ? joinNames(
           team.map((a) => a.name),
           t,
         )
-      : undefined,
+      : t("onboarding.railValue.later"),
     plan: steps.includes("plan") && !held ? t("onboarding.railValue.on") : undefined,
     ai: aiDone ? (aiLabel ?? t("onboarding.railValue.ai")) : undefined,
   };
@@ -910,6 +921,8 @@ export function OnboardingPage() {
                     template={template}
                     reviewer={lodiName}
                     onContinue={() => setPicked(null)}
+                    onSkip={() => source.skip.mutate()}
+                    skipping={source.skip.isPending}
                   />
                 ) : (
                   <TeamSource state={source} orgId={orgId} personal={personalNow} org={name} />
@@ -917,7 +930,8 @@ export function OnboardingPage() {
               {step === "plan" && orgId && (
                 <PlanStep
                   orgId={orgId}
-                  // A personal workspace with no agents yet: its right hand, asleep until the plan.
+                  // No agents yet (a personal workspace's, or a team step left with none): its right hand, asleep until
+                  // the plan.
                   team={team.length > 0 ? team : lodi ? [lodi] : []}
                   offer={offer}
                   skipping={open.isPending}

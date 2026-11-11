@@ -172,13 +172,14 @@ export function AiStage({
   lead: Agent | undefined;
   /** Every agent thinks: the sky turns to day. */
   awake: boolean;
-  /** A personal workspace has no team (ADR 0159): its agents, or its right hand by name while it is alone. */
+  /** A personal workspace has no team (ADR 0159): its agents, in words of its own. */
   personal: boolean;
 }) {
   const { t } = useTranslation();
   const day = useDawn(awake);
   const names = agents.map((a) => a.name);
-  const alone = personal && lead !== undefined && agents.length === 1 ? agentGrammar(lead.name) : null;
+  // The right hand alone (a personal workspace's "no agents yet", a team step left with none): by its name.
+  const alone = lead !== undefined && agents.length === 1 ? agentGrammar(lead.name) : null;
   const head = alone
     ? t(awake ? "onboarding.flow.ai.awakeAlone" : "onboarding.flow.ai.readyAlone", alone)
     : personal
@@ -201,7 +202,7 @@ export function AiStage({
           <span>
             {awake
               ? t("onboarding.flow.ai.answer", { names: joinNames(names, t), count: agents.length })
-              : t(personal ? "onboarding.flow.ai.wakePersonal" : "arrival.stage.wake")}
+              : t(personal || alone ? "onboarding.flow.ai.wakePersonal" : "arrival.stage.wake")}
           </span>
         </div>
       </div>

@@ -771,6 +771,11 @@ export const en = {
         title: "Your team",
         /** Under the title once the team is made (back from a later step): the list of who is in it. */
         madeLead: "They're already in the workspace. You can adjust each one later.",
+        /**
+         * The quiet link under the template's button: no team now, the next step with only the right hand. The
+         * agents are created by hand later.
+         */
+        later: "Create the agents later, on my own",
         /** The team step opens on this question; the cards are the import page's apps, then "none". */
         ask: {
           title: "Do you already have agents in another app?",
@@ -785,6 +790,10 @@ export const en = {
           /** The button, with "I don't use any yet" picked. */
           fresh: "Build a new team",
           freshPersonal: "Continue without agents",
+          /** A team's quiet link under the button: on to the next step with only the right hand, no agents brought. */
+          skip: "Skip this step",
+          /** Beside "Skip this step": what skipping means. */
+          skipText: "You can create the agents later, one by one.",
         },
         /** Bringing the team from an app that answers a request: copy the request there, paste its answer here. */
         bring: {
@@ -814,6 +823,8 @@ export const en = {
       plan: {
         title: "Turn your team on",
         lead: "Your team is ready. With the plan and an AI, it starts today.",
+        /** The same, for a team with only its right hand (the team step was skipped). */
+        leadAlone: "With the plan and an AI, your right hand starts today. You can create the other agents later.",
         asleep: "Asleep until the plan",
         price: "<b>{{name}} plan</b> · {{price}} a month",
         name: "<b>{{name}} plan</b>",

@@ -11,8 +11,9 @@ import "@/components/import-flow.css";
 import "./team-source.css";
 
 /**
- * The team step before a team exists (ADR 0162, amended 2026-11-10): first the question (agents in another app, or
- * none yet), then bringing them (ADR 0055) inside the step, or a team's templates. This module stays light: the
+ * The team step before a team exists (ADR 0162, amended 2026-11-10 and 2026-11-11): first the question (agents in
+ * another app, or none yet), then bringing them (ADR 0055) inside the step, or a team's templates; a team may also
+ * leave the step with no agents, from the question or its templates. This module stays light: the
  * import's screens, its hook and its readers (archives, every app's parser) load with `TeamSourceBody` only once the
  * step shows them, so the onboarding's first screens never carry them.
  */
@@ -61,8 +62,10 @@ const asksFirst = (card: ImportCard | null) => card === "grok-bot" || card === "
 /**
  * The step's state, at the page's level so it outlives the step's own views and the rail's moves: the answer picked,
  * the view, and the hold that keeps the step on screen (`onHold`: the page pins the team step) while the import
- * applies and while its report waits. "No agents yet" saves `step: "agents"` on the workspace's onboarding, so a
- * resume knows it: a team opens on its templates, a personal workspace (ADR 0159) has its step answered.
+ * applies and while its report waits. The answers are saved on the workspace's onboarding, so a resume knows them: a
+ * team's "no agents yet" saves `step: "import"` and opens on its templates; leaving the step with no agents saves
+ * `step: "agents"`, which answers it (a personal workspace's "no agents yet", ADR 0159; a team's `skip`, ADR 0162
+ * amended 2026-11-11).
  */
 export function useTeamSource(
   orgId: string | null,
@@ -87,42 +90,63 @@ export function useTeamSource(
     resetFlow.current = reset;
   }, []);
 
-  // Read from the stored step on every render, never once at mount: the page renders before `/me` arrives.
-  const passedAgents = stepIndex(o.passed ?? "workspace") >= stepIndex("agents");
-  const base: Stage = stage ?? (!o.personal && passedAgents ? "template" : "ask");
+  // Read from the stored step on every render, never once at mount: the page renders before `/me` arrives. A team's
+  // "no agents yet" opens its templates; a step left with no agents ("agents" and on) opens on the question again, to
+  // bring or build a team after all.
+  const base: Stage = stage ?? (!o.personal && o.passed === "import" ? "template" : "ask");
   // The report only once the apply settled and kept the step (`TeamSourceBody`'s `reporting`): a clean one stays on
   // what was found, its button pending, until the rail moves on.
   const view: TeamSourceView =
     base !== "import" ? base : facts.report && holding && !facts.applying ? "report" : facts.coming ? "found" : "bring";
   const replyCard = replyCardOf(chosen);
 
+  const saveStep = (step: "import" | "agents") =>
+    orgId ? api.orgs.saveOnboarding(orgId, { step }) : Promise.resolve(null);
+  /** The step saved, in `/me` as the server answered it, where the rail reads it. */
+  const remember = (step: "import" | "agents", saved: { step: OnboardingStepId } | null) =>
+    qc.setQueryData<Me>(
+      keys.me,
+      (me) =>
+        me && {
+          ...me,
+          organizations: me.organizations.map((org) =>
+            org.id === orgId && org.onboarding
+              ? {
+                  ...org,
+                  onboarding: {
+                    ...org.onboarding,
+                    // It only moves forward, as the server keeps it.
+                    step:
+                      saved?.step ?? (stepIndex(org.onboarding.step) >= stepIndex(step) ? org.onboarding.step : step),
+                  },
+                }
+              : org,
+          ),
+        },
+    );
+
+  // "No agents yet": a team's templates; a personal workspace's step answered.
+  const noneStep = o.personal ? "agents" : "import";
   const none = useMutation({
-    mutationFn: () => (orgId ? api.orgs.saveOnboarding(orgId, { step: "agents" }) : Promise.resolve(null)),
+    mutationFn: () => saveStep(noneStep),
     onSuccess: (saved) => {
-      qc.setQueryData<Me>(
-        keys.me,
-        (me) =>
-          me && {
-            ...me,
-            organizations: me.organizations.map((org) =>
-              org.id === orgId && org.onboarding
-                ? {
-                    ...org,
-                    onboarding: {
-                      ...org.onboarding,
-                      // It only moves forward, as the server keeps it.
-                      step:
-                        saved?.step ??
-                        (stepIndex(org.onboarding.step) >= stepIndex("agents") ? org.onboarding.step : "agents"),
-                    },
-                  }
-                : org,
-            ),
-          },
-      );
-      // A pin left from going back to this step lets go: the rail moves on by itself where the answer is enough.
-      hold(false);
+      remember(noneStep, saved);
       if (!o.personal) setStage("template");
+      // A pin left from going back to this step lets go: the rail moves on by itself where the answer is enough. A
+      // team that had left the step with no agents keeps it, on its templates: what is stored still answers the step.
+      const left = stepIndex(saved?.step ?? noneStep) >= stepIndex("agents");
+      if (o.personal || !left) hold(false);
+    },
+  });
+
+  // A team's way out, from the question or its templates (ADR 0162, amended 2026-11-11): the step answered with no
+  // agents besides the right hand, and the rail on to the next one. Back on the step later, the question again.
+  const skip = useMutation({
+    mutationFn: () => saveStep("agents"),
+    onSuccess: (saved) => {
+      remember("agents", saved);
+      setStage("ask");
+      hold(false);
     },
   });
 
@@ -189,6 +213,8 @@ export function useTeamSource(
     preview: view === "found" || view === "report" ? facts.coming : null,
     /** "No agents yet". */
     none,
+    /** A team's "Skip this step" and "Create the agents later": the step left with no agents. */
+    skip,
     /** Back to the question. */
     ask,
     /** For the step's views (`TeamSource`) only. */

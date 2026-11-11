@@ -726,6 +726,7 @@
       "team": {
         "title": "Timmu",
         "madeLead": "Mereka sudah ada di ruang kerja. Kamu bisa menyesuaikan masing-masing nanti.",
+        "later": "Buat agen nanti, sendiri",
         "ask": {
           "title": "Sudah punya agen di aplikasi lain?",
           "lead": "Kalau ada, aku bawa seluruh timnya: instruksi, skill, dan rutinitas.",
@@ -735,7 +736,9 @@
           "noneTextPersonal": "Kita mulai berdua saja. Agen bisa menyusul nanti, kapan pun kamu mau.",
           "from": "Bawa dari {{app}}",
           "fresh": "Susun tim baru",
-          "freshPersonal": "Lanjut tanpa agen"
+          "freshPersonal": "Lanjut tanpa agen",
+          "skip": "Lewati langkah ini",
+          "skipText": "Kamu bisa membuat agen nanti, satu per satu."
         },
         "bring": {
           "title": "Bawa timmu dari {{app}}",
@@ -761,6 +764,7 @@
       "plan": {
         "title": "Nyalakan timmu",
         "lead": "Timmu sudah siap. Dengan paketnya dan sebuah AI, tim mulai hari ini.",
+        "leadAlone": "Dengan paketnya dan sebuah AI, tangan kananmu mulai hari ini. Agen lainnya bisa kamu buat nanti.",
         "asleep": "Tidur sampai ada paket",
         "price": "<b>Paket {{name}}</b> · {{price}} per bulan",
         "name": "<b>Paket {{name}}</b>",

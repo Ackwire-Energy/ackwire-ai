@@ -1823,6 +1823,9 @@
   "onboarding.flow.team.madeLead": {
     "value": "They're already in the workspace. You can adjust each one later."
   },
+  "onboarding.flow.team.later": {
+    "value": "Create the agents later, on my own"
+  },
   "onboarding.flow.team.ask.title": {
     "value": "Do you already have agents in another app?"
   },
@@ -1849,6 +1852,12 @@
   },
   "onboarding.flow.team.ask.freshPersonal": {
     "value": "Continue without agents"
+  },
+  "onboarding.flow.team.ask.skip": {
+    "value": "Skip this step"
+  },
+  "onboarding.flow.team.ask.skipText": {
+    "value": "You can create the agents later, one by one."
   },
   "onboarding.flow.team.bring.title": {
     "value": "Bring your team from {{app}}"
@@ -1906,6 +1915,9 @@
   },
   "onboarding.flow.plan.lead": {
     "value": "Your team is ready. With the plan and an AI, it starts today."
+  },
+  "onboarding.flow.plan.leadAlone": {
+    "value": "With the plan and an AI, your right hand starts today. You can create the other agents later."
   },
   "onboarding.flow.plan.asleep": {
     "value": "Asleep until the plan"

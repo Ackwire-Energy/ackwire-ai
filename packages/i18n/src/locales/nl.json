@@ -736,6 +736,7 @@
       "team": {
         "title": "Je team",
         "madeLead": "Ze staan al in de werkruimte. Je kunt ze later een voor een aanpassen.",
+        "later": "Agents later zelf aanmaken",
         "ask": {
           "title": "Heb je al agents in een andere app?",
           "lead": "Zo ja, dan haal ik het hele team: instructies, skills en routines.",
@@ -745,7 +746,9 @@
           "noneTextPersonal": "We beginnen met z'n tweeën. Agents komen later, wanneer je wilt.",
           "from": "Ophalen uit {{app}}",
           "fresh": "Een nieuw team samenstellen",
-          "freshPersonal": "Doorgaan zonder agents"
+          "freshPersonal": "Doorgaan zonder agents",
+          "skip": "Deze stap overslaan",
+          "skipText": "Je kunt de agents later een voor een aanmaken."
         },
         "bring": {
           "title": "Haal je team uit {{app}}",
@@ -772,6 +775,7 @@
       "plan": {
         "title": "Zet je team aan",
         "lead": "Je team is klaar. Met het abonnement en een AI begint het vandaag.",
+        "leadAlone": "Met het abonnement en een AI begint je rechterhand vandaag. De andere agents kun je later aanmaken.",
         "asleep": "Slaapt tot het abonnement",
         "price": "<b>Abonnement {{name}}</b> · {{price}} per maand",
         "name": "<b>Abonnement {{name}}</b>",

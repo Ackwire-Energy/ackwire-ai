@@ -736,6 +736,7 @@
       "team": {
         "title": "Ekibin",
         "madeLead": "Zaten çalışma alanındalar. Her birini sonra ayarlayabilirsiniz.",
+        "later": "Ajanları sonra kendim oluşturacağım",
         "ask": {
           "title": "Başka bir uygulamada zaten ajanın var mı?",
           "lead": "Varsa bütün ekibi getiririm: talimatlar, beceriler ve rutinler.",
@@ -745,7 +746,9 @@
           "noneTextPersonal": "Önce ikimiz başlıyoruz. Ajanlar sonra, istediğin zaman gelir.",
           "from": "{{app}} uygulamasından getir",
           "fresh": "Yeni bir ekip kur",
-          "freshPersonal": "Ajansız devam et"
+          "freshPersonal": "Ajansız devam et",
+          "skip": "Bu adımı atla",
+          "skipText": "Ajanları sonra tek tek oluşturabilirsin."
         },
         "bring": {
           "title": "Ekibini {{app}} uygulamasından getir",
@@ -772,6 +775,7 @@
       "plan": {
         "title": "Ekibini başlat",
         "lead": "Ekibin hazır. Plan ve bir yapay zekayla bugün başlıyor.",
+        "leadAlone": "Plan ve bir yapay zekayla sağ kolun bugün başlıyor. Diğer ajanları sonra oluşturabilirsin.",
         "asleep": "Plana kadar uykuda",
         "price": "<b>{{name}} planı</b> · ayda {{price}}",
         "name": "<b>{{name}} planı</b>",

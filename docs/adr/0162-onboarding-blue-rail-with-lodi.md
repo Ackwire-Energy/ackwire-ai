@@ -148,3 +148,26 @@ the workspace. Amends §1 (the steps), §2 (the plan step's words), §3 (where i
   plan).
 - **The phone** (§7) keeps its steps (`funnel: null`): no AI step, and a workspace left at the web's AI step opens
   there. Its card on a hold shows the plan row in words only, saying the plan is chosen on the web.
+
+## Amended 2026-11-11: a team may leave its team step with no agents
+
+People who would rather build their agents by hand were made to go through an import or a template: the owner, trying
+the rail live, wants them to go on without one. Amends the 2026-11-10 bullets on the steps and on "Ainda não uso
+nenhum".
+
+- **Two ways out, one per view.** A team's question has "Pular esta etapa" under its button, with "Você cria os agentes
+  depois, um por um." beside it, as the AI step's "Conectar depois"; its templates have "Criar os agentes depois, por
+  conta própria" under "Criar o time". Both leave the step with the right hand alone and go on to the plan where the
+  workspace waits for one, else to Connect an AI. A personal workspace's question gets no link: its "Ainda não uso
+  nenhum" already is that.
+- **What is stored.** Leaving the step saves the onboarding's step as `agents`, which now answers the team step in a
+  team's workspace too (`railState`), so a reload resumes after it. A team's "Ainda não uso nenhum" (and "Prefiro
+  montar um time novo") saves `import` instead: past the question, its templates next, the step still waiting for a
+  team. No new column or step. A team workspace left on its templates before this change resumes after the team step,
+  its question there to go back to.
+- **Afterwards.** The rail's team row reads "Depois" (a personal workspace's too). Back on the step, the question shows
+  again, never an empty team, so a team can still be brought or built; a template made there keeps the step on screen
+  until Continuar. The plan step lists the right hand alone and says "Com o plano e uma IA, o seu braço direito começa
+  hoje. Os outros agentes você cria depois."; on the AI step, Lodi's line, the stage beside it and the done heading
+  speak of the right hand by name, as for a personal workspace with no agents. The workspace opens as any team's:
+  #general, or the right hand's DM when the plan was left for later. The phone (`funnel: null`) is unchanged.

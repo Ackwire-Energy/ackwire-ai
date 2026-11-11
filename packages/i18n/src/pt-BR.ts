@@ -749,6 +749,7 @@ export const ptBR = {
       team: {
         title: "Seu time",
         madeLead: "Eles já estão no workspace. Você ajusta cada um depois.",
+        later: "Criar os agentes depois, por conta própria",
         ask: {
           title: "Você já tem agentes em outro app?",
           lead: "Se tiver, eu trago o time inteiro: instruções, skills e rotinas.",
@@ -759,6 +760,8 @@ export const ptBR = {
           from: "Trazer do {{app}}",
           fresh: "Montar um time novo",
           freshPersonal: "Seguir sem agentes",
+          skip: "Pular esta etapa",
+          skipText: "Você cria os agentes depois, um por um.",
         },
         bring: {
           title: "Traga o seu time do {{app}}",
@@ -785,6 +788,7 @@ export const ptBR = {
       plan: {
         title: "Ligue o time",
         lead: "O time está pronto. Com o plano e uma IA, ele começa hoje.",
+        leadAlone: "Com o plano e uma IA, o seu braço direito começa hoje. Os outros agentes você cria depois.",
         asleep: "Dormindo até o plano",
         price: "<b>Plano {{name}}</b> · {{price}} por mês",
         name: "<b>Plano {{name}}</b>",

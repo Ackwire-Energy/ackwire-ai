@@ -442,6 +442,10 @@ html:not([data-pointer]) .onb__logo:focus-visible {
   padding-bottom: var(--space-6);
   font-size: 14px;
 }
+/* Under the step's button, in its bar (the team step's way out): the bar keeps the room below it. */
+.onb__actions > .onb__skip {
+  padding-bottom: 0;
+}
 /*
  * The preview: the workspace's sidebar at its own size, in a frame, showing only what exists now. Never wider: the
  * sidebar's one-line names (a long workspace or person) end in its ellipsis there, as in the app, instead of widening

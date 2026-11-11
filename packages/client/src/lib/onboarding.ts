@@ -41,8 +41,10 @@ export function presetInput(t: TFunction, preset: Preset): AgentInput {
  * agents arrive chosen in "agents", which only picks and creates the team.
  * "computer" comes before "ai": a computer the agents can use helps that step,
  * whose plan sign-in runs on it.
- * The web's rail reads two of them back as answers with no data of their own (`RailFunnel`, ADR 0162): "agents" for
- * a workspace that brings no agents yet, "computer" for a plan step that was shown.
+ * The web's rail reads them back as answers with no data of their own (`RailFunnel`, ADR 0162): "import" for a team
+ * that brings no agents and goes on to its templates, "agents" for a team step left with no agents (a personal
+ * workspace's "no agents yet", a team's "Skip this step" or "Create the agents later"), "computer" for a plan step that
+ * was shown.
  */
 export const ONBOARDING_STEPS = [
   { id: "workspace", optional: false },
@@ -93,10 +95,11 @@ export function railStepAt(f: {
 }
 
 /**
- * What the web's rail reads besides the workspace's data (ADR 0162, amended 2026-11-10): whether every agent thinks
- * (`teamThinks`; undefined while that isn't known, read as not yet) and the furthest step the server stored
- * (`onboarding.step`), which answers what has no data of its own: a personal workspace's "no agents yet" ("agents")
- * and a plan step once shown ("computer", so the step stays on the rail, answered, after paying).
+ * What the web's rail reads besides the workspace's data (ADR 0162, amended 2026-11-10 and 2026-11-11): whether every
+ * agent thinks (`teamThinks`; undefined while that isn't known, read as not yet) and the furthest step the server
+ * stored (`onboarding.step`), which answers what has no data of its own: a team step left with no agents ("agents": a
+ * personal workspace's "no agents yet", a team's "Skip this step" or "Create the agents later") and a plan step once
+ * shown ("computer", so the step stays on the rail, answered, after paying).
  */
 export interface RailFunnel {
   thinks: boolean | undefined;
@@ -111,7 +114,8 @@ export interface RailFunnel {
  * `funnel` null (the phone) keeps the rail it has always had: no AI step, and a personal workspace (ADR 0159) has no
  * steps once it exists (it opens, its right hand's card holds the rest). With a funnel (the web, ADR 0162 amended
  * 2026-11-10) the rail ends on connecting an AI, answered once every agent thinks, and a personal workspace walks it
- * too, with no "what it does" step: its team step is answered by agents brought in or by "no agents yet".
+ * too, with no "what it does" step. The team step is answered by agents brought in or made, or by leaving it with no
+ * agents (amended 2026-11-11): a personal workspace's "no agents yet", a team's way out of its question or templates.
  */
 export function railState(f: {
   orgId: string | null;
@@ -138,8 +142,9 @@ export function railState(f: {
       : railStepAt({
           created: f.orgId !== null,
           context: f.context.trim() !== "",
-          // "No agents yet" answers a personal workspace's team step; a team's still makes one (its templates).
-          team: f.team > 0 || (funnel !== null && personal && passed >= stepIndex("agents")),
+          // The step left with no agents ("agents") answers it, in a team's workspace too; a team's "no agents yet"
+          // saves only "import", its templates still to come.
+          team: f.team > 0 || (funnel !== null && passed >= stepIndex("agents")),
           waitsForPlan,
           personal: funnel !== null && personal,
           ai: funnel !== null,

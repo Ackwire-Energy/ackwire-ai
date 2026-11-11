@@ -746,6 +746,7 @@
       "team": {
         "title": "Votre équipe",
         "madeLead": "Ils sont déjà dans l'espace de travail. Vous pourrez ajuster chacun ensuite.",
+        "later": "Créer les agents plus tard, moi-même",
         "ask": {
           "title": "Vous avez déjà des agents dans une autre app ?",
           "lead": "Si oui, j'apporte toute l'équipe : instructions, compétences et routines.",
@@ -755,7 +756,9 @@
           "noneTextPersonal": "On commence à deux. Les agents viendront plus tard, quand vous voudrez.",
           "from": "Importer depuis {{app}}",
           "fresh": "Monter une nouvelle équipe",
-          "freshPersonal": "Continuer sans agents"
+          "freshPersonal": "Continuer sans agents",
+          "skip": "Passer cette étape",
+          "skipText": "Vous pourrez créer les agents plus tard, un par un."
         },
         "bring": {
           "title": "Importez votre équipe depuis {{app}}",
@@ -783,6 +786,7 @@
       "plan": {
         "title": "Activez votre équipe",
         "lead": "Votre équipe est prête. Avec l'abonnement et une IA, elle commence aujourd'hui.",
+        "leadAlone": "Avec l'abonnement et une IA, votre bras droit commence aujourd'hui. Vous pourrez créer les autres agents plus tard.",
         "asleep": "Endormie jusqu'à l'abonnement",
         "price": "<b>Abonnement {{name}}</b> · {{price}} par mois",
         "name": "<b>Abonnement {{name}}</b>",

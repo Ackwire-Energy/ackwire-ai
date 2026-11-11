@@ -258,7 +258,8 @@ export function TeamSourceBody({
 
 /**
  * The question: the import's apps as cards, and "No agents yet" on a row of its own under them (the cards' grid never
- * ends on a lone card). The step's button says where the answer leads.
+ * ends on a lone card). The step's button says where the answer leads. A team's question has "Skip this step" under
+ * it (ADR 0162, amended 2026-11-11); a personal workspace's "No agents yet" already goes on with no agents.
  */
 function Ask({
   state,
@@ -272,11 +273,11 @@ function Ask({
   org: string;
 }) {
   const { t } = useTranslation();
-  const { link, none } = state;
+  const { link, none, skip } = state;
   const { chosen } = link;
   return (
     <>
-      <Locked when={none.isPending}>
+      <Locked when={none.isPending || skip.isPending}>
         <div className="onb__answer">
           <RadioGroup
             value={chosen ?? ""}
@@ -318,7 +319,7 @@ function Ask({
           block
           kbd={["↵"]}
           data-enter=""
-          disabled={chosen === null}
+          disabled={chosen === null || skip.isPending}
           loading={none.isPending}
           onClick={() => {
             if (chosen === "none") return none.mutate();
@@ -333,6 +334,19 @@ function Ask({
               ? t("onboarding.flow.team.ask.from", { app: cardName(t, chosen) })
               : t("onboarding.actions.continue")}
         </Button>
+        {!personal && (
+          <p className="onb__skip">
+            <span className="muted">{t("onboarding.flow.team.ask.skipText")}</span>
+            <button
+              type="button"
+              className="ac-link"
+              disabled={none.isPending || skip.isPending}
+              onClick={() => skip.mutate()}
+            >
+              {t("onboarding.flow.team.ask.skip")}
+            </button>
+          </p>
+        )}
       </div>
     </>
   );

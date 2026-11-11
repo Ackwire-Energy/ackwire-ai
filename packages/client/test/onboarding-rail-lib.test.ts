@@ -123,8 +123,46 @@ describe("the onboarding's rail (ADR 0162)", () => {
     // A step gone back to is shown only while it stays answered: the AI step isn't, the plan step on a hold isn't.
     expect(railState({ ...base, standing: payment, picked: "ai" }).step).toBe("plan");
     expect(railState({ ...base, picked: "plan" }).step).toBe("ai");
-    // "No agents yet" saved in a team's workspace doesn't answer its team step: its templates still make the team.
-    expect(railState({ ...base, team: 0, funnel: { ...funnel, passed: "agents" } }).at).toBe("team");
+    // A team's "no agents yet" ("import") doesn't answer its team step: its templates still make the team.
+    expect(railState({ ...base, team: 0, funnel: { ...funnel, passed: "import" } }).at).toBe("team");
+  });
+
+  test("a team's step left with no agents answers it, on the web only (ADR 0162, amended 2026-11-11)", () => {
+    const funnel = { thinks: false, passed: "agents" as const };
+    const base = {
+      orgId: "o1",
+      standing: undefined,
+      billingUrl: null,
+      context: "Loja online",
+      team: 0,
+      picked: null,
+      funnel,
+    };
+    // Self-hosted: on to the AI step with the right hand alone; once it thinks, it opens.
+    expect(railState(base)).toMatchObject({
+      steps: ["name", "business", "team", "ai"],
+      at: "ai",
+      step: "ai",
+      reached: 3,
+    });
+    expect(railState({ ...base, funnel: { thinks: true, passed: "agents" } }).at).toBe("open");
+    // Waiting for its first plan: the plan step next, then the AI step; still so once the plan step showed and was paid.
+    const held = { ...base, standing: { state: "hold", reason: "payment" } as OrgStanding };
+    expect(railState(held)).toMatchObject({ steps: ["name", "business", "team", "plan", "ai"], at: "plan", index: 3 });
+    expect(railState({ ...base, funnel: { thinks: false, passed: "computer" } })).toMatchObject({
+      steps: ["name", "business", "team", "plan", "ai"],
+      at: "ai",
+    });
+    // Answered, the team step may be gone back to (its question again, to bring or build a team after all).
+    expect(railState({ ...base, picked: "team" })).toMatchObject({ step: "team", index: 2, reached: 3 });
+    // Only past the question ("import": its templates next), the step still waits for a team.
+    expect(railState({ ...base, funnel: { ...funnel, passed: "import" } })).toMatchObject({ at: "team", reached: 2 });
+    // The phone (no funnel) reads no stored step: a team with no agents stays on its team step, held or not.
+    expect(railState({ ...base, funnel: null })).toMatchObject({ steps: ["name", "business", "team"], at: "team" });
+    expect(railState({ ...held, funnel: null })).toMatchObject({
+      steps: ["name", "business", "team", "plan"],
+      at: "team",
+    });
   });
 
   test("the AI step's answer: every agent thinks, read only from a status that lists them all", () => {

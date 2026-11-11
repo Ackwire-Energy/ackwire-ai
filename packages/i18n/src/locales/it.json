@@ -746,6 +746,7 @@
       "team": {
         "title": "Il tuo team",
         "madeLead": "Sono già nello spazio di lavoro. Puoi sistemare ciascuno dopo.",
+        "later": "Creare gli agenti più tardi, per conto mio",
         "ask": {
           "title": "Hai già agenti in un'altra app?",
           "lead": "Se sì, porto tutto il team: istruzioni, skill e routine.",
@@ -755,7 +756,9 @@
           "noneTextPersonal": "Iniziamo noi due. Gli agenti arrivano dopo, quando vuoi.",
           "from": "Porta da {{app}}",
           "fresh": "Crea un nuovo team",
-          "freshPersonal": "Continua senza agenti"
+          "freshPersonal": "Continua senza agenti",
+          "skip": "Salta questo passaggio",
+          "skipText": "Puoi creare gli agenti dopo, uno per uno."
         },
         "bring": {
           "title": "Porta il tuo team da {{app}}",
@@ -783,6 +786,7 @@
       "plan": {
         "title": "Attiva il tuo team",
         "lead": "Il tuo team è pronto. Con il piano e un'IA, inizia oggi.",
+        "leadAlone": "Con il piano e un'IA, il tuo braccio destro inizia oggi. Gli altri agenti puoi crearli dopo.",
         "asleep": "Dorme fino al piano",
         "price": "<b>Piano {{name}}</b> · {{price}} al mese",
         "name": "<b>Piano {{name}}</b>",

@@ -168,8 +168,9 @@ describe("the team step's question", () => {
     for (const app of ["Grok Bot", "ChatGPT dots", "OpenClaw", "Outro app"]) expect(answer(app)).toBeTruthy();
     const none = answer(/Ainda não uso nenhum/);
     expect(none.closest("label")?.textContent).toContain("Eu monto um time para a Acme a partir do que vocês fazem.");
-    // Nothing picked: the step's button waits for an answer.
+    // Nothing picked: the step's button waits for an answer, and under it the way past the step.
     expect((button("Continuar") as HTMLButtonElement).disabled).toBe(true);
+    expect((button("Pular esta etapa") as HTMLButtonElement).disabled).toBe(false);
     await click(answer("Grok Bot"), 4);
     expect(answer("Grok Bot").getAttribute("aria-checked")).toBe("true");
     expect(button("Trazer do Grok Bot")).toBeTruthy();
@@ -182,7 +183,8 @@ describe("the team step's question", () => {
     await open(state);
     await click(answer(/Ainda não uso nenhum/), 4);
     await click(button("Montar um time novo"), 12);
-    expect(calls(state, "orgs.saveOnboarding").map((c) => c.args)).toEqual([[ORG_ID, { step: "agents" }]]);
+    // Only past the question: the team step still waits for its team.
+    expect(calls(state, "orgs.saveOnboarding").map((c) => c.args)).toEqual([[ORG_ID, { step: "import" }]]);
     expect(heading()).toBe("Seu time");
     expect(button("Criar o time")).toBeTruthy();
     await click(button("Voltar"), 6);
@@ -258,7 +260,7 @@ describe("bringing the team from an app that answers in its chat", () => {
     await click(answer("Grok Bot"), 4);
     await click(button("Trazer do Grok Bot"), 10);
     await click(button("Prefiro montar um time novo"), 12);
-    expect(calls(state, "orgs.saveOnboarding").map((c) => c.args)).toEqual([[ORG_ID, { step: "agents" }]]);
+    expect(calls(state, "orgs.saveOnboarding").map((c) => c.args)).toEqual([[ORG_ID, { step: "import" }]]);
     expect(heading()).toBe("Seu time");
     expect(button("Criar o time")).toBeTruthy();
   });
@@ -301,6 +303,8 @@ describe("a personal workspace (ADR 0159)", () => {
     expect(answer(/Ainda não uso nenhum/).closest("label")?.textContent).toContain(
       "A gente começa só nós dois. Os agentes vêm depois, quando você quiser.",
     );
+    // That answer is its way on with no agents: no "Skip this step" beside it.
+    expect(screen().queryByRole("button", { name: "Pular esta etapa" })).toBeNull();
     await click(answer("Grok Bot"), 4);
     await click(button("Trazer do Grok Bot"), 10);
     expect(heading()).toBe("Traga os seus agentes do Grok Bot");
