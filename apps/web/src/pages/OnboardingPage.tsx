@@ -75,6 +75,7 @@ import { OnboardingPreview, type PreviewAgent } from "./onboarding/OnboardingPre
 import { PeopleStep } from "./onboarding/PeopleStep";
 import { BusinessStep, PlanStep, TeamStep, useTemplate } from "./onboarding/steps";
 import { TeamSource, useTeamSource } from "./onboarding/TeamSource";
+import { TeamStart } from "./onboarding/TeamStart";
 import "./onboarding.css";
 
 /** Back from paying, `/me` is asked again this often until the hold lifts (as the hold's banner does). */
@@ -630,9 +631,14 @@ export function OnboardingPage() {
         : undefined,
   };
 
-  // Beside the team step: what an import would bring, else the template's team while the templates show.
+  // Beside the team step: what an import would bring, else the template's team while the templates show, or while
+  // "Start with a ready-made team" is picked on how to start (ADR 0162, amended 2026-11-11).
   const brought = step === "team" ? source.preview : null;
-  const templateShown = step === "team" && team.length === 0 && !personalNow && view === "template";
+  const templateShown =
+    step === "team" &&
+    team.length === 0 &&
+    !personalNow &&
+    (view === "template" || (view === "start" && source.start === "template"));
   const coming =
     step === "team" && team.length === 0
       ? (brought?.channels ?? (templateShown ? (template.chosen?.team.newChannels ?? []) : []))
@@ -1001,8 +1007,12 @@ export function OnboardingPage() {
                     template={template}
                     reviewer={lodiName}
                     onContinue={() => setPicked(null)}
-                    onSkip={() => source.skip.mutate()}
-                    skipping={source.skip.isPending}
+                  />
+                ) : view === "start" ? (
+                  <TeamStart
+                    state={source}
+                    template={template}
+                    lodi={{ name: lodiName, look: lookOf(lodi) ?? RIGHT_HAND_DEFAULT.appearance }}
                   />
                 ) : (
                   <TeamSource state={source} orgId={orgId} personal={personalNow} org={name} />

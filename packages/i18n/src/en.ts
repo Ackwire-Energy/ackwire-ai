@@ -749,6 +749,8 @@ export const en = {
         planThen: "Once the plan is on, the next screen is where you connect your AI.",
         /** The team step's question: does the person already have agents in another app. */
         ask: "Already have a team somewhere else? I'll bring all of it here.",
+        /** How a team with no agents yet starts: the template for what it does, or just the two of them. */
+        start: "I have a team ready for what you do. Or we start with just the two of us.",
         askPersonal: "Already use agents somewhere else? I'll bring them all here.",
         /** `{{app}}`: the other app ("Grok Bot"). */
         bring: "Copy the request, paste it in {{app}} and bring back the answer. I'll do the rest.",
@@ -782,10 +784,28 @@ export const en = {
         /** Under the title once the team is made (back from a later step): the list of who is in it. */
         madeLead: "They're already in the workspace. You can adjust each one later.",
         /**
-         * The quiet link under the template's button: no team now, the next step with only the right hand. The
-         * agents are created by hand later.
+         * After "I don't use any yet", how a team starts: the template for what it does (its templates next) or from
+         * scratch (the next step with only the right hand; the agents are created by hand later). Two radio cards, each
+         * with who comes in it.
          */
-        later: "Create the agents later, on my own",
+        start: {
+          title: "How do you want to start the team?",
+          lead: "You can change all of it later, nothing is lost.",
+          template: "Start with a ready-made team",
+          /** `{{template}}`: the template's name ("Marketing agency"). */
+          templateText_one: "{{count}} agent from the {{template}} template, in its own channel, with its routine ready.",
+          templateText_other:
+            "{{count}} agents from the {{template}} template, each in its own channel, with their routines ready.",
+          scratch: "Start from scratch",
+          /** `{{name}}`: the right hand's name. */
+          scratchText: "Just {{name}}, your right hand. You create each agent later, your way.",
+          /** Beside the right hand's face and an empty place: who the team starts with. */
+          scratchWho: "{{name}} and whoever you create",
+          /** The button, with the template's team picked. */
+          see: "See the ready-made team",
+          /** The button, with "Start from scratch" picked. */
+          scratchGo: "Go on with just {{name}}",
+        },
         /** The team step opens on this question; the cards are the import page's apps, then "none". */
         ask: {
           title: "Do you already have agents in another app?",

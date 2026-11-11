@@ -178,15 +178,15 @@ describe("the team step's question", () => {
     expect(button("Montar um time novo")).toBeTruthy();
   });
 
-  test("no agents yet is remembered on the workspace and opens a team's templates, with Back to the question", async () => {
+  test("no agents yet is remembered on the workspace and opens how a team starts, with Back to the question", async () => {
     const state = settingUp();
     await open(state);
     await click(answer(/Ainda não uso nenhum/), 4);
     await click(button("Montar um time novo"), 12);
     // Only past the question: the team step still waits for its team.
     expect(calls(state, "orgs.saveOnboarding").map((c) => c.args)).toEqual([[ORG_ID, { step: "import" }]]);
-    expect(heading()).toBe("Seu time");
-    expect(button("Criar o time")).toBeTruthy();
+    expect(heading()).toBe("Como você quer começar o time?");
+    expect(button("Seguir só com o Lodi")).toBeTruthy();
     await click(button("Voltar"), 6);
     expect(heading()).toBe(ASK);
   });
@@ -254,15 +254,15 @@ describe("bringing the team from an app that answers in its chat", () => {
     expect(applies(state)).toEqual([]);
   });
 
-  test("Prefer a new team, from the request, saves no agents yet and opens the templates", async () => {
+  test("Prefer a new team, from the request, saves no agents yet and opens how a team starts", async () => {
     const state = settingUp();
     await open(state);
     await click(answer("Grok Bot"), 4);
     await click(button("Trazer do Grok Bot"), 10);
     await click(button("Prefiro montar um time novo"), 12);
     expect(calls(state, "orgs.saveOnboarding").map((c) => c.args)).toEqual([[ORG_ID, { step: "import" }]]);
-    expect(heading()).toBe("Seu time");
-    expect(button("Criar o time")).toBeTruthy();
+    expect(heading()).toBe("Como você quer começar o time?");
+    expect(answer(/Começar do zero/).getAttribute("aria-checked")).toBe("true");
   });
 
   test("something that stayed behind holds the step on the report until Continue", async () => {

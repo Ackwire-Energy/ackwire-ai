@@ -719,6 +719,7 @@
         "plan": "Na het abonnement hoef je alleen nog een AI te koppelen. Ik laat je zien waar.",
         "planThen": "Zodra het abonnement aanstaat, koppel je op het volgende scherm je AI.",
         "ask": "Heb je al een team ergens anders? Ik haal het in zijn geheel hierheen.",
+        "start": "Ik heb een team klaar voor wat jullie doen. Of we beginnen met z'n tweeën.",
         "askPersonal": "Gebruik je al agents ergens anders? Ik haal ze allemaal hierheen.",
         "bring": "Kopieer het verzoek, plak het in {{app}} en breng het antwoord terug. De rest doe ik.",
         "bringFiles": "Zet hier neer wat de app heeft geëxporteerd. De rest doe ik.",
@@ -742,7 +743,18 @@
       "team": {
         "title": "Je team",
         "madeLead": "Ze staan al in de werkruimte. Je kunt ze later een voor een aanpassen.",
-        "later": "Agents later zelf aanmaken",
+        "start": {
+          "title": "Hoe wil je het team beginnen?",
+          "lead": "Je kunt later alles veranderen, er gaat niets verloren.",
+          "template": "Beginnen met een kant-en-klaar team",
+          "templateText_one": "{{count}} agent uit het sjabloon {{template}}, in een eigen kanaal, met de routine al klaar.",
+          "templateText_other": "{{count}} agents uit het sjabloon {{template}}, elk in een eigen kanaal, met de routines al klaar.",
+          "scratch": "Vanaf nul beginnen",
+          "scratchText": "Alleen {{name}}, je rechterhand. Elke agent maak je later, op jouw manier.",
+          "scratchWho": "{{name}} en wie je zelf maakt",
+          "see": "Het kant-en-klare team bekijken",
+          "scratchGo": "Verder met alleen {{name}}"
+        },
         "ask": {
           "title": "Heb je al agents in een andere app?",
           "lead": "Zo ja, dan haal ik het hele team: instructies, skills en routines.",

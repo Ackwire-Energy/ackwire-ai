@@ -153,7 +153,8 @@ export function TeamSourceBody({
     [planned, flow.pick],
   );
 
-  // "Prefer a new team" from the request: a team's templates, or a personal workspace on with no agents yet.
+  // "Prefer a new team" from the request: a team's start (a template's team or from scratch), or a personal workspace on
+  // with no agents yet.
   const fresh = () => {
     flow.reset();
     link.choose("none");
@@ -173,14 +174,14 @@ export function TeamSourceBody({
     const onContinue = () => {
       setAwaitCopy(false);
       if (agentsCame) return link.hold(false);
-      // No agent came (all of them skipped, or only skills and channels): a team picks a template, a personal
-      // workspace goes on with no agents yet, as "Prefer a new team" does (the question shows that answer while it
-      // saves, and stays with it if the save fails).
+      // No agent came (all of them skipped, or only skills and channels): a team chooses how to start (a template's
+      // team or from scratch), a personal workspace goes on with no agents yet, as "Prefer a new team" does (the
+      // question shows that answer while it saves, and stays with it if the save fails).
       if (personal) {
         link.hold(false);
         return fresh();
       }
-      link.go("template");
+      link.go("start");
       link.hold(false);
     };
     return (

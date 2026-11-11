@@ -719,6 +719,7 @@
         "plan": "Plandan sonra sadece bir yapay zeka bağlamak kalıyor. Nerede olduğunu gösteririm.",
         "planThen": "Plan başlayınca sıradaki ekranda yapay zekanı bağlayacaksın.",
         "ask": "Başka bir yerde zaten ekibin mi var? Hepsini buraya getiririm.",
+        "start": "Yaptığınız işe uygun hazır bir ekibim var. Ya da sadece ikimiz başlarız.",
         "askPersonal": "Başka bir yerde zaten ajan mı kullanıyorsun? Hepsini buraya getiririm.",
         "bring": "İsteği kopyala, {{app}} içine yapıştır ve cevabı getir. Gerisini ben hallederim.",
         "bringFiles": "Uygulamanın dışa aktardığını buraya bırak. Gerisini ben hallederim.",
@@ -742,7 +743,18 @@
       "team": {
         "title": "Ekibin",
         "madeLead": "Zaten çalışma alanındalar. Her birini sonra ayarlayabilirsiniz.",
-        "later": "Ajanları sonra kendim oluşturacağım",
+        "start": {
+          "title": "Ekibe nasıl başlamak istersin?",
+          "lead": "Her şeyi sonra değiştirebilirsin, hiçbir şey kaybolmaz.",
+          "template": "Hazır bir ekiple başla",
+          "templateText_one": "{{template}} şablonundan {{count}} ajan, kendi kanalında, rutini hazır.",
+          "templateText_other": "{{template}} şablonundan {{count}} ajan, her biri kendi kanalında, rutinleri hazır.",
+          "scratch": "Sıfırdan başla",
+          "scratchText": "Sadece {{name}}, sağ kolun. Her ajanı sonra kendi tarzınla oluşturursun.",
+          "scratchWho": "{{name}} ve senin oluşturacakların",
+          "see": "Hazır ekibi gör",
+          "scratchGo": "Sadece {{name}} ile devam et"
+        },
         "ask": {
           "title": "Başka bir uygulamada zaten ajanın var mı?",
           "lead": "Varsa bütün ekibi getiririm: talimatlar, beceriler ve rutinler.",

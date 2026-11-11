@@ -9,7 +9,7 @@
   `lib/no-ai.ts` (`teamThinks`), `lib/setup-checklist.ts` (three rows, invitations finish the people row, the plan
   row), `lib/push-offer.ts` (`pushAskAt`), `lib/billing.ts` (`planOfferOf`); engine `team-templates.ts`
   (`sayTeamHello`), `standing.ts` (`TEAM_HELLO_JOB` queued by `setBillingHold`), `billing-link.ts` (`plan`); web
-  `pages/OnboardingPage.tsx`, `pages/onboarding/*` (`TeamSource.tsx`: `useTeamSource`, `TeamSource`; `AiStep.tsx`:
+  `pages/OnboardingPage.tsx`, `pages/onboarding/*` (`TeamSource.tsx`: `useTeamSource`, `TeamSource`; `TeamStart.tsx`; `AiStep.tsx`:
   `AiHost`, `AiStep`, `AiStage`; `PeopleStep.tsx`), `components/invite/EmailChips.tsx` (`chipsFrom`),
   `components/Sky.tsx` (`OnboardingProgress`, `TeamAsleepSky`), `lib/plan-offer.ts`,
   `lib/arrival.ts` (`ARRIVAL_BETA_ONLY`), `components/arrival/Arrival.tsx`, `components/FirstRun.tsx`,
@@ -157,15 +157,28 @@ the rail live, wants them to go on without one. A team's workspace is also for t
 on the rail brought them in. Amends the 2026-11-10 bullets on the steps, on "Ainda não uso nenhum", on the AI step and
 on where it opens.
 
-- **Two ways out, one per view.** A team's question has "Pular esta etapa" under its button, with "Você cria os agentes
-  depois, um por um." beside it, as the AI step's "Conectar depois"; its templates have "Criar os agentes depois, por
-  conta própria" under "Criar o time". Both leave the step with the right hand alone and go on to the plan where the
-  workspace waits for one, else to Connect an AI. A personal workspace's question gets no link: its "Ainda não uso
-  nenhum" already is that.
+- **Two ways out.** A team's question has "Pular esta etapa" under its button, with "Você cria os agentes depois, um
+  por um." beside it, as the AI step's "Conectar depois"; after its "Ainda não uso nenhum", how the team starts offers
+  "Começar do zero" (below). Both leave the step with the right hand alone and go on to the plan where the workspace
+  waits for one, else to Connect an AI. A personal workspace's question gets no link: its "Ainda não uso nenhum"
+  already is that.
+- **How a team starts** (the owner's pick among three drafts, the same day). A team's "Ainda não uso nenhum" no longer
+  drops the person on a template with a small link out: it asks first, "Como você quer começar o time?", with two of
+  the question's own radio cards, one under the other, each with who comes in it (faces, then names): "Começar com um
+  time pronto" (the template for the workspace's business, named, "3 agentes do modelo Loja online, cada um no seu
+  canal, com as rotinas prontas.") and "Começar do zero" ("Só o Lodi, o seu braço direito. Você cria cada agente
+  depois, do seu jeito.", with an empty place beside Lodi's face), picked when the view opens. The button says where
+  the answer leads: "Ver o time pronto" opens the templates, whose "Criar os agentes depois, por conta própria" is gone
+  (their Back returns here, the answer kept; Back here returns to the question); "Seguir só com o Lodi" is the way out
+  above. The picked card's agents are awake and hop one after another as it is picked, the other's doze; the preview
+  beside the step shows the template's agents and channels while the ready-made team is picked, Lodi alone otherwise.
+  Arrows move between the cards and Enter on one presses the button. Lodi says "Tenho um time pronto para o que vocês
+  fazem. Ou a gente começa só nós dois." A personal workspace and the phone have no such view.
 - **What is stored.** Leaving the step saves the onboarding's step as `agents`, which now answers the team step in a
   team's workspace too (`railState`), so a reload resumes after it. A team's "Ainda não uso nenhum" (and "Prefiro
-  montar um time novo") saves `import` instead: past the question, its templates next, the step still waiting for a
-  team. No new column or step. A team workspace left on its templates before this change resumes after the team step,
+  montar um time novo", or an import whose agents all stayed behind) saves `import` instead: past the question, how
+  the team starts next, the step still waiting for a team. Looking at the templates stores nothing, so a reload there
+  or on how to start opens on how to start again, "Começar do zero" picked. No new column or step. A team workspace left on its templates before this change resumes after the team step,
   its question there to go back to.
 - **Afterwards.** The rail's team row reads "Depois" (a personal workspace's too). Back on the step, the question shows
   again, never an empty team, so a team can still be brought or built; a template made there keeps the step on screen

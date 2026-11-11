@@ -729,6 +729,7 @@
         "plan": "Après l'abonnement, il ne reste qu'à connecter une IA. Je vous montre où.",
         "planThen": "Une fois l'abonnement activé, l'écran suivant sert à connecter votre IA.",
         "ask": "Vous avez déjà une équipe ailleurs ? Je l'apporte ici en entier.",
+        "start": "J'ai une équipe prête pour ce que vous faites. Ou on commence à deux.",
         "askPersonal": "Vous utilisez déjà des agents ailleurs ? Je les apporte tous ici.",
         "bring": "Copiez la demande, collez-la dans {{app}} et rapportez la réponse. Je m'occupe du reste.",
         "bringFiles": "Déposez ici ce que l'app a exporté. Je m'occupe du reste.",
@@ -752,7 +753,19 @@
       "team": {
         "title": "Votre équipe",
         "madeLead": "Ils sont déjà dans l'espace de travail. Vous pourrez ajuster chacun ensuite.",
-        "later": "Créer les agents plus tard, moi-même",
+        "start": {
+          "title": "Comment voulez-vous démarrer l'équipe ?",
+          "lead": "Vous pourrez tout changer plus tard, rien n'est perdu.",
+          "template": "Démarrer avec une équipe toute prête",
+          "templateText_one": "{{count}} agent du modèle {{template}}, dans son propre canal, avec sa routine prête.",
+          "templateText_many": "{{count}} agents du modèle {{template}}, chacun dans son canal, avec ses routines prêtes.",
+          "templateText_other": "{{count}} agents du modèle {{template}}, chacun dans son canal, avec ses routines prêtes.",
+          "scratch": "Partir de zéro",
+          "scratchText": "Seulement {{name}}, votre bras droit. Vous créerez chaque agent plus tard, à votre façon.",
+          "scratchWho": "{{name}} et ceux que vous créerez",
+          "see": "Voir l'équipe toute prête",
+          "scratchGo": "Continuer seulement avec {{name}}"
+        },
         "ask": {
           "title": "Vous avez déjà des agents dans une autre app ?",
           "lead": "Si oui, j'apporte toute l'équipe : instructions, compétences et routines.",

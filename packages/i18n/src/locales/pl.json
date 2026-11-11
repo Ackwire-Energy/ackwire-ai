@@ -739,6 +739,7 @@
         "plan": "Po planie zostaje tylko podłączyć AI. Pokażę ci, gdzie.",
         "planThen": "Gdy plan będzie włączony, na następnym ekranie połączysz swoją AI.",
         "ask": "Masz już zespół gdzie indziej? Przeniosę go tu w całości.",
+        "start": "Mam zespół gotowy do tego, czym się zajmujecie. Albo zaczynamy we dwoje.",
         "askPersonal": "Używasz już agentów gdzie indziej? Przeniosę ich tu wszystkich.",
         "bring": "Skopiuj prośbę, wklej ją w {{app}} i przynieś odpowiedź. Resztą zajmę się ja.",
         "bringFiles": "Upuść tutaj to, co wyeksportowała aplikacja. Resztą zajmę się ja.",
@@ -762,7 +763,20 @@
       "team": {
         "title": "Twój zespół",
         "madeLead": "Są już w przestrzeni roboczej. Każdego możesz później dopasować.",
-        "later": "Utwórz agentów później, samodzielnie",
+        "start": {
+          "title": "Jak chcesz zacząć zespół?",
+          "lead": "Wszystko możesz potem zmienić, nic nie przepadnie.",
+          "template": "Zacznij od gotowego zespołu",
+          "templateText_one": "{{count}} agent z szablonu {{template}}, na własnym kanale, z gotową rutyną.",
+          "templateText_few": "{{count}} agentów z szablonu {{template}}, każdy na własnym kanale, z gotowymi rutynami.",
+          "templateText_many": "{{count}} agentów z szablonu {{template}}, każdy na własnym kanale, z gotowymi rutynami.",
+          "templateText_other": "{{count}} agenta z szablonu {{template}}, każdy na własnym kanale, z gotowymi rutynami.",
+          "scratch": "Zacznij od zera",
+          "scratchText": "Tylko {{name}}, twoja prawa ręka. Każdego agenta utworzysz później, po swojemu.",
+          "scratchWho": "{{name}} i ci, których utworzysz",
+          "see": "Zobacz gotowy zespół",
+          "scratchGo": "Dalej tylko z agentem {{name}}"
+        },
         "ask": {
           "title": "Masz już agentów w innej aplikacji?",
           "lead": "Jeśli tak, przeniosę cały zespół: instrukcje, umiejętności i rutyny.",

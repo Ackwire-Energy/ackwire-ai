@@ -12,22 +12,27 @@ import "./team-source.css";
 
 /**
  * The team step before a team exists (ADR 0162, amended 2026-11-10 and 2026-11-11): first the question (agents in
- * another app, or none yet), then bringing them (ADR 0055) inside the step, or a team's templates; a team may also
- * leave the step with no agents, from the question or its templates. This module stays light: the
+ * another app, or none yet), then bringing them (ADR 0055) inside the step, or, for a team with none yet, how to start
+ * ("Start with a ready-made team", its templates next, or "Start from scratch", the step left with no agents); a team
+ * may also skip the step from the question. This module stays light: the
  * import's screens, its hook and its readers (archives, every app's parser) load with `TeamSourceBody` only once the
  * step shows them, so the onboarding's first screens never carry them.
  */
 
 /**
- * What the step shows: the question, a team's templates (rendered by the page), the request or the files to bring
- * them, what was found, and the report of what came (kept on screen until its Continue when something stayed behind).
+ * What the step shows: the question, a team's start and its templates (rendered by the page), the request or the files
+ * to bring them, what was found, and the report of what came (kept on screen until its Continue when something stayed
+ * behind).
  */
-export type TeamSourceView = "ask" | "template" | "bring" | "found" | "report";
+export type TeamSourceView = "ask" | "start" | "template" | "bring" | "found" | "report";
+
+/** How a team with no agents yet starts: a template's team, or from scratch with the right hand alone. */
+export type TeamStartPick = "template" | "scratch";
 
 /** An answer to the question: one of the import's apps, or none yet. */
 export type TeamSourceChoice = ImportCard | "none";
 
-type Stage = "ask" | "template" | "import";
+type Stage = "ask" | "start" | "template" | "import";
 
 /** What the import holds now, as the page's heading, Lodi's line and the preview read it (the views publish it). */
 export interface TeamSourceFacts {
@@ -63,9 +68,9 @@ const asksFirst = (card: ImportCard | null) => card === "grok-bot" || card === "
  * The step's state, at the page's level so it outlives the step's own views and the rail's moves: the answer picked,
  * the view, and the hold that keeps the step on screen (`onHold`: the page pins the team step) while the import
  * applies and while its report waits. The answers are saved on the workspace's onboarding, so a resume knows them: a
- * team's "no agents yet" saves `step: "import"` and opens on its templates; leaving the step with no agents saves
- * `step: "agents"`, which answers it (a personal workspace's "no agents yet", ADR 0159; a team's `skip`, ADR 0162
- * amended 2026-11-11).
+ * team's "no agents yet" saves `step: "import"` and opens on how to start (a reload there or on the templates opens on
+ * it again, "Start from scratch" picked); leaving the step with no agents saves `step: "agents"`, which answers it (a
+ * personal workspace's "no agents yet", ADR 0159; a team's `skip`, ADR 0162 amended 2026-11-11).
  */
 export function useTeamSource(
   orgId: string | null,
@@ -75,6 +80,8 @@ export function useTeamSource(
   const qc = useQueryClient();
   const [stage, setStage] = useState<Stage | null>(null);
   const [chosen, choose] = useState<TeamSourceChoice | null>(null);
+  // How a team with no agents yet starts: from scratch until the person picks the template's team.
+  const [start, pickStart] = useState<TeamStartPick>("scratch");
   const [holding, setHolding] = useState(false);
   const [facts, setFacts] = useState<TeamSourceFacts>(NO_FACTS);
   const resetFlow = useRef<(() => void) | null>(null);
@@ -91,9 +98,9 @@ export function useTeamSource(
   }, []);
 
   // Read from the stored step on every render, never once at mount: the page renders before `/me` arrives. A team's
-  // "no agents yet" opens its templates; a step left with no agents ("agents" and on) opens on the question again, to
-  // bring or build a team after all.
-  const base: Stage = stage ?? (!o.personal && o.passed === "import" ? "template" : "ask");
+  // "no agents yet" opens on how to start (the templates are a view of this visit only); a step left with no agents
+  // ("agents" and on) opens on the question again, to bring or build a team after all.
+  const base: Stage = stage ?? (!o.personal && o.passed === "import" ? "start" : "ask");
   // The report only once the apply settled and kept the step (`TeamSourceBody`'s `reporting`): a clean one stays on
   // what was found, its button pending, until the rail moves on.
   const view: TeamSourceView =
@@ -125,13 +132,16 @@ export function useTeamSource(
         },
     );
 
-  // "No agents yet": a team's templates; a personal workspace's step answered.
+  // "No agents yet": a team's start, "Start from scratch" picked; a personal workspace's step answered.
   const noneStep = o.personal ? "agents" : "import";
   const none = useMutation({
     mutationFn: () => saveStep(noneStep),
     onSuccess: (saved) => {
       remember(noneStep, saved);
-      if (!o.personal) setStage("template");
+      if (!o.personal) {
+        pickStart("scratch");
+        setStage("start");
+      }
       // A pin left from going back to this step lets go: the rail moves on by itself where the answer is enough. A
       // team that had left the step with no agents keeps it, on its templates: what is stored still answers the step.
       const left = stepIndex(saved?.step ?? noneStep) >= stepIndex("agents");
@@ -139,8 +149,9 @@ export function useTeamSource(
     },
   });
 
-  // A team's way out, from the question or its templates (ADR 0162, amended 2026-11-11): the step answered with no
-  // agents besides the right hand, and the rail on to the next one. Back on the step later, the question again.
+  // A team's way out, the question's "Skip this step" or its start's "Start from scratch" (ADR 0162, amended
+  // 2026-11-11): the step answered with no agents besides the right hand, and the rail on to the next one. Back on the
+  // step later, the question again.
   const skip = useMutation({
     mutationFn: () => saveStep("agents"),
     onSuccess: (saved) => {
@@ -157,8 +168,10 @@ export function useTeamSource(
     if (holding) hold(false);
   };
   const back =
-    view === "template" || view === "bring"
-      ? ask
+    view === "template"
+      ? () => setStage("start")
+      : view === "start" || view === "bring"
+        ? ask
       : view === "found" && !facts.applying && !facts.report
         ? () => {
             // Back to the request or the files; an apply that failed lets the step go with it.
@@ -187,6 +200,12 @@ export function useTeamSource(
         lead: t("onboarding.flow.team.found.lead"),
         say: t(o.personal ? "onboarding.flow.lodi.foundPersonal" : "onboarding.flow.lodi.found"),
       };
+    if (view === "start")
+      return {
+        title: t("onboarding.flow.team.start.title"),
+        lead: t("onboarding.flow.team.start.lead"),
+        say: t("onboarding.flow.lodi.start"),
+      };
     if (view === "template")
       return {
         title: t("onboarding.flow.team.title"),
@@ -213,7 +232,10 @@ export function useTeamSource(
     preview: view === "found" || view === "report" ? facts.coming : null,
     /** "No agents yet". */
     none,
-    /** A team's "Skip this step" and "Create the agents later": the step left with no agents. */
+    /** How a team with no agents yet starts, picked on its start ("Start from scratch" until changed). */
+    start,
+    pickStart,
+    /** A team's "Skip this step" and "Start from scratch": the step left with no agents. */
     skip,
     /** Back to the question. */
     ask,

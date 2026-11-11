@@ -121,11 +121,11 @@ export function BusinessStep({
 }
 
 /**
- * Step 3, "Your team", once "I don't use any yet" answered its question (`TeamSource`, ADR 0162): the template for the
- * workspace's business (another one from the select), made in one click with no model call. Once the team exists, it
- * shows who is in it. A personal workspace never gets a template here (ADR 0159): its card in the right hand's DM
- * makes its agents later. Under the template's button, "Create the agents later, on my own" leaves the step with no
- * agents (`onSkip`, ADR 0162 amended 2026-11-11).
+ * Step 3, "Your team", once "Start with a ready-made team" answered how to start (`TeamStart`, ADR 0162 amended
+ * 2026-11-11): the template for the workspace's business (another one from the select), made in one click with no model
+ * call; its Back returns to how to start, where "Start from scratch" is the way on with no agents. Once the team exists,
+ * it shows who is in it. A personal workspace never gets a template here (ADR 0159): its card in the right hand's DM
+ * makes its agents later.
  */
 export function TeamStep({
   orgId,
@@ -134,8 +134,6 @@ export function TeamStep({
   template,
   reviewer,
   onContinue,
-  onSkip,
-  skipping,
 }: {
   orgId: string;
   team: Agent[];
@@ -144,10 +142,6 @@ export function TeamStep({
   template: ReturnType<typeof useTemplate>;
   reviewer: string;
   onContinue: () => void;
-  /** The step left with no agents, the rail on to the next one. */
-  onSkip: () => void;
-  /** That answer on its way to the server. */
-  skipping: boolean;
 }) {
   const { t, i18n } = useTranslation();
   // Pending until the team is in the agents' list, then while the page places the next step: a second press never
@@ -181,7 +175,7 @@ export function TeamStep({
     );
   return (
     <>
-      <Locked when={pending || skipping}>
+      <Locked when={pending}>
         <div className="onb__answer">
           <Field label={t("teamPlan.templates.title")} id="onb-template">
             <Select
@@ -232,7 +226,7 @@ export function TeamStep({
           block
           kbd={["↵"]}
           data-enter=""
-          disabled={!chosen || skipping}
+          disabled={!chosen}
           loading={pending}
           onClick={() =>
             chosen &&
@@ -254,11 +248,6 @@ export function TeamStep({
         >
           {t(failed ? "teamPlan.card.retry" : "teamPlan.templates.create")}
         </Button>
-        <p className="onb__skip">
-          <button type="button" className="ac-link" disabled={pending || skipping} onClick={onSkip}>
-            {t("onboarding.flow.team.later")}
-          </button>
-        </p>
       </div>
     </>
   );

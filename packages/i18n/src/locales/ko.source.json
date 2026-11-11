@@ -1784,6 +1784,9 @@
   "onboarding.flow.lodi.ask": {
     "value": "Already have a team somewhere else? I'll bring all of it here."
   },
+  "onboarding.flow.lodi.start": {
+    "value": "I have a team ready for what you do. Or we start with just the two of us."
+  },
   "onboarding.flow.lodi.askPersonal": {
     "value": "Already use agents somewhere else? I'll bring them all here."
   },
@@ -1841,8 +1844,35 @@
   "onboarding.flow.team.madeLead": {
     "value": "They're already in the workspace. You can adjust each one later."
   },
-  "onboarding.flow.team.later": {
-    "value": "Create the agents later, on my own"
+  "onboarding.flow.team.start.title": {
+    "value": "How do you want to start the team?"
+  },
+  "onboarding.flow.team.start.lead": {
+    "value": "You can change all of it later, nothing is lost."
+  },
+  "onboarding.flow.team.start.template": {
+    "value": "Start with a ready-made team"
+  },
+  "onboarding.flow.team.start.templateText": {
+    "value": {
+      "one": "{{count}} agent from the {{template}} template, in its own channel, with its routine ready.",
+      "other": "{{count}} agents from the {{template}} template, each in its own channel, with their routines ready."
+    }
+  },
+  "onboarding.flow.team.start.scratch": {
+    "value": "Start from scratch"
+  },
+  "onboarding.flow.team.start.scratchText": {
+    "value": "Just {{name}}, your right hand. You create each agent later, your way."
+  },
+  "onboarding.flow.team.start.scratchWho": {
+    "value": "{{name}} and whoever you create"
+  },
+  "onboarding.flow.team.start.see": {
+    "value": "See the ready-made team"
+  },
+  "onboarding.flow.team.start.scratchGo": {
+    "value": "Go on with just {{name}}"
   },
   "onboarding.flow.team.ask.title": {
     "value": "Do you already have agents in another app?"

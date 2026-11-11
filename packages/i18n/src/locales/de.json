@@ -719,6 +719,7 @@
         "plan": "Nach dem Tarif fehlt nur noch eine KI. Ich zeige dir, wo.",
         "planThen": "Sobald der Tarif läuft, verbindest du auf dem nächsten Bildschirm deine KI.",
         "ask": "Du hast schon ein Team woanders? Ich hole es komplett hierher.",
+        "start": "Ich habe ein Team, das zu dem passt, was ihr macht. Oder wir fangen zu zweit an.",
         "askPersonal": "Du nutzt schon Agenten woanders? Ich hole sie alle hierher.",
         "bring": "Kopiere die Anfrage, füge sie in {{app}} ein und bring die Antwort mit. Den Rest mache ich.",
         "bringFiles": "Leg hier ab, was die App exportiert hat. Den Rest mache ich.",
@@ -742,7 +743,18 @@
       "team": {
         "title": "Dein Team",
         "madeLead": "Sie sind schon im Workspace. Du kannst jeden später anpassen.",
-        "later": "Agenten später selbst erstellen",
+        "start": {
+          "title": "Wie willst du mit dem Team anfangen?",
+          "lead": "Du kannst später alles ändern, nichts geht verloren.",
+          "template": "Mit einem fertigen Team anfangen",
+          "templateText_one": "{{count}} Agent aus der Vorlage {{template}}, in seinem eigenen Kanal, mit fertiger Routine.",
+          "templateText_other": "{{count}} Agenten aus der Vorlage {{template}}, jeder in seinem eigenen Kanal, mit fertigen Routinen.",
+          "scratch": "Bei null anfangen",
+          "scratchText": "Nur {{name}}, deine rechte Hand. Jeden Agenten erstellst du später, auf deine Art.",
+          "scratchWho": "{{name}} und wen du erstellst",
+          "see": "Das fertige Team ansehen",
+          "scratchGo": "Nur mit {{name}} weiter"
+        },
         "ask": {
           "title": "Hast du schon Agenten in einer anderen App?",
           "lead": "Wenn ja, hole ich das ganze Team: Anweisungen, Skills und Routinen.",

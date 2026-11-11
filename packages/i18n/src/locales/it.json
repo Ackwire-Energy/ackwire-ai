@@ -729,6 +729,7 @@
         "plan": "Dopo il piano, manca solo collegare un'IA. Ti mostro dove.",
         "planThen": "Con il piano attivo, la prossima schermata è quella per collegare la tua IA.",
         "ask": "Hai già un team da un'altra parte? Lo porto qui tutto intero.",
+        "start": "Ho un team pronto per quello che fate. Oppure iniziamo noi due.",
         "askPersonal": "Usi già agenti da un'altra parte? Li porto tutti qui.",
         "bring": "Copia la richiesta, incollala in {{app}} e riporta la risposta. Al resto penso io.",
         "bringFiles": "Trascina qui quello che l'app ha esportato. Al resto penso io.",
@@ -752,7 +753,19 @@
       "team": {
         "title": "Il tuo team",
         "madeLead": "Sono già nello spazio di lavoro. Puoi sistemare ciascuno dopo.",
-        "later": "Creare gli agenti più tardi, per conto mio",
+        "start": {
+          "title": "Come vuoi iniziare il team?",
+          "lead": "Puoi cambiare tutto dopo, non si perde nulla.",
+          "template": "Inizia con un team pronto",
+          "templateText_one": "{{count}} agente dal modello {{template}}, nel suo canale, con la sua routine pronta.",
+          "templateText_many": "{{count}} agenti dal modello {{template}}, ognuno nel suo canale, con le routine pronte.",
+          "templateText_other": "{{count}} agenti dal modello {{template}}, ognuno nel suo canale, con le routine pronte.",
+          "scratch": "Inizia da zero",
+          "scratchText": "Solo {{name}}, il tuo braccio destro. Ogni agente lo crei dopo, a modo tuo.",
+          "scratchWho": "{{name}} e chi creerai",
+          "see": "Vedi il team pronto",
+          "scratchGo": "Continua solo con {{name}}"
+        },
         "ask": {
           "title": "Hai già agenti in un'altra app?",
           "lead": "Se sì, porto tutto il team: istruzioni, skill e routine.",

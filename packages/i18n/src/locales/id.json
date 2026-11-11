@@ -709,6 +709,7 @@
         "plan": "Setelah paketnya, tinggal hubungkan AI. Nanti aku tunjukkan di mana.",
         "planThen": "Setelah paketnya aktif, layar berikutnya untuk menghubungkan AI-mu.",
         "ask": "Sudah punya tim di tempat lain? Aku bawa semuanya ke sini.",
+        "start": "Aku punya tim yang siap untuk pekerjaan kalian. Atau kita mulai berdua saja.",
         "askPersonal": "Sudah memakai agen di tempat lain? Aku bawa semuanya ke sini.",
         "bring": "Salin permintaannya, tempel di {{app}}, lalu bawa jawabannya. Sisanya urusanku.",
         "bringFiles": "Taruh di sini apa yang diekspor aplikasinya. Sisanya urusanku.",
@@ -732,7 +733,17 @@
       "team": {
         "title": "Timmu",
         "madeLead": "Mereka sudah ada di ruang kerja. Kamu bisa menyesuaikan masing-masing nanti.",
-        "later": "Buat agen nanti, sendiri",
+        "start": {
+          "title": "Bagaimana kamu mau memulai tim?",
+          "lead": "Semuanya bisa diubah nanti, tidak ada yang hilang.",
+          "template": "Mulai dengan tim siap pakai",
+          "templateText_other": "{{count}} agen dari template {{template}}, masing-masing di kanalnya sendiri, dengan rutinitas yang sudah siap.",
+          "scratch": "Mulai dari nol",
+          "scratchText": "Hanya {{name}}, tangan kananmu. Setiap agen kamu buat nanti, dengan caramu sendiri.",
+          "scratchWho": "{{name}} dan agen yang kamu buat",
+          "see": "Lihat tim siap pakai",
+          "scratchGo": "Lanjut hanya dengan {{name}}"
+        },
         "ask": {
           "title": "Sudah punya agen di aplikasi lain?",
           "lead": "Kalau ada, aku bawa seluruh timnya: instruksi, skill, dan rutinitas.",
