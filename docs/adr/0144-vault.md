@@ -303,6 +303,31 @@ the Vault" still means the Vault: where it goes and who may use it are the perso
 password manager's access is the connection's); keys in a password manager; changing a Bitwarden login; deleting or
 archiving anything; a description or notes on a made login; telling a read-only credential before the first write.
 
+### 10. A connection starts open to every agent, and an agent can tell "connected" from "no access"
+
+A team connection used to start with no agent, like a team item, and connecting asked only "the team's or personal".
+The person finished connecting, asked an agent for a login, and the agent answered as if nothing were connected: its
+empty answer was the same in both cases. The product's defaults are open, and admins narrow them.
+
+- **Default at connect.** A connection made without an access gets `DEFAULT_CONNECTION_ACCESS`: `allAgents` for both
+  scopes (a team one: everyone in the workspace asks, any agent uses, a personal one: its owner asks, any agent
+  uses). `allAgents` is a standing choice, not a list taken that day, so an agent created later is in. Items saved
+  by hand keep §2's default (a team item: no agent yet): a person saves those one at a time and picks there.
+- **The end of connecting.** The same as a tool's: "<name> connected", one sentence on who can use it (the access
+  sentence the server's rule gives), "Ajustar" (the connection's default access) and "Pronto". On the phone, the
+  same note and buttons on the connect screen.
+- **Connections made before.** Nothing changes for them. One no agent may use (`allAgents` off and no agent picked)
+  says so on its row, with the way to its access for who manages it.
+- **What an agent is told.** `vault_list` adds, for each connection the person behind the run may know of (their
+  own personal one, a team one whose audience they are in) that this agent is not shared with: the manager's name
+  and the connection's label, team or personal, whether any item was read from it ("has items", never how many),
+  and who gives access (its owner, or whoever manages credentials). No item of it, in any form. A connection the run
+  may not know exists (§2's `hidden`) is never named.
+- **Who changes it.** Unchanged: its owner for a personal one, `manage_credentials` for a team one, checked on the
+  server. Anyone else gets "not found".
+- The right hand has no Vault tools (`vault:read` is not among its fixed grants), so it gets this only once that
+  scope is granted to it.
+
 ## Consequences
 
 - Agents find what they need before asking (`vault_list`), and a password typed once in a card can serve the next

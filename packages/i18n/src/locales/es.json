@@ -3699,6 +3699,8 @@
       "access": "Acceso predeterminado",
       "accessTitle": "Acceso predeterminado de {{label}}",
       "accessText": "Sus elementos siguen esto, salvo que cambies alguno. Cada cambio se guarda al instante.",
+      "noAgents": "Ningún agente usa esta conexión.",
+      "giveAccess": "Dar acceso",
       "actionsName": "Más opciones de {{name}}",
       "disconnect": "Desconectar",
       "removeTitle": "¿Desconectar {{name}}?",

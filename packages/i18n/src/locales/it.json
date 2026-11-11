@@ -3703,6 +3703,8 @@
       "access": "Accesso predefinito",
       "accessTitle": "Accesso predefinito di {{label}}",
       "accessText": "I suoi elementi seguono questo, a meno che tu non ne cambi uno. Ogni modifica si salva subito.",
+      "noAgents": "Nessun agente usa questa connessione.",
+      "giveAccess": "Dai accesso",
       "actionsName": "Altre opzioni per {{name}}",
       "disconnect": "Scollega",
       "removeTitle": "Scollegare {{name}}?",

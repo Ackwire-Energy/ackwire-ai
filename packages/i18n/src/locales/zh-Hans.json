@@ -3470,6 +3470,8 @@
       "access": "默认权限",
       "accessTitle": "{{label}} 的默认权限",
       "accessText": "除非你单独修改某一项，其中的项目都遵循此设置。每次更改都会立即保存。",
+      "noAgents": "没有智能体使用此连接。",
+      "giveAccess": "授予访问权限",
       "actionsName": "{{name}} 的更多操作",
       "disconnect": "断开连接",
       "removeTitle": "要断开 {{name}} 吗？",

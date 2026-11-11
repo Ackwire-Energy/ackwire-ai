@@ -2403,7 +2403,7 @@
       "guide": "Abrir la guía de {{name}}",
       "fields": "Datos",
       "private": "Estos datos se guardan cifrados y no se vuelven a mostrar.",
-      "teamHelp": "Sus elementos empiezan visibles para todos en el espacio de trabajo y sin ningún agente. Luego eliges los agentes.",
+      "teamHelp": "Todos en el espacio de trabajo ven sus elementos y todos los agentes pueden usarlos. Puedes ajustarlo después.",
       "personalHelp": "Solo tú ves sus elementos, y tus agentes los usan cuando se lo pides.",
       "checking": "Verificando con {{name}}…",
       "connected": "{{name}} conectado",

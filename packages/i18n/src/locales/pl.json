@@ -3834,6 +3834,8 @@
       "access": "Dostęp domyślny",
       "accessTitle": "Dostęp domyślny dla {{label}}",
       "accessText": "Jego elementy stosują się do tego, chyba że zmienisz któryś z nich. Każda zmiana zapisuje się od razu.",
+      "noAgents": "Żaden agent nie korzysta z tego połączenia.",
+      "giveAccess": "Daj dostęp",
       "actionsName": "Więcej dla {{name}}",
       "disconnect": "Rozłącz",
       "removeTitle": "Rozłączyć {{name}}?",

@@ -3467,6 +3467,8 @@
       "access": "기본 접근 권한",
       "accessTitle": "{{label}}의 기본 접근 권한",
       "accessText": "항목을 따로 바꾸지 않으면 이 설정을 따라요. 바꾸면 바로 저장돼요.",
+      "noAgents": "이 연결을 쓰는 에이전트가 없어요.",
+      "giveAccess": "접근 허용",
       "actionsName": "{{name}} 더 보기",
       "disconnect": "연결 해제",
       "removeTitle": "{{name}} 연결을 해제할까요?",

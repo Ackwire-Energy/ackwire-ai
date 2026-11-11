@@ -2417,8 +2417,7 @@ export const featureKeysEn = {
       guide: "Open the {{name}} guide",
       fields: "Details",
       private: "These details are kept encrypted and never shown again.",
-      teamHelp:
-        "Its items start visible to everyone in the workspace and used by no agent. You choose the agents next.",
+      teamHelp: "Everyone in the workspace sees its items and every agent can use them. You can adjust it next.",
       personalHelp: "Only you see its items, and your agents use them when you ask.",
       checking: "Checking with {{name}}…",
       connected: "{{name}} connected",

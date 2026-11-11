@@ -3469,6 +3469,8 @@
       "access": "デフォルトのアクセス",
       "accessTitle": "{{label}}のデフォルトのアクセス",
       "accessText": "個別に変更しない限り、項目はこの設定に従います。変更はすぐに保存されます。",
+      "noAgents": "この接続を使うエージェントはいません。",
+      "giveAccess": "アクセスを許可",
       "actionsName": "{{name}}のその他の操作",
       "disconnect": "切断",
       "removeTitle": "{{name}}を切断しますか？",

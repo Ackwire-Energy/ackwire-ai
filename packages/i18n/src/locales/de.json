@@ -3598,6 +3598,8 @@
       "access": "Standardzugriff",
       "accessTitle": "Standardzugriff von {{label}}",
       "accessText": "Seine Einträge folgen dem, außer du änderst einen davon. Jede Änderung wird sofort gespeichert.",
+      "noAgents": "Kein Agent nutzt diese Verbindung.",
+      "giveAccess": "Zugriff geben",
       "actionsName": "Mehr für {{name}}",
       "disconnect": "Trennen",
       "removeTitle": "{{name}} trennen?",
