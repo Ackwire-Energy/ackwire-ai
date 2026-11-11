@@ -13997,7 +13997,8 @@ html:not([data-pointer]) .settings-row--open:focus-visible {
     padding-left: calc(28px + var(--space-3));
   }
   /* A line with a status under its name and a switch or nothing at its end: the icon, the name and the switch on one
-     line, the status under them at the row's full width, so the icon never owns a column beside three lines. */
+     line, the status under them at the row's full width, so the icon never owns a column beside three lines. A step
+     (`--space-2`, a MediaRow's) parts it from the icon: closer, it reads as the icon's caption. */
   .settings-row--lead:has(> .settings-row__text > .settings-row__status):has(> .settings-row__end > .ac-switch),
   .settings-row--lead:not(.settings-row--open):has(> .settings-row__text > .settings-row__status):not(
     :has(> .settings-row__end)
@@ -14005,7 +14006,7 @@ html:not([data-pointer]) .settings-row--open:focus-visible {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
-    gap: 2px var(--space-3);
+    gap: var(--space-2) var(--space-3);
   }
   .settings-row--lead:has(> .settings-row__end > .ac-switch) > .settings-row__text:has(> .settings-row__status),
   .settings-row--lead:not(.settings-row--open, :has(> .settings-row__end))
@@ -14022,12 +14023,12 @@ html:not([data-pointer]) .settings-row--open:focus-visible {
     grid-area: 1 / 3;
   }
   /* A line that opens something, with a status: the icon, the name and the chevron (a value before it) on one line,
-     the status under the name, from the name's edge as on a wide screen and as the other rows' controls. */
+     the status under them at the row's width, so the icon never owns a column beside three lines. */
   .settings-row--lead.settings-row--open:has(> .settings-row__text > .settings-row__status) {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
-    gap: 2px var(--space-3);
+    gap: var(--space-2) var(--space-3);
   }
   .settings-row--lead.settings-row--open:has(> .settings-row__value):has(
     > .settings-row__text > .settings-row__status
@@ -14038,7 +14039,7 @@ html:not([data-pointer]) .settings-row--open:focus-visible {
     display: contents;
   }
   .settings-row--lead.settings-row--open > .settings-row__text > .settings-row__status {
-    grid-column: 2 / -1;
+    grid-column: 1 / -1;
   }
   .settings-row--lead.settings-row--open:has(> .settings-row__text > .settings-row__status) > .settings-row__value {
     grid-area: 1 / 3;
