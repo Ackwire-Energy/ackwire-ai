@@ -3006,7 +3006,14 @@ async function executeRunInner(
     // in on a key nor waits for the computer. Only waiting its turn for room stays a wait.
     if (isRightHand(agent) && u.code !== "busy" && !u.queued) {
       const ownModel = u.scope ? ownLimitsModel(plan.account?.provider, plan.model) : null;
-      await failNoAi(rightHandNoAiReason(u.code, ownModel ? u.scope : undefined), undefined, ownModel?.label);
+      const why = rightHandNoAiReason(u.code, ownModel ? u.scope : undefined);
+      // Its line says only that the plan's CLI or its computer failed: what they said is kept in the run and reported,
+      // as any agent's CLI failure is. Otherwise a CLI that can't start there fails every turn with nothing saying why.
+      if (why === "cli_failed" || why === "computer_failed") {
+        await addRunStep(db, run, "error", { reason: "brain_unavailable", code: u.code, message: u.message });
+        options.failed?.(new BrainFailure(u.code, u.message, true));
+      }
+      await failNoAi(why, undefined, ownModel?.label);
       return "failed";
     }
     // Tools already ran in a turn cut off by its computer: only that computer may finish it (the model
