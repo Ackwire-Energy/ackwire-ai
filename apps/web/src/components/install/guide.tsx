@@ -1,9 +1,9 @@
-import { type DesktopRelease, useDesktopLatest } from "@agenteschat/client";
-import { desktopTargetOf, type Platform, platformOf } from "@agenteschat/client/lib/machines";
+import type { DesktopRelease } from "@agenteschat/client";
+import { type Platform, platformOf } from "@agenteschat/client/lib/machines";
 import { Button, Icon } from "@agenteschat/ui";
 import { type CSSProperties, useLayoutEffect, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import { DownloadButtons } from "@/components/devices/parts";
+import { type DesktopDownload, DownloadButtons, useBuildName, useDesktopDownloads } from "@/components/devices/parts";
 import { CommandBlock } from "@/components/machine-bits";
 import { SCENE_H, SCENE_W, Scene, type SceneId } from "./scenes";
 import "./install.css";
@@ -23,17 +23,26 @@ export function systemOfParam(value: unknown): InstallSystem | undefined {
   return INSTALL_SYSTEMS.find((s) => s === value);
 }
 
-/** A system's build, as `/api/desktop/latest` asks for it (one universal Mac build; x64 elsewhere). */
-export function buildTarget(system: InstallSystem) {
-  return system === "mac"
-    ? ({ target: "darwin", arch: "aarch64" } as const)
-    : ({ target: system, arch: "x86_64" } as const);
+/** A system and, on Windows and Linux, whether its ARM64 build (a Mac has one build for both chips). */
+export interface InstallBuild {
+  system: InstallSystem;
+  arm: boolean;
 }
 
-/** The system this page is open on, or none (a phone, an ARM Linux). */
-export function systemHere(): InstallSystem | null {
-  if (typeof navigator === "undefined") return null;
-  return desktopTargetOf(navigator.userAgent) ? platformOf(navigator.userAgent) : null;
+/** A build as `/api/desktop/latest` asks for it. */
+export function buildTarget({ system, arm }: InstallBuild) {
+  if (system === "mac") return { target: "darwin", arch: "aarch64" } as const;
+  return { target: system, arch: arm ? "aarch64" : "x86_64" } as const;
+}
+
+/** The file a release's link downloads (`agentes_<v>_arm64-setup.exe`…), or the name a build's file would have. */
+export function fileOf({ system, arm }: InstallBuild, release: DesktopRelease | null): string {
+  const named = release?.url.split("?")[0]?.split("/").pop();
+  if (named) return decodeURIComponent(named);
+  const v = release?.version ?? "<version>";
+  if (system === "windows") return `agentes_${v}_${arm ? "arm64" : "x64"}-setup.exe`;
+  if (system === "linux") return `agentes_${v}_${arm ? "arm64" : "amd64"}.deb`;
+  return `agentes_${v}_universal.dmg`;
 }
 
 /** What `xattr` clears on a Mac when the button never shows: the mark every browser download carries. */
@@ -58,7 +67,7 @@ interface Step {
 /** The line over the frames: the app is in beta, so the system asks once (`<b>` marks the first sentence). */
 type WhyKey = "install.mac.why" | "install.windows.why" | "install.linux.why";
 
-function useSteps(system: InstallSystem, version: string): { why: WhyKey; steps: Step[] } {
+function useSteps(system: InstallSystem, file: string): { why: WhyKey; steps: Step[] } {
   const { t } = useTranslation();
   if (system === "mac")
     return {
@@ -103,7 +112,7 @@ function useSteps(system: InstallSystem, version: string): { why: WhyKey; steps:
         scene: "linuxApt",
         text: t("install.linux.apt"),
         long: t("install.linux.aptLong"),
-        cmd: `sudo apt install ./agentes_${version || "<version>"}_amd64.deb`,
+        cmd: `sudo apt install ./${file}`,
       },
       { scene: "linuxOpen", text: t("install.linux.open") },
     ],
@@ -114,7 +123,7 @@ function useSteps(system: InstallSystem, version: string): { why: WhyKey; steps:
  * A scene scaled into its box. `zoom` > 1 looks closer, centred on the thing to click (measured from the drawing, so
  * a longer translation still lands on it); 1 shows the whole desktop.
  */
-function FitScene({ id, version, zoom = 1 }: { id: SceneId; version: string; zoom?: number }) {
+function FitScene({ id, version, file, zoom = 1 }: { id: SceneId; version: string; file: string; zoom?: number }) {
   const box = useRef<HTMLDivElement>(null);
   const shot = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
@@ -150,7 +159,7 @@ function FitScene({ id, version, zoom = 1 }: { id: SceneId; version: string; zoo
   return (
     <div ref={box} className="isc-box" aria-hidden="true">
       <div ref={shot} className="isc-fit">
-        <Scene id={id} version={version} />
+        <Scene id={id} version={version} file={file} />
       </div>
     </div>
   );
@@ -173,14 +182,17 @@ const ZOOM: Record<SceneId, number> = {
  * The steps as frames under a download: why the system asks (beta), one drawing at a time with its line, moving on
  * by themselves (a bar fills; hovering pauses it; the bars and arrows move it by hand), and the full page.
  */
-export function InstallFrames({ system, release }: { system: InstallSystem; release: DesktopRelease }) {
+export function InstallFrames({ build, release }: { build: InstallBuild; release: DesktopRelease }) {
   const { t } = useTranslation();
-  const { why, steps } = useSteps(system, release.version);
+  const buildName = useBuildName();
+  const { system, arm } = build;
+  const file = fileOf(build, release);
+  const { why, steps } = useSteps(system, file);
   const [at, setAt] = useState(0);
   const go = (i: number) => setAt((i + steps.length) % steps.length);
   const step = steps[at] ?? steps[0];
   if (!step) return null;
-  const name = t(`machines.os.${buildTarget(system).target}`);
+  const name = buildName({ target: buildTarget(build).target, arm: arm && system !== "mac" });
   return (
     <section className="ifr" aria-label={t("install.frames", { system: name })}>
       <p className="ifr__lead ac-iconline">
@@ -192,7 +204,7 @@ export function InstallFrames({ system, release }: { system: InstallSystem; rele
       <div className="ifr__pic">
         {steps.map((s, i) => (
           <div key={s.scene} className="ifr__frame" data-on={i === at || undefined}>
-            <FitScene id={s.scene} version={release.version} zoom={ZOOM[s.scene]} />
+            <FitScene id={s.scene} version={release.version} file={file} zoom={ZOOM[s.scene]} />
           </div>
         ))}
       </div>
@@ -238,7 +250,12 @@ export function InstallFrames({ system, release }: { system: InstallSystem; rele
           />
         </span>
       </div>
-      <a className="ifr__more ac-link" href={`/download?system=${system}`} target="_blank" rel="noreferrer">
+      <a
+        className="ifr__more ac-link"
+        href={`/download?system=${system}${arm && system !== "mac" ? "&arch=arm64" : ""}`}
+        target="_blank"
+        rel="noreferrer"
+      >
         {t("install.fullGuide")}
         <Icon name="arrowRight" size={14} />
       </a>
@@ -247,8 +264,8 @@ export function InstallFrames({ system, release }: { system: InstallSystem; rele
 }
 
 /**
- * "Download for …" and, under it, the frames of the system picked (this computer's, or the one chosen in Other
- * systems). Nothing under it while that system has no build.
+ * "Download for …" and, under it, the frames of the build picked (this computer's, or the one chosen in Other
+ * systems). Nothing under it while that build has no release.
  */
 export function DownloadWithGuide({
   primary = false,
@@ -257,24 +274,29 @@ export function DownloadWithGuide({
   primary?: boolean;
   onLine?: (shell: "unix" | "windows") => void;
 }) {
-  const [system, setSystem] = useState<InstallSystem | null>(systemHere);
-  const target = buildTarget(system ?? "mac");
-  const build = useDesktopLatest(target.target, target.arch, system !== null);
+  const { latest, mine } = useDesktopDownloads();
+  const [picked, setPicked] = useState<DesktopDownload | null>(null);
+  const build = picked ?? mine ?? null;
+  const release = build ? latest[build.id].data : null;
   return (
     <>
       <span className="dv-step__acts">
-        <DownloadButtons primary={primary} onLine={onLine} onPick={setSystem} />
+        <DownloadButtons primary={primary} onLine={onLine} onPick={setPicked} />
       </span>
-      {system && build.data && <InstallFrames key={system} system={system} release={build.data} />}
+      {build && release && (
+        <InstallFrames key={build.id} build={{ system: build.platform, arm: build.arm }} release={release} />
+      )}
     </>
   );
 }
 
 /** Every step of a system with its drawing, in a numbered line (the `/download` page). */
-export function InstallSteps({ system, release }: { system: InstallSystem; release: DesktopRelease | null }) {
+export function InstallSteps({ build, release }: { build: InstallBuild; release: DesktopRelease | null }) {
   const { t } = useTranslation();
+  const { system } = build;
   const version = release?.version ?? "";
-  const { steps } = useSteps(system, version);
+  const file = fileOf(build, release);
+  const { steps } = useSteps(system, file);
   const onMac = typeof navigator !== "undefined" && platformOf(navigator.userAgent) === "mac";
   return (
     <>
@@ -298,7 +320,7 @@ export function InstallSteps({ system, release }: { system: InstallSystem; relea
               </div>
             </div>
             <div className="ist__shot">
-              <FitScene id={s.scene} version={version} />
+              <FitScene id={s.scene} version={version} file={file} />
             </div>
           </li>
         ))}

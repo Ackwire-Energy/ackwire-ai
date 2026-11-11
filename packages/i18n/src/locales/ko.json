@@ -1409,6 +1409,8 @@
       "version": "버전 {{version}}",
       "versionSize": "버전 {{version}} · {{size}}",
       "soon": "아직 {{system}}용 버전이 없어요.",
+      "useArm": "ARM 칩 컴퓨터인가요? ARM 버전 다운로드",
+      "useX64": "x64 버전 다운로드",
       "unavailable": "지금은 여기서 앱을 다운로드할 수 없어요. 잠시 후 다시 시도하세요.",
       "installOn": "{{system}}에 설치",
       "system": "시스템",
@@ -13004,6 +13006,7 @@
     "downloadFor": "{{system}}용 다운로드",
     "downloadApp": "앱 다운로드",
     "otherSystems": "다른 시스템",
+    "armBuild": "{{system}} (ARM)",
     "onThePhone": "휴대폰에서",
     "onTheIphone": "iPhone에서",
     "screen": {

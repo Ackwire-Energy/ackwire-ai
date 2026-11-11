@@ -1409,6 +1409,8 @@
       "version": "Versi {{version}}",
       "versionSize": "Versi {{version}} · {{size}}",
       "soon": "Belum ada versi untuk {{system}}.",
+      "useArm": "Komputer dengan chip ARM? Unduh versi ARM",
+      "useX64": "Unduh versi x64",
       "unavailable": "Aplikasinya tidak bisa diunduh dari sini sekarang. Coba lagi sebentar lagi.",
       "installOn": "Pasang di {{system}}",
       "system": "Sistem",
@@ -13066,6 +13068,7 @@
     "downloadFor": "Unduh untuk {{system}}",
     "downloadApp": "Unduh aplikasinya",
     "otherSystems": "Sistem lain",
+    "armBuild": "{{system}} (ARM)",
     "onThePhone": "Di ponsel",
     "onTheIphone": "Di iPhone",
     "screen": {

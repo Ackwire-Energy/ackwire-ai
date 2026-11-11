@@ -1529,6 +1529,8 @@
       "version": "Версия {{version}}",
       "versionSize": "Версия {{version}} · {{size}}",
       "soon": "Версии для {{system}} пока нет.",
+      "useArm": "Компьютер с процессором ARM? Скачайте версию для ARM",
+      "useX64": "Скачать версию x64",
       "unavailable": "Сейчас приложение отсюда не скачать. Попробуйте чуть позже.",
       "installOn": "Установить на {{system}}",
       "system": "Система",
@@ -14367,6 +14369,7 @@
     "downloadFor": "Скачать для {{system}}",
     "downloadApp": "Скачать приложение",
     "otherSystems": "Другие системы",
+    "armBuild": "{{system}} (ARM)",
     "onThePhone": "На телефоне",
     "onTheIphone": "На iPhone",
     "screen": {

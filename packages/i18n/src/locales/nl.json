@@ -1448,6 +1448,8 @@
       "version": "Versie {{version}}",
       "versionSize": "Versie {{version}} · {{size}}",
       "soon": "Er is nog geen versie voor {{system}}.",
+      "useArm": "Computer met een ARM-chip? Download de ARM-versie",
+      "useX64": "Download de x64-versie",
       "unavailable": "De app kan nu niet van hier worden gedownload. Probeer het zo opnieuw.",
       "installOn": "Installeren op {{system}}",
       "system": "Systeem",
@@ -13564,6 +13566,7 @@
     "downloadFor": "Downloaden voor {{system}}",
     "downloadApp": "De app downloaden",
     "otherSystems": "Andere systemen",
+    "armBuild": "{{system}} (ARM)",
     "onThePhone": "Op de telefoon",
     "onTheIphone": "Op de iPhone",
     "screen": {

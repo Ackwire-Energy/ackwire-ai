@@ -1350,6 +1350,9 @@
   align-items: flex-end;
   gap: 6px;
 }
+.dlp__arch {
+  font-size: 13px;
+}
 .dlp__get small {
   color: var(--muted);
   font-size: 13px;
