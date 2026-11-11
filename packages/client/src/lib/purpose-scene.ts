@@ -76,7 +76,16 @@ export const SCENE_LINES: Record<PurposeKind, readonly string[]> = {
 export const SCENE_COLOR: Record<PurposeKind, "violet" | "sky"> = { personal: "violet", team: "sky" };
 
 /** What a card's agents do, as the cluster of pills under its line (ADR 0162). */
-export type PurposeActivity = "agenda" | "home" | "bills" | "studies" | "travel" | "support" | "finance" | "reports" | "sales";
+export type PurposeActivity =
+  | "agenda"
+  | "home"
+  | "bills"
+  | "studies"
+  | "travel"
+  | "support"
+  | "finance"
+  | "reports"
+  | "sales";
 
 /**
  * Each pill's agent (its index in `SCENE_FACES`) and words (`onboarding.purpose.activities.<key>`), in the order they

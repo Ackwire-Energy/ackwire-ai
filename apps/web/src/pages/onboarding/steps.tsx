@@ -12,18 +12,7 @@ import {
   teamFailureText,
   templateFor,
 } from "@agenteschat/client/lib/team-plan";
-import {
-  Button,
-  Chip,
-  Field,
-  Icon,
-  type IconName,
-  Locked,
-  Select,
-  Skeleton,
-  Spinner,
-  Textarea,
-} from "@agenteschat/ui";
+import { Button, Chip, Field, Icon, type IconName, Locked, Select, Skeleton, Spinner, Textarea } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
