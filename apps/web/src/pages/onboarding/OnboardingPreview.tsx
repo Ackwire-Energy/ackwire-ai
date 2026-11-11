@@ -48,11 +48,9 @@ export function OnboardingPreview({
   // The right hand stands first, the team after it.
   const team = agents.length - 1;
   return (
+    // No caption over it: the frame starts on the step's top line, and its name ("Your workspace, as you answer") is
+    // for screen readers.
     <aside className="onb-preview" aria-label={t("onboarding.flow.preview.label")}>
-      <p className="onb-preview__label">
-        <span className="onb-preview__dot" aria-hidden="true" />
-        {t("onboarding.flow.preview.label")}
-      </p>
       <div className="onb-preview__frame" aria-hidden="true" inert>
         <div className="sidebar onb-preview__side">
           <div className="sidebar__top">

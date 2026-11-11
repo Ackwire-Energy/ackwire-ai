@@ -6,6 +6,7 @@ import type { OnboardingStepId } from "../lib/onboarding";
 import type { TeamWeekAct, TeamWeekPrefs } from "../lib/team-week";
 import type { AudienceChoice } from "../lib/who-sees";
 import type { WikiAccess } from "../lib/wiki";
+import type { WorkAreaAnswer } from "../lib/work-area";
 import type {
   SecretToVaultInput,
   VaultConnectInput,
@@ -416,6 +417,8 @@ export interface ApiClient {
     unread(): Promise<{ organizations: { orgId: string; unread: number; waiting: number }[] } | null>;
     /** My app language (emails and pushes are written in it). */
     updateMe(input: { locale: AppLocale; auto?: boolean }): Promise<void>;
+    /** My own area, asked once during the onboarding, or `skipped` (`PUT /me/work-area`). */
+    setWorkArea(area: WorkAreaAnswer): Promise<void>;
     /** A one-time sign-in for the phone app, shown as a QR code. */
     phoneSignIn(): Promise<PhoneSignIn>;
     /**
@@ -1058,6 +1061,8 @@ export interface ApiClient {
     ): Promise<WifiPairing>;
     wifiPairing(orgId: string, machineId: string, pairingId: string): Promise<WifiPairing>;
     cancelWifiPairing(orgId: string, machineId: string, pairingId: string): Promise<void>;
+    /** Asks the computer to also look for a plugged phone it has no driver for, which adb never lists (Windows). */
+    lookForPhones(orgId: string, machineId: string): Promise<void>;
   };
   /** Connected computers (ADR 0025): machines running `agentes-runner`. */
   machines: {

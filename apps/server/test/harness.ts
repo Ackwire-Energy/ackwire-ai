@@ -169,7 +169,6 @@ export async function createTestServer(
     mcpConnect: options.mcpConnect,
     http: options.http,
     embeddings: options.embeddings ? { provider: embeddings, apiKey: "test" } : undefined,
-    deltaFlushMs: 0,
     s3Fetch: options.s3Fetch,
     speechFetch: options.speechFetch,
     resolveHost: options.resolveHost,

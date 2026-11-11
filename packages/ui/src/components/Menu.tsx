@@ -91,6 +91,25 @@ export function MenuItem({
   );
 }
 
+/**
+ * A face at a menu's head that changes it (the account menu's own photo): an item, since a menu takes no Tab, so the
+ * arrow keys and Enter reach it. Hover and focus lay the photo glyph over it; a touch screen, with no hover, keeps a
+ * small photo badge on its corner instead. `label` names it and is its tooltip.
+ */
+export function MenuFace({ label, onSelect, children }: { label: string; onSelect: () => void; children: ReactNode }) {
+  return (
+    <DropdownMenu.Item className="ac-face-edit" aria-label={label} title={label} textValue={label} onSelect={onSelect}>
+      {children}
+      <span className="ac-face-edit__glyph" aria-hidden="true">
+        <Icon name="image" size={16} />
+      </span>
+      <span className="ac-face-edit__badge" aria-hidden="true">
+        <Icon name="image" size={14} />
+      </span>
+    </DropdownMenu.Item>
+  );
+}
+
 export function MenuRadioGroup({
   label,
   value,

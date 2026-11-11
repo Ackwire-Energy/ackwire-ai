@@ -47,7 +47,7 @@ const click = async (el: Element, rounds = 10) => {
 };
 /** The first question answered for a company or team: its name comes next. */
 const forATeam = async () => {
-  await click(answer(/Para minha empresa ou time/), 4);
+  await click(answer(/Para meu time/), 4);
   await click(button("Continuar"), 4);
 };
 const type = async (label: string, value: string) => {
@@ -853,6 +853,98 @@ describe("a team with no agents for now (ADR 0162, amended 2026-11-11)", () => {
   });
 });
 
+describe("the person's own area, asked once per account", () => {
+  const AREA = "E você, cuida de quê?";
+  /** Nobody asked this account its area yet (the fake's accounts said it already). */
+  const unasked = (state: FakeState) => {
+    if (state.me) state.me.user.workArea = null;
+    return state;
+  };
+  const chip = (name: string) => button(name);
+
+  test("a team's, after what it does, on that step of the rail: Back keeps the answers, a chip then Continue goes on", async () => {
+    const state = unasked(newcomer(false));
+    await renderApp("/onboarding", { api: createFakeApi(state) });
+    await settle(10);
+    await forATeam();
+    await type("Nome", "Ateliê Couto");
+    await click(button("Continuar"), 14);
+    await click(button("Loja online"), 4);
+    await click(button("Continuar"), 14);
+    expect(heading()).toBe(AREA);
+    expect(document.querySelector(".onb__lead")?.textContent).toBe("Só para a gente entender quem usa o agentes.chat.");
+    // Still "What you do" on the rail: no step of its own.
+    expect(eyebrow()).toBe("Passo 2 de 5");
+    expect(document.querySelector(".onb__step[aria-current='step']")?.textContent).toContain("O que vocês fazem");
+    expect(document.querySelector(".onb__say")?.textContent).toBe("Última curiosidade antes do time.");
+    expect((button("Continuar") as HTMLButtonElement).disabled).toBe(true);
+    // Back: what it does, as answered.
+    await click(button("Voltar"), 8);
+    expect(heading()).toBe("O que a Ateliê Couto faz?");
+    expect(button("Loja online").getAttribute("aria-pressed")).toBe("true");
+    await click(button("Continuar"), 14);
+    expect(heading()).toBe(AREA);
+    // One at a time; a chip only marks it.
+    await click(chip("Vendas"), 4);
+    await click(chip("Marketing"), 4);
+    expect(chip("Marketing").getAttribute("aria-pressed")).toBe("true");
+    expect(chip("Vendas").getAttribute("aria-pressed")).toBe("false");
+    expect(heading()).toBe(AREA);
+    await click(button("Continuar"), 14);
+    expect(calls(state, "account.setWorkArea").map((c) => c.args[0])).toEqual(["marketing"]);
+    expect(heading()).toBe(ASK);
+    cleanup();
+
+    // Another visit, the area said: never asked again.
+    await renderApp("/onboarding", { api: createFakeApi(state) });
+    await settle(14);
+    expect(heading()).toBe(ASK);
+  });
+
+  test("Skip this step stores that it was asked; a reload before either asks again", async () => {
+    const state = unasked(settingUp({ context: "Loja online" }));
+    await renderApp("/onboarding", { api: createFakeApi(state) });
+    await settle(14);
+    // Reloaded before answering: asked again.
+    expect(heading()).toBe(AREA);
+    await click(button("Pular esta etapa"), 14);
+    expect(calls(state, "account.setWorkArea").map((c) => c.args[0])).toEqual(["skipped"]);
+    expect(heading()).toBe(ASK);
+    cleanup();
+    await renderApp("/onboarding", { api: createFakeApi(state) });
+    await settle(14);
+    expect(heading()).toBe(ASK);
+  });
+
+  test("a save that fails never holds the onboarding", async () => {
+    const state = unasked(settingUp({ context: "Loja online" }));
+    const api = createFakeApi(state);
+    api.account.setWorkArea = async () => {
+      throw new ApiError(500, "internal", "Something broke");
+    };
+    await renderApp("/onboarding", { api });
+    await settle(14);
+    await click(chip("Finanças"), 4);
+    await click(button("Continuar"), 14);
+    expect(heading()).toBe(ASK);
+  });
+
+  test("a personal workspace's, after For me, before its agents; no Back to a purpose it can't change", async () => {
+    const state = unasked(newcomer(false));
+    await renderApp("/onboarding", { api: createFakeApi(state) });
+    await settle(10);
+    await click(answer(/^Para mim(?!ha)/), 4);
+    await click(button("Continuar"), 16);
+    expect(heading()).toBe(AREA);
+    expect(document.querySelector(".onb__say")?.textContent).toBe("Última curiosidade antes dos seus agentes.");
+    expect(screen().queryByRole("button", { name: "Voltar" })).toBeNull();
+    await click(chip("Desenvolvimento"), 4);
+    await click(button("Continuar"), 14);
+    expect(calls(state, "account.setWorkArea").map((c) => c.args[0])).toEqual(["dev"]);
+    expect(heading()).toBe(ASK);
+  });
+});
+
 describe("inviting people, a team's last step (ADR 0162, amended 2026-11-11)", () => {
   test("the addresses as chips, each with its role, sent by the step's button; the workspace opens in #general", async () => {
     const state = settingUp({ context: "Loja online", team: true });
@@ -974,7 +1066,7 @@ describe("the name step's other cases", () => {
     if (state.me) state.me.user = { ...state.me.user, canCreateWorkspace: false };
     await renderApp("/onboarding", { api: createFakeApi(state) });
     await settle(10);
-    await click(answer(/Para minha empresa ou time/), 4);
+    await click(answer(/Para meu time/), 4);
     expect((button("Continuar") as HTMLButtonElement).disabled).toBe(true);
     expect(document.querySelector(".onb__note")?.textContent).toBeTruthy();
   });
@@ -992,7 +1084,7 @@ describe("for me (ADR 0159)", () => {
     await settle(10);
     expect(heading()).toBe("Para que você vai usar o agentes.chat?");
     expect((button("Continuar") as HTMLButtonElement).disabled).toBe(true);
-    // "For me", not "For my company or team", whose words start the same in Portuguese.
+    // "For me", not "For my team", whose words start the same in Portuguese.
     await click(answer(/^Para mim(?!ha)/), 4);
     expect(screen().queryByLabelText("Nome")).toBeNull();
     // Its whole path on the rail at once: what it is for, its agents, the plan, an AI.
@@ -1057,7 +1149,7 @@ describe("for me (ADR 0159)", () => {
     await forATeam();
     expect(screen().getByLabelText("Nome")).toBeTruthy();
     await click(button("Voltar"), 4);
-    expect(answer(/Para minha empresa ou time/).getAttribute("aria-checked")).toBe("true");
+    expect(answer(/Para meu time/).getAttribute("aria-checked")).toBe("true");
     expect(calls(state, "orgs.create")).toEqual([]);
   });
 });

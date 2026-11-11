@@ -22,6 +22,7 @@
     "loadingPage": "Caricamento della pagina",
     "refreshing": "Aggiornamento",
     "retry": "Riprova",
+    "soon": "In arrivo",
     "unknownError": "Qualcosa è andato storto. Riprova.",
     "ourSide": "Qualcosa è andato storto da parte nostra. Riprova tra poco.",
     "signedOut": "La sessione è scaduta. Accedi di nuovo per continuare.",
@@ -36,7 +37,6 @@
     "table": "Tabella",
     "chartItem": "Elemento",
     "chartShare": "Quota",
-    "chartPending": "Creazione del grafico…",
     "you": "tu",
     "saved": "Salvato",
     "youSuffix": " (tu)",
@@ -728,6 +728,8 @@
         "teamMadePersonal": "I tuoi agenti sono già qui. Andiamo avanti quando vuoi.",
         "plan": "Dopo il piano, manca solo collegare un'IA. Ti mostro dove.",
         "planThen": "Con il piano attivo, la prossima schermata è quella per collegare la tua IA.",
+        "area": "Un'ultima domanda prima del team.",
+        "areaPersonal": "Un'ultima domanda prima dei tuoi agenti.",
         "ask": "Hai già un team da un'altra parte? Lo porto qui tutto intero.",
         "start": "Ho un team pronto per quello che fate. Oppure iniziamo noi due.",
         "askPersonal": "Usi già agenti da un'altra parte? Li porto tutti qui.",
@@ -743,6 +745,20 @@
         "connectedThen": "Ecco fatto. Resta solo da invitare chi lavora con te.",
         "people": "Ora le persone. Dammi le loro email e mando gli inviti.",
         "peopleLink": "Ora le persone. Mandagli il link e ti mostro ogni richiesta."
+      },
+      "area": {
+        "title": "E tu, di cosa ti occupi?",
+        "lead": "Solo per capire chi usa agentes.chat.",
+        "skip": "Salta questo passaggio",
+        "options": {
+          "dev": "Sviluppo",
+          "marketing": "Marketing",
+          "sales": "Vendite",
+          "finance": "Finanza",
+          "ops": "Operazioni",
+          "support": "Assistenza clienti",
+          "other": "Altro"
+        }
       },
       "preview": {
         "label": "Il tuo spazio di lavoro, mentre rispondi",
@@ -878,10 +894,23 @@
       "lead": "Puoi cambiarlo dopo, non si perde nulla.",
       "personal": "Per me",
       "personalText": "Agenti che si prendono cura della tua giornata.",
-      "team": "Per la mia azienda o il mio team",
+      "team": "Per il mio team",
       "teamText": "Persone e agenti lavorano insieme, con canali, ruoli e approvazioni.",
       "personalExamples": "La tua giornata alle 7 · Bollette · Allenamento",
-      "teamExamples": "Assistenza clienti · Finanze · Report"
+      "teamExamples": "Assistenza clienti · Finanze · Report",
+      "personalLine": "Agenti che si occupano della tua giornata.",
+      "teamLine": "Persone e agenti nello stesso posto.",
+      "activities": {
+        "agenda": "Agenda del giorno",
+        "home": "Casa",
+        "bills": "Bollette",
+        "studies": "Studio",
+        "travel": "Viaggi",
+        "support": "Assistenza clienti",
+        "finance": "Finanze",
+        "reports": "Report",
+        "sales": "Vendite"
+      }
     },
     "personal": {
       "name": "Personale"
@@ -1780,7 +1809,7 @@
   "openOnPhone": {
     "qr": "Codice QR per accedere all'app agentes",
     "making": "Creazione del codice…",
-    "stepApp": "Installa l'app agentes sul telefono (App Store o Google Play).",
+    "stepApp": "Installa l'app agentes sul telefono.",
     "stepTailscale": "Installa Tailscale sul telefono e accedi con lo stesso account Tailscale di questo server.",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -2621,6 +2650,7 @@
       "computer_away": "{{name}} non può rispondere ora: il computer del piano non è disponibile.",
       "computer_failed": "{{name}} non può rispondere ora: il computer del piano ha avuto un problema.",
       "cli_failed": "{{name}} non può rispondere ora: l'IA del piano si è fermata con un errore.",
+      "cli_failedWhy": "{{name}} non può rispondere ora: l'IA del piano si è fermata con un errore ({{why}}).",
       "plan_limit": "{{name}} non può rispondere ora: il piano ha raggiunto il limite.",
       "plan_not_shared": "Collega il tuo piano per parlare con {{name}}: il piano del workspace risponde solo al suo proprietario.",
       "plan_unattended": "{{name}} non ha risposto: la richiesta non veniva da una persona, e il piano del workspace risponde solo al suo proprietario.",
@@ -3382,7 +3412,6 @@
     "messageTo": "Messaggio per {{name}}",
     "audienceEdit": "Modifica",
     "nowIn": "ora, in #{{channel}}",
-    "answersHere": "Risponde qui senza bisogno di @",
     "more": "Altro",
     "of": "Profilo di {{name}}",
     "presence": "Presenza",
@@ -4090,7 +4119,7 @@
       "open": "Apri",
       "routine": "Sempre in questa routine",
       "thisRoutine": "questa routine",
-      "noteRoutine": "{{routine}} fa {{actions}} da sola d'ora in poi, con qualsiasi valore. Fuori da questa routine continua a chiedere. Per annullare: le impostazioni della routine.",
+      "noteRoutine": "{{routine}} lo fa da sola d'ora in poi, con qualsiasi valore: {{actions}}. Fuori da questa routine continua a chiedere. Per annullare: le impostazioni della routine.",
       "doneRoutine": "Approvato. {{routine}} non lo chiederà più.",
       "undoRoutine": "Per annullarlo, vai nelle impostazioni della routine."
     },
@@ -4693,7 +4722,7 @@
       "showSteps": "Vedi ogni passo",
       "hideSteps": "Nascondi i passi",
       "asked": "Ha chiesto un'approvazione",
-      "grants": "{{name}} potrà {{doing}}, solo questa volta e con questi valori."
+      "grants": "{{name}} lo farà solo questa volta e con questi valori: {{doing}}."
     }
   },
   "agent": {
@@ -13805,6 +13834,7 @@
     "onHost": "su {{host}}",
     "onHostChip": "Su {{host}}",
     "menu": "Azioni per {{name}}",
+    "settings": "Impostazioni",
     "rename": "Rinomina",
     "renameName": "Rinomina {{name}}",
     "renameTitle": "Rinomina il dispositivo",
@@ -13914,7 +13944,8 @@
       "team_limit": "L'Apple Account gratuito ha raggiunto il limite di app",
       "helper_untrusted": "L'iPhone non ha ancora autorizzato l'app di test",
       "booting": "Avvio in corso",
-      "no_driver": "Windows non ha un driver per questo telefono",
+      "no_driver": "Windows non ha un driver USB per questo telefono",
+      "no_driverLinux": "Linux non riesce ad aprire questo telefono",
       "os_too_old": "Questo sistema è troppo vecchio per gli strumenti",
       "adb_offline": "Il telefono non risponde",
       "other": "Serve qualcosa sul dispositivo"
@@ -13934,7 +13965,8 @@
       "team_limit": "Rimuovi un'app che hai creato",
       "helper_untrusted": "Autorizzala sull'iPhone",
       "booting": "Aspetta che si avvii",
-      "no_driver": "Installa il driver USB del telefono",
+      "no_driver": "Installa il driver USB del produttore del telefono",
+      "no_driverLinux": "Aggiungi le regole udev per questo telefono",
       "os_too_old": "Aggiorna il telefono",
       "adb_offline": "Ricollegalo",
       "other": "Guarda cosa serve"
@@ -14075,18 +14107,35 @@
       "noComputer": "I telefoni si collegano tramite un computer, e non ce n'è ancora nessuno collegato.",
       "hostOffline": "{{computer}} è offline. Accendilo o scegline un altro.",
       "devOptions": "Attiva Opzioni sviluppatore",
-      "devOptionsText": "Impostazioni › Informazioni sul telefono, poi tocca 7 volte Numero build.",
+      "devOptionsText": "Impostazioni › Informazioni sul telefono, poi tocca 7 volte Numero build. Sui Samsung: Info sul telefono › Informazioni software › Numero build.",
       "usbDebugging": "Attiva il Debug USB",
-      "usbDebuggingText": "Impostazioni › Sistema › Opzioni sviluppatore › Debug USB.",
+      "usbDebuggingText": "Impostazioni › Sistema › Opzioni sviluppatore › Debug USB. Sui Samsung: Impostazioni › Opzioni sviluppatore.",
+      "done": "Fatto",
+      "notYet": "Non ancora",
       "plug": "Collega il telefono",
       "plugged": "Collegato a {{computer}}",
       "looking": "Ricerca di un telefono su {{computer}}…",
-      "found": "Fatto su {{name}}",
       "allow": "Tocca Consenti sul telefono",
       "allowText": "Prima seleziona Consenti sempre da questo computer.",
       "wifiNote": "Il debug wireless si disattiva quando il telefono si riavvia. Un cavo è più affidabile.",
-      "notShowing": "Il telefono non compare?",
-      "notShowingHelp": "Prova un altro cavo o un'altra porta, e scegli Trasferimento file se il telefono chiede a cosa serve l'USB. Sui Samsung, disattiva Blocco automatico in Impostazioni › Sicurezza e privacy.",
+      "noDriver": "{{computer}} vede il telefono ma non ha il suo driver USB. Installa il driver del produttore, poi ricollega il telefono.",
+      "noDriverLinux": "{{computer}} vede il telefono ma non riesce ad aprirlo. Aggiungi le regole udev per il telefono, poi ricollegalo.",
+      "udev": "Come aggiungere le regole udev",
+      "slow": "Ancora niente?",
+      "help": {
+        "cable": "Un cavo che trasferisce dati. Alcuni servono solo a caricare. Oppure prova un'altra porta.",
+        "unlocked": "Il telefono sbloccato, con lo schermo acceso.",
+        "fileTransfer": "Se il telefono chiede come usare l'USB, scegli Trasferimento file.",
+        "usbDebugging": "Debug USB attivo.",
+        "seeStep": "Vedi il passaggio 2",
+        "samsung": "Sui Samsung, Blocco automatico disattivato: Impostazioni › Sicurezza e privacy › Blocco automatico.",
+        "driver": "Su Windows, il driver USB del produttore del telefono:"
+      },
+      "drivers": {
+        "google": "Google, per Pixel",
+        "samsung": "Samsung",
+        "others": "Altri produttori"
+      },
       "qrLabel": "Codice QR che apre questi passaggi sul telefono",
       "qrLine": "Fallo dal telefono",
       "qrCaption": "Scansionalo per aprire questi passaggi nell'app agentes.chat, con un pulsante per ogni impostazione.",
@@ -14112,7 +14161,7 @@
       "noComputer": "L'accoppiamento via Wi-Fi funziona con un tuo computer. Usa un cavo, o collegane uno.",
       "wireless": "Attiva il Debug wireless",
       "wirelessText": "Opzioni sviluppatore › Debug wireless. Spunta Consenti sempre su questa rete, poi tocca Consenti.",
-      "scan": "Scansiona il codice con il telefono",
+      "scan": "Scansionalo da Debug wireless, non con la fotocamera",
       "code": "Scrivi quello che mostra il telefono",
       "pathQr": "Accoppia dispositivo con codice QR",
       "making": "Creo il codice…",
@@ -14128,14 +14177,17 @@
       "pair": "Accoppia",
       "tryAgain": "Riprova",
       "qrLabel": "Codice QR per il Debug wireless sul telefono",
-      "qrLine": "Scansiona con il telefono",
-      "qrCaption": "Telefono e computer sulla stessa rete Wi-Fi.",
+      "qrLine": "Non con la fotocamera",
+      "qrCaption": "Propone una rete Wi-Fi chiamata agentes-…, che non esiste. Tieni il telefono sulla rete Wi-Fi del computer.",
       "fail": {
         "mdns_off": "{{computer}} non riesce a cercare telefoni sul Wi-Fi. Aggiorna lì gli Android platform-tools, o usa un cavo.",
-        "same_wifi": "Il telefono non è raggiungibile. Mettilo sulla stessa rete Wi-Fi di {{computer}} e riprova.",
+        "mdns_offMac": "{{computer}} non riesce a cercare telefoni sul Wi-Fi. Su quel Mac, attiva agentes.chat in Impostazioni di Sistema › Privacy e sicurezza › Rete locale e riprova.",
+        "same_wifi": "Il telefono non è raggiungibile. Non è sulla stessa rete di {{computer}}. Mettilo sulla stessa rete Wi-Fi e riprova.",
+        "same_wifiMac": "Il telefono non è raggiungibile. Mettilo sulla stessa rete Wi-Fi di {{computer}}. Su quel Mac, attiva anche agentes.chat in Impostazioni di Sistema › Privacy e sicurezza › Rete locale.",
         "refused": "Il telefono ha interrotto l'accoppiamento. Lascia aperta la sua schermata di accoppiamento e riprova.",
         "refusedCode": "Il telefono non ha accettato quel codice. Controlla codice e indirizzo, poi accoppia di nuovo.",
-        "timed_out": "Nessuno ha scansionato il codice in 2 minuti. Controlla che il telefono sia sulla stessa rete Wi-Fi di {{computer}} e riprova.",
+        "timed_out": "Nessun telefono si è accoppiato in 2 minuti. Se la fotocamera ha scansionato il codice o il telefono ha lasciato la rete Wi-Fi, rimettilo sulla stessa rete Wi-Fi di {{computer}} e scansiona da Debug wireless.",
+        "timed_outMac": "Nessun telefono si è accoppiato in 2 minuti. Se la fotocamera ha scansionato il codice o il telefono ha lasciato la rete Wi-Fi, rimettilo sulla stessa rete Wi-Fi di {{computer}} e scansiona da Debug wireless. Su quel Mac, attiva anche agentes.chat in Impostazioni di Sistema › Privacy e sicurezza › Rete locale.",
         "outdated": "L'accoppiamento via Wi-Fi richiede Android 14 o successivo con l'aggiornamento di sicurezza di maggio 2026. Aggiorna il telefono, o usa un cavo.",
         "adb_missing": "{{computer}} non ha gli Android platform-tools. Installa lì Android Studio, poi riprova.",
         "update": "L'accoppiamento via Wi-Fi richiede un agentes.chat più recente su {{computer}}. Aggiornalo, poi riprova.",
@@ -16043,6 +16095,7 @@
       "no_ai_computer_away": "Ora non posso rispondere: il computer del mio piano non è disponibile.",
       "no_ai_computer_failed": "Ora non posso rispondere: il computer del mio piano ha avuto un problema.",
       "no_ai_cli_failed": "Ora non posso rispondere: l'IA del mio piano si è fermata con un errore.",
+      "no_ai_cli_failedWhy": "Ora non posso rispondere: l'IA del mio piano si è fermata con un errore ({{why}}).",
       "no_ai_plan_limit": "Ora non posso rispondere: il piano con cui penso ha raggiunto il limite.",
       "no_ai_plan_not_shared": "Non posso risponderti con il piano del workspace: risponde solo al suo proprietario. Collega il tuo piano e ti risponderò.",
       "no_ai_plan_unattended": "Non ho risposto: la richiesta non veniva da una persona, e il piano del workspace risponde solo al suo proprietario.",
@@ -17443,8 +17496,7 @@
       "task": "Attività",
       "state": "Stato",
       "using": "Sta usando",
-      "time": "Durata",
-      "computer": "Gira su"
+      "time": "Durata"
     },
     "sections": {
       "asked": "Chieste da persone",
@@ -17506,7 +17558,6 @@
     },
     "askedBy": "L'ha chiesta {{name}}",
     "askedByYou": "L'hai chiesta tu",
-    "servers": "I nostri server",
     "plan": "{{done}} di {{total}} fatti",
     "program": {
       "browser": "Browser",

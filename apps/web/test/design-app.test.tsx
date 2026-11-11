@@ -26,24 +26,21 @@ const live = (over: Partial<LiveRun>): LiveRun => ({
   channelId: "c",
   threadId: "t",
   status: "running",
-  text: "",
-  lastSeq: 0,
   ...over,
 });
 
 describe("the living avatar follows the run", () => {
-  test("queued/thinking/running without words → thinking; words → writing; done/failed/approval → idle", () => {
+  test("queued/thinking → thinking; writing (running) → writing; done/failed/approval → idle", () => {
     expect(agentStateOfRun(live({ status: "queued" }))).toBe("thinking");
     expect(agentStateOfRun(live({ status: "thinking" }))).toBe("thinking");
-    expect(agentStateOfRun(live({ status: "running" }))).toBe("thinking");
-    expect(agentStateOfRun(live({ status: "running", text: "Achei" }))).toBe("writing");
-    expect(agentStateOfRun(live({ status: "done", text: "Achei" }))).toBe("idle");
+    expect(agentStateOfRun(live({ status: "running" }))).toBe("writing");
+    expect(agentStateOfRun(live({ status: "done" }))).toBe("idle");
     expect(agentStateOfRun(live({ status: "failed" }))).toBe("idle");
     expect(agentStateOfRun(live({ status: "waiting_approval" }))).toBe("idle");
     const state = {
       runs: {
         r1: live({ runId: "r1", status: "thinking" }),
-        r2: live({ runId: "r2", status: "running", text: "x", channelId: "other" }),
+        r2: live({ runId: "r2", status: "running", channelId: "other" }),
       },
       finished: {},
     };

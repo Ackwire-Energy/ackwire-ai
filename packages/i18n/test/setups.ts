@@ -201,13 +201,7 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
   apiKey: ["agentPage.work.brain.fallbackTitle"],
   // A message nobody mentions still gets an agent: routing.mine (the chip and its help line), routing.by (Settings),
   // or the receipt of a message a rule sent to its one candidate.
-  routing: [
-    "profile.answersHere",
-    "channelMembers.replyAloneHelp",
-    "routing.by.jev",
-    "routing.by.model",
-    "receipts.by.only_agent",
-  ],
+  routing: ["channelMembers.replyAloneHelp", "routing.by.jev", "routing.by.model", "receipts.by.only_agent"],
   system: [
     "wiki.import.howTo",
     "machines.download.step1",

@@ -6,25 +6,19 @@ import {
   SCENE_LINES,
   SCENE_W,
 } from "@agenteschat/client/lib/purpose-scene";
-import {
-  type AgentAppearance,
-  Avatar,
-  horizonCrest,
-  horizonTones,
-  mix,
-  PixelSky,
-  playAgentReaction,
-} from "@agenteschat/ui";
-import { type CSSProperties, useEffect, useRef } from "react";
+import { type AgentAppearance, Avatar, cx, horizonCrest, horizonTones, mix, PixelSky } from "@agenteschat/ui";
+import type { CSSProperties } from "react";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { type PurposeLife, sceneAgentKey, WAKE_STEP_MS } from "@/components/purpose-life";
 
 /**
  * The scene of an answer to "what will you use agentes.chat for?" (ADR 0159), the onboarding's brand moment, drawn
  * with the app's own faces and the org chart's lines, over the cards' horizon (`CardHorizon`). For me: the person
  * signing up in the middle (their photo, or their initials as everywhere), their agents around them, each joined to
  * them. For a team: an org chart, them on top, people and agents under them. The other answer rests (its agents doze,
- * their zz); choosing one draws its lines and wakes its agents with a hop, and from then on they look at the pointer.
- * Decorative: the answer says it in words.
+ * their zz); choosing one draws its lines and wakes its agents in a wave (`usePurposeLife`: a z pops off each, eyes
+ * open, a hop), and from then on they look at the pointer; the agent whose pill works bobs. Pointing at an agent
+ * points at its pill. Decorative: the answer says it in words.
  *
  * Laid out on the shared stage (`SCENE_W`×`SCENE_H`, scaled down on a phone), the phone's drawing too.
  */
@@ -34,17 +28,18 @@ export type PurposeYou = { name: string; image: string | null };
 /** A pixel portrait of someone on the team (anyone). */
 const TEAMMATE = "/onboarding/person-31.jpg";
 
-export function PurposeScene({ kind, chosen, you }: { kind: PurposeKind; chosen: boolean; you: PurposeYou }) {
+export function PurposeScene({
+  kind,
+  chosen,
+  you,
+  life,
+}: {
+  kind: PurposeKind;
+  chosen: boolean;
+  you: PurposeYou;
+  life: PurposeLife;
+}) {
   const faces = SCENE_FACES[kind];
-  // Choosing it wakes its agents with a hop (the engine's "up" reaction), once per choice, as its lines arrive.
-  const was = useRef(chosen);
-  useEffect(() => {
-    if (chosen && !was.current)
-      faces.forEach((f, i) => {
-        if ("look" in f) playAgentReaction(`purpose-${kind}-${i}`, "up");
-      });
-    was.current = chosen;
-  }, [chosen, kind, faces]);
   const color = SCENE_COLOR[kind];
   return (
     <span className="onb-scene" data-kind={kind} data-chosen={chosen || undefined} data-gaze="" aria-hidden="true">
@@ -95,21 +90,30 @@ export function PurposeScene({ kind, chosen, you }: { kind: PurposeKind; chosen:
             <span
               // biome-ignore lint/suspicious/noArrayIndexKey: a fixed cast
               key={i}
-              className="onb-scene__face"
+              className={cx("onb-scene__face", life.working === i && "is-bob")}
               style={{ left: f.x - f.size / 2, top: f.y - f.size / 2, width: f.size, height: f.size }}
+              onPointerEnter={life.hasPill(i) ? () => life.point(i) : undefined}
+              onPointerLeave={life.hasPill(i) ? () => life.point(null) : undefined}
             >
               {"look" in f ? (
                 <AgentAvatar
-                  name={`purpose-${kind}-${i}`}
+                  name={sceneAgentKey(kind, i)}
                   appearance={f.look as AgentAppearance}
                   size="md"
-                  state={chosen ? "idle" : "sleeping"}
-                  reactionKey={`purpose-${kind}-${i}`}
+                  state={life.awake(i) ? "idle" : "sleeping"}
+                  reactionKey={sceneAgentKey(kind, i)}
                 />
               ) : "you" in f ? (
                 <Avatar kind="person" name={you.name} imageUrl={you.image ?? undefined} size="lg" />
               ) : (
                 <Avatar kind="person" name="" imageUrl={TEAMMATE} size="lg" />
+              )}
+              {life.waking && "look" in f && (
+                <span
+                  className="onb-zpop"
+                  aria-hidden="true"
+                  style={{ animationDelay: `${life.wakeOrder(i) * WAKE_STEP_MS}ms` }}
+                />
               )}
             </span>
           ))}

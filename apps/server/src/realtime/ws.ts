@@ -74,7 +74,7 @@ import type { StreamSocketData, StreamSockets } from "./streams";
  *   valid for `ttlMs` (5 s).
  * - Server → client frames: `ready`, `subscribed`, `unsubscribed` (with a
  *   `reason` when the server dropped it: `revoked`, `archived`), `error`, and
- *   channel events (`message.created`, `agent.delta`, `agent.run`,
+ *   channel events (`message.created`, `agent.run`, `agent.typing`,
  *   `approval.*`) wrapped as `{"type":"event","channelId":…,"event":{…}}`.
  *   Events for this person only (approvals waiting for them, DMs) arrive as
  *   `{"type":"event","scope":"user","event":{…}}`.

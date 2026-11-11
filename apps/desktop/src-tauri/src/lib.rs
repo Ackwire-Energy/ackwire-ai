@@ -16,6 +16,7 @@ mod local_server;
 mod main_window;
 mod menus;
 mod notch;
+mod prepare;
 mod runners;
 mod servers;
 mod tailscale;
@@ -51,6 +52,8 @@ struct AppInfo {
     version: String,
     os: &'static str,
     arch: &'static str,
+    /// The system's own version where it is read (macOS: `15.1`).
+    system: Option<String>,
 }
 
 /// The providers' own sign-in pages the runner gets from `claude auth login` / `codex login --device-auth`
@@ -422,6 +425,8 @@ fn hide_window(app: AppHandle, name: String) -> Result<(), String> {
     }
     let Some(window) = app.get_webview_window(&name) else { return Ok(()) };
     if MADE_ON_OPEN.contains(&name.as_str()) {
+        // `destroy` skips CloseRequested, where a setup on screen ends with its window.
+        prepare::closed(&app, &name);
         window.destroy().map_err(|e| e.to_string())?;
     } else {
         window.hide().map_err(|e| e.to_string())?;
@@ -441,6 +446,7 @@ fn app_info(app: AppHandle) -> AppInfo {
         version: app.package_info().version.to_string(),
         os: std::env::consts::OS,
         arch: std::env::consts::ARCH,
+        system: prepare::system_version(),
     }
 }
 
@@ -613,6 +619,7 @@ pub fn run() {
         .manage(dock::Dock::default())
         .manage(menus::MenuParts::default())
         .manage(window_state::LastSaved::default())
+        .manage(prepare::Resumed::default())
         .manage(UpdateDownload::default())
         .invoke_handler(tauri::generate_handler![
             runners_list,
@@ -672,7 +679,14 @@ pub fn run() {
             cover::cover_retry,
             cover::cover_hide,
             cover::cover_server,
-            cover::cover_details
+            cover::cover_details,
+            prepare::screen_access,
+            prepare::screen_request,
+            prepare::disk_access,
+            prepare::network_ask,
+            prepare::privacy_open,
+            prepare::setup_state_get,
+            prepare::setup_state_set
         ])
         .on_menu_event(|app, event| menus::on_event(app, event.id().as_ref()))
         .on_window_event(|window, event| match event {
@@ -696,8 +710,10 @@ pub fn run() {
                 let _ = window.hide();
                 sync_dock(window.app_handle());
             }
-            // Welcome and Preferences really close (made again when they open).
-            WindowEvent::CloseRequested { .. } if MADE_ON_OPEN.contains(&window.label()) => {}
+            // Welcome and Preferences really close (made again when they open), and a setup on screen ends with them.
+            WindowEvent::CloseRequested { .. } if MADE_ON_OPEN.contains(&window.label()) => {
+                prepare::closed(window.app_handle(), window.label());
+            }
             WindowEvent::Destroyed if MADE_ON_OPEN.contains(&window.label()) => sync_dock(window.app_handle()),
             WindowEvent::CloseRequested { api, .. } => {
                 // The other windows are made once and only hidden; quitting goes through "Quit".
@@ -768,12 +784,18 @@ pub fn run() {
             main_window::stop_from_notices(&handle);
             deep_link::setup(&handle);
             // Started at login: in the background (the popover, the tray). Opened by hand: the main window on
-            // the server open now, or the first run while there is none.
+            // the server open now, or the first run while there is none. Opened again by macOS in the middle of a
+            // setup (the "Quit & Reopen" after a permission): the main window on the page it showed, and the setup's
+            // window over it.
             let at_login = std::env::args().any(|a| a == AUTOSTART_ARG);
+            let resume = prepare::resume(&handle, at_login);
             if servers::current(&handle).is_none() {
                 let _ = present(&handle, "welcome");
             } else if !at_login {
-                let _ = main_window::open(&handle, None);
+                let _ = main_window::open(&handle, resume.as_ref().and_then(|r| r.page.clone()));
+            }
+            if let Some(resume) = resume {
+                let _ = present(&handle, resume.window);
             }
             // In the Dock from the start, like Slack (the popover then applies the person's choice).
             sync_dock(&handle);

@@ -39,8 +39,14 @@ export const DEFAULT_DM_STYLE: ChatStyle = "bubbles";
 export const DEFAULT_CHAT_TONE: ChatTone = "light";
 /** Owner's decision: smaller words than before the setting existed, which `lg` comes close to. */
 export const DEFAULT_TEXT_SIZE: ChatTextSize = "md";
+/**
+ * Owner's decision: a conversation opens where the person stopped reading. Only an explicit `openAt` is stored, so
+ * whoever picked "latest" keeps it.
+ */
+export const DEFAULT_OPEN_AT: ChatOpenAt = "read";
 
 export const textSizeOf = (prefs: ChatPrefs | undefined): ChatTextSize => prefs?.textSize ?? DEFAULT_TEXT_SIZE;
+export const openAtOf = (prefs: ChatPrefs | undefined): ChatOpenAt => prefs?.openAt ?? DEFAULT_OPEN_AT;
 
 /**
  * A conversation's vertical rhythm, the web's (`--msg-part-gap`, `--msg-turn-gap`, `--msg-card-gap`, `--msg-block`) and
@@ -90,7 +96,8 @@ export const mineOnRight = (style: ChatStyle) => style === "comfortable" || styl
 export const facesShown = (style: ChatStyle, dm: boolean) => !(dm && mineOnRight(style));
 
 /** Where a conversation opens the first time it is shown with `unread` messages waiting. */
-export const opensAtLastRead = (prefs: ChatPrefs | undefined, unread: number) => prefs?.openAt === "read" && unread > 0;
+export const opensAtLastRead = (prefs: ChatPrefs | undefined, unread: number) =>
+  openAtOf(prefs) === "read" && unread > 0;
 
 /**
  * The first message that landed after `lastReadAt` and isn't mine: where the "Novas" line goes. Null: none in what's

@@ -248,15 +248,19 @@ export function ApprovalSheet({
           <View>
             <GroupedHeader>{t("mobile.approval.sheet.nextTime")}</GroupedHeader>
             <GroupedList>
+              {/* What it covers behind its ⓘ: the sheet ends on its buttons, not on a paragraph. */}
               <GroupedRow
                 label={approveAlwaysLabel(t, a)}
                 labelLines={2}
                 toggle={always}
                 disabled={decide.isPending}
                 onPress={() => setAlways((on) => !on)}
+                hint={{
+                  name: t("common.about", { label: approveAlwaysLabel(t, a) }),
+                  text: approveAlwaysHint(t, a, name || t("channel.unknownAgent")),
+                }}
               />
             </GroupedList>
-            <GroupedFooter>{approveAlwaysHint(t, a, name || t("channel.unknownAgent"))}</GroupedFooter>
           </View>
         ) : null}
         {pending ? (

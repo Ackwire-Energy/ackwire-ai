@@ -164,7 +164,7 @@ describe("a receipt never changes a message's height", () => {
         .map((m) => new RegExp(`(?:^|;)\\s*${prop}:\\s*([^;]+)`).exec(m[2] ?? "")?.[1]?.trim())
         .findLast(Boolean);
     const px = (v: string | undefined) => Number.parseFloat(v ?? "");
-    // The check: a 16px icon with 2px each side, which the action bar stands 8px left of.
+    // The check: a 16px icon with 2px each side. The action bar keeps its one place over it (components.test.tsx).
     const check = px(value(kit, ".ac-receipt__check .ac-icon", "width")) + 2 * 2;
     expect(value(kit, ".ac-receipt__check", "padding")).toBe("0 2px");
     expect(
@@ -173,7 +173,7 @@ describe("a receipt never changes a message's height", () => {
         ".ac-msg:has(> .ac-msg__body > .ac-msg__aside--floating:not(:empty)) > .ac-msg__body > .ac-msg__actions",
         "right",
       ),
-    ).toBe(`calc(var(--msg-inline) + ${check + 8}px)`);
+    ).toBeUndefined();
     // The reader's face (18px) with 1px each side: the same 20px, and no taller than the name's line.
     const face = px(value(kit, ".ac-avatar--xs", "width"));
     expect(value(app, ".ac-receipt__check:has(> .ac-avatar)", "padding")).toBe("0 1px");

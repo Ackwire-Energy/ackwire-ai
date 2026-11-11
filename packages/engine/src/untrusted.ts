@@ -11,8 +11,12 @@ export { cleanOutside };
  * and long text is cut with a note. Every place that hands outside text to a model uses this.
  */
 
-/** Markers of every envelope the engine writes, old and current: none may appear inside a block. */
-const MARKERS = /<\s*\/?\s*(?:external_data|email_content|database_rows|untrusted_data|page_content|thread)\b[^>]*>/gi;
+/**
+ * Markers of every envelope the engine writes, old and current: none may appear inside a block. Spaces after the
+ * slash are only looked for after a slash: `\s*\/?\s*` splits a long run of spaces every way before it fails.
+ */
+const MARKERS =
+  /<\s*(?:\/\s*)?(?:external_data|email_content|database_rows|untrusted_data|page_content|thread)\b[^>]*>/gi;
 
 /** Said once when outside text carried characters that hide or reorder it (bidi overrides, tag characters). */
 export const HIDDEN_CHARS_NOTE = "[hidden characters removed]";

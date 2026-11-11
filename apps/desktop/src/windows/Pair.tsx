@@ -2,18 +2,22 @@
  * Pairing this computer from the welcome window, after the person said yes here. `PairOffer`: shown once after
  * sign-in for a workspace this computer doesn't work for yet (the card is the ask, so no system dialog follows).
  * `PairLinkSheet`: a pair link from the web, with who made it and where from, read from its server; Connect starts
- * the runner with the link and waits for its maker to let it in on the web.
+ * the runner with the link and waits for its maker to let it in on the web. Both show what agents can do here as
+ * switches, and on a Mac go on to `Prepare` (its permissions) once paired.
  */
 import type { DeviceAudience } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
-import { Button, Checkbox, Icon, type IconName, PixelSpinner, Select } from "@agenteschat/ui";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { Button, Checkbox, Icon, type IconName, PixelSpinner, ProviderLogo, Select, Switch } from "@agenteschat/ui";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useHost, useSnapshot, useStore } from "../app";
 import { type LinkFailure, type LinkInfo, type PairTarget, pairWithLink, pairWithSession } from "../control/pair";
+import { allDone } from "../control/permissions";
 import { serverName } from "../control/server";
-import { OrgTile } from "../ui/bits";
-import { PrefCard, PrefRow } from "../ui/settings";
+import { type PairTools, pairTools, toolsFound } from "../control/this-mac";
+import { MacPortrait, OrgTile } from "../ui/bits";
+import { MacPermissionCard, needsPrepare, useMacGrants } from "../ui/permissions";
+import { CardTitle, hintFor, PrefCard, PrefRow } from "../ui/settings";
 import { PeoplePicker } from "./prefs/ThisMac";
 
 const AUDIENCE_ICON: Record<DeviceAudience["mode"], IconName> = {
@@ -45,7 +49,7 @@ function Sheet({
 }
 
 /** The welcome window around a sheet shown outside the first run. */
-const Framed = ({ children }: { children: ReactNode }) => (
+export const Framed = ({ children }: { children: ReactNode }) => (
   <div className="dk-fr" data-screen="pair">
     <div className="dk-fr__body">{children}</div>
   </div>
@@ -65,7 +69,142 @@ const Waiting = ({ text }: { text: string }) => (
   </p>
 );
 
-/** "Let Acme's agents use this Mac?": who may use it, open at login, Not now or Allow. */
+const logo = (mark: ReactNode) => <span className="dk-logo">{mark}</span>;
+
+/**
+ * "What agents can do here": the pairing's tools as switches, on as `pairTools` starts them (Claude Code and Codex
+ * only once a runner here found them); `chosen` holds the ones the person changed. Folders come later.
+ */
+function ToolSwitches({
+  chosen,
+  onChange,
+  disabled,
+}: {
+  chosen: Partial<PairTools>;
+  onChange: (next: Partial<PairTools>) => void;
+  disabled: boolean;
+}) {
+  const { t } = useTranslation();
+  const snap = useSnapshot();
+  const found = toolsFound(snap);
+  const tools = { ...pairTools(snap), ...chosen };
+  const row = (tool: keyof PairTools, lead: ReactNode, name: string, desc: string, under?: ReactNode) => (
+    <PrefRow
+      key={tool}
+      lead={lead}
+      htmlFor={`pair-${tool}`}
+      title={name}
+      hint={hintFor(t, name, desc)}
+      under={under}
+      end={
+        <Switch
+          id={`pair-${tool}`}
+          aria-describedby={under ? `pair-${tool}-hint pair-${tool}-warn` : `pair-${tool}-hint`}
+          checked={tools[tool]}
+          disabled={disabled}
+          onCheckedChange={(on) => onChange({ ...chosen, [tool]: on })}
+        />
+      }
+    />
+  );
+  return (
+    <div className="dk-pair__group">
+      <CardTitle>{t("desktop.pair.canDo")}</CardTitle>
+      <PrefCard>
+        {row(
+          "commands",
+          logo(<Icon name="code" size={16} />),
+          t("desktop.tools.commandsName"),
+          t("desktop.tools.commandsDesc"),
+          <span className="dk-honest ac-iconline">
+            <Icon name="alert" size={14} />
+            <span id="pair-commands-warn">{t("desktop.tools.commandsWarn")}</span>
+          </span>,
+        )}
+        {found?.claude &&
+          row(
+            "claude",
+            logo(<ProviderLogo id="claude_code" size="xs" />),
+            t("desktop.tools.claudeName"),
+            t("desktop.tools.claudeDesc"),
+          )}
+        {found?.codex &&
+          row(
+            "codex",
+            logo(<ProviderLogo id="codex" size="xs" />),
+            t("desktop.tools.codexName"),
+            t("desktop.tools.codexDesc"),
+          )}
+        {row(
+          "browser",
+          logo(<Icon name="globe" size={16} />),
+          t("desktop.tools.browserName"),
+          t("desktop.tools.browserDesc"),
+        )}
+      </PrefCard>
+      <p className="dk-under-card dk-help">{t("desktop.pair.foldersLater")}</p>
+    </div>
+  );
+}
+
+/**
+ * "Get this Mac ready", right after pairing on a Mac: the permissions agents need, asked now so nothing stops them
+ * later. Kept by the app from the start, so when macOS quits it for Screen Recording or Full Disk Access it opens here
+ * again (`resumed`, the statuses read fresh). Skip for now and Continue both end it: the pairing never depends on it.
+ */
+export function Prepare({
+  org,
+  server,
+  resumed = false,
+  onClose,
+}: {
+  org: string;
+  server: string;
+  resumed?: boolean;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const host = useHost();
+  const keep = useCallback(
+    () => host.setSetupState({ step: "prepare", org, server }).catch(() => {}),
+    [host, org, server],
+  );
+  // Left without Continue or Skip (Esc back to an earlier screen): forgotten too. A quit never unmounts it.
+  useEffect(() => {
+    void keep();
+    return () => void host.setSetupState(null).catch(() => {});
+  }, [keep, host]);
+  const mac = useMacGrants(keep);
+  const finish = () => {
+    void host.setSetupState(null).catch(() => {});
+    onClose();
+  };
+  return (
+    <Sheet
+      lead={<MacPortrait state="online" />}
+      title={t("desktop.prepare.title")}
+      acts={
+        <>
+          {!(mac.grants && allDone(mac.grants)) && (
+            <Button variant="ghost" onClick={finish}>
+              {t("desktop.prepare.skip")}
+            </Button>
+          )}
+          <Button variant="primary" onClick={finish}>
+            {t("desktop.common.continue")}
+          </Button>
+        </>
+      }
+    >
+      <p className="dk-lead">{t("desktop.prepare.lead", { org })}</p>
+      <div className="dk-pair__group">
+        <MacPermissionCard mac={mac} resumed={resumed} />
+      </div>
+    </Sheet>
+  );
+}
+
+/** "Let Acme's agents use this Mac?": who may use it, open at login, what agents can do, Not now or Allow. */
 export function PairOffer({ target, onClose }: { target: PairTarget; onClose: () => void }) {
   const { t, i18n } = useTranslation();
   const host = useHost();
@@ -73,7 +212,8 @@ export function PairOffer({ target, onClose }: { target: PairTarget; onClose: ()
   const [audience, setAudience] = useState<DeviceAudience>({ mode: "owner", userIds: [], roleIds: [] });
   const [picking, setPicking] = useState(false);
   const [atLogin, setAtLogin] = useState(true);
-  const [state, setState] = useState<"ask" | "busy" | "done">("ask");
+  const [tools, setTools] = useState<Partial<PairTools>>({});
+  const [state, setState] = useState<"ask" | "busy" | "prepare" | "done">("ask");
   const [failed, setFailed] = useState<string | null>(null);
   const org = target.name;
   const lead = <OrgTile logo={target.logo} size="lg" />;
@@ -82,15 +222,21 @@ export function PairOffer({ target, onClose }: { target: PairTarget; onClose: ()
     setState("busy");
     setFailed(null);
     try {
-      await pairWithSession(host, store, target, audience);
+      await pairWithSession(host, store, target, audience, tools);
       if (atLogin) await host.setAutostart(true).catch(() => {});
-      setState("done");
+      setState((await needsPrepare(host).catch(() => false)) ? "prepare" : "done");
     } catch (err) {
       setFailed(errorText(t, err, i18n.language));
       setState("ask");
     }
   };
 
+  if (state === "prepare")
+    return (
+      <Framed>
+        <Prepare org={org} server={target.server} onClose={onClose} />
+      </Framed>
+    );
   if (state === "done") {
     return (
       <Framed>
@@ -124,7 +270,6 @@ export function PairOffer({ target, onClose }: { target: PairTarget; onClose: ()
           </>
         }
       >
-        <p className="dk-lead">{t("desktop.pair.offerBody")}</p>
         <PrefCard>
           <PrefRow
             lead={
@@ -162,6 +307,7 @@ export function PairOffer({ target, onClose }: { target: PairTarget; onClose: ()
             title={t("desktop.pair.keepReady")}
           />
         </PrefCard>
+        <ToolSwitches chosen={tools} onChange={setTools} disabled={busy} />
         {failed && <Problem text={failed} />}
         {picking && (
           <PeoplePicker
@@ -188,6 +334,7 @@ type LinkState =
   | { kind: "unreachable" }
   | { kind: "ask"; info: LinkInfo }
   | { kind: "waiting"; info: LinkInfo }
+  | { kind: "prepare"; org: string }
   | { kind: "done"; org: string }
   | { kind: "failed"; info: LinkInfo; code: LinkFailure };
 
@@ -202,6 +349,7 @@ export function PairLinkSheet({ server, code, onClose }: { server: string; code:
   const snap = useSnapshot();
   const [state, setState] = useState<LinkState>({ kind: "checking" });
   const [asked, setAsked] = useState(0);
+  const [tools, setTools] = useState<Partial<PairTools>>({});
   const from = serverName(server);
   // The sheet gone (Cancel, Esc, a newer link): the runner stops asking, even if it hadn't started yet.
   const pairing = useRef<{ cancel: () => Promise<void> } | null>(null);
@@ -230,14 +378,15 @@ export function PairLinkSheet({ server, code, onClose }: { server: string; code:
   const connect = async (info: LinkInfo) => {
     setState({ kind: "waiting", info });
     try {
-      const started = await pairWithLink(store, server, code);
+      const started = await pairWithLink(store, server, code, tools);
       pairing.current = started;
       if (gone.current) return void started.cancel();
       const org = await started.done;
       pairing.current = null;
       // Agents of a computer paired here work while the app runs.
       await host.setAutostart(true).catch(() => {});
-      if (!gone.current) setState({ kind: "done", org });
+      const prepare = await needsPrepare(host).catch(() => false);
+      if (!gone.current) setState({ kind: prepare ? "prepare" : "done", org });
     } catch (err) {
       pairing.current = null;
       const word = err instanceof Error ? err.message : "";
@@ -288,6 +437,7 @@ export function PairLinkSheet({ server, code, onClose }: { server: string; code:
         <Problem text={t("desktop.prefs.thisMac.unreachable", { server: from })} />
       </Sheet>
     );
+  if (state.kind === "prepare") return <Prepare org={state.org} server={server} onClose={onClose} />;
   if (state.kind === "done") return <Sheet title={t("desktop.pair.done", { org: state.org })} acts={close} />;
 
   const { info } = state;
@@ -363,7 +513,8 @@ export function PairLinkSheet({ server, code, onClose }: { server: string; code:
       }
     >
       {facts}
-      <p className="dk-lead">{t("desktop.pair.linkBody", { org: info.org })}</p>
+      <p className="dk-lead">{t("desktop.pair.linkBody")}</p>
+      <ToolSwitches chosen={tools} onChange={setTools} disabled={false} />
     </Sheet>
   );
 }

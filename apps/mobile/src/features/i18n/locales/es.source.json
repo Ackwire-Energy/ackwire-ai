@@ -146,9 +146,6 @@
   "choices.failed": {
     "value": "Your pick didn't go through. Try again."
   },
-  "chart.pending": {
-    "value": "Building the chart…"
-  },
   "chart.table": {
     "value": "Table"
   },
@@ -913,18 +910,6 @@
   },
   "chat.offlineWait": {
     "value": "Goes out when the connection is back"
-  },
-  "chat.turn.thinking": {
-    "value": "thinking"
-  },
-  "chat.turn.working": {
-    "value": "working"
-  },
-  "chat.turn.writing": {
-    "value": "writing"
-  },
-  "chat.turn.stopped": {
-    "value": "stopped"
   },
   "chat.steer.waiting": {
     "value": "{{name}} reads it at the next pause"
@@ -4443,7 +4428,10 @@
     "value": "Starting up"
   },
   "devices.reason.no_driver": {
-    "value": "Windows needs this phone's USB driver"
+    "value": "Windows needs the phone maker's USB driver"
+  },
+  "devices.reason.no_driverLinux": {
+    "value": "Linux needs udev rules for this phone"
   },
   "devices.reason.os_too_old": {
     "value": "This phone's system is too old"
@@ -4698,7 +4686,7 @@
     "value": "Turn on Developer options"
   },
   "devices.android.step1Text": {
-    "value": "Tap Build number 7 times, then enter your PIN."
+    "value": "Tap Build number 7 times, then enter your PIN. On Samsung: Software information › Build number."
   },
   "devices.android.openAbout": {
     "value": "Open About phone"
@@ -4711,9 +4699,6 @@
   },
   "devices.android.step3": {
     "value": "Plug it into {{host}}"
-  },
-  "devices.android.step3Hint": {
-    "value": "Use a cable that carries data, not one that only charges. If the phone asks what the USB is for, pick File transfer."
   },
   "devices.android.looking": {
     "value": "Looking for this phone"
@@ -4761,7 +4746,7 @@
     "value": "Scan the code on a computer"
   },
   "devices.android.wifi2Text": {
-    "value": "From Wireless debugging › Pair device with QR code."
+    "value": "From Wireless debugging › Pair device with QR code. Don't use the camera: it reads the code as a Wi-Fi network and takes the phone off your Wi-Fi."
   },
   "devices.android.wifi2Hint": {
     "value": "In agentes.chat on a computer, open Connect a device › Android phone › Over Wi-Fi and pick {{host}}."
@@ -5321,6 +5306,9 @@
   },
   "onb.create": {
     "value": "Create"
+  },
+  "onb.enter": {
+    "value": "Go to the workspace"
   },
   "onb.shareMessage": {
     "value": "Join {{org}} on agentes.chat: {{url}}"
@@ -6541,8 +6529,5 @@
   },
   "empty.audit.text": {
     "value": "When an agent does something outside the conversation, it shows up here."
-  },
-  "onb.enter": {
-    "value": "Go to the workspace"
   }
 }

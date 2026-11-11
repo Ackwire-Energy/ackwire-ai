@@ -9,7 +9,7 @@
 
 1. A person posts a message. `insertMessage` resolves `@handle` mentions to active agents that are members of the channel and, in the same transaction, enqueues `message.posted`.
 2. `dispatchMentions` (job `message.posted`) creates one `agent_runs` row per mentioned agent (`unique (trigger_message_id, agent_id)`) and enqueues `agent_run.execute` (dedupe key per run).
-3. `executeRun` moves the run `queued → running`, builds the context, streams through the Model Gateway publishing `agent.delta` events, then in one transaction persists the agent's reply (in the trigger's thread), the steps and `running → done`, and publishes `message.created`.
+3. `executeRun` moves the run `queued → running`, builds the context, streams through the Model Gateway (`agent.typing` once it writes, its words kept on the server, amended 2026-11-10: ADR 0010), then in one transaction persists the agent's reply (in the trigger's thread), the steps and `running → done`, and publishes `message.created`.
 
 **State machine** (`agent_runs.status`): `queued → running → (waiting_approval → running)* → done | failed`. Transitions are compare-and-set (`UPDATE … WHERE status = from`); illegal ones throw. `waiting_approval` is reserved for the approvals flow: suspending is a status change, resuming is enqueueing a new execute job.
 

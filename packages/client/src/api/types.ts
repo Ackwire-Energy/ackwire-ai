@@ -265,6 +265,8 @@ export interface User {
   locale?: string | null;
   /** The language follows each device's own (Automático) until the person picks one. */
   localeAuto?: boolean;
+  /** Their own area, asked once during the onboarding (`WORK_AREAS`), or `skipped`; null until asked. */
+  workArea?: string | null;
 }
 
 /** ADR 0056 §8: `hold` pauses the agents, `suspended` closes the workspace. */
@@ -1491,11 +1493,6 @@ export interface ActiveRun {
   pendingMessageIds?: string[];
   /** A routine's run working in the background: it holds no conversation and shows no "trabalhando". */
   background?: boolean;
-  /**
-   * What its current model call streamed so far past its last tool: `text` starts at `at` of the call's text, so an
-   * app opened mid-answer goes on from `at` plus its length. `shownAt`: as `agent.delta.shownAt`.
-   */
-  live?: { turn: number; at: number; text: string; shownAt?: string };
 }
 
 /** Real-time channel events (packages/engine/src/events.ts, docs/adr/0010-realtime.md). */
@@ -1562,6 +1559,7 @@ export type ChannelEvent =
       messageIds?: string[];
     }
   | ArtifactEvent
+  /** From a server that still streams a reply's words: read only as "it writes" (the reply shows whole, once posted). */
   | {
       type: "agent.delta";
       channelId: string;
@@ -1570,14 +1568,6 @@ export type ChannelEvent =
       agentId: string;
       seq: number;
       text: string;
-      /** Which model call of the run this text belongs to (narration is keyed by it). */
-      turn?: number;
-      /** Where `text` starts in its turn's text: past what arrived here, a piece was missed. */
-      at?: number;
-      /** Where its stretch starts in the turn's text (a stretch: the text between two calls of a computer brain). */
-      from?: number;
-      /** When its reply first showed words (ISO, the server's clock): its message is posted there (`LiveRun.shownAt`). */
-      shownAt?: string;
     }
   | {
       type: "agent.run";
@@ -5816,11 +5806,29 @@ export interface AccountLoginStart {
   expiresAt: string;
 }
 
+/** Why a sign-in ended on the computer (mirror of `ACCOUNT_LOGIN_FAILURES` in `@agenteschat/adapters`). */
+export type AccountLoginFailure =
+  | "not_installed"
+  | "no_tty"
+  | "network"
+  | "bad_code"
+  | "cli_exit"
+  | "not_signed_in_after_login"
+  | "status_unknown"
+  | "no_token"
+  | "not_kept"
+  | "timeout"
+  | "canceled";
+
 /** `GET …/account-logins/{loginId}`. */
 export interface AccountLoginStatus {
   state: "waiting" | "done" | "failed" | "expired";
   account?: MachineAccount;
   error?: string;
+  /** `failed` or `expired` on the computer: why (an older runner sends none). */
+  code?: AccountLoginFailure;
+  /** With `code`: what the CLI itself said, in English. */
+  message?: string;
   /** `failed`: the viewer already has this account on that computer, named `label` (an older server sends no `account`). */
   duplicate?: { label: string; account?: MachineAccount };
   /** `failed`: signing in again came back as another account, this email; the account stays signed out. */
@@ -6776,6 +6784,8 @@ export interface TaskWait {
   window: string | null;
   /** When the limit resets; null when unknown. */
   resetsAt: string | null;
+  /** When it began waiting on its plan or budget; null when unknown (absent on an older server). */
+  since?: string | null;
   /** You may press Continuar agora. */
   canContinue: boolean;
 }

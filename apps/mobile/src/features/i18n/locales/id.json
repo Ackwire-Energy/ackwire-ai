@@ -55,7 +55,6 @@
     "failed": "Pilihanmu tidak terkirim. Coba lagi."
   },
   "chart": {
-    "pending": "Membuat grafik…",
     "table": "Tabel",
     "item": "Item",
     "share": "Bagikan",
@@ -363,12 +362,6 @@
     "toLatestNew": "Ke pesan terbaru: {{text}}",
     "stopAgent": "Hentikan {{name}}",
     "offlineWait": "Terkirim saat koneksi kembali",
-    "turn": {
-      "thinking": "berpikir",
-      "working": "bekerja",
-      "writing": "menulis",
-      "stopped": "berhenti"
-    },
     "steer": {
       "waiting": "{{name}} membacanya di jeda berikutnya",
       "computer": "{{name}} membacanya saat mendapat komputer",
@@ -1716,7 +1709,8 @@
       "team_limit": "Hapus satu aplikasi buatan sendiri dari iPhone ini",
       "helper_untrusted": "Percayai helper pengujian di iPhone ini",
       "booting": "Sedang memulai",
-      "no_driver": "Windows butuh driver USB ponsel ini",
+      "no_driver": "Windows butuh driver USB dari pembuat ponsel",
+      "no_driverLinux": "Linux butuh aturan udev untuk ponsel ini",
       "os_too_old": "Sistem ponsel ini terlalu lama",
       "adb_offline": "Cabut kabelnya lalu colokkan lagi",
       "other": "Belum siap"
@@ -1816,12 +1810,11 @@
       "noHost": "Ponsel ini bekerja lewat salah satu komputermu. Hubungkan komputer dulu.",
       "hostOffline": "{{host}} sedang offline. Nyalakan dan buka agentes.chat di sana.",
       "step1": "Nyalakan Opsi developer",
-      "step1Text": "Ketuk Nomor build 7 kali, lalu masukkan PIN-mu.",
+      "step1Text": "Ketuk Nomor build 7 kali, lalu masukkan PIN-mu. Di Samsung: Informasi perangkat lunak › Nomor versi.",
       "openAbout": "Buka Tentang ponsel",
       "step2": "Nyalakan Proses debug USB",
       "openDev": "Buka Opsi developer",
       "step3": "Colokkan ke {{host}}",
-      "step3Hint": "Pakai kabel yang bisa mengirim data, bukan yang hanya untuk mengisi daya. Jika ponsel menanyakan fungsi USB-nya, pilih Transfer file.",
       "looking": "Mencari ponsel ini",
       "step4": "Ketuk Izinkan di ponsel ini",
       "step4Text": "Centang dulu Selalu izinkan dari komputer ini.",
@@ -1839,7 +1832,7 @@
       "wifi1": "Nyalakan Proses debug nirkabel",
       "wifi1Text": "Centang Selalu izinkan di jaringan ini, lalu ketuk Izinkan.",
       "wifi2": "Pindai kode di komputer",
-      "wifi2Text": "Dari Proses debug nirkabel › Sambungkan perangkat dengan kode QR.",
+      "wifi2Text": "Dari Proses debug nirkabel › Sambungkan perangkat dengan kode QR. Jangan pakai kamera: kamera membaca kode sebagai jaringan Wi-Fi dan mengeluarkan ponsel dari Wi-Fi kamu.",
       "wifi2Hint": "Di agentes.chat pada komputer, buka Hubungkan perangkat › Ponsel Android › Lewat Wi-Fi dan pilih {{host}}.",
       "codeHead": "Sambungkan dengan kode penyambungan",
       "codeNote": "Dari Proses debug nirkabel › Sambungkan perangkat dengan kode penyambungan. Buka Setelan dan agentes.chat berdampingan agar kodenya tetap terlihat.",
@@ -2063,9 +2056,9 @@
     "anotherLead": "Di agentes.chat. Kamu tetap di {{org}} dan bisa berpindah kapan saja.",
     "suggested": "Dari emailmu di {{domain}}, aku menyarankan {{org}}.",
     "create": "Buat",
+    "enter": "Masuk ke ruang kerja",
     "shareMessage": "Gabung ke {{org}} di agentes.chat: {{url}}",
-    "failed": "Tidak bisa menyimpan. Coba lagi.",
-    "enter": "Masuk ke ruang kerja"
+    "failed": "Tidak bisa menyimpan. Coba lagi."
   },
   "ai": {
     "yourPlan": "Paket AI-mu",

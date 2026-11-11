@@ -28,6 +28,8 @@ export const en = {
     loadingPage: "Loading the page",
     refreshing: "Refreshing",
     retry: "Try again",
+    /** A mark on something offered but not out yet (an app for a system, a store): it can't be pressed. */
+    soon: "Soon",
     unknownError: "Something went wrong. Try again.",
     /** A server error (a 5xx of its own): nothing the person did, and nothing they can fix. */
     ourSide: "Something went wrong on our side. Try again in a little while.",
@@ -44,7 +46,6 @@ export const en = {
     table: "Table",
     chartItem: "Item",
     chartShare: "Share",
-    chartPending: "Building the chart…",
     you: "you",
     saved: "Saved",
     youSuffix: " (you)",
@@ -747,6 +748,9 @@ export const en = {
         plan: "After the plan, all that's left is connecting an AI. I'll show you where.",
         /** On the plan step, with the AI step right after it. */
         planThen: "Once the plan is on, the next screen is where you connect your AI.",
+        /** The person's own area, asked once: on a team's rail after what it does, on a personal one after its purpose. */
+        area: "One last thing before the team.",
+        areaPersonal: "One last thing before your agents.",
         /** The team step's question: does the person already have agents in another app. */
         ask: "Already have a team somewhere else? I'll bring all of it here.",
         /** How a team with no agents yet starts: the template for what it does, or just the two of them. */
@@ -771,6 +775,24 @@ export const en = {
         /** The people step: by email, or (a server that sends no email) through the workspace's link. */
         people: "Now the people. Give me their emails and I'll send the invitations.",
         peopleLink: "Now the people. Send them the link and I'll show you each request.",
+      },
+      /**
+       * The person's own area (about them, never the workspace), asked once per account: on a team's rail after what
+       * it does, on a personal one after what it is for. Optional; the operator API reads it.
+       */
+      area: {
+        title: "And you, what do you work on?",
+        lead: "Just so we know who uses agentes.chat.",
+        skip: "Skip this step",
+        options: {
+          dev: "Development",
+          marketing: "Marketing",
+          sales: "Sales",
+          finance: "Finance",
+          ops: "Operations",
+          support: "Customer support",
+          other: "Something else",
+        },
       },
       preview: {
         label: "Your workspace, as you answer",
@@ -942,11 +964,26 @@ export const en = {
       lead: "You can change this later, nothing is lost.",
       personal: "For me",
       personalText: "Agents that look after your day.",
-      team: "For my company or team",
+      team: "For my team",
       teamText: "People and agents work together, with channels, roles and approvals.",
       /** A quiet line of what it does, under each answer. */
       personalExamples: "Your day at 7 · Bills · Training",
       teamExamples: "Customer support · Finance · Reports",
+      /** The web's cards (ADR 0162): one line under the title, then a pill per agent of the drawing. */
+      personalLine: "Agents that look after your day.",
+      teamLine: "People and agents in one place.",
+      /** What each agent of a card's drawing does, on its pill: a few words. */
+      activities: {
+        agenda: "Daily agenda",
+        home: "Home",
+        bills: "Bills",
+        studies: "Studies",
+        travel: "Trips",
+        support: "Support",
+        finance: "Finance",
+        reports: "Reports",
+        sales: "Sales",
+      },
     },
     /** A personal workspace's name, given at once in the person's language (renamed in Settings like any other). */
     personal: {
@@ -1806,7 +1843,8 @@ export const en = {
   openOnPhone: {
     qr: "QR code to sign in to the agentes app",
     making: "Making the code…",
-    stepApp: "Install the agentes app on your phone (App Store or Google Play).",
+    /** Followed by the App Store and Google Play, each marked Soon until the app is in it. */
+    stepApp: "Install the agentes app on your phone.",
     stepTailscale: "Install Tailscale on your phone and sign in with the same Tailscale account as this server.",
     /** The links to Tailscale in each store, after the step: the store's own name. */
     appStore: "App Store",
@@ -2654,6 +2692,8 @@ export const en = {
       computer_failed: "{{name}} can't answer now: the computer the plan is signed in on had a problem.",
       /** The plan's CLI on that computer failed, not the computer. */
       cli_failed: "{{name}} can't answer now: the plan's AI stopped with an error.",
+      /** The same, with what the CLI said (`why`: its own words, often in English). */
+      cli_failedWhy: "{{name}} can't answer now: the plan's AI stopped with an error ({{why}}).",
       plan_limit: "{{name}} can't answer now: the plan reached its limit.",
       plan_not_shared: "Connect your own plan to talk to {{name}}: the workspace's plan serves only its owner.",
       /** A request no person made (another agent's, a routine's): nobody's own plan would answer it. */
@@ -3442,8 +3482,6 @@ export const en = {
     messageTo: "Message {{name}}",
     audienceEdit: "Edit",
     nowIn: "now, in #{{channel}}",
-    /** An agent set to answer in this channel without being mentioned (its card opened from the channel). */
-    answersHere: "Answers here without an @",
     more: "More",
     of: "Profile of {{name}}",
     presence: "Presence",
@@ -13259,6 +13297,8 @@ export const en = {
     onHost: "on {{host}}",
     onHostChip: "On {{host}}",
     menu: "{{name}} actions",
+    /** A device row's menu: opens that device's page. */
+    settings: "Settings",
     rename: "Rename",
     renameName: "Rename {{name}}",
     renameTitle: "Rename the device",
@@ -13369,7 +13409,8 @@ export const en = {
       team_limit: "The free Apple Account reached its app limit",
       helper_untrusted: "The iPhone doesn't trust the test helper yet",
       booting: "Starting",
-      no_driver: "Windows has no driver for this phone",
+      no_driver: "Windows has no USB driver for this phone",
+      no_driverLinux: "Linux can't open this phone",
       os_too_old: "This system is too old for the tools",
       adb_offline: "The phone isn't answering",
       other: "It needs something on the device",
@@ -13390,7 +13431,8 @@ export const en = {
       team_limit: "Remove an app you built",
       helper_untrusted: "Trust it on the iPhone",
       booting: "Wait for it to start",
-      no_driver: "Install the phone's USB driver",
+      no_driver: "Install the phone maker's USB driver",
+      no_driverLinux: "Add udev rules for this phone",
       os_too_old: "Update the phone",
       adb_offline: "Plug it in again",
       other: "See what it needs",
@@ -13527,19 +13569,45 @@ export const en = {
       noComputer: "Phones connect through a computer, and none is connected yet.",
       hostOffline: "{{computer}} is offline. Turn it on, or pick another one.",
       devOptions: "Turn on Developer options",
-      devOptionsText: "Settings\u00a0›\u00a0About phone, then tap Build number 7 times.",
+      /** Android's own setting names; Samsung's own where its path differs. */
+      devOptionsText:
+        "Settings\u00a0›\u00a0About phone, then tap Build number 7 times. On Samsung: About phone\u00a0›\u00a0Software information\u00a0›\u00a0Build number.",
       usbDebugging: "Turn on USB debugging",
-      usbDebuggingText: "Settings\u00a0›\u00a0System\u00a0›\u00a0Developer options\u00a0›\u00a0USB debugging.",
+      usbDebuggingText:
+        "Settings\u00a0›\u00a0System\u00a0›\u00a0Developer options\u00a0›\u00a0USB debugging. On Samsung: Settings\u00a0›\u00a0Developer options.",
+      /** A button: the person did this step on the phone. */
+      done: "Done",
+      /** Unticks a step the person ticked. */
+      notYet: "Not done yet",
       plug: "Plug the phone in",
       plugged: "Plugged into {{computer}}",
       looking: "Looking for a phone on {{computer}}…",
-      found: "Done on {{name}}",
       allow: "Tap Allow on the phone",
       allowText: "Check Always allow from this computer first.",
       wifiNote: "Wireless debugging turns off when the phone restarts. A cable is more reliable.",
-      notShowing: "Phone not showing up?",
-      notShowingHelp:
-        "Try another cable or port, and pick File transfer if the phone asks what the USB is for. On Samsung, turn off Auto Blocker in Settings\u00a0›\u00a0Security and privacy.",
+      noDriver:
+        "{{computer}} sees the phone but has no USB driver for it. Install the phone maker's driver, then plug the phone in again.",
+      noDriverLinux:
+        "{{computer}} sees the phone but can't open it. Add udev rules for it, then plug the phone in again.",
+      udev: "How to add udev rules",
+      /** Over a checklist of why a plugged phone may not show up, after 30 s without one. */
+      slow: "Still not showing up?",
+      /** Android's own setting names, as the phone shows them in this language; Samsung's own for Auto Blocker. */
+      help: {
+        cable: "A cable that carries data. Some only charge. Or try another port.",
+        unlocked: "The phone unlocked, with its screen on.",
+        fileTransfer: "If the phone asks how to use USB, pick File transfer.",
+        usbDebugging: "USB debugging on.",
+        seeStep: "See step 2",
+        samsung: "On Samsung, Auto Blocker off: Settings\u00a0›\u00a0Security and privacy\u00a0›\u00a0Auto Blocker.",
+        driver: "On Windows, the phone maker's USB driver:",
+      },
+      /** Links to each maker's USB driver page. */
+      drivers: {
+        google: "Google, for Pixel",
+        samsung: "Samsung",
+        others: "Other makers",
+      },
       qrLabel: "QR code that opens these steps on the phone",
       qrLine: "Do it from your phone",
       qrCaption: "Scan to open these steps in the agentes.chat app, with buttons for each setting.",
@@ -13568,7 +13636,7 @@ export const en = {
       wireless: "Turn on Wireless debugging",
       wirelessText:
         "Developer options\u00a0›\u00a0Wireless debugging. Check Always allow on this network, then tap Allow.",
-      scan: "Scan the code with the phone",
+      scan: "Scan it from Wireless debugging, not the camera",
       code: "Type what the phone shows",
       pathQr: "Pair device with QR code",
       making: "Making the code…",
@@ -13584,16 +13652,28 @@ export const en = {
       pair: "Pair",
       tryAgain: "Try again",
       qrLabel: "QR code for Wireless debugging on the phone",
-      qrLine: "Scan with the phone",
-      qrCaption: "Phone and computer on the same Wi-Fi.",
+      qrLine: "Not with the camera",
+      /** "agentes-…" is how the camera names the Wi-Fi network it reads in the QR: keep it as written. */
+      qrCaption:
+        "It offers a Wi-Fi network named agentes-…, which doesn't exist. Keep the phone on the computer's Wi-Fi.",
       fail: {
         mdns_off:
           "{{computer}} can't look for phones on the Wi-Fi. Update Android platform-tools there, or use a cable.",
-        same_wifi: "Couldn't reach the phone. Put it on the same Wi-Fi as {{computer}} and try again.",
+        /** On a Mac: macOS's own names for its Local Network privacy setting, as System Settings shows them in this language. */
+        mdns_offMac:
+          "{{computer}} can't look for phones on the Wi-Fi. On that Mac, turn on agentes.chat in System Settings\u00a0›\u00a0Privacy & Security\u00a0›\u00a0Local Network, then try again.",
+        same_wifi:
+          "Couldn't reach the phone. It's not on the same network as {{computer}}. Put it on the same Wi-Fi and try again.",
+        /** On a Mac: macOS's own names for its Local Network privacy setting, as System Settings shows them in this language. */
+        same_wifiMac:
+          "Couldn't reach the phone. Put it on the same Wi-Fi as {{computer}}. On that Mac, also turn on agentes.chat in System Settings\u00a0›\u00a0Privacy & Security\u00a0›\u00a0Local Network.",
         refused: "The phone stopped the pairing. Keep its pairing screen open and try again.",
         refusedCode: "The phone didn't take that code. Check the code and the address, then pair again.",
         timed_out:
-          "Nothing scanned the code in 2 minutes. Check the phone is on the same Wi-Fi as {{computer}} and try again.",
+          "No phone paired in 2 minutes. If the camera scanned the code or the phone left the Wi-Fi, put it on the same Wi-Fi as {{computer}} and scan from Wireless debugging.",
+        /** On a Mac: macOS's own names for its Local Network privacy setting, as System Settings shows them in this language. */
+        timed_outMac:
+          "No phone paired in 2 minutes. If the camera scanned the code or the phone left the Wi-Fi, put it on the same Wi-Fi as {{computer}} and scan from Wireless debugging. On that Mac, also turn on agentes.chat in System Settings\u00a0›\u00a0Privacy & Security\u00a0›\u00a0Local Network.",
         outdated:
           "Wi-Fi pairing needs Android 14 or newer with the May 2026 security update. Update the phone, or use a cable.",
         adb_missing: "{{computer}} has no Android platform-tools. Install Android Studio there, then try again.",
@@ -15545,6 +15625,7 @@ export const en = {
       no_ai_computer_away: "I can't answer now: the computer my plan is signed in on is away.",
       no_ai_computer_failed: "I can't answer now: the computer my plan is signed in on had a problem.",
       no_ai_cli_failed: "I can't answer now: my plan's AI stopped with an error.",
+      no_ai_cli_failedWhy: "I can't answer now: my plan's AI stopped with an error ({{why}}).",
       no_ai_plan_limit: "I can't answer now: the plan I think with reached its limit.",
       no_ai_plan_not_shared:
         "I can't answer you on the workspace's plan: it serves only its owner. Connect your own plan and I will.",
@@ -16917,7 +16998,7 @@ export const en = {
       fromRoutine: "started by the routine {{name}}",
       stopNote: "If you stop it, {{name}} is told you did and won't ask again on its own.",
     },
-    columns: { task: "Task", state: "State", using: "Using now", time: "Time", computer: "Runs on" },
+    columns: { task: "Task", state: "State", using: "Using now", time: "Time" },
     sections: {
       asked: "Asked by people",
       delegated: "Asked by agents",
@@ -16983,7 +17064,6 @@ export const en = {
     },
     askedBy: "{{name}} asked",
     askedByYou: "You asked",
-    servers: "Our servers",
     plan: "{{done}} of {{total}} done",
     program: {
       browser: "Browser",

@@ -360,7 +360,6 @@ async function closeAside(deps: ParkedDeps, run: AgentRun, r: Release): Promise<
     waitingForBrain: t.waitingForBrain,
     postedUpTo: 0,
     postedCount: 0,
-    deltaSeq: 0,
     catchUpTriage: r.record,
   };
   appendUserText(carried, asks.map((a) => `[${a.name ?? "Someone"}]: ${a.body}`).join("\n\n"));

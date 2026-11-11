@@ -28,7 +28,7 @@ import {
   RadioCard,
   RadioGroup,
 } from "@agenteschat/ui";
-import { Fragment, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { StorageMeter } from "@/components/Limits";
 import { LoadingCards } from "@/components/Loading";
@@ -36,6 +36,7 @@ import { useOrg } from "@/components/org-context";
 import { useRevealsFiles } from "@/components/ThisMac";
 import { useComputerEdition } from "@/components/WorkspaceComputer";
 import { thisMac } from "@/lib/desktop";
+import { softBreaks } from "@/lib/soft-breaks";
 import { useToast } from "@/lib/toast";
 
 type Choice = "agentes" | "s3";
@@ -97,19 +98,7 @@ function PlatformLine({ platform }: { platform: StoragePlatform }) {
 
 /** A path in code style that wraps after its separators, never inside a folder's name unless it must. */
 function PathCode({ path }: { path: string }) {
-  // After each separator but the root's, so "/Users/" stays whole.
-  const parts = path.split(/(?<=.[\\/])/);
-  return (
-    <code style={{ fontSize: 12.5, overflowWrap: "anywhere" }}>
-      {parts.map((part, i) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: the parts of one path, in order
-        <Fragment key={i}>
-          {i > 0 && <wbr />}
-          {part}
-        </Fragment>
-      ))}
-    </code>
-  );
+  return <code style={{ fontSize: 12.5, overflowWrap: "anywhere" }}>{softBreaks(path)}</code>;
 }
 
 /**

@@ -66,7 +66,6 @@ export const featureKeysPtBR = {
     failed: "Não deu para mandar sua escolha. Tente de novo.",
   },
   chart: {
-    pending: "Montando o gráfico…",
     table: "Tabela",
     item: "Item",
     share: "Parte",
@@ -393,12 +392,6 @@ export const featureKeysPtBR = {
     toLatestNew: "Ir para as mensagens mais recentes: {{text}}",
     stopAgent: "Parar {{name}}",
     offlineWait: "Sai quando a conexão voltar",
-    turn: {
-      thinking: "pensando",
-      working: "trabalhando",
-      writing: "escrevendo",
-      stopped: "parado",
-    },
     steer: {
       waiting: "{{name}} lê na próxima pausa",
       computer: "{{name}} lê quando conseguir o computador",
@@ -1841,7 +1834,8 @@ export const featureKeysPtBR = {
       team_limit: "Remova deste iPhone um app que você criou",
       helper_untrusted: "Confie no app de testes neste iPhone",
       booting: "Iniciando",
-      no_driver: "O Windows precisa do driver USB deste celular",
+      no_driver: "O Windows precisa do driver USB do fabricante do celular",
+      no_driverLinux: "O Linux precisa de regras udev para este celular",
       os_too_old: "O sistema deste celular é antigo demais",
       adb_offline: "Desconecte o cabo e conecte de novo",
       other: "Ainda não está pronto",
@@ -1939,13 +1933,12 @@ export const featureKeysPtBR = {
       noHost: "Este celular funciona por um computador seu. Conecte um primeiro.",
       hostOffline: "O {{host}} está desligado. Ligue e abra o agentes.chat nele.",
       step1: "Ative as Opções do desenvolvedor",
-      step1Text: "Toque em Número da versão 7 vezes e digite seu PIN.",
+      step1Text:
+        "Toque em Número da versão 7 vezes e digite seu PIN. Num Samsung: Informações do software\u00a0›\u00a0Número de compilação.",
       openAbout: "Abrir Sobre o telefone",
       step2: "Ative a Depuração USB",
       openDev: "Abrir Opções do desenvolvedor",
       step3: "Conecte o cabo no {{host}}",
-      step3Hint:
-        "Use um cabo que transmite dados, não um que só carrega. Se o celular perguntar para que serve o USB, escolha Transferência de arquivos.",
       looking: "Procurando este celular",
       step4: "Toque em Permitir neste celular",
       step4Text: "Antes, marque Sempre permitir neste computador.",
@@ -1963,7 +1956,8 @@ export const featureKeysPtBR = {
       wifi1: "Ative a Depuração por Wi-Fi",
       wifi1Text: "Marque Sempre permitir nesta rede e toque em Permitir.",
       wifi2: "Escaneie o código num computador",
-      wifi2Text: "Em Depuração por Wi-Fi\u00a0›\u00a0Parear o dispositivo com um código QR.",
+      wifi2Text:
+        "Em Depuração por Wi-Fi\u00a0›\u00a0Parear o dispositivo com um código QR. Não use a câmera: ela lê o código como uma rede Wi-Fi e tira o celular do seu Wi-Fi.",
       wifi2Hint:
         "No agentes.chat num computador, abra Conectar um dispositivo\u00a0›\u00a0Celular Android\u00a0›\u00a0Por Wi-Fi e escolha {{host}}.",
       codeHead: "Parear com um código de pareamento",

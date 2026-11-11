@@ -59,6 +59,9 @@
   "common.retry": {
     "value": "Try again"
   },
+  "common.soon": {
+    "value": "Soon"
+  },
   "common.unknownError": {
     "value": "Something went wrong. Try again."
   },
@@ -100,9 +103,6 @@
   },
   "common.chartShare": {
     "value": "Share"
-  },
-  "common.chartPending": {
-    "value": "Building the chart…"
   },
   "common.you": {
     "value": "you"
@@ -1781,6 +1781,12 @@
   "onboarding.flow.lodi.planThen": {
     "value": "Once the plan is on, the next screen is where you connect your AI."
   },
+  "onboarding.flow.lodi.area": {
+    "value": "One last thing before the team."
+  },
+  "onboarding.flow.lodi.areaPersonal": {
+    "value": "One last thing before your agents."
+  },
   "onboarding.flow.lodi.ask": {
     "value": "Already have a team somewhere else? I'll bring all of it here."
   },
@@ -1825,6 +1831,36 @@
   },
   "onboarding.flow.lodi.peopleLink": {
     "value": "Now the people. Send them the link and I'll show you each request."
+  },
+  "onboarding.flow.area.title": {
+    "value": "And you, what do you work on?"
+  },
+  "onboarding.flow.area.lead": {
+    "value": "Just so we know who uses agentes.chat."
+  },
+  "onboarding.flow.area.skip": {
+    "value": "Skip this step"
+  },
+  "onboarding.flow.area.options.dev": {
+    "value": "Development"
+  },
+  "onboarding.flow.area.options.marketing": {
+    "value": "Marketing"
+  },
+  "onboarding.flow.area.options.sales": {
+    "value": "Sales"
+  },
+  "onboarding.flow.area.options.finance": {
+    "value": "Finance"
+  },
+  "onboarding.flow.area.options.ops": {
+    "value": "Operations"
+  },
+  "onboarding.flow.area.options.support": {
+    "value": "Customer support"
+  },
+  "onboarding.flow.area.options.other": {
+    "value": "Something else"
   },
   "onboarding.flow.preview.label": {
     "value": "Your workspace, as you answer"
@@ -2133,7 +2169,7 @@
     "value": "Agents that look after your day."
   },
   "onboarding.purpose.team": {
-    "value": "For my company or team"
+    "value": "For my team"
   },
   "onboarding.purpose.teamText": {
     "value": "People and agents work together, with channels, roles and approvals."
@@ -2143,6 +2179,39 @@
   },
   "onboarding.purpose.teamExamples": {
     "value": "Customer support · Finance · Reports"
+  },
+  "onboarding.purpose.personalLine": {
+    "value": "Agents that look after your day."
+  },
+  "onboarding.purpose.teamLine": {
+    "value": "People and agents in one place."
+  },
+  "onboarding.purpose.activities.agenda": {
+    "value": "Daily agenda"
+  },
+  "onboarding.purpose.activities.home": {
+    "value": "Home"
+  },
+  "onboarding.purpose.activities.bills": {
+    "value": "Bills"
+  },
+  "onboarding.purpose.activities.studies": {
+    "value": "Studies"
+  },
+  "onboarding.purpose.activities.travel": {
+    "value": "Trips"
+  },
+  "onboarding.purpose.activities.support": {
+    "value": "Support"
+  },
+  "onboarding.purpose.activities.finance": {
+    "value": "Finance"
+  },
+  "onboarding.purpose.activities.reports": {
+    "value": "Reports"
+  },
+  "onboarding.purpose.activities.sales": {
+    "value": "Sales"
   },
   "onboarding.personal.name": {
     "value": "Personal"
@@ -4269,7 +4338,7 @@
     "value": "Making the code…"
   },
   "openOnPhone.stepApp": {
-    "value": "Install the agentes app on your phone (App Store or Google Play)."
+    "value": "Install the agentes app on your phone."
   },
   "openOnPhone.stepTailscale": {
     "value": "Install Tailscale on your phone and sign in with the same Tailscale account as this server."
@@ -6235,6 +6304,9 @@
   "noAi.rightHand.cli_failed": {
     "value": "{{name}} can't answer now: the plan's AI stopped with an error."
   },
+  "noAi.rightHand.cli_failedWhy": {
+    "value": "{{name}} can't answer now: the plan's AI stopped with an error ({{why}})."
+  },
   "noAi.rightHand.plan_limit": {
     "value": "{{name}} can't answer now: the plan reached its limit."
   },
@@ -8009,9 +8081,6 @@
   },
   "profile.nowIn": {
     "value": "now, in #{{channel}}"
-  },
-  "profile.answersHere": {
-    "value": "Answers here without an @"
   },
   "profile.more": {
     "value": "More"
@@ -32370,6 +32439,9 @@
   "devices.menu": {
     "value": "{{name}} actions"
   },
+  "devices.settings": {
+    "value": "Settings"
+  },
   "devices.rename": {
     "value": "Rename"
   },
@@ -32668,7 +32740,10 @@
     "value": "Starting"
   },
   "devices.reason.no_driver": {
-    "value": "Windows has no driver for this phone"
+    "value": "Windows has no USB driver for this phone"
+  },
+  "devices.reason.no_driverLinux": {
+    "value": "Linux can't open this phone"
   },
   "devices.reason.os_too_old": {
     "value": "This system is too old for the tools"
@@ -32722,7 +32797,10 @@
     "value": "Wait for it to start"
   },
   "devices.fix.no_driver": {
-    "value": "Install the phone's USB driver"
+    "value": "Install the phone maker's USB driver"
+  },
+  "devices.fix.no_driverLinux": {
+    "value": "Add udev rules for this phone"
   },
   "devices.fix.os_too_old": {
     "value": "Update the phone"
@@ -33073,13 +33151,19 @@
     "value": "Turn on Developer options"
   },
   "devices.android.devOptionsText": {
-    "value": "Settings › About phone, then tap Build number 7 times."
+    "value": "Settings › About phone, then tap Build number 7 times. On Samsung: About phone › Software information › Build number."
   },
   "devices.android.usbDebugging": {
     "value": "Turn on USB debugging"
   },
   "devices.android.usbDebuggingText": {
-    "value": "Settings › System › Developer options › USB debugging."
+    "value": "Settings › System › Developer options › USB debugging. On Samsung: Settings › Developer options."
+  },
+  "devices.android.done": {
+    "value": "Done"
+  },
+  "devices.android.notYet": {
+    "value": "Not done yet"
   },
   "devices.android.plug": {
     "value": "Plug the phone in"
@@ -33090,9 +33174,6 @@
   "devices.android.looking": {
     "value": "Looking for a phone on {{computer}}…"
   },
-  "devices.android.found": {
-    "value": "Done on {{name}}"
-  },
   "devices.android.allow": {
     "value": "Tap Allow on the phone"
   },
@@ -33102,11 +33183,47 @@
   "devices.android.wifiNote": {
     "value": "Wireless debugging turns off when the phone restarts. A cable is more reliable."
   },
-  "devices.android.notShowing": {
-    "value": "Phone not showing up?"
+  "devices.android.noDriver": {
+    "value": "{{computer}} sees the phone but has no USB driver for it. Install the phone maker's driver, then plug the phone in again."
   },
-  "devices.android.notShowingHelp": {
-    "value": "Try another cable or port, and pick File transfer if the phone asks what the USB is for. On Samsung, turn off Auto Blocker in Settings › Security and privacy."
+  "devices.android.noDriverLinux": {
+    "value": "{{computer}} sees the phone but can't open it. Add udev rules for it, then plug the phone in again."
+  },
+  "devices.android.udev": {
+    "value": "How to add udev rules"
+  },
+  "devices.android.slow": {
+    "value": "Still not showing up?"
+  },
+  "devices.android.help.cable": {
+    "value": "A cable that carries data. Some only charge. Or try another port."
+  },
+  "devices.android.help.unlocked": {
+    "value": "The phone unlocked, with its screen on."
+  },
+  "devices.android.help.fileTransfer": {
+    "value": "If the phone asks how to use USB, pick File transfer."
+  },
+  "devices.android.help.usbDebugging": {
+    "value": "USB debugging on."
+  },
+  "devices.android.help.seeStep": {
+    "value": "See step 2"
+  },
+  "devices.android.help.samsung": {
+    "value": "On Samsung, Auto Blocker off: Settings › Security and privacy › Auto Blocker."
+  },
+  "devices.android.help.driver": {
+    "value": "On Windows, the phone maker's USB driver:"
+  },
+  "devices.android.drivers.google": {
+    "value": "Google, for Pixel"
+  },
+  "devices.android.drivers.samsung": {
+    "value": "Samsung"
+  },
+  "devices.android.drivers.others": {
+    "value": "Other makers"
   },
   "devices.android.qrLabel": {
     "value": "QR code that opens these steps on the phone"
@@ -33166,7 +33283,7 @@
     "value": "Developer options › Wireless debugging. Check Always allow on this network, then tap Allow."
   },
   "devices.wifiPair.scan": {
-    "value": "Scan the code with the phone"
+    "value": "Scan it from Wireless debugging, not the camera"
   },
   "devices.wifiPair.code": {
     "value": "Type what the phone shows"
@@ -33214,16 +33331,22 @@
     "value": "QR code for Wireless debugging on the phone"
   },
   "devices.wifiPair.qrLine": {
-    "value": "Scan with the phone"
+    "value": "Not with the camera"
   },
   "devices.wifiPair.qrCaption": {
-    "value": "Phone and computer on the same Wi-Fi."
+    "value": "It offers a Wi-Fi network named agentes-…, which doesn't exist. Keep the phone on the computer's Wi-Fi."
   },
   "devices.wifiPair.fail.mdns_off": {
     "value": "{{computer}} can't look for phones on the Wi-Fi. Update Android platform-tools there, or use a cable."
   },
+  "devices.wifiPair.fail.mdns_offMac": {
+    "value": "{{computer}} can't look for phones on the Wi-Fi. On that Mac, turn on agentes.chat in System Settings › Privacy & Security › Local Network, then try again."
+  },
   "devices.wifiPair.fail.same_wifi": {
-    "value": "Couldn't reach the phone. Put it on the same Wi-Fi as {{computer}} and try again."
+    "value": "Couldn't reach the phone. It's not on the same network as {{computer}}. Put it on the same Wi-Fi and try again."
+  },
+  "devices.wifiPair.fail.same_wifiMac": {
+    "value": "Couldn't reach the phone. Put it on the same Wi-Fi as {{computer}}. On that Mac, also turn on agentes.chat in System Settings › Privacy & Security › Local Network."
   },
   "devices.wifiPair.fail.refused": {
     "value": "The phone stopped the pairing. Keep its pairing screen open and try again."
@@ -33232,7 +33355,10 @@
     "value": "The phone didn't take that code. Check the code and the address, then pair again."
   },
   "devices.wifiPair.fail.timed_out": {
-    "value": "Nothing scanned the code in 2 minutes. Check the phone is on the same Wi-Fi as {{computer}} and try again."
+    "value": "No phone paired in 2 minutes. If the camera scanned the code or the phone left the Wi-Fi, put it on the same Wi-Fi as {{computer}} and scan from Wireless debugging."
+  },
+  "devices.wifiPair.fail.timed_outMac": {
+    "value": "No phone paired in 2 minutes. If the camera scanned the code or the phone left the Wi-Fi, put it on the same Wi-Fi as {{computer}} and scan from Wireless debugging. On that Mac, also turn on agentes.chat in System Settings › Privacy & Security › Local Network."
   },
   "devices.wifiPair.fail.outdated": {
     "value": "Wi-Fi pairing needs Android 14 or newer with the May 2026 security update. Update the phone, or use a cable."
@@ -37979,6 +38105,9 @@
   "chat.body.no_ai_cli_failed": {
     "value": "I can't answer now: my plan's AI stopped with an error."
   },
+  "chat.body.no_ai_cli_failedWhy": {
+    "value": "I can't answer now: my plan's AI stopped with an error ({{why}})."
+  },
   "chat.body.no_ai_plan_limit": {
     "value": "I can't answer now: the plan I think with reached its limit."
   },
@@ -40771,9 +40900,6 @@
   "taskManager.columns.time": {
     "value": "Time"
   },
-  "taskManager.columns.computer": {
-    "value": "Runs on"
-  },
   "taskManager.sections.asked": {
     "value": "Asked by people"
   },
@@ -40920,9 +41046,6 @@
   },
   "taskManager.askedByYou": {
     "value": "You asked"
-  },
-  "taskManager.servers": {
-    "value": "Our servers"
   },
   "taskManager.plan": {
     "value": "{{done}} of {{total}} done"

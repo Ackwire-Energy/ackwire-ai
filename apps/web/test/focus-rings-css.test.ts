@@ -9,7 +9,10 @@ const OWN_COLOR = /var\(--(ink|ink2|frame-ink|sky-ink)\)|#[0-9a-f]{3,8}\b|rgba?\
 /** Drawn on a surface of their own (the welcome sky, an agent's colored frame), where gray wouldn't show. */
 const OWN_SURFACES = [".sky-welcome__close", ".welcome-card__", ".brw-mf__now"];
 
-/** A selector list's selectors, split at the commas outside parentheses. */
+/**
+ * A selector list's selectors, split at the commas outside parentheses, each run of whitespace one space: the formatter
+ * breaks a long selector at its combinators, after the gate too.
+ */
 function selectors(list: string) {
   const out: string[] = [];
   let depth = 0;
@@ -22,7 +25,7 @@ function selectors(list: string) {
       start = i + 1;
     }
   }
-  return [...out, list.slice(start).trim()];
+  return [...out, list.slice(start).trim()].map((s) => s.replace(/\s+/g, " "));
 }
 
 describe("focus rings", () => {

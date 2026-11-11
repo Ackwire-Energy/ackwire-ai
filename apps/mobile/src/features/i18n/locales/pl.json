@@ -61,7 +61,6 @@
     "failed": "Twój wybór nie został wysłany. Spróbuj ponownie."
   },
   "chart": {
-    "pending": "Tworzenie wykresu…",
     "table": "Tabela",
     "item": "Element",
     "share": "Udostępnij",
@@ -405,12 +404,6 @@
     "toLatestNew": "Przejdź do najnowszych wiadomości: {{text}}",
     "stopAgent": "Zatrzymaj: {{name}}",
     "offlineWait": "Wyśle się po powrocie połączenia",
-    "turn": {
-      "thinking": "myśli",
-      "working": "pracuje",
-      "writing": "pisze",
-      "stopped": "zatrzymano"
-    },
     "steer": {
       "waiting": "{{name}} przeczyta to przy następnej przerwie",
       "computer": "{{name}} przeczyta to, gdy dostanie komputer",
@@ -2004,7 +1997,8 @@
       "team_limit": "Usuń z tego iPhone'a własną aplikację",
       "helper_untrusted": "Zaufaj pomocnikowi testowemu na tym iPhonie",
       "booting": "Uruchamia się",
-      "no_driver": "Windows potrzebuje sterownika USB tego telefonu",
+      "no_driver": "Windows potrzebuje sterownika USB producenta telefonu",
+      "no_driverLinux": "Linux potrzebuje reguł udev dla tego telefonu",
       "os_too_old": "System tego telefonu jest za stary",
       "adb_offline": "Odłącz kabel i podłącz go ponownie",
       "other": "Jeszcze nie jest gotowe"
@@ -2107,12 +2101,11 @@
       "noHost": "Ten telefon działa przez twój komputer. Najpierw podłącz komputer.",
       "hostOffline": "{{host}} jest offline. Włącz go i otwórz tam agentes.chat.",
       "step1": "Włącz Opcje programisty",
-      "step1Text": "Stuknij 7 razy Numer kompilacji, a potem wpisz PIN.",
+      "step1Text": "Stuknij 7 razy Numer kompilacji, a potem wpisz PIN. Na Samsungu: Informacje o oprogramowaniu › Numer wersji.",
       "openAbout": "Otwórz Informacje o telefonie",
       "step2": "Włącz debugowanie USB",
       "openDev": "Otwórz Opcje programisty",
       "step3": "Podłącz go do {{host}}",
-      "step3Hint": "Użyj kabla do przesyłania danych, nie takiego, który tylko ładuje. Jeśli telefon zapyta, do czego służy USB, wybierz Przesyłanie plików.",
       "looking": "Szukam tego telefonu",
       "step4": "Stuknij Zezwól na tym telefonie",
       "step4Text": "Najpierw zaznacz Zawsze zezwalaj z tego komputera.",
@@ -2130,7 +2123,7 @@
       "wifi1": "Włącz debugowanie bezprzewodowe",
       "wifi1Text": "Zaznacz Zawsze zezwalaj w tej sieci i stuknij Zezwól.",
       "wifi2": "Zeskanuj kod na komputerze",
-      "wifi2Text": "W Debugowanie bezprzewodowe › Sparuj urządzenie za pomocą kodu QR.",
+      "wifi2Text": "W Debugowanie bezprzewodowe › Sparuj urządzenie za pomocą kodu QR. Nie używaj aparatu: odczyta kod jako sieć Wi-Fi i odłączy telefon od twojej sieci.",
       "wifi2Hint": "W agentes.chat na komputerze otwórz Podłącz urządzenie › Telefon z Androidem › Przez Wi-Fi i wybierz {{host}}.",
       "codeHead": "Sparuj za pomocą kodu parowania",
       "codeNote": "W Debugowanie bezprzewodowe › Sparuj urządzenie za pomocą kodu parowania. Otwórz Ustawienia i agentes.chat obok siebie, żeby kod został na ekranie.",
@@ -2366,9 +2359,9 @@
     "anotherLead": "W agentes.chat. Zostajesz w {{org}} i możesz przełączyć się w każdej chwili.",
     "suggested": "Na podstawie twojego adresu w domenie {{domain}} proponuję {{org}}.",
     "create": "Utwórz",
+    "enter": "Wejdź do przestrzeni roboczej",
     "shareMessage": "Dołącz do {{org}} w agentes.chat: {{url}}",
-    "failed": "Nie udało się zapisać. Spróbuj ponownie.",
-    "enter": "Wejdź do przestrzeni roboczej"
+    "failed": "Nie udało się zapisać. Spróbuj ponownie."
   },
   "ai": {
     "yourPlan": "Twój plan AI",

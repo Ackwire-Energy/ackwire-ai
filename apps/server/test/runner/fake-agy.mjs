@@ -1,9 +1,12 @@
 // A fake Antigravity CLI (`agy`) for runner tests. Each start appends its argv, cwd and the env that matters (its home,
 // the MCP run and token, keys that must stay out) to $FAKE_AGY_LOG (one JSON line). Signed in: `fake-auth.json` in
-// $HOME/.gemini/antigravity-cli. `--version` prints a version line, `models` the models (signed out: an error),
-// `acp --login` prints a Google sign-in link and, as Antigravity CLI 1.5.3 does, reads the pasted code only from its
-// terminal (none: "no controlling terminal", exit 1; a code with paste marks it never turned on is refused), then signs
-// in. `-p /usage` prints the
+// $HOME/.gemini/antigravity-cli. `--version` prints a version line, `models` the models as Antigravity CLI 1.5.0 does
+// (seen on Linux, 2026-11-11): "Fetching available models..." on stderr, then one model a line on stdout, its slug and
+// name split by a tab; signed out "Please sign in…", an account Google won't serve "Eligibility check failed…", exit 1.
+// `acp --login` prints its Google sign-in link and prompt as 1.5.0 does and, as 1.5.x does, reads the pasted code only
+// from its terminal (none: "no controlling terminal", exit 1), then exchanges it: a code with "bad" in it, or with paste
+// marks it never turned on, is refused by Google (`invalid_grant`), one with "offline" can't reach Google, one with
+// "ineligible" signs in an account `models` then refuses; else "Logged in as …", exit 0. `-p /usage` prints the
 // quotas, `-p /logout` signs out. `-p <prompt> --output-format stream-json` prints one turn: init (the conversation:
 // `--conversation`'s, or a new one when it doesn't know that one; its tools: our server's alone with `--agent`, else
 // the CLI's own and ours, or $FAKE_AGY_TOOLS), a text delta, a shell step (none with "BRIDGE_ONLY"), a call to our
@@ -42,18 +45,27 @@ if (args[0] === "--version") {
   process.exit(0);
 }
 if (args[0] === "models") {
+  process.stderr.write("Fetching available models...\n");
   if (!existsSync(auth)) {
-    process.stderr.write("Error: authentication required. Run agy to sign in.\n");
+    process.stderr.write(
+      "Error: Please sign in to view available models. Launch the CLI without arguments to sign in.\n",
+    );
+    process.exit(1);
+  }
+  if (readFileSync(auth, "utf8").includes("ineligible")) {
+    process.stderr.write(
+      "Error: Eligibility check failed: PERMISSION_DENIED (code 403): The caller does not have permission\n",
+    );
     process.exit(1);
   }
   process.stdout.write(
-    "gemini-4-argon-high       Gemini 4 Argon (High)\ngemini-3.8-flash-medium   Gemini 3.8 Flash (Medium)\n",
+    "gemini-4-argon-high\tGemini 4 Argon (High)\ngemini-3.8-flash-medium\tGemini 3.8 Flash (Medium)\n",
   );
   process.exit(0);
 }
 if (args[0] === "acp" && args[1] === "--login") {
   process.stdout.write(
-    "Open this link in a browser to log in with Google:\nhttps://accounts.google.com/o/oauth2/v2/auth?client_id=agy&state=s1\nThen paste the authorization code, or the full URL of the page you land on, and press Enter: ",
+    "Open this link in a browser to log in with Google:\r\n\r\n  https://accounts.google.com/o/oauth2/auth?client_id=agy&state=s1\r\n\r\nThen paste the authorization code, or the full URL of the page you land on, and press Enter:\r\n",
   );
   if (!process.stdin.isTTY) {
     process.stderr.write("Error: no controlling terminal; cannot complete interactive login\n");
@@ -65,13 +77,19 @@ if (args[0] === "acp" && args[1] === "--login") {
     code += chunk;
     if (/[\r\n]/.test(code)) break;
   }
-  if (!code.trim() || code.includes("\x1b")) {
-    process.stdout.write("\r\nSign-in failed: invalid authorization code\r\n");
+  if (!code.trim() || code.includes("\x1b") || code.includes("bad")) {
+    process.stdout.write('\r\ncouldn\'t log in: token exchange failed: oauth2: "invalid_grant" "Bad Request"\r\n');
+    process.exit(1);
+  }
+  if (code.includes("offline")) {
+    process.stdout.write(
+      '\r\ncouldn\'t log in: token exchange failed: Post "https://oauth2.googleapis.com/token": dial tcp: lookup oauth2.googleapis.com: no such host\r\n',
+    );
     process.exit(1);
   }
   mkdirSync(dir, { recursive: true });
-  writeFileSync(auth, "{}");
-  process.stdout.write("Signed in.\n");
+  writeFileSync(auth, code.includes("ineligible") ? '{"ineligible":true}' : "{}");
+  process.stdout.write("Logged in as ana@example.com.\r\n");
   process.exit(0);
 }
 if (args[0] === "-p" && args[1] === "/usage") {

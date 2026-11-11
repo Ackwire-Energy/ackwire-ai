@@ -468,16 +468,16 @@ describe("answering without a mention, as true for my own messages as who picks 
     return screen().getByRole("dialog", { name: "Perfil" }).textContent;
   };
 
-  test("my own plan picks: no chip in the column; the agent's card opened here says it answers without an @", async () => {
+  test("my own plan picks: no chip in the column and no line on the agent's card about answering without an @", async () => {
     await withRouting("plan");
     expect(await columnAgents()).not.toContain("sem menção");
-    expect(await cardOf("Atlas")).toContain("Responde aqui sem precisar de @");
+    expect(await cardOf("Atlas")).not.toContain("sem precisar de @");
   });
 
   test("only rules for my messages: no line on its card; it still takes replies and follow-ups", async () => {
     await withRouting("rules");
     expect(await columnAgents()).not.toContain("sem menção");
-    expect(await cardOf("Atlas")).not.toContain("Responde aqui sem precisar de @");
+    expect(await cardOf("Atlas")).not.toContain("sem precisar de @");
     cleanup();
     await withRouting("rules");
     expect(await onItsOwn()).toEqual({

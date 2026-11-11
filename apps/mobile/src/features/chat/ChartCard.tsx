@@ -20,16 +20,13 @@ import { useTranslation } from "react-i18next";
 import { type LayoutChangeEvent, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import Animated, { Easing, FadeIn, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Icon, IconButton, PixelOrbit, PressScale, Text, useReducedMotion, useTheme } from "@/ui";
+import { Icon, IconButton, PressScale, Text, useReducedMotion, useTheme } from "@/ui";
 import { router } from "@/ui/navigation";
 import { useColors } from "../shared/hooks";
 import type { Inline } from "./logic";
 import { Table } from "./MessageSpans";
 
-/**
- * Charts already drawn once (by their data): when an answer stops streaming, its live row gives way to the
- * message row and the chart mounts again; it shouldn't grow in twice.
- */
+/** Charts already drawn once (by their data): a row the list mounts again doesn't grow its chart in twice. */
 const drawn = new Set<string>();
 const keyOf = (spec: ChartSpec) => JSON.stringify([spec.type, spec.title, spec.labels, spec.series, spec.value]);
 
@@ -109,24 +106,6 @@ export const ChartCard = memo(function ChartCard({
     </View>
   );
 });
-
-/** A ```chart block still being written: a quiet card until its data is complete. */
-export function ChartPending({ accent = "sky" }: { accent?: AgentColorName }) {
-  const { t } = useTranslation();
-  const c = useColors();
-  return (
-    <View
-      style={[styles.card, styles.pending, { backgroundColor: c.sunken, borderColor: c.line }]}
-      accessibilityRole="progressbar"
-      accessibilityLabel={t("mobile.chart.pending")}
-    >
-      <PixelOrbit color={accent} size={14} />
-      <Text variant="footnote" tone="faint">
-        {t("mobile.chart.pending")}
-      </Text>
-    </View>
-  );
-}
 
 /** The full screen chart (`/chart`, a native form sheet): the chart big, its table under it. */
 export function ChartSheet() {
@@ -565,7 +544,6 @@ function BigNumber({
 
 const styles = StyleSheet.create({
   card: { borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, overflow: "hidden" },
-  pending: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 14 },
   top: { flexDirection: "row", alignItems: "flex-start", gap: 4, paddingLeft: 14, paddingRight: 4, paddingTop: 10 },
   titles: { flex: 1, gap: 2, paddingTop: 4 },
   pill: { minHeight: 30, paddingHorizontal: 10, borderRadius: 15 },

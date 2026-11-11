@@ -526,7 +526,7 @@ describe("agent browser requests (ADR 0040)", () => {
   test("the watching log keeps the browser calls only", () => {
     expect(
       browserSteps([
-        { kind: "say", text: "hi" },
+        { kind: "steer", messageId: "m1" },
         {
           kind: "call",
           id: "c1",
@@ -848,7 +848,7 @@ describe("the agent is in its browser", () => {
     expect(usesBrowser({ tool: "mcp__agentes__browser_read" })).toBe(true);
     const call = (id: string, tool: string) => ({ kind: "call", id, tool, detail: null, running: false });
     expect(
-      usesBrowser({ tool: null, work: [call("1", "browser_open"), { kind: "say", text: "Abri." }] as never }),
+      usesBrowser({ tool: null, work: [call("1", "browser_open"), { kind: "steer", messageId: "m1" }] as never }),
     ).toBe(true);
     expect(usesBrowser({ work: [call("1", "browser_open"), call("2", "run_code")] as never })).toBe(false);
     expect(usesBrowser({})).toBe(false);

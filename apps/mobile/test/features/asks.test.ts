@@ -251,8 +251,6 @@ describe("the line's stop while it shows a request", () => {
     channelId: "c1",
     threadId: "m1",
     status: "running",
-    text: "",
-    lastSeq: 0,
     ...over,
   });
   const name = (id: string) => id;

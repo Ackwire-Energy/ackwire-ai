@@ -30,6 +30,7 @@ export const ptBR = {
     loadingPage: "Carregando a página",
     refreshing: "Atualizando",
     retry: "Tentar de novo",
+    soon: "Em breve",
     unknownError: "Algo deu errado. Tente de novo.",
     /** A server error (a 5xx of its own): nothing the person did, and nothing they can fix. */
     ourSide: "Algo deu errado do nosso lado. Tente de novo daqui a pouco.",
@@ -46,7 +47,6 @@ export const ptBR = {
     table: "Tabela",
     chartItem: "Item",
     chartShare: "Parte",
-    chartPending: "Montando o gráfico…",
     you: "você",
     youSuffix: " (você)",
     saved: "Salvo",
@@ -730,6 +730,8 @@ export const ptBR = {
         teamMadePersonal: "Os seus agentes já estão aqui. Quando quiser, a gente segue.",
         plan: "Depois do plano, falta só conectar uma IA. Eu mostro onde.",
         planThen: "Com o plano ligado, a próxima tela já é a de conectar a sua IA.",
+        area: "Última curiosidade antes do time.",
+        areaPersonal: "Última curiosidade antes dos seus agentes.",
         ask: "Já tem um time em outro lugar? Eu trago ele inteiro para cá.",
         start: "Tenho um time pronto para o que vocês fazem. Ou a gente começa só nós dois.",
         askPersonal: "Já usa agentes em outro lugar? Eu trago todos para cá.",
@@ -745,6 +747,20 @@ export const ptBR = {
         connectedThen: "Agora sim. Falta só chamar quem trabalha com você.",
         people: "Agora as pessoas. Me passa os e-mails que eu mando os convites.",
         peopleLink: "Agora as pessoas. Mande o link e eu te mostro cada pedido.",
+      },
+      area: {
+        title: "E você, cuida de quê?",
+        lead: "Só para a gente entender quem usa o agentes.chat.",
+        skip: "Pular esta etapa",
+        options: {
+          dev: "Desenvolvimento",
+          marketing: "Marketing",
+          sales: "Vendas",
+          finance: "Finanças",
+          ops: "Operações",
+          support: "Atendimento",
+          other: "Outra coisa",
+        },
       },
       preview: {
         label: "O seu workspace, enquanto você responde",
@@ -879,10 +895,23 @@ export const ptBR = {
       lead: "Dá para mudar depois, nada se perde.",
       personal: "Para mim",
       personalText: "Agentes que cuidam do seu dia.",
-      team: "Para minha empresa ou time",
+      team: "Para meu time",
       teamText: "Pessoas e agentes trabalham juntos, com canais, papéis e aprovações.",
       personalExamples: "O seu dia às 7h · Contas · Treino",
       teamExamples: "Atendimento · Financeiro · Relatórios",
+      personalLine: "Agentes que cuidam do seu dia.",
+      teamLine: "Pessoas e agentes no mesmo lugar.",
+      activities: {
+        agenda: "Agenda do dia",
+        home: "Casa",
+        bills: "Contas",
+        studies: "Estudos",
+        travel: "Viagens",
+        support: "Atendimento",
+        finance: "Financeiro",
+        reports: "Relatórios",
+        sales: "Vendas",
+      },
     },
     personal: {
       name: "Pessoal",
@@ -1738,7 +1767,7 @@ export const ptBR = {
   openOnPhone: {
     qr: "QR code para entrar no app agentes",
     making: "Gerando o código…",
-    stepApp: "Instale o app agentes no celular (App Store ou Google Play).",
+    stepApp: "Instale o app agentes no celular.",
     stepTailscale: "Instale o Tailscale no celular e entre com a mesma conta do Tailscale deste servidor.",
     appStore: "App Store",
     googlePlay: "Google Play",
@@ -2597,6 +2626,7 @@ export const ptBR = {
       computer_failed: "{{name}} não consegue responder agora: o computador do plano teve um problema.",
       /** The plan's CLI on that computer failed, not the computer. */
       cli_failed: "{{name}} não consegue responder agora: a IA do plano parou com um erro.",
+      cli_failedWhy: "{{name}} não consegue responder agora: a IA do plano parou com um erro ({{why}}).",
       plan_limit: "{{name}} não consegue responder agora: o plano chegou ao limite.",
       plan_not_shared:
         "Conecte o seu plano para conversar com {{name}}: o plano do workspace só atende o próprio dono.",
@@ -3378,8 +3408,6 @@ export const ptBR = {
     messageTo: "Mensagem para {{name}}",
     audienceEdit: "Editar",
     nowIn: "agora, em #{{channel}}",
-    /** An agent set to answer in this channel without being mentioned (its card opened from the channel). */
-    answersHere: "Responde aqui sem precisar de @",
     more: "Mais",
     of: "Perfil de {{name}}",
     presence: "Presença",
@@ -13310,6 +13338,7 @@ export const ptBR = {
     onHost: "em {{host}}",
     onHostChip: "Em {{host}}",
     menu: "Ações de {{name}}",
+    settings: "Configurações",
     rename: "Renomear",
     renameName: "Renomear {{name}}",
     renameTitle: "Renomear o dispositivo",
@@ -13419,7 +13448,8 @@ export const ptBR = {
       team_limit: "A Conta Apple gratuita atingiu o limite de apps",
       helper_untrusted: "O iPhone ainda não confia no assistente de testes",
       booting: "Iniciando",
-      no_driver: "O Windows não tem driver para este celular",
+      no_driver: "O Windows não tem driver USB para este celular",
+      no_driverLinux: "O Linux não consegue abrir este celular",
       os_too_old: "Este sistema é antigo demais para as ferramentas",
       adb_offline: "O celular não está respondendo",
       other: "Ele precisa de algo no dispositivo",
@@ -13439,7 +13469,8 @@ export const ptBR = {
       team_limit: "Remova um app que você criou",
       helper_untrusted: "Confie nele no iPhone",
       booting: "Espere ele iniciar",
-      no_driver: "Instale o driver USB do celular",
+      no_driver: "Instale o driver USB do fabricante do celular",
+      no_driverLinux: "Adicione regras udev para este celular",
       os_too_old: "Atualize o celular",
       adb_offline: "Conecte de novo",
       other: "Veja do que ele precisa",
@@ -13577,20 +13608,40 @@ export const ptBR = {
       noComputer: "Os celulares se conectam por um computador, e nenhum está conectado ainda.",
       hostOffline: "{{computer}} está offline. Ligue-o, ou escolha outro.",
       devOptions: "Ative as Opções do desenvolvedor",
-      devOptionsText: "Configurações\u00a0›\u00a0Sobre o telefone, depois toque 7 vezes em Número da versão.",
+      devOptionsText:
+        "Configurações\u00a0›\u00a0Sobre o telefone, depois toque 7 vezes em Número da versão. Num Samsung: Sobre o telefone\u00a0›\u00a0Informações do software\u00a0›\u00a0Número de compilação.",
       usbDebugging: "Ative a depuração USB",
       usbDebuggingText:
-        "Configurações\u00a0›\u00a0Sistema\u00a0›\u00a0Opções do desenvolvedor\u00a0›\u00a0Depuração USB.",
+        "Configurações\u00a0›\u00a0Sistema\u00a0›\u00a0Opções do desenvolvedor\u00a0›\u00a0Depuração USB. Num Samsung: Configurações\u00a0›\u00a0Opções do desenvolvedor.",
+      done: "Já fiz",
+      notYet: "Ainda não fiz",
       plug: "Conecte o celular",
       plugged: "Conectado a {{computer}}",
       looking: "Procurando um celular em {{computer}}…",
-      found: "Feito no {{name}}",
       allow: "Toque em Permitir no celular",
       allowText: "Marque Sempre permitir neste computador antes.",
       wifiNote: "A depuração por Wi-Fi desliga quando o celular reinicia. O cabo é mais confiável.",
-      notShowing: "O celular não aparece?",
-      notShowingHelp:
-        "Tente outro cabo ou outra porta, e escolha Transferência de arquivos se o celular perguntar para que é o USB. Num Samsung, desligue o Bloqueador automático em Configurações\u00a0›\u00a0Segurança e privacidade.",
+      noDriver:
+        "{{computer}} vê o celular, mas não tem o driver USB dele. Instale o driver do fabricante e conecte o celular de novo.",
+      noDriverLinux:
+        "{{computer}} vê o celular, mas não consegue abri-lo. Adicione regras udev para ele e conecte o celular de novo.",
+      udev: "Como adicionar regras udev",
+      slow: "Ainda não apareceu?",
+      help: {
+        cable: "Um cabo que passa dados. Alguns só carregam. Ou tente outra porta.",
+        unlocked: "O celular desbloqueado, com a tela acesa.",
+        fileTransfer: "Se o celular perguntar como usar o USB, escolha Transferência de arquivos.",
+        usbDebugging: "Depuração USB ativada.",
+        seeStep: "Ver passo 2",
+        samsung:
+          "Num Samsung, o Bloqueador automático desligado: Configurações\u00a0›\u00a0Segurança e privacidade\u00a0›\u00a0Bloqueador automático.",
+        driver: "No Windows, o driver USB do fabricante do celular:",
+      },
+      drivers: {
+        google: "Google, para Pixel",
+        samsung: "Samsung",
+        others: "Outros fabricantes",
+      },
       qrLabel: "QR code que abre estes passos no celular",
       qrLine: "Faça pelo celular",
       qrCaption: "Escaneie para abrir estes passos no app agentes.chat, com botões para cada configuração.",
@@ -13617,7 +13668,7 @@ export const ptBR = {
       wireless: "Ative a depuração por Wi-Fi",
       wirelessText:
         "Opções do desenvolvedor\u00a0›\u00a0Depuração por Wi-Fi. Marque Sempre permitir nesta rede e toque em Permitir.",
-      scan: "Escaneie o código com o celular",
+      scan: "Escaneie pela Depuração por Wi-Fi, não pela câmera",
       code: "Digite o que o celular mostra",
       pathQr: "Parear o dispositivo com um código QR",
       making: "Gerando o código…",
@@ -13633,16 +13684,24 @@ export const ptBR = {
       pair: "Parear",
       tryAgain: "Tentar de novo",
       qrLabel: "Código QR para a depuração por Wi-Fi no celular",
-      qrLine: "Escaneie com o celular",
-      qrCaption: "Celular e computador no mesmo Wi-Fi.",
+      qrLine: "Não pela câmera",
+      qrCaption:
+        "Ela oferece uma rede Wi-Fi chamada agentes-…, que não existe. Deixe o celular no Wi-Fi do computador.",
       fail: {
         mdns_off:
           "{{computer}} não consegue procurar celulares no Wi-Fi. Atualize o Android platform-tools nele, ou use um cabo.",
-        same_wifi: "Não deu para alcançar o celular. Coloque-o no mesmo Wi-Fi que {{computer}} e tente de novo.",
+        mdns_offMac:
+          "{{computer}} não consegue procurar celulares no Wi-Fi. Nesse Mac, ligue o agentes.chat em Ajustes do Sistema\u00a0›\u00a0Privacidade e Segurança\u00a0›\u00a0Rede Local e tente de novo.",
+        same_wifi:
+          "Não deu para alcançar o celular. Ele não está na mesma rede que {{computer}}. Coloque-o no mesmo Wi-Fi e tente de novo.",
+        same_wifiMac:
+          "Não deu para alcançar o celular. Coloque-o no mesmo Wi-Fi que {{computer}}. Nesse Mac, ligue também o agentes.chat em Ajustes do Sistema\u00a0›\u00a0Privacidade e Segurança\u00a0›\u00a0Rede Local.",
         refused: "O celular parou o pareamento. Deixe a tela de pareamento aberta e tente de novo.",
         refusedCode: "O celular não aceitou esse código. Confira o código e o endereço, e pareie de novo.",
         timed_out:
-          "Ninguém escaneou o código em 2 minutos. Confira se o celular está no mesmo Wi-Fi que {{computer}} e tente de novo.",
+          "Nenhum celular pareou em 2 minutos. Se a câmera escaneou o código ou o celular saiu do Wi-Fi, coloque-o no mesmo Wi-Fi que {{computer}} e escaneie pela Depuração por Wi-Fi.",
+        timed_outMac:
+          "Nenhum celular pareou em 2 minutos. Se a câmera escaneou o código ou o celular saiu do Wi-Fi, coloque-o no mesmo Wi-Fi que {{computer}} e escaneie pela Depuração por Wi-Fi. Nesse Mac, ligue também o agentes.chat em Ajustes do Sistema\u00a0›\u00a0Privacidade e Segurança\u00a0›\u00a0Rede Local.",
         outdated:
           "O pareamento por Wi-Fi precisa do Android 14 ou mais novo com a atualização de segurança de maio de 2026. Atualize o celular, ou use um cabo.",
         adb_missing: "{{computer}} não tem o Android platform-tools. Instale o Android Studio nele e tente de novo.",
@@ -15586,6 +15645,7 @@ export const ptBR = {
       no_ai_computer_away: "Agora não consigo responder: o computador do meu plano está fora do ar.",
       no_ai_computer_failed: "Agora não consigo responder: o computador do meu plano teve um problema.",
       no_ai_cli_failed: "Agora não consigo responder: a IA do meu plano parou com um erro.",
+      no_ai_cli_failedWhy: "Agora não consigo responder: a IA do meu plano parou com um erro ({{why}}).",
       no_ai_plan_limit: "Agora não consigo responder: o plano com que eu penso chegou ao limite.",
       no_ai_plan_not_shared:
         "Não consigo te responder pelo plano do workspace: ele só atende o próprio dono. Conecte o seu plano e eu respondo.",
@@ -17067,7 +17127,7 @@ export const ptBR = {
       fromRoutine: "começou na rotina {{name}}",
       stopNote: "Se parar, {{name}} fica sabendo que você parou e não pede de novo por conta própria.",
     },
-    columns: { task: "Tarefa", state: "Estado", using: "Usando agora", time: "Tempo", computer: "Onde roda" },
+    columns: { task: "Tarefa", state: "Estado", using: "Usando agora", time: "Tempo" },
     sections: {
       asked: "Pedidas por pessoas",
       delegated: "Pedidas por agentes",
@@ -17132,7 +17192,6 @@ export const ptBR = {
     },
     askedBy: "{{name}} pediu",
     askedByYou: "Você pediu",
-    servers: "Nossos servidores",
     plan: "{{done}} de {{total}} feitos",
     program: {
       browser: "Navegador",

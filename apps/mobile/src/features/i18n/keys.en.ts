@@ -61,7 +61,6 @@ export const featureKeysEn = {
     failed: "Your pick didn't go through. Try again.",
   },
   chart: {
-    pending: "Building the chart…",
     table: "Table",
     item: "Item",
     share: "Share",
@@ -400,12 +399,6 @@ export const featureKeysEn = {
     toLatestNew: "Go to the latest messages: {{text}}",
     stopAgent: "Stop {{name}}",
     offlineWait: "Goes out when the connection is back",
-    turn: {
-      thinking: "thinking",
-      working: "working",
-      writing: "writing",
-      stopped: "stopped",
-    },
     steer: {
       waiting: "{{name}} reads it at the next pause",
       /** Sent to an agent waiting for its computer: it has no pause, it reads it once it gets the computer. */
@@ -1890,7 +1883,8 @@ export const featureKeysEn = {
       team_limit: "Remove an app you built from this iPhone",
       helper_untrusted: "Trust the test helper on this iPhone",
       booting: "Starting up",
-      no_driver: "Windows needs this phone's USB driver",
+      no_driver: "Windows needs the phone maker's USB driver",
+      no_driverLinux: "Linux needs udev rules for this phone",
       os_too_old: "This phone's system is too old",
       adb_offline: "Unplug the cable and plug it in again",
       other: "Not ready yet",
@@ -1988,13 +1982,13 @@ export const featureKeysEn = {
       noHost: "This phone works through a computer of yours. Connect one first.",
       hostOffline: "{{host}} is offline. Turn it on and open agentes.chat there.",
       step1: "Turn on Developer options",
-      step1Text: "Tap Build number 7 times, then enter your PIN.",
+      /** Android's own setting names; Samsung's own where its path differs. */
+      step1Text:
+        "Tap Build number 7 times, then enter your PIN. On Samsung: Software information\u00a0›\u00a0Build number.",
       openAbout: "Open About phone",
       step2: "Turn on USB debugging",
       openDev: "Open Developer options",
       step3: "Plug it into {{host}}",
-      step3Hint:
-        "Use a cable that carries data, not one that only charges. If the phone asks what the USB is for, pick File transfer.",
       looking: "Looking for this phone",
       step4: "Tap Allow on this phone",
       step4Text: "Check Always allow from this computer first.",
@@ -2013,7 +2007,8 @@ export const featureKeysEn = {
       wifi1: "Turn on Wireless debugging",
       wifi1Text: "Check Always allow on this network, then tap Allow.",
       wifi2: "Scan the code on a computer",
-      wifi2Text: "From Wireless debugging\u00a0›\u00a0Pair device with QR code.",
+      wifi2Text:
+        "From Wireless debugging\u00a0›\u00a0Pair device with QR code. Don't use the camera: it reads the code as a Wi-Fi network and takes the phone off your Wi-Fi.",
       wifi2Hint:
         "In agentes.chat on a computer, open Connect a device\u00a0›\u00a0Android phone\u00a0›\u00a0Over Wi-Fi and pick {{host}}.",
       codeHead: "Pair with a pairing code",
@@ -2256,7 +2251,7 @@ export const featureKeysEn = {
     zoneTitle: "Time zone",
     /** A second workspace from Adicionar workspace (ADR 0154): where it lives, and that nothing is left. */
     anotherTitle: "What's the new workspace called?",
-    /** Its first question (ADR 0159), before the name: "For me" or "For my company or team". */
+    /** Its first question (ADR 0159), before the name: "For me" or "For my team". */
     anotherPurpose: "What's the new workspace for?",
     anotherLead: "On agentes.chat. You stay in {{org}} and can switch any time.",
     /** The first run's name, suggested from a work address's domain. */

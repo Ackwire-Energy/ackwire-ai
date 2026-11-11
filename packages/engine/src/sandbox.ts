@@ -189,7 +189,7 @@ async function withTargetComputer<T>(
   deps: SandboxDeps,
   ctx: ToolContext,
   asked: string,
-  agent: { handle: string; name: string } | null,
+  agent: { handle: string; name: string; machineId?: string | null } | null,
   fn: (computer: ComputerHandle) => Promise<T>,
   options: { allowPaused?: boolean; label?: string },
 ): Promise<T> {
@@ -209,7 +209,12 @@ async function withTargetComputer<T>(
     return await withConnectedMachine(
       hub,
       ctx,
-      { machineId: computer.id, handle: agent?.handle ?? "agent", ...(agent?.name ? { name: agent.name } : {}) },
+      {
+        machineId: computer.id,
+        handle: agent?.handle ?? "agent",
+        ...(agent?.name ? { name: agent.name } : {}),
+        device: computer.id !== agent?.machineId,
+      },
       async (handle) => {
         entered = true;
         await noteDeviceInUse(deps, ctx, target, check.requester, options.label);
@@ -250,11 +255,12 @@ async function withMachine<T>(
  * One connected machine as a computer handle, without the org's computer
  * switch: the agent browser (ADR 0040) works on a connected machine whether
  * or not the org runs code there, and its site-bound secrets go to that machine.
+ * `device`: a person's computer the agent named, not its own, whose refusals point to that person.
  */
 export async function withConnectedMachine<T>(
   hub: MachineCaller,
   ctx: Pick<ToolContext, "orgId" | "agentId" | "signal">,
-  { machineId, handle, name }: { machineId: string; handle: string; name?: string },
+  { machineId, handle, name, device }: { machineId: string; handle: string; name?: string; device?: boolean },
   fn: (computer: ComputerHandle) => Promise<T>,
   options: { allowPaused?: boolean } = {},
 ): Promise<T> {
@@ -280,7 +286,7 @@ export async function withConnectedMachine<T>(
       `The runner on the computer ${status.name} is out of date (it can't give each agent its own folder). ${runnerUpdateWay(status)}`,
     );
   }
-  const provider = createMachineSandboxProvider(hub, { id: ctx.agentId, handle, ...(name ? { name } : {}) });
+  const provider = createMachineSandboxProvider(hub, { id: ctx.agentId, handle, ...(name ? { name } : {}) }, device);
   return fn({ id: machineId, provider, ref: `machine:${machineId}`, machineId });
 }
 

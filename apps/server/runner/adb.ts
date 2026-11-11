@@ -243,3 +243,77 @@ export function pngSize(data: Buffer): { width: number; height: number } | null 
     return null;
   return { width: data.readUInt32BE(16), height: data.readUInt32BE(20) };
 }
+
+/**
+ * Windows lists a phone it has no USB driver for (a Pixel without Google's driver, a Galaxy without Samsung's) under
+ * Other devices, and adb never sees it. PowerShell's PnP list of present USB devices with a driver problem, as JSON
+ * (one object or an array; nothing when there is none). Read only.
+ */
+export const PNP_SHELL =
+  "Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object { $_.InstanceId -like 'USB\\*' -and ($_.Status -ne 'OK' -or $_.ConfigManagerErrorCode -ne 0) } | Select-Object InstanceId,FriendlyName,Class,Status,ConfigManagerErrorCode | ConvertTo-Json -Compress";
+
+/** USB vendor ids of phone makers whose phones may show up without a driver (Google, Samsung, Motorola, Xiaomi…). */
+const PHONE_VENDORS = new Set([
+  "18D1", // Google
+  "04E8", // Samsung
+  "22B8", // Motorola
+  "2717", // Xiaomi
+  "12D1", // Huawei
+  "2A70", // OnePlus
+  "22D9", // OPPO, realme
+  "2D95", // vivo
+  "0FCE", // Sony
+  "0BB4", // HTC
+  "19D2", // ZTE
+  "2E04", // HMD (Nokia)
+  "1004", // LG
+]);
+/** Classes Windows gives a device it has no driver for, or a phone's own (MTP, ADB). */
+const UNKNOWN_CLASS = /^(|unknown|wpd|usbdevice|androidusbdeviceclass|adb)$/i;
+const SAYS_ANDROID = /android|\badb\b/i;
+/** A name that says what kind of device it is, not which phone ("ADB Interface", "SAMSUNG_Android", "MTP"). */
+const GENERIC_NAME = /android|\badb\b|\bmtp\b|\busb\b|interface|composite|unknown/i;
+
+/** A plugged phone Windows has no driver for: its USB serial (adb's own, once the driver is in) and model. */
+export interface DriverlessPhone {
+  serial: string;
+  model: string;
+}
+
+/**
+ * The phones in `PNP_SHELL`'s output: a USB device with a driver problem whose class or name says Android or ADB,
+ * or one of a phone maker's in a class Windows gives a device it has no driver for. A phone's interfaces (MTP, ADB)
+ * are one phone, by vendor and product id; its serial is the parent's `USB\VID_…&PID_…\<serial>`.
+ */
+export function driverlessPhones(json: string): DriverlessPhone[] {
+  let rows: unknown;
+  try {
+    rows = JSON.parse(json.trim() || "[]");
+  } catch {
+    return [];
+  }
+  const list = (Array.isArray(rows) ? rows : [rows]).filter(
+    (r): r is Record<string, unknown> => typeof r === "object" && r !== null,
+  );
+  const byDevice = new Map<string, { serial: string | null; names: string[] }>();
+  for (const r of list) {
+    const id = typeof r.InstanceId === "string" ? r.InstanceId : "";
+    const ids = /^USB\\VID_([0-9A-F]{4})&PID_([0-9A-F]{4})[^\\]*\\(.+)$/i.exec(id);
+    if (!ids) continue;
+    const [, vid = "", pid = "", tail = ""] = ids;
+    const name = typeof r.FriendlyName === "string" ? r.FriendlyName.trim() : "";
+    const cls = typeof r.Class === "string" ? r.Class.trim() : "";
+    const android = SAYS_ANDROID.test(name) || SAYS_ANDROID.test(cls);
+    if (!android && !(PHONE_VENDORS.has(vid.toUpperCase()) && UNKNOWN_CLASS.test(cls))) continue;
+    const key = `${vid}:${pid}`.toUpperCase();
+    const had = byDevice.get(key) ?? { serial: null, names: [] };
+    // An interface's own id (`6&2a3b4c&0&0001`) isn't the phone's serial.
+    if (!tail.includes("&") && /^[\w.-]{1,100}$/.test(tail)) had.serial = tail;
+    if (name) had.names.push(name);
+    byDevice.set(key, had);
+  }
+  return [...byDevice].map(([key, d]) => ({
+    serial: d.serial ?? `usb-${key.replace(":", "-").toLowerCase()}`,
+    model: d.names.find((n) => !GENERIC_NAME.test(n)) ?? "Android phone",
+  }));
+}

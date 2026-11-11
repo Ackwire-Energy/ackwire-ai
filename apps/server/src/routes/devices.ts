@@ -9,6 +9,7 @@ import {
   denyDeviceJoin,
   forgetPhone,
   listDevices,
+  lookForPhones,
   normalizeUserCode,
   openConnectLink,
   startWifiPairing,
@@ -385,6 +386,25 @@ export function deviceAppRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId, machineId, pairingId } = c.req.valid("param");
       return c.json(await wifiPairingState({ db, hub: hub() }, c.get("user").id, orgId, machineId, pairingId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/devices/computers/{machineId}/phone-looks",
+      tags,
+      security,
+      summary: "Look for a cabled phone the computer has no driver for",
+      description:
+        "A phone guide waits for a phone plugged into this computer: for the next minute, the computer also looks for one it has no USB driver for (Windows), which then shows as needing the person (`no_driver`). Read only. Ask again while the guide stays open.",
+      request: { params: MachineParams },
+      responses: { 204: noContent[204], ...errors },
+    }),
+    async (c) => {
+      const { orgId, machineId } = c.req.valid("param");
+      await lookForPhones({ db, hub: hub() }, c.get("user").id, orgId, machineId);
+      return c.body(null, 204);
     },
   );
 

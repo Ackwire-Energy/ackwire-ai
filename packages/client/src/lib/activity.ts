@@ -391,18 +391,6 @@ function activityOf(tool: string | null | undefined, connector?: string | null, 
   return known ? { kind: "consulting", app: known } : { kind: "usingTool" };
 }
 
-/** An agent's run is in the timeline (its first words arrived, or it failed): not in the bar. */
-/**
- * The run has its own row in the timeline: it wrote something, ended badly,
- * or read a message sent while it worked (`agent.run.read`: the row stays put
- * with "Leu seu recado" even though its text so far became narration).
- */
-export const isWriting = (r: LiveRun) =>
-  r.status === "failed" ||
-  r.status === "canceled" ||
-  r.text.length > 0 ||
-  (r.work ?? []).some((w) => w.kind === "steer");
-
 export interface ActivityEntry {
   id: string;
   type: "agent" | "person";
@@ -421,38 +409,34 @@ export interface EntryConsult {
   since: number;
 }
 
-/**
- * Who shows in the bar, in order: agents asking another agent (`consults`),
- * agents about to answer (not yet writing), then people typing.
- */
 /** Live statuses the working bar shows (the ones "Parar" can stop; a provisional row is about to be one). */
 const BAR_STATUSES: ReadonlySet<string> = new Set(["thinking", "queued", "running"]);
 
 /**
- * At work with no words of its own yet (nothing written, said or read): its row in the conversation is the waiting
- * row (face, dots, step line), with no name or time until words arrive.
+ * At work: its words wait for its message, which shows them whole once posted. Its row in the conversation draws only
+ * for something to show meanwhile (its browser card), and the bar says who works, on what and for how long.
  */
-export const waitsForWords = (r: Pick<LiveRun, "status" | "text" | "work">) =>
+export const waitsForWords = (r: Pick<LiveRun, "status">) =>
   // Waiting on an approval keeps the waiting row: a header for that moment would jump in and out again.
-  (BAR_STATUSES.has(r.status) || r.status === "waiting_approval") &&
-  r.text.length === 0 &&
-  !(r.work ?? []).some((w) => w.kind === "say" || w.kind === "steer");
+  BAR_STATUSES.has(r.status) || r.status === "waiting_approval";
 
+/**
+ * Who shows in the bar, in order: agents asking another agent (`consults`), agents at work (thinking, at a tool or
+ * writing: their words show whole once posted), then people typing.
+ */
 export function barEntries(
   runs: LiveRun[],
   typingUserIds: string[],
   agentName: (id: string) => string,
   personName: (id: string) => string | undefined,
   consults: LiveConsult[] = [],
-  /** Agents already writing stay in ("Theo está escrevendo…"): the card above the box is always on. */
-  withWriting = false,
 ): ActivityEntry[] {
   const out: ActivityEntry[] = [];
   const seen = new Set<string>();
   for (const c of consults) {
     if (seen.has(c.agentId)) continue;
-    // Its words are on screen already: the reply's row says it.
-    if (runs.some((r) => r.runId === c.runId && isWriting(r))) continue;
+    // Its run failed: its row in the conversation says so.
+    if (runs.some((r) => r.runId === c.runId && r.status === "failed")) continue;
     seen.add(c.agentId);
     out.push({
       id: c.agentId,
@@ -465,14 +449,14 @@ export function barEntries(
   for (const r of runs) {
     // Only work in progress: a run waiting (an approval, an answer, its computer) or ended isn't "working".
     if (!BAR_STATUSES.has(r.status) || seen.has(r.agentId)) continue;
-    const writing = isWriting(r);
-    if (writing && !withWriting) continue;
     seen.add(r.agentId);
     out.push({
       id: r.agentId,
       type: "agent",
       name: agentName(r.agentId),
-      activity: writing ? { kind: "writing" } : toolActivity(r.tool, r.connector, r.toolDetail, r),
+      // `running` with no call out: its words are on their way (they show whole, once posted).
+      activity:
+        r.status === "running" && !r.tool ? { kind: "writing" } : toolActivity(r.tool, r.connector, r.toolDetail, r),
     });
   }
   for (const id of typingUserIds) {
@@ -508,11 +492,11 @@ export function elapsedParts(ms: number): { m: number; s: number } | null {
 }
 
 /**
- * The turn the bar tells for one agent on its own, its phrase and its time alike: a turn it stopped, or one that
- * failed, can still be listed beside the one at work.
+ * The turn the bar tells for one agent on its own, its phrase and its time alike: a turn that failed can still be
+ * listed beside the one at work.
  */
 const turnAtWork = (runs: LiveRun[], agentId: string) =>
-  runs.find((r) => r.agentId === agentId && r.status !== "failed" && r.status !== "canceled");
+  runs.find((r) => r.agentId === agentId && r.status !== "failed");
 
 /** How long a run has been at it ("16 s", "1 min 5 s"), from 2 s on: the bar's time and its live row's alike. */
 export function runElapsed(t: TFunction, run: Pick<LiveRun, "startedAt" | "workingSince">, now: number): string | null {

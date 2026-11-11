@@ -350,14 +350,14 @@ describe("the team dialog's styles", () => {
     expect(still).not.toMatch(/\.ai-strip__badge[^{]*\{[^}]*animation/);
   });
 
-  test("a choice's tile sits on its title's first line, never on the middle of the title and its line", async () => {
+  test("a choice's title and its line sit as one block on the tile's middle, with what ends the card", async () => {
     const css = await stylesheet("../src/components/arrival/arrival.css");
     const rule = css.split(/\n\.arrival-opts \.ac-option \{/)[1]?.split("}")[0] ?? "";
-    expect(rule).not.toContain("align-items: center");
-    expect(css).toContain(
+    expect(rule).toContain("align-items: center");
+    // No nudge pulling the title up to the tile's top any more.
+    expect(css).not.toContain(
       ".arrival-opts .ac-option > :is(.ac-brand, .arrival-opts__tile):first-child + .ac-option__text > .ac-option__title {",
     );
-    expect(css).toContain("margin-block-start: calc(var(--cap-top) - 0.5lh);");
   });
 
   test("Choose keeps long names whole, the box and the face on the name's first line", async () => {

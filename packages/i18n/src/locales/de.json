@@ -22,6 +22,7 @@
     "loadingPage": "Seite wird geladen",
     "refreshing": "Wird aktualisiert",
     "retry": "Erneut versuchen",
+    "soon": "Bald",
     "unknownError": "Etwas ist schiefgelaufen. Versuch es noch einmal.",
     "ourSide": "Bei uns ist etwas schiefgelaufen. Versuch es gleich noch einmal.",
     "signedOut": "Deine Sitzung ist abgelaufen. Melde dich erneut an, um weiterzumachen.",
@@ -36,7 +37,6 @@
     "table": "Tabelle",
     "chartItem": "Element",
     "chartShare": "Anteil",
-    "chartPending": "Diagramm wird erstellt…",
     "you": "du",
     "saved": "Gespeichert",
     "youSuffix": " (du)",
@@ -718,6 +718,8 @@
         "teamMadePersonal": "Deine Agenten sind schon da. Wir machen weiter, wann immer du bereit bist.",
         "plan": "Nach dem Tarif fehlt nur noch eine KI. Ich zeige dir, wo.",
         "planThen": "Sobald der Tarif läuft, verbindest du auf dem nächsten Bildschirm deine KI.",
+        "area": "Noch eine letzte Frage vor dem Team.",
+        "areaPersonal": "Noch eine letzte Frage vor deinen Agenten.",
         "ask": "Du hast schon ein Team woanders? Ich hole es komplett hierher.",
         "start": "Ich habe ein Team, das zu dem passt, was ihr macht. Oder wir fangen zu zweit an.",
         "askPersonal": "Du nutzt schon Agenten woanders? Ich hole sie alle hierher.",
@@ -733,6 +735,20 @@
         "connectedThen": "Jetzt passt es. Es fehlen nur noch die Leute, mit denen du arbeitest.",
         "people": "Jetzt die Leute. Gib mir ihre E-Mail-Adressen, und ich schicke die Einladungen.",
         "peopleLink": "Jetzt die Leute. Schick ihnen den Link, und ich zeige dir jede Anfrage."
+      },
+      "area": {
+        "title": "Und du, woran arbeitest du?",
+        "lead": "Nur damit wir wissen, wer agentes.chat nutzt.",
+        "skip": "Diesen Schritt überspringen",
+        "options": {
+          "dev": "Entwicklung",
+          "marketing": "Marketing",
+          "sales": "Vertrieb",
+          "finance": "Finanzen",
+          "ops": "Betrieb",
+          "support": "Kundenservice",
+          "other": "Etwas anderes"
+        }
       },
       "preview": {
         "label": "Dein Workspace, während du antwortest",
@@ -860,10 +876,23 @@
       "lead": "Du kannst das später ändern, nichts geht verloren.",
       "personal": "Für mich",
       "personalText": "Agenten für deinen Kalender, deine Rechnungen, dein Training und alles, worum du sonst bittest.",
-      "team": "Für meine Firma oder mein Team",
+      "team": "Für mein Team",
       "teamText": "Personen und Agenten arbeiten zusammen, mit Kanälen, Rollen und Freigaben.",
       "personalExamples": "Dein Tag um 7 · Rechnungen · Training",
-      "teamExamples": "Kundensupport · Finanzen · Berichte"
+      "teamExamples": "Kundensupport · Finanzen · Berichte",
+      "personalLine": "Agenten, die sich um deinen Tag kümmern.",
+      "teamLine": "Menschen und Agenten an einem Ort.",
+      "activities": {
+        "agenda": "Tagesplan",
+        "home": "Zuhause",
+        "bills": "Rechnungen",
+        "studies": "Lernen",
+        "travel": "Reisen",
+        "support": "Kundenservice",
+        "finance": "Finanzen",
+        "reports": "Berichte",
+        "sales": "Vertrieb"
+      }
     },
     "personal": {
       "name": "Privat"
@@ -1727,7 +1756,7 @@
   "openOnPhone": {
     "qr": "QR-Code zum Anmelden in der agentes-App",
     "making": "Code wird erstellt…",
-    "stepApp": "Installiere die agentes-App auf deinem Handy (App Store oder Google Play).",
+    "stepApp": "Installiere die agentes-App auf deinem Handy.",
     "stepTailscale": "Installiere Tailscale auf deinem Handy und melde dich mit demselben Tailscale-Konto an wie dieser Server.",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -2527,6 +2556,7 @@
       "computer_away": "{{name}} kann gerade nicht antworten: Der Computer, auf dem das Abo angemeldet ist, ist nicht erreichbar.",
       "computer_failed": "{{name}} kann gerade nicht antworten: Der Computer des Abos hatte ein Problem.",
       "cli_failed": "{{name}} kann gerade nicht antworten: Die KI des Abos wurde mit einem Fehler beendet.",
+      "cli_failedWhy": "{{name}} kann gerade nicht antworten: Die KI des Abos wurde mit einem Fehler beendet ({{why}}).",
       "plan_limit": "{{name}} kann gerade nicht antworten: Das Abo hat sein Limit erreicht.",
       "plan_not_shared": "Verbinde dein eigenes Abo, um mit {{name}} zu sprechen: Das Abo des Workspace antwortet nur der Person, der es gehört.",
       "plan_unattended": "{{name}} hat nicht geantwortet: Die Anfrage kam nicht von einer Person, und das Abo des Workspace antwortet nur der Person, der es gehört.",
@@ -3271,7 +3301,6 @@
     "messageTo": "Nachricht an {{name}}",
     "audienceEdit": "Bearbeiten",
     "nowIn": "jetzt in #{{channel}}",
-    "answersHere": "Antwortet hier ohne @",
     "more": "Mehr",
     "of": "Profil von {{name}}",
     "presence": "Status",
@@ -3973,7 +4002,7 @@
       "open": "Öffnen",
       "routine": "Immer in dieser Routine",
       "thisRoutine": "diese Routine",
-      "noteRoutine": "{{routine}} erledigt {{actions}} ab jetzt selbstständig, mit beliebigen Werten. Außerhalb dieser Routine wird weiter gefragt. Rückgängig machen: in den Einstellungen der Routine.",
+      "noteRoutine": "{{routine}} erledigt das ab jetzt selbstständig, mit beliebigen Werten: {{actions}}. Außerhalb dieser Routine wird weiter gefragt. Rückgängig machen: in den Einstellungen der Routine.",
       "doneRoutine": "Freigegeben. {{routine}} fragt danach nicht mehr.",
       "undoRoutine": "Zum Rückgängigmachen geh in die Einstellungen der Routine."
     },
@@ -4548,7 +4577,7 @@
       "showSteps": "Jeden Schritt ansehen",
       "hideSteps": "Schritte ausblenden",
       "asked": "Hat um Freigabe gebeten",
-      "grants": "{{name}} wird {{doing}}, nur dieses Mal und mit diesen Werten."
+      "grants": "{{name}} macht das nur dieses Mal und mit diesen Werten: {{doing}}."
     }
   },
   "agent": {
@@ -13340,6 +13369,7 @@
     "onHost": "auf {{host}}",
     "onHostChip": "Auf {{host}}",
     "menu": "Aktionen für {{name}}",
+    "settings": "Einstellungen",
     "rename": "Umbenennen",
     "renameName": "{{name}} umbenennen",
     "renameTitle": "Gerät umbenennen",
@@ -13448,7 +13478,8 @@
       "team_limit": "Der kostenlose Apple Account hat sein App-Limit erreicht",
       "helper_untrusted": "Das iPhone vertraut der Test-App noch nicht",
       "booting": "Startet",
-      "no_driver": "Windows hat keinen Treiber für dieses Handy",
+      "no_driver": "Windows hat keinen USB-Treiber für dieses Handy",
+      "no_driverLinux": "Linux kann dieses Handy nicht öffnen",
       "os_too_old": "Dieses System ist zu alt für die Tools",
       "adb_offline": "Das Handy antwortet nicht",
       "other": "Auf dem Gerät fehlt noch etwas"
@@ -13468,7 +13499,8 @@
       "team_limit": "Entferne eine selbst erstellte App",
       "helper_untrusted": "Vertraue ihr auf dem iPhone",
       "booting": "Warte, bis es gestartet ist",
-      "no_driver": "Installiere den USB-Treiber des Handys",
+      "no_driver": "Installiere den USB-Treiber vom Hersteller des Handys",
+      "no_driverLinux": "Füge udev-Regeln für dieses Handy hinzu",
       "os_too_old": "Aktualisiere das Handy",
       "adb_offline": "Steck es neu ein",
       "other": "Sieh nach, was fehlt"
@@ -13607,18 +13639,35 @@
       "noComputer": "Handys verbinden sich über einen Computer, und noch ist keiner verbunden.",
       "hostOffline": "{{computer}} ist offline. Schalte ihn ein oder wähle einen anderen.",
       "devOptions": "Entwickleroptionen aktivieren",
-      "devOptionsText": "Einstellungen › Über das Telefon, dann 7-mal auf Build-Nummer tippen.",
+      "devOptionsText": "Einstellungen › Über das Telefon, dann 7-mal auf Build-Nummer tippen. Bei Samsung: Telefoninfo › Softwareinformationen › Buildnummer.",
       "usbDebugging": "USB-Debugging aktivieren",
-      "usbDebuggingText": "Einstellungen › System › Entwickleroptionen › USB-Debugging.",
+      "usbDebuggingText": "Einstellungen › System › Entwickleroptionen › USB-Debugging. Bei Samsung: Einstellungen › Entwickleroptionen.",
+      "done": "Erledigt",
+      "notYet": "Noch nicht erledigt",
       "plug": "Handy anschließen",
       "plugged": "Angeschlossen an {{computer}}",
       "looking": "Suche ein Handy an {{computer}}…",
-      "found": "Erledigt an {{name}}",
       "allow": "Tippe auf dem Handy auf Zulassen",
       "allowText": "Setz vorher das Häkchen bei Von diesem Computer immer zulassen.",
       "wifiNote": "Debugging über WLAN schaltet sich aus, wenn das Handy neu startet. Ein Kabel ist zuverlässiger.",
-      "notShowing": "Handy wird nicht angezeigt?",
-      "notShowingHelp": "Versuch ein anderes Kabel oder einen anderen Anschluss, und wähle Dateiübertragung, wenn das Handy fragt, wofür USB genutzt wird. Schalte bei Samsung Auto Blocker unter Einstellungen › Sicherheit und Datenschutz aus.",
+      "noDriver": "{{computer}} sieht das Handy, hat aber keinen USB-Treiber dafür. Installiere den Treiber des Herstellers und schließ das Handy dann neu an.",
+      "noDriverLinux": "{{computer}} sieht das Handy, kann es aber nicht öffnen. Füge udev-Regeln dafür hinzu und schließ das Handy dann neu an.",
+      "udev": "So fügst du udev-Regeln hinzu",
+      "slow": "Immer noch nicht da?",
+      "help": {
+        "cable": "Ein Kabel, das Daten überträgt. Manche laden nur. Oder probier einen anderen Anschluss.",
+        "unlocked": "Das Handy entsperrt, mit eingeschaltetem Bildschirm.",
+        "fileTransfer": "Wenn das Handy fragt, wofür USB genutzt wird, wähle Dateiübertragung.",
+        "usbDebugging": "USB-Debugging an.",
+        "seeStep": "Siehe Schritt 2",
+        "samsung": "Bei Samsung Auto Blocker aus: Einstellungen › Sicherheit und Datenschutz › Auto Blocker.",
+        "driver": "Unter Windows der USB-Treiber vom Hersteller des Handys:"
+      },
+      "drivers": {
+        "google": "Google, für Pixel",
+        "samsung": "Samsung",
+        "others": "Andere Hersteller"
+      },
       "qrLabel": "QR-Code, der diese Schritte auf dem Handy öffnet",
       "qrLine": "Mach es vom Handy aus",
       "qrCaption": "Scanne ihn, um diese Schritte in der agentes.chat-App zu öffnen, mit einem Button für jede Einstellung.",
@@ -13644,7 +13693,7 @@
       "noComputer": "Die Kopplung über WLAN klappt mit einem deiner Computer. Nutze ein Kabel oder verbinde einen.",
       "wireless": "Debugging über WLAN einschalten",
       "wirelessText": "Entwickleroptionen › Debugging über WLAN. Setz das Häkchen bei In diesem Netzwerk immer zulassen und tippe auf Zulassen.",
-      "scan": "Code mit dem Handy scannen",
+      "scan": "In Debugging über WLAN scannen, nicht mit der Kamera",
       "code": "Eingeben, was das Handy zeigt",
       "pathQr": "Gerät über QR-Code koppeln",
       "making": "Code wird erstellt…",
@@ -13660,14 +13709,17 @@
       "pair": "Koppeln",
       "tryAgain": "Erneut versuchen",
       "qrLabel": "QR-Code für Debugging über WLAN auf dem Handy",
-      "qrLine": "Mit dem Handy scannen",
-      "qrCaption": "Handy und Computer im selben WLAN.",
+      "qrLine": "Nicht mit der Kamera",
+      "qrCaption": "Sie bietet ein WLAN namens agentes-… an, das es nicht gibt. Lass das Handy im WLAN des Computers.",
       "fail": {
         "mdns_off": "{{computer}} kann im WLAN nicht nach Handys suchen. Aktualisiere dort die Android platform-tools oder nutze ein Kabel.",
-        "same_wifi": "Das Handy war nicht erreichbar. Bring es ins selbe WLAN wie {{computer}} und versuch es erneut.",
+        "mdns_offMac": "{{computer}} kann im WLAN nicht nach Handys suchen. Schalte auf diesem Mac agentes.chat unter Systemeinstellungen › Datenschutz & Sicherheit › Lokales Netzwerk ein und versuch es erneut.",
+        "same_wifi": "Das Handy war nicht erreichbar. Es ist nicht im selben Netzwerk wie {{computer}}. Bring es ins selbe WLAN und versuch es erneut.",
+        "same_wifiMac": "Das Handy war nicht erreichbar. Bring es ins selbe WLAN wie {{computer}}. Schalte auf diesem Mac außerdem agentes.chat unter Systemeinstellungen › Datenschutz & Sicherheit › Lokales Netzwerk ein.",
         "refused": "Das Handy hat die Kopplung abgebrochen. Lass den Kopplungsbildschirm offen und versuch es erneut.",
         "refusedCode": "Das Handy hat diesen Code nicht angenommen. Prüf Code und Adresse und kopple erneut.",
-        "timed_out": "In 2 Minuten hat niemand den Code gescannt. Prüf, ob das Handy im selben WLAN wie {{computer}} ist, und versuch es erneut.",
+        "timed_out": "In 2 Minuten hat sich kein Handy gekoppelt. Wenn die Kamera den Code gescannt hat oder das Handy das WLAN verlassen hat, bring es ins selbe WLAN wie {{computer}} und scanne in Debugging über WLAN.",
+        "timed_outMac": "In 2 Minuten hat sich kein Handy gekoppelt. Wenn die Kamera den Code gescannt hat oder das Handy das WLAN verlassen hat, bring es ins selbe WLAN wie {{computer}} und scanne in Debugging über WLAN. Schalte auf diesem Mac außerdem agentes.chat unter Systemeinstellungen › Datenschutz & Sicherheit › Lokales Netzwerk ein.",
         "outdated": "Die Kopplung über WLAN braucht Android 14 oder neuer mit dem Sicherheitsupdate von Mai 2026. Aktualisiere das Handy oder nutze ein Kabel.",
         "adb_missing": "Auf {{computer}} fehlen die Android platform-tools. Installiere dort Android Studio und versuch es erneut.",
         "update": "Die Kopplung über WLAN braucht ein neueres agentes.chat auf {{computer}}. Aktualisiere es und versuch es erneut.",
@@ -15528,6 +15580,7 @@
       "no_ai_computer_away": "Ich kann gerade nicht antworten: Der Computer, auf dem mein Abo angemeldet ist, ist nicht erreichbar.",
       "no_ai_computer_failed": "Ich kann gerade nicht antworten: Der Computer meines Abos hatte ein Problem.",
       "no_ai_cli_failed": "Ich kann gerade nicht antworten: Die KI meines Abos wurde mit einem Fehler beendet.",
+      "no_ai_cli_failedWhy": "Ich kann gerade nicht antworten: Die KI meines Abos wurde mit einem Fehler beendet ({{why}}).",
       "no_ai_plan_limit": "Ich kann gerade nicht antworten: Das Abo, mit dem ich denke, hat sein Limit erreicht.",
       "no_ai_plan_not_shared": "Über das Abo des Workspace kann ich dir nicht antworten: Es antwortet nur der Person, der es gehört. Verbinde dein eigenes Abo, dann antworte ich.",
       "no_ai_plan_unattended": "Ich habe nicht geantwortet: Die Anfrage kam nicht von einer Person, und das Abo des Workspace antwortet nur der Person, der es gehört.",
@@ -16803,8 +16856,7 @@
       "task": "Aufgabe",
       "state": "Status",
       "using": "Nutzt gerade",
-      "time": "Dauer",
-      "computer": "Läuft auf"
+      "time": "Dauer"
     },
     "sections": {
       "asked": "Von Personen beauftragt",
@@ -16865,7 +16917,6 @@
     },
     "askedBy": "Auftrag von {{name}}",
     "askedByYou": "Dein Auftrag",
-    "servers": "Unsere Server",
     "plan": "{{done}} von {{total}} erledigt",
     "program": {
       "browser": "Browser",

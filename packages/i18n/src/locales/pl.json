@@ -22,6 +22,7 @@
     "loadingPage": "Ładowanie strony",
     "refreshing": "Odświeżanie",
     "retry": "Spróbuj ponownie",
+    "soon": "Wkrótce",
     "unknownError": "Coś poszło nie tak. Spróbuj ponownie.",
     "ourSide": "Coś poszło nie tak po naszej stronie. Spróbuj ponownie za chwilę.",
     "signedOut": "Twoja sesja wygasła. Zaloguj się ponownie, aby kontynuować.",
@@ -36,7 +37,6 @@
     "table": "Tabela",
     "chartItem": "Element",
     "chartShare": "Udział",
-    "chartPending": "Tworzę wykres…",
     "you": "ty",
     "saved": "Zapisano",
     "youSuffix": " (ty)",
@@ -738,6 +738,8 @@
         "teamMadePersonal": "Twoi agenci już tu są. Ruszamy dalej, kiedy chcesz.",
         "plan": "Po planie zostaje tylko podłączyć AI. Pokażę ci, gdzie.",
         "planThen": "Gdy plan będzie włączony, na następnym ekranie połączysz swoją AI.",
+        "area": "Jeszcze jedno pytanie przed zespołem.",
+        "areaPersonal": "Jeszcze jedno pytanie przed twoimi agentami.",
         "ask": "Masz już zespół gdzie indziej? Przeniosę go tu w całości.",
         "start": "Mam zespół gotowy do tego, czym się zajmujecie. Albo zaczynamy we dwoje.",
         "askPersonal": "Używasz już agentów gdzie indziej? Przeniosę ich tu wszystkich.",
@@ -753,6 +755,20 @@
         "connectedThen": "No i gotowe. Zostaje tylko zaprosić osoby, z którymi pracujesz.",
         "people": "Teraz ludzie. Podaj mi ich adresy e-mail, a wyślę zaproszenia.",
         "peopleLink": "Teraz ludzie. Wyślij im link, a pokażę ci każdą prośbę."
+      },
+      "area": {
+        "title": "A ty, czym się zajmujesz?",
+        "lead": "Tylko po to, żebyśmy wiedzieli, kto używa agentes.chat.",
+        "skip": "Pomiń ten krok",
+        "options": {
+          "dev": "Programowanie",
+          "marketing": "Marketing",
+          "sales": "Sprzedaż",
+          "finance": "Finanse",
+          "ops": "Operacje",
+          "support": "Obsługa klienta",
+          "other": "Coś innego"
+        }
       },
       "preview": {
         "label": "Twoja przestrzeń robocza, gdy odpowiadasz",
@@ -895,10 +911,23 @@
       "lead": "Możesz to później zmienić, nic nie przepadnie.",
       "personal": "Dla mnie",
       "personalText": "Agenci, którzy dbają o twój dzień.",
-      "team": "Dla mojej firmy lub zespołu",
+      "team": "Dla mojego zespołu",
       "teamText": "Ludzie i agenci pracują razem, z kanałami, rolami i zatwierdzeniami.",
       "personalExamples": "Twój dzień o 7 · Rachunki · Trening",
-      "teamExamples": "Obsługa klienta · Finanse · Raporty"
+      "teamExamples": "Obsługa klienta · Finanse · Raporty",
+      "personalLine": "Agenci, którzy dbają o Twój dzień.",
+      "teamLine": "Ludzie i agenci w jednym miejscu.",
+      "activities": {
+        "agenda": "Plan dnia",
+        "home": "Dom",
+        "bills": "Rachunki",
+        "studies": "Nauka",
+        "travel": "Podróże",
+        "support": "Obsługa klienta",
+        "finance": "Finanse",
+        "reports": "Raporty",
+        "sales": "Sprzedaż"
+      }
     },
     "personal": {
       "name": "Osobiste"
@@ -1832,7 +1861,7 @@
   "openOnPhone": {
     "qr": "Kod QR do logowania w aplikacji agentes",
     "making": "Tworzę kod…",
-    "stepApp": "Zainstaluj aplikację agentes na telefonie (App Store lub Google Play).",
+    "stepApp": "Zainstaluj aplikację agentes na telefonie.",
     "stepTailscale": "Zainstaluj Tailscale na telefonie i zaloguj się tym samym kontem Tailscale co ten serwer.",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -2715,6 +2744,7 @@
       "computer_away": "{{name}} nie może teraz odpowiedzieć: komputer planu jest niedostępny.",
       "computer_failed": "{{name}} nie może teraz odpowiedzieć: komputer planu miał problem.",
       "cli_failed": "{{name}} nie może teraz odpowiedzieć: AI planu zatrzymała się z błędem.",
+      "cli_failedWhy": "{{name}} nie może teraz odpowiedzieć: AI planu zatrzymała się z błędem ({{why}}).",
       "plan_limit": "{{name}} nie może teraz odpowiedzieć: plan osiągnął limit.",
       "plan_not_shared": "Połącz własny plan, aby rozmawiać z {{name}}: plan workspace'u odpowiada tylko swojemu właścicielowi.",
       "plan_unattended": "{{name}} nie odpowie: prośba nie pochodzi od osoby, a plan workspace'u odpowiada tylko swojemu właścicielowi.",
@@ -3486,7 +3516,6 @@
     "messageTo": "Wiadomość do: {{name}}",
     "audienceEdit": "Edytuj",
     "nowIn": "teraz, w #{{channel}}",
-    "answersHere": "Odpowiada tutaj bez @",
     "more": "Więcej",
     "of": "Profil: {{name}}",
     "presence": "Obecność",
@@ -4857,7 +4886,7 @@
       "showSteps": "Zobacz każdy krok",
       "hideSteps": "Ukryj kroki",
       "asked": "Poprosił o zgodę",
-      "grants": "{{name}} może {{doing}}, tylko ten raz i z tymi wartościami."
+      "grants": "{{name}} zrobi to tylko ten raz i z tymi wartościami: {{doing}}."
     }
   },
   "agent": {
@@ -14255,6 +14284,7 @@
     "onHost": "na {{host}}",
     "onHostChip": "Na {{host}}",
     "menu": "Działania: {{name}}",
+    "settings": "Ustawienia",
     "rename": "Zmień nazwę",
     "renameName": "Zmień nazwę: {{name}}",
     "renameTitle": "Zmień nazwę urządzenia",
@@ -14365,7 +14395,8 @@
       "team_limit": "Bezpłatne konto Apple Account osiągnęło limit aplikacji",
       "helper_untrusted": "iPhone jeszcze nie ufa pomocnikowi testowemu",
       "booting": "Uruchamianie",
-      "no_driver": "Windows nie ma sterownika dla tego telefonu",
+      "no_driver": "Windows nie ma sterownika USB dla tego telefonu",
+      "no_driverLinux": "Linux nie może otworzyć tego telefonu",
       "os_too_old": "Ten system jest za stary dla narzędzi",
       "adb_offline": "Telefon nie odpowiada",
       "other": "Coś trzeba zrobić na urządzeniu"
@@ -14385,7 +14416,8 @@
       "team_limit": "Usuń własną aplikację",
       "helper_untrusted": "Zaufaj mu na iPhonie",
       "booting": "Poczekaj, aż się uruchomi",
-      "no_driver": "Zainstaluj sterownik USB telefonu",
+      "no_driver": "Zainstaluj sterownik USB producenta telefonu",
+      "no_driverLinux": "Dodaj reguły udev dla tego telefonu",
       "os_too_old": "Zaktualizuj telefon",
       "adb_offline": "Podłącz go ponownie",
       "other": "Zobacz, czego potrzebuje"
@@ -14528,18 +14560,35 @@
       "noComputer": "Telefony łączą się przez komputer, a żaden nie jest jeszcze podłączony.",
       "hostOffline": "{{computer}} jest offline. Włącz go albo wybierz inny.",
       "devOptions": "Włącz Opcje programisty",
-      "devOptionsText": "Ustawienia › Informacje o telefonie, potem stuknij 7 razy Numer kompilacji.",
+      "devOptionsText": "Ustawienia › Informacje o telefonie, potem stuknij 7 razy Numer kompilacji. Na Samsungu: Informacje o telefonie › Informacje o oprogramowaniu › Numer wersji.",
       "usbDebugging": "Włącz debugowanie USB",
-      "usbDebuggingText": "Ustawienia › System › Opcje programisty › Debugowanie USB.",
+      "usbDebuggingText": "Ustawienia › System › Opcje programisty › Debugowanie USB. Na Samsungu: Ustawienia › Opcje programisty.",
+      "done": "Gotowe",
+      "notYet": "Jeszcze nie",
       "plug": "Podłącz telefon",
       "plugged": "Podłączony do: {{computer}}",
       "looking": "Szukam telefonu na {{computer}}…",
-      "found": "Gotowe: {{name}}",
       "allow": "Stuknij Zezwól na telefonie",
       "allowText": "Najpierw zaznacz Zawsze zezwalaj z tego komputera.",
       "wifiNote": "Debugowanie bezprzewodowe wyłącza się po ponownym uruchomieniu telefonu. Kabel jest pewniejszy.",
-      "notShowing": "Telefon się nie pokazuje?",
-      "notShowingHelp": "Spróbuj innego kabla lub portu i wybierz Przesyłanie plików, jeśli telefon zapyta, do czego służy USB. Na Samsungu wyłącz Automatyczny bloker w Ustawienia › Bezpieczeństwo i prywatność.",
+      "noDriver": "{{computer}} widzi telefon, ale nie ma dla niego sterownika USB. Zainstaluj sterownik producenta, a potem podłącz telefon ponownie.",
+      "noDriverLinux": "{{computer}} widzi telefon, ale nie może go otworzyć. Dodaj dla niego reguły udev, a potem podłącz telefon ponownie.",
+      "udev": "Jak dodać reguły udev",
+      "slow": "Nadal go nie widać?",
+      "help": {
+        "cable": "Kabel, który przesyła dane. Niektóre tylko ładują. Albo spróbuj innego portu.",
+        "unlocked": "Telefon odblokowany, z włączonym ekranem.",
+        "fileTransfer": "Jeśli telefon zapyta, jak używać USB, wybierz Przesyłanie plików.",
+        "usbDebugging": "Debugowanie USB włączone.",
+        "seeStep": "Zobacz krok 2",
+        "samsung": "Na Samsungu Automatyczny bloker wyłączony: Ustawienia › Bezpieczeństwo i prywatność › Automatyczny bloker.",
+        "driver": "W Windows sterownik USB producenta telefonu:"
+      },
+      "drivers": {
+        "google": "Google, dla Pixela",
+        "samsung": "Samsung",
+        "others": "Inni producenci"
+      },
       "qrLabel": "Kod QR, który otwiera te kroki na telefonie",
       "qrLine": "Zrób to z telefonu",
       "qrCaption": "Zeskanuj, żeby otworzyć te kroki w aplikacji agentes.chat, z przyciskiem do każdego ustawienia.",
@@ -14565,7 +14614,7 @@
       "noComputer": "Parowanie przez Wi-Fi działa z twoim komputerem. Użyj kabla albo podłącz komputer.",
       "wireless": "Włącz debugowanie bezprzewodowe",
       "wirelessText": "Opcje programisty › Debugowanie bezprzewodowe. Zaznacz Zawsze zezwalaj w tej sieci i stuknij Zezwól.",
-      "scan": "Zeskanuj kod telefonem",
+      "scan": "Zeskanuj z ekranu Debugowanie bezprzewodowe, nie aparatem",
       "code": "Wpisz to, co pokazuje telefon",
       "pathQr": "Sparuj urządzenie za pomocą kodu QR",
       "making": "Tworzę kod…",
@@ -14581,14 +14630,17 @@
       "pair": "Sparuj",
       "tryAgain": "Spróbuj ponownie",
       "qrLabel": "Kod QR do debugowania bezprzewodowego na telefonie",
-      "qrLine": "Zeskanuj telefonem",
-      "qrCaption": "Telefon i komputer w tej samej sieci Wi-Fi.",
+      "qrLine": "Nie aparatem",
+      "qrCaption": "Aparat pokaże sieć Wi-Fi o nazwie agentes-…, która nie istnieje. Zostaw telefon w sieci Wi-Fi komputera.",
       "fail": {
         "mdns_off": "{{computer}} nie może szukać telefonów w sieci Wi-Fi. Zaktualizuj tam Android platform-tools albo użyj kabla.",
-        "same_wifi": "Nie udało się połączyć z telefonem. Podłącz go do tej samej sieci Wi-Fi co {{computer}} i spróbuj ponownie.",
+        "mdns_offMac": "{{computer}} nie może szukać telefonów w sieci Wi-Fi. Na tym Macu włącz agentes.chat w Ustawienia systemowe › Prywatność i ochrona › Sieć lokalna i spróbuj ponownie.",
+        "same_wifi": "Nie udało się połączyć z telefonem. Nie jest w tej samej sieci co {{computer}}. Podłącz go do tej samej sieci Wi-Fi i spróbuj ponownie.",
+        "same_wifiMac": "Nie udało się połączyć z telefonem. Podłącz go do tej samej sieci Wi-Fi co {{computer}}. Na tym Macu włącz też agentes.chat w Ustawienia systemowe › Prywatność i ochrona › Sieć lokalna.",
         "refused": "Telefon przerwał parowanie. Zostaw otwarty ekran parowania i spróbuj ponownie.",
         "refusedCode": "Telefon nie przyjął tego kodu. Sprawdź kod i adres, a potem sparuj ponownie.",
-        "timed_out": "Nikt nie zeskanował kodu przez 2 minuty. Sprawdź, czy telefon jest w tej samej sieci Wi-Fi co {{computer}}, i spróbuj ponownie.",
+        "timed_out": "Przez 2 minuty żaden telefon się nie sparował. Jeśli kod zeskanował aparat albo telefon odłączył się od Wi-Fi, podłącz go do tej samej sieci Wi-Fi co {{computer}} i zeskanuj kod z ekranu Debugowanie bezprzewodowe.",
+        "timed_outMac": "Przez 2 minuty żaden telefon się nie sparował. Jeśli kod zeskanował aparat albo telefon odłączył się od Wi-Fi, podłącz go do tej samej sieci Wi-Fi co {{computer}} i zeskanuj kod z ekranu Debugowanie bezprzewodowe. Na tym Macu włącz też agentes.chat w Ustawienia systemowe › Prywatność i ochrona › Sieć lokalna.",
         "outdated": "Parowanie przez Wi-Fi wymaga Androida 14 lub nowszego z aktualizacją zabezpieczeń z maja 2026. Zaktualizuj telefon albo użyj kabla.",
         "adb_missing": "{{computer}} nie ma Android platform-tools. Zainstaluj tam Android Studio i spróbuj ponownie.",
         "update": "Parowanie przez Wi-Fi wymaga nowszego agentes.chat na {{computer}}. Zaktualizuj i spróbuj ponownie.",
@@ -16538,6 +16590,7 @@
       "no_ai_computer_away": "Nie mogę teraz odpowiedzieć: komputer mojego planu jest niedostępny.",
       "no_ai_computer_failed": "Nie mogę teraz odpowiedzieć: komputer mojego planu miał problem.",
       "no_ai_cli_failed": "Nie mogę teraz odpowiedzieć: AI mojego planu zatrzymała się z błędem.",
+      "no_ai_cli_failedWhy": "Nie mogę teraz odpowiedzieć: AI mojego planu zatrzymała się z błędem ({{why}}).",
       "no_ai_plan_limit": "Nie mogę teraz odpowiedzieć: plan, z którym myślę, osiągnął limit.",
       "no_ai_plan_not_shared": "Nie mogę Ci odpowiedzieć przez plan workspace'u: odpowiada tylko swojemu właścicielowi. Połącz własny plan, a odpowiem.",
       "no_ai_plan_unattended": "Nie odpowiem: prośba nie pochodzi od osoby, a plan workspace'u odpowiada tylko swojemu właścicielowi.",
@@ -17914,8 +17967,7 @@
       "task": "Zadanie",
       "state": "Stan",
       "using": "Używa teraz",
-      "time": "Czas",
-      "computer": "Gdzie działa"
+      "time": "Czas"
     },
     "sections": {
       "asked": "Zlecone przez osoby",
@@ -17978,7 +18030,6 @@
     },
     "askedBy": "{{name}} poprosił(a)",
     "askedByYou": "Twoja prośba",
-    "servers": "Nasze serwery",
     "plan": "{{done}} z {{total}} gotowe",
     "program": {
       "browser": "Przeglądarka",

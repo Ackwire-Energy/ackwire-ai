@@ -1,3 +1,4 @@
+import { isWorkAreaAnswer, WORK_AREA_ANSWERS } from "@agenteschat/client/lib/work-area";
 import { operatorListOrgs, operatorOrg, operatorUser } from "@agenteschat/engine";
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 import { apiError, errorResponse } from "../http/errors";
@@ -139,6 +140,10 @@ const User = z
       .nullable()
       .openapi({ description: "Since when it is blocked (`PUT /users/{userId}/block`)." }),
     blockedReason: z.string().nullable(),
+    workArea: z.enum(WORK_AREA_ANSWERS).nullable().openapi({
+      description:
+        "The person's own area, asked once during the onboarding: `dev`, `marketing`, `sales`, `finance`, `ops`, `support`, `other`, or `skipped`; null until asked (or for an account from before the question).",
+    }),
     orgs: z.array(
       z.object({
         orgId: z.uuid(),
@@ -250,6 +255,7 @@ export function registerOperatorOrgs(api: OpenAPIHono, { db, version, humanCheck
           ...user,
           createdAt: user.createdAt.toISOString(),
           blockedAt: iso(user.blockedAt),
+          workArea: isWorkAreaAnswer(user.workArea) ? user.workArea : null,
           orgs: user.orgs.map((o) => ({ ...o, joinedAt: o.joinedAt.toISOString(), lastSeenAt: iso(o.lastSeenAt) })),
           sessions: user.sessions.map((s) => ({ ...s, createdAt: s.createdAt.toISOString() })),
         },

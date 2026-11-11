@@ -159,6 +159,7 @@ export async function operatorUser(db: Database, userId: string) {
       createdAt: users.createdAt,
       blockedAt: users.blockedAt,
       blockedReason: users.blockedReason,
+      workArea: users.workArea,
     })
     .from(users)
     .where(eq(users.id, userId));
