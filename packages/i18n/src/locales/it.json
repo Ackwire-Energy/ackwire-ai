@@ -8594,7 +8594,7 @@
       "homeHint": "La missione ha un thread: è lì che {{name}} parla, chiede decisioni e mostra il suo lavoro.",
       "homeHint_female": "La missione ha un thread: è lì che {{name}} parla, chiede decisioni e mostra il suo lavoro.",
       "offline": "{{name}} è offline. Il piano parte quando torna.",
-      "needsMachine": "Le missioni girano su un computer collegato. Collegane uno a {{name}} in Impostazioni › Computer.",
+      "needsMachine": "Le missioni girano su un computer collegato. Collegane uno a {{name}} in Impostazioni › Dispositivi.",
       "commandHint": "Puoi anche avviarne una scrivendo nel campo di testo di qualsiasi conversazione:",
       "approvals": "Merge, deploy e rollback chiedono sempre l'approvazione",
       "start": "Avvia missione",
@@ -13686,8 +13686,6 @@
       "firstTime": "La prima volta",
       "step1": "Apri il file scaricato e trascina agentes.chat in Applicazioni.",
       "step1Install": "Apri il file scaricato per installarlo.",
-      "step2": "Aprila, fai clic su Usa il tuo server, poi su Connetti al mio server, e scrivi l'indirizzo di questa pagina. Accedi, poi fai clic su Usa questo {{device}} in Impostazioni → Computer.",
-      "other": "Altri modi: server o Linux",
       "otherText": "Esegui questo nel terminale del computer, poi conferma il codice che mostra.",
       "waiting": "In attesa che il computer si colleghi…"
     },
@@ -14248,19 +14246,9 @@
       },
       "saved": "Ora {{name}} usa {{computer}}."
     },
-    "lead": "Dove lavorano i tuoi agenti: questo server e ogni computer che colleghi.",
-    "leadCloud": "Dove lavorano i tuoi agenti: un computer solo per questo spazio di lavoro, sempre acceso.",
     "about": "Informazioni su questo computer",
     "how": "Come funzionano i computer",
-    "hostMissing": "Anche questo server può essere il computer dei tuoi agenti: <guide>ecco come</guide>.",
-    "other": {
-      "title": "Altri computer",
-      "text": "Collegati con un codice, come un Mac mini a casa o un altro server. Cosa consente ognuno si imposta su quel computer.",
-      "emptyTitle": "Esegui gli agenti su qualsiasi computer",
-      "emptyText": "Collega un Mac mini a casa o un altro server con un codice, e gli agenti ci lavorano.",
-      "emptyViewerTitle": "I computer del team compaiono qui",
-      "emptyViewer": "Chi può collegare i computer ne aggiunge uno, e compare qui."
-    }
+    "hostMissing": "Anche questo server può essere il computer dei tuoi agenti: <guide>ecco come</guide>."
   },
   "outage": {
     "region": "Computer offline",
@@ -17416,7 +17404,7 @@
       "turn": "Ruota in orizzontale",
       "upright": "Ruota in verticale",
       "message": "Scrivi a {{name}}",
-      "chooseOnWeb": "Sceglilo su agentes.chat, in Impostazioni › Computer."
+      "chooseOnWeb": "Sceglilo su agentes.chat, in Impostazioni › Dispositivi."
     }
   },
   "taskManager": {

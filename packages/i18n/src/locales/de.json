@@ -8285,7 +8285,7 @@
       "homeHint": "Die Mission bekommt einen Thread: Dort spricht {{name}}, bittet um Entscheidungen und zeigt seine Arbeit.",
       "homeHint_female": "Die Mission bekommt einen Thread: Dort spricht {{name}}, bittet um Entscheidungen und zeigt ihre Arbeit.",
       "offline": "{{name}} ist offline. Der Plan startet, sobald er wieder da ist.",
-      "needsMachine": "Missionen laufen auf einem verbundenen Computer. Verbinde einen mit {{name}} unter Einstellungen › Computer.",
+      "needsMachine": "Missionen laufen auf einem verbundenen Computer. Verbinde einen mit {{name}} unter Einstellungen › Geräte.",
       "commandHint": "Du kannst auch eine starten, indem du in einer beliebigen Unterhaltung im Eingabefeld tippst:",
       "approvals": "Merge, Deploy und Rollback fragen immer nach Freigabe",
       "start": "Mission starten",
@@ -13222,8 +13222,6 @@
       "firstTime": "Beim ersten Mal",
       "step1": "Öffne die heruntergeladene Datei und zieh agentes.chat in den Ordner Programme.",
       "step1Install": "Öffne die heruntergeladene Datei, um sie zu installieren.",
-      "step2": "Öffne sie, klicke auf Eigenen Server verwenden, dann auf Mit meinem Server verbinden, und gib die Adresse dieser Seite ein. Melde dich an und klicke dann unter Einstellungen → Computer auf Diesen {{device}} verwenden.",
-      "other": "Andere Wege: Server oder Linux",
       "otherText": "Führe das im Terminal des Computers aus und bestätige dann den angezeigten Code.",
       "waiting": "Warte, bis sich der Computer verbindet…"
     },
@@ -13780,19 +13778,9 @@
       },
       "saved": "{{name}} nutzt jetzt {{computer}}."
     },
-    "lead": "Wo deine Agenten arbeiten: dieser Server und jeder Computer, den du verbindest.",
-    "leadCloud": "Wo deine Agenten arbeiten: ein Computer nur für diesen Workspace, immer an.",
     "about": "Über diesen Computer",
     "how": "So funktionieren Computer",
-    "hostMissing": "Dieser Server kann auch der Computer deiner Agenten sein: <guide>so geht's</guide>.",
-    "other": {
-      "title": "Andere Computer",
-      "text": "Mit einem Code verbunden, etwa ein Mac mini zu Hause oder ein anderer Server. Was jeder erlaubt, wird auf dem jeweiligen Computer festgelegt.",
-      "emptyTitle": "Lass Agenten auf jedem Computer laufen",
-      "emptyText": "Verbinde einen Mac mini zu Hause oder einen anderen Server mit einem Code, und Agenten arbeiten darauf.",
-      "emptyViewerTitle": "Die Computer des Teams erscheinen hier",
-      "emptyViewer": "Wer Computer verbinden darf, fügt einen hinzu, und er erscheint hier."
-    }
+    "hostMissing": "Dieser Server kann auch der Computer deiner Agenten sein: <guide>so geht's</guide>."
   },
   "outage": {
     "region": "Offline-Computer",
@@ -16782,7 +16770,7 @@
       "turn": "Quer drehen",
       "upright": "Hochkant drehen",
       "message": "{{name}} schreiben",
-      "chooseOnWeb": "Wähle ihn auf agentes.chat unter Einstellungen › Computer."
+      "chooseOnWeb": "Wähle ihn auf agentes.chat unter Einstellungen › Geräte."
     }
   },
   "taskManager": {

@@ -8235,7 +8235,7 @@
       "homeHint": "Misyonun bir ileti dizisi olur: {{name}} orada konuşur, karar ister ve çalışmasını gösterir.",
       "homeHint_female": "Misyonun bir ileti dizisi olur: {{name}} orada konuşur, karar ister ve çalışmasını gösterir.",
       "offline": "{{name}} çevrimdışı. Geri gelince plan başlar.",
-      "needsMachine": "Misyonlar bağlı bir bilgisayarda çalışır. Ayarlar › Bilgisayarlar bölümünden {{name}} için bir bilgisayar bağlayın.",
+      "needsMachine": "Misyonlar bağlı bir bilgisayarda çalışır. Ayarlar › Cihazlar bölümünden {{name}} için bir bilgisayar bağlayın.",
       "commandHint": "Herhangi bir sohbetin mesaj kutusuna yazarak da başlatabilirsiniz:",
       "approvals": "Birleştirme, dağıtım ve geri alma her zaman onay ister",
       "start": "Misyonu başlat",
@@ -13157,8 +13157,6 @@
       "firstTime": "İlk seferde",
       "step1": "İndirilen dosyayı açın ve agentes.chat'i Uygulamalar klasörüne sürükleyin.",
       "step1Install": "Kurmak için indirilen dosyayı açın.",
-      "step2": "Uygulamayı açın, Kendi sunucunu kullan'a, ardından Sunucuma bağlan'a tıklayın ve bu sayfanın adresini yazın. Giriş yapın, sonra Ayarlar → Bilgisayarlar bölümünde Bu {{device}} cihazını kullan'a tıklayın.",
-      "other": "Diğer yollar: sunucu veya Linux",
       "otherText": "Bunu bilgisayarın terminalinde çalıştırın, sonra gösterdiği kodu onaylayın.",
       "waiting": "Bilgisayarın bağlanması bekleniyor…"
     },
@@ -13715,19 +13713,9 @@
       },
       "saved": "{{name}} artık {{computer}} kullanıyor."
     },
-    "lead": "Ajanlarınızın çalıştığı yer: bu sunucu ve bağladığınız bilgisayarlar.",
-    "leadCloud": "Ajanlarınızın çalıştığı yer: yalnızca bu çalışma alanına ait, her zaman açık bir bilgisayar.",
     "about": "Bu bilgisayar hakkında",
     "how": "Bilgisayarlar nasıl çalışır",
-    "hostMissing": "Bu sunucu da ajanlarınızın bilgisayarı olabilir: <guide>nasıl yapılır</guide>.",
-    "other": {
-      "title": "Diğer bilgisayarlar",
-      "text": "Evdeki bir Mac mini ya da başka bir sunucu gibi, bir kodla bağlanır. Her birinin neye izin verdiği o bilgisayarda ayarlanır.",
-      "emptyTitle": "Ajanları herhangi bir bilgisayarda çalıştırın",
-      "emptyText": "Evdeki bir Mac mini'yi veya başka bir sunucuyu kodla bağlayın, ajanlar orada çalışsın.",
-      "emptyViewerTitle": "Ekibin bilgisayarları burada görünür",
-      "emptyViewer": "Bilgisayar bağlayabilen kişi bir tane ekler ve burada görünür."
-    }
+    "hostMissing": "Bu sunucu da ajanlarınızın bilgisayarı olabilir: <guide>nasıl yapılır</guide>."
   },
   "outage": {
     "region": "Çevrimdışı bilgisayarlar",
@@ -16711,7 +16699,7 @@
       "turn": "Yan çevirin",
       "upright": "Dik çevirin",
       "message": "{{name}} ajanına mesaj gönder",
-      "chooseOnWeb": "agentes.chat üzerinde, Ayarlar › Bilgisayarlar bölümünden seçin."
+      "chooseOnWeb": "agentes.chat üzerinde, Ayarlar › Cihazlar bölümünden seçin."
     }
   },
   "taskManager": {

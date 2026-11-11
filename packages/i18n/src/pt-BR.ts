@@ -8515,7 +8515,7 @@ export const ptBR = {
       homeHint: "A missão ganha uma thread: é lá que {{name}} conversa, pede decisões e mostra o que fez.",
       offline: "{{name}} está offline. O plano começa quando ele voltar.",
       needsMachine:
-        "Missões rodam num computador conectado. Conecte um ao {{name}} em Configurações\u00a0›\u00a0Computadores.",
+        "Missões rodam num computador conectado. Conecte um ao {{name}} em Configurações\u00a0›\u00a0Dispositivos.",
       commandHint: "Também dá para começar escrevendo no composer de qualquer conversa:",
       approvals: "Merge, deploy e rollback sempre pedem aprovação",
       start: "Começar missão",
@@ -13207,9 +13207,6 @@ export const ptBR = {
       firstTime: "Na primeira vez",
       step1: "Abra o arquivo baixado e arraste o agentes.chat para Aplicativos.",
       step1Install: "Abra o arquivo baixado para instalar.",
-      step2:
-        "Abra o app, clique em Usar o seu próprio servidor, depois em Conectar ao meu servidor, e digite o endereço desta página. Entre e clique em Usar este {{device}} em Configurações → Computadores.",
-      other: "Outras formas: servidor ou Linux",
       otherText: "Rode no terminal do computador e confirme o código que ele mostrar.",
       waiting: "Esperando o computador conectar…",
     },
@@ -13755,22 +13752,11 @@ export const ptBR = {
       state: { online: "online", paused: "pausado", offline: "offline" },
       saved: "{{name}} agora usa {{computer}}.",
     },
-    lead: "Onde os agentes trabalham: este servidor e outros que você conectar.",
-    leadCloud: "Onde os agentes trabalham: um computador só deste workspace, sempre ligado.",
     /** The workspace computer's page ends with its help page's link. */
     about: "Sobre este computador",
     /** Settings › Computers (self-host) ends with its help page's link. */
     how: "Como os computadores funcionam",
     hostMissing: "Este servidor também pode ser o computador dos agentes: <guide>veja como</guide>.",
-    other: {
-      title: "Outros computadores",
-      /** The title's ⓘ. */
-      text: "Conectados com um código, como um Mac mini em casa ou outro servidor. O que cada um libera se ajusta nele mesmo.",
-      emptyTitle: "Rode agentes em qualquer computador",
-      emptyText: "Conecte um Mac mini em casa ou outro servidor com um código, e os agentes trabalham nele.",
-      emptyViewerTitle: "Os computadores do time aparecem aqui",
-      emptyViewer: "Quem pode conectar computadores adiciona um, e ele aparece aqui.",
-    },
   },
   outage: {
     region: "Computadores desconectados",
@@ -17047,7 +17033,7 @@ export const ptBR = {
       turn: "Deitar a tela",
       upright: "Voltar a tela para em pé",
       message: "Mensagem para {{name}}",
-      chooseOnWeb: "Escolha no agentes.chat, em Configurações\u00a0›\u00a0Computadores.",
+      chooseOnWeb: "Escolha no agentes.chat, em Configurações\u00a0›\u00a0Dispositivos.",
     },
   },
   taskManager: {

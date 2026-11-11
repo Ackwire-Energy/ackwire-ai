@@ -113,14 +113,12 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     "browser.inCard.noComputer",
     "browser.live.noComputer",
     "computers.hostMissing",
-    "computers.lead",
     "connectAi.wait.connecting",
     "errors.mission.unavailable",
     // The feedback form's line on who reads it, where the server isn't one of agentes.chat's own (`auth-config.cloud`).
     "feedback.goesServer",
     "feedback.offer.goesServer",
     "feedback.offer.sentServer",
-    "machines.download.step2",
     "machines.download.title",
     "machines.host.",
     "members.requests.copyText",
@@ -213,7 +211,11 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
   system: [
     "wiki.import.howTo",
     "machines.download.step1",
-    "help.selfhost.computers.sections.0.blocks.0",
+    // The ask and the website's choice name the Mac with the PC and Linux words beside it.
+    "help.any.computers.sections.0.blocks.0",
+    "help.any.computers.sections.1.blocks.1.list.0",
+    // The moving steps' command is the Mac's, said so in the step above it.
+    "help.selfhost.run-on-your-computer.sections.10.blocks.1.code",
     "desktop.prefs.general.dockDesc",
     "desktop.prefs.general.menuBarTitle",
     "desktop.prefs.updates.",
@@ -245,8 +247,6 @@ export const ANYWHERE: readonly string[] = [
   "database.scopeAll",
   "database.widenText_one",
   "database.widenText_other",
-  // "a server that's always on": what to install instead of this computer.
-  "help.selfhost.run-on-your-computer.sections.1.blocks.0",
   "mobile.connectors.needsKey",
   "mobile.connectors.review.waiting",
   "mobile.auth.server.",

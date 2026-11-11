@@ -58,7 +58,7 @@ export interface SandboxDeps {
 
 /** Told when the agent has no computer. */
 export const NO_COMPUTER_MESSAGE =
-  "You have no computer: no connected computer was chosen for you. Ask an admin or your owner to connect one (Settings → Computers).";
+  "You have no computer: no connected computer was chosen for you. Ask an admin or your owner to connect one (Settings › Devices).";
 
 /** Told instead while the workspace's own computer is still being prepared (ADR 0056 §10). */
 export const PREPARING_COMPUTER_MESSAGE =

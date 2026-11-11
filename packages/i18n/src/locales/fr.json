@@ -8583,7 +8583,7 @@
       "homeHint": "La mission a son fil : c'est là que {{name}} parle, demande des décisions et montre son travail.",
       "homeHint_female": "La mission a son fil : c'est là que {{name}} parle, demande des décisions et montre son travail.",
       "offline": "{{name}} est hors ligne. Le plan démarre à son retour.",
-      "needsMachine": "Les missions tournent sur un ordinateur connecté. Connectez-en un à {{name}} dans Paramètres › Ordinateurs.",
+      "needsMachine": "Les missions tournent sur un ordinateur connecté. Connectez-en un à {{name}} dans Paramètres › Appareils.",
       "commandHint": "Vous pouvez aussi en lancer une en tapant dans la zone de saisie de n'importe quelle conversation :",
       "approvals": "Le merge, le déploiement et le rollback demandent toujours une approbation",
       "start": "Démarrer la mission",
@@ -13676,8 +13676,6 @@
       "firstTime": "La première fois",
       "step1": "Ouvrez le fichier téléchargé et faites glisser agentes.chat dans Applications.",
       "step1Install": "Ouvrez le fichier téléchargé pour l'installer.",
-      "step2": "Ouvrez-la, cliquez sur Utiliser votre propre serveur, puis sur Se connecter à mon serveur, et saisissez l'adresse de cette page. Connectez-vous, puis cliquez sur Utiliser ce {{device}} dans Paramètres → Ordinateurs.",
-      "other": "Autres méthodes : serveur ou Linux",
       "otherText": "Lancez ceci dans le terminal de l'ordinateur, puis confirmez le code qu'il affiche.",
       "waiting": "En attente de la connexion de l'ordinateur…"
     },
@@ -14238,19 +14236,9 @@
       },
       "saved": "{{name}} utilise désormais {{computer}}."
     },
-    "lead": "Où travaillent vos agents : ce serveur et tout ordinateur que vous connectez.",
-    "leadCloud": "Là où vos agents travaillent : un ordinateur rien que pour cet espace de travail, toujours allumé.",
     "about": "À propos de cet ordinateur",
     "how": "Comment fonctionnent les ordinateurs",
-    "hostMissing": "Ce serveur peut aussi être l'ordinateur de vos agents : <guide>voici comment</guide>.",
-    "other": {
-      "title": "Autres ordinateurs",
-      "text": "Connectés avec un code, comme un Mac mini à la maison ou un autre serveur. Ce que chacun autorise se règle sur l'ordinateur lui-même.",
-      "emptyTitle": "Faites tourner des agents sur n'importe quel ordinateur",
-      "emptyText": "Connectez un Mac mini chez vous ou un autre serveur avec un code, et les agents y travaillent.",
-      "emptyViewerTitle": "Les ordinateurs de l'équipe apparaissent ici",
-      "emptyViewer": "Les personnes qui peuvent connecter des ordinateurs en ajoutent un, et il apparaît ici."
-    }
+    "hostMissing": "Ce serveur peut aussi être l'ordinateur de vos agents : <guide>voici comment</guide>."
   },
   "outage": {
     "region": "Ordinateurs hors ligne",
@@ -17412,7 +17400,7 @@
       "turn": "Tourner à l'horizontale",
       "upright": "Tourner à la verticale",
       "message": "Écrire à {{name}}",
-      "chooseOnWeb": "Choisissez-le sur agentes.chat, dans Paramètres › Ordinateurs."
+      "chooseOnWeb": "Choisissez-le sur agentes.chat, dans Paramètres › Appareils."
     }
   },
   "taskManager": {
