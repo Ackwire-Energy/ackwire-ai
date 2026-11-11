@@ -160,6 +160,11 @@ export class ControlClient {
     }
   }
 
+  /** Nothing reads the runners' lines any more: every open request fails now instead of timing out. */
+  close(): void {
+    for (const homeId of new Set([...this.pending.values()].map((p) => p.homeId))) this.closeHome(homeId);
+  }
+
   /** Open requests (tests, diagnostics). */
   get inFlight(): number {
     return this.pending.size;
