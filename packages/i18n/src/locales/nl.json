@@ -13433,6 +13433,7 @@
     "onHost": "op {{host}}",
     "onHostChip": "Op {{host}}",
     "menu": "Acties voor {{name}}",
+    "settings": "Instellingen",
     "rename": "Hernoemen",
     "renameName": "{{name}} hernoemen",
     "renameTitle": "Apparaat hernoemen",

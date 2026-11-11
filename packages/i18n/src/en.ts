@@ -13298,6 +13298,8 @@ export const en = {
     onHost: "on {{host}}",
     onHostChip: "On {{host}}",
     menu: "{{name}} actions",
+    /** A device row's menu: opens that device's page. */
+    settings: "Settings",
     rename: "Rename",
     renameName: "Rename {{name}}",
     renameTitle: "Rename the device",

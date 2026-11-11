@@ -12943,6 +12943,7 @@
     "onHost": "在 {{host}} 上",
     "onHostChip": "在 {{host}} 上",
     "menu": "{{name}} 的操作",
+    "settings": "设置",
     "rename": "重命名",
     "renameName": "重命名 {{name}}",
     "renameTitle": "重命名设备",

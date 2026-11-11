@@ -28,6 +28,7 @@ const fakeHost = inTauri()
         link: params.get("link"),
         found: params.get("found") !== "0",
         someCommands: params.get("commands") === "some",
+        macReady: params.get("mac") === "ready",
         here: {
           phase: (params.get("phase") as LocalPhase | null) ?? undefined,
           reach: params.get("reach") === "1",

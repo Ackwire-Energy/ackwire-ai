@@ -13306,6 +13306,7 @@
     "onHost": "{{host}} üzerinde",
     "onHostChip": "{{host}} üzerinde",
     "menu": "{{name}} işlemleri",
+    "settings": "Ayarlar",
     "rename": "Yeniden adlandır",
     "renameName": "Yeniden adlandır: {{name}}",
     "renameTitle": "Cihazı yeniden adlandırın",

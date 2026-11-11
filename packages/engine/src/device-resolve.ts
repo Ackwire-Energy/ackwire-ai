@@ -18,6 +18,7 @@ import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { formatDuration } from "./machine-task-text";
 import { taskRequester } from "./machine-tasks";
 import { notify, resolveNotifications } from "./notifications";
+import { personAtComputerWay } from "./runner-update";
 import { replyThreadOf } from "./runs";
 import type { ToolContext, ToolOutput } from "./tools/types";
 
@@ -529,7 +530,55 @@ function phoneLine(p: PhoneDevice, people: Map<string, string>) {
   return `"${p.name}" (${model}${system}${kind}): ${statusWords(p.status, people)}`;
 }
 
-function computerLine(d: ComputerDevice, people: Map<string, string>, requester: string | null) {
+/** The switches agents' tools need on a computer, as people call them. */
+const SWITCHES = { commands: "shell commands", claude: "Claude Code", codex: "Codex" } as const;
+
+/** Which of those switches are off. */
+export const switchesOff = (on: Record<keyof typeof SWITCHES, boolean>) =>
+  (Object.keys(SWITCHES) as (keyof typeof SWITCHES)[])
+    .filter((key) => !on[key])
+    .map((key) => ({ key, name: SWITCHES[key] }));
+
+/**
+ * "Off there: …" for a computer, from its runner's last report, and who turns them on: what an agent would otherwise
+ * learn only by failing. A coding CLI never found there has nothing to turn on.
+ */
+export function offThereText(m: {
+  os: string;
+  execAllowed: boolean;
+  access: { tools: { claude: boolean; codex: boolean } } | null;
+  executors: { claude?: unknown; codex?: unknown; mode?: string };
+}) {
+  const tools = m.access?.tools;
+  const off = switchesOff({
+    commands: m.execAllowed,
+    claude: !tools || !m.executors.claude || tools.claude,
+    codex: !tools || !m.executors.codex || tools.codex,
+  });
+  if (off.length === 0) return "";
+  return `Off there: ${off.map((s) => s.name).join(", ")}. Only the person at it can turn ${off.length > 1 ? "them" : "it"} on, ${personAtComputerWay(
+    m,
+    "Tools",
+    off.map((s) => `tools enable ${s.key}`),
+  )}.`;
+}
+
+/** `offThereText` of each of the workspace's computers. Not in `listDevices`: its access is for admins and the pairer. */
+async function offThere(db: Database, orgId: string) {
+  const rows = await db
+    .select({
+      id: machines.id,
+      os: machines.os,
+      execAllowed: machines.execAllowed,
+      access: machines.access,
+      executors: machines.executors,
+    })
+    .from(machines)
+    .where(and(eq(machines.orgId, orgId), isNull(machines.deletedAt)));
+  return new Map(rows.map((m) => [m.id, offThereText(m)]));
+}
+
+function computerLine(d: ComputerDevice, people: Map<string, string>, requester: string | null, off = "") {
   const size = [d.cpus ? `${d.cpus} CPUs` : "", d.memoryGb ? `${d.memoryGb} GB` : ""].filter(Boolean).join(", ");
   const facts = [osName(d.os), d.arch, size].filter(Boolean).join(" ");
   const owner =
@@ -547,6 +596,7 @@ function computerLine(d: ComputerDevice, people: Map<string, string>, requester:
   return [
     `- "${d.name}" (${facts}; ${owner}${d.systemMode ? "; each agent its own user" : ""}): ${statusWords(d.status, people)}.`,
     tools ? `  Tools: ${tools}.` : "",
+    off ? `  ${off}` : "",
     ...phones.map((line) => `  Phone ${line}.`),
   ]
     .filter(Boolean)
@@ -573,6 +623,7 @@ export async function devicesForRequester(
     ...devices.flatMap((d) => d.phones.map((p) => (p.status.kind === "in_use" ? p.status.userId : null))),
   ]);
   const forWhom = people.get(requester) ?? "the person you work for";
+  const off = await offThere(ctx.db, ctx.orgId).catch(() => new Map<string, string>());
   if (asked.trim()) {
     const phones = devices.flatMap((d) => d.phones.map((p) => ({ ...p, host: d })));
     const found = pickDevice<{ id: string; name: string }>([...devices, ...phones], asked, "device", (i) =>
@@ -582,7 +633,7 @@ export async function devicesForRequester(
     const computer = devices.find((d) => d.id === found.item.id);
     const phone = phones.find((p) => p.id === found.item.id);
     const line = computer
-      ? computerLine(computer, people, requester)
+      ? computerLine(computer, people, requester, computer.mayUse ? off.get(computer.id) : "")
       : phone
         ? `- Phone ${phoneLine(phone, people)}, on "${phone.host.name}".`
         : "";
@@ -604,7 +655,12 @@ export async function devicesForRequester(
     text: [
       `# Devices you may use for ${forWhom}`,
       ...usable.map((d) => {
-        const line = computerLine({ ...d, phones: d.phones.filter((p) => p.mayUse) }, people, requester);
+        const line = computerLine(
+          { ...d, phones: d.phones.filter((p) => p.mayUse) },
+          people,
+          requester,
+          d.mayUse || d.id === home ? off.get(d.id) : "",
+        );
         // A phone shared on its own grants none of its computer's commands.
         return d.mayUse || d.id === home
           ? line

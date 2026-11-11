@@ -13371,6 +13371,7 @@
     "onHost": "auf {{host}}",
     "onHostChip": "Auf {{host}}",
     "menu": "Aktionen für {{name}}",
+    "settings": "Einstellungen",
     "rename": "Umbenennen",
     "renameName": "{{name}} umbenennen",
     "renameTitle": "Gerät umbenennen",

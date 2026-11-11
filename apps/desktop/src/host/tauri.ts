@@ -6,6 +6,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { Candidate } from "../control/first-run";
 import type { LocalServerStatus, ReachResult, ReachStage, StepChange, Tailnet } from "../control/local-server";
 import type { LinkInfo } from "../control/pair";
+import type { SetupState } from "../control/permissions";
 import { platformOf } from "../control/platform";
 import type { ServerList, ServerWorkspaces } from "../control/server";
 import type { ThisMacRequest } from "../control/this-mac";
@@ -116,5 +117,12 @@ export function createTauriHost(): Host {
     tailscale: () => invoke<Tailnet>("tailscale_status"),
     openTailscale: (page) => invoke<void>("tailscale_open", { page }),
     onNewHostHome: (cb) => subscribe<string>("host://new", cb),
+    screenAccess: () => invoke<boolean>("screen_access"),
+    requestScreenAccess: () => invoke<boolean>("screen_request"),
+    diskAccess: () => invoke<boolean>("disk_access"),
+    askLocalNetwork: () => invoke<void>("network_ask"),
+    openPrivacy: (pane) => invoke<void>("privacy_open", { pane }),
+    setupState: () => invoke<SetupState | null>("setup_state_get"),
+    setSetupState: (state) => invoke<void>("setup_state_set", { state }),
   };
 }

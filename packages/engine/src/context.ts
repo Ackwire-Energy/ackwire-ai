@@ -30,7 +30,7 @@ import { peopleAllIn } from "./channels";
 import { consultationOrigin, type HandOff, handOffsFrom } from "./consultations";
 import { teamMemoryForPrompt } from "./context/tools";
 import { widgetRunContext } from "./dashboards/refresh-context";
-import { deviceRoster, osName } from "./device-resolve";
+import { deviceRoster, osName, switchesOff } from "./device-resolve";
 import { isAgentOnlyDm } from "./dms";
 import { cutText, stringsOf } from "./format";
 import { issueWorkBrief, issueWorkOf } from "./issue-work";
@@ -2026,11 +2026,7 @@ export function machineAccessText(a: {
   folders: string[];
   tools: { claude: boolean; codex: boolean; commands: boolean };
 }) {
-  const off = [
-    a.tools.commands ? "" : "shell commands",
-    a.tools.claude ? "" : "Claude Code",
-    a.tools.codex ? "" : "Codex",
-  ].filter(Boolean);
+  const off = switchesOff(a.tools).map((s) => s.name);
   return [
     `# Your folders on the computer "${a.name}"`,
     a.folders.length > 0
@@ -2092,7 +2088,12 @@ export function devicesText(devices: {
     `People connected more devices here: ${parts.join("; ")}. computer_status says which you may use for the person you work for and how each is; name a computer with \`computer\` and a phone with the phone tools.${
       devices.computers.some((c) => c.os === "windows") ? " Commands on Windows run in cmd.exe." : ""
     }`,
-  ].join("\n");
+    devices.computers.some((c) => c.os === "darwin")
+      ? 'A screenshot of a person\'s Mac, when commands are on there: run `screencapture -x screen.png` in your folder there (run_code with `computer`), then upload_file it with the same `computer`. If it is refused or comes out blank, ask the person to allow Screen Recording in the agentes.chat app there (Preferences › General › Permissions). A file there refused with "Operation not permitted" or "Permission denied" needs Full Disk Access, turned on in the same place. Never suggest terminal flags, restarting programs or saving a file for you to read.'
+      : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 /**

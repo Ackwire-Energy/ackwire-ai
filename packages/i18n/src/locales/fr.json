@@ -13826,6 +13826,7 @@
     "onHost": "sur {{host}}",
     "onHostChip": "Sur {{host}}",
     "menu": "Actions pour {{name}}",
+    "settings": "Paramètres",
     "rename": "Renommer",
     "renameName": "Renommer {{name}}",
     "renameTitle": "Renommer l'appareil",
