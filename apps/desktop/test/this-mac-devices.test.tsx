@@ -16,13 +16,9 @@ import { createDesktopI18n } from "../src/i18n";
 import { ToastProvider } from "../src/ui/Toast";
 import { WindowView } from "../src/WindowView";
 import { ThisMacCards } from "../src/windows/prefs/ThisMac";
+import { until } from "./until";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-
-async function until(ready: () => unknown) {
-  for (let i = 0; i < 200 && !ready(); i++) await act(() => new Promise((resolve) => setTimeout(resolve, 20)));
-  expect(Boolean(ready())).toBe(true);
-}
 
 async function mount(
   window: "prefs" | "welcome",
@@ -154,6 +150,7 @@ describe("the iPhone setup window", () => {
     });
   });
 
+  // It walks every iPhone state in one window, one render each: past bun's 5 s default when the suite shares a process.
   test("every iPhone state names its way out, and a step that sits still says what most likely holds it", async () => {
     writePref(IPHONE_SETUP_PREF, true);
     await mount("welcome", <WindowView name="welcome" />, async (el, host) => {
@@ -206,7 +203,7 @@ describe("the iPhone setup window", () => {
         setSystemTime();
       }
     });
-  });
+  }, 20_000);
 
   test("without the ask, the welcome window is the first run", () =>
     mount("welcome", <WindowView name="welcome" />, async (el) => {
