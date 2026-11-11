@@ -2750,7 +2750,15 @@ export interface McpToolInfo {
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
+  /** MCP's own `_meta`, passed to the CLI as is (`MCP_ALWAYS_LOAD`). */
+  _meta?: Record<string, unknown>;
 }
+
+/**
+ * A tool's `_meta` key Claude Code reads: listed with its schema from the first round, never behind its ToolSearch.
+ * The runner sets it on the tools every run reaches for; the server on what one kind of run needs at once.
+ */
+export const MCP_ALWAYS_LOAD = "anthropic/alwaysLoad";
 
 /** Most tools one `mcp.tools` frame carries. */
 export const MCP_TOOLS_MAX = 200;

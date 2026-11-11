@@ -22,6 +22,7 @@ import {
   type Widget,
   widgetCostLine,
   widgetFailureKey,
+  widgetStepWords,
   withEditRoles,
 } from "../src/index";
 
@@ -350,5 +351,20 @@ describe("dashboard events", () => {
     const deleted = { type: "dashboard.changed", dashboardId: "d1", deleted: true } as { type: string };
     expect(applyDashboardEvent(qc, "o1", deleted)).toBe(true);
     expect(qc.getQueryData(keys.dashboard("o1", "d1"))).toBeUndefined();
+  });
+});
+
+describe("a build's step line", () => {
+  // The keys as the app would say them, so the test reads which words each call gets.
+  const t = ((key: string, values?: { app?: string }) => (values?.app ? `${key}(${values.app})` : key)) as never;
+  const step = (tool: string, connector: string | null = null) => ({ tool, connector, service: null, at: "" });
+
+  test("a connected app by its name, our own tools by what they do, thinking between calls", () => {
+    expect(widgetStepWords(t, null)).toBe("dashboards.newWidget.thinking");
+    expect(widgetStepWords(t, undefined)).toBe("dashboards.newWidget.thinking");
+    expect(widgetStepWords(t, step("stripe_list_subscriptions", "Stripe"))).toBe("Chat.activity.consulting(Stripe)");
+    expect(widgetStepWords(t, step("web_search"))).toBe("Chat.activity.searchingWeb");
+    expect(widgetStepWords(t, step("permission_prompt"))).toBe("Chat.activity.runningCommandAny");
+    expect(widgetStepWords(t, step("update_widget"))).toBe("dashboards.newWidget.finishing");
   });
 });

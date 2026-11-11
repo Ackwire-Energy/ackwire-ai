@@ -57,6 +57,7 @@ type List = { home: Board | null; dashboards: Board[]; homeDashboardId: string |
 type Detail = Widget & {
   dashboard: { id: string; kind: string; title: string };
   canEdit: boolean;
+  step: { tool: string; connector: string | null; service: string | null; at: string } | null;
   history: { id: string; status: string; summary: string; failureCode: string | null; costUsd: number | null }[];
 };
 
@@ -942,7 +943,8 @@ test("Test, then Create widget: a draft only its creator sees, confirmed once it
   expect((await read<Board>(await s.board(s.owner, sales.id))).widgets).toEqual([]);
   expect((await s.api(s.owner, `/widgets/${draft.id}`)).status).toBe(404);
   expect((await s.api(s.owner, `/widgets/${draft.id}`, { method: "DELETE" })).status).toBe(404);
-  expect((await read<Detail>(await s.api(s.ana, `/widgets/${draft.id}`))).draft).toBe(true);
+  // Its creator's view carries the step its build is in: none while it waits to start.
+  expect(await read<Detail>(await s.api(s.ana, `/widgets/${draft.id}`))).toMatchObject({ draft: true, step: null });
 
   const confirm = {
     dashboardId: sales.id,

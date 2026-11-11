@@ -3,6 +3,7 @@ import { and, type Database, type Executor, eq, inArray, isNull, type SQL, schem
 import { linkRunActions, publishMessageActions } from "./agent-actions";
 import { followWork } from "./agent-status";
 import { openApprovalCard, publishApproval } from "./approvals";
+import { runAuthorityById } from "./authority";
 import type { BrainTool, ToolResult } from "./brains/types";
 import { readableChannelIds } from "./channels";
 import { consultationCardThread, consultationOrigin } from "./consultations";
@@ -37,7 +38,7 @@ import { publishSecret, type SecretRequestRow, secretLabelOf, secretRequestView,
 import { artifactToolDetail, promptAnswer, promptPoll, toolCode, toolCommand, toolDetail } from "./tool-detail";
 import { directoryRole, HARNESS_PREFIX, ON_DEMAND_USE, resolveDirectoryTool } from "./tools/directory";
 import { type Approval, type InvokeResult, isSensitive, type ToolGateway } from "./tools/gateway";
-import { withWhy } from "./tools/run-policy";
+import { WIDGET_UP_FRONT_MAX, widgetUpFront, withWhy } from "./tools/run-policy";
 import type { ToolContext, ToolDefinition, ToolOutput } from "./tools/types";
 import { withWikiLinks } from "./wiki-links";
 
@@ -622,10 +623,15 @@ const loadedGroupsOf = (transcript: unknown): string[] | null => {
  */
 export async function bridgeToolsFor(deps: RunToolsDeps, id: BridgeIdentity): Promise<BrainTool[]> {
   if (!deps.tools) return [];
-  const { ctx } = await locate(deps.db, id);
+  const { ctx, run } = await locate(deps.db, id);
   const tools = await deps.tools.list(ctx);
   // Our own tools before the connectors': a cap on the list (`MCP_TOOLS_MAX`) only ever drops connector tools.
-  return [...tools.filter((t) => !t.connectionId), ...tools.filter((t) => t.connectionId)].map(brainToolOf);
+  const ordered = [...tools.filter((t) => !t.connectionId), ...tools.filter((t) => t.connectionId)];
+  const authority = run ? await runAuthorityById(deps.db, run.orgId, run.id) : null;
+  if (!(authority?.kind === "routine" && authority.brief?.widget)) return ordered.map(brainToolOf);
+  // A widget's refresh (ADR 0135 §5): what it reads with and answers through, in hand from the first round.
+  let room = WIDGET_UP_FRONT_MAX;
+  return ordered.map((t) => (widgetUpFront(t) && room-- > 0 ? { ...brainToolOf(t), upFront: true } : brainToolOf(t)));
 }
 
 /** The gateway's own refusals, as codes (the gateway returns them as plain error text). */
