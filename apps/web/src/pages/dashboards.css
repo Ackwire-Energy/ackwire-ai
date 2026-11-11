@@ -616,9 +616,15 @@ html:not([data-pointer]) .nwc-ask:focus-visible {
 }
 .nwc-asked > span {
   min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+  text-align: start;
+}
+/* The ask is shown whole: when it and the row's choices don't fit side by side, the choices go under it. */
+.nwc-row:has(> .nwc-asked) {
+  flex-wrap: wrap;
+}
+.nwc-row > .nwc-asked {
+  flex: 1 1 200px;
 }
 .nwc-asked .ac-icon {
   flex: none;
