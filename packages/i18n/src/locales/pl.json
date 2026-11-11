@@ -738,6 +738,8 @@
         "teamMadePersonal": "Twoi agenci już tu są. Ruszamy dalej, kiedy chcesz.",
         "plan": "Po planie zostaje tylko podłączyć AI. Pokażę ci, gdzie.",
         "planThen": "Gdy plan będzie włączony, na następnym ekranie połączysz swoją AI.",
+        "area": "Jeszcze jedno pytanie przed zespołem.",
+        "areaPersonal": "Jeszcze jedno pytanie przed twoimi agentami.",
         "ask": "Masz już zespół gdzie indziej? Przeniosę go tu w całości.",
         "start": "Mam zespół gotowy do tego, czym się zajmujecie. Albo zaczynamy we dwoje.",
         "askPersonal": "Używasz już agentów gdzie indziej? Przeniosę ich tu wszystkich.",
@@ -753,6 +755,20 @@
         "connectedThen": "No i gotowe. Zostaje tylko zaprosić osoby, z którymi pracujesz.",
         "people": "Teraz ludzie. Podaj mi ich adresy e-mail, a wyślę zaproszenia.",
         "peopleLink": "Teraz ludzie. Wyślij im link, a pokażę ci każdą prośbę."
+      },
+      "area": {
+        "title": "A ty, czym się zajmujesz?",
+        "lead": "Tylko po to, żebyśmy wiedzieli, kto używa agentes.chat.",
+        "skip": "Pomiń ten krok",
+        "options": {
+          "dev": "Programowanie",
+          "marketing": "Marketing",
+          "sales": "Sprzedaż",
+          "finance": "Finanse",
+          "ops": "Operacje",
+          "support": "Obsługa klienta",
+          "other": "Coś innego"
+        }
       },
       "preview": {
         "label": "Twoja przestrzeń robocza, gdy odpowiadasz",
@@ -895,10 +911,23 @@
       "lead": "Możesz to później zmienić, nic nie przepadnie.",
       "personal": "Dla mnie",
       "personalText": "Agenci, którzy dbają o twój dzień.",
-      "team": "Dla mojej firmy lub zespołu",
+      "team": "Dla mojego zespołu",
       "teamText": "Ludzie i agenci pracują razem, z kanałami, rolami i zatwierdzeniami.",
       "personalExamples": "Twój dzień o 7 · Rachunki · Trening",
-      "teamExamples": "Obsługa klienta · Finanse · Raporty"
+      "teamExamples": "Obsługa klienta · Finanse · Raporty",
+      "personalLine": "Agenci, którzy dbają o Twój dzień.",
+      "teamLine": "Ludzie i agenci w jednym miejscu.",
+      "activities": {
+        "agenda": "Plan dnia",
+        "home": "Dom",
+        "bills": "Rachunki",
+        "studies": "Nauka",
+        "travel": "Podróże",
+        "support": "Obsługa klienta",
+        "finance": "Finanse",
+        "reports": "Raporty",
+        "sales": "Sprzedaż"
+      }
     },
     "personal": {
       "name": "Osobiste"

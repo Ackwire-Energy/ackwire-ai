@@ -202,3 +202,12 @@ on where it opens.
   connected screen (and the Connect dialog over it) until "Continuar", which goes on to the people; going back from the
   people shows it again. The workspace opens in #general, on the arrival's beta notice alone whenever the AI step was
   shown, in this visit or left for later in an earlier one.
+- **Later the same day, after the owner's review of the polish round.** The first question's two cards stack, each
+  wide: the drawing on its horizon on the left, the words on the right from the top, both as tall as each other, the
+  screen within a 720px window. The preview beside the steps loses its caption ("O seu workspace, enquanto você
+  responde" stays its accessible name). And the person's own area is asked once per account, about them and never
+  the workspace, on a screen of its own right before the team step (a team's after "O que vocês fazem", still that
+  step on the rail; a personal workspace's after "Para mim"): "E você, cuida de quê?", the business step's chips one at
+  a time, Continuar once one is picked, "Pular esta etapa" under it. It is stored per account in `users.work_area`
+  (an id of `WORK_AREAS`, `@agenteschat/client/lib/work-area`, or `skipped`; migration 0250) through
+  `PUT /me/work-area`, never waited for, and the operator API's account reads it (which kinds of people stay).

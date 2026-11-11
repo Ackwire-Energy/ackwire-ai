@@ -729,18 +729,14 @@ html:not([data-pointer]) .arrival-have__link:focus-visible {
   font-weight: 600;
   line-height: 24px;
 }
+/*
+ * A tile beside a title and its one line: the two lines as a block on the tile's middle, and what ends the card (the
+ * chevron, "No subscription") on the same middle, so the three share one centre. Each card holds only these, never a
+ * list ("Another plan" opens into cards of their own).
+ */
 .arrival-opts .ac-option {
+  align-items: center;
   width: 100%;
-}
-/* A tile beside a title and its line, as a face line: the title's capitals start at the tile's top (`.ac-captop`). */
-.arrival-opts .ac-option > :is(.ac-brand, .arrival-opts__tile):first-child + .ac-option__text > .ac-option__title {
-  /* Browsers without the lh unit: the page's 22px line. */
-  margin-block-start: calc(var(--cap-top) - 11px);
-}
-@supports (top: 1lh) {
-  .arrival-opts .ac-option > :is(.ac-brand, .arrival-opts__tile):first-child + .ac-option__text > .ac-option__title {
-    margin-block-start: calc(var(--cap-top) - 0.5lh);
-  }
 }
 .arrival-opts .ac-option > .ac-option__text {
   flex: 1;

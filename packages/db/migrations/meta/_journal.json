@@ -1744,6 +1744,13 @@
       "when": 1794635300000,
       "tag": "0250_machine_egress_waiting",
       "breakpoints": true
+    },
+    {
+      "idx": 251,
+      "version": "7",
+      "when": 1794645300000,
+      "tag": "0251_user_work_area",
+      "breakpoints": true
     }
   ]
 }

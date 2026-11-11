@@ -279,7 +279,8 @@
       "portrait.options.clothes.polo",
       "portrait.options.hair.undercut",
       "portrait.options.hair.mullet",
-      "devices.android.drivers.samsung"
+      "devices.android.drivers.samsung",
+      "onboarding.flow.area.options.marketing"
     ],
     "es": [
       "devices.iphone.path.general",
@@ -513,7 +514,8 @@
       "portrait.options.clothes.polo",
       "portrait.options.hair.undercut",
       "portrait.options.hair.mullet",
-      "devices.android.drivers.samsung"
+      "devices.android.drivers.samsung",
+      "onboarding.flow.area.options.marketing"
     ],
     "fr": [
       "calendar.moreRuns",
@@ -914,7 +916,8 @@
       "portrait.options.clothes.polo",
       "portrait.options.hair.undercut",
       "portrait.options.hair.dreads",
-      "devices.android.drivers.samsung"
+      "devices.android.drivers.samsung",
+      "onboarding.flow.area.options.marketing"
     ],
     "de": [
       "devices.iphone.steps.account",
@@ -1332,7 +1335,8 @@
       "portrait.options.hair.undercut",
       "portrait.options.hair.dreads",
       "agentPage.work.brain.v2.computer",
-      "devices.android.drivers.samsung"
+      "devices.android.drivers.samsung",
+      "onboarding.flow.area.options.marketing"
     ],
     "it": [
       "calendar.moreRuns",
@@ -1673,7 +1677,8 @@
       "portrait.options.hair.undercut",
       "portrait.options.hair.mullet",
       "agentPage.work.brain.v2.computer",
-      "devices.android.drivers.samsung"
+      "devices.android.drivers.samsung",
+      "onboarding.flow.area.options.marketing"
     ],
     "nl": [
       "calendar.moreRuns",
@@ -2239,7 +2244,8 @@
       "portrait.options.hair.undercut",
       "portrait.options.hair.dreads",
       "agentPage.work.brain.v2.computer",
-      "devices.android.drivers.samsung"
+      "devices.android.drivers.samsung",
+      "onboarding.flow.area.options.marketing"
     ],
     "ja": [
       "devices.system.android",
@@ -2960,7 +2966,8 @@
       "portrait.options.hair.flat",
       "portrait.options.hair.undercut",
       "portrait.options.hair.mullet",
-      "devices.android.drivers.samsung"
+      "devices.android.drivers.samsung",
+      "onboarding.flow.area.options.marketing"
     ],
     "tr": [
       "devices.cpus",
@@ -3409,7 +3416,8 @@
       "portrait.options.hair.flat",
       "portrait.options.hair.undercut",
       "portrait.options.hair.mullet",
-      "devices.android.drivers.samsung"
+      "devices.android.drivers.samsung",
+      "onboarding.flow.area.options.marketing"
     ],
     "ru": [
       "devices.system.android",

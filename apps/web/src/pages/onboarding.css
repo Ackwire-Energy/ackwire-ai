@@ -454,7 +454,8 @@ html:not([data-pointer]) .onb__logo:focus-visible {
 /*
  * The preview: the workspace's sidebar at its own size, in a frame, showing only what exists now. Never wider: the
  * sidebar's one-line names (a long workspace or person) end in its ellipsis there, as in the app, instead of widening
- * the preview into the question's column.
+ * the preview into the question's column. No caption over it: the frame starts on the step's top line (the rail
+ * wordmark's, where Back's middle sits).
  */
 .onb-preview {
   flex: 0 0 272px;
@@ -462,22 +463,6 @@ html:not([data-pointer]) .onb__logo:focus-visible {
   position: sticky;
   top: 0;
   padding-top: 40px;
-}
-.onb-preview__label {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin: 0 0 var(--space-2);
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--muted);
-}
-.onb-preview__dot {
-  width: var(--space-2);
-  height: var(--space-2);
-  border-radius: var(--radius-cut);
-  background: var(--ok);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 20%, transparent);
 }
 .onb-preview__frame {
   height: min(600px, calc(100dvh - 120px));
@@ -587,27 +572,66 @@ html:not([data-pointer]) .onb__logo:focus-visible {
   }
 }
 /*
- * What the workspace is for (ADR 0159), the onboarding's brand moment: two cards side by side (OptionList `cards`),
- * on top who would be there (`PurposeScene`: you with your agents around you, or a team's chart), the words under it.
- * Where two would be narrower than the kit's cards (a 320px phone), one over the other: side by side, a title would
- * break word by word.
+ * What the workspace is for (ADR 0159), the onboarding's brand moment: two wide cards one over the other (OptionList
+ * `cards`, `PurposeCards`), each as tall as the other: on the left who would be there (`PurposeScene`: you with your
+ * agents around you, or a team's chart) on its horizon, inside the card's hairline, a hairline between it and the
+ * words; on the right the title, one line and the cluster of pills (ADR 0162), clear of the radio in the corner. The
+ * title, both cards and Continue fit a 720px window. On a phone, the drawing over the words.
  */
 .onb-purpose .ac-optlist__cards {
+  grid-template-columns: minmax(0, 1fr);
+  grid-auto-rows: 1fr;
   gap: 12px;
 }
 .onb-purpose .ac-optrow {
   isolation: isolate;
+  flex-direction: row;
+  align-items: stretch;
   gap: 0;
   padding: 0;
   overflow: hidden;
 }
+/* The drawing's band sits inside the card's 1px hairline, its corners the card's less that hairline: the border shows
+   all the way round, chosen or not. */
 .onb-purpose .ac-optrow__lead {
   align-self: stretch;
+  margin: 1px 0 1px 1px;
+  border-right: 1px solid var(--line);
 }
 .onb-purpose .ac-optrow__text {
-  padding: 12px 18px 18px;
+  flex: 1;
+  width: auto;
+  min-width: 0;
+  padding: 16px 16px 16px 20px;
 }
+/* The drawing's band: the stage a step smaller, standing on the band's horizon. */
+.onb-purpose .onb-scene {
+  width: 184px;
+  height: auto;
+  min-height: 176px;
+  overflow: hidden;
+  border-radius: calc(var(--radius-lg) - 1px) 0 0 calc(var(--radius-lg) - 1px);
+}
+/* As tall as the card, whatever the words make it: the room fills the band, the stage on its middle. */
+.onb-purpose .onb-scene__room {
+  position: absolute;
+  inset: 0;
+  height: auto;
+}
+.onb-purpose .onb-scene__stage {
+  scale: 0.8;
+}
+/* A faint veil over the drawing, so its side reads a shade apart while the drawing and its sky stay as they are. */
+.onb-purpose .onb-scene::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--ink) 3%, transparent);
+  pointer-events: none;
+}
+/* The title alone clears the radio in the corner. */
 .onb-purpose .ac-optrow__title {
+  padding-right: 28px;
   font-size: 17px;
   font-weight: 650;
   letter-spacing: -0.01em;
@@ -615,11 +639,136 @@ html:not([data-pointer]) .onb__logo:focus-visible {
 .onb-purpose .ac-optrow__desc {
   margin-top: 4px;
 }
-.onb-purpose__examples {
-  display: block;
-  margin-top: 8px;
-  font-size: 13px;
-  color: var(--faint);
+/* The cluster (ADR 0162): pills of one size in their order, 6px apart both ways, left-aligned with the title, a pill
+   that doesn't fit going to the next line; its box reserved for two lines. Nothing in it ever changes size or place:
+   its life is colour, opacity and a tiny scale on a pill itself. */
+.onb-cluster {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 6px;
+  min-height: 54px;
+  margin-top: 12px;
+}
+.onb-pill {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 10px 0 3px;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--ink2);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  /* Asleep: a step dimmer, completely still. */
+  opacity: 0.55;
+  transition:
+    opacity 0.3s var(--out),
+    color 0.2s var(--out),
+    background-color 0.3s var(--out),
+    box-shadow 0.2s var(--out);
+}
+.onb-pill > .ac-avatar {
+  flex: none;
+  width: 18px;
+  height: 18px;
+}
+/* Lit: the card is chosen. */
+.onb-cluster[data-lit] .onb-pill {
+  opacity: 1;
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--line2);
+}
+/* Waking: each pill lights in turn, a beat after its agent, with a small scale-in on the pill itself. */
+.onb-cluster[data-waking] .onb-pill {
+  transition-delay: var(--d, 0ms);
+  animation: onb-pill-light 0.34s var(--out) var(--d, 0ms);
+}
+@keyframes onb-pill-light {
+  from {
+    transform: scale(0.96);
+  }
+}
+/* Pointed at, or its agent is: border and words brighten. */
+.onb-pill:hover,
+.onb-pill.is-hot {
+  opacity: 1;
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--faint);
+}
+/* Work: a thin pixel sweep along the pill's foot, inside it. */
+.onb-pill__bar {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 2px;
+  height: 2px;
+  background: repeating-linear-gradient(90deg, var(--ink2) 0 2px, transparent 2px 4px);
+  transform: scaleX(0);
+  transform-origin: left;
+  opacity: 0;
+  pointer-events: none;
+}
+.onb-pill.is-working .onb-pill__bar {
+  animation: onb-pill-sweep 1.6s steps(16, end) both;
+}
+@keyframes onb-pill-sweep {
+  0% {
+    opacity: 1;
+    transform: scaleX(0);
+  }
+  85% {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scaleX(1);
+  }
+}
+/* Its agent bobs gently while it works (the box's own translate: it is placed by left and top). */
+.onb-scene__face.is-bob {
+  animation: onb-scene-bob 0.8s ease-in-out 2;
+}
+@keyframes onb-scene-bob {
+  50% {
+    translate: 0 -2px;
+  }
+}
+/* A sleeping z popping off an agent as it wakes. */
+.onb-zpop {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  color: var(--ink2);
+  font-family: var(--font-dot, monospace);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  pointer-events: none;
+  opacity: 0;
+  animation: onb-zpop 0.7s var(--out) both;
+}
+/* The z is drawn, not written: a mark, not words. */
+.onb-zpop::before {
+  content: "z";
+}
+@keyframes onb-zpop {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(6px, -14px) scale(0.6);
+  }
 }
 .onb-scene {
   /* The ground the horizon rises from: the card, as it is chosen or not. */
@@ -690,7 +839,7 @@ html:not([data-pointer]) .onb__logo:focus-visible {
   width: 100%;
   height: 100%;
 }
-/* A phone's width: the same drawing, smaller, and the words a step smaller. */
+/* A phone's width: the drawing over the words, smaller, and the words a step smaller. */
 @media (max-width: 520px) {
   .onb-scene {
     height: 128px;
@@ -701,15 +850,41 @@ html:not([data-pointer]) .onb__logo:focus-visible {
   .onb-scene__sky {
     height: 48px;
   }
+  .onb-purpose .ac-optrow {
+    flex-direction: column;
+  }
+  .onb-purpose .ac-optrow__lead {
+    margin: 1px 1px 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .onb-purpose .onb-scene {
+    width: 100%;
+    height: 128px;
+    min-height: 0;
+    border-radius: calc(var(--radius-lg) - 1px) calc(var(--radius-lg) - 1px) 0 0;
+  }
+  .onb-purpose .onb-scene__stage {
+    scale: 0.64;
+  }
   .onb-purpose .ac-optrow__text {
+    flex: none;
+    width: 100%;
     padding: 10px 14px 14px;
   }
   .onb-purpose .ac-optrow__title {
+    padding-right: 0;
     font-size: 16px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .onb-scene[data-chosen] .onb-scene__line {
+  .onb-scene[data-chosen] .onb-scene__line,
+  .onb-pill,
+  .onb-cluster[data-waking] .onb-pill,
+  .onb-pill.is-working .onb-pill__bar,
+  .onb-scene__face.is-bob,
+  .onb-zpop {
+    transition: none;
     animation: none;
   }
 }

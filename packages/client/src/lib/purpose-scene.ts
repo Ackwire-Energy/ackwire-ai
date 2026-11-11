@@ -1,7 +1,7 @@
 /*
  * The drawings of the onboarding's first question (ADR 0159), the same on the web and the phone: on a 240 × 172 stage
  * (scaled to the card), the person signing up in the middle of six agents, each joined to them ("For me"), or on top
- * of a small org chart of people and agents ("For my company or team"). Pure numbers: each app draws the faces with
+ * of a small org chart of people and agents ("For my team"). Pure numbers: each app draws the faces with
  * its own avatars, the lines in its own vector layer.
  */
 
@@ -74,3 +74,35 @@ export const SCENE_LINES: Record<PurposeKind, readonly string[]> = {
 
 /** Each answer's color: its horizon. */
 export const SCENE_COLOR: Record<PurposeKind, "violet" | "sky"> = { personal: "violet", team: "sky" };
+
+/** What a card's agents do, as the cluster of pills under its line (ADR 0162). */
+export type PurposeActivity =
+  | "agenda"
+  | "home"
+  | "bills"
+  | "studies"
+  | "travel"
+  | "support"
+  | "finance"
+  | "reports"
+  | "sales";
+
+/**
+ * Each pill's agent (its index in `SCENE_FACES`) and words (`onboarding.purpose.activities.<key>`), in the order they
+ * light up: round the ring from the top-left for me, down the tree for a team. An agent may have no pill.
+ */
+export const SCENE_ACTIVITIES: Record<PurposeKind, readonly { agent: number; key: PurposeActivity }[]> = {
+  personal: [
+    { agent: 2, key: "agenda" },
+    { agent: 3, key: "home" },
+    { agent: 4, key: "bills" },
+    { agent: 5, key: "studies" },
+    { agent: 6, key: "travel" },
+  ],
+  team: [
+    { agent: 1, key: "support" },
+    { agent: 3, key: "finance" },
+    { agent: 4, key: "reports" },
+    { agent: 5, key: "sales" },
+  ],
+};
