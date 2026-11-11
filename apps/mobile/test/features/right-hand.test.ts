@@ -156,6 +156,7 @@ test("the phone's greeting draws the checklist and Conversas has one line back t
 });
 
 test("Configurações lists no section for it: its settings open from its own profile, on their screen", () => {
+  const src = (f: string) => readFileSync(new URL(`../../src/features/${f}`, import.meta.url), "utf8");
   expect(SETTINGS_SECTIONS.map((s) => s.id as string)).not.toContain("right_hand");
   expect(src("right-hand/SettingsScreen.tsx")).toContain('router.push("/settings/right-hand" as never)');
   expect(src("agents/AgentProfileScreen.tsx")).toContain("onPress: openRightHandSettings");

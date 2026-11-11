@@ -568,23 +568,24 @@ describe("Configurações do workspace", () => {
         .getAllByRole("link")
         .map((l) => l.lastChild?.textContent),
     ).toEqual([
+      // With their notifications, who approves for them and their AI apps (ADR 0119) as its tabs.
       "Sua conta",
-      "Notificações",
-      // Whether the right hand approves for them is each person's own choice.
-      "Aprovações",
-      // Each person connects their own AI apps (ADR 0119).
-      "Apps de IA",
-      // AGPL's legal notices and the attribution, for everyone (the section 7(b) term in NOTICE).
-      "Sobre o agentes.chat",
       // The people, where a member who may not invite suggests someone (ADR 0090).
-      "Membros e convites",
-      // Their own logins, keys and contacts (ADR 0144).
-      "Cofre",
-      "Conectores e MCPs",
-      "Dispositivos",
+      "Pessoas",
       // The AI accounts and their meters, in percentages (ADR 0063).
       "IA e uso",
+      // With the Vault as a tab: their own logins, keys and contacts (ADR 0144).
+      "Conectores",
     ]);
+    // What no entry holds is under Advanced: the devices on a self-hosted server, and AGPL's legal notices and the
+    // attribution, for everyone (the section 7(b) term in NOTICE).
+    await click(within(nav).getByRole("button", { name: "Avançado" }));
+    expect(
+      within(nav)
+        .getAllByRole("link")
+        .slice(4)
+        .map((l) => l.lastChild?.textContent),
+    ).toEqual(["Dispositivos", "Sobre o agentes.chat"]);
     // Settings opens on their account: what the agents know of the workspace is not theirs to read.
     expect(screen().queryByLabelText("O que os agentes sabem da Acme")).toBeNull();
     expect(document.body.textContent).not.toContain("Acme builds rockets");
@@ -621,7 +622,9 @@ describe("Configurações do workspace", () => {
     const state = seedState();
     state.authConfig = { ...state.authConfig, billingUrl: "https://billing.example.com" };
     await go(state, "settings/billing");
-    expect(nav().getByRole("link", { name: "Plano e cobrança" }).getAttribute("aria-current")).toBe("page");
+    // Its own address opens it alone, on the entry that holds it.
+    expect(nav().queryByRole("link", { name: "Plano e cobrança" })).toBeNull();
+    expect(nav().getByRole("link", { name: "IA e uso" }).getAttribute("aria-current")).toBe("page");
     expect(screen().getByRole("heading", { level: 2, name: "Plano e cobrança" })).toBeTruthy();
     expect(document.body.textContent).toContain("O plano, o cartão e as faturas, numa página nossa fora do app.");
     await click(screen().getByRole("button", { name: "Abrir plano e cobrança" }));

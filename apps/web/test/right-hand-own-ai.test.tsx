@@ -93,6 +93,10 @@ test("Lodi's old settings address opens Lodi's page: two groups, the face opens 
   await act(async () => fireEvent.click(choices[0] as HTMLElement));
   await settle(8);
   expect(sent).toEqual([{ scope: "workspace", brain: "model" }]);
+  // The dialog stays for the key's model. Closed, the row behind it says the new value.
+  expect(within(dialog).getAllByRole("radio")[0]?.getAttribute("aria-checked")).toBe("true");
+  await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: "Fechar" })));
+  await settle(4);
   expect(row(/^IA de quem não tem plano próprio/).querySelector(".settings-row__status")?.textContent).toBe(
     "OpenAI da Acme",
   );

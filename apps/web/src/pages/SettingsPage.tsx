@@ -182,10 +182,12 @@ function Settings({
   const marked = settingsNavEntry(current, open, short);
   const tabs = settingsTabs(marked, open, short).filter(isSettingsSection);
   const inAdvanced = nav.advanced.some((s) => s.id === marked);
-  const [advanced, setAdvanced] = useState(inAdvanced);
-  // A section of Advanced opened by its address (⌘K, a card, a notice) shows in the list.
+  const [opened, setOpened] = useState(inAdvanced);
+  // A section of Advanced opened by its address (⌘K, a card, a notice) shows in the list in that same render (the
+  // strip centres its key then), and the list stays open after leaving it.
+  const advanced = opened || inAdvanced;
   useEffect(() => {
-    if (inAdvanced) setAdvanced(true);
+    if (inAdvanced) setOpened(true);
   }, [inAdvanced]);
   const strip = useRef<HTMLDivElement>(null);
   useCentreCurrent(strip, marked);
@@ -292,7 +294,7 @@ function Settings({
                     type="button"
                     className="settings__link"
                     aria-expanded={advanced}
-                    onClick={() => setAdvanced((open) => !open)}
+                    onClick={() => setOpened(!advanced)}
                   >
                     <Icon name={advanced ? "chevronDown" : "chevronRight"} size={18} />
                     {t("settings.advanced")}
