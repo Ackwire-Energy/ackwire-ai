@@ -70,6 +70,7 @@ import {
   agentGid,
   authEgressPrefix,
   denySchedulers,
+  ensureContainers,
   ensureGitCacheUser,
   GIT_CACHE_DIR,
   grantGitCache,
@@ -558,7 +559,15 @@ export class RunnerDaemon implements RequestObserver {
     const agentUser = this.session?.agentUser;
     if (!agentUser) return runnerUser(this.opts.home, await this.agentFolder(agent), agent);
     const u = agentUser(agent);
+    this.startContainers(u);
     return systemDesktopUser(systemLauncher(u), { uid: u.uid, gid: agentGid(u.user) });
+  }
+
+  /** Its containers service (ADR 0168), as before its worker: a desktop's or a terminal's docker finds it. */
+  private startContainers(u: AgentUser) {
+    if (this.opts.workers || !rootlessContainers()) return;
+    const problem = ensureContainers(u);
+    if (problem) this.opts.log(`[${u.user}] its containers service didn't start: ${problem}`);
   }
 
   /** Its switch is on, and the last check made under that switch passed. */
@@ -657,7 +666,9 @@ export class RunnerDaemon implements RequestObserver {
   private async terminalUser(agent: AgentScope): Promise<TerminalUser> {
     const agentUser = this.session?.agentUser;
     if (!agentUser) return runnerTerminalUser(await this.agentFolder(agent));
-    return systemTerminalUser(systemLauncher(agentUser(agent)), agent);
+    const u = agentUser(agent);
+    this.startContainers(u);
+    return systemTerminalUser(systemLauncher(u), agent);
   }
 
   /** The agent's folder in the connected workspace. */

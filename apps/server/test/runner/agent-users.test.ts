@@ -237,7 +237,7 @@ test("a useradd that fails keeps the uid listed: the next request makes the user
 test("with a shared folder, each agent's user joins its group and gets ~/shared, made as the agent, once per process", () => {
   const home = tempDir("agent-users-");
   dirs.push(home);
-  const os = fakeOs();
+  const os = fakeOs(undefined, home);
   const shared = { path: "/srv/agentes/shared", group: "agentes-shared" };
   const users = new AgentUsers({ home, range: RANGE, run: os.run, etc: home, shared });
   users.ensure(ANA);

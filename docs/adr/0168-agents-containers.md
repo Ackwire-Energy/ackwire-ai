@@ -6,8 +6,8 @@
   (what a uid-keyed firewall must count as an agent's), ADR 0057 (what an agent's share holds)
 - Code: runner `agent-users.ts` (`agentSubids`, `ensureSubids`, `rootlessContainers`, `containersCommand`,
   `ensureContainers`, `stopContainers`, `RUNTIME_DIR`, `DELEGATE`, `NOSUID_VIEW`, `CONTAINERS_START`, the launcher's
-  `containers`), `supervisor.ts` (`launchWorker`, `stopContainers` at a network's deadline), `daemon.ts` (an agent that
-  left), `service.ts` (`AGENT_TMP_CLEANUP`), `toolchains.ts` (`podman`); adapters `RunnerToolchains.podman`; engine
+  `containers`), `supervisor.ts` (`launchWorker`, `stopContainers` at a network's deadline), `daemon.ts` (a desktop or
+  terminal, an agent that left), `service.ts` (`AGENT_TMP_CLEANUP`), `toolchains.ts` (`podman`); adapters `RunnerToolchains.podman`; engine
   `context.ts` (`containersText`); tests `agent-users.test.ts`, `supervisor.test.ts`, `system-mode.test.ts`,
   `toolchains.test.ts`, engine `desktop.test.ts`, `turn-context.test.ts`
 
@@ -66,8 +66,8 @@ started inside it.
    weight, its 4096 tasks and the agents' common memory limit hold, and with the delegated cgroup each container's own
    `--memory`, `--cpus` and `--pids-limit` hold inside them. Images and volumes are in the agent's home, on the disk the
    workspace's files are on, which moves with it.
-8. **Lifecycle.** The supervisor makes sure the service runs as it should before it starts the agent's worker
-   (`ensureContainers`): started when it isn't, started anew when its command changed (a namespace, a network hook, a
+8. **Lifecycle.** Root makes sure the service runs as it should before it starts the agent's worker, desktop or
+   terminal (`ensureContainers`): started when it isn't, started anew when its command changed (a namespace, a network hook, a
    runner whose steps differ: the unit's description carries the command's hash), which stops its containers. A
    network change's deadline stops it (`retireNetworkAgent`), as does an agent leaving the computer. Stopping
    `agents.slice` (a hold) stops every container. After a reboot it comes back with the agent's next worker, and its
