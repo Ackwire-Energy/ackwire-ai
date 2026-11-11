@@ -169,17 +169,19 @@ export async function startServer(options: StartOptions) {
     runtime: { name: "bun", version: Bun.version },
   });
   const log = createLogger(config.LOG_LEVEL, errors);
-  startFreezeWatch(
-    {
-      logLevel: config.LOG_LEVEL,
-      ...(config.SENTRY_DSN
-        ? { reports: { dsn: config.SENTRY_DSN, environment: config.SENTRY_ENVIRONMENT, release } }
-        : {}),
-    },
-    log,
-  );
   try {
-    return await boot(options, config, log, release, errors);
+    const started = await boot(options, config, log, release, errors);
+    // Once it serves: a boot's own long steps (migrations, the built-in database's start) aren't what it is for.
+    startFreezeWatch(
+      {
+        logLevel: config.LOG_LEVEL,
+        ...(config.SENTRY_DSN
+          ? { reports: { dsn: config.SENTRY_DSN, environment: config.SENTRY_ENVIRONMENT, release } }
+          : {}),
+      },
+      log,
+    );
+    return started;
   } catch (error) {
     log.error("startup failed", { error, unhandled: true });
     await log.flush(EXIT_FLUSH_MS);
