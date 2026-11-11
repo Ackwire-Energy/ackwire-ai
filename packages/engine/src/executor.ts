@@ -896,12 +896,28 @@ const PROVIDER_BACK_TEXT = "My AI is back.";
 /** Causes a run waits out. Any other that still came as retryable reads by the provider's own words. */
 const OUTAGE_CAUSES: ReadonlySet<string> = new Set(["rate_limit", "down", "timeout", "unreachable", "ours"]);
 
-const outageNote = (error: unknown, account?: { provider?: string }) => {
-  // A CLI that failed on its own isn't its provider: the wait is said as the CLI's.
+/**
+ * A computer brain's failure that is its computer's own, with no answer of its provider's in it: its runner refused the
+ * turn (a sign-in it can't run yet after a restart or a move) or its CLI failed by itself.
+ */
+const computersOwn = (error: unknown, account?: { provider?: string }) => {
+  if (!(error instanceof BrainFailure)) return false;
+  const cli = cliFailureOf(error, account);
+  return cli ? "brain" in cli : !error.provider.cause;
+};
+
+/** `brain`: the turn's brain in words, for a refusal of its runner's (a CLI's own failure names its CLI). */
+const outageNote = (error: unknown, account: { provider?: string } | undefined, brain: string) => {
+  // The computer failing on its own isn't its provider: the wait is said as its brain's.
   const cli = error instanceof BrainFailure ? cliFailureOf(error, account) : null;
-  if (cli && "brain" in cli) return bodyCode("brain_unavailable", { brain: cli.brain });
+  if (computersOwn(error, account))
+    return bodyCode("brain_unavailable", { brain: cli && "brain" in cli ? cli.brain : brain });
   const failure =
-    error instanceof ProviderError ? providerFailureOf(error) : cli ? providerFailureOf(cli.provider) : null;
+    error instanceof ProviderError
+      ? providerFailureOf(error)
+      : cli && "provider" in cli
+        ? providerFailureOf(cli.provider)
+        : null;
   if (!failure?.provider) return bodyCode("provider_unavailable");
   const { cause, provider, detail } = failure;
   return bodyCode(`provider_wait_${OUTAGE_CAUSES.has(cause) ? cause : "said"}`, { provider, detail });
@@ -2297,17 +2313,27 @@ async function executeRunInner(
     const at = Date.now() + minutes * 60_000;
     const noteId = t.outage?.noteId;
     t.outage = { since, n: n + 1, waitId, ...(noteId ? { noteId } : {}), ...(line ? { line, at, people } : {}) };
+    // The computer failing on its own waits on the same ladder as a wait for that computer: the apps say it waits for
+    // its computer, and the computer coming back resumes it (`resumeRunsWaitingForMachine`).
+    const own = error instanceof BrainFailure && computersOwn(error, plan.account) ? error.code : null;
+    const machineId = own ? (plan.session?.machineId ?? agent.machineId ?? null) : null;
+    const brain = isComputerBrain(plan.kind) ? plan.kind : "claude_code";
+    const words = outageNote(error, plan.account, BRAIN_NAMES[brain]);
     await deferred;
     await addRunStep(db, run, "error", { reason: "provider_outage", message, parked: n + 1 });
-    // Said once where it answers, so the wait reads as the provider's, not as a question to a person.
+    // Said once where it answers, so the wait reads as the provider's or the computer's, not as a question to a person.
+    // The computer's own names its code and no computer: the apps keep it a plain note, never the card that waits for
+    // a computer to come back, which an online one would close at once as back.
     const note =
       n === 0 && !run.background && viaRoutine === null
         ? await db.transaction(async (tx) => {
             const m = await post(
               tx,
               replyThreadId,
-              PROVIDER_UNAVAILABLE_TEXT,
-              outageNote(error, plan.account),
+              own
+                ? `${words.bodyParams.brain} can't answer right now. I'll answer when it's back.`
+                : PROVIDER_UNAVAILABLE_TEXT,
+              own ? { ...words, brainUnavailable: { brain, code: own } } : words,
               undefined,
               true,
             );
@@ -2329,10 +2355,13 @@ async function executeRunInner(
       runAt: new Date(at),
       maxAttempts: 4,
     });
-    if (!(await transitionRun(db, run.id, "running", "waiting_input", { transcript: storedTranscript(t) })))
+    const waiting = { transcript: storedTranscript(t), ...(machineId ? { waitingMachineId: machineId } : {}) };
+    if (!(await transitionRun(db, run.id, "running", "waiting_input", waiting)))
       throw new PermanentJobError("run changed state while executing");
-    await publishChannelEvent(deps.pubsub, event("waiting_input", undefined, true));
-    await finished("waiting_input", undefined, true);
+    const outage = machineId ? undefined : true;
+    const computer = machineId ? "away" : undefined;
+    await publishChannelEvent(deps.pubsub, event("waiting_input", undefined, outage, computer));
+    await finished("waiting_input", undefined, outage, computer);
     return true;
   };
 
