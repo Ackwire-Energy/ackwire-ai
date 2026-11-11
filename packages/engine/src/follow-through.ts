@@ -193,12 +193,14 @@ const wakingReminders = (db: Executor, run: Pick<AgentRun, "orgId" | "agentId" |
 
 /**
  * Whatever run set it, the agent comes back to this conversation by itself: a follow-up still to come (the person's,
- * in the main timeline), a reminder that runs it here, or long work of its own that reports here. Only for a promise
- * already made: `wakesLater` alone decides whether a turn is judged at all, or every turn beside a running work would
- * go unread.
+ * in the main timeline), a reminder that runs it here, or long work of its own whose updates come here
+ * (`updatesThreadOf`: a work asked in the main timeline talks in its own thread, so a new request there beside it
+ * still gets its nudge). Only for a promise already made: `wakesLater` alone decides whether a turn is judged at all,
+ * or every turn beside a running work would go unread.
  */
 export async function comesBackHere(db: Executor, run: AgentRun) {
   const { personId } = await runAuthority(db, run);
+  const threadId = replyThreadOf(run);
   const [followUps, reminders, works] = await Promise.all([
     pendingFollowUps(db, run, personId),
     wakingReminders(db, run),
@@ -212,6 +214,7 @@ export async function comesBackHere(db: Executor, run: AgentRun) {
               eq(agentWorks.orgId, run.orgId),
               eq(agentWorks.agentId, run.agentId),
               eq(agentWorks.channelId, run.channelId),
+              sql`(case when ${agentWorks.ownThread} then ${agentWorks.anchorMessageId} else ${agentWorks.homeThreadId} end) is not distinct from ${threadId}::uuid`,
               inArray(agentWorks.status, ["queued", "live"]),
             ),
           )
