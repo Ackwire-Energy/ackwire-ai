@@ -23,10 +23,12 @@ import {
   adbStateOf,
   androidKind,
   androidTransport,
+  driverlessPhones,
   FACTS_SHELL,
   findAdb,
   KEYGUARD_SHELL,
   keyguardShowing,
+  PNP_SHELL,
   parseAdbDevices,
   parseAndroidFacts,
   pngFrom,
@@ -66,6 +68,10 @@ export const IDLE_MS = 5 * 60_000;
 /** A phone's facts (model, screen, battery) are read again after this long. */
 export const FACTS_TTL_MS = 5 * 60_000;
 const TOOLS_TTL_MS = 30_000;
+/** How long a phone guide's `phone.look` keeps a Windows computer looking for phones it has no driver for. */
+export const LOOK_MS = 60_000;
+/** How often it looks meanwhile (PowerShell's PnP list takes a second or two). */
+export const DRIVERLESS_EVERY_MS = 9_000;
 /** How often a known Wi-Fi phone that isn't connected is looked for on the network. */
 export const RECONNECT_MS = 15_000;
 /** The longest screen recording, whatever records it: about 45 MB at 2 Mbps, under the 50 MB file limit. */
@@ -177,10 +183,16 @@ export const extraToolDirs = (home: string) => [...usualDirs(home), path.join(ho
 
 // ── Words ─────────────────────────────────────────────────────────────────────
 
+/** No driver for the phone: Windows wants its maker's USB driver, Linux udev rules. */
+export const noDriverWords = (platform: NodeJS.Platform) =>
+  platform === "win32"
+    ? "Windows has no USB driver for the phone. Install its maker's (Google's for a Pixel, Samsung's for a Galaxy), then plug it in again."
+    : "This computer can't open the phone. Add udev rules for it (developer.android.com/studio/run/device), then plug it in again.";
+
 export const REASON_WORDS: Partial<Record<PhoneReason, string>> = {
   unauthorized: "Tap Allow on the phone (check Always allow from this computer first).",
   adb_offline: "The phone shows as offline. Unplug it and plug it back in.",
-  no_driver: "This computer can't open the phone. On Linux, add udev rules for it.",
+  no_driver: noDriverWords(process.platform),
   untrusted: "Tap Trust on the iPhone and enter its passcode.",
   developer_mode_off:
     "Turn on Developer Mode: Settings › Privacy & Security › Developer Mode, then restart the iPhone.",
@@ -302,6 +314,8 @@ export interface PhoneManagerOptions {
   iosScreen?: IosScreenDriverFactory | null;
   /** How often a Wi-Fi pairing looks at the network (`PAIR_POLL_MS`). */
   pairPollMs?: number;
+  /** Windows: `PNP_SHELL`'s output (default: PowerShell runs it); null when it couldn't. */
+  pnp?: () => Promise<string | null>;
 }
 
 const keyOf = (p: { platform: string; serial: string }) => `${p.platform}:${p.serial}`;
@@ -402,6 +416,9 @@ export class PhoneManager {
   private reconnecting: Promise<void> | null = null;
   private readonly pairer: WifiPairer;
   private appleSeen: Phone[] | null = null;
+  /** Until when a phone guide asked to look for phones Windows has no driver for (`phone.look`). */
+  private lookUntil = 0;
+  private driverless: { at: number; phones: Phone[] } | null = null;
   private tick = 0;
   private polling: Promise<void> | null = null;
   private first: Promise<void> | null = null;
@@ -457,6 +474,59 @@ export class PhoneManager {
       now: this.now,
       ...(opts.pairPollMs !== undefined ? { pollMs: opts.pairPollMs } : {}),
     });
+  }
+
+  /** `phone.look`: a phone guide waits for a phone. True when this computer looks for driverless ones (Windows). */
+  look(): boolean {
+    if (this.platform !== "win32") return false;
+    this.lookUntil = this.now() + LOOK_MS;
+    void this.poll();
+    return true;
+  }
+
+  /**
+   * Phones plugged in that Windows has no USB driver for, as `no_driver`: only while a guide asked, and only when adb
+   * lists no phone by cable (one it lists has a driver). Looked at every `DRIVERLESS_EVERY_MS` meanwhile.
+   */
+  private async scanDriverless(found: readonly Phone[]): Promise<Phone[]> {
+    const now = this.now();
+    if (this.platform !== "win32" || now >= this.lookUntil) {
+      this.driverless = null;
+      return [];
+    }
+    if (found.some((p) => p.platform === "android" && p.transport === "usb")) return [];
+    if (!this.driverless || now - this.driverless.at >= DRIVERLESS_EVERY_MS) {
+      const out = await (this.opts.pnp ?? (() => this.pnp()))();
+      const phones = driverlessPhones(out ?? "").map(
+        (d): Phone => ({
+          platform: "android",
+          serial: d.serial,
+          kind: "device",
+          model: d.model,
+          osVersion: "",
+          transport: "usb",
+          state: "needs_you",
+          reason: "no_driver",
+        }),
+      );
+      this.driverless = { at: now, phones };
+    }
+    return this.driverless.phones;
+  }
+
+  private async pnp() {
+    const shell = path.join(
+      this.env.SystemRoot ?? "C:\\Windows",
+      "System32",
+      "WindowsPowerShell",
+      "v1.0",
+      "powershell.exe",
+    );
+    const r = await runTool(shell, ["-NoProfile", "-NonInteractive", "-Command", PNP_SHELL], {
+      timeoutMs: 8_000,
+      env: this.env,
+    });
+    return r.code === 0 && !r.timedOut ? r.stdout.toString("utf8") : null;
   }
 
   /** `phone.pair.*`: pairing an Android phone over Wi-Fi with this computer's adb. */
@@ -537,6 +607,7 @@ export class PhoneManager {
     const found: Phone[] = [];
     const reach = new Map<string, string>();
     if (tools.adb) found.push(...(await this.scanAndroid(tools.adb, reach)));
+    found.push(...(await this.scanDriverless(found)));
     if (tools.xcrun) {
       if (this.appleSeen === null || this.tick % APPLE_EVERY === 0) this.appleSeen = await this.scanApple(tools.xcrun);
       found.push(...this.appleSeen);

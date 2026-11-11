@@ -3,7 +3,10 @@ import { resources } from "@agenteschat/i18n";
 import i18next, { type TFunction } from "i18next";
 import type { ComputerDevice, DeviceAudience, PhoneDevice } from "../src/api/types";
 import {
+  ANDROID_USB_DRIVERS,
+  androidNotShowing,
   androidStage,
+  androidSteps,
   audienceWords,
   controlRefusalText,
   deviceCounts,
@@ -11,6 +14,7 @@ import {
   deviceRows,
   deviceWaitEventOf,
   deviceWaitOf,
+  fixText,
   iphoneSteps,
   linkPhase,
   mayTakePhone,
@@ -19,6 +23,7 @@ import {
   phoneCloseState,
   phoneScreenCover,
   phoneScreenUrl,
+  reasonText,
   screenGesture,
   statusDetail,
   statusPill,
@@ -177,6 +182,57 @@ describe("connecting a phone", () => {
     expect(androidStage(host, known)).toMatchObject({ kind: "allow", phone: { id: "new" } });
     host.phones[1] = phone({ id: "new" });
     expect(androidStage(host, known)).toMatchObject({ kind: "ready", phone: { id: "new" } });
+  });
+
+  test("Android by cable: the person ticks the phone-only steps, one step open, and may untick their own", () => {
+    const looking = androidStage(computer({}), new Set());
+    const fresh = androidSteps(looking, new Set());
+    expect(fresh.states).toEqual({ devOptions: "current", usbDebugging: "waiting", plug: "waiting", allow: "waiting" });
+    expect(fresh.open).toBe("devOptions");
+    // Done on the phone: it ticks, and the next one opens.
+    const one = androidSteps(looking, new Set(["devOptions"]));
+    expect(one.states).toMatchObject({ devOptions: "done", usbDebugging: "current" });
+    expect(one.open).toBe("usbDebugging");
+    expect([...one.byHand]).toEqual(["devOptions"]);
+    const two = androidSteps(looking, new Set(["devOptions", "usbDebugging"]));
+    expect(two.states).toMatchObject({ devOptions: "done", usbDebugging: "done", plug: "current" });
+    // A done step opened again stays done, and only that one is open.
+    expect(androidSteps(looking, new Set(["devOptions", "usbDebugging"]), "devOptions")).toMatchObject({
+      open: "devOptions",
+      now: "plug",
+      states: { devOptions: "done", plug: "current" },
+    });
+  });
+
+  test("Android by cable: the phone shows up in any state and every step before Allow ticks by itself", () => {
+    const asking = phone({ id: "new", status: { kind: "needs_you", reason: "unauthorized" } });
+    const allow = androidSteps(androidStage(computer({ phones: [asking] }), new Set()), new Set());
+    expect(allow.states).toEqual({ devOptions: "done", usbDebugging: "done", plug: "done", allow: "needs" });
+    expect(allow.open).toBe("allow");
+    // Seen by the computer: nothing is the person's word alone any more.
+    expect(allow.byHand.size).toBe(0);
+    // Seen without a driver: the cable step needs the person, the phone's steps are done.
+    const driverless = phone({ id: "new", status: { kind: "needs_you", reason: "no_driver" } });
+    const stage = androidStage(computer({ os: "windows", phones: [driverless] }), new Set(["new"]));
+    expect(stage.kind).toBe("driver");
+    expect(androidSteps(stage, new Set()).states).toEqual({
+      devOptions: "done",
+      usbDebugging: "done",
+      plug: "needs",
+      allow: "waiting",
+    });
+  });
+
+  test("Android by cable: why a phone may not show up, the USB driver on Windows only", () => {
+    expect(androidNotShowing("darwin")).toEqual(["cable", "unlocked", "fileTransfer", "usbDebugging", "samsung"]);
+    expect(androidNotShowing("linux")).not.toContain("driver");
+    expect(androidNotShowing("windows").at(-1)).toBe("driver");
+    expect(Object.values(ANDROID_USB_DRIVERS).every((u) => u.startsWith("https://developer."))).toBe(true);
+    // No driver: Windows wants the phone maker's, Linux udev rules.
+    expect(fixText(t, "no_driver", "windows")).toBe("Install the phone maker's USB driver");
+    expect(reasonText(t, "no_driver", "windows")).toBe("Windows has no USB driver for this phone");
+    expect(fixText(t, "no_driver", "linux")).toBe("Add udev rules for this phone");
+    expect(reasonText(t, "no_driver", "linux")).toBe("Linux can't open this phone");
   });
 
   test("iPhone: steps before the phone's reason are done, that one waits on the person", () => {

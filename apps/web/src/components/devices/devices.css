@@ -395,6 +395,60 @@ a.dv-row__detail {
   width: 14px;
   height: 14px;
 }
+/* A folded step: its title alone, a button that opens it (a done step to look again, a later one to read ahead). It
+   takes the row's height, the step's own padding, so a finger finds it. */
+.dv-step__open {
+  justify-self: stretch;
+  margin-block: calc(-1 * var(--space-2));
+  padding: var(--space-2) 0;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  letter-spacing: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.dv-step__open:hover {
+  color: var(--ink);
+}
+/* Why a plugged phone may not show up: a title over a short list, under the cable step it waits on. */
+.dv-slow {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.dv-slow__title {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 18px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.dv-slow__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding-inline-start: var(--space-4);
+  font-size: var(--text-sm);
+  line-height: 18px;
+  color: var(--ink2);
+  overflow-wrap: anywhere;
+}
+.dv-slow__list > li::marker {
+  color: var(--faint);
+}
+.dv-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  font-size: var(--text-sm);
+  line-height: 18px;
+}
+.dv-slow__list .dv-links {
+  margin-top: var(--space-1);
+}
 
 /* A tiny drawing of the phone's own setting row, in the app's look: the row to find is ringed, with a
    tap count or the switch's state. Decorative: the step's words say the same thing. */
