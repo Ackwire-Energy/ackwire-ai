@@ -388,12 +388,12 @@ describe("no AI connected: above the composer", () => {
     // The conversation's agent leads, the right hand isn't one of them.
     expect(within(whom).getByRole("button", { name: /^Todos os agentes/ }).textContent).toContain("Atlas e Ada");
     await click(within(box).getByRole("button", { name: /^Claude/ }), 8);
-    const panel = within(screen().getByRole("dialog")).getByRole("region", { name: "Seu plano do Claude" });
-    expect(within(panel).getByRole("combobox", { name: "Agentes que usam este plano" }).textContent).toBe(
-      "Todos os agentes",
-    );
-    // The first screen already said who: the panel doesn't list them again.
-    expect(panel.querySelector(".ai-panel__who")).toBeNull();
+    // The plan's panel signs in for both, the conversation's agent first; the first screen already said who, so the
+    // panel names nobody again.
+    const steps = screen().getByRole("dialog");
+    expect(steps.textContent).toContain("Um login por agente, com a mesma conta.");
+    expect(within(steps).getByRole("button", { name: "Fazer login para o Atlas" })).toBeTruthy();
+    expect(steps.querySelector(".ai-panel__who")).toBeNull();
   });
 
   test("the agent's page: 'Sem IA' by its name opens Connect for that agent", async () => {
