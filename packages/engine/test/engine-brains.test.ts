@@ -36,6 +36,7 @@ import {
   enableOperatorEvents,
   enqueue,
   executeToolForRun,
+  getMessage,
   grantScopes,
   insertMessage,
   invokeToolForRun,
@@ -45,12 +46,14 @@ import {
   listMessages,
   listThreads,
   listWorkingRuns,
+  loadAgentStatuses,
   MAX_COMPUTER_DROPS,
   type MachineStatus,
   notePlanLimit,
   openDm,
   postPersonMessage,
   queueOnRun,
+  receiptsFor,
   recoverStaleRuns,
   resetAccountFailures,
   resolveBrain,
@@ -4299,4 +4302,110 @@ test("computer sessions: a conversation run never takes a session an active run 
   const again = { ...next, id: Bun.randomUUIDv7(), triggerMessageId: Bun.randomUUIDv7() };
   await fx.db.insert(schema.agentRuns).values(again);
   expect((await resolveBrain({ db: fx.db }, agent, again, dm.id, {})).session?.id).not.toBe(first.brainSessionId);
+});
+
+/** The run's job may try once: its next failure is its last attempt (`finalAttempt`), where a wait parks it. */
+const lastAttempt = (fx: Fixture) =>
+  fx.db.update(schema.outbox).set({ maxAttempts: 1 }).where(eq(schema.outbox.kind, "agent_run.execute"));
+
+/** What the person's message, the agent's line and a hand-off read of the agent's one run. */
+async function readsOf(fx: Fixture) {
+  const [run] = await fx.db.select().from(schema.agentRuns);
+  if (!run) throw new Error("no run");
+  const asked = await getMessage(fx.db, fx.org.id, run.triggerMessageId);
+  const receipts = await receiptsFor(fx.db, fx.org.id, asked ? [asked] : []);
+  const [status] = await loadAgentStatuses(fx.db, fx.org.id, new Date(), [fx.agent.id]);
+  return {
+    run,
+    handled: receipts.get(run.triggerMessageId)?.handled.map(({ status, outage, computer }) => ({
+      status,
+      ...(outage ? { outage } : {}),
+      ...(computer ? { computer } : {}),
+    })),
+    line: status?.status?.kind,
+  };
+}
+
+test("back from a provider outage and in line for its computer, it reads as in line, never as the provider being down", async () => {
+  f = await setup();
+  const machineId = await computerAgent(f);
+  await f.db.update(schema.providerCredentials).set({ revokedAt: new Date() });
+  const { brain } = scriptedComputerBrain((n) => [
+    n === 0
+      ? {
+          type: "error",
+          code: "claude_failed",
+          message: "API Error: 529 Overloaded",
+          retryable: true,
+          cause: "provider_transient",
+          httpStatus: 529,
+        }
+      : { type: "error", code: "busy", message: "The computer is busy with other requests.", retryable: true },
+  ]);
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(f, "@dev oi");
+  await lastAttempt(f);
+  await drainOutbox(f.db, handlers);
+  expect((await readsOf(f)).handled).toEqual([{ status: "waiting_input", outage: true }]);
+
+  // The provider's wait is over and the computer has no room: the run waits in its line, the outage marker kept.
+  await drainOutbox(f.db, handlers, { now: new Date(Date.now() + 3 * 60_000), maxBatches: 1 });
+  const reads = await readsOf(f);
+  expect(reads.run.transcript).toMatchObject({ outage: { n: 1 }, waitingForBrain: { code: "busy" } });
+  expect(reads.run.waitingMachineId).toBe(machineId);
+  expect(reads.handled).toEqual([{ status: "waiting_input", computer: "queued" }]);
+  expect(reads.line).toBe("queued_computer");
+});
+
+test("a refusal of the computer's own waits for that computer: never the provider's words, back when it is", async () => {
+  f = await setup();
+  const machineId = await computerAgent(f);
+  await f.db.update(schema.providerCredentials).set({ revokedAt: new Date() });
+  let ready = false;
+  const { brain } = scriptedComputerBrain(() => [
+    ready
+      ? { type: "done", text: "Pronto." }
+      : {
+          type: "error",
+          code: "unsupported",
+          message: "This computer can't run this Claude sign-in right now. Try again later.",
+          retryable: true,
+        },
+  ]);
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(f, "@dev oi");
+  await lastAttempt(f);
+  await drainOutbox(f.db, handlers);
+  const reads = await readsOf(f);
+  expect(reads.run.status).toBe("waiting_input");
+  expect(reads.run.waitingMachineId).toBe(machineId);
+  expect(reads.handled).toEqual([{ status: "waiting_input", computer: "away" }]);
+  expect(reads.line).toBe("waiting_computer");
+  expect(consultationWait(reads.run)).toBe("computer");
+  // A plain note in the computer's words: it names no computer, so no app shows the card that waits for one to come back.
+  const notes = (await timeline(f)).filter((m) => m.author.type === "agent");
+  expect(notes.map((m) => [m.body, m.meta.bodyCode, m.meta.bodyParams, m.meta.brainUnavailable])).toEqual([
+    [
+      "Claude Code can't answer right now. I'll answer when it's back.",
+      "brain_unavailable",
+      { brain: "Claude Code" },
+      { brain: "claude_code", code: "unsupported" },
+    ],
+  ]);
+
+  // Its runner reconnects with the sign-in ready: the run goes on there.
+  ready = true;
+  await resumeRunsWaitingForMachine(f.db, machineId);
+  await drainOutbox(f.db, handlers);
+  const after = await runById(f, reads.run.id);
+  expect(after?.status).toBe("done");
+  expect(after?.waitingMachineId).toBeNull();
 });
