@@ -141,7 +141,7 @@ describe("IA e uso: budget only where the workspace uses the API", () => {
     expect(regions()).toEqual([]);
     const body = document.querySelector(".settings__body")?.textContent ?? "";
     expect(body).not.toMatch(/orçamento|US\$/i);
-    // Where the first key is added, which is what brings the budget in.
+    // A workspace that already holds a key keeps its keys in sight.
     expect(screen().getByRole("region", { name: "Chaves de provedor" })).toBeTruthy();
     // The tabs stay: Resumo, then Pessoas.
     expect(
@@ -149,6 +149,17 @@ describe("IA e uso: budget only where the workspace uses the API", () => {
         .getAllByRole("tab")
         .map((tab) => tab.textContent),
     ).toEqual(["Resumo", "Pessoas"]);
+  });
+
+  test("on plans alone with no key: only the accounts, and the first key is added from Conectar uma IA", async () => {
+    const state = onPlans();
+    state.credentials = [];
+    await go("settings/usage", state);
+    const accounts = screen().getByRole("region", { name: "Contas" });
+    expect(screen().queryByRole("region", { name: "Chaves de provedor" })).toBeNull();
+    expect(regions()).toEqual([]);
+    await click(within(accounts).getByRole("button", { name: "Conectar uma IA" }));
+    expect(within(screen().getByRole("dialog")).getByRole("radio", { name: "Com chave de API" })).toBeTruthy();
   });
 
   test("one agent on the API with a key: the API per agent, its spend by kind and the default budget", async () => {

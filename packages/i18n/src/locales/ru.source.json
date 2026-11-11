@@ -5156,9 +5156,6 @@
   "rightHand.settings.audit": {
     "value": "See what {{name}} did"
   },
-  "rightHand.settings.change": {
-    "value": "Change"
-  },
   "rightHand.settings.planHelp": {
     "value": "The plan's owner pays. When its computer is away, the conversation says so and offers an API key."
   },
@@ -5230,9 +5227,6 @@
   },
   "rightHand.settings.noPlans": {
     "value": "Connect a plan in AI and usage to use it here."
-  },
-  "rightHand.settings.sharesOn": {
-    "value": "People without their own plan talk to {{name}} through this plan."
   },
   "rightHand.settings.lend": {
     "value": "Lend this plan to people without one"

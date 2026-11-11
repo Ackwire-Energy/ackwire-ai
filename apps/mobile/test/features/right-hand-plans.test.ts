@@ -22,20 +22,26 @@ test("Connect for it offers every plan the phone offers, ChatGPT's too, and its 
   expect(steps).toContain("options={PLAN_CHOICES.map((c) => ({");
 });
 
-test("Sua IA is one status: what answers me, by its logo and what it is to me, and its action; Lodi's settings open with it", () => {
+test("Sua IA is one row that opens its choice: what answers me, by its logo and what it is to me; Lodi's settings open with it", () => {
   const screen = readFileSync(join(import.meta.dir, "../../src/features/right-hand/SettingsScreen.tsx"), "utf8");
   const profile = readFileSync(join(import.meta.dir, "../../src/features/agents/AgentProfileScreen.tsx"), "utf8");
   // The four states come from the client's rule, as on the web (ADR 0137 §11).
   expect(screen).toContain('const status = mineStatus(view, meId ?? "", platform, agent.brain?.maker);');
-  for (const kind of ["own", "key", "plan"]) expect(screen).toContain(`status.kind === "${kind}"`);
-  // A plan of mine or lent to me: its maker's logo, whose it is, Trocar, and back to the workspace's in one tap.
-  expect(screen).toContain('leading={<ProviderLogo id={status.brain} size="sm" />}');
+  for (const kind of ["nobody", "own", "key"]) expect(screen).toContain(`status.kind === "${kind}"`);
+  // A plan of mine or lent to me: its maker's logo and whose it is. The sheet holds the ways out, the one in use
+  // checked: another plan, or back to the workspace's. No word at the row's end, no second row under it.
+  expect(screen).toContain('<ProviderLogo id={status.brain} size="sm" />');
+  expect(screen).toContain("value: own ? MINE : WORKSPACE,");
+  expect(screen).toContain('{ key: OTHER, label: t("agentPage.work.brain.connectPlan")');
+  expect(screen).toContain("if (picked === OTHER || (picked === MINE && !own)) connect();");
+  expect(screen).toContain("else if (picked === WORKSPACE && own) back();");
+  expect(screen).not.toContain("value={t(");
+  expect(screen).not.toContain("onPress={back}");
   expect(screen).toContain('t("rightHand.settings.mineOf", { owner: first(status.ownerId) })');
   expect(screen).toContain('{ scope: "mine", brain: "model" }');
   // The workspace's key or plan answers me: what it is, and Usar meu plano.
-  expect(screen).toContain('sub={t("rightHand.settings.mineKey")}');
-  expect(screen).toContain('sub={t("rightHand.settings.minePlan")}');
-  expect(screen.match(/value=\{t\("rightHand\.settings\.useMine"\)\}/g)).toHaveLength(2);
+  expect(screen).toContain('t(status.kind === "key" ? "rightHand.settings.mineKey" : "rightHand.settings.minePlan")');
+  expect(screen).toContain('{ key: MINE, label: t("rightHand.settings.useMine")');
   // Nobody answers me: the call to connect my plan, and why it is mine alone behind the ⓘ, not a paragraph under it.
   expect(screen).toContain('sub={t("rightHand.settings.mineNobody")}');
   expect(screen).toContain('text: t("rightHand.settings.mineHelp", agentGrammar(agent.name)),');
@@ -69,9 +75,9 @@ test("Lodi's settings: the workspace's plan is lent by a switch for whoever sets
   expect(screen).toContain('label={t("rightHand.settings.lend")}');
   expect(screen).toContain("set({ onlyOwner: on })");
   expect(screen).toContain("disabled={!view.canEdit || busy}");
-  // One line under the switch whatever its state, and the plan by its name and whose account it is.
-  expect(screen).toContain('<GroupedFooter>{t("rightHand.settings.sharesOn", g)}</GroupedFooter>');
-  expect(screen).not.toContain("sharesOff");
+  // No sentence under the switch: its name says what it does, the plan's terms are behind its ⓘ.
+  expect(screen).not.toContain("sharesOn");
+  expect(screen).toContain("{...(terms ? { hint: { name: terms.about, text: terms.text } } : {})}");
   expect(screen).toContain('t("rightHand.settings.planName", { name: a.label })');
   // The budget only where something bills per use, lending and the audience only with someone else here.
   expect(screen).toContain("{usesApi ? (");

@@ -15,6 +15,7 @@ import {
 import { agentsReach, audienceOf, audiencePatch } from "@agenteschat/client/lib/audience";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
+import { accountPlan, planReplies } from "@agenteschat/client/lib/plans";
 import { AUTO } from "@agenteschat/client/lib/providers";
 import { mineStatus, rightHandOf } from "@agenteschat/client/lib/right-hand";
 import { dayText, hourText, teamWeekOn } from "@agenteschat/client/lib/team-week";
@@ -45,8 +46,8 @@ import { useFailed } from "../routines/hooks";
 import { usePersonalView } from "../settings/hooks";
 import { Gap, SettingsPage } from "../settings/parts";
 import { AgentFace } from "../shared/Face";
-import { pickOne } from "../shared/PickerSheet";
 import { type Directory, useColors, useDirectory, useMeId } from "../shared/hooks";
+import { type PickLeading, pickOne } from "../shared/PickerSheet";
 import { RightHandApprovalsGroup } from "./Approvals";
 
 /** Opens Configurações › the right hand (ADR 0137). */
@@ -100,11 +101,17 @@ function GroupTitle({ children, note }: { children: string; note?: string }) {
   );
 }
 
+/** The choices of "Sua IA": the person's own plan, connecting another one, the workspace's AI. */
+const MINE = "mine";
+const OTHER = "other";
+const WORKSPACE = "workspace";
+
 /**
- * "Sua IA" (ADR 0137 §11) as one status, as on the web (`mineStatus`): the logo of what answers the person in their own
- * DM with the right hand, its name and what it is to them (Claude, chave do workspace), and its action at the row's end
- * (Usar meu plano; Trocar and Usar a do workspace on a plan of theirs). When nothing answers them it is the call to
- * connect a plan. Why it is theirs alone is the row's ⓘ. Everyone has it, on the right hand's profile.
+ * "Sua IA" (ADR 0137 §11) as one row that opens, as on the web (`mineStatus`): the logo of what answers the person in
+ * their own DM with the right hand, its name and what it is to them (Claude, chave do workspace). Its sheet holds the
+ * choice, the one in use checked: their own plan (connecting one, or another) or the workspace's AI. When nothing
+ * answers them the row is the call to connect a plan. Why it is theirs alone is the row's ⓘ. Everyone has it, on the
+ * right hand's profile.
  */
 export function RightHandMine({ agent }: { agent: Agent }) {
   const { t } = useTranslation();
@@ -127,57 +134,74 @@ export function RightHandMine({ agent }: { agent: Agent }) {
       })
       .catch(failed);
   if (!status) return null;
-  const row = {
-    chevron: true,
-    onPress: () => openConnectAi({ agentId: agent.id }),
-    hint: {
-      name: t("common.about", { label: t("rightHand.settings.mine") }),
-      text: t("rightHand.settings.mineHelp", agentGrammar(agent.name)),
-    },
+  const connect = () => openConnectAi({ agentId: agent.id });
+  const hint = {
+    name: t("common.about", { label: t("rightHand.settings.mine") }),
+    text: t("rightHand.settings.mineHelp", agentGrammar(agent.name)),
   };
-  return (
-    <GroupedList>
-      {status.kind === "own" ? (
+  if (status.kind === "nobody")
+    return (
+      <GroupedList>
         <GroupedRow
-          {...row}
-          leading={<ProviderLogo id={status.brain} size="sm" />}
-          label={status.label ?? t(`aiAccounts.connect.${status.brain}`)}
-          sub={
-            status.ownerId
-              ? t("rightHand.settings.mineOf", { owner: first(status.ownerId) })
-              : t("rightHand.settings.mineYours")
-          }
-          value={t("rightHand.settings.change")}
-        />
-      ) : status.kind === "key" ? (
-        <GroupedRow
-          {...row}
-          {...(status.provider
-            ? { leading: <ProviderLogo id={status.provider} size="sm" /> }
-            : { icon: "key" as const })}
-          label={status.label ?? t("rightHand.settings.mineKeyName")}
-          sub={t("rightHand.settings.mineKey")}
-          value={t("rightHand.settings.useMine")}
-        />
-      ) : status.kind === "plan" ? (
-        <GroupedRow
-          {...row}
-          leading={<ProviderLogo id={status.brain} size="sm" />}
-          label={t(`aiAccounts.connect.${status.brain}`)}
-          sub={t("rightHand.settings.minePlan")}
-          value={t("rightHand.settings.useMine")}
-        />
-      ) : (
-        <GroupedRow
-          {...row}
           icon="bolt"
           label={t("rightHand.settings.connectMine")}
           sub={t("rightHand.settings.mineNobody")}
+          hint={hint}
+          chevron
+          onPress={connect}
         />
-      )}
-      {status.kind === "own" ? (
-        <GroupedRow icon="members" label={t("rightHand.settings.useWorkspace")} onPress={back} />
-      ) : null}
+      </GroupedList>
+    );
+  const own = status.kind === "own";
+  const logo =
+    status.kind === "key" ? (
+      status.provider ? (
+        <ProviderLogo id={status.provider} size="sm" />
+      ) : null
+    ) : (
+      <ProviderLogo id={status.brain} size="sm" />
+    );
+  const label =
+    status.kind === "own"
+      ? (status.label ?? t(`aiAccounts.connect.${status.brain}`))
+      : status.kind === "key"
+        ? (status.label ?? t("rightHand.settings.mineKeyName"))
+        : t(`aiAccounts.connect.${status.brain}`);
+  const sub =
+    status.kind === "own"
+      ? status.ownerId
+        ? t("rightHand.settings.mineOf", { owner: first(status.ownerId) })
+        : t("rightHand.settings.mineYours")
+      : t(status.kind === "key" ? "rightHand.settings.mineKey" : "rightHand.settings.minePlan");
+  const leading: PickLeading = logo ? { kind: "node", node: logo } : { kind: "icon", name: "key" };
+  const choose = async () => {
+    const picked = await pickOne({
+      title: t("rightHand.settings.mine"),
+      value: own ? MINE : WORKSPACE,
+      options: own
+        ? [
+            { key: MINE, label, sub, leading },
+            { key: OTHER, label: t("agentPage.work.brain.connectPlan"), leading: { kind: "icon", name: "plus" } },
+            { key: WORKSPACE, label: t("rightHand.settings.useWorkspace"), leading: { kind: "icon", name: "members" } },
+          ]
+        : [
+            { key: MINE, label: t("rightHand.settings.useMine"), leading: { kind: "icon", name: "bolt" } },
+            { key: WORKSPACE, label: t("rightHand.settings.useWorkspace"), sub: `${label} · ${sub}`, leading },
+          ],
+    });
+    if (picked === OTHER || (picked === MINE && !own)) connect();
+    else if (picked === WORKSPACE && own) back();
+  };
+  return (
+    <GroupedList>
+      <GroupedRow
+        {...(logo ? { leading: logo } : { icon: "key" as const })}
+        label={label}
+        sub={sub}
+        hint={hint}
+        chevron
+        onPress={() => void choose()}
+      />
     </GroupedList>
   );
 }
@@ -260,6 +284,9 @@ function WorkspaceAi({ agent, dir }: { agent: Agent; dir: Directory }) {
   const owner = theirs(signIn?.ownerId);
   const on = view ? !view.onlyOwner : false;
   const g = agentGrammar(agent.name);
+  const terms = kind
+    ? planReplies(t, { on: false, agent: null, brain: kind, plan: signIn?.plan, coding: accountPlan(signIn) })
+    : null;
   return (
     <>
       <GroupedList>
@@ -309,12 +336,13 @@ function WorkspaceAi({ agent, dir }: { agent: Agent; dir: Directory }) {
               icon="members"
               label={t("rightHand.settings.lend")}
               labelLines={2}
+              // The plan's own terms on lending it, as an agent's plan says them everywhere.
+              {...(terms ? { hint: { name: terms.about, text: terms.text } } : {})}
               toggle={on}
               disabled={!view.canEdit || busy}
               onPress={() => set({ onlyOwner: on })}
             />
           </GroupedList>
-          <GroupedFooter>{t("rightHand.settings.sharesOn", g)}</GroupedFooter>
         </>
       ) : null}
     </>

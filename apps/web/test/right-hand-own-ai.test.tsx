@@ -83,9 +83,10 @@ test("Lodi's old settings address opens Lodi's page: two groups, the face opens 
   expect(screen().queryByRole("button", { name: "Usar uma chave de API" })).toBeNull();
   // The switch says what it does once: its state is the switch.
   const lend = screen().getByRole("switch", { name: "Emprestar este plano a quem não tem um" });
-  const words = lend.closest(".settings-row")?.querySelector(".settings-row__status")?.textContent ?? "";
-  expect(words).toContain("Quem não tem plano próprio conversa com o Lodi por este plano.");
-  expect(words).not.toMatch(/Ligado|Desligado/);
+  const lendRow = lend.closest(".settings-row") as HTMLElement;
+  expect(lendRow.querySelector(".settings-row__status")).toBeNull();
+  // The plan's terms on lending it stay one press away, beside the name.
+  expect(within(lendRow).getByRole("button", { name: "Sobre Emprestar este plano a quem não tem um" })).toBeTruthy();
   // The row opens the choice in place, and choosing there changes the row.
   await act(async () => fireEvent.click(ai));
   await settle(4);
@@ -164,6 +165,17 @@ test("Sua IA on a plan of mine: the dialog goes back to the workspace's AI, and 
   await act(async () => fireEvent.click(row(/^Sua IA/)));
   await settle(4);
   const dialog = screen().getByRole("dialog", { name: "Sua IA" });
+  // Every way out is a choice of the list, the plan in use checked: no button stands loose among them.
+  expect(
+    within(dialog)
+      .getAllByRole("radio")
+      .map((r) => [r.textContent, r.getAttribute("aria-checked")]),
+  ).toEqual([
+    ["Trabalhoseu plano", "true"],
+    ["Conectar outro plano", "false"],
+    ["Usar a do workspace", "false"],
+  ]);
+  expect(within(dialog).queryByRole("button", { name: "Mudar" })).toBeNull();
   await act(async () => fireEvent.click(within(dialog).getByRole("radio", { name: /Usar a do workspace/ })));
   await settle(8);
   expect(sent).toEqual([{ scope: "mine", brain: "model" }]);

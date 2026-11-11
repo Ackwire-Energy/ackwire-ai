@@ -2156,7 +2156,6 @@ export const en = {
       audienceHelp: "Outside it, a person doesn't see {{name}} in the sidebar.",
       lock: "{{name}} can't be archived or deleted. The only thing it posts without being asked is Team week, for admins.",
       audit: "See what {{name}} did",
-      change: "Change",
       planHelp: "The plan's owner pays. When its computer is away, the conversation says so and offers an API key.",
       /** The face that opens the look's dialog, read aloud and on hover. */
       lookEdit: "Change {{name}}'s look",
@@ -2190,7 +2189,6 @@ export const en = {
       workspaceHelp: "People without their own plan talk to {{name}} through this AI.",
       noPlans: "Connect a plan in AI and usage to use it here.",
       /** Under the switch that lends the workspace's plan: what it does, whatever its state. */
-      sharesOn: "People without their own plan talk to {{name}} through this plan.",
       lend: "Lend this plan to people without one",
       /** The right hand's page, its two groups: what is the viewer's alone, and what admins set for everyone. */
       groupMine: "Just for you",

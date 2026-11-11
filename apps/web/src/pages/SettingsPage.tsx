@@ -1,6 +1,7 @@
 import type { Credential, OrgSettings } from "@agenteschat/client";
 import {
   useAddCredential,
+  useAiAccounts,
   useAuthConfig,
   useComposioUsage,
   useComputerSetup,
@@ -758,9 +759,13 @@ function KeysSection() {
   >(null);
   const look = useRightHandLook();
   const hold = usePlanHold();
+  const plans = useAiAccounts(org.id).data?.accounts.length ?? 0;
   if (!allowed) return null;
   const live = (credentials.data ?? []).filter((c) => !c.revokedAt);
   const noKeys = credentials.isSuccess && live.length === 0;
+  // On plans alone the screen is the accounts: the first key is added from "Conectar uma IA", and this card comes
+  // with it.
+  if (live.length === 0 && plans > 0) return null;
   return (
     <Card aria-labelledby="sec-keys">
       <CardHeader
@@ -1103,7 +1108,7 @@ export function KeyDialog({
  * admins), then the API's spend by kind and the default budget (admins).
  */
 /**
- * IA e uso › Resumo: the workspace's AI accounts, then its provider keys and who picks the agents. What bills per use
+ * IA e uso › Resumo: the workspace's AI accounts, then its provider keys (on plans alone, once it has one). What bills per use
  * (the API per agent, its spend by kind, the default budget) shows only once the workspace uses the API
  * (`workspaceUsesApi`): on plans alone there is no budget to show.
  */

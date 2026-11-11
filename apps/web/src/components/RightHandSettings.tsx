@@ -31,7 +31,6 @@ import {
   DialogFooter,
   GroupHeading,
   Icon,
-  InfoHint,
   Input,
   OptionList,
   type OptionListItem,
@@ -55,28 +54,6 @@ import { useDirectory } from "@/hooks/useDirectory";
 import { usePersonalView } from "@/hooks/usePersonalView";
 import { fullLook, lookOf } from "@/lib/look";
 import { useToast } from "@/lib/toast";
-
-/** The plan's terms behind an ⓘ after a line (`planReplies`), as an agent's plan says them everywhere. */
-function PlanTerms({
-  line,
-  brain,
-  plan,
-  coding,
-}: {
-  line: string;
-  brain: PlanKind;
-  plan?: string | null;
-  coding?: ReturnType<typeof accountPlan>;
-}) {
-  const { t } = useTranslation();
-  const says = planReplies(t, { on: false, agent: null, brain, plan, coding });
-  return (
-    <span className="plan-replies__terms ac-hintline">
-      <span>{line}</span>
-      <InfoHint name={says.about}>{says.text}</InfoHint>
-    </span>
-  );
-}
 
 /**
  * The right hand's page (ADR 0137): its settings in two groups. "Só para você": the AI the viewer's own conversation
@@ -205,24 +182,18 @@ export function RightHandMineRow({ agent }: { agent: Agent }) {
       </span>
     </span>
   );
-  const options: OptionListItem<"mine" | "workspace">[] = [];
-  if (own)
-    options.push({
-      value: "mine",
-      title: name,
-      description: what,
-      children: connectMine && !held && (
-        <Button size="sm" disabled={busy} onClick={connectMine}>
-          {t("rightHand.settings.change")}
-        </Button>
-      ),
-    });
+  const options: OptionListItem<"mine" | "other" | "workspace">[] = [];
+  if (own) options.push({ value: "mine", title: name, description: what });
   // On a billing hold nothing connects before the plan, whose one way in is the hold's banner (ADR 0162).
-  else if (connectMine && !held)
-    options.push({
-      value: "mine",
-      title: t(status.kind === "nobody" ? "rightHand.settings.connectMine" : "rightHand.settings.useMine"),
-    });
+  if (connectMine && !held)
+    options.push(
+      own
+        ? { value: "other", title: t("agentPage.work.brain.connectPlan") }
+        : {
+            value: "mine",
+            title: t(status.kind === "nobody" ? "rightHand.settings.connectMine" : "rightHand.settings.useMine"),
+          },
+    );
   if (status.kind !== "nobody")
     options.push({
       value: "workspace",
@@ -255,7 +226,7 @@ export function RightHandMineRow({ agent }: { agent: Agent }) {
               onValueChange={(next) => {
                 if (next === "workspace") {
                   if (own) back();
-                } else if (!own) connectMine?.();
+                } else if (next === "other" || !own) connectMine?.();
               }}
               options={options}
             />
@@ -444,13 +415,10 @@ function RightHandForm({ agent }: { agent: Agent }) {
               id="rh-shares"
               icon={opened ? "audienceEveryone" : "audienceOwner"}
               label={t("rightHand.settings.lend")}
-              status={
-                <PlanTerms
-                  line={t("rightHand.settings.sharesOn", g)}
-                  brain={kind}
-                  plan={signIn?.plan}
-                  coding={accountPlan(signIn)}
-                />
+              // The plan's own terms on lending it, as an agent's plan says them everywhere.
+              hint={
+                planReplies(t, { on: false, agent: null, brain: kind, plan: signIn?.plan, coding: accountPlan(signIn) })
+                  .text
               }
               control={
                 <Switch
