@@ -12,7 +12,7 @@ import {
   teamFailureText,
   templateFor,
 } from "@agenteschat/client/lib/team-plan";
-import { Button, Chip, Field, Icon, Locked, Select, Skeleton, Spinner, Textarea } from "@agenteschat/ui";
+import { Button, Chip, Field, Icon, type IconName, Locked, Select, Skeleton, Spinner, Textarea } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
@@ -74,7 +74,7 @@ export function BusinessStep({
                 aria-pressed={b === kind}
                 onClick={() => setKind(b === kind ? null : b)}
               >
-                {b === kind && <Icon name="check" size={14} />}
+                <Icon name={BUSINESS_ICONS[b]} size={14} />
                 <span>{t(`teamPlan.business.${b}`)}</span>
               </button>
             ))}
@@ -367,3 +367,14 @@ export function PlanStep({
     </>
   );
 }
+
+/** Each business type's chip leads with its icon, chosen or not (the chip darkens when chosen). */
+const BUSINESS_ICONS: Record<BusinessType, IconName> = {
+  agency: "bulb",
+  store: "archiveBox",
+  clinic: "calendar",
+  software: "code",
+  support: "message",
+  services: "document",
+  other: "more",
+};

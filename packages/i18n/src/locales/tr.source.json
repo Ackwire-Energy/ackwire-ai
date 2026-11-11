@@ -1778,6 +1778,12 @@
   "onboarding.flow.lodi.planThen": {
     "value": "Once the plan is on, the next screen is where you connect your AI."
   },
+  "onboarding.flow.lodi.area": {
+    "value": "One last thing before the team."
+  },
+  "onboarding.flow.lodi.areaPersonal": {
+    "value": "One last thing before your agents."
+  },
   "onboarding.flow.lodi.ask": {
     "value": "Already have a team somewhere else? I'll bring all of it here."
   },
@@ -1822,6 +1828,36 @@
   },
   "onboarding.flow.lodi.peopleLink": {
     "value": "Now the people. Send them the link and I'll show you each request."
+  },
+  "onboarding.flow.area.title": {
+    "value": "And you, what do you work on?"
+  },
+  "onboarding.flow.area.lead": {
+    "value": "Just so we know who uses agentes.chat."
+  },
+  "onboarding.flow.area.skip": {
+    "value": "Skip this step"
+  },
+  "onboarding.flow.area.options.dev": {
+    "value": "Development"
+  },
+  "onboarding.flow.area.options.marketing": {
+    "value": "Marketing"
+  },
+  "onboarding.flow.area.options.sales": {
+    "value": "Sales"
+  },
+  "onboarding.flow.area.options.finance": {
+    "value": "Finance"
+  },
+  "onboarding.flow.area.options.ops": {
+    "value": "Operations"
+  },
+  "onboarding.flow.area.options.support": {
+    "value": "Customer support"
+  },
+  "onboarding.flow.area.options.other": {
+    "value": "Something else"
   },
   "onboarding.flow.preview.label": {
     "value": "Your workspace, as you answer"
@@ -2130,7 +2166,7 @@
     "value": "Agents that look after your day."
   },
   "onboarding.purpose.team": {
-    "value": "For my company or team"
+    "value": "For my team"
   },
   "onboarding.purpose.teamText": {
     "value": "People and agents work together, with channels, roles and approvals."
@@ -2140,6 +2176,39 @@
   },
   "onboarding.purpose.teamExamples": {
     "value": "Customer support · Finance · Reports"
+  },
+  "onboarding.purpose.personalLine": {
+    "value": "Agents that look after your day."
+  },
+  "onboarding.purpose.teamLine": {
+    "value": "People and agents in one place."
+  },
+  "onboarding.purpose.activities.agenda": {
+    "value": "Daily agenda"
+  },
+  "onboarding.purpose.activities.home": {
+    "value": "Home"
+  },
+  "onboarding.purpose.activities.bills": {
+    "value": "Bills"
+  },
+  "onboarding.purpose.activities.studies": {
+    "value": "Studies"
+  },
+  "onboarding.purpose.activities.travel": {
+    "value": "Trips"
+  },
+  "onboarding.purpose.activities.support": {
+    "value": "Support"
+  },
+  "onboarding.purpose.activities.finance": {
+    "value": "Finance"
+  },
+  "onboarding.purpose.activities.reports": {
+    "value": "Reports"
+  },
+  "onboarding.purpose.activities.sales": {
+    "value": "Sales"
   },
   "onboarding.personal.name": {
     "value": "Personal"

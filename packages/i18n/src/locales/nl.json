@@ -717,6 +717,8 @@
         "teamMadePersonal": "Je agents zijn er al. We gaan verder wanneer je wilt.",
         "plan": "Na het abonnement hoef je alleen nog een AI te koppelen. Ik laat je zien waar.",
         "planThen": "Zodra het abonnement aanstaat, koppel je op het volgende scherm je AI.",
+        "area": "Nog één laatste vraag voor het team.",
+        "areaPersonal": "Nog één laatste vraag voor je agents.",
         "ask": "Heb je al een team ergens anders? Ik haal het in zijn geheel hierheen.",
         "start": "Ik heb een team klaar voor wat jullie doen. Of we beginnen met z'n tweeën.",
         "askPersonal": "Gebruik je al agents ergens anders? Ik haal ze allemaal hierheen.",
@@ -732,6 +734,20 @@
         "connectedThen": "Zo. Je hoeft alleen nog de mensen uit te nodigen met wie je werkt.",
         "people": "Nu de mensen. Geef me hun e-mailadressen en ik stuur de uitnodigingen.",
         "peopleLink": "Nu de mensen. Stuur ze de link en ik laat je elk verzoek zien."
+      },
+      "area": {
+        "title": "En jij, waar werk je aan?",
+        "lead": "Alleen zodat we weten wie agentes.chat gebruikt.",
+        "skip": "Deze stap overslaan",
+        "options": {
+          "dev": "Ontwikkeling",
+          "marketing": "Marketing",
+          "sales": "Verkoop",
+          "finance": "Financiën",
+          "ops": "Bedrijfsvoering",
+          "support": "Klantenservice",
+          "other": "Iets anders"
+        }
       },
       "preview": {
         "label": "Je werkruimte, terwijl je antwoordt",
@@ -859,10 +875,23 @@
       "lead": "Je kunt dit later wijzigen, er gaat niets verloren.",
       "personal": "Voor mezelf",
       "personalText": "Agents voor je agenda, rekeningen, training en alles wat je vraagt.",
-      "team": "Voor mijn bedrijf of team",
+      "team": "Voor mijn team",
       "teamText": "Mensen en agents werken samen, met kanalen, rollen en goedkeuringen.",
       "personalExamples": "Je dag om 7 uur · Rekeningen · Training",
-      "teamExamples": "Klantenservice · Financiën · Rapporten"
+      "teamExamples": "Klantenservice · Financiën · Rapporten",
+      "personalLine": "Agents die voor je dag zorgen.",
+      "teamLine": "Mensen en agents op één plek.",
+      "activities": {
+        "agenda": "Dagplanning",
+        "home": "Thuis",
+        "bills": "Rekeningen",
+        "studies": "Studie",
+        "travel": "Reizen",
+        "support": "Klantenservice",
+        "finance": "Financiën",
+        "reports": "Rapporten",
+        "sales": "Verkoop"
+      }
     },
     "personal": {
       "name": "Persoonlijk"

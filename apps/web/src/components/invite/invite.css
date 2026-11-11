@@ -64,6 +64,10 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* On a narrow screen the address gives way (its ellipsis), never the role's word. */
+.email-chip > .ac-select {
+  flex: none;
+}
 /* Why an address isn't sent: "confira" in danger, "já está na Acme" quiet. */
 .email-chip__bad,
 .email-chip__soft {

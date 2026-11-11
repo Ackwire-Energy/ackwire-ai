@@ -717,6 +717,8 @@
         "teamMadePersonal": "Ajanlarınız zaten burada. Hazır olduğunuzda devam ederiz.",
         "plan": "Plandan sonra sadece bir yapay zeka bağlamak kalıyor. Nerede olduğunu gösteririm.",
         "planThen": "Plan başlayınca sıradaki ekranda yapay zekanı bağlayacaksın.",
+        "area": "Ekipten önce son bir soru.",
+        "areaPersonal": "Ajanlarından önce son bir soru.",
         "ask": "Başka bir yerde zaten ekibin mi var? Hepsini buraya getiririm.",
         "start": "Yaptığınız işe uygun hazır bir ekibim var. Ya da sadece ikimiz başlarız.",
         "askPersonal": "Başka bir yerde zaten ajan mı kullanıyorsun? Hepsini buraya getiririm.",
@@ -732,6 +734,20 @@
         "connectedThen": "İşte oldu. Geriye yalnızca birlikte çalıştığın kişileri davet etmek kaldı.",
         "people": "Şimdi sıra kişilerde. E-postalarını bana ver, davetleri göndereyim.",
         "peopleLink": "Şimdi sıra kişilerde. Onlara bağlantıyı gönder, her isteği sana göstereyim."
+      },
+      "area": {
+        "title": "Peki sen, ne iş yapıyorsun?",
+        "lead": "Sadece agentes.chat'i kimlerin kullandığını anlamak için.",
+        "skip": "Bu adımı atla",
+        "options": {
+          "dev": "Geliştirme",
+          "marketing": "Pazarlama",
+          "sales": "Satış",
+          "finance": "Finans",
+          "ops": "Operasyon",
+          "support": "Müşteri desteği",
+          "other": "Başka bir şey"
+        }
       },
       "preview": {
         "label": "Sen cevapladıkça çalışma alanın",
@@ -859,10 +875,23 @@
       "lead": "Bunu sonra değiştirebilirsiniz, hiçbir şey kaybolmaz.",
       "personal": "Kendim için",
       "personalText": "Gününü düzenleyen ajanlar.",
-      "team": "Şirketim veya ekibim için",
+      "team": "Ekibim için",
       "teamText": "Kişiler ve ajanlar kanallar, roller ve onaylarla birlikte çalışır.",
       "personalExamples": "Saat 7'de günün · Faturalar · Antrenman",
-      "teamExamples": "Müşteri desteği · Finans · Raporlar"
+      "teamExamples": "Müşteri desteği · Finans · Raporlar",
+      "personalLine": "Gününüzle ilgilenen ajanlar.",
+      "teamLine": "İnsanlar ve ajanlar aynı yerde.",
+      "activities": {
+        "agenda": "Günün ajandası",
+        "home": "Ev",
+        "bills": "Faturalar",
+        "studies": "Ders çalışma",
+        "travel": "Seyahatler",
+        "support": "Müşteri desteği",
+        "finance": "Finans",
+        "reports": "Raporlar",
+        "sales": "Satış"
+      }
     },
     "personal": {
       "name": "Kişisel"
