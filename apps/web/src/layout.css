@@ -6445,8 +6445,10 @@ html:not([data-pointer]) .photo-drop:focus-visible {
   gap: 14px;
   padding-top: 4px;
 }
+/* Full width, its own height: a block switch grows along its row, and in this column that would be down. */
 .avatar-builder__side .ac-seg {
   align-self: stretch;
+  flex: none;
 }
 .avatar-builder__stage {
   width: 192px;
