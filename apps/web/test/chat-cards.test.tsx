@@ -446,25 +446,11 @@ describe("a question for one person", () => {
 });
 
 describe("a receipt's words stay whole", () => {
-  test("Desfazer leaving with its time keeps its room: the sentence never rewraps", async () => {
-    await openChannel((id) => [answer(id, [{ undoableUntil: inMs(1_200) }])]);
+  test("a receipt is its sentence alone: no Desfazer, no time, no room kept for one", async () => {
+    await openChannel((id) => [answer(id, [{ undoableUntil: inMs(200_000) }])]);
     const receipt = document.querySelector(".ag-rc") as HTMLElement;
-    const room = () => receipt.querySelector(".ag-rc__act");
-    expect(within(receipt).getByRole("button", { name: /^Desfazer/ })).toBeTruthy();
-    expect(room()).not.toBeNull();
-    await act(() => new Promise((r) => setTimeout(r, 2_100)));
-    await settle(2);
     expect(within(receipt).queryByRole("button")).toBeNull();
-    // Gone, its room stays, as wide as Desfazer with its time and as Refazer: hidden, and read by no one.
-    expect(room()).not.toBeNull();
-    const kept = room()?.querySelector(".ag-rc__room") as HTMLElement;
-    expect(kept.getAttribute("aria-hidden")).toBe("true");
-    expect([...kept.children].map((c) => c.textContent)).toEqual(["Desfazer0:00", "Refazer"]);
-    cleanup();
-    // One nobody could undo any more when it was drawn never had the room.
-    await openChannel((id) => [answer(id, [{ undoableUntil: inMs(-1_000) }])]);
-    expect(document.querySelector(".ag-rc")).not.toBeNull();
-    expect(document.querySelector(".ag-rc__act")).toBeNull();
+    expect(receipt.querySelector(".ag-rc__sentence")?.children).toHaveLength(1);
   });
 });
 

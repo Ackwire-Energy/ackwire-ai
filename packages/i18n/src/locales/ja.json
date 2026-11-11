@@ -2683,8 +2683,6 @@
     "chip": "メモリを更新しました",
     "was": "以前: {{text}}",
     "open": "{{name}}が知っていること",
-    "undo": "元に戻す",
-    "undone": "元に戻しました",
     "group": "{{name}}が更新したメモリ"
   },
   "reach": {
@@ -2839,17 +2837,9 @@
     "someone": "誰か",
     "you": "あなた",
     "undo": "元に戻す",
-    "redo": "やり直す",
-    "undoAll": "すべて元に戻す",
     "changes_other": "{{count}}件の変更",
     "undoneBy": "{{name}}が元に戻しました",
-    "ago": "{{time}}前",
-    "timeLeft": "元に戻せるのはあと{{time}}",
     "group": "{{name}}による変更",
-    "undone": "元に戻しました。",
-    "redone": "やり直しました。",
-    "undoneAll_other": "{{count}}件の変更を元に戻しました。",
-    "partial_other": "{{count}}件の変更を元に戻せませんでした。",
     "errors": {
       "changed_since": "その後、誰かがこれを変更しました。今元に戻すと、その変更が失われます。",
       "expired": "元に戻せる時間が過ぎました。",

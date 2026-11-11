@@ -2681,8 +2681,6 @@
     "chip": "메모리 업데이트됨",
     "was": "이전: {{text}}",
     "open": "{{name}}이(가) 아는 것",
-    "undo": "실행 취소",
-    "undone": "취소됨",
     "group": "{{name}}이(가) 업데이트한 메모리"
   },
   "reach": {
@@ -2837,17 +2835,9 @@
     "someone": "누군가",
     "you": "나",
     "undo": "실행 취소",
-    "redo": "다시 실행",
-    "undoAll": "모두 실행 취소",
     "changes_other": "변경 {{count}}개",
     "undoneBy": "{{name}}님이 실행 취소함",
-    "ago": "{{time}} 전",
-    "timeLeft": "실행 취소 가능 시간 {{time}} 남음",
     "group": "{{name}}의 변경 사항",
-    "undone": "실행 취소했어요.",
-    "redone": "다시 실행했어요.",
-    "undoneAll_other": "변경 {{count}}개를 실행 취소했어요.",
-    "partial_other": "변경 {{count}}개를 실행 취소하지 못했어요.",
     "errors": {
       "changed_since": "그 이후 누군가 이 항목을 변경했어요. 지금 실행 취소하면 그 변경 사항이 사라져요.",
       "expired": "실행 취소 가능 시간이 지났어요.",
