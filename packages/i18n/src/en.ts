@@ -2693,10 +2693,16 @@ export const en = {
       woke_one: "{{count}} agent woke up",
       woke_other: "{{count}} agents woke up",
       wokeAll: "The team is awake",
+      /** The end's title when every agent was passed over. */
+      wokeNone: "Nobody woke up",
       thinksAll: "They already think with your {{plan}}",
       thinksOne: "{{name}} already thinks with your {{plan}}",
       stayed: "{{name}} is still without AI: their sign-in didn't finish.",
       stayedMany: "{{names}} are still without AI: their sign-ins didn't finish.",
+      /** One agent passed over, and why its sign-in didn't finish (`why`: the sign-in's own words). */
+      why: "{{name}}: {{why}}",
+      /** The team's right hand still without an AI at the end: its own Connect, since its AI is each person's. */
+      stayedHand: "{{name}} has no AI for you yet.",
       again: "Connect {{name}}",
       againMany: "Connect the {{n}}",
       /** Whom they answer on the person's own subscription (ADR 0059 §5), and the link that opens them to the team. */
@@ -5001,7 +5007,7 @@ export const en = {
           },
           startFailed: "No answer from {{computer}}. Try again in a moment.",
           sendFailed: "Couldn't send the code. Check it and try again.",
-          done: "The {{account}} account is on {{computer}}. Click Use to save.",
+          done: "The {{account}} account is signed in again on {{computer}}. It's in use now.",
         },
         offCloud: "{{computer}} isn't answering",
         /** Who thinks as one change per screen (ADR 0032, addendum of 2026-11-10). */
@@ -5018,6 +5024,8 @@ export const en = {
           /** The main button: `label` is the account's title ("Claude 2 · Max"). */
           switchTo: "Switch to {{label}}",
           teamTitle: "Change the team's account",
+          /** The two cards of the team screen, for a screen reader: whom the switch is for. */
+          teamAria: "Whom it is for",
           /** Two cards, when the account thinks for all of its owner's agents: whom the switch is for. */
           justOne: "Only {{name}}",
           everyone: "Everyone on this account",

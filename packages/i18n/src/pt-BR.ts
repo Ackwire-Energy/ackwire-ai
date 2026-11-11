@@ -2662,12 +2662,19 @@ export const ptBR = {
       woke_one: "{{count}} agente acordou",
       woke_other: "{{count}} agentes acordaram",
       wokeAll: "O time acordou",
+      /** The end's title when every agent was passed over. */
+      wokeNone: "Ninguém acordou",
       thinksAll: "Eles já pensam com o seu {{plan}}",
       thinksOne: "O {{name}} já pensa com o seu {{plan}}",
       thinksOne_female: "A {{name}} já pensa com o seu {{plan}}",
       stayed: "O {{name}} ficou sem IA: o login dele não terminou.",
       stayed_female: "A {{name}} ficou sem IA: o login dela não terminou.",
       stayedMany: "{{names}} ficaram sem IA: os logins não terminaram.",
+      /** One agent passed over, and why its login didn't end (`why`: the sign-in's own words). */
+      why: "{{name}}: {{why}}",
+      /** The team's right hand still without an AI at the end: its own Connect, since its AI is each person's. */
+      stayedHand: "O {{name}} ainda não tem IA para você.",
+      stayedHand_female: "A {{name}} ainda não tem IA para você.",
       again: "Conectar o {{name}}",
       again_female: "Conectar a {{name}}",
       againMany: "Conectar os {{n}}",
@@ -4979,7 +4986,7 @@ export const ptBR = {
           },
           startFailed: "O {{computer}} não respondeu. Tente de novo em instantes.",
           sendFailed: "Não deu para enviar o código. Confira e tente de novo.",
-          done: "A conta {{account}} entrou no {{computer}}. Clique em Usar para salvar.",
+          done: "A conta {{account}} entrou de novo no {{computer}}. Já está em uso.",
         },
         offCloud: "O {{computer}} não está respondendo",
         /** Who thinks as one change per screen (ADR 0032, addendum of 2026-11-10). */
@@ -4999,6 +5006,8 @@ export const ptBR = {
           /** The main button: `label` is the account's title ("Claude 2 · Max"). */
           switchTo: "Trocar para {{label}}",
           teamTitle: "Trocar a conta do time",
+          /** The two cards of the team screen, for a screen reader: whom the switch is for. */
+          teamAria: "Para quem é",
           /** Two cards, when the account thinks for all of its owner's agents: whom the switch is for. */
           justOne: "Só o {{name}}",
           justOne_female: "Só a {{name}}",
