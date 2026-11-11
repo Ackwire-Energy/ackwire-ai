@@ -400,12 +400,6 @@ export const featureKeysEn = {
     toLatestNew: "Go to the latest messages: {{text}}",
     stopAgent: "Stop {{name}}",
     offlineWait: "Goes out when the connection is back",
-    turn: {
-      thinking: "thinking",
-      working: "working",
-      writing: "writing",
-      stopped: "stopped",
-    },
     steer: {
       waiting: "{{name}} reads it at the next pause",
       /** Sent to an agent waiting for its computer: it has no pause, it reads it once it gets the computer. */

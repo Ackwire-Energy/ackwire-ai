@@ -66,11 +66,10 @@ describe("the rows follow the same choice as the web", () => {
     expect(page).toContain('modeKey(org, "settings.account.chat.toneChannels")');
   });
 
-  test("my row and the live row read the conversation's look", async () => {
+  test("my row reads the conversation's look", async () => {
     const row = await read("chat/MessageRow.tsx");
     expect(row).toContain("const onRight = mine && mineOnRight(look.style);");
     expect(row).toContain("if (onRight) {");
-    expect(await read("chat/LiveRows.tsx")).toContain("const look = useRowLook();");
     const chat = await read("chat/ChatScreen.tsx");
     expect(chat).toContain("<RowLookContext.Provider value={rowLook}>");
     expect(chat).toContain('Boolean(dm) || thread.data?.channelKind === "dm"');
@@ -80,7 +79,6 @@ describe("the rows follow the same choice as the web", () => {
     const row = await read("chat/MessageRow.tsx");
     expect(row).toContain("{!inBubble || look.names ? (");
     expect(row).not.toContain("{!bubbled || look.names ? (");
-    expect(await read("chat/LiveRows.tsx")).toContain("{!bubbled || look.names || !(said || run.text) ? (");
   });
 
   test("opening at the last read message goes to the line, once, with no glide", async () => {
@@ -106,9 +104,7 @@ describe("the rows follow the same choice as the web", () => {
   test("the look says it, and every row with a face column and every quiet row reads it", async () => {
     expect(await read("chat/look.ts")).toContain("faces: facesShown(style, dm)");
     expect(await read("chat/look.ts")).toContain("paddingLeft: BUBBLES_INSET");
-    for (const file of ["chat/MessageRow.tsx", "chat/LiveRows.tsx"]) {
-      expect(await read(file)).toContain("{look.faces ? (");
-    }
+    expect(await read("chat/MessageRow.tsx")).toContain("{look.faces ? (");
     const queue = await read("queue/parts.tsx");
     expect(queue).toContain("{faces ? (");
     expect(await read("chat/QuoteLine.tsx")).toContain(
@@ -186,9 +182,6 @@ describe("Tamanho do texto on the phone", () => {
     expect(await read("chat/MessageRow.tsx")).toContain(
       "maxFontSizeMultiplier={nameSize ? CHAT_TEXT_MAX_SCALE : undefined}",
     );
-    expect(await read("chat/LiveRows.tsx")).toContain(
-      "maxFontSizeMultiplier={look.text ? CHAT_TEXT_MAX_SCALE : undefined}",
-    );
   });
 
   test("every conversation reads the step from its look, and Conversa saves it on the server with a preview", async () => {
@@ -214,9 +207,6 @@ describe("Tamanho do texto on the phone", () => {
     expect(row).toContain("maxFontSizeMultiplier={timeSize ? CHAT_TEXT_MAX_SCALE : undefined}");
     // A receipt at the end of someone else's name line centres on that line, as tall as the name's at every step.
     expect(row).toContain("[styles.whoMark, nameSize ? { height: nameSize.lineHeight } : null]");
-    const live = await read("chat/LiveRows.tsx");
-    expect(live).toContain("style={look.text ? chatTimeOf(look.text) : undefined}");
-    expect(live.match(/maxFontSizeMultiplier=\{look\.text \? CHAT_TEXT_MAX_SCALE : undefined\}/g)).toHaveLength(2);
     const card = await read("chat/CodeCard.tsx");
     expect(card).toContain("sized ? chatCodeOf(sized) : null");
     expect(card).toContain("maxFontSizeMultiplier={sized ? CHAT_TEXT_MAX_SCALE : undefined}");

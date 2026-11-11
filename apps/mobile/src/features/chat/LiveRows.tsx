@@ -1,4 +1,4 @@
-import { elapsedClock, type LiveConsult, type LiveRun, usesBrowser, workingSinceOf } from "@agenteschat/client";
+import { elapsedClock, type LiveConsult, type LiveRun, usesBrowser } from "@agenteschat/client";
 import {
   type ActivityEntry,
   activitySentence,
@@ -8,26 +8,10 @@ import {
   barFaces,
   barWords,
   entriesOffScreen,
-  isWriting,
   listNames,
-  runElapsed,
-  waitsForWords,
 } from "@agenteschat/client/lib/activity";
-import { initialReveal, rebaseReveal, revealStep } from "@agenteschat/client/lib/reveal";
-import { barStep, formatDuration } from "@agenteschat/client/lib/work";
-import type { AgentColorName } from "@agenteschat/ui/agent/engine";
-import {
-  type ComponentRef,
-  createContext,
-  memo,
-  type ReactNode,
-  useCallback,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from "react";
+import { barStep } from "@agenteschat/client/lib/work";
+import { type ReactNode, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
@@ -53,64 +37,24 @@ import { Dither } from "@/sky/Dither";
 import { softTones } from "@/sky/math";
 import { CHROME_MAX_SCALE, haptics, Icon, PixelStop, Text, useReducedMotion, useTheme } from "@/ui";
 import { AgentFace, AgentWho, Face } from "../shared/Face";
-import { useColors, useDirectory, useNow, useWhen } from "../shared/hooks";
+import { useDirectory, useNow } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import type { Measurable } from "./ask-store";
-import { ConsultPairRow, useRunConsults } from "./ConsultGroup";
 import {
   awayRun,
-  CHAT_TEXT_MAX_SCALE,
-  chatNameOf,
-  chatTimeOf,
   type LineDrawn,
   type LineWords,
   leavingWords,
   lineFit,
-  MSG_AVATAR,
-  MSG_GAP,
-  MSG_INSET,
   markedParts,
   markName,
-  nameInk,
   narrowDrawn,
   PHRASE_FADE_MS,
   type PhraseTurn,
-  rowFrame,
   turnPhrase,
   workingEntries,
 } from "./logic";
-import { lookRows, useRhythm, useRowLook } from "./look";
-import { MessageText } from "./MessageText";
 import { type RowSight, rowsShown } from "./row-sight";
-import { TurnTools } from "./ToolCalls";
-import {
-  fadeTail,
-  pruneMarks,
-  type RevealMark,
-  rememberTurn,
-  turnItems,
-  turnOpener,
-  turnPhase,
-  turnShows,
-  turnSignature,
-  WORD_FADE_MS,
-  withOpacity,
-} from "./turn";
-
-/**
- * What the conversation's live rows read from their screen: where they say they are drawn (the line above the
- * composer speaks only for those out of view), which of them offers its stop (the web's rule: the latest one here I
- * may stop) and how to stop it.
- */
-export interface LiveRowsView {
-  sight: RowSight;
-  stopRunId: string | undefined;
-  onStop: (run: LiveRun) => void;
-}
-
-const LiveRowsContext = createContext<LiveRowsView | null>(null);
-
-export const LiveRowsProvider = LiveRowsContext.Provider;
 
 /** The runs whose live rows are on screen, redrawn only when that set changes. */
 export const useRowsInView = (sight: RowSight) =>
@@ -177,257 +121,11 @@ function lookAtRows(sight: RowSight, view: RowView, look: number, latest: () => 
   });
 }
 
-/**
- * An agent's turn, live: one block from "pensando" to the last word, in
- * the same place, the last thing in the conversation while it works. The header says what it is doing
- * (its pixel orbit and a breathing word, and for how long); then the words, revealed at a steady pace and fading
- * in, with the thin caret; under them, last, its tools in one line that opens into every call (`TurnTools`) and,
- * under it, the wells of the messages it read. When it is done, its saved reply takes the same row and keeps the
- * same block in the same place, closed on "Usou N ferramentas" (`recentTurn`).
- */
-export const TurnRow = memo(function TurnRow({
-  run,
-  bodyOf,
-}: {
-  run: LiveRun;
-  /** A message's text (the "Leu seu recado" wells quote it). */
-  bodyOf: (messageId: string) => string | undefined;
-}) {
-  const { t } = useTranslation();
-  const dir = useDirectory();
-  const when = useWhen();
-  const look = useRowLook();
-  const c = useColors();
-  const { scheme } = useTheme();
-  const bubbled = look.style === "bubbles";
-  const compact = look.style === "compact";
-  const rhythm = useRhythm();
-  const agent = dir.agentById.get(run.agentId);
-  const color = agentLook(agent).color;
-  const phase = turnPhase(run);
-  const live = phase !== "stopped";
-  const items = turnItems(run);
-  // The first thing it said opens the block, above its tools.
-  const { said, lines } = turnOpener(items);
-  // At work with no words yet: no row of its own, the line above the composer says who, what, how long, and stops it.
-  const waiting = waitsForWords(run);
-  const wordsOnTop = !said && lines.length === 0;
-  const now = useNow(1000);
-  // Asking other agents before it posted anything: the pair row stands right before this row (its reply takes it).
-  const consults = useRunConsults(run.runId, run, null);
-  const pair =
-    consults.length > 0 ? <ConsultPairRow askerId={run.agentId} channelId={run.channelId} items={consults} /> : null;
-  const since = workingSinceOf(run) ?? run.since ?? null;
-  const secs = since ? Math.max(0, now - since) : 0;
-  const word = t(`mobile.chat.turn.${phase}`);
-  const took = secs >= 2000 ? ` · ${formatDuration(t, secs)}` : "";
-
-  // Its work, for the saved reply to keep in place.
-  const quotes = Object.fromEntries(
-    items.flatMap((x) => (x.kind === "steer" ? [[x.messageId, bodyOf(x.messageId) ?? ""]] : [])),
-  );
-  const signature = turnSignature(items);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `signature` stands for the items and their quotes
-  useEffect(() => {
-    rememberTurn(run.runId, { items: turnItems(run, true), quotes, at: Date.now() });
-  }, [run.runId, signature]);
-  const [mountedAt] = useState(() => Date.now());
-  // Drawn, the row tells the screen, which measures whether it shows: the line above the composer leaves this agent
-  // out while it does (the row says its step, its time and its stop) and speaks for it once it doesn't.
-  const sight = useContext(LiveRowsContext)?.sight;
-  const seen = useCallback(
-    (view: ComponentRef<typeof View> | null) => (view && sight ? sight.register(run.runId, view) : undefined),
-    [sight, run.runId],
-  );
-  if (waiting) return pair;
-  return (
-    <>
-      {pair}
-      <View
-        ref={seen}
-        collapsable={false}
-        style={[
-          styles.msg,
-          bubbled && lookRows.bubblesRow,
-          compact && lookRows.compactRow,
-          rowFrame(rhythm.block, rhythm.turn),
-        ]}
-      >
-        {compact ? <View style={lookRows.compactClock} /> : null}
-        {look.faces ? (
-          <View style={[styles.avslot, bubbled && lookRows.bubblesSlot, compact && lookRows.compactSlot]}>
-            <AgentFace
-              agentId={run.agentId}
-              size={compact ? 18 : bubbled ? 30 : 34}
-              mode={live ? (phase === "writing" ? "run" : "think") : "idle"}
-            />
-          </View>
-        ) : null}
-        <View style={[styles.body, { gap: rhythm.part }]}>
-          <View>
-            <View style={styles.who}>
-              {/* A DM drops the name only where a bubble stands under it, as on a saved row. */}
-              {!bubbled || look.names || !(said || run.text) ? (
-                <Text
-                  variant="footnote"
-                  tone="ink2"
-                  style={[
-                    styles.name,
-                    look.text ? chatNameOf(look.text) : undefined,
-                    bubbled ? { color: nameInk(color, scheme === "dark") } : undefined,
-                  ]}
-                  numberOfLines={1}
-                  maxFontSizeMultiplier={look.text ? CHAT_TEXT_MAX_SCALE : undefined}
-                >
-                  {agent?.name ?? ""}
-                </Text>
-              ) : null}
-              {/* While it works, the line above the box says so: the block has its start time, as a message (the web's
-              `RunClock`); "parado" once stopped. */}
-              <View style={styles.state} accessible accessibilityLiveRegion="polite" accessibilityLabel={word}>
-                {live ? (
-                  <Text
-                    variant="footnote"
-                    tone="faint"
-                    style={look.text ? chatTimeOf(look.text) : undefined}
-                    maxFontSizeMultiplier={look.text ? CHAT_TEXT_MAX_SCALE : undefined}
-                  >
-                    {when.time(new Date(since ?? mountedAt).toISOString())}
-                  </Text>
-                ) : (
-                  <Text variant="footnote" tone="faint" maxFontSizeMultiplier={CHROME_MAX_SCALE}>
-                    {word}
-                    {took}
-                  </Text>
-                )}
-              </View>
-              {/* Its words arriving: its time and its stop after the time it started (the line above the composer no
-              longer says them while the row shows). */}
-              {live ? <RunTail run={run} now={now} /> : null}
-            </View>
-            {/* Nothing said and no steps yet: the words stream where the opener stands, so the line it opens
-            with stays put when a tool call turns it into narration. */}
-            {bubbled && (said || run.text) ? (
-              <View style={[lookRows.bubble, { backgroundColor: c.bubble }]}>
-                {said && !wordsOnTop ? <MessageText body={said} selectable={false} /> : null}
-                {run.text ? <RevealText text={run.text} live={phase === "writing"} accent={color} /> : null}
-              </View>
-            ) : (
-              <>
-                {wordsOnTop && run.text ? (
-                  <RevealText text={run.text} live={phase === "writing"} accent={color} />
-                ) : said ? (
-                  <View style={run.text ? { marginBottom: rhythm.part } : undefined}>
-                    <MessageText body={said} selectable={false} />
-                  </View>
-                ) : null}
-                {run.text && !wordsOnTop ? (
-                  <RevealText text={run.text} live={phase === "writing"} accent={color} />
-                ) : null}
-              </>
-            )}
-          </View>
-          {/* Its tools last, where its saved reply keeps them. */}
-          <TurnTools items={lines} agentName={agent?.name ?? ""} color={color} quoteOf={bodyOf} />
-        </View>
-      </View>
-    </>
-  );
-});
-
-/**
- * The end of an agent's live row (the web's `RunTail`): "· 12 s" while it works and its stop when it is the run here
- * I'd stop. The line above the composer says neither while the row shows, so they sit where the eye already is. The
- * clock keeps its room from the start, so the stop never shifts when the seconds appear.
- */
-function RunTail({ run, now }: { run: LiveRun; now: number }) {
-  const { t } = useTranslation();
-  const rows = useContext(LiveRowsContext);
-  const atWork = run.status === "thinking" || run.status === "queued" || run.status === "running";
-  const stops = rows?.stopRunId === run.runId ? [run] : [];
-  if (!atWork && stops.length === 0) return null;
-  const took = atWork ? runElapsed(t, run, now) : null;
-  return (
-    <View style={styles.tail}>
-      {atWork ? (
-        <Text
-          variant="footnote"
-          tone="faint"
-          numberOfLines={1}
-          maxFontSizeMultiplier={CHROME_MAX_SCALE}
-          style={styles.tailClock}
-        >
-          {took ? `· ${took}` : ""}
-        </Text>
-      ) : null}
-      {rows ? <LineStop runs={stops} onStop={rows.onStop} rule={false} place="row" /> : null}
-    </View>
-  );
-}
-
-/**
- * The words as they arrive: revealed word by word at a steady reading pace (a backlog drains faster, never
- * in one chunk), each new word fading in (~280 ms), the caret after them. Mounted with a long text already
- * (back to the conversation mid-reply), it shows it at once.
- */
-function RevealText({ text, live, accent }: { text: string; live: boolean; accent: AgentColorName }) {
-  const c = useTheme().colors;
-  const reduced = useReducedMotion();
-  const shown = useRef(initialReveal(text));
-  const prev = useRef(text);
-  const marks = useRef<RevealMark[]>([]);
-  const last = useRef<number | null>(null);
-  if (prev.current !== text) {
-    const kept = rebaseReveal(shown.current, prev.current, text);
-    if (kept < shown.current) marks.current = [];
-    shown.current = kept;
-    prev.current = text;
-  }
-  // The clock runs while words wait to be shown or are still fading in.
-  const active = live && !reduced && (shown.current < text.length || marks.current.length > 0);
-  const t = useFrameTime(active, 0);
-  const ms = t * 1000;
-  if (!active) {
-    // Idle: the next words start a fresh pace (no jump for the time it waited).
-    last.current = null;
-    if (!live || reduced) shown.current = text.length;
-    marks.current = [];
-  } else if (last.current !== ms) {
-    const elapsed = last.current === null ? 0 : ms - last.current;
-    last.current = ms;
-    if (shown.current < text.length) {
-      const next = revealStep(shown.current, text, elapsed);
-      if (next > shown.current) {
-        shown.current = next;
-        marks.current.push({ at: next, t: ms });
-      }
-    }
-    marks.current = pruneMarks(marks.current, ms);
-    // All shown and settled: nothing fades any more.
-    const only = marks.current[0];
-    if (shown.current >= text.length && marks.current.length === 1 && only && ms - only.t >= WORD_FADE_MS)
-      marks.current = [];
-  }
-  const { solid, tail } = fadeTail(text, shown.current, marks.current, ms);
-  const tailNode =
-    tail.length > 0
-      ? tail.map((p, i) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: the pieces of the tail, in order
-          <RNText key={i} style={{ color: withOpacity(c.ink, p.opacity) }}>
-            {p.text}
-          </RNText>
-        ))
-      : undefined;
-  return (
-    <MessageText body={text.slice(0, solid)} tail={tailNode} streaming={live} selectable={false} accent={accent} />
-  );
-}
-
-/** The runs at work in their browser (not writing yet), one per agent: each gets its browser card. */
+/** The runs at work in their browser, one per agent: each gets its browser card. */
 export function browsingRuns(runs: LiveRun[]): LiveRun[] {
   const seen = new Set<string>();
   return runs.filter((r) => {
-    if (isWriting(r) || !usesBrowser(r) || seen.has(r.agentId)) return false;
+    if (r.status === "failed" || !usesBrowser(r) || seen.has(r.agentId)) return false;
     seen.add(r.agentId);
     return true;
   });
@@ -435,15 +133,14 @@ export function browsingRuns(runs: LiveRun[]): LiveRun[] {
 
 /**
  * The working line, as the web's activity bar above the composer (ChannelPage `ActivityBar`,
- * WorkingLine.tsx, `.ac-typing[data-active]`), one for everyone at work here: a low glass pill as wide
- * as the box whatever it says, with a dithered band sweeping in the first agent's color behind it while
- * agents work; a few small faces, each on a plate and popping in (an agent on its own asking another shows
- * both, with an arrow; three dots first while only people type); one line with names in ink, crossfading
- * whenever it changes ("Theo e mais 2 estão trabalhando · Marina está digitando…"); the clock of a question
- * that is out. An agent whose live row is on screen is left out: the row says its step, its time and its stop,
- * once. Its row out of view, the line speaks for it: its face, the row's step after its name with its time right
- * after it ("16 s"), whoever types beside it, then "Ver" (back to the row). It has no stop of its own: the box's,
- * right under it, is the one.
+ * WorkingLine.tsx, `.ac-typing[data-active]`), one for everyone at work here and the one thing that says so while
+ * their words wait for their replies (which show whole, once posted): a low glass pill as wide as the box under it
+ * whatever it says, with a dithered band sweeping in the first agent's color behind it while agents work; a few small
+ * faces, each on a plate and popping in (an agent on its own asking another shows both, with an arrow; three dots
+ * first while only people type); one line with names in ink, crossfading whenever it changes ("Theo e mais 2 estão
+ * trabalhando · Marina está digitando…"); the clock of a question that is out. One agent on its own: its face, its
+ * step after its name ("escrevendo…" while it writes) with its time right after it ("16 s"), whoever types beside it,
+ * then "Parar".
  * Nothing moves with Reduce Motion or off screen.
  */
 export function WorkingLine({
@@ -452,7 +149,6 @@ export function WorkingLine({
   typing,
   onOpenBrowser,
   sight,
-  onSee,
   stop,
 }: {
   runs: LiveRun[];
@@ -463,8 +159,6 @@ export function WorkingLine({
   onOpenBrowser?: (agentId: string) => void;
   /** Which agents' live rows are on screen: the line leaves those out. */
   sight: RowSight;
-  /** "Ver": back to the live row of the agent the line speaks for. */
-  onSee: (run: LiveRun) => void;
   /**
    * "Parar", the word, last in the line: the runs here the person may stop. The line is the one place that stops
    * (the composer keeps only its send), so the state and its action read together.
@@ -544,14 +238,8 @@ export function WorkingLine({
   // An agent working in its browser: the line says so, and a tap opens its browser card in the conversation.
   const browsing = browsingRuns(runs)[0];
   const openBrowser = browsing && onOpenBrowser ? () => onOpenBrowser(browsing.agentId) : undefined;
-  // "Ver" once its row is in the conversation (before that, there is nothing to go back to).
-  const seeable = away && turnShows(away) ? away : undefined;
   // The line stops only the agents it speaks for: a row on screen has its own stop at its end.
   const stopHere = stop ? stop.runs.filter((r) => !rowInView(r)) : [];
-  // Back to the row is a scroll, so no haptic.
-  const see = () => {
-    if (seeable) onSee(seeable);
-  };
   return (
     <View style={styles.dock}>
       <Animated.View
@@ -634,23 +322,6 @@ export function WorkingLine({
           >
             {clock}
           </Text>
-        ) : null}
-        {seeable ? (
-          <>
-            <View style={[styles.sep, { backgroundColor: c.line }]} />
-            <Pressable
-              onPress={see}
-              accessibilityRole="button"
-              accessibilityLabel={`${t("run.strip.see")} · ${lead?.name ?? ""}`}
-              // A 16-point word in a 28-point pill: 14 above and below makes the 44 a finger needs.
-              hitSlop={{ top: 14, bottom: 14, left: 8, right: 8 }}
-              style={({ pressed }) => pressed && styles.pressed}
-            >
-              <Text variant="caption" tone="ink" maxFontSizeMultiplier={CHROME_MAX_SCALE} style={styles.ink}>
-                {t("run.strip.see")}
-              </Text>
-            </Pressable>
-          </>
         ) : null}
         {/* "Parar" as a word, last: the one stop on screen while the rows are out of view (the row's tail has its own
             while it shows; the composer keeps only its send). */}
@@ -898,19 +569,7 @@ function TypingDots({ color }: { color: string }) {
 }
 
 const styles = StyleSheet.create({
-  // Same turn as a saved message (MessageRow): the reply replaces it in place.
-  msg: {
-    flexDirection: "row",
-    gap: MSG_GAP,
-    paddingLeft: MSG_INSET,
-    paddingRight: 16,
-  },
-  avslot: { width: MSG_AVATAR, alignItems: "center", paddingTop: 2 },
-  body: { flex: 1, minWidth: 0 },
-  // The row's end: "· 12 s" and the stop. The clock keeps room for its seconds, and the stop never raises the line it
-  // ends (24 points drawn in a 16-point line).
-  tail: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 0 },
-  tailClock: { minWidth: 44, fontVariant: ["tabular-nums"] },
+  // A stop at a row's end never raises the line it ends (24 points drawn in a 16-point line).
   rowStop: {
     width: 24,
     height: 24,
@@ -919,11 +578,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  who: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4, minHeight: 19 },
-  name: { fontWeight: "600", fontSize: 14, lineHeight: 19, flexShrink: 1 },
-  state: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 0 },
-  // As wide as the box, whatever it says: a turning phrase or a face coming and going never moves its edge.
-  dock: { paddingHorizontal: 4, paddingBottom: 6 },
+  // As wide as the box under it, its edges on the box's, whatever it says: a turning phrase or a face coming and going
+  // never moves its edge.
+  dock: { paddingBottom: 6 },
   pill: {
     flexDirection: "row",
     alignItems: "center",

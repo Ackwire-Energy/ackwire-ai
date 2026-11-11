@@ -87,7 +87,9 @@ describe("Aprovações", () => {
   test("refusing asks why, optional; approving covers this once, with these values", async () => {
     await go("approvals?open=ap-merge");
     const open = pane("Fazer um merge");
-    expect(open.querySelector(".ap-bar__text")?.textContent).toBe(
+    // The bar holds only its buttons: what approving covers is Aprovar's tip and description.
+    expect(open.querySelector(".ap-bar p")).toBeNull();
+    expect(open.querySelector("[data-approve]")?.getAttribute("aria-description")).toBe(
       "Ada vai fazer um merge, só desta vez e com estes valores.",
     );
     await click(within(open).getByRole("button", { name: /^Recusar/ }));

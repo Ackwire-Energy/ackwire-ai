@@ -3301,7 +3301,6 @@
     "messageTo": "Сообщение для {{name}}",
     "audienceEdit": "Изменить",
     "nowIn": "сейчас, в #{{channel}}",
-    "answersHere": "Отвечает здесь без @",
     "more": "Ещё",
     "of": "Профиль: {{name}}",
     "presence": "Статус",

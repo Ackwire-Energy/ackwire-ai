@@ -1,8 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
-import { channelTopic } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
-import { drainOutbox, listMessages, liveTurnOf, postPersonMessage, type ToolSource } from "../src";
+import { drainOutbox, listMessages, postPersonMessage, type ToolSource } from "../src";
 import { type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
@@ -34,7 +33,7 @@ const turns = (req: ModelRequest) => req.messages.filter((m) => m.role === "assi
 /** An answer past `WORKING_TEXT_MAX`: read as the answer before its turn ends. */
 const LONG = "Não dá para compilar aqui: faltam Go e gcc no computador. ".repeat(6);
 
-test("a 3-call tool loop: working text goes to the steps, never live; the long answer streams; the message is the final answer", async () => {
+test("a 3-call tool loop: working text goes to the steps, never live; the answer shows only in its message, whole", async () => {
   const env = envTool();
   f = await setup({
     toolSources: [env.source],
@@ -51,33 +50,11 @@ test("a 3-call tool loop: working text goes to the steps, never live; the long a
     },
   });
   const events = f.listen(f.general.id);
-  // What an app opening mid-answer reads, as each piece goes out: the call's text so far, from its start.
-  const seen: { turn: number; at: number; upTo: string; live: string | undefined }[] = [];
-  let runId = "";
-  const heard = new Map<number, string>();
-  f.pubsub.subscribe(channelTopic(f.general.id), (e) => {
-    const d = e as { type: string; runId: string; turn: number; text: string };
-    if (d.type !== "agent.delta") return;
-    runId = d.runId;
-    heard.set(d.turn, (heard.get(d.turn) ?? "") + d.text);
-    const live = liveTurnOf(d.runId);
-    seen.push({ turn: d.turn, at: live?.at ?? -1, upTo: heard.get(d.turn) ?? "", live: live?.text });
-  });
   await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
     body: "@dev compila o projeto",
   });
   await drainOutbox(f.db, f.handlers);
   expect(env.calls()).toBe(2);
-  expect(seen.length).toBeGreaterThan(0);
-  for (const x of seen) {
-    // Published once the call ended (its last pieces), it's gone: the app waits for the message or the next call.
-    if (x.live === undefined) continue;
-    expect(x.at).toBe(0);
-    expect(x.live.startsWith(x.upTo)).toBe(true);
-  }
-  expect(seen.some((x) => x.live !== undefined)).toBe(true);
-  // The run ended: nothing kept.
-  expect(liveTurnOf(runId)).toBeUndefined();
 
   // The message holds only the final answer, whole.
   const timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
@@ -92,24 +69,10 @@ test("a 3-call tool loop: working text goes to the steps, never live; the long a
   expect(live).not.toContain("Começo verificando");
   expect(live).not.toContain("Go não está instalado");
 
-  // Deltas: only the answer, tagged by its turn, with increasing seq (never reused).
-  const deltas = events.flatMap((e) =>
-    e.type === "agent.delta" ? [e as unknown as { turn: number; seq: number; text: string }] : [],
-  );
-  const byTurn = new Map<number, string>();
-  for (const d of deltas) byTurn.set(d.turn, (byTurn.get(d.turn) ?? "") + d.text);
-  expect([...byTurn]).toEqual([[3, `${LONG}Instale os dois.`]]);
-  // Only a brain that says when each call ended marks its stretches.
-  expect(deltas.some((d) => "from" in d)).toBe(false);
-  const seqs = deltas.map((d) => d.seq);
-  expect(seqs).toEqual([...seqs].sort((a, b) => a - b));
-  expect(new Set(seqs).size).toBe(seqs.length);
-  // Each piece says where it starts in its turn's text: an app that missed one knows its text has a hole.
-  const told = new Map<number, number>();
-  for (const d of deltas as { turn: number; at?: number; text: string }[]) {
-    expect(d.at).toBe(told.get(d.turn) ?? 0);
-    told.set(d.turn, (told.get(d.turn) ?? 0) + d.text.length);
-  }
+  // The answer too: only its message carries it; the last call said it writes.
+  const before = JSON.stringify(events.filter((e) => e.type !== "message.created"));
+  expect(before).not.toContain("Instale os dois");
+  expect(events.some((e) => e.type === "agent.typing")).toBe(true);
 
   // Steps: the model calls keep the narration, for the run's activity.
   const [run] = await f.db.select().from(schema.agentRuns);
@@ -124,13 +87,18 @@ test("a 3-call tool loop: working text goes to the steps, never live; the long a
   expect(calls).toEqual(["Começo verificando o ambiente.", "Go não está instalado. Vou tentar o compilador C.", null]);
 });
 
-test("a short answer shows whole when its turn ends, with no tool call to wait for", async () => {
+test("a short answer shows whole in its message, with no tool call to wait for", async () => {
   f = await setup({ reply: () => ({ chunks: ["Tudo ", "certo."] }) });
   const events = f.listen(f.general.id);
   await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body: "@dev oi" });
   await drainOutbox(f.db, f.handlers);
-  const deltas = events.flatMap((e) => (e.type === "agent.delta" ? [(e as unknown as { text: string }).text] : []));
-  expect(deltas.join("")).toBe("Tudo certo.");
+  const reply = events.find(
+    (e) =>
+      e.type === "message.created" &&
+      (e as { message?: { author: { type: string } } }).message?.author.type === "agent",
+  );
+  expect(reply).toMatchObject({ message: { body: "Tudo certo." } });
+  expect(JSON.stringify(events.filter((e) => e !== reply))).not.toContain("certo");
 });
 
 test("a final call with no text closes with the last narration instead of an empty reply", async () => {

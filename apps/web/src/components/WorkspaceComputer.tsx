@@ -42,7 +42,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
-import { usePrefersReducedMotion } from "@/hooks/useRevealedText";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 import { Egress } from "./computer/Egress";
 

@@ -15,11 +15,12 @@ import { nextLabel } from "@agenteschat/client/lib/format";
 import { connectorName } from "@agenteschat/client/lib/scopes";
 import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import type { TFunction } from "i18next";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, Platform, Pressable, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { Button, Chip, Fuse, haptics, LineIcon, Text, useToast } from "@/ui";
+import { useInfoHint } from "@/ui/InfoHint";
 import { router } from "@/ui/navigation";
 import { parseInline } from "../chat/logic";
 import { Spans } from "../chat/MessageSpans";
@@ -552,34 +553,7 @@ export function useCancelAhead() {
   };
 }
 
-/**
- * "Aprovar sempre" ("Aprovar sempre leituras" for a SQL tool's reads) where the request offers it, and under it
- * exactly what one tap approves for good and where to undo it, as on the web.
- */
-export function ApproveAlways({
-  approval: a,
-  name,
-  disabled,
-  onPress,
-}: {
-  approval: Approval;
-  name: string;
-  disabled: boolean;
-  onPress: () => void;
-}) {
-  const { t } = useTranslation();
-  if (!approveAlwaysOffered(a)) return null;
-  return (
-    <View style={styles.always}>
-      <Button variant="ghost" wide label={approveAlwaysLabel(t, a)} disabled={disabled} onPress={onPress} />
-      <Text variant="caption" tone="faint" style={styles.alwaysHint}>
-        {approveAlwaysHint(t, a, name || t("channel.unknownAgent"))}
-      </Text>
-    </View>
-  );
-}
-
-/** "Aprovar sempre" in a request card's row of buttons, the same size as the others (its hint: `ApproveAlwaysHint`). */
+/** "Aprovar sempre" in a request card's row of buttons, the same size as the others (its ⓘ: `ApproveAlwaysInfo`). */
 export function ApproveAlwaysButton({
   approval: a,
   disabled,
@@ -596,14 +570,30 @@ export function ApproveAlwaysButton({
   );
 }
 
-/** What "Aprovar sempre" covers and where to undo it, on a line of its own under the row of buttons. */
-export function ApproveAlwaysHint({ approval: a, name }: { approval: Approval; name: string }) {
+/**
+ * What "Aprovar sempre" covers and where to undo it, behind an ⓘ (a touch screen has no tooltip): `children` puts the
+ * ⓘ after the button, in the row that holds only buttons, and its words under the row (null while closed, so the row
+ * keeps no room for them). Both null where the request doesn't offer it.
+ */
+export function ApproveAlwaysInfo({
+  approval: a,
+  name,
+  children,
+}: {
+  approval: Approval | undefined;
+  name: string;
+  children: (info: { button: ReactNode; text: ReactNode }) => ReactNode;
+}) {
   const { t } = useTranslation();
-  if (!approveAlwaysOffered(a)) return null;
+  const offered = a ? approveAlwaysOffered(a) : false;
+  const info = useInfoHint({
+    name: t("common.about", { label: a ? approveAlwaysLabel(t, a) : "" }),
+    text: a && offered ? approveAlwaysHint(t, a, name || t("channel.unknownAgent")) : "",
+  });
   return (
-    <Text variant="caption" tone="faint">
-      {approveAlwaysHint(t, a, name || t("channel.unknownAgent"))}
-    </Text>
+    <>
+      {children(offered ? { button: info.button, text: info.open ? info.text : null } : { button: null, text: null })}
+    </>
   );
 }
 
@@ -668,6 +658,4 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.6 },
   saidRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   expiry: { fontWeight: "500", fontVariant: ["tabular-nums"] },
-  always: { gap: 4 },
-  alwaysHint: { textAlign: "center" },
 });

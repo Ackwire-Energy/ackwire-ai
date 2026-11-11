@@ -515,7 +515,6 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
       // Production's depth backstop (`AGENT_MAX_HOPS`): the stretch limits bound agents that run on their own.
       maxHops: 100,
       maxToolTurns,
-      deltaFlushMs: 0,
       tools,
       context,
       search,

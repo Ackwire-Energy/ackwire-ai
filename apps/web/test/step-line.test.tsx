@@ -12,7 +12,7 @@ afterEach(() => {
   setSystemTime();
 });
 
-/** The bar's words for an agent whose row still waits for its answer. */
+/** The bar's words for an agent at work. */
 const barStep = () => document.querySelector(".ac-typing__step")?.textContent ?? null;
 
 test("the bar says the agent's own words for its step once the turn is past a few seconds, and drops them with the answer", async () => {
@@ -37,8 +37,8 @@ test("the bar says the agent's own words for its step once the turn is past a fe
   await settle(2);
   expect(barStep()).toBe("“Vou ler o painel de tarefas do app”");
 
-  await ev({ type: "agent.delta", ...ids, seq: 0, turn: 1, at: 0, text: "Faltam o ícone e a classificação." });
+  await ev({ type: "agent.typing", ...ids });
   await settle(3);
-  // Its answer is on its way: the words go (a row out of view reads "escrevendo…").
-  expect(barStep() ?? "").not.toContain("Vou ler");
+  // Its answer is on its way: the words go, the bar says it writes (the answer shows whole once posted).
+  expect(barStep()).toBe("escrevendo…");
 });

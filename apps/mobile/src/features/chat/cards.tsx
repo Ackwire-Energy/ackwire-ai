@@ -36,7 +36,7 @@ import {
 import { nextLabel } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { modeKey } from "@agenteschat/client/lib/workspace-mode";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
@@ -63,7 +63,7 @@ import {
   ApprovalPreview,
   ApprovalTraits,
   ApproveAlwaysButton,
-  ApproveAlwaysHint,
+  ApproveAlwaysInfo,
   approvalHeadline,
   approvalTitleText,
   hasApprovalPreview,
@@ -285,12 +285,20 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
       onAlways={() => approveAlways(a)}
     />
   );
-  // A run's or the card's decision, in one row; "Aprovar sempre" (and what it covers, under the row) on a run.
-  const decideParts = (list: Approval[], label: string, run: boolean) => {
+  // A run's "Aprovar sempre": its first request that offers it, which I may decide.
+  const alwaysLead = (list: Approval[]) => list.find((a) => always.has(a.id) && a.canDecide);
+  // A run's or the card's decision, in one row of buttons; on a run, "Aprovar sempre" with its ⓘ (what it covers, under
+  // the row while open).
+  const decideParts = (
+    list: Approval[],
+    label: string,
+    run: boolean,
+    info?: { button: ReactNode; text: ReactNode },
+  ) => {
     const scope = approveAllScope(list).ids;
     if (scope.length < 2) return null;
     const high = list.some((a) => scope.includes(a.id) && approvalRisk(a) === "high");
-    const lead = run ? list.find((a) => always.has(a.id) && a.canDecide) : undefined;
+    const lead = run ? alwaysLead(list) : undefined;
     return {
       acts: (
         <View style={styles.itemActs}>
@@ -307,6 +315,7 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
             />
           )}
           {lead ? <ApproveAlwaysButton approval={lead} disabled={busy} onPress={() => approveAlways(lead)} /> : null}
+          {lead ? info?.button : null}
           <Button
             variant="secondary"
             size="card"
@@ -316,18 +325,22 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
           />
         </View>
       ),
-      hint: lead ? <ApproveAlwaysHint approval={lead} name={name} /> : null,
+      hint: lead ? info?.text : null,
     };
   };
-  const decide = (list: Approval[], label: string, run: boolean) => {
-    const parts = decideParts(list, label, run);
-    return parts ? (
-      <>
-        {parts.acts}
-        {parts.hint}
-      </>
-    ) : null;
-  };
+  const decide = (list: Approval[], label: string, run: boolean) => (
+    <ApproveAlwaysInfo approval={run ? alwaysLead(list) : undefined} name={name}>
+      {(info) => {
+        const parts = decideParts(list, label, run, info);
+        return parts ? (
+          <>
+            {parts.acts}
+            {parts.hint}
+          </>
+        ) : null;
+      }}
+    </ApproveAlwaysInfo>
+  );
   const partial =
     blocked > 0 && ids.length > 0 ? (
       <Text variant="footnote" tone="muted">
@@ -366,43 +379,49 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
               if (run.length < 2) return item(lead, false, true);
               const key = keys[i] ?? lead.id;
               const open = opened.has(key);
-              const parts = decideParts(run, t("approval.run.approve"), true);
               return (
-                <View key={key} style={[styles.item, styles.divided, { borderTopColor: c.line2 }]}>
-                  <View style={styles.itemRow}>
-                    <View style={styles.itemMark}>
-                      <ApprovalMark approval={lead} size={20} bare />
-                    </View>
-                    <View style={[ACT_LINE.row, styles.itemWrap]}>
-                      <View style={ACT_LINE.text}>
-                        <Text variant="subhead" tone="ink" style={styles.bold}>
-                          {head(run)}
-                        </Text>
-                        <Pressable
-                          onPress={() => {
-                            tapHaptic();
-                            toggle(key);
-                          }}
-                          accessibilityRole="button"
-                          accessibilityState={{ expanded: open }}
-                          // An 18-point line: the slop gives "Show" the 44 a finger needs.
-                          hitSlop={{ top: 13, bottom: 13, left: 6, right: 6 }}
-                          style={({ pressed }) => [styles.runMore, pressed && styles.pressed]}
-                        >
-                          <Text variant="footnote" tone="ink2" style={styles.bold}>
-                            {t("approval.run.show")}
-                          </Text>
-                          <View style={open ? styles.flip : undefined}>
-                            <Icon name="chev" size={13} color={c.muted} />
+                <ApproveAlwaysInfo key={key} approval={alwaysLead(run)} name={name}>
+                  {(info) => {
+                    const parts = decideParts(run, t("approval.run.approve"), true, info);
+                    return (
+                      <View style={[styles.item, styles.divided, { borderTopColor: c.line2 }]}>
+                        <View style={styles.itemRow}>
+                          <View style={styles.itemMark}>
+                            <ApprovalMark approval={lead} size={20} bare />
                           </View>
-                        </Pressable>
+                          <View style={[ACT_LINE.row, styles.itemWrap]}>
+                            <View style={ACT_LINE.text}>
+                              <Text variant="subhead" tone="ink" style={styles.bold}>
+                                {head(run)}
+                              </Text>
+                              <Pressable
+                                onPress={() => {
+                                  tapHaptic();
+                                  toggle(key);
+                                }}
+                                accessibilityRole="button"
+                                accessibilityState={{ expanded: open }}
+                                // An 18-point line: the slop gives "Show" the 44 a finger needs.
+                                hitSlop={{ top: 13, bottom: 13, left: 6, right: 6 }}
+                                style={({ pressed }) => [styles.runMore, pressed && styles.pressed]}
+                              >
+                                <Text variant="footnote" tone="ink2" style={styles.bold}>
+                                  {t("approval.run.show")}
+                                </Text>
+                                <View style={open ? styles.flip : undefined}>
+                                  <Icon name="chev" size={13} color={c.muted} />
+                                </View>
+                              </Pressable>
+                            </View>
+                            {parts?.acts}
+                          </View>
+                        </View>
+                        {parts?.hint ? <View style={styles.itemUnder}>{parts.hint}</View> : null}
+                        {open ? <View style={styles.nested}>{run.map((a) => item(a, true, true))}</View> : null}
                       </View>
-                      {parts?.acts}
-                    </View>
-                  </View>
-                  {parts?.hint ? <View style={styles.itemUnder}>{parts.hint}</View> : null}
-                  {open ? <View style={styles.nested}>{run.map((a) => item(a, true, true))}</View> : null}
-                </View>
+                    );
+                  }}
+                </ApproveAlwaysInfo>
               );
             })}
             {partial}
@@ -463,91 +482,99 @@ function ApprovalGroupItem({
   // "Recusar" asks once, in the system's alert, as the card of one request does.
   const { refuse, pending: refusing } = useRefuseApproval(a);
   return (
-    <View style={[styles.item, divider && [styles.divided, { borderTopColor: c.line2 }], !pending && styles.itemDone]}>
-      <View style={styles.itemRow}>
-        <View style={styles.itemMark}>
-          <ApprovalMark approval={a} size={20} bare />
-        </View>
-        {/* Its words, then its buttons at the row's end while the words fit their line beside them; else the buttons
+    <ApproveAlwaysInfo approval={pending && a.canDecide && always ? a : undefined} name={name}>
+      {(info) => (
+        <View
+          style={[styles.item, divider && [styles.divided, { borderTopColor: c.line2 }], !pending && styles.itemDone]}
+        >
+          <View style={styles.itemRow}>
+            <View style={styles.itemMark}>
+              <ApprovalMark approval={a} size={20} bare />
+            </View>
+            {/* Its words, then its buttons at the row's end while the words fit their line beside them; else the buttons
             go under the words, from where they start. The words read whole, code drawn as code. */}
-        <View style={[ACT_LINE.row, styles.itemWrap]}>
-          <View style={ACT_LINE.text}>
-            <Text variant="subhead" tone="ink" style={styles.bold}>
-              {approvalTitleText(t, a)}
-            </Text>
-            {detail ? (
-              <Text variant="footnote" tone="muted">
-                <Spans inline={parseInline(detail)} />
-              </Text>
-            ) : null}
-            {own.why ? (
-              <Text variant="footnote" tone="ink">
-                <Spans inline={parseInline(own.why)} />
-              </Text>
-            ) : null}
-            {own.origin ? (
-              <Text variant="footnote" tone="muted">
-                {tt(own.origin.key, own.origin.values)}
-              </Text>
-            ) : null}
-            <ApprovalAheadLine approval={a} />
-          </View>
-          {pending && a.canDecide ? (
-            <View style={styles.itemActs}>
-              {approvalRisk(a) === "high" ? (
-                <HoldButton size="card" label={t("mobile.approval.hold")} onConfirm={onApprove} />
-              ) : (
-                <Button
-                  variant="primary"
-                  size="card"
-                  label={t("mobile.approval.approve")}
-                  disabled={busy || refusing}
-                  onPress={onApprove}
-                />
-              )}
-              {always ? <ApproveAlwaysButton approval={a} disabled={busy || refusing} onPress={onAlways} /> : null}
-              <Button
-                variant="secondary"
-                size="card"
-                label={t("mobile.approval.refuse")}
-                disabled={busy || refusing}
-                onPress={refuse}
-              />
+            <View style={[ACT_LINE.row, styles.itemWrap]}>
+              <View style={ACT_LINE.text}>
+                <Text variant="subhead" tone="ink" style={styles.bold}>
+                  {approvalTitleText(t, a)}
+                </Text>
+                {detail ? (
+                  <Text variant="footnote" tone="muted">
+                    <Spans inline={parseInline(detail)} />
+                  </Text>
+                ) : null}
+                {own.why ? (
+                  <Text variant="footnote" tone="ink">
+                    <Spans inline={parseInline(own.why)} />
+                  </Text>
+                ) : null}
+                {own.origin ? (
+                  <Text variant="footnote" tone="muted">
+                    {tt(own.origin.key, own.origin.values)}
+                  </Text>
+                ) : null}
+                <ApprovalAheadLine approval={a} />
+              </View>
+              {pending && a.canDecide ? (
+                <View style={styles.itemActs}>
+                  {approvalRisk(a) === "high" ? (
+                    <HoldButton size="card" label={t("mobile.approval.hold")} onConfirm={onApprove} />
+                  ) : (
+                    <Button
+                      variant="primary"
+                      size="card"
+                      label={t("mobile.approval.approve")}
+                      disabled={busy || refusing}
+                      onPress={onApprove}
+                    />
+                  )}
+                  {always ? <ApproveAlwaysButton approval={a} disabled={busy || refusing} onPress={onAlways} /> : null}
+                  {info.button}
+                  <Button
+                    variant="secondary"
+                    size="card"
+                    label={t("mobile.approval.refuse")}
+                    disabled={busy || refusing}
+                    onPress={refuse}
+                  />
+                </View>
+              ) : null}
             </View>
-          ) : null}
+          </View>
+          {pending ? (
+            info.text ? (
+              <View style={styles.itemUnder}>{info.text}</View>
+            ) : null
+          ) : (
+            // Decided while the card shows: how it ended fades in under its words.
+            <Animated.View
+              entering={reduced ? undefined : FadeIn.duration(160)}
+              style={[styles.item, styles.itemUnder]}
+            >
+              <Text variant="footnote" tone="muted">
+                {[
+                  decisionOutcome(t, a, meId, (id) => dir.memberById.get(id)?.name),
+                  scheduled && t("approval.ahead.scheduled", { when: nextLabel(i18n.language, scheduled) }),
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </Text>
+              {scheduled && a.canCancel ? (
+                <View style={styles.cancelAhead}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    label={t("approval.ahead.cancel")}
+                    loading={cancelAhead.pending}
+                    onPress={() => cancelAhead.cancel(a.id)}
+                  />
+                </View>
+              ) : null}
+            </Animated.View>
+          )}
         </View>
-      </View>
-      {pending ? (
-        a.canDecide && always ? (
-          <View style={styles.itemUnder}>
-            <ApproveAlwaysHint approval={a} name={name} />
-          </View>
-        ) : null
-      ) : (
-        // Decided while the card shows: how it ended fades in under its words.
-        <Animated.View entering={reduced ? undefined : FadeIn.duration(160)} style={[styles.item, styles.itemUnder]}>
-          <Text variant="footnote" tone="muted">
-            {[
-              decisionOutcome(t, a, meId, (id) => dir.memberById.get(id)?.name),
-              scheduled && t("approval.ahead.scheduled", { when: nextLabel(i18n.language, scheduled) }),
-            ]
-              .filter(Boolean)
-              .join(" · ")}
-          </Text>
-          {scheduled && a.canCancel ? (
-            <View style={styles.cancelAhead}>
-              <Button
-                variant="ghost"
-                size="sm"
-                label={t("approval.ahead.cancel")}
-                loading={cancelAhead.pending}
-                onPress={() => cancelAhead.cancel(a.id)}
-              />
-            </View>
-          ) : null}
-        </Animated.View>
       )}
-    </View>
+    </ApproveAlwaysInfo>
   );
 }
 

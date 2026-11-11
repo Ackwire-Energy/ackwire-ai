@@ -377,12 +377,6 @@
     "toLatestNew": "En son mesajlara git: {{text}}",
     "stopAgent": "{{name}} ajanını durdur",
     "offlineWait": "Bağlantı geri gelince gönderilir",
-    "turn": {
-      "thinking": "düşünüyor",
-      "working": "çalışıyor",
-      "writing": "yazıyor",
-      "stopped": "durdu"
-    },
     "steer": {
       "waiting": "{{name}} bir sonraki arada okuyacak",
       "computer": "{{name}} bilgisayarı alınca okuyacak",

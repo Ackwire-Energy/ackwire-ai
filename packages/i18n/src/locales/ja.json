@@ -2990,7 +2990,6 @@
     "messageTo": "{{name}}へのメッセージ",
     "audienceEdit": "編集",
     "nowIn": "現在 #{{channel}} で作業中",
-    "answersHere": "ここでは@なしで返信します",
     "more": "その他",
     "of": "{{name}}のプロフィール",
     "presence": "ステータス",

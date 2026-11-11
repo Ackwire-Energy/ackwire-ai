@@ -363,12 +363,6 @@
     "toLatestNew": "前往最新消息：{{text}}",
     "stopAgent": "停止 {{name}}",
     "offlineWait": "恢复连接后发送",
-    "turn": {
-      "thinking": "思考中",
-      "working": "工作中",
-      "writing": "撰写中",
-      "stopped": "已停止"
-    },
     "steer": {
       "waiting": "{{name}} 会在下次暂停时读取",
       "computer": "{{name}} 拿到电脑后会阅读",

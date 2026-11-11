@@ -68,7 +68,11 @@ describe("command approvals", () => {
     await settle(6);
     const card = screen().getByRole("region", { name: "Claude Code pede para rodar um comando" });
     expect(card.textContent).toContain("swift build -c release");
-    expect(card.textContent).toContain("Aprovar sempre libera swift build …");
+    // What it covers is the button's tip: no line of its own under the buttons.
+    expect(card.textContent).not.toContain("Aprovar sempre libera");
+    expect(
+      within(card).getByRole("button", { name: "Aprovar sempre nesta missão" }).getAttribute("aria-description"),
+    ).toContain("Aprovar sempre libera swift build …");
     expect(within(card).getByRole("button", { name: "Recusar" })).toBeTruthy();
     await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Aprovar sempre nesta missão" })));
     await settle(6);
@@ -94,7 +98,10 @@ describe("command approvals", () => {
     );
     await settle(6);
     const card = screen().getByRole("region", { name: "Claude Code pede para rodar um comando" });
-    expect(card.textContent).toContain("libera gh issue create com quaisquer argumentos");
+    expect(card.textContent).not.toContain("com quaisquer argumentos");
+    expect(
+      within(card).getByRole("button", { name: "Aprovar sempre para este agente" }).getAttribute("aria-description"),
+    ).toContain("libera gh issue create com quaisquer argumentos");
     await act(async () =>
       fireEvent.click(within(card).getByRole("button", { name: "Aprovar sempre para este agente" })),
     );

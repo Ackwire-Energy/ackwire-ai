@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import type { ActiveRun } from "../src/api/types";
 import { firstUnreadId } from "../src/lib/chat-look";
-import { blockPlaces, landedAfter, lastPostedId, PLACE_KEPT_MS, postedAtOf } from "../src/lib/timeline";
+import { landedAfter, lastPostedId, PLACE_KEPT_MS, postedAtOf } from "../src/lib/timeline";
 import { applyChannelEvent, emptyStreams, reconcileRuns } from "../src/realtime/streams";
 
 /** A UUIDv7 as the server makes them: its first 48 bits are the clock at the insert (ms). */
@@ -11,24 +11,11 @@ const v7 = (ms: number, n = 1) => {
 };
 const at = (iso: string) => Date.parse(iso);
 
-test("a live block knows where its words first showed: from its deltas, and opened mid-answer from the server", () => {
+test("an agent at work keeps no place of its own: a server's deltas, and the active runs, say only that it writes", () => {
   const delta = { type: "agent.delta" as const, channelId: "c", threadId: "t", agentId: "ada", runId: "r" };
-  let s = applyChannelEvent(emptyStreams, { ...delta, seq: 0, text: "O deploy", turn: 1, at: 0 });
-  expect(s.runs.r?.shownAt).toBeUndefined();
-  s = applyChannelEvent(s, {
-    ...delta,
-    seq: 1,
-    text: " de ontem",
-    turn: 1,
-    at: 8,
-    shownAt: "2026-11-08T16:33:23.000Z",
-  });
-  expect(s.runs.r?.shownAt).toBe("2026-11-08T16:33:23.000Z");
-  // A new try replaces the text in the same block: the place stays.
-  s = applyChannelEvent(s, { ...delta, seq: 2, text: "Achei", turn: 2, at: 0, shownAt: "2026-11-08T16:33:23.000Z" });
-  expect(s.runs.r?.text).toBe("Achei");
-  expect(s.runs.r?.shownAt).toBe("2026-11-08T16:33:23.000Z");
-
+  const s = applyChannelEvent(emptyStreams, { ...delta, seq: 0, text: "O deploy" });
+  expect(s.runs.r?.status).toBe("running");
+  expect(Object.keys(s.runs.r ?? {})).not.toContain("text");
   const active: ActiveRun[] = [
     {
       runId: "r2",
@@ -37,36 +24,9 @@ test("a live block knows where its words first showed: from its deltas, and open
       threadId: "t",
       status: "running",
       startedAt: "2026-11-08T16:33:00.000Z",
-      live: { turn: 1, at: 0, text: "Olhando", shownAt: "2026-11-08T16:33:20.000Z" },
     },
   ];
-  expect(reconcileRuns(emptyStreams, "c", active).runs.r2?.shownAt).toBe("2026-11-08T16:33:20.000Z");
-});
-
-test("blocks draw right before the first row after their words showed, by that moment; the others after every row", () => {
-  const rows = [
-    { kind: "day", iso: "2026-11-08T16:30:00.000Z" },
-    { kind: "message", message: { createdAt: "2026-11-08T16:30:00.000Z" } },
-    // Sent while the answers were being written.
-    { kind: "message", message: { createdAt: "2026-11-08T16:33:47.000Z" } },
-    { kind: "marker" },
-    // Mine, still on its way: after everything, whatever my clock says.
-    { kind: "message", message: { createdAt: "2026-11-08T16:00:00.000Z", local: "pending" as const } },
-  ];
-  const blocks = [
-    { id: "ada", shownAt: "2026-11-08T16:33:23.000Z" },
-    { id: "thinking" },
-    { id: "late", shownAt: "2026-11-08T16:34:00.000Z" },
-    { id: "atlas", shownAt: "2026-11-08T16:31:00.000Z" },
-  ];
-  const { before, after } = blockPlaces(rows, blocks, (b) => b.shownAt);
-  expect([...before].map(([i, list]) => [i, list.map((b) => b.id)])).toEqual([
-    [2, ["atlas", "ada"]],
-    [4, ["late"]],
-  ]);
-  expect(after.map((b) => b.id)).toEqual(["thinking"]);
-  // Nothing written after its words: it stays at the end, as before.
-  expect(blockPlaces(rows.slice(0, 2), blocks.slice(0, 1), (b) => b.shownAt).after).toHaveLength(1);
+  expect(reconcileRuns(emptyStreams, "c", active).runs.r2?.status).toBe("thinking");
 });
 
 test("what landed after a read: written after it, or posted since in a place before it", () => {

@@ -3301,7 +3301,6 @@
     "messageTo": "Wiadomość do: {{name}}",
     "audienceEdit": "Edytuj",
     "nowIn": "teraz, w #{{channel}}",
-    "answersHere": "Odpowiada tutaj bez @",
     "more": "Więcej",
     "of": "Profil: {{name}}",
     "presence": "Obecność",

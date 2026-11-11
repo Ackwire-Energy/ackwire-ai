@@ -124,7 +124,7 @@ export function applyConsultEvent(
       const next = dropIfBack(state, runId);
       return message.author.type === "agent" ? dropBackOf(next, message.author.id, message.channelId) : next;
     }
-    // Its words are arriving: the reply's own row takes over.
+    // It writes its reply now: the line says that instead.
     case "agent.delta":
     case "agent.typing":
       return typeof e.runId === "string" ? dropBackOf(dropIfBack(state, e.runId), e.agentId, e.channelId) : state;

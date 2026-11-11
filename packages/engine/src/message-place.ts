@@ -1,10 +1,9 @@
 import { type SQL, type schema, sql } from "@agenteschat/db";
 
 /**
- * How long a streamed reply keeps the place where its first words showed (its `created_at`, ADR 0010): what people
- * sent while it wrote stays below it, as the apps drew it live. One that took longer is posted at the end, where the
- * conversation is by then. It also bounds how far back `landedAfterSql` looks. Mirrored in packages/client
- * (`PLACE_KEPT_MS`, lib/timeline.ts).
+ * How far before its post a message's `created_at` can be: the lead a brain wrote right before its question card, and
+ * replies from when they kept the place where their streamed words first showed (ADR 0010). It bounds how far back
+ * `landedAfterSql` and `postedBySql` look. Mirrored in packages/client (`PLACE_KEPT_MS`, lib/timeline.ts).
  */
 export const PLACE_KEPT_MS = 10 * 60_000;
 

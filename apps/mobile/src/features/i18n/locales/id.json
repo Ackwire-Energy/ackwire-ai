@@ -363,12 +363,6 @@
     "toLatestNew": "Ke pesan terbaru: {{text}}",
     "stopAgent": "Hentikan {{name}}",
     "offlineWait": "Terkirim saat koneksi kembali",
-    "turn": {
-      "thinking": "berpikir",
-      "working": "bekerja",
-      "writing": "menulis",
-      "stopped": "berhenti"
-    },
     "steer": {
       "waiting": "{{name}} membacanya di jeda berikutnya",
       "computer": "{{name}} membacanya saat mendapat komputer",

@@ -44,9 +44,10 @@ test("vertical slice: @mention → outbox → run → streamed reply → persist
   expect(systemText(request?.system ?? "")).toContain("Answer briefly.");
   expect(request?.messages.at(-1)).toEqual({ role: "user", content: "[ana]: @dev can you look at the failing build?" });
 
-  // Deltas went out through PubSub to channel subscribers, in order, then the final message.
+  // Events went out through PubSub to channel subscribers, in order, then the final message.
   // Ordering: the message is out first, "thinking" is shown before any routing or model work,
-  // then the claim, typing on the first text, the stream, the reply, and the finish + receipt.
+  // then the claim, typing on the first text (none of its words: the reply shows them whole), the reply, and the
+  // finish + receipt.
   expect(events.map((e) => e.type)).toEqual([
     "message.created",
     "message.routed", // at post time: the run was created with the message
@@ -55,7 +56,6 @@ test("vertical slice: @mention → outbox → run → streamed reply → persist
     "message.claimed",
     "agent.run",
     "agent.typing",
-    "agent.delta", // a short answer shows whole when its turn ends
     "message.created",
     "agent.run",
     "agent.idle",
@@ -71,9 +71,6 @@ test("vertical slice: @mention → outbox → run → streamed reply → persist
   // Asked in the channel: the run's events and reply are in the main timeline.
   expect(events[2]).toMatchObject({ agentId: f.agent.id, runId: run?.id, threadId: null });
   expect(events.at(-1)).toMatchObject({ type: "message.handled", messageId: question.id, status: "done" });
-  const deltas = events.filter((e) => e.type === "agent.delta");
-  expect(deltas.map((e) => e.text).join("")).toBe("Sure, I'll check the build.");
-  expect(deltas.map((e) => e.seq)).toEqual([0]);
   expect([...events].reverse().find((e) => e.type === "agent.run")).toMatchObject({ status: "done", runId: run?.id });
 
   // The reply is persisted in the main timeline, under the question, authored by the agent.

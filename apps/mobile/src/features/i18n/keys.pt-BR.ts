@@ -393,12 +393,6 @@ export const featureKeysPtBR = {
     toLatestNew: "Ir para as mensagens mais recentes: {{text}}",
     stopAgent: "Parar {{name}}",
     offlineWait: "Sai quando a conexão voltar",
-    turn: {
-      thinking: "pensando",
-      working: "trabalhando",
-      writing: "escrevendo",
-      stopped: "parado",
-    },
     steer: {
       waiting: "{{name}} lê na próxima pausa",
       computer: "{{name}} lê quando conseguir o computador",

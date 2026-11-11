@@ -44,7 +44,7 @@ export class RowSight {
     return [...this.rows];
   }
 
-  /** A run's live row is drawn (`TurnRow`); returns the call that takes it back when it goes. */
+  /** A run's live row is drawn; returns the call that takes it back when it goes. */
   register(runId: string, view: Measurable) {
     this.rows.set(runId, view);
     this.publish();

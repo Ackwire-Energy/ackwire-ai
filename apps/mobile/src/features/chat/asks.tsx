@@ -907,8 +907,9 @@ const styles = StyleSheet.create({
   done: { alignSelf: "stretch" },
   // The breathing square centered in the pill's 14-point mark.
   waitMark: { width: 14, height: 14, alignItems: "center", justifyContent: "center" },
-  // The bar: the working line's shape (WorkingLine), so one replaces the other without moving.
-  dock: { paddingHorizontal: 4, paddingBottom: 6 },
+  // The bar: the working line's shape and width (WorkingLine, the composer's edges), so one replaces the other
+  // without moving.
+  dock: { paddingBottom: 6 },
   pill: {
     flexDirection: "row",
     alignItems: "center",

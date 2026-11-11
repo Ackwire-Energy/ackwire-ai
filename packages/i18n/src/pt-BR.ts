@@ -3173,8 +3173,6 @@ export const ptBR = {
     messageTo: "Mensagem para {{name}}",
     audienceEdit: "Editar",
     nowIn: "agora, em #{{channel}}",
-    /** An agent set to answer in this channel without being mentioned (its card opened from the channel). */
-    answersHere: "Responde aqui sem precisar de @",
     more: "Mais",
     of: "Perfil de {{name}}",
     presence: "Presença",

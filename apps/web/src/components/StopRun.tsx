@@ -104,7 +104,7 @@ export function runContext(t: TFunction, run: LiveRun, now = Date.now()) {
       ? t("run.ctx.code", { time: ago(call.since) })
       : t("run.ctx.tool", { doing: activityVerb(t, doing), time: ago(call.since) });
   }
-  if (run.text) return t("run.ctx.writing");
+  if (run.status === "running") return t("run.ctx.writing");
   return t("run.ctx.thinking", { time: ago(workingSinceOf(run)) });
 }
 

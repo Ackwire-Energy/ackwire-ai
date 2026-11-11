@@ -391,12 +391,6 @@
     "toLatestNew": "Aller aux derniers messages : {{text}}",
     "stopAgent": "Arrêter {{name}}",
     "offlineWait": "Partira au retour de la connexion",
-    "turn": {
-      "thinking": "réfléchit",
-      "working": "travaille",
-      "writing": "écrit",
-      "stopped": "arrêté"
-    },
     "steer": {
       "waiting": "{{name}} le lira à la prochaine pause",
       "computer": "{{name}} le lira dès qu'il aura l'ordinateur",

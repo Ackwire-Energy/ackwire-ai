@@ -1489,11 +1489,6 @@ export interface ActiveRun {
   pendingMessageIds?: string[];
   /** A routine's run working in the background: it holds no conversation and shows no "trabalhando". */
   background?: boolean;
-  /**
-   * What its current model call streamed so far past its last tool: `text` starts at `at` of the call's text, so an
-   * app opened mid-answer goes on from `at` plus its length. `shownAt`: as `agent.delta.shownAt`.
-   */
-  live?: { turn: number; at: number; text: string; shownAt?: string };
 }
 
 /** Real-time channel events (packages/engine/src/events.ts, docs/adr/0010-realtime.md). */
@@ -1560,6 +1555,7 @@ export type ChannelEvent =
       messageIds?: string[];
     }
   | ArtifactEvent
+  /** From a server that still streams a reply's words: read only as "it writes" (the reply shows whole, once posted). */
   | {
       type: "agent.delta";
       channelId: string;
@@ -1568,14 +1564,6 @@ export type ChannelEvent =
       agentId: string;
       seq: number;
       text: string;
-      /** Which model call of the run this text belongs to (narration is keyed by it). */
-      turn?: number;
-      /** Where `text` starts in its turn's text: past what arrived here, a piece was missed. */
-      at?: number;
-      /** Where its stretch starts in the turn's text (a stretch: the text between two calls of a computer brain). */
-      from?: number;
-      /** When its reply first showed words (ISO, the server's clock): its message is posted there (`LiveRun.shownAt`). */
-      shownAt?: string;
     }
   | {
       type: "agent.run";

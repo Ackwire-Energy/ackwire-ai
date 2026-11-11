@@ -414,8 +414,7 @@ export function workingEntries(
   typing: string[] = [],
   personName: (id: string) => string | undefined = () => undefined,
 ): ActivityEntry[] {
-  // Writing agents stay in: the line above the box is on while they work.
-  return barEntries(runs, typing, agentName, personName, consults, true);
+  return barEntries(runs, typing, agentName, personName, consults);
 }
 
 /**
@@ -456,10 +455,6 @@ export function awayRun(
   const run = solo ? runs.find((r) => r.agentId === solo.id) : undefined;
   return run && !rowInView(run) ? run : undefined;
 }
-
-/** The run whose live row offers its stop (the web's rule): the latest one here I may stop. */
-export const rowStopOf = (runs: LiveRun[], canStop: (run: LiveRun) => boolean): LiveRun | undefined =>
-  stoppableInLine(runs).findLast((r) => canStop(r));
 
 /**
  * Who may press "Parar" (the web's `useStopRun`): admins, the agent's owner,

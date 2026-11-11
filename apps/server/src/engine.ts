@@ -146,7 +146,6 @@ export interface EngineOptions {
   appleRevoke?: AppleTokenRevoker;
   http?: typeof fetch;
   embeddings?: { provider: EmbeddingProvider; apiKey: string };
-  deltaFlushMs?: number;
   /** Latency measurements from runs (logged by the server). */
   onTiming?(name: string, ms: number, attrs: Record<string, unknown>): void;
   /** Tests: fake TypeSafe transport. */
@@ -777,7 +776,6 @@ export function buildEngine(o: EngineOptions) {
     contextMessages: config.AGENT_CONTEXT_MESSAGES,
     blockSpec: (orgId, artifactId, version) => blockSpecAt(artifacts, orgId, artifactId, version),
     maxHops: config.AGENT_MAX_HOPS,
-    deltaFlushMs: o.deltaFlushMs,
     onTiming: o.onTiming,
     onRunProfile: o.onRunProfile,
     router: {

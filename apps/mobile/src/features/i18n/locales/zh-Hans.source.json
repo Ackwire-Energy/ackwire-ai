@@ -914,18 +914,6 @@
   "chat.offlineWait": {
     "value": "Goes out when the connection is back"
   },
-  "chat.turn.thinking": {
-    "value": "thinking"
-  },
-  "chat.turn.working": {
-    "value": "working"
-  },
-  "chat.turn.writing": {
-    "value": "writing"
-  },
-  "chat.turn.stopped": {
-    "value": "stopped"
-  },
   "chat.steer.waiting": {
     "value": "{{name}} reads it at the next pause"
   },

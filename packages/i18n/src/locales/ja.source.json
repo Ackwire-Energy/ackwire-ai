@@ -7509,9 +7509,6 @@
   "profile.nowIn": {
     "value": "now, in #{{channel}}"
   },
-  "profile.answersHere": {
-    "value": "Answers here without an @"
-  },
   "profile.more": {
     "value": "More"
   },

@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { builtCss, declarations, topLevel } from "./built-css";
 
-test("what ships keeps the bar above the composer one low width: the words take what is left, the clock ticks in place", async () => {
+test("what ships keeps the bar above the composer one low width, the composer's: the words take what is left, the clock ticks in place", async () => {
   const css = topLevel(await builtCss());
   const last = (selector: string, property: string) =>
     declarations(css, selector)
@@ -9,9 +9,11 @@ test("what ships keeps the bar above the composer one low width: the words take 
       .at(-1)?.[1];
   const bar = '.ac-typing[data-active="true"]';
   // One width whatever it says or shows (a turning phrase, the seconds, "Ver" or the stop coming and going): no width
-  // of its own, so it fills the composer, up to 440px.
+  // of its own and no cap, so it fills the composer's column, its edges on the composer's (the channel, a thread in
+  // the panel, a DM, a task's conversation alike).
   expect(last(bar, "width")).toBeUndefined();
-  expect(last(bar, "max-width")).toBe("440px");
+  expect(last(bar, "max-width")).toBeUndefined();
+  expect(last(".ac-typing", "margin")).toBe("0 0 var(--space-1)");
   expect(last(bar, "height")).toBe("28px");
   // The words never size it: they take the room left, on one line.
   const words = `${bar} .ac-typing__text`;
@@ -33,10 +35,6 @@ test("what ships keeps the bar above the composer one low width: the words take 
   expect(last(".ac-typing__step", "max-width")).toBeUndefined();
   expect(last(".ac-typing__step", "min-width")).toBe("0");
   expect(last(".ac-typing__step", "flex")).toBe("0 auto");
-  // Its step and someone typing beside it: the pill widens for both.
-  expect(last(`${bar}[data-wide]`, "max-width")).toBe("640px");
-  // A task's conversation column: the bar spans its composer, no 440px stop short of the composer's edge.
-  expect(last(`:is(.ac-details__side,.issue-page__talk) .channel__composer>${bar}`, "max-width")).toBe("none");
   // The clock's figures are all one width (`ac-num`), so the seconds never nudge it.
   expect(last(".ac-num", "font-variant-numeric")).toBe("tabular-nums");
 });

@@ -3200,7 +3200,6 @@
     "messageTo": "Mensaje para {{name}}",
     "audienceEdit": "Editar",
     "nowIn": "ahora, en #{{channel}}",
-    "answersHere": "Responde aquí sin necesidad de @",
     "more": "Más",
     "of": "Perfil de {{name}}",
     "presence": "Presencia",

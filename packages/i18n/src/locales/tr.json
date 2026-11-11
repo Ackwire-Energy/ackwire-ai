@@ -3088,7 +3088,6 @@
     "messageTo": "{{name}} için mesaj",
     "audienceEdit": "Düzenle",
     "nowIn": "şu an #{{channel}} kanalında",
-    "answersHere": "Burada @ olmadan yanıtlar",
     "more": "Daha fazla",
     "of": "{{name}} profili",
     "presence": "Durum",

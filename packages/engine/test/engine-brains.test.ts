@@ -2811,7 +2811,7 @@ test("a computer brain that fails after a bridged pause: the run keeps waiting w
   expect(gh.executed).toEqual([{ tool: "github_merge_pr", input: { repo: "acme/app", pr: 42 } }]);
 });
 
-test("a short line before a bridged approval never shows live: the card says it, nothing is posted", async () => {
+test("a short line before a bridged approval is never posted: the card says it", async () => {
   const gh = fakeGithub();
   f = await setup({ toolSources: [gh.source] });
   await grantScopes(f.db, f.org.id, f.agent.id, ALL_GITHUB_SCOPES);
@@ -2831,16 +2831,14 @@ test("a short line before a bridged approval never shows live: the card says it,
     brains: { claude_code: () => brain },
     machines: { status: async (id) => statusOf(id) },
   });
-  const events = f.listen(f.general.id);
   await post(f, "@dev faz o merge do PR 42");
   await drainOutbox(f.db, handlers);
 
   expect((await f.db.select().from(schema.agentRuns))[0]?.status).toBe("waiting_approval");
-  expect(events.some((e) => e.type === "agent.delta")).toBe(false);
   expect((await timeline(f)).some((m) => m.body.includes("Vou pedir"))).toBe(false);
 });
 
-test("a long line shown before a bridged approval goes with its card, not up where its words first showed", async () => {
+test("a long line said before a bridged approval goes right after its card, below what came meanwhile", async () => {
   const gh = fakeGithub();
   f = await setup({ toolSources: [gh.source] });
   await grantScopes(f.db, f.org.id, f.agent.id, ALL_GITHUB_SCOPES);
@@ -2852,7 +2850,7 @@ test("a long line shown before a bridged approval goes with its card, not up whe
       return;
     }
     yield { type: "text_delta", text: said };
-    // Someone writes once its words are on screen, before it asks.
+    // Someone writes while it writes, before it asks.
     await Bun.sleep(5);
     await post(f, "manda ver");
     await Bun.sleep(5);
@@ -2873,7 +2871,7 @@ test("a long line shown before a bridged approval goes with its card, not up whe
   await post(f, "@dev faz o merge do PR 42");
   await drainOutbox(f.db, handlers);
 
-  expect(events.some((e) => e.type === "agent.delta" && Boolean((e as { shownAt?: string }).shownAt))).toBe(true);
+  expect(events.some((e) => e.type === "agent.typing")).toBe(true);
   const main = await timeline(f);
   const meanwhile = main.findIndex((m) => m.body === "manda ver");
   const card = main.findIndex((m) => typeof m.meta.approvalId === "string");

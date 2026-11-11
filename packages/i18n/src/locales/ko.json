@@ -2988,7 +2988,6 @@
     "messageTo": "{{name}}에게 보낼 메시지",
     "audienceEdit": "편집",
     "nowIn": "지금 #{{channel}}에서",
-    "answersHere": "여기서는 @ 없이 답합니다",
     "more": "더 보기",
     "of": "{{name}}의 프로필",
     "presence": "상태",

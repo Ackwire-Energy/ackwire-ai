@@ -363,12 +363,6 @@
     "toLatestNew": "최신 메시지로 이동: {{text}}",
     "stopAgent": "{{name}} 중지",
     "offlineWait": "연결되면 전송돼요",
-    "turn": {
-      "thinking": "생각 중",
-      "working": "작업 중",
-      "writing": "작성 중",
-      "stopped": "중지됨"
-    },
     "steer": {
       "waiting": "{{name}}이(가) 다음에 멈출 때 읽어요",
       "computer": "{{name}}이(가) 컴퓨터를 쓰게 되면 읽어요",

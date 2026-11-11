@@ -377,12 +377,6 @@
     "toLatestNew": "Naar de nieuwste berichten: {{text}}",
     "stopAgent": "{{name}} stoppen",
     "offlineWait": "Gaat weg zodra de verbinding terug is",
-    "turn": {
-      "thinking": "denkt na",
-      "working": "aan het werk",
-      "writing": "schrijft",
-      "stopped": "gestopt"
-    },
     "steer": {
       "waiting": "{{name}} leest het bij de volgende pauze",
       "computer": "{{name}} leest het zodra de computer vrij is",

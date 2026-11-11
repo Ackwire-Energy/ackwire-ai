@@ -391,12 +391,6 @@
     "toLatestNew": "Ir a los mensajes más recientes: {{text}}",
     "stopAgent": "Detener a {{name}}",
     "offlineWait": "Se envía cuando vuelva la conexión",
-    "turn": {
-      "thinking": "pensando",
-      "working": "trabajando",
-      "writing": "escribiendo",
-      "stopped": "detenido"
-    },
     "steer": {
       "waiting": "{{name}} lo lee en la próxima pausa",
       "computer": "{{name}} lo lee cuando tenga la computadora",
