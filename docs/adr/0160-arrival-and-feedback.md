@@ -26,7 +26,8 @@ with Postgres alone, and must not need a third-party widget in the apps.
 
 2. **First the beta notice, then Connect an AI.** The notice says the product is in beta and what that means, and,
    only where the server takes feedback, where to send it. Every way out of it goes on. Connect an AI follows for a
-   person who has one to connect (`useMayConnectAi`) while some agent has none.
+   person who has one to connect (`useMayConnectAi`) while some agent has none. After the onboarding's AI step, or a
+   plan left for later, the onboarding asks for the notice alone (`?arrival=beta`, ADR 0162 amended 2026-11-10).
 
 3. **Connect an AI gets a stage, not a second flow.** Opened with `arrival`, the same dialog (ADR 0061) shows the
    workspace's agents asleep under a night sky beside the choices, and the sky turns to day as they wake once an AI
@@ -136,3 +137,30 @@ with Postgres alone, and must not need a third-party widget in the apps.
 - The phone app has neither the arrival nor the form yet.
 - The arrival's choice cards and the picker (ADR 0061) are two views of the same choices: a plan added to
   `PLAN_CHOICES` shows in both.
+
+## Addendum (2026-11-10): Connect from an agent's conversation, for every agent with no AI
+
+Someone who brought eight agents from another app had to open Connect in each one's conversation: there it was the plain dialog, for that agent alone (ADR 0059 §2), listing what they already had above a second picker that offered the same account again.
+
+- Connect opened from an agent's own conversation (the notice over the composer and the setup card: `ConnectAiRequest.chat`) is a narrow dialog under the arrival's sky, with the agent asleep on it, when the agent is the person's own, whatever it was set to think with and whatever its AI status says (the notice and the card only ask while it can't answer). Anything else (someone else's agent, the right hand, a key asked for by a message) keeps the plain dialog, as do the other ways in.
+- What the person already has comes first, to pick and then confirm at the foot ("Usar Claude · Max"): their own accounts, the workspace's keys, then other people's plans under each owner's name (`ConnectHave`, over the same rows and actions as the picker's: `useExistingAi`). A row says how near its limit the plan is, in words and as a bar; the one with most room is picked, one at its limit goes last. Someone else's plan shows that its owner hears of it only when it is the one picked. Past four rows each group shows its best one.
+- A new AI is a row under them ("Ou conecte outra") that opens the arrival's choices; with nothing connected yet the dialog opens on them.
+- When more agents of the person's have no AI, it opens for all of them ("Para: Todos os agentes"), and the same select narrows it to the agent of the conversation. This supersedes "opened for one agent, it is for that agent alone" for this way in. For all, the list keeps only the accounts that think for all of their owner's agents there, and picking one moves each agent onto it (`PlanPanel`'s `use`). What is decided when the dialog opens is kept while it is open, since connecting changes who has an AI.
+- A new sign-in follows the plan's own rule (ADR 0059 §2): one for all where the computer shares it, else one per agent in turn.
+- No new strings: the select, the rows, the button and the titles reuse the picker's and the arrival's.
+- Not here yet: the phone app.
+
+### For the whole team
+
+Connect opened for several agents or for none (the channel's notice, Settings › AI accounts, the first-run list, a team just made, a receipt or a card that names several agents, the computer-ready link, the onboarding's AI step of ADR 0162) showed the plain dialog: two tabs, a select of plans, "For: All agents" and the agents' names squeezed into chips. It is now the same narrow dialog under the sky, every screen built the same way (`BandDialog`: the sky with who wakes, the title with the way back on its line, one thing in the middle, the footer with a one-line note, the secondary action and the main one).
+
+- It is for every agent of the person's that can't think, on the computer of the first of them, since a plan signs in on one computer; decided once the agents and their AI are known, and kept while the dialog is open. The sky draws four of them and says how many more.
+- The team's right hand has no computer, so it never picks the one a plan signs in on and is never the agent a plan's panel reads or signs in for: the computer is the first other agent's, and the right hand wakes with the team by its own AI status. With nobody else to wake it is one agent alone, its own plain dialog.
+- A caller that already knows the card (the onboarding's AI step) opens it on that choice's steps (`start`), the API key's included.
+- The first screen says for whom on one line (their faces, "N agents without AI") with "Choose", which lists them one per row with a checkbox, all ticked, long names whole on their line; the footer counts them ("N of M checked") and "Use these N" narrows whom the plan's steps are for. Under that line, the accounts the person already has that think for all of them at once (their own, signed in, shared there) come first, with "Connect another AI" under them; otherwise the choices, where a plan that will ask for one login per agent on that computer says so at its card's end. The API key stays a choice for admins.
+- One login per agent is one instruction at a time: how far along ("3 of 8"), whose turn ("Sign in to Gemini for Lia"), why it asks again, and every agent's face in order: done with a check, the one now with a ring, those to come dimmed, one whose login didn't end with a mark. The sign-in and its link are the footer's actions, and the first agent's account is the next ones' hint as before. A login that didn't end says so in that place with the reason, and the footer offers skipping that agent beside trying again, the last one too. One sign-in for all, or one key sent to every login, has no faces.
+- The end says who woke ("The team is awake", how many, or that nobody did when every agent was skipped), what they think with (the account signed in), who stayed without an AI and why (each one's own reason), with "Connect Lia" to go again for those and counting the whole team across those rounds, and whom they answer: only the person on their subscription, with "Open to the team" turning on "Answers other people" for them under the same rules and the same terms note (ADR 0059 §5), in a seat's own words on a team or enterprise plan. A right hand still without an AI is named apart, and its "Connect" opens its own dialog. The dawn plays as they wake.
+- A screen that changes slides in from the side it comes from (deeper screens from the end), its title with it; whose turn moves along the faces and a check pops onto each as it lands; nothing moves for whoever asked for less motion.
+- The plain dialog stays for every way in that names one thing or has its own: someone else's agent (locked), one agent alone (the right hand's own AI among them), a plan to sign in to again (`plan`), a key asked for (`intent`) or pasted, an agent still being made, a billing hold, and nobody to wake (no agent of the person's yet, or every one already thinks).
+- On a page with no socket (the onboarding) the dialog reads the AI status, the computers and the plans' state again every few seconds while it is open.
+- New strings under `connectAi.team`.

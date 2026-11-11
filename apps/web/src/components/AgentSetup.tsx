@@ -288,7 +288,7 @@ export function AgentSetupCard({ agent, place }: { agent: Agent; place: "dm" | "
     });
 
   const act = (step: AgentSetupStep) => {
-    if (step === "ai") connect?.open({ agentId: agent.id });
+    if (step === "ai") connect?.open({ agentId: agent.id, chat: true });
     else setOpen(step);
   };
   const confirmed = () => setOpen(null);

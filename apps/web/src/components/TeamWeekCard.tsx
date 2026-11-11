@@ -257,7 +257,18 @@ function FixRow({
     <AgentAvatar agentId={agentId} name={dir.anyAgent(agentId)?.name ?? ""} size="md" />
   ) : (
     <span className="tw__tile" aria-hidden="true">
-      <Icon name={row.kind === "unanswered" ? "question" : row.kind === "stalled" ? "issues" : "routines"} size={16} />
+      <Icon
+        name={
+          row.kind === "unanswered"
+            ? "question"
+            : row.kind === "stalled"
+              ? "issues"
+              : row.kind === "howto"
+                ? "book"
+                : "routines"
+        }
+        size={16}
+      />
     </span>
   );
   const receipt = proposal?.undoActionId ? message.actions?.find((a) => a.id === proposal.undoActionId) : undefined;

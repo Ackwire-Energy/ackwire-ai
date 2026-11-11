@@ -49,6 +49,7 @@ import {
   accountSignIn,
   handToken,
   TOKEN_FD_ENV,
+  withoutContainers,
   withSignIn,
   yieldRoute,
 } from "./accounts";
@@ -1296,7 +1297,9 @@ export class TaskManager {
         ...(signIn?.token ? { tokenFd: true } : {}),
       });
       if (executor !== "shell") writeFileSync(path.join(dir, "stdin.txt"), input, { mode: 0o600 });
-      const base: NodeJS.ProcessEnv = { ...process.env, ...(secrets?.env ?? {}) };
+      // A Codex task's sandbox is what holds it: no way out through the agent's containers service (ADR 0169).
+      const own = executor === "codex" ? withoutContainers(process.env) : process.env;
+      const base: NodeJS.ProcessEnv = { ...own, ...(secrets?.env ?? {}) };
       // As a turn's (ADR 0041 §5): the account's folder is the CLI's home and nothing else signs it in; a plan's key
       // goes in the env under the plan's name, a token only on descriptor 3 (`spawnWrapper`).
       const env = signIn ? accountEnv(signIn.kind, signIn.home, base) : base;

@@ -1372,6 +1372,8 @@
     "uses_other": "{{count}}-mal genutzt",
     "confirmed": "Von einer Person bestätigt",
     "unconfirmed": "Noch nicht bestätigt",
+    "confirm": "Bestätigen",
+    "confirmedToast": "Bestätigt",
     "details": "Technische Details",
     "before": "Vorher stand hier: {{text}}",
     "fix": "Korrigieren",

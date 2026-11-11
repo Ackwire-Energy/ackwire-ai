@@ -2941,14 +2941,14 @@ export class BrowserManager {
   }
 
   /**
-   * Chrome's `Singleton*` files name the host and pid that holds a profile. Restored onto another computer they make
-   * Chrome exit with 21 (in use elsewhere), so before a launch they go when no Chrome this runner recorded for the
-   * folder still runs.
+   * Before a launch, nothing holds the profile. A Chrome this runner recorded on it that still runs is held by no
+   * session (an overlapping runner's, a stop still under way): a Chrome started beside it hands it the start page as
+   * one more tab and exits, so a few restarts left a pile of start pages there. It is stopped first. Chrome's
+   * `Singleton*` files name the host and pid that holds a profile; restored onto another computer they make Chrome
+   * exit with 21 (in use elsewhere), so they go too.
    */
   private async clearStaleLock(profile: string) {
-    for (const { pid, profile: held } of await this.readPids()) {
-      if (held === profile && (await this.isOurChrome(pid, profile).catch(() => false))) return;
-    }
+    await this.killLeftovers(profile);
     await Promise.all(
       ["SingletonLock", "SingletonCookie", "SingletonSocket"].map((f) => rm(path.join(profile, f), { force: true })),
     );
@@ -2966,11 +2966,11 @@ export class BrowserManager {
     return { deleted: true };
   }
 
-  /** Chromes a previous run of this runner home left (it crashed or was killed): stopped. */
-  private async killLeftovers() {
+  /** Chromes a previous run of this runner home left (it crashed or was killed), or only `on` that profile: stopped. */
+  private async killLeftovers(on?: string) {
     const live = new Set([...this.sessions.values()].map((s) => s.chrome?.pid).filter((p) => p !== undefined));
     for (const { pid, profile } of await this.readPids()) {
-      if (live.has(pid)) continue;
+      if (live.has(pid) || (on !== undefined && profile !== on)) continue;
       if (await this.isOurChrome(pid, profile).catch(() => false)) {
         try {
           process.kill(pid, "SIGTERM");

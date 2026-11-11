@@ -92,6 +92,7 @@ import { KeyMismatch, KeyRefused, KeySite, ProviderKeySelect } from "@/component
 import { RolesSection } from "@/components/roles/RolesSection";
 import { SkillsSection } from "@/components/Skills";
 import { StorageSection } from "@/components/StorageSettings";
+import { TeamMemoryCard } from "@/components/TeamMemory";
 import { VoiceSettingsSection } from "@/components/VoiceSettings";
 import { VaultSection } from "@/components/vault/VaultSection";
 import { WorkspaceModeDialog } from "@/components/WorkspaceModeDialog";
@@ -623,6 +624,8 @@ function GeneralSection() {
 
       {personal ? contextCard : workspaceCard}
       {personal ? workspaceCard : contextCard}
+
+      <TeamMemoryCard />
 
       <UsageStatisticsCard />
       {org.role === "owner" && <DeleteWorkspaceCard />}

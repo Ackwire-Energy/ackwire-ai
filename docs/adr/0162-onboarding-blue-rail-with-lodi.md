@@ -5,13 +5,16 @@
 - Amends: 0137 §6 (the onboarding asked only the workspace's name, then its right hand's DM), 0155 §6 (the right
   hand's card had five rows), 0079 §3 (the billing link's claims) and §7 (where a hold offers the plan), 0071 §3 (when
   our notifications ask opens)
-- Code: client `lib/onboarding.ts` (`railSteps`, `railStepAt`, `railState`, `landingOf`),
-  `lib/setup-checklist.ts` (three rows, invitations finish the people row), `lib/push-offer.ts` (`pushAskAt`),
-  `lib/billing.ts` (`planOfferOf`); engine `team-templates.ts` (`sayTeamHello`), `standing.ts` (`TEAM_HELLO_JOB`
-  queued by `setBillingHold`), `billing-link.ts` (`plan`); web `pages/OnboardingPage.tsx`, `pages/onboarding/*`,
-  `components/Sky.tsx` (`OnboardingProgress`, `TeamAsleepSky`), `lib/plan-offer.ts`, `components/FirstRun.tsx`,
-  `components/WebPush.tsx` (`PushAskInline`), `routes/onboarding.tsx`; phone `features/onboarding/OnboardingFlow.tsx`,
-  `features/onboarding/steps.tsx`
+- Code: client `lib/onboarding.ts` (`railSteps`, `railStepAt`, `railState` with its `funnel`, `landingOf`),
+  `lib/no-ai.ts` (`teamThinks`), `lib/setup-checklist.ts` (three rows, invitations finish the people row, the plan
+  row), `lib/push-offer.ts` (`pushAskAt`), `lib/billing.ts` (`planOfferOf`); engine `team-templates.ts`
+  (`sayTeamHello`), `standing.ts` (`TEAM_HELLO_JOB` queued by `setBillingHold`), `billing-link.ts` (`plan`); web
+  `pages/OnboardingPage.tsx`, `pages/onboarding/*` (`TeamSource.tsx`: `useTeamSource`, `TeamSource`; `TeamStart.tsx`; `AiStep.tsx`:
+  `AiHost`, `AiStep`, `AiStage`; `PeopleStep.tsx`), `components/invite/EmailChips.tsx` (`chipsFrom`),
+  `components/Sky.tsx` (`OnboardingProgress`, `TeamAsleepSky`), `lib/plan-offer.ts`,
+  `lib/arrival.ts` (`ARRIVAL_BETA_ONLY`), `components/arrival/Arrival.tsx`, `components/FirstRun.tsx`,
+  `components/Standing.tsx` (`HoldBanner`), `components/WebPush.tsx` (`PushAskInline`), `routes/onboarding.tsx`; phone
+  `features/onboarding/OnboardingFlow.tsx`, `features/onboarding/steps.tsx`, `features/right-hand/FirstRun.tsx`
 
 ## Context
 
@@ -98,3 +101,104 @@ way out of the account stays one quiet "Sair".
 - **The floating date** never floats over the conversation's start (the greeting and its cards): above the first day it
   shows nothing (`dayAtTop`, the phone's `dayInView`).
 - **The computer notice** says no line under its title before the provisioner names a step (`setupNoticeStatusKey`).
+
+## Amended 2026-11-10: the whole path before the workspace opens
+
+The rail now ends where the team can think, instead of leaving an AI and, for a team from another app, the import to
+the workspace. Amends §1 (the steps), §2 (the plan step's words), §3 (where it opens) and §5 (the card on a hold).
+
+- **The steps.** A team's: its name, what it does, its team, the plan, connect an AI. A personal workspace's (ADR
+  0159): what it is for, its agents, the plan, connect an AI; it has no business step, and its name ("Pessoal") is never
+  asked. The plan is listed while the workspace waits for its first plan, and stays listed once paid (it reads
+  "Ligado"): showing a held plan step saves the onboarding's step as `computer`, so the rail lists the plan when the
+  workspace waits for one or that step was passed. A server that never held the workspace has no plan step. `railState`
+  takes a `funnel` (`thinks`, `passed`); the phone passes `null` and keeps the steps of §1 and §7.
+- **The team step asks first** whether the person already has agents in another app: the import page's cards, then
+  "Ainda não uso nenhum". An app that answers a request is asked from the step (copy the request, paste its answer,
+  "Ler a resposta"); a file or a folder goes through the import's picker. What was found shows before anything is made,
+  and "Trazer o time" applies it (ADR 0055). Imported agents arrive with no model of their own, so they take the new
+  agent's default and think with the AI connected next. A step with something skipped or failed, or with the agents'
+  files still copying, stays on its report until Continue; an import that brought no agent goes on as "none" would.
+  The import's views load only once the step is reached, so the first screen after sign-up stays light.
+- **"Ainda não uso nenhum"** opens a team's templates as before, and a personal workspace's next step ("Seguir sem
+  agentes"). Both save the onboarding's step as `agents` (no new column), so a resume opens on the templates. In a
+  team's workspace the marker only picks that view: the step is answered by its agents. In a personal workspace,
+  which may have none, it answers the step.
+- **The plan step** says what comes after it beside its button ("Em seguida: conectar a sua IA.") and its way out reads
+  "Ligar depois e só conhecer o workspace". Paying no longer finishes the onboarding: back from the billing page
+  (`?paid`) the step says the payment was received and asks again every 5 s until the hold lifts, then the AI step
+  follows.
+- **The AI step** is Connect an AI (ADR 0160 §3) on the onboarding page: the same choices as cards, with the team asleep
+  on the stage beside them. Every card, the API key's included, opens Connect for the whole team (ADR 0160, "For
+  the whole team") directly on that choice's steps (`start`); with the right hand alone, its own Connect. The step
+  is answered from data: every agent of the team has an AI, ready or waiting for its computer (`teamThinks`). A status
+  that doesn't list every agent answers nothing until it is read again, which happens whenever the team changes. While
+  the step is up it reads the status every 10 s and the plans' state every 5 s, since the onboarding has no socket, so
+  an AI connected in another tab, on the phone, or right after paying moves it on. Once it thinks, the step says so
+  with the team awake and "Entrar no workspace". "Conectar depois" finishes the onboarding the same way, and a failure
+  says so. A skipped plan never reaches this step.
+- **Nothing opens under the person.** While they are on a step they chose (one picked on the rail, an import's report,
+  the AI's done screen), the page doesn't open the workspace by itself.
+- **Where it opens.** As in §3, with the arrival's notice alone (`?arrival=beta`, ADR 0160) after the AI step or a
+  skipped plan; a team that already thinks when its team is made still opens with `?arrival=1`.
+- **The card on a hold** (amends §5): a first row, "Ligue o time." ("Ligue os seus agentes." in a personal workspace),
+  whose "Ver planos" opens the billing page, for an owner who may pay while the workspace waits for its first plan. The
+  AI row says "É o passo seguinte ao plano."; the others still open with the plan. In the right hand's DM the hold's
+  banner steps aside while the card shows that row (after its "payment received" line, which still shows); everywhere
+  else, and for anyone the card doesn't show the row to, it stays (amends §3, where the banner was the one way to the
+  plan).
+- **The phone** (§7) keeps its steps (`funnel: null`): no AI step, and a workspace left at the web's AI step opens
+  there. Its card on a hold shows the plan row in words only, saying the plan is chosen on the web.
+
+## Amended 2026-11-11: a team may leave its team step with no agents, and invites its people last
+
+People who would rather build their agents by hand were made to go through an import or a template: the owner, trying
+the rail live, wants them to go on without one. A team's workspace is also for the people who work there, and nothing
+on the rail brought them in. Amends the 2026-11-10 bullets on the steps, on "Ainda não uso nenhum", on the AI step and
+on where it opens.
+
+- **Two ways out.** A team's question has "Pular esta etapa" under its button, with "Você cria os agentes depois, um
+  por um." beside it, as the AI step's "Conectar depois"; after its "Ainda não uso nenhum", how the team starts offers
+  "Começar do zero" (below). Both leave the step with the right hand alone and go on to the plan where the workspace
+  waits for one, else to Connect an AI. A personal workspace's question gets no link: its "Ainda não uso nenhum"
+  already is that.
+- **How a team starts** (the owner's pick among three drafts, the same day). A team's "Ainda não uso nenhum" no longer
+  drops the person on a template with a small link out: it asks first, "Como você quer começar o time?", with two of
+  the question's own radio cards, one under the other, each with who comes in it (faces, then names): "Começar com um
+  time pronto" (the template for the workspace's business, named, "3 agentes do modelo Loja online, cada um no seu
+  canal, com as rotinas prontas.") and "Começar do zero" ("Só o Lodi, o seu braço direito. Você cria cada agente
+  depois, do seu jeito.", with an empty place beside Lodi's face), picked when the view opens. The button says where
+  the answer leads: "Ver o time pronto" opens the templates, whose "Criar os agentes depois, por conta própria" is gone
+  (their Back returns here, the answer kept; Back here returns to the question); "Seguir só com o Lodi" is the way out
+  above. The picked card's agents are awake and hop one after another as it is picked, the other's doze; the preview
+  beside the step shows the template's agents and channels while the ready-made team is picked, Lodi alone otherwise.
+  Arrows move between the cards and Enter on one presses the button. Lodi says "Tenho um time pronto para o que vocês
+  fazem. Ou a gente começa só nós dois." A personal workspace and the phone have no such view.
+- **What is stored.** Leaving the step saves the onboarding's step as `agents`, which now answers the team step in a
+  team's workspace too (`railState`), so a reload resumes after it. A team's "Ainda não uso nenhum" (and "Prefiro
+  montar um time novo", or an import whose agents all stayed behind) saves `import` instead: past the question, how
+  the team starts next, the step still waiting for a team. Looking at the templates stores nothing, so a reload there
+  or on how to start opens on how to start again, "Começar do zero" picked. No new column or step. A team workspace left on its templates before this change resumes after the team step,
+  its question there to go back to.
+- **Afterwards.** The rail's team row reads "Depois" (a personal workspace's too). Back on the step, the question shows
+  again, never an empty team, so a team can still be brought or built; a template made there keeps the step on screen
+  until Continuar. The plan step lists the right hand alone and says "Com o plano e uma IA, o seu braço direito começa
+  hoje. Os outros agentes você cria depois."; on the AI step, Lodi's line, the stage beside it and the done heading
+  speak of the right hand by name, as for a personal workspace with no agents. The workspace opens as any team's:
+  #general, or the right hand's DM when the plan was left for later. The phone (`funnel: null`) is unchanged.
+- **Inviting people, a team's last step.** A team's rail on the web ends on "Convidar pessoas", after the AI step, so
+  reaching a connected AI takes no more steps than before: "Quem trabalha com você?", the addresses as chips with each
+  one's role, and the workspace's link a click away, with the invite dialog's own pieces (ADR 0090: `EmailChips`,
+  `ChipRole`, `InviteLinkPanel`, the batch invite) on the step rather than a form of its own. Its button sends the
+  invitations and finishes the onboarding; "Convidar depois" under it finishes it with none. A server that sends no
+  email shows the link alone, with "Entrar no workspace". A personal workspace and the phone (`funnel: null`) have no
+  such step.
+- **What answers it.** The AI step is answered by every agent thinking, or, on a team's rail, by "Conectar depois",
+  which now goes on to the people step and saves the onboarding's step as `ai`. The invitations sent save `team` before
+  the onboarding finishes, so a finish that fails resumes past the step. Both are the server's steps already (no new
+  step or column). A stored step past the plan's (`ai`, `team`) lists the plan step only on a server with billing,
+  where the workspace waited for it: a self-hosted rail never gets one.
+- **The AI step on a team's rail.** Its words no longer say it is the last step, and an AI connected on it keeps the
+  connected screen (and the Connect dialog over it) until "Continuar", which goes on to the people; going back from the
+  people shows it again. The workspace opens in #general, on the arrival's beta notice alone whenever the AI step was
+  shown, in this visit or left for later in an earlier one.

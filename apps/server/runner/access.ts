@@ -464,6 +464,7 @@ export function parseAgents(v: unknown): MachineAgent[] {
         ? { accounts: o.accounts.filter(isAccountId).slice(0, 500) }
         : {}),
       ...(str(o.locale, 32) ? { locale: str(o.locale, 32) } : {}),
+      ...(o.containers === true ? { containers: true } : {}),
     });
   }
   return out;

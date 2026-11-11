@@ -65,11 +65,13 @@ import { ChoiceChip, TeamTemplatesSheet, useSendAnswer } from "./TeamCard";
  * greeting for the workspace's owners, with what the onboarding didn't do (an AI, apps, people), each row Connect AI,
  * a pushed screen or the invite screen. A personal workspace (ADR 0159), which the onboarding opens at once, has four
  * in its words: what the person wants help with (areas of life, answered in place or on a pushed screen), their agents
- * (a sheet of templates), an AI, their apps. On a billing hold every row waits, the AI row saying where the plan is in
- * words only (App Store 3.1.1).
+ * (a sheet of templates), an AI, their apps. On a billing hold the rest wait for the plan: a workspace waiting for its
+ * first plan leads with a plan row (ADR 0162, amended 2026-11-10) that says where the plan is chosen, in words only
+ * and with no button (App Store 3.1.1); on any other hold the AI row says it.
  */
 
 const ROW_ICON: Record<FirstRunStep, IconName> = {
+  plan: "play",
   about: "person",
   team: "agent",
   ai: "brain",
@@ -90,6 +92,8 @@ export function useFirstRun(agent: Agent | undefined, channelId: string | null =
   const dir = useDirectory();
   const meId = useMeId();
   const may = stepPermissions(org, meId, dir.agents);
+  const hold = usePlanHold(orgId, org);
+  const held = hold !== null;
   const steps = !agent
     ? []
     : firstRunSteps(agent, {
@@ -101,6 +105,7 @@ export function useFirstRun(agent: Agent | undefined, channelId: string | null =
         connectors: can(org, "manage_connectors"),
         invite: may.invite,
         personal: isPersonal(org),
+        waitsForPlan: hold === "payment",
       });
   const status = useAiStatus(orgId);
   const members = useMembers(orgId);
@@ -108,7 +113,6 @@ export function useFirstRun(agent: Agent | undefined, channelId: string | null =
   const messages = useMessages(orgId, channelId ?? "", channelId !== null && steps.includes("about")).data;
   const invitations = useInvitations(orgId, steps.includes("people"));
   const connections = useConnections(orgId, steps.includes("apps"));
-  const held = usePlanHold(orgId, org) !== null;
   const team = dir.agents.filter((a) => !isRightHand(a));
   const aiState = agent ? aiStateOf(status.data, agent.id) : undefined;
   const live = (connections.data ?? []).filter((c) => !c.revokedAt);
@@ -197,6 +201,8 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
   const stateOf = (s: FirstRunStep) => firstRunRowState(s, { done, held });
   const next = steps.find((s) => stateOf(s) === "open");
   const act: Record<FirstRunStep, () => void> = {
+    // No way to pay from the phone (App Store 3.1.1): the plan row has no button.
+    plan: () => undefined,
     about: () => openSetupStep(agent.id, "about", run.typed),
     team: () => (done.has("team") ? router.push("/team") : setTemplates({})),
     // For the whole team, as the web's row: with agents besides it, every agent of the person's is chosen.
@@ -204,6 +210,7 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
     apps: () => openSetupStep(agent.id, "apps"),
     people: () => router.push("/invite-people"),
   };
+  const mayPay = can(org, "manage_billing");
   const rows = steps.map((s) => {
     const state = stateOf(s);
     const words = firstRunRow(
@@ -219,20 +226,28 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
         invited: run.invited.length ? joinNames(run.invited, t) : null,
         personal,
       },
-      agent.setup?.done.includes(s) ?? false,
+      s !== "plan" && (agent.setup?.done.includes(s) ?? false),
     );
-    // On a hold, the AI row says where the plan is chosen, in words only (App Store 3.1.1).
-    const plan = s === "ai" && state === "afterPlan";
+    // The plan row says where the plan is chosen, in words only, and has no button (App Store 3.1.1). Without one (a
+    // hold that isn't a first plan's), the AI row says it, as before.
+    const holdLine = s === "ai" && state === "afterPlan" && !steps.includes("plan");
     return {
       key: s,
       icon: ROW_ICON[s],
       done: state === "done",
-      title: plan ? planHoldPhoneLine(t, can(org, "manage_billing")) : words.title,
-      desc: plan ? undefined : words.desc,
+      title: holdLine ? planHoldPhoneLine(t, mayPay) : words.title,
+      desc: holdLine
+        ? undefined
+        : s === "plan"
+          ? t("common.joinSentences", {
+              a: words.desc ?? "",
+              b: t(mayPay ? "connectAi.billingWeb" : "standing.billing.askAdmin"),
+            })
+          : words.desc,
       dim: state === "afterPlan",
       saying: said && beatRow(said.step) === s ? said.text : null,
       // A personal workspace's first question is answered by the chips under it (`AboutYouAnswers`), not a button.
-      ...(words.action && !(s === "about" && next === "about")
+      ...(words.action && s !== "plan" && !(s === "about" && next === "about")
         ? {
             action: {
               label: words.action,

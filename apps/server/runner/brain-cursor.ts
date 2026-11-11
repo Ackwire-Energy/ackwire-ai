@@ -7,7 +7,7 @@ import type { CommandProfile } from "@agenteschat/adapters/command-policy";
 import type { AgentScope } from "@agenteschat/adapters/machine-protocol";
 import { isAccountId } from "@agenteschat/adapters/machine-protocol";
 import { redactSecrets } from "@agenteschat/adapters/secret-box";
-import { ACCOUNT_MISSING_MESSAGE, accountEnv, cursorKeyOf, withoutSignIns } from "./accounts";
+import { ACCOUNT_MISSING_MESSAGE, accountEnv, cursorKeyOf, withoutContainers, withoutSignIns } from "./accounts";
 import {
   CODEX_TOOL_OUTPUT_MAX,
   type CodexBrainEvent,
@@ -468,7 +468,7 @@ export async function runCursorTurn(input: CursorTurnInput, opts: CursorTurnOpti
     ...(input.chat ? { locked: true } : {}),
   });
   const base: NodeJS.ProcessEnv = {
-    ...(input.chat ? withoutSignIns(process.env) : process.env),
+    ...withoutContainers(input.chat ? withoutSignIns(process.env) : process.env),
     ...(opts.env ?? {}),
     [CURSOR_RUN_ENV]: input.runId,
     [CODEX_MCP_ENV[0]]: input.mcp.token,

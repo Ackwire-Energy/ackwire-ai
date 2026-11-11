@@ -84,8 +84,8 @@ const cardOf = (app: string): ImportCard => IMPORT_CARDS.find((c) => c === app) 
 
 /**
  * The card and app name of a bundle (or of what one brought, `imports.sources`). One in our format names its app in
- * `source.ref` ("agenteschat:<org>" for our own export, "grok-bot:…" for a
- * reply to `EXPORT_PROMPT`); `app` is null for an app we don't know.
+ * `source.ref` ("agenteschat:<org>" for our own export, "grok-bot" for a
+ * reply to `EXPORT_PROMPT`, "grok-bot:…" for one imported before); `app` is null for an app we don't know.
  */
 export function bundleOrigin(bundle: { source: Pick<MigrationBundle["source"], "app" | "ref"> }): {
   card: ImportCard;

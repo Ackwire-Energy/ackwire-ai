@@ -1372,6 +1372,8 @@
     "uses_other": "{{count}} keer gebruikt",
     "confirmed": "Bevestigd door een persoon",
     "unconfirmed": "Nog niet bevestigd",
+    "confirm": "Bevestigen",
+    "confirmedToast": "Bevestigd",
     "details": "Technische details",
     "before": "Eerder stond er: {{text}}",
     "fix": "Corrigeren",

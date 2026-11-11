@@ -8,6 +8,8 @@ import {
   BROWSER_WM_CLASS,
   desktopName,
   execArg,
+  KEEPER_FILE,
+  KEEPER_SETTINGS,
   LOOK_DIR,
   LOOK_MARKER,
   LOOK_SCRIPT,
@@ -19,6 +21,7 @@ import {
   lookId,
   lookSettings,
   lookTheme,
+  TERMINAL_NOTE_ENV,
 } from "../../runner/desktop-look";
 import { removeDirs, tempDir } from "./helpers";
 
@@ -435,6 +438,9 @@ test("the terminal: the agent's name in the prompt and the title, from the look'
       "AGENTES_NAME='Ada'",
       "shopt -s promptvars",
       String.raw`PS1='\[\e]0;$AGENTES_NAME: \w\a\]\[\e[1;32m\]$AGENTES_NAME\[\e[0m\]:\[\e[1;34m\]\w\[\e[0m\]\$ '`,
+      `[ -n "\${AGENTES_TERMINAL_NOTE-}" ] && printf '%s\\n\\n' "$AGENTES_TERMINAL_NOTE"; unset AGENTES_TERMINAL_NOTE`,
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: shell parameters, not a template literal
+      'PROMPT_COMMAND="history -a${PROMPT_COMMAND:+; $PROMPT_COMMAND}"',
       "",
     ].join("\n"),
   );
@@ -471,6 +477,87 @@ test.if(posix && existsSync("/bin/bash"))(
     expect(existsSync(path.join(home, "pwned2"))).toBe(false);
   },
 );
+
+test.if(posix && existsSync("/bin/bash"))(
+  "a Terminal opened again says its note above its first prompt, and its shell keeps nothing of it",
+  () => {
+    const home = tempDir("look-");
+    dirs.push(home);
+    const file = path.join(home, "bashrc");
+    writeFileSync(file, fileOf(home, look(), `${LOOK_DIR}/bashrc`));
+    writeFileSync(path.join(home, ".hushlogin"), "");
+    const shell = (env: Record<string, string>) =>
+      spawnSync("/bin/bash", ["--rcfile", file, "-i", "-c", `printf "@@%s" "\${${TERMINAL_NOTE_ENV}-gone}"`], {
+        cwd: home,
+        env: { HOME: home, PATH: "/usr/bin:/bin", TERM: "dumb", ...env },
+        encoding: "utf8",
+        timeout: 5000,
+      }).stdout;
+    const reopened = shell({ [TERMINAL_NOTE_ENV]: "The computer restarted: this is a new shell in the same folder." });
+    expect(reopened).toContain("The computer restarted: this is a new shell in the same folder.\n\n");
+    expect(reopened.endsWith("@@gone")).toBe(true);
+    // Any other Terminal says nothing.
+    expect(shell({}).endsWith("@@gone")).toBe(true);
+    expect(shell({})).not.toContain("restarted");
+  },
+);
+
+test.if(posix && existsSync("/bin/bash"))(
+  "each command goes to the history file once it ran, while the shell still runs: a terminal killed with its computer keeps it",
+  async () => {
+    const home = tempDir("look-");
+    dirs.push(home);
+    const file = path.join(home, "bashrc");
+    writeFileSync(file, fileOf(home, look(), `${LOOK_DIR}/bashrc`));
+    writeFileSync(path.join(home, ".hushlogin"), "");
+    const shell = Bun.spawn(["/bin/bash", "--rcfile", file, "-i"], {
+      cwd: home,
+      env: { HOME: home, PATH: "/usr/bin:/bin", TERM: "dumb" },
+      stdin: "pipe",
+      stdout: "ignore",
+      stderr: "ignore",
+    });
+    try {
+      shell.stdin.write("echo first-command\n");
+      await shell.stdin.flush();
+      const history = path.join(home, ".bash_history");
+      const deadline = Date.now() + 10_000;
+      while (!(existsSync(history) && readFileSync(history, "utf8").includes("echo first-command"))) {
+        if (Date.now() > deadline) throw new Error("the command never reached the history file");
+        await Bun.sleep(50);
+      }
+      expect(shell.exitCode).toBeNull();
+    } finally {
+      shell.kill("SIGKILL");
+    }
+  },
+);
+
+test("the keeper: its source, its settings and its autostart entry, so it starts with the session (ADR 0168)", () => {
+  const home = "/home/ag-01a142cb";
+  const source = readFileSync(path.join(import.meta.dir, "..", "..", "runner", "desktop-keeper.py"));
+  expect(fileOf(home, look(), KEEPER_FILE).equals(source)).toBe(true);
+  expect(JSON.parse(textOf(home, look(), KEEPER_SETTINGS))).toEqual({
+    browserClass: BROWSER_WM_CLASS,
+    notes: ["agentes-wait", "agentes-note"],
+  });
+  expect(textOf(home, look(), ".config/autostart/agentes-keeper.desktop")).toBe(
+    [
+      "[Desktop Entry]",
+      "Type=Application",
+      "Name=agentes.chat",
+      "Comment=Lists the windows open on this desktop, to open them again after its computer restarted or moved",
+      `Exec=python3 -I ${home}/.local/share/agentes/keeper.py ${home}/.local/share/agentes/keeper.json`,
+      "NoDisplay=true",
+      "",
+    ].join("\n"),
+  );
+  // Whatever the shell, and a home with spaces quoted as the spec says.
+  expect(paths(home, look({ shell: "/usr/bin/zsh" }))).toContain(KEEPER_FILE);
+  expect(textOf("/srv/a b/home", look(), ".config/autostart/agentes-keeper.desktop")).toContain(
+    'Exec=python3 -I "/srv/a b/home/.local/share/agentes/keeper.py" "/srv/a b/home/.local/share/agentes/keeper.json"',
+  );
+});
 
 test("the images ship as committed (their base64 text is the PNGs): the wallpaper the desktop's size, the mark the dock's icon size", () => {
   const wallpaper = fileOf("/h", look(), ".local/share/agentes/wallpaper.png");
@@ -517,8 +604,8 @@ test("files that change come with a new LOOK_VERSION: desktops that have the loo
   }
   // Changed the look on purpose? Bump LOOK_VERSION and put the new hash here.
   expect({ version: LOOK_VERSION, files: hash.digest("hex").slice(0, 16) }).toEqual({
-    version: 5,
-    files: "8b294ae1558cf237",
+    version: 7,
+    files: "dd23e758f11b0aa7",
   });
 });
 
@@ -730,7 +817,7 @@ function liveComputer() {
   const proc = path.join(root, "proc");
   const calls = path.join(root, "calls");
   mkdirSync(bin);
-  for (const name of ["xfconf-query", "dbus-send"]) {
+  for (const name of ["xfconf-query", "dbus-send", "setsid"]) {
     writeFileSync(
       path.join(bin, name),
       [
@@ -770,6 +857,10 @@ function liveComputer() {
   return { root, process, run, called };
 }
 
+/** What the fake `setsid` notes for the keeper started in the session on `bus`. */
+const keeperStarted = (bus: string, home: string) =>
+  `setsid ${bus} [-f] [python3] [-I] [${home}/${KEEPER_FILE}] [${home}/${KEEPER_SETTINGS}]`;
+
 /** What the fake `xfconf-query` notes for each setting given on `bus`. */
 const noted = (bus: string, settings: string[][]) =>
   settings.map((args) => `xfconf-query ${bus}${args.map((a) => ` [${a}]`).join("")}`);
@@ -795,16 +886,18 @@ test.if(posix)(
     expect(c.run(home, o, ":77")).toBe(0);
     for (const f of lookFiles(home, o)) expect(readFileSync(path.join(home, f.path)).equals(f.data)).toBe(true);
     expect(readFileSync(path.join(home, LOOK_MARKER), "utf8")).toBe(`${lookId(home, o)}\n`);
-    // Then the panel's restart, from its own main loop: it reads its settings, gtk.css and docklike's file again.
-    expect(c.called()).toEqual([...noted(bus, lookSettings(home, o)), restarted(bus)]);
+    // Then the panel's restart, from its own main loop: it reads its settings, gtk.css and docklike's file again. Then
+    // the keeper starts in that session (ADR 0168).
+    expect(c.called()).toEqual([...noted(bus, lookSettings(home, o)), restarted(bus), keeperStarted(bus, home)]);
 
-    // A session whose panel isn't running: its settings go, and no panel is started.
+    // A session whose panel isn't running: its settings go, no panel is started, and its keeper starts.
     const other = path.join(c.root, "other");
     c.process(51, "xfce4-session", { DISPLAY: ":78", DBUS_SESSION_BUS_ADDRESS: "unix:path=/tmp/dbus-eve" });
     expect(c.run(other, o, ":78")).toBe(0);
-    expect(c.called().slice(lookSettings(home, o).length + 1)).toEqual(
-      noted("unix:path=/tmp/dbus-eve", lookSettings(other, o)),
-    );
+    expect(c.called().slice(lookSettings(home, o).length + 2)).toEqual([
+      ...noted("unix:path=/tmp/dbus-eve", lookSettings(other, o)),
+      keeperStarted("unix:path=/tmp/dbus-eve", other),
+    ]);
   },
 );
 

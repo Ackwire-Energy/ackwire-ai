@@ -27,3 +27,9 @@ test("the channel's members screen and the mention picker read the shared roster
   for (const f of ["features/chat/ChannelMembers.tsx", "features/chat/MentionPicker.tsx"])
     expect(src(f)).toContain("useRoster");
 });
+
+test("adding to a channel: the ones being added keep their rows, and nobody reads as in already, until the sheet moves on", () => {
+  expect(src("features/chat/ChannelMembers.tsx")).toMatch(
+    /const inChannel = useHeldWhile\(\s*new Set\(\(roster\.data \?\? \[\]\)[^;]*\),\s*add\.isPending \|\| add\.isSuccess,\s*\);/,
+  );
+});

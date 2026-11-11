@@ -3163,10 +3163,10 @@ test("the launch line: the agent's launcher, then this runner's worker with the 
   const ana = USERS[0] as AgentUser;
   const runner = ["/opt/agentes-runner/bin/bun", "/opt/agentes-runner/agentes-runner.mjs"];
   const home = "/var/lib/agentes-runner-agents/ag-a1b2c3d4";
-  // A systemd older than 253 (no OOMPolicy on scopes): the same on any computer the test runs on.
-  const cmd = workerCommand(ana, runner, home, true, false);
+  // A systemd older than 253 (no OOMPolicy on scopes), and no Podman: the same on any computer the test runs on.
+  const cmd = workerCommand(ana, runner, home, true, false, false);
   expect(cmd.argv).toEqual([
-    ...systemLauncher(ana, true, false).prefix,
+    ...systemLauncher(ana, true, false, false).prefix,
     ...runner,
     "worker",
     "--agent",
@@ -3196,6 +3196,12 @@ test("the launch line: the agent's launcher, then this runner's worker with the 
     "SHELL",
     "USER",
   ]);
+  // With rootless containers (ADR 0169): its runtime dir, and Podman's socket for docker and podman alike.
+  expect(workerCommand(ana, runner, home, true, false, true).env).toMatchObject({
+    XDG_RUNTIME_DIR: "/run/user/21000",
+    CONTAINER_HOST: "unix:///run/user/21000/podman/podman.sock",
+    DOCKER_HOST: "unix:///run/user/21000/podman/podman.sock",
+  });
   expect(workerCommand(ana, runner, home, false).argv.slice(0, 4)).toEqual([
     "/usr/sbin/runuser",
     "-u",

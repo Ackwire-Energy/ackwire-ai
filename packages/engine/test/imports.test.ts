@@ -271,6 +271,55 @@ describe("planning and applying an import", () => {
     expect(after.filter((r) => r.enabled)).toEqual([]);
   });
 
+  test("an agent that comes back with no instructions never clears what an earlier import brought", async () => {
+    f = await setup();
+    const first = await run({ bundle: bundle() });
+    const scoutId = byKey(first.items).get("agent:scout")?.targetId ?? "";
+    const closerId = byKey(first.items).get("agent:closer")?.targetId ?? "";
+
+    const again = bundle();
+    const [scout, closer] = again.agents as [MigrationBundle["agents"][number], MigrationBundle["agents"][number]];
+    const kept = scout.instructions;
+    scout.instructions = "";
+    closer.instructions = "Close the deal.";
+    const items = byKey((await run({ bundle: again })).items);
+    expect(items.get("agent:scout")?.action).toBe("unchanged");
+    expect(items.get("agent:closer")?.action).toBe("update");
+    const rows = await f.db.select().from(schema.agents).where(eq(schema.agents.orgId, f.org.id));
+    expect(rows.find((a) => a.id === scoutId)?.instructions).toBe(kept);
+    expect(rows.find((a) => a.id === closerId)?.instructions).toBe("Close the deal.");
+    expect(rows.filter((a) => a.archivedAt === null && ["Scout", "Closer"].includes(a.name))).toHaveLength(2);
+  });
+
+  test("another app's reply is one package: asking again never makes the same agent twice", async () => {
+    f = await setup();
+    const reply = (ref: string) =>
+      bundle({
+        source: { app: "agenteschat", ref, name: "Grok Bot", files: [] },
+        skills: [],
+        channels: [],
+        routines: [],
+        notes: [],
+      });
+    // A reply imported when the package still carried the model's own name for the export.
+    const old = await run({ bundle: reply("grok-bot:my-bots") });
+    const scoutId = byKey(old.items).get("agent:scout")?.targetId ?? "";
+
+    const again = reply("grok-bot");
+    (again.agents[1] as MigrationBundle["agents"][number]).instructions = "Close the deal.";
+    const items = byKey((await run({ bundle: again })).items);
+    expect(items.get("agent:scout")).toMatchObject({ action: "unchanged", targetId: scoutId });
+    expect(items.get("agent:closer")?.action).toBe("update");
+    const third = byKey((await run({ bundle: again })).items);
+    expect(third.get("agent:closer")?.action).toBe("unchanged");
+    const rows = await f.db.select().from(schema.agents).where(eq(schema.agents.orgId, f.org.id));
+    expect(rows.filter((a) => ["Scout", "Closer"].includes(a.name))).toHaveLength(2);
+
+    // Another app's package is its own, and so is our export of another workspace.
+    const other = byKey((await run({ bundle: reply("chatgpt-dots") })).items);
+    expect(other.get("agent:scout")?.action).toBe("create");
+  });
+
   test("text that looks like a credential never comes; what depends on a skipped agent is skipped", async () => {
     f = await setup();
     const b = bundle();

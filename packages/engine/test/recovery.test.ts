@@ -15,6 +15,7 @@ import {
   listMessages,
   postPersonMessage,
   processOutbox,
+  RESUME_MAX_AGE_MS,
   RUN_STALE_MS,
   recoverStaleRuns,
   releaseJobs,
@@ -508,6 +509,40 @@ describe("server restarts", () => {
     expect(jobs.map((j) => j.status).sort()).toEqual(["failed", "pending"]);
     await drainOutbox(f.db, f.handlers);
     expect((await runRow(run.id))?.status).toBe("done");
+  });
+
+  test("an orphan whose reply thread is gone still fails with its notice, posted in the channel itself", async () => {
+    const { run } = await interruptedRun();
+    await orphan(run.id);
+    await addRunStep(f.db, run, "tool_call", { toolUseId: "toolu_cut", name: "long_task", input: {} });
+    // Its thread root is no top-level message of this channel any more.
+    await f.db
+      .update(schema.agentRuns)
+      .set({ threadRootId: crypto.randomUUID() })
+      .where(eq(schema.agentRuns.id, run.id));
+
+    expect((await recoverStaleRuns({ db: f.db, pubsub: f.pubsub })).failed).toEqual([run.id]);
+    expect(await runRow(run.id)).toMatchObject({ status: "failed", error: INTERRUPTED_BY_RESTART });
+    const timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    expect(timeline.at(-1)).toMatchObject({ threadId: null });
+    expect(timeline.at(-1)?.body).toContain(INTERRUPTED_BY_RESTART);
+  });
+
+  test("an orphan dead for longer than the resume window fails with its notice instead of resuming", async () => {
+    const { run } = await interruptedRun();
+    await orphan(run.id);
+    await f.db
+      .update(schema.agentRuns)
+      .set({ heartbeatAt: new Date(Date.now() - RESUME_MAX_AGE_MS - 60_000) })
+      .where(eq(schema.agentRuns.id, run.id));
+
+    expect(await recoverStaleRuns({ db: f.db, pubsub: f.pubsub })).toEqual({
+      resumed: [],
+      failed: [run.id],
+      requeued: [],
+    });
+    await drainOutbox(f.db, f.handlers);
+    expect(f.provider.calls).toHaveLength(1);
   });
 
   test("an orphan cut in the middle of a tool call fails with the notice, keeps its text, and the app hears it", async () => {

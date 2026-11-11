@@ -13,6 +13,7 @@ import {
 import { listsAgent, opensDetails } from "@agenteschat/client/lib/audience";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { useHeldWhile } from "@agenteschat/client/lib/hold";
 import { can, leavesChannel, managesChannel, setsAutoReply } from "@agenteschat/client/lib/permissions";
 import { joinsChannels } from "@agenteschat/client/lib/right-hand";
 import { picksForMe, replyAloneKey } from "@agenteschat/client/lib/routing";
@@ -385,20 +386,6 @@ function AddChannelMembers({ channelId, channelName }: { channelId: string; chan
   const refresh = useRefresh(channelId);
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const inChannel = new Set((roster.data ?? []).map((m) => `${m.type === "agent" ? "agent" : "person"}:${m.id}`));
-  const candidates = [
-    ...dir.agents
-      .filter((a) => listsAgent(org, a) && joinsChannels(a))
-      .map((a) => ({ kind: "agent" as const, id: a.id, name: a.name, line: `@${a.handle}` })),
-    ...[...dir.memberById.values()].map((m) => ({
-      kind: "person" as const,
-      id: m.userId,
-      name: m.name,
-      line: m.email,
-    })),
-  ].filter((w) => !inChannel.has(`${w.kind}:${w.id}`));
-  const needle = q.trim().toLowerCase();
-  const rows = candidates.filter((w) => !needle || `${w.name} ${w.line}`.toLowerCase().includes(needle));
   const back = () => sheet.open(<ChannelMembersSheet channelId={channelId} channelName={channelName} />);
   const add = useMutation({
     mutationFn: async () => {
@@ -416,6 +403,24 @@ function AddChannelMembers({ channelId, channelName }: { channelId: string; chan
       toast({ title: errorText(t, error), icon: "x" });
     },
   });
+  // Who was in before Adicionar: the ones being added keep their rows until the sheet moves on.
+  const inChannel = useHeldWhile(
+    new Set((roster.data ?? []).map((m) => `${m.type === "agent" ? "agent" : "person"}:${m.id}`)),
+    add.isPending || add.isSuccess,
+  );
+  const candidates = [
+    ...dir.agents
+      .filter((a) => listsAgent(org, a) && joinsChannels(a))
+      .map((a) => ({ kind: "agent" as const, id: a.id, name: a.name, line: `@${a.handle}` })),
+    ...[...dir.memberById.values()].map((m) => ({
+      kind: "person" as const,
+      id: m.userId,
+      name: m.name,
+      line: m.email,
+    })),
+  ].filter((w) => !inChannel.has(`${w.kind}:${w.id}`));
+  const needle = q.trim().toLowerCase();
+  const rows = candidates.filter((w) => !needle || `${w.name} ${w.line}`.toLowerCase().includes(needle));
   // Someone not in the workspace yet, or an agent still to make: their own screens, the sheet closes for them.
   const leaveFor = (path: string) => () => {
     sheet.close();

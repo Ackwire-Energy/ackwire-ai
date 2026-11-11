@@ -69,7 +69,7 @@ export function NoAiBanner({ agentIds, dmAgentId }: { agentIds: string[]; dmAgen
           <b>{t(noAiStatusKey(status.data, dmAgentId), agentGrammar(name))}</b>
         </span>
         {mayConnectAi(agent, me.user.id, org) && (
-          <Button size="sm" onClick={() => connect.open({ agentId: dmAgentId })}>
+          <Button size="sm" onClick={() => connect.open({ agentId: dmAgentId, chat: true })}>
             {t("noAi.action")}
           </Button>
         )}
@@ -78,6 +78,10 @@ export function NoAiBanner({ agentIds, dmAgentId }: { agentIds: string[]; dmAgen
   }
   if (status.data.any || agentIds.length === 0) return null;
   const action = t("noAi.banner.orgAction");
+  // The workspace has no AI at all: Connect for the whole team, whoever is in the channel (ADR 0160, "For the whole
+  // team"). Only someone else's agent alone in it opens its own dialog, which says who connects it.
+  const lone = agentIds.length === 1 ? dir.agentById.get(agentIds[0] ?? "") : undefined;
+  const theirs = lone !== undefined && lone.ownerUserId !== me.user.id && !isRightHand(lone);
   return (
     <div className="noai-banner ac-actline" role="status">
       <span className="noai-banner__text ac-iconline">
@@ -93,7 +97,7 @@ export function NoAiBanner({ agentIds, dmAgentId }: { agentIds: string[]; dmAgen
           <b>{t("noAi.banner.org")}</b>
         )}
       </span>
-      <Button size="sm" onClick={() => connect.open({ agentId: agentIds.length === 1 ? agentIds[0] : undefined })}>
+      <Button size="sm" onClick={() => connect.open(theirs ? { agentId: lone.id } : {})}>
         {action}
       </Button>
     </div>

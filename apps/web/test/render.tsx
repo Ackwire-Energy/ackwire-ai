@@ -9,7 +9,7 @@ import {
   Outlet,
   RouterProvider,
 } from "@tanstack/react-router";
-import { act, render, within } from "@testing-library/react";
+import { act, fireEvent, render, within } from "@testing-library/react";
 import { type ReactNode, StrictMode } from "react";
 import { AppProviders, type AppServices } from "@/app/providers";
 import { createQueryClient } from "@/app/query-client";
@@ -92,6 +92,25 @@ export function onScreen(selector: string) {
 }
 
 /**
+ * A dialog that closes stays on screen until `endExit`, as a browser keeps it through its exit animation (Radix waits
+ * for one): what it shows while it closes can be checked. The next app rendered starts without it.
+ */
+export function exitsLast() {
+  const sheet = document.createElement("style");
+  sheet.dataset.exitsLast = "";
+  sheet.textContent = '.ac-dialog[data-state="closed"] { animation-name: dialog-out; }';
+  document.head.append(sheet);
+}
+
+/** Ends the exit of a dialog that `exitsLast` keeps on screen. */
+export const endExit = (dialog: Element) =>
+  act(async () => void fireEvent.animationEnd(dialog, { animationName: "dialog-out" }));
+
+const forgetExits = () => {
+  for (const sheet of document.querySelectorAll("style[data-exits-last]")) sheet.remove();
+};
+
+/**
  * Renders one page inside the app providers and a minimal router (for
  * `<Link>`), optionally inside an organization (sidebar context + realtime).
  */
@@ -105,6 +124,7 @@ export async function renderPage(
     path?: string;
   },
 ) {
+  forgetExits();
   const sockets = fakeSockets();
   const createSocket = options.createSocket ?? sockets.factory;
   const services = makeServices(options.api, options.auth, createSocket);
@@ -158,6 +178,7 @@ export async function renderApp(
   }
   // Each app starts in its own language (pt-BR), whatever page language a test before it showed (`showIn`).
   document.documentElement.lang = "";
+  forgetExits();
   const sockets = fakeSockets();
   const services = makeServices(options.api, options.auth, options.createSocket ?? sockets.factory);
   const router = createRouter({

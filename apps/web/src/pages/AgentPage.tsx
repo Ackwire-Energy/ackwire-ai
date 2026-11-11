@@ -59,6 +59,7 @@ import {
   AGENT_TABS,
   type AgentSection,
   type AgentTab,
+  type BrainScreen,
   budgetValue,
   canEdit,
   changedKeys,
@@ -116,6 +117,8 @@ export interface AgentPageProps {
   agentId: string;
   tab: AgentTab;
   section?: AgentSection;
+  /** With the section "brain": the screen "Quem pensa" opens on (a notification's "Escolher outro modelo"). */
+  brainAt?: BrainScreen;
   /** The memory or skill a link opened Memória at. */
   item?: string;
   /** Changes the tab (and section) in the URL. */
@@ -172,6 +175,7 @@ function AgentProfile({
   agent,
   tab,
   section,
+  brainAt,
   item,
   onNavigate,
   onClose,
@@ -836,6 +840,7 @@ function AgentProfile({
 
       <WorkDialogs
         open={work}
+        brainAt={section === "brain" ? brainAt : undefined}
         onClose={() => {
           setWork(null);
           if (section === "brain") onNavigate(tab);

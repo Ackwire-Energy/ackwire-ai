@@ -8,6 +8,13 @@ export function Egress({ machine, compact = false }: { machine: Machine | null |
   const { t } = useTranslation();
   const e = machine?.kind === "managed" && machine.online ? machine.egress : null;
   const transition = machine?.kind === "managed" ? machine.networkTransition : null;
+  // A while with no way out for its agents: their connections wait, nothing is broken.
+  if (machine?.kind === "managed" && machine.online && machine.egressWaiting)
+    return (
+      <span role="status" className={compact ? "dsk-egress ac-iconline muted" : "setup-line small"}>
+        {t("machines.egress.waiting")}
+      </span>
+    );
   if (transition)
     return (
       <span role="status" className="setup-line small">

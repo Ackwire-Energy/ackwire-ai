@@ -3,6 +3,7 @@ import type { Agent, AgentSetupChecklist, AgentSetupStep, AudienceMode, Connecto
 import type { Level } from "./access-levels";
 import { PERSONAL_STARTER_APPS, presetChannels, ROLE_DEFAULTS, ROLE_IDS, type RoleId } from "./new-agent";
 import { providerLabel } from "./providers";
+import { leadsWithPlan } from "./right-hand";
 
 /*
  * A new agent's setup checklist (ADR 0155 §2): the top of its chat, in its voice, lists what it still needs. The
@@ -224,11 +225,16 @@ export function setupRow(t: TFunction, step: AgentSetupStep, done: boolean, f: S
 
 /**
  * Its rows, one order everywhere: what the onboarding's steps leave (they made the workspace, said what it does and
- * made the team): an AI, apps, people. A personal workspace (ADR 0159), which the onboarding opens at once, starts
- * with what the person wants help with and their agents, and has no people row.
+ * made the team): an AI, apps, people. A personal workspace (ADR 0159) starts with what the person wants help with and
+ * their agents, and has no people row. A workspace waiting for its first agentes.chat plan, its plan left in the
+ * onboarding, leads with the plan (ADR 0162, amended 2026-11-10): the row with the way to pay, the rest after it.
+ * "plan" is no `SetupStep`: nothing about it is stored, the row leaves when the hold lifts.
  */
-export const FIRST_RUN_STEPS = ["about", "team", "ai", "apps", "people"] as const satisfies readonly SetupStep[];
+type RowId = SetupStep | "plan";
+export const FIRST_RUN_STEPS = ["plan", "about", "team", "ai", "apps", "people"] as const satisfies readonly RowId[];
 export type FirstRunStep = (typeof FIRST_RUN_STEPS)[number];
+/** The rows the data can do, so each has a fact and a line once done: all but the plan's, which only leaves. */
+export type FirstRunDoneStep = Exclude<FirstRunStep, "plan">;
 
 /** What may each row's button do for this person (`stepPermissions` in lib/home, plus `configure`). */
 export interface FirstRunPowers {
@@ -241,6 +247,8 @@ export interface FirstRunPowers {
   invite: boolean;
   /** A personal workspace (ADR 0159): its first run has no people row, it is for one person. */
   personal?: boolean;
+  /** It waits for its first agentes.chat plan (a "payment" hold): the plan row leads, for whoever may pay. */
+  waitsForPlan?: boolean;
 }
 
 /**
@@ -251,6 +259,7 @@ export interface FirstRunPowers {
 export function firstRunSteps(agent: Pick<Agent, "setup" | "builtin">, may: FirstRunPowers): FirstRunStep[] {
   if (agent.builtin !== "right_hand" || !agent.setup || !may.owner) return [];
   const row: Record<FirstRunStep, boolean> = {
+    plan: leadsWithPlan(agent, may),
     about: Boolean(may.personal) && may.configure,
     team: Boolean(may.personal) && may.createAgents,
     ai: may.connectAi || may.pay,
@@ -275,13 +284,14 @@ export interface FirstRunFacts {
 }
 
 /** Whether the data did a row (a skip doesn't): what a row's line and burst celebrate. */
-export const firstRunFact = (facts: FirstRunFacts, step: FirstRunStep) => facts[step === "about" ? "context" : step];
+export const firstRunFact = (facts: FirstRunFacts, step: FirstRunDoneStep) =>
+  facts[step === "about" ? "context" : step];
 
 /**
  * The line a row says once done. A personal workspace's own words; its first two rows are only ever its own, so they
  * have no other.
  */
-export const firstRunSayKey = (step: FirstRunStep, personal: boolean) => {
+export const firstRunSayKey = (step: FirstRunDoneStep, personal: boolean) => {
   if (step === "about" || step === "team") return `agentSetup.firstRun.say.${step}Personal` as const;
   return personal ? (`agentSetup.firstRun.say.${step}Personal` as const) : (`agentSetup.firstRun.say.${step}` as const);
 };
@@ -302,23 +312,32 @@ export function firstRunDone(setup: AgentSetupChecklist, facts: FirstRunFacts): 
  * invitations only wait for an answer, then `people` once someone joined. Joining is what it celebrates; an
  * invitation it only says is sent.
  */
-export type FirstRunBeat = FirstRunStep | "invited";
+export type FirstRunBeat = FirstRunDoneStep | "invited";
 
+/** The plan row is never done (it leaves when the hold lifts), so it is never a beat. */
 export const firstRunBeats = (done: readonly FirstRunStep[], f: { members: number; invited: number }): FirstRunBeat[] =>
-  done.map((s) => (s === "people" && f.members <= 1 && f.invited > 0 ? "invited" : s));
+  done
+    .filter((s): s is FirstRunDoneStep => s !== "plan")
+    .map((s) => (s === "people" && f.members <= 1 && f.invited > 0 ? "invited" : s));
 
 /** The row a beat's line shows under. */
 export const beatRow = (beat: FirstRunBeat): FirstRunStep => (beat === "invited" ? "people" : beat);
 
-/** How a row reads now: done, open, or waiting for the plan (a billing hold: the hold's banner holds the plan). */
+/**
+ * How a row reads now: done, open, or waiting for the plan (a billing hold: the plan row, where there is one, else the
+ * hold's banner, holds the way to it).
+ */
 export type FirstRunRowState = "done" | "open" | "afterPlan";
 
-/** How a row reads now. On a hold a personal workspace's first two rows stay open: its agents wait for the plan asleep. */
+/**
+ * How a row reads now. On a hold the plan row is open, and a personal workspace's first two rows stay open too: its
+ * agents wait for the plan asleep.
+ */
 export const firstRunRowState = (
   step: FirstRunStep,
   s: { done: ReadonlySet<FirstRunStep>; held: boolean },
 ): FirstRunRowState =>
-  s.done.has(step) ? "done" : s.held && step !== "about" && step !== "team" ? "afterPlan" : "open";
+  s.done.has(step) ? "done" : s.held && step !== "plan" && step !== "about" && step !== "team" ? "afterPlan" : "open";
 
 /** The foot's asks wait for a team that can think: a team and an AI, never on a hold. */
 export const firstRunAsks = (done: ReadonlySet<FirstRunStep>, held: boolean, team: boolean) =>
@@ -352,6 +371,7 @@ export const firstRunAiLabel = (thinks: { text: string; kind: string }, maker: s
  * about the person instead of the company, their agents instead of a team, their apps instead of work apps.
  */
 export const PERSONAL_ROW_WORDS: Partial<Record<FirstRunStep, readonly string[]>> = {
+  plan: ["todo", "todoDesc"],
   about: ["todo", "todoDesc", "done"],
   team: ["todo", "todoDesc", "action", "done"],
   apps: ["todo", "todoDesc"],
@@ -369,8 +389,13 @@ export function firstRunRow(
   const t = tr as unknown as (key: string, o?: Record<string, unknown>) => string;
   const k = (key: string) =>
     `agentSetup.firstRun.${step}.${key}${f.personal && PERSONAL_ROW_WORDS[step]?.includes(key) ? "Personal" : ""}`;
+  // The AI row is the one right after the plan's, so it says so; the rest only open with the plan.
   if (state === "afterPlan")
-    return { title: t(k("todo"), { org: f.org }), desc: t("agentSetup.firstRun.afterPlan"), action: "" };
+    return {
+      title: t(k("todo"), { org: f.org }),
+      desc: t(step === "ai" ? "agentSetup.firstRun.afterPlanNext" : "agentSetup.firstRun.afterPlan"),
+      action: "",
+    };
   if (state === "done") {
     switch (step) {
       case "about":

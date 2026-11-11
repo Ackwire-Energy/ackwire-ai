@@ -37,6 +37,7 @@ export const CATEGORIES: ConnectorCategory[] = [
   "support",
   "marketing",
   "automation",
+  "social",
 ];
 
 /** Connector search over label, id and description, plus the text shown (`shown`: the name and description in the app's language). */

@@ -339,7 +339,10 @@ export function startWorkers(deps: WorkerDeps) {
   });
 
   every("recovery", WORKER_INTERVALS_MS.recovery, async () => {
-    const r = await recoverStaleRuns({ db, pubsub: deps.pubsub });
+    const r = await recoverStaleRuns(
+      { db, pubsub: deps.pubsub },
+      { onError: (runId, error) => log.warn("a stale run couldn't be recovered", { runId, error: String(error) }) },
+    );
     if (r.resumed.length + r.failed.length + r.requeued.length > 0) log.info("stale runs recovered", r);
     // Long work whose run ended without closing it (a crash between the two) gets its end, once (ADR 0121 §7).
     const closed = await reconcileWorks({ db, pubsub: deps.pubsub });

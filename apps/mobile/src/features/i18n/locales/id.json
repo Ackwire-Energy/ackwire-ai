@@ -1292,6 +1292,8 @@
     "uses_other": "Dipakai {{count}} kali",
     "confirmed": "Dikonfirmasi oleh seseorang",
     "unconfirmed": "Belum dikonfirmasi",
+    "confirm": "Konfirmasi",
+    "confirmedToast": "Dikonfirmasi",
     "details": "Detail teknis",
     "before": "Sebelumnya tertulis: {{text}}",
     "fix": "Perbaiki",

@@ -1,11 +1,14 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, type Executor, eq, isNull, rowsOf, schema, sql } from "@agenteschat/db";
+import { and, type Database, desc, type Executor, eq, gte, isNull, rowsOf, schema, sql } from "@agenteschat/db";
 import { listApprovals } from "./approvals";
 import { canTalkTo, speakerFor } from "./audience";
+import { editContextItem, howToSql } from "./context/items";
+import { LEARN_DEFAULTS } from "./context/learn";
 import { NO_CHANNEL_REASON, OVER_BUDGET_REASON, proposeSettings } from "./context/proposals";
 import { openPersonAgentDm } from "./dms";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishMessageCreated } from "./events";
+import { cutText } from "./format";
 import { commentIssue } from "./issues";
 import { getMessage, insertMessage, messageView, postPersonMessage } from "./messages";
 import { enqueue } from "./outbox";
@@ -24,7 +27,7 @@ import { taskSeenSql } from "./task-access";
  * proposal (budget, a channel), the approvals list, a routine, a message to Lodi or to a task's conversation.
  */
 
-const { agents, contextProposals, organizationMembers, organizationSettings } = schema;
+const { agents, contextItems, contextProposals, organizationMembers, organizationSettings } = schema;
 
 export const TEAM_WEEK_JOB = "team_week.post";
 export const TEAM_WEEK_CARD = "team_week";
@@ -122,6 +125,11 @@ export type TeamWeekRow =
       count: number;
       hour: number;
     }
+  /**
+   * A how-to of the person's own agent reused past the bar that no person vouched for yet (ADR 0167): "Virar skill?"
+   * confirms it (`editContextItem` confirmed), and the day's pass makes it a skill.
+   */
+  | { id: string; kind: "howto"; agentId: string; itemId: string; title: string; uses: number }
   /** Steps of a task waiting on another step for hours: its agent is told to go on with them in parallel. */
   | {
       id: string;
@@ -371,6 +379,7 @@ export async function buildTeamWeek(
 
   const stalled = await stalledSteps(db, w);
   if (stalled) rows.push(stalled);
+  rows.push(...(await provenHowTos(db, w)));
 
   const stats = {
     done: Number(counts?.done ?? 0),
@@ -554,6 +563,49 @@ async function stalledSteps(db: Database, w: Window): Promise<TeamWeekRow | null
     hours: Math.floor((w.end.getTime() - new Date(s.moved).getTime()) / HOUR_MS),
     agentId: s.assignee_type === "agent" ? s.assignee_id : s.on_agent,
   };
+}
+
+/** How many proven how-tos one card offers to make skills, at most. */
+const HOWTOS_SHOWN = 3;
+
+/**
+ * The person's own agents' how-tos reused at least `LEARN_DEFAULTS.skillAfter` times that are still untrusted, so the
+ * day's pass can't make them skills (ADR 0167), the most reused first.
+ */
+async function provenHowTos(db: Database, w: Window): Promise<TeamWeekRow[]> {
+  const rows = await db
+    .select({
+      id: contextItems.id,
+      agentId: contextItems.agentId,
+      title: contextItems.title,
+      content: contextItems.content,
+      uses: contextItems.recurrence,
+    })
+    .from(contextItems)
+    .innerJoin(agents, eq(agents.id, contextItems.agentId))
+    .where(
+      and(
+        eq(contextItems.orgId, w.orgId),
+        eq(agents.ownerUserId, w.userId),
+        isNull(agents.archivedAt),
+        eq(contextItems.status, "active"),
+        isNull(contextItems.supersededBy),
+        howToSql(),
+        eq(contextItems.trust, "low"),
+        eq(contextItems.disputed, false),
+        gte(contextItems.recurrence, LEARN_DEFAULTS.skillAfter),
+      ),
+    )
+    .orderBy(desc(contextItems.recurrence))
+    .limit(HOWTOS_SHOWN);
+  return rows.map((r) => ({
+    id: `howto:${r.id}`,
+    kind: "howto" as const,
+    agentId: r.agentId ?? "",
+    itemId: r.id,
+    title: cutText(r.title || r.content, 120),
+    uses: r.uses,
+  }));
 }
 
 // --- When it goes out ------------------------------------------------------------------------------------------
@@ -744,6 +796,9 @@ export async function actOnTeamWeek(
     } else if (row.kind === "stalled") {
       if (!text) throw new ValidationError("Say what to tell its agent");
       await commentIssue({ db, pubsub: deps.pubsub }, { type: "person", userId: actorId }, orgId, row.issueId, text);
+    } else if (row.kind === "howto") {
+      // The person vouches for it (ADR 0167): trusted and verified, the day's pass makes it the agent's skill.
+      await editContextItem(db, actorId, orgId, row.itemId, { confirmed: true });
     } else throw new ValidationError("This row is applied on its own card", "team_week.own_path");
     next.done[row.id] = done;
   }

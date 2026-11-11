@@ -1,11 +1,20 @@
 import { afterEach, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, statSync, symlinkSync, writeFileSync, writeSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync, writeSync } from "node:fs";
 import { createConnection } from "node:net";
 import path from "node:path";
 import type { AgentScope, MachineRequest, RunnerAccess } from "@agenteschat/adapters/machine-protocol";
 import { systemLauncher } from "../../runner/agent-users";
-import { LOOK_MARKER, LOOK_SCRIPT, type LookOptions, lookCommand, lookFiles, lookId } from "../../runner/desktop-look";
+import {
+  KEEPER_STATE,
+  LOOK_MARKER,
+  LOOK_SCRIPT,
+  type LookOptions,
+  lookCommand,
+  lookFiles,
+  lookId,
+  TERMINAL_NOTE_ENV,
+} from "../../runner/desktop-look";
 import {
   abstractDisplays,
   DesktopSessions,
@@ -19,6 +28,7 @@ import {
   procStat,
   runnerUser,
   systemDesktopUser,
+  terminalNote,
   vncPasswordFile,
 } from "../../runner/desktop-session";
 import { RunnerError } from "../../runner/errors";
@@ -42,7 +52,7 @@ interface FakeProc {
 }
 
 const commandOf = (p: FakeProc) =>
-  (["agentes-look", "agentes-xvnc"] as const).find((name) => p.argv.includes(name)) ??
+  (["agentes-look", "agentes-xvnc", "agentes-app"] as const).find((name) => p.argv.includes(name)) ??
   p.argv.map((a) => path.basename(a)).find((a) => a === "sh" || a === "Xtigervnc" || a === "dbus-launch");
 
 /**
@@ -62,6 +72,8 @@ function fakeComputer(lockDir: string) {
   const files = new Set<string>();
   const hangs = new Set<string>();
   const stats: ProcessStat[] = [];
+  const cwds = new Map<number, string>();
+  const envs = new Map<number, Record<string, string>>();
   const system: DesktopSystem = {
     platform: "linux",
     pty: true,
@@ -109,6 +121,8 @@ function fakeComputer(lockDir: string) {
       if (p?.alive) return p.argv.slice(p.argv.findIndex((a) => commandOf({ ...p, argv: [a] }) !== undefined));
       return others.get(pid) ?? null;
     },
+    cwd: (pid) => cwds.get(pid) ?? null,
+    environ: (pid) => envs.get(pid) ?? null,
     kill(pid, signal) {
       kills.push([pid, signal]);
       procs.find((x) => x.pid === pid)?.exit(null);
@@ -134,8 +148,10 @@ function fakeComputer(lockDir: string) {
     files,
     /** Commands that never end by themselves ("sh": the prepare, "agentes-look"). */
     hangs,
-    /** What `/proc` lists. */
+    /** What `/proc` lists, and each process's folder and environment there. */
     stats,
+    cwds,
+    envs,
   };
 }
 
@@ -829,6 +845,222 @@ test("restore: a desktop left running is taken back only when its pid is still t
   expect(t.fake.of("Xtigervnc")).toHaveLength(2);
   expect((await next.ensure(qa)).display).toBe(22);
   next.close();
+});
+
+test("Terminals open when the computer restarted open again at the desktop's next start: new shells in their folders, saying why", async () => {
+  const t = setup();
+  const before = new DesktopSessions({ ...t.opts, system: gone(t.fake.system) });
+  const { display } = await before.ensure(dev);
+  // Two shells in the Terminal on its display (the dock starts it apart from the session), one on another desktop.
+  const site = path.join(t.folders, "dev", "site");
+  const notes = path.join(t.folders, "dev", "notes");
+  t.fake.stats.push(
+    { pid: 7000, ppid: 1, name: "xfce4-terminal", start: 50, cpu: 1 },
+    { pid: 7002, ppid: 7000, name: "bash", start: 52, cpu: 0 },
+    { pid: 7001, ppid: 7000, name: "bash", start: 51, cpu: 0 },
+    { pid: 7100, ppid: 1, name: "xfce4-terminal", start: 50, cpu: 1 },
+    { pid: 7101, ppid: 7100, name: "bash", start: 51, cpu: 0 },
+  );
+  t.fake.envs.set(7000, { DISPLAY: `:${display}` });
+  t.fake.envs.set(7100, { DISPLAY: `:${display + 1}` });
+  t.fake.cwds.set(7001, site);
+  t.fake.cwds.set(7002, notes);
+  t.fake.cwds.set(7101, path.join(t.folders, "ops"));
+  await before.sweep();
+  before.close();
+
+  // The computer restarts: nothing of the desktop runs anymore, and `notes` didn't come back.
+  for (const p of t.fake.procs) p.alive = false;
+  t.fake.stats.length = 0;
+  t.fake.files.add(site);
+  const next = new DesktopSessions(t.opts);
+  next.restore();
+  expect(next.status(dev).running).toBe(false);
+  await next.ensure(dev);
+  const terminals = () => t.fake.procs.filter((p) => p.argv.some((a) => path.basename(a) === "xfce4-terminal"));
+  // Not before its session settled.
+  await next.sweep();
+  expect(terminals()).toEqual([]);
+  const session = t.fake.of("dbus-launch").at(-1);
+  if (!session) throw new Error("no session");
+  t.fake.stats.push(
+    { pid: session.pid, ppid: 1, name: "dbus-launch", start: 99, cpu: 0 },
+    { pid: 9000, ppid: session.pid, name: "xfce4-session", start: 100, cpu: 1 },
+  );
+  t.fake.envs.set(9000, { DBUS_SESSION_BUS_ADDRESS: "unix:path=/tmp/dbus-0f1e,guid=0f1e", LD_PRELOAD: "/tmp/x.so" });
+  t.clock.now += 15_000;
+  await next.sweep();
+  expect(terminals().map((p) => p.argv)).toEqual([
+    ["/usr/bin/xfce4-terminal", "--disable-server", `--working-directory=${site}`],
+  ]);
+  // On the session's bus (the Terminal's settings: the look's prompt says the note), and nothing else of its
+  // environment: the agent's processes never hand the launcher anything.
+  const env = terminals()[0]?.opts.env;
+  expect(env).toMatchObject({
+    DISPLAY: `:${display}`,
+    DBUS_SESSION_BUS_ADDRESS: "unix:path=/tmp/dbus-0f1e,guid=0f1e",
+    [TERMINAL_NOTE_ENV]: terminalNote(false),
+  });
+  expect(env).not.toHaveProperty("LD_PRELOAD");
+  // Once: later sweeps keep what is open now and open nothing more; a desktop stopped on purpose forgets it.
+  t.clock.now += 60_000;
+  await next.sweep();
+  expect(terminals()).toHaveLength(1);
+  t.fake.stats.push({ pid: 9100, ppid: 1, name: "xfce4-terminal", start: 120, cpu: 1 });
+  t.fake.stats.push({ pid: 9101, ppid: 9100, name: "bash", start: 121, cpu: 0 });
+  t.fake.envs.set(9100, { DISPLAY: `:${display}` });
+  t.fake.cwds.set(9101, site);
+  await next.sweep();
+  const open = path.join(t.home, "desktop", "01a142cb.open");
+  expect(JSON.parse(readFileSync(open, "utf8"))).toEqual({ terminals: [site] });
+  await next.stop(dev);
+  expect(existsSync(open)).toBe(false);
+});
+
+/** The keeper's list of the desktop's app windows in the agent's HOME (`desktop-keeper.py` writes it). */
+function keeperList(home: string, list: unknown) {
+  const file = path.join(home, KEEPER_STATE);
+  mkdirSync(path.dirname(file), { recursive: true });
+  writeFileSync(file, JSON.stringify(list));
+  return file;
+}
+
+test("after a move the desktop opens again its browser and its other apps as the keeper listed them, each as the agent in its folder, and its Terminals say the computer moved", async () => {
+  const opened: string[] = [];
+  const openBrowser = async (agent: AgentScope) => {
+    opened.push(agent.id);
+  };
+  const t = setup();
+  const here = { ...t.fake.system, machineId: () => "machine-a" };
+  const before = new DesktopSessions({ ...t.opts, system: gone(here) });
+  const { display } = await before.ensure(dev);
+  const home = (await t.opts.user(dev)).home;
+  const notes = path.join(t.folders, "dev", "notes");
+  t.fake.stats.push(
+    { pid: 7000, ppid: 1, name: "xfce4-terminal", start: 50, cpu: 1 },
+    { pid: 7001, ppid: 7000, name: "bash", start: 51, cpu: 0 },
+  );
+  t.fake.envs.set(7000, { DISPLAY: `:${display}` });
+  t.fake.cwds.set(7001, notes);
+  keeperList(home, {
+    v: 1,
+    browser: true,
+    apps: [
+      { argv: ["mousepad", "todo.txt"], cwd: notes },
+      { argv: ["thunar"], cwd: home },
+      // What a list may not hold is left out: a relative folder, no command, a command line too long.
+      { argv: ["evil"], cwd: "relative" },
+      { argv: [], cwd: home },
+      { argv: ["big", "x".repeat(5000)], cwd: home },
+    ],
+  });
+  await before.sweep();
+  const open = path.join(t.home, "desktop", "01a142cb.open");
+  expect(JSON.parse(readFileSync(open, "utf8"))).toEqual({
+    terminals: [notes],
+    apps: [
+      { argv: ["mousepad", "todo.txt"], cwd: notes },
+      { argv: ["thunar"], cwd: home },
+    ],
+    browser: true,
+    machine: "machine-a",
+  });
+  before.close();
+
+  // The workspace moved to another computer: its files came along, nothing of the desktop runs.
+  for (const p of t.fake.procs) p.alive = false;
+  t.fake.stats.length = 0;
+  t.fake.files.add(notes);
+  const next = new DesktopSessions({
+    ...t.opts,
+    openBrowser,
+    system: { ...t.fake.system, machineId: () => "machine-b" },
+  });
+  next.restore();
+  await next.ensure(dev);
+  const session = t.fake.of("dbus-launch").at(-1);
+  if (!session) throw new Error("no session");
+  t.fake.stats.push(
+    { pid: session.pid, ppid: 1, name: "dbus-launch", start: 99, cpu: 0 },
+    { pid: 9000, ppid: session.pid, name: "xfce4-session", start: 100, cpu: 1 },
+  );
+  t.fake.envs.set(9000, { DBUS_SESSION_BUS_ADDRESS: "unix:path=/tmp/dbus-0f1e,guid=0f1e", API_TOKEN: "t0ps3cret" });
+  t.clock.now += 15_000;
+  await next.sweep();
+  expect(opened).toEqual([dev.id]);
+  const terminal = t.fake.procs.find((p) => p.argv.some((a) => path.basename(a) === "xfce4-terminal"));
+  expect(terminal?.opts.env).toMatchObject({ [TERMINAL_NOTE_ENV]: terminalNote(true) });
+  expect(terminalNote(true)).toBe("The computer moved to another server: this is a new shell in the same folder.");
+  const apps = t.fake.of("agentes-app");
+  expect(apps.map((p) => p.argv.slice(4))).toEqual([
+    [notes, "mousepad", "todo.txt"],
+    [home, "thunar"],
+  ]);
+  // Root never enters the folder: the agent's own shell does, and falls back to its home.
+  expect(apps[0]?.argv.slice(0, 4)).toEqual([
+    "/bin/sh",
+    "-c",
+    'cd "$1" 2>/dev/null || cd; shift; exec "$@"',
+    "agentes-app",
+  ]);
+  expect(apps[0]?.opts.cwd).toBe("/");
+  expect(apps[0]?.opts.env).toMatchObject({
+    DISPLAY: `:${display}`,
+    DBUS_SESSION_BUS_ADDRESS: "unix:path=/tmp/dbus-0f1e,guid=0f1e",
+  });
+  expect(apps[0]?.opts.env).not.toHaveProperty("API_TOKEN");
+  expect(apps[0]?.opts.env).not.toHaveProperty(TERMINAL_NOTE_ENV);
+  expect(t.logs).toContainEqual(
+    "the desktop of dev opened again after the computer moved: 1 terminals, 2 other apps, its browser",
+  );
+  // Once.
+  t.clock.now += 60_000;
+  await next.sweep();
+  expect(opened).toEqual([dev.id]);
+  expect(t.fake.of("agentes-app")).toHaveLength(2);
+  await next.stop(dev);
+});
+
+test("the keeper's list is read only as a plain file of the HOME's owner, never through a link", async () => {
+  const t = setup();
+  await t.desktops.ensure(dev);
+  const home = (await t.opts.user(dev)).home;
+  const elsewhere = path.join(t.folders, "elsewhere.json");
+  writeFileSync(elsewhere, JSON.stringify({ v: 1, browser: true, apps: [{ argv: ["leak"], cwd: home }] }));
+  const file = path.join(home, KEEPER_STATE);
+  mkdirSync(path.dirname(file), { recursive: true });
+  symlinkSync(elsewhere, file);
+  await t.desktops.sweep();
+  expect(existsSync(path.join(t.home, "desktop", "01a142cb.open"))).toBe(false);
+  rmSync(file);
+  keeperList(home, { v: 1, browser: true, apps: [] });
+  await t.desktops.sweep();
+  expect(JSON.parse(readFileSync(path.join(t.home, "desktop", "01a142cb.open"), "utf8"))).toEqual({
+    terminals: [],
+    browser: true,
+  });
+});
+
+test("a desktop that ends once the runner is stopping keeps what was open and isn't started again: a reboot stops both", async () => {
+  const t = setup();
+  const { display } = await t.desktops.ensure(dev);
+  const notes = path.join(t.folders, "dev", "notes");
+  t.fake.stats.push(
+    { pid: 7000, ppid: 1, name: "xfce4-terminal", start: 50, cpu: 1 },
+    { pid: 7001, ppid: 7000, name: "bash", start: 51, cpu: 0 },
+  );
+  t.fake.envs.set(7000, { DISPLAY: `:${display}` });
+  t.fake.cwds.set(7001, notes);
+  await t.desktops.sweep();
+  const open = path.join(t.home, "desktop", "01a142cb.open");
+  expect(existsSync(open)).toBe(true);
+  const xvncs = t.fake.of("Xtigervnc").length;
+  t.desktops.close();
+  // The computer shuts down: the desktop's processes end while the runner is still stopping.
+  for (const p of t.fake.procs) p.exit(null);
+  await Bun.sleep(10);
+  expect(existsSync(open)).toBe(true);
+  expect(t.fake.of("Xtigervnc")).toHaveLength(xvncs);
 });
 
 /**

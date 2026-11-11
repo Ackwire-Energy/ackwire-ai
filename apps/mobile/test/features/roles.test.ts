@@ -155,3 +155,12 @@ describe("Papéis e permissões on the phone (ADR 0085), as the web's", () => {
     expect(newRoleInput("Nada", "blank", []).permissions).toEqual([]);
   });
 });
+
+describe("Adicionar pessoas to a role on the phone", () => {
+  test("the ones being added keep their rows, and nobody reads as having it, until the screen is gone", () => {
+    const screen = readFileSync(join(import.meta.dir, "../../src/features/settings/RolesScreen.tsx"), "utf8");
+    expect(screen).toContain("const people = useHeldWhile(live, busy);");
+    // Busy, so held, while it goes back too.
+    expect(screen).toMatch(/stays = false;\s*goBack\(\);[\s\S]*?if \(stays\) setBusy\(false\);/);
+  });
+});

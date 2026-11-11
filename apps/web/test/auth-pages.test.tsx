@@ -187,7 +187,10 @@ describe("Entrar (e-mail primeiro)", () => {
     await press(/^Entrar/, 10);
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/home`);
     expect(router.state.location.search).toEqual({});
-    const dialog = screen().getByRole("dialog", { name: "Conectar uma IA" });
+    // Asked for no agent in particular: Connect for the team (ADR 0160, addendum), whose Claude says it's ready.
+    const dialog = screen().getByRole("dialog", { name: "Conectar uma IA para o time" });
+    await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: /^Claude/ })));
+    await settle(4);
     const panel = within(dialog).getByRole("region", { name: "Seu plano do Claude" });
     expect(panel.textContent).toContain("O computador está pronto.");
   });

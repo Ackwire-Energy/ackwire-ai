@@ -127,3 +127,11 @@ off" works as in a team workspace (web `routes/org.$orgId.index.tsx`).
 
 ADR 0164: the sidebar's "New agent" opens the same card as a team's, with the personal starters; the one-sentence ask
 sent to the right hand is gone.
+
+## Amendment (2026-11-10): the personal onboarding (§2)
+
+"For me" no longer opens the workspace at once. It still creates the workspace as personal, named in the person's
+language, and then goes through the onboarding's rail (ADR 0162, amended 2026-11-10) in its own words and with no
+business step: its agents (bringing them from another app, or "Seguir sem agentes"), the plan where the workspace waits
+for its first one, and connecting an AI, then the right hand's DM. On a billing hold the card's first row is "Ligue os
+seus agentes.", before the four rows above.

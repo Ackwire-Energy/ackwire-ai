@@ -1,5 +1,14 @@
-import { randomBytes } from "node:crypto";
-import { appendFileSync, chmodSync, lstatSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { createHash, randomBytes } from "node:crypto";
+import {
+  appendFileSync,
+  chmodSync,
+  existsSync,
+  lstatSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import { AGENT_WORKER_HOMES } from "@agenteschat/adapters/command-policy";
 import { type AgentScope, isAccountId } from "@agenteschat/adapters/machine-protocol";
@@ -77,7 +86,7 @@ const AGENT_RAM = [
  * own /tmp only `mkdir` runs, never `chmod`, since the agent may have put a link there. Every launch of the agent
  * binds the same folders, so its processes see one /tmp.
  */
-const PRIVATE_TMP = [
+const PRIVATE_TMP_STEPS = [
   "set -e",
   `m=${AGENT_RAM_ROOT}/$1`,
   `r=${AGENT_TMP_ROOT}`,
@@ -96,8 +105,74 @@ const PRIVATE_TMP = [
   'if [ "$(stat -c %a /run/lock 2>/dev/null)" = 1777 ]; then mount --bind "$m/lock" /run/lock; fi',
   "mkdir -m 1777 /tmp/.X11-unix 2>/dev/null || :",
   "mkdir -m 1777 /tmp/.ICE-unix 2>/dev/null || :",
-  'exec "$@"',
+];
+const PRIVATE_TMP = [...PRIVATE_TMP_STEPS, 'exec "$@"'].join("\n");
+
+/**
+ * Rootless containers for the agents (ADR 0169): Podman, and the set-user-ID helpers that map an agent's own ids
+ * into its user namespaces. Where they are, each agent has a containers service (`containersCommand`), and every
+ * launch of it a runtime dir and Podman's socket.
+ */
+const ID_MAP_HELPERS = ["/usr/bin/newuidmap", "/usr/bin/newgidmap"];
+const CONTAINER_TOOLS = ["/usr/bin/podman", ...ID_MAP_HELPERS];
+export const rootlessContainers = (exists: (file: string) => boolean = existsSync) =>
+  CONTAINER_TOOLS.every((file) => exists(file));
+/** The agent's `XDG_RUNTIME_DIR` as it sees it: `run/` in its tmpfs, cleared at every boot and never aged. */
+export const agentRuntimeDir = (uid: number) => `/run/user/${uid}`;
+export const containersUnit = (uid: number) => `agentes-containers-${uid}.service`;
+const podmanSocket = (uid: number) => `unix://${agentRuntimeDir(uid)}/podman/podman.sock`;
+
+/** Root, in the agent's namespace before it becomes the agent (`$m` its tmpfs): its runtime dir where XDG puts it. */
+const RUNTIME_DIR = [
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: the shell's own expansion, not JavaScript's.
+  "u=${m##*/}",
+  'install -d -m 0700 -o "$u" "$m/run"',
+  'mkdir -p "/run/user/$u"',
+  'mount --bind "$m/run" "/run/user/$u"',
+];
+
+/** Root, in the containers service: its unit's cgroup becomes the agent's to divide (Delegate=yes, as user@ does). */
+const DELEGATE = [
+  'c=/sys/fs/cgroup$(sed -n "s/^0:://p" /proc/self/cgroup)',
+  'case $c in */agents-"$u".slice/agentes-containers-"$u".service) ;; *) echo "not its containers service: $c" >&2; exit 1 ;; esac',
+  'chown "$u" "$c" "$c/cgroup.procs" "$c/cgroup.subtree_control" "$c/cgroup.threads"',
+];
+
+/**
+ * Root, in the containers service, last: every mount nosuid but the two id-map helpers. The service runs without
+ * no_new_privs, which would void their set-user-ID, so this is what keeps every other set-user-ID program from its
+ * processes. The options a mount has are given back with nosuid, since a remount with util-linux's older mount(2)
+ * path would reset them. A mount it can't remount (an autofs point) stays as it is.
+ */
+const NOSUID_VIEW = [
+  "command -v findmnt >/dev/null",
+  'findmnt -rno TARGET,VFS-OPTIONS | while read -r p o; do mount -o "remount,bind,nosuid,$o" "$p" 2>/dev/null || :; done',
+  `for f in ${ID_MAP_HELPERS.join(" ")}; do mount --bind "$f" "$f"; mount -o remount,bind,suid "$f"; done`,
+];
+
+/**
+ * As the agent, the containers service's start: its own defaults where it has none (`$1` and `$2`, Podman's
+ * containers.conf and storage.conf), Podman's socket and its restart of `restart: always` containers switched on,
+ * then its user manager. All of it is the agent's to change; none of it keeps it apart from the others.
+ */
+const CONTAINERS_START = [
+  'c="$HOME/.config"',
+  'mkdir -p "$c/containers" "$c/systemd/user/sockets.target.wants" "$c/systemd/user/default.target.wants" || :',
+  '[ -e "$c/containers/containers.conf" ] || printf %s "$1" > "$c/containers/containers.conf" || :',
+  '[ -e "$c/containers/storage.conf" ] || printf %s "$2" > "$c/containers/storage.conf" || :',
+  "for u in sockets.target.wants/podman.socket default.target.wants/podman-restart.service; do",
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: the shell's own expansion, not JavaScript's.
+  '  [ -e "$c/systemd/user/$u" ] || ln -s "/usr/lib/systemd/user/${u#*/}" "$c/systemd/user/$u" || :',
+  "done",
+  "exec /usr/lib/systemd/systemd --user",
 ].join("\n");
+
+/** Podman's banner before every `docker compose` (an external provider's) off. */
+const CONTAINERS_CONF =
+  "# agentes.chat wrote this once: change it as you like.\n[engine]\ncompose_warning_logs = false\n";
+/** Images, containers and volumes in the agent's home: its disk, which moves with the workspace. */
+const storageConf = (home: string) =>
+  `# agentes.chat wrote this once: change it as you like.\n[storage]\ndriver = "overlay"\ngraphroot = "${home}/.local/share/containers/storage"\n`;
 
 /**
  * adb's server port for an agent (`ANDROID_ADB_SERVER_PORT`, which adb, the Android Gradle plugin, Expo and React
@@ -223,6 +298,14 @@ export class AgentUsers {
     }
     if (!known) {
       denySchedulers(user.user, this.opts.etc);
+      // Without its ids the agent still works; only its containers don't start.
+      let ids: string | null;
+      try {
+        ids = ensureSubids(user, this.opts.etc, this.opts.run);
+      } catch (err) {
+        ids = err instanceof Error ? err.message : String(err);
+      }
+      if (ids) this.opts.log?.(`${user.user} has no ids for containers: ${ids}`);
       // A computer that can't share still serves the agent, in its own folders.
       const { shared } = this.opts;
       for (const p of shared ? joinShared(user.user, agentHome(user.user), shared, this.opts.run) : []) {
@@ -297,6 +380,73 @@ export function denySchedulers(user: string, etc = "/etc") {
 }
 
 /**
+ * An agent's subordinate uids and gids (`/etc/subuid`, `/etc/subgid`), which the users inside its rootless
+ * containers map to: the 65536 from `uid << 16`. Taken from the uid alone, they are the same on every computer where
+ * the agent keeps its uid (a move keeps it), so what its containers left in its home keeps owners it maps. No two
+ * agents share one, and none is a real uid: those are all below 65536, an agent's block 1000 << 16 or above. An
+ * operator's firewall that keys on agents' uids must also take every id from 65536 up for an agent's (ADR 0169).
+ */
+export const SUBIDS = 65536;
+export const agentSubids = (uid: number): [number, number] => [uid * SUBIDS, (uid + 1) * SUBIDS - 1];
+
+interface SubidRange {
+  owner: string;
+  first: number;
+  last: number;
+}
+
+const parseSubids = (text: string): SubidRange[] =>
+  text.split("\n").flatMap((line) => {
+    const [owner = "", start = "", count = ""] = line.trim().split(":");
+    return owner && /^\d+$/.test(start) && /^[1-9]\d*$/.test(count)
+      ? [{ owner, first: Number(start), last: Number(start) + Number(count) - 1 }]
+      : [];
+  });
+
+/**
+ * Gives the agent's user its own block (`agentSubids`) in both files and no other range: useradd hands each new user
+ * the next free one by the order users came in, which no other computer repeats. Anyone else's range over that block
+ * leaves the agent with none, never sharing ids (its containers then don't start). usermod takes the files' lock.
+ * Returns why the agent has no ids, or null.
+ */
+export function ensureSubids(user: Pick<AgentUser, "user" | "uid">, etc = "/etc", run: RunCommand = runSync) {
+  const [first, last] = agentSubids(user.uid);
+  const files = [
+    ["subuid", "--del-subuids", "--add-subuids"],
+    ["subgid", "--del-subgids", "--add-subgids"],
+  ] as const;
+  const ranges = files.map(([name]) => {
+    const file = path.join(etc, name);
+    try {
+      return parseSubids(readFileSync(file, "utf8"));
+    } catch {
+      // usermod refuses to add ranges to a file that isn't there. Podman reads it as the agent: readable by all.
+      writeFileSync(file, "", { flag: "a" });
+      chmodSync(file, 0o644);
+      return [];
+    }
+  });
+  const own = (r: SubidRange) => r.owner === user.user || r.owner === String(user.uid);
+  const clash = ranges.flat().find((r) => !own(r) && r.first <= last && r.last >= first);
+  const exact = (r: SubidRange) => r.first === first && r.last === last;
+  const args = files.flatMap(([, del, add], i) => {
+    const mine = (ranges[i] ?? []).filter(own);
+    return [
+      // usermod removes a user's ranges by its name only.
+      ...mine
+        .filter((r) => r.owner === user.user && (clash || !exact(r)))
+        .flatMap((r) => [del, `${r.first}-${r.last}`]),
+      ...(clash || mine.some(exact) ? [] : [add, `${first}-${last}`]),
+    ];
+  });
+  if (args.length > 0) {
+    const r = run("usermod", [...args, user.user]);
+    if (r.code !== 0) return `usermod failed (${r.code}): ${r.output.slice(0, 300)}`;
+  }
+  return clash ? `${clash.owner} holds ${clash.first}-${clash.last}, over its ${first}-${last}` : null;
+}
+
+/**
  * Runs a command as the agent's user inside its slice (whose limits then
  * hold), with its own temporary folders (`AGENT_RAM`, `PRIVATE_TMP`), or with
  * runuser alone where systemd isn't PID 1 (a container). Absolute paths: root
@@ -306,27 +456,23 @@ export function denySchedulers(user: string, etc = "/etc") {
  * fails where its caller can tell, and the agent's other work goes on. sh,
  * unshare and sh each become the next program (no fork), so runuser still
  * passes SIGTERM on; with slave propagation, what the computer unmounts leaves
- * the agent's namespace too.
+ * the agent's namespace too. With rootless containers (`containers`), every
+ * launch has the agent's runtime dir and talks to its containers service's
+ * Podman (`docker` and `podman` both, through the socket's Docker API too).
  */
 export function systemLauncher(
   u: AgentUser,
   systemd = systemdBooted(),
   oomPolicy = systemd && scopeOomPolicy(),
+  containers = systemd && rootlessContainers(),
 ): Launcher {
   const home = agentHome(u.user);
   const runuser = ["/usr/sbin/runuser", "-u", u.user, "--"];
   const command = [...networkPrefix(u), ...networkRestrictions(u), ...runuser];
+  const socket = podmanSocket(u.uid);
   const env = {
-    HOME: home,
-    USER: u.user,
-    LOGNAME: u.user,
-    SHELL: AGENT_SHELL,
-    // Last, so a tool an agent put in the shared `bin/` never stands in for the computer's own.
-    PATH: `${AGENT_PATH}:${home}/${SHARED_LINK}/bin`,
-    [SHARED_BIN_ENV]: `${home}/${SHARED_LINK}/bin`,
-    LANG: "C.UTF-8",
-    ANDROID_ADB_SERVER_PORT: String(adbServerPort(u.uid)),
-    GRADLE_OPTS,
+    ...agentEnv(u, containers),
+    ...(containers ? { CONTAINER_HOST: socket, DOCKER_HOST: socket } : {}),
   };
   if (!systemd) return { prefix: command, env, home };
   return {
@@ -350,10 +496,7 @@ export function systemLauncher(
       "--",
       "/bin/sh",
       "-c",
-      // A configured isolation policy gets a fresh private proc instance, never a host remount.
-      u.networkLauncher || u.networkMark || u.networkRevision
-        ? `set -e\n/usr/bin/mount -t proc -o nosuid,nodev,noexec,hidepid=2 proc /proc\n${PRIVATE_TMP}`
-        : PRIVATE_TMP,
+      agentView(u, containers ? RUNTIME_DIR : []),
       "sh",
       String(u.uid),
       ...command,
@@ -362,6 +505,136 @@ export function systemLauncher(
     home,
     tmp: agentTmp(u.uid),
   };
+}
+
+/** The agent's whole environment; a launch adds what one command needs (DISPLAY, TERM…). */
+function agentEnv(u: AgentUser, containers: boolean): Record<string, string> {
+  const home = agentHome(u.user);
+  return {
+    HOME: home,
+    USER: u.user,
+    LOGNAME: u.user,
+    SHELL: AGENT_SHELL,
+    // Last, so a tool an agent put in the shared `bin/` never stands in for the computer's own.
+    PATH: `${AGENT_PATH}:${home}/${SHARED_LINK}/bin`,
+    [SHARED_BIN_ENV]: `${home}/${SHARED_LINK}/bin`,
+    LANG: "C.UTF-8",
+    ANDROID_ADB_SERVER_PORT: String(adbServerPort(u.uid)),
+    GRADLE_OPTS,
+    ...(containers ? { XDG_RUNTIME_DIR: agentRuntimeDir(u.uid) } : {}),
+  };
+}
+
+/** Root's steps in the agent's new mount namespace (`PRIVATE_TMP`, with `more` before it becomes the agent). */
+function agentView(u: AgentUser, more: string[]) {
+  const view = more.length > 0 ? [...PRIVATE_TMP_STEPS, ...more, 'exec "$@"'].join("\n") : PRIVATE_TMP;
+  // A configured isolation policy gets a fresh private proc instance, never a host remount.
+  return u.networkLauncher || u.networkMark || u.networkRevision
+    ? `set -e\n/usr/bin/mount -t proc -o nosuid,nodev,noexec,hidepid=2 proc /proc\n${view}`
+    : view;
+}
+
+/**
+ * The agent's containers service, `agentes-containers-<uid>.service` (ADR 0169): a systemd user manager of the
+ * agent's own, which runs Podman's API (its socket, every launch's `CONTAINER_HOST` and `DOCKER_HOST`), the
+ * healthcheck timers, compose's DNS helper and the containers themselves. It goes through the steps every launch of
+ * the agent does (its tmpfs, its mount namespace and /tmp, its network hook, its user) in a unit of its slice whose
+ * cgroup is the agent's to divide, so each container's `--memory` and `--cpus` hold inside the agent's share, and
+ * stopping the slice stops them all. Without no_new_privs, which would void the id-map helpers' set-user-ID: its
+ * mount view keeps set-user-ID to them alone (`NOSUID_VIEW`), and the bounding set still drops NET_ADMIN and NET_RAW.
+ * `Restart=always` runs it again, network hook included, if it dies; OOMPolicy=continue: a container the kernel stops
+ * for memory takes only itself. A service's command line is its ExecStart=, where systemd expands `${…}` (and `$NAME`
+ * as a whole word) itself, unlike a scope's: every `$` goes as `$$`, which it reads as one, on any version
+ * (`--expand-environment=no` needs systemd 254).
+ */
+export function containersCommand(u: AgentUser): string[] {
+  const env = Object.entries(agentEnv(u, true)).map(([name, value]) => `${name}=${value}`);
+  const command = [
+    "/bin/sh",
+    "-c",
+    AGENT_RAM,
+    "sh",
+    String(u.uid),
+    "/usr/bin/unshare",
+    "--mount",
+    "--propagation",
+    "slave",
+    "--",
+    "/bin/sh",
+    "-c",
+    agentView(u, [...RUNTIME_DIR, ...DELEGATE, ...NOSUID_VIEW]),
+    "sh",
+    String(u.uid),
+    ...networkPrefix(u),
+    SETPRIV,
+    "--bounding-set=-net_admin,-net_raw",
+    "--",
+    "/usr/sbin/runuser",
+    "-u",
+    u.user,
+    "--",
+    "/usr/bin/env",
+    "-i",
+    ...env,
+    "/bin/sh",
+    "-c",
+    CONTAINERS_START,
+    "sh",
+    CONTAINERS_CONF,
+    storageConf(agentHome(u.user)),
+  ];
+  return [
+    "/usr/bin/systemd-run",
+    "--quiet",
+    "--collect",
+    `--unit=${containersUnit(u.uid)}`,
+    `--slice=${agentSlice(u.uid)}`,
+    "--property=Delegate=yes",
+    "--property=Restart=always",
+    "--property=RestartSec=5",
+    "--property=OOMPolicy=continue",
+    "--property=TimeoutStopSec=15",
+    "--",
+    ...command.map((arg) => arg.replaceAll("$", () => "$$")),
+  ];
+}
+
+/**
+ * The agent's containers service running as `containersCommand` says now: started when it isn't, and started again
+ * when what it would run changed (its network hook above all: a namespace's containers live where the agent's other
+ * processes do), which stops its containers. Its description carries that command's hash. Returns why it doesn't
+ * run, or null.
+ */
+export function ensureContainers(u: AgentUser, run: RunCommand = runSync): string | null {
+  const [file = "", ...args] = containersCommand(u);
+  const description = `agentes.chat containers ${createHash("sha256")
+    .update([file, ...args].join("\0"))
+    .digest("hex")
+    .slice(0, 16)}`;
+  const unit = containersUnit(u.uid);
+  const shown = run("systemctl", ["show", "--property=ActiveState,Description", unit]).output;
+  const property = (name: string) => new RegExp(`^${name}=(.*)$`, "m").exec(shown)?.[1];
+  if (["active", "activating", "reloading"].includes(property("ActiveState") ?? "")) {
+    if (property("Description") === description) return null;
+    run("systemctl", ["stop", unit]);
+  }
+  const r = run(file, [`--description=${description}`, ...args]);
+  return r.code === 0 ? null : `${file} failed (${r.code}): ${r.output.slice(0, 300)}`;
+}
+
+/** The agent's containers stop (a network change's deadline, the agent left this computer). */
+export const stopContainers = (uid: number, run: RunCommand = runSync) =>
+  run("systemctl", ["stop", "--no-block", containersUnit(uid)]);
+
+/**
+ * Its containers service as the agents frame says (`MachineAgent.containers`): kept as `ensureContainers` keeps it, or
+ * stopped for an agent whose brain's shell runs in a sandbox of its CLI's own, which the service, outside it, would be
+ * a way out of (ADR 0169).
+ */
+export function keepContainers(u: AgentUser, allowed: boolean, run: RunCommand = runSync): string | null {
+  if (allowed) return ensureContainers(u, run);
+  stopContainers(u.uid, run);
+  return null;
 }
 
 /** Root executes this hook before dropping privileges. Every path component must remain root-controlled. */

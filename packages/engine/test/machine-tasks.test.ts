@@ -580,17 +580,14 @@ describe("background tasks (ADR 0029)", () => {
     expect((await taskRow(a.id))?.resumedTaskId).toBe(back.started[1]?.taskId ?? "");
   });
 
-  test("an interrupted shell task can't resume: the agent is woken to tell the people", async () => {
-    f = await setup({
-      machines: true,
-      reply: () => ({ chunks: ["The build was interrupted; want me to restart it?"] }),
-    });
+  test("an interrupted shell command starts again where it ran once its computer is back: the thread hears it, nobody is woken", async () => {
+    f = await setup({ machines: true, reply: () => ({ chunks: ["ok"] }) });
     const paired = await pairedMachine();
     const hub = f.machineHub as MachineHub;
     const runner = taskRunner(hub);
     await runner.hello(paired.token);
     const root = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
-      body: "build it please",
+      body: "serve the site please",
     });
     const task = await startMachineTask(
       { db: f.db, pubsub: f.pubsub, call: hub.call },
@@ -604,28 +601,109 @@ describe("background tasks (ADR 0029)", () => {
         threadRootId: root.id,
         runId: null,
         requestedByUserId: f.owner.id,
-        title: "Build",
+        title: "Dev server",
         executor: "shell",
-        command: "make",
+        command: "npm run dev -- --port 4321",
+        branch: "feat/site",
       },
     );
+    expect(await taskRow(task.id)).toMatchObject({ cwd: `.worktrees/${task.id}`, branch: "feat/site" });
+    // The computer restarted (or moved): its journal no longer has the task.
     await runner.disconnect();
-    const again = taskRunner(hub);
-    await again.hello(paired.token, { tasks: [] });
-    expect(again.started).toEqual([]);
+    const back = taskRunner(hub);
+    await back.hello(paired.token, { tasks: [] });
     expect(await taskRow(task.id)).toMatchObject({ status: "interrupted" });
+    // The same command in the worktree it ran in, with no new branch.
+    expect(back.started).toHaveLength(1);
+    expect(back.started[0]).toMatchObject({
+      executor: "shell",
+      command: "npm run dev -- --port 4321",
+      cwd: `.worktrees/${task.id}`,
+    });
+    expect(back.started[0]).not.toHaveProperty("branch");
+    expect(back.started[0]).not.toHaveProperty("approved");
+    const again = await taskRow(back.started[0]?.taskId ?? "");
+    expect(again).toMatchObject({ status: "running", resumedFromId: task.id, resumeCount: 1, title: "Dev server" });
+    expect((await taskRow(task.id))?.resumedTaskId).toBe(again?.id ?? "");
     await drainOutbox(f.db, f.handlers);
     const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: root.id });
-    expect(thread.find((m) => m.meta.machineTask)?.body).toContain("was interrupted on MacBook");
-    expect(thread.at(-1)?.body).toBe("The build was interrupted; want me to restart it?");
-    const woken = await f.db
-      .select()
-      .from(schema.agentRuns)
-      .where(and(eq(schema.agentRuns.agentId, f.agent.id), eq(schema.agentRuns.status, "done")));
-    expect(woken).toHaveLength(1);
+    const notice = thread.find((m) => m.meta.bodyCode === "machine_task_restarted");
+    expect(notice?.body).toBe('The computer MacBook is back: "Dev server" started again.');
+    expect(notice?.meta.bodyParams).toEqual({ title: "Dev server", computer: "MacBook" });
+    // Starting again is not an end: nobody is woken.
+    expect(await f.db.select().from(schema.outbox).where(eq(schema.outbox.kind, "machine.task_done"))).toEqual([]);
   });
 
-  test("a shell task's offline notice says it won't resume after a restart; the grace's end tells open apps", async () => {
+  test("a shell command that can't start again by itself wakes the agent to tell the people: held, resuming off, or stopped by a person", async () => {
+    f = await setup({
+      machines: true,
+      reply: () => ({ chunks: ["The deploy was interrupted; want me to run it again?"] }),
+    });
+    const paired = await pairedMachine();
+    const hub = f.machineHub as MachineHub;
+    const runner = taskRunner(hub, {
+      holds: (command) => (command.startsWith("./deploy") ? "A deploy waits for a person" : null),
+    });
+    await runner.hello(paired.token);
+    const root = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "deploy it please",
+    });
+    const start = (title: string, command: string, approved = false) =>
+      startMachineTask(
+        { db: f.db, pubsub: f.pubsub, call: hub.call },
+        {
+          orgId: f.org.id,
+          agent: { id: f.agent.id, handle: "dev" },
+          machineId: paired.machineId,
+          protocol: 4,
+          machineName: "MacBook",
+          channelId: f.general.id,
+          threadRootId: root.id,
+          runId: null,
+          requestedByUserId: f.owner.id,
+          title,
+          executor: "shell",
+          command,
+          ...(approved ? { approved: true } : {}),
+        },
+      );
+    // A person approved this deploy once: that approval isn't its second start's.
+    const deploy = await start("Deploy", "./deploy.sh", true);
+    await runner.disconnect();
+    const back = taskRunner(hub, {
+      holds: (command) => (command.startsWith("./deploy") ? "A deploy waits for a person" : null),
+    });
+    await back.hello(paired.token, { tasks: [] });
+    expect(back.started).toEqual([]);
+    expect(await taskRow(deploy.id)).toMatchObject({ status: "interrupted", resumedTaskId: null });
+    await drainOutbox(f.db, f.handlers);
+    let thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: root.id });
+    expect(thread.find((m) => m.meta.machineTask)?.body).toContain("was interrupted on MacBook");
+    expect(thread.at(-1)?.body).toBe("The deploy was interrupted; want me to run it again?");
+
+    // Resuming turned off on that computer.
+    await f.db.update(schema.machines).set({ resumeTasks: false }).where(eq(schema.machines.id, paired.machineId));
+    const build = await start("Build", "make");
+    await back.disconnect();
+    const third = taskRunner(hub);
+    await third.hello(paired.token, { tasks: [] });
+    expect(third.started).toEqual([]);
+    expect(await taskRow(build.id)).toMatchObject({ status: "interrupted", resumedTaskId: null });
+
+    // Stopped by a person before the computer went: never started again.
+    await f.db.update(schema.machines).set({ resumeTasks: true }).where(eq(schema.machines.id, paired.machineId));
+    const watch = await start("Watch", "npm run watch");
+    await f.db.update(schema.machineTasks).set({ canceledBy: f.owner.id }).where(eq(schema.machineTasks.id, watch.id));
+    await third.disconnect();
+    const fourth = taskRunner(hub);
+    await fourth.hello(paired.token, { tasks: [] });
+    expect(fourth.started).toEqual([]);
+    await drainOutbox(f.db, f.handlers);
+    thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: root.id });
+    expect(thread.filter((m) => m.meta.bodyCode === "machine_task_restarted")).toEqual([]);
+  });
+
+  test("a shell task's offline notice says it comes back after a restart; the grace's end tells open apps", async () => {
     f = await setup({ machines: true, reply: () => ({ chunks: ["ok"] }) });
     const paired = await pairedMachine();
     const hub = createMachineHub({ db: f.db, pubsub: f.pubsub, replicaId: "replica-g", taskOfflineGraceMs: 0 });
@@ -659,9 +737,9 @@ describe("background tasks (ADR 0029)", () => {
     const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: root.id });
     const notice = thread.find((m) => m.meta.bodyCode === "machine_offline");
     expect(notice?.body).toContain(
-      '"Build" keeps running there if only the connection dropped. If the computer restarted, it stopped and won\'t resume by itself.',
+      '"Build" keeps running there if only the connection dropped, and resumes where it stopped if the computer restarted.',
     );
-    expect(notice?.meta.bodyParams).not.toHaveProperty("context");
+    expect(notice?.meta.bodyParams).toMatchObject({ context: "resumes" });
     // Still away past the grace: open apps look again (it is an outage now).
     expect(statuses).toContainEqual({ type: "machine.status", machineId: paired.machineId, online: false });
   });

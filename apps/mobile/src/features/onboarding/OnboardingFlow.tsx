@@ -113,6 +113,7 @@ export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; ano
     team: team.length,
     picked,
     personal,
+    funnel: null,
   });
   // Before the workspace exists, what it is for comes first.
   const asking = orgId === null && !forTeam;
