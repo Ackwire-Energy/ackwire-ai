@@ -19,6 +19,7 @@ import {
   lookId,
   lookSettings,
   lookTheme,
+  TERMINAL_NOTE_ENV,
 } from "../../runner/desktop-look";
 import { removeDirs, tempDir } from "./helpers";
 
@@ -435,6 +436,7 @@ test("the terminal: the agent's name in the prompt and the title, from the look'
       "AGENTES_NAME='Ada'",
       "shopt -s promptvars",
       String.raw`PS1='\[\e]0;$AGENTES_NAME: \w\a\]\[\e[1;32m\]$AGENTES_NAME\[\e[0m\]:\[\e[1;34m\]\w\[\e[0m\]\$ '`,
+      `[ -n "\${AGENTES_TERMINAL_NOTE-}" ] && printf '%s\\n\\n' "$AGENTES_TERMINAL_NOTE"; unset AGENTES_TERMINAL_NOTE`,
       "",
     ].join("\n"),
   );
@@ -469,6 +471,30 @@ test.if(posix && existsSync("/bin/bash"))(
     expect(ps1).not.toContain("pwned");
     expect(existsSync(path.join(home, "pwned"))).toBe(false);
     expect(existsSync(path.join(home, "pwned2"))).toBe(false);
+  },
+);
+
+test.if(posix && existsSync("/bin/bash"))(
+  "a Terminal opened again says its note above its first prompt, and its shell keeps nothing of it",
+  () => {
+    const home = tempDir("look-");
+    dirs.push(home);
+    const file = path.join(home, "bashrc");
+    writeFileSync(file, fileOf(home, look(), `${LOOK_DIR}/bashrc`));
+    writeFileSync(path.join(home, ".hushlogin"), "");
+    const shell = (env: Record<string, string>) =>
+      spawnSync("/bin/bash", ["--rcfile", file, "-i", "-c", `printf "@@%s" "\${${TERMINAL_NOTE_ENV}-gone}"`], {
+        cwd: home,
+        env: { HOME: home, PATH: "/usr/bin:/bin", TERM: "dumb", ...env },
+        encoding: "utf8",
+        timeout: 5000,
+      }).stdout;
+    const reopened = shell({ [TERMINAL_NOTE_ENV]: "The computer restarted: this is a new shell in the same folder." });
+    expect(reopened).toContain("The computer restarted: this is a new shell in the same folder.\n\n");
+    expect(reopened.endsWith("@@gone")).toBe(true);
+    // Any other Terminal says nothing.
+    expect(shell({}).endsWith("@@gone")).toBe(true);
+    expect(shell({})).not.toContain("restarted");
   },
 );
 
@@ -517,8 +543,8 @@ test("files that change come with a new LOOK_VERSION: desktops that have the loo
   }
   // Changed the look on purpose? Bump LOOK_VERSION and put the new hash here.
   expect({ version: LOOK_VERSION, files: hash.digest("hex").slice(0, 16) }).toEqual({
-    version: 5,
-    files: "8b294ae1558cf237",
+    version: 6,
+    files: "26e13a21680e689d",
   });
 });
 

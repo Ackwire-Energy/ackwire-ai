@@ -30,7 +30,7 @@ import { xmlEscape, xmlUnescape } from "./xml";
  */
 
 /** Bumped whenever what `lookFiles` writes changes. */
-export const LOOK_VERSION = 5;
+export const LOOK_VERSION = 6;
 
 /** Orchis's light theme (GTK and xfwm4), else GTK's Adwaita and xfwm4's Default. */
 export type LookTheme = "orchis" | "stock";
@@ -394,11 +394,14 @@ ${
 }</channel>
 `;
 
+/** A Terminal the runner opens again (`desktop-session.ts`) carries its one-line note in this variable. */
+export const TERMINAL_NOTE_ENV = "AGENTES_TERMINAL_NOTE";
+
 /**
  * `~/.bashrc` first (`--rcfile` reads this file in its place; Debian's and Ubuntu's bash still read
  * `/etc/bash.bashrc` before it), then the agent's name, green, in the prompt and in the window's title. The prompt
  * names it through a variable it expands, never in its own text, so no character of the name runs anything or
- * takes a prompt escape.
+ * takes a prompt escape. A Terminal opened again says its note (`TERMINAL_NOTE_ENV`) above its first prompt, once.
  */
 const bashrc = (name: string) =>
   [
@@ -407,6 +410,7 @@ const bashrc = (name: string) =>
     `AGENTES_NAME=${shQuote(name)}`,
     "shopt -s promptvars",
     String.raw`PS1='\[\e]0;$AGENTES_NAME: \w\a\]\[\e[1;32m\]$AGENTES_NAME\[\e[0m\]:\[\e[1;34m\]\w\[\e[0m\]\$ '`,
+    `[ -n "\${${TERMINAL_NOTE_ENV}-}" ] && printf '%s\\n\\n' "$${TERMINAL_NOTE_ENV}"; unset ${TERMINAL_NOTE_ENV}`,
     "",
   ].join("\n");
 

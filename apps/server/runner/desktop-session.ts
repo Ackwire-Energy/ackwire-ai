@@ -10,6 +10,7 @@ import {
   openSync,
   readdirSync,
   readFileSync,
+  readlinkSync,
   renameSync,
   rmSync,
   writeFileSync,
@@ -26,7 +27,7 @@ import {
 } from "@agenteschat/adapters/machine-protocol";
 import type { Launcher } from "./agent-users";
 import { BROWSER_SOCKET, closeBrowser, serveBrowser } from "./desktop-browser";
-import { desktopName, type LookOptions, lookCommand, lookDock, lookTheme } from "./desktop-look";
+import { desktopName, type LookOptions, lookCommand, lookDock, lookTheme, TERMINAL_NOTE_ENV } from "./desktop-look";
 import { RunnerError } from "./errors";
 import { resolveCommand } from "./executors";
 import { readJson, readSmallJson, writeJson } from "./json-file";
@@ -71,6 +72,11 @@ import { KeyedQueue } from "./queue";
  *   `KillMode=process`): the next runner takes them back from
  *   `<runner home>/desktop/<id8>.json` once the pid there is still that
  *   display's Xtigervnc.
+ * - What is open on one is kept beside it (`<id8>.open`, `recordOpen`, at each
+ *   sweep), so a desktop that the computer's restart or move ended opens it
+ *   again at its next start (`reopen`): its Terminals, as new shells in the
+ *   folders theirs were in, each with a line saying why. A desktop that ends
+ *   while the runner runs (stopped, parked, crashed) forgets it.
  */
 
 /** Memory left free before a desktop or a headed Chrome starts: desktops are parked to keep it. */
@@ -97,6 +103,10 @@ const REFRESH_IDLE_MS = 60_000;
  */
 const SESSION_PROGRAMS = ["xfwm4", "xfsettingsd", "xfce4-panel", "wrapper-2.0", "Thunar", "xfdesktop"];
 const SESSION_SETTLED_MS = 15_000;
+/** Terminals a desktop opens again after a restart, at most: each is a process of its own there. */
+const REOPEN_MAX = 8;
+/** What a Terminal opened again says above its first prompt (`TERMINAL_NOTE_ENV`). */
+export const TERMINAL_NOTE = "The computer restarted: this is a new shell in the same folder.";
 /**
  * The look written into a running session (`refresh`) also sets some 70 settings, an `xfconf-query` each through
  * the session's bus, and restarts its dock: seconds on a busy computer, so it gets this many steps' time.
@@ -349,6 +359,9 @@ export interface DesktopSystem {
   spawn(argv: string[], opts: DesktopSpawnOptions): DesktopProcess;
   /** A process's command line; null when it isn't running. */
   cmdline(pid: number): string[] | null;
+  /** A process's folder and its environment; null when it isn't running (none where there is no `/proc`). */
+  cwd?(pid: number): string | null;
+  environ?(pid: number): Record<string, string> | null;
   kill(pid: number, signal: NodeJS.Signals): void;
   /** Every process on the computer (none where there is no `/proc`). */
   processes(): ProcessStat[];
@@ -430,6 +443,23 @@ export const hostSystem = (): DesktopSystem => ({
       const argv = readFileSync(`/proc/${pid}/cmdline`, "utf8").split("\0");
       if (argv.at(-1) === "") argv.pop();
       return argv.length > 0 ? argv : null;
+    } catch {
+      return null;
+    }
+  },
+  cwd(pid) {
+    try {
+      return readlinkSync(`/proc/${pid}/cwd`);
+    } catch {
+      return null;
+    }
+  },
+  environ(pid) {
+    try {
+      const vars = readFileSync(`/proc/${pid}/environ`, "utf8").split("\0");
+      return Object.fromEntries(
+        vars.flatMap((v) => (v.includes("=") ? [[v.slice(0, v.indexOf("=")), v.slice(v.indexOf("=") + 1)]] : [])),
+      );
     } catch {
       return null;
     }
@@ -532,6 +562,38 @@ interface Desktop extends Saved {
   refresh: { current: boolean; queued: boolean; params: boolean; look: boolean };
   /** Started by this runner, its session's start not in the log yet (`sessionStart`). */
   untold?: boolean;
+  /** What was open on it before the computer restarted, opened again once its session settled (`reopen`). */
+  reopen?: OpenOnDesktop;
+  /** What `recordOpen` last kept of it, as written. */
+  recorded?: string;
+}
+
+/**
+ * What is open on a desktop, in `<id8>.open`: its Terminals as the folders their shells were in, oldest first.
+ * ponytail: Terminals only; the desktop's other windows, its browser's tabs and background work go here too.
+ */
+export interface OpenOnDesktop {
+  terminals: string[];
+}
+
+/** The environment of a desktop's session, and of what the runner opens in it as the session would (`reopen`). */
+const sessionEnv = (env: Record<string, string>, display: number, xauthority: string) => ({
+  ...env,
+  DISPLAY: `:${display}`,
+  XAUTHORITY: xauthority,
+  LANG: "C.UTF-8",
+  LC_ALL: "C.UTF-8",
+  XDG_CURRENT_DESKTOP: "XFCE",
+  XDG_SESSION_TYPE: "x11",
+  // The agents' desktop computer use reads apps through the accessibility tree.
+  ACCESSIBILITY_ENABLED: "1",
+  QT_LINUX_ACCESSIBILITY_ALWAYS_ON: "1",
+});
+
+function parseOpen(v: unknown): OpenOnDesktop | null {
+  if (!isRecord(v) || !Array.isArray(v.terminals)) return null;
+  const terminals = v.terminals.filter((f): f is string => typeof f === "string" && path.isAbsolute(f));
+  return terminals.length > 0 ? { terminals: terminals.slice(0, REOPEN_MAX) } : null;
 }
 
 /** Browser's socket: in the password file's folder, root's for the agent in system mode. */
@@ -800,13 +862,29 @@ export class DesktopSessions {
    * runner started says how its session's start went (`sessionStart`), once that is over.
    */
   sweep(): Promise<void> {
+    let procs: ProcessStat[] | undefined;
+    const processes = () => {
+      procs ??= this.sys.processes();
+      return procs;
+    };
     for (const d of [...this.desktops.values()]) {
       if (!this.alive(d)) {
         this.ended(d);
         continue;
       }
       if (this.opts.inUse?.(d.agent.id)) d.lastUsed = this.now();
-      if (d.untold && this.now() - d.startedAt >= SESSION_SETTLED_MS) this.sessionStart(d);
+      const settled = this.now() - d.startedAt >= SESSION_SETTLED_MS;
+      if (d.untold && settled) this.sessionStart(d, processes());
+      const open = d.reopen;
+      if (open && settled) {
+        d.reopen = undefined;
+        this.refreshes = this.refreshes.then(() =>
+          this.serial(d.agent.id, () => this.reopen(d, open)).catch(() => {
+            // Its agent's user isn't known while the runner isn't connected: the next sweep tries again.
+            d.reopen ??= open;
+          }),
+        );
+      } else if (!open) this.recordOpen(d, processes());
       if (d.refresh.current && !d.refresh.queued && !(d.refresh.params && d.refresh.look)) {
         d.refresh.queued = true;
         // One that throws (its agent's user isn't known while the runner isn't connected) is tried again at the next
@@ -822,11 +900,9 @@ export class DesktopSessions {
    * processes used so far (a program building a cache shows seconds; one waiting on another, none): the processes
    * under the one this runner started, as `/proc` has them. Once per desktop it started.
    */
-  private sessionStart(d: Desktop) {
+  private sessionStart(d: Desktop, procs: readonly ProcessStat[]) {
     d.untold = false;
-    const procs = this.sys.processes();
-    const tree = procs.filter((p) => p.pid === d.sessionPid);
-    for (let i = 0; i < tree.length; i++) tree.push(...procs.filter((p) => p.ppid === tree[i]?.pid));
+    const tree = this.sessionTree(d, procs);
     const base = tree.find((p) => p.name === "xfce4-session")?.start;
     if (base === undefined) return;
     const parts = SESSION_PROGRAMS.map((name) => {
@@ -838,6 +914,80 @@ export class DesktopSessions {
         : `${name} not yet`;
     });
     this.opts.log(`the desktop of ${d.agent.handle}: its session started ${parts.join(", ")}`);
+  }
+
+  /** The processes under the session this runner started, as `/proc` has them. */
+  private sessionTree(d: Desktop, procs: readonly ProcessStat[]) {
+    const tree = procs.filter((p) => p.pid === d.sessionPid);
+    for (let i = 0; i < tree.length; i++) tree.push(...procs.filter((p) => p.ppid === tree[i]?.pid));
+    return tree;
+  }
+
+  private openFile(agent: AgentScope) {
+    return path.join(this.dir, `${id8(agent)}.open`);
+  }
+
+  /** What is open on the desktop now, in its `<id8>.open` when that changed: what a start after a restart reopens. */
+  private recordOpen(d: Desktop, procs: readonly ProcessStat[]) {
+    const open: OpenOnDesktop = { terminals: this.terminalFolders(d, procs) };
+    const text = JSON.stringify(open);
+    if (text === d.recorded) return;
+    try {
+      if (open.terminals.length > 0) writeJson(this.openFile(d.agent), open);
+      else rmSync(this.openFile(d.agent), { force: true });
+      d.recorded = text;
+    } catch {
+      // the next sweep writes it
+    }
+  }
+
+  /**
+   * The folders of the desktop's Terminals, oldest first: the shells of the `xfce4-terminal`s on its display (the
+   * dock starts them apart from its session, so they aren't in its tree).
+   */
+  private terminalFolders(d: Desktop, procs: readonly ProcessStat[]) {
+    const terminals = new Set(
+      procs
+        .filter((p) => p.name === "xfce4-terminal" && this.sys.environ?.(p.pid)?.DISPLAY === `:${d.display}`)
+        .map((p) => p.pid),
+    );
+    return procs
+      .filter((p) => terminals.has(p.ppid))
+      .sort((a, b) => a.start - b.start)
+      .flatMap((p) => {
+        const folder = this.sys.cwd?.(p.pid);
+        return folder && path.isAbsolute(folder) && !folder.endsWith(" (deleted)") ? [folder] : [];
+      })
+      .slice(0, REOPEN_MAX);
+  }
+
+  /**
+   * What was open on the desktop before the computer restarted opens again: each Terminal a new shell in its folder
+   * (one that is gone is left out), on the session's bus, where its settings and the look's prompt are, with
+   * `TERMINAL_NOTE` above its first prompt. Only the bus comes from the session's environment: what the agent's
+   * processes hold is never handed to the launcher, which starts as root in system mode.
+   */
+  private async reopen(d: Desktop, open: OpenOnDesktop) {
+    if (this.desktops.get(d.agent.id) !== d || !this.alive(d)) return;
+    const user = await this.opts.user(d.agent);
+    const terminal = this.sys.which("xfce4-terminal", user.env.PATH);
+    const folders = open.terminals.filter((f) => this.sys.exists(f));
+    if (!terminal || this.asRoot(user) || folders.length === 0) return;
+    const session = this.sessionTree(d, this.sys.processes()).find((p) => p.name === "xfce4-session");
+    const bus = session ? this.sys.environ?.(session.pid)?.DBUS_SESSION_BUS_ADDRESS : undefined;
+    const env = {
+      ...sessionEnv({ ...user.env, HOME: d.home }, d.display, d.xauthority),
+      ...(bus && /^unix:[\w=/.,%-]+$/.test(bus) ? { DBUS_SESSION_BUS_ADDRESS: bus } : {}),
+      [TERMINAL_NOTE_ENV]: TERMINAL_NOTE,
+    };
+    for (const folder of folders) {
+      this.sys.spawn([...user.prefix, terminal, "--disable-server", `--working-directory=${folder}`], {
+        cwd: "/",
+        env,
+        detached: true,
+      });
+    }
+    this.opts.log(`the desktop of ${d.agent.handle} opened its ${folders.length} terminals again after a restart`);
   }
 
   /** The runner stops: desktops go on running (the next runner takes them back). */
@@ -964,18 +1114,7 @@ export class DesktopSessions {
         const sessionAt = this.now();
         const session = this.sys.spawn([...user.prefix, dbus, "--exit-with-session", "xfce4-session"], {
           cwd: user.home,
-          env: {
-            ...env,
-            DISPLAY: `:${display}`,
-            XAUTHORITY: files.xauthority,
-            LANG: "C.UTF-8",
-            LC_ALL: "C.UTF-8",
-            XDG_CURRENT_DESKTOP: "XFCE",
-            XDG_SESSION_TYPE: "x11",
-            // The agents' desktop computer use reads apps through the accessibility tree.
-            ACCESSIBILITY_ENABLED: "1",
-            QT_LINUX_ACCESSIBILITY_ALWAYS_ON: "1",
-          },
+          env: sessionEnv(env, display, files.xauthority),
           detached: true,
           log,
         });
@@ -1000,6 +1139,9 @@ export class DesktopSessions {
           untold: true,
         };
         writeJson(d.file, saved);
+        // Left by a desktop the computer's restart or move ended: any that ended while a runner ran forgot it.
+        const open = parseOpen(readJson(this.openFile(agent)));
+        if (open) d.reopen = open;
         this.add(d);
         void x.exited.then(() => this.ended(d));
         void session.exited.then(() => this.ended(d));
@@ -1237,7 +1379,7 @@ export class DesktopSessions {
     });
   }
 
-  /** Stops the desktop's processes (pids checked first: one could be reused) and forgets it. */
+  /** Stops the desktop's processes (pids checked first: one could be reused) and forgets it, and what was open on it. */
   private async end(d: Desktop) {
     d.ending = true;
     if (this.desktops.get(d.agent.id) === d) this.desktops.delete(d.agent.id);
@@ -1250,6 +1392,7 @@ export class DesktopSessions {
     }
     if (d.browser) closeBrowser(d.browser, browserSocket(d.passwd));
     rmSync(d.file, { force: true });
+    rmSync(this.openFile(d.agent), { force: true });
     rmSync(d.passwd, { force: true });
     if (this.desktops.size === 0) this.close();
   }
